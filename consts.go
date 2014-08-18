@@ -1,0 +1,46 @@
+package weave
+
+import (
+	"time"
+)
+
+const (
+	Protocol          = "weave"
+	ProtocolVersion   = 8
+	UDPOverhead       = 28 // 20 bytes for IPv4, 8 bytes for UDP
+	EthernetOverhead  = 14
+	Port              = 6783
+	DefaultPMTU       = 65535
+	MaxUDPPacketSize  = 65536
+	ChannelSize       = 16
+	UDPNonceSendAt    = 8192
+	FragTestSize      = 60001
+	PMTUDiscoverySize = 60000
+	FastHeartbeat     = 500 * time.Millisecond
+	SlowHeartbeat     = 10 * time.Second
+	FetchAllInterval  = 30 * time.Second
+	FragTestInterval  = 5 * time.Minute
+	PMTUVerifyTimeout = 5 * time.Second
+)
+
+const (
+	ProtocolConnectionEstablished  = iota
+	ProtocolFragmentationReceived  = iota
+	ProtocolStartFragmentationTest = iota
+	ProtocolNonce                  = iota
+	ProtocolFetchAll               = iota
+	ProtocolUpdate                 = iota
+	ProtocolPMTUVerified           = iota
+)
+
+var (
+	FragTest                           = make([]byte, FragTestSize)
+	PMTUDiscovery                      = make([]byte, PMTUDiscoverySize)
+	ProtocolConnectionEstablishedByte  = []byte{ProtocolConnectionEstablished}
+	ProtocolFragmentationReceivedByte  = []byte{ProtocolFragmentationReceived}
+	ProtocolStartFragmentationTestByte = []byte{ProtocolStartFragmentationTest}
+	ProtocolNonceByte                  = []byte{ProtocolNonce}
+	ProtocolFetchAllByte               = []byte{ProtocolFetchAll}
+	ProtocolUpdateByte                 = []byte{ProtocolUpdate}
+	ProtocolPMTUVerifiedByte           = []byte{ProtocolPMTUVerified}
+)
