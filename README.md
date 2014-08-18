@@ -15,10 +15,6 @@ Each hosts needs to have the following installed
 
 [pipework]: https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework
 
-(NB. The above assumes that the zettio/weave docker image is
-available. Which it will be once the project is public. Meanwhile,
-you'll have to [build the image yourself](#Building)).
-
 ## Example
 
 Say you have docker running on two hosts, accessible to each other as
@@ -203,6 +199,8 @@ connectivity failure if the weave container is restarted quickly
 enough.
 
 ## Building
+
+(NB. This is only necessary if you want to work on weave.)
 
 To build weave you need `libpcap-dev` and `docker` installed.
 
