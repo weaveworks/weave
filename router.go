@@ -62,7 +62,6 @@ func (router *Router) Sniff() {
 	handle := router.createPCap(true, 65535, router.BufSz)
 	defer handle.Close()
 
-	ourself := router.Ourself
 	dec := NewEthernetDecoder()
 
 	localAddrs, err := router.Iface.Addrs()
@@ -70,18 +69,18 @@ func (router *Router) Sniff() {
 	checkFrameTooBig := dec.CheckFrameTooBigFunc(router.Iface.HardwareAddr, localAddrs, handle)
 
 	mac := router.Iface.HardwareAddr
-	if router.Macs.Enter(mac, ourself) {
+	if router.Macs.Enter(mac, router.Ourself) {
 		log.Println("Discovered our MAC", mac)
 	}
 	for {
 		pkt, _, err := handle.ReadPacketData()
 		checkFatal(err)
 		router.LogFrame("Sniffed", pkt, nil)
-		checkWarn(router.handleCapturedPacket(pkt, dec, ourself, checkFrameTooBig))
+		checkWarn(router.handleCapturedPacket(pkt, dec, checkFrameTooBig))
 	}
 }
 
-func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecoder, ourself *Peer, checkFrameTooBig func(error) error) error {
+func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecoder, checkFrameTooBig func(error) error) error {
 	dec.DecodeLayers(frameData)
 	decodedLen := len(dec.decoded)
 	if decodedLen == 0 {
@@ -92,10 +91,10 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	// We need to filter out frames we injected ourselves. For such
 	// frames, the srcMAC will have been recorded as associated with a
 	// different peer.
-	if found && srcPeer != ourself {
+	if found && srcPeer != router.Ourself {
 		return nil
 	}
-	if router.Macs.Enter(srcMac, ourself) {
+	if router.Macs.Enter(srcMac, router.Ourself) {
 		log.Println("Discovered local MAC", srcMac)
 	}
 	if dec.DropFrame() {
@@ -103,7 +102,7 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	}
 	dstMac := dec.eth.DstMAC
 	dstPeer, found := router.Macs.Lookup(dstMac)
-	if found && dstPeer == ourself {
+	if found && dstPeer == router.Ourself {
 		return nil
 	}
 	df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
@@ -113,9 +112,9 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 		router.LogFrame("Forwarding", frameData, &dec.eth)
 	}
 	if !found || dec.BroadcastFrame() {
-		return checkFrameTooBig(ourself.Broadcast(df, frameData, dec))
+		return checkFrameTooBig(router.Ourself.Broadcast(df, frameData, dec))
 	} else {
-		return checkFrameTooBig(ourself.Forward(dstPeer, df, frameData, dec))
+		return checkFrameTooBig(router.Ourself.Forward(dstPeer, df, frameData, dec))
 	}
 }
 
