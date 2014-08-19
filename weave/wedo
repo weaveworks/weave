@@ -2,7 +2,7 @@
 set -e
 
 BRIDGE=weave
-CONTAINER_IFNAME=ethcr
+CONTAINER_IFNAME=ethwe
 MTU=65535
 
 COMMAND=$1
