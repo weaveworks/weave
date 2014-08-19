@@ -12,7 +12,7 @@ shift 2
 # pre-create bridge so we can set the MTU
 [ ! -d /sys/class/net/$BRIDGE ] && {
     ip link add dev $BRIDGE type bridge > /dev/null 2>&1
-    ip link set dev $BRIDGE address $(od -txC -An -N6 /dev/random | tr \  : | tail -c+2)
+    ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/random | tr \  : | tail -c+2)
     # attempting to set the bridge MTU to a high value directly
     # fails. Bridges take the lowest MTU of their interfaces. So
     # instead we create a temporary interface with the desired MTU,
