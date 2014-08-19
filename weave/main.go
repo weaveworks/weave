@@ -115,7 +115,6 @@ func main() {
 
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
 	router.Start()
-	startSignalHandlers(router)
 	for _, peer := range peers {
 		targetPeer := peer
 		go func() {
@@ -124,23 +123,21 @@ func main() {
 			}
 		}()
 	}
-	router.Sniff()
+	handleSignals(router)
 }
 
-func startSignalHandlers(router *weave.Router) {
+func handleSignals(router *weave.Router) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGQUIT, syscall.SIGUSR1)
 	buf := make([]byte, 1<<20)
-	go func() {
-		for {
-			sig := <-sigs
-			switch sig {
-			case syscall.SIGQUIT:
-				runtime.Stack(buf, true)
-				log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
-			case syscall.SIGUSR1:
-				log.Printf("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", router.Status())
-			}
+	for {
+		sig := <-sigs
+		switch sig {
+		case syscall.SIGQUIT:
+			runtime.Stack(buf, true)
+			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+		case syscall.SIGUSR1:
+			log.Printf("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", router.Status())
 		}
-	}()
+	}
 }

@@ -39,10 +39,12 @@ func (router *Router) UsingPassword() bool {
 }
 
 func (router *Router) Start() {
+	handle := router.createPCap(true, 65535, router.BufSz)
 	router.ConnectionMaker = StartConnectionMaker(router)
 	router.Topology = StartTopology(router)
-	router.UDPListener = router.listenUDP(Port)
+	router.UDPListener = router.listenUDP(Port, handle)
 	router.listenTCP(Port)
+	router.sniff(handle)
 }
 
 func (router *Router) Status() string {
@@ -56,11 +58,8 @@ func (router *Router) Status() string {
 	return buf.String()
 }
 
-func (router *Router) Sniff() {
+func (router *Router) sniff(handle *pcap.Handle) {
 	log.Println("Sniffing traffic on", router.Iface)
-
-	handle := router.createPCap(true, 65535, router.BufSz)
-	defer handle.Close()
 
 	dec := NewEthernetDecoder()
 
@@ -72,12 +71,15 @@ func (router *Router) Sniff() {
 	if router.Macs.Enter(mac, router.Ourself) {
 		log.Println("Discovered our MAC", mac)
 	}
-	for {
-		pkt, _, err := handle.ReadPacketData()
-		checkFatal(err)
-		router.LogFrame("Sniffed", pkt, nil)
-		checkWarn(router.handleCapturedPacket(pkt, dec, checkFrameTooBig))
-	}
+	go func() {
+		defer handle.Close()
+		for {
+			pkt, _, err := handle.ReadPacketData()
+			checkFatal(err)
+			router.LogFrame("Sniffed", pkt, nil)
+			checkWarn(router.handleCapturedPacket(pkt, dec, checkFrameTooBig))
+		}
+	}()
 }
 
 func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecoder, checkFrameTooBig func(error) error) error {
@@ -144,7 +146,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	NewLocalConnection(connRemote, UnknownPeerName, tcpConn, nil, router)
 }
 
-func (router *Router) listenUDP(localPort int) *net.UDPConn {
+	func (router *Router) listenUDP(localPort int, handle *pcap.Handle) *net.UDPConn {
 	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", localPort))
 	checkFatal(err)
 	conn, err := net.ListenUDP("udp4", localAddr)
@@ -156,13 +158,12 @@ func (router *Router) listenUDP(localPort int) *net.UDPConn {
 	// This one makes sure all packets we send out do not have DF set on them.
 	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DONT)
 	checkFatal(err)
-	go router.udpReader(conn)
+	go router.udpReader(conn, handle)
 	return conn
 }
 
-func (router *Router) udpReader(conn *net.UDPConn) {
+func (router *Router) udpReader(conn *net.UDPConn, handle *pcap.Handle) {
 	defer conn.Close()
-	handle := router.createPCap(false, 0, 0)
 	dec := NewEthernetDecoder()
 	handleUDPPacket := router.handleUDPPacketFunc(dec, handle)
 	buf := make([]byte, MaxUDPPacketSize)
