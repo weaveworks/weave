@@ -142,7 +142,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	NewLocalConnection(connRemote, UnknownPeerName, tcpConn, nil, router)
 }
 
-	func (router *Router) listenUDP(localPort int, handle *pcap.Handle) *net.UDPConn {
+func (router *Router) listenUDP(localPort int, handle *pcap.Handle) *net.UDPConn {
 	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", localPort))
 	checkFatal(err)
 	conn, err := net.ListenUDP("udp4", localAddr)
