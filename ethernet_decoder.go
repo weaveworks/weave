@@ -19,39 +19,15 @@ func (dec *EthernetDecoder) DecodeLayers(data []byte) error {
 	return dec.parser.DecodeLayers(data, &dec.decoded)
 }
 
-func (dec *EthernetDecoder) CheckFrameTooBigFunc(srcMac net.HardwareAddr, localAddrs []net.Addr, handle *pcap.Handle) func(error) error {
-	networks := make([]LocalAddress, len(localAddrs))
-	idx := 0
-	for _, addr := range localAddrs {
-		ip, ipnet, err := net.ParseCIDR(addr.String())
-		if err == nil && ip.To4() != nil {
-			networks[idx] = LocalAddress{ip: ip.To4(), network: ipnet}
-			idx++
-		}
-	}
-	networks = networks[:idx]
-	if len(networks) == 0 {
-		log.Fatal("Interface has no addresses assigned. Cannot continue")
-	}
-	findIP := func(ip net.IP) net.IP {
-		for _, la := range networks {
-			if la.network.Contains(ip) {
-				return la.ip
-			}
-		}
-		// can't find anything, we'll have to rely on default gateway.
-		return networks[0].ip
-	}
-
+func (dec *EthernetDecoder) CheckFrameTooBigFunc(handle *pcap.Handle) func(error) error {
 	return func(err error) error {
 		if ftbe, ok := err.(FrameTooBigError); ok {
 			// we know: 1. ip is valid, 2. it was ip and DF was set
-			srcIP := findIP(dec.ip.SrcIP)
-			icmpFrame, err := dec.formICMPMTUPacket(srcMac, srcIP, ftbe.PMTU)
+			icmpFrame, err := dec.formICMPMTUPacket(ftbe.PMTU)
 			if err != nil {
 				return err
 			}
-			log.Println("Injecting ICMP 3,4. PMTU:", ftbe.PMTU)
+			log.Printf("Injecting ICMP 3,4 (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.PMTU)
 			return handle.WritePacketData(icmpFrame)
 		} else {
 			return err
@@ -59,7 +35,7 @@ func (dec *EthernetDecoder) CheckFrameTooBigFunc(srcMac net.HardwareAddr, localA
 	}
 }
 
-func (dec *EthernetDecoder) formICMPMTUPacket(srcMac net.HardwareAddr, srcIP net.IP, mtu int) ([]byte, error) {
+func (dec *EthernetDecoder) formICMPMTUPacket(mtu int) ([]byte, error) {
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths:       true,
@@ -68,7 +44,7 @@ func (dec *EthernetDecoder) formICMPMTUPacket(srcMac net.HardwareAddr, srcIP net
 	payload := gopacket.Payload(dec.ip.BaseLayer.Contents[:ipHeaderSize+8])
 	err := gopacket.SerializeLayers(buf, opts,
 		&layers.Ethernet{
-			SrcMAC:       srcMac,
+			SrcMAC:       dec.eth.DstMAC,
 			DstMAC:       dec.eth.SrcMAC,
 			EthernetType: dec.eth.EthernetType},
 		&layers.IPv4{
@@ -80,7 +56,7 @@ func (dec *EthernetDecoder) formICMPMTUPacket(srcMac net.HardwareAddr, srcIP net
 			TTL:        64,
 			Protocol:   layers.IPProtocolICMPv4,
 			DstIP:      dec.ip.SrcIP,
-			SrcIP:      srcIP},
+			SrcIP:      dec.ip.DstIP},
 		&layers.ICMPv4{
 			TypeCode: 0x304,
 			Id:       0,

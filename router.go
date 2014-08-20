@@ -62,11 +62,7 @@ func (router *Router) sniff(handle *pcap.Handle) {
 	log.Println("Sniffing traffic on", router.Iface)
 
 	dec := NewEthernetDecoder()
-
-	localAddrs, err := router.Iface.Addrs()
-	checkFatal(err)
-	checkFrameTooBig := dec.CheckFrameTooBigFunc(router.Iface.HardwareAddr, localAddrs, handle)
-
+	checkFrameTooBig := dec.CheckFrameTooBigFunc(handle)
 	mac := router.Iface.HardwareAddr
 	if router.Macs.Enter(mac, router.Ourself) {
 		log.Println("Discovered our MAC", mac)
@@ -198,9 +194,7 @@ func (router *Router) udpReader(conn *net.UDPConn, handle *pcap.Handle) {
 }
 
 func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, handle *pcap.Handle) FrameConsumer {
-	localAddrs, err := router.Iface.Addrs()
-	checkFatal(err)
-	checkFrameTooBig := dec.CheckFrameTooBigFunc(router.Iface.HardwareAddr, localAddrs, handle)
+	checkFrameTooBig := dec.CheckFrameTooBigFunc(handle)
 
 	return func(relayConn *LocalConnection, sender *net.UDPAddr, srcNameByte, dstNameByte []byte, frameLen uint16, frame []byte) error {
 		srcName := PeerNameFromBin(srcNameByte)
