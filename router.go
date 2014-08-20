@@ -38,11 +38,16 @@ func (router *Router) UsingPassword() bool {
 }
 
 func (router *Router) Start() {
+	// we need two pcap handles since they aren't thread-safe
+	pio, err := NewPcapIO(router.Iface.Name, router.BufSz)
+	checkFatal(err)
+	po, err := NewPcapO(router.Iface.Name)
+	checkFatal(err)
 	router.ConnectionMaker = StartConnectionMaker(router)
 	router.Topology = StartTopology(router)
-	router.UDPListener = router.listenUDP(Port)
+	router.UDPListener = router.listenUDP(Port, po)
 	router.listenTCP(Port)
-	router.sniff()
+	router.sniff(pio)
 }
 
 func (router *Router) Status() string {
@@ -56,9 +61,7 @@ func (router *Router) Status() string {
 	return buf.String()
 }
 
-func (router *Router) sniff() {
-	pio, err := NewPcapIO(router.Iface.Name, router.BufSz)
-	checkFatal(err)
+func (router *Router) sniff(pio PacketSourceSink) {
 	log.Println("Sniffing traffic on", router.Iface)
 
 	dec := NewEthernetDecoder()
@@ -141,7 +144,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	NewLocalConnection(connRemote, UnknownPeerName, tcpConn, nil, router)
 }
 
-func (router *Router) listenUDP(localPort int) *net.UDPConn {
+func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {
 	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", localPort))
 	checkFatal(err)
 	conn, err := net.ListenUDP("udp4", localAddr)
@@ -152,8 +155,6 @@ func (router *Router) listenUDP(localPort int) *net.UDPConn {
 	fd := int(f.Fd())
 	// This one makes sure all packets we send out do not have DF set on them.
 	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DONT)
-	checkFatal(err)
-	po, err := NewPcapO(router.Iface.Name)
 	checkFatal(err)
 	go router.udpReader(conn, po)
 	return conn
