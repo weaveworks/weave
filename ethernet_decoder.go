@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
-	"code.google.com/p/gopacket/pcap"
 	"log"
 	"net"
 )
@@ -19,7 +18,7 @@ func (dec *EthernetDecoder) DecodeLayers(data []byte) error {
 	return dec.parser.DecodeLayers(data, &dec.decoded)
 }
 
-func (dec *EthernetDecoder) CheckFrameTooBigFunc(handle *pcap.Handle) func(error) error {
+func (dec *EthernetDecoder) CheckFrameTooBigFunc(po PacketSink) func(error) error {
 	return func(err error) error {
 		if ftbe, ok := err.(FrameTooBigError); ok {
 			// we know: 1. ip is valid, 2. it was ip and DF was set
@@ -28,7 +27,7 @@ func (dec *EthernetDecoder) CheckFrameTooBigFunc(handle *pcap.Handle) func(error
 				return err
 			}
 			log.Printf("Injecting ICMP 3,4 (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.PMTU)
-			return handle.WritePacketData(icmpFrame)
+			return po.WritePacket(icmpFrame)
 		} else {
 			return err
 		}

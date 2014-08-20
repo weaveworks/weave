@@ -3,7 +3,6 @@ package weave
 import (
 	"bytes"
 	"code.google.com/p/gopacket/layers"
-	"code.google.com/p/gopacket/pcap"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -39,12 +38,13 @@ func (router *Router) UsingPassword() bool {
 }
 
 func (router *Router) Start() {
-	handle := router.createPCap(true, 65535, router.BufSz)
+	pio, err := NewPcapIO(router.Iface.Name, router.BufSz)
+	checkFatal(err)
 	router.ConnectionMaker = StartConnectionMaker(router)
 	router.Topology = StartTopology(router)
-	router.UDPListener = router.listenUDP(Port, handle)
+	router.UDPListener = router.listenUDP(Port, pio)
 	router.listenTCP(Port)
-	router.sniff(handle)
+	router.sniff(pio)
 }
 
 func (router *Router) Status() string {
@@ -58,19 +58,18 @@ func (router *Router) Status() string {
 	return buf.String()
 }
 
-func (router *Router) sniff(handle *pcap.Handle) {
+func (router *Router) sniff(pio PacketSourceSink) {
 	log.Println("Sniffing traffic on", router.Iface)
 
 	dec := NewEthernetDecoder()
-	checkFrameTooBig := dec.CheckFrameTooBigFunc(handle)
+	checkFrameTooBig := dec.CheckFrameTooBigFunc(pio)
 	mac := router.Iface.HardwareAddr
 	if router.Macs.Enter(mac, router.Ourself) {
 		log.Println("Discovered our MAC", mac)
 	}
 	go func() {
-		defer handle.Close()
 		for {
-			pkt, _, err := handle.ReadPacketData()
+			pkt, err := pio.ReadPacket()
 			checkFatal(err)
 			router.LogFrame("Sniffed", pkt, nil)
 			checkWarn(router.handleCapturedPacket(pkt, dec, checkFrameTooBig))
@@ -142,7 +141,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	NewLocalConnection(connRemote, UnknownPeerName, tcpConn, nil, router)
 }
 
-func (router *Router) listenUDP(localPort int, handle *pcap.Handle) *net.UDPConn {
+func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {
 	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", localPort))
 	checkFatal(err)
 	conn, err := net.ListenUDP("udp4", localAddr)
@@ -154,14 +153,14 @@ func (router *Router) listenUDP(localPort int, handle *pcap.Handle) *net.UDPConn
 	// This one makes sure all packets we send out do not have DF set on them.
 	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DONT)
 	checkFatal(err)
-	go router.udpReader(conn, handle)
+	go router.udpReader(conn, po)
 	return conn
 }
 
-func (router *Router) udpReader(conn *net.UDPConn, handle *pcap.Handle) {
+func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 	defer conn.Close()
 	dec := NewEthernetDecoder()
-	handleUDPPacket := router.handleUDPPacketFunc(dec, handle)
+	handleUDPPacket := router.handleUDPPacketFunc(dec, po)
 	buf := make([]byte, MaxUDPPacketSize)
 	for {
 		n, sender, err := conn.ReadFromUDP(buf)
@@ -193,8 +192,8 @@ func (router *Router) udpReader(conn *net.UDPConn, handle *pcap.Handle) {
 	}
 }
 
-func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, handle *pcap.Handle) FrameConsumer {
-	checkFrameTooBig := dec.CheckFrameTooBigFunc(handle)
+func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) FrameConsumer {
+	checkFrameTooBig := dec.CheckFrameTooBigFunc(po)
 
 	return func(relayConn *LocalConnection, sender *net.UDPAddr, srcNameByte, dstNameByte []byte, frameLen uint16, frame []byte) error {
 		srcName := PeerNameFromBin(srcNameByte)
@@ -251,7 +250,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, handle *pcap.Han
 			log.Println("Discovered remote MAC", srcMac, "at", srcPeer.Name)
 		}
 		router.LogFrame("Injecting", frame, &dec.eth)
-		checkWarn(handle.WritePacketData(frame))
+		checkWarn(po.WritePacket(frame))
 		dstPeer, found = router.Macs.Lookup(dec.eth.DstMAC)
 		if !found || dec.BroadcastFrame() || dstPeer != router.Ourself {
 			df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
@@ -259,19 +258,4 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, handle *pcap.Han
 		}
 		return nil
 	}
-}
-
-func (router *Router) createPCap(promisc bool, snaplen int, buffSize int) *pcap.Handle {
-	inactive, err := pcap.NewInactiveHandle(router.Iface.Name)
-	checkFatal(err)
-	defer inactive.CleanUp()
-	checkFatal(inactive.SetPromisc(promisc))
-	checkFatal(inactive.SetSnapLen(snaplen))
-	checkFatal(inactive.SetTimeout(-1))
-	checkFatal(inactive.SetImmediateMode(true))
-	checkFatal(inactive.SetBufferSize(buffSize))
-	active, err := inactive.Activate()
-	checkFatal(err)
-	checkFatal(active.SetDirection(pcap.DirectionIn))
-	return active
 }

@@ -272,3 +272,16 @@ type NaClDecryptorInstance struct {
 	highestOffsetSeen   uint16
 	nonceChan           chan *[24]byte
 }
+
+type PacketSource interface {
+	ReadPacket() ([]byte, error)
+}
+
+type PacketSink interface {
+	WritePacket([]byte) error
+}
+
+type PacketSourceSink interface {
+	PacketSource
+	PacketSink
+}
