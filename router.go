@@ -111,10 +111,16 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	} else {
 		router.LogFrame("Forwarding", frameData, &dec.eth)
 	}
+	// at this point we are handing over the frame to forwarders, so
+	// we need to make a copy of it in order to prevent the next
+	// capture from overwriting the data
+	frameLen := len(frameData)
+	frameCopy := make([]byte, frameLen, frameLen)
+	copy(frameCopy, frameData)
 	if !found || dec.BroadcastFrame() {
-		return checkFrameTooBig(router.Ourself.Broadcast(df, frameData, dec))
+		return checkFrameTooBig(router.Ourself.Broadcast(df, frameCopy, dec))
 	} else {
-		return checkFrameTooBig(router.Ourself.Forward(dstPeer, df, frameData, dec))
+		return checkFrameTooBig(router.Ourself.Forward(dstPeer, df, frameCopy, dec))
 	}
 }
 

@@ -50,7 +50,7 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 }
 
 func (pi *PcapIO) ReadPacket() (data []byte, err error) {
-	data, _, err = pi.handle.ReadPacketData()
+	data, _, err = pi.handle.ZeroCopyReadPacketData()
 	return
 }
 
