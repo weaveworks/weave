@@ -8,16 +8,26 @@ type PcapIO struct {
 	handle *pcap.Handle
 }
 
-func NewPcapIO(ifName string, bufSz int) (handle *PcapIO, err error) {
+func NewPcapIO(ifName string, bufSz int) (pio PacketSourceSink, err error) {
+	pio, err = newPcapIO(ifName, true, 65535, bufSz)
+	return
+}
+
+func NewPcapO(ifName string) (po PacketSink, err error) {
+	po, err = newPcapIO(ifName, false, 0, 0)
+	return
+}
+
+func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *PcapIO, err error) {
 	inactive, err := pcap.NewInactiveHandle(ifName)
 	if err != nil {
 		return
 	}
 	defer inactive.CleanUp()
-	if inactive.SetPromisc(true) != nil {
+	if inactive.SetPromisc(promisc) != nil {
 		return
 	}
-	if inactive.SetSnapLen(65535) != nil {
+	if inactive.SetSnapLen(snaplen) != nil {
 		return
 	}
 	if inactive.SetTimeout(-1) != nil {
