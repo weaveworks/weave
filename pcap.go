@@ -24,26 +24,26 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 		return
 	}
 	defer inactive.CleanUp()
-	if inactive.SetPromisc(promisc) != nil {
+	if err = inactive.SetPromisc(promisc); err != nil {
 		return
 	}
-	if inactive.SetSnapLen(snaplen) != nil {
+	if err = inactive.SetSnapLen(snaplen); err != nil {
 		return
 	}
-	if inactive.SetTimeout(-1) != nil {
+	if err = inactive.SetTimeout(-1); err != nil {
 		return
 	}
-	if inactive.SetImmediateMode(true) != nil {
+	if err = inactive.SetImmediateMode(true); err != nil {
 		return
 	}
-	if inactive.SetBufferSize(bufSz) != nil {
+	if err = inactive.SetBufferSize(bufSz); err != nil {
 		return
 	}
 	active, err := inactive.Activate()
 	if err != nil {
 		return
 	}
-	if active.SetDirection(pcap.DirectionIn) != nil {
+	if err = active.SetDirection(pcap.DirectionIn); err != nil {
 		return
 	}
 	return &PcapIO{handle: active}, nil
