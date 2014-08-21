@@ -10,8 +10,8 @@ multiple containers, running anywhere.
 
 Each host needs to have the following installed
 
-- `wedo` and `docker-ns` from the weave sub-directory. Install these
-  somewhere in the root user's path, e.g. `/usr/local/bin'.
+- `weave` and `docker-ns` from the `weaver` sub-directory. Install
+  these somewhere in the root user's path, e.g. `/usr/local/bin`.
 - [pipework][], by Jérôme Petazzoni. Install this in the same place as
   the aforementioned scripts.
 
@@ -19,7 +19,7 @@ Each host needs to have the following installed
 
 e.g.
 
-    host# cp -a weave/wedo weave/docker-ns /usr/local/bin
+    host# cp -a weaver/weave weaver/docker-ns /usr/local/bin
     host# curl https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework \
           > /usr/local/bin/pipework; chmod a+x /usr/local/bin/pipework
 
@@ -35,15 +35,15 @@ two containers, one on each host.
 
 On $HOST1 run (as root)
 
-    host1# WEAVE=$(wedo launch 10.0.0.1/16)
-    host1# C=$(wedo run 10.0.1.1/24 -t -i debian /bin/bash)
+    host1# WEAVE=$(weave launch 10.0.0.1/16)
+    host1# C=$(weave run 10.0.1.1/24 -t -i debian /bin/bash)
 
 The first line starts the weave router, in a container. This needs to
 be done once on each host. We tell weave that its IP address should
 be 10.0.0.1, and that the weave network is on 10.0.0.0/16.
 
 The second line starts our application container. We give it an IP
-address and network (a subnet of the weave network). `wedo run`
+address and network (a subnet of the weave network). `weave run`
 invokes `docker run -d` with all the parameter following the IP
 address and netmask. So we could be launching any container this way;
 here we just take a stock debian container and launch a shell in it.
@@ -58,8 +58,8 @@ individual IP addresses must, of course, be unique.
 
 We repeat similar steps on $HOST2...
 
-    host2# WEAVE=$(wedo launch 10.0.0.2/16 $HOST1)
-    host2# C=$(wedo run 10.0.1.2/24 -t -i debian /bin/bash)
+    host2# WEAVE=$(weave launch 10.0.0.2/16 $HOST1)
+    host2# C=$(weave run 10.0.1.2/24 -t -i debian /bin/bash)
 
 The only difference, apart from the IP addresses, is that we tell our
 weave that it should peer with the weave running on $HOST1. We could
@@ -131,8 +131,8 @@ To accomplish that, we assign each application a different subnet. So,
 in the above example, if we wanted to add another application similar
 to, but isolated from, our first, we'd launch the containers with...
 
-    host1# D=$(wedo run 10.0.2.1/24 -t -i debian /bin/bash)
-    host2# D=$(wedo run 10.0.2.2/24 -t -i debian /bin/bash)
+    host1# D=$(weave run 10.0.2.1/24 -t -i debian /bin/bash)
+    host2# D=$(weave run 10.0.2.2/24 -t -i debian /bin/bash)
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
@@ -161,7 +161,7 @@ In order to connect containers across untrusted networks, weave peers
 can be told to encrypt traffic by supplying a `-password` option when
 launching weave, e.g.
 
-    host1# WEAVE=$(wedo launch 10.0.0.1/16 -password wEaVe)
+    host1# WEAVE=$(weave launch 10.0.0.1/16 -password wEaVe)
 
 The same password must be specified for all weave peers.
 
@@ -219,7 +219,7 @@ To build weave you need `libpcap-dev` and `docker` installed.
 
 Then simply run
 
-    $ make -C weave
+    $ make -C weaver
 
-This will build the weave application, produce a docker image
-`zettio/weave` and export that image to /tmp/wedo.tar
+This will build the weave router, produce a docker image
+`zettio/weave` and export that image to /tmp/weave.tar
