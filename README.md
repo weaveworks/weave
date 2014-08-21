@@ -17,7 +17,8 @@ Each host needs to have the following installed
 e.g.
 
     host# cp -a weave/wedo weave/docker-ns /usr/local/bin
-    host# curl https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework > /usr/local/bin/pipework; chmod a+x /usr/local/bin/pipework
+    host# curl https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework \
+          > /usr/local/bin/pipework; chmod a+x /usr/local/bin/pipework
 
 We also need `ethtool` and `arping`. On most systems these are
 installed already; if not then grab them via your favourite package
