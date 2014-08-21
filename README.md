@@ -1,7 +1,7 @@
-# Weave - the Docker SDN
+# Weave - the Docker network
 
-Weave lets you connect Docker containers deployed across multiple
-hosts, as if they were all plugged into the same network switch.
+Weave connects Docker containers deployed across multiple hosts, as if
+they were all plugged into the same network switch.
 
 ## Installation
 
