@@ -5,7 +5,7 @@ hosts, as if they were all plugged into the same network switch.
 
 ## Installation
 
-Each hosts needs to have the following installed
+Each host needs to have the following installed
 
 - `wedo` and `docker-ns` from the weave sub-directory. Install these
   somewhere in the root user's path, e.g. `/usr/local/bin'.
