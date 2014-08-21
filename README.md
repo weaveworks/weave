@@ -3,6 +3,9 @@
 Weave connects Docker containers deployed across multiple hosts, as if
 they were all plugged into the same network switch.
 
+With weave you can easily construct applications consisting of
+multiple containers, running anywhere.
+
 ## Installation
 
 Each host needs to have the following installed
