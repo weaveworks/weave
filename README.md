@@ -11,9 +11,17 @@ Each host needs to have the following installed
   somewhere in the root user's path, e.g. `/usr/local/bin'.
 - [pipework][], by Jérôme Petazzoni. This too needs to be installed in
   the root user's path.
-- `ethtool` and `arping` - grab them via your favourite package manager.
 
 [pipework]: https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework
+
+e.g.
+
+    host# cp -a weave/wedo weave/docker-ns /usr/local/bin
+    host# curl https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework > /usr/local/bin/pipework; chmod a+x /usr/local/bin/pipework
+
+We also need `ethtool` and `arping`. On most systems these are
+installed already; if not then grab them via your favourite package
+manager.
 
 ## Example
 
