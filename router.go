@@ -229,6 +229,11 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			if router.Macs.Enter(srcMac, srcPeer) {
 				log.Println("Discovered remote MAC", srcMac, "at", srcPeer.Name)
 			}
+			if df {
+				router.LogFrame("Relaying DF", frame, &dec.eth)
+			} else {
+				router.LogFrame("Relaying", frame, &dec.eth)
+			}
 			return checkFrameTooBig(router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec))
 		}
 
