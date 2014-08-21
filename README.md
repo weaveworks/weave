@@ -9,8 +9,8 @@ Each host needs to have the following installed
 
 - `wedo` and `docker-ns` from the weave sub-directory. Install these
   somewhere in the root user's path, e.g. `/usr/local/bin'.
-- [pipework][], by Jérôme Petazzoni. This too needs to be installed in
-  the root user's path.
+- [pipework][], by Jérôme Petazzoni. Install this in the same place as
+  the aforementioned scripts.
 
 [pipework]: https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework
 
