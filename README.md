@@ -34,17 +34,18 @@ On $HOST1 run (as root)
     host1# WEAVE=$(wedo launch 10.0.0.1/16)
     host1# C=$(wedo run 10.0.1.1/24 -t -i debian /bin/bash)
 
-The first line starts the weave container. This needs to be done once
-on each host. The second line starts our application container; this
-could be any container - here we just take a stock debian container
-and launch a shell in it. If our application consists of more than one
-container on this host we simply launch them with a variation on that
-2nd line.
+The first line starts the weave router, in a container. This needs to
+be done once on each host. We tell weave that its IP address should
+be 10.0.0.1, and that the weave network is on 10.0.0.0/16.
 
-We tell weave that its IP address should be 10.0.0.1, and that the
-weave network is on 10.0.0.0/16. Similarly, we specify the IP address
-and network for our application container, with the network being a
-subnet of the weave network.
+The second line starts our application container. We give it an IP
+address and network (a subnet of the weave network). `wedo run`
+invokes `docker run -d` with all the parameter following the IP
+address and netmask. So we could be launching any container this way;
+here we just take a stock debian container and launch a shell in it.
+
+If our application consists of more than one container on this host we
+simply launch them with a variation on that 2nd line.
 
 The IP addresses and netmasks can be anything you like which doesn't
 conflict with any IP ranges of 'external' services your containers
