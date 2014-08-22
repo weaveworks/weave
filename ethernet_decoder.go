@@ -61,11 +61,10 @@ func (dec *EthernetDecoder) formICMPMTUPacket(mtu int) ([]byte, error) {
 			Id:       0,
 			Seq:      uint16(mtu)},
 		&payload)
-	if err == nil {
-		return buf.Bytes(), nil
-	} else {
+	if err != nil {
 		return []byte{}, err
 	}
+	return buf.Bytes(), nil
 }
 
 var (
