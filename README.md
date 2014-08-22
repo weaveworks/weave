@@ -8,24 +8,14 @@ multiple containers, running anywhere.
 
 ## Installation
 
-Each host needs to have the following installed
+Each host needs to have `weave` from the `weaver` sub-directory
+installed in the root user's path, e.g.
 
-- `weave` and `docker-ns` from the `weaver` sub-directory. Install
-  these somewhere in the root user's path, e.g. `/usr/local/bin`.
-- [pipework][], by Jérôme Petazzoni. Install this in the same place as
-  the aforementioned scripts.
+    host# curl https://raw.githubusercontent.com/zettio/weave/master/weaver/weave \
+          > /usr/local/bin/weave; chmod a+x /usr/local/bin/weave
 
-[pipework]: https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework
-
-e.g.
-
-    host# cp -a weaver/weave weaver/docker-ns /usr/local/bin
-    host# curl https://raw.githubusercontent.com/jpetazzo/pipework/master/pipework \
-          > /usr/local/bin/pipework; chmod a+x /usr/local/bin/pipework
-
-We also need `ethtool` and `arping`. On most systems these are
-installed already; if not then grab them via your favourite package
-manager.
+We also need `ethtool`. On most systems that is installed already; if
+not then grab it via your favourite package manager.
 
 ## Example
 

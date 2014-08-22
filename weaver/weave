@@ -12,7 +12,7 @@ shift 2
 
 # pre-create bridge so we can set the MTU
 [ ! -d /sys/class/net/$BRIDGE ] && {
-    ip link add dev $BRIDGE type bridge > /dev/null 2>&1
+    ip link add dev $BRIDGE type bridge
     ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/random | tr \  : | tail -c+2)
     # attempting to set the bridge MTU to a high value directly
     # fails. Bridges take the lowest MTU of their interfaces. So
@@ -42,8 +42,36 @@ case "$COMMAND" in
         ;;
 esac
 
-${SCRIPT_DIR}/pipework $BRIDGE -i $CONTAINER_IFNAME $CONTAINER $IPADDR 1>&2
+# the following borrows from https://github.com/jpetazzo/pipework
 
-${SCRIPT_DIR}/docker-ns $CONTAINER ethtool -K $IFACE tx off > /dev/null
+DOCKERPID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
+[ "$DOCKERPID" = 0 ] && {
+    echo "Docker inspect returned invalid PID 0"
+    exit 1
+}
+[ "$DOCKERPID" = "<no value>" ] && {
+    echo "Container $CONTAINER unknown to Docker."
+    exit 1
+}
+
+NSPID=$DOCKERPID
+
+[ ! -d /var/run/netns ] && mkdir -p /var/run/netns
+[ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
+ln -s /proc/$NSPID/ns/net /var/run/netns/$NSPID
+
+LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
+GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
+ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU
+ip link set $LOCAL_IFNAME master $BRIDGE
+ip link set $LOCAL_IFNAME up
+ip link set $GUEST_IFNAME netns $NSPID
+ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
+ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
+ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
+
+ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
+
+[ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
 
 echo $CONTAINER
