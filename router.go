@@ -65,7 +65,8 @@ func (router *Router) sniff(pio PacketSourceSink) {
 	log.Println("Sniffing traffic on", router.Iface)
 
 	dec := NewEthernetDecoder()
-	checkFrameTooBig := dec.CheckFrameTooBigFunc(pio)
+	injectFrame := func(frame []byte) error { return pio.WritePacket(frame) }
+	checkFrameTooBig := func(err error) error { return dec.CheckFrameTooBig(err, injectFrame) }
 	mac := router.Iface.HardwareAddr
 	if router.Macs.Enter(mac, router.Ourself) {
 		log.Println("Discovered our MAC", mac)
@@ -202,7 +203,15 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 }
 
 func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) FrameConsumer {
-	checkFrameTooBig := dec.CheckFrameTooBigFunc(po)
+	checkFrameTooBig := func(err error, srcPeer *Peer) error {
+		if err == nil { // optimisation: avoid closure creation in common case
+			return nil
+		}
+		return dec.CheckFrameTooBig(err,
+			func(icmpFrame []byte) error {
+				return router.Ourself.Forward(srcPeer, false, icmpFrame, nil)
+			})
+	}
 
 	return func(relayConn *LocalConnection, sender *net.UDPAddr, srcNameByte, dstNameByte []byte, frameLen uint16, frame []byte) error {
 		srcName := PeerNameFromBin(srcNameByte)
@@ -234,7 +243,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			} else {
 				router.LogFrame("Relaying", frame, &dec.eth)
 			}
-			return checkFrameTooBig(router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec))
+			return checkFrameTooBig(router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec), srcPeer)
 		}
 
 		if relayConn.Remote().Name == srcPeer.Name {
@@ -268,7 +277,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		dstPeer, found = router.Macs.Lookup(dec.eth.DstMAC)
 		if !found || dec.BroadcastFrame() || dstPeer != router.Ourself {
 			df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
-			checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec))
+			checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
 		}
 		return nil
 	}

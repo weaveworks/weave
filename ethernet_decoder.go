@@ -18,19 +18,17 @@ func (dec *EthernetDecoder) DecodeLayers(data []byte) error {
 	return dec.parser.DecodeLayers(data, &dec.decoded)
 }
 
-func (dec *EthernetDecoder) CheckFrameTooBigFunc(po PacketSink) func(error) error {
-	return func(err error) error {
-		if ftbe, ok := err.(FrameTooBigError); ok {
-			// we know: 1. ip is valid, 2. it was ip and DF was set
-			icmpFrame, err := dec.formICMPMTUPacket(ftbe.PMTU)
-			if err != nil {
-				return err
-			}
-			log.Printf("Injecting ICMP 3,4 (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.PMTU)
-			return po.WritePacket(icmpFrame)
-		} else {
+func (dec *EthernetDecoder) CheckFrameTooBig(err error, sendFrame func([]byte) error) error {
+	if ftbe, ok := err.(FrameTooBigError); ok {
+		// we know: 1. ip is valid, 2. it was ip and DF was set
+		icmpFrame, err := dec.formICMPMTUPacket(ftbe.PMTU)
+		if err != nil {
 			return err
 		}
+		log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.PMTU)
+		return sendFrame(icmpFrame)
+	} else {
+		return err
 	}
 }
 
