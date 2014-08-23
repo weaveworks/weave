@@ -312,26 +312,22 @@ func (sender *RawUDPSender) Send(msg []byte) error {
 	}
 	packet := sender.ipBuf.Bytes()
 	_, err = sender.socket.Write(packet)
-	if err != nil {
-		if PosixError(err) == syscall.EMSGSIZE {
-			f, err := sender.socket.File()
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			fd := int(f.Fd())
-			log.Println("EMSGSIZE on send, expecting PMTU update (IP packet was",
-				len(packet), "bytes, payload was", len(msg), "bytes)")
-			pmtu, err := syscall.GetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU)
-			if err != nil {
-				return err
-			}
-			return FrameTooBigError{PMTU: pmtu}
-		} else {
-			return err
-		}
+	if err == nil || PosixError(err) != syscall.EMSGSIZE {
+		return err
 	}
-	return nil
+	f, err := sender.socket.File()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	fd := int(f.Fd())
+	log.Println("EMSGSIZE on send, expecting PMTU update (IP packet was",
+		len(packet), "bytes, payload was", len(msg), "bytes)")
+	pmtu, err := syscall.GetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU)
+	if err != nil {
+		return err
+	}
+	return FrameTooBigError{PMTU: pmtu}
 }
 
 func (sender *RawUDPSender) Shutdown() error {
