@@ -184,6 +184,13 @@ host. Weave will automatically discover the other hosts in the other
 network and establish connections to them if it can (in order to avoid
 unnecessary multi-hop routing).
 
+### Container mobility
+
+Containers can be moved between hosts without requiring any
+reconfiguration or, in many cases, restarts of other containers. All
+that is required is for the migrated container to be started with the
+same IP address as it was given originally.
+
 ### Fault tolerance
 
 Weave peers continually exchange topology information, and monitor
