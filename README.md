@@ -203,7 +203,8 @@ enough.
 
 ## Building
 
-(NB. This is only necessary if you want to work on weave.)
+(NB. This is only necessary if you want to work on weave. Also, these
+instructions have only been tested on Ubuntu.)
 
 To build weave you need `libpcap-dev` and `docker` installed.
 
