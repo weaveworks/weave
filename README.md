@@ -1,7 +1,12 @@
 # Weave - the Docker network
 
-Weave connects Docker containers deployed across multiple hosts, as if
-they were all plugged into the same network switch.
+Weave creates a virtual network that connects Docker containers
+deployed across multiple hosts.
+
+Applications use the network just as if the containers were all
+plugged into the same network switch, with no need to configure port
+mappings, links, etc. Weave can optionally encrypt traffic, allowing
+hosts to be connected across an untrusted network.
 
 With weave you can easily construct applications consisting of
 multiple containers, running anywhere.
