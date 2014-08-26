@@ -33,7 +33,7 @@ MACADDR=$(</sys/class/net/$BRIDGE/address)
 
 case "$COMMAND" in
     launch)
-        CONTAINER=$(docker run -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
+        CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
         IFACE=eth0
         ;;
     run)
