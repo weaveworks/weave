@@ -13,8 +13,8 @@ func (conn *LocalConnection) ensureForwarders() error {
 	if conn.forwardChan != nil || conn.forwardChanDF != nil {
 		return nil
 	}
-	// only thing that can error, so do it earlier
-	rawUDPSender, err := NewRawUDPSender(conn)
+	udpSender := NewSimpleUDPSender(conn)
+	udpSenderDF, err := NewRawUDPSender(conn) // only thing that can error, so do it early
 	if err != nil {
 		return err
 	}
@@ -43,8 +43,8 @@ func (conn *LocalConnection) ensureForwarders() error {
 	conn.stopForward = stopForward
 	conn.stopForwardDF = stopForwardDF
 	conn.Unlock()
-	go conn.forwarderLoop(forwardChan, stopForward, encryptor, NewSimpleUDPSender(conn), DefaultPMTU)
-	go conn.forwarderLoop(forwardChanDF, stopForwardDF, encryptorDF, rawUDPSender, conn.clientPMTU)
+	go conn.forwarderLoop(forwardChan, stopForward, encryptor, udpSender, DefaultPMTU)
+	go conn.forwarderLoop(forwardChanDF, stopForwardDF, encryptorDF, udpSenderDF, conn.clientPMTU)
 
 	return nil
 }
