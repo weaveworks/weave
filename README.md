@@ -217,6 +217,25 @@ that event, and indeed may not even experience a temporary
 connectivity failure if the weave container is restarted quickly
 enough.
 
+## Troubleshooting
+
+Check the weave container logs with
+
+    docker logs $WEAVE
+
+A reasonable amount of information, and all errors, get logged there.
+
+The log verbosity can be increased by supplying the `-debug` flag when
+launching weave. Be warned, this will log information on a per-packet
+basis, so can produce a lot of output.
+
+One can ask a weave router to log a status report by sending it a USR1
+signal, e.g.
+
+    kill -USR1 `docker inspect --format='{{ .State.Pid }}' $WEAVE`
+
+and then inspect the logs.
+
 ## Building
 
 (NB. This is only necessary if you want to work on weave. Also, these
