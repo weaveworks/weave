@@ -147,6 +147,7 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 			pmtuVerifyTick = nil
 			if !conn.isClientPMTUVerfied() {
 				clientPMTU -= 10
+				maxPayload -= 10
 				updateClientPMTU()
 			}
 		case frame = <-forwardCh:
