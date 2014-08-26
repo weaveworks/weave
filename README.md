@@ -13,14 +13,17 @@ multiple containers, running anywhere.
 
 ## Installation
 
-Each host needs to have `weave` from the `weaver` sub-directory
-installed in the root user's path, e.g.
+To run weave on a host, you need to install...
 
-    host# curl https://raw.githubusercontent.com/zettio/weave/master/weaver/weave \
-          > /usr/local/bin/weave; chmod a+x /usr/local/bin/weave
+1. docker. We've tested with version 1.1.0 through 1.2.0, but other
+   versions should work too.
+2. weave. Install this with
 
-We also need `ethtool`. On most systems that is installed already; if
-not then grab it via your favourite package manager.
+        sudo wget -O /usr/local/bin/weave https://raw.githubusercontent.com/zettio/weave/master/weaver/weave
+        sudo chmod a+x /usr/local/bin/weave
+
+3. ethtool. On many systems that is installed already; if not then
+grab it via your favourite package manager.
 
 ## Example
 
