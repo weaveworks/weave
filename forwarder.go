@@ -70,15 +70,29 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 	var pmtuVerifyTick <-chan time.Time
 	var clientPMTU int
 	maxPayload := pmtu - UDPOverhead
+	calculateClientPMTU := func(ftbe FrameTooBigError) {
+		maxPayload = ftbe.PMTU - UDPOverhead
+		clientPMTU = maxPayload - enc.PacketOverhead() - enc.FrameOverhead() - EthernetOverhead
+	}
 	updateClientPMTU := func() {
-		conn.setClientPMTU(clientPMTU)
-		pmtuVerifyFrame := &ForwardedFrame{
-			srcPeer: conn.local,
-			dstPeer: conn.remote,
-			frame:   make([]byte, clientPMTU+EthernetOverhead)}
-		for cnt := 0; cnt < 10; cnt += 1 {
-			enc.AppendFrame(pmtuVerifyFrame)
-			udpSender.Send(enc.Bytes())
+		for gotNewPMTU := true; gotNewPMTU; {
+			conn.setClientPMTU(clientPMTU)
+			pmtuVerifyFrame := &ForwardedFrame{
+				srcPeer: conn.local,
+				dstPeer: conn.remote,
+				frame:   make([]byte, clientPMTU+EthernetOverhead)}
+			gotNewPMTU = false
+			for cnt := 0; cnt < 10; cnt += 1 {
+				enc.AppendFrame(pmtuVerifyFrame)
+				err := udpSender.Send(enc.Bytes())
+				if err != nil {
+					if ftbe, ok := err.(FrameTooBigError); ok {
+						calculateClientPMTU(ftbe)
+						gotNewPMTU = true
+						break
+					}
+				}
+			}
 		}
 		pmtuVerifyTick = time.After(PMTUVerifyTimeout)
 	}
@@ -94,8 +108,7 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 		err := udpSender.Send(enc.Bytes())
 		if err != nil {
 			if ftbe, ok := err.(FrameTooBigError); ok {
-				maxPayload = ftbe.PMTU - UDPOverhead
-				clientPMTU = maxPayload - enc.PacketOverhead() - enc.FrameOverhead() - EthernetOverhead
+				calculateClientPMTU(ftbe)
 				updateClientPMTU()
 			} else if PosixError(err) == syscall.ENOBUFS {
 				// TODO handle this better
