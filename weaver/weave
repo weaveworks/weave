@@ -18,6 +18,11 @@ usage() {
 
 shift 2 || usage
 
+[ `id -u` = 0 ] || {
+    echo "weave must be run as 'root'"
+    exit 1
+}
+
 # pre-create bridge so we can set the MTU
 [ ! -d /sys/class/net/$BRIDGE ] && {
     ip link add dev $BRIDGE type bridge
