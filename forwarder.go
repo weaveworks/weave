@@ -29,8 +29,10 @@ func (conn *LocalConnection) ensureForwarders() error {
 		encryptorDF = NewNonEncryptor(conn.local.NameByte)
 	}
 
-	// The forward chans in the conn struct are read by other
-	// processes, so we have to use locks.
+	maxPayload, effectivePMTU := maxPayloadAndEffectivePMTU(encryptorDF, DefaultPMTU)
+
+	// The forward chans and effectivePMTU in the conn struct are read
+	// by other processes, so we have to use locks.
 	var (
 		forwardChan   = make(chan *ForwardedFrame, ChannelSize)
 		forwardChanDF = make(chan *ForwardedFrame, ChannelSize)
@@ -42,9 +44,10 @@ func (conn *LocalConnection) ensureForwarders() error {
 	conn.forwardChanDF = forwardChanDF
 	conn.stopForward = stopForward
 	conn.stopForwardDF = stopForwardDF
+	conn.effectivePMTU = effectivePMTU
 	conn.Unlock()
-	go conn.forwarderLoop(forwardChan, stopForward, encryptor, udpSender, DefaultPMTU)
-	go conn.forwarderLoop(forwardChanDF, stopForwardDF, encryptorDF, udpSenderDF, conn.effectivePMTU)
+	go conn.forwarderLoop(forwardChan, stopForward, encryptor, udpSender, maxPayload, effectivePMTU)
+	go conn.forwarderLoop(forwardChanDF, stopForwardDF, encryptorDF, udpSenderDF, maxPayload, effectivePMTU)
 
 	return nil
 }
@@ -63,17 +66,9 @@ func (conn *LocalConnection) stopForwarders() {
 	}
 }
 
-func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, stop <-chan interface{}, enc Encryptor, udpSender UDPSender, pmtu int) {
+func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, stop <-chan interface{}, enc Encryptor, udpSender UDPSender, maxPayload int, effectivePMTU int) {
 	defer udpSender.Shutdown()
-	// The pmtu governs the max size of msg we can pass to the
-	// udpSender. udpSender will add in the UDP/IP headers
 	var pmtuVerifyTick <-chan time.Time
-	var effectivePMTU int
-	maxPayload := pmtu - UDPOverhead
-	calculateEffectivePMTU := func(mtbe MsgTooBigError) {
-		maxPayload = mtbe.PMTU - UDPOverhead
-		effectivePMTU = maxPayload - enc.PacketOverhead() - enc.FrameOverhead() - EthernetOverhead
-	}
 	updateEffectivePMTU := func() {
 		for gotNewPMTU := true; gotNewPMTU; {
 			conn.setEffectivePMTU(effectivePMTU)
@@ -87,7 +82,7 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 				err := udpSender.Send(enc.Bytes())
 				if err != nil {
 					if mtbe, ok := err.(MsgTooBigError); ok {
-						calculateEffectivePMTU(mtbe)
+						maxPayload, effectivePMTU = maxPayloadAndEffectivePMTU(enc, mtbe.PMTU)
 						gotNewPMTU = true
 						break
 					}
@@ -108,7 +103,7 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 		err := udpSender.Send(enc.Bytes())
 		if err != nil {
 			if mtbe, ok := err.(MsgTooBigError); ok {
-				calculateEffectivePMTU(mtbe)
+				maxPayload, effectivePMTU = maxPayloadAndEffectivePMTU(enc, mtbe.PMTU)
 				updateEffectivePMTU()
 			} else if PosixError(err) == syscall.ENOBUFS {
 				// TODO handle this better
@@ -221,6 +216,12 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 			forwardChanDF <- segFrame
 		})
 	}
+}
+
+func maxPayloadAndEffectivePMTU(enc Encryptor, pmtu int) (maxPayload int, effectivePMTU int) {
+	maxPayload = pmtu - UDPOverhead
+	effectivePMTU = maxPayload - enc.PacketOverhead() - enc.FrameOverhead() - EthernetOverhead
+	return
 }
 
 func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFrame, forward func(*ForwardedFrame)) error {
