@@ -118,7 +118,7 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 		}
 	}
 	logDrop := func(frame *ForwardedFrame) {
-		conn.log("dropping too big frame during forwarding: frame len:", len(frame.frame), "; PMTU:", pmtu)
+		conn.log("dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", effectivePMTU)
 	}
 	// We want to drain before exiting otherwise we could get the
 	// packet sniffer or udp listener blocked on sending to a full
