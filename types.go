@@ -273,6 +273,8 @@ type NaClDecryptorInstance struct {
 	nonceChan           chan *[24]byte
 }
 
+// Packet capture/inject interfaces
+
 type PacketSource interface {
 	ReadPacket() ([]byte, error)
 }
