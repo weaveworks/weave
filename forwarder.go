@@ -70,8 +70,8 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 	var pmtuVerifyTick <-chan time.Time
 	var clientPMTU int
 	maxPayload := pmtu - UDPOverhead
-	calculateClientPMTU := func(ftbe FrameTooBigError) {
-		maxPayload = ftbe.PMTU - UDPOverhead
+	calculateClientPMTU := func(mtbe MsgTooBigError) {
+		maxPayload = mtbe.PMTU - UDPOverhead
 		clientPMTU = maxPayload - enc.PacketOverhead() - enc.FrameOverhead() - EthernetOverhead
 	}
 	updateClientPMTU := func() {
@@ -86,8 +86,8 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 				enc.AppendFrame(pmtuVerifyFrame)
 				err := udpSender.Send(enc.Bytes())
 				if err != nil {
-					if ftbe, ok := err.(FrameTooBigError); ok {
-						calculateClientPMTU(ftbe)
+					if mtbe, ok := err.(MsgTooBigError); ok {
+						calculateClientPMTU(mtbe)
 						gotNewPMTU = true
 						break
 					}
@@ -107,8 +107,8 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 	flush := func() {
 		err := udpSender.Send(enc.Bytes())
 		if err != nil {
-			if ftbe, ok := err.(FrameTooBigError); ok {
-				calculateClientPMTU(ftbe)
+			if mtbe, ok := err.(MsgTooBigError); ok {
+				calculateClientPMTU(mtbe)
 				updateClientPMTU()
 			} else if PosixError(err) == syscall.ENOBUFS {
 				// TODO handle this better
@@ -341,7 +341,7 @@ func (sender *RawUDPSender) Send(msg []byte) error {
 	if err != nil {
 		return err
 	}
-	return FrameTooBigError{PMTU: pmtu}
+	return MsgTooBigError{PMTU: pmtu}
 }
 
 func (sender *RawUDPSender) Shutdown() error {

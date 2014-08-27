@@ -98,8 +98,12 @@ type EthernetDecoder struct {
 	parser  *gopacket.DecodingLayerParser
 }
 
+type MsgTooBigError struct {
+	PMTU int // actual pmtu, i.e. what the kernel told us
+}
+
 type FrameTooBigError struct {
-	PMTU  int
+	PMTU int // effective pmtu, i.e. what we tell packet senders
 }
 
 type UnknownPeersError struct {
