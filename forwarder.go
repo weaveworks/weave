@@ -29,25 +29,27 @@ func (conn *LocalConnection) ensureForwarders() error {
 		encryptorDF = NewNonEncryptor(conn.local.NameByte)
 	}
 
-	maxPayload, effectivePMTU := maxPayloadAndEffectivePMTU(encryptorDF, DefaultPMTU)
-
-	// The forward chans and effectivePMTU in the conn struct are read
-	// by other processes, so we have to use locks.
 	var (
 		forwardChan   = make(chan *ForwardedFrame, ChannelSize)
 		forwardChanDF = make(chan *ForwardedFrame, ChannelSize)
 		stopForward   = make(chan interface{}, 0)
 		stopForwardDF = make(chan interface{}, 0)
 	)
+	forwarder := NewForwarder(conn, forwardChan, stopForward, encryptor, udpSender, DefaultPMTU)
+	forwarderDF := NewForwarder(conn, forwardChanDF, stopForwardDF, encryptorDF, udpSenderDF, DefaultPMTU)
+
+	// The forward chans and effectivePMTU in the conn struct are read
+	// by other processes, so we have to use locks.
 	conn.Lock()
 	conn.forwardChan = forwardChan
 	conn.forwardChanDF = forwardChanDF
 	conn.stopForward = stopForward
 	conn.stopForwardDF = stopForwardDF
-	conn.effectivePMTU = effectivePMTU
+	conn.effectivePMTU = forwarder.effectivePMTU
 	conn.Unlock()
-	go conn.forwarderLoop(forwardChan, stopForward, encryptor, udpSender, maxPayload, effectivePMTU)
-	go conn.forwarderLoop(forwardChanDF, stopForwardDF, encryptorDF, udpSenderDF, maxPayload, effectivePMTU)
+
+	go forwarder.Run()
+	go forwarderDF.Run()
 
 	return nil
 }
@@ -63,112 +65,6 @@ func (conn *LocalConnection) stopForwarders() {
 	if conn.stopForward != nil {
 		conn.stopForward <- nil
 		conn.stopForwardDF <- nil
-	}
-}
-
-func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, stop <-chan interface{}, enc Encryptor, udpSender UDPSender, maxPayload int, effectivePMTU int) {
-	defer udpSender.Shutdown()
-	var pmtuVerifyTick <-chan time.Time
-	updateEffectivePMTU := func() {
-		for gotNewPMTU := true; gotNewPMTU; {
-			conn.setEffectivePMTU(effectivePMTU)
-			pmtuVerifyFrame := &ForwardedFrame{
-				srcPeer: conn.local,
-				dstPeer: conn.remote,
-				frame:   make([]byte, effectivePMTU+EthernetOverhead)}
-			gotNewPMTU = false
-			for cnt := 0; cnt < 10; cnt += 1 {
-				enc.AppendFrame(pmtuVerifyFrame)
-				err := udpSender.Send(enc.Bytes())
-				if err != nil {
-					if mtbe, ok := err.(MsgTooBigError); ok {
-						maxPayload, effectivePMTU = maxPayloadAndEffectivePMTU(enc, mtbe.PMTU)
-						gotNewPMTU = true
-						break
-					}
-				}
-			}
-		}
-		pmtuVerifyTick = time.After(PMTUVerifyTimeout)
-	}
-	appendFrame := func(frame *ForwardedFrame) bool {
-		frameLen := len(frame.frame)
-		if enc.TotalLen()+enc.FrameOverhead()+frameLen > maxPayload {
-			return false
-		}
-		enc.AppendFrame(frame)
-		return true
-	}
-	flush := func() {
-		err := udpSender.Send(enc.Bytes())
-		if err != nil {
-			if mtbe, ok := err.(MsgTooBigError); ok {
-				maxPayload, effectivePMTU = maxPayloadAndEffectivePMTU(enc, mtbe.PMTU)
-				updateEffectivePMTU()
-			} else if PosixError(err) == syscall.ENOBUFS {
-				// TODO handle this better
-			} else {
-				conn.CheckFatal(err)
-			}
-		}
-	}
-	logDrop := func(frame *ForwardedFrame) {
-		conn.log("dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", effectivePMTU)
-	}
-	// We want to drain before exiting otherwise we could get the
-	// packet sniffer or udp listener blocked on sending to a full
-	// chan
-	drain := func() {
-		for {
-			select {
-			case <-forwardCh:
-			default:
-				return
-			}
-		}
-	}
-	var flushed, ok bool
-	var frame *ForwardedFrame
-	for {
-		flushed = false
-		select {
-		case <-stop:
-			drain()
-			return
-		case <-pmtuVerifyTick:
-			// We only do this case here when we know the buffers are
-			// all empty so that we don't risk appending verify-frames
-			// to other data.
-			pmtuVerifyTick = nil
-			if !conn.isEffectivePMTUVerfied() {
-				effectivePMTU -= 8
-				maxPayload -= 8
-				updateEffectivePMTU()
-			}
-		case frame = <-forwardCh:
-			if !appendFrame(frame) {
-				logDrop(frame)
-				continue
-			}
-			for !flushed {
-				select {
-				case frame, ok = <-forwardCh:
-					if !ok {
-						return
-					}
-					if !appendFrame(frame) {
-						flush()
-						if !appendFrame(frame) {
-							logDrop(frame)
-							flushed = true
-						}
-					}
-				default:
-					flush()
-					flushed = true
-				}
-			}
-		}
 	}
 }
 
@@ -216,12 +112,6 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 			forwardChanDF <- segFrame
 		})
 	}
-}
-
-func maxPayloadAndEffectivePMTU(enc Encryptor, pmtu int) (maxPayload int, effectivePMTU int) {
-	maxPayload = pmtu - UDPOverhead
-	effectivePMTU = maxPayload - enc.PacketOverhead() - enc.FrameOverhead() - EthernetOverhead
-	return
 }
 
 func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFrame, forward func(*ForwardedFrame)) error {
@@ -276,6 +166,134 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 		forward(&segFrame)
 	}
 	return nil
+}
+
+// Forwarder
+
+func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, stop <-chan interface{}, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
+	forwarder := &Forwarder{
+		conn:      conn,
+		ch:        ch,
+		stop:      stop,
+		enc:       enc,
+		udpSender: udpSender}
+	forwarder.setMaxPayloadAndEffectivePMTU(pmtu)
+	return forwarder
+}
+
+func (fwd *Forwarder) Run() {
+	defer fwd.udpSender.Shutdown()
+	var flushed, ok bool
+	var frame *ForwardedFrame
+	for {
+		flushed = false
+		select {
+		case <-fwd.stop:
+			fwd.drain()
+			return
+		case <-fwd.pmtuVerifyTick:
+			// We only do this case here when we know the buffers are
+			// all empty so that we don't risk appending verify-frames
+			// to other data.
+			fwd.pmtuVerifyTick = nil
+			if !fwd.conn.isEffectivePMTUVerfied() {
+				fwd.effectivePMTU -= 8
+				fwd.maxPayload -= 8
+				fwd.updateEffectivePMTU()
+			}
+		case frame = <-fwd.ch:
+			if !fwd.appendFrame(frame) {
+				fwd.logDrop(frame)
+				continue
+			}
+			for !flushed {
+				select {
+				case frame, ok = <-fwd.ch:
+					if !ok {
+						return
+					}
+					if !fwd.appendFrame(frame) {
+						fwd.flush()
+						if !fwd.appendFrame(frame) {
+							fwd.logDrop(frame)
+							flushed = true
+						}
+					}
+				default:
+					fwd.flush()
+					flushed = true
+				}
+			}
+		}
+	}
+}
+
+func (fwd *Forwarder) setMaxPayloadAndEffectivePMTU(pmtu int) {
+	fwd.maxPayload = pmtu - UDPOverhead
+	fwd.effectivePMTU = fwd.maxPayload - fwd.enc.PacketOverhead() - fwd.enc.FrameOverhead() - EthernetOverhead
+}
+
+func (fwd *Forwarder) updateEffectivePMTU() {
+	for gotNewPMTU := true; gotNewPMTU; {
+		fwd.conn.setEffectivePMTU(fwd.effectivePMTU)
+		pmtuVerifyFrame := &ForwardedFrame{
+			srcPeer: fwd.conn.local,
+			dstPeer: fwd.conn.remote,
+			frame:   make([]byte, fwd.effectivePMTU+EthernetOverhead)}
+		gotNewPMTU = false
+		for cnt := 0; cnt < 10; cnt += 1 {
+			fwd.enc.AppendFrame(pmtuVerifyFrame)
+			err := fwd.udpSender.Send(fwd.enc.Bytes())
+			if err != nil {
+				if mtbe, ok := err.(MsgTooBigError); ok {
+					fwd.setMaxPayloadAndEffectivePMTU(mtbe.PMTU)
+					gotNewPMTU = true
+					break
+				}
+			}
+		}
+	}
+	fwd.pmtuVerifyTick = time.After(PMTUVerifyTimeout)
+}
+
+func (fwd *Forwarder) appendFrame(frame *ForwardedFrame) bool {
+	frameLen := len(frame.frame)
+	if fwd.enc.TotalLen()+fwd.enc.FrameOverhead()+frameLen > fwd.maxPayload {
+		return false
+	}
+	fwd.enc.AppendFrame(frame)
+	return true
+}
+
+func (fwd *Forwarder) flush() {
+	err := fwd.udpSender.Send(fwd.enc.Bytes())
+	if err != nil {
+		if mtbe, ok := err.(MsgTooBigError); ok {
+			fwd.setMaxPayloadAndEffectivePMTU(mtbe.PMTU)
+			fwd.updateEffectivePMTU()
+		} else if PosixError(err) == syscall.ENOBUFS {
+			// TODO handle this better
+		} else {
+			fwd.conn.CheckFatal(err)
+		}
+	}
+}
+
+func (fwd *Forwarder) drain() {
+	// We want to drain before exiting otherwise we could get the
+	// packet sniffer or udp listener blocked on sending to a full
+	// chan
+	for {
+		select {
+		case <-fwd.ch:
+		default:
+			return
+		}
+	}
+}
+
+func (fwd *Forwarder) logDrop(frame *ForwardedFrame) {
+	fwd.conn.log("dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", fwd.effectivePMTU)
 }
 
 // UDP Senders
