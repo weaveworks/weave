@@ -65,7 +65,7 @@ type LocalConnection struct {
 	remoteUDPAddr *net.UDPAddr
 	established   bool
 	stackFrag     bool
-	clientPMTU    int
+	effectivePMTU int
 	pmtuVerified  bool
 	SessionKey    *[32]byte
 	heartbeatStop chan<- interface{}
@@ -103,7 +103,7 @@ type MsgTooBigError struct {
 }
 
 type FrameTooBigError struct {
-	PMTU int // effective pmtu, i.e. what we tell packet senders
+	EPMTU int // effective pmtu, i.e. what we tell packet senders
 }
 
 type UnknownPeersError struct {

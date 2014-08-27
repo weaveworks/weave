@@ -21,11 +21,11 @@ func (dec *EthernetDecoder) DecodeLayers(data []byte) error {
 func (dec *EthernetDecoder) CheckFrameTooBig(err error, sendFrame func([]byte) error) error {
 	if ftbe, ok := err.(FrameTooBigError); ok {
 		// we know: 1. ip is valid, 2. it was ip and DF was set
-		icmpFrame, err := dec.formICMPMTUPacket(ftbe.PMTU)
+		icmpFrame, err := dec.formICMPMTUPacket(ftbe.EPMTU)
 		if err != nil {
 			return err
 		}
-		log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.PMTU)
+		log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.EPMTU)
 		return sendFrame(icmpFrame)
 	} else {
 		return err

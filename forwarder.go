@@ -44,7 +44,7 @@ func (conn *LocalConnection) ensureForwarders() error {
 	conn.stopForwardDF = stopForwardDF
 	conn.Unlock()
 	go conn.forwarderLoop(forwardChan, stopForward, encryptor, udpSender, DefaultPMTU)
-	go conn.forwarderLoop(forwardChanDF, stopForwardDF, encryptorDF, udpSenderDF, conn.clientPMTU)
+	go conn.forwarderLoop(forwardChanDF, stopForwardDF, encryptorDF, udpSenderDF, conn.effectivePMTU)
 
 	return nil
 }
@@ -68,26 +68,26 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 	// The pmtu governs the max size of msg we can pass to the
 	// udpSender. udpSender will add in the UDP/IP headers
 	var pmtuVerifyTick <-chan time.Time
-	var clientPMTU int
+	var effectivePMTU int
 	maxPayload := pmtu - UDPOverhead
-	calculateClientPMTU := func(mtbe MsgTooBigError) {
+	calculateEffectivePMTU := func(mtbe MsgTooBigError) {
 		maxPayload = mtbe.PMTU - UDPOverhead
-		clientPMTU = maxPayload - enc.PacketOverhead() - enc.FrameOverhead() - EthernetOverhead
+		effectivePMTU = maxPayload - enc.PacketOverhead() - enc.FrameOverhead() - EthernetOverhead
 	}
-	updateClientPMTU := func() {
+	updateEffectivePMTU := func() {
 		for gotNewPMTU := true; gotNewPMTU; {
-			conn.setClientPMTU(clientPMTU)
+			conn.setEffectivePMTU(effectivePMTU)
 			pmtuVerifyFrame := &ForwardedFrame{
 				srcPeer: conn.local,
 				dstPeer: conn.remote,
-				frame:   make([]byte, clientPMTU+EthernetOverhead)}
+				frame:   make([]byte, effectivePMTU+EthernetOverhead)}
 			gotNewPMTU = false
 			for cnt := 0; cnt < 10; cnt += 1 {
 				enc.AppendFrame(pmtuVerifyFrame)
 				err := udpSender.Send(enc.Bytes())
 				if err != nil {
 					if mtbe, ok := err.(MsgTooBigError); ok {
-						calculateClientPMTU(mtbe)
+						calculateEffectivePMTU(mtbe)
 						gotNewPMTU = true
 						break
 					}
@@ -108,8 +108,8 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 		err := udpSender.Send(enc.Bytes())
 		if err != nil {
 			if mtbe, ok := err.(MsgTooBigError); ok {
-				calculateClientPMTU(mtbe)
-				updateClientPMTU()
+				calculateEffectivePMTU(mtbe)
+				updateEffectivePMTU()
 			} else if PosixError(err) == syscall.ENOBUFS {
 				// TODO handle this better
 			} else {
@@ -145,10 +145,10 @@ func (conn *LocalConnection) forwarderLoop(forwardCh <-chan *ForwardedFrame, sto
 			// all empty so that we don't risk appending verify-frames
 			// to other data.
 			pmtuVerifyTick = nil
-			if !conn.isClientPMTUVerfied() {
-				clientPMTU -= 8
+			if !conn.isEffectivePMTUVerfied() {
+				effectivePMTU -= 8
 				maxPayload -= 8
-				updateClientPMTU()
+				updateEffectivePMTU()
 			}
 		case frame = <-forwardCh:
 			if !appendFrame(frame) {
@@ -186,7 +186,7 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 	var (
 		forwardChan   = conn.forwardChan
 		forwardChanDF = conn.forwardChanDF
-		clientPMTU    = conn.clientPMTU
+		effectivePMTU = conn.effectivePMTU
 		stackFrag     = conn.stackFrag
 	)
 	conn.RUnlock()
@@ -196,11 +196,11 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		return nil
 	}
 	if df {
-		if len(frame.frame)-EthernetOverhead <= clientPMTU {
+		if len(frame.frame)-EthernetOverhead <= effectivePMTU {
 			forwardChanDF <- frame
 			return nil
 		} else {
-			return FrameTooBigError{PMTU: clientPMTU}
+			return FrameTooBigError{EPMTU: effectivePMTU}
 		}
 	} else {
 		if stackFrag || dec == nil || len(dec.decoded) < 2 {
@@ -209,7 +209,7 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		}
 		// Don't have trustworthy stack, so we're going to have to
 		// send it DF in any case.
-		if len(frame.frame)-EthernetOverhead <= clientPMTU {
+		if len(frame.frame)-EthernetOverhead <= effectivePMTU {
 			forwardChanDF <- frame
 			return nil
 		}
@@ -217,7 +217,7 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		// We can't trust the stack to fragment, we have IP, and we
 		// have a frame that's too big for the MTU, so we have to
 		// fragment it ourself.
-		return fragment(dec.eth, dec.ip, clientPMTU, frame, func(segFrame *ForwardedFrame) {
+		return fragment(dec.eth, dec.ip, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
 			forwardChanDF <- segFrame
 		})
 	}

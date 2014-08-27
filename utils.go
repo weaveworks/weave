@@ -35,7 +35,7 @@ func (mtbe MsgTooBigError) Error() string {
 }
 
 func (ftbe FrameTooBigError) Error() string {
-	return fmt.Sprint("Frame too big error. PMTU is ", ftbe.PMTU)
+	return fmt.Sprint("Frame too big error. Effective PMTU is ", ftbe.EPMTU)
 }
 
 func (upe UnknownPeersError) Error() string {

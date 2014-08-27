@@ -63,7 +63,7 @@ func NewLocalConnection(connRemote *RemoteConnection, expectedName PeerName, tcp
 		Router:           router,
 		TCPConn:          tcpConn,
 		remoteUDPAddr:    udpAddr,
-		clientPMTU:       DefaultPMTU,
+		effectivePMTU:    DefaultPMTU,
 		queryChan:        queryChan}
 	go connLocal.queryLoop(queryChan, expectedName)
 }
@@ -96,24 +96,24 @@ func (conn *LocalConnection) CheckFatal(err error) error {
 
 // Called by forwarder processes, read in Forward (by sniffer and udp
 // listener process in router).
-func (conn *LocalConnection) setClientPMTU(pmtu int) {
+func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 	conn.Lock()
 	defer conn.Unlock()
-	conn.clientPMTU = pmtu
+	conn.effectivePMTU = pmtu
 	conn.pmtuVerified = false
 	conn.log("Client PMTU set to", pmtu)
 }
 
-func (conn *LocalConnection) clientPMTUVerification(pmtu int) {
+func (conn *LocalConnection) effectivePMTUVerification(pmtu int) {
 	conn.Lock()
 	defer conn.Unlock()
-	if pmtu == conn.clientPMTU && !conn.pmtuVerified {
-		conn.log("Client PMTU verified at", pmtu)
+	if pmtu == conn.effectivePMTU && !conn.pmtuVerified {
+		conn.log("Effecive PMTU verified at", pmtu)
 		conn.pmtuVerified = true
 	}
 }
 
-func (conn *LocalConnection) isClientPMTUVerfied() bool {
+func (conn *LocalConnection) isEffectivePMTUVerfied() bool {
 	conn.RLock()
 	defer conn.RUnlock()
 	return conn.pmtuVerified
@@ -506,7 +506,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			}
 			conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 		} else if msg[0] == ProtocolPMTUVerified {
-			conn.clientPMTUVerification(int(binary.BigEndian.Uint16(msg[1:])))
+			conn.effectivePMTUVerification(int(binary.BigEndian.Uint16(msg[1:])))
 		} else {
 			conn.log("received unknown msg:\n", msg)
 		}
