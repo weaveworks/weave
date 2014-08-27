@@ -200,7 +200,7 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 			forwardChanDF <- frame
 			return nil
 		} else {
-			return FrameTooBigError{PMTU: clientPMTU, frame: frame}
+			return FrameTooBigError{PMTU: clientPMTU}
 		}
 	} else {
 		if stackFrag || dec == nil || len(dec.decoded) < 2 {

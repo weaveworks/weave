@@ -100,7 +100,6 @@ type EthernetDecoder struct {
 
 type FrameTooBigError struct {
 	PMTU  int
-	frame *ForwardedFrame
 }
 
 type UnknownPeersError struct {
