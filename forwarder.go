@@ -129,7 +129,7 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 	headerSize := int(ip.IHL) * 4
 	// &^ is bit clear (AND NOT). So here we're clearing the lowest 3
 	// bits.
-	maxSegmentSize := (pmtu - EthernetOverhead - headerSize) &^ 7
+	maxSegmentSize := (pmtu - headerSize) &^ 7
 	opts := gopacket.SerializeOptions{
 		FixLengths:       false,
 		ComputeChecksums: true}
