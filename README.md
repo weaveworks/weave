@@ -11,6 +11,11 @@ hosts to be connected across an untrusted network.
 With weave you can easily construct applications consisting of
 multiple containers, running anywhere.
 
+Weave complements Docker's existing networking capabilities - use
+weave to establish network connectivity *between* containers, and
+Docker port mappings etc to establish network connectivity *to*
+individual containers from the outside world.
+
 ## Installation
 
 To run weave on a host, you need to install...
