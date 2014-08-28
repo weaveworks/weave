@@ -91,7 +91,7 @@ if [ command -v ethtool >/dev/null 2>&1 ]
 then
     ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
 else
-    echo "Unable to run ethtool command; continuing without it" >&2
+    echo "Cannot find ethtool; continuing without it" >&2
 fi
 
 [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
