@@ -7,8 +7,8 @@ import (
 const (
 	Protocol          = "weave"
 	ProtocolVersion   = 8
-	UDPOverhead       = 28 // 20 bytes for IPv4, 8 bytes for UDP
 	EthernetOverhead  = 14
+	UDPOverhead       = 28 // 20 bytes for IPv4, 8 bytes for UDP
 	Port              = 6783
 	DefaultPMTU       = 65535
 	MaxUDPPacketSize  = 65536
