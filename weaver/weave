@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 BRIDGE=weave
@@ -42,7 +42,7 @@ shift 2 || usage
 #
 # TODO use the mac of one of the physical host interfaces (eth0,
 # wlan0, etc) so the name becomes stable across host restarts.
-MACADDR=$(</sys/class/net/$BRIDGE/address)
+MACADDR=`cat /sys/class/net/$BRIDGE/address`
 
 case "$COMMAND" in
     launch)
