@@ -101,7 +101,7 @@ func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 	defer conn.Unlock()
 	conn.effectivePMTU = pmtu
 	conn.pmtuVerified = false
-	conn.log("effective PMTU set to", pmtu)
+	conn.log("Effective PMTU set to", pmtu)
 }
 
 func (conn *LocalConnection) effectivePMTUVerification(pmtu int) {
