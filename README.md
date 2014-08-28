@@ -248,7 +248,8 @@ and then inspect the logs.
 (NB. This is only necessary if you want to work on weave. Also, these
 instructions have only been tested on Ubuntu.)
 
-To build weave you need `libpcap-dev` and `docker` installed.
+To build weave you need `libpcap-dev` and `docker` installed. And
+`go`.
 
 Then simply run
 
