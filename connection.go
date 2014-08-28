@@ -108,8 +108,8 @@ func (conn *LocalConnection) effectivePMTUVerification(pmtu int) {
 	conn.Lock()
 	defer conn.Unlock()
 	if pmtu == conn.effectivePMTU && !conn.pmtuVerified {
-		conn.log("Effective PMTU verified at", pmtu)
 		conn.pmtuVerified = true
+		conn.log("Effective PMTU verified at", pmtu)
 	}
 }
 
