@@ -167,9 +167,9 @@ launching weave, e.g.
 
     host1# WEAVE=$(weave launch 10.0.0.1/16 -password wEaVe)
 
-The same password must be specified for all weave peers; it is the
-basis for creating ephemeral session keys for connections between
-peers.
+The same password must be specified for all weave peers; it is the a
+component in the creation of ephemeral session keys for connections
+between peers.
 
 ### Multi-cloud networking
 
