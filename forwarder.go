@@ -87,12 +87,11 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		return nil
 	}
 	if df {
-		if len(frame.frame)-EthernetOverhead <= effectivePMTU {
+		if !frameTooBig(frame, effectivePMTU) {
 			forwardChanDF <- frame
 			return nil
-		} else {
-			return FrameTooBigError{EPMTU: effectivePMTU}
 		}
+		return FrameTooBigError{EPMTU: effectivePMTU}
 	} else {
 		if stackFrag || dec == nil || len(dec.decoded) < 2 {
 			forwardChan <- frame
@@ -100,7 +99,7 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		}
 		// Don't have trustworthy stack, so we're going to have to
 		// send it DF in any case.
-		if len(frame.frame)-EthernetOverhead <= effectivePMTU {
+		if !frameTooBig(frame, effectivePMTU) {
 			forwardChanDF <- frame
 			return nil
 		}
@@ -112,6 +111,16 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 			forwardChanDF <- segFrame
 		})
 	}
+}
+
+func frameTooBig(frame *ForwardedFrame, effectivePMTU int) bool {
+	// We capture/forward complete ethernet frames. Therefore the
+	// frame length includes the ethernet header. However, MTUs
+	// operate at the IP layer and thus do not include the ethernet
+	// header. To put it another way, when a sender that was told an
+	// MTU of M sends an IP packet of exactly that length, we will
+	// capture/forward M + EthernetOverhead bytes of data.
+	return len(frame.frame) > effectivePMTU+EthernetOverhead
 }
 
 func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFrame, forward func(*ForwardedFrame)) error {
