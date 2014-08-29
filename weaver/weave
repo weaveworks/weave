@@ -11,8 +11,8 @@ IPADDR=$2
 
 usage() {
     echo "Usage:"
-    echo "weave <ipaddr>/<subnet> launch [-passwd <passwd>] <peer_host> ..."
-    echo "weave <ipaddr>/<subnet> run <docker run args> ..."
+    echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
+    echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
     echo "weave status"
     exit 1
 }
