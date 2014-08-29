@@ -8,6 +8,11 @@ usage() {
     exit 1
 }
 
+[ `id -u` = 0 ] || {
+    echo "weave must be run as 'root'"
+    exit 1
+}
+
 [ $# -gt 1 ] || usage
 
 BRIDGE=weave
@@ -19,11 +24,6 @@ COMMAND=$1
 IPADDR=$2
 
 shift 2
-
-[ `id -u` = 0 ] || {
-    echo "weave must be run as 'root'"
-    exit 1
-}
 
 # pre-create bridge so we can set the MTU
 [ ! -d /sys/class/net/$BRIDGE ] && {
