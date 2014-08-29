@@ -11,6 +11,11 @@ hosts to be connected across an untrusted network.
 With weave you can easily construct applications consisting of
 multiple containers, running anywhere.
 
+Weave complements Docker's existing networking capabilities - use
+weave to establish network connectivity *between* containers, and
+Docker port mappings etc to establish network connectivity *to*
+individual containers from the outside world.
+
 ## Installation
 
 To run weave on a host, you need to install...
@@ -162,7 +167,9 @@ launching weave, e.g.
 
     host1# WEAVE=$(weave launch 10.0.0.1/16 -password wEaVe)
 
-The same password must be specified for all weave peers.
+The same password must be specified for all weave peers; it is the a
+component in the creation of ephemeral session keys for connections
+between peers.
 
 ### Multi-cloud networking
 
@@ -262,7 +269,8 @@ and the run command like this:
 (NB. This is only necessary if you want to work on weave. Also, these
 instructions have only been tested on Ubuntu.)
 
-To build weave you need `libpcap-dev` and `docker` installed, and the Go SDK.
+To build weave you need `libpcap-dev` and `docker` installed. And
+`go`.
 
 Then simply run
 
