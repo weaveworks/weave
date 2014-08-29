@@ -17,6 +17,12 @@ usage() {
     exit 1
 }
 
+# utility function to check whether a command can be executed by the shell
+# see http://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script
+command_exists () {
+    command -v $1 >/dev/null 2>&1
+}
+
 if [ "$COMMAND" != "status" -a "$#" -lt 2 ]; then
     usage
     exit 1
@@ -56,9 +62,9 @@ case "$COMMAND" in
         ;;
     status)
         DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave)
-        if command -v wget >/dev/null 2>&1 ; then
+        if command_exists wget ; then
             wget -O - -q $DOCKERIP:6784/status
-        elif command -v curl >/dev/null 2>&1 ; then
+        elif command_exists curl ; then
             curl $DOCKERIP:6784/status
         else
             echo "weave status needs either curl or wget to function" >&2
@@ -106,7 +112,7 @@ ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
 ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
 ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
 
-if command -v ethtool >/dev/null 2>&1
+if command_exists ethtool
 then
     ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
 else
