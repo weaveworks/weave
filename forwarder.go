@@ -206,9 +206,15 @@ func (fwd *Forwarder) Run() {
 			// to other data.
 			fwd.pmtuVerifyTick = nil
 			if !fwd.conn.isEffectivePMTUVerfied() {
-				fwd.effectivePMTU -= 8
-				fwd.maxPayload -= 8
-				fwd.updateEffectivePMTU()
+				if fwd.pmtuVerifyCount == 0 {
+					fwd.pmtuVerifyCount = PMTUVerifyAttempts
+					fwd.effectivePMTU -= 8
+					fwd.maxPayload -= 8
+					fwd.conn.setEffectivePMTU(fwd.effectivePMTU)
+				} else {
+					fwd.pmtuVerifyCount--
+				}
+				fwd.verifyEffectivePMTU()
 			}
 		case frame = <-fwd.ch:
 			if !fwd.appendFrame(frame) {
@@ -242,27 +248,16 @@ func (fwd *Forwarder) setMaxPayloadAndEffectivePMTU(pmtu int) {
 	fwd.effectivePMTU = fwd.maxPayload - fwd.enc.PacketOverhead() - fwd.enc.FrameOverhead() - EthernetOverhead
 }
 
-func (fwd *Forwarder) updateEffectivePMTU() {
-	for gotNewPMTU := true; gotNewPMTU; {
-		fwd.conn.setEffectivePMTU(fwd.effectivePMTU)
-		pmtuVerifyFrame := &ForwardedFrame{
-			srcPeer: fwd.conn.local,
-			dstPeer: fwd.conn.remote,
-			frame:   make([]byte, fwd.effectivePMTU+EthernetOverhead)}
-		gotNewPMTU = false
-		for cnt := 0; cnt < 10; cnt += 1 {
-			fwd.enc.AppendFrame(pmtuVerifyFrame)
-			err := fwd.udpSender.Send(fwd.enc.Bytes())
-			if err != nil {
-				if mtbe, ok := err.(MsgTooBigError); ok {
-					fwd.setMaxPayloadAndEffectivePMTU(mtbe.PMTU)
-					gotNewPMTU = true
-					break
-				}
-			}
-		}
+func (fwd *Forwarder) verifyEffectivePMTU() {
+	pmtuVerifyFrame := &ForwardedFrame{
+		srcPeer: fwd.conn.local,
+		dstPeer: fwd.conn.remote,
+		frame:   make([]byte, fwd.effectivePMTU+EthernetOverhead)}
+	fwd.enc.AppendFrame(pmtuVerifyFrame)
+	fwd.flush()
+	if fwd.pmtuVerifyTick == nil {
+		fwd.pmtuVerifyTick = time.After(PMTUVerifyTimeout << (PMTUVerifyAttempts - fwd.pmtuVerifyCount))
 	}
-	fwd.pmtuVerifyTick = time.After(PMTUVerifyTimeout)
 }
 
 func (fwd *Forwarder) appendFrame(frame *ForwardedFrame) bool {
@@ -279,7 +274,9 @@ func (fwd *Forwarder) flush() {
 	if err != nil {
 		if mtbe, ok := err.(MsgTooBigError); ok {
 			fwd.setMaxPayloadAndEffectivePMTU(mtbe.PMTU)
-			fwd.updateEffectivePMTU()
+			fwd.conn.setEffectivePMTU(fwd.effectivePMTU)
+			fwd.pmtuVerifyCount = PMTUVerifyAttempts
+			fwd.verifyEffectivePMTU()
 		} else if PosixError(err) == syscall.ENOBUFS {
 			// TODO handle this better
 		} else {

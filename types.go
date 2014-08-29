@@ -86,14 +86,15 @@ type ConnectionInteraction struct {
 }
 
 type Forwarder struct {
-	conn           *LocalConnection
-	ch             <-chan *ForwardedFrame
-	stop           <-chan interface{}
-	pmtuVerifyTick <-chan time.Time
-	enc            Encryptor
-	udpSender      UDPSender
-	maxPayload     int
-	effectivePMTU  int
+	conn            *LocalConnection
+	ch              <-chan *ForwardedFrame
+	stop            <-chan interface{}
+	pmtuVerifyTick  <-chan time.Time
+	pmtuVerifyCount uint
+	enc             Encryptor
+	udpSender       UDPSender
+	maxPayload      int
+	effectivePMTU   int
 }
 
 type UDPPacket struct {
