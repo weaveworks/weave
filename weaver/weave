@@ -1,6 +1,15 @@
 #!/bin/sh
 set -e
 
+usage() {
+    echo "Usage:"
+    echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
+    echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
+    exit 1
+}
+
+[ $# -gt 1 ] || usage
+
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
@@ -9,14 +18,7 @@ SCRIPT_DIR=$(dirname $(readlink -f $0))
 COMMAND=$1
 IPADDR=$2
 
-usage() {
-    echo "Usage:"
-    echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
-    echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
-    exit 1
-}
-
-shift 2 || usage
+shift 2
 
 [ `id -u` = 0 ] || {
     echo "weave must be run as 'root'"
