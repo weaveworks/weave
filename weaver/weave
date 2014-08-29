@@ -19,7 +19,6 @@ BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
 
-SCRIPT_DIR=$(dirname $(readlink -f $0))
 COMMAND=$1
 IPADDR=$2
 
