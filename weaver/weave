@@ -17,7 +17,7 @@ usage() {
     exit 1
 }
 
-if [ "$#" -lt 1 ]; then
+if [ "$COMMAND" != "status" -a "$#" -lt 2 ]; then
     usage
     exit 1
 fi
