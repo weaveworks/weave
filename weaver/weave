@@ -24,22 +24,24 @@ IPADDR=$2
 
 shift 2
 
-# pre-create bridge so we can set the MTU
-[ ! -d /sys/class/net/$BRIDGE ] && {
-    ip link add dev $BRIDGE type bridge
-    ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/random | tr \  : | tail -c+2)
-    # attempting to set the bridge MTU to a high value directly
-    # fails. Bridges take the lowest MTU of their interfaces. So
-    # instead we create a temporary interface with the desired MTU,
-    # attach that to the bridge, and then remove it again.
-    ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
-    ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
-    ip link del dev v${CONTAINER_IFNAME}du
-    ip link set dev $BRIDGE up
+create_bridge() {
+    [ ! -d /sys/class/net/$BRIDGE ] && {
+        ip link add dev $BRIDGE type bridge
+        ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/random | tr \  : | tail -c+2)
+        # Attempting to set the bridge MTU to a high value directly
+        # fails. Bridges take the lowest MTU of their interfaces. So
+        # instead we create a temporary interface with the desired
+        # MTU, attach that to the bridge, and then remove it again.
+        ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
+        ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
+        ip link del dev v${CONTAINER_IFNAME}du
+        ip link set dev $BRIDGE up
+    }
 }
 
 case "$COMMAND" in
     launch)
+        create_bridge
         # We set the router name to the bridge mac since that is
         # stable across re-creations of the containers.
         #
@@ -51,6 +53,7 @@ case "$COMMAND" in
         IFACE=eth0
         ;;
     run)
+        create_bridge
         CONTAINER=$(docker run -d "$@")
         IFACE=$CONTAINER_IFNAME
         ;;
