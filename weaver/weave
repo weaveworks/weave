@@ -19,7 +19,7 @@ usage() {
 
 if [ "$#" -lt 1 ]; then
     usage
-exit 1
+    exit 1
 fi
 
 [ `id -u` = 0 ] || {

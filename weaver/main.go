@@ -9,6 +9,7 @@ import (
 	"github.com/davecheney/profile"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -123,10 +124,18 @@ func main() {
 			}
 		}()
 	}
-	httpResponder := weave.NewHttpStatusResponder(router)
-	go httpResponder.ListenAndServe()
+	go handleHttp(router)
 	handleSignals(router)
 }
+
+func handleHttp(router *weave.Router) {
+	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, router.Status())
+	})
+	address := fmt.Sprintf(":%d", weave.StatusPort)
+	http.ListenAndServe(address, nil)
+}
+
 
 func handleSignals(router *weave.Router) {
 	sigs := make(chan os.Signal, 1)
