@@ -35,8 +35,8 @@ create_bridge() {
         ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
         ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
         ip link del dev v${CONTAINER_IFNAME}du
-        ip link set dev $BRIDGE up
     }
+    ip link set dev $BRIDGE up
 }
 
 case "$COMMAND" in
