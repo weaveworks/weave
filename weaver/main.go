@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/zettio/weave"
+	"github.com/bboreham/weave"
 	"code.google.com/p/gopacket/layers"
 	"crypto/sha256"
 	"flag"
@@ -70,7 +70,7 @@ func main() {
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
 	flag.Parse()
 	peers = flag.Args()
-
+    
 	if ifaceName == "" {
 		fmt.Println("Missing required parameter 'iface'")
 		os.Exit(1)
@@ -123,6 +123,8 @@ func main() {
 			}
 		}()
 	}
+    httpResponder := weave.NewHttpStatusResponder(router)
+    go httpResponder.ListenAndServe()
 	handleSignals(router)
 }
 

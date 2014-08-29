@@ -13,10 +13,14 @@ usage() {
     echo "Usage:"
     echo "weave <ipaddr>/<subnet> launch [-passwd <passwd>] <peer_host> ..."
     echo "weave <ipaddr>/<subnet> run <docker run args> ..."
+    echo "weave status"
     exit 1
 }
 
-shift 2 || usage
+if [ "$#" -lt 1 ]; then
+    usage
+exit 1
+fi
 
 [ `id -u` = 0 ] || {
     echo "weave must be run as 'root'"
@@ -46,10 +50,25 @@ MACADDR=`cat /sys/class/net/$BRIDGE/address`
 
 case "$COMMAND" in
     launch)
+        shift 2
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
         IFACE=eth0
         ;;
+    status)
+        DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave)
+        if command -v wget >/dev/null 2>&1 ; then
+            wget -O - -q $DOCKERIP:6784/status
+        elif command -v curl >/dev/null 2>&1 ; then
+            curl $DOCKERIP:6784/status
+        else
+            echo "weave status needs either curl or wget to function" >&2
+            exit 1
+        fi
+        # return the status from the wget or curl command, so if they fail then we fail.
+        exit $?
+        ;;
     run)
+        shift 2
         CONTAINER=$(docker run -d "$@")
         IFACE=$CONTAINER_IFNAME
         ;;
@@ -87,8 +106,7 @@ ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
 ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
 ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
 
-if [ command -v ethtool >/dev/null 2>&1 ]
-then
+if command -v ethtool >/dev/null 2>&1 ; then
     ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
 else
     echo "Cannot find ethtool; continuing without it" >&2
