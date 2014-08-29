@@ -106,7 +106,8 @@ ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
 ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
 ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
 
-if command -v ethtool >/dev/null 2>&1 ; then
+if [ command -v ethtool >/dev/null 2>&1 ]
+then
     ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
 else
     echo "Cannot find ethtool; continuing without it" >&2
