@@ -205,7 +205,8 @@ requires the following steps on $HOST2...
    container service. This needs to be done once for every service we
    want to expose.
 
-        host2# iptables -t nat -A PREROUTING -p udp -i eth0 --dport 2211 -j DNAT --to-destination 10.0.1.1:4422
+        host2# iptables -t nat -A PREROUTING -p udp -i eth0 --dport 2211 -j DNAT \
+               --to-destination 10.0.1.1:4422
 
     Here we are assuming that the "outside world" is connecting to
     $HOST2 via 'eth0'. We want UDP traffic to port 2211 on the
