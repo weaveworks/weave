@@ -210,7 +210,7 @@ Say we want to make our 'nc' "service" that is running in the
 container on $HOST1 accessible to the outside world via $HOST2.
 
 First we need to expose the application network to the host, as
-explained [above](#Host network integration), i.e.
+explained [above](#host-network-integration), i.e.
 
     host2# weave expose 10.0.1.102/24
 
