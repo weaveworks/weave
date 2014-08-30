@@ -34,17 +34,21 @@ func (conn *LocalConnection) ensureForwarders() error {
 		forwardChanDF = make(chan *ForwardedFrame, ChannelSize)
 		stopForward   = make(chan interface{}, 0)
 		stopForwardDF = make(chan interface{}, 0)
+		verifyPMTU    = make(chan int, ChannelSize)
 	)
-	forwarder := NewForwarder(conn, forwardChan, stopForward, encryptor, udpSender, DefaultPMTU)
-	forwarderDF := NewForwarder(conn, forwardChanDF, stopForwardDF, encryptorDF, udpSenderDF, DefaultPMTU)
+	//NB: only forwarderDF can ever encounter EMSGSIZE errors, and
+	//thus perform PMTU verification
+	forwarder := NewForwarder(conn, forwardChan, stopForward, nil, encryptor, udpSender, DefaultPMTU)
+	forwarderDF := NewForwarder(conn, forwardChanDF, stopForwardDF, verifyPMTU, encryptorDF, udpSenderDF, DefaultPMTU)
 
-	// The forward chans and effectivePMTU in the conn struct are read
-	// by other processes, so we have to use locks.
+	// Various fields in the conn struct are read by other processes,
+	// so we have to use locks.
 	conn.Lock()
 	conn.forwardChan = forwardChan
 	conn.forwardChanDF = forwardChanDF
 	conn.stopForward = stopForward
 	conn.stopForwardDF = stopForwardDF
+	conn.verifyPMTU = verifyPMTU
 	conn.effectivePMTU = forwarder.effectivePMTU
 	conn.Unlock()
 
@@ -179,13 +183,14 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 
 // Forwarder
 
-func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, stop <-chan interface{}, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
-	forwarder := &Forwarder{
-		conn:      conn,
-		ch:        ch,
-		stop:      stop,
-		enc:       enc,
-		udpSender: udpSender}
+func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, stop <-chan interface{}, pmtuVerified <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
+ 	forwarder := &Forwarder{
+		conn:         conn,
+		ch:           ch,
+		stop:         stop,
+		pmtuVerified: pmtuVerified,
+		enc:          enc,
+		udpSender:    udpSender}
 	forwarder.setMaxPayloadAndEffectivePMTU(pmtu)
 	return forwarder
 }
@@ -216,6 +221,8 @@ func (fwd *Forwarder) Run() {
 				}
 				fwd.verifyEffectivePMTU()
 			}
+		case pmtu := <-fwd.pmtuVerified:
+			fwd.conn.effectivePMTUVerification(pmtu)
 		case frame = <-fwd.ch:
 			if !fwd.appendFrame(frame) {
 				fwd.logDrop(frame)

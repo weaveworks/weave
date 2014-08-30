@@ -73,6 +73,7 @@ type LocalConnection struct {
 	forwardChanDF chan<- *ForwardedFrame
 	stopForward   chan<- interface{}
 	stopForwardDF chan<- interface{}
+	verifyPMTU    chan<- int
 	Decryptor     Decryptor
 	Router        *Router
 	UID           uint64
@@ -90,6 +91,7 @@ type Forwarder struct {
 	ch              <-chan *ForwardedFrame
 	stop            <-chan interface{}
 	pmtuVerifyTick  <-chan time.Time
+	pmtuVerified    <-chan int
 	pmtuVerifyCount uint
 	enc             Encryptor
 	udpSender       UDPSender
