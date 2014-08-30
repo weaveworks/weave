@@ -8,13 +8,15 @@ plugged into the same network switch, with no need to configure port
 mappings, links, etc. Weave can optionally encrypt traffic, allowing
 hosts to be connected across an untrusted network.
 
+Services provided by application containers on the weave network can
+be made accessible to the outside world, regardless of where those
+containers are running.
+
 With weave you can easily construct applications consisting of
 multiple containers, running anywhere.
 
-Weave complements Docker's existing networking capabilities - use
-weave to establish network connectivity *between* containers, and
-Docker port mappings etc to establish network connectivity *to*
-individual containers from the outside world.
+Weave works alongside Docker's existing (single host) networking
+capabilities, so these can continue to be used by containers.
 
 ## Installation
 
@@ -56,9 +58,10 @@ If our application consists of more than one container on this host we
 simply launch them with a variation on that 2nd line.
 
 The IP addresses and netmasks can be anything you like which doesn't
-conflict with any IP ranges of 'external' services your containers
-need to connect to. The same IP range must be used everywhere, and the
-individual IP addresses must, of course, be unique.
+conflict with any IP ranges of 'external' services the hosts or your
+containers need to connect to. The same IP range must be used
+everywhere, and the individual IP addresses must, of course, be
+unique.
 
 We repeat similar steps on $HOST2...
 
@@ -170,6 +173,52 @@ launching weave, e.g.
 The same password must be specified for all weave peers; it is the a
 component in the creation of ephemeral session keys for connections
 between peers.
+
+### External access
+
+Services running in containers on a weave network can be made
+accessible to the outside world (or, more generally, other networks)
+from any weave host, regardless of where the service containers are
+located.
+
+Say we want to make our 'nc' "service" that is running in the
+container on $HOST1 accessible to the outside world via $HOST2. This
+requires the following steps on $HOST2...
+
+1. Add a NAT masquerading rule for the entire weave network. This
+   needs to be done just once.
+
+        host2# iptables -t nat -A POSTROUTING -d 10.0.0.2/16 ! -s 10.0.0.2/16 -j MASQUERADE
+
+   The IP address and netmask are the same as given in the `weave
+   launch` command.
+
+2. Add an IP address to the weave bridge. This needs to be done once
+   for every weave application subnet.
+
+        host2# ip addr add dev weave 10.0.1.102/24
+
+   The address must be on the destination container's weave subnet and
+   not already in use.
+
+3. Add a NAT rule to route from the outside world to the destination
+   container service. This needs to be done once for every service we
+   want to expose.
+
+        host2# iptables -t nat -A PREROUTING -p udp -i eth0 --dport 2211 -j DNAT --to-destination 10.0.1.1:4422
+
+    Here we are assuming that the "outside world" is connecting to
+    $HOST2 via 'eth0'. We want UDP traffic to port 2211 on the
+    external IPs to be routed to our 'nc' service, which is running on
+    port 4422 in the container with IP 10.0.1.1.
+
+With the above in place, we can connect to our 'nc' service from anywhere with
+
+    nc -u $HOST2 2211
+
+Similar NAT rules to the above can used to expose services provided by
+containers on the weave network not just to outside world but also
+other, internal, networks.
 
 ### Multi-cloud networking
 
