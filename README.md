@@ -279,3 +279,6 @@ Then simply run
 
 This will build the weave router, produce a docker image
 `zettio/weave` and export that image to /tmp/weave.tar
+
+If you are interested in the inner workings of weave, read the
+[architecture documentation](docs/architecture.txt).
