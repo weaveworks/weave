@@ -40,7 +40,7 @@ two containers, one on each host.
 On $HOST1 run (as root)
 
     host1# WEAVE=$(weave launch 10.0.0.1/16)
-    host1# C=$(weave run 10.0.1.1/24 -t -i debian /bin/bash)
+    host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu /bin/bash)
 
 The first line starts the weave router, in a container. This needs to
 be done once on each host. We tell weave that its IP address should
@@ -50,7 +50,7 @@ The second line starts our application container. We give it an IP
 address and network (a subnet of the weave network). `weave run`
 invokes `docker run -d` with all the parameter following the IP
 address and netmask. So we could be launching any container this way;
-here we just take a stock debian container and launch a shell in it.
+here we just take a stock ubuntu container and launch a shell in it.
 
 If our application consists of more than one container on this host we
 simply launch them with a variation on that 2nd line.
@@ -63,7 +63,7 @@ individual IP addresses must, of course, be unique.
 We repeat similar steps on $HOST2...
 
     host2# WEAVE=$(weave launch 10.0.0.2/16 $HOST1)
-    host2# C=$(weave run 10.0.1.2/24 -t -i debian /bin/bash)
+    host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu /bin/bash)
 
 The only difference, apart from the IP addresses, is that we tell our
 weave that it should peer with the weave running on $HOST1. We could
@@ -135,8 +135,8 @@ To accomplish that, we assign each application a different subnet. So,
 in the above example, if we wanted to add another application similar
 to, but isolated from, our first, we'd launch the containers with...
 
-    host1# D=$(weave run 10.0.2.1/24 -t -i debian /bin/bash)
-    host2# D=$(weave run 10.0.2.2/24 -t -i debian /bin/bash)
+    host1# D=$(weave run 10.0.2.1/24 -t -i ubuntu /bin/bash)
+    host2# D=$(weave run 10.0.2.2/24 -t -i ubuntu /bin/bash)
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
@@ -263,7 +263,7 @@ example above, the 'launch' command would be run like this:
 
 and the 'run' command like this:
 
-    host1# C=$(boot2docker ssh "sudo ./weave run 10.0.1.1/24 -t -i debian /bin/bash")
+    host1# C=$(boot2docker ssh "sudo ./weave run 10.0.1.1/24 -t -i ubuntu /bin/bash")
 
 ## Building
 
