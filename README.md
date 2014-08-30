@@ -185,15 +185,7 @@ Say we want to make our 'nc' "service" that is running in the
 container on $HOST1 accessible to the outside world via $HOST2. This
 requires the following steps on $HOST2...
 
-1. Add a NAT masquerading rule for the entire weave network. This
-   needs to be done just once.
-
-        host2# iptables -t nat -A POSTROUTING -d 10.0.0.2/16 ! -s 10.0.0.2/16 -j MASQUERADE
-
-   The IP address and netmask are the same as given in the `weave
-   launch` command.
-
-2. Add an IP address to the weave bridge. This needs to be done once
+1. Add an IP address to the weave bridge. This needs to be done once
    for every weave application subnet.
 
         host2# ip addr add dev weave 10.0.1.102/24
@@ -201,7 +193,7 @@ requires the following steps on $HOST2...
    The address must be on the destination container's weave subnet and
    not already in use.
 
-3. Add a NAT rule to route from the outside world to the destination
+2. Add a NAT rule to route from the outside world to the destination
    container service. This needs to be done once for every service we
    want to expose.
 

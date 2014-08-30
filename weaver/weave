@@ -39,9 +39,18 @@ create_bridge() {
     ip link set dev $BRIDGE up
 }
 
+setup_masquerading() {
+    IPTABLES_ARGS="POSTROUTING -d $IPADDR ! -s $IPADDR -j MASQUERADE"
+    if ! iptables -w -t nat -C $IPTABLES_ARGS >/dev/null 2>&1
+    then
+        iptables -w -t nat -A $IPTABLES_ARGS >/dev/null
+    fi
+}
+
 case "$COMMAND" in
     launch)
         create_bridge
+        setup_masquerading
         # We set the router name to the bridge mac since that is
         # stable across re-creations of the containers.
         #
