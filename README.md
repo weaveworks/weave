@@ -174,6 +174,31 @@ The same password must be specified for all weave peers; it is the a
 component in the creation of ephemeral session keys for connections
 between peers.
 
+### Host network integration
+
+Weave application networks can be integrated with a host's network,
+establishing connectivity between the host and application containers
+anywhere.
+
+Let's say we want $HOST2 to have access to the containers from our
+example. On $HOST2 we run
+
+    host2# weave expose 10.0.1.102/24
+
+choosing an unused IP address in the application subnet.
+
+Now
+
+    host2# ping 10.0.1.2
+
+will work. And, more interestingly,
+
+    host2# ping 10.0.1.1
+    host2# echo 'Hello, world.' | nc -u 10.0.1.1 1122
+
+will work too, which is interacting with a container that resides on
+$HOST1.
+
 ### External access
 
 Services running in containers on a weave network can be made
@@ -182,33 +207,31 @@ from any weave host, regardless of where the service containers are
 located.
 
 Say we want to make our 'nc' "service" that is running in the
-container on $HOST1 accessible to the outside world via $HOST2. This
-requires the following steps on $HOST2...
+container on $HOST1 accessible to the outside world via $HOST2.
 
-1. Add an IP address to the weave bridge. This needs to be done once
-   for every weave application subnet.
+First we need to expose the application network to the host, as
+explained in [Host network integration], i.e.
 
-        host2# ip addr add dev weave 10.0.1.102/24
+    host2# weave expose 10.0.1.102/24
 
-   The address must be on the destination container's weave subnet and
-   not already in use.
+Then we add a NAT rule to route from the outside world to the
+destination container service.
 
-2. Add a NAT rule to route from the outside world to the destination
-   container service. This needs to be done once for every service we
-   want to expose.
+    host2# iptables -t nat -A PREROUTING -p udp -i eth0 --dport 2211 -j DNAT \
+           --to-destination 10.0.1.1:4422
 
-        host2# iptables -t nat -A PREROUTING -p udp -i eth0 --dport 2211 -j DNAT \
-               --to-destination 10.0.1.1:4422
-
-    Here we are assuming that the "outside world" is connecting to
-    $HOST2 via 'eth0'. We want UDP traffic to port 2211 on the
-    external IPs to be routed to our 'nc' service, which is running on
-    port 4422 in the container with IP 10.0.1.1.
+Here we are assuming that the "outside world" is connecting to $HOST2
+via 'eth0'. We want UDP traffic to port 2211 on the external IPs to be
+routed to our 'nc' service, which is running on port 4422 in the
+container with IP 10.0.1.1.
 
 With the above in place, we can connect to our 'nc' service from
 anywhere with
 
-    nc -u $HOST2 2211
+    echo 'Hello, world.' | nc -u $HOST2 4422
+
+(NB: due to the way routing is handled in the Linux kernel, this won't
+work when run *on* $HOST2.)
 
 Similar NAT rules to the above can used to expose services provided by
 containers on the weave network not just to outside world but also

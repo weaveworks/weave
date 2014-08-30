@@ -5,6 +5,7 @@ usage() {
     echo "Usage:"
     echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
+    echo "weave expose <ipaddr>/<subnet>"
     exit 1
 }
 
@@ -59,12 +60,21 @@ case "$COMMAND" in
         # restarts.
         MACADDR=`cat /sys/class/net/$BRIDGE/address`
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
+        echo $CONTAINER
         IFACE=eth0
         ;;
     run)
         create_bridge
         CONTAINER=$(docker run -d "$@")
+        echo $CONTAINER
         IFACE=$CONTAINER_IFNAME
+        ;;
+    expose)
+        if ! ip addr list dev $BRIDGE | grep -qF $IPADDR
+        then
+            ip addr add dev $BRIDGE $IPADDR
+        fi
+        exit 0
         ;;
     *)
         echo "Unknown weave command '$COMMAND'"
@@ -108,5 +118,3 @@ else
 fi
 
 [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
-
-echo $CONTAINER
