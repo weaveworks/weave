@@ -213,7 +213,8 @@ requires the following steps on $HOST2...
     external IPs to be routed to our 'nc' service, which is running on
     port 4422 in the container with IP 10.0.1.1.
 
-With the above in place, we can connect to our 'nc' service from anywhere with
+With the above in place, we can connect to our 'nc' service from
+anywhere with
 
     nc -u $HOST2 2211
 
