@@ -111,15 +111,21 @@ To application containers, the network established by weave looks
 like a giant Ethernet switch to which all the containers are
 connected.
 
-That means *any* protocol is supported. Doesn't even have to be over
-TCP/IP, e.g. in the above example,
+Containers can easily access services from each other, e.g. in the
+container on $HOST1 we can start a netcat "service" with
 
-    root@28841bd02eff:/# nc -lu -p 4422
+    root@28841bd02eff:/# nc -lk -p 4422
 
-    root@f76829496120:/# echo 'Hello, world.' | nc -u 10.0.1.1 4422
+and then connect to it from the container on $HOST2 with
 
-sends some data from the 2nd container to the first over a UDP
-connection on port 4422.
+    root@f76829496120:/# echo 'Hello, world.' | nc 10.0.1.1 4422
+
+Note that *any* protocol is supported. Doesn't even have to be over
+TCP/IP, e.g. a netcat UDP service would be run with
+
+    root@28841bd02eff:/# nc -lu -p 5533
+
+    root@f76829496120:/# echo 'Hello, world.' | nc -u 10.0.1.1 5533
 
 We can deploy the entire arsenal of standard network tools and
 applications, developed over decades, to configure, secure, monitor,
@@ -194,10 +200,8 @@ Now
 will work. And, more interestingly,
 
     host2# ping 10.0.1.1
-    host2# echo 'Hello, world.' | nc -u 10.0.1.1 4422
 
-will work too, which is interacting with a container that resides on
-$HOST1.
+will work too, which is talking to a container that resides on $HOST1.
 
 ### External access
 
@@ -206,8 +210,8 @@ accessible to the outside world (or, more generally, other networks)
 from any weave host, regardless of where the service containers are
 located.
 
-Say we want to make our 'nc' "service" that is running in the
-container on $HOST1 accessible to the outside world via $HOST2.
+Say we want to make our example netcat "service", which is running in
+a container on $HOST1, accessible to the outside world via $HOST2.
 
 First we need to expose the application network to the host, as
 explained [above](#host-network-integration), i.e.
@@ -217,11 +221,11 @@ explained [above](#host-network-integration), i.e.
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
-    host2# iptables -t nat -A PREROUTING -p udp -i eth0 --dport 2211 -j DNAT \
+    host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 -j DNAT \
            --to-destination 10.0.1.1:4422
 
 Here we are assuming that the "outside world" is connecting to $HOST2
-via 'eth0'. We want UDP traffic to port 2211 on the external IPs to be
+via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
 routed to our 'nc' service, which is running on port 4422 in the
 container with IP 10.0.1.1.
 
