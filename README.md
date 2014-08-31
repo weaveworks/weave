@@ -287,10 +287,11 @@ the partition heals.
 The weave container is very light-weight - just over 8MB image size
 and a few 10s of MBs of runtime memory - and disposable. I.e. should
 weave ever run into difficulty, one can simply bounce the weave
-container (though note issue #18). Application containers do *not*
-have to be restarted in that event, and indeed may not even experience
-a temporary connectivity failure if the weave container is restarted
-quickly enough.
+container (though note
+[issue #18](https://github.com/zettio/weave/issues/18)). Application
+containers do *not* have to be restarted in that event, and indeed may
+not even experience a temporary connectivity failure if the weave
+container is restarted quickly enough.
 
 ## Troubleshooting
 
