@@ -72,9 +72,8 @@ The only difference, apart from the IP addresses, is that we tell our
 weave that it should peer with the weave running on $HOST1. We could
 instead have told the weave on $HOST1 to connect to $HOST2, or told
 both about each other. Order doesn't matter here; weave automatically
-(re)connects to peers when they are become available. Also, we can
-tell weave to connect to multiple peers by supplying multiple
-addresses.
+(re)connects to peers when they become available. Also, we can tell
+weave to connect to multiple peers by supplying multiple addresses.
 
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...
@@ -176,7 +175,7 @@ launching weave, e.g.
 
     host1# WEAVE=$(weave launch 10.0.0.1/16 -password wEaVe)
 
-The same password must be specified for all weave peers; it is the a
+The same password must be specified for all weave peers; it is a
 component in the creation of ephemeral session keys for connections
 between peers.
 
@@ -186,8 +185,8 @@ Weave application networks can be integrated with a host's network,
 establishing connectivity between the host and application containers
 anywhere.
 
-Let's say we want $HOST2 to have access to the containers from our
-example. On $HOST2 we run
+Let's say that in our example we we want $HOST2 to have access to the
+application containers. On $HOST2 we run
 
     host2# weave expose 10.0.1.102/24
 
@@ -206,7 +205,7 @@ will work too, which is talking to a container that resides on $HOST1.
 ### External access
 
 Services running in containers on a weave network can be made
-accessible to the outside world (or, more generally, other networks)
+accessible to the outside world (and, more generally, other networks)
 from any weave host, regardless of where the service containers are
 located.
 
@@ -237,9 +236,8 @@ anywhere with
 (NB: due to the way routing is handled in the Linux kernel, this won't
 work when run *on* $HOST2.)
 
-Similar NAT rules to the above can used to expose services provided by
-containers on the weave network not just to outside world but also
-other, internal, networks.
+Similar NAT rules to the above can used to expose services not just to
+outside world but also other, internal, networks.
 
 ### Multi-cloud networking
 
