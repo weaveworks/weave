@@ -506,7 +506,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			}
 			conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 		} else if msg[0] == ProtocolPMTUVerified {
-			conn.effectivePMTUVerification(int(binary.BigEndian.Uint16(msg[1:])))
+			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else {
 			conn.log("received unknown msg:\n", msg)
 		}
