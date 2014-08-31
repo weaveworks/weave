@@ -41,7 +41,7 @@ two containers, one on each host.
 
 On $HOST1 run (as root)
 
-    host1# WEAVE=$(weave launch 10.0.0.1/16)
+    host1# weave launch 10.0.0.1/16
     host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu /bin/bash)
 
 The first line starts the weave router, in a container. This needs to
@@ -65,7 +65,7 @@ unique.
 
 We repeat similar steps on $HOST2...
 
-    host2# WEAVE=$(weave launch 10.0.0.2/16 $HOST1)
+    host2# weave launch 10.0.0.2/16 $HOST1
     host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu /bin/bash)
 
 The only difference, apart from the IP addresses, is that we tell our
@@ -173,7 +173,7 @@ In order to connect containers across untrusted networks, weave peers
 can be told to encrypt traffic by supplying a `-password` option when
 launching weave, e.g.
 
-    host1# WEAVE=$(weave launch 10.0.0.1/16 -password wEaVe)
+    host1# weave launch 10.0.0.1/16 -password wEaVe
 
 The same password must be specified for all weave peers; it is a
 component in the creation of ephemeral session keys for connections
@@ -296,7 +296,7 @@ enough.
 
 Check the weave container logs with
 
-    docker logs $WEAVE
+    docker logs weave
 
 A reasonable amount of information, and all errors, get logged there.
 
@@ -307,7 +307,7 @@ basis, so can produce a lot of output.
 One can ask a weave router to log a status report by sending it a USR1
 signal, e.g.
 
-    kill -USR1 `docker inspect --format='{{ .State.Pid }}' $WEAVE`
+    kill -USR1 `docker inspect --format='{{ .State.Pid }}' weave`
 
 and then inspect the logs.
 
@@ -327,7 +327,7 @@ make it executable like this:
 Then, if we were trying to create the same containers as in the first
 example above, the 'launch' command would be run like this:
 
-    host1$ WEAVE=$(boot2docker ssh "sudo ./weave launch 10.0.0.1/16")
+    host1$ boot2docker ssh "sudo ./weave launch 10.0.0.1/16"
 
 and the 'run' command like this:
 
