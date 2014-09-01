@@ -30,8 +30,15 @@ To run weave on a host, you need to install...
           https://raw.githubusercontent.com/zettio/weave/master/weaver/weave
         sudo chmod a+x /usr/local/bin/weave
 
-3. ethtool. On many systems that is installed already; if not then
-grab it via your favourite package manager.
+3. (recommended) ethtool. On many systems this is installed already;
+   if not then grab it via your favourite package manager. On some
+   systems, weave application container networking may not operate
+   correctly unless ethtool is available.
+
+4. (optional) conntrack. Install this via your favourite package
+   manager. Without conntrack, the weave network may not re-establish
+   itself fully when individual weave instances are stopped (with
+   `weave stop`) and restarted quickly (typically within ~3 minutes).
 
 ## Example
 
@@ -286,12 +293,11 @@ the partition heals.
 
 The weave container is very light-weight - just over 8MB image size
 and a few 10s of MBs of runtime memory - and disposable. I.e. should
-weave ever run into difficulty, one can simply bounce the weave
-container (though note
-[issue #18](https://github.com/zettio/weave/issues/18)). Application
-containers do *not* have to be restarted in that event, and indeed may
-not even experience a temporary connectivity failure if the weave
-container is restarted quickly enough.
+weave ever run into difficulty, one can simply stop it (with `weave
+stop`) and restart it. Application containers do *not* have to be
+restarted in that event, and indeed may not even experience a
+temporary connectivity failure if the weave container is restarted
+quickly enough.
 
 ## Troubleshooting
 

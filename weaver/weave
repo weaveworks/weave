@@ -6,6 +6,7 @@ usage() {
     echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
     echo "weave expose <ipaddr>/<subnet>"
+    echo "weave stop"
     exit 1
 }
 
@@ -14,16 +15,15 @@ usage() {
     exit 1
 }
 
-[ $# -gt 1 ] || usage
+[ $# -gt 0 ] || usage
 
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
 
 COMMAND=$1
-IPADDR=$2
 
-shift 2
+shift 1
 
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
@@ -50,6 +50,9 @@ setup_masquerading() {
 
 case "$COMMAND" in
     launch)
+        [ $# -gt 0 ] || usage
+        IPADDR=$1
+        shift 1
         create_bridge
         setup_masquerading
         # We set the router name to the bridge mac since that is
@@ -64,15 +67,32 @@ case "$COMMAND" in
         IFACE=eth0
         ;;
     run)
+        [ $# -gt 0 ] || usage
+        IPADDR=$1
+        shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@")
         echo $CONTAINER
         IFACE=$CONTAINER_IFNAME
         ;;
     expose)
+        [ $# -gt 0 ] || usage
+        IPADDR=$1
+        shift 1
         if ! ip addr list dev $BRIDGE | grep -qF $IPADDR
         then
             ip addr add dev $BRIDGE $IPADDR
+        fi
+        exit 0
+        ;;
+    stop)
+        docker kill weave > /dev/null
+        docker rm weave > /dev/null
+        if command -v conntrack >/dev/null 2>&1
+        then
+            conntrack -D -p udp --dport 6783 >/dev/null 2>&1
+        else
+            echo "Cannot find conntrack; please install it. Continuing without it." >&2
         fi
         exit 0
         ;;
@@ -114,7 +134,7 @@ if command -v ethtool >/dev/null 2>&1
 then
     ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
 else
-    echo "Cannot find ethtool; continuing without it" >&2
+    echo "Cannot find ethtool; please install it. Continuing without it." >&2
 fi
 
 [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
