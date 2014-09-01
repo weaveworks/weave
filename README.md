@@ -358,3 +358,9 @@ This will build the weave router, produce a docker image
 
 If you are interested in the inner workings of weave, read the
 [architecture documentation](docs/architecture.txt).
+
+## Contact Us
+
+Found a bug, want to suggest a feature, or have a question?
+[File an issue](https://github.com/zettio/weave/issues), or email us
+at weave@zett.io.
