@@ -80,7 +80,8 @@ weave that it should peer with the weave running on $HOST1. We could
 instead have told the weave on $HOST1 to connect to $HOST2, or told
 both about each other. Order doesn't matter here; weave automatically
 (re)connects to peers when they become available. Also, we can tell
-weave to connect to multiple peers by supplying multiple addresses.
+weave to connect to multiple peers by supplying multiple
+addresses. And we can [add peers dynamically](#dynamic-topologies).
 
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...
