@@ -15,9 +15,12 @@ import (
 const macMaxAge = 10 * time.Minute
 
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
+	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
+		log.Println("Expired MAC", mac, "at", peer.Name)
+	}
 	router := &Router{
 		Iface:     iface,
-		Macs:      NewMacCache(macMaxAge),
+		Macs:      NewMacCache(macMaxAge, onMacExpiry),
 		Peers:     NewPeerCache(),
 		ConnLimit: connLimit,
 		BufSz:     bufSz,

@@ -18,12 +18,14 @@ type MacCache struct {
 	table       map[uint64]*MacCacheEntry
 	maxAge      time.Duration
 	expiryTimer *time.Timer
+	onExpiry    func(net.HardwareAddr, *Peer)
 }
 
-func NewMacCache(maxAge time.Duration) *MacCache {
+func NewMacCache(maxAge time.Duration, onExpiry func(net.HardwareAddr, *Peer)) *MacCache {
 	res := &MacCache{
-		table:  make(map[uint64]*MacCacheEntry),
-		maxAge: maxAge}
+		table:    make(map[uint64]*MacCacheEntry),
+		maxAge:   maxAge,
+		onExpiry: onExpiry}
 	res.setExpiryTimer()
 	return res
 }
@@ -102,6 +104,7 @@ func (cache *MacCache) expire() {
 	for key, entry := range cache.table {
 		if now.After(entry.lastSeen.Add(cache.maxAge)) {
 			delete(cache.table, key)
+			cache.onExpiry(intmac(key), entry.peer)
 		}
 	}
 	cache.setExpiryTimer()
