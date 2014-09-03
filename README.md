@@ -210,17 +210,17 @@ will work. And, more interestingly,
 
 will work too, which is talking to a container that resides on $HOST1.
 
-### External access
+### Service export
 
 Services running in containers on a weave network can be made
 accessible to the outside world (and, more generally, other networks)
-from any weave host, regardless of where the service containers are
+from any weave host, irrespective of where the service containers are
 located.
 
 Say we want to make our example netcat "service", which is running in
 a container on $HOST1, accessible to the outside world via $HOST2.
 
-First we need to expose the application network to the host, as
+First we need to expose the application network to $HOST2, as
 explained [above](#host-network-integration), i.e.
 
     host2# weave expose 10.0.1.102/24
@@ -228,8 +228,8 @@ explained [above](#host-network-integration), i.e.
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
-    host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 -j DNAT \
-           --to-destination 10.0.1.1:4422
+    host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
+           -j DNAT --to-destination 10.0.1.1:4422
 
 Here we are assuming that the "outside world" is connecting to $HOST2
 via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
@@ -246,6 +246,42 @@ work when run *on* $HOST2.)
 
 Similar NAT rules to the above can used to expose services not just to
 outside world but also other, internal, networks.
+
+### Service import
+
+Applications running in containers on a weave network can be given
+access to services which are only reachable from certain weave hosts,
+irrespective of where the application containers are located.
+
+Say that, as an extension of our example, we have a netcat service
+running on $HOST3, port 2211, and that $HOST3 is not part of the weave
+network and is only reachable from $HOST1, not $HOST2. Nevertheless we
+want to make the service accessible to an application running in a
+container on $HOST2.
+
+First we need to expose the application network to the host, as
+explained [above](#host-network-integration), this time on $HOST1,
+i.e.
+
+    host1# weave expose 10.0.1.101/24
+
+Then we add a NAT rule to route from the above IP to the destination
+service.
+
+    host1# iptables -t nat -A PREROUTING -p tcp -d 10.0.1.101 --dport 3322 \
+           -j DNAT --to-destination $HOST3:2211
+
+This allows any application container to reach the service by
+connecting to 10.0.0.1:3322. So if $HOST3 is indeed running a netcat
+service on port 2211, e.g.
+
+    host3# nc -kl 2211
+
+then we can connect to it from our application container on $HOST2 with
+
+    root@f76829496120:/# echo 'Hello, world.' | nc 10.0.1.101 3322
+
+The same command will work from any application container.
 
 ### Multi-cloud networking
 

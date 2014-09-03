@@ -40,12 +40,16 @@ create_bridge() {
     ip link set dev $BRIDGE up
 }
 
-setup_masquerading() {
-    IPTABLES_ARGS="POSTROUTING -d $IPADDR ! -s $IPADDR -j MASQUERADE"
-    if ! iptables -w -t nat -C $IPTABLES_ARGS >/dev/null 2>&1
+add_nat_rule() {
+    if ! iptables -w -t nat -C $1 >/dev/null 2>&1
     then
-        iptables -w -t nat -A $IPTABLES_ARGS >/dev/null
+        iptables -w -t nat -A $1 >/dev/null
     fi
+}
+
+setup_masquerading() {
+    add_nat_rule "POSTROUTING -d $IPADDR ! -s $IPADDR -j MASQUERADE"
+    add_nat_rule "POSTROUTING -s $IPADDR ! -d $IPADDR -j MASQUERADE"
 }
 
 case "$COMMAND" in
