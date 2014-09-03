@@ -18,10 +18,13 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer.Name)
 	}
+	onPeerGC := func(peer *Peer) {
+		log.Println("Removing unreachable", peer)
+	}
 	router := &Router{
 		Iface:     iface,
 		Macs:      NewMacCache(macMaxAge, onMacExpiry),
-		Peers:     NewPeerCache(),
+		Peers:     NewPeerCache(onPeerGC),
 		ConnLimit: connLimit,
 		BufSz:     bufSz,
 		LogFrame:  logFrame}
