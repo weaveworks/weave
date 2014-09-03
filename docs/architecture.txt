@@ -203,7 +203,6 @@ dropped by firewalls. Whenever weave sends between peers with DF set
 and gets an error informing it of a new PMTU, it will attempt to
 verify that PMTU by sending packets of exactly that size to the remote
 peer. If it gets no indication from the remote weave that these
-packets have been received within a timeout period, it will
-artificially drop the PMTU by 8 and try again. Thus this will slowly
-reduce the PMTU until a working PMTU is found. This is slow, but it
-does work and works around ICMP packets being dropped.
+packets have been received within a timeout period, it will conduct a
+binary search - sending packets of different sizes - to determine the
+PMTU.
