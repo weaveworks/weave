@@ -49,8 +49,8 @@ add_nat_rule() {
 }
 
 setup_masquerading() {
-    add_nat_rule "POSTROUTING -d $IPADDR ! -s $IPADDR -j MASQUERADE"
-    add_nat_rule "POSTROUTING -s $IPADDR ! -d $IPADDR -j MASQUERADE"
+    add_nat_rule "POSTROUTING -o $BRIDGE ! -s $IPADDR -j MASQUERADE"
+    add_nat_rule "POSTROUTING -s $IPADDR ! -o $BRIDGE -j MASQUERADE"
 }
 
 case "$COMMAND" in
