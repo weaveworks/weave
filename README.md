@@ -239,7 +239,7 @@ container with IP 10.0.1.1.
 With the above in place, we can connect to our 'nc' service from
 anywhere with
 
-    echo 'Hello, world.' | nc -u $HOST2 2211
+    echo 'Hello, world.' | nc $HOST2 2211
 
 (NB: due to the way routing is handled in the Linux kernel, this won't
 work when run *on* $HOST2.)
