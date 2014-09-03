@@ -6,6 +6,7 @@ usage() {
     echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
     echo "weave expose <ipaddr>/<subnet>"
+    echo "weave hide   <ipaddr>/<subnet>"
     echo "weave stop"
     exit 1
 }
@@ -86,6 +87,16 @@ case "$COMMAND" in
         if ! ip addr list dev $BRIDGE | grep -qF $IPADDR
         then
             ip addr add dev $BRIDGE $IPADDR
+        fi
+        exit 0
+        ;;
+    hide)
+        [ $# -gt 0 ] || usage
+        IPADDR=$1
+        shift 1
+        if ip addr list dev $BRIDGE | grep -qF $IPADDR
+        then
+            ip addr del dev $BRIDGE $IPADDR
         fi
         exit 0
         ;;

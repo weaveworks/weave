@@ -198,7 +198,8 @@ application containers. On $HOST2 we run
 
     host2# weave expose 10.0.1.102/24
 
-choosing an unused IP address in the application subnet.
+choosing an unused IP address in the application subnet. (There is a
+corresponding 'hide' command to revert this step.)
 
 Now
 
