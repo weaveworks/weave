@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"flag"
 	"fmt"
+	"io"
 	"github.com/davecheney/profile"
 	"log"
 	"net"
@@ -136,10 +137,13 @@ func main() {
 
 func handleHttp(router *weave.Router) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, router.Status())
+		io.WriteString(w, router.Status())
 	})
 	address := fmt.Sprintf(":%d", weave.StatusPort)
-	http.ListenAndServe(address, nil)
+	err := http.ListenAndServe(address, nil)
+	if err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
 }
 
 

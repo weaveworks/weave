@@ -80,16 +80,19 @@ case "$COMMAND" in
         ;;
     status)
         DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave)
+        if [ -z "$DOCKERIP" ] ; then
+            echo "The weave container is not running." >&2
+            exit 1
+        fi
         if command_exists wget ; then
             wget -O - -q $DOCKERIP:6784/status
         elif command_exists curl ; then
             curl $DOCKERIP:6784/status
         else
-            echo "weave status needs either curl or wget to function" >&2
+            echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
             exit 1
         fi
-        # return the status from the wget or curl command, so if they fail then we fail.
-        exit $?
+        exit 0
         ;;
     run)
         [ $# -gt 0 ] || usage
