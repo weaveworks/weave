@@ -349,12 +349,9 @@ The log verbosity can be increased by supplying the `-debug` flag when
 launching weave. Be warned, this will log information on a per-packet
 basis, so can produce a lot of output.
 
-One can ask a weave router to log a status report by sending it a USR1
-signal, e.g.
+One can ask a weave router to report its status with
 
-    kill -USR1 `docker inspect --format='{{ .State.Pid }}' weave`
-
-and then inspect the logs.
+    weave status
 
 ## Installation with Boot2Docker
 
