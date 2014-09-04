@@ -282,7 +282,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		checkWarn(po.WritePacket(frame))
 		dstPeer, found = router.Macs.Lookup(dec.eth.DstMAC)
 		if !found || dec.BroadcastFrame() || dstPeer != router.Ourself {
-			checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
+			return checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
 		}
 		return nil
 	}
