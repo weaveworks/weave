@@ -5,17 +5,17 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
-	"log"
 	"sync"
 )
 
 type PeerCache struct {
 	sync.RWMutex
 	table map[PeerName]*Peer
+	onGC func(*Peer)
 }
 
-func NewPeerCache() *PeerCache {
-	return &PeerCache{table: make(map[PeerName]*Peer)}
+func NewPeerCache(onGC func(*Peer)) *PeerCache {
+	return &PeerCache{table: make(map[PeerName]*Peer), onGC: onGC}
 }
 
 func (cache *PeerCache) FetchWithDefault(peer *Peer) *Peer {
@@ -129,7 +129,7 @@ func (cache *PeerCache) garbageCollect(ourself *Peer) []*Peer {
 	for name, peer := range cache.table {
 		found, _ := ourself.HasPathTo(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
-			log.Println("Removing unreachable", peer)
+			cache.onGC(peer)
 			delete(cache.table, name)
 			ourself.Router.Macs.Delete(peer)
 			removed = append(removed, peer)

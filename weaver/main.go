@@ -47,7 +47,13 @@ func main() {
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	procs := runtime.NumCPU()
+	// packet sniffing can block an OS thread, so we need one thread
+	// for that plus at least one more.
+	if procs < 2 {
+		procs = 2
+	}
+	runtime.GOMAXPROCS(procs)
 
 	var (
 		ifaceName  string

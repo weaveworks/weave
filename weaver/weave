@@ -1,18 +1,13 @@
 #!/bin/sh
 set -e
 
-BRIDGE=weave
-CONTAINER_IFNAME=ethwe
-MTU=65535
-
-SCRIPT_DIR=$(dirname $(readlink -f $0))
-COMMAND=$1
-IPADDR=$2
-
 usage() {
     echo "Usage:"
     echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
+    echo "weave expose <ipaddr>/<subnet>"
+    echo "weave hide   <ipaddr>/<subnet>"
+    echo "weave stop"
     echo "weave status"
     exit 1
 }
@@ -23,41 +18,64 @@ command_exists () {
     command -v $1 >/dev/null 2>&1
 }
 
-if [ "$COMMAND" != "status" -a "$#" -lt 2 ]; then
-    usage
-    exit 1
-fi
-
 [ `id -u` = 0 ] || {
     echo "weave must be run as 'root'"
     exit 1
 }
 
-# pre-create bridge so we can set the MTU
-[ ! -d /sys/class/net/$BRIDGE ] && {
-    ip link add dev $BRIDGE type bridge
-    ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/random | tr \  : | tail -c+2)
-    # attempting to set the bridge MTU to a high value directly
-    # fails. Bridges take the lowest MTU of their interfaces. So
-    # instead we create a temporary interface with the desired MTU,
-    # attach that to the bridge, and then remove it again.
-    ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
-    ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
-    ip link del dev v${CONTAINER_IFNAME}du
+[ $# -gt 0 ] || usage
+
+BRIDGE=weave
+CONTAINER_IFNAME=ethwe
+MTU=65535
+
+COMMAND=$1
+
+shift 1
+
+create_bridge() {
+    [ ! -d /sys/class/net/$BRIDGE ] && {
+        ip link add dev $BRIDGE type bridge
+        ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/random | tr \  : | tail -c+2)
+        # Attempting to set the bridge MTU to a high value directly
+        # fails. Bridges take the lowest MTU of their interfaces. So
+        # instead we create a temporary interface with the desired
+        # MTU, attach that to the bridge, and then remove it again.
+        ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
+        ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
+        ip link del dev v${CONTAINER_IFNAME}du
+    }
     ip link set dev $BRIDGE up
 }
 
-# We set the router name to the bridge mac since that is stable across
-# re-creations of the containers.
-#
-# TODO use the mac of one of the physical host interfaces (eth0,
-# wlan0, etc) so the name becomes stable across host restarts.
-MACADDR=`cat /sys/class/net/$BRIDGE/address`
+add_nat_rule() {
+    if ! iptables -w -t nat -C $1 >/dev/null 2>&1
+    then
+        iptables -w -t nat -A $1 >/dev/null
+    fi
+}
+
+setup_masquerading() {
+    add_nat_rule "POSTROUTING -o $BRIDGE ! -s $IPADDR -j MASQUERADE"
+    add_nat_rule "POSTROUTING -s $IPADDR ! -o $BRIDGE -j MASQUERADE"
+}
 
 case "$COMMAND" in
     launch)
-        shift 2
+        [ $# -gt 0 ] || usage
+        IPADDR=$1
+        shift 1
+        create_bridge
+        setup_masquerading
+        # We set the router name to the bridge mac since that is
+        # stable across re-creations of the containers.
+        #
+        # TODO use the mac of one of the physical host interfaces
+        # (eth0, wlan0, etc) so the name becomes stable across host
+        # restarts.
+        MACADDR=`cat /sys/class/net/$BRIDGE/address`
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
+        echo $CONTAINER
         IFACE=eth0
         ;;
     status)
@@ -74,9 +92,44 @@ case "$COMMAND" in
         exit $?
         ;;
     run)
-        shift 2
+        [ $# -gt 0 ] || usage
+        IPADDR=$1
+        shift 1
+        create_bridge
         CONTAINER=$(docker run -d "$@")
+        echo $CONTAINER
         IFACE=$CONTAINER_IFNAME
+        ;;
+    expose)
+        [ $# -gt 0 ] || usage
+        IPADDR=$1
+        shift 1
+        if ! ip addr list dev $BRIDGE | grep -qF $IPADDR
+        then
+            ip addr add dev $BRIDGE $IPADDR
+        fi
+        exit 0
+        ;;
+    hide)
+        [ $# -gt 0 ] || usage
+        IPADDR=$1
+        shift 1
+        if ip addr list dev $BRIDGE | grep -qF $IPADDR
+        then
+            ip addr del dev $BRIDGE $IPADDR
+        fi
+        exit 0
+        ;;
+    stop)
+        docker kill weave > /dev/null
+        docker rm weave > /dev/null
+        if command -v conntrack >/dev/null 2>&1
+        then
+            conntrack -D -p udp --dport 6783 >/dev/null 2>&1
+        else
+            echo "Cannot find conntrack; please install it. Continuing without it." >&2
+        fi
+        exit 0
         ;;
     *)
         echo "Unknown weave command '$COMMAND'"
@@ -116,9 +169,7 @@ if command_exists ethtool
 then
     ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
 else
-    echo "Cannot find ethtool; continuing without it" >&2
+    echo "Cannot find ethtool; please install it. Continuing without it." >&2
 fi
 
 [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
-
-echo $CONTAINER

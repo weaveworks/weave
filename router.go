@@ -15,10 +15,16 @@ import (
 const macMaxAge = 10 * time.Minute
 
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
+	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
+		log.Println("Expired MAC", mac, "at", peer.Name)
+	}
+	onPeerGC := func(peer *Peer) {
+		log.Println("Removing unreachable", peer)
+	}
 	router := &Router{
 		Iface:     iface,
-		Macs:      NewMacCache(macMaxAge),
-		Peers:     NewPeerCache(),
+		Macs:      NewMacCache(macMaxAge, onMacExpiry),
+		Peers:     NewPeerCache(onPeerGC),
 		ConnLimit: connLimit,
 		BufSz:     bufSz,
 		LogFrame:  logFrame}
@@ -274,11 +280,12 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		}
 		router.LogFrame("Injecting", frame, &dec.eth)
 		checkWarn(po.WritePacket(frame))
+
 		dstPeer, found = router.Macs.Lookup(dec.eth.DstMAC)
 		if !found || dec.BroadcastFrame() || dstPeer != router.Ourself {
-			df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
-			checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
+			return checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
 		}
+
 		return nil
 	}
 }

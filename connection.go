@@ -99,24 +99,10 @@ func (conn *LocalConnection) CheckFatal(err error) error {
 func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 	conn.Lock()
 	defer conn.Unlock()
-	conn.effectivePMTU = pmtu
-	conn.pmtuVerified = false
-	conn.log("Effective PMTU set to", pmtu)
-}
-
-func (conn *LocalConnection) effectivePMTUVerification(pmtu int) {
-	conn.Lock()
-	defer conn.Unlock()
-	if pmtu == conn.effectivePMTU && !conn.pmtuVerified {
-		conn.pmtuVerified = true
-		conn.log("Effective PMTU verified at", pmtu)
+	if (conn.effectivePMTU != pmtu) {
+		conn.effectivePMTU = pmtu
+		conn.log("Effective PMTU set to", pmtu)
 	}
-}
-
-func (conn *LocalConnection) isEffectivePMTUVerfied() bool {
-	conn.RLock()
-	defer conn.RUnlock()
-	return conn.pmtuVerified
 }
 
 // Called by the connection's actor process, by the connection's
@@ -506,7 +492,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			}
 			conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 		} else if msg[0] == ProtocolPMTUVerified {
-			conn.effectivePMTUVerification(int(binary.BigEndian.Uint16(msg[1:])))
+			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else {
 			conn.log("received unknown msg:\n", msg)
 		}

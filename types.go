@@ -66,13 +66,13 @@ type LocalConnection struct {
 	established   bool
 	stackFrag     bool
 	effectivePMTU int
-	pmtuVerified  bool
 	SessionKey    *[32]byte
 	heartbeatStop chan<- interface{}
 	forwardChan   chan<- *ForwardedFrame
 	forwardChanDF chan<- *ForwardedFrame
 	stopForward   chan<- interface{}
 	stopForwardDF chan<- interface{}
+	verifyPMTU    chan<- int
 	Decryptor     Decryptor
 	Router        *Router
 	UID           uint64
@@ -86,14 +86,19 @@ type ConnectionInteraction struct {
 }
 
 type Forwarder struct {
-	conn           *LocalConnection
-	ch             <-chan *ForwardedFrame
-	stop           <-chan interface{}
-	pmtuVerifyTick <-chan time.Time
-	enc            Encryptor
-	udpSender      UDPSender
-	maxPayload     int
-	effectivePMTU  int
+	conn            *LocalConnection
+	ch              <-chan *ForwardedFrame
+	stop            <-chan interface{}
+	verifyPMTUTick  <-chan time.Time
+	verifyPMTU      <-chan int
+	pmtuVerifyCount uint
+	enc             Encryptor
+	udpSender       UDPSender
+	maxPayload      int
+	pmtuVerified    bool
+	highestGoodPMTU int
+	unverifiedPMTU  int
+	lowestBadPMTU   int
 }
 
 type UDPPacket struct {

@@ -5,23 +5,24 @@ import (
 )
 
 const (
-	Protocol          = "weave"
-	ProtocolVersion   = 8
-	EthernetOverhead  = 14
-	UDPOverhead       = 28 // 20 bytes for IPv4, 8 bytes for UDP
-	Port              = 6783
-	StatusPort        = Port + 1
-	DefaultPMTU       = 65535
-	MaxUDPPacketSize  = 65536
-	ChannelSize       = 16
-	UDPNonceSendAt    = 8192
-	FragTestSize      = 60001
-	PMTUDiscoverySize = 60000
-	FastHeartbeat     = 500 * time.Millisecond
-	SlowHeartbeat     = 10 * time.Second
-	FetchAllInterval  = 30 * time.Second
-	FragTestInterval  = 5 * time.Minute
-	PMTUVerifyTimeout = 5 * time.Second
+	Protocol           = "weave"
+	ProtocolVersion    = 8
+	EthernetOverhead   = 14
+	UDPOverhead        = 28 // 20 bytes for IPv4, 8 bytes for UDP
+	Port               = 6783
+	StatusPort         = Port + 1
+	DefaultPMTU        = 65535
+	MaxUDPPacketSize   = 65536
+	ChannelSize        = 16
+	UDPNonceSendAt     = 8192
+	FragTestSize       = 60001
+	PMTUDiscoverySize  = 60000
+	FastHeartbeat      = 500 * time.Millisecond
+	SlowHeartbeat      = 10 * time.Second
+	FetchAllInterval   = 30 * time.Second
+	FragTestInterval   = 5 * time.Minute
+	PMTUVerifyAttempts = 8
+	PMTUVerifyTimeout  = 10 * time.Millisecond // gets doubled with every attempt
 )
 
 const (
