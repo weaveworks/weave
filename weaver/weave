@@ -7,8 +7,15 @@ usage() {
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
     echo "weave expose <ipaddr>/<subnet>"
     echo "weave hide   <ipaddr>/<subnet>"
+    echo "weave status"
     echo "weave stop"
     exit 1
+}
+
+# utility function to check whether a command can be executed by the shell
+# see http://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script
+command_exists () {
+    command -v $1 >/dev/null 2>&1
 }
 
 [ `id -u` = 0 ] || {
@@ -71,6 +78,22 @@ case "$COMMAND" in
         echo $CONTAINER
         IFACE=eth0
         ;;
+    status)
+        DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave)
+        if [ -z "$DOCKERIP" ] ; then
+            echo "The weave container is not running." >&2
+            exit 1
+        fi
+        if command_exists wget ; then
+            wget -O - -q $DOCKERIP:6784/status
+        elif command_exists curl ; then
+            curl $DOCKERIP:6784/status
+        else
+            echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
+            exit 1
+        fi
+        exit 0
+        ;;
     run)
         [ $# -gt 0 ] || usage
         IPADDR=$1
@@ -103,7 +126,7 @@ case "$COMMAND" in
     stop)
         docker kill weave > /dev/null
         docker rm weave > /dev/null
-        if command -v conntrack >/dev/null 2>&1
+        if command_exists conntrack
         then
             conntrack -D -p udp --dport 6783 >/dev/null 2>&1
         else
@@ -145,7 +168,7 @@ ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
 ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
 ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
 
-if command -v ethtool >/dev/null 2>&1
+if command_exists ethtool
 then
     ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
 else

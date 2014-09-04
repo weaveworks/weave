@@ -6,9 +6,11 @@ import (
 	"crypto/sha256"
 	"flag"
 	"fmt"
+	"io"
 	"github.com/davecheney/profile"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -129,8 +131,21 @@ func main() {
 			}
 		}()
 	}
+	go handleHttp(router)
 	handleSignals(router)
 }
+
+func handleHttp(router *weave.Router) {
+	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, router.Status())
+	})
+	address := fmt.Sprintf(":%d", weave.StatusPort)
+	err := http.ListenAndServe(address, nil)
+	if err != nil {
+		log.Fatal("Unable to create http listener: ", err)
+	}
+}
+
 
 func handleSignals(router *weave.Router) {
 	sigs := make(chan os.Signal, 1)
