@@ -288,7 +288,7 @@ The same command will work from any application container.
 
 Weave can network containers hosted in different cloud providers /
 data centres. So, for example, one could run an application consisting
-of containers on GCE, AMZN and a local data centres.
+of containers on GCE, EC2 and a local data centres.
 
 To enable this, the network must be configured to permit TCP and UDP
 connections to port 6783 of the docker hosts.
@@ -301,7 +301,7 @@ is able to route traffic between containers as long as there is at
 least one *path* of connected hosts between them.
 
 So, for example, if a docker host in a local data centre can connect
-to hosts in GCE and AMZN, but the latter two cannot connect to each
+to hosts in GCE and EC2, but the latter two cannot connect to each
 other, containers in the latter two can still communicate; weave will
 route the traffic via the local data centre.
 
