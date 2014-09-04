@@ -142,7 +142,7 @@ func handleHttp(router *weave.Router) {
 	address := fmt.Sprintf(":%d", weave.StatusPort)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		log.Fatal("Unable to create http listener: ", err)
 	}
 }
 
