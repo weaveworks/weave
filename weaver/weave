@@ -7,8 +7,8 @@ usage() {
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
     echo "weave expose <ipaddr>/<subnet>"
     echo "weave hide   <ipaddr>/<subnet>"
-    echo "weave stop"
     echo "weave status"
+    echo "weave stop"
     exit 1
 }
 
