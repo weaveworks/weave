@@ -124,12 +124,7 @@ func main() {
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
 	router.Start()
 	for _, peer := range peers {
-		targetPeer := peer
-		go func() {
-			if err := router.Ourself.CreateConnection(targetPeer, weave.UnknownPeerName); err != nil {
-				log.Println(err)
-			}
-		}()
+		router.ConnectionMaker.EnsureConnection(weave.UnknownPeerName, peer)
 	}
 	go handleHttp(router)
 	handleSignals(router)
