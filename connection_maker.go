@@ -1,5 +1,13 @@
 package weave
 
+/* ConnectionMaker is responsible for making connections between peers,
+and retrying them when they break.  It sits in a loop waiting for requests
+to be sent over queryChan, or for timer ticks.
+Every connection has a PeerName, which is a unique identifier for every weave
+router (e.g.  a MAC address), and an IP address which it was foundAt.
+
+*/
+
 import (
 	"bytes"
 	"fmt"
@@ -25,7 +33,7 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 		router:            router,
 		queryChan:         queryChan,
 		failedConnections: make(map[PeerName]*FailedConnection),
-		attemptingConnections: make(map[ConnectionMakerPair]bool)}
+		attempting:        make(map[ConnectionMakerPair]bool)}
 	go state.queryLoop(queryChan)
 	return state
 }
@@ -67,11 +75,12 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
 			case query.code == CMConnAttemptFinished:
-			 cm.attemptingConnections[ConnectionMakerPair{query.foundAt, query.name}] = false;
+				delete(cm.attempting, ConnectionMakerPair{query.foundAt, query.name})
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
 		case now := <-tick:
+		ConnectionLoop:
 			for name, failedConn := range cm.failedConnections {
 				if now.After(failedConn.tryAfter) {
 					if _, found := cm.router.Ourself.ConnectionTo(name); found {
@@ -81,15 +90,18 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 						delete(cm.failedConnections, name)
 						continue
 					}
+					// wait until all current attempts to contact this peer have failed before starting a new batch
+					for target := range failedConn.foundAt {
+						if cm.attempting[ConnectionMakerPair{target, name}] {
+							continue ConnectionLoop
+						}
+					}
 					after, interval := tryAfter(failedConn.tryInterval)
 					failedConn.tryInterval = interval
 					failedConn.tryAfter = after
 					failedConn.attemptCount += 1
 					for target := range failedConn.foundAt {
-						if cm.attemptingConnections[ConnectionMakerPair{target, name}] {
-							continue
-						}
-					cm.attemptingConnections[ConnectionMakerPair{target, name}] = true
+						cm.attempting[ConnectionMakerPair{target, name}] = true
 						go cm.attemptConnection(target, name)
 					}
 				}
@@ -130,7 +142,7 @@ func (cm *ConnectionMaker) status() string {
 		foundAt := make([]string, 0, len(failedConn.foundAt))
 		for target := range failedConn.foundAt {
 			foundAt = append(foundAt, target)
-			tryingNow = tryingNow || cm.attemptingConnections[ConnectionMakerPair{target, name}]
+			tryingNow = tryingNow || cm.attempting[ConnectionMakerPair{target, name}]
 		}
 		if tryingNow {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying again now): %v\n", name, failedConn.attemptCount, foundAt))

@@ -169,7 +169,7 @@ type ConnectionMaker struct {
 	queryChan         chan<- *ConnectionMakerInteraction
 	activeConnections map[string]string
 	failedConnections map[PeerName]*FailedConnection
-	attemptingConnections map[ConnectionMakerPair]bool
+	attempting        map[ConnectionMakerPair]bool
 }
 
 type FailedConnection struct {
