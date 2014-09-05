@@ -3,14 +3,21 @@
 Weave creates a virtual network that connects Docker containers
 deployed across multiple hosts.
 
+![Weave Virtual Network](/docs/virtual-network.png?raw=true "Weave Virtual Network")
+
 Applications use the network just as if the containers were all
 plugged into the same network switch, with no need to configure port
-mappings, links, etc. Weave can optionally encrypt traffic, allowing
-hosts to be connected across an untrusted network.
+mappings, links, etc. Services provided by application containers on
+the weave network can be made accessible to the outside world,
+regardless of where those containers are running. Similarly, existing
+internal systems can be exposed to application containers irrespective
+of their location.
 
-Services provided by application containers on the weave network can
-be made accessible to the outside world, regardless of where those
-containers are running.
+![Weave Deployment](/docs/deployment.png?raw=true "Weave Deployment")
+
+Weave can traverse firewalls and operate in partially connected
+networks. Traffic can be encrypted, allowing hosts to be connected
+across an untrusted network.
 
 With weave you can easily construct applications consisting of
 multiple containers, running anywhere.
@@ -22,7 +29,7 @@ capabilities, so these can continue to be used by containers.
 
 To run weave on a host, you need to install...
 
-1. docker. We've tested with version 1.1.0 through 1.2.0, but other
+1. docker. We've tested with versions 0.9.1 through 1.2.0, but other
    versions should work too.
 2. weave. Install this with
 
@@ -288,7 +295,7 @@ The same command will work from any application container.
 
 Weave can network containers hosted in different cloud providers /
 data centres. So, for example, one could run an application consisting
-of containers on GCE, AMZN and a local data centres.
+of containers on GCE, EC2 and a local data centres.
 
 To enable this, the network must be configured to permit TCP and UDP
 connections to port 6783 of the docker hosts.
@@ -301,7 +308,7 @@ is able to route traffic between containers as long as there is at
 least one *path* of connected hosts between them.
 
 So, for example, if a docker host in a local data centre can connect
-to hosts in GCE and AMZN, but the latter two cannot connect to each
+to hosts in GCE and EC2, but the latter two cannot connect to each
 other, containers in the latter two can still communicate; weave will
 route the traffic via the local data centre.
 
@@ -390,7 +397,35 @@ Then simply run
 This will build the weave router, produce a docker image
 `zettio/weave` and export that image to /tmp/weave.tar
 
-If you are interested in the inner workings of weave, read the
+## How does it work?
+
+Weave creates a network bridge on the host. Each container is
+connected to that bridge via a veth pair, the container side of which
+is given the IP address & netmask supplied in 'weave run'. Also
+connected to the bridge is the weave router container, which is given
+the IP address & netmask supplied in 'weave launch'.
+
+A weave router captures Ethernet packets from its bridge-connected
+interface in promiscuous mode, using 'pcap'. It forwards these packets
+over UDP to weave router peers running on other hosts. On receipt of
+such a packet, a router injects the packet on its bridge interface
+using 'pcap' and/or forwards the packet to peers.
+
+Weave routers learn which peer host a particular MAC address resides
+on. They combine this knowledge with topology information in order to
+make routing decisions and thus avoid forwarding every packet to every
+peer. The topology information captures which peers are connected to
+which other peers; weave can route packets in partially connected
+networks with changing topology.
+
+Weave routers establish TCP connections to each other, over which they
+perform a protocol handshake and subsequently exchange topology
+information. These connections are encrypted if so configured. Peers
+also establish UDP "connections", possibly encrypted, for the
+aforementioned packet forwarding. These "connections" are duplex and
+can traverse firewalls.
+
+More details on the inner workings of weave can be found in the
 [architecture documentation](docs/architecture.txt).
 
 ## Contact Us
