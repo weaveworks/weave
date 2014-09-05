@@ -29,7 +29,7 @@ capabilities, so these can continue to be used by containers.
 
 To run weave on a host, you need to install...
 
-1. docker. We've tested with version 1.1.0 through 1.2.0, but other
+1. docker. We've tested with versions 0.9.1 through 1.2.0, but other
    versions should work too.
 2. weave. Install this with
 
