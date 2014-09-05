@@ -167,7 +167,6 @@ type ConnectionMakerPair struct {
 type ConnectionMaker struct {
 	router            *Router
 	queryChan         chan<- *ConnectionMakerInteraction
-	activeConnections map[string]string
 	failedConnections map[PeerName]*FailedConnection
 	attempting        map[ConnectionMakerPair]bool
 }
