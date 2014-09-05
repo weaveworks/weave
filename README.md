@@ -5,12 +5,14 @@ deployed across multiple hosts.
 
 Applications use the network just as if the containers were all
 plugged into the same network switch, with no need to configure port
-mappings, links, etc. Weave can optionally encrypt traffic, allowing
-hosts to be connected across an untrusted network.
+mappings, links, etc. Services provided by application containers on
+the weave network can be made accessible to the outside world,
+regardless of where those containers are running.
 
-Services provided by application containers on the weave network can
-be made accessible to the outside world, regardless of where those
-containers are running.
+![Weave Virtual Network](/docs/virtual-network.png?raw=true "Weave Virtual Network")
+
+Weave can optionally encrypt traffic, allowing hosts to be connected
+across an untrusted network.
 
 With weave you can easily construct applications consisting of
 multiple containers, running anywhere.
