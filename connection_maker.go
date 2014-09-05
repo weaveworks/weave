@@ -24,7 +24,8 @@ const (
 	MaxAttemptCount = 100
 	CMEnsure        = iota
 	CMStatus        = iota
-	CMConnAttemptFinished = iota
+	CMConnSucceeded = iota
+	CMConnFailed    = iota
 )
 
 func StartConnectionMaker(router *Router) *ConnectionMaker {
@@ -74,7 +75,10 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 				}
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
-			case query.code == CMConnAttemptFinished:
+			case query.code == CMConnSucceeded:
+				delete(cm.attempting, ConnectionMakerPair{query.foundAt, query.name})
+				delete(cm.failedConnections[query.name].foundAt, query.foundAt)
+			case query.code == CMConnFailed:
 				delete(cm.attempting, ConnectionMakerPair{query.foundAt, query.name})
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
@@ -86,6 +90,8 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 					if _, found := cm.router.Ourself.ConnectionTo(name); found {
 						delete(cm.failedConnections, name)
 						continue
+					} else if len(failedConn.foundAt) == 0 {
+						delete(cm.failedConnections, name)
 					} else if failedConn.attemptCount == MaxAttemptCount {
 						delete(cm.failedConnections, name)
 						continue
@@ -154,12 +160,14 @@ func (cm *ConnectionMaker) status() string {
 }
 
 func (cm *ConnectionMaker) attemptConnection(foundAt string, targetName PeerName) {
+	var conncode = CMConnSucceeded
 	if err := cm.router.Ourself.CreateConnection(foundAt, targetName); err != nil {
 		log.Println(err)
+		conncode = CMConnFailed
 	}
 	// Tell the query loop we've finished this attempt
 	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMConnAttemptFinished},
+		Interaction: Interaction{code: conncode},
 		name:        targetName,
 		foundAt:     foundAt}
 }
