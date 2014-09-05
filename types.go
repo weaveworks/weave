@@ -159,11 +159,17 @@ type ConnectionMakerInteraction struct {
 	name    PeerName
 }
 
+type ConnectionMakerPair struct {
+	foundAt string
+	name    PeerName
+}
+
 type ConnectionMaker struct {
 	router            *Router
 	queryChan         chan<- *ConnectionMakerInteraction
 	activeConnections map[string]string
 	failedConnections map[PeerName]*FailedConnection
+	attemptingConnections map[ConnectionMakerPair]bool
 }
 
 type FailedConnection struct {

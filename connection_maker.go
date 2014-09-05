@@ -11,11 +11,12 @@ import (
 )
 
 const (
-	InitialInterval = 5 * time.Second
+	InitialInterval = 1 * time.Second
 	MaxInterval     = 10 * time.Minute
 	MaxAttemptCount = 100
 	CMEnsure        = iota
 	CMStatus        = iota
+	CMConnAttemptFinished = iota
 )
 
 func StartConnectionMaker(router *Router) *ConnectionMaker {
@@ -23,7 +24,8 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 	state := &ConnectionMaker{
 		router:            router,
 		queryChan:         queryChan,
-		failedConnections: make(map[PeerName]*FailedConnection)}
+		failedConnections: make(map[PeerName]*FailedConnection),
+		attemptingConnections: make(map[ConnectionMakerPair]bool)}
 	go state.queryLoop(queryChan)
 	return state
 }
@@ -64,6 +66,8 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 				}
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
+			case query.code == CMConnAttemptFinished:
+			 cm.attemptingConnections[ConnectionMakerPair{query.foundAt, query.name}] = false;
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
@@ -82,6 +86,10 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 					failedConn.tryAfter = after
 					failedConn.attemptCount += 1
 					for target := range failedConn.foundAt {
+						if cm.attemptingConnections[ConnectionMakerPair{target, name}] {
+							continue
+						}
+					cm.attemptingConnections[ConnectionMakerPair{target, name}] = true
 						go cm.attemptConnection(target, name)
 					}
 				}
@@ -118,11 +126,17 @@ func (cm *ConnectionMaker) addToFailedConnection(name PeerName, foundAt string) 
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
 	for name, failedConn := range cm.failedConnections {
+		tryingNow := false
 		foundAt := make([]string, 0, len(failedConn.foundAt))
 		for target := range failedConn.foundAt {
 			foundAt = append(foundAt, target)
+			tryingNow = tryingNow || cm.attemptingConnections[ConnectionMakerPair{target, name}]
 		}
-		buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v): %v\n", name, failedConn.attemptCount, failedConn.tryAfter, foundAt))
+		if tryingNow {
+			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying again now): %v\n", name, failedConn.attemptCount, foundAt))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v): %v\n", name, failedConn.attemptCount, failedConn.tryAfter, foundAt))
+		}
 	}
 	return buf.String()
 }
@@ -131,6 +145,11 @@ func (cm *ConnectionMaker) attemptConnection(foundAt string, targetName PeerName
 	if err := cm.router.Ourself.CreateConnection(foundAt, targetName); err != nil {
 		log.Println(err)
 	}
+	// Tell the query loop we've finished this attempt
+	cm.queryChan <- &ConnectionMakerInteraction{
+		Interaction: Interaction{code: CMConnAttemptFinished},
+		name:        targetName,
+		foundAt:     foundAt}
 }
 
 func tryAfter(interval time.Duration) (time.Time, time.Duration) {
