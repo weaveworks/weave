@@ -9,9 +9,14 @@ Applications use the network just as if the containers were all
 plugged into the same network switch, with no need to configure port
 mappings, links, etc. Services provided by application containers on
 the weave network can be made accessible to the outside world,
-regardless of where those containers are running.
+regardless of where those containers are running. Similarly, existing
+internal systems can be exposed to application containers irrespective
+of their location.
 
-Weave can optionally encrypt traffic, allowing hosts to be connected
+![Weave Deployment](/docs/deployment.png?raw=true "Weave Deployment")
+
+Weave can traverse firewalls and operate in partially connected
+networks. Traffic can be encrypted, allowing hosts to be connected
 across an untrusted network.
 
 With weave you can easily construct applications consisting of
