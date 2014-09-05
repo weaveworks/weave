@@ -49,9 +49,16 @@ create_bridge() {
 }
 
 add_nat_rule() {
-    if ! iptables -w -t nat -C $1 >/dev/null 2>&1
+    if [ -z "$CHECKED_IPTABLES_W" ] ; then
+        if iptables -S -w >/dev/null 2>&1 ; then
+            IPTABLES_W=-w
+        fi
+        CHECKED_IPTABLES_W=1
+    fi
+
+    if ! iptables $IPTABLES_W -t nat -C $1 >/dev/null 2>&1
     then
-        iptables -w -t nat -A $1 >/dev/null
+        iptables $IPTABLES_W -t nat -A $1 >/dev/null
     fi
 }
 
