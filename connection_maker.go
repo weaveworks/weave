@@ -92,6 +92,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 						continue
 					} else if len(failedConn.foundAt) == 0 {
 						delete(cm.failedConnections, name)
+						continue
 					} else if failedConn.attemptCount == MaxAttemptCount {
 						delete(cm.failedConnections, name)
 						continue
