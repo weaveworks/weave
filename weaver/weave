@@ -49,6 +49,7 @@ create_bridge() {
 }
 
 add_nat_rule() {
+    # -w is recent addition to iptables
     if [ -z "$CHECKED_IPTABLES_W" ] ; then
         if iptables -S -w >/dev/null 2>&1 ; then
             IPTABLES_W=-w
