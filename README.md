@@ -165,15 +165,18 @@ A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
 
     host1# docker attach $D
+    
     root@da50502598d5:/# ping -c 1 -q 10.0.2.2
     PING 10.0.2.2 (10.0.2.2): 48 data bytes
     --- 10.0.2.2 ping statistics ---
     1 packets transmitted, 1 packets received, 0% packet loss
     round-trip min/avg/max/stddev = 0.562/0.562/0.562/0.000 ms
+    
     root@da50502598d5:/# ping -c 1 -q 10.0.1.1
     PING 10.0.1.1 (10.0.1.1) 56(84) bytes of data.
     --- 10.0.1.1 ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
+    
     root@da50502598d5:/# ping -c 1 -q 10.0.1.2
     PING 10.0.1.2 (10.0.1.2) 56(84) bytes of data.
     --- 10.0.1.2 ping statistics ---
