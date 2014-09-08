@@ -99,7 +99,7 @@ func (conn *LocalConnection) CheckFatal(err error) error {
 func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 	conn.Lock()
 	defer conn.Unlock()
-	if (conn.effectivePMTU != pmtu) {
+	if conn.effectivePMTU != pmtu {
 		conn.effectivePMTU = pmtu
 		conn.log("Effective PMTU set to", pmtu)
 	}
