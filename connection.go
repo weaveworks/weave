@@ -221,6 +221,7 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	conn.established = true
 	conn.Unlock()
 	if !old {
+		conn.Router.ConnectionMaker.ConnectionEstablished(conn.remoteTCPAddr)
 		conn.local.ConnectionEstablished(conn)
 		if err := conn.ensureHeartbeat(false); err != nil {
 			return err
@@ -447,7 +448,6 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			// them and thus has informed us via TCP that it considers
 			// the connection is now up. We now do a fetchAll on it.
 			conn.SetEstablished()
-			conn.Router.ConnectionMaker.ConnectionEstablished(conn.remoteTCPAddr)
 			conn.SendTCP(ProtocolFetchAllByte)
 		} else if msg[0] == ProtocolStartFragmentationTest {
 			conn.Forward(false, &ForwardedFrame{
