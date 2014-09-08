@@ -165,11 +165,12 @@ type ConnectionMaker struct {
 	targets   map[string]*Target
 }
 
+type ConnectionState int
+
 // Information about an address where we may find a peer
 type Target struct {
-	acceptAnyPeer bool          // was this address given to us on the command line?
-	attempting    bool          // are we currently attempting to connect to this address?
-	established   bool          // has the connection been established
+	acceptAnyPeer bool // was this address given to us on the command line?
+	state         ConnectionState
 	tryAfter      time.Time     // next time to try this address
 	tryInterval   time.Duration // backoff time on next failure
 	attemptCount  int

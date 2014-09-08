@@ -16,8 +16,13 @@ const (
 	CMEnsure        = iota
 	CMStatus        = iota
 	CMEstablished   = iota
-	CMConnSucceeded = iota
 	CMConnFailed    = iota
+)
+
+const (
+	CMUnconnected      ConnectionState = iota
+	CMAttempting                       = iota
+	CMEstablishedState                 = iota
 )
 
 func StartConnectionMaker(router *Router) *ConnectionMaker {
@@ -95,27 +100,23 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			case query.code == CMEstablished:
 				target := cm.targets[query.address]
 				if target != nil {
-					target.established = true
+					target.state = CMEstablishedState
 				} else {
 					log.Fatal("Connection established to unknown address", query.address)
 				}
-			case query.code == CMConnSucceeded:
-				cm.targets[query.address].attempting = false
 			case query.code == CMConnFailed:
 				target := cm.targets[query.address]
-				target.attempting = false
-				after, interval := tryAfter(target.tryInterval)
-				target.tryInterval = interval
-				target.tryAfter = after
+				target.state = CMUnconnected
+				target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 				maybeTick()
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
 		case now := <-tick:
 			for address, target := range cm.targets {
-				if !target.established && !target.attempting && now.After(target.tryAfter) {
+				if target.state == CMUnconnected && now.After(target.tryAfter) {
 					target.attemptCount += 1
-					target.attempting = true
+					target.state = CMAttempting
 					go cm.attemptConnection(address, target.acceptAnyPeer)
 				}
 			}
@@ -129,6 +130,7 @@ func (cm *ConnectionMaker) addToTargets(acceptAnyPeer bool, address string) {
 	target := cm.targets[address]
 	if target == nil {
 		target = &Target{
+			state:         CMUnconnected,
 			acceptAnyPeer: acceptAnyPeer,
 		}
 		cm.targets[address] = target
@@ -137,18 +139,21 @@ func (cm *ConnectionMaker) addToTargets(acceptAnyPeer bool, address string) {
 
 func (cm *ConnectionMaker) resetTarget(address string) {
 	target := cm.targets[address]
-	target.established = false
-	after, interval := tryImmediately()
-	target.tryInterval = interval
-	target.tryAfter = after
+	// If we were in the middle of a connection attempt then back-off again
+	if target.state == CMAttempting {
+		target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
+	} else {
+		target.tryAfter, target.tryInterval = tryImmediately()
+	}
+	target.state = CMUnconnected
 }
 
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
 	for address, target := range cm.targets {
-		if target.established {
+		if target.state == CMEstablishedState {
 			buf.WriteString(fmt.Sprintf("%s connected\n", address))
-		} else if target.attempting {
+		} else if target.state == CMAttempting {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying since %v)\n", address, target.attemptCount, target.tryAfter))
 		} else {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v)\n", address, target.attemptCount, target.tryAfter))
@@ -159,15 +164,12 @@ func (cm *ConnectionMaker) status() string {
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
 	log.Println("Attempting connection to", address)
-	var conncode = CMConnSucceeded
 	if err := cm.router.Ourself.CreateConnection(address, acceptNewPeer); err != nil {
 		log.Println(err)
-		conncode = CMConnFailed
+		cm.queryChan <- &ConnectionMakerInteraction{
+			Interaction: Interaction{code: CMConnFailed},
+			address:     address}
 	}
-	// Tell the query loop we've finished this attempt
-	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: conncode},
-		address:     address}
 }
 
 func tryImmediately() (time.Time, time.Duration) {
