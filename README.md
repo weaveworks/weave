@@ -56,7 +56,7 @@ two containers, one on each host.
 On $HOST1 run (as root)
 
     host1# weave launch 10.0.0.1/16
-    host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu /bin/bash)
+    host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu)
 
 The first line starts the weave router, in a container. This needs to
 be done once on each host. We tell weave that its IP address should
@@ -80,7 +80,7 @@ unique.
 We repeat similar steps on $HOST2...
 
     host2# weave launch 10.0.0.2/16 $HOST1
-    host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu /bin/bash)
+    host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu)
 
 The only difference, apart from the IP addresses, is that we tell our
 weave that it should peer with the weave running on $HOST1. We could
@@ -158,8 +158,8 @@ To accomplish that, we assign each application a different subnet. So,
 in the above example, if we wanted to add another application similar
 to, but isolated from, our first, we'd launch the containers with...
 
-    host1# D=$(weave run 10.0.2.1/24 -t -i ubuntu /bin/bash)
-    host2# D=$(weave run 10.0.2.2/24 -t -i ubuntu /bin/bash)
+    host1# D=$(weave run 10.0.2.1/24 -t -i ubuntu)
+    host2# D=$(weave run 10.0.2.2/24 -t -i ubuntu)
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
@@ -383,7 +383,7 @@ example above, the 'launch' command would be run like this:
 
 and the 'run' command like this:
 
-    host1# C=$(boot2docker ssh "sudo ./weave run 10.0.1.1/24 -t -i ubuntu /bin/bash")
+    host1# C=$(boot2docker ssh "sudo ./weave run 10.0.1.1/24 -t -i ubuntu")
 
 ## Building
 
