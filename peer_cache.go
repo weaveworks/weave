@@ -11,7 +11,7 @@ import (
 type PeerCache struct {
 	sync.RWMutex
 	table map[PeerName]*Peer
-	onGC func(*Peer)
+	onGC  func(*Peer)
 }
 
 func NewPeerCache(onGC func(*Peer)) *PeerCache {
