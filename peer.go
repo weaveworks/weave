@@ -190,7 +190,7 @@ func (peer *Peer) StartLocalPeer() {
 	go peer.queryLoop(queryChan)
 }
 
-func (peer *Peer) CreateConnection(peerAddr string, expectedName PeerName) error {
+func (peer *Peer) CreateConnection(peerAddr string, acceptNewPeer bool) error {
 	if err := peer.checkConnectionLimit(); err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func (peer *Peer) CreateConnection(peerAddr string, expectedName PeerName) error
 		return err
 	}
 	connRemote := NewRemoteConnection(peer, nil, tcpConn.RemoteAddr().String())
-	NewLocalConnection(connRemote, expectedName, tcpConn, udpAddr, peer.Router)
+	NewLocalConnection(connRemote, acceptNewPeer, tcpConn, udpAddr, peer.Router)
 	return nil
 }
 

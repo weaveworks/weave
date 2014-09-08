@@ -78,20 +78,18 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			case query.code == CMConnSucceeded:
 				cm.targets[query.foundAt].attempting = false
 			case query.code == CMConnFailed:
-				cm.targets[query.foundAt].attempting = false
+				target := cm.targets[query.foundAt]
+				target.attempting = false
+				after, interval := tryAfter(target.tryInterval)
+				target.tryInterval = interval
+				target.tryAfter = after
+				maybeTick()
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
 		case now := <-tick:
 			for address, target := range cm.targets {
 				if target.conn == nil && !target.attempting && now.After(target.tryAfter) {
-				    if target.attemptCount == MaxAttemptCount {
-					    // FIXME
-						continue
-					}
-					after, interval := tryAfter(target.tryInterval)
-					target.tryInterval = interval
-					target.tryAfter = after
 					target.attemptCount += 1
 					target.attempting = true;
 					go cm.attemptConnection(address, target.commandLine)
@@ -130,7 +128,7 @@ func (cm *ConnectionMaker) status() string {
 		if (target.conn != nil) {
 			buf.WriteString(fmt.Sprintf("%s connected to: %v\n", address, target.conn))
 		} else if target.attempting {
-			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying again now)\n", address, target.attemptCount))
+			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying since %v)\n", address, target.attemptCount, target.tryAfter))
 		} else {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v)\n", address, target.attemptCount, target.tryAfter))
 		}
@@ -139,9 +137,9 @@ func (cm *ConnectionMaker) status() string {
 }
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
-	log.Println("Attempting connection to ", address)
+	log.Println("Attempting connection to", address)
 	var conncode = CMConnSucceeded
-	if err := cm.router.Ourself.CreateConnection(address, UnknownPeerName); err != nil {
+	if err := cm.router.Ourself.CreateConnection(address, acceptNewPeer); err != nil {
 		log.Println(err)
 		conncode = CMConnFailed
 	}
