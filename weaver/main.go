@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/zettio/weave"
 	"code.google.com/p/gopacket/layers"
 	"crypto/sha256"
 	"flag"
 	"fmt"
-	"io"
 	"github.com/davecheney/profile"
+	"github.com/zettio/weave"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -140,7 +140,6 @@ func handleHttp(router *weave.Router) {
 		log.Fatal("Unable to create http listener: ", err)
 	}
 }
-
 
 func handleSignals(router *weave.Router) {
 	sigs := make(chan os.Signal, 1)

@@ -23,16 +23,16 @@ const (
 func StartConnectionMaker(router *Router) *ConnectionMaker {
 	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
 	state := &ConnectionMaker{
-		router:            router,
-		queryChan:         queryChan,
-		targets: 		   make(map[string]*Target)}
+		router:    router,
+		queryChan: queryChan,
+		targets:   make(map[string]*Target)}
 	go state.queryLoop(queryChan)
 	return state
 }
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMEnsure},
+		Interaction:   Interaction{code: CMEnsure},
 		acceptAnyPeer: true,
 		address:       address}
 }
@@ -43,9 +43,9 @@ func (cm *ConnectionMaker) EnsureConnection(address string) {
 		address = addrHost
 	}
 	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMEnsure},
+		Interaction:   Interaction{code: CMEnsure},
 		acceptAnyPeer: false,
-		address:     address}
+		address:       address}
 }
 
 func (cm *ConnectionMaker) ConnectionEstablished(address string) {
@@ -115,7 +115,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			for address, target := range cm.targets {
 				if !target.established && !target.attempting && now.After(target.tryAfter) {
 					target.attemptCount += 1
-					target.attempting = true;
+					target.attempting = true
 					go cm.attemptConnection(address, target.acceptAnyPeer)
 				}
 			}
@@ -140,13 +140,13 @@ func (cm *ConnectionMaker) resetTarget(address string) {
 	target.established = false
 	after, interval := tryImmediately()
 	target.tryInterval = interval
-	target.tryAfter =  after
+	target.tryAfter = after
 }
 
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
 	for address, target := range cm.targets {
-		if (target.established) {
+		if target.established {
 			buf.WriteString(fmt.Sprintf("%s connected\n", address))
 		} else if target.attempting {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying since %v)\n", address, target.attemptCount, target.tryAfter))

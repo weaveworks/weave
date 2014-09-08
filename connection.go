@@ -99,7 +99,7 @@ func (conn *LocalConnection) CheckFatal(err error) error {
 func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 	conn.Lock()
 	defer conn.Unlock()
-	if (conn.effectivePMTU != pmtu) {
+	if conn.effectivePMTU != pmtu {
 		conn.effectivePMTU = pmtu
 		conn.log("Effective PMTU set to", pmtu)
 	}
@@ -345,8 +345,8 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 		return err
 	}
 	if !acceptNewPeer {
-	    if _, found := conn.Router.Peers.Fetch(name); !found {
-		    return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
+		if _, found := conn.Router.Peers.Fetch(name); !found {
+			return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
 		}
 	}
 
