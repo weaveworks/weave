@@ -115,6 +115,7 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 		}
 	}
 }
+
 func (peer *Peer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
 	return peer.Relay(peer, dstPeer, df, frame, dec)
 }
