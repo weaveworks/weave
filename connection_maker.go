@@ -33,8 +33,7 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 	state := &ConnectionMaker{
 		router:            router,
 		queryChan:         queryChan,
-		failedConnections: make(map[PeerName]*FailedConnection),
-		attempting:        make(map[ConnectionMakerPair]bool)}
+		targets: 		   make(map[string]*Target)}
 	go state.queryLoop(queryChan)
 	return state
 }
@@ -57,7 +56,8 @@ func (cm *ConnectionMaker) String() string {
 func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteraction) {
 	var tick <-chan time.Time
 	maybeTick := func() {
-		if tick == nil && len(cm.failedConnections) > 0 {
+		// would be nice to optimise this to stop ticking when there is nothing worth trying
+		if tick == nil {
 			tick = time.After(5 * time.Second)
 		}
 	}
@@ -70,47 +70,31 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			switch {
 			case query.code == CMEnsure:
 				if query.name != cm.router.Ourself.Name {
-					cm.addToFailedConnection(query.name, query.foundAt)
+					cm.addToTargets(query.name, query.foundAt)
 					maybeTick()
 				}
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
 			case query.code == CMConnSucceeded:
-				delete(cm.attempting, ConnectionMakerPair{query.foundAt, query.name})
-				delete(cm.failedConnections[query.name].foundAt, query.foundAt)
+				cm.targets[query.foundAt].attempting = false
 			case query.code == CMConnFailed:
-				delete(cm.attempting, ConnectionMakerPair{query.foundAt, query.name})
+				cm.targets[query.foundAt].attempting = false
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
 		case now := <-tick:
-		ConnectionLoop:
-			for name, failedConn := range cm.failedConnections {
-				if now.After(failedConn.tryAfter) {
-					if _, found := cm.router.Ourself.ConnectionTo(name); found {
-						delete(cm.failedConnections, name)
-						continue
-					} else if len(failedConn.foundAt) == 0 {
-						delete(cm.failedConnections, name)
-						continue
-					} else if failedConn.attemptCount == MaxAttemptCount {
-						delete(cm.failedConnections, name)
+			for address, target := range cm.targets {
+				if target.conn == nil && !target.attempting && now.After(target.tryAfter) {
+				    if target.attemptCount == MaxAttemptCount {
+					    // FIXME
 						continue
 					}
-					// wait until all current attempts to contact this peer have failed before starting a new batch
-					for target := range failedConn.foundAt {
-						if cm.attempting[ConnectionMakerPair{target, name}] {
-							continue ConnectionLoop
-						}
-					}
-					after, interval := tryAfter(failedConn.tryInterval)
-					failedConn.tryInterval = interval
-					failedConn.tryAfter = after
-					failedConn.attemptCount += 1
-					for target := range failedConn.foundAt {
-						cm.attempting[ConnectionMakerPair{target, name}] = true
-						go cm.attemptConnection(target, name)
-					}
+					after, interval := tryAfter(target.tryInterval)
+					target.tryInterval = interval
+					target.tryAfter = after
+					target.attemptCount += 1
+					target.attempting = true;
+					go cm.attemptConnection(address, target.commandLine)
 				}
 			}
 			tick = nil
@@ -119,58 +103,53 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 	}
 }
 
-func (cm *ConnectionMaker) addToFailedConnection(name PeerName, foundAt string) {
-	failed := cm.failedConnections[name]
-	if failed == nil {
+func (cm *ConnectionMaker) addToTargets(name PeerName, foundAt string) {
+	target := cm.targets[foundAt]
+	if target == nil {
 		after, interval := tryAfter(InitialInterval)
-		failed = &FailedConnection{
-			foundAt:     make(map[string]bool),
+		target = &Target{
 			tryInterval: interval,
 			tryAfter:    after}
 	}
 	foundAtHost, foundAtPortStr, err := net.SplitHostPort(foundAt)
 	if err == nil {
 		// ensure port-less version is there
-		failed.foundAt[foundAtHost] = true
+		cm.targets[foundAtHost] = target
 		if foundAtPort, err := strconv.Atoi(foundAtPortStr); err == nil && foundAtPort != Port {
-			failed.foundAt[foundAt] = true
+		    cm.targets[foundAt] = target
 		}
 	} else {
 		// can't split it, assume it must not have port on it
-		failed.foundAt[foundAt] = true
+	    cm.targets[foundAt] = target
 	}
-	cm.failedConnections[name] = failed
 }
 
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
-	for name, failedConn := range cm.failedConnections {
-		tryingNow := false
-		foundAt := make([]string, 0, len(failedConn.foundAt))
-		for target := range failedConn.foundAt {
-			foundAt = append(foundAt, target)
-			tryingNow = tryingNow || cm.attempting[ConnectionMakerPair{target, name}]
-		}
-		if tryingNow {
-			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying again now): %v\n", name, failedConn.attemptCount, foundAt))
+	for address, target := range cm.targets {
+		if (target.conn != nil) {
+			buf.WriteString(fmt.Sprintf("%s connected to: %v\n", address, target.conn))
+		} else if target.attempting {
+			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying again now)\n", address, target.attemptCount))
 		} else {
-			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v): %v\n", name, failedConn.attemptCount, failedConn.tryAfter, foundAt))
+			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v)\n", address, target.attemptCount, target.tryAfter))
 		}
 	}
 	return buf.String()
 }
 
-func (cm *ConnectionMaker) attemptConnection(foundAt string, targetName PeerName) {
+func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
+	log.Println("Attempting connection to ", address)
 	var conncode = CMConnSucceeded
-	if err := cm.router.Ourself.CreateConnection(foundAt, targetName); err != nil {
+	if err := cm.router.Ourself.CreateConnection(address, UnknownPeerName); err != nil {
 		log.Println(err)
 		conncode = CMConnFailed
 	}
 	// Tell the query loop we've finished this attempt
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: conncode},
-		name:        targetName,
-		foundAt:     foundAt}
+		name:        UnknownPeerName,
+		foundAt:     address}
 }
 
 func tryAfter(interval time.Duration) (time.Time, time.Duration) {

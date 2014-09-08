@@ -159,22 +159,19 @@ type ConnectionMakerInteraction struct {
 	name    PeerName
 }
 
-type ConnectionMakerPair struct {
-	foundAt string
-	name    PeerName
-}
-
 type ConnectionMaker struct {
 	router            *Router
 	queryChan         chan<- *ConnectionMakerInteraction
-	failedConnections map[PeerName]*FailedConnection
-	attempting        map[ConnectionMakerPair]bool
+    targets           map[string]*Target
 }
 
-type FailedConnection struct {
-	foundAt      map[string]bool
-	tryAfter     time.Time
-	tryInterval  time.Duration
+// Information about an address where we may find a peer
+type Target struct {
+    commandLine  bool		// was this address given to us on the command line?
+	attempting	 bool		// are we currently attempting to connect to this address?
+	conn         *Connection
+	tryAfter     time.Time				   // next time to try this address
+	tryInterval  time.Duration			   // backoff time on next failure
 	attemptCount int
 }
 
