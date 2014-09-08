@@ -169,7 +169,7 @@ type ConnectionMaker struct {
 type Target struct {
     acceptAnyPeer  bool		// was this address given to us on the command line?
 	attempting	 bool		// are we currently attempting to connect to this address?
-	conn         *Connection
+	established  bool       // has the connection been established
 	tryAfter     time.Time				   // next time to try this address
 	tryInterval  time.Duration			   // backoff time on next failure
 	attemptCount int

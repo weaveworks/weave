@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"strconv"
 	"time"
 )
 
@@ -16,6 +15,7 @@ const (
 	MaxAttemptCount = 100
 	CMEnsure        = iota
 	CMStatus        = iota
+	CMEstablished   = iota
 	CMConnSucceeded = iota
 	CMConnFailed    = iota
 )
@@ -38,9 +38,23 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 }
 
 func (cm *ConnectionMaker) EnsureConnection(address string) {
+	// If we've been given a port number, take it off
+	if addrHost, _, err := net.SplitHostPort(address); err == nil {
+		address = addrHost
+	}
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: CMEnsure},
 		acceptAnyPeer: false,
+		address:     address}
+}
+
+func (cm *ConnectionMaker) ConnectionEstablished(address string) {
+	// If we've been given a port number, take it off
+	if addrHost, _, err := net.SplitHostPort(address); err == nil {
+		address = addrHost
+	}
+	cm.queryChan <- &ConnectionMakerInteraction{
+		Interaction: Interaction{code: CMEstablished},
 		address:     address}
 }
 
@@ -72,6 +86,12 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 				maybeTick()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
+			case query.code == CMEstablished:
+				target := cm.targets[query.address]
+				log.Println("Connection established to", query.address, target)
+				if target != nil {
+					target.established = true
+				}
 			case query.code == CMConnSucceeded:
 				cm.targets[query.address].attempting = false
 			case query.code == CMConnFailed:
@@ -86,7 +106,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			}
 		case now := <-tick:
 			for address, target := range cm.targets {
-				if target.conn == nil && !target.attempting && now.After(target.tryAfter) {
+				if !target.established && !target.attempting && now.After(target.tryAfter) {
 					target.attemptCount += 1
 					target.attempting = true;
 					go cm.attemptConnection(address, target.acceptAnyPeer)
@@ -107,25 +127,16 @@ func (cm *ConnectionMaker) addToTargets(acceptAnyPeer bool, address string) {
 			tryInterval: interval,
 			tryAfter:    after}
 	}
+	target.established = false  // this seems a crap place to do this
 	// FIXME: what does it mean if an address is added twice?
-	addrHost, addrPortStr, err := net.SplitHostPort(address)
-	if err == nil {
-		// ensure port-less version is there
-		cm.targets[addrHost] = target
-		if addrPort, err := strconv.Atoi(addrPortStr); err == nil && addrPort != Port {
-		    cm.targets[address] = target
-		}
-	} else {
-		// can't split it, assume it must not have port on it
-	    cm.targets[address] = target
-	}
+    cm.targets[address] = target
 }
 
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
 	for address, target := range cm.targets {
-		if (target.conn != nil) {
-			buf.WriteString(fmt.Sprintf("%s connected to: %v\n", address, target.conn))
+		if (target.established) {
+			buf.WriteString(fmt.Sprintf("%s connected\n", address))
 		} else if target.attempting {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying since %v)\n", address, target.attemptCount, target.tryAfter))
 		} else {
