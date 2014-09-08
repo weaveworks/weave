@@ -1,13 +1,5 @@
 package weave
 
-/* ConnectionMaker is responsible for making connections between peers,
-and retrying them when they break.  It sits in a loop waiting for requests
-to be sent over queryChan, or for timer ticks.
-Every connection has a PeerName, which is a unique identifier for every weave
-router (e.g.  a MAC address), and an IP address which it was foundAt.
-
-*/
-
 import (
 	"bytes"
 	"fmt"
@@ -38,11 +30,18 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 	return state
 }
 
-func (cm *ConnectionMaker) EnsureConnection(name PeerName, foundAt string) {
+func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: CMEnsure},
-		name:        name,
-		foundAt:     foundAt}
+		acceptAnyPeer: true,
+		address:       address}
+}
+
+func (cm *ConnectionMaker) EnsureConnection(address string) {
+	cm.queryChan <- &ConnectionMakerInteraction{
+		Interaction: Interaction{code: CMEnsure},
+		acceptAnyPeer: false,
+		address:     address}
 }
 
 func (cm *ConnectionMaker) String() string {
@@ -69,16 +68,14 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			}
 			switch {
 			case query.code == CMEnsure:
-				if query.name != cm.router.Ourself.Name {
-					cm.addToTargets(query.name, query.foundAt)
-					maybeTick()
-				}
+				cm.addToTargets(query.acceptAnyPeer, query.address)
+				maybeTick()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
 			case query.code == CMConnSucceeded:
-				cm.targets[query.foundAt].attempting = false
+				cm.targets[query.address].attempting = false
 			case query.code == CMConnFailed:
-				target := cm.targets[query.foundAt]
+				target := cm.targets[query.address]
 				target.attempting = false
 				after, interval := tryAfter(target.tryInterval)
 				target.tryInterval = interval
@@ -92,7 +89,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 				if target.conn == nil && !target.attempting && now.After(target.tryAfter) {
 					target.attemptCount += 1
 					target.attempting = true;
-					go cm.attemptConnection(address, target.commandLine)
+					go cm.attemptConnection(address, target.acceptAnyPeer)
 				}
 			}
 			tick = nil
@@ -101,24 +98,26 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 	}
 }
 
-func (cm *ConnectionMaker) addToTargets(name PeerName, foundAt string) {
-	target := cm.targets[foundAt]
+func (cm *ConnectionMaker) addToTargets(acceptAnyPeer bool, address string) {
+	target := cm.targets[address]
 	if target == nil {
 		after, interval := tryAfter(InitialInterval)
 		target = &Target{
+			acceptAnyPeer: acceptAnyPeer,
 			tryInterval: interval,
 			tryAfter:    after}
 	}
-	foundAtHost, foundAtPortStr, err := net.SplitHostPort(foundAt)
+	// FIXME: what does it mean if an address is added twice?
+	addrHost, addrPortStr, err := net.SplitHostPort(address)
 	if err == nil {
 		// ensure port-less version is there
-		cm.targets[foundAtHost] = target
-		if foundAtPort, err := strconv.Atoi(foundAtPortStr); err == nil && foundAtPort != Port {
-		    cm.targets[foundAt] = target
+		cm.targets[addrHost] = target
+		if addrPort, err := strconv.Atoi(addrPortStr); err == nil && addrPort != Port {
+		    cm.targets[address] = target
 		}
 	} else {
 		// can't split it, assume it must not have port on it
-	    cm.targets[foundAt] = target
+	    cm.targets[address] = target
 	}
 }
 
@@ -146,8 +145,7 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	// Tell the query loop we've finished this attempt
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: conncode},
-		name:        UnknownPeerName,
-		foundAt:     address}
+		address:     address}
 }
 
 func tryAfter(interval time.Duration) (time.Time, time.Duration) {

@@ -279,7 +279,7 @@ func (conn *LocalConnection) handleShutdown() {
 	conn.stopForwarders()
 
 	if conn.remote != nil {
-		conn.Router.ConnectionMaker.EnsureConnection(conn.remote.Name, conn.remoteTCPAddr)
+		conn.Router.ConnectionMaker.EnsureConnection(conn.remoteTCPAddr)
 	}
 }
 

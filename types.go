@@ -155,8 +155,8 @@ type Topology struct {
 
 type ConnectionMakerInteraction struct {
 	Interaction
-	foundAt string
-	name    PeerName
+	acceptAnyPeer bool
+	address       string
 }
 
 type ConnectionMaker struct {
@@ -167,7 +167,7 @@ type ConnectionMaker struct {
 
 // Information about an address where we may find a peer
 type Target struct {
-    commandLine  bool		// was this address given to us on the command line?
+    acceptAnyPeer  bool		// was this address given to us on the command line?
 	attempting	 bool		// are we currently attempting to connect to this address?
 	conn         *Connection
 	tryAfter     time.Time				   // next time to try this address
