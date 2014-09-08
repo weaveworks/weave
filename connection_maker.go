@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	InitialInterval = 1 * time.Second
+	InitialInterval = 5 * time.Second
 	MaxInterval     = 10 * time.Minute
 	MaxAttemptCount = 100
 	CMEnsure        = iota
@@ -74,6 +74,11 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			tick = time.After(5 * time.Second)
 		}
 	}
+	tickNow := func() {
+		if tick == nil {
+			tick = time.After(0 * time.Second)
+		}
+	}
 	for {
 		select {
 		case query, ok := <-queryChan:
@@ -83,14 +88,16 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			switch {
 			case query.code == CMEnsure:
 				cm.addToTargets(query.acceptAnyPeer, query.address)
-				maybeTick()
+				cm.resetTarget(query.address)
+				tickNow()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
 			case query.code == CMEstablished:
 				target := cm.targets[query.address]
-				log.Println("Connection established to", query.address, target)
 				if target != nil {
 					target.established = true
+				} else {
+					log.Fatal("Connection established to unknown address", query.address)
 				}
 			case query.code == CMConnSucceeded:
 				cm.targets[query.address].attempting = false
@@ -121,15 +128,19 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 func (cm *ConnectionMaker) addToTargets(acceptAnyPeer bool, address string) {
 	target := cm.targets[address]
 	if target == nil {
-		after, interval := tryAfter(InitialInterval)
 		target = &Target{
 			acceptAnyPeer: acceptAnyPeer,
-			tryInterval: interval,
-			tryAfter:    after}
+		}
+		cm.targets[address] = target
 	}
-	target.established = false  // this seems a crap place to do this
-	// FIXME: what does it mean if an address is added twice?
-    cm.targets[address] = target
+}
+
+func (cm *ConnectionMaker) resetTarget(address string) {
+	target := cm.targets[address]
+	target.established = false
+	after, interval := tryImmediately()
+	target.tryInterval = interval
+	target.tryAfter =  after
 }
 
 func (cm *ConnectionMaker) status() string {
@@ -157,6 +168,11 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: conncode},
 		address:     address}
+}
+
+func tryImmediately() (time.Time, time.Duration) {
+	interval := time.Duration(rand.Int63n(int64(InitialInterval)))
+	return time.Now(), interval
 }
 
 func tryAfter(interval time.Duration) (time.Time, time.Duration) {
