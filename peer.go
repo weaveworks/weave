@@ -57,6 +57,29 @@ func (peer *Peer) ConnectionTo(name PeerName) (Connection, bool) {
 	return conn, found // yes, you really can't inline that. FFS.
 }
 
+// given an address like '1.2.3.4:567', return the address if it has a port,
+// otherwise return the address with weave's standard port number
+func normalisePeerAddr(peerAddr string) string {
+	_, _, err := net.SplitHostPort(peerAddr)
+	if err == nil {
+		return peerAddr
+	} else {
+		return fmt.Sprintf("%s:%d", peerAddr, Port)
+	}
+}
+
+func (peer *Peer) ConnectionOn(peerAddr string) (Connection, bool) {
+	peerAddr = normalisePeerAddr(peerAddr)
+	peer.RLock()
+	defer peer.RUnlock()
+	for _, conn := range peer.connections {
+		if conn.RemoteTCPAddr() == peerAddr {
+			return conn, true
+		}
+	}
+	return nil, false
+}
+
 func (peer *Peer) ForEachConnection(fun func(PeerName, Connection)) {
 	peer.RLock()
 	defer peer.RUnlock()
@@ -197,13 +220,7 @@ func (peer *Peer) CreateConnection(peerAddr string, acceptNewPeer bool) error {
 		return err
 	}
 	// We're dialing the remote so that means connections will come from random ports
-	_, _, err := net.SplitHostPort(peerAddr)
-	var addrStr string
-	if err == nil {
-		addrStr = peerAddr
-	} else {
-		addrStr = fmt.Sprintf("%s:%d", peerAddr, Port)
-	}
+	addrStr := normalisePeerAddr(peerAddr)
 	tcpAddr, tcpErr := net.ResolveTCPAddr("tcp4", addrStr)
 	udpAddr, udpErr := net.ResolveUDPAddr("udp4", addrStr)
 	if tcpErr != nil || udpErr != nil {
