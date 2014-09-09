@@ -434,7 +434,11 @@ More details on the inner workings of weave can be found in the
 ## Contact Us
 
 Found a bug, want to suggest a feature, or have a question?
-[File an issue](https://github.com/zettio/weave/issues), or email us
-at weave@zett.io.
+[File an issue](https://github.com/zettio/weave/issues), or email
+weave@zett.io.
 
-Follow us on Twitter: [@weavenetwork](https://twitter.com/weavenetwork).
+Follow weave on Twitter:
+[@weavenetwork](https://twitter.com/weavenetwork).
+
+Discuss weave on
+[Hacker News](https://news.ycombinator.com/item?id=8289786).
