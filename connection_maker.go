@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"net"
 	"time"
 )
 
@@ -43,10 +42,7 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 }
 
 func (cm *ConnectionMaker) EnsureConnection(address string) {
-	// If we've been given a port number, take it off
-	if addrHost, _, err := net.SplitHostPort(address); err == nil {
-		address = addrHost
-	}
+	address = StripPortFromAddr(address)
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction:   Interaction{code: CMEnsure},
 		acceptAnyPeer: false,
@@ -54,10 +50,7 @@ func (cm *ConnectionMaker) EnsureConnection(address string) {
 }
 
 func (cm *ConnectionMaker) ConnectionEstablished(address string) {
-	// If we've been given a port number, take it off
-	if addrHost, _, err := net.SplitHostPort(address); err == nil {
-		address = addrHost
-	}
+	address = StripPortFromAddr(address)
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: CMEstablished},
 		address:     address}
@@ -92,6 +85,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			}
 			switch {
 			case query.code == CMEnsure:
+				log.Println("Connection ensure", query.address)
 				cm.addToTargets(query.acceptAnyPeer, query.address)
 				cm.resetTarget(query.address)
 				tickNow()
@@ -100,6 +94,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			case query.code == CMEstablished:
 				target := cm.targets[query.address]
 				if target != nil {
+					log.Println("Connection established to", query.address, target)
 					target.state = CSEstablished
 				} else {
 					log.Fatal("Connection established to unknown address", query.address)
@@ -115,9 +110,9 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 		case now := <-tick:
 			for address, target := range cm.targets {
 				if target.state == CSUnconnected && now.After(target.tryAfter) {
-					if _, found := cm.router.Ourself.ConnectionOn(address); found {
+					/*if _, found := cm.router.Ourself.ConnectionOn(address); found {
 						target.state = CSEstablished
-					} else {
+					} else*/ {
 						target.attemptCount += 1
 						target.state = CSAttempting
 						go cm.attemptConnection(address, target.acceptAnyPeer)
