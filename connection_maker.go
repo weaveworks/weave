@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"time"
 )
 
@@ -42,7 +43,10 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 }
 
 func (cm *ConnectionMaker) EnsureConnection(address string) {
-	address = StripPortFromAddr(address)
+	// If we've been given a port number, take it off
+	if addrHost, _, err := net.SplitHostPort(address); err == nil {
+		address = addrHost
+	}
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction:   Interaction{code: CMEnsure},
 		acceptAnyPeer: false,
@@ -50,7 +54,10 @@ func (cm *ConnectionMaker) EnsureConnection(address string) {
 }
 
 func (cm *ConnectionMaker) ConnectionEstablished(address string) {
-	address = StripPortFromAddr(address)
+	// If we've been given a port number, take it off
+	if addrHost, _, err := net.SplitHostPort(address); err == nil {
+		address = addrHost
+	}
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: CMEstablished},
 		address:     address}
