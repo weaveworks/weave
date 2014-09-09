@@ -115,9 +115,13 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 		case now := <-tick:
 			for address, target := range cm.targets {
 				if target.state == CMUnconnected && now.After(target.tryAfter) {
-					target.attemptCount += 1
-					target.state = CMAttempting
-					go cm.attemptConnection(address, target.acceptAnyPeer)
+					if _, found := cm.router.Ourself.ConnectionOn(address); found {
+						target.state = CMEstablished
+					} else {
+						target.attemptCount += 1
+						target.state = CMAttempting
+						go cm.attemptConnection(address, target.acceptAnyPeer)
+					}
 				}
 			}
 			tick = nil
