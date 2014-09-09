@@ -20,9 +20,9 @@ const (
 )
 
 const (
-	CMUnconnected      ConnectionState = iota
-	CMAttempting                       = iota
-	CMEstablishedState                 = iota
+	CSUnconnected ConnectionState = iota
+	CSAttempting                  = iota
+	CSEstablished                 = iota
 )
 
 func StartConnectionMaker(router *Router) *ConnectionMaker {
@@ -100,13 +100,13 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			case query.code == CMEstablished:
 				target := cm.targets[query.address]
 				if target != nil {
-					target.state = CMEstablishedState
+					target.state = CSEstablished
 				} else {
 					log.Fatal("Connection established to unknown address", query.address)
 				}
 			case query.code == CMConnFailed:
 				target := cm.targets[query.address]
-				target.state = CMUnconnected
+				target.state = CSUnconnected
 				target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 				maybeTick()
 			default:
@@ -114,12 +114,12 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			}
 		case now := <-tick:
 			for address, target := range cm.targets {
-				if target.state == CMUnconnected && now.After(target.tryAfter) {
+				if target.state == CSUnconnected && now.After(target.tryAfter) {
 					if _, found := cm.router.Ourself.ConnectionOn(address); found {
-						target.state = CMEstablished
+						target.state = CSEstablished
 					} else {
 						target.attemptCount += 1
-						target.state = CMAttempting
+						target.state = CSAttempting
 						go cm.attemptConnection(address, target.acceptAnyPeer)
 					}
 				}
@@ -134,7 +134,7 @@ func (cm *ConnectionMaker) addToTargets(acceptAnyPeer bool, address string) {
 	target := cm.targets[address]
 	if target == nil {
 		target = &Target{
-			state:         CMUnconnected,
+			state:         CSUnconnected,
 			acceptAnyPeer: acceptAnyPeer,
 		}
 		cm.targets[address] = target
@@ -144,20 +144,20 @@ func (cm *ConnectionMaker) addToTargets(acceptAnyPeer bool, address string) {
 func (cm *ConnectionMaker) resetTarget(address string) {
 	target := cm.targets[address]
 	// If we were in the middle of a connection attempt then back-off again
-	if target.state == CMAttempting {
+	if target.state == CSAttempting {
 		target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 	} else {
 		target.tryAfter, target.tryInterval = tryImmediately()
 	}
-	target.state = CMUnconnected
+	target.state = CSUnconnected
 }
 
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
 	for address, target := range cm.targets {
-		if target.state == CMEstablishedState {
+		if target.state == CSEstablished {
 			buf.WriteString(fmt.Sprintf("%s connected\n", address))
-		} else if target.state == CMAttempting {
+		} else if target.state == CSAttempting {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying since %v)\n", address, target.attemptCount, target.tryAfter))
 		} else {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v)\n", address, target.attemptCount, target.tryAfter))
