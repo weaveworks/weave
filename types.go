@@ -159,9 +159,9 @@ type ConnectionMakerInteraction struct {
 }
 
 type ConnectionMaker struct {
-	router    *Router
-	queryChan chan<- *ConnectionMakerInteraction
-	targets   map[string]*Target
+	router         *Router
+	queryChan      chan<- *ConnectionMakerInteraction
+	targets        map[string]*Target
 	cmdLineAddress map[string]bool
 }
 

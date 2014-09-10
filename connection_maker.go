@@ -14,8 +14,7 @@ const (
 	MaxAttemptCount = 100
 	CMInitiate      = iota
 	CMStatus        = iota
-	CMEstablished   = iota
-	CMConnFailed    = iota
+	CMAttemptDone   = iota
 )
 
 const (
@@ -26,10 +25,10 @@ const (
 func StartConnectionMaker(router *Router) *ConnectionMaker {
 	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
 	state := &ConnectionMaker{
-		router:    router,
-		queryChan: queryChan,
+		router:         router,
+		queryChan:      queryChan,
 		cmdLineAddress: make(map[string]bool),
-		targets:   make(map[string]*Target)}
+		targets:        make(map[string]*Target)}
 	go state.queryLoop(queryChan)
 	return state
 }
@@ -69,18 +68,18 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			}
 			switch {
 			case query.code == CMInitiate:
-				cm.cmdLineAddress[query.address] = true;
+				cm.cmdLineAddress[query.address] = true
 				tickNow()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
-			case query.code == CMConnFailed:
+			case query.code == CMAttemptDone:
 				target := cm.targets[query.address]
 				if target != nil {
 					target.state = CSUnconnected
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 					maybeTick()
 				} else {
-					log.Fatal("CMConnFailed unknown address", query.address)
+					log.Fatal("CMAttemptDone unknown address", query.address)
 				}
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
@@ -95,31 +94,23 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	ourself := cm.router.Ourself
-
 	validTarget := make(map[string]bool)
-
-	// Any targets that are now connected, we don't need to attempt any more
-	for address, _ := range cm.targets {
-		if _, found := ourself.ConnectionOn(address); found {
-			//log.Println("Deleting target now connected:", address)
-			delete(cm.targets, address)
-		}
-	}
-
-	// Add command-line targets that are not connected
-	for address, _ := range cm.cmdLineAddress {
-		if _, found := ourself.ConnectionOn(address); !found {
-			//log.Println("Unconnected cmdline:", address)
-			cm.addToTargets(address)
-			validTarget[address] = true
-		}
-	}
 
 	// copy the set of peers we are connected to, so we can access it without locking
 	our_connected_peers := make(map[PeerName]bool)
-	ourself.ForEachConnection(func(peer PeerName, _ Connection) {
+	our_connected_targets := make(map[string]bool)
+	ourself.ForEachConnection(func(peer PeerName, conn Connection) {
 		our_connected_peers[peer] = true
+		our_connected_targets[conn.RemoteTCPAddr()] = true
 	})
+
+	// Add command-line targets that are not connected
+	for address, _ := range cm.cmdLineAddress {
+		if !our_connected_targets[address] {
+			//log.Println("Unconnected cmdline:", address)
+			validTarget[address] = true
+		}
+	}
 
 	// Add peers that someone else is connected to, but we aren't
 	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
@@ -130,27 +121,27 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 				// try both portnumber of connection and standart port
 				if host, port, err := ExtractHostPort(address); err == nil {
 					if port != Port {
-						cm.addToTargets(address)
 						validTarget[address] = true
 					}
-					cm.addToTargets(host)
 					validTarget[host] = true
 				}
 			}
 		})
 	})
 
+	for address, _ := range validTarget {
+		cm.addToTargets(address)
+	}
+
 	for address, target := range cm.targets {
 		if target.state == CSUnconnected {
-			if validTarget[address] {
-				if now.After(target.tryAfter) {
-					target.attemptCount += 1
-					target.state = CSAttempting
-					go cm.attemptConnection(address, cm.cmdLineAddress[address])
-				}
-			} else {
+			if our_connected_targets[address] || !validTarget[address] {
 				//log.Println("Deleting target no longer valid:", address)
 				delete(cm.targets, address)
+			} else if now.After(target.tryAfter) {
+				target.attemptCount += 1
+				target.state = CSAttempting
+				go cm.attemptConnection(address, cm.cmdLineAddress[address])
 			}
 		}
 	}
@@ -160,7 +151,7 @@ func (cm *ConnectionMaker) addToTargets(address string) {
 	target := cm.targets[address]
 	if target == nil {
 		target = &Target{
-			state:     CSUnconnected,
+			state: CSUnconnected,
 		}
 		target.tryAfter, target.tryInterval = tryImmediately()
 		cm.targets[address] = target
@@ -183,10 +174,10 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	log.Println("Attempting connection to", address)
 	if err := cm.router.Ourself.CreateConnection(address, acceptNewPeer); err != nil {
 		log.Println(err)
-		cm.queryChan <- &ConnectionMakerInteraction{
-			Interaction: Interaction{code: CMConnFailed},
-			address:     address}
 	}
+	cm.queryChan <- &ConnectionMakerInteraction{
+		Interaction: Interaction{code: CMAttemptDone},
+		address:     address}
 }
 
 func tryImmediately() (time.Time, time.Duration) {

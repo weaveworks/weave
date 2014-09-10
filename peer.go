@@ -57,18 +57,6 @@ func (peer *Peer) ConnectionTo(name PeerName) (Connection, bool) {
 	return conn, found // yes, you really can't inline that. FFS.
 }
 
-func (peer *Peer) ConnectionOn(peerAddr string) (Connection, bool) {
-	peerAddr = NormalisePeerAddr(peerAddr)
-	peer.RLock()
-	defer peer.RUnlock()
-	for _, conn := range peer.connections {
-		if conn.RemoteTCPAddr() == peerAddr {
-			return conn, true
-		}
-	}
-	return nil, false
-}
-
 func (peer *Peer) ForEachConnection(fun func(PeerName, Connection)) {
 	peer.RLock()
 	defer peer.RUnlock()
