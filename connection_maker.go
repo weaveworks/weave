@@ -95,7 +95,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	ourself := cm.router.Ourself
-	count_unconnected_commandline := 0
+	has_unconnected_commandline := false
 	// Any targets that are now connected, we don't need to attempt any more
 	for address, target := range cm.targets {
 		if _, found := ourself.ConnectionOn(address); found {
@@ -112,18 +112,18 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 			if target.state != CSAttempting {
 				target.state = CSUnconnected
 			}
-			count_unconnected_commandline += 1
+			has_unconnected_commandline = true
 		}
 	}
 
 	// Look for peers that we don't have a connection to.
-	count_unconnected_peers := 0
+	has_unconnected_peers := false
 	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
 		for peer2, conn := range peer.connections {
 			if _, found := ourself.ConnectionTo(peer2); !found &&
 				peer2 != ourself.Name {
 				log.Println("Unconnected peer:", peer2)
-				count_unconnected_peers += 1
+				has_unconnected_peers = true
 				// peer2 is a peer that someone else knows about, but we don't have a connection to.
 				address := conn.RemoteTCPAddr()
 				if host, port, err := ExtractHostPort(address); err == nil {
@@ -136,17 +136,13 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 		}
 	})
 
-	if count_unconnected_commandline == 0 && count_unconnected_peers == 0 {
-		// We are already connected to everyone we could possibly be connected to; nothing further to do.
-		return
-	}
-
-	// Now connect to any targets in scope
-	for address, target := range cm.targets {
-		if target.state == CSUnconnected && now.After(target.tryAfter) {
-			target.attemptCount += 1
-			target.state = CSAttempting
-			go cm.attemptConnection(address, target.isCmdLine)
+	if has_unconnected_commandline || has_unconnected_peers {
+		for address, target := range cm.targets {
+			if target.state == CSUnconnected && now.After(target.tryAfter) {
+				target.attemptCount += 1
+				target.state = CSAttempting
+				go cm.attemptConnection(address, target.isCmdLine)
+			}
 		}
 	}
 }
