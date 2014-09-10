@@ -95,6 +95,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	ourself := cm.router.Ourself
+
 	// Any targets that are now connected, we don't need to attempt any more
 	for address, target := range cm.targets {
 		if _, found := ourself.ConnectionOn(address); found {
@@ -108,6 +109,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 				delete(cm.targets, address)
 			}
 		} else if target.isCmdLine {
+			// This is a target that we are not connected to - if we are not currently attempting to connect, make sure we record it as unconnected
 			if target.state != CSAttempting {
 				target.state = CSUnconnected
 			}
@@ -135,13 +137,11 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 		})
 	})
 
-	{
-		for address, target := range cm.targets {
-			if target.state == CSUnconnected && now.After(target.tryAfter) {
-				target.attemptCount += 1
-				target.state = CSAttempting
-				go cm.attemptConnection(address, target.isCmdLine)
-			}
+	for address, target := range cm.targets {
+		if target.state == CSUnconnected && now.After(target.tryAfter) {
+			target.attemptCount += 1
+			target.state = CSAttempting
+			go cm.attemptConnection(address, target.isCmdLine)
 		}
 	}
 }

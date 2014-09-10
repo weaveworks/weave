@@ -155,7 +155,7 @@ type Topology struct {
 
 type ConnectionMakerInteraction struct {
 	Interaction
-	address   string
+	address string
 }
 
 type ConnectionMaker struct {
