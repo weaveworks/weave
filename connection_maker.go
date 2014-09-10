@@ -100,13 +100,14 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	our_connected_peers := make(map[PeerName]bool)
 	our_connected_targets := make(map[string]bool)
 	ourself.ForEachConnection(func(peer PeerName, conn Connection) {
+		//log.Println("Connected peer:", peer, conn.RemoteTCPAddr())
 		our_connected_peers[peer] = true
 		our_connected_targets[conn.RemoteTCPAddr()] = true
 	})
 
 	// Add command-line targets that are not connected
 	for address, _ := range cm.cmdLineAddress {
-		if !our_connected_targets[address] {
+		if !our_connected_targets[NormalisePeerAddr(address)] {
 			//log.Println("Unconnected cmdline:", address)
 			validTarget[address] = true
 		}
