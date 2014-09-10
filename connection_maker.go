@@ -131,7 +131,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 		cm.addToTargets(address)
 	}
 
-	now = time.Now()  // make sure we catch items just added
+	now = time.Now() // make sure we catch items just added
 	for address, target := range cm.targets {
 		if target.state == CSUnconnected {
 			if our_connected_targets[address] || !validTarget[address] {
