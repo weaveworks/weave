@@ -20,11 +20,6 @@ const (
 	CMFailed   = iota
 )
 
-const (
-	CSUnconnected ConnectionState = iota
-	CSAttempting                  = iota
-)
-
 func StartConnectionMaker(router *Router) *ConnectionMaker {
 	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
 	state := &ConnectionMaker{
@@ -79,7 +74,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 				query.resultChan <- cm.status()
 			case query.code == CMFailed:
 				if target, found := cm.targets[query.address]; found {
-					target.state = CSUnconnected
+					target.attempting = false
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 					maybeTick()
 				}
@@ -140,13 +135,13 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 
 	now = time.Now() // make sure we catch items just added
 	for address, target := range cm.targets {
-		if target.state == CSUnconnected {
+		if !target.attempting {
 			if our_connected_targets[address] || !validTarget[address] {
 				//log.Println("Deleting target no longer valid:", address)
 				delete(cm.targets, address)
 			} else if now.After(target.tryAfter) {
+				target.attempting = true
 				target.attemptCount += 1
-				target.state = CSAttempting
 				go cm.attemptConnection(address, cm.cmdLineAddress[address])
 			}
 		} else if our_connected_targets[address] {
@@ -160,9 +155,7 @@ func (cm *ConnectionMaker) addToTargets(address string) {
 	address = NormalisePeerAddr(address)
 	target := cm.targets[address]
 	if target == nil {
-		target = &Target{
-			state: CSUnconnected,
-		}
+		target = &Target{}
 		target.tryAfter, target.tryInterval = tryImmediately()
 		cm.targets[address] = target
 	}
@@ -171,7 +164,7 @@ func (cm *ConnectionMaker) addToTargets(address string) {
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
 	for address, target := range cm.targets {
-		if target.state == CSAttempting {
+		if target.attempting {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying since %v)\n", address, target.attemptCount, target.tryAfter))
 		} else {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v)\n", address, target.attemptCount, target.tryAfter))
