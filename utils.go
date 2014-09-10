@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 )
 
 func checkFatal(e error) {
@@ -96,4 +97,37 @@ func (lop ListOfPeers) Swap(i, j int) {
 }
 func (lop ListOfPeers) Less(i, j int) bool {
 	return lop[i].Name < lop[i].Name
+}
+
+func StripPortFromAddr(address string) string {
+	// If we've been given a port number, take it off
+	if addrHost, _, err := net.SplitHostPort(address); err == nil {
+		return addrHost
+	}
+	return address
+}
+
+// given an address like '1.2.3.4:567', return the host and port number,
+// given an address like '1.2.3.4', return the host and weave's standard port number
+func ExtractHostPort(address string) (host string, port int, err error) {
+	if host, port, err := net.SplitHostPort(address); err == nil {
+		if portnum, err := strconv.Atoi(port); err == nil {
+			return host, portnum, nil
+		} else {
+			return host, 0, err
+		}
+	} else {
+		return host, Port, nil
+	}
+}
+
+// given an address like '1.2.3.4:567', return the address if it has a port,
+// otherwise return the address with weave's standard port number
+func NormalisePeerAddr(peerAddr string) string {
+	_, _, err := net.SplitHostPort(peerAddr)
+	if err == nil {
+		return peerAddr
+	} else {
+		return fmt.Sprintf("%s:%d", peerAddr, Port)
+	}
 }
