@@ -102,14 +102,19 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 		our_connected_targets[conn.RemoteTCPAddr()] = true
 	})
 
-	// Add command-line targets that are not connected
-	for address, _ := range cm.cmdLineAddress {
+	addTarget := func(address string) {
 		if !our_connected_targets[address] {
 			validTarget[address] = true
 		}
 	}
 
-	// Add peers that someone else is connected to, but we aren't
+	// Add command-line targets that are not connected
+	for address, _ := range cm.cmdLineAddress {
+		addTarget(address)
+	}
+
+	// Add targets for peers that someone else is connected to, but we
+	// aren't
 	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
 		peer.ForEachConnection(func(peer2 PeerName, conn Connection) {
 			if peer2 == ourself.Name || our_connected_peers[peer2] {
@@ -117,9 +122,9 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 			}
 			address := conn.RemoteTCPAddr()
 			// try both portnumber of connection and standard port
-			validTarget[address] = true
+			addTarget(address)
 			if host, _, err := net.SplitHostPort(address); err == nil {
-				validTarget[NormalisePeerAddr(host)] = true
+				addTarget(NormalisePeerAddr(host))
 			}
 		})
 	})
