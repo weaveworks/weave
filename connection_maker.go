@@ -12,7 +12,7 @@ const (
 	InitialInterval = 5 * time.Second
 	MaxInterval     = 10 * time.Minute
 	MaxAttemptCount = 100
-	CMEnsure        = iota
+	CMInitiate      = iota
 	CMStatus        = iota
 	CMEstablished   = iota
 	CMConnFailed    = iota
@@ -36,24 +36,13 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction:   Interaction{code: CMEnsure},
-		acceptAnyPeer: true,
-		address:       address}
+		Interaction: Interaction{code: CMInitiate},
+		isCmdLine:   true,
+		address:     address}
 }
 
 func (cm *ConnectionMaker) EnsureConnection(address string) {
-	address = StripPortFromAddr(address)
-	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction:   Interaction{code: CMEnsure},
-		acceptAnyPeer: false,
-		address:       address}
-}
-
-func (cm *ConnectionMaker) ConnectionEstablished(address string) {
-	address = StripPortFromAddr(address)
-	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMEstablished},
-		address:     address}
+	// Do nothing - we will figure out what to do later
 }
 
 func (cm *ConnectionMaker) String() string {
@@ -84,65 +73,99 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 				return
 			}
 			switch {
-			case query.code == CMEnsure:
-				cm.addToTargets(query.acceptAnyPeer, query.address)
-				cm.resetTarget(query.address)
+			case query.code == CMInitiate:
+				cm.addToTargets(query.isCmdLine, query.address)
 				tickNow()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
-			case query.code == CMEstablished:
-				target := cm.targets[query.address]
-				if target != nil {
-					target.state = CSEstablished
-				} else {
-					log.Fatal("Connection established to unknown address", query.address)
-				}
 			case query.code == CMConnFailed:
 				target := cm.targets[query.address]
-				target.state = CSUnconnected
-				target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
-				maybeTick()
+				if target != nil {
+					target.state = CSUnconnected
+					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
+					maybeTick()
+				} else {
+					log.Fatal("CMConnFailed unknown address", query.address)
+				}
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
 		case now := <-tick:
-			for address, target := range cm.targets {
-				if target.state == CSUnconnected && now.After(target.tryAfter) {
-					if _, found := cm.router.Ourself.ConnectionOn(address); found {
-						target.state = CSEstablished
-					} else {
-						target.attemptCount += 1
-						target.state = CSAttempting
-						go cm.attemptConnection(address, target.acceptAnyPeer)
-					}
-				}
-			}
+			cm.checkStateAndAttemptConnections(now)
 			tick = nil
 			maybeTick()
 		}
 	}
 }
 
-func (cm *ConnectionMaker) addToTargets(acceptAnyPeer bool, address string) {
-	target := cm.targets[address]
-	if target == nil {
-		target = &Target{
-			state:         CSUnconnected,
-			acceptAnyPeer: acceptAnyPeer,
+func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
+	ourself := cm.router.Ourself
+	count_unconnected_commandline := 0
+	// Any targets that are now connected, we don't need to attempt any more
+	for address, target := range cm.targets {
+		if _, found := ourself.ConnectionOn(address); found {
+			if target.isCmdLine {
+				// We need to keep hold of targets supplied on the
+				// command-line, because that info isn't
+				// tracked anywhere else
+				target.state = CSEstablished
+				target.tryInterval = InitialInterval
+			} else {
+				delete(cm.targets, address)
+			}
+		} else if target.isCmdLine {
+			if target.state != CSAttempting {
+				target.state = CSUnconnected
+			}
+			count_unconnected_commandline += 1
 		}
-		cm.targets[address] = target
+	}
+
+	// Look for peers that we don't have a connection to.
+	count_unconnected_peers := 0
+	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
+		for peer2, conn := range peer.connections {
+			if _, found := ourself.ConnectionTo(peer2); !found &&
+				peer2 != ourself.Name {
+				log.Println("Unconnected peer:", peer2)
+				count_unconnected_peers += 1
+				// peer2 is a peer that someone else knows about, but we don't have a connection to.
+				address := conn.RemoteTCPAddr()
+				if host, port, err := ExtractHostPort(address); err == nil {
+					if port != Port {
+						cm.addToTargets(false, address)
+					}
+					cm.addToTargets(false, host)
+				}
+			}
+		}
+	})
+
+	if count_unconnected_commandline == 0 && count_unconnected_peers == 0 {
+		// We are already connected to everyone we could possibly be connected to; nothing further to do.
+		return
+	}
+
+	// Now connect to any targets in scope
+	for address, target := range cm.targets {
+		if target.state == CSUnconnected && now.After(target.tryAfter) {
+			target.attemptCount += 1
+			target.state = CSAttempting
+			go cm.attemptConnection(address, target.isCmdLine)
+		}
 	}
 }
 
-func (cm *ConnectionMaker) resetTarget(address string) {
+func (cm *ConnectionMaker) addToTargets(isCmdLine bool, address string) {
 	target := cm.targets[address]
-	// If we were in the middle of a connection attempt then back-off again
-	if target.state == CSAttempting {
-		target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
-	} else {
+	if target == nil {
+		target = &Target{
+			state:     CSUnconnected,
+			isCmdLine: isCmdLine,
+		}
 		target.tryAfter, target.tryInterval = tryImmediately()
+		cm.targets[address] = target
 	}
-	target.state = CSUnconnected
 }
 
 func (cm *ConnectionMaker) status() string {

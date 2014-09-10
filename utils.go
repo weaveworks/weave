@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 )
 
 func checkFatal(e error) {
@@ -104,6 +105,20 @@ func StripPortFromAddr(address string) string {
 		return addrHost
 	}
 	return address
+}
+
+// given an address like '1.2.3.4:567', return the host and port number,
+// given an address like '1.2.3.4', return the host and weave's standard port number
+func ExtractHostPort(address string) (host string, port int, err error) {
+	if host, port, err := net.SplitHostPort(address); err == nil {
+		if portnum, err := strconv.Atoi(port); err == nil {
+			return host, portnum, nil
+		} else {
+			return host, 0, err
+		}
+	} else {
+		return host, Port, nil
+	}
 }
 
 // given an address like '1.2.3.4:567', return the address if it has a port,

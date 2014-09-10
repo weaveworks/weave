@@ -155,8 +155,8 @@ type Topology struct {
 
 type ConnectionMakerInteraction struct {
 	Interaction
-	acceptAnyPeer bool
-	address       string
+	isCmdLine bool
+	address   string
 }
 
 type ConnectionMaker struct {
@@ -169,11 +169,11 @@ type ConnectionState int
 
 // Information about an address where we may find a peer
 type Target struct {
-	acceptAnyPeer bool // was this address given to us on the command line?
-	state         ConnectionState
-	tryAfter      time.Time     // next time to try this address
-	tryInterval   time.Duration // backoff time on next failure
-	attemptCount  int
+	isCmdLine    bool // was this address given to us on the command line?
+	state        ConnectionState
+	tryAfter     time.Time     // next time to try this address
+	tryInterval  time.Duration // backoff time on next failure
+	attemptCount int
 }
 
 // UDPSender interface and implementations

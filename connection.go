@@ -221,7 +221,6 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	conn.established = true
 	conn.Unlock()
 	if !old {
-		conn.Router.ConnectionMaker.ConnectionEstablished(conn.remoteTCPAddr)
 		conn.local.ConnectionEstablished(conn)
 		if err := conn.ensureHeartbeat(false); err != nil {
 			return err
