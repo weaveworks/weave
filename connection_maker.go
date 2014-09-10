@@ -161,11 +161,13 @@ func (cm *ConnectionMaker) addToTargets(address string) {
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
 	for address, target := range cm.targets {
+		var fmtStr string
 		if target.attempting {
-			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying since %v)\n", address, target.attemptCount, target.tryAfter))
+			fmtStr = "%s (%v attempts, trying since %v)\n"
 		} else {
-			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v)\n", address, target.attemptCount, target.tryAfter))
+			fmtStr = "%s (%v attempts, next at %v)\n"
 		}
+		buf.WriteString(fmt.Sprintf(fmtStr, address, target.attemptCount, target.tryAfter))
 	}
 	return buf.String()
 }
