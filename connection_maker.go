@@ -68,7 +68,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			}
 			switch {
 			case query.code == CMInitiate:
-				cm.cmdLineAddress[query.address] = true
+				cm.cmdLineAddress[NormalisePeerAddr(query.address)] = true
 				tickNow()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
@@ -122,9 +122,11 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 				// try both portnumber of connection and standart port
 				if host, port, err := ExtractHostPort(address); err == nil {
 					if port != Port {
+						// This is an address with port, that is not the standard port
 						validTarget[address] = true
 					}
-					validTarget[host] = true
+					// Add the address with standard port
+					validTarget[NormalisePeerAddr(host)] = true
 				}
 			}
 		})
@@ -149,6 +151,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 }
 
 func (cm *ConnectionMaker) addToTargets(address string) {
+	address = NormalisePeerAddr(address)
 	target := cm.targets[address]
 	if target == nil {
 		target = &Target{
