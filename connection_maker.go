@@ -97,7 +97,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	our_connected_peers := make(map[PeerName]bool)
 	our_connected_targets := make(map[string]bool)
 	ourself.ForEachConnection(func(peer PeerName, conn Connection) {
-		//log.Println("Connected peer:", peer, conn.RemoteTCPAddr())
 		our_connected_peers[peer] = true
 		our_connected_targets[conn.RemoteTCPAddr()] = true
 	})
@@ -105,7 +104,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	// Add command-line targets that are not connected
 	for address, _ := range cm.cmdLineAddress {
 		if !our_connected_targets[NormalisePeerAddr(address)] {
-			//log.Println("Unconnected cmdline:", address)
 			validTarget[address] = true
 		}
 	}
@@ -137,7 +135,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	for address, target := range cm.targets {
 		if !target.attempting {
 			if our_connected_targets[address] || !validTarget[address] {
-				//log.Println("Deleting target no longer valid:", address)
 				delete(cm.targets, address)
 			} else if now.After(target.tryAfter) {
 				target.attempting = true
@@ -145,7 +142,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 				go cm.attemptConnection(address, cm.cmdLineAddress[address])
 			}
 		} else if our_connected_targets[address] {
-			//log.Println("Deleting target now connected:", address)
 			delete(cm.targets, address)
 		}
 	}
