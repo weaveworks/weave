@@ -63,7 +63,7 @@ func (router *Router) Status() string {
 	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
 	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))
 	buf.WriteString(fmt.Sprintf("Topology:\n%s", router.Topology))
-	buf.WriteString(fmt.Sprintf("Reconnections:\n%s", router.ConnectionMaker))
+	buf.WriteString(fmt.Sprintf("Reconnects:\n%s", router.ConnectionMaker))
 	return buf.String()
 }
 
