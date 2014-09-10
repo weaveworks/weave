@@ -111,18 +111,18 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	// Add peers that someone else is connected to, but we aren't
 	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
 		peer.ForEachConnection(func(peer2 PeerName, conn Connection) {
-			if peer2 != ourself.Name && !our_connected_peers[peer2] {
-				address := conn.RemoteTCPAddr()
-				//log.Println("Unconnected peer:", peer2, address)
-				// try both portnumber of connection and standart port
-				if host, port, err := ExtractHostPort(address); err == nil {
-					if port != Port {
-						// This is an address with port, that is not the standard port
-						validTarget[address] = true
-					}
-					// Add the address with standard port
-					validTarget[NormalisePeerAddr(host)] = true
+			if peer2 == ourself.Name || our_connected_peers[peer2] {
+				return
+			}
+			address := conn.RemoteTCPAddr()
+			// try both portnumber of connection and standart port
+			if host, port, err := ExtractHostPort(address); err == nil {
+				if port != Port {
+					// This is an address with port, that is not the standard port
+					validTarget[address] = true
 				}
+				// Add the address with standard port
+				validTarget[NormalisePeerAddr(host)] = true
 			}
 		})
 	})
