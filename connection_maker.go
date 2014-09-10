@@ -116,12 +116,8 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 			}
 			address := conn.RemoteTCPAddr()
 			// try both portnumber of connection and standart port
-			if host, port, err := ExtractHostPort(address); err == nil {
-				if port != Port {
-					// This is an address with port, that is not the standard port
-					validTarget[address] = true
-				}
-				// Add the address with standard port
+			validTarget[address] = true
+			if host, _, err := ExtractHostPort(address); err == nil {
 				validTarget[NormalisePeerAddr(host)] = true
 			}
 		})
@@ -133,16 +129,21 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 
 	now = time.Now() // make sure we catch items just added
 	for address, target := range cm.targets {
-		if !target.attempting {
-			if our_connected_targets[address] || !validTarget[address] {
-				delete(cm.targets, address)
-			} else if now.After(target.tryAfter) {
-				target.attempting = true
-				target.attemptCount += 1
-				go cm.attemptConnection(address, cm.cmdLineAddress[address])
-			}
-		} else if our_connected_targets[address] {
+		if our_connected_targets[address] {
 			delete(cm.targets, address)
+			continue
+		}
+		if target.attempting {
+			continue
+		}
+		if !validTarget[address] {
+			delete(cm.targets, address)
+			continue
+		}
+		if now.After(target.tryAfter) {
+			target.attempting = true
+			target.attemptCount += 1
+			go cm.attemptConnection(address, cm.cmdLineAddress[address])
 		}
 	}
 }
