@@ -154,7 +154,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// on Port and we wait for them to send us something on UDP to
 	// start.
 	connRemote := NewRemoteConnection(router.Ourself, nil, tcpConn.RemoteAddr().String())
-	NewLocalConnection(connRemote, UnknownPeerName, tcpConn, nil, router)
+	NewLocalConnection(connRemote, true, tcpConn, nil, router)
 }
 
 func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {

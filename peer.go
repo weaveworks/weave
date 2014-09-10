@@ -109,9 +109,6 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 	defer peer.Unlock()
 	peer.version = version
 	peer.connections = connections
-	for remoteName, conn := range connections {
-		peer.Router.ConnectionMaker.EnsureConnection(remoteName, conn.RemoteTCPAddr())
-	}
 }
 
 func (peer *Peer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
@@ -190,18 +187,12 @@ func (peer *Peer) StartLocalPeer() {
 	go peer.queryLoop(queryChan)
 }
 
-func (peer *Peer) CreateConnection(peerAddr string, expectedName PeerName) error {
+func (peer *Peer) CreateConnection(peerAddr string, acceptNewPeer bool) error {
 	if err := peer.checkConnectionLimit(); err != nil {
 		return err
 	}
 	// We're dialing the remote so that means connections will come from random ports
-	_, _, err := net.SplitHostPort(peerAddr)
-	var addrStr string
-	if err == nil {
-		addrStr = peerAddr
-	} else {
-		addrStr = fmt.Sprintf("%s:%d", peerAddr, Port)
-	}
+	addrStr := NormalisePeerAddr(peerAddr)
 	tcpAddr, tcpErr := net.ResolveTCPAddr("tcp4", addrStr)
 	udpAddr, udpErr := net.ResolveUDPAddr("udp4", addrStr)
 	if tcpErr != nil || udpErr != nil {
@@ -216,7 +207,7 @@ func (peer *Peer) CreateConnection(peerAddr string, expectedName PeerName) error
 		return err
 	}
 	connRemote := NewRemoteConnection(peer, nil, tcpConn.RemoteAddr().String())
-	NewLocalConnection(connRemote, expectedName, tcpConn, udpAddr, peer.Router)
+	NewLocalConnection(connRemote, acceptNewPeer, tcpConn, udpAddr, peer.Router)
 	return nil
 }
 
