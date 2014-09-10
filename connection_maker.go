@@ -12,9 +12,12 @@ const (
 	InitialInterval = 5 * time.Second
 	MaxInterval     = 10 * time.Minute
 	MaxAttemptCount = 100
-	CMInitiate      = iota
-	CMStatus        = iota
-	CMFailed        = iota
+)
+
+const (
+	CMInitiate = iota
+	CMStatus   = iota
+	CMFailed   = iota
 )
 
 const (
