@@ -55,11 +55,6 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			tick = time.After(5 * time.Second)
 		}
 	}
-	tickNow := func() {
-		if tick == nil {
-			tick = time.After(0 * time.Second)
-		}
-	}
 	for {
 		select {
 		case query, ok := <-queryChan:
@@ -69,12 +64,12 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			switch {
 			case query.code == CMInitiate:
 				cm.cmdLineAddress[NormalisePeerAddr(query.address)] = true
-				tickNow()
+				cm.checkStateAndAttemptConnections(time.Now())
+				maybeTick()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
 			case query.code == CMAttemptDone:
-				target := cm.targets[query.address]
-				if target != nil {
+				if target, found := cm.targets[query.address]; found {
 					target.state = CSUnconnected
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 					maybeTick()
@@ -96,7 +91,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	ourself := cm.router.Ourself
 	validTarget := make(map[string]bool)
 
-	// copy the set of peers we are connected to, so we can access it without locking
+	// copy the set of things we are connected to, so we can access them without locking
 	our_connected_peers := make(map[PeerName]bool)
 	our_connected_targets := make(map[string]bool)
 	ourself.ForEachConnection(func(peer PeerName, conn Connection) {
