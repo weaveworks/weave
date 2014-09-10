@@ -162,13 +162,13 @@ type ConnectionMaker struct {
 	router    *Router
 	queryChan chan<- *ConnectionMakerInteraction
 	targets   map[string]*Target
+	cmdLineAddress map[string]bool
 }
 
 type ConnectionState int
 
 // Information about an address where we may find a peer
 type Target struct {
-	isCmdLine    bool // was this address given to us on the command line?
 	state        ConnectionState
 	tryAfter     time.Time     // next time to try this address
 	tryInterval  time.Duration // backoff time on next failure

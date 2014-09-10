@@ -21,7 +21,6 @@ const (
 const (
 	CSUnconnected ConnectionState = iota
 	CSAttempting                  = iota
-	CSEstablished                 = iota
 )
 
 func StartConnectionMaker(router *Router) *ConnectionMaker {
@@ -29,6 +28,7 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 	state := &ConnectionMaker{
 		router:    router,
 		queryChan: queryChan,
+		cmdLineAddress: make(map[string]bool),
 		targets:   make(map[string]*Target)}
 	go state.queryLoop(queryChan)
 	return state
@@ -69,7 +69,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			}
 			switch {
 			case query.code == CMInitiate:
-				cm.addToTargets(true, query.address)
+				cm.cmdLineAddress[query.address] = true;
 				tickNow()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
@@ -96,62 +96,69 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	ourself := cm.router.Ourself
 
+	validTarget := make(map[string]bool)
+
 	// Any targets that are now connected, we don't need to attempt any more
-	for address, target := range cm.targets {
+	for address, _ := range cm.targets {
 		if _, found := ourself.ConnectionOn(address); found {
-			if target.isCmdLine {
-				// We need to keep hold of targets supplied on the
-				// command-line, because that info isn't
-				// tracked anywhere else
-				target.state = CSEstablished
-				target.tryInterval = InitialInterval
-			} else {
-				delete(cm.targets, address)
-			}
-		} else if target.isCmdLine {
-			// This is a target that we are not connected to - if we are not currently attempting to connect, make sure we record it as unconnected
-			if target.state != CSAttempting {
-				target.state = CSUnconnected
-			}
+			//log.Println("Deleting target now connected:", address)
+			delete(cm.targets, address)
 		}
 	}
 
-	// build a map of peers we are connected to, so we can access it without locking
+	// Add command-line targets that are not connected
+	for address, _ := range cm.cmdLineAddress {
+		if _, found := ourself.ConnectionOn(address); !found {
+			//log.Println("Unconnected cmdline:", address)
+			cm.addToTargets(address)
+			validTarget[address] = true
+		}
+	}
+
+	// copy the set of peers we are connected to, so we can access it without locking
 	our_connected_peers := make(map[PeerName]bool)
 	ourself.ForEachConnection(func(peer PeerName, _ Connection) {
 		our_connected_peers[peer] = true
 	})
 
-	// Now look for peers that someone else is connected to, but we don't have a connection to.
+	// Add peers that someone else is connected to, but we aren't
 	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
 		peer.ForEachConnection(func(peer2 PeerName, conn Connection) {
 			if peer2 != ourself.Name && !our_connected_peers[peer2] {
 				address := conn.RemoteTCPAddr()
+				//log.Println("Unconnected peer:", peer2, address)
+				// try both portnumber of connection and standart port
 				if host, port, err := ExtractHostPort(address); err == nil {
 					if port != Port {
-						cm.addToTargets(false, address)
+						cm.addToTargets(address)
+						validTarget[address] = true
 					}
-					cm.addToTargets(false, host)
+					cm.addToTargets(host)
+					validTarget[host] = true
 				}
 			}
 		})
 	})
 
 	for address, target := range cm.targets {
-		if target.state == CSUnconnected && now.After(target.tryAfter) {
-			target.attemptCount += 1
-			target.state = CSAttempting
-			go cm.attemptConnection(address, target.isCmdLine)
+		if validTarget[address] {
+			if target.state == CSUnconnected && now.After(target.tryAfter) {
+				target.attemptCount += 1
+				target.state = CSAttempting
+				go cm.attemptConnection(address, cm.cmdLineAddress[address])
+			}
+		} else {
+			//log.Println("Deleting target no longer valid:", address)
+			delete(cm.targets, address)
 		}
 	}
 }
 
-func (cm *ConnectionMaker) addToTargets(isCmdLine bool, address string) {
+func (cm *ConnectionMaker) addToTargets(address string) {
 	target := cm.targets[address]
 	if target == nil {
 		target = &Target{
 			state:     CSUnconnected,
-			isCmdLine: isCmdLine,
 		}
 		target.tryAfter, target.tryInterval = tryImmediately()
 		cm.targets[address] = target
@@ -161,9 +168,7 @@ func (cm *ConnectionMaker) addToTargets(isCmdLine bool, address string) {
 func (cm *ConnectionMaker) status() string {
 	var buf bytes.Buffer
 	for address, target := range cm.targets {
-		if target.state == CSEstablished {
-			buf.WriteString(fmt.Sprintf("%s connected\n", address))
-		} else if target.state == CSAttempting {
+		if target.state == CSAttempting {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, trying since %v)\n", address, target.attemptCount, target.tryAfter))
 		} else {
 			buf.WriteString(fmt.Sprintf("%s (%v attempts, next at %v)\n", address, target.attemptCount, target.tryAfter))
