@@ -123,15 +123,13 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	// Now look for peers that someone else is connected to, but we don't have a connection to.
 	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
 		peer.ForEachConnection(func(peer2 PeerName, conn Connection) {
-			if peer2 != ourself.Name {
-				if _, found := our_connected_peers[peer2]; !found {
-					address := conn.RemoteTCPAddr()
-					if host, port, err := ExtractHostPort(address); err == nil {
-						if port != Port {
-							cm.addToTargets(false, address)
-						}
-						cm.addToTargets(false, host)
+			if peer2 != ourself.Name && !our_connected_peers[peer2] {
+				address := conn.RemoteTCPAddr()
+				if host, port, err := ExtractHostPort(address); err == nil {
+					if port != Port {
+						cm.addToTargets(false, address)
 					}
+					cm.addToTargets(false, host)
 				}
 			}
 		})
