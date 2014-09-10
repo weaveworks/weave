@@ -14,7 +14,7 @@ const (
 	MaxAttemptCount = 100
 	CMInitiate      = iota
 	CMStatus        = iota
-	CMAttemptDone   = iota
+	CMFailed        = iota
 )
 
 const (
@@ -36,6 +36,12 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: CMInitiate},
+		address:     address}
+}
+
+func (cm *ConnectionMaker) ShutdownConnection(address string) {
+	cm.queryChan <- &ConnectionMakerInteraction{
+		Interaction: Interaction{code: CMFailed},
 		address:     address}
 }
 
@@ -68,13 +74,11 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 				maybeTick()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
-			case query.code == CMAttemptDone:
+			case query.code == CMFailed:
 				if target, found := cm.targets[query.address]; found {
 					target.state = CSUnconnected
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 					maybeTick()
-				} else {
-					log.Fatal("CMAttemptDone unknown address", query.address)
 				}
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
@@ -142,6 +146,9 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 				target.state = CSAttempting
 				go cm.attemptConnection(address, cm.cmdLineAddress[address])
 			}
+		} else if our_connected_targets[address] {
+			//log.Println("Deleting target now connected:", address)
+			delete(cm.targets, address)
 		}
 	}
 }
@@ -174,10 +181,8 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	log.Println("Attempting connection to", address)
 	if err := cm.router.Ourself.CreateConnection(address, acceptNewPeer); err != nil {
 		log.Println(err)
+		cm.ShutdownConnection(address)
 	}
-	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMAttemptDone},
-		address:     address}
 }
 
 func tryImmediately() (time.Time, time.Duration) {
