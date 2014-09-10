@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"time"
 )
 
@@ -115,9 +116,9 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 				return
 			}
 			address := conn.RemoteTCPAddr()
-			// try both portnumber of connection and standart port
+			// try both portnumber of connection and standard port
 			validTarget[address] = true
-			if host, _, err := ExtractHostPort(address); err == nil {
+			if host, _, err := net.SplitHostPort(address); err == nil {
 				validTarget[NormalisePeerAddr(host)] = true
 			}
 		})
