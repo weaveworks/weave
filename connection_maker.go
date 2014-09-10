@@ -141,15 +141,17 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	})
 
 	for address, target := range cm.targets {
-		if validTarget[address] {
-			if target.state == CSUnconnected && now.After(target.tryAfter) {
-				target.attemptCount += 1
-				target.state = CSAttempting
-				go cm.attemptConnection(address, cm.cmdLineAddress[address])
+		if target.state == CSUnconnected {
+			if validTarget[address] {
+				if now.After(target.tryAfter) {
+					target.attemptCount += 1
+					target.state = CSAttempting
+					go cm.attemptConnection(address, cm.cmdLineAddress[address])
+				}
+			} else {
+				//log.Println("Deleting target no longer valid:", address)
+				delete(cm.targets, address)
 			}
-		} else {
-			//log.Println("Deleting target no longer valid:", address)
-			delete(cm.targets, address)
 		}
 	}
 }
