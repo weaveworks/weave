@@ -104,7 +104,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 
 	// Add command-line targets that are not connected
 	for address, _ := range cm.cmdLineAddress {
-		if !our_connected_targets[NormalisePeerAddr(address)] {
+		if !our_connected_targets[address] {
 			validTarget[address] = true
 		}
 	}
