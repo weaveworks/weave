@@ -15,9 +15,9 @@ const (
 )
 
 const (
-	CMInitiate = iota
-	CMStatus   = iota
-	CMFailed   = iota
+	CMInitiate   = iota
+	CMStatus     = iota
+	CMTerminated = iota
 )
 
 func StartConnectionMaker(router *Router) *ConnectionMaker {
@@ -37,9 +37,9 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 		address:     address}
 }
 
-func (cm *ConnectionMaker) ShutdownConnection(address string) {
+func (cm *ConnectionMaker) ConnectionTerminated(address string) {
 	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMFailed},
+		Interaction: Interaction{code: CMTerminated},
 		address:     address}
 }
 
@@ -72,7 +72,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 				maybeTick()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
-			case query.code == CMFailed:
+			case query.code == CMTerminated:
 				if target, found := cm.targets[query.address]; found {
 					target.attempting = false
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
@@ -177,7 +177,7 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	log.Println("Attempting connection to", address)
 	if err := cm.router.Ourself.CreateConnection(address, acceptNewPeer); err != nil {
 		log.Println(err)
-		cm.ShutdownConnection(address)
+		cm.ConnectionTerminated(address)
 	}
 }
 
