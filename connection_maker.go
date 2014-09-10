@@ -116,8 +116,8 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	// Add targets for peers that someone else is connected to, but we
 	// aren't
 	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
-		peer.ForEachConnection(func(peer2 PeerName, conn Connection) {
-			if peer2 == ourself.Name || our_connected_peers[peer2] {
+		peer.ForEachConnection(func(otherPeer PeerName, conn Connection) {
+			if otherPeer == ourself.Name || our_connected_peers[otherPeer] {
 				return
 			}
 			address := conn.RemoteTCPAddr()
