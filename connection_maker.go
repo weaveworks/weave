@@ -95,7 +95,6 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	ourself := cm.router.Ourself
-	has_unconnected_commandline := false
 	// Any targets that are now connected, we don't need to attempt any more
 	for address, target := range cm.targets {
 		if _, found := ourself.ConnectionOn(address); found {
@@ -112,31 +111,33 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 			if target.state != CSAttempting {
 				target.state = CSUnconnected
 			}
-			has_unconnected_commandline = true
 		}
 	}
 
-	// Look for peers that we don't have a connection to.
-	has_unconnected_peers := false
-	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
-		for peer2, conn := range peer.connections {
-			if _, found := ourself.ConnectionTo(peer2); !found &&
-				peer2 != ourself.Name {
-				log.Println("Unconnected peer:", peer2)
-				has_unconnected_peers = true
-				// peer2 is a peer that someone else knows about, but we don't have a connection to.
-				address := conn.RemoteTCPAddr()
-				if host, port, err := ExtractHostPort(address); err == nil {
-					if port != Port {
-						cm.addToTargets(false, address)
-					}
-					cm.addToTargets(false, host)
-				}
-			}
-		}
+	// build a map of peers we are connected to, so we can access it without locking
+	our_connected_peers := make(map[PeerName]bool)
+	ourself.ForEachConnection(func(peer PeerName, _ Connection) {
+		our_connected_peers[peer] = true
 	})
 
-	if has_unconnected_commandline || has_unconnected_peers {
+	// Now look for peers that someone else is connected to, but we don't have a connection to.
+	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
+		peer.ForEachConnection(func(peer2 PeerName, conn Connection) {
+			if peer2 != ourself.Name {
+				if _, found := our_connected_peers[peer2]; !found {
+					address := conn.RemoteTCPAddr()
+					if host, port, err := ExtractHostPort(address); err == nil {
+						if port != Port {
+							cm.addToTargets(false, address)
+						}
+						cm.addToTargets(false, host)
+					}
+				}
+			}
+		})
+	})
+
+	{
 		for address, target := range cm.targets {
 			if target.state == CSUnconnected && now.After(target.tryAfter) {
 				target.attemptCount += 1
