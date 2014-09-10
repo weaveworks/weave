@@ -121,11 +121,6 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 	defer peer.Unlock()
 	peer.version = version
 	peer.connections = connections
-	for remoteName, conn := range connections {
-		if remoteName != peer.Router.Ourself.Name {
-			peer.Router.ConnectionMaker.EnsureConnection(conn.RemoteTCPAddr())
-		}
-	}
 }
 
 func (peer *Peer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {

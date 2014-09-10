@@ -37,12 +37,7 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: CMInitiate},
-		isCmdLine:   true,
 		address:     address}
-}
-
-func (cm *ConnectionMaker) EnsureConnection(address string) {
-	// Do nothing - we will figure out what to do later
 }
 
 func (cm *ConnectionMaker) String() string {
@@ -74,7 +69,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			}
 			switch {
 			case query.code == CMInitiate:
-				cm.addToTargets(query.isCmdLine, query.address)
+				cm.addToTargets(true, query.address)
 				tickNow()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()

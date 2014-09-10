@@ -277,10 +277,6 @@ func (conn *LocalConnection) handleShutdown() {
 	// blank out the forwardChan so that the router processes don't
 	// try to send any more
 	conn.stopForwarders()
-
-	if conn.remote != nil {
-		conn.Router.ConnectionMaker.EnsureConnection(conn.remoteTCPAddr)
-	}
 }
 
 func (conn *LocalConnection) handshake(acceptNewPeer bool) error {

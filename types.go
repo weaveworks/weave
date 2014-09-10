@@ -155,7 +155,6 @@ type Topology struct {
 
 type ConnectionMakerInteraction struct {
 	Interaction
-	isCmdLine bool
 	address   string
 }
 
