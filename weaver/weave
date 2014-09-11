@@ -82,6 +82,23 @@ case "$COMMAND" in
         # (eth0, wlan0, etc) so the name becomes stable across host
         # restarts.
         MACADDR=`cat /sys/class/net/$BRIDGE/address`
+        case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' weave 2>/dev/null) in
+            "true zettio/weave")
+                echo "Weave is already running." >&2
+                exit 1
+                ;;
+            "false zettio/weave")
+                docker rm weave >/dev/null
+                ;;
+            true*)
+                echo "Found another running container named 'weave'. Aborting." >&2
+                exit 1
+                ;;
+            false*)
+                echo "Found another container named 'weave'. Aborting." >&2
+                exit 1
+                ;;
+        esac
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
         echo $CONTAINER
         IFACE=eth0
