@@ -132,8 +132,8 @@ case "$COMMAND" in
         exit 0
         ;;
     stop)
-        docker kill weave > /dev/null
-        docker rm weave > /dev/null
+        docker kill weave >/dev/null
+        docker rm weave >/dev/null
         if command_exists conntrack
         then
             conntrack -D -p udp --dport 6783 >/dev/null 2>&1
@@ -178,7 +178,7 @@ ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
 
 if command_exists ethtool
 then
-    ip netns exec $NSPID ethtool -K $IFACE tx off > /dev/null
+    ip netns exec $NSPID ethtool -K $IFACE tx off >/dev/null
 else
     echo "Cannot find ethtool; please install it. Continuing without it." >&2
 fi
