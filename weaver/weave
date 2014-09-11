@@ -5,6 +5,7 @@ usage() {
     echo "Usage:"
     echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
+    echo "weave attach <ipaddr>/<subnet> <container_id>"
     echo "weave expose <ipaddr>/<subnet>"
     echo "weave hide   <ipaddr>/<subnet>"
     echo "weave status"
@@ -129,6 +130,13 @@ case "$COMMAND" in
         create_bridge
         CONTAINER=$(docker run -d "$@")
         echo $CONTAINER
+        IFACE=$CONTAINER_IFNAME
+        ;;
+    attach)
+        [ $# -gt 1 ] || usage
+        IPADDR=$1
+        create_bridge
+        CONTAINER=$2
         IFACE=$CONTAINER_IFNAME
         ;;
     expose)
