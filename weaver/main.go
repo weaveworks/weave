@@ -18,6 +18,12 @@ import (
 	"time"
 )
 
+var builddate string  // set by the Makefile
+
+func versionString() string {
+	return "Weave of " + builddate
+}
+
 func ensureInterface(ifaceName string, wait bool) (iface *net.Interface, err error) {
 	iface, err = findInterface(ifaceName)
 	if err == nil || !wait {
@@ -62,6 +68,7 @@ func main() {
 		password   string
 		wait       bool
 		debug      bool
+		version    bool
 		prof       string
 		peers      []string
 		connLimit  int
@@ -73,16 +80,21 @@ func main() {
 	flag.StringVar(&password, "password", "", "network password")
 	flag.BoolVar(&wait, "wait", false, "wait for interface to be created and come up")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
+	flag.BoolVar(&version, "version", false, "display version information")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&connLimit, "connlimit", 10, "connection limit (defaults to 10, set to 0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
 	flag.Parse()
 	peers = flag.Args()
 
+	if version {
+		fmt.Println(versionString())
+	}
 	if ifaceName == "" {
 		fmt.Println("Missing required parameter 'iface'")
 		os.Exit(1)
 	}
+	log.Println(versionString(), os.Args)
 	iface, err := ensureInterface(ifaceName, wait)
 	if err != nil {
 		log.Fatal(err)
@@ -138,6 +150,9 @@ func main() {
 func handleHttp(router *weave.Router) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, router.Status())
+	})
+	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, versionString() + "\n")
 	})
 	address := fmt.Sprintf(":%d", weave.StatusPort)
 	err := http.ListenAndServe(address, nil)

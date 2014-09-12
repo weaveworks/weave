@@ -127,6 +127,10 @@ case "$COMMAND" in
 		rest_command status
         exit 0
         ;;
+    version)
+		rest_command version
+        exit 0
+        ;;
     run)
         [ $# -gt 0 ] || usage
         IPADDR=$1
