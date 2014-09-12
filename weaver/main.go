@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-var builddate string  // set by the Makefile
+var builddate string // set by the Makefile
 
 func versionString() string {
 	return "Weave of " + builddate
@@ -152,7 +152,7 @@ func handleHttp(router *weave.Router) {
 		io.WriteString(w, router.Status())
 	})
 	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, versionString() + "\n")
+		io.WriteString(w, versionString()+"\n")
 	})
 	address := fmt.Sprintf(":%d", weave.StatusPort)
 	err := http.ListenAndServe(address, nil)
