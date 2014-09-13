@@ -152,9 +152,10 @@ case "$COMMAND" in
         exit 0
         ;;
     stop)
-        if ! docker rm -f weave >/dev/null 2>&1 ; then
+        if ! docker kill weave >/dev/null 2>&1 ; then
             echo "Weave is not running."
         fi
+        docker rm -f weave >/dev/null 2>&1 || true
         if command_exists conntrack
         then
             conntrack -D -p udp --dport 6783 >/dev/null 2>&1
