@@ -135,6 +135,7 @@ case "$COMMAND" in
         [ $# -gt 0 ] || usage
         IPADDR=$1
         shift 1
+        create_bridge
         if ! ip addr list dev $BRIDGE | grep -qF $IPADDR
         then
             ip addr add dev $BRIDGE $IPADDR
@@ -145,6 +146,7 @@ case "$COMMAND" in
         [ $# -gt 0 ] || usage
         IPADDR=$1
         shift 1
+        create_bridge
         if ip addr list dev $BRIDGE | grep -qF $IPADDR
         then
             ip addr del dev $BRIDGE $IPADDR
