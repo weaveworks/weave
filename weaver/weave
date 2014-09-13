@@ -54,6 +54,8 @@ create_bridge() {
         ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
         ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
         ip link del dev v${CONTAINER_IFNAME}du
+        # disable offloading
+        check_command_and_run ethtool ethtool -K $BRIDGE tx off >/dev/null
     }
     ip link set dev $BRIDGE up
 }
