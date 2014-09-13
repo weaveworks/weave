@@ -76,8 +76,40 @@ add_nat_rule() {
 }
 
 setup_masquerading() {
-    add_nat_rule "POSTROUTING -o $BRIDGE ! -s $IPADDR -j MASQUERADE"
-    add_nat_rule "POSTROUTING -s $IPADDR ! -o $BRIDGE -j MASQUERADE"
+    add_nat_rule "POSTROUTING -o $BRIDGE ! -s $1 -j MASQUERADE"
+    add_nat_rule "POSTROUTING -s $1 ! -o $BRIDGE -j MASQUERADE"
+}
+
+# the following borrows from https://github.com/jpetazzo/pipework
+configure_container_networking() {
+    DOCKERPID=$(docker inspect --format='{{ .State.Pid }}' $1)
+    [ "$DOCKERPID" = 0 ] && {
+        echo "Docker inspect returned invalid PID 0"
+        exit 1
+    }
+    [ "$DOCKERPID" = "<no value>" ] && {
+        echo "Container $1 unknown to Docker."
+        exit 1
+    }
+    NSPID=$DOCKERPID
+
+    [ ! -d /var/run/netns ] && mkdir -p /var/run/netns
+    [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
+    ln -s /proc/$NSPID/ns/net /var/run/netns/$NSPID
+
+    LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
+    GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
+    ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU
+    ip link set $LOCAL_IFNAME master $BRIDGE
+    ip link set $LOCAL_IFNAME up
+    ip link set $GUEST_IFNAME netns $NSPID
+    ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
+    ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME
+    ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
+
+    check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off >/dev/null
+
+    [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
 }
 
 case "$COMMAND" in
@@ -86,7 +118,7 @@ case "$COMMAND" in
         IPADDR=$1
         shift 1
         create_bridge
-        setup_masquerading
+        setup_masquerading $IPADDR
         # We set the router name to the bridge mac since that is
         # stable across re-creations of the containers.
         #
@@ -112,8 +144,8 @@ case "$COMMAND" in
                 ;;
         esac
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
+        configure_container_networking $CONTAINER $IPADDR eth0
         echo $CONTAINER
-        IFACE=eth0
         ;;
     status)
         if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave 2>/dev/null) ; then
@@ -132,7 +164,6 @@ case "$COMMAND" in
             echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
             exit 1
         fi
-        exit 0
         ;;
     run)
         [ $# -gt 0 ] || usage
@@ -140,8 +171,8 @@ case "$COMMAND" in
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@")
+        configure_container_networking $CONTAINER $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
-        IFACE=$CONTAINER_IFNAME
         ;;
     expose)
         [ $# -gt 0 ] || usage
@@ -152,7 +183,6 @@ case "$COMMAND" in
         then
             ip addr add dev $BRIDGE $IPADDR
         fi
-        exit 0
         ;;
     hide)
         [ $# -gt 0 ] || usage
@@ -163,7 +193,6 @@ case "$COMMAND" in
         then
             ip addr del dev $BRIDGE $IPADDR
         fi
-        exit 0
         ;;
     stop)
         if ! docker kill weave >/dev/null 2>&1 ; then
@@ -171,42 +200,9 @@ case "$COMMAND" in
         fi
         docker rm -f weave >/dev/null 2>&1 || true
         check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1
-        exit 0
         ;;
     *)
         echo "Unknown weave command '$COMMAND'"
         usage
         ;;
 esac
-
-# the following borrows from https://github.com/jpetazzo/pipework
-
-DOCKERPID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
-[ "$DOCKERPID" = 0 ] && {
-    echo "Docker inspect returned invalid PID 0"
-    exit 1
-}
-[ "$DOCKERPID" = "<no value>" ] && {
-    echo "Container $CONTAINER unknown to Docker."
-    exit 1
-}
-
-NSPID=$DOCKERPID
-
-[ ! -d /var/run/netns ] && mkdir -p /var/run/netns
-[ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
-ln -s /proc/$NSPID/ns/net /var/run/netns/$NSPID
-
-LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
-GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
-ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU
-ip link set $LOCAL_IFNAME master $BRIDGE
-ip link set $LOCAL_IFNAME up
-ip link set $GUEST_IFNAME netns $NSPID
-ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
-ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
-ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
-
-check_command_and_run ethtool ip netns exec $NSPID ethtool -K $IFACE tx off >/dev/null
-
-[ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
