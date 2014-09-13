@@ -33,6 +33,16 @@ COMMAND=$1
 
 shift 1
 
+check_command_and_run() {
+    if command_exists $1
+    then
+        shift 1
+        "$@"
+    else
+        echo "Cannot find $1; please install it. Continuing without it." >&2
+    fi
+}
+
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
         ip link add dev $BRIDGE type bridge
@@ -158,12 +168,7 @@ case "$COMMAND" in
             echo "Weave is not running."
         fi
         docker rm -f weave >/dev/null 2>&1 || true
-        if command_exists conntrack
-        then
-            conntrack -D -p udp --dport 6783 >/dev/null 2>&1
-        else
-            echo "Cannot find conntrack; please install it. Continuing without it." >&2
-        fi
+        check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1
         exit 0
         ;;
     *)
@@ -200,11 +205,6 @@ ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
 ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
 ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
 
-if command_exists ethtool
-then
-    ip netns exec $NSPID ethtool -K $IFACE tx off >/dev/null
-else
-    echo "Cannot find ethtool; please install it. Continuing without it." >&2
-fi
+check_command_and_run ethtool ip netns exec $NSPID ethtool -K $IFACE tx off >/dev/null
 
 [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
