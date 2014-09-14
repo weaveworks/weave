@@ -199,7 +199,7 @@ case "$COMMAND" in
             echo "Weave is not running."
         fi
         docker rm -f weave >/dev/null 2>&1 || true
-        check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1
+        check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
         ;;
     *)
         echo "Unknown weave command '$COMMAND'"
