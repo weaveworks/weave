@@ -349,6 +349,13 @@ quickly enough.
 
 ## Troubleshooting
 
+Check what version of weave you are running: 
+
+    weave version
+
+and compare against https://registry.hub.docker.com/u/zettio/weave/tags/manage/
+to ensure you have the latest released version.
+
 Check the weave container logs with
 
     docker logs weave
