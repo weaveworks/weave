@@ -105,6 +105,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	addTarget := func(address string) {
 		if !our_connected_targets[address] {
 			validTarget[address] = true
+			cm.addTarget(address)
 		}
 	}
 
@@ -129,10 +130,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 		})
 	})
 
-	for address, _ := range validTarget {
-		cm.addToTargets(address)
-	}
-
 	now = time.Now() // make sure we catch items just added
 	for address, target := range cm.targets {
 		if our_connected_targets[address] {
@@ -154,11 +151,9 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 	}
 }
 
-func (cm *ConnectionMaker) addToTargets(address string) {
-	address = NormalisePeerAddr(address)
-	target := cm.targets[address]
-	if target == nil {
-		target = &Target{}
+func (cm *ConnectionMaker) addTarget(address string) {
+	if _, found := cm.targets[address]; !found {
+		target := &Target{}
 		target.tryAfter, target.tryInterval = tryImmediately()
 		cm.targets[address] = target
 	}
