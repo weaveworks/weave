@@ -172,7 +172,6 @@ type Target struct {
 	attempting   bool          // are we currently attempting to connect there?
 	tryAfter     time.Time     // next time to try this address
 	tryInterval  time.Duration // backoff time on next failure
-	attemptCount int
 }
 
 // UDPSender interface and implementations

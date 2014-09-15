@@ -12,7 +12,6 @@ import (
 const (
 	InitialInterval = 5 * time.Second
 	MaxInterval     = 10 * time.Minute
-	MaxAttemptCount = 100
 )
 
 const (
@@ -145,7 +144,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 		}
 		if now.After(target.tryAfter) {
 			target.attempting = true
-			target.attemptCount += 1
 			go cm.attemptConnection(address, cm.cmdLineAddress[address])
 		}
 	}
@@ -164,11 +162,11 @@ func (cm *ConnectionMaker) status() string {
 	for address, target := range cm.targets {
 		var fmtStr string
 		if target.attempting {
-			fmtStr = "%s (%v attempts, trying since %v)\n"
+			fmtStr = "%s (trying since %v)\n"
 		} else {
-			fmtStr = "%s (%v attempts, next at %v)\n"
+			fmtStr = "%s (next try at %v)\n"
 		}
-		buf.WriteString(fmt.Sprintf(fmtStr, address, target.attemptCount, target.tryAfter))
+		buf.WriteString(fmt.Sprintf(fmtStr, address, target.tryAfter))
 	}
 	return buf.String()
 }
