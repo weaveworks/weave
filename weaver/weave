@@ -195,7 +195,6 @@ case "$COMMAND" in
             fi
         fi
         docker images --no-trunc | grep $DOCKERIMAGE | grep -v latest | tr -s ' ' | cut -d ' ' -f 2
-        exit 0
         ;;
     run)
         [ $# -gt 0 ] || usage
