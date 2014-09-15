@@ -9,8 +9,13 @@ weaver: ../*.go main.go
 
 docker-image: /tmp/weave.tar
 
+# override this on the command-line when you are doing a release
+# e.g. make tag=0.99
+tag=dev
+
 /tmp/weave.tar: Dockerfile weaver
-	sudo docker build -t zettio/weave .
+	sudo docker build -t zettio/weave:latest .
+	sudo docker tag zettio/weave:latest zettio/weave:$(tag)
 	sudo docker save zettio/weave > /tmp/weave.tar
 
 clean:
