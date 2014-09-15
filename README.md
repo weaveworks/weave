@@ -363,6 +363,24 @@ One can ask a weave router to report its status with
 
     weave status
 
+To stop weave, run
+
+    weave stop
+
+Note that this leaves the local application container network intact;
+containers on the local host can continue to communicate, whereas
+communication with containers on different hosts, as well as service
+export/import, is disrupted but resumes when weave is relaunched.
+
+To stop weave and completely remove all traces of the weave network on
+the local host, run
+
+    weave reset
+
+Any running application containers will permanently lose connectivity
+with the weave network and have to be restarted in order to
+re-connect.
+
 ## Installation with Boot2Docker
 
 If you are running Docker inside the Boot2Docker VM, e.g. because you

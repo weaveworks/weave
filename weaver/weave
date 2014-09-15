@@ -9,6 +9,7 @@ usage() {
     echo "weave hide   <ipaddr>/<subnet>"
     echo "weave status"
     echo "weave stop"
+    echo "weave reset"
     exit 1
 }
 
@@ -58,6 +59,12 @@ create_bridge() {
         check_command_and_run ethtool ethtool -K $BRIDGE tx off >/dev/null
     }
     ip link set dev $BRIDGE up
+}
+
+destroy_bridge() {
+    if [ -d /sys/class/net/$BRIDGE ] ; then
+        ip link del dev $BRIDGE
+    fi
 }
 
 run_iptables() {
@@ -214,6 +221,13 @@ case "$COMMAND" in
         docker rm -f weave >/dev/null 2>&1 || true
         check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
         stop_masquerading
+        ;;
+    reset)
+        docker kill weave >/dev/null 2>&1 || true
+        docker rm -f weave >/dev/null 2>&1 || true
+        check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
+        stop_masquerading
+        destroy_bridge
         ;;
     *)
         echo "Unknown weave command '$COMMAND'"
