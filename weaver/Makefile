@@ -3,7 +3,7 @@
 all: docker-image
 
 weaver: ../*.go main.go
-	go build -ldflags="-X main.builddate \"`date -u -Iseconds`\" -extldflags '-static'"
+	go build -ldflags '-extldflags "-static"'
 
 .PHONY: docker-image
 

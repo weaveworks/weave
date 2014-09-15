@@ -68,26 +68,6 @@ setup_masquerading() {
     add_nat_rule "POSTROUTING -s $IPADDR ! -o $BRIDGE -j MASQUERADE"
 }
 
-rest_command() {
-	RESTCOMMAND=$1
-    if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave 2>/dev/null) ; then
-        echo "Weave is not running." >&2
-        exit 1
-    fi
-    if [ -z "$DOCKERIP" ] ; then
-        echo "Weave is not running." >&2
-        exit 1
-    fi
-    if command_exists wget ; then
-        wget -O - -q $DOCKERIP:6784/$RESTCOMMAND
-    elif command_exists curl ; then
-        curl $DOCKERIP:6784/$RESTCOMMAND
-    else
-        echo "Cannot find wget or curl. Install one of them for 'weave $RESTCOMMAND' to function." >&2
-        exit 1
-    fi
-}
-
 case "$COMMAND" in
     launch)
         [ $# -gt 0 ] || usage
@@ -124,11 +104,22 @@ case "$COMMAND" in
         IFACE=eth0
         ;;
     status)
-		rest_command status
-        exit 0
-        ;;
-    version)
-		rest_command version
+        if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave 2>/dev/null) ; then
+            echo "Weave is not running." >&2
+            exit 1
+        fi
+        if [ -z "$DOCKERIP" ] ; then
+            echo "Weave is not running." >&2
+            exit 1
+        fi
+        if command_exists wget ; then
+            wget -O - -q $DOCKERIP:6784/status
+        elif command_exists curl ; then
+            curl $DOCKERIP:6784/status
+        else
+            echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
+            exit 1
+        fi
         exit 0
         ;;
     run)
