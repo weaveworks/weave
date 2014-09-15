@@ -124,7 +124,7 @@ case "$COMMAND" in
         exit 0
         ;;
     version)
-		# Try the running container first; if no luck try the image
+        # Try the running container first; if no luck try the image
         if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' weave 2>/dev/null) ; then
             if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' zettio/weave 2>/dev/null) ; then
                 echo "Unable to find zettio/weave image." >&2
