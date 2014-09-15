@@ -278,9 +278,7 @@ func (conn *LocalConnection) handleShutdown() {
 	// try to send any more
 	conn.stopForwarders()
 
-	if conn.remote != nil {
-		conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr)
-	}
+	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr)
 }
 
 func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
