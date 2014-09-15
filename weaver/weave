@@ -9,6 +9,7 @@ usage() {
     echo "weave hide   <ipaddr>/<subnet>"
     echo "weave status"
     echo "weave stop"
+    echo "weave reset"
     exit 1
 }
 
@@ -33,6 +34,16 @@ COMMAND=$1
 
 shift 1
 
+check_command_and_run() {
+    if command_exists $1
+    then
+        shift 1
+        "$@"
+    else
+        echo "Cannot find $1; please install it. Continuing without it." >&2
+    fi
+}
+
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
         ip link add dev $BRIDGE type bridge
@@ -44,11 +55,19 @@ create_bridge() {
         ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
         ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
         ip link del dev v${CONTAINER_IFNAME}du
+        # disable offloading
+        check_command_and_run ethtool ethtool -K $BRIDGE tx off >/dev/null
     }
     ip link set dev $BRIDGE up
 }
 
-add_nat_rule() {
+destroy_bridge() {
+    if [ -d /sys/class/net/$BRIDGE ] ; then
+        ip link del dev $BRIDGE
+    fi
+}
+
+run_iptables() {
     # -w is recent addition to iptables
     if [ -z "$CHECKED_IPTABLES_W" ] ; then
         if iptables -S -w >/dev/null 2>&1 ; then
@@ -57,15 +76,59 @@ add_nat_rule() {
         CHECKED_IPTABLES_W=1
     fi
 
-    if ! iptables $IPTABLES_W -t nat -C $1 >/dev/null 2>&1
+    iptables $IPTABLES_W "$@"
+}
+
+add_nat_rule() {
+    if ! run_iptables -t nat -C "$@" >/dev/null 2>&1
     then
-        iptables $IPTABLES_W -t nat -A $1 >/dev/null
+        run_iptables -t nat -A "$@" >/dev/null
     fi
 }
 
 setup_masquerading() {
-    add_nat_rule "POSTROUTING -o $BRIDGE ! -s $IPADDR -j MASQUERADE"
-    add_nat_rule "POSTROUTING -s $IPADDR ! -o $BRIDGE -j MASQUERADE"
+    run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
+    add_nat_rule POSTROUTING -j WEAVE
+    add_nat_rule WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
+    add_nat_rule WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
+}
+
+stop_masquerading() {
+    run_iptables -t nat -F WEAVE >/dev/null 2>&1 || true
+    run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
+    run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
+}
+
+# the following borrows from https://github.com/jpetazzo/pipework
+configure_container_networking() {
+    DOCKERPID=$(docker inspect --format='{{ .State.Pid }}' $1)
+    [ "$DOCKERPID" = 0 ] && {
+        echo "Docker inspect returned invalid PID 0"
+        exit 1
+    }
+    [ "$DOCKERPID" = "<no value>" ] && {
+        echo "Container $1 unknown to Docker."
+        exit 1
+    }
+    NSPID=$DOCKERPID
+
+    [ ! -d /var/run/netns ] && mkdir -p /var/run/netns
+    [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
+    ln -s /proc/$NSPID/ns/net /var/run/netns/$NSPID
+
+    LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
+    GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
+    ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU
+    ip link set $LOCAL_IFNAME master $BRIDGE
+    ip link set $LOCAL_IFNAME up
+    ip link set $GUEST_IFNAME netns $NSPID
+    ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
+    ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME
+    ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
+
+    check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off >/dev/null
+
+    [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
 }
 
 case "$COMMAND" in
@@ -73,15 +136,6 @@ case "$COMMAND" in
         [ $# -gt 0 ] || usage
         IPADDR=$1
         shift 1
-        create_bridge
-        setup_masquerading
-        # We set the router name to the bridge mac since that is
-        # stable across re-creations of the containers.
-        #
-        # TODO use the mac of one of the physical host interfaces
-        # (eth0, wlan0, etc) so the name becomes stable across host
-        # restarts.
-        MACADDR=`cat /sys/class/net/$BRIDGE/address`
         case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' weave 2>/dev/null) in
             "true zettio/weave")
                 echo "Weave is already running." >&2
@@ -99,9 +153,19 @@ case "$COMMAND" in
                 exit 1
                 ;;
         esac
+        create_bridge
+        stop_masquerading
+        setup_masquerading $IPADDR
+        # We set the router name to the bridge mac since that is
+        # stable across re-creations of the containers.
+        #
+        # TODO use the mac of one of the physical host interfaces
+        # (eth0, wlan0, etc) so the name becomes stable across host
+        # restarts.
+        MACADDR=`cat /sys/class/net/$BRIDGE/address`
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
+        configure_container_networking $CONTAINER $IPADDR eth0
         echo $CONTAINER
-        IFACE=eth0
         ;;
     status)
         if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave 2>/dev/null) ; then
@@ -120,7 +184,6 @@ case "$COMMAND" in
             echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
             exit 1
         fi
-        exit 0
         ;;
     run)
         [ $# -gt 0 ] || usage
@@ -128,80 +191,46 @@ case "$COMMAND" in
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@")
+        configure_container_networking $CONTAINER $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
-        IFACE=$CONTAINER_IFNAME
         ;;
     expose)
         [ $# -gt 0 ] || usage
         IPADDR=$1
         shift 1
+        create_bridge
         if ! ip addr list dev $BRIDGE | grep -qF $IPADDR
         then
             ip addr add dev $BRIDGE $IPADDR
         fi
-        exit 0
         ;;
     hide)
         [ $# -gt 0 ] || usage
         IPADDR=$1
         shift 1
+        create_bridge
         if ip addr list dev $BRIDGE | grep -qF $IPADDR
         then
             ip addr del dev $BRIDGE $IPADDR
         fi
-        exit 0
         ;;
     stop)
-        if ! docker rm -f weave >/dev/null 2>&1 ; then
+        if ! docker kill weave >/dev/null 2>&1 ; then
             echo "Weave is not running."
         fi
-        if command_exists conntrack
-        then
-            conntrack -D -p udp --dport 6783 >/dev/null 2>&1
-        else
-            echo "Cannot find conntrack; please install it. Continuing without it." >&2
-        fi
-        exit 0
+        docker rm -f weave >/dev/null 2>&1 || true
+        check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
+        stop_masquerading
+        ;;
+    reset)
+        docker kill weave >/dev/null 2>&1 || true
+        docker rm -f weave >/dev/null 2>&1 || true
+        check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
+        stop_masquerading
+        destroy_bridge
         ;;
     *)
         echo "Unknown weave command '$COMMAND'"
         usage
         ;;
 esac
-
-# the following borrows from https://github.com/jpetazzo/pipework
-
-DOCKERPID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
-[ "$DOCKERPID" = 0 ] && {
-    echo "Docker inspect returned invalid PID 0"
-    exit 1
-}
-[ "$DOCKERPID" = "<no value>" ] && {
-    echo "Container $CONTAINER unknown to Docker."
-    exit 1
-}
-
-NSPID=$DOCKERPID
-
-[ ! -d /var/run/netns ] && mkdir -p /var/run/netns
-[ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
-ln -s /proc/$NSPID/ns/net /var/run/netns/$NSPID
-
-LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
-GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
-ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU
-ip link set $LOCAL_IFNAME master $BRIDGE
-ip link set $LOCAL_IFNAME up
-ip link set $GUEST_IFNAME netns $NSPID
-ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
-ip netns exec $NSPID ip addr add $IPADDR dev $CONTAINER_IFNAME
-ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
-
-if command_exists ethtool
-then
-    ip netns exec $NSPID ethtool -K $IFACE tx off >/dev/null
-else
-    echo "Cannot find ethtool; please install it. Continuing without it." >&2
-fi
-
-[ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
