@@ -83,7 +83,6 @@ func main() {
 		fmt.Println("Missing required parameter 'iface'")
 		os.Exit(1)
 	}
-	log.Println("Weave: ", os.Args)
 	iface, err := ensureInterface(ifaceName, wait)
 	if err != nil {
 		log.Fatal(err)
