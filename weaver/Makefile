@@ -13,13 +13,8 @@ docker-image: /tmp/weave.tar
 	sudo docker build -t zettio/weave .
 	sudo docker save zettio/weave > /tmp/weave.tar
 
-# override this on the command-line when you are doing a release
-# e.g. make publish tag=0.99
-tag=latest
-
 publish: docker-image
-	git tag -a $(tag) -m "Release $(tag)"
-	sudo docker tag zettio/weave:latest zettio/weave:$(tag)
+	sudo docker tag zettio/weave:latest zettio/weave:git-`git rev-parse --short=12 HEAD`
 	sudo docker push zettio/weave
 
 clean:
