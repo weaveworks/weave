@@ -19,4 +19,4 @@ publish: docker-image
 
 clean:
 	-sudo docker rmi zettio/weave
-	rm -f weaver pipework /tmp/weave.tar
+	rm -f weaver /tmp/weave.tar
