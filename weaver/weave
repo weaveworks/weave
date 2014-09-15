@@ -80,17 +80,16 @@ add_nat_rule() {
 }
 
 setup_masquerading() {
-    if ! run_iptables -t nat -S WEAVE >/dev/null 2>&1
-    then
-        run_iptables -t nat -N WEAVE
-        add_nat_rule POSTROUTING -j WEAVE
-    fi
+    run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
+    add_nat_rule POSTROUTING -j WEAVE
     add_nat_rule WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
     add_nat_rule WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
 }
 
 stop_masquerading() {
     run_iptables -t nat -F WEAVE >/dev/null 2>&1 || true
+    run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
+    run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
 }
 
 # the following borrows from https://github.com/jpetazzo/pipework
