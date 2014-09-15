@@ -155,22 +155,23 @@ type Topology struct {
 
 type ConnectionMakerInteraction struct {
 	Interaction
-	foundAt string
-	name    PeerName
+	address string
 }
 
 type ConnectionMaker struct {
-	router            *Router
-	queryChan         chan<- *ConnectionMakerInteraction
-	activeConnections map[string]string
-	failedConnections map[PeerName]*FailedConnection
+	router         *Router
+	queryChan      chan<- *ConnectionMakerInteraction
+	targets        map[string]*Target
+	cmdLineAddress map[string]bool
 }
 
-type FailedConnection struct {
-	foundAt      map[string]bool
-	tryAfter     time.Time
-	tryInterval  time.Duration
-	attemptCount int
+type ConnectionState int
+
+// Information about an address where we may find a peer
+type Target struct {
+	attempting   bool          // are we currently attempting to connect there?
+	tryAfter     time.Time     // next time to try this address
+	tryInterval  time.Duration // backoff time on next failure
 }
 
 // UDPSender interface and implementations
