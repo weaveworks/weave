@@ -10,7 +10,7 @@ weaver: ../*.go main.go
 docker-image: /tmp/weave.tar
 
 /tmp/weave.tar: Dockerfile weaver
-	sudo docker build -t zettio/weave:latest .
+	sudo docker build -t zettio/weave .
 	sudo docker save zettio/weave > /tmp/weave.tar
 
 # override this on the command-line when you are doing a release
