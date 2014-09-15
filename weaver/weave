@@ -8,6 +8,7 @@ usage() {
     echo "weave expose <ipaddr>/<subnet>"
     echo "weave hide   <ipaddr>/<subnet>"
     echo "weave status"
+    echo "weave version"
     echo "weave stop"
     exit 1
 }
@@ -120,6 +121,17 @@ case "$COMMAND" in
             echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
             exit 1
         fi
+        exit 0
+        ;;
+    version)
+		# Try the running container first; if no luck try the image
+        if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' weave 2>/dev/null) ; then
+            if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' zettio/weave 2>/dev/null) ; then
+                echo "Unable to find zettio/weave image." >&2
+                exit 1
+            fi
+        fi
+        docker images --no-trunc | grep $DOCKERIMAGE | grep -v latest | tr -s ' ' | cut -d ' ' -f 2
         exit 0
         ;;
     run)
