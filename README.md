@@ -294,6 +294,52 @@ then we can connect to it from our application container on $HOST2 with
 
 The same command will work from any application container.
 
+### Service binding
+
+Importing a service provides a degree of indirection that allows late
+and dynamic binding, similar to what can be achieved with a proxy. In
+our example, application containers are unaware that the service they
+are accessing at `10.0.1.101:3322` is in fact residing on
+`$HOST3:2211`. We can point application containers at another service
+location by changing the above NAT rule, without having to alter the
+applications themselves.
+
+### Service routing
+
+The [service export](#service-export) and
+[service import](#service-import) features can be combined to
+establish connectivity between applications and services residing on
+disjoint networks, even when those networks are separated by firewalls
+and might have overlapping IP ranges. Each network imports its
+services into weave, and in turn exports from weave services required
+by its applications. There are no application containers in this
+scenario (though of course there could be); weave is acting purely as
+a address translation and routing facility, using the weave
+application network as an intermediary.
+
+In our example above, the netcat service on $HOST3 is imported into
+weave via $HOST1. We can export it on $HOST2 by first exposing the
+application network with
+
+    host2# weave expose 10.0.1.102/24
+
+and then adding a NAT rule which routes traffic from the $HOST2
+network (i.e. anything which can connect to $HOST2) to the service
+endpoint in the weave network
+
+    host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
+           -j DNAT --to-destination 10.0.1.101:3322
+
+Now any host on the same network as $HOST2 can access the service with
+
+    echo 'Hello, world.' | nc $HOST2 4433
+
+Furthermore, as explained in [service-binding](#service-binding), we
+can dynamically alter the service locations without having to touch
+the applications that access them, e.g. we could move the example
+netcat service to $HOST4:2211 while retaining its 10.0.1.101:3322
+endpoint in the weave network.
+
 ### Multi-cloud networking
 
 Weave can network containers hosted in different cloud providers /
