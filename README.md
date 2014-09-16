@@ -349,12 +349,13 @@ quickly enough.
 
 ## Troubleshooting
 
-Check what version of weave you are running: 
+Check what version of weave you are running:
 
     weave version
 
-and compare against https://registry.hub.docker.com/u/zettio/weave/tags/manage/.
-If you don't have the latest released version you can download it with:
+and compare against
+https://registry.hub.docker.com/u/zettio/weave/tags/manage/.  If you
+do not have the latest released version you can download it with:
 
     docker pull zettio/weave
 
