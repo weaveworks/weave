@@ -314,7 +314,7 @@ and might have overlapping IP ranges. Each network imports its
 services into weave, and in turn exports from weave services required
 by its applications. There are no application containers in this
 scenario (though of course there could be); weave is acting purely as
-a address translation and routing facility, using the weave
+an address translation and routing facility, using the weave
 application network as an intermediary.
 
 In our example above, the netcat service on $HOST3 is imported into
