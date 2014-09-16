@@ -39,7 +39,7 @@ func (ftbe FrameTooBigError) Error() string {
 }
 
 func (upe UnknownPeersError) Error() string {
-	return fmt.Sprint("Reference to unknown peers")
+	return fmt.Sprint("Reference to unknown peer: ", upe.Name)
 }
 
 func (nce NameCollisionError) Error() string {
