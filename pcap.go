@@ -8,9 +8,19 @@ type PcapIO struct {
 	handle *pcap.Handle
 }
 
-func NewPcapIO(ifName string, bufSz int) (pio PacketSourceSink, err error) {
-	pio, err = newPcapIO(ifName, true, 65535, bufSz)
-	return
+func NewPcapIO(ifName string, bufSz int) (PacketSourceSink, error) {
+	pio, err := newPcapIO(ifName, true, 65535, bufSz)
+	if err != nil {
+		return pio, err
+	}
+
+	// Under Linux, libpcap implements the SetDirection filtering
+	// in userspace.  So set a BPF filter to discard outbound
+	// packets inside the kernel.  We do this here rather than in
+	// newPcapIO because libpcap doesn't like this in combination
+	// with a 0 snaplen.
+	err = pio.handle.SetBPFFilter("inbound")
+	return pio, err
 }
 
 func NewPcapO(ifName string) (po PacketSink, err error) {
