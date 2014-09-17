@@ -128,11 +128,11 @@ configure_container_networking() {
             ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME && \
             ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME && \
             ip netns exec $NSPID ip link set $CONTAINER_IFNAME up && \
-            $(check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off >/dev/null) && \
+            (check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off >/dev/null) && \
             EXITCODE=0
         else
             # failed before we assigned the veth to the container's namespace - delete it
-            ip link delete $LOCAL_IFNAME type veth || true
+            ip link del $LOCAL_IFNAME type veth || true
         fi
     fi
 
