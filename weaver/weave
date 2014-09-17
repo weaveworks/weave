@@ -117,19 +117,28 @@ configure_container_networking() {
     [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
     ln -s /proc/$NSPID/ns/net /var/run/netns/$NSPID
 
+    EXITCODE=1
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
-    ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU
-    ip link set $LOCAL_IFNAME master $BRIDGE
-    ip link set $LOCAL_IFNAME up
-    ip link set $GUEST_IFNAME netns $NSPID
-    ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
-    ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME
-    ip netns exec $NSPID ip link set $CONTAINER_IFNAME up
-
-    check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off >/dev/null
+    if ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
+        if  ip link set $LOCAL_IFNAME master $BRIDGE && \
+            ip link set $LOCAL_IFNAME up && \
+            ip link set $GUEST_IFNAME netns $NSPID
+        then
+            ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME && \
+            ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME && \
+            ip netns exec $NSPID ip link set $CONTAINER_IFNAME up && \
+            (check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off >/dev/null) && \
+            EXITCODE=0
+        else
+            # failed before we assigned the veth to the container's namespace - delete it
+            ip link del $LOCAL_IFNAME type veth || true
+        fi
+    fi
 
     [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
+
+    return $EXITCODE
 }
 
 case "$COMMAND" in
