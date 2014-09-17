@@ -177,22 +177,24 @@ func (cache *PeerCache) decodeUpdate(update []byte, router *Router) (newPeers ma
 		}
 	}
 
+	unknownPeers := false
 	for _, connsBuf := range decodedConns {
-		err = connsIterator(connsBuf, func(remoteNameByte []byte, _ string) error {
+		connsIterator(connsBuf, func(remoteNameByte []byte, _ string) {
 			remoteName := PeerNameFromBin(remoteNameByte)
 			if _, found := newPeers[remoteName]; found {
-				return nil
+				return
 			}
 			if _, found := cache.table[remoteName]; found {
-				return nil
+				return
 			}
 			// Update refers to a peer which we have no knowledge
 			// of. Thus we can't apply the update. Abort.
-			return UnknownPeersError{remoteName}
+			unknownPeers = true
 		})
-		if err != nil {
-			break
-		}
+	}
+	if unknownPeers {
+		err = UnknownPeersError{}
+		return
 	}
 	return
 }
@@ -280,7 +282,7 @@ func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, uid uint64, version u
 	return
 }
 
-func connsIterator(input []byte, fun func([]byte, string) error) error {
+func connsIterator(input []byte, fun func([]byte, string)) {
 	buf := new(bytes.Buffer)
 	buf.Write(input)
 	dec := gob.NewDecoder(buf)
@@ -288,26 +290,22 @@ func connsIterator(input []byte, fun func([]byte, string) error) error {
 		var nameByte []byte
 		err := dec.Decode(&nameByte)
 		if err == io.EOF {
-			return nil
+			return
 		}
 		checkFatal(err)
 		var foundAt string
 		checkFatal(dec.Decode(&foundAt))
-		if err = fun(nameByte, string(foundAt)); err != nil {
-			return err
-		}
+		fun(nameByte, string(foundAt))
 	}
-	return nil
 }
 
 func readConnsMap(peer *Peer, buf []byte, table map[PeerName]*Peer) map[PeerName]Connection {
 	conns := make(map[PeerName]Connection)
-	connsIterator(buf, func(nameByte []byte, remoteTCPAddr string) error {
+	connsIterator(buf, func(nameByte []byte, remoteTCPAddr string) {
 		name := PeerNameFromBin(nameByte)
 		remotePeer := table[name]
 		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr)
 		conns[name] = conn
-		return nil
 	})
 	return conns
 }

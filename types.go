@@ -123,7 +123,6 @@ type FrameTooBigError struct {
 }
 
 type UnknownPeersError struct {
-	Name PeerName
 }
 
 type NameCollisionError struct {
