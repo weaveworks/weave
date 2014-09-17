@@ -21,7 +21,7 @@ command_exists () {
 }
 
 [ `id -u` = 0 ] || {
-    echo "weave must be run as 'root'"
+    echo "weave must be run as 'root'" >&2
     exit 1
 }
 
@@ -104,11 +104,11 @@ stop_masquerading() {
 configure_container_networking() {
     DOCKERPID=$(docker inspect --format='{{ .State.Pid }}' $1)
     [ "$DOCKERPID" = 0 ] && {
-        echo "Docker inspect returned invalid PID 0"
+        echo "Container $1 not running." >&2
         exit 1
     }
     [ "$DOCKERPID" = "<no value>" ] && {
-        echo "Container $1 unknown to Docker."
+        echo "Container $1 unknown to Docker." >&2
         exit 1
     }
     NSPID=$DOCKERPID
@@ -241,7 +241,7 @@ case "$COMMAND" in
         destroy_bridge
         ;;
     *)
-        echo "Unknown weave command '$COMMAND'"
+        echo "Unknown weave command '$COMMAND'" >&2
         usage
         ;;
 esac
