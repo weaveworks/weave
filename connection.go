@@ -51,7 +51,7 @@ func (conn *RemoteConnection) String() string {
 
 // Async. Does not return anything. If the connection is successful,
 // it will end up in the local peer's connections map.
-func NewLocalConnection(connRemote *RemoteConnection, expectedName PeerName, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router) {
+func NewLocalConnection(connRemote *RemoteConnection, acceptNewPeer bool, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router) {
 	if connRemote.local != router.Ourself {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
@@ -65,7 +65,7 @@ func NewLocalConnection(connRemote *RemoteConnection, expectedName PeerName, tcp
 		remoteUDPAddr:    udpAddr,
 		effectivePMTU:    DefaultPMTU,
 		queryChan:        queryChan}
-	go connLocal.queryLoop(queryChan, expectedName)
+	go connLocal.queryLoop(queryChan, acceptNewPeer)
 }
 
 func (conn *LocalConnection) Established() bool {
@@ -161,8 +161,8 @@ func (conn *LocalConnection) SendTCP(msg []byte) {
 
 // ACTOR server
 
-func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, expectedName PeerName) {
-	err := conn.handshake(expectedName)
+func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
+	err := conn.handshake(acceptNewPeer)
 	if err != nil {
 		log.Printf("->[%s] encountered error during handshake: %v\n", conn.remoteTCPAddr, err)
 		conn.handleShutdown()
@@ -278,12 +278,10 @@ func (conn *LocalConnection) handleShutdown() {
 	// try to send any more
 	conn.stopForwarders()
 
-	if conn.remote != nil {
-		conn.Router.ConnectionMaker.EnsureConnection(conn.remote.Name, conn.remoteTCPAddr)
-	}
+	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr)
 }
 
-func (conn *LocalConnection) handshake(expectedName PeerName) error {
+func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 	// We do not need to worry about locking in here as at this point,
 	// the connection is not reachable by any go-routine other than
 	// ourself. Only when we add this connection to the conn.local
@@ -344,8 +342,10 @@ func (conn *LocalConnection) handshake(expectedName PeerName) error {
 	if err != nil {
 		return err
 	}
-	if expectedName != UnknownPeerName && expectedName != name {
-		return fmt.Errorf("Unexpected remote name: expected %s, received %s", expectedName, name)
+	if !acceptNewPeer {
+		if _, found := conn.Router.Peers.Fetch(name); !found {
+			return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
+		}
 	}
 
 	uidStr, err := checkHandshakeStringField("UID", "", handshakeRecv)

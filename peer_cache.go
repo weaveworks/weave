@@ -105,8 +105,8 @@ func (cache *PeerCache) String() string {
 	var buf bytes.Buffer
 	cache.ForEach(func(name PeerName, peer *Peer) {
 		buf.WriteString(fmt.Sprint(peer, "\n"))
-		peer.ForEachConnection(func(remoteName PeerName, _ Connection) {
-			buf.WriteString(fmt.Sprintf("   -> %v\n", remoteName))
+		peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
+			buf.WriteString(fmt.Sprintf("   -> %v [%v]\n", remoteName, conn.RemoteTCPAddr()))
 		})
 	})
 	return buf.String()

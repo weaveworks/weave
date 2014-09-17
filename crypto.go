@@ -139,7 +139,7 @@ func (ne *NonEncryptor) AppendFrame(frame *ForwardedFrame) {
 	bufTail = bufTail[2:]
 	copy(bufTail, frame.frame)
 	ne.bufTail = bufTail[frameLen:]
-	ne.buffered = ne.buffered + srcLen + dstLen + 2 + frameLen
+	ne.buffered += srcLen + dstLen + 2 + frameLen
 }
 
 func (ne *NonEncryptor) TotalLen() int {
