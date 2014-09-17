@@ -481,7 +481,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 		} else if msg[0] == ProtocolUpdate {
 			newUpdate, err := conn.Router.Peers.ApplyUpdate(msg[1:], conn.Router)
 			if _, ok := err.(UnknownPeersError); err != nil && ok {
-				checkWarn(err)
+				// That update contained a peer we didn't know about; request full update
 				conn.SendTCP(ProtocolFetchAllByte)
 				continue
 			} else if conn.CheckFatal(err) != nil {
