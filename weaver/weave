@@ -118,7 +118,7 @@ configure_container_networking() {
     [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
     ln -s /proc/$NSPID/ns/net /var/run/netns/$NSPID
 
-	EXITCODE=1
+    EXITCODE=1
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
     if ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
