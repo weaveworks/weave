@@ -1,5 +1,6 @@
 #!/bin/sh
 set -e
+set -x
 
 usage() {
     echo "Usage:"
@@ -138,7 +139,7 @@ configure_container_networking() {
 
     [ -f /var/run/netns/$NSPID ] && rm -f /var/run/netns/$NSPID
 
-    exit $EXITCODE
+    return $EXITCODE
 }
 
 case "$COMMAND" in
