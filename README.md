@@ -283,7 +283,7 @@ service.
            -j DNAT --to-destination $HOST3:2211
 
 This allows any application container to reach the service by
-connecting to 10.0.0.1:3322. So if $HOST3 is indeed running a netcat
+connecting to 10.0.1.101:3322. So if $HOST3 is indeed running a netcat
 service on port 2211, e.g.
 
     host3# nc -kl 2211
