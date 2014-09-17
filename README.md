@@ -484,8 +484,8 @@ the IP address & netmask supplied in 'weave launch'.
 
 A weave router captures Ethernet packets from its bridge-connected
 interface in promiscuous mode, using 'pcap'. This typically excludes
-traffic between local containers, or between the host and local
-containers, which is routed straight over the bridge by the
+traffic between local containers, and between the host and local
+containers, all of which is routed straight over the bridge by the
 kernel. Captured packets are forwarded over UDP to weave router peers
 running on other hosts. On receipt of such a packet, a router injects
 the packet on its bridge interface using 'pcap' and/or forwards the
