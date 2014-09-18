@@ -78,6 +78,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 				}
 				cm.checkStateAndAttemptConnections(time.Now())
+				maybeTick()
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
