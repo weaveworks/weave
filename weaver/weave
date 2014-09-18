@@ -121,15 +121,15 @@ configure_container_networking() {
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
     IP_TMPFILE=/tmp/weave_ip_output_$$
-    if ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU > $IP_TMPFILE 2>&1 ; then
+    if ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU >$IP_TMPFILE 2>&1 ; then
         if  (ip link set $LOCAL_IFNAME master $BRIDGE &&
             ip link set $LOCAL_IFNAME up &&
-            ip link set $GUEST_IFNAME netns $NSPID) > $IP_TMPFILE 2>&1
+            ip link set $GUEST_IFNAME netns $NSPID) >$IP_TMPFILE 2>&1
         then
             (ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME &&
             ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME &&
             ip netns exec $NSPID ip link set $CONTAINER_IFNAME up &&
-            check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off > /dev/null) > $IP_TMPFILE 2>&1 &&
+            check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off >/dev/null) >$IP_TMPFILE 2>&1 &&
             EXITCODE=0
         else
             # failed before we assigned the veth to the container's namespace - delete it
@@ -138,7 +138,7 @@ configure_container_networking() {
     fi
 
     if [ "$EXITCODE" -ne 0 ] ; then
-        if ! ps -p $DOCKERPID > /dev/null 2>&1 ; then
+        if ! ps -p $DOCKERPID >/dev/null 2>&1 ; then
             echo "Container $1 died" >&2
         else
             echo "Failure during network set-up:" >&2
