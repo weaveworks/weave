@@ -483,10 +483,14 @@ connected to the bridge is the weave router container, which is given
 the IP address & netmask supplied in 'weave launch'.
 
 A weave router captures Ethernet packets from its bridge-connected
-interface in promiscuous mode, using 'pcap'. It forwards these packets
-over UDP to weave router peers running on other hosts. On receipt of
-such a packet, a router injects the packet on its bridge interface
-using 'pcap' and/or forwards the packet to peers.
+interface in promiscuous mode, using 'pcap'. This typically excludes
+traffic between local containers, and between the host and local
+containers, all of which is routed straight over the bridge by the
+kernel. Captured packets are forwarded over UDP to weave router peers
+running on other hosts. On receipt of such a packet, a router injects
+the packet on its bridge interface using 'pcap' and/or forwards the
+packet to peers.
+
 
 Weave routers learn which peer host a particular MAC address resides
 on. They combine this knowledge with topology information in order to
