@@ -121,6 +121,7 @@ configure_container_networking() {
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
     IP_TMPFILE=/tmp/weave_ip_output_$$
+    rm -f $IP_TMPFILE
     if ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU >$IP_TMPFILE 2>&1 ; then
         if  (ip link set $LOCAL_IFNAME master $BRIDGE &&
             ip link set $LOCAL_IFNAME up &&
