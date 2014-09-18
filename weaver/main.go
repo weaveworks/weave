@@ -24,11 +24,15 @@ func ensureInterface(ifaceName string, wait bool) (iface *net.Interface, err err
 		return
 	}
 	log.Println("Waiting for interface", ifaceName, "to come up")
-	for err != nil {
+	count := 0
+	for err != nil && count < 5 {
+		count += 1
 		time.Sleep(1 * time.Second)
 		iface, err = findInterface(ifaceName)
 	}
-	log.Println("Interface", ifaceName, "is up")
+	if err == nil {
+		log.Println("Interface", ifaceName, "is up")
+	}
 	return
 }
 
@@ -47,6 +51,7 @@ func main() {
 
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	log.Println(os.Args)
 
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
@@ -86,6 +91,9 @@ func main() {
 	iface, err := ensureInterface(ifaceName, wait)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if wait && iface == nil {
+		os.Exit(1)
 	}
 
 	if connLimit < 0 {
