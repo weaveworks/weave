@@ -113,11 +113,11 @@ find_container_pid() {
         echo "Container $1 unknown to Docker." >&2
         exit 1
     }
-	return 0
+    return 0
 }
 
 configure_container_networking() {
-	find_container_pid $1
+    find_container_pid $1
     NSPID=$DOCKERPID
 
     [ ! -d /var/run/netns ] && mkdir -p /var/run/netns
@@ -161,7 +161,7 @@ configure_container_networking() {
 }
 
 takedown_container_networking() {
-	find_container_pid $1
+    find_container_pid $1
     NSPID=$DOCKERPID
 
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
