@@ -209,9 +209,11 @@ case "$COMMAND" in
     attach)
         [ $# -gt 1 ] || usage
         IPADDR=$1
+        shift 1
         create_bridge
-        CONTAINER=$2
-        IFACE=$CONTAINER_IFNAME
+        CONTAINER=$1
+        shift 1
+        configure_container_networking $CONTAINER $IPADDR $CONTAINER_IFNAME
         ;;
     expose)
         [ $# -gt 0 ] || usage
