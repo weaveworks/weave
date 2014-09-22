@@ -92,9 +92,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if wait && iface == nil {
-		os.Exit(1)
-	}
 
 	if connLimit < 0 {
 		connLimit = 0
