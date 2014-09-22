@@ -54,7 +54,6 @@ func (cm *ConnectionMaker) String() string {
 func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteraction) {
 	var tick <-chan time.Time
 	maybeTick := func() {
-		// would be nice to optimise this to stop ticking when there is nothing worth trying
 		if tick == nil {
 			tick = time.After(5 * time.Second)
 		}
