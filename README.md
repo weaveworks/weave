@@ -508,12 +508,8 @@ More details on the inner workings of weave can be found in the
 
 Found a bug, want to suggest a feature, or have a question?
 [File an issue](https://github.com/zettio/weave/issues), or email
-weave@zett.io.
-
-When reporting a bug, please include what version of weave you are
-running, as shown by
-
-    weave version
+weave@zett.io. When reporting a bug, please include what version of
+weave you are running, as shown by `weave version`.
 
 Follow weave on Twitter:
 [@weavenetwork](https://twitter.com/weavenetwork).
