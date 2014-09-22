@@ -182,14 +182,14 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 		if !ok {
 			break
 		}
-		switch {
-		case query.code == CShutdown:
+		switch query.code {
+		case CShutdown:
 			terminate = true
-		case query.code == CSetEstablished:
+		case CSetEstablished:
 			err = conn.handleSetEstablished()
-		case query.code == CSetRemoteUDPAddr:
+		case CSetRemoteUDPAddr:
 			err = conn.handleSetRemoteUDPAddr(query.payload.(*net.UDPAddr))
-		case query.code == CSendTCP:
+		case CSendTCP:
 			err = conn.handleSendTCP(query.payload.([]byte))
 		}
 	}

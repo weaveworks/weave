@@ -16,8 +16,8 @@ const (
 
 const (
 	CMInitiate   = iota
-	CMStatus     = iota
 	CMTerminated = iota
+	CMStatus     = iota
 )
 
 func StartConnectionMaker(router *Router) *ConnectionMaker {
@@ -64,20 +64,20 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			if !ok {
 				return
 			}
-			switch {
-			case query.code == CMInitiate:
+			switch query.code {
+			case CMInitiate:
 				cm.cmdLineAddress[NormalisePeerAddr(query.address)] = true
 				cm.checkStateAndAttemptConnections()
 				maybeTick()
-			case query.code == CMStatus:
-				query.resultChan <- cm.status()
-			case query.code == CMTerminated:
+			case CMTerminated:
 				if target, found := cm.targets[query.address]; found {
 					target.attempting = false
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 				}
 				cm.checkStateAndAttemptConnections()
 				maybeTick()
+			case CMStatus:
+				query.resultChan <- cm.status()
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
