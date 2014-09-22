@@ -67,7 +67,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			switch {
 			case query.code == CMInitiate:
 				cm.cmdLineAddress[NormalisePeerAddr(query.address)] = true
-				cm.checkStateAndAttemptConnections(time.Now())
+				cm.checkStateAndAttemptConnections()
 				maybeTick()
 			case query.code == CMStatus:
 				query.resultChan <- cm.status()
@@ -76,20 +76,20 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 					target.attempting = false
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 				}
-				cm.checkStateAndAttemptConnections(time.Now())
+				cm.checkStateAndAttemptConnections()
 				maybeTick()
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
-		case now := <-tick:
-			cm.checkStateAndAttemptConnections(now)
+		case <-tick:
+			cm.checkStateAndAttemptConnections()
 			tick = nil
 			maybeTick()
 		}
 	}
 }
 
-func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
+func (cm *ConnectionMaker) checkStateAndAttemptConnections() {
 	ourself := cm.router.Ourself
 	validTarget := make(map[string]bool)
 
@@ -129,7 +129,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections(now time.Time) {
 		})
 	})
 
-	now = time.Now() // make sure we catch items just added
+	now := time.Now() // make sure we catch items just added
 	for address, target := range cm.targets {
 		if our_connected_targets[address] {
 			delete(cm.targets, address)
