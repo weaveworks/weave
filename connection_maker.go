@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net"
 	"time"
@@ -17,6 +18,7 @@ const (
 const (
 	CMInitiate   = iota
 	CMTerminated = iota
+	CMRefresh    = iota
 	CMStatus     = iota
 )
 
@@ -43,6 +45,11 @@ func (cm *ConnectionMaker) ConnectionTerminated(address string) {
 		address:     address}
 }
 
+func (cm *ConnectionMaker) Refresh() {
+	cm.queryChan <- &ConnectionMakerInteraction{
+		Interaction: Interaction{code: CMRefresh}}
+}
+
 func (cm *ConnectionMaker) String() string {
 	resultChan := make(chan interface{}, 0)
 	cm.queryChan <- &ConnectionMakerInteraction{
@@ -52,12 +59,8 @@ func (cm *ConnectionMaker) String() string {
 }
 
 func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteraction) {
-	var tick <-chan time.Time
-	maybeTick := func() {
-		if tick == nil {
-			tick = time.After(5 * time.Second)
-		}
-	}
+	timer := time.NewTimer(math.MaxInt64)
+	run := func() { timer.Reset(cm.checkStateAndAttemptConnections()) }
 	for {
 		select {
 		case query, ok := <-queryChan:
@@ -67,29 +70,27 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			switch query.code {
 			case CMInitiate:
 				cm.cmdLineAddress[NormalisePeerAddr(query.address)] = true
-				cm.checkStateAndAttemptConnections()
-				maybeTick()
+				run()
 			case CMTerminated:
 				if target, found := cm.targets[query.address]; found {
 					target.attempting = false
 					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 				}
-				cm.checkStateAndAttemptConnections()
-				maybeTick()
+				run()
+			case CMRefresh:
+				run()
 			case CMStatus:
 				query.resultChan <- cm.status()
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
 			}
-		case <-tick:
-			cm.checkStateAndAttemptConnections()
-			tick = nil
-			maybeTick()
+		case <-timer.C:
+			run()
 		}
 	}
 }
 
-func (cm *ConnectionMaker) checkStateAndAttemptConnections() {
+func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	ourself := cm.router.Ourself
 	validTarget := make(map[string]bool)
 
@@ -130,6 +131,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() {
 	})
 
 	now := time.Now() // make sure we catch items just added
+	after := time.Duration(math.MaxInt64)
 	for address, target := range cm.targets {
 		if our_connected_targets[address] {
 			delete(cm.targets, address)
@@ -142,11 +144,15 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() {
 			delete(cm.targets, address)
 			continue
 		}
-		if now.After(target.tryAfter) {
+		switch duration := target.tryAfter.Sub(now); {
+		case duration <= 0:
 			target.attempting = true
 			go cm.attemptConnection(address, cm.cmdLineAddress[address])
+		case duration < after:
+			after = duration
 		}
 	}
+	return after
 }
 
 func (cm *ConnectionMaker) addTarget(address string) {
