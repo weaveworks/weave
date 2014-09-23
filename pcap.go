@@ -40,6 +40,9 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 	if err = inactive.SetSnapLen(snaplen); err != nil {
 		return
 	}
+	if err = inactive.SetTimeout(-1); err != nil {
+		return
+	}
 	if err = inactive.SetImmediateMode(true); err != nil {
 		return
 	}
