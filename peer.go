@@ -259,15 +259,15 @@ func (peer *Peer) queryLoop(queryChan <-chan *PeerInteraction) {
 		if !ok {
 			return
 		}
-		switch {
-		case query.code == PAddConnection:
+		switch query.code {
+		case PAddConnection:
 			peer.handleAddConnection(query.payload.(*LocalConnection))
-		case query.code == PDeleteConnection:
+		case PDeleteConnection:
 			peer.handleDeleteConnection(query.payload.(*LocalConnection))
 			query.resultChan <- nil
-		case query.code == PConnectionEstablished:
+		case PConnectionEstablished:
 			peer.handleConnectionEstablished(query.payload.(*LocalConnection))
-		case query.code == PBroadcastTCP:
+		case PBroadcastTCP:
 			peer.handleBroadcastTCP(query.payload.([]byte))
 		}
 	}

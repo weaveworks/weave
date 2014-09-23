@@ -15,7 +15,8 @@ docker-image: /tmp/weave.tar
 
 publish: docker-image
 	sudo docker tag zettio/weave zettio/weave:git-`git rev-parse --short=12 HEAD`
-	sudo docker push zettio/weave
+	sudo docker push zettio/weave:latest
+	sudo docker push zettio/weave:git-`git rev-parse --short=12 HEAD`
 
 clean:
 	-sudo docker rmi zettio/weave

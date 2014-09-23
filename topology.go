@@ -81,15 +81,15 @@ func (topo *Topology) queryLoop(queryChan <-chan *Interaction) {
 		if !ok {
 			return
 		}
-		switch {
-		case query.code == TRebuildRoutes:
+		switch query.code {
+		case TRebuildRoutes:
 			unicast := topo.buildUnicastRoutes()
 			broadcast := topo.buildBroadcastRoutes()
 			topo.Lock()
 			topo.unicast = unicast
 			topo.broadcast = broadcast
 			topo.Unlock()
-		case query.code == TFetchAll:
+		case TFetchAll:
 			query.resultChan <- topo.router.Peers.EncodeAllPeers()
 		default:
 			log.Fatal("Unexpected topology query:", query)
