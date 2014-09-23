@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"net"
 	"time"
@@ -59,7 +58,7 @@ func (cm *ConnectionMaker) String() string {
 }
 
 func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteraction) {
-	timer := time.NewTimer(math.MaxInt64)
+	timer := time.NewTimer(MaxDuration)
 	run := func() { timer.Reset(cm.checkStateAndAttemptConnections()) }
 	for {
 		select {
@@ -131,7 +130,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	})
 
 	now := time.Now() // make sure we catch items just added
-	after := time.Duration(math.MaxInt64)
+	after := MaxDuration
 	for address, target := range cm.targets {
 		if our_connected_targets[address] {
 			delete(cm.targets, address)

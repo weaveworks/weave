@@ -40,6 +40,9 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 	if err = inactive.SetSnapLen(snaplen); err != nil {
 		return
 	}
+	if err = inactive.SetTimeout(MaxDuration); err != nil {
+		return
+	}
 	if err = inactive.SetImmediateMode(true); err != nil {
 		return
 	}
@@ -57,7 +60,12 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 }
 
 func (pi *PcapIO) ReadPacket() (data []byte, err error) {
-	data, _, err = pi.handle.ZeroCopyReadPacketData()
+	for {
+		data, _, err = pi.handle.ZeroCopyReadPacketData()
+		if err == nil || err != pcap.NextErrorTimeoutExpired {
+			break
+		}
+	}
 	return
 }
 
