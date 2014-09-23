@@ -185,6 +185,35 @@ each other but not the containers of our first application...
 This isolation-through-subnets scheme is an example of carrying over a
 well-known technique from the 'on metal' days to containers.
 
+### Dynamic network attachment
+
+In some scenarios containers are started independently, e.g. via some
+existing tool chain, or require more complex startup sequences than
+provided by `weave run`. And sometimes the decision which application
+network a container should be part of is made post startup. For these
+situation, weave allows an existing, running container to be attached
+to the weave network. To illustrate, we can achieve the same effect as
+the first example with
+
+    host1# C=$(docker run -d -t -i ubuntu)
+    host1# weave attach 10.0.1.1/24 $C
+
+There is a matching `weave detach` command:
+
+    host1# weave detach 10.0.1.1/24 $C
+
+You can detach a container from one application network and attach it
+to another:
+
+    host1# weave detach 10.0.1.1/24 $C
+    host1# weave attach 10.0.2.1/24 $C
+
+or attach a container to multiple application networks, effectively
+sharing it between applications:
+
+    host1# weave attach 10.0.1.1/24 $C
+    host1# weave attach 10.0.2.1/24 $C
+
 ### Security
 
 In order to connect containers across untrusted networks, weave peers
@@ -220,30 +249,6 @@ will work. And, more interestingly,
     host2# ping 10.0.1.1
 
 will work too, which is talking to a container that resides on $HOST1.
-
-### Attach to already-running containers
-
-If you don't want to start containers via the `weave` script, e.g. because
-you are controlling them as part of some larger orchestration scheme, you can
-attach the weave network to an already-running container. To illustrate, we
-can achieve the same effect as the first example like this:
-
-    host1# C=$(docker run -d -t -i ubuntu)
-    host1# weave attach 10.0.1.1/24 $C
-
-There is a matching `weave detach` command:
-
-    host1# weave detach 10.0.1.1/24 $C
-
-You can detach a container from one subnet and re-attach it to another:
-
-    host1# weave detach 10.0.1.1/24 $C
-    host1# weave attach 10.0.2.1/24 $C
-
-or attach a container to multiple subnets:
-
-    host1# weave attach 10.0.1.1/24 $C
-    host1# weave attach 10.0.2.1/24 $C
 
 ### Service export
 
