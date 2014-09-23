@@ -77,6 +77,10 @@ func (cache *PeerCache) ApplyUpdate(update []byte, router *Router) ([]byte, erro
 	// Don't need to hold cache lock any longer
 	cache.Unlock()
 
+	if len(newUpdate) > 0 {
+		router.ConnectionMaker.Refresh()
+	}
+
 	return encodePeersMap(newUpdate), nil
 }
 
