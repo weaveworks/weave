@@ -18,17 +18,19 @@ import (
 	"time"
 )
 
-func ensureInterface(ifaceName string, wait bool) (iface *net.Interface, err error) {
+func ensureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
 	iface, err = findInterface(ifaceName)
-	if err == nil || !wait {
+	if err == nil || wait == 0 {
 		return
 	}
 	log.Println("Waiting for interface", ifaceName, "to come up")
-	for err != nil {
+	for ; err != nil && wait > 0; wait -= 1 {
 		time.Sleep(1 * time.Second)
 		iface, err = findInterface(ifaceName)
 	}
-	log.Println("Interface", ifaceName, "is up")
+	if err == nil {
+		log.Println("Interface", ifaceName, "is up")
+	}
 	return
 }
 
@@ -47,6 +49,7 @@ func main() {
 
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	log.Println(os.Args)
 
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
@@ -60,7 +63,7 @@ func main() {
 		ifaceName  string
 		routerName string
 		password   string
-		wait       bool
+		wait       int
 		debug      bool
 		prof       string
 		peers      []string
@@ -71,7 +74,7 @@ func main() {
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
 	flag.StringVar(&password, "password", "", "network password")
-	flag.BoolVar(&wait, "wait", false, "wait for interface to be created and come up")
+	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&connLimit, "connlimit", 10, "connection limit (defaults to 10, set to 0 for unlimited)")
