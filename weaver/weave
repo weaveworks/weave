@@ -187,7 +187,7 @@ detach() {
     EXITCODE=1
     if ip netns exec $NSPID ip addr del $2 dev $CONTAINER_IFNAME ; then
         # if no inet addresses remain then delete the veth
-        if [ $(ip netns exec $NSPID ip -f inet addr show dev ethwe | wc -c) -eq 0 ] ; then
+        if [ -z "$(ip netns exec $NSPID ip -f inet addr list dev ethwe)" ] ; then
             if ip link del $LOCAL_IFNAME type veth ; then
                 EXITCODE=0
             else
