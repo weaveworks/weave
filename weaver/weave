@@ -7,6 +7,8 @@ usage() {
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
     echo "weave expose <ipaddr>/<subnet>"
     echo "weave hide   <ipaddr>/<subnet>"
+    echo "weave tap    <n>"
+    echo "weave untap  <n>"
     echo "weave status"
     echo "weave version"
     echo "weave stop"
@@ -25,11 +27,28 @@ command_exists () {
     exit 1
 }
 
-[ $# -gt 0 ] || usage
-
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
+
+# parse global options
+while [ $# -gt 0 ]
+do
+    case "$1" in
+        -bridge)
+            BRIDGE="$2"
+            shift 2; continue;;
+        -ifname)
+            CONTAINER_IFNAME="$2"
+            shift 2; continue;;
+        -mtu)
+            MTU="$2"
+            shift 2; continue;;
+    esac    
+    break
+done
+
+[ $# -gt 0 ] || usage
 
 COMMAND=$1
 
@@ -122,7 +141,8 @@ configure_container_networking() {
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
     IP_TMPFILE=/tmp/weave_ip_output_$$
     rm -f $IP_TMPFILE
-    if ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU >$IP_TMPFILE 2>&1 ; then
+    BRIDGE_MTU="$(cat /sys/class/net/$BRIDGE/mtu)"
+    if ip link add name $LOCAL_IFNAME mtu $BRIDGE_MTU type veth peer name $GUEST_IFNAME mtu $BRIDGE_MTU >$IP_TMPFILE 2>&1 ; then
         if  (ip link set $LOCAL_IFNAME master $BRIDGE &&
                 ip link set $LOCAL_IFNAME up &&
                 ip link set $GUEST_IFNAME netns $NSPID) >$IP_TMPFILE 2>&1
@@ -260,6 +280,20 @@ case "$COMMAND" in
         check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
         stop_masquerading
         destroy_bridge
+        ;;
+    tap)
+        [ $# -gt 0 ] || usage
+        TAPDEV="v${CONTAINER_IFNAME}tp$1"
+        BRIDGE_MTU="$(cat /sys/class/net/$BRIDGE/mtu)"
+        ip tuntap add dev "$TAPDEV" mode tap
+        ip link set dev "$TAPDEV" mtu "$BRIDGE_MTU"
+        ip link set dev "$TAPDEV" master "$BRIDGE"
+        ip link set dev "$TAPDEV" up
+        ;;
+    untap)
+        [ $# -gt 0 ] || usage
+        TAPDEV="v${CONTAINER_IFNAME}tp$1"
+        ip link del dev "$TAPDEV"
         ;;
     *)
         echo "Unknown weave command '$COMMAND'" >&2
