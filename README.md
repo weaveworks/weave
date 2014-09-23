@@ -221,6 +221,30 @@ will work. And, more interestingly,
 
 will work too, which is talking to a container that resides on $HOST1.
 
+### Attach to already-running containers
+
+If you don't want to start containers via the `weave` script, e.g. because
+you are controlling them as part of some larger orchestration scheme, you can
+attach the weave network to an already-running container. To illustrate, we
+can achieve the same effect as the first example like this:
+
+    host1# C=$(docker run -d -t -i ubuntu)
+    host1# weave attach 10.0.1.1/24 $C
+
+There is a matching `weave detach` command:
+
+    host1# weave detach 10.0.1.1/24 $C
+
+You can detach a container from one subnet and re-attach it to another:
+
+    host1# weave detach 10.0.1.1/24 $C
+    host1# weave attach 10.0.2.1/24 $C
+
+or attach a container to multiple subnets:
+
+    host1# weave attach 10.0.1.1/24 $C
+    host1# weave attach 10.0.2.1/24 $C
+
 ### Service export
 
 Services running in containers on a weave network can be made
