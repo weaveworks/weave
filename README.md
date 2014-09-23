@@ -233,11 +233,11 @@ can achieve the same effect as the first example like this:
 
 There is a matching `weave detach` command:
 
-    host1# weave detach $C
+    host1# weave detach 10.0.1.1/24 $C
 
 You can detach a container from one subnet and re-attach it to another:
 
-    host1# weave detach $C
+    host1# weave detach 10.0.1.1/24 $C
     host1# weave attach 10.0.2.1/24 $C
 
 or attach a container to multiple subnets:

@@ -6,7 +6,7 @@ usage() {
     echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
     echo "weave attach <ipaddr>/<subnet> <container_id>"
-    echo "weave detach <container_id>"
+    echo "weave detach <ipaddr>/<subnet> <container_id>"
     echo "weave expose <ipaddr>/<subnet>"
     echo "weave hide   <ipaddr>/<subnet>"
     echo "weave status"
