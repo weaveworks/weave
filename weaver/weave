@@ -144,6 +144,7 @@ container_netns_postamble() {
 
 # Attach Container-ID $1 to the weave network at CIDR address $2,
 # creating a virtual ethernet device if necessary.
+# Also turn off tx offload on device $3 inside the namespace.
 attach() {
     container_netns_preamble $1
 
