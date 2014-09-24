@@ -461,6 +461,21 @@ Any running application containers will permanently lose connectivity
 with the weave network and have to be restarted in order to
 re-connect.
 
+### Reboots
+
+When a host reboots, docker's default behaviour is to restart any
+containers that were running. Since weave relies on special network
+configuration outside of the containers, the weave network will not
+function in this state.
+
+To remedy this, stop and re-launch the weave container, and re-attach
+the application containers with `weave attach`.
+
+For a more permanent solution,
+[disable Docker's auto-restart feature](https://docs.docker.com/articles/host_integration/)
+and create appropriate startup scripts to launch weave and run
+application containers from your favourite process manager.
+
 ## Installation with Boot2Docker
 
 If you are running Docker inside the Boot2Docker VM, e.g. because you
