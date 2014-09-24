@@ -141,8 +141,9 @@ container_netns_postamble() {
     rm -f /var/run/netns/$NSPID
 }
 
-# Parameters are container ID, CIDR address
-configure_container_networking() {
+# Attach Container-ID $1 to the weave network at CIDR address $2,
+# creating a virtual ethernet device if necessary.
+attach() {
     container_netns_preamble $1
 
     # If veth name already exists then assume we set it up already;
@@ -176,7 +177,8 @@ configure_container_networking() {
     return $EXITCODE
 }
 
-# Parameters are container ID, CIDR address, interface-name
+# Detach Container-ID $1 at CIDR address $2 from the weave network
+# removing the virtual ethernet device if there are no more addresses
 detach() {
     container_netns_preamble $1
 
@@ -232,7 +234,7 @@ case "$COMMAND" in
         # restarts.
         MACADDR=`cat /sys/class/net/$BRIDGE/address`
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
-        configure_container_networking $CONTAINER $IPADDR eth0
+        attach $CONTAINER $IPADDR eth0
         echo $CONTAINER
         ;;
     status)
@@ -269,13 +271,13 @@ case "$COMMAND" in
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@")
-        configure_container_networking $CONTAINER $IPADDR $CONTAINER_IFNAME
+        attach $CONTAINER $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
     attach)
         [ $# -gt 1 ] || usage
         create_bridge
-        configure_container_networking $2 $1 $CONTAINER_IFNAME
+        attach $2 $1 $CONTAINER_IFNAME
         ;;
     detach)
         [ $# -gt 1 ] || usage
