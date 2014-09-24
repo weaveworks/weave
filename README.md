@@ -442,8 +442,8 @@ function in this state.
 To remedy this, stop and re-launch the weave container, and re-attach
 the application containers with `weave attach`.
 
-For a mor permanent solution,
-[disable Docker's auto-restart feature](https://docs.docker.com/articles/host_integration/),
+For a more permanent solution,
+[disable Docker's auto-restart feature](https://docs.docker.com/articles/host_integration/)
 and create appropriate startup scripts to launch weave and run
 application containers from your favourite process manager.
 
