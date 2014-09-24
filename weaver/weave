@@ -3,7 +3,7 @@ set -e
 
 usage() {
     echo "Usage:"
-    echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
+    echo "weave launch <ipaddr>/<subnet> [-password <password>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
     echo "weave attach <ipaddr>/<subnet> <container_id>"
     echo "weave detach <ipaddr>/<subnet> <container_id>"
