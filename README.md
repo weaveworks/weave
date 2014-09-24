@@ -191,7 +191,7 @@ In some scenarios containers are started independently, e.g. via some
 existing tool chain, or require more complex startup sequences than
 provided by `weave run`. And sometimes the decision which application
 network a container should be part of is made post startup. For these
-situation, weave allows an existing, running container to be attached
+situations, weave allows an existing, running container to be attached
 to the weave network. To illustrate, we can achieve the same effect as
 the first example with
 
