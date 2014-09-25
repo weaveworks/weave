@@ -174,6 +174,10 @@ attach() {
         fi
     fi
 
+    # Route multicast packets across the weave network.  This will fail
+    # if the route is already present.
+    ip netns exec $NSPID ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME >/dev/null 2>&1 || true
+
     container_netns_postamble $1
 
     return $EXITCODE
