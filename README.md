@@ -64,12 +64,12 @@ be 10.0.0.1, and that the weave network is on 10.0.0.0/16.
 
 The second line starts our application container. We give it an IP
 address and network (a subnet of the weave network). `weave run`
-invokes `docker run -d` with all the parameter following the IP
+invokes `docker run -d` with all the parameters following the IP
 address and netmask. So we could be launching any container this way;
 here we just take a stock ubuntu container and launch a shell in it.
 
 If our application consists of more than one container on this host we
-simply launch them with a variation on that 2nd line.
+simply launch them with a variation on that second line.
 
 The IP addresses and netmasks can be anything you like which doesn't
 conflict with any IP ranges of 'external' services the hosts or your
@@ -91,7 +91,7 @@ weave to connect to multiple peers by supplying multiple
 addresses. And we can [add peers dynamically](#dynamic-topologies).
 
 If there is a firewall between $HOST1 and $HOST2, you must open port 
-6783 for TCP and UDP. 
+6783 for TCP and UDP.
 
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...
@@ -128,7 +128,7 @@ To application containers, the network established by weave looks
 like a giant Ethernet switch to which all the containers are
 connected.
 
-Containers can easily access services from each other, e.g. in the
+Containers can easily access services from each other; e.g. in the
 container on $HOST1 we can start a netcat "service" with
 
     root@28841bd02eff:/# nc -lk -p 4422
@@ -193,7 +193,7 @@ well-known technique from the 'on metal' days to containers.
 In some scenarios containers are started independently, e.g. via some
 existing tool chain, or require more complex startup sequences than
 provided by `weave run`. And sometimes the decision which application
-network a container should be part of is made post startup. For these
+network a container should be part of is made post-startup. For these
 situations, weave allows an existing, running container to be attached
 to the weave network. To illustrate, we can achieve the same effect as
 the first example with
@@ -235,7 +235,7 @@ Weave application networks can be integrated with a host's network,
 establishing connectivity between the host and application containers
 anywhere.
 
-Let's say that in our example we we want $HOST2 to have access to the
+Let's say that in our example we want $HOST2 to have access to the
 application containers. On $HOST2 we run
 
     host2# weave expose 10.0.1.102/24
@@ -288,7 +288,7 @@ anywhere with
 work when run *on* $HOST2.)
 
 Similar NAT rules to the above can used to expose services not just to
-outside world but also other, internal, networks.
+the outside world but also other, internal, networks.
 
 ### Service import
 
@@ -376,7 +376,7 @@ endpoint in the weave network.
 
 Weave can network containers hosted in different cloud providers /
 data centres. So, for example, one could run an application consisting
-of containers on GCE, EC2 and a local data centres.
+of containers on GCE, EC2 and in local data centres.
 
 To enable this, the network must be configured to permit TCP and UDP
 connections to port 6783 of the docker hosts.
@@ -533,7 +533,6 @@ running on other hosts. On receipt of such a packet, a router injects
 the packet on its bridge interface using 'pcap' and/or forwards the
 packet to peers.
 
-
 Weave routers learn which peer host a particular MAC address resides
 on. They combine this knowledge with topology information in order to
 make routing decisions and thus avoid forwarding every packet to every
@@ -555,7 +554,7 @@ More details on the inner workings of weave can be found in the
 
 Found a bug, want to suggest a feature, or have a question?
 [File an issue](https://github.com/zettio/weave/issues), or email
-weave@zett.io. When reporting a bug, please include what version of
+weave@zett.io. When reporting a bug, please include which version of
 weave you are running, as shown by `weave version`.
 
 Follow weave on Twitter:
