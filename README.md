@@ -90,6 +90,9 @@ both about each other. Order doesn't matter here; weave automatically
 weave to connect to multiple peers by supplying multiple
 addresses. And we can [add peers dynamically](#dynamic-topologies).
 
+If there is a firewall between $HOST1 and $HOST2, you must open port 
+6783 for TCP and UDP. 
+
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...
 
