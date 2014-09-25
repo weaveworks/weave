@@ -2,6 +2,7 @@ package weave
 
 import (
 	"time"
+	"math"
 )
 
 const (
@@ -23,6 +24,7 @@ const (
 	FragTestInterval   = 5 * time.Minute
 	PMTUVerifyAttempts = 8
 	PMTUVerifyTimeout  = 10 * time.Millisecond // gets doubled with every attempt
+	MaxDuration        = time.Duration(math.MaxInt64)
 )
 
 const (

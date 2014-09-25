@@ -188,6 +188,35 @@ each other but not the containers of our first application...
 This isolation-through-subnets scheme is an example of carrying over a
 well-known technique from the 'on metal' days to containers.
 
+### Dynamic network attachment
+
+In some scenarios containers are started independently, e.g. via some
+existing tool chain, or require more complex startup sequences than
+provided by `weave run`. And sometimes the decision which application
+network a container should be part of is made post startup. For these
+situations, weave allows an existing, running container to be attached
+to the weave network. To illustrate, we can achieve the same effect as
+the first example with
+
+    host1# C=$(docker run -d -t -i ubuntu)
+    host1# weave attach 10.0.1.1/24 $C
+
+There is a matching `weave detach` command:
+
+    host1# weave detach 10.0.1.1/24 $C
+
+You can detach a container from one application network and attach it
+to another:
+
+    host1# weave detach 10.0.1.1/24 $C
+    host1# weave attach 10.0.2.1/24 $C
+
+or attach a container to multiple application networks, effectively
+sharing it between applications:
+
+    host1# weave attach 10.0.1.1/24 $C
+    host1# weave attach 10.0.2.1/24 $C
+
 ### Security
 
 In order to connect containers across untrusted networks, weave peers
@@ -434,6 +463,21 @@ the local host, run
 Any running application containers will permanently lose connectivity
 with the weave network and have to be restarted in order to
 re-connect.
+
+### Reboots
+
+When a host reboots, docker's default behaviour is to restart any
+containers that were running. Since weave relies on special network
+configuration outside of the containers, the weave network will not
+function in this state.
+
+To remedy this, stop and re-launch the weave container, and re-attach
+the application containers with `weave attach`.
+
+For a more permanent solution,
+[disable Docker's auto-restart feature](https://docs.docker.com/articles/host_integration/)
+and create appropriate startup scripts to launch weave and run
+application containers from your favourite process manager.
 
 ## Installation with Boot2Docker
 

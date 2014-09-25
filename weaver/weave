@@ -3,8 +3,10 @@ set -e
 
 usage() {
     echo "Usage:"
-    echo "weave launch <ipaddr>/<subnet> [-passwd <passwd>] <peer_host> ..."
+    echo "weave launch <ipaddr>/<subnet> [-password <password>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
+    echo "weave attach <ipaddr>/<subnet> <container_id>"
+    echo "weave detach <ipaddr>/<subnet> <container_id>"
     echo "weave expose <ipaddr>/<subnet>"
     echo "weave hide   <ipaddr>/<subnet>"
     echo "weave status"
@@ -101,7 +103,7 @@ stop_masquerading() {
 }
 
 # the following borrows from https://github.com/jpetazzo/pipework
-configure_container_networking() {
+container_netns_preamble() {
     DOCKERPID=$(docker inspect --format='{{ .State.Pid }}' $1)
     [ "$DOCKERPID" = 0 ] && {
         echo "Container $1 not running." >&2
@@ -122,7 +124,41 @@ configure_container_networking() {
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
     IP_TMPFILE=/tmp/weave_ip_output_$$
     rm -f $IP_TMPFILE
-    if ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU >$IP_TMPFILE 2>&1 ; then
+
+    return 0
+}
+
+container_netns_postamble() {
+    if [ "$EXITCODE" -ne 0 ] ; then
+        if ! ps -p $DOCKERPID >/dev/null 2>&1 ; then
+            echo "Container $1 died" >&2
+        else
+            echo "Failure during network configuration for container $1:" >&2
+            cat $IP_TMPFILE >&2
+        fi
+    fi
+
+    rm -f $IP_TMPFILE
+    rm -f /var/run/netns/$NSPID
+}
+
+# Attach Container-ID $1 to the weave network at CIDR address $2,
+# creating a virtual ethernet device if necessary.
+# Also turn off tx offload on device $3 inside the namespace.
+attach() {
+    container_netns_preamble $1
+
+    # If veth name already exists then assume we set it up already;
+    # just add the IP address, if it's not already there
+    if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
+        if ! (ip netns exec $NSPID ip addr list dev $CONTAINER_IFNAME | grep -qF $2) 2>$IP_TMPFILE ; then
+            if ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME 2>$IP_TMPFILE ; then
+                EXITCODE=0  # succeeded in adding the address
+            fi
+        else
+            EXITCODE=0      # address was there already
+        fi
+    elif ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU >$IP_TMPFILE 2>&1 ; then
         if  (ip link set $LOCAL_IFNAME master $BRIDGE &&
                 ip link set $LOCAL_IFNAME up &&
                 ip link set $GUEST_IFNAME netns $NSPID) >$IP_TMPFILE 2>&1
@@ -138,18 +174,32 @@ configure_container_networking() {
         fi
     fi
 
-    if [ "$EXITCODE" -ne 0 ] ; then
-        if ! ps -p $DOCKERPID >/dev/null 2>&1 ; then
-            echo "Container $1 died" >&2
-        else
-            echo "Failure during network configuration for container $1:" >&2
-            cat $IP_TMPFILE >&2
+    container_netns_postamble $1
+
+    return $EXITCODE
+}
+
+# Detach Container-ID $1 at CIDR address $2 from the weave network
+# removing the virtual ethernet device if there are no more addresses
+detach() {
+    container_netns_preamble $1
+
+    if (ip netns exec $NSPID ip addr list dev $CONTAINER_IFNAME | grep -qF $2) 2>$IP_TMPFILE ; then
+        if ip netns exec $NSPID ip addr del $2 dev $CONTAINER_IFNAME 2>$IP_TMPFILE ; then
+            # if no inet addresses remain then delete the veth
+            if [ -z "$(ip netns exec $NSPID ip -f inet addr list dev ethwe 2>$IP_TMPFILE)" ] ; then
+                if ip link del $LOCAL_IFNAME type veth 2>$IP_TMPFILE ; then
+                    EXITCODE=0
+                fi
+            else
+                EXITCODE=0
+            fi
         fi
+    else
+        EXITCODE=0
     fi
 
-    rm -f $IP_TMPFILE
-    rm -f /var/run/netns/$NSPID
-
+    container_netns_postamble $1
     return $EXITCODE
 }
 
@@ -186,7 +236,7 @@ case "$COMMAND" in
         # restarts.
         MACADDR=`cat /sys/class/net/$BRIDGE/address`
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
-        configure_container_networking $CONTAINER $IPADDR eth0
+        attach $CONTAINER $IPADDR eth0
         echo $CONTAINER
         ;;
     status)
@@ -223,8 +273,17 @@ case "$COMMAND" in
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@")
-        configure_container_networking $CONTAINER $IPADDR $CONTAINER_IFNAME
+        attach $CONTAINER $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
+        ;;
+    attach)
+        [ $# -gt 1 ] || usage
+        create_bridge
+        attach $2 $1 $CONTAINER_IFNAME
+        ;;
+    detach)
+        [ $# -gt 1 ] || usage
+        detach $2 $1
         ;;
     expose)
         [ $# -gt 0 ] || usage
