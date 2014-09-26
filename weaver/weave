@@ -102,105 +102,102 @@ stop_masquerading() {
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
 }
 
-# the following borrows from https://github.com/jpetazzo/pipework
-container_netns_preamble() {
-    DOCKERPID=$(docker inspect --format='{{ .State.Pid }}' $1)
-    [ "$DOCKERPID" = 0 ] && {
-        echo "Container $1 not running." >&2
-        exit 1
-    }
-    [ "$DOCKERPID" = "<no value>" ] && {
-        echo "Container $1 unknown to Docker." >&2
-        exit 1
-    }
-    NSPID=$DOCKERPID
+with_container_netns () {
+    CONTAINER="$2"
+    CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
 
+    if [ "$CONTAINER_PID" = 0 ] ; then
+        echo "Container $CONTAINER not running." >&2
+        exit 1
+    fi
+
+    if [ "$CONTAINER_PID" = "<no value>" ] ; then
+        echo "Container $CONTAINER unknown to Docker." >&2
+        exit 1
+    fi
+
+    NETNS=$CONTAINER_PID
     [ ! -d /var/run/netns ] && mkdir -p /var/run/netns
-    rm -f /var/run/netns/$NSPID
-    ln -s /proc/$NSPID/ns/net /var/run/netns/$NSPID
+    rm -f /var/run/netns/$NETNS
+    ln -s /proc/$CONTAINER_PID/ns/net /var/run/netns/$NETNS
 
-    EXITCODE=1
-    LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${NSPID}"
-    GUEST_IFNAME="v${CONTAINER_IFNAME}pg${NSPID}"
+    LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
+    GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
     IP_TMPFILE=/tmp/weave_ip_output_$$
     rm -f $IP_TMPFILE
 
-    return 0
-}
-
-container_netns_postamble() {
-    if [ "$EXITCODE" -ne 0 ] ; then
-        if ! ps -p $DOCKERPID >/dev/null 2>&1 ; then
-            echo "Container $1 died" >&2
+    # Run the wrapped command
+    STATUS=0
+    if ! "$@" >$IP_TMPFILE 2>&1 ; then
+        STATUS=1
+        if ! ps -p $CONTAINER_PID >/dev/null 2>&1 ; then
+            echo "Container $CONTAINER died" >&2
         else
-            echo "Failure during network configuration for container $1:" >&2
+            echo "Failure during network configuration for container $CONTAINER:" >&2
             cat $IP_TMPFILE >&2
         fi
     fi
 
-    rm -f $IP_TMPFILE
-    rm -f /var/run/netns/$NSPID
+    rm -f $IP_TMPFILE /var/run/netns/$NETNS
+    return $STATUS
 }
 
 # Attach Container-ID $1 to the weave network at CIDR address $2,
 # creating a virtual ethernet device if necessary.
 # Also turn off tx offload on device $3 inside the namespace.
 attach() {
-    container_netns_preamble $1
-
-    # If veth name already exists then assume we set it up already;
-    # just add the IP address, if it's not already there
     if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
-        if ! (ip netns exec $NSPID ip addr list dev $CONTAINER_IFNAME | grep -qF $2) 2>$IP_TMPFILE ; then
-            if ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME 2>$IP_TMPFILE ; then
-                EXITCODE=0  # succeeded in adding the address
-            fi
-        else
-            EXITCODE=0      # address was there already
+        # veth name already exists, so assume we set it up already;
+        # just add the IP address.
+        if ip netns exec $NETNS ip addr list dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
+            # address was there already
+            return 0
         fi
-    elif ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU >$IP_TMPFILE 2>&1 ; then
-        if  (ip link set $LOCAL_IFNAME master $BRIDGE &&
-                ip link set $LOCAL_IFNAME up &&
-                ip link set $GUEST_IFNAME netns $NSPID) >$IP_TMPFILE 2>&1
-        then
-            (ip netns exec $NSPID ip link set $GUEST_IFNAME name $CONTAINER_IFNAME &&
-                ip netns exec $NSPID ip addr add $2 dev $CONTAINER_IFNAME &&
-                ip netns exec $NSPID ip link set $CONTAINER_IFNAME up &&
-                check_command_and_run ethtool ip netns exec $NSPID ethtool -K $3 tx off >/dev/null) >$IP_TMPFILE 2>&1 &&
-            EXITCODE=0
-        else
-            # failed before we assigned the veth to the container's namespace - delete it
-            ip link del $LOCAL_IFNAME type veth || true
+
+        if ! ip netns exec $NETNS ip addr add $2 dev $CONTAINER_IFNAME ; then
+            return 1
         fi
+
+        return 0
     fi
 
-    container_netns_postamble $1
+    if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
+        return 1
+    fi
 
-    return $EXITCODE
+    if ! ip link set $LOCAL_IFNAME master $BRIDGE ||
+        ! ip link set $LOCAL_IFNAME up ||
+        ! ip link set $GUEST_IFNAME netns $NETNS ; then
+        # failed before we assigned the veth to the container's
+        # namespace - delete it
+        ip link del $LOCAL_IFNAME type veth || true
+        return 1
+    fi
+
+    ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME &&
+    ip netns exec $NETNS ip addr add $2 dev $CONTAINER_IFNAME &&
+    ip netns exec $NETNS ip link set $CONTAINER_IFNAME up &&
+    check_command_and_run ethtool ip netns exec $NETNS ethtool -K $3 tx off >/dev/null
 }
 
 # Detach Container-ID $1 at CIDR address $2 from the weave network
 # removing the virtual ethernet device if there are no more addresses
 detach() {
-    container_netns_preamble $1
-
-    if (ip netns exec $NSPID ip addr list dev $CONTAINER_IFNAME | grep -qF $2) 2>$IP_TMPFILE ; then
-        if ip netns exec $NSPID ip addr del $2 dev $CONTAINER_IFNAME 2>$IP_TMPFILE ; then
-            # if no inet addresses remain then delete the veth
-            if [ -z "$(ip netns exec $NSPID ip -f inet addr list dev ethwe 2>$IP_TMPFILE)" ] ; then
-                if ip link del $LOCAL_IFNAME type veth 2>$IP_TMPFILE ; then
-                    EXITCODE=0
-                fi
-            else
-                EXITCODE=0
-            fi
-        fi
-    else
-        EXITCODE=0
+    if ! ip netns exec $NETNS ip addr list dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
+        # address is not there, leave the device alone
+        return 0
     fi
 
-    container_netns_postamble $1
-    return $EXITCODE
+    if ! ip netns exec $NETNS ip addr del $2 dev $CONTAINER_IFNAME ; then
+        return 1
+    fi
+
+    if [ -n "$(ip netns exec $NETNS ip -f inet addr list dev ethwe)" ] ; then
+        # other addresses are left, leave the device alone
+        return 0
+    fi
+
+    ip link del $LOCAL_IFNAME type veth
 }
 
 case "$COMMAND" in
@@ -236,7 +233,7 @@ case "$COMMAND" in
         # restarts.
         MACADDR=`cat /sys/class/net/$BRIDGE/address`
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS zettio/weave -name $MACADDR "$@")
-        attach $CONTAINER $IPADDR eth0
+        with_container_netns attach $CONTAINER $IPADDR eth0
         echo $CONTAINER
         ;;
     status)
@@ -273,17 +270,17 @@ case "$COMMAND" in
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@")
-        attach $CONTAINER $IPADDR $CONTAINER_IFNAME
+        with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
     attach)
         [ $# -gt 1 ] || usage
         create_bridge
-        attach $2 $1 $CONTAINER_IFNAME
+        with_container_netns attach $2 $1 $CONTAINER_IFNAME
         ;;
     detach)
         [ $# -gt 1 ] || usage
-        detach $2 $1
+        with_container_netns detach $2 $1
         ;;
     expose)
         [ $# -gt 0 ] || usage
