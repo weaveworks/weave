@@ -174,10 +174,20 @@ attach() {
         return 1
     fi
 
-    ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME &&
-    ip netns exec $NETNS ip addr add $2 dev $CONTAINER_IFNAME &&
-    ip netns exec $NETNS ip link set $CONTAINER_IFNAME up &&
-    check_command_and_run ethtool ip netns exec $NETNS ethtool -K $3 tx off >/dev/null
+    if ! ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
+        ! ip netns exec $NETNS ip addr add $2 dev $CONTAINER_IFNAME ||
+        ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ||
+        ! check_command_and_run ethtool ip netns exec $NETNS ethtool -K $3 tx off >/dev/null ; then
+        return 1
+    fi
+
+    if ip netns exec $NETNS ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
+        # There's a multicast route already present, leave it alone.
+        return 0
+    fi
+
+    # Route multicast packets across the weave network.
+    ip netns exec $NETNS ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
 }
 
 # Detach Container-ID $1 at CIDR address $2 from the weave network
@@ -197,6 +207,7 @@ detach() {
         return 0
     fi
 
+    # Deleting the interface will delete the multicast route we set up
     ip link del $LOCAL_IFNAME type veth
 }
 
