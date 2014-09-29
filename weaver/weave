@@ -102,6 +102,7 @@ stop_masquerading() {
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
 }
 
+# the following borrows from https://github.com/jpetazzo/pipework
 with_container_netns () {
     CONTAINER="$2"
     CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
