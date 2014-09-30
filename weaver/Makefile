@@ -3,6 +3,7 @@
 all: docker-image
 
 weaver: ../*.go main.go
+	go get
 	go build -ldflags '-extldflags "-static"'
 
 .PHONY: docker-image
