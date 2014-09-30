@@ -60,6 +60,9 @@ create_bridge() {
         ip link del dev v${CONTAINER_IFNAME}du
         # disable offloading
         check_command_and_run ethtool ethtool -K $BRIDGE tx off >/dev/null
+        # Work round the situation where there are no rules allowing traffic
+        # across our bridge. E.g. ufw
+        add_iptables_rule filter FORWARD -i weave -o weave -j ACCEPT
     }
     ip link set dev $BRIDGE up
 }
@@ -68,6 +71,7 @@ destroy_bridge() {
     if [ -d /sys/class/net/$BRIDGE ] ; then
         ip link del dev $BRIDGE
     fi
+    iptables -t filter -D FORWARD -i weave -o weave -j ACCEPT 2>/dev/null || true
 }
 
 run_iptables() {
