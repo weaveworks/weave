@@ -82,11 +82,18 @@ run_iptables() {
     iptables $IPTABLES_W "$@"
 }
 
-add_nat_rule() {
-    if ! run_iptables -t nat -C "$@" >/dev/null 2>&1
+# Add a rule to iptables, if it doesn't exist already
+add_iptables_rule() {
+    IPTABLES_TABLE="$1"
+    shift 1
+    if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1
     then
-        run_iptables -t nat -A "$@" >/dev/null
+        run_iptables -t $IPTABLES_TABLE -A "$@" >/dev/null
     fi
+}
+
+add_nat_rule() {
+    add_iptables_rule nat $@
 }
 
 setup_masquerading() {
