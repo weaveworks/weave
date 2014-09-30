@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/miekg/dns"
 	"net"
-	"weavedns"
+	"github.com/zettio/weavedns"
 	"log"
 )
 
