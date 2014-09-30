@@ -513,9 +513,9 @@ The package name is `github.com/zettio/weave`, so assuming `$GOPATH`
 is set:
 
     $ cd $GOPATH
-    $ mkdir -p src/github.com/zettio
-    $ cd src/github.com/zettio
-    $ git clone https://github.com/zettio/weave
+    $ WEAVE=github.com/zettio/weave
+    $ git clone https://$WEAVE src/$WEAVE
+    $ cd src/$WEAVE
 
 Then simply run
 
