@@ -142,7 +142,7 @@ with_container_netns () {
     STATUS=0
     if ! "$@" >$IP_TMPFILE 2>&1 ; then
         STATUS=1
-        if ! ps -p $CONTAINER_PID >/dev/null 2>&1 ; then
+        if [ "$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)" != "$CONTAINER_PID" ] ; then
             echo "Container $CONTAINER died" >&2
         else
             echo "Failure during network configuration for container $CONTAINER:" >&2
