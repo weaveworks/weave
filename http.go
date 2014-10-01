@@ -1,9 +1,9 @@
 package weavedns
 
 import (
-	"net/http"
 	"fmt"
 	"log"
+	"net/http"
 )
 
 const (
