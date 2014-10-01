@@ -19,10 +19,10 @@ func handleLocal(w dns.ResponseWriter, r *dns.Msg) {
 			Class: dns.ClassINET, Ttl: 3600}
 		a := &dns.A{hdr, net.ParseIP(ip)}
 		m.Answer = append(m.Answer, a)
+		w.WriteMsg(m)
 	} else {
 		log.Printf("Failed lookup for %s", q.Name)
 	}
-	w.WriteMsg(m)
 	return
 }
 
