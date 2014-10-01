@@ -2,9 +2,9 @@ package main
 
 import (
 	"github.com/miekg/dns"
-	"net"
 	"github.com/zettio/weavedns"
 	"log"
+	"net"
 )
 
 var zone = new(weavedns.ZoneDb)
