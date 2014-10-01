@@ -15,8 +15,12 @@ func ListenHttp(db Zone) {
 		name := r.FormValue("name")
 		addr := r.FormValue("ip")
 		weave_ip := r.FormValue("weave_ip")
-		log.Printf("Adding %s %s %s", name, addr, weave_ip)
-		db.AddRecord(name, addr, weave_ip)
+		if name != "" && addr != "" && weave_ip != "" {
+			log.Printf("Adding %s, %s, %s", name, addr, weave_ip)
+			db.AddRecord(name, addr, weave_ip)
+		} else {
+			log.Printf("Invalid request: %s, %s, %s", name, addr, weave_ip)
+		}
 	})
 	address := fmt.Sprintf(":%d", UPDATE_PORT)
 	err := http.ListenAndServe(address, nil)
