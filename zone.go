@@ -1,9 +1,9 @@
 package weavedns
 
 import (
-	"sync"
-	"log"
 	"github.com/miekg/dns"
+	"log"
+	"sync"
 )
 
 type Zone interface {
@@ -13,13 +13,13 @@ type Zone interface {
 }
 
 type Record struct {
-	Name string
-	Ip string
+	Name    string
+	Ip      string
 	WeaveIp string
 }
 
 type ZoneDb struct {
-	mx sync.RWMutex
+	mx   sync.RWMutex
 	recs []Record
 }
 
