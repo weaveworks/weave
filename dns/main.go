@@ -80,5 +80,5 @@ func main() {
 
 	go dns.ActivateAndServe(nil, conn, MDNSServeMux)
 
-	dns.ListenAndServe(":5300", "udp", LocalServeMux)
+	dns.ListenAndServe(":53", "udp", LocalServeMux)
 }
