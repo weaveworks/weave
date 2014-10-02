@@ -30,7 +30,7 @@ func (ops LookupError) Error() string {
 }
 
 // Stop gap.
-func (zone ZoneDb) match(name string) (string, error) {
+func (zone *ZoneDb) match(name string) (string, error) {
 	for _, r := range zone.recs {
 		log.Printf("%s == %s ?", r.Name, name)
 		if r.Name == name {
