@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/miekg/dns"
 	"github.com/zettio/weavedns"
 	"log"
@@ -62,6 +64,13 @@ func handleLocal(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 func main() {
+	var (
+		dnsPort int
+	)
+
+	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to dns requests (defaults to 53)")
+	flag.Parse()
+
 	LocalServeMux := dns.NewServeMux()
 	LocalServeMux.HandleFunc("local", handleLocal)
 	go weavedns.ListenHttp(zone)
@@ -80,7 +89,8 @@ func main() {
 
 	go dns.ActivateAndServe(nil, conn, MDNSServeMux)
 
-	err = dns.ListenAndServe(":53", "udp", LocalServeMux)
+	address := fmt.Sprintf(":%d", dnsPort)
+	err = dns.ListenAndServe(address, "udp", LocalServeMux)
 	if err != nil {
 		log.Fatal(err)
 	}
