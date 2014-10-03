@@ -73,7 +73,7 @@ func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- 
 	c.Lock()
 	query, found := c.inflight[name]
 	if !found {
-		query = &inflightQuery{name: name}
+		query = &inflightQuery{name: name, Id: m.Id}
 		c.inflight[name] = query
 	}
 	info := &responseInfo{ch: responseCh}
@@ -95,6 +95,22 @@ func (c *MDNSClient) SendResponse(m *dns.Msg) error {
 	}
 	_, err = c.conn.WriteTo(buf, c.addr)
 	return err
+}
+
+func (c *MDNSClient) IsInflightQuery(m *dns.Msg) bool {
+	if len(m.Question) == 1 {
+		q := m.Question[0]
+		if q.Qtype == dns.TypeA {
+			c.Lock()
+			defer c.Unlock()
+			if query, found := c.inflight[q.Name]; found {
+				if query.Id == m.Id {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (c *MDNSClient) HandleResponse(r *dns.Msg) {

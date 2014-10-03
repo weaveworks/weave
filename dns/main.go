@@ -26,7 +26,6 @@ var mdnsClient *weavedns.MDNSClient
 func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
 	// Here we have to handle both requests incoming, responses to queries
 	// we sent out, and responses to queries that other nodes sent
-	// And we also get to see our own queries!
 	if len(r.Answer) > 0 {
 		mdnsClient.HandleResponse(r)
 	} else if len(r.Question) > 0 {
@@ -35,6 +34,10 @@ func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
 		if err == nil {
 			m := makeDNSReply(r, q.Name, net.ParseIP(ip))
 			mdnsClient.SendResponse(m)
+		} else if mdnsClient.IsInflightQuery(r) {
+			// ignore this - it's our own query received via multicast
+		} else {
+			log.Printf("Failed MDNS lookup for %s", q.Name)
 		}
 	}
 }
