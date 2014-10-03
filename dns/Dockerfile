@@ -1,3 +1,5 @@
-FROM ubuntu
-EXPOSE 53/udp
-ADD ./dns /home/dns
+FROM scratch
+# EXPOSE 53/udp
+WORKDIR /home/weave
+ADD ./dns /home/weave/weavedns
+ENTRYPOINT ["/home/weave/weavedns"]
