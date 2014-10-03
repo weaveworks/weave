@@ -125,7 +125,8 @@ func (c *MDNSClient) HandleResponse(r *dns.Msg) {
 				// To be simple for now, assume this is the only response coming
 				delete(c.inflight, rr.Hdr.Name)
 			} else {
-				log.Println("Response received that didn't match query", r)
+				// We've received a response that didn't match a query
+				// Do we want to cache it?
 			}
 			c.Unlock()
 		}
