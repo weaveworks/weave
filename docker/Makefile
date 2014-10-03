@@ -1,20 +1,21 @@
 IMAGE:=/tmp/weavedns.tar
+MAIN:=../main
 
 .DEFAULT: docker-image
 
 all: docker-image
 
-dns: ../*.go main.go
-	go get && GOARCH=amd64 GOOS=linux go build -v
+dns: ../*.go ../main/main.go
+	go get $(MAIN) && GOARCH=amd64 GOOS=linux go build -o weavedns -v $(MAIN)
 
 .PHONY: docker-image
 
 docker-image: $(IMAGE)
 
 $(IMAGE): Dockerfile dns
-	sudo -E docker build --rm -t zettio/weavedns .
+	sudo -E docker build -t zettio/weavedns .
 	sudo -E docker save zettio/weavedns > $(IMAGE)
 
 clean:
 	-sudo docker rmi zettio/weavedns
-	rm -f dns $(IMAGE)
+	rm -f weavedns $(IMAGE)

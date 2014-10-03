@@ -1,5 +1,5 @@
 FROM scratch
 # EXPOSE 53/udp
 WORKDIR /home/weave
-ADD ./dns /home/weave/weavedns
+ADD ./weavedns /home/weave/
 ENTRYPOINT ["/home/weave/weavedns"]
