@@ -38,7 +38,7 @@ func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 func handleLocal(w dns.ResponseWriter, r *dns.Msg) {
-	log.Printf("Received message:", r)
+	log.Printf("Received message: %s", r)
 	q := r.Question[0]
 	ip, err := zone.MatchLocal(q.Name)
 	if err == nil {
@@ -80,5 +80,8 @@ func main() {
 
 	go dns.ActivateAndServe(nil, conn, MDNSServeMux)
 
-	dns.ListenAndServe(":53", "udp", LocalServeMux)
+	err = dns.ListenAndServe(":53", "udp", LocalServeMux)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
