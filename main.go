@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/miekg/dns"
-	"github.com/zettio/weavedns"
+	"github.com/zettio/weavedns/server"
 	"log"
 	"net"
 )
