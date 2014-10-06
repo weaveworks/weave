@@ -60,8 +60,8 @@ func NewMDNSClient() (*MDNSClient, error) {
 	return retval, nil
 }
 
-func LinkLocalMulticastListener() (net.PacketConn, error) {
-	conn, err := net.ListenMulticastUDP("udp", nil, ipv4Addr)
+func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
+	conn, err := net.ListenMulticastUDP("udp", ifi, ipv4Addr)
 	return conn, err
 }
 

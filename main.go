@@ -97,18 +97,23 @@ func findInterface(ifaceName string) (iface *net.Interface, err error) {
 
 func main() {
 	var (
-		dnsPort int
-		wait    int
+		ifaceName string
+		dnsPort   int
+		wait      int
 	)
 
-	flag.IntVar(&wait, "wait", 5, "number of seconds to wait for interface to be created and come up (defaults to 5)")
+	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
+	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0)")
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to dns requests (defaults to 53)")
 	flag.Parse()
 
-	ifaceName := "ethwe"
-	_, err := ensureInterface(ifaceName, wait)
-	if err != nil {
-		log.Fatal(err)
+	var iface *net.Interface = nil
+	if ifaceName != "" {
+		var err error
+		iface, err = ensureInterface(ifaceName, wait)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	LocalServeMux := dns.NewServeMux()
@@ -118,7 +123,7 @@ func main() {
 	MDNSServeMux := dns.NewServeMux()
 	MDNSServeMux.HandleFunc("local", handleMDNS)
 
-	conn, err := weavedns.LinkLocalMulticastListener()
+	conn, err := weavedns.LinkLocalMulticastListener(iface)
 	if err != nil {
 		log.Fatal(err)
 	}
