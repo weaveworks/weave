@@ -10,11 +10,11 @@ weaver: ../*.go main.go
 	go build -ldflags '-extldflags "-static"'
 
 .PHONY: docker-image
-docker-image: /tmp/weave.tar
+docker-image: /var/tmp/weave.tar
 
-/tmp/weave.tar: Dockerfile weaver
+/var/tmp/weave.tar: Dockerfile weaver
 	$(SUDO) docker build -t zettio/weave .
-	$(SUDO) docker save zettio/weave > /tmp/weave.tar
+	$(SUDO) docker save zettio/weave > /var/tmp/weave.tar
 
 publish: docker-image
 	$(SUDO) docker tag zettio/weave zettio/weave:git-`git rev-parse --short=12 HEAD`
@@ -23,4 +23,4 @@ publish: docker-image
 
 clean:
 	-$(SUDO) docker rmi zettio/weave
-	rm -f weaver /tmp/weave.tar
+	rm -f weaver /var/tmp/weave.tar
