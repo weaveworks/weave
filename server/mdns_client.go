@@ -196,6 +196,7 @@ func (c *MDNSClient) handleResponse(r *dns.Msg) {
 			if query, found := c.inflight[rr.Hdr.Name]; found {
 				for _, resp := range query.responseInfos {
 					resp.ch <- &ResponseA{Name: rr.Hdr.Name, Addr: rr.A}
+					close(resp.ch)
 				}
 				// To be simple for now, assume this is the only response coming
 				delete(c.inflight, rr.Hdr.Name)
