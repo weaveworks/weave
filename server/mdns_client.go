@@ -4,7 +4,6 @@ import (
 	"github.com/miekg/dns"
 	"log"
 	"net"
-	"sync"
 )
 
 // Portions of this code taken from github.com/armon/mdns
@@ -41,10 +40,16 @@ type inflightQuery struct {
 }
 
 type MDNSClient struct {
-	sync.RWMutex
-	conn     *net.UDPConn
-	addr     *net.UDPAddr
-	inflight map[string]*inflightQuery
+	conn      *net.UDPConn
+	addr      *net.UDPAddr
+	inflight  map[string]*inflightQuery
+	queryChan chan<- *MDNSInteraction
+}
+
+type mDNSQueryInfo struct {
+	name       string
+	querytype  uint16
+	responseCh chan<- *ResponseA
 }
 
 func NewMDNSClient() (*MDNSClient, error) {
@@ -60,32 +65,15 @@ func NewMDNSClient() (*MDNSClient, error) {
 	return retval, nil
 }
 
+func (c *MDNSClient) Start() {
+	queryChan := make(chan *MDNSInteraction, 4)
+	c.queryChan = queryChan
+	go c.queryLoop(queryChan)
+}
+
 func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 	conn, err := net.ListenMulticastUDP("udp", ifi, ipv4Addr)
 	return conn, err
-}
-
-func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- *ResponseA) error {
-	m := new(dns.Msg)
-	m.SetQuestion(name, querytype)
-	m.RecursionDesired = false
-
-	c.Lock()
-	query, found := c.inflight[name]
-	if !found {
-		query = &inflightQuery{name: name, Id: m.Id}
-		c.inflight[name] = query
-	}
-	info := &responseInfo{ch: responseCh}
-	query.responseInfos = append(query.responseInfos, info)
-	c.Unlock()
-
-	buf, err := m.Pack()
-	if err != nil {
-		return err
-	}
-	_, err = c.conn.WriteTo(buf, c.addr)
-	return err
 }
 
 func (c *MDNSClient) SendResponse(m *dns.Msg) error {
@@ -97,12 +85,100 @@ func (c *MDNSClient) SendResponse(m *dns.Msg) error {
 	return err
 }
 
+// ACTOR client API
+
+const (
+	CSendQuery       = iota
+	CShutdown        = iota
+	CIsInflightQuery = iota
+	CMessageReceived = iota
+)
+
+type Interaction struct {
+	code       int
+	resultChan chan<- interface{}
+}
+
+type MDNSInteraction struct {
+	Interaction
+	payload interface{}
+}
+
+// Async
+func (c *MDNSClient) Shutdown() {
+	c.queryChan <- &MDNSInteraction{Interaction: Interaction{code: CShutdown}}
+}
+
+// Async
+func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- *ResponseA) {
+	c.queryChan <- &MDNSInteraction{Interaction: Interaction{code: CSendQuery}, payload: mDNSQueryInfo{name, querytype, responseCh}}
+}
+
+// Sync
 func (c *MDNSClient) IsInflightQuery(m *dns.Msg) bool {
+	resultChan := make(chan interface{})
+	c.queryChan <- &MDNSInteraction{Interaction: Interaction{code: CIsInflightQuery, resultChan: resultChan}, payload: m}
+	result := <-resultChan
+	return result.(bool)
+}
+
+// Async - called from dns library multiplexer
+func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
+	c.queryChan <- &MDNSInteraction{Interaction: Interaction{code: CMessageReceived}, payload: r}
+}
+
+// ACTOR server
+
+func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
+	var err error
+	terminate := false
+	for !terminate {
+		if err != nil {
+			log.Printf("encountered error", err)
+			break
+		}
+		query, ok := <-queryChan
+		if !ok {
+			break
+		}
+		switch query.code {
+		case CShutdown:
+			terminate = true
+		case CSendQuery:
+			err = c.handleSendQuery(query.payload.(mDNSQueryInfo))
+		case CIsInflightQuery:
+			query.resultChan <- c.handleIsInflightQuery(query.payload.(*dns.Msg))
+		case CMessageReceived:
+			c.handleResponse(query.payload.(*dns.Msg))
+		}
+	}
+	// handle shutdown here
+}
+
+func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) error {
+	m := new(dns.Msg)
+	m.SetQuestion(q.name, q.querytype)
+	m.RecursionDesired = false
+	query, found := c.inflight[q.name]
+	if !found {
+		query = &inflightQuery{name: q.name, Id: m.Id}
+		c.inflight[q.name] = query
+	}
+	info := &responseInfo{ch: q.responseCh}
+	query.responseInfos = append(query.responseInfos, info)
+
+	buf, err := m.Pack()
+	if err != nil {
+		return err
+	}
+	_, err = c.conn.WriteTo(buf, c.addr)
+	return err
+}
+
+func (c *MDNSClient) handleIsInflightQuery(m *dns.Msg) bool {
 	if len(m.Question) == 1 {
 		q := m.Question[0]
 		if q.Qtype == dns.TypeA {
-			c.Lock()
-			defer c.Unlock()
 			if query, found := c.inflight[q.Name]; found {
 				if query.Id == m.Id {
 					return true
@@ -113,11 +189,10 @@ func (c *MDNSClient) IsInflightQuery(m *dns.Msg) bool {
 	return false
 }
 
-func (c *MDNSClient) HandleResponse(r *dns.Msg) {
+func (c *MDNSClient) handleResponse(r *dns.Msg) {
 	for _, answer := range r.Answer {
 		switch rr := answer.(type) {
 		case *dns.A:
-			c.Lock()
 			if query, found := c.inflight[rr.Hdr.Name]; found {
 				for _, resp := range query.responseInfos {
 					resp.ch <- &ResponseA{Name: rr.Hdr.Name, Addr: rr.A}
@@ -128,7 +203,6 @@ func (c *MDNSClient) HandleResponse(r *dns.Msg) {
 				// We've received a response that didn't match a query
 				// Do we want to cache it?
 			}
-			c.Unlock()
 		}
 	}
 }

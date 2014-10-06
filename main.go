@@ -29,7 +29,7 @@ func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
 	// Here we have to handle both requests incoming, responses to queries
 	// we sent out, and responses to queries that other nodes sent
 	if len(r.Answer) > 0 {
-		mdnsClient.HandleResponse(r)
+		mdnsClient.ResponseCallback(r)
 	} else if len(r.Question) > 0 {
 		q := r.Question[0]
 		ip, err := zone.MatchLocal(q.Name)
@@ -131,6 +131,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	mdnsClient.Start()
 
 	go dns.ActivateAndServe(nil, conn, MDNSServeMux)
 
