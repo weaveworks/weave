@@ -7,6 +7,7 @@ import (
 	"github.com/zettio/weavedns"
 	"log"
 	"net"
+	"time"
 )
 
 var zone = new(weavedns.ZoneDb)
@@ -24,6 +25,7 @@ func makeDNSReply(r *dns.Msg, name string, addr net.IP) *dns.Msg {
 var mdnsClient *weavedns.MDNSClient
 
 func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
+	log.Println("MDNS received:", r)
 	// Here we have to handle both requests incoming, responses to queries
 	// we sent out, and responses to queries that other nodes sent
 	if len(r.Answer) > 0 {
@@ -50,7 +52,7 @@ func handleLocal(w dns.ResponseWriter, r *dns.Msg) {
 		m := makeDNSReply(r, q.Name, net.ParseIP(ip))
 		w.WriteMsg(m)
 	} else {
-		log.Printf("Failed lookup for %s", q.Name)
+		log.Printf("Failed lookup for %s; sending mDNS query", q.Name)
 		// We don't know the answer; see if someone else does
 		channel := make(chan *weavedns.ResponseA, 4)
 		go func() {
@@ -66,13 +68,48 @@ func handleLocal(w dns.ResponseWriter, r *dns.Msg) {
 	return
 }
 
+func ensureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
+	iface, err = findInterface(ifaceName)
+	if err == nil || wait == 0 {
+		return
+	}
+	log.Println("Waiting for interface", ifaceName, "to come up")
+	for ; err != nil && wait > 0; wait -= 1 {
+		time.Sleep(1 * time.Second)
+		iface, err = findInterface(ifaceName)
+	}
+	if err == nil {
+		log.Println("Interface", ifaceName, "is up")
+	}
+	return
+}
+
+func findInterface(ifaceName string) (iface *net.Interface, err error) {
+	iface, err = net.InterfaceByName(ifaceName)
+	if err != nil {
+		return iface, fmt.Errorf("Unable to find interface %s", ifaceName)
+	}
+	if 0 == (net.FlagUp & iface.Flags) {
+		return iface, fmt.Errorf("Interface %s is not up", ifaceName)
+	}
+	return
+}
+
 func main() {
 	var (
 		dnsPort int
+		wait    int
 	)
 
+	flag.IntVar(&wait, "wait", 5, "number of seconds to wait for interface to be created and come up (defaults to 5)")
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to dns requests (defaults to 53)")
 	flag.Parse()
+
+	ifaceName := "ethwe"
+	_, err := ensureInterface(ifaceName, wait)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	LocalServeMux := dns.NewServeMux()
 	LocalServeMux.HandleFunc("local", handleLocal)
