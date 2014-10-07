@@ -16,28 +16,28 @@ and remove records from the DNS server.
 The DNS server accepts HTTP requests on the following URL (patterns)
 and methods:
 
-PUT /name/<identifier>/<ip-address>
+`PUT /name/<identifier>/<ip-address>`
 
 Put a record for an IP, bound to a host-scoped identifier (e.g., a
 container ID), in the DNS database.
 
-DELETE /name/<identifier>/<ip-address>
+`DELETE /name/<identifier>/<ip-address>`
 
 Remove a specific record for an IP and host-scoped identifier.
 
-DELETE /name/<identifier>
+`DELETE /name/<identifier>`
 
 Remove all records for the host-scoped identifier.
 
-GET /name/
+`GET /name/`
 
 List all the records in the database.
 
-GET /name/<identifier>
+`GET /name/<identifier>`
 
 List all the records for a host-scoped identifier.
 
-GET /status
+`GET /status`
 
 Give the server status.
 
