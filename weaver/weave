@@ -75,7 +75,7 @@ add_nat_rule() {
 
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
-        ip link add dev $BRIDGE type bridge
+        ip link add name $BRIDGE type bridge
         ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/random | tr \  : | tail -c+2)
         # Attempting to set the bridge MTU to a high value directly
         # fails. Bridges take the lowest MTU of their interfaces. So
