@@ -30,7 +30,8 @@ type ResponseA struct {
 }
 
 type responseInfo struct {
-	ch chan<- *ResponseA
+	timeout time.Time // if no answer by this time, give up
+	ch      chan<- *ResponseA
 }
 
 // Represents one query that we have sent for one name.
@@ -40,7 +41,6 @@ type inflightQuery struct {
 	name          string
 	Id            uint16 // the DNS message ID
 	responseInfos []*responseInfo
-	timeout       time.Time // if no answer by this time, give up
 }
 
 type MDNSClient struct {
@@ -142,15 +142,25 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 		now := time.Now()
 		after := MaxDuration
 		for name, query := range c.inflight {
-			switch duration := query.timeout.Sub(now); {
-			case duration <= 0: // timed out
-				log.Println("Query timed out:", name)
-				for _, item := range query.responseInfos {
+			// Count down from end of slice to beginning
+			length := len(query.responseInfos)
+			for i := length - 1; i >= 0; i-- {
+				item := query.responseInfos[i]
+				switch duration := item.timeout.Sub(now); {
+				case duration <= 0: // timed out
 					close(item.ch)
+					// Swap item from the end of the slice
+					length--
+					if i < length {
+						query.responseInfos[i] = query.responseInfos[length]
+					}
+				case duration < after:
+					after = duration
 				}
+			}
+			query.responseInfos = query.responseInfos[:length]
+			if length == 0 {
 				delete(c.inflight, name)
-			case duration < after:
-				after = duration
 			}
 		}
 		log.Println("Next timeout:", after)
@@ -199,14 +209,16 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) (err error) {
 			return err
 		}
 		query = &inflightQuery{
-			name:    q.name,
-			Id:      m.Id,
-			timeout: time.Now().Add(mDNSTimeout),
+			name: q.name,
+			Id:   m.Id,
 		}
 		c.inflight[q.name] = query
 		_, err = c.conn.WriteTo(buf, c.addr)
 	}
-	info := &responseInfo{ch: q.responseCh}
+	info := &responseInfo{
+		ch:      q.responseCh,
+		timeout: time.Now().Add(mDNSTimeout),
+	}
 	query.responseInfos = append(query.responseInfos, info)
 
 	return err
