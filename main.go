@@ -25,7 +25,6 @@ func makeDNSReply(r *dns.Msg, name string, addr net.IP) *dns.Msg {
 var mdnsClient *weavedns.MDNSClient
 
 func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
-	log.Println("MDNS received:", r)
 	// Here we have to handle both requests incoming, responses to queries
 	// we sent out, and responses to queries that other nodes sent
 	if len(r.Answer) > 0 {
@@ -45,7 +44,6 @@ func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 func handleLocal(w dns.ResponseWriter, r *dns.Msg) {
-	log.Printf("Received message: %s", r)
 	q := r.Question[0]
 	ip, err := zone.MatchLocal(q.Name)
 	if err == nil {
@@ -56,12 +54,12 @@ func handleLocal(w dns.ResponseWriter, r *dns.Msg) {
 		// We don't know the answer; see if someone else does
 		channel := make(chan *weavedns.ResponseA, 4)
 		go func() {
+			// Loop terminates when channel is closed by MDNSClient on timeout
 			for resp := range channel {
 				log.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
 				m := makeDNSReply(r, resp.Name, resp.Addr)
 				w.WriteMsg(m)
 			}
-			// FIXME: need to add a time-out either here or in mdnsClient
 		}()
 		mdnsClient.SendQuery(q.Name, dns.TypeA, channel)
 	}
