@@ -256,6 +256,9 @@ case "$COMMAND" in
         # (eth0, wlan0, etc) so the name becomes stable across host
         # restarts.
         MACADDR=`cat /sys/class/net/$BRIDGE/address`
+        # Set WEAVE_DOCKER_ARGS in the environment in order to supply
+        # additional parameters, such as resource limits, to docker
+        # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@")
         with_container_netns attach $CONTAINER $IPADDR eth0
         echo $CONTAINER
