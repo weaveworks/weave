@@ -1,6 +1,6 @@
 .DEFAULT: all
 
-# If you can use docker with being root, you can do "make SUDO="
+# If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
 
 all: docker-image
