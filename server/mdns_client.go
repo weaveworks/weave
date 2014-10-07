@@ -3,14 +3,18 @@ package weavedns
 import (
 	"github.com/miekg/dns"
 	"log"
+	"math"
 	"net"
+	"time"
 )
 
 // Portions of this code taken from github.com/armon/mdns
 
 const (
-	ipv4mdns = "224.0.0.251" // link-local multicast address
-	mdnsPort = 5353          // mDNS assigned port
+	ipv4mdns    = "224.0.0.251" // link-local multicast address
+	mdnsPort    = 5353          // mDNS assigned port
+	mDNSTimeout = time.Second
+	MaxDuration = time.Duration(math.MaxInt64)
 )
 
 var (
@@ -36,7 +40,7 @@ type inflightQuery struct {
 	name          string
 	Id            uint16 // the DNS message ID
 	responseInfos []*responseInfo
-	// add timeout here ?
+	timeout       time.Time // if no answer by this time, give up
 }
 
 type MDNSClient struct {
@@ -130,6 +134,26 @@ func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
 // ACTOR server
 
 func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
+	timer := time.NewTimer(MaxDuration)
+	run := func() {
+		now := time.Now()
+		after := MaxDuration
+		for name, query := range c.inflight {
+			switch duration := query.timeout.Sub(now); {
+			case duration <= 0: // timed out
+				log.Println("Query timed out:", name)
+				for _, item := range query.responseInfos {
+					close(item.ch)
+				}
+				delete(c.inflight, name)
+			case duration < after:
+				after = duration
+			}
+		}
+		log.Println("Next timeout:", after)
+		timer.Reset(after)
+	}
+
 	var err error
 	terminate := false
 	for !terminate {
@@ -137,41 +161,51 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 			log.Printf("encountered error", err)
 			break
 		}
-		query, ok := <-queryChan
-		if !ok {
-			break
-		}
-		switch query.code {
-		case CShutdown:
-			terminate = true
-		case CSendQuery:
-			err = c.handleSendQuery(query.payload.(mDNSQueryInfo))
-		case CIsInflightQuery:
-			query.resultChan <- c.handleIsInflightQuery(query.payload.(*dns.Msg))
-		case CMessageReceived:
-			c.handleResponse(query.payload.(*dns.Msg))
+		select {
+		case query, ok := <-queryChan:
+			if !ok {
+				break
+			}
+			switch query.code {
+			case CShutdown:
+				terminate = true
+			case CSendQuery:
+				err = c.handleSendQuery(query.payload.(mDNSQueryInfo))
+				run()
+			case CIsInflightQuery:
+				query.resultChan <- c.handleIsInflightQuery(query.payload.(*dns.Msg))
+			case CMessageReceived:
+				c.handleResponse(query.payload.(*dns.Msg))
+				run()
+			}
+		case <-timer.C:
+			run()
 		}
 	}
 	// handle shutdown here
 }
 
-func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) error {
-	m := new(dns.Msg)
-	m.SetQuestion(q.name, q.querytype)
-	m.RecursionDesired = false
+func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) (err error) {
 	query, found := c.inflight[q.name]
 	if !found {
-		query = &inflightQuery{name: q.name, Id: m.Id}
+		m := new(dns.Msg)
+		m.SetQuestion(q.name, q.querytype)
+		m.RecursionDesired = false
+		buf, err := m.Pack()
+		if err != nil {
+			return err
+		}
+		query = &inflightQuery{
+			name:    q.name,
+			Id:      m.Id,
+			timeout: time.Now().Add(mDNSTimeout),
+		}
 		c.inflight[q.name] = query
+		_, err = c.conn.WriteTo(buf, c.addr)
 	}
 	info := &responseInfo{ch: q.responseCh}
 	query.responseInfos = append(query.responseInfos, info)
 
-	buf, err := m.Pack()
-	if err != nil {
-		return err
-	}
-	_, err = c.conn.WriteTo(buf, c.addr)
 	return err
 }
 
@@ -196,10 +230,7 @@ func (c *MDNSClient) handleResponse(r *dns.Msg) {
 			if query, found := c.inflight[rr.Hdr.Name]; found {
 				for _, resp := range query.responseInfos {
 					resp.ch <- &ResponseA{Name: rr.Hdr.Name, Addr: rr.A}
-					close(resp.ch)
 				}
-				// To be simple for now, assume this is the only response coming
-				delete(c.inflight, rr.Hdr.Name)
 			} else {
 				// We've received a response that didn't match a query
 				// Do we want to cache it?
