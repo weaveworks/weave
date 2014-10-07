@@ -50,8 +50,8 @@ To run weave on a host, you need to install...
 ## Example
 
 Say you have docker running on two hosts, accessible to each other as
-$HOST1 and $HOST2, and want to deploy an application consisting of
-two containers, one on each host.
+$HOST1 and $HOST2, and want to deploy an application consisting of two
+containers, one on each host.
 
 On $HOST1 run (as root)
 
@@ -82,16 +82,18 @@ We repeat similar steps on $HOST2...
     host2# weave launch 10.0.0.2/16 $HOST1
     host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu)
 
-The only difference, apart from the IP addresses, is that we tell our
-weave that it should peer with the weave running on $HOST1. We could
-instead have told the weave on $HOST1 to connect to $HOST2, or told
-both about each other. Order doesn't matter here; weave automatically
-(re)connects to peers when they become available. Also, we can tell
-weave to connect to multiple peers by supplying multiple
-addresses. And we can [add peers dynamically](#dynamic-topologies).
+The only difference, apart from the choice of IP addresses for the
+weave router and the application container, is that we tell our weave
+that it should peer with the weave on $HOST1 (specified as the IP
+address by which $HOST2 can reach it). NB: if there is a firewall
+between $HOST1 and $HOST2, you must open port 6783 for TCP and UDP.
 
-If there is a firewall between $HOST1 and $HOST2, you must open port 
-6783 for TCP and UDP.
+Note that we could instead have told the weave on $HOST1 to connect to
+$HOST2, or told both about each other. Order does not matter here;
+weave automatically (re)connects to peers when they become
+available. Also, we can tell weave to connect to multiple peers by
+supplying multiple addresses, separated by spaces. And we can
+[add peers dynamically](#dynamic-topologies).
 
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...
