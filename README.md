@@ -36,6 +36,7 @@ To run weave on a host, you need to install...
         sudo wget -O /usr/local/bin/weave \
           https://raw.githubusercontent.com/zettio/weave/master/weaver/weave
         sudo chmod a+x /usr/local/bin/weave
+	/usr/bin/docker pull zettio/weave
 
 3. (recommended) ethtool. On many systems this is installed already;
    if not then grab it via your favourite package manager. On some
