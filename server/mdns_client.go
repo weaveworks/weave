@@ -98,37 +98,40 @@ const (
 	CMessageReceived = iota
 )
 
-type Interaction struct {
+type MDNSInteraction struct {
 	code       int
 	resultChan chan<- interface{}
-}
-
-type MDNSInteraction struct {
-	Interaction
-	payload interface{}
+	payload    interface{}
 }
 
 // Async
 func (c *MDNSClient) Shutdown() {
-	c.queryChan <- &MDNSInteraction{Interaction: Interaction{code: CShutdown}}
+	c.queryChan <- &MDNSInteraction{code: CShutdown}
 }
 
 // Async
 func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- *ResponseA) {
-	c.queryChan <- &MDNSInteraction{Interaction: Interaction{code: CSendQuery}, payload: mDNSQueryInfo{name, querytype, responseCh}}
+	c.queryChan <- &MDNSInteraction{
+		code:    CSendQuery,
+		payload: mDNSQueryInfo{name, querytype, responseCh},
+	}
 }
 
 // Sync
 func (c *MDNSClient) IsInflightQuery(m *dns.Msg) bool {
 	resultChan := make(chan interface{})
-	c.queryChan <- &MDNSInteraction{Interaction: Interaction{code: CIsInflightQuery, resultChan: resultChan}, payload: m}
+	c.queryChan <- &MDNSInteraction{
+		code:       CIsInflightQuery,
+		resultChan: resultChan,
+		payload:    m,
+	}
 	result := <-resultChan
 	return result.(bool)
 }
 
 // Async - called from dns library multiplexer
 func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
-	c.queryChan <- &MDNSInteraction{Interaction: Interaction{code: CMessageReceived}, payload: r}
+	c.queryChan <- &MDNSInteraction{code: CMessageReceived, payload: r}
 }
 
 // ACTOR server
