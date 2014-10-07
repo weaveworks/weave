@@ -163,7 +163,6 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 				delete(c.inflight, name)
 			}
 		}
-		log.Println("Next timeout:", after)
 		timer.Reset(after)
 	}
 
