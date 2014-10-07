@@ -38,7 +38,7 @@ func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		ip, err := zone.MatchLocal(q.Name)
 		if err == nil {
-			m := makeDNSReply(r, q.Name, net.ParseIP(ip))
+			m := makeDNSReply(r, q.Name, ip)
 			mdnsClient.SendResponse(m)
 		} else if mdnsClient.IsInflightQuery(r) {
 			// ignore this - it's our own query received via multicast
@@ -53,7 +53,7 @@ func handleLocal(w dns.ResponseWriter, r *dns.Msg) {
 	q := r.Question[0]
 	ip, err := zone.MatchLocal(q.Name)
 	if err == nil {
-		m := makeDNSReply(r, q.Name, net.ParseIP(ip))
+		m := makeDNSReply(r, q.Name, ip)
 		w.WriteMsg(m)
 	} else {
 		log.Printf("Failed lookup for %s; sending mDNS query", q.Name)

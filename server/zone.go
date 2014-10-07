@@ -3,19 +3,20 @@ package weavedns
 import (
 	"github.com/miekg/dns"
 	"log"
+	"net"
 	"sync"
 )
 
 type Zone interface {
-	AddRecord(name string, ip string, weave_ip string) error
-	MatchLocal(name string) (string, error)
-	MatchGlobal(name string) (string, error)
+	AddRecord(string, net.IP, net.IP, *net.IPNet) error
+	MatchLocal(string) (net.IP, error)
 }
 
 type Record struct {
 	Name    string
-	Ip      string
-	WeaveIp string
+	Ip      net.IP
+	WeaveIp net.IP
+	Subnet  *net.IPNet
 }
 
 type ZoneDb struct {
@@ -30,31 +31,25 @@ func (ops LookupError) Error() string {
 }
 
 // Stop gap.
-func (zone *ZoneDb) match(name string) (string, error) {
+func (zone *ZoneDb) match(name string) (net.IP, error) {
 	for _, r := range zone.recs {
 		log.Printf("%s == %s ?", r.Name, name)
 		if r.Name == name {
 			return r.WeaveIp, nil
 		}
 	}
-	return "", LookupError(name)
+	return nil, LookupError(name)
 }
 
-func (zone *ZoneDb) MatchLocal(name string) (string, error) {
+func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	return zone.match(name)
 }
 
-func (zone *ZoneDb) MatchGlobal(name string) (string, error) {
+func (zone *ZoneDb) AddRecord(name string, ip net.IP, weave_ip net.IP, weave_subnet *net.IPNet) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
-	return zone.match(name)
-}
-
-func (zone *ZoneDb) AddRecord(name string, ip string, weave_ip string) error {
-	zone.mx.Lock()
-	defer zone.mx.Unlock()
-	zone.recs = append(zone.recs, Record{dns.Fqdn(name), ip, weave_ip})
+	zone.recs = append(zone.recs, Record{dns.Fqdn(name), ip, weave_ip, weave_subnet})
 	return nil
 }
