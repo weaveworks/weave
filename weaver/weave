@@ -33,7 +33,10 @@ WEAVE_IMAGE='zettio/weave'
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
-WEAVE_DOCKER_ARGS=''
+
+# `export WEAVE_DOCKER_ARGS='customer arguments'` 
+# prior to weave launch will permit you to pass along arguments 
+# to the `docker run` command used to launch the weave container
 
 COMMAND=$1
 

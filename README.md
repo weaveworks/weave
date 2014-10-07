@@ -56,14 +56,18 @@ two containers, one on each host.
 
 On $HOST1 run (as root)
 
+    host2# export WEAVE_DOCKER_ARGS='--memory=1gb'
     host1# weave launch 10.0.0.1/16
     host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu)
 
-The first line starts the weave router, in a container. This needs to
+The first line sets additional arguments intended to be passed along 
+to the `docker run` command which launches the weave container.  
+
+The next line starts the weave router, in a container. This needs to
 be done once on each host. We tell weave that its IP address should
 be 10.0.0.1, and that the weave network is on 10.0.0.0/16.
 
-The second line starts our application container. We give it an IP
+The third line starts our application container. We give it an IP
 address and network (a subnet of the weave network). `weave run`
 invokes `docker run -d` with all the parameters following the IP
 address and netmask. So we could be launching any container this way;
@@ -80,6 +84,8 @@ unique.
 
 We repeat similar steps on $HOST2...
 
+    host2# export HOST1='<host1_ip_routable_from_host2>'
+    host2# export WEAVE_DOCKER_ARGS='--memory=1gb'
     host2# weave launch 10.0.0.2/16 $HOST1
     host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu)
 
@@ -88,7 +94,7 @@ weave that it should peer with the weave running on $HOST1. We could
 instead have told the weave on $HOST1 to connect to $HOST2, or told
 both about each other. Order doesn't matter here; weave automatically
 (re)connects to peers when they become available. Also, we can tell
-weave to connect to multiple peers by supplying multiple
+weave to connect to multiple peers by supplying multiple space delimited 
 addresses. And we can [add peers dynamically](#dynamic-topologies).
 
 If there is a firewall between $HOST1 and $HOST2, you must open port 
