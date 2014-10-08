@@ -101,7 +101,6 @@ func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 const (
 	CSendQuery       = iota
 	CShutdown        = iota
-	CIsInflightQuery = iota
 	CMessageReceived = iota
 )
 
@@ -122,18 +121,6 @@ func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- 
 		code:    CSendQuery,
 		payload: mDNSQueryInfo{name, querytype, responseCh},
 	}
-}
-
-// Sync
-func (c *MDNSClient) IsInflightQuery(m *dns.Msg) bool {
-	resultChan := make(chan interface{})
-	c.queryChan <- &MDNSInteraction{
-		code:       CIsInflightQuery,
-		resultChan: resultChan,
-		payload:    m,
-	}
-	result := <-resultChan
-	return result.(bool)
 }
 
 // Async - called from dns library multiplexer
@@ -191,8 +178,6 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 			case CSendQuery:
 				err = c.handleSendQuery(query.payload.(mDNSQueryInfo))
 				run()
-			case CIsInflightQuery:
-				query.resultChan <- c.handleIsInflightQuery(query.payload.(*dns.Msg))
 			case CMessageReceived:
 				c.handleResponse(query.payload.(*dns.Msg))
 				run()
@@ -228,20 +213,6 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) (err error) {
 	query.responseInfos = append(query.responseInfos, info)
 
 	return err
-}
-
-func (c *MDNSClient) handleIsInflightQuery(m *dns.Msg) bool {
-	if len(m.Question) == 1 {
-		q := m.Question[0]
-		if q.Qtype == dns.TypeA {
-			if query, found := c.inflight[q.Name]; found {
-				if query.Id == m.Id {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 func (c *MDNSClient) handleResponse(r *dns.Msg) {
