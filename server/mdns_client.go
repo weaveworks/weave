@@ -44,6 +44,7 @@ type inflightQuery struct {
 }
 
 type MDNSClient struct {
+	server    *dns.Server
 	conn      *net.UDPConn
 	addr      *net.UDPAddr
 	inflight  map[string]*inflightQuery
@@ -82,7 +83,8 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 		}
 	}
 
-	go dns.ActivateAndServe(nil, multicast, dns.HandlerFunc(handleMDNS))
+	c.server = &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
+	go c.server.ActivateAndServe()
 
 	queryChan := make(chan *MDNSInteraction, 4)
 	c.queryChan = queryChan
@@ -174,6 +176,7 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 			}
 			switch query.code {
 			case CShutdown:
+				c.server.Shutdown()
 				terminate = true
 			case CSendQuery:
 				err = c.handleSendQuery(query.payload.(mDNSQueryInfo))
@@ -186,7 +189,6 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 			run()
 		}
 	}
-	// handle shutdown here
 }
 
 func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) (err error) {
