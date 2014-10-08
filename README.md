@@ -570,5 +570,8 @@ weave you are running, as shown by `weave version`.
 Follow weave on Twitter:
 [@weavenetwork](https://twitter.com/weavenetwork).
 
+Read the Weave blog:
+[Weaveblog](http://weaveblog.com/).
+
 Discuss weave on
 [Hacker News](https://news.ycombinator.com/item?id=8289786).
