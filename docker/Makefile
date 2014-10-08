@@ -6,7 +6,7 @@ MAIN:=../
 all: docker-image
 
 weavedns: ../server/*.go ../main.go
-	go get $(MAIN) && GOARCH=amd64 GOOS=linux go build -o $@ -v $(MAIN)
+	go get $(MAIN) && GOARCH=amd64 GOOS=linux go build -ldflags '-linkmode external -extldflags "-static"' -o $@ -v $(MAIN)
 
 .PHONY: docker-image
 
