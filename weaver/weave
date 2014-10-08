@@ -29,7 +29,7 @@ command_exists () {
 
 [ $# -gt 0 ] || usage
 
-WEAVE_IMAGE='zettio/weave'
+IMAGE=zettio/weave
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
@@ -234,11 +234,11 @@ case "$COMMAND" in
         IPADDR=$1
         shift 1
         case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' weave 2>/dev/null) in
-            "true $WEAVE_IMAGE")
+            "true $IMAGE")
                 echo "Weave is already running." >&2
                 exit 1
                 ;;
-            "false $WEAVE_IMAGE")
+            "false $IMAGE")
                 docker rm weave >/dev/null
                 ;;
             true*)
@@ -260,7 +260,10 @@ case "$COMMAND" in
         # (eth0, wlan0, etc) so the name becomes stable across host
         # restarts.
         MACADDR=`cat /sys/class/net/$BRIDGE/address`
-        CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $WEAVE_IMAGE -name $MACADDR "$@")
+        # Set WEAVE_DOCKER_ARGS in the environment in order to supply
+        # additional parameters, such as resource limits, to docker
+        # when launching the weave container.
+        CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@")
         with_container_netns attach $CONTAINER $IPADDR eth0
         echo $CONTAINER
         ;;
@@ -285,8 +288,8 @@ case "$COMMAND" in
     version)
         # Try the running container first; if no luck try the image
         if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' weave 2>/dev/null) ; then
-            if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $WEAVE_IMAGE 2>/dev/null) ; then
-                echo "Unable to find $WEAVE_IMAGE image." >&2
+            if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $IMAGE 2>/dev/null) ; then
+                echo "Unable to find $IMAGE image." >&2
                 exit 1
             fi
         fi

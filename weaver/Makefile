@@ -1,5 +1,8 @@
 .DEFAULT: all
 
+# If you can use docker without being root, you can do "make SUDO="
+SUDO=sudo
+
 all: docker-image
 
 weaver: ../*.go main.go
@@ -7,18 +10,17 @@ weaver: ../*.go main.go
 	go build -ldflags '-extldflags "-static"'
 
 .PHONY: docker-image
+docker-image: /var/tmp/weave.tar
 
-docker-image: /tmp/weave.tar
-
-/tmp/weave.tar: Dockerfile weaver
-	sudo docker build -t zettio/weave .
-	sudo docker save zettio/weave > /tmp/weave.tar
+/var/tmp/weave.tar: Dockerfile weaver
+	$(SUDO) docker build -t zettio/weave .
+	$(SUDO) docker save zettio/weave > /var/tmp/weave.tar
 
 publish: docker-image
-	sudo docker tag zettio/weave zettio/weave:git-`git rev-parse --short=12 HEAD`
-	sudo docker push zettio/weave:latest
-	sudo docker push zettio/weave:git-`git rev-parse --short=12 HEAD`
+	$(SUDO) docker tag zettio/weave zettio/weave:git-`git rev-parse --short=12 HEAD`
+	$(SUDO) docker push zettio/weave:latest
+	$(SUDO) docker push zettio/weave:git-`git rev-parse --short=12 HEAD`
 
 clean:
-	-sudo docker rmi zettio/weave
-	rm -f weaver /tmp/weave.tar
+	-$(SUDO) docker rmi zettio/weave
+	rm -f weaver /var/tmp/weave.tar
