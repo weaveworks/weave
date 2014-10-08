@@ -65,6 +65,7 @@ func TestSimpleQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer mdnsClient.Shutdown()
 
 	server, err := RunLocalMulticastServer()
 	if err != nil {
