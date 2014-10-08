@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"testing"
-	"time"
 )
 
 var (
@@ -76,16 +75,11 @@ func TestSimpleQuery(t *testing.T) {
 	var received_addr net.IP
 
 	channel := make(chan *ResponseA, 4)
-	go func() {
-		for resp := range channel {
-			log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
-			received_addr = resp.Addr
-		}
-	}()
-
 	mdnsClient.SendQuery("test.weave.", dns.TypeA, channel)
-
-	time.Sleep(200 * time.Millisecond)
+	for resp := range channel {
+		log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
+		received_addr = resp.Addr
+	}
 
 	if !received_addr.Equal(test_addr) {
 		t.Log("Unexpected result for test.weave", received_addr)
