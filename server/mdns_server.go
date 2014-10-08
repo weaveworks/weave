@@ -69,7 +69,11 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 	if err != nil {
 		return err
 	}
-	s.localAddrs, err = ifi.Addrs()
+	if ifi == nil {
+		s.localAddrs, err = net.InterfaceAddrs()
+	} else {
+		s.localAddrs, err = ifi.Addrs()
+	}
 	if err != nil {
 		return err
 	}
