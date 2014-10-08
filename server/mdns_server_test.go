@@ -45,6 +45,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	}
 
 	var received_addr net.IP
+	received_count := 0
 
 	// Implement a minimal listener for responses
 	multicast, err := LinkLocalMulticastListener(nil)
@@ -59,6 +60,7 @@ func TestServerSimpleQuery(t *testing.T) {
 				switch rr := answer.(type) {
 				case *dns.A:
 					received_addr = rr.A
+					received_count++
 				}
 			}
 		}
@@ -68,12 +70,27 @@ func TestServerSimpleQuery(t *testing.T) {
 	go server.ActivateAndServe()
 	defer server.Shutdown()
 
+	time.Sleep(100 * time.Millisecond) // Allow for server to get going
+
 	sendQuery("test.weave.", dns.TypeA)
 
 	time.Sleep(time.Second)
 
+	if received_count != 1 {
+		t.Log("Unexpected result count for test.weave", received_count)
+		t.Fail()
+	}
 	if !received_addr.Equal(weave_ip) {
 		t.Log("Unexpected result for test.weave", received_addr)
+		t.Fail()
+	}
+
+	received_count = 0
+
+	sendQuery("testfail.weave.", dns.TypeA)
+
+	if received_count != 0 {
+		t.Log("Unexpected result count for testfail.weave", received_count)
 		t.Fail()
 	}
 }
