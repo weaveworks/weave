@@ -8,13 +8,21 @@ import (
 )
 
 var (
-	test_addr = net.ParseIP("9.8.7.6")
+	success_test_name = "test1.weave."
+	fail_test_name    = "test2.weave."
+	test_addr         = net.ParseIP("9.8.7.6")
 )
 
 func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 	//log.Println("minimalServer received:", req)
 	if len(req.Answer) > 0 {
 		return // Only interested in questions.
+	}
+	if len(req.Question) != 1 {
+		return // We only handle single-question messages
+	}
+	if req.Question[0].Name != success_test_name {
+		return // This is not the DNS record you are looking for
 	}
 
 	m := new(dns.Msg)
@@ -76,14 +84,37 @@ func TestSimpleQuery(t *testing.T) {
 	var received_addr net.IP
 
 	channel := make(chan *ResponseA, 4)
-	mdnsClient.SendQuery("test.weave.", dns.TypeA, channel)
+
+	// First, a test we expect to succeed
+	mdnsClient.SendQuery(success_test_name, dns.TypeA, channel)
 	for resp := range channel {
+		if resp.err != nil {
+			t.Fatal(resp.err)
+		}
 		log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
 		received_addr = resp.Addr
 	}
 
 	if !received_addr.Equal(test_addr) {
-		t.Log("Unexpected result for test.weave", received_addr)
+		t.Log("Unexpected result for", success_test_name, received_addr)
+		t.Fail()
+	}
+
+	received_response := false
+	// Now, a test we expect to time out with no responses
+	channel2 := make(chan *ResponseA, 4)
+	mdnsClient.SendQuery("test2.weave.", dns.TypeA, channel2)
+	for resp := range channel2 {
+		if resp.err != nil {
+			t.Fatal(resp.err)
+		}
+		log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
+		received_addr = resp.Addr
+		received_response = true
+	}
+
+	if received_response {
+		t.Log("Unexpected result for test2.weave", received_addr)
 		t.Fail()
 	}
 }
