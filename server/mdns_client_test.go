@@ -46,15 +46,16 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 	}
 }
 
-func RunLocalMulticastServer() error {
+func RunLocalMulticastServer() (*dns.Server, error) {
 	mux := dns.NewServeMux()
 	mux.HandleFunc("weave", minimalServer)
 	multicast, err := net.ListenMulticastUDP("udp", nil, ipv4Addr)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	go dns.ActivateAndServe(nil, multicast, mux)
-	return nil
+	server := &dns.Server{Listener: nil, PacketConn: multicast, Handler: mux}
+	go server.ActivateAndServe()
+	return server, nil
 }
 
 func TestSimpleQuery(t *testing.T) {
@@ -68,10 +69,11 @@ func TestSimpleQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = RunLocalMulticastServer()
+	server, err := RunLocalMulticastServer()
 	if err != nil {
 		t.Fatalf("Unable to run test server: %s", err)
 	}
+	defer server.Shutdown()
 
 	var received_addr net.IP
 
