@@ -48,6 +48,18 @@ To run weave on a host, you need to install...
    itself fully when individual weave instances are stopped (with
    `weave stop`) and restarted quickly (typically within ~3 minutes).
 
+Alternately, one can use a configuration management tool to handle 
+these tasks.  If you use puppet, checkout these modules:
+
+	https://forge.puppetlabs.com/garethr/docker
+	https://github.com/garethr/garethr-docker
+	https://github.com/hesco/hesco-weave 
+
+With those two modules (and their few dependencies), the installation 
+of docker and weave can be managed with a few lines of DSL, and a handful 
+of values set in /etc/puppet/hieradata/.  See the documentation in those 
+modules for the details.  
+
 ## Example
 
 Say you have docker running on two hosts, accessible to each other as
