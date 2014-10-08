@@ -66,6 +66,7 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	server := &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
 	go server.ActivateAndServe()
+	defer server.Shutdown()
 
 	sendQuery("test.weave.", dns.TypeA)
 
