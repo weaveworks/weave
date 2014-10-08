@@ -2,7 +2,6 @@ package weavedns
 
 import (
 	"github.com/miekg/dns"
-	"log"
 	"math"
 	"net"
 	"time"
@@ -27,6 +26,7 @@ var (
 type ResponseA struct {
 	Name string
 	Addr net.IP
+	err  error
 }
 
 type responseInfo struct {
@@ -162,13 +162,8 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 		timer.Reset(after)
 	}
 
-	var err error
 	terminate := false
 	for !terminate {
-		if err != nil {
-			log.Printf("encountered error", err)
-			break
-		}
 		select {
 		case query, ok := <-queryChan:
 			if !ok {
@@ -179,7 +174,7 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 				c.server.Shutdown()
 				terminate = true
 			case CSendQuery:
-				err = c.handleSendQuery(query.payload.(mDNSQueryInfo))
+				c.handleSendQuery(query.payload.(mDNSQueryInfo))
 				run()
 			case CMessageReceived:
 				c.handleResponse(query.payload.(*dns.Msg))
@@ -189,9 +184,16 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 			run()
 		}
 	}
+
+	// Close all response channels
+	for _, query := range c.inflight {
+		for _, item := range query.responseInfos {
+			close(item.ch)
+		}
+	}
 }
 
-func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) (err error) {
+func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) error {
 	query, found := c.inflight[q.name]
 	if !found {
 		m := new(dns.Msg)
@@ -199,6 +201,8 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) (err error) {
 		m.RecursionDesired = false
 		buf, err := m.Pack()
 		if err != nil {
+			q.responseCh <- &ResponseA{err: err}
+			close(q.responseCh)
 			return err
 		}
 		query = &inflightQuery{
@@ -207,6 +211,11 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) (err error) {
 		}
 		c.inflight[q.name] = query
 		_, err = c.conn.WriteTo(buf, c.addr)
+		if err != nil {
+			q.responseCh <- &ResponseA{err: err}
+			close(q.responseCh)
+			return err
+		}
 	}
 	info := &responseInfo{
 		ch:      q.responseCh,
@@ -214,7 +223,7 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) (err error) {
 	}
 	query.responseInfos = append(query.responseInfos, info)
 
-	return err
+	return nil
 }
 
 func (c *MDNSClient) handleResponse(r *dns.Msg) {
