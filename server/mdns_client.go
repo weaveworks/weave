@@ -59,7 +59,6 @@ type mDNSQueryInfo struct {
 func NewMDNSClient() (*MDNSClient, error) {
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 	retval := &MDNSClient{
@@ -69,24 +68,32 @@ func NewMDNSClient() (*MDNSClient, error) {
 	return retval, nil
 }
 
-func (c *MDNSClient) Start() {
+func (c *MDNSClient) Start(ifi *net.Interface) error {
+	multicast, err := LinkLocalMulticastListener(ifi)
+	if err != nil {
+		return err
+	}
+
+	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
+		//log.Println("client received:", r)
+		// Only handle responses here
+		if len(r.Answer) > 0 {
+			c.ResponseCallback(r)
+		}
+	}
+
+	go dns.ActivateAndServe(nil, multicast, dns.HandlerFunc(handleMDNS))
+
 	queryChan := make(chan *MDNSInteraction, 4)
 	c.queryChan = queryChan
 	go c.queryLoop(queryChan)
+
+	return nil
 }
 
 func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 	conn, err := net.ListenMulticastUDP("udp", ifi, ipv4Addr)
 	return conn, err
-}
-
-func (c *MDNSClient) SendResponse(m *dns.Msg) error {
-	buf, err := m.Pack()
-	if err != nil {
-		return err
-	}
-	_, err = c.conn.WriteTo(buf, c.addr)
-	return err
 }
 
 // ACTOR client API

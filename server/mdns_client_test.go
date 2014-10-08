@@ -10,11 +10,6 @@ import (
 
 var (
 	test_addr = net.ParseIP("9.8.7.6")
-	sendconn  *net.UDPConn
-	sendAddr  = &net.UDPAddr{
-		IP:   net.ParseIP(ipv4mdns),
-		Port: 0,
-	}
 )
 
 func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
@@ -39,7 +34,13 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 		log.Fatal("Nil buffer")
 	}
 	//log.Println("minimalServer sending:", buf)
-	_, err = sendconn.WriteTo(buf, ipv4Addr)
+	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
+	sendconn, err := net.DialUDP("udp", nil, ipv4Addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = sendconn.Write(buf)
+	sendconn.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,24 +63,7 @@ func TestSimpleQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mdnsClient.Start()
-	mux := dns.NewServeMux()
-
-	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
-		//log.Println("test received:", r)
-		// Only handle responses here
-		if len(r.Answer) > 0 {
-			mdnsClient.ResponseCallback(r)
-		}
-	}
-
-	mux.HandleFunc("weave", handleMDNS)
-	multicast, err := net.ListenMulticastUDP("udp", nil, ipv4Addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	go dns.ActivateAndServe(nil, multicast, mux)
-	sendconn, err = net.ListenUDP("udp", sendAddr)
+	err = mdnsClient.Start(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,9 +82,10 @@ func TestSimpleQuery(t *testing.T) {
 			received_addr = resp.Addr
 		}
 	}()
+
 	mdnsClient.SendQuery("test.weave.", dns.TypeA, channel)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(200 * time.Millisecond)
 
 	if !received_addr.Equal(test_addr) {
 		t.Log("Unexpected result for test.weave", received_addr)

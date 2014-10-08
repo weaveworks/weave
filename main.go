@@ -26,20 +26,21 @@ func makeDNSReply(r *dns.Msg, name string, addr net.IP) *dns.Msg {
 	return m
 }
 
-var mdnsClient *weavedns.MDNSClient
+var (
+	mdnsClient *weavedns.MDNSClient
+	mdnsServer *weavedns.MDNSServer
+)
 
 func handleMDNS(w dns.ResponseWriter, r *dns.Msg) {
-	// Here we have to handle both requests incoming, responses to queries
-	// we sent out, and responses to queries that other nodes sent
-	if len(r.Answer) > 0 {
-		mdnsClient.ResponseCallback(r)
-	} else if len(r.Question) > 0 {
+	// Ignore answers to other questions
+	if len(r.Answer) == 0 && len(r.Question) > 0 {
 		q := r.Question[0]
 		ip, err := zone.MatchLocal(q.Name)
 		if err == nil {
 			m := makeDNSReply(r, q.Name, ip)
-			mdnsClient.SendResponse(m)
+			mdnsServer.SendResponse(m)
 		} else if mdnsClient.IsInflightQuery(r) {
+			log.Println("Inflight Query", w.RemoteAddr(), w.LocalAddr())
 			// ignore this - it's our own query received via multicast
 		} else {
 			log.Printf("Failed MDNS lookup for %s", q.Name)
@@ -135,7 +136,14 @@ func main() {
 	} else {
 		log.Printf("Using mDNS on %s", ifaceName)
 	}
-	mdnsClient.Start()
+	err = mdnsClient.Start(iface)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mdnsServer, err = weavedns.NewMDNSServer()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	go dns.ActivateAndServe(nil, conn, MDNSServeMux)
 
