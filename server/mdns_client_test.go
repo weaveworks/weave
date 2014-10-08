@@ -47,13 +47,11 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 }
 
 func RunLocalMulticastServer() (*dns.Server, error) {
-	mux := dns.NewServeMux()
-	mux.HandleFunc("weave", minimalServer)
 	multicast, err := net.ListenMulticastUDP("udp", nil, ipv4Addr)
 	if err != nil {
 		return nil, err
 	}
-	server := &dns.Server{Listener: nil, PacketConn: multicast, Handler: mux}
+	server := &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(minimalServer)}
 	go server.ActivateAndServe()
 	return server, nil
 }
