@@ -6,8 +6,8 @@ SUDO=sudo
 all: docker-image
 
 weaver: ../*.go main.go
-	go get
-	go build -ldflags '-extldflags "-static"'
+	go get -tags netgo
+	go build -ldflags '-extldflags "-static"' -tags netgo
 
 .PHONY: docker-image
 docker-image: /var/tmp/weave.tar
