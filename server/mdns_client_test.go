@@ -84,9 +84,18 @@ func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 type testContext struct {
 	received_addr  net.IP
 	received_count int
+	channel        chan *ResponseA
 }
 
-func (c *testContext) checkResponse(t *testing.T, resp *ResponseA) {
+func newTestContext() *testContext {
+	return &testContext{channel: make(chan *ResponseA, 4)}
+}
+
+func (c *testContext) checkResponse(t *testing.T, channel_ok bool, resp *ResponseA) {
+	if !channel_ok {
+		c.channel = nil
+		return
+	}
 	if resp.err != nil {
 		t.Fatal(resp.err)
 	}
@@ -101,13 +110,12 @@ func TestSimpleQuery(t *testing.T) {
 	defer mdnsClient.Shutdown()
 	defer server.Shutdown()
 
-	var context testContext
-	channel := make(chan *ResponseA, 4)
+	context := newTestContext()
 
 	// First, a test we expect to succeed
-	mdnsClient.SendQuery(success_test_name, dns.TypeA, channel)
-	for resp := range channel {
-		context.checkResponse(t, resp)
+	mdnsClient.SendQuery(success_test_name, dns.TypeA, context.channel)
+	for resp := range context.channel {
+		context.checkResponse(t, true, resp)
 	}
 
 	if !context.received_addr.Equal(test_addr) {
@@ -116,11 +124,10 @@ func TestSimpleQuery(t *testing.T) {
 	}
 
 	// Now, a test we expect to time out with no responses
-	context.received_count = 0
-	channel2 := make(chan *ResponseA, 4)
-	mdnsClient.SendQuery("test2.weave.", dns.TypeA, channel2)
-	for resp := range channel2 {
-		context.checkResponse(t, resp)
+	context = newTestContext()
+	mdnsClient.SendQuery("test2.weave.", dns.TypeA, context.channel)
+	for resp := range context.channel {
+		context.checkResponse(t, true, resp)
 	}
 
 	if context.received_count > 0 {
@@ -135,29 +142,19 @@ func TestParallelQuery(t *testing.T) {
 	defer mdnsClient.Shutdown()
 	defer server.Shutdown()
 
-	var context1 testContext
-	var context2 testContext
-	channel1 := make(chan *ResponseA, 4)
-	channel2 := make(chan *ResponseA, 4)
+	context1 := newTestContext()
+	context2 := newTestContext()
 
-	go mdnsClient.SendQuery(success_test_name, dns.TypeA, channel1)
-	go mdnsClient.SendQuery(success_test_name, dns.TypeA, channel2)
+	go mdnsClient.SendQuery(success_test_name, dns.TypeA, context1.channel)
+	go mdnsClient.SendQuery(success_test_name, dns.TypeA, context2.channel)
 	timeout := time.After(2 * time.Second)
 outerloop:
-	for channel1 != nil || channel2 != nil {
+	for context1.channel != nil || context2.channel != nil {
 		select {
-		case resp, ok := <-channel1:
-			if !ok {
-				channel1 = nil
-				continue
-			}
-			context1.checkResponse(t, resp)
-		case resp, ok := <-channel2:
-			if !ok {
-				channel2 = nil
-				continue
-			}
-			context2.checkResponse(t, resp)
+		case resp, ok := <-context1.channel:
+			context1.checkResponse(t, ok, resp)
+		case resp, ok := <-context2.channel:
+			context2.checkResponse(t, ok, resp)
 		case <-timeout:
 			break outerloop
 		}
