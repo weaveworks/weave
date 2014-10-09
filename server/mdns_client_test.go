@@ -80,46 +80,50 @@ func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 	return mdnsClient, server, err
 }
 
+type testContext struct {
+	received_addr  net.IP
+	received_count int
+}
+
+func (c *testContext) checkResponse(t *testing.T, resp *ResponseA) {
+	if resp.err != nil {
+		t.Fatal(resp.err)
+	}
+	log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
+	c.received_addr = resp.Addr
+	c.received_count++
+}
+
 func TestSimpleQuery(t *testing.T) {
 	log.Println("TestSimpleQuery starting")
 	mdnsClient, server, _ := setup(t)
 	defer mdnsClient.Shutdown()
 	defer server.Shutdown()
 
-	var received_addr net.IP
-
+	var context testContext
 	channel := make(chan *ResponseA, 4)
 
 	// First, a test we expect to succeed
 	mdnsClient.SendQuery(success_test_name, dns.TypeA, channel)
 	for resp := range channel {
-		if resp.err != nil {
-			t.Fatal(resp.err)
-		}
-		log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
-		received_addr = resp.Addr
+		context.checkResponse(t, resp)
 	}
 
-	if !received_addr.Equal(test_addr) {
-		t.Log("Unexpected result for", success_test_name, received_addr)
+	if !context.received_addr.Equal(test_addr) {
+		t.Log("Unexpected result for", success_test_name, context.received_addr)
 		t.Fail()
 	}
 
-	received_response := false
 	// Now, a test we expect to time out with no responses
+	context.received_count = 0
 	channel2 := make(chan *ResponseA, 4)
 	mdnsClient.SendQuery("test2.weave.", dns.TypeA, channel2)
 	for resp := range channel2 {
-		if resp.err != nil {
-			t.Fatal(resp.err)
-		}
-		log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
-		received_addr = resp.Addr
-		received_response = true
+		context.checkResponse(t, resp)
 	}
 
-	if received_response {
-		t.Log("Unexpected result for test2.weave", received_addr)
+	if context.received_count > 0 {
+		t.Log("Unexpected result for test2.weave", context.received_addr)
 		t.Fail()
 	}
 }
