@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"testing"
+	"time"
 )
 
 var (
@@ -124,6 +125,46 @@ func TestSimpleQuery(t *testing.T) {
 
 	if context.received_count > 0 {
 		t.Log("Unexpected result for test2.weave", context.received_addr)
+		t.Fail()
+	}
+}
+
+func TestParallelQuery(t *testing.T) {
+	log.Println("TestParallelQuery starting")
+	mdnsClient, server, _ := setup(t)
+	defer mdnsClient.Shutdown()
+	defer server.Shutdown()
+
+	var context1 testContext
+	var context2 testContext
+	channel1 := make(chan *ResponseA, 4)
+	channel2 := make(chan *ResponseA, 4)
+
+	go mdnsClient.SendQuery(success_test_name, dns.TypeA, channel1)
+	go mdnsClient.SendQuery(success_test_name, dns.TypeA, channel2)
+	timeout := time.After(2 * time.Second)
+outerloop:
+	for channel1 != nil || channel2 != nil {
+		select {
+		case resp, ok := <-channel1:
+			if !ok {
+				channel1 = nil
+				continue
+			}
+			context1.checkResponse(t, resp)
+		case resp, ok := <-channel2:
+			if !ok {
+				channel2 = nil
+				continue
+			}
+			context2.checkResponse(t, resp)
+		case <-timeout:
+			break outerloop
+		}
+	}
+
+	if !context1.received_addr.Equal(test_addr) || !context2.received_addr.Equal(test_addr) || context1.received_count != 1 || context2.received_count != 1 {
+		t.Log("Unexpected result for", success_test_name, context1.received_addr, context2.received_addr, context1.received_count, context2.received_count)
 		t.Fail()
 	}
 }
