@@ -63,8 +63,7 @@ func RunLocalMulticastServer() (*dns.Server, error) {
 	return server, nil
 }
 
-func TestSimpleQuery(t *testing.T) {
-	log.Println("TestSimpleQuery starting")
+func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 	mdnsClient, err := NewMDNSClient()
 	if err != nil {
 		t.Fatal(err)
@@ -73,12 +72,18 @@ func TestSimpleQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer mdnsClient.Shutdown()
 
 	server, err := RunLocalMulticastServer()
 	if err != nil {
 		t.Fatalf("Unable to run test server: %s", err)
 	}
+	return mdnsClient, server, err
+}
+
+func TestSimpleQuery(t *testing.T) {
+	log.Println("TestSimpleQuery starting")
+	mdnsClient, server, _ := setup(t)
+	defer mdnsClient.Shutdown()
 	defer server.Shutdown()
 
 	var received_addr net.IP
