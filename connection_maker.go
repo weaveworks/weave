@@ -133,7 +133,9 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if our_connected_targets[address] {
+		tcpAddr, err := net.ResolveTCPAddr("tcp4", address)
+		ipAddr := tcpAddr.String()
+		if err == nil && our_connected_targets[ipAddr] {
 			delete(cm.targets, address)
 			continue
 		}
