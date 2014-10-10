@@ -69,11 +69,6 @@ func StartServer(ifaceName string, dnsPort int, httpPort int, wait int) error {
 	var zone = new(ZoneDb)
 	go ListenHttp(zone)
 
-	var (
-		mdnsClient *MDNSClient
-		mdnsServer *MDNSServer
-	)
-
 	var iface *net.Interface = nil
 	if ifaceName != "" {
 		var err error
@@ -83,11 +78,7 @@ func StartServer(ifaceName string, dnsPort int, httpPort int, wait int) error {
 		}
 	}
 
-	LocalServeMux := dns.NewServeMux()
-	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler(zone, mdnsClient))
-
-	var err error
-	mdnsClient, err = NewMDNSClient()
+	mdnsClient, err := NewMDNSClient()
 	if err != nil {
 		log.Fatal(err)
 	} else {
@@ -97,7 +88,11 @@ func StartServer(ifaceName string, dnsPort int, httpPort int, wait int) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	mdnsServer, err = NewMDNSServer(zone)
+
+	LocalServeMux := dns.NewServeMux()
+	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler(zone, mdnsClient))
+
+	mdnsServer, err := NewMDNSServer(zone)
 	if err != nil {
 		log.Fatal(err)
 	}
