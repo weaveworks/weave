@@ -6,8 +6,15 @@ SUDO=sudo
 all: docker-image
 
 weaver: ../*.go main.go
-	go get
-	go build -ldflags '-extldflags "-static"'
+	go get -tags netgo
+	go build -ldflags '-extldflags "-static"' -tags netgo
+	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
+		rm $@; \
+		echo "\nYour go standard library was built without the 'netgo' build tag."; \
+		echo "To fix that, run"; \
+		echo "    sudo go install -a -tags netgo std"; \
+		false; \
+	}
 
 .PHONY: docker-image
 docker-image: /var/tmp/weave.tar

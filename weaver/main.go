@@ -127,7 +127,11 @@ func main() {
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
 	router.Start()
 	for _, peer := range peers {
-		router.ConnectionMaker.InitiateConnection(peer)
+		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+			router.ConnectionMaker.InitiateConnection(addr.String())
+		} else {
+			log.Fatal(err)
+		}
 	}
 	go handleHttp(router)
 	handleSignals(router)
