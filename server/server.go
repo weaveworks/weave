@@ -39,6 +39,14 @@ func findInterface(ifaceName string) (iface *net.Interface, err error) {
 	return
 }
 
+func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
+	m := new(dns.Msg)
+	m.SetReply(r)
+	m.RecursionAvailable = true
+	m.Rcode = dns.RcodeNameError
+	return m
+}
+
 func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
@@ -61,6 +69,20 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 			mdnsClient.SendQuery(q.Name, dns.TypeA, channel)
 		}
 		return
+	}
+}
+
+func notUsHandler() dns.HandlerFunc {
+	return func(w dns.ResponseWriter, r *dns.Msg) {
+		q := r.Question[0]
+		addrs, err := net.LookupIP(q.Name)
+		if err == nil {
+			m := makeDNSReply(r, q.Name, addrs[0])
+			w.WriteMsg(m)
+		} else {
+			m := makeDNSFailResponse(r)
+			w.WriteMsg(m)
+		}
 	}
 }
 
@@ -91,6 +113,7 @@ func StartServer(ifaceName string, dnsPort int, httpPort int, wait int) error {
 
 	LocalServeMux := dns.NewServeMux()
 	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler(zone, mdnsClient))
+	LocalServeMux.HandleFunc(".", notUsHandler())
 
 	mdnsServer, err := NewMDNSServer(zone)
 	if err != nil {

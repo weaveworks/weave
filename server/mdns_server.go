@@ -27,6 +27,7 @@ func NewMDNSServer(zone *ZoneDb) (*MDNSServer, error) {
 func makeDNSReply(r *dns.Msg, name string, addr net.IP) *dns.Msg {
 	m := new(dns.Msg)
 	m.SetReply(r)
+	m.RecursionAvailable = true
 	hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeA,
 		Class: dns.ClassINET, Ttl: 3600}
 	a := &dns.A{hdr, addr}
