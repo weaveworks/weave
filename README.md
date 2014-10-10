@@ -85,8 +85,9 @@ We repeat similar steps on $HOST2...
 The only difference, apart from the choice of IP addresses for the
 weave router and the application container, is that we tell our weave
 that it should peer with the weave on $HOST1 (specified as the IP
-address by which $HOST2 can reach it). NB: if there is a firewall
-between $HOST1 and $HOST2, you must open port 6783 for TCP and UDP.
+address or hostname by which $HOST2 can reach it). NB: if there is a
+firewall between $HOST1 and $HOST2, you must open port 6783 for TCP
+and UDP.
 
 Note that we could instead have told the weave on $HOST1 to connect to
 $HOST2, or told both about each other. Order does not matter here;
