@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <title>Weave by zettio</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>Weave</h1>
+        <h2>The Docker Network</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/zettio/weave/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/zettio/weave/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/zettio/weave" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>
+<a name="weave---the-docker-network" class="anchor" href="#weave---the-docker-network"><span class="octicon octicon-link"></span></a>Weave - the Docker network</h1>
+
+<p>Weave creates a virtual network that connects Docker containers
+deployed across multiple hosts.</p>
+
+<p><img src="/docs/virtual-network.png?raw=true" alt="Weave Virtual Network" title="Weave Virtual Network"></p>
+
+<p>Applications use the network just as if the containers were all
+plugged into the same network switch, with no need to configure port
+mappings, links, etc. Services provided by application containers on
+the weave network can be made accessible to the outside world,
+regardless of where those containers are running. Similarly, existing
+internal systems can be exposed to application containers irrespective
+of their location.</p>
+
+<p><img src="/docs/deployment.png?raw=true" alt="Weave Deployment" title="Weave Deployment"></p>
+
+<p>Weave can traverse firewalls and operate in partially connected
+networks. Traffic can be encrypted, allowing hosts to be connected
+across an untrusted network.</p>
+
+<p>With weave you can easily construct applications consisting of
+multiple containers, running anywhere.</p>
+
+<p>Weave works alongside Docker's existing (single host) networking
+capabilities, so these can continue to be used by containers.</p>
+
+<h2>
+<a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>To run weave on a host, you need to install...</p>
+
+<ol>
+<li>docker. We've tested with versions 0.9.1 through 1.2.0, but other
+versions should work too.</li>
+<li>
+<p>weave. Install this with</p>
+
+<pre><code>sudo wget -O /usr/local/bin/weave \
+  https://raw.githubusercontent.com/zettio/weave/master/weaver/weave
+sudo chmod a+x /usr/local/bin/weave
+</code></pre>
+</li>
+<li><p>(recommended) ethtool. On many systems this is installed already;
+if not then grab it via your favourite package manager. On some
+systems, weave application container networking may not operate
+correctly unless ethtool is available.</p></li>
+<li><p>(optional) conntrack. Install this via your favourite package
+manager. Without conntrack, the weave network may not re-establish
+itself fully when individual weave instances are stopped (with
+<code>weave stop</code>) and restarted quickly (typically within ~3 minutes).</p></li>
+</ol>
+
+<h2>
+<a name="example" class="anchor" href="#example"><span class="octicon octicon-link"></span></a>Example</h2>
+
+<p>Say you have docker running on two hosts, accessible to each other as
+$HOST1 and $HOST2, and want to deploy an application consisting of two
+containers, one on each host.</p>
+
+<p>On $HOST1 run (as root)</p>
+
+<pre><code>host1# weave launch 10.0.0.1/16
+host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu)
+</code></pre>
+
+<p>The first line starts the weave router, in a container. This needs to
+be done once on each host. We tell weave that its IP address should
+be 10.0.0.1, and that the weave network is on 10.0.0.0/16.</p>
+
+<p>The second line starts our application container. We give it an IP
+address and network (a subnet of the weave network). <code>weave run</code>
+invokes <code>docker run -d</code> with all the parameters following the IP
+address and netmask. So we could be launching any container this way;
+here we just take a stock ubuntu container and launch a shell in it.</p>
+
+<p>If our application consists of more than one container on this host we
+simply launch them with a variation on that second line.</p>
+
+<p>The IP addresses and netmasks can be anything you like which doesn't
+conflict with any IP ranges of 'external' services the hosts or your
+containers need to connect to. The same IP range must be used
+everywhere, and the individual IP addresses must, of course, be
+unique.</p>
+
+<p>We repeat similar steps on $HOST2...</p>
+
+<pre><code>host2# weave launch 10.0.0.2/16 $HOST1
+host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu)
+</code></pre>
+
+<p>The only difference, apart from the choice of IP addresses for the
+weave router and the application container, is that we tell our weave
+that it should peer with the weave on $HOST1 (specified as the IP
+address by which $HOST2 can reach it). NB: if there is a firewall
+between $HOST1 and $HOST2, you must open port 6783 for TCP and UDP.</p>
+
+<p>Note that we could instead have told the weave on $HOST1 to connect to
+$HOST2, or told both about each other. Order does not matter here;
+weave automatically (re)connects to peers when they become
+available. Also, we can tell weave to connect to multiple peers by
+supplying multiple addresses, separated by spaces. And we can
+<a href="#dynamic-topologies">add peers dynamically</a>.</p>
+
+<p>Now that we've got everything set up, let's see whether our containers
+can talk to each other...</p>
+
+<p>On $HOST1...</p>
+
+<pre><code>host1# docker attach $C
+root@28841bd02eff:/# ping -c 1 -q 10.0.1.2
+PING 10.0.1.2 (10.0.1.2): 48 data bytes
+--- 10.0.1.2 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 1.048/1.048/1.048/0.000 ms
+</code></pre>
+
+<p>Similarly, on $HOST2...</p>
+
+<pre><code>host2# docker attach $C
+root@f76829496120:/# ping -c 1 -q 10.0.1.1
+PING 10.0.1.1 (10.0.1.1): 48 data bytes
+--- 10.0.1.1 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 1.034/1.034/1.034/0.000 ms
+</code></pre>
+
+<p>So there we have it, two containers on separate hosts happily talking
+to each other.</p>
+
+<h2>
+<a name="features" class="anchor" href="#features"><span class="octicon octicon-link"></span></a>Features</h2>
+
+<p>Weave has a few more features beyond those illustrated by the basic
+example above...</p>
+
+<h3>
+<a name="virtual-ethernet-switch" class="anchor" href="#virtual-ethernet-switch"><span class="octicon octicon-link"></span></a>Virtual Ethernet Switch</h3>
+
+<p>To application containers, the network established by weave looks
+like a giant Ethernet switch to which all the containers are
+connected.</p>
+
+<p>Containers can easily access services from each other; e.g. in the
+container on $HOST1 we can start a netcat "service" with</p>
+
+<pre><code>root@28841bd02eff:/# nc -lk -p 4422
+</code></pre>
+
+<p>and then connect to it from the container on $HOST2 with</p>
+
+<pre><code>root@f76829496120:/# echo 'Hello, world.' | nc 10.0.1.1 4422
+</code></pre>
+
+<p>Note that <em>any</em> protocol is supported. Doesn't even have to be over
+TCP/IP, e.g. a netcat UDP service would be run with</p>
+
+<pre><code>root@28841bd02eff:/# nc -lu -p 5533
+
+root@f76829496120:/# echo 'Hello, world.' | nc -u 10.0.1.1 5533
+</code></pre>
+
+<p>We can deploy the entire arsenal of standard network tools and
+applications, developed over decades, to configure, secure, monitor,
+and troubleshoot our container network. To put it another way, we can
+now re-use the same tools and techniques when deploying applications
+as containers as we would have done when deploying them 'on metal' in
+our data centre.</p>
+
+<h3>
+<a name="application-isolation" class="anchor" href="#application-isolation"><span class="octicon octicon-link"></span></a>Application isolation</h3>
+
+<p>A single weave network can host multiple, isolated applications, with
+each application's containers being able to communicate with each
+other but not containers of other applications.</p>
+
+<p>To accomplish that, we assign each application a different subnet. So,
+in the above example, if we wanted to add another application similar
+to, but isolated from, our first, we'd launch the containers with...</p>
+
+<pre><code>host1# D=$(weave run 10.0.2.1/24 -t -i ubuntu)
+host2# D=$(weave run 10.0.2.2/24 -t -i ubuntu)
+</code></pre>
+
+<p>A quick 'ping' test in the containers confirms that they can talk to
+each other but not the containers of our first application...</p>
+
+<pre><code>host1# docker attach $D
+
+root@da50502598d5:/# ping -c 1 -q 10.0.2.2
+PING 10.0.2.2 (10.0.2.2): 48 data bytes
+--- 10.0.2.2 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.562/0.562/0.562/0.000 ms
+
+root@da50502598d5:/# ping -c 1 -q 10.0.1.1
+PING 10.0.1.1 (10.0.1.1) 56(84) bytes of data.
+--- 10.0.1.1 ping statistics ---
+1 packets transmitted, 0 received, 100% packet loss, time 0ms
+
+root@da50502598d5:/# ping -c 1 -q 10.0.1.2
+PING 10.0.1.2 (10.0.1.2) 56(84) bytes of data.
+--- 10.0.1.2 ping statistics ---
+1 packets transmitted, 0 received, 100% packet loss, time 0ms
+</code></pre>
+
+<p>This isolation-through-subnets scheme is an example of carrying over a
+well-known technique from the 'on metal' days to containers.</p>
+
+<h3>
+<a name="dynamic-network-attachment" class="anchor" href="#dynamic-network-attachment"><span class="octicon octicon-link"></span></a>Dynamic network attachment</h3>
+
+<p>In some scenarios containers are started independently, e.g. via some
+existing tool chain, or require more complex startup sequences than
+provided by <code>weave run</code>. And sometimes the decision which application
+network a container should be part of is made post-startup. For these
+situations, weave allows an existing, running container to be attached
+to the weave network. To illustrate, we can achieve the same effect as
+the first example with</p>
+
+<pre><code>host1# C=$(docker run -d -t -i ubuntu)
+host1# weave attach 10.0.1.1/24 $C
+</code></pre>
+
+<p>There is a matching <code>weave detach</code> command:</p>
+
+<pre><code>host1# weave detach 10.0.1.1/24 $C
+</code></pre>
+
+<p>You can detach a container from one application network and attach it
+to another:</p>
+
+<pre><code>host1# weave detach 10.0.1.1/24 $C
+host1# weave attach 10.0.2.1/24 $C
+</code></pre>
+
+<p>or attach a container to multiple application networks, effectively
+sharing it between applications:</p>
+
+<pre><code>host1# weave attach 10.0.1.1/24 $C
+host1# weave attach 10.0.2.1/24 $C
+</code></pre>
+
+<h3>
+<a name="security" class="anchor" href="#security"><span class="octicon octicon-link"></span></a>Security</h3>
+
+<p>In order to connect containers across untrusted networks, weave peers
+can be told to encrypt traffic by supplying a <code>-password</code> option when
+launching weave, e.g.</p>
+
+<pre><code>host1# weave launch 10.0.0.1/16 -password wEaVe
+</code></pre>
+
+<p>The same password must be specified for all weave peers; it is a
+component in the creation of ephemeral session keys for connections
+between peers.</p>
+
+<h3>
+<a name="host-network-integration" class="anchor" href="#host-network-integration"><span class="octicon octicon-link"></span></a>Host network integration</h3>
+
+<p>Weave application networks can be integrated with a host's network,
+establishing connectivity between the host and application containers
+anywhere.</p>
+
+<p>Let's say that in our example we want $HOST2 to have access to the
+application containers. On $HOST2 we run</p>
+
+<pre><code>host2# weave expose 10.0.1.102/24
+</code></pre>
+
+<p>choosing an unused IP address in the application subnet. (There is a
+corresponding 'hide' command to revert this step.)</p>
+
+<p>Now</p>
+
+<pre><code>host2# ping 10.0.1.2
+</code></pre>
+
+<p>will work. And, more interestingly,</p>
+
+<pre><code>host2# ping 10.0.1.1
+</code></pre>
+
+<p>will work too, which is talking to a container that resides on $HOST1.</p>
+
+<h3>
+<a name="service-export" class="anchor" href="#service-export"><span class="octicon octicon-link"></span></a>Service export</h3>
+
+<p>Services running in containers on a weave network can be made
+accessible to the outside world (and, more generally, other networks)
+from any weave host, irrespective of where the service containers are
+located.</p>
+
+<p>Say we want to make our example netcat "service", which is running in
+a container on $HOST1, accessible to the outside world via $HOST2.</p>
+
+<p>First we need to expose the application network to $HOST2, as
+explained <a href="#host-network-integration">above</a>, i.e.</p>
+
+<pre><code>host2# weave expose 10.0.1.102/24
+</code></pre>
+
+<p>Then we add a NAT rule to route from the outside world to the
+destination container service.</p>
+
+<pre><code>host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
+       -j DNAT --to-destination 10.0.1.1:4422
+</code></pre>
+
+<p>Here we are assuming that the "outside world" is connecting to $HOST2
+via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
+routed to our 'nc' service, which is running on port 4422 in the
+container with IP 10.0.1.1.</p>
+
+<p>With the above in place, we can connect to our 'nc' service from
+anywhere with</p>
+
+<pre><code>echo 'Hello, world.' | nc $HOST2 2211
+</code></pre>
+
+<p>(NB: due to the way routing is handled in the Linux kernel, this won't
+work when run <em>on</em> $HOST2.)</p>
+
+<p>Similar NAT rules to the above can used to expose services not just to
+the outside world but also other, internal, networks.</p>
+
+<h3>
+<a name="service-import" class="anchor" href="#service-import"><span class="octicon octicon-link"></span></a>Service import</h3>
+
+<p>Applications running in containers on a weave network can be given
+access to services which are only reachable from certain weave hosts,
+irrespective of where the application containers are located.</p>
+
+<p>Say that, as an extension of our example, we have a netcat service
+running on $HOST3, port 2211, and that $HOST3 is not part of the weave
+network and is only reachable from $HOST1, not $HOST2. Nevertheless we
+want to make the service accessible to an application running in a
+container on $HOST2.</p>
+
+<p>First we need to expose the application network to the host, as
+explained <a href="#host-network-integration">above</a>, this time on $HOST1,
+i.e.</p>
+
+<pre><code>host1# weave expose 10.0.1.101/24
+</code></pre>
+
+<p>Then we add a NAT rule to route from the above IP to the destination
+service.</p>
+
+<pre><code>host1# iptables -t nat -A PREROUTING -p tcp -d 10.0.1.101 --dport 3322 \
+       -j DNAT --to-destination $HOST3:2211
+</code></pre>
+
+<p>This allows any application container to reach the service by
+connecting to 10.0.1.101:3322. So if $HOST3 is indeed running a netcat
+service on port 2211, e.g.</p>
+
+<pre><code>host3# nc -kl 2211
+</code></pre>
+
+<p>then we can connect to it from our application container on $HOST2 with</p>
+
+<pre><code>root@f76829496120:/# echo 'Hello, world.' | nc 10.0.1.101 3322
+</code></pre>
+
+<p>The same command will work from any application container.</p>
+
+<h3>
+<a name="service-binding" class="anchor" href="#service-binding"><span class="octicon octicon-link"></span></a>Service binding</h3>
+
+<p>Importing a service provides a degree of indirection that allows late
+and dynamic binding, similar to what can be achieved with a proxy. In
+our example, application containers are unaware that the service they
+are accessing at <code>10.0.1.101:3322</code> is in fact residing on
+<code>$HOST3:2211</code>. We can point application containers at another service
+location by changing the above NAT rule, without having to alter the
+applications themselves.</p>
+
+<h3>
+<a name="service-routing" class="anchor" href="#service-routing"><span class="octicon octicon-link"></span></a>Service routing</h3>
+
+<p>The <a href="#service-export">service export</a> and
+<a href="#service-import">service import</a> features can be combined to
+establish connectivity between applications and services residing on
+disjoint networks, even when those networks are separated by firewalls
+and might have overlapping IP ranges. Each network imports its
+services into weave, and in turn exports from weave services required
+by its applications. There are no application containers in this
+scenario (though of course there could be); weave is acting purely as
+an address translation and routing facility, using the weave
+application network as an intermediary.</p>
+
+<p>In our example above, the netcat service on $HOST3 is imported into
+weave via $HOST1. We can export it on $HOST2 by first exposing the
+application network with</p>
+
+<pre><code>host2# weave expose 10.0.1.102/24
+</code></pre>
+
+<p>and then adding a NAT rule which routes traffic from the $HOST2
+network (i.e. anything which can connect to $HOST2) to the service
+endpoint in the weave network</p>
+
+<pre><code>host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
+       -j DNAT --to-destination 10.0.1.101:3322
+</code></pre>
+
+<p>Now any host on the same network as $HOST2 can access the service with</p>
+
+<pre><code>echo 'Hello, world.' | nc $HOST2 4433
+</code></pre>
+
+<p>Furthermore, as explained in <a href="#service-binding">service-binding</a>, we
+can dynamically alter the service locations without having to touch
+the applications that access them, e.g. we could move the example
+netcat service to $HOST4:2211 while retaining its 10.0.1.101:3322
+endpoint in the weave network.</p>
+
+<h3>
+<a name="multi-cloud-networking" class="anchor" href="#multi-cloud-networking"><span class="octicon octicon-link"></span></a>Multi-cloud networking</h3>
+
+<p>Weave can network containers hosted in different cloud providers /
+data centres. So, for example, one could run an application consisting
+of containers on GCE, EC2 and in local data centres.</p>
+
+<p>To enable this, the network must be configured to permit TCP and UDP
+connections to port 6783 of the docker hosts.</p>
+
+<h3>
+<a name="multi-hop-routing" class="anchor" href="#multi-hop-routing"><span class="octicon octicon-link"></span></a>Multi-hop routing</h3>
+
+<p>A network of containers across more than two hosts can be established
+even when there is only partial connectivity between the hosts. Weave
+is able to route traffic between containers as long as there is at
+least one <em>path</em> of connected hosts between them.</p>
+
+<p>So, for example, if a docker host in a local data centre can connect
+to hosts in GCE and EC2, but the latter two cannot connect to each
+other, containers in the latter two can still communicate; weave will
+route the traffic via the local data centre.</p>
+
+<h3>
+<a name="dynamic-topologies" class="anchor" href="#dynamic-topologies"><span class="octicon octicon-link"></span></a>Dynamic topologies</h3>
+
+<p>To add a host to an existing weave network, one simply launches
+weave on the host, supplying the address of at least one existing
+host. Weave will automatically discover the other hosts in the other
+network and establish connections to them if it can (in order to avoid
+unnecessary multi-hop routing).</p>
+
+<h3>
+<a name="container-mobility" class="anchor" href="#container-mobility"><span class="octicon octicon-link"></span></a>Container mobility</h3>
+
+<p>Containers can be moved between hosts without requiring any
+reconfiguration or, in many cases, restarts of other containers. All
+that is required is for the migrated container to be started with the
+same IP address as it was given originally.</p>
+
+<h3>
+<a name="fault-tolerance" class="anchor" href="#fault-tolerance"><span class="octicon octicon-link"></span></a>Fault tolerance</h3>
+
+<p>Weave peers continually exchange topology information, and monitor
+and (re)establish network connections to other peers. So if hosts or
+networks fail, weave can "route around" the problem. This includes
+network partitions; containers on either side of a partition can
+continue to communicate, with full connectivity being restored when
+the partition heals.</p>
+
+<p>The weave container is very light-weight - just over 8MB image size
+and a few 10s of MBs of runtime memory - and disposable. I.e. should
+weave ever run into difficulty, one can simply stop it (with <code>weave
+stop</code>) and restart it. Application containers do <em>not</em> have to be
+restarted in that event, and indeed may not even experience a
+temporary connectivity failure if the weave container is restarted
+quickly enough.</p>
+
+<h2>
+<a name="troubleshooting" class="anchor" href="#troubleshooting"><span class="octicon octicon-link"></span></a>Troubleshooting</h2>
+
+<p>Make sure you are running the latest version - you can download it
+with</p>
+
+<pre><code>docker pull zettio/weave
+</code></pre>
+
+<p>Check the weave container logs with</p>
+
+<pre><code>docker logs weave
+</code></pre>
+
+<p>A reasonable amount of information, and all errors, get logged there.</p>
+
+<p>The log verbosity can be increased by supplying the <code>-debug</code> flag when
+launching weave. Be warned, this will log information on a per-packet
+basis, so can produce a lot of output.</p>
+
+<p>One can ask a weave router to report its status with</p>
+
+<pre><code>weave status
+</code></pre>
+
+<p>To stop weave, run</p>
+
+<pre><code>weave stop
+</code></pre>
+
+<p>Note that this leaves the local application container network intact;
+containers on the local host can continue to communicate, whereas
+communication with containers on different hosts, as well as service
+export/import, is disrupted but resumes when weave is relaunched.</p>
+
+<p>To stop weave and completely remove all traces of the weave network on
+the local host, run</p>
+
+<pre><code>weave reset
+</code></pre>
+
+<p>Any running application containers will permanently lose connectivity
+with the weave network and have to be restarted in order to
+re-connect.</p>
+
+<h3>
+<a name="reboots" class="anchor" href="#reboots"><span class="octicon octicon-link"></span></a>Reboots</h3>
+
+<p>When a host reboots, docker's default behaviour is to restart any
+containers that were running. Since weave relies on special network
+configuration outside of the containers, the weave network will not
+function in this state.</p>
+
+<p>To remedy this, stop and re-launch the weave container, and re-attach
+the application containers with <code>weave attach</code>.</p>
+
+<p>For a more permanent solution,
+<a href="https://docs.docker.com/articles/host_integration/">disable Docker's auto-restart feature</a>
+and create appropriate startup scripts to launch weave and run
+application containers from your favourite process manager.</p>
+
+<h2>
+<a name="installation-with-boot2docker" class="anchor" href="#installation-with-boot2docker"><span class="octicon octicon-link"></span></a>Installation with Boot2Docker</h2>
+
+<p>If you are running Docker inside the Boot2Docker VM, e.g. because you
+are on a Mac, then the following changes are required to these
+instructions:</p>
+
+<p>Assuming you have fetched the 'weave' script via curl or similar, and
+it is in the current directory, transfer it to the Boot2Docker VM and
+make it executable like this:</p>
+
+<pre><code>host1$ boot2docker ssh "cat &gt; weave" &lt; weave
+host1$ boot2docker ssh "chmod a+x weave"
+</code></pre>
+
+<p>Then, if we were trying to create the same containers as in the first
+example above, the 'launch' command would be run like this:</p>
+
+<pre><code>host1$ boot2docker ssh "sudo ./weave launch 10.0.0.1/16"
+</code></pre>
+
+<p>and the 'run' command like this:</p>
+
+<pre><code>host1# C=$(boot2docker ssh "sudo ./weave run 10.0.1.1/24 -t -i ubuntu")
+</code></pre>
+
+<h2>
+<a name="building" class="anchor" href="#building"><span class="octicon octicon-link"></span></a>Building</h2>
+
+<p>(NB. This is only necessary if you want to work on weave. Also, these
+instructions have only been tested on Ubuntu.)</p>
+
+<p>To build weave you need <code>libpcap-dev</code> and <code>docker</code> installed. And <code>go</code>
+(and <code>git</code> and <code>hg</code> to fetch dependencies).</p>
+
+<p>The package name is <code>github.com/zettio/weave</code>, so assuming <code>$GOPATH</code>
+is set:</p>
+
+<pre><code>$ cd $GOPATH
+$ WEAVE=github.com/zettio/weave
+$ git clone https://$WEAVE src/$WEAVE
+$ cd src/$WEAVE
+</code></pre>
+
+<p>Then simply run</p>
+
+<pre><code>$ make -C weaver
+</code></pre>
+
+<p>This will build the weave router, produce a docker image
+<code>zettio/weave</code> and export that image to /tmp/weave.tar</p>
+
+<h2>
+<a name="how-does-it-work" class="anchor" href="#how-does-it-work"><span class="octicon octicon-link"></span></a>How does it work?</h2>
+
+<p>Weave creates a network bridge on the host. Each container is
+connected to that bridge via a veth pair, the container side of which
+is given the IP address &amp; netmask supplied in 'weave run'. Also
+connected to the bridge is the weave router container, which is given
+the IP address &amp; netmask supplied in 'weave launch'.</p>
+
+<p>A weave router captures Ethernet packets from its bridge-connected
+interface in promiscuous mode, using 'pcap'. This typically excludes
+traffic between local containers, and between the host and local
+containers, all of which is routed straight over the bridge by the
+kernel. Captured packets are forwarded over UDP to weave router peers
+running on other hosts. On receipt of such a packet, a router injects
+the packet on its bridge interface using 'pcap' and/or forwards the
+packet to peers.</p>
+
+<p>Weave routers learn which peer host a particular MAC address resides
+on. They combine this knowledge with topology information in order to
+make routing decisions and thus avoid forwarding every packet to every
+peer. The topology information captures which peers are connected to
+which other peers; weave can route packets in partially connected
+networks with changing topology.</p>
+
+<p>Weave routers establish TCP connections to each other, over which they
+perform a protocol handshake and subsequently exchange topology
+information. These connections are encrypted if so configured. Peers
+also establish UDP "connections", possibly encrypted, for the
+aforementioned packet forwarding. These "connections" are duplex and
+can traverse firewalls.</p>
+
+<p>More details on the inner workings of weave can be found in the
+<a href="docs/architecture.txt">architecture documentation</a>.</p>
+
+<h2>
+<a name="contact-us" class="anchor" href="#contact-us"><span class="octicon octicon-link"></span></a>Contact Us</h2>
+
+<p>Found a bug, want to suggest a feature, or have a question?
+<a href="https://github.com/zettio/weave/issues">File an issue</a>, or email
+<a href="mailto:weave@zett.io">weave@zett.io</a>. When reporting a bug, please include which version of
+weave you are running, as shown by <code>weave version</code>.</p>
+
+<p>Follow weave on Twitter:
+<a href="https://twitter.com/weavenetwork">@weavenetwork</a>.</p>
+
+<p>Read the Weave blog:
+<a href="http://weaveblog.com/">Weaveblog</a>.</p>
+
+<p>Discuss weave on
+<a href="https://news.ycombinator.com/item?id=8289786">Hacker News</a>.</p>
+      </section>
+    </div>
+
+    
+  </body>
+</html>
