@@ -120,6 +120,13 @@ Similarly, on $HOST2...
 So there we have it, two containers on separate hosts happily talking
 to each other.
 
+## Find out more
+
+ * [Documentation homepage](http://zettio.github.io/weave/)
+ * [Troubleshooting](http://zettio.github.io/weave/troubleshooting.html)
+ * [Building](http://zettio.github.io/weave/building.html)
+ * [How it works](http://zettio.github.io/weave/how-it-works.html)
+
 ## Contact Us
 
 Found a bug, want to suggest a feature, or have a question?
