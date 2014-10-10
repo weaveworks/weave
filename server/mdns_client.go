@@ -12,7 +12,7 @@ import (
 const (
 	ipv4mdns    = "224.0.0.251" // link-local multicast address
 	mdnsPort    = 5353          // mDNS assigned port
-	mDNSTimeout = time.Second
+	mDNSTimeout = 200 * time.Millisecond
 	MaxDuration = time.Duration(math.MaxInt64)
 )
 
