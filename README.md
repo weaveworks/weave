@@ -36,6 +36,7 @@ To run weave on a host, you need to install...
         sudo wget -O /usr/local/bin/weave \
           https://raw.githubusercontent.com/zettio/weave/master/weaver/weave
         sudo chmod a+x /usr/local/bin/weave
+	/usr/bin/docker pull zettio/weave
 
 3. (recommended) ethtool. On many systems this is installed already;
    if not then grab it via your favourite package manager. On some
@@ -47,6 +48,18 @@ To run weave on a host, you need to install...
    itself fully when individual weave instances are stopped (with
    `weave stop`) and restarted quickly (typically within ~3 minutes).
 
+Alternately, one can use a configuration management tool to handle 
+these tasks.  If you use puppet, checkout these modules:
+
+	https://forge.puppetlabs.com/garethr/docker
+	https://github.com/garethr/garethr-docker
+	https://github.com/hesco/hesco-weave 
+
+With those two modules (and their few dependencies), the installation 
+of docker and weave can be managed with a few lines of DSL, and a handful 
+of values set in /etc/puppet/hieradata/.  See the documentation in those 
+modules for the details.  
+
 ## Example
 
 Say you have docker running on two hosts, accessible to each other as
@@ -55,14 +68,18 @@ containers, one on each host.
 
 On $HOST1 run (as root)
 
+    host2# export WEAVE_DOCKER_ARGS='--memory=1gb'
     host1# weave launch 10.0.0.1/16
     host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu)
 
-The first line starts the weave router, in a container. This needs to
+The first line sets additional arguments intended to be passed along 
+to the `docker run` command which launches the weave container.  
+
+The next line starts the weave router, in a container. This needs to
 be done once on each host. We tell weave that its IP address should
 be 10.0.0.1, and that the weave network is on 10.0.0.0/16.
 
-The second line starts our application container. We give it an IP
+The third line starts our application container. We give it an IP
 address and network (a subnet of the weave network). `weave run`
 invokes `docker run -d` with all the parameters following the IP
 address and netmask. So we could be launching any container this way;
@@ -79,6 +96,8 @@ unique.
 
 We repeat similar steps on $HOST2...
 
+    host2# export HOST1='<host1_ip_routable_from_host2>'
+    host2# export WEAVE_DOCKER_ARGS='--memory=1gb'
     host2# weave launch 10.0.0.2/16 $HOST1
     host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu)
 
