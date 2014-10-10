@@ -7,11 +7,7 @@ import (
 	"net/http"
 )
 
-const (
-	UPDATE_PORT = 6785
-)
-
-func ListenHttp(db Zone) {
+func ListenHttp(db Zone, port int) {
 	http.HandleFunc("/add", func(w http.ResponseWriter, r *http.Request) {
 		name := r.FormValue("name")
 		addr := r.FormValue("ip")
@@ -31,7 +27,7 @@ func ListenHttp(db Zone) {
 			log.Printf("Invalid request: %s, %s, %s", name, addr, weave_cidr)
 		}
 	})
-	address := fmt.Sprintf(":%d", UPDATE_PORT)
+	address := fmt.Sprintf(":%d", port)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
 		log.Fatal("Unable to create http listener: ", err)

@@ -1,6 +1,8 @@
 package weavedns
 
 import (
+	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,11 +18,13 @@ func TestHttp(t *testing.T) {
 	)
 
 	var zone = new(ZoneDb)
-	go ListenHttp(zone)
+	port := rand.Intn(10000) + 32768
+	fmt.Println("Http test on port", port)
+	go ListenHttp(zone, port)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
-	resp, err := http.PostForm("http://localhost:6785/add",
+	resp, err := http.PostForm(fmt.Sprintf("http://localhost:%d/add", port),
 		url.Values{"name": {success_test_name}, "ip": {docker_ip}, "weave_cidr": {test_addr1}})
 	if err != nil {
 		t.Fatal(err)
