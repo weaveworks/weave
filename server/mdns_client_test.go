@@ -118,8 +118,8 @@ func TestSimpleQuery(t *testing.T) {
 		context.checkResponse(t, true, resp)
 	}
 
-	if !context.received_addr.Equal(test_addr) {
-		t.Log("Unexpected result for", success_test_name, context.received_addr)
+	if !context.received_addr.Equal(test_addr) || context.received_count != 1 {
+		t.Log("Unexpected result for", success_test_name, context.received_addr, context.received_count)
 		t.Fail()
 	}
 
