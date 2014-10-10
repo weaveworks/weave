@@ -24,14 +24,18 @@ func NewMDNSServer(zone *ZoneDb) (*MDNSServer, error) {
 	return retval, nil
 }
 
-func makeDNSReply(r *dns.Msg, name string, addr net.IP) *dns.Msg {
+func makeDNSReply(r *dns.Msg, name string, addrs []net.IP) *dns.Msg {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.RecursionAvailable = true
-	hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeA,
-		Class: dns.ClassINET, Ttl: 3600}
-	a := &dns.A{hdr, addr}
-	m.Answer = append(m.Answer, a)
+	m.Answer = make([]dns.RR, len(addrs))
+	for i, addr := range addrs {
+		if ip4 := addr.To4(); ip4 != nil {
+			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeA,
+				Class: dns.ClassINET, Ttl: 3600}
+			m.Answer[i] = &dns.A{hdr, addr}
+		}
+	}
 	return m
 }
 
@@ -56,7 +60,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 			q := r.Question[0]
 			ip, err := s.zone.MatchLocal(q.Name)
 			if err == nil {
-				m := makeDNSReply(r, q.Name, ip)
+				m := makeDNSReply(r, q.Name, []net.IP{ip})
 				s.SendResponse(m)
 			} else if s.addrIsLocal(w.RemoteAddr()) {
 				// ignore this - it's our own query received via multicast

@@ -52,7 +52,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		q := r.Question[0]
 		ip, err := zone.MatchLocal(q.Name)
 		if err == nil {
-			m := makeDNSReply(r, q.Name, ip)
+			m := makeDNSReply(r, q.Name, []net.IP{ip})
 			w.WriteMsg(m)
 		} else {
 			log.Printf("Failed lookup for %s; sending mDNS query", q.Name)
@@ -62,7 +62,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 				// Loop terminates when channel is closed by MDNSClient on timeout
 				for resp := range channel {
 					log.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
-					m := makeDNSReply(r, resp.Name, resp.Addr)
+					m := makeDNSReply(r, resp.Name, []net.IP{resp.Addr})
 					w.WriteMsg(m)
 				}
 			}()
@@ -77,7 +77,14 @@ func notUsHandler() dns.HandlerFunc {
 		q := r.Question[0]
 		addrs, err := net.LookupIP(q.Name)
 		if err == nil {
-			m := makeDNSReply(r, q.Name, addrs[0])
+			// Filter out ipv6 addresses
+			filtered := make([]net.IP, 0)
+			for _, addr := range addrs {
+				if ip4 := addr.To4(); ip4 != nil {
+					filtered = append(filtered, ip4)
+				}
+			}
+			m := makeDNSReply(r, q.Name, filtered)
 			w.WriteMsg(m)
 		} else {
 			m := makeDNSFailResponse(r)
