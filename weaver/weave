@@ -162,7 +162,7 @@ attach() {
     if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
         # veth name already exists, so assume we set it up already;
         # just add the IP address.
-        if ip netns exec $NETNS ip addr list dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
+        if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
             # address was there already
             return 0
         fi
@@ -206,7 +206,7 @@ attach() {
 # Detach Container-ID $1 at CIDR address $2 from the weave network
 # removing the virtual ethernet device if there are no more addresses
 detach() {
-    if ! ip netns exec $NETNS ip addr list dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
+    if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
         # address is not there, leave the device alone
         return 0
     fi
@@ -215,7 +215,7 @@ detach() {
         return 1
     fi
 
-    if [ -n "$(ip netns exec $NETNS ip -f inet addr list dev ethwe)" ] ; then
+    if [ -n "$(ip netns exec $NETNS ip -f inet addr show dev ethwe)" ] ; then
         # other addresses are left, leave the device alone
         return 0
     fi
@@ -314,7 +314,7 @@ case "$COMMAND" in
         IPADDR=$1
         shift 1
         create_bridge
-        if ! ip addr list dev $BRIDGE | grep -qF $IPADDR
+        if ! ip addr show dev $BRIDGE | grep -qF $IPADDR
         then
             ip addr add dev $BRIDGE $IPADDR
         fi
@@ -324,7 +324,7 @@ case "$COMMAND" in
         IPADDR=$1
         shift 1
         create_bridge
-        if ip addr list dev $BRIDGE | grep -qF $IPADDR
+        if ip addr show dev $BRIDGE | grep -qF $IPADDR
         then
             ip addr del dev $BRIDGE $IPADDR
         fi
