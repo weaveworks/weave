@@ -3,12 +3,12 @@ set -e
 
 usage() {
     echo "Usage:"
-    echo "weave launch <ipaddr>/<subnet> [-password <password>] <peer_host> ..."
-    echo "weave run    <ipaddr>/<subnet> <docker run args> ..."
-    echo "weave attach <ipaddr>/<subnet> <container_id>"
-    echo "weave detach <ipaddr>/<subnet> <container_id>"
-    echo "weave expose <ipaddr>/<subnet>"
-    echo "weave hide   <ipaddr>/<subnet>"
+    echo "weave launch <ipaddr>/<subnet-cidr> [-password <password>] <peer_host> ..."
+    echo "weave run    <ipaddr>/<subnet-cidr> <docker run args> ..."
+    echo "weave attach <ipaddr>/<subnet-cidr> <container_id>"
+    echo "weave detach <ipaddr>/<subnet-cidr> <container_id>"
+    echo "weave expose <ipaddr>/<subnet-cidr>"
+    echo "weave hide   <ipaddr>/<subnet-cidr>"
     echo "weave status"
     echo "weave version"
     echo "weave stop"
