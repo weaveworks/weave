@@ -48,8 +48,9 @@ PUTs), or a JSON object with the same fields. The fields are:
 
 ```js
     {
-        "domain": string,
-        "routing_prefix": number
+        "fqdn": string,
+        "routing_prefix": number,
+        "local_ip": string
     }
 ```
 
