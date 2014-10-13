@@ -2,21 +2,22 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/fsouza/go-dockerclient"
 	"log"
+	"net/http"
 )
 
 func main() {
 	var (
-		serverAddr string
-		serverPort int
+		updatePath string
 		apiPath    string
 	)
-	flag.StringVar(&serverAddr, "host", "", "address or hostname of server to update")
-	flag.IntVar(&serverPort, "port", 6785, "port on server to send updates to")
-	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock",
-		"Path to Docker API socket")
+	flag.StringVar(&updatePath, "endpoint", "", "Endpoint to which to send updates")
+	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
 	flag.Parse()
+
+	// TODO: check status on endpoint
 
 	client, err := docker.NewClient(apiPath)
 	if err != nil {
@@ -28,13 +29,25 @@ func main() {
 	client.AddEventListener(events)
 
 	log.Printf("Using Docker API on %s", apiPath)
-	log.Printf("Posting updates to server %s:%d", serverAddr, serverPort)
+	log.Printf("Posting updates to ", updatePath)
 
 	go func() {
 		for event := range events {
-			log.Printf("Event %s", *event)
+			handleEvent(event, client, updatePath)
 		}
 		done <- true
 	}()
 	<-done
+}
+
+func handleEvent(event *docker.APIEvents, client *docker.Client, endpoint string) error {
+	switch event.Status {
+	case "die":
+		id := event.ID
+		url := fmt.Sprintf("%s/name/%s", endpoint, id)
+		client := &http.Client{}
+		req, _ := http.NewRequest("DELETE", url, nil)
+		client.Do(req)
+	}
+	return nil
 }
