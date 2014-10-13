@@ -123,6 +123,7 @@ to each other.
 ## Find out more
 
  * [Documentation homepage](http://zettio.github.io/weave/)
+ * [Features](http://zettio.github.io/weave/features.html)
  * [Troubleshooting](http://zettio.github.io/weave/troubleshooting.html)
  * [Building](http://zettio.github.io/weave/building.html)
  * [How it works](http://zettio.github.io/weave/how-it-works.html)
