@@ -63,6 +63,22 @@ func TestHttp(t *testing.T) {
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatal("Unexpected http response", resp.Status)
 	}
+
+	// Delete the address
+	resp, err = genForm("DELETE", addr_url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("Unexpected http response", resp.Status)
+	}
+
+	// Check that the address is not there now.
+	_, err = zone.MatchLocal(success_test_name)
+	if _, ok := err.(LookupError); !ok {
+		t.Fatal(err)
+	}
+
 	// Would like to shut down the http server at the end of this test
 	// but it's complicated.
 	// See https://groups.google.com/forum/#!topic/golang-nuts/vLHWa5sHnCE

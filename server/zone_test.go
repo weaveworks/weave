@@ -36,4 +36,16 @@ func TestZone(t *testing.T) {
 	if _, ok := err.(DuplicateError); !ok {
 		t.Fatal(err)
 	}
+
+	// Now delete the record
+	err = zone.DeleteRecord(container_id, weave_ip)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the address is not there now.
+	_, err = zone.MatchLocal(success_test_name)
+	if _, ok := err.(LookupError); !ok {
+		t.Fatal("Unexpected result when deleting record", success_test_name, err)
+	}
 }

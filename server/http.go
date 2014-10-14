@@ -50,6 +50,25 @@ func ListenHttp(db Zone, port int) {
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
 			}
+		case "DELETE":
+			identifier, weave_ipstr, err := parseUrl(r.URL.Path)
+			if identifier == "" || weave_ipstr == "" {
+				log.Printf("Invalid request: %s, %s", r.URL, r.Form)
+				http.Error(w, "Invalid Request", http.StatusBadRequest)
+				return
+			}
+			weave_ip := net.ParseIP(weave_ipstr)
+			if weave_ip == nil {
+				log.Printf("Invalid IP in request: %s", weave_ipstr)
+				http.Error(w, "Invalid IP in request", http.StatusBadRequest)
+				return
+			}
+			log.Printf("Deleting %s (%s)", identifier, weave_ipstr)
+			err = db.DeleteRecord(identifier, weave_ip)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 		default:
 			log.Println("Unexpected http method", r.Method)
 			http.Error(w, "Unexpected http method: "+r.Method, http.StatusBadRequest)
