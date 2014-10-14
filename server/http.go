@@ -37,12 +37,20 @@ func ListenHttp(db Zone, port int) {
 			}
 			weave_cidr := weave_ipstr + "/" + prefix
 			weave_ip, subnet, err := net.ParseCIDR(weave_cidr)
-			if err == nil {
-				log.Printf("Adding %s (%s) -> %s", name, local_ip, weave_cidr)
-				db.AddRecord(identifier, name, ip, weave_ip, subnet)
-			} else if err != nil {
+			if err != nil {
 				log.Printf("Invalid CIDR in request: %s", weave_cidr)
+				http.Error(w, fmt.Sprintf("Invalid CIDR: %s", weave_cidr), http.StatusBadRequest)
+				return
 			}
+			log.Printf("Adding %s (%s) -> %s", name, local_ip, weave_cidr)
+			err = db.AddRecord(identifier, name, ip, weave_ip, subnet)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+		default:
+			log.Println("Unexpected http method", r.Method)
+			http.Error(w, "Unexpected http method: "+r.Method, http.StatusBadRequest)
 		}
 	})
 	address := fmt.Sprintf(":%d", port)
