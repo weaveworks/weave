@@ -32,6 +32,7 @@ func TestHttp(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
+	// Ask the http server to add our test address into the database
 	addr_parts := strings.Split(test_addr1, "/")
 	resp, err := putForm(fmt.Sprintf("http://localhost:%d/name/%s/%s", port, container_id, addr_parts[0]),
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
@@ -39,19 +40,17 @@ func TestHttp(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != 200 {
-		t.Log("Unexpected http response", resp.Status)
-		t.Fail()
+		t.Fatal("Unexpected http response", resp.Status)
 	}
 
+	// Check that the address is now there.
 	ip, err := zone.MatchLocal(success_test_name)
 	if err != nil {
-		t.Log(zone)
 		t.Fatal(err)
 	}
 	weave_ip, _, _ := net.ParseCIDR(test_addr1)
 	if !ip.Equal(weave_ip) {
-		t.Log("Unexpected result for", success_test_name, ip)
-		t.Fail()
+		t.Fatal("Unexpected result for", success_test_name, ip)
 	}
 
 	// Would like to shut down the http server at the end of this test
