@@ -34,10 +34,11 @@ func (ops LookupError) Error() string {
 type DuplicateError struct {
 	Name    string
 	WeaveIp net.IP
+	Ident   string
 }
 
 func (err DuplicateError) Error() string {
-	return "Duplicate " + err.Name + "," + err.WeaveIp.String()
+	return "Duplicate " + err.Name + "," + err.WeaveIp.String() + " in container " + err.Ident
 }
 
 // Stop gap.
@@ -70,8 +71,8 @@ func (zone *ZoneDb) AddRecord(identifier string, name string, ip net.IP, weave_i
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	fqdn := dns.Fqdn(name)
-	if zone.indexOfNameAddr(fqdn, weave_ip) != -1 {
-		return DuplicateError{fqdn, weave_ip}
+	if index := zone.indexOfNameAddr(fqdn, weave_ip); index != -1 {
+		return DuplicateError{fqdn, weave_ip, zone.recs[index].Ident}
 	}
 	zone.recs = append(zone.recs, Record{identifier, fqdn, ip, weave_ip, weave_subnet})
 	return nil
