@@ -20,6 +20,10 @@ The log verbosity can be increased by supplying the `-debug` flag when
 launching weave. Be warned, this will log information on a per-packet
 basis, so can produce a lot of output.
 
+Another useful debugging technique is to attach standard packet
+capture and analysis tools, such as tcpdump and wireshark, to the
+`weave` network bridge on the host.
+
 One can ask a weave router to report its status with
 
     weave status
