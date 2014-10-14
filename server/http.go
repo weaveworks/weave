@@ -34,6 +34,7 @@ func ListenHttp(db Zone, port int) {
 			ip := net.ParseIP(local_ip)
 			if ip == nil {
 				log.Printf("Invalid IP in request: %s", local_ip)
+				http.Error(w, "Invalid IP in request", http.StatusBadRequest)
 				return
 			}
 			weave_cidr := weave_ipstr + "/" + prefix
