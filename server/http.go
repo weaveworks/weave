@@ -28,6 +28,7 @@ func ListenHttp(db Zone, port int) {
 			local_ip := r.FormValue("local_ip")
 			if identifier == "" || weave_ipstr == "" || name == "" || prefix == "" || local_ip == "" {
 				log.Printf("Invalid request: %s, %s", r.URL, r.Form)
+				http.Error(w, "Invalid Request", http.StatusBadRequest)
 				return
 			}
 			ip := net.ParseIP(local_ip)
