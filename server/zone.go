@@ -31,6 +31,15 @@ func (ops LookupError) Error() string {
 	return "Unable to find " + string(ops)
 }
 
+type DuplicateError struct {
+	Name    string
+	WeaveIp net.IP
+}
+
+func (err DuplicateError) Error() string {
+	return "Duplicate " + err.Name + "," + err.WeaveIp.String()
+}
+
 // Stop gap.
 func (zone *ZoneDb) match(name string) (net.IP, error) {
 	for _, r := range zone.recs {
@@ -42,6 +51,15 @@ func (zone *ZoneDb) match(name string) (net.IP, error) {
 	return nil, LookupError(name)
 }
 
+func (zone *ZoneDb) indexOfNameAddr(name string, addr net.IP) int {
+	for i, r := range zone.recs {
+		if r.Name == name && r.WeaveIp.Equal(addr) {
+			return i
+		}
+	}
+	return -1
+}
+
 func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
@@ -51,6 +69,10 @@ func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 func (zone *ZoneDb) AddRecord(identifier string, name string, ip net.IP, weave_ip net.IP, weave_subnet *net.IPNet) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
-	zone.recs = append(zone.recs, Record{identifier, dns.Fqdn(name), ip, weave_ip, weave_subnet})
+	fqdn := dns.Fqdn(name)
+	if zone.indexOfNameAddr(fqdn, weave_ip) != -1 {
+		return DuplicateError{fqdn, weave_ip}
+	}
+	zone.recs = append(zone.recs, Record{identifier, fqdn, ip, weave_ip, weave_subnet})
 	return nil
 }
