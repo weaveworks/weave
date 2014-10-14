@@ -8,7 +8,7 @@ layout: default
 Make sure you are running the latest version - you can download it
 with
 
-    docker pull zettio/weave
+    docker pull zettio/weave:latest
 
 Check the weave container logs with
 
