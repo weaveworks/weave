@@ -6,12 +6,20 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
 
+func putForm(url string, data url.Values) (resp *http.Response, err error) {
+	req, err := http.NewRequest("PUT", url, strings.NewReader(data.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return http.DefaultClient.Do(req)
+}
+
 func TestHttp(t *testing.T) {
 	var (
+		container_id      = "deadbeef"
 		success_test_name = "test1.weave."
 		test_addr1        = "10.0.2.1/24"
 		docker_ip         = "9.8.7.6"
@@ -24,8 +32,9 @@ func TestHttp(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
-	resp, err := http.PostForm(fmt.Sprintf("http://localhost:%d/add", port),
-		url.Values{"name": {success_test_name}, "ip": {docker_ip}, "weave_cidr": {test_addr1}})
+	addr_parts := strings.Split(test_addr1, "/")
+	resp, err := putForm(fmt.Sprintf("http://localhost:%d/name/%s/%s", port, container_id, addr_parts[0]),
+		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
 	if err != nil {
 		t.Fatal(err)
 	}

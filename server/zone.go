@@ -8,11 +8,12 @@ import (
 )
 
 type Zone interface {
-	AddRecord(string, net.IP, net.IP, *net.IPNet) error
+	AddRecord(string, string, net.IP, net.IP, *net.IPNet) error
 	MatchLocal(string) (net.IP, error)
 }
 
 type Record struct {
+	Ident   string
 	Name    string
 	Ip      net.IP
 	WeaveIp net.IP
@@ -47,9 +48,9 @@ func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 	return zone.match(name)
 }
 
-func (zone *ZoneDb) AddRecord(name string, ip net.IP, weave_ip net.IP, weave_subnet *net.IPNet) error {
+func (zone *ZoneDb) AddRecord(identifier string, name string, ip net.IP, weave_ip net.IP, weave_subnet *net.IPNet) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
-	zone.recs = append(zone.recs, Record{dns.Fqdn(name), ip, weave_ip, weave_subnet})
+	zone.recs = append(zone.recs, Record{identifier, dns.Fqdn(name), ip, weave_ip, weave_subnet})
 	return nil
 }
