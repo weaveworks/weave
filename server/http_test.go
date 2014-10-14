@@ -34,7 +34,8 @@ func TestHttp(t *testing.T) {
 
 	// Ask the http server to add our test address into the database
 	addr_parts := strings.Split(test_addr1, "/")
-	resp, err := genForm("PUT", fmt.Sprintf("http://localhost:%d/name/%s/%s", port, container_id, addr_parts[0]),
+	addr_url := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, container_id, addr_parts[0])
+	resp, err := genForm("PUT", addr_url,
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
 	if err != nil {
 		t.Fatal(err)
@@ -53,6 +54,15 @@ func TestHttp(t *testing.T) {
 		t.Fatal("Unexpected result for", success_test_name, ip)
 	}
 
+	// Now try adding the same address again - should fail
+	resp, err = genForm("PUT", addr_url,
+		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatal("Unexpected http response", resp.Status)
+	}
 	// Would like to shut down the http server at the end of this test
 	// but it's complicated.
 	// See https://groups.google.com/forum/#!topic/golang-nuts/vLHWa5sHnCE
