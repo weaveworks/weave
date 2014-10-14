@@ -21,3 +21,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.provision :shell, :inline => "sudo go install -a -tags netgo std"
 
 end
+
+begin
+  load 'Vagrantfile.local'
+rescue LoadError
+end
