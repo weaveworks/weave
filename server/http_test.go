@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-func putForm(url string, data url.Values) (resp *http.Response, err error) {
-	req, err := http.NewRequest("PUT", url, strings.NewReader(data.Encode()))
+func genForm(method string, url string, data url.Values) (resp *http.Response, err error) {
+	req, err := http.NewRequest(method, url, strings.NewReader(data.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return http.DefaultClient.Do(req)
 }
@@ -34,7 +34,7 @@ func TestHttp(t *testing.T) {
 
 	// Ask the http server to add our test address into the database
 	addr_parts := strings.Split(test_addr1, "/")
-	resp, err := putForm(fmt.Sprintf("http://localhost:%d/name/%s/%s", port, container_id, addr_parts[0]),
+	resp, err := genForm("PUT", fmt.Sprintf("http://localhost:%d/name/%s/%s", port, container_id, addr_parts[0]),
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
 	if err != nil {
 		t.Fatal(err)
