@@ -28,7 +28,7 @@ type ZoneDb struct {
 type LookupError string
 
 func (ops LookupError) Error() string {
-	return string(ops)
+	return "Unable to find " + string(ops)
 }
 
 // Stop gap.
