@@ -3,10 +3,13 @@ title: Building Weave
 layout: default
 ---
 
-## Building
+**NB** This is only necessary if you want to work on the weave code.
 
-(NB. This is only necessary if you want to work on weave. Also, these
-instructions have only been tested on Ubuntu.)
+## Building directly in Linux
+
+You can work on weave without using a VM if you are running the docker
+daemon outside a VM. (These instructions have only been tested on
+Ubuntu.)
 
 To build weave you need `libpcap-dev` and `docker` installed. And `go`
 (and `git` and `hg` to fetch dependencies).
@@ -25,3 +28,46 @@ Then simply run
 
 This will build the weave router, produce a docker image
 `zettio/weave` and export that image to /tmp/weave.tar
+
+## Building using Vagrant
+
+If you aren't running Linux, or otherwise don't want to run the docker
+host outside a VM, you can use
+[Vagrant](https://www.vagrantup.com/downloads.html) to run a
+development environment.
+
+The `Vagrantfile` in the top directory constructs a VM that has
+
+ * docker installed
+ * go tools installed
+ * weave dependencies installed
+ * $GOPATH set to ~
+ * the local working directory mapped as a synced folder into the
+   right place in $GOPATH
+
+If you are in the working directory and issue
+
+    host:weave$ vagrant up
+
+you will get a virtual machine with the above. Your working directory
+is sync'ed with `~/src/github.com/zettio/weave` on the VM, so to log
+in and build the weave image, do
+
+```bash
+host:weave$ vagrant ssh
+vm:~$ cd src/github.com/zettio/weave
+vm:weave$ make -C weaver
+```
+
+The docker daemon is also running in this VM, so you can then do
+
+```bash
+vm:weave$ sudo weaver/weave launch 10.0.0.1/16
+vm:weave$ docker ps
+```
+
+and so on.
+
+You can provide extra Vagrant configuration by putting a file
+`Vagrant.local` in the same place as `Vagrantfile`; for instance, to
+forward additional ports.
