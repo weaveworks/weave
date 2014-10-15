@@ -6,7 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/davecheney/profile"
-	"github.com/zettio/weave"
+	weave "github.com/zettio/weave/router"
 	"io"
 	"log"
 	"net"

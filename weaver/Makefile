@@ -5,7 +5,7 @@ SUDO=sudo
 
 all: docker-image
 
-weaver: ../*.go main.go
+weaver: ../router/*.go main.go
 	go get -tags netgo
 	go build -ldflags '-extldflags "-static"' -tags netgo
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
