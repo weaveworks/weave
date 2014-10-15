@@ -89,7 +89,7 @@ func (conn *LocalConnection) CheckFatal(err error) error {
 	if err == nil {
 		return nil
 	}
-	conn.log("encountered fatal error", err)
+	conn.log("error:", err)
 	conn.Shutdown()
 	return err
 }
@@ -173,7 +173,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 	terminate := false
 	for !terminate {
 		if err != nil {
-			conn.log("encountered fatal error", err)
+			conn.log("error:", err)
 			break
 		}
 		query, ok := <-queryChan
@@ -242,7 +242,7 @@ func (conn *LocalConnection) handleSendTCP(msg []byte) error {
 
 func (conn *LocalConnection) handleShutdown() {
 	if conn.remote != nil {
-		conn.log("shutting down")
+		conn.log("connection shutting down")
 	}
 
 	// Whilst some of these elements may have been written to whilst
