@@ -186,7 +186,8 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 			log.Println("ignoring UDP read error", err)
 			continue
 		} else if n < NameSize {
-			continue // TODO something different?
+			log.Println("ignoring too short UDP packet from", sender)
+			continue
 		}
 		name := PeerNameFromBin(buf[:NameSize])
 		packet := make([]byte, n-NameSize)
