@@ -116,8 +116,6 @@ func (conn *LocalConnection) setStackFrag(frag bool) {
 }
 
 func (conn *LocalConnection) log(args ...interface{}) {
-	// why oh why can't I just write
-	// log.Println("Connection to peer", conn.remote.Name, args...)?
 	v := append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name))
 	v = append(v, args...)
 	log.Println(v...)
