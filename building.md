@@ -34,7 +34,16 @@ This will build the weave router, produce a docker image
 If you aren't running Linux, or otherwise don't want to run the docker
 daemon outside a VM, you can use
 [Vagrant](https://www.vagrantup.com/downloads.html) to run a
-development environment.
+development environment. You'll probably need to install
+[VirtualBox](https://www.virtualbox.org/wiki/Downloads) too, for
+Vagrant to run VMs in.
+
+First, check out the code:
+
+```bash
+$ git clone https://github.com/zettio/weave
+$ cd weave
+```
 
 The `Vagrantfile` in the top directory constructs a VM that has
 
@@ -45,25 +54,31 @@ The `Vagrantfile` in the top directory constructs a VM that has
  * the local working directory mapped as a synced folder into the
    right place in $GOPATH
 
-If you are in the working directory and issue
-
-    host:weave$ vagrant up
-
-you will get a virtual machine with the above. Your working directory
-is sync'ed with `~/src/github.com/zettio/weave` on the VM, so to log
-in and build the weave image, do
+Once you are in the working directory you can issue
 
 ```bash
-host:weave$ vagrant ssh
-vm:~$ cd src/github.com/zettio/weave
-vm:weave$ make -C weaver
+$ vagrant up
+```
+
+and wait for a while (don't worry, the long download and package
+installation is done just once). The working directory is sync'ed with
+`~/src/github.com/zettio/weave` on the VM, so you can edit files and
+use git and so on in the regular filesystem.
+
+To build and run the code, you need to use the VM. To log in and build
+the weave image, do
+
+```bash
+$ vagrant ssh
+vm$ cd src/github.com/zettio/weave
+vm$ make -C weaver
 ```
 
 The docker daemon is also running in this VM, so you can then do
 
 ```bash
-vm:weave$ sudo weaver/weave launch 10.0.0.1/16
-vm:weave$ docker ps
+$ sudo weaver/weave launch 10.0.0.1/16
+$ docker ps
 ```
 
 and so on.
