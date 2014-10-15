@@ -1,21 +1,28 @@
-IMAGE:=/tmp/weavedns.tar
-MAIN:=../
+.DEFAULT: all
 
-.DEFAULT: docker-image
-
-all: docker-image
+all: server-image updater-image
 
 weavedns: ../server/*.go ../main.go
-	go get -tags netgo $(MAIN) && go build -tags netgo -ldflags '-linkmode external -extldflags "-static"' -o $@ -v $(MAIN)
+	go get -tags netgo ../ && go build -tags netgo -ldflags '-linkmode external -extldflags "-static"' -o $@ -v ../
 
-.PHONY: docker-image
+updater: ../updater/main.go
+	go get -tags netgo ../updater/ && go build -tags netgo -ldflags '-linkmode external -extldflags "-static"' -o $@ -v ../updater/
 
-docker-image: $(IMAGE)
+.PHONY: server-image updater-image
 
-$(IMAGE): Dockerfile weavedns
+updater-image: /var/tmp/updater.tar
+server-image: /var/tmp/weavedns.tar
+
+/var/tmp/weavedns.tar: Dockerfile weavedns
 	sudo -E docker build -t zettio/weavedns .
-	sudo -E docker save zettio/weavedns > $(IMAGE)
+	sudo -E docker save zettio/weavedns > $@
+
+/var/tmp/updater.tar: ../updater/Dockerfile updater
+	sudo -E docker build -t zettio/updater ../updater/
+	sudo -E docker save zettio/updater > $@
 
 clean:
 	-sudo docker rmi zettio/weavedns
-	rm -f weavedns $(IMAGE)
+	-sudo docker rmi zettio/updater
+	rm -f weavedns updater
+	rm -f /var/tmp/{updater,weavedns}.tar
