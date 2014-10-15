@@ -17,17 +17,21 @@ To build weave you need `libpcap-dev` and `docker` installed. And `go`
 The package name is `github.com/zettio/weave`, so assuming `$GOPATH`
 is set:
 
-    $ cd $GOPATH
-    $ WEAVE=github.com/zettio/weave
-    $ git clone https://$WEAVE src/$WEAVE
-    $ cd src/$WEAVE
+```bash
+$ cd $GOPATH
+$ WEAVE=github.com/zettio/weave
+$ git clone https://$WEAVE src/$WEAVE
+$ cd src/$WEAVE
+```
 
 Then simply run
 
-    $ make -C weaver
+```bash
+$ make -C weaver
+```
 
 This will build the weave router, produce a docker image
-`zettio/weave` and export that image to /tmp/weave.tar
+`zettio/weave` and export that image to `/tmp/weave.tar`.
 
 ## Building using Vagrant
 
@@ -77,8 +81,8 @@ vm$ make -C weaver
 The docker daemon is also running in this VM, so you can then do
 
 ```bash
-$ sudo weaver/weave launch 10.0.0.1/16
-$ docker ps
+vm$ sudo weaver/weave launch 10.0.0.1/16
+vm$ docker ps
 ```
 
 and so on.
