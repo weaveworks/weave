@@ -187,24 +187,23 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 			continue
 		} else if n < NameSize {
 			continue // TODO something different?
-		} else {
-			name := PeerNameFromBin(buf[:NameSize])
-			packet := make([]byte, n-NameSize)
-			copy(packet, buf[NameSize:n])
-			udpPacket := &UDPPacket{
-				Name:   name,
-				Packet: packet,
-				Sender: sender}
-			peerConn, found := router.Ourself.ConnectionTo(name)
-			if !found {
-				continue
-			}
-			relayConn, ok := peerConn.(*LocalConnection)
-			if !ok {
-				continue
-			}
-			checkWarn(relayConn.Decryptor.IterateFrames(handleUDPPacket, udpPacket))
 		}
+		name := PeerNameFromBin(buf[:NameSize])
+		packet := make([]byte, n-NameSize)
+		copy(packet, buf[NameSize:n])
+		udpPacket := &UDPPacket{
+			Name:   name,
+			Packet: packet,
+			Sender: sender}
+		peerConn, found := router.Ourself.ConnectionTo(name)
+		if !found {
+			continue
+		}
+		relayConn, ok := peerConn.(*LocalConnection)
+		if !ok {
+			continue
+		}
+		checkWarn(relayConn.Decryptor.IterateFrames(handleUDPPacket, udpPacket))
 	}
 }
 
