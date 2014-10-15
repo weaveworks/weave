@@ -5,7 +5,7 @@ layout: default
 
 **NB** This is only necessary if you want to work on the weave code.
 
-## Building directly in Linux
+## Building directly on Linux
 
 You can work on weave without using a VM if you are running the docker
 daemon outside a VM. (These instructions have only been tested on
@@ -32,7 +32,7 @@ This will build the weave router, produce a docker image
 ## Building using Vagrant
 
 If you aren't running Linux, or otherwise don't want to run the docker
-host outside a VM, you can use
+daemon outside a VM, you can use
 [Vagrant](https://www.vagrantup.com/downloads.html) to run a
 development environment.
 
