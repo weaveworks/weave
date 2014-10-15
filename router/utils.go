@@ -46,6 +46,10 @@ func (nce NameCollisionError) Error() string {
 	return fmt.Sprint("Multiple peers found with same name: ", nce.Name)
 }
 
+func (pde PacketDecodingError) Error() string {
+	return fmt.Sprint("Failed to decode packet: ", pde.Desc)
+}
+
 func (packet UDPPacket) String() string {
 	return fmt.Sprintf("UDP Packet\n name: %s\n sender: %v\n payload: % X", packet.Name, packet.Sender, packet.Packet)
 }
