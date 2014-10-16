@@ -4,9 +4,12 @@ import (
 	"flag"
 	"github.com/zettio/weavedns/server"
 	"log"
+	"os"
 )
 
 func main() {
+	log.Println(os.Args)
+
 	var (
 		ifaceName string
 		apiPath   string
