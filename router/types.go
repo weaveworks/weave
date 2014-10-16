@@ -129,6 +129,10 @@ type NameCollisionError struct {
 	Name PeerName
 }
 
+type PacketDecodingError struct {
+	Desc string
+}
+
 type LocalAddress struct {
 	ip      net.IP
 	network *net.IPNet
