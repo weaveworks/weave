@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	test_addr1 = "10.0.2.1/24"
+	container_id = "deadbeef"
+	test_addr1   = "10.0.2.1/24"
 )
 
 func sendQuery(name string, querytype uint16) error {
@@ -33,7 +34,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	var zone = new(ZoneDb)
 	docker_ip := net.ParseIP("9.8.7.6")
 	weave_ip, subnet, _ := net.ParseCIDR(test_addr1)
-	zone.AddRecord("test.weave.", docker_ip, weave_ip, subnet)
+	zone.AddRecord(container_id, "test.weave.", docker_ip, weave_ip, subnet)
 
 	mdnsServer, err := NewMDNSServer(zone)
 	if err != nil {

@@ -8,11 +8,13 @@ import (
 )
 
 type Zone interface {
-	AddRecord(string, net.IP, net.IP, *net.IPNet) error
+	AddRecord(string, string, net.IP, net.IP, *net.IPNet) error
+	DeleteRecord(ident string, weave_ip net.IP) error
 	MatchLocal(string) (net.IP, error)
 }
 
 type Record struct {
+	Ident   string
 	Name    string
 	Ip      net.IP
 	WeaveIp net.IP
@@ -27,7 +29,17 @@ type ZoneDb struct {
 type LookupError string
 
 func (ops LookupError) Error() string {
-	return string(ops)
+	return "Unable to find " + string(ops)
+}
+
+type DuplicateError struct {
+	Name    string
+	WeaveIp net.IP
+	Ident   string
+}
+
+func (err DuplicateError) Error() string {
+	return "Duplicate " + err.Name + "," + err.WeaveIp.String() + " in container " + err.Ident
 }
 
 // Stop gap.
@@ -41,15 +53,49 @@ func (zone *ZoneDb) match(name string) (net.IP, error) {
 	return nil, LookupError(name)
 }
 
+func (zone *ZoneDb) indexOfNameAddr(name string, addr net.IP) int {
+	for i, r := range zone.recs {
+		if r.Name == name && r.WeaveIp.Equal(addr) {
+			return i
+		}
+	}
+	return -1
+}
+
+func (zone *ZoneDb) indexOfIdentAddr(ident string, addr net.IP) int {
+	for i, r := range zone.recs {
+		if r.Ident == ident && r.WeaveIp.Equal(addr) {
+			return i
+		}
+	}
+	return -1
+}
+
 func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	return zone.match(name)
 }
 
-func (zone *ZoneDb) AddRecord(name string, ip net.IP, weave_ip net.IP, weave_subnet *net.IPNet) error {
+func (zone *ZoneDb) AddRecord(identifier string, name string, ip net.IP, weave_ip net.IP, weave_subnet *net.IPNet) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
-	zone.recs = append(zone.recs, Record{dns.Fqdn(name), ip, weave_ip, weave_subnet})
+	fqdn := dns.Fqdn(name)
+	if index := zone.indexOfNameAddr(fqdn, weave_ip); index != -1 {
+		return DuplicateError{fqdn, weave_ip, zone.recs[index].Ident}
+	}
+	zone.recs = append(zone.recs, Record{identifier, fqdn, ip, weave_ip, weave_subnet})
+	return nil
+}
+
+func (zone *ZoneDb) DeleteRecord(ident string, weave_ip net.IP) error {
+	zone.mx.Lock()
+	defer zone.mx.Unlock()
+	if index := zone.indexOfIdentAddr(ident, weave_ip); index == -1 {
+		return LookupError(ident)
+	} else {
+		zone.recs = append(zone.recs[:index], zone.recs[index+1:]...)
+	}
+
 	return nil
 }
