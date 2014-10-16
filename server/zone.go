@@ -10,6 +10,7 @@ import (
 type Zone interface {
 	AddRecord(string, string, net.IP, net.IP, *net.IPNet) error
 	DeleteRecord(ident string, weave_ip net.IP) error
+	DeleteRecordsFor(ident string) error
 	MatchLocal(string) (net.IP, error)
 }
 
@@ -97,5 +98,20 @@ func (zone *ZoneDb) DeleteRecord(ident string, weave_ip net.IP) error {
 		zone.recs = append(zone.recs[:index], zone.recs[index+1:]...)
 	}
 
+	return nil
+}
+
+func (zone *ZoneDb) DeleteRecordsFor(ident string) error {
+	zone.mx.Lock()
+	defer zone.mx.Unlock()
+	w := 0 // write index
+
+	for _, r := range zone.recs {
+		if r.Ident != ident {
+			zone.recs[w] = r
+			w++
+		}
+	}
+	zone.recs = zone.recs[:w]
 	return nil
 }

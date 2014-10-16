@@ -100,9 +100,8 @@ func notUsHandler() dns.HandlerFunc {
 	}
 }
 
-func StartServer(ifaceName string, dnsPort int, httpPort int, wait int) error {
+func StartServer(zone Zone, ifaceName string, dnsPort int, httpPort int, wait int) error {
 
-	var zone = new(ZoneDb)
 	go ListenHttp(zone, httpPort)
 
 	var iface *net.Interface = nil

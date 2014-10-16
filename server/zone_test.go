@@ -48,4 +48,34 @@ func TestZone(t *testing.T) {
 	if _, ok := err.(LookupError); !ok {
 		t.Fatal("Unexpected result when deleting record", success_test_name, err)
 	}
+
+}
+
+func TestDeleteFor(t *testing.T) {
+	var (
+		id        = "foobar"
+		name      = "foo.weave."
+		addr1     = "10.1.2.3/24"
+		addr2     = "10.2.7.8/24"
+		docker_ip = "172.16.0.4"
+	)
+	zone := new(ZoneDb)
+	ip := net.ParseIP(docker_ip)
+	for _, addr := range []string{addr1, addr2} {
+		weave_ip, subnet, _ := net.ParseCIDR(addr)
+		err := zone.AddRecord(id, name, ip, weave_ip, subnet)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err := zone.MatchLocal(name)
+	if err != nil {
+		t.Fatal("Did not get result for lookup")
+	}
+	err = zone.DeleteRecordsFor(id)
+	_, err = zone.MatchLocal(name)
+	if _, ok := err.(LookupError); !ok {
+		t.Fatal("Expected no results after deleting records for ident")
+	}
 }

@@ -9,10 +9,10 @@ import (
 type MDNSServer struct {
 	localAddrs []net.Addr
 	sendconn   *net.UDPConn
-	zone       *ZoneDb
+	zone       Zone
 }
 
-func NewMDNSServer(zone *ZoneDb) (*MDNSServer, error) {
+func NewMDNSServer(zone Zone) (*MDNSServer, error) {
 	//log.Println("minimalServer sending:", buf)
 	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
 	sendconn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
