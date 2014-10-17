@@ -48,3 +48,14 @@ entries for any containers that die. You can tell it not to by adding
 ```bash
 $ weave run 10.0.0.2/16 --name=weavedns -v /var/run/docker.sock:/var/run/docker.sock zettio/weavedns --watch=false
 ```
+
+## Present limitations
+
+ * The server will not know about restarted containers, unless you
+   re-PUT the name.
+ * The server will forget names if it is itself restarted.
+ * The server may give unreachable IPs as answers, since it
+   doesn't try to filter by subnet yet.
+ * We use UDP broadcast to find out about remote names (from Weave DNS
+   servers on other hosts); this likely won't scale well beyond a
+   certain point T.B.D., so we'll have to come up with another scheme.
