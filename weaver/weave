@@ -259,7 +259,7 @@ case "$COMMAND" in
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
-        CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@")
+        CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
         with_container_netns attach $CONTAINER $IPADDR eth0
         echo $CONTAINER
         ;;
@@ -296,7 +296,7 @@ case "$COMMAND" in
         IPADDR=$1
         shift 1
         create_bridge
-        CONTAINER=$(docker run -d "$@")
+        CONTAINER=$(docker run -d "$@" | tail -n 1)
         with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
