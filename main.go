@@ -38,6 +38,6 @@ func main() {
 
 	err := weavedns.StartServer(zone, ifaceName, dnsPort, httpPort, wait)
 	if err != nil {
-		log.Fatalf("Failed to start server: %s", err)
+		log.Fatal("Failed to start server", err)
 	}
 }

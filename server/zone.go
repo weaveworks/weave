@@ -2,7 +2,6 @@ package weavedns
 
 import (
 	"github.com/miekg/dns"
-	"log"
 	"net"
 	"sync"
 )
@@ -46,7 +45,6 @@ func (err DuplicateError) Error() string {
 // Stop gap.
 func (zone *ZoneDb) match(name string) (net.IP, error) {
 	for _, r := range zone.recs {
-		log.Printf("%s == %s ?", r.Name, name)
 		if r.Name == name {
 			return r.WeaveIp, nil
 		}

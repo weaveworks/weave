@@ -28,6 +28,7 @@ func handleEvent(zone Zone, event *docker.APIEvents, client *docker.Client) erro
 	switch event.Status {
 	case "die":
 		id := event.ID
+		log.Printf("Container %s down. Removing records", id)
 		zone.DeleteRecordsFor(id)
 	}
 	return nil
