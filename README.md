@@ -42,4 +42,9 @@ $ dig @$dns_ip +short shell1.weave
 ```
 
 By default, the server will also watch docker events and remove
-entries for any containers that die.
+entries for any containers that die. You can tell it not to by adding
+`--watch=false` to the container args:
+
+```bash
+$ weave run 10.0.0.2/16 --name=weavedns -v /var/run/docker.sock:/var/run/docker.sock zettio/weavedns --watch=false
+```

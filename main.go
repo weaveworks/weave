@@ -24,7 +24,7 @@ func main() {
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0)")
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to dns requests (defaults to 53)")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests (defaults to 6785)")
-	flag.BoolVar(&watch, "watch", false, "watch the docker socket for container events")
+	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.Parse()
 
 	var zone = new(weavedns.ZoneDb)
