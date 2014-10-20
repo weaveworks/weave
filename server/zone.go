@@ -21,6 +21,8 @@ type Record struct {
 	Subnet  *net.IPNet
 }
 
+// Very simple data structure for now, with linear searching.
+// TODO: make more sophisticated to improve performance.
 type ZoneDb struct {
 	mx   sync.RWMutex
 	recs []Record
@@ -42,7 +44,6 @@ func (err DuplicateError) Error() string {
 	return "Duplicate " + err.Name + "," + err.WeaveIp.String() + " in container " + err.Ident
 }
 
-// Stop gap.
 func (zone *ZoneDb) match(name string) (net.IP, error) {
 	for _, r := range zone.recs {
 		if r.Name == name {
