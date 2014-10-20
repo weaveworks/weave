@@ -131,36 +131,42 @@ func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
 	c.queryChan <- &MDNSInteraction{code: CMessageReceived, payload: r}
 }
 
+// Check all in-flight queries, close all that have already timed out,
+// and return the duration until the next timeout
+func (c *MDNSClient) checkInFlightQueries() time.Duration {
+	now := time.Now()
+	after := MaxDuration
+	for name, query := range c.inflight {
+		// Count down from end of slice to beginning
+		length := len(query.responseInfos)
+		for i := length - 1; i >= 0; i-- {
+			item := query.responseInfos[i]
+			switch duration := item.timeout.Sub(now); {
+			case duration <= 0: // timed out
+				close(item.ch)
+				// Swap item from the end of the slice
+				length--
+				if i < length {
+					query.responseInfos[i] = query.responseInfos[length]
+				}
+			case duration < after:
+				after = duration
+			}
+		}
+		query.responseInfos = query.responseInfos[:length]
+		if length == 0 {
+			delete(c.inflight, name)
+		}
+	}
+	return after
+}
+
 // ACTOR server
 
 func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 	timer := time.NewTimer(MaxDuration)
 	run := func() {
-		now := time.Now()
-		after := MaxDuration
-		for name, query := range c.inflight {
-			// Count down from end of slice to beginning
-			length := len(query.responseInfos)
-			for i := length - 1; i >= 0; i-- {
-				item := query.responseInfos[i]
-				switch duration := item.timeout.Sub(now); {
-				case duration <= 0: // timed out
-					close(item.ch)
-					// Swap item from the end of the slice
-					length--
-					if i < length {
-						query.responseInfos[i] = query.responseInfos[length]
-					}
-				case duration < after:
-					after = duration
-				}
-			}
-			query.responseInfos = query.responseInfos[:length]
-			if length == 0 {
-				delete(c.inflight, name)
-			}
-		}
-		timer.Reset(after)
+		timer.Reset(c.checkInFlightQueries())
 	}
 
 	terminate := false
@@ -186,7 +192,7 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 		}
 	}
 
-	// Close all response channels
+	// Close all response channels at termination
 	for _, query := range c.inflight {
 		for _, item := range query.responseInfos {
 			close(item.ch)
