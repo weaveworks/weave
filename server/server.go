@@ -65,13 +65,13 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 					log.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
 					replies = append(replies, resp.Addr)
 				}
+				var response_msg *dns.Msg
 				if len(replies) > 0 {
-					m := makeDNSReply(r, q.Name, replies)
-					w.WriteMsg(m)
+					response_msg = makeDNSReply(r, q.Name, replies)
 				} else {
-					m := makeDNSFailResponse(r)
-					w.WriteMsg(m)
+					response_msg = makeDNSFailResponse(r)
 				}
+				w.WriteMsg(response_msg)
 			}()
 			mdnsClient.SendQuery(q.Name, dns.TypeA, channel)
 		}
@@ -83,6 +83,7 @@ func notUsHandler() dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		addrs, err := net.LookupIP(q.Name)
+		var response_msg *dns.Msg
 		if err == nil {
 			// Filter out ipv6 addresses
 			filtered := make([]net.IP, 0)
@@ -91,12 +92,11 @@ func notUsHandler() dns.HandlerFunc {
 					filtered = append(filtered, ip4)
 				}
 			}
-			m := makeDNSReply(r, q.Name, filtered)
-			w.WriteMsg(m)
+			response_msg = makeDNSReply(r, q.Name, filtered)
 		} else {
-			m := makeDNSFailResponse(r)
-			w.WriteMsg(m)
+			response_msg = makeDNSFailResponse(r)
 		}
+		w.WriteMsg(response_msg)
 	}
 }
 
