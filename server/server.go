@@ -57,7 +57,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		} else {
 			log.Printf("Failed lookup for %s; sending mDNS query", q.Name)
 			// We don't know the answer; see if someone else does
-			channel := make(chan *ResponseA, 4)
+			channel := make(chan *ResponseA, ChannelSize)
 			replies := make([]net.IP, 0)
 			go func() {
 				// Loop terminates when channel is closed by MDNSClient on timeout

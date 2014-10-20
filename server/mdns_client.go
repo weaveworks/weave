@@ -16,6 +16,7 @@ const (
 	// TODO: introduce caching so we don't have to wait this long on every call.
 	mDNSTimeout = 250 * time.Millisecond
 	MaxDuration = time.Duration(math.MaxInt64)
+	ChannelSize = 16
 )
 
 var (
@@ -88,7 +89,7 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 	c.server = &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
 	go c.server.ActivateAndServe()
 
-	queryChan := make(chan *MDNSInteraction, 4)
+	queryChan := make(chan *MDNSInteraction, ChannelSize)
 	c.queryChan = queryChan
 	go c.queryLoop(queryChan)
 
