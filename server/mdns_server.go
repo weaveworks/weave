@@ -24,16 +24,20 @@ func NewMDNSServer(zone Zone) (*MDNSServer, error) {
 	return retval, nil
 }
 
-func makeDNSReply(r *dns.Msg, name string, addrs []net.IP) *dns.Msg {
+func makeDNSReply(r *dns.Msg, name string, qtype uint16, addrs []net.IP) *dns.Msg {
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.RecursionAvailable = true
-	m.Answer = make([]dns.RR, len(addrs))
-	for i, addr := range addrs {
-		if ip4 := addr.To4(); ip4 != nil {
-			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeA,
-				Class: dns.ClassINET, Ttl: 3600}
-			m.Answer[i] = &dns.A{hdr, addr}
+	hdr := dns.RR_Header{Name: name, Rrtype: qtype, Class: dns.ClassINET, Ttl: 3600}
+	for _, addr := range addrs {
+		if qtype == dns.TypeA {
+			if ip4 := addr.To4(); ip4 != nil {
+				m.Answer = append(m.Answer, &dns.A{hdr, addr})
+			}
+		} else if qtype == dns.TypeAAAA {
+			if ip4 := addr.To4(); ip4 == nil {
+				m.Answer = append(m.Answer, &dns.AAAA{hdr, addr})
+			}
 		}
 	}
 	return m
@@ -60,7 +64,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 			q := r.Question[0]
 			ip, err := s.zone.MatchLocal(q.Name)
 			if err == nil {
-				m := makeDNSReply(r, q.Name, []net.IP{ip})
+				m := makeDNSReply(r, q.Name, dns.TypeA, []net.IP{ip})
 				s.SendResponse(m)
 			} else if s.addrIsLocal(w.RemoteAddr()) {
 				// ignore this - it's our own query received via multicast

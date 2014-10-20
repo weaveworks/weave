@@ -52,7 +52,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		q := r.Question[0]
 		ip, err := zone.MatchLocal(q.Name)
 		if err == nil {
-			m := makeDNSReply(r, q.Name, []net.IP{ip})
+			m := makeDNSReply(r, q.Name, dns.TypeA, []net.IP{ip})
 			w.WriteMsg(m)
 		} else {
 			log.Printf("Failed lookup for %s; sending mDNS query", q.Name)
@@ -67,7 +67,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 				}
 				var response_msg *dns.Msg
 				if len(replies) > 0 {
-					response_msg = makeDNSReply(r, q.Name, replies)
+					response_msg = makeDNSReply(r, q.Name, dns.TypeA, replies)
 				} else {
 					response_msg = makeDNSFailResponse(r)
 				}
@@ -79,20 +79,17 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 	}
 }
 
+/* When we receive a request for a name outside of our '.weave' domain, call
+   the underlying lookup mechanism and return the answer(s) it gives.
+   Unfortunately, this means that TTLs from a real DNS server are lost - FIXME.
+*/
 func notUsHandler() dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		addrs, err := net.LookupIP(q.Name)
 		var response_msg *dns.Msg
 		if err == nil {
-			// Filter out ipv6 addresses
-			filtered := make([]net.IP, 0)
-			for _, addr := range addrs {
-				if ip4 := addr.To4(); ip4 != nil {
-					filtered = append(filtered, ip4)
-				}
-			}
-			response_msg = makeDNSReply(r, q.Name, filtered)
+			response_msg = makeDNSReply(r, q.Name, q.Qtype, addrs)
 		} else {
 			response_msg = makeDNSFailResponse(r)
 		}
