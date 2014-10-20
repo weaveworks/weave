@@ -2,7 +2,6 @@ package weavedns
 
 import (
 	"github.com/miekg/dns"
-	"log"
 	"math"
 	"net"
 	"time"
