@@ -25,20 +25,20 @@ for other containers:
 
 ```bash
 $ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
-$ shell1=$(weave run 10.0.1.2/24 --dns=$dns_ip -t ubuntu /bin/bash)
+$ shell1=$(weave run 10.0.1.2/24 -h shell.weave.local --dns=$dns_ip -t ubuntu /bin/bash)
 ```
 
 To associate a hostname with an IP, use an HTTP PUT to the DNS server:
 
 ```bash
 $ shell1_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $shell1)
-$ curl -X PUT "http://$dns_ip:6785/name/$shell1/10.0.1.2?fqdn=shell1.weave&routing_prefix=24&local_ip=$shell1_ip"
+$ curl -X PUT "http://$dns_ip:6785/name/$shell1/10.0.1.2?fqdn=shell1.weave.local&routing_prefix=24&local_ip=$shell1_ip"
 ```
 
 You should now be able to look up the name:
 
 ```bash
-$ dig @$dns_ip +short shell1.weave
+$ dig @$dns_ip +short shell1.weave.local
 ```
 
 By default, the server will also watch docker events and remove
