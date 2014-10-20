@@ -23,7 +23,7 @@ example](https://github.com/zettio/weave#example):
  * [Container mobility](#container-mobility)
  * [Fault tolerance](#fault-tolerance)
 
-### Virtual Ethernet Switch
+### <a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
 To application containers, the network established by weave looks
 like a giant Ethernet switch to which all the containers are
@@ -52,7 +52,7 @@ now re-use the same tools and techniques when deploying applications
 as containers as we would have done when deploying them 'on metal' in
 our data centre.
 
-### Application isolation
+### <a name="application-isolation"></a>Application isolation
 
 A single weave network can host multiple, isolated applications, with
 each application's containers being able to communicate with each
@@ -89,7 +89,7 @@ each other but not the containers of our first application...
 This isolation-through-subnets scheme is an example of carrying over a
 well-known technique from the 'on metal' days to containers.
 
-### Dynamic network attachment
+### <a name="dynamic-network-attachment"></a>Dynamic network attachment
 
 In some scenarios containers are started independently, e.g. via some
 existing tool chain, or require more complex startup sequences than
@@ -118,7 +118,7 @@ sharing it between applications:
     host1# weave attach 10.0.1.1/24 $C
     host1# weave attach 10.0.2.1/24 $C
 
-### Security
+### <a name="security"></a>Security
 
 In order to connect containers across untrusted networks, weave peers
 can be told to encrypt traffic by supplying a `-password` option when
@@ -130,7 +130,7 @@ The same password must be specified for all weave peers; it is a
 component in the creation of ephemeral session keys for connections
 between peers.
 
-### Host network integration
+### <a name="host-network-integration"></a>Host network integration
 
 Weave application networks can be integrated with a host's network,
 establishing connectivity between the host and application containers
@@ -154,7 +154,7 @@ will work. And, more interestingly,
 
 will work too, which is talking to a container that resides on $HOST1.
 
-### Service export
+### <a name="service-export"></a>Service export
 
 Services running in containers on a weave network can be made
 accessible to the outside world (and, more generally, other networks)
@@ -191,7 +191,7 @@ work when run *on* $HOST2.)
 Similar NAT rules to the above can used to expose services not just to
 the outside world but also other, internal, networks.
 
-### Service import
+### <a name="service-import"></a>Service import
 
 Applications running in containers on a weave network can be given
 access to services which are only reachable from certain weave hosts,
@@ -227,7 +227,7 @@ then we can connect to it from our application container on $HOST2 with
 
 The same command will work from any application container.
 
-### Service binding
+### <a name="service-binding"></a>Service binding
 
 Importing a service provides a degree of indirection that allows late
 and dynamic binding, similar to what can be achieved with a proxy. In
@@ -237,7 +237,7 @@ are accessing at `10.0.1.101:3322` is in fact residing on
 location by changing the above NAT rule, without having to alter the
 applications themselves.
 
-### Service routing
+### <a name="service-routing"></a>Service routing
 
 The [service export](#service-export) and
 [service import](#service-import) features can be combined to
@@ -273,7 +273,7 @@ the applications that access them, e.g. we could move the example
 netcat service to $HOST4:2211 while retaining its 10.0.1.101:3322
 endpoint in the weave network.
 
-### Multi-cloud networking
+### <a name="multi-cloud-networking"></a>Multi-cloud networking
 
 Weave can network containers hosted in different cloud providers /
 data centres. So, for example, one could run an application consisting
@@ -282,7 +282,7 @@ of containers on GCE, EC2 and in local data centres.
 To enable this, the network must be configured to permit TCP and UDP
 connections to port 6783 of the docker hosts.
 
-### Multi-hop routing
+### <a name="multi-hop-routing"></a>Multi-hop routing
 
 A network of containers across more than two hosts can be established
 even when there is only partial connectivity between the hosts. Weave
@@ -294,7 +294,7 @@ to hosts in GCE and EC2, but the latter two cannot connect to each
 other, containers in the latter two can still communicate; weave will
 route the traffic via the local data centre.
 
-### Dynamic topologies
+### <a name="dynamic-topologies"></a>Dynamic topologies
 
 To add a host to an existing weave network, one simply launches
 weave on the host, supplying the address of at least one existing
@@ -302,14 +302,14 @@ host. Weave will automatically discover the other hosts in the other
 network and establish connections to them if it can (in order to avoid
 unnecessary multi-hop routing).
 
-### Container mobility
+### <a name="container-mobility"></a>Container mobility
 
 Containers can be moved between hosts without requiring any
 reconfiguration or, in many cases, restarts of other containers. All
 that is required is for the migrated container to be started with the
 same IP address as it was given originally.
 
-### Fault tolerance
+### <a name="fault-tolerance"></a>Fault tolerance
 
 Weave peers continually exchange topology information, and monitor
 and (re)establish network connections to other peers. So if hosts or
