@@ -2,6 +2,7 @@ package weavedns
 
 import (
 	"github.com/miekg/dns"
+	"log"
 	"math"
 	"net"
 	"time"
@@ -39,6 +40,7 @@ type responseInfo struct {
 // Represents one query that we have sent for one name.
 // If we, internally, get several requests for the same name while we have
 // a query in flight, then we don't want to send more queries out.
+// Invariant on responseInfos: they are in non-descending order of timeout.
 type inflightQuery struct {
 	name          string
 	id            uint16 // the DNS message ID
@@ -131,37 +133,36 @@ func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
 	c.queryChan <- &MDNSInteraction{code: CMessageReceived, payload: r}
 }
 
+// ACTOR server
+
 // Check all in-flight queries, close all that have already timed out,
 // and return the duration until the next timeout
 func (c *MDNSClient) checkInFlightQueries() time.Duration {
 	now := time.Now()
 	after := MaxDuration
 	for name, query := range c.inflight {
-		// Count down from end of slice to beginning
-		length := len(query.responseInfos)
-		for i := length - 1; i >= 0; i-- {
-			item := query.responseInfos[i]
-			switch duration := item.timeout.Sub(now); {
-			case duration <= 0: // timed out
+		// Invariant on responseInfos: they are in non-descending order of timeout.
+		num_closed := 0
+		for _, item := range query.responseInfos {
+			duration := item.timeout.Sub(now)
+			if duration <= 0 { // timed out
 				close(item.ch)
-				// Swap item from the end of the slice
-				length--
-				if i < length {
-					query.responseInfos[i] = query.responseInfos[length]
+				num_closed++
+			} else {
+				if duration < after {
+					after = duration
 				}
-			case duration < after:
-				after = duration
+				break // don't need to look at any more for this query
 			}
 		}
-		query.responseInfos = query.responseInfos[:length]
-		if length == 0 {
+		// Remove timed-out items from the slice
+		query.responseInfos = query.responseInfos[num_closed:]
+		if len(query.responseInfos) == 0 {
 			delete(c.inflight, name)
 		}
 	}
 	return after
 }
-
-// ACTOR server
 
 func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 	timer := time.NewTimer(MaxDuration)
@@ -228,6 +229,8 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 		ch:      q.responseCh,
 		timeout: time.Now().Add(mDNSTimeout),
 	}
+	// Invariant on responseInfos: they are in non-descending order of timeout.
+	// Since we use a fixed interval from Now(), this must be after all existing timeouts.
 	query.responseInfos = append(query.responseInfos, info)
 }
 
