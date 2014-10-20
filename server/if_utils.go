@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func ensureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
+func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
 	iface, err = findInterface(ifaceName)
 	if err == nil || wait == 0 {
 		return

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"github.com/zettio/weavedns/server"
 	"log"
+	"net"
 	"os"
 )
 
@@ -36,7 +37,16 @@ func main() {
 		}
 	}
 
-	err := weavedns.StartServer(zone, ifaceName, dnsPort, httpPort, wait)
+	var iface *net.Interface = nil
+	if ifaceName != "" {
+		var err error
+		iface, err = weavedns.EnsureInterface(ifaceName, wait)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	err := weavedns.StartServer(zone, iface, dnsPort, httpPort, wait)
 	if err != nil {
 		log.Fatal("Failed to start server", err)
 	}

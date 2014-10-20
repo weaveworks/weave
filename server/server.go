@@ -69,24 +69,14 @@ func notUsHandler() dns.HandlerFunc {
 	}
 }
 
-func StartServer(zone Zone, ifaceName string, dnsPort int, httpPort int, wait int) error {
-
+func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wait int) error {
 	go ListenHttp(zone, httpPort)
-
-	var iface *net.Interface = nil
-	if ifaceName != "" {
-		var err error
-		iface, err = ensureInterface(ifaceName, wait)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	mdnsClient, err := NewMDNSClient()
 	if err != nil {
 		log.Fatal(err)
 	} else {
-		log.Printf("Using mDNS on %s", ifaceName)
+		log.Printf("Using mDNS on %s", iface.Name)
 	}
 	err = mdnsClient.Start(iface)
 	if err != nil {
