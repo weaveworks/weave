@@ -26,7 +26,7 @@ var (
 type ResponseA struct {
 	Name string
 	Addr net.IP
-	err  error
+	Err  error
 }
 
 type responseInfo struct {
@@ -39,7 +39,7 @@ type responseInfo struct {
 // a query in flight, then we don't want to send more queries out.
 type inflightQuery struct {
 	name          string
-	Id            uint16 // the DNS message ID
+	id            uint16 // the DNS message ID
 	responseInfos []*responseInfo
 }
 
@@ -201,18 +201,18 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) error {
 		m.RecursionDesired = false
 		buf, err := m.Pack()
 		if err != nil {
-			q.responseCh <- &ResponseA{err: err}
+			q.responseCh <- &ResponseA{Err: err}
 			close(q.responseCh)
 			return err
 		}
 		query = &inflightQuery{
 			name: q.name,
-			Id:   m.Id,
+			id:   m.Id,
 		}
 		c.inflight[q.name] = query
 		_, err = c.conn.WriteTo(buf, c.addr)
 		if err != nil {
-			q.responseCh <- &ResponseA{err: err}
+			q.responseCh <- &ResponseA{Err: err}
 			close(q.responseCh)
 			return err
 		}

@@ -96,8 +96,8 @@ func (c *testContext) checkResponse(t *testing.T, channel_ok bool, resp *Respons
 		c.channel = nil
 		return
 	}
-	if resp.err != nil {
-		t.Fatal(resp.err)
+	if resp.Err != nil {
+		t.Fatal(resp.Err)
 	}
 	log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
 	c.received_addr = resp.Addr
