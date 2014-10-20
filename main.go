@@ -3,14 +3,12 @@ package main
 import (
 	"flag"
 	"github.com/zettio/weavedns/server"
-	"log"
+	"io/ioutil"
 	"net"
 	"os"
 )
 
 func main() {
-	log.Println(os.Args)
-
 	var (
 		ifaceName string
 		apiPath   string
@@ -18,6 +16,7 @@ func main() {
 		httpPort  int
 		wait      int
 		watch     bool
+		debug     bool
 	)
 
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
@@ -26,14 +25,21 @@ func main() {
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to dns requests (defaults to 53)")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests (defaults to 6785)")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
+	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	flag.Parse()
+
+	debugOut := ioutil.Discard
+	if debug {
+		debugOut = os.Stderr
+	}
+	weavedns.InitLogging(debugOut, os.Stdout, os.Stdout, os.Stderr)
 
 	var zone = new(weavedns.ZoneDb)
 
 	if watch {
 		err := weavedns.StartUpdater(apiPath, zone)
 		if err != nil {
-			log.Fatal("Unable to start watcher", err)
+			weavedns.Error.Fatal("Unable to start watcher", err)
 		}
 	}
 
@@ -42,12 +48,12 @@ func main() {
 		var err error
 		iface, err = weavedns.EnsureInterface(ifaceName, wait)
 		if err != nil {
-			log.Fatal(err)
+			weavedns.Error.Fatal(err)
 		}
 	}
 
 	err := weavedns.StartServer(zone, iface, dnsPort, httpPort, wait)
 	if err != nil {
-		log.Fatal("Failed to start server", err)
+		weavedns.Error.Fatal("Failed to start server", err)
 	}
 }
