@@ -3,6 +3,7 @@ set -e
 
 usage() {
     echo "Usage:"
+    echo "weave setup  <ipaddr>/<subnet-cidr>"
     echo "weave launch <ipaddr>/<subnet-cidr> [-password <password>] <peer_host> ..."
     echo "weave run    <ipaddr>/<subnet-cidr> <docker run args> ..."
     echo "weave attach <ipaddr>/<subnet-cidr> <container_id>"
@@ -262,6 +263,11 @@ case "$COMMAND" in
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
         with_container_netns attach $CONTAINER $IPADDR eth0
         echo $CONTAINER
+        ;;
+    setup)
+        create_bridge
+        stop_masquerading
+        setup_masquerading $1
         ;;
     status)
         if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave 2>/dev/null) ; then
