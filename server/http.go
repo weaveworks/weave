@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"github.com/miekg/dns"
 	"net"
 	"net/http"
 	"strings"
@@ -18,7 +19,7 @@ func parseUrl(url string) (identifier string, ipaddr string, err error) {
 	return parts[2], parts[3], nil
 }
 
-func ListenHttp(db Zone, port int) {
+func ListenHttp(domain string, db Zone, port int) {
 	http.HandleFunc("/name/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "PUT":
@@ -44,11 +45,15 @@ func ListenHttp(db Zone, port int) {
 				http.Error(w, fmt.Sprintf("Invalid CIDR: %s", weave_cidr), http.StatusBadRequest)
 				return
 			}
-			log.Printf("Adding %s (%s) -> %s", name, local_ip, weave_cidr)
-			err = db.AddRecord(identifier, name, ip, weave_ip, subnet)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusConflict)
-				return
+			if dns.IsSubDomain(domain, name) {
+				log.Printf("Adding %s (%s) -> %s", name, local_ip, weave_cidr)
+				err = db.AddRecord(identifier, name, ip, weave_ip, subnet)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusConflict)
+					return
+				}
+			} else {
+				log.Printf("Ignoring name %s, not in %s", name, domain)
 			}
 		case "DELETE":
 			identifier, weave_ipstr, err := parseUrl(r.URL.Path)

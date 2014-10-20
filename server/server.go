@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	LOCAL_DOMAIN = "weave"
+	LOCAL_DOMAIN = "weave.local."
 )
 
 func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
@@ -70,7 +70,7 @@ func notUsHandler() dns.HandlerFunc {
 }
 
 func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wait int) error {
-	go ListenHttp(zone, httpPort)
+	go ListenHttp(LOCAL_DOMAIN, zone, httpPort)
 
 	mdnsClient, err := NewMDNSClient()
 	if err != nil {
