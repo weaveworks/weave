@@ -10,9 +10,11 @@ import (
 // Portions of this code taken from github.com/armon/mdns
 
 const (
-	ipv4mdns    = "224.0.0.251" // link-local multicast address
-	mdnsPort    = 5353          // mDNS assigned port
-	mDNSTimeout = 200 * time.Millisecond
+	ipv4mdns = "224.0.0.251" // link-local multicast address
+	mdnsPort = 5353          // mDNS assigned port
+	// We wait this long to hear responses from other mDNS servers on the network.
+	// TODO: introduce caching so we don't have to wait this long on every call.
+	mDNSTimeout = 250 * time.Millisecond
 	MaxDuration = time.Duration(math.MaxInt64)
 )
 
@@ -62,11 +64,10 @@ func NewMDNSClient() (*MDNSClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	retval := &MDNSClient{
+	return &MDNSClient{
 		conn:     conn,
 		addr:     ipv4Addr,
-		inflight: make(map[string]*inflightQuery)}
-	return retval, nil
+		inflight: make(map[string]*inflightQuery)}, nil
 }
 
 func (c *MDNSClient) Start(ifi *net.Interface) error {
@@ -77,7 +78,7 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 
 	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
 		//log.Println("client received:", r)
-		// Only handle responses here
+		// Don't want to handle queries here, so filter anything out that isn't a response
 		if len(r.Answer) > 0 {
 			c.ResponseCallback(r)
 		}
@@ -193,7 +194,7 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 	}
 }
 
-func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) error {
+func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 	query, found := c.inflight[q.name]
 	if !found {
 		m := new(dns.Msg)
@@ -203,7 +204,7 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) error {
 		if err != nil {
 			q.responseCh <- &ResponseA{Err: err}
 			close(q.responseCh)
-			return err
+			return
 		}
 		query = &inflightQuery{
 			name: q.name,
@@ -214,7 +215,7 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) error {
 		if err != nil {
 			q.responseCh <- &ResponseA{Err: err}
 			close(q.responseCh)
-			return err
+			return
 		}
 	}
 	info := &responseInfo{
@@ -222,8 +223,6 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) error {
 		timeout: time.Now().Add(mDNSTimeout),
 	}
 	query.responseInfos = append(query.responseInfos, info)
-
-	return nil
 }
 
 func (c *MDNSClient) handleResponse(r *dns.Msg) {
