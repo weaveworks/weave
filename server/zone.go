@@ -72,8 +72,8 @@ func (zone *ZoneDb) indexOfIdentAddr(ident string, addr net.IP) int {
 }
 
 func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
-	zone.mx.Lock()
-	defer zone.mx.Unlock()
+	zone.mx.RLock()
+	defer zone.mx.RUnlock()
 	return zone.match(name)
 }
 
