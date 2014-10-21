@@ -5,6 +5,12 @@ import (
 	"testing"
 )
 
+func assertNoErr(t *testing.T, err error) {
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestZone(t *testing.T) {
 	var (
 		container_id      = "deadbeef"
@@ -18,15 +24,12 @@ func TestZone(t *testing.T) {
 	ip := net.ParseIP(docker_ip)
 	weave_ip, subnet, _ := net.ParseCIDR(test_addr1)
 	err := zone.AddRecord(container_id, success_test_name, ip, weave_ip, subnet)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 
 	// Check that the address is now there.
 	found_ip, err := zone.MatchLocal(success_test_name)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
+
 	if !found_ip.Equal(weave_ip) {
 		t.Fatal("Unexpected result for", success_test_name, ip)
 	}
@@ -39,9 +42,7 @@ func TestZone(t *testing.T) {
 
 	// Now delete the record
 	err = zone.DeleteRecord(container_id, weave_ip)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 
 	// Check that the address is not there now.
 	_, err = zone.MatchLocal(success_test_name)
@@ -49,6 +50,11 @@ func TestZone(t *testing.T) {
 		t.Fatal("Unexpected result when deleting record", success_test_name, err)
 	}
 
+	// Delete a record that isn't there
+	err = zone.DeleteRecord(container_id, net.ParseIP("0.0.0.0"))
+	if _, ok := err.(LookupError); !ok {
+		t.Fatal("Expected a LookupError when deleting a record that doesn't exist")
+	}
 }
 
 func TestDeleteFor(t *testing.T) {
@@ -64,15 +70,12 @@ func TestDeleteFor(t *testing.T) {
 	for _, addr := range []string{addr1, addr2} {
 		weave_ip, subnet, _ := net.ParseCIDR(addr)
 		err := zone.AddRecord(id, name, ip, weave_ip, subnet)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoErr(t, err)
 	}
 
 	_, err := zone.MatchLocal(name)
-	if err != nil {
-		t.Fatal("Did not get result for lookup")
-	}
+	assertNoErr(t, err)
+
 	err = zone.DeleteRecordsFor(id)
 	_, err = zone.MatchLocal(name)
 	if _, ok := err.(LookupError); !ok {
