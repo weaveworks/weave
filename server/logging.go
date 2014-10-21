@@ -14,10 +14,10 @@ const (
 // Inspired by http://www.goinggo.net/2013/11/using-log-package-in-go.html
 
 var (
-	Debug   *log.Logger = log.New(ioutil.Discard, "DEBUG: ", standard_log_flags)
-	Info    *log.Logger = log.New(os.Stdout, "INFO: ", standard_log_flags)
-	Warning *log.Logger = log.New(os.Stdout, "WARNING: ", standard_log_flags)
-	Error   *log.Logger = log.New(os.Stdout, "ERROR: ", standard_log_flags)
+	Debug   *log.Logger
+	Info    *log.Logger
+	Warning *log.Logger
+	Error   *log.Logger
 )
 
 func InitLogging(debugHandle io.Writer,
@@ -29,4 +29,8 @@ func InitLogging(debugHandle io.Writer,
 	Info = log.New(infoHandle, "INFO: ", standard_log_flags)
 	Warning = log.New(warningHandle, "WARNING: ", standard_log_flags)
 	Error = log.New(errorHandle, "ERROR: ", standard_log_flags)
+}
+
+func init() {
+	InitLogging(ioutil.Discard, os.Stdout, os.Stdout, os.Stderr)
 }
