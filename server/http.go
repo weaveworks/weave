@@ -48,7 +48,13 @@ func ListenHttp(domain string, db Zone, port int) {
 				Info.Printf("Adding %s (%s) -> %s", name, local_ip, weave_cidr)
 				err = db.AddRecord(identifier, name, ip, weave_ip, subnet)
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusConflict)
+					dup, ok := err.(DuplicateError)
+					if !ok {
+						Error.Print("Unexpected error from DB", err)
+						http.Error(w, "Internal error", http.StatusInternalServerError)
+					} else if dup.Ident != identifier {
+						http.Error(w, err.Error(), http.StatusConflict)
+					}
 					return
 				}
 			} else {
@@ -70,8 +76,11 @@ func ListenHttp(domain string, db Zone, port int) {
 			Info.Printf("Deleting %s (%s)", identifier, weave_ipstr)
 			err = db.DeleteRecord(identifier, weave_ip)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
+				if _, ok := err.(LookupError); !ok {
+					Error.Print("Unexpected error from DB", err)
+					http.Error(w, "Internal error", http.StatusInternalServerError)
+					return
+				}
 			}
 		default:
 			Warning.Println("Unexpected http method", r.Method)

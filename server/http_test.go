@@ -41,7 +41,7 @@ func TestHttp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Fatal("Unexpected http response", resp.Status)
 	}
 
@@ -55,8 +55,19 @@ func TestHttp(t *testing.T) {
 		t.Fatal("Unexpected result for", success_test_name, ip)
 	}
 
-	// Now try adding the same address again - should fail
+	// Adding exactly the same address should be OK
 	resp, err = genForm("PUT", addr_url,
+		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("Expected duplicate add to succeed with 200 OK")
+	}
+
+	// Now try adding the same address again with a different ident - should fail
+	other_url := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addr_parts[0])
+	resp, err = genForm("PUT", other_url,
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +89,15 @@ func TestHttp(t *testing.T) {
 	_, err = zone.MatchLocal(success_test_name)
 	if _, ok := err.(LookupError); !ok {
 		t.Fatal(err)
+	}
+
+	// Delete the address again, it should accept this
+	resp, err = genForm("DELETE", addr_url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal("Unexpected http response", resp.Status)
 	}
 
 	// Would like to shut down the http server at the end of this test
