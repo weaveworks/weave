@@ -20,7 +20,8 @@ func genForm(method string, url string, data url.Values) (resp *http.Response, e
 func TestHttp(t *testing.T) {
 	var (
 		container_id      = "deadbeef"
-		success_test_name = "test1.weave."
+		test_domain       = "weave.local."
+		success_test_name = "test1." + test_domain
 		test_addr1        = "10.0.2.1/24"
 		docker_ip         = "9.8.7.6"
 	)
@@ -28,7 +29,7 @@ func TestHttp(t *testing.T) {
 	var zone = new(ZoneDb)
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
-	go ListenHttp(zone, port)
+	go ListenHttp(test_domain, zone, port)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
