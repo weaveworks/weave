@@ -79,7 +79,6 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 	}
 
 	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
-		//log.Println("client received:", r)
 		// Don't want to handle queries here, so filter anything out that isn't a response
 		if len(r.Answer) > 0 {
 			c.ResponseCallback(r)

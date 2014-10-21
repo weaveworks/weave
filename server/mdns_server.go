@@ -2,7 +2,6 @@ package weavedns
 
 import (
 	"github.com/miekg/dns"
-	"log"
 	"net"
 )
 
@@ -13,7 +12,6 @@ type MDNSServer struct {
 }
 
 func NewMDNSServer(zone Zone) (*MDNSServer, error) {
-	//log.Println("minimalServer sending:", buf)
 	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
 	sendconn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
@@ -69,7 +67,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 			} else if s.addrIsLocal(w.RemoteAddr()) {
 				// ignore this - it's our own query received via multicast
 			} else {
-				log.Printf("Failed MDNS lookup for %s", q.Name)
+				Debug.Printf("Failed MDNS lookup for %s", q.Name)
 			}
 		}
 	}

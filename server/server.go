@@ -3,12 +3,11 @@ package weavedns
 import (
 	"fmt"
 	"github.com/miekg/dns"
-	"log"
 	"net"
 )
 
 const (
-	LOCAL_DOMAIN = "weave"
+	LOCAL_DOMAIN = "weave.local."
 )
 
 func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
@@ -22,19 +21,20 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
+		Debug.Printf("Local query: %s", q)
 		ip, err := zone.MatchLocal(q.Name)
 		if err == nil {
 			m := makeDNSReply(r, q.Name, dns.TypeA, []net.IP{ip})
 			w.WriteMsg(m)
 		} else {
-			log.Printf("Failed lookup for %s; sending mDNS query", q.Name)
+			Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
 			// We don't know the answer; see if someone else does
 			channel := make(chan *ResponseA, ChannelSize)
 			replies := make([]net.IP, 0)
 			go func() {
 				// Loop terminates when channel is closed by MDNSClient on timeout
 				for resp := range channel {
-					log.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
+					Debug.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
 					replies = append(replies, resp.Addr)
 				}
 				var response_msg *dns.Msg
@@ -58,29 +58,31 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 func notUsHandler() dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
+		Debug.Printf("Non-local query: %s", q)
 		addrs, err := net.LookupIP(q.Name)
 		var response_msg *dns.Msg
 		if err == nil {
 			response_msg = makeDNSReply(r, q.Name, q.Qtype, addrs)
 		} else {
 			response_msg = makeDNSFailResponse(r)
+			Debug.Print("Failed fallback lookup", err)
 		}
 		w.WriteMsg(response_msg)
 	}
 }
 
 func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wait int) error {
-	go ListenHttp(zone, httpPort)
+	go ListenHttp(LOCAL_DOMAIN, zone, httpPort)
 
 	mdnsClient, err := NewMDNSClient()
 	if err != nil {
-		log.Fatal(err)
+		Error.Fatal(err)
 	} else {
-		log.Printf("Using mDNS on %s", iface.Name)
+		Info.Printf("Using mDNS on %s", iface.Name)
 	}
 	err = mdnsClient.Start(iface)
 	if err != nil {
-		log.Fatal(err)
+		Error.Fatal(err)
 	}
 
 	LocalServeMux := dns.NewServeMux()
@@ -89,19 +91,19 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wai
 
 	mdnsServer, err := NewMDNSServer(zone)
 	if err != nil {
-		log.Fatal(err)
+		Error.Fatal(err)
 	}
 	err = mdnsServer.Start(iface)
 	if err != nil {
-		log.Fatal(err)
+		Error.Fatal(err)
 	}
 
 	address := fmt.Sprintf(":%d", dnsPort)
 	err = dns.ListenAndServe(address, "udp", LocalServeMux)
 	if err != nil {
-		log.Fatal(err)
+		Error.Fatal(err)
 	} else {
-		log.Printf("Listening for DNS on %s", address)
+		Info.Printf("Listening for DNS on %s", address)
 	}
 	return nil
 }
