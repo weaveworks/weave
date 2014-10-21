@@ -10,6 +10,18 @@ const (
 	LOCAL_DOMAIN = "weave.local."
 )
 
+func checkFatal(e error) {
+	if e != nil {
+		Error.Fatal(e)
+	}
+}
+
+func checkWarn(e error) {
+	if e != nil {
+		Warning.Println(e)
+	}
+}
+
 func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 	m := new(dns.Msg)
 	m.SetReply(r)
@@ -75,35 +87,26 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wai
 	go ListenHttp(LOCAL_DOMAIN, zone, httpPort)
 
 	mdnsClient, err := NewMDNSClient()
-	if err != nil {
-		Error.Fatal(err)
-	} else {
-		Info.Printf("Using mDNS on %s", iface.Name)
-	}
+	checkFatal(err)
+
+	Info.Printf("Using mDNS on %s", iface.Name)
 	err = mdnsClient.Start(iface)
-	if err != nil {
-		Error.Fatal(err)
-	}
+	checkFatal(err)
 
 	LocalServeMux := dns.NewServeMux()
 	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler(zone, mdnsClient))
 	LocalServeMux.HandleFunc(".", notUsHandler())
 
 	mdnsServer, err := NewMDNSServer(zone)
-	if err != nil {
-		Error.Fatal(err)
-	}
+	checkFatal(err)
+
 	err = mdnsServer.Start(iface)
-	if err != nil {
-		Error.Fatal(err)
-	}
+	checkFatal(err)
 
 	address := fmt.Sprintf(":%d", dnsPort)
 	err = dns.ListenAndServe(address, "udp", LocalServeMux)
-	if err != nil {
-		Error.Fatal(err)
-	} else {
-		Info.Printf("Listening for DNS on %s", address)
-	}
+	checkFatal(err)
+
+	Info.Printf("Listening for DNS on %s", address)
 	return nil
 }
