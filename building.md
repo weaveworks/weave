@@ -27,11 +27,11 @@ $ cd src/$WEAVE
 Then simply run
 
 ```bash
-$ make -C weaver
+$ make
 ```
 
 This will build the weave router, produce a docker image
-`zettio/weave` and export that image to `/tmp/weave.tar`.
+`zettio/weave` and export that image to `/var/tmp/weave.tar`.
 
 ## Building using Vagrant
 
@@ -75,13 +75,13 @@ the weave image, do
 ```bash
 $ vagrant ssh
 vm$ cd src/github.com/zettio/weave
-vm$ make -C weaver
+vm$ make
 ```
 
 The docker daemon is also running in this VM, so you can then do
 
 ```bash
-vm$ sudo weaver/weave launch 10.0.0.1/16
+vm$ sudo ./weave launch 10.0.0.1/16
 vm$ docker ps
 ```
 
