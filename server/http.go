@@ -66,7 +66,7 @@ func ListenHttp(domain string, db Zone, port int) {
 					if !ok {
 						httpErrorAndLog(
 							Error, w, "Internal error", http.StatusInternalServerError,
-							"Unexpected error from DB", err)
+							"Unexpected error from DB: %s", err)
 						return
 					} else if dup.Ident != identifier {
 						http.Error(w, err.Error(), http.StatusConflict)
@@ -95,7 +95,7 @@ func ListenHttp(domain string, db Zone, port int) {
 				if _, ok := err.(LookupError); !ok {
 					httpErrorAndLog(
 						Error, w, "Internal error", http.StatusInternalServerError,
-						"Unexpected error from DB", err)
+						"Unexpected error from DB: %s", err)
 					return
 				}
 			}
