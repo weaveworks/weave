@@ -14,9 +14,9 @@ const (
 	mdnsPort = 5353          // mDNS assigned port
 	// We wait this long to hear responses from other mDNS servers on the network.
 	// TODO: introduce caching so we don't have to wait this long on every call.
-	mDNSTimeout = 250 * time.Millisecond
+	mDNSTimeout = 500 * time.Millisecond
 	MaxDuration = time.Duration(math.MaxInt64)
-	ChannelSize = 16
+	MailboxSize = 16
 )
 
 var (
@@ -88,7 +88,7 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 	c.server = &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
 	go c.server.ActivateAndServe()
 
-	queryChan := make(chan *MDNSInteraction, ChannelSize)
+	queryChan := make(chan *MDNSInteraction, MailboxSize)
 	c.queryChan = queryChan
 	go c.queryLoop(queryChan)
 
@@ -216,13 +216,13 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 			name: q.name,
 			id:   m.Id,
 		}
-		c.inflight[q.name] = query
 		_, err = c.conn.WriteTo(buf, c.addr)
 		if err != nil {
 			q.responseCh <- &ResponseA{Err: err}
 			close(q.responseCh)
 			return
 		}
+		c.inflight[q.name] = query
 	}
 	info := &responseInfo{
 		ch:      q.responseCh,
@@ -237,10 +237,13 @@ func (c *MDNSClient) handleResponse(r *dns.Msg) {
 	for _, answer := range r.Answer {
 		switch rr := answer.(type) {
 		case *dns.A:
-			if query, found := c.inflight[rr.Hdr.Name]; found {
+			name := rr.Hdr.Name
+			if query, found := c.inflight[name]; found {
 				for _, resp := range query.responseInfos {
 					resp.ch <- &ResponseA{Name: rr.Hdr.Name, Addr: rr.A}
+					close(resp.ch)
 				}
+				delete(c.inflight, name)
 			} else {
 				// We've received a response that didn't match a query
 				// Do we want to cache it?
