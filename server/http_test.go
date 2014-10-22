@@ -69,9 +69,7 @@ func TestHttp(t *testing.T) {
 
 	// Check that the address is not there now.
 	_, err = zone.MatchLocal(success_test_name)
-	if _, ok := err.(LookupError); !ok {
-		t.Fatal(err)
-	}
+	assertErrorType(t, err, (*LookupError)(nil), "nonexistent lookup")
 
 	// Delete the address again, it should accept this
 	resp, err = genForm("DELETE", addr_url, nil)

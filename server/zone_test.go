@@ -30,9 +30,7 @@ func TestZone(t *testing.T) {
 
 	// Now try to add the same address again
 	err = zone.AddRecord(container_id, success_test_name, ip, weave_ip, subnet)
-	if _, ok := err.(DuplicateError); !ok {
-		t.Fatal(err)
-	}
+	assertErrorType(t, err, (*DuplicateError)(nil), "duplicate add")
 
 	// Now delete the record
 	err = zone.DeleteRecord(container_id, weave_ip)
@@ -40,15 +38,11 @@ func TestZone(t *testing.T) {
 
 	// Check that the address is not there now.
 	_, err = zone.MatchLocal(success_test_name)
-	if _, ok := err.(LookupError); !ok {
-		t.Fatal("Unexpected result when deleting record", success_test_name, err)
-	}
+	assertErrorType(t, err, (*LookupError)(nil), "after deleting record")
 
 	// Delete a record that isn't there
 	err = zone.DeleteRecord(container_id, net.ParseIP("0.0.0.0"))
-	if _, ok := err.(LookupError); !ok {
-		t.Fatal("Expected a LookupError when deleting a record that doesn't exist")
-	}
+	assertErrorType(t, err, (*LookupError)(nil), "when deleting record that doesn't exist")
 }
 
 func TestDeleteFor(t *testing.T) {
@@ -72,7 +66,5 @@ func TestDeleteFor(t *testing.T) {
 
 	err = zone.DeleteRecordsFor(id)
 	_, err = zone.MatchLocal(name)
-	if _, ok := err.(LookupError); !ok {
-		t.Fatal("Expected no results after deleting records for ident")
-	}
+	assertErrorType(t, err, (*LookupError)(nil), "after deleting records for ident")
 }
