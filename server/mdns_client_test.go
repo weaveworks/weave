@@ -66,13 +66,9 @@ func RunLocalMulticastServer() (*dns.Server, error) {
 
 func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 	mdnsClient, err := NewMDNSClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	err = mdnsClient.Start(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 
 	server, err := RunLocalMulticastServer()
 	if err != nil {
@@ -96,9 +92,7 @@ func (c *testContext) checkResponse(t *testing.T, channel_ok bool, resp *Respons
 		c.channel = nil
 		return
 	}
-	if resp.Err != nil {
-		t.Fatal(resp.Err)
-	}
+	assertNoErr(t, resp.Err)
 	log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
 	c.received_addr = resp.Addr
 	c.received_count++

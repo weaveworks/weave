@@ -38,18 +38,14 @@ func TestHttp(t *testing.T) {
 	addr_url := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, container_id, addr_parts[0])
 	resp, err := genForm("PUT", addr_url,
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatal("Unexpected http response", resp.Status)
 	}
 
 	// Check that the address is now there.
 	ip, err := zone.MatchLocal(success_test_name)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	weave_ip, _, _ := net.ParseCIDR(test_addr1)
 	if !ip.Equal(weave_ip) {
 		t.Fatal("Unexpected result for", success_test_name, ip)
@@ -58,9 +54,7 @@ func TestHttp(t *testing.T) {
 	// Adding exactly the same address should be OK
 	resp, err = genForm("PUT", addr_url,
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatal("Expected duplicate add to succeed with 200 OK")
 	}
@@ -69,18 +63,14 @@ func TestHttp(t *testing.T) {
 	other_url := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addr_parts[0])
 	resp, err = genForm("PUT", other_url,
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatal("Unexpected http response", resp.Status)
 	}
 
 	// Delete the address
 	resp, err = genForm("DELETE", addr_url, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatal("Unexpected http response", resp.Status)
 	}
@@ -93,9 +83,7 @@ func TestHttp(t *testing.T) {
 
 	// Delete the address again, it should accept this
 	resp, err = genForm("DELETE", addr_url, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatal("Unexpected http response", resp.Status)
 	}

@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-func assertNoErr(t *testing.T, err error) {
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestZone(t *testing.T) {
 	var (
 		container_id      = "deadbeef"

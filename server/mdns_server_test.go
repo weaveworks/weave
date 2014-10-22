@@ -37,22 +37,16 @@ func TestServerSimpleQuery(t *testing.T) {
 	zone.AddRecord(container_id, "test.weave.", docker_ip, weave_ip, subnet)
 
 	mdnsServer, err := NewMDNSServer(zone)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	err = mdnsServer.Start(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 
 	var received_addr net.IP
 	received_count := 0
 
 	// Implement a minimal listener for responses
 	multicast, err := LinkLocalMulticastListener(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 
 	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
 		// Only handle responses here
