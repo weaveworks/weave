@@ -39,9 +39,7 @@ func TestHttp(t *testing.T) {
 	resp, err := genForm("PUT", addr_url,
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
 	assertNoErr(t, err)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatal("Unexpected http response", resp.Status)
-	}
+	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is now there.
 	ip, err := zone.MatchLocal(success_test_name)
@@ -55,25 +53,19 @@ func TestHttp(t *testing.T) {
 	resp, err = genForm("PUT", addr_url,
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
 	assertNoErr(t, err)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatal("Expected duplicate add to succeed with 200 OK")
-	}
+	assertStatus(t, resp.StatusCode, http.StatusOK, "http success response for duplicate add")
 
 	// Now try adding the same address again with a different ident - should fail
 	other_url := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addr_parts[0])
 	resp, err = genForm("PUT", other_url,
 		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
 	assertNoErr(t, err)
-	if resp.StatusCode != http.StatusConflict {
-		t.Fatal("Unexpected http response", resp.Status)
-	}
+	assertStatus(t, resp.StatusCode, http.StatusConflict, "http response")
 
 	// Delete the address
 	resp, err = genForm("DELETE", addr_url, nil)
 	assertNoErr(t, err)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatal("Unexpected http response", resp.Status)
-	}
+	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is not there now.
 	_, err = zone.MatchLocal(success_test_name)
@@ -84,9 +76,7 @@ func TestHttp(t *testing.T) {
 	// Delete the address again, it should accept this
 	resp, err = genForm("DELETE", addr_url, nil)
 	assertNoErr(t, err)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatal("Unexpected http response", resp.Status)
-	}
+	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Would like to shut down the http server at the end of this test
 	// but it's complicated.
