@@ -1,13 +1,18 @@
 .DEFAULT: all
+.PHONY: all publish clean
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
 
-all: docker-image
+WEAVER_EXE=weaver/weaver
+WEAVER_IMAGE=zettio/weave
+WEAVER_EXPORT=/var/tmp/weave.tar
 
-weaver: ../router/*.go main.go
-	go get -tags netgo
-	go build -ldflags '-extldflags "-static"' -tags netgo
+all: $(WEAVER_EXPORT)
+
+$(WEAVER_EXE): router/*.go weaver/main.go
+	go get -tags netgo ./weaver
+	go build -ldflags '-extldflags "-static"' -tags netgo -o $@ ./weaver
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 		rm $@; \
 		echo "\nYour go standard library was built without the 'netgo' build tag."; \
@@ -16,18 +21,15 @@ weaver: ../router/*.go main.go
 		false; \
 	}
 
-.PHONY: docker-image
-docker-image: /var/tmp/weave.tar
+$(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
+	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
+	$(SUDO) docker save $(WEAVER_IMAGE) > $@
 
-/var/tmp/weave.tar: Dockerfile weaver
-	$(SUDO) docker build -t zettio/weave .
-	$(SUDO) docker save zettio/weave > /var/tmp/weave.tar
-
-publish: docker-image
-	$(SUDO) docker tag zettio/weave zettio/weave:git-`git rev-parse --short=12 HEAD`
-	$(SUDO) docker push zettio/weave:latest
-	$(SUDO) docker push zettio/weave:git-`git rev-parse --short=12 HEAD`
+publish: $(WEAVER_EXPORT)
+	$(SUDO) docker tag $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
+	$(SUDO) docker push $(WEAVER_IMAGE):latest
+	$(SUDO) docker push $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
 
 clean:
-	-$(SUDO) docker rmi zettio/weave
-	rm -f weaver /var/tmp/weave.tar
+	-$(SUDO) docker rmi $(WEAVER_IMAGE)
+	rm -f $(WEAVER_EXE) $(WEAVER_EXPORT)
