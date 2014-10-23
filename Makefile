@@ -23,7 +23,7 @@ $(WEAVER_EXE): router/*.go weaver/main.go
 
 $(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
-	$(SUDO) docker save $(WEAVER_IMAGE) > $@
+	$(SUDO) docker save $(WEAVER_IMAGE):latest > $@
 
 publish: $(WEAVER_EXPORT)
 	$(SUDO) docker tag $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
