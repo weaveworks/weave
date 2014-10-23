@@ -4,6 +4,7 @@ set -e
 usage() {
     echo "Usage:"
     echo "weave launch  [-password <password>] <peer> ..."
+    echo "weave launch-dns <cidr>"
     echo "weave connect <peer>"
     echo "weave run     <cidr> <docker run args> ..."
     echo "weave start   <cidr> <container_id>"
@@ -35,7 +36,9 @@ command_exists () {
 [ $# -gt 0 ] || usage
 
 IMAGE=zettio/weave
+DNS_IMAGE=zettio/weavedns
 CONTAINER_NAME=weave
+DNS_CONTAINER_NAME=weavedns
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
@@ -279,6 +282,22 @@ rest_call() {
     fi
 }
 
+# Perform operation $1 on container ID $2 to local DNS database at address $3
+# This function is only called where we know $2 is a valid container name
+tell_dns() {
+    if ! DNSID=$(docker inspect --format='{{ .Id }}' weavedns 2>/dev/null) || [ -z "$DNSID" ] ; then
+        # weavedns not running - silently return
+        return
+    fi
+    # get the long form of the container ID
+    CONTAINER=$(docker inspect --format '{{.Id}}' $2 2>/dev/null)
+    # extract IP address and routing prefix from CIDR
+    WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
+    WEAVE_ADDR_PR=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\2/')
+    MORE_ARGS=$(docker inspect --format '--data-urlencode local_ip={{ .NetworkSettings.IPAddress }} --data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
+    rest_call $1 weavedns 6785/name/$CONTAINER/$WEAVE_ADDR_IP --data-urlencode "routing_prefix=$WEAVE_ADDR_PR" $MORE_ARGS
+}
+
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
     case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $1 2>/dev/null) in
@@ -323,6 +342,16 @@ case "$COMMAND" in
         with_container_netns $CONTAINER launch
         echo $CONTAINER
         ;;
+    launch-dns)
+        [ $# -gt 0 ] || usage
+        CIDR=$1
+        shift 1
+        check_not_running $DNS_CONTAINER_NAME $DNS_IMAGE
+        create_bridge
+        CONTAINER=$(docker run -d --name=$DNS_CONTAINER_NAME -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@")
+        with_container_netns $CONTAINER attach $CIDR
+        echo $CONTAINER
+        ;;
     connect)
         [ $# -eq 1 ] || usage
         rest_call POST weave $HTTP_PORT/connect -d "peer=$1"
@@ -347,8 +376,10 @@ case "$COMMAND" in
         CIDR=$1
         shift 1
         create_bridge
-        CONTAINER=$(docker run -d "$@" | tail -n 1)
+        DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}' $DNS_CONTAINER_NAME 2>/dev/null) || true
+        CONTAINER=$(docker run $DNS_ARG -d "$@" | tail -n 1)
         with_container_netns $CONTAINER attach $CIDR
+        tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
         ;;
     start)
@@ -357,6 +388,7 @@ case "$COMMAND" in
         create_bridge
         CONTAINER=$(docker start $2)
         with_container_netns $CONTAINER attach $1
+        tell_dns PUT $CONTAINER $1
         echo $CONTAINER
         ;;
     attach)
@@ -364,11 +396,13 @@ case "$COMMAND" in
         validate_cidr $1
         create_bridge
         with_container_netns $2 attach $1
+        tell_dns PUT $2 $1
         ;;
     detach)
         [ $# -eq 2 ] || usage
         validate_cidr $1
         with_container_netns $2 detach $1
+        tell_dns DELETE $2 $1
         ;;
     expose)
         [ $# -eq 1 ] || usage
@@ -397,7 +431,9 @@ case "$COMMAND" in
         if ! docker kill $CONTAINER_NAME >/dev/null 2>&1 ; then
             echo "Weave is not running."
         fi
+
         docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+        docker rm -f $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         check_command_and_run conntrack conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         ;;
     reset)
