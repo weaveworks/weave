@@ -16,8 +16,8 @@ func TestZone(t *testing.T) {
 	var zone = new(ZoneDb)
 
 	ip := net.ParseIP(dockerIP)
-	weaveIP, subnet, _ := net.ParseCIDR(testAddr1)
-	err := zone.AddRecord(containerID, successTestName, ip, weaveIP, subnet)
+	weaveIP, _, _ := net.ParseCIDR(testAddr1)
+	err := zone.AddRecord(containerID, successTestName, ip, weaveIP)
 	assertNoErr(t, err)
 
 	// Check that the address is now there.
@@ -29,7 +29,7 @@ func TestZone(t *testing.T) {
 	}
 
 	// Now try to add the same address again
-	err = zone.AddRecord(containerID, successTestName, ip, weaveIP, subnet)
+	err = zone.AddRecord(containerID, successTestName, ip, weaveIP)
 	assertErrorType(t, err, (*DuplicateError)(nil), "duplicate add")
 
 	// Now delete the record
@@ -56,8 +56,8 @@ func TestDeleteFor(t *testing.T) {
 	zone := new(ZoneDb)
 	ip := net.ParseIP(dockerIP)
 	for _, addr := range []string{addr1, addr2} {
-		weaveIP, subnet, _ := net.ParseCIDR(addr)
-		err := zone.AddRecord(id, name, ip, weaveIP, subnet)
+		weaveIP, _, _ := net.ParseCIDR(addr)
+		err := zone.AddRecord(id, name, ip, weaveIP)
 		assertNoErr(t, err)
 	}
 

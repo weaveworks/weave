@@ -7,8 +7,7 @@ import (
 )
 
 type Zone interface {
-	AddRecord(ident string, name string, localIP net.IP,
-		weaveIP net.IP, weaveSubnet *net.IPNet) error
+	AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP) error
 	DeleteRecord(ident string, weaveIp net.IP) error
 	DeleteRecordsFor(ident string) error
 	MatchLocal(name string) (net.IP, error)
@@ -19,7 +18,6 @@ type Record struct {
 	Name    string
 	LocalIP net.IP
 	WeaveIP net.IP
-	Subnet  *net.IPNet
 }
 
 // Very simple data structure for now, with linear searching.
@@ -65,7 +63,7 @@ func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 	return nil, LookupError(name)
 }
 
-func (zone *ZoneDb) AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP, weaveSubnet *net.IPNet) error {
+func (zone *ZoneDb) AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	fqdn := dns.Fqdn(name)
@@ -73,7 +71,7 @@ func (zone *ZoneDb) AddRecord(ident string, name string, localIP net.IP, weaveIP
 		func(r Record) bool { return r.Name == fqdn && r.WeaveIP.Equal(weaveIP) }); index != -1 {
 		return DuplicateError{fqdn, weaveIP, zone.recs[index].Ident}
 	}
-	zone.recs = append(zone.recs, Record{ident, fqdn, localIP, weaveIP, weaveSubnet})
+	zone.recs = append(zone.recs, Record{ident, fqdn, localIP, weaveIP})
 	return nil
 }
 

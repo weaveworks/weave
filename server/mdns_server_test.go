@@ -33,8 +33,8 @@ func TestServerSimpleQuery(t *testing.T) {
 	log.Println("TestServerSimpleQuery starting")
 	var zone = new(ZoneDb)
 	dockerIP := net.ParseIP("9.8.7.6")
-	weaveIP, subnet, _ := net.ParseCIDR(testAddr1)
-	zone.AddRecord(containerID, "test.weave.", dockerIP, weaveIP, subnet)
+	weaveIP, _, _ := net.ParseCIDR(testAddr1)
+	zone.AddRecord(containerID, "test.weave.", dockerIP, weaveIP)
 
 	mdnsServer, err := NewMDNSServer(zone)
 	assertNoErr(t, err)

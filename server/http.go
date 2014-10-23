@@ -35,32 +35,30 @@ func ListenHttp(domain string, db Zone, port int) {
 
 		switch r.Method {
 		case "PUT":
-			identifier, weaveIPstr, err := parseUrl(r.URL.Path)
+			ident, weaveIPstr, err := parseUrl(r.URL.Path)
 			name := r.FormValue("fqdn")
-			prefix := r.FormValue("routing_prefix")
-			localIP := r.FormValue("local_ip")
+			localIPstr := r.FormValue("local_ip")
 
-			if identifier == "" || weaveIPstr == "" || name == "" || prefix == "" || localIP == "" {
+			if ident == "" || weaveIPstr == "" || name == "" || localIPstr == "" {
 				reqError("Invalid request", "Invalid request: %s, %s", r.URL, r.Form)
 				return
 			}
 
-			ip := net.ParseIP(localIP)
-			if ip == nil {
-				reqError("Invalid IP in request", "Invalid IP in request: %s", localIP)
+			localIP := net.ParseIP(localIPstr)
+			if localIP == nil {
+				reqError("Invalid IP in request", "Invalid IP in request: %s", localIPstr)
 				return
 			}
 
-			weaveCIDR := weaveIPstr + "/" + prefix
-			weaveIP, subnet, err := net.ParseCIDR(weaveCIDR)
-			if err != nil {
-				reqError("Invalid CIDR", "Invalid CIDR in request: %s", weaveCIDR)
+			weaveIP := net.ParseIP(weaveIPstr)
+			if weaveIP == nil {
+				reqError("Invalid weave IP", "Invalid weave IP in request: %s", weaveIPstr)
 				return
 			}
 
 			if dns.IsSubDomain(domain, name) {
-				Info.Printf("Adding %s (%s) -> %s", name, localIP, weaveCIDR)
-				err = db.AddRecord(identifier, name, ip, weaveIP, subnet)
+				Info.Printf("Adding %s (%s) -> %s", name, localIPstr, weaveIPstr)
+				err = db.AddRecord(ident, name, localIP, weaveIP)
 				if err != nil {
 					dup, ok := err.(DuplicateError)
 					if !ok {
@@ -68,7 +66,7 @@ func ListenHttp(domain string, db Zone, port int) {
 							Error, w, "Internal error", http.StatusInternalServerError,
 							"Unexpected error from DB: %s", err)
 						return
-					} else if dup.Ident != identifier {
+					} else if dup.Ident != ident {
 						http.Error(w, err.Error(), http.StatusConflict)
 						return
 					} // else we are golden
@@ -78,8 +76,8 @@ func ListenHttp(domain string, db Zone, port int) {
 			}
 
 		case "DELETE":
-			identifier, weaveIPstr, err := parseUrl(r.URL.Path)
-			if identifier == "" || weaveIPstr == "" {
+			ident, weaveIPstr, err := parseUrl(r.URL.Path)
+			if ident == "" || weaveIPstr == "" {
 				reqError("Invalid Request", "Invalid request: %s, %s", r.URL, r.Form)
 				return
 			}
@@ -89,8 +87,8 @@ func ListenHttp(domain string, db Zone, port int) {
 				reqError("Invalid IP in request", "Invalid IP in request: %s", weaveIPstr)
 				return
 			}
-			Info.Printf("Deleting %s (%s)", identifier, weaveIPstr)
-			err = db.DeleteRecord(identifier, weaveIP)
+			Info.Printf("Deleting %s (%s)", ident, weaveIPstr)
+			err = db.DeleteRecord(ident, weaveIP)
 			if err != nil {
 				if _, ok := err.(LookupError); !ok {
 					httpErrorAndLog(
