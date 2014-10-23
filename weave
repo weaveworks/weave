@@ -5,6 +5,7 @@ usage() {
     echo "Usage:"
     echo "weave launch <cidr> [-password <password>] <peer_host> ..."
     echo "weave run    <cidr> <docker run args> ..."
+    echo "weave start  <cidr> <container_id>"
     echo "weave attach <cidr> <container_id>"
     echo "weave detach <cidr> <container_id>"
     echo "weave expose <cidr>"
