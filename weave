@@ -3,16 +3,18 @@ set -e
 
 usage() {
     echo "Usage:"
-    echo "weave launch <ipaddr>/<subnet-cidr> [-password <password>] <peer_host> ..."
-    echo "weave run    <ipaddr>/<subnet-cidr> <docker run args> ..."
-    echo "weave attach <ipaddr>/<subnet-cidr> <container_id>"
-    echo "weave detach <ipaddr>/<subnet-cidr> <container_id>"
-    echo "weave expose <ipaddr>/<subnet-cidr>"
-    echo "weave hide   <ipaddr>/<subnet-cidr>"
+    echo "weave launch <cidr> [-password <password>] <peer_host> ..."
+    echo "weave run    <cidr> <docker run args> ..."
+    echo "weave attach <cidr> <container_id>"
+    echo "weave detach <cidr> <container_id>"
+    echo "weave expose <cidr>"
+    echo "weave hide   <cidr>"
     echo "weave status"
     echo "weave version"
     echo "weave stop"
     echo "weave reset"
+    echo
+    echo "where <cidr> is of the form <ip-address>/<routing-prefix-length>"
     exit 1
 }
 
