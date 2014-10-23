@@ -65,13 +65,13 @@ be 10.0.0.1, and that the weave network is on 10.0.0.0/16.
 The second line starts our application container. We give it an IP
 address and network (a subnet of the weave network). `weave run`
 invokes `docker run -d` with all the parameters following the IP
-address and netmask. So we could be launching any container this way;
+address and network. So we could be launching any container this way;
 here we just take a stock ubuntu container and launch a shell in it.
 
 If our application consists of more than one container on this host we
 simply launch them with a variation on that second line.
 
-The IP addresses and netmasks can be anything you like which doesn't
+The IP addresses and networks can be anything you like which doesn't
 conflict with any IP ranges of 'external' services the hosts or your
 containers need to connect to. The same IP range must be used
 everywhere, and the individual IP addresses must, of course, be
