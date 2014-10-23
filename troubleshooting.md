@@ -24,6 +24,21 @@ Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the
 `weave` network bridge on the host.
 
+To get a list of all the containers running on this host that are
+connected to the weave network:
+
+    weave ps
+
+This produces output like:
+
+    /weave zettio/weave (5245643870f1.): 10.0.5.1/16
+    /hopeful_wilson bboreham/mcast (e32a7d37a93a.): 10.0.8.3/24
+    /thirsty_newton ubuntu/latest (caa1d4ee2570.): 10.0.1.1/24 10.0.2.1/24
+
+On each line the values are: the name of the container, the name of
+the image, (hostname.domain): then the IP addresses assigned on the
+weave network.
+
 One can ask a weave router to report its status with
 
     weave status
