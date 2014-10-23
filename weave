@@ -14,7 +14,7 @@ usage() {
     echo "weave stop"
     echo "weave reset"
     echo
-    echo "where <cidr> is of the form <ip-address>/<routing-prefix-length>"
+    echo "where <cidr> is of the form <ip_address>/<routing_prefix_length>"
     exit 1
 }
 
