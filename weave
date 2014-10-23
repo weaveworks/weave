@@ -258,6 +258,27 @@ detach() {
     ip link del $LOCAL_IFNAME type veth
 }
 
+# Call url $3 on program $2 with http verb $1
+rest_call() {
+    http_verb="$1"
+    if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $2 2>/dev/null) ; then
+        echo "$2 is not running." >&2
+        exit 1
+    fi
+    if [ -z "$DOCKERIP" ] ; then
+        echo "$2 is not running." >&2
+        exit 1
+    fi
+    url="$3"
+    shift 3
+    if command_exists curl ; then
+        curl -s -X $http_verb "$@" $DOCKERIP:$url
+    else
+        echo "Cannot find curl, which is required for this operation." >&2
+        exit 1
+    fi
+}
+
 case "$COMMAND" in
     launch)
         case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $CONTAINER_NAME 2>/dev/null) in
@@ -299,25 +320,10 @@ case "$COMMAND" in
         ;;
     connect)
         [ $# -eq 1 ] || usage
-        docker_ip
-        if command_exists curl ; then
-            curl -d peer=$1 $DOCKERIP:$HTTP_PORT/connect
-        else
-            echo "Cannot find curl. Install it for 'weave connect' to function." >&2
-            exit 1
-        fi
+        rest_call POST weave $HTTP_PORT/connect -d "peer=$1"
         ;;
     status)
-        [ $# -eq 0 ] || usage
-        docker_ip
-        if command_exists wget ; then
-            wget -O - -q $DOCKERIP:$HTTP_PORT/status
-        elif command_exists curl ; then
-            curl $DOCKERIP:$HTTP_PORT/status
-        else
-            echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
-            exit 1
-        fi
+        rest_call GET weave $HTTP_PORT/status
         ;;
     version)
         [ $# -eq 0 ] || usage
