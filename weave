@@ -10,6 +10,7 @@ usage() {
     echo "weave detach <cidr> <container_id>"
     echo "weave expose <cidr>"
     echo "weave hide   <cidr>"
+    echo "weave ps"
     echo "weave status"
     echo "weave version"
     echo "weave stop"
@@ -118,6 +119,9 @@ stop_masquerading() {
 }
 
 # the following borrows from https://github.com/jpetazzo/pipework
+
+# run all args as a command in the network namespace of container $2
+# if an error is caused by container dieing, swallow output from error
 with_container_netns () {
     CONTAINER="$2"
     CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
@@ -139,6 +143,8 @@ with_container_netns () {
 
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
+    # if an error is caused by container dieing, swallow output from all commands and
+    # just say the container died.
     IP_TMPFILE=/tmp/weave_ip_output_$$
     rm -f $IP_TMPFILE
 
@@ -154,6 +160,7 @@ with_container_netns () {
         fi
     fi
 
+    cat $IP_TMPFILE  # no error - send the output to stdout
     rm -f $IP_TMPFILE /var/run/netns/$NETNS
     return $STATUS
 }
@@ -227,6 +234,23 @@ detach() {
     ip link del $LOCAL_IFNAME type veth
 }
 
+# send to stdout any IPv4 addresses configured on the interface 'ethwe', one per line
+container_weave_ips() {
+    (ip netns exec $NETNS ip addr show dev ethwe 2>&1 || true) | grep 'inet ' | while read line
+    do
+        echo $line | tr -s ' ' | cut -d ' ' -f 2
+    done
+}
+
+weave_ps() {
+    for CONTAINER_ID in $(docker ps -q) ; do
+        CONTAINER_IPS=$(with_container_netns container_weave_ips $CONTAINER_ID)
+        if [ -n "$CONTAINER_IPS" ] ; then
+            echo $(docker inspect --format '{{ .Name }} {{ .Config.Image }} ({{ .Config.Hostname }}.{{ .Config.Domainname }}):' $CONTAINER_ID) $CONTAINER_IPS
+        fi
+    done
+}
+
 case "$COMMAND" in
     launch)
         [ $# -gt 0 ] || usage
@@ -283,6 +307,9 @@ case "$COMMAND" in
             echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
             exit 1
         fi
+        ;;
+    ps)
+        weave_ps
         ;;
     version)
         # Try the running container first; if no luck try the image
