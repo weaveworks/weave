@@ -141,12 +141,12 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 	after := MaxDuration
 	for name, query := range c.inflight {
 		// Invariant on responseInfos: they are in non-descending order of timeout.
-		num_closed := 0
+		numClosed := 0
 		for _, item := range query.responseInfos {
 			duration := item.timeout.Sub(now)
 			if duration <= 0 { // timed out
 				close(item.ch)
-				num_closed++
+				numClosed++
 			} else {
 				if duration < after {
 					after = duration
@@ -155,7 +155,7 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 			}
 		}
 		// Remove timed-out items from the slice
-		query.responseInfos = query.responseInfos[num_closed:]
+		query.responseInfos = query.responseInfos[numClosed:]
 		if len(query.responseInfos) == 0 {
 			delete(c.inflight, name)
 		}

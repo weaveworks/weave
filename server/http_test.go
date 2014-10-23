@@ -19,60 +19,60 @@ func genForm(method string, url string, data url.Values) (resp *http.Response, e
 
 func TestHttp(t *testing.T) {
 	var (
-		container_id      = "deadbeef"
-		test_domain       = "weave.local."
-		success_test_name = "test1." + test_domain
-		test_addr1        = "10.0.2.1/24"
-		docker_ip         = "9.8.7.6"
+		containerID     = "deadbeef"
+		testDomain      = "weave.local."
+		successTestName = "test1." + testDomain
+		testAddr1       = "10.0.2.1/24"
+		dockerIP        = "9.8.7.6"
 	)
 
 	var zone = new(ZoneDb)
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
-	go ListenHttp(test_domain, zone, port)
+	go ListenHttp(testDomain, zone, port)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
 	// Ask the http server to add our test address into the database
-	addr_parts := strings.Split(test_addr1, "/")
-	addr_url := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, container_id, addr_parts[0])
-	resp, err := genForm("PUT", addr_url,
-		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
+	addrParts := strings.Split(testAddr1, "/")
+	addrUrl := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, containerID, addrParts[0])
+	resp, err := genForm("PUT", addrUrl,
+		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
 	assertNoErr(t, err)
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is now there.
-	ip, err := zone.MatchLocal(success_test_name)
+	ip, err := zone.MatchLocal(successTestName)
 	assertNoErr(t, err)
-	weave_ip, _, _ := net.ParseCIDR(test_addr1)
-	if !ip.Equal(weave_ip) {
-		t.Fatal("Unexpected result for", success_test_name, ip)
+	weaveIP, _, _ := net.ParseCIDR(testAddr1)
+	if !ip.Equal(weaveIP) {
+		t.Fatal("Unexpected result for", successTestName, ip)
 	}
 
 	// Adding exactly the same address should be OK
-	resp, err = genForm("PUT", addr_url,
-		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
+	resp, err = genForm("PUT", addrUrl,
+		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
 	assertNoErr(t, err)
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http success response for duplicate add")
 
 	// Now try adding the same address again with a different ident - should fail
-	other_url := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addr_parts[0])
-	resp, err = genForm("PUT", other_url,
-		url.Values{"fqdn": {success_test_name}, "local_ip": {docker_ip}, "routing_prefix": {addr_parts[1]}})
+	otherUrl := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addrParts[0])
+	resp, err = genForm("PUT", otherUrl,
+		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
 	assertNoErr(t, err)
 	assertStatus(t, resp.StatusCode, http.StatusConflict, "http response")
 
 	// Delete the address
-	resp, err = genForm("DELETE", addr_url, nil)
+	resp, err = genForm("DELETE", addrUrl, nil)
 	assertNoErr(t, err)
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is not there now.
-	_, err = zone.MatchLocal(success_test_name)
+	_, err = zone.MatchLocal(successTestName)
 	assertErrorType(t, err, (*LookupError)(nil), "nonexistent lookup")
 
 	// Delete the address again, it should accept this
-	resp, err = genForm("DELETE", addr_url, nil)
+	resp, err = genForm("DELETE", addrUrl, nil)
 	assertNoErr(t, err)
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 

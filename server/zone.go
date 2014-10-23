@@ -7,17 +7,18 @@ import (
 )
 
 type Zone interface {
-	AddRecord(string, string, net.IP, net.IP, *net.IPNet) error
-	DeleteRecord(ident string, weave_ip net.IP) error
+	AddRecord(ident string, name string, localIP net.IP,
+		weaveIP net.IP, weaveSubnet *net.IPNet) error
+	DeleteRecord(ident string, weaveIp net.IP) error
 	DeleteRecordsFor(ident string) error
-	MatchLocal(string) (net.IP, error)
+	MatchLocal(name string) (net.IP, error)
 }
 
 type Record struct {
 	Ident   string
 	Name    string
-	Ip      net.IP
-	WeaveIp net.IP
+	LocalIP net.IP
+	WeaveIP net.IP
 	Subnet  *net.IPNet
 }
 
@@ -36,12 +37,12 @@ func (ops LookupError) Error() string {
 
 type DuplicateError struct {
 	Name    string
-	WeaveIp net.IP
+	WeaveIP net.IP
 	Ident   string
 }
 
 func (err DuplicateError) Error() string {
-	return "Duplicate " + err.Name + "," + err.WeaveIp.String() + " in container " + err.Ident
+	return "Duplicate " + err.Name + "," + err.WeaveIP.String() + " for identity " + err.Ident
 }
 
 func (zone *ZoneDb) indexOf(match func(Record) bool) int {
@@ -58,29 +59,29 @@ func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 	defer zone.mx.RUnlock()
 	for _, r := range zone.recs {
 		if r.Name == name {
-			return r.WeaveIp, nil
+			return r.WeaveIP, nil
 		}
 	}
 	return nil, LookupError(name)
 }
 
-func (zone *ZoneDb) AddRecord(identifier string, name string, ip net.IP, weave_ip net.IP, weave_subnet *net.IPNet) error {
+func (zone *ZoneDb) AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP, weaveSubnet *net.IPNet) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	fqdn := dns.Fqdn(name)
 	if index := zone.indexOf(
-		func(r Record) bool { return r.Name == fqdn && r.WeaveIp.Equal(weave_ip) }); index != -1 {
-		return DuplicateError{fqdn, weave_ip, zone.recs[index].Ident}
+		func(r Record) bool { return r.Name == fqdn && r.WeaveIP.Equal(weaveIP) }); index != -1 {
+		return DuplicateError{fqdn, weaveIP, zone.recs[index].Ident}
 	}
-	zone.recs = append(zone.recs, Record{identifier, fqdn, ip, weave_ip, weave_subnet})
+	zone.recs = append(zone.recs, Record{ident, fqdn, localIP, weaveIP, weaveSubnet})
 	return nil
 }
 
-func (zone *ZoneDb) DeleteRecord(ident string, weave_ip net.IP) error {
+func (zone *ZoneDb) DeleteRecord(ident string, weaveIP net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	if index := zone.indexOf(
-		func(r Record) bool { return r.Ident == ident && r.WeaveIp.Equal(weave_ip) }); index == -1 {
+		func(r Record) bool { return r.Ident == ident && r.WeaveIP.Equal(weaveIP) }); index == -1 {
 		return LookupError(ident)
 	} else {
 		zone.recs = append(zone.recs[:index], zone.recs[index+1:]...)

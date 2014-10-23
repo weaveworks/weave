@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	success_test_name = "test1.weave."
-	fail_test_name    = "test2.weave."
-	test_addr         = net.ParseIP("9.8.7.6")
+	successTestName = "test1.weave."
+	failTestName    = "test2.weave."
+	testAddr        = net.ParseIP("9.8.7.6")
 )
 
 func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
@@ -22,7 +22,7 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 	if len(req.Question) != 1 {
 		return // We only handle single-question messages
 	}
-	if req.Question[0].Name != success_test_name {
+	if req.Question[0].Name != successTestName {
 		return // This is not the DNS record you are looking for
 	}
 
@@ -31,7 +31,7 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 
 	hdr := dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeA,
 		Class: dns.ClassINET, Ttl: 3600}
-	a := &dns.A{hdr, test_addr}
+	a := &dns.A{hdr, testAddr}
 	m.Answer = append(m.Answer, a)
 
 	buf, err := m.Pack()
@@ -78,24 +78,24 @@ func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 }
 
 type testContext struct {
-	received_addr  net.IP
-	received_count int
-	channel        chan *ResponseA
+	receivedAddr  net.IP
+	receivedCount int
+	channel       chan *ResponseA
 }
 
 func newTestContext() *testContext {
 	return &testContext{channel: make(chan *ResponseA, 4)}
 }
 
-func (c *testContext) checkResponse(t *testing.T, channel_ok bool, resp *ResponseA) {
-	if !channel_ok {
+func (c *testContext) checkResponse(t *testing.T, channelOk bool, resp *ResponseA) {
+	if !channelOk {
 		c.channel = nil
 		return
 	}
 	assertNoErr(t, resp.Err)
 	log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
-	c.received_addr = resp.Addr
-	c.received_count++
+	c.receivedAddr = resp.Addr
+	c.receivedCount++
 }
 
 func TestSimpleQuery(t *testing.T) {
@@ -107,13 +107,13 @@ func TestSimpleQuery(t *testing.T) {
 	context := newTestContext()
 
 	// First, a test we expect to succeed
-	mdnsClient.SendQuery(success_test_name, dns.TypeA, context.channel)
+	mdnsClient.SendQuery(successTestName, dns.TypeA, context.channel)
 	for resp := range context.channel {
 		context.checkResponse(t, true, resp)
 	}
 
-	if !context.received_addr.Equal(test_addr) || context.received_count != 1 {
-		t.Log("Unexpected result for", success_test_name, context.received_addr, context.received_count)
+	if !context.receivedAddr.Equal(testAddr) || context.receivedCount != 1 {
+		t.Log("Unexpected result for", successTestName, context.receivedAddr, context.receivedCount)
 		t.Fail()
 	}
 
@@ -124,8 +124,8 @@ func TestSimpleQuery(t *testing.T) {
 		context.checkResponse(t, true, resp)
 	}
 
-	if context.received_count > 0 {
-		t.Log("Unexpected result for test2.weave", context.received_addr)
+	if context.receivedCount > 0 {
+		t.Log("Unexpected result for test2.weave", context.receivedAddr)
 		t.Fail()
 	}
 }
@@ -139,8 +139,8 @@ func TestParallelQuery(t *testing.T) {
 	context1 := newTestContext()
 	context2 := newTestContext()
 
-	go mdnsClient.SendQuery(success_test_name, dns.TypeA, context1.channel)
-	go mdnsClient.SendQuery(success_test_name, dns.TypeA, context2.channel)
+	go mdnsClient.SendQuery(successTestName, dns.TypeA, context1.channel)
+	go mdnsClient.SendQuery(successTestName, dns.TypeA, context2.channel)
 	timeout := time.After(2 * time.Second)
 outerloop:
 	for context1.channel != nil || context2.channel != nil {
@@ -154,8 +154,8 @@ outerloop:
 		}
 	}
 
-	if !context1.received_addr.Equal(test_addr) || !context2.received_addr.Equal(test_addr) || context1.received_count != 1 || context2.received_count != 1 {
-		t.Log("Unexpected result for", success_test_name, context1.received_addr, context2.received_addr, context1.received_count, context2.received_count)
+	if !context1.receivedAddr.Equal(testAddr) || !context2.receivedAddr.Equal(testAddr) || context1.receivedCount != 1 || context2.receivedCount != 1 {
+		t.Log("Unexpected result for", successTestName, context1.receivedAddr, context2.receivedAddr, context1.receivedCount, context2.receivedCount)
 		t.Fail()
 	}
 }

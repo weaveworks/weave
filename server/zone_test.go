@@ -7,57 +7,57 @@ import (
 
 func TestZone(t *testing.T) {
 	var (
-		container_id      = "deadbeef"
-		success_test_name = "test1.weave."
-		test_addr1        = "10.0.2.1/24"
-		docker_ip         = "9.8.7.6"
+		containerID     = "deadbeef"
+		successTestName = "test1.weave."
+		testAddr1       = "10.0.2.1/24"
+		dockerIP        = "9.8.7.6"
 	)
 
 	var zone = new(ZoneDb)
 
-	ip := net.ParseIP(docker_ip)
-	weave_ip, subnet, _ := net.ParseCIDR(test_addr1)
-	err := zone.AddRecord(container_id, success_test_name, ip, weave_ip, subnet)
+	ip := net.ParseIP(dockerIP)
+	weaveIP, subnet, _ := net.ParseCIDR(testAddr1)
+	err := zone.AddRecord(containerID, successTestName, ip, weaveIP, subnet)
 	assertNoErr(t, err)
 
 	// Check that the address is now there.
-	found_ip, err := zone.MatchLocal(success_test_name)
+	foundIP, err := zone.MatchLocal(successTestName)
 	assertNoErr(t, err)
 
-	if !found_ip.Equal(weave_ip) {
-		t.Fatal("Unexpected result for", success_test_name, ip)
+	if !foundIP.Equal(weaveIP) {
+		t.Fatal("Unexpected result for", successTestName, ip)
 	}
 
 	// Now try to add the same address again
-	err = zone.AddRecord(container_id, success_test_name, ip, weave_ip, subnet)
+	err = zone.AddRecord(containerID, successTestName, ip, weaveIP, subnet)
 	assertErrorType(t, err, (*DuplicateError)(nil), "duplicate add")
 
 	// Now delete the record
-	err = zone.DeleteRecord(container_id, weave_ip)
+	err = zone.DeleteRecord(containerID, weaveIP)
 	assertNoErr(t, err)
 
 	// Check that the address is not there now.
-	_, err = zone.MatchLocal(success_test_name)
+	_, err = zone.MatchLocal(successTestName)
 	assertErrorType(t, err, (*LookupError)(nil), "after deleting record")
 
 	// Delete a record that isn't there
-	err = zone.DeleteRecord(container_id, net.ParseIP("0.0.0.0"))
+	err = zone.DeleteRecord(containerID, net.ParseIP("0.0.0.0"))
 	assertErrorType(t, err, (*LookupError)(nil), "when deleting record that doesn't exist")
 }
 
 func TestDeleteFor(t *testing.T) {
 	var (
-		id        = "foobar"
-		name      = "foo.weave."
-		addr1     = "10.1.2.3/24"
-		addr2     = "10.2.7.8/24"
-		docker_ip = "172.16.0.4"
+		id       = "foobar"
+		name     = "foo.weave."
+		addr1    = "10.1.2.3/24"
+		addr2    = "10.2.7.8/24"
+		dockerIP = "172.16.0.4"
 	)
 	zone := new(ZoneDb)
-	ip := net.ParseIP(docker_ip)
+	ip := net.ParseIP(dockerIP)
 	for _, addr := range []string{addr1, addr2} {
-		weave_ip, subnet, _ := net.ParseCIDR(addr)
-		err := zone.AddRecord(id, name, ip, weave_ip, subnet)
+		weaveIP, subnet, _ := net.ParseCIDR(addr)
+		err := zone.AddRecord(id, name, ip, weaveIP, subnet)
 		assertNoErr(t, err)
 	}
 

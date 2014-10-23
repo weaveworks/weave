@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	container_id = "deadbeef"
-	test_addr1   = "10.0.2.1/24"
+	containerID = "deadbeef"
+	testAddr1   = "10.0.2.1/24"
 )
 
 func sendQuery(name string, querytype uint16) error {
@@ -32,17 +32,17 @@ func sendQuery(name string, querytype uint16) error {
 func TestServerSimpleQuery(t *testing.T) {
 	log.Println("TestServerSimpleQuery starting")
 	var zone = new(ZoneDb)
-	docker_ip := net.ParseIP("9.8.7.6")
-	weave_ip, subnet, _ := net.ParseCIDR(test_addr1)
-	zone.AddRecord(container_id, "test.weave.", docker_ip, weave_ip, subnet)
+	dockerIP := net.ParseIP("9.8.7.6")
+	weaveIP, subnet, _ := net.ParseCIDR(testAddr1)
+	zone.AddRecord(containerID, "test.weave.", dockerIP, weaveIP, subnet)
 
 	mdnsServer, err := NewMDNSServer(zone)
 	assertNoErr(t, err)
 	err = mdnsServer.Start(nil)
 	assertNoErr(t, err)
 
-	var received_addr net.IP
-	received_count := 0
+	var receivedAddr net.IP
+	receivedCount := 0
 
 	// Implement a minimal listener for responses
 	multicast, err := LinkLocalMulticastListener(nil)
@@ -54,8 +54,8 @@ func TestServerSimpleQuery(t *testing.T) {
 			for _, answer := range r.Answer {
 				switch rr := answer.(type) {
 				case *dns.A:
-					received_addr = rr.A
-					received_count++
+					receivedAddr = rr.A
+					receivedCount++
 				}
 			}
 		}
@@ -71,21 +71,21 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	if received_count != 1 {
-		t.Log("Unexpected result count for test.weave", received_count)
+	if receivedCount != 1 {
+		t.Log("Unexpected result count for test.weave", receivedCount)
 		t.Fail()
 	}
-	if !received_addr.Equal(weave_ip) {
-		t.Log("Unexpected result for test.weave", received_addr)
+	if !receivedAddr.Equal(weaveIP) {
+		t.Log("Unexpected result for test.weave", receivedAddr)
 		t.Fail()
 	}
 
-	received_count = 0
+	receivedCount = 0
 
 	sendQuery("testfail.weave.", dns.TypeA)
 
-	if received_count != 0 {
-		t.Log("Unexpected result count for testfail.weave", received_count)
+	if receivedCount != 0 {
+		t.Log("Unexpected result count for testfail.weave", receivedCount)
 		t.Fail()
 	}
 }
