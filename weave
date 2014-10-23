@@ -279,25 +279,30 @@ rest_call() {
     fi
 }
 
+# Check that a container named $1 with image $2 is not running
+check_not_running() {
+    case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $1 2>/dev/null) in
+        "true $2")
+            echo "$1 is already running." >&2
+            exit 1
+            ;;
+        "false $2")
+            docker rm $1 >/dev/null
+            ;;
+        true*)
+            echo "Found another running container named '$1'. Aborting." >&2
+            exit 1
+            ;;
+        false*)
+            echo "Found another container named '$1'. Aborting." >&2
+            exit 1
+            ;;
+    esac
+}
+
 case "$COMMAND" in
     launch)
-        case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $CONTAINER_NAME 2>/dev/null) in
-            "true $IMAGE")
-                echo "Weave is already running." >&2
-                exit 1
-                ;;
-            "false $IMAGE")
-                docker rm $CONTAINER_NAME >/dev/null
-                ;;
-            true*)
-                echo "Found another running container named '$CONTAINER_NAME'. Aborting." >&2
-                exit 1
-                ;;
-            false*)
-                echo "Found another container named '$CONTAINER_NAME'. Aborting." >&2
-                exit 1
-                ;;
-        esac
+        check_not_running $CONTAINER_NAME $IMAGE
         create_bridge
         # We set the router name to the bridge mac since that is
         # stable across re-creations of the containers.
