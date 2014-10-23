@@ -302,6 +302,14 @@ case "$COMMAND" in
         with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
+    start)
+        [ $# -gt 1 ] || usage
+        IPADDR=$1
+        create_bridge
+        CONTAINER=$(docker start $2)
+        with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
+        echo $CONTAINER
+        ;;
     attach)
         [ $# -gt 1 ] || usage
         create_bridge
