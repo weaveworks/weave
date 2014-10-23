@@ -121,7 +121,7 @@ stop_masquerading() {
 # the following borrows from https://github.com/jpetazzo/pipework
 
 # run all args as a command in the network namespace of container $2
-# if an error is caused by container dieing, swallow output from error
+# if an error is caused by container dying, swallow output from error
 with_container_netns () {
     CONTAINER="$2"
     CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
@@ -143,8 +143,6 @@ with_container_netns () {
 
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
-    # if an error is caused by container dieing, swallow output from all commands and
-    # just say the container died.
     IP_TMPFILE=/tmp/weave_ip_output_$$
     rm -f $IP_TMPFILE
 
@@ -236,10 +234,7 @@ detach() {
 
 # send to stdout any IPv4 addresses configured on the interface 'ethwe', one per line
 container_weave_ips() {
-    (ip netns exec $NETNS ip addr show dev ethwe 2>&1 || true) | grep 'inet ' | while read line
-    do
-        echo $line | tr -s ' ' | cut -d ' ' -f 2
-    done
+    ip netns exec $NETNS ip addr show dev ethwe 2>&1 | grep -o 'inet .*' | cut -d ' ' -f 2 || true
 }
 
 weave_ps() {
@@ -287,7 +282,7 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
-        with_container_netns attach $CONTAINER $IPADDR eth0
+        with_container_netns attach $CONTAINER $IPADDR eth0 >/dev/null
         echo $CONTAINER
         ;;
     status)
@@ -327,7 +322,7 @@ case "$COMMAND" in
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@" | tail -n 1)
-        with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
+        with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME >/dev/null
         echo $CONTAINER
         ;;
     start)
@@ -341,11 +336,11 @@ case "$COMMAND" in
     attach)
         [ $# -gt 1 ] || usage
         create_bridge
-        with_container_netns attach $2 $1 $CONTAINER_IFNAME
+        with_container_netns attach $2 $1 $CONTAINER_IFNAME >/dev/null
         ;;
     detach)
         [ $# -gt 1 ] || usage
-        with_container_netns detach $2 $1
+        with_container_netns detach $2 $1 >/dev/null
         ;;
     expose)
         [ $# -gt 0 ] || usage
