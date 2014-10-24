@@ -24,6 +24,8 @@ Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the
 `weave` network bridge on the host.
 
+<hr/>
+
 To get a list of all the containers running on this host that are
 connected to the weave network:
 
@@ -40,9 +42,63 @@ list of IP address/routing prefix length ([CIDR
 notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing))
 assigned on the weave network.
 
+<hr/>
+
 One can ask a weave router to report its status with
 
     weave status
+
+This produces output like:
+
+````
+Local identity is 7a:f4:56:87:76:3b
+Sniffing traffic on &{39 65535 ethwe ae:e3:07:9c:8c:d4 up|broadcast|multicast}
+MACs:
+Peers:
+Peer 7a:16:dd:5b:83:de (v31) (UID 13151318985609435078)
+   -> 7a:f4:56:87:76:3b [37.157.33.76:7195]
+Peer 7a:f4:56:87:76:3b (v1) (UID 6913268221365110570)
+   -> 7a:16:dd:5b:83:de [191.235.147.190:6783]
+Topology:
+unicast:
+7a:f4:56:87:76:3b -> 00:00:00:00:00:00
+7a:16:dd:5b:83:de -> 7a:16:dd:5b:83:de
+broadcast:
+7a:f4:56:87:76:3b -> [7a:16:dd:5b:83:de]
+7a:16:dd:5b:83:de -> []
+Reconnects:
+192.168.32.1:6783 (next try at 2014-10-23 16:39:50.585932102 +0000 UTC)
+````
+
+The terms used here are explained further at [how it
+works](http://zettio.github.io/weave/how-it-works.html).
+
+A 'peer' on the weave network is a weave router; one per host.  Each
+peer has a name, which will tend to remain the same over restarts, and
+a unique identifier (UID) which will be different each time it is run.
+These are opaque identifiers as far as the program is concerned,
+although the name defaults to a MAC address.
+
+The 'sniffing traffic' line shows details of the virtual ethernet
+interface that weave is using to receive packets on the local
+machine.
+
+Then comes a list of all peers known to this router, including itself.
+Each peer is listed with its name, a version number (incremented on
+each reconnect) and the UID.  Then each line beginning `->` shows
+another peer that it is connected to, with the IP address and port
+number of the connection. In the above example, the local router has
+connected to its peer using address 191.235.147.190:6783, and its peer
+sees the same connection as coming from 37.157.33.76:7195.
+
+After that comes the topology information used to decide how to route packets between peers - see  the [architecture documentation](https://raw.githubusercontent.com/zettio/weave/master/docs/architecture.txt) for full explanation.
+
+Finally 'Reconnects', which shows peers that this router is aware of,
+but is not currently connected to.  Each line will contain some
+information about whether it is attempting to connect or will wait for
+a while before connecting again.
+
+<hr/>
 
 To stop weave, run
 
