@@ -191,13 +191,10 @@ attach() {
         return 1
     fi
 
-    if ip netns exec $NETNS ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
-        # There's a multicast route already present, leave it alone.
-        return 0
-    fi
-
     # Route multicast packets across the weave network.
-    ip netns exec $NETNS ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
+    if ! ip netns exec $NETNS ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
+        ip netns exec $NETNS ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
+    fi
 }
 
 detach() {
