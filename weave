@@ -207,7 +207,7 @@ detach() {
         return 1
     fi
 
-    if [ -n "$(ip netns exec $NETNS ip -f inet addr show dev ethwe)" ] ; then
+    if [ -n "$(ip netns exec $NETNS ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
         # other addresses are left, leave the device alone
         return 0
     fi
