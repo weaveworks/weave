@@ -73,10 +73,6 @@ add_iptables_rule() {
     fi
 }
 
-add_nat_rule() {
-    add_iptables_rule nat "$@"
-}
-
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
         ip link add name $BRIDGE type bridge
@@ -106,9 +102,9 @@ destroy_bridge() {
 
 setup_masquerading() {
     run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
-    add_nat_rule POSTROUTING -j WEAVE
-    add_nat_rule WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
-    add_nat_rule WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
+    add_iptables_rule nat POSTROUTING -j WEAVE
+    add_iptables_rule nat WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
+    add_iptables_rule nat WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
 }
 
 stop_masquerading() {
