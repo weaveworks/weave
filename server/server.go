@@ -34,29 +34,35 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("Local query: %+v", q)
-		ip, err := zone.MatchLocal(q.Name)
-		if err == nil {
-			m := makeDNSReply(r, q.Name, dns.TypeA, []net.IP{ip})
-			w.WriteMsg(m)
+		if q.Qtype == dns.TypeA {
+			ip, err := zone.MatchLocal(q.Name)
+			if err == nil {
+				m := makeDNSReply(r, q.Name, dns.TypeA, []net.IP{ip})
+				w.WriteMsg(m)
+			} else {
+				Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
+				// We don't know the answer; see if someone else does
+				channel := make(chan *ResponseA)
+				replies := make([]net.IP, 0)
+				go func() {
+					for resp := range channel {
+						Debug.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
+						replies = append(replies, resp.Addr)
+					}
+					var responseMsg *dns.Msg
+					if len(replies) > 0 {
+						responseMsg = makeDNSReply(r, q.Name, dns.TypeA, replies)
+					} else {
+						responseMsg = makeDNSFailResponse(r)
+					}
+					w.WriteMsg(responseMsg)
+				}()
+				mdnsClient.SendQuery(q.Name, dns.TypeA, channel)
+			}
 		} else {
-			Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
-			// We don't know the answer; see if someone else does
-			channel := make(chan *ResponseA)
-			replies := make([]net.IP, 0)
-			go func() {
-				for resp := range channel {
-					Debug.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
-					replies = append(replies, resp.Addr)
-				}
-				var responseMsg *dns.Msg
-				if len(replies) > 0 {
-					responseMsg = makeDNSReply(r, q.Name, dns.TypeA, replies)
-				} else {
-					responseMsg = makeDNSFailResponse(r)
-				}
-				w.WriteMsg(responseMsg)
-			}()
-			mdnsClient.SendQuery(q.Name, dns.TypeA, channel)
+			Warning.Printf("Local query not handled: %+v", q)
+			m := makeDNSFailResponse(r)
+			w.WriteMsg(m)
 		}
 		return
 	}
@@ -70,13 +76,18 @@ func notUsHandler() dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("Non-local query: %+v", q)
-		addrs, err := net.LookupIP(q.Name)
 		var responseMsg *dns.Msg
-		if err == nil {
-			responseMsg = makeDNSReply(r, q.Name, q.Qtype, addrs)
+		if q.Qtype == dns.TypeA {
+			addrs, err := net.LookupIP(q.Name)
+			if err == nil {
+				responseMsg = makeDNSReply(r, q.Name, q.Qtype, addrs)
+			} else {
+				responseMsg = makeDNSFailResponse(r)
+				Debug.Print("Failed fallback lookup ", err)
+			}
 		} else {
+			Warning.Printf("Non-local query not handled: %+v", q)
 			responseMsg = makeDNSFailResponse(r)
-			Debug.Print("Failed fallback lookup ", err)
 		}
 		w.WriteMsg(responseMsg)
 	}
