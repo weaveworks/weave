@@ -226,7 +226,7 @@ detach() {
 case "$COMMAND" in
     launch)
         [ $# -gt 0 ] || usage
-        IPADDR=$1
+        CIDR=$1
         shift 1
         case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' weave 2>/dev/null) in
             "true $IMAGE")
@@ -247,7 +247,7 @@ case "$COMMAND" in
         esac
         create_bridge
         stop_masquerading
-        setup_masquerading $IPADDR
+        setup_masquerading $CIDR
         # We set the router name to the bridge mac since that is
         # stable across re-creations of the containers.
         #
@@ -259,7 +259,7 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
-        with_container_netns $CONTAINER attach $IPADDR eth0
+        with_container_netns $CONTAINER attach $CIDR eth0
         echo $CONTAINER
         ;;
     status)
@@ -292,11 +292,11 @@ case "$COMMAND" in
         ;;
     run)
         [ $# -gt 0 ] || usage
-        IPADDR=$1
+        CIDR=$1
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@" | tail -n 1)
-        with_container_netns $CONTAINER attach $IPADDR $CONTAINER_IFNAME
+        with_container_netns $CONTAINER attach $CIDR $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
     start)
