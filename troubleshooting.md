@@ -31,13 +31,13 @@ connected to the weave network:
 
 This produces output like:
 
-    /weave zettio/weave (5245643870f1.): 10.0.5.1/16
-    /hopeful_wilson bboreham/mcast (e32a7d37a93a.): 10.0.8.3/24
-    /thirsty_newton ubuntu/latest (caa1d4ee2570.): 10.0.1.1/24 10.0.2.1/24
+    5245643870f1 10.0.5.1/16
+    e32a7d37a93a 10.0.8.3/24
+    caa1d4ee2570 10.0.1.1/24 10.0.2.1/24
 
-On each line the values are: the name of the container, the name of
-the image, (hostname.domain): then the IP addresses assigned on the
-weave network.
+giving, for each running container attached, the container ID then the
+IP addresses assigned on the weave network.  `weave ps -v` adds the
+container name and image name as reported by `docker inspect`.
 
 One can ask a weave router to report its status with
 
