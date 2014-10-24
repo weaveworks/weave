@@ -36,8 +36,7 @@ This produces output like:
     caa1d4ee2570 10.0.1.1/24 10.0.2.1/24
 
 giving, for each running container attached, the container ID then the
-IP addresses assigned on the weave network.  `weave ps -v` adds the
-container name and image name as reported by `docker inspect`.
+IP addresses assigned on the weave network.
 
 One can ask a weave router to report its status with
 
