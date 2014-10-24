@@ -20,12 +20,18 @@ func TestZone(t *testing.T) {
 	err := zone.AddRecord(containerID, successTestName, ip, weaveIP)
 	assertNoErr(t, err)
 
+	// Add a few more records to make the job harder
+	err = zone.AddRecord("abcdef0123", "adummy.weave.", net.ParseIP("1.1.1.1"), net.ParseIP("10.0.0.1"))
+	assertNoErr(t, err)
+	err = zone.AddRecord("0123abcdef", "zdummy.weave.", net.ParseIP("2.2.2.2"), net.ParseIP("10.0.0.2"))
+	assertNoErr(t, err)
+
 	// Check that the address is now there.
 	foundIP, err := zone.MatchLocal(successTestName)
 	assertNoErr(t, err)
 
 	if !foundIP.Equal(weaveIP) {
-		t.Fatal("Unexpected result for", successTestName, ip)
+		t.Fatal("Unexpected result for", successTestName, foundIP)
 	}
 
 	// Now try to add the same address again
