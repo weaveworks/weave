@@ -301,10 +301,9 @@ case "$COMMAND" in
         ;;
     start)
         [ $# -gt 1 ] || usage
-        IPADDR=$1
         create_bridge
         CONTAINER=$(docker start $2)
-        with_container_netns $CONTAINER attach $IPADDR $CONTAINER_IFNAME
+        with_container_netns $CONTAINER attach $1 $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
     attach)
@@ -318,22 +317,18 @@ case "$COMMAND" in
         ;;
     expose)
         [ $# -gt 0 ] || usage
-        IPADDR=$1
-        shift 1
         create_bridge
-        if ! ip addr show dev $BRIDGE | grep -qF $IPADDR
+        if ! ip addr show dev $BRIDGE | grep -qF $1
         then
-            ip addr add dev $BRIDGE $IPADDR
+            ip addr add dev $BRIDGE $1
         fi
         ;;
     hide)
         [ $# -gt 0 ] || usage
-        IPADDR=$1
-        shift 1
         create_bridge
-        if ip addr show dev $BRIDGE | grep -qF $IPADDR
+        if ip addr show dev $BRIDGE | grep -qF $1
         then
-            ip addr del dev $BRIDGE $IPADDR
+            ip addr del dev $BRIDGE $1
         fi
         ;;
     stop)
