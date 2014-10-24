@@ -67,22 +67,12 @@ func (dec *EthernetDecoder) formICMPMTUPacket(mtu int) ([]byte, error) {
 
 var (
 	// see http://en.wikipedia.org/wiki/Multicast_address#Ethernet
-	broadcastMAC, _        = net.ParseMAC("ff:ff:ff:ff:ff:ff")
-	zeroMAC, _             = net.ParseMAC("00:00:00:00:00:00")
-	stpMACPrefix           = []byte{0x01, 0x80, 0xC2, 0x00, 0x00}
-	ipv4MulticastMACPrefix = []byte{0x01, 0x00, 0x5E}
-	ipv6MulticastMACPrefix = []byte{0x33, 0x33}
+	stpMACPrefix = []byte{0x01, 0x80, 0xC2, 0x00, 0x00}
+	zeroMAC, _   = net.ParseMAC("00:00:00:00:00:00")
 )
 
 func (dec *EthernetDecoder) DropFrame() bool {
 	return bytes.Equal(stpMACPrefix, dec.eth.DstMAC[:len(stpMACPrefix)])
-}
-
-func (dec *EthernetDecoder) BroadcastFrame() bool {
-	return bytes.Equal(broadcastMAC, dec.eth.DstMAC) ||
-		// treat multicast frames as broadcast
-		bytes.Equal(ipv4MulticastMACPrefix, dec.eth.DstMAC[:len(ipv4MulticastMACPrefix)]) ||
-		bytes.Equal(ipv6MulticastMACPrefix, dec.eth.DstMAC[:len(ipv6MulticastMACPrefix)])
 }
 
 func (dec *EthernetDecoder) IsPMTUVerify() bool {
