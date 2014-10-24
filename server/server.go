@@ -33,7 +33,7 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("Local query: %s", q)
+		Debug.Printf("Local query: %+v", q)
 		ip, err := zone.MatchLocal(q.Name)
 		if err == nil {
 			m := makeDNSReply(r, q.Name, dns.TypeA, []net.IP{ip})
@@ -69,14 +69,14 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 func notUsHandler() dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("Non-local query: %s", q)
+		Debug.Printf("Non-local query: %+v", q)
 		addrs, err := net.LookupIP(q.Name)
 		var responseMsg *dns.Msg
 		if err == nil {
 			responseMsg = makeDNSReply(r, q.Name, q.Qtype, addrs)
 		} else {
 			responseMsg = makeDNSFailResponse(r)
-			Debug.Print("Failed fallback lookup", err)
+			Debug.Print("Failed fallback lookup ", err)
 		}
 		w.WriteMsg(responseMsg)
 	}
@@ -107,9 +107,9 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wai
 	checkFatal(err)
 
 	address := fmt.Sprintf(":%d", dnsPort)
+	Info.Printf("Listening for DNS on %s", address)
 	err = dns.ListenAndServe(address, "udp", LocalServeMux)
 	checkFatal(err)
 
-	Info.Printf("Listening for DNS on %s", address)
 	return nil
 }
