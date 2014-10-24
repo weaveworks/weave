@@ -241,8 +241,7 @@ weave_ps() {
     for CONTAINER_ID in $(docker ps -q) ; do
         CONTAINER_IPS=$(with_container_netns container_weave_ips $CONTAINER_ID)
         if [ -n "$CONTAINER_IPS" ] ; then
-            [ $# -gt 0 ] && [ "$1" = "-v" ] && CONTAINER_INFO=$(docker inspect --format '{{ .Name }} {{ .Config.Image }}' $CONTAINER_ID)
-            echo $CONTAINER_ID $CONTAINER_INFO $CONTAINER_IPS
+            echo $CONTAINER_ID $CONTAINER_IPS
         fi
     done
 }
@@ -305,7 +304,7 @@ case "$COMMAND" in
         fi
         ;;
     ps)
-        weave_ps "$@"
+        weave_ps
         ;;
     version)
         # Try the running container first; if no luck try the image
