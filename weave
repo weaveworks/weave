@@ -175,16 +175,16 @@ attach() {
         return 1
     fi
 
-    if ! ip link set $LOCAL_IFNAME master $BRIDGE ||
-        ! ip link set $LOCAL_IFNAME up ||
-        ! ip link set $GUEST_IFNAME netns $NETNS ; then
+    if ! ip link set $GUEST_IFNAME netns $NETNS ; then
         # failed before we assigned the veth to the container's
         # namespace - delete it
         ip link del $LOCAL_IFNAME type veth || true
         return 1
     fi
 
-    if ! ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
+    if ! ip link set $LOCAL_IFNAME master $BRIDGE ||
+        ! ip link set $LOCAL_IFNAME up ||
+        ! ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
         ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ||
         ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ||
         ! check_command_and_run ethtool ip netns exec $NETNS ethtool -K $2 tx off >/dev/null ; then
