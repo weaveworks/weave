@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"net"
+	"strings"
 )
 
 const (
 	LOCAL_DOMAIN = "weave.local."
+	RDNS_DOMAIN  = "in-addr.arpa."
 )
 
 func checkFatal(e error) {
@@ -68,6 +70,34 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 	}
 }
 
+func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
+	return func(w dns.ResponseWriter, r *dns.Msg) {
+		q := r.Question[0]
+		Debug.Printf("Local rdns query: %+v", q)
+		if q.Qtype == dns.TypePTR && strings.HasSuffix(q.Name, ".in-addr.arpa.") {
+			if ip := net.ParseIP(q.Name[:len(q.Name)-14]); ip != nil {
+				ip4 := ip.To4()
+				revIP := []byte{ip4[3], ip4[2], ip4[1], ip4[0]}
+				Debug.Printf("Looking for address: %+v", revIP)
+				name, err := zone.MatchLocalIP(revIP)
+				if err == nil {
+					Debug.Printf("Found name: %s", name)
+					m := new(dns.Msg)
+					m.SetReply(r)
+					m.RecursionAvailable = true
+					hdr := dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: 3600}
+					m.Answer = []dns.RR{&dns.PTR{hdr, name}}
+					w.WriteMsg(m)
+				} else {
+					Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
+					// We don't know the answer; see if someone else does
+					// TODO
+				}
+			}
+		}
+	}
+}
+
 /* When we receive a request for a name outside of our '.weave' domain, call
    the underlying lookup mechanism and return the answer(s) it gives.
    Unfortunately, this means that TTLs from a real DNS server are lost - FIXME.
@@ -109,6 +139,7 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wai
 
 	LocalServeMux := dns.NewServeMux()
 	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler(zone, mdnsClient))
+	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler(zone, mdnsClient))
 	LocalServeMux.HandleFunc(".", notUsHandler())
 
 	mdnsServer, err := NewMDNSServer(zone)
