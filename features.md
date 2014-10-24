@@ -219,7 +219,7 @@ This allows any application container to reach the service by
 connecting to 10.0.1.101:3322. So if $HOST3 is indeed running a netcat
 service on port 2211, e.g.
 
-    host3# nc -kl 2211
+    host3# nc -lk -p 2211
 
 then we can connect to it from our application container on $HOST2 with
 
