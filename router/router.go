@@ -34,7 +34,7 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	ourself := NewPeer(name, 0, 0, router)
 	router.Ourself = router.Peers.FetchWithDefault(ourself)
 	router.Ourself.StartLocalPeer()
-	log.Println("Local identity is", router.Ourself.Name)
+	log.Println("Our name is", router.Ourself.Name)
 
 	return router
 }
@@ -58,7 +58,7 @@ func (router *Router) Start() {
 
 func (router *Router) Status() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintln("Local identity is", router.Ourself.Name))
+	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name))
 	buf.WriteString(fmt.Sprintln("Sniffing traffic on", router.Iface))
 	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
 	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))
