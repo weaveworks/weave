@@ -11,6 +11,7 @@ type Zone interface {
 	DeleteRecord(ident string, weaveIp net.IP) error
 	DeleteRecordsFor(ident string) error
 	MatchLocal(name string) (net.IP, error)
+	MatchLocalIP(ip net.IP) (string, error)
 }
 
 type Record struct {
@@ -61,6 +62,17 @@ func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 		}
 	}
 	return nil, LookupError(name)
+}
+
+func (zone *ZoneDb) MatchLocalIP(ip net.IP) (string, error) {
+	zone.mx.RLock()
+	defer zone.mx.RUnlock()
+	for _, r := range zone.recs {
+		if r.WeaveIP.Equal(ip) {
+			return r.Name, nil
+		}
+	}
+	return "", LookupError(ip.String())
 }
 
 func (zone *ZoneDb) AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP) error {
