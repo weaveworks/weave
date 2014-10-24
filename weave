@@ -5,6 +5,7 @@ usage() {
     echo "Usage:"
     echo "weave launch <cidr> [-password <password>] <peer_host> ..."
     echo "weave run    <cidr> <docker run args> ..."
+    echo "weave start  <cidr> <container_id>"
     echo "weave attach <cidr> <container_id>"
     echo "weave detach <cidr> <container_id>"
     echo "weave expose <cidr>"
@@ -299,6 +300,14 @@ case "$COMMAND" in
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@" | tail -n 1)
+        with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
+        echo $CONTAINER
+        ;;
+    start)
+        [ $# -gt 1 ] || usage
+        IPADDR=$1
+        create_bridge
+        CONTAINER=$(docker start $2)
         with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
         ;;

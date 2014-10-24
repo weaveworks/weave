@@ -62,11 +62,13 @@ The first line starts the weave router, in a container. This needs to
 be done once on each host. We tell weave that its IP address should
 be 10.0.0.1, and that the weave network is on 10.0.0.0/16.
 
-The second line starts our application container. We give it an IP
+The second line runs our application container. We give it an IP
 address and network (a subnet of the weave network). `weave run`
 invokes `docker run -d` with all the parameters following the IP
 address and network. So we could be launching any container this way;
-here we just take a stock ubuntu container and launch a shell in it.
+here we just take a stock ubuntu container and launch a shell in
+it. There's also a `weave start` command, which invokes `docker start`
+for starting existing containers.
 
 If our application consists of more than one container on this host we
 simply launch them with a variation on that second line.
