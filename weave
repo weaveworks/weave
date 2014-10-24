@@ -256,6 +256,7 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     status)
+        [ $# -eq 0 ] || usage
         if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave 2>/dev/null) ; then
             echo "Weave is not running." >&2
             exit 1
@@ -274,6 +275,7 @@ case "$COMMAND" in
         fi
         ;;
     version)
+        [ $# -eq 0 ] || usage
         # Try the running container first; if no luck try the image
         if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' weave 2>/dev/null) ; then
             if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $IMAGE 2>/dev/null) ; then
@@ -293,23 +295,23 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     start)
-        [ $# -gt 1 ] || usage
+        [ $# -eq 2 ] || usage
         create_bridge
         CONTAINER=$(docker start $2)
         with_container_netns $CONTAINER attach $1 $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
     attach)
-        [ $# -gt 1 ] || usage
+        [ $# -eq 2 ] || usage
         create_bridge
         with_container_netns $2 attach $1 $CONTAINER_IFNAME
         ;;
     detach)
-        [ $# -gt 1 ] || usage
+        [ $# -eq 2 ] || usage
         with_container_netns $2 detach $1
         ;;
     expose)
-        [ $# -gt 0 ] || usage
+        [ $# -eq 1 ] || usage
         create_bridge
         if ! ip addr show dev $BRIDGE | grep -qF $1
         then
@@ -317,7 +319,7 @@ case "$COMMAND" in
         fi
         ;;
     hide)
-        [ $# -gt 0 ] || usage
+        [ $# -eq 1 ] || usage
         create_bridge
         if ip addr show dev $BRIDGE | grep -qF $1
         then
@@ -325,6 +327,7 @@ case "$COMMAND" in
         fi
         ;;
     stop)
+        [ $# -eq 0 ] || usage
         if ! docker kill weave >/dev/null 2>&1 ; then
             echo "Weave is not running."
         fi
@@ -333,6 +336,7 @@ case "$COMMAND" in
         stop_masquerading
         ;;
     reset)
+        [ $# -eq 0 ] || usage
         docker kill weave >/dev/null 2>&1 || true
         docker rm -f weave >/dev/null 2>&1 || true
         check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
