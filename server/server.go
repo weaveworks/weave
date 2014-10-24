@@ -88,7 +88,11 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wai
 	mdnsClient, err := NewMDNSClient()
 	checkFatal(err)
 
-	Info.Printf("Using mDNS on %s", iface.Name)
+	ifaceName := "default interface"
+	if iface != nil {
+		ifaceName = iface.Name
+	}
+	Info.Printf("Using mDNS on %s", ifaceName)
 	err = mdnsClient.Start(iface)
 	checkFatal(err)
 
