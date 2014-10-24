@@ -36,7 +36,9 @@ This produces output like:
     caa1d4ee2570 10.0.1.1/24 10.0.2.1/24
 
 giving, for each running container attached, the container ID then the
-IP addresses assigned on the weave network.
+list of IP address/routing prefix length ([CIDR
+notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing))
+assigned on the weave network.
 
 One can ask a weave router to report its status with
 
