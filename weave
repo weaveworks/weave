@@ -158,9 +158,6 @@ with_container_netns () {
     return $STATUS
 }
 
-# Attach Container-ID $1 to the weave network at CIDR address $2,
-# creating a virtual ethernet device if necessary.
-# Also turn off tx offload on device $3 inside the namespace.
 attach() {
     if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
         # veth name already exists, so assume we set it up already;
@@ -206,8 +203,6 @@ attach() {
     ip netns exec $NETNS ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
 }
 
-# Detach Container-ID $1 at CIDR address $2 from the weave network
-# removing the virtual ethernet device if there are no more addresses
 detach() {
     if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
         # address is not there, leave the device alone
