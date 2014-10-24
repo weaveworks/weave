@@ -119,7 +119,7 @@ stop_masquerading() {
 
 # the following borrows from https://github.com/jpetazzo/pipework
 with_container_netns () {
-    CONTAINER="$2"
+    CONTAINER="$1"
     CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
 
     if [ "$CONTAINER_PID" = 0 ] ; then
@@ -144,6 +144,7 @@ with_container_netns () {
 
     # Run the wrapped command
     STATUS=0
+    shift 1
     if ! "$@" >$IP_TMPFILE 2>&1 ; then
         STATUS=1
         if [ "$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)" != "$CONTAINER_PID" ] ; then
@@ -162,12 +163,12 @@ attach() {
     if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
         # veth name already exists, so assume we set it up already;
         # just add the IP address.
-        if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
+        if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
             # address was there already
             return 0
         fi
 
-        if ! ip netns exec $NETNS ip addr add $2 dev $CONTAINER_IFNAME ; then
+        if ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ; then
             return 1
         fi
 
@@ -188,9 +189,9 @@ attach() {
     fi
 
     if ! ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
-        ! ip netns exec $NETNS ip addr add $2 dev $CONTAINER_IFNAME ||
+        ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ||
         ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ||
-        ! check_command_and_run ethtool ip netns exec $NETNS ethtool -K $3 tx off >/dev/null ; then
+        ! check_command_and_run ethtool ip netns exec $NETNS ethtool -K $2 tx off >/dev/null ; then
         return 1
     fi
 
@@ -204,12 +205,12 @@ attach() {
 }
 
 detach() {
-    if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $2 >/dev/null ; then
+    if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
         # address is not there, leave the device alone
         return 0
     fi
 
-    if ! ip netns exec $NETNS ip addr del $2 dev $CONTAINER_IFNAME ; then
+    if ! ip netns exec $NETNS ip addr del $1 dev $CONTAINER_IFNAME ; then
         return 1
     fi
 
@@ -258,7 +259,7 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
-        with_container_netns attach $CONTAINER $IPADDR eth0
+        with_container_netns $CONTAINER attach $IPADDR eth0
         echo $CONTAINER
         ;;
     status)
@@ -295,7 +296,7 @@ case "$COMMAND" in
         shift 1
         create_bridge
         CONTAINER=$(docker run -d "$@" | tail -n 1)
-        with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
+        with_container_netns $CONTAINER attach $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
     start)
@@ -303,17 +304,17 @@ case "$COMMAND" in
         IPADDR=$1
         create_bridge
         CONTAINER=$(docker start $2)
-        with_container_netns attach $CONTAINER $IPADDR $CONTAINER_IFNAME
+        with_container_netns $CONTAINER attach $IPADDR $CONTAINER_IFNAME
         echo $CONTAINER
         ;;
     attach)
         [ $# -gt 1 ] || usage
         create_bridge
-        with_container_netns attach $2 $1 $CONTAINER_IFNAME
+        with_container_netns $2 attach $1 $CONTAINER_IFNAME
         ;;
     detach)
         [ $# -gt 1 ] || usage
-        with_container_netns detach $2 $1
+        with_container_netns $2 detach $1
         ;;
     expose)
         [ $# -gt 0 ] || usage
