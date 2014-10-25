@@ -24,9 +24,7 @@ Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the
 `weave` network bridge on the host.
 
-One can ask a weave router to report its status with
-
-    weave status
+One can ask a weave router for a [status report](#status-report).
 
 To stop weave, run
 
@@ -45,6 +43,79 @@ the local host, run
 Any running application containers will permanently lose connectivity
 with the weave network and have to be restarted in order to
 re-connect.
+
+### Status report
+
+The command
+
+    weave status
+
+reports on the current status of the weave router.
+
+This produces output like:
+
+````
+Our name is 7a:f4:56:87:76:3b
+Sniffing traffic on &{39 65535 ethwe ae:e3:07:9c:8c:d4 up|broadcast|multicast}
+MACs:
+ba:8c:b9:dc:e1:c9 -> 7a:f4:56:87:76:3b (2014-10-23 16:39:19.482338935 +0000 UTC)
+ce:15:34:a9:b5:6d -> 7a:f4:56:87:76:3b (2014-10-23 16:39:28.257103595 +0000 UTC)
+7a:61:a2:49:4b:91 -> 7a:f4:56:87:76:3b (2014-10-23 16:39:27.482970752 +0000 UTC)
+9e:95:0c:54:8e:39 -> 7a:16:dd:5b:83:de (2014-10-23 16:39:28.795601325 +0000 UTC)
+72:5f:a4:60:e5:ce -> 7a:16:dd:5b:83:de (2014-10-23 16:39:29.575995255 +0000 UTC)
+Peers:
+Peer 7a:16:dd:5b:83:de (v31) (UID 13151318985609435078)
+   -> 7a:f4:56:87:76:3b [37.157.33.76:7195]
+Peer 7a:f4:56:87:76:3b (v1) (UID 6913268221365110570)
+   -> 7a:16:dd:5b:83:de [191.235.147.190:6783]
+Topology:
+unicast:
+7a:f4:56:87:76:3b -> 00:00:00:00:00:00
+7a:16:dd:5b:83:de -> 7a:16:dd:5b:83:de
+broadcast:
+7a:f4:56:87:76:3b -> [7a:16:dd:5b:83:de]
+7a:16:dd:5b:83:de -> []
+Reconnects:
+192.168.32.1:6783 (next try at 2014-10-23 16:39:50.585932102 +0000 UTC)
+````
+
+The terms used here are explained further at
+[how it works](how-it-works.html).
+
+A 'peer' on the weave network is a weave router; one per host.  Each
+peer has a name, which tends to remain the same over restarts, and a
+unique identifier (UID) which is different each time it is run.  These
+are opaque identifiers as far as the router is concerned, although the
+name defaults to a MAC address.
+
+The 'Sniffing traffic' line shows details of the virtual ethernet
+interface that weave is using to receive packets on the local
+machine.
+
+The 'MACs' section lists all MAC addresses known to this router. These
+identify containers in the weave network, as well as points for
+[host network integration](features.html#host-network-integration). For
+each MAC the list shows the peer they reside on, and the time when the
+router last saw some traffic from them.
+
+The 'Peers' section lists all peers known to this router, including
+itself.  Each peer is shown with its name, version number (incremented
+on each reconnect) and the UID.  Then each line beginning `->` shows
+another peer that it is connected to, with the IP address and port
+number of the connection. In the above example, the local router has
+connected to its peer using address 191.235.147.190:6783, and its peer
+sees the same connection as coming from 37.157.33.76:7195.
+
+The 'Topology' section summarised the information for deciding how to
+route packets between peers, which is mostly of interest when the
+weave network is not fully connected.  See the
+[architecture documentation](https://raw.githubusercontent.com/zettio/weave/master/docs/architecture.txt)
+for a full explanation.
+
+Finally, 'Reconnects' lists peers that this router is aware of, but is
+not currently connected to.  Each line contains some information about
+whether it is attempting to connect or is waiting for a while before
+connecting again.
 
 ### Reboots
 
