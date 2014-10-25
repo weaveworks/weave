@@ -55,6 +55,15 @@ check_command_and_run() {
     fi
 }
 
+validate_cidr() {
+    # The regexp here is far from precise, but good enough.
+    if ! echo "$1" | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$' >/dev/null ; then
+        echo "Invalid CIDR: $1" >&2
+        echo "CIDR must of be of form <ip_address>/<routing_prefix_length>, e.g. 10.0.1.1/24" >&2
+        exit 1
+    fi
+}
+
 run_iptables() {
     # -w is recent addition to iptables
     if [ -z "$CHECKED_IPTABLES_W" ] ; then
@@ -223,6 +232,7 @@ detach() {
 case "$COMMAND" in
     launch)
         [ $# -gt 0 ] || usage
+        validate_cidr $1
         CIDR=$1
         shift 1
         case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $CONTAINER_NAME 2>/dev/null) in
@@ -291,6 +301,7 @@ case "$COMMAND" in
         ;;
     run)
         [ $# -gt 0 ] || usage
+        validate_cidr $1
         CIDR=$1
         shift 1
         create_bridge
@@ -300,6 +311,7 @@ case "$COMMAND" in
         ;;
     start)
         [ $# -eq 2 ] || usage
+        validate_cidr $1
         create_bridge
         CONTAINER=$(docker start $2)
         with_container_netns $CONTAINER attach $1 $CONTAINER_IFNAME
@@ -307,15 +319,18 @@ case "$COMMAND" in
         ;;
     attach)
         [ $# -eq 2 ] || usage
+        validate_cidr $1
         create_bridge
         with_container_netns $2 attach $1 $CONTAINER_IFNAME
         ;;
     detach)
         [ $# -eq 2 ] || usage
+        validate_cidr $1
         with_container_netns $2 detach $1
         ;;
     expose)
         [ $# -eq 1 ] || usage
+        validate_cidr $1
         create_bridge
         if ! ip addr show dev $BRIDGE | grep -qF $1
         then
@@ -324,6 +339,7 @@ case "$COMMAND" in
         ;;
     hide)
         [ $# -eq 1 ] || usage
+        validate_cidr $1
         create_bridge
         if ip addr show dev $BRIDGE | grep -qF $1
         then
