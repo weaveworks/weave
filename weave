@@ -33,9 +33,12 @@ command_exists () {
 [ $# -gt 0 ] || usage
 
 IMAGE=zettio/weave
+CONTAINER_NAME=weave
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
+PORT=6783
+HTTP_PORT=6784
 
 COMMAND=$1
 
@@ -221,20 +224,20 @@ case "$COMMAND" in
         [ $# -gt 0 ] || usage
         CIDR=$1
         shift 1
-        case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' weave 2>/dev/null) in
+        case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $CONTAINER_NAME 2>/dev/null) in
             "true $IMAGE")
                 echo "Weave is already running." >&2
                 exit 1
                 ;;
             "false $IMAGE")
-                docker rm weave >/dev/null
+                docker rm $CONTAINER_NAME >/dev/null
                 ;;
             true*)
-                echo "Found another running container named 'weave'. Aborting." >&2
+                echo "Found another running container named '$CONTAINER_NAME'. Aborting." >&2
                 exit 1
                 ;;
             false*)
-                echo "Found another container named 'weave'. Aborting." >&2
+                echo "Found another container named '$CONTAINER_NAME'. Aborting." >&2
                 exit 1
                 ;;
         esac
@@ -251,13 +254,13 @@ case "$COMMAND" in
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
-        CONTAINER=$(docker run --privileged -d --name=weave -p 6783:6783/tcp -p 6783:6783/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
+        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
         with_container_netns $CONTAINER attach $CIDR eth0
         echo $CONTAINER
         ;;
     status)
         [ $# -eq 0 ] || usage
-        if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weave 2>/dev/null) ; then
+        if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $CONTAINER_NAME 2>/dev/null) ; then
             echo "Weave is not running." >&2
             exit 1
         fi
@@ -266,9 +269,9 @@ case "$COMMAND" in
             exit 1
         fi
         if command_exists wget ; then
-            wget -O - -q $DOCKERIP:6784/status
+            wget -O - -q $DOCKERIP:$HTTP_PORT/status
         elif command_exists curl ; then
-            curl $DOCKERIP:6784/status
+            curl $DOCKERIP:$HTTP_PORT/status
         else
             echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
             exit 1
@@ -277,7 +280,7 @@ case "$COMMAND" in
     version)
         [ $# -eq 0 ] || usage
         # Try the running container first; if no luck try the image
-        if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' weave 2>/dev/null) ; then
+        if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' $CONTAINER_NAME 2>/dev/null) ; then
             if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $IMAGE 2>/dev/null) ; then
                 echo "Unable to find $IMAGE image." >&2
                 exit 1
@@ -328,18 +331,18 @@ case "$COMMAND" in
         ;;
     stop)
         [ $# -eq 0 ] || usage
-        if ! docker kill weave >/dev/null 2>&1 ; then
+        if ! docker kill $CONTAINER_NAME >/dev/null 2>&1 ; then
             echo "Weave is not running."
         fi
-        docker rm -f weave >/dev/null 2>&1 || true
-        check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
+        docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+        check_command_and_run conntrack conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         stop_masquerading
         ;;
     reset)
         [ $# -eq 0 ] || usage
-        docker kill weave >/dev/null 2>&1 || true
-        docker rm -f weave >/dev/null 2>&1 || true
-        check_command_and_run conntrack conntrack -D -p udp --dport 6783 >/dev/null 2>&1 || true
+        docker kill $CONTAINER_NAME >/dev/null 2>&1 || true
+        docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+        check_command_and_run conntrack conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         stop_masquerading
         destroy_bridge
         ;;
