@@ -6,7 +6,7 @@ pkgs = "lxc-docker golang ethtool libpcap-dev git mercurial"
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box = "phusion/ubuntu-14.04-amd64"
   config.vm.box_url = "https://oss-binaries.phusionpassenger.com/vagrant/boxes/latest/ubuntu-14.04-amd64-vbox.box"
-  
+
   config.vm.network "private_network", ip: vm_ip
 
   config.vm.synced_folder "./", "/home/vagrant/src/github.com/zettio/weave"
