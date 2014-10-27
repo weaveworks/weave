@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"net"
-	"strings"
 )
 
 const (
 	LOCAL_DOMAIN = "weave.local."
 	RDNS_DOMAIN  = "in-addr.arpa."
 )
+
+// +1 to also exclude a dot
+var rdnsDomainLen = len(RDNS_DOMAIN) + 1
 
 func checkFatal(e error) {
 	if e != nil {
@@ -74,8 +76,8 @@ func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("Local rdns query: %+v", q)
-		if q.Qtype == dns.TypePTR && strings.HasSuffix(q.Name, ".in-addr.arpa.") {
-			if ip := net.ParseIP(q.Name[:len(q.Name)-14]); ip != nil {
+		if q.Qtype == dns.TypePTR {
+			if ip := net.ParseIP(q.Name[:len(q.Name)-rdnsDomainLen]); ip != nil {
 				ip4 := ip.To4()
 				revIP := []byte{ip4[3], ip4[2], ip4[1], ip4[0]}
 				Debug.Printf("Looking for address: %+v", revIP)
