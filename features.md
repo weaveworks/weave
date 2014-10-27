@@ -296,10 +296,10 @@ route the traffic via the local data centre.
 
 ### <a name="dynamic-topologies"></a>Dynamic topologies
 
-To add a host to an existing weave network, one simply launches
-weave on the host, supplying the address of at least one existing
-host. Weave will automatically discover the other hosts in the other
-network and establish connections to them if it can (in order to avoid
+To add a host to an existing weave network, one simply launches weave
+on the host, supplying the address of at least one existing
+host. Weave will automatically discover the other hosts in the network
+and establish connections to them if it can (in order to avoid
 unnecessary multi-hop routing).
 
 ### <a name="container-mobility"></a>Container mobility
