@@ -141,6 +141,14 @@ func handleHttp(router *weave.Router) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, router.Status())
 	})
+	http.HandleFunc("/connect", func (w http.ResponseWriter, r *http.Request) {
+		peer := r.FormValue("peer")
+		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+			router.ConnectionMaker.InitiateConnection(addr.String())
+		} else {
+			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
+		}
+	})
 	address := fmt.Sprintf(":%d", weave.HttpPort)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
