@@ -3,7 +3,7 @@ set -e
 
 usage() {
     echo "Usage:"
-    echo "weave launch [-password <password>] <peer> ..."
+    echo "weave launch  [-password <password>] <peer> ..."
     echo "weave connect <peer>"
     echo "weave run     <cidr> <docker run args> ..."
     echo "weave start   <cidr> <container_id>"
@@ -16,8 +16,8 @@ usage() {
     echo "weave stop"
     echo "weave reset"
     echo
-    echo "where <cidr> is of the form <ip_address>/<routing_prefix_length>, and"
-    echo "      <peer> is of the form <ip_address_or_fqdn>[:<port>]"
+    echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>], and"
+    echo "      <cidr> is of the form <ip_address>/<routing_prefix_length>"
     exit 1
 }
 
