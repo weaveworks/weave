@@ -3,20 +3,21 @@ set -e
 
 usage() {
     echo "Usage:"
-    echo "weave launch [-password <password>] <peer> ..."
-    echo "weave run    <cidr> <docker run args> ..."
-    echo "weave start  <cidr> <container_id>"
-    echo "weave attach <cidr> <container_id>"
-    echo "weave detach <cidr> <container_id>"
-    echo "weave expose <cidr>"
-    echo "weave hide   <cidr>"
+    echo "weave launch  [-password <password>] <peer> ..."
+    echo "weave connect <peer>"
+    echo "weave run     <cidr> <docker run args> ..."
+    echo "weave start   <cidr> <container_id>"
+    echo "weave attach  <cidr> <container_id>"
+    echo "weave detach  <cidr> <container_id>"
+    echo "weave expose  <cidr>"
+    echo "weave hide    <cidr>"
     echo "weave status"
     echo "weave version"
     echo "weave stop"
     echo "weave reset"
     echo
-    echo "where <cidr> is of the form <ip_address>/<routing_prefix_length>, and"
-    echo "      <peer> is of the form <ip_address_or_fqdn>[:<port>]"
+    echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>], and"
+    echo "      <cidr> is of the form <ip_address>/<routing_prefix_length>"
     exit 1
 }
 
@@ -131,6 +132,17 @@ destroy_bridge() {
     run_iptables -t nat -F WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
+}
+
+docker_ip() {
+    if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $CONTAINER_NAME 2>/dev/null) ; then
+        echo "Weave is not running." >&2
+        exit 1
+    fi
+    if [ -z "$DOCKERIP" ] ; then
+        echo "Weave is not running." >&2
+        exit 1
+    fi
 }
 
 # the following borrows from https://github.com/jpetazzo/pipework
@@ -285,16 +297,19 @@ case "$COMMAND" in
         with_container_netns $CONTAINER launch
         echo $CONTAINER
         ;;
+    connect)
+        [ $# -eq 1 ] || usage
+        docker_ip
+        if command_exists curl ; then
+            curl -d peer=$1 $DOCKERIP:$HTTP_PORT/connect
+        else
+            echo "Cannot find curl. Install it for 'weave connect' to function." >&2
+            exit 1
+        fi
+        ;;
     status)
         [ $# -eq 0 ] || usage
-        if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $CONTAINER_NAME 2>/dev/null) ; then
-            echo "Weave is not running." >&2
-            exit 1
-        fi
-        if [ -z "$DOCKERIP" ] ; then
-            echo "Weave is not running." >&2
-            exit 1
-        fi
+        docker_ip
         if command_exists wget ; then
             wget -O - -q $DOCKERIP:$HTTP_PORT/status
         elif command_exists curl ; then
