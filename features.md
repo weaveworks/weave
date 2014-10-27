@@ -302,6 +302,18 @@ host. Weave will automatically discover the other hosts in the network
 and establish connections to them if it can (in order to avoid
 unnecessary multi-hop routing).
 
+In some situations all existing weave hosts may be unreachable from
+the new host due to firewalls, etc. However, it is still possible to
+add the new host, provided inverse connections, i.e. from existing
+hosts to the new hosts, are possible. To accomplish that, one launches
+weave on the new host without supplying any additional addresses, and
+then on one of the existing hosts runs
+
+    host# weave connect $NEW_HOST
+
+Other hosts in the weave network will automatically attempt to
+establish connections to the new host too.
+
 ### <a name="container-mobility"></a>Container mobility
 
 Containers can be moved between hosts without requiring any
