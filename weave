@@ -187,15 +187,15 @@ connect_container_to_bridge() {
     fi
 
     ip link set $LOCAL_IFNAME master $BRIDGE &&
-    ip link set $LOCAL_IFNAME up &&
-    ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
-    }
+        ip link set $LOCAL_IFNAME up &&
+        ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
+}
 
 
 launch() {
     connect_container_to_bridge &&
-    ip netns exec $NETNS ip link set $CONTAINER_IFNAME up &&
-    check_command_and_run ethtool ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null
+        ip netns exec $NETNS ip link set $CONTAINER_IFNAME up &&
+        check_command_and_run ethtool ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null
 }
 
 attach() {
