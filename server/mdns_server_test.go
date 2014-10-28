@@ -72,12 +72,10 @@ func TestServerSimpleQuery(t *testing.T) {
 	time.Sleep(time.Second)
 
 	if receivedCount != 1 {
-		t.Log("Unexpected result count for test.weave", receivedCount)
-		t.Fail()
+		t.Fatal("Unexpected result count for test.weave", receivedCount)
 	}
 	if !receivedAddr.Equal(weaveIP) {
-		t.Log("Unexpected result for test.weave", receivedAddr)
-		t.Fail()
+		t.Fatal("Unexpected result for test.weave", receivedAddr)
 	}
 
 	receivedCount = 0
@@ -85,7 +83,6 @@ func TestServerSimpleQuery(t *testing.T) {
 	sendQuery("testfail.weave.", dns.TypeA)
 
 	if receivedCount != 0 {
-		t.Log("Unexpected result count for testfail.weave", receivedCount)
-		t.Fail()
+		t.Fatal("Unexpected result count for testfail.weave", receivedCount)
 	}
 }

@@ -35,23 +35,18 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 	m.Answer = append(m.Answer, a)
 
 	buf, err := m.Pack()
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkFatal(err)
 	if buf == nil {
 		log.Fatal("Nil buffer")
 	}
 	//log.Println("minimalServer sending:", buf)
 	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
 	sendconn, err := net.DialUDP("udp", nil, ipv4Addr)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkFatal(err)
+
 	_, err = sendconn.Write(buf)
 	sendconn.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkFatal(err)
 }
 
 func RunLocalMulticastServer() (*dns.Server, error) {
@@ -113,8 +108,7 @@ func TestSimpleQuery(t *testing.T) {
 	}
 
 	if !context.receivedAddr.Equal(testAddr) || context.receivedCount != 1 {
-		t.Log("Unexpected result for", successTestName, context.receivedAddr, context.receivedCount)
-		t.Fail()
+		t.Fatal("Unexpected result for", successTestName, context.receivedAddr, context.receivedCount)
 	}
 
 	// Now, a test we expect to time out with no responses
@@ -125,8 +119,7 @@ func TestSimpleQuery(t *testing.T) {
 	}
 
 	if context.receivedCount > 0 {
-		t.Log("Unexpected result for test2.weave", context.receivedAddr)
-		t.Fail()
+		t.Fatal("Unexpected result for test2.weave", context.receivedAddr)
 	}
 }
 
@@ -155,7 +148,6 @@ outerloop:
 	}
 
 	if !context1.receivedAddr.Equal(testAddr) || !context2.receivedAddr.Equal(testAddr) || context1.receivedCount != 1 || context2.receivedCount != 1 {
-		t.Log("Unexpected result for", successTestName, context1.receivedAddr, context2.receivedAddr, context1.receivedCount, context2.receivedCount)
-		t.Fail()
+		t.Fatal("Unexpected result for", successTestName, context1.receivedAddr, context2.receivedAddr, context1.receivedCount, context2.receivedCount)
 	}
 }
