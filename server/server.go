@@ -41,7 +41,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		if q.Qtype == dns.TypeA {
 			ip, err := zone.MatchLocal(q.Name)
 			if err == nil {
-				m := makeDNSReply(r, q.Name, dns.TypeA, []net.IP{ip})
+				m := makeAReply(r, &q, []net.IP{ip})
 				w.WriteMsg(m)
 			} else {
 				Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
@@ -55,7 +55,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 					}
 					var responseMsg *dns.Msg
 					if len(replies) > 0 {
-						responseMsg = makeDNSReply(r, q.Name, dns.TypeA, replies)
+						responseMsg = makeAReply(r, &q, replies)
 					} else {
 						responseMsg = makeDNSFailResponse(r)
 					}
@@ -84,11 +84,7 @@ func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 				name, err := zone.MatchLocalIP(revIP)
 				if err == nil {
 					Debug.Printf("Found name: %s", name)
-					m := new(dns.Msg)
-					m.SetReply(r)
-					m.RecursionAvailable = true
-					hdr := dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: localTTL}
-					m.Answer = []dns.RR{&dns.PTR{hdr, name}}
+					m := makePTRReply(r, &q, []string{name})
 					w.WriteMsg(m)
 				} else {
 					Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
@@ -112,7 +108,7 @@ func notUsHandler() dns.HandlerFunc {
 		if q.Qtype == dns.TypeA {
 			addrs, err := net.LookupIP(q.Name)
 			if err == nil {
-				responseMsg = makeDNSReply(r, q.Name, q.Qtype, addrs)
+				responseMsg = makeAReply(r, &q, addrs)
 			} else {
 				responseMsg = makeDNSFailResponse(r)
 				Debug.Print("Failed fallback lookup ", err)

@@ -43,7 +43,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 			q := r.Question[0]
 			ip, err := s.zone.MatchLocal(q.Name)
 			if err == nil {
-				m := makeDNSReply(r, q.Name, dns.TypeA, []net.IP{ip})
+				m := makeAReply(r, &q, []net.IP{ip})
 				s.SendResponse(m)
 			} else if s.addrIsLocal(w.RemoteAddr()) {
 				// ignore this - it's our own query received via multicast
