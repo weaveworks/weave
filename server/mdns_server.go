@@ -55,7 +55,9 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 			q := r.Question[0]
 			if ip, err := s.zone.MatchLocal(q.Name); err == nil {
 				m := makeAReply(r, &q, []net.IP{ip})
-				s.SendResponse(m)
+				if err = s.sendResponse(m); err != nil {
+					Warning.Printf("Error writing to %s", w)
+				}
 			} else if s.addrIsLocal(w.RemoteAddr()) {
 				// ignore this - it's our own query received via multicast
 			} else {
@@ -67,7 +69,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 	return err
 }
 
-func (s *MDNSServer) SendResponse(m *dns.Msg) error {
+func (s *MDNSServer) sendResponse(m *dns.Msg) error {
 	buf, err := m.Pack()
 	if err != nil {
 		return err
