@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	standardLogFlags = log.Ldate | log.Ltime | log.Lshortfile
+	standardLogFlags = log.Ldate | log.Ltime | log.Lmicroseconds
 )
 
-// Inspired by http://www.goinggo.net/2013/11/using-log-package-in-go.html
+// Largely taken from
+// http://www.goinggo.net/2013/11/using-log-package-in-go.html
 
 var (
 	Debug   *log.Logger
