@@ -21,9 +21,9 @@ func main() {
 
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
-	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0)")
-	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to dns requests (defaults to 53)")
-	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests (defaults to 6785)")
+	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
+	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to dns requests")
+	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	flag.Parse()
