@@ -87,7 +87,7 @@ func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 					m := new(dns.Msg)
 					m.SetReply(r)
 					m.RecursionAvailable = true
-					hdr := dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: 3600}
+					hdr := dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: localTTL}
 					m.Answer = []dns.RR{&dns.PTR{hdr, name}}
 					w.WriteMsg(m)
 				} else {

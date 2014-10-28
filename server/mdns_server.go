@@ -11,6 +11,11 @@ type MDNSServer struct {
 	zone       Zone
 }
 
+const (
+	localTTL uint32 = 300 // somewhat arbitrary; we don't expect anyone
+	// downstream to cache results
+)
+
 func NewMDNSServer(zone Zone) (*MDNSServer, error) {
 	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
 	sendconn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
@@ -26,7 +31,7 @@ func makeDNSReply(r *dns.Msg, name string, qtype uint16, addrs []net.IP) *dns.Ms
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.RecursionAvailable = true
-	hdr := dns.RR_Header{Name: name, Rrtype: qtype, Class: dns.ClassINET, Ttl: 3600}
+	hdr := dns.RR_Header{Name: name, Rrtype: qtype, Class: dns.ClassINET, Ttl: localTTL}
 	for _, addr := range addrs {
 		if qtype == dns.TypeA {
 			if ip4 := addr.To4(); ip4 != nil {
