@@ -35,21 +35,6 @@ func (s *MDNSServer) addrIsLocal(testaddr net.Addr) bool {
 }
 
 func (s *MDNSServer) Start(ifi *net.Interface) error {
-	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
-		// Ignore answers to other questions
-		if len(r.Answer) == 0 && len(r.Question) > 0 {
-			q := r.Question[0]
-			if ip, err := s.zone.MatchLocal(q.Name); err == nil {
-				m := makeAReply(r, &q, []net.IP{ip})
-				s.SendResponse(m)
-			} else if s.addrIsLocal(w.RemoteAddr()) {
-				// ignore this - it's our own query received via multicast
-			} else {
-				Debug.Printf("Failed MDNS lookup for %s", q.Name)
-			}
-		}
-	}
-
 	conn, err := LinkLocalMulticastListener(ifi)
 	if err != nil {
 		return err
@@ -64,8 +49,21 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 		return err
 	}
 
+	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
+		// Ignore answers to other questions
+		if len(r.Answer) == 0 && len(r.Question) > 0 {
+			q := r.Question[0]
+			if ip, err := s.zone.MatchLocal(q.Name); err == nil {
+				m := makeAReply(r, &q, []net.IP{ip})
+				s.SendResponse(m)
+			} else if s.addrIsLocal(w.RemoteAddr()) {
+				// ignore this - it's our own query received via multicast
+			} else {
+				Debug.Printf("Failed MDNS lookup for %s", q.Name)
+			}
+		}
+	}
 	go dns.ActivateAndServe(nil, conn, dns.HandlerFunc(handleMDNS))
-
 	return err
 }
 
