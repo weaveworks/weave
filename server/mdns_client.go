@@ -12,8 +12,8 @@ import (
 const (
 	ipv4mdns = "224.0.0.251" // link-local multicast address
 	mdnsPort = 5353          // mDNS assigned port
-	// We wait this long to hear responses from other mDNS servers on the network.
-	// TODO: introduce caching so we don't have to wait this long on every call.
+	// We wait this long to hear a response from other mDNS servers on
+	// the network.
 	mDNSTimeout = 500 * time.Millisecond
 	MaxDuration = time.Duration(math.MaxInt64)
 	MailboxSize = 16
@@ -40,7 +40,7 @@ type responseInfo struct {
 // Represents one query that we have sent for one name.
 // If we, internally, get several requests for the same name while we have
 // a query in flight, then we don't want to send more queries out.
-// Invariant on responseInfos: they are in non-descending order of timeout.
+// Invariant on responseInfos: they are in ascending order of timeout.
 type inflightQuery struct {
 	name          string
 	id            uint16 // the DNS message ID
@@ -140,7 +140,7 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 	now := time.Now()
 	after := MaxDuration
 	for name, query := range c.inflight {
-		// Invariant on responseInfos: they are in non-descending order of timeout.
+		// Invariant on responseInfos: they are in ascending order of timeout.
 		numClosed := 0
 		for _, item := range query.responseInfos {
 			duration := item.timeout.Sub(now)
@@ -228,7 +228,7 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 		ch:      q.responseCh,
 		timeout: time.Now().Add(mDNSTimeout),
 	}
-	// Invariant on responseInfos: they are in non-descending order of timeout.
+	// Invariant on responseInfos: they are in ascending order of timeout.
 	// Since we use a fixed interval from Now(), this must be after all existing timeouts.
 	query.responseInfos = append(query.responseInfos, info)
 }
