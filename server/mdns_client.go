@@ -62,14 +62,14 @@ type mDNSQueryInfo struct {
 }
 
 func NewMDNSClient() (*MDNSClient, error) {
-	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
-	if err != nil {
+	if conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0}); err != nil {
 		return nil, err
+	} else {
+		return &MDNSClient{
+			conn:     conn,
+			addr:     ipv4Addr,
+			inflight: make(map[string]*inflightQuery)}, nil
 	}
-	return &MDNSClient{
-		conn:     conn,
-		addr:     ipv4Addr,
-		inflight: make(map[string]*inflightQuery)}, nil
 }
 
 func (c *MDNSClient) Start(ifi *net.Interface) error {
@@ -96,8 +96,7 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 }
 
 func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
-	conn, err := net.ListenMulticastUDP("udp", ifi, ipv4Addr)
-	return conn, err
+	return net.ListenMulticastUDP("udp", ifi, ipv4Addr)
 }
 
 // ACTOR client API
@@ -216,8 +215,7 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 			name: q.name,
 			id:   m.Id,
 		}
-		_, err = c.conn.WriteTo(buf, c.addr)
-		if err != nil {
+		if _, err = c.conn.WriteTo(buf, c.addr); err != nil {
 			q.responseCh <- &ResponseA{Err: err}
 			close(q.responseCh)
 			return

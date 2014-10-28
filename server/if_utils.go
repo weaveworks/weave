@@ -7,8 +7,7 @@ import (
 )
 
 func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
-	iface, err = findInterface(ifaceName)
-	if err == nil || wait == 0 {
+	if iface, err = findInterface(ifaceName); err == nil || wait == 0 {
 		return
 	}
 	Info.Println("Waiting for interface", ifaceName, "to come up")
@@ -23,8 +22,7 @@ func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err erro
 }
 
 func findInterface(ifaceName string) (iface *net.Interface, err error) {
-	iface, err = net.InterfaceByName(ifaceName)
-	if err != nil {
+	if iface, err = net.InterfaceByName(ifaceName); err != nil {
 		return iface, fmt.Errorf("Unable to find interface %s", ifaceName)
 	}
 	if 0 == (net.FlagUp & iface.Flags) {

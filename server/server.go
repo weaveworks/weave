@@ -39,8 +39,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		q := r.Question[0]
 		Debug.Printf("Local query: %+v", q)
 		if q.Qtype == dns.TypeA {
-			ip, err := zone.MatchLocal(q.Name)
-			if err == nil {
+			if ip, err := zone.MatchLocal(q.Name); err == nil {
 				m := makeAReply(r, &q, []net.IP{ip})
 				w.WriteMsg(m)
 			} else {
@@ -81,8 +80,7 @@ func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 				ip4 := ip.To4()
 				revIP := []byte{ip4[3], ip4[2], ip4[1], ip4[0]}
 				Debug.Printf("Looking for address: %+v", revIP)
-				name, err := zone.MatchLocalIP(revIP)
-				if err == nil {
+				if name, err := zone.MatchLocalIP(revIP); err == nil {
 					Debug.Printf("Found name: %s", name)
 					m := makePTRReply(r, &q, []string{name})
 					w.WriteMsg(m)
@@ -106,8 +104,7 @@ func notUsHandler() dns.HandlerFunc {
 		Debug.Printf("Non-local query: %+v", q)
 		var responseMsg *dns.Msg
 		if q.Qtype == dns.TypeA {
-			addrs, err := net.LookupIP(q.Name)
-			if err == nil {
+			if addrs, err := net.LookupIP(q.Name); err == nil {
 				responseMsg = makeAReply(r, &q, addrs)
 			} else {
 				responseMsg = makeDNSFailResponse(r)

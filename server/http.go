@@ -38,7 +38,6 @@ func ListenHttp(domain string, db Zone, port int) {
 			ident, weaveIPstr, err := parseUrl(r.URL.Path)
 			name := r.FormValue("fqdn")
 			localIPstr := r.FormValue("local_ip")
-
 			if ident == "" || weaveIPstr == "" || name == "" || localIPstr == "" {
 				reqError("Invalid request", "Invalid request: %s, %s", r.URL, r.Form)
 				return
@@ -58,10 +57,8 @@ func ListenHttp(domain string, db Zone, port int) {
 
 			if dns.IsSubDomain(domain, name) {
 				Info.Printf("Adding %s (%s) -> %s", name, localIPstr, weaveIPstr)
-				err = db.AddRecord(ident, name, localIP, weaveIP)
-				if err != nil {
-					dup, ok := err.(DuplicateError)
-					if !ok {
+				if err = db.AddRecord(ident, name, localIP, weaveIP); err != nil {
+					if dup, ok := err.(DuplicateError); !ok {
 						httpErrorAndLog(
 							Error, w, "Internal error", http.StatusInternalServerError,
 							"Unexpected error from DB: %s", err)
@@ -88,8 +85,7 @@ func ListenHttp(domain string, db Zone, port int) {
 				return
 			}
 			Info.Printf("Deleting %s (%s)", ident, weaveIPstr)
-			err = db.DeleteRecord(ident, weaveIP)
-			if err != nil {
+			if err = db.DeleteRecord(ident, weaveIP); err != nil {
 				if _, ok := err.(LookupError); !ok {
 					httpErrorAndLog(
 						Error, w, "Internal error", http.StatusInternalServerError,
@@ -105,8 +101,7 @@ func ListenHttp(domain string, db Zone, port int) {
 	})
 
 	address := fmt.Sprintf(":%d", port)
-	err := http.ListenAndServe(address, nil)
-	if err != nil {
+	if err := http.ListenAndServe(address, nil); err != nil {
 		Error.Fatal("Unable to create http listener: ", err)
 	}
 }

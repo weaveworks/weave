@@ -17,9 +17,7 @@ func NewMDNSServer(zone Zone) (*MDNSServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	retval := &MDNSServer{sendconn: sendconn, zone: zone}
-
-	return retval, nil
+	return &MDNSServer{sendconn: sendconn, zone: zone}, nil
 }
 
 // Return true if testaddr is a UDP address with IP matching my local i/f
@@ -41,8 +39,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 		// Ignore answers to other questions
 		if len(r.Answer) == 0 && len(r.Question) > 0 {
 			q := r.Question[0]
-			ip, err := s.zone.MatchLocal(q.Name)
-			if err == nil {
+			if ip, err := s.zone.MatchLocal(q.Name); err == nil {
 				m := makeAReply(r, &q, []net.IP{ip})
 				s.SendResponse(m)
 			} else if s.addrIsLocal(w.RemoteAddr()) {
@@ -57,6 +54,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 	if err != nil {
 		return err
 	}
+
 	if ifi == nil {
 		s.localAddrs, err = net.InterfaceAddrs()
 	} else {
