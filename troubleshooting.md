@@ -45,7 +45,7 @@ Any running application containers will permanently lose connectivity
 with the weave network and have to be restarted in order to
 re-connect.
 
-### Status report
+### <a name="status-report"></a>Status report
 
 The command
 
@@ -119,7 +119,7 @@ not currently connected to.  Each line contains some information about
 whether it is attempting to connect or is waiting for a while before
 connecting again.
 
-### List attached containers
+### <a name="list-attached-containers"></a>List attached containers
 
     weave ps
 
