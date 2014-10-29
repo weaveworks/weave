@@ -266,16 +266,6 @@ container_weave_addrs() {
     ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
-weave_ps() {
-    for CONTAINER_ID in $(docker ps -q) ; do
-        if CONTAINER_ADDRS=$(with_container_netns $CONTAINER_ID container_weave_addrs 2>&1) ; then
-            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | cut -d ' ' -f 2)
-            CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | grep -o 'link/ether .*' | cut -d ' ' -f 2)
-            echo $CONTAINER_ID $CONTAINER_MAC $CONTAINER_IPS
-        fi
-    done
-}
-
 case "$COMMAND" in
     launch)
         case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $CONTAINER_NAME 2>/dev/null) in
@@ -338,7 +328,14 @@ case "$COMMAND" in
         fi
         ;;
     ps)
-        weave_ps
+        [ $# -eq 0 ] || usage
+        for CONTAINER_ID in $(docker ps -q) ; do
+            if CONTAINER_ADDRS=$(with_container_netns $CONTAINER_ID container_weave_addrs 2>&1) ; then
+                CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | cut -d ' ' -f 2)
+                CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | grep -o 'link/ether .*' | cut -d ' ' -f 2)
+                echo $CONTAINER_ID $CONTAINER_MAC $CONTAINER_IPS
+            fi
+        done
         ;;
     version)
         [ $# -eq 0 ] || usage
