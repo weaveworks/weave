@@ -96,7 +96,8 @@ The 'MACs' section lists all MAC addresses known to this router. These
 identify containers in the weave network, as well as points for
 [host network integration](features.html#host-network-integration). For
 each MAC the list shows the peer they reside on, and the time when the
-router last saw some traffic from them.
+router last saw some traffic from that MAC. The router forgets
+addresses which are inactive for longer than 10 minutes.
 
 The 'Peers' section lists all peers known to this router, including
 itself.  Each peer is shown with its name, version number (incremented
