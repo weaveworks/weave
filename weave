@@ -263,7 +263,7 @@ detach() {
 }
 
 container_weave_addrs() {
-    ip netns exec $NETNS ip addr show dev ethwe
+    ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
 weave_ps() {
