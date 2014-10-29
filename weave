@@ -12,6 +12,7 @@ usage() {
     echo "weave detach     <cidr> <container_id>"
     echo "weave expose     <cidr>"
     echo "weave hide       <cidr>"
+    echo "weave ps"
     echo "weave status"
     echo "weave version"
     echo "weave stop"
@@ -149,6 +150,9 @@ docker_ip() {
 }
 
 # the following borrows from https://github.com/jpetazzo/pipework
+
+# run args $2 $3 ... as a command in the network namespace of container $1
+# if an error is caused by container dying, swallow output from error
 with_container_netns () {
     CONTAINER="$1"
     CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
@@ -186,6 +190,7 @@ with_container_netns () {
         fi
     fi
 
+    cat $IP_TMPFILE  # no error - send the output to stdout
     rm -f $IP_TMPFILE /var/run/netns/$NETNS
     return $STATUS
 }
@@ -319,6 +324,10 @@ check_not_running() {
     esac
 }
 
+container_weave_addrs() {
+    ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
+}
+
 case "$COMMAND" in
     launch)
         check_not_running $CONTAINER_NAME $IMAGE
@@ -339,7 +348,7 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
-        with_container_netns $CONTAINER launch
+        with_container_netns $CONTAINER launch >/dev/null
         echo $CONTAINER
         ;;
     launch-dns)
@@ -349,7 +358,7 @@ case "$COMMAND" in
         check_not_running $DNS_CONTAINER_NAME $DNS_IMAGE
         create_bridge
         CONTAINER=$(docker run -d --name=$DNS_CONTAINER_NAME -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@")
-        with_container_netns $CONTAINER attach $CIDR
+        with_container_netns $CONTAINER attach $CIDR >/dev/null
         echo $CONTAINER
         ;;
     connect)
@@ -358,6 +367,16 @@ case "$COMMAND" in
         ;;
     status)
         rest_call GET weave $HTTP_PORT/status
+        ;;
+    ps)
+        [ $# -eq 0 ] || usage
+        for CONTAINER_ID in $(docker ps -q) ; do
+            if CONTAINER_ADDRS=$(with_container_netns $CONTAINER_ID container_weave_addrs 2>&1) ; then
+                CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | grep -o 'link/ether .*' | cut -d ' ' -f 2)
+                CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*'       | cut -d ' ' -f 2)
+                echo $CONTAINER_ID $CONTAINER_MAC $CONTAINER_IPS
+            fi
+        done
         ;;
     version)
         [ $# -eq 0 ] || usage
@@ -378,7 +397,7 @@ case "$COMMAND" in
         create_bridge
         DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}' $DNS_CONTAINER_NAME 2>/dev/null) || true
         CONTAINER=$(docker run $DNS_ARG -d "$@" | tail -n 1)
-        with_container_netns $CONTAINER attach $CIDR
+        with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
         ;;
@@ -387,7 +406,7 @@ case "$COMMAND" in
         validate_cidr $1
         create_bridge
         CONTAINER=$(docker start $2)
-        with_container_netns $CONTAINER attach $1
+        with_container_netns $CONTAINER attach $1 >/dev/null
         tell_dns PUT $CONTAINER $1
         echo $CONTAINER
         ;;
@@ -395,13 +414,13 @@ case "$COMMAND" in
         [ $# -eq 2 ] || usage
         validate_cidr $1
         create_bridge
-        with_container_netns $2 attach $1
+        with_container_netns $2 attach $1 >/dev/null
         tell_dns PUT $2 $1
         ;;
     detach)
         [ $# -eq 2 ] || usage
         validate_cidr $1
-        with_container_netns $2 detach $1
+        with_container_netns $2 detach $1 >/dev/null
         tell_dns DELETE $2 $1
         ;;
     expose)
