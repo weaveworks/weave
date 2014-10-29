@@ -24,24 +24,8 @@ Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the
 `weave` network bridge on the host.
 
-To get a list of all the containers running on this host that are
-connected to the weave network:
-
-    weave ps
-
-This produces output like:
-
-    b07565b06c53 a2:d0:43:02:68:f8
-    5245643870f1 ce:15:34:a9:b5:6d 10.0.5.1/16
-    e32a7d37a93a 7a:61:a2:49:4b:91 10.0.8.3/24
-    caa1d4ee2570 ba:8c:b9:dc:e1:c9 10.0.1.1/24 10.0.2.1/24
-
-giving, for each running container attached, the container ID, its MAC
-address, then the list of IP address/routing prefix length ([CIDR
-notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing))
-assigned on the weave network.
-
-One can ask a weave router for a [status report](#status-report).
+One can ask a weave router for a [status report](#status-report) or
+for a [list of attached containers](#list-attached-containers).
 
 To stop weave, run
 
@@ -133,6 +117,23 @@ Finally, 'Reconnects' lists peers that this router is aware of, but is
 not currently connected to.  Each line contains some information about
 whether it is attempting to connect or is waiting for a while before
 connecting again.
+
+### List attached containers
+
+    weave ps
+
+Produces a list of all the containers running on this host that are
+connected to the weave network, like this:
+
+    b07565b06c53 a2:d0:43:02:68:f8
+    5245643870f1 ce:15:34:a9:b5:6d 10.0.5.1/16
+    e32a7d37a93a 7a:61:a2:49:4b:91 10.0.8.3/24
+    caa1d4ee2570 ba:8c:b9:dc:e1:c9 10.0.1.1/24 10.0.2.1/24
+
+On each line are the container ID, its MAC address, then the list of
+IP address/routing prefix length ([CIDR
+notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing))
+assigned on the weave network.
 
 ### Reboots
 
