@@ -124,7 +124,7 @@ In order to connect containers across untrusted networks, weave peers
 can be told to encrypt traffic by supplying a `-password` option when
 launching weave, e.g.
 
-    host1# weave launch 10.0.0.1/16 -password wEaVe
+    host1# weave launch -password wEaVe
 
 The same password must be specified for all weave peers; it is a
 component in the creation of ephemeral session keys for connections
@@ -219,7 +219,7 @@ This allows any application container to reach the service by
 connecting to 10.0.1.101:3322. So if $HOST3 is indeed running a netcat
 service on port 2211, e.g.
 
-    host3# nc -kl 2211
+    host3# nc -lk -p 2211
 
 then we can connect to it from our application container on $HOST2 with
 
@@ -296,11 +296,23 @@ route the traffic via the local data centre.
 
 ### <a name="dynamic-topologies"></a>Dynamic topologies
 
-To add a host to an existing weave network, one simply launches
-weave on the host, supplying the address of at least one existing
-host. Weave will automatically discover the other hosts in the other
-network and establish connections to them if it can (in order to avoid
+To add a host to an existing weave network, one simply launches weave
+on the host, supplying the address of at least one existing
+host. Weave will automatically discover the other hosts in the network
+and establish connections to them if it can (in order to avoid
 unnecessary multi-hop routing).
+
+In some situations all existing weave hosts may be unreachable from
+the new host due to firewalls, etc. However, it is still possible to
+add the new host, provided inverse connections, i.e. from existing
+hosts to the new hosts, are possible. To accomplish that, one launches
+weave on the new host without supplying any additional addresses, and
+then on one of the existing hosts runs
+
+    host# weave connect $NEW_HOST
+
+Other hosts in the weave network will automatically attempt to
+establish connections to the new host too.
 
 ### <a name="container-mobility"></a>Container mobility
 

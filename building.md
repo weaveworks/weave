@@ -81,7 +81,7 @@ vm$ make
 The docker daemon is also running in this VM, so you can then do
 
 ```bash
-vm$ sudo ./weave launch 10.0.0.1/16
+vm$ sudo ./weave launch
 vm$ docker ps
 ```
 

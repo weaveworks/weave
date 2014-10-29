@@ -19,7 +19,7 @@ make it executable like this:
 Then, if we were trying to create the same containers as in the first
 example above, the 'launch' command would be run like this:
 
-    host1$ boot2docker ssh "sudo ./weave launch 10.0.0.1/16"
+    host1$ boot2docker ssh "sudo ./weave launch"
 
 and the 'run' command like this:
 
