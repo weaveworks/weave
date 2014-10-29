@@ -295,7 +295,7 @@ tell_dns() {
     WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
     WEAVE_ADDR_PR=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\2/')
     MORE_ARGS=$(docker inspect --format '--data-urlencode local_ip={{ .NetworkSettings.IPAddress }} --data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
-    rest_call $1 weavedns 6785/name/$CONTAINER/$WEAVE_ADDR_IP --data-urlencode "routing_prefix=$WEAVE_ADDR_PR" $MORE_ARGS
+    rest_call $1 weavedns 6785/name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
 }
 
 # Check that a container named $1 with image $2 is not running
