@@ -11,6 +11,7 @@ usage() {
     echo "weave detach  <cidr> <container_id>"
     echo "weave expose  <cidr>"
     echo "weave hide    <cidr>"
+    echo "weave ps"
     echo "weave status"
     echo "weave version"
     echo "weave stop"
