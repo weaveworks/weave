@@ -31,12 +31,13 @@ connected to the weave network:
 
 This produces output like:
 
-    5245643870f1 10.0.5.1/16
-    e32a7d37a93a 10.0.8.3/24
-    caa1d4ee2570 10.0.1.1/24 10.0.2.1/24
+    b07565b06c53 a2:d0:43:02:68:f8
+    5245643870f1 ce:15:34:a9:b5:6d 10.0.5.1/16
+    e32a7d37a93a 7a:61:a2:49:4b:91 10.0.8.3/24
+    caa1d4ee2570 ba:8c:b9:dc:e1:c9 10.0.1.1/24 10.0.2.1/24
 
-giving, for each running container attached, the container ID then the
-list of IP address/routing prefix length ([CIDR
+giving, for each running container attached, the container ID, its MAC
+address, then the list of IP address/routing prefix length ([CIDR
 notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing))
 assigned on the weave network.
 
