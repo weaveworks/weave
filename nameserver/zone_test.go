@@ -1,4 +1,4 @@
-package weavedns
+package nameserver
 
 import (
 	"net"

@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/zettio/weavedns/server"
+	weavedns "github.com/zettio/weavedns/nameserver"
 	"io/ioutil"
 	"net"
 	"os"

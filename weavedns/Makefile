@@ -2,8 +2,8 @@
 
 all: server-image
 
-weavedns: ../server/*.go ../main.go
-	go get -tags netgo ../ && go build -tags netgo -ldflags '-linkmode external -extldflags "-static"' -o $@ -v ../
+weavedns: ../nameserver/*.go ./main.go
+	go get -tags netgo && go build -tags netgo -ldflags '-linkmode external -extldflags "-static"' -o $@ -v
 
 .PHONY: server-image
 

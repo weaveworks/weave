@@ -1,4 +1,4 @@
-package weavedns
+package nameserver
 
 import (
 	"github.com/fsouza/go-dockerclient"
