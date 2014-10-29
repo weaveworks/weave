@@ -55,20 +55,20 @@ containers, one on each host.
 
 On $HOST1 run (as root)
 
-    host1# weave launch 10.0.0.1/16
+    host1# weave launch
     host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu)
 
 The first line starts the weave router, in a container. This needs to
-be done once on each host. We tell weave that its IP address should
-be 10.0.0.1, and that the weave network is on 10.0.0.0/16.
+be done once on each host.
 
 The second line runs our application container. We give it an IP
-address and network (a subnet of the weave network). `weave run`
-invokes `docker run -d` with all the parameters following the IP
-address and network. So we could be launching any container this way;
-here we just take a stock ubuntu container and launch a shell in
-it. There's also a `weave start` command, which invokes `docker start`
-for starting existing containers.
+address and network, in
+[CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation).
+`weave run` invokes `docker run -d` with all the parameters following
+the IP address and network. So we could be launching any container
+this way; here we just take a stock ubuntu container and launch a
+shell in it. There's also a `weave start` command, which invokes
+`docker start` for starting existing containers.
 
 If our application consists of more than one container on this host we
 simply launch them with a variation on that second line.
@@ -81,13 +81,13 @@ unique.
 
 We repeat similar steps on $HOST2...
 
-    host2# weave launch 10.0.0.2/16 $HOST1
+    host2# weave launch $HOST1
     host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu)
 
-The only difference, apart from the choice of IP addresses for the
-weave router and the application container, is that we tell our weave
-that it should peer with the weave on $HOST1 (specified as the IP
-address or hostname by which $HOST2 can reach it). NB: if there is a
+The only difference, apart from the choice of IP address for the
+application container, is that we tell our weave that it should peer
+with the weave on $HOST1 (specified as the IP address or hostname, and
+optional `:port`, by which $HOST2 can reach it). NB: if there is a
 firewall between $HOST1 and $HOST2, you must open port 6783 for TCP
 and UDP.
 
