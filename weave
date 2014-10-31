@@ -45,6 +45,7 @@ CONTAINER_IFNAME=ethwe
 MTU=65535
 PORT=6783
 HTTP_PORT=6784
+DNS_HTTP_PORT=6785
 
 COMMAND=$1
 
@@ -266,8 +267,8 @@ detach() {
     ip link del $LOCAL_IFNAME type veth
 }
 
-# Call url $3 on program $2 with http verb $1
-rest_call() {
+# Call url $4 on container $2 at port $3 with http verb $1
+http_call() {
     http_verb="$1"
     if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $2 2>/dev/null) ; then
         echo "$2 is not running." >&2
@@ -277,10 +278,11 @@ rest_call() {
         echo "$2 is not running." >&2
         exit 1
     fi
-    url="$3"
+    port="$3"
+    url="$4"
     shift 3
     if command_exists curl ; then
-        curl -s -X $http_verb "$@" $DOCKERIP:$url
+        curl -s -X $http_verb "$@" http://$DOCKERIP:$port$url
     else
         echo "Cannot find curl, which is required for this operation." >&2
         exit 1
@@ -290,7 +292,7 @@ rest_call() {
 # Perform operation $1 on container ID $2 to local DNS database at address $3
 # This function is only called where we know $2 is a valid container name
 tell_dns() {
-    if ! DNSID=$(docker inspect --format='{{ .Id }}' weavedns 2>/dev/null) || [ -z "$DNSID" ] ; then
+    if ! DNSID=$(docker inspect --format='{{ .Id }}' $DNS_CONTAINER_NAME 2>/dev/null) || [ -z "$DNSID" ] ; then
         # weavedns not running - silently return
         return
     fi
@@ -300,7 +302,7 @@ tell_dns() {
     WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
     WEAVE_ADDR_PR=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\2/')
     MORE_ARGS=$(docker inspect --format '--data-urlencode local_ip={{ .NetworkSettings.IPAddress }} --data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
-    rest_call $1 weavedns 6785/name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
+    http_call $1 $DNS_CONTAINER_NAME $DNS_HTTP_PORT /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
 }
 
 # Check that a container named $1 with image $2 is not running
@@ -363,10 +365,10 @@ case "$COMMAND" in
         ;;
     connect)
         [ $# -eq 1 ] || usage
-        rest_call POST weave $HTTP_PORT/connect -d "peer=$1"
+        http_call POST $CONTAINER_NAME $HTTP_PORT /connect -d "peer=$1"
         ;;
     status)
-        rest_call GET weave $HTTP_PORT/status
+        http_call GET $CONTAINER_NAME $HTTP_PORT /status
         ;;
     ps)
         [ $# -eq 0 ] || usage
