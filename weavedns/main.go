@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	weavedns "github.com/zettio/weave/nameserver"
+	weavenet "github.com/zettio/weave/net"
 	"io/ioutil"
 	"net"
 	"os"
@@ -46,9 +47,12 @@ func main() {
 	var iface *net.Interface = nil
 	if ifaceName != "" {
 		var err error
-		iface, err = weavedns.EnsureInterface(ifaceName, wait)
+		weavedns.Info.Println("Waiting for interface", ifaceName, "to come up")
+		iface, err = weavenet.EnsureInterface(ifaceName, wait)
 		if err != nil {
 			weavedns.Error.Fatal(err)
+		} else {
+			weavedns.Info.Println("Interface", ifaceName, "is up")
 		}
 	}
 

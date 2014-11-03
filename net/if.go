@@ -1,4 +1,4 @@
-package nameserver
+package net
 
 import (
 	"fmt"
@@ -10,13 +10,9 @@ func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err erro
 	if iface, err = findInterface(ifaceName); err == nil || wait == 0 {
 		return
 	}
-	Info.Println("Waiting for interface", ifaceName, "to come up")
 	for ; err != nil && wait > 0; wait -= 1 {
 		time.Sleep(1 * time.Second)
 		iface, err = findInterface(ifaceName)
-	}
-	if err == nil {
-		Info.Println("Interface", ifaceName, "is up")
 	}
 	return
 }
