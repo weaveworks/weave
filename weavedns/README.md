@@ -6,56 +6,92 @@ host. It is then told about hostnames for the local containers. For
 other names it will ask the other weave hosts, or fall back to using
 the host's configured name server.
 
-## Use
+## Using weaveDNS
 
-The Weave DNS container should be started after the Weave router --
-i.e., after running `weave launch` -- and joined to the Weave network.
-
-In general, it should be given an IP in the same subnet as the
-router. To watch for container events it must have the docker socker
-mounted.
+The weave script command `launch-dns` starts the DNS container, and
+giving any other container a hostname in the domain `.weave.local`
+will register it in DNS. For example:
 
 ```bash
-$ weave launch 10.0.0.1/16
-$ weave run 10.0.0.2/16 --name=weavedns -v /var/run/docker.sock:/var/run/docker.sock zettio/weavedns
+$ weave launch
+$ weave launch-dns 10.1.0.2/16
+$ weave run 10.1.1.25/24 -ti -h pingme.weave.local ubuntu /bin/bash
+$ shell1=$(weave run 10.1.1.26 -ti ubuntu.weave.local ubuntu /bin/bash)
+$ docker attach $shell1
+
+# ping pingme.weave.local
+...
 ```
 
-The docker IP for the container can then be provided as the `--dns` value
-for other containers:
+## Doing things more manually
+
+If a weaveDNS container is running, `weave run` will automatically
+supply it as the DNS server to the new container. Similarly, both
+`weave run` and `weave attach` will register the hostname of the given
+container against the given weave network IP address.
+
+However, in some circumstances, you may not want to use the `weave`
+command. You can still use take advantage of a running weaveDNS
+though.
+
+### Supplying the DNS server
+
+If you want to use weaveDNS from a container without starting it using
+`weave run`, you can simply supply the weaveDNS IP as the `--dns`
+value to the container:
 
 ```bash
 $ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
-$ shell1=$(weave run 10.0.1.2/24 -h shell.weave.local --dns=$dns_ip -t ubuntu /bin/bash)
+$ shell2=$(docker --dns=$dns_ip -ti ubuntu /bin/bash)
+$ weave attach 10.1.1.27/24 $shell2
 ```
 
-To associate a hostname with an IP, use an HTTP PUT to the DNS server:
+This isn't very useful unless the container is also attached to the
+weave network (as in the last line above).
+
+### Adding containers to DNS
+
+If DNS is started after you've attached a container to the weave
+network, or you want to give it a name *other* than that given as its
+hostname, you can register it using the HTTP API:
 
 ```bash
-$ shell1_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $shell1)
-$ curl -X PUT "http://$dns_ip:6785/name/$shell1/10.0.1.2?fqdn=shell1.weave.local&routing_prefix=24&local_ip=$shell1_ip"
+$ docker start $shell2
+$ shell2_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $shell2)
+$ curl -X PUT "http://$dns_ip:6785/name/$shell2/10.1.1.27" -d local_ip=$shell2_ip -d fqdn=shell2.weave.local
 ```
 
-You should now be able to look up the name:
+### Not watching docker events
 
-```bash
-$ dig @$dns_ip +short shell1.weave.local
-```
-
-By default, the server will also watch docker events and remove
-entries for any containers that die. You can tell it not to by adding
+By default, the server will watch docker events and remove entries for
+any containers that die. You can tell it not to, by adding
 `--watch=false` to the container args:
 
 ```bash
-$ weave run 10.0.0.2/16 --name=weavedns -v /var/run/docker.sock:/var/run/docker.sock zettio/weavedns --watch=false
+$ weave launch-dns 10.1.0.2/16 --watch=false
+```
+
+You can manually delete entries for a host, by poking weaveDNS's HTTP
+API with e.g., `curl`:
+
+```bash
+$ docker stop $shell2
+$ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
+$ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.1.1.27"
 ```
 
 ## Present limitations
 
- * The server will not know about restarted containers, unless you
-   re-PUT the name.
- * The server will forget names if it is itself restarted.
- * The server may give unreachable IPs as answers, since it
-   doesn't try to filter by subnet yet.
- * We use UDP broadcast to find out about remote names (from Weave DNS
+ * The server will not know about restarted containers, but if you
+   re-attach a restarted container to the weave network, it will be
+   re-registered with weaveDNS.
+ * The server will currently forget names if it is itself restarted,
+   and otherwise not know about containers running when it starts. In
+   the future it will look at existing container hostnames upon
+   starting up.
+ * The server may give unreachable IPs as answers, since it doesn't
+   try to filter by reachability. If you use subnets, align your
+   hostnames with the subnets.
+ * We use UDP multicast to find out about remote names (from Weave DNS
    servers on other hosts); this likely won't scale well beyond a
    certain point T.B.D., so we'll have to come up with another scheme.
