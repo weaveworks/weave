@@ -30,19 +30,19 @@ supply it as the DNS server to the new container. Similarly, both
 `weave run` and `weave attach` will register the hostname of the given
 container against the given weave network IP address.
 
-However, in some circumstances, you may not want to use the `weave`
-command. You can still use take advantage of a running weaveDNS
-though.
+In some circumstances, you may not want to use the `weave`
+command. You can still take advantage of a running weaveDNS, using the
+HTTP API.
 
 ### Supplying the DNS server
 
-If you want to use weaveDNS from a container without starting it using
-`weave run`, you can simply supply the weaveDNS IP as the `--dns`
-value to the container:
+If you want to use `docker run` to start a container, rather than
+`weave run`, you can supply the weaveDNS IP as the `--dns` option to
+make it use weaveDNS:
 
 ```bash
 $ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
-$ shell2=$(docker --dns=$dns_ip -ti ubuntu /bin/bash)
+$ shell2=$(docker run --dns=$dns_ip -ti ubuntu /bin/bash)
 $ weave attach 10.1.1.27/24 $shell2
 ```
 
@@ -52,8 +52,8 @@ weave network (as in the last line above).
 ### Adding containers to DNS
 
 If DNS is started after you've attached a container to the weave
-network, or you want to give it a name *other* than that given as its
-hostname, you can register it using the HTTP API:
+network, or you want to give the container a name in DNS *other* than
+its hostname, you can register it using the HTTP API:
 
 ```bash
 $ docker start $shell2
