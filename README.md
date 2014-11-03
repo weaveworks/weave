@@ -1,5 +1,7 @@
 # Weave - the Docker network
 
+VERSION v0.11.0
+
 Weave creates a virtual network that connects Docker containers
 deployed across multiple hosts.
 
