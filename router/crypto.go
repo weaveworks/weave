@@ -1,4 +1,4 @@
-package weave
+package router
 
 import (
 	"bytes"
@@ -224,12 +224,19 @@ func (nd *NonDecryptor) IterateFrames(fun FrameConsumer, packet *UDPPacket) erro
 		dstNameByte := buf[:NameSize]
 		buf = buf[NameSize:]
 		length := binary.BigEndian.Uint16(buf[:2])
-		frame := buf[2 : 2+length]
-		buf = buf[2+length:]
+		buf = buf[2:]
+		if len(buf) < int(length) {
+			return PacketDecodingError{Desc: fmt.Sprintf("too short; expected frame of length %d, got %d", length, len(buf))}
+		}
+		frame := buf[:length]
+		buf = buf[length:]
 		err := fun(nd.conn, packet.Sender, srcNameByte, dstNameByte, length, frame)
 		if err != nil {
 			return err
 		}
+	}
+	if len(buf) > 0 {
+		return PacketDecodingError{Desc: fmt.Sprintf("%d octets of trailing garbage", len(buf))}
 	}
 	return nil
 }
@@ -279,7 +286,7 @@ func (nd *NaClDecryptor) ReceiveNonce(msg []byte) {
 func (nd *NaClDecryptor) IterateFrames(fun FrameConsumer, packet *UDPPacket) error {
 	buf, err := nd.decrypt(packet.Packet)
 	if err != nil {
-		return err
+		return PacketDecodingError{Desc: fmt.Sprint("decryption failed; ", err)}
 	}
 	packet.Packet = buf
 	return nd.NonDecryptor.IterateFrames(fun, packet)

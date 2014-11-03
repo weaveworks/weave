@@ -1,4 +1,4 @@
-package weave
+package router
 
 import (
 	"crypto/rand"
@@ -44,6 +44,10 @@ func (upe UnknownPeersError) Error() string {
 
 func (nce NameCollisionError) Error() string {
 	return fmt.Sprint("Multiple peers found with same name: ", nce.Name)
+}
+
+func (pde PacketDecodingError) Error() string {
+	return fmt.Sprint("Failed to decode packet: ", pde.Desc)
 }
 
 func (packet UDPPacket) String() string {

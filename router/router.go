@@ -1,4 +1,4 @@
-package weave
+package router
 
 import (
 	"bytes"
@@ -34,7 +34,7 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	ourself := NewPeer(name, 0, 0, router)
 	router.Ourself = router.Peers.FetchWithDefault(ourself)
 	router.Ourself.StartLocalPeer()
-	log.Println("Local identity is", router.Ourself.Name)
+	log.Println("Our name is", router.Ourself.Name)
 
 	return router
 }
@@ -58,7 +58,7 @@ func (router *Router) Start() {
 
 func (router *Router) Status() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintln("Local identity is", router.Ourself.Name))
+	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name))
 	buf.WriteString(fmt.Sprintln("Sniffing traffic on", router.Iface))
 	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
 	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))
@@ -124,7 +124,8 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	frameLen := len(frameData)
 	frameCopy := make([]byte, frameLen, frameLen)
 	copy(frameCopy, frameData)
-	if !found || dec.BroadcastFrame() {
+
+	if !found {
 		return checkFrameTooBig(router.Ourself.Broadcast(df, frameCopy, dec))
 	} else {
 		return checkFrameTooBig(router.Ourself.Forward(dstPeer, df, frameCopy, dec))
@@ -186,24 +187,29 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 			log.Println("ignoring UDP read error", err)
 			continue
 		} else if n < NameSize {
-			continue // TODO something different?
+			log.Println("ignoring too short UDP packet from", sender)
+			continue
+		}
+		name := PeerNameFromBin(buf[:NameSize])
+		packet := make([]byte, n-NameSize)
+		copy(packet, buf[NameSize:n])
+		udpPacket := &UDPPacket{
+			Name:   name,
+			Packet: packet,
+			Sender: sender}
+		peerConn, found := router.Ourself.ConnectionTo(name)
+		if !found {
+			continue
+		}
+		relayConn, ok := peerConn.(*LocalConnection)
+		if !ok {
+			continue
+		}
+		err = relayConn.Decryptor.IterateFrames(handleUDPPacket, udpPacket)
+		if pde, ok := err.(PacketDecodingError); ok {
+			relayConn.log(pde.Error())
 		} else {
-			name := PeerNameFromBin(buf[:NameSize])
-			packet := make([]byte, n-NameSize)
-			copy(packet, buf[NameSize:n])
-			udpPacket := &UDPPacket{
-				Name:   name,
-				Packet: packet,
-				Sender: sender}
-			peerConn, found := router.Ourself.ConnectionTo(name)
-			if !found {
-				continue
-			}
-			relayConn, ok := peerConn.(*LocalConnection)
-			if !ok {
-				continue
-			}
-			checkWarn(relayConn.Decryptor.IterateFrames(handleUDPPacket, udpPacket))
+			checkWarn(err)
 		}
 	}
 }
@@ -282,7 +288,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		checkWarn(po.WritePacket(frame))
 
 		dstPeer, found = router.Macs.Lookup(dec.eth.DstMAC)
-		if !found || dec.BroadcastFrame() || dstPeer != router.Ourself {
+		if !found || dstPeer != router.Ourself {
 			return checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
 		}
 

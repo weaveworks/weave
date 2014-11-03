@@ -6,7 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/davecheney/profile"
-	"github.com/zettio/weave"
+	weave "github.com/zettio/weave/router"
 	"io"
 	"log"
 	"net"
@@ -127,7 +127,11 @@ func main() {
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
 	router.Start()
 	for _, peer := range peers {
-		router.ConnectionMaker.InitiateConnection(peer)
+		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+			router.ConnectionMaker.InitiateConnection(addr.String())
+		} else {
+			log.Fatal(err)
+		}
 	}
 	go handleHttp(router)
 	handleSignals(router)
@@ -137,7 +141,15 @@ func handleHttp(router *weave.Router) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, router.Status())
 	})
-	address := fmt.Sprintf(":%d", weave.StatusPort)
+	http.HandleFunc("/connect", func (w http.ResponseWriter, r *http.Request) {
+		peer := r.FormValue("peer")
+		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+			router.ConnectionMaker.InitiateConnection(addr.String())
+		} else {
+			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
+		}
+	})
+	address := fmt.Sprintf(":%d", weave.HttpPort)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
 		log.Fatal("Unable to create http listener: ", err)

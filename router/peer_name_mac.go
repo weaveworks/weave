@@ -14,7 +14,7 @@
 // Note that we do not mandate *what* MAC should be used as the peer
 // name. In particular it doesn't actually have to be the MAC of, say,
 // the network interface the peer is sniffing on.
-package weave
+package router
 
 import (
 	"net"

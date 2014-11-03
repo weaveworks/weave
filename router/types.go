@@ -1,4 +1,4 @@
-package weave
+package router
 
 import (
 	"bytes"
@@ -127,6 +127,10 @@ type UnknownPeersError struct {
 
 type NameCollisionError struct {
 	Name PeerName
+}
+
+type PacketDecodingError struct {
+	Desc string
 }
 
 type LocalAddress struct {

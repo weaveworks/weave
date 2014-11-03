@@ -1,0 +1,426 @@
+#!/bin/sh
+set -e
+
+usage() {
+    echo "Usage:"
+    echo "weave launch  [-password <password>] <peer> ..."
+    echo "weave connect <peer>"
+    echo "weave run     <cidr> <docker run args> ..."
+    echo "weave start   <cidr> <container_id>"
+    echo "weave attach  <cidr> <container_id>"
+    echo "weave detach  <cidr> <container_id>"
+    echo "weave expose  <cidr>"
+    echo "weave hide    <cidr>"
+    echo "weave ps"
+    echo "weave status"
+    echo "weave version"
+    echo "weave stop"
+    echo "weave reset"
+    echo
+    echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>], and"
+    echo "      <cidr> is of the form <ip_address>/<routing_prefix_length>"
+    exit 1
+}
+
+# utility function to check whether a command can be executed by the shell
+# see http://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script
+command_exists () {
+    command -v $1 >/dev/null 2>&1
+}
+
+[ `id -u` = 0 ] || {
+    echo "weave must be run as 'root'" >&2
+    exit 1
+}
+
+[ $# -gt 0 ] || usage
+
+IMAGE=zettio/weave
+CONTAINER_NAME=weave
+BRIDGE=weave
+CONTAINER_IFNAME=ethwe
+MTU=65535
+PORT=6783
+HTTP_PORT=6784
+
+# `export WEAVE_DOCKER_ARGS='customer arguments'` 
+# prior to weave launch will permit you to pass along arguments 
+# to the `docker run` command used to launch the weave container
+
+COMMAND=$1
+
+shift 1
+
+check_command_and_run() {
+    if command_exists $1
+    then
+        shift 1
+        "$@"
+    else
+        echo "Cannot find $1; please install it. Continuing without it." >&2
+    fi
+}
+
+is_cidr() {
+    # The regexp here is far from precise, but good enough.
+    echo "$1" | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$' >/dev/null
+}
+
+validate_cidr() {
+    if ! is_cidr "$1" ; then
+        echo "Invalid CIDR: $1" >&2
+        echo "CIDR must of be of form <ip_address>/<routing_prefix_length>, e.g. 10.0.1.1/24" >&2
+        exit 1
+    fi
+}
+
+run_iptables() {
+    # -w is recent addition to iptables
+    if [ -z "$CHECKED_IPTABLES_W" ] ; then
+        if iptables -S -w >/dev/null 2>&1 ; then
+            IPTABLES_W=-w
+        fi
+        CHECKED_IPTABLES_W=1
+    fi
+
+    iptables $IPTABLES_W "$@"
+}
+
+# Add a rule to iptables, if it doesn't exist already
+add_iptables_rule() {
+    IPTABLES_TABLE="$1"
+    shift 1
+    if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1
+    then
+        run_iptables -t $IPTABLES_TABLE -A "$@" >/dev/null
+    fi
+}
+
+# Delete a rule from iptables, if it exist
+delete_iptables_rule() {
+    IPTABLES_TABLE="$1"
+    shift 1
+    if run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1
+    then
+        run_iptables -t $IPTABLES_TABLE -D "$@" >/dev/null
+    fi
+}
+
+create_bridge() {
+    [ ! -d /sys/class/net/$BRIDGE ] && {
+        ip link add name $BRIDGE type bridge
+        ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/random | tr \  : | tail -c+2)
+        # Attempting to set the bridge MTU to a high value directly
+        # fails. Bridges take the lowest MTU of their interfaces. So
+        # instead we create a temporary interface with the desired
+        # MTU, attach that to the bridge, and then remove it again.
+        ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
+        ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
+        ip link del dev v${CONTAINER_IFNAME}du
+        # disable offloading
+        check_command_and_run ethtool ethtool -K $BRIDGE tx off >/dev/null
+        # Work around the situation where there are no rules allowing traffic
+        # across our bridge. E.g. ufw
+        add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
+        # create a chain for masquerading
+        run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
+        add_iptables_rule nat POSTROUTING -j WEAVE
+    }
+    ip link set dev $BRIDGE up
+}
+
+destroy_bridge() {
+    if [ -d /sys/class/net/$BRIDGE ] ; then
+        ip link del dev $BRIDGE
+    fi
+    run_iptables -t filter -D FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT 2>/dev/null || true
+    run_iptables -t nat -F WEAVE >/dev/null 2>&1 || true
+    run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
+    run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
+}
+
+docker_ip() {
+    if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $CONTAINER_NAME 2>/dev/null) ; then
+        echo "Weave is not running." >&2
+        exit 1
+    fi
+    if [ -z "$DOCKERIP" ] ; then
+        echo "Weave is not running." >&2
+        exit 1
+    fi
+}
+
+# the following borrows from https://github.com/jpetazzo/pipework
+
+# run args $2 $3 ... as a command in the network namespace of container $1
+# if an error is caused by container dying, swallow output from error
+with_container_netns () {
+    CONTAINER="$1"
+    CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
+
+    if [ "$CONTAINER_PID" = 0 ] ; then
+        echo "Container $CONTAINER not running." >&2
+        exit 1
+    fi
+
+    if [ "$CONTAINER_PID" = "<no value>" ] ; then
+        echo "Container $CONTAINER unknown to Docker." >&2
+        exit 1
+    fi
+
+    NETNS=$CONTAINER_PID
+    [ ! -d /var/run/netns ] && mkdir -p /var/run/netns
+    rm -f /var/run/netns/$NETNS
+    ln -s /proc/$CONTAINER_PID/ns/net /var/run/netns/$NETNS
+
+    LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
+    GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
+    IP_TMPFILE=/tmp/weave_ip_output_$$
+    rm -f $IP_TMPFILE
+
+    # Run the wrapped command
+    STATUS=0
+    shift 1
+    if ! "$@" >$IP_TMPFILE 2>&1 ; then
+        STATUS=1
+        if [ "$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)" != "$CONTAINER_PID" ] ; then
+            echo "Container $CONTAINER died" >&2
+        else
+            echo "Failure during network configuration for container $CONTAINER:" >&2
+            cat $IP_TMPFILE >&2
+        fi
+    fi
+
+    cat $IP_TMPFILE  # no error - send the output to stdout
+    rm -f $IP_TMPFILE /var/run/netns/$NETNS
+    return $STATUS
+}
+
+connect_container_to_bridge() {
+    if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
+        return 1
+    fi
+    if ! ip link set $GUEST_IFNAME netns $NETNS ; then
+        # failed before we assigned the veth to the container's
+        # namespace - delete it
+        ip link del $LOCAL_IFNAME type veth || true
+        return 1
+    fi
+
+    ip link set $LOCAL_IFNAME master $BRIDGE &&
+        ip link set $LOCAL_IFNAME up &&
+        ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
+}
+
+
+launch() {
+    connect_container_to_bridge &&
+        ip netns exec $NETNS ip link set $CONTAINER_IFNAME up &&
+        check_command_and_run ethtool ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null
+}
+
+attach() {
+    if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
+        # veth name already exists, so assume we set it up already;
+        # just add the IP address.
+        if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
+            # address was there already
+            return 0
+        fi
+
+        if ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ; then
+            return 1
+        fi
+
+        return 0
+    fi
+
+    if ! connect_container_to_bridge ||
+        ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ||
+        ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ||
+        ! check_command_and_run ethtool ip netns exec $NETNS ethtool -K $CONTAINER_IFNAME tx off >/dev/null ; then
+        return 1
+    fi
+
+    # Route multicast packets across the weave network.
+    if ! ip netns exec $NETNS ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
+        ip netns exec $NETNS ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
+    fi
+}
+
+detach() {
+    if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
+        # address is not there, leave the device alone
+        return 0
+    fi
+
+    if ! ip netns exec $NETNS ip addr del $1 dev $CONTAINER_IFNAME ; then
+        return 1
+    fi
+
+    if [ -n "$(ip netns exec $NETNS ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
+        # other addresses are left, leave the device alone
+        return 0
+    fi
+
+    # Deleting the interface will delete the multicast route we set up
+    ip link del $LOCAL_IFNAME type veth
+}
+
+container_weave_addrs() {
+    ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
+}
+
+case "$COMMAND" in
+    launch)
+        case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $CONTAINER_NAME 2>/dev/null) in
+            "true $IMAGE")
+                echo "Weave is already running." >&2
+                exit 1
+                ;;
+            "false $IMAGE")
+                docker rm $CONTAINER_NAME >/dev/null
+                ;;
+            true*)
+                echo "Found another running container named '$CONTAINER_NAME'. Aborting." >&2
+                exit 1
+                ;;
+            false*)
+                echo "Found another container named '$CONTAINER_NAME'. Aborting." >&2
+                exit 1
+                ;;
+        esac
+        create_bridge
+        # We set the router name to the bridge mac since that is
+        # stable across re-creations of the containers.
+        #
+        # TODO use the mac of one of the physical host interfaces
+        # (eth0, wlan0, etc) so the name becomes stable across host
+        # restarts.
+        MACADDR=`cat /sys/class/net/$BRIDGE/address`
+        # backward compatibility...
+        if is_cidr "$1" ; then
+            echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
+            shift 1
+        fi
+        # Set WEAVE_DOCKER_ARGS in the environment in order to supply
+        # additional parameters, such as resource limits, to docker
+        # when launching the weave container.
+        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
+        with_container_netns $CONTAINER launch >/dev/null
+        echo $CONTAINER
+        ;;
+    connect)
+        [ $# -eq 1 ] || usage
+        docker_ip
+        if command_exists curl ; then
+            curl -d peer=$1 $DOCKERIP:$HTTP_PORT/connect
+        else
+            echo "Cannot find curl. Install it for 'weave connect' to function." >&2
+            exit 1
+        fi
+        ;;
+    status)
+        [ $# -eq 0 ] || usage
+        docker_ip
+        if command_exists wget ; then
+            wget -O - -q $DOCKERIP:$HTTP_PORT/status
+        elif command_exists curl ; then
+            curl $DOCKERIP:$HTTP_PORT/status
+        else
+            echo "Cannot find wget or curl. Install one of them for 'weave status' to function." >&2
+            exit 1
+        fi
+        ;;
+    ps)
+        [ $# -eq 0 ] || usage
+        for CONTAINER_ID in $(docker ps -q) ; do
+            if CONTAINER_ADDRS=$(with_container_netns $CONTAINER_ID container_weave_addrs 2>&1) ; then
+                CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | grep -o 'link/ether .*' | cut -d ' ' -f 2)
+                CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*'       | cut -d ' ' -f 2)
+                echo $CONTAINER_ID $CONTAINER_MAC $CONTAINER_IPS
+            fi
+        done
+        ;;
+    version)
+        [ $# -eq 0 ] || usage
+        # Try the running container first; if no luck try the image
+        if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' $CONTAINER_NAME 2>/dev/null) ; then
+            if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $IMAGE 2>/dev/null) ; then
+                echo "Unable to find $IMAGE image." >&2
+                exit 1
+            fi
+        fi
+        docker images --no-trunc | grep $DOCKERIMAGE | grep -v latest | tr -s ' ' | cut -d ' ' -f 2
+        ;;
+    run)
+        [ $# -gt 0 ] || usage
+        validate_cidr $1
+        CIDR=$1
+        shift 1
+        create_bridge
+        CONTAINER=$(docker run -d "$@" | tail -n 1)
+        with_container_netns $CONTAINER attach $CIDR >/dev/null
+        echo $CONTAINER
+        ;;
+    start)
+        [ $# -eq 2 ] || usage
+        validate_cidr $1
+        create_bridge
+        CONTAINER=$(docker start $2)
+        with_container_netns $CONTAINER attach $1 >/dev/null
+        echo $CONTAINER
+        ;;
+    attach)
+        [ $# -eq 2 ] || usage
+        validate_cidr $1
+        create_bridge
+        with_container_netns $2 attach $1 >/dev/null
+        ;;
+    detach)
+        [ $# -eq 2 ] || usage
+        validate_cidr $1
+        with_container_netns $2 detach $1 >/dev/null
+        ;;
+    expose)
+        [ $# -eq 1 ] || usage
+        validate_cidr $1
+        create_bridge
+        if ! ip addr show dev $BRIDGE | grep -qF $1
+        then
+            ip addr add dev $BRIDGE $1
+            add_iptables_rule nat WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
+            add_iptables_rule nat WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
+        fi
+        ;;
+    hide)
+        [ $# -eq 1 ] || usage
+        validate_cidr $1
+        create_bridge
+        if ip addr show dev $BRIDGE | grep -qF $1
+        then
+            ip addr del dev $BRIDGE $1
+            delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
+            delete_iptables_rule nat WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
+        fi
+        ;;
+    stop)
+        [ $# -eq 0 ] || usage
+        if ! docker kill $CONTAINER_NAME >/dev/null 2>&1 ; then
+            echo "Weave is not running."
+        fi
+        docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+        check_command_and_run conntrack conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
+        ;;
+    reset)
+        [ $# -eq 0 ] || usage
+        docker kill $CONTAINER_NAME >/dev/null 2>&1 || true
+        docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+        check_command_and_run conntrack conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
+        destroy_bridge
+        ;;
+    *)
+        echo "Unknown weave command '$COMMAND'" >&2
+        usage
+        ;;
+esac
