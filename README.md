@@ -142,3 +142,6 @@ Follow weave on Twitter:
 
 Read the Weave blog:
 [Weaveblog](http://weaveblog.com/).
+
+IRC:
+[#weavenetwork](irc://irc.freenode.net:6667/weavenetwork)
