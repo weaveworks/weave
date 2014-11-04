@@ -26,5 +26,8 @@ _testmain.go
 # Emacs backup files
 *~
 
+# Vim swap files
+.*.sw?
+
 # Project specific
 weavedns/weavedns
