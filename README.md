@@ -144,4 +144,4 @@ Read the Weave blog:
 [Weaveblog](http://weaveblog.com/).
 
 IRC:
-[#weavenetwork](irc://irc.freenode.net:6667/weavenetwork)
+[#weavenetwork](https://botbot.me/freenode/weavenetwork/)
