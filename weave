@@ -280,7 +280,7 @@ http_call() {
     fi
     port="$3"
     url="$4"
-    shift 3
+    shift 4
     if command_exists curl ; then
         curl -s -X $http_verb "$@" http://$DOCKERIP:$port$url
     else
