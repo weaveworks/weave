@@ -14,11 +14,14 @@ func StartUpdater(apiPath string, zone Zone) error {
 	client, err := docker.NewClient(apiPath)
 	checkError(err, apiPath)
 
+	env, err := client.Version()
+	checkError(err, apiPath)
+
 	events := make(chan *docker.APIEvents)
 	err = client.AddEventListener(events)
 	checkError(err, apiPath)
 
-	Info.Printf("Using Docker API on %s", apiPath)
+	Info.Printf("Using Docker API on %s: %v", apiPath, env)
 
 	go func() {
 		for event := range events {
