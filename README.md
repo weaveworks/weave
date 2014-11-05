@@ -76,11 +76,11 @@ shell in it. There's also a `weave start` command, which invokes
 If our application consists of more than one container on this host we
 simply launch them with a variation on that second line.
 
-The IP addresses and networks can be anything you like which doesn't
-conflict with any IP ranges of 'external' services the hosts or your
-containers need to connect to. The same IP range must be used
-everywhere, and the individual IP addresses must, of course, be
-unique.
+The IP addresses and netmasks can be anything you like, but make sure
+they don't conflict with any IP ranges in use on the hosts or IP
+addresses of external services the hosts or containers need to connect
+to. The same IP range must be used everywhere, and the individual IP
+addresses must, of course, be unique.
 
 We repeat similar steps on $HOST2...
 
@@ -145,3 +145,6 @@ Follow weave on Twitter:
 
 Read the Weave blog:
 [Weaveblog](http://weaveblog.com/).
+
+IRC:
+[#weavenetwork](https://botbot.me/freenode/weavenetwork/)
