@@ -4,17 +4,19 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-func StartUpdater(apiPath string, zone Zone) error {
-	client, err := docker.NewClient(apiPath)
+func checkError(err error, apiPath string) {
 	if err != nil {
 		Error.Fatalf("Unable to connect to Docker API on %s: %s", apiPath, err)
 	}
+}
+
+func StartUpdater(apiPath string, zone Zone) error {
+	client, err := docker.NewClient(apiPath)
+	checkError(err, apiPath)
 
 	events := make(chan *docker.APIEvents)
 	err = client.AddEventListener(events)
-	if err != nil {
-		Error.Fatalf("Unable to connect to Docker API on %s: %s", apiPath, err)
-	}
+	checkError(err, apiPath)
 
 	Info.Printf("Using Docker API on %s", apiPath)
 
