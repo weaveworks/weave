@@ -11,7 +11,10 @@ func StartUpdater(apiPath string, zone Zone) error {
 	}
 
 	events := make(chan *docker.APIEvents)
-	client.AddEventListener(events)
+	err = client.AddEventListener(events)
+	if err != nil {
+		Error.Fatalf("Unable to connect to Docker API on %s: %s", apiPath, err)
+	}
 
 	Info.Printf("Using Docker API on %s", apiPath)
 
