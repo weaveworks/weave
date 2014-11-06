@@ -16,7 +16,7 @@ will register it in DNS. For example:
 $ weave launch
 $ weave launch-dns 10.1.0.2/16
 $ weave run 10.1.1.25/24 -ti -h pingme.weave.local ubuntu /bin/bash
-$ shell1=$(weave run 10.1.1.26 -ti ubuntu.weave.local ubuntu /bin/bash)
+$ shell1=$(weave run 10.1.1.26/24 -ti ubuntu.weave.local ubuntu /bin/bash)
 $ docker attach $shell1
 
 # ping pingme.weave.local
