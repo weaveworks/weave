@@ -23,6 +23,10 @@ $ docker attach $shell1
 ...
 ```
 
+The IP address supplied to `weave launch-dns` must not be used by any
+other container, and the supplied network must contain all application
+networks.
+
 ## Doing things more manually
 
 If a weaveDNS container is running, `weave run` will automatically
