@@ -8,9 +8,9 @@ the host's configured name server.
 
 ## Using weaveDNS
 
-The weave script command `launch-dns` starts the DNS container, and
-giving any other container a hostname in the domain `.weave.local`
-will register it in DNS. For example:
+The weave script command `launch-dns` starts the DNS
+container. Subsquently, giving any container a hostname in the domain
+`.weave.local` will register it in DNS. For example:
 
 ```bash
 $ weave launch
