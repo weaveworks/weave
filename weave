@@ -300,7 +300,6 @@ tell_dns() {
     CONTAINER=$(docker inspect --format '{{.Id}}' $2 2>/dev/null)
     # extract IP address and routing prefix from CIDR
     WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
-    WEAVE_ADDR_PR=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\2/')
     MORE_ARGS=$(docker inspect --format '--data-urlencode local_ip={{ .NetworkSettings.IPAddress }} --data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
     http_call $1 $DNS_CONTAINER_NAME $DNS_HTTP_PORT /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
 }
