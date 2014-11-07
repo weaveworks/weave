@@ -451,7 +451,7 @@ case "$COMMAND" in
         if ! docker kill $CONTAINER_NAME >/dev/null 2>&1 ; then
             echo "Weave is not running."
         fi
-
+        docker kill  $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         docker rm -f $CONTAINER_NAME     >/dev/null 2>&1 || true
         docker rm -f $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         check_command_and_run conntrack conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
