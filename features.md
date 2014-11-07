@@ -341,6 +341,7 @@ quickly enough.
 
 ### <a name="dns"></a>DNS
 
-WeaveDNS is a distributed DNS service for weave networks. A preview
-release of weaveDNS is described [on our
+WeaveDNS is a distributed DNS service for weave networks, enabling
+containers to address each other by name rather than IP address. A
+preview release of weaveDNS is described [on our
 blog](http://weaveblog.com/2014/11/04/have-you-met-weavedns/).
