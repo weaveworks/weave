@@ -22,6 +22,7 @@ example](https://github.com/zettio/weave#example):
  * [Dynamic topologies](#dynamic-topologies)
  * [Container mobility](#container-mobility)
  * [Fault tolerance](#fault-tolerance)
+ * [DNS](#dns)
 
 ### <a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
@@ -337,3 +338,9 @@ stop`) and restart it. Application containers do *not* have to be
 restarted in that event, and indeed may not even experience a
 temporary connectivity failure if the weave container is restarted
 quickly enough.
+
+### <a name="dns"></a>DNS
+
+WeaveDNS is a distributed DNS service for weave networks. A preview
+release of weaveDNS is described [on our
+blog](http://weaveblog.com/2014/11/04/have-you-met-weavedns/).
