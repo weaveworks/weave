@@ -90,6 +90,13 @@ each other but not the containers of our first application...
 This isolation-through-subnets scheme is an example of carrying over a
 well-known technique from the 'on metal' days to containers.
 
+NB: By default docker permits communication between containers on the
+same host, via their docker-assigned IP addresses. For complete
+isolation between application containers, that feature needs to be
+disabled by
+[setting `--icc=false`](https://docs.docker.com/articles/networking/#between-containers)
+in the docker daemon configuration.
+
 ### <a name="dynamic-network-attachment"></a>Dynamic network attachment
 
 In some scenarios containers are started independently, e.g. via some
