@@ -397,7 +397,17 @@ case "$COMMAND" in
         shift 1
         create_bridge
         DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}'" --link $DNS_CONTAINER_NAME:$DNS_CONTAINER_NAME" $DNS_CONTAINER_NAME 2>/dev/null) || true
-        CONTAINER=$(docker run $DNS_ARG -d "$@" | tail -n 1)
+        DNS_SEARCH_ARG="--dns-search=."
+        for arg in $@; do
+           case $arg in
+               --dns-search=*)
+                   DNS_SEARCH_ARG=""
+                   ;;
+               *)
+                   ;;
+           esac;
+        done
+        CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@" | tail -n 1)
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
