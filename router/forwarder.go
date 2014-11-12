@@ -90,6 +90,16 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		conn.log("Cannot forward frame yet - awaiting contact")
 		return nil
 	}
+	// We could use non-blocking channel sends here, i.e. drop frames
+	// on the floor when the forwarder is busy. This would allow our
+	// caller - the capturing loop in the router - to read frames more
+	// quickly when under load, i.e. we'd drop fewer frames on the
+	// floor during capture. And we could maximise CPU utilisation
+	// since we aren't stalling a thread. However, a lot of work has
+	// already been done by the time we get here. Since any packet we
+	// drop will likely get re-transmitted we end up paying that cost
+	// multiple times. So it's better to drop things at the beginning
+	// of our pipeline.
 	if df {
 		if !frameTooBig(frame, effectivePMTU) {
 			forwardChanDF <- frame
