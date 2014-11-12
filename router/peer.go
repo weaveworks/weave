@@ -286,23 +286,22 @@ func (peer *Peer) handleAddConnection(conn *LocalConnection) {
 	if dupConn, found := peer.connections[toName]; found {
 		if dupConn == conn {
 			return
+		}
+		// conn.UID is used as the tie breaker here, in the
+		// knowledge that both sides will make the same decision.
+		dupConnLocal := dupConn.(*LocalConnection)
+		if conn.UID == dupConnLocal.UID {
+			// oh good grief. Sod it, just kill both of them.
+			conn.CheckFatal(dupErr)
+			dupConnLocal.CheckFatal(dupErr)
+			peer.handleDeleteConnection(dupConnLocal)
+			return
+		} else if conn.UID < dupConnLocal.UID {
+			dupConnLocal.CheckFatal(dupErr)
+			peer.handleDeleteConnection(dupConnLocal)
 		} else {
-			// conn.UID is used as the tie breaker here, in the
-			// knowledge that both sides will make the same decision.
-			dupConnLocal := dupConn.(*LocalConnection)
-			if conn.UID == dupConnLocal.UID {
-				// oh good grief. Sod it, just kill both of them.
-				conn.CheckFatal(dupErr)
-				dupConnLocal.CheckFatal(dupErr)
-				peer.handleDeleteConnection(dupConnLocal)
-				return
-			} else if conn.UID < dupConnLocal.UID {
-				dupConnLocal.CheckFatal(dupErr)
-				peer.handleDeleteConnection(dupConnLocal)
-			} else {
-				conn.CheckFatal(dupErr)
-				return
-			}
+			conn.CheckFatal(dupErr)
+			return
 		}
 	}
 	if err := peer.checkConnectionLimit(); err != nil {
