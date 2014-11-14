@@ -1,0 +1,17 @@
+#! /bin/sh
+set -e
+
+MERGE_ARGS="-X subtree=site"
+
+merge_dir=$(mktemp -d -t weave-merge)/weave
+git clone -b gh-pages . $merge_dir
+
+pushd $merge_dir
+git pull --ff-only git@github.com:zettio/weave gh-pages
+git fetch origin master
+git merge $MERGE_ARGS -e -m "Merge master into gh-pages" origin/master
+
+popd
+git fetch $merge_dir gh-pages:gh-pages
+
+# rm -rf $merge_dir
