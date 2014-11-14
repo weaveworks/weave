@@ -345,6 +345,9 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 			return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
 		}
 	}
+	if existingConn, found := conn.local.ConnectionTo(name); found && existingConn.Established() {
+		return fmt.Errorf("Already have connection to %s at %s", name, existingConn.RemoteTCPAddr())
+	}
 
 	uidStr, err := checkHandshakeStringField("UID", "", handshakeRecv)
 	if err != nil {
