@@ -1,9 +1,9 @@
 ---
-title: Weave, the Docker network
+title: weave, the Docker network
 layout: default
 ---
 
-# Weave documentation
+# weave documentation
 
  * [Introduction and example (in README)](https://github.com/zettio/weave#readme)
  * [Features](features.html)
