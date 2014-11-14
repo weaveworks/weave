@@ -1,0 +1,4 @@
+markdown: redcarpet
+
+redcarpet:
+  extensions: ['fenced_code_blocks', 'smart']
