@@ -103,7 +103,7 @@ func notUsHandler() dns.HandlerFunc {
 		q := r.Question[0]
 		Debug.Printf("Non-local query: %+v", q)
 		var responseMsg *dns.Msg
-		if q.Qtype == dns.TypeA {
+		if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
 			if addrs, err := net.LookupIP(q.Name); err == nil {
 				responseMsg = makeAddressReply(r, &q, addrs)
 			} else {
