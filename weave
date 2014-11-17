@@ -271,19 +271,19 @@ detach() {
 http_call() {
     http_verb="$1"
     if ! status=$(docker inspect --format='{{ .State.Running }} {{ .NetworkSettings.IPAddress }}' $2 2>/dev/null); then
-        echo "$2 is not a container; have you launched it?" >&2
+        echo "$2 container is not present; have you launched it?" >&2
         exit 1
     fi
     case "$status" in
         "true ")
-            echo "$2 has no IP address; is Docker networking enabled?" >&2
+            echo "$2 container has no IP address; is Docker networking enabled?" >&2
             exit 1
             ;;
         true*)
             ip=$(echo $status | sed -e 's/true //')
             ;;
         *)
-            echo "$2 is not running." >&2
+            echo "$2 container is not running." >&2
             exit 1
             ;;
     esac
