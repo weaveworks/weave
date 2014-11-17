@@ -54,7 +54,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 		if len(r.Answer) == 0 && len(r.Question) > 0 {
 			q := r.Question[0]
 			if ip, err := s.zone.MatchLocal(q.Name); err == nil {
-				m := makeAReply(r, &q, []net.IP{ip})
+				m := makeAddressReply(r, &q, []net.IP{ip})
 				if err = s.sendResponse(m); err != nil {
 					Warning.Printf("Error writing to %s", w)
 				}

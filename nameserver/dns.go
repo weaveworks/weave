@@ -24,7 +24,7 @@ func makeReply(r *dns.Msg, as []dns.RR) *dns.Msg {
 	return m
 }
 
-func makeAReply(r *dns.Msg, q *dns.Question, addrs []net.IP) *dns.Msg {
+func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []net.IP) *dns.Msg {
 	answers := make([]dns.RR, len(addrs))
 	header := makeHeader(r, q)
 	count := 0

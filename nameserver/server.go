@@ -40,7 +40,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		Debug.Printf("Local query: %+v", q)
 		if q.Qtype == dns.TypeA {
 			if ip, err := zone.MatchLocal(q.Name); err == nil {
-				m := makeAReply(r, &q, []net.IP{ip})
+				m := makeAddressReply(r, &q, []net.IP{ip})
 				w.WriteMsg(m)
 			} else {
 				Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
@@ -54,7 +54,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 					}
 					var responseMsg *dns.Msg
 					if len(replies) > 0 {
-						responseMsg = makeAReply(r, &q, replies)
+						responseMsg = makeAddressReply(r, &q, replies)
 					} else {
 						responseMsg = makeDNSFailResponse(r)
 					}
@@ -105,7 +105,7 @@ func notUsHandler() dns.HandlerFunc {
 		var responseMsg *dns.Msg
 		if q.Qtype == dns.TypeA {
 			if addrs, err := net.LookupIP(q.Name); err == nil {
-				responseMsg = makeAReply(r, &q, addrs)
+				responseMsg = makeAddressReply(r, &q, addrs)
 			} else {
 				responseMsg = makeDNSFailResponse(r)
 				Debug.Print("Failed fallback lookup ", err)
