@@ -270,19 +270,28 @@ detach() {
 # Call url $4 on container $2 at port $3 with http verb $1
 http_call() {
     http_verb="$1"
-    if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $2 2>/dev/null) ; then
-        echo "$2 is not running." >&2
+    if ! status=$(docker inspect --format='{{ .State.Running }} {{ .NetworkSettings.IPAddress }}' $2 2>/dev/null); then
+        echo "$2 container is not present; have you launched it?" >&2
         exit 1
     fi
-    if [ -z "$DOCKERIP" ] ; then
-        echo "$2 is not running." >&2
-        exit 1
-    fi
+    case "$status" in
+        "true ")
+            echo "$2 container has no IP address; is Docker networking enabled?" >&2
+            exit 1
+            ;;
+        true*)
+            ip="${status#true }"
+            ;;
+        *)
+            echo "$2 container is not running." >&2
+            exit 1
+            ;;
+    esac
     port="$3"
     url="$4"
     shift 4
     if command_exists curl ; then
-        curl -s -X $http_verb "$@" http://$DOCKERIP:$port$url
+        curl -s -X $http_verb "$@" http://$ip:$port$url
     else
         echo "Cannot find curl, which is required for this operation." >&2
         exit 1
