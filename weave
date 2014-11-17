@@ -304,6 +304,21 @@ tell_dns() {
     http_call $1 $DNS_CONTAINER_NAME $DNS_HTTP_PORT /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
 }
 
+# Checks global settings that are required before launching weave
+check_global_settings() {
+    if ! $(brctl show | grep -q ^docker0)
+    then
+        echo "Couldn't detect default docker bridge ... Aborting."
+	echo "Suggestion: please restart docker daemon removing '-b=none' "
+	echo "  in default docker settings. For example, default settings can "
+	echo "  be found /etc/default/docker.io on ubuntu systems."
+        exit 1
+    fi
+
+    echo "network settings looking okay"
+    exit 0
+}
+
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
     case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $1 2>/dev/null) in
@@ -331,6 +346,7 @@ container_weave_addrs() {
 
 case "$COMMAND" in
     launch)
+        check_global_settings 
         check_not_running $CONTAINER_NAME $IMAGE
         create_bridge
         # We set the router name to the bridge mac since that is
