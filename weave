@@ -280,7 +280,7 @@ http_call() {
             exit 1
             ;;
         true*)
-            ip=$(echo $status | sed -e 's/true //')
+            ip="${status#true }"
             ;;
         *)
             echo "$2 container is not running." >&2
