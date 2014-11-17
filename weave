@@ -306,17 +306,28 @@ tell_dns() {
 
 # Checks global settings that are required before launching weave
 check_global_settings() {
-    if ! $(brctl show | grep -q ^docker0)
+
+    if ! $(cat /etc/lsb-release | grep -q "DISTRIB_ID=Ubuntu")
     then
-        echo "Couldn't detect default docker bridge ... Aborting."
-	echo "Suggestion: please restart docker daemon removing '-b=none' "
-	echo "  in default docker settings. For example, default settings can "
-	echo "  be found /etc/default/docker.io on ubuntu systems."
+        # not an ubuntu system returning
+        return
+    fi
+
+    DOCKER_DAEMON="docker.io"
+    pidof $DOCKER_DAEMON > /dev/null && DOCKER_PID=$(pidof $DOCKER_DAEMON) 
+    if [ -z $DOCKER_PID ]
+    then
+        echo "Couldn't detect docker daemon running... Aborting." >&2 
         exit 1
     fi
 
-    echo "network settings looking okay"
-    exit 0
+    if $(cat /proc/$DOCKER_PID/cmdline | grep -q "\-b=none") 
+    then
+        echo "Docker started without a bridge option... Aborting." >&2 
+	echo "Suggestion: please restart docker daemon without '-b=none' option"
+        exit 1
+    fi
+ 
 }
 
 # Check that a container named $1 with image $2 is not running

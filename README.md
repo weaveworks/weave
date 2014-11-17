@@ -49,9 +49,9 @@ To run weave on a host, you need to install...
 
 ## Example
 
-Say you have docker running (without bridging override, -b=none) on two hosts,
-accessible to each other as $HOST1 and $HOST2, and want to deploy an 
-application consisting of two containers, one on each host.
+Say you have docker running on two hosts, accessible to each other as
+$HOST1 and $HOST2, and want to deploy an application consisting of two
+containers, one on each host.
 
 On $HOST1 run (as root)
 
