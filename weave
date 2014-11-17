@@ -276,7 +276,7 @@ http_call() {
     fi
     case "$status" in
         "true ")
-            echo "$2 has no IP address; is Docker networking running?" >&2
+            echo "$2 has no IP address; is Docker networking enabled?" >&2
             exit 1
             ;;
         true*)
