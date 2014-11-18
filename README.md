@@ -50,10 +50,10 @@ To run weave on a host, you need to install...
 ## Example
 
 Say you have docker running on two hosts, accessible to each other as
-$HOST1 and $HOST2, and want to deploy an application consisting of two
-containers, one on each host.
+`$HOST1` and `$HOST2`, and want to deploy an application consisting of
+two containers, one on each host.
 
-On $HOST1 run (as root)
+On `$HOST1` run (as root)
 
     host1# weave launch
     host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu)
@@ -79,20 +79,20 @@ addresses of external services the hosts or containers need to connect
 to. The same IP range must be used everywhere, and the individual IP
 addresses must, of course, be unique.
 
-We repeat similar steps on $HOST2...
+We repeat similar steps on `$HOST2`...
 
     host2# weave launch $HOST1
     host2# C=$(weave run 10.0.1.2/24 -t -i ubuntu)
 
 The only difference, apart from the choice of IP address for the
 application container, is that we tell our weave that it should peer
-with the weave on $HOST1 (specified as the IP address or hostname, and
-optional `:port`, by which $HOST2 can reach it). NB: if there is a
-firewall between $HOST1 and $HOST2, you must open port 6783 for TCP
+with the weave on `$HOST1` (specified as the IP address or hostname, and
+optional `:port`, by which `$HOST2` can reach it). NB: if there is a
+firewall between `$HOST1` and `$HOST2`, you must open port 6783 for TCP
 and UDP.
 
-Note that we could instead have told the weave on $HOST1 to connect to
-$HOST2, or told both about each other. Order does not matter here;
+Note that we could instead have told the weave on `$HOST1` to connect to
+`$HOST2`, or told both about each other. Order does not matter here;
 weave automatically (re)connects to peers when they become
 available. Also, we can tell weave to connect to multiple peers by
 supplying multiple addresses, separated by spaces. And we can
@@ -101,7 +101,7 @@ supplying multiple addresses, separated by spaces. And we can
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...
 
-On $HOST1...
+On `$HOST1`...
 
     host1# docker attach $C
     root@28841bd02eff:/# ping -c 1 -q 10.0.1.2
@@ -110,7 +110,7 @@ On $HOST1...
     1 packets transmitted, 1 packets received, 0% packet loss
     round-trip min/avg/max/stddev = 1.048/1.048/1.048/0.000 ms
 
-Similarly, on $HOST2...
+Similarly, on `$HOST2`...
 
     host2# docker attach $C
     root@f76829496120:/# ping -c 1 -q 10.0.1.1
