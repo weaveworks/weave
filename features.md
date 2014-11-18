@@ -31,11 +31,11 @@ like a giant Ethernet switch to which all the containers are
 connected.
 
 Containers can easily access services from each other; e.g. in the
-container on $HOST1 we can start a netcat "service" with
+container on `$HOST1` we can start a netcat "service" with
 
     root@28841bd02eff:/# nc -lk -p 4422
 
-and then connect to it from the container on $HOST2 with
+and then connect to it from the container on `$HOST2` with
 
     root@f76829496120:/# echo 'Hello, world.' | nc 10.0.1.1 4422
 
@@ -144,8 +144,8 @@ Weave application networks can be integrated with a host's network,
 establishing connectivity between the host and application containers
 anywhere.
 
-Let's say that in our example we want $HOST2 to have access to the
-application containers. On $HOST2 we run
+Let's say that in our example we want `$HOST2` to have access to the
+application containers. On `$HOST2` we run
 
     host2# weave expose 10.0.1.102/24
 
@@ -160,7 +160,7 @@ will work. And, more interestingly,
 
     host2# ping 10.0.1.1
 
-will work too, which is talking to a container that resides on $HOST1.
+will work too, which is talking to a container that resides on `$HOST1`.
 
 ### <a name="service-export"></a>Service export
 
@@ -170,9 +170,9 @@ from any weave host, irrespective of where the service containers are
 located.
 
 Say we want to make our example netcat "service", which is running in
-a container on $HOST1, accessible to the outside world via $HOST2.
+a container on `$HOST1`, accessible to the outside world via `$HOST2`.
 
-First we need to expose the application network to $HOST2, as
+First we need to expose the application network to `$HOST2`, as
 explained [above](#host-network-integration), i.e.
 
     host2# weave expose 10.0.1.102/24
@@ -183,7 +183,7 @@ destination container service.
     host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
            -j DNAT --to-destination 10.0.1.1:4422
 
-Here we are assuming that the "outside world" is connecting to $HOST2
+Here we are assuming that the "outside world" is connecting to `$HOST2`
 via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
 routed to our 'nc' service, which is running on port 4422 in the
 container with IP 10.0.1.1.
@@ -194,7 +194,7 @@ anywhere with
     echo 'Hello, world.' | nc $HOST2 2211
 
 (NB: due to the way routing is handled in the Linux kernel, this won't
-work when run *on* $HOST2.)
+work when run *on* `$HOST2`.)
 
 Similar NAT rules to the above can used to expose services not just to
 the outside world but also other, internal, networks.
@@ -206,13 +206,13 @@ access to services which are only reachable from certain weave hosts,
 irrespective of where the application containers are located.
 
 Say that, as an extension of our example, we have a netcat service
-running on $HOST3, port 2211, and that $HOST3 is not part of the weave
-network and is only reachable from $HOST1, not $HOST2. Nevertheless we
+running on `$HOST3`, port 2211, and that `$HOST3` is not part of the weave
+network and is only reachable from `$HOST1`, not `$HOST2`. Nevertheless we
 want to make the service accessible to an application running in a
-container on $HOST2.
+container on `$HOST2`.
 
 First we need to expose the application network to the host, as
-explained [above](#host-network-integration), this time on $HOST1,
+explained [above](#host-network-integration), this time on `$HOST1`,
 i.e.
 
     host1# weave expose 10.0.1.101/24
@@ -224,12 +224,12 @@ service.
            -j DNAT --to-destination $HOST3:2211
 
 This allows any application container to reach the service by
-connecting to 10.0.1.101:3322. So if $HOST3 is indeed running a netcat
+connecting to 10.0.1.101:3322. So if `$HOST3` is indeed running a netcat
 service on port 2211, e.g.
 
     host3# nc -lk -p 2211
 
-then we can connect to it from our application container on $HOST2 with
+then we can connect to it from our application container on `$HOST2` with
 
     root@f76829496120:/# echo 'Hello, world.' | nc 10.0.1.101 3322
 
@@ -258,27 +258,27 @@ scenario (though of course there could be); weave is acting purely as
 an address translation and routing facility, using the weave
 application network as an intermediary.
 
-In our example above, the netcat service on $HOST3 is imported into
-weave via $HOST1. We can export it on $HOST2 by first exposing the
+In our example above, the netcat service on `$HOST3` is imported into
+weave via `$HOST1`. We can export it on `$HOST2` by first exposing the
 application network with
 
     host2# weave expose 10.0.1.102/24
 
-and then adding a NAT rule which routes traffic from the $HOST2
-network (i.e. anything which can connect to $HOST2) to the service
+and then adding a NAT rule which routes traffic from the `$HOST2`
+network (i.e. anything which can connect to `$HOST2`) to the service
 endpoint in the weave network
 
     host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
            -j DNAT --to-destination 10.0.1.101:3322
 
-Now any host on the same network as $HOST2 can access the service with
+Now any host on the same network as `$HOST2` can access the service with
 
     echo 'Hello, world.' | nc $HOST2 4433
 
 Furthermore, as explained in [service-binding](#service-binding), we
 can dynamically alter the service locations without having to touch
 the applications that access them, e.g. we could move the example
-netcat service to $HOST4:2211 while retaining its 10.0.1.101:3322
+netcat service to `$HOST4:2211` while retaining its 10.0.1.101:3322
 endpoint in the weave network.
 
 ### <a name="multi-cloud-networking"></a>Multi-cloud networking
