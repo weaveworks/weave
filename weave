@@ -308,6 +308,19 @@ tell_dns() {
     http_call $1 $DNS_CONTAINER_NAME $DNS_HTTP_PORT /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
 }
 
+# Tell the newly-started weaveDNS about existing weave IPs
+populate_dns() {
+    for CONTAINER in $(docker ps -q); do
+        MORE_ARGS=$(docker inspect --format '--data-urlencode local_ip={{ .NetworkSettings.IPAddress }} --data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
+        if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
+            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
+            for IP in $CONTAINER_IPS; do
+                http_call PUT $DNS_CONTAINER_NAME $DNS_HTTP_PORT /name/$CONTAINER/$IP $MORE_ARGS
+            done
+        fi
+    done
+}
+
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
     case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $1 2>/dev/null) in
@@ -379,9 +392,10 @@ case "$COMMAND" in
         check_not_running $DNS_CONTAINER_NAME $DNS_IMAGE
         create_bridge
         docker_bridge_ip
-        CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@" | tail -n 1)
-        with_container_netns $CONTAINER attach $CIDR >/dev/null
-        echo $CONTAINER
+        DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@" | tail -n 1)
+        with_container_netns $DNS_CONTAINER attach $CIDR >/dev/null
+        populate_dns
+        echo $DNS_CONTAINER
         ;;
     connect)
         [ $# -eq 1 ] || usage
