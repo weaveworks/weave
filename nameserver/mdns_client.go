@@ -8,6 +8,7 @@ import (
 )
 
 // Portions of this code taken from github.com/armon/mdns
+// And portions from github.com/miekg/dns
 
 const (
 	ipv4mdns = "224.0.0.251" // link-local multicast address
@@ -15,6 +16,7 @@ const (
 	// We wait this long to hear a response from other mDNS servers on
 	// the network.
 	mDNSTimeout = 500 * time.Millisecond
+	mDNSMaxSize = 1024 // Max size of response message
 	MaxDuration = time.Duration(math.MaxInt64)
 	MailboxSize = 16
 )
@@ -48,7 +50,7 @@ type inflightQuery struct {
 }
 
 type MDNSClient struct {
-	server    *dns.Server
+	listener  *ResponseListener
 	conn      *net.UDPConn
 	addr      *net.UDPAddr
 	inflight  map[string]*inflightQuery
@@ -59,6 +61,69 @@ type mDNSQueryInfo struct {
 	name       string
 	querytype  uint16
 	responseCh chan<- *ResponseA
+}
+
+type HandlerFunc func(*dns.Msg)
+
+type ResponseListener struct {
+	// For graceful shutdown.
+	stopUDP chan bool
+}
+
+type MDNSError struct{ err string }
+
+func (e *MDNSError) Error() string {
+	if e == nil {
+		return "weavedns: <nil>"
+	}
+	return "weavedns: " + e.err
+}
+
+func (srv *ResponseListener) Activate(ifi *net.Interface, handler HandlerFunc) error {
+	multicast, err := LinkLocalMulticastListener(ifi)
+	if err != nil {
+		return err
+	}
+	srv.stopUDP = make(chan bool)
+	if l, ok := multicast.(*net.UDPConn); ok {
+		defer l.Close()
+		for {
+			m, e := srv.readUDP(l, 2*time.Second)
+			select {
+			case <-srv.stopUDP:
+				return nil
+			default:
+			}
+			if e != nil {
+				continue
+			}
+			req := new(dns.Msg)
+			if err := req.Unpack(m); err == nil {
+				handler(req)
+			} else {
+				Warning.Printf("Error unpacking message %s", err)
+			}
+		}
+	}
+	return &MDNSError{err: "bad listeners"}
+}
+
+func (srv *ResponseListener) Shutdown() {
+	srv.stopUDP <- true
+}
+
+func (srv *ResponseListener) readUDP(conn *net.UDPConn, timeout time.Duration) ([]byte, error) {
+	conn.SetReadDeadline(time.Now().Add(timeout))
+	m := make([]byte, mDNSMaxSize)
+	n, _, e := conn.ReadFrom(m)
+	if e != nil || n == 0 {
+		if e != nil {
+			return nil, e
+		}
+		return nil, dns.ErrShortRead
+	}
+	m = m[:n]
+	return m, nil
 }
 
 func NewMDNSClient() (*MDNSClient, error) {
@@ -73,20 +138,15 @@ func NewMDNSClient() (*MDNSClient, error) {
 }
 
 func (c *MDNSClient) Start(ifi *net.Interface) error {
-	multicast, err := LinkLocalMulticastListener(ifi)
-	if err != nil {
-		return err
-	}
-
-	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
+	handleMDNS := func(r *dns.Msg) {
 		// Don't want to handle queries here, so filter anything out that isn't a response
 		if len(r.Answer) > 0 {
-			c.ResponseCallback(r)
+			c.ResponseReceived(r)
 		}
 	}
 
-	c.server = &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
-	go c.server.ActivateAndServe()
+	c.listener = &ResponseListener{}
+	go c.listener.Activate(ifi, handleMDNS)
 
 	queryChan := make(chan *MDNSInteraction, MailboxSize)
 	c.queryChan = queryChan
@@ -126,8 +186,8 @@ func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- 
 	}
 }
 
-// Async - called from dns library multiplexer
-func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
+// Async
+func (c *MDNSClient) ResponseReceived(r *dns.Msg) {
 	c.queryChan <- &MDNSInteraction{code: CMessageReceived, payload: r}
 }
 
@@ -177,7 +237,7 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 			}
 			switch query.code {
 			case CShutdown:
-				c.server.Shutdown()
+				c.listener.Shutdown()
 				terminate = true
 			case CSendQuery:
 				c.handleSendQuery(query.payload.(mDNSQueryInfo))

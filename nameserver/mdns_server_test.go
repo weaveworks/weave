@@ -45,10 +45,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	receivedCount := 0
 
 	// Implement a minimal listener for responses
-	multicast, err := LinkLocalMulticastListener(nil)
-	assertNoErr(t, err)
-
-	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
+	handleMDNS := func(r *dns.Msg) {
 		// Only handle responses here
 		if len(r.Answer) > 0 {
 			for _, answer := range r.Answer {
@@ -61,9 +58,9 @@ func TestServerSimpleQuery(t *testing.T) {
 		}
 	}
 
-	server := &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
-	go server.ActivateAndServe()
-	defer server.Shutdown()
+	rl := &ResponseListener{}
+	go rl.Activate(nil, handleMDNS)
+	defer rl.Shutdown()
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 
