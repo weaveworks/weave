@@ -55,9 +55,9 @@ HTTP API.
 
 ### Supplying the DNS server
 
-If you want to use `docker run` to start a container, rather than
-`weave run`, you can supply the weaveDNS IP as the `--dns` option to
-make it use weaveDNS:
+If you want to start containers with `docker run` rather than `weave
+run`, you can supply the weaveDNS IP as the `--dns` option to make it
+use weaveDNS:
 
 ```bash
 $ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
@@ -70,10 +70,16 @@ weave network (as in the last line above).
 
 ### Supplying the domain search path
 
-Again, when using `docker run`, you will usually want to supply a
-domain search path so that you can use unqualified hostnames. Use
-`--dns-search=.` to make the resolver use the container's domain, or
-e.g., `--dns-search=weave.local` to make it look in `weave.local`.
+By default, Docker will provide containers with a `/etc/resolv.conf`
+that matches that for the host. In some circumstances, this may
+include a DNS search path, which will break the nice "bare names
+resolve" property above.
+
+Therefore, when starting containers with `docker run` instead of
+`weave run`, you will usually want to supply a domain search path so
+that you can use unqualified hostnames. Use `--dns-search=.` to make
+the resolver use the container's domain, or e.g.,
+`--dns-search=weave.local` to make it look in `weave.local`.
 
 ### Adding containers to DNS
 
@@ -105,13 +111,6 @@ $ docker stop $shell2
 $ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
 $ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.1.1.27"
 ```
-
-### Supplying `--dns-search=`
-
-By default, Docker will provide containers with a `/etc/resolv.conf`
-that matches that for the host. In some circumstances, this may
-include a DNS search path, which will break the nice "bare names
-resolve" property above.
 
 ## Present limitations
 
