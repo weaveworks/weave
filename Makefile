@@ -36,13 +36,16 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
 publish: $(WEAVER_EXPORT)
-	$(SUDO) docker tag $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
+	/bin/bash scripts/set_version.sh
+	$(SUDO) docker tag $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git describe --tags`
 	$(SUDO) docker push $(WEAVER_IMAGE):latest
-	$(SUDO) docker push $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
-	$(SUDO) docker tag $(WEAVEDNS_IMAGE) $(WEAVEDNS_IMAGE):git-`git rev-parse --short=12 HEAD`
+	$(SUDO) docker push $(WEAVER_IMAGE):git-`git describe --tags`
+	/usr/bin/git push origin master --tags
+	$(SUDO) docker tag $(WEAVEDNS_IMAGE) $(WEAVEDNS_IMAGE):git-`git describe --tags` 
 	$(SUDO) docker push $(WEAVEDNS_IMAGE):latest
-	$(SUDO) docker push $(WEAVEDNS_IMAGE):git-`git rev-parse --short=12 HEAD`
+	$(SUDO) docker push $(WEAVEDNS_IMAGE):git-`git describe --tags`
 
 clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE)
 	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT)
+

@@ -47,6 +47,10 @@ PORT=6783
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
 
+# `export WEAVE_DOCKER_ARGS='customer arguments'` 
+# prior to weave launch will permit you to pass along arguments 
+# to the `docker run` command used to launch the weave container
+
 COMMAND=$1
 
 shift 1
