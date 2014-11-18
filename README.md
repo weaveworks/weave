@@ -47,6 +47,12 @@ To run weave on a host, you need to install...
    itself fully when individual weave instances are stopped (with
    `weave stop`) and restarted quickly (typically within ~3 minutes).
 
+## Quick Start Screencast
+
+<a href="http://youtu.be/k6r7yuSr0hE" target="_blank">
+  <img src="https://www.dropbox.com/s/7xwm8r1r3k16u3k/Screenshot%202014-11-18%2011.59.45.png?dl=1" />
+</a>
+
 ## Example
 
 Say you have docker running on two hosts, accessible to each other as
