@@ -35,7 +35,11 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-publish: $(WEAVER_EXPORT)
+# Add more directories in here as more tests are created
+tests:
+	cd nameserver; go test
+
+publish: $(WEAVER_EXPORT) tests
 	$(SUDO) docker tag $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
 	$(SUDO) docker push $(WEAVER_IMAGE):latest
 	$(SUDO) docker push $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
