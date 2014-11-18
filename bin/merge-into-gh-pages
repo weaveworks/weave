@@ -1,9 +1,9 @@
-#! /bin/sh
+#! /bin/bash
 set -e
 
 MERGE_ARGS="-X subtree=site"
 
-merge_dir=$(mktemp -d -t weave-merge)/weave
+merge_dir=$(mktemp -d -t weave-merge.XXXXXX)/weave
 git clone -b gh-pages . $merge_dir
 
 pushd $merge_dir
