@@ -70,42 +70,30 @@ type ResponseListener struct {
 	stopUDP chan bool
 }
 
-type MDNSError struct{ err string }
-
-func (e *MDNSError) Error() string {
-	if e == nil {
-		return "weavedns: <nil>"
-	}
-	return "weavedns: " + e.err
-}
-
 func (srv *ResponseListener) Activate(ifi *net.Interface, handler HandlerFunc) error {
 	multicast, err := LinkLocalMulticastListener(ifi)
 	if err != nil {
 		return err
 	}
 	srv.stopUDP = make(chan bool)
-	if l, ok := multicast.(*net.UDPConn); ok {
-		defer l.Close()
-		for {
-			m, e := srv.readUDP(l, 2*time.Second)
-			select {
-			case <-srv.stopUDP:
-				return nil
-			default:
-			}
-			if e != nil {
-				continue
-			}
-			req := new(dns.Msg)
-			if err := req.Unpack(m); err == nil {
-				handler(req)
-			} else {
-				Warning.Printf("Error unpacking message %s", err)
-			}
+	defer multicast.Close()
+	for {
+		m, e := srv.readUDP(multicast, 2*time.Second)
+		select {
+		case <-srv.stopUDP:
+			return nil
+		default:
+		}
+		if e != nil {
+			continue
+		}
+		req := new(dns.Msg)
+		if err := req.Unpack(m); err == nil {
+			handler(req)
+		} else {
+			Warning.Printf("Error unpacking message %s", err)
 		}
 	}
-	return &MDNSError{err: "bad listeners"}
 }
 
 func (srv *ResponseListener) Shutdown() {
@@ -155,7 +143,7 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 	return nil
 }
 
-func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
+func LinkLocalMulticastListener(ifi *net.Interface) (*net.UDPConn, error) {
 	return net.ListenMulticastUDP("udp", ifi, ipv4Addr)
 }
 
