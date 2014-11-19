@@ -338,6 +338,19 @@ container_weave_addrs() {
     ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
+uname_sys=`uname -s`
+uname_rel_major=`uname -r | cut -d. -f1`
+uname_rel_minor=`uname -r | cut -d. -f2`
+
+[ ! $uname_sys = 'Linux' ] && {
+  echo "ERROR: Operating systems other than Linux are not supported (you have $uname_sys)" >&2
+  exit 1
+}
+
+(([ $uname_rel_major -eq 3 ] && [ $uname_rel_minor -ge 5 ]) || [ $uname_rel_major -gt 3 ]) || {
+  echo "WARNING: Linux kernel version 3.5 or newer is required (you have `uname -sr`)" >&2
+}
+
 case "$COMMAND" in
     launch)
         check_not_running $CONTAINER_NAME $IMAGE
