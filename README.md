@@ -30,7 +30,7 @@ capabilities, so these can continue to be used by containers.
 To run weave on a host, you need to install...
 
 1. Linux and Docker. We've tested with Docker versions 0.9.1 through
-   1.2.0, but other versions should work too. Linux kernels after 3.5
+   1.3.1, but other versions should work too. Linux kernels after 3.5
    are known to work; the newer the better.
 2. weave. Install this with
 
