@@ -139,17 +139,6 @@ destroy_bridge() {
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
 }
 
-docker_ip() {
-    if ! DOCKERIP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $CONTAINER_NAME 2>/dev/null) ; then
-        echo "Weave is not running." >&2
-        exit 1
-    fi
-    if [ -z "$DOCKERIP" ] ; then
-        echo "Weave is not running." >&2
-        exit 1
-    fi
-}
-
 # the following borrows from https://github.com/jpetazzo/pipework
 
 # run args $2 $3 ... as a command in the network namespace of container $1
