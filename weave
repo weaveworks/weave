@@ -302,6 +302,32 @@ tell_dns() {
     http_call $1 $DNS_CONTAINER_NAME $DNS_HTTP_PORT /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
 }
 
+# Checks global settings that are required before launching weave
+check_global_settings() {
+
+    if ! $(cat /etc/lsb-release | grep -q "DISTRIB_ID=Ubuntu")
+    then
+        # not an ubuntu system returning
+        return
+    fi
+
+    DOCKER_DAEMON="docker.io"
+    pidof $DOCKER_DAEMON > /dev/null && DOCKER_PID=$(pidof $DOCKER_DAEMON) 
+    if [ -z $DOCKER_PID ]
+    then
+        echo "Couldn't detect docker daemon running... Aborting." >&2 
+        exit 1
+    fi
+
+    if $(cat /proc/$DOCKER_PID/cmdline | grep -q "\-b=none") 
+    then
+        echo "Docker started without a bridge option... Aborting." >&2 
+	echo "Suggestion: please restart docker daemon without '-b=none' option"
+        exit 1
+    fi
+ 
+}
+
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
     case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $1 2>/dev/null) in
@@ -342,6 +368,7 @@ uname_rel_minor=`uname -r | cut -d. -f2`
 
 case "$COMMAND" in
     launch)
+        check_global_settings 
         check_not_running $CONTAINER_NAME $IMAGE
         create_bridge
         # We set the router name to the bridge mac since that is
