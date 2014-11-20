@@ -85,7 +85,7 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 		}
 	}
 
-	c.server = &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
+	c.server = &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
 	go c.server.ActivateAndServe()
 
 	queryChan := make(chan *MDNSInteraction, MailboxSize)
