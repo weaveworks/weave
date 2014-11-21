@@ -152,7 +152,7 @@ PMTU is the lowest MTU of hop in the path between two different
 nodes. In general, it is a benefit to know what the PMTU is so that
 you can perform any necessary fragmentation of packets at the
 endpoints of the path to avoid any refragmentation needing to
-occur. If you allow refrafmentation to occur then you can end up with
+occur. If you allow refragmentation to occur then you can end up with
 many small packets and network performance can suffer.  To discover
 PMTU, there is an IP flag called "Don't Fragment" (DF). With this set,
 if a node receives a packet that is bigger than the next MTU, it is
