@@ -48,7 +48,9 @@ type inflightQuery struct {
 }
 
 type MDNSClient struct {
-	server    *dns.Server
+	// note unorthodox use of 'Server' class in client logic - using it to
+	// listen on a multicast socket and call callback whenever a message comes in.
+	listener  *dns.Server
 	conn      *net.UDPConn
 	addr      *net.UDPAddr
 	inflight  map[string]*inflightQuery
@@ -85,8 +87,8 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 		}
 	}
 
-	c.server = &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
-	go c.server.ActivateAndServe()
+	c.listener = &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
+	go c.listener.ActivateAndServe()
 
 	queryChan := make(chan *MDNSInteraction, MailboxSize)
 	c.queryChan = queryChan
@@ -177,7 +179,7 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 			}
 			switch query.code {
 			case CShutdown:
-				c.server.Shutdown()
+				c.listener.Shutdown()
 				terminate = true
 			case CSendQuery:
 				c.handleSendQuery(query.payload.(mDNSQueryInfo))

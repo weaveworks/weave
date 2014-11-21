@@ -61,9 +61,9 @@ func TestServerSimpleQuery(t *testing.T) {
 		}
 	}
 
-	server := &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
-	go server.ActivateAndServe()
-	defer server.Shutdown()
+	listener := &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
+	go listener.ActivateAndServe()
+	defer listener.Shutdown()
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 
