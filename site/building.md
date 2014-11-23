@@ -11,8 +11,8 @@ You can work on weave without using a VM if you are running the docker
 daemon outside a VM. (These instructions have only been tested on
 Ubuntu.)
 
-To build weave you need `libpcap-dev` and `docker` installed. And `go`
-(and `git` and `hg` to fetch dependencies).
+To build weave you need `libpcap-dev` and `docker` (version 1.3.0 or
+later) installed. And `go` (and `git` and `hg` to fetch dependencies).
 
 The package name is `github.com/zettio/weave`, so assuming `$GOPATH`
 is set:
