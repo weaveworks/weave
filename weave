@@ -46,7 +46,6 @@ MTU=65535
 PORT=6783
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
-DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 
 COMMAND=$1
 
@@ -138,11 +137,6 @@ destroy_bridge() {
     run_iptables -t nat -F WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
-}
-
-docker_bridge_ip() {
-    DOCKER_BRIDGE_IP=$(ip -4 addr show $DOCKER_BRIDGE | grep -o 'inet [.0-9]*')
-    DOCKER_BRIDGE_IP=${DOCKER_BRIDGE_IP#inet }
 }
 
 # the following borrows from https://github.com/jpetazzo/pipework
@@ -375,8 +369,7 @@ case "$COMMAND" in
         shift 1
         check_not_running $DNS_CONTAINER_NAME $DNS_IMAGE
         create_bridge
-        docker_bridge_ip
-        CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@" | tail -n 1)
+        CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@" | tail -n 1)
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         echo $CONTAINER
         ;;
@@ -414,8 +407,7 @@ case "$COMMAND" in
         CIDR=$1
         shift 1
         create_bridge
-        docker_bridge_ip
-        DNS_ARG="--dns $DOCKER_BRIDGE_IP"
+        DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}'" --link $DNS_CONTAINER_NAME:$DNS_CONTAINER_NAME" $DNS_CONTAINER_NAME 2>/dev/null) || true
         DNS_SEARCH_ARG="--dns-search=."
         for arg in $@; do
            case $arg in
