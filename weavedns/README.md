@@ -23,9 +23,9 @@ $ docker attach $shell1
 ...
 ```
 
-The IP address supplied to `weave launch-dns` must not be used by any
-other container, and the supplied network must contain all application
-networks.
+The weave IP address supplied to `weave launch-dns` must not be used
+by any other container, and the supplied network must contain all
+application networks.
 
 ## Domain search paths
 
@@ -50,23 +50,45 @@ supply it as the DNS server to the new container. Similarly, both
 container against the given weave network IP address.
 
 In some circumstances, you may not want to use the `weave`
-command. You can still take advantage of a running weaveDNS, using the
-HTTP API.
+command. You can still take advantage of a running weaveDNS, with some
+extra manual steps.
+
+### Using a different docker bridge
+
+So that containers can connect to a stable and always routable IP
+address, weaveDNS publishes its port 53 to the Docker bridge device,
+which is assumed to be `docker0`.
+
+Some configurations will use a different Docker bridge device. To
+supply a different bridge device, use the environment variable
+`DOCKER_BRIDGE`, e.g.,
+
+```bash
+$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.0.1.2/16
+```
 
 ### Supplying the DNS server
 
 If you want to start containers with `docker run` rather than `weave
-run`, you can supply the weaveDNS IP as the `--dns` option to make it
-use weaveDNS:
+run`, you can supply the docker bridge IP as the `--dns` option to
+make it use weaveDNS:
 
 ```bash
-$ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
-$ shell2=$(docker run --dns=$dns_ip -ti ubuntu)
+$ docker_ip=$(docker inspect --format='{{ .NetworkSettings.Gateway }}' weavedns)
+$ shell2=$(docker run --dns=$docker_ip -ti ubuntu)
 $ weave attach 10.1.1.27/24 $shell2
 ```
 
 This isn't very useful unless the container is also attached to the
 weave network (as in the last line above).
+
+Also note that this means of finding the Docker bridge's IP address
+requires a running container (any one would do); another way to find
+it is:
+
+```bash
+$ docker_ip=$(ip -4 addr show dev docker0 | grep -o 'inet [0-9.]*' | cut -d ' ' -f 2)
+```
 
 ### Supplying the domain search path
 
