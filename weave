@@ -6,7 +6,7 @@ usage() {
     echo "weave launch     [-password <password>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
-    echo "weave run        <cidr> <docker run args> ..."
+    echo "weave run        [-with-dns] <cidr> <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
     echo "weave attach     <cidr> <container_id>"
     echo "weave detach     <cidr> <container_id>"
@@ -402,21 +402,32 @@ case "$COMMAND" in
         docker images --no-trunc | grep $DOCKERIMAGE | grep -v latest | tr -s ' ' | cut -d ' ' -f 2
         ;;
     run)
-        [ $# -gt 0 ] || usage
-        validate_cidr $1
-        CIDR=$1
-        shift 1
+        [ $# -gt 1 ] || usage
         create_bridge
-        DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}'" --link $DNS_CONTAINER_NAME:$DNS_CONTAINER_NAME" $DNS_CONTAINER_NAME 2>/dev/null) || true
-        DNS_SEARCH_ARG="--dns-search=."
-        for arg in $@; do
-           case $arg in
-               --dns-search=*)
-                   DNS_SEARCH_ARG=""
-                   ;;
-               *)
-                   ;;
-           esac;
+        for arg in $1 $2; do
+            case $arg in
+                [0-9]*)
+                    if [ -z $CIDR ] ; then
+                        validate_cidr $arg
+                        CIDR=$arg
+                        shift 1
+                    fi
+                    ;;
+                -with-dns)
+                    shift 1
+                    DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}'" --link $DNS_CONTAINER_NAME:$DNS_CONTAINER_NAME" $DNS_CONTAINER_NAME 2>/dev/null) || true
+                    DNS_SEARCH_ARG="--dns-search=."
+                    for arg in $@; do
+                        case $arg in
+                            --dns-search=*)
+                                DNS_SEARCH_ARG=""
+                                ;;
+                            *)
+                                ;;
+                        esac;
+                    done
+                    ;;
+            esac;
         done
         CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@" | tail -n 1)
         with_container_netns $CONTAINER attach $CIDR >/dev/null
