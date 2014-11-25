@@ -327,17 +327,20 @@ container_weave_addrs() {
     ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
-uname_sys=`uname -s`
-uname_rel_major=`uname -r | cut -d. -f1`
-uname_rel_minor=`uname -r | cut -d. -f2`
+uname -s -r | sed -n 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
+    if ! read sys maj min ; then
+      echo "ERROR: Unable to parse operating system version `uname -s -r`" >&2
+      exit 1
+    fi
 
-[ ! $uname_sys = 'Linux' ] && {
-  echo "ERROR: Operating systems other than Linux are not supported (you have $uname_sys)" >&2
-  exit 1
-}
+    if [ "$sys" != 'Linux' ] ; then
+        echo "ERROR: Operating systems other than Linux are not supported (you have `uname -s -r`)" >&2
+        exit 1
+    fi
 
-(([ $uname_rel_major -eq 3 ] && [ $uname_rel_minor -ge 5 ]) || [ $uname_rel_major -gt 3 ]) || {
-  echo "WARNING: Linux kernel version 3.5 or newer is required (you have `uname -sr`)" >&2
+    if ! [ \( "$maj" -eq 3 -a "$min" -ge 5 \) -o "$maj" -gt 3 ] ; then
+        echo "WARNING: Linux kernel version 3.5 or newer is required (you have ${maj}.${min})" >&2
+    fi
 }
 
 case "$COMMAND" in
