@@ -403,32 +403,24 @@ case "$COMMAND" in
         ;;
     run)
         [ $# -gt 1 ] || usage
+        if [ "$1" = "--with-dns" ] ; then
+            shift 1
+            DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}'" --link $DNS_CONTAINER_NAME:$DNS_CONTAINER_NAME" $DNS_CONTAINER_NAME 2>/dev/null) || true
+            DNS_SEARCH_ARG="--dns-search=."
+            for arg in $@; do
+                case $arg in
+                    --dns-search=*)
+                        DNS_SEARCH_ARG=""
+                        ;;
+                    *)
+                        ;;
+                esac;
+            done
+        fi
+        validate_cidr $1
+        CIDR=$1
+        shift 1
         create_bridge
-        for arg in $1 $2; do
-            case $arg in
-                [0-9]*)
-                    if [ -z $CIDR ] ; then
-                        validate_cidr $arg
-                        CIDR=$arg
-                        shift 1
-                    fi
-                    ;;
-                --with-dns)
-                    shift 1
-                    DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}'" --link $DNS_CONTAINER_NAME:$DNS_CONTAINER_NAME" $DNS_CONTAINER_NAME 2>/dev/null) || true
-                    DNS_SEARCH_ARG="--dns-search=."
-                    for arg in $@; do
-                        case $arg in
-                            --dns-search=*)
-                                DNS_SEARCH_ARG=""
-                                ;;
-                            *)
-                                ;;
-                        esac;
-                    done
-                    ;;
-            esac;
-        done
         CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@" | tail -n 1)
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
