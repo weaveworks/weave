@@ -317,6 +317,17 @@ tell_dns() {
 # Tell the newly-started weaveDNS about existing weave IPs
 populate_dns() {
     DNS_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $DNS_CONTAINER_NAME)
+    WAIT_TIME=1
+    while ! http_call_ip $DNS_IP $DNS_HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
+        echo "Waiting for weaveDNS container to start" >&2
+        sleep $WAIT_TIME
+        WAIT_TIME=$((WAIT_TIME+1))
+    done
+    if [ $WAIT_TIME = 4 ]; then
+        echo "Timed out waiting for weaveDNS container to start." >&2
+        echo "If running, it will not be pre-populated." >&2
+    fi
+
     for CONTAINER in $(docker ps -q); do
         MORE_ARGS=$(docker inspect --format '--data-urlencode local_ip={{ .NetworkSettings.IPAddress }} --data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
         if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then

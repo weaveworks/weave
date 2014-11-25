@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/miekg/dns"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -26,6 +27,15 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 }
 
 func ListenHttp(domain string, db Zone, port int) {
+
+	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		} else {
+			io.WriteString(w, "ok")
+		}
+	})
+
 	http.HandleFunc("/name/", func(w http.ResponseWriter, r *http.Request) {
 
 		reqError := func(msg string, logmsg string, logargs ...interface{}) {
