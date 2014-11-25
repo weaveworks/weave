@@ -8,15 +8,16 @@ the host's configured name server.
 
 ## Using weaveDNS
 
-The weave script command `launch-dns` starts the DNS
-container. Subsquently, giving any container a hostname in the domain
+The weave script command `launch-dns` starts the DNS container, and
+then you use the `--with-dns` option on containers you wish to use it.
+Subsquently, giving any container a hostname in the domain
 `.weave.local` will register it in DNS. For example:
 
 ```bash
 $ weave launch
 $ weave launch-dns 10.1.0.2/16
 $ weave run 10.1.1.25/24 -ti -h pingme.weave.local ubuntu
-$ shell1=$(weave run 10.1.1.26/24 -ti -h ubuntu.weave.local ubuntu)
+$ shell1=$(weave run --with-dns 10.1.1.26/24 -ti -h ubuntu.weave.local ubuntu)
 $ docker attach $shell1
 
 # ping pingme
@@ -39,13 +40,13 @@ If you want to supply other entries for the domain search path, you
 will need *also* to supply the `weave.local` domain or subdomain:
 
 ```bash
-weave run 10.1.1.4/24 -ti --dns-search=weave.local --dns-search=local ubuntu
+weave run --with-dns 10.1.1.4/24 -ti --dns-search=weave.local --dns-search=local ubuntu
 ```
 
 ## Doing things more manually
 
-If a weaveDNS container is running, `weave run` will automatically
-supply it as the DNS server to the new container. Similarly, both
+If you use the `--with-dns` option, `weave run` will automatically
+supply the DNS server address to the new container. And both
 `weave run` and `weave attach` will register the hostname of the given
 container against the given weave network IP address.
 
