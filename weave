@@ -6,7 +6,7 @@ usage() {
     echo "weave launch     [-password <password>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
-    echo "weave run        [-with-dns] <cidr> <docker run args> ..."
+    echo "weave run        [--with-dns] <cidr> <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
     echo "weave attach     <cidr> <container_id>"
     echo "weave detach     <cidr> <container_id>"
@@ -413,7 +413,7 @@ case "$COMMAND" in
                         shift 1
                     fi
                     ;;
-                -with-dns)
+                --with-dns)
                     shift 1
                     DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}'" --link $DNS_CONTAINER_NAME:$DNS_CONTAINER_NAME" $DNS_CONTAINER_NAME 2>/dev/null) || true
                     DNS_SEARCH_ARG="--dns-search=."
