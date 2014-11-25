@@ -402,7 +402,7 @@ case "$COMMAND" in
         docker images --no-trunc | grep $DOCKERIMAGE | grep -v latest | tr -s ' ' | cut -d ' ' -f 2
         ;;
     run)
-        [ $# -gt 1 ] || usage
+        [ $# -gt 0 ] || usage
         if [ "$1" = "--with-dns" ] ; then
             shift 1
             DNS_ARG=$(docker inspect --format '--dns {{ .NetworkSettings.IPAddress }}'" --link $DNS_CONTAINER_NAME:$DNS_CONTAINER_NAME" $DNS_CONTAINER_NAME 2>/dev/null) || true
