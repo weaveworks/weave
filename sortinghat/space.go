@@ -5,18 +5,12 @@ import (
 	"net"
 )
 
-type Space interface {
-	AllocateFor(ident string) net.IP
-	DeleteRecordsFor(ident string) error
-	Free(addr net.IP)
-}
-
 type Record struct {
 	Ident string
 	IP    net.IP
 }
 
-type simpleSpace struct {
+type Space struct {
 	start         net.IP
 	size          uint32
 	max_allocated uint32
@@ -24,11 +18,11 @@ type simpleSpace struct {
 	free_list     []net.IP
 }
 
-func NewSpace(start net.IP, size uint32) Space {
-	return &simpleSpace{start: start, size: size, max_allocated: 0}
+func NewSpace(start net.IP, size uint32) *Space {
+	return &Space{start: start, size: size, max_allocated: 0}
 }
 
-func (space *simpleSpace) AllocateFor(ident string) net.IP {
+func (space *Space) AllocateFor(ident string) net.IP {
 	var ret net.IP = nil
 	if n := len(space.free_list); n > 0 {
 		ret = space.free_list[n-1]
@@ -43,7 +37,7 @@ func (space *simpleSpace) AllocateFor(ident string) net.IP {
 	return ret
 }
 
-func (space *simpleSpace) Free(addr net.IP) {
+func (space *Space) Free(addr net.IP) {
 	space.free_list = append(space.free_list, addr)
 	// TODO: consolidate free space
 }
@@ -63,7 +57,7 @@ func Add(addr net.IP, i uint32) net.IP {
 	return p
 }
 
-func (space *simpleSpace) DeleteRecordsFor(ident string) error {
+func (space *Space) DeleteRecordsFor(ident string) error {
 	w := 0 // write index
 
 	for _, r := range space.recs {
@@ -78,6 +72,6 @@ func (space *simpleSpace) DeleteRecordsFor(ident string) error {
 	return nil
 }
 
-func (space *simpleSpace) String() string {
+func (space *Space) String() string {
 	return fmt.Sprintf("Space allocator start %s, size %d, allocated %d, free %d", space.start, space.size, len(space.recs), len(space.free_list))
 }
