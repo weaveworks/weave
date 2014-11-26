@@ -262,27 +262,33 @@ detach() {
     ip link del $LOCAL_IFNAME type veth
 }
 
-# Call url $4 on container $2 at port $3 with http verb $1
+# Call url $4 with http verb $3 on container $1 at port $2
 http_call() {
-    http_verb="$1"
-    if ! status=$(docker inspect --format='{{ .State.Running }} {{ .NetworkSettings.IPAddress }}' $2 2>/dev/null); then
-        echo "$2 container is not present; have you launched it?" >&2
+    if ! status=$(docker inspect --format='{{ .State.Running }} {{ .NetworkSettings.IPAddress }}' $1 2>/dev/null); then
+        echo "$1 container is not present; have you launched it?" >&2
         exit 1
     fi
     case "$status" in
         "true ")
-            echo "$2 container has no IP address; is Docker networking enabled?" >&2
+            echo "$1 container has no IP address; is Docker networking enabled?" >&2
             exit 1
             ;;
         true*)
             ip="${status#true }"
             ;;
         *)
-            echo "$2 container is not running." >&2
+            echo "$1 container is not running." >&2
             exit 1
             ;;
     esac
-    port="$3"
+    shift 1
+    http_call_ip $ip $@
+}
+
+http_call_ip() {
+    ip="$1"
+    port="$2"
+    http_verb="$3"
     url="$4"
     shift 4
     if command_exists curl ; then
@@ -305,7 +311,32 @@ tell_dns() {
     # extract IP address and routing prefix from CIDR
     WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
     MORE_ARGS=$(docker inspect --format '--data-urlencode local_ip={{ .NetworkSettings.IPAddress }} --data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
-    http_call $1 $DNS_CONTAINER_NAME $DNS_HTTP_PORT /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
+    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
+}
+
+# Tell the newly-started weaveDNS about existing weave IPs
+populate_dns() {
+    DNS_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $DNS_CONTAINER_NAME)
+    WAIT_TIME=1
+    while ! http_call_ip $DNS_IP $DNS_HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
+        echo "Waiting for weaveDNS container to start" >&2
+        sleep $WAIT_TIME
+        WAIT_TIME=$((WAIT_TIME+1))
+    done
+    if [ $WAIT_TIME = 4 ]; then
+        echo "Timed out waiting for weaveDNS container to start." >&2
+        echo "If running, it will not be pre-populated." >&2
+    fi
+
+    for CONTAINER in $(docker ps -q); do
+        MORE_ARGS=$(docker inspect --format '--data-urlencode local_ip={{ .NetworkSettings.IPAddress }} --data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
+        if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
+            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
+            for IP in $CONTAINER_IPS; do
+                http_call_ip $DNS_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
+            done
+        fi
+    done
 }
 
 # Check that a container named $1 with image $2 is not running
@@ -379,16 +410,17 @@ case "$COMMAND" in
         check_not_running $DNS_CONTAINER_NAME $DNS_IMAGE
         create_bridge
         docker_bridge_ip
-        CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@" | tail -n 1)
-        with_container_netns $CONTAINER attach $CIDR >/dev/null
-        echo $CONTAINER
+        DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@" | tail -n 1)
+        with_container_netns $DNS_CONTAINER attach $CIDR >/dev/null
+        populate_dns
+        echo $DNS_CONTAINER
         ;;
     connect)
         [ $# -eq 1 ] || usage
-        http_call POST $CONTAINER_NAME $HTTP_PORT /connect -d "peer=$1"
+        http_call $CONTAINER_NAME $HTTP_PORT POST /connect -d "peer=$1"
         ;;
     status)
-        http_call GET $CONTAINER_NAME $HTTP_PORT /status
+        http_call $CONTAINER_NAME $HTTP_PORT GET /status
         ;;
     ps)
         [ $# -eq 0 ] || usage
