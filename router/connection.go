@@ -464,22 +464,13 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			// 1. FetchAll. This carries no payload. The receiver
 			// responds with the entire topology model as the receiver
 			// has it.
-			//
+			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Topology.FetchAll()))
+		} else if msg[0] == ProtocolUpdate {
 			// 2. Update. This carries a topology payload. The
 			// receiver merges it with its own topology model. If the
 			// payload is a subset of the receiver's topology, no
 			// further action is taken. Otherwise, the receiver sends
-			// out to all its connections an "improved" update:
-			//  - elements which the original payload added to the
-			//    receiver are included
-			//  - elements which the original payload updated in the
-			//    receiver are included
-			//  - elements which are equal between the receiver and
-			//    the payload are not included
-			//  - elements where the payload was older than the
-			//    receiver's version are updated
-			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Topology.FetchAll()))
-		} else if msg[0] == ProtocolUpdate {
+			// out to all its connections an "improved" update.
 			newUpdate, err := conn.Router.Peers.ApplyUpdate(msg[1:], conn.Router)
 			if _, ok := err.(UnknownPeersError); err != nil && ok {
 				// That update contained a peer we didn't know about;

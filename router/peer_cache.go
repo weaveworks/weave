@@ -51,6 +51,15 @@ func (cache *PeerCache) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
+// Create an "improved" update from an incoming update:
+//  - elements which the original payload added to the
+//    receiver are included
+//  - elements which the original payload updated in the
+//    receiver are included
+//  - elements which are equal between the receiver and
+//    the payload are not included
+//  - elements where the payload was older than the
+//    receiver's version are updated
 func (cache *PeerCache) ApplyUpdate(update []byte, router *Router) ([]byte, error) {
 	cache.Lock()
 
