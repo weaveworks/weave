@@ -201,18 +201,17 @@ connect_container_to_bridge() {
     if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
         return 1
     fi
-    if ! ip link set $GUEST_IFNAME netns $NETNS ; then
+    if ip link set $LOCAL_IFNAME master $BRIDGE &&
+        ip link set $LOCAL_IFNAME up &&
+        ip link set $GUEST_IFNAME netns $NETNS ; then
+        ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
+    else
         # failed before we assigned the veth to the container's
         # namespace - delete it
         ip link del $LOCAL_IFNAME type veth || true
         return 1
     fi
-
-    ip link set $LOCAL_IFNAME master $BRIDGE &&
-        ip link set $LOCAL_IFNAME up &&
-        ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
 }
-
 
 launch() {
     connect_container_to_bridge &&
