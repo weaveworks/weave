@@ -68,3 +68,13 @@ TODO: flesh this out
 Name suffixes identify applications and thus subnets. Subnets are automatically allocated from a different free IP range than the default range (the range can also be specified as an extra argument to `weave launch`). All subnets are /24, though this too can be changed with a `weave launch` option. There's also a way (TBD) to have subnets of different size. Btw, some interesting scenarios arising here when different weave peers are launched with different options.
 
 The magic `.` prefix indicates that the container should be anonymous, i.e. be given a random name, not registered in DNS but still be part of the given application and hence being able to resolve unqualified names in it.
+
+## exposing apps instead of subnets
+
+````bash
+root@:~# weave expose foo
+````
+
+Note that this may in perform a subnet allocation, if the app name is
+presently unknown. It will also perform an IP allocation in that
+subnet since we need that for the masquerading setup.
