@@ -325,7 +325,6 @@ populate_dns() {
     DNS_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $DNS_CONTAINER_NAME)
     WAIT_TIME=1
     while ! http_call_ip $DNS_IP $DNS_HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
-        echo "Waiting for weaveDNS container to start" >&2
         sleep $WAIT_TIME
         WAIT_TIME=$((WAIT_TIME+1))
     done
