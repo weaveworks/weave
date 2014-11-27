@@ -3,6 +3,7 @@ package sortinghat
 import (
 	"fmt"
 	"net"
+	"sync"
 )
 
 type Record struct {
@@ -11,6 +12,7 @@ type Record struct {
 }
 
 type Space struct {
+	sync.RWMutex
 	start         net.IP
 	size          uint32
 	max_allocated uint32
@@ -23,6 +25,8 @@ func NewSpace(start net.IP, size uint32) *Space {
 }
 
 func (space *Space) AllocateFor(ident string) net.IP {
+	space.Lock()
+	defer space.Unlock()
 	var ret net.IP = nil
 	if n := len(space.free_list); n > 0 {
 		ret = space.free_list[n-1]
@@ -38,8 +42,10 @@ func (space *Space) AllocateFor(ident string) net.IP {
 }
 
 func (space *Space) Free(addr net.IP) {
+	space.Lock()
 	space.free_list = append(space.free_list, addr)
 	// TODO: consolidate free space
+	space.Unlock()
 }
 
 // IPv4 Address Arithmetic - convert to 32-bit unsigned integer, add, and convert back
@@ -58,6 +64,8 @@ func Add(addr net.IP, i uint32) net.IP {
 }
 
 func (space *Space) DeleteRecordsFor(ident string) error {
+	space.Lock()
+	defer space.Unlock()
 	w := 0 // write index
 
 	for _, r := range space.recs {
@@ -73,5 +81,7 @@ func (space *Space) DeleteRecordsFor(ident string) error {
 }
 
 func (space *Space) String() string {
+	space.RLock()
+	defer space.RUnlock()
 	return fmt.Sprintf("Space allocator start %s, size %d, allocated %d, free %d", space.start, space.size, len(space.recs), len(space.free_list))
 }
