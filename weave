@@ -198,7 +198,12 @@ with_container_netns () {
 }
 
 connect_container_to_bridge() {
-    if ip link set $LOCAL_IFNAME master $BRIDGE &&
+    if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
+        return 1
+    fi
+
+    if check_command_and_run ethtool -K $GUEST_IFNAME tx off >/dev/null &&
+        ip link set $LOCAL_IFNAME master $BRIDGE &&
         ip link set $LOCAL_IFNAME up &&
         ip link set $GUEST_IFNAME netns $NETNS ; then
         ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
@@ -211,9 +216,6 @@ connect_container_to_bridge() {
 }
 
 launch() {
-    if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
-        return 1
-    fi
     connect_container_to_bridge &&
         check_command_and_run_anything ethtool ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null &&
         ip netns exec $NETNS ip link set $CONTAINER_IFNAME up
@@ -235,12 +237,7 @@ attach() {
         return 0
     fi
 
-    if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
-        return 1
-    fi
-
-    if ! check_command_and_run ethtool -K $GUEST_IFNAME tx off >/dev/null ||
-        ! connect_container_to_bridge ||
+    if ! connect_container_to_bridge ||
         ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ||
         ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ; then
         return 1
