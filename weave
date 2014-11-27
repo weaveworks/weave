@@ -147,9 +147,10 @@ docker_bridge_ip() {
 
 # the following borrows from https://github.com/jpetazzo/pipework
 
-# set $NETNS to the network namespace of container $1, and execute
-# args $2 $3 ... as a command.  If an error is caused by container
-# dying, swallow output from error.
+# Set $NETNS to the network namespace of container $1, $LOCAL_IFNAME
+# and $GUEST_IFNAME to suitable names for two ends of a veth pair,
+# specific to the container, and execute args $2 $3 ... as a command.
+# If an error is caused by container dying, swallow output from error.
 with_container_netns () {
     CONTAINER="$1"
     CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
