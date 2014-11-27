@@ -32,9 +32,8 @@ func sendQuery(name string, querytype uint16) error {
 func TestServerSimpleQuery(t *testing.T) {
 	log.Println("TestServerSimpleQuery starting")
 	var zone = new(ZoneDb)
-	dockerIP := net.ParseIP("9.8.7.6")
 	weaveIP, _, _ := net.ParseCIDR(testAddr1)
-	zone.AddRecord(containerID, "test.weave.", dockerIP, weaveIP)
+	zone.AddRecord(containerID, "test.weave.", weaveIP)
 
 	mdnsServer, err := NewMDNSServer(zone)
 	assertNoErr(t, err)

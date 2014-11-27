@@ -7,7 +7,7 @@ import (
 )
 
 type Zone interface {
-	AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP) error
+	AddRecord(ident string, name string, weaveIP net.IP) error
 	DeleteRecord(ident string, weaveIp net.IP) error
 	DeleteRecordsFor(ident string) error
 	MatchLocal(name string) (net.IP, error)
@@ -17,7 +17,6 @@ type Zone interface {
 type Record struct {
 	Ident   string
 	Name    string
-	LocalIP net.IP
 	WeaveIP net.IP
 }
 
@@ -75,7 +74,7 @@ func (zone *ZoneDb) MatchLocalIP(ip net.IP) (string, error) {
 	return "", LookupError(ip.String())
 }
 
-func (zone *ZoneDb) AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP) error {
+func (zone *ZoneDb) AddRecord(ident string, name string, weaveIP net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	fqdn := dns.Fqdn(name)
@@ -83,7 +82,7 @@ func (zone *ZoneDb) AddRecord(ident string, name string, localIP net.IP, weaveIP
 		func(r Record) bool { return r.Name == fqdn && r.WeaveIP.Equal(weaveIP) }); index != -1 {
 		return DuplicateError{fqdn, weaveIP, zone.recs[index].Ident}
 	}
-	zone.recs = append(zone.recs, Record{ident, fqdn, localIP, weaveIP})
+	zone.recs = append(zone.recs, Record{ident, fqdn, weaveIP})
 	return nil
 }
 

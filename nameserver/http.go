@@ -47,15 +47,8 @@ func ListenHttp(domain string, db Zone, port int) {
 		case "PUT":
 			ident, weaveIPstr, err := parseUrl(r.URL.Path)
 			name := r.FormValue("fqdn")
-			localIPstr := r.FormValue("local_ip")
-			if ident == "" || weaveIPstr == "" || name == "" || localIPstr == "" {
+			if ident == "" || weaveIPstr == "" || name == "" {
 				reqError("Invalid request", "Invalid request: %s, %s", r.URL, r.Form)
-				return
-			}
-
-			localIP := net.ParseIP(localIPstr)
-			if localIP == nil {
-				reqError("Invalid IP in request", "Invalid IP in request: %s", localIPstr)
 				return
 			}
 
@@ -66,8 +59,8 @@ func ListenHttp(domain string, db Zone, port int) {
 			}
 
 			if dns.IsSubDomain(domain, name) {
-				Info.Printf("Adding %s (%s) -> %s", name, localIPstr, weaveIPstr)
-				if err = db.AddRecord(ident, name, localIP, weaveIP); err != nil {
+				Info.Printf("Adding %s -> %s", name, weaveIPstr)
+				if err = db.AddRecord(ident, name, weaveIP); err != nil {
 					if dup, ok := err.(DuplicateError); !ok {
 						httpErrorAndLog(
 							Error, w, "Internal error", http.StatusInternalServerError,
