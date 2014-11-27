@@ -369,7 +369,7 @@ container_weave_addrs() {
     ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
-uname -s -r | sed -n 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
+uname -s -r | sed -n 's|^\([^ ]*\) \([0-9]\+\)\.\([0-9]\+\).*|\1 \2 \3|p' | {
     if ! read sys maj min ; then
       echo "ERROR: Unable to parse operating system version `uname -s -r`" >&2
       exit 1
