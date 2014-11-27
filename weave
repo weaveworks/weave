@@ -216,8 +216,8 @@ connect_container_to_bridge() {
 
 launch() {
     connect_container_to_bridge &&
-        ip netns exec $NETNS ip link set $CONTAINER_IFNAME up &&
-        check_command_and_run_anything ethtool ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null
+        check_command_and_run_anything ethtool ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null &&
+        ip netns exec $NETNS ip link set $CONTAINER_IFNAME up
 }
 
 attach() {
@@ -237,9 +237,9 @@ attach() {
     fi
 
     if ! connect_container_to_bridge ||
+        ! check_command_and_run_anything ethtool ip netns exec $NETNS ethtool -K $CONTAINER_IFNAME tx off >/dev/null ||
         ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ||
-        ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ||
-        ! check_command_and_run_anything ethtool ip netns exec $NETNS ethtool -K $CONTAINER_IFNAME tx off >/dev/null ; then
+        ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ; then
         return 1
     fi
 
