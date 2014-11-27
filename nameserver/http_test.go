@@ -42,11 +42,11 @@ func TestHttp(t *testing.T) {
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is now there.
-	ip, err := zone.MatchLocal(successTestName)
+	foundIP, err := zone.MatchLocal(successTestName)
 	assertNoErr(t, err)
-	weaveIP, _, _ := net.ParseCIDR(testAddr1)
-	if !ip.Equal(weaveIP) {
-		t.Fatal("Unexpected result for", successTestName, ip)
+	ip, _, _ := net.ParseCIDR(testAddr1)
+	if !foundIP.Equal(ip) {
+		t.Fatal("Unexpected result for", successTestName, foundIP)
 	}
 
 	// Adding exactly the same address should be OK

@@ -32,8 +32,8 @@ func sendQuery(name string, querytype uint16) error {
 func TestServerSimpleQuery(t *testing.T) {
 	log.Println("TestServerSimpleQuery starting")
 	var zone = new(ZoneDb)
-	weaveIP, _, _ := net.ParseCIDR(testAddr1)
-	zone.AddRecord(containerID, "test.weave.", weaveIP)
+	ip, _, _ := net.ParseCIDR(testAddr1)
+	zone.AddRecord(containerID, "test.weave.", ip)
 
 	mdnsServer, err := NewMDNSServer(zone)
 	assertNoErr(t, err)
@@ -73,7 +73,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	if receivedCount != 1 {
 		t.Fatal("Unexpected result count for test.weave", receivedCount)
 	}
-	if !receivedAddr.Equal(weaveIP) {
+	if !receivedAddr.Equal(ip) {
 		t.Fatal("Unexpected result for test.weave", receivedAddr)
 	}
 

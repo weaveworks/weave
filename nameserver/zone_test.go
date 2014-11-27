@@ -14,8 +14,8 @@ func TestZone(t *testing.T) {
 
 	var zone = new(ZoneDb)
 
-	weaveIP, _, _ := net.ParseCIDR(testAddr1)
-	err := zone.AddRecord(containerID, successTestName, weaveIP)
+	ip, _, _ := net.ParseCIDR(testAddr1)
+	err := zone.AddRecord(containerID, successTestName, ip)
 	assertNoErr(t, err)
 
 	// Add a few more records to make the job harder
@@ -28,24 +28,24 @@ func TestZone(t *testing.T) {
 	foundIP, err := zone.MatchLocal(successTestName)
 	assertNoErr(t, err)
 
-	if !foundIP.Equal(weaveIP) {
+	if !foundIP.Equal(ip) {
 		t.Fatal("Unexpected result for", successTestName, foundIP)
 	}
 
 	// See if we can find the address by IP.
-	foundName, err := zone.MatchLocalIP(weaveIP)
+	foundName, err := zone.MatchLocalIP(ip)
 	assertNoErr(t, err)
 
 	if foundName != successTestName {
-		t.Fatal("Unexpected result for", weaveIP, foundName)
+		t.Fatal("Unexpected result for", ip, foundName)
 	}
 
 	// Now try to add the same address again
-	err = zone.AddRecord(containerID, successTestName, weaveIP)
+	err = zone.AddRecord(containerID, successTestName, ip)
 	assertErrorType(t, err, (*DuplicateError)(nil), "duplicate add")
 
 	// Now delete the record
-	err = zone.DeleteRecord(containerID, weaveIP)
+	err = zone.DeleteRecord(containerID, ip)
 	assertNoErr(t, err)
 
 	// Check that the address is not there now.
@@ -66,8 +66,8 @@ func TestDeleteFor(t *testing.T) {
 	)
 	zone := new(ZoneDb)
 	for _, addr := range []string{addr1, addr2} {
-		weaveIP, _, _ := net.ParseCIDR(addr)
-		err := zone.AddRecord(id, name, weaveIP)
+		ip, _, _ := net.ParseCIDR(addr)
+		err := zone.AddRecord(id, name, ip)
 		assertNoErr(t, err)
 	}
 
