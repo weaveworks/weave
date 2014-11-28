@@ -521,7 +521,7 @@ case "$COMMAND" in
     stop)
         [ $# -eq 0 ] || usage
         if ! docker kill $CONTAINER_NAME >/dev/null 2>&1 ; then
-            echo "Weave is not running."
+            echo "Weave is not running." >&2
         fi
         docker kill  $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         docker rm -f $CONTAINER_NAME     >/dev/null 2>&1 || true
