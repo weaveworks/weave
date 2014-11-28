@@ -216,6 +216,10 @@ connect_container_to_bridge() {
 }
 
 launch() {
+    if ! ip netns exec $NETNS ip link show eth0 >/dev/null 2>&1 ; then
+        echo "No eth0 interface inside $CONTAINER_NAME container; perhaps you are running the docker daemon with container networking disabled (-b=none)." >&2
+        return 1
+    fi
     connect_container_to_bridge &&
         check_command_and_run_anything ethtool ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null &&
         ip netns exec $NETNS ip link set $CONTAINER_IFNAME up
