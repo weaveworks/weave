@@ -36,11 +36,17 @@ like `pingme`, in its own domain. That's why you can just say `ping
 pingme` above -- since the hostname is `ubuntu.weave.local`, it will
 look for `pingme.weave.local`.
 
-If you want to supply other entries for the domain search path, you
-will need *also* to supply the `weave.local` domain or subdomain:
+If you want to supply other entries for the domain search path,
+e.g. if you want containers in different sub-domains to resolve
+hostnames across all sub-domains plus some external domains, you will
+need *also* to supply the `weave.local` domain to retain the above
+behaviour.
 
 ```bash
-weave run --with-dns 10.1.1.4/24 -ti --dns-search=weave.local --dns-search=local ubuntu
+weave run --with-dns 10.1.1.4/24 -ti \
+  --dns-search=zone1.weave.local --dns-search=zone2.weave.local \
+  --dns-search=corp1.com --dns-search=corp2.com \
+  --dns-search=weave.local ubuntu
 ```
 
 ## Doing things more manually
