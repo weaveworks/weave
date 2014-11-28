@@ -42,7 +42,7 @@ func TestHttp(t *testing.T) {
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is now there.
-	foundIP, err := zone.MatchLocal(successTestName)
+	foundIP, err := zone.LookupLocal(successTestName)
 	assertNoErr(t, err)
 	ip, _, _ := net.ParseCIDR(testAddr1)
 	if !foundIP.Equal(ip) {
@@ -68,7 +68,7 @@ func TestHttp(t *testing.T) {
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is not there now.
-	_, err = zone.MatchLocal(successTestName)
+	_, err = zone.LookupLocal(successTestName)
 	assertErrorType(t, err, (*LookupError)(nil), "nonexistent lookup")
 
 	// Delete the address again, it should accept this

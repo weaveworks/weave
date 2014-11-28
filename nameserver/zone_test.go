@@ -25,7 +25,7 @@ func TestZone(t *testing.T) {
 	assertNoErr(t, err)
 
 	// Check that the address is now there.
-	foundIP, err := zone.MatchLocal(successTestName)
+	foundIP, err := zone.LookupLocal(successTestName)
 	assertNoErr(t, err)
 
 	if !foundIP.Equal(ip) {
@@ -33,7 +33,7 @@ func TestZone(t *testing.T) {
 	}
 
 	// See if we can find the address by IP.
-	foundName, err := zone.MatchLocalIP(ip)
+	foundName, err := zone.ReverseLookupLocal(ip)
 	assertNoErr(t, err)
 
 	if foundName != successTestName {
@@ -49,7 +49,7 @@ func TestZone(t *testing.T) {
 	assertNoErr(t, err)
 
 	// Check that the address is not there now.
-	_, err = zone.MatchLocal(successTestName)
+	_, err = zone.LookupLocal(successTestName)
 	assertErrorType(t, err, (*LookupError)(nil), "after deleting record")
 
 	// Delete a record that isn't there
@@ -71,10 +71,10 @@ func TestDeleteFor(t *testing.T) {
 		assertNoErr(t, err)
 	}
 
-	_, err := zone.MatchLocal(name)
+	_, err := zone.LookupLocal(name)
 	assertNoErr(t, err)
 
 	err = zone.DeleteRecordsFor(id)
-	_, err = zone.MatchLocal(name)
+	_, err = zone.LookupLocal(name)
 	assertErrorType(t, err, (*LookupError)(nil), "after deleting records for ident")
 }

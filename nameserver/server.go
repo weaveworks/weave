@@ -39,7 +39,7 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		q := r.Question[0]
 		Debug.Printf("Local query: %+v", q)
 		if q.Qtype == dns.TypeA {
-			if ip, err := zone.MatchLocal(q.Name); err == nil {
+			if ip, err := zone.LookupLocal(q.Name); err == nil {
 				m := makeAddressReply(r, &q, []net.IP{ip})
 				w.WriteMsg(m)
 			} else {
@@ -80,7 +80,7 @@ func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 				ip4 := ip.To4()
 				revIP := []byte{ip4[3], ip4[2], ip4[1], ip4[0]}
 				Debug.Printf("Looking for address: %+v", revIP)
-				if name, err := zone.MatchLocalIP(revIP); err == nil {
+				if name, err := zone.ReverseLookupLocal(revIP); err == nil {
 					Debug.Printf("Found name: %s", name)
 					m := makePTRReply(r, &q, []string{name})
 					w.WriteMsg(m)
