@@ -11,17 +11,21 @@ type Record struct {
 	IP    net.IP
 }
 
+type MinSpace struct {
+	Start         net.IP
+	Size          uint32
+	Max_allocated uint32
+}
+
 type Space struct {
+	MinSpace
+	recs      []Record
+	free_list []net.IP
 	sync.RWMutex
-	start         net.IP
-	size          uint32
-	max_allocated uint32
-	recs          []Record
-	free_list     []net.IP
 }
 
 func NewSpace(start net.IP, size uint32) *Space {
-	return &Space{start: start, size: size, max_allocated: 0}
+	return &Space{MinSpace: MinSpace{Start: start, Size: size, Max_allocated: 0}}
 }
 
 func (space *Space) AllocateFor(ident string) net.IP {
@@ -31,9 +35,9 @@ func (space *Space) AllocateFor(ident string) net.IP {
 	if n := len(space.free_list); n > 0 {
 		ret = space.free_list[n-1]
 		space.free_list = space.free_list[:n-1]
-	} else if space.max_allocated < space.size {
-		space.max_allocated++
-		ret = Add(space.start, space.max_allocated-1)
+	} else if space.Max_allocated < space.Size {
+		space.Max_allocated++
+		ret = Add(space.Start, space.Max_allocated-1)
 	} else {
 		return nil
 	}
@@ -83,5 +87,5 @@ func (space *Space) DeleteRecordsFor(ident string) error {
 func (space *Space) String() string {
 	space.RLock()
 	defer space.RUnlock()
-	return fmt.Sprintf("Space allocator start %s, size %d, allocated %d, free %d", space.start, space.size, len(space.recs), len(space.free_list))
+	return fmt.Sprintf("Space allocator start %s, size %d, allocated %d, free %d", space.Start, space.Size, len(space.recs), len(space.free_list))
 }
