@@ -20,6 +20,8 @@ $ weave run 10.1.1.25/24 -ti -h pingme.weave.local ubuntu
 $ shell1=$(weave run --with-dns 10.1.1.26/24 -ti -h ubuntu.weave.local ubuntu)
 $ docker attach $shell1
 
+The DNS container can be stopped with `stop-dns`.
+
 # ping pingme
 ...
 ```

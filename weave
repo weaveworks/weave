@@ -16,6 +16,7 @@ usage() {
     echo "weave status"
     echo "weave version"
     echo "weave stop"
+    echo "weave stop-dns"
     echo "weave reset"
     echo
     echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>], and"
@@ -523,10 +524,15 @@ case "$COMMAND" in
         if ! docker kill $CONTAINER_NAME >/dev/null 2>&1 ; then
             echo "Weave is not running." >&2
         fi
-        docker kill  $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
-        docker rm -f $CONTAINER_NAME     >/dev/null 2>&1 || true
-        docker rm -f $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
+        docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
         check_command_and_run conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
+        ;;
+    stop-dns)
+        [ $# -eq 0 ] || usage
+        if ! docker kill $DNS_CONTAINER_NAME >/dev/null 2>&1 ; then
+            echo "WeaveDNS is not running." >&2
+        fi
+        docker rm -f $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         ;;
     reset)
         [ $# -eq 0 ] || usage
