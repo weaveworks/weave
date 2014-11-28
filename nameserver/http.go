@@ -45,29 +45,22 @@ func ListenHttp(domain string, db Zone, port int) {
 
 		switch r.Method {
 		case "PUT":
-			ident, weaveIPstr, err := parseUrl(r.URL.Path)
+			ident, ipStr, err := parseUrl(r.URL.Path)
 			name := r.FormValue("fqdn")
-			localIPstr := r.FormValue("local_ip")
-			if ident == "" || weaveIPstr == "" || name == "" || localIPstr == "" {
+			if ident == "" || ipStr == "" || name == "" {
 				reqError("Invalid request", "Invalid request: %s, %s", r.URL, r.Form)
 				return
 			}
 
-			localIP := net.ParseIP(localIPstr)
-			if localIP == nil {
-				reqError("Invalid IP in request", "Invalid IP in request: %s", localIPstr)
-				return
-			}
-
-			weaveIP := net.ParseIP(weaveIPstr)
-			if weaveIP == nil {
-				reqError("Invalid weave IP", "Invalid weave IP in request: %s", weaveIPstr)
+			ip := net.ParseIP(ipStr)
+			if ip == nil {
+				reqError("Invalid IP", "Invalid IP in request: %s", ipStr)
 				return
 			}
 
 			if dns.IsSubDomain(domain, name) {
-				Info.Printf("Adding %s (%s) -> %s", name, localIPstr, weaveIPstr)
-				if err = db.AddRecord(ident, name, localIP, weaveIP); err != nil {
+				Info.Printf("Adding %s -> %s", name, ipStr)
+				if err = db.AddRecord(ident, name, ip); err != nil {
 					if dup, ok := err.(DuplicateError); !ok {
 						httpErrorAndLog(
 							Error, w, "Internal error", http.StatusInternalServerError,
@@ -83,19 +76,19 @@ func ListenHttp(domain string, db Zone, port int) {
 			}
 
 		case "DELETE":
-			ident, weaveIPstr, err := parseUrl(r.URL.Path)
-			if ident == "" || weaveIPstr == "" {
+			ident, ipStr, err := parseUrl(r.URL.Path)
+			if ident == "" || ipStr == "" {
 				reqError("Invalid Request", "Invalid request: %s, %s", r.URL, r.Form)
 				return
 			}
 
-			weaveIP := net.ParseIP(weaveIPstr)
-			if weaveIP == nil {
-				reqError("Invalid IP in request", "Invalid IP in request: %s", weaveIPstr)
+			ip := net.ParseIP(ipStr)
+			if ip == nil {
+				reqError("Invalid IP in request", "Invalid IP in request: %s", ipStr)
 				return
 			}
-			Info.Printf("Deleting %s (%s)", ident, weaveIPstr)
-			if err = db.DeleteRecord(ident, weaveIP); err != nil {
+			Info.Printf("Deleting %s (%s)", ident, ipStr)
+			if err = db.DeleteRecord(ident, ip); err != nil {
 				if _, ok := err.(LookupError); !ok {
 					httpErrorAndLog(
 						Error, w, "Internal error", http.StatusInternalServerError,

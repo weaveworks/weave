@@ -7,18 +7,17 @@ import (
 )
 
 type Zone interface {
-	AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP) error
-	DeleteRecord(ident string, weaveIp net.IP) error
+	AddRecord(ident string, name string, ip net.IP) error
+	DeleteRecord(ident string, ip net.IP) error
 	DeleteRecordsFor(ident string) error
 	MatchLocal(name string) (net.IP, error)
 	MatchLocalIP(ip net.IP) (string, error)
 }
 
 type Record struct {
-	Ident   string
-	Name    string
-	LocalIP net.IP
-	WeaveIP net.IP
+	Ident string
+	Name  string
+	IP    net.IP
 }
 
 // Very simple data structure for now, with linear searching.
@@ -35,13 +34,13 @@ func (ops LookupError) Error() string {
 }
 
 type DuplicateError struct {
-	Name    string
-	WeaveIP net.IP
-	Ident   string
+	Name  string
+	IP    net.IP
+	Ident string
 }
 
 func (err DuplicateError) Error() string {
-	return "Duplicate " + err.Name + "," + err.WeaveIP.String() + " for identity " + err.Ident
+	return "Duplicate " + err.Name + "," + err.IP.String() + " for identity " + err.Ident
 }
 
 func (zone *ZoneDb) indexOf(match func(Record) bool) int {
@@ -58,7 +57,7 @@ func (zone *ZoneDb) MatchLocal(name string) (net.IP, error) {
 	defer zone.mx.RUnlock()
 	for _, r := range zone.recs {
 		if r.Name == name {
-			return r.WeaveIP, nil
+			return r.IP, nil
 		}
 	}
 	return nil, LookupError(name)
@@ -68,30 +67,30 @@ func (zone *ZoneDb) MatchLocalIP(ip net.IP) (string, error) {
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 	for _, r := range zone.recs {
-		if r.WeaveIP.Equal(ip) {
+		if r.IP.Equal(ip) {
 			return r.Name, nil
 		}
 	}
 	return "", LookupError(ip.String())
 }
 
-func (zone *ZoneDb) AddRecord(ident string, name string, localIP net.IP, weaveIP net.IP) error {
+func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	fqdn := dns.Fqdn(name)
 	if index := zone.indexOf(
-		func(r Record) bool { return r.Name == fqdn && r.WeaveIP.Equal(weaveIP) }); index != -1 {
-		return DuplicateError{fqdn, weaveIP, zone.recs[index].Ident}
+		func(r Record) bool { return r.Name == fqdn && r.IP.Equal(ip) }); index != -1 {
+		return DuplicateError{fqdn, ip, zone.recs[index].Ident}
 	}
-	zone.recs = append(zone.recs, Record{ident, fqdn, localIP, weaveIP})
+	zone.recs = append(zone.recs, Record{ident, fqdn, ip})
 	return nil
 }
 
-func (zone *ZoneDb) DeleteRecord(ident string, weaveIP net.IP) error {
+func (zone *ZoneDb) DeleteRecord(ident string, ip net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	if index := zone.indexOf(
-		func(r Record) bool { return r.Ident == ident && r.WeaveIP.Equal(weaveIP) }); index == -1 {
+		func(r Record) bool { return r.Ident == ident && r.IP.Equal(ip) }); index == -1 {
 		return LookupError(ident)
 	} else {
 		zone.recs = append(zone.recs[:index], zone.recs[index+1:]...)
