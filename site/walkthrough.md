@@ -104,6 +104,6 @@ names in it.
 root@:~# weave expose foo
 ````
 
-Note that this may in perform a subnet allocation, if the app name is
+Note that this may perform a subnet allocation, if the app name is
 presently unknown. It will also perform an IP allocation in that
 subnet since we need that for the masquerading setup.
