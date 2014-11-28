@@ -385,6 +385,17 @@ uname -s -r | sed -n 's|^\([^ ]*\) \([0-9]\+\)\.\([0-9]\+\).*|\1 \2 \3|p' | {
     fi
 }
 
+if ! DOCKER_VERSION=$(docker --version | sed -n 's|^Docker version \([0-9]\+\.[0-9]\+.[0-9]\+\),.*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
+    echo "ERROR: Unable to parse docker version" >&2
+    exit 1
+fi
+
+# guard against https://github.com/docker/docker/issues/8632
+if [ "$DOCKER_VERSION" = "1.3.0" ] ; then
+    echo "You are running Docker version $DOCKER_VERSION, which contains a bug that prevents weave from working properly. Please upgrade." >&2
+    exit 1
+fi
+
 case "$COMMAND" in
     launch)
         check_not_running $CONTAINER_NAME $IMAGE
@@ -404,7 +415,7 @@ case "$COMMAND" in
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
-        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@" | tail -n 1)
+        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@")
         with_container_netns $CONTAINER launch >/dev/null
         echo $CONTAINER
         ;;
@@ -415,7 +426,7 @@ case "$COMMAND" in
         check_not_running $DNS_CONTAINER_NAME $DNS_IMAGE
         create_bridge
         docker_bridge_ip
-        DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@" | tail -n 1)
+        DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@")
         with_container_netns $DNS_CONTAINER attach $CIDR >/dev/null
         populate_dns
         echo $DNS_CONTAINER
@@ -469,7 +480,7 @@ case "$COMMAND" in
         CIDR=$1
         shift 1
         create_bridge
-        CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@" | tail -n 1)
+        CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@")
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
