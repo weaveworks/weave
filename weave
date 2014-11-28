@@ -333,7 +333,7 @@ populate_dns() {
         echo "If running, it will not be pre-populated." >&2
     fi
 
-    for CONTAINER in $(docker ps -q); do
+    for CONTAINER in $(docker ps -q --no-trunc); do
         MORE_ARGS=$(docker inspect --format '--data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
         if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
             CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
