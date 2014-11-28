@@ -396,6 +396,10 @@ if [ "$DOCKER_VERSION" = "1.3.0" ] ; then
     exit 1
 fi
 
+DOCKER_VERSION_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f 1)
+DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
+DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
+
 case "$COMMAND" in
     launch)
         check_not_running $CONTAINER_NAME $IMAGE
@@ -463,6 +467,12 @@ case "$COMMAND" in
         [ $# -gt 0 ] || usage
         if [ "$1" = "--with-dns" ] ; then
             shift 1
+            if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
+                 \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
+                    "$DOCKER_VERSION_MINOR" -lt 2 \) ] ; then
+                echo "ERROR: The '--with-dns' option requires Docker 1.2.0 or later; you are running $DOCKER_VERSION" >&2
+                exit 1
+            fi
             docker_bridge_ip
             DNS_ARG="--dns $DOCKER_BRIDGE_IP"
             DNS_SEARCH_ARG="--dns-search=."
