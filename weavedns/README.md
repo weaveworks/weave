@@ -140,10 +140,6 @@ $ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.1.1.27"
  * The server will not know about restarted containers, but if you
    re-attach a restarted container to the weave network, it will be
    re-registered with weaveDNS.
- * The server will currently forget names if it is itself restarted,
-   and otherwise not know about containers running when it starts. In
-   the future it will look at existing container hostnames upon
-   starting up.
  * The server may give unreachable IPs as answers, since it doesn't
    try to filter by reachability. If you use subnets, align your
    hostnames with the subnets.
