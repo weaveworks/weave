@@ -11,8 +11,18 @@ import (
 type PeerSpace struct {
 	router.PeerName
 	version uint64
-	spaces  []MinSpace
+	spaces  []SpaceInfo
 	sync.RWMutex
+}
+
+func NewPeerSpace(pn router.PeerName) *PeerSpace {
+	return &PeerSpace{PeerName: pn}
+}
+
+func (s *PeerSpace) AddSpace(space SpaceInfo) {
+	s.Lock()
+	defer s.Unlock()
+	s.spaces = append(s.spaces, space)
 }
 
 func (s *PeerSpace) Encode() ([]byte, error) {
@@ -52,9 +62,10 @@ func (s *PeerSpace) DecodeUpdate(update []byte) error {
 	if err := decoder.Decode(&numSpaces); err != nil {
 		return err
 	}
-	s.spaces = make([]MinSpace, numSpaces)
+	s.spaces = make([]SpaceInfo, numSpaces)
 	for i := 0; i < numSpaces; i++ {
-		if err := decoder.Decode(&s.spaces[i]); err != nil {
+		s.spaces[i] = new(MinSpace)
+		if err := decoder.Decode(s.spaces[i]); err != nil {
 			return err
 		}
 	}

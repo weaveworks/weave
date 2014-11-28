@@ -11,10 +11,17 @@ type Record struct {
 	IP    net.IP
 }
 
+type SpaceInfo interface {
+	GetStart() net.IP
+	GetSize() uint32
+	GetMaxAllocated() uint32
+	Equal(SpaceInfo) bool
+}
+
 type MinSpace struct {
-	Start         net.IP
-	Size          uint32
-	Max_allocated uint32
+	Start        net.IP
+	Size         uint32
+	MaxAllocated uint32
 }
 
 type Space struct {
@@ -24,8 +31,26 @@ type Space struct {
 	sync.RWMutex
 }
 
+func (s *MinSpace) GetStart() net.IP {
+	return s.Start
+}
+
+func (s *MinSpace) GetSize() uint32 {
+	return s.Size
+}
+
+func (s *MinSpace) GetMaxAllocated() uint32 {
+	return s.MaxAllocated
+}
+
+func (ms1 *MinSpace) Equal(ms2 SpaceInfo) bool {
+	return ms1.GetStart().Equal(ms2.GetStart()) &&
+		ms1.GetSize() == ms2.GetSize() &&
+		ms1.GetMaxAllocated() == ms2.GetMaxAllocated()
+}
+
 func NewSpace(start net.IP, size uint32) *Space {
-	return &Space{MinSpace: MinSpace{Start: start, Size: size, Max_allocated: 0}}
+	return &Space{MinSpace: MinSpace{Start: start, Size: size, MaxAllocated: 0}}
 }
 
 func (space *Space) AllocateFor(ident string) net.IP {
@@ -35,9 +60,9 @@ func (space *Space) AllocateFor(ident string) net.IP {
 	if n := len(space.free_list); n > 0 {
 		ret = space.free_list[n-1]
 		space.free_list = space.free_list[:n-1]
-	} else if space.Max_allocated < space.Size {
-		space.Max_allocated++
-		ret = Add(space.Start, space.Max_allocated-1)
+	} else if space.MaxAllocated < space.Size {
+		space.MaxAllocated++
+		ret = Add(space.Start, space.MaxAllocated-1)
 	} else {
 		return nil
 	}
