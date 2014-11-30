@@ -90,10 +90,12 @@ func (peer *Peer) HasPathTo(target *Peer, symmetric bool) (bool, map[PeerName]bo
 				// made to that path during our calculation.
 				remote := conn.Remote()
 				remote.RLock()
-				defer remote.RUnlock()
 				if _, found := remote.connections[curPeer.Name]; !symmetric || found {
+					defer remote.RUnlock()
 					nextWorklist = append(nextWorklist, remote)
 					reached[remoteName] = true
+				} else {
+					remote.RUnlock()
 				}
 			}
 		}
