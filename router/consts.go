@@ -35,6 +35,7 @@ const (
 	ProtocolFetchAll               = iota
 	ProtocolUpdate                 = iota
 	ProtocolPMTUVerified           = iota
+	ProtocolGossip
 )
 
 var (

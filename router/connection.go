@@ -486,6 +486,8 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
+		} else if msg[0] == ProtocolGossip {
+			conn.Router.GossipDelegate.MergeRemoteState(msg[1:], false)
 		} else {
 			conn.log("received unknown msg:\n", msg)
 		}

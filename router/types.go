@@ -24,6 +24,27 @@ type Router struct {
 	ConnLimit          int
 	BufSz              int
 	LogFrame           func(string, []byte, *layers.Ethernet)
+	GossipDelegate     GossipDelegate
+}
+
+type GossipDelegate interface {
+	// NotifyMsg is called when a user-data message is received.
+	NotifyMsg([]byte)
+
+	// GetBroadcasts is called when user data messages can be broadcast.
+	GetBroadcasts(overhead, limit int) [][]byte
+
+	// LocalState is used for a TCP Push/Pull. This is sent to
+	// the remote side in addition to the membership information. Any
+	// data can be sent here. See MergeRemoteState as well. The `join`
+	// boolean indicates this is for a join instead of a push/pull.
+	LocalState(join bool) []byte
+
+	// MergeRemoteState is invoked after a TCP Push/Pull. This is the
+	// state received from the remote side and is the result of the
+	// remote side's LocalState call. The 'join'
+	// boolean indicates this is for a join instead of a push/pull.
+	MergeRemoteState(buf []byte, join bool)
 }
 
 type Peer struct {

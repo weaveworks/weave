@@ -282,6 +282,10 @@ func (peer *Peer) BroadcastTCP(msg []byte) {
 		payload:     msg}
 }
 
+func (peer *Peer) Gossip(msg []byte) {
+	peer.BroadcastTCP(Concat([]byte{ProtocolGossip}, msg))
+}
+
 // ACTOR server
 
 func (peer *Peer) queryLoop(queryChan <-chan *PeerInteraction) {
@@ -391,12 +395,15 @@ func (peer *Peer) handleConnectionEstablished(conn *LocalConnection) {
 func (peer *Peer) handleBroadcastTCP(msg []byte) {
 	peer.Router.Topology.RebuildRoutes()
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
+		log.Println("about to gossip", len(msg), "bytes on", conn)
 		conn.(*LocalConnection).SendTCP(msg)
 	})
 }
 
 func (peer *Peer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.handleBroadcastTCP(Concat(ProtocolUpdateByte, EncodePeers(append(peers, peer)...)))
+	buf := peer.Router.GossipDelegate.LocalState(false)
+	peer.handleBroadcastTCP(Concat([]byte{ProtocolGossip}, buf))
 }
 
 func (peer *Peer) checkConnectionLimit() error {
