@@ -1,8 +1,8 @@
 package router
 
 import (
-	"time"
 	"math"
+	"time"
 )
 
 const (
