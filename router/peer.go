@@ -115,8 +115,8 @@ func (peer *Peer) Routes(stopAt *Peer, symmetric bool) (bool, map[PeerName]PeerN
 					defer remote.RUnlock()
 					nextWorklist = append(nextWorklist, remote)
 					// We now know how to get to remoteName: the same
-					// way we get to curPeer. Except, if curPeer the
-					// starting peer in which case we know we can
+					// way we get to curPeer. Except, if curPeer is
+					// the starting peer in which case we know we can
 					// reach remoteName directly.
 					if curPeer == peer {
 						routes[remoteName] = remoteName
