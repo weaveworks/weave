@@ -8,6 +8,7 @@ import (
 	"github.com/davecheney/profile"
 	weavenet "github.com/zettio/weave/net"
 	weave "github.com/zettio/weave/router"
+	"github.com/zettio/weave/sortinghat"
 	"io"
 	"log"
 	"net"
@@ -106,13 +107,20 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	go handleHttp(router)
+	peerSpace := sortinghat.NewPeerSpace(ourName)
+	startAddr := "10.0.1.0"
+	poolSize := 256
+	space := sortinghat.NewSpace(net.ParseIP(startAddr), uint32(poolSize))
+	peerSpace.AddSpace(space)
+	router.GossipDelegate = peerSpace
+	go handleHttp(router, space)
 	handleSignals(router)
 }
 
-func handleHttp(router *weave.Router) {
+func handleHttp(router *weave.Router, space *sortinghat.Space) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, router.Status())
+		io.WriteString(w, fmt.Sprintln(space))
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")
@@ -122,6 +130,7 @@ func handleHttp(router *weave.Router) {
 			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
 		}
 	})
+	sortinghat.HttpHandleIP(space)
 	address := fmt.Sprintf(":%d", weave.HttpPort)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
