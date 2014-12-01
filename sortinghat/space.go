@@ -15,6 +15,7 @@ type SpaceInfo interface {
 	GetStart() net.IP
 	GetSize() uint32
 	GetMaxAllocated() uint32
+	GetMinSpace() *MinSpace
 	Equal(SpaceInfo) bool
 }
 
@@ -29,6 +30,10 @@ type Space struct {
 	recs      []Record
 	free_list []net.IP
 	sync.RWMutex
+}
+
+func (s *MinSpace) GetMinSpace() *MinSpace {
+	return s
 }
 
 func (s *MinSpace) GetStart() net.IP {

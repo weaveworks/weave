@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/zettio/weave/router"
+	"log"
 	"sync"
 )
 
@@ -40,7 +41,7 @@ func (s *PeerSpace) Encode() ([]byte, error) {
 		return nil, err
 	}
 	for _, space := range s.spaces {
-		if err := enc.Encode(space); err != nil {
+		if err := enc.Encode(space.GetMinSpace()); err != nil {
 			return nil, err
 		}
 	}
@@ -80,19 +81,24 @@ func (s *PeerSpace) String() string {
 
 // GossipDelegate methods
 func (s *PeerSpace) NotifyMsg(msg []byte) {
-	fmt.Printf("NotifyMsg: %+v", msg)
+	log.Printf("NotifyMsg: %+v\n", msg)
 }
 
 func (s *PeerSpace) GetBroadcasts(overhead, limit int) [][]byte {
-	fmt.Printf("GetBroadcasts: %d %d", overhead, limit)
+	log.Printf("GetBroadcasts: %d %d\n", overhead, limit)
 	return nil
 }
 
 func (s *PeerSpace) LocalState(join bool) []byte {
-	fmt.Printf("LocalState: %t", join)
-	return []byte("something")
+	log.Printf("LocalState: %t\n", join)
+	if buf, err := s.Encode(); err == nil {
+		return buf
+	} else {
+		log.Println("Error", err)
+	}
+	return nil
 }
 
 func (s *PeerSpace) MergeRemoteState(buf []byte, join bool) {
-	fmt.Printf("MergeRemoteState: %t %+v", join, buf)
+	log.Printf("MergeRemoteState: %t %+v\n", join, buf)
 }
