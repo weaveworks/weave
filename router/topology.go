@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"sort"
 )
 
 func (topo *Topology) Unicast(name PeerName) (PeerName, bool) {
@@ -97,69 +96,45 @@ func (topo *Topology) queryLoop(queryChan <-chan *Interaction) {
 	}
 }
 
+// Calculate all the routes for the question: if *we* want to send a
+// packet to Peer X, what is the next hop?
+//
+// When we sniff a packet, we determine the destination peer
+// ourself. Consequently, we can relay the packet via any
+// arbitrary peers - the intermediate peers do not have to have
+// any knowledge of the MAC address at all. Thus there's no need
+// to exchange knowledge of MAC addresses, nor any constraints on
+// the routes that we construct.
 func (topo *Topology) buildUnicastRoutes() map[PeerName]PeerName {
-	// He we are calculating all the routes for the question: if *we*
-	// want to send a packet to Peer X, what is the next hop?
-	//
-	// When we sniff a packet, we determine the destination peer
-	// ourself. Consequently, we can relay the packet via any
-	// arbitrary peers - the intermediate peers do not have to have
-	// any knowledge of the MAC address at all. Thus there's no need
-	// to exchange knowledge of MAC addresses, nor any constraints on
-	// the routes that we construct.
-	//
-	// Because currently we do not have weightings on the connections
-	// between peers, there is no need to use Dijkstra's
-	// algorithm. Instead, we can use the simpler and cheaper
-	// breadth-first widening.
-	//
-	// Currently we make no attempt to perform any balancing of any
-	// sort. That could happen in the future.
-
-	unicast := make(map[PeerName]PeerName)
-	ourself := topo.router.Ourself
-	unicast[ourself.Name] = UnknownPeerName
-	nextWorklist := []*Peer{}
-	ourself.ForEachConnection(func(remoteName PeerName, conn Connection) {
-		unicast[remoteName] = remoteName
-		nextWorklist = append(nextWorklist, conn.Remote())
-	})
-	for len(nextWorklist) > 0 {
-		worklist := nextWorklist
-		sort.Sort(ListOfPeers(worklist))
-		nextWorklist = []*Peer{}
-		for _, peer := range worklist {
-			localName := peer.Name
-			peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
-				if _, found := unicast[remoteName]; found {
-					return
-				}
-				// We now know how to get to remoteName: the same
-				// way we get to peer. However, we only record this as
-				// a valid path if remoteName has peer in its
-				// connections. I.e. it must be a symmetric
-				// connection.
-				if _, found := conn.Remote().ConnectionTo(localName); found {
-					unicast[remoteName] = unicast[localName]
-					nextWorklist = append(nextWorklist, conn.Remote())
-				}
-			})
-		}
-	}
-	return unicast
+	_, routes := topo.router.Ourself.Routes(nil, true)
+	return routes
 }
 
+// Calculate all the routes for the question: if we receive a
+// broadcast originally from Peer X, which peers should we pass the
+// frames on to?
+//
+// When the topology is stable, and thus all peers perform route
+// calculations based on the same data, the algorithm ensures that
+// broadcasts reach every peer exactly once.
+//
+// This is largely due to properties of the Peer.Routes algorithm. In
+// particular:
+//
+// ForAll X,Y,Z in Peers.
+//     X.Routes(Y) <= X.Routes(Z) \/
+//     X.Routes(Z) <= X.Routes(Y)
+// ForAll X,Y,Z in Peers.
+//     Y =/= Z /\ X.Routes(Y) <= X.Routes(Z) =>
+//     X.Routes(Y) u [P | Y.HasSymmetricConnectionTo(P)] <= X.Routes(Z)
+// where <= is the subset relationship on keys of the returned map.
 func (topo *Topology) buildBroadcastRoutes() map[PeerName][]PeerName {
-	// For broadcast, we need to construct which of our connected
-	// peers we should pass frames on to should we receive any
-	// broadcast originally from peer X
 	broadcast := make(map[PeerName][]PeerName)
 	ourself := topo.router.Ourself
 
 	topo.router.Peers.ForEach(func(name PeerName, peer *Peer) {
 		hops := []PeerName{}
-		found, reached := peer.HasPathTo(ourself, true)
-		if found {
+		if found, reached := peer.Routes(ourself, true); found {
 			ourself.ForEachConnection(func(remoteName PeerName, conn Connection) {
 				if _, found := reached[remoteName]; found {
 					return

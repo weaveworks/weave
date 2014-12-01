@@ -131,7 +131,7 @@ func (cache *PeerCache) fetchAlias(peer *Peer) (*Peer, bool) {
 func (cache *PeerCache) garbageCollect(ourself *Peer) []*Peer {
 	removed := []*Peer{}
 	for name, peer := range cache.table {
-		found, _ := ourself.HasPathTo(peer, false)
+		found, _ := ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
 			cache.onGC(peer)
 			delete(cache.table, name)
