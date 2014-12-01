@@ -18,15 +18,21 @@ func assertStatus(t *testing.T, got int, wanted int, desc string) {
 }
 
 func assertErrorInterface(t *testing.T, got interface{}, wanted interface{}, desc string) {
+	if got == nil {
+		t.Fatalf("Expected %s but got nil", reflect.TypeOf(wanted).Elem())
+	}
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
 	if !gotT.Implements(wantedT) {
-		t.Fatalf("Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
+		t.Fatalf("Expected %s but got %s (%s)", wantedT, gotT, desc)
 	}
 }
 
 func assertErrorType(t *testing.T, got interface{}, wanted interface{}, desc string) {
+	if got == nil {
+		t.Fatalf("Expected %s but got nil", reflect.TypeOf(wanted).Elem())
+	}
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
 	if gotT != wantedT {
-		t.Fatalf("Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
+		t.Fatalf("Expected %s but got %s (%s)", wantedT, gotT, desc)
 	}
 }
