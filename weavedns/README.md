@@ -151,6 +151,6 @@ $ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.1.1.27"
  * The server may give unreachable IPs as answers, since it doesn't
    try to filter by reachability. If you use subnets, align your
    hostnames with the subnets.
- * We use UDP multicast to find out about remote names (from Weave DNS
+ * We use UDP multicast to find out about remote names (from weaveDNS
    servers on other hosts); this likely won't scale well beyond a
    certain point T.B.D., so we'll have to come up with another scheme.
