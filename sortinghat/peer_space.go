@@ -79,6 +79,17 @@ func (s *PeerSpace) String() string {
 	return fmt.Sprint("PeerSpace ", s.PeerName, " (v", s.version, ") (spaces: ", len(s.spaces), ") (1st: ", s.spaces[0], ")")
 }
 
+func (s *PeerSpace) NumFreeAddresses() uint32 {
+	freeAddresses := 0
+	for _, space := range s.spaces {
+		freeAddresses += space.NumFreeAddresses()
+	}
+	return freeAddresses
+}
+
+func (s *PeerSpace) ConsiderOurPosition() {
+}
+
 // GossipDelegate methods
 func (s *PeerSpace) NotifyMsg(msg []byte) {
 	log.Printf("NotifyMsg: %+v\n", msg)
@@ -101,4 +112,7 @@ func (s *PeerSpace) LocalState(join bool) []byte {
 
 func (s *PeerSpace) MergeRemoteState(buf []byte, join bool) {
 	log.Printf("MergeRemoteState: %t %+v\n", join, buf)
+	s.DecodeUpdate(buf)
 }
+
+//FIXME: do we need a data structure that is a set of Peer Spaces ?

@@ -16,6 +16,7 @@ type SpaceInfo interface {
 	GetSize() uint32
 	GetMaxAllocated() uint32
 	GetMinSpace() *MinSpace
+	NumFreeAddresses() uint32
 	Equal(SpaceInfo) bool
 }
 
@@ -46,6 +47,10 @@ func (s *MinSpace) GetSize() uint32 {
 
 func (s *MinSpace) GetMaxAllocated() uint32 {
 	return s.MaxAllocated
+}
+
+func (s *MinSpace) NumFreeAddresses() uint32 {
+	return s.Size - len(recs) + len(free_list)
 }
 
 func (ms1 *MinSpace) Equal(ms2 SpaceInfo) bool {

@@ -108,19 +108,22 @@ func main() {
 		}
 	}
 	peerSpace := sortinghat.NewPeerSpace(ourName)
-	startAddr := "10.0.1.0"
-	poolSize := 256
-	space := sortinghat.NewSpace(net.ParseIP(startAddr), uint32(poolSize))
-	peerSpace.AddSpace(space)
+	if len(peers) == 0 {
+		startAddr := "10.0.1.0"
+		poolSize := 256
+		space := sortinghat.NewSpace(net.ParseIP(startAddr), uint32(poolSize))
+		peerSpace.AddSpace(space)
+		sortinghat.HttpHandleIP(space)
+	}
 	router.GossipDelegate = peerSpace
-	go handleHttp(router, space)
+	go handleHttp(router, peerSpace)
 	handleSignals(router)
 }
 
-func handleHttp(router *weave.Router, space *sortinghat.Space) {
+func handleHttp(router *weave.Router, ps *sortinghat.PeerSpace) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, router.Status())
-		io.WriteString(w, fmt.Sprintln(space))
+		io.WriteString(w, fmt.Sprintln(ps))
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")
@@ -130,7 +133,6 @@ func handleHttp(router *weave.Router, space *sortinghat.Space) {
 			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
 		}
 	})
-	sortinghat.HttpHandleIP(space)
 	address := fmt.Sprintf(":%d", weave.HttpPort)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
