@@ -55,26 +55,31 @@ func TestHttp(t *testing.T) {
 	assertNoErr(t, err)
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http success response for duplicate add")
 
-	// Now try adding the same address again with a different ident - should fail
+	// Now try adding the same address again with a different ident --
+	// again should be fine
 	otherUrl := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addrParts[0])
 	resp, err = genForm("PUT", otherUrl,
 		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
 	assertNoErr(t, err)
-	assertStatus(t, resp.StatusCode, http.StatusConflict, "http response")
+	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Delete the address
 	resp, err = genForm("DELETE", addrUrl, nil)
 	assertNoErr(t, err)
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
-	// Check that the address is not there now.
+	// Check that the address is still resolvable.
 	_, err = zone.LookupLocal(successTestName)
-	assertErrorType(t, err, (*LookupError)(nil), "nonexistent lookup")
+	assertNoErr(t, err)
 
-	// Delete the address again, it should accept this
-	resp, err = genForm("DELETE", addrUrl, nil)
+	// Delete the address record mentioning the other container
+	resp, err = genForm("DELETE", otherUrl, nil)
 	assertNoErr(t, err)
 	assertStatus(t, resp.StatusCode, http.StatusOK, "http response")
+
+	// Check that the address is gone
+	_, err = zone.LookupLocal(successTestName)
+	assertErrorType(t, err, (*LookupError)(nil), "fully-removed address")
 
 	// Would like to shut down the http server at the end of this test
 	// but it's complicated.

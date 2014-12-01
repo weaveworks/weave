@@ -34,13 +34,10 @@ func (ops LookupError) Error() string {
 }
 
 type DuplicateError struct {
-	Name  string
-	IP    net.IP
-	Ident string
 }
 
-func (err DuplicateError) Error() string {
-	return "Duplicate " + err.Name + "," + err.IP.String() + " for identity " + err.Ident
+func (dup DuplicateError) Error() string {
+	return "Tried to add a duplicate entry"
 }
 
 func (zone *ZoneDb) indexOf(match func(Record) bool) int {
@@ -79,8 +76,10 @@ func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) error {
 	defer zone.mx.Unlock()
 	fqdn := dns.Fqdn(name)
 	if index := zone.indexOf(
-		func(r Record) bool { return r.Name == fqdn && r.IP.Equal(ip) }); index != -1 {
-		return DuplicateError{fqdn, ip, zone.recs[index].Ident}
+		func(r Record) bool {
+			return r.Name == fqdn && r.IP.Equal(ip) && r.Ident == ident
+		}); index != -1 {
+		return DuplicateError{}
 	}
 	zone.recs = append(zone.recs, Record{ident, fqdn, ip})
 	return nil
@@ -90,7 +89,9 @@ func (zone *ZoneDb) DeleteRecord(ident string, ip net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	if index := zone.indexOf(
-		func(r Record) bool { return r.Ident == ident && r.IP.Equal(ip) }); index == -1 {
+		func(r Record) bool {
+			return r.Ident == ident && r.IP.Equal(ip)
+		}); index == -1 {
 		return LookupError(ident)
 	} else {
 		zone.recs = append(zone.recs[:index], zone.recs[index+1:]...)

@@ -61,15 +61,12 @@ func ListenHttp(domain string, db Zone, port int) {
 			if dns.IsSubDomain(domain, name) {
 				Info.Printf("Adding %s -> %s", name, ipStr)
 				if err = db.AddRecord(ident, name, ip); err != nil {
-					if dup, ok := err.(DuplicateError); !ok {
+					if _, ok := err.(DuplicateError); !ok {
 						httpErrorAndLog(
 							Error, w, "Internal error", http.StatusInternalServerError,
 							"Unexpected error from DB: %s", err)
 						return
-					} else if dup.Ident != ident {
-						http.Error(w, err.Error(), http.StatusConflict)
-						return
-					} // else we are golden
+					} // oh, I already know this. whatever.
 				}
 			} else {
 				Info.Printf("Ignoring name %s, not in %s", name, domain)
