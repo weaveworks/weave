@@ -99,7 +99,7 @@ func (lop ListOfPeers) Swap(i, j int) {
 	lop[i], lop[j] = lop[j], lop[i]
 }
 func (lop ListOfPeers) Less(i, j int) bool {
-	return lop[i].Name < lop[i].Name
+	return lop[i].Name < lop[j].Name
 }
 
 // given an address like '1.2.3.4:567', return the address if it has a port,
