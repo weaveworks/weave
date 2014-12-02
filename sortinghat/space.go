@@ -50,7 +50,7 @@ func (s *MinSpace) GetMaxAllocated() uint32 {
 }
 
 func (s *MinSpace) NumFreeAddresses() uint32 {
-	return s.Size - len(recs) + len(free_list)
+	return s.Size - s.MaxAllocated
 }
 
 func (ms1 *MinSpace) Equal(ms2 SpaceInfo) bool {
@@ -117,6 +117,10 @@ func (space *Space) DeleteRecordsFor(ident string) error {
 	}
 	space.recs = space.recs[:w]
 	return nil
+}
+
+func (s *Space) NumFreeAddresses() uint32 {
+	return s.Size - uint32(len(s.recs)) + uint32(len(s.free_list))
 }
 
 func (space *Space) String() string {

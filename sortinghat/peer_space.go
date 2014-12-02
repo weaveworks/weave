@@ -80,7 +80,7 @@ func (s *PeerSpace) String() string {
 }
 
 func (s *PeerSpace) NumFreeAddresses() uint32 {
-	freeAddresses := 0
+	var freeAddresses uint32 = 0
 	for _, space := range s.spaces {
 		freeAddresses += space.NumFreeAddresses()
 	}
