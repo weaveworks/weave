@@ -7,9 +7,10 @@ import (
 
 func TestZone(t *testing.T) {
 	var (
-		containerID     = "deadbeef"
-		successTestName = "test1.weave."
-		testAddr1       = "10.0.2.1/24"
+		containerID      = "deadbeef"
+		otherContainerID = "cowjuice"
+		successTestName  = "test1.weave."
+		testAddr1        = "10.0.2.1/24"
 	)
 
 	var zone = new(ZoneDb)
@@ -40,12 +41,18 @@ func TestZone(t *testing.T) {
 		t.Fatal("Unexpected result for", ip, foundName)
 	}
 
-	// Now try to add the same address again
 	err = zone.AddRecord(containerID, successTestName, ip)
 	assertErrorType(t, err, (*DuplicateError)(nil), "duplicate add")
 
-	// Now delete the record
+	err = zone.AddRecord(otherContainerID, successTestName, ip)
+	// Delete the record for the original container
 	err = zone.DeleteRecord(containerID, ip)
+	assertNoErr(t, err)
+
+	_, err = zone.LookupLocal(successTestName)
+	assertNoErr(t, err)
+
+	err = zone.DeleteRecord(otherContainerID, ip)
 	assertNoErr(t, err)
 
 	// Check that the address is not there now.
@@ -59,10 +66,10 @@ func TestZone(t *testing.T) {
 
 func TestDeleteFor(t *testing.T) {
 	var (
-		id       = "foobar"
-		name     = "foo.weave."
-		addr1    = "10.1.2.3/24"
-		addr2    = "10.2.7.8/24"
+		id    = "foobar"
+		name  = "foo.weave."
+		addr1 = "10.1.2.3/24"
+		addr2 = "10.2.7.8/24"
 	)
 	zone := new(ZoneDb)
 	for _, addr := range []string{addr1, addr2} {
