@@ -487,11 +487,28 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else if msg[0] == ProtocolGossipUnicast {
-			// FIXME: if it's not for me, pass it on
-			conn.Router.GossipDelegate.NotifyMsg(msg[1:])
+			if msg[1] == GossipVersion {
+				srcNameLen := msg[2]
+				srcName := PeerNameFromBin(msg[3 : 3+srcNameLen])
+				destNameLen := msg[3+srcNameLen]
+				destName := PeerNameFromBin(msg[4+srcNameLen : 4+srcNameLen+destNameLen])
+				if conn.local.Name == destName {
+					conn.Router.GossipDelegate.NotifyMsg(msg[1:])
+				} else {
+					conn.local.RelayGossipTo(srcName, destName, msg)
+				}
+			} else {
+				conn.log("received gossip msg at unsupported version:\n", msg)
+			}
 		} else if msg[0] == ProtocolGossipBroadcast {
-			conn.Router.GossipDelegate.MergeRemoteState(msg[1:], false)
-			conn.local.RelayGossip(conn.local, msg) // FIXME: where did it originate?
+			if msg[1] == GossipVersion {
+				srcNameLen := msg[2]
+				srcName := PeerNameFromBin(msg[3 : 3+srcNameLen])
+				conn.Router.GossipDelegate.MergeRemoteState(msg[3+srcNameLen:], false)
+				conn.local.RelayGossip(srcName, msg)
+			} else {
+				conn.log("received gossip msg at unsupported version:\n", msg)
+			}
 		} else {
 			conn.log("received unknown msg:\n", msg)
 		}
