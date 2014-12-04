@@ -72,7 +72,7 @@ func (space *Space) AllocateFor(ident string) net.IP {
 		space.free_list = space.free_list[:n-1]
 	} else if space.MaxAllocated < space.Size {
 		space.MaxAllocated++
-		ret = Add(space.Start, space.MaxAllocated-1)
+		ret = add(space.Start, space.MaxAllocated-1)
 	} else {
 		return nil
 	}
@@ -80,26 +80,43 @@ func (space *Space) AllocateFor(ident string) net.IP {
 	return ret
 }
 
-func (space *Space) Free(addr net.IP) {
+func (space *Space) Free(addr net.IP) bool {
+	diff := subtract(addr, space.Start)
+	if diff < 0 || diff >= int64(space.Size) {
+		return false
+	}
 	space.Lock()
 	space.free_list = append(space.free_list, addr)
 	// TODO: consolidate free space
 	space.Unlock()
+	return true
+}
+
+func ip4int(ip4 net.IP) (r uint32) {
+	for _, b := range ip4.To4() {
+		r <<= 8
+		r |= uint32(b)
+	}
+	return
+}
+
+func intip4(key uint32) (r net.IP) {
+	r = make([]byte, net.IPv4len)
+	for i := 3; i >= 0; i-- {
+		r[i] = byte(key)
+		key >>= 8
+	}
+	return
 }
 
 // IPv4 Address Arithmetic - convert to 32-bit unsigned integer, add, and convert back
-func Add(addr net.IP, i uint32) net.IP {
-	ip := addr.To4()
-	if ip == nil {
-		return nil
-	}
-	sum := (uint32(ip[0]) << 24) + (uint32(ip[1]) << 16) + (uint32(ip[2]) << 8) + uint32(ip[3]) + i
-	p := make(net.IP, net.IPv4len)
-	p[0] = byte(sum >> 24)
-	p[1] = byte((sum & 0xffffff) >> 16)
-	p[2] = byte((sum & 0xffff) >> 8)
-	p[3] = byte(sum & 0xff)
-	return p
+func add(addr net.IP, i uint32) net.IP {
+	sum := ip4int(addr) + i
+	return intip4(sum)
+}
+
+func subtract(a, b net.IP) int64 {
+	return int64(ip4int(a)) - int64(ip4int(b))
 }
 
 func (space *Space) DeleteRecordsFor(ident string) error {
@@ -120,6 +137,8 @@ func (space *Space) DeleteRecordsFor(ident string) error {
 }
 
 func (s *Space) NumFreeAddresses() uint32 {
+	s.RLock()
+	defer s.RUnlock()
 	return s.Size - uint32(len(s.recs)) + uint32(len(s.free_list))
 }
 
