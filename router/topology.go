@@ -56,6 +56,7 @@ func StartTopology(router *Router) *Topology {
 const (
 	TFetchAll      = iota
 	TRebuildRoutes = iota
+	TSync
 )
 
 func (topo *Topology) FetchAll() []byte {
@@ -65,6 +66,14 @@ func (topo *Topology) FetchAll() []byte {
 		resultChan: resultChan}
 	result := <-resultChan
 	return result.([]byte)
+}
+
+func (topo *Topology) Sync() {
+	resultChan := make(chan interface{}, 0)
+	topo.queryChan <- &Interaction{
+		code:       TSync,
+		resultChan: resultChan}
+	<-resultChan
 }
 
 // Async.
@@ -90,6 +99,8 @@ func (topo *Topology) queryLoop(queryChan <-chan *Interaction) {
 			topo.Unlock()
 		case TFetchAll:
 			query.resultChan <- topo.router.Peers.EncodeAllPeers()
+		case TSync:
+			query.resultChan <- true // no action: just serves to sync up
 		default:
 			log.Fatal("Unexpected topology query:", query)
 		}

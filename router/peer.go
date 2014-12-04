@@ -238,19 +238,26 @@ func (peer *Peer) GossipBroadcastOn(conn *LocalConnection, buf []byte) {
 	conn.SendTCP(msg)
 }
 
-func (peer *Peer) GossipSendTo(dstPeer *Peer, buf []byte) error {
-	log.Println("GossipSendTo", len(buf), "bytes to", dstPeer)
-	peerName := peer.Name.Bin()
-	nameLenByte := []byte{byte(len(peerName))}
-	msg := Concat([]byte{ProtocolGossipUnicast}, []byte{GossipVersion}, nameLenByte, peerName, buf)
-	return peer.RelayGossipTo(peer.Name, dstPeer.Name, msg)
+func (peer *Peer) GossipSendTo(dstPeerName PeerName, buf []byte) error {
+	log.Println("GossipSendTo", len(buf), "bytes to", dstPeerName)
+	srcPeerByte := peer.Name.Bin()
+	nameLenByte := []byte{byte(len(srcPeerByte))}
+	dstPeerByte := dstPeerName.Bin()
+	dstNameLenByte := []byte{byte(len(dstPeerByte))}
+	msg := Concat([]byte{ProtocolGossipUnicast}, []byte{GossipVersion}, nameLenByte, srcPeerByte, dstNameLenByte, dstPeerByte, buf)
+	return peer.RelayGossipTo(peer.Name, dstPeerName, msg)
 }
 
 func (peer *Peer) RelayGossipTo(srcPeerName, dstPeerName PeerName, msg []byte) error {
 	relayPeerName, found := peer.Router.Topology.Unicast(dstPeerName)
 	if !found {
-		log.Println("Received gossip for unknown destination:", dstPeerName)
-		return nil
+		peer.Router.Topology.RebuildRoutes()
+		peer.Router.Topology.Sync()
+		relayPeerName, found = peer.Router.Topology.Unicast(dstPeerName)
+		if !found {
+			log.Println("Cannot relay gossip for unknown destination:", dstPeerName)
+			return nil
+		}
 	}
 	conn, found := peer.ConnectionTo(relayPeerName)
 	if !found {
