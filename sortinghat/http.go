@@ -25,12 +25,12 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf(logmsg, logargs...)
 }
 
-func HttpHandleIP(space *Space) {
+func (alloc *Allocator) HandleHttp() {
 	http.HandleFunc("/ip/", func(w http.ResponseWriter, r *http.Request) {
 		ident, err := parseUrl(r.URL.Path)
 		if err != nil {
 			httpErrorAndLog(Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
-		} else if newAddr := space.AllocateFor(ident); newAddr != nil {
+		} else if newAddr := alloc.AllocateFor(ident); newAddr != nil {
 			io.WriteString(w, newAddr.String())
 		} else {
 			httpErrorAndLog(
@@ -40,11 +40,11 @@ func HttpHandleIP(space *Space) {
 	})
 }
 
-func ListenHttp(port int, space *Space) {
+func ListenHttp(port int, alloc *Allocator) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, fmt.Sprintln(space))
+		io.WriteString(w, fmt.Sprintln(alloc))
 	})
-	HttpHandleIP(space)
+	alloc.HandleHttp()
 
 	address := fmt.Sprintf(":%d", port)
 	if err := http.ListenAndServe(address, nil); err != nil {

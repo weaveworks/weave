@@ -2,6 +2,7 @@ package sortinghat
 
 import (
 	"fmt"
+	"github.com/zettio/weave/router"
 	wt "github.com/zettio/weave/testing"
 	"io/ioutil"
 	"math/rand"
@@ -27,10 +28,11 @@ func TestHttp(t *testing.T) {
 		testAddr1   = "10.0.3.4"
 	)
 
-	space := NewSpace(net.ParseIP(testAddr1), 3)
+	ourName, _ := router.PeerNameFromString("08:00:27:01:c3:9a")
+	alloc := NewAllocator(ourName, nil, net.ParseIP(testAddr1), 3)
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
-	go ListenHttp(port, space)
+	go ListenHttp(port, alloc)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
@@ -47,7 +49,7 @@ func TestHttp(t *testing.T) {
 	}
 
 	// Now free the first one, and we should get it back when we ask
-	space.Free(net.ParseIP(addr1))
+	alloc.Free(net.ParseIP(addr1))
 	addr3 := HttpGet(t, fmt.Sprintf("http://localhost:%d/ip/%s", port, container2))
 	if addr3 != testAddr1 {
 		t.Fatalf("Expected address %s but got %s", testAddr1, addr1)
