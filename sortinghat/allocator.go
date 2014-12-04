@@ -15,9 +15,10 @@ const (
 
 type Allocator struct {
 	sync.RWMutex
-	ourName   router.PeerName
-	gossip    router.GossipCommsProvider
-	spacesets map[router.PeerName]*PeerSpace
+	ourName     router.PeerName
+	gossip      router.GossipCommsProvider
+	spacesets   map[router.PeerName]*PeerSpace
+	ourSpaceSet *PeerSpace
 }
 
 func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, startAddr net.IP, poolSize int) *Allocator {
@@ -27,9 +28,10 @@ func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, st
 	}
 
 	return &Allocator{
-		gossip:    gossip,
-		ourName:   ourName,
-		spacesets: map[router.PeerName]*PeerSpace{ourName: peerSpace},
+		gossip:      gossip,
+		ourName:     ourName,
+		spacesets:   map[router.PeerName]*PeerSpace{ourName: peerSpace},
+		ourSpaceSet: peerSpace,
 	}
 }
 
@@ -77,8 +79,7 @@ func (alloc *Allocator) ConsiderOurPosition() {
 	// Rule: if we have no IP space, pick the peer with the most available space and request some
 	alloc.RLock()
 	defer alloc.RUnlock()
-	ourSpaceSet := alloc.spacesets[alloc.ourName]
-	if ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
+	if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
 		var best *PeerSpace = nil
 		var bestNumFree uint32 = 0
 		for _, spaceset := range alloc.spacesets {
@@ -94,17 +95,11 @@ func (alloc *Allocator) ConsiderOurPosition() {
 }
 
 func (alloc *Allocator) AllocateFor(ident string) net.IP {
-	alloc.Lock()
-	ourSpaceSet := alloc.spacesets[alloc.ourName]
-	alloc.Unlock()
-	return ourSpaceSet.AllocateFor(ident)
+	return alloc.ourSpaceSet.AllocateFor(ident)
 }
 
 func (alloc *Allocator) Free(addr net.IP) error {
-	alloc.Lock()
-	ourSpaceSet := alloc.spacesets[alloc.ourName]
-	alloc.Unlock()
-	return ourSpaceSet.Free(addr)
+	return alloc.ourSpaceSet.Free(addr)
 }
 
 func (alloc *Allocator) String() string {
