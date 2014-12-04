@@ -10,12 +10,18 @@ import (
 	"testing"
 )
 
+func equal(ms1 SpaceInfo, ms2 SpaceInfo) bool {
+	return ms1.GetStart().Equal(ms2.GetStart()) &&
+		ms1.GetSize() == ms2.GetSize() &&
+		ms1.GetMaxAllocated() == ms2.GetMaxAllocated()
+}
+
 func (ps1 *PeerSpace) Equal(ps2 *PeerSpace) bool {
 	if ps1.PeerName == ps2.PeerName &&
 		ps1.version == ps2.version &&
 		len(ps1.spaces) == len(ps2.spaces) {
 		for i := 0; i < len(ps1.spaces); i++ {
-			if !ps1.spaces[i].Equal(ps2.spaces[i]) {
+			if !equal(ps1.spaces[i], ps2.spaces[i]) {
 				return false
 			}
 		}

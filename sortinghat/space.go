@@ -17,7 +17,6 @@ type SpaceInfo interface {
 	GetMaxAllocated() uint32
 	GetMinSpace() *MinSpace
 	NumFreeAddresses() uint32
-	Equal(SpaceInfo) bool
 }
 
 type MinSpace struct {
@@ -51,12 +50,6 @@ func (s *MinSpace) GetMaxAllocated() uint32 {
 
 func (s *MinSpace) NumFreeAddresses() uint32 {
 	return s.Size - s.MaxAllocated
-}
-
-func (ms1 *MinSpace) Equal(ms2 SpaceInfo) bool {
-	return ms1.GetStart().Equal(ms2.GetStart()) &&
-		ms1.GetSize() == ms2.GetSize() &&
-		ms1.GetMaxAllocated() == ms2.GetMaxAllocated()
 }
 
 func NewSpace(start net.IP, size uint32) *Space {
