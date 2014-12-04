@@ -107,23 +107,22 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	peerSpace := sortinghat.NewPeerSpace(ourName)
+	var allocator *sortinghat.Allocator
 	if len(peers) == 0 {
-		startAddr := "10.0.1.0"
-		poolSize := 256
-		space := sortinghat.NewSpace(net.ParseIP(startAddr), uint32(poolSize))
-		peerSpace.AddSpace(space)
-		sortinghat.HttpHandleIP(space)
+		allocator = sortinghat.NewAllocator(ourName, router.Ourself, net.ParseIP("10.0.1.0"), 256)
+	} else {
+		allocator = sortinghat.NewAllocator(ourName, router.Ourself, nil, 0)
 	}
-	router.GossipDelegate = peerSpace
-	go handleHttp(router, peerSpace)
+	router.GossipDelegate = allocator
+	allocator.HandleHttp()
+	go handleHttp(router, allocator)
 	handleSignals(router)
 }
 
-func handleHttp(router *weave.Router, ps *sortinghat.PeerSpace) {
+func handleHttp(router *weave.Router, alloc *sortinghat.Allocator) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, router.Status())
-		io.WriteString(w, fmt.Sprintln(ps))
+		io.WriteString(w, fmt.Sprintln(alloc))
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")

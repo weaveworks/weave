@@ -9,16 +9,8 @@ import (
 )
 
 type PeerSpaceSet struct {
-	ourName   router.PeerName
 	spacesets map[router.PeerName]*PeerSpace
 	sync.RWMutex
-}
-
-func NewPeerSpaceSet(pn router.PeerName, space *PeerSpace) *PeerSpaceSet {
-	return &PeerSpaceSet{
-		ourName:   pn,
-		spacesets: map[router.PeerName]*PeerSpace{pn: space},
-	}
 }
 
 func (s *PeerSpaceSet) Encode() ([]byte, error) {
@@ -59,47 +51,4 @@ func (s *PeerSpaceSet) DecodeUpdate(update []byte) error {
 		}
 	}
 	return nil
-}
-
-func (s *PeerSpaceSet) ConsiderOurPosition() {
-	// Rule: if we have no IP space, pick the peer with the most available space and request some
-	if s.spacesets[s.ourName].NumFreeAddresses() == 0 {
-		var best *PeerSpace = nil
-		var bestNumFree uint32 = 0
-		for _, spaceset := range s.spacesets {
-			if num := spaceset.NumFreeAddresses(); num > bestNumFree {
-				bestNumFree = num
-				best = spaceset
-			}
-		}
-		if best != nil {
-			log.Println("Decided to ask peer", best.PeerName, "for space")
-		}
-	}
-}
-
-// GossipDelegate methods
-func (s *PeerSpaceSet) NotifyMsg(msg []byte) {
-	log.Printf("NotifyMsg: %+v\n", msg)
-}
-
-func (s *PeerSpaceSet) GetBroadcasts(overhead, limit int) [][]byte {
-	log.Printf("GetBroadcasts: %d %d\n", overhead, limit)
-	return nil
-}
-
-func (s *PeerSpaceSet) LocalState(join bool) []byte {
-	log.Printf("LocalState: %t\n", join)
-	if buf, err := s.Encode(); err == nil {
-		return buf
-	} else {
-		log.Println("Error", err)
-	}
-	return nil
-}
-
-func (s *PeerSpaceSet) MergeRemoteState(buf []byte, join bool) {
-	log.Printf("MergeRemoteState: %t %d bytes\n", join, len(buf))
-	s.DecodeUpdate(buf)
-	s.ConsiderOurPosition()
 }
