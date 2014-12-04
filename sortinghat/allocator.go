@@ -1,15 +1,23 @@
 package sortinghat
 
 import (
+	"bytes"
+	"encoding/gob"
 	"github.com/zettio/weave/router"
 	"log"
 	"net"
+	"sync"
+)
+
+const (
+	MinSafeFreeAddresses = 5
 )
 
 type Allocator struct {
-	ourName router.PeerName
-	gossip  router.GossipCommsProvider
-	pss     PeerSpaceSet
+	sync.RWMutex
+	ourName   router.PeerName
+	gossip    router.GossipCommsProvider
+	spacesets map[router.PeerName]*PeerSpace
 }
 
 func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, startAddr net.IP, poolSize int) *Allocator {
@@ -19,20 +27,61 @@ func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, st
 	}
 
 	return &Allocator{
-		gossip:  gossip,
-		ourName: ourName,
-		pss: PeerSpaceSet{
-			spacesets: map[router.PeerName]*PeerSpace{ourName: peerSpace},
-		},
+		gossip:    gossip,
+		ourName:   ourName,
+		spacesets: map[router.PeerName]*PeerSpace{ourName: peerSpace},
 	}
+}
+
+func (alloc *Allocator) Encode() ([]byte, error) {
+	alloc.RLock()
+	defer alloc.RUnlock()
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	if err := enc.Encode(len(alloc.spacesets)); err != nil {
+		return nil, err
+	}
+	for _, spaceset := range alloc.spacesets {
+		if err := spaceset.Encode(enc); err != nil {
+			return nil, err
+		}
+	}
+	return buf.Bytes(), nil
+}
+
+func (alloc *Allocator) DecodeUpdate(update []byte) error {
+	alloc.Lock()
+	defer alloc.Unlock()
+	reader := bytes.NewReader(update)
+	decoder := gob.NewDecoder(reader)
+	var numSpaceSets int
+	if err := decoder.Decode(&numSpaceSets); err != nil {
+		return err
+	}
+	for i := 0; i < numSpaceSets; i++ {
+		newSpaceset := new(PeerSpace)
+		if err := newSpaceset.Decode(decoder); err != nil {
+			return err
+		}
+		// compare this received spaceset's version against the one we had prev.
+		oldSpaceset, found := alloc.spacesets[newSpaceset.PeerName]
+		if !found || newSpaceset.version > oldSpaceset.version {
+			log.Println("Replacing", newSpaceset.PeerName, "data with newer version")
+			alloc.spacesets[newSpaceset.PeerName] = newSpaceset
+		}
+	}
+	return nil
 }
 
 func (alloc *Allocator) ConsiderOurPosition() {
 	// Rule: if we have no IP space, pick the peer with the most available space and request some
-	if alloc.pss.spacesets[alloc.ourName].NumFreeAddresses() == 0 {
+	alloc.RLock()
+	defer alloc.RUnlock()
+	ourSpaceSet := alloc.spacesets[alloc.ourName]
+	if ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
 		var best *PeerSpace = nil
 		var bestNumFree uint32 = 0
-		for _, spaceset := range alloc.pss.spacesets {
+		for _, spaceset := range alloc.spacesets {
 			if num := spaceset.NumFreeAddresses(); num > bestNumFree {
 				bestNumFree = num
 				best = spaceset
@@ -45,10 +94,17 @@ func (alloc *Allocator) ConsiderOurPosition() {
 }
 
 func (alloc *Allocator) AllocateFor(ident string) net.IP {
-	return nil
+	alloc.Lock()
+	ourSpaceSet := alloc.spacesets[alloc.ourName]
+	alloc.Unlock()
+	return ourSpaceSet.AllocateFor(ident)
 }
 
-func (alloc *Allocator) Free(addr net.IP) {
+func (alloc *Allocator) Free(addr net.IP) error {
+	alloc.Lock()
+	ourSpaceSet := alloc.spacesets[alloc.ourName]
+	alloc.Unlock()
+	return ourSpaceSet.Free(addr)
 }
 
 func (alloc *Allocator) String() string {
@@ -67,7 +123,7 @@ func (alloc *Allocator) GetBroadcasts(overhead, limit int) [][]byte {
 
 func (alloc *Allocator) LocalState(join bool) []byte {
 	log.Printf("LocalState: %t\n", join)
-	if buf, err := alloc.pss.Encode(); err == nil {
+	if buf, err := alloc.Encode(); err == nil {
 		return buf
 	} else {
 		log.Println("Error", err)
@@ -77,6 +133,6 @@ func (alloc *Allocator) LocalState(join bool) []byte {
 
 func (alloc *Allocator) MergeRemoteState(buf []byte, join bool) {
 	log.Printf("MergeRemoteState: %t %d bytes\n", join, len(buf))
-	alloc.pss.DecodeUpdate(buf)
+	alloc.DecodeUpdate(buf)
 	alloc.ConsiderOurPosition()
 }
