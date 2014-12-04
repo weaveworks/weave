@@ -498,7 +498,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 					conn.local.RelayGossipTo(srcName, destName, msg)
 				}
 			} else {
-				conn.log("received gossip msg at unsupported version:\n", msg)
+				conn.log("received gossip msg with unsupported version:", msg[1])
 			}
 		} else if msg[0] == ProtocolGossipBroadcast {
 			if msg[1] == GossipVersion {
@@ -507,7 +507,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 				conn.Router.GossipDelegate.MergeRemoteState(msg[3+srcNameLen:], false)
 				conn.local.RelayGossip(srcName, msg)
 			} else {
-				conn.log("received gossip msg at unsupported version:\n", msg)
+				conn.log("received gossip msg with unsupported version:", msg[1])
 			}
 		} else {
 			conn.log("received unknown msg:\n", msg)
