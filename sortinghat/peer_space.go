@@ -1,11 +1,9 @@
 package sortinghat
 
 import (
-	"bytes"
 	"encoding/gob"
 	"fmt"
 	"github.com/zettio/weave/router"
-	"log"
 	"sync"
 )
 
@@ -26,33 +24,29 @@ func (s *PeerSpace) AddSpace(space SpaceInfo) {
 	s.spaces = append(s.spaces, space)
 }
 
-func (s *PeerSpace) Encode() ([]byte, error) {
+func (s *PeerSpace) Encode(enc *gob.Encoder) error {
 	s.RLock()
 	defer s.RUnlock()
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
 	if err := enc.Encode(s.PeerName); err != nil {
-		return nil, err
+		return err
 	}
 	if err := enc.Encode(s.version); err != nil {
-		return nil, err
+		return err
 	}
 	if err := enc.Encode(len(s.spaces)); err != nil {
-		return nil, err
+		return err
 	}
 	for _, space := range s.spaces {
 		if err := enc.Encode(space.GetMinSpace()); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return buf.Bytes(), nil
+	return nil
 }
 
-func (s *PeerSpace) DecodeUpdate(update []byte) error {
+func (s *PeerSpace) Decode(decoder *gob.Decoder) error {
 	s.Lock()
 	defer s.Unlock()
-	reader := bytes.NewReader(update)
-	decoder := gob.NewDecoder(reader)
 	if err := decoder.Decode(&s.PeerName); err != nil {
 		return err
 	}
@@ -86,33 +80,3 @@ func (s *PeerSpace) NumFreeAddresses() uint32 {
 	}
 	return freeAddresses
 }
-
-func (s *PeerSpace) ConsiderOurPosition() {
-}
-
-// GossipDelegate methods
-func (s *PeerSpace) NotifyMsg(msg []byte) {
-	log.Printf("NotifyMsg: %+v\n", msg)
-}
-
-func (s *PeerSpace) GetBroadcasts(overhead, limit int) [][]byte {
-	log.Printf("GetBroadcasts: %d %d\n", overhead, limit)
-	return nil
-}
-
-func (s *PeerSpace) LocalState(join bool) []byte {
-	log.Printf("LocalState: %t\n", join)
-	if buf, err := s.Encode(); err == nil {
-		return buf
-	} else {
-		log.Println("Error", err)
-	}
-	return nil
-}
-
-func (s *PeerSpace) MergeRemoteState(buf []byte, join bool) {
-	log.Printf("MergeRemoteState: %t %+v\n", join, buf)
-	s.DecodeUpdate(buf)
-}
-
-//FIXME: do we need a data structure that is a set of Peer Spaces ?

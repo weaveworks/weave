@@ -1,6 +1,8 @@
 package sortinghat
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"github.com/zettio/weave/router"
 	wt "github.com/zettio/weave/testing"
@@ -29,14 +31,20 @@ func TestEncodeDecode(t *testing.T) {
 		testAddr1 = "10.0.3.4"
 	)
 
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+
 	pn1, _ := router.PeerNameFromString(peer1)
 	ps1 := PeerSpace{PeerName: pn1, version: 1234}
 	ps1.AddSpace(&MinSpace{Start: net.ParseIP(testAddr1), Size: 10, MaxAllocated: 0})
-	buf, err := ps1.Encode()
+
+	err := ps1.Encode(enc)
 	wt.AssertNoErr(t, err)
 
+	decoder := gob.NewDecoder(buf)
+
 	var ps2 PeerSpace
-	err = ps2.DecodeUpdate(buf)
+	err = ps2.Decode(decoder)
 	wt.AssertNoErr(t, err)
 	if !ps1.Equal(&ps2) {
 		t.Fatalf("Decoded PeerSpace not equal to original")
