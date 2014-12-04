@@ -50,8 +50,8 @@ To run weave on a host, you need to install...
 
 ## Quick Start Screencast
 
-<a href="http://youtu.be/k6r7yuSr0hE" target="_blank">
-  <img src="https://www.dropbox.com/s/7xwm8r1r3k16u3k/Screenshot%202014-11-18%2011.59.45.png?dl=1" />
+<a href="http://youtu.be/k6r7yuSr0hE" alt="Click to watch the screencast" target="_blank">
+  <img src="/docs/hello-screencast.png" />
 </a>
 
 ## Example
