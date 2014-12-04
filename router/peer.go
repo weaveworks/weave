@@ -238,12 +238,12 @@ func (peer *Peer) GossipBroadcastOn(conn *LocalConnection, buf []byte) {
 	conn.SendTCP(msg)
 }
 
-func (peer *Peer) GossipSendTo(dstPeer *Peer, buf []byte) {
+func (peer *Peer) GossipSendTo(dstPeer *Peer, buf []byte) error {
 	log.Println("GossipSendTo", len(buf), "bytes to", dstPeer)
 	peerName := peer.Name.Bin()
 	nameLenByte := []byte{byte(len(peerName))}
 	msg := Concat([]byte{ProtocolGossipUnicast}, []byte{GossipVersion}, nameLenByte, peerName, buf)
-	peer.RelayGossipTo(peer.Name, dstPeer.Name, msg)
+	return peer.RelayGossipTo(peer.Name, dstPeer.Name, msg)
 }
 
 func (peer *Peer) RelayGossipTo(srcPeerName, dstPeerName PeerName, msg []byte) error {
