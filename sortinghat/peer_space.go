@@ -2,8 +2,10 @@ package sortinghat
 
 import (
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"github.com/zettio/weave/router"
+	"net"
 	"sync"
 )
 
@@ -74,9 +76,34 @@ func (s *PeerSpace) String() string {
 }
 
 func (s *PeerSpace) NumFreeAddresses() uint32 {
+	s.RLock()
+	defer s.RUnlock()
 	var freeAddresses uint32 = 0
 	for _, space := range s.spaces {
 		freeAddresses += space.NumFreeAddresses()
 	}
 	return freeAddresses
+}
+
+func (s *PeerSpace) AllocateFor(ident string) net.IP {
+	s.Lock()
+	defer s.Unlock()
+	// TODO: Optimize; perhaps cache last-used space
+	for _, space := range s.spaces {
+		if ret := space.(*Space).AllocateFor(ident); ret != nil {
+			return ret
+		}
+	}
+	return nil
+}
+
+func (s *PeerSpace) Free(addr net.IP) error {
+	s.Lock()
+	defer s.Unlock()
+	for _, space := range s.spaces {
+		if space.(*Space).Free(addr) {
+			return nil
+		}
+	}
+	return errors.New("Attempt to free IP address not in range")
 }
