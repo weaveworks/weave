@@ -29,15 +29,12 @@ type Router struct {
 
 type GossipCommsProvider interface {
 	Gossip() // Send my LocalState
-	RelayGossip(srcName PeerName, msg []byte)
-	GossipBroadcastOn(conn *LocalConnection, buf []byte)
 	GossipSendTo(dstPeerName PeerName, buf []byte) error
-	RelayGossipTo(srcPeerName, dstPeerName PeerName, msg []byte) error
 }
 
 type GossipDelegate interface {
 	// NotifyMsg is called when a user-data message is received.
-	NotifyMsg([]byte)
+	NotifyMsg(sender PeerName, msg []byte)
 
 	// GetBroadcasts is called when user data messages can be broadcast.
 	GetBroadcasts(overhead, limit int) [][]byte

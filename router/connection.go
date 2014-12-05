@@ -494,7 +494,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 				destName := PeerNameFromBin(msg[4+srcNameLen : 4+srcNameLen+destNameLen])
 				if conn.local.Name == destName {
 					payload := msg[4+srcNameLen+destNameLen:]
-					conn.Router.GossipDelegate.NotifyMsg(payload)
+					conn.Router.GossipDelegate.NotifyMsg(srcName, payload)
 				} else {
 					conn.local.RelayGossipTo(srcName, destName, msg)
 				}
