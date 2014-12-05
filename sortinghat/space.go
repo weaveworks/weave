@@ -11,14 +11,6 @@ type Record struct {
 	IP    net.IP
 }
 
-type SpaceInfo interface {
-	GetStart() net.IP
-	GetSize() uint32
-	GetMaxAllocated() uint32
-	GetMinSpace() *MinSpace
-	NumFreeAddresses() uint32
-}
-
 type MinSpace struct {
 	Start        net.IP
 	Size         uint32

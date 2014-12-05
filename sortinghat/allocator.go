@@ -18,20 +18,20 @@ type Allocator struct {
 	ourName     router.PeerName
 	gossip      router.GossipCommsProvider
 	spacesets   map[router.PeerName]*PeerSpace
-	ourSpaceSet *PeerSpace
+	ourSpaceSet *SpaceSet
 }
 
 func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, startAddr net.IP, poolSize int) *Allocator {
-	peerSpace := NewPeerSpace(ourName)
+	spaceSet := NewSpaceSet(ourName)
 	if poolSize > 0 {
-		peerSpace.AddSpace(NewSpace(startAddr, uint32(poolSize)))
+		spaceSet.AddSpace(NewSpace(startAddr, uint32(poolSize)))
 	}
 
 	return &Allocator{
 		gossip:      gossip,
 		ourName:     ourName,
-		spacesets:   map[router.PeerName]*PeerSpace{ourName: peerSpace},
-		ourSpaceSet: peerSpace,
+		spacesets:   make(map[router.PeerName]*PeerSpace),
+		ourSpaceSet: spaceSet,
 	}
 }
 
@@ -40,14 +40,13 @@ func (alloc *Allocator) Encode() ([]byte, error) {
 	defer alloc.RUnlock()
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	if err := enc.Encode(len(alloc.spacesets)); err != nil {
+	if err := enc.Encode(1); err != nil {
 		return nil, err
 	}
-	for _, spaceset := range alloc.spacesets {
-		if err := spaceset.Encode(enc); err != nil {
-			return nil, err
-		}
+	if err := alloc.ourSpaceSet.Encode(enc); err != nil {
+		return nil, err
 	}
+	// Question: Do I want to encode the PeerSpaces - other people's space-sets?
 	return buf.Bytes(), nil
 }
 

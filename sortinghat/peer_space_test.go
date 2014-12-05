@@ -10,13 +10,13 @@ import (
 	"testing"
 )
 
-func equal(ms1 SpaceInfo, ms2 SpaceInfo) bool {
+func equal(ms1 *Space, ms2 *MinSpace) bool {
 	return ms1.GetStart().Equal(ms2.GetStart()) &&
 		ms1.GetSize() == ms2.GetSize() &&
 		ms1.GetMaxAllocated() == ms2.GetMaxAllocated()
 }
 
-func (ps1 *PeerSpace) Equal(ps2 *PeerSpace) bool {
+func (ps1 *SpaceSet) Equal(ps2 *PeerSpace) bool {
 	if ps1.PeerName == ps2.PeerName &&
 		ps1.version == ps2.version &&
 		len(ps1.spaces) == len(ps2.spaces) {
@@ -41,8 +41,8 @@ func TestEncodeDecode(t *testing.T) {
 	enc := gob.NewEncoder(buf)
 
 	pn1, _ := router.PeerNameFromString(peer1)
-	ps1 := PeerSpace{PeerName: pn1, version: 1234}
-	ps1.AddSpace(&MinSpace{Start: net.ParseIP(testAddr1), Size: 10, MaxAllocated: 0})
+	ps1 := &SpaceSet{PeerName: pn1, version: 1234}
+	ps1.AddSpace(&Space{MinSpace: MinSpace{Start: net.ParseIP(testAddr1), Size: 10, MaxAllocated: 0}})
 
 	err := ps1.Encode(enc)
 	wt.AssertNoErr(t, err)
