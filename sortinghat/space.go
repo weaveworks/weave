@@ -40,7 +40,7 @@ func (s *MinSpace) GetMaxAllocated() uint32 {
 	return s.MaxAllocated
 }
 
-func (s *MinSpace) NumFreeAddresses() uint32 {
+func (s *MinSpace) LargestFreeBlock() uint32 {
 	return s.Size - s.MaxAllocated
 }
 
@@ -125,6 +125,10 @@ func (s *Space) NumFreeAddresses() uint32 {
 	s.RLock()
 	defer s.RUnlock()
 	return s.Size - uint32(len(s.recs)) + uint32(len(s.free_list))
+}
+
+func (s *Space) LargestFreeBlock() uint32 {
+	return s.Size - s.MaxAllocated
 }
 
 func (space *Space) String() string {

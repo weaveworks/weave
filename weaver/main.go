@@ -107,11 +107,9 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	var allocator *sortinghat.Allocator
+	allocator := sortinghat.NewAllocator(ourName, router.Ourself, net.ParseIP("10.0.1.0"), 256)
 	if len(peers) == 0 {
-		allocator = sortinghat.NewAllocator(ourName, router.Ourself, net.ParseIP("10.0.1.0"), 256)
-	} else {
-		allocator = sortinghat.NewAllocator(ourName, router.Ourself, nil, 0)
+		allocator.ManageSpace(net.ParseIP("10.0.1.0"), 256)
 	}
 	router.GossipDelegate = allocator
 	allocator.HandleHttp()

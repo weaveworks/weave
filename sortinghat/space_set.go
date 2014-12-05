@@ -64,6 +64,40 @@ func (s *SpaceSet) NumFreeAddresses() uint32 {
 	return freeAddresses
 }
 
+// Give up some space because one of our peers has asked for it.
+// Pick some large reasonably-sized chunk.
+func (s *SpaceSet) GiveUpSpace() (start net.IP, size uint32, ok bool) {
+	totalFreeAddresses := s.NumFreeAddresses()
+	if totalFreeAddresses < MinSafeFreeAddresses {
+		return nil, 0, false
+	}
+	var bestFree uint32 = 0
+	var bestSpace *Space = nil
+	for _, space := range s.spaces {
+		numFree := space.NumFreeAddresses()
+		if numFree > bestFree {
+			bestFree = numFree
+			bestSpace = space
+			if numFree >= MaxAddressesToGiveUp {
+				break
+			}
+		}
+	}
+	if bestSpace != nil {
+		var spaceToGiveUp uint32 = MaxAddressesToGiveUp
+		if spaceToGiveUp > bestFree {
+			spaceToGiveUp = bestFree
+		}
+		// Don't give away more than half of our available addresses
+		if spaceToGiveUp > totalFreeAddresses/2 {
+			spaceToGiveUp = totalFreeAddresses / 2
+		}
+		bestSpace.Size -= spaceToGiveUp
+		return add(bestSpace.Start, bestSpace.Size), spaceToGiveUp, true
+	}
+	return nil, 0, false
+}
+
 func (s *SpaceSet) AllocateFor(ident string) net.IP {
 	s.Lock()
 	defer s.Unlock()

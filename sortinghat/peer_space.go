@@ -53,7 +53,7 @@ func (s *PeerSpace) NumFreeAddresses() uint32 {
 	defer s.RUnlock()
 	var freeAddresses uint32 = 0
 	for _, space := range s.spaces {
-		freeAddresses += space.NumFreeAddresses()
+		freeAddresses += space.LargestFreeBlock()
 	}
 	return freeAddresses
 }
