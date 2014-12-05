@@ -1,0 +1,24 @@
+#! /bin/bash
+
+# Preparation
+
+## Get the new version number from the most recent tag
+
+# Sanity checks
+
+## Check that the version doesn't already exist by looking at github
+## releases
+
+## Check that the top changelog entry is this version
+
+# Build and test
+
+# Clone the repo at the tag, inject the version numbers, build
+# distributables (library versions?)
+
+# Run tests with the distributables, including version check
+
+# Publish
+
+# Either leave the distributables in a directory for the dev to
+# upload, or upload them automatically?
