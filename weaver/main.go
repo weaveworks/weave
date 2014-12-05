@@ -18,6 +18,8 @@ import (
 	"syscall"
 )
 
+var version = "(unreleased version)"
+
 func main() {
 
 	log.SetPrefix(weave.Protocol + " ")
@@ -32,17 +34,19 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		ifaceName  string
-		routerName string
-		password   string
-		wait       int
-		debug      bool
-		prof       string
-		peers      []string
-		connLimit  int
-		bufSz      int
+		justVersion bool
+		ifaceName   string
+		routerName  string
+		password    string
+		wait        int
+		debug       bool
+		prof        string
+		peers       []string
+		connLimit   int
+		bufSz       int
 	)
 
+	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
 	flag.StringVar(&password, "password", "", "network password")
@@ -53,6 +57,11 @@ func main() {
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
 	flag.Parse()
 	peers = flag.Args()
+
+	if justVersion {
+		io.WriteString(os.Stdout, fmt.Sprintf("weaver %s\n", version))
+		os.Exit(0)
+	}
 
 	options := make(map[string]string)
 	flag.Visit(func(f *flag.Flag) {
@@ -127,6 +136,7 @@ func main() {
 
 func handleHttp(router *weave.Router) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, fmt.Sprintln("weaver version", version))
 		io.WriteString(w, router.Status())
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {

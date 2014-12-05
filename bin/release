@@ -1,24 +1,65 @@
 #! /bin/bash
 
+set -e
+set -o nounset
+
 # Preparation
 
 ## Get the new version number from the most recent tag
 
-# Sanity checks
+LATEST_TAG=$(git describe --abbrev=0 --match='v*')
+VERSION=${LATEST_TAG#v}
+echo Attempt to build distributables for version $VERSION
+# NB does not check that this tag is on master
+
+echo
+echo == Sanity checks
 
 ## Check that the version doesn't already exist by looking at github
 ## releases
+if curl -sSf https://api.github.com/repos/zettio/weave/releases/$LATEST_TAG 2>/dev/null; then
+    echo Release $LATEST_TAG already exists on GitHub
+    echo https://github.com/zettio/weave/releases/$LATEST_TAG
+    exit 1
+fi
+
+## Clone the repo at the tag and go there
+RELEASE_DIR=releases/$LATEST_TAG
+mkdir -p releases
+git clone -q -b $LATEST_TAG . $RELEASE_DIR
+cd $RELEASE_DIR
 
 ## Check that the top changelog entry is this version
+latest_changelog=$(grep -o "Release v.*" -m1 ./CHANGELOG.md)
+if ! [ `echo "$latest_changelog" | grep -o 'v[^ ]*'` == $LATEST_TAG ]; then
+    echo Latest changelog entry $latest_changelog does not match
+    echo the latest tag $LATEST_TAG
+    exit 1
+fi
 
-# Build and test
+echo Sanity checks OK for releasing tag $LATEST_TAG
 
-# Clone the repo at the tag, inject the version numbers, build
-# distributables (library versions?)
+echo
+echo == Build and test
 
-# Run tests with the distributables, including version check
+## Inject the version numbers and build the distributables
+## (library versions?)
+
+sed -i "/var version = / c\var version = \"$VERSION\"" weaver/main.go
+make
+
+## Run tests with the distributables, including version check
+v=$(./weaver/weaver --version)
+if ! [ "$v" == "weaver $VERSION" ]; then
+    echo Version of distributable "$v" does not match tag $LATEST_TAG
+    exit 1
+fi
+
+make tests
+
+echo Build and tests OK
 
 # Publish
 
-# Either leave the distributables in a directory for the dev to
-# upload, or upload them automatically?
+## Either leave the distributables in a directory for the dev to
+## upload, or upload them automatically?
