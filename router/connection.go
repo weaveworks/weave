@@ -410,7 +410,7 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 func checkHandshakeStringField(fieldName string, expectedValue string, handshake map[string]string) (string, error) {
 	val, found := handshake[fieldName]
 	if !found {
-		return "", fmt.Errorf("Field % is missing", fieldName)
+		return "", fmt.Errorf("Field %s is missing", fieldName)
 	}
 	if expectedValue != "" && val != expectedValue {
 		return "", fmt.Errorf("Field %s has wrong value; expected '%s', received '%s'", fieldName, expectedValue, val)
