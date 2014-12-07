@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime"
@@ -33,15 +34,15 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		ifaceName  string
-		routerName string
-		password   string
-		wait       int
-		debug      bool
-		prof       string
-		peers      []string
-		connLimit  int
-		bufSz      int
+		ifaceName  		string
+		routerName 		string
+		password   		string
+		wait       		int
+		debug      		bool
+		prof       		string
+		peers      		[]string
+		connLimit  		int
+		bufSz      		int
 	)
 
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
@@ -100,10 +101,23 @@ func main() {
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
 	router.Start()
 	for _, peer := range peers {
-		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
-			router.ConnectionMaker.InitiateConnection(addr.String())
-		} else {
+		u, err := url.Parse(peer)
+		if err != nil {
 			log.Fatal(err)
+		}
+
+		switch u.Scheme {
+			case "mdns": {
+				router.ConnectionMaker.InitiateMDnsRendezvous(u.Host)
+			}
+			default: {
+				// the peer id must be just a regular IP address...
+				if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+					router.ConnectionMaker.InitiateConnection(addr.String())
+				} else {
+					log.Fatal(err)
+				}
+			}
 		}
 	}
 	go handleHttp(router)

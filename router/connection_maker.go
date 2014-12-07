@@ -38,6 +38,20 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 		address:     address}
 }
 
+func (cm *ConnectionMaker) InitiateMDnsRendezvous(domain string) {
+	// check if we are already working on this domain
+	_, found := cm.rendezvous[domain]
+	if !found {
+		mdns := NewMDnsRendezvous(cm, domain)
+		err := mdns.Start()
+		if err != nil {
+			log.Println("Failed rendezvous on %s: %s", domain, err)
+			return
+		}
+		cm.rendezvous[domain] = mdns
+	}
+}
+
 func (cm *ConnectionMaker) ConnectionTerminated(address string) {
 	cm.queryChan <- &ConnectionMakerInteraction{
 		Interaction: Interaction{code: CMTerminated},
@@ -89,6 +103,7 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 		}
 	}
 }
+
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	ourself := cm.router.Ourself

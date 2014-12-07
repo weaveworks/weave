@@ -162,11 +162,22 @@ type ConnectionMakerInteraction struct {
 	address string
 }
 
+type RendezvousService interface {
+	Start() error
+	Stop() error
+}
+
+type SimpleRendezvousService struct {
+	Domain 		string		// something like "mdns:///somedomain"
+	announcedIp net.IP		// just in case we change IP...
+}
+
 type ConnectionMaker struct {
 	router         *Router
 	queryChan      chan<- *ConnectionMakerInteraction
 	targets        map[string]*Target
 	cmdLineAddress map[string]bool
+	rendezvous     map[string]RendezvousService
 }
 
 type ConnectionState int
