@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/davecheney/profile"
+	lg "github.com/zettio/weave/logging"
 	weavenet "github.com/zettio/weave/net"
 	weave "github.com/zettio/weave/router"
 	"github.com/zettio/weave/sortinghat"
@@ -39,6 +40,7 @@ func main() {
 		password   string
 		wait       int
 		debug      bool
+		pktdebug   bool
 		prof       string
 		peers      []string
 		connLimit  int
@@ -49,12 +51,15 @@ func main() {
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
 	flag.StringVar(&password, "password", "", "network password")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0, i.e. don't wait)")
+	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&connLimit, "connlimit", 10, "connection limit (defaults to 10, set to 0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
 	flag.Parse()
 	peers = flag.Args()
+
+	lg.InitDefault(debug)
 
 	if ifaceName == "" {
 		fmt.Println("Missing required parameter 'iface'")
@@ -79,7 +84,7 @@ func main() {
 	}
 
 	var logFrame func(string, []byte, *layers.Ethernet)
-	if debug {
+	if pktdebug {
 		logFrame = func(prefix string, frame []byte, eth *layers.Ethernet) {
 			h := fmt.Sprintf("%x", sha256.Sum256(frame))
 			if eth == nil {

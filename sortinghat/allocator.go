@@ -3,8 +3,8 @@ package sortinghat
 import (
 	"bytes"
 	"encoding/gob"
+	lg "github.com/zettio/weave/logging"
 	"github.com/zettio/weave/router"
-	"log"
 	"net"
 	"sync"
 )
@@ -77,7 +77,7 @@ func (alloc *Allocator) DecodeUpdate(update []byte) error {
 		// compare this received spaceset's version against the one we had prev.
 		oldSpaceset, found := alloc.spacesets[newSpaceset.PeerName]
 		if !found || newSpaceset.version > oldSpaceset.version {
-			log.Println("Replacing", newSpaceset.PeerName, "data with newer version")
+			lg.Debug.Println("Replacing", newSpaceset.PeerName, "data with newer version")
 			alloc.spacesets[newSpaceset.PeerName] = newSpaceset
 		}
 	}
@@ -105,7 +105,7 @@ func (alloc *Allocator) requestSpace() {
 		}
 	}
 	if best != nil {
-		log.Println("Decided to ask peer", best.PeerName, "for space")
+		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space")
 		myState, _ := alloc.Encode()
 		msg := router.Concat([]byte{GossipSpaceRequest}, myState)
 		alloc.gossip.GossipSendTo(best.PeerName, msg)
@@ -114,10 +114,11 @@ func (alloc *Allocator) requestSpace() {
 }
 
 func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
-	log.Println("Received space request")
+	lg.Debug.Println("Received space request from", sender)
 	alloc.DecodeUpdate(msg)
 
 	if start, size, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
+		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
 		myState, _ := alloc.Encode()
 		size_encoding := intip4(size) // hack!
 		msg := router.Concat([]byte{GossipSpaceDonate}, start, size_encoding, myState)
@@ -126,7 +127,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 }
 
 func (alloc *Allocator) handleSpaceDonate(msg []byte) {
-	log.Println("Received space donation")
+	lg.Info.Println("Received space donation")
 
 	alloc.gossip.Gossip()
 }
@@ -145,7 +146,7 @@ func (alloc *Allocator) String() string {
 
 // GossipDelegate methods
 func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
-	log.Printf("NotifyMsg from %s: %+v\n", sender, msg)
+	lg.Debug.Printf("NotifyMsg from %s: %+v\n", sender, msg)
 	switch msg[0] {
 	case GossipSpaceRequest:
 		alloc.handleSpaceRequest(sender, msg[1:])
@@ -155,22 +156,22 @@ func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
 }
 
 func (alloc *Allocator) GetBroadcasts(overhead, limit int) [][]byte {
-	log.Printf("GetBroadcasts: %d %d\n", overhead, limit)
+	lg.Debug.Printf("GetBroadcasts: %d %d\n", overhead, limit)
 	return nil
 }
 
 func (alloc *Allocator) LocalState(join bool) []byte {
-	log.Printf("LocalState: %t\n", join)
+	lg.Debug.Printf("LocalState: %t\n", join)
 	if buf, err := alloc.Encode(); err == nil {
 		return buf
 	} else {
-		log.Println("Error", err)
+		lg.Error.Println("Error", err)
 	}
 	return nil
 }
 
 func (alloc *Allocator) MergeRemoteState(buf []byte, join bool) {
-	log.Printf("MergeRemoteState: %t %d bytes\n", join, len(buf))
+	lg.Debug.Printf("MergeRemoteState: %t %d bytes\n", join, len(buf))
 	alloc.DecodeUpdate(buf)
 	alloc.ConsiderOurPosition()
 }
