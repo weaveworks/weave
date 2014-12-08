@@ -25,6 +25,7 @@ func (s *SpaceSet) AddSpace(space *Space) {
 	s.Lock()
 	defer s.Unlock()
 	s.spaces = append(s.spaces, space)
+	s.version++
 }
 
 func (s *SpaceSet) Encode(enc *gob.Encoder) error {
@@ -93,6 +94,7 @@ func (s *SpaceSet) GiveUpSpace() (start net.IP, size uint32, ok bool) {
 			spaceToGiveUp = totalFreeAddresses / 2
 		}
 		bestSpace.Size -= spaceToGiveUp
+		s.version++
 		return add(bestSpace.Start, bestSpace.Size), spaceToGiveUp, true
 	}
 	return nil, 0, false

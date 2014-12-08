@@ -94,9 +94,12 @@ func (f *fakeGossipComms) GossipSendTo(dstPeerName router.PeerName, buf []byte) 
 }
 
 func TestGossip(t *testing.T) {
-	var (
+	const (
 		testStart1     = "10.0.1.0"
 		testStart2     = "10.0.1.1"
+		origSize       = 10
+		donateSize     = 5
+		donateStart    = "10.0.1.6"
 		ourNameString  = "01:00:00:01:00:00"
 		peerNameString = "02:00:00:02:00:00"
 	)
@@ -110,7 +113,7 @@ func TestGossip(t *testing.T) {
 	fakeGossip2 := new(fakeGossipComms)
 	pn, _ := router.PeerNameFromString(peerNameString)
 	alloc2 := NewAllocator(pn, fakeGossip2, net.ParseIP(testStart1), 1024)
-	alloc2.ManageSpace(net.ParseIP(testStart2), 10)
+	alloc2.ManageSpace(net.ParseIP(testStart2), origSize)
 
 	buf, err := alloc2.Encode()
 	wt.AssertNoErr(t, err)
@@ -128,12 +131,19 @@ func TestGossip(t *testing.T) {
 	fakeGossip1.Reset()
 
 	// Now make it look like alloc2 has given up half its space
-	alloc2.ourSpaceSet.spaces[0].Size = 5
+	alloc2.ourSpaceSet.spaces[0].Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	buf, err = alloc2.Encode()
+	alloc2state, err := alloc2.Encode()
 	wt.AssertNoErr(t, err)
 
-	alloc1.MergeRemoteState(buf, true)
-	//	alloc.NotifyMsg()
+	size_encoding := intip4(donateSize) // hack! using intip4
+	msg := router.Concat([]byte{GossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
+	alloc1.NotifyMsg(pn, msg)
+	if n := alloc1.ourSpaceSet.NumFreeAddresses(); n != 6 {
+		t.Fatalf("Total free addresses should be 6 but got %d", n)
+	}
+	if n := alloc1.spacesets[pn].version; n != 2 {
+		t.Fatalf("Peer version should be 2 but got %d", n)
+	}
 }

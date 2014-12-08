@@ -121,13 +121,20 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
 		myState, _ := alloc.Encode()
 		size_encoding := intip4(size) // hack!
-		msg := router.Concat([]byte{GossipSpaceDonate}, start, size_encoding, myState)
+		msg := router.Concat([]byte{GossipSpaceDonate}, start.To4(), size_encoding, myState)
 		alloc.gossip.GossipSendTo(sender, msg)
 	}
 }
 
 func (alloc *Allocator) handleSpaceDonate(msg []byte) {
-	lg.Info.Println("Received space donation")
+	var start net.IP = msg[0:4]
+	size := ip4int(msg[4:8])
+	lg.Debug.Println("Received space donation start", start, "size", size)
+	if err := alloc.DecodeUpdate(msg[8:]); err != nil {
+		lg.Error.Println("Error decoding update", err)
+		return
+	}
+	alloc.ourSpaceSet.AddSpace(NewSpace(start, size))
 
 	alloc.gossip.Gossip()
 }
