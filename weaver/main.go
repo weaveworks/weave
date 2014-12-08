@@ -20,7 +20,6 @@ import (
 )
 
 func main() {
-
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 	log.Println(os.Args)
@@ -43,6 +42,7 @@ func main() {
 		peers      		[]string
 		connLimit  		int
 		bufSz      		int
+		externalIps     weavenet.ExternalIps
 	)
 
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
@@ -53,6 +53,7 @@ func main() {
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&connLimit, "connlimit", 10, "connection limit (defaults to 10, set to 0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
+	flag.Var(&externalIps, "ext", "external IPs to announce in rendezvous services")
 	flag.Parse()
 	peers = flag.Args()
 
@@ -108,7 +109,7 @@ func main() {
 
 		switch u.Scheme {
 			case "mdns": {
-				router.ConnectionMaker.InitiateMDnsRendezvous(u.Host)
+				router.ConnectionMaker.InitiateMDnsRendezvous(u, externalIps)
 			}
 			default: {
 				// the peer id must be just a regular IP address...

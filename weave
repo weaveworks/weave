@@ -421,10 +421,21 @@ case "$COMMAND" in
             echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
             shift 1
         fi
+
+        # guess the possible external IP addresses...
+        EXT_DEVS=$(netstat -i | tail -n +3 | cut -f1 -d' ' | grep -v "^\(veth\|weave\|bridge\|lo\)")
+        EXT_IPS=""
+        for DEV in $EXT_DEVS ; do
+            EXT_IP=$(ip addr show $DEV | sed -n '/inet /{s/^.*inet \([0-9.]\+\).*$/\1/;p}')
+            EXT_IPS="$EXT_IPS,$EXT_IP"
+        done
+        EXT_IPS=$(echo $EXT_IPS | cut -c2-)
+
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
-        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@")
+        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE \
+                    -name $MACADDR -ext $EXT_IPS "$@")
         with_container_netns $CONTAINER launch >/dev/null
         echo $CONTAINER
         ;;

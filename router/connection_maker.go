@@ -3,9 +3,12 @@ package router
 import (
 	"bytes"
 	"fmt"
+	weavenet "github.com/zettio/weave/net"
 	"log"
 	"math/rand"
 	"net"
+	"net/url"
+	"path"
 	"time"
 )
 
@@ -27,7 +30,9 @@ func StartConnectionMaker(router *Router) *ConnectionMaker {
 		router:         router,
 		queryChan:      queryChan,
 		cmdLineAddress: make(map[string]bool),
-		targets:        make(map[string]*Target)}
+		targets:        make(map[string]*Target),
+		rendezvous:     make(map[string]RendezvousService),
+	}
 	go state.queryLoop(queryChan)
 	return state
 }
@@ -38,17 +43,20 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 		address:     address}
 }
 
-func (cm *ConnectionMaker) InitiateMDnsRendezvous(domain string) {
+func (cm *ConnectionMaker) InitiateMDnsRendezvous(u *url.URL, externalIps weavenet.ExternalIps) {
 	// check if we are already working on this domain
+	domain := path.Base(u.Path)  		// use only the last part of the path
+	serviceId := fmt.Sprintf("mdns://%s", domain)
 	_, found := cm.rendezvous[domain]
 	if !found {
+		log.Printf("Starting mDNS rendezvous on domain '%s'", domain)
 		mdns := NewMDnsRendezvous(cm, domain)
-		err := mdns.Start()
+		err := mdns.Start(externalIps)
 		if err != nil {
-			log.Println("Failed rendezvous on %s: %s", domain, err)
+			log.Printf("Failed rendezvous on %s: %s", domain, err)
 			return
 		}
-		cm.rendezvous[domain] = mdns
+		cm.rendezvous[serviceId] = mdns
 	}
 }
 

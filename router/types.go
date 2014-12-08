@@ -6,6 +6,7 @@ import (
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
 	"encoding/gob"
+	weavenet "github.com/zettio/weave/net"
 	"net"
 	"sync"
 	"time"
@@ -163,7 +164,7 @@ type ConnectionMakerInteraction struct {
 }
 
 type RendezvousService interface {
-	Start() error
+	Start(weavenet.ExternalIps) error
 	Stop() error
 }
 
