@@ -2,22 +2,24 @@ package net
 
 import (
 	"fmt"
-	"net"
 	"strings"
 )
 
-// external IP addresses
-type ExternalIps []net.IP
+// External IP addresses
+type ExternalIps map[string]bool
 
-func (i *ExternalIps) String() string {
-	return fmt.Sprint(*i)
+func NewExternalIps() ExternalIps {
+	return make(map[string]bool)
+}
+func (ext *ExternalIps) String() string {
+	return fmt.Sprint(*ext)
 }
 
-// Utility methd for setting the external addresses from a list of comma-separated IPs
-func (i *ExternalIps) Set(value string) error {
+// Utility method for setting the external addresses from a list of comma-separated IPs
+// Note that we do not remove previously set values.
+func (ext ExternalIps) Set(value string) error {
 	for _, ipstr := range strings.Split(value, ",") {
-		ip := net.ParseIP(ipstr)
-		*i = append(*i, ip)
+		ext[ipstr] = true
 	}
 	return nil
 }

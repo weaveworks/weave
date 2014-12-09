@@ -169,8 +169,8 @@ type RendezvousService interface {
 }
 
 type SimpleRendezvousService struct {
-	Domain 		string		// something like "mdns:///somedomain"
-	announcedIp net.IP		// just in case we change IP...
+	Domain 		 string					// something like "mdns:///somedomain"
+	announcedIps weavenet.ExternalIps
 }
 
 type ConnectionMaker struct {

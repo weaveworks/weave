@@ -45,6 +45,8 @@ func main() {
 		externalIps     weavenet.ExternalIps
 	)
 
+	externalIps = weavenet.NewExternalIps()
+
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
 	flag.StringVar(&password, "password", "", "network password")
