@@ -37,7 +37,7 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 
 # Add more directories in here as more tests are created
 tests:
-	cd nameserver; go test
+	cd nameserver; go test -tags netgo
 
 publish: $(WEAVER_EXPORT) tests
 	$(SUDO) docker tag $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
