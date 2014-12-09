@@ -133,6 +133,9 @@ func (alloc *Allocator) ElectLeader() {
 		// I'm the winner; take control of the whole universe
 		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
 		go alloc.gossip.Gossip()
+	} else {
+		// We expect the other guy to take control, but if he doesn't, try again.
+		time.AfterFunc(waitForLeader, func() { alloc.ElectLeader() })
 	}
 }
 
