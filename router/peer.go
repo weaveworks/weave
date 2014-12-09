@@ -213,7 +213,9 @@ func (peer *Peer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *Ethe
 
 func (peer *Peer) Gossip() {
 	buf := peer.Router.GossipDelegate.LocalState(false)
-	msg := Concat([]byte{ProtocolGossipBroadcast}, buf)
+	peerName := peer.Name.Bin()
+	nameLenByte := []byte{byte(len(peerName))}
+	msg := Concat([]byte{ProtocolGossipBroadcast}, []byte{GossipVersion}, nameLenByte, peerName, buf)
 	peer.RelayGossip(peer.Name, msg)
 }
 

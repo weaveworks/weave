@@ -17,7 +17,7 @@ func TestAllocFree(t *testing.T) {
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	alloc := NewAllocator(ourName, nil, net.ParseIP(testAddr1), 3)
-	alloc.ManageSpace(net.ParseIP(testAddr1), 3)
+	alloc.manageSpace(net.ParseIP(testAddr1), 3)
 
 	addr1 := alloc.AllocateFor(containerID)
 	if addr1.String() != testAddr1 {
@@ -49,8 +49,8 @@ func TestMultiSpaces(t *testing.T) {
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	alloc := NewAllocator(ourName, nil, net.ParseIP(testStart1), 1024)
-	alloc.ManageSpace(net.ParseIP(testStart1), 1)
-	alloc.ManageSpace(net.ParseIP(testStart2), 3)
+	alloc.manageSpace(net.ParseIP(testStart1), 1)
+	alloc.manageSpace(net.ParseIP(testStart2), 3)
 
 	if n := alloc.ourSpaceSet.NumFreeAddresses(); n != 4 {
 		t.Fatalf("Total free addresses should be 4 but got %d", n)
@@ -107,15 +107,15 @@ func TestGossip(t *testing.T) {
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	fakeGossip1 := new(fakeGossipComms)
 	alloc1 := NewAllocator(ourName, fakeGossip1, net.ParseIP(testStart1), 1024)
-	alloc1.ManageSpace(net.ParseIP(testStart1), 1)
+	alloc1.manageSpace(net.ParseIP(testStart1), 1)
 
 	// Simulate another peer on the gossip network
 	fakeGossip2 := new(fakeGossipComms)
 	pn, _ := router.PeerNameFromString(peerNameString)
 	alloc2 := NewAllocator(pn, fakeGossip2, net.ParseIP(testStart1), 1024)
-	alloc2.ManageSpace(net.ParseIP(testStart2), origSize)
+	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
 
-	buf, err := alloc2.Encode()
+	buf, err := alloc2.encode()
 	wt.AssertNoErr(t, err)
 
 	alloc1.MergeRemoteState(buf, true)
@@ -134,7 +134,7 @@ func TestGossip(t *testing.T) {
 	alloc2.ourSpaceSet.spaces[0].Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	alloc2state, err := alloc2.Encode()
+	alloc2state, err := alloc2.encode()
 	wt.AssertNoErr(t, err)
 
 	size_encoding := intip4(donateSize) // hack! using intip4

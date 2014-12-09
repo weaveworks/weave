@@ -48,6 +48,12 @@ func (s *PeerSpace) String() string {
 	return fmt.Sprint("PeerSpace ", s.PeerName, " (v", s.version, ") (spaces: ", len(s.spaces), ") (1st: ", s.spaces[0], ")")
 }
 
+func (s *PeerSpace) Empty() bool {
+	s.RLock()
+	defer s.RUnlock()
+	return len(s.spaces) == 0
+}
+
 func (s *PeerSpace) NumFreeAddresses() uint32 {
 	s.RLock()
 	defer s.RUnlock()

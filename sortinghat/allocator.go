@@ -7,17 +7,20 @@ import (
 	"github.com/zettio/weave/router"
 	"net"
 	"sync"
+	"time"
 )
 
 const (
 	MinSafeFreeAddresses = 5
 	MaxAddressesToGiveUp = 256
+	waitForLeader        = 2 * time.Second
 
 	gossipSpaceRequest = iota
 	gossipSpaceDonate
 
 	allocStateNeutral = iota
 	allocStateExpectingDonation
+	allocStateLeaderless // Need to elect a leader
 )
 
 type Allocator struct {
@@ -31,23 +34,28 @@ type Allocator struct {
 }
 
 func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, startAddr net.IP, universeSize int) *Allocator {
-	return &Allocator{
+	alloc := &Allocator{
 		gossip:      gossip,
 		ourName:     ourName,
-		state:       allocStateNeutral,
+		state:       allocStateLeaderless,
 		universe:    MinSpace{Start: startAddr, Size: uint32(universeSize)},
 		spacesets:   make(map[router.PeerName]*PeerSpace),
 		ourSpaceSet: NewSpaceSet(ourName),
 	}
+	time.AfterFunc(waitForLeader, func() { alloc.ElectLeader() })
+	return alloc
 }
 
-func (alloc *Allocator) ManageSpace(startAddr net.IP, poolSize int) {
-	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, uint32(poolSize)))
+// NOTE: exposed functions (start with uppercase) take a lock;
+// internal functions never take a lock.  Go's locks are not re-entrant
+
+// Only called when testing or if we are elected leader
+func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
+	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, poolSize))
+	alloc.state = allocStateNeutral
 }
 
-func (alloc *Allocator) Encode() ([]byte, error) {
-	alloc.RLock()
-	defer alloc.RUnlock()
+func (alloc *Allocator) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	if err := enc.Encode(1); err != nil {
@@ -61,8 +69,6 @@ func (alloc *Allocator) Encode() ([]byte, error) {
 }
 
 func (alloc *Allocator) decodeUpdate(update []byte) error {
-	alloc.Lock()
-	defer alloc.Unlock()
 	reader := bytes.NewReader(update)
 	decoder := gob.NewDecoder(reader)
 	var numSpaceSets int
@@ -77,8 +83,11 @@ func (alloc *Allocator) decodeUpdate(update []byte) error {
 		// compare this received spaceset's version against the one we had prev.
 		oldSpaceset, found := alloc.spacesets[newSpaceset.PeerName]
 		if !found || newSpaceset.version > oldSpaceset.version {
-			lg.Debug.Println("Replacing", newSpaceset.PeerName, "data with newer version")
+			lg.Debug.Println("Replacing", newSpaceset.PeerName, "data with newer version", newSpaceset.version)
 			alloc.spacesets[newSpaceset.PeerName] = newSpaceset
+			if alloc.state == allocStateLeaderless {
+				alloc.state = allocStateNeutral
+			}
 		}
 	}
 	return nil
@@ -92,6 +101,38 @@ func (alloc *Allocator) considerOurPosition() {
 		}
 	case allocStateExpectingDonation:
 		// What?
+	case allocStateLeaderless:
+		// Can't do anything in this state - waiting for timeout
+	}
+}
+
+func (alloc *Allocator) haveLeader() {
+}
+
+func (alloc *Allocator) ElectLeader() {
+	lg.Debug.Println("Time to look for a leader")
+	alloc.Lock()
+	defer alloc.Unlock()
+	// If anyone is already managing some space, then we don't need to elect a leader
+	if !alloc.ourSpaceSet.Empty() {
+		return
+	}
+	highest := alloc.ourName
+	for _, spaceset := range alloc.spacesets {
+		if !spaceset.Empty() {
+			return
+		}
+		if spaceset.PeerName > highest {
+			highest = spaceset.PeerName
+		}
+	}
+	lg.Debug.Println("Elected leader:", highest)
+	// The peer with the highest name is the leader
+	if highest == alloc.ourName {
+		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
+		// I'm the winner; take control of the whole universe
+		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
+		go alloc.gossip.Gossip()
 	}
 }
 
@@ -106,7 +147,7 @@ func (alloc *Allocator) requestSpace() {
 	}
 	if best != nil {
 		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space")
-		myState, _ := alloc.Encode()
+		myState, _ := alloc.encode()
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
 		alloc.gossip.GossipSendTo(best.PeerName, msg)
 		alloc.state = allocStateExpectingDonation
@@ -119,7 +160,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 
 	if start, size, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
 		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
-		myState, _ := alloc.Encode()
+		myState, _ := alloc.encode()
 		size_encoding := intip4(size) // hack!
 		msg := router.Concat([]byte{gossipSpaceDonate}, start.To4(), size_encoding, myState)
 		alloc.gossip.GossipSendTo(sender, msg)
@@ -140,15 +181,19 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 		}
 		alloc.ourSpaceSet.AddSpace(NewSpace(start, size))
 		alloc.state = allocStateNeutral
-		alloc.gossip.Gossip()
+		go alloc.gossip.Gossip()
 	}
 }
 
 func (alloc *Allocator) AllocateFor(ident string) net.IP {
+	alloc.Lock()
+	defer alloc.Unlock()
 	return alloc.ourSpaceSet.AllocateFor(ident)
 }
 
 func (alloc *Allocator) Free(addr net.IP) error {
+	alloc.Lock()
+	defer alloc.Unlock()
 	return alloc.ourSpaceSet.Free(addr)
 }
 
@@ -159,6 +204,8 @@ func (alloc *Allocator) String() string {
 // GossipDelegate methods
 func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
 	lg.Debug.Printf("NotifyMsg from %s: %+v\n", sender, msg)
+	alloc.Lock()
+	defer alloc.Unlock()
 	switch msg[0] {
 	case gossipSpaceRequest:
 		alloc.handleSpaceRequest(sender, msg[1:])
@@ -173,8 +220,10 @@ func (alloc *Allocator) GetBroadcasts(overhead, limit int) [][]byte {
 }
 
 func (alloc *Allocator) LocalState(join bool) []byte {
+	alloc.Lock()
+	defer alloc.Unlock()
 	lg.Debug.Printf("LocalState: %t\n", join)
-	if buf, err := alloc.Encode(); err == nil {
+	if buf, err := alloc.encode(); err == nil {
 		return buf
 	} else {
 		lg.Error.Println("Error", err)

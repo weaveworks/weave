@@ -51,7 +51,17 @@ func (s *SpaceSet) Encode(enc *gob.Encoder) error {
 func (s *SpaceSet) String() string {
 	s.RLock()
 	defer s.RUnlock()
-	return fmt.Sprint("SpaceSet ", s.PeerName, " (v", s.version, ") (spaces: ", len(s.spaces), ") (1st: ", s.spaces[0], ")")
+	if len(s.spaces) == 0 {
+		return fmt.Sprint("SpaceSet ", s.PeerName, " (v", s.version, ") empty")
+	} else {
+		return fmt.Sprint("SpaceSet ", s.PeerName, " (v", s.version, ") (spaces: ", len(s.spaces), ") (1st: ", s.spaces[0], ")")
+	}
+}
+
+func (s *SpaceSet) Empty() bool {
+	s.RLock()
+	defer s.RUnlock()
+	return len(s.spaces) == 0
 }
 
 func (s *SpaceSet) NumFreeAddresses() uint32 {
