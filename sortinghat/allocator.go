@@ -13,18 +13,18 @@ const (
 	MinSafeFreeAddresses = 5
 	MaxAddressesToGiveUp = 256
 
-	GossipSpaceRequest = iota
-	GossipSpaceDonate
+	gossipSpaceRequest = iota
+	gossipSpaceDonate
 
-	AllocStateNeutral = iota
-	AllocStateExpectingHole
+	allocStateNeutral = iota
+	allocStateExpectingDonation
 )
 
 type Allocator struct {
 	sync.RWMutex
 	ourName     router.PeerName
 	state       int
-	universe    MinSpace
+	universe    MinSpace // all the addresses that could
 	gossip      router.GossipCommsProvider
 	spacesets   map[router.PeerName]*PeerSpace
 	ourSpaceSet *SpaceSet
@@ -34,7 +34,7 @@ func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, st
 	return &Allocator{
 		gossip:      gossip,
 		ourName:     ourName,
-		state:       AllocStateNeutral,
+		state:       allocStateNeutral,
 		universe:    MinSpace{Start: startAddr, Size: uint32(universeSize)},
 		spacesets:   make(map[router.PeerName]*PeerSpace),
 		ourSpaceSet: NewSpaceSet(ourName),
@@ -60,7 +60,7 @@ func (alloc *Allocator) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (alloc *Allocator) DecodeUpdate(update []byte) error {
+func (alloc *Allocator) decodeUpdate(update []byte) error {
 	alloc.Lock()
 	defer alloc.Unlock()
 	reader := bytes.NewReader(update)
@@ -84,13 +84,13 @@ func (alloc *Allocator) DecodeUpdate(update []byte) error {
 	return nil
 }
 
-func (alloc *Allocator) ConsiderOurPosition() {
+func (alloc *Allocator) considerOurPosition() {
 	switch alloc.state {
-	case AllocStateNeutral:
+	case allocStateNeutral:
 		if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
 			alloc.requestSpace()
 		}
-	case AllocStateExpectingHole:
+	case allocStateExpectingDonation:
 		// What?
 	}
 }
@@ -107,36 +107,41 @@ func (alloc *Allocator) requestSpace() {
 	if best != nil {
 		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space")
 		myState, _ := alloc.Encode()
-		msg := router.Concat([]byte{GossipSpaceRequest}, myState)
+		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
 		alloc.gossip.GossipSendTo(best.PeerName, msg)
-		alloc.state = AllocStateExpectingHole
+		alloc.state = allocStateExpectingDonation
 	}
 }
 
 func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 	lg.Debug.Println("Received space request from", sender)
-	alloc.DecodeUpdate(msg)
+	alloc.decodeUpdate(msg)
 
 	if start, size, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
 		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
 		myState, _ := alloc.Encode()
 		size_encoding := intip4(size) // hack!
-		msg := router.Concat([]byte{GossipSpaceDonate}, start.To4(), size_encoding, myState)
+		msg := router.Concat([]byte{gossipSpaceDonate}, start.To4(), size_encoding, myState)
 		alloc.gossip.GossipSendTo(sender, msg)
 	}
 }
 
-func (alloc *Allocator) handleSpaceDonate(msg []byte) {
+func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 	var start net.IP = msg[0:4]
 	size := ip4int(msg[4:8])
-	lg.Debug.Println("Received space donation start", start, "size", size)
-	if err := alloc.DecodeUpdate(msg[8:]); err != nil {
-		lg.Error.Println("Error decoding update", err)
-		return
+	lg.Debug.Println("Received space donation: sender", sender, "start", start, "size", size)
+	switch alloc.state {
+	case allocStateNeutral:
+		lg.Error.Println("Not expecting to receive space donation from", sender)
+	case allocStateExpectingDonation:
+		if err := alloc.decodeUpdate(msg[8:]); err != nil {
+			lg.Error.Println("Error decoding update", err)
+			return
+		}
+		alloc.ourSpaceSet.AddSpace(NewSpace(start, size))
+		alloc.state = allocStateNeutral
+		alloc.gossip.Gossip()
 	}
-	alloc.ourSpaceSet.AddSpace(NewSpace(start, size))
-
-	alloc.gossip.Gossip()
 }
 
 func (alloc *Allocator) AllocateFor(ident string) net.IP {
@@ -155,10 +160,10 @@ func (alloc *Allocator) String() string {
 func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
 	lg.Debug.Printf("NotifyMsg from %s: %+v\n", sender, msg)
 	switch msg[0] {
-	case GossipSpaceRequest:
+	case gossipSpaceRequest:
 		alloc.handleSpaceRequest(sender, msg[1:])
-	case GossipSpaceDonate:
-		alloc.handleSpaceDonate(msg[1:])
+	case gossipSpaceDonate:
+		alloc.handleSpaceDonate(sender, msg[1:])
 	}
 }
 
@@ -179,6 +184,6 @@ func (alloc *Allocator) LocalState(join bool) []byte {
 
 func (alloc *Allocator) MergeRemoteState(buf []byte, join bool) {
 	lg.Debug.Printf("MergeRemoteState: %t %d bytes\n", join, len(buf))
-	alloc.DecodeUpdate(buf)
-	alloc.ConsiderOurPosition()
+	alloc.decodeUpdate(buf)
+	alloc.considerOurPosition()
 }

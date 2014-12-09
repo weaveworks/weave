@@ -138,7 +138,7 @@ func TestGossip(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	size_encoding := intip4(donateSize) // hack! using intip4
-	msg := router.Concat([]byte{GossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
+	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
 	alloc1.NotifyMsg(pn, msg)
 	if n := alloc1.ourSpaceSet.NumFreeAddresses(); n != 6 {
 		t.Fatalf("Total free addresses should be 6 but got %d", n)
