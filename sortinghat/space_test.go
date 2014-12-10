@@ -65,13 +65,22 @@ func TestSpaceOverlap(t *testing.T) {
 
 	space2 := NewSpace(ipAddr2, 10).GetMinSpace()
 	space3 := NewSpace(ipAddr3, 10).GetMinSpace()
-	if !space1.Overlaps(space2) {
-		t.Fatal("Space.Overlaps failed")
+	space4 := NewSpace(ipAddr1, 10).GetMinSpace()
+	space5 := NewSpace(ipAddr1, 11).GetMinSpace()
+	space6 := NewSpace(ipAddr1, 9).GetMinSpace()
+	if !space1.Overlaps(space2) || !space2.Overlaps(space1) {
+		t.Fatalf("Space.Overlaps failed: %+v / %+v", space1, space2)
 	}
-	if !space2.Overlaps(space1) {
-		t.Fatal("Space.Overlaps failed")
+	if space4.Overlaps(space2) || space2.Overlaps(space4) {
+		t.Fatalf("Space.Overlaps failed: %+v / %+v", space4, space2)
 	}
-	if space3.Overlaps(space1) {
-		t.Fatal("Space.Overlaps failed")
+	if !space5.Overlaps(space2) || !space2.Overlaps(space5) {
+		t.Fatalf("Space.Overlaps failed: %+v / %+v", space5, space2)
+	}
+	if space6.Overlaps(space2) || space2.Overlaps(space6) {
+		t.Fatalf("Space.Overlaps failed: %+v / %+v", space6, space2)
+	}
+	if space3.Overlaps(space1) || space1.Overlaps(space3) {
+		t.Fatalf("Space.Overlaps failed: %+v / %+v", space3, space1)
 	}
 }
