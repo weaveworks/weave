@@ -44,6 +44,11 @@ func (s *MinSpace) LargestFreeBlock() uint32 {
 	return s.Size - s.MaxAllocated
 }
 
+func (a *MinSpace) Overlaps(b *MinSpace) bool {
+	diff := subtract(a.Start, b.Start)
+	return !(-diff > int64(a.Size) || diff > int64(b.Size))
+}
+
 func NewSpace(start net.IP, size uint32) *Space {
 	return &Space{MinSpace: MinSpace{Start: start, Size: size, MaxAllocated: 0}}
 }

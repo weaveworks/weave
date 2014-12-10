@@ -132,3 +132,14 @@ func (s *SpaceSet) Free(addr net.IP) error {
 	}
 	return errors.New("Attempt to free IP address not in range")
 }
+
+func (s *SpaceSet) Overlaps(space *MinSpace) bool {
+	s.RLock()
+	defer s.RUnlock()
+	for _, space2 := range s.spaces {
+		if space.Overlaps(&space2.MinSpace) {
+			return true
+		}
+	}
+	return false
+}

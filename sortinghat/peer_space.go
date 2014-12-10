@@ -63,3 +63,14 @@ func (s *PeerSpace) NumFreeAddresses() uint32 {
 	}
 	return freeAddresses
 }
+
+func (s *PeerSpace) Overlaps(space *MinSpace) bool {
+	s.RLock()
+	defer s.RUnlock()
+	for _, space2 := range s.spaces {
+		if space.Overlaps(space2) {
+			return true
+		}
+	}
+	return false
+}

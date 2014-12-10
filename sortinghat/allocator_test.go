@@ -99,7 +99,7 @@ func TestGossip(t *testing.T) {
 		testStart2     = "10.0.1.1"
 		origSize       = 10
 		donateSize     = 5
-		donateStart    = "10.0.1.6"
+		donateStart    = "10.0.1.7"
 		ourNameString  = "01:00:00:01:00:00"
 		peerNameString = "02:00:00:02:00:00"
 	)

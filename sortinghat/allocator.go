@@ -47,7 +47,8 @@ func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, st
 }
 
 // NOTE: exposed functions (start with uppercase) take a lock;
-// internal functions never take a lock.  Go's locks are not re-entrant
+// internal functions never take a lock and never call an exposed function.
+// Go's locks are not re-entrant
 
 // Only called when testing or if we are elected leader
 func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
@@ -91,6 +92,18 @@ func (alloc *Allocator) decodeUpdate(update []byte) error {
 		}
 	}
 	return nil
+}
+
+func (alloc *Allocator) spaceOwner(space *MinSpace) router.PeerName {
+	if alloc.ourSpaceSet.Overlaps(space) {
+		return alloc.ourName
+	}
+	for peerName, spaceset := range alloc.spacesets {
+		if spaceset.Overlaps(space) {
+			return peerName
+		}
+	}
+	return router.UnknownPeerName
 }
 
 func (alloc *Allocator) considerOurPosition() {
@@ -178,11 +191,17 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 	case allocStateNeutral:
 		lg.Error.Println("Not expecting to receive space donation from", sender)
 	case allocStateExpectingDonation:
+		// Message is concluded by an update of state of the sender
 		if err := alloc.decodeUpdate(msg[8:]); err != nil {
 			lg.Error.Println("Error decoding update", err)
 			return
 		}
-		alloc.ourSpaceSet.AddSpace(NewSpace(start, size))
+		newSpace := NewSpace(start, size)
+		if owner := alloc.spaceOwner(newSpace.GetMinSpace()); owner != router.UnknownPeerName {
+			lg.Error.Printf("Space donated: %+v is already owned by %s", newSpace, owner)
+			return
+		}
+		alloc.ourSpaceSet.AddSpace(newSpace)
 		alloc.state = allocStateNeutral
 		go alloc.gossip.Gossip()
 	}
