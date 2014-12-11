@@ -483,13 +483,13 @@ func (peer *Peer) handleConnectionEstablished(conn *LocalConnection) {
 }
 
 func (peer *Peer) handleBroadcastTCP(msg []byte) {
-	peer.Router.Topology.RebuildRoutes()
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
 		conn.(*LocalConnection).SendTCP(msg)
 	})
 }
 
 func (peer *Peer) broadcastPeerUpdate(peers ...*Peer) {
+	peer.Router.Topology.RebuildRoutes()
 	peer.handleBroadcastTCP(Concat(ProtocolUpdateByte, EncodePeers(append(peers, peer)...)))
 }
 

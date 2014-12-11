@@ -491,6 +491,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			if len(newUpdate) == 0 {
 				continue
 			}
+			conn.Router.Topology.RebuildRoutes()
 			conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
