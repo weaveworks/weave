@@ -19,6 +19,26 @@ func NewPeerSpace(pn router.PeerName) *PeerSpace {
 	return &PeerSpace{PeerName: pn}
 }
 
+func (s *PeerSpace) Encode(enc *gob.Encoder) error {
+	s.RLock()
+	defer s.RUnlock()
+	if err := enc.Encode(s.PeerName); err != nil {
+		return err
+	}
+	if err := enc.Encode(s.version); err != nil {
+		return err
+	}
+	if err := enc.Encode(len(s.spaces)); err != nil {
+		return err
+	}
+	for _, space := range s.spaces {
+		if err := enc.Encode(space.GetMinSpace()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *PeerSpace) Decode(decoder *gob.Decoder) error {
 	s.Lock()
 	defer s.Unlock()

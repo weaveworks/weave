@@ -3,6 +3,7 @@ package sortinghat
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	lg "github.com/zettio/weave/logging"
 	"github.com/zettio/weave/router"
 	"net"
@@ -56,16 +57,24 @@ func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
 	alloc.state = allocStateNeutral
 }
 
-func (alloc *Allocator) encode() ([]byte, error) {
+func (alloc *Allocator) encode(includePeers bool) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	if err := enc.Encode(1); err != nil {
+	num := 1
+	if includePeers {
+		num += len(alloc.spacesets)
+	}
+	if err := enc.Encode(num); err != nil {
 		return nil, err
 	}
 	if err := alloc.ourSpaceSet.Encode(enc); err != nil {
 		return nil, err
 	}
-	// Question: Do I want to encode the PeerSpaces - other people's space-sets?
+	if includePeers {
+		for _, spaceset := range alloc.spacesets {
+			spaceset.Encode(enc)
+		}
+	}
 	return buf.Bytes(), nil
 }
 
@@ -145,7 +154,7 @@ func (alloc *Allocator) ElectLeader() {
 		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
 		// I'm the winner; take control of the whole universe
 		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
-		go alloc.gossip.Gossip()
+		alloc.gossip.GossipBroadcast(alloc.localState())
 	} else {
 		// We expect the other guy to take control, but if he doesn't, try again.
 		time.AfterFunc(waitForLeader, func() { alloc.ElectLeader() })
@@ -163,7 +172,7 @@ func (alloc *Allocator) requestSpace() {
 	}
 	if best != nil {
 		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space")
-		myState, _ := alloc.encode()
+		myState, _ := alloc.encode(false)
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
 		alloc.gossip.GossipSendTo(best.PeerName, msg)
 		alloc.state = allocStateExpectingDonation
@@ -176,7 +185,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 
 	if start, size, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
 		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
-		myState, _ := alloc.encode()
+		myState, _ := alloc.encode(false)
 		size_encoding := intip4(size) // hack!
 		msg := router.Concat([]byte{gossipSpaceDonate}, start.To4(), size_encoding, myState)
 		alloc.gossip.GossipSendTo(sender, msg)
@@ -198,12 +207,12 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 		}
 		newSpace := NewSpace(start, size)
 		if owner := alloc.spaceOwner(newSpace.GetMinSpace()); owner != router.UnknownPeerName {
-			lg.Error.Printf("Space donated: %+v is already owned by %s", newSpace, owner)
+			lg.Error.Printf("Space donated: %+v is already owned by %s\n%+v", newSpace, owner, alloc.spacesets[owner])
 			return
 		}
 		alloc.ourSpaceSet.AddSpace(newSpace)
 		alloc.state = allocStateNeutral
-		go alloc.gossip.Gossip()
+		alloc.gossip.GossipBroadcast(alloc.localState())
 	}
 }
 
@@ -220,12 +229,15 @@ func (alloc *Allocator) Free(addr net.IP) error {
 }
 
 func (alloc *Allocator) String() string {
-	return "something"
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintf("Allocator state %d\n", alloc.state))
+	buf.WriteString(fmt.Sprintf("Spaces:\n%s", alloc.ourSpaceSet))
+	return buf.String()
 }
 
 // GossipDelegate methods
 func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
-	lg.Debug.Printf("NotifyMsg from %s: %+v\n", sender, msg)
+	lg.Debug.Printf("NotifyMsg from %s: %d bytes\n", sender, len(msg))
 	alloc.Lock()
 	defer alloc.Unlock()
 	switch msg[0] {
@@ -236,16 +248,15 @@ func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
 	}
 }
 
-func (alloc *Allocator) GetBroadcasts(overhead, limit int) [][]byte {
-	lg.Debug.Printf("GetBroadcasts: %d %d\n", overhead, limit)
-	return nil
-}
-
-func (alloc *Allocator) LocalState(join bool) []byte {
+func (alloc *Allocator) LocalState() []byte {
 	alloc.Lock()
 	defer alloc.Unlock()
-	lg.Debug.Printf("LocalState: %t\n", join)
-	if buf, err := alloc.encode(); err == nil {
+	return alloc.localState()
+}
+
+func (alloc *Allocator) localState() []byte {
+	lg.Debug.Println("localState")
+	if buf, err := alloc.encode(false); err == nil {
 		return buf
 	} else {
 		lg.Error.Println("Error", err)
@@ -253,8 +264,25 @@ func (alloc *Allocator) LocalState(join bool) []byte {
 	return nil
 }
 
-func (alloc *Allocator) MergeRemoteState(buf []byte, join bool) {
-	lg.Debug.Printf("MergeRemoteState: %t %d bytes\n", join, len(buf))
+func (alloc *Allocator) GlobalState() []byte {
+	alloc.Lock()
+	defer alloc.Unlock()
+	lg.Debug.Println("GlobalState")
+	if buf, err := alloc.encode(true); err == nil {
+		return buf
+	} else {
+		lg.Error.Println("Error", err)
+	}
+	return nil
+}
+
+func (alloc *Allocator) MergeRemoteState(buf []byte, justNew bool) []byte {
+	lg.Debug.Printf("MergeRemoteState: %d bytes %t\n", len(buf), justNew)
 	alloc.decodeUpdate(buf)
 	alloc.considerOurPosition()
+	if justNew {
+		return nil // HACK FIXME
+	} else {
+		return buf // HACK FIXME
+	}
 }

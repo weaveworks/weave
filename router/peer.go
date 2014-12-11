@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"sort"
+	"time"
 )
 
 func NewPeer(name PeerName, uid uint64, version uint64, router *Router) *Peer {
@@ -211,15 +212,36 @@ func (peer *Peer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *Ethe
 	})
 }
 
+// contains state for everyone that sending peer knows
+// done on an interval; sent by one peer down [all/random subset of] connections
+// peers that receive it should examine the info, and if it is broadcast
 func (peer *Peer) Gossip() {
-	buf := peer.Router.GossipDelegate.LocalState(false)
+	buf := peer.Router.GossipDelegate.GlobalState()
+	peer.ForEachConnection(func(_ PeerName, conn Connection) {
+		peer.gossipOn(conn.(*LocalConnection), buf)
+	})
+}
+
+func (peer *Peer) gossipOn(conn *LocalConnection, buf []byte) {
+	log.Println("gossipOn", conn, len(buf), "bytes")
+	peerName := peer.Name.Bin()
+	nameLenByte := []byte{byte(len(peerName))}
+	msg := Concat([]byte{ProtocolGossip}, []byte{GossipVersion}, nameLenByte, peerName, buf)
+	conn.SendTCP(msg)
+}
+
+// intended for state from sending peer only
+// done when there is a change that everyone should hear about quickly
+// peers that receive it should relay it using broadcast topology.
+func (peer *Peer) GossipBroadcast(buf []byte) error {
 	peerName := peer.Name.Bin()
 	nameLenByte := []byte{byte(len(peerName))}
 	msg := Concat([]byte{ProtocolGossipBroadcast}, []byte{GossipVersion}, nameLenByte, peerName, buf)
-	peer.RelayGossip(peer.Name, msg)
+	peer.RelayGossipBroadcast(peer.Name, msg)
+	return nil // ?
 }
 
-func (peer *Peer) RelayGossip(srcName PeerName, msg []byte) {
+func (peer *Peer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
 	log.Println("Have been asked to relay gossip", len(msg), "bytes from", srcName)
 	if srcPeer, found := peer.Router.Peers.Fetch(srcName); found {
 		peer.CallBroadcastFunc(srcPeer, func(conn *LocalConnection) error {
@@ -232,14 +254,8 @@ func (peer *Peer) RelayGossip(srcName PeerName, msg []byte) {
 	}
 }
 
-func (peer *Peer) GossipBroadcastOn(conn *LocalConnection, buf []byte) {
-	log.Println("GossipBroadcastOn", conn, len(buf), "bytes")
-	peerName := peer.Name.Bin()
-	nameLenByte := []byte{byte(len(peerName))}
-	msg := Concat([]byte{ProtocolGossipBroadcast}, []byte{GossipVersion}, nameLenByte, peerName, buf)
-	conn.SendTCP(msg)
-}
-
+// specific message from one peer to another
+// intermediate peers should relay it using unicast topology.
 func (peer *Peer) GossipSendTo(dstPeerName PeerName, buf []byte) error {
 	log.Println("GossipSendTo", len(buf), "bytes to", dstPeerName)
 	srcPeerByte := peer.Name.Bin()
@@ -258,6 +274,7 @@ func (peer *Peer) RelayGossipTo(srcPeerName, dstPeerName PeerName, msg []byte) e
 		relayPeerName, found = peer.Router.Topology.Unicast(dstPeerName)
 		if !found {
 			log.Println("Cannot relay gossip for unknown destination:", dstPeerName)
+			log.Println("Topology: ", peer.Router.Topology)
 			return nil
 		}
 	}
@@ -353,21 +370,26 @@ func (peer *Peer) BroadcastTCP(msg []byte) {
 // ACTOR server
 
 func (peer *Peer) queryLoop(queryChan <-chan *PeerInteraction) {
+	gossipTimer := time.Tick(SlowHeartbeat)
 	for {
-		query, ok := <-queryChan
-		if !ok {
-			return
-		}
-		switch query.code {
-		case PAddConnection:
-			peer.handleAddConnection(query.payload.(*LocalConnection))
-		case PDeleteConnection:
-			peer.handleDeleteConnection(query.payload.(*LocalConnection))
-			query.resultChan <- nil
-		case PConnectionEstablished:
-			peer.handleConnectionEstablished(query.payload.(*LocalConnection))
-		case PBroadcastTCP:
-			peer.handleBroadcastTCP(query.payload.([]byte))
+		select {
+		case query, ok := <-queryChan:
+			if !ok {
+				return
+			}
+			switch query.code {
+			case PAddConnection:
+				peer.handleAddConnection(query.payload.(*LocalConnection))
+			case PDeleteConnection:
+				peer.handleDeleteConnection(query.payload.(*LocalConnection))
+				query.resultChan <- nil
+			case PConnectionEstablished:
+				peer.handleConnectionEstablished(query.payload.(*LocalConnection))
+			case PBroadcastTCP:
+				peer.handleBroadcastTCP(query.payload.([]byte))
+			}
+		case <-gossipTimer:
+			peer.Gossip()
 		}
 	}
 }
@@ -456,8 +478,8 @@ func (peer *Peer) handleConnectionEstablished(conn *LocalConnection) {
 	peer.broadcastPeerUpdate(conn.Remote())
 
 	// Send new friend our state
-	buf := peer.Router.GossipDelegate.LocalState(true)
-	peer.GossipBroadcastOn(conn, buf)
+	buf := peer.Router.GossipDelegate.LocalState()
+	peer.gossipOn(conn, buf)
 }
 
 func (peer *Peer) handleBroadcastTCP(msg []byte) {

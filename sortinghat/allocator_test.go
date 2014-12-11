@@ -72,24 +72,29 @@ func TestMultiSpaces(t *testing.T) {
 	}
 }
 
-type fakeMessage struct {
+type mockMessage struct {
 	dst router.PeerName
 	buf []byte
 }
 
-type fakeGossipComms struct {
-	messages []fakeMessage
+type mockGossipComms struct {
+	messages []mockMessage
 }
 
-func (f *fakeGossipComms) Reset() {
-	f.messages = make([]fakeMessage, 0)
+func (f *mockGossipComms) Reset() {
+	f.messages = make([]mockMessage, 0)
 }
 
-func (f *fakeGossipComms) Gossip() {
+func (f *mockGossipComms) Gossip() {
 }
 
-func (f *fakeGossipComms) GossipSendTo(dstPeerName router.PeerName, buf []byte) error {
-	f.messages = append(f.messages, fakeMessage{dstPeerName, buf})
+func (f *mockGossipComms) GossipBroadcast(buf []byte) error {
+	// fixme?
+	return nil
+}
+
+func (f *mockGossipComms) GossipSendTo(dstPeerName router.PeerName, buf []byte) error {
+	f.messages = append(f.messages, mockMessage{dstPeerName, buf})
 	return nil
 }
 
@@ -105,36 +110,36 @@ func TestGossip(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	fakeGossip1 := new(fakeGossipComms)
-	alloc1 := NewAllocator(ourName, fakeGossip1, net.ParseIP(testStart1), 1024)
+	mockGossip1 := new(mockGossipComms)
+	alloc1 := NewAllocator(ourName, mockGossip1, net.ParseIP(testStart1), 1024)
 	alloc1.manageSpace(net.ParseIP(testStart1), 1)
 
 	// Simulate another peer on the gossip network
-	fakeGossip2 := new(fakeGossipComms)
+	mockGossip2 := new(mockGossipComms)
 	pn, _ := router.PeerNameFromString(peerNameString)
-	alloc2 := NewAllocator(pn, fakeGossip2, net.ParseIP(testStart1), 1024)
+	alloc2 := NewAllocator(pn, mockGossip2, net.ParseIP(testStart1), 1024)
 	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
 
-	buf, err := alloc2.encode()
+	buf, err := alloc2.encode(true)
 	wt.AssertNoErr(t, err)
 
 	alloc1.MergeRemoteState(buf, true)
 
-	if len(fakeGossip1.messages) != 1 || fakeGossip1.messages[0].dst.String() != peerNameString {
-		t.Fatalf("Gossip message not sent as expected: %+v", fakeGossip1)
+	if len(mockGossip1.messages) != 1 || mockGossip1.messages[0].dst.String() != peerNameString {
+		t.Fatalf("Gossip message not sent as expected: %+v", mockGossip1)
 	}
 
-	if len(fakeGossip2.messages) != 0 {
-		t.Fatalf("Gossip message unexpected: %+v", fakeGossip2)
+	if len(mockGossip2.messages) != 0 {
+		t.Fatalf("Gossip message unexpected: %+v", mockGossip2)
 	}
 
-	fakeGossip1.Reset()
+	mockGossip1.Reset()
 
 	// Now make it look like alloc2 has given up half its space
 	alloc2.ourSpaceSet.spaces[0].Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	alloc2state, err := alloc2.encode()
+	alloc2state, err := alloc2.encode(false)
 	wt.AssertNoErr(t, err)
 
 	size_encoding := intip4(donateSize) // hack! using intip4

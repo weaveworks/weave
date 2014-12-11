@@ -418,6 +418,13 @@ func checkHandshakeStringField(fieldName string, expectedValue string, handshake
 	return val, nil
 }
 
+func decodePeerName(msg []byte) (name PeerName, nameLen byte, remainder []byte) {
+	nameLen = msg[0]
+	name = PeerNameFromBin(msg[1 : 1+nameLen])
+	remainder = msg[1+nameLen:]
+	return
+}
+
 func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool) {
 	defer conn.Decryptor.Shutdown()
 	var receiver TCPReceiver
@@ -440,6 +447,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			// the traffic rather than shutting down.
 			continue
 		}
+		conn.Remote().LastKnown = time.Now()
 		if msg[0] == ProtocolConnectionEstablished {
 			// We initiated the connection. We sent fast heartbeats to
 			// the remote side, which has now received at least one of
@@ -488,25 +496,42 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else if msg[0] == ProtocolGossipUnicast {
 			if msg[1] == GossipVersion {
-				srcNameLen := msg[2]
-				srcName := PeerNameFromBin(msg[3 : 3+srcNameLen])
-				destNameLen := msg[3+srcNameLen]
-				destName := PeerNameFromBin(msg[4+srcNameLen : 4+srcNameLen+destNameLen])
+				origMsg := msg
+				srcName, _, msg := decodePeerName(msg[2:])
+				destName, _, msg := decodePeerName(msg)
 				if conn.local.Name == destName {
-					payload := msg[4+srcNameLen+destNameLen:]
-					conn.Router.GossipDelegate.NotifyMsg(srcName, payload)
+					conn.Router.GossipDelegate.NotifyMsg(srcName, msg)
 				} else {
-					conn.local.RelayGossipTo(srcName, destName, msg)
+					conn.local.RelayGossipTo(srcName, destName, origMsg)
 				}
 			} else {
 				conn.log("received gossip msg with unsupported version:", msg[1])
 			}
 		} else if msg[0] == ProtocolGossipBroadcast {
+			// intended for state from sending peer only
+			// done when there is a change that everyone should hear about quickly
+			// peers that receive it should update it with anything they know that is newer
+			// and relay it using broadcast topology.
 			if msg[1] == GossipVersion {
-				srcNameLen := msg[2]
-				srcName := PeerNameFromBin(msg[3 : 3+srcNameLen])
-				conn.Router.GossipDelegate.MergeRemoteState(msg[3+srcNameLen:], false)
-				conn.local.RelayGossip(srcName, msg)
+				origMsg := msg
+				srcName, srcNameLen, msg := decodePeerName(msg[2:])
+				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg, false)
+				newMsg := Concat(origMsg[0:3+srcNameLen], newBuf)
+				conn.local.RelayGossipBroadcast(srcName, newMsg)
+			} else {
+				conn.log("received gossip msg with unsupported version:", msg[1])
+			}
+		} else if msg[0] == ProtocolGossip {
+			// contains state for everyone that sending peer knows
+			// peers that receive it should examine the info, and if any of it is newer then
+			// start a broadcast with that info as above.
+			if msg[1] == GossipVersion {
+				_, _, msg := decodePeerName(msg[2:])
+				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg, true)
+				if newBuf != nil {
+					// Note broadcast has us as the sender, not who we heard it from.
+					conn.local.GossipBroadcast(newBuf)
+				}
 			} else {
 				conn.log("received gossip msg with unsupported version:", msg[1])
 			}

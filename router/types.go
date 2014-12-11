@@ -28,28 +28,30 @@ type Router struct {
 }
 
 type GossipCommsProvider interface {
-	Gossip() // Send my LocalState
+	// specific message from one peer to another
+	// intermediate peers should relay it using unicast topology.
 	GossipSendTo(dstPeerName PeerName, buf []byte) error
+	// intended for state from sending peer only
+	// done when there is a change that everyone should hear about quickly
+	// peers that receive it should update it with anything they know that is newer
+	// and relay it using broadcast topology.
+	GossipBroadcast(buf []byte) error
+	// contains state for everyone that sending peer knows
+	// done on an interval; sent by one peer down [all/random subset of] connections
+	// peers that receive it should examine the info, and if any of it is newer then
+	// start a broadcast with that info as above.
+	Gossip()
 }
 
 type GossipDelegate interface {
-	// NotifyMsg is called when a user-data message is received.
 	NotifyMsg(sender PeerName, msg []byte)
 
-	// GetBroadcasts is called when user data messages can be broadcast.
-	GetBroadcasts(overhead, limit int) [][]byte
+	LocalState() []byte
+	GlobalState() []byte
 
-	// LocalState is used for a TCP Push/Pull. This is sent to
-	// the remote side in addition to the membership information. Any
-	// data can be sent here. See MergeRemoteState as well. The `join`
-	// boolean indicates this is for a join instead of a push/pull.
-	LocalState(join bool) []byte
-
-	// MergeRemoteState is invoked after a TCP Push/Pull. This is the
-	// state received from the remote side and is the result of the
-	// remote side's LocalState call. The 'join'
-	// boolean indicates this is for a join instead of a push/pull.
-	MergeRemoteState(buf []byte, join bool)
+	// Return supplied state updated with anything we know which is newer.
+	// If justNew, then only return the state which is newer, or nil if nothing new.
+	MergeRemoteState(buf []byte, justNew bool) []byte
 }
 
 type Peer struct {
@@ -61,6 +63,7 @@ type Peer struct {
 	UID           uint64
 	Router        *Router
 	localRefCount uint64
+	LastKnown     time.Time
 	queryChan     chan<- *PeerInteraction
 }
 
