@@ -97,7 +97,7 @@ MACs discovery.
 
 ### Crypto
 
-Weave can be configures to encrypt both the data passing over the TCP
+Weave can be configured to encrypt both the data passing over the TCP
 connections and the payloads of UDP packets sent between peers. This
 is accomplished using the [NaCl](http://nacl.cr.yp.to/) crypto
 libraries, employing Curve25519, XSalsa20 and Poly1305 to encrypt and
