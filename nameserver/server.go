@@ -39,8 +39,8 @@ func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		q := r.Question[0]
 		Debug.Printf("Local query: %+v", q)
 		if q.Qtype == dns.TypeA {
-			if ip, err := zone.LookupLocal(q.Name); err == nil {
-				m := makeAddressReply(r, &q, []net.IP{ip})
+			if ips, err := zone.LookupLocal(q.Name); err == nil {
+				m := makeAddressReply(r, &q, ips)
 				w.WriteMsg(m)
 			} else {
 				Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)

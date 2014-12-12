@@ -53,8 +53,9 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 		// Ignore answers to other questions
 		if len(r.Answer) == 0 && len(r.Question) > 0 {
 			q := r.Question[0]
-			if ip, err := s.zone.LookupLocal(q.Name); err == nil {
-				m := makeAddressReply(r, &q, []net.IP{ip})
+			if ips, err := s.zone.LookupLocal(q.Name); err == nil {
+				Debug.Printf("%d IPs found for name %s", len(ips), q.Name)
+				m := makeAddressReply(r, &q, ips)
 				if err = s.sendResponse(m); err != nil {
 					Warning.Printf("Error writing to %s", w)
 				}
@@ -70,6 +71,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 }
 
 func (s *MDNSServer) sendResponse(m *dns.Msg) error {
+	Debug.Printf("Sending response")
 	buf, err := m.Pack()
 	if err != nil {
 		return err

@@ -151,3 +151,44 @@ outerloop:
 		t.Fatal("Unexpected result for", successTestName, context1.receivedAddr, context2.receivedAddr, context1.receivedCount, context2.receivedCount)
 	}
 }
+
+func TestInflightCleanups(t *testing.T) {
+	client, _ := NewMDNSClient()
+	timeBase := time.Now()
+
+	client.inflight["A.local"] = &inflightQuery{
+		name: "A.local",
+		id:   0,
+		responseInfos: []*responseInfo{
+			&responseInfo{
+				timeout: timeBase.Add(1),
+				ch:      make(chan<- *ResponseA),
+			},
+			&responseInfo{
+				timeout: timeBase.Add(2),
+				ch:      make(chan<- *ResponseA),
+			},
+			&responseInfo{
+				timeout: timeBase.Add(3),
+				ch:      make(chan<- *ResponseA),
+			},
+			&responseInfo{
+				timeout: timeBase.Add(4),
+				ch:      make(chan<- *ResponseA),
+			},
+		},
+		backgroundResponseInfos: []*backgroundRespInfo{
+			&backgroundRespInfo{
+				ch:      make(chan <- *ResponseA),
+			},
+		},
+	}
+	client.checkInFlightQueries(timeBase.Add(2))
+	afterCleanup := client.inflight["A.local"]
+	if len(afterCleanup.responseInfos) != 2 {
+		t.Fatalf("Inflight cleanup failed: %d found, 2 expected", len(client.inflight))
+	}
+	if len(afterCleanup.backgroundResponseInfos) != 1 {		// just in case, as nothing should change here...
+		t.Fatalf("Inflight cleanup failed: %d found, 1 expected", len(client.inflight))
+	}
+}

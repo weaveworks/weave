@@ -77,8 +77,8 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 
 	// query periodically (every MDNS_QUERY_PERIOD seconds) for this name
 	go func() {
-		var responsesChan chan *nameserver.ResponseA
 		timer := time.NewTimer(0)
+		responsesChan := make(chan *nameserver.ResponseA)
 
 	outerloop:
 		for {
@@ -88,8 +88,7 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 				mdnsClient.Shutdown()
 				break outerloop
 			case <-timer.C:
-				responsesChan = make(chan *nameserver.ResponseA)
-				mdnsClient.SendQuery(mdns.fullDomain, dns.TypeA, responsesChan)
+				mdnsClient.BackgroundQuery(mdns.fullDomain, dns.TypeA, responsesChan)
 				timer.Reset(MDNS_QUERY_PERIOD * time.Second)
 			case resp, ok := <-responsesChan:
 				if ok {

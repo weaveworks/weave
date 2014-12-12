@@ -10,7 +10,7 @@ type Zone interface {
 	AddRecord(ident string, name string, ip net.IP) error
 	DeleteRecord(ident string, ip net.IP) error
 	DeleteRecordsFor(ident string) error
-	LookupLocal(name string) (net.IP, error)
+	LookupLocal(name string) ([]net.IP, error)
 	ReverseLookupLocal(ip net.IP) (string, error)
 }
 
@@ -49,15 +49,20 @@ func (zone *ZoneDb) indexOf(match func(Record) bool) int {
 	return -1
 }
 
-func (zone *ZoneDb) LookupLocal(name string) (net.IP, error) {
+func (zone *ZoneDb) LookupLocal(name string) (res []net.IP, err error) {
+	err = nil
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 	for _, r := range zone.recs {
 		if r.Name == name {
-			return r.IP, nil
+			res = append(res, r.IP)
 		}
 	}
-	return nil, LookupError(name)
+
+	if len(res) == 0 {
+		err = LookupError(name)
+	}
+	return
 }
 
 func (zone *ZoneDb) ReverseLookupLocal(ip net.IP) (string, error) {
