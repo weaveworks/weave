@@ -15,7 +15,7 @@ Subsquently, giving any container a hostname in the domain
 
 ```bash
 $ weave launch
-$ weave launch-dns 10.1.0.2/16
+$ weave launch-dns 10.1.254.1/24
 $ weave run 10.1.1.25/24 -ti -h pingme.weave.local ubuntu
 $ shell1=$(weave run --with-dns 10.1.1.26/24 -ti -h ubuntu.weave.local ubuntu)
 $ docker attach $shell1
@@ -74,7 +74,7 @@ supply a different bridge device, use the environment variable
 `DOCKER_BRIDGE`, e.g.,
 
 ```bash
-$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.0.1.2/16
+$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.1.254.1/24
 ```
 
 ### Supplying the DNS server
@@ -140,7 +140,7 @@ any containers that die. You can tell it not to, by adding
 `--watch=false` to the container args:
 
 ```bash
-$ weave launch-dns 10.1.0.2/16 --watch=false
+$ weave launch-dns 10.1.254.1/24 --watch=false
 ```
 
 ### Unregistering
