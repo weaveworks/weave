@@ -115,12 +115,12 @@ poorly documented, and easily used wrongly.
 #### Establishing the Ephemeral Session Key
 
 For every connection between peers, a fresh public/private key pair is
-created at both ends, using NaCl's `GenerateKey` function, and the
-public key portion is sent to the other end as part of the initial
-handshake performed over TCP. Peers that were started with `-password`
-do not continue with connection establishment unless they receive a
-public key from the remote peer. Thus either all peers in a weave
-network must be started with `-password`, or none of them.
+created at both ends, using NaCl's `GenerateKey` function. The public
+key portion is sent to the other end as part of the initial handshake
+performed over TCP. Peers that were started with `-password` do not
+continue with connection establishment unless they receive a public
+key from the remote peer. Thus either all peers in a weave network
+must be started with `-password`, or none of them.
 
 When a peer has received a public key from the remote peer, it uses
 this to form the ephemeral session key for this connection. The public
