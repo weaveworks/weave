@@ -84,7 +84,7 @@ UDP packet.
 The meta data for each frame contains the names of the capturing and
 destination peers. Since the name of the capturing peer name is
 associated with the source MAC of the captured payload, it allows
-receivings peers to build up their mappings of which client MAC
+receiving peers to build up their mappings of which client MAC
 addresses are local to which peers. The destination peer name enables
 the receiving peer to identify whether this frame is destined for
 itself or whether it should be forwarded on to some other peer,
@@ -93,7 +93,7 @@ intermediate peer has no knowledge of the destination MAC: only the
 original capturing peer needs to determine the destination peer from
 the MAC. This way weave peers never need to exchange the MAC addresses
 of clients and need not take any special action for ARP traffic and
-MACs discovery.
+MAC discovery.
 
 ### Crypto
 
@@ -162,12 +162,12 @@ size or latency is not a major concern, so the potentially substantial
 increase in length of messages by prepending the full nonce, or the
 cost of generating a fresh random nonce for each message is not
 considered likely to cause problems. The random nonces are created by
-crypto library's rand module, which implements a cryptographically
+the go `crypto/rand` package, which implements a cryptographically
 secure pseudorandom number generator.
 
 #### UDP
 
-UDP connection carry captured traffic between peers. For a UDP packet
+UDP connections carry captured traffic between peers. For a UDP packet
 sent between peers that are using crypto, the encapsulation looks as
 follows:
 
