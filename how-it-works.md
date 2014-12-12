@@ -38,3 +38,7 @@ make routing decisions and thus avoid forwarding every packet to every
 peer. The topology information captures which peers are connected to
 which other peers; weave can route packets in partially connected
 networks with changing topology.
+
+### Further reading
+More details on the inner workings of weave can be found in the
+[architecture documentation](https://github.com/zettio/weave/blob/master/docs/architecture.txt).
