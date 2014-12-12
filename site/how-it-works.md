@@ -39,10 +39,6 @@ When the weave router forwards packets, the encapsulation looks
 something like this:
 
     +-----------------------------------+
-    | IP headers                        |
-    +-----------------------------------+
-    | UDP headers                       |
-    +-----------------------------------+
     | Name of sending peer              |
     +-----------------------------------+
     | Frame 1: Name of capturing peer   |
@@ -72,12 +68,12 @@ something like this:
     | Frame N: Captured payload         |
     +-----------------------------------+
 
-The standard IP and UDP headers are followed the name of the sending
-peer, which enables the receiving peer to identify who sent this UDP
-packet. Next come the meta data and payload for one or more captured
-frames. The router performs batching: if it captures several frames
-very quickly that all need forwarding to the same peer, it will fit as
-many of them as possible into a single UDP packet.
+The name of the sending peer enables the receiving peer to identify
+who sent this UDP packet. This is followed by the meta data and
+payload for one or more captured frames. The router performs batching:
+if it captures several frames very quickly that all need forwarding to
+the same peer, it will fit as many of them as possible into a single
+UDP packet.
 
 The meta data for each frame contains the names of the capturing and
 destination peers. Since the name of the capturing peer name is
@@ -167,10 +163,6 @@ UDP connection carry captured traffic between peers. For a UDP packet
 sent between peers that are using crypto, the encapsulation looks as
 follows:
 
-    +-----------------------------------+
-    | IP headers                        |
-    +-----------------------------------+
-    | UDP headers                       |
     +-----------------------------------+
     | Name of sending peer              |
     +-----------------------------------+
