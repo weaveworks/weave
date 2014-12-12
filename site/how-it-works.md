@@ -5,12 +5,11 @@ layout: default
 
 ## How does it work?
 
-A weave network consists of a number of so-called 'peers' - weave
-routers residing on different hosts. Each peer has a name, which tends
-to remain the same over restarts, and a unique identifier (UID) which
-is different each time it is run.  These are opaque identifiers as far
-as the router is concerned, although the name defaults to a MAC
-address.
+A weave network consists of a number of 'peers' - weave routers
+residing on different hosts. Each peer has a name, which tends to
+remain the same over restarts, and a unique identifier (UID) which is
+different each time it is run.  These are opaque identifiers as far as
+the router is concerned, although the name defaults to a MAC address.
 
 Weave routers establish TCP connections to each other, over which they
 perform a protocol handshake and subsequently exchange topology
