@@ -486,14 +486,14 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 				// request full update
 				conn.SendTCP(ProtocolFetchAllByte)
 				continue
-			} else if conn.CheckFatal(err) != nil {
+			}
+			if conn.CheckFatal(err) != nil {
 				return
 			}
-			if len(newUpdate) == 0 {
-				continue
+			if len(newUpdate) != 0 {
+				conn.Router.Topology.RebuildRoutes()
+				conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 			}
-			conn.Router.Topology.RebuildRoutes()
-			conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else {
