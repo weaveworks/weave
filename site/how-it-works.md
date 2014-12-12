@@ -5,6 +5,19 @@ layout: default
 
 ## How does it work?
 
+A weave network consists of a number of 'peers' - weave routers
+residing on different hosts. Each peer has a name, which tends to
+remain the same over restarts, and a unique identifier (UID) which is
+different each time it is run.  These are opaque identifiers as far as
+the router is concerned, although the name defaults to a MAC address.
+
+Weave routers establish TCP connections to each other, over which they
+perform a protocol handshake and subsequently exchange topology
+information (see below). These connections are encrypted if so
+configured. Peers also establish UDP "connections", possibly
+encrypted, which carry encapsulated network packets. These
+"connections" are duplex and can traverse firewalls.
+
 Weave creates a network bridge on the host. Each container is
 connected to that bridge via a veth pair, the container side of which
 is given the IP address & netmask supplied in 'weave run'. Also
@@ -25,13 +38,6 @@ make routing decisions and thus avoid forwarding every packet to every
 peer. The topology information captures which peers are connected to
 which other peers; weave can route packets in partially connected
 networks with changing topology.
-
-Weave routers establish TCP connections to each other, over which they
-perform a protocol handshake and subsequently exchange topology
-information. These connections are encrypted if so configured. Peers
-also establish UDP "connections", possibly encrypted, for the
-aforementioned packet forwarding. These "connections" are duplex and
-can traverse firewalls.
 
 ### <a name="encapsulation"></a>Encapsulation
 
