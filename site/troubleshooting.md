@@ -83,11 +83,8 @@ Reconnects:
 The terms used here are explained further at
 [how it works](how-it-works.html).
 
-A 'peer' on the weave network is a weave router; one per host.  Each
-peer has a name, which tends to remain the same over restarts, and a
-unique identifier (UID) which is different each time it is run.  These
-are opaque identifiers as far as the router is concerned, although the
-name defaults to a MAC address.
+The 'Our name' line identifies the local weave router as a peer in the
+weave network.
 
 The 'Sniffing traffic' line shows details of the virtual ethernet
 interface that weave is using to receive packets on the local
