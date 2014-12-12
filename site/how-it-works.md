@@ -97,17 +97,20 @@ MACs discovery.
 
 ### Crypto
 
-Weave encrypts traffic over both TCP and UDP between peers. Weave
-uses the NaCl crypto libraries, using Curve25519, XSalsa20 and Poly1305
-to encrypt and authenticate messages. Weave protects against injection
-and replay attacks for traffic forwarded between peers.
+Weave can be configures to encrypt both the data passing over the TCP
+connections and the payloads of UDP packets sent between peers. This
+is accomplished using the [NaCl](http://nacl.cr.yp.to/) crypto
+libraries, employing Curve25519, XSalsa20 and Poly1305 to encrypt and
+authenticate messages. Weave protects against injection and replay
+attacks for traffic forwarded between peers.
 
 NaCl was selected because of its good reputation both in terms of
 selection and implementation of ciphers, but equally importantly, its
-clear APIs and good documentation. It is quite difficult to use NaCl
-incorrectly.  Contrast this with libraries such as OpenSSL where the
-size of the library and its APIs are vast, poorly documented, and
-easily used wrongly.
+clear APIs, good documentation and high-quality
+[go implementation](https://godoc.org/golang.org/x/crypto/nacl). It is
+quite difficult to use NaCl incorrectly. Contrast this with libraries
+such as OpenSSL where the library and its APIs are vast in size,
+poorly documented, and easily used wrongly.
 
 #### Establishing the Ephemeral Session Key
 
