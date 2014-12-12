@@ -25,8 +25,8 @@ $ docker attach $shell1
 ```
 
 The weave IP address supplied to `weave launch-dns` must not be used
-by any other container, and the supplied network must contain all
-application networks.
+by any other container, and the supplied network must be the same for
+all DNS containers, and be disjoint from all application networks.
 
 The DNS container can be stopped with `stop-dns`.
 
