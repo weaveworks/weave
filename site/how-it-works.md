@@ -147,14 +147,14 @@ between two peers.
 TCP connection are only used to exchange topology information between
 peers, via a message-based protocol. The router generates a fresh
 192-bit random nonce for every message to be sent, and prepends the
-nonce to the encrypted message so that the receiver knows the
-nonce. Encryption of each message is carried out using NaCl's
-`secretbox.Seal` function using the ephemeral session key. Each TCP
-connection has a monotonically incrementing message counter, the
-current value of which is included in the encrypted part of the
-message. Given the assumption that TCP is reliable and ordered, a
-message received via TCP is only acted upon if the message counter in
-the received message is the expected message counter. This prevents
+nonce to the encrypted message, as is normal in NaCl, so that the
+receiver knows the nonce. Encryption of each message is carried out
+using NaCl's `secretbox.Seal` function using the ephemeral session
+key. Each TCP connection has a monotonically incrementing message
+counter, the current value of which is included in the encrypted part
+of the message. Given the assumption that TCP is reliable and ordered,
+a message received via TCP is only acted upon if the message counter
+in the received message is the expected message counter. This prevents
 replay attacks on the TCP connection.
 
 As TCP connections do not carry captured traffic, minimising message
