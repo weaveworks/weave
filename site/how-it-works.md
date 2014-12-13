@@ -252,7 +252,7 @@ offset is set to the offset of the current message and the new nonce
 is used. If those conditions are not met, the receiving side continues
 with the current nonce (according to the rules below), updating the
 highest offset seen as appropriate. Thus in order for the nonce to not
-be updated incorrectly would require a loss of at least 8192 messages.
+be updated correctly would require a loss of at least 8192 messages.
 
 5. When the receiving side switches to the new nonce, it does not
 discard the old nonce. If the highest offset seen is below 8192 (25% of
