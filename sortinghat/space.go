@@ -49,6 +49,10 @@ func (a *MinSpace) Overlaps(b *MinSpace) bool {
 	return !(-diff >= int64(a.Size) || diff >= int64(b.Size))
 }
 
+func (s *MinSpace) String() string {
+	return fmt.Sprintf("start %s, size %d, max allocated %d", s.Start, s.Size, s.MaxAllocated)
+}
+
 func NewSpace(start net.IP, size uint32) *Space {
 	return &Space{MinSpace: MinSpace{Start: start, Size: size, MaxAllocated: 0}}
 }

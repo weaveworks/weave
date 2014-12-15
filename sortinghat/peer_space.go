@@ -1,6 +1,7 @@
 package sortinghat
 
 import (
+	"bytes"
 	"encoding/gob"
 	"fmt"
 	"github.com/zettio/weave/router"
@@ -63,9 +64,14 @@ func (s *PeerSpace) Decode(decoder *gob.Decoder) error {
 }
 
 func (s *PeerSpace) String() string {
+	var buf bytes.Buffer
 	s.RLock()
 	defer s.RUnlock()
-	return fmt.Sprint("PeerSpace ", s.PeerName, " (v", s.version, ") (spaces: ", len(s.spaces), ") (1st: ", s.spaces[0], ")")
+	buf.WriteString(fmt.Sprint("PeerSpace ", s.PeerName, " (v", s.version, ")\n"))
+	for _, space := range s.spaces {
+		buf.WriteString(fmt.Sprintf("  %s\n", space.String()))
+	}
+	return buf.String()
 }
 
 func (s *PeerSpace) Empty() bool {

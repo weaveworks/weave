@@ -15,10 +15,12 @@ const (
 	MinSafeFreeAddresses = 5
 	MaxAddressesToGiveUp = 256
 	waitForLeader        = 5 * time.Second
-
+)
+const (
 	gossipSpaceRequest = iota
 	gossipSpaceDonate
-
+)
+const (
 	allocStateNeutral = iota
 	allocStateExpectingDonation
 	allocStateLeaderless // Need to elect a leader
@@ -230,8 +232,13 @@ func (alloc *Allocator) Free(addr net.IP) error {
 
 func (alloc *Allocator) String() string {
 	var buf bytes.Buffer
+	alloc.RLock()
+	defer alloc.RUnlock()
 	buf.WriteString(fmt.Sprintf("Allocator state %d\n", alloc.state))
-	buf.WriteString(fmt.Sprintf("Spaces:\n%s", alloc.ourSpaceSet))
+	buf.WriteString(fmt.Sprintf("%s\n", alloc.ourSpaceSet))
+	for _, spaceset := range alloc.spacesets {
+		buf.WriteString(spaceset.String())
+	}
 	return buf.String()
 }
 

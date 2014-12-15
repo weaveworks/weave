@@ -1,6 +1,7 @@
 package sortinghat
 
 import (
+	"bytes"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -49,13 +50,14 @@ func (s *SpaceSet) Encode(enc *gob.Encoder) error {
 }
 
 func (s *SpaceSet) String() string {
+	var buf bytes.Buffer
 	s.RLock()
 	defer s.RUnlock()
-	if len(s.spaces) == 0 {
-		return fmt.Sprint("SpaceSet ", s.PeerName, " (v", s.version, ") empty")
-	} else {
-		return fmt.Sprint("SpaceSet ", s.PeerName, " (v", s.version, ") (spaces: ", len(s.spaces), ") (1st: ", s.spaces[0], ")")
+	buf.WriteString(fmt.Sprint("SpaceSet ", s.PeerName, " (v", s.version, ")\n"))
+	for _, space := range s.spaces {
+		buf.WriteString(fmt.Sprintf("  %s\n", space.String()))
 	}
+	return buf.String()
 }
 
 func (s *SpaceSet) Empty() bool {
