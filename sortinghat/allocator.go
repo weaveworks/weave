@@ -14,7 +14,6 @@ import (
 const (
 	MinSafeFreeAddresses = 5
 	MaxAddressesToGiveUp = 256
-	waitForLeader        = 5 * time.Second
 )
 const (
 	gossipSpaceRequest = iota
@@ -45,7 +44,7 @@ func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, st
 		spacesets:   make(map[router.PeerName]*PeerSpace),
 		ourSpaceSet: NewSpaceSet(ourName),
 	}
-	time.AfterFunc(waitForLeader, func() { alloc.ElectLeader() })
+	time.AfterFunc(router.GossipWaitForLead, func() { alloc.ElectLeader() })
 	return alloc
 }
 
@@ -172,7 +171,7 @@ func (alloc *Allocator) ElectLeader() {
 		alloc.gossip.GossipBroadcast(alloc.localState())
 	} else {
 		// We expect the other guy to take control, but if he doesn't, try again.
-		time.AfterFunc(waitForLeader, func() { alloc.ElectLeader() })
+		time.AfterFunc(router.GossipWaitForLead, func() { alloc.ElectLeader() })
 	}
 }
 

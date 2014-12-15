@@ -372,7 +372,7 @@ func (peer *Peer) BroadcastTCP(msg []byte) {
 // ACTOR server
 
 func (peer *Peer) queryLoop(queryChan <-chan *PeerInteraction) {
-	gossipTimer := time.Tick(SlowHeartbeat)
+	gossipTimer := time.Tick(GossipInterval)
 	for {
 		select {
 		case query, ok := <-queryChan:
