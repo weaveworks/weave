@@ -92,6 +92,17 @@ func (alloc *Allocator) decodeUpdate(update []byte) error {
 		if err := newSpaceset.Decode(decoder); err != nil {
 			return err
 		}
+		if newSpaceset.PeerName == alloc.ourName {
+			if newSpaceset.version > alloc.ourSpaceSet.version {
+				lg.Debug.Println("Received update to our own info")
+				if !alloc.ourSpaceSet.Empty() {
+					lg.Error.Println("Received overwrite to our own allocation info")
+				}
+				alloc.ourSpaceSet.MergeFrom(newSpaceset)
+				lg.Debug.Println("info now:", alloc.string())
+			}
+			continue
+		}
 		// compare this received spaceset's version against the one we had prev.
 		oldSpaceset, found := alloc.spacesets[newSpaceset.PeerName]
 		if !found || newSpaceset.version > oldSpaceset.version {
@@ -233,9 +244,13 @@ func (alloc *Allocator) Free(addr net.IP) error {
 }
 
 func (alloc *Allocator) String() string {
-	var buf bytes.Buffer
 	alloc.RLock()
 	defer alloc.RUnlock()
+	return alloc.string()
+}
+
+func (alloc *Allocator) string() string {
+	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("Allocator state %d\n", alloc.state))
 	buf.WriteString(fmt.Sprintf("%s\n", alloc.ourSpaceSet))
 	for _, spaceset := range alloc.spacesets {

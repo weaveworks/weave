@@ -29,6 +29,18 @@ func (s *SpaceSet) AddSpace(space *Space) {
 	s.version++
 }
 
+// We've found (via gossip) some information about what we should be managing
+func (s *SpaceSet) MergeFrom(peerSpace *PeerSpace) {
+	s.Lock()
+	defer s.Unlock()
+	s.spaces = make([]*Space, len(peerSpace.spaces))
+	// Simple implementation for now: throw away what we know
+	for i, space := range peerSpace.spaces {
+		s.spaces[i] = NewSpace(space.Start, space.Size)
+	}
+	s.version = peerSpace.version
+}
+
 func (s *SpaceSet) Encode(enc *gob.Encoder) error {
 	s.RLock()
 	defer s.RUnlock()
