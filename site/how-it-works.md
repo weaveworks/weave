@@ -95,7 +95,7 @@ the MAC. This way weave peers never need to exchange the MAC addresses
 of clients and need not take any special action for ARP traffic and
 MAC discovery.
 
-### Crypto
+### <a name="crypto"></a>Crypto
 
 Weave can be configured to encrypt both the data passing over the TCP
 connections and the payloads of UDP packets sent between peers. This
