@@ -14,7 +14,7 @@ import (
 const (
 	MinSafeFreeAddresses = 5
 	MaxAddressesToGiveUp = 256
-	waitForLeader        = 2 * time.Second
+	waitForLeader        = 5 * time.Second
 
 	gossipSpaceRequest = iota
 	gossipSpaceDonate

@@ -218,7 +218,9 @@ func (peer *Peer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *Ethe
 func (peer *Peer) Gossip() {
 	buf := peer.Router.GossipDelegate.GlobalState()
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
-		peer.gossipOn(conn.(*LocalConnection), buf)
+		if conn.Established() {
+			peer.gossipOn(conn.(*LocalConnection), buf)
+		}
 	})
 }
 
