@@ -142,7 +142,7 @@ to each other.
 
 Found a bug, want to suggest a feature, or have a question?
 [File an issue](https://github.com/zettio/weave/issues), or email
-weave@zett.io. When reporting a bug, please include which version of
+help@weave.works. When reporting a bug, please include which version of
 weave you are running, as shown by `weave version`.
 
 Follow weave on Twitter:
