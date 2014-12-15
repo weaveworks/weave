@@ -139,11 +139,13 @@ func (alloc *Allocator) ElectLeader() {
 	defer alloc.Unlock()
 	// If anyone is already managing some space, then we don't need to elect a leader
 	if !alloc.ourSpaceSet.Empty() {
+		lg.Debug.Println("I have some space; someone must have given it to me")
 		return
 	}
 	highest := alloc.ourName
 	for _, spaceset := range alloc.spacesets {
 		if !spaceset.Empty() {
+			lg.Debug.Println("Peer", spaceset.PeerName, "has some space; someone must have given it to her")
 			return
 		}
 		if spaceset.PeerName > highest {
