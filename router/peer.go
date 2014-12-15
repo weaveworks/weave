@@ -478,10 +478,6 @@ func (peer *Peer) handleConnectionEstablished(conn *LocalConnection) {
 	peer.Unlock()
 	log.Println("Peer", peer.Name, "established active connection to remote peer", conn.Remote().Name, "at", conn.RemoteTCPAddr())
 	peer.broadcastPeerUpdate(conn.Remote())
-
-	// Send new friend our state
-	buf := peer.Router.GossipDelegate.LocalState()
-	peer.gossipOn(conn, buf)
 }
 
 func (peer *Peer) handleBroadcastTCP(msg []byte) {
