@@ -79,17 +79,21 @@ func (alloc *Allocator) encode(includePeers bool) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (alloc *Allocator) decodeUpdate(update []byte) error {
+// Unpack the supplied buffer which is encoded as per encode() above.
+// return a slice of MinSpace containing those PeerSpaces which are newer
+// than what we had previously
+func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpace, error) {
 	reader := bytes.NewReader(update)
 	decoder := gob.NewDecoder(reader)
 	var numSpaceSets int
 	if err := decoder.Decode(&numSpaceSets); err != nil {
-		return err
+		return nil, err
 	}
+	ret := make([]*PeerSpace, 0)
 	for i := 0; i < numSpaceSets; i++ {
 		newSpaceset := new(PeerSpace)
 		if err := newSpaceset.Decode(decoder); err != nil {
-			return err
+			return nil, err
 		}
 		if newSpaceset.PeerName == alloc.ourName {
 			if newSpaceset.version > alloc.ourSpaceSet.version {
@@ -99,6 +103,7 @@ func (alloc *Allocator) decodeUpdate(update []byte) error {
 				}
 				alloc.ourSpaceSet.MergeFrom(newSpaceset)
 				lg.Debug.Println("info now:", alloc.string())
+				ret = append(ret, newSpaceset)
 			}
 			continue
 		}
@@ -110,9 +115,10 @@ func (alloc *Allocator) decodeUpdate(update []byte) error {
 			if alloc.state == allocStateLeaderless {
 				alloc.state = allocStateNeutral
 			}
+			ret = append(ret, newSpaceset)
 		}
 	}
-	return nil
+	return ret, nil
 }
 
 func (alloc *Allocator) spaceOwner(space *MinSpace) router.PeerName {
@@ -128,6 +134,9 @@ func (alloc *Allocator) spaceOwner(space *MinSpace) router.PeerName {
 }
 
 func (alloc *Allocator) considerOurPosition() {
+	if alloc.gossip == nil {
+		return // Can't do anything.
+	}
 	switch alloc.state {
 	case allocStateNeutral:
 		if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
@@ -215,7 +224,7 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 		lg.Error.Println("Not expecting to receive space donation from", sender)
 	case allocStateExpectingDonation:
 		// Message is concluded by an update of state of the sender
-		if err := alloc.decodeUpdate(msg[8:]); err != nil {
+		if _, err := alloc.decodeUpdate(msg[8:]); err != nil {
 			lg.Error.Println("Error decoding update", err)
 			return
 		}
@@ -299,13 +308,28 @@ func (alloc *Allocator) GlobalState() []byte {
 	return nil
 }
 
-func (alloc *Allocator) MergeRemoteState(buf []byte, justNew bool) []byte {
-	lg.Debug.Printf("MergeRemoteState: %d bytes %t\n", len(buf), justNew)
-	alloc.decodeUpdate(buf)
+// merge in state and return a buffer encoding those PeerSpaces which are newer
+// than what we had previously, or nil if none were newer
+func (alloc *Allocator) MergeRemoteState(buf []byte) []byte {
+	lg.Debug.Printf("MergeRemoteState: %d bytes\n", len(buf))
+	newerPeerSpaces, err := alloc.decodeUpdate(buf)
+	if err != nil {
+		lg.Error.Println("Error decoding update", err)
+		return nil
+	}
 	alloc.considerOurPosition()
-	if justNew {
-		return nil // HACK FIXME
+	if len(newerPeerSpaces) == 0 {
+		return nil
 	} else {
-		return buf // HACK FIXME
+		buf := new(bytes.Buffer)
+		enc := gob.NewEncoder(buf)
+		if err := enc.Encode(len(newerPeerSpaces)); err != nil {
+			lg.Error.Println("Error encoding update", err)
+			return nil
+		}
+		for _, spaceset := range newerPeerSpaces {
+			spaceset.Encode(enc)
+		}
+		return buf.Bytes()
 	}
 }

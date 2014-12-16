@@ -38,6 +38,18 @@ func TestAllocFree(t *testing.T) {
 	}
 }
 
+func equalByteBuffer(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestMultiSpaces(t *testing.T) {
 	var (
 		containerID   = "deadbeef"
@@ -69,6 +81,80 @@ func TestMultiSpaces(t *testing.T) {
 
 	if n := alloc.ourSpaceSet.NumFreeAddresses(); n != 2 {
 		t.Fatalf("Free addresses should be 2 but got %d", n)
+	}
+}
+
+func TestEncodeMerge(t *testing.T) {
+	var (
+		testStart1     = "10.0.1.0"
+		testStart2     = "10.0.2.0"
+		testStart3     = "10.0.3.0"
+		ourNameString  = "01:00:00:01:00:00"
+		peerNameString = "02:00:00:02:00:00"
+	)
+
+	ourName, _ := router.PeerNameFromString(ourNameString)
+	alloc := NewAllocator(ourName, nil, net.ParseIP(testStart1), 1024)
+	alloc.manageSpace(net.ParseIP(testStart1), 16)
+	alloc.manageSpace(net.ParseIP(testStart2), 32)
+
+	encodedState, err := alloc.encode(true)
+	wt.AssertNoErr(t, err)
+
+	peerName, _ := router.PeerNameFromString(peerNameString)
+	alloc2 := NewAllocator(peerName, nil, net.ParseIP(testStart1), 1024)
+	alloc2.manageSpace(net.ParseIP(testStart3), 32)
+	encodedState2, err := alloc2.encode(true)
+	wt.AssertNoErr(t, err)
+
+	newBuf := alloc2.MergeRemoteState(encodedState)
+	if len(alloc2.spacesets) != 1 {
+		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc2.spacesets), 1)
+	}
+	decodedSpaceSet, found := alloc2.spacesets[ourName]
+	if !found {
+		t.Fatal("Decoded allocator did not contain spaceSet")
+	}
+	if !alloc.ourSpaceSet.Equal(decodedSpaceSet) {
+		t.Fatalf("Allocator not decoded as expected: %+v vs %+v", alloc.ourSpaceSet, decodedSpaceSet)
+	}
+
+	// Returned buffer should be all the new ones - i.e. everything we passed in
+	if !equalByteBuffer(encodedState, newBuf) {
+		t.Fatal("Generated buffer does not match")
+	}
+
+	// Do it again, and nothing should be new
+	newBuf = alloc2.MergeRemoteState(encodedState)
+	if newBuf != nil {
+		t.Fatal("Unexpected new items found")
+	}
+
+	// Now encode and merge the other way
+	buf, err := alloc2.encode(true)
+	wt.AssertNoErr(t, err)
+
+	newBuf = alloc.MergeRemoteState(buf)
+	if len(alloc.spacesets) != 1 {
+		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc.spacesets), 1)
+	}
+	decodedSpaceSet, found = alloc.spacesets[peerName]
+	if !found {
+		t.Fatal("Decoded allocator did not contain spaceSet")
+	}
+	if !alloc2.ourSpaceSet.Equal(decodedSpaceSet) {
+		t.Fatalf("Allocator not decoded as expected: %+v vs %+v", alloc2.ourSpaceSet, decodedSpaceSet)
+	}
+
+	// Returned buffer should be all the new ones - i.e. just alloc2's state
+	if !equalByteBuffer(encodedState2, newBuf) {
+		t.Fatal("Generated buffer does not match")
+	}
+
+	// Do it again, and nothing should be new
+	newBuf = alloc.MergeRemoteState(buf)
+	if newBuf != nil {
+		t.Fatal("Unexpected new items found")
 	}
 }
 
@@ -123,7 +209,7 @@ func TestGossip(t *testing.T) {
 	buf, err := alloc2.encode(true)
 	wt.AssertNoErr(t, err)
 
-	alloc1.MergeRemoteState(buf, true)
+	alloc1.MergeRemoteState(buf)
 
 	if len(mockGossip1.messages) != 1 || mockGossip1.messages[0].dst.String() != peerNameString {
 		t.Fatalf("Gossip message not sent as expected: %+v", mockGossip1)
