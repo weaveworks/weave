@@ -261,7 +261,6 @@ func (peer *Peer) encodePeer(enc *gob.Encoder) {
 	checkFatal(enc.Encode(peer.NameByte))
 	checkFatal(enc.Encode(peer.UID))
 	checkFatal(enc.Encode(peer.version))
-	// FIXME - send the lastKnown time here (?)
 
 	connsBuf := new(bytes.Buffer)
 	connsEnc := gob.NewEncoder(connsBuf)

@@ -62,7 +62,6 @@ type Peer struct {
 	UID           uint64
 	Router        *Router
 	localRefCount uint64
-	LastKnown     time.Time
 	queryChan     chan<- *PeerInteraction
 }
 

@@ -447,7 +447,6 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			// the traffic rather than shutting down.
 			continue
 		}
-		conn.Remote().LastKnown = time.Now()
 		if msg[0] == ProtocolConnectionEstablished {
 			// We initiated the connection. We sent fast heartbeats to
 			// the remote side, which has now received at least one of
