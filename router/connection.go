@@ -511,27 +511,26 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 		} else if msg[0] == ProtocolGossipBroadcast {
 			// intended for state from sending peer only
 			// done when there is a change that everyone should hear about quickly
-			// peers that receive it should update it with anything they know that is newer
-			// and relay it using broadcast topology.
+			// relayed using broadcast topology.
 			if msg[1] == GossipVersion {
 				origMsg := msg
-				srcName, srcNameLen, msg := decodePeerName(msg[2:])
-				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg)
-				newMsg := Concat(origMsg[0:3+srcNameLen], newBuf)
-				conn.local.RelayGossipBroadcast(srcName, newMsg)
+				srcName, _, msg := decodePeerName(msg[2:])
+				conn.Router.GossipDelegate.MergeRemoteState(msg)
+				// Question: should we stop the broadcast here if it wasn't new to us?
+				conn.local.RelayGossipBroadcast(srcName, origMsg)
 			} else {
 				conn.log("received gossip msg with unsupported version:", msg[1])
 			}
 		} else if msg[0] == ProtocolGossip {
 			// contains state for everyone that sending peer knows
 			// peers that receive it should examine the info, and if any of it is newer then
-			// start a broadcast with that info as above.
+			// pass it on to their peers
 			if msg[1] == GossipVersion {
 				_, _, msg := decodePeerName(msg[2:])
 				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg)
 				if newBuf != nil {
 					// Note broadcast has us as the sender, not who we heard it from.
-					conn.local.GossipBroadcast(newBuf)
+					conn.local.GossipMsg(newBuf)
 				}
 			} else {
 				conn.log("received gossip msg with unsupported version:", msg[1])

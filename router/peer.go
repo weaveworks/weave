@@ -216,7 +216,10 @@ func (peer *Peer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *Ethe
 // done on an interval; sent by one peer down [all/random subset of] connections
 // peers that receive it should examine the info, and if it is broadcast
 func (peer *Peer) Gossip() {
-	buf := peer.Router.GossipDelegate.GlobalState()
+	peer.GossipMsg(peer.Router.GossipDelegate.GlobalState())
+}
+
+func (peer *Peer) GossipMsg(buf []byte) {
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
 		if conn.Established() {
 			peer.gossipOn(conn.(*LocalConnection), buf)

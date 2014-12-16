@@ -33,8 +33,7 @@ type GossipCommsProvider interface {
 	GossipSendTo(dstPeerName PeerName, buf []byte) error
 	// intended for state from sending peer only
 	// done when there is a change that everyone should hear about quickly
-	// peers that receive it should update it with anything they know that is newer
-	// and relay it using broadcast topology.
+	// relayed it using broadcast topology.
 	GossipBroadcast(buf []byte) error
 	// contains state for everyone that sending peer knows
 	// done on an interval; sent by one peer down [all/random subset of] connections
