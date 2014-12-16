@@ -516,7 +516,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			if msg[1] == GossipVersion {
 				origMsg := msg
 				srcName, srcNameLen, msg := decodePeerName(msg[2:])
-				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg, false)
+				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg)
 				newMsg := Concat(origMsg[0:3+srcNameLen], newBuf)
 				conn.local.RelayGossipBroadcast(srcName, newMsg)
 			} else {
@@ -528,7 +528,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			// start a broadcast with that info as above.
 			if msg[1] == GossipVersion {
 				_, _, msg := decodePeerName(msg[2:])
-				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg, true)
+				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg)
 				if newBuf != nil {
 					// Note broadcast has us as the sender, not who we heard it from.
 					conn.local.GossipBroadcast(newBuf)

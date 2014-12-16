@@ -49,9 +49,9 @@ type GossipDelegate interface {
 	LocalState() []byte
 	GlobalState() []byte
 
-	// Return supplied state updated with anything we know which is newer.
-	// If justNew, then only return the state which is newer, or nil if nothing new.
-	MergeRemoteState(buf []byte, justNew bool) []byte
+	// merge in state and return a buffer encoding those PeerSpaces which are newer
+	// than what we had previously, or nil if none were newer
+	MergeRemoteState(buf []byte) []byte
 }
 
 type Peer struct {
