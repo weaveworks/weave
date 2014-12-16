@@ -33,7 +33,7 @@ func (s *PeerSpace) Encode(enc *gob.Encoder) error {
 		return err
 	}
 	for _, space := range s.spaces {
-		if err := enc.Encode(space.GetMinSpace()); err != nil {
+		if err := enc.Encode(space); err != nil {
 			return err
 		}
 	}
