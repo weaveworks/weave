@@ -84,3 +84,43 @@ func TestSpaceOverlap(t *testing.T) {
 		t.Fatalf("Space.Overlaps failed: %+v / %+v", space3, space1)
 	}
 }
+
+func TestSpaceHeirs(t *testing.T) {
+	const (
+		testAddr1 = "10.0.1.1"
+		testAddr2 = "10.0.1.10"
+		testAddr3 = "10.0.4.4"
+	)
+
+	var (
+		ipAddr1 = net.ParseIP(testAddr1)
+		ipAddr2 = net.ParseIP(testAddr2)
+		ipAddr3 = net.ParseIP(testAddr3)
+	)
+
+	universe := NewMinSpace(ipAddr1, 256)
+	space1 := NewMinSpace(ipAddr1, 9)
+	space2 := NewMinSpace(ipAddr2, 9)   // 1 is heir to 2
+	space3 := NewMinSpace(ipAddr3, 8)   // 3 is nowhere near 1 or 2
+	space4 := NewMinSpace(ipAddr1, 8)   // 4 is just too small to be heir to 2
+	space5 := NewMinSpace(ipAddr2, 247) // 5 is heir to 1, considering wrap-around
+
+	if !space1.IsHeirTo(space2, universe) {
+		t.Fatalf("Space.IsHeirTo false negative: %+v / %+v", space1, space2)
+	}
+	if space2.IsHeirTo(space1, universe) {
+		t.Fatalf("Space.IsHeirTo false positive: %+v / %+v", space2, space1)
+	}
+	if space1.IsHeirTo(space3, universe) {
+		t.Fatalf("Space.IsHeirTo false positive: %+v / %+v", space1, space3)
+	}
+	if space3.IsHeirTo(space2, universe) {
+		t.Fatalf("Space.IsHeirTo false positive: %+v / %+v", space3, space2)
+	}
+	if space4.IsHeirTo(space2, universe) {
+		t.Fatalf("Space.IsHeirTo false positive: %+v / %+v", space4, space2)
+	}
+	if !space5.IsHeirTo(space1, universe) {
+		t.Fatalf("Space.IsHeirTo false negative: %+v / %+v", space5, space1)
+	}
+}

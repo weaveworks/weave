@@ -49,8 +49,27 @@ func (a *MinSpace) Overlaps(b *MinSpace) bool {
 	return !(-diff >= int64(a.Size) || diff >= int64(b.Size))
 }
 
+// A space is heir to another space if it is immediately lower than it
+// (considering the universe as a ring)
+func (a *MinSpace) IsHeirTo(b *MinSpace, universe *MinSpace) bool {
+	diff := subtract(b.Start, a.Start)
+	usize, asize := int64(universe.Size), int64(a.Size)
+	if diff > usize || diff < -usize {
+		// This is probably an error
+		return false
+	} else if diff < 0 {
+		return diff+usize == asize
+	} else {
+		return diff == asize
+	}
+}
+
 func (s *MinSpace) String() string {
 	return fmt.Sprintf("start %s, size %d, max allocated %d", s.Start, s.Size, s.MaxAllocated)
+}
+
+func NewMinSpace(start net.IP, size uint32) *MinSpace {
+	return &MinSpace{Start: start, Size: size, MaxAllocated: 0}
 }
 
 func NewSpace(start net.IP, size uint32) *Space {
