@@ -16,9 +16,9 @@ func equal(ms1 *Space, ms2 *MinSpace) bool {
 		ms1.GetMaxAllocated() == ms2.GetMaxAllocated()
 }
 
+// Note does not compare PeerName and UID
 func (ps1 *SpaceSet) Equal(ps2 *PeerSpace) bool {
-	if ps1.PeerName == ps2.PeerName &&
-		ps1.version == ps2.version &&
+	if ps1.version == ps2.version &&
 		len(ps1.spaces) == len(ps2.spaces) {
 		for i := 0; i < len(ps1.spaces); i++ {
 			if !equal(ps1.spaces[i], ps2.spaces[i]) {
@@ -36,15 +36,16 @@ func TestEncodeDecode(t *testing.T) {
 		peer1     = "7a:9f:eb:b6:0c:6e"
 		testAddr1 = "10.0.3.4"
 	)
+	const peer1UID = 123456
 
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 
 	pn1, _ := router.PeerNameFromString(peer1)
-	ps1 := &SpaceSet{PeerName: pn1, version: 1234}
+	ps1 := &SpaceSet{version: 1234}
 	ps1.AddSpace(&Space{MinSpace: MinSpace{Start: net.ParseIP(testAddr1), Size: 10, MaxAllocated: 0}})
 
-	err := ps1.Encode(enc)
+	err := ps1.Encode(enc, pn1, peer1UID)
 	wt.AssertNoErr(t, err)
 
 	decoder := gob.NewDecoder(buf)
@@ -52,7 +53,7 @@ func TestEncodeDecode(t *testing.T) {
 	var ps2 PeerSpace
 	err = ps2.Decode(decoder)
 	wt.AssertNoErr(t, err)
-	if !ps1.Equal(&ps2) {
+	if ps2.PeerName != pn1 || ps2.UID != peer1UID || !ps1.Equal(&ps2) {
 		t.Fatalf("Decoded PeerSpace not equal to original")
 	}
 }

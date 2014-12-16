@@ -12,20 +12,24 @@ import (
 // This represents someone else's space allocations. See also SpaceSet.
 type PeerSpace struct {
 	router.PeerName
+	UID      uint64
 	version  uint64
 	spaces   []*MinSpace
 	lastSeen time.Time
 	sync.RWMutex
 }
 
-func NewPeerSpace(pn router.PeerName) *PeerSpace {
-	return &PeerSpace{PeerName: pn, lastSeen: time.Now()}
+func NewPeerSpace(pn router.PeerName, uid uint64) *PeerSpace {
+	return &PeerSpace{PeerName: pn, UID: uid, lastSeen: time.Now()}
 }
 
 func (s *PeerSpace) Encode(enc *gob.Encoder) error {
 	s.RLock()
 	defer s.RUnlock()
 	if err := enc.Encode(s.PeerName); err != nil {
+		return err
+	}
+	if err := enc.Encode(s.UID); err != nil {
 		return err
 	}
 	if err := enc.Encode(s.version); err != nil {
@@ -46,6 +50,9 @@ func (s *PeerSpace) Decode(decoder *gob.Decoder) error {
 	s.Lock()
 	defer s.Unlock()
 	if err := decoder.Decode(&s.PeerName); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&s.UID); err != nil {
 		return err
 	}
 	if err := decoder.Decode(&s.version); err != nil {
@@ -69,7 +76,7 @@ func (s *PeerSpace) String() string {
 	var buf bytes.Buffer
 	s.RLock()
 	defer s.RUnlock()
-	buf.WriteString(fmt.Sprint("PeerSpace ", s.PeerName, " (v", s.version, ")\n"))
+	buf.WriteString(fmt.Sprint("PeerSpace ", s.PeerName, s.UID, " (v", s.version, ")\n"))
 	for _, space := range s.spaces {
 		buf.WriteString(fmt.Sprintf("  %s\n", space.String()))
 	}

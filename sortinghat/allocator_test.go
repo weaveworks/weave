@@ -7,6 +7,11 @@ import (
 	"testing"
 )
 
+const (
+	ourUID  = 123456
+	peerUID = 654321
+)
+
 func TestAllocFree(t *testing.T) {
 	var (
 		containerID   = "deadbeef"
@@ -16,7 +21,7 @@ func TestAllocFree(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, nil, net.ParseIP(testAddr1), 3)
+	alloc := NewAllocator(ourName, ourUID, nil, net.ParseIP(testAddr1), 3)
 	alloc.manageSpace(net.ParseIP(testAddr1), 3)
 
 	addr1 := alloc.AllocateFor(containerID)
@@ -60,7 +65,7 @@ func TestMultiSpaces(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, nil, net.ParseIP(testStart1), 1024)
+	alloc := NewAllocator(ourName, ourUID, nil, net.ParseIP(testStart1), 1024)
 	alloc.manageSpace(net.ParseIP(testStart1), 1)
 	alloc.manageSpace(net.ParseIP(testStart2), 3)
 
@@ -94,7 +99,7 @@ func TestEncodeMerge(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, nil, net.ParseIP(testStart1), 1024)
+	alloc := NewAllocator(ourName, ourUID, nil, net.ParseIP(testStart1), 1024)
 	alloc.manageSpace(net.ParseIP(testStart1), 16)
 	alloc.manageSpace(net.ParseIP(testStart2), 32)
 
@@ -102,20 +107,20 @@ func TestEncodeMerge(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	peerName, _ := router.PeerNameFromString(peerNameString)
-	alloc2 := NewAllocator(peerName, nil, net.ParseIP(testStart1), 1024)
+	alloc2 := NewAllocator(peerName, peerUID, nil, net.ParseIP(testStart1), 1024)
 	alloc2.manageSpace(net.ParseIP(testStart3), 32)
 	encodedState2, err := alloc2.encode(true)
 	wt.AssertNoErr(t, err)
 
 	newBuf := alloc2.MergeRemoteState(encodedState)
-	if len(alloc2.spacesets) != 1 {
-		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc2.spacesets), 1)
+	if len(alloc2.peerInfo) != 1 {
+		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc2.peerInfo), 1)
 	}
-	decodedSpaceSet, found := alloc2.spacesets[ourName]
+	decodedSpaceSet, found := alloc2.peerInfo[ourUID]
 	if !found {
 		t.Fatal("Decoded allocator did not contain spaceSet")
 	}
-	if !alloc.ourSpaceSet.Equal(decodedSpaceSet) {
+	if decodedSpaceSet.PeerName != ourName || decodedSpaceSet.UID != ourUID || !alloc.ourSpaceSet.Equal(decodedSpaceSet) {
 		t.Fatalf("Allocator not decoded as expected: %+v vs %+v", alloc.ourSpaceSet, decodedSpaceSet)
 	}
 
@@ -135,14 +140,14 @@ func TestEncodeMerge(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	newBuf = alloc.MergeRemoteState(buf)
-	if len(alloc.spacesets) != 1 {
-		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc.spacesets), 1)
+	if len(alloc.peerInfo) != 1 {
+		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc.peerInfo), 1)
 	}
-	decodedSpaceSet, found = alloc.spacesets[peerName]
+	decodedSpaceSet, found = alloc.peerInfo[peerUID]
 	if !found {
 		t.Fatal("Decoded allocator did not contain spaceSet")
 	}
-	if !alloc2.ourSpaceSet.Equal(decodedSpaceSet) {
+	if decodedSpaceSet.PeerName != peerName || decodedSpaceSet.UID != peerUID || !alloc2.ourSpaceSet.Equal(decodedSpaceSet) {
 		t.Fatalf("Allocator not decoded as expected: %+v vs %+v", alloc2.ourSpaceSet, decodedSpaceSet)
 	}
 
@@ -197,13 +202,13 @@ func TestGossip(t *testing.T) {
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	mockGossip1 := new(mockGossipComms)
-	alloc1 := NewAllocator(ourName, mockGossip1, net.ParseIP(testStart1), 1024)
+	alloc1 := NewAllocator(ourName, ourUID, mockGossip1, net.ParseIP(testStart1), 1024)
 	alloc1.manageSpace(net.ParseIP(testStart1), 1)
 
 	// Simulate another peer on the gossip network
 	mockGossip2 := new(mockGossipComms)
 	pn, _ := router.PeerNameFromString(peerNameString)
-	alloc2 := NewAllocator(pn, mockGossip2, net.ParseIP(testStart1), 1024)
+	alloc2 := NewAllocator(pn, peerUID, mockGossip2, net.ParseIP(testStart1), 1024)
 	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
 
 	buf, err := alloc2.encode(true)
@@ -234,7 +239,7 @@ func TestGossip(t *testing.T) {
 	if n := alloc1.ourSpaceSet.NumFreeAddresses(); n != 6 {
 		t.Fatalf("Total free addresses should be 6 but got %d", n)
 	}
-	if n := alloc1.spacesets[pn].version; n != 2 {
+	if n := alloc1.peerInfo[peerUID].version; n != 2 {
 		t.Fatalf("Peer version should be 2 but got %d", n)
 	}
 }

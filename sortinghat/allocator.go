@@ -28,22 +28,24 @@ const (
 type Allocator struct {
 	sync.RWMutex
 	ourName     router.PeerName
+	ourUID      uint64
 	state       int
 	universe    MinSpace // all the addresses that could be allocated
 	gossip      router.GossipCommsProvider
-	spacesets   map[router.PeerName]*PeerSpace
+	peerInfo    map[uint64]*PeerSpace // indexed by peer UID
 	ourSpaceSet *SpaceSet
 	maxAge      time.Duration
 }
 
-func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, startAddr net.IP, universeSize int) *Allocator {
+func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.GossipCommsProvider, startAddr net.IP, universeSize int) *Allocator {
 	alloc := &Allocator{
 		gossip:      gossip,
 		ourName:     ourName,
+		ourUID:      ourUID,
 		state:       allocStateLeaderless,
 		universe:    MinSpace{Start: startAddr, Size: uint32(universeSize)},
-		spacesets:   make(map[router.PeerName]*PeerSpace),
-		ourSpaceSet: NewSpaceSet(ourName),
+		peerInfo:    make(map[uint64]*PeerSpace),
+		ourSpaceSet: NewSpaceSet(),
 		maxAge:      10 * time.Minute,
 	}
 	time.AfterFunc(router.GossipWaitForLead, func() { alloc.ElectLeader() })
@@ -65,16 +67,16 @@ func (alloc *Allocator) encode(includePeers bool) ([]byte, error) {
 	enc := gob.NewEncoder(buf)
 	num := 1
 	if includePeers {
-		num += len(alloc.spacesets)
+		num += len(alloc.peerInfo)
 	}
 	if err := enc.Encode(num); err != nil {
 		return nil, err
 	}
-	if err := alloc.ourSpaceSet.Encode(enc); err != nil {
+	if err := alloc.ourSpaceSet.Encode(enc, alloc.ourName, alloc.ourUID); err != nil {
 		return nil, err
 	}
 	if includePeers {
-		for _, spaceset := range alloc.spacesets {
+		for _, spaceset := range alloc.peerInfo {
 			spaceset.Encode(enc)
 		}
 	}
@@ -98,8 +100,9 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpace, error) {
 		if err := newSpaceset.Decode(decoder); err != nil {
 			return nil, err
 		}
-		if newSpaceset.PeerName == alloc.ourName {
+		if newSpaceset.UID == alloc.ourUID {
 			if newSpaceset.version > alloc.ourSpaceSet.version {
+				// Is this even possible?
 				lg.Debug.Println("Received update to our own info")
 				if !alloc.ourSpaceSet.Empty() {
 					lg.Error.Println("Received overwrite to our own allocation info")
@@ -111,30 +114,30 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpace, error) {
 			continue
 		}
 		// compare this received spaceset's version against the one we had prev.
-		oldSpaceset, found := alloc.spacesets[newSpaceset.PeerName]
+		oldSpaceset, found := alloc.peerInfo[newSpaceset.UID]
 		if !found || newSpaceset.version > oldSpaceset.version {
 			lg.Debug.Println("Replacing", newSpaceset.PeerName, "data with newer version", newSpaceset.version)
-			alloc.spacesets[newSpaceset.PeerName] = newSpaceset
+			alloc.peerInfo[newSpaceset.UID] = newSpaceset
 			if alloc.state == allocStateLeaderless {
 				alloc.state = allocStateNeutral
 			}
 			ret = append(ret, newSpaceset)
 		}
-		alloc.spacesets[newSpaceset.PeerName].lastSeen = now
+		alloc.peerInfo[newSpaceset.UID].lastSeen = now
 	}
 	return ret, nil
 }
 
-func (alloc *Allocator) spaceOwner(space *MinSpace) router.PeerName {
+func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
 	if alloc.ourSpaceSet.Overlaps(space) {
-		return alloc.ourName
+		return alloc.ourUID
 	}
-	for peerName, spaceset := range alloc.spacesets {
+	for uid, spaceset := range alloc.peerInfo {
 		if spaceset.Overlaps(space) {
-			return peerName
+			return uid
 		}
 	}
-	return router.UnknownPeerName
+	return 0
 }
 
 func (alloc *Allocator) considerOurPosition() {
@@ -149,9 +152,9 @@ func (alloc *Allocator) considerOurPosition() {
 		}
 		// Should we time-out any of our peers?
 		now := time.Now()
-		for _, entry := range alloc.spacesets {
-			if now.Before(entry.lastSeen.Add(alloc.maxAge)) {
-				lg.Debug.Printf("Peer %s timed out", entry.PeerName)
+		for _, entry := range alloc.peerInfo {
+			if now.After(entry.lastSeen.Add(alloc.maxAge)) {
+				lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName, entry.lastSeen)
 				// FIXME: do something?
 			}
 		}
@@ -176,7 +179,7 @@ func (alloc *Allocator) ElectLeader() {
 		return
 	}
 	highest := alloc.ourName
-	for _, spaceset := range alloc.spacesets {
+	for _, spaceset := range alloc.peerInfo {
 		if !spaceset.Empty() {
 			lg.Debug.Println("Peer", spaceset.PeerName, "has some space; someone must have given it to her")
 			return
@@ -201,7 +204,7 @@ func (alloc *Allocator) ElectLeader() {
 func (alloc *Allocator) requestSpace() {
 	var best *PeerSpace = nil
 	var bestNumFree uint32 = 0
-	for _, spaceset := range alloc.spacesets {
+	for _, spaceset := range alloc.peerInfo {
 		if num := spaceset.NumFreeAddresses(); num > bestNumFree {
 			bestNumFree = num
 			best = spaceset
@@ -243,8 +246,8 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 			return
 		}
 		newSpace := NewSpace(start, size)
-		if owner := alloc.spaceOwner(newSpace.GetMinSpace()); owner != router.UnknownPeerName {
-			lg.Error.Printf("Space donated: %+v is already owned by %s\n%+v", newSpace, owner, alloc.spacesets[owner])
+		if owner := alloc.spaceOwner(newSpace.GetMinSpace()); owner != 0 {
+			lg.Error.Printf("Space donated: %+v is already owned by UID %d\n%+v", newSpace, owner, alloc.peerInfo[owner])
 			return
 		}
 		alloc.ourSpaceSet.AddSpace(newSpace)
@@ -275,7 +278,7 @@ func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("Allocator state %d universe %+v\n", alloc.state, alloc.universe))
 	buf.WriteString(fmt.Sprintf("%s\n", alloc.ourSpaceSet))
-	for _, spaceset := range alloc.spacesets {
+	for _, spaceset := range alloc.peerInfo {
 		buf.WriteString(spaceset.String())
 	}
 	return buf.String()
@@ -314,7 +317,6 @@ func (alloc *Allocator) localState() []byte {
 func (alloc *Allocator) GlobalState() []byte {
 	alloc.Lock()
 	defer alloc.Unlock()
-	lg.Debug.Println("GlobalState")
 	if buf, err := alloc.encode(true); err == nil {
 		return buf
 	} else {

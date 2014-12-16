@@ -12,14 +12,13 @@ import (
 
 // Represents our own space allocations.  See also PeerSpace.
 type SpaceSet struct {
-	router.PeerName
 	version uint64
 	spaces  []*Space
 	sync.RWMutex
 }
 
-func NewSpaceSet(pn router.PeerName) *SpaceSet {
-	return &SpaceSet{PeerName: pn}
+func NewSpaceSet() *SpaceSet {
+	return &SpaceSet{}
 }
 
 func (s *SpaceSet) AddSpace(space *Space) {
@@ -41,10 +40,13 @@ func (s *SpaceSet) MergeFrom(peerSpace *PeerSpace) {
 	s.version = peerSpace.version
 }
 
-func (s *SpaceSet) Encode(enc *gob.Encoder) error {
+func (s *SpaceSet) Encode(enc *gob.Encoder, ourName router.PeerName, ourUID uint64) error {
 	s.RLock()
 	defer s.RUnlock()
-	if err := enc.Encode(s.PeerName); err != nil {
+	if err := enc.Encode(ourName); err != nil {
+		return err
+	}
+	if err := enc.Encode(ourUID); err != nil {
 		return err
 	}
 	if err := enc.Encode(s.version); err != nil {
@@ -65,7 +67,7 @@ func (s *SpaceSet) String() string {
 	var buf bytes.Buffer
 	s.RLock()
 	defer s.RUnlock()
-	buf.WriteString(fmt.Sprint("SpaceSet ", s.PeerName, " (v", s.version, ")\n"))
+	buf.WriteString(fmt.Sprint("SpaceSet (v", s.version, ")\n"))
 	for _, space := range s.spaces {
 		buf.WriteString(fmt.Sprintf("  %s\n", space.String()))
 	}

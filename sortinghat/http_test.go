@@ -27,9 +27,13 @@ func TestHttp(t *testing.T) {
 		container2  = "baddf00d"
 		testAddr1   = "10.0.3.4"
 	)
+	const (
+		ourUID  = 123456
+		peerUID = 654321
+	)
 
 	ourName, _ := router.PeerNameFromString("08:00:27:01:c3:9a")
-	alloc := NewAllocator(ourName, nil, net.ParseIP(testAddr1), 3)
+	alloc := NewAllocator(ourName, ourUID, nil, net.ParseIP(testAddr1), 3)
 	alloc.manageSpace(net.ParseIP(testAddr1), 3)
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
