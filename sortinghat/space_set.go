@@ -34,7 +34,7 @@ func (s *SpaceSet) MergeFrom(peerSpace *PeerSpace) {
 	s.Lock()
 	defer s.Unlock()
 	s.spaces = make([]*Space, len(peerSpace.spaces))
-	// Simple implementation for now: throw away what we know
+	// Simple implementation for now: throw away what we know.  FIXME if it clashes
 	for i, space := range peerSpace.spaces {
 		s.spaces[i] = NewSpace(space.Start, space.Size)
 	}

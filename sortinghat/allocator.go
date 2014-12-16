@@ -29,7 +29,7 @@ type Allocator struct {
 	sync.RWMutex
 	ourName     router.PeerName
 	state       int
-	universe    MinSpace // all the addresses that could
+	universe    MinSpace // all the addresses that could be allocated
 	gossip      router.GossipCommsProvider
 	spacesets   map[router.PeerName]*PeerSpace
 	ourSpaceSet *SpaceSet
@@ -259,7 +259,7 @@ func (alloc *Allocator) String() string {
 
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("Allocator state %d\n", alloc.state))
+	buf.WriteString(fmt.Sprintf("Allocator state %d universe %+v\n", alloc.state, alloc.universe))
 	buf.WriteString(fmt.Sprintf("%s\n", alloc.ourSpaceSet))
 	for _, spaceset := range alloc.spacesets {
 		buf.WriteString(spaceset.String())

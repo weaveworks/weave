@@ -112,7 +112,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	allocator := sortinghat.NewAllocator(ourName, router.Ourself, net.ParseIP("10.0.1.1"), 254)
+	allocator := sortinghat.NewAllocator(ourName, router.Ourself, net.ParseIP("10.0.1.1"), 253)
 	router.GossipDelegate = allocator
 	allocator.HandleHttp()
 	go handleHttp(router, allocator)
