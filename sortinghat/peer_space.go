@@ -6,18 +6,20 @@ import (
 	"fmt"
 	"github.com/zettio/weave/router"
 	"sync"
+	"time"
 )
 
 // This represents someone else's space allocations. See also SpaceSet.
 type PeerSpace struct {
 	router.PeerName
-	version uint64
-	spaces  []*MinSpace
+	version  uint64
+	spaces   []*MinSpace
+	lastSeen time.Time
 	sync.RWMutex
 }
 
 func NewPeerSpace(pn router.PeerName) *PeerSpace {
-	return &PeerSpace{PeerName: pn}
+	return &PeerSpace{PeerName: pn, lastSeen: time.Now()}
 }
 
 func (s *PeerSpace) Encode(enc *gob.Encoder) error {

@@ -33,6 +33,7 @@ type Allocator struct {
 	gossip      router.GossipCommsProvider
 	spacesets   map[router.PeerName]*PeerSpace
 	ourSpaceSet *SpaceSet
+	maxAge      time.Duration
 }
 
 func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, startAddr net.IP, universeSize int) *Allocator {
@@ -43,6 +44,7 @@ func NewAllocator(ourName router.PeerName, gossip router.GossipCommsProvider, st
 		universe:    MinSpace{Start: startAddr, Size: uint32(universeSize)},
 		spacesets:   make(map[router.PeerName]*PeerSpace),
 		ourSpaceSet: NewSpaceSet(ourName),
+		maxAge:      10 * time.Minute,
 	}
 	time.AfterFunc(router.GossipWaitForLead, func() { alloc.ElectLeader() })
 	return alloc
@@ -90,6 +92,7 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpace, error) {
 		return nil, err
 	}
 	ret := make([]*PeerSpace, 0)
+	now := time.Now()
 	for i := 0; i < numSpaceSets; i++ {
 		newSpaceset := new(PeerSpace)
 		if err := newSpaceset.Decode(decoder); err != nil {
@@ -117,6 +120,7 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpace, error) {
 			}
 			ret = append(ret, newSpaceset)
 		}
+		alloc.spacesets[newSpaceset.PeerName].lastSeen = now
 	}
 	return ret, nil
 }
@@ -139,9 +143,19 @@ func (alloc *Allocator) considerOurPosition() {
 	}
 	switch alloc.state {
 	case allocStateNeutral:
+		// Should we ask for some space?
 		if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
 			alloc.requestSpace()
 		}
+		// Should we time-out any of our peers?
+		now := time.Now()
+		for _, entry := range alloc.spacesets {
+			if now.Before(entry.lastSeen.Add(alloc.maxAge)) {
+				lg.Debug.Printf("Peer %s timed out", entry.PeerName)
+				// FIXME: do something?
+			}
+		}
+		// Look for leaked reservations
 	case allocStateExpectingDonation:
 		// What?
 	case allocStateLeaderless:
@@ -278,6 +292,7 @@ func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
 	case gossipSpaceDonate:
 		alloc.handleSpaceDonate(sender, msg[1:])
 	}
+	alloc.considerOurPosition()
 }
 
 func (alloc *Allocator) LocalState() []byte {
