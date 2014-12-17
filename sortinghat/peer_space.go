@@ -9,27 +9,33 @@ import (
 	"time"
 )
 
-// This represents someone else's space allocations. See also SpaceSet.
+// This represents a peer's space allocations. See also SpaceSet.
 type PeerSpace struct {
-	router.PeerName
-	UID      uint64
+	peerName router.PeerName
+	uid      uint64
 	version  uint64
-	spaces   []*MinSpace
+	spaces   []Space
 	lastSeen time.Time
 	sync.RWMutex
 }
 
 func NewPeerSpace(pn router.PeerName, uid uint64) *PeerSpace {
-	return &PeerSpace{PeerName: pn, UID: uid, lastSeen: time.Now()}
+	return &PeerSpace{peerName: pn, uid: uid, lastSeen: time.Now()}
 }
+
+func (s *PeerSpace) LastSeen() time.Time       { return s.lastSeen }
+func (s *PeerSpace) SetLastSeen(t time.Time)   { s.lastSeen = t }
+func (s *PeerSpace) PeerName() router.PeerName { return s.peerName }
+func (s *PeerSpace) UID() uint64               { return s.uid }
+func (s *PeerSpace) Version() uint64           { return s.version }
 
 func (s *PeerSpace) Encode(enc *gob.Encoder) error {
 	s.RLock()
 	defer s.RUnlock()
-	if err := enc.Encode(s.PeerName); err != nil {
+	if err := enc.Encode(s.peerName); err != nil {
 		return err
 	}
-	if err := enc.Encode(s.UID); err != nil {
+	if err := enc.Encode(s.uid); err != nil {
 		return err
 	}
 	if err := enc.Encode(s.version); err != nil {
@@ -39,7 +45,7 @@ func (s *PeerSpace) Encode(enc *gob.Encoder) error {
 		return err
 	}
 	for _, space := range s.spaces {
-		if err := enc.Encode(space); err != nil {
+		if err := enc.Encode(space.GetMinSpace()); err != nil {
 			return err
 		}
 	}
@@ -49,10 +55,10 @@ func (s *PeerSpace) Encode(enc *gob.Encoder) error {
 func (s *PeerSpace) Decode(decoder *gob.Decoder) error {
 	s.Lock()
 	defer s.Unlock()
-	if err := decoder.Decode(&s.PeerName); err != nil {
+	if err := decoder.Decode(&s.peerName); err != nil {
 		return err
 	}
-	if err := decoder.Decode(&s.UID); err != nil {
+	if err := decoder.Decode(&s.uid); err != nil {
 		return err
 	}
 	if err := decoder.Decode(&s.version); err != nil {
@@ -62,7 +68,7 @@ func (s *PeerSpace) Decode(decoder *gob.Decoder) error {
 	if err := decoder.Decode(&numSpaces); err != nil {
 		return err
 	}
-	s.spaces = make([]*MinSpace, numSpaces)
+	s.spaces = make([]Space, numSpaces)
 	for i := 0; i < numSpaces; i++ {
 		s.spaces[i] = new(MinSpace)
 		if err := decoder.Decode(s.spaces[i]); err != nil {
@@ -76,7 +82,7 @@ func (s *PeerSpace) String() string {
 	var buf bytes.Buffer
 	s.RLock()
 	defer s.RUnlock()
-	buf.WriteString(fmt.Sprint("PeerSpace ", s.PeerName, s.UID, " (v", s.version, ")\n"))
+	buf.WriteString(fmt.Sprint("SpaceSet ", s.peerName, s.uid, " (v", s.version, ")\n"))
 	for _, space := range s.spaces {
 		buf.WriteString(fmt.Sprintf("  %s\n", space.String()))
 	}

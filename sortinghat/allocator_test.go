@@ -113,14 +113,14 @@ func TestEncodeMerge(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	newBuf := alloc2.MergeRemoteState(encodedState)
-	if len(alloc2.peerInfo) != 1 {
-		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc2.peerInfo), 1)
+	if len(alloc2.peerInfo) != 2 {
+		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc2.peerInfo), 2)
 	}
 	decodedSpaceSet, found := alloc2.peerInfo[ourUID]
 	if !found {
 		t.Fatal("Decoded allocator did not contain spaceSet")
 	}
-	if decodedSpaceSet.PeerName != ourName || decodedSpaceSet.UID != ourUID || !alloc.ourSpaceSet.Equal(decodedSpaceSet) {
+	if decodedSpaceSet.PeerName() != ourName || decodedSpaceSet.UID() != ourUID || !alloc.ourSpaceSet.Equal(decodedSpaceSet.(*PeerSpace)) {
 		t.Fatalf("Allocator not decoded as expected: %+v vs %+v", alloc.ourSpaceSet, decodedSpaceSet)
 	}
 
@@ -140,14 +140,14 @@ func TestEncodeMerge(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	newBuf = alloc.MergeRemoteState(buf)
-	if len(alloc.peerInfo) != 1 {
-		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc.peerInfo), 1)
+	if len(alloc.peerInfo) != 2 {
+		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc.peerInfo), 2)
 	}
 	decodedSpaceSet, found = alloc.peerInfo[peerUID]
 	if !found {
 		t.Fatal("Decoded allocator did not contain spaceSet")
 	}
-	if decodedSpaceSet.PeerName != peerName || decodedSpaceSet.UID != peerUID || !alloc2.ourSpaceSet.Equal(decodedSpaceSet) {
+	if decodedSpaceSet.PeerName() != peerName || decodedSpaceSet.UID() != peerUID || !alloc2.ourSpaceSet.Equal(decodedSpaceSet.(*PeerSpace)) {
 		t.Fatalf("Allocator not decoded as expected: %+v vs %+v", alloc2.ourSpaceSet, decodedSpaceSet)
 	}
 
@@ -227,7 +227,7 @@ func TestGossip(t *testing.T) {
 	mockGossip1.Reset()
 
 	// Now make it look like alloc2 has given up half its space
-	alloc2.ourSpaceSet.spaces[0].Size = donateSize
+	alloc2.ourSpaceSet.spaces[0].GetMinSpace().Size = donateSize
 	alloc2.ourSpaceSet.version++
 
 	alloc2state, err := alloc2.encode(false)
@@ -239,7 +239,7 @@ func TestGossip(t *testing.T) {
 	if n := alloc1.ourSpaceSet.NumFreeAddresses(); n != 6 {
 		t.Fatalf("Total free addresses should be 6 but got %d", n)
 	}
-	if n := alloc1.peerInfo[peerUID].version; n != 2 {
+	if n := alloc1.peerInfo[peerUID].Version(); n != 2 {
 		t.Fatalf("Peer version should be 2 but got %d", n)
 	}
 }

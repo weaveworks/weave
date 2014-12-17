@@ -11,13 +11,24 @@ type Record struct {
 	IP    net.IP
 }
 
+type Space interface {
+	GetMinSpace() *MinSpace
+	GetStart() net.IP
+	GetSize() uint32
+	GetMaxAllocated() uint32
+	LargestFreeBlock() uint32
+	Overlaps(b Space) bool
+	String() string
+}
+
+// This struct is used in Gob-encoding to pass info around, which is why all of its fields are exported.
 type MinSpace struct {
 	Start        net.IP
 	Size         uint32
 	MaxAllocated uint32
 }
 
-type Space struct {
+type MutableSpace struct {
 	MinSpace
 	recs      []Record
 	free_list []net.IP
@@ -44,9 +55,9 @@ func (s *MinSpace) LargestFreeBlock() uint32 {
 	return s.Size - s.MaxAllocated
 }
 
-func (a *MinSpace) Overlaps(b *MinSpace) bool {
-	diff := subtract(a.Start, b.Start)
-	return !(-diff >= int64(a.Size) || diff >= int64(b.Size))
+func (a *MinSpace) Overlaps(b Space) bool {
+	diff := subtract(a.Start, b.GetStart())
+	return !(-diff >= int64(a.Size) || diff >= int64(b.GetSize()))
 }
 
 // A space is heir to another space if it is immediately lower than it
@@ -72,11 +83,11 @@ func NewMinSpace(start net.IP, size uint32) *MinSpace {
 	return &MinSpace{Start: start, Size: size, MaxAllocated: 0}
 }
 
-func NewSpace(start net.IP, size uint32) *Space {
-	return &Space{MinSpace: MinSpace{Start: start, Size: size, MaxAllocated: 0}}
+func NewSpace(start net.IP, size uint32) *MutableSpace {
+	return &MutableSpace{MinSpace: MinSpace{Start: start, Size: size, MaxAllocated: 0}}
 }
 
-func (space *Space) AllocateFor(ident string) net.IP {
+func (space *MutableSpace) AllocateFor(ident string) net.IP {
 	space.Lock()
 	defer space.Unlock()
 	var ret net.IP = nil
@@ -93,7 +104,7 @@ func (space *Space) AllocateFor(ident string) net.IP {
 	return ret
 }
 
-func (space *Space) Free(addr net.IP) bool {
+func (space *MutableSpace) Free(addr net.IP) bool {
 	diff := subtract(addr, space.Start)
 	if diff < 0 || diff >= int64(space.Size) {
 		return false
@@ -132,7 +143,7 @@ func subtract(a, b net.IP) int64 {
 	return int64(ip4int(a)) - int64(ip4int(b))
 }
 
-func (space *Space) DeleteRecordsFor(ident string) error {
+func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 	space.Lock()
 	defer space.Unlock()
 	w := 0 // write index
@@ -149,18 +160,18 @@ func (space *Space) DeleteRecordsFor(ident string) error {
 	return nil
 }
 
-func (s *Space) NumFreeAddresses() uint32 {
+func (s *MutableSpace) NumFreeAddresses() uint32 {
 	s.RLock()
 	defer s.RUnlock()
 	return s.Size - uint32(len(s.recs)) + uint32(len(s.free_list))
 }
 
-func (s *Space) LargestFreeBlock() uint32 {
+func (s *MutableSpace) LargestFreeBlock() uint32 {
 	return s.Size - s.MaxAllocated
 }
 
-func (space *Space) String() string {
+func (space *MutableSpace) String() string {
 	space.RLock()
 	defer space.RUnlock()
-	return fmt.Sprintf("Space allocator start %s, size %d, allocated %d, free %d", space.Start, space.Size, len(space.recs), len(space.free_list))
+	return fmt.Sprintf("MutableSpace start %s, size %d, allocated %d, free %d", space.Start, space.Size, len(space.recs), len(space.free_list))
 }

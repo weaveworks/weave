@@ -32,8 +32,8 @@ type Allocator struct {
 	state       int
 	universe    MinSpace // all the addresses that could be allocated
 	gossip      router.GossipCommsProvider
-	peerInfo    map[uint64]*PeerSpace // indexed by peer UID
-	ourSpaceSet *SpaceSet
+	peerInfo    map[uint64]SpaceSet // indexed by peer UID
+	ourSpaceSet *MutableSpaceSet
 	maxAge      time.Duration
 }
 
@@ -44,10 +44,11 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.GossipCo
 		ourUID:      ourUID,
 		state:       allocStateLeaderless,
 		universe:    MinSpace{Start: startAddr, Size: uint32(universeSize)},
-		peerInfo:    make(map[uint64]*PeerSpace),
-		ourSpaceSet: NewSpaceSet(),
+		peerInfo:    make(map[uint64]SpaceSet),
+		ourSpaceSet: NewSpaceSet(ourName, ourUID),
 		maxAge:      10 * time.Minute,
 	}
+	alloc.peerInfo[ourUID] = alloc.ourSpaceSet
 	time.AfterFunc(router.GossipWaitForLead, func() { alloc.ElectLeader() })
 	return alloc
 }
@@ -67,18 +68,17 @@ func (alloc *Allocator) encode(includePeers bool) ([]byte, error) {
 	enc := gob.NewEncoder(buf)
 	num := 1
 	if includePeers {
-		num += len(alloc.peerInfo)
+		num = len(alloc.peerInfo)
 	}
 	if err := enc.Encode(num); err != nil {
-		return nil, err
-	}
-	if err := alloc.ourSpaceSet.Encode(enc, alloc.ourName, alloc.ourUID); err != nil {
 		return nil, err
 	}
 	if includePeers {
 		for _, spaceset := range alloc.peerInfo {
 			spaceset.Encode(enc)
 		}
+	} else {
+		alloc.ourSpaceSet.Encode(enc)
 	}
 	return buf.Bytes(), nil
 }
@@ -100,38 +100,26 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpace, error) {
 		if err := newSpaceset.Decode(decoder); err != nil {
 			return nil, err
 		}
-		if newSpaceset.UID == alloc.ourUID {
-			if newSpaceset.version > alloc.ourSpaceSet.version {
-				// Is this even possible?
-				lg.Debug.Println("Received update to our own info")
-				if !alloc.ourSpaceSet.Empty() {
-					lg.Error.Println("Received overwrite to our own allocation info")
-				}
-				alloc.ourSpaceSet.MergeFrom(newSpaceset)
-				lg.Debug.Println("info now:", alloc.string())
-				ret = append(ret, newSpaceset)
-			}
-			continue
-		}
 		// compare this received spaceset's version against the one we had prev.
-		oldSpaceset, found := alloc.peerInfo[newSpaceset.UID]
-		if !found || newSpaceset.version > oldSpaceset.version {
+		oldSpaceset, found := alloc.peerInfo[newSpaceset.UID()]
+		if !found || newSpaceset.Version() > oldSpaceset.Version() {
+			if newSpaceset.UID() == alloc.ourUID {
+				lg.Error.Println("Received update to our own info")
+				continue // Shouldn't happen
+			}
 			lg.Debug.Println("Replacing", newSpaceset.PeerName, "data with newer version", newSpaceset.version)
-			alloc.peerInfo[newSpaceset.UID] = newSpaceset
+			alloc.peerInfo[newSpaceset.UID()] = newSpaceset
 			if alloc.state == allocStateLeaderless {
 				alloc.state = allocStateNeutral
 			}
 			ret = append(ret, newSpaceset)
 		}
-		alloc.peerInfo[newSpaceset.UID].lastSeen = now
+		alloc.peerInfo[newSpaceset.UID()].SetLastSeen(now)
 	}
 	return ret, nil
 }
 
 func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
-	if alloc.ourSpaceSet.Overlaps(space) {
-		return alloc.ourUID
-	}
 	for uid, spaceset := range alloc.peerInfo {
 		if spaceset.Overlaps(space) {
 			return uid
@@ -153,8 +141,8 @@ func (alloc *Allocator) considerOurPosition() {
 		// Should we time-out any of our peers?
 		now := time.Now()
 		for _, entry := range alloc.peerInfo {
-			if now.After(entry.lastSeen.Add(alloc.maxAge)) {
-				lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName, entry.lastSeen)
+			if now.After(entry.LastSeen().Add(alloc.maxAge)) {
+				lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
 				// FIXME: do something?
 			}
 		}
@@ -178,19 +166,19 @@ func (alloc *Allocator) ElectLeader() {
 		lg.Debug.Println("I have some space; someone must have given it to me")
 		return
 	}
-	highest := alloc.ourName
-	for _, spaceset := range alloc.peerInfo {
+	highest := alloc.ourUID
+	for uid, spaceset := range alloc.peerInfo {
 		if !spaceset.Empty() {
-			lg.Debug.Println("Peer", spaceset.PeerName, "has some space; someone must have given it to her")
+			lg.Debug.Println("Peer", spaceset.PeerName(), "has some space; someone must have given it to her")
 			return
 		}
-		if spaceset.PeerName > highest {
-			highest = spaceset.PeerName
+		if uid > highest {
+			highest = uid
 		}
 	}
 	lg.Debug.Println("Elected leader:", highest)
 	// The peer with the highest name is the leader
-	if highest == alloc.ourName {
+	if highest == alloc.ourUID {
 		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
 		// I'm the winner; take control of the whole universe
 		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
@@ -202,7 +190,7 @@ func (alloc *Allocator) ElectLeader() {
 }
 
 func (alloc *Allocator) requestSpace() {
-	var best *PeerSpace = nil
+	var best SpaceSet = nil
 	var bestNumFree uint32 = 0
 	for _, spaceset := range alloc.peerInfo {
 		if num := spaceset.NumFreeAddresses(); num > bestNumFree {
@@ -214,7 +202,7 @@ func (alloc *Allocator) requestSpace() {
 		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space")
 		myState, _ := alloc.encode(false)
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
-		alloc.gossip.GossipSendTo(best.PeerName, msg)
+		alloc.gossip.GossipSendTo(best.PeerName(), msg)
 		alloc.state = allocStateExpectingDonation
 	}
 }
@@ -277,7 +265,6 @@ func (alloc *Allocator) String() string {
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("Allocator state %d universe %+v\n", alloc.state, alloc.universe))
-	buf.WriteString(fmt.Sprintf("%s\n", alloc.ourSpaceSet))
 	for _, spaceset := range alloc.peerInfo {
 		buf.WriteString(spaceset.String())
 	}
