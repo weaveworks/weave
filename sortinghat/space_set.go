@@ -1,10 +1,13 @@
 package sortinghat
 
 import (
+	"bytes"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"github.com/zettio/weave/router"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -22,13 +25,122 @@ type SpaceSet interface {
 	String() string
 }
 
-// Represents our own space allocations.  See also PeerSpace.
-type MutableSpaceSet struct {
-	PeerSpace
+// This represents a peer's space allocations, which we only hear about.
+type PeerSpaceSet struct {
+	peerName router.PeerName
+	uid      uint64
+	version  uint64
+	spaces   []Space
+	lastSeen time.Time
+	sync.RWMutex
 }
 
+// Represents our own space, which we can allocate and free within.
+type MutableSpaceSet struct {
+	PeerSpaceSet
+}
+
+func NewPeerSpace(pn router.PeerName, uid uint64) *PeerSpaceSet {
+	return &PeerSpaceSet{peerName: pn, uid: uid, lastSeen: time.Now()}
+}
+
+func (s *PeerSpaceSet) LastSeen() time.Time       { return s.lastSeen }
+func (s *PeerSpaceSet) SetLastSeen(t time.Time)   { s.lastSeen = t }
+func (s *PeerSpaceSet) PeerName() router.PeerName { return s.peerName }
+func (s *PeerSpaceSet) UID() uint64               { return s.uid }
+func (s *PeerSpaceSet) Version() uint64           { return s.version }
+
+func (s *PeerSpaceSet) Encode(enc *gob.Encoder) error {
+	s.RLock()
+	defer s.RUnlock()
+	if err := enc.Encode(s.peerName); err != nil {
+		return err
+	}
+	if err := enc.Encode(s.uid); err != nil {
+		return err
+	}
+	if err := enc.Encode(s.version); err != nil {
+		return err
+	}
+	if err := enc.Encode(len(s.spaces)); err != nil {
+		return err
+	}
+	for _, space := range s.spaces {
+		if err := enc.Encode(space.GetMinSpace()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *PeerSpaceSet) Decode(decoder *gob.Decoder) error {
+	s.Lock()
+	defer s.Unlock()
+	if err := decoder.Decode(&s.peerName); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&s.uid); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&s.version); err != nil {
+		return err
+	}
+	var numSpaces int
+	if err := decoder.Decode(&numSpaces); err != nil {
+		return err
+	}
+	s.spaces = make([]Space, numSpaces)
+	for i := 0; i < numSpaces; i++ {
+		s.spaces[i] = new(MinSpace)
+		if err := decoder.Decode(s.spaces[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *PeerSpaceSet) String() string {
+	var buf bytes.Buffer
+	s.RLock()
+	defer s.RUnlock()
+	buf.WriteString(fmt.Sprint("SpaceSet ", s.peerName, s.uid, " (v", s.version, ")\n"))
+	for _, space := range s.spaces {
+		buf.WriteString(fmt.Sprintf("  %s\n", space.String()))
+	}
+	return buf.String()
+}
+
+func (s *PeerSpaceSet) Empty() bool {
+	s.RLock()
+	defer s.RUnlock()
+	return len(s.spaces) == 0
+}
+
+func (s *PeerSpaceSet) NumFreeAddresses() uint32 {
+	s.RLock()
+	defer s.RUnlock()
+	var freeAddresses uint32 = 0
+	for _, space := range s.spaces {
+		freeAddresses += space.LargestFreeBlock()
+	}
+	return freeAddresses
+}
+
+func (s *PeerSpaceSet) Overlaps(space *MinSpace) bool {
+	s.RLock()
+	defer s.RUnlock()
+	for _, space2 := range s.spaces {
+		if space.Overlaps(space2) {
+			return true
+		}
+	}
+	return false
+}
+
+// -------------------------------------------------
+
 func NewSpaceSet(pn router.PeerName, uid uint64) *MutableSpaceSet {
-	return &MutableSpaceSet{PeerSpace{peerName: pn, uid: uid, lastSeen: time.Now()}}
+	return &MutableSpaceSet{PeerSpaceSet{peerName: pn, uid: uid, lastSeen: time.Now()}}
 }
 
 func (s *MutableSpaceSet) AddSpace(space *MutableSpace) {

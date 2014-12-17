@@ -86,17 +86,17 @@ func (alloc *Allocator) encode(includePeers bool) ([]byte, error) {
 // Unpack the supplied buffer which is encoded as per encode() above.
 // return a slice of MinSpace containing those PeerSpaces which are newer
 // than what we had previously
-func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpace, error) {
+func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 	reader := bytes.NewReader(update)
 	decoder := gob.NewDecoder(reader)
 	var numSpaceSets int
 	if err := decoder.Decode(&numSpaceSets); err != nil {
 		return nil, err
 	}
-	ret := make([]*PeerSpace, 0)
+	ret := make([]*PeerSpaceSet, 0)
 	now := time.Now()
 	for i := 0; i < numSpaceSets; i++ {
-		newSpaceset := new(PeerSpace)
+		newSpaceset := new(PeerSpaceSet)
 		if err := newSpaceset.Decode(decoder); err != nil {
 			return nil, err
 		}
