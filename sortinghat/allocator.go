@@ -25,6 +25,12 @@ const (
 	allocStateLeaderless // Need to elect a leader
 )
 
+// To allow time itself to be stubbed out for testing
+type timeProvider interface {
+	Now() time.Time
+	AfterFunc(d time.Duration, f func()) *time.Timer
+}
+
 type Allocator struct {
 	sync.RWMutex
 	ourName     router.PeerName
@@ -35,18 +41,29 @@ type Allocator struct {
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
 	ourSpaceSet *MutableSpaceSet
 	maxAge      time.Duration
+	timeProvider
+}
+
+type defaultTime struct {
+}
+
+func (defaultTime) Now() time.Time { return time.Now() }
+
+func (defaultTime) AfterFunc(d time.Duration, f func()) *time.Timer {
+	return time.AfterFunc(d, f)
 }
 
 func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.GossipCommsProvider, startAddr net.IP, universeSize int) *Allocator {
 	alloc := &Allocator{
-		gossip:      gossip,
-		ourName:     ourName,
-		ourUID:      ourUID,
-		state:       allocStateLeaderless,
-		universe:    MinSpace{Start: startAddr, Size: uint32(universeSize)},
-		peerInfo:    make(map[uint64]SpaceSet),
-		ourSpaceSet: NewSpaceSet(ourName, ourUID),
-		maxAge:      10 * time.Minute,
+		gossip:       gossip,
+		ourName:      ourName,
+		ourUID:       ourUID,
+		state:        allocStateLeaderless,
+		universe:     MinSpace{Start: startAddr, Size: uint32(universeSize)},
+		peerInfo:     make(map[uint64]SpaceSet),
+		ourSpaceSet:  NewSpaceSet(ourName, ourUID),
+		maxAge:       10 * time.Minute,
+		timeProvider: defaultTime{},
 	}
 	alloc.peerInfo[ourUID] = alloc.ourSpaceSet
 	time.AfterFunc(router.GossipWaitForLead, func() { alloc.ElectLeader() })
@@ -82,7 +99,7 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 		return nil, err
 	}
 	ret := make([]*PeerSpaceSet, 0)
-	now := time.Now()
+	now := alloc.timeProvider.Now()
 	for i := 0; i < numSpaceSets; i++ {
 		newSpaceset := new(PeerSpaceSet)
 		if err := newSpaceset.Decode(decoder); err != nil {
@@ -127,7 +144,7 @@ func (alloc *Allocator) considerOurPosition() {
 			alloc.requestSpace()
 		}
 		// Should we time-out any of our peers?
-		now := time.Now()
+		now := alloc.timeProvider.Now()
 		for _, entry := range alloc.peerInfo {
 			if now.After(entry.LastSeen().Add(alloc.maxAge)) {
 				lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
