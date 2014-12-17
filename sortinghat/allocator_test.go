@@ -2,7 +2,6 @@ package sortinghat
 
 import (
 	"github.com/zettio/weave/router"
-	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
 )
@@ -103,14 +102,12 @@ func TestEncodeMerge(t *testing.T) {
 	alloc.manageSpace(net.ParseIP(testStart1), 16)
 	alloc.manageSpace(net.ParseIP(testStart2), 32)
 
-	encodedState, err := alloc.encode(true)
-	wt.AssertNoErr(t, err)
+	encodedState := alloc.GlobalState()
 
 	peerName, _ := router.PeerNameFromString(peerNameString)
 	alloc2 := NewAllocator(peerName, peerUID, nil, net.ParseIP(testStart1), 1024)
 	alloc2.manageSpace(net.ParseIP(testStart3), 32)
-	encodedState2, err := alloc2.encode(true)
-	wt.AssertNoErr(t, err)
+	encodedState2 := alloc2.GlobalState()
 
 	newBuf := alloc2.MergeRemoteState(encodedState)
 	if len(alloc2.peerInfo) != 2 {
@@ -136,8 +133,7 @@ func TestEncodeMerge(t *testing.T) {
 	}
 
 	// Now encode and merge the other way
-	buf, err := alloc2.encode(true)
-	wt.AssertNoErr(t, err)
+	buf := alloc2.GlobalState()
 
 	newBuf = alloc.MergeRemoteState(buf)
 	if len(alloc.peerInfo) != 2 {
@@ -211,8 +207,7 @@ func TestGossip(t *testing.T) {
 	alloc2 := NewAllocator(pn, peerUID, mockGossip2, net.ParseIP(testStart1), 1024)
 	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
 
-	buf, err := alloc2.encode(true)
-	wt.AssertNoErr(t, err)
+	buf := alloc2.GlobalState()
 
 	alloc1.MergeRemoteState(buf)
 
@@ -230,8 +225,7 @@ func TestGossip(t *testing.T) {
 	alloc2.ourSpaceSet.spaces[0].GetMinSpace().Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	alloc2state, err := alloc2.encode(false)
-	wt.AssertNoErr(t, err)
+	alloc2state := alloc2.LocalState()
 
 	size_encoding := intip4(donateSize) // hack! using intip4
 	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)

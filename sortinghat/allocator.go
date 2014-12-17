@@ -63,24 +63,12 @@ func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
 	alloc.state = allocStateNeutral
 }
 
-func (alloc *Allocator) encode(includePeers bool) ([]byte, error) {
+func (alloc *Allocator) encode(spaceset SpaceSet) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	num := 1
-	if includePeers {
-		num = len(alloc.peerInfo)
-	}
-	if err := enc.Encode(num); err != nil {
-		return nil, err
-	}
-	if includePeers {
-		for _, spaceset := range alloc.peerInfo {
-			spaceset.Encode(enc)
-		}
-	} else {
-		alloc.ourSpaceSet.Encode(enc)
-	}
-	return buf.Bytes(), nil
+	enc.Encode(1)
+	spaceset.Encode(enc)
+	return buf.Bytes()
 }
 
 // Unpack the supplied buffer which is encoded as per encode() above.
@@ -200,7 +188,7 @@ func (alloc *Allocator) requestSpace() {
 	}
 	if best != nil {
 		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space")
-		myState, _ := alloc.encode(false)
+		myState := alloc.encode(alloc.ourSpaceSet)
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
 		alloc.gossip.GossipSendTo(best.PeerName(), msg)
 		alloc.state = allocStateExpectingDonation
@@ -213,7 +201,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 
 	if start, size, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
 		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
-		myState, _ := alloc.encode(false)
+		myState := alloc.encode(alloc.ourSpaceSet)
 		size_encoding := intip4(size) // hack!
 		msg := router.Concat([]byte{gossipSpaceDonate}, start.To4(), size_encoding, myState)
 		alloc.gossip.GossipSendTo(sender, msg)
@@ -293,10 +281,10 @@ func (alloc *Allocator) LocalState() []byte {
 
 func (alloc *Allocator) localState() []byte {
 	lg.Debug.Println("localState")
-	if buf, err := alloc.encode(false); err == nil {
+	if buf := alloc.encode(alloc.ourSpaceSet); buf != nil {
 		return buf
 	} else {
-		lg.Error.Println("Error", err)
+		lg.Error.Println("Error encoding state")
 	}
 	return nil
 }
@@ -304,12 +292,13 @@ func (alloc *Allocator) localState() []byte {
 func (alloc *Allocator) GlobalState() []byte {
 	alloc.Lock()
 	defer alloc.Unlock()
-	if buf, err := alloc.encode(true); err == nil {
-		return buf
-	} else {
-		lg.Error.Println("Error", err)
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	enc.Encode(len(alloc.peerInfo))
+	for _, spaceset := range alloc.peerInfo {
+		spaceset.Encode(enc)
 	}
-	return nil
+	return buf.Bytes()
 }
 
 // merge in state and return a buffer encoding those PeerSpaces which are newer
