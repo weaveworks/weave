@@ -45,7 +45,6 @@ type GossipCommsProvider interface {
 type GossipDelegate interface {
 	NotifyMsg(sender PeerName, msg []byte)
 
-	LocalState() []byte
 	GlobalState() []byte
 
 	// merge in state and return a buffer encoding those PeerSpaces which are newer
