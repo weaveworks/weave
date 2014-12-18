@@ -148,7 +148,8 @@ func (alloc *Allocator) considerOurPosition() {
 		for _, entry := range alloc.peerInfo {
 			if now.After(entry.LastSeen().Add(alloc.maxAge)) {
 				lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
-				// FIXME: do something?
+				entry.(*PeerSpaceSet).MakeTombstone()
+				alloc.gossip.GossipBroadcast(alloc.encode(entry))
 			}
 		}
 		// Look for leaked reservations

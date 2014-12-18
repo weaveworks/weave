@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/zettio/weave/router"
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -135,6 +136,13 @@ func (s *PeerSpaceSet) Overlaps(space *MinSpace) bool {
 		}
 	}
 	return false
+}
+
+func (s *PeerSpaceSet) MakeTombstone() {
+	s.Lock()
+	s.spaces = nil
+	s.version = math.MaxUint64
+	s.Unlock()
 }
 
 // -------------------------------------------------
