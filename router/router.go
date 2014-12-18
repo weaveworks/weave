@@ -247,9 +247,6 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			if decodedLen == 0 {
 				return nil
 			}
-			if router.Macs.Enter(srcMac, srcPeer) {
-				log.Println("Discovered remote MAC", srcMac, "at", srcPeer.Name)
-			}
 			if df {
 				router.LogFrame("Relaying DF", frame, &dec.eth)
 			} else {
