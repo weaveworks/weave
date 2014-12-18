@@ -528,7 +528,6 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 				_, _, msg := decodePeerName(msg[2:])
 				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg)
 				if newBuf != nil {
-					// Note broadcast has us as the sender, not who we heard it from.
 					conn.local.GossipMsg(newBuf)
 				}
 			} else {
