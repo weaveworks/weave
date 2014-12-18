@@ -6,7 +6,10 @@ You need two VMs with docker >=1.3.1 installed and listening on TCP
 port 2375 (see below). You also need to be able to ssh to these VMs,
 preferably without having to input anything.
 
-The `Vagrantfile` in this directory constructs two such VMs.
+The `Vagrantfile` in this directory constructs two such VMs. To meet
+the aforementioned ssh requirement you may want to
+
+    cp ~/.vagrant.d/insecure_private_key .
 
 ## Running tests
 
