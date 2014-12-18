@@ -1,65 +1,119 @@
 #! /bin/bash
 
 set -e
-set -o nounset
 
-# Preparation
+PWD=`pwd`
+GITHUB_USER=squaremo
+RELEASE_NAME="Weave"
+RELEASE_DESCRIPTION="Weaving Containers into Applications"
 
-## Get the new version number from the most recent tag
+setup() {
+    ## Get the new version number from the most recent tag
+    LATEST_TAG=$(git describe --abbrev=0 --match='v*')
+    VERSION=${LATEST_TAG#v}
+    # NB does not check that this tag is on master
+    RELEASE_DIR=./releases/$LATEST_TAG
+}
 
-LATEST_TAG=$(git describe --abbrev=0 --match='v*')
-VERSION=${LATEST_TAG#v}
-echo Attempt to build distributables for version $VERSION
-# NB does not check that this tag is on master
+prepare() {
+    setup
 
-echo
-echo == Sanity checks
+    echo "Attempting to build distributables for version $VERSION"
+    if [ -d $RELEASE_DIR ]; then
+        echo Release directory $RELEASE_DIR already exists, you may want to >&2
+        echo     rm -rf $RELEASE_DIR >&2
+        exit 1
+    fi
+    
+    ## Clone the repo at the tag and go there
+    mkdir -p releases
+    git clone -q -b $LATEST_TAG . $RELEASE_DIR 2>/dev/null
+    cd $RELEASE_DIR
 
-## Check that the version doesn't already exist by looking at github
-## releases
-if curl -sSf https://api.github.com/repos/zettio/weave/releases/$LATEST_TAG 2>/dev/null; then
-    echo Release $LATEST_TAG already exists on GitHub
-    echo https://github.com/zettio/weave/releases/$LATEST_TAG
-    exit 1
-fi
+    ## Check that the top changelog entry is this version
+    latest_changelog=$(grep -o "Release v.*" -m1 ./CHANGELOG.md)
+    if ! [ `echo "$latest_changelog" | grep -o 'v[^ ]*'` == $LATEST_TAG ]; then
+        echo Latest changelog entry $latest_changelog does not match >&2
+        echo the latest tag $LATEST_TAG >&2
+        exit 1
+    fi
 
-## Clone the repo at the tag and go there
-RELEASE_DIR=releases/$LATEST_TAG
-mkdir -p releases
-git clone -q -b $LATEST_TAG . $RELEASE_DIR
-cd $RELEASE_DIR
+    echo
+    echo == Build and test
 
-## Check that the top changelog entry is this version
-latest_changelog=$(grep -o "Release v.*" -m1 ./CHANGELOG.md)
-if ! [ `echo "$latest_changelog" | grep -o 'v[^ ]*'` == $LATEST_TAG ]; then
-    echo Latest changelog entry $latest_changelog does not match
-    echo the latest tag $LATEST_TAG
-    exit 1
-fi
+    ## Inject the version numbers and build the distributables
+    ## (library versions?)
 
-echo Sanity checks OK for releasing tag $LATEST_TAG
+    sed -i "/var version = / c\var version = \"$VERSION\"" weaver/main.go
+    make
 
-echo
-echo == Build and test
+    if make tests; then
+        echo '** Tests pass'
+    else
+        echo Tests failed, probably best not publish this one >&2
+        exit 1
+    fi
 
-## Inject the version numbers and build the distributables
-## (library versions?)
+    ## Run tests with the distributables, including version check
+    v=$(./weaver/weaver --version)
+    if ! [ "$v" == "weaver $VERSION" ]; then
+        echo Version of distributable "$v" does not match tag $LATEST_TAG >&2
+        exit 1
+    fi
 
-sed -i "/var version = / c\var version = \"$VERSION\"" weaver/main.go
-make
+    echo '** Build OK'
+    echo '** Release artefacts in' $RELEASE_DIR
+}
 
-## Run tests with the distributables, including version check
-v=$(./weaver/weaver --version)
-if ! [ "$v" == "weaver $VERSION" ]; then
-    echo Version of distributable "$v" does not match tag $LATEST_TAG
-    exit 1
-fi
+publish() {
+    setup
+    cd $PWD/$RELEASE_DIR
 
-make tests
+    echo == Sanity checks
 
-echo Build and tests OK
+    ## Check that the version doesn't already exist by looking at github
+    ## releases
+    if curl -sSf https://api.github.com/repos/zettio/weave/releases/$LATEST_TAG 2>/dev/null; then
+        echo Release $LATEST_TAG already exists on GitHub >&2
+        echo https://github.com/zettio/weave/releases/$LATEST_TAG >&2
+        exit 1
+    fi
 
-# Publish
+    echo '** Sanity checks OK for publishing tag' $LATEST_TAG as zettio/weave:$VERSION
 
-## Either leave the distributables in a directory for the dev to
-## upload, or upload them automatically?
+    if ! which github-release; then
+        echo Please install git-release:
+        echo     go get github.com/aktau/github-release
+        echo and create a git token per https://github.com/aktau/github-release
+        exit 1
+    fi
+
+    echo == Creating GitHub release $VERSION
+    github-release release --user $GITHUB_USER \
+        --repo weave \
+        --tag $LATEST_TAG \
+        --name "$RELEASE_NAME" \
+        --description "$RELEASE_DESCRIPTION" \
+        --pre-release
+}
+
+usage() {
+    echo Usage:
+    echo     ./bin/release prepare
+    echo -- Build artefacts for the latest version tag
+    echo     ./bin/release publish
+    echo -- Publish the artefacts for the latest tag to GitHub and DockerHub
+}
+
+case "$1" in
+    prepare)
+        prepare
+        ;;
+    publish)
+        publish
+        ;;
+    *)
+        echo Unknown command "$1"
+        usage
+        ;;
+esac
