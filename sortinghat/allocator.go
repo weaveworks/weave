@@ -28,7 +28,7 @@ const (
 // To allow time itself to be stubbed out for testing
 type timeProvider interface {
 	Now() time.Time
-	AfterFunc(d time.Duration, f func()) *time.Timer
+	AfterFunc(d time.Duration, f func())
 }
 
 type Allocator struct {
@@ -49,8 +49,8 @@ type defaultTime struct {
 
 func (defaultTime) Now() time.Time { return time.Now() }
 
-func (defaultTime) AfterFunc(d time.Duration, f func()) *time.Timer {
-	return time.AfterFunc(d, f)
+func (defaultTime) AfterFunc(d time.Duration, f func()) {
+	time.AfterFunc(d, f)
 }
 
 func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.GossipCommsProvider, startAddr net.IP, universeSize int) *Allocator {

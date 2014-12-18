@@ -2,8 +2,10 @@ package sortinghat
 
 import (
 	"github.com/zettio/weave/router"
+	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
+	"time"
 )
 
 const (
@@ -176,13 +178,80 @@ func (f *mockGossipComms) Gossip() {
 }
 
 func (f *mockGossipComms) GossipBroadcast(buf []byte) error {
-	// fixme?
+	f.messages = append(f.messages, mockMessage{router.UnknownPeerName, buf})
 	return nil
 }
 
 func (f *mockGossipComms) GossipSendTo(dstPeerName router.PeerName, buf []byte) error {
 	f.messages = append(f.messages, mockMessage{dstPeerName, buf})
 	return nil
+}
+
+func (m *mockGossipComms) VerifyMessage(t *testing.T, dst string, msgType byte, buf []byte) {
+	if len(m.messages) == 0 {
+		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite())
+	} else if msg := m.messages[0]; msg.dst.String() != dst {
+		t.Fatalf("%s: Expected Gossip message to %s but got dest %s", wt.CallSite(), dst, msg.dst)
+	} else if msg.buf[0] != msgType {
+		t.Fatalf("%s: Expected Gossip message of type %d but got type %d", wt.CallSite(), msgType, msg.buf[0])
+	} else if !equalByteBuffer(msg.buf[1:], buf) {
+		t.Fatalf("%s: Gossip message not sent as expected: %+v", wt.CallSite(), msg)
+	} else {
+		// Swallow this message
+		m.messages = m.messages[1:]
+	}
+}
+
+func (m *mockGossipComms) VerifyBroadcastMessage(t *testing.T, buf []byte) {
+	if len(m.messages) == 0 {
+		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite())
+	} else if msg := m.messages[0]; msg.dst != router.UnknownPeerName {
+		t.Fatalf("%s: Expected Gossip broadcast message but got dest %s", wt.CallSite(), msg.dst)
+	} else if !equalByteBuffer(msg.buf, buf) {
+		t.Fatalf("%s: Gossip message not sent as expected: %+v", wt.CallSite(), msg)
+	} else {
+		// Swallow this message
+		m.messages = m.messages[1:]
+	}
+}
+
+func (m *mockGossipComms) VerifyNoMoreMessages(t *testing.T) {
+	if len(m.messages) > 0 {
+		t.Fatalf("%s, Gossip message unexpected: %+v", wt.CallSite(), m)
+	}
+}
+
+type mockTimeProvider struct {
+	myTime  time.Time
+	pending []mockTimer
+}
+
+type mockTimer struct {
+	when time.Time
+	f    func()
+}
+
+func (m *mockTimeProvider) SetTime(t time.Time) { m.myTime = t }
+func (m *mockTimeProvider) Now() time.Time      { return m.myTime }
+
+func (m *mockTimeProvider) AfterFunc(d time.Duration, f func()) {
+	t := mockTimer{
+		when: m.myTime.Add(d),
+		f:    f,
+	}
+	m.pending = append(m.pending, t)
+}
+
+func goFunc(arg interface{}) {
+}
+
+func (m *mockTimeProvider) runPending(newTime time.Time) {
+	m.myTime = newTime
+	for _, t := range m.pending {
+		if t.when.After(m.myTime) {
+			t.f()
+		}
+	}
 }
 
 func TestGossip(t *testing.T) {
@@ -196,36 +265,45 @@ func TestGossip(t *testing.T) {
 		peerNameString = "02:00:00:02:00:00"
 	)
 
+	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	mockGossip1 := new(mockGossipComms)
 	alloc1 := NewAllocator(ourName, ourUID, mockGossip1, net.ParseIP(testStart1), 1024)
+	mockTime := new(mockTimeProvider)
+	mockTime.SetTime(baseTime)
+	alloc1.timeProvider = mockTime
 	alloc1.manageSpace(net.ParseIP(testStart1), 1)
+
+	mockTime.SetTime(baseTime.Add(1 * time.Second))
 
 	// Simulate another peer on the gossip network
 	mockGossip2 := new(mockGossipComms)
 	pn, _ := router.PeerNameFromString(peerNameString)
 	alloc2 := NewAllocator(pn, peerUID, mockGossip2, net.ParseIP(testStart1), 1024)
+	alloc2.timeProvider = alloc1.timeProvider
 	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
+
+	mockTime.SetTime(baseTime.Add(2 * time.Second))
 
 	buf := alloc2.GlobalState()
 
+	mockTime.SetTime(baseTime.Add(3 * time.Second))
+
 	alloc1.MergeRemoteState(buf)
 
-	if len(mockGossip1.messages) != 1 || mockGossip1.messages[0].dst.String() != peerNameString {
-		t.Fatalf("Gossip message not sent as expected: %+v", mockGossip1)
-	}
-
-	if len(mockGossip2.messages) != 0 {
-		t.Fatalf("Gossip message unexpected: %+v", mockGossip2)
-	}
-
-	mockGossip1.Reset()
+	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.LocalState())
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
 
 	// Now make it look like alloc2 has given up half its space
 	alloc2.ourSpaceSet.spaces[0].GetMinSpace().Size = donateSize
 	alloc2.ourSpaceSet.version++
 
+	mockTime.SetTime(baseTime.Add(4 * time.Second))
+
 	alloc2state := alloc2.LocalState()
+
+	mockTime.SetTime(baseTime.Add(5 * time.Second))
 
 	size_encoding := intip4(donateSize) // hack! using intip4
 	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
@@ -236,4 +314,20 @@ func TestGossip(t *testing.T) {
 	if n := alloc1.peerInfo[peerUID].Version(); n != 2 {
 		t.Fatalf("Peer version should be 2 but got %d", n)
 	}
+
+	mockGossip1.VerifyBroadcastMessage(t, alloc1.LocalState())
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	// Now looking to trigger a timeout
+	mockTime.SetTime(baseTime.Add(11 * time.Minute))
+	alloc1.considerOurPosition()
+
+	// Now make it look like alloc2 is a tombstone so we can check the message
+	alloc2.ourSpaceSet.MakeTombstone()
+	mockTime.SetTime(baseTime.Add(12 * time.Minute))
+
+	mockGossip1.VerifyBroadcastMessage(t, alloc2.LocalState())
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
 }
