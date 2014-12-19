@@ -18,6 +18,7 @@ type Space interface {
 	GetMaxAllocated() uint32
 	LargestFreeBlock() uint32
 	Overlaps(b Space) bool
+	IsHeirTo(b *MinSpace, universe *MinSpace) bool
 	String() string
 }
 
@@ -63,16 +64,13 @@ func (a *MinSpace) Overlaps(b Space) bool {
 // A space is heir to another space if it is immediately lower than it
 // (considering the universe as a ring)
 func (a *MinSpace) IsHeirTo(b *MinSpace, universe *MinSpace) bool {
-	diff := subtract(b.Start, a.Start)
-	usize, asize := int64(universe.Size), int64(a.Size)
-	if diff > usize || diff < -usize {
-		// This is probably an error
+	startA, startB := subtract(a.Start, universe.Start), subtract(b.Start, universe.Start)
+	if startA < 0 || startB < 0 { // space outside our universe
 		return false
-	} else if diff < 0 {
-		return diff+usize == asize
-	} else {
-		return diff == asize
 	}
+	sizeU, sizeA := int64(universe.Size), int64(a.Size)
+	return startA < startB && startA+sizeA == startB ||
+		startA > startB && startA+sizeA-sizeU == startB
 }
 
 func (s *MinSpace) String() string {

@@ -87,18 +87,20 @@ func TestSpaceOverlap(t *testing.T) {
 
 func TestSpaceHeirs(t *testing.T) {
 	const (
+		testAddr0 = "10.0.1.0"
 		testAddr1 = "10.0.1.1"
 		testAddr2 = "10.0.1.10"
 		testAddr3 = "10.0.4.4"
 	)
 
 	var (
+		ipAddr0 = net.ParseIP(testAddr0)
 		ipAddr1 = net.ParseIP(testAddr1)
 		ipAddr2 = net.ParseIP(testAddr2)
 		ipAddr3 = net.ParseIP(testAddr3)
 	)
 
-	universe := NewMinSpace(ipAddr1, 256)
+	universe := NewMinSpace(ipAddr0, 256)
 	space1 := NewMinSpace(ipAddr1, 9)
 	space2 := NewMinSpace(ipAddr2, 9)   // 1 is heir to 2
 	space3 := NewMinSpace(ipAddr3, 8)   // 3 is nowhere near 1 or 2
