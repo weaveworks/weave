@@ -22,7 +22,6 @@ func main() {
 
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	log.Println(os.Args)
 
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
@@ -54,6 +53,17 @@ func main() {
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
 	flag.Parse()
 	peers = flag.Args()
+
+	options := make(map[string]string)
+	flag.Visit(func (f *flag.Flag) {
+		value := f.Value.String()
+		if f.Name == "password" {
+			value = "<elided>"
+		}
+		options[f.Name] = value
+	})
+	log.Println("Command line options:", options)
+	log.Println("Command line peers:", peers)
 
 	if ifaceName == "" {
 		fmt.Println("Missing required parameter 'iface'")
