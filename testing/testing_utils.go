@@ -36,6 +36,24 @@ func AssertStatus(t *testing.T, got int, wanted int, desc string) {
 	}
 }
 
+func AssertEqualUint32(t *testing.T, got uint32, wanted uint32, desc string) {
+	if got != wanted {
+		t.Fatalf("%s: Expected %s %d but got %d", CallSite(), desc, wanted, got)
+	}
+}
+
+func AssertEqualUint64(t *testing.T, got uint64, wanted uint64, desc string) {
+	if got != wanted {
+		t.Fatalf("%s: Expected %s %d but got %d", CallSite(), desc, wanted, got)
+	}
+}
+
+func AssertEqualStr(t *testing.T, got string, wanted string, desc string) {
+	if got != wanted {
+		t.Fatalf("%s: Expected %s '%s' but got '%s'", CallSite(), desc, wanted, got)
+	}
+}
+
 func AssertErrorInterface(t *testing.T, got interface{}, wanted interface{}, desc string) {
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
 	if !gotT.Implements(wantedT) {
