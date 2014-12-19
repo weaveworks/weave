@@ -76,7 +76,7 @@ func (a *MinSpace) IsHeirTo(b *MinSpace, universe *MinSpace) bool {
 }
 
 func (s *MinSpace) String() string {
-	return fmt.Sprintf("start %s, size %d, max allocated %d", s.Start, s.Size, s.MaxAllocated)
+	return fmt.Sprintf("%s+%d, %d", s.Start, s.Size, s.MaxAllocated)
 }
 
 func NewMinSpace(start net.IP, size uint32) *MinSpace {
@@ -173,5 +173,5 @@ func (s *MutableSpace) LargestFreeBlock() uint32 {
 func (space *MutableSpace) String() string {
 	space.RLock()
 	defer space.RUnlock()
-	return fmt.Sprintf("MutableSpace start %s, size %d, allocated %d, free %d", space.Start, space.Size, len(space.recs), len(space.free_list))
+	return fmt.Sprintf("%s+%d, %d/%d", space.Start, space.Size, len(space.recs), len(space.free_list))
 }
