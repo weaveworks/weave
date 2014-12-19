@@ -85,12 +85,8 @@ func (alloc *Allocator) startForTesting() {
 // internal functions never take a lock and never call an exposed function.
 // Go's locks are not re-entrant
 
-// Only called when testing or if we are elected leader
 func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
 	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, poolSize))
-	if alloc.state == allocStateLeaderless {
-		alloc.state = allocStateNeutral
-	}
 }
 
 func (alloc *Allocator) encode(spaceset SpaceSet) []byte {
@@ -194,17 +190,23 @@ func (alloc *Allocator) discardOldLeaks() {
 }
 
 // look for leaks which are aged, and which we are heir to
-func (alloc *Allocator) reclaimLeaks(now time.Time) {
+func (alloc *Allocator) reclaimLeaks(now time.Time) (changed bool) {
+	changed = false
 	limit := now.Add(-router.GossipDeadTimeout)
 	for age, leak := range alloc.leaked {
 		if age.Before(limit) {
 			for _, space := range alloc.ourSpaceSet.spaces {
 				if space.IsHeirTo(leak.GetMinSpace(), alloc.universe.GetMinSpace()) {
-					lg.Debug.Printf("Reclaiming leak %+v heir %+v", leak, space)
+					lg.Info.Printf("Reclaiming leak %+v heir %+v", leak, space)
+					delete(alloc.leaked, age)
+					alloc.manageSpace(leak.GetStart(), leak.GetSize())
+					changed = true
+					break
 				}
 			}
 		}
 	}
+	return
 }
 
 func (alloc *Allocator) considerOurPosition() {
@@ -219,9 +221,12 @@ func (alloc *Allocator) considerOurPosition() {
 			alloc.requestSpace()
 		}
 		alloc.discardOldLeaks()
-		alloc.reclaimLeaks(now)
+		changed := alloc.reclaimLeaks(now)
 		alloc.lookForDeadPeers(now)
 		alloc.lookForNewLeaks(now)
+		if changed {
+			alloc.gossip.GossipBroadcast(alloc.localState())
+		}
 	case allocStateExpectingDonation:
 		// If nobody came back to us, ask again
 		if now.After(alloc.stateExpire) {
