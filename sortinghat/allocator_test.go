@@ -26,9 +26,7 @@ func TestAllocFree(t *testing.T) {
 	alloc.manageSpace(net.ParseIP(testAddr1), 3)
 
 	addr1 := alloc.AllocateFor(containerID)
-	if addr1.String() != testAddr1 {
-		t.Fatalf("Expected address %s but got %s", testAddr1, addr1)
-	}
+	wt.AssertEqualStr(t, addr1.String(), testAddr1, "address")
 
 	// Ask for another address and check it's different
 	addr2 := alloc.AllocateFor(container2)
@@ -39,9 +37,7 @@ func TestAllocFree(t *testing.T) {
 	// Now free the first one, and we should get it back when we ask
 	alloc.Free(net.ParseIP(testAddr1))
 	addr3 := alloc.AllocateFor(container2)
-	if addr3.String() != testAddr1 {
-		t.Fatalf("Expected address %s but got %s", testAddr1, addr1)
-	}
+	wt.AssertEqualStr(t, addr3.String(), testAddr1, "address")
 }
 
 func equalByteBuffer(a, b []byte) bool {
@@ -70,24 +66,15 @@ func TestMultiSpaces(t *testing.T) {
 	alloc.manageSpace(net.ParseIP(testStart1), 1)
 	alloc.manageSpace(net.ParseIP(testStart2), 3)
 
-	if n := alloc.ourSpaceSet.NumFreeAddresses(); n != 4 {
-		t.Fatalf("Total free addresses should be 4 but got %d", n)
-	}
+	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 4, "Total free addresses")
 
 	addr1 := alloc.AllocateFor(containerID)
-	if addr1.String() != testStart1 {
-		t.Fatalf("Expected address %s but got %s", testStart1, addr1)
-	}
+	wt.AssertEqualStr(t, addr1.String(), testStart1, "address")
 
 	// First space should now be full and this address should come from second space
 	addr2 := alloc.AllocateFor(container2)
-	if addr2.String() != testStart2 {
-		t.Fatalf("Expected address %s but got %s", testStart2, addr2)
-	}
-
-	if n := alloc.ourSpaceSet.NumFreeAddresses(); n != 2 {
-		t.Fatalf("Free addresses should be 2 but got %d", n)
-	}
+	wt.AssertEqualStr(t, addr2.String(), testStart2, "address")
+	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 2, "Total free addresses")
 }
 
 func TestEncodeMerge(t *testing.T) {
@@ -293,7 +280,7 @@ func TestGossip(t *testing.T) {
 
 	// Give alloc1 some space so we can test the choosing algorithm
 	alloc1.manageSpace(net.ParseIP(testStart1), 1)
-	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
+	alloc1.state = allocStateNeutral
 	alloc1.considerOurPosition()
 	mockGossip1.VerifyNoMoreMessages(t)
 
@@ -325,12 +312,8 @@ func TestGossip(t *testing.T) {
 	size_encoding := intip4(donateSize) // hack! using intip4
 	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
 	alloc1.NotifyMsg(pn, msg)
-	if n := alloc1.ourSpaceSet.NumFreeAddresses(); n != 6 {
-		t.Fatalf("Total free addresses should be 6 but got %d", n)
-	}
-	if n := alloc1.peerInfo[peerUID].Version(); n != 2 {
-		t.Fatalf("Peer version should be 2 but got %d", n)
-	}
+	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 6, "Total free addresses")
+	wt.AssertEqualUint64(t, alloc1.peerInfo[peerUID].Version(), 2, "Peer version")
 
 	mockGossip1.VerifyBroadcastMessage(t, alloc1.LocalState())
 	mockGossip1.VerifyNoMoreMessages(t)
@@ -342,12 +325,13 @@ func TestGossip(t *testing.T) {
 
 	// Now make it look like alloc2 is a tombstone so we can check the message
 	alloc2.ourSpaceSet.MakeTombstone()
-	mockTime.SetTime(baseTime.Add(12 * time.Minute))
 
 	mockGossip1.VerifyBroadcastMessage(t, alloc2.LocalState())
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
+	// Now move the time forward so alloc1 reclaims alloc2's storage
+	mockTime.SetTime(baseTime.Add(12 * time.Minute))
 	alloc1.considerOurPosition()
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
