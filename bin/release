@@ -71,30 +71,52 @@ publish() {
 
     echo == Sanity checks
 
+    if ! which github-release >/dev/null; then
+        echo Please install git-release: >&2
+        echo -e "\tgo get github.com/aktau/github-release" >&2
+        echo and create a git token per https://github.com/aktau/github-release >&2
+        exit 1
+    fi
+
+    ## Check that the tag exists by looking at github
+    if ! curl -sSf https://api.github.com/repos/$GITHUB_USER/weave/git/tags/$LATEST_TAG_SHA >/dev/null 2>&1; then
+        echo -e "\u2757 Tag $LATEST_TAG is not on GitHub" >&2
+        echo -e "\thttps://github.com/$GITHUB_USER/weave/tags" >&2
+        echo "You may need to" >&2
+        echo -e "\tgit push --tags"
+        exit 1
+    fi
+    echo -e "\u2713 Tag $LATEST_TAG exists in GitHub repo $GITHUB_USER/weave"
+
     ## Check that the version doesn't already exist by looking at github
     ## releases
-    if curl -sSf https://api.github.com/repos/zettio/weave/releases/$LATEST_TAG 2>/dev/null; then
-        echo Release $LATEST_TAG already exists on GitHub >&2
-        echo https://github.com/zettio/weave/releases/$LATEST_TAG >&2
+    if github-release info --user $GITHUB_USER --repo weave --tag $LATEST_TAG >/dev/null 2>&1; then
+        echo -e "\u2757 Release $LATEST_TAG already exists on GitHub" >&2
+        echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG" >&2
         exit 1
     fi
 
     echo '** Sanity checks OK for publishing tag' $LATEST_TAG as zettio/weave:$VERSION
 
-    if ! which github-release; then
-        echo Please install git-release:
-        echo     go get github.com/aktau/github-release
-        echo and create a git token per https://github.com/aktau/github-release
-        exit 1
-    fi
-
-    echo == Creating GitHub release $VERSION
-    github-release release --user $GITHUB_USER \
+    echo == Creating GitHub release $RELEASE_NAME $VERSION
+    # This cannot be done as a draft because of a bug in
+    # github-release: https://github.com/aktau/github-release/issues/7
+    github-release release \
+        --user $GITHUB_USER \
         --repo weave \
         --tag $LATEST_TAG \
-        --name "$RELEASE_NAME" \
-        --description "$RELEASE_DESCRIPTION" \
-        --pre-release
+        --name "$RELEASE_NAME $VERSION" \
+        --description "$RELEASE_DESCRIPTION"
+
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag $LATEST_TAG \
+        --name "weave" \
+        --file "./weave"
+
+    echo "** Published release $RELEASE_NAME $VERSION"
+    echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
 }
 
 usage() {
