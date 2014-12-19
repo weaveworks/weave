@@ -36,6 +36,7 @@ type Allocator struct {
 	ourName     router.PeerName
 	ourUID      uint64
 	state       int
+	stateExpire time.Time
 	universe    MinSpace // all the addresses that could be allocated
 	gossip      router.GossipCommsProvider
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
@@ -62,12 +63,20 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.GossipCo
 		universe:     MinSpace{Start: startAddr, Size: uint32(universeSize)},
 		peerInfo:     make(map[uint64]SpaceSet),
 		ourSpaceSet:  NewSpaceSet(ourName, ourUID),
-		maxAge:       10 * time.Minute,
+		maxAge:       10 * time.Second,
 		timeProvider: defaultTime{},
 	}
 	alloc.peerInfo[ourUID] = alloc.ourSpaceSet
-	time.AfterFunc(router.GossipWaitForLead, func() { alloc.ElectLeader() })
 	return alloc
+}
+
+func (alloc *Allocator) Start() {
+	alloc.moveToState(allocStateLeaderless, router.GossipWaitForLead)
+	go alloc.queryLoop()
+}
+
+func (alloc *Allocator) startForTesting() {
+	alloc.moveToState(allocStateLeaderless, router.GossipWaitForLead)
 }
 
 // NOTE: exposed functions (start with uppercase) take a lock;
@@ -77,7 +86,9 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.GossipCo
 // Only called when testing or if we are elected leader
 func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
 	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, poolSize))
-	alloc.state = allocStateNeutral
+	if alloc.state == allocStateLeaderless {
+		alloc.state = allocStateNeutral
+	}
 }
 
 func (alloc *Allocator) encode(spaceset SpaceSet) []byte {
@@ -114,8 +125,8 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 			}
 			lg.Debug.Println("Replacing", newSpaceset.PeerName, "data with newer version", newSpaceset.version)
 			alloc.peerInfo[newSpaceset.UID()] = newSpaceset
-			if alloc.state == allocStateLeaderless {
-				alloc.state = allocStateNeutral
+			if alloc.state == allocStateLeaderless && !newSpaceset.Empty() {
+				alloc.moveToState(allocStateNeutral, 0)
 			}
 			ret = append(ret, newSpaceset)
 		}
@@ -137,6 +148,7 @@ func (alloc *Allocator) considerOurPosition() {
 	if alloc.gossip == nil {
 		return // Can't do anything.
 	}
+	now := alloc.timeProvider.Now()
 	switch alloc.state {
 	case allocStateNeutral:
 		// Should we ask for some space?
@@ -145,6 +157,7 @@ func (alloc *Allocator) considerOurPosition() {
 		}
 		// Look for any peers we haven't heard from in a long time
 		now := alloc.timeProvider.Now()
+		alloc.ourSpaceSet.lastSeen = now
 		for _, entry := range alloc.peerInfo {
 			if now.After(entry.LastSeen().Add(alloc.maxAge)) {
 				lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
@@ -160,22 +173,29 @@ func (alloc *Allocator) considerOurPosition() {
 				allSpace.Exclude(space)
 			})
 		}
-		lg.Info.Printf("Leaked spaces: %s", allSpace)
+		if !allSpace.Empty() {
+			lg.Info.Printf("Leaked spaces: %s", allSpace)
+		}
 		// Look for leaked reservations that we are heir to
 	case allocStateExpectingDonation:
-		// What?
+		// If nobody came back to us, ask again
+		if now.After(alloc.stateExpire) {
+			alloc.requestSpace()
+		}
 	case allocStateLeaderless:
-		// Can't do anything in this state - waiting for timeout
+		if now.After(alloc.stateExpire) {
+			alloc.electLeader()
+		}
 	}
 }
 
-func (alloc *Allocator) haveLeader() {
+func (alloc *Allocator) moveToState(newState int, timeout time.Duration) {
+	alloc.state = newState
+	alloc.stateExpire = alloc.timeProvider.Now().Add(timeout)
 }
 
-func (alloc *Allocator) ElectLeader() {
+func (alloc *Allocator) electLeader() {
 	lg.Debug.Println("Time to look for a leader")
-	alloc.Lock()
-	defer alloc.Unlock()
 	// If anyone is already managing some space, then we don't need to elect a leader
 	if !alloc.ourSpaceSet.Empty() {
 		lg.Debug.Println("I have some space; someone must have given it to me")
@@ -197,10 +217,11 @@ func (alloc *Allocator) ElectLeader() {
 		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
 		// I'm the winner; take control of the whole universe
 		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
+		alloc.moveToState(allocStateNeutral, 0)
 		alloc.gossip.GossipBroadcast(alloc.localState())
 	} else {
 		// We expect the other guy to take control, but if he doesn't, try again.
-		time.AfterFunc(router.GossipWaitForLead, func() { alloc.ElectLeader() })
+		alloc.moveToState(allocStateLeaderless, router.GossipWaitForLead)
 	}
 }
 
@@ -208,17 +229,19 @@ func (alloc *Allocator) requestSpace() {
 	var best SpaceSet = nil
 	var bestNumFree uint32 = 0
 	for _, spaceset := range alloc.peerInfo {
-		if num := spaceset.NumFreeAddresses(); num > bestNumFree {
+		if num := spaceset.NumFreeAddresses(); spaceset != alloc.ourSpaceSet && num > bestNumFree {
 			bestNumFree = num
 			best = spaceset
 		}
 	}
 	if best != nil {
-		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space")
+		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space:", best)
 		myState := alloc.encode(alloc.ourSpaceSet)
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
 		alloc.gossip.GossipSendTo(best.PeerName(), msg)
-		alloc.state = allocStateExpectingDonation
+		alloc.moveToState(allocStateExpectingDonation, router.GossipReqTimeout)
+	} else {
+		lg.Debug.Println("Nobody available to ask for space")
 	}
 }
 
@@ -254,7 +277,7 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 			return
 		}
 		alloc.ourSpaceSet.AddSpace(newSpace)
-		alloc.state = allocStateNeutral
+		alloc.moveToState(allocStateNeutral, 0)
 		alloc.gossip.GossipBroadcast(alloc.localState())
 	}
 }
@@ -284,6 +307,20 @@ func (alloc *Allocator) string() string {
 		buf.WriteString(spaceset.String())
 	}
 	return buf.String()
+}
+
+// Actor (?)
+
+func (alloc *Allocator) queryLoop() {
+	gossipTimer := time.Tick(router.GossipInterval)
+	for {
+		select {
+		case <-gossipTimer:
+			alloc.Lock()
+			alloc.considerOurPosition()
+			alloc.Unlock()
+		}
+	}
 }
 
 // GossipDelegate methods

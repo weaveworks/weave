@@ -269,10 +269,11 @@ func TestGossip(t *testing.T) {
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	mockGossip1 := new(mockGossipComms)
 	alloc1 := NewAllocator(ourName, ourUID, mockGossip1, net.ParseIP(testStart1), 1024)
+	alloc1.startForTesting()
 	mockTime := new(mockTimeProvider)
 	mockTime.SetTime(baseTime)
 	alloc1.timeProvider = mockTime
-	alloc1.manageSpace(net.ParseIP(testStart1), 1)
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 
 	mockTime.SetTime(baseTime.Add(1 * time.Second))
 
@@ -281,15 +282,35 @@ func TestGossip(t *testing.T) {
 	pn, _ := router.PeerNameFromString(peerNameString)
 	alloc2 := NewAllocator(pn, peerUID, mockGossip2, net.ParseIP(testStart1), 1024)
 	alloc2.timeProvider = alloc1.timeProvider
-	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
 
 	mockTime.SetTime(baseTime.Add(2 * time.Second))
 
-	buf := alloc2.GlobalState()
+	alloc1.MergeRemoteState(alloc2.GlobalState())
+	// At first, this peer has no space, so alloc1 should do nothing
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
 
+	// Give alloc1 some space so we can test the choosing algorithm
+	alloc1.manageSpace(net.ParseIP(testStart1), 1)
+	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
+	alloc1.considerOurPosition()
+	mockGossip1.VerifyNoMoreMessages(t)
+
+	// Now give alloc2 some space and tell alloc1 about it
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
+	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
 
-	alloc1.MergeRemoteState(buf)
+	alloc1.MergeRemoteState(alloc2.GlobalState())
+
+	// Alloc1 should ask alloc2 for space
+	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.LocalState())
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	// Time out with no reply
+	mockTime.SetTime(baseTime.Add(5 * time.Second))
+	alloc1.considerOurPosition()
 
 	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.LocalState())
 	mockGossip1.VerifyNoMoreMessages(t)
@@ -299,11 +320,7 @@ func TestGossip(t *testing.T) {
 	alloc2.ourSpaceSet.spaces[0].GetMinSpace().Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	mockTime.SetTime(baseTime.Add(4 * time.Second))
-
 	alloc2state := alloc2.LocalState()
-
-	mockTime.SetTime(baseTime.Add(5 * time.Second))
 
 	size_encoding := intip4(donateSize) // hack! using intip4
 	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
