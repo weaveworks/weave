@@ -24,6 +24,7 @@ type SpaceSet interface {
 	NumFreeAddresses() uint32
 	Overlaps(space *MinSpace) bool
 	String() string
+	ForEachSpace(fun func(Space))
 }
 
 // This represents a peer's space allocations, which we only hear about.
@@ -98,6 +99,14 @@ func (s *PeerSpaceSet) Decode(decoder *gob.Decoder) error {
 		}
 	}
 	return nil
+}
+
+func (s *PeerSpaceSet) ForEachSpace(fun func(Space)) {
+	s.RLock()
+	defer s.RUnlock()
+	for _, space := range s.spaces {
+		fun(space)
+	}
 }
 
 func (s *PeerSpaceSet) String() string {
@@ -226,4 +235,33 @@ func (s *MutableSpaceSet) Free(addr net.IP) error {
 		}
 	}
 	return errors.New("Attempt to free IP address not in range")
+}
+
+func endOfBlock(a Space) net.IP {
+	return add(a.GetStart(), a.GetSize())
+}
+
+func (s *MutableSpaceSet) Exclude(a Space) bool {
+	s.Lock()
+	defer s.Unlock()
+	ns := make([]Space, 0)
+	aSize := int64(a.GetSize())
+	for _, b := range s.spaces {
+		bSize := int64(b.GetSize())
+		diff := subtract(a.GetStart(), b.GetStart())
+		if diff > 0 && diff < bSize {
+			ns = append(ns, NewSpace(b.GetStart(), uint32(diff)))
+			if bSize > aSize+diff {
+				ns = append(ns, NewSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
+			}
+		} else if diff <= 0 && -diff < aSize {
+			if aSize+diff < bSize {
+				ns = append(ns, NewSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
+			}
+		} else { // Pieces do not overlap; leave the existing one in place
+			ns = append(ns, b)
+		}
+	}
+	s.spaces = ns
+	return false
 }

@@ -143,7 +143,7 @@ func (alloc *Allocator) considerOurPosition() {
 		if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
 			alloc.requestSpace()
 		}
-		// Should we time-out any of our peers?
+		// Look for any peers we haven't heard from in a long time
 		now := alloc.timeProvider.Now()
 		for _, entry := range alloc.peerInfo {
 			if now.After(entry.LastSeen().Add(alloc.maxAge)) {
@@ -152,7 +152,16 @@ func (alloc *Allocator) considerOurPosition() {
 				alloc.gossip.GossipBroadcast(alloc.encode(entry))
 			}
 		}
-		// Look for leaked reservations
+		// Look for holes in the address space
+		allSpace := NewSpaceSet(router.UnknownPeerName, 0)
+		allSpace.AddSpace(NewSpace(alloc.universe.Start, alloc.universe.Size))
+		for _, peerSpaceSet := range alloc.peerInfo {
+			peerSpaceSet.ForEachSpace(func(space Space) {
+				allSpace.Exclude(space)
+			})
+		}
+		lg.Info.Printf("Leaked spaces: %s", allSpace)
+		// Look for leaked reservations that we are heir to
 	case allocStateExpectingDonation:
 		// What?
 	case allocStateLeaderless:
