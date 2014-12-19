@@ -31,11 +31,6 @@ type timeProvider interface {
 	AfterFunc(d time.Duration, f func())
 }
 
-type leak struct {
-	Space
-	time.Time
-}
-
 type Allocator struct {
 	sync.RWMutex
 	ourName     router.PeerName
@@ -46,7 +41,7 @@ type Allocator struct {
 	gossip      router.GossipCommsProvider
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
 	ourSpaceSet *MutableSpaceSet
-	leaked      []leak
+	leaked      map[time.Time]Space
 	maxAge      time.Duration
 	timeProvider
 }
@@ -69,6 +64,7 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.GossipCo
 		universe:     MinSpace{Start: startAddr, Size: uint32(universeSize)},
 		peerInfo:     make(map[uint64]SpaceSet),
 		ourSpaceSet:  NewSpaceSet(ourName, ourUID),
+		leaked:       make(map[time.Time]Space),
 		maxAge:       10 * time.Second,
 		timeProvider: defaultTime{},
 	}
@@ -152,9 +148,11 @@ func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
 
 func (alloc *Allocator) lookForDeadPeers(now time.Time) {
 	for _, entry := range alloc.peerInfo {
-		if now.After(entry.LastSeen().Add(alloc.maxAge)) {
+		if peerEntry, ok := entry.(*PeerSpaceSet); ok &&
+			!peerEntry.IsTombstone() &&
+			now.After(entry.LastSeen().Add(alloc.maxAge)) {
 			lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
-			entry.(*PeerSpaceSet).MakeTombstone()
+			peerEntry.MakeTombstone()
 			alloc.gossip.GossipBroadcast(alloc.encode(entry))
 		}
 	}
@@ -170,13 +168,41 @@ func (alloc *Allocator) lookForNewLeaks(now time.Time) {
 	}
 	if !allSpace.Empty() {
 		// Now remove the leaks we already knew about
-		for _, lk := range alloc.leaked {
-			allSpace.Exclude(lk.Space)
+		for _, leak := range alloc.leaked {
+			allSpace.Exclude(leak)
 		}
-		lg.Info.Printf("New leaked spaces: %s", allSpace)
-		for _, space := range allSpace.spaces {
-			// fixme: should merge contiguous spaces
-			alloc.leaked = append(alloc.leaked, leak{space, now})
+		if !allSpace.Empty() {
+			lg.Info.Printf("New leaked spaces: %s", allSpace)
+			for _, space := range allSpace.spaces {
+				// fixme: should merge contiguous spaces
+				alloc.leaked[now] = space
+				break // can only store one space against each time
+			}
+		}
+	}
+}
+
+func (alloc *Allocator) discardOldLeaks() {
+	for age, leak := range alloc.leaked {
+		if alloc.ourSpaceSet.Overlaps(leak.GetMinSpace()) {
+			lg.Debug.Printf("Discarding non-leak %+v", leak)
+			// Really, we should only discard the piece that is overlapped, but
+			// this way is simpler and we will recover any real leaks in the end
+			delete(alloc.leaked, age)
+		}
+	}
+}
+
+// look for leaks which are aged, and which we are heir to
+func (alloc *Allocator) reclaimLeaks(now time.Time) {
+	limit := now.Add(-router.GossipDeadTimeout)
+	for age, leak := range alloc.leaked {
+		if age.Before(limit) {
+			for _, space := range alloc.ourSpaceSet.spaces {
+				if space.IsHeirTo(leak.GetMinSpace(), alloc.universe.GetMinSpace()) {
+					lg.Debug.Printf("Reclaiming leak %+v heir %+v", leak, space)
+				}
+			}
 		}
 	}
 }
@@ -192,7 +218,8 @@ func (alloc *Allocator) considerOurPosition() {
 		if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
 			alloc.requestSpace()
 		}
-		alloc.ourSpaceSet.lastSeen = now
+		alloc.discardOldLeaks()
+		alloc.reclaimLeaks(now)
 		alloc.lookForDeadPeers(now)
 		alloc.lookForNewLeaks(now)
 	case allocStateExpectingDonation:

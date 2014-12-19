@@ -154,6 +154,10 @@ func (s *PeerSpaceSet) MakeTombstone() {
 	s.Unlock()
 }
 
+func (s *PeerSpaceSet) IsTombstone() bool {
+	return s.version == math.MaxUint64
+}
+
 // -------------------------------------------------
 
 func NewSpaceSet(pn router.PeerName, uid uint64) *MutableSpaceSet {

@@ -347,4 +347,8 @@ func TestGossip(t *testing.T) {
 	mockGossip1.VerifyBroadcastMessage(t, alloc2.LocalState())
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
+
+	alloc1.considerOurPosition()
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
 }

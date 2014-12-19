@@ -29,6 +29,7 @@ const (
 	GossipInterval     = 3 * time.Second
 	GossipReqTimeout   = 1 * time.Second
 	GossipWaitForLead  = 10 * time.Second
+	GossipDeadTimeout  = 10 * time.Second
 )
 
 const (
