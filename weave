@@ -427,7 +427,7 @@ case "$COMMAND" in
         fi
 
         # guess the possible external IP addresses...
-        EXT_DEVS=$(netstat -i | tail -n +3 | cut -f1 -d' ' | grep -v "^\(veth\|weave\|bridge\|lo\)")
+        EXT_DEVS=$(netstat -i | tail -n +3 | cut -f1 -d' ' | grep -v "^\(veth\|weave\|bridge\|docker\|lo\)")
         EXT_IPS=""
         for DEV in $EXT_DEVS ; do EXT_IPS="$EXT_IPS,$(dev_ip $DEV)" ; done
         EXT_IPS=$(echo $EXT_IPS | cut -c2-)

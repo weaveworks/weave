@@ -15,20 +15,21 @@ Subsquently, giving any container a hostname in the domain
 
 ```bash
 $ weave launch
-$ weave launch-dns 10.1.0.2/16
+$ weave launch-dns 10.1.254.1/24
 $ weave run 10.1.1.25/24 -ti -h pingme.weave.local ubuntu
 $ shell1=$(weave run --with-dns 10.1.1.26/24 -ti -h ubuntu.weave.local ubuntu)
 $ docker attach $shell1
-
-The DNS container can be stopped with `stop-dns`.
 
 # ping pingme
 ...
 ```
 
 The weave IP address supplied to `weave launch-dns` must not be used
-by any other container, and the supplied network must contain all
-application networks.
+by any other container, and the supplied network must be the same for
+all DNS containers, and be disjoint from all application networks.
+
+The DNS container can be stopped with `stop-dns`.
+
 
 ## Domain search paths
 
@@ -73,7 +74,7 @@ supply a different bridge device, use the environment variable
 `DOCKER_BRIDGE`, e.g.,
 
 ```bash
-$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.0.1.2/16
+$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.1.254.1/24
 ```
 
 ### Supplying the DNS server
@@ -124,6 +125,14 @@ $ shell2_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $shell2
 $ curl -X PUT "http://$dns_ip:6785/name/$shell2/10.1.1.27" -d local_ip=$shell2_ip -d fqdn=shell2.weave.local
 ```
 
+### Registering multiple containers with the same name
+
+This is supported; in the initial implementation weaveDNS will pick one address to return when you ask for the name.  Since weave-dns will remove any container that dies, this is a simple way to implement redundancy.  In the current implementation it does not attempt to do load-balancing.
+
+### Replacing one container with another at the same name
+
+If you would like to deploy a new version of a service, keep the old one running because it has active connections but make all new requests go to the new version, then you can simply start the new server container and then [unregister](https://github.com/zettio/weave/tree/master/weavedns#unregistering) the old one from DNS. And finally, when all connections to the old server have terminated, stop the container as normal.
+
 ### Not watching docker events
 
 By default, the server will watch docker events and remove entries for
@@ -131,8 +140,10 @@ any containers that die. You can tell it not to, by adding
 `--watch=false` to the container args:
 
 ```bash
-$ weave launch-dns 10.1.0.2/16 --watch=false
+$ weave launch-dns 10.1.254.1/24 --watch=false
 ```
+
+### Unregistering
 
 You can manually delete entries for a host, by poking weaveDNS's HTTP
 API with e.g., `curl`:

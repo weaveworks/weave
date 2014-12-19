@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-const macMaxAge = 10 * time.Minute
+const macMaxAge = 10 * time.Minute // [1]
+
+// [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
+// /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
@@ -246,9 +249,6 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			// it's not for us, we're just relaying it
 			if decodedLen == 0 {
 				return nil
-			}
-			if router.Macs.Enter(srcMac, srcPeer) {
-				log.Println("Discovered remote MAC", srcMac, "at", srcPeer.Name)
 			}
 			if df {
 				router.LogFrame("Relaying DF", frame, &dec.eth)

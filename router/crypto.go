@@ -315,9 +315,9 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 		if !ok {
 			return nil, fmt.Errorf("Nonce chan closed")
 		}
+		decState.highestOffsetSeen = offsetNoFlags
 		nonce = decState.nonce
 		usedOffsets = decState.usedOffsets
-		decState.highestOffsetSeen = offsetNoFlags
 	} else {
 		highestOffsetSeen := decState.highestOffsetSeen
 		if offsetNoFlags < (1<<13) && highestOffsetSeen > ((1<<14)+(1<<13)) &&

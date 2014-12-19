@@ -68,10 +68,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if connLimit < 0 {
-		connLimit = 0
-	}
-
 	if routerName == "" {
 		routerName = iface.HardwareAddr.String()
 	}

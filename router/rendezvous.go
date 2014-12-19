@@ -49,10 +49,24 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 		return errors.New("No external IP addresses provided")
 	}
 
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return fmt.Errorf("Could not get interfaces list: %s", err)
+	}
+	log.Printf("Interfaces:")
+	for _, i := range ifaces {
+		log.Printf("    * %v", i)
+		addrs, _ := i.Addrs()
+		for _, ip := range addrs {
+			log.Printf("      * %v", ip)
+		}
+	}
+
 	name, err := os.Hostname()
+	miface, _ := net.InterfaceByName("eth0")
 	zone := new(nameserver.ZoneDb)
 	for announcedIp := range announcedIps {
-		log.Printf("Announcing %s at %s", mdns.fullDomain, announcedIp)
+		log.Printf("Announcing %s at %s on %s", mdns.fullDomain, announcedIp, miface.Name)
 		zone.AddRecord(name, mdns.fullDomain, net.ParseIP(announcedIp))
 		mdns.announcedIps[announcedIp] = true
 	}
@@ -70,7 +84,7 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 		return fmt.Errorf("Error when starting mDNS client: %s", err)
 	}
 
-	err = mdnsClient.Start(mdns.cm.router.Iface)
+	err = mdnsClient.Start(miface) //mdns.cm.router.Iface)
 	if err != nil {
 		return fmt.Errorf("Error when starting mDNS client: %s", err)
 	}

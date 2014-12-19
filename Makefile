@@ -20,7 +20,8 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE):
 		rm $@; \
 		echo "\nYour go standard library was built without the 'netgo' build tag."; \
 		echo "To fix that, run"; \
-		echo "    sudo go install -a -tags netgo std"; \
+		echo "    sudo go clean -i net"; \
+		echo "    sudo go install -tags netgo std"; \
 		false; \
 	}
 
@@ -37,7 +38,7 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 
 # Add more directories in here as more tests are created
 tests:
-	cd nameserver; go test
+	cd nameserver; go test -tags netgo
 
 publish: $(WEAVER_EXPORT) tests
 	$(SUDO) docker tag $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
