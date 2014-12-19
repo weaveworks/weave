@@ -390,6 +390,17 @@ uname -s -r | sed -n 's|^\([^ ]*\) \([0-9]\+\)\.\([0-9]\+\).*|\1 \2 \3|p' | {
     fi
 }
 
+if ! command_exists ip ; then
+    echo "ERROR: ip utility is missing. Please install it." >&2
+    exit 1
+fi
+
+if ! ip netns list >/dev/null 2>&1 ; then
+    echo "ERROR:" $(ip -V) "does not support network namespaces." >&2
+    echo "       Please install iproute2-ss111010 or later." >&2
+    exit 1
+fi
+
 if ! DOCKER_VERSION=$(docker -v | sed -n 's|^Docker version \([0-9]\+\.[0-9]\+.[0-9]\+\),.*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
     echo "ERROR: Unable to parse docker version" >&2
     exit 1
