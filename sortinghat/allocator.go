@@ -31,6 +31,11 @@ type timeProvider interface {
 	AfterFunc(d time.Duration, f func())
 }
 
+type leak struct {
+	Space
+	time.Time
+}
+
 type Allocator struct {
 	sync.RWMutex
 	ourName     router.PeerName
@@ -41,6 +46,7 @@ type Allocator struct {
 	gossip      router.GossipCommsProvider
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
 	ourSpaceSet *MutableSpaceSet
+	leaked      []leak
 	maxAge      time.Duration
 	timeProvider
 }
@@ -144,6 +150,37 @@ func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
 	return 0
 }
 
+func (alloc *Allocator) lookForDeadPeers(now time.Time) {
+	for _, entry := range alloc.peerInfo {
+		if now.After(entry.LastSeen().Add(alloc.maxAge)) {
+			lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
+			entry.(*PeerSpaceSet).MakeTombstone()
+			alloc.gossip.GossipBroadcast(alloc.encode(entry))
+		}
+	}
+}
+
+func (alloc *Allocator) lookForNewLeaks(now time.Time) {
+	allSpace := NewSpaceSet(router.UnknownPeerName, 0)
+	allSpace.AddSpace(NewSpace(alloc.universe.Start, alloc.universe.Size))
+	for _, peerSpaceSet := range alloc.peerInfo {
+		peerSpaceSet.ForEachSpace(func(space Space) {
+			allSpace.Exclude(space)
+		})
+	}
+	if !allSpace.Empty() {
+		// Now remove the leaks we already knew about
+		for _, lk := range alloc.leaked {
+			allSpace.Exclude(lk.Space)
+		}
+		lg.Info.Printf("New leaked spaces: %s", allSpace)
+		for _, space := range allSpace.spaces {
+			// fixme: should merge contiguous spaces
+			alloc.leaked = append(alloc.leaked, leak{space, now})
+		}
+	}
+}
+
 func (alloc *Allocator) considerOurPosition() {
 	if alloc.gossip == nil {
 		return // Can't do anything.
@@ -155,28 +192,9 @@ func (alloc *Allocator) considerOurPosition() {
 		if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
 			alloc.requestSpace()
 		}
-		// Look for any peers we haven't heard from in a long time
-		now := alloc.timeProvider.Now()
 		alloc.ourSpaceSet.lastSeen = now
-		for _, entry := range alloc.peerInfo {
-			if now.After(entry.LastSeen().Add(alloc.maxAge)) {
-				lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
-				entry.(*PeerSpaceSet).MakeTombstone()
-				alloc.gossip.GossipBroadcast(alloc.encode(entry))
-			}
-		}
-		// Look for holes in the address space
-		allSpace := NewSpaceSet(router.UnknownPeerName, 0)
-		allSpace.AddSpace(NewSpace(alloc.universe.Start, alloc.universe.Size))
-		for _, peerSpaceSet := range alloc.peerInfo {
-			peerSpaceSet.ForEachSpace(func(space Space) {
-				allSpace.Exclude(space)
-			})
-		}
-		if !allSpace.Empty() {
-			lg.Info.Printf("Leaked spaces: %s", allSpace)
-		}
-		// Look for leaked reservations that we are heir to
+		alloc.lookForDeadPeers(now)
+		alloc.lookForNewLeaks(now)
 	case allocStateExpectingDonation:
 		// If nobody came back to us, ask again
 		if now.After(alloc.stateExpire) {
