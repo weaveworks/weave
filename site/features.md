@@ -136,7 +136,8 @@ launching weave, e.g.
 
 The same password must be specified for all weave peers; it is a
 component in the creation of ephemeral session keys for connections
-between peers.
+between peers. See the
+[crypto documentation](how-it-works.html#crypto) for more details.
 
 ### <a name="host-network-integration"></a>Host network integration
 
