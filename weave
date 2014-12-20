@@ -3,7 +3,7 @@ set -e
 
 usage() {
     echo "Usage:"
-    echo "weave launch     [-password <password>] <peer> ..."
+    echo "weave launch     [-password <password> | -passwordfile <path>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
     echo "weave run        [--with-dns] <cidr> <docker run args> ..."
@@ -421,10 +421,19 @@ case "$COMMAND" in
             echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
             shift 1
         fi
+        if [ "$1" = "-password" ] ; then
+            [ $# -gt 1 ] || usage
+            PASSWORD=$2
+            shift 2
+        elif [ "$1" = "-passwordfile" ] ; then
+            [ $# -gt 1 ] || usage
+            PASSWORDFILE=$2
+            shift 2
+        fi
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
-        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@")
+        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp ${PASSWORD:+-e WEAVE_PASSWORD="$PASSWORD"} ${PASSWORDFILE:+--env-file="$PASSWORDFILE"} $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@")
         with_container_netns $CONTAINER launch >/dev/null
         echo $CONTAINER
         ;;
