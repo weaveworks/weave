@@ -177,24 +177,26 @@ with_container_netns () {
 
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
-    IP_TMPFILE=/tmp/weave_ip_output_$$
-    rm -f $IP_TMPFILE
+    IP_TMPOUT=/tmp/weave_ip_out_$$
+    IP_TMPERR=/tmp/weave_ip_err_$$
+    rm -f $IP_TMPOUT $IP_TMPERR
 
     # Run the wrapped command
     STATUS=0
     shift 1
-    if ! "$@" >$IP_TMPFILE 2>&1 ; then
+    if ! "$@" >$IP_TMPOUT 2>$IP_TMPERR ; then
         STATUS=1
         if [ "$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)" != "$CONTAINER_PID" ] ; then
             echo "Container $CONTAINER died" >&2
         else
             echo "Failure during network configuration for container $CONTAINER:" >&2
-            cat $IP_TMPFILE >&2
+            cat $IP_TMPERR >&2
         fi
     else
-        cat $IP_TMPFILE
+        cat $IP_TMPOUT
+        cat $IP_TMPERR >&2
     fi
-    rm -f $IP_TMPFILE /var/run/netns/$NETNS
+    rm -f $IP_TMPOUT $IP_TMPERR /var/run/netns/$NETNS
     return $STATUS
 }
 
