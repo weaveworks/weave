@@ -21,7 +21,7 @@ def configure_docker(host, ip)
   pkg_cmd << pkgs
   host.vm.provision :shell, :inline => pkg_cmd
   host.vm.provision :shell, :inline => "usermod -a -G docker vagrant; "
-  
+
   # Listen on the remote API
   host.vm.provision :shell, :inline => "echo 'DOCKER_OPTS=\"-H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\"' >> /etc/default/docker"
   host.vm.provision :shell, :inline => "service docker restart"
