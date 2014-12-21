@@ -191,9 +191,9 @@ with_container_netns () {
             echo "Failure during network configuration for container $CONTAINER:" >&2
             cat $IP_TMPFILE >&2
         fi
+    else
+        cat $IP_TMPFILE
     fi
-
-    cat $IP_TMPFILE  # no error - send the output to stdout
     rm -f $IP_TMPFILE /var/run/netns/$NETNS
     return $STATUS
 }
