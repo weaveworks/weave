@@ -73,6 +73,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if password == "" {
+		password = os.Getenv("WEAVE_PASSWORD")
+	}
+	if password == "" {
+		log.Println("Communication between peers is unencrypted.")
+	} else {
+		log.Println("Communication between peers is encrypted.")
+	}
+
 	var logFrame func(string, []byte, *layers.Ethernet)
 	if debug {
 		logFrame = func(prefix string, frame []byte, eth *layers.Ethernet) {

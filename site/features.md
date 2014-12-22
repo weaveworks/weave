@@ -129,10 +129,18 @@ sharing it between applications:
 ### <a name="security"></a>Security
 
 In order to connect containers across untrusted networks, weave peers
-can be told to encrypt traffic by supplying a `-password` option when
-launching weave, e.g.
+can be told to encrypt traffic by supplying a `-password` or
+`-passwordfile` option when launching weave, e.g.
 
     host1# weave launch -password wEaVe
+
+or
+
+    host1# weave launch -passwordfile /path/to/file
+
+where the file must contain a single line like this:
+
+    WEAVE_PASSWORD=wEaVe
 
 The same password must be specified for all weave peers; it is a
 component in the creation of ephemeral session keys for connections
