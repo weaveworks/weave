@@ -22,7 +22,6 @@ func main() {
 
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	log.Println(os.Args)
 
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
@@ -55,6 +54,17 @@ func main() {
 	flag.Parse()
 	peers = flag.Args()
 
+	options := make(map[string]string)
+	flag.Visit(func (f *flag.Flag) {
+		value := f.Value.String()
+		if f.Name == "password" {
+			value = "<elided>"
+		}
+		options[f.Name] = value
+	})
+	log.Println("Command line options:", options)
+	log.Println("Command line peers:", peers)
+
 	if ifaceName == "" {
 		fmt.Println("Missing required parameter 'iface'")
 		os.Exit(1)
@@ -71,6 +81,15 @@ func main() {
 	ourName, err := weave.PeerNameFromUserInput(routerName)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if password == "" {
+		password = os.Getenv("WEAVE_PASSWORD")
+	}
+	if password == "" {
+		log.Println("Communication between peers is unencrypted.")
+	} else {
+		log.Println("Communication between peers is encrypted.")
 	}
 
 	var logFrame func(string, []byte, *layers.Ethernet)
