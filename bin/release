@@ -4,12 +4,14 @@ set -e
 
 PWD=`pwd`
 GITHUB_USER=squaremo
+DOCKERHUB_USER=squaremo
 RELEASE_NAME="Weave"
 RELEASE_DESCRIPTION="Weaving Containers into Applications"
 
 setup() {
     ## Get the new version number from the most recent tag
     LATEST_TAG=$(git describe --abbrev=0 --match='v*')
+    LATEST_TAG_SHA=$(git rev-parse $LATEST_TAG)
     VERSION=${LATEST_TAG#v}
     # NB does not check that this tag is on master
     RELEASE_DIR=./releases/$LATEST_TAG
@@ -45,7 +47,9 @@ prepare() {
     ## (library versions?)
 
     sed -i "/var version = / c\var version = \"$VERSION\"" weaver/main.go
-    make
+    make \
+        WEAVER_IMAGE=$DOCKERHUB_USER/weave \
+        WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns
 
     if make tests; then
         echo '** Tests pass'
@@ -96,7 +100,16 @@ publish() {
         exit 1
     fi
 
-    echo '** Sanity checks OK for publishing tag' $LATEST_TAG as zettio/weave:$VERSION
+    echo '** Sanity checks OK for publishing tag' $LATEST_TAG as $DOCKERHUB_USER/weave:$VERSION
+
+    echo == Tagging $DOCKERHUB_USER/weave and $DOCKERHUB_USER/weavedns as $VERSION
+    docker tag $DOCKERHUB_USER/weave $DOCKERHUB_USER/weave:$VERSION
+    docker tag $DOCKERHUB_USER/weavedns $DOCKERHUB_USER/weavedns:$VERSION
+
+    docker push $DOCKERHUB_USER/weave:$VERSION
+    echo == Pushed $DOCKERHUB_USER/weave:$VERSION to docker hub
+    docker push $DOCKERHUB_USER/weavedns:$VERSION
+    echo == Pushed $DOCKERHUB_USER/weavedns:$VERSION to docker hub
 
     echo == Creating GitHub release $RELEASE_NAME $VERSION
     # This cannot be done as a draft because of a bug in
