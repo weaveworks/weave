@@ -430,7 +430,7 @@ case "$COMMAND" in
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
-        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR "$@")
+        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -p $PORT:$PORT/tcp -p $PORT:$PORT/udp $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -iface $CONTAINER_IFNAME "$@")
         with_container_netns $CONTAINER launch >/dev/null
         echo $CONTAINER
         ;;
@@ -441,7 +441,7 @@ case "$COMMAND" in
         check_not_running $DNS_CONTAINER_NAME $DNS_IMAGE
         create_bridge
         docker_bridge_ip
-        DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE "$@")
+        DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock $DNS_IMAGE -iface $CONTAINER_IFNAME "$@")
         with_container_netns $DNS_CONTAINER attach $CIDR >/dev/null
         populate_dns
         echo $DNS_CONTAINER
