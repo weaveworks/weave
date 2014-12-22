@@ -17,7 +17,7 @@ setup() {
     RELEASE_DIR=./releases/$LATEST_TAG
 }
 
-prepare() {
+build() {
     setup
 
     echo "Attempting to build distributables for version $VERSION"
@@ -141,8 +141,8 @@ usage() {
 }
 
 case "$1" in
-    prepare)
-        prepare
+    build)
+        build
         ;;
     publish)
         publish
