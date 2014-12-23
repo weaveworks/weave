@@ -24,32 +24,26 @@ type Router struct {
 	ConnLimit          int
 	BufSz              int
 	LogFrame           func(string, []byte, *layers.Ethernet)
-	GossipDelegate     GossipDelegate
+	Gossiper           Gossiper
 }
 
-type GossipCommsProvider interface {
+type Gossip interface {
 	// specific message from one peer to another
 	// intermediate peers should relay it using unicast topology.
-	GossipSendTo(dstPeerName PeerName, buf []byte) error
-	// intended for state from sending peer only
-	// done when there is a change that everyone should hear about quickly
+	GossipUnicast(dstPeerName PeerName, buf []byte) error
+	// intended for a state change that everyone should hear about quickly
 	// relayed using broadcast topology.
 	GossipBroadcast(buf []byte) error
-	// contains state for everyone that sending peer knows
-	// done on an interval; sent by one peer down [all/random subset of] connections
-	// peers that receive it should examine the info, and if any of it is newer then
-	// start a broadcast with that info as above.
-	Gossip()
 }
 
-type GossipDelegate interface {
-	NotifyMsg(sender PeerName, msg []byte)
-
-	GlobalState() []byte
-
-	// merge in state and return a buffer encoding those PeerSpaces which are newer
-	// than what we had previously, or nil if none were newer
-	MergeRemoteState(buf []byte) []byte
+type Gossiper interface {
+	OnGossipBroadcast(msg []byte)
+	OnGossipUnicast(sender PeerName, msg []byte)
+	// Return state of everything we know; intended to be called periodically
+	Gossip() []byte
+	// merge in state and return "everything new I've just learnt",
+	// or nil if nothing in the received message was new
+	OnGossip(buf []byte) []byte
 }
 
 type Peer struct {

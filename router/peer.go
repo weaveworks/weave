@@ -216,7 +216,7 @@ func (peer *Peer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *Ethe
 // done on an interval; sent by one peer down [all/random subset of] connections
 // peers that receive it should examine the info, and if it is broadcast
 func (peer *Peer) Gossip() {
-	peer.GossipMsg(peer.Router.GossipDelegate.GlobalState())
+	peer.GossipMsg(peer.Router.Gossiper.Gossip())
 }
 
 func (peer *Peer) GossipMsg(buf []byte) {
@@ -258,7 +258,7 @@ func (peer *Peer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
 
 // specific message from one peer to another
 // intermediate peers should relay it using unicast topology.
-func (peer *Peer) GossipSendTo(dstPeerName PeerName, buf []byte) error {
+func (peer *Peer) GossipUnicast(dstPeerName PeerName, buf []byte) error {
 	srcPeerByte := peer.Name.Bin()
 	nameLenByte := []byte{byte(len(srcPeerByte))}
 	dstPeerByte := dstPeerName.Bin()

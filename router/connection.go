@@ -500,7 +500,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 				srcName, _, msg := decodePeerName(msg[2:])
 				destName, _, msg := decodePeerName(msg)
 				if conn.local.Name == destName {
-					conn.Router.GossipDelegate.NotifyMsg(srcName, msg)
+					conn.Router.Gossiper.OnGossipUnicast(srcName, msg)
 				} else {
 					conn.local.RelayGossipTo(srcName, destName, origMsg)
 				}
@@ -514,8 +514,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			if msg[1] == GossipVersion {
 				origMsg := msg
 				srcName, _, msg := decodePeerName(msg[2:])
-				conn.Router.GossipDelegate.MergeRemoteState(msg)
-				// Question: should we stop the broadcast here if it wasn't new to us?
+				conn.Router.Gossiper.OnGossipBroadcast(msg)
 				conn.local.RelayGossipBroadcast(srcName, origMsg)
 			} else {
 				conn.log("received gossip msg with unsupported version:", msg[1])
@@ -526,7 +525,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			// pass it on to their peers
 			if msg[1] == GossipVersion {
 				_, _, msg := decodePeerName(msg[2:])
-				newBuf := conn.Router.GossipDelegate.MergeRemoteState(msg)
+				newBuf := conn.Router.Gossiper.OnGossip(msg)
 				if newBuf != nil {
 					conn.local.GossipMsg(newBuf)
 				}

@@ -91,14 +91,14 @@ func TestEncodeMerge(t *testing.T) {
 	alloc.manageSpace(net.ParseIP(testStart1), 16)
 	alloc.manageSpace(net.ParseIP(testStart2), 32)
 
-	encodedState := alloc.GlobalState()
+	encodedState := alloc.Gossip()
 
 	peerName, _ := router.PeerNameFromString(peerNameString)
 	alloc2 := NewAllocator(peerName, peerUID, nil, net.ParseIP(testStart1), 1024)
 	alloc2.manageSpace(net.ParseIP(testStart3), 32)
-	encodedState2 := alloc2.GlobalState()
+	encodedState2 := alloc2.Gossip()
 
-	newBuf := alloc2.MergeRemoteState(encodedState)
+	newBuf := alloc2.OnGossip(encodedState)
 	if len(alloc2.peerInfo) != 2 {
 		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc2.peerInfo), 2)
 	}
@@ -116,15 +116,15 @@ func TestEncodeMerge(t *testing.T) {
 	}
 
 	// Do it again, and nothing should be new
-	newBuf = alloc2.MergeRemoteState(encodedState)
+	newBuf = alloc2.OnGossip(encodedState)
 	if newBuf != nil {
 		t.Fatal("Unexpected new items found")
 	}
 
 	// Now encode and merge the other way
-	buf := alloc2.GlobalState()
+	buf := alloc2.Gossip()
 
-	newBuf = alloc.MergeRemoteState(buf)
+	newBuf = alloc.OnGossip(buf)
 	if len(alloc.peerInfo) != 2 {
 		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc.peerInfo), 2)
 	}
@@ -142,7 +142,7 @@ func TestEncodeMerge(t *testing.T) {
 	}
 
 	// Do it again, and nothing should be new
-	newBuf = alloc.MergeRemoteState(buf)
+	newBuf = alloc.OnGossip(buf)
 	if newBuf != nil {
 		t.Fatal("Unexpected new items found")
 	}
@@ -161,15 +161,12 @@ func (f *mockGossipComms) Reset() {
 	f.messages = make([]mockMessage, 0)
 }
 
-func (f *mockGossipComms) Gossip() {
-}
-
 func (f *mockGossipComms) GossipBroadcast(buf []byte) error {
 	f.messages = append(f.messages, mockMessage{router.UnknownPeerName, buf})
 	return nil
 }
 
-func (f *mockGossipComms) GossipSendTo(dstPeerName router.PeerName, buf []byte) error {
+func (f *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
 	f.messages = append(f.messages, mockMessage{dstPeerName, buf})
 	return nil
 }
@@ -272,7 +269,7 @@ func TestGossip(t *testing.T) {
 
 	mockTime.SetTime(baseTime.Add(2 * time.Second))
 
-	alloc1.MergeRemoteState(alloc2.GlobalState())
+	alloc1.OnGossipBroadcast(alloc2.Gossip())
 	// At first, this peer has no space, so alloc1 should do nothing
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 	mockGossip1.VerifyNoMoreMessages(t)
@@ -288,10 +285,10 @@ func TestGossip(t *testing.T) {
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
 	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
 
-	alloc1.MergeRemoteState(alloc2.GlobalState())
+	alloc1.OnGossipBroadcast(alloc2.Gossip())
 
 	// Alloc1 should ask alloc2 for space
-	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.LocalState())
+	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.localState())
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
@@ -299,7 +296,7 @@ func TestGossip(t *testing.T) {
 	mockTime.SetTime(baseTime.Add(5 * time.Second))
 	alloc1.considerOurPosition()
 
-	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.LocalState())
+	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.localState())
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
@@ -307,15 +304,15 @@ func TestGossip(t *testing.T) {
 	alloc2.ourSpaceSet.spaces[0].GetMinSpace().Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	alloc2state := alloc2.LocalState()
+	alloc2state := alloc2.localState()
 
 	size_encoding := intip4(donateSize) // hack! using intip4
 	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
-	alloc1.NotifyMsg(pn, msg)
+	alloc1.OnGossipUnicast(pn, msg)
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 6, "Total free addresses")
 	wt.AssertEqualUint64(t, alloc1.peerInfo[peerUID].Version(), 2, "Peer version")
 
-	mockGossip1.VerifyBroadcastMessage(t, alloc1.LocalState())
+	mockGossip1.VerifyBroadcastMessage(t, alloc1.localState())
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
@@ -326,13 +323,14 @@ func TestGossip(t *testing.T) {
 	// Now make it look like alloc2 is a tombstone so we can check the message
 	alloc2.ourSpaceSet.MakeTombstone()
 
-	mockGossip1.VerifyBroadcastMessage(t, alloc2.LocalState())
+	mockGossip1.VerifyBroadcastMessage(t, alloc2.localState())
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
 	// Now move the time forward so alloc1 reclaims alloc2's storage
 	mockTime.SetTime(baseTime.Add(12 * time.Minute))
 	alloc1.considerOurPosition()
+	mockGossip1.VerifyBroadcastMessage(t, alloc1.localState())
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 }

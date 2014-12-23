@@ -38,7 +38,7 @@ type Allocator struct {
 	state       int
 	stateExpire time.Time
 	universe    MinSpace // all the addresses that could be allocated
-	gossip      router.GossipCommsProvider
+	gossip      router.Gossip
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
 	ourSpaceSet *MutableSpaceSet
 	leaked      map[time.Time]Space
@@ -55,7 +55,7 @@ func (defaultTime) AfterFunc(d time.Duration, f func()) {
 	time.AfterFunc(d, f)
 }
 
-func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.GossipCommsProvider, startAddr net.IP, universeSize int) *Allocator {
+func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.Gossip, startAddr net.IP, universeSize int) *Allocator {
 	alloc := &Allocator{
 		gossip:       gossip,
 		ourName:      ourName,
@@ -288,7 +288,7 @@ func (alloc *Allocator) requestSpace() {
 		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space:", best)
 		myState := alloc.encode(alloc.ourSpaceSet)
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
-		alloc.gossip.GossipSendTo(best.PeerName(), msg)
+		alloc.gossip.GossipUnicast(best.PeerName(), msg)
 		alloc.moveToState(allocStateExpectingDonation, router.GossipReqTimeout)
 	} else {
 		lg.Debug.Println("Nobody available to ask for space")
@@ -304,7 +304,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 		myState := alloc.encode(alloc.ourSpaceSet)
 		size_encoding := intip4(size) // hack!
 		msg := router.Concat([]byte{gossipSpaceDonate}, start.To4(), size_encoding, myState)
-		alloc.gossip.GossipSendTo(sender, msg)
+		alloc.gossip.GossipUnicast(sender, msg)
 	}
 }
 
@@ -373,9 +373,19 @@ func (alloc *Allocator) queryLoop() {
 	}
 }
 
+func (alloc *Allocator) localState() []byte {
+	lg.Debug.Println("localState")
+	if buf := alloc.encode(alloc.ourSpaceSet); buf != nil {
+		return buf
+	} else {
+		lg.Error.Println("Error encoding state")
+	}
+	return nil
+}
+
 // GossipDelegate methods
-func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
-	lg.Debug.Printf("NotifyMsg from %s: %d bytes\n", sender, len(msg))
+func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) {
+	lg.Debug.Printf("OnGossipUnicast from %s: %d bytes\n", sender, len(msg))
 	alloc.Lock()
 	defer alloc.Unlock()
 	switch msg[0] {
@@ -387,23 +397,7 @@ func (alloc *Allocator) NotifyMsg(sender router.PeerName, msg []byte) {
 	alloc.considerOurPosition()
 }
 
-func (alloc *Allocator) LocalState() []byte {
-	alloc.Lock()
-	defer alloc.Unlock()
-	return alloc.localState()
-}
-
-func (alloc *Allocator) localState() []byte {
-	lg.Debug.Println("localState")
-	if buf := alloc.encode(alloc.ourSpaceSet); buf != nil {
-		return buf
-	} else {
-		lg.Error.Println("Error encoding state")
-	}
-	return nil
-}
-
-func (alloc *Allocator) GlobalState() []byte {
+func (alloc *Allocator) Gossip() []byte {
 	alloc.Lock()
 	defer alloc.Unlock()
 	buf := new(bytes.Buffer)
@@ -415,10 +409,20 @@ func (alloc *Allocator) GlobalState() []byte {
 	return buf.Bytes()
 }
 
+func (alloc *Allocator) OnGossipBroadcast(buf []byte) {
+	lg.Debug.Printf("OnGossipBroadcast: %d bytes\n", len(buf))
+	_, err := alloc.decodeUpdate(buf)
+	if err != nil {
+		lg.Error.Println("Error decoding update", err)
+		return
+	}
+	alloc.considerOurPosition()
+}
+
 // merge in state and return a buffer encoding those PeerSpaces which are newer
 // than what we had previously, or nil if none were newer
-func (alloc *Allocator) MergeRemoteState(buf []byte) []byte {
-	lg.Debug.Printf("MergeRemoteState: %d bytes\n", len(buf))
+func (alloc *Allocator) OnGossip(buf []byte) []byte {
+	lg.Debug.Printf("OnGossip: %d bytes\n", len(buf))
 	newerPeerSpaces, err := alloc.decodeUpdate(buf)
 	if err != nil {
 		lg.Error.Println("Error decoding update", err)
