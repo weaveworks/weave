@@ -495,42 +495,30 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else if msg[0] == ProtocolGossipUnicast {
-			if msg[1] == GossipVersion {
-				origMsg := msg
-				srcName, _, msg := decodePeerName(msg[2:])
-				destName, _, msg := decodePeerName(msg)
-				if conn.local.Name == destName {
-					conn.Router.Gossiper.OnGossipUnicast(srcName, msg)
-				} else {
-					conn.local.RelayGossipTo(srcName, destName, origMsg)
-				}
+			origMsg := msg
+			srcName, _, msg := decodePeerName(msg[2:])
+			destName, _, msg := decodePeerName(msg)
+			if conn.local.Name == destName {
+				conn.Router.Gossiper.OnGossipUnicast(srcName, msg)
 			} else {
-				conn.log("received gossip msg with unsupported version:", msg[1])
+				conn.local.RelayGossipTo(srcName, destName, origMsg)
 			}
 		} else if msg[0] == ProtocolGossipBroadcast {
 			// intended for state from sending peer only
 			// done when there is a change that everyone should hear about quickly
 			// relayed using broadcast topology.
-			if msg[1] == GossipVersion {
-				origMsg := msg
-				srcName, _, msg := decodePeerName(msg[2:])
-				conn.Router.Gossiper.OnGossipBroadcast(msg)
-				conn.local.RelayGossipBroadcast(srcName, origMsg)
-			} else {
-				conn.log("received gossip msg with unsupported version:", msg[1])
-			}
+			origMsg := msg
+			srcName, _, msg := decodePeerName(msg[2:])
+			conn.Router.Gossiper.OnGossipBroadcast(msg)
+			conn.local.RelayGossipBroadcast(srcName, origMsg)
 		} else if msg[0] == ProtocolGossip {
 			// contains state for everyone that sending peer knows
 			// peers that receive it should examine the info, and if any of it is newer then
 			// pass it on to their peers
-			if msg[1] == GossipVersion {
-				_, _, msg := decodePeerName(msg[2:])
-				newBuf := conn.Router.Gossiper.OnGossip(msg)
-				if newBuf != nil {
-					conn.local.GossipMsg(newBuf)
-				}
-			} else {
-				conn.log("received gossip msg with unsupported version:", msg[1])
+			_, _, msg := decodePeerName(msg[2:])
+			newBuf := conn.Router.Gossiper.OnGossip(msg)
+			if newBuf != nil {
+				conn.local.GossipMsg(newBuf)
 			}
 		} else {
 			conn.log("received unknown msg:\n", msg)

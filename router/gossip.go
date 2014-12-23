@@ -22,7 +22,7 @@ func (peer *Peer) GossipMsg(buf []byte) {
 func (peer *Peer) gossipOn(conn *LocalConnection, buf []byte) {
 	peerName := peer.Name.Bin()
 	nameLenByte := []byte{byte(len(peerName))}
-	msg := Concat([]byte{ProtocolGossip}, []byte{GossipVersion}, nameLenByte, peerName, buf)
+	msg := Concat([]byte{ProtocolGossip}, nameLenByte, peerName, buf)
 	conn.SendTCP(msg)
 }
 
@@ -32,7 +32,7 @@ func (peer *Peer) gossipOn(conn *LocalConnection, buf []byte) {
 func (peer *Peer) GossipBroadcast(buf []byte) error {
 	peerName := peer.Name.Bin()
 	nameLenByte := []byte{byte(len(peerName))}
-	msg := Concat([]byte{ProtocolGossipBroadcast}, []byte{GossipVersion}, nameLenByte, peerName, buf)
+	msg := Concat([]byte{ProtocolGossipBroadcast}, nameLenByte, peerName, buf)
 	peer.RelayGossipBroadcast(peer.Name, msg)
 	return nil // ?
 }
@@ -55,7 +55,7 @@ func (peer *Peer) GossipUnicast(dstPeerName PeerName, buf []byte) error {
 	nameLenByte := []byte{byte(len(srcPeerByte))}
 	dstPeerByte := dstPeerName.Bin()
 	dstNameLenByte := []byte{byte(len(dstPeerByte))}
-	msg := Concat([]byte{ProtocolGossipUnicast}, []byte{GossipVersion}, nameLenByte, srcPeerByte, dstNameLenByte, dstPeerByte, buf)
+	msg := Concat([]byte{ProtocolGossipUnicast}, nameLenByte, srcPeerByte, dstNameLenByte, dstPeerByte, buf)
 	return peer.RelayGossipTo(peer.Name, dstPeerName, msg)
 }
 
