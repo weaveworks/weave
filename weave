@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+SCRIPT_VERSION="(unreleased version)"
+
 usage() {
     echo "Usage:"
     echo "weave launch     [-password <password> | -passwordfile <path>] <peer> ..."
@@ -479,14 +481,21 @@ case "$COMMAND" in
         ;;
     version)
         [ $# -eq 0 ] || usage
-        # Try the running container first; if no luck try the image
+        echo weave script $SCRIPT_VERSION
         if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' $CONTAINER_NAME 2>/dev/null) ; then
             if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $IMAGE 2>/dev/null) ; then
                 echo "Unable to find $IMAGE image." >&2
                 exit 1
             fi
         fi
-        docker images --no-trunc | grep $DOCKERIMAGE | grep -v latest | tr -s ' ' | cut -d ' ' -f 2
+        docker run --rm $DOCKERIMAGE --version
+        if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' $DNS_CONTAINER_NAME 2>/dev/null) ; then
+            if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $DNS_IMAGE 2>/dev/null) ; then
+                echo "Unable to find $DNS_IMAGE image." >&2
+                exit 1
+            fi
+        fi
+        docker run --rm $DOCKERIMAGE --version
         ;;
     run)
         [ $# -gt 0 ] || usage
