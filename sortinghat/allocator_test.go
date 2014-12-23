@@ -288,7 +288,7 @@ func TestGossip(t *testing.T) {
 	alloc1.OnGossipBroadcast(alloc2.Gossip())
 
 	// Alloc1 should ask alloc2 for space
-	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.localState())
+	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, encode(alloc1.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
@@ -296,7 +296,7 @@ func TestGossip(t *testing.T) {
 	mockTime.SetTime(baseTime.Add(5 * time.Second))
 	alloc1.considerOurPosition()
 
-	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, alloc1.localState())
+	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, encode(alloc1.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
@@ -304,7 +304,7 @@ func TestGossip(t *testing.T) {
 	alloc2.ourSpaceSet.spaces[0].GetMinSpace().Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	alloc2state := alloc2.localState()
+	alloc2state := encode(alloc2.ourSpaceSet)
 
 	size_encoding := intip4(donateSize) // hack! using intip4
 	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
@@ -312,7 +312,7 @@ func TestGossip(t *testing.T) {
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 6, "Total free addresses")
 	wt.AssertEqualUint64(t, alloc1.peerInfo[peerUID].Version(), 2, "Peer version")
 
-	mockGossip1.VerifyBroadcastMessage(t, alloc1.localState())
+	mockGossip1.VerifyBroadcastMessage(t, encode(alloc1.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
@@ -323,14 +323,14 @@ func TestGossip(t *testing.T) {
 	// Now make it look like alloc2 is a tombstone so we can check the message
 	alloc2.ourSpaceSet.MakeTombstone()
 
-	mockGossip1.VerifyBroadcastMessage(t, alloc2.localState())
+	mockGossip1.VerifyBroadcastMessage(t, encode(alloc2.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
 	// Now move the time forward so alloc1 reclaims alloc2's storage
 	mockTime.SetTime(baseTime.Add(12 * time.Minute))
 	alloc1.considerOurPosition()
-	mockGossip1.VerifyBroadcastMessage(t, alloc1.localState())
+	mockGossip1.VerifyBroadcastMessage(t, encode(alloc1.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 }

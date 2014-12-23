@@ -96,7 +96,7 @@ func panicOnError(err error) {
 	}
 }
 
-func (alloc *Allocator) encode(spaceset SpaceSet) []byte {
+func encode(spaceset SpaceSet) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	panicOnError(enc.Encode(1))
@@ -156,7 +156,7 @@ func (alloc *Allocator) lookForDeadPeers(now time.Time) {
 			now.After(entry.LastSeen().Add(alloc.maxAge)) {
 			lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
 			peerEntry.MakeTombstone()
-			alloc.gossip.GossipBroadcast(alloc.encode(entry))
+			alloc.gossip.GossipBroadcast(encode(entry))
 		}
 	}
 }
@@ -232,7 +232,7 @@ func (alloc *Allocator) considerOurPosition() {
 		alloc.lookForDeadPeers(now)
 		alloc.lookForNewLeaks(now)
 		if changed {
-			alloc.gossip.GossipBroadcast(alloc.localState())
+			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 		}
 	case allocStateExpectingDonation:
 		// If nobody came back to us, ask again
@@ -275,7 +275,7 @@ func (alloc *Allocator) electLeader() {
 		// I'm the winner; take control of the whole universe
 		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
 		alloc.moveToState(allocStateNeutral, 0)
-		alloc.gossip.GossipBroadcast(alloc.localState())
+		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	} else {
 		// We expect the other guy to take control, but if he doesn't, try again.
 		alloc.moveToState(allocStateLeaderless, router.GossipWaitForLead)
@@ -293,7 +293,7 @@ func (alloc *Allocator) requestSpace() {
 	}
 	if best != nil {
 		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space:", best)
-		myState := alloc.encode(alloc.ourSpaceSet)
+		myState := encode(alloc.ourSpaceSet)
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
 		alloc.gossip.GossipUnicast(best.PeerName(), msg)
 		alloc.moveToState(allocStateExpectingDonation, router.GossipReqTimeout)
@@ -308,7 +308,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 
 	if start, size, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
 		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
-		myState := alloc.encode(alloc.ourSpaceSet)
+		myState := encode(alloc.ourSpaceSet)
 		size_encoding := intip4(size) // hack!
 		msg := router.Concat([]byte{gossipSpaceDonate}, start.To4(), size_encoding, myState)
 		alloc.gossip.GossipUnicast(sender, msg)
@@ -335,7 +335,7 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 		}
 		alloc.ourSpaceSet.AddSpace(newSpace)
 		alloc.moveToState(allocStateNeutral, 0)
-		alloc.gossip.GossipBroadcast(alloc.localState())
+		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	}
 }
 
@@ -380,10 +380,6 @@ func (alloc *Allocator) queryLoop() {
 	}
 }
 
-func (alloc *Allocator) localState() []byte {
-	return alloc.encode(alloc.ourSpaceSet)
-}
-
 // GossipDelegate methods
 func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) {
 	lg.Debug.Printf("OnGossipUnicast from %s: %d bytes\n", sender, len(msg))
@@ -403,9 +399,9 @@ func (alloc *Allocator) Gossip() []byte {
 	defer alloc.Unlock()
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	enc.Encode(len(alloc.peerInfo))
+	panicOnError(enc.Encode(len(alloc.peerInfo)))
 	for _, spaceset := range alloc.peerInfo {
-		spaceset.Encode(enc)
+		panicOnError(spaceset.Encode(enc))
 	}
 	return buf.Bytes()
 }
