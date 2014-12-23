@@ -313,7 +313,7 @@ func (peer *Peer) queryLoop(queryChan <-chan *PeerInteraction) {
 				peer.handleBroadcastTCP(query.payload.([]byte))
 			}
 		case <-gossipTimer:
-			peer.Gossip()
+			peer.Router.SendAllGossip()
 		}
 	}
 }

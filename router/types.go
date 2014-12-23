@@ -24,7 +24,7 @@ type Router struct {
 	ConnLimit          int
 	BufSz              int
 	LogFrame           func(string, []byte, *layers.Ethernet)
-	Gossiper           Gossiper
+	GossipChannels     map[uint32]*GossipChannel // does not change after startup - access not locked
 }
 
 // Interface to receive notifications when we spot the presence or absence of a peer
@@ -51,6 +51,13 @@ type Gossiper interface {
 	// merge in state and return "everything new I've just learnt",
 	// or nil if nothing in the received message was new
 	OnGossip(buf []byte) []byte
+}
+
+type GossipChannel struct {
+	localPeer *Peer
+	name      string
+	hash      uint32
+	gossiper  Gossiper
 }
 
 type Peer struct {

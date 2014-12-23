@@ -22,7 +22,7 @@ func TestAllocFree(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, ourUID, nil, net.ParseIP(testAddr1), 3)
+	alloc := NewAllocator(ourName, ourUID, net.ParseIP(testAddr1), 3)
 	alloc.manageSpace(net.ParseIP(testAddr1), 3)
 
 	addr1 := alloc.AllocateFor(containerID)
@@ -62,7 +62,7 @@ func TestMultiSpaces(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, ourUID, nil, net.ParseIP(testStart1), 1024)
+	alloc := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), 1024)
 	alloc.manageSpace(net.ParseIP(testStart1), 1)
 	alloc.manageSpace(net.ParseIP(testStart2), 3)
 
@@ -87,14 +87,14 @@ func TestEncodeMerge(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, ourUID, nil, net.ParseIP(testStart1), 1024)
+	alloc := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), 1024)
 	alloc.manageSpace(net.ParseIP(testStart1), 16)
 	alloc.manageSpace(net.ParseIP(testStart2), 32)
 
 	encodedState := alloc.Gossip()
 
 	peerName, _ := router.PeerNameFromString(peerNameString)
-	alloc2 := NewAllocator(peerName, peerUID, nil, net.ParseIP(testStart1), 1024)
+	alloc2 := NewAllocator(peerName, peerUID, net.ParseIP(testStart1), 1024)
 	alloc2.manageSpace(net.ParseIP(testStart3), 32)
 	encodedState2 := alloc2.Gossip()
 
@@ -252,7 +252,8 @@ func TestGossip(t *testing.T) {
 	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	mockGossip1 := new(mockGossipComms)
-	alloc1 := NewAllocator(ourName, ourUID, mockGossip1, net.ParseIP(testStart1), 1024)
+	alloc1 := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), 1024)
+	alloc1.SetGossip(mockGossip1)
 	alloc1.startForTesting()
 	mockTime := new(mockTimeProvider)
 	mockTime.SetTime(baseTime)
@@ -264,7 +265,8 @@ func TestGossip(t *testing.T) {
 	// Simulate another peer on the gossip network
 	mockGossip2 := new(mockGossipComms)
 	pn, _ := router.PeerNameFromString(peerNameString)
-	alloc2 := NewAllocator(pn, peerUID, mockGossip2, net.ParseIP(testStart1), 1024)
+	alloc2 := NewAllocator(pn, peerUID, net.ParseIP(testStart1), 1024)
+	alloc2.SetGossip(mockGossip2)
 	alloc2.timeProvider = alloc1.timeProvider
 
 	mockTime.SetTime(baseTime.Add(2 * time.Second))

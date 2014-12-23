@@ -1,39 +1,51 @@
 package router
 
 import (
+	"hash/fnv"
 	"log"
 )
+
+func hash(s string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return h.Sum32()
+}
+
+func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
+	h := hash(channelName)
+	channel := &GossipChannel{router.Ourself, channelName, h, g}
+	router.GossipChannels[h] = channel
+	return channel
+}
 
 // contains state for everyone that sending peer knows
 // done on an interval; sent by one peer down [all/random subset of] connections
 // peers that receive it should examine the info, and if it is broadcast
-func (peer *Peer) Gossip() {
-	peer.GossipMsg(peer.Router.Gossiper.Gossip())
+func (router *Router) SendAllGossip() {
+	for _, c := range router.GossipChannels {
+		c.GossipMsg(c.gossiper.Gossip())
+	}
 }
 
-func (peer *Peer) GossipMsg(buf []byte) {
-	peer.ForEachConnection(func(_ PeerName, conn Connection) {
+func (c *GossipChannel) GossipMsg(buf []byte) {
+	c.localPeer.ForEachConnection(func(_ PeerName, conn Connection) {
 		if conn.Established() {
-			peer.gossipOn(conn.(*LocalConnection), buf)
+			peerName := c.localPeer.Name.Bin()
+			nameLenByte := []byte{byte(len(peerName))}
+			msg := Concat([]byte{ProtocolGossip}, uint32slice(c.hash), nameLenByte, peerName, buf)
+			conn.(*LocalConnection).SendTCP(msg)
 		}
 	})
-}
-
-func (peer *Peer) gossipOn(conn *LocalConnection, buf []byte) {
-	peerName := peer.Name.Bin()
-	nameLenByte := []byte{byte(len(peerName))}
-	msg := Concat([]byte{ProtocolGossip}, nameLenByte, peerName, buf)
-	conn.SendTCP(msg)
 }
 
 // intended for state from sending peer only
 // done when there is a change that everyone should hear about quickly
 // peers that receive it should relay it using broadcast topology.
-func (peer *Peer) GossipBroadcast(buf []byte) error {
-	peerName := peer.Name.Bin()
+func (c *GossipChannel) GossipBroadcast(buf []byte) error {
+	peerName := c.localPeer.Name.Bin()
 	nameLenByte := []byte{byte(len(peerName))}
-	msg := Concat([]byte{ProtocolGossipBroadcast}, nameLenByte, peerName, buf)
-	peer.RelayGossipBroadcast(peer.Name, msg)
+	msg := Concat([]byte{ProtocolGossipBroadcast}, uint32slice(c.hash), nameLenByte, peerName, buf)
+	c.localPeer.RelayGossipBroadcast(c.localPeer.Name, msg)
 	return nil // ?
 }
 
@@ -50,13 +62,13 @@ func (peer *Peer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
 
 // specific message from one peer to another
 // intermediate peers should relay it using unicast topology.
-func (peer *Peer) GossipUnicast(dstPeerName PeerName, buf []byte) error {
-	srcPeerByte := peer.Name.Bin()
+func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
+	srcPeerByte := c.localPeer.Name.Bin()
 	nameLenByte := []byte{byte(len(srcPeerByte))}
 	dstPeerByte := dstPeerName.Bin()
 	dstNameLenByte := []byte{byte(len(dstPeerByte))}
-	msg := Concat([]byte{ProtocolGossipUnicast}, nameLenByte, srcPeerByte, dstNameLenByte, dstPeerByte, buf)
-	return peer.RelayGossipTo(peer.Name, dstPeerName, msg)
+	msg := Concat([]byte{ProtocolGossipUnicast}, uint32slice(c.hash), nameLenByte, srcPeerByte, dstNameLenByte, dstPeerByte, buf)
+	return c.localPeer.RelayGossipTo(c.localPeer.Name, dstPeerName, msg)
 }
 
 func (peer *Peer) RelayGossipTo(srcPeerName, dstPeerName PeerName, msg []byte) error {
@@ -80,5 +92,7 @@ func (peer *Peer) RelayGossipTo(srcPeerName, dstPeerName PeerName, msg []byte) e
 }
 
 func (ourself *Peer) OnDead(peer *Peer) {
-	ourself.Router.Gossiper.OnDead(peer.UID)
+	for _, c := range ourself.Router.GossipChannels {
+		c.gossiper.OnDead(peer.UID)
+	}
 }

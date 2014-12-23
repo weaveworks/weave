@@ -55,9 +55,8 @@ func (defaultTime) AfterFunc(d time.Duration, f func()) {
 	time.AfterFunc(d, f)
 }
 
-func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.Gossip, startAddr net.IP, universeSize int) *Allocator {
+func NewAllocator(ourName router.PeerName, ourUID uint64, startAddr net.IP, universeSize int) *Allocator {
 	alloc := &Allocator{
-		gossip:       gossip,
 		ourName:      ourName,
 		ourUID:       ourUID,
 		state:        allocStateLeaderless,
@@ -70,6 +69,10 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, gossip router.Gossip, 
 	}
 	alloc.peerInfo[ourUID] = alloc.ourSpaceSet
 	return alloc
+}
+
+func (alloc *Allocator) SetGossip(gossip router.Gossip) {
+	alloc.gossip = gossip
 }
 
 func (alloc *Allocator) Start() {
@@ -442,7 +445,8 @@ func (alloc *Allocator) OnDead(uid uint64) {
 			!peerEntry.IsTombstone() {
 			lg.Debug.Printf("Gossip Peer %s marked as dead", entry.PeerName())
 			peerEntry.MakeTombstone()
-			alloc.gossip.GossipBroadcast(encode(entry))
+			// Can't run this synchronously or we deadlock
+			go alloc.gossip.GossipBroadcast(encode(entry))
 		}
 	}
 }

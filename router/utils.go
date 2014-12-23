@@ -73,6 +73,23 @@ func randUint64() (r uint64) {
 	return
 }
 
+func sliceuint32(buf []byte) (r uint32) {
+	for _, b := range buf {
+		r <<= 8
+		r |= uint32(b)
+	}
+	return
+}
+
+func uint32slice(key uint32) (r []byte) {
+	r = make([]byte, 4)
+	for i := 3; i >= 0; i-- {
+		r[i] = byte(key)
+		key >>= 8
+	}
+	return
+}
+
 func macint(mac net.HardwareAddr) (r uint64) {
 	for _, b := range mac {
 		r <<= 8
