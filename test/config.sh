@@ -4,7 +4,7 @@ set -e
 
 . ./assert.sh
 
-SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key}
+SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key -o UserKnownHostsFile=./.ssh_known_hosts -o CheckHostIP=no -o StrictHostKeyChecking=no}
 HOST1=${HOST1:-192.168.48.19}
 HOST2=${HOST2:-192.168.48.15}
 
