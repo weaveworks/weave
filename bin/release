@@ -3,8 +3,8 @@
 set -e
 
 PWD=`pwd`
-GITHUB_USER=squaremo
-DOCKERHUB_USER=squaremo
+GITHUB_USER=zettio
+DOCKERHUB_USER=zettio
 RELEASE_NAME="Weave"
 RELEASE_DESCRIPTION="Weaving Containers into Applications"
 
