@@ -41,10 +41,10 @@ tests:
 	cd nameserver; go test -tags netgo
 
 publish: $(WEAVER_EXPORT) tests
-	$(SUDO) docker tag $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
+	$(SUDO) docker tag  $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
 	$(SUDO) docker push $(WEAVER_IMAGE):latest
 	$(SUDO) docker push $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
-	$(SUDO) docker tag $(WEAVEDNS_IMAGE) $(WEAVEDNS_IMAGE):git-`git rev-parse --short=12 HEAD`
+	$(SUDO) docker tag  $(WEAVEDNS_IMAGE) $(WEAVEDNS_IMAGE):git-`git rev-parse --short=12 HEAD`
 	$(SUDO) docker push $(WEAVEDNS_IMAGE):latest
 	$(SUDO) docker push $(WEAVEDNS_IMAGE):git-`git rev-parse --short=12 HEAD`
 
