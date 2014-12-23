@@ -288,7 +288,7 @@ http_call() {
             ;;
     esac
     shift 1
-    http_call_ip $ip $@
+    http_call_ip $ip "$@"
 }
 
 http_call_ip() {
@@ -501,7 +501,7 @@ case "$COMMAND" in
             docker_bridge_ip
             DNS_ARG="--dns $DOCKER_BRIDGE_IP"
             DNS_SEARCH_ARG="--dns-search=."
-            for arg in $@; do
+            for arg in "$@"; do
                 case $arg in
                     --dns-search=*)
                         DNS_SEARCH_ARG=""
