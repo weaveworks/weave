@@ -9,7 +9,6 @@ import (
 	"math"
 	"net"
 	"sync"
-	"time"
 )
 
 type SpaceSet interface {
@@ -17,8 +16,6 @@ type SpaceSet interface {
 	Decode(decoder *gob.Decoder) error
 	Empty() bool
 	Version() uint64
-	LastSeen() time.Time
-	SetLastSeen(time.Time)
 	PeerName() router.PeerName
 	UID() uint64
 	NumFreeAddresses() uint32
@@ -33,7 +30,6 @@ type PeerSpaceSet struct {
 	uid      uint64
 	version  uint64
 	spaces   []Space
-	lastSeen time.Time
 	sync.RWMutex
 }
 
@@ -43,11 +39,9 @@ type MutableSpaceSet struct {
 }
 
 func NewPeerSpace(pn router.PeerName, uid uint64) *PeerSpaceSet {
-	return &PeerSpaceSet{peerName: pn, uid: uid, lastSeen: time.Now()}
+	return &PeerSpaceSet{peerName: pn, uid: uid}
 }
 
-func (s *PeerSpaceSet) LastSeen() time.Time       { return s.lastSeen }
-func (s *PeerSpaceSet) SetLastSeen(t time.Time)   { s.lastSeen = t }
 func (s *PeerSpaceSet) PeerName() router.PeerName { return s.peerName }
 func (s *PeerSpaceSet) UID() uint64               { return s.uid }
 func (s *PeerSpaceSet) Version() uint64           { return s.version }
@@ -161,7 +155,7 @@ func (s *PeerSpaceSet) IsTombstone() bool {
 // -------------------------------------------------
 
 func NewSpaceSet(pn router.PeerName, uid uint64) *MutableSpaceSet {
-	return &MutableSpaceSet{PeerSpaceSet{peerName: pn, uid: uid, lastSeen: time.Now()}}
+	return &MutableSpaceSet{PeerSpaceSet{peerName: pn, uid: uid}}
 }
 
 func (s *MutableSpaceSet) AddSpace(space *MutableSpace) {

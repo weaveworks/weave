@@ -78,3 +78,7 @@ func (peer *Peer) RelayGossipTo(srcPeerName, dstPeerName PeerName, msg []byte) e
 	conn.(*LocalConnection).SendTCP(msg)
 	return nil
 }
+
+func (ourself *Peer) OnDead(peer *Peer) {
+	ourself.Router.Gossiper.OnDead(peer.UID)
+}

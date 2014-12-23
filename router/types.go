@@ -27,6 +27,12 @@ type Router struct {
 	Gossiper           Gossiper
 }
 
+// Interface to receive notifications when we spot the presence or absence of a peer
+type PeerLifecycle interface {
+	OnAlive(uint64)
+	OnDead(uint64)
+}
+
 type Gossip interface {
 	// specific message from one peer to another
 	// intermediate peers should relay it using unicast topology.
@@ -37,6 +43,7 @@ type Gossip interface {
 }
 
 type Gossiper interface {
+	PeerLifecycle
 	OnGossipBroadcast(msg []byte)
 	OnGossipUnicast(sender PeerName, msg []byte)
 	// Return state of everything we know; intended to be called periodically

@@ -143,6 +143,7 @@ func (cache *PeerCache) garbageCollect(ourself *Peer) []*Peer {
 		found, _ := ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
 			cache.onGC(peer)
+			ourself.OnDead(peer)
 			delete(cache.table, name)
 			ourself.Router.Macs.Delete(peer)
 			removed = append(removed, peer)

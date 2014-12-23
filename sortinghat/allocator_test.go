@@ -318,6 +318,7 @@ func TestGossip(t *testing.T) {
 
 	// Now looking to trigger a timeout
 	mockTime.SetTime(baseTime.Add(11 * time.Minute))
+	alloc1.OnDead(peerUID) // FIXME: Is someone else supposed to call this?
 	alloc1.considerOurPosition()
 
 	// Now make it look like alloc2 is a tombstone so we can check the message

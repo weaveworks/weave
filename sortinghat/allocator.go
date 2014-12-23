@@ -115,7 +115,6 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 		return nil, err
 	}
 	ret := make([]*PeerSpaceSet, 0)
-	now := alloc.timeProvider.Now()
 	for i := 0; i < numSpaceSets; i++ {
 		newSpaceset := new(PeerSpaceSet)
 		if err := newSpaceset.Decode(decoder); err != nil {
@@ -135,7 +134,6 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 			}
 			ret = append(ret, newSpaceset)
 		}
-		alloc.peerInfo[newSpaceset.UID()].SetLastSeen(now)
 	}
 	return ret, nil
 }
@@ -147,18 +145,6 @@ func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
 		}
 	}
 	return 0
-}
-
-func (alloc *Allocator) lookForDeadPeers(now time.Time) {
-	for _, entry := range alloc.peerInfo {
-		if peerEntry, ok := entry.(*PeerSpaceSet); ok &&
-			!peerEntry.IsTombstone() &&
-			now.After(entry.LastSeen().Add(alloc.maxAge)) {
-			lg.Debug.Printf("Gossip Peer %s timed out; last seen %v", entry.PeerName(), entry.LastSeen())
-			peerEntry.MakeTombstone()
-			alloc.gossip.GossipBroadcast(encode(entry))
-		}
-	}
 }
 
 func (alloc *Allocator) lookForNewLeaks(now time.Time) {
@@ -229,7 +215,6 @@ func (alloc *Allocator) considerOurPosition() {
 		}
 		alloc.discardOldLeaks()
 		changed := alloc.reclaimLeaks(now)
-		alloc.lookForDeadPeers(now)
 		alloc.lookForNewLeaks(now)
 		if changed {
 			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
@@ -408,6 +393,8 @@ func (alloc *Allocator) Gossip() []byte {
 
 func (alloc *Allocator) OnGossipBroadcast(buf []byte) {
 	lg.Debug.Printf("OnGossipBroadcast: %d bytes\n", len(buf))
+	alloc.Lock()
+	defer alloc.Unlock()
 	_, err := alloc.decodeUpdate(buf)
 	if err != nil {
 		lg.Error.Println("Error decoding update", err)
@@ -420,6 +407,8 @@ func (alloc *Allocator) OnGossipBroadcast(buf []byte) {
 // than what we had previously, or nil if none were newer
 func (alloc *Allocator) OnGossip(buf []byte) []byte {
 	lg.Debug.Printf("OnGossip: %d bytes\n", len(buf))
+	alloc.Lock()
+	defer alloc.Unlock()
 	newerPeerSpaces, err := alloc.decodeUpdate(buf)
 	if err != nil {
 		lg.Error.Println("Error decoding update", err)
@@ -436,5 +425,24 @@ func (alloc *Allocator) OnGossip(buf []byte) []byte {
 			panicOnError(spaceset.Encode(enc))
 		}
 		return buf.Bytes()
+	}
+}
+
+func (alloc *Allocator) OnAlive(uid uint64) {
+	// If it's new to us, nothing to do.
+	// If we previously believed it to be dead, need to figure that case out.
+}
+
+func (alloc *Allocator) OnDead(uid uint64) {
+	alloc.Lock()
+	defer alloc.Unlock()
+	entry, found := alloc.peerInfo[uid]
+	if found {
+		if peerEntry, ok := entry.(*PeerSpaceSet); ok &&
+			!peerEntry.IsTombstone() {
+			lg.Debug.Printf("Gossip Peer %s marked as dead", entry.PeerName())
+			peerEntry.MakeTombstone()
+			alloc.gossip.GossipBroadcast(encode(entry))
+		}
 	}
 }
