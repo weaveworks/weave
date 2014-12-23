@@ -24,7 +24,7 @@ usage() {
     exit 1
 }
 
-[ `id -u` = 0 ] || {
+[ $(id -u) = 0 ] || {
     echo "weave must be run as 'root'" >&2
     exit 1
 }
@@ -371,12 +371,12 @@ container_weave_addrs() {
 
 uname -s -r | sed -n 's|^\([^ ]*\) \([0-9]\+\)\.\([0-9]\+\).*|\1 \2 \3|p' | {
     if ! read sys maj min ; then
-      echo "ERROR: Unable to parse operating system version `uname -s -r`" >&2
+      echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
       exit 1
     fi
 
     if [ "$sys" != 'Linux' ] ; then
-        echo "ERROR: Operating systems other than Linux are not supported (you have `uname -s -r`)" >&2
+        echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
         exit 1
     fi
 
@@ -421,7 +421,7 @@ case "$COMMAND" in
         # TODO use the mac of one of the physical host interfaces
         # (eth0, wlan0, etc) so the name becomes stable across host
         # restarts.
-        MACADDR=`cat /sys/class/net/$BRIDGE/address`
+        MACADDR=$(cat /sys/class/net/$BRIDGE/address)
         # backward compatibility...
         if is_cidr "$1" ; then
             echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
