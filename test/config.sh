@@ -45,3 +45,4 @@ end_suite() {
 }
 
 WEAVE=./bin/weave
+DOCKER_NS=./bin/docker-ns
