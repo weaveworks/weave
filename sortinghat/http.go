@@ -3,7 +3,7 @@ package sortinghat
 import (
 	"errors"
 	"fmt"
-	. "github.com/zettio/weave/logging"
+	. "github.com/zettio/weave/common"
 	"io"
 	"log"
 	"net/http"

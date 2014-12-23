@@ -6,7 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/davecheney/profile"
-	lg "github.com/zettio/weave/logging"
+	lg "github.com/zettio/weave/common"
 	weavenet "github.com/zettio/weave/net"
 	weave "github.com/zettio/weave/router"
 	"github.com/zettio/weave/sortinghat"

@@ -2,8 +2,8 @@ package sortinghat
 
 import (
 	"fmt"
+	wt "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
-	wt "github.com/zettio/weave/testing"
 	"io/ioutil"
 	"math/rand"
 	"net"

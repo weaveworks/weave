@@ -1,8 +1,8 @@
 package sortinghat
 
 import (
+	wt "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
-	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
 	"time"

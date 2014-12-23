@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	lg "github.com/zettio/weave/logging"
+	lg "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
 	"net"
 	"sync"
