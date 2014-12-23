@@ -391,7 +391,7 @@ if ! command_exists ip ; then
 fi
 
 if ! ip netns list >/dev/null 2>&1 ; then
-    echo "ERROR:" $(ip -V) "does not support network namespaces." >&2
+    echo "ERROR: $(ip -V) does not support network namespaces." >&2
     echo "       Please install iproute2-ss111010 or later." >&2
     exit 1
 fi
