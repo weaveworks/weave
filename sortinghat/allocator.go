@@ -89,11 +89,18 @@ func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
 	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, poolSize))
 }
 
+// We shouldn't ever get any errors on *encoding*, but if we do, this will make sure we get to hear about them.
+func panicOnError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (alloc *Allocator) encode(spaceset SpaceSet) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	enc.Encode(1)
-	spaceset.Encode(enc)
+	panicOnError(enc.Encode(1))
+	panicOnError(spaceset.Encode(enc))
 	return buf.Bytes()
 }
 
@@ -374,13 +381,7 @@ func (alloc *Allocator) queryLoop() {
 }
 
 func (alloc *Allocator) localState() []byte {
-	lg.Debug.Println("localState")
-	if buf := alloc.encode(alloc.ourSpaceSet); buf != nil {
-		return buf
-	} else {
-		lg.Error.Println("Error encoding state")
-	}
-	return nil
+	return alloc.encode(alloc.ourSpaceSet)
 }
 
 // GossipDelegate methods
@@ -434,12 +435,9 @@ func (alloc *Allocator) OnGossip(buf []byte) []byte {
 	} else {
 		buf := new(bytes.Buffer)
 		enc := gob.NewEncoder(buf)
-		if err := enc.Encode(len(newerPeerSpaces)); err != nil {
-			lg.Error.Println("Error encoding update", err)
-			return nil
-		}
+		panicOnError(enc.Encode(len(newerPeerSpaces)))
 		for _, spaceset := range newerPeerSpaces {
-			spaceset.Encode(enc)
+			panicOnError(spaceset.Encode(enc))
 		}
 		return buf.Bytes()
 	}
