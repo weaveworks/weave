@@ -57,6 +57,15 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
+// Create an "improved" update from an incoming update:
+//  - elements which the original payload added to the
+//    receiver are included
+//  - elements which the original payload updated in the
+//    receiver are included
+//  - elements which are equal between the receiver and
+//    the payload are not included
+//  - elements where the payload was older than the
+//    receiver's version are updated
 func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
 	peers.Lock()
 
@@ -136,7 +145,6 @@ func (peers *Peers) garbageCollect() []*Peer {
 		found, _ := peers.ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
 			peers.onGC(peer)
-			ourself.OnDead(peer) // probably a bad idea to do this while lock is held
 			delete(peers.table, name)
 			peers.macs.Delete(peer)
 			removed = append(removed, peer)

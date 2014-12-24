@@ -299,3 +299,40 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		return nil
 	}
 }
+
+// Gossip methods
+
+func (router *Router) OnAlive(uint64) {
+	// don't care
+}
+func (router *Router) OnDead(uint64) {
+	// don't care
+}
+func (router *Router) OnGossipBroadcast(msg []byte) {
+	// Not expecting these
+	log.Println("Unexpected Gossip Broadcast:", msg)
+}
+func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) {
+	// Not expecting these
+	log.Println("Unexpected Gossip Unicast:", msg)
+}
+
+// Return state of everything we know; intended to be called periodically
+func (router *Router) Gossip() []byte {
+	return router.Peers.EncodeAllPeers()
+}
+
+// merge in state and return "everything new I've just learnt",
+// or nil if nothing in the received message was new
+func (router *Router) OnGossip(buf []byte) []byte {
+	newUpdate, err := router.Peers.ApplyUpdate(buf)
+	if err != nil {
+		// fixme
+	} else if len(newUpdate) == 0 {
+		return nil
+	}
+	router.Routes.Recalculate()
+	return newUpdate
+}
+
+// todo: worry about the old behaviour which sent a subset of the graph

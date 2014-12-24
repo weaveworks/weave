@@ -51,7 +51,6 @@ type LocalConnection struct {
 	effectivePMTU int
 	SessionKey    *[32]byte
 	heartbeat     *time.Ticker
-	fetchAll      *time.Ticker
 	fragTest      *time.Ticker
 	forwardChan   chan<- *ForwardedFrame
 	forwardChanDF chan<- *ForwardedFrame
