@@ -9,10 +9,11 @@ import (
 
 type Routes struct {
 	sync.RWMutex
-	queryChan chan<- *Interaction
+	ourself   *Peer
+	peers     *Peers
 	unicast   map[PeerName]PeerName
 	broadcast map[PeerName][]PeerName
-	router    *Router
+	queryChan chan<- *Interaction
 }
 
 func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
@@ -47,15 +48,16 @@ func (routes *Routes) String() string {
 	return buf.String()
 }
 
-func StartRoutes(router *Router) *Routes {
+func StartRoutes(ourself *Peer, peers *Peers) *Routes {
 	queryChan := make(chan *Interaction, ChannelSize)
 	state := &Routes{
-		router:    router,
-		queryChan: queryChan,
+		ourself:   ourself,
+		peers:     peers,
 		unicast:   make(map[PeerName]PeerName),
-		broadcast: make(map[PeerName][]PeerName)}
-	state.unicast[router.Ourself.Name] = UnknownPeerName
-	state.broadcast[router.Ourself.Name] = []PeerName{}
+		broadcast: make(map[PeerName][]PeerName),
+		queryChan: queryChan}
+	state.unicast[ourself.Name] = UnknownPeerName
+	state.broadcast[ourself.Name] = []PeerName{}
 	go state.queryLoop(queryChan)
 	return state
 }
@@ -103,7 +105,7 @@ func (routes *Routes) queryLoop(queryChan <-chan *Interaction) {
 // to exchange knowledge of MAC addresses, nor any constraints on
 // the routes that we construct.
 func (routes *Routes) calculateUnicast() map[PeerName]PeerName {
-	_, unicast := routes.router.Ourself.Routes(nil, true)
+	_, unicast := routes.ourself.Routes(nil, true)
 	return unicast
 }
 
@@ -127,9 +129,9 @@ func (routes *Routes) calculateUnicast() map[PeerName]PeerName {
 // where <= is the subset relationship on keys of the returned map.
 func (routes *Routes) calculateBroadcast() map[PeerName][]PeerName {
 	broadcast := make(map[PeerName][]PeerName)
-	ourself := routes.router.Ourself
+	ourself := routes.ourself
 
-	routes.router.Peers.ForEach(func(name PeerName, peer *Peer) {
+	routes.peers.ForEach(func(name PeerName, peer *Peer) {
 		hops := []PeerName{}
 		if found, reached := peer.Routes(ourself, true); found {
 			ourself.ForEachConnection(func(remoteName PeerName, conn Connection) {

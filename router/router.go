@@ -53,7 +53,7 @@ func (router *Router) Start() {
 	po, err := NewPcapO(router.Iface.Name)
 	checkFatal(err)
 	router.ConnectionMaker = StartConnectionMaker(router)
-	router.Routes = StartRoutes(router)
+	router.Routes = StartRoutes(router.Ourself, router.Peers)
 	router.UDPListener = router.listenUDP(Port, po)
 	router.listenTCP(Port)
 	router.sniff(pio)
