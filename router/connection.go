@@ -195,8 +195,6 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			}
 		case <-tickerChan(conn.heartbeat):
 			conn.forwardHeartbeatFrame()
-		case <-tickerChan(conn.fetchAll):
-			err = conn.handleSendTCP(ProtocolFetchAllByte)
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
 			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
@@ -237,7 +235,6 @@ func (conn *LocalConnection) handleSetEstablished() error {
 		}
 		stopTicker(conn.heartbeat)
 		conn.heartbeat = time.NewTicker(SlowHeartbeat)
-		conn.fetchAll = time.NewTicker(FetchAllInterval)
 		conn.fragTest = time.NewTicker(FragTestInterval)
 		conn.forwardHeartbeatFrame() // avoid initial wait
 		// Send a large frame down the DF channel in order to prompt
@@ -284,7 +281,6 @@ func (conn *LocalConnection) handleShutdown() {
 	}
 
 	stopTicker(conn.heartbeat)
-	stopTicker(conn.fetchAll)
 	stopTicker(conn.fragTest)
 
 	// blank out the forwardChan so that the router processes don't
@@ -459,9 +455,9 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			// We initiated the connection. We sent fast heartbeats to
 			// the remote side, which has now received at least one of
 			// them and thus has informed us via TCP that it considers
-			// the connection is now up. We now do a fetchAll on it.
+			// the connection is now up.
 			conn.SetEstablished()
-			conn.SendTCP(ProtocolFetchAllByte)
+			conn.Router.Ourself.OnAlive(conn.remote)
 		} else if msg[0] == ProtocolStartFragmentationTest {
 			conn.Forward(false, &ForwardedFrame{
 				srcPeer: conn.local,
@@ -472,44 +468,6 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			conn.setStackFrag(true)
 		} else if usingPassword && msg[0] == ProtocolNonce {
 			conn.Decryptor.ReceiveNonce(msg[1:])
-		} else if msg[0] == ProtocolFetchAll {
-			// There are exactly two messages that relate to topology
-			// updates.
-			//
-			// 1. FetchAll. This carries no payload. The receiver
-			// responds with the entire topology model as the receiver
-			// has it.
-			//
-			// 2. Update. This carries a topology payload. The
-			// receiver merges it with its own topology model. If the
-			// payload is a subset of the receiver's topology, no
-			// further action is taken. Otherwise, the receiver sends
-			// out to all its connections an "improved" update:
-			//  - elements which the original payload added to the
-			//    receiver are included
-			//  - elements which the original payload updated in the
-			//    receiver are included
-			//  - elements which are equal between the receiver and
-			//    the payload are not included
-			//  - elements where the payload was older than the
-			//    receiver's version are updated
-			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Peers.EncodeAllPeers()))
-		} else if msg[0] == ProtocolUpdate {
-			newUpdate, err := conn.Router.Peers.ApplyUpdate(msg[1:])
-			if _, ok := err.(UnknownPeersError); err != nil && ok {
-				// That update contained a peer we didn't know about;
-				// request full update
-				conn.SendTCP(ProtocolFetchAllByte)
-				continue
-			}
-			if conn.CheckFatal(err) != nil {
-				return
-			}
-			if len(newUpdate) != 0 {
-				conn.Router.ConnectionMaker.Refresh()
-				conn.Router.Routes.Recalculate()
-				conn.Router.Ourself.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
-			}
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else if msg[0] == ProtocolGossipUnicast {
@@ -525,7 +483,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 					channel.gossiper.OnGossipUnicast(srcName, msg)
 				}
 			} else {
-				conn.local.RelayGossipTo(destName, origMsg)
+				conn.Router.Ourself.RelayGossipTo(destName, origMsg)
 			}
 		} else if msg[0] == ProtocolGossipBroadcast {
 			// intended for state from sending peer only
@@ -540,7 +498,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			} else {
 				channel.gossiper.OnGossipBroadcast(msg)
 			}
-			conn.local.RelayGossipBroadcast(srcName, origMsg)
+			conn.Router.Ourself.RelayGossipBroadcast(srcName, origMsg)
 		} else if msg[0] == ProtocolGossip {
 			// contains state for everyone that sending peer knows
 			// peers that receive it should examine the info, and if any of it is newer then

@@ -31,7 +31,7 @@ type Gossiper interface {
 }
 
 type GossipChannel struct {
-	localPeer *Peer
+	localPeer *LocalPeer
 	name      string
 	hash      uint32
 	gossiper  Gossiper
@@ -75,7 +75,7 @@ func (c *GossipChannel) GossipBroadcast(buf []byte) error {
 	return nil // ?
 }
 
-func (peer *Peer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
+func (peer *LocalPeer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
 	if srcPeer, found := peer.Router.Peers.Fetch(srcName); found {
 		peer.CallBroadcastFunc(srcPeer, func(conn *LocalConnection) error {
 			conn.SendTCP(msg)
@@ -97,8 +97,8 @@ func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
 	return c.localPeer.RelayGossipTo(dstPeerName, msg)
 }
 
-func (peer *Peer) RelayGossipTo(dstPeerName PeerName, msg []byte) error {
-	relayPeerName, found := peer.Router.Topology.Unicast(dstPeerName)
+func (peer *LocalPeer) RelayGossipTo(dstPeerName PeerName, msg []byte) error {
+	relayPeerName, found := peer.Router.Routes.Unicast(dstPeerName)
 	if !found {
 		log.Println("Cannot relay gossip for unknown destination:", dstPeerName)
 		return nil
@@ -112,13 +112,13 @@ func (peer *Peer) RelayGossipTo(dstPeerName PeerName, msg []byte) error {
 	return nil
 }
 
-func (ourself *Peer) OnAlive(peer *Peer) {
+func (ourself *LocalPeer) OnAlive(peer *Peer) {
 	for _, c := range ourself.Router.GossipChannels {
 		c.gossiper.OnAlive(peer.UID)
 	}
 }
 
-func (ourself *Peer) OnDead(peer *Peer) {
+func (ourself *LocalPeer) OnDead(peer *Peer) {
 	for _, c := range ourself.Router.GossipChannels {
 		c.gossiper.OnDead(peer.UID)
 	}
