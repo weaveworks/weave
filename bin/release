@@ -33,10 +33,9 @@ build() {
     cd $RELEASE_DIR
 
     ## Check that the top changelog entry is this version
-    latest_changelog=$(grep -o "Release v.*" -m1 ./CHANGELOG.md)
-    if ! [ `echo "$latest_changelog" | grep -o 'v[^ ]*'` == $LATEST_TAG ]; then
-        echo -e "\u2757 Latest changelog entry $latest_changelog does not match" >&2
-        echo "the latest tag $LATEST_TAG" >&2
+    if ! latest_changelog=$(grep -o "== Release [0-9].*" -m1 ./CHANGELOG.md) || \
+       ! [ `echo "$latest_changelog" | grep -o '[0-9][^ ]*'` == "$VERSION" ]; then
+        echo -e "\u2757 Latest changelog entry \"$latest_changelog\" does not match the release version $VERSION" >&2
         exit 1
     fi
 
@@ -61,9 +60,9 @@ build() {
     fi
 
     ## Run tests with the distributables, including version check
-    v=$(./weaver/weaver --version)
-    if ! [ "$v" == "weaver $VERSION" ]; then
-        echo "Version of distributable "$v" does not match tag $LATEST_TAG" >&2
+    v=$(./weaver/weaver --version | grep -o '[0-9].*')
+    if ! [ "$v" == "$VERSION" ]; then
+        echo "Version of distributable "$v" does not match release version $VERSION" >&2
         exit 1
     fi
 
