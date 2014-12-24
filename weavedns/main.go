@@ -36,7 +36,7 @@ func main() {
 	flag.Parse()
 
 	if justVersion {
-		io.WriteString(os.Stdout, fmt.Sprintf("weavedns %s\n", version))
+		io.WriteString(os.Stdout, fmt.Sprintf("weave DNS %s\n", version))
 		os.Exit(0)
 	}
 

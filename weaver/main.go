@@ -59,7 +59,7 @@ func main() {
 	peers = flag.Args()
 
 	if justVersion {
-		io.WriteString(os.Stdout, fmt.Sprintf("weaver %s\n", version))
+		io.WriteString(os.Stdout, fmt.Sprintf("weave router %s\n", version))
 		os.Exit(0)
 	}
 
@@ -136,7 +136,7 @@ func main() {
 
 func handleHttp(router *weave.Router) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, fmt.Sprintln("weaver version", version))
+		io.WriteString(w, fmt.Sprintln("weave router", version))
 		io.WriteString(w, router.Status())
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
