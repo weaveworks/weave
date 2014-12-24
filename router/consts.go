@@ -22,6 +22,7 @@ const (
 	SlowHeartbeat      = 10 * time.Second
 	FetchAllInterval   = 30 * time.Second
 	FragTestInterval   = 5 * time.Minute
+	ReadTimeout        = 2 * FetchAllInterval
 	PMTUVerifyAttempts = 8
 	PMTUVerifyTimeout  = 10 * time.Millisecond // gets doubled with every attempt
 	MaxDuration        = time.Duration(math.MaxInt64)
