@@ -40,14 +40,6 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 tests:
 	cd nameserver; go test -tags netgo
 
-publish: $(WEAVER_EXPORT) tests
-	$(SUDO) docker tag  $(WEAVER_IMAGE) $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
-	$(SUDO) docker push $(WEAVER_IMAGE):latest
-	$(SUDO) docker push $(WEAVER_IMAGE):git-`git rev-parse --short=12 HEAD`
-	$(SUDO) docker tag  $(WEAVEDNS_IMAGE) $(WEAVEDNS_IMAGE):git-`git rev-parse --short=12 HEAD`
-	$(SUDO) docker push $(WEAVEDNS_IMAGE):latest
-	$(SUDO) docker push $(WEAVEDNS_IMAGE):git-`git rev-parse --short=12 HEAD`
-
 clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE)
 	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT)
