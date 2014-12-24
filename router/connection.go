@@ -493,7 +493,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			//    the payload are not included
 			//  - elements where the payload was older than the
 			//    receiver's version are updated
-			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Topology.FetchAll()))
+			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Peers.EncodeAllPeers()))
 		} else if msg[0] == ProtocolUpdate {
 			newUpdate, err := conn.Router.Peers.ApplyUpdate(msg[1:], conn.Router)
 			if _, ok := err.(UnknownPeersError); err != nil && ok {

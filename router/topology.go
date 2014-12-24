@@ -54,18 +54,8 @@ func StartTopology(router *Router) *Topology {
 // ACTOR client API
 
 const (
-	TFetchAll      = iota
 	TRebuildRoutes = iota
 )
-
-func (topo *Topology) FetchAll() []byte {
-	resultChan := make(chan interface{}, 0)
-	topo.queryChan <- &Interaction{
-		code:       TFetchAll,
-		resultChan: resultChan}
-	result := <-resultChan
-	return result.([]byte)
-}
 
 // Async.
 func (topo *Topology) RebuildRoutes() {
@@ -88,8 +78,6 @@ func (topo *Topology) queryLoop(queryChan <-chan *Interaction) {
 			topo.unicast = unicast
 			topo.broadcast = broadcast
 			topo.Unlock()
-		case TFetchAll:
-			query.resultChan <- topo.router.Peers.EncodeAllPeers()
 		default:
 			log.Fatal("Unexpected topology query:", query)
 		}
