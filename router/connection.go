@@ -287,7 +287,6 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 	tcpConn := conn.TCPConn
 	tcpConn.SetKeepAlive(true)
 	tcpConn.SetLinger(0)
-	tcpConn.SetNoDelay(true)
 
 	enc := gob.NewEncoder(tcpConn)
 
