@@ -506,7 +506,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 				return
 			}
 			if len(newUpdate) != 0 {
-				conn.Router.Topology.RebuildRoutes()
+				conn.Router.Routes.Recalculate()
 				conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 			}
 		} else if msg[0] == ProtocolPMTUVerified {

@@ -17,7 +17,7 @@ type Router struct {
 	Macs               *MacCache
 	Peers              *PeerCache
 	UDPListener        *net.UDPConn
-	Topology           *Topology
+	Routes             *Routes
 	ConnectionMaker    *ConnectionMaker
 	Password           *[]byte
 	ConnLimit          int
@@ -148,14 +148,6 @@ type ForwardedFrame struct {
 type Interaction struct {
 	code       int
 	resultChan chan<- interface{}
-}
-
-type Topology struct {
-	sync.RWMutex
-	queryChan chan<- *Interaction
-	unicast   map[PeerName]PeerName
-	broadcast map[PeerName][]PeerName
-	router    *Router
 }
 
 type ConnectionMakerInteraction struct {

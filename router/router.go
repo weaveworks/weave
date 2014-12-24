@@ -53,7 +53,7 @@ func (router *Router) Start() {
 	po, err := NewPcapO(router.Iface.Name)
 	checkFatal(err)
 	router.ConnectionMaker = StartConnectionMaker(router)
-	router.Topology = StartTopology(router)
+	router.Routes = StartRoutes(router)
 	router.UDPListener = router.listenUDP(Port, po)
 	router.listenTCP(Port)
 	router.sniff(pio)
@@ -65,7 +65,7 @@ func (router *Router) Status() string {
 	buf.WriteString(fmt.Sprintln("Sniffing traffic on", router.Iface))
 	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
 	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))
-	buf.WriteString(fmt.Sprintf("Topology:\n%s", router.Topology))
+	buf.WriteString(fmt.Sprintf("Routes:\n%s", router.Routes))
 	buf.WriteString(fmt.Sprintf("Reconnects:\n%s", router.ConnectionMaker))
 	return buf.String()
 }

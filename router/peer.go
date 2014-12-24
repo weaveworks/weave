@@ -151,7 +151,7 @@ func (peer *Peer) Broadcast(df bool, frame []byte, dec *EthernetDecoder) error {
 }
 
 func (peer *Peer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
-	relayPeerName, found := peer.Router.Topology.Unicast(dstPeer.Name)
+	relayPeerName, found := peer.Router.Routes.Unicast(dstPeer.Name)
 	if !found {
 		// Not necessarily an error as there could be a race with the
 		// dst disappearing whilst the frame is in flight
@@ -172,7 +172,7 @@ func (peer *Peer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec *Ethe
 }
 
 func (peer *Peer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
-	nextHops := peer.Router.Topology.Broadcast(srcPeer.Name)
+	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
 		return nil
 	}
@@ -395,7 +395,7 @@ func (peer *Peer) handleBroadcastTCP(msg []byte) {
 }
 
 func (peer *Peer) broadcastPeerUpdate(peers ...*Peer) {
-	peer.Router.Topology.RebuildRoutes()
+	peer.Router.Routes.Recalculate()
 	peer.handleBroadcastTCP(Concat(ProtocolUpdateByte, EncodePeers(append(peers, peer)...)))
 }
 
