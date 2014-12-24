@@ -310,9 +310,8 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 	// ourself. Only when we add this connection to the conn.local
 	// peer will it be visible from multiple go-routines.
 	tcpConn := conn.TCPConn
-	tcpConn.SetKeepAlive(true)
 	tcpConn.SetLinger(0)
-	tcpConn.SetNoDelay(true)
+	conn.extendReadDeadline()
 
 	enc := gob.NewEncoder(tcpConn)
 
@@ -454,6 +453,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 	var err error
 	for {
 		var msg []byte
+		conn.extendReadDeadline()
 		if conn.CheckFatal(decoder.Decode(&msg)) != nil {
 			return
 		}
@@ -525,6 +525,10 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			conn.log("received unknown msg:\n", msg)
 		}
 	}
+}
+
+func (conn *LocalConnection) extendReadDeadline() {
+	conn.TCPConn.SetReadDeadline(time.Now().Add(ReadTimeout))
 }
 
 // Heartbeating serves two purposes: a) keeping NAT paths alive, and
