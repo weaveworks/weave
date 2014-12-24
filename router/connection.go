@@ -179,15 +179,9 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			conn.log("error:", err)
 			break
 		}
-		if conn.heartbeat != nil {
-			heartbeat = conn.heartbeat.C
-		}
-		if conn.fetchAll != nil {
-			fetchAll = conn.fetchAll.C
-		}
-		if conn.fragTest != nil {
-			fragTest = conn.fragTest.C
-		}
+		heartbeat = tickerChan(conn.heartbeat)
+		fetchAll = tickerChan(conn.fetchAll)
+		fragTest = tickerChan(conn.fragTest)
 		select {
 		case query, ok := <-queryChan:
 			if !ok {
@@ -541,6 +535,13 @@ func (conn *LocalConnection) forwardHeartbeatFrame() {
 		dstPeer: conn.remote,
 		frame:   []byte{}}
 	conn.Forward(true, heartbeatFrame, nil)
+}
+
+func tickerChan(ticker *time.Ticker) <-chan time.Time {
+	if ticker != nil {
+		return ticker.C
+	}
+	return nil
 }
 
 func stopTicker(ticker *time.Ticker) {
