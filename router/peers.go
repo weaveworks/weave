@@ -68,7 +68,7 @@ func (peers *Peers) ApplyUpdate(update []byte, router *Router) ([]byte, error) {
 	}
 
 	// Now apply the updates
-	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns, router)
+	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns, router.Ourself)
 
 	for _, peerRemoved := range peers.garbageCollect(router.Ourself, router.Macs) {
 		delete(newUpdate, peerRemoved.Name)
@@ -99,10 +99,10 @@ func EncodePeers(peers ...*Peer) []byte {
 	return buf.Bytes()
 }
 
-func (peers *Peers) GarbageCollect(router *Router) []*Peer {
+func (peers *Peers) GarbageCollect(ourself *Peer, macs *MacCache) []*Peer {
 	peers.Lock()
 	defer peers.Unlock()
-	return peers.garbageCollect(router.Ourself, router.Macs)
+	return peers.garbageCollect(ourself, macs)
 }
 
 func (peers *Peers) String() string {
@@ -203,7 +203,7 @@ func (peers *Peers) decodeUpdate(update []byte, router *Router) (newPeers map[Pe
 	return
 }
 
-func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte, router *Router) map[PeerName]*Peer {
+func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte, ourself *Peer) map[PeerName]*Peer {
 	newUpdate := make(map[PeerName]*Peer)
 	for idx, newPeer := range decodedUpdate {
 		connsBuf := decodedConns[idx]
@@ -220,7 +220,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte, ro
 				// change.
 				newUpdate[name] = peer
 				continue
-			} else if peer == router.Ourself {
+			} else if peer == ourself {
 				// nobody but us updates us
 				continue
 			} else if peer.Version() == newPeer.Version() {
