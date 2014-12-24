@@ -1,4 +1,4 @@
-package nameserver
+package common
 
 import (
 	"io"
@@ -32,6 +32,10 @@ func InitLogging(debugHandle io.Writer,
 	Error = log.New(errorHandle, "ERROR: ", standardLogFlags)
 }
 
-func init() {
-	InitLogging(ioutil.Discard, os.Stdout, os.Stdout, os.Stderr)
+func InitDefaultLogging(debug bool) {
+	debugOut := ioutil.Discard
+	if debug {
+		debugOut = os.Stderr
+	}
+	InitLogging(debugOut, os.Stdout, os.Stdout, os.Stderr)
 }
