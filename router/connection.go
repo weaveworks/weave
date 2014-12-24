@@ -178,9 +178,6 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			conn.log("error:", err)
 			break
 		}
-		heartbeat := tickerChan(conn.heartbeat)
-		fetchAll := tickerChan(conn.fetchAll)
-		fragTest := tickerChan(conn.fragTest)
 		select {
 		case query, ok := <-queryChan:
 			if !ok {
@@ -196,11 +193,11 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			case CSendTCP:
 				err = conn.handleSendTCP(query.payload.([]byte))
 			}
-		case <-heartbeat:
+		case <-tickerChan(conn.heartbeat):
 			conn.forwardHeartbeatFrame()
-		case <-fetchAll:
+		case <-tickerChan(conn.fetchAll):
 			err = conn.handleSendTCP(ProtocolFetchAllByte)
-		case <-fragTest:
+		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
 			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
 
