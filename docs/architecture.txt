@@ -96,19 +96,18 @@ Router:
     directly connected neighbours via TCP. This network update message
     contains the relevant changes to the network topology due to the
     connection change. When such a message is received by a TCP
-    receiver threads, they invoke the peers cache to apply the update
-    to the local model of the network topology. This may fail for a
-    number of reasons (for example the update may contain reference to
-    peers that we have no prior knowledge of. In this case, we ignore
-    the update and send back to the peer from whom we received the
-    update a request for the complete network topology), or it may
-    apply and elicit some changes to our model. If it does elicit some
-    changes then we send out an updated update message to all our
-    peers. In this way the changes are passed quickly from peer to
-    peer based on the established connections and stop being sent once
-    a received update causes no changes to the peer's topology
-    model. Changes are additive and care is taken to ensure that no
-    loops can occur.
+    receiver threads, they apply the update to the local model of the
+    network topology. This may fail for a number of reasons (for
+    example the update may contain reference to peers that we have no
+    prior knowledge of. In this case, we ignore the update and send
+    back to the peer from whom we received the update a request for
+    the complete network topology), or it may apply and elicit some
+    changes to our model. If it does elicit some changes then we send
+    out an updated update message to all our peers. In this way the
+    changes are passed quickly from peer to peer based on the
+    established connections and stop being sent once a received update
+    causes no changes to the peer's topology model. Changes are
+    additive and care is taken to ensure that no loops can occur.
 
 
 Routing

@@ -27,7 +27,7 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	router := &Router{
 		Iface:     iface,
 		Macs:      NewMacCache(macMaxAge, onMacExpiry),
-		Peers:     NewPeerCache(onPeerGC),
+		Peers:     NewPeers(onPeerGC),
 		ConnLimit: connLimit,
 		BufSz:     bufSz,
 		LogFrame:  logFrame}

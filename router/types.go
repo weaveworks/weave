@@ -15,7 +15,7 @@ type Router struct {
 	Ourself            *Peer
 	Iface              *net.Interface
 	Macs               *MacCache
-	Peers              *PeerCache
+	Peers              *Peers
 	UDPListener        *net.UDPConn
 	Routes             *Routes
 	ConnectionMaker    *ConnectionMaker
