@@ -20,10 +20,10 @@ setup() {
 build() {
     setup
 
-    echo "Attempting to build distributables for version $VERSION"
+    echo "== Clone repo at $LATEST_TAG for version $VERSION"
     if [ -d $RELEASE_DIR ]; then
-        echo Release directory $RELEASE_DIR already exists, you may want to >&2
-        echo     rm -rf $RELEASE_DIR >&2
+        echo -e "\u2757 Release directory $RELEASE_DIR already exists, you may want to" >&2
+        echo -e "\trm -rf $RELEASE_DIR" >&2
         exit 1
     fi
     
@@ -35,13 +35,13 @@ build() {
     ## Check that the top changelog entry is this version
     latest_changelog=$(grep -o "Release v.*" -m1 ./CHANGELOG.md)
     if ! [ `echo "$latest_changelog" | grep -o 'v[^ ]*'` == $LATEST_TAG ]; then
-        echo Latest changelog entry $latest_changelog does not match >&2
-        echo the latest tag $LATEST_TAG >&2
+        echo -e "\u2757 Latest changelog entry $latest_changelog does not match" >&2
+        echo "the latest tag $LATEST_TAG" >&2
         exit 1
     fi
 
     echo
-    echo == Build and test
+    echo "== Build and test"
 
     ## Inject the version numbers and build the distributables
     ## (library versions?)
@@ -54,20 +54,20 @@ build() {
         WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns
 
     if make tests; then
-        echo '** Tests pass'
+        echo -e '\u2713 Tests pass'
     else
-        echo Tests failed, probably best not publish this one >&2
+        echo -e "\u2757 Tests failed, probably best not publish this one" >&2
         exit 1
     fi
 
     ## Run tests with the distributables, including version check
     v=$(./weaver/weaver --version)
     if ! [ "$v" == "weaver $VERSION" ]; then
-        echo Version of distributable "$v" does not match tag $LATEST_TAG >&2
+        echo "Version of distributable "$v" does not match tag $LATEST_TAG" >&2
         exit 1
     fi
 
-    echo '** Build OK'
+    echo -e '\u2713 Build OK'
     echo '** Release artefacts in' $RELEASE_DIR
 }
 
@@ -75,12 +75,12 @@ publish() {
     setup
     cd $PWD/$RELEASE_DIR
 
-    echo == Sanity checks
+    echo "== Sanity checks"
 
     if ! which github-release >/dev/null; then
-        echo Please install git-release: >&2
+        echo "Please install git-release:" >&2
         echo -e "\tgo get github.com/aktau/github-release" >&2
-        echo and create a git token per https://github.com/aktau/github-release >&2
+        echo "and create a git token per https://github.com/aktau/github-release" >&2
         exit 1
     fi
 
@@ -109,11 +109,11 @@ publish() {
     docker tag $DOCKERHUB_USER/weavedns $DOCKERHUB_USER/weavedns:$VERSION
 
     docker push $DOCKERHUB_USER/weave:$VERSION
-    echo == Pushed $DOCKERHUB_USER/weave:$VERSION to docker hub
+    echo "** Pushed $DOCKERHUB_USER/weave:$VERSION to docker hub"
     docker push $DOCKERHUB_USER/weavedns:$VERSION
-    echo == Pushed $DOCKERHUB_USER/weavedns:$VERSION to docker hub
+    echo "** Pushed $DOCKERHUB_USER/weavedns:$VERSION to docker hub"
 
-    echo == Creating GitHub release $RELEASE_NAME $VERSION
+    echo "== Creating GitHub release $RELEASE_NAME $VERSION"
     # This cannot be done as a draft because of a bug in
     # github-release: https://github.com/aktau/github-release/issues/7
     github-release release \
@@ -135,11 +135,11 @@ publish() {
 }
 
 usage() {
-    echo Usage:
-    echo     ./bin/release prepare
-    echo -- Build artefacts for the latest version tag
-    echo     ./bin/release publish
-    echo -- Publish the artefacts for the latest tag to GitHub and DockerHub
+    echo "Usage:"
+    echo -e "\t./bin/release prepare"
+    echo "-- Build artefacts for the latest version tag"
+    echo -e "\t./bin/release publish"
+    echo "-- Publish the artefacts for the latest tag to GitHub and DockerHub"
 }
 
 case "$1" in
@@ -150,7 +150,7 @@ case "$1" in
         publish
         ;;
     *)
-        echo Unknown command "$1"
+        echo "Unknown command \"$1\""
         usage
         ;;
 esac
