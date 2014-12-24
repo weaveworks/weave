@@ -14,7 +14,6 @@ import (
 type Router struct {
 	Ourself            *Peer
 	Iface              *net.Interface
-	PeersSubscribeChan chan<- chan<- map[string]Peer
 	Macs               *MacCache
 	Peers              *PeerCache
 	UDPListener        *net.UDPConn
