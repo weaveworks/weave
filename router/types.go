@@ -162,8 +162,6 @@ type ConnectionMaker struct {
 	cmdLineAddress map[string]bool
 }
 
-type ConnectionState int
-
 // Information about an address where we may find a peer
 type Target struct {
 	attempting  bool          // are we currently attempting to connect there?
