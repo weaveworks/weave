@@ -172,16 +172,15 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			conn.forwardHeartbeatFrame() // avoid initial wait
 		}
 	}
-	var heartbeat, fetchAll, fragTest <-chan time.Time
 	terminate := false
 	for !terminate {
 		if err != nil {
 			conn.log("error:", err)
 			break
 		}
-		heartbeat = tickerChan(conn.heartbeat)
-		fetchAll = tickerChan(conn.fetchAll)
-		fragTest = tickerChan(conn.fragTest)
+		heartbeat := tickerChan(conn.heartbeat)
+		fetchAll := tickerChan(conn.fetchAll)
+		fragTest := tickerChan(conn.fragTest)
 		select {
 		case query, ok := <-queryChan:
 			if !ok {
