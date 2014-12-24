@@ -105,10 +105,9 @@ func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 	}
 }
 
-// Called by the connection's actor process, by the connection's
-// heartbeat process and by the connection's TCP received
-// process. StackFrag is read in conn.Forward (called by router udp
-// listener and sniffer processes)
+// Called by the connection's actor process, and by the connection's
+// TCP received process. StackFrag is read in conn.Forward (called by
+// router udp listener and sniffer processes)
 func (conn *LocalConnection) setStackFrag(frag bool) {
 	conn.Lock()
 	defer conn.Unlock()
@@ -168,7 +167,10 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 	}
 	conn.local.AddConnection(conn)
 	if conn.remoteUDPAddr != nil {
-		err = conn.ensureHeartbeat(true)
+		if err = conn.ensureForwarders(); err == nil {
+			conn.heartbeat = time.NewTicker(FastHeartbeat)
+			conn.forwardHeartbeatFrame() // avoid initial wait
+		}
 	}
 	terminate := false
 	for !terminate {
@@ -176,19 +178,29 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			conn.log("error:", err)
 			break
 		}
-		query, ok := <-queryChan
-		if !ok {
-			break
-		}
-		switch query.code {
-		case CShutdown:
-			terminate = true
-		case CSetEstablished:
-			err = conn.handleSetEstablished()
-		case CSetRemoteUDPAddr:
-			err = conn.handleSetRemoteUDPAddr(query.payload.(*net.UDPAddr))
-		case CSendTCP:
-			err = conn.handleSendTCP(query.payload.([]byte))
+		select {
+		case query, ok := <-queryChan:
+			if !ok {
+				break
+			}
+			switch query.code {
+			case CShutdown:
+				terminate = true
+			case CSetEstablished:
+				err = conn.handleSetEstablished()
+			case CSetRemoteUDPAddr:
+				err = conn.handleSetRemoteUDPAddr(query.payload.(*net.UDPAddr))
+			case CSendTCP:
+				err = conn.handleSendTCP(query.payload.([]byte))
+			}
+		case <-tickerChan(conn.heartbeat):
+			conn.forwardHeartbeatFrame()
+		case <-tickerChan(conn.fetchAll):
+			err = conn.handleSendTCP(ProtocolFetchAllByte)
+		case <-tickerChan(conn.fragTest):
+			conn.setStackFrag(false)
+			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
+
 		}
 	}
 	conn.handleShutdown()
@@ -220,9 +232,14 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	conn.Unlock()
 	if !old {
 		conn.local.ConnectionEstablished(conn)
-		if err := conn.ensureHeartbeat(false); err != nil {
+		if err := conn.ensureForwarders(); err != nil {
 			return err
 		}
+		stopTicker(conn.heartbeat)
+		conn.heartbeat = time.NewTicker(SlowHeartbeat)
+		conn.fetchAll = time.NewTicker(FetchAllInterval)
+		conn.fragTest = time.NewTicker(FragTestInterval)
+		conn.forwardHeartbeatFrame() // avoid initial wait
 		// Send a large frame down the DF channel in order to prompt
 		// PMTU discovery to start.
 		conn.Forward(true, &ForwardedFrame{
@@ -266,11 +283,9 @@ func (conn *LocalConnection) handleShutdown() {
 		conn.local.DeleteConnection(conn)
 	}
 
-	if conn.heartbeatStop != nil {
-		// heartbeatStop is 0 length, so this send will synchronise
-		// with the receive.
-		conn.heartbeatStop <- nil
-	}
+	stopTicker(conn.heartbeat)
+	stopTicker(conn.fetchAll)
+	stopTicker(conn.fragTest)
 
 	// blank out the forwardChan so that the router processes don't
 	// try to send any more
@@ -506,56 +521,27 @@ func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(ReadTimeout))
 }
 
-// Heartbeats
-
 // Heartbeating serves two purposes: a) keeping NAT paths alive, and
 // b) updating a remote peer's knowledge of our address, in the event
 // it changes (e.g. because NAT paths expired).
 // Called only by connection actor process.
-func (conn *LocalConnection) ensureHeartbeat(fast bool) error {
-	if err := conn.ensureForwarders(); err != nil {
-		return err
-	}
-	var heartbeat, fetchAll, fragTest <-chan time.Time
-	// explicitly 0 length chan - make send block until receive occurs
-	stop := make(chan interface{}, 0)
-	if fast {
-		// fast, nofetchall, no fragtest
-		// Lang Spec: "A nil channel is never ready for communication."
-		heartbeat = time.Tick(FastHeartbeat)
-	} else {
-		heartbeat = time.Tick(SlowHeartbeat)
-		fetchAll = time.Tick(FetchAllInterval)
-		fragTest = time.Tick(FragTestInterval)
-	}
-	// Don't need locks here as this is only read here and in
-	// handleShutdown, both of which are called by the connection
-	// actor process only.
-	if conn.heartbeatStop != nil {
-		conn.heartbeatStop <- nil
-	}
-	conn.heartbeatStop = stop
-	go conn.forwardHeartbeats(heartbeat, fetchAll, fragTest, stop)
-	return nil
-}
-
-func (conn *LocalConnection) forwardHeartbeats(heartbeat, fetchAll, fragTest <-chan time.Time, stop <-chan interface{}) {
+func (conn *LocalConnection) forwardHeartbeatFrame() {
 	heartbeatFrame := &ForwardedFrame{
 		srcPeer: conn.local,
 		dstPeer: conn.remote,
 		frame:   []byte{}}
-	conn.Forward(true, heartbeatFrame, nil) // avoid initial wait
-	for {
-		select {
-		case <-stop:
-			return
-		case <-heartbeat:
-			conn.Forward(true, heartbeatFrame, nil)
-		case <-fetchAll:
-			conn.SendTCP(ProtocolFetchAllByte)
-		case <-fragTest:
-			conn.setStackFrag(false)
-			conn.SendTCP(ProtocolStartFragmentationTestByte)
-		}
+	conn.Forward(true, heartbeatFrame, nil)
+}
+
+func tickerChan(ticker *time.Ticker) <-chan time.Time {
+	if ticker != nil {
+		return ticker.C
+	}
+	return nil
+}
+
+func stopTicker(ticker *time.Ticker) {
+	if ticker != nil {
+		ticker.Stop()
 	}
 }

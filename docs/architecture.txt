@@ -66,10 +66,9 @@ Router:
     simply responds to traffic received from the remote peer via TCP
   5. We register this connection with the local peer
   6a. If we initiated this connection then we now start sending fast
-    heartbeats (a new thread is spawned to do the heartbeating) to the
-    remote peer so that the remote peer can determine what
+    heartbeats to the remote peer so that the remote peer can determine what
     address/port it should use to send UDP back to us. To do this, we
-    also spawn off two further threads which are the forwarder
+    spawn off two further threads which are the forwarder
     loops. These receive frames which are to be sent to the remote
     peer. One of them sends frames without the DF flag set. To do this
     it just sends the packets out of the UDP Listener socket. The
@@ -84,9 +83,8 @@ Router:
     local peer. It will tell the local connection (communicating to
     the actor thread) about the UDP address of the remote peer. The
     local connection will then start its forwarder threads as
-    described in 6a, and start sending slow heartbeats (heartbeating
-    is done by another process). The local connection is marked as
-    established which means it is included in network updates
+    described in 6a, and start sending slow heartbeats. The local connection
+    is marked as established which means it is included in network updates
     broadcast to our peers. We also send to the remote peer via TCP a
     ConnectionEstablished message. The remote peer receives this (on
     the TCP receiver process), tells the connection actor process,
