@@ -22,7 +22,8 @@ const (
 )
 
 type ConnectionMaker struct {
-	router         *Router
+	ourself        *Peer
+	peers          *Peers
 	targets        map[string]*Target
 	cmdLineAddress map[string]bool
 	queryChan      chan<- *ConnectionMakerInteraction
@@ -40,10 +41,11 @@ type ConnectionMakerInteraction struct {
 	address string
 }
 
-func StartConnectionMaker(router *Router) *ConnectionMaker {
+func StartConnectionMaker(ourself *Peer, peers *Peers) *ConnectionMaker {
 	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
 	state := &ConnectionMaker{
-		router:         router,
+		ourself:        ourself,
+		peers:          peers,
 		queryChan:      queryChan,
 		cmdLineAddress: make(map[string]bool),
 		targets:        make(map[string]*Target)}
@@ -110,13 +112,12 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 }
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
-	ourself := cm.router.Ourself
 	validTarget := make(map[string]bool)
 
 	// copy the set of things we are connected to, so we can access them without locking
 	our_connected_peers := make(map[PeerName]bool)
 	our_connected_targets := make(map[string]bool)
-	ourself.ForEachConnection(func(peer PeerName, conn Connection) {
+	cm.ourself.ForEachConnection(func(peer PeerName, conn Connection) {
 		our_connected_peers[peer] = true
 		our_connected_targets[conn.RemoteTCPAddr()] = true
 	})
@@ -135,9 +136,9 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 
 	// Add targets for peers that someone else is connected to, but we
 	// aren't
-	cm.router.Peers.ForEach(func(name PeerName, peer *Peer) {
+	cm.peers.ForEach(func(name PeerName, peer *Peer) {
 		peer.ForEachConnection(func(otherPeer PeerName, conn Connection) {
-			if otherPeer == ourself.Name || our_connected_peers[otherPeer] {
+			if otherPeer == cm.ourself.Name || our_connected_peers[otherPeer] {
 				return
 			}
 			address := conn.RemoteTCPAddr()
@@ -198,7 +199,7 @@ func (cm *ConnectionMaker) status() string {
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
 	log.Println("Attempting connection to", address)
-	if err := cm.router.Ourself.CreateConnection(address, acceptNewPeer); err != nil {
+	if err := cm.ourself.CreateConnection(address, acceptNewPeer); err != nil {
 		log.Println(err)
 		cm.ConnectionTerminated(address)
 	}
