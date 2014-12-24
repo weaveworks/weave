@@ -136,6 +136,7 @@ func (peers *Peers) garbageCollect() []*Peer {
 		found, _ := peers.ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
 			peers.onGC(peer)
+			ourself.OnDead(peer) // probably a bad idea to do this while lock is held
 			delete(peers.table, name)
 			peers.macs.Delete(peer)
 			removed = append(removed, peer)

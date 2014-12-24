@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 )
 
 type LocalPeer struct {
@@ -153,21 +154,26 @@ func (peer *LocalPeer) BroadcastTCP(msg []byte) {
 // ACTOR server
 
 func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
+	gossipTimer := time.Tick(GossipInterval)
 	for {
-		query, ok := <-queryChan
-		if !ok {
-			return
-		}
-		switch query.code {
-		case PAddConnection:
-			peer.handleAddConnection(query.payload.(*LocalConnection))
-		case PDeleteConnection:
-			peer.handleDeleteConnection(query.payload.(*LocalConnection))
-			query.resultChan <- nil
-		case PConnectionEstablished:
-			peer.handleConnectionEstablished(query.payload.(*LocalConnection))
-		case PBroadcastTCP:
-			peer.handleBroadcastTCP(query.payload.([]byte))
+		select {
+		case query, ok := <-queryChan:
+			if !ok {
+				return
+			}
+			switch query.code {
+			case PAddConnection:
+				peer.handleAddConnection(query.payload.(*LocalConnection))
+			case PDeleteConnection:
+				peer.handleDeleteConnection(query.payload.(*LocalConnection))
+				query.resultChan <- nil
+			case PConnectionEstablished:
+				peer.handleConnectionEstablished(query.payload.(*LocalConnection))
+			case PBroadcastTCP:
+				peer.handleBroadcastTCP(query.payload.([]byte))
+			}
+		case <-gossipTimer:
+			peer.Router.SendAllGossip()
 		}
 	}
 }

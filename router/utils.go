@@ -3,6 +3,7 @@ package router
 import (
 	"crypto/rand"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"net"
 )
@@ -69,6 +70,42 @@ func randUint64() (r uint64) {
 	for _, v := range buf {
 		r <<= 8
 		r |= uint64(v)
+	}
+	return
+}
+
+func decodePeerName(msg []byte) (name PeerName, nameLen byte, remainder []byte) {
+	nameLen = msg[0]
+	name = PeerNameFromBin(msg[1 : 1+nameLen])
+	remainder = msg[1+nameLen:]
+	return
+}
+
+func decodeGossipChannel(msg []byte) (hash uint32, remainder []byte) {
+	hash = sliceuint32(msg[0:4])
+	remainder = msg[4:]
+	return
+}
+
+func hash(s string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return h.Sum32()
+}
+
+func sliceuint32(buf []byte) (r uint32) {
+	for _, b := range buf {
+		r <<= 8
+		r |= uint32(b)
+	}
+	return
+}
+
+func uint32slice(key uint32) (r []byte) {
+	r = make([]byte, 4)
+	for i := 3; i >= 0; i-- {
+		r[i] = byte(key)
+		key >>= 8
 	}
 	return
 }

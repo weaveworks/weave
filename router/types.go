@@ -23,6 +23,7 @@ type Router struct {
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
+	GossipChannels  map[uint32]*GossipChannel // does not change after startup - access not locked
 }
 
 type Connection interface {

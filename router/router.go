@@ -25,11 +25,12 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 		log.Println("Removing unreachable", peer)
 	}
 	router := &Router{
-		Iface:     iface,
-		Macs:      NewMacCache(macMaxAge, onMacExpiry),
-		ConnLimit: connLimit,
-		BufSz:     bufSz,
-		LogFrame:  logFrame}
+		Iface:          iface,
+		Macs:           NewMacCache(macMaxAge, onMacExpiry),
+		GossipChannels: make(map[uint32]*GossipChannel),
+		ConnLimit:      connLimit,
+		BufSz:          bufSz,
+		LogFrame:       logFrame}
 	if len(password) > 0 {
 		router.Password = &password
 	}
