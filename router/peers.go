@@ -70,7 +70,7 @@ func (peers *Peers) ApplyUpdate(update []byte, router *Router) ([]byte, error) {
 	// Now apply the updates
 	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns, router)
 
-	for _, peerRemoved := range peers.garbageCollect(router.Ourself) {
+	for _, peerRemoved := range peers.garbageCollect(router.Ourself, router.Macs) {
 		delete(newUpdate, peerRemoved.Name)
 	}
 
@@ -102,7 +102,7 @@ func EncodePeers(peers ...*Peer) []byte {
 func (peers *Peers) GarbageCollect(router *Router) []*Peer {
 	peers.Lock()
 	defer peers.Unlock()
-	return peers.garbageCollect(router.Ourself)
+	return peers.garbageCollect(router.Ourself, router.Macs)
 }
 
 func (peers *Peers) String() string {
@@ -128,14 +128,14 @@ func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
 	return nil, false
 }
 
-func (peers *Peers) garbageCollect(ourself *Peer) []*Peer {
+func (peers *Peers) garbageCollect(ourself *Peer, macs *MacCache) []*Peer {
 	removed := []*Peer{}
 	for name, peer := range peers.table {
 		found, _ := ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
 			peers.onGC(peer)
 			delete(peers.table, name)
-			ourself.Router.Macs.Delete(peer)
+			macs.Delete(peer)
 			removed = append(removed, peer)
 		}
 	}
