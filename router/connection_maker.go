@@ -21,6 +21,25 @@ const (
 	CMStatus     = iota
 )
 
+type ConnectionMaker struct {
+	router         *Router
+	targets        map[string]*Target
+	cmdLineAddress map[string]bool
+	queryChan      chan<- *ConnectionMakerInteraction
+}
+
+// Information about an address where we may find a peer
+type Target struct {
+	attempting  bool          // are we currently attempting to connect there?
+	tryAfter    time.Time     // next time to try this address
+	tryInterval time.Duration // backoff time on next failure
+}
+
+type ConnectionMakerInteraction struct {
+	Interaction
+	address string
+}
+
 func StartConnectionMaker(router *Router) *ConnectionMaker {
 	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
 	state := &ConnectionMaker{
