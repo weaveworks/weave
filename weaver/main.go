@@ -55,7 +55,7 @@ func main() {
 	peers = flag.Args()
 
 	options := make(map[string]string)
-	flag.Visit(func (f *flag.Flag) {
+	flag.Visit(func(f *flag.Flag) {
 		value := f.Value.String()
 		if f.Name == "password" {
 			value = "<elided>"
