@@ -10,12 +10,18 @@ import (
 
 type Peers struct {
 	sync.RWMutex
-	table map[PeerName]*Peer
-	onGC  func(*Peer)
+	ourself *Peer
+	macs    *MacCache
+	table   map[PeerName]*Peer
+	onGC    func(*Peer)
 }
 
-func NewPeers(onGC func(*Peer)) *Peers {
-	return &Peers{table: make(map[PeerName]*Peer), onGC: onGC}
+func NewPeers(ourself *Peer, macs *MacCache, onGC func(*Peer)) *Peers {
+	return &Peers{
+		ourself: ourself,
+		macs:    macs,
+		table:   make(map[PeerName]*Peer),
+		onGC:    onGC}
 }
 
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
@@ -51,7 +57,7 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
-func (peers *Peers) ApplyUpdate(update []byte, ourself *Peer, macs *MacCache) ([]byte, error) {
+func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
 	peers.Lock()
 
 	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
@@ -68,9 +74,9 @@ func (peers *Peers) ApplyUpdate(update []byte, ourself *Peer, macs *MacCache) ([
 	}
 
 	// Now apply the updates
-	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns, ourself)
+	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns)
 
-	for _, peerRemoved := range peers.garbageCollect(ourself, macs) {
+	for _, peerRemoved := range peers.garbageCollect() {
 		delete(newUpdate, peerRemoved.Name)
 	}
 
@@ -95,10 +101,10 @@ func EncodePeers(peers ...*Peer) []byte {
 	return buf.Bytes()
 }
 
-func (peers *Peers) GarbageCollect(ourself *Peer, macs *MacCache) []*Peer {
+func (peers *Peers) GarbageCollect() []*Peer {
 	peers.Lock()
 	defer peers.Unlock()
-	return peers.garbageCollect(ourself, macs)
+	return peers.garbageCollect()
 }
 
 func (peers *Peers) String() string {
@@ -124,14 +130,14 @@ func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
 	return nil, false
 }
 
-func (peers *Peers) garbageCollect(ourself *Peer, macs *MacCache) []*Peer {
+func (peers *Peers) garbageCollect() []*Peer {
 	removed := []*Peer{}
 	for name, peer := range peers.table {
-		found, _ := ourself.Routes(peer, false)
+		found, _ := peers.ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
 			peers.onGC(peer)
 			delete(peers.table, name)
-			macs.Delete(peer)
+			peers.macs.Delete(peer)
 			removed = append(removed, peer)
 		}
 	}
@@ -199,7 +205,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 	return
 }
 
-func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte, ourself *Peer) map[PeerName]*Peer {
+func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte) map[PeerName]*Peer {
 	newUpdate := make(map[PeerName]*Peer)
 	for idx, newPeer := range decodedUpdate {
 		connsBuf := decodedConns[idx]
@@ -216,7 +222,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte, ou
 				// change.
 				newUpdate[name] = peer
 				continue
-			} else if peer == ourself {
+			} else if peer == peers.ourself {
 				// nobody but us updates us
 				continue
 			} else if peer.Version() == newPeer.Version() {

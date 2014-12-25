@@ -362,7 +362,7 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	}
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
-	peer.Router.Peers.GarbageCollect(peer.Router.Ourself.Peer, peer.Router.Macs)
+	peer.Router.Peers.GarbageCollect()
 	if broadcast {
 		peer.broadcastPeerUpdate()
 	}

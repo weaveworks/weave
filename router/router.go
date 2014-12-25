@@ -27,7 +27,6 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	router := &Router{
 		Iface:     iface,
 		Macs:      NewMacCache(macMaxAge, onMacExpiry),
-		Peers:     NewPeers(onPeerGC),
 		ConnLimit: connLimit,
 		BufSz:     bufSz,
 		LogFrame:  logFrame}
@@ -35,6 +34,7 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 		router.Password = &password
 	}
 	router.Ourself = StartLocalPeer(name, router)
+	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	log.Println("Our name is", router.Ourself.Name)
 
