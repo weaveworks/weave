@@ -14,9 +14,9 @@ func NewPeer(name PeerName, uid uint64, version uint64) *Peer {
 	return &Peer{
 		Name:        name,
 		NameByte:    name.Bin(),
-		connections: make(map[PeerName]Connection),
+		UID:         uid,
 		version:     version,
-		UID:         uid}
+		connections: make(map[PeerName]Connection)}
 }
 
 func (peer *Peer) String() string {

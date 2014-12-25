@@ -12,13 +12,13 @@ import (
 )
 
 type Router struct {
-	Ourself         *LocalPeer
 	Iface           *net.Interface
+	Ourself         *LocalPeer
 	Macs            *MacCache
 	Peers           *Peers
-	UDPListener     *net.UDPConn
 	Routes          *Routes
 	ConnectionMaker *ConnectionMaker
+	UDPListener     *net.UDPConn
 	Password        *[]byte
 	ConnLimit       int
 	BufSz           int
@@ -29,10 +29,10 @@ type Peer struct {
 	sync.RWMutex
 	Name          PeerName
 	NameByte      []byte
-	connections   map[PeerName]Connection
-	version       uint64
 	UID           uint64
+	version       uint64
 	localRefCount uint64
+	connections   map[PeerName]Connection
 }
 
 type LocalPeer struct {
