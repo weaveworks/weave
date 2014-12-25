@@ -7,7 +7,7 @@ import (
 	"sort"
 )
 
-func NewPeer(name PeerName, uid uint64, version uint64, router *Router) *Peer {
+func NewPeer(name PeerName, uid uint64, version uint64) *Peer {
 	if uid == 0 {
 		uid = randUint64()
 	}
@@ -16,8 +16,7 @@ func NewPeer(name PeerName, uid uint64, version uint64, router *Router) *Peer {
 		NameByte:    name.Bin(),
 		connections: make(map[PeerName]Connection),
 		version:     version,
-		UID:         uid,
-		Router:      router}
+		UID:         uid}
 }
 
 func (peer *Peer) String() string {
@@ -139,9 +138,6 @@ func (peer *Peer) Routes(stopAt *Peer, symmetric bool) (bool, map[PeerName]PeerN
 }
 
 func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerName]Connection) {
-	if peer == peer.Router.Ourself.Peer {
-		log.Fatal("Attempt to set version and connections on the local peer", peer.Name)
-	}
 	peer.Lock()
 	defer peer.Unlock()
 	peer.version = version
@@ -149,7 +145,7 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 }
 
 func StartLocalPeer(name PeerName, router *Router) *LocalPeer {
-	peer := &LocalPeer{Peer: NewPeer(name, 0, 0, router)}
+	peer := &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
 	queryChan := make(chan *PeerInteraction, ChannelSize)
 	peer.queryChan = queryChan
 	go peer.queryLoop(queryChan)

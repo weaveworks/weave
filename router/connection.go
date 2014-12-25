@@ -406,7 +406,7 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 		conn.Decryptor = NewNonDecryptor(conn)
 	}
 
-	toPeer := NewPeer(name, uid, 0, conn.Router)
+	toPeer := NewPeer(name, uid, 0)
 	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
 	if toPeer == nil {
 		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")

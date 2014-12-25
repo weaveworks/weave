@@ -169,7 +169,7 @@ func (peers *Peers) decodeUpdate(update []byte, router *Router) (newPeers map[Pe
 			return
 		}
 		name := PeerNameFromBin(nameByte)
-		newPeer := NewPeer(name, uid, version, router)
+		newPeer := NewPeer(name, uid, version)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connsBuf)
 		existingPeer, found := peers.table[name]

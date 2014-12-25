@@ -32,12 +32,12 @@ type Peer struct {
 	connections   map[PeerName]Connection
 	version       uint64
 	UID           uint64
-	Router        *Router
 	localRefCount uint64
 }
 
 type LocalPeer struct {
 	*Peer
+	Router    *Router
 	queryChan chan<- *PeerInteraction
 }
 
