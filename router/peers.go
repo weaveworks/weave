@@ -54,7 +54,7 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 func (peers *Peers) ApplyUpdate(update []byte, router *Router) ([]byte, error) {
 	peers.Lock()
 
-	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update, router)
+	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
 	if err != nil {
 		peers.Unlock()
 		return nil, err
@@ -151,7 +151,7 @@ func encodePeersMap(peers map[PeerName]*Peer) []byte {
 	return buf.Bytes()
 }
 
-func (peers *Peers) decodeUpdate(update []byte, router *Router) (newPeers map[PeerName]*Peer, decodedUpdate []*Peer, decodedConns [][]byte, err error) {
+func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, decodedUpdate []*Peer, decodedConns [][]byte, err error) {
 	newPeers = make(map[PeerName]*Peer)
 	decodedUpdate = []*Peer{}
 	decodedConns = [][]byte{}
