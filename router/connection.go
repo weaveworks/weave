@@ -495,7 +495,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			//    receiver's version are updated
 			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Peers.EncodeAllPeers()))
 		} else if msg[0] == ProtocolUpdate {
-			newUpdate, err := conn.Router.Peers.ApplyUpdate(msg[1:], conn.Router)
+			newUpdate, err := conn.Router.Peers.ApplyUpdate(msg[1:], conn.Router.Ourself.Peer, conn.Router.Macs)
 			if _, ok := err.(UnknownPeersError); err != nil && ok {
 				// That update contained a peer we didn't know about;
 				// request full update
@@ -506,6 +506,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 				return
 			}
 			if len(newUpdate) != 0 {
+				conn.Router.ConnectionMaker.Refresh()
 				conn.Router.Routes.Recalculate()
 				conn.Router.Ourself.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 			}

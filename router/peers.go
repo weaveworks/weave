@@ -51,7 +51,7 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
-func (peers *Peers) ApplyUpdate(update []byte, router *Router) ([]byte, error) {
+func (peers *Peers) ApplyUpdate(update []byte, ourself *Peer, macs *MacCache) ([]byte, error) {
 	peers.Lock()
 
 	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
@@ -68,18 +68,14 @@ func (peers *Peers) ApplyUpdate(update []byte, router *Router) ([]byte, error) {
 	}
 
 	// Now apply the updates
-	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns, router.Ourself.Peer)
+	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns, ourself)
 
-	for _, peerRemoved := range peers.garbageCollect(router.Ourself.Peer, router.Macs) {
+	for _, peerRemoved := range peers.garbageCollect(ourself, macs) {
 		delete(newUpdate, peerRemoved.Name)
 	}
 
 	// Don't need to hold peers lock any longer
 	peers.Unlock()
-
-	if len(newUpdate) > 0 {
-		router.ConnectionMaker.Refresh()
-	}
 
 	return encodePeersMap(newUpdate), nil
 }
