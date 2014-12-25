@@ -12,17 +12,17 @@ import (
 )
 
 type Router struct {
-	Ourself            *Peer
-	Iface              *net.Interface
-	Macs               *MacCache
-	Peers              *Peers
-	UDPListener        *net.UDPConn
-	Routes             *Routes
-	ConnectionMaker    *ConnectionMaker
-	Password           *[]byte
-	ConnLimit          int
-	BufSz              int
-	LogFrame           func(string, []byte, *layers.Ethernet)
+	Ourself         *Peer
+	Iface           *net.Interface
+	Macs            *MacCache
+	Peers           *Peers
+	UDPListener     *net.UDPConn
+	Routes          *Routes
+	ConnectionMaker *ConnectionMaker
+	Password        *[]byte
+	ConnLimit       int
+	BufSz           int
+	LogFrame        func(string, []byte, *layers.Ethernet)
 }
 
 type Peer struct {
