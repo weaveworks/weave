@@ -68,9 +68,9 @@ func (peers *Peers) ApplyUpdate(update []byte, router *Router) ([]byte, error) {
 	}
 
 	// Now apply the updates
-	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns, router.Ourself)
+	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns, router.Ourself.Peer)
 
-	for _, peerRemoved := range peers.garbageCollect(router.Ourself, router.Macs) {
+	for _, peerRemoved := range peers.garbageCollect(router.Ourself.Peer, router.Macs) {
 		delete(newUpdate, peerRemoved.Name)
 	}
 

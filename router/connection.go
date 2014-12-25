@@ -52,7 +52,7 @@ func (conn *RemoteConnection) String() string {
 // Async. Does not return anything. If the connection is successful,
 // it will end up in the local peer's connections map.
 func NewLocalConnection(connRemote *RemoteConnection, acceptNewPeer bool, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router) {
-	if connRemote.local != router.Ourself {
+	if connRemote.local != router.Ourself.Peer {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
 
@@ -165,7 +165,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 		conn.handleShutdown()
 		return
 	}
-	conn.local.AddConnection(conn)
+	conn.Router.Ourself.AddConnection(conn)
 	if conn.remoteUDPAddr != nil {
 		if err = conn.ensureForwarders(); err == nil {
 			conn.heartbeat = time.NewTicker(FastHeartbeat)
@@ -231,7 +231,7 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	conn.established = true
 	conn.Unlock()
 	if !old {
-		conn.local.ConnectionEstablished(conn)
+		conn.Router.Ourself.ConnectionEstablished(conn)
 		if err := conn.ensureForwarders(); err != nil {
 			return err
 		}
@@ -280,7 +280,7 @@ func (conn *LocalConnection) handleShutdown() {
 
 	if conn.remote != nil {
 		conn.remote.DecrementLocalRefCount()
-		conn.local.DeleteConnection(conn)
+		conn.Router.Ourself.DeleteConnection(conn)
 	}
 
 	stopTicker(conn.heartbeat)
@@ -507,7 +507,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			}
 			if len(newUpdate) != 0 {
 				conn.Router.Routes.Recalculate()
-				conn.local.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
+				conn.Router.Ourself.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 			}
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))

@@ -12,7 +12,7 @@ import (
 )
 
 type Router struct {
-	Ourself         *Peer
+	Ourself         *LocalPeer
 	Iface           *net.Interface
 	Macs            *MacCache
 	Peers           *Peers
@@ -34,7 +34,11 @@ type Peer struct {
 	UID           uint64
 	Router        *Router
 	localRefCount uint64
-	queryChan     chan<- *PeerInteraction
+}
+
+type LocalPeer struct {
+	*Peer
+	queryChan chan<- *PeerInteraction
 }
 
 type PeerInteraction struct {

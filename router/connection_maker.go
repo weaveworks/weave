@@ -22,7 +22,7 @@ const (
 )
 
 type ConnectionMaker struct {
-	ourself        *Peer
+	ourself        *LocalPeer
 	peers          *Peers
 	targets        map[string]*Target
 	cmdLineAddress map[string]bool
@@ -41,7 +41,7 @@ type ConnectionMakerInteraction struct {
 	address string
 }
 
-func StartConnectionMaker(ourself *Peer, peers *Peers) *ConnectionMaker {
+func StartConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
 	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
 	state := &ConnectionMaker{
 		ourself:        ourself,
