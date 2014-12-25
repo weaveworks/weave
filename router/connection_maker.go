@@ -153,9 +153,13 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if our_connected_targets[address] {
-			delete(cm.targets, address)
-			continue
+		if host, _, err := net.SplitHostPort(address); err == nil {
+			normalized_addr := NormalisePeerAddr(host)
+			if our_connected_targets[address] || our_connected_targets[normalized_addr] {
+				delete(cm.targets, address)
+				delete(cm.targets, normalized_addr)
+				continue
+			}
 		}
 		if target.attempting {
 			continue
