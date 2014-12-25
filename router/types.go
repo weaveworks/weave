@@ -25,27 +25,6 @@ type Router struct {
 	LogFrame        func(string, []byte, *layers.Ethernet)
 }
 
-type Peer struct {
-	sync.RWMutex
-	Name          PeerName
-	NameByte      []byte
-	UID           uint64
-	version       uint64
-	localRefCount uint64
-	connections   map[PeerName]Connection
-}
-
-type LocalPeer struct {
-	*Peer
-	Router    *Router
-	queryChan chan<- *PeerInteraction
-}
-
-type PeerInteraction struct {
-	Interaction
-	payload interface{}
-}
-
 type Connection interface {
 	Local() *Peer
 	Remote() *Peer

@@ -5,7 +5,18 @@ import (
 	"log"
 	"net"
 	"sort"
+	"sync"
 )
+
+type Peer struct {
+	sync.RWMutex
+	Name          PeerName
+	NameByte      []byte
+	UID           uint64
+	version       uint64
+	localRefCount uint64
+	connections   map[PeerName]Connection
+}
 
 func NewPeer(name PeerName, uid uint64, version uint64) *Peer {
 	if uid == 0 {
@@ -142,6 +153,17 @@ func (peer *Peer) Routes(stopAt *Peer, symmetric bool) (bool, map[PeerName]PeerN
 		}
 	}
 	return false, routes
+}
+
+type LocalPeer struct {
+	*Peer
+	Router    *Router
+	queryChan chan<- *PeerInteraction
+}
+
+type PeerInteraction struct {
+	Interaction
+	payload interface{}
 }
 
 func StartLocalPeer(name PeerName, router *Router) *LocalPeer {
