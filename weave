@@ -194,6 +194,11 @@ with_container_netns () {
 }
 
 connect_container_to_bridge() {
+    if [ "$(readlink /proc/$CONTAINER_PID/ns/net)" = "$(readlink /proc/$$/ns/net)" ] ; then
+        echo "Container is running in the host network namespace, and therefore cannot be" >&2
+        echo "connected to weave. Perhaps the container was started with --net=host." >&2
+        return 1
+    fi
     if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
         return 1
     fi
