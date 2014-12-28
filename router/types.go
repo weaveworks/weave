@@ -114,7 +114,8 @@ type NameCollisionError struct {
 }
 
 type PacketDecodingError struct {
-	Desc string
+	Fatal bool
+	Desc  string
 }
 
 type LocalAddress struct {

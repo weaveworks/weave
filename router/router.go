@@ -209,7 +209,11 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 		}
 		err = relayConn.Decryptor.IterateFrames(handleUDPPacket, udpPacket)
 		if pde, ok := err.(PacketDecodingError); ok {
-			relayConn.log(pde.Error())
+			if pde.Fatal {
+				relayConn.CheckFatal(pde)
+			} else {
+				relayConn.log(pde.Error())
+			}
 		} else {
 			checkWarn(err)
 		}

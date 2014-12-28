@@ -286,7 +286,7 @@ func (nd *NaClDecryptor) ReceiveNonce(msg []byte) {
 func (nd *NaClDecryptor) IterateFrames(fun FrameConsumer, packet *UDPPacket) error {
 	buf, err := nd.decrypt(packet.Packet)
 	if err != nil {
-		return PacketDecodingError{Desc: fmt.Sprint("decryption failed; ", err)}
+		return PacketDecodingError{Fatal: true, Desc: fmt.Sprint("decryption failed; ", err)}
 	}
 	packet.Packet = buf
 	return nd.NonDecryptor.IterateFrames(fun, packet)
