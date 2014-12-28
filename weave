@@ -318,16 +318,16 @@ tell_dns() {
         return
     fi
     # get the long form of the container ID
-    CONTAINER=$(docker inspect --format '{{.Id}}' $2 2>/dev/null)
+    CONTAINER=$(docker inspect --format='{{ .Id }}' $2 2>/dev/null)
     # extract IP address and routing prefix from CIDR
     WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
-    MORE_ARGS=$(docker inspect --format '--data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
+    MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
     http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
 }
 
 # Tell the newly-started weaveDNS about existing weave IPs
 populate_dns() {
-    DNS_IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $DNS_CONTAINER_NAME)
+    DNS_IP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $DNS_CONTAINER_NAME)
     WAIT_TIME=1
     while ! http_call_ip $DNS_IP $DNS_HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
         sleep $WAIT_TIME
@@ -339,7 +339,7 @@ populate_dns() {
     fi
 
     for CONTAINER in $(docker ps -q --no-trunc); do
-        MORE_ARGS=$(docker inspect --format '--data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
+        MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
         if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
             CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
             for IP in $CONTAINER_IPS; do
@@ -351,7 +351,7 @@ populate_dns() {
 
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
-    case $(docker inspect --format '{{ .State.Running }} {{ .Config.Image }}' $1 2>/dev/null) in
+    case $(docker inspect --format='{{ .State.Running }} {{ .Config.Image }}' $1 2>/dev/null) in
         "true $2")
             echo "$1 is already running." >&2
             exit 1
