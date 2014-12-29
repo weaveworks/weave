@@ -153,6 +153,14 @@ with_container_netns () {
     CONTAINER="$1"
     CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
 
+    NM_CONTAINER=$(docker inspect --format='{{ .HostConfig.NetworkMode }}' $CONTAINER | grep 'container:' | sed -e 's/container://')
+
+    # The container uses the same network stack of another container
+    if [ "$NM_CONTAINER" != "" ] ; then
+        CONTAINER="$NM_CONTAINER"
+        CONTAINER_PID=$(docker inspect --format='{{ .State.Pid }}' $CONTAINER)
+    fi
+
     if [ "$CONTAINER_PID" = 0 ] ; then
         echo "Container $CONTAINER not running." >&2
         exit 1
