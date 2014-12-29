@@ -227,8 +227,8 @@ launch() {
 }
 
 attach() {
-    if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
-        # veth name already exists, so assume we set it up already;
+    if ip netns exec $NETNS ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
+        # container already has the expected network interface, so assume we set it up already;
         # just add the IP address.
         if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
             # address was there already
