@@ -135,7 +135,7 @@ publish() {
 
 usage() {
     echo "Usage:"
-    echo -e "\t./bin/release prepare"
+    echo -e "\t./bin/release build"
     echo "-- Build artefacts for the latest version tag"
     echo -e "\t./bin/release publish"
     echo "-- Publish the artefacts for the latest tag to GitHub and DockerHub"
