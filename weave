@@ -270,7 +270,7 @@ detach() {
     fi
 
     # Deleting the interface will delete the multicast route we set up
-    ip link del $LOCAL_IFNAME type veth
+    ip netns exec $NETNS ip link del $CONTAINER_IFNAME type veth
 }
 
 # Call url $4 with http verb $3 on container $1 at port $2
