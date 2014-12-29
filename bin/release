@@ -10,7 +10,10 @@ RELEASE_DESCRIPTION="Weaving Containers into Applications"
 
 setup() {
     ## Get the new version number from the most recent tag
-    LATEST_TAG=$(git describe --abbrev=0 --match='v*')
+    if ! LATEST_TAG=$(git describe --abbrev=0 --match='v*' 2>/dev/null) ; then
+        echo "Could not find a 'v*' version tag." >&2
+        exit 1
+    fi
     LATEST_TAG_SHA=$(git rev-parse $LATEST_TAG)
     VERSION=${LATEST_TAG#v}
     # NB does not check that this tag is on master
