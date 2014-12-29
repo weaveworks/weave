@@ -15,6 +15,7 @@ setup() {
         exit 1
     fi
     LATEST_TAG_SHA=$(git rev-parse $LATEST_TAG)
+    LATEST_RELEASE_SHA=$(git rev-parse latest_release)
     VERSION=${LATEST_TAG#v}
     # NB does not check that this tag is on master
     RELEASE_DIR=./releases/$LATEST_TAG
@@ -84,14 +85,30 @@ publish() {
         exit 1
     fi
 
-    ## Check that the tag exists by looking at github
-    if ! curl -sSf https://api.github.com/repos/$GITHUB_USER/weave/git/tags/$LATEST_TAG_SHA >/dev/null 2>&1; then
-        echo -e "\u2757 Tag $LATEST_TAG is not on GitHub" >&2
-        echo -e "\thttps://github.com/$GITHUB_USER/weave/tags" >&2
-        echo "You may need to" >&2
-        echo -e "\tgit push --tags"
+    if ! [ $(git rev-list -1 $LATEST_TAG) == $(git rev-list -1 latest_release) ]; then
+        echo -e "\u2757 The tag latest_release does not point to the same commit as $LATEST_TAG"
         exit 1
     fi
+
+    ## Check that the tag exists by looking at github
+    if ! curl -sSf https://api.github.com/repos/$GITHUB_USER/weave/git/tags/$LATEST_TAG_SHA >/dev/null 2>&1; then
+        echo -e "\u2757 Tag $LATEST_TAG is not on GitHub, or is not the same as the local tag" >&2
+        echo -e "\thttps://github.com/$GITHUB_USER/weave/tags" >&2
+        echo "You may need to" >&2
+        echo -e "\tgit push git@github.com:$GITHUB_USER/weave $LATEST_TAG"
+        exit 1
+    fi
+
+    ## Check that the 'latest_release' tag exists by looking at github
+    if ! curl -sSf https://api.github.com/repos/$GITHUB_USER/weave/git/tags/$LATEST_RELEASE_SHA >/dev/null 2>&1; then
+        echo -e "\u2757 Tag latest_release is not on GitHub, or is not the same as the local tag" >&2
+        echo -e "\thttps://github.com/$GITHUB_USER/weave/tags" >&2
+        echo "You may need to" >&2
+        echo -e "\tgit tag -af latest_release"
+        echo -e "\tgit push -f git@github.com:$GITHUB_USER/weave latest_release"
+        exit 1
+    fi
+
     echo -e "\u2713 Tag $LATEST_TAG exists in GitHub repo $GITHUB_USER/weave"
 
     ## Check that the version doesn't already exist by looking at github
@@ -132,6 +149,31 @@ publish() {
 
     echo "** Published release $RELEASE_NAME $VERSION"
     echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
+
+    if github-release info --user $GITHUB_USER --repo weave \
+        --tag latest_release >/dev/null 2>&1; then
+        github-release delete \
+            --user $GITHUB_USER \
+            --repo weave \
+            --tag latest_release
+    fi
+
+    github-release release \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag latest_release \
+        --name "$RELEASE_NAME latest ($VERSION)" \
+        --description "$RELEASE_DESCRIPTION"
+
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag latest_release \
+        --name "weave" \
+        --file "./weave"
+
+    echo "** Published $RELEASE_NAME as latest_release at"
+    echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/latest_release"    
 }
 
 usage() {
