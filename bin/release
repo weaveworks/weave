@@ -47,11 +47,9 @@ build() {
 
     ## Inject the version numbers and build the distributables
     ## (library versions?)
-
-    sed -i "/var version = / c\var version = \"$VERSION\"" weaver/main.go
-    sed -i "/var version = / c\var version = \"$VERSION\"" weavedns/main.go
     sed -i "/SCRIPT_VERSION=/ c\SCRIPT_VERSION=\"$VERSION\"" ./weave
     make \
+        WEAVE_VERSION=$VERSION \
         WEAVER_IMAGE=$DOCKERHUB_USER/weave \
         WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns
 

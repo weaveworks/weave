@@ -4,6 +4,7 @@
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
 
+WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
 WEAVER_IMAGE=zettio/weave
@@ -15,7 +16,7 @@ all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT)
 
 $(WEAVER_EXE) $(WEAVEDNS_EXE):
 	go get -tags netgo ./$(shell dirname $@)
-	go build -ldflags '-extldflags "-static"' -tags netgo -o $@ ./$(shell dirname $@)
+	go build -ldflags '-extldflags "-static"' -ldflags "-X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(shell dirname $@)
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 		rm $@; \
 		echo "\nYour go standard library was built without the 'netgo' build tag."; \
