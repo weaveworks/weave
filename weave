@@ -277,19 +277,19 @@ detach() {
 http_call() {
     if ! status=$(docker inspect --format='{{ .State.Running }} {{ .NetworkSettings.IPAddress }}' $1 2>/dev/null); then
         echo "$1 container is not present; have you launched it?" >&2
-        exit 1
+        return 1
     fi
     case "$status" in
         "true ")
             echo "$1 container has no IP address; is Docker networking enabled?" >&2
-            exit 1
+            return 1
             ;;
         true*)
             ip="${status#true }"
             ;;
         *)
             echo "$1 container is not running." >&2
-            exit 1
+            return 1
             ;;
     esac
     shift 1
@@ -313,7 +313,7 @@ http_call_ip() {
 # Perform operation $1 on container ID $2 to local DNS database at address $3
 # This function is only called where we know $2 is a valid container name
 tell_dns() {
-    if ! DNSID=$(docker inspect --format='{{ .Id }}' $DNS_CONTAINER_NAME 2>/dev/null) || [ -z "$DNSID" ] ; then
+    if ! status=$(docker inspect --format='{{ .State.Running }}' $DNS_CONTAINER_NAME 2>/dev/null) || [ "$status" != "true" ] ; then
         # weavedns not running - silently return
         return
     fi
@@ -322,7 +322,7 @@ tell_dns() {
     # extract IP address and routing prefix from CIDR
     WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
     MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
-    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS
+    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS || true
 }
 
 # Tell the newly-started weaveDNS about existing weave IPs
