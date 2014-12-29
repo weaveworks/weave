@@ -26,7 +26,7 @@ build() {
         echo -e "\trm -rf $RELEASE_DIR" >&2
         exit 1
     fi
-    
+
     ## Clone the repo at the tag and go there
     mkdir -p releases
     git clone -q -b $LATEST_TAG . $RELEASE_DIR 2>/dev/null
