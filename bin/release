@@ -10,7 +10,7 @@ RELEASE_DESCRIPTION="Weaving Containers into Applications"
 
 setup() {
     ## Get the new version number from the most recent tag
-    if ! LATEST_TAG=$(git describe --abbrev=0 --match='v*' 2>/dev/null) ; then
+    if ! LATEST_TAG=$(git describe --tags --abbrev=0 --match='v*' 2>/dev/null) ; then
         echo "Could not find a 'v*' version tag." >&2
         exit 1
     fi
