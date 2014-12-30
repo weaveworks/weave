@@ -175,7 +175,7 @@ publish() {
         --file "./weave"
 
     echo "** Published $RELEASE_NAME as latest_release at"
-    echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/latest_release"    
+    echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/latest_release"
 }
 
 usage() {
