@@ -6,6 +6,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/zettio/weave/nameserver"
 	weavenet "github.com/zettio/weave/net"
+	"math"
 	"log"
 	"net"
 	"os"
@@ -14,6 +15,9 @@ import (
 
 // period for asking for new peers in a domain
 const MDNS_QUERY_PERIOD = 5
+
+// max period for asking for peers
+const MDNS_MAX_QUERY_PERIOD = 60
 
 type mDnsRendezvous struct {
 	SimpleRendezvousService
@@ -91,8 +95,10 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 
 	// query periodically (every MDNS_QUERY_PERIOD seconds) for this name
 	go func() {
+		queryPeriod := MDNS_QUERY_PERIOD
 		timer := time.NewTimer(0)
 		responsesChan := make(chan *nameserver.ResponseA)
+		minInt := func(x int,y int) int { return int(math.Min(float64(x), float64(y))) }
 
 	outerloop:
 		for {
@@ -103,14 +109,14 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 				break outerloop
 			case <-timer.C:
 				mdnsClient.BackgroundQuery(mdns.fullDomain, dns.TypeA, responsesChan)
-				timer.Reset(MDNS_QUERY_PERIOD * time.Second)
+				// increase the period, up to MDNS_MAX_QUERY_PERIOD
+				queryPeriod = minInt(queryPeriod * 2, MDNS_MAX_QUERY_PERIOD)
+				timer.Reset(time.Duration(queryPeriod) * time.Second)
 			case resp, ok := <-responsesChan:
 				if ok {
 					foundIpStr := resp.Addr.String()
-					if _, ourselves := mdns.announcedIps[foundIpStr]; ourselves {
-						log.Printf("Found ourselves (%s) with mDNS", foundIpStr)
-					} else {
-						log.Printf("Found new peer %s with mDNS", foundIpStr)
+					if _, ourselves := mdns.announcedIps[foundIpStr]; !ourselves {
+						log.Printf("Found peer %s with mDNS", foundIpStr)
 						mdns.cm.InitiateConnection(foundIpStr)
 					}
 				}
