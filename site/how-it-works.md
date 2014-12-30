@@ -117,27 +117,27 @@ poorly documented, and easily used wrongly.
 For every connection between peers, a fresh public/private key pair is
 created at both ends, using NaCl's `GenerateKey` function. The public
 key portion is sent to the other end as part of the initial handshake
-performed over TCP. Peers that were started with `-password` do not
+performed over TCP. Peers that were started with a password do not
 continue with connection establishment unless they receive a public
 key from the remote peer. Thus either all peers in a weave network
-must be started with `-password`, or none of them.
+must be supplied with a password, or none.
 
 When a peer has received a public key from the remote peer, it uses
 this to form the ephemeral session key for this connection. The public
 key from the remote peer is combined with the private key for the
 local peer in the usual Diffie-Hellman way, resulting in both peers
-arriving at the same shared key. To this is appended the password from
-the command line `-password` option, and the result is hashed through
-SHA256, to form the final ephemeral session key. Thus the supplied
-password is never exchanged directly, and is thoroughly mixed into the
-shared secret. The shared key formed by Diffie-Hellman is 256 bits
-long, appending the password to this obviously makes it longer by an
-unknown amount, and the use of SHA256 reduces this back to 256 bits,
-to form the final ephemeral session key. This late combination with
-the password eliminates "Man In The Middle" attacks: sniffing the
-public key exchange between the two peers and faking their responses
-will not grant an attacker knowledge of the password, and so an
-attacker would not be able to form valid ephemeral session keys.
+arriving at the same shared key. To this is appended the supplied
+password, and the result is hashed through SHA256, to form the final
+ephemeral session key. Thus the supplied password is never exchanged
+directly, and is thoroughly mixed into the shared secret. The shared
+key formed by Diffie-Hellman is 256 bits long, appending the password
+to this obviously makes it longer by an unknown amount, and the use of
+SHA256 reduces this back to 256 bits, to form the final ephemeral
+session key. This late combination with the password eliminates "Man
+In The Middle" attacks: sniffing the public key exchange between the
+two peers and faking their responses will not grant an attacker
+knowledge of the password, and so an attacker would not be able to
+form valid ephemeral session keys.
 
 The same ephemeral session key is used for both TCP and UDP traffic
 between two peers.

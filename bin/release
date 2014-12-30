@@ -1,0 +1,200 @@
+#! /bin/bash
+
+set -e
+
+PWD=`pwd`
+GITHUB_USER=zettio
+DOCKERHUB_USER=zettio
+RELEASE_NAME="Weave"
+RELEASE_DESCRIPTION="Weaving Containers into Applications"
+
+setup() {
+    ## Get the new version number from the most recent tag
+    if ! LATEST_TAG=$(git describe --abbrev=0 --match='v*' 2>/dev/null) ; then
+        echo "Could not find an annotated 'v*' version tag." >&2
+        exit 1
+    fi
+    LATEST_TAG_SHA=$(git rev-parse $LATEST_TAG)
+    LATEST_RELEASE_SHA=$(git rev-parse latest_release)
+    VERSION=${LATEST_TAG#v}
+    # NB does not check that this tag is on master
+    RELEASE_DIR=./releases/$LATEST_TAG
+}
+
+build() {
+    setup
+
+    echo "== Clone repo at $LATEST_TAG for version $VERSION"
+    if [ -d $RELEASE_DIR ]; then
+        echo -e "\u2757 Release directory $RELEASE_DIR already exists, you may want to" >&2
+        echo -e "\trm -rf $RELEASE_DIR" >&2
+        exit 1
+    fi
+
+    ## Clone the repo at the tag and go there
+    mkdir -p releases
+    git clone -q -b $LATEST_TAG . $RELEASE_DIR 2>/dev/null
+    cd $RELEASE_DIR
+
+    ## Check that the top changelog entry is this version
+    if ! latest_changelog=$(grep -o "## Release [0-9].*" -m1 ./CHANGELOG.md) || \
+       ! [ `echo "$latest_changelog" | grep -o '[0-9][^ ]*'` == "$VERSION" ]; then
+        echo -e "\u2757 Latest changelog entry \"$latest_changelog\" does not match the release version $VERSION" >&2
+        exit 1
+    fi
+
+    echo
+    echo "== Build and test"
+
+    ## Inject the version numbers and build the distributables
+    ## (library versions?)
+    sed -i "/SCRIPT_VERSION=/ c\SCRIPT_VERSION=\"$VERSION\"" ./weave
+    make \
+        WEAVE_VERSION=$VERSION \
+        WEAVER_IMAGE=$DOCKERHUB_USER/weave \
+        WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns
+
+    if make tests; then
+        echo -e '\u2713 Tests pass'
+    else
+        echo -e "\u2757 Tests failed, probably best not publish this one" >&2
+        exit 1
+    fi
+
+    ## Run tests with the distributables, including version check
+    v=$(./weaver/weaver --version | grep -o '[0-9].*')
+    if ! [ "$v" == "$VERSION" ]; then
+        echo "Version of distributable "$v" does not match release version $VERSION" >&2
+        exit 1
+    fi
+
+    echo -e '\u2713 Build OK'
+    echo '** Release artefacts in' $RELEASE_DIR
+}
+
+publish() {
+    setup
+    cd $PWD/$RELEASE_DIR
+
+    echo "== Sanity checks"
+
+    if ! which github-release >/dev/null; then
+        echo "Please install git-release:" >&2
+        echo -e "\tgo get github.com/aktau/github-release" >&2
+        echo "and create a git token per https://github.com/aktau/github-release" >&2
+        exit 1
+    fi
+
+    if ! [ $(git rev-list -1 $LATEST_TAG) == $(git rev-list -1 latest_release) ]; then
+        echo -e "\u2757 The tag latest_release does not point to the same commit as $LATEST_TAG"
+        exit 1
+    fi
+
+    ## Check that the tag exists by looking at github
+    if ! curl -sSf https://api.github.com/repos/$GITHUB_USER/weave/git/tags/$LATEST_TAG_SHA >/dev/null 2>&1; then
+        echo -e "\u2757 Tag $LATEST_TAG is not on GitHub, or is not the same as the local tag" >&2
+        echo -e "\thttps://github.com/$GITHUB_USER/weave/tags" >&2
+        echo "You may need to" >&2
+        echo -e "\tgit push git@github.com:$GITHUB_USER/weave $LATEST_TAG"
+        exit 1
+    fi
+
+    ## Check that the 'latest_release' tag exists by looking at github
+    if ! curl -sSf https://api.github.com/repos/$GITHUB_USER/weave/git/tags/$LATEST_RELEASE_SHA >/dev/null 2>&1; then
+        echo -e "\u2757 Tag latest_release is not on GitHub, or is not the same as the local tag" >&2
+        echo -e "\thttps://github.com/$GITHUB_USER/weave/tags" >&2
+        echo "You may need to" >&2
+        echo -e "\tgit tag -af latest_release"
+        echo -e "\tgit push -f git@github.com:$GITHUB_USER/weave latest_release"
+        exit 1
+    fi
+
+    echo -e "\u2713 Tag $LATEST_TAG exists in GitHub repo $GITHUB_USER/weave"
+
+    ## Check that the version doesn't already exist by looking at github
+    ## releases
+    if github-release info --user $GITHUB_USER --repo weave --tag $LATEST_TAG >/dev/null 2>&1; then
+        echo -e "\u2757 Release $LATEST_TAG already exists on GitHub" >&2
+        echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG" >&2
+        exit 1
+    fi
+
+    echo '** Sanity checks OK for publishing tag' $LATEST_TAG as $DOCKERHUB_USER/weave:$VERSION
+
+    echo == Tagging $DOCKERHUB_USER/weave and $DOCKERHUB_USER/weavedns as $VERSION
+    docker tag $DOCKERHUB_USER/weave $DOCKERHUB_USER/weave:$VERSION
+    docker tag $DOCKERHUB_USER/weavedns $DOCKERHUB_USER/weavedns:$VERSION
+
+    docker push $DOCKERHUB_USER/weave:$VERSION
+    docker push $DOCKERHUB_USER/weave:latest
+    echo "** Pushed $DOCKERHUB_USER/weave:$VERSION to docker hub"
+    docker push $DOCKERHUB_USER/weavedns:$VERSION
+    docker push $DOCKERHUB_USER/weavedns:latest
+    echo "** Pushed $DOCKERHUB_USER/weavedns:$VERSION to docker hub"
+
+    echo "== Creating GitHub release $RELEASE_NAME $VERSION"
+    # This cannot be done as a draft because of a bug in
+    # github-release: https://github.com/aktau/github-release/issues/7
+    github-release release \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag $LATEST_TAG \
+        --name "$RELEASE_NAME $VERSION" \
+        --description "$RELEASE_DESCRIPTION"
+
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag $LATEST_TAG \
+        --name "weave" \
+        --file "./weave"
+
+    echo "** Published release $RELEASE_NAME $VERSION"
+    echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
+
+    if github-release info --user $GITHUB_USER --repo weave \
+        --tag latest_release >/dev/null 2>&1; then
+        github-release delete \
+            --user $GITHUB_USER \
+            --repo weave \
+            --tag latest_release
+    fi
+
+    github-release release \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag latest_release \
+        --name "$RELEASE_NAME latest ($VERSION)" \
+        --description "$RELEASE_DESCRIPTION"
+
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag latest_release \
+        --name "weave" \
+        --file "./weave"
+
+    echo "** Published $RELEASE_NAME as latest_release at"
+    echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/latest_release"
+}
+
+usage() {
+    echo "Usage:"
+    echo -e "\t./bin/release build"
+    echo "-- Build artefacts for the latest version tag"
+    echo -e "\t./bin/release publish"
+    echo "-- Publish the artefacts for the latest tag to GitHub and DockerHub"
+}
+
+case "$1" in
+    build)
+        build
+        ;;
+    publish)
+        publish
+        ;;
+    *)
+        echo "Unknown command \"$1\""
+        usage
+        ;;
+esac

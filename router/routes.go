@@ -4,49 +4,60 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"sync"
 )
 
-func (topo *Topology) Unicast(name PeerName) (PeerName, bool) {
-	topo.RLock()
-	defer topo.RUnlock()
-	hop, found := topo.unicast[name]
+type Routes struct {
+	sync.RWMutex
+	ourself   *Peer
+	peers     *Peers
+	unicast   map[PeerName]PeerName
+	broadcast map[PeerName][]PeerName
+	queryChan chan<- *Interaction
+}
+
+func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
+	routes.RLock()
+	defer routes.RUnlock()
+	hop, found := routes.unicast[name]
 	return hop, found
 }
 
-func (topo *Topology) Broadcast(name PeerName) []PeerName {
-	topo.RLock()
-	defer topo.RUnlock()
-	hops, found := topo.broadcast[name]
+func (routes *Routes) Broadcast(name PeerName) []PeerName {
+	routes.RLock()
+	defer routes.RUnlock()
+	hops, found := routes.broadcast[name]
 	if !found {
 		return []PeerName{}
 	}
 	return hops
 }
 
-func (topo *Topology) String() string {
+func (routes *Routes) String() string {
 	var buf bytes.Buffer
-	topo.RLock()
-	defer topo.RUnlock()
+	routes.RLock()
+	defer routes.RUnlock()
 	buf.WriteString(fmt.Sprintln("unicast:"))
-	for name, hop := range topo.unicast {
+	for name, hop := range routes.unicast {
 		buf.WriteString(fmt.Sprintf("%s -> %s\n", name, hop))
 	}
 	buf.WriteString(fmt.Sprintln("broadcast:"))
-	for name, hops := range topo.broadcast {
+	for name, hops := range routes.broadcast {
 		buf.WriteString(fmt.Sprintf("%s -> %v\n", name, hops))
 	}
 	return buf.String()
 }
 
-func StartTopology(router *Router) *Topology {
+func StartRoutes(ourself *Peer, peers *Peers) *Routes {
 	queryChan := make(chan *Interaction, ChannelSize)
-	state := &Topology{
-		router:    router,
-		queryChan: queryChan,
+	state := &Routes{
+		ourself:   ourself,
+		peers:     peers,
 		unicast:   make(map[PeerName]PeerName),
-		broadcast: make(map[PeerName][]PeerName)}
-	state.unicast[router.Ourself.Name] = UnknownPeerName
-	state.broadcast[router.Ourself.Name] = []PeerName{}
+		broadcast: make(map[PeerName][]PeerName),
+		queryChan: queryChan}
+	state.unicast[ourself.Name] = UnknownPeerName
+	state.broadcast[ourself.Name] = []PeerName{}
 	go state.queryLoop(queryChan)
 	return state
 }
@@ -54,44 +65,32 @@ func StartTopology(router *Router) *Topology {
 // ACTOR client API
 
 const (
-	TFetchAll      = iota
-	TRebuildRoutes = iota
+	RRecalculate = iota
 )
 
-func (topo *Topology) FetchAll() []byte {
-	resultChan := make(chan interface{}, 0)
-	topo.queryChan <- &Interaction{
-		code:       TFetchAll,
-		resultChan: resultChan}
-	result := <-resultChan
-	return result.([]byte)
-}
-
 // Async.
-func (topo *Topology) RebuildRoutes() {
-	topo.queryChan <- &Interaction{code: TRebuildRoutes}
+func (routes *Routes) Recalculate() {
+	routes.queryChan <- &Interaction{code: RRecalculate}
 }
 
 // ACTOR server
 
-func (topo *Topology) queryLoop(queryChan <-chan *Interaction) {
+func (routes *Routes) queryLoop(queryChan <-chan *Interaction) {
 	for {
 		query, ok := <-queryChan
 		if !ok {
 			return
 		}
 		switch query.code {
-		case TRebuildRoutes:
-			unicast := topo.buildUnicastRoutes()
-			broadcast := topo.buildBroadcastRoutes()
-			topo.Lock()
-			topo.unicast = unicast
-			topo.broadcast = broadcast
-			topo.Unlock()
-		case TFetchAll:
-			query.resultChan <- topo.router.Peers.EncodeAllPeers()
+		case RRecalculate:
+			unicast := routes.calculateUnicast()
+			broadcast := routes.calculateBroadcast()
+			routes.Lock()
+			routes.unicast = unicast
+			routes.broadcast = broadcast
+			routes.Unlock()
 		default:
-			log.Fatal("Unexpected topology query:", query)
+			log.Fatal("Unexpected routes query:", query)
 		}
 	}
 }
@@ -105,9 +104,9 @@ func (topo *Topology) queryLoop(queryChan <-chan *Interaction) {
 // any knowledge of the MAC address at all. Thus there's no need
 // to exchange knowledge of MAC addresses, nor any constraints on
 // the routes that we construct.
-func (topo *Topology) buildUnicastRoutes() map[PeerName]PeerName {
-	_, routes := topo.router.Ourself.Routes(nil, true)
-	return routes
+func (routes *Routes) calculateUnicast() map[PeerName]PeerName {
+	_, unicast := routes.ourself.Routes(nil, true)
+	return unicast
 }
 
 // Calculate all the routes for the question: if we receive a
@@ -128,11 +127,11 @@ func (topo *Topology) buildUnicastRoutes() map[PeerName]PeerName {
 //     Y =/= Z /\ X.Routes(Y) <= X.Routes(Z) =>
 //     X.Routes(Y) u [P | Y.HasSymmetricConnectionTo(P)] <= X.Routes(Z)
 // where <= is the subset relationship on keys of the returned map.
-func (topo *Topology) buildBroadcastRoutes() map[PeerName][]PeerName {
+func (routes *Routes) calculateBroadcast() map[PeerName][]PeerName {
 	broadcast := make(map[PeerName][]PeerName)
-	ourself := topo.router.Ourself
+	ourself := routes.ourself
 
-	topo.router.Peers.ForEach(func(name PeerName, peer *Peer) {
+	routes.peers.ForEach(func(name PeerName, peer *Peer) {
 		hops := []PeerName{}
 		if found, reached := peer.Routes(ourself, true); found {
 			ourself.ForEachConnection(func(remoteName PeerName, conn Connection) {

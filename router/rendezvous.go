@@ -76,7 +76,7 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 	}
 
 	mdnsServer, err := nameserver.NewMDNSServer(zone)
-	err = mdnsServer.Start(mdns.cm.router.Iface)
+	err = mdnsServer.Start(nil) //mdns.cm.router.Iface)
 	if err != nil {
 		return fmt.Errorf("Error when starting mDNS service: %s", err)
 	}
@@ -93,7 +93,7 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 		return fmt.Errorf("Error when starting mDNS client: %s", err)
 	}
 
-	// query periodically (every MDNS_QUERY_PERIOD seconds) for this name
+	// query periodically (up to MDNS_QUERY_PERIOD seconds) for this name
 	go func() {
 		queryPeriod := MDNS_QUERY_PERIOD
 		timer := time.NewTimer(0)
@@ -111,6 +111,7 @@ func (mdns *mDnsRendezvous) Start(announcedIps weavenet.ExternalIps) error {
 				mdnsClient.BackgroundQuery(mdns.fullDomain, dns.TypeA, responsesChan)
 				// increase the period, up to MDNS_MAX_QUERY_PERIOD
 				queryPeriod = minInt(queryPeriod * 2, MDNS_MAX_QUERY_PERIOD)
+				log.Printf("Querying every %d seconds...", queryPeriod)
 				timer.Reset(time.Duration(queryPeriod) * time.Second)
 			case resp, ok := <-responsesChan:
 				if ok {

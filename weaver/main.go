@@ -19,10 +19,11 @@ import (
 	"syscall"
 )
 
+var version = "(unreleased version)"
+
 func main() {
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	log.Println(os.Args)
 
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
@@ -33,6 +34,7 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
+		justVersion		bool
 		ifaceName  		string
 		routerName 		string
 		password   		string
@@ -47,6 +49,7 @@ func main() {
 
 	externalIps = weavenet.NewExternalIps()
 
+	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
 	flag.StringVar(&password, "password", "", "network password")
@@ -58,6 +61,22 @@ func main() {
 	flag.Var(&externalIps, "ext", "external IPs to announce in rendezvous services")
 	flag.Parse()
 	peers = flag.Args()
+
+	if justVersion {
+		io.WriteString(os.Stdout, fmt.Sprintf("weave router %s\n", version))
+		os.Exit(0)
+	}
+
+	options := make(map[string]string)
+	flag.Visit(func(f *flag.Flag) {
+		value := f.Value.String()
+		if f.Name == "password" {
+			value = "<elided>"
+		}
+		options[f.Name] = value
+	})
+	log.Println("Command line options:", options)
+	log.Println("Command line peers:", peers)
 
 	if ifaceName == "" {
 		fmt.Println("Missing required parameter 'iface'")
@@ -75,6 +94,15 @@ func main() {
 	ourName, err := weave.PeerNameFromUserInput(routerName)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if password == "" {
+		password = os.Getenv("WEAVE_PASSWORD")
+	}
+	if password == "" {
+		log.Println("Communication between peers is unencrypted.")
+	} else {
+		log.Println("Communication between peers is encrypted.")
 	}
 
 	var logFrame func(string, []byte, *layers.Ethernet)
@@ -125,6 +153,7 @@ func main() {
 
 func handleHttp(router *weave.Router) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, fmt.Sprintln("weave router", version))
 		io.WriteString(w, router.Status())
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {

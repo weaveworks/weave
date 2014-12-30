@@ -6,42 +6,23 @@ import (
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
 	"encoding/gob"
-	weavenet "github.com/zettio/weave/net"
 	"net"
 	"sync"
 	"time"
 )
 
 type Router struct {
-	Ourself            *Peer
-	Iface              *net.Interface
-	PeersSubscribeChan chan<- chan<- map[string]Peer
-	Macs               *MacCache
-	Peers              *PeerCache
-	UDPListener        *net.UDPConn
-	Topology           *Topology
-	ConnectionMaker    *ConnectionMaker
-	Password           *[]byte
-	ConnLimit          int
-	BufSz              int
-	LogFrame           func(string, []byte, *layers.Ethernet)
-}
-
-type Peer struct {
-	sync.RWMutex
-	Name          PeerName
-	NameByte      []byte
-	connections   map[PeerName]Connection
-	version       uint64
-	UID           uint64
-	Router        *Router
-	localRefCount uint64
-	queryChan     chan<- *PeerInteraction
-}
-
-type PeerInteraction struct {
-	Interaction
-	payload interface{}
+	Iface           *net.Interface
+	Ourself         *LocalPeer
+	Macs            *MacCache
+	Peers           *Peers
+	Routes          *Routes
+	ConnectionMaker *ConnectionMaker
+	UDPListener     *net.UDPConn
+	Password        *[]byte
+	ConnLimit       int
+	BufSz           int
+	LogFrame        func(string, []byte, *layers.Ethernet)
 }
 
 type Connection interface {
@@ -68,7 +49,9 @@ type LocalConnection struct {
 	stackFrag     bool
 	effectivePMTU int
 	SessionKey    *[32]byte
-	heartbeatStop chan<- interface{}
+	heartbeat     *time.Ticker
+	fetchAll      *time.Ticker
+	fragTest      *time.Ticker
 	forwardChan   chan<- *ForwardedFrame
 	forwardChanDF chan<- *ForwardedFrame
 	stopForward   chan<- interface{}
@@ -131,7 +114,8 @@ type NameCollisionError struct {
 }
 
 type PacketDecodingError struct {
-	Desc string
+	Fatal bool
+	Desc  string
 }
 
 type LocalAddress struct {
@@ -148,46 +132,6 @@ type ForwardedFrame struct {
 type Interaction struct {
 	code       int
 	resultChan chan<- interface{}
-}
-
-type Topology struct {
-	sync.RWMutex
-	queryChan chan<- *Interaction
-	unicast   map[PeerName]PeerName
-	broadcast map[PeerName][]PeerName
-	router    *Router
-}
-
-type ConnectionMakerInteraction struct {
-	Interaction
-	address string
-}
-
-type RendezvousService interface {
-	Start(weavenet.ExternalIps) error
-	Stop() error
-}
-
-type SimpleRendezvousService struct {
-	Domain 		 string					// something like "mdns:///somedomain"
-	announcedIps weavenet.ExternalIps
-}
-
-type ConnectionMaker struct {
-	router         *Router
-	queryChan      chan<- *ConnectionMakerInteraction
-	targets        map[string]*Target
-	cmdLineAddress map[string]bool
-	rendezvous     map[string]RendezvousService
-}
-
-type ConnectionState int
-
-// Information about an address where we may find a peer
-type Target struct {
-	attempting  bool          // are we currently attempting to connect there?
-	tryAfter    time.Time     // next time to try this address
-	tryInterval time.Duration // backoff time on next failure
 }
 
 // UDPSender interface and implementations
