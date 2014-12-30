@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+SCRIPT_VERSION="(unreleased version)"
+
 usage() {
     echo "Usage:"
     echo "weave launch     [-password <password> | -passwordfile <path>] <peer> ..."
@@ -390,6 +392,15 @@ uname -s -r | sed -n 's|^\([^ ]*\) \([0-9]\+\)\.\([0-9]\+\).*|\1 \2 \3|p' | {
     fi
 }
 
+ask_version() {
+    if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' $1 2>/dev/null) ; then
+            if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $2 2>/dev/null) ; then
+                echo "Unable to find $2 image." >&2
+            fi
+    fi
+    [ -n "$DOCKERIMAGE" ] && docker run --rm $DOCKERIMAGE --version
+}
+
 if ! command_exists ip ; then
     echo "ERROR: ip utility is missing. Please install it." >&2
     exit 1
@@ -484,14 +495,9 @@ case "$COMMAND" in
         ;;
     version)
         [ $# -eq 0 ] || usage
-        # Try the running container first; if no luck try the image
-        if ! DOCKERIMAGE=$(docker inspect --format='{{ .Image }}' $CONTAINER_NAME 2>/dev/null) ; then
-            if ! DOCKERIMAGE=$(docker inspect --format='{{ .Id }}' $IMAGE 2>/dev/null) ; then
-                echo "Unable to find $IMAGE image." >&2
-                exit 1
-            fi
-        fi
-        docker images --no-trunc | grep $DOCKERIMAGE | grep -v latest | tr -s ' ' | cut -d ' ' -f 2
+        echo weave script $SCRIPT_VERSION
+        ask_version $CONTAINER_NAME $IMAGE
+        ask_version $DNS_CONTAINER_NAME $DNS_IMAGE
         ;;
     run)
         [ $# -gt 0 ] || usage
