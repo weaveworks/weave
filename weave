@@ -33,8 +33,16 @@ usage() {
 
 [ $# -gt 0 ] || usage
 
-IMAGE=zettio/weave
-DNS_IMAGE=zettio/weavedns
+if [ "$SCRIPT_VERSION" = "(unreleased version)" ] ; then
+    IMAGE_VERSION=latest
+else
+    IMAGE_VERSION=$SCRIPT_VERSION
+fi
+
+IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
+
+IMAGE=zettio/weave:$IMAGE_VERSION
+DNS_IMAGE=zettio/weavedns:$IMAGE_VERSION
 CONTAINER_NAME=weave
 DNS_CONTAINER_NAME=weavedns
 BRIDGE=weave
