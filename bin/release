@@ -37,7 +37,7 @@ build() {
     cd $RELEASE_DIR
 
     ## Check that the top changelog entry is this version
-    if ! latest_changelog=$(grep -o "== Release [0-9].*" -m1 ./CHANGELOG.md) || \
+    if ! latest_changelog=$(grep -o "## Release [0-9].*" -m1 ./CHANGELOG.md) || \
        ! [ `echo "$latest_changelog" | grep -o '[0-9][^ ]*'` == "$VERSION" ]; then
         echo -e "\u2757 Latest changelog entry \"$latest_changelog\" does not match the release version $VERSION" >&2
         exit 1
