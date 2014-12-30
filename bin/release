@@ -126,8 +126,10 @@ publish() {
     docker tag $DOCKERHUB_USER/weavedns $DOCKERHUB_USER/weavedns:$VERSION
 
     docker push $DOCKERHUB_USER/weave:$VERSION
+    docker push $DOCKERHUB_USER/weave:latest
     echo "** Pushed $DOCKERHUB_USER/weave:$VERSION to docker hub"
     docker push $DOCKERHUB_USER/weavedns:$VERSION
+    docker push $DOCKERHUB_USER/weavedns:latest
     echo "** Pushed $DOCKERHUB_USER/weavedns:$VERSION to docker hub"
 
     echo "== Creating GitHub release $RELEASE_NAME $VERSION"
