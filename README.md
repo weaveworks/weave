@@ -27,26 +27,12 @@ capabilities, so these can continue to be used by containers.
 
 ## Installation
 
-To run weave on a host, you need to install...
+Ensure you are running Linux (kernel 3.5 or later) and have Docker
+(version 0.9.1 or later) installed. Then install weave with
 
-1. Linux and Docker. We've tested with Docker versions 0.9.1 through
-   1.3.1, but other versions should work too. Linux kernels after 3.5
-   are known to work; the newer the better.
-2. weave. Install this with
-
-        sudo wget -O /usr/local/bin/weave \
-          https://github.com/zettio/weave/releases/download/latest_release/weave
-        sudo chmod a+x /usr/local/bin/weave
-
-3. (recommended) ethtool. On many systems this is installed already;
-   if not then grab it via your favourite package manager. On some
-   systems, weave application container networking may not operate
-   correctly unless ethtool is available.
-
-4. (optional) conntrack. Install this via your favourite package
-   manager. Without conntrack, the weave network may not re-establish
-   itself fully when individual weave instances are stopped (with
-   `weave stop`) and restarted quickly (typically within ~3 minutes).
+    sudo wget -O /usr/local/bin/weave \
+      https://github.com/zettio/weave/releases/download/latest_release/weave
+    sudo chmod a+x /usr/local/bin/weave
 
 ## Quick Start Screencast
 
