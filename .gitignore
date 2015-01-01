@@ -27,5 +27,6 @@ _testmain.go
 *~
 
 # Project specific
+weaver/weaver
 weavedns/weavedns
 releases
