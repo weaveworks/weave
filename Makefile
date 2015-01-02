@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all tests clean
+.PHONY: all update tests clean
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
@@ -13,6 +13,9 @@ WEAVER_EXPORT=/var/tmp/weave.tar
 WEAVEDNS_EXPORT=/var/tmp/weavedns.tar
 
 all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT)
+
+update:
+	go get -u -f -v -tags -netgo ./$(shell dirname $(WEAVER_EXE)) ./$(shell dirname $(WEAVEDNS_EXE))
 
 $(WEAVER_EXE) $(WEAVEDNS_EXE):
 	go get -tags netgo ./$(shell dirname $@)
