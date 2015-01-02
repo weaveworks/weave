@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
+	wt "github.com/zettio/weave/common"
 	"log"
 	"net"
 	"testing"
@@ -61,9 +62,9 @@ func RunLocalMulticastServer() (*dns.Server, error) {
 
 func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 	mdnsClient, err := NewMDNSClient()
-	assertNoErr(t, err)
+	wt.AssertNoErr(t, err)
 	err = mdnsClient.Start(nil)
-	assertNoErr(t, err)
+	wt.AssertNoErr(t, err)
 
 	server, err := RunLocalMulticastServer()
 	if err != nil {
@@ -87,7 +88,7 @@ func (c *testContext) checkResponse(t *testing.T, channelOk bool, resp *Response
 		c.channel = nil
 		return
 	}
-	assertNoErr(t, resp.Err)
+	wt.AssertNoErr(t, resp.Err)
 	log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
 	c.receivedAddr = resp.Addr
 	c.receivedCount++
