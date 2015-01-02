@@ -77,10 +77,9 @@ func (c *GossipChannel) GossipBroadcast(buf []byte) error {
 
 func (peer *Peer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
 	if srcPeer, found := peer.Router.Peers.Fetch(srcName); found {
-		peer.CallBroadcastFunc(srcPeer, func(conn *LocalConnection) error {
+		for _, conn := range peer.NextBroadcastHops(srcPeer) {
 			conn.SendTCP(msg)
-			return nil
-		})
+		}
 	} else {
 		log.Println("Unable to relay gossip from unknown peer", srcName)
 	}
