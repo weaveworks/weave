@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all publish clean tests
+.PHONY: all tests clean
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
