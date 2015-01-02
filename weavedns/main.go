@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	. "github.com/zettio/weave/common"
 	weavedns "github.com/zettio/weave/nameserver"
 	weavenet "github.com/zettio/weave/net"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 )
@@ -40,35 +40,31 @@ func main() {
 		os.Exit(0)
 	}
 
-	debugOut := ioutil.Discard
-	if debug {
-		debugOut = os.Stderr
-	}
-	weavedns.InitLogging(debugOut, os.Stdout, os.Stdout, os.Stderr)
+	InitDefaultLogging(debug)
 
 	var zone = new(weavedns.ZoneDb)
 
 	if watch {
 		err := weavedns.StartUpdater(apiPath, zone)
 		if err != nil {
-			weavedns.Error.Fatal("Unable to start watcher", err)
+			Error.Fatal("Unable to start watcher", err)
 		}
 	}
 
 	var iface *net.Interface = nil
 	if ifaceName != "" {
 		var err error
-		weavedns.Info.Println("Waiting for interface", ifaceName, "to come up")
+		Info.Println("Waiting for interface", ifaceName, "to come up")
 		iface, err = weavenet.EnsureInterface(ifaceName, wait)
 		if err != nil {
-			weavedns.Error.Fatal(err)
+			Error.Fatal(err)
 		} else {
-			weavedns.Info.Println("Interface", ifaceName, "is up")
+			Info.Println("Interface", ifaceName, "is up")
 		}
 	}
 
 	err := weavedns.StartServer(zone, iface, dnsPort, httpPort, wait)
 	if err != nil {
-		weavedns.Error.Fatal("Failed to start server", err)
+		Error.Fatal("Failed to start server", err)
 	}
 }
