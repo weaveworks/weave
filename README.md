@@ -52,7 +52,13 @@ On `$HOST1` run (as root)
     host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu)
 
 The first line starts the weave router, in a container. This needs to
-be done once on each host.
+be done once on each host. The required docker image for the weave
+router container is downloaded automatically. There is also a `weave
+setup` command for downloading this and other images required for
+weave operation; this is a strictly optional step which is especially
+useful for automated installation of weave and ensures that any
+subsequent weave commands do not encounter delays due to image
+downloading.
 
 The second line runs our application container. We give it an IP
 address and network, in

@@ -5,6 +5,7 @@ SCRIPT_VERSION="(unreleased version)"
 
 usage() {
     echo "Usage:"
+    echo "weave setup"
     echo "weave launch     [-password <password> | -passwordfile <path>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
@@ -447,6 +448,11 @@ DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
 DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
 
 case "$COMMAND" in
+    setup)
+        for img in $IMAGE $DNS_IMAGE $TOOLS_IMAGE ; do
+            docker pull $img
+        done
+        ;;
     launch)
         check_not_running $CONTAINER_NAME $BASE_IMAGE
         create_bridge
