@@ -43,8 +43,10 @@ IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 
 BASE_IMAGE=zettio/weave
 BASE_DNS_IMAGE=zettio/weavedns
+BASE_TOOLS_IMAGE=zettio/weavetools
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
+TOOLS_IMAGE=$BASE_TOOLS_IMAGE:$IMAGE_VERSION
 CONTAINER_NAME=weave
 DNS_CONTAINER_NAME=weavedns
 BRIDGE=weave
@@ -65,11 +67,11 @@ command_exists () {
     command -v $1 >/dev/null 2>&1
 }
 
-command_exists_or_warn () {
-    if ! command_exists $1 ; then
-        echo "Cannot find $1; please install it. Continuing without it." >&2
-        return 1
-    fi
+run_tool() {
+    TOOL_NET=$1
+    TOOL_COMMAND=$2
+    shift 2
+    docker run --rm --privileged --net=$TOOL_NET $TOOLS_IMAGE /bin/$TOOL_COMMAND "$@"
 }
 
 is_cidr() {
@@ -129,7 +131,7 @@ create_bridge() {
         ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
         ip link del dev v${CONTAINER_IFNAME}du
         # disable offloading
-        if command_exists_or_warn ethtool; then ethtool -K $BRIDGE tx off >/dev/null; fi
+        run_tool host ethtool -K $BRIDGE tx off >/dev/null
         # Work around the situation where there are no rules allowing traffic
         # across our bridge. E.g. ufw
         add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
@@ -215,7 +217,7 @@ connect_container_to_bridge() {
         return 1
     fi
 
-    if { if command_exists_or_warn ethtool; then ethtool -K $GUEST_IFNAME tx off >/dev/null; fi } &&
+    if run_tool host ethtool -K $GUEST_IFNAME tx off >/dev/null &&
         ip link set $LOCAL_IFNAME master $BRIDGE &&
         ip link set $LOCAL_IFNAME up &&
         ip link set $GUEST_IFNAME netns $NETNS ; then
@@ -234,7 +236,7 @@ launch() {
         return 1
     fi
     connect_container_to_bridge &&
-        { if command_exists_or_warn ethtool ; then ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null; fi } &&
+        run_tool container:$CONTAINER ethtool -K eth0 tx off >/dev/null &&
         ip netns exec $NETNS ip link set $CONTAINER_IFNAME up
 }
 
@@ -515,6 +517,16 @@ case "$COMMAND" in
         echo weave script $SCRIPT_VERSION
         ask_version $CONTAINER_NAME $IMAGE
         ask_version $DNS_CONTAINER_NAME $DNS_IMAGE
+        if ! TOOLS_IMAGE_ID=$(docker inspect --format='{{ .Id }}' $TOOLS_IMAGE 2>/dev/null) ; then
+            echo "Unable to find $TOOLS_IMAGE image." >&2
+        else
+            TOOLS_VERSION=$(docker images --no-trunc | grep $TOOLS_IMAGE_ID | grep -v latest | tr -s ' ' | cut -d ' ' -f 2 | tr "\n" ' ')
+            if [ -n "$TOOLS_VERSION" ] ; then
+                echo "weave tools $TOOLS_VERSION"
+            else
+                echo "weave tools (unreleased version)"
+            fi
+        fi
         ;;
     run)
         [ $# -gt 0 ] || usage
@@ -598,9 +610,7 @@ case "$COMMAND" in
             echo "Weave is not running." >&2
         fi
         docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
-        if command_exists_or_warn conntrack; then
-            conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
-        fi
+        run_tool host conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         ;;
     stop-dns)
         [ $# -eq 0 ] || usage
@@ -615,9 +625,7 @@ case "$COMMAND" in
         docker kill  $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         docker rm -f $CONTAINER_NAME     >/dev/null 2>&1 || true
         docker rm -f $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
-        if command_exists_or_warn conntrack; then
-            conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
-        fi
+        run_tool host conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         destroy_bridge
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do
             ip link del $LOCAL_IFNAME
