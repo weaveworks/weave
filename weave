@@ -57,6 +57,7 @@ PORT=6783
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
+PROCFS=${PROCFS:-/proc}
 
 COMMAND=$1
 
@@ -181,7 +182,7 @@ with_container_netns () {
     NETNS=$CONTAINER_PID
     [ ! -d /var/run/netns ] && mkdir -p /var/run/netns
     rm -f /var/run/netns/$NETNS
-    ln -s /proc/$CONTAINER_PID/ns/net /var/run/netns/$NETNS
+    ln -s $PROCFS/$CONTAINER_PID/ns/net /var/run/netns/$NETNS
 
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
@@ -209,7 +210,7 @@ with_container_netns () {
 }
 
 connect_container_to_bridge() {
-    if [ "$(readlink /proc/$CONTAINER_PID/ns/net)" = "$(readlink /proc/$$/ns/net)" ] ; then
+    if [ "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink $PROCFS/$$/ns/net)" ] ; then
         echo "Container is running in the host network namespace, and therefore cannot be" >&2
         echo "connected to weave. Perhaps the container was started with --net=host." >&2
         return 1
