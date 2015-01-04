@@ -1,3 +1,21 @@
+## Release 0.8.0
+
+- Align script and image version. When the `weave` script has a
+  version number, i.e. it is part of an official release, it runs
+  docker images matching that version. Thus the script and image
+  versions are automatically aligned. Unversioned/unreleased `weave`
+  scripts run the 'latest'-tagged image versions.
+
+- Eliminate dependency on ethtool and conntrack. Instead of requiring
+  these to be installed on the host, weave invokes them via a
+  `weavetools` docker image that contains minimally packaged versions
+  of these utilities.
+
+- New `weave setup` command. This downloads all docker images used by
+  weave. Invoking this is strictly optional; its main purpose is to
+  facilitate automated installation of weave and preventing delays in
+  subsequent weave command execution due to image downloading.
+
 ## Release 0.7.0
 
 This is the first release assigned a version number.
