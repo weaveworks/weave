@@ -302,12 +302,6 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 // Gossip methods
 
-func (router *Router) OnAlive(uint64) {
-	// don't care
-}
-func (router *Router) OnDead(uint64) {
-	// don't care
-}
 func (router *Router) OnGossipBroadcast(msg []byte) {
 	// Not expecting these
 	log.Println("Unexpected Gossip Broadcast:", msg)

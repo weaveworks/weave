@@ -4,12 +4,6 @@ import (
 	"log"
 )
 
-// Interface to receive notifications when we spot the presence or absence of a peer
-type PeerLifecycle interface {
-	OnAlive(uint64)
-	OnDead(uint64)
-}
-
 type Gossip interface {
 	// specific message from one peer to another
 	// intermediate peers should relay it using unicast topology.
@@ -20,7 +14,6 @@ type Gossip interface {
 }
 
 type Gossiper interface {
-	PeerLifecycle
 	OnGossipBroadcast(msg []byte)
 	OnGossipUnicast(sender PeerName, msg []byte)
 	// Return state of everything we know; intended to be called periodically
@@ -109,16 +102,4 @@ func (peer *LocalPeer) RelayGossipTo(dstPeerName PeerName, msg []byte) error {
 	}
 	conn.(*LocalConnection).SendTCP(msg)
 	return nil
-}
-
-func (ourself *LocalPeer) OnAlive(peer *Peer) {
-	for _, c := range ourself.Router.GossipChannels {
-		c.gossiper.OnAlive(peer.UID)
-	}
-}
-
-func (ourself *LocalPeer) OnDead(peer *Peer) {
-	for _, c := range ourself.Router.GossipChannels {
-		c.gossiper.OnDead(peer.UID)
-	}
 }

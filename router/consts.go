@@ -26,9 +26,6 @@ const (
 	PMTUVerifyTimeout  = 10 * time.Millisecond // gets doubled with every attempt
 	MaxDuration        = time.Duration(math.MaxInt64)
 	GossipInterval     = 3 * time.Second
-	GossipReqTimeout   = 1 * time.Second
-	GossipWaitForLead  = 10 * time.Second
-	GossipDeadTimeout  = 10 * time.Second
 )
 
 const (
