@@ -457,7 +457,6 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			// them and thus has informed us via TCP that it considers
 			// the connection is now up.
 			conn.SetEstablished()
-			conn.Router.Ourself.OnAlive(conn.remote)
 		} else if msg[0] == ProtocolStartFragmentationTest {
 			conn.Forward(false, &ForwardedFrame{
 				srcPeer: conn.local,
