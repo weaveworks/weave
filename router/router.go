@@ -327,10 +327,12 @@ func (router *Router) Gossip() []byte {
 func (router *Router) OnGossip(buf []byte) []byte {
 	newUpdate, err := router.Peers.ApplyUpdate(buf)
 	if err != nil {
-		// fixme
+		// fixme: should we do anything else?
+		log.Println("Error when applying Gossip update:", err)
 	} else if len(newUpdate) == 0 {
 		return nil
 	}
+	router.ConnectionMaker.Refresh()
 	router.Routes.Recalculate()
 	return newUpdate
 }
