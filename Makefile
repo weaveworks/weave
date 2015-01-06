@@ -8,23 +8,27 @@ WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
 WEAVETOOLS_EXES=tools/bin
+WEAVERENDEZ_EXE=cmd/rendezvous/weaverendezvous
 WEAVER_IMAGE=zettio/weave
 WEAVEDNS_IMAGE=zettio/weavedns
 WEAVETOOLS_IMAGE=zettio/weavetools
+WEAVERENDEZ_IMAGE=zettio/weaverendezvous
 WEAVER_EXPORT=/var/tmp/weave.tar
 WEAVEDNS_EXPORT=/var/tmp/weavedns.tar
 WEAVETOOLS_EXPORT=/var/tmp/weavetools.tar
+WEAVERENDEZ_EXPORT=/var/tmp/weaverendezvous.tar
 
-all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
+all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT) $(WEAVERENDEZ_EXPORT)
 
 update:
 	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE))
 
-$(WEAVER_EXE) $(WEAVEDNS_EXE):
+$(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVERENDEZ_EXE):
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(shell dirname $@)
-	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
+	@ldd $@ 2>/dev/null | grep "not a dynamic executable" >/dev/null || { \
 		rm $@; \
+		echo "\ngo build generated a dynamically linked executable."; \
 		echo "\nYour go standard library was built without the 'netgo' build tag."; \
 		echo "To fix that, run"; \
 		echo "    sudo go clean -i net"; \
@@ -32,8 +36,9 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE):
 		false; \
 	}
 
-$(WEAVER_EXE): router/*.go weaver/main.go
-$(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
+$(WEAVER_EXE):      router/*.go weaver/main.go
+$(WEAVEDNS_EXE):    common/* nameserver/*.go weavedns/main.go
+$(WEAVERENDEZ_EXE): common/* nameserver/*.go rendezvous/*.go cmd/rendezvous/*.go
 
 $(WEAVETOOLS_EXES): tools/build.sh
 	$(SUDO) docker run --rm -v $(realpath $(<D)):/home/weave ubuntu sh /home/weave/build.sh
@@ -50,11 +55,15 @@ $(WEAVETOOLS_EXPORT): tools/Dockerfile $(WEAVETOOLS_EXES)
 	$(SUDO) docker build -t $(WEAVETOOLS_IMAGE) tools
 	$(SUDO) docker save $(WEAVETOOLS_IMAGE):latest > $@
 
+$(WEAVERENDEZ_EXPORT): cmd/rendezvous/Dockerfile $(WEAVERENDEZ_EXE)
+	$(SUDO) docker build -t $(WEAVERENDEZ_IMAGE) cmd/rendezvous
+	$(SUDO) docker save $(WEAVERENDEZ_IMAGE):latest > $@
+
 # Add more directories in here as more tests are created
 tests:
 	cd nameserver; go test -tags netgo
 
 clean:
-	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE)
-	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
-	$(SUDO) rm -rf $(WEAVETOOLS_EXES)
+	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE) $(WEAVERENDEZ_IMAGE)
+	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT) $(WEAVERENDEZ_EXPORT)
+	$(SUDO) rm -rf $(WEAVETOOLS_EXES) $(WEAVERENDEZ_EXES)
