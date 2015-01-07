@@ -57,6 +57,7 @@ func NewRendezvousManager(endpoints []RendezvousEndpoint, weaveUrl *url.URL) *Re
 		fullUrl.Path = "/connect"
 
 		for ip := range r.notifyChan {
+			Debug.Printf("Notifying %s about %s", fullUrl.String(), ip)
 			_, err := http.PostForm(fullUrl.String(), url.Values{"peer": {ip}})
 			if err != nil {
 				Error.Printf("Could not notify about \"%s\": err", ip, err)

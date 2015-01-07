@@ -10,22 +10,36 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"time"
 )
 
 const (
 	mdnsQueryPeriod    = 5  // period for asking for new peers in a domain
 	mdnsMaxQueryPeriod = 60 // the query period grows up to this
+
+    domainStrippedChars = "./+-=_"
 )
+
+// remove some forbidden chars fom a string
+func stripchars(str, chr string) string {
+	return strings.Map(func(r rune) rune {
+		if strings.IndexRune(chr, r) < 0 {
+			return r
+		}
+		return -1
+	}, str)
+}
+
+func domainFromPath(p string) string {
+	return stripchars(path.Base(p), domainStrippedChars) // use only the last part of the path
+}
 
 // Get the full URL we will use for announcing/searching in a domain (ie,
 // for "mdns://some/path" it will be something like "mdns://eth0/path")
 func MDnsWorkerUrl(u url.URL, iface *net.Interface) *url.URL {
 	u.Host = iface.Name
-	u.Path = path.Base(u.Path) // use only the last part of the path
-	if u.Path == "." {
-		u.Path = ""
-	}
+	u.Path = domainFromPath(u.Path)
 	return &u
 }
 
@@ -40,7 +54,7 @@ type mDnsWorker struct {
 
 // Create a new mDNS rendezvous service for a domain
 func NewMDnsWorker(manager *RendezvousManager, domainUrl *url.URL) *mDnsWorker {
-	domain := path.Base(domainUrl.Path)
+	domain := domainFromPath(domainUrl.Path)
 	fullDomain := "weave.local."
 	if len(domain) > 0 {
 		fullDomain = fmt.Sprintf("%s.weave.local.", domain)

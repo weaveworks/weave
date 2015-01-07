@@ -322,6 +322,7 @@ wait_for_container() {
         wait_time=$((wait_time+1))
     done
     [ $wait_time -eq 4 ] && return 1
+    return 0
 }
 
 # Call url $4 with http verb $3 on container $1 at port $2
