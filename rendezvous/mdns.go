@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	mdnsQueryPeriod    = 5   // period for asking for new peers in a domain
-	mdnsMaxQueryPeriod = 120 // the query period grows up to this
+	mdnsQueryPeriod    = 10  // initial period for asking for new peers in a domain
+	mdnsMaxQueryPeriod = 120 // max backoff the query period
 
 	domainStrippedChars = "./+-=_"
 )
@@ -112,7 +112,7 @@ func (mdns *mDnsWorker) Start(endpoints []RendezvousEndpoint, iface *net.Interfa
 		for {
 			select {
 			case <-mdns.stopChan:
-				Debug.Printf("Stop request in mDNS worker")
+				Debug.Printf("Received stop request in mDNS worker")
 				mdnsClient.Shutdown()
 				break outerloop
 			case <-timer.C:
@@ -139,6 +139,7 @@ func (mdns *mDnsWorker) Start(endpoints []RendezvousEndpoint, iface *net.Interfa
 
 // Stop the mDNS worker
 func (mdns *mDnsWorker) Stop() error {
+	Debug.Printf("Stoping mDNS worker on %s", mdns.fullDomain)
 	mdns.stopChan <- true
 	return nil
 }

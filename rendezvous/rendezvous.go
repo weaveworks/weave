@@ -2,11 +2,11 @@ package rendezvous
 
 import (
 	"errors"
+	"fmt"
 	. "github.com/zettio/weave/common"
 	"net"
-	"net/url"
-	"fmt"
 	"net/http"
+	"net/url"
 )
 
 var (
@@ -29,6 +29,9 @@ var rendezvousServices = map[string]RendezvousServiceFactory{
 }
 
 // Common interface for all the rendezvous workers
+// There can be several workers for the same domain, depending on the service. For example,
+// when joining "mdns:///somegroup", we could start a worker for "eth0" (identified by
+// "mdns://eth0/somegroup") and another one for "eth1" (identified by "mdns://eth1/somegroup")
 type RendezvousWorker interface {
 	Start([]RendezvousEndpoint, *net.Interface) error
 	Stop() error
@@ -38,17 +41,22 @@ type SimpleRendezvousWorker struct {
 	Domain string // something like "mdns:///somedomain"
 }
 
+type managerEntry struct {
+	group  string
+	worker RendezvousWorker
+}
+
 type RendezvousManager struct {
-	endpoints []RendezvousEndpoint
-	workers   map[string]RendezvousWorker
+	endpoints  []RendezvousEndpoint
+	workers    map[string]managerEntry
 	notifyChan chan string
 }
 
 // Create a new rendezvous manager
 func NewRendezvousManager(endpoints []RendezvousEndpoint, weaveUrl *url.URL) *RendezvousManager {
 	r := &RendezvousManager{
-		endpoints: endpoints,
-		workers:   make(map[string]RendezvousWorker),
+		endpoints:  endpoints,
+		workers:    make(map[string]managerEntry),
 		notifyChan: make(chan string),
 	}
 
@@ -57,7 +65,7 @@ func NewRendezvousManager(endpoints []RendezvousEndpoint, weaveUrl *url.URL) *Re
 		fullUrl.Path = "/connect"
 
 		for ip := range r.notifyChan {
-			Debug.Printf("Notifying %s about %s", fullUrl.String(), ip)
+			Debug.Printf("Notifying \"%s\" about \"%s\"", fullUrl.String(), ip)
 			_, err := http.PostForm(fullUrl.String(), url.Values{"peer": {ip}})
 			if err != nil {
 				Error.Printf("Could not notify about \"%s\": err", ip, err)
@@ -68,12 +76,12 @@ func NewRendezvousManager(endpoints []RendezvousEndpoint, weaveUrl *url.URL) *Re
 	return r
 }
 
-// Connect to a rendezvous domain (ie, "mdns:///somedomain")
-func (r *RendezvousManager) Connect(domain string) error {
-	Debug.Printf("Connecting to \"%s\"", domain)
-	u, err := url.Parse(domain)
+// Connect to a rendezvous service/domain (ie, "mdns:///somedomain")
+func (r *RendezvousManager) Connect(group string) error {
+	Debug.Printf("Connecting to \"%s\"", group)
+	u, err := url.Parse(group)
 	if err != nil {
-		Error.Printf("Could not parse rendezvous domain url \"%s\"", domain)
+		Error.Printf("Could not get service from group name \"%s\"", group)
 		return errMalformedUrl
 	}
 
@@ -102,7 +110,7 @@ func (r *RendezvousManager) Connect(domain string) error {
 			Error.Printf("Failed rendezvous worker initialization for \"%s\": %s", workerUrlStr, err)
 			worker.Stop()
 		} else {
-			r.workers[workerUrlStr] = worker
+			r.workers[workerUrlStr] = managerEntry{group, worker}
 		}
 	}
 
@@ -110,8 +118,15 @@ func (r *RendezvousManager) Connect(domain string) error {
 }
 
 // Leave a rendezvous service/domain (ie, "mdns:///somedomain")
-func (r *RendezvousManager) Leave(domain string) error {
-	// TODO
+func (r *RendezvousManager) Leave(group string) error {
+	Debug.Printf("Leaving group %s", group)
+	for key, entry := range r.workers {
+		if entry.group == group  {
+			Debug.Printf("... stopping %s", key)
+			entry.worker.Stop()
+			delete(r.workers, key)
+		}
+	}
 	return nil
 }
 
@@ -121,10 +136,12 @@ func (r *RendezvousManager) notifyAbout(ip string) error {
 	return nil
 }
 
+// Stop all the rendezvous workers
 func (r *RendezvousManager) Stop() error {
-	Debug.Printf("Stoping all workers in rendezvous manager")
-	for key, worker := range r.workers {
-		worker.Stop()
+	Debug.Printf("Stopping all workers in rendezvous manager")
+	for key, entry := range r.workers {
+		Debug.Printf("... stopping %s", key)
+		entry.worker.Stop()
 		delete(r.workers, key)
 	}
 	close(r.notifyChan)
