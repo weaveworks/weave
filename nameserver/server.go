@@ -31,57 +31,45 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 	return m
 }
 
-func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
+func queryHandler(lookups []Lookup) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("Local query: %+v", q)
+		Debug.Printf("Query: %+v", q)
 		if q.Qtype == dns.TypeA {
-			if ip, err := zone.LookupLocal(q.Name); err == nil {
-				m := makeAddressReply(r, &q, []net.IP{ip})
-				w.WriteMsg(m)
-			} else {
-				Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
-				// We don't know the answer; see if someone else does
-				channel := make(chan *ResponseA)
-				replies := make([]net.IP, 0)
-				go func() {
-					for resp := range channel {
-						Debug.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
-						replies = append(replies, resp.Addr)
-					}
-					var responseMsg *dns.Msg
-					if len(replies) > 0 {
-						responseMsg = makeAddressReply(r, &q, replies)
-					} else {
-						responseMsg = makeDNSFailResponse(r)
-					}
-					w.WriteMsg(responseMsg)
-				}()
-				mdnsClient.SendQuery(q.Name, dns.TypeA, channel)
+			for _, lookup := range lookups {
+				if ip, err := lookup.LookupLocal(q.Name); err == nil {
+					m := makeAddressReply(r, &q, []net.IP{ip})
+					w.WriteMsg(m)
+					return
+				}
 			}
+			Debug.Printf("Query failed for %s", q.Name)
+			w.WriteMsg(makeDNSFailResponse(r))
 		} else {
-			Warning.Printf("Local query not handled: %+v", q)
-			m := makeDNSFailResponse(r)
-			w.WriteMsg(m)
+			Warning.Printf("Query not handled: %+v", q)
+			w.WriteMsg(makeDNSFailResponse(r))
 		}
 		return
 	}
 }
 
-func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
+func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("Local rdns query: %+v", q)
+		Debug.Printf("Reverse query: %+v", q)
 		if q.Qtype == dns.TypePTR {
-			if name, err := zone.ReverseLookupLocal(q.Name); err == nil {
-				Debug.Printf("Found name: %s", name)
-				m := makePTRReply(r, &q, []string{name})
-				w.WriteMsg(m)
-			} else {
-				Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
-				// We don't know the answer; see if someone else does
-				// TODO
+			for _, lookup := range lookups {
+				if name, err := lookup.ReverseLookupLocal(q.Name); err == nil {
+					m := makePTRReply(r, &q, []string{name})
+					w.WriteMsg(m)
+					return
+				}
 			}
+			Debug.Printf("Reverse query failed for %s", q.Name)
+			w.WriteMsg(makeDNSFailResponse(r))
+		} else {
+			Warning.Printf("Reverse query not handled: %+v", q)
+			w.WriteMsg(makeDNSFailResponse(r))
 		}
 	}
 }
@@ -125,8 +113,8 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wai
 	checkFatal(err)
 
 	LocalServeMux := dns.NewServeMux()
-	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler(zone, mdnsClient))
-	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler(zone, mdnsClient))
+	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler([]Lookup{zone, mdnsClient}))
+	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler([]Lookup{zone, mdnsClient}))
 	LocalServeMux.HandleFunc(".", notUsHandler())
 
 	mdnsServer, err := NewMDNSServer(zone)

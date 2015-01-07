@@ -14,12 +14,16 @@ const (
 // +1 to also exclude a dot
 var rdnsDomainLen = len(RDNS_DOMAIN) + 1
 
+type Lookup interface {
+	LookupLocal(name string) (net.IP, error)
+	ReverseLookupLocal(inaddr string) (string, error)
+}
+
 type Zone interface {
 	AddRecord(ident string, name string, ip net.IP) error
 	DeleteRecord(ident string, ip net.IP) error
 	DeleteRecordsFor(ident string) error
-	LookupLocal(name string) (net.IP, error)
-	ReverseLookupLocal(inaddr string) (string, error)
+	Lookup
 }
 
 type Record struct {

@@ -152,3 +152,18 @@ outerloop:
 		t.Fatal("Unexpected result for", successTestName, context1.receivedAddr, context2.receivedAddr, context1.receivedCount, context2.receivedCount)
 	}
 }
+
+func TestAsLookup(t *testing.T) {
+	mdnsClient, server, _ := setup(t)
+	defer mdnsClient.Shutdown()
+	defer server.Shutdown()
+
+	ip, err := mdnsClient.LookupLocal(successTestName)
+	wt.AssertNoErr(t, err)
+	if !testAddr.Equal(ip) {
+		t.Fatalf("Returned address incorrect %s", ip)
+	}
+
+	ip, err = mdnsClient.LookupLocal("foo.example.com.")
+	wt.AssertErrorType(t, err, (*LookupError)(nil), "unknown hostname")
+}
