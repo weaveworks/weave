@@ -55,15 +55,15 @@ which is the standard behaviour for Docker containers.
 ## Domain search paths
 
 If you don't supply a domain search path (with `--dns-search=`),
-`weave run ...` will tell a container to look for "bare" hostnames,
-like `pingme`, in its own domain. That's why you can just say `ping
+`weave run ...` tells a container to look for "bare" hostnames, like
+`pingme`, in its own domain. That's why you can just invoke `ping
 pingme` above -- since the hostname is `ubuntu.weave.local`, it will
 look for `pingme.weave.local`.
 
 If you want to supply other entries for the domain search path,
 e.g. if you want containers in different sub-domains to resolve
-hostnames across all sub-domains plus some external domains, you will
-need *also* to supply the `weave.local` domain to retain the above
+hostnames across all sub-domains plus some external domains, you need
+*also* to supply the `weave.local` domain to retain the above
 behaviour.
 
 ```bash
@@ -75,10 +75,10 @@ weave run --with-dns 10.1.1.4/24 -ti \
 
 ## Doing things more manually
 
-If you use the `--with-dns` option, `weave run` will automatically
-supply the DNS server address to the new container. And both
-`weave run` and `weave attach` will register the hostname of the given
-container against the given weave network IP address.
+If you use the `--with-dns` option, `weave run` automatically supplies
+the DNS server address to the new container. And both `weave run` and
+`weave attach` register the hostname of the given container against
+the given weave network IP address.
 
 In some circumstances, you may not want to use the `weave`
 command. You can still take advantage of a running weaveDNS, with some
@@ -90,7 +90,7 @@ So that containers can connect to a stable and always routable IP
 address, weaveDNS publishes its port 53 to the Docker bridge device,
 which is assumed to be `docker0`.
 
-Some configurations will use a different Docker bridge device. To
+Some configurations may use a different Docker bridge device. To
 supply a different bridge device, use the environment variable
 `DOCKER_BRIDGE`, e.g.,
 
@@ -123,10 +123,10 @@ $ docker_ip=$(ip -4 addr show dev docker0 | grep -o 'inet [0-9.]*' | cut -d ' ' 
 
 ### Supplying the domain search path
 
-By default, Docker will provide containers with a `/etc/resolv.conf`
-that matches that for the host. In some circumstances, this may
-include a DNS search path, which will break the nice "bare names
-resolve" property above.
+By default, Docker provides containers with a `/etc/resolv.conf` that
+matches that for the host. In some circumstances, this may include a
+DNS search path, which will break the nice "bare names resolve"
+property above.
 
 Therefore, when starting containers with `docker run` instead of
 `weave run`, you will usually want to supply a domain search path so
@@ -148,7 +148,10 @@ $ curl -X PUT "http://$dns_ip:6785/name/$shell2/10.1.1.27" -d local_ip=$shell2_i
 
 ### Registering multiple containers with the same name
 
-This is supported; in the initial implementation weaveDNS will pick one address to return when you ask for the name.  Since weave-dns will remove any container that dies, this is a simple way to implement redundancy.  In the current implementation it does not attempt to do load-balancing.
+This is supported; weaveDNS picks one address to return when you ask
+for the name. Since weaveDNS removes any container that dies, this is
+a simple way to implement redundancy.  In the current implementation
+it does not attempt to do load-balancing.
 
 ### Replacing one container with another at the same name
 
@@ -156,9 +159,9 @@ If you would like to deploy a new version of a service, keep the old one running
 
 ### Not watching docker events
 
-By default, the server will watch docker events and remove entries for
-any containers that die. You can tell it not to, by adding
-`--watch=false` to the container args:
+By default, weaveDNS watchs docker events and removes entries for any
+containers that die. You can tell it not to, by adding `--watch=false`
+to the container args:
 
 ```bash
 $ weave launch-dns 10.1.254.1/24 --watch=false
