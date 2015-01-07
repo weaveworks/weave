@@ -1,10 +1,9 @@
 # Weave DNS server
 
-The Weave DNS server answers name queries in a Weave network. It is
-run per-host, to be supplied as the nameserver for containers on that
-host. It is then told about hostnames for the local containers. For
-other names it will ask the other weave hosts, or fall back to using
-the host's configured name server.
+The Weave DNS server answers name queries in a Weave network. This provides a 
+simple way for containers to find each other: just give them hostnames and 
+tell other containers to connect to those names.  Unlike Docker `--link`, this 
+requires no code changes and works across hosts.
 
 ## Using weaveDNS
 
@@ -24,12 +23,26 @@ $ docker attach $shell1
 ...
 ```
 
-The weave IP address supplied to `weave launch-dns` must not be used
-by any other container, and the supplied network must be the same for
-all DNS containers, and be disjoint from all application networks.
+Launch weaveDNS on every host, picking a different IP address from the same 
+subnet each time.  It's best if this subnet is different from the one you use for
+application containers.  In our example the weaveDNS address is in subnet 
+10.1.254.0/24 and the ubuntu containers are in subnet 10.1.1.0/24.
+
+As usual, these subnets must not be in use for other purposes on your hosts.
 
 The DNS container can be stopped with `stop-dns`.
 
+## How it works
+
+WeaveDNS runs on every host, and acts as the nameserver for containers on that
+host. It is told about hostnames for local containers by the `weave run` 
+command.
+
+WeaveDNS only stores names in the `.weave.local` domain. If it is asked for
+a name in `.weave.local` it doesn't know about, it will ask the other weaveDNS
+servers.
+If asked for a name in another domain it will fall back to using the host's
+configured nameserver.
 
 ## Domain search paths
 
