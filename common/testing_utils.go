@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-func CallSite() string {
-	_, file, line, ok := runtime.Caller(2)
+func CallSite(level int) string {
+	_, file, line, ok := runtime.Caller(level)
 	if ok {
 		// Truncate file name at last file name separator.
 		if index := strings.LastIndex(file, "/"); index >= 0 {
@@ -26,26 +26,26 @@ func CallSite() string {
 
 func AssertNoErr(t *testing.T, err error) {
 	if err != nil {
-		t.Fatal(CallSite(), err)
+		t.Fatal(CallSite(2), err)
 	}
 }
 
 func AssertStatus(t *testing.T, got int, wanted int, desc string) {
 	if got != wanted {
-		t.Fatalf("%s: Expected %s %d but got %d", CallSite(), desc, wanted, got)
+		t.Fatalf("%s: Expected %s %d but got %d", CallSite(2), desc, wanted, got)
 	}
 }
 
 func AssertErrorInterface(t *testing.T, got interface{}, wanted interface{}, desc string) {
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
 	if !gotT.Implements(wantedT) {
-		t.Fatalf("%s: Expected %s but got %s (%s)", CallSite(), wantedT.String(), gotT.String(), desc)
+		t.Fatalf("%s: Expected %s but got %s (%s)", CallSite(2), wantedT.String(), gotT.String(), desc)
 	}
 }
 
 func AssertErrorType(t *testing.T, got interface{}, wanted interface{}, desc string) {
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
 	if gotT != wantedT {
-		t.Fatalf("%s: Expected %s but got %s (%s)", CallSite(), wantedT.String(), gotT.String(), desc)
+		t.Fatalf("%s: Expected %s but got %s (%s)", CallSite(2), wantedT.String(), gotT.String(), desc)
 	}
 }
