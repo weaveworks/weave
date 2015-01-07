@@ -300,15 +300,8 @@ detach() {
     ip netns exec $NETNS ip link del $CONTAINER_IFNAME type veth
 }
 
-<<<<<<< HEAD
 container_is_running() {
-    if ! status=$(docker inspect --format='{{ .State.Running }}' $1 2>/dev/null) || [ "$status" != "true" ] ; then
-=======
-# Call url $4 with http verb $3 on container $1 at port $2
-http_call() {
-    if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null); then
-        echo "$1 container is not present; have you launched it?" >&2
->>>>>>> 71d96eed7d6d6833286226b3fdf47328cd994376
+    if ! status=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) || [ "$status" != "true" ] ; then
         return 1
     fi
 }
@@ -317,7 +310,7 @@ http_call() {
 container_ip() {
     container_name=$1
     container_is_running $container_name || return 1
-    docker inspect --format='{{ .NetworkSettings.IPAddress }}' $container_name 2>/dev/null
+    docker inspect --format='{{.NetworkSettings.IPAddress}}' $container_name 2>/dev/null
 }
 
 # wait for a for a container with name $1 to be up and running
