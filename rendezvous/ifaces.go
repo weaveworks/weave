@@ -14,7 +14,11 @@ var errIfaceListError = errors.New("Error when gathering interfaces list")
 
 // (regular expressions of) interfaces we ignore when calculating the external IPs
 var ignoredIfaces = []string{
+	"^weave.*",
+	"^dummy.*",
 	"^ethwe.*",
+	"^veth.*",
+	"^vnet.*",
 	"^bridge.*",
 	"^docker.*",
 	"^tun.*",
@@ -77,7 +81,7 @@ func EndpointsListFromIfaceNamesList(ifaces IfaceNamesList) ([]RendezvousEndpoin
 			parsedIfaces = append(parsedIfaces, parsedIface)
 		}
 	} else {
-		Debug.Printf("Guessing external devices list...")
+		Debug.Printf("Guessing external interfaces...")
 		guessedIfaces, err := net.Interfaces()
 		if err != nil {
 			return nil, errIfaceListError
@@ -86,6 +90,7 @@ func EndpointsListFromIfaceNamesList(ifaces IfaceNamesList) ([]RendezvousEndpoin
 		for idx, _ := range guessedIfaces {
 			guessedIface := &guessedIfaces[idx]
 			if !isIgnoredIface(guessedIface) {
+				Debug.Printf("... %s seems a valid interface", guessedIface.Name)
 				parsedIfaces = append(parsedIfaces, guessedIface)
 			}
 		}
@@ -98,7 +103,7 @@ func EndpointsListFromIfaceNamesList(ifaces IfaceNamesList) ([]RendezvousEndpoin
 		for _, addr := range addrs {
 			ip, _, err := net.ParseCIDR(addr.String())
 			if err != nil {
-				Error.Printf("Could not parse device address %s", addr)
+				Error.Printf("Could not parse interface address %s", addr)
 				continue
 			}
 			if ip.IsGlobalUnicast() {

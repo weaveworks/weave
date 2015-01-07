@@ -260,12 +260,10 @@ func (c *MDNSClient) handleBackgroundQuery(q mDNSQueryInfo) {
 	buf, err := m.Pack()
 	if err != nil {
 		q.responseCh <- &ResponseA{Err: err}
-		close(q.responseCh)
 		return
 	}
 	if _, err = c.conn.WriteTo(buf, c.addr); err != nil {
 		q.responseCh <- &ResponseA{Err: err}
-		close(q.responseCh)
 		return
 	}
 

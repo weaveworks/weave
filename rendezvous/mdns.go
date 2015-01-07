@@ -23,19 +23,23 @@ const (
 func MDnsWorkerUrl(u url.URL, iface *net.Interface) *url.URL {
 	u.Host = iface.Name
 	u.Path = path.Base(u.Path) // use only the last part of the path
+	if u.Path == "." {
+		u.Path = ""
+	}
 	return &u
 }
 
 type mDnsWorker struct {
 	SimpleRendezvousService
 
+	manager      *RendezvousManager
 	fullDomain   string
 	stopChan     chan bool
 	announcedIps map[string]bool // keep track the IPs we finally announce
 }
 
 // Create a new mDNS rendezvous service for a domain
-func NewMDnsWorker(domainUrl *url.URL) *mDnsWorker {
+func NewMDnsWorker(manager *RendezvousManager, domainUrl *url.URL) *mDnsWorker {
 	domain := path.Base(domainUrl.Path)
 	fullDomain := "weave.local."
 	if len(domain) > 0 {
@@ -46,6 +50,7 @@ func NewMDnsWorker(domainUrl *url.URL) *mDnsWorker {
 		SimpleRendezvousService: SimpleRendezvousService{
 			Domain: domain,
 		},
+		manager:      manager,
 		fullDomain:   fullDomain,
 		stopChan:     make(chan bool),
 		announcedIps: make(map[string]bool),
@@ -93,7 +98,7 @@ func (mdns *mDnsWorker) Start(endpoints []RendezvousEndpoint, iface *net.Interfa
 		for {
 			select {
 			case <-mdns.stopChan:
-				Debug.Printf("Shutting down rendezvous")
+				Debug.Printf("Stop request in mDNS worker")
 				mdnsClient.Shutdown()
 				break outerloop
 			case <-timer.C:
@@ -106,8 +111,8 @@ func (mdns *mDnsWorker) Start(endpoints []RendezvousEndpoint, iface *net.Interfa
 				if ok {
 					foundIpStr := resp.Addr.String()
 					if _, ourselves := mdns.announcedIps[foundIpStr]; !ourselves {
-						Debug.Printf("Found peer %s with mDNS", foundIpStr)
-						// TODO: trigger the connecting in Weave to foundIpStr
+						Debug.Printf("Found peer \"%s\" with mDNS", foundIpStr)
+						mdns.manager.notifyAbout(foundIpStr)
 					}
 				}
 			}

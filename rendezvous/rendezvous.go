@@ -5,6 +5,8 @@ import (
 	. "github.com/zettio/weave/common"
 	"net"
 	"net/url"
+	"fmt"
+	"net/http"
 )
 
 var (
@@ -15,14 +17,14 @@ var (
 // Factories for rendezvous services
 type RendezvousServiceFactory struct {
 	GetWorkerUrl func(url.URL, *net.Interface) *url.URL
-	NewWorker    func(*url.URL) RendezvousWorker
+	NewWorker    func(*RendezvousManager, *url.URL) RendezvousWorker
 }
 
 // All the rendezvous services
 var rendezvousServices = map[string]RendezvousServiceFactory{
 	"mdns": {
 		MDnsWorkerUrl,
-		func(u *url.URL) RendezvousWorker { return NewMDnsWorker(u) },
+		func(r *RendezvousManager, u *url.URL) RendezvousWorker { return NewMDnsWorker(r, u) },
 	},
 }
 
@@ -39,15 +41,30 @@ type SimpleRendezvousService struct {
 type RendezvousManager struct {
 	endpoints []RendezvousEndpoint
 	workers   map[string]RendezvousWorker
+	notifyChan chan string
 }
 
 // Create a new rendezvous manager
-func NewRendezvousManager(endpoints []RendezvousEndpoint) *RendezvousManager {
-	r := RendezvousManager{
+func NewRendezvousManager(endpoints []RendezvousEndpoint, weaveUrl *url.URL) *RendezvousManager {
+	r := &RendezvousManager{
 		endpoints: endpoints,
 		workers:   make(map[string]RendezvousWorker),
+		notifyChan: make(chan string),
 	}
-	return &r
+
+	go func() {
+		fullUrl := weaveUrl
+		fullUrl.Path = "/connect"
+
+		for ip := range r.notifyChan {
+			_, err := http.PostForm(fullUrl.String(), url.Values{"peer": {ip}})
+			if err != nil {
+				Error.Printf("Could not notify about \"%s\": err", ip, err)
+			}
+		}
+	}()
+
+	return r
 }
 
 // Connect to a rendezvous domain (ie, "mdns:///somedomain")
@@ -79,7 +96,7 @@ func (r *RendezvousManager) Connect(domain string) error {
 		}
 
 		Debug.Printf("Starting new worker for \"%s\"", workerUrlStr)
-		worker := factory.NewWorker(workerUrl)
+		worker := factory.NewWorker(r, workerUrl)
 		if err := worker.Start(r.endpoints, iface); err != nil {
 			Error.Printf("Failed rendezvous worker initialization for \"%s\": %s", workerUrlStr, err)
 			worker.Stop()
@@ -91,11 +108,29 @@ func (r *RendezvousManager) Connect(domain string) error {
 	return nil
 }
 
+// Leave a rendezvous service/domain (ie, "mdns:///somedomain")
+func (r *RendezvousManager) Leave(domain string) error {
+	// TODO
+	return nil
+}
+
+// Notify the router about a new peer
+func (r *RendezvousManager) notifyAbout(ip string) error {
+	r.notifyChan <- ip
+	return nil
+}
+
 func (r *RendezvousManager) Stop() error {
 	Debug.Printf("Stoping all workers in rendezvous manager")
 	for key, worker := range r.workers {
 		worker.Stop()
 		delete(r.workers, key)
 	}
+	close(r.notifyChan)
 	return nil
+}
+
+// Return a simple status
+func (r *RendezvousManager) Status() string {
+	return fmt.Sprintf("%d workers", len(r.workers))
 }

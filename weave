@@ -8,8 +8,9 @@ usage() {
     echo "weave setup"
     echo "weave launch     [-password <password> | -passwordfile <path>] <peer> ..."
     echo "weave launch-dns <cidr>"
-    echo "weave launch-rendezvous"
     echo "weave connect    <peer>"
+    echo "weave join       <group>"
+    echo "weave leave      <group>"
     echo "weave run        [--with-dns] <cidr> <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
     echo "weave attach     <cidr> <container_id>"
@@ -23,7 +24,8 @@ usage() {
     echo "weave stop-dns"
     echo "weave reset"
     echo
-    echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>], and"
+    echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>],"
+    echo "      <group> is of the form <service>://[<domain>], and"
     echo "      <cidr> is of the form <ip_address>/<routing_prefix_length>"
     exit 1
 }
@@ -72,6 +74,10 @@ shift 1
 command_exists () {
     command -v $1 >/dev/null 2>&1
 }
+
+log()   { echo "$1"; }
+warn()  { log "WARNING: $1"; }
+fatal() { log "ERROR: $1"; exit 1; }
 
 run_tool() {
     TOOL_NET=$1
@@ -293,25 +299,34 @@ detach() {
     ip netns exec $NETNS ip link del $CONTAINER_IFNAME type veth
 }
 
-# Call url $4 with http verb $3 on container $1 at port $2
-http_call() {
-    if ! status=$(docker inspect --format='{{ .State.Running }} {{ .NetworkSettings.IPAddress }}' $1 2>/dev/null); then
-        echo "$1 container is not present; have you launched it?" >&2
+container_is_running() {
+    if ! status=$(docker inspect --format='{{ .State.Running }}' $1 2>/dev/null) || [ "$status" != "true" ] ; then
         return 1
     fi
-    case "$status" in
-        "true ")
-            echo "$1 container has no IP address; is Docker networking enabled?" >&2
-            return 1
-            ;;
-        true*)
-            ip="${status#true }"
-            ;;
-        *)
-            echo "$1 container is not running." >&2
-            return 1
-            ;;
-    esac
+}
+
+# Get the IP address of a container with name $1
+container_ip() {
+    container_name=$1
+    container_is_running $container_name || return 1
+    docker inspect --format='{{ .NetworkSettings.IPAddress }}' $container_name 2>/dev/null
+}
+
+# wait for a for a container with name $1 to be up and running
+wait_for_container() {
+    container_name=$1
+    wait_time=1
+    while [ $wait_time -lt 4 ]; do
+        container_is_running $container_name && return 0
+        sleep 1
+        wait_time=$((wait_time+1))
+    done
+    [ $wait_time -eq 4 ] && return 1
+}
+
+# Call url $4 with http verb $3 on container $1 at port $2
+http_call() {
+    ip=$(container_ip $1) || fatal "$1 container has no IP address; is Docker networking enabled?"
     shift 1
     http_call_ip $ip "$@"
 }
@@ -322,12 +337,24 @@ http_call_ip() {
     http_verb="$3"
     url="$4"
     shift 4
-    if command_exists curl ; then
-        curl -s -X $http_verb "$@" http://$ip:$port$url
-    else
-        echo "Cannot find curl, which is required for this operation." >&2
-        exit 1
-    fi
+    command_exists curl || fatal "Cannot find curl, which is required for this operation."
+    curl -s -X $http_verb "$@" http://$ip:$port$url
+}
+
+# Wait for a container with name $1 that provides a "/status" at port $2
+wait_for_http_status() {
+    ip=$1
+    port=$2
+
+    [ -n "$ip" ] || fatal "no IP address for container"
+
+    wait_time=1
+    while ! http_call_ip $ip $port "GET" "/status" >/dev/null && [ $wait_time -lt 4 ]; do
+        sleep 1
+        wait_time=$((wait_time+1))
+    done
+    [ $wait_time = 4 ] && return 1
+    return 0
 }
 
 # Perform operation $1 on container ID $2 to local DNS database at address $3
@@ -347,23 +374,15 @@ tell_dns() {
 
 # Tell the newly-started weaveDNS about existing weave IPs
 populate_dns() {
-    DNS_IP=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $DNS_CONTAINER_NAME)
-    WAIT_TIME=1
-    while ! http_call_ip $DNS_IP $DNS_HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
-        sleep $WAIT_TIME
-        WAIT_TIME=$((WAIT_TIME+1))
-    done
-    if [ $WAIT_TIME = 4 ]; then
-        echo "Timed out waiting for weaveDNS container to start." >&2
-        echo "If running, it will not be pre-populated." >&2
-    fi
+    dns_ip=$(container_ip $DNS_CONTAINER_NAME)
+    wait_for_http_status $dns_ip $DNS_HTTP_PORT || log "Timed out waiting for $DNS_CONTAINER_NAME container to start."
 
     for CONTAINER in $(docker ps -q --no-trunc); do
         MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{ .Config.Hostname }}.{{ .Config.Domainname }}.' $CONTAINER 2>/dev/null) && true
         if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
             CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
             for IP in $CONTAINER_IPS; do
-                http_call_ip $DNS_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
+                http_call_ip $dns_ip $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
             done
         fi
     done
@@ -397,20 +416,25 @@ check_not_running() {
     esac
 }
 
+check_rendezvous_running() {
+    if ! container_is_running $RENDEZVOUS_CONTAINER_NAME ; then
+        create_bridge
+        docker_bridge_ip
+        weave_ip=$(container_ip $CONTAINER_NAME) || fatal "Weave container has no IP address"
+        docker rm $RENDEZVOUS_CONTAINER_NAME 2>/dev/null || /bin/true
+        RENDEZVOUS_CONTAINER=$(docker run --privileged -d --net=host --name=$RENDEZVOUS_CONTAINER_NAME \
+            -p $RENDEZVOUS_HTTP_PORT:$RENDEZVOUS_HTTP_PORT/tcp \
+            $RENDEZVOUS_IMAGE -port $RENDEZVOUS_HTTP_PORT -weave http://$weave_ip:$HTTP_PORT/ "$@")
+    fi
+}
+
 container_weave_addrs() {
     ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
 uname -s -r | sed -n 's|^\([^ ]*\) \([0-9]\+\)\.\([0-9]\+\).*|\1 \2 \3|p' | {
-    if ! read sys maj min ; then
-      echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
-      exit 1
-    fi
-
-    if [ "$sys" != 'Linux' ] ; then
-        echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
-        exit 1
-    fi
+    read sys maj min     || fatal "Unable to parse operating system version $(uname -s -r)"
+    [ "$sys" = 'Linux' ] || fatal "Operating systems other than Linux are not supported (you have $sys)"
 
     if ! [ \( "$maj" -eq 3 -a "$min" -ge 5 \) -o "$maj" -gt 3 ] ; then
         echo "WARNING: Linux kernel version 3.5 or newer is required (you have ${maj}.${min})" >&2
@@ -508,28 +532,23 @@ case "$COMMAND" in
         populate_dns
         echo $DNS_CONTAINER
         ;;
-    launch-rendezvous)
-        [ $# -gt 0 ] || usage
-        check_not_running $RENDEZVOUS_CONTAINER_NAME $BASE_RENDEZVOUS_IMAGE
-        create_bridge
-        docker_bridge_ip
-        RENDEZVOUS_CONTAINER=$(docker run --privileged -d --name=$RENDEZVOUS_CONTAINER_NAME \
-            -p $DOCKER_BRIDGE_IP:80:80/tcp --net=host \
-            $DNS_IMAGE -iface $CONTAINER_IFNAME "$@")
-        echo $RENDEZVOUS_CONTAINER
-        ;;
     connect)
         [ $# -eq 1 ] || usage
-        SCHEME=$(echo "$1" | grep :// | sed -e's,^\(.*://\).*,\1,g')
-        case "$SCHEME" in
-            "tcp://"|"")
-                http_call $CONTAINER_NAME $HTTP_PORT POST /connect -d "peer=$1"
-                ;;
-            *)
-                check_not_running $RENDEZVOUS_CONTAINER_NAME $BASE_RENDEZVOUS_IMAGE && $0 launch-rendezvous
-                http_call $RENDEZVOUS_CONTAINER_NAME $RENDEZVOUS_HTTP_PORT POST /connect -d "domain=$1"
-                ;;
-        esac
+        http_call $CONTAINER_NAME $HTTP_PORT "POST" "/connect" -d "peer=$1"
+        ;;
+    join)
+        [ $# -eq 1 ] || usage
+        check_rendezvous_running
+        wait_for_http_status 127.0.0.1 $RENDEZVOUS_HTTP_PORT || \
+            fatal "Timeout waiting for rendezvous container. Check the logs with \"docker logs $RENDEZVOUS_CONTAINER_NAME\""
+        http_call_ip 127.0.0.1 $RENDEZVOUS_HTTP_PORT "POST" "/join" -d "domain=$1"
+        ;;
+    leave)
+        [ $# -eq 1 ] || usage
+        check_rendezvous_running
+        wait_for_http_status 127.0.0.1 $RENDEZVOUS_HTTP_PORT || \
+            fatal "Timeout waiting for rendezvous container. Check the logs with \"docker logs $RENDEZVOUS_CONTAINER_NAME\""
+        http_call_ip 127.0.0.1 $RENDEZVOUS_HTTP_PORT "POST" "/leave" -d "domain=$1"
         ;;
     status)
         http_call $CONTAINER_NAME $HTTP_PORT GET /status
