@@ -11,12 +11,21 @@ import (
 	"testing"
 )
 
-func NewTestRouter(t *testing.T, name PeerName) *Router {
+type peerQueue struct {
+	peers []*Peer
+}
+
+func (q *peerQueue) clear() {
+	q.peers = nil
+}
+
+func NewTestRouter(t *testing.T, name PeerName, queue *peerQueue) *Router {
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		//t.Log("Expired MAC", mac, "at", peer.Name)
 	}
 	onPeerGC := func(peer *Peer) {
-		t.Log("Removing unreachable", peer)
+		//t.Log("Removing unreachable", peer)
+		queue.peers = append(queue.peers, peer)
 	}
 	router := &Router{
 		Iface:          nil,
@@ -76,6 +85,12 @@ type byName []*decodedPeerInfo
 func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byName) Less(i, j int) bool { return a[i].name < a[j].name }
+
+func AssertEmpty(t *testing.T, array []*Peer, desc string) {
+	if len(array) != 0 {
+		t.Fatalf("%s: Expected empty %s but got %s", wt.CallSite(2), desc, array)
+	}
+}
 
 func AssertEqualPN(t *testing.T, got, wanted PeerName, desc string) {
 	if got != wanted {
@@ -185,10 +200,14 @@ func TestGossip(t *testing.T) {
 		peer3Name, _ = PeerNameFromString(peer3NameString)
 	)
 
+	removed := &peerQueue{nil}
+
 	// Create some peers that will talk to each other
-	r1 := NewTestRouter(t, peer1Name)
-	r2 := NewTestRouter(t, peer2Name)
-	r3 := NewTestRouter(t, peer3Name)
+	r1 := NewTestRouter(t, peer1Name, removed)
+	r2 := NewTestRouter(t, peer2Name, removed)
+	r3 := NewTestRouter(t, peer3Name, removed)
+
+	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Check state when they have no connections
 	checkEncoding(t, r1.Gossip(), rs(r1), ca(nil))
@@ -265,4 +284,61 @@ func TestGossip(t *testing.T) {
 		checkBlank(t, r1.OnGossip(newInfo4b))
 		checkBlank(t, r3.OnGossip(newInfo4b))
 	}
+
+	removed.clear()
+
+	// Drop the connection from 2 to 3
+	r2.DeleteTestConnection(r3)
+	checkEncoding(t, r2.Gossip(), rs(r1, r2, r3), ca(cs(r2, r3), cs(r1), cs(r1)))
+	peersRemoved := r2.Peers.GarbageCollect()
+	AssertEmpty(t, peersRemoved, "peers removed")
+	AssertEmpty(t, removed.peers, "garbage-collected peers")
+
+	// Now r2 tells its connections
+	{
+		newInfo5 := r1.OnGossip(r2.Gossip())
+		checkEncoding(t, newInfo5, rs(r2), ca(cs(r1)))
+		checkBlank(t, r2.OnGossip(newInfo5))
+		newInfo5b := r3.OnGossip(newInfo5)
+		checkEncoding(t, newInfo5b, rs(r2), ca(cs(r1)))
+		checkBlank(t, r1.OnGossip(newInfo5b))
+
+		checkEncoding(t, r1.Gossip(), rs(r1, r2, r3), ca(cs(r2, r3), cs(r1), cs(r1)))
+		checkEncoding(t, r2.Gossip(), rs(r1, r2, r3), ca(cs(r2, r3), cs(r1), cs(r1)))
+		checkEncoding(t, r3.Gossip(), rs(r1, r2, r3), ca(cs(r2, r3), cs(r1), cs(r1)))
+
+		AssertEmpty(t, r1.Peers.GarbageCollect(), "peers removed")
+		AssertEmpty(t, r2.Peers.GarbageCollect(), "peers removed")
+		AssertEmpty(t, r3.Peers.GarbageCollect(), "peers removed")
+	}
+
+	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
+	r1.DeleteTestConnection(r3)
+	checkEncoding(t, r1.Gossip(), rs(r1, r2, r3), ca(cs(r2), cs(r1), cs(r1)))
+	peersRemoved = r1.Peers.GarbageCollect()
+	wt.AssertEqualInt(t, len(peersRemoved), 1, "peers removed")
+	wt.AssertEqualInt(t, len(removed.peers), 1, "peers removed")
+	checkEncoding(t, r1.Gossip(), rs(r1, r2), ca(cs(r2), cs(r1)))
+	removed.clear()
+
+	// Now r1 tells its remaining connection
+	{
+		newInfo6 := r2.OnGossip(r1.Gossip())
+		checkEncoding(t, newInfo6, rs(r1), ca(cs(r2)))
+		checkBlank(t, r1.OnGossip(newInfo6))
+	}
+
+	checkEncoding(t, r1.Gossip(), rs(r1, r2), ca(cs(r2), cs(r1)))
+	checkEncoding(t, r2.Gossip(), rs(r1, r2), ca(cs(r2), cs(r1)))
+	// r3 still thinks r1 has a connection to it
+	checkEncoding(t, r3.Gossip(), rs(r1, r2, r3), ca(cs(r2, r3), cs(r1), cs(r1)))
+
+	// On a timer, r3 will gossip to r1
+	newInfo7 := r1.OnGossip(r3.Gossip())
+	// 1 received an update that had an older version of 1
+	checkEncoding(t, newInfo7, rs(r1), ca(cs(r2)))
+	// r1 receives info about 3, but eliminates it through garbage collection
+	checkEncoding(t, r1.Gossip(), rs(r1, r2), ca(cs(r2), cs(r1)))
+	wt.AssertEqualInt(t, len(removed.peers), 2, "peers removed")
+	removed.clear()
 }
