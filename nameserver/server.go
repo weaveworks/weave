@@ -9,11 +9,7 @@ import (
 
 const (
 	LOCAL_DOMAIN = "weave.local."
-	RDNS_DOMAIN  = "in-addr.arpa."
 )
-
-// +1 to also exclude a dot
-var rdnsDomainLen = len(RDNS_DOMAIN) + 1
 
 func checkFatal(e error) {
 	if e != nil {
@@ -77,19 +73,14 @@ func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
 		q := r.Question[0]
 		Debug.Printf("Local rdns query: %+v", q)
 		if q.Qtype == dns.TypePTR {
-			if ip := net.ParseIP(q.Name[:len(q.Name)-rdnsDomainLen]); ip != nil {
-				ip4 := ip.To4()
-				revIP := []byte{ip4[3], ip4[2], ip4[1], ip4[0]}
-				Debug.Printf("Looking for address: %+v", revIP)
-				if name, err := zone.ReverseLookupLocal(revIP); err == nil {
-					Debug.Printf("Found name: %s", name)
-					m := makePTRReply(r, &q, []string{name})
-					w.WriteMsg(m)
-				} else {
-					Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
-					// We don't know the answer; see if someone else does
-					// TODO
-				}
+			if name, err := zone.ReverseLookupLocal(q.Name); err == nil {
+				Debug.Printf("Found name: %s", name)
+				m := makePTRReply(r, &q, []string{name})
+				w.WriteMsg(m)
+			} else {
+				Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
+				// We don't know the answer; see if someone else does
+				// TODO
 			}
 		}
 	}

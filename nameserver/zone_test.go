@@ -35,7 +35,7 @@ func TestZone(t *testing.T) {
 	}
 
 	// See if we can find the address by IP.
-	foundName, err := zone.ReverseLookupLocal(ip)
+	foundName, err := zone.ReverseLookupLocal("1.2.0.10.in-addr.arpa.")
 	wt.AssertNoErr(t, err)
 
 	if foundName != successTestName {
