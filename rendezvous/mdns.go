@@ -46,10 +46,10 @@ func MDnsWorkerUrl(u url.URL, iface *net.Interface) *url.URL {
 type mDnsWorker struct {
 	SimpleRendezvousWorker
 
-	manager      *RendezvousManager
-	fullDomain   string
-	stopChan     chan bool
-	announcedIps map[string]bool // keep track the IPs we finally announce
+	manager    *RendezvousManager
+	fullDomain string
+	stopChan   chan bool
+	skippedIps map[string]bool // keep track the IPs we have notified about or our own IPs
 }
 
 // Create a new mDNS rendezvous service for a domain
@@ -64,22 +64,22 @@ func NewMDnsWorker(manager *RendezvousManager, domainUrl *url.URL) *mDnsWorker {
 		SimpleRendezvousWorker: SimpleRendezvousWorker{
 			Domain: domain,
 		},
-		manager:      manager,
-		fullDomain:   fullDomain,
-		stopChan:     make(chan bool),
-		announcedIps: make(map[string]bool),
+		manager:    manager,
+		fullDomain: fullDomain,
+		stopChan:   make(chan bool),
+		skippedIps: make(map[string]bool),
 	}
 	return &mdns
 }
 
 // start a mDNS worker for this domain/interface
-func (mdns *mDnsWorker) Start(endpoints []RendezvousEndpoint, iface *net.Interface) error {
+func (mdns *mDnsWorker) Start(externals []externalIface, iface *net.Interface) error {
 	name, err := os.Hostname()
 	zone := new(nameserver.ZoneDb)
-	for _, ep := range endpoints {
-		Debug.Printf("Announcing %s at %s on %s", mdns.fullDomain, ep.ip, ep.iface.Name)
-		zone.AddRecord(name, mdns.fullDomain, ep.ip)
-		mdns.announcedIps[ep.ip.String()] = true
+	for _, external := range externals {
+		Debug.Printf("Announcing %s at %s on %s", mdns.fullDomain, external.ip, external.iface.Name)
+		zone.AddRecord(name, mdns.fullDomain, external.ip)
+		mdns.skippedIps[external.ip.String()] = true
 	}
 
 	Debug.Printf("Starting mDNS server on %s...", iface.Name)
@@ -124,9 +124,10 @@ func (mdns *mDnsWorker) Start(endpoints []RendezvousEndpoint, iface *net.Interfa
 			case resp, ok := <-responsesChan:
 				if ok {
 					foundIpStr := resp.Addr.String()
-					if _, ourselves := mdns.announcedIps[foundIpStr]; !ourselves {
+					if _, skipped := mdns.skippedIps[foundIpStr]; !skipped {
 						Debug.Printf("Found peer \"%s\" with mDNS", foundIpStr)
 						mdns.manager.notifyAbout(foundIpStr)
+						mdns.skippedIps[foundIpStr] = true		 //TODO: maybe we should move skippedIps to the manager...
 					}
 				}
 			}

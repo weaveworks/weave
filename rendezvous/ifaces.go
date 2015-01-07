@@ -98,18 +98,18 @@ func GuessExternalInterfaces(extraIgnored IfaceNamesList) ([]*net.Interface, err
 }
 
 // A pair of interface and corresponding IP address
-type RendezvousEndpoint struct {
+type externalIface struct {
 	iface *net.Interface
 	ip    net.IP
 }
 
-func (re *RendezvousEndpoint) String() string {
+func (re *externalIface) String() string {
 	return fmt.Sprintf("%s@%s", re.ip.String(), re.iface.Name)
 }
 
-// For each interface, create an entrypoint: a pair of interface and external IP address
-func RendezvousEndpointsFromIfaces(ifaces []*net.Interface) ([]RendezvousEndpoint, error) {
-	eps := make([]RendezvousEndpoint, 0)
+// For each interface, create an endpoint: a pair of interface and external IP address
+func ExternalsFromIfaces(ifaces []*net.Interface) ([]externalIface, error) {
+	eps := make([]externalIface, 0)
 	for _, iface := range ifaces {
 		addrs, _ := iface.Addrs()
 		for _, addr := range addrs {
@@ -119,10 +119,7 @@ func RendezvousEndpointsFromIfaces(ifaces []*net.Interface) ([]RendezvousEndpoin
 				continue
 			}
 			if ip.IsGlobalUnicast() {
-				eps = append(eps, RendezvousEndpoint{
-					iface: iface,
-					ip:    ip,
-				})
+				eps = append(eps, externalIface{iface, ip})
 			}
 		}
 	}

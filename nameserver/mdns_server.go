@@ -63,7 +63,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 			} else if s.addrIsLocal(w.RemoteAddr()) {
 				// ignore this - it's our own query received via multicast
 			} else {
-				Debug.Printf("Failed MDNS lookup for %s", q.Name)
+				Debug.Printf("mDNS server: failed MDNS lookup for %s", q.Name)
 			}
 		}
 	}
@@ -72,7 +72,6 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 }
 
 func (s *MDNSServer) sendResponse(m *dns.Msg) error {
-	Debug.Printf("Sending response")
 	buf, err := m.Pack()
 	if err != nil {
 		return err

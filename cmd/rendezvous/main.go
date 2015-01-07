@@ -69,7 +69,7 @@ func main() {
 		}
 	}
 
-	endpoints, err := RendezvousEndpointsFromIfaces(parsedIfaces)
+	externals, err := ExternalsFromIfaces(parsedIfaces)
 	if err != nil {
 		log.Fatalf("Could not get rendezvous announced enpoints: %s", err)
 	}
@@ -79,7 +79,7 @@ func main() {
 		log.Fatalf("Could not parse weave URL \"%s\": %s", weaveUrl, err)
 	}
 
-	manager := NewRendezvousManager(endpoints, parsedWeaveUrl)
+	manager := NewRendezvousManager(externals, parsedWeaveUrl)
 	for _, domain := range domains {
 		manager.Connect(domain)
 	}

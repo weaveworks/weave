@@ -33,7 +33,7 @@ var rendezvousServices = map[string]RendezvousServiceFactory{
 // when joining "mdns:///somegroup", we could start a worker for "eth0" (identified by
 // "mdns://eth0/somegroup") and another one for "eth1" (identified by "mdns://eth1/somegroup")
 type RendezvousWorker interface {
-	Start([]RendezvousEndpoint, *net.Interface) error
+	Start([]externalIface, *net.Interface) error
 	Stop() error
 }
 
@@ -47,13 +47,13 @@ type managerEntry struct {
 }
 
 type RendezvousManager struct {
-	endpoints  []RendezvousEndpoint
+	endpoints  []externalIface
 	workers    map[string]managerEntry
 	notifyChan chan string
 }
 
 // Create a new rendezvous manager
-func NewRendezvousManager(endpoints []RendezvousEndpoint, weaveUrl *url.URL) *RendezvousManager {
+func NewRendezvousManager(endpoints []externalIface, weaveUrl *url.URL) *RendezvousManager {
 	r := &RendezvousManager{
 		endpoints:  endpoints,
 		workers:    make(map[string]managerEntry),
