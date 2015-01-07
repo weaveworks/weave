@@ -1,16 +1,20 @@
 # Weave DNS server
 
-The Weave DNS server answers name queries in a Weave network. This provides a
-simple way for containers to find each other: just give them hostnames and
-tell other containers to connect to those names.  Unlike Docker `--link`, this
-requires no code changes and works across hosts.
+The Weave DNS server answers name queries in a Weave network. This
+provides a simple way for containers to find each other: just give
+them hostnames and tell other containers to connect to those names.
+Unlike Docker 'links', this requires no code changes and works across
+hosts.
 
 ## Using weaveDNS
 
-The weave script command `launch-dns` starts the DNS container, and
-then you use the `--with-dns` option on containers you wish to use it.
-Subsquently, giving any container a hostname in the domain
-`.weave.local` will register it in DNS. For example:
+WeaveDNS is deployed as a set of containers that communicate with each
+other over the weave network. One such container needs to be started
+on every weave host, by invoking the weave script command
+`launch-dns`. Application containers are then instructed to use
+WeaveDNS as their nameserver by supplying the `--with-dns` option when
+starting them. Giving any container a hostname in the `.weave.local`
+domain registers it in weaveDNS.  For example:
 
 ```bash
 $ weave launch
@@ -23,26 +27,30 @@ $ docker attach $shell1
 ...
 ```
 
-Launch weaveDNS on every host, picking a different IP address from the same
-subnet each time.  It's best if this subnet is different from the one you use for
-application containers.  In our example the weaveDNS address is in subnet
-10.1.254.0/24 and the ubuntu containers are in subnet 10.1.1.0/24.
+Each weaveDNS container started with `launch-dns` needs to be given
+its own, unique, IP address, in a subnet that is a) common to all
+weaveDNS containers, b) disjoint from the application subnets, and c)
+not in use on any of the hosts. In our example the weaveDNS address is
+in subnet 10.1.254.0/24 and the application containers are in
+subnet 10.1.1.0/24.
 
-As usual, these subnets must not be in use for other purposes on your hosts.
-
-The DNS container can be stopped with `stop-dns`.
+WeaveDNS containers can be stopped with `stop-dns`.
 
 ## How it works
 
-WeaveDNS runs on every host, and acts as the nameserver for containers on that
-host. It is told about hostnames for local containers by the `weave run`
-command.
+The weaveDNS container running on every host acts as the nameserver
+for containers on that host. It is told about hostnames for local
+containers by the `weave run` command. If a hostname is in the
+`.weave.local` domain then weaveDNS records the association of that
+name with the container's weave IP address(es).
 
-WeaveDNS only stores names in the `.weave.local` domain. If it is asked for
-a name in `.weave.local` it doesn't know about, it will ask the other weaveDNS
-servers.
-If asked for a name in another domain it will fall back to using the host's
-configured nameserver.
+When weaveDNS is queried for a name in the `.weave.local` domain, it
+first checks its own records. If the name is not found there, it asks
+the weaveDNS servers on the other hosts in the weave network.
+
+When weaveDNS is queried for a name in a domain other than
+`.weave.local`, it queries the host's configured nameserver,
+which is the standard behaviour for Docker containers.
 
 ## Domain search paths
 
