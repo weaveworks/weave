@@ -95,7 +95,9 @@ same host, via their docker-assigned IP addresses. For complete
 isolation between application containers, that feature needs to be
 disabled by
 [setting `--icc=false`](https://docs.docker.com/articles/networking/#between-containers)
-in the docker daemon configuration.
+in the docker daemon configuration. Furthermore, containers should be
+prevented from capturing and injecting raw network packets - this can
+be accomplished by starting them with the `--cap-drop net_raw` option.
 
 ### <a name="dynamic-network-attachment"></a>Dynamic network attachment
 
