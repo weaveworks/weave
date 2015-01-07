@@ -92,6 +92,24 @@ func AssertEmpty(t *testing.T, array []*Peer, desc string) {
 	}
 }
 
+func checkPeerArray(t *testing.T, peers []*Peer, routers []*Router) {
+	check := make(map[PeerName]bool)
+	for _, peer := range peers {
+		check[peer.Name] = true
+	}
+	for _, router := range routers {
+		name := router.Ourself.Peer.Name
+		if _, found := check[name]; found {
+			delete(check, name)
+		} else {
+			t.Fatalf("%s: Expected peer not found %s", wt.CallSite(2), name)
+		}
+	}
+	if len(check) > 0 {
+		t.Fatalf("%s: Unexpected peers: %v", wt.CallSite(2), check)
+	}
+}
+
 func AssertEqualPN(t *testing.T, got, wanted PeerName, desc string) {
 	if got != wanted {
 		t.Fatalf("%s: Expected %s %s but got %s", wt.CallSite(4), desc, wanted, got)
@@ -223,6 +241,7 @@ func TestGossip(t *testing.T) {
 	r2.AddTestConnection(r3)
 	checkEncoding(t, r2.Gossip(), rs(r1, r2, r3), ca(nil, cs(r1, r3), nil))
 	checkEncoding(t, r3.Gossip(), rs(r3), ca(nil))
+	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Now r2 is going to gossip to r1
 	newInfo1 := r1.OnGossip(r2.Gossip())
@@ -246,11 +265,14 @@ func TestGossip(t *testing.T) {
 
 	// Now r2 gossips to r3, but 1 and 2 are unreachable from r3 so they get removed from the update
 	{
+		AssertEmpty(t, removed.peers, "garbage-collected peers")
 		newInfo2 := r3.OnGossip(r2.Gossip())
+		checkPeerArray(t, removed.peers, rs(r1, r2))
 		checkBlank(t, newInfo2)
 		checkEncoding(t, r3.Gossip(), rs(r3), ca(nil))
 		// r3 doesn't have any outgoing connections, so this doesn't go any further
 	}
+	removed.clear()
 
 	// Add a connection from 3 to 1 and now r1 is reachable.
 	r3.AddTestConnection(r1)
@@ -262,6 +284,7 @@ func TestGossip(t *testing.T) {
 	// 3 receives an update from 1 that has an older version of 3, so 3 goes into the 'new info'
 	checkEncoding(t, newInfo3, rs(r1, r2, r3), ca(cs(r2, r3), cs(r1, r3), cs(r1)))
 	checkEncoding(t, r3.Gossip(), rs(r1, r2, r3), ca(cs(r2, r3), cs(r1, r3), cs(r1)))
+	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Now the gossip from 3 to 1 that was 'simultaneous' with the one before
 	newInfo4 := r1.OnGossip(r3Gossip)
@@ -285,7 +308,7 @@ func TestGossip(t *testing.T) {
 		checkBlank(t, r3.OnGossip(newInfo4b))
 	}
 
-	removed.clear()
+	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Drop the connection from 2 to 3
 	r2.DeleteTestConnection(r3)
@@ -310,14 +333,15 @@ func TestGossip(t *testing.T) {
 		AssertEmpty(t, r1.Peers.GarbageCollect(), "peers removed")
 		AssertEmpty(t, r2.Peers.GarbageCollect(), "peers removed")
 		AssertEmpty(t, r3.Peers.GarbageCollect(), "peers removed")
+		AssertEmpty(t, removed.peers, "garbage-collected peers")
 	}
 
 	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
 	r1.DeleteTestConnection(r3)
 	checkEncoding(t, r1.Gossip(), rs(r1, r2, r3), ca(cs(r2), cs(r1), cs(r1)))
 	peersRemoved = r1.Peers.GarbageCollect()
-	wt.AssertEqualInt(t, len(peersRemoved), 1, "peers removed")
-	wt.AssertEqualInt(t, len(removed.peers), 1, "peers removed")
+	checkPeerArray(t, peersRemoved, rs(r3))
+	checkPeerArray(t, removed.peers, rs(r3))
 	checkEncoding(t, r1.Gossip(), rs(r1, r2), ca(cs(r2), cs(r1)))
 	removed.clear()
 
@@ -326,6 +350,8 @@ func TestGossip(t *testing.T) {
 		newInfo6 := r2.OnGossip(r1.Gossip())
 		checkEncoding(t, newInfo6, rs(r1), ca(cs(r2)))
 		checkBlank(t, r1.OnGossip(newInfo6))
+		checkPeerArray(t, removed.peers, rs(r3))
+		removed.clear()
 	}
 
 	checkEncoding(t, r1.Gossip(), rs(r1, r2), ca(cs(r2), cs(r1)))
@@ -339,6 +365,6 @@ func TestGossip(t *testing.T) {
 	checkEncoding(t, newInfo7, rs(r1), ca(cs(r2)))
 	// r1 receives info about 3, but eliminates it through garbage collection
 	checkEncoding(t, r1.Gossip(), rs(r1, r2), ca(cs(r2), cs(r1)))
-	wt.AssertEqualInt(t, len(removed.peers), 2, "peers removed")
+	checkPeerArray(t, removed.peers, rs(r3))
 	removed.clear()
 }
