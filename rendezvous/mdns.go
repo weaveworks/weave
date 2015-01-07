@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	mdnsQueryPeriod    = 5  // period for asking for new peers in a domain
-	mdnsMaxQueryPeriod = 60 // the query period grows up to this
+	mdnsQueryPeriod    = 5   // period for asking for new peers in a domain
+	mdnsMaxQueryPeriod = 120 // the query period grows up to this
 
-    domainStrippedChars = "./+-=_"
+	domainStrippedChars = "./+-=_"
 )
 
 // remove some forbidden chars fom a string
@@ -44,7 +44,7 @@ func MDnsWorkerUrl(u url.URL, iface *net.Interface) *url.URL {
 }
 
 type mDnsWorker struct {
-	SimpleRendezvousService
+	SimpleRendezvousWorker
 
 	manager      *RendezvousManager
 	fullDomain   string
@@ -61,7 +61,7 @@ func NewMDnsWorker(manager *RendezvousManager, domainUrl *url.URL) *mDnsWorker {
 	}
 
 	mdns := mDnsWorker{
-		SimpleRendezvousService: SimpleRendezvousService{
+		SimpleRendezvousWorker: SimpleRendezvousWorker{
 			Domain: domain,
 		},
 		manager:      manager,

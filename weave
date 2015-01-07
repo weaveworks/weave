@@ -421,11 +421,14 @@ check_rendezvous_running() {
     if ! container_is_running $RENDEZVOUS_CONTAINER_NAME ; then
         create_bridge
         docker_bridge_ip
+        wait_for_container $CONTAINER_NAME
         weave_ip=$(container_ip $CONTAINER_NAME) || fatal "Weave container has no IP address"
         docker rm $RENDEZVOUS_CONTAINER_NAME 2>/dev/null || /bin/true
         RENDEZVOUS_CONTAINER=$(docker run --privileged -d --net=host --name=$RENDEZVOUS_CONTAINER_NAME \
             -p $RENDEZVOUS_HTTP_PORT:$RENDEZVOUS_HTTP_PORT/tcp \
-            $RENDEZVOUS_IMAGE -port $RENDEZVOUS_HTTP_PORT -weave http://$weave_ip:$HTTP_PORT/ "$@")
+            $RENDEZVOUS_IMAGE -port $RENDEZVOUS_HTTP_PORT \
+            -nifaces $BRIDGE,$CONTAINER_IFNAME,$DOCKER_BRIDGE \
+            -weave http://$weave_ip:$HTTP_PORT/ "$@")
     fi
 }
 
@@ -542,14 +545,14 @@ case "$COMMAND" in
         check_rendezvous_running
         wait_for_http_status 127.0.0.1 $RENDEZVOUS_HTTP_PORT || \
             fatal "Timeout waiting for rendezvous container. Check the logs with \"docker logs $RENDEZVOUS_CONTAINER_NAME\""
-        http_call_ip 127.0.0.1 $RENDEZVOUS_HTTP_PORT "POST" "/join" -d "domain=$1"
+        http_call_ip 127.0.0.1 $RENDEZVOUS_HTTP_PORT "POST" "/join" -d "group=$1"
         ;;
     leave)
         [ $# -eq 1 ] || usage
         check_rendezvous_running
         wait_for_http_status 127.0.0.1 $RENDEZVOUS_HTTP_PORT || \
             fatal "Timeout waiting for rendezvous container. Check the logs with \"docker logs $RENDEZVOUS_CONTAINER_NAME\""
-        http_call_ip 127.0.0.1 $RENDEZVOUS_HTTP_PORT "POST" "/leave" -d "domain=$1"
+        http_call_ip 127.0.0.1 $RENDEZVOUS_HTTP_PORT "POST" "/leave" -d "group=$1"
         ;;
     status)
         http_call $CONTAINER_NAME $HTTP_PORT GET /status

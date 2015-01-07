@@ -6,7 +6,7 @@ import (
 
 func TestInterfacesGuess(t *testing.T) {
 	var ifaces IfaceNamesList = NewIfaceNamesList()
-	eps, err := EndpointsListFromIfaceNamesList(ifaces)
+	eps, err := GuessExternalInterfaces(ifaces)
 	if err != nil {
 		t.Fail()
 	}

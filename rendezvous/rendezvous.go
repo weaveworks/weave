@@ -34,7 +34,7 @@ type RendezvousWorker interface {
 	Stop() error
 }
 
-type SimpleRendezvousService struct {
+type SimpleRendezvousWorker struct {
 	Domain string // something like "mdns:///somedomain"
 }
 

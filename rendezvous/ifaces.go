@@ -19,7 +19,6 @@ var ignoredIfaces = []string{
 	"^ethwe.*",
 	"^veth.*",
 	"^vnet.*",
-	"^bridge.*",
 	"^docker.*",
 	"^tun.*",
 	"^tap.*",
@@ -39,14 +38,27 @@ func isIgnoredIface(i *net.Interface) bool {
 	return false
 }
 
-// External interfaces
+// An interfaces names set
 type IfaceNamesList map[string]bool
 
 func NewIfaceNamesList() IfaceNamesList {
 	return make(map[string]bool)
 }
+
 func (il *IfaceNamesList) String() string {
 	return fmt.Sprint(*il)
+}
+
+func (il *IfaceNamesList) ToInterfaces() ([]*net.Interface, error) {
+	parsedIfaces := make([]*net.Interface, 0)
+	for iface := range *il {
+		parsedIface, err := net.InterfaceByName(iface)
+		if err != nil {
+			return nil, fmt.Errorf("Could not find interface %s", iface)
+		}
+		parsedIfaces = append(parsedIfaces, parsedIface)
+	}
+	return parsedIfaces, nil
 }
 
 // Utility method for setting the interfaces from a list of comma-separated interfaces
@@ -56,6 +68,33 @@ func (il IfaceNamesList) Set(value string) error {
 		il[ifacestr] = true
 	}
 	return nil
+}
+
+// Guess the external interfaces, ignoring some devices by default, and some others if
+// they are in `extraIgnored`
+func GuessExternalInterfaces(extraIgnored IfaceNamesList) ([]*net.Interface, error) {
+	parsedIfaces := make([]*net.Interface, 0)
+
+	Debug.Printf("Guessing external interfaces...")
+	guessedIfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, errIfaceListError
+	}
+
+	isExtraIgnored := func(i *net.Interface) bool {
+		_, inExtra := extraIgnored[i.Name]
+		return inExtra
+	}
+
+	for idx, _ := range guessedIfaces {
+		guessedIface := &guessedIfaces[idx]
+		if !isIgnoredIface(guessedIface) && !isExtraIgnored(guessedIface) {
+			Debug.Printf("... %s seems a valid interface", guessedIface.Name)
+			parsedIfaces = append(parsedIfaces, guessedIface)
+		}
+	}
+
+	return parsedIfaces, nil
 }
 
 // A pair of interface and corresponding IP address
@@ -68,37 +107,10 @@ func (re *RendezvousEndpoint) String() string {
 	return fmt.Sprintf("%s@%s", re.ip.String(), re.iface.Name)
 }
 
-// Convert the interfaces list provided in command line to a list of endpoints
-func EndpointsListFromIfaceNamesList(ifaces IfaceNamesList) ([]RendezvousEndpoint, error) {
-	parsedIfaces := make([]*net.Interface, 0)
-
-	if len(ifaces) > 0 {
-		for iface := range ifaces {
-			parsedIface, err := net.InterfaceByName(iface)
-			if err != nil {
-				return nil, fmt.Errorf("Could not find interface %s", iface)
-			}
-			parsedIfaces = append(parsedIfaces, parsedIface)
-		}
-	} else {
-		Debug.Printf("Guessing external interfaces...")
-		guessedIfaces, err := net.Interfaces()
-		if err != nil {
-			return nil, errIfaceListError
-		}
-
-		for idx, _ := range guessedIfaces {
-			guessedIface := &guessedIfaces[idx]
-			if !isIgnoredIface(guessedIface) {
-				Debug.Printf("... %s seems a valid interface", guessedIface.Name)
-				parsedIfaces = append(parsedIfaces, guessedIface)
-			}
-		}
-	}
-
-	// for each interface, create an entrypoint: a pair of interface and external IP address
+// For each interface, create an entrypoint: a pair of interface and external IP address
+func RendezvousEndpointsFromIfaces(ifaces []*net.Interface) ([]RendezvousEndpoint, error) {
 	eps := make([]RendezvousEndpoint, 0)
-	for _, iface := range parsedIfaces {
+	for _, iface := range ifaces {
 		addrs, _ := iface.Addrs()
 		for _, addr := range addrs {
 			ip, _, err := net.ParseCIDR(addr.String())
