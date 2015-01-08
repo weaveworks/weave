@@ -7,6 +7,7 @@ import (
 	lg "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
 	"net"
+	"sort"
 	"sync"
 	"time"
 )
@@ -130,7 +131,7 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 				lg.Error.Println("Received update to our own info")
 				continue // Shouldn't happen
 			}
-			lg.Debug.Println("Replacing", newSpaceset.PeerName, "data with newer version", newSpaceset.version)
+			lg.Debug.Println("Replacing data with newer version", newSpaceset)
 			alloc.peerInfo[newSpaceset.UID()] = newSpaceset
 			if alloc.state == allocStateLeaderless && !newSpaceset.Empty() {
 				alloc.moveToState(allocStateNeutral, 0)
@@ -148,6 +149,24 @@ func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
 		}
 	}
 	return 0
+}
+
+func (alloc *Allocator) lookForOverlaps() (ret bool) {
+	ret = false
+	allSpaces := make([]Space, 0)
+	for _, peerSpaceSet := range alloc.peerInfo {
+		peerSpaceSet.ForEachSpace(func(space Space) {
+			allSpaces = append(allSpaces, space)
+		})
+	}
+	sort.Sort(SpaceByStart(allSpaces))
+	for i := 0; i < len(allSpaces)-1; i++ {
+		if allSpaces[i].Overlaps(allSpaces[i+1]) {
+			lg.Error.Printf("Spaces overlap: %s and %s", allSpaces[i], allSpaces[i+1])
+			ret = true
+		}
+	}
+	return
 }
 
 func (alloc *Allocator) lookForNewLeaks(now time.Time) {
@@ -219,6 +238,7 @@ func (alloc *Allocator) considerOurPosition() {
 		alloc.discardOldLeaks()
 		changed := alloc.reclaimLeaks(now)
 		alloc.lookForNewLeaks(now)
+		alloc.lookForOverlaps()
 		if changed {
 			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 		}
@@ -409,7 +429,7 @@ func (alloc *Allocator) OnGossipBroadcast(buf []byte) {
 // merge in state and return a buffer encoding those PeerSpaces which are newer
 // than what we had previously, or nil if none were newer
 func (alloc *Allocator) OnGossip(buf []byte) []byte {
-	lg.Debug.Printf("OnGossip: %d bytes\n", len(buf))
+	lg.Debug.Printf("Allocator.OnGossip: %d bytes\n", len(buf))
 	alloc.Lock()
 	defer alloc.Unlock()
 	newerPeerSpaces, err := alloc.decodeUpdate(buf)

@@ -171,6 +171,10 @@ func (f *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte)
 	return nil
 }
 
+// Note: this style of verification, using equalByteBuffer, requires
+// that the contents of messages are never re-ordered.  Which, for instance,
+// requires they are not based off iterating through a map.
+
 func (m *mockGossipComms) VerifyMessage(t *testing.T, dst string, msgType byte, buf []byte) {
 	if len(m.messages) == 0 {
 		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite(2))

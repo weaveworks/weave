@@ -22,6 +22,13 @@ type Space interface {
 	String() string
 }
 
+// For sorting
+type SpaceByStart []Space
+
+func (a SpaceByStart) Len() int           { return len(a) }
+func (a SpaceByStart) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SpaceByStart) Less(i, j int) bool { return ip4int(a[i].GetStart()) < ip4int(a[j].GetStart()) }
+
 // This struct is used in Gob-encoding to pass info around, which is why all of its fields are exported.
 type MinSpace struct {
 	Start        net.IP
