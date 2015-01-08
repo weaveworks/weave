@@ -36,6 +36,24 @@ func AssertEqualuint64(t *testing.T, got, wanted uint64, desc string, level int)
 	}
 }
 
+func AssertEqualUint32(t *testing.T, got, wanted uint32, desc string) {
+	if got != wanted {
+		t.Fatalf("%s: Expected %s %d but got %d", CallSite(2), desc, wanted, got)
+	}
+}
+
+func AssertEqualUint64(t *testing.T, got, wanted uint64, desc string) {
+	if got != wanted {
+		t.Fatalf("%s: Expected %s %d but got %d", CallSite(2), desc, wanted, got)
+	}
+}
+
+func AssertEqualStr(t *testing.T, got, wanted string, desc string) {
+	if got != wanted {
+		t.Fatalf("%s: Expected %s '%s' but got '%s'", CallSite(2), desc, wanted, got)
+	}
+}
+
 func AssertEqualInt(t *testing.T, got, wanted int, desc string) {
 	if got != wanted {
 		t.Fatalf("%s: Expected %s %d but got %d", CallSite(2), desc, wanted, got)

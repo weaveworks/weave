@@ -173,13 +173,13 @@ func (f *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte)
 
 func (m *mockGossipComms) VerifyMessage(t *testing.T, dst string, msgType byte, buf []byte) {
 	if len(m.messages) == 0 {
-		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite())
+		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite(2))
 	} else if msg := m.messages[0]; msg.dst.String() != dst {
-		t.Fatalf("%s: Expected Gossip message to %s but got dest %s", wt.CallSite(), dst, msg.dst)
+		t.Fatalf("%s: Expected Gossip message to %s but got dest %s", wt.CallSite(2), dst, msg.dst)
 	} else if msg.buf[0] != msgType {
-		t.Fatalf("%s: Expected Gossip message of type %d but got type %d", wt.CallSite(), msgType, msg.buf[0])
+		t.Fatalf("%s: Expected Gossip message of type %d but got type %d", wt.CallSite(2), msgType, msg.buf[0])
 	} else if !equalByteBuffer(msg.buf[1:], buf) {
-		t.Fatalf("%s: Gossip message not sent as expected: %+v", wt.CallSite(), msg)
+		t.Fatalf("%s: Gossip message not sent as expected: %+v", wt.CallSite(2), msg)
 	} else {
 		// Swallow this message
 		m.messages = m.messages[1:]
@@ -188,11 +188,11 @@ func (m *mockGossipComms) VerifyMessage(t *testing.T, dst string, msgType byte, 
 
 func (m *mockGossipComms) VerifyBroadcastMessage(t *testing.T, buf []byte) {
 	if len(m.messages) == 0 {
-		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite())
+		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite(2))
 	} else if msg := m.messages[0]; msg.dst != router.UnknownPeerName {
-		t.Fatalf("%s: Expected Gossip broadcast message but got dest %s", wt.CallSite(), msg.dst)
+		t.Fatalf("%s: Expected Gossip broadcast message but got dest %s", wt.CallSite(2), msg.dst)
 	} else if !equalByteBuffer(msg.buf, buf) {
-		t.Fatalf("%s: Gossip message not sent as expected: %+v", wt.CallSite(), msg)
+		t.Fatalf("%s: Gossip message not sent as expected: %+v", wt.CallSite(2), msg)
 	} else {
 		// Swallow this message
 		m.messages = m.messages[1:]
@@ -201,7 +201,7 @@ func (m *mockGossipComms) VerifyBroadcastMessage(t *testing.T, buf []byte) {
 
 func (m *mockGossipComms) VerifyNoMoreMessages(t *testing.T) {
 	if len(m.messages) > 0 {
-		t.Fatalf("%s, Gossip message unexpected: %+v", wt.CallSite(), m)
+		t.Fatalf("%s, Gossip message unexpected: %+v", wt.CallSite(2), m)
 	}
 }
 
@@ -320,13 +320,18 @@ func TestGossip(t *testing.T) {
 
 	// Now looking to trigger a timeout
 	mockTime.SetTime(baseTime.Add(11 * time.Minute))
-	alloc1.OnDead(peerUID) // FIXME: Is someone else supposed to call this?
-	alloc1.considerOurPosition()
+	alloc1.OnDead(peerUID)             // FIXME: Is someone else supposed to call this?
+	time.Sleep(100 * time.Millisecond) // slight hack: allow the async broadcast to complete
 
 	// Now make it look like alloc2 is a tombstone so we can check the message
 	alloc2.ourSpaceSet.MakeTombstone()
 
 	mockGossip1.VerifyBroadcastMessage(t, encode(alloc2.ourSpaceSet))
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	// Allow alloc1 to note the leak, but at this point it doesn't do anything
+	alloc1.considerOurPosition()
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
