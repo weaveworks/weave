@@ -4,13 +4,14 @@
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
 
+DOCKERHUB_USER=zettio
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
 WEAVETOOLS_EXES=tools/bin
-WEAVER_IMAGE=zettio/weave
-WEAVEDNS_IMAGE=zettio/weavedns
-WEAVETOOLS_IMAGE=zettio/weavetools
+WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
+WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
+WEAVETOOLS_IMAGE=$(DOCKERHUB_USER)/weavetools
 WEAVER_EXPORT=/var/tmp/weave.tar
 WEAVEDNS_EXPORT=/var/tmp/weavedns.tar
 WEAVETOOLS_EXPORT=/var/tmp/weavetools.tar
