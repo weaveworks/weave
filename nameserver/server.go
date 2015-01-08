@@ -98,9 +98,7 @@ func notUsHandler() dns.HandlerFunc {
 	}
 }
 
-func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wait int) error {
-	go ListenHttp(LOCAL_DOMAIN, zone, httpPort)
-
+func StartServer(zone Zone, iface *net.Interface, dnsPort int, wait int) error {
 	mdnsClient, err := NewMDNSClient()
 	checkFatal(err)
 
