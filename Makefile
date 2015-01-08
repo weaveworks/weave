@@ -1,5 +1,7 @@
+PUBLISH=publish_weave publish_weavedns publish_weavetools
+
 .DEFAULT: all
-.PHONY: all update tests clean
+.PHONY: all update tests publish $(PUBLISH) clean
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
@@ -54,6 +56,13 @@ $(WEAVETOOLS_EXPORT): tools/Dockerfile $(WEAVETOOLS_EXES)
 # Add more directories in here as more tests are created
 tests:
 	cd nameserver; go test -tags netgo
+
+$(PUBLISH): publish_%:
+	$(SUDO) docker tag  $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(SUDO) docker push $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(SUDO) docker push $(DOCKERHUB_USER)/$*:latest
+
+publish: $(PUBLISH)
 
 clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE)
