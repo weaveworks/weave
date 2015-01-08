@@ -63,6 +63,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 				q := &r.Question[0]
 				if q.Qtype == qtype {
 					if m := lookup(r, q); m != nil {
+						Debug.Printf("Found local answer to mDNS query %s", q.Name)
 						if err = s.sendResponse(m); err != nil {
 							Warning.Printf("Error writing to %s", w)
 						}
