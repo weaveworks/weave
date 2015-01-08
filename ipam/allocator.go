@@ -130,6 +130,9 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 			if newSpaceset.UID() == alloc.ourUID {
 				lg.Error.Println("Received update to our own info")
 				continue // Shouldn't happen
+			} else if newSpaceset.PeerName() == alloc.ourName {
+				lg.Debug.Println("Received update with our peerName but different UID")
+				continue
 			}
 			lg.Debug.Println("Replacing data with newer version", newSpaceset)
 			alloc.peerInfo[newSpaceset.UID()] = newSpaceset
@@ -300,7 +303,7 @@ func (alloc *Allocator) requestSpace() {
 		}
 	}
 	if best != nil {
-		lg.Debug.Println("Decided to ask peer", best.PeerName, "for space:", best)
+		lg.Debug.Println("Decided to ask peer", best.PeerName(), "for space:", best)
 		myState := encode(alloc.ourSpaceSet)
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
 		alloc.gossip.GossipUnicast(best.PeerName(), msg)

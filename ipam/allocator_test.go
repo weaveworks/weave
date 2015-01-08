@@ -346,3 +346,34 @@ func TestGossip(t *testing.T) {
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 }
+
+func TestGossipGarbage(t *testing.T) {
+	const (
+		ourNameString = "01:00:00:01:00:00"
+		testStart1    = "10.0.1.0"
+	)
+
+	ourName, _ := router.PeerNameFromString(ourNameString)
+	mockGossip1 := new(mockGossipComms)
+	alloc1 := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), 1024)
+	alloc1.SetGossip(mockGossip1)
+	alloc1.startForTesting()
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
+
+	// Simulate another peer on the gossip network, but WITH SAME PEER NAME
+	mockGossip2 := new(mockGossipComms)
+	alloc2 := NewAllocator(ourName, peerUID, net.ParseIP(testStart1), 1024)
+	alloc2.SetGossip(mockGossip2)
+
+	// Give alloc1 some space
+	alloc1.manageSpace(net.ParseIP(testStart1), 0)
+	alloc1.state = allocStateNeutral
+	alloc1.considerOurPosition()
+	mockGossip1.VerifyNoMoreMessages(t)
+
+	// Call decodeUpdate rather than OnGossip which also calls considerOurPosition
+	alloc2.decodeUpdate(alloc1.Gossip())
+	wt.AssertStatus(t, alloc2.state, allocStateLeaderless, "allocator state")
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+}
