@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-const macMaxAge = 10 * time.Minute
+const macMaxAge = 10 * time.Minute // [1]
+
+// [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
+// /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
@@ -24,7 +27,6 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	router := &Router{
 		Iface:          iface,
 		Macs:           NewMacCache(macMaxAge, onMacExpiry),
-		Peers:          NewPeerCache(onPeerGC),
 		GossipChannels: make(map[uint32]*GossipChannel),
 		ConnLimit:      connLimit,
 		BufSz:          bufSz,
@@ -32,9 +34,9 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	if len(password) > 0 {
 		router.Password = &password
 	}
-	ourself := NewPeer(name, 0, 0, router)
-	router.Ourself = router.Peers.FetchWithDefault(ourself)
-	router.Ourself.StartLocalPeer()
+	router.Ourself = StartLocalPeer(name, router)
+	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
+	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	log.Println("Our name is", router.Ourself.Name)
 
 	return router
@@ -50,8 +52,8 @@ func (router *Router) Start() {
 	checkFatal(err)
 	po, err := NewPcapO(router.Iface.Name)
 	checkFatal(err)
-	router.ConnectionMaker = StartConnectionMaker(router)
-	router.Topology = StartTopology(router)
+	router.Routes = StartRoutes(router.Ourself.Peer, router.Peers)
+	router.ConnectionMaker = StartConnectionMaker(router.Ourself, router.Peers)
 	router.UDPListener = router.listenUDP(Port, po)
 	router.listenTCP(Port)
 	router.sniff(pio)
@@ -63,7 +65,7 @@ func (router *Router) Status() string {
 	buf.WriteString(fmt.Sprintln("Sniffing traffic on", router.Iface))
 	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
 	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))
-	buf.WriteString(fmt.Sprintf("Topology:\n%s", router.Topology))
+	buf.WriteString(fmt.Sprintf("Routes:\n%s", router.Routes))
 	buf.WriteString(fmt.Sprintf("Reconnects:\n%s", router.ConnectionMaker))
 	return buf.String()
 }
@@ -75,7 +77,7 @@ func (router *Router) sniff(pio PacketSourceSink) {
 	injectFrame := func(frame []byte) error { return pio.WritePacket(frame) }
 	checkFrameTooBig := func(err error) error { return dec.CheckFrameTooBig(err, injectFrame) }
 	mac := router.Iface.HardwareAddr
-	if router.Macs.Enter(mac, router.Ourself) {
+	if router.Macs.Enter(mac, router.Ourself.Peer) {
 		log.Println("Discovered our MAC", mac)
 	}
 	go func() {
@@ -99,10 +101,10 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	// We need to filter out frames we injected ourselves. For such
 	// frames, the srcMAC will have been recorded as associated with a
 	// different peer.
-	if found && srcPeer != router.Ourself {
+	if found && srcPeer != router.Ourself.Peer {
 		return nil
 	}
-	if router.Macs.Enter(srcMac, router.Ourself) {
+	if router.Macs.Enter(srcMac, router.Ourself.Peer) {
 		log.Println("Discovered local MAC", srcMac)
 	}
 	if dec.DropFrame() {
@@ -110,7 +112,7 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	}
 	dstMac := dec.eth.DstMAC
 	dstPeer, found := router.Macs.Lookup(dstMac)
-	if found && dstPeer == router.Ourself {
+	if found && dstPeer == router.Ourself.Peer {
 		return nil
 	}
 	df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
@@ -155,7 +157,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// someone else is dialing us, so our udp sender is the conn
 	// on Port and we wait for them to send us something on UDP to
 	// start.
-	connRemote := NewRemoteConnection(router.Ourself, nil, tcpConn.RemoteAddr().String())
+	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, tcpConn.RemoteAddr().String())
 	NewLocalConnection(connRemote, true, tcpConn, nil, router)
 }
 
@@ -208,7 +210,11 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 		}
 		err = relayConn.Decryptor.IterateFrames(handleUDPPacket, udpPacket)
 		if pde, ok := err.(PacketDecodingError); ok {
-			relayConn.log(pde.Error())
+			if pde.Fatal {
+				relayConn.CheckFatal(pde)
+			} else {
+				relayConn.log(pde.Error())
+			}
 		} else {
 			checkWarn(err)
 		}
@@ -243,13 +249,10 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
 		srcMac := dec.eth.SrcMAC
 
-		if dstPeer != router.Ourself {
+		if dstPeer != router.Ourself.Peer {
 			// it's not for us, we're just relaying it
 			if decodedLen == 0 {
 				return nil
-			}
-			if router.Macs.Enter(srcMac, srcPeer) {
-				log.Println("Discovered remote MAC", srcMac, "at", srcPeer.Name)
 			}
 			if df {
 				router.LogFrame("Relaying DF", frame, &dec.eth)
@@ -289,10 +292,43 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		checkWarn(po.WritePacket(frame))
 
 		dstPeer, found = router.Macs.Lookup(dec.eth.DstMAC)
-		if !found || dstPeer != router.Ourself {
+		if !found || dstPeer != router.Ourself.Peer {
 			return checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
 		}
 
 		return nil
 	}
 }
+
+// Gossip methods
+
+func (router *Router) OnGossipBroadcast(msg []byte) {
+	// Not expecting these
+	log.Println("Unexpected Gossip Broadcast:", msg)
+}
+func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) {
+	// Not expecting these
+	log.Println("Unexpected Gossip Unicast:", msg)
+}
+
+// Return state of everything we know; intended to be called periodically
+func (router *Router) Gossip() []byte {
+	return router.Peers.EncodeAllPeers()
+}
+
+// merge in state and return "everything new I've just learnt",
+// or nil if nothing in the received message was new
+func (router *Router) OnGossip(buf []byte) []byte {
+	newUpdate, err := router.Peers.ApplyUpdate(buf)
+	if err != nil {
+		// fixme: should we do anything else?
+		log.Println("Error when applying Gossip update:", err)
+	} else if len(newUpdate) == 0 {
+		return nil
+	}
+	router.ConnectionMaker.Refresh()
+	router.Routes.Recalculate()
+	return newUpdate
+}
+
+// todo: worry about the old behaviour which sent a subset of the graph

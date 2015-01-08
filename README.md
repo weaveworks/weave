@@ -27,31 +27,17 @@ capabilities, so these can continue to be used by containers.
 
 ## Installation
 
-To run weave on a host, you need to install...
+Ensure you are running Linux (kernel 3.5 or later) and have Docker
+(version 0.9.1 or later) installed. Then install weave with
 
-1. Linux and Docker. We've tested with Docker versions 0.9.1 through
-   1.3.1, but other versions should work too. Linux kernels after 3.5
-   are known to work; the newer the better.
-2. weave. Install this with
-
-        sudo wget -O /usr/local/bin/weave \
-          https://raw.githubusercontent.com/zettio/weave/master/weave
-        sudo chmod a+x /usr/local/bin/weave
-
-3. (recommended) ethtool. On many systems this is installed already;
-   if not then grab it via your favourite package manager. On some
-   systems, weave application container networking may not operate
-   correctly unless ethtool is available.
-
-4. (optional) conntrack. Install this via your favourite package
-   manager. Without conntrack, the weave network may not re-establish
-   itself fully when individual weave instances are stopped (with
-   `weave stop`) and restarted quickly (typically within ~3 minutes).
+    sudo wget -O /usr/local/bin/weave \
+      https://github.com/zettio/weave/releases/download/latest_release/weave
+    sudo chmod a+x /usr/local/bin/weave
 
 ## Quick Start Screencast
 
-<a href="http://youtu.be/k6r7yuSr0hE" target="_blank">
-  <img src="https://www.dropbox.com/s/7xwm8r1r3k16u3k/Screenshot%202014-11-18%2011.59.45.png?dl=1" />
+<a href="http://youtu.be/k6r7yuSr0hE" alt="Click to watch the screencast" target="_blank">
+  <img src="/docs/hello-screencast.png" />
 </a>
 
 ## Example
@@ -66,7 +52,13 @@ On `$HOST1` run (as root)
     host1# C=$(weave run 10.0.1.1/24 -t -i ubuntu)
 
 The first line starts the weave router, in a container. This needs to
-be done once on each host.
+be done once on each host. The required docker image for the weave
+router container is downloaded automatically. There is also a `weave
+setup` command for downloading this and other images required for
+weave operation; this is a strictly optional step which is especially
+useful for automated installation of weave and ensures that any
+subsequent weave commands do not encounter delays due to image
+downloading.
 
 The second line runs our application container. We give it an IP
 address and network, in
@@ -103,7 +95,7 @@ Note that we could instead have told the weave on `$HOST1` to connect to
 weave automatically (re)connects to peers when they become
 available. Also, we can tell weave to connect to multiple peers by
 supplying multiple addresses, separated by spaces. And we can
-[add peers dynamically](#dynamic-topologies).
+[add peers dynamically](http://zettio.github.io/weave/features.html#dynamic-topologies).
 
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...
@@ -142,7 +134,7 @@ to each other.
 
 Found a bug, want to suggest a feature, or have a question?
 [File an issue](https://github.com/zettio/weave/issues), or email
-weave@zett.io. When reporting a bug, please include which version of
+help@weave.works. When reporting a bug, please include which version of
 weave you are running, as shown by `weave version`.
 
 Follow weave on Twitter:

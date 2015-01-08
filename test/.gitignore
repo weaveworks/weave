@@ -1,0 +1,4 @@
+insecure_private_key
+assert.sh
+.vagrant
+.ssh_known_hosts

@@ -1,6 +1,9 @@
 #! /bin/bash
 set -e
 
+# For info on why/how to use this script, see
+# https://github.com/zettio/weave/wiki/WorkingOnWeave#working-on-docs
+
 MERGE_ARGS="-X subtree=site"
 
 merge_dir=$(mktemp -d -t weave-merge.XXXXXX)/weave

@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
+	wt "github.com/zettio/weave/common"
 	"log"
 	"net"
 	"testing"
@@ -36,16 +37,16 @@ func TestServerSimpleQuery(t *testing.T) {
 	zone.AddRecord(containerID, "test.weave.", ip)
 
 	mdnsServer, err := NewMDNSServer(zone)
-	assertNoErr(t, err)
+	wt.AssertNoErr(t, err)
 	err = mdnsServer.Start(nil)
-	assertNoErr(t, err)
+	wt.AssertNoErr(t, err)
 
 	var receivedAddr net.IP
 	receivedCount := 0
 
 	// Implement a minimal listener for responses
 	multicast, err := LinkLocalMulticastListener(nil)
-	assertNoErr(t, err)
+	wt.AssertNoErr(t, err)
 
 	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
 		// Only handle responses here

@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
+	. "github.com/zettio/weave/common"
 	"net"
 )
 

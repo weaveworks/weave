@@ -286,7 +286,7 @@ func (nd *NaClDecryptor) ReceiveNonce(msg []byte) {
 func (nd *NaClDecryptor) IterateFrames(fun FrameConsumer, packet *UDPPacket) error {
 	buf, err := nd.decrypt(packet.Packet)
 	if err != nil {
-		return PacketDecodingError{Desc: fmt.Sprint("decryption failed; ", err)}
+		return PacketDecodingError{Fatal: true, Desc: fmt.Sprint("decryption failed; ", err)}
 	}
 	packet.Packet = buf
 	return nd.NonDecryptor.IterateFrames(fun, packet)
@@ -315,9 +315,9 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 		if !ok {
 			return nil, fmt.Errorf("Nonce chan closed")
 		}
+		decState.highestOffsetSeen = offsetNoFlags
 		nonce = decState.nonce
 		usedOffsets = decState.usedOffsets
-		decState.highestOffsetSeen = offsetNoFlags
 	} else {
 		highestOffsetSeen := decState.highestOffsetSeen
 		if offsetNoFlags < (1<<13) && highestOffsetSeen > ((1<<14)+(1<<13)) &&
@@ -371,7 +371,7 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 		usedOffsets.Add(offsetNoFlagsInt)
 		return result, nil
 	} else {
-		return nil, fmt.Errorf("Unable to decrypt msg via UDP: %v", buf)
+		return nil, fmt.Errorf("Unable to decrypt UDP packet")
 	}
 }
 
@@ -436,7 +436,7 @@ func NewEncryptedTCPReceiver(conn *LocalConnection) *EncryptedTCPReceiver {
 func (receiver *EncryptedTCPReceiver) Decode(msg []byte) ([]byte, error) {
 	plaintext, success := DecryptPrefixNonce(msg, receiver.conn.SessionKey)
 	if !success {
-		return msg, fmt.Errorf("Unable to decrypt msg via TCP:\n %X", msg)
+		return msg, fmt.Errorf("Unable to decrypt TCP msg")
 	}
 	receiver.buffer.Reset()
 	_, err := receiver.buffer.Write(plaintext)

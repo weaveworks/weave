@@ -8,45 +8,51 @@ import (
 	"sync"
 )
 
-type PeerCache struct {
+type Peers struct {
 	sync.RWMutex
-	table map[PeerName]*Peer
-	onGC  func(*Peer)
+	ourself *Peer
+	macs    *MacCache
+	table   map[PeerName]*Peer
+	onGC    func(*Peer)
 }
 
-func NewPeerCache(onGC func(*Peer)) *PeerCache {
-	return &PeerCache{table: make(map[PeerName]*Peer), onGC: onGC}
+func NewPeers(ourself *Peer, macs *MacCache, onGC func(*Peer)) *Peers {
+	return &Peers{
+		ourself: ourself,
+		macs:    macs,
+		table:   make(map[PeerName]*Peer),
+		onGC:    onGC}
 }
 
-func (cache *PeerCache) FetchWithDefault(peer *Peer) *Peer {
-	cache.RLock()
-	res, found := cache.fetchAlias(peer)
-	cache.RUnlock()
+func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
+	peers.RLock()
+	res, found := peers.fetchAlias(peer)
+	peers.RUnlock()
 	if found {
 		return res
 	}
-	cache.Lock()
-	defer cache.Unlock()
-	res, found = cache.fetchAlias(peer)
+	peers.Lock()
+	defer peers.Unlock()
+	res, found = peers.fetchAlias(peer)
 	if found {
 		return res
 	}
-	cache.table[peer.Name] = peer
+	peers.table[peer.Name] = peer
 	peer.IncrementLocalRefCount()
 	return peer
 }
 
-func (cache *PeerCache) Fetch(name PeerName) (*Peer, bool) {
-	cache.RLock()
-	defer cache.RUnlock()
-	peer, found := cache.table[name]
+func (peers *Peers) Fetch(name PeerName) (*Peer, bool) {
+	peers.RLock()
+	defer peers.RUnlock()
+	peer, found := peers.table[name]
 	return peer, found // GRRR, why can't I inline this!?
 }
 
-func (cache *PeerCache) ForEach(fun func(PeerName, *Peer)) {
-	cache.RLock()
-	defer cache.RUnlock()
-	for name, peer := range cache.table {
+func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
+	peers.RLock()
+	defer peers.RUnlock()
+	for name, peer := range peers.table {
 		fun(name, peer)
 	}
 }
@@ -60,12 +66,12 @@ func (cache *PeerCache) ForEach(fun func(PeerName, *Peer)) {
 //    the payload are not included
 //  - elements where the payload was older than the
 //    receiver's version are updated
-func (cache *PeerCache) ApplyUpdate(update []byte, router *Router) ([]byte, error) {
-	cache.Lock()
+func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
+	peers.Lock()
 
-	newPeers, decodedUpdate, decodedConns, err := cache.decodeUpdate(update, router)
+	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
 	if err != nil {
-		cache.Unlock()
+		peers.Unlock()
 		return nil, err
 	}
 
@@ -73,30 +79,26 @@ func (cache *PeerCache) ApplyUpdate(update []byte, router *Router) ([]byte, erro
 	// have no knowledge of. We can now apply the update. Start by
 	// adding in any new peers into the cache.
 	for name, newPeer := range newPeers {
-		cache.table[name] = newPeer
+		peers.table[name] = newPeer
 	}
 
 	// Now apply the updates
-	newUpdate := cache.applyUpdate(decodedUpdate, decodedConns, router)
+	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns)
 
-	for _, peerRemoved := range cache.garbageCollect(router.Ourself) {
+	for _, peerRemoved := range peers.garbageCollect() {
 		delete(newUpdate, peerRemoved.Name)
 	}
 
-	// Don't need to hold cache lock any longer
-	cache.Unlock()
-
-	if len(newUpdate) > 0 {
-		router.ConnectionMaker.Refresh()
-	}
+	// Don't need to hold peers lock any longer
+	peers.Unlock()
 
 	return encodePeersMap(newUpdate), nil
 }
 
-func (cache *PeerCache) EncodeAllPeers() []byte {
-	cache.RLock()
-	defer cache.RUnlock()
-	return encodePeersMap(cache.table)
+func (peers *Peers) EncodeAllPeers() []byte {
+	peers.RLock()
+	defer peers.RUnlock()
+	return encodePeersMap(peers.table)
 }
 
 func EncodePeers(peers ...*Peer) []byte {
@@ -108,15 +110,15 @@ func EncodePeers(peers ...*Peer) []byte {
 	return buf.Bytes()
 }
 
-func (cache *PeerCache) GarbageCollect(router *Router) []*Peer {
-	cache.Lock()
-	defer cache.Unlock()
-	return cache.garbageCollect(router.Ourself)
+func (peers *Peers) GarbageCollect() []*Peer {
+	peers.Lock()
+	defer peers.Unlock()
+	return peers.garbageCollect()
 }
 
-func (cache *PeerCache) String() string {
+func (peers *Peers) String() string {
 	var buf bytes.Buffer
-	cache.ForEach(func(name PeerName, peer *Peer) {
+	peers.ForEach(func(name PeerName, peer *Peer) {
 		buf.WriteString(fmt.Sprint(peer, "\n"))
 		peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
 			buf.WriteString(fmt.Sprintf("   -> %v [%v]\n", remoteName, conn.RemoteTCPAddr()))
@@ -125,8 +127,8 @@ func (cache *PeerCache) String() string {
 	return buf.String()
 }
 
-func (cache *PeerCache) fetchAlias(peer *Peer) (*Peer, bool) {
-	if existingPeer, found := cache.table[peer.Name]; found {
+func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
+	if existingPeer, found := peers.table[peer.Name]; found {
 		if existingPeer.UID == peer.UID {
 			existingPeer.IncrementLocalRefCount()
 			return existingPeer, true
@@ -137,15 +139,14 @@ func (cache *PeerCache) fetchAlias(peer *Peer) (*Peer, bool) {
 	return nil, false
 }
 
-func (cache *PeerCache) garbageCollect(ourself *Peer) []*Peer {
+func (peers *Peers) garbageCollect() []*Peer {
 	removed := []*Peer{}
-	for name, peer := range cache.table {
-		found, _ := ourself.Routes(peer, false)
+	for name, peer := range peers.table {
+		found, _ := peers.ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
-			cache.onGC(peer)
-			ourself.OnDead(peer)
-			delete(cache.table, name)
-			ourself.Router.Macs.Delete(peer)
+			peers.onGC(peer)
+			delete(peers.table, name)
+			peers.macs.Delete(peer)
 			removed = append(removed, peer)
 		}
 	}
@@ -161,7 +162,7 @@ func encodePeersMap(peers map[PeerName]*Peer) []byte {
 	return buf.Bytes()
 }
 
-func (cache *PeerCache) decodeUpdate(update []byte, router *Router) (newPeers map[PeerName]*Peer, decodedUpdate []*Peer, decodedConns [][]byte, err error) {
+func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, decodedUpdate []*Peer, decodedConns [][]byte, err error) {
 	newPeers = make(map[PeerName]*Peer)
 	decodedUpdate = []*Peer{}
 	decodedConns = [][]byte{}
@@ -179,10 +180,10 @@ func (cache *PeerCache) decodeUpdate(update []byte, router *Router) (newPeers ma
 			return
 		}
 		name := PeerNameFromBin(nameByte)
-		newPeer := NewPeer(name, uid, version, router)
+		newPeer := NewPeer(name, uid, version)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connsBuf)
-		existingPeer, found := cache.table[name]
+		existingPeer, found := peers.table[name]
 		if !found {
 			newPeers[name] = newPeer
 		} else if existingPeer.UID != newPeer.UID {
@@ -198,7 +199,7 @@ func (cache *PeerCache) decodeUpdate(update []byte, router *Router) (newPeers ma
 			if _, found := newPeers[remoteName]; found {
 				return
 			}
-			if _, found := cache.table[remoteName]; found {
+			if _, found := peers.table[remoteName]; found {
 				return
 			}
 			// Update refers to a peer which we have no knowledge
@@ -213,13 +214,13 @@ func (cache *PeerCache) decodeUpdate(update []byte, router *Router) (newPeers ma
 	return
 }
 
-func (cache *PeerCache) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte, router *Router) map[PeerName]*Peer {
+func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte) map[PeerName]*Peer {
 	newUpdate := make(map[PeerName]*Peer)
 	for idx, newPeer := range decodedUpdate {
 		connsBuf := decodedConns[idx]
 		name := newPeer.Name
-		// guaranteed to find peer in the cache.table
-		peer := cache.table[name]
+		// guaranteed to find peer in the peers.table
+		peer := peers.table[name]
 		if peer != newPeer {
 			if peer.Version() > newPeer.Version() {
 				// we know more about this one than the update. If
@@ -230,7 +231,7 @@ func (cache *PeerCache) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte
 				// change.
 				newUpdate[name] = peer
 				continue
-			} else if peer == router.Ourself {
+			} else if peer == peers.ourself {
 				// nobody but us updates us
 				continue
 			} else if peer.Version() == newPeer.Version() {
@@ -247,8 +248,8 @@ func (cache *PeerCache) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte
 		// No - we know that peer is not ourself, so the only prospect
 		// for an update would be someone else calling
 		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
-		// the peers cache, so there can be no race here.
-		conns := readConnsMap(peer, connsBuf, cache.table)
+		// the router.Peers, so there can be no race here.
+		conns := readConnsMap(peer, connsBuf, peers.table)
 		peer.SetVersionAndConnections(newPeer.Version(), conns)
 		newUpdate[name] = peer
 	}

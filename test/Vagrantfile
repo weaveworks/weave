@@ -1,0 +1,41 @@
+VAGRANTFILE_API_VERSION = "2"
+
+host1_ip = "192.168.48.19" # arbitrary private IP
+host2_ip = "192.168.48.15" # arbitrary private IP
+
+def configure_docker(host, ip)
+  pkgs = "lxc-docker ethtool conntrack"
+
+  host.vm.box = "phusion/ubuntu-14.04-amd64"
+  host.vm.box_url = "https://oss-binaries.phusionpassenger.com/vagrant/boxes/latest/ubuntu-14.04-amd64-vbox.box"
+
+  host.vm.network "private_network", ip: ip
+
+  # host.vm.synced_folder "./", "/home/vagrant/src/github.com/zettio/weave"
+
+  host.vm.provision :shell, :inline => "sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9"
+  host.vm.provision :shell, :inline => "echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"
+
+  pkg_cmd = "apt-get update -qq; " \
+  "apt-get install -q -y --force-yes --no-install-recommends "
+  pkg_cmd << pkgs
+  host.vm.provision :shell, :inline => pkg_cmd
+  host.vm.provision :shell, :inline => "usermod -a -G docker vagrant; "
+
+  # Listen on the remote API
+  host.vm.provision :shell, :inline => "echo 'DOCKER_OPTS=\"-H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\"' >> /etc/default/docker"
+  host.vm.provision :shell, :inline => "service docker restart"
+end
+
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+  config.vm.define "host1" do |host1|
+    configure_docker(host1, host1_ip)
+  end
+
+  config.vm.define "host2" do |host2|
+    configure_docker(host2, host2_ip)
+  end
+
+end

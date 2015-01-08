@@ -56,6 +56,7 @@ reports on the current status of the weave router.
 This produces output like:
 
 ````
+weave router 0.7.0
 Our name is 7a:f4:56:87:76:3b
 Sniffing traffic on &{39 65535 ethwe ae:e3:07:9c:8c:d4 up|broadcast|multicast}
 MACs:
@@ -69,7 +70,7 @@ Peer 7a:16:dd:5b:83:de (v31) (UID 13151318985609435078)
    -> 7a:f4:56:87:76:3b [37.157.33.76:7195]
 Peer 7a:f4:56:87:76:3b (v1) (UID 6913268221365110570)
    -> 7a:16:dd:5b:83:de [191.235.147.190:6783]
-Topology:
+Routes:
 unicast:
 7a:f4:56:87:76:3b -> 00:00:00:00:00:00
 7a:16:dd:5b:83:de -> 7a:16:dd:5b:83:de
@@ -83,11 +84,8 @@ Reconnects:
 The terms used here are explained further at
 [how it works](how-it-works.html).
 
-A 'peer' on the weave network is a weave router; one per host.  Each
-peer has a name, which tends to remain the same over restarts, and a
-unique identifier (UID) which is different each time it is run.  These
-are opaque identifiers as far as the router is concerned, although the
-name defaults to a MAC address.
+The 'Our name' line identifies the local weave router as a peer in the
+weave network.
 
 The 'Sniffing traffic' line shows details of the virtual ethernet
 interface that weave is using to receive packets on the local
@@ -108,7 +106,7 @@ number of the connection. In the above example, the local router has
 connected to its peer using address 191.235.147.190:6783, and its peer
 sees the same connection as coming from 37.157.33.76:7195.
 
-The 'Topology' section summarised the information for deciding how to
+The 'Routes' section summarised the information for deciding how to
 route packets between peers, which is mostly of interest when the
 weave network is not fully connected.  See the
 [architecture documentation](https://raw.githubusercontent.com/zettio/weave/master/docs/architecture.txt)

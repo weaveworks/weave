@@ -12,69 +12,18 @@ import (
 )
 
 type Router struct {
-	Ourself            *Peer
-	Iface              *net.Interface
-	PeersSubscribeChan chan<- chan<- map[string]Peer
-	Macs               *MacCache
-	Peers              *PeerCache
-	UDPListener        *net.UDPConn
-	Topology           *Topology
-	ConnectionMaker    *ConnectionMaker
-	Password           *[]byte
-	ConnLimit          int
-	BufSz              int
-	LogFrame           func(string, []byte, *layers.Ethernet)
-	GossipChannels     map[uint32]*GossipChannel // does not change after startup - access not locked
-}
-
-// Interface to receive notifications when we spot the presence or absence of a peer
-type PeerLifecycle interface {
-	OnAlive(uint64)
-	OnDead(uint64)
-}
-
-type Gossip interface {
-	// specific message from one peer to another
-	// intermediate peers should relay it using unicast topology.
-	GossipUnicast(dstPeerName PeerName, buf []byte) error
-	// intended for a state change that everyone should hear about quickly
-	// relayed using broadcast topology.
-	GossipBroadcast(buf []byte) error
-}
-
-type Gossiper interface {
-	PeerLifecycle
-	OnGossipBroadcast(msg []byte)
-	OnGossipUnicast(sender PeerName, msg []byte)
-	// Return state of everything we know; intended to be called periodically
-	Gossip() []byte
-	// merge in state and return "everything new I've just learnt",
-	// or nil if nothing in the received message was new
-	OnGossip(buf []byte) []byte
-}
-
-type GossipChannel struct {
-	localPeer *Peer
-	name      string
-	hash      uint32
-	gossiper  Gossiper
-}
-
-type Peer struct {
-	sync.RWMutex
-	Name          PeerName
-	NameByte      []byte
-	connections   map[PeerName]Connection
-	version       uint64
-	UID           uint64
-	Router        *Router
-	localRefCount uint64
-	queryChan     chan<- *PeerInteraction
-}
-
-type PeerInteraction struct {
-	Interaction
-	payload interface{}
+	Iface           *net.Interface
+	Ourself         *LocalPeer
+	Macs            *MacCache
+	Peers           *Peers
+	Routes          *Routes
+	ConnectionMaker *ConnectionMaker
+	UDPListener     *net.UDPConn
+	Password        *[]byte
+	ConnLimit       int
+	BufSz           int
+	LogFrame        func(string, []byte, *layers.Ethernet)
+	GossipChannels  map[uint32]*GossipChannel // does not change after startup - access not locked
 }
 
 type Connection interface {
@@ -101,7 +50,8 @@ type LocalConnection struct {
 	stackFrag     bool
 	effectivePMTU int
 	SessionKey    *[32]byte
-	heartbeatStop chan<- interface{}
+	heartbeat     *time.Ticker
+	fragTest      *time.Ticker
 	forwardChan   chan<- *ForwardedFrame
 	forwardChanDF chan<- *ForwardedFrame
 	stopForward   chan<- interface{}
@@ -164,7 +114,8 @@ type NameCollisionError struct {
 }
 
 type PacketDecodingError struct {
-	Desc string
+	Fatal bool
+	Desc  string
 }
 
 type LocalAddress struct {
@@ -181,35 +132,6 @@ type ForwardedFrame struct {
 type Interaction struct {
 	code       int
 	resultChan chan<- interface{}
-}
-
-type Topology struct {
-	sync.RWMutex
-	queryChan chan<- *Interaction
-	unicast   map[PeerName]PeerName
-	broadcast map[PeerName][]PeerName
-	router    *Router
-}
-
-type ConnectionMakerInteraction struct {
-	Interaction
-	address string
-}
-
-type ConnectionMaker struct {
-	router         *Router
-	queryChan      chan<- *ConnectionMakerInteraction
-	targets        map[string]*Target
-	cmdLineAddress map[string]bool
-}
-
-type ConnectionState int
-
-// Information about an address where we may find a peer
-type Target struct {
-	attempting  bool          // are we currently attempting to connect there?
-	tryAfter    time.Time     // next time to try this address
-	tryInterval time.Duration // backoff time on next failure
 }
 
 // UDPSender interface and implementations
