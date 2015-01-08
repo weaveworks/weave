@@ -34,7 +34,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	log.Println("TestServerSimpleQuery starting")
 	var zone = new(ZoneDb)
 	ip, _, _ := net.ParseCIDR(testAddr1)
-	zone.AddRecord(containerID, "test.weave.", ip)
+	zone.AddRecord(containerID, "test.weave.local.", ip)
 
 	mdnsServer, err := NewMDNSServer(zone)
 	wt.AssertNoErr(t, err)
@@ -67,15 +67,15 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 
-	sendQuery("test.weave.", dns.TypeA)
+	sendQuery("test.weave.local.", dns.TypeA)
 
 	time.Sleep(time.Second)
 
 	if receivedCount != 1 {
-		t.Fatal("Unexpected result count for test.weave", receivedCount)
+		t.Fatal("Unexpected result count for test.weave.local", receivedCount)
 	}
 	if !receivedAddr.Equal(ip) {
-		t.Fatal("Unexpected result for test.weave", receivedAddr)
+		t.Fatal("Unexpected result for test.weave.local", receivedAddr)
 	}
 
 	receivedCount = 0
