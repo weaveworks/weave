@@ -53,7 +53,8 @@ build() {
     make \
         WEAVE_VERSION=$VERSION \
         WEAVER_IMAGE=$DOCKERHUB_USER/weave \
-        WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns
+        WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns \
+        WEAVETOOLS_IMAGE=$DOCKERHUB_USER/weavetools
 
     if make tests; then
         echo -e '\u2713 Tests pass'
