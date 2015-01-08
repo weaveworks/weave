@@ -6,8 +6,8 @@ import (
 	"net"
 )
 
-func mdnsLookup(client *MDNSClient, name string, qtype uint16) (*ResponseA, error) {
-	channel := make(chan *ResponseA)
+func mdnsLookup(client *MDNSClient, name string, qtype uint16) (*Response, error) {
+	channel := make(chan *Response)
 	client.SendQuery(name, qtype, channel)
 	for resp := range channel {
 		Debug.Printf("Got response name %s addr %s", resp.Name, resp.Addr)

@@ -13,9 +13,27 @@ var (
 	successTestName = "test1.weave."
 	failTestName    = "test2.weave."
 	testAddr        = net.ParseIP("9.8.7.6")
+	testInAddr      = "6.7.8.9.in-addr.arpa."
 )
 
 func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
+
+	sendAnswer := func(m *dns.Msg) {
+		buf, err := m.Pack()
+		checkFatal(err)
+		if buf == nil {
+			log.Fatal("Nil buffer")
+		}
+		//log.Println("minimalServer sending:", buf)
+		// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
+		sendconn, err := net.DialUDP("udp", nil, ipv4Addr)
+		checkFatal(err)
+
+		_, err = sendconn.Write(buf)
+		sendconn.Close()
+		checkFatal(err)
+	}
+
 	//log.Println("minimalServer received:", req)
 	if len(req.Answer) > 0 {
 		return // Only interested in questions.
@@ -23,31 +41,24 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 	if len(req.Question) != 1 {
 		return // We only handle single-question messages
 	}
-	if req.Question[0].Name != successTestName {
-		return // This is not the DNS record you are looking for
+
+	if req.Question[0].Qtype == dns.TypeA && req.Question[0].Name == successTestName {
+		m := new(dns.Msg)
+		m.SetReply(req)
+		hdr := dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeA,
+			Class: dns.ClassINET, Ttl: 3600}
+		a := &dns.A{hdr, testAddr}
+		m.Answer = append(m.Answer, a)
+		sendAnswer(m)
+	} else if req.Question[0].Qtype == dns.TypePTR && req.Question[0].Name == testInAddr {
+		m := new(dns.Msg)
+		m.SetReply(req)
+		hdr := dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypePTR,
+			Class: dns.ClassINET, Ttl: 3600}
+		a := &dns.PTR{hdr, successTestName}
+		m.Answer = append(m.Answer, a)
+		sendAnswer(m)
 	}
-
-	m := new(dns.Msg)
-	m.SetReply(req)
-
-	hdr := dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeA,
-		Class: dns.ClassINET, Ttl: 3600}
-	a := &dns.A{hdr, testAddr}
-	m.Answer = append(m.Answer, a)
-
-	buf, err := m.Pack()
-	checkFatal(err)
-	if buf == nil {
-		log.Fatal("Nil buffer")
-	}
-	//log.Println("minimalServer sending:", buf)
-	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
-	sendconn, err := net.DialUDP("udp", nil, ipv4Addr)
-	checkFatal(err)
-
-	_, err = sendconn.Write(buf)
-	sendconn.Close()
-	checkFatal(err)
 }
 
 func RunLocalMulticastServer() (*dns.Server, error) {
@@ -76,14 +87,14 @@ func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 type testContext struct {
 	receivedAddr  net.IP
 	receivedCount int
-	channel       chan *ResponseA
+	channel       chan *Response
 }
 
 func newTestContext() *testContext {
-	return &testContext{channel: make(chan *ResponseA, 4)}
+	return &testContext{channel: make(chan *Response, 4)}
 }
 
-func (c *testContext) checkResponse(t *testing.T, channelOk bool, resp *ResponseA) {
+func (c *testContext) checkResponse(t *testing.T, channelOk bool, resp *Response) {
 	if !channelOk {
 		c.channel = nil
 		return
@@ -166,4 +177,10 @@ func TestAsLookup(t *testing.T) {
 
 	ip, err = mdnsClient.LookupLocal("foo.example.com.")
 	wt.AssertErrorType(t, err, (*LookupError)(nil), "unknown hostname")
+
+	name, err := mdnsClient.ReverseLookupLocal(testInAddr)
+	wt.AssertNoErr(t, err)
+	if !(successTestName == name) {
+		t.Fatalf("Expected name %s, got %s", successTestName, name)
+	}
 }
