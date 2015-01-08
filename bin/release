@@ -2,12 +2,13 @@
 
 set -e
 
-SUDO=sudo
+SUDO=${SUDO-sudo}
+GITHUB_USER=${GITHUB_USER:-zettio}
+DOCKERHUB_USER=${DOCKERHUB_USER:-zettio}
+RELEASE_NAME=${RELEASE_NAME:-"Weave"}
+RELEASE_DESCRIPTION=${RELEASE_DESCRIPTION:-"Weaving Containers into Applications"}
+
 PWD=`pwd`
-GITHUB_USER=zettio
-DOCKERHUB_USER=zettio
-RELEASE_NAME="Weave"
-RELEASE_DESCRIPTION="Weaving Containers into Applications"
 
 setup() {
     ## Get the new version number from the most recent tag
@@ -51,6 +52,7 @@ build() {
     ## (library versions?)
     sed -i "/SCRIPT_VERSION=/ c\SCRIPT_VERSION=\"$VERSION\"" ./weave
     make \
+        SUDO=$SUDO \
         WEAVE_VERSION=$VERSION \
         WEAVER_IMAGE=$DOCKERHUB_USER/weave \
         WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns \
