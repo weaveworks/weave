@@ -32,7 +32,7 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE):
 		false; \
 	}
 
-$(WEAVER_EXE): router/*.go sortinghat/*.go weaver/main.go
+$(WEAVER_EXE): router/*.go ipam/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
 
 $(WEAVETOOLS_EXES): tools/build.sh

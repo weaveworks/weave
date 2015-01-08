@@ -1,4 +1,4 @@
-package sortinghat
+package ipam
 
 import (
 	wt "github.com/zettio/weave/common"

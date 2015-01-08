@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"github.com/davecheney/profile"
 	lg "github.com/zettio/weave/common"
+	"github.com/zettio/weave/ipam"
 	weavenet "github.com/zettio/weave/net"
 	weave "github.com/zettio/weave/router"
-	"github.com/zettio/weave/sortinghat"
 	"io"
 	"log"
 	"net"
@@ -136,7 +136,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	allocator := sortinghat.NewAllocator(ourName, router.Ourself.UID, net.ParseIP("10.0.1.1"), 253)
+	allocator := ipam.NewAllocator(ourName, router.Ourself.UID, net.ParseIP("10.0.1.1"), 253)
 	allocator.SetGossip(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
 	allocator.HandleHttp()
@@ -144,7 +144,7 @@ func main() {
 	handleSignals(router)
 }
 
-func handleHttp(router *weave.Router, alloc *sortinghat.Allocator) {
+func handleHttp(router *weave.Router, alloc *ipam.Allocator) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln("weave router", version))
 		io.WriteString(w, router.Status())
