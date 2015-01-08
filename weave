@@ -471,11 +471,11 @@ case "$COMMAND" in
         fi
         if [ "$1" = "-password" ] ; then
             [ $# -gt 1 ] || usage
-            PASSWORD=$2
+            PASSWORD_ARGS="-e WEAVE_PASSWORD=$2"
             shift 2
         elif [ "$1" = "-passwordfile" ] ; then
             [ $# -gt 1 ] || usage
-            PASSWORDFILE=$2
+            PASSWORD_ARGS="--env-file=$2"
             shift 2
         fi
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
@@ -483,7 +483,7 @@ case "$COMMAND" in
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
             -p $PORT:$PORT/tcp -p $PORT:$PORT/udp \
-            ${PASSWORD:+-e WEAVE_PASSWORD="$PASSWORD"} ${PASSWORDFILE:+--env-file="$PASSWORDFILE"} \
+            $PASSWORD_ARGS \
             $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -iface $CONTAINER_IFNAME "$@")
         with_container_netns $CONTAINER launch >/dev/null
         echo $CONTAINER
