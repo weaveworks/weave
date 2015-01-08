@@ -51,12 +51,7 @@ build() {
     ## Inject the version numbers and build the distributables
     ## (library versions?)
     sed -i "/SCRIPT_VERSION=/ c\SCRIPT_VERSION=\"$VERSION\"" ./weave
-    make \
-        SUDO=$SUDO \
-        WEAVE_VERSION=$VERSION \
-        WEAVER_IMAGE=$DOCKERHUB_USER/weave \
-        WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns \
-        WEAVETOOLS_IMAGE=$DOCKERHUB_USER/weavetools
+    make SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER
 
     if make tests; then
         echo -e '\u2713 Tests pass'
