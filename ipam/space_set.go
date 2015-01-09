@@ -104,12 +104,16 @@ func (s *PeerSpaceSet) ForEachSpace(fun func(Space)) {
 }
 
 func (s *PeerSpaceSet) String() string {
-	var buf bytes.Buffer
 	s.RLock()
 	defer s.RUnlock()
-	buf.WriteString(fmt.Sprint("SpaceSet ", s.peerName, s.uid, " (v", s.version, ")\n"))
+	return s.describe(fmt.Sprint("SpaceSet ", s.peerName, s.uid, " (v", s.version, ")"))
+}
+
+func (s *PeerSpaceSet) describe(heading string) string {
+	var buf bytes.Buffer
+	buf.WriteString(heading)
 	for _, space := range s.spaces {
-		buf.WriteString(fmt.Sprintf("  %s\n", space.String()))
+		buf.WriteString(fmt.Sprintf("\n  %s", space.String()))
 	}
 	return buf.String()
 }

@@ -186,7 +186,7 @@ func (alloc *Allocator) lookForNewLeaks(now time.Time) {
 			allSpace.Exclude(leak)
 		}
 		if !allSpace.Empty() {
-			lg.Info.Printf("New leaked spaces: %s", allSpace)
+			lg.Info.Println(allSpace.describe("New leaked spaces:"))
 			for _, space := range allSpace.spaces {
 				// fixme: should merge contiguous spaces
 				alloc.leaked[now] = space
@@ -372,8 +372,9 @@ func (alloc *Allocator) String() string {
 
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("Allocator state %d universe %+v\n", alloc.state, alloc.universe))
+	buf.WriteString(fmt.Sprintf("Allocator state %d universe %s+%d", alloc.state, alloc.universe.Start, alloc.universe.Size))
 	for _, spaceset := range alloc.peerInfo {
+		buf.WriteByte('\n')
 		buf.WriteString(spaceset.String())
 	}
 	return buf.String()
@@ -467,7 +468,7 @@ func (alloc *Allocator) OnDead(uid uint64) {
 	if found {
 		if peerEntry, ok := entry.(*PeerSpaceSet); ok &&
 			!peerEntry.IsTombstone() {
-			lg.Debug.Printf("Gossip Peer %s marked as dead", entry.PeerName())
+			lg.Info.Printf("Allocator: Marking %s as dead", entry.PeerName())
 			peerEntry.MakeTombstone()
 			// Can't run this synchronously or we deadlock
 			go alloc.gossip.GossipBroadcast(encode(entry))
