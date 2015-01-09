@@ -58,7 +58,7 @@ then you should follow the instructions below. These instructions apply to
 CentOS and RHEL as of 7.0. On Fedora 21, there is no need to do this.
 
 Once you have installed `weave` in `/usr/local/bin`, set its execution
-context with commands shown below. You will need to have the
+context with the commands shown below. You will need to have the
 `policycoreutils-python` package installed.
 
     sudo semanage fcontext -a -t unconfined_exec_t -f f /usr/local/bin/weave
