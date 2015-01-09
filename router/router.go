@@ -307,13 +307,13 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 // Gossip methods
 
-func (router *Router) OnGossipBroadcast(msg []byte) {
-	// Not expecting these
-	log.Println("Unexpected Gossip Broadcast:", msg)
-}
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) {
 	// Not expecting these
 	log.Println("Unexpected Gossip Unicast:", msg)
+}
+func (router *Router) OnGossipBroadcast(msg []byte) {
+	// Not expecting these
+	log.Println("Unexpected Gossip Broadcast:", msg)
 }
 
 // Return state of everything we know; intended to be called periodically

@@ -13,8 +13,8 @@ type Gossip interface {
 }
 
 type Gossiper interface {
-	OnGossipBroadcast(msg []byte)
 	OnGossipUnicast(sender PeerName, msg []byte)
+	OnGossipBroadcast(msg []byte)
 	// Return state of everything we know; gets called periodically
 	Gossip() []byte
 	// merge in state and return "everything new I've just learnt",
@@ -53,24 +53,6 @@ func (c *GossipChannel) GossipMsg(buf []byte) {
 	})
 }
 
-func (c *GossipChannel) GossipBroadcast(buf []byte) error {
-	peerName := c.localPeer.Name.Bin()
-	nameLenByte := []byte{byte(len(peerName))}
-	msg := Concat([]byte{ProtocolGossipBroadcast}, uint32slice(c.hash), nameLenByte, peerName, buf)
-	c.localPeer.RelayGossipBroadcast(c.localPeer.Name, msg)
-	return nil // ?
-}
-
-func (peer *LocalPeer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
-	if srcPeer, found := peer.Router.Peers.Fetch(srcName); found {
-		for _, conn := range peer.NextBroadcastHops(srcPeer) {
-			conn.SendTCP(msg)
-		}
-	} else {
-		log.Println("Unable to relay gossip from unknown peer", srcName)
-	}
-}
-
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
 	srcPeerByte := c.localPeer.Name.Bin()
 	nameLenByte := []byte{byte(len(srcPeerByte))}
@@ -93,4 +75,22 @@ func (peer *LocalPeer) RelayGossipTo(dstPeerName PeerName, msg []byte) error {
 	}
 	conn.(*LocalConnection).SendTCP(msg)
 	return nil
+}
+
+func (c *GossipChannel) GossipBroadcast(buf []byte) error {
+	peerName := c.localPeer.Name.Bin()
+	nameLenByte := []byte{byte(len(peerName))}
+	msg := Concat([]byte{ProtocolGossipBroadcast}, uint32slice(c.hash), nameLenByte, peerName, buf)
+	c.localPeer.RelayGossipBroadcast(c.localPeer.Name, msg)
+	return nil // ?
+}
+
+func (peer *LocalPeer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
+	if srcPeer, found := peer.Router.Peers.Fetch(srcName); found {
+		for _, conn := range peer.NextBroadcastHops(srcPeer) {
+			conn.SendTCP(msg)
+		}
+	} else {
+		log.Println("Unable to relay gossip from unknown peer", srcName)
+	}
 }
