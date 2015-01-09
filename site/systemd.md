@@ -48,7 +48,7 @@ To ensure weave launches after reboot, you need run
 
     sudo systemctl enable weave
 
-For more information on systemd, please refer to the documentation supplied 
+For more information on systemd, please refer to the documentation supplied
 by your distribution of Linux.
 
 ## SELinux Tweaks
@@ -57,9 +57,9 @@ If your OS has SELinux enabled and you wish to run weave as a systemd unit,
 then you should follow the instructions below. These instructions apply to
 CentOS and RHEL as of 7.0. On Fedora 21, there is no need to do this.
 
-Once installed `weave` in `/usr/local/bin`, you should set it's execution
-context with commands shown below. You will need to have `policycoreutils-python`
-package installed.
+Once you have installed `weave` in `/usr/local/bin`, set its execution
+context with commands shown below. You will need to have the
+`policycoreutils-python` package installed.
 
     sudo semanage fcontext -a -t unconfined_exec_t -f f /usr/local/bin/weave
     sudo restorecon /usr/local/bin/weave
