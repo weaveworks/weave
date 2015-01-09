@@ -104,9 +104,9 @@ func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 // ACTOR client API
 
 const (
-	CSendQuery       = iota
-	CShutdown        = iota
-	CMessageReceived = iota
+	CSendQuery = iota
+	CShutdown
+	CMessageReceived
 )
 
 type MDNSInteraction struct {
