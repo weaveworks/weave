@@ -404,7 +404,6 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) {
 	case gossipSpaceDonate:
 		alloc.handleSpaceDonate(sender, msg[1:])
 	}
-	alloc.considerOurPosition()
 }
 
 func (alloc *Allocator) Gossip() []byte {
