@@ -428,6 +428,17 @@ func checkHandshakeStringField(fieldName string, expectedValue string, handshake
 	return val, nil
 }
 
+func (conn *LocalConnection) handleGossip(msg []byte, onok func(channel *GossipChannel, srcName PeerName, payload []byte)) {
+	channelHash, msg := decodeGossipChannel(msg[1:])
+	channel, found := conn.Router.GossipChannels[channelHash]
+	if !found {
+		conn.log("received unknown gossip channel:\n", channelHash)
+	} else {
+		srcName, payload := decodePeerName(msg)
+		onok(channel, srcName, payload)
+	}
+}
+
 func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool) {
 	defer conn.Decryptor.Shutdown()
 	var receiver TCPReceiver
@@ -471,48 +482,25 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else if msg[0] == ProtocolGossipUnicast {
 			origMsg := msg
-			channelHash, msg := decodeGossipChannel(msg[1:])
-			srcName, _, msg := decodePeerName(msg)
-			destName, _, msg := decodePeerName(msg)
-			if conn.local.Name == destName {
-				channel, found := conn.Router.GossipChannels[channelHash]
-				if !found {
-					conn.log("received unknown gossip channel:\n", channelHash)
-				} else {
+			conn.handleGossip(msg, func(channel *GossipChannel, srcName PeerName, payload []byte) {
+				destName, msg := decodePeerName(payload)
+				if conn.local.Name == destName {
 					channel.gossiper.OnGossipUnicast(srcName, msg)
+				} else {
+					conn.Router.Ourself.RelayGossipTo(destName, origMsg)
 				}
-			} else {
-				conn.Router.Ourself.RelayGossipTo(destName, origMsg)
-			}
+			})
 		} else if msg[0] == ProtocolGossipBroadcast {
-			// intended for state from sending peer only
-			// done when there is a change that everyone should hear about quickly
-			// relayed using broadcast topology.
-			origMsg := msg
-			channelHash, msg := decodeGossipChannel(msg[1:])
-			srcName, _, msg := decodePeerName(msg)
-			channel, found := conn.Router.GossipChannels[channelHash]
-			if !found {
-				conn.log("received unknown gossip channel:\n", channelHash)
-			} else {
-				channel.gossiper.OnGossipBroadcast(msg)
-			}
-			conn.Router.Ourself.RelayGossipBroadcast(srcName, origMsg)
+			conn.handleGossip(msg, func(channel *GossipChannel, srcName PeerName, payload []byte) {
+				channel.gossiper.OnGossipBroadcast(payload)
+				conn.Router.Ourself.RelayGossipBroadcast(srcName, msg)
+			})
 		} else if msg[0] == ProtocolGossip {
-			// contains state for everyone that sending peer knows
-			// peers that receive it should examine the info, and if any of it is newer then
-			// pass it on to their peers
-			channelHash, msg := decodeGossipChannel(msg[1:])
-			channel, found := conn.Router.GossipChannels[channelHash]
-			if !found {
-				conn.log("received unknown gossip channel:\n", channelHash)
-			} else {
-				_, _, msg := decodePeerName(msg)
-				newBuf := channel.gossiper.OnGossip(msg)
-				if newBuf != nil {
+			conn.handleGossip(msg, func(channel *GossipChannel, srcName PeerName, payload []byte) {
+				if newBuf := channel.gossiper.OnGossip(payload); newBuf != nil {
 					channel.GossipMsg(newBuf)
 				}
-			}
+			})
 		} else {
 			conn.log("received unknown msg:\n", msg)
 		}

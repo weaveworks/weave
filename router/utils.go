@@ -74,8 +74,8 @@ func randUint64() (r uint64) {
 	return
 }
 
-func decodePeerName(msg []byte) (name PeerName, nameLen byte, remainder []byte) {
-	nameLen = msg[0]
+func decodePeerName(msg []byte) (name PeerName, remainder []byte) {
+	nameLen := msg[0]
 	name = PeerNameFromBin(msg[1 : 1+nameLen])
 	remainder = msg[1+nameLen:]
 	return
