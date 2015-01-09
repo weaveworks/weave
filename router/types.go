@@ -17,13 +17,13 @@ type Router struct {
 	Macs            *MacCache
 	Peers           *Peers
 	Routes          *Routes
+	GossipChannels  map[uint32]*GossipChannel
 	ConnectionMaker *ConnectionMaker
 	UDPListener     *net.UDPConn
 	Password        *[]byte
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
-	GossipChannels  map[uint32]*GossipChannel // does not change after startup - access not locked
 }
 
 type Connection interface {
