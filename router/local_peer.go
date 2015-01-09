@@ -18,12 +18,15 @@ type PeerInteraction struct {
 	payload interface{}
 }
 
-func StartLocalPeer(name PeerName, router *Router) *LocalPeer {
+func NewLocalPeer(name PeerName, router *Router) *LocalPeer {
 	peer := &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
+	return peer
+}
+
+func (peer *LocalPeer) Start() {
 	queryChan := make(chan *PeerInteraction, ChannelSize)
 	peer.queryChan = queryChan
 	go peer.queryLoop(queryChan)
-	return peer
 }
 
 func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {

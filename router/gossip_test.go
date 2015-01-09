@@ -19,37 +19,20 @@ func (q *peerQueue) clear() {
 	q.peers = nil
 }
 
+// Construct a Router object with a mock interface to check peer
+// garbage-collection, and without firing up any ancilliary goroutines
 func NewTestRouter(t *testing.T, name PeerName, queue *peerQueue) *Router {
-	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
-		//t.Log("Expired MAC", mac, "at", peer.Name)
-	}
+	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {}
 	onPeerGC := func(peer *Peer) {
 		//t.Log("Removing unreachable", peer)
 		queue.peers = append(queue.peers, peer)
 	}
-	router := &Router{
-		Iface:          nil,
-		Macs:           NewMacCache(macMaxAge, onMacExpiry),
-		GossipChannels: make(map[uint32]*GossipChannel),
-		ConnLimit:      10,
-		BufSz:          1024,
-		LogFrame:       nil}
-	router.Ourself = &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
-	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
-	router.Peers.FetchWithDefault(router.Ourself.Peer)
-	// Now a couple of things that are actors that we don't want running
-	// independently when testing
+	router := newRouter(nil, name, nil, 10, 1024, nil, onMacExpiry, onPeerGC)
 	router.ConnectionMaker = &ConnectionMaker{
 		ourself:   router.Ourself,
 		queryChan: make(chan *ConnectionMakerInteraction, ChannelSize)}
-	router.Routes = &Routes{
-		ourself:   router.Ourself.Peer,
-		peers:     router.Peers,
-		unicast:   make(map[PeerName]PeerName),
-		broadcast: make(map[PeerName][]PeerName),
-		queryChan: make(chan *Interaction, ChannelSize)}
-	router.Routes.unicast[name] = UnknownPeerName
-	router.Routes.broadcast[name] = []PeerName{}
+	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
+	router.Routes.queryChan = make(chan *Interaction, ChannelSize)
 	return router
 }
 
@@ -92,6 +75,7 @@ func AssertEmpty(t *testing.T, array []*Peer, desc string) {
 	}
 }
 
+// Check that the peers slice matches the peers associated with the routers slice
 func checkPeerArray(t *testing.T, peers []*Peer, routers []*Router) {
 	check := make(map[PeerName]bool)
 	for _, peer := range peers {

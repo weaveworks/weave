@@ -24,6 +24,13 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	onPeerGC := func(peer *Peer) {
 		log.Println("Removing unreachable", peer)
 	}
+	router := newRouter(iface, name, password, connLimit, bufSz, logFrame, onMacExpiry, onPeerGC)
+	router.Ourself.Start()
+
+	return router
+}
+
+func newRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet), onMacExpiry func(mac net.HardwareAddr, peer *Peer), onPeerGC func(peer *Peer)) *Router {
 	router := &Router{
 		Iface:          iface,
 		Macs:           NewMacCache(macMaxAge, onMacExpiry),
@@ -34,11 +41,9 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	if len(password) > 0 {
 		router.Password = &password
 	}
-	router.Ourself = StartLocalPeer(name, router)
+	router.Ourself = NewLocalPeer(name, router)
 	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
-	log.Println("Our name is", router.Ourself.Name)
-
 	return router
 }
 
