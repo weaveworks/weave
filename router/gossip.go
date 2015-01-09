@@ -6,17 +6,16 @@ import (
 
 type Gossip interface {
 	// specific message from one peer to another
-	// intermediate peers should relay it using unicast topology.
+	// intermediate peers relay it using unicast topology.
 	GossipUnicast(dstPeerName PeerName, buf []byte) error
-	// intended for a state change that everyone should hear about quickly
-	// relayed using broadcast topology.
+	// send a message to every peer, relayed using broadcast topology.
 	GossipBroadcast(buf []byte) error
 }
 
 type Gossiper interface {
 	OnGossipBroadcast(msg []byte)
 	OnGossipUnicast(sender PeerName, msg []byte)
-	// Return state of everything we know; intended to be called periodically
+	// Return state of everything we know; gets called periodically
 	Gossip() []byte
 	// merge in state and return "everything new I've just learnt",
 	// or nil if nothing in the received message was new
@@ -37,9 +36,6 @@ func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 	return channel
 }
 
-// contains state for everyone that sending peer knows
-// done on an interval; sent by one peer down [all/random subset of] connections
-// peers that receive it should examine the info, and if it is broadcast
 func (router *Router) SendAllGossip() {
 	for _, c := range router.GossipChannels {
 		c.GossipMsg(c.gossiper.Gossip())
@@ -57,9 +53,6 @@ func (c *GossipChannel) GossipMsg(buf []byte) {
 	})
 }
 
-// intended for state from sending peer only
-// done when there is a change that everyone should hear about quickly
-// peers that receive it should relay it using broadcast topology.
 func (c *GossipChannel) GossipBroadcast(buf []byte) error {
 	peerName := c.localPeer.Name.Bin()
 	nameLenByte := []byte{byte(len(peerName))}
@@ -78,8 +71,6 @@ func (peer *LocalPeer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
 	}
 }
 
-// specific message from one peer to another
-// intermediate peers should relay it using unicast topology.
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
 	srcPeerByte := c.localPeer.Name.Bin()
 	nameLenByte := []byte{byte(len(srcPeerByte))}
