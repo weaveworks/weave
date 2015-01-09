@@ -29,13 +29,13 @@ const (
 )
 
 const (
-	ProtocolConnectionEstablished  = iota
-	ProtocolFragmentationReceived  = iota
-	ProtocolStartFragmentationTest = iota
-	ProtocolNonce                  = iota
-	ProtocolFetchAll               = iota
-	ProtocolUpdate                 = iota
-	ProtocolPMTUVerified           = iota
+	ProtocolConnectionEstablished = iota
+	ProtocolFragmentationReceived
+	ProtocolStartFragmentationTest
+	ProtocolNonce
+	ProtocolFetchAll
+	ProtocolUpdate
+	ProtocolPMTUVerified
 )
 
 var (
