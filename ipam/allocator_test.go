@@ -242,6 +242,14 @@ func (m *mockTimeProvider) runPending(newTime time.Time) {
 	}
 }
 
+func assertNoOverlaps(t *testing.T, allocs ...*Allocator) {
+	for _, alloc := range allocs {
+		if alloc.lookForOverlaps() {
+			t.Fatalf("%s: Allocator has overlapping space: %s", wt.CallSite(2), alloc)
+		}
+	}
+}
+
 func TestGossip(t *testing.T) {
 	const (
 		testStart1     = "10.0.1.0"
@@ -347,7 +355,79 @@ func TestGossip(t *testing.T) {
 	mockGossip2.VerifyNoMoreMessages(t)
 }
 
-func TestGossipGarbage(t *testing.T) {
+func TestLeaks(t *testing.T) {
+	const (
+		testStart1     = "10.0.1.0"
+		testStart2     = "10.0.1.8"
+		origSize       = 10
+		universeSize   = 16
+		ourNameString  = "01:00:00:01:00:00"
+		peerNameString = "02:00:00:02:00:00"
+	)
+
+	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
+	ourName, _ := router.PeerNameFromString(ourNameString)
+	mockGossip1 := new(mockGossipComms)
+	alloc1 := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), universeSize)
+	alloc1.state = allocStateNeutral
+	alloc1.SetGossip(mockGossip1)
+	mockTime := new(mockTimeProvider)
+	mockTime.SetTime(baseTime)
+	alloc1.timeProvider = mockTime
+
+	mockTime.SetTime(baseTime.Add(1 * time.Second))
+
+	// Simulate another peer on the gossip network
+	mockGossip2 := new(mockGossipComms)
+	pn, _ := router.PeerNameFromString(peerNameString)
+	alloc2 := NewAllocator(pn, peerUID, net.ParseIP(testStart1), universeSize)
+	alloc2.SetGossip(mockGossip2)
+	alloc2.timeProvider = alloc1.timeProvider
+
+	mockTime.SetTime(baseTime.Add(20 * time.Second))
+
+	// Give alloc1 the space from .0 to .7; nobody owns from .7 to .15
+	alloc1.manageSpace(net.ParseIP(testStart1), 8)
+	alloc1.considerOurPosition()
+	mockGossip1.VerifyNoMoreMessages(t)
+
+	// Allow alloc1 to note the leak
+	mockTime.SetTime(baseTime.Add(30 * time.Second))
+	alloc1.considerOurPosition()
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	// Alloc2 is managing some of that space; it tells alloc1 about itself
+	mockTime.SetTime(baseTime.Add(40 * time.Second))
+	alloc2.manageSpace(net.ParseIP(testStart2), 4)
+	alloc2.considerOurPosition()
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	assertNoOverlaps(t, alloc1, alloc2)
+
+	mockTime.SetTime(baseTime.Add(50 * time.Second))
+	alloc1.OnGossipBroadcast(alloc2.Gossip())
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	assertNoOverlaps(t, alloc1, alloc2)
+
+	// Allow alloc1 to note the leak, but at this point it doesn't do anything
+	mockTime.SetTime(baseTime.Add(60 * time.Second))
+	alloc1.considerOurPosition()
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	// Now move the time forward so alloc1 reclaims the leak
+	mockTime.SetTime(baseTime.Add(12 * time.Minute))
+	alloc1.considerOurPosition()
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	assertNoOverlaps(t, alloc1, alloc2)
+}
+
+func TestGossipBreakage(t *testing.T) {
 	const (
 		ourNameString = "01:00:00:01:00:00"
 		testStart1    = "10.0.1.0"

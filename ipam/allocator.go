@@ -198,11 +198,13 @@ func (alloc *Allocator) lookForNewLeaks(now time.Time) {
 
 func (alloc *Allocator) discardOldLeaks() {
 	for age, leak := range alloc.leaked {
-		if alloc.ourSpaceSet.Overlaps(leak.GetMinSpace()) {
-			lg.Debug.Printf("Discarding non-leak %+v", leak)
-			// Really, we should only discard the piece that is overlapped, but
-			// this way is simpler and we will recover any real leaks in the end
-			delete(alloc.leaked, age)
+		for _, peerSpaceSet := range alloc.peerInfo {
+			if peerSpaceSet.Overlaps(leak.GetMinSpace()) {
+				lg.Debug.Printf("Discarding non-leak %+v", leak)
+				// Really, we should only discard the piece that is overlapped, but
+				// this way is simpler and we will recover any real leaks in the end
+				delete(alloc.leaked, age)
+			}
 		}
 	}
 }
