@@ -6,7 +6,7 @@ SCRIPT_VERSION="(unreleased version)"
 usage() {
     echo "Usage:"
     echo "weave setup"
-    echo "weave launch     [-password <password> | -passwordfile <path>] <peer> ..."
+    echo "weave launch     [-password <password>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
     echo "weave join       <group>"
@@ -143,8 +143,6 @@ create_bridge() {
         ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
         ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
         ip link del dev v${CONTAINER_IFNAME}du
-        # disable offloading
-        run_tool host ethtool -K $BRIDGE tx off >/dev/null
         # Work around the situation where there are no rules allowing traffic
         # across our bridge. E.g. ufw
         add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
@@ -152,6 +150,12 @@ create_bridge() {
         run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
         add_iptables_rule nat POSTROUTING -j WEAVE
     }
+    # disable offloading - we do this even when $BRIDGE already exists
+    # simply because it has the desirable side-effect of ensuring we
+    # have the $TOOLS_IMAGE and thus do not incur downloading-induced
+    # delays in more time-sensitive sections elsewhere.
+    run_tool host ethtool -K $BRIDGE tx off >/dev/null
+
     ip link set dev $BRIDGE up
 }
 
@@ -505,11 +509,8 @@ case "$COMMAND" in
 
         if [ "$1" = "-password" ] ; then
             [ $# -gt 1 ] || usage
-            PASSWORD=$2
-            shift 2
-        elif [ "$1" = "-passwordfile" ] ; then
-            [ $# -gt 1 ] || usage
-            PASSWORDFILE=$2
+            WEAVE_PASSWORD="$2"
+            export WEAVE_PASSWORD
             shift 2
         fi
 
@@ -517,8 +518,7 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp \
-            ${PASSWORD:+-e WEAVE_PASSWORD="$PASSWORD"} ${PASSWORDFILE:+--env-file="$PASSWORDFILE"} \
+            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD \
             $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -iface $CONTAINER_IFNAME "$@")
         with_container_netns $CONTAINER launch >/dev/null
         echo $CONTAINER

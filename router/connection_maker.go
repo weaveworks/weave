@@ -15,10 +15,10 @@ const (
 )
 
 const (
-	CMInitiate   = iota
-	CMTerminated = iota
-	CMRefresh    = iota
-	CMStatus     = iota
+	CMInitiate = iota
+	CMTerminated
+	CMRefresh
+	CMStatus
 )
 
 type ConnectionMaker struct {

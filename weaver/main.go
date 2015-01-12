@@ -135,8 +135,13 @@ func main() {
 }
 
 func handleHttp(router *weave.Router) {
+	encryption := "off"
+	if router.Password != nil && len(*router.Password) > 0 {
+		encryption = "on"
+	}
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln("weave router", version))
+		io.WriteString(w, fmt.Sprintln("Encryption", encryption))
 		io.WriteString(w, router.Status())
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {

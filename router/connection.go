@@ -123,10 +123,10 @@ func (conn *LocalConnection) log(args ...interface{}) {
 // ACTOR client API
 
 const (
-	CSendTCP          = iota
-	CSetEstablished   = iota
-	CSetRemoteUDPAddr = iota
-	CShutdown         = iota
+	CSendTCP = iota
+	CSetEstablished
+	CSetRemoteUDPAddr
+	CShutdown
 )
 
 // Async

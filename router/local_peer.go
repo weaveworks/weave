@@ -113,10 +113,10 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 // ACTOR client API
 
 const (
-	PAddConnection         = iota
-	PBroadcastTCP          = iota
-	PDeleteConnection      = iota
-	PConnectionEstablished = iota
+	PAddConnection = iota
+	PBroadcastTCP
+	PDeleteConnection
+	PConnectionEstablished
 )
 
 // Async: rely on the peer to shut us down if we shouldn't be adding

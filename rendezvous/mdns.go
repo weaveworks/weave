@@ -105,7 +105,7 @@ func (mdns *mDnsWorker) Start(externals []externalIface, iface *net.Interface) e
 	go func() {
 		queryPeriod := mdnsQueryPeriod
 		timer := time.NewTimer(0)
-		responsesChan := make(chan *nameserver.ResponseA)
+		responsesChan := make(chan *nameserver.Response)
 		minInt := func(x int, y int) int { return int(math.Min(float64(x), float64(y))) }
 
 	outerloop:
@@ -127,7 +127,7 @@ func (mdns *mDnsWorker) Start(externals []externalIface, iface *net.Interface) e
 					if _, skipped := mdns.skippedIps[foundIpStr]; !skipped {
 						Debug.Printf("Found peer \"%s\" with mDNS", foundIpStr)
 						mdns.manager.notifyAbout(foundIpStr)
-						mdns.skippedIps[foundIpStr] = true		 //TODO: maybe we should move skippedIps to the manager...
+						mdns.skippedIps[foundIpStr] = true //TODO: maybe we should move skippedIps to the manager...
 					}
 				}
 			}

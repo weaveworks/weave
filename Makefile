@@ -1,18 +1,19 @@
 .DEFAULT: all
-.PHONY: all update tests clean
+.PHONY: all update tests publish $(PUBLISH) clean
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
 
+DOCKERHUB_USER=zettio
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
 WEAVETOOLS_EXES=tools/bin
 WEAVERENDEZ_EXE=cmd/rendezvous/weaverendezvous
-WEAVER_IMAGE=zettio/weave
-WEAVEDNS_IMAGE=zettio/weavedns
-WEAVETOOLS_IMAGE=zettio/weavetools
-WEAVERENDEZ_IMAGE=zettio/weaverendezvous
+WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
+WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
+WEAVETOOLS_IMAGE=$(DOCKERHUB_USER)/weavetools
+WEAVERENDEZ_IMAGE=$(DOCKERHUB_USER)/weaverendezvous
 WEAVER_EXPORT=/var/tmp/weave.tar
 WEAVEDNS_EXPORT=/var/tmp/weavedns.tar
 WEAVETOOLS_EXPORT=/var/tmp/weavetools.tar
@@ -28,7 +29,6 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVERENDEZ_EXE):
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(shell dirname $@)
 	@ldd $@ 2>/dev/null | grep "not a dynamic executable" >/dev/null || { \
 		rm $@; \
-		echo "\ngo build generated a dynamically linked executable."; \
 		echo "\nYour go standard library was built without the 'netgo' build tag."; \
 		echo "To fix that, run"; \
 		echo "    sudo go clean -i net"; \
@@ -62,6 +62,13 @@ $(WEAVERENDEZ_EXPORT): cmd/rendezvous/Dockerfile $(WEAVERENDEZ_EXE)
 # Add more directories in here as more tests are created
 tests:
 	cd nameserver; go test -tags netgo
+
+$(PUBLISH): publish_%:
+	$(SUDO) docker tag  $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(SUDO) docker push $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(SUDO) docker push $(DOCKERHUB_USER)/$*:latest
+
+publish: $(PUBLISH)
 
 clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE) $(WEAVERENDEZ_IMAGE)

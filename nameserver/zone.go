@@ -2,16 +2,28 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
+	. "github.com/zettio/weave/common"
 	"net"
 	"sync"
 )
+
+const (
+	RDNS_DOMAIN = "in-addr.arpa."
+)
+
+// +1 to also exclude a dot
+var rdnsDomainLen = len(RDNS_DOMAIN) + 1
+
+type Lookup interface {
+	LookupLocal(name string) ([]net.IP, error)
+	ReverseLookupLocal(inaddr string) (string, error)
+}
 
 type Zone interface {
 	AddRecord(ident string, name string, ip net.IP) error
 	DeleteRecord(ident string, ip net.IP) error
 	DeleteRecordsFor(ident string) error
-	LookupLocal(name string) ([]net.IP, error)
-	ReverseLookupLocal(ip net.IP) (string, error)
+	Lookup
 }
 
 type Record struct {
@@ -65,15 +77,23 @@ func (zone *ZoneDb) LookupLocal(name string) (res []net.IP, err error) {
 	return
 }
 
-func (zone *ZoneDb) ReverseLookupLocal(ip net.IP) (string, error) {
-	zone.mx.RLock()
-	defer zone.mx.RUnlock()
-	for _, r := range zone.recs {
-		if r.IP.Equal(ip) {
-			return r.Name, nil
+func (zone *ZoneDb) ReverseLookupLocal(inaddr string) (string, error) {
+	if revIP := net.ParseIP(inaddr[:len(inaddr)-rdnsDomainLen]); revIP != nil {
+		revIP4 := revIP.To4()
+		ip := []byte{revIP4[3], revIP4[2], revIP4[1], revIP4[0]}
+		Debug.Printf("Looking for address: %+v", ip)
+		zone.mx.RLock()
+		defer zone.mx.RUnlock()
+		for _, r := range zone.recs {
+			if r.IP.Equal(ip) {
+				return r.Name, nil
+			}
 		}
+		return "", LookupError(inaddr)
+	} else {
+		Warning.Printf("Asked to reverse lookup %s", inaddr)
+		return "", LookupError(inaddr)
 	}
-	return "", LookupError(ip.String())
 }
 
 func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) error {
