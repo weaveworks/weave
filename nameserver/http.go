@@ -24,7 +24,7 @@ func parseUrl(url string) (identifier string, ipaddr string, err error) {
 func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	status int, logmsg string, logargs ...interface{}) {
 	http.Error(w, msg, status)
-	level.Printf(logmsg, logargs...)
+	level.Printf("[http] "+logmsg, logargs...)
 }
 
 func ListenHttp(domain string, db Zone, port int) {
@@ -60,7 +60,7 @@ func ListenHttp(domain string, db Zone, port int) {
 			}
 
 			if dns.IsSubDomain(domain, name) {
-				Info.Printf("Adding %s -> %s", name, ipStr)
+				Info.Printf("[http] Adding %s -> %s", name, ipStr)
 				if err = db.AddRecord(ident, name, ip); err != nil {
 					if _, ok := err.(DuplicateError); !ok {
 						httpErrorAndLog(
@@ -70,7 +70,7 @@ func ListenHttp(domain string, db Zone, port int) {
 					} // oh, I already know this. whatever.
 				}
 			} else {
-				Info.Printf("Ignoring name %s, not in %s", name, domain)
+				Info.Printf("[http] Ignoring name %s, not in %s", name, domain)
 			}
 
 		case "DELETE":
@@ -85,7 +85,7 @@ func ListenHttp(domain string, db Zone, port int) {
 				reqError("Invalid IP in request", "Invalid IP in request: %s", ipStr)
 				return
 			}
-			Info.Printf("Deleting %s (%s)", ident, ipStr)
+			Info.Printf("[http] Deleting %s (%s)", ident, ipStr)
 			if err = db.DeleteRecord(ident, ip); err != nil {
 				if _, ok := err.(LookupError); !ok {
 					httpErrorAndLog(
@@ -103,6 +103,6 @@ func ListenHttp(domain string, db Zone, port int) {
 
 	address := fmt.Sprintf(":%d", port)
 	if err := http.ListenAndServe(address, nil); err != nil {
-		Error.Fatal("Unable to create http listener: ", err)
+		Error.Fatal("[http] Unable to create http listener: ", err)
 	}
 }

@@ -34,7 +34,7 @@ func sendQuery(name string, querytype uint16) error {
 
 func TestServerSimpleQuery(t *testing.T) {
 	// The ff can be handy for debugging (obvs)
-	//wt.InitDefaultLogging(true)
+	wt.InitDefaultLogging(true)
 
 	log.Println("TestServerSimpleQuery starting")
 	var zone = new(ZoneDb)
