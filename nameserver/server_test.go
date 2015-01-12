@@ -3,7 +3,8 @@ package nameserver
 import (
 	"fmt"
 	"github.com/miekg/dns"
-	wt "github.com/zettio/weave/common"
+	"github.com/zettio/weave/common"
+	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestDNSServer(t *testing.T) {
 	dnsAddr := fmt.Sprintf("localhost:%d", port)
 	testCIDR1 := testAddr1 + "/24"
 
-	wt.InitDefaultLogging(true)
+	common.InitDefaultLogging(true)
 	var zone = new(ZoneDb)
 	ip, _, _ := net.ParseCIDR(testCIDR1)
 	zone.AddRecord(containerID, successTestName, ip)
