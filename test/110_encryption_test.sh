@@ -5,7 +5,7 @@
 C1=10.1.1.4
 C2=10.1.1.7
 
-start_suite "Ping over cross-host weave network"
+start_suite "Ping over encrypted cross-host weave network"
 
 for HOST in $HOST1 $HOST2; do
     run_on $HOST sudo $WEAVE stop || true
