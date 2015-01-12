@@ -23,7 +23,7 @@ all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
 update:
 	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE))
 
-$(WEAVER_EXE) $(WEAVEDNS_EXE):
+$(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(shell dirname $@)
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
