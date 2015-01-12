@@ -68,12 +68,15 @@ func TestDNSServer(t *testing.T) {
 	wt.AssertStatus(t, r.Rcode, dns.RcodeNameError, "DNS response code")
 	wt.AssertEqualInt(t, len(r.Answer), 0, "Number of answers")
 
-	// This non-local query should fail because we don't handle MX records
+	// This non-local query for an MX record should succeed by being
+	// passed on to the configured (/etc/resolv.conf) DNS server.
 	m.SetQuestion(nonLocalName, dns.TypeMX)
 	r, _, err = c.Exchange(m, dnsAddr)
 	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeNameError, "DNS response code")
-	wt.AssertEqualInt(t, len(r.Answer), 0, "Number of answers")
+	wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
+	if !(len(r.Answer) > 0) {
+		t.Fatal("Number of answers > 0")
+	}
 
 	// Not testing MDNS functionality of server here (yet)
 }
