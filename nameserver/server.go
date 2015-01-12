@@ -37,7 +37,7 @@ func queryHandler(lookups []Lookup) dns.HandlerFunc {
 		Debug.Printf("Query: %+v", q)
 		if q.Qtype == dns.TypeA {
 			for _, lookup := range lookups {
-				if ip, err := lookup.LookupLocal(q.Name); err == nil {
+				if ip, err := lookup.LookupName(q.Name); err == nil {
 					m := makeAddressReply(r, &q, []net.IP{ip})
 					w.WriteMsg(m)
 					return
@@ -56,7 +56,7 @@ func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 		Debug.Printf("Reverse query: %+v", q)
 		if q.Qtype == dns.TypePTR {
 			for _, lookup := range lookups {
-				if name, err := lookup.ReverseLookupLocal(q.Name); err == nil {
+				if name, err := lookup.LookupInaddr(q.Name); err == nil {
 					m := makePTRReply(r, &q, []string{name})
 					w.WriteMsg(m)
 					return

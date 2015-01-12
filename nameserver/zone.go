@@ -15,8 +15,8 @@ const (
 var rdnsDomainLen = len(RDNS_DOMAIN) + 1
 
 type Lookup interface {
-	LookupLocal(name string) (net.IP, error)
-	ReverseLookupLocal(inaddr string) (string, error)
+	LookupName(name string) (net.IP, error)
+	LookupInaddr(inaddr string) (string, error)
 }
 
 type Zone interface {
@@ -61,7 +61,7 @@ func (zone *ZoneDb) indexOf(match func(Record) bool) int {
 	return -1
 }
 
-func (zone *ZoneDb) LookupLocal(name string) (net.IP, error) {
+func (zone *ZoneDb) LookupName(name string) (net.IP, error) {
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 	for _, r := range zone.recs {
@@ -72,7 +72,7 @@ func (zone *ZoneDb) LookupLocal(name string) (net.IP, error) {
 	return nil, LookupError(name)
 }
 
-func (zone *ZoneDb) ReverseLookupLocal(inaddr string) (string, error) {
+func (zone *ZoneDb) LookupInaddr(inaddr string) (string, error) {
 	if revIP := net.ParseIP(inaddr[:len(inaddr)-rdnsDomainLen]); revIP != nil {
 		revIP4 := revIP.To4()
 		ip := []byte{revIP4[3], revIP4[2], revIP4[1], revIP4[0]}

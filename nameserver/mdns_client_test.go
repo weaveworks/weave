@@ -169,16 +169,16 @@ func TestAsLookup(t *testing.T) {
 	defer mdnsClient.Shutdown()
 	defer server.Shutdown()
 
-	ip, err := mdnsClient.LookupLocal(successTestName)
+	ip, err := mdnsClient.LookupName(successTestName)
 	wt.AssertNoErr(t, err)
 	if !testAddr.Equal(ip) {
 		t.Fatalf("Returned address incorrect %s", ip)
 	}
 
-	ip, err = mdnsClient.LookupLocal("foo.example.com.")
+	ip, err = mdnsClient.LookupName("foo.example.com.")
 	wt.AssertErrorType(t, err, (*LookupError)(nil), "unknown hostname")
 
-	name, err := mdnsClient.ReverseLookupLocal(testInAddr)
+	name, err := mdnsClient.LookupInaddr(testInAddr)
 	wt.AssertNoErr(t, err)
 	if !(successTestName == name) {
 		t.Fatalf("Expected name %s, got %s", successTestName, name)

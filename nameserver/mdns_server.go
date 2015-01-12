@@ -52,7 +52,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 
 	handleLocal := s.makeHandler(dns.TypeA,
 		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
-			if ip, err := zone.LookupLocal(q.Name); err == nil {
+			if ip, err := zone.LookupName(q.Name); err == nil {
 				return makeAddressReply(r, q, []net.IP{ip})
 			} else {
 				return nil
@@ -61,7 +61,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 
 	handleReverse := s.makeHandler(dns.TypePTR,
 		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
-			if name, err := zone.ReverseLookupLocal(q.Name); err == nil {
+			if name, err := zone.LookupInaddr(q.Name); err == nil {
 				return makePTRReply(r, q, []string{name})
 			} else {
 				return nil
