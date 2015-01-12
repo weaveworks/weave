@@ -269,10 +269,6 @@ func (conn *LocalConnection) handleShutdown() {
 	// (or write elements which are only read by the same
 	// process). Taking locks is only done for elements which are read
 	// by other processes.
-	if conn.shutdown {
-		return
-	}
-	conn.shutdown = true
 
 	if conn.TCPConn != nil {
 		checkWarn(conn.TCPConn.Close())
