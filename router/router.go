@@ -157,7 +157,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// on Port and we wait for them to send us something on UDP to
 	// start.
 	remoteAddrStr := tcpConn.RemoteAddr().String()
-	log.Printf("->[%s] connection accepted", remoteAddrStr)
+	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
 	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr)
 	NewLocalConnection(connRemote, true, tcpConn, nil, router)
 }

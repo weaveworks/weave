@@ -198,9 +198,9 @@ func (cm *ConnectionMaker) status() string {
 }
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
-	log.Println("Attempting connection to", address)
+	log.Printf("->[%s] attempting connection\n", address)
 	if err := cm.ourself.CreateConnection(address, acceptNewPeer); err != nil {
-		log.Println(err)
+		log.Printf("->[%s] error during connection attempt: %v\n", err)
 		cm.ConnectionTerminated(address)
 	}
 }
