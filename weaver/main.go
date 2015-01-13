@@ -21,6 +21,7 @@ import (
 var version = "(unreleased version)"
 
 func main() {
+
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
@@ -33,16 +34,16 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		justVersion		bool
-		ifaceName  		string
-		routerName 		string
-		password   		string
-		wait       		int
-		debug      		bool
-		prof       		string
-		peers      		[]string
-		connLimit  		int
-		bufSz      		int
+		justVersion bool
+		ifaceName   string
+		routerName  string
+		password    string
+		wait        int
+		debug       bool
+		prof        string
+		peers       []string
+		connLimit   int
+		bufSz       int
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -123,7 +124,6 @@ func main() {
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
 	router.Start()
 	for _, peer := range peers {
-		// the peer id must be just a regular IP address...
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
 			router.ConnectionMaker.InitiateConnection(addr.String())
 		} else {

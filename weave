@@ -76,7 +76,7 @@ command_exists () {
     command -v $1 >/dev/null 2>&1
 }
 
-log()   { echo "$1"; }
+log()   { echo "$1" >&2 ; }
 warn()  { log "WARNING: $1"; }
 fatal() { log "ERROR: $1"; exit 1; }
 

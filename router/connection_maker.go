@@ -48,8 +48,7 @@ func StartConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
 		peers:          peers,
 		queryChan:      queryChan,
 		cmdLineAddress: make(map[string]bool),
-		targets:        make(map[string]*Target),
-	}
+		targets:        make(map[string]*Target)}
 	go state.queryLoop(queryChan)
 	return state
 }
@@ -111,7 +110,6 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 		}
 	}
 }
-
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	validTarget := make(map[string]bool)

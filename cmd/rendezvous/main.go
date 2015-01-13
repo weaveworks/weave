@@ -130,6 +130,8 @@ func handleSignals(rm *RendezvousManager) {
 		case syscall.SIGQUIT:
 			runtime.Stack(buf, true)
 			Info.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+		case syscall.SIGINT:
+			Info.Printf("=== received SIGINT ===\n*** exiting...\n")
 			rm.Stop()
 		}
 	}
