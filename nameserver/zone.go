@@ -81,7 +81,7 @@ func (zone *ZoneDb) ReverseLookupLocal(inaddr string) (string, error) {
 	if revIP := net.ParseIP(inaddr[:len(inaddr)-rdnsDomainLen]); revIP != nil {
 		revIP4 := revIP.To4()
 		ip := []byte{revIP4[3], revIP4[2], revIP4[1], revIP4[0]}
-		Debug.Printf("Looking for address: %+v", ip)
+		Debug.Printf("[zonedb] Looking for address: %+v", ip)
 		zone.mx.RLock()
 		defer zone.mx.RUnlock()
 		for _, r := range zone.recs {
@@ -91,7 +91,7 @@ func (zone *ZoneDb) ReverseLookupLocal(inaddr string) (string, error) {
 		}
 		return "", LookupError(inaddr)
 	} else {
-		Warning.Printf("Asked to reverse lookup %s", inaddr)
+		Warning.Printf("[zonedb] Asked to reverse lookup %s", inaddr)
 		return "", LookupError(inaddr)
 	}
 }

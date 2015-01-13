@@ -36,9 +36,9 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVERENDEZ_EXE):
 		false; \
 	}
 
-$(WEAVER_EXE):      router/*.go weaver/main.go
-$(WEAVEDNS_EXE):    common/* nameserver/*.go weavedns/main.go
-$(WEAVERENDEZ_EXE): common/* nameserver/*.go rendezvous/*.go cmd/rendezvous/*.go
+$(WEAVER_EXE):      common/*.go router/*.go weaver/main.go
+$(WEAVEDNS_EXE):    common/*.go nameserver/*.go weavedns/main.go
+$(WEAVERENDEZ_EXE): common/*.go nameserver/*.go rendezvous/*.go cmd/rendezvous/*.go
 
 $(WEAVETOOLS_EXES): tools/build.sh
 	$(SUDO) docker run --rm -v $(realpath $(<D)):/home/weave ubuntu sh /home/weave/build.sh

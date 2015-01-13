@@ -91,12 +91,15 @@ func (s *MDNSServer) makeHandler(qtype uint16, lookup LookupFunc) dns.HandlerFun
 			q := &r.Question[0]
 			if q.Qtype == qtype {
 				if m := lookup(s.zone, r, q); m != nil {
-					Debug.Printf("Found local answer to mDNS query %s", q.Name)
+					Debug.Printf("[mdns msgid %d] Found local answer to mDNS query %s",
+						r.MsgHdr.Id, q.Name)
 					if err := s.sendResponse(m); err != nil {
-						Warning.Printf("Error writing to %s", s.sendconn)
+						Warning.Printf("[mdns msgid %d] Error writing to %s",
+							r.MsgHdr.Id, s.sendconn)
 					}
 				} else {
-					Debug.Printf("No local answer for mDNS query %s", q.Name)
+					Debug.Printf("[mdns msgid %d] No local answer for mDNS query %s",
+						r.MsgHdr.Id, q.Name)
 				}
 			}
 		}

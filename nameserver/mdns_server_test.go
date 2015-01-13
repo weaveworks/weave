@@ -2,7 +2,8 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
-	wt "github.com/zettio/weave/common"
+	"github.com/zettio/weave/common"
+	wt "github.com/zettio/weave/testing"
 	"log"
 	"net"
 	"testing"
@@ -34,7 +35,7 @@ func sendQuery(name string, querytype uint16) error {
 
 func TestServerSimpleQuery(t *testing.T) {
 	// The ff can be handy for debugging (obvs)
-	//wt.InitDefaultLogging(true)
+	common.InitDefaultLogging(true)
 
 	log.Println("TestServerSimpleQuery starting")
 	var zone = new(ZoneDb)

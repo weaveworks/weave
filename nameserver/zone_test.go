@@ -1,7 +1,7 @@
 package nameserver
 
 import (
-	wt "github.com/zettio/weave/common"
+	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
 )

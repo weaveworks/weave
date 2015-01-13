@@ -60,7 +60,6 @@ type LocalConnection struct {
 	Decryptor     Decryptor
 	Router        *Router
 	UID           uint64
-	shutdown      bool
 	queryChan     chan<- *ConnectionInteraction
 }
 
