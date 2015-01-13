@@ -210,6 +210,7 @@ func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
 	peer.Lock()
 	peer.connections[toName] = conn
 	peer.Unlock()
+	conn.log("connection added")
 }
 
 func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
@@ -226,6 +227,7 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	peer.Lock()
 	delete(peer.connections, toName)
 	peer.Unlock()
+	conn.log("connection deleted")
 	broadcast := false
 	if conn.Established() {
 		peer.Lock()
@@ -252,7 +254,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 	peer.Lock()
 	peer.version += 1
 	peer.Unlock()
-	log.Println("Peer", peer.Name, "established active connection to remote peer", conn.Remote().Name, "at", conn.RemoteTCPAddr())
+	conn.log("connection fully established")
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 

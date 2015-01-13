@@ -30,7 +30,7 @@ type Connection interface {
 	Remote() *Peer
 	RemoteTCPAddr() string
 	Established() bool
-	Shutdown()
+	Shutdown(error)
 }
 
 type RemoteConnection struct {
