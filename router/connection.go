@@ -212,9 +212,6 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 }
 
 func (conn *LocalConnection) handleSetRemoteUDPAddr(remoteUDPAddr *net.UDPAddr) error {
-	if remoteUDPAddr == nil {
-		return nil
-	}
 	conn.Lock()
 	old := conn.remoteUDPAddr
 	conn.remoteUDPAddr = remoteUDPAddr
