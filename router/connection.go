@@ -172,7 +172,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 
-	go conn.receiveTCP(dec, conn.Router.UsingPassword())
+	go conn.receiveTCP(dec)
 	conn.Router.Ourself.AddConnection(conn)
 
 	if conn.remoteUDPAddr != nil {
@@ -435,8 +435,9 @@ func checkHandshakeStringField(fieldName string, expectedValue string, handshake
 	return val, nil
 }
 
-func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool) {
+func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	defer conn.Decryptor.Shutdown()
+	usingPassword := conn.SessionKey != nil
 	var receiver TCPReceiver
 	if usingPassword {
 		receiver = NewEncryptedTCPReceiver(conn)
