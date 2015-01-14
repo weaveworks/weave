@@ -65,7 +65,7 @@ func NewLocalConnection(connRemote *RemoteConnection, acceptNewPeer bool, tcpCon
 		remoteUDPAddr:    udpAddr,
 		effectivePMTU:    DefaultPMTU,
 		queryChan:        queryChan}
-	go connLocal.queryLoop(queryChan, acceptNewPeer)
+	go connLocal.run(queryChan, acceptNewPeer)
 }
 
 func (conn *LocalConnection) Established() bool {
@@ -158,21 +158,34 @@ func (conn *LocalConnection) SendTCP(msg []byte) {
 
 // ACTOR server
 
-func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
-	err := conn.handshake(acceptNewPeer)
-	if err != nil {
+func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
+	defer conn.handleShutdown()
+	if err := conn.handshake(acceptNewPeer); err != nil {
 		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
-		conn.handleShutdown()
 		return
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 	conn.Router.Ourself.AddConnection(conn)
 	if conn.remoteUDPAddr != nil {
-		if err = conn.ensureForwarders(); err == nil {
+		if err := conn.ensureForwarders(); err == nil {
 			conn.heartbeat = time.NewTicker(FastHeartbeat)
 			conn.forwardHeartbeatFrame() // avoid initial wait
+		} else {
+			conn.log("connection shutting down due to error:", err)
+			return
 		}
 	}
+	err := conn.queryLoop(queryChan)
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
+		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
+	} else if err != nil {
+		conn.log("connection shutting down due to error:", err)
+	} else {
+		conn.log("connection shutting down")
+	}
+}
+
+func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) (err error) {
 	terminate := false
 	for !terminate && err == nil {
 		select {
@@ -198,17 +211,9 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
 			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
-
 		}
 	}
-	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
-		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
-	} else if err != nil {
-		conn.log("connection shutting down due to error:", err)
-	} else {
-		conn.log("connection shutting down")
-	}
-	conn.handleShutdown()
+	return
 }
 
 func (conn *LocalConnection) handleSetRemoteUDPAddr(remoteUDPAddr *net.UDPAddr) error {
