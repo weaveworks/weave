@@ -96,9 +96,9 @@ func TestGossipTopology(t *testing.T) {
 	r1 := NewTestRouter(t, peer1Name, removed)
 	r2 := NewTestRouter(t, peer2Name, removed)
 	r3 := NewTestRouter(t, peer3Name, removed)
-	r1.NewGossip("topology", r1)
-	r2.NewGossip("topology", r2)
-	r3.NewGossip("topology", r3)
+	r1.NewGossip(TopologyGossipCh, r1)
+	r2.NewGossip(TopologyGossipCh, r2)
+	r3.NewGossip(TopologyGossipCh, r3)
 
 	AssertEmpty(t, removed.peers, "garbage-collected peers")
 

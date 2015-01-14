@@ -42,6 +42,15 @@ func (router *Router) SendAllGossip() {
 	}
 }
 
+func (router *Router) SendGossip(channelName string, msg []byte) {
+	channelHash := hash(channelName)
+	if channel, found := router.GossipChannels[channelHash]; !found {
+		log.Println("[gossip] attempt to send on unknown channel:", channelName)
+	} else {
+		channel.GossipMsg(msg)
+	}
+}
+
 func (c *GossipChannel) GossipMsg(buf []byte) {
 	c.localPeer.ForEachConnection(func(_ PeerName, conn Connection) {
 		if conn.Established() {

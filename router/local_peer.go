@@ -276,7 +276,7 @@ func (peer *LocalPeer) handleBroadcastTCP(msg []byte) {
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
 	// Sending everything; previous implementation optimised to just new peers
-	peer.Router.SendAllGossip()
+	peer.Router.SendGossip(TopologyGossipCh, peer.Router.Peers.EncodeAllPeers())
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

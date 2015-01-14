@@ -25,6 +25,7 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 		log.Println("Removing unreachable", peer)
 	}
 	router := newRouter(iface, name, password, connLimit, bufSz, logFrame, onMacExpiry, onPeerGC)
+	router.NewGossip(TopologyGossipCh, router)
 	router.Ourself.Start()
 
 	return router

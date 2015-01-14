@@ -123,7 +123,6 @@ func main() {
 
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
 	log.Println("Our name is", router.Ourself.Name)
-	router.NewGossip("topology", router)
 	router.Start()
 	for _, peer := range peers {
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
