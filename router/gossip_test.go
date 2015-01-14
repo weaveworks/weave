@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	wt "github.com/zettio/weave/common"
+	wt "github.com/zettio/weave/testing"
 	"io"
 	"net"
 	"sort"
@@ -172,7 +172,7 @@ type mockConnection struct {
 func (conn *mockConnection) Local() *Peer          { return nil }
 func (conn *mockConnection) Remote() *Peer         { return conn.remote }
 func (conn *mockConnection) RemoteTCPAddr() string { return "" }
-func (conn *mockConnection) Shutdown()             {}
+func (conn *mockConnection) Shutdown(error)        {}
 func (conn *mockConnection) Established() bool     { return true }
 
 // Wrappers for building arguments to test functions

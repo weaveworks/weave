@@ -31,7 +31,7 @@ type Connection interface {
 	Remote() *Peer
 	RemoteTCPAddr() string
 	Established() bool
-	Shutdown()
+	Shutdown(error)
 }
 
 type RemoteConnection struct {
@@ -60,7 +60,6 @@ type LocalConnection struct {
 	Decryptor     Decryptor
 	Router        *Router
 	UID           uint64
-	shutdown      bool
 	queryChan     chan<- *ConnectionInteraction
 }
 

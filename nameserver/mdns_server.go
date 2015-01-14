@@ -50,24 +50,60 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 		return err
 	}
 
-	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
-		// Ignore answers to other questions
-		if len(r.Answer) == 0 && len(r.Question) > 0 {
-			q := r.Question[0]
-			if ip, err := s.zone.LookupLocal(q.Name); err == nil {
-				m := makeAddressReply(r, &q, []net.IP{ip})
-				if err = s.sendResponse(m); err != nil {
-					Warning.Printf("Error writing to %s", w)
-				}
-			} else if s.addrIsLocal(w.RemoteAddr()) {
-				// ignore this - it's our own query received via multicast
+	handleLocal := s.makeHandler(dns.TypeA,
+		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
+			if ip, err := zone.LookupName(q.Name); err == nil {
+				return makeAddressReply(r, q, []net.IP{ip})
 			} else {
-				Debug.Printf("Failed MDNS lookup for %s", q.Name)
+				return nil
+			}
+		})
+
+	handleReverse := s.makeHandler(dns.TypePTR,
+		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
+			if name, err := zone.LookupInaddr(q.Name); err == nil {
+				return makePTRReply(r, q, []string{name})
+			} else {
+				return nil
+			}
+		})
+
+	mux := dns.NewServeMux()
+	mux.HandleFunc(LOCAL_DOMAIN, handleLocal)
+	mux.HandleFunc(RDNS_DOMAIN, handleReverse)
+
+	go dns.ActivateAndServe(nil, conn, mux)
+	return err
+}
+
+type LookupFunc func(Lookup, *dns.Msg, *dns.Question) *dns.Msg
+
+func (s *MDNSServer) makeHandler(qtype uint16, lookup LookupFunc) dns.HandlerFunc {
+	return func(_ dns.ResponseWriter, r *dns.Msg) {
+		// Handle only questions, ignore answers. We might also ignore
+		// questions that arise locally (i.e., that come from an IP we
+		// think is local), but in the interest of avoiding
+		// complication, and easier testing, this is elided on the
+		// assumption that the client wouldn't ask if it already knew
+		// the answer, and if it does ask, it'll be happy to get an
+		// answer.
+		if len(r.Answer) == 0 && len(r.Question) > 0 {
+			q := &r.Question[0]
+			if q.Qtype == qtype {
+				if m := lookup(s.zone, r, q); m != nil {
+					Debug.Printf("[mdns msgid %d] Found local answer to mDNS query %s",
+						r.MsgHdr.Id, q.Name)
+					if err := s.sendResponse(m); err != nil {
+						Warning.Printf("[mdns msgid %d] Error writing to %s",
+							r.MsgHdr.Id, s.sendconn)
+					}
+				} else {
+					Debug.Printf("[mdns msgid %d] No local answer for mDNS query %s",
+						r.MsgHdr.Id, q.Name)
+				}
 			}
 		}
 	}
-	go dns.ActivateAndServe(nil, conn, dns.HandlerFunc(handleMDNS))
-	return err
 }
 
 func (s *MDNSServer) sendResponse(m *dns.Msg) error {

@@ -4,7 +4,7 @@ host1_ip = "192.168.48.19" # arbitrary private IP
 host2_ip = "192.168.48.15" # arbitrary private IP
 
 def configure_docker(host, ip)
-  pkgs = "lxc-docker ethtool conntrack"
+  pkgs = "lxc-docker"
 
   host.vm.box = "phusion/ubuntu-14.04-amd64"
   host.vm.box_url = "https://oss-binaries.phusionpassenger.com/vagrant/boxes/latest/ubuntu-14.04-amd64-vbox.box"

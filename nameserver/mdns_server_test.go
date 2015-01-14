@@ -2,7 +2,8 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
-	wt "github.com/zettio/weave/common"
+	"github.com/zettio/weave/common"
+	wt "github.com/zettio/weave/testing"
 	"log"
 	"net"
 	"testing"
@@ -11,7 +12,9 @@ import (
 
 var (
 	containerID = "deadbeef"
+	testName    = "test.weave.local."
 	testAddr1   = "10.0.2.1/24"
+	testInAddr1 = "1.2.0.10.in-addr.arpa."
 )
 
 func sendQuery(name string, querytype uint16) error {
@@ -31,10 +34,13 @@ func sendQuery(name string, querytype uint16) error {
 }
 
 func TestServerSimpleQuery(t *testing.T) {
+	// The ff can be handy for debugging (obvs)
+	common.InitDefaultLogging(true)
+
 	log.Println("TestServerSimpleQuery starting")
 	var zone = new(ZoneDb)
 	ip, _, _ := net.ParseCIDR(testAddr1)
-	zone.AddRecord(containerID, "test.weave.", ip)
+	zone.AddRecord(containerID, testName, ip)
 
 	mdnsServer, err := NewMDNSServer(zone)
 	wt.AssertNoErr(t, err)
@@ -42,7 +48,25 @@ func TestServerSimpleQuery(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	var receivedAddr net.IP
+	var receivedName string
+	var recvChan chan interface{}
 	receivedCount := 0
+
+	reset := func() {
+		receivedAddr = nil
+		receivedName = ""
+		receivedCount = 0
+		recvChan = make(chan interface{})
+	}
+
+	wait := func() {
+		select {
+		case <-recvChan:
+			return
+		case <-time.After(100 * time.Millisecond):
+			return
+		}
+	}
 
 	// Implement a minimal listener for responses
 	multicast, err := LinkLocalMulticastListener(nil)
@@ -56,8 +80,12 @@ func TestServerSimpleQuery(t *testing.T) {
 				case *dns.A:
 					receivedAddr = rr.A
 					receivedCount++
+				case *dns.PTR:
+					receivedName = rr.Ptr
+					receivedCount++
 				}
 			}
+			recvChan <- "ok"
 		}
 	}
 
@@ -67,22 +95,32 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 
-	sendQuery("test.weave.", dns.TypeA)
-
-	time.Sleep(time.Second)
+	reset()
+	sendQuery(testName, dns.TypeA)
+	wait()
 
 	if receivedCount != 1 {
-		t.Fatal("Unexpected result count for test.weave", receivedCount)
+		t.Fatalf("Unexpected result count %d for %s", receivedCount, testName)
 	}
 	if !receivedAddr.Equal(ip) {
-		t.Fatal("Unexpected result for test.weave", receivedAddr)
+		t.Fatalf("Unexpected result %s for %s", receivedAddr, testName)
 	}
 
-	receivedCount = 0
-
+	reset()
 	sendQuery("testfail.weave.", dns.TypeA)
+	wait()
 
 	if receivedCount != 0 {
-		t.Fatal("Unexpected result count for testfail.weave", receivedCount)
+		t.Fatalf("Unexpected result count %d for testfail.weave", receivedCount)
+	}
+
+	reset()
+	sendQuery(testInAddr1, dns.TypePTR)
+	wait()
+
+	if receivedCount != 1 {
+		t.Fatalf("Expected an answer to %s, got %d answers", testInAddr1, receivedCount)
+	} else if !(testName == receivedName) {
+		t.Fatalf("Expected answer %s to query for %s, got %s", testName, testInAddr1, receivedName)
 	}
 }

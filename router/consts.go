@@ -29,11 +29,11 @@ const (
 )
 
 const (
-	ProtocolConnectionEstablished  = iota
-	ProtocolFragmentationReceived  = iota
-	ProtocolStartFragmentationTest = iota
-	ProtocolNonce                  = iota
-	ProtocolPMTUVerified           = iota
+	ProtocolConnectionEstablished = iota
+	ProtocolFragmentationReceived
+	ProtocolStartFragmentationTest
+	ProtocolNonce
+	ProtocolPMTUVerified
 	ProtocolGossip
 	ProtocolGossipUnicast
 	ProtocolGossipBroadcast

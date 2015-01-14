@@ -117,10 +117,10 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 // ACTOR client API
 
 const (
-	PAddConnection         = iota
-	PBroadcastTCP          = iota
-	PDeleteConnection      = iota
-	PConnectionEstablished = iota
+	PAddConnection = iota
+	PBroadcastTCP
+	PDeleteConnection
+	PConnectionEstablished
 )
 
 // Async: rely on the peer to shut us down if we shouldn't be adding
@@ -219,6 +219,7 @@ func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
 	peer.Lock()
 	peer.connections[toName] = conn
 	peer.Unlock()
+	conn.log("connection added")
 }
 
 func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
@@ -235,6 +236,7 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	peer.Lock()
 	delete(peer.connections, toName)
 	peer.Unlock()
+	conn.log("connection deleted")
 	broadcast := false
 	if conn.Established() {
 		peer.Lock()
@@ -261,7 +263,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 	peer.Lock()
 	peer.version += 1
 	peer.Unlock()
-	log.Println("Peer", peer.Name, "established active connection to remote peer", conn.Remote().Name, "at", conn.RemoteTCPAddr())
+	conn.log("connection fully established")
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 

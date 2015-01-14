@@ -162,7 +162,9 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// someone else is dialing us, so our udp sender is the conn
 	// on Port and we wait for them to send us something on UDP to
 	// start.
-	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, tcpConn.RemoteAddr().String())
+	remoteAddrStr := tcpConn.RemoteAddr().String()
+	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
+	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr)
 	NewLocalConnection(connRemote, true, tcpConn, nil, router)
 }
 

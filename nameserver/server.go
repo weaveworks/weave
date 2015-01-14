@@ -9,11 +9,7 @@ import (
 
 const (
 	LOCAL_DOMAIN = "weave.local."
-	RDNS_DOMAIN  = "in-addr.arpa."
 )
-
-// +1 to also exclude a dot
-var rdnsDomainLen = len(RDNS_DOMAIN) + 1
 
 func checkFatal(e error) {
 	if e != nil {
@@ -35,93 +31,80 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 	return m
 }
 
-func queryHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
+func queryHandler(lookups []Lookup) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("Local query: %+v", q)
+		Debug.Printf("Query: %+v", q)
 		if q.Qtype == dns.TypeA {
-			if ip, err := zone.LookupLocal(q.Name); err == nil {
-				m := makeAddressReply(r, &q, []net.IP{ip})
-				w.WriteMsg(m)
-			} else {
-				Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
-				// We don't know the answer; see if someone else does
-				channel := make(chan *ResponseA)
-				replies := make([]net.IP, 0)
-				go func() {
-					for resp := range channel {
-						Debug.Printf("Got address response %s to query %s addr %s", resp.Name, q.Name, resp.Addr)
-						replies = append(replies, resp.Addr)
-					}
-					var responseMsg *dns.Msg
-					if len(replies) > 0 {
-						responseMsg = makeAddressReply(r, &q, replies)
-					} else {
-						responseMsg = makeDNSFailResponse(r)
-					}
-					w.WriteMsg(responseMsg)
-				}()
-				mdnsClient.SendQuery(q.Name, dns.TypeA, channel)
-			}
-		} else {
-			Warning.Printf("Local query not handled: %+v", q)
-			m := makeDNSFailResponse(r)
-			w.WriteMsg(m)
-		}
-		return
-	}
-}
-
-func rdnsHandler(zone Zone, mdnsClient *MDNSClient) dns.HandlerFunc {
-	return func(w dns.ResponseWriter, r *dns.Msg) {
-		q := r.Question[0]
-		Debug.Printf("Local rdns query: %+v", q)
-		if q.Qtype == dns.TypePTR {
-			if ip := net.ParseIP(q.Name[:len(q.Name)-rdnsDomainLen]); ip != nil {
-				ip4 := ip.To4()
-				revIP := []byte{ip4[3], ip4[2], ip4[1], ip4[0]}
-				Debug.Printf("Looking for address: %+v", revIP)
-				if name, err := zone.ReverseLookupLocal(revIP); err == nil {
-					Debug.Printf("Found name: %s", name)
-					m := makePTRReply(r, &q, []string{name})
+			for _, lookup := range lookups {
+				if ip, err := lookup.LookupName(q.Name); err == nil {
+					m := makeAddressReply(r, &q, []net.IP{ip})
 					w.WriteMsg(m)
-				} else {
-					Debug.Printf("Failed lookup for %s; sending mDNS query", q.Name)
-					// We don't know the answer; see if someone else does
-					// TODO
+					return
 				}
 			}
 		}
+		Info.Printf("[dns msgid %d] No results for type %s query %s",
+			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
+		w.WriteMsg(makeDNSFailResponse(r))
 	}
 }
 
-/* When we receive a request for a name outside of our '.weave' domain, call
-   the underlying lookup mechanism and return the answer(s) it gives.
-   Unfortunately, this means that TTLs from a real DNS server are lost - FIXME.
-*/
-func notUsHandler() dns.HandlerFunc {
+func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("Non-local query: %+v", q)
-		var responseMsg *dns.Msg
-		if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
-			if addrs, err := net.LookupIP(q.Name); err == nil {
-				responseMsg = makeAddressReply(r, &q, addrs)
-			} else {
-				responseMsg = makeDNSFailResponse(r)
-				Debug.Print("Failed fallback lookup ", err)
+		Debug.Printf("Reverse query: %+v", q)
+		if q.Qtype == dns.TypePTR {
+			for _, lookup := range lookups {
+				if name, err := lookup.LookupInaddr(q.Name); err == nil {
+					m := makePTRReply(r, &q, []string{name})
+					w.WriteMsg(m)
+					return
+				}
 			}
+			Info.Printf("[dns msgid %d] No results for type %s query %s",
+				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
 		} else {
-			Warning.Printf("Non-local query not handled: %+v", q)
-			responseMsg = makeDNSFailResponse(r)
+			Warning.Printf("[dns msgid %d] Unexpected reverse query type %s: %+v",
+				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q)
 		}
-		w.WriteMsg(responseMsg)
+		w.WriteMsg(makeDNSFailResponse(r))
 	}
 }
 
-func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wait int) error {
-	go ListenHttp(LOCAL_DOMAIN, zone, httpPort)
+/* When we receive a request for a name outside of our '.weave.local.'
+   domain, ask the configured DNS server as a fallback.
+*/
+func notUsHandler() dns.HandlerFunc {
+	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	checkFatal(err)
+	return func(w dns.ResponseWriter, r *dns.Msg) {
+		q := r.Question[0]
+		Debug.Printf("[dns msgid %d] Non-local query: %+v", r.MsgHdr.Id, q)
+		for _, server := range config.Servers {
+			reply, err := dns.Exchange(r, fmt.Sprintf("%s:%s", server, config.Port))
+			if err != nil {
+				Debug.Printf("[dns msgid %d] Network error trying %s (%s)",
+					r.MsgHdr.Id, server, err)
+				continue
+			}
+			if reply != nil && reply.Rcode != dns.RcodeSuccess {
+				Debug.Printf("[dns msgid %d] Failure reported by %s for query %s",
+					r.MsgHdr.Id, server, q.Name)
+				continue
+			}
+			Debug.Printf("[dns msgid %d] Given answer by %s for query %s",
+				r.MsgHdr.Id, server, q.Name)
+			w.WriteMsg(reply)
+			return
+		}
+		Warning.Printf("[dns msgid %d] Failed lookup for external name %s",
+			r.MsgHdr.Id, q.Name)
+		w.WriteMsg(makeDNSFailResponse(r))
+	}
+}
 
+func StartServer(zone Zone, iface *net.Interface, dnsPort int, wait int) error {
 	mdnsClient, err := NewMDNSClient()
 	checkFatal(err)
 
@@ -134,8 +117,8 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, httpPort int, wai
 	checkFatal(err)
 
 	LocalServeMux := dns.NewServeMux()
-	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler(zone, mdnsClient))
-	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler(zone, mdnsClient))
+	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler([]Lookup{zone, mdnsClient}))
+	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler([]Lookup{zone, mdnsClient}))
 	LocalServeMux.HandleFunc(".", notUsHandler())
 
 	mdnsServer, err := NewMDNSServer(zone)
