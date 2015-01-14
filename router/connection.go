@@ -422,16 +422,6 @@ func checkHandshakeStringField(fieldName string, expectedValue string, handshake
 	return val, nil
 }
 
-func (conn *LocalConnection) handleGossip(msg []byte, onok func(channel *GossipChannel, srcName PeerName, payload []byte)) {
-	channelHash, msg := decodeGossipChannel(msg[1:])
-	if channel, found := conn.Router.GossipChannels[channelHash]; !found {
-		conn.log("[gossip] received unknown channel:\n", channelHash)
-	} else {
-		srcName, payload := decodePeerName(msg)
-		onok(channel, srcName, payload)
-	}
-}
-
 func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool) {
 	defer conn.Decryptor.Shutdown()
 	var receiver TCPReceiver
@@ -474,26 +464,11 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else if msg[0] == ProtocolGossipUnicast {
-			origMsg := msg
-			conn.handleGossip(msg, func(channel *GossipChannel, srcName PeerName, payload []byte) {
-				destName, msg := decodePeerName(payload)
-				if conn.local.Name == destName {
-					channel.gossiper.OnGossipUnicast(srcName, msg)
-				} else {
-					conn.Router.Ourself.RelayGossipTo(destName, origMsg)
-				}
-			})
+			handleGossip(conn, msg, deliverGossipUnicast)
 		} else if msg[0] == ProtocolGossipBroadcast {
-			conn.handleGossip(msg, func(channel *GossipChannel, srcName PeerName, payload []byte) {
-				channel.gossiper.OnGossipBroadcast(payload)
-				conn.Router.Ourself.RelayGossipBroadcast(srcName, msg)
-			})
+			handleGossip(conn, msg, deliverGossipBroadcast)
 		} else if msg[0] == ProtocolGossip {
-			conn.handleGossip(msg, func(channel *GossipChannel, srcName PeerName, payload []byte) {
-				if newBuf := channel.gossiper.OnGossip(payload); newBuf != nil {
-					channel.GossipMsg(newBuf)
-				}
-			})
+			handleGossip(conn, msg, deliverGossip)
 		} else {
 			conn.log("received unknown msg:\n", msg)
 		}
