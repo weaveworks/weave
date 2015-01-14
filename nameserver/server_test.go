@@ -78,5 +78,14 @@ func TestDNSServer(t *testing.T) {
 		t.Fatal("Number of answers > 0")
 	}
 
-	// Not testing MDNS functionality of server here (yet)
+	m.SetQuestion("8.8.8.8.in-addr.arpa.", dns.TypePTR)
+	r, _, err = c.Exchange(m, dnsAddr)
+	wt.AssertNoErr(t, err)
+	wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS success response code")
+	if !(len(r.Answer) > 0) {
+		t.Fatal("Number of answers > 0")
+	}
+
+	// Not testing MDNS functionality of server here (yet), since it
+	// needs two servers, each listening on its own address
 }
