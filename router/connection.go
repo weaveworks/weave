@@ -247,27 +247,27 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	old := conn.established
 	conn.established = true
 	conn.Unlock()
-	if !old {
-		conn.Router.Ourself.ConnectionEstablished(conn)
-		if err := conn.ensureForwarders(); err != nil {
-			return err
-		}
-		stopTicker(conn.heartbeat)
-		conn.heartbeat = time.NewTicker(SlowHeartbeat)
-		conn.fetchAll = time.NewTicker(FetchAllInterval)
-		conn.fragTest = time.NewTicker(FragTestInterval)
-		conn.forwardHeartbeatFrame() // avoid initial wait
-		// Send a large frame down the DF channel in order to prompt
-		// PMTU discovery to start.
-		conn.Forward(true, &ForwardedFrame{
-			srcPeer: conn.local,
-			dstPeer: conn.remote,
-			frame:   PMTUDiscovery},
-			nil)
-		conn.setStackFrag(false)
-		return conn.handleSendTCP(ProtocolStartFragmentationTestByte)
+	if old {
+		return nil
 	}
-	return nil
+	conn.Router.Ourself.ConnectionEstablished(conn)
+	if err := conn.ensureForwarders(); err != nil {
+		return err
+	}
+	stopTicker(conn.heartbeat)
+	conn.heartbeat = time.NewTicker(SlowHeartbeat)
+	conn.fetchAll = time.NewTicker(FetchAllInterval)
+	conn.fragTest = time.NewTicker(FragTestInterval)
+	conn.forwardHeartbeatFrame() // avoid initial wait
+	// Send a large frame down the DF channel in order to prompt
+	// PMTU discovery to start.
+	conn.Forward(true, &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   PMTUDiscovery},
+		nil)
+	conn.setStackFrag(false)
+	return conn.handleSendTCP(ProtocolStartFragmentationTestByte)
 }
 
 func (conn *LocalConnection) handleSendTCP(msg []byte) error {
