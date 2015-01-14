@@ -131,7 +131,7 @@ const (
 func (conn *LocalConnection) Shutdown(err error) {
 	conn.queryChan <- &ConnectionInteraction{
 		Interaction: Interaction{code: CShutdown},
-	    payload:     err}
+		payload:     err}
 }
 
 // Async
@@ -424,9 +424,8 @@ func checkHandshakeStringField(fieldName string, expectedValue string, handshake
 
 func (conn *LocalConnection) handleGossip(msg []byte, onok func(channel *GossipChannel, srcName PeerName, payload []byte)) {
 	channelHash, msg := decodeGossipChannel(msg[1:])
-	channel, found := conn.Router.GossipChannels[channelHash]
-	if !found {
-		conn.log("received unknown gossip channel:\n", channelHash)
+	if channel, found := conn.Router.GossipChannels[channelHash]; !found {
+		conn.log("[gossip] received unknown channel:\n", channelHash)
 	} else {
 		srcName, payload := decodePeerName(msg)
 		onok(channel, srcName, payload)

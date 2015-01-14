@@ -64,10 +64,10 @@ func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
 
 func (peer *LocalPeer) RelayGossipTo(dstPeerName PeerName, msg []byte) error {
 	if relayPeerName, found := peer.Router.Routes.Unicast(dstPeerName); !found {
-		log.Println("Cannot relay gossip for unknown destination:", dstPeerName)
+		log.Println("[gossip] unknown relay destination:", dstPeerName)
 		return nil // ?
 	} else if conn, found := peer.ConnectionTo(relayPeerName); !found {
-		log.Println("Gossip: Unable to find connection to relay peer", relayPeerName)
+		log.Println("[gossip] unable to find connection to relay peer", relayPeerName)
 		return nil // ?
 	} else {
 		conn.(*LocalConnection).SendTCP(msg)
@@ -89,6 +89,6 @@ func (peer *LocalPeer) RelayGossipBroadcast(srcName PeerName, msg []byte) {
 			conn.SendTCP(msg)
 		}
 	} else {
-		log.Println("Unable to relay gossip from unknown peer", srcName)
+		log.Println("[gossip] unable to relay broadcast from unknown peer", srcName)
 	}
 }
