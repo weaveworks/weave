@@ -3,6 +3,7 @@ package router
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	wt "github.com/zettio/weave/testing"
 	"io"
@@ -40,7 +41,7 @@ func (r1 *Router) AddTestConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	r1.Ourself.Peer.connections[toName] = &RemoteConnection{r1.Ourself.Peer, toPeer, ""}
+	r1.Ourself.Peer.connections[toName] = &mockChannelConnection{mockConnection{toPeer, ""}, r2}
 	r1.Ourself.Peer.version += 1
 }
 
@@ -175,6 +176,21 @@ func (conn *mockConnection) RemoteTCPAddr() string { return "" }
 func (conn *mockConnection) Shutdown(error)        {}
 func (conn *mockConnection) Established() bool     { return true }
 
+type mockChannelConnection struct {
+	mockConnection
+	dest *Router
+}
+
+func (conn *mockChannelConnection) SendTCP(msg []byte) {
+	channelHash, payload := decodeGossipChannel(msg[1:])
+	if channel, found := conn.dest.GossipChannels[channelHash]; !found {
+		panic(errors.New(fmt.Sprintf("unknown channel: %d", channelHash)))
+	} else {
+		srcName, payload := decodePeerName(payload)
+		deliverGossip(channel, srcName, msg, payload)
+	}
+}
+
 // Wrappers for building arguments to test functions
 func rs(routers ...*Router) []*Router { return routers }
 func cs(routers ...*Router) []Connection {
@@ -238,7 +254,7 @@ func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Co
 		if _, found := checkConns[remoteName]; found {
 			delete(checkConns, remoteName)
 		} else {
-			t.Fatalf("%s: Unexpected connection from %s to %s", wt.CallSite(5), ourName, remoteName)
+			t.Fatalf("%s: Unexpected connection from %s to %s", wt.CallSite(3), ourName, remoteName)
 		}
 	}
 	if len(checkConns) > 0 {
@@ -283,6 +299,9 @@ func TestGossipTopology(t *testing.T) {
 	r1 := NewTestRouter(t, peer1Name, removed)
 	r2 := NewTestRouter(t, peer2Name, removed)
 	r3 := NewTestRouter(t, peer3Name, removed)
+	r1.NewGossip("topology", r1)
+	r2.NewGossip("topology", r2)
+	r3.NewGossip("topology", r3)
 
 	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
@@ -297,77 +316,39 @@ func TestGossipTopology(t *testing.T) {
 	checkTopology(t, r1, tp(r1, r2), tp(r2))
 	checkTopology(t, r2, tp(r2, r1), tp(r1))
 
+	r1.SendAllGossip()
+
+	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
+	checkTopology(t, r2, tp(r2, r1), tp(r1, r2))
+
 	// Currently, the connection from 2 to 3 is one-way only
 	r2.AddTestConnection(r3)
-	checkTopology(t, r2, tp(r1), tp(r2, r1, r3), tp(r3))
+	checkTopology(t, r2, tp(r1, r2), tp(r2, r1, r3), tp(r3))
 	checkTopology(t, r3, tp(r3))
 	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
-	// Now r2 is going to gossip to r1
-	newInfo1 := r1.OnGossip(r2.Gossip())
-	// Check that r1 recognized the new info, and nothing else changed
-	// 1 received an update from 2 that had an older version of 1, so 1 goes into the 'new info'
-	checkEncoding(t, newInfo1, rs(r1, r2, r3), ca(cs(r2), cs(r1, r3), nil))
+	// Now r2 is going to gossip to all its peers
+	r2.SendAllGossip()
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1, r3), tp(r3))
-	checkTopology(t, r2, tp(r1), tp(r2, r1, r3), tp(r3))
+	checkTopology(t, r2, tp(r1, r2), tp(r2, r1, r3), tp(r3))
 	checkTopology(t, r3, tp(r3))
-
-	// r1 sends its new info to all connections, i.e. r2
-	{
-		newInfo1b := r2.OnGossip(newInfo1)
-		checkEncoding(t, newInfo1b, rs(r1), ca(cs(r2)))
-		checkTopology(t, r2, tp(r1, r2), tp(r2, r1, r3), tp(r3))
-
-		// r2 sends its new info to all connections, i.e. r1
-		newInfo1c := r1.OnGossip(newInfo1b)
-		checkBlank(t, newInfo1c) // nothing new; stops here
-	}
-
-	// Now r2 gossips to r3, but 1 and 2 are unreachable from r3 so they get removed from the update
-	{
-		AssertEmpty(t, removed.peers, "garbage-collected peers")
-		newInfo2 := r3.OnGossip(r2.Gossip())
-		checkPeerArray(t, removed.peers, rs(r1, r2))
-		checkBlank(t, newInfo2)
-		checkTopology(t, r3, tp(r3))
-		// r3 doesn't have any outgoing connections, so this doesn't go any further
-	}
+	// When r2 gossiped to r3, 1 and 2 were unreachable from r3 so they got removed from the update
+	checkPeerArray(t, removed.peers, rs(r1, r2))
 	removed.clear()
 
 	// Add a connection from 3 to 1 and now r1 is reachable.
 	r3.AddTestConnection(r1)
-	r1.AddTestConnection(r3)
-	// These two are going to gossip out their state; freeze it in variables
-	r1Gossip := r1.Gossip()
-	r3Gossip := r3.Gossip()
-	newInfo3 := r3.OnGossip(r1Gossip)
-	// 3 receives an update from 1 that has an older version of 3, so 3 goes into the 'new info'
-	checkEncoding(t, newInfo3, rs(r1, r2, r3), ca(cs(r2, r3), cs(r1, r3), cs(r1)))
-	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
+	r3.SendAllGossip()
+	checkTopology(t, r1, tp(r1, r2), tp(r2, r1, r3), tp(r3, r1))
+	checkTopology(t, r2, tp(r1, r2), tp(r2, r1, r3), tp(r3, r1))
+	checkTopology(t, r3, tp(r1), tp(r3, r1))
 	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
-	// Now the gossip from 3 to 1 that was 'simultaneous' with the one before
-	newInfo4 := r1.OnGossip(r3Gossip)
-	// r3 is newer and r1 is older so both go in the new items
-	checkEncoding(t, newInfo4, rs(r1, r3), ca(cs(r2, r3), cs(r1)))
+	r1.AddTestConnection(r3)
+	r1.SendAllGossip()
 	checkTopology(t, r1, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
-
-	// Now 3 passes on its new info to 1, but there is nothing now new to 1
-	checkBlank(t, r1.OnGossip(newInfo3))
-
-	// Now 1 passes on the new info generated earlier to its connections 2 and 3
-	{
-		newInfo4b := r2.OnGossip(newInfo4)
-		checkEncoding(t, newInfo4b, rs(r1, r3), ca(cs(r2, r3), cs(r1)))
-		checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
-		newInfo4c := r3.OnGossip(newInfo4)
-		checkBlank(t, newInfo4c)
-		checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
-		// 2 now sends its 'new' info to its connected peers 1 and 3, but there is nothing new
-		checkBlank(t, r1.OnGossip(newInfo4b))
-		checkBlank(t, r3.OnGossip(newInfo4b))
-	}
-
+	checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
+	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
 	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Drop the connection from 2 to 3
@@ -378,23 +359,15 @@ func TestGossipTopology(t *testing.T) {
 	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Now r2 tells its connections
-	{
-		newInfo5 := r1.OnGossip(r2.Gossip())
-		checkEncoding(t, newInfo5, rs(r2), ca(cs(r1)))
-		checkBlank(t, r2.OnGossip(newInfo5))
-		newInfo5b := r3.OnGossip(newInfo5)
-		checkEncoding(t, newInfo5b, rs(r2), ca(cs(r1)))
-		checkBlank(t, r1.OnGossip(newInfo5b))
+	r2.SendAllGossip()
+	checkTopology(t, r1, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
+	checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
+	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
 
-		checkTopology(t, r1, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
-		checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
-		checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
-
-		AssertEmpty(t, r1.Peers.GarbageCollect(), "peers removed")
-		AssertEmpty(t, r2.Peers.GarbageCollect(), "peers removed")
-		AssertEmpty(t, r3.Peers.GarbageCollect(), "peers removed")
-		AssertEmpty(t, removed.peers, "garbage-collected peers")
-	}
+	AssertEmpty(t, r1.Peers.GarbageCollect(), "peers removed")
+	AssertEmpty(t, r2.Peers.GarbageCollect(), "peers removed")
+	AssertEmpty(t, r3.Peers.GarbageCollect(), "peers removed")
+	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
 	r1.DeleteTestConnection(r3)
@@ -406,13 +379,9 @@ func TestGossipTopology(t *testing.T) {
 	removed.clear()
 
 	// Now r1 tells its remaining connection
-	{
-		newInfo6 := r2.OnGossip(r1.Gossip())
-		checkEncoding(t, newInfo6, rs(r1), ca(cs(r2)))
-		checkBlank(t, r1.OnGossip(newInfo6))
-		checkPeerArray(t, removed.peers, rs(r3))
-		removed.clear()
-	}
+	r1.SendAllGossip()
+	checkPeerArray(t, removed.peers, rs(r3))
+	removed.clear()
 
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
 	checkTopology(t, r2, tp(r1, r2), tp(r2, r1))
@@ -420,9 +389,7 @@ func TestGossipTopology(t *testing.T) {
 	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
 
 	// On a timer, r3 will gossip to r1
-	newInfo7 := r1.OnGossip(r3.Gossip())
-	// 1 received an update that had an older version of 1
-	checkEncoding(t, newInfo7, rs(r1), ca(cs(r2)))
+	r3.SendAllGossip()
 	// r1 receives info about 3, but eliminates it through garbage collection
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
 	checkPeerArray(t, removed.peers, rs(r3))

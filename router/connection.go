@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+type ConnectionSender interface {
+	SendTCP(msg []byte)
+}
+
 func NewRemoteConnection(from, to *Peer, tcpAddr string) *RemoteConnection {
 	return &RemoteConnection{
 		local:         from,

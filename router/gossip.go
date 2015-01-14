@@ -48,7 +48,7 @@ func (c *GossipChannel) GossipMsg(buf []byte) {
 			peerName := c.localPeer.Name.Bin()
 			nameLenByte := []byte{byte(len(peerName))}
 			msg := Concat([]byte{ProtocolGossip}, uint32slice(c.hash), nameLenByte, peerName, buf)
-			conn.(*LocalConnection).SendTCP(msg)
+			conn.(ConnectionSender).SendTCP(msg)
 		}
 	})
 }
