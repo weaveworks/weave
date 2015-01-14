@@ -160,12 +160,21 @@ func (conn *LocalConnection) SendTCP(msg []byte) {
 
 func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
 	defer conn.handleShutdown()
-	if err := conn.handshake(acceptNewPeer); err != nil {
+
+	tcpConn := conn.TCPConn
+	tcpConn.SetLinger(0)
+	enc := gob.NewEncoder(tcpConn)
+	dec := gob.NewDecoder(tcpConn)
+
+	if err := conn.handshake(enc, dec, acceptNewPeer); err != nil {
 		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
 		return
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
+
+	go conn.receiveTCP(dec, conn.Router.UsingPassword())
 	conn.Router.Ourself.AddConnection(conn)
+
 	if conn.remoteUDPAddr != nil {
 		if err := conn.ensureForwarders(); err == nil {
 			conn.heartbeat = time.NewTicker(FastHeartbeat)
@@ -175,6 +184,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 			return
 		}
 	}
+
 	err := conn.queryLoop(queryChan)
 	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
 		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
@@ -293,19 +303,15 @@ func (conn *LocalConnection) handleShutdown() {
 	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr)
 }
 
-func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
+func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, acceptNewPeer bool) error {
 	// We do not need to worry about locking in here as at this point,
 	// the connection is not reachable by any go-routine other than
 	// ourself. Only when we add this connection to the conn.local
 	// peer will it be visible from multiple go-routines.
-	tcpConn := conn.TCPConn
-	tcpConn.SetLinger(0)
+
 	conn.extendReadDeadline()
 
-	enc := gob.NewEncoder(tcpConn)
-
 	localConnID := randUint64()
-
 	versionStr := fmt.Sprint(ProtocolVersion)
 	handshakeSend := map[string]string{
 		"Protocol":        Protocol,
@@ -328,7 +334,6 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 	}
 	enc.Encode(handshakeSend)
 
-	dec := gob.NewDecoder(tcpConn)
 	err = dec.Decode(&handshakeRecv)
 	if err != nil {
 		return err
@@ -416,7 +421,6 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 	}
 	conn.remote = toPeer
 
-	go conn.receiveTCP(dec, usingPassword)
 	return nil
 }
 
