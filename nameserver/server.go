@@ -51,6 +51,7 @@ func queryHandler(lookups []Lookup) dns.HandlerFunc {
 }
 
 func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
+	fallback := notUsHandler()
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("Reverse query: %+v", q)
@@ -62,13 +63,12 @@ func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 					return
 				}
 			}
-			Info.Printf("[dns msgid %d] No results for type %s query %s",
-				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
+			fallback(w, r)
+			return
 		} else {
 			Warning.Printf("[dns msgid %d] Unexpected reverse query type %s: %+v",
 				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q)
 		}
-		w.WriteMsg(makeDNSFailResponse(r))
 	}
 }
 
@@ -80,7 +80,7 @@ func notUsHandler() dns.HandlerFunc {
 	checkFatal(err)
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("[dns msgid %d] Non-local query: %+v", r.MsgHdr.Id, q)
+		Debug.Printf("[dns msgid %d] Fallback query: %+v", r.MsgHdr.Id, q)
 		for _, server := range config.Servers {
 			reply, err := dns.Exchange(r, fmt.Sprintf("%s:%s", server, config.Port))
 			if err != nil {
