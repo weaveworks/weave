@@ -1,5 +1,5 @@
 ---
-title: Topology
+title: Topology via Gossip
 layout: default
 ---
 
@@ -19,23 +19,12 @@ pass on changes to their neighbours, and so on, until the entire
 network knows about any change.  
 
 ### Communication
-Topology is communicated over the TCP links between peers.
-There are two message types:
+Topology is communicated over the TCP links between peers, using a
+Gossip mechanism.  Topology messages are sent every time a connection
+is added or deleted, and also periodically on a timer in case someone
+has missed an update.
 
-#### FetchAll 
-This carries no payload. The receiver responds with the
-entire topology model as the receiver has it.  A new peer joining the
-network sends this message after it has completed initial handshakes.
-
-#### Update
-This carries a topology payload. This is sent:
-  * upon receipt of a FetchAll message, as above, 
-  * when a connection is added - the update will contain the two peers
-that have just connected
-  * when a connection is deleted - the update will contain just the peer
-that lost the connection
-
-The 
+Upon receiving an update, the 
 receiver merges it with its own topology model. If the payload is a
 subset of the receiver's topology, no further action is
 taken. Otherwise, the receiver sends out to all its connections an
@@ -51,14 +40,23 @@ taken. Otherwise, the receiver sends out to all its connections an
    receiver's version are updated
 
 If the update mentions a peer that the receiver has never heard of,
-then the entire update is rejected and the receiver will send a
-FetchAll message back to the sender.
+then the entire update is ignored.
 
 ### Message details
-A topology update message is laid out like this:
+Every gossip message is structured as follows:
 
     +-----------------------------------+
-    | 1-byte message type               |
+    | 1-byte message type - Gossip      |
+    +-----------------------------------+
+    | 4-byte Gossip channel - Topology  |
+    +-----------------------------------+
+    | Peer Name of source               |
+    +-----------------------------------+
+    | Gossip payload (topology update)  |
+    +-----------------------------------+
+
+The topology update payload is laid out like this:
+
     +-----------------------------------+
     | Peer 1: Name                      |
     +-----------------------------------+
@@ -105,7 +103,7 @@ knowledge of that second peer.
 
 
 ### Out-of-date topology
-The peer-to-peer passing of updates is not instantaneous, so it is
+The peer-to-peer gossiping of updates is not instantaneous, so it is
 very posisble for a node elsewhere in the network to have an
 out-of-date view.
 
