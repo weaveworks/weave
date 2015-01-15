@@ -56,6 +56,7 @@ $(WEAVETOOLS_EXPORT): tools/Dockerfile $(WEAVETOOLS_EXES)
 # Add more directories in here as more tests are created
 tests:
 	cd router; go test -tags netgo
+	cd ipam; go test -tags netgo
 	cd nameserver; go test -tags netgo
 
 $(PUBLISH): publish_%:
