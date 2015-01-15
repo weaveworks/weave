@@ -26,7 +26,7 @@ var (
 	}
 )
 
-type ResponseA struct {
+type Response struct {
 	Name string
 	Addr net.IP
 	Err  error
@@ -34,7 +34,7 @@ type ResponseA struct {
 
 type responseInfo struct {
 	timeout time.Time // if no answer by this time, give up
-	ch      chan<- *ResponseA
+	ch      chan<- *Response
 }
 
 // Represents one query that we have sent for one name.
@@ -60,7 +60,7 @@ type MDNSClient struct {
 type mDNSQueryInfo struct {
 	name       string
 	querytype  uint16
-	responseCh chan<- *ResponseA
+	responseCh chan<- *Response
 }
 
 func NewMDNSClient() (*MDNSClient, error) {
@@ -104,9 +104,9 @@ func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 // ACTOR client API
 
 const (
-	CSendQuery       = iota
-	CShutdown        = iota
-	CMessageReceived = iota
+	CSendQuery = iota
+	CShutdown
+	CMessageReceived
 )
 
 type MDNSInteraction struct {
@@ -121,7 +121,7 @@ func (c *MDNSClient) Shutdown() {
 }
 
 // Async
-func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- *ResponseA) {
+func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- *Response) {
 	c.queryChan <- &MDNSInteraction{
 		code:    CSendQuery,
 		payload: mDNSQueryInfo{name, querytype, responseCh},
@@ -209,7 +209,7 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 		m.RecursionDesired = false
 		buf, err := m.Pack()
 		if err != nil {
-			q.responseCh <- &ResponseA{Err: err}
+			q.responseCh <- &Response{Err: err}
 			close(q.responseCh)
 			return
 		}
@@ -218,7 +218,7 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 			id:   m.Id,
 		}
 		if _, err = c.conn.WriteTo(buf, c.addr); err != nil {
-			q.responseCh <- &ResponseA{Err: err}
+			q.responseCh <- &Response{Err: err}
 			close(q.responseCh)
 			return
 		}
@@ -235,19 +235,29 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 
 func (c *MDNSClient) handleResponse(r *dns.Msg) {
 	for _, answer := range r.Answer {
+		var name string
+		var res *Response
+
 		switch rr := answer.(type) {
 		case *dns.A:
-			name := rr.Hdr.Name
-			if query, found := c.inflight[name]; found {
-				for _, resp := range query.responseInfos {
-					resp.ch <- &ResponseA{Name: rr.Hdr.Name, Addr: rr.A}
-					close(resp.ch)
-				}
-				delete(c.inflight, name)
-			} else {
-				// We've received a response that didn't match a query
-				// Do we want to cache it?
+			name = rr.Hdr.Name
+			res = &Response{Addr: rr.A}
+		case *dns.PTR:
+			name = rr.Hdr.Name
+			res = &Response{Name: rr.Ptr}
+		default:
+			return
+		}
+
+		if query, found := c.inflight[name]; found {
+			for _, resp := range query.responseInfos {
+				resp.ch <- res
+				close(resp.ch)
 			}
+			delete(c.inflight, name)
+		} else {
+			// We've received a response that didn't match a query
+			// Do we want to cache it?
 		}
 	}
 }

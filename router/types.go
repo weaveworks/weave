@@ -17,13 +17,13 @@ type Router struct {
 	Macs            *MacCache
 	Peers           *Peers
 	Routes          *Routes
+	GossipChannels  map[uint32]*GossipChannel
 	ConnectionMaker *ConnectionMaker
 	UDPListener     *net.UDPConn
 	Password        *[]byte
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
-	GossipChannels  map[uint32]*GossipChannel // does not change after startup - access not locked
 }
 
 type Connection interface {
@@ -31,7 +31,7 @@ type Connection interface {
 	Remote() *Peer
 	RemoteTCPAddr() string
 	Established() bool
-	Shutdown()
+	Shutdown(error)
 }
 
 type RemoteConnection struct {
@@ -60,7 +60,6 @@ type LocalConnection struct {
 	Decryptor     Decryptor
 	Router        *Router
 	UID           uint64
-	shutdown      bool
 	queryChan     chan<- *ConnectionInteraction
 }
 

@@ -24,6 +24,14 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	onPeerGC := func(peer *Peer) {
 		log.Println("Removing unreachable", peer)
 	}
+	router := newRouter(iface, name, password, connLimit, bufSz, logFrame, onMacExpiry, onPeerGC)
+	router.NewGossip(TopologyGossipCh, router)
+	router.Ourself.Start()
+
+	return router
+}
+
+func newRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet), onMacExpiry func(mac net.HardwareAddr, peer *Peer), onPeerGC func(peer *Peer)) *Router {
 	router := &Router{
 		Iface:          iface,
 		Macs:           NewMacCache(macMaxAge, onMacExpiry),
@@ -34,11 +42,9 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	if len(password) > 0 {
 		router.Password = &password
 	}
-	router.Ourself = StartLocalPeer(name, router)
+	router.Ourself = NewLocalPeer(name, router)
 	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
-	log.Println("Our name is", router.Ourself.Name)
-
 	return router
 }
 
@@ -157,7 +163,9 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// someone else is dialing us, so our udp sender is the conn
 	// on Port and we wait for them to send us something on UDP to
 	// start.
-	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, tcpConn.RemoteAddr().String())
+	remoteAddrStr := tcpConn.RemoteAddr().String()
+	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
+	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr)
 	NewLocalConnection(connRemote, true, tcpConn, nil, router)
 }
 
@@ -302,13 +310,13 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 // Gossip methods
 
-func (router *Router) OnGossipBroadcast(msg []byte) {
-	// Not expecting these
-	log.Println("Unexpected Gossip Broadcast:", msg)
-}
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) {
 	// Not expecting these
-	log.Println("Unexpected Gossip Unicast:", msg)
+	log.Println("[gossip] Unexpected Unicast:", msg)
+}
+func (router *Router) OnGossipBroadcast(msg []byte) {
+	// Not expecting these
+	log.Println("[gossip] Unexpected Broadcast:", msg)
 }
 
 // Return state of everything we know; intended to be called periodically
@@ -322,7 +330,7 @@ func (router *Router) OnGossip(buf []byte) []byte {
 	newUpdate, err := router.Peers.ApplyUpdate(buf)
 	if err != nil {
 		// fixme: should we do anything else?
-		log.Println("Error when applying Gossip update:", err)
+		log.Println("[gossip] error when applying update:", err)
 	} else if len(newUpdate) == 0 {
 		return nil
 	}

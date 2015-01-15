@@ -7,7 +7,8 @@ import (
 
 func checkError(err error, apiPath string) {
 	if err != nil {
-		Error.Fatalf("Unable to connect to Docker API on %s: %s", apiPath, err)
+		Error.Fatalf("[updater] Unable to connect to Docker API on %s: %s",
+			apiPath, err)
 	}
 }
 
@@ -22,7 +23,7 @@ func StartUpdater(apiPath string, zone Zone) error {
 	err = client.AddEventListener(events)
 	checkError(err, apiPath)
 
-	Info.Printf("Using Docker API on %s: %v", apiPath, env)
+	Info.Printf("[updater] Using Docker API on %s: %v", apiPath, env)
 
 	go func() {
 		for event := range events {
@@ -36,7 +37,7 @@ func handleEvent(zone Zone, event *docker.APIEvents, client *docker.Client) erro
 	switch event.Status {
 	case "die":
 		id := event.ID
-		Info.Printf("Container %s down. Removing records", id)
+		Info.Printf("[updater] Container %s down. Removing records", id)
 		zone.DeleteRecordsFor(id)
 	}
 	return nil

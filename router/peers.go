@@ -57,7 +57,8 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
-// Create an "improved" update from an incoming update:
+// Merge an incoming update with our own topology model, and
+// create an "improved" update:
 //  - elements which the original payload added to the
 //    receiver are included
 //  - elements which the original payload updated in the

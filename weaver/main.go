@@ -127,7 +127,7 @@ func main() {
 	}
 
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
-	router.NewGossip("topology", router)
+	log.Println("Our name is", router.Ourself.Name)
 	router.Start()
 	for _, peer := range peers {
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
@@ -145,8 +145,13 @@ func main() {
 }
 
 func handleHttp(router *weave.Router, alloc *ipam.Allocator) {
+	encryption := "off"
+	if router.Password != nil && len(*router.Password) > 0 {
+		encryption = "on"
+	}
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln("weave router", version))
+		io.WriteString(w, fmt.Sprintln("Encryption", encryption))
 		io.WriteString(w, router.Status())
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})

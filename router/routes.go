@@ -48,16 +48,22 @@ func (routes *Routes) String() string {
 	return buf.String()
 }
 
-func StartRoutes(ourself *Peer, peers *Peers) *Routes {
-	queryChan := make(chan *Interaction, ChannelSize)
+func NewRoutes(ourself *Peer, peers *Peers) *Routes {
 	state := &Routes{
 		ourself:   ourself,
 		peers:     peers,
 		unicast:   make(map[PeerName]PeerName),
 		broadcast: make(map[PeerName][]PeerName),
-		queryChan: queryChan}
+	}
 	state.unicast[ourself.Name] = UnknownPeerName
 	state.broadcast[ourself.Name] = []PeerName{}
+	return state
+}
+
+func StartRoutes(ourself *Peer, peers *Peers) *Routes {
+	state := NewRoutes(ourself, peers)
+	queryChan := make(chan *Interaction, ChannelSize)
+	state.queryChan = queryChan
 	go state.queryLoop(queryChan)
 	return state
 }

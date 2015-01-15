@@ -2,12 +2,13 @@
 
 set -e
 
-SUDO=sudo
+SUDO=${SUDO-sudo}
+GITHUB_USER=${GITHUB_USER:-zettio}
+DOCKERHUB_USER=${DOCKERHUB_USER:-zettio}
+RELEASE_NAME=${RELEASE_NAME:-"Weave"}
+RELEASE_DESCRIPTION=${RELEASE_DESCRIPTION:-"Weaving Containers into Applications"}
+
 PWD=`pwd`
-GITHUB_USER=zettio
-DOCKERHUB_USER=zettio
-RELEASE_NAME="Weave"
-RELEASE_DESCRIPTION="Weaving Containers into Applications"
 
 setup() {
     ## Get the new version number from the most recent tag
@@ -50,10 +51,7 @@ build() {
     ## Inject the version numbers and build the distributables
     ## (library versions?)
     sed -i "/SCRIPT_VERSION=/ c\SCRIPT_VERSION=\"$VERSION\"" ./weave
-    make \
-        WEAVE_VERSION=$VERSION \
-        WEAVER_IMAGE=$DOCKERHUB_USER/weave \
-        WEAVEDNS_IMAGE=$DOCKERHUB_USER/weavedns
+    make SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER
 
     if make tests; then
         echo -e '\u2713 Tests pass'
@@ -122,13 +120,8 @@ publish() {
 
     echo '** Sanity checks OK for publishing tag' $LATEST_TAG as $DOCKERHUB_USER/weave:$VERSION
 
-    for IMAGE in weave weavedns weavetools ; do
-        echo == Tagging $DOCKERHUB_USER/$IMAGE as $VERSION
-        $SUDO docker tag  $DOCKERHUB_USER/$IMAGE $DOCKERHUB_USER/$IMAGE:$VERSION
-        $SUDO docker push $DOCKERHUB_USER/$IMAGE:$VERSION
-        $SUDO docker push $DOCKERHUB_USER/$IMAGE:latest
-        echo "** Pushed $DOCKERHUB_USER/$IMAGE:$VERSION to docker hub"
-    done
+    echo "== Tagging and publishing images on docker hub as user $DOCKERHUB_USER"
+    make SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
 
     echo "== Creating GitHub release $RELEASE_NAME $VERSION"
     # This cannot be done as a draft because of a bug in

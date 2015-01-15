@@ -18,12 +18,15 @@ type PeerInteraction struct {
 	payload interface{}
 }
 
-func StartLocalPeer(name PeerName, router *Router) *LocalPeer {
+func NewLocalPeer(name PeerName, router *Router) *LocalPeer {
 	peer := &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
+	return peer
+}
+
+func (peer *LocalPeer) Start() {
 	queryChan := make(chan *PeerInteraction, ChannelSize)
 	peer.queryChan = queryChan
 	go peer.queryLoop(queryChan)
-	return peer
 }
 
 func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
@@ -114,10 +117,10 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 // ACTOR client API
 
 const (
-	PAddConnection         = iota
-	PBroadcastTCP          = iota
-	PDeleteConnection      = iota
-	PConnectionEstablished = iota
+	PAddConnection = iota
+	PBroadcastTCP
+	PDeleteConnection
+	PConnectionEstablished
 )
 
 // Async: rely on the peer to shut us down if we shouldn't be adding
@@ -216,6 +219,7 @@ func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
 	peer.Lock()
 	peer.connections[toName] = conn
 	peer.Unlock()
+	conn.log("connection added")
 }
 
 func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
@@ -232,6 +236,7 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	peer.Lock()
 	delete(peer.connections, toName)
 	peer.Unlock()
+	conn.log("connection deleted")
 	broadcast := false
 	if conn.Established() {
 		peer.Lock()
@@ -258,7 +263,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 	peer.Lock()
 	peer.version += 1
 	peer.Unlock()
-	log.Println("Peer", peer.Name, "established active connection to remote peer", conn.Remote().Name, "at", conn.RemoteTCPAddr())
+	conn.log("connection fully established")
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 
@@ -271,7 +276,7 @@ func (peer *LocalPeer) handleBroadcastTCP(msg []byte) {
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
 	// Sending everything; previous implementation optimised to just new peers
-	peer.Router.SendAllGossip()
+	peer.Router.SendGossip(TopologyGossipCh, peer.Router.Peers.EncodeAllPeers())
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

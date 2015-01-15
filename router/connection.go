@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+type ConnectionSender interface {
+	SendTCP(msg []byte)
+}
+
 func NewRemoteConnection(from, to *Peer, tcpAddr string) *RemoteConnection {
 	return &RemoteConnection{
 		local:         from,
@@ -30,7 +34,7 @@ func (conn *RemoteConnection) RemoteTCPAddr() string {
 	return conn.remoteTCPAddr
 }
 
-func (conn *RemoteConnection) Shutdown() {
+func (conn *RemoteConnection) Shutdown(error) {
 }
 
 func (conn *RemoteConnection) Established() bool {
@@ -86,11 +90,9 @@ func (conn *LocalConnection) RemoteUDPAddr() *net.UDPAddr {
 // peer actor process. Do not call this from the connection's actor
 // process itself.
 func (conn *LocalConnection) CheckFatal(err error) error {
-	if err == nil {
-		return nil
+	if err != nil {
+		conn.Shutdown(err)
 	}
-	conn.log("error:", err)
-	conn.Shutdown()
 	return err
 }
 
@@ -123,15 +125,17 @@ func (conn *LocalConnection) log(args ...interface{}) {
 // ACTOR client API
 
 const (
-	CSendTCP          = iota
-	CSetEstablished   = iota
-	CSetRemoteUDPAddr = iota
-	CShutdown         = iota
+	CSendTCP = iota
+	CSetEstablished
+	CSetRemoteUDPAddr
+	CShutdown
 )
 
 // Async
-func (conn *LocalConnection) Shutdown() {
-	conn.queryChan <- &ConnectionInteraction{Interaction: Interaction{code: CShutdown}}
+func (conn *LocalConnection) Shutdown(err error) {
+	conn.queryChan <- &ConnectionInteraction{
+		Interaction: Interaction{code: CShutdown},
+		payload:     err}
 }
 
 // Async
@@ -161,10 +165,11 @@ func (conn *LocalConnection) SendTCP(msg []byte) {
 func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
 	err := conn.handshake(acceptNewPeer)
 	if err != nil {
-		log.Printf("->[%s] encountered error during handshake: %v\n", conn.remoteTCPAddr, err)
+		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
 		conn.handleShutdown()
 		return
 	}
+	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 	conn.Router.Ourself.AddConnection(conn)
 	if conn.remoteUDPAddr != nil {
 		if err = conn.ensureForwarders(); err == nil {
@@ -173,11 +178,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 		}
 	}
 	terminate := false
-	for !terminate {
-		if err != nil {
-			conn.log("error:", err)
-			break
-		}
+	for !terminate && err == nil {
 		select {
 		case query, ok := <-queryChan:
 			if !ok {
@@ -185,6 +186,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			}
 			switch query.code {
 			case CShutdown:
+				err = query.payload.(error)
 				terminate = true
 			case CSetEstablished:
 				err = conn.handleSetEstablished()
@@ -201,13 +203,17 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 
 		}
 	}
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
+		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
+	} else if err != nil {
+		conn.log("connection shutting down due to error:", err)
+	} else {
+		conn.log("connection shutting down")
+	}
 	conn.handleShutdown()
 }
 
 func (conn *LocalConnection) handleSetRemoteUDPAddr(remoteUDPAddr *net.UDPAddr) error {
-	if remoteUDPAddr == nil {
-		return nil
-	}
 	conn.Lock()
 	old := conn.remoteUDPAddr
 	conn.remoteUDPAddr = remoteUDPAddr
@@ -255,10 +261,6 @@ func (conn *LocalConnection) handleSendTCP(msg []byte) error {
 }
 
 func (conn *LocalConnection) handleShutdown() {
-	if conn.remote != nil {
-		conn.log("connection shutting down")
-	}
-
 	// Whilst some of these elements may have been written to whilst
 	// holding locks, they were only written to by the connection
 	// actor process. handleShutdown is only called by the connection
@@ -266,10 +268,6 @@ func (conn *LocalConnection) handleShutdown() {
 	// (or write elements which are only read by the same
 	// process). Taking locks is only done for elements which are read
 	// by other processes.
-	if conn.shutdown {
-		return
-	}
-	conn.shutdown = true
 
 	if conn.TCPConn != nil {
 		checkWarn(conn.TCPConn.Close())
@@ -470,49 +468,11 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 		} else if msg[0] == ProtocolPMTUVerified {
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
 		} else if msg[0] == ProtocolGossipUnicast {
-			origMsg := msg
-			channelHash, msg := decodeGossipChannel(msg[1:])
-			srcName, _, msg := decodePeerName(msg)
-			destName, _, msg := decodePeerName(msg)
-			if conn.local.Name == destName {
-				channel, found := conn.Router.GossipChannels[channelHash]
-				if !found {
-					conn.log("received unknown gossip channel:\n", channelHash)
-				} else {
-					channel.gossiper.OnGossipUnicast(srcName, msg)
-				}
-			} else {
-				conn.Router.Ourself.RelayGossipTo(destName, origMsg)
-			}
+			handleGossip(conn, msg, deliverGossipUnicast)
 		} else if msg[0] == ProtocolGossipBroadcast {
-			// intended for state from sending peer only
-			// done when there is a change that everyone should hear about quickly
-			// relayed using broadcast topology.
-			origMsg := msg
-			channelHash, msg := decodeGossipChannel(msg[1:])
-			srcName, _, msg := decodePeerName(msg)
-			channel, found := conn.Router.GossipChannels[channelHash]
-			if !found {
-				conn.log("received unknown gossip channel:\n", channelHash)
-			} else {
-				channel.gossiper.OnGossipBroadcast(msg)
-			}
-			conn.Router.Ourself.RelayGossipBroadcast(srcName, origMsg)
+			handleGossip(conn, msg, deliverGossipBroadcast)
 		} else if msg[0] == ProtocolGossip {
-			// contains state for everyone that sending peer knows
-			// peers that receive it should examine the info, and if any of it is newer then
-			// pass it on to their peers
-			channelHash, msg := decodeGossipChannel(msg[1:])
-			channel, found := conn.Router.GossipChannels[channelHash]
-			if !found {
-				conn.log("received unknown gossip channel:\n", channelHash)
-			} else {
-				_, _, msg := decodePeerName(msg)
-				newBuf := channel.gossiper.OnGossip(msg)
-				if newBuf != nil {
-					channel.GossipMsg(newBuf)
-				}
-			}
+			handleGossip(conn, msg, deliverGossip)
 		} else {
 			conn.log("received unknown msg:\n", msg)
 		}
