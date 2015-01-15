@@ -42,25 +42,26 @@ type RemoteConnection struct {
 type LocalConnection struct {
 	sync.RWMutex
 	RemoteConnection
-	TCPConn       *net.TCPConn
-	tcpSender     TCPSender
-	remoteUDPAddr *net.UDPAddr
-	established   bool
-	stackFrag     bool
-	effectivePMTU int
-	SessionKey    *[32]byte
-	heartbeat     *time.Ticker
-	fetchAll      *time.Ticker
-	fragTest      *time.Ticker
-	forwardChan   chan<- *ForwardedFrame
-	forwardChanDF chan<- *ForwardedFrame
-	stopForward   chan<- interface{}
-	stopForwardDF chan<- interface{}
-	verifyPMTU    chan<- int
-	Decryptor     Decryptor
-	Router        *Router
-	UID           uint64
-	queryChan     chan<- *ConnectionInteraction
+	TCPConn           *net.TCPConn
+	tcpSender         TCPSender
+	remoteUDPAddr     *net.UDPAddr
+	established       bool
+	receivedHeartbeat bool
+	stackFrag         bool
+	effectivePMTU     int
+	SessionKey        *[32]byte
+	heartbeat         *time.Ticker
+	fetchAll          *time.Ticker
+	fragTest          *time.Ticker
+	forwardChan       chan<- *ForwardedFrame
+	forwardChanDF     chan<- *ForwardedFrame
+	stopForward       chan<- interface{}
+	stopForwardDF     chan<- interface{}
+	verifyPMTU        chan<- int
+	Decryptor         Decryptor
+	Router            *Router
+	UID               uint64
+	queryChan         chan<- *ConnectionInteraction
 }
 
 type ConnectionInteraction struct {

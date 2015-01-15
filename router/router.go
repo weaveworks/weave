@@ -265,7 +265,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 		if relayConn.Remote().Name == srcPeer.Name {
 			if frameLen == 0 {
-				relayConn.SetRemoteUDPAddr(sender)
+				relayConn.ReceivedHeartbeat(sender)
 				return nil
 			} else if frameLen == FragTestSize && bytes.Equal(frame, FragTest) {
 				relayConn.SendTCP(ProtocolFragmentationReceivedByte)
