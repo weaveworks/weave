@@ -462,10 +462,11 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			continue
 		}
 		if msg[0] == ProtocolConnectionEstablished {
-			// We initiated the connection. We sent fast heartbeats to
-			// the remote side, which has now received at least one of
-			// them and thus has informed us via TCP that it considers
-			// the connection is now up. We now do a fetchAll on it.
+			// We sent fast heartbeats to the remote peer, which has
+			// now received at least one of them and told us via this
+			// message.  We can now consider the connection as
+			// established from our end, and request the complete
+			// topology from the remote.
 			conn.SetEstablished()
 			conn.SendTCP(ProtocolFetchAllByte)
 		} else if msg[0] == ProtocolStartFragmentationTest {
