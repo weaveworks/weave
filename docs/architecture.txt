@@ -83,13 +83,17 @@ Router:
     local peer. It will tell the local connection (communicating to
     the actor thread) about the UDP address of the remote peer. The
     local connection will then start its forwarder threads as
-    described in 6a, and start sending slow heartbeats. The local connection
-    is marked as established which means it is included in network updates
-    broadcast to our peers. We also send to the remote peer via TCP a
-    ConnectionEstablished message. The remote peer receives this (on
-    the TCP receiver process), tells the connection actor process,
-    which then replaces the fast heartbeater with a slow heartbeater
-    and similarly marks the connection as established.
+    described in 6a, and start sending fast heartbeats. We send to the
+    remote peer via TCP a ConnectionEstablished message. The remote
+    peer receives this (on the TCP receiver process), tells the
+    connection actor process, which then replaces the fast heartbeater
+    with a slow heartbeater and marks the connection as established
+    (which means it is included in network updates broadcast to our
+    peers).
+  6c. When the connection initiator receives the fast heartbeat from
+    the remote peer it sends to the remote peer via a TCP a
+    ConnectionEstablished message. This is handled by the remote peer
+    as described in 6b.
   7. Whenever a connection is established or terminated, the local
     peer's version is incremented. Whenever this happens, the peer
     generates a network update message which is broadcast to its

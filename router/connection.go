@@ -69,7 +69,7 @@ func NewLocalConnection(connRemote *RemoteConnection, acceptNewPeer bool, tcpCon
 		remoteUDPAddr:    udpAddr,
 		effectivePMTU:    DefaultPMTU,
 		queryChan:        queryChan}
-	go connLocal.queryLoop(queryChan, acceptNewPeer)
+	go connLocal.run(queryChan, acceptNewPeer)
 }
 
 func (conn *LocalConnection) Established() bool {
@@ -127,7 +127,7 @@ func (conn *LocalConnection) log(args ...interface{}) {
 const (
 	CSendTCP = iota
 	CSetEstablished
-	CSetRemoteUDPAddr
+	CReceivedHeartbeat
 	CShutdown
 )
 
@@ -139,12 +139,12 @@ func (conn *LocalConnection) Shutdown(err error) {
 }
 
 // Async
-func (conn *LocalConnection) SetRemoteUDPAddr(remoteUDPAddr *net.UDPAddr) {
+func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr) {
 	if remoteUDPAddr == nil {
 		return
 	}
 	conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: CSetRemoteUDPAddr},
+		Interaction: Interaction{code: CReceivedHeartbeat},
 		payload:     remoteUDPAddr}
 }
 
@@ -162,21 +162,41 @@ func (conn *LocalConnection) SendTCP(msg []byte) {
 
 // ACTOR server
 
-func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
-	err := conn.handshake(acceptNewPeer)
-	if err != nil {
+func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
+	defer conn.handleShutdown()
+
+	tcpConn := conn.TCPConn
+	tcpConn.SetLinger(0)
+	enc := gob.NewEncoder(tcpConn)
+	dec := gob.NewDecoder(tcpConn)
+
+	if err := conn.handshake(enc, dec, acceptNewPeer); err != nil {
 		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
-		conn.handleShutdown()
 		return
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
+
+	go conn.receiveTCP(dec)
 	conn.Router.Ourself.AddConnection(conn)
+
 	if conn.remoteUDPAddr != nil {
-		if err = conn.ensureForwarders(); err == nil {
-			conn.heartbeat = time.NewTicker(FastHeartbeat)
-			conn.forwardHeartbeatFrame() // avoid initial wait
+		if err := conn.sendFastHeartbeats(); err != nil {
+			conn.log("connection shutting down due to error:", err)
+			return
 		}
 	}
+
+	err := conn.queryLoop(queryChan)
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
+		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
+	} else if err != nil {
+		conn.log("connection shutting down due to error:", err)
+	} else {
+		conn.log("connection shutting down")
+	}
+}
+
+func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) (err error) {
 	terminate := false
 	for !terminate && err == nil {
 		select {
@@ -188,10 +208,10 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			case CShutdown:
 				err = query.payload.(error)
 				terminate = true
+			case CReceivedHeartbeat:
+				err = conn.handleReceivedHeartbeat(query.payload.(*net.UDPAddr))
 			case CSetEstablished:
 				err = conn.handleSetEstablished()
-			case CSetRemoteUDPAddr:
-				err = conn.handleSetRemoteUDPAddr(query.payload.(*net.UDPAddr))
 			case CSendTCP:
 				err = conn.handleSendTCP(query.payload.([]byte))
 			}
@@ -200,60 +220,63 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
 			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
-
 		}
 	}
-	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
-		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
-	} else if err != nil {
-		conn.log("connection shutting down due to error:", err)
-	} else {
-		conn.log("connection shutting down")
-	}
-	conn.handleShutdown()
+	return
 }
 
-func (conn *LocalConnection) handleSetRemoteUDPAddr(remoteUDPAddr *net.UDPAddr) error {
+// Handlers
+//
+// NB: The conn.* fields are only written by the connection actor
+// process, which is the caller of the handlers. Hence we do not need
+// locks for reading, and only need write locks for fields read by
+// other processes.
+
+func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr) error {
+	oldRemoteUDPAddr := conn.remoteUDPAddr
+	old := conn.receivedHeartbeat
 	conn.Lock()
-	old := conn.remoteUDPAddr
 	conn.remoteUDPAddr = remoteUDPAddr
+	conn.receivedHeartbeat = true
 	conn.Unlock()
-	if old == nil {
+	if !old {
 		if err := conn.handleSendTCP(ProtocolConnectionEstablishedByte); err != nil {
 			return err
 		}
-		return conn.handleSetEstablished()
-	} else if old.String() != remoteUDPAddr.String() {
+	}
+	if oldRemoteUDPAddr == nil {
+		return conn.sendFastHeartbeats()
+	} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
 		log.Println("Peer", conn.remote.Name, "moved from", old, "to", remoteUDPAddr)
 	}
 	return nil
 }
 
 func (conn *LocalConnection) handleSetEstablished() error {
-	conn.Lock()
 	old := conn.established
+	conn.Lock()
 	conn.established = true
 	conn.Unlock()
-	if !old {
-		conn.Router.Ourself.ConnectionEstablished(conn)
-		if err := conn.ensureForwarders(); err != nil {
-			return err
-		}
-		stopTicker(conn.heartbeat)
-		conn.heartbeat = time.NewTicker(SlowHeartbeat)
-		conn.fragTest = time.NewTicker(FragTestInterval)
-		conn.forwardHeartbeatFrame() // avoid initial wait
-		// Send a large frame down the DF channel in order to prompt
-		// PMTU discovery to start.
-		conn.Forward(true, &ForwardedFrame{
-			srcPeer: conn.local,
-			dstPeer: conn.remote,
-			frame:   PMTUDiscovery},
-			nil)
-		conn.setStackFrag(false)
-		return conn.handleSendTCP(ProtocolStartFragmentationTestByte)
+	if old {
+		return nil
 	}
-	return nil
+	conn.Router.Ourself.ConnectionEstablished(conn)
+	if err := conn.ensureForwarders(); err != nil {
+		return err
+	}
+	stopTicker(conn.heartbeat)
+	conn.heartbeat = time.NewTicker(SlowHeartbeat)
+	conn.fragTest = time.NewTicker(FragTestInterval)
+	conn.forwardHeartbeatFrame() // avoid initial wait
+	// Send a large frame down the DF channel in order to prompt
+	// PMTU discovery to start.
+	conn.Forward(true, &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   PMTUDiscovery},
+		nil)
+	conn.setStackFrag(false)
+	return conn.handleSendTCP(ProtocolStartFragmentationTestByte)
 }
 
 func (conn *LocalConnection) handleSendTCP(msg []byte) error {
@@ -261,14 +284,6 @@ func (conn *LocalConnection) handleSendTCP(msg []byte) error {
 }
 
 func (conn *LocalConnection) handleShutdown() {
-	// Whilst some of these elements may have been written to whilst
-	// holding locks, they were only written to by the connection
-	// actor process. handleShutdown is only called by the connection
-	// actor process. So there is no need to take locks to read these
-	// (or write elements which are only read by the same
-	// process). Taking locks is only done for elements which are read
-	// by other processes.
-
 	if conn.TCPConn != nil {
 		checkWarn(conn.TCPConn.Close())
 	}
@@ -288,19 +303,17 @@ func (conn *LocalConnection) handleShutdown() {
 	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr)
 }
 
-func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
-	// We do not need to worry about locking in here as at this point,
+// Helpers
+
+func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, acceptNewPeer bool) error {
+	// We do not need to worry about locking in here as at this point
 	// the connection is not reachable by any go-routine other than
 	// ourself. Only when we add this connection to the conn.local
 	// peer will it be visible from multiple go-routines.
-	tcpConn := conn.TCPConn
-	tcpConn.SetLinger(0)
+
 	conn.extendReadDeadline()
 
-	enc := gob.NewEncoder(tcpConn)
-
 	localConnID := randUint64()
-
 	versionStr := fmt.Sprint(ProtocolVersion)
 	handshakeSend := map[string]string{
 		"Protocol":        Protocol,
@@ -323,7 +336,6 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 	}
 	enc.Encode(handshakeSend)
 
-	dec := gob.NewDecoder(tcpConn)
 	err = dec.Decode(&handshakeRecv)
 	if err != nil {
 		return err
@@ -411,7 +423,6 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
 	}
 	conn.remote = toPeer
 
-	go conn.receiveTCP(dec, usingPassword)
 	return nil
 }
 
@@ -426,8 +437,9 @@ func checkHandshakeStringField(fieldName string, expectedValue string, handshake
 	return val, nil
 }
 
-func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool) {
+func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	defer conn.Decryptor.Shutdown()
+	usingPassword := conn.SessionKey != nil
 	var receiver TCPReceiver
 	if usingPassword {
 		receiver = NewEncryptedTCPReceiver(conn)
@@ -481,6 +493,15 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 
 func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(ReadTimeout))
+}
+
+func (conn *LocalConnection) sendFastHeartbeats() error {
+	err := conn.ensureForwarders()
+	if err == nil {
+		conn.heartbeat = time.NewTicker(FastHeartbeat)
+		conn.forwardHeartbeatFrame() // avoid initial wait
+	}
+	return err
 }
 
 // Heartbeating serves two purposes: a) keeping NAT paths alive, and

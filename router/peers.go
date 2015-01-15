@@ -122,7 +122,11 @@ func (peers *Peers) String() string {
 	peers.ForEach(func(name PeerName, peer *Peer) {
 		buf.WriteString(fmt.Sprint(peer, "\n"))
 		peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
-			buf.WriteString(fmt.Sprintf("   -> %v [%v]\n", remoteName, conn.RemoteTCPAddr()))
+			established := ""
+			if !conn.Established() {
+				established = " (unestablished)"
+			}
+			buf.WriteString(fmt.Sprintf("   -> %v [%v%s]\n", remoteName, conn.RemoteTCPAddr(), established))
 		})
 	})
 	return buf.String()
