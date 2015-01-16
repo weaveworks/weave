@@ -7,7 +7,7 @@ import (
 
 const (
 	Protocol           = "weave"
-	ProtocolVersion    = 10
+	ProtocolVersion    = 11
 	EthernetOverhead   = 14
 	UDPOverhead        = 28 // 20 bytes for IPv4, 8 bytes for UDP
 	Port               = 6783

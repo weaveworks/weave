@@ -51,6 +51,7 @@ type LocalConnection struct {
 	stackFrag         bool
 	effectivePMTU     int
 	SessionKey        *[32]byte
+	heartbeatFrame    *ForwardedFrame
 	heartbeat         *time.Ticker
 	fragTest          *time.Ticker
 	forwardChan       chan<- *ForwardedFrame

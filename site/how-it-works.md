@@ -88,7 +88,7 @@ The name of the sending peer enables the receiving peer to identify
 who sent this UDP packet. This is followed by the meta data and
 payload for one or more captured frames. The router performs batching:
 if it captures several frames very quickly that all need forwarding to
-the same peer, it will fit as many of them as possible into a single
+the same peer, it fits as many of them as possible into a single
 UDP packet.
 
 The meta data for each frame contains the names of the capturing and
@@ -98,7 +98,7 @@ receiving peers to build up their mappings of which client MAC
 addresses are local to which peers. The destination peer name enables
 the receiving peer to identify whether this frame is destined for
 itself or whether it should be forwarded on to some other peer,
-accomodating multi-hop routing. This will work even when the receiving
+accommodating multi-hop routing. This works even when the receiving
 intermediate peer has no knowledge of the destination MAC: only the
 original capturing peer needs to determine the destination peer from
 the MAC. This way weave peers never need to exchange the MAC addresses
@@ -186,7 +186,7 @@ which the structure is:
 
 #### Removal of peers
 If a peer, after receiving a topology update, sees that another peer
-no longer has any connections within the network, it will drop all
+no longer has any connections within the network, it drops all
 knowledge of that second peer.
 
 
@@ -199,7 +199,7 @@ If the destination peer for a packet is still reachable, then
 out-of-date topology can result in it taking a less efficient route.
 
 If the out-of-date topology makes it look as if the destination peer
-is not reachable, then the packet will be dropped.  For most protocols
+is not reachable, then the packet is dropped.  For most protocols
 (e.g. TCP), the transmission will be retried a short time later, by
 which time the topology should have updated.
 
@@ -318,7 +318,7 @@ This is very similar to the [non-crypto encapsulation](#encapsulation).
 All of the frames are encrypted with the same ephemeral session key
 and all must be decrypted by the receiving peer. Frames which are to
 be forwarded on to some further peer will be re-encrypted with the
-relevant ephemeral session keys for the onwards connections. Thus all
+relevant ephemeral session keys for the onward connections. Thus all
 traffic is fully decrypted on every peer it passes through.
 Encryption is again done with the NaCl `secretbox.Seal` function.
 

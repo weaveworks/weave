@@ -254,14 +254,41 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 		dec.DecodeLayers(frame)
 		decodedLen := len(dec.decoded)
+		if decodedLen == 0 {
+			return nil
+		}
+		// Handle special frames produced internally (rather than
+		// captured/forwarded) by the remote router.
+		//
+		// We really shouldn't be decoding these above, since they are
+		// not genuine Ethernet frames. However, it is actually more
+		// efficient to do so, as we want to optimise for the common
+		// (i.e. non-special) frames. These always need decoding, and
+		// detecting special frames is cheaper post decoding than pre.
+		if decodedLen == 1 && dec.IsSpecial() {
+			if srcPeer != relayConn.Remote() || dstPeer != router.Ourself.Peer {
+				// A special frame not originating from the remote, or
+				// not for us? How odd; let's just drop it.
+				return nil
+			}
+			switch {
+			case frameLen == EthernetOverhead+8:
+				relayConn.ReceivedHeartbeat(sender, binary.BigEndian.Uint64(frame[EthernetOverhead:]))
+			case frameLen == FragTestSize && bytes.Equal(frame, FragTest):
+				relayConn.SendTCP(ProtocolFragmentationReceivedByte)
+			case frameLen == PMTUDiscoverySize && bytes.Equal(frame, PMTUDiscovery):
+			default:
+				frameLenBytes := []byte{0, 0}
+				binary.BigEndian.PutUint16(frameLenBytes, uint16(frameLen-EthernetOverhead))
+				relayConn.SendTCP(Concat(ProtocolPMTUVerifiedByte, frameLenBytes))
+			}
+			return nil
+		}
+
 		df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
-		srcMac := dec.eth.SrcMAC
 
 		if dstPeer != router.Ourself.Peer {
 			// it's not for us, we're just relaying it
-			if decodedLen == 0 {
-				return nil
-			}
 			if df {
 				router.LogFrame("Relaying DF", frame, &dec.eth)
 			} else {
@@ -270,36 +297,16 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			return checkFrameTooBig(router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec), srcPeer)
 		}
 
-		if relayConn.Remote().Name == srcPeer.Name {
-			if frameLen == 0 {
-				relayConn.ReceivedHeartbeat(sender)
-				return nil
-			} else if frameLen == FragTestSize && bytes.Equal(frame, FragTest) {
-				relayConn.SendTCP(ProtocolFragmentationReceivedByte)
-				return nil
-			} else if frameLen == PMTUDiscoverySize && bytes.Equal(frame, PMTUDiscovery) {
-				return nil
-			}
-		}
-
-		if decodedLen == 0 {
-			return nil
-		}
-
-		if dec.IsPMTUVerify() && relayConn.Remote().Name == srcPeer.Name {
-			frameLenBytes := []byte{0, 0}
-			binary.BigEndian.PutUint16(frameLenBytes, uint16(frameLen-EthernetOverhead))
-			relayConn.SendTCP(Concat(ProtocolPMTUVerifiedByte, frameLenBytes))
-			return nil
-		}
+		srcMac := dec.eth.SrcMAC
+		dstMac := dec.eth.DstMAC
 
 		if router.Macs.Enter(srcMac, srcPeer) {
-			log.Println("Discovered remote MAC", srcMac, "at", srcPeer.Name)
+			log.Println("Discovered remote MAC", srcMac, "at", srcName)
 		}
 		router.LogFrame("Injecting", frame, &dec.eth)
 		checkWarn(po.WritePacket(frame))
 
-		dstPeer, found = router.Macs.Lookup(dec.eth.DstMAC)
+		dstPeer, found = router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
 			return checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
 		}

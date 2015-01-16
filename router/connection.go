@@ -139,8 +139,12 @@ func (conn *LocalConnection) Shutdown(err error) {
 }
 
 // Async
-func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr) {
-	if remoteUDPAddr == nil {
+//
+// Heartbeating serves two purposes: a) keeping NAT paths alive, and
+// b) updating a remote peer's knowledge of our address, in the event
+// it changes (e.g. because NAT paths expired).
+func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connUID uint64) {
+	if remoteUDPAddr == nil || connUID != conn.UID {
 		return
 	}
 	conn.queryChan <- &ConnectionInteraction{
@@ -175,6 +179,13 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 		return
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
+
+	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
+	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.UID)
+	conn.heartbeatFrame = &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   heartbeatFrameBytes}
 
 	go conn.receiveTCP(dec)
 	conn.Router.Ourself.AddConnection(conn)
@@ -216,7 +227,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 				err = conn.handleSendTCP(query.payload.([]byte))
 			}
 		case <-tickerChan(conn.heartbeat):
-			conn.forwardHeartbeatFrame()
+			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
 			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
@@ -253,6 +264,7 @@ func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr)
 }
 
 func (conn *LocalConnection) handleSetEstablished() error {
+	stopTicker(conn.heartbeat)
 	old := conn.established
 	conn.Lock()
 	conn.established = true
@@ -264,10 +276,6 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	if err := conn.ensureForwarders(); err != nil {
 		return err
 	}
-	stopTicker(conn.heartbeat)
-	conn.heartbeat = time.NewTicker(SlowHeartbeat)
-	conn.fragTest = time.NewTicker(FragTestInterval)
-	conn.forwardHeartbeatFrame() // avoid initial wait
 	// Send a large frame down the DF channel in order to prompt
 	// PMTU discovery to start.
 	conn.Forward(true, &ForwardedFrame{
@@ -275,8 +283,15 @@ func (conn *LocalConnection) handleSetEstablished() error {
 		dstPeer: conn.remote,
 		frame:   PMTUDiscovery},
 		nil)
+	conn.heartbeat = time.NewTicker(SlowHeartbeat)
+	conn.fragTest = time.NewTicker(FragTestInterval)
+	// avoid initial waits for timers to fire
+	conn.Forward(true, conn.heartbeatFrame, nil)
 	conn.setStackFrag(false)
-	return conn.handleSendTCP(ProtocolStartFragmentationTestByte)
+	if err := conn.handleSendTCP(ProtocolStartFragmentationTestByte); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (conn *LocalConnection) handleSendTCP(msg []byte) error {
@@ -461,31 +476,36 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			// the traffic rather than shutting down.
 			continue
 		}
-		if msg[0] == ProtocolConnectionEstablished {
-			// We initiated the connection. We sent fast heartbeats to
-			// the remote side, which has now received at least one of
-			// them and thus has informed us via TCP that it considers
-			// the connection is now up.
+		switch msg[0] {
+		case ProtocolConnectionEstablished:
+			// We sent fast heartbeats to the remote peer, which has
+			// now received at least one of them and told us via this
+			// message.  We can now consider the connection as
+			// established from our end.
 			conn.SetEstablished()
-		} else if msg[0] == ProtocolStartFragmentationTest {
+		case ProtocolStartFragmentationTest:
 			conn.Forward(false, &ForwardedFrame{
 				srcPeer: conn.local,
 				dstPeer: conn.remote,
 				frame:   FragTest},
 				nil)
-		} else if msg[0] == ProtocolFragmentationReceived {
+		case ProtocolFragmentationReceived:
 			conn.setStackFrag(true)
-		} else if usingPassword && msg[0] == ProtocolNonce {
-			conn.Decryptor.ReceiveNonce(msg[1:])
-		} else if msg[0] == ProtocolPMTUVerified {
+		case ProtocolNonce:
+			if usingPassword {
+				conn.Decryptor.ReceiveNonce(msg[1:])
+			} else {
+				conn.log("ignoring unexpected nonce on unencrypted connection")
+			}
+		case ProtocolPMTUVerified:
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
-		} else if msg[0] == ProtocolGossipUnicast {
+		case ProtocolGossipUnicast:
 			handleGossip(conn, msg, deliverGossipUnicast)
-		} else if msg[0] == ProtocolGossipBroadcast {
+		case ProtocolGossipBroadcast:
 			handleGossip(conn, msg, deliverGossipBroadcast)
-		} else if msg[0] == ProtocolGossip {
+		case ProtocolGossip:
 			handleGossip(conn, msg, deliverGossip)
-		} else {
+		default:
 			conn.log("received unknown msg:\n", msg)
 		}
 	}
@@ -499,21 +519,9 @@ func (conn *LocalConnection) sendFastHeartbeats() error {
 	err := conn.ensureForwarders()
 	if err == nil {
 		conn.heartbeat = time.NewTicker(FastHeartbeat)
-		conn.forwardHeartbeatFrame() // avoid initial wait
+		conn.Forward(true, conn.heartbeatFrame, nil) // avoid initial wait
 	}
 	return err
-}
-
-// Heartbeating serves two purposes: a) keeping NAT paths alive, and
-// b) updating a remote peer's knowledge of our address, in the event
-// it changes (e.g. because NAT paths expired).
-// Called only by connection actor process.
-func (conn *LocalConnection) forwardHeartbeatFrame() {
-	heartbeatFrame := &ForwardedFrame{
-		srcPeer: conn.local,
-		dstPeer: conn.remote,
-		frame:   []byte{}}
-	conn.Forward(true, heartbeatFrame, nil)
 }
 
 func tickerChan(ticker *time.Ticker) <-chan time.Time {
