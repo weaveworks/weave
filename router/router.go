@@ -262,7 +262,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			return checkFrameTooBig(router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec), srcPeer)
 		}
 
-		if relayConn.Remote().Name == srcPeer.Name {
+		if relayConn.Remote() == srcPeer {
 			if frameLen == 0 {
 				relayConn.ReceivedHeartbeat(sender)
 				return nil
@@ -278,7 +278,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			return nil
 		}
 
-		if dec.IsPMTUVerify() && relayConn.Remote().Name == srcPeer.Name {
+		if dec.IsPMTUVerify() && relayConn.Remote() == srcPeer {
 			frameLenBytes := []byte{0, 0}
 			binary.BigEndian.PutUint16(frameLenBytes, uint16(frameLen-EthernetOverhead))
 			relayConn.SendTCP(Concat(ProtocolPMTUVerifiedByte, frameLenBytes))
@@ -289,7 +289,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		dstMac := dec.eth.DstMAC
 
 		if router.Macs.Enter(srcMac, srcPeer) {
-			log.Println("Discovered remote MAC", srcMac, "at", srcPeer.Name)
+			log.Println("Discovered remote MAC", srcMac, "at", srcName)
 		}
 		router.LogFrame("Injecting", frame, &dec.eth)
 		checkWarn(po.WritePacket(frame))
