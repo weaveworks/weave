@@ -114,7 +114,6 @@ There are two message types:
 This carries no payload. The receiver responds with the entire
 topology model as the receiver has it. FetchAll is sent:
 
- * when a new connection is established, by both sides of the new connection
  * when an update is received that references a peer that the receiver does not know
  * periodically, on a timer, in case any updates have been missed
 
