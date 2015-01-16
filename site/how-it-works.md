@@ -98,7 +98,7 @@ receiving peers to build up their mappings of which client MAC
 addresses are local to which peers. The destination peer name enables
 the receiving peer to identify whether this frame is destined for
 itself or whether it should be forwarded on to some other peer,
-accomodating multi-hop routing. This works even when the receiving
+accommodating multi-hop routing. This works even when the receiving
 intermediate peer has no knowledge of the destination MAC: only the
 original capturing peer needs to determine the destination peer from
 the MAC. This way weave peers never need to exchange the MAC addresses
@@ -194,7 +194,7 @@ knowledge of that second peer.
 
 #### Out-of-date topology
 The peer-to-peer passing of updates is not instantaneous, so it is
-very posisble for a node elsewhere in the network to have an
+very possible for a node elsewhere in the network to have an
 out-of-date view.
 
 If the destination peer for a packet is still reachable, then
@@ -320,7 +320,7 @@ This is very similar to the [non-crypto encapsulation](#encapsulation).
 All of the frames are encrypted with the same ephemeral session key
 and all must be decrypted by the receiving peer. Frames which are to
 be forwarded on to some further peer will be re-encrypted with the
-relevant ephemeral session keys for the onwards connections. Thus all
+relevant ephemeral session keys for the onward connections. Thus all
 traffic is fully decrypted on every peer it passes through.
 Encryption is again done with the NaCl `secretbox.Seal` function.
 
