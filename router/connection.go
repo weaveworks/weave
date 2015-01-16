@@ -251,6 +251,7 @@ func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr)
 }
 
 func (conn *LocalConnection) handleSetEstablished() error {
+	stopTicker(conn.heartbeat)
 	old := conn.established
 	conn.Lock()
 	conn.established = true
@@ -262,11 +263,6 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	if err := conn.ensureForwarders(); err != nil {
 		return err
 	}
-	stopTicker(conn.heartbeat)
-	conn.heartbeat = time.NewTicker(SlowHeartbeat)
-	conn.fetchAll = time.NewTicker(FetchAllInterval)
-	conn.fragTest = time.NewTicker(FragTestInterval)
-	conn.forwardHeartbeatFrame() // avoid initial wait
 	// Send a large frame down the DF channel in order to prompt
 	// PMTU discovery to start.
 	conn.Forward(true, &ForwardedFrame{
@@ -274,8 +270,19 @@ func (conn *LocalConnection) handleSetEstablished() error {
 		dstPeer: conn.remote,
 		frame:   PMTUDiscovery},
 		nil)
+	conn.heartbeat = time.NewTicker(SlowHeartbeat)
+	conn.fetchAll = time.NewTicker(FetchAllInterval)
+	conn.fragTest = time.NewTicker(FragTestInterval)
+	// avoid initial waits for timers to fire
+	conn.forwardHeartbeatFrame()
+	if err := conn.handleSendTCP(ProtocolFetchAllByte); err != nil {
+		return err
+	}
 	conn.setStackFrag(false)
-	return conn.handleSendTCP(ProtocolStartFragmentationTestByte)
+	if err := conn.handleSendTCP(ProtocolStartFragmentationTestByte); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (conn *LocalConnection) handleSendTCP(msg []byte) error {
@@ -465,10 +472,8 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			// We sent fast heartbeats to the remote peer, which has
 			// now received at least one of them and told us via this
 			// message.  We can now consider the connection as
-			// established from our end, and request the complete
-			// topology from the remote.
+			// established from our end.
 			conn.SetEstablished()
-			conn.SendTCP(ProtocolFetchAllByte)
 		} else if msg[0] == ProtocolStartFragmentationTest {
 			conn.Forward(false, &ForwardedFrame{
 				srcPeer: conn.local,
