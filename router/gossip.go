@@ -64,7 +64,7 @@ func (c *GossipChannel) GossipMsg(buf []byte) {
 
 func handleGossip(conn *LocalConnection, msg []byte, onok func(channel *GossipChannel, srcName PeerName, origMsg, payload []byte)) {
 	if len(msg) < 10 {
-		conn.log("[gossip] received invalid message (%d bytes long)", len(msg))
+		conn.log("[gossip] received invalid message of length:", len(msg))
 		return
 	}
 	channelHash, payload := decodeGossipChannel(msg[1:])
