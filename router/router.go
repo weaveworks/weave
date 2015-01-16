@@ -248,7 +248,6 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		dec.DecodeLayers(frame)
 		decodedLen := len(dec.decoded)
 		df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
-		srcMac := dec.eth.SrcMAC
 
 		if dstPeer != router.Ourself.Peer {
 			// it's not for us, we're just relaying it
@@ -286,13 +285,16 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			return nil
 		}
 
+		srcMac := dec.eth.SrcMAC
+		dstMac := dec.eth.DstMAC
+
 		if router.Macs.Enter(srcMac, srcPeer) {
 			log.Println("Discovered remote MAC", srcMac, "at", srcPeer.Name)
 		}
 		router.LogFrame("Injecting", frame, &dec.eth)
 		checkWarn(po.WritePacket(frame))
 
-		dstPeer, found = router.Macs.Lookup(dec.eth.DstMAC)
+		dstPeer, found = router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
 			return checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
 		}
