@@ -122,13 +122,12 @@ topology model as the receiver has it. FetchAll is sent:
 This carries a topology payload. This is sent:
 
   * upon receipt of a FetchAll message, as above,
-  * when a connection is added - the update will contain the two peers
+  * when a connection is established - the update contains the two peers
 that have just connected
-  * when a connection is deleted - the update will contain just the peer
+  * when a connection is deleted - the update contains just the peer
 that lost the connection
 
-The
-receiver merges it with its own topology model. If the payload is a
+The receiver merges it with its own topology model. If the payload is a
 subset of the receiver's topology, no further action is
 taken. Otherwise, the receiver sends out to all its connections an
 "improved" update:
@@ -143,7 +142,7 @@ taken. Otherwise, the receiver sends out to all its connections an
    receiver's version are updated
 
 If the update mentions a peer that the receiver does not know,
-then the entire update is rejected and the receiver will send a
+then the entire update is rejected and the receiver sends a
 FetchAll message back to the sender.
 
 #### Message details
@@ -190,7 +189,7 @@ which the structure is:
 
 #### Removal of peers
 If a peer, after receiving a topology update, sees that another peer
-no longer has any connections within the network, it will drop all
+no longer has any connections within the network, it drops all
 knowledge of that second peer.
 
 
