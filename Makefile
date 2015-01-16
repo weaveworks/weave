@@ -27,7 +27,7 @@ update:
 $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVERENDEZ_EXE):
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(shell dirname $@)
-	@ldd $@ 2>/dev/null | grep "not a dynamic executable" >/dev/null || { \
+	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 		rm $@; \
 		echo "\nYour go standard library was built without the 'netgo' build tag."; \
 		echo "To fix that, run"; \
