@@ -10,7 +10,6 @@ layout: default
  * [Troubleshooting](troubleshooting.html)
  * [Building](building.html)
  * [How it works](how-it-works.html)
- * [Topology](topology.html)
  * [Contact information](https://github.com/zettio/weave#contact-us)
  * *Installation Notes*
    * [Using with boot2docker](boot2docker.html)
