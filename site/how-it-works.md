@@ -39,6 +39,16 @@ peer. The topology information captures which peers are connected to
 which other peers; weave can route packets in partially connected
 networks with changing topology.
 
+For example, in this network, peer 1 is connected directly to 2 and 3,
+but if 1 needs to send a packet to 4 or 5 it must first send it to
+peer 3:
+![diagram showing five peers in a weave network][diagram1]
+Weave peers [communicate their own topology](#topology) with neighbours, who then
+pass on changes to their neighbours, and so on, until the entire
+network knows about any change.
+
+[diagram1]: images/top-diag1.png "Diagram 1"
+
 ### <a name="encapsulation"></a>Encapsulation
 
 When the weave router forwards packets, the encapsulation looks
@@ -94,6 +104,108 @@ original capturing peer needs to determine the destination peer from
 the MAC. This way weave peers never need to exchange the MAC addresses
 of clients and need not take any special action for ARP traffic and
 MAC discovery.
+
+### <a name="topology"></a>Topology Communication
+
+Topology is communicated over the TCP links between peers.
+There are two message types:
+
+##### FetchAll
+This carries no payload. The receiver responds with the entire
+topology model as the receiver has it. FetchAll is sent:
+
+ * when a new connection is established, by the peer that initiated the connection
+ * when an update is received that references a peer that the receiver does not know
+ * periodically, on a timer, in case any updates have been missed
+
+##### Update
+This carries a topology payload. This is sent:
+
+  * upon receipt of a FetchAll message, as above,
+  * when a connection is added - the update will contain the two peers
+that have just connected
+  * when a connection is deleted - the update will contain just the peer
+that lost the connection
+
+The
+receiver merges it with its own topology model. If the payload is a
+subset of the receiver's topology, no further action is
+taken. Otherwise, the receiver sends out to all its connections an
+"improved" update:
+
+ - elements which the original payload added to the
+   receiver are included
+ - elements which the original payload updated in the
+   receiver are included
+ - elements which are equal between the receiver and
+   the payload are not included
+ - elements where the payload was older than the
+   receiver's version are updated
+
+If the update mentions a peer that the receiver does not know,
+then the entire update is rejected and the receiver will send a
+FetchAll message back to the sender.
+
+#### Message details
+A topology update message is laid out like this:
+
+    +-----------------------------------+
+    | Peer 1: Name                      |
+    +-----------------------------------+
+    | Peer 1: UID                       |
+    +-----------------------------------+
+    | Peer 1: Version number            |
+    +-----------------------------------+
+    | Peer 1: List of connections       |
+    +-----------------------------------+
+    |                ...                |
+    +-----------------------------------+
+    | Peer N: Name                      |
+    +-----------------------------------+
+    | Peer N: UID                       |
+    +-----------------------------------+
+    | Peer N: Version number            |
+    +-----------------------------------+
+    | Peer N: List of connections       |
+    +-----------------------------------+
+
+Each List of connections is encapsulated as a byte buffer, within
+which the structure is:
+
+    +-----------------------------------+
+    | Connection 1: Remote Peer Name    |
+    +-----------------------------------+
+    | Connection 1: Remote IP address   |
+    +-----------------------------------+
+    | Connection 2: Remote Peer Name    |
+    +-----------------------------------+
+    | Connection 2: Remote IP address   |
+    +-----------------------------------+
+    |                ...                |
+    +-----------------------------------+
+    | Connection N: Remote Peer Name    |
+    +-----------------------------------+
+    | Connection N: Remote IP address   |
+    +-----------------------------------+
+
+#### Removal of peers
+If a peer, after receiving a topology update, sees that another peer
+no longer has any connections within the network, it will drop all
+knowledge of that second peer.
+
+
+#### Out-of-date topology
+The peer-to-peer passing of updates is not instantaneous, so it is
+very posisble for a node elsewhere in the network to have an
+out-of-date view.
+
+If the destination peer for a packet is still reachable, then
+out-of-date topology can result in it taking a less efficient route.
+
+If the out-of-date topology makes it look as if the destination peer
+is not reachable, then the packet will be dropped.  For most protocols
+(e.g. TCP), the transmission will be retried a short time later, by
+which time the topology should have updated.
 
 ### <a name="crypto"></a>Crypto
 
