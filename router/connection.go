@@ -30,7 +30,7 @@ func (conn *RemoteConnection) RemoteTCPAddr() string {
 	return conn.remoteTCPAddr
 }
 
-func (conn *RemoteConnection) Shutdown() {
+func (conn *RemoteConnection) Shutdown(error) {
 }
 
 func (conn *RemoteConnection) Established() bool {
@@ -86,11 +86,9 @@ func (conn *LocalConnection) RemoteUDPAddr() *net.UDPAddr {
 // peer actor process. Do not call this from the connection's actor
 // process itself.
 func (conn *LocalConnection) CheckFatal(err error) error {
-	if err == nil {
-		return nil
+	if err != nil {
+		conn.Shutdown(err)
 	}
-	conn.log("error:", err)
-	conn.Shutdown()
 	return err
 }
 
@@ -130,8 +128,10 @@ const (
 )
 
 // Async
-func (conn *LocalConnection) Shutdown() {
-	conn.queryChan <- &ConnectionInteraction{Interaction: Interaction{code: CShutdown}}
+func (conn *LocalConnection) Shutdown(err error) {
+	conn.queryChan <- &ConnectionInteraction{
+		Interaction: Interaction{code: CShutdown},
+	    payload:     err}
 }
 
 // Async
@@ -161,10 +161,11 @@ func (conn *LocalConnection) SendTCP(msg []byte) {
 func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
 	err := conn.handshake(acceptNewPeer)
 	if err != nil {
-		log.Printf("->[%s] encountered error during handshake: %v\n", conn.remoteTCPAddr, err)
+		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
 		conn.handleShutdown()
 		return
 	}
+	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 	conn.Router.Ourself.AddConnection(conn)
 	if conn.remoteUDPAddr != nil {
 		if err = conn.ensureForwarders(); err == nil {
@@ -173,11 +174,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 		}
 	}
 	terminate := false
-	for !terminate {
-		if err != nil {
-			conn.log("error:", err)
-			break
-		}
+	for !terminate && err == nil {
 		select {
 		case query, ok := <-queryChan:
 			if !ok {
@@ -185,6 +182,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			}
 			switch query.code {
 			case CShutdown:
+				err = query.payload.(error)
 				terminate = true
 			case CSetEstablished:
 				err = conn.handleSetEstablished()
@@ -203,13 +201,17 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 
 		}
 	}
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
+		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
+	} else if err != nil {
+		conn.log("connection shutting down due to error:", err)
+	} else {
+		conn.log("connection shutting down")
+	}
 	conn.handleShutdown()
 }
 
 func (conn *LocalConnection) handleSetRemoteUDPAddr(remoteUDPAddr *net.UDPAddr) error {
-	if remoteUDPAddr == nil {
-		return nil
-	}
 	conn.Lock()
 	old := conn.remoteUDPAddr
 	conn.remoteUDPAddr = remoteUDPAddr
@@ -258,10 +260,6 @@ func (conn *LocalConnection) handleSendTCP(msg []byte) error {
 }
 
 func (conn *LocalConnection) handleShutdown() {
-	if conn.remote != nil {
-		conn.log("connection shutting down")
-	}
-
 	// Whilst some of these elements may have been written to whilst
 	// holding locks, they were only written to by the connection
 	// actor process. handleShutdown is only called by the connection

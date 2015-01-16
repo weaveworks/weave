@@ -37,7 +37,7 @@ func queryHandler(lookups []Lookup) dns.HandlerFunc {
 		Debug.Printf("Query: %+v", q)
 		if q.Qtype == dns.TypeA {
 			for _, lookup := range lookups {
-				if ip, err := lookup.LookupLocal(q.Name); err == nil {
+				if ip, err := lookup.LookupName(q.Name); err == nil {
 					m := makeAddressReply(r, &q, ip)
 					w.WriteMsg(m)
 					return
@@ -56,7 +56,7 @@ func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 		Debug.Printf("Reverse query: %+v", q)
 		if q.Qtype == dns.TypePTR {
 			for _, lookup := range lookups {
-				if name, err := lookup.ReverseLookupLocal(q.Name); err == nil {
+				if name, err := lookup.LookupInaddr(q.Name); err == nil {
 					m := makePTRReply(r, &q, []string{name})
 					w.WriteMsg(m)
 					return
@@ -72,28 +72,35 @@ func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 	}
 }
 
-/* When we receive a request for a name outside of our '.weave' domain, call
-   the underlying lookup mechanism and return the answer(s) it gives.
-   Unfortunately, this means that TTLs from a real DNS server are lost - FIXME.
+/* When we receive a request for a name outside of our '.weave.local.'
+   domain, ask the configured DNS server as a fallback.
 */
 func notUsHandler() dns.HandlerFunc {
+	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	checkFatal(err)
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] Non-local query: %+v", r.MsgHdr.Id, q)
-		var responseMsg *dns.Msg
-		if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
-			if addrs, err := net.LookupIP(q.Name); err == nil {
-				responseMsg = makeAddressReply(r, &q, addrs)
-			} else {
-				responseMsg = makeDNSFailResponse(r)
-				Debug.Printf("[dns msgid %d] Failed fallback: %s", r.MsgHdr.Id, err)
+		for _, server := range config.Servers {
+			reply, err := dns.Exchange(r, fmt.Sprintf("%s:%s", server, config.Port))
+			if err != nil {
+				Debug.Printf("[dns msgid %d] Network error trying %s (%s)",
+					r.MsgHdr.Id, server, err)
+				continue
 			}
-		} else {
-			Warning.Printf("[dns msgid %d] Non-local query not handled: %+v",
-				r.MsgHdr.Id, q)
-			responseMsg = makeDNSFailResponse(r)
+			if reply != nil && reply.Rcode != dns.RcodeSuccess {
+				Debug.Printf("[dns msgid %d] Failure reported by %s for query %s",
+					r.MsgHdr.Id, server, q.Name)
+				continue
+			}
+			Debug.Printf("[dns msgid %d] Given answer by %s for query %s",
+				r.MsgHdr.Id, server, q.Name)
+			w.WriteMsg(reply)
+			return
 		}
-		w.WriteMsg(responseMsg)
+		Warning.Printf("[dns msgid %d] Failed lookup for external name %s",
+			r.MsgHdr.Id, q.Name)
+		w.WriteMsg(makeDNSFailResponse(r))
 	}
 }
 

@@ -23,7 +23,7 @@ func mdnsLookup(client *MDNSClient, name string, qtype uint16) (*Response, error
 	return nil, LookupError(name)
 }
 
-func (client *MDNSClient) LookupLocal(name string) ([]net.IP, error) {
+func (client *MDNSClient) LookupName(name string) ([]net.IP, error) {
 	if r, e := mdnsLookup(client, name, dns.TypeA); r != nil {
 		return []net.IP{r.Addr}, nil
 	} else {
@@ -31,7 +31,7 @@ func (client *MDNSClient) LookupLocal(name string) ([]net.IP, error) {
 	}
 }
 
-func (client *MDNSClient) ReverseLookupLocal(inaddr string) (string, error) {
+func (client *MDNSClient) LookupInaddr(inaddr string) (string, error) {
 	if r, e := mdnsLookup(client, inaddr, dns.TypePTR); r != nil {
 		return r.Name, nil
 	} else {

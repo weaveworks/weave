@@ -43,7 +43,7 @@ func TestHttp(t *testing.T) {
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is now there.
-	foundIP, err := zone.LookupLocal(successTestName)
+	foundIP, err := zone.LookupName(successTestName)
 	wt.AssertNoErr(t, err)
 	ip, _, _ := net.ParseCIDR(testAddr1)
 	if !foundIP.Equal(ip) {
@@ -70,7 +70,7 @@ func TestHttp(t *testing.T) {
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is still resolvable.
-	_, err = zone.LookupLocal(successTestName)
+	_, err = zone.LookupName(successTestName)
 	wt.AssertNoErr(t, err)
 
 	// Delete the address record mentioning the other container
@@ -79,7 +79,7 @@ func TestHttp(t *testing.T) {
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is gone
-	_, err = zone.LookupLocal(successTestName)
+	_, err = zone.LookupName(successTestName)
 	wt.AssertErrorType(t, err, (*LookupError)(nil), "fully-removed address")
 
 	// Would like to shut down the http server at the end of this test
