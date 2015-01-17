@@ -138,7 +138,7 @@ help@weave.works. When reporting a bug, please include which version of
 weave you are running, as shown by `weave version`.
 
 Follow weave on Twitter:
-[@weavenetwork](https://twitter.com/weavenetwork).
+[@weaveworks](https://twitter.com/weaveworks).
 
 Read the Weave blog:
 [Weaveblog](http://weaveblog.com/).
