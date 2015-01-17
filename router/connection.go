@@ -135,6 +135,10 @@ func (conn *LocalConnection) Shutdown(err error) {
 }
 
 // Async
+//
+// Heartbeating serves two purposes: a) keeping NAT paths alive, and
+// b) updating a remote peer's knowledge of our address, in the event
+// it changes (e.g. because NAT paths expired).
 func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr) {
 	if remoteUDPAddr == nil {
 		return
@@ -171,6 +175,11 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 		return
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
+
+	conn.heartbeatFrame = &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   []byte{}}
 
 	go conn.receiveTCP(dec)
 	conn.Router.Ourself.AddConnection(conn)
@@ -212,7 +221,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 				err = conn.handleSendTCP(query.payload.([]byte))
 			}
 		case <-tickerChan(conn.heartbeat):
-			conn.forwardHeartbeatFrame()
+			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fetchAll):
 			err = conn.handleSendTCP(ProtocolFetchAllByte)
 		case <-tickerChan(conn.fragTest):
@@ -274,7 +283,7 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	conn.fetchAll = time.NewTicker(FetchAllInterval)
 	conn.fragTest = time.NewTicker(FragTestInterval)
 	// avoid initial waits for timers to fire
-	conn.forwardHeartbeatFrame()
+	conn.Forward(true, conn.heartbeatFrame, nil)
 	if err := conn.handleSendTCP(ProtocolFetchAllByte); err != nil {
 		return err
 	}
@@ -539,21 +548,9 @@ func (conn *LocalConnection) sendFastHeartbeats() error {
 	err := conn.ensureForwarders()
 	if err == nil {
 		conn.heartbeat = time.NewTicker(FastHeartbeat)
-		conn.forwardHeartbeatFrame() // avoid initial wait
+		conn.Forward(true, conn.heartbeatFrame, nil)  // avoid initial wait
 	}
 	return err
-}
-
-// Heartbeating serves two purposes: a) keeping NAT paths alive, and
-// b) updating a remote peer's knowledge of our address, in the event
-// it changes (e.g. because NAT paths expired).
-// Called only by connection actor process.
-func (conn *LocalConnection) forwardHeartbeatFrame() {
-	heartbeatFrame := &ForwardedFrame{
-		srcPeer: conn.local,
-		dstPeer: conn.remote,
-		frame:   []byte{}}
-	conn.Forward(true, heartbeatFrame, nil)
 }
 
 func tickerChan(ticker *time.Ticker) <-chan time.Time {
