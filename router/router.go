@@ -247,7 +247,9 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 		dec.DecodeLayers(frame)
 		decodedLen := len(dec.decoded)
-
+		if decodedLen == 0 {
+			return nil
+		}
 		// Handle special frames produced internally (rather than
 		// captured/forwarded) by the remote router.
 		//
@@ -256,18 +258,19 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		// efficient to do so, as we want to optimise for the common
 		// (i.e. non-special) frames. These always need decoding, and
 		// detecting special frames is cheaper post decoding than pre.
-		if decodedLen == 0 || (decodedLen == 1 && dec.IsSpecial()) {
+		if decodedLen == 1 && dec.IsSpecial() {
 			if srcPeer != relayConn.Remote() || dstPeer != router.Ourself.Peer {
 				// A special frame not originating from the remote, or
 				// not for us? How odd; let's just drop it.
 				return nil
 			}
-			if frameLen == 0 {
-				relayConn.ReceivedHeartbeat(sender)
-			} else if frameLen == FragTestSize && bytes.Equal(frame, FragTest) {
+			switch {
+			case frameLen == EthernetOverhead + 8:
+				relayConn.ReceivedHeartbeat(sender, binary.BigEndian.Uint64(frame[EthernetOverhead:]))
+			case frameLen == FragTestSize && bytes.Equal(frame, FragTest):
 				relayConn.SendTCP(ProtocolFragmentationReceivedByte)
-			} else if frameLen == PMTUDiscoverySize && bytes.Equal(frame, PMTUDiscovery) {
-			} else if decodedLen == 1 {
+			case frameLen == PMTUDiscoverySize && bytes.Equal(frame, PMTUDiscovery):
+			default:
 				frameLenBytes := []byte{0, 0}
 				binary.BigEndian.PutUint16(frameLenBytes, uint16(frameLen-EthernetOverhead))
 				relayConn.SendTCP(Concat(ProtocolPMTUVerifiedByte, frameLenBytes))

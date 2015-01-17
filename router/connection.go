@@ -139,8 +139,8 @@ func (conn *LocalConnection) Shutdown(err error) {
 // Heartbeating serves two purposes: a) keeping NAT paths alive, and
 // b) updating a remote peer's knowledge of our address, in the event
 // it changes (e.g. because NAT paths expired).
-func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr) {
-	if remoteUDPAddr == nil {
+func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connUID uint64) {
+	if remoteUDPAddr == nil || connUID != conn.UID {
 		return
 	}
 	conn.queryChan <- &ConnectionInteraction{
@@ -176,10 +176,12 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 
+	heartbeatFrameBytes := make([]byte, EthernetOverhead + 8)
+	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.UID)
 	conn.heartbeatFrame = &ForwardedFrame{
 		srcPeer: conn.local,
 		dstPeer: conn.remote,
-		frame:   []byte{}}
+		frame:   heartbeatFrameBytes}
 
 	go conn.receiveTCP(dec)
 	conn.Router.Ourself.AddConnection(conn)
