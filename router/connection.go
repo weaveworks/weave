@@ -131,7 +131,7 @@ const (
 func (conn *LocalConnection) Shutdown(err error) {
 	conn.queryChan <- &ConnectionInteraction{
 		Interaction: Interaction{code: CShutdown},
-	    payload:     err}
+		payload:     err}
 }
 
 // Async
@@ -176,7 +176,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 
-	heartbeatFrameBytes := make([]byte, EthernetOverhead + 8)
+	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
 	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.UID)
 	conn.heartbeatFrame = &ForwardedFrame{
 		srcPeer: conn.local,
@@ -550,12 +550,11 @@ func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(ReadTimeout))
 }
 
-
 func (conn *LocalConnection) sendFastHeartbeats() error {
 	err := conn.ensureForwarders()
 	if err == nil {
 		conn.heartbeat = time.NewTicker(FastHeartbeat)
-		conn.Forward(true, conn.heartbeatFrame, nil)  // avoid initial wait
+		conn.Forward(true, conn.heartbeatFrame, nil) // avoid initial wait
 	}
 	return err
 }

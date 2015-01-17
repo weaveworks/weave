@@ -265,7 +265,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 				return nil
 			}
 			switch {
-			case frameLen == EthernetOverhead + 8:
+			case frameLen == EthernetOverhead+8:
 				relayConn.ReceivedHeartbeat(sender, binary.BigEndian.Uint64(frame[EthernetOverhead:]))
 			case frameLen == FragTestSize && bytes.Equal(frame, FragTest):
 				relayConn.SendTCP(ProtocolFragmentationReceivedByte)
