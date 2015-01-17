@@ -320,8 +320,9 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 		usedOffsets = decState.usedOffsets
 	} else {
 		highestOffsetSeen := decState.highestOffsetSeen
-		if offsetNoFlags < (1<<13) && highestOffsetSeen > ((1<<14)+(1<<13)) &&
-			(highestOffsetSeen-offsetNoFlags) > ((1<<14)+(1<<13)) {
+		switch {
+		case offsetNoFlags < (1<<13) && highestOffsetSeen > ((1<<14)+(1<<13)) &&
+			(highestOffsetSeen-offsetNoFlags) > ((1<<14)+(1<<13)):
 			// offset is in the first quarter, highestOffsetSeen is in
 			// the top quarter and under a quarter behind us. We
 			// interpret this as we need to move to the next nonce
@@ -335,29 +336,29 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 			decState.highestOffsetSeen = offsetNoFlags
 			nonce = decState.nonce
 			usedOffsets = decState.usedOffsets
-		} else if offsetNoFlags > highestOffsetSeen &&
-			(offsetNoFlags-highestOffsetSeen) < (1<<13) {
+		case offsetNoFlags > highestOffsetSeen &&
+			(offsetNoFlags-highestOffsetSeen) < (1<<13):
 			// offset is under a quarter above highestOffsetSeen. This
 			// is ok - maybe some packet loss
 			decState.highestOffsetSeen = offsetNoFlags
 			nonce = decState.nonce
 			usedOffsets = decState.usedOffsets
-		} else if offsetNoFlags <= highestOffsetSeen &&
-			(highestOffsetSeen-offsetNoFlags) < (1<<13) {
+		case offsetNoFlags <= highestOffsetSeen &&
+			(highestOffsetSeen-offsetNoFlags) < (1<<13):
 			// offset is within a quarter of the highest we've
 			// seen. This is ok - just assuming some out-of-order
 			// delivery.
 			nonce = decState.nonce
 			usedOffsets = decState.usedOffsets
-		} else if highestOffsetSeen < (1<<13) && offsetNoFlags > ((1<<14)+(1<<13)) &&
-			(offsetNoFlags-highestOffsetSeen) > ((1<<14)+(1<<13)) {
+		case highestOffsetSeen < (1<<13) && offsetNoFlags > ((1<<14)+(1<<13)) &&
+			(offsetNoFlags-highestOffsetSeen) > ((1<<14)+(1<<13)):
 			// offset is in the last quarter, highestOffsetSeen is in
 			// the first quarter, and offset is under a quarter behind
 			// us. This is ok - as above, just some out of order. But
 			// here it means we're dealing with the previous nonce
 			nonce = decState.previousNonce
 			usedOffsets = decState.previousUsedOffsets
-		} else {
+		default:
 			return nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
 		}
 	}
