@@ -37,4 +37,16 @@ fetch $CONNTRACK
 (cd $CONNTRACK; ./configure && make LDFLAGS=-static && rm -f src/conntrack && make LDFLAGS=-all-static)
 cp $CONNTRACK/src/conntrack "$BASEDIR"/bin/
 
+# curl
+
+CURL=curl-7.40.0
+
+rm -rf $CURL
+
+curl -s -S  http://curl.haxx.se/download/$CURL.tar.gz | tar xvz
+(cd $CURL; ./configure --without-ssl --disable-shared && make && rm src/curl && make LDFLAGS=-all-static)
+cp $CURL/src/curl "$BASEDIR"/bin/
+
+#
+
 touch "$BASEDIR"/bin

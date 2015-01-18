@@ -322,12 +322,7 @@ http_call_ip() {
     http_verb="$3"
     url="$4"
     shift 4
-    if command_exists curl ; then
-        curl -s -X $http_verb "$@" http://$ip:$port$url
-    else
-        echo "Cannot find curl, which is required for this operation." >&2
-        exit 1
-    fi
+    run_tool host curl -s -X $http_verb "$@" http://$ip:$port$url
 }
 
 # Perform operation $1 on container ID $2 to local DNS database at address $3
