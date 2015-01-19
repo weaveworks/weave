@@ -145,6 +145,10 @@ func handleHttp(router *weave.Router) {
 		io.WriteString(w, fmt.Sprintln("Encryption", encryption))
 		io.WriteString(w, router.Status())
 	})
+	http.HandleFunc("/topo-json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		io.WriteString(w, router.Peers.JsonString())
+	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {

@@ -132,6 +132,30 @@ func (peers *Peers) String() string {
 	return buf.String()
 }
 
+func (peers *Peers) JsonString() string {
+	var buf bytes.Buffer
+	buf.WriteString("{\"topology\": [\n")
+	firstPeer := true
+	peers.ForEach(func(name PeerName, peer *Peer) {
+		if !firstPeer {
+			buf.WriteString(",\n")
+		}
+		firstPeer = false
+		buf.WriteString(fmt.Sprintf("  { \"name\" : \"%s\", \"connections\" : [", name))
+		firstConn := true
+		peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
+			if !firstConn {
+				buf.WriteString(",")
+			}
+			firstConn = false
+			buf.WriteString(fmt.Sprintf("\n    { \"remoteName\": \"%s\", \"tcpAddr\": \"%s\", \"established\": \"%t\" }", remoteName, conn.RemoteTCPAddr(), conn.Established()))
+		})
+		buf.WriteString(" ] }")
+	})
+	buf.WriteString("\n]}")
+	return buf.String()
+}
+
 func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
 	if existingPeer, found := peers.table[peer.Name]; found {
 		if existingPeer.UID == peer.UID {
