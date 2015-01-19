@@ -434,16 +434,16 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 
 	toPeer := NewPeer(name, uid, 0)
 	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
-	if toPeer == nil {
+	switch toPeer {
+	case nil:
 		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
-	} else if toPeer == conn.local {
-		// have to do assigment here to ensure Shutdown releases ref count
-		conn.remote = toPeer
+	case conn.local:
+		conn.remote = toPeer // have to do assigment here to ensure Shutdown releases ref count
 		return fmt.Errorf("Cannot connect to ourself")
+	default:
+		conn.remote = toPeer
+		return nil
 	}
-	conn.remote = toPeer
-
-	return nil
 }
 
 func checkHandshakeStringField(fieldName string, expectedValue string, handshake map[string]string) (string, error) {
