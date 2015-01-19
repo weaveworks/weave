@@ -1,3 +1,7 @@
+// No mocks are tested by this file.
+// It supplies some mock implementations to other unit tests,
+// and is named "...test.go" so it is only compiled under `go test`.
+
 package router
 
 import (
@@ -37,8 +41,9 @@ func (r1 *Router) AddTestConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	r1.Ourself.Peer.connections[toName] = &mockConnection{toPeer, ""}
-	r1.Ourself.Peer.version += 1
+	conn := &mockConnection{toPeer, ""}
+	r1.Ourself.addConnection(conn)
+	r1.Ourself.connectionEstablished(conn)
 }
 
 func (r0 *Router) AddTestRemoteConnection(r1, r2 *Router) {
@@ -48,16 +53,15 @@ func (r0 *Router) AddTestRemoteConnection(r1, r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	toPeer = r0.Peers.FetchWithDefault(toPeer)
-	r0.Ourself.Peer.connections[toName] = &RemoteConnection{fromPeer, toPeer, ""}
-	r0.Ourself.Peer.version += 1
+	r0.Ourself.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
 }
 
 func (r1 *Router) DeleteTestConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer, _ := r1.Peers.Fetch(toName)
 	toPeer.DecrementLocalRefCount()
-	delete(r1.Ourself.Peer.connections, toName)
-	r1.Ourself.Peer.version += 1
+	conn, _ := r1.Ourself.Peer.ConnectionTo(toName)
+	r1.Ourself.deleteConnection(conn)
 }
 
 type mockConnection struct {
