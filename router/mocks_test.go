@@ -27,10 +27,8 @@ func NewTestRouter(t *testing.T, name PeerName, queue *peerQueue) *Router {
 	router := NewRouter(nil, name, nil, 10, 1024, nil)
 	router.Macs.onExpiry = onMacExpiry
 	router.Peers.onGC = onPeerGC
-	router.ConnectionMaker = &ConnectionMaker{
-		ourself:   router.Ourself,
-		queryChan: make(chan *ConnectionMakerInteraction, ChannelSize)}
-	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
+	// Create dummy channels otherwise tests hang on nil channel
+	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
 	router.Routes.queryChan = make(chan *Interaction, ChannelSize)
 	return router
 }
