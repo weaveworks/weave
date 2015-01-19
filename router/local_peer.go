@@ -19,8 +19,7 @@ type PeerInteraction struct {
 }
 
 func NewLocalPeer(name PeerName, router *Router) *LocalPeer {
-	peer := &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
-	return peer
+	return &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
 }
 
 func (peer *LocalPeer) Start() {
@@ -58,24 +57,6 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 		dec)
 }
 
-func (peer *LocalPeer) NextBroadcastHops(srcPeer *Peer) []*LocalConnection {
-	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
-	if len(nextHops) == 0 {
-		return nil
-	}
-	nextConns := make([]*LocalConnection, 0, len(nextHops))
-	peer.RLock()
-	for _, hopName := range nextHops {
-		conn, found := peer.connections[hopName]
-		// Again, !found could just be due to a race.
-		if found {
-			nextConns = append(nextConns, conn.(*LocalConnection))
-		}
-	}
-	peer.RUnlock()
-	return nextConns
-}
-
 func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
 	for _, conn := range peer.NextBroadcastHops(srcPeer) {
 		err := conn.Forward(df, &ForwardedFrame{
@@ -88,6 +69,24 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec 
 		}
 	}
 	return nil
+}
+
+func (peer *LocalPeer) NextBroadcastHops(srcPeer *Peer) []*LocalConnection {
+	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
+	if len(nextHops) == 0 {
+		return nil
+	}
+	nextConns := make([]*LocalConnection, 0, len(nextHops))
+	peer.RLock()
+	defer peer.RUnlock()
+	for _, hopName := range nextHops {
+		conn, found := peer.connections[hopName]
+		// Again, !found could just be due to a race.
+		if found {
+			nextConns = append(nextConns, conn.(*LocalConnection))
+		}
+	}
+	return nextConns
 }
 
 func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) error {
@@ -110,7 +109,8 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 		return err
 	}
 	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String())
-	NewLocalConnection(connRemote, acceptNewPeer, tcpConn, udpAddr, peer.Router)
+	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.Router)
+	connLocal.Start(acceptNewPeer)
 	return nil
 }
 

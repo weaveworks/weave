@@ -57,16 +57,16 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
-// Merge an incoming update with our own topology model, and
+// Merge an incoming update with our own topology, and
 // create an "improved" update:
-//  - elements which the original payload added to the
-//    receiver are included
-//  - elements which the original payload updated in the
-//    receiver are included
-//  - elements which are equal between the receiver and
-//    the payload are not included
-//  - elements where the payload was older than the
-//    receiver's version are updated
+// - elements which the original payload added to the receiver are
+//   included
+// - elements which the original payload updated in the receiver are
+//   included
+// - elements which are equal between the receiver and the payload are
+//   not included
+// - elements where the payload was older than the receiver's version
+//   are updated
 func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
 	peers.Lock()
 

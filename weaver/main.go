@@ -172,8 +172,8 @@ func handleSignals(router *weave.Router) {
 		sig := <-sigs
 		switch sig {
 		case syscall.SIGQUIT:
-			runtime.Stack(buf, true)
-			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+			stacklen := runtime.Stack(buf, true)
+			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
 		case syscall.SIGUSR1:
 			log.Printf("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", router.Status())
 		}

@@ -41,16 +41,18 @@ type ConnectionMakerInteraction struct {
 	address string
 }
 
-func StartConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
-	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
-	state := &ConnectionMaker{
+func NewConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
+	return &ConnectionMaker{
 		ourself:        ourself,
 		peers:          peers,
-		queryChan:      queryChan,
 		cmdLineAddress: make(map[string]bool),
 		targets:        make(map[string]*Target)}
-	go state.queryLoop(queryChan)
-	return state
+}
+
+func (cm *ConnectionMaker) Start() {
+	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
+	cm.queryChan = queryChan
+	go cm.queryLoop(queryChan)
 }
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {

@@ -24,7 +24,9 @@ func NewTestRouter(t *testing.T, name PeerName, queue *peerQueue) *Router {
 			queue.peers = append(queue.peers, peer)
 		}
 	}
-	router := newRouter(nil, name, nil, 10, 1024, nil, onMacExpiry, onPeerGC)
+	router := NewRouter(nil, name, nil, 10, 1024, nil)
+	router.Macs.onExpiry = onMacExpiry
+	router.Peers.onGC = onPeerGC
 	router.ConnectionMaker = &ConnectionMaker{
 		ourself:   router.Ourself,
 		queryChan: make(chan *ConnectionMakerInteraction, ChannelSize)}

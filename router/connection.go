@@ -53,23 +53,25 @@ func (conn *RemoteConnection) String() string {
 	return fmt.Sprint("Connection ", from, "->", to)
 }
 
-// Async. Does not return anything. If the connection is successful,
-// it will end up in the local peer's connections map.
-func NewLocalConnection(connRemote *RemoteConnection, acceptNewPeer bool, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router) {
+func NewLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router) *LocalConnection {
 	if connRemote.local != router.Ourself.Peer {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
-
-	queryChan := make(chan *ConnectionInteraction, ChannelSize)
 	// NB, we're taking a copy of connRemote here.
-	connLocal := &LocalConnection{
+	return &LocalConnection{
 		RemoteConnection: *connRemote,
 		Router:           router,
 		TCPConn:          tcpConn,
 		remoteUDPAddr:    udpAddr,
-		effectivePMTU:    DefaultPMTU,
-		queryChan:        queryChan}
-	go connLocal.run(queryChan, acceptNewPeer)
+		effectivePMTU:    DefaultPMTU}
+}
+
+// Async. Does not return anything. If the connection is successful,
+// it will end up in the local peer's connections map.
+func (conn *LocalConnection) Start(acceptNewPeer bool) {
+	queryChan := make(chan *ConnectionInteraction, ChannelSize)
+	conn.queryChan = queryChan
+	go conn.run(queryChan, acceptNewPeer)
 }
 
 func (conn *LocalConnection) Established() bool {
@@ -429,16 +431,16 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 
 	toPeer := NewPeer(name, uid, 0)
 	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
-	if toPeer == nil {
+	switch toPeer {
+	case nil:
 		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
-	} else if toPeer == conn.local {
-		// have to do assigment here to ensure Shutdown releases ref count
-		conn.remote = toPeer
+	case conn.local:
+		conn.remote = toPeer // have to do assigment here to ensure Shutdown releases ref count
 		return fmt.Errorf("Cannot connect to ourself")
+	default:
+		conn.remote = toPeer
+		return nil
 	}
-	conn.remote = toPeer
-
-	return nil
 }
 
 func checkHandshakeStringField(fieldName string, expectedValue string, handshake map[string]string) (string, error) {

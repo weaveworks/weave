@@ -50,8 +50,8 @@ func (conn *LocalConnection) ensureForwarders() error {
 	conn.effectivePMTU = forwarder.unverifiedPMTU
 	conn.Unlock()
 
-	go forwarder.Run()
-	go forwarderDF.Run()
+	forwarder.Start()
+	forwarderDF.Start()
 
 	return nil
 }
@@ -204,7 +204,11 @@ func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, stop <-chan 
 	return fwd
 }
 
-func (fwd *Forwarder) Run() {
+func (fwd *Forwarder) Start() {
+	go fwd.run()
+}
+
+func (fwd *Forwarder) run() {
 	defer fwd.udpSender.Shutdown()
 	var flushed, ok bool
 	var frame *ForwardedFrame

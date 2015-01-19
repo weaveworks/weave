@@ -18,23 +18,8 @@ const macMaxAge = 10 * time.Minute // [1]
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
-	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
-		log.Println("Expired MAC", mac, "at", peer.Name)
-	}
-	onPeerGC := func(peer *Peer) {
-		log.Println("Removing unreachable", peer)
-	}
-	router := newRouter(iface, name, password, connLimit, bufSz, logFrame, onMacExpiry, onPeerGC)
-	router.NewGossip(TopologyGossipCh, router)
-	router.Ourself.Start()
-
-	return router
-}
-
-func newRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet), onMacExpiry func(mac net.HardwareAddr, peer *Peer), onPeerGC func(peer *Peer)) *Router {
 	router := &Router{
 		Iface:          iface,
-		Macs:           NewMacCache(macMaxAge, onMacExpiry),
 		GossipChannels: make(map[uint32]*GossipChannel),
 		ConnLimit:      connLimit,
 		BufSz:          bufSz,
@@ -42,14 +27,20 @@ func newRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	if len(password) > 0 {
 		router.Password = &password
 	}
+	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
+		log.Println("Expired MAC", mac, "at", peer.Name)
+	}
+	onPeerGC := func(peer *Peer) {
+		log.Println("Removing unreachable", peer)
+	}
 	router.Ourself = NewLocalPeer(name, router)
+	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
 	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
+	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
+	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
+	router.NewGossip(TopologyGossipCh, router)
 	return router
-}
-
-func (router *Router) UsingPassword() bool {
-	return router.Password != nil
 }
 
 func (router *Router) Start() {
@@ -58,11 +49,17 @@ func (router *Router) Start() {
 	checkFatal(err)
 	po, err := NewPcapO(router.Iface.Name)
 	checkFatal(err)
-	router.Routes = StartRoutes(router.Ourself.Peer, router.Peers)
-	router.ConnectionMaker = StartConnectionMaker(router.Ourself, router.Peers)
+	router.Ourself.Start()
+	router.Macs.Start()
+	router.Routes.Start()
+	router.ConnectionMaker.Start()
 	router.UDPListener = router.listenUDP(Port, po)
 	router.listenTCP(Port)
 	router.sniff(pio)
+}
+
+func (router *Router) UsingPassword() bool {
+	return router.Password != nil
 }
 
 func (router *Router) Status() string {
@@ -166,7 +163,8 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	remoteAddrStr := tcpConn.RemoteAddr().String()
 	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
 	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr)
-	NewLocalConnection(connRemote, true, tcpConn, nil, router)
+	connLocal := NewLocalConnection(connRemote, tcpConn, nil, router)
+	connLocal.Start(true)
 }
 
 func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {
