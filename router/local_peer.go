@@ -216,9 +216,7 @@ func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
 		conn.CheckFatal(err)
 		return
 	}
-	peer.Lock()
-	peer.connections[toName] = conn
-	peer.Unlock()
+	peer.addConnection(conn)
 	conn.log("connection added")
 }
 
@@ -233,21 +231,12 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	if connFound, found := peer.connections[toName]; !found || connFound != conn {
 		return
 	}
-	peer.Lock()
-	delete(peer.connections, toName)
-	peer.Unlock()
+	peer.deleteConnection(conn)
 	conn.log("connection deleted")
-	broadcast := false
-	if conn.Established() {
-		peer.Lock()
-		peer.version += 1
-		peer.Unlock()
-		broadcast = true
-	}
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
 	peer.Router.Peers.GarbageCollect()
-	if broadcast {
+	if conn.Established() {
 		peer.broadcastPeerUpdate()
 	}
 }
@@ -260,9 +249,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 		conn.CheckFatal(fmt.Errorf("Cannot set unknown connection active"))
 		return
 	}
-	peer.Lock()
-	peer.version += 1
-	peer.Unlock()
+	peer.connectionEstablished(conn)
 	conn.log("connection fully established")
 	peer.broadcastPeerUpdate(conn.Remote())
 }
@@ -271,6 +258,28 @@ func (peer *LocalPeer) handleBroadcastTCP(msg []byte) {
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
 		conn.(*LocalConnection).SendTCP(msg)
 	})
+}
+
+func (peer *LocalPeer) addConnection(conn Connection) {
+	peer.Lock()
+	peer.connections[conn.Remote().Name] = conn
+	peer.Unlock()
+}
+
+func (peer *LocalPeer) deleteConnection(conn Connection) {
+	established := conn.Established()
+	peer.Lock()
+	delete(peer.connections, conn.Remote().Name)
+	if established {
+		peer.version += 1
+	}
+	peer.Unlock()
+}
+
+func (peer *LocalPeer) connectionEstablished(conn Connection) {
+	peer.Lock()
+	peer.version += 1
+	peer.Unlock()
 }
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
