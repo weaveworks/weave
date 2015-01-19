@@ -16,6 +16,23 @@ type Routes struct {
 	queryChan chan<- *Interaction
 }
 
+func NewRoutes(ourself *Peer, peers *Peers) *Routes {
+	routes := &Routes{
+		ourself:   ourself,
+		peers:     peers,
+		unicast:   make(map[PeerName]PeerName),
+		broadcast: make(map[PeerName][]PeerName)}
+	routes.unicast[ourself.Name] = UnknownPeerName
+	routes.broadcast[ourself.Name] = []PeerName{}
+	return routes
+}
+
+func (routes *Routes) Start() {
+	queryChan := make(chan *Interaction, ChannelSize)
+	routes.queryChan = queryChan
+	go routes.queryLoop(queryChan)
+}
+
 func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
 	routes.RLock()
 	defer routes.RUnlock()
@@ -46,20 +63,6 @@ func (routes *Routes) String() string {
 		buf.WriteString(fmt.Sprintf("%s -> %v\n", name, hops))
 	}
 	return buf.String()
-}
-
-func StartRoutes(ourself *Peer, peers *Peers) *Routes {
-	queryChan := make(chan *Interaction, ChannelSize)
-	state := &Routes{
-		ourself:   ourself,
-		peers:     peers,
-		unicast:   make(map[PeerName]PeerName),
-		broadcast: make(map[PeerName][]PeerName),
-		queryChan: queryChan}
-	state.unicast[ourself.Name] = UnknownPeerName
-	state.broadcast[ourself.Name] = []PeerName{}
-	go state.queryLoop(queryChan)
-	return state
 }
 
 // ACTOR client API

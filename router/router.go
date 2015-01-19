@@ -33,16 +33,12 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	if len(password) > 0 {
 		router.Password = &password
 	}
-	router.Ourself = StartLocalPeer(name, router)
+	router.Ourself = NewLocalPeer(name, router)
 	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
-	log.Println("Our name is", router.Ourself.Name)
-
+	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
+	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
 	return router
-}
-
-func (router *Router) UsingPassword() bool {
-	return router.Password != nil
 }
 
 func (router *Router) Start() {
@@ -51,11 +47,16 @@ func (router *Router) Start() {
 	checkFatal(err)
 	po, err := NewPcapO(router.Iface.Name)
 	checkFatal(err)
-	router.Routes = StartRoutes(router.Ourself.Peer, router.Peers)
-	router.ConnectionMaker = StartConnectionMaker(router.Ourself, router.Peers)
+	router.Ourself.Start()
+	router.Routes.Start()
+	router.ConnectionMaker.Start()
 	router.UDPListener = router.listenUDP(Port, po)
 	router.listenTCP(Port)
 	router.sniff(pio)
+}
+
+func (router *Router) UsingPassword() bool {
+	return router.Password != nil
 }
 
 func (router *Router) Status() string {
@@ -159,7 +160,8 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	remoteAddrStr := tcpConn.RemoteAddr().String()
 	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
 	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr)
-	NewLocalConnection(connRemote, true, tcpConn, nil, router)
+	connLocal := NewLocalConnection(connRemote, tcpConn, nil, router)
+	connLocal.Start(true)
 }
 
 func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {

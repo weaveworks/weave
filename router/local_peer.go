@@ -17,12 +17,14 @@ type PeerInteraction struct {
 	payload interface{}
 }
 
-func StartLocalPeer(name PeerName, router *Router) *LocalPeer {
-	peer := &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
+func NewLocalPeer(name PeerName, router *Router) *LocalPeer {
+	return &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
+}
+
+func (peer *LocalPeer) Start() {
 	queryChan := make(chan *PeerInteraction, ChannelSize)
 	peer.queryChan = queryChan
 	go peer.queryLoop(queryChan)
-	return peer
 }
 
 func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
@@ -106,7 +108,8 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 		return err
 	}
 	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String())
-	NewLocalConnection(connRemote, acceptNewPeer, tcpConn, udpAddr, peer.Router)
+	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.Router)
+	connLocal.Start(acceptNewPeer)
 	return nil
 }
 
