@@ -73,7 +73,7 @@ func (conn *mockConnection) Established() bool     { return true }
 
 func AssertEmpty(t *testing.T, array []*Peer, desc string) {
 	if len(array) != 0 {
-		t.Fatalf("%s: Expected empty %s but got %s", wt.CallSite(2), desc, array)
+		wt.Fatalf(t, "Expected empty %s but got %s", desc, array)
 	}
 }
 
@@ -88,11 +88,11 @@ func checkPeerArray(t *testing.T, peers []*Peer, routers []*Router) {
 		if _, found := check[name]; found {
 			delete(check, name)
 		} else {
-			t.Fatalf("%s: Expected peer not found %s", wt.CallSite(2), name)
+			wt.Fatalf(t, "Expected peer not found %s", name)
 		}
 	}
 	if len(check) > 0 {
-		t.Fatalf("%s: Unexpected peers: %v", wt.CallSite(2), check)
+		wt.Fatalf(t, "Unexpected peers: %v", check)
 	}
 }
 

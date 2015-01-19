@@ -52,11 +52,11 @@ func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Co
 		if _, found := checkConns[remoteName]; found {
 			delete(checkConns, remoteName)
 		} else {
-			t.Fatalf("%s: Unexpected connection from %s to %s", wt.CallSite(3), ourName, remoteName)
+			wt.Fatalf(t, "Unexpected connection from %s to %s", ourName, remoteName)
 		}
 	}
 	if len(checkConns) > 0 {
-		t.Fatalf("%s: Expected connections not found: from %s to %v", wt.CallSite(3), ourName, checkConns)
+		t.Fatalf("Expected connections not found: from %s to %v\n%s", ourName, checkConns, wt.StackTrace())
 	}
 }
 
@@ -71,11 +71,11 @@ func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
 			checkEqualConns(t, name, peer.connections, wantedPeer.connections)
 			delete(check, name)
 		} else {
-			t.Fatalf("%s: Unexpected peer: %s", wt.CallSite(2), name)
+			t.Fatalf("Unexpected peer: %s\n%s", name, wt.StackTrace())
 		}
 	}
 	if len(check) > 0 {
-		t.Fatalf("%s: Expected peers not found: %v", wt.CallSite(2), check)
+		t.Fatalf("Expected peers not found: %v\n%s", check, wt.StackTrace())
 	}
 }
 
