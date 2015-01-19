@@ -5,6 +5,7 @@ import (
 	"fmt"
 	wt "github.com/zettio/weave/testing"
 	"testing"
+	"time"
 )
 
 type mockChannelConnection struct {
@@ -79,6 +80,12 @@ func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
 }
 
 func TestGossipTopology(t *testing.T) {
+	wt.RunWithTimeout(t, 1*time.Second, func() {
+		implTestGossipTopology(t)
+	})
+}
+
+func implTestGossipTopology(t *testing.T) {
 	const (
 		peer1NameString = "01:00:00:01:00:00"
 		peer2NameString = "02:00:00:02:00:00"

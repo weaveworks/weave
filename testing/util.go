@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func CallSite(level int) string {
@@ -73,4 +74,26 @@ func AssertType(t *testing.T, got interface{}, wanted interface{}, desc string) 
 	if gotT != wantedT {
 		t.Fatalf("%s: Expected %s but got %s (%s)", CallSite(2), wantedT.String(), gotT.String(), desc)
 	}
+}
+
+func StackTraceAll() string {
+	buf := make([]byte, 1<<20)
+	stacklen := runtime.Stack(buf, true)
+	return string(buf[:stacklen])
+}
+
+// Borrowed from net/http tests:
+// goTimeout runs f, failing t if f takes more than d to complete.
+func RunWithTimeout(t *testing.T, d time.Duration, f func()) {
+	ch := make(chan bool, 2)
+	timer := time.AfterFunc(d, func() {
+		t.Errorf("Timeout expired after %v: stacks:\n%s", d, StackTraceAll())
+		ch <- true
+	})
+	defer timer.Stop()
+	go func() {
+		defer func() { ch <- true }()
+		f()
+	}()
+	<-ch
 }
