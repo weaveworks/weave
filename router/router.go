@@ -18,22 +18,22 @@ const macMaxAge = 10 * time.Minute // [1]
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
-	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
-		log.Println("Expired MAC", mac, "at", peer.Name)
-	}
-	onPeerGC := func(peer *Peer) {
-		log.Println("Removing unreachable", peer)
-	}
 	router := &Router{
 		Iface:     iface,
-		Macs:      NewMacCache(macMaxAge, onMacExpiry),
 		ConnLimit: connLimit,
 		BufSz:     bufSz,
 		LogFrame:  logFrame}
 	if len(password) > 0 {
 		router.Password = &password
 	}
+	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
+		log.Println("Expired MAC", mac, "at", peer.Name)
+	}
+	onPeerGC := func(peer *Peer) {
+		log.Println("Removing unreachable", peer)
+	}
 	router.Ourself = NewLocalPeer(name, router)
+	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
 	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
@@ -48,6 +48,7 @@ func (router *Router) Start() {
 	po, err := NewPcapO(router.Iface.Name)
 	checkFatal(err)
 	router.Ourself.Start()
+	router.Macs.Start()
 	router.Routes.Start()
 	router.ConnectionMaker.Start()
 	router.UDPListener = router.listenUDP(Port, po)
