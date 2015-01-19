@@ -57,26 +57,8 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 }
 
 func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
-	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
-	if len(nextHops) == 0 {
-		return nil
-	}
-	// We must not hold a read lock on peer during the conn.Forward
-	// below, since that is a potentially blocking operation (e.g. if
-	// the channel is full).
-	nextConns := make([]*LocalConnection, 0, len(nextHops))
-	peer.RLock()
-	for _, hopName := range nextHops {
-		conn, found := peer.connections[hopName]
-		// Again, !found could just be due to a race.
-		if found {
-			nextConns = append(nextConns, conn.(*LocalConnection))
-		}
-	}
-	peer.RUnlock()
-	var err error
-	for _, conn := range nextConns {
-		err = conn.Forward(df, &ForwardedFrame{
+	for _, conn := range peer.NextBroadcastHops(srcPeer) {
+		err := conn.Forward(df, &ForwardedFrame{
 			srcPeer: srcPeer,
 			dstPeer: conn.Remote(),
 			frame:   frame},
@@ -86,6 +68,24 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec 
 		}
 	}
 	return nil
+}
+
+func (peer *LocalPeer) NextBroadcastHops(srcPeer *Peer) []*LocalConnection {
+	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
+	if len(nextHops) == 0 {
+		return nil
+	}
+	nextConns := make([]*LocalConnection, 0, len(nextHops))
+	peer.RLock()
+	defer peer.RUnlock()
+	for _, hopName := range nextHops {
+		conn, found := peer.connections[hopName]
+		// Again, !found could just be due to a race.
+		if found {
+			nextConns = append(nextConns, conn.(*LocalConnection))
+		}
+	}
+	return nextConns
 }
 
 func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) error {
