@@ -10,11 +10,6 @@ type UDPPacket struct {
 	Sender *net.UDPAddr
 }
 
-type LocalAddress struct {
-	ip      net.IP
-	network *net.IPNet
-}
-
 type ForwardedFrame struct {
 	srcPeer *Peer
 	dstPeer *Peer
