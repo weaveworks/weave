@@ -250,7 +250,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 
 func (peer *LocalPeer) handleSendProtocolMsg(m ProtocolMsg) {
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
-		conn.(*LocalConnection).SendProtocolMsg(m)
+		conn.(ProtocolSender).SendProtocolMsg(m)
 	})
 }
 

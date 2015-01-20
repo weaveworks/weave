@@ -21,3 +21,7 @@ type ProtocolMsg struct {
 	tag ProtocolTag
 	msg []byte
 }
+
+type ProtocolSender interface {
+	SendProtocolMsg(m ProtocolMsg)
+}
