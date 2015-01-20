@@ -17,6 +17,20 @@ const macMaxAge = 10 * time.Minute // [1]
 // [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
+type Router struct {
+	Iface           *net.Interface
+	Ourself         *LocalPeer
+	Macs            *MacCache
+	Peers           *Peers
+	Routes          *Routes
+	ConnectionMaker *ConnectionMaker
+	UDPListener     *net.UDPConn
+	Password        *[]byte
+	ConnLimit       int
+	BufSz           int
+	LogFrame        func(string, []byte, *layers.Ethernet)
+}
+
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
 	router := &Router{
 		Iface:     iface,

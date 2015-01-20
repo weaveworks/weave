@@ -1,23 +1,8 @@
 package router
 
 import (
-	"code.google.com/p/gopacket/layers"
 	"net"
 )
-
-type Router struct {
-	Iface           *net.Interface
-	Ourself         *LocalPeer
-	Macs            *MacCache
-	Peers           *Peers
-	Routes          *Routes
-	ConnectionMaker *ConnectionMaker
-	UDPListener     *net.UDPConn
-	Password        *[]byte
-	ConnLimit       int
-	BufSz           int
-	LogFrame        func(string, []byte, *layers.Ethernet)
-}
 
 type UDPPacket struct {
 	Name   PeerName
