@@ -343,5 +343,3 @@ func (router *Router) OnGossip(buf []byte) []byte {
 	router.Routes.Recalculate()
 	return newUpdate
 }
-
-// todo: worry about the old behaviour which sent a subset of the graph

@@ -41,7 +41,7 @@ func (r1 *Router) AddTestConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := &mockConnection{toPeer, ""}
+	conn := &mockConnection{r1.Ourself.Peer, toPeer, ""}
 	r1.Ourself.addConnection(conn)
 	r1.Ourself.connectionEstablished(conn)
 }
@@ -65,11 +65,12 @@ func (r1 *Router) DeleteTestConnection(r2 *Router) {
 }
 
 type mockConnection struct {
+	local         *Peer
 	remote        *Peer
 	remoteTCPAddr string // we are not currently checking the TCP address
 }
 
-func (conn *mockConnection) Local() *Peer          { return nil }
+func (conn *mockConnection) Local() *Peer          { return conn.local }
 func (conn *mockConnection) Remote() *Peer         { return conn.remote }
 func (conn *mockConnection) RemoteTCPAddr() string { return "" }
 func (conn *mockConnection) Shutdown(error)        {}
@@ -105,7 +106,7 @@ func rs(routers ...*Router) []*Router { return routers }
 func cs(routers ...*Router) []Connection {
 	ret := make([]Connection, len(routers))
 	for i, r := range routers {
-		ret[i] = &mockConnection{r.Ourself.Peer, ""}
+		ret[i] = &mockConnection{nil, r.Ourself.Peer, ""}
 	}
 	return ret
 }

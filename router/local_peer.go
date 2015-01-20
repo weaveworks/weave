@@ -241,16 +241,17 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	}
 }
 
-func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
+func (peer *LocalPeer) handleConnectionEstablished(conn Connection) {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Peer informed of active connection where peer is not the source of connection")
 	}
 	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
-		conn.CheckFatal(fmt.Errorf("Cannot set unknown connection active"))
+		conn.Shutdown(fmt.Errorf("Cannot set unknown connection active"))
 		return
 	}
 	peer.connectionEstablished(conn)
-	conn.log("connection fully established")
+	log.Printf("->[%s]: connection fully established", conn.Remote().Name)
+	peer.Router.SendAllGossipDown(conn)
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 
@@ -284,8 +285,7 @@ func (peer *LocalPeer) connectionEstablished(conn Connection) {
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
-	// Sending everything; previous implementation optimised to just new peers
-	peer.Router.SendGossip(TopologyGossipCh, peer.Router.Peers.EncodeAllPeers())
+	peer.Router.SendGossip(TopologyGossipCh, EncodePeers(append(peers, peer.Peer)...))
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {
