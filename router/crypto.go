@@ -85,7 +85,8 @@ func EncodeNonce(df bool) (*[24]byte, []byte, error) {
 		flags = flags | 1
 	}
 	SetNonceLow15Bits(&nonce, flags)
-	return &nonce, nonce[:], nil
+	// NB: need to make a copy since callers may modify the array
+	return &nonce, Concat(nonce[:]), nil
 }
 
 func DecodeNonce(msg []byte) (bool, *[24]byte) {
