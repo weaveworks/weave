@@ -269,6 +269,11 @@ type NaClDecryptorInstance struct {
 	nonceChan           chan *[24]byte
 }
 
+type PacketDecodingError struct {
+	Fatal bool
+	Desc  string
+}
+
 func NewNonDecryptor(conn *LocalConnection) *NonDecryptor {
 	return &NonDecryptor{conn: conn}
 }

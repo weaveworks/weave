@@ -16,6 +16,13 @@ type Peers struct {
 	onGC    func(*Peer)
 }
 
+type UnknownPeersError struct {
+}
+
+type NameCollisionError struct {
+	Name PeerName
+}
+
 func NewPeers(ourself *Peer, macs *MacCache, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,

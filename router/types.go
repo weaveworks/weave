@@ -10,26 +10,6 @@ type UDPPacket struct {
 	Sender *net.UDPAddr
 }
 
-type MsgTooBigError struct {
-	PMTU int // actual pmtu, i.e. what the kernel told us
-}
-
-type FrameTooBigError struct {
-	EPMTU int // effective pmtu, i.e. what we tell packet senders
-}
-
-type UnknownPeersError struct {
-}
-
-type NameCollisionError struct {
-	Name PeerName
-}
-
-type PacketDecodingError struct {
-	Fatal bool
-	Desc  string
-}
-
 type LocalAddress struct {
 	ip      net.IP
 	network *net.IPNet

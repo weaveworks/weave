@@ -26,6 +26,10 @@ type RawUDPSender struct {
 	conn      *LocalConnection
 }
 
+type MsgTooBigError struct {
+	PMTU int // actual pmtu, i.e. what the kernel told us
+}
+
 func NewSimpleUDPSender(conn *LocalConnection) *SimpleUDPSender {
 	return &SimpleUDPSender{udpConn: conn.Router.UDPListener, conn: conn}
 }

@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+type FrameTooBigError struct {
+	EPMTU int // effective pmtu, i.e. what we tell packet senders
+}
+
 func (conn *LocalConnection) ensureForwarders() error {
 	if conn.forwardChan != nil || conn.forwardChanDF != nil {
 		return nil
