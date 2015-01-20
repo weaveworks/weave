@@ -7,6 +7,11 @@ import (
 	"net"
 )
 
+type Interaction struct {
+	code       int
+	resultChan chan<- interface{}
+}
+
 func checkFatal(e error) {
 	if e != nil {
 		log.Fatal(e)
