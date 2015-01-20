@@ -11,6 +11,8 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"net"
+	"sync"
 )
 
 func GenerateKeyPair() (publicKey, privateKey *[32]byte, err error) {
@@ -98,6 +100,34 @@ func DecodeNonce(msg []byte) (bool, *[24]byte) {
 }
 
 // Frame Encryptors
+
+type Encryptor interface {
+	FrameOverhead() int
+	PacketOverhead() int
+	IsEmpty() bool
+	Bytes() []byte
+	AppendFrame(*ForwardedFrame)
+	TotalLen() int
+}
+
+type NonEncryptor struct {
+	buf       []byte
+	bufTail   []byte
+	buffered  int
+	prefixLen int
+}
+
+type NaClEncryptor struct {
+	NonEncryptor
+	buf       []byte
+	offset    uint16
+	nonce     *[24]byte
+	nonceChan chan *[24]byte
+	flags     uint16
+	prefixLen int
+	conn      *LocalConnection
+	df        bool
+}
 
 func NewNonEncryptor(prefix []byte) *NonEncryptor {
 	buf := make([]byte, MaxUDPPacketSize)
@@ -211,6 +241,33 @@ func (ne *NaClEncryptor) TotalLen() int {
 }
 
 // Frame Decryptors
+
+type FrameConsumer func(*LocalConnection, *net.UDPAddr, []byte, []byte, uint16, []byte) error
+
+type Decryptor interface {
+	IterateFrames(FrameConsumer, *UDPPacket) error
+	ReceiveNonce([]byte)
+	Shutdown()
+}
+
+type NonDecryptor struct {
+	conn *LocalConnection
+}
+
+type NaClDecryptor struct {
+	NonDecryptor
+	instance   *NaClDecryptorInstance
+	instanceDF *NaClDecryptorInstance
+}
+
+type NaClDecryptorInstance struct {
+	nonce               *[24]byte
+	previousNonce       *[24]byte
+	usedOffsets         *bit.Set
+	previousUsedOffsets *bit.Set
+	highestOffsetSeen   uint16
+	nonceChan           chan *[24]byte
+}
 
 func NewNonDecryptor(conn *LocalConnection) *NonDecryptor {
 	return &NonDecryptor{conn: conn}
@@ -378,6 +435,28 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 
 // TCP Senders
 
+type TCPSender interface {
+	Send([]byte) error
+}
+
+type SimpleTCPSender struct {
+	encoder *gob.Encoder
+}
+
+type EncryptedTCPSender struct {
+	sync.RWMutex
+	outerEncoder *gob.Encoder
+	innerEncoder *gob.Encoder
+	buffer       *bytes.Buffer
+	conn         *LocalConnection
+	msgCount     int
+}
+
+type EncryptedTCPMessage struct {
+	Number int
+	Body   []byte
+}
+
 func NewSimpleTCPSender(encoder *gob.Encoder) *SimpleTCPSender {
 	return &SimpleTCPSender{encoder: encoder}
 }
@@ -416,6 +495,20 @@ func (sender *EncryptedTCPSender) Send(msg []byte) error {
 }
 
 // TCP Receivers
+
+type TCPReceiver interface {
+	Decode([]byte) ([]byte, error)
+}
+
+type SimpleTCPReceiver struct {
+}
+
+type EncryptedTCPReceiver struct {
+	conn     *LocalConnection
+	decoder  *gob.Decoder
+	buffer   *bytes.Buffer
+	msgCount int
+}
 
 func NewSimpleTCPReceiver() *SimpleTCPReceiver {
 	return &SimpleTCPReceiver{}
