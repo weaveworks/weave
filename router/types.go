@@ -1,11 +1,5 @@
 package router
 
-type ForwardedFrame struct {
-	srcPeer *Peer
-	dstPeer *Peer
-	frame   []byte
-}
-
 type Interaction struct {
 	code       int
 	resultChan chan<- interface{}

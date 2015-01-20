@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+type ForwardedFrame struct {
+	srcPeer *Peer
+	dstPeer *Peer
+	frame   []byte
+}
+
 type FrameTooBigError struct {
 	EPMTU int // effective pmtu, i.e. what we tell packet senders
 }
