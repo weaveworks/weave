@@ -1,7 +1,6 @@
 package router
 
 import (
-	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
 	"net"
 	"sync"
@@ -87,13 +86,6 @@ type UDPPacket struct {
 	Name   PeerName
 	Packet []byte
 	Sender *net.UDPAddr
-}
-
-type EthernetDecoder struct {
-	eth     layers.Ethernet
-	ip      layers.IPv4
-	decoded []gopacket.LayerType
-	parser  *gopacket.DecodingLayerParser
 }
 
 type MsgTooBigError struct {
