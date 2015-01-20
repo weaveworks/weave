@@ -66,22 +66,6 @@ type ConnectionInteraction struct {
 	payload interface{}
 }
 
-type Forwarder struct {
-	conn            *LocalConnection
-	ch              <-chan *ForwardedFrame
-	stop            <-chan interface{}
-	verifyPMTUTick  <-chan time.Time
-	verifyPMTU      <-chan int
-	pmtuVerifyCount uint
-	enc             Encryptor
-	udpSender       UDPSender
-	maxPayload      int
-	pmtuVerified    bool
-	highestGoodPMTU int
-	unverifiedPMTU  int
-	lowestBadPMTU   int
-}
-
 type UDPPacket struct {
 	Name   PeerName
 	Packet []byte
