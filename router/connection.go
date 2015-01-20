@@ -479,6 +479,11 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			// the traffic rather than shutting down.
 			continue
 		}
+		if len(msg) < 1 {
+			conn.log("ignoring blank msg")
+			continue
+		}
+		payload := msg[1:]
 		switch msg[0] {
 		case ProtocolConnectionEstablished:
 			// We sent fast heartbeats to the remote peer, which has
@@ -496,7 +501,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			conn.setStackFrag(true)
 		case ProtocolNonce:
 			if usingPassword {
-				conn.Decryptor.ReceiveNonce(msg[1:])
+				conn.Decryptor.ReceiveNonce(payload)
 			} else {
 				conn.log("ignoring unexpected nonce on unencrypted connection")
 			}
@@ -515,7 +520,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			// out to all its connections an "improved" update.
 			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Peers.EncodeAllPeers()))
 		case ProtocolUpdate:
-			newUpdate, err := conn.Router.Peers.ApplyUpdate(msg[1:])
+			newUpdate, err := conn.Router.Peers.ApplyUpdate(payload)
 			if _, ok := err.(UnknownPeersError); err != nil && ok {
 				// That update contained a peer we didn't know about;
 				// request full update
@@ -531,7 +536,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 				conn.Router.Ourself.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
 			}
 		case ProtocolPMTUVerified:
-			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
+			conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
 		default:
 			conn.log("received unknown msg:\n", msg)
 		}
