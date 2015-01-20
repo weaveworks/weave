@@ -195,6 +195,16 @@ func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {
 	return conn
 }
 
+type UDPPacket struct {
+	Name   PeerName
+	Packet []byte
+	Sender *net.UDPAddr
+}
+
+func (packet UDPPacket) String() string {
+	return fmt.Sprintf("UDP Packet\n name: %s\n sender: %v\n payload: % X", packet.Name, packet.Sender, packet.Packet)
+}
+
 func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 	defer conn.Close()
 	dec := NewEthernetDecoder()

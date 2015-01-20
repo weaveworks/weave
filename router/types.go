@@ -1,15 +1,5 @@
 package router
 
-import (
-	"net"
-)
-
-type UDPPacket struct {
-	Name   PeerName
-	Packet []byte
-	Sender *net.UDPAddr
-}
-
 type ForwardedFrame struct {
 	srcPeer *Peer
 	dstPeer *Peer

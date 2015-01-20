@@ -50,10 +50,6 @@ func (pde PacketDecodingError) Error() string {
 	return fmt.Sprint("Failed to decode packet: ", pde.Desc)
 }
 
-func (packet UDPPacket) String() string {
-	return fmt.Sprintf("UDP Packet\n name: %s\n sender: %v\n payload: % X", packet.Name, packet.Sender, packet.Packet)
-}
-
 func Concat(elems ...[]byte) []byte {
 	res := []byte{}
 	for _, e := range elems {
