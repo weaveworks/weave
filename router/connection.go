@@ -8,8 +8,54 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 )
+
+type Connection interface {
+	Local() *Peer
+	Remote() *Peer
+	RemoteTCPAddr() string
+	Established() bool
+	Shutdown(error)
+}
+
+type RemoteConnection struct {
+	local         *Peer
+	remote        *Peer
+	remoteTCPAddr string
+}
+
+type LocalConnection struct {
+	sync.RWMutex
+	RemoteConnection
+	TCPConn           *net.TCPConn
+	tcpSender         TCPSender
+	remoteUDPAddr     *net.UDPAddr
+	established       bool
+	receivedHeartbeat bool
+	stackFrag         bool
+	effectivePMTU     int
+	SessionKey        *[32]byte
+	heartbeatFrame    *ForwardedFrame
+	heartbeat         *time.Ticker
+	fetchAll          *time.Ticker
+	fragTest          *time.Ticker
+	forwardChan       chan<- *ForwardedFrame
+	forwardChanDF     chan<- *ForwardedFrame
+	stopForward       chan<- interface{}
+	stopForwardDF     chan<- interface{}
+	verifyPMTU        chan<- int
+	Decryptor         Decryptor
+	Router            *Router
+	UID               uint64
+	queryChan         chan<- *ConnectionInteraction
+}
+
+type ConnectionInteraction struct {
+	Interaction
+	payload interface{}
+}
 
 func NewRemoteConnection(from, to *Peer, tcpAddr string) *RemoteConnection {
 	return &RemoteConnection{
