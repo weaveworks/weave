@@ -117,9 +117,9 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 
 const (
 	PAddConnection = iota
-	PBroadcastTCP
 	PDeleteConnection
 	PConnectionEstablished
+	PSendProtocolMsg
 )
 
 // Async: rely on the peer to shut us down if we shouldn't be adding
@@ -147,10 +147,10 @@ func (peer *LocalPeer) ConnectionEstablished(conn *LocalConnection) {
 }
 
 // Async.
-func (peer *LocalPeer) BroadcastTCP(msg []byte) {
+func (peer *LocalPeer) SendProtocolMsg(tag ProtocolMsg, msg []byte) {
 	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PBroadcastTCP},
-		payload:     msg}
+		Interaction: Interaction{code: PSendProtocolMsg},
+		payload:     TaggedProtocolMsg{tag, msg}}
 }
 
 // ACTOR server
@@ -169,8 +169,8 @@ func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
 			query.resultChan <- nil
 		case PConnectionEstablished:
 			peer.handleConnectionEstablished(query.payload.(*LocalConnection))
-		case PBroadcastTCP:
-			peer.handleBroadcastTCP(query.payload.([]byte))
+		case PSendProtocolMsg:
+			peer.handleSendProtocolMsg(query.payload.(TaggedProtocolMsg))
 		}
 	}
 }
@@ -248,9 +248,9 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 
-func (peer *LocalPeer) handleBroadcastTCP(msg []byte) {
+func (peer *LocalPeer) handleSendProtocolMsg(m TaggedProtocolMsg) {
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
-		conn.(*LocalConnection).SendTCP(msg)
+		conn.(*LocalConnection).SendProtocolMsg(m.tag, m.msg)
 	})
 }
 
@@ -278,7 +278,8 @@ func (peer *LocalPeer) connectionEstablished(conn Connection) {
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
-	peer.handleBroadcastTCP(Concat(ProtocolUpdateByte, EncodePeers(append(peers, peer.Peer)...)))
+	update := EncodePeers(append(peers, peer.Peer)...)
+	peer.handleSendProtocolMsg(TaggedProtocolMsg{tag: ProtocolUpdate, msg: update})
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

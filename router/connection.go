@@ -167,7 +167,7 @@ func (conn *LocalConnection) log(args ...interface{}) {
 // ACTOR client API
 
 const (
-	CSendTCP = iota
+	CSendProtocolMsg = iota
 	CSetEstablished
 	CReceivedHeartbeat
 	CShutdown
@@ -200,10 +200,10 @@ func (conn *LocalConnection) SetEstablished() {
 }
 
 // Async
-func (conn *LocalConnection) SendTCP(msg []byte) {
+func (conn *LocalConnection) SendProtocolMsg(tag ProtocolMsg, msg []byte) {
 	conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: CSendTCP},
-		payload:     msg}
+		Interaction: Interaction{code: CSendProtocolMsg},
+		payload:     TaggedProtocolMsg{tag, msg}}
 }
 
 // ACTOR server
@@ -265,16 +265,16 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 				err = conn.handleReceivedHeartbeat(query.payload.(*net.UDPAddr))
 			case CSetEstablished:
 				err = conn.handleSetEstablished()
-			case CSendTCP:
-				err = conn.handleSendTCP(query.payload.([]byte))
+			case CSendProtocolMsg:
+				err = conn.handleSendProtocolMsg(query.payload.(TaggedProtocolMsg))
 			}
 		case <-tickerChan(conn.heartbeat):
 			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fetchAll):
-			err = conn.handleSendTCP(ProtocolFetchAllByte)
+			err = conn.handleSendSimpleProtocolMsg(ProtocolFetchAll)
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
-			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
+			err = conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest)
 		}
 	}
 	return
@@ -295,7 +295,7 @@ func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr)
 	conn.receivedHeartbeat = true
 	conn.Unlock()
 	if !old {
-		if err := conn.handleSendTCP(ProtocolConnectionEstablishedByte); err != nil {
+		if err := conn.handleSendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
 			return err
 		}
 	}
@@ -332,18 +332,22 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	conn.fragTest = time.NewTicker(FragTestInterval)
 	// avoid initial waits for timers to fire
 	conn.Forward(true, conn.heartbeatFrame, nil)
-	if err := conn.handleSendTCP(ProtocolFetchAllByte); err != nil {
+	if err := conn.handleSendSimpleProtocolMsg(ProtocolFetchAll); err != nil {
 		return err
 	}
 	conn.setStackFrag(false)
-	if err := conn.handleSendTCP(ProtocolStartFragmentationTestByte); err != nil {
+	if err := conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (conn *LocalConnection) handleSendTCP(msg []byte) error {
-	return conn.tcpSender.Send(msg)
+func (conn *LocalConnection) handleSendSimpleProtocolMsg(tag ProtocolMsg) error {
+	return conn.handleSendProtocolMsg(TaggedProtocolMsg{tag: tag})
+}
+
+func (conn *LocalConnection) handleSendProtocolMsg(m TaggedProtocolMsg) error {
+	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
 }
 
 func (conn *LocalConnection) handleShutdown() {
@@ -564,13 +568,13 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			// payload is a subset of the receiver's topology, no
 			// further action is taken. Otherwise, the receiver sends
 			// out to all its connections an "improved" update.
-			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Peers.EncodeAllPeers()))
+			conn.SendProtocolMsg(ProtocolUpdate, conn.Router.Peers.EncodeAllPeers())
 		case ProtocolUpdate:
 			newUpdate, err := conn.Router.Peers.ApplyUpdate(payload)
 			if _, ok := err.(UnknownPeersError); err != nil && ok {
 				// That update contained a peer we didn't know about;
 				// request full update
-				conn.SendTCP(ProtocolFetchAllByte)
+				conn.SendProtocolMsg(ProtocolFetchAll, nil)
 				continue
 			}
 			if conn.CheckFatal(err) != nil {
@@ -579,7 +583,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			if len(newUpdate) != 0 {
 				conn.Router.ConnectionMaker.Refresh()
 				conn.Router.Routes.Recalculate()
-				conn.Router.Ourself.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
+				conn.Router.Ourself.SendProtocolMsg(ProtocolUpdate, newUpdate)
 			}
 		case ProtocolPMTUVerified:
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))

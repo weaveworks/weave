@@ -7,6 +7,11 @@ const (
 
 type ProtocolMsg byte
 
+type TaggedProtocolMsg struct {
+	tag ProtocolMsg
+	msg []byte
+}
+
 const (
 	ProtocolConnectionEstablished ProtocolMsg = iota
 	ProtocolFragmentationReceived
@@ -15,14 +20,4 @@ const (
 	ProtocolFetchAll
 	ProtocolUpdate
 	ProtocolPMTUVerified
-)
-
-var (
-	ProtocolConnectionEstablishedByte  = []byte{byte(ProtocolConnectionEstablished)}
-	ProtocolFragmentationReceivedByte  = []byte{byte(ProtocolFragmentationReceived)}
-	ProtocolStartFragmentationTestByte = []byte{byte(ProtocolStartFragmentationTest)}
-	ProtocolNonceByte                  = []byte{byte(ProtocolNonce)}
-	ProtocolFetchAllByte               = []byte{byte(ProtocolFetchAll)}
-	ProtocolUpdateByte                 = []byte{byte(ProtocolUpdate)}
-	ProtocolPMTUVerifiedByte           = []byte{byte(ProtocolPMTUVerified)}
 )
