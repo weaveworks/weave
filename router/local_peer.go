@@ -241,16 +241,16 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	}
 }
 
-func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
+func (peer *LocalPeer) handleConnectionEstablished(conn Connection) {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Peer informed of active connection where peer is not the source of connection")
 	}
 	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
-		conn.CheckFatal(fmt.Errorf("Cannot set unknown connection active"))
+		conn.Shutdown(fmt.Errorf("Cannot set unknown connection active"))
 		return
 	}
 	peer.connectionEstablished(conn)
-	conn.log("connection fully established")
+	log.Printf("->[%s]: connection fully established", conn.Remote().Name)
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 
