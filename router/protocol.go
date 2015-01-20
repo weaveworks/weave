@@ -7,11 +7,6 @@ const (
 
 type ProtocolTag byte
 
-type ProtocolMsg struct {
-	tag ProtocolTag
-	msg []byte
-}
-
 const (
 	ProtocolConnectionEstablished ProtocolTag = iota
 	ProtocolFragmentationReceived
@@ -21,3 +16,8 @@ const (
 	ProtocolUpdate
 	ProtocolPMTUVerified
 )
+
+type ProtocolMsg struct {
+	tag ProtocolTag
+	msg []byte
+}
