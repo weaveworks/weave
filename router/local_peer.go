@@ -251,6 +251,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn Connection) {
 	}
 	peer.connectionEstablished(conn)
 	log.Printf("->[%s]: connection fully established", conn.Remote().Name)
+	peer.Router.SendAllGossipDown(conn)
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 
@@ -284,8 +285,7 @@ func (peer *LocalPeer) connectionEstablished(conn Connection) {
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
-	// Sending everything; previous implementation optimised to just new peers
-	peer.Router.SendGossip(TopologyGossipCh, peer.Router.Peers.EncodeAllPeers())
+	peer.Router.SendGossip(TopologyGossipCh, EncodePeers(append(peers, peer.Peer)...))
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

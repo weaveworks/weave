@@ -53,11 +53,22 @@ func (router *Router) SendGossip(channelName string, msg []byte) {
 	}
 }
 
+func (router *Router) SendAllGossipDown(conn Connection) {
+	for _, c := range router.GossipChannels {
+		gossip := c.gossiper.Gossip()
+		c.send(gossip, conn)
+	}
+}
+
+func (c *GossipChannel) send(buf []byte, conn Connection) {
+	msg := Concat([]byte{ProtocolGossip}, GobEncode(c.hash, c.ourself.Name, buf))
+	conn.(ConnectionSender).SendTCP(msg)
+}
+
 func (c *GossipChannel) GossipMsg(buf []byte) {
 	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
 		if conn.Established() {
-			msg := Concat([]byte{ProtocolGossip}, GobEncode(c.hash, c.ourself.Name, buf))
-			conn.(ConnectionSender).SendTCP(msg)
+			c.send(buf, conn)
 		}
 	})
 }
