@@ -31,6 +31,19 @@ type Router struct {
 	LogFrame        func(string, []byte, *layers.Ethernet)
 }
 
+type PacketSource interface {
+	ReadPacket() ([]byte, error)
+}
+
+type PacketSink interface {
+	WritePacket([]byte) error
+}
+
+type PacketSourceSink interface {
+	PacketSource
+	PacketSink
+}
+
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
 	router := &Router{
 		Iface:     iface,
