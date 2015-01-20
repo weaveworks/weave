@@ -42,11 +42,13 @@ func (r1 *Router) AddTestChannelConnection(r2 *Router) {
 
 // Create a remote Peer object plus all of its connections, based on the name and UIDs of existing routers
 func tp(r *Router, routers ...*Router) *Peer {
-	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, r.Ourself.Peer.version)
+	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, 0)
+	connections := make(map[PeerName]Connection)
 	for _, r2 := range routers {
 		p2 := NewPeer(r2.Ourself.Peer.Name, r2.Ourself.Peer.UID, r2.Ourself.Peer.version)
-		peer.connections[r2.Ourself.Peer.Name] = &mockConnection{p2, ""}
+		connections[r2.Ourself.Peer.Name] = &mockConnection{p2, ""}
 	}
+	peer.SetVersionAndConnections(r.Ourself.Peer.version, connections)
 	return peer
 }
 
