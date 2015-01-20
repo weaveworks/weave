@@ -5,8 +5,10 @@ const (
 	ProtocolVersion = 10
 )
 
+type ProtocolMsg byte
+
 const (
-	ProtocolConnectionEstablished = iota
+	ProtocolConnectionEstablished ProtocolMsg = iota
 	ProtocolFragmentationReceived
 	ProtocolStartFragmentationTest
 	ProtocolNonce
@@ -16,11 +18,11 @@ const (
 )
 
 var (
-	ProtocolConnectionEstablishedByte  = []byte{ProtocolConnectionEstablished}
-	ProtocolFragmentationReceivedByte  = []byte{ProtocolFragmentationReceived}
-	ProtocolStartFragmentationTestByte = []byte{ProtocolStartFragmentationTest}
-	ProtocolNonceByte                  = []byte{ProtocolNonce}
-	ProtocolFetchAllByte               = []byte{ProtocolFetchAll}
-	ProtocolUpdateByte                 = []byte{ProtocolUpdate}
-	ProtocolPMTUVerifiedByte           = []byte{ProtocolPMTUVerified}
+	ProtocolConnectionEstablishedByte  = []byte{byte(ProtocolConnectionEstablished)}
+	ProtocolFragmentationReceivedByte  = []byte{byte(ProtocolFragmentationReceived)}
+	ProtocolStartFragmentationTestByte = []byte{byte(ProtocolStartFragmentationTest)}
+	ProtocolNonceByte                  = []byte{byte(ProtocolNonce)}
+	ProtocolFetchAllByte               = []byte{byte(ProtocolFetchAll)}
+	ProtocolUpdateByte                 = []byte{byte(ProtocolUpdate)}
+	ProtocolPMTUVerifiedByte           = []byte{byte(ProtocolPMTUVerified)}
 )

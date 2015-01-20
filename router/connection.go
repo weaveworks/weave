@@ -530,7 +530,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			continue
 		}
 		payload := msg[1:]
-		switch msg[0] {
+		switch ProtocolMsg(msg[0]) {
 		case ProtocolConnectionEstablished:
 			// We sent fast heartbeats to the remote peer, which has
 			// now received at least one of them and told us via this
