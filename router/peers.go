@@ -57,16 +57,16 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
-// Merge an incoming update with our own topology model, and
+// Merge an incoming update with our own topology, and
 // create an "improved" update:
-//  - elements which the original payload added to the
-//    receiver are included
-//  - elements which the original payload updated in the
-//    receiver are included
-//  - elements which are equal between the receiver and
-//    the payload are not included
-//  - elements where the payload was older than the
-//    receiver's version are updated
+// - elements which the original payload added to the receiver are
+//   included
+// - elements which the original payload updated in the receiver are
+//   included
+// - elements which are equal between the receiver and the payload are
+//   not included
+// - elements where the payload was older than the receiver's version
+//   are updated
 func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
 	peers.Lock()
 
@@ -122,9 +122,37 @@ func (peers *Peers) String() string {
 	peers.ForEach(func(name PeerName, peer *Peer) {
 		buf.WriteString(fmt.Sprint(peer, "\n"))
 		peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
-			buf.WriteString(fmt.Sprintf("   -> %v [%v]\n", remoteName, conn.RemoteTCPAddr()))
+			established := ""
+			if !conn.Established() {
+				established = " (unestablished)"
+			}
+			buf.WriteString(fmt.Sprintf("   -> %v [%v%s]\n", remoteName, conn.RemoteTCPAddr(), established))
 		})
 	})
+	return buf.String()
+}
+
+func (peers *Peers) JsonString() string {
+	var buf bytes.Buffer
+	buf.WriteString("{\"topology\": [\n")
+	firstPeer := true
+	peers.ForEach(func(name PeerName, peer *Peer) {
+		if !firstPeer {
+			buf.WriteString(",\n")
+		}
+		firstPeer = false
+		buf.WriteString(fmt.Sprintf("  { \"name\" : \"%s\", \"connections\" : [", name))
+		firstConn := true
+		peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
+			if !firstConn {
+				buf.WriteString(",")
+			}
+			firstConn = false
+			buf.WriteString(fmt.Sprintf("\n    { \"remoteName\": \"%s\", \"tcpAddr\": \"%s\", \"established\": \"%t\" }", remoteName, conn.RemoteTCPAddr(), conn.Established()))
+		})
+		buf.WriteString(" ] }")
+	})
+	buf.WriteString("\n]}")
 	return buf.String()
 }
 

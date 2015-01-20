@@ -155,6 +155,10 @@ func handleHttp(router *weave.Router, alloc *ipam.Allocator) {
 		io.WriteString(w, router.Status())
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
+	http.HandleFunc("/topo-json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		io.WriteString(w, router.Peers.JsonString())
+	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
@@ -178,8 +182,8 @@ func handleSignals(router *weave.Router) {
 		sig := <-sigs
 		switch sig {
 		case syscall.SIGQUIT:
-			runtime.Stack(buf, true)
-			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+			stacklen := runtime.Stack(buf, true)
+			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
 		case syscall.SIGUSR1:
 			log.Printf("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", router.Status())
 		}

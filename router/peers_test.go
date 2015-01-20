@@ -29,16 +29,16 @@ func (a byName) Less(i, j int) bool { return a[i].name < a[j].name }
 
 func AssertEqualPN(t *testing.T, got, wanted PeerName, desc string) {
 	if got != wanted {
-		t.Fatalf("%s: Expected %s %s but got %s", wt.CallSite(4), desc, wanted, got)
+		wt.Fatalf(t, "Expected %s %s but got %s", desc, wanted, got)
 	}
 }
 
 func checkPeerDetails(t *testing.T, got *decodedPeerInfo, wanted *Peer) {
 	AssertEqualPN(t, got.name, wanted.Name, "Peer Name")
-	wt.AssertEqualuint64(t, got.uid, wanted.UID, "Peer UID", 4)
+	wt.AssertEqualuint64(t, got.uid, wanted.UID, "Peer UID")
 	//Not checking the version because I haven't synthesised the data independently
 	//and the 'real' version is often out of sync with another peers' view of it
-	//wt.AssertEqualuint64(t, got.version, wanted.version, "Peer version", 4)
+	//wt.AssertEqualuint64(t, got.version, wanted.version, "Peer version")
 }
 
 func checkConnsEncoding(t *testing.T, ourName PeerName, connsBuf []byte, connections []Connection) {
@@ -51,11 +51,11 @@ func checkConnsEncoding(t *testing.T, ourName PeerName, connsBuf []byte, connect
 		if _, found := checkConns[remoteName]; found {
 			delete(checkConns, remoteName)
 		} else {
-			t.Fatalf("%s: Unexpected connection decoded from %s to %s", wt.CallSite(5), ourName, remoteName)
+			wt.Fatalf(t, "Unexpected connection decoded from %s to %s", ourName, remoteName)
 		}
 	})
 	if len(checkConns) > 0 {
-		t.Fatalf("%s: Expected connections not found: from %s to %v", wt.CallSite(3), ourName, checkConns)
+		wt.Fatalf(t, "Expected connections not found: from %s to %v", ourName, checkConns)
 	}
 }
 
@@ -66,7 +66,7 @@ func decodePeerInfo(t *testing.T, decoder *gob.Decoder) []*decodedPeerInfo {
 		if decErr == io.EOF {
 			break
 		} else if decErr != nil {
-			t.Fatalf("%s: Error when decoding peer (%s)", wt.CallSite(2), decErr)
+			wt.Fatalf(t, "Error when decoding peer (%s)", decErr)
 		}
 		peerInfo = append(peerInfo, &decodedPeerInfo{PeerNameFromBin(nameByte), uid, version, connsBuf})
 	}
@@ -77,7 +77,7 @@ func checkBlank(t *testing.T, update []byte) {
 	decoder := gob.NewDecoder(bytes.NewReader(update))
 	peerInfo := decodePeerInfo(t, decoder)
 	if len(peerInfo) != 0 {
-		t.Fatalf("%s: Expected 0 items but got %s", wt.CallSite(2), peerInfo)
+		wt.Fatalf(t, "Expected 0 items but got %s", peerInfo)
 	}
 }
 
@@ -89,7 +89,7 @@ func checkEncoding(t *testing.T, update []byte, routers []*Router, connections [
 	sort.Sort(byName(peerInfo))
 	N := len(peerInfo)
 	if N != len(routers) {
-		t.Fatalf("%s: Expected %d items but got %d: %s", wt.CallSite(2), len(routers), N, peerInfo)
+		wt.Fatalf(t, "Expected %d items but got %d: %s", len(routers), N, peerInfo)
 	}
 	for i := 0; i < N; i++ {
 		checkPeerDetails(t, peerInfo[i], routers[i].Ourself.Peer)

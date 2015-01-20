@@ -19,8 +19,7 @@ type PeerInteraction struct {
 }
 
 func NewLocalPeer(name PeerName, router *Router) *LocalPeer {
-	peer := &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
-	return peer
+	return &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
 }
 
 func (peer *LocalPeer) Start() {
@@ -58,24 +57,6 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 		dec)
 }
 
-func (peer *LocalPeer) NextBroadcastHops(srcPeer *Peer) []*LocalConnection {
-	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
-	if len(nextHops) == 0 {
-		return nil
-	}
-	nextConns := make([]*LocalConnection, 0, len(nextHops))
-	peer.RLock()
-	for _, hopName := range nextHops {
-		conn, found := peer.connections[hopName]
-		// Again, !found could just be due to a race.
-		if found {
-			nextConns = append(nextConns, conn.(*LocalConnection))
-		}
-	}
-	peer.RUnlock()
-	return nextConns
-}
-
 func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
 	for _, conn := range peer.NextBroadcastHops(srcPeer) {
 		err := conn.Forward(df, &ForwardedFrame{
@@ -88,6 +69,24 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec 
 		}
 	}
 	return nil
+}
+
+func (peer *LocalPeer) NextBroadcastHops(srcPeer *Peer) []*LocalConnection {
+	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
+	if len(nextHops) == 0 {
+		return nil
+	}
+	nextConns := make([]*LocalConnection, 0, len(nextHops))
+	peer.RLock()
+	defer peer.RUnlock()
+	for _, hopName := range nextHops {
+		conn, found := peer.connections[hopName]
+		// Again, !found could just be due to a race.
+		if found {
+			nextConns = append(nextConns, conn.(*LocalConnection))
+		}
+	}
+	return nextConns
 }
 
 func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) error {
@@ -110,7 +109,8 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 		return err
 	}
 	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String())
-	NewLocalConnection(connRemote, acceptNewPeer, tcpConn, udpAddr, peer.Router)
+	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.Router)
+	connLocal.Start(acceptNewPeer)
 	return nil
 }
 
@@ -216,9 +216,7 @@ func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
 		conn.CheckFatal(err)
 		return
 	}
-	peer.Lock()
-	peer.connections[toName] = conn
-	peer.Unlock()
+	peer.addConnection(conn)
 	conn.log("connection added")
 }
 
@@ -233,21 +231,12 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	if connFound, found := peer.connections[toName]; !found || connFound != conn {
 		return
 	}
-	peer.Lock()
-	delete(peer.connections, toName)
-	peer.Unlock()
+	peer.deleteConnection(conn)
 	conn.log("connection deleted")
-	broadcast := false
-	if conn.Established() {
-		peer.Lock()
-		peer.version += 1
-		peer.Unlock()
-		broadcast = true
-	}
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
 	peer.Router.Peers.GarbageCollect()
-	if broadcast {
+	if conn.Established() {
 		peer.broadcastPeerUpdate()
 	}
 }
@@ -260,9 +249,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 		conn.CheckFatal(fmt.Errorf("Cannot set unknown connection active"))
 		return
 	}
-	peer.Lock()
-	peer.version += 1
-	peer.Unlock()
+	peer.connectionEstablished(conn)
 	conn.log("connection fully established")
 	peer.broadcastPeerUpdate(conn.Remote())
 }
@@ -271,6 +258,28 @@ func (peer *LocalPeer) handleBroadcastTCP(msg []byte) {
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
 		conn.(*LocalConnection).SendTCP(msg)
 	})
+}
+
+func (peer *LocalPeer) addConnection(conn Connection) {
+	peer.Lock()
+	peer.connections[conn.Remote().Name] = conn
+	peer.Unlock()
+}
+
+func (peer *LocalPeer) deleteConnection(conn Connection) {
+	established := conn.Established()
+	peer.Lock()
+	delete(peer.connections, conn.Remote().Name)
+	if established {
+		peer.version += 1
+	}
+	peer.Unlock()
+}
+
+func (peer *LocalPeer) connectionEstablished(conn Connection) {
+	peer.Lock()
+	peer.version += 1
+	peer.Unlock()
 }
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {

@@ -1,10 +1,13 @@
 package router
 
 import (
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	wt "github.com/zettio/weave/testing"
 	"testing"
+	"time"
 )
 
 type mockChannelConnection struct {
@@ -12,13 +15,18 @@ type mockChannelConnection struct {
 	dest *Router
 }
 
+// This is basically the same as LocalConnection.handleGossip()
 func (conn *mockChannelConnection) SendTCP(msg []byte) {
-	channelHash, payload := decodeGossipChannel(msg[1:])
-	if channel, found := conn.dest.GossipChannels[channelHash]; !found {
+	decoder := gob.NewDecoder(bytes.NewReader(msg[1:]))
+	var channelHash uint32
+	if err := decoder.Decode(&channelHash); err != nil {
+		panic(errors.New(fmt.Sprintf("error when decoding: %s", err)))
+	} else if channel, found := conn.dest.GossipChannels[channelHash]; !found {
 		panic(errors.New(fmt.Sprintf("unknown channel: %d", channelHash)))
 	} else {
-		srcName, payload := decodePeerName(payload)
-		deliverGossip(channel, srcName, msg, payload)
+		var srcName PeerName
+		checkFatal(decoder.Decode(&srcName))
+		deliverGossip(channel, srcName, msg, decoder)
 	}
 }
 
@@ -26,18 +34,21 @@ func (r1 *Router) AddTestChannelConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	r1.Ourself.Peer.connections[toName] = &mockChannelConnection{mockConnection{toPeer, ""}, r2}
-	r1.Ourself.Peer.version += 1
+	conn := &mockChannelConnection{mockConnection{toPeer, ""}, r2}
+	r1.Ourself.addConnection(conn)
+	r1.Ourself.connectionEstablished(conn)
 	r1.Ourself.broadcastPeerUpdate(toPeer)
 }
 
-// Create a Peer object based on the name and UID of existing routers
+// Create a remote Peer object plus all of its connections, based on the name and UIDs of existing routers
 func tp(r *Router, routers ...*Router) *Peer {
-	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, r.Ourself.Peer.version)
+	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, 0)
+	connections := make(map[PeerName]Connection)
 	for _, r2 := range routers {
 		p2 := NewPeer(r2.Ourself.Peer.Name, r2.Ourself.Peer.UID, r2.Ourself.Peer.version)
-		peer.connections[r2.Ourself.Peer.Name] = &mockConnection{p2, ""}
+		connections[r2.Ourself.Peer.Name] = &mockConnection{p2, ""}
 	}
+	peer.SetVersionAndConnections(r.Ourself.Peer.version, connections)
 	return peer
 }
 
@@ -51,11 +62,11 @@ func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Co
 		if _, found := checkConns[remoteName]; found {
 			delete(checkConns, remoteName)
 		} else {
-			t.Fatalf("%s: Unexpected connection from %s to %s", wt.CallSite(3), ourName, remoteName)
+			wt.Fatalf(t, "Unexpected connection from %s to %s", ourName, remoteName)
 		}
 	}
 	if len(checkConns) > 0 {
-		t.Fatalf("%s: Expected connections not found: from %s to %v", wt.CallSite(3), ourName, checkConns)
+		t.Fatalf("Expected connections not found: from %s to %v\n%s", ourName, checkConns, wt.StackTrace())
 	}
 }
 
@@ -70,15 +81,21 @@ func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
 			checkEqualConns(t, name, peer.connections, wantedPeer.connections)
 			delete(check, name)
 		} else {
-			t.Fatalf("%s: Unexpected peer: %s", wt.CallSite(2), name)
+			t.Fatalf("Unexpected peer: %s\n%s", name, wt.StackTrace())
 		}
 	}
 	if len(check) > 0 {
-		t.Fatalf("%s: Expected peers not found: %v", wt.CallSite(2), check)
+		t.Fatalf("Expected peers not found: %v\n%s", check, wt.StackTrace())
 	}
 }
 
 func TestGossipTopology(t *testing.T) {
+	wt.RunWithTimeout(t, 1*time.Second, func() {
+		implTestGossipTopology(t)
+	})
+}
+
+func implTestGossipTopology(t *testing.T) {
 	const (
 		peer1NameString = "01:00:00:01:00:00"
 		peer2NameString = "02:00:00:02:00:00"

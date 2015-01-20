@@ -39,6 +39,16 @@ peer. The topology information captures which peers are connected to
 which other peers; weave can route packets in partially connected
 networks with changing topology.
 
+For example, in this network, peer 1 is connected directly to 2 and 3,
+but if 1 needs to send a packet to 4 or 5 it must first send it to
+peer 3:
+![diagram showing five peers in a weave network][diagram1]
+Weave peers [communicate their own topology](#topology) with neighbours, who then
+pass on changes to their neighbours, and so on, until the entire
+network knows about any change.
+
+[diagram1]: images/top-diag1.png "Diagram 1"
+
 ### <a name="encapsulation"></a>Encapsulation
 
 When the weave router forwards packets, the encapsulation looks
@@ -78,7 +88,7 @@ The name of the sending peer enables the receiving peer to identify
 who sent this UDP packet. This is followed by the meta data and
 payload for one or more captured frames. The router performs batching:
 if it captures several frames very quickly that all need forwarding to
-the same peer, it will fit as many of them as possible into a single
+the same peer, it fits as many of them as possible into a single
 UDP packet.
 
 The meta data for each frame contains the names of the capturing and
@@ -88,12 +98,110 @@ receiving peers to build up their mappings of which client MAC
 addresses are local to which peers. The destination peer name enables
 the receiving peer to identify whether this frame is destined for
 itself or whether it should be forwarded on to some other peer,
-accomodating multi-hop routing. This will work even when the receiving
+accommodating multi-hop routing. This works even when the receiving
 intermediate peer has no knowledge of the destination MAC: only the
 original capturing peer needs to determine the destination peer from
 the MAC. This way weave peers never need to exchange the MAC addresses
 of clients and need not take any special action for ARP traffic and
 MAC discovery.
+
+### <a name="topology"></a>Topology Communication
+
+Topology is communicated over the TCP links between peers, using a
+Gossip mechanism.  Topology messages are sent every time a connection
+is added or deleted, and also periodically on a timer in case someone
+has missed an update.
+
+Upon receiving an update, the
+receiver merges it with its own topology model. If the payload is a
+subset of the receiver's topology, no further action is
+taken. Otherwise, the receiver sends out to all its connections an
+"improved" update:
+
+ - elements which the original payload added to the
+   receiver are included
+ - elements which the original payload updated in the
+   receiver are included
+ - elements which are equal between the receiver and
+   the payload are not included
+ - elements where the payload was older than the
+   receiver's version are updated
+
+If the update mentions a peer that the receiver has does not know,
+then the entire update is ignored.
+
+#### Message details
+Every gossip message is structured as follows:
+
+    +-----------------------------------+
+    | 1-byte message type - Gossip      |
+    +-----------------------------------+
+    | 4-byte Gossip channel - Topology  |
+    +-----------------------------------+
+    | Peer Name of source               |
+    +-----------------------------------+
+    | Gossip payload (topology update)  |
+    +-----------------------------------+
+
+The topology update payload is laid out like this:
+
+    +-----------------------------------+
+    | Peer 1: Name                      |
+    +-----------------------------------+
+    | Peer 1: UID                       |
+    +-----------------------------------+
+    | Peer 1: Version number            |
+    +-----------------------------------+
+    | Peer 1: List of connections       |
+    +-----------------------------------+
+    |                ...                |
+    +-----------------------------------+
+    | Peer N: Name                      |
+    +-----------------------------------+
+    | Peer N: UID                       |
+    +-----------------------------------+
+    | Peer N: Version number            |
+    +-----------------------------------+
+    | Peer N: List of connections       |
+    +-----------------------------------+
+
+Each List of connections is encapsulated as a byte buffer, within
+which the structure is:
+
+    +-----------------------------------+
+    | Connection 1: Remote Peer Name    |
+    +-----------------------------------+
+    | Connection 1: Remote IP address   |
+    +-----------------------------------+
+    | Connection 2: Remote Peer Name    |
+    +-----------------------------------+
+    | Connection 2: Remote IP address   |
+    +-----------------------------------+
+    |                ...                |
+    +-----------------------------------+
+    | Connection N: Remote Peer Name    |
+    +-----------------------------------+
+    | Connection N: Remote IP address   |
+    +-----------------------------------+
+
+#### Removal of peers
+If a peer, after receiving a topology update, sees that another peer
+no longer has any connections within the network, it drops all
+knowledge of that second peer.
+
+
+#### Out-of-date topology
+The peer-to-peer gossiping of updates is not instantaneous, so it is
+very possible for a node elsewhere in the network to have an
+out-of-date view.
+
+If the destination peer for a packet is still reachable, then
+out-of-date topology can result in it taking a less efficient route.
+
+If the out-of-date topology makes it look as if the destination peer
+is not reachable, then the packet is dropped.  For most protocols
+(e.g. TCP), the transmission will be retried a short time later, by
+which time the topology should have updated.
 
 ### <a name="crypto"></a>Crypto
 
@@ -210,7 +318,7 @@ This is very similar to the [non-crypto encapsulation](#encapsulation).
 All of the frames are encrypted with the same ephemeral session key
 and all must be decrypted by the receiving peer. Frames which are to
 be forwarded on to some further peer will be re-encrypted with the
-relevant ephemeral session keys for the onwards connections. Thus all
+relevant ephemeral session keys for the onward connections. Thus all
 traffic is fully decrypted on every peer it passes through.
 Encryption is again done with the NaCl `secretbox.Seal` function.
 

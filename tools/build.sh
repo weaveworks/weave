@@ -7,6 +7,14 @@ apt-get -y install curl make pkg-config gcc bison flex
 BASEDIR=$(dirname $0)
 mkdir -p "$BASEDIR"/bin
 
+copy_exe() {
+    if ldd $1 >/dev/null 2>&1 ; then
+        echo "ERROR: $1 was not linked statically." 2>&1
+        exit 1
+    fi
+    cp $1 "$BASEDIR"/bin/
+}
+
 # ethtool
 
 ETHTOOL=ethtool-3.16
@@ -14,8 +22,8 @@ ETHTOOL=ethtool-3.16
 rm -rf $ETHTOOL
 
 curl -s -S https://www.kernel.org/pub/software/network/ethtool/$ETHTOOL.tar.gz | tar xvz
-(cd $ETHTOOL; ./configure LDFLAGS=-static; make)
-cp $ETHTOOL/ethtool "$BASEDIR"/bin/
+(cd $ETHTOOL; ./configure LDFLAGS=-static && make)
+copy_exe $ETHTOOL/ethtool
 
 # conntrack
 
@@ -30,11 +38,23 @@ fetch() {
 
 for PACKAGE in $PACKAGES; do
     fetch $PACKAGE
-    (cd $PACKAGE; ./configure && make LDFLAGS=-static install)
+    (cd $PACKAGE; ./configure --disable-shared && make install)
 done
 
 fetch $CONNTRACK
-(cd $CONNTRACK; ./configure && make LDFLAGS=-static && rm -f src/conntrack && make LDFLAGS=-all-static)
-cp $CONNTRACK/src/conntrack "$BASEDIR"/bin/
+(cd $CONNTRACK; ./configure --disable-shared && make && rm -f src/conntrack && make LDFLAGS=-all-static)
+copy_exe $CONNTRACK/src/conntrack
+
+# curl
+
+CURL=curl-7.40.0
+
+rm -rf $CURL
+
+curl -s -S  http://curl.haxx.se/download/$CURL.tar.gz | tar xvz
+(cd $CURL; ./configure --without-ssl --disable-shared && make && rm src/curl && make LDFLAGS=-all-static)
+copy_exe $CURL/src/curl
+
+#
 
 touch "$BASEDIR"/bin

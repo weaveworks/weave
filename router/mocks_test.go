@@ -1,3 +1,7 @@
+// No mocks are tested by this file.
+// It supplies some mock implementations to other unit tests,
+// and is named "...test.go" so it is only compiled under `go test`.
+
 package router
 
 import (
@@ -24,11 +28,11 @@ func NewTestRouter(t *testing.T, name PeerName, queue *peerQueue) *Router {
 			queue.peers = append(queue.peers, peer)
 		}
 	}
-	router := newRouter(nil, name, nil, 10, 1024, nil, onMacExpiry, onPeerGC)
-	router.ConnectionMaker = &ConnectionMaker{
-		ourself:   router.Ourself,
-		queryChan: make(chan *ConnectionMakerInteraction, ChannelSize)}
-	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
+	router := NewRouter(nil, name, nil, 10, 1024, nil)
+	router.Macs.onExpiry = onMacExpiry
+	router.Peers.onGC = onPeerGC
+	// Create dummy channels otherwise tests hang on nil channel
+	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
 	router.Routes.queryChan = make(chan *Interaction, ChannelSize)
 	return router
 }
@@ -37,8 +41,9 @@ func (r1 *Router) AddTestConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	r1.Ourself.Peer.connections[toName] = &mockConnection{toPeer, ""}
-	r1.Ourself.Peer.version += 1
+	conn := &mockConnection{toPeer, ""}
+	r1.Ourself.addConnection(conn)
+	r1.Ourself.connectionEstablished(conn)
 }
 
 func (r0 *Router) AddTestRemoteConnection(r1, r2 *Router) {
@@ -48,16 +53,15 @@ func (r0 *Router) AddTestRemoteConnection(r1, r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	toPeer = r0.Peers.FetchWithDefault(toPeer)
-	r0.Ourself.Peer.connections[toName] = &RemoteConnection{fromPeer, toPeer, ""}
-	r0.Ourself.Peer.version += 1
+	r0.Ourself.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
 }
 
 func (r1 *Router) DeleteTestConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer, _ := r1.Peers.Fetch(toName)
 	toPeer.DecrementLocalRefCount()
-	delete(r1.Ourself.Peer.connections, toName)
-	r1.Ourself.Peer.version += 1
+	conn, _ := r1.Ourself.Peer.ConnectionTo(toName)
+	r1.Ourself.deleteConnection(conn)
 }
 
 type mockConnection struct {
@@ -73,7 +77,7 @@ func (conn *mockConnection) Established() bool     { return true }
 
 func AssertEmpty(t *testing.T, array []*Peer, desc string) {
 	if len(array) != 0 {
-		t.Fatalf("%s: Expected empty %s but got %s", wt.CallSite(2), desc, array)
+		wt.Fatalf(t, "Expected empty %s but got %s", desc, array)
 	}
 }
 
@@ -88,11 +92,11 @@ func checkPeerArray(t *testing.T, peers []*Peer, routers []*Router) {
 		if _, found := check[name]; found {
 			delete(check, name)
 		} else {
-			t.Fatalf("%s: Expected peer not found %s", wt.CallSite(2), name)
+			wt.Fatalf(t, "Expected peer not found %s", name)
 		}
 	}
 	if len(check) > 0 {
-		t.Fatalf("%s: Unexpected peers: %v", wt.CallSite(2), check)
+		wt.Fatalf(t, "Unexpected peers: %v", check)
 	}
 }
 
