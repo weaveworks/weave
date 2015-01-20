@@ -207,7 +207,7 @@ func (ne *NaClEncryptor) Bytes() []byte {
 		if err = ne.conn.CheckFatal(err); err != nil {
 			return []byte{}
 		}
-		ne.conn.SendProtocolMsg(ProtocolNonce, encodedNonce)
+		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 		ne.nonce = freshNonce
 		nonce = freshNonce
 	}
@@ -226,7 +226,7 @@ func (ne *NaClEncryptor) Bytes() []byte {
 			return []byte{}
 		}
 		ne.nonceChan <- nonce
-		ne.conn.SendProtocolMsg(ProtocolNonce, encodedNonce)
+		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 	}
 	ne.offset = offset
 

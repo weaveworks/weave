@@ -147,10 +147,10 @@ func (peer *LocalPeer) ConnectionEstablished(conn *LocalConnection) {
 }
 
 // Async.
-func (peer *LocalPeer) SendProtocolMsg(tag ProtocolMsg, msg []byte) {
+func (peer *LocalPeer) SendProtocolMsg(m ProtocolMsg) {
 	peer.queryChan <- &PeerInteraction{
 		Interaction: Interaction{code: PSendProtocolMsg},
-		payload:     TaggedProtocolMsg{tag, msg}}
+		payload:     m}
 }
 
 // ACTOR server
@@ -170,7 +170,7 @@ func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
 		case PConnectionEstablished:
 			peer.handleConnectionEstablished(query.payload.(*LocalConnection))
 		case PSendProtocolMsg:
-			peer.handleSendProtocolMsg(query.payload.(TaggedProtocolMsg))
+			peer.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 		}
 	}
 }
@@ -248,9 +248,9 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 
-func (peer *LocalPeer) handleSendProtocolMsg(m TaggedProtocolMsg) {
+func (peer *LocalPeer) handleSendProtocolMsg(m ProtocolMsg) {
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
-		conn.(*LocalConnection).SendProtocolMsg(m.tag, m.msg)
+		conn.(*LocalConnection).SendProtocolMsg(m)
 	})
 }
 
@@ -278,8 +278,7 @@ func (peer *LocalPeer) connectionEstablished(conn Connection) {
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
-	update := EncodePeers(append(peers, peer.Peer)...)
-	peer.handleSendProtocolMsg(TaggedProtocolMsg{tag: ProtocolUpdate, msg: update})
+	peer.handleSendProtocolMsg(ProtocolMsg{ProtocolUpdate, EncodePeers(append(peers, peer.Peer)...)})
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

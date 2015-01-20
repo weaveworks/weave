@@ -200,10 +200,10 @@ func (conn *LocalConnection) SetEstablished() {
 }
 
 // Async
-func (conn *LocalConnection) SendProtocolMsg(tag ProtocolMsg, msg []byte) {
+func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 	conn.queryChan <- &ConnectionInteraction{
 		Interaction: Interaction{code: CSendProtocolMsg},
-		payload:     TaggedProtocolMsg{tag, msg}}
+		payload:     m}
 }
 
 // ACTOR server
@@ -266,7 +266,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 			case CSetEstablished:
 				err = conn.handleSetEstablished()
 			case CSendProtocolMsg:
-				err = conn.handleSendProtocolMsg(query.payload.(TaggedProtocolMsg))
+				err = conn.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
 		case <-tickerChan(conn.heartbeat):
 			conn.Forward(true, conn.heartbeatFrame, nil)
@@ -342,11 +342,11 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	return nil
 }
 
-func (conn *LocalConnection) handleSendSimpleProtocolMsg(tag ProtocolMsg) error {
-	return conn.handleSendProtocolMsg(TaggedProtocolMsg{tag: tag})
+func (conn *LocalConnection) handleSendSimpleProtocolMsg(tag ProtocolTag) error {
+	return conn.handleSendProtocolMsg(ProtocolMsg{tag: tag})
 }
 
-func (conn *LocalConnection) handleSendProtocolMsg(m TaggedProtocolMsg) error {
+func (conn *LocalConnection) handleSendProtocolMsg(m ProtocolMsg) error {
 	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
 }
 
@@ -534,7 +534,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			continue
 		}
 		payload := msg[1:]
-		switch ProtocolMsg(msg[0]) {
+		switch ProtocolTag(msg[0]) {
 		case ProtocolConnectionEstablished:
 			// We sent fast heartbeats to the remote peer, which has
 			// now received at least one of them and told us via this
@@ -568,13 +568,13 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			// payload is a subset of the receiver's topology, no
 			// further action is taken. Otherwise, the receiver sends
 			// out to all its connections an "improved" update.
-			conn.SendProtocolMsg(ProtocolUpdate, conn.Router.Peers.EncodeAllPeers())
+			conn.SendProtocolMsg(ProtocolMsg{ProtocolUpdate, conn.Router.Peers.EncodeAllPeers()})
 		case ProtocolUpdate:
 			newUpdate, err := conn.Router.Peers.ApplyUpdate(payload)
 			if _, ok := err.(UnknownPeersError); err != nil && ok {
 				// That update contained a peer we didn't know about;
 				// request full update
-				conn.SendProtocolMsg(ProtocolFetchAll, nil)
+				conn.SendProtocolMsg(ProtocolMsg{ProtocolFetchAll, nil})
 				continue
 			}
 			if conn.CheckFatal(err) != nil {
@@ -583,7 +583,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			if len(newUpdate) != 0 {
 				conn.Router.ConnectionMaker.Refresh()
 				conn.Router.Routes.Recalculate()
-				conn.Router.Ourself.SendProtocolMsg(ProtocolUpdate, newUpdate)
+				conn.Router.Ourself.SendProtocolMsg(ProtocolMsg{ProtocolUpdate, newUpdate})
 			}
 		case ProtocolPMTUVerified:
 			conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))

@@ -5,15 +5,15 @@ const (
 	ProtocolVersion = 10
 )
 
-type ProtocolMsg byte
+type ProtocolTag byte
 
-type TaggedProtocolMsg struct {
-	tag ProtocolMsg
+type ProtocolMsg struct {
+	tag ProtocolTag
 	msg []byte
 }
 
 const (
-	ProtocolConnectionEstablished ProtocolMsg = iota
+	ProtocolConnectionEstablished ProtocolTag = iota
 	ProtocolFragmentationReceived
 	ProtocolStartFragmentationTest
 	ProtocolNonce

@@ -308,12 +308,12 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			case frameLen == EthernetOverhead+8:
 				relayConn.ReceivedHeartbeat(sender, binary.BigEndian.Uint64(frame[EthernetOverhead:]))
 			case frameLen == FragTestSize && bytes.Equal(frame, FragTest):
-				relayConn.SendProtocolMsg(ProtocolFragmentationReceived, nil)
+				relayConn.SendProtocolMsg(ProtocolMsg{ProtocolFragmentationReceived, nil})
 			case frameLen == PMTUDiscoverySize && bytes.Equal(frame, PMTUDiscovery):
 			default:
 				frameLenBytes := []byte{0, 0}
 				binary.BigEndian.PutUint16(frameLenBytes, uint16(frameLen-EthernetOverhead))
-				relayConn.SendProtocolMsg(ProtocolPMTUVerified, frameLenBytes)
+				relayConn.SendProtocolMsg(ProtocolMsg{ProtocolPMTUVerified, frameLenBytes})
 			}
 			return nil
 		}
