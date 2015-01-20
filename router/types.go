@@ -132,26 +132,6 @@ type Interaction struct {
 	resultChan chan<- interface{}
 }
 
-// UDPSender interface and implementations
-
-type UDPSender interface {
-	Send([]byte) error
-	Shutdown() error
-}
-
-type SimpleUDPSender struct {
-	conn    *LocalConnection
-	udpConn *net.UDPConn
-}
-
-type RawUDPSender struct {
-	ipBuf     gopacket.SerializeBuffer
-	opts      gopacket.SerializeOptions
-	udpHeader *layers.UDP
-	socket    *net.IPConn
-	conn      *LocalConnection
-}
-
 // Packet capture/inject interfaces
 
 type PacketSource interface {
