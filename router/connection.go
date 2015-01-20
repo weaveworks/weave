@@ -115,9 +115,7 @@ func (conn *LocalConnection) setStackFrag(frag bool) {
 }
 
 func (conn *LocalConnection) log(args ...interface{}) {
-	v := append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name))
-	v = append(v, args...)
-	log.Println(v...)
+	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
 }
 
 // ACTOR client API
