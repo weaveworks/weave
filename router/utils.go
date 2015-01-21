@@ -10,6 +10,11 @@ import (
 	"net"
 )
 
+type Interaction struct {
+	code       int
+	resultChan chan<- interface{}
+}
+
 func checkFatal(e error) {
 	if e != nil {
 		log.Fatal(e)
@@ -51,10 +56,6 @@ func (nce NameCollisionError) Error() string {
 
 func (pde PacketDecodingError) Error() string {
 	return fmt.Sprint("Failed to decode packet: ", pde.Desc)
-}
-
-func (packet UDPPacket) String() string {
-	return fmt.Sprintf("UDP Packet\n name: %s\n sender: %v\n payload: % X", packet.Name, packet.Sender, packet.Packet)
 }
 
 func Concat(elems ...[]byte) []byte {

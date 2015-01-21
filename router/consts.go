@@ -6,8 +6,6 @@ import (
 )
 
 const (
-	Protocol           = "weave"
-	ProtocolVersion    = 11
 	EthernetOverhead   = 14
 	UDPOverhead        = 28 // 20 bytes for IPv4, 8 bytes for UDP
 	Port               = 6783
@@ -25,27 +23,9 @@ const (
 	PMTUVerifyAttempts = 8
 	PMTUVerifyTimeout  = 10 * time.Millisecond // gets doubled with every attempt
 	MaxDuration        = time.Duration(math.MaxInt64)
-	GossipInterval     = 3 * time.Second
-	TopologyGossipCh   = "topology"
-)
-
-const (
-	ProtocolConnectionEstablished = iota
-	ProtocolFragmentationReceived
-	ProtocolStartFragmentationTest
-	ProtocolNonce
-	ProtocolPMTUVerified
-	ProtocolGossip
-	ProtocolGossipUnicast
-	ProtocolGossipBroadcast
 )
 
 var (
-	FragTest                           = make([]byte, FragTestSize)
-	PMTUDiscovery                      = make([]byte, PMTUDiscoverySize)
-	ProtocolConnectionEstablishedByte  = []byte{ProtocolConnectionEstablished}
-	ProtocolFragmentationReceivedByte  = []byte{ProtocolFragmentationReceived}
-	ProtocolStartFragmentationTestByte = []byte{ProtocolStartFragmentationTest}
-	ProtocolNonceByte                  = []byte{ProtocolNonce}
-	ProtocolPMTUVerifiedByte           = []byte{ProtocolPMTUVerified}
+	FragTest      = make([]byte, FragTestSize)
+	PMTUDiscovery = make([]byte, PMTUDiscoverySize)
 )

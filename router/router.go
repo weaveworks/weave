@@ -17,6 +17,34 @@ const macMaxAge = 10 * time.Minute // [1]
 // [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
+type Router struct {
+	Iface           *net.Interface
+	Ourself         *LocalPeer
+	Macs            *MacCache
+	Peers           *Peers
+	Routes          *Routes
+	ConnectionMaker *ConnectionMaker
+	UDPListener     *net.UDPConn
+	Password        *[]byte
+	ConnLimit       int
+	BufSz           int
+	LogFrame        func(string, []byte, *layers.Ethernet)
+	GossipChannels  map[uint32]*GossipChannel
+}
+
+type PacketSource interface {
+	ReadPacket() ([]byte, error)
+}
+
+type PacketSink interface {
+	WritePacket([]byte) error
+}
+
+type PacketSourceSink interface {
+	PacketSource
+	PacketSink
+}
+
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
 	router := &Router{
 		Iface:          iface,
@@ -183,6 +211,16 @@ func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {
 	return conn
 }
 
+type UDPPacket struct {
+	Name   PeerName
+	Packet []byte
+	Sender *net.UDPAddr
+}
+
+func (packet UDPPacket) String() string {
+	return fmt.Sprintf("UDP Packet\n name: %s\n sender: %v\n payload: % X", packet.Name, packet.Sender, packet.Packet)
+}
+
 func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 	defer conn.Close()
 	dec := NewEthernetDecoder()
@@ -273,12 +311,12 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			case frameLen == EthernetOverhead+8:
 				relayConn.ReceivedHeartbeat(sender, binary.BigEndian.Uint64(frame[EthernetOverhead:]))
 			case frameLen == FragTestSize && bytes.Equal(frame, FragTest):
-				relayConn.SendTCP(ProtocolFragmentationReceivedByte)
+				relayConn.SendProtocolMsg(ProtocolMsg{ProtocolFragmentationReceived, nil})
 			case frameLen == PMTUDiscoverySize && bytes.Equal(frame, PMTUDiscovery):
 			default:
 				frameLenBytes := []byte{0, 0}
 				binary.BigEndian.PutUint16(frameLenBytes, uint16(frameLen-EthernetOverhead))
-				relayConn.SendTCP(Concat(ProtocolPMTUVerifiedByte, frameLenBytes))
+				relayConn.SendProtocolMsg(ProtocolMsg{ProtocolPMTUVerified, frameLenBytes})
 			}
 			return nil
 		}

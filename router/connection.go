@@ -8,11 +8,52 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 )
 
-type ConnectionSender interface {
-	SendTCP(msg []byte)
+type Connection interface {
+	Local() *Peer
+	Remote() *Peer
+	RemoteTCPAddr() string
+	Established() bool
+	Shutdown(error)
+}
+
+type RemoteConnection struct {
+	local         *Peer
+	remote        *Peer
+	remoteTCPAddr string
+}
+
+type LocalConnection struct {
+	sync.RWMutex
+	RemoteConnection
+	TCPConn           *net.TCPConn
+	tcpSender         TCPSender
+	remoteUDPAddr     *net.UDPAddr
+	established       bool
+	receivedHeartbeat bool
+	stackFrag         bool
+	effectivePMTU     int
+	SessionKey        *[32]byte
+	heartbeatFrame    *ForwardedFrame
+	heartbeat         *time.Ticker
+	fragTest          *time.Ticker
+	forwardChan       chan<- *ForwardedFrame
+	forwardChanDF     chan<- *ForwardedFrame
+	stopForward       chan<- interface{}
+	stopForwardDF     chan<- interface{}
+	verifyPMTU        chan<- int
+	Decryptor         Decryptor
+	Router            *Router
+	UID               uint64
+	queryChan         chan<- *ConnectionInteraction
+}
+
+type ConnectionInteraction struct {
+	Interaction
+	payload interface{}
 }
 
 func NewRemoteConnection(from, to *Peer, tcpAddr string) *RemoteConnection {
@@ -119,15 +160,13 @@ func (conn *LocalConnection) setStackFrag(frag bool) {
 }
 
 func (conn *LocalConnection) log(args ...interface{}) {
-	v := append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name))
-	v = append(v, args...)
-	log.Println(v...)
+	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
 }
 
 // ACTOR client API
 
 const (
-	CSendTCP = iota
+	CSendProtocolMsg = iota
 	CSetEstablished
 	CReceivedHeartbeat
 	CShutdown
@@ -160,10 +199,10 @@ func (conn *LocalConnection) SetEstablished() {
 }
 
 // Async
-func (conn *LocalConnection) SendTCP(msg []byte) {
+func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 	conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: CSendTCP},
-		payload:     msg}
+		Interaction: Interaction{code: CSendProtocolMsg},
+		payload:     m}
 }
 
 // ACTOR server
@@ -225,14 +264,14 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 				err = conn.handleReceivedHeartbeat(query.payload.(*net.UDPAddr))
 			case CSetEstablished:
 				err = conn.handleSetEstablished()
-			case CSendTCP:
-				err = conn.handleSendTCP(query.payload.([]byte))
+			case CSendProtocolMsg:
+				err = conn.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
 		case <-tickerChan(conn.heartbeat):
 			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
-			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
+			err = conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest)
 		}
 	}
 	return
@@ -253,7 +292,7 @@ func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr)
 	conn.receivedHeartbeat = true
 	conn.Unlock()
 	if !old {
-		if err := conn.handleSendTCP(ProtocolConnectionEstablishedByte); err != nil {
+		if err := conn.handleSendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
 			return err
 		}
 	}
@@ -290,14 +329,18 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	// avoid initial waits for timers to fire
 	conn.Forward(true, conn.heartbeatFrame, nil)
 	conn.setStackFrag(false)
-	if err := conn.handleSendTCP(ProtocolStartFragmentationTestByte); err != nil {
+	if err := conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (conn *LocalConnection) handleSendTCP(msg []byte) error {
-	return conn.tcpSender.Send(msg)
+func (conn *LocalConnection) handleSendSimpleProtocolMsg(tag ProtocolTag) error {
+	return conn.handleSendProtocolMsg(ProtocolMsg{tag: tag})
+}
+
+func (conn *LocalConnection) handleSendProtocolMsg(m ProtocolMsg) error {
+	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
 }
 
 func (conn *LocalConnection) handleShutdown() {
@@ -478,7 +521,12 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			// the traffic rather than shutting down.
 			continue
 		}
-		switch msg[0] {
+		if len(msg) < 1 {
+			conn.log("ignoring blank msg")
+			continue
+		}
+		payload := msg[1:]
+		switch ProtocolTag(msg[0]) {
 		case ProtocolConnectionEstablished:
 			// We sent fast heartbeats to the remote peer, which has
 			// now received at least one of them and told us via this
@@ -495,18 +543,18 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			conn.setStackFrag(true)
 		case ProtocolNonce:
 			if usingPassword {
-				conn.Decryptor.ReceiveNonce(msg[1:])
+				conn.Decryptor.ReceiveNonce(payload)
 			} else {
 				conn.log("ignoring unexpected nonce on unencrypted connection")
 			}
 		case ProtocolPMTUVerified:
-			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
+			conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
 		case ProtocolGossipUnicast:
-			handleGossip(conn, msg, deliverGossipUnicast)
+			handleGossip(conn, payload, deliverGossipUnicast)
 		case ProtocolGossipBroadcast:
-			handleGossip(conn, msg, deliverGossipBroadcast)
+			handleGossip(conn, payload, deliverGossipBroadcast)
 		case ProtocolGossip:
-			handleGossip(conn, msg, deliverGossip)
+			handleGossip(conn, payload, deliverGossip)
 		default:
 			conn.log("received unknown msg:\n", msg)
 		}

@@ -16,8 +16,8 @@ type mockChannelConnection struct {
 }
 
 // This is basically the same as LocalConnection.handleGossip()
-func (conn *mockChannelConnection) SendTCP(msg []byte) {
-	decoder := gob.NewDecoder(bytes.NewReader(msg[1:]))
+func (conn *mockChannelConnection) SendProtocolMsg(msg ProtocolMsg) {
+	decoder := gob.NewDecoder(bytes.NewReader(msg.msg))
 	var channelHash uint32
 	if err := decoder.Decode(&channelHash); err != nil {
 		panic(errors.New(fmt.Sprintf("error when decoding: %s", err)))
@@ -26,7 +26,7 @@ func (conn *mockChannelConnection) SendTCP(msg []byte) {
 	} else {
 		var srcName PeerName
 		checkFatal(decoder.Decode(&srcName))
-		deliverGossip(channel, srcName, msg, decoder)
+		deliverGossip(channel, srcName, msg.msg, decoder)
 	}
 }
 

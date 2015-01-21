@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+type ForwardedFrame struct {
+	srcPeer *Peer
+	dstPeer *Peer
+	frame   []byte
+}
+
+type FrameTooBigError struct {
+	EPMTU int // effective pmtu, i.e. what we tell packet senders
+}
+
 func (conn *LocalConnection) ensureForwarders() error {
 	if conn.forwardChan != nil || conn.forwardChanDF != nil {
 		return nil
@@ -190,6 +200,22 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 }
 
 // Forwarder
+
+type Forwarder struct {
+	conn            *LocalConnection
+	ch              <-chan *ForwardedFrame
+	stop            <-chan interface{}
+	verifyPMTUTick  <-chan time.Time
+	verifyPMTU      <-chan int
+	pmtuVerifyCount uint
+	enc             Encryptor
+	udpSender       UDPSender
+	maxPayload      int
+	pmtuVerified    bool
+	highestGoodPMTU int
+	unverifiedPMTU  int
+	lowestBadPMTU   int
+}
 
 func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, stop <-chan interface{}, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
 	fwd := &Forwarder{
