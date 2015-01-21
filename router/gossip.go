@@ -65,8 +65,7 @@ func (router *Router) SendGossip(channelName string, msg []byte) {
 
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for _, channel := range router.GossipChannels {
-		gossip := channel.gossiper.Gossip()
-		channel.send(gossip, conn)
+		channel.send(channel.gossiper.Gossip(), conn)
 	}
 }
 
