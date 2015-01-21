@@ -82,44 +82,62 @@ func (c *GossipChannel) GossipMsg(buf []byte) {
 	})
 }
 
-func handleGossip(conn *LocalConnection, payload []byte, onok func(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder)) {
+func handleGossip(conn *LocalConnection, payload []byte, onok func(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error) error {
 	decoder := gob.NewDecoder(bytes.NewReader(payload))
 	var channelHash uint32
-	checkFatal(decoder.Decode(&channelHash))
+	if err := conn.CheckFatal(decoder.Decode(&channelHash)); err != nil {
+		return err
+	}
 	if channel, found := conn.Router.GossipChannels[channelHash]; !found {
+		// Don't close the connection on unknown gossip - maybe the sysadmin has
+		// upgraded one node in the weave network and intends to do this one shortly.
 		logGossip("received unknown channel:", channelHash, "from ", conn.Remote().Name)
+		return nil
 	} else {
 		var srcName PeerName
-		checkFatal(decoder.Decode(&srcName))
-		onok(channel, srcName, payload, decoder)
+		if err := conn.CheckFatal(decoder.Decode(&srcName)); err != nil {
+			return err
+		}
+		return conn.CheckFatal(onok(channel, srcName, payload, decoder))
 	}
 }
 
-func deliverGossipUnicast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) {
+func deliverGossipUnicast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
 	var destName PeerName
-	checkFatal(dec.Decode(&destName))
+	if err := dec.Decode(&destName); err != nil {
+		return err
+	}
 	if channel.ourself.Name == destName {
 		var payload []byte
-		checkFatal(dec.Decode(&payload))
+		if err := dec.Decode(&payload); err != nil {
+			return err
+		}
 		channel.gossiper.OnGossipUnicast(srcName, payload)
 	} else {
 		channel.RelayGossipTo(destName, ProtocolMsg{ProtocolGossipUnicast, origPayload})
 	}
+	return nil
 }
 
-func deliverGossipBroadcast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) {
+func deliverGossipBroadcast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
 	var payload []byte
-	checkFatal(dec.Decode(&payload))
+	if err := dec.Decode(&payload); err != nil {
+		return err
+	}
 	channel.gossiper.OnGossipBroadcast(payload)
 	channel.RelayGossipBroadcast(srcName, ProtocolMsg{ProtocolGossipBroadcast, origPayload})
+	return nil
 }
 
-func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.Decoder) {
+func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.Decoder) error {
 	var payload []byte
-	checkFatal(dec.Decode(&payload))
+	if err := dec.Decode(&payload); err != nil {
+		return err
+	}
 	if newBuf := channel.gossiper.OnGossip(payload); newBuf != nil {
 		channel.GossipMsg(newBuf)
 	}
+	return nil
 }
 
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {

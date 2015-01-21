@@ -25,7 +25,9 @@ func (conn *mockChannelConnection) SendProtocolMsg(msg ProtocolMsg) {
 		panic(errors.New(fmt.Sprintf("unknown channel: %d", channelHash)))
 	} else {
 		var srcName PeerName
-		checkFatal(decoder.Decode(&srcName))
+		if err := decoder.Decode(&srcName); err != nil {
+			panic(err)
+		}
 		deliverGossip(channel, srcName, msg.msg, decoder)
 	}
 }
