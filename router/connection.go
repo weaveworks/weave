@@ -15,6 +15,7 @@ import (
 type Connection interface {
 	Local() *Peer
 	Remote() *Peer
+	BreakTie(Connection) ConnectionTieBreak
 	RemoteTCPAddr() string
 	Established() bool
 	Shutdown(error)
@@ -80,6 +81,10 @@ func (conn *RemoteConnection) Remote() *Peer {
 	return conn.remote
 }
 
+func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak {
+	return TieBreakTied
+}
+
 func (conn *RemoteConnection) RemoteTCPAddr() string {
 	return conn.remoteTCPAddr
 }
@@ -124,12 +129,13 @@ func (conn *LocalConnection) Start(acceptNewPeer bool) {
 	go conn.run(queryChan, acceptNewPeer)
 }
 
-func (conn *LocalConnection) BreakTie(dupConn *LocalConnection) ConnectionTieBreak {
+func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
+	dupConnLocal := dupConn.(*LocalConnection)
  	// conn.uid is used as the tie breaker here, in the knowledge that
 	// both sides will make the same decision.
-	if conn.uid < dupConn.uid {
+	if conn.uid < dupConnLocal.uid {
 		return TieBreakWon
-	} else if dupConn.uid < conn.uid {
+	} else if dupConnLocal.uid < conn.uid {
 		return TieBreakLost
 	} else {
 		return TieBreakTied
