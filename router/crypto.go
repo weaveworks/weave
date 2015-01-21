@@ -85,7 +85,8 @@ func EncodeNonce(df bool) (*[24]byte, []byte, error) {
 		flags = flags | 1
 	}
 	SetNonceLow15Bits(&nonce, flags)
-	return &nonce, Concat(ProtocolNonceByte, nonce[:]), nil
+	// NB: need to make a copy since callers may modify the array
+	return &nonce, Concat(nonce[:]), nil
 }
 
 func DecodeNonce(msg []byte) (bool, *[24]byte) {
@@ -206,7 +207,7 @@ func (ne *NaClEncryptor) Bytes() []byte {
 		if err = ne.conn.CheckFatal(err); err != nil {
 			return []byte{}
 		}
-		ne.conn.SendTCP(encodedNonce)
+		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 		ne.nonce = freshNonce
 		nonce = freshNonce
 	}
@@ -225,7 +226,7 @@ func (ne *NaClEncryptor) Bytes() []byte {
 			return []byte{}
 		}
 		ne.nonceChan <- nonce
-		ne.conn.SendTCP(encodedNonce)
+		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 	}
 	ne.offset = offset
 
