@@ -84,11 +84,11 @@ func (conn *RemoteConnection) RemoteTCPAddr() string {
 	return conn.remoteTCPAddr
 }
 
-func (conn *RemoteConnection) Shutdown(error) {
-}
-
 func (conn *RemoteConnection) Established() bool {
 	return true
+}
+
+func (conn *RemoteConnection) Shutdown(error) {
 }
 
 func (conn *RemoteConnection) String() string {
@@ -125,7 +125,7 @@ func (conn *LocalConnection) Start(acceptNewPeer bool) {
 }
 
 func (conn *LocalConnection) BreakTie(dupConn *LocalConnection) ConnectionTieBreak {
-	// conn.uid is used as the tie breaker here, in the knowledge that
+ 	// conn.uid is used as the tie breaker here, in the knowledge that
 	// both sides will make the same decision.
 	if conn.uid < dupConn.uid {
 		return TieBreakWon
@@ -136,17 +136,17 @@ func (conn *LocalConnection) BreakTie(dupConn *LocalConnection) ConnectionTieBre
 	}
 }
 
-func (conn *LocalConnection) Established() bool {
-	conn.RLock()
-	defer conn.RUnlock()
-	return conn.established
-}
-
 // Read by the forwarder processes when in the UDP senders
 func (conn *LocalConnection) RemoteUDPAddr() *net.UDPAddr {
 	conn.RLock()
 	defer conn.RUnlock()
 	return conn.remoteUDPAddr
+}
+
+func (conn *LocalConnection) Established() bool {
+	conn.RLock()
+	defer conn.RUnlock()
+	return conn.established
 }
 
 // Called by the forwarder processes in a few places (including
