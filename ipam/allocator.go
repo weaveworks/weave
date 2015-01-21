@@ -13,6 +13,9 @@ import (
 )
 
 const (
+	GossipReqTimeout     = 1 * time.Second
+	GossipWaitForLead    = 10 * time.Second
+	GossipDeadTimeout    = 10 * time.Second
 	MinSafeFreeAddresses = 5
 	MaxAddressesToGiveUp = 256
 )
@@ -77,12 +80,12 @@ func (alloc *Allocator) SetGossip(gossip router.Gossip) {
 }
 
 func (alloc *Allocator) Start() {
-	alloc.moveToState(allocStateLeaderless, router.GossipWaitForLead)
+	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
 	go alloc.queryLoop()
 }
 
 func (alloc *Allocator) startForTesting() {
-	alloc.moveToState(allocStateLeaderless, router.GossipWaitForLead)
+	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
 }
 
 // NOTE: exposed functions (start with uppercase) take a lock;
@@ -212,7 +215,7 @@ func (alloc *Allocator) discardOldLeaks() {
 // look for leaks which are aged, and which we are heir to
 func (alloc *Allocator) reclaimLeaks(now time.Time) (changed bool) {
 	changed = false
-	limit := now.Add(-router.GossipDeadTimeout)
+	limit := now.Add(-GossipDeadTimeout)
 	for age, leak := range alloc.leaked {
 		if age.Before(limit) {
 			for _, space := range alloc.ourSpaceSet.spaces {
@@ -291,7 +294,7 @@ func (alloc *Allocator) electLeader() {
 		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	} else {
 		// We expect the other guy to take control, but if he doesn't, try again.
-		alloc.moveToState(allocStateLeaderless, router.GossipWaitForLead)
+		alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
 	}
 }
 
@@ -309,7 +312,7 @@ func (alloc *Allocator) requestSpace() {
 		myState := encode(alloc.ourSpaceSet)
 		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
 		alloc.gossip.GossipUnicast(best.PeerName(), msg)
-		alloc.moveToState(allocStateExpectingDonation, router.GossipReqTimeout)
+		alloc.moveToState(allocStateExpectingDonation, GossipReqTimeout)
 	} else {
 		lg.Debug.Println("Nobody available to ask for space")
 	}

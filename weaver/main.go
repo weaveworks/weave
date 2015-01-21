@@ -157,7 +157,8 @@ func handleHttp(router *weave.Router, alloc *ipam.Allocator) {
 	})
 	http.HandleFunc("/topo-json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		io.WriteString(w, router.Peers.JsonString())
+		json, _ := router.Peers.MarshalJSON()
+		w.Write(json)
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")

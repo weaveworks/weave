@@ -8,6 +8,28 @@ import (
 	"syscall"
 )
 
+type UDPSender interface {
+	Send([]byte) error
+	Shutdown() error
+}
+
+type SimpleUDPSender struct {
+	conn    *LocalConnection
+	udpConn *net.UDPConn
+}
+
+type RawUDPSender struct {
+	ipBuf     gopacket.SerializeBuffer
+	opts      gopacket.SerializeOptions
+	udpHeader *layers.UDP
+	socket    *net.IPConn
+	conn      *LocalConnection
+}
+
+type MsgTooBigError struct {
+	PMTU int // actual pmtu, i.e. what the kernel told us
+}
+
 func NewSimpleUDPSender(conn *LocalConnection) *SimpleUDPSender {
 	return &SimpleUDPSender{udpConn: conn.Router.UDPListener, conn: conn}
 }

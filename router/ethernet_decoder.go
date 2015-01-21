@@ -8,6 +8,13 @@ import (
 	"net"
 )
 
+type EthernetDecoder struct {
+	eth     layers.Ethernet
+	ip      layers.IPv4
+	decoded []gopacket.LayerType
+	parser  *gopacket.DecodingLayerParser
+}
+
 func NewEthernetDecoder() *EthernetDecoder {
 	dec := &EthernetDecoder{}
 	dec.parser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &dec.eth, &dec.ip)

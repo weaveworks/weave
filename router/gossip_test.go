@@ -16,8 +16,8 @@ type mockChannelConnection struct {
 }
 
 // This is basically the same as LocalConnection.handleGossip()
-func (conn *mockChannelConnection) SendTCP(msg []byte) {
-	decoder := gob.NewDecoder(bytes.NewReader(msg[1:]))
+func (conn *mockChannelConnection) SendProtocolMsg(msg ProtocolMsg) {
+	decoder := gob.NewDecoder(bytes.NewReader(msg.msg))
 	var channelHash uint32
 	if err := decoder.Decode(&channelHash); err != nil {
 		panic(errors.New(fmt.Sprintf("error when decoding: %s", err)))
@@ -25,8 +25,10 @@ func (conn *mockChannelConnection) SendTCP(msg []byte) {
 		panic(errors.New(fmt.Sprintf("unknown channel: %d", channelHash)))
 	} else {
 		var srcName PeerName
-		checkFatal(decoder.Decode(&srcName))
-		deliverGossip(channel, srcName, msg, decoder)
+		if err := decoder.Decode(&srcName); err != nil {
+			panic(err)
+		}
+		deliverGossip(channel, srcName, msg.msg, decoder)
 	}
 }
 
@@ -106,17 +108,13 @@ func implTestGossipTopology(t *testing.T) {
 		peer3Name, _ = PeerNameFromString(peer3NameString)
 	)
 
-	removed := &peerQueue{nil}
-
 	// Create some peers that will talk to each other
-	r1 := NewTestRouter(t, peer1Name, removed)
-	r2 := NewTestRouter(t, peer2Name, removed)
-	r3 := NewTestRouter(t, peer3Name, removed)
+	r1 := NewTestRouter(t, peer1Name)
+	r2 := NewTestRouter(t, peer2Name)
+	r3 := NewTestRouter(t, peer3Name)
 	r1.NewGossip(TopologyGossipCh, r1)
 	r2.NewGossip(TopologyGossipCh, r2)
 	r3.NewGossip(TopologyGossipCh, r3)
-
-	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Check state when they have no connections
 	checkTopology(t, r1, tp(r1))
@@ -134,23 +132,19 @@ func implTestGossipTopology(t *testing.T) {
 	r2.AddTestChannelConnection(r3)
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1, r3), tp(r3))
 	checkTopology(t, r2, tp(r1, r2), tp(r2, r1, r3), tp(r3))
-	checkTopology(t, r3, tp(r3))
 	// When r2 gossiped to r3, 1 and 2 were unreachable from r3 so they got removed from the update
-	checkPeerArray(t, removed.peers, rs(r1, r2))
-	removed.clear()
+	checkTopology(t, r3, tp(r3))
 
 	// Add a connection from 3 to 1 and now r1 is reachable.
 	r3.AddTestChannelConnection(r1)
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1, r3), tp(r3, r1))
 	checkTopology(t, r2, tp(r1, r2), tp(r2, r1, r3), tp(r3, r1))
 	checkTopology(t, r3, tp(r1), tp(r3, r1))
-	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	r1.AddTestChannelConnection(r3)
 	checkTopology(t, r1, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
 	checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
 	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
-	AssertEmpty(t, removed.peers, "garbage-collected peers")
 
 	// Drop the connection from 2 to 3
 	r2.DeleteTestConnection(r3)
@@ -167,12 +161,9 @@ func implTestGossipTopology(t *testing.T) {
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1), tp(r3, r1))
 	r1.Peers.GarbageCollect()
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
-	removed.clear()
 
 	// Now r1 tells its remaining connection, which also garbage-collects 3
 	r1.Ourself.broadcastPeerUpdate()
-	checkPeerArray(t, removed.peers, rs(r3))
-	removed.clear()
 
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
 	checkTopology(t, r2, tp(r1, r2), tp(r2, r1))
@@ -183,6 +174,4 @@ func implTestGossipTopology(t *testing.T) {
 	r3.SendAllGossip()
 	// r1 receives info about 3, but eliminates it through garbage collection
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
-	checkPeerArray(t, removed.peers, rs(r3))
-	removed.clear()
 }

@@ -1,8 +1,8 @@
 package ipam
 
 import (
-	wt "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
+	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
 	"time"
@@ -26,7 +26,7 @@ func TestAllocFree(t *testing.T) {
 	alloc.manageSpace(net.ParseIP(testAddr1), 3)
 
 	addr1 := alloc.AllocateFor(containerID)
-	wt.AssertEqualStr(t, addr1.String(), testAddr1, "address")
+	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
 
 	// Ask for another address and check it's different
 	addr2 := alloc.AllocateFor(container2)
@@ -37,7 +37,7 @@ func TestAllocFree(t *testing.T) {
 	// Now free the first one, and we should get it back when we ask
 	alloc.Free(net.ParseIP(testAddr1))
 	addr3 := alloc.AllocateFor(container2)
-	wt.AssertEqualStr(t, addr3.String(), testAddr1, "address")
+	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
 }
 
 func equalByteBuffer(a, b []byte) bool {
@@ -69,11 +69,11 @@ func TestMultiSpaces(t *testing.T) {
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 4, "Total free addresses")
 
 	addr1 := alloc.AllocateFor(containerID)
-	wt.AssertEqualStr(t, addr1.String(), testStart1, "address")
+	wt.AssertEqualString(t, addr1.String(), testStart1, "address")
 
 	// First space should now be full and this address should come from second space
 	addr2 := alloc.AllocateFor(container2)
-	wt.AssertEqualStr(t, addr2.String(), testStart2, "address")
+	wt.AssertEqualString(t, addr2.String(), testStart2, "address")
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 2, "Total free addresses")
 }
 
@@ -177,13 +177,13 @@ func (f *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte)
 
 func (m *mockGossipComms) VerifyMessage(t *testing.T, dst string, msgType byte, buf []byte) {
 	if len(m.messages) == 0 {
-		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite(2))
+		wt.Fatalf(t, "Expected Gossip message but none sent")
 	} else if msg := m.messages[0]; msg.dst.String() != dst {
-		t.Fatalf("%s: Expected Gossip message to %s but got dest %s", wt.CallSite(2), dst, msg.dst)
+		wt.Fatalf(t, "Expected Gossip message to %s but got dest %s", dst, msg.dst)
 	} else if msg.buf[0] != msgType {
-		t.Fatalf("%s: Expected Gossip message of type %d but got type %d", wt.CallSite(2), msgType, msg.buf[0])
+		wt.Fatalf(t, "Expected Gossip message of type %d but got type %d", msgType, msg.buf[0])
 	} else if !equalByteBuffer(msg.buf[1:], buf) {
-		t.Fatalf("%s: Gossip message not sent as expected: %+v", wt.CallSite(2), msg)
+		wt.Fatalf(t, "Gossip message not sent as expected: %+v", msg)
 	} else {
 		// Swallow this message
 		m.messages = m.messages[1:]
@@ -192,11 +192,11 @@ func (m *mockGossipComms) VerifyMessage(t *testing.T, dst string, msgType byte, 
 
 func (m *mockGossipComms) VerifyBroadcastMessage(t *testing.T, buf []byte) {
 	if len(m.messages) == 0 {
-		t.Fatalf("%s: Expected Gossip message but none sent", wt.CallSite(2))
+		wt.Fatalf(t, "Expected Gossip message but none sent")
 	} else if msg := m.messages[0]; msg.dst != router.UnknownPeerName {
-		t.Fatalf("%s: Expected Gossip broadcast message but got dest %s", wt.CallSite(2), msg.dst)
+		wt.Fatalf(t, "Expected Gossip broadcast message but got dest %s", msg.dst)
 	} else if !equalByteBuffer(msg.buf, buf) {
-		t.Fatalf("%s: Gossip message not sent as expected: %+v", wt.CallSite(2), msg)
+		wt.Fatalf(t, "Gossip message not sent as expected: %+v", msg)
 	} else {
 		// Swallow this message
 		m.messages = m.messages[1:]
@@ -205,7 +205,7 @@ func (m *mockGossipComms) VerifyBroadcastMessage(t *testing.T, buf []byte) {
 
 func (m *mockGossipComms) VerifyNoMoreMessages(t *testing.T) {
 	if len(m.messages) > 0 {
-		t.Fatalf("%s, Gossip message unexpected: %+v", wt.CallSite(2), m)
+		wt.Fatalf(t, "Gossip message unexpected: %+v", m)
 	}
 }
 
@@ -245,7 +245,7 @@ func (m *mockTimeProvider) runPending(newTime time.Time) {
 func assertNoOverlaps(t *testing.T, allocs ...*Allocator) {
 	for _, alloc := range allocs {
 		if alloc.lookForOverlaps() {
-			t.Fatalf("%s: Allocator has overlapping space: %s", wt.CallSite(2), alloc)
+			wt.Fatalf(t, "Allocator has overlapping space: %s", alloc)
 		}
 	}
 }
@@ -324,7 +324,7 @@ func TestGossip(t *testing.T) {
 	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
 	alloc1.OnGossipUnicast(pn, msg)
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 6, "Total free addresses")
-	wt.AssertEqualUint64(t, alloc1.peerInfo[peerUID].Version(), 2, "Peer version")
+	wt.AssertEqualuint64(t, alloc1.peerInfo[peerUID].Version(), 2, "Peer version")
 
 	mockGossip1.VerifyBroadcastMessage(t, encode(alloc1.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
