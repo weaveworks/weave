@@ -155,11 +155,6 @@ func handleHttp(router *weave.Router, alloc *ipam.Allocator) {
 		io.WriteString(w, router.Status())
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
-	http.HandleFunc("/topo-json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		json, _ := router.Peers.MarshalJSON()
-		w.Write(json)
-	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
