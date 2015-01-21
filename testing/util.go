@@ -64,14 +64,12 @@ func Fatalf(t *testing.T, format string, args ...interface{}) {
 }
 
 func StackTrace() string {
-	buf := make([]byte, 1<<20)
-	stacklen := runtime.Stack(buf, false)
-	return string(buf[:stacklen])
+	return stackTrace(false)
 }
 
-func StackTraceAll() string {
+func stackTrace(all bool) string {
 	buf := make([]byte, 1<<20)
-	stacklen := runtime.Stack(buf, true)
+	stacklen := runtime.Stack(buf, all)
 	return string(buf[:stacklen])
 }
 
@@ -80,7 +78,7 @@ func StackTraceAll() string {
 func RunWithTimeout(t *testing.T, d time.Duration, f func()) {
 	ch := make(chan bool, 2)
 	timer := time.AfterFunc(d, func() {
-		t.Errorf("Timeout expired after %v: stacks:\n%s", d, StackTraceAll())
+		t.Errorf("Timeout expired after %v: stacks:\n%s", d, stackTrace(true))
 		ch <- true
 	})
 	defer timer.Stop()
