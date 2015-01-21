@@ -192,21 +192,21 @@ func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
 		dupConnLocal := dupConn.(*LocalConnection)
 		switch conn.BreakTie(dupConnLocal) {
 		case TieBreakWon:
-			dupConnLocal.CheckFatal(dupErr)
+			dupConn.Shutdown(dupErr)
 			peer.handleDeleteConnection(dupConnLocal)
 		case TieBreakLost:
-			conn.CheckFatal(dupErr)
+			conn.Shutdown(dupErr)
 			return
 		case TieBreakTied:
 			// oh good grief. Sod it, just kill both of them.
-			conn.CheckFatal(dupErr)
-			dupConnLocal.CheckFatal(dupErr)
+			conn.Shutdown(dupErr)
+			dupConn.Shutdown(dupErr)
 			peer.handleDeleteConnection(dupConnLocal)
 			return
 		}
 	}
 	if err := peer.checkConnectionLimit(); err != nil {
-		conn.CheckFatal(err)
+		conn.Shutdown(err)
 		return
 	}
 	peer.addConnection(conn)
@@ -239,7 +239,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
 		log.Fatal("Peer informed of active connection where peer is not the source of connection")
 	}
 	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
-		conn.CheckFatal(fmt.Errorf("Cannot set unknown connection active"))
+		conn.Shutdown(fmt.Errorf("Cannot set unknown connection active"))
 		return
 	}
 	peer.connectionEstablished(conn)

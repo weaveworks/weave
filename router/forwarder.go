@@ -349,7 +349,7 @@ func (fwd *Forwarder) flush() {
 		} else if PosixError(err) == syscall.ENOBUFS {
 			// TODO handle this better
 		} else {
-			fwd.conn.CheckFatal(err)
+			fwd.conn.Shutdown(err)
 		}
 	}
 }

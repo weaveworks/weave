@@ -149,17 +149,6 @@ func (conn *LocalConnection) Established() bool {
 	return conn.established
 }
 
-// Called by the forwarder processes in a few places (including
-// crypto), but the connection TCP receiver process, and by the local
-// peer actor process. Do not call this from the connection's actor
-// process itself.
-func (conn *LocalConnection) CheckFatal(err error) error {
-	if err != nil {
-		conn.Shutdown(err)
-	}
-	return err
-}
-
 // Called by forwarder processes, read in Forward (by sniffer and udp
 // listener process in router).
 func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
@@ -538,7 +527,8 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	for {
 		var msg []byte
 		conn.extendReadDeadline()
-		if conn.CheckFatal(decoder.Decode(&msg)) != nil {
+		if err = decoder.Decode(&msg); err != nil {
+			conn.Shutdown(err)
 			return
 		}
 		msg, err = receiver.Decode(msg)
@@ -597,7 +587,8 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 				conn.SendProtocolMsg(ProtocolMsg{ProtocolFetchAll, nil})
 				continue
 			}
-			if conn.CheckFatal(err) != nil {
+			if err != nil {
+				conn.Shutdown(err)
 				return
 			}
 			if len(newUpdate) != 0 {
