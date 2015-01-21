@@ -206,7 +206,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 
 	unknownPeers := false
 	for _, connsBuf := range decodedConns {
-		connsIterator(connsBuf, func(remoteNameByte []byte, _ string) {
+		decErr := connsIterator(connsBuf, func(remoteNameByte []byte, _ string) {
 			remoteName := PeerNameFromBin(remoteNameByte)
 			if _, found := newPeers[remoteName]; found {
 				return
@@ -218,6 +218,12 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			// of. Thus we can't apply the update. Abort.
 			unknownPeers = true
 		})
+		if decErr == io.EOF {
+			continue
+		} else if decErr != nil {
+			err = decErr
+			return
+		}
 	}
 	if unknownPeers {
 		err = UnknownPeersError{}
@@ -290,49 +296,49 @@ func (peer *Peer) encodePeer(enc *gob.Encoder) {
 }
 
 func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, uid uint64, version uint64, conns []byte, err error) {
-	err = dec.Decode(&nameByte)
-	if err != nil {
+	if err = dec.Decode(&nameByte); err != nil {
 		return
 	}
-	err = dec.Decode(&uid)
-	if err != nil {
+	if err = dec.Decode(&uid); err != nil {
 		return
 	}
-	err = dec.Decode(&version)
-	if err != nil {
+	if err = dec.Decode(&version); err != nil {
 		return
 	}
-	err = dec.Decode(&conns)
-	if err == io.EOF {
+	if err = dec.Decode(&conns); err == io.EOF {
 		err = nil
 	}
 	return
 }
 
-func connsIterator(input []byte, fun func([]byte, string)) {
+func connsIterator(input []byte, fun func([]byte, string)) error {
 	buf := new(bytes.Buffer)
 	buf.Write(input)
 	dec := gob.NewDecoder(buf)
 	for {
 		var nameByte []byte
-		err := dec.Decode(&nameByte)
-		if err == io.EOF {
-			return
+		if err := dec.Decode(&nameByte); err != nil {
+			return err
 		}
-		checkFatal(err)
 		var foundAt string
-		checkFatal(dec.Decode(&foundAt))
+		if err := dec.Decode(&foundAt); err != nil {
+			return err
+		}
 		fun(nameByte, string(foundAt))
 	}
 }
 
 func readConnsMap(peer *Peer, buf []byte, table map[PeerName]*Peer) map[PeerName]Connection {
 	conns := make(map[PeerName]Connection)
-	connsIterator(buf, func(nameByte []byte, remoteTCPAddr string) {
+	if err := connsIterator(buf, func(nameByte []byte, remoteTCPAddr string) {
 		name := PeerNameFromBin(nameByte)
 		remotePeer := table[name]
 		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr)
 		conns[name] = conn
-	})
+	}); err != io.EOF {
+		// this should never happen since we've already successfully
+		// decoded the same data in decodeUpdate
+		checkFatal(err)
+	}
 	return conns
 }
