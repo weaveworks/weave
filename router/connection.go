@@ -56,7 +56,7 @@ type LocalConnection struct {
 	verifyPMTU        chan<- int
 	Decryptor         Decryptor
 	Router            *Router
-	UID               uint64
+	uid               uint64
 	queryChan         chan<- *ConnectionInteraction
 }
 
@@ -125,11 +125,11 @@ func (conn *LocalConnection) Start(acceptNewPeer bool) {
 }
 
 func (conn *LocalConnection) BreakTie(dupConn *LocalConnection) ConnectionTieBreak {
-	// conn.UID is used as the tie breaker here, in the knowledge that
+	// conn.uid is used as the tie breaker here, in the knowledge that
 	// both sides will make the same decision.
-	if conn.UID < dupConn.UID {
+	if conn.uid < dupConn.uid {
 		return TieBreakWon
-	} else if dupConn.UID < conn.UID {
+	} else if dupConn.uid < conn.uid {
 		return TieBreakLost
 	} else {
 		return TieBreakTied
@@ -206,7 +206,7 @@ func (conn *LocalConnection) Shutdown(err error) {
 // b) updating a remote peer's knowledge of our address, in the event
 // it changes (e.g. because NAT paths expired).
 func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connUID uint64) {
-	if remoteUDPAddr == nil || connUID != conn.UID {
+	if remoteUDPAddr == nil || connUID != conn.uid {
 		return
 	}
 	conn.queryChan <- &ConnectionInteraction{
@@ -243,7 +243,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 
 	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
-	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.UID)
+	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.uid)
 	conn.heartbeatFrame = &ForwardedFrame{
 		srcPeer: conn.local,
 		dstPeer: conn.remote,
@@ -474,7 +474,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	if err != nil {
 		return err
 	}
-	conn.UID = localConnID ^ remoteConnID
+	conn.uid = localConnID ^ remoteConnID
 
 	if usingPassword {
 		remotePublicStr, rpErr := checkHandshakeStringField("PublicKey", "", handshakeRecv)
