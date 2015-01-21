@@ -6,7 +6,6 @@ package router
 
 import (
 	wt "github.com/zettio/weave/testing"
-	"net"
 	"testing"
 )
 
@@ -21,7 +20,6 @@ func (q *peerQueue) clear() {
 // Construct a Router object with a mock interface to check peer
 // garbage-collection, and without firing up any ancilliary goroutines
 func NewTestRouter(t *testing.T, name PeerName, queue *peerQueue) *Router {
-	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {}
 	onPeerGC := func(peer *Peer) {
 		//t.Log("Removing unreachable", peer)
 		if queue != nil {
@@ -29,7 +27,6 @@ func NewTestRouter(t *testing.T, name PeerName, queue *peerQueue) *Router {
 		}
 	}
 	router := NewRouter(nil, name, nil, 10, 1024, nil)
-	router.Macs.onExpiry = onMacExpiry
 	router.Peers.onGC = onPeerGC
 	// Create dummy channels otherwise tests hang on nil channel
 	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
