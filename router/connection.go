@@ -20,6 +20,14 @@ type Connection interface {
 	Shutdown(error)
 }
 
+type ConnectionTieBreak int
+
+const (
+	TieBreakWon ConnectionTieBreak = iota
+	TieBreakLost
+	TieBreakTied
+)
+
 type RemoteConnection struct {
 	local         *Peer
 	remote        *Peer
@@ -114,6 +122,18 @@ func (conn *LocalConnection) Start(acceptNewPeer bool) {
 	queryChan := make(chan *ConnectionInteraction, ChannelSize)
 	conn.queryChan = queryChan
 	go conn.run(queryChan, acceptNewPeer)
+}
+
+func (conn *LocalConnection) BreakTie(dupConn *LocalConnection) ConnectionTieBreak {
+	// conn.UID is used as the tie breaker here, in the knowledge that
+	// both sides will make the same decision.
+	if conn.UID < dupConn.UID {
+		return TieBreakWon
+	} else if dupConn.UID < conn.UID {
+		return TieBreakLost
+	} else {
+		return TieBreakTied
+	}
 }
 
 func (conn *LocalConnection) Established() bool {
