@@ -305,8 +305,8 @@ func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, uid uint64, version u
 	if err = dec.Decode(&version); err != nil {
 		return
 	}
-	if err = dec.Decode(&conns); err == io.EOF {
-		err = nil
+	if err = dec.Decode(&conns); err != nil {
+		return
 	}
 	return
 }
