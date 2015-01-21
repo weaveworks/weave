@@ -355,11 +355,11 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) {
 	// Not expecting these
-	log.Println("[gossip] Unexpected Unicast:", msg)
+	logGossip("Unexpected Unicast:", msg)
 }
 func (router *Router) OnGossipBroadcast(msg []byte) {
 	// Not expecting these
-	log.Println("[gossip] Unexpected Broadcast:", msg)
+	logGossip("Unexpected Broadcast:", msg)
 }
 
 // Return state of everything we know; intended to be called periodically
@@ -373,7 +373,7 @@ func (router *Router) OnGossip(buf []byte) []byte {
 	newUpdate, err := router.Peers.ApplyUpdate(buf)
 	if err != nil {
 		// fixme: should we do anything else?
-		log.Println("[gossip] error when applying update:", err)
+		logGossip("error when applying update:", err)
 	} else if len(newUpdate) == 0 {
 		return nil
 	}

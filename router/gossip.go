@@ -38,31 +38,35 @@ type GossipChannel struct {
 }
 
 func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
-	h := hash(channelName)
-	channel := &GossipChannel{router.Ourself, channelName, h, g}
-	router.GossipChannels[h] = channel
+	channelHash := hash(channelName)
+	channel := &GossipChannel{router.Ourself, channelName, channelHash, g}
+	router.GossipChannels[channelHash] = channel
 	return channel
 }
 
+func logGossip(args ...interface{}) {
+	log.Println(append(append([]interface{}{}, "[gossip]:"), args...)...)
+}
+
 func (router *Router) SendAllGossip() {
-	for _, c := range router.GossipChannels {
-		c.GossipMsg(c.gossiper.Gossip())
+	for _, channel := range router.GossipChannels {
+		channel.GossipMsg(channel.gossiper.Gossip())
 	}
 }
 
 func (router *Router) SendGossip(channelName string, msg []byte) {
 	channelHash := hash(channelName)
 	if channel, found := router.GossipChannels[channelHash]; !found {
-		log.Println("[gossip] attempt to send on unknown channel:", channelName)
+		logGossip("attempt to send on unknown channel:", channelName)
 	} else {
 		channel.GossipMsg(msg)
 	}
 }
 
 func (router *Router) SendAllGossipDown(conn Connection) {
-	for _, c := range router.GossipChannels {
-		gossip := c.gossiper.Gossip()
-		c.send(gossip, conn)
+	for _, channel := range router.GossipChannels {
+		gossip := channel.gossiper.Gossip()
+		channel.send(gossip, conn)
 	}
 }
 
@@ -127,10 +131,10 @@ func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
 
 func (c *GossipChannel) RelayGossipTo(dstPeerName PeerName, msg ProtocolMsg) error {
 	if relayPeerName, found := c.ourself.Router.Routes.Unicast(dstPeerName); !found {
-		log.Println("[gossip] unknown relay destination:", dstPeerName)
+		logGossip("unknown relay destination:", dstPeerName)
 		return nil // ?
 	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
-		log.Println("[gossip] unable to find connection to relay peer", relayPeerName)
+		logGossip("unable to find connection to relay peer", relayPeerName)
 		return nil // ?
 	} else {
 		conn.(ProtocolSender).SendProtocolMsg(msg)
@@ -150,6 +154,6 @@ func (c *GossipChannel) RelayGossipBroadcast(srcName PeerName, msg ProtocolMsg) 
 			conn.SendProtocolMsg(msg)
 		}
 	} else {
-		log.Println("[gossip] unable to relay broadcast from unknown peer", srcName)
+		logGossip("unable to relay broadcast from unknown peer", srcName)
 	}
 }
