@@ -86,10 +86,9 @@ func (c *GossipChannel) GossipMsg(buf []byte) {
 func handleGossip(conn *LocalConnection, payload []byte, onok func(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder)) {
 	decoder := gob.NewDecoder(bytes.NewReader(payload))
 	var channelHash uint32
-	if err := decoder.Decode(&channelHash); err != nil {
-		conn.log("[gossip] error when decoding:", err)
-	} else if channel, found := conn.Router.GossipChannels[channelHash]; !found {
-		conn.log("[gossip] received unknown channel:", channelHash)
+	checkFatal(decoder.Decode(&channelHash))
+	if channel, found := conn.Router.GossipChannels[channelHash]; !found {
+		logGossip("received unknown channel:", channelHash, "from ", conn.Remote().Name)
 	} else {
 		var srcName PeerName
 		checkFatal(decoder.Decode(&srcName))
