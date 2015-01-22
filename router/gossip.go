@@ -80,28 +80,25 @@ func (c *GossipChannel) GossipMsg(buf []byte) {
 	})
 }
 
-func handleGossip(conn *LocalConnection, payload []byte, onok func(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error) error {
+func (conn *LocalConnection) handleGossip(payload []byte, onok func(*GossipChannel, PeerName, []byte, *gob.Decoder) error) error {
 	decoder := gob.NewDecoder(bytes.NewReader(payload))
 	var channelHash uint32
 	if err := decoder.Decode(&channelHash); err != nil {
-		conn.Shutdown(err)
 		return err
 	}
-	if channel, found := conn.Router.GossipChannels[channelHash]; !found {
+	channel, found := conn.Router.GossipChannels[channelHash]
+	if !found {
 		// Don't close the connection on unknown gossip - maybe the sysadmin has
 		// upgraded one node in the weave network and intends to do this one shortly.
 		logGossip("received unknown channel:", channelHash, "from ", conn.Remote().Name)
 		return nil
-	} else {
-		var srcName PeerName
-		if err := decoder.Decode(&srcName); err == nil {
-			conn.Shutdown(err)
-			return err
-		}
-		if err := onok(channel, srcName, payload, decoder); err != nil {
-			conn.Shutdown(err)
-			return err
-		}
+	}
+	var srcName PeerName
+	if err := decoder.Decode(&srcName); err != nil {
+		return err
+	}
+	if err := onok(channel, srcName, payload, decoder); err != nil {
+		return err
 	}
 	return nil
 }

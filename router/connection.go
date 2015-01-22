@@ -567,11 +567,11 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 	case ProtocolPMTUVerified:
 		conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
 	case ProtocolGossipUnicast:
-		handleGossip(conn, payload, deliverGossipUnicast)
+		return conn.handleGossip(payload, deliverGossipUnicast)
 	case ProtocolGossipBroadcast:
-		handleGossip(conn, payload, deliverGossipBroadcast)
+		return conn.handleGossip(payload, deliverGossipBroadcast)
 	case ProtocolGossip:
-		handleGossip(conn, payload, deliverGossip)
+		return conn.handleGossip(payload, deliverGossip)
 	default:
 		conn.log("ignoring unknown protocol tag:", tag)
 	}
