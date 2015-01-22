@@ -23,7 +23,7 @@ func (r1 *Router) AddTestConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := &mockConnection{r1.Ourself.Peer, toPeer, ""}
+	conn := newMockConnection(r1.Ourself.Peer, toPeer)
 	r1.Ourself.addConnection(conn)
 	r1.Ourself.connectionEstablished(conn)
 }
@@ -46,17 +46,13 @@ func (r1 *Router) DeleteTestConnection(r2 *Router) {
 	r1.Ourself.deleteConnection(conn)
 }
 
-type mockConnection struct {
-	local         *Peer
-	remote        *Peer
-	remoteTCPAddr string // we are not currently checking the TCP address
+// mockConnection used in testing is very similar to a RemoteConnection, without
+// the RemoteTCPAddr(), but I want to keep a separate type in order to distinguish
+// what is created by the test from what is created by the real code.
+func newMockConnection(from, to *Peer) Connection {
+	type mockConnection struct{ RemoteConnection }
+	return &mockConnection{RemoteConnection{from, to, ""}}
 }
-
-func (conn *mockConnection) Local() *Peer          { return conn.local }
-func (conn *mockConnection) Remote() *Peer         { return conn.remote }
-func (conn *mockConnection) RemoteTCPAddr() string { return "" }
-func (conn *mockConnection) Shutdown(error)        {}
-func (conn *mockConnection) Established() bool     { return true }
 
 // Check that the peers slice matches the peers associated with the routers slice
 func checkPeerArray(t *testing.T, peers []*Peer, routers []*Router) {
@@ -82,7 +78,7 @@ func rs(routers ...*Router) []*Router { return routers }
 func cs(routers ...*Router) []Connection {
 	ret := make([]Connection, len(routers))
 	for i, r := range routers {
-		ret[i] = &mockConnection{nil, r.Ourself.Peer, ""}
+		ret[i] = newMockConnection(nil, r.Ourself.Peer)
 	}
 	return ret
 }
