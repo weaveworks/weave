@@ -54,32 +54,68 @@ func newMockConnection(from, to *Peer) Connection {
 	return &mockConnection{RemoteConnection{from, to, ""}}
 }
 
-// Check that the peers slice matches the peers associated with the routers slice
-func checkPeerArray(t *testing.T, peers []*Peer, routers []*Router) {
-	check := make(map[PeerName]bool)
-	for _, peer := range peers {
-		check[peer.Name] = true
+func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Connection) {
+	checkConns := make(map[PeerName]bool)
+	for _, conn := range wanted {
+		checkConns[conn.Remote().Name] = true
 	}
-	for _, router := range routers {
-		name := router.Ourself.Peer.Name
-		if _, found := check[name]; found {
-			delete(check, name)
+	for _, conn := range got {
+		remoteName := conn.Remote().Name
+		if _, found := checkConns[remoteName]; found {
+			delete(checkConns, remoteName)
 		} else {
-			wt.Fatalf(t, "Expected peer not found %s", name)
+			wt.Fatalf(t, "Unexpected connection from %s to %s", ourName, remoteName)
 		}
 	}
-	if len(check) > 0 {
-		wt.Fatalf(t, "Unexpected peers: %v", check)
+	if len(checkConns) > 0 {
+		wt.Fatalf(t, "Expected connections not found: from %s to %v", ourName, checkConns)
 	}
 }
 
-// Wrappers for building arguments to test functions
-func rs(routers ...*Router) []*Router { return routers }
-func cs(routers ...*Router) []Connection {
-	ret := make([]Connection, len(routers))
-	for i, r := range routers {
-		ret[i] = newMockConnection(nil, r.Ourself.Peer)
-	}
-	return ret
+// Check that the peers slice matches the wanted peers
+func checkPeerArray(t *testing.T, peers []*Peer, wantedPeers ...*Peer) {
+	checkTopologyPeers(t, false, peers, wantedPeers...)
 }
-func ca(cslices ...[]Connection) [][]Connection { return cslices }
+
+// Check that the topology of router matches the peers and all of their connections
+func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
+	peers := make([]*Peer, 0)
+	for _, peer := range router.Peers.table {
+		peers = append(peers, peer)
+	}
+	checkTopologyPeers(t, true, peers, wantedPeers...)
+}
+
+// Check that the peers slice matches the wanted peers and optionally all of their connections
+func checkTopologyPeers(t *testing.T, checkConns bool, peers []*Peer, wantedPeers ...*Peer) {
+	check := make(map[PeerName]*Peer)
+	for _, peer := range wantedPeers {
+		check[peer.Name] = peer
+	}
+	for _, peer := range peers {
+		name := peer.Name
+		if wantedPeer, found := check[name]; found {
+			if checkConns {
+				checkEqualConns(t, name, peer.connections, wantedPeer.connections)
+			}
+			delete(check, name)
+		} else {
+			wt.Fatalf(t, "Unexpected peer: %s", name)
+		}
+	}
+	if len(check) > 0 {
+		wt.Fatalf(t, "Expected peers not found: %v", check)
+	}
+}
+
+// Create a remote Peer object plus all of its connections, based on the name and UIDs of existing routers
+func tp(r *Router, routers ...*Router) *Peer {
+	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, 0)
+	connections := make(map[PeerName]Connection)
+	for _, r2 := range routers {
+		p2 := NewPeer(r2.Ourself.Peer.Name, r2.Ourself.Peer.UID, r2.Ourself.Peer.version)
+		connections[r2.Ourself.Peer.Name] = newMockConnection(peer, p2)
+	}
+	peer.SetVersionAndConnections(r.Ourself.Peer.version, connections)
+	return peer
+}

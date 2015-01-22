@@ -27,21 +27,7 @@ func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byName) Less(i, j int) bool { return a[i].name < a[j].name }
 
-func AssertEqualPN(t *testing.T, got, wanted PeerName, desc string) {
-	if got != wanted {
-		wt.Fatalf(t, "Expected %s %s but got %s", desc, wanted, got)
-	}
-}
-
-func checkPeerDetails(t *testing.T, got *decodedPeerInfo, wanted *Peer) {
-	AssertEqualPN(t, got.name, wanted.Name, "Peer Name")
-	wt.AssertEqualuint64(t, got.uid, wanted.UID, "Peer UID")
-	//Not checking the version because I haven't synthesised the data independently
-	//and the 'real' version is often out of sync with another peers' view of it
-	//wt.AssertEqualuint64(t, got.version, wanted.version, "Peer version")
-}
-
-func checkConnsEncoding(t *testing.T, ourName PeerName, connsBuf []byte, connections []Connection) {
+func checkConnsEncoding(t *testing.T, ourName PeerName, connsBuf []byte, connections map[PeerName]Connection) {
 	checkConns := make(map[PeerName]bool)
 	for _, conn := range connections {
 		checkConns[conn.Remote().Name] = true
@@ -73,27 +59,25 @@ func decodePeerInfo(t *testing.T, decoder *gob.Decoder) []*decodedPeerInfo {
 	return peerInfo
 }
 
-func checkBlank(t *testing.T, update []byte) {
-	decoder := gob.NewDecoder(bytes.NewReader(update))
-	peerInfo := decodePeerInfo(t, decoder)
-	if len(peerInfo) != 0 {
-		wt.Fatalf(t, "Expected 0 items but got %s", peerInfo)
-	}
-}
-
-func checkEncoding(t *testing.T, update []byte, routers []*Router, connections [][]Connection) {
+func checkEncoding(t *testing.T, update []byte, wantedPeers ...*Peer) {
 	decoder := gob.NewDecoder(bytes.NewReader(update))
 
-	// Peers can come either way round, so read them all in and sort them
+	// Peers can come in any order, so read them all in and sort them
 	peerInfo := decodePeerInfo(t, decoder)
 	sort.Sort(byName(peerInfo))
 	N := len(peerInfo)
-	if N != len(routers) {
-		wt.Fatalf(t, "Expected %d items but got %d: %s", len(routers), N, peerInfo)
+	if N != len(wantedPeers) {
+		wt.Fatalf(t, "Expected %d items but got %d: %s", len(wantedPeers), N, peerInfo)
 	}
-	for i := 0; i < N; i++ {
-		checkPeerDetails(t, peerInfo[i], routers[i].Ourself.Peer)
-		checkConnsEncoding(t, peerInfo[i].name, peerInfo[i].connsBuf, connections[i])
+	for i, wanted := range wantedPeers {
+		if peerInfo[i].name != wanted.Name {
+			wt.Fatalf(t, "Expected Peer Name %s but got %s", wanted.Name, peerInfo[i].name)
+		}
+		wt.AssertEqualuint64(t, peerInfo[i].uid, wanted.UID, "Peer UID")
+		//Not checking the version because I haven't synthesised the data independently
+		//and the 'real' version is often out of sync with another peers' view of it
+		//wt.AssertEqualuint64(t, peerInfo[i].version, wanted.version, "Peer version")
+		checkConnsEncoding(t, peerInfo[i].name, peerInfo[i].connsBuf, wanted.connections)
 	}
 }
 
@@ -115,18 +99,18 @@ func TestPeersEncoding(t *testing.T) {
 	r3 := NewTestRouter(t, peer3Name)
 
 	// Check state when they have no connections
-	checkEncoding(t, r1.Peers.EncodeAllPeers(), rs(r1), ca(nil))
-	checkEncoding(t, r2.Peers.EncodeAllPeers(), rs(r2), ca(nil))
+	checkEncoding(t, r1.Peers.EncodeAllPeers(), tp(r1))
+	checkEncoding(t, r2.Peers.EncodeAllPeers(), tp(r2))
 
 	// Now try adding some connections
 	r1.AddTestConnection(r2)
 	r2.AddTestConnection(r1)
-	checkEncoding(t, r1.Peers.EncodeAllPeers(), rs(r1, r2), ca(cs(r2), nil))
-	checkEncoding(t, r2.Peers.EncodeAllPeers(), rs(r1, r2), ca(nil, cs(r1)))
+	checkEncoding(t, r1.Peers.EncodeAllPeers(), tp(r1, r2), tp(r2))
+	checkEncoding(t, r2.Peers.EncodeAllPeers(), tp(r1), tp(r2, r1))
 	// Currently, the connection from 2 to 3 is one-way only
 	r2.AddTestConnection(r3)
-	checkEncoding(t, r2.Peers.EncodeAllPeers(), rs(r1, r2, r3), ca(nil, cs(r1, r3), nil))
-	checkEncoding(t, r3.Peers.EncodeAllPeers(), rs(r3), ca(nil))
+	checkEncoding(t, r2.Peers.EncodeAllPeers(), tp(r1), tp(r2, r1, r3), tp(r3))
+	checkEncoding(t, r3.Peers.EncodeAllPeers(), tp(r3))
 }
 
 func TestPeersGarbageCollection(t *testing.T) {
@@ -166,5 +150,5 @@ func TestPeersGarbageCollection(t *testing.T) {
 	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
 	r1.DeleteTestConnection(r3)
 	peersRemoved = r1.Peers.GarbageCollect()
-	checkPeerArray(t, peersRemoved, rs(r3))
+	checkPeerArray(t, peersRemoved, tp(r3))
 }

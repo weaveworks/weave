@@ -41,55 +41,6 @@ func (r1 *Router) AddTestChannelConnection(r2 *Router) {
 	r1.Ourself.handleConnectionEstablished(conn)
 }
 
-// Create a remote Peer object plus all of its connections, based on the name and UIDs of existing routers
-func tp(r *Router, routers ...*Router) *Peer {
-	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, 0)
-	connections := make(map[PeerName]Connection)
-	for _, r2 := range routers {
-		p2 := NewPeer(r2.Ourself.Peer.Name, r2.Ourself.Peer.UID, r2.Ourself.Peer.version)
-		connections[r2.Ourself.Peer.Name] = newMockConnection(peer, p2)
-	}
-	peer.SetVersionAndConnections(r.Ourself.Peer.version, connections)
-	return peer
-}
-
-func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Connection) {
-	checkConns := make(map[PeerName]bool)
-	for _, conn := range wanted {
-		checkConns[conn.Remote().Name] = true
-	}
-	for _, conn := range got {
-		remoteName := conn.Remote().Name
-		if _, found := checkConns[remoteName]; found {
-			delete(checkConns, remoteName)
-		} else {
-			wt.Fatalf(t, "Unexpected connection from %s to %s", ourName, remoteName)
-		}
-	}
-	if len(checkConns) > 0 {
-		t.Fatalf("Expected connections not found: from %s to %v\n%s", ourName, checkConns, wt.StackTrace())
-	}
-}
-
-func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
-	check := make(map[PeerName]*Peer)
-	for _, peer := range wantedPeers {
-		check[peer.Name] = peer
-	}
-	for _, peer := range router.Peers.table {
-		name := peer.Name
-		if wantedPeer, found := check[name]; found {
-			checkEqualConns(t, name, peer.connections, wantedPeer.connections)
-			delete(check, name)
-		} else {
-			t.Fatalf("Unexpected peer: %s\n%s", name, wt.StackTrace())
-		}
-	}
-	if len(check) > 0 {
-		t.Fatalf("Expected peers not found: %v\n%s", check, wt.StackTrace())
-	}
-}
-
 func TestGossipTopology(t *testing.T) {
 	wt.RunWithTimeout(t, 1*time.Second, func() {
 		implTestGossipTopology(t)
