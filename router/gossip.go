@@ -115,7 +115,7 @@ func deliverGossipUnicast(channel *GossipChannel, srcName PeerName, origPayload 
 		}
 		channel.gossiper.OnGossipUnicast(srcName, payload)
 	} else {
-		channel.RelayGossipTo(destName, ProtocolMsg{ProtocolGossipUnicast, origPayload})
+		channel.relayGossipUnicast(destName, origPayload)
 	}
 	return nil
 }
@@ -126,8 +126,7 @@ func deliverGossipBroadcast(channel *GossipChannel, srcName PeerName, origPayloa
 		return err
 	}
 	channel.gossiper.OnGossipBroadcast(payload)
-	channel.RelayGossipBroadcast(srcName, ProtocolMsg{ProtocolGossipBroadcast, origPayload})
-	return nil
+	return channel.relayGossipBroadcast(srcName, origPayload)
 }
 
 func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.Decoder) error {
@@ -142,35 +141,32 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 }
 
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
-	msg := ProtocolMsg{ProtocolGossipUnicast, GobEncode(c.hash, c.ourself.Name, dstPeerName, buf)}
-	return c.RelayGossipTo(dstPeerName, msg)
+	return c.relayGossipUnicast(dstPeerName, GobEncode(c.hash, c.ourself.Name, dstPeerName, buf))
 }
 
-func (c *GossipChannel) RelayGossipTo(dstPeerName PeerName, msg ProtocolMsg) error {
+func (c *GossipChannel) GossipBroadcast(buf []byte) error {
+	return c.relayGossipBroadcast(c.ourself.Name, GobEncode(c.hash, c.ourself.Name, buf))
+}
+
+func (c *GossipChannel) relayGossipUnicast(dstPeerName PeerName, msg []byte) error {
 	if relayPeerName, found := c.ourself.Router.Routes.Unicast(dstPeerName); !found {
 		logGossip("unknown relay destination:", dstPeerName)
-		return nil // ?
 	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
 		logGossip("unable to find connection to relay peer", relayPeerName)
-		return nil // ?
 	} else {
-		conn.(ProtocolSender).SendProtocolMsg(msg)
+		conn.(ProtocolSender).SendProtocolMsg(ProtocolMsg{ProtocolGossipUnicast, msg})
 	}
 	return nil
 }
 
-func (c *GossipChannel) GossipBroadcast(buf []byte) error {
-	msg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.hash, c.ourself.Name, buf)}
-	c.RelayGossipBroadcast(c.ourself.Name, msg)
-	return nil // ?
-}
-
-func (c *GossipChannel) RelayGossipBroadcast(srcName PeerName, msg ProtocolMsg) {
-	if srcPeer, found := c.ourself.Router.Peers.Fetch(srcName); found {
-		for _, conn := range c.ourself.NextBroadcastHops(srcPeer) {
-			conn.SendProtocolMsg(msg)
-		}
-	} else {
+func (c *GossipChannel) relayGossipBroadcast(srcName PeerName, msg []byte) error {
+	if srcPeer, found := c.ourself.Router.Peers.Fetch(srcName); !found {
 		logGossip("unable to relay broadcast from unknown peer", srcName)
+	} else {
+		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, msg}
+		for _, conn := range c.ourself.NextBroadcastHops(srcPeer) {
+			conn.SendProtocolMsg(protocolMsg)
+		}
 	}
+	return nil
 }
