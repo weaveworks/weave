@@ -204,7 +204,8 @@ func (ne *NaClEncryptor) Bytes() []byte {
 	nonce := ne.nonce
 	if nonce == nil {
 		freshNonce, encodedNonce, err := EncodeNonce(ne.df)
-		if err = ne.conn.CheckFatal(err); err != nil {
+		if err != nil {
+			ne.conn.Shutdown(err)
 			return []byte{}
 		}
 		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
@@ -222,7 +223,8 @@ func (ne *NaClEncryptor) Bytes() []byte {
 		ne.nonce = <-ne.nonceChan
 	} else if offset == 1<<14 { // half way through range, send new nonce
 		nonce, encodedNonce, err := EncodeNonce(ne.df)
-		if err = ne.conn.CheckFatal(err); err != nil {
+		if err != nil {
+			ne.conn.Shutdown(err)
 			return []byte{}
 		}
 		ne.nonceChan <- nonce
