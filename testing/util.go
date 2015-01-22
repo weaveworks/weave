@@ -64,6 +64,12 @@ func AssertType(t *testing.T, got interface{}, wanted interface{}, desc string) 
 	}
 }
 
+func AssertEmpty(t *testing.T, array interface{}, desc string) {
+	if reflect.ValueOf(array).Len() != 0 {
+		Fatalf(t, "Expected empty %s but got %s", desc, array)
+	}
+}
+
 // Like testing.Fatalf, but adds the stack trace of the current call
 func Fatalf(t *testing.T, format string, args ...interface{}) {
 	t.Fatalf(format+"\n%s", append(args, StackTrace())...)

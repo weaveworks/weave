@@ -76,9 +76,7 @@ func (c *GossipChannel) send(buf []byte, conn Connection) {
 
 func (c *GossipChannel) GossipMsg(buf []byte) {
 	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
-		if conn.Established() {
-			c.send(buf, conn)
-		}
+		c.send(buf, conn)
 	})
 }
 

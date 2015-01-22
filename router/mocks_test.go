@@ -23,7 +23,7 @@ func (r1 *Router) AddTestConnection(r2 *Router) {
 	toName := r2.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
 	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := &mockConnection{r1.Ourself.Peer, toPeer, ""}
+	conn := newMockConnection(r1.Ourself.Peer, toPeer)
 	r1.Ourself.addConnection(conn)
 	r1.Ourself.connectionEstablished(conn)
 }
@@ -46,50 +46,76 @@ func (r1 *Router) DeleteTestConnection(r2 *Router) {
 	r1.Ourself.deleteConnection(conn)
 }
 
-type mockConnection struct {
-	local         *Peer
-	remote        *Peer
-	remoteTCPAddr string // we are not currently checking the TCP address
+// mockConnection used in testing is very similar to a RemoteConnection, without
+// the RemoteTCPAddr(), but I want to keep a separate type in order to distinguish
+// what is created by the test from what is created by the real code.
+func newMockConnection(from, to *Peer) Connection {
+	type mockConnection struct{ RemoteConnection }
+	return &mockConnection{RemoteConnection{from, to, ""}}
 }
 
-func (conn *mockConnection) Local() *Peer          { return conn.local }
-func (conn *mockConnection) Remote() *Peer         { return conn.remote }
-func (conn *mockConnection) RemoteTCPAddr() string { return "" }
-func (conn *mockConnection) Shutdown(error)        {}
-func (conn *mockConnection) Established() bool     { return true }
-
-func AssertEmpty(t *testing.T, array []*Peer, desc string) {
-	if len(array) != 0 {
-		wt.Fatalf(t, "Expected empty %s but got %s", desc, array)
+func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Connection) {
+	checkConns := make(map[PeerName]bool)
+	for _, conn := range wanted {
+		checkConns[conn.Remote().Name] = true
+	}
+	for _, conn := range got {
+		remoteName := conn.Remote().Name
+		if _, found := checkConns[remoteName]; found {
+			delete(checkConns, remoteName)
+		} else {
+			wt.Fatalf(t, "Unexpected connection from %s to %s", ourName, remoteName)
+		}
+	}
+	if len(checkConns) > 0 {
+		wt.Fatalf(t, "Expected connections not found: from %s to %v", ourName, checkConns)
 	}
 }
 
-// Check that the peers slice matches the peers associated with the routers slice
-func checkPeerArray(t *testing.T, peers []*Peer, routers []*Router) {
-	check := make(map[PeerName]bool)
+// Check that the peers slice matches the wanted peers
+func checkPeerArray(t *testing.T, peers []*Peer, wantedPeers ...*Peer) {
+	checkTopologyPeers(t, false, peers, wantedPeers...)
+}
+
+// Check that the topology of router matches the peers and all of their connections
+func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
+	peers := make([]*Peer, 0)
+	for _, peer := range router.Peers.table {
+		peers = append(peers, peer)
+	}
+	checkTopologyPeers(t, true, peers, wantedPeers...)
+}
+
+// Check that the peers slice matches the wanted peers and optionally all of their connections
+func checkTopologyPeers(t *testing.T, checkConns bool, peers []*Peer, wantedPeers ...*Peer) {
+	check := make(map[PeerName]*Peer)
+	for _, peer := range wantedPeers {
+		check[peer.Name] = peer
+	}
 	for _, peer := range peers {
-		check[peer.Name] = true
-	}
-	for _, router := range routers {
-		name := router.Ourself.Peer.Name
-		if _, found := check[name]; found {
+		name := peer.Name
+		if wantedPeer, found := check[name]; found {
+			if checkConns {
+				checkEqualConns(t, name, peer.connections, wantedPeer.connections)
+			}
 			delete(check, name)
 		} else {
-			wt.Fatalf(t, "Expected peer not found %s", name)
+			wt.Fatalf(t, "Unexpected peer: %s", name)
 		}
 	}
 	if len(check) > 0 {
-		wt.Fatalf(t, "Unexpected peers: %v", check)
+		wt.Fatalf(t, "Expected peers not found: %v", check)
 	}
 }
 
-// Wrappers for building arguments to test functions
-func rs(routers ...*Router) []*Router { return routers }
-func cs(routers ...*Router) []Connection {
-	ret := make([]Connection, len(routers))
-	for i, r := range routers {
-		ret[i] = &mockConnection{nil, r.Ourself.Peer, ""}
+// Create a remote Peer object plus all of its connections, based on the name and UIDs of existing routers
+func tp(r *Router, routers ...*Router) *Peer {
+	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, 0)
+	connections := make(map[PeerName]Connection)
+	for _, r2 := range routers {
+		p2 := NewPeer(r2.Ourself.Peer.Name, r2.Ourself.Peer.UID, r2.Ourself.Peer.version)
+		connections[r2.Ourself.Peer.Name] = newMockConnection(peer, p2)
 	}
-	return ret
+	peer.SetVersionAndConnections(r.Ourself.Peer.version, connections)
+	return peer
 }
-func ca(cslices ...[]Connection) [][]Connection { return cslices }
