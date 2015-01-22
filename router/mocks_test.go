@@ -58,12 +58,6 @@ func (conn *mockConnection) RemoteTCPAddr() string { return "" }
 func (conn *mockConnection) Shutdown(error)        {}
 func (conn *mockConnection) Established() bool     { return true }
 
-func AssertEmpty(t *testing.T, array []*Peer, desc string) {
-	if len(array) != 0 {
-		wt.Fatalf(t, "Expected empty %s but got %s", desc, array)
-	}
-}
-
 // Check that the peers slice matches the peers associated with the routers slice
 func checkPeerArray(t *testing.T, peers []*Peer, routers []*Router) {
 	check := make(map[PeerName]bool)
