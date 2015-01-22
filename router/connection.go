@@ -534,80 +534,79 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 		var msg []byte
 		conn.extendReadDeadline()
 		if err = decoder.Decode(&msg); err != nil {
-			conn.Shutdown(err)
-			return
+			break
 		}
 		msg, err = receiver.Decode(msg)
 		if err != nil {
-			checkWarn(err)
-			// remote peer may be using wrong password. Or there could
-			// be some sort of injection attack going on. Just ignore
-			// the traffic rather than shutting down.
-			continue
+			break
 		}
 		if len(msg) < 1 {
 			conn.log("ignoring blank msg")
 			continue
 		}
-		payload := msg[1:]
-		switch ProtocolTag(msg[0]) {
-		case ProtocolConnectionEstablished:
-			// We sent fast heartbeats to the remote peer, which has
-			// now received at least one of them and told us via this
-			// message.  We can now consider the connection as
-			// established from our end.
-			conn.SetEstablished()
-		case ProtocolStartFragmentationTest:
-			conn.Forward(false, &ForwardedFrame{
-				srcPeer: conn.local,
-				dstPeer: conn.remote,
-				frame:   FragTest},
-				nil)
-		case ProtocolFragmentationReceived:
-			conn.setStackFrag(true)
-		case ProtocolNonce:
-			if usingPassword {
-				conn.Decryptor.ReceiveNonce(payload)
-			} else {
-				conn.log("ignoring unexpected nonce on unencrypted connection")
-			}
-		case ProtocolFetchAll:
-			// There are exactly two messages that relate to topology
-			// updates.
-			//
-			// 1. FetchAll. This carries no payload. The receiver
-			// responds with the entire topology model as the receiver
-			// has it.
-			//
-			// 2. Update. This carries a topology payload. The
-			// receiver merges it with its own topology model. If the
-			// payload is a subset of the receiver's topology, no
-			// further action is taken. Otherwise, the receiver sends
-			// out to all its connections an "improved" update.
-			conn.SendProtocolMsg(ProtocolMsg{ProtocolUpdate, conn.Router.Peers.EncodeAllPeers()})
-		case ProtocolUpdate:
-			newUpdate, err := conn.Router.Peers.ApplyUpdate(payload)
-			if _, ok := err.(UnknownPeersError); err != nil && ok {
-				// That update contained a peer we didn't know about;
-				// request full update
-				conn.SendProtocolMsg(ProtocolMsg{ProtocolFetchAll, nil})
-				continue
-			}
-			if err != nil {
-				conn.Shutdown(err)
-				return
-			}
-			if len(newUpdate) != 0 {
-				conn.Router.ConnectionMaker.Refresh()
-				conn.Router.Routes.Recalculate()
-				conn.Router.Ourself.SendProtocolMsg(ProtocolMsg{ProtocolUpdate, newUpdate})
-			}
-		case ProtocolPMTUVerified:
-			conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
-		default:
-			conn.log("received unknown msg:\n", msg)
+		if err = conn.handleProtocolMsg(ProtocolTag(msg[0]), msg[1:]); err != nil {
+			break
 		}
 	}
+	conn.Shutdown(err)
+}
+
+func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) error {
+	switch tag {
+	case ProtocolConnectionEstablished:
+		// We sent fast heartbeats to the remote peer, which has now
+		// received at least one of them and told us via this message.
+		// We can now consider the connection as established from our
+		// end.
+		conn.SetEstablished()
+	case ProtocolStartFragmentationTest:
+		conn.Forward(false, &ForwardedFrame{
+			srcPeer: conn.local,
+			dstPeer: conn.remote,
+			frame:   FragTest},
+			nil)
+	case ProtocolFragmentationReceived:
+		conn.setStackFrag(true)
+	case ProtocolNonce:
+		if conn.SessionKey == nil {
+			return fmt.Errorf("unexpected nonce on unencrypted connection")
+		}
+		conn.Decryptor.ReceiveNonce(payload)
+	case ProtocolFetchAll:
+		// There are exactly two messages that relate to topology
+		// updates.
+		//
+		// 1. FetchAll. This carries no payload. The receiver responds
+		// with the entire topology model as the receiver has it.
+		//
+		// 2. Update. This carries a topology payload. The receiver
+		// merges it with its own topology model. If the payload is a
+		// subset of the receiver's topology, no further action is
+		// taken. Otherwise, the receiver sends out to all its
+		// connections an "improved" update.
+		conn.SendProtocolMsg(ProtocolMsg{ProtocolUpdate, conn.Router.Peers.EncodeAllPeers()})
+	case ProtocolUpdate:
+		newUpdate, err := conn.Router.Peers.ApplyUpdate(payload)
+		if _, ok := err.(UnknownPeersError); err != nil && ok {
+			// That update contained a peer we didn't know about;
+			// request full update
+			conn.SendProtocolMsg(ProtocolMsg{ProtocolFetchAll, nil})
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if len(newUpdate) != 0 {
+			conn.Router.ConnectionMaker.Refresh()
+			conn.Router.Routes.Recalculate()
+			conn.Router.Ourself.SendProtocolMsg(ProtocolMsg{ProtocolUpdate, newUpdate})
+		}
+	case ProtocolPMTUVerified:
+		conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
+	default:
+		conn.log("ignoring unknown protocol tag:", tag)
+	}
+	return nil
 }
 
 func (conn *LocalConnection) extendReadDeadline() {
