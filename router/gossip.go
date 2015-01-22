@@ -83,7 +83,8 @@ func (c *GossipChannel) GossipMsg(buf []byte) {
 func handleGossip(conn *LocalConnection, payload []byte, onok func(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error) error {
 	decoder := gob.NewDecoder(bytes.NewReader(payload))
 	var channelHash uint32
-	if err := conn.CheckFatal(decoder.Decode(&channelHash)); err != nil {
+	if err := decoder.Decode(&channelHash); err != nil {
+		conn.Shutdown(err)
 		return err
 	}
 	if channel, found := conn.Router.GossipChannels[channelHash]; !found {
@@ -93,11 +94,16 @@ func handleGossip(conn *LocalConnection, payload []byte, onok func(channel *Goss
 		return nil
 	} else {
 		var srcName PeerName
-		if err := conn.CheckFatal(decoder.Decode(&srcName)); err != nil {
+		if err := decoder.Decode(&srcName); err == nil {
+			conn.Shutdown(err)
 			return err
 		}
-		return conn.CheckFatal(onok(channel, srcName, payload, decoder))
+		if err := onok(channel, srcName, payload, decoder); err != nil {
+			conn.Shutdown(err)
+			return err
+		}
 	}
+	return nil
 }
 
 func deliverGossipUnicast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error {

@@ -166,12 +166,21 @@ func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
 			}
 			switch query.code {
 			case PAddConnection:
-				peer.handleAddConnection(query.payload.(*LocalConnection))
+				conn := query.payload.(*LocalConnection)
+				if peer.handleAddConnection(conn) {
+					conn.log("connection added")
+				}
 			case PDeleteConnection:
-				peer.handleDeleteConnection(query.payload.(*LocalConnection))
+				conn := query.payload.(*LocalConnection)
+				if peer.handleDeleteConnection(conn) {
+					conn.log("connection deleted")
+				}
 				query.resultChan <- nil
 			case PConnectionEstablished:
-				peer.handleConnectionEstablished(query.payload.(*LocalConnection))
+				conn := query.payload.(*LocalConnection)
+				if peer.handleConnectionEstablished(conn) {
+					conn.log("connection fully established")
+				}
 			case PSendProtocolMsg:
 				peer.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
@@ -181,7 +190,7 @@ func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
 	}
 }
 
-func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
+func (peer *LocalPeer) handleAddConnection(conn Connection) bool {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Attempt made to add connection to peer where peer is not the source of connection")
 	}
@@ -193,34 +202,32 @@ func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
 	// deliberately non symmetrical
 	if dupConn, found := peer.connections[toName]; found {
 		if dupConn == conn {
-			return
+			return false
 		}
-		// conn.UID is used as the tie breaker here, in the
-		// knowledge that both sides will make the same decision.
-		dupConnLocal := dupConn.(*LocalConnection)
-		if conn.UID == dupConnLocal.UID {
+		switch conn.BreakTie(dupConn) {
+		case TieBreakWon:
+			dupConn.Shutdown(dupErr)
+			peer.handleDeleteConnection(dupConn)
+		case TieBreakLost:
+			conn.Shutdown(dupErr)
+			return false
+		case TieBreakTied:
 			// oh good grief. Sod it, just kill both of them.
-			conn.CheckFatal(dupErr)
-			dupConnLocal.CheckFatal(dupErr)
-			peer.handleDeleteConnection(dupConnLocal)
-			return
-		} else if conn.UID < dupConnLocal.UID {
-			dupConnLocal.CheckFatal(dupErr)
-			peer.handleDeleteConnection(dupConnLocal)
-		} else {
-			conn.CheckFatal(dupErr)
-			return
+			conn.Shutdown(dupErr)
+			dupConn.Shutdown(dupErr)
+			peer.handleDeleteConnection(dupConn)
+			return false
 		}
 	}
 	if err := peer.checkConnectionLimit(); err != nil {
-		conn.CheckFatal(err)
-		return
+		conn.Shutdown(err)
+		return false
 	}
 	peer.addConnection(conn)
-	conn.log("connection added")
+	return true
 }
 
-func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
+func (peer *LocalPeer) handleDeleteConnection(conn Connection) bool {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Attempt made to delete connection from peer where peer is not the source of connection")
 	}
@@ -229,30 +236,30 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	}
 	toName := conn.Remote().Name
 	if connFound, found := peer.connections[toName]; !found || connFound != conn {
-		return
+		return false
 	}
 	peer.deleteConnection(conn)
-	conn.log("connection deleted")
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
 	peer.Router.Peers.GarbageCollect()
 	if conn.Established() {
 		peer.broadcastPeerUpdate()
 	}
+	return true
 }
 
-func (peer *LocalPeer) handleConnectionEstablished(conn Connection) {
+func (peer *LocalPeer) handleConnectionEstablished(conn Connection) bool {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Peer informed of active connection where peer is not the source of connection")
 	}
 	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
 		conn.Shutdown(fmt.Errorf("Cannot set unknown connection active"))
-		return
+		return false
 	}
 	peer.connectionEstablished(conn)
-	log.Printf("->[%s]: connection fully established", conn.Remote().Name)
 	peer.Router.SendAllGossipDown(conn)
 	peer.broadcastPeerUpdate(conn.Remote())
+	return true
 }
 
 func (peer *LocalPeer) handleSendProtocolMsg(m ProtocolMsg) {

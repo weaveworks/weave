@@ -15,10 +15,19 @@ import (
 type Connection interface {
 	Local() *Peer
 	Remote() *Peer
+	BreakTie(Connection) ConnectionTieBreak
 	RemoteTCPAddr() string
 	Established() bool
 	Shutdown(error)
 }
+
+type ConnectionTieBreak int
+
+const (
+	TieBreakWon ConnectionTieBreak = iota
+	TieBreakLost
+	TieBreakTied
+)
 
 type RemoteConnection struct {
 	local         *Peer
@@ -47,7 +56,7 @@ type LocalConnection struct {
 	verifyPMTU        chan<- int
 	Decryptor         Decryptor
 	Router            *Router
-	UID               uint64
+	uid               uint64
 	queryChan         chan<- *ConnectionInteraction
 }
 
@@ -71,15 +80,19 @@ func (conn *RemoteConnection) Remote() *Peer {
 	return conn.remote
 }
 
+func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak {
+	return TieBreakTied
+}
+
 func (conn *RemoteConnection) RemoteTCPAddr() string {
 	return conn.remoteTCPAddr
 }
 
-func (conn *RemoteConnection) Shutdown(error) {
-}
-
 func (conn *RemoteConnection) Established() bool {
 	return true
+}
+
+func (conn *RemoteConnection) Shutdown(error) {
 }
 
 func (conn *RemoteConnection) String() string {
@@ -115,10 +128,17 @@ func (conn *LocalConnection) Start(acceptNewPeer bool) {
 	go conn.run(queryChan, acceptNewPeer)
 }
 
-func (conn *LocalConnection) Established() bool {
-	conn.RLock()
-	defer conn.RUnlock()
-	return conn.established
+func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
+	dupConnLocal := dupConn.(*LocalConnection)
+	// conn.uid is used as the tie breaker here, in the knowledge that
+	// both sides will make the same decision.
+	if conn.uid < dupConnLocal.uid {
+		return TieBreakWon
+	} else if dupConnLocal.uid < conn.uid {
+		return TieBreakLost
+	} else {
+		return TieBreakTied
+	}
 }
 
 // Read by the forwarder processes when in the UDP senders
@@ -128,15 +148,10 @@ func (conn *LocalConnection) RemoteUDPAddr() *net.UDPAddr {
 	return conn.remoteUDPAddr
 }
 
-// Called by the forwarder processes in a few places (including
-// crypto), but the connection TCP receiver process, and by the local
-// peer actor process. Do not call this from the connection's actor
-// process itself.
-func (conn *LocalConnection) CheckFatal(err error) error {
-	if err != nil {
-		conn.Shutdown(err)
-	}
-	return err
+func (conn *LocalConnection) Established() bool {
+	conn.RLock()
+	defer conn.RUnlock()
+	return conn.established
 }
 
 // Called by forwarder processes, read in Forward (by sniffer and udp
@@ -185,7 +200,7 @@ func (conn *LocalConnection) Shutdown(err error) {
 // b) updating a remote peer's knowledge of our address, in the event
 // it changes (e.g. because NAT paths expired).
 func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connUID uint64) {
-	if remoteUDPAddr == nil || connUID != conn.UID {
+	if remoteUDPAddr == nil || connUID != conn.uid {
 		return
 	}
 	conn.queryChan <- &ConnectionInteraction{
@@ -222,7 +237,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 
 	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
-	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.UID)
+	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.uid)
 	conn.heartbeatFrame = &ForwardedFrame{
 		srcPeer: conn.local,
 		dstPeer: conn.remote,
@@ -446,7 +461,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	if err != nil {
 		return err
 	}
-	conn.UID = localConnID ^ remoteConnID
+	conn.uid = localConnID ^ remoteConnID
 
 	if usingPassword {
 		remotePublicStr, rpErr := checkHandshakeStringField("PublicKey", "", handshakeRecv)
@@ -510,7 +525,8 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	for {
 		var msg []byte
 		conn.extendReadDeadline()
-		if conn.CheckFatal(decoder.Decode(&msg)) != nil {
+		if err = decoder.Decode(&msg); err != nil {
+			conn.Shutdown(err)
 			return
 		}
 		msg, err = receiver.Decode(msg)
