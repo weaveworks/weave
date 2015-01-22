@@ -136,6 +136,8 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 			} else if newSpaceset.PeerName() == alloc.ourName {
 				lg.Debug.Println("Received update with our peerName but different UID")
 				continue
+			} else if oldSpaceset != nil && oldSpaceset.MaybeDead() {
+				lg.Info.Println("Received update for peer believed dead", newSpaceset)
 			}
 			lg.Debug.Println("Replacing data with newer version", newSpaceset)
 			alloc.peerInfo[newSpaceset.UID()] = newSpaceset
@@ -173,6 +175,19 @@ func (alloc *Allocator) lookForOverlaps() (ret bool) {
 		}
 	}
 	return
+}
+
+func (alloc *Allocator) lookForDead(now time.Time) {
+	limit := now.Add(-GossipDeadTimeout)
+	for _, entry := range alloc.peerInfo {
+		if peerEntry, ok := entry.(*PeerSpaceSet); ok &&
+			peerEntry.MaybeDead() && !peerEntry.IsTombstone() &&
+			peerEntry.lastSeen.Before(limit) {
+			peerEntry.MakeTombstone()
+			lg.Debug.Println("Tombstoned", peerEntry)
+			alloc.gossip.GossipBroadcast(encode(peerEntry))
+		}
+	}
 }
 
 func (alloc *Allocator) lookForNewLeaks(now time.Time) {
@@ -244,6 +259,7 @@ func (alloc *Allocator) considerOurPosition() {
 			alloc.requestSpace()
 		}
 		alloc.discardOldLeaks()
+		alloc.lookForDead(now)
 		changed := alloc.reclaimLeaks(now)
 		alloc.lookForNewLeaks(now)
 		alloc.lookForOverlaps()
@@ -459,22 +475,20 @@ func (alloc *Allocator) OnGossip(buf []byte) []byte {
 	}
 }
 
-func (alloc *Allocator) OnAlive(uid uint64) {
+func (alloc *Allocator) OnAlive(name router.PeerName, uid uint64) {
 	// If it's new to us, nothing to do.
 	// If we previously believed it to be dead, need to figure that case out.
 }
 
-func (alloc *Allocator) OnDead(uid uint64) {
+func (alloc *Allocator) OnDead(name router.PeerName, uid uint64) {
 	alloc.Lock()
 	defer alloc.Unlock()
 	entry, found := alloc.peerInfo[uid]
 	if found {
 		if peerEntry, ok := entry.(*PeerSpaceSet); ok &&
-			!peerEntry.IsTombstone() {
-			lg.Info.Printf("Allocator: Marking %s as dead", entry.PeerName())
-			peerEntry.MakeTombstone()
-			// Can't run this synchronously or we deadlock
-			go alloc.gossip.GossipBroadcast(encode(entry))
+			!peerEntry.MaybeDead() {
+			lg.Info.Printf("[allocator] Marking %s as maybe dead", entry.PeerName())
+			peerEntry.MarkMaybeDead(true, alloc.timeProvider.Now())
 		}
 	}
 }

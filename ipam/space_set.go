@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"time"
 )
 
 type SpaceSet interface {
@@ -21,15 +22,18 @@ type SpaceSet interface {
 	NumFreeAddresses() uint32
 	Overlaps(space *MinSpace) bool
 	String() string
+	MaybeDead() bool
 	ForEachSpace(fun func(Space))
 }
 
 // This represents a peer's space allocations, which we only hear about.
 type PeerSpaceSet struct {
-	peerName router.PeerName
-	uid      uint64
-	version  uint64
-	spaces   []Space
+	peerName  router.PeerName
+	uid       uint64
+	version   uint64
+	spaces    []Space
+	lastSeen  time.Time
+	maybeDead bool
 	sync.RWMutex
 }
 
@@ -45,6 +49,7 @@ func NewPeerSpace(pn router.PeerName, uid uint64) *PeerSpaceSet {
 func (s *PeerSpaceSet) PeerName() router.PeerName { return s.peerName }
 func (s *PeerSpaceSet) UID() uint64               { return s.uid }
 func (s *PeerSpaceSet) Version() uint64           { return s.version }
+func (s *PeerSpaceSet) MaybeDead() bool           { return s.maybeDead }
 
 func (s *PeerSpaceSet) Encode(enc *gob.Encoder) error {
 	s.RLock()
@@ -143,6 +148,13 @@ func (s *PeerSpaceSet) Overlaps(space *MinSpace) bool {
 		}
 	}
 	return false
+}
+
+func (s *PeerSpaceSet) MarkMaybeDead(f bool, now time.Time) {
+	s.Lock()
+	s.maybeDead = f
+	s.lastSeen = now
+	s.Unlock()
 }
 
 func (s *PeerSpaceSet) MakeTombstone() {

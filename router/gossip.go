@@ -20,6 +20,11 @@ type Gossip interface {
 	GossipBroadcast(buf []byte) error
 }
 
+type LifeCycle interface {
+	OnAlive(name PeerName, uid uint64)
+	OnDead(name PeerName, uid uint64)
+}
+
 type Gossiper interface {
 	OnGossipUnicast(sender PeerName, msg []byte)
 	OnGossipBroadcast(msg []byte)
@@ -175,5 +180,21 @@ func (c *GossipChannel) RelayGossipBroadcast(srcName PeerName, msg ProtocolMsg) 
 		}
 	} else {
 		logGossip("unable to relay broadcast from unknown peer", srcName)
+	}
+}
+
+func (router *Router) NotifyAlive(peer *Peer) {
+	for _, channel := range router.GossipChannels {
+		if lifecycler, ok := channel.gossiper.(LifeCycle); ok {
+			lifecycler.OnAlive(peer.Name, peer.UID)
+		}
+	}
+}
+
+func (router *Router) NotifyDead(peer *Peer) {
+	for _, channel := range router.GossipChannels {
+		if lifecycler, ok := channel.gossiper.(LifeCycle); ok {
+			lifecycler.OnDead(peer.Name, peer.UID)
+		}
 	}
 }

@@ -196,7 +196,7 @@ func (m *mockGossipComms) VerifyBroadcastMessage(t *testing.T, buf []byte) {
 	} else if msg := m.messages[0]; msg.dst != router.UnknownPeerName {
 		wt.Fatalf(t, "Expected Gossip broadcast message but got dest %s", msg.dst)
 	} else if !equalByteBuffer(msg.buf, buf) {
-		wt.Fatalf(t, "Gossip message not sent as expected: %+v", msg)
+		wt.Fatalf(t, "Gossip message not sent as expected: \nwant: %x\ngot : %x", buf, msg.buf)
 	} else {
 		// Swallow this message
 		m.messages = m.messages[1:]
@@ -250,7 +250,19 @@ func assertNoOverlaps(t *testing.T, allocs ...*Allocator) {
 	}
 }
 
+func (alloc *Allocator) considerWhileLocked() {
+	alloc.Lock()
+	alloc.considerOurPosition()
+	alloc.Unlock()
+}
+
 func TestGossip(t *testing.T) {
+	wt.RunWithTimeout(t, 1*time.Second, func() {
+		implTestGossip(t)
+	})
+}
+
+func implTestGossip(t *testing.T) {
 	const (
 		testStart1     = "10.0.1.0"
 		testStart2     = "10.0.1.1"
@@ -292,7 +304,7 @@ func TestGossip(t *testing.T) {
 	// Give alloc1 some space so we can test the choosing algorithm
 	alloc1.manageSpace(net.ParseIP(testStart1), 1)
 	alloc1.state = allocStateNeutral
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 	mockGossip1.VerifyNoMoreMessages(t)
 
 	// Now give alloc2 some space and tell alloc1 about it
@@ -308,7 +320,7 @@ func TestGossip(t *testing.T) {
 
 	// Time out with no reply
 	mockTime.SetTime(baseTime.Add(5 * time.Second))
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 
 	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, encode(alloc1.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
@@ -331,25 +343,24 @@ func TestGossip(t *testing.T) {
 	mockGossip2.VerifyNoMoreMessages(t)
 
 	// Now looking to trigger a timeout
+	alloc1.OnDead(pn, peerUID) // Simulate call from router
 	mockTime.SetTime(baseTime.Add(11 * time.Minute))
-	alloc1.OnDead(peerUID)             // FIXME: Is someone else supposed to call this?
-	time.Sleep(100 * time.Millisecond) // slight hack: allow the async broadcast to complete
+	alloc1.considerWhileLocked()
 
 	// Now make it look like alloc2 is a tombstone so we can check the message
 	alloc2.ourSpaceSet.MakeTombstone()
-
 	mockGossip1.VerifyBroadcastMessage(t, encode(alloc2.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
 	// Allow alloc1 to note the leak, but at this point it doesn't do anything
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
 	// Now move the time forward so alloc1 reclaims alloc2's storage
 	mockTime.SetTime(baseTime.Add(12 * time.Minute))
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 	mockGossip1.VerifyBroadcastMessage(t, encode(alloc1.ourSpaceSet))
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
@@ -388,19 +399,19 @@ func TestLeaks(t *testing.T) {
 
 	// Give alloc1 the space from .0 to .7; nobody owns from .7 to .15
 	alloc1.manageSpace(net.ParseIP(testStart1), 8)
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 	mockGossip1.VerifyNoMoreMessages(t)
 
 	// Allow alloc1 to note the leak
 	mockTime.SetTime(baseTime.Add(30 * time.Second))
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
 	// Alloc2 is managing some of that space; it tells alloc1 about itself
 	mockTime.SetTime(baseTime.Add(40 * time.Second))
 	alloc2.manageSpace(net.ParseIP(testStart2), 4)
-	alloc2.considerOurPosition()
+	alloc2.considerWhileLocked()
 	mockGossip2.VerifyNoMoreMessages(t)
 
 	assertNoOverlaps(t, alloc1, alloc2)
@@ -414,13 +425,13 @@ func TestLeaks(t *testing.T) {
 
 	// Allow alloc1 to note the leak, but at this point it doesn't do anything
 	mockTime.SetTime(baseTime.Add(60 * time.Second))
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
 	// Now move the time forward so alloc1 reclaims the leak
 	mockTime.SetTime(baseTime.Add(12 * time.Minute))
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 
@@ -448,7 +459,7 @@ func TestGossipBreakage(t *testing.T) {
 	// Give alloc1 some space
 	alloc1.manageSpace(net.ParseIP(testStart1), 0)
 	alloc1.state = allocStateNeutral
-	alloc1.considerOurPosition()
+	alloc1.considerWhileLocked()
 	mockGossip1.VerifyNoMoreMessages(t)
 
 	// Call decodeUpdate rather than OnGossip which also calls considerOurPosition
