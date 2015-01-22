@@ -526,55 +526,56 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 		var msg []byte
 		conn.extendReadDeadline()
 		if err = decoder.Decode(&msg); err != nil {
-			conn.Shutdown(err)
-			return
+			break
 		}
 		msg, err = receiver.Decode(msg)
 		if err != nil {
-			checkWarn(err)
-			// remote peer may be using wrong password. Or there could
-			// be some sort of injection attack going on. Just ignore
-			// the traffic rather than shutting down.
-			continue
+			break
 		}
 		if len(msg) < 1 {
 			conn.log("ignoring blank msg")
 			continue
 		}
-		payload := msg[1:]
-		switch ProtocolTag(msg[0]) {
-		case ProtocolConnectionEstablished:
-			// We sent fast heartbeats to the remote peer, which has
-			// now received at least one of them and told us via this
-			// message.  We can now consider the connection as
-			// established from our end.
-			conn.SetEstablished()
-		case ProtocolStartFragmentationTest:
-			conn.Forward(false, &ForwardedFrame{
-				srcPeer: conn.local,
-				dstPeer: conn.remote,
-				frame:   FragTest},
-				nil)
-		case ProtocolFragmentationReceived:
-			conn.setStackFrag(true)
-		case ProtocolNonce:
-			if usingPassword {
-				conn.Decryptor.ReceiveNonce(payload)
-			} else {
-				conn.log("ignoring unexpected nonce on unencrypted connection")
-			}
-		case ProtocolPMTUVerified:
-			conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
-		case ProtocolGossipUnicast:
-			handleGossip(conn, payload, deliverGossipUnicast)
-		case ProtocolGossipBroadcast:
-			handleGossip(conn, payload, deliverGossipBroadcast)
-		case ProtocolGossip:
-			handleGossip(conn, payload, deliverGossip)
-		default:
-			conn.log("received unknown msg:\n", msg)
+		if err = conn.handleProtocolMsg(ProtocolTag(msg[0]), msg[1:]); err != nil {
+			break
 		}
 	}
+	conn.Shutdown(err)
+}
+
+func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) error {
+	switch tag {
+	case ProtocolConnectionEstablished:
+		// We sent fast heartbeats to the remote peer, which has now
+		// received at least one of them and told us via this message.
+		// We can now consider the connection as established from our
+		// end.
+		conn.SetEstablished()
+	case ProtocolStartFragmentationTest:
+		conn.Forward(false, &ForwardedFrame{
+			srcPeer: conn.local,
+			dstPeer: conn.remote,
+			frame:   FragTest},
+			nil)
+	case ProtocolFragmentationReceived:
+		conn.setStackFrag(true)
+	case ProtocolNonce:
+		if conn.SessionKey == nil {
+			return fmt.Errorf("unexpected nonce on unencrypted connection")
+		}
+		conn.Decryptor.ReceiveNonce(payload)
+	case ProtocolPMTUVerified:
+		conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
+	case ProtocolGossipUnicast:
+		return conn.handleGossip(payload, deliverGossipUnicast)
+	case ProtocolGossipBroadcast:
+		return conn.handleGossip(payload, deliverGossipBroadcast)
+	case ProtocolGossip:
+		return conn.handleGossip(payload, deliverGossip)
+	default:
+		conn.log("ignoring unknown protocol tag:", tag)
+	}
+	return nil
 }
 
 func (conn *LocalConnection) extendReadDeadline() {
