@@ -553,11 +553,15 @@ case "$COMMAND" in
                 esac;
             done
         fi
-        validate_cidr $1
-        CIDR=$1
-        shift 1
+        if is_cidr "$1" ; then
+            CIDR=$1
+            shift 1
+        fi
         create_bridge
         CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@")
+        if [ -z "$CIDR" ] ; then
+            CIDR="$(http_call $CONTAINER_NAME $HTTP_PORT GET /ip/$CONTAINER)"/24
+        fi
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
