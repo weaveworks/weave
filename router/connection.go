@@ -131,7 +131,7 @@ func (conn *LocalConnection) Start(acceptNewPeer bool) {
 
 func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
 	dupConnLocal := dupConn.(*LocalConnection)
- 	// conn.uid is used as the tie breaker here, in the knowledge that
+	// conn.uid is used as the tie breaker here, in the knowledge that
 	// both sides will make the same decision.
 	if conn.uid < dupConnLocal.uid {
 		return TieBreakWon
