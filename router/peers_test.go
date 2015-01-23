@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-func newNode(name PeerName) (*LocalPeer, *Peers) {
-	localPeer := NewLocalPeer(name, nil)
-	peers := NewPeers(localPeer.Peer, func(*Peer) {})
-	peers.FetchWithDefault(localPeer.Peer)
-	return localPeer, peers
+func newNode(name PeerName) (*Peer, *Peers) {
+	peer := NewPeer(name, 0, 0)
+	peers := NewPeers(peer, func(*Peer) {})
+	peers.FetchWithDefault(peer)
+	return peer, peers
 }
 
 // Check that ApplyUpdate copies the whole topology from r1
@@ -37,20 +37,20 @@ func TestPeersEncoding(t *testing.T) {
 
 	// Create some peers
 	p1, ps1 := newNode(peer1Name)
-	r2 := NewTestRouter(peer2Name)
-	r3 := NewTestRouter(peer3Name)
+	p2, ps2 := newNode(peer2Name)
+	p3, ps3 := newNode(peer3Name)
 
 	// Now try adding some connections
-	ps1.AddTestConnection(p1, r2.Ourself.Peer)
-	checkApplyUpdate(t, p1.Peer, ps1)
-	r2.Peers.AddTestConnection(r2.Ourself, p1.Peer)
-	checkApplyUpdate(t, r2.Ourself.Peer, r2.Peers)
+	ps1.AddTestConnection(p1, p2)
+	checkApplyUpdate(t, p1, ps1)
+	ps2.AddTestConnection(p2, p1)
+	checkApplyUpdate(t, p2, ps2)
 
 	// Currently, the connection from 2 to 3 is one-way only
-	r2.Peers.AddTestConnection(r2.Ourself, r3.Ourself.Peer)
-	checkApplyUpdate(t, p1.Peer, ps1)
-	checkApplyUpdate(t, r2.Ourself.Peer, r2.Peers)
-	checkApplyUpdate(t, r3.Ourself.Peer, r3.Peers)
+	ps2.AddTestConnection(p2, p3)
+	checkApplyUpdate(t, p1, ps1)
+	checkApplyUpdate(t, p2, ps2)
+	checkApplyUpdate(t, p3, ps3)
 }
 
 func TestPeersGarbageCollection(t *testing.T) {
@@ -66,29 +66,29 @@ func TestPeersGarbageCollection(t *testing.T) {
 	)
 
 	// Create some peers with some connections to each other
-	r1 := NewTestRouter(peer1Name)
-	r2 := NewTestRouter(peer2Name)
-	r3 := NewTestRouter(peer3Name)
-	r1.Peers.AddTestConnection(r1.Ourself, r2.Ourself.Peer)
-	r2.Peers.AddTestRemoteConnection(r2.Ourself, r1.Ourself.Peer, r2.Ourself.Peer)
-	r2.Peers.AddTestConnection(r2.Ourself, r1.Ourself.Peer)
-	r2.Peers.AddTestConnection(r2.Ourself, r3.Ourself.Peer)
-	r3.Peers.AddTestConnection(r3.Ourself, r1.Ourself.Peer)
-	r1.Peers.AddTestConnection(r1.Ourself, r3.Ourself.Peer)
-	r2.Peers.AddTestRemoteConnection(r2.Ourself, r1.Ourself.Peer, r3.Ourself.Peer)
-	r2.Peers.AddTestRemoteConnection(r2.Ourself, r3.Ourself.Peer, r1.Ourself.Peer)
+	p1, ps1 := newNode(peer1Name)
+	p2, ps2 := newNode(peer2Name)
+	p3, ps3 := newNode(peer3Name)
+	ps1.AddTestConnection(p1, p2)
+	ps2.AddTestRemoteConnection(p2, p1, p2)
+	ps2.AddTestConnection(p2, p1)
+	ps2.AddTestConnection(p2, p3)
+	ps3.AddTestConnection(p3, p1)
+	ps1.AddTestConnection(p1, p3)
+	ps2.AddTestRemoteConnection(p2, p1, p3)
+	ps2.AddTestRemoteConnection(p2, p3, p1)
 
 	// Drop the connection from 2 to 3, and 3 isn't garbage-collected because 1 has a connection to 3
-	r2.DeleteTestConnection(r3)
-	peersRemoved := r2.Peers.GarbageCollect()
+	ps2.DeleteTestConnection(p2, p3)
+	peersRemoved := ps2.GarbageCollect()
 	wt.AssertEmpty(t, peersRemoved, "peers removed")
 
-	wt.AssertEmpty(t, r1.Peers.GarbageCollect(), "peers removed")
-	wt.AssertEmpty(t, r2.Peers.GarbageCollect(), "peers removed")
-	wt.AssertEmpty(t, r3.Peers.GarbageCollect(), "peers removed")
+	wt.AssertEmpty(t, ps1.GarbageCollect(), "peers removed")
+	wt.AssertEmpty(t, ps2.GarbageCollect(), "peers removed")
+	wt.AssertEmpty(t, ps3.GarbageCollect(), "peers removed")
 
 	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
-	r1.DeleteTestConnection(r3)
-	peersRemoved = r1.Peers.GarbageCollect()
-	checkPeerArray(t, peersRemoved, tp(r3))
+	ps1.DeleteTestConnection(p1, p3)
+	peersRemoved = ps1.GarbageCollect()
+	checkPeerArray(t, peersRemoved, p3)
 }

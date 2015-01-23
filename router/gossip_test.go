@@ -15,6 +15,15 @@ type mockChannelConnection struct {
 	dest *Router
 }
 
+// Construct a Router object with dummy channels otherwise tests hang on nil channel
+// when Router.OnGossip() calls async methods
+func NewTestRouter(name PeerName) *Router {
+	router := NewRouter(nil, name, nil, 10, 1024, nil)
+	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
+	router.Routes.queryChan = make(chan *Interaction, ChannelSize)
+	return router
+}
+
 // This is basically the same as LocalConnection.handleGossip()
 func (conn *mockChannelConnection) SendProtocolMsg(msg ProtocolMsg) {
 	decoder := gob.NewDecoder(bytes.NewReader(msg.msg))
@@ -45,6 +54,24 @@ func TestGossipTopology(t *testing.T) {
 	wt.RunWithTimeout(t, 1*time.Second, func() {
 		implTestGossipTopology(t)
 	})
+}
+
+// Create a remote Peer object plus all of its connections so we can check topology,
+// based on the name and UIDs of existing routers
+func tp(r *Router, routers ...*Router) *Peer {
+	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, 0)
+	connections := make(map[PeerName]Connection)
+	for _, r2 := range routers {
+		p2 := NewPeer(r2.Ourself.Peer.Name, r2.Ourself.Peer.UID, r2.Ourself.Peer.version)
+		connections[r2.Ourself.Peer.Name] = newMockConnection(peer, p2)
+	}
+	peer.SetVersionAndConnections(r.Ourself.Peer.version, connections)
+	return peer
+}
+
+// Check that the topology of router matches the peers and all of their connections
+func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
+	checkTopologyPeers(t, true, router.Peers.allPeers(), wantedPeers...)
 }
 
 func implTestGossipTopology(t *testing.T) {
@@ -98,7 +125,7 @@ func implTestGossipTopology(t *testing.T) {
 	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
 
 	// Drop the connection from 2 to 3
-	r2.DeleteTestConnection(r3)
+	r2.Peers.DeleteTestConnection(r2.Ourself.Peer, r3.Ourself.Peer)
 	checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
 
 	// Now r2 tells its connections
@@ -108,7 +135,7 @@ func implTestGossipTopology(t *testing.T) {
 	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
 
 	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
-	r1.DeleteTestConnection(r3)
+	r1.Peers.DeleteTestConnection(r1.Ourself.Peer, r3.Ourself.Peer)
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1), tp(r3, r1))
 	r1.Peers.GarbageCollect()
 	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))

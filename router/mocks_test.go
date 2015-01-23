@@ -9,26 +9,18 @@ import (
 	"testing"
 )
 
-// Construct a Router object with a mock interface to check peer
-// garbage-collection, and without firing up any ancilliary goroutines
-func NewTestRouter(name PeerName) *Router {
-	router := NewRouter(nil, name, nil, 10, 1024, nil)
-	// Create dummy channels otherwise tests hang on nil channel
-	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
-	router.Routes.queryChan = make(chan *Interaction, ChannelSize)
-	return router
-}
-
-func (peers *Peers) AddTestConnection(ourself *LocalPeer, peer *Peer) {
-	toName := peer.Name
-	toPeer := NewPeer(toName, peer.UID, 0)
+// Add to (peers,p1) a connection from p1 to p2
+func (peers *Peers) AddTestConnection(p1, p2 *Peer) {
+	toName := p2.Name
+	toPeer := NewPeer(toName, p2.UID, 0)
 	peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := newMockConnection(ourself.Peer, toPeer)
-	ourself.addConnection(conn)
-	ourself.connectionEstablished(conn)
+	conn := newMockConnection(p1, toPeer)
+	p1.addConnection(conn)
+	p1.connectionEstablished(conn)
 }
 
-func (peers *Peers) AddTestRemoteConnection(p0 *LocalPeer, p1, p2 *Peer) {
+// Add to (peers,p0) a connection from p1 to p2
+func (peers *Peers) AddTestRemoteConnection(p0, p1, p2 *Peer) {
 	fromName := p1.Name
 	fromPeer := NewPeer(fromName, p1.UID, 0)
 	fromPeer = peers.FetchWithDefault(fromPeer)
@@ -38,12 +30,12 @@ func (peers *Peers) AddTestRemoteConnection(p0 *LocalPeer, p1, p2 *Peer) {
 	p0.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
 }
 
-func (r1 *Router) DeleteTestConnection(r2 *Router) {
-	toName := r2.Ourself.Peer.Name
-	toPeer, _ := r1.Peers.Fetch(toName)
+func (peers *Peers) DeleteTestConnection(ourself *Peer, peer *Peer) {
+	toName := peer.Name
+	toPeer, _ := peers.Fetch(toName)
 	toPeer.DecrementLocalRefCount()
-	conn, _ := r1.Ourself.Peer.ConnectionTo(toName)
-	r1.Ourself.deleteConnection(conn)
+	conn, _ := ourself.ConnectionTo(toName)
+	ourself.deleteConnection(conn)
 }
 
 // mockConnection used in testing is very similar to a RemoteConnection, without
@@ -96,11 +88,6 @@ func checkPeerArray(t *testing.T, peers []*Peer, wantedPeers ...*Peer) {
 	checkTopologyPeers(t, false, peers, wantedPeers...)
 }
 
-// Check that the topology of router matches the peers and all of their connections
-func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
-	checkTopologyPeers(t, true, router.Peers.allPeers(), wantedPeers...)
-}
-
 // Check that the peers slice matches the wanted peers and optionally all of their connections
 func checkTopologyPeers(t *testing.T, checkConns bool, peers []*Peer, wantedPeers ...*Peer) {
 	check := make(map[PeerName]*Peer)
@@ -121,16 +108,4 @@ func checkTopologyPeers(t *testing.T, checkConns bool, peers []*Peer, wantedPeer
 	if len(check) > 0 {
 		wt.Fatalf(t, "Expected peers not found: %v", check)
 	}
-}
-
-// Create a remote Peer object plus all of its connections, based on the name and UIDs of existing routers
-func tp(r *Router, routers ...*Router) *Peer {
-	peer := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, 0)
-	connections := make(map[PeerName]Connection)
-	for _, r2 := range routers {
-		p2 := NewPeer(r2.Ourself.Peer.Name, r2.Ourself.Peer.UID, r2.Ourself.Peer.version)
-		connections[r2.Ourself.Peer.Name] = newMockConnection(peer, p2)
-	}
-	peer.SetVersionAndConnections(r.Ourself.Peer.version, connections)
-	return peer
 }
