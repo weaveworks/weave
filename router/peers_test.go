@@ -1,7 +1,9 @@
 package router
 
 import (
+	"fmt"
 	wt "github.com/zettio/weave/testing"
+	"math/rand"
 	"testing"
 )
 
@@ -24,33 +26,39 @@ func checkApplyUpdate(t *testing.T, peer *Peer, peers *Peers) {
 }
 
 func TestPeersEncoding(t *testing.T) {
-	const (
-		peer1NameString = "01:00:00:01:00:00"
-		peer2NameString = "02:00:00:02:00:00"
-		peer3NameString = "03:00:00:03:00:00"
-	)
-	var (
-		peer1Name, _ = PeerNameFromString(peer1NameString)
-		peer2Name, _ = PeerNameFromString(peer2NameString)
-		peer3Name, _ = PeerNameFromString(peer3NameString)
-	)
+	const numNodes = 20
+	const numIters = 1000
+	var peer [numNodes]*Peer
+	var ps [numNodes]*Peers
+	for i := 0; i < numNodes; i++ {
+		name, _ := PeerNameFromString(fmt.Sprintf("%02d:00:00:01:00:00", i))
+		peer[i], ps[i] = newNode(name)
+	}
 
-	// Create some peers
-	p1, ps1 := newNode(peer1Name)
-	p2, ps2 := newNode(peer2Name)
-	p3, ps3 := newNode(peer3Name)
-
-	// Now try adding some connections
-	ps1.AddTestConnection(p1, p2)
-	checkApplyUpdate(t, p1, ps1)
-	ps2.AddTestConnection(p2, p1)
-	checkApplyUpdate(t, p2, ps2)
-
-	// Currently, the connection from 2 to 3 is one-way only
-	ps2.AddTestConnection(p2, p3)
-	checkApplyUpdate(t, p1, ps1)
-	checkApplyUpdate(t, p2, ps2)
-	checkApplyUpdate(t, p3, ps3)
+	conns := make([]struct{ from, to int }, 0)
+	for i := 0; i < numIters; i++ {
+		oper := rand.Intn(2)
+		switch oper {
+		case 0:
+			from, to := rand.Intn(numNodes), rand.Intn(numNodes)
+			if from != to {
+				if _, found := peer[from].ConnectionTo(peer[to].Name); !found {
+					ps[from].AddTestConnection(peer[from], peer[to])
+					conns = append(conns, struct{ from, to int }{from, to})
+					checkApplyUpdate(t, peer[from], ps[from])
+				}
+			}
+		case 1:
+			if len(conns) > 0 {
+				n := rand.Intn(len(conns))
+				c := conns[n]
+				ps[c.from].DeleteTestConnection(peer[c.from], peer[c.to])
+				ps[c.from].GarbageCollect()
+				checkApplyUpdate(t, peer[c.from], ps[c.from])
+				conns = append(conns[:n], conns[n+1:]...)
+			}
+		}
+	}
 }
 
 func TestPeersGarbageCollection(t *testing.T) {
