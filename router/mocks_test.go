@@ -72,6 +72,25 @@ func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Co
 	}
 }
 
+// Get all the peers from a Peers in a slice
+func (p1 *Peers) allPeers() []*Peer {
+	peers := make([]*Peer, 0)
+	for _, peer := range p1.table {
+		peers = append(peers, peer)
+	}
+	return peers
+}
+
+func (p1 *Peers) allPeersExcept(excludeName PeerName) []*Peer {
+	peers := p1.allPeers()
+	for i, peer := range peers {
+		if peer.Name == excludeName {
+			return append(peers[:i], peers[i+1:]...)
+		}
+	}
+	return peers
+}
+
 // Check that the peers slice matches the wanted peers
 func checkPeerArray(t *testing.T, peers []*Peer, wantedPeers ...*Peer) {
 	checkTopologyPeers(t, false, peers, wantedPeers...)
@@ -79,11 +98,7 @@ func checkPeerArray(t *testing.T, peers []*Peer, wantedPeers ...*Peer) {
 
 // Check that the topology of router matches the peers and all of their connections
 func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
-	peers := make([]*Peer, 0)
-	for _, peer := range router.Peers.table {
-		peers = append(peers, peer)
-	}
-	checkTopologyPeers(t, true, peers, wantedPeers...)
+	checkTopologyPeers(t, true, router.Peers.allPeers(), wantedPeers...)
 }
 
 // Check that the peers slice matches the wanted peers and optionally all of their connections
