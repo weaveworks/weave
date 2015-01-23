@@ -108,27 +108,32 @@ MAC discovery.
 ### <a name="topology"></a>Topology Communication
 
 Topology is communicated over the TCP links between peers, using a
-Gossip mechanism.  Topology messages are sent every time a connection
-is added or deleted, and also periodically on a timer in case someone
-has missed an update.
+Gossip mechanism.  Topology messages are sent by a peer...
 
-Upon receiving an update, the
-receiver merges it with its own topology model. If the payload is a
-subset of the receiver's topology, no further action is
-taken. Otherwise, the receiver sends out to all its connections an
-"improved" update:
+- when a connection has been established; the entire topology is sent
+  to the remote peer, and an incremental update, containing
+  information on just the two peers at the ends of the connection, is
+  sent to all neighbours
+- when a connection has been torn down; an update containing just
+  information about the local peer is sent to all neighbours
+- periodically, on a timer, in case someone has missed an update.
 
- - elements which the original payload added to the
-   receiver are included
- - elements which the original payload updated in the
-   receiver are included
- - elements which are equal between the receiver and
-   the payload are not included
- - elements where the payload was older than the
-   receiver's version are updated
+Upon receiving an update, the receiver merges it with its own topology
+model. If the payload is a subset of the receiver's topology, no
+further action is taken. Otherwise, the receiver sends out to all its
+connections an "improved" update:
 
-If the update mentions a peer that the receiver has does not know,
-then the entire update is ignored.
+ - elements which the original payload added to the receiver are
+   included
+ - elements which the original payload updated in the receiver are
+   included
+ - elements which are equal between the receiver and the payload are
+   not included
+ - elements where the payload was older than the receiver's version
+   are updated
+
+If the update mentions a peer that the receiver does not know, then
+the entire update is ignored.
 
 #### Message details
 Every gossip message is structured as follows:
