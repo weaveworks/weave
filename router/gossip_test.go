@@ -60,9 +60,9 @@ func implTestGossipTopology(t *testing.T) {
 	)
 
 	// Create some peers that will talk to each other
-	r1 := NewTestRouter(t, peer1Name)
-	r2 := NewTestRouter(t, peer2Name)
-	r3 := NewTestRouter(t, peer3Name)
+	r1 := NewTestRouter(peer1Name)
+	r2 := NewTestRouter(peer2Name)
+	r3 := NewTestRouter(peer3Name)
 	r1.NewGossip(TopologyGossipCh, r1)
 	r2.NewGossip(TopologyGossipCh, r2)
 	r3.NewGossip(TopologyGossipCh, r3)

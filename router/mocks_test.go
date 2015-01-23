@@ -11,7 +11,7 @@ import (
 
 // Construct a Router object with a mock interface to check peer
 // garbage-collection, and without firing up any ancilliary goroutines
-func NewTestRouter(t *testing.T, name PeerName) *Router {
+func NewTestRouter(name PeerName) *Router {
 	router := NewRouter(nil, name, nil, 10, 1024, nil)
 	// Create dummy channels otherwise tests hang on nil channel
 	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)

@@ -94,9 +94,9 @@ func TestPeersEncoding(t *testing.T) {
 	)
 
 	// Create some peers
-	r1 := NewTestRouter(t, peer1Name)
-	r2 := NewTestRouter(t, peer2Name)
-	r3 := NewTestRouter(t, peer3Name)
+	r1 := NewTestRouter(peer1Name)
+	r2 := NewTestRouter(peer2Name)
+	r3 := NewTestRouter(peer3Name)
 
 	// Check state when they have no connections
 	checkEncoding(t, r1.Peers.EncodeAllPeers(), tp(r1))
@@ -126,9 +126,9 @@ func TestPeersGarbageCollection(t *testing.T) {
 	)
 
 	// Create some peers with some connections to each other
-	r1 := NewTestRouter(t, peer1Name)
-	r2 := NewTestRouter(t, peer2Name)
-	r3 := NewTestRouter(t, peer3Name)
+	r1 := NewTestRouter(peer1Name)
+	r2 := NewTestRouter(peer2Name)
+	r3 := NewTestRouter(peer3Name)
 	r1.AddTestConnection(r2)
 	r2.AddTestRemoteConnection(r1, r2)
 	r2.AddTestConnection(r1)
