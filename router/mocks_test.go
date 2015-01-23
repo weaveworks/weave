@@ -19,23 +19,23 @@ func NewTestRouter(name PeerName) *Router {
 	return router
 }
 
-func (r1 *Router) AddTestConnection(r2 *Router) {
-	toName := r2.Ourself.Peer.Name
-	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
-	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := newMockConnection(r1.Ourself.Peer, toPeer)
-	r1.Ourself.addConnection(conn)
-	r1.Ourself.connectionEstablished(conn)
+func (peers *Peers) AddTestConnection(ourself *LocalPeer, peer *Peer) {
+	toName := peer.Name
+	toPeer := NewPeer(toName, peer.UID, 0)
+	peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
+	conn := newMockConnection(ourself.Peer, toPeer)
+	ourself.addConnection(conn)
+	ourself.connectionEstablished(conn)
 }
 
-func (r0 *Router) AddTestRemoteConnection(r1, r2 *Router) {
-	fromName := r2.Ourself.Peer.Name
-	fromPeer := NewPeer(fromName, r1.Ourself.Peer.UID, 0)
-	fromPeer = r0.Peers.FetchWithDefault(fromPeer)
-	toName := r2.Ourself.Peer.Name
-	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
-	toPeer = r0.Peers.FetchWithDefault(toPeer)
-	r0.Ourself.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
+func (peers *Peers) AddTestRemoteConnection(p0 *LocalPeer, p1, p2 *Peer) {
+	fromName := p1.Name
+	fromPeer := NewPeer(fromName, p1.UID, 0)
+	fromPeer = peers.FetchWithDefault(fromPeer)
+	toName := p2.Name
+	toPeer := NewPeer(toName, p2.UID, 0)
+	toPeer = peers.FetchWithDefault(toPeer)
+	p0.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
 }
 
 func (r1 *Router) DeleteTestConnection(r2 *Router) {
@@ -72,6 +72,25 @@ func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Co
 	}
 }
 
+// Get all the peers from a Peers in a slice
+func (p1 *Peers) allPeers() []*Peer {
+	peers := make([]*Peer, 0)
+	for _, peer := range p1.table {
+		peers = append(peers, peer)
+	}
+	return peers
+}
+
+func (p1 *Peers) allPeersExcept(excludeName PeerName) []*Peer {
+	peers := p1.allPeers()
+	for i, peer := range peers {
+		if peer.Name == excludeName {
+			return append(peers[:i], peers[i+1:]...)
+		}
+	}
+	return peers
+}
+
 // Check that the peers slice matches the wanted peers
 func checkPeerArray(t *testing.T, peers []*Peer, wantedPeers ...*Peer) {
 	checkTopologyPeers(t, false, peers, wantedPeers...)
@@ -79,11 +98,7 @@ func checkPeerArray(t *testing.T, peers []*Peer, wantedPeers ...*Peer) {
 
 // Check that the topology of router matches the peers and all of their connections
 func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
-	peers := make([]*Peer, 0)
-	for _, peer := range router.Peers.table {
-		peers = append(peers, peer)
-	}
-	checkTopologyPeers(t, true, peers, wantedPeers...)
+	checkTopologyPeers(t, true, router.Peers.allPeers(), wantedPeers...)
 }
 
 // Check that the peers slice matches the wanted peers and optionally all of their connections

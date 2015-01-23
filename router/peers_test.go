@@ -1,84 +1,26 @@
 package router
 
 import (
-	"bytes"
-	"encoding/gob"
-	"fmt"
 	wt "github.com/zettio/weave/testing"
-	"io"
-	"sort"
 	"testing"
 )
 
-type decodedPeerInfo struct {
-	name     PeerName
-	uid      uint64
-	version  uint64
-	connsBuf []byte
+func newNode(name PeerName) (*LocalPeer, *Peers) {
+	localPeer := NewLocalPeer(name, nil)
+	peers := NewPeers(localPeer.Peer, func(*Peer) {})
+	peers.FetchWithDefault(localPeer.Peer)
+	return localPeer, peers
 }
 
-func (i *decodedPeerInfo) String() string {
-	return fmt.Sprint("Peer ", i.name, " (v", i.version, ") (UID ", i.uid, ")")
-}
+// Check that ApplyUpdate copies the whole topology from r1
+func checkApplyUpdate(t *testing.T, peer *Peer, peers *Peers) {
+	dummyName, _ := PeerNameFromString("99:00:00:01:00:00")
+	// Testbed has to be a node outside of the network, with a connection into it
+	testBed, testBedPeers := newNode(dummyName)
+	testBedPeers.AddTestConnection(testBed, peer)
+	testBedPeers.ApplyUpdate(peers.EncodeAllPeers())
 
-type byName []*decodedPeerInfo
-
-func (a byName) Len() int           { return len(a) }
-func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byName) Less(i, j int) bool { return a[i].name < a[j].name }
-
-func checkConnsEncoding(t *testing.T, ourName PeerName, connsBuf []byte, connections map[PeerName]Connection) {
-	checkConns := make(map[PeerName]bool)
-	for _, conn := range connections {
-		checkConns[conn.Remote().Name] = true
-	}
-	connsIterator(connsBuf, func(remoteNameByte []byte, _ string) {
-		remoteName := PeerNameFromBin(remoteNameByte)
-		if _, found := checkConns[remoteName]; found {
-			delete(checkConns, remoteName)
-		} else {
-			wt.Fatalf(t, "Unexpected connection decoded from %s to %s", ourName, remoteName)
-		}
-	})
-	if len(checkConns) > 0 {
-		wt.Fatalf(t, "Expected connections not found: from %s to %v", ourName, checkConns)
-	}
-}
-
-func decodePeerInfo(t *testing.T, decoder *gob.Decoder) []*decodedPeerInfo {
-	peerInfo := make([]*decodedPeerInfo, 0)
-	for {
-		nameByte, uid, version, connsBuf, decErr := decodePeerNoConns(decoder)
-		if decErr == io.EOF {
-			break
-		} else if decErr != nil {
-			wt.Fatalf(t, "Error when decoding peer (%s)", decErr)
-		}
-		peerInfo = append(peerInfo, &decodedPeerInfo{PeerNameFromBin(nameByte), uid, version, connsBuf})
-	}
-	return peerInfo
-}
-
-func checkEncoding(t *testing.T, update []byte, wantedPeers ...*Peer) {
-	decoder := gob.NewDecoder(bytes.NewReader(update))
-
-	// Peers can come in any order, so read them all in and sort them
-	peerInfo := decodePeerInfo(t, decoder)
-	sort.Sort(byName(peerInfo))
-	N := len(peerInfo)
-	if N != len(wantedPeers) {
-		wt.Fatalf(t, "Expected %d items but got %d: %s", len(wantedPeers), N, peerInfo)
-	}
-	for i, wanted := range wantedPeers {
-		if peerInfo[i].name != wanted.Name {
-			wt.Fatalf(t, "Expected Peer Name %s but got %s", wanted.Name, peerInfo[i].name)
-		}
-		wt.AssertEqualuint64(t, peerInfo[i].uid, wanted.UID, "Peer UID")
-		//Not checking the version because I haven't synthesised the data independently
-		//and the 'real' version is often out of sync with another peers' view of it
-		//wt.AssertEqualuint64(t, peerInfo[i].version, wanted.version, "Peer version")
-		checkConnsEncoding(t, peerInfo[i].name, peerInfo[i].connsBuf, wanted.connections)
-	}
+	checkTopologyPeers(t, true, testBedPeers.allPeersExcept(dummyName), peers.allPeers()...)
 }
 
 func TestPeersEncoding(t *testing.T) {
@@ -94,23 +36,21 @@ func TestPeersEncoding(t *testing.T) {
 	)
 
 	// Create some peers
-	r1 := NewTestRouter(peer1Name)
+	p1, ps1 := newNode(peer1Name)
 	r2 := NewTestRouter(peer2Name)
 	r3 := NewTestRouter(peer3Name)
 
-	// Check state when they have no connections
-	checkEncoding(t, r1.Peers.EncodeAllPeers(), tp(r1))
-	checkEncoding(t, r2.Peers.EncodeAllPeers(), tp(r2))
-
 	// Now try adding some connections
-	r1.AddTestConnection(r2)
-	r2.AddTestConnection(r1)
-	checkEncoding(t, r1.Peers.EncodeAllPeers(), tp(r1, r2), tp(r2))
-	checkEncoding(t, r2.Peers.EncodeAllPeers(), tp(r1), tp(r2, r1))
+	ps1.AddTestConnection(p1, r2.Ourself.Peer)
+	checkApplyUpdate(t, p1.Peer, ps1)
+	r2.Peers.AddTestConnection(r2.Ourself, p1.Peer)
+	checkApplyUpdate(t, r2.Ourself.Peer, r2.Peers)
+
 	// Currently, the connection from 2 to 3 is one-way only
-	r2.AddTestConnection(r3)
-	checkEncoding(t, r2.Peers.EncodeAllPeers(), tp(r1), tp(r2, r1, r3), tp(r3))
-	checkEncoding(t, r3.Peers.EncodeAllPeers(), tp(r3))
+	r2.Peers.AddTestConnection(r2.Ourself, r3.Ourself.Peer)
+	checkApplyUpdate(t, p1.Peer, ps1)
+	checkApplyUpdate(t, r2.Ourself.Peer, r2.Peers)
+	checkApplyUpdate(t, r3.Ourself.Peer, r3.Peers)
 }
 
 func TestPeersGarbageCollection(t *testing.T) {
@@ -129,14 +69,14 @@ func TestPeersGarbageCollection(t *testing.T) {
 	r1 := NewTestRouter(peer1Name)
 	r2 := NewTestRouter(peer2Name)
 	r3 := NewTestRouter(peer3Name)
-	r1.AddTestConnection(r2)
-	r2.AddTestRemoteConnection(r1, r2)
-	r2.AddTestConnection(r1)
-	r2.AddTestConnection(r3)
-	r3.AddTestConnection(r1)
-	r1.AddTestConnection(r3)
-	r2.AddTestRemoteConnection(r1, r3)
-	r2.AddTestRemoteConnection(r3, r1)
+	r1.Peers.AddTestConnection(r1.Ourself, r2.Ourself.Peer)
+	r2.Peers.AddTestRemoteConnection(r2.Ourself, r1.Ourself.Peer, r2.Ourself.Peer)
+	r2.Peers.AddTestConnection(r2.Ourself, r1.Ourself.Peer)
+	r2.Peers.AddTestConnection(r2.Ourself, r3.Ourself.Peer)
+	r3.Peers.AddTestConnection(r3.Ourself, r1.Ourself.Peer)
+	r1.Peers.AddTestConnection(r1.Ourself, r3.Ourself.Peer)
+	r2.Peers.AddTestRemoteConnection(r2.Ourself, r1.Ourself.Peer, r3.Ourself.Peer)
+	r2.Peers.AddTestRemoteConnection(r2.Ourself, r3.Ourself.Peer, r1.Ourself.Peer)
 
 	// Drop the connection from 2 to 3, and 3 isn't garbage-collected because 1 has a connection to 3
 	r2.DeleteTestConnection(r3)
