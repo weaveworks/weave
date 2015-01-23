@@ -54,15 +54,6 @@ func (router *Router) SendAllGossip() {
 	}
 }
 
-func (router *Router) SendGossip(channelName string, msg []byte) {
-	channelHash := hash(channelName)
-	if channel, found := router.GossipChannels[channelHash]; !found {
-		logGossip("attempt to send on unknown channel:", channelName)
-	} else {
-		channel.GossipMsg(msg)
-	}
-}
-
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for _, channel := range router.GossipChannels {
 		channel.send(channel.gossiper.Gossip(), conn)

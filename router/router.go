@@ -25,6 +25,7 @@ type Router struct {
 	Routes          *Routes
 	ConnectionMaker *ConnectionMaker
 	GossipChannels  map[uint32]*GossipChannel
+	TopologyGossip  Gossip
 	UDPListener     *net.UDPConn
 	Password        *[]byte
 	ConnLimit       int
@@ -67,7 +68,7 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
-	router.NewGossip(TopologyGossipCh, router)
+	router.TopologyGossip = router.NewGossip(TopologyGossipCh, router)
 	return router
 }
 
