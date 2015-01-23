@@ -21,13 +21,13 @@ type Gossip interface {
 }
 
 type Gossiper interface {
-	OnGossipUnicast(sender PeerName, msg []byte)
-	OnGossipBroadcast(msg []byte)
+	OnGossipUnicast(sender PeerName, msg []byte) error
+	OnGossipBroadcast(msg []byte) error
 	// Return state of everything we know; gets called periodically
 	Gossip() []byte
 	// merge in state and return "everything new I've just learnt",
 	// or nil if nothing in the received message was new
-	OnGossip(buf []byte) []byte
+	OnGossip(buf []byte) ([]byte, error)
 }
 
 type GossipChannel struct {
@@ -94,11 +94,10 @@ func deliverGossipUnicast(channel *GossipChannel, srcName PeerName, origPayload 
 		if err := dec.Decode(&payload); err != nil {
 			return err
 		}
-		channel.gossiper.OnGossipUnicast(srcName, payload)
+		return channel.gossiper.OnGossipUnicast(srcName, payload)
 	} else {
-		channel.relayGossipUnicast(destName, origPayload)
+		return channel.relayGossipUnicast(destName, origPayload)
 	}
-	return nil
 }
 
 func deliverGossipBroadcast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
@@ -106,7 +105,9 @@ func deliverGossipBroadcast(channel *GossipChannel, srcName PeerName, origPayloa
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	channel.gossiper.OnGossipBroadcast(payload)
+	if err := channel.gossiper.OnGossipBroadcast(payload); err != nil {
+		return err
+	}
 	return channel.relayGossipBroadcast(srcName, origPayload)
 }
 
@@ -115,7 +116,9 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	if newBuf := channel.gossiper.OnGossip(payload); newBuf != nil {
+	if newBuf, err := channel.gossiper.OnGossip(payload); err != nil {
+		return err
+	} else if newBuf != nil {
 		channel.SendGossipMsg(newBuf)
 	}
 	return nil
