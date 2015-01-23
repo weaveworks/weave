@@ -37,6 +37,12 @@ func AssertEqualString(t *testing.T, got, wanted string, desc string) {
 	}
 }
 
+func AssertNotEqualString(t *testing.T, got, wanted string, desc string) {
+	if got == wanted {
+		Fatalf(t, "Expected %s unlike '%s'", desc, wanted)
+	}
+}
+
 func AssertStatus(t *testing.T, got int, wanted int, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)

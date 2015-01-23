@@ -3,6 +3,7 @@ package ipam
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	lg "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
@@ -41,6 +42,7 @@ type Allocator struct {
 	ourUID      uint64
 	state       int
 	stateExpire time.Time
+	universeLen int
 	universe    MinSpace // all the addresses that could be allocated
 	gossip      router.Gossip
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
@@ -59,12 +61,26 @@ func (defaultTime) AfterFunc(d time.Duration, f func()) {
 	time.AfterFunc(d, f)
 }
 
-func NewAllocator(ourName router.PeerName, ourUID uint64, startAddr net.IP, universeSize int) *Allocator {
+func NewAllocator(ourName router.PeerName, ourUID uint64, universeCIDR string) (*Allocator, error) {
+	_, universeNet, err := net.ParseCIDR(universeCIDR)
+	if err != nil {
+		return nil, err
+	}
+	if universeNet.IP.To4() == nil {
+		return nil, errors.New("Non-IPv4 address not supported")
+	}
+	// Get the size of the network from the mask
+	ones, bits := universeNet.Mask.Size()
+	var universeSize uint32 = 1 << uint(bits-ones)
+	if universeSize < 4 {
+		return nil, errors.New("Allocation universe too small")
+	}
 	alloc := &Allocator{
 		ourName:      ourName,
 		ourUID:       ourUID,
 		state:        allocStateLeaderless,
-		universe:     MinSpace{Start: startAddr, Size: uint32(universeSize)},
+		universeLen:  ones,
+		universe:     MinSpace{Start: universeNet.IP, Size: universeSize},
 		peerInfo:     make(map[uint64]SpaceSet),
 		ourSpaceSet:  NewSpaceSet(ourName, ourUID),
 		leaked:       make(map[time.Time]Space),
@@ -72,7 +88,7 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, startAddr net.IP, univ
 		timeProvider: defaultTime{},
 	}
 	alloc.peerInfo[ourUID] = alloc.ourSpaceSet
-	return alloc
+	return alloc, nil
 }
 
 func (alloc *Allocator) SetGossip(gossip router.Gossip) {
@@ -305,7 +321,8 @@ func (alloc *Allocator) electLeader() {
 	if highest == alloc.ourUID {
 		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
 		// I'm the winner; take control of the whole universe
-		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
+		// But don't allocate the first and last addresses
+		alloc.manageSpace(add(alloc.universe.Start, 1), alloc.universe.Size-2)
 		alloc.moveToState(allocStateNeutral, 0)
 		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	} else {

@@ -22,8 +22,8 @@ func TestAllocFree(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, ourUID, net.ParseIP(testAddr1), 3)
-	alloc.manageSpace(net.ParseIP(testAddr1), 3)
+	alloc, _ := NewAllocator(ourName, ourUID, testAddr1+"/30")
+	alloc.manageSpace(net.ParseIP(testAddr1), 4)
 
 	addr1 := alloc.AllocateFor(containerID)
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
@@ -62,7 +62,7 @@ func TestMultiSpaces(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), 1024)
+	alloc, _ := NewAllocator(ourName, ourUID, testStart1+"/30")
 	alloc.manageSpace(net.ParseIP(testStart1), 1)
 	alloc.manageSpace(net.ParseIP(testStart2), 3)
 
@@ -87,14 +87,14 @@ func TestEncodeMerge(t *testing.T) {
 	)
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
-	alloc := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), 1024)
+	alloc, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
 	alloc.manageSpace(net.ParseIP(testStart1), 16)
 	alloc.manageSpace(net.ParseIP(testStart2), 32)
 
 	encodedState := alloc.Gossip()
 
 	peerName, _ := router.PeerNameFromString(peerNameString)
-	alloc2 := NewAllocator(peerName, peerUID, net.ParseIP(testStart1), 1024)
+	alloc2, _ := NewAllocator(peerName, peerUID, testStart1+"/22")
 	alloc2.manageSpace(net.ParseIP(testStart3), 32)
 	encodedState2 := alloc2.Gossip()
 
@@ -276,7 +276,7 @@ func implTestGossip(t *testing.T) {
 	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	mockGossip1 := new(mockGossipComms)
-	alloc1 := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), 1024)
+	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
 	alloc1.SetGossip(mockGossip1)
 	alloc1.startForTesting()
 	mockTime := new(mockTimeProvider)
@@ -289,7 +289,7 @@ func implTestGossip(t *testing.T) {
 	// Simulate another peer on the gossip network
 	mockGossip2 := new(mockGossipComms)
 	pn, _ := router.PeerNameFromString(peerNameString)
-	alloc2 := NewAllocator(pn, peerUID, net.ParseIP(testStart1), 1024)
+	alloc2, _ := NewAllocator(pn, peerUID, testStart1+"/22")
 	alloc2.SetGossip(mockGossip2)
 	alloc2.timeProvider = alloc1.timeProvider
 
@@ -379,7 +379,7 @@ func TestLeaks(t *testing.T) {
 	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	mockGossip1 := new(mockGossipComms)
-	alloc1 := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), universeSize)
+	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/27")
 	alloc1.state = allocStateNeutral
 	alloc1.SetGossip(mockGossip1)
 	mockTime := new(mockTimeProvider)
@@ -391,7 +391,7 @@ func TestLeaks(t *testing.T) {
 	// Simulate another peer on the gossip network
 	mockGossip2 := new(mockGossipComms)
 	pn, _ := router.PeerNameFromString(peerNameString)
-	alloc2 := NewAllocator(pn, peerUID, net.ParseIP(testStart1), universeSize)
+	alloc2, _ := NewAllocator(pn, peerUID, testStart1+"/27")
 	alloc2.SetGossip(mockGossip2)
 	alloc2.timeProvider = alloc1.timeProvider
 
@@ -446,14 +446,14 @@ func TestGossipBreakage(t *testing.T) {
 
 	ourName, _ := router.PeerNameFromString(ourNameString)
 	mockGossip1 := new(mockGossipComms)
-	alloc1 := NewAllocator(ourName, ourUID, net.ParseIP(testStart1), 1024)
+	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
 	alloc1.SetGossip(mockGossip1)
 	alloc1.startForTesting()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 
 	// Simulate another peer on the gossip network, but WITH SAME PEER NAME
 	mockGossip2 := new(mockGossipComms)
-	alloc2 := NewAllocator(ourName, peerUID, net.ParseIP(testStart1), 1024)
+	alloc2, _ := NewAllocator(ourName, peerUID, testStart1+"/22")
 	alloc2.SetGossip(mockGossip2)
 
 	// Give alloc1 some space

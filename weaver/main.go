@@ -47,6 +47,7 @@ func main() {
 		peers       []string
 		connLimit   int
 		bufSz       int
+		allocCIDR   string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -59,6 +60,7 @@ func main() {
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&connLimit, "connlimit", 10, "connection limit (defaults to 10, set to 0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
+	flag.StringVar(&allocCIDR, "alloc", "", "CIDR of IP address space to allocate within")
 	flag.Parse()
 	peers = flag.Args()
 
@@ -136,15 +138,25 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	allocator := ipam.NewAllocator(ourName, router.Ourself.UID, net.ParseIP("10.0.1.1"), 253)
-	allocator.SetGossip(router.NewGossip("IPallocation", allocator))
-	allocator.Start()
-	allocator.HandleHttp()
+	var allocator *ipam.Allocator = nil
+	// hack for testing
+	if allocCIDR == "" {
+		allocCIDR = "10.0.1.0/24"
+	}
+	if allocCIDR != "" {
+		allocator, err = ipam.NewAllocator(ourName, router.Ourself.UID, allocCIDR)
+		if err != nil {
+			log.Fatal(err)
+		}
+		allocator.SetGossip(router.NewGossip("IPallocation", allocator))
+		allocator.Start()
+		allocator.HandleHttp()
+	}
 	go handleHttp(router, allocator)
 	handleSignals(router)
 }
 
-func handleHttp(router *weave.Router, alloc *ipam.Allocator) {
+func handleHttp(router *weave.Router, others ...interface{}) {
 	encryption := "off"
 	if router.Password != nil && len(*router.Password) > 0 {
 		encryption = "on"
@@ -153,7 +165,9 @@ func handleHttp(router *weave.Router, alloc *ipam.Allocator) {
 		io.WriteString(w, fmt.Sprintln("weave router", version))
 		io.WriteString(w, fmt.Sprintln("Encryption", encryption))
 		io.WriteString(w, router.Status())
-		io.WriteString(w, fmt.Sprintln(alloc))
+		for _, x := range others {
+			io.WriteString(w, fmt.Sprintln(x))
+		}
 	})
 	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")

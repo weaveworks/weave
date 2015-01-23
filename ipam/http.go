@@ -31,7 +31,7 @@ func (alloc *Allocator) HandleHttp() {
 		if err != nil {
 			httpErrorAndLog(Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
 		} else if newAddr := alloc.AllocateFor(ident); newAddr != nil {
-			io.WriteString(w, newAddr.String())
+			io.WriteString(w, fmt.Sprintf("%s/%d", newAddr, alloc.universeLen))
 		} else {
 			httpErrorAndLog(
 				Error, w, "Internal error", http.StatusInternalServerError,

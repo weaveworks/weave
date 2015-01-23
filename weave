@@ -565,7 +565,7 @@ case "$COMMAND" in
         create_bridge
         CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@")
         if [ -z "$CIDR" ] ; then
-            CIDR="$(http_call $CONTAINER_NAME $HTTP_PORT GET /ip/$CONTAINER)"/24
+            CIDR="$(http_call $CONTAINER_NAME $HTTP_PORT GET /ip/$CONTAINER)"
         fi
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
