@@ -50,25 +50,26 @@ func logGossip(args ...interface{}) {
 
 func (router *Router) SendAllGossip() {
 	for _, channel := range router.GossipChannels {
-		channel.GossipMsg(channel.gossiper.Gossip())
+		channel.SendGossipMsg(channel.gossiper.Gossip())
 	}
 }
 
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for _, channel := range router.GossipChannels {
-		channel.send(channel.gossiper.Gossip(), conn)
+		protocolMsg := channel.gossipMsg(channel.gossiper.Gossip())
+		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 	}
 }
 
-func (c *GossipChannel) send(buf []byte, conn Connection) {
-	msg := ProtocolMsg{ProtocolGossip, GobEncode(c.hash, c.ourself.Name, buf)}
-	conn.(ProtocolSender).SendProtocolMsg(msg)
+func (c *GossipChannel) SendGossipMsg(buf []byte) {
+	protocolMsg := c.gossipMsg(buf)
+	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
+		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+	})
 }
 
-func (c *GossipChannel) GossipMsg(buf []byte) {
-	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
-		c.send(buf, conn)
-	})
+func (c *GossipChannel) gossipMsg(buf []byte) ProtocolMsg {
+	return ProtocolMsg{ProtocolGossip, GobEncode(c.hash, c.ourself.Name, buf)}
 }
 
 func (conn *LocalConnection) handleGossip(payload []byte, onok func(*GossipChannel, PeerName, []byte, *gob.Decoder) error) error {
@@ -126,7 +127,7 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 		return err
 	}
 	if newBuf := channel.gossiper.OnGossip(payload); newBuf != nil {
-		channel.GossipMsg(newBuf)
+		channel.SendGossipMsg(newBuf)
 	}
 	return nil
 }
