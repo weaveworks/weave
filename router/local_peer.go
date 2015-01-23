@@ -268,28 +268,6 @@ func (peer *LocalPeer) handleSendProtocolMsg(m ProtocolMsg) {
 	})
 }
 
-func (peer *LocalPeer) addConnection(conn Connection) {
-	peer.Lock()
-	peer.connections[conn.Remote().Name] = conn
-	peer.Unlock()
-}
-
-func (peer *LocalPeer) deleteConnection(conn Connection) {
-	established := conn.Established()
-	peer.Lock()
-	delete(peer.connections, conn.Remote().Name)
-	if established {
-		peer.version += 1
-	}
-	peer.Unlock()
-}
-
-func (peer *LocalPeer) connectionEstablished(conn Connection) {
-	peer.Lock()
-	peer.version += 1
-	peer.Unlock()
-}
-
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
 	// TODO We should just be invoking TopologyGossip.GossipBroadcast
