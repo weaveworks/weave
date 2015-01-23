@@ -85,7 +85,7 @@ func (peers *Peers) allPeersExcept(excludeName PeerName) []*Peer {
 	res := peers.allPeers()
 	for i, peer := range res {
 		if peer.Name == excludeName {
-			return append(peers[:i], peers[i+1:]...)
+			return append(res[:i], res[i+1:]...)
 		}
 	}
 	return res
