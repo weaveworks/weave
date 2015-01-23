@@ -37,10 +37,6 @@ type GossipChannel struct {
 	gossiper Gossiper
 }
 
-func logGossip(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, "[gossip]:"), args...)...)
-}
-
 func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 	channelHash := hash(channelName)
 	channel := &GossipChannel{router.Ourself, channelName, channelHash, g}
@@ -145,9 +141,9 @@ func (c *GossipChannel) GossipBroadcast(buf []byte) error {
 
 func (c *GossipChannel) relayGossipUnicast(dstPeerName PeerName, msg []byte) error {
 	if relayPeerName, found := c.ourself.Router.Routes.Unicast(dstPeerName); !found {
-		logGossip("unknown relay destination:", dstPeerName)
+		c.log("unknown relay destination:", dstPeerName)
 	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
-		logGossip("unable to find connection to relay peer", relayPeerName)
+		c.log("unable to find connection to relay peer", relayPeerName)
 	} else {
 		conn.(ProtocolSender).SendProtocolMsg(ProtocolMsg{ProtocolGossipUnicast, msg})
 	}
@@ -156,7 +152,7 @@ func (c *GossipChannel) relayGossipUnicast(dstPeerName PeerName, msg []byte) err
 
 func (c *GossipChannel) relayGossipBroadcast(srcName PeerName, msg []byte) error {
 	if srcPeer, found := c.ourself.Router.Peers.Fetch(srcName); !found {
-		logGossip("unable to relay broadcast from unknown peer", srcName)
+		c.log("unable to relay broadcast from unknown peer", srcName)
 	} else {
 		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, msg}
 		for _, conn := range c.ourself.NextBroadcastHops(srcPeer) {
@@ -164,4 +160,8 @@ func (c *GossipChannel) relayGossipBroadcast(srcName PeerName, msg []byte) error
 		}
 	}
 	return nil
+}
+
+func (c *GossipChannel) log(args ...interface{}) {
+	log.Println(append(append([]interface{}{}, "[gossip "+c.name+"]:"), args...)...)
 }
