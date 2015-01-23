@@ -90,7 +90,7 @@ func (conn *LocalConnection) handleGossip(payload []byte, onok func(*GossipChann
 	if !found {
 		// Don't close the connection on unknown gossip - maybe the sysadmin has
 		// upgraded one node in the weave network and intends to do this one shortly.
-		logGossip("received unknown channel:", channelHash, "from ", conn.Remote().Name)
+		conn.log("[gossip] received unknown channel with hash", channelHash)
 		return nil
 	}
 	var srcName PeerName
