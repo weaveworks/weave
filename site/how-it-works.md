@@ -107,8 +107,8 @@ MAC discovery.
 
 ### <a name="topology"></a>Topology Communication
 
-Topology is communicated over the TCP links between peers.
-There are two message types:
+Topology is communicated over the TCP links between peers.  There are
+two message types:
 
 ##### FetchAll
 This carries no payload. The receiver responds with the entire
@@ -126,23 +126,23 @@ that have just connected
   * when a connection is deleted - the update contains just the peer
 that lost the connection
 
-The receiver merges it with its own topology model. If the payload is a
-subset of the receiver's topology, no further action is
+The receiver merges it with its own topology model. If the payload is
+a subset of the receiver's topology, no further action is
 taken. Otherwise, the receiver sends out to all its connections an
 "improved" update:
 
- - elements which the original payload added to the
-   receiver are included
- - elements which the original payload updated in the
-   receiver are included
- - elements which are equal between the receiver and
-   the payload are not included
- - elements where the payload was older than the
-   receiver's version are updated
+ - elements which the original payload added to the receiver are
+   included
+ - elements which the original payload updated in the receiver are
+   included
+ - elements which are equal between the receiver and the payload are
+   not included
+ - elements where the payload was older than the receiver's version
+   are updated
 
-If the update mentions a peer that the receiver does not know,
-then the entire update is rejected and the receiver sends a
-FetchAll message back to the sender.
+If the update mentions a peer that the receiver does not know, then
+the entire update is rejected and the receiver sends a FetchAll
+message back to the sender.
 
 #### Message details
 A topology update message is laid out like this:
