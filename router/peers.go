@@ -11,7 +11,6 @@ import (
 type Peers struct {
 	sync.RWMutex
 	ourself *Peer
-	macs    *MacCache
 	table   map[PeerName]*Peer
 	onGC    func(*Peer)
 }
@@ -23,10 +22,9 @@ type NameCollisionError struct {
 	Name PeerName
 }
 
-func NewPeers(ourself *Peer, macs *MacCache, onGC func(*Peer)) *Peers {
+func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
-		macs:    macs,
 		table:   make(map[PeerName]*Peer),
 		onGC:    onGC}
 }
@@ -156,9 +154,8 @@ func (peers *Peers) garbageCollect() []*Peer {
 	for name, peer := range peers.table {
 		found, _ := peers.ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
-			peers.onGC(peer)
 			delete(peers.table, name)
-			peers.macs.Delete(peer)
+			peers.onGC(peer)
 			removed = append(removed, peer)
 		}
 	}

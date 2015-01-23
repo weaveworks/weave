@@ -139,11 +139,13 @@ create_bridge() {
         run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
         add_iptables_rule nat POSTROUTING -j WEAVE
     }
-    # disable offloading - we do this even when $BRIDGE already exists
-    # simply because it has the desirable side-effect of ensuring we
-    # have the $TOOLS_IMAGE and thus do not incur downloading-induced
-    # delays in more time-sensitive sections elsewhere.
-    run_tool host ethtool -K $BRIDGE tx off >/dev/null
+    if [ ! "$1" = "--without-ethtool" ] ; then
+        # disable offloading - we do this even when $BRIDGE already exists
+        # simply because it has the desirable side-effect of ensuring we
+        # have the $TOOLS_IMAGE and thus do not incur downloading-induced
+        # delays in more time-sensitive sections elsewhere.
+        run_tool host ethtool -K $BRIDGE tx off >/dev/null
+    fi
 
     ip link set dev $BRIDGE up
 }
@@ -452,6 +454,9 @@ case "$COMMAND" in
         for img in $IMAGE $DNS_IMAGE $TOOLS_IMAGE ; do
             docker pull $img
         done
+        ;;
+    create-bridge)
+        create_bridge --without-ethtool
         ;;
     launch)
         check_not_running $CONTAINER_NAME $BASE_IMAGE
