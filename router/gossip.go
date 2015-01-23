@@ -37,15 +37,15 @@ type GossipChannel struct {
 	gossiper Gossiper
 }
 
+func logGossip(args ...interface{}) {
+	log.Println(append(append([]interface{}{}, "[gossip]:"), args...)...)
+}
+
 func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 	channelHash := hash(channelName)
 	channel := &GossipChannel{router.Ourself, channelName, channelHash, g}
 	router.GossipChannels[channelHash] = channel
 	return channel
-}
-
-func logGossip(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, "[gossip]:"), args...)...)
 }
 
 func (router *Router) SendAllGossip() {
@@ -59,17 +59,6 @@ func (router *Router) SendAllGossipDown(conn Connection) {
 		protocolMsg := channel.gossipMsg(channel.gossiper.Gossip())
 		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 	}
-}
-
-func (c *GossipChannel) SendGossipMsg(buf []byte) {
-	protocolMsg := c.gossipMsg(buf)
-	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
-		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
-	})
-}
-
-func (c *GossipChannel) gossipMsg(buf []byte) ProtocolMsg {
-	return ProtocolMsg{ProtocolGossip, GobEncode(c.hash, c.ourself.Name, buf)}
 }
 
 func (conn *LocalConnection) handleGossip(payload []byte, onok func(*GossipChannel, PeerName, []byte, *gob.Decoder) error) error {
@@ -130,6 +119,17 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 		channel.SendGossipMsg(newBuf)
 	}
 	return nil
+}
+
+func (c *GossipChannel) SendGossipMsg(buf []byte) {
+	protocolMsg := c.gossipMsg(buf)
+	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
+		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+	})
+}
+
+func (c *GossipChannel) gossipMsg(buf []byte) ProtocolMsg {
+	return ProtocolMsg{ProtocolGossip, GobEncode(c.hash, c.ourself.Name, buf)}
 }
 
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
