@@ -57,11 +57,12 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 		log.Println("Expired MAC", mac, "at", peer.Name)
 	}
 	onPeerGC := func(peer *Peer) {
-		log.Println("Removing unreachable", peer)
+		router.Macs.Delete(peer)
+		log.Println("Removed unreachable", peer)
 	}
 	router.Ourself = NewLocalPeer(name, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
-	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
+	router.Peers = NewPeers(router.Ourself.Peer, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
