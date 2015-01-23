@@ -73,22 +73,22 @@ func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Co
 }
 
 // Get all the peers from a Peers in a slice
-func (p1 *Peers) allPeers() []*Peer {
-	peers := make([]*Peer, 0)
-	for _, peer := range p1.table {
-		peers = append(peers, peer)
+func (peers *Peers) allPeers() []*Peer {
+	res := make([]*Peer, 0)
+	for _, peer := range peers.table {
+		res = append(res, peer)
 	}
-	return peers
+	return res
 }
 
-func (p1 *Peers) allPeersExcept(excludeName PeerName) []*Peer {
-	peers := p1.allPeers()
-	for i, peer := range peers {
+func (peers *Peers) allPeersExcept(excludeName PeerName) []*Peer {
+	res := peers.allPeers()
+	for i, peer := range res {
 		if peer.Name == excludeName {
 			return append(peers[:i], peers[i+1:]...)
 		}
 	}
-	return peers
+	return res
 }
 
 // Check that the peers slice matches the wanted peers
