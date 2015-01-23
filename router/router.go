@@ -24,12 +24,12 @@ type Router struct {
 	Peers           *Peers
 	Routes          *Routes
 	ConnectionMaker *ConnectionMaker
+	GossipChannels  map[uint32]*GossipChannel
 	UDPListener     *net.UDPConn
 	Password        *[]byte
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
-	GossipChannels  map[uint32]*GossipChannel
 }
 
 type PacketSource interface {
