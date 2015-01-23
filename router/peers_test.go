@@ -5,15 +5,22 @@ import (
 	"testing"
 )
 
+func newNode(name PeerName) (*LocalPeer, *Peers) {
+	localPeer := NewLocalPeer(name, nil)
+	peers := NewPeers(localPeer.Peer, func(*Peer) {})
+	peers.FetchWithDefault(localPeer.Peer)
+	return localPeer, peers
+}
+
 // Check that ApplyUpdate copies the whole topology from r1
-func checkApplyUpdate(t *testing.T, r1 *Router) {
+func checkApplyUpdate(t *testing.T, peer *Peer, peers *Peers) {
 	dummyName, _ := PeerNameFromString("99:00:00:01:00:00")
 	// Testbed has to be a node outside of the network, with a connection into it
-	testBed := NewTestRouter(t, dummyName)
-	testBed.AddTestConnection(r1)
-	testBed.Peers.ApplyUpdate(r1.Peers.EncodeAllPeers())
+	testBed, testBedPeers := newNode(dummyName)
+	testBedPeers.AddTestConnection(testBed, peer)
+	testBedPeers.ApplyUpdate(peers.EncodeAllPeers())
 
-	checkTopologyPeers(t, true, testBed.Peers.allPeersExcept(dummyName), r1.Peers.allPeers()...)
+	checkTopologyPeers(t, true, testBedPeers.allPeersExcept(dummyName), peers.allPeers()...)
 }
 
 func TestPeersEncoding(t *testing.T) {
@@ -29,21 +36,21 @@ func TestPeersEncoding(t *testing.T) {
 	)
 
 	// Create some peers
-	r1 := NewTestRouter(t, peer1Name)
+	p1, ps1 := newNode(peer1Name)
 	r2 := NewTestRouter(t, peer2Name)
 	r3 := NewTestRouter(t, peer3Name)
 
 	// Now try adding some connections
-	r1.AddTestConnection(r2)
-	checkApplyUpdate(t, r1)
-	r2.AddTestConnection(r1)
-	checkApplyUpdate(t, r2)
+	ps1.AddTestConnection(p1, r2.Ourself.Peer)
+	checkApplyUpdate(t, p1.Peer, ps1)
+	r2.Peers.AddTestConnection(r2.Ourself, p1.Peer)
+	checkApplyUpdate(t, r2.Ourself.Peer, r2.Peers)
 
 	// Currently, the connection from 2 to 3 is one-way only
-	r2.AddTestConnection(r3)
-	checkApplyUpdate(t, r1)
-	checkApplyUpdate(t, r2)
-	checkApplyUpdate(t, r3)
+	r2.Peers.AddTestConnection(r2.Ourself, r3.Ourself.Peer)
+	checkApplyUpdate(t, p1.Peer, ps1)
+	checkApplyUpdate(t, r2.Ourself.Peer, r2.Peers)
+	checkApplyUpdate(t, r3.Ourself.Peer, r3.Peers)
 }
 
 func TestPeersGarbageCollection(t *testing.T) {
@@ -62,14 +69,14 @@ func TestPeersGarbageCollection(t *testing.T) {
 	r1 := NewTestRouter(t, peer1Name)
 	r2 := NewTestRouter(t, peer2Name)
 	r3 := NewTestRouter(t, peer3Name)
-	r1.AddTestConnection(r2)
-	r2.AddTestRemoteConnection(r1, r2)
-	r2.AddTestConnection(r1)
-	r2.AddTestConnection(r3)
-	r3.AddTestConnection(r1)
-	r1.AddTestConnection(r3)
-	r2.AddTestRemoteConnection(r1, r3)
-	r2.AddTestRemoteConnection(r3, r1)
+	r1.Peers.AddTestConnection(r1.Ourself, r2.Ourself.Peer)
+	r2.Peers.AddTestRemoteConnection(r2.Ourself, r1.Ourself.Peer, r2.Ourself.Peer)
+	r2.Peers.AddTestConnection(r2.Ourself, r1.Ourself.Peer)
+	r2.Peers.AddTestConnection(r2.Ourself, r3.Ourself.Peer)
+	r3.Peers.AddTestConnection(r3.Ourself, r1.Ourself.Peer)
+	r1.Peers.AddTestConnection(r1.Ourself, r3.Ourself.Peer)
+	r2.Peers.AddTestRemoteConnection(r2.Ourself, r1.Ourself.Peer, r3.Ourself.Peer)
+	r2.Peers.AddTestRemoteConnection(r2.Ourself, r3.Ourself.Peer, r1.Ourself.Peer)
 
 	// Drop the connection from 2 to 3, and 3 isn't garbage-collected because 1 has a connection to 3
 	r2.DeleteTestConnection(r3)

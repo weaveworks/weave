@@ -19,23 +19,23 @@ func NewTestRouter(t *testing.T, name PeerName) *Router {
 	return router
 }
 
-func (r1 *Router) AddTestConnection(r2 *Router) {
-	toName := r2.Ourself.Peer.Name
-	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
-	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := newMockConnection(r1.Ourself.Peer, toPeer)
-	r1.Ourself.addConnection(conn)
-	r1.Ourself.connectionEstablished(conn)
+func (peers *Peers) AddTestConnection(ourself *LocalPeer, peer *Peer) {
+	toName := peer.Name
+	toPeer := NewPeer(toName, peer.UID, 0)
+	peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
+	conn := newMockConnection(ourself.Peer, toPeer)
+	ourself.addConnection(conn)
+	ourself.connectionEstablished(conn)
 }
 
-func (r0 *Router) AddTestRemoteConnection(r1, r2 *Router) {
-	fromName := r2.Ourself.Peer.Name
-	fromPeer := NewPeer(fromName, r1.Ourself.Peer.UID, 0)
-	fromPeer = r0.Peers.FetchWithDefault(fromPeer)
-	toName := r2.Ourself.Peer.Name
-	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
-	toPeer = r0.Peers.FetchWithDefault(toPeer)
-	r0.Ourself.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
+func (peers *Peers) AddTestRemoteConnection(p0 *LocalPeer, p1, p2 *Peer) {
+	fromName := p1.Name
+	fromPeer := NewPeer(fromName, p1.UID, 0)
+	fromPeer = peers.FetchWithDefault(fromPeer)
+	toName := p2.Name
+	toPeer := NewPeer(toName, p2.UID, 0)
+	toPeer = peers.FetchWithDefault(toPeer)
+	p0.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
 }
 
 func (r1 *Router) DeleteTestConnection(r2 *Router) {
