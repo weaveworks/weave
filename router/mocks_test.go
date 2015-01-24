@@ -1,7 +1,7 @@
 // No mocks are tested by this file.
 //
 // It supplies some mock implementations to other unit tests, and is
-//named "...test.go" so it is only compiled under `go test`.
+// named "...test.go" so it is only compiled under `go test`.
 
 package router
 
