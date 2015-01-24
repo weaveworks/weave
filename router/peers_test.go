@@ -90,16 +90,14 @@ func TestPeersGarbageCollection(t *testing.T) {
 	// Drop the connection from 2 to 3, and 3 isn't garbage-collected
 	// because 1 has a connection to 3
 	ps2.DeleteTestConnection(p2, p3)
-	peersRemoved := ps2.GarbageCollect()
-	wt.AssertEmpty(t, peersRemoved, "peers removed")
+	wt.AssertEmpty(t, ps2.GarbageCollect(), "peers removed")
 
 	wt.AssertEmpty(t, ps1.GarbageCollect(), "peers removed")
 	wt.AssertEmpty(t, ps2.GarbageCollect(), "peers removed")
 	wt.AssertEmpty(t, ps3.GarbageCollect(), "peers removed")
 
-	// Drop the connection from 1 to 3, and it will get removed by
+	// Drop the connection from 1 to 3, and 3 will get removed by
 	// garbage-collection
 	ps1.DeleteTestConnection(p1, p3)
-	peersRemoved = ps1.GarbageCollect()
-	checkPeerArray(t, peersRemoved, p3)
+	checkPeerArray(t, ps1.GarbageCollect(), p3)
 }
