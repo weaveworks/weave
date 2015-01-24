@@ -10,25 +10,24 @@ import (
 	"testing"
 )
 
-// Add to (peers,p1) a connection from p1 to p2
-func (peers *Peers) AddTestConnection(p1, p2 *Peer) {
-	toName := p2.Name
-	toPeer := NewPeer(toName, p2.UID, 0)
+// Add to peers a connection from peers.ourself to p
+func (peers *Peers) AddTestConnection(p *Peer) {
+	toPeer := NewPeer(p.Name, p.UID, 0)
 	peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := newMockConnection(p1, toPeer)
-	p1.addConnection(conn)
-	p1.connectionEstablished(conn)
+	conn := newMockConnection(peers.ourself, toPeer)
+	peers.ourself.addConnection(conn)
+	peers.ourself.connectionEstablished(conn)
 }
 
 // Add to (peers,p0) a connection from p1 to p2
-func (peers *Peers) AddTestRemoteConnection(p0, p1, p2 *Peer) {
+func (peers *Peers) AddTestRemoteConnection(p1, p2 *Peer) {
 	fromName := p1.Name
 	fromPeer := NewPeer(fromName, p1.UID, 0)
 	fromPeer = peers.FetchWithDefault(fromPeer)
 	toName := p2.Name
 	toPeer := NewPeer(toName, p2.UID, 0)
 	toPeer = peers.FetchWithDefault(toPeer)
-	p0.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
+	peers.ourself.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
 }
 
 func (peers *Peers) DeleteTestConnection(ourself *Peer, peer *Peer) {

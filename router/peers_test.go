@@ -17,10 +17,10 @@ func newNode(name PeerName) (*Peer, *Peers) {
 // Check that ApplyUpdate copies the whole topology from peers
 func checkApplyUpdate(t *testing.T, peer *Peer, peers *Peers) {
 	dummyName, _ := PeerNameFromString("99:00:00:01:00:00")
-	// Testbed has to be a node outside of the network, with a
-	// connection into it
-	testBed, testBedPeers := newNode(dummyName)
-	testBedPeers.AddTestConnection(testBed, peer)
+	// We need a new node outside of the network, with a connection
+	// into it.
+	_, testBedPeers := newNode(dummyName)
+	testBedPeers.AddTestConnection(peer)
 	testBedPeers.ApplyUpdate(peers.EncodeAllPeers())
 
 	checkTopologyPeers(t, true, testBedPeers.allPeersExcept(dummyName), peers.allPeers()...)
@@ -44,7 +44,7 @@ func TestPeersEncoding(t *testing.T) {
 			from, to := rand.Intn(numNodes), rand.Intn(numNodes)
 			if from != to {
 				if _, found := peer[from].ConnectionTo(peer[to].Name); !found {
-					ps[from].AddTestConnection(peer[from], peer[to])
+					ps[from].AddTestConnection(peer[to])
 					conns = append(conns, struct{ from, to int }{from, to})
 					checkApplyUpdate(t, peer[from], ps[from])
 				}
@@ -78,14 +78,14 @@ func TestPeersGarbageCollection(t *testing.T) {
 	p1, ps1 := newNode(peer1Name)
 	p2, ps2 := newNode(peer2Name)
 	p3, ps3 := newNode(peer3Name)
-	ps1.AddTestConnection(p1, p2)
-	ps2.AddTestRemoteConnection(p2, p1, p2)
-	ps2.AddTestConnection(p2, p1)
-	ps2.AddTestConnection(p2, p3)
-	ps3.AddTestConnection(p3, p1)
-	ps1.AddTestConnection(p1, p3)
-	ps2.AddTestRemoteConnection(p2, p1, p3)
-	ps2.AddTestRemoteConnection(p2, p3, p1)
+	ps1.AddTestConnection(p2)
+	ps2.AddTestRemoteConnection(p1, p2)
+	ps2.AddTestConnection(p1)
+	ps2.AddTestConnection(p3)
+	ps3.AddTestConnection(p1)
+	ps1.AddTestConnection(p3)
+	ps2.AddTestRemoteConnection(p1, p3)
+	ps2.AddTestRemoteConnection(p3, p1)
 
 	// Drop the connection from 2 to 3, and 3 isn't garbage-collected
 	// because 1 has a connection to 3
