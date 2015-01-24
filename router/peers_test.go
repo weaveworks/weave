@@ -62,6 +62,13 @@ func TestPeersEncoding(t *testing.T) {
 	}
 }
 
+// TODO we should also test:
+//
+// - applying an incremental update, including the case where that
+//   leads to an UnknownPeersError
+//
+// - the "improved update" calculation
+
 func TestPeersGarbageCollection(t *testing.T) {
 	const (
 		peer1NameString = "01:00:00:01:00:00"
