@@ -7,6 +7,15 @@ import (
 	"testing"
 )
 
+// TODO we should also test:
+//
+// - applying an incremental update, including the case where that
+//   leads to an UnknownPeersError
+//
+// - the "improved update" calculation
+//
+// - non-gc of peers that are only referenced locally
+
 func newNode(name PeerName) (*Peer, *Peers) {
 	peer := NewPeer(name, 0, 0)
 	peers := NewPeers(peer, func(*Peer) {})
@@ -61,13 +70,6 @@ func TestPeersEncoding(t *testing.T) {
 		}
 	}
 }
-
-// TODO we should also test:
-//
-// - applying an incremental update, including the case where that
-//   leads to an UnknownPeersError
-//
-// - the "improved update" calculation
 
 func TestPeersGarbageCollection(t *testing.T) {
 	const (
