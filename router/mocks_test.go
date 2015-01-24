@@ -1,6 +1,7 @@
 // No mocks are tested by this file.
-// It supplies some mock implementations to other unit tests,
-// and is named "...test.go" so it is only compiled under `go test`.
+//
+// It supplies some mock implementations to other unit tests, and is
+//named "...test.go" so it is only compiled under `go test`.
 
 package router
 
@@ -38,9 +39,10 @@ func (peers *Peers) DeleteTestConnection(ourself *Peer, peer *Peer) {
 	ourself.deleteConnection(conn)
 }
 
-// mockConnection used in testing is very similar to a RemoteConnection, without
-// the RemoteTCPAddr(), but I want to keep a separate type in order to distinguish
-// what is created by the test from what is created by the real code.
+// mockConnection used in testing is very similar to a
+// RemoteConnection, without the RemoteTCPAddr(). We are making it a
+// separate type in order to distinguish what is created by the test
+// from what is created by the real code.
 func newMockConnection(from, to *Peer) Connection {
 	type mockConnection struct{ RemoteConnection }
 	return &mockConnection{RemoteConnection{from, to, ""}}
@@ -88,7 +90,8 @@ func checkPeerArray(t *testing.T, peers []*Peer, wantedPeers ...*Peer) {
 	checkTopologyPeers(t, false, peers, wantedPeers...)
 }
 
-// Check that the peers slice matches the wanted peers and optionally all of their connections
+// Check that the peers slice matches the wanted peers and optionally
+// all of their connections
 func checkTopologyPeers(t *testing.T, checkConns bool, peers []*Peer, wantedPeers ...*Peer) {
 	check := make(map[PeerName]*Peer)
 	for _, peer := range wantedPeers {

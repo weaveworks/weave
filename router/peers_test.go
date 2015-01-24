@@ -14,10 +14,11 @@ func newNode(name PeerName) (*Peer, *Peers) {
 	return peer, peers
 }
 
-// Check that ApplyUpdate copies the whole topology from r1
+// Check that ApplyUpdate copies the whole topology from peers
 func checkApplyUpdate(t *testing.T, peer *Peer, peers *Peers) {
 	dummyName, _ := PeerNameFromString("99:00:00:01:00:00")
-	// Testbed has to be a node outside of the network, with a connection into it
+	// Testbed has to be a node outside of the network, with a
+	// connection into it
 	testBed, testBedPeers := newNode(dummyName)
 	testBedPeers.AddTestConnection(testBed, peer)
 	testBedPeers.ApplyUpdate(peers.EncodeAllPeers())
@@ -86,7 +87,8 @@ func TestPeersGarbageCollection(t *testing.T) {
 	ps2.AddTestRemoteConnection(p2, p1, p3)
 	ps2.AddTestRemoteConnection(p2, p3, p1)
 
-	// Drop the connection from 2 to 3, and 3 isn't garbage-collected because 1 has a connection to 3
+	// Drop the connection from 2 to 3, and 3 isn't garbage-collected
+	// because 1 has a connection to 3
 	ps2.DeleteTestConnection(p2, p3)
 	peersRemoved := ps2.GarbageCollect()
 	wt.AssertEmpty(t, peersRemoved, "peers removed")
@@ -95,7 +97,8 @@ func TestPeersGarbageCollection(t *testing.T) {
 	wt.AssertEmpty(t, ps2.GarbageCollect(), "peers removed")
 	wt.AssertEmpty(t, ps3.GarbageCollect(), "peers removed")
 
-	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
+	// Drop the connection from 1 to 3, and it will get removed by
+	// garbage-collection
 	ps1.DeleteTestConnection(p1, p3)
 	peersRemoved = ps1.GarbageCollect()
 	checkPeerArray(t, peersRemoved, p3)
