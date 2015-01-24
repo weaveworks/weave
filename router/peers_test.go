@@ -15,12 +15,12 @@ func newNode(name PeerName) (*Peer, *Peers) {
 }
 
 // Check that ApplyUpdate copies the whole topology from peers
-func checkApplyUpdate(t *testing.T, peer *Peer, peers *Peers) {
+func checkApplyUpdate(t *testing.T, peers *Peers) {
 	dummyName, _ := PeerNameFromString("99:00:00:01:00:00")
 	// We need a new node outside of the network, with a connection
 	// into it.
 	_, testBedPeers := newNode(dummyName)
-	testBedPeers.AddTestConnection(peer)
+	testBedPeers.AddTestConnection(peers.ourself)
 	testBedPeers.ApplyUpdate(peers.EncodeAllPeers())
 
 	checkTopologyPeers(t, true, testBedPeers.allPeersExcept(dummyName), peers.allPeers()...)
@@ -46,7 +46,7 @@ func TestPeersEncoding(t *testing.T) {
 				if _, found := peer[from].ConnectionTo(peer[to].Name); !found {
 					ps[from].AddTestConnection(peer[to])
 					conns = append(conns, struct{ from, to int }{from, to})
-					checkApplyUpdate(t, peer[from], ps[from])
+					checkApplyUpdate(t, ps[from])
 				}
 			}
 		case 1:
@@ -55,7 +55,7 @@ func TestPeersEncoding(t *testing.T) {
 				c := conns[n]
 				ps[c.from].DeleteTestConnection(peer[c.from], peer[c.to])
 				ps[c.from].GarbageCollect()
-				checkApplyUpdate(t, peer[c.from], ps[c.from])
+				checkApplyUpdate(t, ps[c.from])
 				conns = append(conns[:n], conns[n+1:]...)
 			}
 		}
