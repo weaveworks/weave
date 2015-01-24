@@ -86,13 +86,13 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 	peer.connections = connections
 }
 
-func (peer *LocalPeer) addConnection(conn Connection) {
+func (peer *Peer) addConnection(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	peer.connections[conn.Remote().Name] = conn
 }
 
-func (peer *LocalPeer) deleteConnection(conn Connection) {
+func (peer *Peer) deleteConnection(conn Connection) {
 	established := conn.Established()
 	peer.Lock()
 	defer peer.Unlock()
@@ -102,7 +102,7 @@ func (peer *LocalPeer) deleteConnection(conn Connection) {
 	}
 }
 
-func (peer *LocalPeer) connectionEstablished(conn Connection) {
+func (peer *Peer) connectionEstablished(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	peer.version += 1
