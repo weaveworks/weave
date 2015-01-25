@@ -125,19 +125,11 @@ peers that have just connected
   * when a connection is deleted - the update contains just the peer
 that lost the connection
 
-The receiver merges it with its own topology model. If the payload is
-a subset of the receiver's topology, no further action is
-taken. Otherwise, the receiver sends out to all its connections an
-"improved" update:
-
- - elements which the original payload added to the receiver are
-   included
- - elements which the original payload updated in the receiver are
-   included
- - elements which are equal between the receiver and the payload are
-   not included
- - elements where the payload was older than the receiver's version
-   are updated
+The receiver merges the update with its own topology model, adding
+peers hitherto unknown to it, and updating peers for which the update
+contains a more recent version than known to it. If there were any
+such new/updated peers, then an improved update containing them is
+sent out on all connections.
 
 If the update mentions a peer that the receiver does not know, then
 the entire update is rejected and the receiver sends a FetchAll
