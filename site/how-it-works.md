@@ -12,9 +12,9 @@ different each time it is run.  These are opaque identifiers as far as
 the router is concerned, although the name defaults to a MAC address.
 
 Weave routers establish TCP connections to each other, over which they
-perform a protocol handshake and subsequently exchange topology
-information (see below). These connections are encrypted if so
-configured. Peers also establish UDP "connections", possibly
+perform a protocol handshake and subsequently exchange
+[topology](#topology) information. These connections are encrypted if
+so configured. Peers also establish UDP "connections", possibly
 encrypted, which carry encapsulated network packets. These
 "connections" are duplex and can traverse firewalls.
 
@@ -35,19 +35,11 @@ packet to peers.
 Weave routers learn which peer host a particular MAC address resides
 on. They combine this knowledge with topology information in order to
 make routing decisions and thus avoid forwarding every packet to every
-peer. The topology information captures which peers are connected to
-which other peers; weave can route packets in partially connected
-networks with changing topology.
-
-For example, in this network, peer 1 is connected directly to 2 and 3,
-but if 1 needs to send a packet to 4 or 5 it must first send it to
-peer 3:
-![diagram showing five peers in a weave network][diagram1]
-Weave peers [communicate their own topology](#topology) with neighbours, who then
-pass on changes to their neighbours, and so on, until the entire
-network knows about any change.
-
-[diagram1]: images/top-diag1.png "Diagram 1"
+peer. Weave can route packets in partially connected networks with
+changing topology. For example, in this network, peer 1 is connected
+directly to 2 and 3, but if 1 needs to send a packet to 4 or 5 it must
+first send it to peer 3:
+![Partially connected Weave Network](images/top-diag1.png "Partially connected Weave Network")
 
 ### <a name="encapsulation"></a>Encapsulation
 
@@ -105,7 +97,13 @@ the MAC. This way weave peers never need to exchange the MAC addresses
 of clients and need not take any special action for ARP traffic and
 MAC discovery.
 
-### <a name="topology"></a>Topology Communication
+### <a name="topology"></a>Topology
+
+The topology information captures which peers are connected to which
+other peers. Weave peers communicate their knowledge of the topology
+(and changes to it) to their neighbours, who then pass this
+information on to their own neighbours, and so on, until the entire
+network knows about any change.
 
 Topology is communicated over the TCP links between peers, using a
 Gossip mechanism.  Topology messages are sent by a peer...
@@ -118,19 +116,11 @@ Gossip mechanism.  Topology messages are sent by a peer...
   information about the local peer is sent to all neighbours
 - periodically, on a timer, in case someone has missed an update.
 
-Upon receiving an update, the receiver merges it with its own topology
-model. If the payload is a subset of the receiver's topology, no
-further action is taken. Otherwise, the receiver sends out to all its
-connections an "improved" update:
-
- - elements which the original payload added to the receiver are
-   included
- - elements which the original payload updated in the receiver are
-   included
- - elements which are equal between the receiver and the payload are
-   not included
- - elements where the payload was older than the receiver's version
-   are updated
+The receiver of a topology update merges that update with its own
+topology model, adding peers hitherto unknown to it, and updating
+peers for which the update contains a more recent version than known
+to it. If there were any such new/updated peers, then an improved
+update containing them is sent out on all connections.
 
 If the update mentions a peer that the receiver does not know, then
 the entire update is ignored.
@@ -193,7 +183,6 @@ which the structure is:
 If a peer, after receiving a topology update, sees that another peer
 no longer has any connections within the network, it drops all
 knowledge of that second peer.
-
 
 #### Out-of-date topology
 The peer-to-peer gossiping of updates is not instantaneous, so it is
