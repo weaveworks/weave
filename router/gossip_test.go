@@ -41,13 +41,13 @@ func (conn *mockChannelConnection) SendProtocolMsg(msg ProtocolMsg) {
 	}
 }
 
-func (r1 *Router) AddTestChannelConnection(r2 *Router) {
-	toName := r2.Ourself.Peer.Name
-	toPeer := NewPeer(toName, r2.Ourself.Peer.UID, 0)
-	r1.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := &mockChannelConnection{RemoteConnection{r1.Ourself.Peer, toPeer, ""}, r2}
-	r1.Ourself.addConnection(conn)
-	r1.Ourself.handleConnectionEstablished(conn)
+func (router *Router) AddTestChannelConnection(r *Router) {
+	toName := r.Ourself.Peer.Name
+	toPeer := NewPeer(toName, r.Ourself.Peer.UID, 0)
+	router.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
+	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, ""}, r}
+	router.Ourself.addConnection(conn)
+	router.Ourself.handleConnectionEstablished(conn)
 }
 
 func TestGossipTopology(t *testing.T) {
