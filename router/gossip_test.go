@@ -56,9 +56,10 @@ func TestGossipTopology(t *testing.T) {
 	})
 }
 
-// Create a remote Peer object plus all of its connections so we can check topology,
-// based on the name and UIDs of existing routers
-func tp(router *Router, routers ...*Router) *Peer {
+// Create a Peer representing the receiver router, with connections to
+// the routers supplied as arguments, carrying across all UID and
+// version information.
+func (router *Router) tp(routers ...*Router) *Peer {
 	peer := NewPeer(router.Ourself.Peer.Name, router.Ourself.Peer.UID, 0)
 	connections := make(map[PeerName]Connection)
 	for _, r := range routers {
@@ -95,61 +96,61 @@ func implTestGossipTopology(t *testing.T) {
 	r3.NewGossip(TopologyGossipCh, r3)
 
 	// Check state when they have no connections
-	checkTopology(t, r1, tp(r1))
-	checkTopology(t, r2, tp(r2))
+	checkTopology(t, r1, r1.tp())
+	checkTopology(t, r2, r2.tp())
 
 	// Now try adding some connections
 	r1.AddTestChannelConnection(r2)
-	checkTopology(t, r1, tp(r1, r2), tp(r2))
-	checkTopology(t, r2, tp(r2))
+	checkTopology(t, r1, r1.tp(r2), r2.tp())
+	checkTopology(t, r2, r2.tp())
 	r2.AddTestChannelConnection(r1)
-	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
-	checkTopology(t, r2, tp(r2, r1), tp(r1, r2))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
+	checkTopology(t, r2, r2.tp(r1), r1.tp(r2))
 
 	// Currently, the connection from 2 to 3 is one-way only
 	r2.AddTestChannelConnection(r3)
-	checkTopology(t, r1, tp(r1, r2), tp(r2, r1, r3), tp(r3))
-	checkTopology(t, r2, tp(r1, r2), tp(r2, r1, r3), tp(r3))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp())
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp())
 	// When r2 gossiped to r3, 1 and 2 were unreachable from r3 so they got removed from the update
-	checkTopology(t, r3, tp(r3))
+	checkTopology(t, r3, r3.tp())
 
 	// Add a connection from 3 to 1 and now r1 is reachable.
 	r3.AddTestChannelConnection(r1)
-	checkTopology(t, r1, tp(r1, r2), tp(r2, r1, r3), tp(r3, r1))
-	checkTopology(t, r2, tp(r1, r2), tp(r2, r1, r3), tp(r3, r1))
-	checkTopology(t, r3, tp(r1), tp(r3, r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r1))
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r1))
+	checkTopology(t, r3, r1.tp(), r3.tp(r1))
 
 	r1.AddTestChannelConnection(r3)
-	checkTopology(t, r1, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
-	checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
-	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1, r3), tp(r3, r1))
+	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
+	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
+	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
 
 	// Drop the connection from 2 to 3
 	r2.Peers.DeleteTestConnection(r2.Ourself.Peer, r3.Ourself.Peer)
-	checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
+	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 
 	// Now r2 tells its connections
 	r2.Ourself.broadcastPeerUpdate()
-	checkTopology(t, r1, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
-	checkTopology(t, r2, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
-	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
+	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
+	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
+	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 
 	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
 	r1.Peers.DeleteTestConnection(r1.Ourself.Peer, r3.Ourself.Peer)
-	checkTopology(t, r1, tp(r1, r2), tp(r2, r1), tp(r3, r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
 	r1.Peers.GarbageCollect()
-	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
 
 	// Now r1 tells its remaining connection, which also garbage-collects 3
 	r1.Ourself.broadcastPeerUpdate()
 
-	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
-	checkTopology(t, r2, tp(r1, r2), tp(r2, r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
 	// r3 still thinks r1 has a connection to it
-	checkTopology(t, r3, tp(r1, r2, r3), tp(r2, r1), tp(r3, r1))
+	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 
 	// On a timer, r3 will gossip to r1
 	r3.SendAllGossip()
 	// r1 receives info about 3, but eliminates it through garbage collection
-	checkTopology(t, r1, tp(r1, r2), tp(r2, r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
 }
