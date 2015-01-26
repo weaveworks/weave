@@ -69,7 +69,7 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
-	router.TopologyGossip = router.NewGossip(TopologyGossipCh, router)
+	router.TopologyGossip = router.NewGossip("topology", router)
 	return router
 }
 

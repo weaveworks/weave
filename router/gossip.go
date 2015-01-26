@@ -8,10 +8,7 @@ import (
 	"time"
 )
 
-const (
-	GossipInterval   = 30 * time.Second
-	TopologyGossipCh = "topology"
-)
+const GossipInterval = 30 * time.Second
 
 type Gossip interface {
 	// specific message from one peer to another
