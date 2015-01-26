@@ -52,7 +52,7 @@ func (router *Router) AddTestChannelConnection(r *Router) {
 	router.Peers.FetchWithDefault(toPeer) //
 
 	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, ""}, r}
-	router.Ourself.addConnection(conn)
+	router.Ourself.handleAddConnection(conn)
 	router.Ourself.handleConnectionEstablished(conn)
 }
 
