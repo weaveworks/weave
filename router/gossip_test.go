@@ -52,13 +52,13 @@ func (router *Router) AddTestChannelConnection(r *Router) {
 	router.Ourself.handleConnectionEstablished(conn)
 }
 
-func (router *Router) DeleteTestChannelConnection(peers2 *Peers) {
-	toName := peers2.ourself.Name
+func (router *Router) DeleteTestChannelConnection(r *Router) {
+	toName := r.Ourself.Peer.Name
 	toPeer, _ := router.Peers.Fetch(toName)
 	toPeer.DecrementLocalRefCount()
 	conn, _ := router.Ourself.ConnectionTo(toName)
 	router.Ourself.handleDeleteConnection(conn)
-	fromPeer, _ := peers2.Fetch(router.Ourself.Name)
+	fromPeer, _ := r.Peers.Fetch(router.Ourself.Name)
 	fromPeer.DecrementLocalRefCount()
 }
 
@@ -139,13 +139,13 @@ func implTestGossipTopology(t *testing.T) {
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
 
 	// Drop the connection from 2 to 3
-	r2.DeleteTestChannelConnection(r3.Peers)
+	r2.DeleteTestChannelConnection(r3)
 	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1))
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 
 	// Drop the connection from 1 to 3
-	r1.DeleteTestChannelConnection(r3.Peers)
+	r1.DeleteTestChannelConnection(r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
 
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
