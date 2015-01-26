@@ -62,7 +62,7 @@ func TestPeersEncoding(t *testing.T) {
 			if len(conns) > 0 {
 				n := rand.Intn(len(conns))
 				c := conns[n]
-				ps[c.from].DeleteTestConnection(peer[c.from], peer[c.to])
+				ps[c.from].DeleteTestConnection(peer[c.to])
 				ps[c.from].GarbageCollect()
 				checkApplyUpdate(t, ps[c.from])
 				conns = append(conns[:n], conns[n+1:]...)
@@ -103,11 +103,11 @@ func TestPeersGarbageCollection(t *testing.T) {
 
 	// Drop the connection from 2 to 3, and 3 isn't garbage-collected
 	// because 1 has a connection to 3
-	ps2.DeleteTestConnection(p2, p3)
+	ps2.DeleteTestConnection(p3)
 	wt.AssertEmpty(t, ps2.GarbageCollect(), "peers removed")
 
 	// Drop the connection from 1 to 3, and 3 will get removed by
 	// garbage-collection
-	ps1.DeleteTestConnection(p1, p3)
+	ps1.DeleteTestConnection(p3)
 	checkPeerArray(t, ps1.GarbageCollect(), p3)
 }
