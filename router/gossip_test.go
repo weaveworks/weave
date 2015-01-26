@@ -96,24 +96,13 @@ func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
 }
 
 func implTestGossipTopology(t *testing.T) {
-	const (
-		peer1NameString = "01:00:00:01:00:00"
-		peer2NameString = "02:00:00:02:00:00"
-		peer3NameString = "03:00:00:03:00:00"
-	)
-	var (
-		peer1Name, _ = PeerNameFromString(peer1NameString)
-		peer2Name, _ = PeerNameFromString(peer2NameString)
-		peer3Name, _ = PeerNameFromString(peer3NameString)
-	)
-
 	// Create some peers that will talk to each other
+	peer1Name, _ := PeerNameFromString("01:00:00:01:00:00")
+	peer2Name, _ := PeerNameFromString("02:00:00:02:00:00")
+	peer3Name, _ := PeerNameFromString("03:00:00:03:00:00")
 	r1 := NewTestRouter(peer1Name)
 	r2 := NewTestRouter(peer2Name)
 	r3 := NewTestRouter(peer3Name)
-	r1.NewGossip(TopologyGossipCh, r1)
-	r2.NewGossip(TopologyGossipCh, r2)
-	r3.NewGossip(TopologyGossipCh, r3)
 
 	// Check state when they have no connections
 	checkTopology(t, r1, r1.tp())
