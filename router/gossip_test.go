@@ -14,8 +14,10 @@ type mockChannelConnection struct {
 	dest *Router
 }
 
-// Construct a Router object with dummy channels otherwise tests hang on nil channel
-// when Router.OnGossip() calls async methods
+// Construct a "passive" Router, i.e. without any goroutines.
+//
+// We need to create some dummy channels otherwise tests hang on nil
+// channels when Router.OnGossip() calls async methods.
 func NewTestRouter(name PeerName) *Router {
 	router := NewRouter(nil, name, nil, 10, 1024, nil)
 	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
