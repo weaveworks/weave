@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	GossipInterval   = 3 * time.Second
+	GossipInterval   = 30 * time.Second
 	TopologyGossipCh = "topology"
 )
 
