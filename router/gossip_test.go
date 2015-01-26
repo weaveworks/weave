@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// TODO test gossip unicast and broadcast; atm we only test topology
+// gossip, which does not employ unicast or broadcast.
+
 type mockChannelConnection struct {
 	RemoteConnection
 	dest *Router
