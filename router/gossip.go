@@ -3,6 +3,7 @@ package router
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"log"
 	"time"
 )
@@ -57,18 +58,15 @@ func (router *Router) SendAllGossipDown(conn Connection) {
 	}
 }
 
-func (conn *LocalConnection) handleGossip(payload []byte, onok func(*GossipChannel, PeerName, []byte, *gob.Decoder) error) error {
+func (router *Router) handleGossip(payload []byte, onok func(*GossipChannel, PeerName, []byte, *gob.Decoder) error) error {
 	decoder := gob.NewDecoder(bytes.NewReader(payload))
 	var channelHash uint32
 	if err := decoder.Decode(&channelHash); err != nil {
 		return err
 	}
-	channel, found := conn.Router.GossipChannels[channelHash]
+	channel, found := router.GossipChannels[channelHash]
 	if !found {
-		// Don't close the connection on unknown gossip - maybe the sysadmin has
-		// upgraded one node in the weave network and intends to do this one shortly.
-		conn.log("[gossip] received unknown channel with hash", channelHash)
-		return nil
+		return fmt.Errorf("[gossip] received unknown channel with hash %v", channelHash)
 	}
 	var srcName PeerName
 	if err := decoder.Decode(&srcName); err != nil {

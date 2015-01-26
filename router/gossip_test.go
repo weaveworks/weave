@@ -1,10 +1,6 @@
 package router
 
 import (
-	"bytes"
-	"encoding/gob"
-	"errors"
-	"fmt"
 	wt "github.com/zettio/weave/testing"
 	"testing"
 	"time"
@@ -24,20 +20,9 @@ func NewTestRouter(name PeerName) *Router {
 	return router
 }
 
-// This is basically the same as LocalConnection.handleGossip()
-func (conn *mockChannelConnection) SendProtocolMsg(msg ProtocolMsg) {
-	decoder := gob.NewDecoder(bytes.NewReader(msg.msg))
-	var channelHash uint32
-	if err := decoder.Decode(&channelHash); err != nil {
-		panic(errors.New(fmt.Sprintf("error when decoding: %s", err)))
-	} else if channel, found := conn.dest.GossipChannels[channelHash]; !found {
-		panic(errors.New(fmt.Sprintf("unknown channel: %d", channelHash)))
-	} else {
-		var srcName PeerName
-		if err := decoder.Decode(&srcName); err != nil {
-			panic(err)
-		}
-		deliverGossip(channel, srcName, msg.msg, decoder)
+func (conn *mockChannelConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
+	if err := conn.dest.handleGossip(protocolMsg.msg, deliverGossip); err != nil {
+		panic(err)
 	}
 }
 
