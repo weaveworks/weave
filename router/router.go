@@ -353,7 +353,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 	}
 }
 
-// Gossip methods
+// Gossiper methods - the Router is the topology Gossiper
 
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
 	return fmt.Errorf("unexpected topology gossip unicast: %v", msg)
@@ -375,7 +375,7 @@ func (router *Router) OnGossip(buf []byte) ([]byte, error) {
 	if _, ok := err.(UnknownPeersError); err != nil && ok {
 		// That update contained a peer we didn't know about; we
 		// ignore this; eventually we should receive an update
-		// containing a the complete topology.
+		// containing a complete topology.
 		return nil, nil
 	}
 	if err != nil {
