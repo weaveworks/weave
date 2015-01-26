@@ -45,9 +45,21 @@ func (router *Router) AddTestChannelConnection(r *Router) {
 	toName := r.Ourself.Peer.Name
 	toPeer := NewPeer(toName, r.Ourself.Peer.UID, 0)
 	router.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
+	fromPeer := NewPeer(router.Ourself.Peer.Name, router.Ourself.Peer.UID, 0)
+	r.Peers.FetchWithDefault(fromPeer)
 	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, ""}, r}
 	router.Ourself.addConnection(conn)
 	router.Ourself.handleConnectionEstablished(conn)
+}
+
+func (router *Router) DeleteTestChannelConnection(peers2 *Peers) {
+	toName := peers2.ourself.Name
+	toPeer, _ := router.Peers.Fetch(toName)
+	toPeer.DecrementLocalRefCount()
+	conn, _ := router.Ourself.ConnectionTo(toName)
+	router.Ourself.handleDeleteConnection(conn)
+	fromPeer, _ := peers2.Fetch(router.Ourself.Name)
+	fromPeer.DecrementLocalRefCount()
 }
 
 func TestGossipTopology(t *testing.T) {
@@ -102,7 +114,7 @@ func implTestGossipTopology(t *testing.T) {
 	// Now try adding some connections
 	r1.AddTestChannelConnection(r2)
 	checkTopology(t, r1, r1.tp(r2), r2.tp())
-	checkTopology(t, r2, r2.tp())
+	checkTopology(t, r2, r1.tp(r2), r2.tp())
 	r2.AddTestChannelConnection(r1)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
 	checkTopology(t, r2, r2.tp(r1), r1.tp(r2))
@@ -111,14 +123,15 @@ func implTestGossipTopology(t *testing.T) {
 	r2.AddTestChannelConnection(r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp())
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp())
-	// When r2 gossiped to r3, 1 and 2 were unreachable from r3 so they got removed from the update
-	checkTopology(t, r3, r3.tp())
+	// When r2 gossiped to r3, 1 was unreachable from r3 so it got removed from the
+	// list of peers, but remains referenced in the connection from 1 to 3.
+	checkTopology(t, r3, r2.tp(r1, r3), r3.tp())
 
 	// Add a connection from 3 to 1 and now r1 is reachable.
 	r3.AddTestChannelConnection(r1)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r1))
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r1))
-	checkTopology(t, r3, r1.tp(), r3.tp(r1))
+	checkTopology(t, r3, r1.tp(), r2.tp(r1, r3), r3.tp(r1))
 
 	r1.AddTestChannelConnection(r3)
 	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
@@ -126,31 +139,21 @@ func implTestGossipTopology(t *testing.T) {
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
 
 	// Drop the connection from 2 to 3
-	r2.Peers.DeleteTestConnection(r2.Ourself.Peer, r3.Ourself.Peer)
-	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
-
-	// Now r2 tells its connections
-	r2.Ourself.broadcastPeerUpdate()
+	r2.DeleteTestChannelConnection(r3.Peers)
 	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
-	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
+	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1))
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 
-	// Drop the connection from 1 to 3, and it will get removed by garbage-collection
-	r1.Peers.DeleteTestConnection(r1.Ourself.Peer, r3.Ourself.Peer)
+	// Drop the connection from 1 to 3
+	r1.DeleteTestChannelConnection(r3.Peers)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
-	r1.Peers.GarbageCollect()
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
 
-	// Now r1 tells its remaining connection, which also garbage-collects 3
-	r1.Ourself.broadcastPeerUpdate()
-
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
 	// r3 still thinks r1 has a connection to it
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 
 	// On a timer, r3 will gossip to r1
 	r3.SendAllGossip()
-	// r1 receives info about 3, but eliminates it through garbage collection
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
 }
