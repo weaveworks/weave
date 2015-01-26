@@ -42,24 +42,32 @@ func (conn *mockChannelConnection) SendProtocolMsg(msg ProtocolMsg) {
 }
 
 func (router *Router) AddTestChannelConnection(r *Router) {
+	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
+
+	fromPeer := NewPeer(fromName, router.Ourself.Peer.UID, 0)
 	toPeer := NewPeer(toName, r.Ourself.Peer.UID, 0)
-	router.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	fromPeer := NewPeer(router.Ourself.Peer.Name, router.Ourself.Peer.UID, 0)
-	r.Peers.FetchWithDefault(fromPeer)
+
+	r.Peers.FetchWithDefault(fromPeer)    // Has side-effect of incrementing refcount
+	router.Peers.FetchWithDefault(toPeer) //
+
 	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, ""}, r}
 	router.Ourself.addConnection(conn)
 	router.Ourself.handleConnectionEstablished(conn)
 }
 
 func (router *Router) DeleteTestChannelConnection(r *Router) {
+	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
+
+	fromPeer, _ := r.Peers.Fetch(fromName)
 	toPeer, _ := router.Peers.Fetch(toName)
+
+	fromPeer.DecrementLocalRefCount()
 	toPeer.DecrementLocalRefCount()
+
 	conn, _ := router.Ourself.ConnectionTo(toName)
 	router.Ourself.handleDeleteConnection(conn)
-	fromPeer, _ := r.Peers.Fetch(router.Ourself.Name)
-	fromPeer.DecrementLocalRefCount()
 }
 
 func TestGossipTopology(t *testing.T) {
