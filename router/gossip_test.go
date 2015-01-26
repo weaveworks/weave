@@ -125,7 +125,7 @@ func implTestGossipTopology(t *testing.T) {
 	checkTopology(t, r2, r1.tp(r2), r2.tp())
 	r2.AddTestChannelConnection(r1)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
-	checkTopology(t, r2, r2.tp(r1), r1.tp(r2))
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
 
 	// Currently, the connection from 2 to 3 is one-way only
 	r2.AddTestChannelConnection(r3)
