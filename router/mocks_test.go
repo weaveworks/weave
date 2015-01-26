@@ -19,7 +19,7 @@ func (peers *Peers) AddTestConnection(p *Peer) {
 	peers.ourself.connectionEstablished(conn)
 }
 
-// Add to (peers,p0) a connection from p1 to p2
+// Add to peers a connection from p1 to p2
 func (peers *Peers) AddTestRemoteConnection(p1, p2 *Peer) {
 	fromName := p1.Name
 	fromPeer := NewPeer(fromName, p1.UID, 0)
@@ -30,12 +30,12 @@ func (peers *Peers) AddTestRemoteConnection(p1, p2 *Peer) {
 	peers.ourself.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
 }
 
-func (peers *Peers) DeleteTestConnection(ourself *Peer, peer *Peer) {
-	toName := peer.Name
+func (peers *Peers) DeleteTestConnection(p *Peer) {
+	toName := p.Name
 	toPeer, _ := peers.Fetch(toName)
 	toPeer.DecrementLocalRefCount()
-	conn, _ := ourself.ConnectionTo(toName)
-	ourself.deleteConnection(conn)
+	conn, _ := peers.ourself.ConnectionTo(toName)
+	peers.ourself.deleteConnection(conn)
 }
 
 // mockConnection used in testing is very similar to a
