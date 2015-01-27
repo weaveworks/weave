@@ -128,7 +128,7 @@ to each other.
  * [Troubleshooting](http://zettio.github.io/weave/troubleshooting.html)
  * [Building](http://zettio.github.io/weave/building.html)
  * [How it works](http://zettio.github.io/weave/how-it-works.html)
- * [Preview of weaveDNS](http://weaveblog.com/2014/11/04/have-you-met-weavedns/)
+ * [WeaveDNS README](https://github.com/zettio/weave/tree/master/weavedns#readme)
 
 ## Contact Us
 

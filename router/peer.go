@@ -86,6 +86,28 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 	peer.connections = connections
 }
 
+func (peer *Peer) addConnection(conn Connection) {
+	peer.Lock()
+	defer peer.Unlock()
+	peer.connections[conn.Remote().Name] = conn
+}
+
+func (peer *Peer) deleteConnection(conn Connection) {
+	established := conn.Established()
+	peer.Lock()
+	defer peer.Unlock()
+	delete(peer.connections, conn.Remote().Name)
+	if established {
+		peer.version += 1
+	}
+}
+
+func (peer *Peer) connectionEstablished(conn Connection) {
+	peer.Lock()
+	defer peer.Unlock()
+	peer.version += 1
+}
+
 // Calculate the routing table from this peer to all peers reachable
 // from it, returning a "next hop" map of PeerNameX -> PeerNameY,
 // which says "in order to send a message to X, the peer should send

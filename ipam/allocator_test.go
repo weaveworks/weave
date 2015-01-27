@@ -98,7 +98,8 @@ func TestEncodeMerge(t *testing.T) {
 	alloc2.manageSpace(net.ParseIP(testStart3), 32)
 	encodedState2 := alloc2.Gossip()
 
-	newBuf := alloc2.OnGossip(encodedState)
+	newBuf, err := alloc2.OnGossip(encodedState)
+	wt.AssertNoErr(t, err)
 	if len(alloc2.peerInfo) != 2 {
 		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc2.peerInfo), 2)
 	}
@@ -116,7 +117,8 @@ func TestEncodeMerge(t *testing.T) {
 	}
 
 	// Do it again, and nothing should be new
-	newBuf = alloc2.OnGossip(encodedState)
+	newBuf, err = alloc2.OnGossip(encodedState)
+	wt.AssertNoErr(t, err)
 	if newBuf != nil {
 		t.Fatal("Unexpected new items found")
 	}
@@ -124,7 +126,8 @@ func TestEncodeMerge(t *testing.T) {
 	// Now encode and merge the other way
 	buf := alloc2.Gossip()
 
-	newBuf = alloc.OnGossip(buf)
+	newBuf, err = alloc.OnGossip(buf)
+	wt.AssertNoErr(t, err)
 	if len(alloc.peerInfo) != 2 {
 		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc.peerInfo), 2)
 	}
@@ -142,7 +145,8 @@ func TestEncodeMerge(t *testing.T) {
 	}
 
 	// Do it again, and nothing should be new
-	newBuf = alloc.OnGossip(buf)
+	newBuf, err = alloc.OnGossip(buf)
+	wt.AssertNoErr(t, err)
 	if newBuf != nil {
 		t.Fatal("Unexpected new items found")
 	}

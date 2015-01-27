@@ -351,9 +351,11 @@ func (alloc *Allocator) requestSpace() {
 	}
 }
 
-func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
+func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) error {
 	lg.Debug.Println("Received space request from", sender)
-	alloc.decodeUpdate(msg)
+	if _, err := alloc.decodeUpdate(msg); err != nil {
+		return err
+	}
 
 	if start, size, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
 		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
@@ -362,6 +364,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) {
 		msg := router.Concat([]byte{gossipSpaceDonate}, start.To4(), size_encoding, myState)
 		alloc.gossip.GossipUnicast(sender, msg)
 	}
+	return nil
 }
 
 func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
@@ -431,7 +434,7 @@ func (alloc *Allocator) queryLoop() {
 }
 
 // GossipDelegate methods
-func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) {
+func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) error {
 	lg.Debug.Printf("OnGossipUnicast from %s: %d bytes\n", sender, len(msg))
 	alloc.Lock()
 	defer alloc.Unlock()
@@ -441,6 +444,7 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) {
 	case gossipSpaceDonate:
 		alloc.handleSpaceDonate(sender, msg[1:])
 	}
+	return nil
 }
 
 func (alloc *Allocator) Gossip() []byte {
@@ -455,32 +459,31 @@ func (alloc *Allocator) Gossip() []byte {
 	return buf.Bytes()
 }
 
-func (alloc *Allocator) OnGossipBroadcast(buf []byte) {
+func (alloc *Allocator) OnGossipBroadcast(buf []byte) error {
 	lg.Debug.Printf("OnGossipBroadcast: %d bytes\n", len(buf))
 	alloc.Lock()
 	defer alloc.Unlock()
 	_, err := alloc.decodeUpdate(buf)
 	if err != nil {
-		lg.Error.Println("Error decoding update", err)
-		return
+		return err
 	}
 	alloc.considerOurPosition()
+	return nil
 }
 
 // merge in state and return a buffer encoding those PeerSpaces which are newer
 // than what we had previously, or nil if none were newer
-func (alloc *Allocator) OnGossip(buf []byte) []byte {
+func (alloc *Allocator) OnGossip(buf []byte) ([]byte, error) {
 	lg.Debug.Printf("Allocator.OnGossip: %d bytes\n", len(buf))
 	alloc.Lock()
 	defer alloc.Unlock()
 	newerPeerSpaces, err := alloc.decodeUpdate(buf)
 	if err != nil {
-		lg.Error.Println("Error decoding update", err)
-		return nil
+		return nil, err
 	}
 	alloc.considerOurPosition()
 	if len(newerPeerSpaces) == 0 {
-		return nil
+		return nil, nil
 	} else {
 		buf := new(bytes.Buffer)
 		enc := gob.NewEncoder(buf)
@@ -488,7 +491,7 @@ func (alloc *Allocator) OnGossip(buf []byte) []byte {
 		for _, spaceset := range newerPeerSpaces {
 			panicOnError(spaceset.Encode(enc))
 		}
-		return buf.Bytes()
+		return buf.Bytes(), nil
 	}
 }
 

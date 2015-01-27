@@ -60,16 +60,16 @@ func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit i
 		log.Println("Expired MAC", mac, "at", peer.Name)
 	}
 	onPeerGC := func(peer *Peer) {
-		log.Println("Removing unreachable", peer)
-		router.NotifyDead(peer)
+		router.Macs.Delete(peer)
+		log.Println("Removed unreachable", peer)
 	}
 	router.Ourself = NewLocalPeer(name, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
-	router.Peers = NewPeers(router.Ourself.Peer, router.Macs, onPeerGC)
+	router.Peers = NewPeers(router.Ourself.Peer, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
-	router.TopologyGossip = router.NewGossip(TopologyGossipCh, router)
+	router.TopologyGossip = router.NewGossip("topology", router)
 	return router
 }
 
@@ -353,15 +353,14 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 	}
 }
 
-// Gossip methods
+// Gossiper methods - the Router is the topology Gossiper
 
-func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) {
-	// Not expecting these
-	logGossip("Unexpected Unicast:", msg)
+func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
+	return fmt.Errorf("unexpected topology gossip unicast: %v", msg)
 }
-func (router *Router) OnGossipBroadcast(msg []byte) {
-	// Not expecting these
-	logGossip("Unexpected Broadcast:", msg)
+
+func (router *Router) OnGossipBroadcast(msg []byte) error {
+	return fmt.Errorf("unexpected topology gossip broadcast: %v", msg)
 }
 
 // Return state of everything we know; intended to be called periodically
@@ -371,15 +370,21 @@ func (router *Router) Gossip() []byte {
 
 // merge in state and return "everything new I've just learnt",
 // or nil if nothing in the received message was new
-func (router *Router) OnGossip(buf []byte) []byte {
+func (router *Router) OnGossip(buf []byte) ([]byte, error) {
 	newUpdate, err := router.Peers.ApplyUpdate(buf)
+	if _, ok := err.(UnknownPeersError); err != nil && ok {
+		// That update contained a peer we didn't know about; we
+		// ignore this; eventually we should receive an update
+		// containing a complete topology.
+		return nil, nil
+	}
 	if err != nil {
-		// fixme: should we do anything else?
-		logGossip("error when applying update:", err)
-	} else if len(newUpdate) == 0 {
-		return nil
+		return nil, err
+	}
+	if len(newUpdate) == 0 {
+		return nil, nil
 	}
 	router.ConnectionMaker.Refresh()
 	router.Routes.Recalculate()
-	return newUpdate
+	return newUpdate, nil
 }

@@ -11,7 +11,6 @@ import (
 type Peers struct {
 	sync.RWMutex
 	ourself *Peer
-	macs    *MacCache
 	table   map[PeerName]*Peer
 	onGC    func(*Peer)
 }
@@ -23,10 +22,9 @@ type NameCollisionError struct {
 	Name PeerName
 }
 
-func NewPeers(ourself *Peer, macs *MacCache, onGC func(*Peer)) *Peers {
+func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
-		macs:    macs,
 		table:   make(map[PeerName]*Peer),
 		onGC:    onGC}
 }
@@ -64,16 +62,12 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
-// Merge an incoming update with our own topology, and
-// create an "improved" update:
-// - elements which the original payload added to the receiver are
-//   included
-// - elements which the original payload updated in the receiver are
-//   included
-// - elements which are equal between the receiver and the payload are
-//   not included
-// - elements where the payload was older than the receiver's version
-//   are updated
+// Merge an incoming update with our own topology.
+//
+// We add peers hitherto unknown to us, and update peers for which the
+// update contains a more recent version than known to us. The return
+// value is an "improved" update containing just these new/updated
+// elements.
 func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
 	peers.Lock()
 
@@ -156,9 +150,8 @@ func (peers *Peers) garbageCollect() []*Peer {
 	for name, peer := range peers.table {
 		found, _ := peers.ourself.Routes(peer, false)
 		if !found && !peer.IsLocallyReferenced() {
-			peers.onGC(peer)
 			delete(peers.table, name)
-			peers.macs.Delete(peer)
+			peers.onGC(peer)
 			removed = append(removed, peer)
 		}
 	}
@@ -239,23 +232,12 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte) ma
 		name := newPeer.Name
 		// guaranteed to find peer in the peers.table
 		peer := peers.table[name]
-		if peer != newPeer {
-			if peer.Version() > newPeer.Version() {
-				// we know more about this one than the update. If
-				// peer is ourself, this is slightly racey (further
-				// changes could occur to ourself in the mean
-				// time). But it doesn't matter as we know that we're
-				// already > newPeer.Version() and that's not going to
-				// change.
-				newUpdate[name] = peer
-				continue
-			} else if peer == peers.ourself {
-				// nobody but us updates us
-				continue
-			} else if peer.Version() == newPeer.Version() {
-				// implication is that connections are equal too
-				continue
-			}
+		if peer != newPeer &&
+			(peer == peers.ourself || peer.Version() >= newPeer.Version()) {
+			// Nobody but us updates us. And if we know more about a
+			// peer than what's in the the update, we ignore the
+			// latter.
+			continue
 		}
 		// If we're here, either it was a new peer, or the update has
 		// more info about the peer than we do. Either case, we need
