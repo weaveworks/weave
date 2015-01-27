@@ -2,7 +2,7 @@ package router
 
 const (
 	Protocol        = "weave"
-	ProtocolVersion = 10
+	ProtocolVersion = 11
 )
 
 type ProtocolTag byte
@@ -15,6 +15,9 @@ const (
 	ProtocolFetchAll
 	ProtocolUpdate
 	ProtocolPMTUVerified
+	ProtocolGossip
+	ProtocolGossipUnicast
+	ProtocolGossipBroadcast
 )
 
 type ProtocolMsg struct {

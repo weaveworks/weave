@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 )
 
 type LocalPeer struct {
@@ -156,30 +157,35 @@ func (peer *LocalPeer) SendProtocolMsg(m ProtocolMsg) {
 // ACTOR server
 
 func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
+	gossipTimer := time.Tick(GossipInterval)
 	for {
-		query, ok := <-queryChan
-		if !ok {
-			return
-		}
-		switch query.code {
-		case PAddConnection:
-			conn := query.payload.(*LocalConnection)
-			if peer.handleAddConnection(conn) {
-				conn.log("connection added")
+		select {
+		case query, ok := <-queryChan:
+			if !ok {
+				return
 			}
-		case PDeleteConnection:
-			conn := query.payload.(*LocalConnection)
-			if peer.handleDeleteConnection(conn) {
-				conn.log("connection deleted")
+			switch query.code {
+			case PAddConnection:
+				conn := query.payload.(*LocalConnection)
+				if peer.handleAddConnection(conn) {
+					conn.log("connection added")
+				}
+			case PDeleteConnection:
+				conn := query.payload.(*LocalConnection)
+				if peer.handleDeleteConnection(conn) {
+					conn.log("connection deleted")
+				}
+				query.resultChan <- nil
+			case PConnectionEstablished:
+				conn := query.payload.(*LocalConnection)
+				if peer.handleConnectionEstablished(conn) {
+					conn.log("connection fully established")
+				}
+			case PSendProtocolMsg:
+				peer.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
-			query.resultChan <- nil
-		case PConnectionEstablished:
-			conn := query.payload.(*LocalConnection)
-			if peer.handleConnectionEstablished(conn) {
-				conn.log("connection fully established")
-			}
-		case PSendProtocolMsg:
-			peer.handleSendProtocolMsg(query.payload.(ProtocolMsg))
+		case <-gossipTimer:
+			peer.Router.SendAllGossip()
 		}
 	}
 }
@@ -251,6 +257,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn Connection) bool {
 		return false
 	}
 	peer.connectionEstablished(conn)
+	peer.Router.SendAllGossipDown(conn)
 	peer.broadcastPeerUpdate(conn.Remote())
 	return true
 }

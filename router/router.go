@@ -24,6 +24,7 @@ type Router struct {
 	Peers           *Peers
 	Routes          *Routes
 	ConnectionMaker *ConnectionMaker
+	GossipChannels  map[uint32]*GossipChannel
 	UDPListener     *net.UDPConn
 	Password        *[]byte
 	ConnLimit       int
@@ -46,10 +47,11 @@ type PacketSourceSink interface {
 
 func NewRouter(iface *net.Interface, name PeerName, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
 	router := &Router{
-		Iface:     iface,
-		ConnLimit: connLimit,
-		BufSz:     bufSz,
-		LogFrame:  logFrame}
+		Iface:          iface,
+		GossipChannels: make(map[uint32]*GossipChannel),
+		ConnLimit:      connLimit,
+		BufSz:          bufSz,
+		LogFrame:       logFrame}
 	if len(password) > 0 {
 		router.Password = &password
 	}
