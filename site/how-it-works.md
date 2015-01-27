@@ -105,38 +105,40 @@ other peers. Weave peers communicate their knowledge of the topology
 information on to their own neighbours, and so on, until the entire
 network knows about any change.
 
-Topology is communicated over the TCP links between peers. There are
-two message types:
+Topology is communicated over the TCP links between peers, using a
+Gossip mechanism.  Topology messages are sent by a peer...
 
-##### FetchAll
-This carries no payload. The receiver responds with the entire
-topology model as the receiver has it. FetchAll is sent:
+- when a connection has been established; the entire topology is sent
+  to the remote peer, and an incremental update, containing
+  information on just the two peers at the ends of the connection, is
+  sent to all neighbours
+- when a connection has been torn down; an update containing just
+  information about the local peer is sent to all neighbours
+- periodically, on a timer, in case someone has missed an update.
 
- * when an update is received that references a peer that the receiver
-   does not know
- * periodically, on a timer, in case any updates have been missed
-
-##### Update
-This carries a topology payload. This is sent:
-
-  * upon receipt of a FetchAll message, as above,
-  * when a connection is established - the update contains the two
-peers that have just connected
-  * when a connection is deleted - the update contains just the peer
-that lost the connection
-
-The receiver merges the update with its own topology model, adding
-peers hitherto unknown to it, and updating peers for which the update
-contains a more recent version than known to it. If there were any
-such new/updated peers, then an improved update containing them is
-sent out on all connections.
+The receiver of a topology update merges that update with its own
+topology model, adding peers hitherto unknown to it, and updating
+peers for which the update contains a more recent version than known
+to it. If there were any such new/updated peers, then an improved
+update containing them is sent out on all connections.
 
 If the update mentions a peer that the receiver does not know, then
-the entire update is rejected and the receiver sends a FetchAll
-message back to the sender.
+the entire update is ignored.
 
 #### Message details
-A topology update message is laid out like this:
+Every gossip message is structured as follows:
+
+    +-----------------------------------+
+    | 1-byte message type - Gossip      |
+    +-----------------------------------+
+    | 4-byte Gossip channel - Topology  |
+    +-----------------------------------+
+    | Peer Name of source               |
+    +-----------------------------------+
+    | Gossip payload (topology update)  |
+    +-----------------------------------+
+
+The topology update payload is laid out like this:
 
     +-----------------------------------+
     | Peer 1: Name                      |
@@ -183,7 +185,7 @@ no longer has any connections within the network, it drops all
 knowledge of that second peer.
 
 #### Out-of-date topology
-The peer-to-peer passing of updates is not instantaneous, so it is
+The peer-to-peer gossiping of updates is not instantaneous, so it is
 very possible for a node elsewhere in the network to have an
 out-of-date view.
 

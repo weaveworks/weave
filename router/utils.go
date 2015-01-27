@@ -1,8 +1,11 @@
 package router
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/gob"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"net"
 )
@@ -72,6 +75,21 @@ func randUint64() (r uint64) {
 		r |= uint64(v)
 	}
 	return
+}
+
+func hash(s string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return h.Sum32()
+}
+
+func GobEncode(items ...interface{}) []byte {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	for _, i := range items {
+		checkFatal(enc.Encode(i))
+	}
+	return buf.Bytes()
 }
 
 func macint(mac net.HardwareAddr) (r uint64) {

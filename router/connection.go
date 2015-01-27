@@ -48,7 +48,6 @@ type LocalConnection struct {
 	SessionKey        *[32]byte
 	heartbeatFrame    *ForwardedFrame
 	heartbeat         *time.Ticker
-	fetchAll          *time.Ticker
 	fragTest          *time.Ticker
 	forwardChan       chan<- *ForwardedFrame
 	forwardChanDF     chan<- *ForwardedFrame
@@ -285,8 +284,6 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 			}
 		case <-tickerChan(conn.heartbeat):
 			conn.Forward(true, conn.heartbeatFrame, nil)
-		case <-tickerChan(conn.fetchAll):
-			err = conn.handleSendSimpleProtocolMsg(ProtocolFetchAll)
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
 			err = conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest)
@@ -343,13 +340,9 @@ func (conn *LocalConnection) handleSetEstablished() error {
 		frame:   PMTUDiscovery},
 		nil)
 	conn.heartbeat = time.NewTicker(SlowHeartbeat)
-	conn.fetchAll = time.NewTicker(FetchAllInterval)
 	conn.fragTest = time.NewTicker(FragTestInterval)
 	// avoid initial waits for timers to fire
 	conn.Forward(true, conn.heartbeatFrame, nil)
-	if err := conn.handleSendSimpleProtocolMsg(ProtocolFetchAll); err != nil {
-		return err
-	}
 	conn.setStackFrag(false)
 	if err := conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
 		return err
@@ -376,7 +369,6 @@ func (conn *LocalConnection) handleShutdown() {
 	}
 
 	stopTicker(conn.heartbeat)
-	stopTicker(conn.fetchAll)
 	stopTicker(conn.fragTest)
 
 	// blank out the forwardChan so that the router processes don't
@@ -572,37 +564,14 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 			return fmt.Errorf("unexpected nonce on unencrypted connection")
 		}
 		conn.Decryptor.ReceiveNonce(payload)
-	case ProtocolFetchAll:
-		// There are exactly two messages that relate to topology
-		// updates.
-		//
-		// 1. FetchAll. This carries no payload. The receiver responds
-		// with the entire topology model as the receiver has it.
-		//
-		// 2. Update. This carries a topology payload. The receiver
-		// merges it with its own topology model. If the payload is a
-		// subset of the receiver's topology, no further action is
-		// taken. Otherwise, the receiver sends out to all its
-		// connections an "improved" update.
-		conn.SendProtocolMsg(ProtocolMsg{ProtocolUpdate, conn.Router.Peers.EncodeAllPeers()})
-	case ProtocolUpdate:
-		newUpdate, err := conn.Router.Peers.ApplyUpdate(payload)
-		if _, ok := err.(UnknownPeersError); err != nil && ok {
-			// That update contained a peer we didn't know about;
-			// request full update
-			conn.SendProtocolMsg(ProtocolMsg{ProtocolFetchAll, nil})
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if len(newUpdate) != 0 {
-			conn.Router.ConnectionMaker.Refresh()
-			conn.Router.Routes.Recalculate()
-			conn.Router.Ourself.SendProtocolMsg(ProtocolMsg{ProtocolUpdate, newUpdate})
-		}
 	case ProtocolPMTUVerified:
 		conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
+	case ProtocolGossipUnicast:
+		return conn.Router.handleGossip(payload, deliverGossipUnicast)
+	case ProtocolGossipBroadcast:
+		return conn.Router.handleGossip(payload, deliverGossipBroadcast)
+	case ProtocolGossip:
+		return conn.Router.handleGossip(payload, deliverGossip)
 	default:
 		conn.log("ignoring unknown protocol tag:", tag)
 	}

@@ -18,9 +18,8 @@ const (
 	PMTUDiscoverySize  = 60000
 	FastHeartbeat      = 500 * time.Millisecond
 	SlowHeartbeat      = 10 * time.Second
-	FetchAllInterval   = 30 * time.Second
 	FragTestInterval   = 5 * time.Minute
-	ReadTimeout        = 2 * FetchAllInterval
+	ReadTimeout        = 1 * time.Minute
 	PMTUVerifyAttempts = 8
 	PMTUVerifyTimeout  = 10 * time.Millisecond // gets doubled with every attempt
 	MaxDuration        = time.Duration(math.MaxInt64)
