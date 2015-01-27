@@ -270,7 +270,14 @@ func (peer *LocalPeer) handleSendProtocolMsg(m ProtocolMsg) {
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
-	peer.handleSendProtocolMsg(ProtocolMsg{ProtocolUpdate, EncodePeers(append(peers, peer.Peer)...)})
+	// TODO We should just be invoking TopologyGossip.GossipBroadcast
+	// here, but route calculation is asynchronous and in this
+	// particular case would likely result in the broadcast not
+	// reaching all peers. So instead we slightly break the Gossip
+	// abstraction (hence the cast) and send a regular update. This is
+	// less efficient though since it will almost certainly reach
+	// peers more than once.
+	peer.Router.TopologyGossip.(*GossipChannel).SendGossipMsg(EncodePeers(append(peers, peer.Peer)...))
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

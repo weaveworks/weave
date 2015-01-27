@@ -12,8 +12,6 @@ const (
 	ProtocolFragmentationReceived
 	ProtocolStartFragmentationTest
 	ProtocolNonce
-	ProtocolFetchAll
-	ProtocolUpdate
 	ProtocolPMTUVerified
 	ProtocolGossip
 	ProtocolGossipUnicast
