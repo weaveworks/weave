@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-type Record struct {
+type Allocation struct {
 	Ident string
 	IP    net.IP
 }
@@ -38,7 +38,7 @@ type MinSpace struct {
 
 type MutableSpace struct {
 	MinSpace
-	recs      []Record
+	recs      []Allocation
 	free_list []net.IP
 	sync.RWMutex
 }
@@ -68,6 +68,11 @@ func (a *MinSpace) Overlaps(b Space) bool {
 	return !(-diff >= int64(a.Size) || diff >= int64(b.GetSize()))
 }
 
+func (a *MinSpace) Contains(addr net.IP) bool {
+	diff := subtract(addr, a.Start)
+	return diff >= 0 && diff < int64(a.Size)
+}
+
 // A space is heir to another space if it is immediately lower than it
 // (considering the universe as a ring)
 func (a *MinSpace) IsHeirTo(b *MinSpace, universe *MinSpace) bool {
@@ -81,7 +86,11 @@ func (a *MinSpace) IsHeirTo(b *MinSpace, universe *MinSpace) bool {
 }
 
 func (s *MinSpace) String() string {
-	return fmt.Sprintf("%s+%d, %d", s.Start, s.Size, s.MaxAllocated)
+	if s.MaxAllocated > 0 {
+		return fmt.Sprintf("%s+%d, %d", s.Start, s.Size, s.MaxAllocated)
+	} else {
+		return fmt.Sprintf("%s+%d", s.Start, s.Size)
+	}
 }
 
 func NewMinSpace(start net.IP, size uint32) *MinSpace {
@@ -105,17 +114,24 @@ func (space *MutableSpace) AllocateFor(ident string) net.IP {
 	} else {
 		return nil
 	}
-	space.recs = append(space.recs, Record{ident, ret})
+	space.recs = append(space.recs, Allocation{ident, ret})
 	return ret
 }
 
 func (space *MutableSpace) Free(addr net.IP) bool {
-	diff := subtract(addr, space.Start)
-	if diff < 0 || diff >= int64(space.Size) {
+	if !space.Contains(addr) {
 		return false
 	}
 	space.Lock()
 	space.free_list = append(space.free_list, addr)
+	for i, r := range space.recs {
+		if r.IP.Equal(addr) {
+			// Delete by swapping the last element into this one and truncating
+			last := len(space.recs) - 1
+			space.recs[i], space.recs = space.recs[last], space.recs[:last]
+			break
+		}
+	}
 	// TODO: consolidate free space
 	space.Unlock()
 	return true
@@ -155,7 +171,7 @@ func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 
 	for _, r := range space.recs {
 		if r.Ident == ident {
-			space.Free(r.IP)
+			space.free_list = append(space.free_list, r.IP)
 		} else {
 			space.recs[w] = r
 			w++
