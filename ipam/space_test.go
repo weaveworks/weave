@@ -14,22 +14,22 @@ func TestSpaceAllocate(t *testing.T) {
 
 	space1 := NewSpace(net.ParseIP(testAddr1), 20)
 	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 20, "LargestFreeBlock")
-	wt.AssertEqualInt(t, len(space1.recs), 0, "allocated records")
+	wt.AssertEqualInt(t, len(space1.allocated), 0, "allocated records")
 
 	addr1 := space1.AllocateFor(containerID)
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
-	wt.AssertEqualInt(t, len(space1.recs), 1, "allocated records")
+	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
 	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 19, "LargestFreeBlock")
 
 	addr2 := space1.AllocateFor(containerID)
 	wt.AssertNotEqualString(t, addr2.String(), testAddr1, "address")
-	wt.AssertEqualInt(t, len(space1.recs), 2, "allocated records")
+	wt.AssertEqualInt(t, len(space1.allocated), 2, "allocated records")
 
 	space1.Free(addr2)
-	wt.AssertEqualInt(t, len(space1.recs), 1, "allocated records")
+	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
 
 	wt.AssertNoErr(t, space1.DeleteRecordsFor(containerID))
-	wt.AssertEqualInt(t, len(space1.recs), 0, "allocated records")
+	wt.AssertEqualInt(t, len(space1.allocated), 0, "allocated records")
 }
 
 func TestSpaceClaim(t *testing.T) {
@@ -43,11 +43,11 @@ func TestSpaceClaim(t *testing.T) {
 
 	space1 := NewSpace(net.ParseIP(testAddr0), 20)
 	space1.Claim(containerID, net.ParseIP(testAddr1))
-	wt.AssertEqualInt(t, len(space1.recs), 1, "allocated records")
+	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
 	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 19, "LargestFreeBlock")
 
 	space1.Claim(containerID, net.ParseIP(testAddr2))
-	wt.AssertEqualInt(t, len(space1.recs), 2, "allocated records")
+	wt.AssertEqualInt(t, len(space1.allocated), 2, "allocated records")
 	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 10, "LargestFreeBlock")
 
 	if ret := space1.Claim(containerID, net.ParseIP(testAddr3)); ret {
@@ -55,7 +55,7 @@ func TestSpaceClaim(t *testing.T) {
 	}
 
 	space1.Free(net.ParseIP(testAddr1))
-	wt.AssertEqualInt(t, len(space1.recs), 1, "allocated records")
+	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
 }
 
 func TestSpaceOverlap(t *testing.T) {

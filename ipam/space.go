@@ -15,6 +15,33 @@ func (a *Allocation) String() string {
 	return fmt.Sprintf("%s %s", a.Ident, a.IP)
 }
 
+type AllocationList []Allocation
+
+func (aa *AllocationList) add(a *Allocation) {
+	*aa = append(*aa, *a)
+}
+
+func (aa *AllocationList) remove(addr net.IP) *Allocation {
+	for i, a := range *aa {
+		if a.IP.Equal(addr) {
+			// Delete by swapping the last element into this one and truncating
+			last := len(*aa) - 1
+			(*aa)[i], (*aa) = (*aa)[last], (*aa)[:last]
+			return &a
+		}
+	}
+	return nil
+}
+
+func (aa *AllocationList) take() *Allocation {
+	if n := len(*aa); n > 0 {
+		ret := (*aa)[n-1]
+		*aa = (*aa)[:n-1]
+		return &ret
+	}
+	return nil
+}
+
 type Space interface {
 	GetMinSpace() *MinSpace
 	GetStart() net.IP
@@ -35,8 +62,8 @@ type MinSpace struct {
 
 type MutableSpace struct {
 	MinSpace
-	recs      []Allocation
-	free_list []net.IP
+	allocated AllocationList
+	free_list AllocationList
 	sync.RWMutex
 }
 
@@ -94,25 +121,24 @@ func (space *MutableSpace) Claim(ident string, addr net.IP) bool {
 	if uint32(diff) > space.MaxAllocated {
 		space.MaxAllocated = uint32(diff)
 	}
-	space.recs = append(space.recs, Allocation{ident, addr})
+	space.allocated.add(&Allocation{ident, addr})
 	return true
 }
 
 func (space *MutableSpace) AllocateFor(ident string) net.IP {
 	space.Lock()
 	defer space.Unlock()
-	var ret net.IP = nil
-	if n := len(space.free_list); n > 0 {
-		ret = space.free_list[n-1]
-		space.free_list = space.free_list[:n-1]
+	ret := space.free_list.take()
+	if ret != nil {
+		ret.Ident = ident
 	} else if space.MaxAllocated < space.Size {
 		space.MaxAllocated++
-		ret = add(space.Start, space.MaxAllocated-1)
+		ret = &Allocation{ident, add(space.Start, space.MaxAllocated-1)}
 	} else {
 		return nil
 	}
-	space.recs = append(space.recs, Allocation{ident, ret})
-	return ret
+	space.allocated.add(ret)
+	return ret.IP
 }
 
 func (space *MutableSpace) Free(addr net.IP) bool {
@@ -120,14 +146,10 @@ func (space *MutableSpace) Free(addr net.IP) bool {
 		return false
 	}
 	space.Lock()
-	space.free_list = append(space.free_list, addr)
-	for i, r := range space.recs {
-		if r.IP.Equal(addr) {
-			// Delete by swapping the last element into this one and truncating
-			last := len(space.recs) - 1
-			space.recs[i], space.recs = space.recs[last], space.recs[:last]
-			break
-		}
+	if a := space.allocated.remove(addr); a != nil {
+		space.free_list.add(a)
+	} else {
+		return false
 	}
 	// TODO: consolidate free space
 	space.Unlock()
@@ -166,22 +188,22 @@ func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 	defer space.Unlock()
 	w := 0 // write index
 
-	for _, r := range space.recs {
+	for _, r := range space.allocated {
 		if r.Ident == ident {
-			space.free_list = append(space.free_list, r.IP)
+			space.free_list.add(&r)
 		} else {
-			space.recs[w] = r
+			space.allocated[w] = r
 			w++
 		}
 	}
-	space.recs = space.recs[:w]
+	space.allocated = space.allocated[:w]
 	return nil
 }
 
 func (s *MutableSpace) NumFreeAddresses() uint32 {
 	s.RLock()
 	defer s.RUnlock()
-	return s.Size - uint32(len(s.recs)) + uint32(len(s.free_list))
+	return s.Size - uint32(len(s.allocated)) + uint32(len(s.free_list))
 }
 
 func (s *MutableSpace) LargestFreeBlock() uint32 {
@@ -195,5 +217,5 @@ func (space *MutableSpace) String() string {
 }
 
 func (space *MutableSpace) string() string {
-	return fmt.Sprintf("%s+%d, %d/%d", space.Start, space.Size, len(space.recs), len(space.free_list))
+	return fmt.Sprintf("%s+%d, %d/%d", space.Start, space.Size, len(space.allocated), len(space.free_list))
 }
