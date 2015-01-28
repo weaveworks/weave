@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
 )
@@ -16,19 +17,11 @@ func TestSpaceAllocate(t *testing.T) {
 	)
 
 	space1 := NewSpace(ipAddr1, 20)
-
-	if f := space1.LargestFreeBlock(); f != 20 {
-		t.Fatalf("LargestFreeBlock: expected %d, got %d", 20, f)
-	}
+	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 20, "LargestFreeBlock")
 
 	addr1 := space1.AllocateFor(containerID)
-	if addr1.String() != testAddr1 {
-		t.Fatalf("Expected address %s but got %s", testAddr1, addr1)
-	}
-
-	if f := space1.LargestFreeBlock(); f != 19 {
-		t.Fatalf("LargestFreeBlock: expected %d, got %d", 19, f)
-	}
+	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
+	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 19, "LargestFreeBlock")
 }
 
 func TestSpaceOverlap(t *testing.T) {
@@ -46,22 +39,11 @@ func TestSpaceOverlap(t *testing.T) {
 
 	space1 := NewSpace(ipAddr1, 20).GetMinSpace()
 
-	if s := add(ipAddr1, 10); s.String() != testAddr2 {
-		t.Fatalf("Expected address %s but got %s", testAddr2, s)
-	}
-	if s := add(ipAddr1, 256); s.String() != testAddr3 {
-		t.Fatalf("Expected address %s but got %s", testAddr3, s)
-	}
-
-	if d := subtract(ipAddr1, ipAddr2); d != -10 {
-		t.Fatalf("Expected difference %d but got %d", 10, d)
-	}
-	if d := subtract(ipAddr2, ipAddr1); d != 10 {
-		t.Fatalf("Expected difference %d but got %d", 10, d)
-	}
-	if d := subtract(ipAddr3, ipAddr1); d != 256 {
-		t.Fatalf("Expected difference %d but got %d", 256, d)
-	}
+	wt.AssertEqualString(t, add(ipAddr1, 10).String(), testAddr2, "address")
+	wt.AssertEqualString(t, add(ipAddr1, 256).String(), testAddr3, "address")
+	wt.AssertEqualInt64(t, subtract(ipAddr1, ipAddr2), -10, "address difference")
+	wt.AssertEqualInt64(t, subtract(ipAddr2, ipAddr1), 10, "address difference")
+	wt.AssertEqualInt64(t, subtract(ipAddr3, ipAddr1), 256, "address difference")
 
 	space2 := NewSpace(ipAddr2, 10).GetMinSpace()
 	space3 := NewSpace(ipAddr3, 10).GetMinSpace()
