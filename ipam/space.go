@@ -114,12 +114,17 @@ func NewSpace(start net.IP, size uint32) *MutableSpace {
 func (space *MutableSpace) Claim(ident string, addr net.IP) bool {
 	space.Lock()
 	defer space.Unlock()
-	diff := subtract(addr, space.Start)
-	if !(diff >= 0 && diff < int64(space.Size)) {
+	offset := subtract(addr, space.Start)
+	if !(offset >= 0 && offset < int64(space.Size)) {
 		return false
 	}
-	if uint32(diff) > space.MaxAllocated {
-		space.MaxAllocated = uint32(diff)
+	if uint32(offset) > space.MaxAllocated {
+		// Need to add all the addresses in the gap to the free list
+		for i := space.MaxAllocated + 1; i < uint32(offset); i++ {
+			addr := add(space.Start, i)
+			space.free_list.add(&Allocation{"", addr})
+		}
+		space.MaxAllocated = uint32(offset)
 	}
 	space.allocated.add(&Allocation{ident, addr})
 	return true
@@ -146,14 +151,13 @@ func (space *MutableSpace) Free(addr net.IP) bool {
 		return false
 	}
 	space.Lock()
+	defer space.Unlock()
 	if a := space.allocated.remove(addr); a != nil {
 		space.free_list.add(a)
-	} else {
-		return false
+		// TODO: consolidate free space
+		return true
 	}
-	// TODO: consolidate free space
-	space.Unlock()
-	return true
+	return false
 }
 
 func ip4int(ip4 net.IP) (r uint32) {

@@ -30,6 +30,19 @@ func TestSpaceAllocate(t *testing.T) {
 
 	wt.AssertNoErr(t, space1.DeleteRecordsFor(containerID))
 	wt.AssertEqualInt(t, len(space1.allocated), 0, "allocated records")
+	wt.AssertEqualInt(t, space1.countMaxAllocations(), 20, "max allocations")
+}
+
+func (space *MutableSpace) countMaxAllocations() int {
+	const containerID = "counting-test"
+	count := 0
+	for ; ; count++ {
+		if space.AllocateFor(containerID) == nil {
+			break
+		}
+	}
+	space.DeleteRecordsFor(containerID)
+	return count
 }
 
 func TestSpaceClaim(t *testing.T) {
@@ -56,6 +69,7 @@ func TestSpaceClaim(t *testing.T) {
 
 	space1.Free(net.ParseIP(testAddr1))
 	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
+	wt.AssertEqualInt(t, space1.countMaxAllocations(), 19, "max allocations")
 }
 
 func TestSpaceOverlap(t *testing.T) {
