@@ -340,6 +340,7 @@ func (alloc *Allocator) electLeader() {
 		// But don't allocate the first and last addresses
 		alloc.manageSpace(add(alloc.universe.Start, 1), alloc.universe.Size-2)
 		alloc.moveToState(allocStateNeutral, 0)
+		alloc.checkClaims()
 		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	} else {
 		// We expect the other guy to take control, but if he doesn't, try again.
