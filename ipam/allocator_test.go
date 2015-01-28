@@ -331,10 +331,8 @@ func implTestGossip(t *testing.T) {
 	alloc2.ourSpaceSet.spaces[0].GetMinSpace().Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	alloc2state := encode(alloc2.ourSpaceSet)
-
-	size_encoding := intip4(donateSize) // hack! using intip4
-	msg := router.Concat([]byte{msgSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
+	donation := NewMinSpace(net.ParseIP(donateStart), donateSize)
+	msg := router.Concat([]byte{msgSpaceDonate}, GobEncode(donation, 1, alloc2.ourSpaceSet))
 	alloc1.OnGossipUnicast(alloc2.ourName, msg)
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 6, "Total free addresses")
 	wt.AssertEqualuint64(t, alloc1.peerInfo[peerUID].Version(), 2, "Peer version")

@@ -105,27 +105,14 @@ func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
 	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, poolSize))
 }
 
-// We shouldn't ever get any errors on *encoding*, but if we do, this will make sure we get to hear about them.
-func panicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 func encode(spaceset SpaceSet) []byte {
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
-	panicOnError(enc.Encode(1))
-	panicOnError(spaceset.Encode(enc))
-	return buf.Bytes()
+	return GobEncode(1, spaceset)
 }
 
 // Unpack the supplied buffer which is encoded as per encode() above.
 // return a slice of MinSpace containing those PeerSpaces which are newer
 // than what we had previously
-func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
-	reader := bytes.NewReader(update)
-	decoder := gob.NewDecoder(reader)
+func (alloc *Allocator) decodeFromDecoder(decoder *gob.Decoder) ([]*PeerSpaceSet, error) {
 	var numSpaceSets int
 	if err := decoder.Decode(&numSpaceSets); err != nil {
 		return nil, err
@@ -160,6 +147,12 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 		}
 	}
 	return ret, nil
+}
+
+func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
+	reader := bytes.NewReader(update)
+	decoder := gob.NewDecoder(reader)
+	return alloc.decodeFromDecoder(decoder)
 }
 
 func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
@@ -379,38 +372,38 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) e
 		return err
 	}
 
-	if start, size, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
-		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
-		myState := encode(alloc.ourSpaceSet)
-		size_encoding := intip4(size) // hack!
-		msg := router.Concat([]byte{msgSpaceDonate}, start.To4(), size_encoding, myState)
+	if space, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
+		lg.Debug.Println("Decided to give  peer", sender, "space", space)
+		msg := router.Concat([]byte{msgSpaceDonate}, GobEncode(space, 1, alloc.ourSpaceSet))
 		alloc.gossip.GossipUnicast(sender, msg)
 	}
 	return nil
 }
 
-func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
-	var start net.IP = msg[0:4]
-	size := ip4int(msg[4:8])
-	lg.Debug.Println("Received space donation: sender", sender, "start", start, "size", size)
+func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) error {
+	reader := bytes.NewReader(msg)
+	decoder := gob.NewDecoder(reader)
+	var donation MinSpace
+	if err := decoder.Decode(&donation); err != nil {
+		return err
+	}
+	lg.Debug.Println("Received space donation: sender", sender, "space", donation)
 	switch alloc.state {
 	case allocStateNeutral:
 		lg.Error.Println("Not expecting to receive space donation from", sender)
 	case allocStateExpectingDonation:
 		// Message is concluded by an update of state of the sender
-		if _, err := alloc.decodeUpdate(msg[8:]); err != nil {
-			lg.Error.Println("Error decoding update", err)
-			return
+		if _, err := alloc.decodeFromDecoder(decoder); err != nil {
+			return err
 		}
-		newSpace := NewSpace(start, size)
-		if owner := alloc.spaceOwner(newSpace.GetMinSpace()); owner != 0 {
-			lg.Error.Printf("Space donated: %+v is already owned by UID %d\n%+v", newSpace, owner, alloc.peerInfo[owner])
-			return
+		if owner := alloc.spaceOwner(&donation); owner != 0 {
+			return errors.New(fmt.Sprintf("Space donated: %+v is already owned by UID %d\n%+v", donation, owner, alloc.peerInfo[owner]))
 		}
-		alloc.ourSpaceSet.AddSpace(newSpace)
+		alloc.ourSpaceSet.AddSpace(NewSpace(donation.Start, donation.Size))
 		alloc.moveToState(allocStateNeutral, 0)
 		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	}
+	return nil
 }
 
 // Claim an address that we think we should own
@@ -483,7 +476,7 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 	case msgSpaceRequest:
 		alloc.handleSpaceRequest(sender, msg[1:])
 	case msgSpaceDonate:
-		alloc.handleSpaceDonate(sender, msg[1:])
+		return alloc.handleSpaceDonate(sender, msg[1:])
 	}
 	return nil
 }

@@ -194,10 +194,10 @@ func (s *MutableSpaceSet) NumFreeAddresses() uint32 {
 
 // Give up some space because one of our peers has asked for it.
 // Pick some large reasonably-sized chunk.
-func (s *MutableSpaceSet) GiveUpSpace() (start net.IP, size uint32, ok bool) {
+func (s *MutableSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 	totalFreeAddresses := s.NumFreeAddresses()
 	if totalFreeAddresses < MinSafeFreeAddresses {
-		return nil, 0, false
+		return nil, false
 	}
 	var bestFree uint32 = 0
 	var bestSpace *MutableSpace = nil
@@ -223,9 +223,9 @@ func (s *MutableSpaceSet) GiveUpSpace() (start net.IP, size uint32, ok bool) {
 		}
 		bestSpace.Size -= spaceToGiveUp
 		s.version++
-		return add(bestSpace.Start, bestSpace.Size), spaceToGiveUp, true
+		return NewMinSpace(add(bestSpace.Start, bestSpace.Size), spaceToGiveUp), true
 	}
-	return nil, 0, false
+	return nil, false
 }
 
 func (s *MutableSpaceSet) AllocateFor(ident string) net.IP {
