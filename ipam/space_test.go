@@ -12,11 +12,7 @@ func TestSpaceAllocate(t *testing.T) {
 		containerID = "deadbeef"
 	)
 
-	var (
-		ipAddr1 = net.ParseIP(testAddr1)
-	)
-
-	space1 := NewSpace(ipAddr1, 20)
+	space1 := NewSpace(net.ParseIP(testAddr1), 20)
 	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 20, "LargestFreeBlock")
 	wt.AssertEqualInt(t, len(space1.recs), 0, "allocated records")
 
@@ -45,27 +41,20 @@ func TestSpaceClaim(t *testing.T) {
 		testAddr3   = "10.0.4.4"
 	)
 
-	var (
-		ipAddr0 = net.ParseIP(testAddr0)
-		ipAddr1 = net.ParseIP(testAddr1)
-		ipAddr2 = net.ParseIP(testAddr2)
-		ipAddr3 = net.ParseIP(testAddr3)
-	)
-
-	space1 := NewSpace(ipAddr0, 20)
-	space1.Claim(containerID, ipAddr1)
+	space1 := NewSpace(net.ParseIP(testAddr0), 20)
+	space1.Claim(containerID, net.ParseIP(testAddr1))
 	wt.AssertEqualInt(t, len(space1.recs), 1, "allocated records")
 	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 19, "LargestFreeBlock")
 
-	space1.Claim(containerID, ipAddr2)
+	space1.Claim(containerID, net.ParseIP(testAddr2))
 	wt.AssertEqualInt(t, len(space1.recs), 2, "allocated records")
 	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 10, "LargestFreeBlock")
 
-	if ret := space1.Claim(containerID, ipAddr3); ret {
+	if ret := space1.Claim(containerID, net.ParseIP(testAddr3)); ret {
 		t.Fatalf("Space.Claim incorrect success")
 	}
 
-	space1.Free(ipAddr1)
+	space1.Free(net.ParseIP(testAddr1))
 	wt.AssertEqualInt(t, len(space1.recs), 1, "allocated records")
 }
 
@@ -121,13 +110,12 @@ func TestSpaceHeirs(t *testing.T) {
 	)
 
 	var (
-		ipAddr0 = net.ParseIP(testAddr0)
 		ipAddr1 = net.ParseIP(testAddr1)
 		ipAddr2 = net.ParseIP(testAddr2)
 		ipAddr3 = net.ParseIP(testAddr3)
 	)
 
-	universe := NewMinSpace(ipAddr0, 256)
+	universe := NewMinSpace(net.ParseIP(testAddr0), 256)
 	space1 := NewMinSpace(ipAddr1, 9)
 	space2 := NewMinSpace(ipAddr2, 9)   // 1 is heir to 2
 	space3 := NewMinSpace(ipAddr3, 8)   // 3 is nowhere near 1 or 2

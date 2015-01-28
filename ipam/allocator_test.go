@@ -11,15 +11,22 @@ import (
 )
 
 const (
-	ourUID  = 123456
-	peerUID = 654321
+	ourUID     = 123456
+	peerUID    = 654321
+	testStart1 = "10.0.1.0"
+	testStart2 = "10.0.2.0"
+	testStart3 = "10.0.3.0"
 )
 
-func testAllocator(name string, ourUID uint64, universeCIDR string, startAddr string, length uint32) *Allocator {
+func testAllocator(name string, ourUID uint64, universeCIDR string) *Allocator {
 	ourName, _ := router.PeerNameFromString(name)
 	alloc, _ := NewAllocator(ourName, ourUID, universeCIDR)
+	alloc.gossip = new(mockGossipComms)
+	return alloc
+}
+
+func (alloc *Allocator) addSpace(startAddr string, length uint32) *Allocator {
 	alloc.manageSpace(net.ParseIP(startAddr), length)
-	alloc.SetGossip(new(mockGossipComms))
 	return alloc
 }
 
@@ -29,7 +36,7 @@ func TestAllocFree(t *testing.T) {
 		testAddr1  = "10.0.3.4"
 	)
 
-	alloc := testAllocator("01:00:00:01:00:00", ourUID, testAddr1+"/30", testAddr1, 4)
+	alloc := testAllocator("01:00:00:01:00:00", ourUID, testAddr1+"/30").addSpace(testAddr1, 4)
 
 	addr1 := alloc.AllocateFor("abcdef")
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
@@ -59,13 +66,9 @@ func equalByteBuffer(a, b []byte) bool {
 }
 
 func TestMultiSpaces(t *testing.T) {
-	const (
-		testStart1 = "10.0.1.0"
-		testStart2 = "10.0.2.0"
-	)
-
-	alloc := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/30", testStart1, 1)
-	alloc.manageSpace(net.ParseIP(testStart2), 3)
+	alloc := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/30")
+	alloc.addSpace(testStart1, 1)
+	alloc.addSpace(testStart2, 3)
 
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 4, "Total free addresses")
 
@@ -79,25 +82,18 @@ func TestMultiSpaces(t *testing.T) {
 }
 
 func TestEncodeMerge(t *testing.T) {
-	const (
-		testStart1 = "10.0.1.0"
-		testStart2 = "10.0.2.0"
-		testStart3 = "10.0.3.0"
-	)
-
-	alloc := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22", testStart1, 16)
-	alloc.manageSpace(net.ParseIP(testStart2), 32)
+	alloc := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
+	alloc.addSpace(testStart1, 16)
+	alloc.addSpace(testStart2, 32)
 
 	encodedState := alloc.Gossip()
 
-	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22", testStart3, 32)
+	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22").addSpace(testStart3, 32)
 	encodedState2 := alloc2.Gossip()
 
 	newBuf, err := alloc2.OnGossip(encodedState)
 	wt.AssertNoErr(t, err)
-	if len(alloc2.peerInfo) != 2 {
-		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc2.peerInfo), 2)
-	}
+	wt.AssertEqualInt(t, len(alloc2.peerInfo), 2, "spaceset count")
 	decodedSpaceSet, found := alloc2.peerInfo[ourUID]
 	if !found {
 		t.Fatal("Decoded allocator did not contain spaceSet")
@@ -123,9 +119,8 @@ func TestEncodeMerge(t *testing.T) {
 
 	newBuf, err = alloc.OnGossip(buf)
 	wt.AssertNoErr(t, err)
-	if len(alloc.peerInfo) != 2 {
-		t.Fatalf("Decoded wrong number of spacesets: %d vs %d", len(alloc.peerInfo), 2)
-	}
+	wt.AssertEqualInt(t, len(alloc.peerInfo), 2, "spaceset count")
+
 	decodedSpaceSet, found = alloc.peerInfo[peerUID]
 	if !found {
 		t.Fatal("Decoded allocator did not contain spaceSet")
@@ -166,10 +161,6 @@ func toStringArray(messages []mockMessage) []string {
 
 type mockGossipComms struct {
 	messages []mockMessage
-}
-
-func (f *mockGossipComms) Reset() {
-	f.messages = make([]mockMessage, 0)
 }
 
 func (f *mockGossipComms) GossipBroadcast(buf []byte) error {
@@ -227,8 +218,7 @@ func noMoreGossip(t *testing.T, gossips ...router.Gossip) {
 }
 
 type mockTimeProvider struct {
-	myTime  time.Time
-	pending []mockTimer
+	myTime time.Time
 }
 
 type mockTimer struct {
@@ -238,26 +228,6 @@ type mockTimer struct {
 
 func (m *mockTimeProvider) SetTime(t time.Time) { m.myTime = t }
 func (m *mockTimeProvider) Now() time.Time      { return m.myTime }
-
-func (m *mockTimeProvider) AfterFunc(d time.Duration, f func()) {
-	t := mockTimer{
-		when: m.myTime.Add(d),
-		f:    f,
-	}
-	m.pending = append(m.pending, t)
-}
-
-func goFunc(arg interface{}) {
-}
-
-func (m *mockTimeProvider) runPending(newTime time.Time) {
-	m.myTime = newTime
-	for _, t := range m.pending {
-		if t.when.After(m.myTime) {
-			t.f()
-		}
-	}
-}
 
 func assertNoOverlaps(t *testing.T, allocs ...*Allocator) {
 	for _, alloc := range allocs {
@@ -281,18 +251,13 @@ func TestGossip(t *testing.T) {
 
 func implTestGossip(t *testing.T) {
 	const (
-		testStart1     = "10.0.1.0"
-		testStart2     = "10.0.1.1"
-		origSize       = 10
 		donateSize     = 5
 		donateStart    = "10.0.1.7"
 		peerNameString = "02:00:00:02:00:00"
 	)
 
 	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
-	ourName, _ := router.PeerNameFromString("01:00:00:01:00:00")
-	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
-	alloc1.SetGossip(new(mockGossipComms))
+	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
 	alloc1.startForTesting()
 	mockTime := new(mockTimeProvider)
 	mockTime.SetTime(baseTime)
@@ -302,9 +267,7 @@ func implTestGossip(t *testing.T) {
 	mockTime.SetTime(baseTime.Add(1 * time.Second))
 
 	// Simulate another peer on the gossip network
-	pn, _ := router.PeerNameFromString(peerNameString)
-	alloc2, _ := NewAllocator(pn, peerUID, testStart1+"/22")
-	alloc2.SetGossip(new(mockGossipComms))
+	alloc2 := testAllocator(peerNameString, peerUID, testStart1+"/22")
 	alloc2.timeProvider = alloc1.timeProvider
 
 	mockTime.SetTime(baseTime.Add(2 * time.Second))
@@ -322,21 +285,21 @@ func implTestGossip(t *testing.T) {
 
 	// Now give alloc2 some space and tell alloc1 about it
 	// Now let alloc2 tell alloc1 about its space
-	alloc2.manageSpace(net.ParseIP(testStart2), origSize)
+	alloc2.manageSpace(net.ParseIP(testStart2), 10)
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
 
 	alloc1.OnGossipBroadcast(alloc2.Gossip())
 
 	// Alloc1 should ask alloc2 for space
 	mockGossip1 := alloc1.gossip.(*mockGossipComms)
-	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, encode(alloc1.ourSpaceSet))
+	mockGossip1.VerifyMessage(t, peerNameString, msgSpaceRequest, encode(alloc1.ourSpaceSet))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// Time out with no reply
 	mockTime.SetTime(baseTime.Add(5 * time.Second))
 	alloc1.considerWhileLocked()
 
-	mockGossip1.VerifyMessage(t, peerNameString, gossipSpaceRequest, encode(alloc1.ourSpaceSet))
+	mockGossip1.VerifyMessage(t, peerNameString, msgSpaceRequest, encode(alloc1.ourSpaceSet))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// Now make it look like alloc2 has given up half its space
@@ -346,7 +309,7 @@ func implTestGossip(t *testing.T) {
 	alloc2state := encode(alloc2.ourSpaceSet)
 
 	size_encoding := intip4(donateSize) // hack! using intip4
-	msg := router.Concat([]byte{gossipSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
+	msg := router.Concat([]byte{msgSpaceDonate}, net.ParseIP(donateStart).To4(), size_encoding, alloc2state)
 	alloc1.OnGossipUnicast(alloc2.ourName, msg)
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 6, "Total free addresses")
 	wt.AssertEqualuint64(t, alloc1.peerInfo[peerUID].Version(), 2, "Peer version")
@@ -377,15 +340,12 @@ func implTestGossip(t *testing.T) {
 
 func TestLeaks(t *testing.T) {
 	const (
-		testStart1   = "10.0.1.0"
-		testStart2   = "10.0.1.8"
-		origSize     = 10
 		universeSize = 16
 	)
 
 	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
 	// Give alloc1 the space from .0 to .7; nobody owns from .7 to .15
-	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/27", testStart1, 8)
+	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/27").addSpace(testStart1, 8)
 	mockTime := new(mockTimeProvider)
 	mockTime.SetTime(baseTime)
 	alloc1.timeProvider = mockTime
@@ -393,7 +353,8 @@ func TestLeaks(t *testing.T) {
 	mockTime.SetTime(baseTime.Add(1 * time.Second))
 
 	// Simulate another peer on the gossip network, that is managing some of that space
-	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/27", testStart2, 4)
+	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/27")
+	alloc2.addSpace("10.0.1.8", 4)
 	alloc2.timeProvider = alloc1.timeProvider
 
 	mockTime.SetTime(baseTime.Add(20 * time.Second))
@@ -434,60 +395,27 @@ func TestLeaks(t *testing.T) {
 	// Fixme: why does nobody gossip anything here?
 }
 
-func TestGossipBreakage(t *testing.T) {
-	const (
-		testStart1 = "10.0.1.0"
-	)
-
-	ourName, _ := router.PeerNameFromString("01:00:00:01:00:00")
-	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
-	alloc1.SetGossip(new(mockGossipComms))
-	alloc1.startForTesting()
-	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
-
-	// Simulate another peer on the gossip network, but WITH SAME PEER NAME
-	mockGossip2 := new(mockGossipComms)
-	alloc2, _ := NewAllocator(ourName, peerUID, testStart1+"/22")
-	alloc2.SetGossip(mockGossip2)
-
-	// Give alloc1 some space
-	alloc1.manageSpace(net.ParseIP(testStart1), 8)
-	alloc1.state = allocStateNeutral
-	alloc1.considerWhileLocked()
-	noMoreGossip(t, alloc1.gossip)
-
-	// Call decodeUpdate rather than OnGossip which also calls considerOurPosition
-	alloc2.decodeUpdate(alloc1.Gossip())
-	wt.AssertStatus(t, alloc2.state, allocStateLeaderless, "allocator state")
-	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
-}
-
 func TestAllocatorClaim1(t *testing.T) {
 	const (
 		containerID = "deadbeef"
 		container2  = "baddf00d"
-		testStart1  = "10.0.1.0"
-		testStart3  = "10.0.3.0"
 		testAddr1   = "10.0.1.5"
 		testAddr2   = "10.0.1.6"
 		oldUID      = 6464646
 	)
 
-	ourName, _ := router.PeerNameFromString("01:00:00:01:00:00")
-	mockGossip1 := new(mockGossipComms)
-	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
-	alloc1.SetGossip(mockGossip1)
+	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
 	alloc1.startForTesting()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 
 	alloc1.considerWhileLocked()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
-	mockGossip1.VerifyNoMoreMessages(t)
+	noMoreGossip(t, alloc1.gossip)
 
-	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22", testStart3, 32)
+	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22").addSpace(testStart3, 32)
 
 	// alloc2 has an echo of the former state of alloc1
-	alloc2.peerInfo[oldUID] = spaceSetWith(ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
+	alloc2.peerInfo[oldUID] = spaceSetWith(alloc1.ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
 
 	alloc1.decodeUpdate(alloc2.Gossip())
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
@@ -496,7 +424,8 @@ func TestAllocatorClaim1(t *testing.T) {
 	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
 	wt.AssertNoErr(t, err)
 	alloc1.considerWhileLocked()
-	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(ourName, oldUID)))
+	mockGossip1 := alloc1.gossip.(*mockGossipComms)
+	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(alloc1.ourName, oldUID)))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 }
 
@@ -505,25 +434,20 @@ func TestAllocatorClaim2(t *testing.T) {
 	const (
 		containerID = "deadbeef"
 		container2  = "baddf00d"
-		testStart1  = "10.0.1.0"
-		testStart3  = "10.0.3.0"
 		testAddr1   = "10.0.1.5"
 		testAddr2   = "10.0.1.6"
 		oldUID      = 6464646
 	)
 
-	ourName, _ := router.PeerNameFromString("01:00:00:01:00:00")
-	mockGossip1 := new(mockGossipComms)
-	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
-	alloc1.SetGossip(mockGossip1)
+	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
 	alloc1.startForTesting()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 	alloc1.considerWhileLocked()
 
-	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22", testStart3, 32)
+	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22").addSpace(testStart3, 32)
 
 	// alloc2 has an echo of the former state of alloc1
-	alloc2.peerInfo[oldUID] = spaceSetWith(ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
+	alloc2.peerInfo[oldUID] = spaceSetWith(alloc1.ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
 
 	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
 	wt.AssertNoErr(t, err)
@@ -534,6 +458,7 @@ func TestAllocatorClaim2(t *testing.T) {
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 	alloc1.considerWhileLocked()
-	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(ourName, oldUID)))
+	mockGossip1 := alloc1.gossip.(*mockGossipComms)
+	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(alloc1.ourName, oldUID)))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 }

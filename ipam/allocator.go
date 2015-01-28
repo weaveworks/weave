@@ -21,20 +21,23 @@ const (
 	MaxAddressesToGiveUp = 256
 )
 const (
-	gossipSpaceRequest = iota
-	gossipSpaceDonate
+	msgSpaceRequest = iota
+	msgSpaceDonate
 )
 const (
 	allocStateNeutral = iota
 	allocStateExpectingDonation
-	allocStateLeaderless // Need to elect a leader
+	allocStateLeaderless
 )
 
 // To allow time itself to be stubbed out for testing
 type timeProvider interface {
 	Now() time.Time
-	AfterFunc(d time.Duration, f func())
 }
+
+type defaultTime struct{}
+
+func (defaultTime) Now() time.Time { return time.Now() }
 
 type Allocator struct {
 	sync.RWMutex
@@ -50,17 +53,7 @@ type Allocator struct {
 	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
 	leaked      map[time.Time]Space
 	claims      []Allocation
-	maxAge      time.Duration
 	timeProvider
-}
-
-type defaultTime struct {
-}
-
-func (defaultTime) Now() time.Time { return time.Now() }
-
-func (defaultTime) AfterFunc(d time.Duration, f func()) {
-	time.AfterFunc(d, f)
 }
 
 func NewAllocator(ourName router.PeerName, ourUID uint64, universeCIDR string) (*Allocator, error) {
@@ -86,7 +79,6 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, universeCIDR string) (
 		peerInfo:     make(map[uint64]SpaceSet),
 		ourSpaceSet:  NewSpaceSet(ourName, ourUID),
 		leaked:       make(map[time.Time]Space),
-		maxAge:       10 * time.Second,
 		timeProvider: defaultTime{},
 	}
 	alloc.peerInfo[ourUID] = alloc.ourSpaceSet
@@ -226,7 +218,7 @@ func (alloc *Allocator) lookForNewLeaks(now time.Time) {
 			allSpace.Exclude(leak)
 		}
 		if !allSpace.Empty() {
-			lg.Info.Println(allSpace.describe("New leaked spaces:"))
+			lg.Debug.Println(allSpace.describe("New leaked spaces:"))
 			for _, space := range allSpace.spaces {
 				// fixme: should merge contiguous spaces
 				alloc.leaked[now] = space
@@ -280,7 +272,7 @@ func (alloc *Allocator) reclaimPastLife() {
 }
 
 func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err error) {
-	lg.Info.Println("checkClaim", addr, alloc.string())
+	lg.Debug.Println("checkClaim", addr, alloc.string())
 	testaddr := NewMinSpace(addr, 1)
 	if !alloc.universe.Overlaps(testaddr) {
 		return 0, errors.New(fmt.Sprintf("Address %s is not within our universe %s", addr, alloc.universe.String()))
@@ -394,8 +386,7 @@ func (alloc *Allocator) requestSpace() {
 	}
 	if best != nil {
 		lg.Debug.Println("Decided to ask peer", best.PeerName(), "for space:", best)
-		myState := encode(alloc.ourSpaceSet)
-		msg := router.Concat([]byte{gossipSpaceRequest}, myState)
+		msg := router.Concat([]byte{msgSpaceRequest}, encode(alloc.ourSpaceSet))
 		alloc.gossip.GossipUnicast(best.PeerName(), msg)
 		alloc.moveToState(allocStateExpectingDonation, GossipReqTimeout)
 	} else {
@@ -413,7 +404,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) e
 		lg.Debug.Println("Decided to give  peer", sender, "space from", start, "size", size)
 		myState := encode(alloc.ourSpaceSet)
 		size_encoding := intip4(size) // hack!
-		msg := router.Concat([]byte{gossipSpaceDonate}, start.To4(), size_encoding, myState)
+		msg := router.Concat([]byte{msgSpaceDonate}, start.To4(), size_encoding, myState)
 		alloc.gossip.GossipUnicast(sender, msg)
 	}
 	return nil
@@ -510,9 +501,9 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 	alloc.Lock()
 	defer alloc.Unlock()
 	switch msg[0] {
-	case gossipSpaceRequest:
+	case msgSpaceRequest:
 		alloc.handleSpaceRequest(sender, msg[1:])
-	case gossipSpaceDonate:
+	case msgSpaceDonate:
 		alloc.handleSpaceDonate(sender, msg[1:])
 	}
 	return nil
