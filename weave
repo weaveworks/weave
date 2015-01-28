@@ -366,6 +366,29 @@ populate_dns() {
     done
 }
 
+# Tell the newly-started weave IP allocator about existing weave IPs
+populate_ipam() {
+    WEAVE_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $CONTAINER_NAME)
+    WAIT_TIME=1
+    while ! http_call_ip $WEAVE_IP $HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
+        sleep $WAIT_TIME
+        WAIT_TIME=$((WAIT_TIME+1))
+    done
+    if [ $WAIT_TIME = 4 ]; then
+        echo "Timed out waiting for weave container to start." >&2
+        echo "If running, it will not be pre-populated." >&2
+    fi
+
+    for CONTAINER in $(docker ps -q --no-trunc); do
+        if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
+            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
+            for IP in $CONTAINER_IPS; do
+                http_call_ip $WEAVE_IP $HTTP_PORT PUT /ip/$CONTAINER/$IP
+            done
+        fi
+    done
+}
+
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
     case $(docker inspect --format='{{.State.Running}} {{.Config.Image}}' $1 2>/dev/null) in
@@ -486,6 +509,7 @@ case "$COMMAND" in
             -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD \
             $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -iface $CONTAINER_IFNAME "$@")
         with_container_netns $CONTAINER launch >/dev/null
+        populate_ipam
         echo $CONTAINER
         ;;
     launch-dns)

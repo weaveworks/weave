@@ -11,6 +11,10 @@ type Allocation struct {
 	IP    net.IP
 }
 
+func (a *Allocation) String() string {
+	return fmt.Sprintf("%s %s", a.Ident, a.IP)
+}
+
 type Space interface {
 	GetMinSpace() *MinSpace
 	GetStart() net.IP
@@ -99,6 +103,20 @@ func NewMinSpace(start net.IP, size uint32) *MinSpace {
 
 func NewSpace(start net.IP, size uint32) *MutableSpace {
 	return &MutableSpace{MinSpace: MinSpace{Start: start, Size: size, MaxAllocated: 0}}
+}
+
+func (space *MutableSpace) Claim(ident string, addr net.IP) bool {
+	space.Lock()
+	defer space.Unlock()
+	diff := subtract(addr, space.Start)
+	if !(diff >= 0 && diff < int64(space.Size)) {
+		return false
+	}
+	if uint32(diff) > space.MaxAllocated {
+		space.MaxAllocated = uint32(diff)
+	}
+	space.recs = append(space.recs, Allocation{ident, addr})
+	return true
 }
 
 func (space *MutableSpace) AllocateFor(ident string) net.IP {
@@ -194,5 +212,9 @@ func (s *MutableSpace) LargestFreeBlock() uint32 {
 func (space *MutableSpace) String() string {
 	space.RLock()
 	defer space.RUnlock()
+	return space.string()
+}
+
+func (space *MutableSpace) string() string {
 	return fmt.Sprintf("%s+%d, %d/%d", space.Start, space.Size, len(space.recs), len(space.free_list))
 }

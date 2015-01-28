@@ -47,7 +47,9 @@ type Allocator struct {
 	gossip      router.Gossip
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
 	ourSpaceSet *MutableSpaceSet
+	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
 	leaked      map[time.Time]Space
+	claims      []Allocation
 	maxAge      time.Duration
 	timeProvider
 }
@@ -151,6 +153,9 @@ func (alloc *Allocator) decodeUpdate(update []byte) ([]*PeerSpaceSet, error) {
 				continue // Shouldn't happen
 			} else if newSpaceset.PeerName() == alloc.ourName {
 				lg.Debug.Println("Received update with our peerName but different UID")
+				if alloc.pastLife == nil || alloc.pastLife.lastSeen.Before(newSpaceset.lastSeen) {
+					alloc.pastLife = newSpaceset
+				}
 				continue
 			} else if oldSpaceset != nil && oldSpaceset.MaybeDead() {
 				lg.Info.Println("Received update for peer believed dead", newSpaceset)
@@ -175,6 +180,7 @@ func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
 	return 0
 }
 
+// Is this actually interesting?  We can get temporary overlaps as things shift around.
 func (alloc *Allocator) lookForOverlaps() (ret bool) {
 	ret = false
 	allSpaces := make([]Space, 0)
@@ -263,6 +269,52 @@ func (alloc *Allocator) reclaimLeaks(now time.Time) (changed bool) {
 	return
 }
 
+func (alloc *Allocator) reclaimPastLife() {
+	lg.Debug.Println("Reclaiming allocations from past life", alloc.pastLife)
+	for _, space := range alloc.pastLife.spaces {
+		alloc.manageSpace(space.GetStart(), space.GetSize())
+	}
+	alloc.pastLife.MakeTombstone()
+	alloc.gossip.GossipBroadcast(encode(alloc.pastLife))
+	lg.Debug.Println("alloc now", alloc.string())
+}
+
+func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err error) {
+	lg.Info.Println("checkClaim", addr, alloc.string())
+	testaddr := NewMinSpace(addr, 1)
+	if !alloc.universe.Overlaps(testaddr) {
+		return 0, errors.New(fmt.Sprintf("Address %s is not within our universe %s", addr, alloc.universe.String()))
+	}
+	if alloc.pastLife != nil && alloc.pastLife.Overlaps(testaddr) {
+		// We've been sent a peerInfo that matches our PeerName but not UID
+		// We've also been asked to claim an IP that is in the range it owned
+		// Conclude that this is an echo of our former self, and reclaim it.
+		alloc.reclaimPastLife()
+	}
+	if owner := alloc.spaceOwner(testaddr); owner == 0 {
+		// That address is not currently owned; wait until someone claims it
+		return 0, nil
+	} else if spaceSet := alloc.peerInfo[owner]; spaceSet == alloc.ourSpaceSet {
+		// We own it, perhaps because we claimed it above.
+		err := alloc.ourSpaceSet.Claim(ident, addr)
+		return alloc.ourUID, err
+	} else {
+		// That address is owned by someone else
+		panic("reclaiming addresses from another owner not implemented") // TODO
+		//return spaceSet.UID(), nil
+	}
+}
+
+func (alloc *Allocator) checkClaims() {
+	lg.Debug.Println("checkClaims:", alloc.string())
+	for _, claim := range alloc.claims {
+		_, err := alloc.checkClaim(claim.Ident, claim.IP)
+		if err != nil {
+			lg.Error.Println("checkClaims:", err)
+		}
+	}
+}
+
 func (alloc *Allocator) considerOurPosition() {
 	if alloc.gossip == nil {
 		return // Can't do anything.
@@ -270,18 +322,18 @@ func (alloc *Allocator) considerOurPosition() {
 	now := alloc.timeProvider.Now()
 	switch alloc.state {
 	case allocStateNeutral:
-		// Should we ask for some space?
-		if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
-			alloc.requestSpace()
-		}
 		alloc.discardOldLeaks()
 		alloc.lookForDead(now)
 		changed := alloc.reclaimLeaks(now)
 		alloc.lookForNewLeaks(now)
 		alloc.lookForOverlaps()
+		alloc.checkClaims()
 		if changed {
 			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
+		} else if alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
+			alloc.requestSpace()
 		}
+
 	case allocStateExpectingDonation:
 		// If nobody came back to us, ask again
 		if now.After(alloc.stateExpire) {
@@ -391,6 +443,21 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) {
 	}
 }
 
+// Claim an address that we think we should own
+func (alloc *Allocator) Claim(ident string, addr net.IP) error {
+	lg.Info.Printf("Address %s claimed by %s", addr, ident)
+	alloc.Lock()
+	defer alloc.Unlock()
+	if owner, err := alloc.checkClaim(ident, addr); err != nil {
+		return err
+	} else if owner == 0 {
+		// That address is not currently owned; wait until someone claims it
+		alloc.claims = append(alloc.claims, Allocation{ident, addr})
+	}
+
+	return nil
+}
+
 func (alloc *Allocator) AllocateFor(ident string) net.IP {
 	alloc.Lock()
 	defer alloc.Unlock()
@@ -415,6 +482,10 @@ func (alloc *Allocator) string() string {
 	for _, spaceset := range alloc.peerInfo {
 		buf.WriteByte('\n')
 		buf.WriteString(spaceset.String())
+	}
+	for _, claim := range alloc.claims {
+		buf.WriteString("\nClaim ")
+		buf.WriteString(claim.String())
 	}
 	return buf.String()
 }

@@ -67,6 +67,12 @@ func spaceSetWith(pn router.PeerName, uid uint64, spaces ...*MutableSpace) *Muta
 	return ps
 }
 
+func tombstoneWith(pn router.PeerName, uid uint64) *MutableSpaceSet {
+	ps := NewSpaceSet(pn, uid)
+	ps.MakeTombstone()
+	return ps
+}
+
 func TestExclude(t *testing.T) {
 	const (
 		peer1     = "7a:9f:eb:b6:0c:6e"

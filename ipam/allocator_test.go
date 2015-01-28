@@ -1,9 +1,11 @@
 package ipam
 
 import (
+	"fmt"
 	"github.com/zettio/weave/router"
 	wt "github.com/zettio/weave/testing"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -157,6 +159,18 @@ type mockMessage struct {
 	buf []byte
 }
 
+func (m *mockMessage) String() string {
+	return fmt.Sprintf("-> %s [%x]", m.dst, m.buf)
+}
+
+func toStringArray(messages []mockMessage) []string {
+	out := make([]string, len(messages))
+	for i := range out {
+		out[i] = messages[i].String()
+	}
+	return out
+}
+
 type mockGossipComms struct {
 	messages []mockMessage
 }
@@ -208,8 +222,9 @@ func (m *mockGossipComms) VerifyBroadcastMessage(t *testing.T, buf []byte) {
 }
 
 func (m *mockGossipComms) VerifyNoMoreMessages(t *testing.T) {
+
 	if len(m.messages) > 0 {
-		wt.Fatalf(t, "Gossip message unexpected: %+v", m)
+		wt.Fatalf(t, "Gossip message(s) unexpected: \n%s", strings.Join(toStringArray(m.messages), "\n"))
 	}
 }
 
@@ -469,6 +484,97 @@ func TestGossipBreakage(t *testing.T) {
 	// Call decodeUpdate rather than OnGossip which also calls considerOurPosition
 	alloc2.decodeUpdate(alloc1.Gossip())
 	wt.AssertStatus(t, alloc2.state, allocStateLeaderless, "allocator state")
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+}
+
+func TestAllocatorClaim1(t *testing.T) {
+	const (
+		containerID    = "deadbeef"
+		container2     = "baddf00d"
+		ourNameString  = "01:00:00:01:00:00"
+		peerNameString = "02:00:00:02:00:00"
+		testStart1     = "10.0.1.0"
+		testStart3     = "10.0.3.0"
+		testAddr1      = "10.0.1.5"
+		testAddr2      = "10.0.1.6"
+		oldUID         = 6464646
+	)
+
+	ourName, _ := router.PeerNameFromString(ourNameString)
+	mockGossip1 := new(mockGossipComms)
+	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
+	alloc1.SetGossip(mockGossip1)
+	alloc1.startForTesting()
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
+
+	alloc1.considerWhileLocked()
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
+	mockGossip1.VerifyNoMoreMessages(t)
+
+	mockGossip2 := new(mockGossipComms)
+	peerName, _ := router.PeerNameFromString(peerNameString)
+	alloc2, _ := NewAllocator(peerName, peerUID, testStart1+"/22")
+	alloc2.manageSpace(net.ParseIP(testStart3), 32)
+
+	// alloc2 has an echo of the former state of alloc1
+	alloc2.peerInfo[oldUID] = spaceSetWith(ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
+
+	alloc1.decodeUpdate(alloc2.Gossip())
+	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
+	wt.AssertNoErr(t, err)
+	alloc1.considerWhileLocked()
+	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(ourName, oldUID)))
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+}
+
+// Same as TestAllocatorClaim1 but the claim and the gossip happen the other way round
+func TestAllocatorClaim2(t *testing.T) {
+	const (
+		containerID    = "deadbeef"
+		container2     = "baddf00d"
+		ourNameString  = "01:00:00:01:00:00"
+		peerNameString = "02:00:00:02:00:00"
+		testStart1     = "10.0.1.0"
+		testStart3     = "10.0.3.0"
+		testAddr1      = "10.0.1.5"
+		testAddr2      = "10.0.1.6"
+		oldUID         = 6464646
+	)
+
+	ourName, _ := router.PeerNameFromString(ourNameString)
+	mockGossip1 := new(mockGossipComms)
+	alloc1, _ := NewAllocator(ourName, ourUID, testStart1+"/22")
+	alloc1.SetGossip(mockGossip1)
+	alloc1.startForTesting()
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
+	alloc1.considerWhileLocked()
+
+	mockGossip2 := new(mockGossipComms)
+	peerName, _ := router.PeerNameFromString(peerNameString)
+	alloc2, _ := NewAllocator(peerName, peerUID, testStart1+"/22")
+	alloc2.manageSpace(net.ParseIP(testStart3), 32)
+
+	// alloc2 has an echo of the former state of alloc1
+	alloc2.peerInfo[oldUID] = spaceSetWith(ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
+
+	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
+	wt.AssertNoErr(t, err)
+	alloc1.considerWhileLocked()
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+
+	alloc1.decodeUpdate(alloc2.Gossip())
+	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
+	mockGossip1.VerifyNoMoreMessages(t)
+	mockGossip2.VerifyNoMoreMessages(t)
+	alloc1.considerWhileLocked()
+	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(ourName, oldUID)))
 	mockGossip1.VerifyNoMoreMessages(t)
 	mockGossip2.VerifyNoMoreMessages(t)
 }

@@ -240,6 +240,21 @@ func (s *MutableSpaceSet) AllocateFor(ident string) net.IP {
 	return nil
 }
 
+// Claim an address that we think we should own
+func (s *MutableSpaceSet) Claim(ident string, addr net.IP) error {
+	s.Lock()
+	defer s.Unlock()
+	if len(s.spaces) == 0 {
+		return nil
+	}
+	for _, space := range s.spaces {
+		if space.(*MutableSpace).Claim(ident, addr) {
+			return nil
+		}
+	}
+	return errors.New("Attempt to claim IP address not in range")
+}
+
 func (s *MutableSpaceSet) Free(addr net.IP) error {
 	s.Lock()
 	defer s.Unlock()

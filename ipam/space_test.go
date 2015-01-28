@@ -36,6 +36,39 @@ func TestSpaceAllocate(t *testing.T) {
 	wt.AssertEqualInt(t, len(space1.recs), 0, "allocated records")
 }
 
+func TestSpaceClaim(t *testing.T) {
+	const (
+		containerID = "deadbeef"
+		testAddr0   = "10.0.1.0"
+		testAddr1   = "10.0.1.1"
+		testAddr2   = "10.0.1.10"
+		testAddr3   = "10.0.4.4"
+	)
+
+	var (
+		ipAddr0 = net.ParseIP(testAddr0)
+		ipAddr1 = net.ParseIP(testAddr1)
+		ipAddr2 = net.ParseIP(testAddr2)
+		ipAddr3 = net.ParseIP(testAddr3)
+	)
+
+	space1 := NewSpace(ipAddr0, 20)
+	space1.Claim(containerID, ipAddr1)
+	wt.AssertEqualInt(t, len(space1.recs), 1, "allocated records")
+	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 19, "LargestFreeBlock")
+
+	space1.Claim(containerID, ipAddr2)
+	wt.AssertEqualInt(t, len(space1.recs), 2, "allocated records")
+	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 10, "LargestFreeBlock")
+
+	if ret := space1.Claim(containerID, ipAddr3); ret {
+		t.Fatalf("Space.Claim incorrect success")
+	}
+
+	space1.Free(ipAddr1)
+	wt.AssertEqualInt(t, len(space1.recs), 1, "allocated records")
+}
+
 func TestSpaceOverlap(t *testing.T) {
 	const (
 		testAddr1 = "10.0.3.4"
