@@ -48,7 +48,7 @@ type Allocator struct {
 	universe    MinSpace // all the addresses that could be allocated
 	gossip      router.Gossip
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
-	ourSpaceSet *MutableSpaceSet
+	ourSpaceSet *OurSpaceSet
 	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
 	leaked      map[time.Time]Space
 	claims      []Allocation

@@ -43,7 +43,7 @@ func TestEncodeDecode(t *testing.T) {
 	enc := gob.NewEncoder(buf)
 
 	pn1, _ := router.PeerNameFromString(peer1)
-	ps1 := &MutableSpaceSet{PeerSpaceSet{peerName: pn1, uid: peer1UID, version: 1234}}
+	ps1 := &OurSpaceSet{PeerSpaceSet{peerName: pn1, uid: peer1UID, version: 1234}}
 	ps1.AddSpace(&MutableSpace{MinSpace: MinSpace{Start: net.ParseIP(testAddr1), Size: 10, MaxAllocated: 0}})
 
 	err := ps1.Encode(enc)
@@ -59,7 +59,7 @@ func TestEncodeDecode(t *testing.T) {
 	}
 }
 
-func spaceSetWith(pn router.PeerName, uid uint64, spaces ...*MutableSpace) *MutableSpaceSet {
+func spaceSetWith(pn router.PeerName, uid uint64, spaces ...*MutableSpace) *OurSpaceSet {
 	ps := NewSpaceSet(pn, uid)
 	for _, space := range spaces {
 		ps.AddSpace(space)
@@ -67,7 +67,7 @@ func spaceSetWith(pn router.PeerName, uid uint64, spaces ...*MutableSpace) *Muta
 	return ps
 }
 
-func tombstoneWith(pn router.PeerName, uid uint64) *MutableSpaceSet {
+func tombstoneWith(pn router.PeerName, uid uint64) *OurSpaceSet {
 	ps := NewSpaceSet(pn, uid)
 	ps.MakeTombstone()
 	return ps

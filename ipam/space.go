@@ -6,42 +6,6 @@ import (
 	"sync"
 )
 
-type Allocation struct {
-	Ident string
-	IP    net.IP
-}
-
-func (a *Allocation) String() string {
-	return fmt.Sprintf("%s %s", a.Ident, a.IP)
-}
-
-type AllocationList []Allocation
-
-func (aa *AllocationList) add(a *Allocation) {
-	*aa = append(*aa, *a)
-}
-
-func (aa *AllocationList) remove(addr net.IP) *Allocation {
-	for i, a := range *aa {
-		if a.IP.Equal(addr) {
-			// Delete by swapping the last element into this one and truncating
-			last := len(*aa) - 1
-			(*aa)[i], (*aa) = (*aa)[last], (*aa)[:last]
-			return &a
-		}
-	}
-	return nil
-}
-
-func (aa *AllocationList) take() *Allocation {
-	if n := len(*aa); n > 0 {
-		ret := (*aa)[n-1]
-		*aa = (*aa)[:n-1]
-		return &ret
-	}
-	return nil
-}
-
 type Space interface {
 	GetMinSpace() *MinSpace
 	GetStart() net.IP
@@ -58,13 +22,6 @@ type MinSpace struct {
 	Start        net.IP
 	Size         uint32
 	MaxAllocated uint32
-}
-
-type MutableSpace struct {
-	MinSpace
-	allocated AllocationList
-	free_list AllocationList
-	sync.RWMutex
 }
 
 func (s *MinSpace) GetMinSpace() *MinSpace   { return s }
@@ -105,6 +62,49 @@ func (s *MinSpace) String() string {
 
 func NewMinSpace(start net.IP, size uint32) *MinSpace {
 	return &MinSpace{Start: start, Size: size, MaxAllocated: 0}
+}
+
+type Allocation struct {
+	Ident string
+	IP    net.IP
+}
+
+func (a *Allocation) String() string {
+	return fmt.Sprintf("%s %s", a.Ident, a.IP)
+}
+
+type AllocationList []Allocation
+
+func (aa *AllocationList) add(a *Allocation) {
+	*aa = append(*aa, *a)
+}
+
+func (aa *AllocationList) remove(addr net.IP) *Allocation {
+	for i, a := range *aa {
+		if a.IP.Equal(addr) {
+			// Delete by swapping the last element into this one and truncating
+			last := len(*aa) - 1
+			(*aa)[i], (*aa) = (*aa)[last], (*aa)[:last]
+			return &a
+		}
+	}
+	return nil
+}
+
+func (aa *AllocationList) take() *Allocation {
+	if n := len(*aa); n > 0 {
+		ret := (*aa)[n-1]
+		*aa = (*aa)[:n-1]
+		return &ret
+	}
+	return nil
+}
+
+type MutableSpace struct {
+	MinSpace
+	allocated AllocationList
+	free_list AllocationList
+	sync.RWMutex
 }
 
 func NewSpace(start net.IP, size uint32) *MutableSpace {

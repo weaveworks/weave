@@ -37,11 +37,6 @@ type PeerSpaceSet struct {
 	sync.RWMutex
 }
 
-// Represents our own space, which we can allocate and free within.
-type MutableSpaceSet struct {
-	PeerSpaceSet
-}
-
 func NewPeerSpace(pn router.PeerName, uid uint64) *PeerSpaceSet {
 	return &PeerSpaceSet{peerName: pn, uid: uid}
 }
@@ -168,20 +163,54 @@ func (s *PeerSpaceSet) IsTombstone() bool {
 	return s.version == math.MaxUint64
 }
 
-// -------------------------------------------------
-
-func NewSpaceSet(pn router.PeerName, uid uint64) *MutableSpaceSet {
-	return &MutableSpaceSet{PeerSpaceSet{peerName: pn, uid: uid}}
+func endOfBlock(a Space) net.IP {
+	return add(a.GetStart(), a.GetSize())
 }
 
-func (s *MutableSpaceSet) AddSpace(space *MutableSpace) {
+func (s *PeerSpaceSet) Exclude(a Space) bool {
+	s.Lock()
+	defer s.Unlock()
+	ns := make([]Space, 0)
+	aSize := int64(a.GetSize())
+	for _, b := range s.spaces {
+		bSize := int64(b.GetSize())
+		diff := subtract(a.GetStart(), b.GetStart())
+		if diff > 0 && diff < bSize {
+			ns = append(ns, NewMinSpace(b.GetStart(), uint32(diff)))
+			if bSize > aSize+diff {
+				ns = append(ns, NewMinSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
+			}
+		} else if diff <= 0 && -diff < aSize {
+			if aSize+diff < bSize {
+				ns = append(ns, NewMinSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
+			}
+		} else { // Pieces do not overlap; leave the existing one in place
+			ns = append(ns, b)
+		}
+	}
+	s.spaces = ns
+	return false
+}
+
+// -------------------------------------------------
+
+// Represents our own space, which we can allocate and free within.
+type OurSpaceSet struct {
+	PeerSpaceSet
+}
+
+func NewSpaceSet(pn router.PeerName, uid uint64) *OurSpaceSet {
+	return &OurSpaceSet{PeerSpaceSet{peerName: pn, uid: uid}}
+}
+
+func (s *OurSpaceSet) AddSpace(space *MutableSpace) {
 	s.Lock()
 	defer s.Unlock()
 	s.spaces = append(s.spaces, space)
 	s.version++
 }
 
-func (s *MutableSpaceSet) NumFreeAddresses() uint32 {
+func (s *OurSpaceSet) NumFreeAddresses() uint32 {
 	s.RLock()
 	defer s.RUnlock()
 	// TODO: Optimize; perhaps maintain the count in allocate and free
@@ -194,7 +223,7 @@ func (s *MutableSpaceSet) NumFreeAddresses() uint32 {
 
 // Give up some space because one of our peers has asked for it.
 // Pick some large reasonably-sized chunk.
-func (s *MutableSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
+func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 	totalFreeAddresses := s.NumFreeAddresses()
 	if totalFreeAddresses < MinSafeFreeAddresses {
 		return nil, false
@@ -228,7 +257,7 @@ func (s *MutableSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 	return nil, false
 }
 
-func (s *MutableSpaceSet) AllocateFor(ident string) net.IP {
+func (s *OurSpaceSet) AllocateFor(ident string) net.IP {
 	s.Lock()
 	defer s.Unlock()
 	// TODO: Optimize; perhaps cache last-used space
@@ -241,7 +270,7 @@ func (s *MutableSpaceSet) AllocateFor(ident string) net.IP {
 }
 
 // Claim an address that we think we should own
-func (s *MutableSpaceSet) Claim(ident string, addr net.IP) error {
+func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 	s.Lock()
 	defer s.Unlock()
 	if len(s.spaces) == 0 {
@@ -255,7 +284,7 @@ func (s *MutableSpaceSet) Claim(ident string, addr net.IP) error {
 	return errors.New("Attempt to claim IP address not in range")
 }
 
-func (s *MutableSpaceSet) Free(addr net.IP) error {
+func (s *OurSpaceSet) Free(addr net.IP) error {
 	s.Lock()
 	defer s.Unlock()
 	for _, space := range s.spaces {
@@ -264,33 +293,4 @@ func (s *MutableSpaceSet) Free(addr net.IP) error {
 		}
 	}
 	return errors.New("Attempt to free IP address not in range")
-}
-
-func endOfBlock(a Space) net.IP {
-	return add(a.GetStart(), a.GetSize())
-}
-
-func (s *MutableSpaceSet) Exclude(a Space) bool {
-	s.Lock()
-	defer s.Unlock()
-	ns := make([]Space, 0)
-	aSize := int64(a.GetSize())
-	for _, b := range s.spaces {
-		bSize := int64(b.GetSize())
-		diff := subtract(a.GetStart(), b.GetStart())
-		if diff > 0 && diff < bSize {
-			ns = append(ns, NewSpace(b.GetStart(), uint32(diff)))
-			if bSize > aSize+diff {
-				ns = append(ns, NewSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
-			}
-		} else if diff <= 0 && -diff < aSize {
-			if aSize+diff < bSize {
-				ns = append(ns, NewSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
-			}
-		} else { // Pieces do not overlap; leave the existing one in place
-			ns = append(ns, b)
-		}
-	}
-	s.spaces = ns
-	return false
 }
