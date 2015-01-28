@@ -40,25 +40,11 @@ type MutableSpace struct {
 	sync.RWMutex
 }
 
-func (s *MinSpace) GetMinSpace() *MinSpace {
-	return s
-}
-
-func (s *MinSpace) GetStart() net.IP {
-	return s.Start
-}
-
-func (s *MinSpace) GetSize() uint32 {
-	return s.Size
-}
-
-func (s *MinSpace) GetMaxAllocated() uint32 {
-	return s.MaxAllocated
-}
-
-func (s *MinSpace) LargestFreeBlock() uint32 {
-	return s.Size - s.MaxAllocated
-}
+func (s *MinSpace) GetMinSpace() *MinSpace   { return s }
+func (s *MinSpace) GetStart() net.IP         { return s.Start }
+func (s *MinSpace) GetSize() uint32          { return s.Size }
+func (s *MinSpace) GetMaxAllocated() uint32  { return s.MaxAllocated }
+func (s *MinSpace) LargestFreeBlock() uint32 { return s.Size - s.MaxAllocated }
 
 func (a *MinSpace) Overlaps(b Space) bool {
 	diff := subtract(a.Start, b.GetStart())
