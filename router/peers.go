@@ -147,9 +147,9 @@ func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
 
 func (peers *Peers) garbageCollect() []*Peer {
 	removed := []*Peer{}
+	_, reached := peers.ourself.Routes(nil, false)
 	for name, peer := range peers.table {
-		found, _ := peers.ourself.Routes(peer, false)
-		if !found && !peer.IsLocallyReferenced() {
+		if _, found := reached[peer.Name]; !found && !peer.IsLocallyReferenced() {
 			delete(peers.table, name)
 			peers.onGC(peer)
 			removed = append(removed, peer)

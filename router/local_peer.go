@@ -118,8 +118,8 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 
 const (
 	PAddConnection = iota
-	PDeleteConnection
 	PConnectionEstablished
+	PDeleteConnection
 	PSendProtocolMsg
 )
 
@@ -131,6 +131,13 @@ func (peer *LocalPeer) AddConnection(conn *LocalConnection) {
 		payload:     conn}
 }
 
+// Async.
+func (peer *LocalPeer) ConnectionEstablished(conn *LocalConnection) {
+	peer.queryChan <- &PeerInteraction{
+		Interaction: Interaction{code: PConnectionEstablished},
+		payload:     conn}
+}
+
 // Sync.
 func (peer *LocalPeer) DeleteConnection(conn *LocalConnection) {
 	resultChan := make(chan interface{})
@@ -138,13 +145,6 @@ func (peer *LocalPeer) DeleteConnection(conn *LocalConnection) {
 		Interaction: Interaction{code: PDeleteConnection, resultChan: resultChan},
 		payload:     conn}
 	<-resultChan
-}
-
-// Async.
-func (peer *LocalPeer) ConnectionEstablished(conn *LocalConnection) {
-	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PConnectionEstablished},
-		payload:     conn}
 }
 
 // Async.
@@ -170,17 +170,17 @@ func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
 				if peer.handleAddConnection(conn) {
 					conn.log("connection added")
 				}
+			case PConnectionEstablished:
+				conn := query.payload.(*LocalConnection)
+				if peer.handleConnectionEstablished(conn) {
+					conn.log("connection fully established")
+				}
 			case PDeleteConnection:
 				conn := query.payload.(*LocalConnection)
 				if peer.handleDeleteConnection(conn) {
 					conn.log("connection deleted")
 				}
 				query.resultChan <- nil
-			case PConnectionEstablished:
-				conn := query.payload.(*LocalConnection)
-				if peer.handleConnectionEstablished(conn) {
-					conn.log("connection fully established")
-				}
 			case PSendProtocolMsg:
 				peer.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
@@ -227,6 +227,20 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) bool {
 	return true
 }
 
+func (peer *LocalPeer) handleConnectionEstablished(conn Connection) bool {
+	if peer.Peer != conn.Local() {
+		log.Fatal("Peer informed of active connection where peer is not the source of connection")
+	}
+	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
+		conn.Shutdown(fmt.Errorf("Cannot set unknown connection active"))
+		return false
+	}
+	peer.connectionEstablished(conn)
+	peer.Router.SendAllGossipDown(conn)
+	peer.broadcastPeerUpdate(conn.Remote())
+	return true
+}
+
 func (peer *LocalPeer) handleDeleteConnection(conn Connection) bool {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Attempt made to delete connection from peer where peer is not the source of connection")
@@ -245,20 +259,6 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) bool {
 	if conn.Established() {
 		peer.broadcastPeerUpdate()
 	}
-	return true
-}
-
-func (peer *LocalPeer) handleConnectionEstablished(conn Connection) bool {
-	if peer.Peer != conn.Local() {
-		log.Fatal("Peer informed of active connection where peer is not the source of connection")
-	}
-	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
-		conn.Shutdown(fmt.Errorf("Cannot set unknown connection active"))
-		return false
-	}
-	peer.connectionEstablished(conn)
-	peer.Router.SendAllGossipDown(conn)
-	peer.broadcastPeerUpdate(conn.Remote())
 	return true
 }
 
