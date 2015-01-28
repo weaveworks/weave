@@ -5,6 +5,7 @@ import (
 	"github.com/zettio/weave/router"
 	wt "github.com/zettio/weave/testing"
 	"net"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -229,9 +230,33 @@ type mockTimer struct {
 func (m *mockTimeProvider) SetTime(t time.Time) { m.myTime = t }
 func (m *mockTimeProvider) Now() time.Time      { return m.myTime }
 
+type SpaceByStart []Space
+
+func (a SpaceByStart) Len() int           { return len(a) }
+func (a SpaceByStart) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SpaceByStart) Less(i, j int) bool { return ip4int(a[i].GetStart()) < ip4int(a[j].GetStart()) }
+
+func (alloc *Allocator) lookForOverlaps(t *testing.T) (ret bool) {
+	ret = false
+	allSpaces := make([]Space, 0)
+	for _, peerSpaceSet := range alloc.peerInfo {
+		peerSpaceSet.ForEachSpace(func(space Space) {
+			allSpaces = append(allSpaces, space)
+		})
+	}
+	sort.Sort(SpaceByStart(allSpaces))
+	for i := 0; i < len(allSpaces)-1; i++ {
+		if allSpaces[i].Overlaps(allSpaces[i+1]) {
+			t.Logf("Spaces overlap: %s and %s", allSpaces[i], allSpaces[i+1])
+			ret = true
+		}
+	}
+	return
+}
+
 func assertNoOverlaps(t *testing.T, allocs ...*Allocator) {
 	for _, alloc := range allocs {
-		if alloc.lookForOverlaps() {
+		if alloc.lookForOverlaps(t) {
 			wt.Fatalf(t, "Allocator has overlapping space: %s", alloc)
 		}
 	}

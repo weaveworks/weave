@@ -8,7 +8,6 @@ import (
 	lg "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
 	"net"
-	"sort"
 	"sync"
 	"time"
 )
@@ -172,25 +171,6 @@ func (alloc *Allocator) spaceOwner(space *MinSpace) uint64 {
 	return 0
 }
 
-// Is this actually interesting?  We can get temporary overlaps as things shift around.
-func (alloc *Allocator) lookForOverlaps() (ret bool) {
-	ret = false
-	allSpaces := make([]Space, 0)
-	for _, peerSpaceSet := range alloc.peerInfo {
-		peerSpaceSet.ForEachSpace(func(space Space) {
-			allSpaces = append(allSpaces, space)
-		})
-	}
-	sort.Sort(SpaceByStart(allSpaces))
-	for i := 0; i < len(allSpaces)-1; i++ {
-		if allSpaces[i].Overlaps(allSpaces[i+1]) {
-			lg.Error.Printf("Spaces overlap: %s and %s", allSpaces[i], allSpaces[i+1])
-			ret = true
-		}
-	}
-	return
-}
-
 func (alloc *Allocator) lookForDead(now time.Time) {
 	limit := now.Add(-GossipDeadTimeout)
 	for _, entry := range alloc.peerInfo {
@@ -318,7 +298,6 @@ func (alloc *Allocator) considerOurPosition() {
 		alloc.lookForDead(now)
 		changed := alloc.reclaimLeaks(now)
 		alloc.lookForNewLeaks(now)
-		alloc.lookForOverlaps()
 		alloc.checkClaims()
 		if changed {
 			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
