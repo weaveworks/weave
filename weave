@@ -592,7 +592,7 @@ case "$COMMAND" in
     expose)
         [ $# -eq 1 ] || usage
         validate_cidr $1
-        create_bridge
+        create_bridge --without-ethtool
         if ! ip addr show dev $BRIDGE | grep -qF $1
         then
             ip addr add dev $BRIDGE $1
@@ -603,7 +603,7 @@ case "$COMMAND" in
     hide)
         [ $# -eq 1 ] || usage
         validate_cidr $1
-        create_bridge
+        create_bridge --without-ethtool
         if ip addr show dev $BRIDGE | grep -qF $1
         then
             ip addr del dev $BRIDGE $1
