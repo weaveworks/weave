@@ -19,6 +19,7 @@ const (
 	FastHeartbeat      = 500 * time.Millisecond
 	SlowHeartbeat      = 10 * time.Second
 	FragTestInterval   = 5 * time.Minute
+	EstablishedTimeout = 30 * time.Second
 	ReadTimeout        = 1 * time.Minute
 	PMTUVerifyAttempts = 8
 	PMTUVerifyTimeout  = 10 * time.Millisecond // gets doubled with every attempt

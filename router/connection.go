@@ -38,26 +38,27 @@ type RemoteConnection struct {
 type LocalConnection struct {
 	sync.RWMutex
 	RemoteConnection
-	TCPConn           *net.TCPConn
-	tcpSender         TCPSender
-	remoteUDPAddr     *net.UDPAddr
-	established       bool
-	receivedHeartbeat bool
-	stackFrag         bool
-	effectivePMTU     int
-	SessionKey        *[32]byte
-	heartbeatFrame    *ForwardedFrame
-	heartbeat         *time.Ticker
-	fragTest          *time.Ticker
-	forwardChan       chan<- *ForwardedFrame
-	forwardChanDF     chan<- *ForwardedFrame
-	stopForward       chan<- interface{}
-	stopForwardDF     chan<- interface{}
-	verifyPMTU        chan<- int
-	Decryptor         Decryptor
-	Router            *Router
-	uid               uint64
-	queryChan         chan<- *ConnectionInteraction
+	TCPConn            *net.TCPConn
+	tcpSender          TCPSender
+	remoteUDPAddr      *net.UDPAddr
+	established        bool
+	receivedHeartbeat  bool
+	stackFrag          bool
+	effectivePMTU      int
+	SessionKey         *[32]byte
+	establishedTimeout *time.Timer
+	heartbeatFrame     *ForwardedFrame
+	heartbeat          *time.Ticker
+	fragTest           *time.Ticker
+	forwardChan        chan<- *ForwardedFrame
+	forwardChanDF      chan<- *ForwardedFrame
+	stopForward        chan<- interface{}
+	stopForwardDF      chan<- interface{}
+	verifyPMTU         chan<- int
+	Decryptor          Decryptor
+	Router             *Router
+	uid                uint64
+	queryChan          chan<- *ConnectionInteraction
 }
 
 type ConnectionInteraction struct {
@@ -253,10 +254,9 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 		}
 	}
 
-	err := conn.queryLoop(queryChan)
-	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
-		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
-	} else if err != nil {
+	conn.establishedTimeout = time.NewTimer(EstablishedTimeout)
+
+	if err := conn.queryLoop(queryChan); err != nil {
 		conn.log("connection shutting down due to error:", err)
 	} else {
 		conn.log("connection shutting down")
@@ -278,9 +278,14 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 			case CReceivedHeartbeat:
 				err = conn.handleReceivedHeartbeat(query.payload.(*net.UDPAddr))
 			case CSetEstablished:
+				conn.establishedTimeout.Stop()
 				err = conn.handleSetEstablished()
 			case CSendProtocolMsg:
 				err = conn.handleSendProtocolMsg(query.payload.(ProtocolMsg))
+			}
+		case <-conn.establishedTimeout.C:
+			if !conn.established {
+				err = fmt.Errorf("failed to establish UDP connectivity")
 			}
 		case <-tickerChan(conn.heartbeat):
 			conn.Forward(true, conn.heartbeatFrame, nil)
@@ -366,6 +371,10 @@ func (conn *LocalConnection) handleShutdown() {
 	if conn.remote != nil {
 		conn.remote.DecrementLocalRefCount()
 		conn.Router.Ourself.DeleteConnection(conn)
+	}
+
+	if conn.establishedTimeout != nil {
+		conn.establishedTimeout.Stop()
 	}
 
 	stopTicker(conn.heartbeat)
