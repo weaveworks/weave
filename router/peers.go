@@ -15,7 +15,8 @@ type Peers struct {
 	onGC    func(*Peer)
 }
 
-type UnknownPeersError struct {
+type UnknownPeerError struct {
+	Name PeerName
 }
 
 type NameCollisionError struct {
@@ -208,7 +209,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			}
 			// Update refers to a peer which we have no knowledge
 			// of. Thus we can't apply the update. Abort.
-			err = UnknownPeersError{}
+			err = UnknownPeerError{remoteName}
 		})
 		if decErr != nil && decErr != io.EOF {
 			err = decErr

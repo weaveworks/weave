@@ -372,10 +372,11 @@ func (router *Router) Gossip() []byte {
 // or nil if nothing in the received message was new
 func (router *Router) OnGossip(buf []byte) ([]byte, error) {
 	newUpdate, err := router.Peers.ApplyUpdate(buf)
-	if _, ok := err.(UnknownPeersError); err != nil && ok {
+	if _, ok := err.(UnknownPeerError); err != nil && ok {
 		// That update contained a peer we didn't know about; we
 		// ignore this; eventually we should receive an update
 		// containing a complete topology.
+		log.Println("topology gossip contained", err)
 		return nil, nil
 	}
 	if err != nil {

@@ -46,8 +46,8 @@ func (ftbe FrameTooBigError) Error() string {
 	return fmt.Sprint("Frame too big error. Effective PMTU is ", ftbe.EPMTU)
 }
 
-func (upe UnknownPeersError) Error() string {
-	return fmt.Sprint("Reference to unknown peers")
+func (upe UnknownPeerError) Error() string {
+	return fmt.Sprint("Reference to unknown peer ", upe.Name)
 }
 
 func (nce NameCollisionError) Error() string {
