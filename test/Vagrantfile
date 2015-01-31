@@ -5,12 +5,13 @@ n_machines = 2
 ip_prefix = "192.168.48"
 ip_suffix_base = 10
 
-def configure_docker(host, ip)
+def configure_docker(host, hostname, ip)
   pkgs = "lxc-docker"
 
   host.vm.box = "phusion/ubuntu-14.04-amd64"
   host.vm.box_url = "https://oss-binaries.phusionpassenger.com/vagrant/boxes/latest/ubuntu-14.04-amd64-vbox.box"
 
+  host.vm.hostname = hostname
   host.vm.network "private_network", ip: ip
 
   # host.vm.synced_folder "./", "/home/vagrant/src/github.com/zettio/weave"
@@ -35,7 +36,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   (1..n_machines).each do |i|
     config.vm.define "host#{i}" do |host|
       ip_suffix = ip_suffix_base + i
-      configure_docker(host, "#{ip_prefix}.#{ip_suffix}")
+      configure_docker(host, "host#{i}", "#{ip_prefix}.#{ip_suffix}")
     end
   end
 
