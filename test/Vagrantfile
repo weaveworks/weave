@@ -1,7 +1,9 @@
 VAGRANTFILE_API_VERSION = "2"
 
-host1_ip = "192.168.48.19" # arbitrary private IP
-host2_ip = "192.168.48.15" # arbitrary private IP
+# these ought to match what is in config.sh
+n_machines = 2
+ip_prefix = "192.168.48"
+ip_suffix_base = 10
 
 def configure_docker(host, ip)
   pkgs = "lxc-docker"
@@ -30,12 +32,11 @@ end
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
-  config.vm.define "host1" do |host1|
-    configure_docker(host1, host1_ip)
-  end
-
-  config.vm.define "host2" do |host2|
-    configure_docker(host2, host2_ip)
+  (1..n_machines).each do |i|
+    config.vm.define "host#{i}" do |host|
+      ip_suffix = ip_suffix_base + i
+      configure_docker(host, "#{ip_prefix}.#{ip_suffix}")
+    end
   end
 
 end
