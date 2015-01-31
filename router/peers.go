@@ -197,7 +197,6 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 		}
 	}
 
-	unknownPeers := false
 	for _, connsBuf := range decodedConns {
 		decErr := connsIterator(connsBuf, func(remoteNameByte []byte, _ string) {
 			remoteName := PeerNameFromBin(remoteNameByte)
@@ -209,18 +208,14 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			}
 			// Update refers to a peer which we have no knowledge
 			// of. Thus we can't apply the update. Abort.
-			unknownPeers = true
+			err = UnknownPeersError{}
 		})
-		if decErr == io.EOF {
-			continue
-		} else if decErr != nil {
+		if decErr != nil && decErr != io.EOF {
 			err = decErr
+		}
+		if err != nil {
 			return
 		}
-	}
-	if unknownPeers {
-		err = UnknownPeersError{}
-		return
 	}
 	return
 }
