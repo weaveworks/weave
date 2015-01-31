@@ -376,7 +376,7 @@ func (router *Router) OnGossip(buf []byte) ([]byte, error) {
 		// That update contained a peer we didn't know about; we
 		// ignore this; eventually we should receive an update
 		// containing a complete topology.
-		log.Println("topology gossip contained", err)
+		log.Println("Topology gossip:", err)
 		return nil, nil
 	}
 	if err != nil {
