@@ -123,12 +123,13 @@ const (
 	PSendProtocolMsg
 )
 
-// Async: rely on the peer to shut us down if we shouldn't be adding
-// ourselves, so therefore this can be async
+// Sync.
 func (peer *LocalPeer) AddConnection(conn *LocalConnection) {
+	resultChan := make(chan interface{})
 	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PAddConnection},
+		Interaction: Interaction{code: PAddConnection, resultChan: resultChan},
 		payload:     conn}
+	<-resultChan
 }
 
 // Async.
@@ -170,6 +171,7 @@ func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
 				if peer.handleAddConnection(conn) {
 					conn.log("connection added")
 				}
+				query.resultChan <- nil
 			case PConnectionEstablished:
 				conn := query.payload.(*LocalConnection)
 				if peer.handleConnectionEstablished(conn) {

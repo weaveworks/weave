@@ -237,15 +237,23 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
 
+	// We invoke AddConnection in the same goroutine that subsequently
+	// becomes the tcp receive loop, rather than outside, because a)
+	// the ordering relative to the receive loop is the only one that
+	// matters [1], b) it prevents unnecessary delays in entering the
+	// main connection loop, and c) it guards against potential
+	// deadlocks.
+	go func () {
+		conn.Router.Ourself.AddConnection(conn)
+		conn.receiveTCP(dec)
+	}()
+
 	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
 	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.uid)
 	conn.heartbeatFrame = &ForwardedFrame{
 		srcPeer: conn.local,
 		dstPeer: conn.remote,
 		frame:   heartbeatFrameBytes}
-
-	go conn.receiveTCP(dec)
-	conn.Router.Ourself.AddConnection(conn)
 
 	if conn.remoteUDPAddr != nil {
 		if err := conn.sendFastHeartbeats(); err != nil {
@@ -262,6 +270,16 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 		conn.log("connection shutting down")
 	}
 }
+// [1] In the absence of any indirect connectivity to the remote peer,
+// the first we hear about it (and any peers reachable from it) is
+// through topology gossip it sends us on the connection. We must
+// ensure that the connection has been added to Ourself prior to
+// processing any such gossip, otherwise we risk immediately gc'ing
+// part of that newly received portion of the topology (though not the
+// remote peer itself, since that will have a positive ref count),
+// leaving behind dangling references to peers. Therefore we invoke
+// AddConnection, which is *synchronous*, before entering the tcp
+// receive loop.
 
 func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) (err error) {
 	terminate := false
