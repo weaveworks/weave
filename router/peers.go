@@ -263,7 +263,6 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	connsBuf := new(bytes.Buffer)
 	connsEnc := gob.NewEncoder(connsBuf)
 	for _, conn := range peer.connections {
-		// DANGER holding rlock on peer, going to take rlock on conn
 		checkFatal(connsEnc.Encode(conn.Remote().NameByte))
 		checkFatal(connsEnc.Encode(conn.RemoteTCPAddr()))
 		// DANGER holding rlock on peer, going to take rlock on conn
