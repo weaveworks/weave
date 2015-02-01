@@ -243,7 +243,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 	// matters [1], b) it prevents unnecessary delays in entering the
 	// main connection loop, and c) it guards against potential
 	// deadlocks.
-	go func () {
+	go func() {
 		conn.Router.Ourself.AddConnection(conn)
 		conn.receiveTCP(dec)
 	}()
@@ -270,6 +270,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, accept
 		conn.log("connection shutting down")
 	}
 }
+
 // [1] In the absence of any indirect connectivity to the remote peer,
 // the first we hear about it (and any peers reachable from it) is
 // through topology gossip it sends us on the connection. We must
