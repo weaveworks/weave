@@ -33,6 +33,7 @@ type RemoteConnection struct {
 	local         *Peer
 	remote        *Peer
 	remoteTCPAddr string
+	established   bool
 }
 
 type LocalConnection struct {
@@ -41,7 +42,6 @@ type LocalConnection struct {
 	TCPConn            *net.TCPConn
 	tcpSender          TCPSender
 	remoteUDPAddr      *net.UDPAddr
-	established        bool
 	receivedHeartbeat  bool
 	stackFrag          bool
 	effectivePMTU      int
@@ -66,11 +66,12 @@ type ConnectionInteraction struct {
 	payload interface{}
 }
 
-func NewRemoteConnection(from, to *Peer, tcpAddr string) *RemoteConnection {
+func NewRemoteConnection(from, to *Peer, tcpAddr string, established bool) *RemoteConnection {
 	return &RemoteConnection{
 		local:         from,
 		remote:        to,
-		remoteTCPAddr: tcpAddr}
+		remoteTCPAddr: tcpAddr,
+		established:   established}
 }
 
 func (conn *RemoteConnection) Local() *Peer {
@@ -90,7 +91,7 @@ func (conn *RemoteConnection) RemoteTCPAddr() string {
 }
 
 func (conn *RemoteConnection) Established() bool {
-	return true
+	return conn.established
 }
 
 func (conn *RemoteConnection) Shutdown(error) {

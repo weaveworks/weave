@@ -90,16 +90,14 @@ func (peer *Peer) addConnection(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	peer.connections[conn.Remote().Name] = conn
+	peer.version += 1
 }
 
 func (peer *Peer) deleteConnection(conn Connection) {
-	established := conn.Established()
 	peer.Lock()
 	defer peer.Unlock()
 	delete(peer.connections, conn.Remote().Name)
-	if established {
-		peer.version += 1
-	}
+	peer.version += 1
 }
 
 func (peer *Peer) connectionEstablished(conn Connection) {
