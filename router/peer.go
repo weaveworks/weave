@@ -119,9 +119,9 @@ func (peer *Peer) connectionEstablished(conn Connection) {
 // same result. This is important since otherwise we risk message loss
 // or routing cycles.
 //
-// When the 'symmetric' flag is set, only symmetric connections are
-// considered, i.e. where both sides indicate they have a connection
-// to the other.
+// When the 'establishedAndSymmetric' flag is set, only connections
+// that are marked as 'established' and are symmetric (i.e. where both
+// sides indicate they have a connection to the other) are considered.
 //
 // When a non-nil stopAt peer is supplied, the widening stops when it
 // reaches that peer. The boolean return indicates whether that has
@@ -131,7 +131,7 @@ func (peer *Peer) connectionEstablished(conn Connection) {
 // traversal. This prevents the connectivity graph from changing
 // underneath us in ways that would invalidate the result. Thus the
 // answer returned may be out of date, but never inconsistent.
-func (peer *Peer) Routes(stopAt *Peer, symmetric bool) (bool, map[PeerName]PeerName) {
+func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[PeerName]PeerName) {
 	peer.RLock()
 	defer peer.RUnlock()
 	routes := make(map[PeerName]PeerName)
@@ -147,12 +147,17 @@ func (peer *Peer) Routes(stopAt *Peer, symmetric bool) (bool, map[PeerName]PeerN
 			}
 			curName := curPeer.Name
 			for remoteName, conn := range curPeer.connections {
+				if establishedAndSymmetric && !conn.Established() {
+					continue
+				}
 				if _, found := routes[remoteName]; found {
 					continue
 				}
 				remote := conn.Remote()
 				remote.RLock()
-				if _, found := remote.connections[curName]; !symmetric || found {
+				// DANGER holding rlock on remote, possibly taking
+				// rlock on remoteConn
+				if remoteConn, found := remote.connections[curName]; !establishedAndSymmetric || (found && remoteConn.Established()) {
 					defer remote.RUnlock()
 					nextWorklist = append(nextWorklist, remote)
 					// We now know how to get to remoteName: the same
