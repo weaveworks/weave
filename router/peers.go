@@ -108,7 +108,7 @@ func EncodePeers(peers ...*Peer) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	for _, peer := range peers {
-		peer.encodePeer(enc)
+		peer.encode(enc)
 	}
 	return buf.Bytes()
 }
@@ -163,7 +163,7 @@ func encodePeersMap(peers map[PeerName]*Peer) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	for _, peer := range peers {
-		peer.encodePeer(enc)
+		peer.encode(enc)
 	}
 	return buf.Bytes()
 }
@@ -252,7 +252,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte) ma
 	return newUpdate
 }
 
-func (peer *Peer) encodePeer(enc *gob.Encoder) {
+func (peer *Peer) encode(enc *gob.Encoder) {
 	peer.RLock()
 	defer peer.RUnlock()
 
