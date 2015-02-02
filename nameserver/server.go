@@ -103,6 +103,12 @@ func notUsHandler(config *dns.ClientConfig) dns.HandlerFunc {
 }
 
 func StartServer(zone Zone, iface *net.Interface, dnsPort int, wait int) error {
+	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	checkFatal(err)
+	return startServerWithConfig(config, zone, iface, dnsPort, wait)
+}
+
+func startServerWithConfig(config *dns.ClientConfig, zone Zone, iface *net.Interface, dnsPort int, wait int) error {
 	mdnsClient, err := NewMDNSClient()
 	checkFatal(err)
 
@@ -114,8 +120,6 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, wait int) error {
 	err = mdnsClient.Start(iface)
 	checkFatal(err)
 
-	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-	checkFatal(err)
 	LocalServeMux := dns.NewServeMux()
 	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler([]Lookup{zone, mdnsClient}))
 	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler(config, []Lookup{zone, mdnsClient}))
