@@ -50,8 +50,8 @@ func queryHandler(lookups []Lookup) dns.HandlerFunc {
 	}
 }
 
-func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
-	fallback := notUsHandler()
+func rdnsHandler(config *dns.ClientConfig, lookups []Lookup) dns.HandlerFunc {
+	fallback := notUsHandler(config)
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("Reverse query: %+v", q)
@@ -75,9 +75,7 @@ func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 /* When we receive a request for a name outside of our '.weave.local.'
    domain, ask the configured DNS server as a fallback.
 */
-func notUsHandler() dns.HandlerFunc {
-	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-	checkFatal(err)
+func notUsHandler(config *dns.ClientConfig) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] Fallback query: %+v", r.MsgHdr.Id, q)
@@ -116,10 +114,12 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, wait int) error {
 	err = mdnsClient.Start(iface)
 	checkFatal(err)
 
+	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	checkFatal(err)
 	LocalServeMux := dns.NewServeMux()
 	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler([]Lookup{zone, mdnsClient}))
-	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler([]Lookup{zone, mdnsClient}))
-	LocalServeMux.HandleFunc(".", notUsHandler())
+	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler(config, []Lookup{zone, mdnsClient}))
+	LocalServeMux.HandleFunc(".", notUsHandler(config))
 
 	mdnsServer, err := NewMDNSServer(zone)
 	checkFatal(err)
