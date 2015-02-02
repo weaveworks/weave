@@ -9,6 +9,7 @@ import (
 
 const (
 	LOCAL_DOMAIN = "weave.local."
+	UDPBufSize   = 1400 // bigger than the default 512, but under usual packet limits
 )
 
 func checkFatal(e error) {
@@ -76,11 +77,13 @@ func rdnsHandler(config *dns.ClientConfig, lookups []Lookup) dns.HandlerFunc {
    domain, ask the configured DNS server as a fallback.
 */
 func notUsHandler(config *dns.ClientConfig) dns.HandlerFunc {
+	dnsClient := new(dns.Client)
+	dnsClient.UDPSize = UDPBufSize
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] Fallback query: %+v", r.MsgHdr.Id, q)
 		for _, server := range config.Servers {
-			reply, err := dns.Exchange(r, fmt.Sprintf("%s:%s", server, config.Port))
+			reply, _, err := dnsClient.Exchange(r, fmt.Sprintf("%s:%s", server, config.Port))
 			if err != nil {
 				Debug.Printf("[dns msgid %d] Network error trying %s (%s)",
 					r.MsgHdr.Id, server, err)
