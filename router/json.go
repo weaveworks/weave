@@ -65,8 +65,10 @@ func (peer *Peer) MarshalJSON() ([]byte, error) {
 	})
 	return json.Marshal(struct {
 		Name        string
+		UID         uint64
+		Version     uint64
 		Connections []Connection
-	}{peer.Name.String(), conns})
+	}{peer.Name.String(), peer.UID, peer.version, conns})
 }
 
 func (conn *RemoteConnection) MarshalJSON() ([]byte, error) {
