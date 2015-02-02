@@ -146,7 +146,6 @@ func handleHttp(router *weave.Router) {
 		io.WriteString(w, router.Status())
 	})
 	http.HandleFunc("/status-json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		json, _ := router.MarshalJSON()
 		w.Write(json)
 	})
