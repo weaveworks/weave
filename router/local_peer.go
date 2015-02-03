@@ -108,7 +108,7 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 	if err != nil {
 		return err
 	}
-	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String())
+	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String(), false)
 	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.Router)
 	connLocal.Start(acceptNewPeer)
 	return nil
@@ -226,6 +226,8 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) bool {
 		return false
 	}
 	peer.addConnection(conn)
+	peer.Router.SendAllGossipDown(conn)
+	peer.broadcastPeerUpdate(conn.Remote())
 	return true
 }
 
@@ -238,8 +240,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn Connection) bool {
 		return false
 	}
 	peer.connectionEstablished(conn)
-	peer.Router.SendAllGossipDown(conn)
-	peer.broadcastPeerUpdate(conn.Remote())
+	peer.broadcastPeerUpdate()
 	return true
 }
 
@@ -258,9 +259,7 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) bool {
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
 	peer.Router.Peers.GarbageCollect()
-	if conn.Established() {
-		peer.broadcastPeerUpdate()
-	}
+	peer.broadcastPeerUpdate()
 	return true
 }
 

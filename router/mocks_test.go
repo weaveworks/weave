@@ -27,7 +27,7 @@ func (peers *Peers) AddTestRemoteConnection(p1, p2 *Peer) {
 	toName := p2.Name
 	toPeer := NewPeer(toName, p2.UID, 0)
 	toPeer = peers.FetchWithDefault(toPeer)
-	peers.ourself.addConnection(&RemoteConnection{fromPeer, toPeer, ""})
+	peers.ourself.addConnection(&RemoteConnection{fromPeer, toPeer, "", false})
 }
 
 func (peers *Peers) DeleteTestConnection(p *Peer) {
@@ -44,7 +44,7 @@ func (peers *Peers) DeleteTestConnection(p *Peer) {
 // from what is created by the real code.
 func newMockConnection(from, to *Peer) Connection {
 	type mockConnection struct{ RemoteConnection }
-	return &mockConnection{RemoteConnection{from, to, ""}}
+	return &mockConnection{RemoteConnection{from, to, "", false}}
 }
 
 func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Connection) {
