@@ -263,6 +263,7 @@ func (s *OurSpaceSet) AllocateFor(ident string) net.IP {
 	// TODO: Optimize; perhaps cache last-used space
 	for _, space := range s.spaces {
 		if ret := space.(*MutableSpace).AllocateFor(ident); ret != nil {
+			s.version++
 			return ret
 		}
 	}
@@ -273,11 +274,9 @@ func (s *OurSpaceSet) AllocateFor(ident string) net.IP {
 func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 	s.Lock()
 	defer s.Unlock()
-	if len(s.spaces) == 0 {
-		return nil
-	}
 	for _, space := range s.spaces {
 		if space.(*MutableSpace).Claim(ident, addr) {
+			s.version++
 			return nil
 		}
 	}
@@ -289,6 +288,7 @@ func (s *OurSpaceSet) Free(addr net.IP) error {
 	defer s.Unlock()
 	for _, space := range s.spaces {
 		if space.(*MutableSpace).Free(addr) {
+			s.version++
 			return nil
 		}
 	}
