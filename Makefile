@@ -59,9 +59,9 @@ tests:
 	cd nameserver; go test -tags netgo
 
 $(PUBLISH): publish_%:
-	$(SUDO) docker tag  $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
-	$(SUDO) docker push $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
-	$(SUDO) docker push $(DOCKERHUB_USER)/$*:latest
+	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(SUDO) docker push   $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(SUDO) docker push   $(DOCKERHUB_USER)/$*:latest
 
 publish: $(PUBLISH)
 
