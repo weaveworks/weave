@@ -8,8 +8,8 @@
 - Adapt to changes in topology - adding & removing of weave peers,
   disruption of connectivity - more rapidly.
 
-- Cope with delays delays in downloading/running docker
-  images/containers required for weave operation.
+- Cope with delays in downloading/running docker images/containers
+  required for weave operation.
 
 See the
 [complete change log](https://github.com/zettio/weave/issues?q=milestone%3A0.9.0)
