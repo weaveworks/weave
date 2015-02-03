@@ -6,6 +6,7 @@ SCRIPT_VERSION="(unreleased version)"
 usage() {
     echo "Usage:"
     echo "weave setup"
+    echo "weave create-bridge"
     echo "weave launch     [-password <password>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
