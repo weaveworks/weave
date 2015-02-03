@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -x -e
 
 apt-get -y update
 apt-get -y install curl make pkg-config gcc bison flex
