@@ -65,10 +65,9 @@ func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 			}
 			fallback(w, r)
 			return
-		} else {
-			Warning.Printf("[dns msgid %d] Unexpected reverse query type %s: %+v",
-				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q)
 		}
+		Warning.Printf("[dns msgid %d] Unexpected reverse query type %s: %+v",
+			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q)
 	}
 }
 

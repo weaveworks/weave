@@ -192,7 +192,7 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 			return err
 		}
 		// make copies of the frame we received
-		var segFrame ForwardedFrame = *frame
+		segFrame := *frame
 		segFrame.frame = buf.Bytes()
 		forward(&segFrame)
 	}
