@@ -1,7 +1,7 @@
 PUBLISH=publish_weave publish_weavedns publish_weavetools
 
 .DEFAULT: all
-.PHONY: all update tests publish $(PUBLISH) clean
+.PHONY: all update tests publish $(PUBLISH) clean prerequisites build
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
@@ -78,3 +78,12 @@ clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE)
 	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
 	$(SUDO) rm -rf $(WEAVETOOLS_EXES)
+
+prerequisites:
+	$(SUDO) apt-get -y update
+	$(SUDO) apt-get -y install --no-install-recommends build-essential git ca-certificates golang docker.io mercurial libpcap-dev
+
+build: prerequisites
+	$(SUDO) go clean -i net
+	$(SUDO) go install -tags netgo std
+	$(MAKE) build_weavetools_exes_in_container=
