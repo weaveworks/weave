@@ -108,12 +108,16 @@ network knows about any change.
 Topology is communicated over the TCP links between peers, using a
 Gossip mechanism.  Topology messages are sent by a peer...
 
-- when a connection has been established; the entire topology is sent
-  to the remote peer, and an incremental update, containing
-  information on just the two peers at the ends of the connection, is
-  sent to all neighbours
+- when a connection has been added; the entire topology is sent to the
+  remote peer, and an incremental update, containing information on
+  just the two peers at the ends of the connection, is sent to all
+  neighbours,
+- when a connection has been marked as 'established', indicating that
+  the remote peer can receive UDP traffic from the peer; an update
+  containing just information about the local peer is sent to all
+  neighbours,
 - when a connection has been torn down; an update containing just
-  information about the local peer is sent to all neighbours
+  information about the local peer is sent to all neighbours,
 - periodically, on a timer, in case someone has missed an update.
 
 The receiver of a topology update merges that update with its own

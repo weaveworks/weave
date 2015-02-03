@@ -2,11 +2,24 @@
 
 set -e
 
+# these ought to match what is in Vagrantfile
+N_MACHINES=${N_MACHINES:-2}
+IP_PREFIX=${IP_PREFIX:-192.168.48}
+IP_SUFFIX_BASE=${IP_SUFFIX_BASE:-10}
+
+HOSTS=
+for i in $(seq 1 $N_MACHINES); do
+    IP="${IP_PREFIX}.$((${IP_SUFFIX_BASE}+$i))"
+    HOSTS="$HOSTS $IP"
+done
+
+# these are used by the tests
+HOST1="${IP_PREFIX}.$((${IP_SUFFIX_BASE}+1))"
+HOST2="${IP_PREFIX}.$((${IP_SUFFIX_BASE}+2))"
+
 . ./assert.sh
 
 SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key -o UserKnownHostsFile=./.ssh_known_hosts -o CheckHostIP=no -o StrictHostKeyChecking=no}
-HOST1=${HOST1:-192.168.48.19}
-HOST2=${HOST2:-192.168.48.15}
 
 remote() {
     rem=$1

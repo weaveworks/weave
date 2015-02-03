@@ -15,7 +15,8 @@ type Peers struct {
 	onGC    func(*Peer)
 }
 
-type UnknownPeersError struct {
+type UnknownPeerError struct {
+	Name PeerName
 }
 
 type NameCollisionError struct {
@@ -107,7 +108,7 @@ func EncodePeers(peers ...*Peer) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	for _, peer := range peers {
-		peer.encodePeer(enc)
+		peer.encode(enc)
 	}
 	return buf.Bytes()
 }
@@ -162,7 +163,7 @@ func encodePeersMap(peers map[PeerName]*Peer) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	for _, peer := range peers {
-		peer.encodePeer(enc)
+		peer.encode(enc)
 	}
 	return buf.Bytes()
 }
@@ -197,9 +198,8 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 		}
 	}
 
-	unknownPeers := false
 	for _, connsBuf := range decodedConns {
-		decErr := connsIterator(connsBuf, func(remoteNameByte []byte, _ string) {
+		decErr := connsIterator(connsBuf, func(remoteNameByte []byte, _ string, _ bool) {
 			remoteName := PeerNameFromBin(remoteNameByte)
 			if _, found := newPeers[remoteName]; found {
 				return
@@ -209,18 +209,14 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			}
 			// Update refers to a peer which we have no knowledge
 			// of. Thus we can't apply the update. Abort.
-			unknownPeers = true
+			err = UnknownPeerError{remoteName}
 		})
-		if decErr == io.EOF {
-			continue
-		} else if decErr != nil {
+		if decErr != nil && decErr != io.EOF {
 			err = decErr
+		}
+		if err != nil {
 			return
 		}
-	}
-	if unknownPeers {
-		err = UnknownPeersError{}
-		return
 	}
 	return
 }
@@ -256,7 +252,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte) ma
 	return newUpdate
 }
 
-func (peer *Peer) encodePeer(enc *gob.Encoder) {
+func (peer *Peer) encode(enc *gob.Encoder) {
 	peer.RLock()
 	defer peer.RUnlock()
 
@@ -267,12 +263,10 @@ func (peer *Peer) encodePeer(enc *gob.Encoder) {
 	connsBuf := new(bytes.Buffer)
 	connsEnc := gob.NewEncoder(connsBuf)
 	for _, conn := range peer.connections {
-		// DANGER holding rlock on peer, going to take rlock on conn
-		if !conn.Established() {
-			continue
-		}
 		checkFatal(connsEnc.Encode(conn.Remote().NameByte))
 		checkFatal(connsEnc.Encode(conn.RemoteTCPAddr()))
+		// DANGER holding rlock on peer, going to take rlock on conn
+		checkFatal(connsEnc.Encode(conn.Established()))
 	}
 	checkFatal(enc.Encode(connsBuf.Bytes()))
 }
@@ -293,7 +287,7 @@ func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, uid uint64, version u
 	return
 }
 
-func connsIterator(input []byte, fun func([]byte, string)) error {
+func connsIterator(input []byte, fun func([]byte, string, bool)) error {
 	buf := new(bytes.Buffer)
 	buf.Write(input)
 	dec := gob.NewDecoder(buf)
@@ -306,16 +300,20 @@ func connsIterator(input []byte, fun func([]byte, string)) error {
 		if err := dec.Decode(&foundAt); err != nil {
 			return err
 		}
-		fun(nameByte, string(foundAt))
+		var established bool
+		if err := dec.Decode(&established); err != nil {
+			return err
+		}
+		fun(nameByte, foundAt, established)
 	}
 }
 
 func readConnsMap(peer *Peer, buf []byte, table map[PeerName]*Peer) map[PeerName]Connection {
 	conns := make(map[PeerName]Connection)
-	if err := connsIterator(buf, func(nameByte []byte, remoteTCPAddr string) {
+	if err := connsIterator(buf, func(nameByte []byte, remoteTCPAddr string, established bool) {
 		name := PeerNameFromBin(nameByte)
 		remotePeer := table[name]
-		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr)
+		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr, established)
 		conns[name] = conn
 	}); err != io.EOF {
 		// this should never happen since we've already successfully

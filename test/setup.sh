@@ -8,7 +8,7 @@ curl -sS https://raw.githubusercontent.com/lehmannro/assert.sh/master/assert.sh 
 . ./config.sh
 
 echo Copying weave images and script to hosts
-for HOST in $HOST1 $HOST2; do
+for HOST in $HOSTS; do
     docker_on $HOST load -i /var/tmp/weave.tar
     docker_on $HOST load -i /var/tmp/weavedns.tar
     docker_on $HOST load -i /var/tmp/weavetools.tar

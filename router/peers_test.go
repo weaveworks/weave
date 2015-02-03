@@ -10,7 +10,7 @@ import (
 // TODO we should also test:
 //
 // - applying an incremental update, including the case where that
-//   leads to an UnknownPeersError
+//   leads to an UnknownPeerError
 //
 // - the "improved update" calculation
 //

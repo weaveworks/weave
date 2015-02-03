@@ -421,7 +421,7 @@ container_weave_addrs() {
     ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
-uname -s -r | sed -n 's|^\([^ ]*\) \([0-9]\+\)\.\([0-9]\+\).*|\1 \2 \3|p' | {
+uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
     if ! read sys maj min ; then
       echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
       exit 1
@@ -457,7 +457,7 @@ if ! ip netns list >/dev/null 2>&1 ; then
     exit 1
 fi
 
-if ! DOCKER_VERSION=$(docker -v | sed -n 's|^Docker version \([0-9]\+\.[0-9]\+.[0-9]\+\).*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
+if ! DOCKER_VERSION=$(docker -v | sed -n -e 's|^Docker version \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
     echo "ERROR: Unable to parse docker version" >&2
     exit 1
 fi
@@ -620,7 +620,7 @@ case "$COMMAND" in
     expose)
         [ $# -eq 1 ] || usage
         validate_cidr $1
-        create_bridge
+        create_bridge --without-ethtool
         if ! ip addr show dev $BRIDGE | grep -qF $1
         then
             ip addr add dev $BRIDGE $1
@@ -631,7 +631,7 @@ case "$COMMAND" in
     hide)
         [ $# -eq 1 ] || usage
         validate_cidr $1
-        create_bridge
+        create_bridge --without-ethtool
         if ip addr show dev $BRIDGE | grep -qF $1
         then
             ip addr del dev $BRIDGE $1

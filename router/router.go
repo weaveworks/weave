@@ -192,7 +192,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// start.
 	remoteAddrStr := tcpConn.RemoteAddr().String()
 	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
-	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr)
+	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr, false)
 	connLocal := NewLocalConnection(connRemote, tcpConn, nil, router)
 	connLocal.Start(true)
 }
@@ -372,10 +372,12 @@ func (router *Router) Gossip() []byte {
 // or nil if nothing in the received message was new
 func (router *Router) OnGossip(buf []byte) ([]byte, error) {
 	newUpdate, err := router.Peers.ApplyUpdate(buf)
-	if _, ok := err.(UnknownPeersError); err != nil && ok {
-		// That update contained a peer we didn't know about; we
-		// ignore this; eventually we should receive an update
-		// containing a complete topology.
+	if _, ok := err.(UnknownPeerError); err != nil && ok {
+		// That update contained a reference to a peer which wasn't
+		// itself included in the update, and we didn't know about
+		// already. We ignore this; eventually we should receive an
+		// update containing a complete topology.
+		log.Println("Topology gossip:", err)
 		return nil, nil
 	}
 	if err != nil {
