@@ -97,9 +97,9 @@ func (alloc *Allocator) startForTesting() {
 	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
 }
 
-// NOTE: exposed functions (start with uppercase) take a lock;
+// NOTE: Go's locks are not re-entrant, so we have some rules to avoid deadlock:
+// exposed functions (start with uppercase) take a lock;
 // internal functions never take a lock and never call an exposed function.
-// Go's locks are not re-entrant
 
 func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
 	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, poolSize))
