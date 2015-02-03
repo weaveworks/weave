@@ -1,3 +1,20 @@
+## Release 0.9.0
+
+- Improve WeaveDNS to the point where it can act as the name server
+  for containers in nearly all situations.
+
+- Diagnose and report peer connectivity more comprehensively.
+
+- Adapt to changes in topology - adding & removing of weave peers,
+  disruption of connectivity - more rapidly.
+
+- Cope with delays delays in downloading/running docker
+  images/containers required for weave operation.
+
+See the
+[complete change log](https://github.com/zettio/weave/issues?q=milestone%3A0.9.0)
+for more details.
+
 ## Release 0.8.0
 
 - Align script and image version. When the `weave` script has a
