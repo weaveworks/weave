@@ -69,12 +69,13 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, universeCIDR string) (
 	if universeSize < 4 {
 		return nil, errors.New("Allocation universe too small")
 	}
+	// Per RFC1122, don't allocate the first (network) and last (broadcast) addresses
 	alloc := &Allocator{
 		ourName:      ourName,
 		ourUID:       ourUID,
 		state:        allocStateLeaderless,
 		universeLen:  ones,
-		universe:     MinSpace{Start: universeNet.IP, Size: universeSize},
+		universe:     MinSpace{Start: add(universeNet.IP, 1), Size: universeSize - 2},
 		peerInfo:     make(map[uint64]SpaceSet),
 		ourSpaceSet:  NewSpaceSet(ourName, ourUID),
 		leaked:       make(map[time.Time]Space),
@@ -338,7 +339,7 @@ func (alloc *Allocator) electLeader() {
 		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
 		// I'm the winner; take control of the whole universe
 		// But don't allocate the first and last addresses
-		alloc.manageSpace(add(alloc.universe.Start, 1), alloc.universe.Size-2)
+		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
 		alloc.moveToState(allocStateNeutral, 0)
 		alloc.checkClaims()
 		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
