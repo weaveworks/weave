@@ -3,11 +3,9 @@ package router
 import (
 	"encoding/binary"
 	"encoding/gob"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -408,138 +406,6 @@ func (conn *LocalConnection) handleShutdown() {
 }
 
 // Helpers
-
-func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, acceptNewPeer bool) error {
-	// We do not need to worry about locking in here as at this point
-	// the connection is not reachable by any go-routine other than
-	// ourself. Only when we add this connection to the conn.local
-	// peer will it be visible from multiple go-routines.
-
-	conn.extendReadDeadline()
-
-	localConnID := randUint64()
-	versionStr := fmt.Sprint(ProtocolVersion)
-	handshakeSend := map[string]string{
-		"Protocol":        Protocol,
-		"ProtocolVersion": versionStr,
-		"PeerNameFlavour": PeerNameFlavour,
-		"Name":            conn.local.Name.String(),
-		"UID":             fmt.Sprint(conn.local.UID),
-		"ConnID":          fmt.Sprint(localConnID)}
-	handshakeRecv := map[string]string{}
-
-	usingPassword := conn.Router.UsingPassword()
-	var public, private *[32]byte
-	var err error
-	if usingPassword {
-		public, private, err = GenerateKeyPair()
-		if err != nil {
-			return err
-		}
-		handshakeSend["PublicKey"] = hex.EncodeToString(public[:])
-	}
-	enc.Encode(handshakeSend)
-
-	err = dec.Decode(&handshakeRecv)
-	if err != nil {
-		return err
-	}
-	_, err = checkHandshakeStringField("Protocol", Protocol, handshakeRecv)
-	if err != nil {
-		return err
-	}
-	_, err = checkHandshakeStringField("ProtocolVersion", versionStr, handshakeRecv)
-	if err != nil {
-		return err
-	}
-	_, err = checkHandshakeStringField("PeerNameFlavour", PeerNameFlavour, handshakeRecv)
-	if err != nil {
-		return err
-	}
-	nameStr, err := checkHandshakeStringField("Name", "", handshakeRecv)
-	if err != nil {
-		return err
-	}
-	name, err := PeerNameFromString(nameStr)
-	if err != nil {
-		return err
-	}
-	if !acceptNewPeer {
-		if _, found := conn.Router.Peers.Fetch(name); !found {
-			return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
-		}
-	}
-	if existingConn, found := conn.local.ConnectionTo(name); found && existingConn.Established() {
-		return fmt.Errorf("Already have connection to %s at %s", name, existingConn.RemoteTCPAddr())
-	}
-
-	uidStr, err := checkHandshakeStringField("UID", "", handshakeRecv)
-	if err != nil {
-		return err
-	}
-	uid, err := strconv.ParseUint(uidStr, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	remoteConnIdStr, err := checkHandshakeStringField("ConnID", "", handshakeRecv)
-	if err != nil {
-		return err
-	}
-	remoteConnID, err := strconv.ParseUint(remoteConnIdStr, 10, 64)
-	if err != nil {
-		return err
-	}
-	conn.uid = localConnID ^ remoteConnID
-
-	if usingPassword {
-		remotePublicStr, rpErr := checkHandshakeStringField("PublicKey", "", handshakeRecv)
-		if rpErr != nil {
-			return rpErr
-		}
-		remotePublicSlice, rpErr := hex.DecodeString(remotePublicStr)
-		if rpErr != nil {
-			return rpErr
-		}
-		remotePublic := [32]byte{}
-		for idx, elem := range remotePublicSlice {
-			remotePublic[idx] = elem
-		}
-		conn.SessionKey = FormSessionKey(&remotePublic, private, conn.Router.Password)
-		conn.tcpSender = NewEncryptedTCPSender(enc, conn)
-		conn.Decryptor = NewNaClDecryptor(conn)
-	} else {
-		if _, found := handshakeRecv["PublicKey"]; found {
-			return fmt.Errorf("Remote network is encrypted. Password required.")
-		}
-		conn.tcpSender = NewSimpleTCPSender(enc)
-		conn.Decryptor = NewNonDecryptor(conn)
-	}
-
-	toPeer := NewPeer(name, uid, 0)
-	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
-	switch toPeer {
-	case nil:
-		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
-	case conn.local:
-		conn.remote = toPeer // have to do assigment here to ensure Shutdown releases ref count
-		return fmt.Errorf("Cannot connect to ourself")
-	default:
-		conn.remote = toPeer
-		return nil
-	}
-}
-
-func checkHandshakeStringField(fieldName string, expectedValue string, handshake map[string]string) (string, error) {
-	val, found := handshake[fieldName]
-	if !found {
-		return "", fmt.Errorf("Field %s is missing", fieldName)
-	}
-	if expectedValue != "" && val != expectedValue {
-		return "", fmt.Errorf("Field %s has wrong value; expected '%s', received '%s'", fieldName, expectedValue, val)
-	}
-	return val, nil
-}
 
 func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	defer conn.Decryptor.Shutdown()
