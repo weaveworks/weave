@@ -455,6 +455,8 @@ case "$COMMAND" in
             docker pull $img
         done
         ;;
+    # intentionally undocumented since it assumes knowledge of weave
+    # internals
     create-bridge)
         create_bridge --without-ethtool
         ;;
