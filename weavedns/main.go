@@ -51,7 +51,7 @@ func main() {
 		}
 	}
 
-	var iface *net.Interface = nil
+	var iface *net.Interface
 	if ifaceName != "" {
 		var err error
 		Info.Println("Waiting for interface", ifaceName, "to come up")
