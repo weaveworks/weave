@@ -207,7 +207,7 @@ func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 func (s *MutableSpace) NumFreeAddresses() uint32 {
 	s.RLock()
 	defer s.RUnlock()
-	return s.Size - uint32(len(s.allocated)) + uint32(len(s.free_list))
+	return s.Size - uint32(len(s.allocated))
 }
 
 func (s *MutableSpace) LargestFreeBlock() uint32 {
