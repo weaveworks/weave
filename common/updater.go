@@ -1,9 +1,12 @@
-package nameserver
+package common
 
 import (
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/zettio/weave/common"
 )
+
+type ContainerObserver interface {
+	DeleteRecordsFor(ident string) error
+}
 
 func checkError(err error, apiPath string) {
 	if err != nil {
@@ -12,7 +15,7 @@ func checkError(err error, apiPath string) {
 	}
 }
 
-func StartUpdater(apiPath string, zone Zone) error {
+func StartUpdater(apiPath string, ob ContainerObserver) error {
 	client, err := docker.NewClient(apiPath)
 	checkError(err, apiPath)
 
@@ -27,18 +30,18 @@ func StartUpdater(apiPath string, zone Zone) error {
 
 	go func() {
 		for event := range events {
-			handleEvent(zone, event, client)
+			handleEvent(ob, event, client)
 		}
 	}()
 	return nil
 }
 
-func handleEvent(zone Zone, event *docker.APIEvents, client *docker.Client) error {
+func handleEvent(ob ContainerObserver, event *docker.APIEvents, client *docker.Client) error {
 	switch event.Status {
 	case "die":
 		id := event.ID
 		Info.Printf("[updater] Container %s down. Removing records", id)
-		zone.DeleteRecordsFor(id)
+		ob.DeleteRecordsFor(id)
 	}
 	return nil
 }
