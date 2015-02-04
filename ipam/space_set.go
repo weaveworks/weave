@@ -106,7 +106,15 @@ func (s *PeerSpaceSet) ForEachSpace(fun func(Space)) {
 func (s *PeerSpaceSet) String() string {
 	s.RLock()
 	defer s.RUnlock()
-	return s.describe(fmt.Sprint("SpaceSet ", s.peerName, s.uid, " (v", s.version, ")"))
+	ver := " (tombstone)"
+	if !s.IsTombstone() {
+		ver = fmt.Sprint(" (v", s.version, ")")
+	}
+	status := ""
+	if s.MaybeDead() {
+		status = " (maybe dead)"
+	}
+	return s.describe(fmt.Sprint("SpaceSet ", s.peerName, s.uid, ver, status))
 }
 
 func (s *PeerSpaceSet) describe(heading string) string {
