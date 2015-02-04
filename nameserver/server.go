@@ -9,7 +9,7 @@ import (
 
 const (
 	LOCAL_DOMAIN = "weave.local."
-	UDPBufSize   = 1400 // bigger than the default 512, but under usual packet limits
+	UDPBufSize   = 4096 // bigger than the default 512
 )
 
 func checkFatal(e error) {
