@@ -455,6 +455,13 @@ func (alloc *Allocator) string() string {
 	return buf.String()
 }
 
+func (alloc *Allocator) DeleteRecordsFor(ident string) error {
+	alloc.Lock()
+	defer alloc.Unlock()
+	alloc.ourSpaceSet.DeleteRecordsFor(ident)
+	return nil
+}
+
 // Actor (?)
 
 func (alloc *Allocator) queryLoop() {

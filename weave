@@ -506,7 +506,7 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD \
+            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -iface $CONTAINER_IFNAME "$@")
         with_container_netns $CONTAINER launch >/dev/null
         populate_ipam

@@ -294,3 +294,12 @@ func (s *OurSpaceSet) Free(addr net.IP) error {
 	}
 	return errors.New("Attempt to free IP address not in range")
 }
+
+func (s *OurSpaceSet) DeleteRecordsFor(ident string) {
+	s.Lock()
+	defer s.Unlock()
+	for _, space := range s.spaces {
+		space.(*MutableSpace).DeleteRecordsFor(ident)
+	}
+	s.version++
+}

@@ -48,6 +48,7 @@ func main() {
 		connLimit   int
 		bufSz       int
 		allocCIDR   string
+		apiPath     string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -61,6 +62,7 @@ func main() {
 	flag.IntVar(&connLimit, "connlimit", 10, "connection limit (defaults to 10, set to 0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
 	flag.StringVar(&allocCIDR, "alloc", "", "CIDR of IP address space to allocate within")
+	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
 	flag.Parse()
 	peers = flag.Args()
 
@@ -151,6 +153,10 @@ func main() {
 		allocator.SetGossip(router.NewGossip("IPallocation", allocator))
 		allocator.Start()
 		allocator.HandleHttp()
+		err := lg.StartUpdater(apiPath, allocator)
+		if err != nil {
+			lg.Error.Fatal("Unable to start watcher", err)
+		}
 	}
 	go handleHttp(router, allocator)
 	handleSignals(router)

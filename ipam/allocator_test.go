@@ -35,9 +35,10 @@ func TestAllocFree(t *testing.T) {
 	const (
 		container2 = "baddf00d"
 		testAddr1  = "10.0.3.4"
+		spaceSize  = 4
 	)
 
-	alloc := testAllocator("01:00:00:01:00:00", ourUID, testAddr1+"/30").addSpace(testAddr1, 4)
+	alloc := testAllocator("01:00:00:01:00:00", ourUID, testAddr1+"/30").addSpace(testAddr1, spaceSize)
 
 	addr1 := alloc.AllocateFor("abcdef")
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
@@ -52,6 +53,10 @@ func TestAllocFree(t *testing.T) {
 	alloc.Free(net.ParseIP(testAddr1))
 	addr3 := alloc.AllocateFor(container2)
 	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
+
+	err := alloc.DeleteRecordsFor(container2)
+	wt.AssertNoErr(t, err)
+	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), spaceSize, "Total free addresses")
 }
 
 func equalByteBuffer(a, b []byte) bool {
