@@ -170,4 +170,16 @@ func TestSpaceHeirs(t *testing.T) {
 	if !space5.IsHeirTo(space1, universe) {
 		t.Fatalf("Space.IsHeirTo false negative: %+v / %+v", space5, space1)
 	}
+
+	spaceM := NewSpace(ipAddr1, 9)
+	merged := spaceM.mergeBlank(space3)
+	if merged {
+		t.Fatalf("Space.merge incorrect success")
+	}
+	merged = spaceM.mergeBlank(space2)
+	if !merged {
+		t.Fatalf("Space.merge incorrect failure")
+	}
+	wt.AssertEqualUint32(t, spaceM.GetSize(), 18, "Merged size")
+	spaceM.checkInvariant(t)
 }

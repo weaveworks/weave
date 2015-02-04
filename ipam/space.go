@@ -214,6 +214,18 @@ func (s *MutableSpace) LargestFreeBlock() uint32 {
 	return s.Size - s.MaxAllocated
 }
 
+// Enlarge a space by merging in a blank space and return true
+// or return false if the space supplied is not contiguous and directly after this one
+func (a *MutableSpace) mergeBlank(b Space) bool {
+	diff := subtract(b.GetStart(), a.Start)
+	if diff != int64(a.Size) {
+		return false
+	} else {
+		a.Size += b.GetSize()
+		return true
+	}
+}
+
 func (space *MutableSpace) String() string {
 	space.RLock()
 	defer space.RUnlock()

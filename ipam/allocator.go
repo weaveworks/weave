@@ -225,12 +225,17 @@ func (alloc *Allocator) reclaimLeaks(now time.Time) (changed bool) {
 				if space.IsHeirTo(leak.GetMinSpace(), alloc.universe.GetMinSpace()) {
 					lg.Info.Printf("Reclaiming leak %+v heir %+v", leak, space)
 					delete(alloc.leaked, age)
-					alloc.manageSpace(leak.GetStart(), leak.GetSize())
+					if !space.(*MutableSpace).mergeBlank(leak) { // If we can't merge the two, add another
+						alloc.manageSpace(leak.GetStart(), leak.GetSize())
+					}
 					changed = true
 					break
 				}
 			}
 		}
+	}
+	if changed {
+		alloc.ourSpaceSet.version++
 	}
 	return
 }
