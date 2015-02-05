@@ -46,52 +46,32 @@ func (s *PeerSpaceSet) UID() uint64               { return s.uid }
 func (s *PeerSpaceSet) Version() uint64           { return s.version }
 func (s *PeerSpaceSet) MaybeDead() bool           { return s.maybeDead }
 
+type peerSpaceTransport struct {
+	PeerName router.PeerName
+	UID      uint64
+	Version  uint64
+	Spaces   []Space
+}
+
 func (s *PeerSpaceSet) Encode(enc *gob.Encoder) error {
 	s.RLock()
 	defer s.RUnlock()
-	if err := enc.Encode(s.peerName); err != nil {
-		return err
+	// Copy as MinSpace to eliminate any MutableSpace info
+	spaces := make([]Space, len(s.spaces))
+	for i, space := range s.spaces {
+		spaces[i] = space.GetMinSpace()
 	}
-	if err := enc.Encode(s.uid); err != nil {
-		return err
-	}
-	if err := enc.Encode(s.version); err != nil {
-		return err
-	}
-	if err := enc.Encode(len(s.spaces)); err != nil {
-		return err
-	}
-	for _, space := range s.spaces {
-		if err := enc.Encode(space.GetMinSpace()); err != nil {
-			return err
-		}
-	}
-	return nil
+	return enc.Encode(peerSpaceTransport{s.peerName, s.uid, s.version, spaces})
 }
 
 func (s *PeerSpaceSet) Decode(decoder *gob.Decoder) error {
-	s.Lock()
+	var t peerSpaceTransport
+	if err := decoder.Decode(&t); err != nil {
+		return err
+	}
+	s.Lock() // probably unnecessary - why would someone be decoding into an object that is also accessed from another thread?
 	defer s.Unlock()
-	if err := decoder.Decode(&s.peerName); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&s.uid); err != nil {
-		return err
-	}
-	if err := decoder.Decode(&s.version); err != nil {
-		return err
-	}
-	var numSpaces int
-	if err := decoder.Decode(&numSpaces); err != nil {
-		return err
-	}
-	s.spaces = make([]Space, numSpaces)
-	for i := 0; i < numSpaces; i++ {
-		s.spaces[i] = new(MinSpace)
-		if err := decoder.Decode(s.spaces[i]); err != nil {
-			return err
-		}
-	}
+	s.peerName, s.uid, s.version, s.spaces = t.PeerName, t.UID, t.Version, t.Spaces
 	return nil
 }
 
@@ -310,4 +290,8 @@ func (s *OurSpaceSet) DeleteRecordsFor(ident string) {
 		space.(*MutableSpace).DeleteRecordsFor(ident)
 	}
 	s.version++
+}
+
+func init() {
+	gob.Register(&MinSpace{})
 }
