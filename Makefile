@@ -10,7 +10,6 @@ DOCKERHUB_USER=zettio
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
-WEAVETOOLS_EXES=tools/bin
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
 WEAVETOOLS_IMAGE=$(DOCKERHUB_USER)/weavetools
@@ -38,18 +37,6 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 $(WEAVER_EXE): router/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
 
-build_weavetools_exes_in_container=yes
-
-$(WEAVETOOLS_EXES): tools/build.sh
-ifdef build_weavetools_exes_in_container
-	$(SUDO) docker run --rm -t -v $(realpath $(<D)):/home/weave ubuntu sh /home/weave/build.sh
-else
-	rm -rf tools/build
-	mkdir tools/build
-	cd tools/build && sh ../../$<
-	rm -rf tools/build
-endif
-
 $(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
 	$(SUDO) docker save $(WEAVER_IMAGE):latest > $@
@@ -58,7 +45,8 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-$(WEAVETOOLS_EXPORT): tools/Dockerfile $(WEAVETOOLS_EXES)
+$(WEAVETOOLS_EXPORT): tools/Dockerfile weave
+	cp weave tools/weave
 	$(SUDO) docker build -t $(WEAVETOOLS_IMAGE) tools
 	$(SUDO) docker save $(WEAVETOOLS_IMAGE):latest > $@
 
@@ -77,9 +65,8 @@ publish: $(PUBLISH)
 clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE)
 	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
-	$(SUDO) rm -rf $(WEAVETOOLS_EXES)
 
 build:
 	$(SUDO) go clean -i net
 	$(SUDO) go install -tags netgo std
-	$(MAKE) build_weavetools_exes_in_container=
+	$(MAKE)
