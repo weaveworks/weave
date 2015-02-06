@@ -9,6 +9,7 @@ import (
 
 const (
 	LOCAL_DOMAIN = "weave.local."
+	UDPBufSize   = 4096 // bigger than the default 512
 )
 
 func checkFatal(e error) {
@@ -50,8 +51,8 @@ func queryHandler(lookups []Lookup) dns.HandlerFunc {
 	}
 }
 
-func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
-	fallback := notUsHandler()
+func rdnsHandler(config *dns.ClientConfig, lookups []Lookup) dns.HandlerFunc {
+	fallback := notUsHandler(config)
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("Reverse query: %+v", q)
@@ -74,14 +75,14 @@ func rdnsHandler(lookups []Lookup) dns.HandlerFunc {
 /* When we receive a request for a name outside of our '.weave.local.'
    domain, ask the configured DNS server as a fallback.
 */
-func notUsHandler() dns.HandlerFunc {
-	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-	checkFatal(err)
+func notUsHandler(config *dns.ClientConfig) dns.HandlerFunc {
+	dnsClient := new(dns.Client)
+	dnsClient.UDPSize = UDPBufSize
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] Fallback query: %+v", r.MsgHdr.Id, q)
 		for _, server := range config.Servers {
-			reply, err := dns.Exchange(r, fmt.Sprintf("%s:%s", server, config.Port))
+			reply, _, err := dnsClient.Exchange(r, fmt.Sprintf("%s:%s", server, config.Port))
 			if err != nil {
 				Debug.Printf("[dns msgid %d] Network error trying %s (%s)",
 					r.MsgHdr.Id, server, err)
@@ -104,6 +105,12 @@ func notUsHandler() dns.HandlerFunc {
 }
 
 func StartServer(zone Zone, iface *net.Interface, dnsPort int, wait int) error {
+	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	checkFatal(err)
+	return startServerWithConfig(config, zone, iface, dnsPort, wait)
+}
+
+func startServerWithConfig(config *dns.ClientConfig, zone Zone, iface *net.Interface, dnsPort int, wait int) error {
 	mdnsClient, err := NewMDNSClient()
 	checkFatal(err)
 
@@ -117,8 +124,8 @@ func StartServer(zone Zone, iface *net.Interface, dnsPort int, wait int) error {
 
 	LocalServeMux := dns.NewServeMux()
 	LocalServeMux.HandleFunc(LOCAL_DOMAIN, queryHandler([]Lookup{zone, mdnsClient}))
-	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler([]Lookup{zone, mdnsClient}))
-	LocalServeMux.HandleFunc(".", notUsHandler())
+	LocalServeMux.HandleFunc(RDNS_DOMAIN, rdnsHandler(config, []Lookup{zone, mdnsClient}))
+	LocalServeMux.HandleFunc(".", notUsHandler(config))
 
 	mdnsServer, err := NewMDNSServer(zone)
 	checkFatal(err)
