@@ -25,33 +25,40 @@ const (
 	msgSpaceClaim
 	msgSpaceClaimRefused
 )
+
 const (
 	allocStateNeutral = iota
-	allocStateExpectingDonation
 	allocStateLeaderless
 )
 
 // Some in-flight request that we have made to another peer
 type request struct {
 	dest    router.PeerName
-	kind    int
-	details MinSpace
+	kind    byte
+	details *MinSpace
+	expires time.Time
 }
 
 type requestList []*request
 
-func (list requestList) Find(space Space) int {
+func (list requestList) find(sender router.PeerName, space Space) int {
 	for i, r := range list {
-		if r.kind == msgSpaceClaim && r.details.Start.Equal(space.GetStart()) {
-			return i
+		if r.dest == sender {
+			if r.kind == msgSpaceRequest || r.details.Start.Equal(space.GetStart()) {
+				return i
+			}
 		}
 	}
 	return -1
 }
 
-func (list *requestList) Remove(space Space) {
-	if pos := list.Find(space); pos >= 0 {
-		(*list) = append((*list)[:pos], (*list)[pos+1:]...)
+func (list *requestList) removeAt(pos int) {
+	(*list) = append((*list)[:pos], (*list)[pos+1:]...)
+}
+
+func (list *requestList) remove(sender router.PeerName, space Space) {
+	if pos := list.find(sender, space); pos >= 0 {
+		list.removeAt(pos)
 	}
 }
 
@@ -277,19 +284,6 @@ func (alloc *Allocator) reclaimPastLife() {
 	lg.Debug.Println("alloc now", alloc.string())
 }
 
-func (alloc *Allocator) requestClaim(dest router.PeerName, addr net.IP) {
-	// Have we already requested this one?
-	claimspace := MinSpace{addr, 1, 0}
-	if alloc.inflight.Find(&claimspace) >= 0 {
-		return
-	}
-	lg.Debug.Println("Claiming address", addr, "from peer:", dest)
-	req := &request{dest, msgSpaceClaim, claimspace}
-	msg := router.Concat([]byte{msgSpaceClaim}, GobEncode(req.details, 1, alloc.ourSpaceSet))
-	alloc.gossip.GossipUnicast(dest, msg)
-	alloc.inflight = append(alloc.inflight, req)
-}
-
 func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err error) {
 	lg.Debug.Println("checkClaim", addr, alloc.string())
 	testaddr := NewMinSpace(addr, 1)
@@ -311,7 +305,11 @@ func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err
 		return alloc.ourUID, err
 	} else {
 		// That address is owned by someone else
-		alloc.requestClaim(spaceSet.PeerName(), addr)
+		claimspace := MinSpace{addr, 1, 0}
+		if alloc.inflight.find(spaceSet.PeerName(), &claimspace) < 0 { // Have we already requested this one?
+			lg.Debug.Println("Claiming address", addr, "from peer:", spaceSet.PeerName())
+			alloc.sendRequest(spaceSet.PeerName(), msgSpaceClaim, &claimspace)
+		}
 		return owner, nil
 	}
 }
@@ -323,6 +321,17 @@ func (alloc *Allocator) checkClaims() {
 			lg.Error.Println("checkClaims:", err)
 		} else if owner == alloc.ourUID {
 			alloc.claims = append(alloc.claims[:i], alloc.claims[i+1:]...)
+			i--
+		}
+	}
+}
+
+// If somebody didn't come back to us, drop the record and we will ask again
+// because we will still have the underlying need
+func (alloc *Allocator) checkInflight(now time.Time) {
+	for i := 0; i < len(alloc.inflight); i++ {
+		if now.After(alloc.inflight[i].expires) {
+			alloc.inflight.removeAt(i)
 			i--
 		}
 	}
@@ -340,15 +349,10 @@ func (alloc *Allocator) considerOurPosition() {
 		changed := alloc.reclaimLeaks(now)
 		alloc.lookForNewLeaks(now)
 		alloc.checkClaims()
+		alloc.checkInflight(now)
 		if changed {
 			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 		} else if len(alloc.inflight) == 0 && alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
-			alloc.requestSpace()
-		}
-
-	case allocStateExpectingDonation:
-		// If nobody came back to us, ask again
-		if now.After(alloc.stateExpire) {
 			alloc.requestSpace()
 		}
 	case allocStateLeaderless:
@@ -396,6 +400,23 @@ func (alloc *Allocator) electLeader() {
 	}
 }
 
+func (alloc *Allocator) sendRequest(dest router.PeerName, kind byte, space *MinSpace) {
+	var msg []byte
+	if space == nil {
+		msg = router.Concat([]byte{kind}, encode(alloc.ourSpaceSet))
+	} else {
+		msg = router.Concat([]byte{kind}, GobEncode(space, 1, alloc.ourSpaceSet))
+	}
+	alloc.gossip.GossipUnicast(dest, msg)
+	req := &request{dest, kind, space, alloc.timeProvider.Now().Add(GossipReqTimeout)}
+	alloc.inflight = append(alloc.inflight, req)
+}
+
+func (alloc *Allocator) sendReply(dest router.PeerName, kind byte, space Space) {
+	msg := router.Concat([]byte{kind}, GobEncode(space, 1, alloc.ourSpaceSet))
+	alloc.gossip.GossipUnicast(dest, msg)
+}
+
 func (alloc *Allocator) requestSpace() {
 	var best SpaceSet = nil
 	var bestNumFree uint32 = 0
@@ -407,9 +428,7 @@ func (alloc *Allocator) requestSpace() {
 	}
 	if best != nil {
 		lg.Debug.Println("Decided to ask peer", best.PeerName(), "for space:", best)
-		msg := router.Concat([]byte{msgSpaceRequest}, encode(alloc.ourSpaceSet))
-		alloc.gossip.GossipUnicast(best.PeerName(), msg)
-		alloc.moveToState(allocStateExpectingDonation, GossipReqTimeout)
+		alloc.sendRequest(best.PeerName(), msgSpaceRequest, nil)
 	} else {
 		lg.Debug.Println("Nobody available to ask for space")
 	}
@@ -423,8 +442,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) e
 
 	if space, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
 		lg.Debug.Println("Decided to give  peer", sender, "space", space)
-		msg := router.Concat([]byte{msgSpaceDonate}, GobEncode(space, 1, alloc.ourSpaceSet))
-		alloc.gossip.GossipUnicast(sender, msg)
+		alloc.sendReply(sender, msgSpaceDonate, space)
 	}
 	return nil
 }
@@ -441,12 +459,11 @@ func (alloc *Allocator) handleSpaceClaim(sender router.PeerName, msg []byte) err
 	}
 	if alloc.ourSpaceSet.GiveUpSpecificSpace(&spaceClaimed) {
 		lg.Debug.Println("Giving peer", sender, "space", spaceClaimed)
-		msg = router.Concat([]byte{msgSpaceDonate}, GobEncode(spaceClaimed, 1, alloc.ourSpaceSet))
+		alloc.sendReply(sender, msgSpaceDonate, &spaceClaimed)
 	} else {
 		lg.Debug.Println("Claim refused - space occupied", spaceClaimed)
-		msg = router.Concat([]byte{msgSpaceClaimRefused}, GobEncode(spaceClaimed, 1, alloc.ourSpaceSet))
+		alloc.sendReply(sender, msgSpaceClaimRefused, &spaceClaimed)
 	}
-	alloc.gossip.GossipUnicast(sender, msg)
 
 	return nil
 }
@@ -458,23 +475,23 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) er
 	if err := decoder.Decode(&donation); err != nil {
 		return err
 	}
-	lg.Debug.Println("Received space donation: sender", sender, "space", donation)
-	if !(alloc.state == allocStateExpectingDonation || len(alloc.inflight) > 0) {
-		lg.Error.Println("Not expecting to receive space donation from", sender)
-		return nil
+	pos := alloc.inflight.find(sender, &donation)
+	if pos < 0 {
+		lg.Error.Println("Not expecting to receive space donation from", sender, alloc.inflight[0].dest)
+		return nil // not a severe enough error to shut down the connection
 	}
+	lg.Debug.Println("Received space donation: sender", sender, "space", donation)
 	// Message is concluded by an update of state of the sender
 	if _, err := alloc.decodeFromDecoder(decoder); err != nil {
 		return err
 	}
 	if owner := alloc.spaceOwner(&donation); owner != 0 {
-		return errors.New(fmt.Sprintf("Space donated: %+v is already owned by UID %d\n%+v", donation, owner, alloc.peerInfo[owner]))
+		lg.Error.Printf("Space donated: %+v is already owned by UID %d\n%+v", donation, owner, alloc.peerInfo[owner])
+		return nil
 	}
 	alloc.ourSpaceSet.AddSpace(NewSpace(donation.Start, donation.Size))
-	if pos := alloc.inflight.Find(&donation); pos >= 0 {
-		alloc.inflight = append(alloc.inflight[:pos], alloc.inflight[pos+1:]...)
-		alloc.checkClaims()
-	}
+	alloc.inflight.removeAt(pos)
+	alloc.checkClaims()
 	alloc.moveToState(allocStateNeutral, 0)
 	alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	return nil
@@ -491,7 +508,7 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 	if _, err := alloc.decodeFromDecoder(decoder); err != nil {
 		return err
 	}
-	(&alloc.inflight).Remove(&claim)
+	alloc.inflight.remove(sender, &claim)
 	// FIXME: what do we do now?
 	return nil
 }
