@@ -6,13 +6,15 @@ import (
 	"time"
 )
 
-func (router *Router) MarshalJSON() ([]byte, error) {
+func (router *Router) GenerateStatusJSON(version, encryption string) ([]byte, error) {
 	return json.Marshal(struct {
+		Version         string
+		Encryption      string
 		Name, Interface string
 		Macs            *MacCache
 		Peers           *Peers
 		Routes          *Routes
-	}{router.Ourself.Name.String(), fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes})
+	}{version, encryption, router.Ourself.Name.String(), fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes})
 	// leaving out ConectionMaker due to async complexities
 }
 
