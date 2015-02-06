@@ -88,6 +88,33 @@ func TestSpaceClaim(t *testing.T) {
 	wt.AssertEqualInt(t, space1.countMaxAllocations(), 19, "max allocations")
 }
 
+func TestSpaceSplit(t *testing.T) {
+	const (
+		containerID = "feedbacc"
+		testAddr1   = "10.0.1.1"
+		testAddr2   = "10.0.1.3"
+	)
+
+	space1 := NewSpace(net.ParseIP(testAddr1), 10)
+	addr1 := space1.AllocateFor(containerID)
+	addr2 := space1.AllocateFor(containerID)
+	addr3 := space1.AllocateFor(containerID)
+	space1.Free(addr2)
+	space1.checkInvariant(t)
+	split1, split2 := space1.Split(net.ParseIP(testAddr2))
+	wt.AssertEqualUint32(t, split1.GetSize(), 2, "split size")
+	wt.AssertEqualUint32(t, split2.GetSize(), 8, "split size")
+	wt.AssertEqualInt(t, len(split1.allocated), 1, "allocated records")
+	wt.AssertEqualInt(t, len(split2.allocated), 1, "allocated records")
+	space1.checkInvariant(t)
+	split1.checkInvariant(t)
+	split2.checkInvariant(t)
+	wt.AssertBool(t, split1.Free(addr1), true, "free")
+	wt.AssertBool(t, split1.Free(addr3), false, "free")
+	wt.AssertBool(t, split2.Free(addr1), false, "free")
+	wt.AssertBool(t, split2.Free(addr3), true, "free")
+}
+
 func TestSpaceOverlap(t *testing.T) {
 	const (
 		testAddr1 = "10.0.3.4"
@@ -108,12 +135,17 @@ func TestSpaceOverlap(t *testing.T) {
 	wt.AssertEqualInt64(t, subtract(ipAddr1, ipAddr2), -10, "address difference")
 	wt.AssertEqualInt64(t, subtract(ipAddr2, ipAddr1), 10, "address difference")
 	wt.AssertEqualInt64(t, subtract(ipAddr3, ipAddr1), 256, "address difference")
+	wt.AssertBool(t, space1.Contains(ipAddr1), true, "contains")
+	wt.AssertBool(t, space1.Contains(ipAddr2), true, "contains")
+	wt.AssertBool(t, space1.Contains(ipAddr3), false, "contains")
 
 	space2 := NewSpace(ipAddr2, 10).GetMinSpace()
 	space3 := NewSpace(ipAddr3, 10).GetMinSpace()
 	space4 := NewSpace(ipAddr1, 10).GetMinSpace()
 	space5 := NewSpace(ipAddr1, 11).GetMinSpace()
 	space6 := NewSpace(ipAddr1, 9).GetMinSpace()
+	space7 := NewSpace(ipAddr2, 9).GetMinSpace()
+	space8 := NewSpace(ipAddr2, 11).GetMinSpace()
 	if !space1.Overlaps(space2) || !space2.Overlaps(space1) {
 		t.Fatalf("Space.Overlaps failed: %+v / %+v", space1, space2)
 	}
@@ -129,6 +161,16 @@ func TestSpaceOverlap(t *testing.T) {
 	if space3.Overlaps(space1) || space1.Overlaps(space3) {
 		t.Fatalf("Space.Overlaps failed: %+v / %+v", space3, space1)
 	}
+
+	wt.AssertBool(t, space1.ContainsSpace(space2), true, "contains")
+	wt.AssertBool(t, space1.ContainsSpace(space7), true, "contains")
+	wt.AssertBool(t, space1.ContainsSpace(space8), false, "contains")
+	wt.AssertBool(t, space1.ContainsSpace(space3), false, "contains")
+	wt.AssertBool(t, space1.ContainsSpace(space4), true, "contains")
+	wt.AssertBool(t, space1.ContainsSpace(space5), true, "contains")
+	wt.AssertBool(t, space2.ContainsSpace(space6), false, "contains")
+	wt.AssertBool(t, space5.ContainsSpace(space1), false, "contains")
+	wt.AssertBool(t, space5.ContainsSpace(space6), true, "contains")
 }
 
 func TestSpaceHeirs(t *testing.T) {

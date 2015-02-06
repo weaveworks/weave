@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"fmt"
+	"github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
 	wt "github.com/zettio/weave/testing"
 	"net"
@@ -191,7 +192,7 @@ func (m *mockGossipComms) VerifyMessage(t *testing.T, dst string, msgType byte, 
 	} else if msg.buf[0] != msgType {
 		wt.Fatalf(t, "Expected Gossip message of type %d but got type %d", msgType, msg.buf[0])
 	} else if !equalByteBuffer(msg.buf[1:], buf) {
-		wt.Fatalf(t, "Gossip message not sent as expected: %+v", msg)
+		wt.Fatalf(t, "Gossip message not sent as expected: \nwant: %x\ngot : %x", buf, msg.buf[1:])
 	} else {
 		// Swallow this message
 		m.messages = m.messages[1:]
@@ -428,7 +429,6 @@ func TestAllocatorClaim1(t *testing.T) {
 		containerID = "deadbeef"
 		container2  = "baddf00d"
 		testAddr1   = "10.0.1.5"
-		testAddr2   = "10.0.1.6"
 		oldUID      = 6464646
 	)
 
@@ -463,7 +463,6 @@ func TestAllocatorClaim2(t *testing.T) {
 		containerID = "deadbeef"
 		container2  = "baddf00d"
 		testAddr1   = "10.0.1.5"
-		testAddr2   = "10.0.1.6"
 		oldUID      = 6464646
 	)
 
@@ -489,4 +488,56 @@ func TestAllocatorClaim2(t *testing.T) {
 	mockGossip1 := alloc1.gossip.(*mockGossipComms)
 	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(alloc1.ourName, oldUID)))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
+}
+
+// Claiming from another peer
+func TestAllocatorClaim3(t *testing.T) {
+	const (
+		containerID     = "deadbeef"
+		container2      = "baddf00d"
+		testAddr1       = "10.0.1.63"
+		peer1NameString = "01:00:00:01:00:00"
+		peer2NameString = "02:00:00:02:00:00"
+	)
+
+	common.InitDefaultLogging(true)
+	alloc1 := testAllocator(peer1NameString, ourUID, testStart1+"/22")
+	alloc1.startForTesting()
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
+	alloc1.considerWhileLocked()
+
+	alloc2 := testAllocator(peer2NameString, peerUID, testStart1+"/22").addSpace(testStart3, 32)
+	// alloc2 is managing the space that alloc1 wants to claim part of
+	alloc2.manageSpace(net.ParseIP(testStart1), 64)
+
+	alloc1.decodeUpdate(alloc2.Gossip())
+	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
+	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
+
+	// Tell alloc1 that we want addr1, and it will send a message to alloc2
+	addr1 := net.ParseIP(testAddr1)
+	err := alloc1.Claim(containerID, addr1)
+	wt.AssertNoErr(t, err)
+	wt.AssertEqualInt(t, len(alloc1.claims), 1, "claims")
+	alloc1.considerWhileLocked()
+	mockGossip1 := alloc1.gossip.(*mockGossipComms)
+	mockGossip2 := alloc2.gossip.(*mockGossipComms)
+	msgbuf := router.Concat(GobEncode(NewMinSpace(addr1, 1)), encode(alloc1.ourSpaceSet))
+	mockGossip1.VerifyMessage(t, peer2NameString, msgSpaceClaim, msgbuf)
+	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
+
+	// alloc2 receives this request and replies
+	err = alloc2.OnGossipUnicast(alloc1.ourName, router.Concat([]byte{msgSpaceClaim}, msgbuf))
+	wt.AssertNoErr(t, err)
+	msgbuf = router.Concat(GobEncode(NewMinSpace(addr1, 1), 1, alloc2.ourSpaceSet))
+	mockGossip2.VerifyMessage(t, peer1NameString, msgSpaceDonate, msgbuf)
+	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
+
+	// alloc1 processes the response
+	err = alloc1.OnGossipUnicast(alloc2.ourName, router.Concat([]byte{msgSpaceDonate}, msgbuf))
+	wt.AssertNoErr(t, err)
+	mockGossip1.VerifyBroadcastMessage(t, encode(alloc1.ourSpaceSet))
+	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
+	wt.AssertEqualInt(t, len(alloc1.inflight), 0, "inflight")
+	wt.AssertEqualInt(t, len(alloc1.claims), 0, "claims")
 }

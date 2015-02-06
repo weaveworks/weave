@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	lg "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
 	"math"
 	"net"
@@ -243,6 +244,39 @@ func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 		return NewMinSpace(add(bestSpace.Start, bestSpace.Size), spaceToGiveUp), true
 	}
 	return nil, false
+}
+
+// If we can, give up the space requested and return true.
+func (s *OurSpaceSet) GiveUpSpecificSpace(spaceClaimed Space) bool {
+	s.Lock()
+	defer s.Unlock()
+	for i, space := range s.spaces {
+		mspace := space.(*MutableSpace)
+		if mspace.ContainsSpace(spaceClaimed) {
+			split1, split2 := mspace.Split(spaceClaimed.GetStart())
+			var split3 *MutableSpace = nil
+			if split2.GetSize() != spaceClaimed.GetSize() {
+				endAddress := add(spaceClaimed.GetStart(), spaceClaimed.GetSize())
+				split2, split3 = split2.Split(endAddress)
+			}
+			if split2.NumFreeAddresses() == spaceClaimed.GetSize() {
+				newspaces := s.spaces[:i]
+				if split1.GetSize() > 0 {
+					newspaces = append(newspaces, split1)
+				}
+				if split3 != nil {
+					newspaces = append(newspaces, split3)
+				}
+				s.spaces = append(newspaces, s.spaces[i+1:]...)
+				s.version++
+				return true
+			} else {
+				lg.Debug.Println("Unable to give up space", split2)
+				return false // space not free
+			}
+		}
+	}
+	return false
 }
 
 func (s *OurSpaceSet) AllocateFor(ident string) net.IP {

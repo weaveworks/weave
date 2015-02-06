@@ -21,7 +21,7 @@ type Space interface {
 type MinSpace struct {
 	Start        net.IP
 	Size         uint32
-	MaxAllocated uint32
+	MaxAllocated uint32 // 0 if nothing allocated, 1 if first address allocated, etc.
 }
 
 func (s *MinSpace) GetMinSpace() *MinSpace   { return s }
@@ -33,6 +33,11 @@ func (s *MinSpace) LargestFreeBlock() uint32 { return s.Size - s.MaxAllocated }
 func (a *MinSpace) Overlaps(b Space) bool {
 	diff := subtract(a.Start, b.GetStart())
 	return !(-diff >= int64(a.Size) || diff >= int64(b.GetSize()))
+}
+
+func (a *MinSpace) ContainsSpace(b Space) bool {
+	diff := subtract(b.GetStart(), a.Start)
+	return diff >= 0 && diff+int64(b.GetSize()) <= int64(a.Size)
 }
 
 func (a *MinSpace) Contains(addr net.IP) bool {
@@ -111,6 +116,7 @@ func NewSpace(start net.IP, size uint32) *MutableSpace {
 	return &MutableSpace{MinSpace: MinSpace{Start: start, Size: size, MaxAllocated: 0}}
 }
 
+// Mark an address as allocated on behalf of some specific container
 func (space *MutableSpace) Claim(ident string, addr net.IP) bool {
 	space.Lock()
 	defer space.Unlock()
@@ -234,4 +240,47 @@ func (space *MutableSpace) String() string {
 
 func (space *MutableSpace) string() string {
 	return fmt.Sprintf("%s+%d, %d/%d", space.Start, space.Size, len(space.allocated), len(space.free_list))
+}
+
+// Divide a space into two new spaces at a given address, copying allocations and frees.
+func (space *MutableSpace) Split(addr net.IP) (*MutableSpace, *MutableSpace) {
+	space.Lock()
+	defer space.Unlock()
+	breakpoint := subtract(addr, space.Start)
+	if breakpoint < 0 || breakpoint >= int64(space.Size) {
+		return nil, nil // Not contained within this space
+	}
+	ret1 := NewSpace(space.GetStart(), uint32(breakpoint))
+	ret2 := NewSpace(addr, space.Size-uint32(breakpoint))
+
+	// Copy all the allocations and find the max-allocated point for each
+	for _, alloc := range space.allocated {
+		offset := subtract(alloc.IP, addr)
+		if offset < 0 {
+			ret1.allocated.add(&alloc)
+			if uint32(breakpoint+offset)+1 > ret1.MaxAllocated {
+				ret1.MaxAllocated = uint32(breakpoint+offset) + 1
+			}
+		} else {
+			ret2.allocated.add(&alloc)
+			if uint32(offset)+1 > ret2.MaxAllocated {
+				ret2.MaxAllocated = uint32(offset) + 1
+			}
+		}
+	}
+	// Now copy the free list, but omit anything above MaxAllocated in each case
+	for _, alloc := range space.free_list {
+		offset := subtract(alloc.IP, addr)
+		if offset < 0 {
+			if uint32(offset+breakpoint) < ret1.MaxAllocated {
+				ret1.free_list.add(&alloc)
+			}
+		} else {
+			if uint32(offset) < ret2.MaxAllocated {
+				ret2.free_list.add(&alloc)
+			}
+		}
+	}
+
+	return ret1, ret2
 }

@@ -13,6 +13,12 @@ func AssertNoErr(t *testing.T, err error) {
 	}
 }
 
+func AssertBool(t *testing.T, got, wanted bool, desc string) {
+	if got != wanted {
+		Fatalf(t, "Expected %s %t but got %t", desc, wanted, got)
+	}
+}
+
 func AssertEqualUint32(t *testing.T, got, wanted uint32, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
