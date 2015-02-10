@@ -25,7 +25,7 @@ type SpaceSet interface {
 	String() string
 	MaybeDead() bool
 	ForEachSpace(fun func(Space))
-	NumSpacesMergeable(SpaceSet) int
+	NumSpacesMergeable(SpaceSet, Space) int
 }
 
 // This represents a peer's space allocations, which we only hear about.
@@ -35,6 +35,7 @@ type PeerSpaceSet struct {
 	version   uint64
 	spaces    []Space
 	lastSeen  time.Time
+	hasFree   bool
 	maybeDead bool
 	sync.RWMutex
 }
@@ -53,6 +54,7 @@ type peerSpaceTransport struct {
 	UID      uint64
 	Version  uint64
 	Spaces   []Space
+	HasFree  bool
 }
 
 func (s *PeerSpaceSet) Encode(enc *gob.Encoder) error {
@@ -63,7 +65,18 @@ func (s *PeerSpaceSet) Encode(enc *gob.Encoder) error {
 	for i, space := range s.spaces {
 		spaces[i] = &MinSpace{space.GetStart(), space.GetSize()}
 	}
-	return enc.Encode(peerSpaceTransport{s.peerName, s.uid, s.version, spaces})
+	return enc.Encode(peerSpaceTransport{s.peerName, s.uid, s.version, spaces, s.HasFreeAddresses()})
+}
+
+func (s *OurSpaceSet) Encode(enc *gob.Encoder) error {
+	s.RLock()
+	defer s.RUnlock()
+	// Copy as MinSpace to eliminate any MutableSpace info
+	spaces := make([]Space, len(s.spaces))
+	for i, space := range s.spaces {
+		spaces[i] = &MinSpace{space.GetStart(), space.GetSize()}
+	}
+	return enc.Encode(peerSpaceTransport{s.peerName, s.uid, s.version, spaces, s.HasFreeAddresses()})
 }
 
 func (s *PeerSpaceSet) Decode(decoder *gob.Decoder) error {
@@ -73,7 +86,7 @@ func (s *PeerSpaceSet) Decode(decoder *gob.Decoder) error {
 	}
 	s.Lock() // probably unnecessary - why would someone be decoding into an object that is also accessed from another thread?
 	defer s.Unlock()
-	s.peerName, s.uid, s.version, s.spaces = t.PeerName, t.UID, t.Version, t.Spaces
+	s.peerName, s.uid, s.version, s.spaces, s.hasFree = t.PeerName, t.UID, t.Version, t.Spaces, t.HasFree
 	return nil
 }
 
@@ -92,11 +105,14 @@ func (s *PeerSpaceSet) String() string {
 	if !s.IsTombstone() {
 		ver = fmt.Sprint(" (v", s.version, ")")
 	}
-	status := ""
+	extra := ""
 	if s.MaybeDead() {
-		status = " (maybe dead)"
+		extra = " (maybe dead)"
 	}
-	return s.describe(fmt.Sprint("SpaceSet ", s.peerName, s.uid, ver, status))
+	if s.HasFreeAddresses() {
+		extra += " (has free)"
+	}
+	return s.describe(fmt.Sprint("SpaceSet ", s.peerName, s.uid, ver, extra))
 }
 
 func (s *PeerSpaceSet) describe(heading string) string {
@@ -117,11 +133,23 @@ func (s *PeerSpaceSet) Empty() bool {
 func (s *PeerSpaceSet) HasFreeAddresses() bool {
 	s.RLock()
 	defer s.RUnlock()
-	return len(s.spaces) > 0 // fixme
+	return s.hasFree
 }
 
-func (s *PeerSpaceSet) NumSpacesMergeable(SpaceSet) int {
-	return 21 // fixme
+// Count the number of times b has a space which is heir to a space in a
+// We presume that if b gave up some space, it would be at the end of a reservation
+// so if it gives it to a then a can merge it
+func (a *PeerSpaceSet) NumSpacesMergeable(b SpaceSet, universe Space) (count int) {
+	a.RLock()
+	defer a.RUnlock()
+	for _, space1 := range a.spaces { // dumb O(n2) implementation
+		b.ForEachSpace(func(space2 Space) {
+			if space2.IsHeirTo(space1, universe) {
+				count++
+			}
+		})
+	}
+	return
 }
 
 func (s *PeerSpaceSet) Overlaps(space Space) bool {
@@ -146,6 +174,7 @@ func (s *PeerSpaceSet) MakeTombstone() {
 	s.Lock()
 	s.spaces = nil
 	s.version = math.MaxUint64
+	s.hasFree = false
 	s.Unlock()
 }
 
@@ -211,9 +240,17 @@ func (s *OurSpaceSet) NumFreeAddresses() uint32 {
 	return freeAddresses
 }
 
+func (s *OurSpaceSet) HasFreeAddresses() bool {
+	s.RLock()
+	defer s.RUnlock()
+	return s.NumFreeAddresses() > 0
+}
+
 // Give up some space because one of our peers has asked for it.
 // Pick some large reasonably-sized chunk.
 func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
+	s.Lock()
+	defer s.Unlock()
 	totalFreeAddresses := s.NumFreeAddresses()
 	if totalFreeAddresses < MinSafeFreeAddresses {
 		return nil, false

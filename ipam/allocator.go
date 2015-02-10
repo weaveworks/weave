@@ -421,9 +421,11 @@ func (alloc *Allocator) requestSpace() {
 	var best SpaceSet = nil
 	var bestNum int = 0
 	for _, spaceset := range alloc.peerInfo {
-		if num := spaceset.NumSpacesMergeable(alloc.ourSpaceSet); spaceset != alloc.ourSpaceSet && spaceset.HasFreeAddresses() && num > bestNum {
-			bestNum = num
-			best = spaceset
+		if spaceset != alloc.ourSpaceSet && spaceset.HasFreeAddresses() {
+			if num := alloc.ourSpaceSet.NumSpacesMergeable(spaceset, &alloc.universe); num > bestNum || best == nil {
+				bestNum = num
+				best = spaceset
+			}
 		}
 	}
 	if best != nil {
