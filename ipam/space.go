@@ -72,6 +72,10 @@ func (aa *AllocationList) add(a *Allocation) {
 	*aa = append(*aa, *a)
 }
 
+func (aa *AllocationList) removeAt(pos int) {
+	(*aa) = append((*aa)[:pos], (*aa)[pos+1:]...)
+}
+
 func (aa *AllocationList) remove(addr net.IP) *Allocation {
 	for i, a := range *aa {
 		if a.IP.Equal(addr) {

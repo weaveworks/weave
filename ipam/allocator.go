@@ -84,7 +84,7 @@ type Allocator struct {
 	ourSpaceSet *OurSpaceSet
 	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
 	leaked      map[time.Time]Space
-	claims      []Allocation
+	claims      AllocationList
 	inflight    requestList
 	timeProvider
 }
@@ -319,7 +319,7 @@ func (alloc *Allocator) checkClaims() {
 		if err != nil {
 			lg.Error.Println("checkClaims:", err)
 		} else if owner == alloc.ourUID {
-			alloc.claims = append(alloc.claims[:i], alloc.claims[i+1:]...)
+			alloc.claims.removeAt(i)
 			i--
 		}
 	}
@@ -519,7 +519,7 @@ func (alloc *Allocator) Claim(ident string, addr net.IP) error {
 	if owner, err := alloc.checkClaim(ident, addr); err != nil {
 		return err
 	} else if owner != alloc.ourUID {
-		alloc.claims = append(alloc.claims, Allocation{ident, addr})
+		alloc.claims.add(&Allocation{ident, addr})
 	}
 
 	return nil
