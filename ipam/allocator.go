@@ -228,7 +228,6 @@ func (alloc *Allocator) lookForNewLeaks(now time.Time) {
 		if !allSpace.Empty() {
 			lg.Debug.Println(allSpace.describe("New leaked spaces:"))
 			for _, space := range allSpace.spaces {
-				// fixme: should merge contiguous spaces
 				alloc.leaked[now] = space
 				break // can only store one space against each time
 			}
@@ -370,13 +369,10 @@ func (alloc *Allocator) moveToState(newState int, timeout time.Duration) {
 func (alloc *Allocator) electLeader() {
 	lg.Debug.Println("Time to look for a leader")
 	// If anyone is already managing some space, then we don't need to elect a leader
-	if !alloc.ourSpaceSet.Empty() {
-		lg.Debug.Println("I have some space; someone must have given it to me")
-		return
-	}
 	highest := alloc.ourUID
 	for uid, spaceset := range alloc.peerInfo {
 		if !spaceset.Empty() {
+			// If anyone is already managing some space, then we don't need to elect a leader
 			lg.Debug.Println("Peer", spaceset.PeerName(), "has some space; someone must have given it to her")
 			return
 		}
@@ -421,7 +417,7 @@ func (alloc *Allocator) requestSpace() {
 	var best SpaceSet = nil
 	var bestNum int = 0
 	for _, spaceset := range alloc.peerInfo {
-		if spaceset != alloc.ourSpaceSet && spaceset.HasFreeAddresses() {
+		if spaceset != alloc.ourSpaceSet && spaceset.HasFreeAddresses() && !spaceset.MaybeDead() {
 			if num := alloc.ourSpaceSet.NumSpacesMergeable(spaceset, &alloc.universe); num > bestNum || best == nil {
 				bestNum = num
 				best = spaceset

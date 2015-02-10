@@ -48,6 +48,7 @@ func (s *PeerSpaceSet) PeerName() router.PeerName { return s.peerName }
 func (s *PeerSpaceSet) UID() uint64               { return s.uid }
 func (s *PeerSpaceSet) Version() uint64           { return s.version }
 func (s *PeerSpaceSet) MaybeDead() bool           { return s.maybeDead }
+func (s *PeerSpaceSet) HasFreeAddresses() bool    { return s.hasFree }
 
 type peerSpaceTransport struct {
 	PeerName router.PeerName
@@ -60,23 +61,16 @@ type peerSpaceTransport struct {
 func (s *PeerSpaceSet) Encode(enc *gob.Encoder) error {
 	s.RLock()
 	defer s.RUnlock()
-	// Copy as MinSpace to eliminate any MutableSpace info
-	spaces := make([]Space, len(s.spaces))
-	for i, space := range s.spaces {
-		spaces[i] = &MinSpace{space.GetStart(), space.GetSize()}
-	}
-	return enc.Encode(peerSpaceTransport{s.peerName, s.uid, s.version, spaces, s.HasFreeAddresses()})
+	return s.encode(enc, s.HasFreeAddresses())
 }
 
-func (s *OurSpaceSet) Encode(enc *gob.Encoder) error {
-	s.RLock()
-	defer s.RUnlock()
+func (s *PeerSpaceSet) encode(enc *gob.Encoder, hasFree bool) error {
 	// Copy as MinSpace to eliminate any MutableSpace info
 	spaces := make([]Space, len(s.spaces))
 	for i, space := range s.spaces {
 		spaces[i] = &MinSpace{space.GetStart(), space.GetSize()}
 	}
-	return enc.Encode(peerSpaceTransport{s.peerName, s.uid, s.version, spaces, s.HasFreeAddresses()})
+	return enc.Encode(peerSpaceTransport{s.peerName, s.uid, s.version, spaces, hasFree})
 }
 
 func (s *PeerSpaceSet) Decode(decoder *gob.Decoder) error {
@@ -88,6 +82,11 @@ func (s *PeerSpaceSet) Decode(decoder *gob.Decoder) error {
 	defer s.Unlock()
 	s.peerName, s.uid, s.version, s.spaces, s.hasFree = t.PeerName, t.UID, t.Version, t.Spaces, t.HasFree
 	return nil
+}
+
+// Need this for gob decode into an interface pointer to work
+func init() {
+	gob.Register(&MinSpace{})
 }
 
 func (s *PeerSpaceSet) ForEachSpace(fun func(Space)) {
@@ -130,15 +129,9 @@ func (s *PeerSpaceSet) Empty() bool {
 	return len(s.spaces) == 0
 }
 
-func (s *PeerSpaceSet) HasFreeAddresses() bool {
-	s.RLock()
-	defer s.RUnlock()
-	return s.hasFree
-}
-
 // Count the number of times b has a space which is heir to a space in a
 // We presume that if b gave up some space, it would be at the end of a reservation
-// so if it gives it to a then a can merge it
+// so if b gives it to a then a can merge it
 func (a *PeerSpaceSet) NumSpacesMergeable(b SpaceSet, universe Space) (count int) {
 	a.RLock()
 	defer a.RUnlock()
@@ -182,35 +175,6 @@ func (s *PeerSpaceSet) IsTombstone() bool {
 	return s.version == math.MaxUint64
 }
 
-func endOfBlock(a Space) net.IP {
-	return add(a.GetStart(), a.GetSize())
-}
-
-func (s *PeerSpaceSet) Exclude(a Space) bool {
-	s.Lock()
-	defer s.Unlock()
-	ns := make([]Space, 0)
-	aSize := int64(a.GetSize())
-	for _, b := range s.spaces {
-		bSize := int64(b.GetSize())
-		diff := subtract(a.GetStart(), b.GetStart())
-		if diff > 0 && diff < bSize {
-			ns = append(ns, NewMinSpace(b.GetStart(), uint32(diff)))
-			if bSize > aSize+diff {
-				ns = append(ns, NewMinSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
-			}
-		} else if diff <= 0 && -diff < aSize {
-			if aSize+diff < bSize {
-				ns = append(ns, NewMinSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
-			}
-		} else { // Pieces do not overlap; leave the existing one in place
-			ns = append(ns, b)
-		}
-	}
-	s.spaces = ns
-	return false
-}
-
 // -------------------------------------------------
 
 // Represents our own space, which we can allocate and free within.
@@ -220,6 +184,12 @@ type OurSpaceSet struct {
 
 func NewSpaceSet(pn router.PeerName, uid uint64) *OurSpaceSet {
 	return &OurSpaceSet{PeerSpaceSet{peerName: pn, uid: uid}}
+}
+
+func (s *OurSpaceSet) Encode(enc *gob.Encoder) error {
+	s.RLock()
+	defer s.RUnlock()
+	return s.encode(enc, s.HasFreeAddresses())
 }
 
 func (s *OurSpaceSet) AddSpace(space *MutableSpace) {
@@ -364,6 +334,31 @@ func (s *OurSpaceSet) DeleteRecordsFor(ident string) {
 	s.version++
 }
 
-func init() {
-	gob.Register(&MinSpace{})
+func endOfBlock(a Space) net.IP {
+	return add(a.GetStart(), a.GetSize())
+}
+
+func (s *OurSpaceSet) Exclude(a Space) bool {
+	s.Lock()
+	defer s.Unlock()
+	ns := make([]Space, 0)
+	aSize := int64(a.GetSize())
+	for _, b := range s.spaces {
+		bSize := int64(b.GetSize())
+		diff := subtract(a.GetStart(), b.GetStart())
+		if diff > 0 && diff < bSize {
+			ns = append(ns, NewMinSpace(b.GetStart(), uint32(diff)))
+			if bSize > aSize+diff {
+				ns = append(ns, NewMinSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
+			}
+		} else if diff <= 0 && -diff < aSize {
+			if aSize+diff < bSize {
+				ns = append(ns, NewMinSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
+			}
+		} else { // Pieces do not overlap; leave the existing one in place
+			ns = append(ns, b)
+		}
+	}
+	s.spaces = ns
+	return false
 }
