@@ -21,7 +21,7 @@ type SpaceSet interface {
 	PeerName() router.PeerName
 	UID() uint64
 	NumFreeAddresses() uint32
-	Overlaps(space *MinSpace) bool
+	Overlaps(space Space) bool
 	String() string
 	MaybeDead() bool
 	ForEachSpace(fun func(Space))
@@ -123,7 +123,7 @@ func (s *PeerSpaceSet) NumFreeAddresses() uint32 {
 	return freeAddresses
 }
 
-func (s *PeerSpaceSet) Overlaps(space *MinSpace) bool {
+func (s *PeerSpaceSet) Overlaps(space Space) bool {
 	s.RLock()
 	defer s.RUnlock()
 	for _, space2 := range s.spaces {

@@ -13,7 +13,7 @@ type Space interface {
 	GetMaxAllocated() uint32
 	LargestFreeBlock() uint32
 	Overlaps(b Space) bool
-	IsHeirTo(b *MinSpace, universe *MinSpace) bool
+	IsHeirTo(b Space, universe Space) bool
 	String() string
 }
 
@@ -47,12 +47,12 @@ func (a *MinSpace) Contains(addr net.IP) bool {
 
 // A space is heir to another space if it is immediately lower than it
 // (considering the universe as a ring)
-func (a *MinSpace) IsHeirTo(b *MinSpace, universe *MinSpace) bool {
-	startA, startB := subtract(a.Start, universe.Start), subtract(b.Start, universe.Start)
+func (a *MinSpace) IsHeirTo(b Space, universe Space) bool {
+	startA, startB := subtract(a.Start, universe.GetStart()), subtract(b.GetStart(), universe.GetStart())
 	if startA < 0 || startB < 0 { // space outside our universe
 		return false
 	}
-	sizeU, sizeA := int64(universe.Size), int64(a.Size)
+	sizeU, sizeA := int64(universe.GetSize()), int64(a.Size)
 	return startA < startB && startA+sizeA == startB ||
 		startA > startB && startA+sizeA-sizeU == startB
 }

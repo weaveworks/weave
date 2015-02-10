@@ -128,7 +128,7 @@ func TestSpaceOverlap(t *testing.T) {
 		ipAddr3 = net.ParseIP(testAddr3)
 	)
 
-	space1 := NewSpace(ipAddr1, 20).GetMinSpace()
+	space1 := NewMinSpace(ipAddr1, 20)
 
 	wt.AssertEqualString(t, add(ipAddr1, 10).String(), testAddr2, "address")
 	wt.AssertEqualString(t, add(ipAddr1, 256).String(), testAddr3, "address")
@@ -139,13 +139,13 @@ func TestSpaceOverlap(t *testing.T) {
 	wt.AssertBool(t, space1.Contains(ipAddr2), true, "contains")
 	wt.AssertBool(t, space1.Contains(ipAddr3), false, "contains")
 
-	space2 := NewSpace(ipAddr2, 10).GetMinSpace()
-	space3 := NewSpace(ipAddr3, 10).GetMinSpace()
-	space4 := NewSpace(ipAddr1, 10).GetMinSpace()
-	space5 := NewSpace(ipAddr1, 11).GetMinSpace()
-	space6 := NewSpace(ipAddr1, 9).GetMinSpace()
-	space7 := NewSpace(ipAddr2, 9).GetMinSpace()
-	space8 := NewSpace(ipAddr2, 11).GetMinSpace()
+	space2 := NewMinSpace(ipAddr2, 10)
+	space3 := NewMinSpace(ipAddr3, 10)
+	space4 := NewMinSpace(ipAddr1, 10)
+	space5 := NewMinSpace(ipAddr1, 11)
+	space6 := NewMinSpace(ipAddr1, 9)
+	space7 := NewMinSpace(ipAddr2, 9)
+	space8 := NewMinSpace(ipAddr2, 11)
 	if !space1.Overlaps(space2) || !space2.Overlaps(space1) {
 		t.Fatalf("Space.Overlaps failed: %+v / %+v", space1, space2)
 	}

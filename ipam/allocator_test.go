@@ -334,7 +334,7 @@ func implTestGossip(t *testing.T) {
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// Now make it look like alloc2 has given up half its space
-	alloc2.ourSpaceSet.spaces[0].GetMinSpace().Size = donateSize
+	alloc2.ourSpaceSet.spaces[0].(*MutableSpace).MinSpace.Size = donateSize
 	alloc2.ourSpaceSet.version++
 
 	donation := NewMinSpace(net.ParseIP(donateStart), donateSize)
