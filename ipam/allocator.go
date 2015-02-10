@@ -305,7 +305,7 @@ func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err
 		return alloc.ourUID, err
 	} else {
 		// That address is owned by someone else
-		claimspace := MinSpace{addr, 1, 0}
+		claimspace := MinSpace{addr, 1}
 		if alloc.inflight.find(spaceSet.PeerName(), &claimspace) < 0 { // Have we already requested this one?
 			lg.Debug.Println("Claiming address", addr, "from peer:", spaceSet.PeerName())
 			alloc.sendRequest(spaceSet.PeerName(), msgSpaceClaim, &claimspace)
@@ -419,10 +419,10 @@ func (alloc *Allocator) sendReply(dest router.PeerName, kind byte, space Space) 
 
 func (alloc *Allocator) requestSpace() {
 	var best SpaceSet = nil
-	var bestNumFree uint32 = 0
+	var bestNum int = 0
 	for _, spaceset := range alloc.peerInfo {
-		if num := spaceset.NumFreeAddresses(); spaceset != alloc.ourSpaceSet && num > bestNumFree {
-			bestNumFree = num
+		if num := spaceset.NumSpacesMergeable(alloc.ourSpaceSet); spaceset != alloc.ourSpaceSet && spaceset.HasFreeAddresses() && num > bestNum {
+			bestNum = num
 			best = spaceset
 		}
 	}

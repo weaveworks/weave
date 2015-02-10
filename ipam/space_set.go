@@ -20,11 +20,12 @@ type SpaceSet interface {
 	Version() uint64
 	PeerName() router.PeerName
 	UID() uint64
-	NumFreeAddresses() uint32
+	HasFreeAddresses() bool
 	Overlaps(space Space) bool
 	String() string
 	MaybeDead() bool
 	ForEachSpace(fun func(Space))
+	NumSpacesMergeable(SpaceSet) int
 }
 
 // This represents a peer's space allocations, which we only hear about.
@@ -60,7 +61,7 @@ func (s *PeerSpaceSet) Encode(enc *gob.Encoder) error {
 	// Copy as MinSpace to eliminate any MutableSpace info
 	spaces := make([]Space, len(s.spaces))
 	for i, space := range s.spaces {
-		spaces[i] = space.GetMinSpace()
+		spaces[i] = &MinSpace{space.GetStart(), space.GetSize()}
 	}
 	return enc.Encode(peerSpaceTransport{s.peerName, s.uid, s.version, spaces})
 }
@@ -102,7 +103,7 @@ func (s *PeerSpaceSet) describe(heading string) string {
 	var buf bytes.Buffer
 	buf.WriteString(heading)
 	for _, space := range s.spaces {
-		buf.WriteString(fmt.Sprintf("\n  %s", space.String()))
+		buf.WriteString(fmt.Sprintf("\n  %s", space))
 	}
 	return buf.String()
 }
@@ -113,14 +114,14 @@ func (s *PeerSpaceSet) Empty() bool {
 	return len(s.spaces) == 0
 }
 
-func (s *PeerSpaceSet) NumFreeAddresses() uint32 {
+func (s *PeerSpaceSet) HasFreeAddresses() bool {
 	s.RLock()
 	defer s.RUnlock()
-	var freeAddresses uint32 = 0
-	for _, space := range s.spaces {
-		freeAddresses += space.LargestFreeBlock()
-	}
-	return freeAddresses
+	return len(s.spaces) > 0 // fixme
+}
+
+func (s *PeerSpaceSet) NumSpacesMergeable(SpaceSet) int {
+	return 21 // fixme
 }
 
 func (s *PeerSpaceSet) Overlaps(space Space) bool {

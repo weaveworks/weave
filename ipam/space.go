@@ -7,28 +7,20 @@ import (
 )
 
 type Space interface {
-	GetMinSpace() *MinSpace
 	GetStart() net.IP
 	GetSize() uint32
-	GetMaxAllocated() uint32
-	LargestFreeBlock() uint32
 	Overlaps(b Space) bool
 	IsHeirTo(b Space, universe Space) bool
-	String() string
 }
 
 // This struct is used in Gob-encoding to pass info around, which is why all of its fields are exported.
 type MinSpace struct {
-	Start        net.IP
-	Size         uint32
-	MaxAllocated uint32 // 0 if nothing allocated, 1 if first address allocated, etc.
+	Start net.IP
+	Size  uint32
 }
 
-func (s *MinSpace) GetMinSpace() *MinSpace   { return s }
-func (s *MinSpace) GetStart() net.IP         { return s.Start }
-func (s *MinSpace) GetSize() uint32          { return s.Size }
-func (s *MinSpace) GetMaxAllocated() uint32  { return s.MaxAllocated }
-func (s *MinSpace) LargestFreeBlock() uint32 { return s.Size - s.MaxAllocated }
+func (s *MinSpace) GetStart() net.IP { return s.Start }
+func (s *MinSpace) GetSize() uint32  { return s.Size }
 
 func (a *MinSpace) Overlaps(b Space) bool {
 	diff := subtract(a.Start, b.GetStart())
@@ -58,15 +50,11 @@ func (a *MinSpace) IsHeirTo(b Space, universe Space) bool {
 }
 
 func (s *MinSpace) String() string {
-	if s.MaxAllocated > 0 {
-		return fmt.Sprintf("%s+%d, %d", s.Start, s.Size, s.MaxAllocated)
-	} else {
-		return fmt.Sprintf("%s+%d", s.Start, s.Size)
-	}
+	return fmt.Sprintf("%s+%d", s.Start, s.Size)
 }
 
 func NewMinSpace(start net.IP, size uint32) *MinSpace {
-	return &MinSpace{Start: start, Size: size, MaxAllocated: 0}
+	return &MinSpace{Start: start, Size: size}
 }
 
 type Allocation struct {
@@ -107,13 +95,14 @@ func (aa *AllocationList) take() *Allocation {
 
 type MutableSpace struct {
 	MinSpace
-	allocated AllocationList
-	free_list AllocationList
+	MaxAllocated uint32 // 0 if nothing allocated, 1 if first address allocated, etc.
+	allocated    AllocationList
+	free_list    AllocationList
 	sync.RWMutex
 }
 
 func NewSpace(start net.IP, size uint32) *MutableSpace {
-	return &MutableSpace{MinSpace: MinSpace{Start: start, Size: size, MaxAllocated: 0}}
+	return &MutableSpace{MinSpace: MinSpace{Start: start, Size: size}, MaxAllocated: 0}
 }
 
 // Mark an address as allocated on behalf of some specific container
