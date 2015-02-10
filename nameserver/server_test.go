@@ -41,7 +41,9 @@ func TestDNSServer(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	go startServerWithConfig(config, zone, nil, port, 0)
+	srv, err := NewDNSServerWithConfig(config, zone, nil, port, port)
+	wt.AssertNoErr(t, err)
+	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
 	c := new(dns.Client)

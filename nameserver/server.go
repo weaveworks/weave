@@ -28,13 +28,8 @@ type DNSServer struct {
 	tcpPort int
 }
 
-// Creates a new DNS server
-func NewDNSServer(zone Zone, iface *net.Interface, udpPort int, tcpPort int) (*DNSServer, error) {
-	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-	if err != nil {
-		return nil, err
-	}
-
+// Creates a new DNS server with a given config
+func NewDNSServerWithConfig(config *dns.ClientConfig, zone Zone, iface *net.Interface, udpPort int, tcpPort int) (*DNSServer, error) {
 	return &DNSServer{
 		config:  config,
 		zone:    zone,
@@ -42,6 +37,16 @@ func NewDNSServer(zone Zone, iface *net.Interface, udpPort int, tcpPort int) (*D
 		udpPort: udpPort,
 		tcpPort: tcpPort,
 	}, nil
+}
+
+// Creates a new DNS server
+func NewDNSServer(zone Zone, iface *net.Interface, udpPort int, tcpPort int) (*DNSServer, error) {
+	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDNSServerWithConfig(config, zone, iface, udpPort, tcpPort)
 }
 
 // Start the DNS server
