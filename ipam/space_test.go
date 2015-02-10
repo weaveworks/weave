@@ -13,7 +13,6 @@ func TestSpaceAllocate(t *testing.T) {
 	)
 
 	space1 := NewSpace(net.ParseIP(testAddr1), 20)
-	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 20, "LargestFreeBlock")
 	wt.AssertEqualInt(t, len(space1.allocated), 0, "allocated records")
 	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 20, "Free addresses")
 	space1.checkInvariant(t)
@@ -21,7 +20,6 @@ func TestSpaceAllocate(t *testing.T) {
 	addr1 := space1.AllocateFor(containerID)
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
 	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
-	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 19, "LargestFreeBlock")
 	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 19, "Free addresses")
 	space1.checkInvariant(t)
 
@@ -70,12 +68,10 @@ func TestSpaceClaim(t *testing.T) {
 	space1.checkInvariant(t)
 	space1.Claim(containerID, net.ParseIP(testAddr1))
 	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
-	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 19, "LargestFreeBlock")
 	space1.checkInvariant(t)
 
 	space1.Claim(containerID, net.ParseIP(testAddr2))
 	wt.AssertEqualInt(t, len(space1.allocated), 2, "allocated records")
-	wt.AssertEqualUint32(t, space1.LargestFreeBlock(), 10, "LargestFreeBlock")
 	space1.checkInvariant(t)
 
 	if ret := space1.Claim(containerID, net.ParseIP(testAddr3)); ret {

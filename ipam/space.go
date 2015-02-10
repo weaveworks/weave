@@ -178,10 +178,6 @@ func (s *MutableSpace) NumFreeAddresses() uint32 {
 	return s.Size - uint32(len(s.allocated))
 }
 
-func (s *MutableSpace) LargestFreeBlock() uint32 {
-	return s.Size - s.MaxAllocated
-}
-
 // Enlarge a space by merging in a blank space and return true
 // or return false if the space supplied is not contiguous and directly after this one
 func (a *MutableSpace) mergeBlank(b Space) bool {
