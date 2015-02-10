@@ -25,7 +25,9 @@ type DNSServer struct {
 	zone    Zone
 	iface   *net.Interface
 	udpPort int
+	udpSrv  *dns.Server
 	tcpPort int
+	tcpSrv  *dns.Server
 }
 
 // Creates a new DNS server with a given config
@@ -73,20 +75,34 @@ func (s *DNSServer) Start() error {
 	err = mdnsServer.Start(s.iface)
 	checkFatal(err)
 
+	udpAddress := fmt.Sprintf(":%d", s.udpPort)
+	s.udpSrv = &dns.Server{Addr: udpAddress, Net: "udp", Handler: LocalServeMux}
+	tcpAddress := fmt.Sprintf(":%d", s.tcpPort)
+	s.tcpSrv = &dns.Server{Addr: tcpAddress, Net: "tcp", Handler: LocalServeMux}
+
 	go func() {
-		udpAddress := fmt.Sprintf(":%d", s.udpPort)
 		Info.Printf("Listening for DNS on %s (UDP)", udpAddress)
-		err = dns.ListenAndServe(udpAddress, "udp", LocalServeMux)
+		err = s.udpSrv.ListenAndServe()
 		checkFatal(err)
 	}()
 
 	go func() {
-		tcpAddress := fmt.Sprintf(":%d", s.tcpPort)
 		Info.Printf("Listening for DNS on %s (TCP)", tcpAddress)
-		err = dns.ListenAndServe(tcpAddress, "tcp", LocalServeMux)
+		err = s.tcpSrv.ListenAndServe()
 		checkFatal(err)
 	}()
 
+	return nil
+}
+
+// Perform a graceful shutdown
+func (s *DNSServer) Stop() error {
+	if err := s.tcpSrv.Shutdown(); err != nil {
+		return err
+	}
+	if err := s.udpSrv.Shutdown(); err != nil {
+		return err
+	}
 	return nil
 }
 
