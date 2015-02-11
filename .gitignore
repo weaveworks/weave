@@ -29,5 +29,6 @@ _testmain.go
 # Project specific
 weaver/weaver
 weavedns/weavedns
+cmd/discovery/weavediscovery
 tools/bin
 releases
