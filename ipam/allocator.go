@@ -132,6 +132,41 @@ func (alloc *Allocator) startForTesting() {
 	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
 }
 
+// external interface
+
+// Claim an address that we think we should own
+func (alloc *Allocator) Claim(ident string, addr net.IP) error {
+	lg.Info.Printf("Address %s claimed by %s", addr, ident)
+	alloc.Lock()
+	defer alloc.Unlock()
+	return alloc.handleClaim(ident, addr)
+}
+
+func (alloc *Allocator) AllocateFor(ident string) net.IP {
+	alloc.Lock()
+	defer alloc.Unlock()
+	return alloc.ourSpaceSet.AllocateFor(ident)
+}
+
+func (alloc *Allocator) Free(addr net.IP) error {
+	alloc.Lock()
+	defer alloc.Unlock()
+	return alloc.ourSpaceSet.Free(addr)
+}
+
+func (alloc *Allocator) String() string {
+	alloc.RLock()
+	defer alloc.RUnlock()
+	return alloc.string()
+}
+
+func (alloc *Allocator) DeleteRecordsFor(ident string) error {
+	alloc.Lock()
+	defer alloc.Unlock()
+	alloc.ourSpaceSet.DeleteRecordsFor(ident)
+	return nil
+}
+
 // NOTE: Go's locks are not re-entrant, so we have some rules to avoid deadlock:
 // exposed functions (start with uppercase) take a lock;
 // internal functions never take a lock and never call an exposed function.
@@ -512,10 +547,7 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 }
 
 // Claim an address that we think we should own
-func (alloc *Allocator) Claim(ident string, addr net.IP) error {
-	lg.Info.Printf("Address %s claimed by %s", addr, ident)
-	alloc.Lock()
-	defer alloc.Unlock()
+func (alloc *Allocator) handleClaim(ident string, addr net.IP) error {
 	// See if it's already claimed
 	if pos := alloc.claims.find(addr); pos >= 0 {
 		if alloc.claims[pos].Ident == ident {
@@ -533,24 +565,6 @@ func (alloc *Allocator) Claim(ident string, addr net.IP) error {
 	return nil
 }
 
-func (alloc *Allocator) AllocateFor(ident string) net.IP {
-	alloc.Lock()
-	defer alloc.Unlock()
-	return alloc.ourSpaceSet.AllocateFor(ident)
-}
-
-func (alloc *Allocator) Free(addr net.IP) error {
-	alloc.Lock()
-	defer alloc.Unlock()
-	return alloc.ourSpaceSet.Free(addr)
-}
-
-func (alloc *Allocator) String() string {
-	alloc.RLock()
-	defer alloc.RUnlock()
-	return alloc.string()
-}
-
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("Allocator state %d universe %s+%d", alloc.state, alloc.universe.Start, alloc.universe.Size))
@@ -563,13 +577,6 @@ func (alloc *Allocator) string() string {
 		buf.WriteString(claim.String())
 	}
 	return buf.String()
-}
-
-func (alloc *Allocator) DeleteRecordsFor(ident string) error {
-	alloc.Lock()
-	defer alloc.Unlock()
-	alloc.ourSpaceSet.DeleteRecordsFor(ident)
-	return nil
 }
 
 // Actor (?)
