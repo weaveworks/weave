@@ -9,9 +9,9 @@ usage() {
     echo "weave launch     [-password <password>] [-alloc <cidr>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
-    echo "weave run        [--with-dns] [cidr] <docker run args> ..."
+    echo "weave run        [--with-dns] [<cidr>] <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
-    echo "weave attach     <cidr> <container_id>"
+    echo "weave attach     [<cidr>] <container_id>"
     echo "weave detach     <cidr> <container_id>"
     echo "weave expose     <cidr>"
     echo "weave hide       <cidr>"
@@ -618,11 +618,17 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     attach)
-        [ $# -eq 2 ] || usage
-        validate_cidr $1
+        [ $# -gt 0 ] || usage
         create_bridge
-        with_container_netns $2 attach $1 >/dev/null
-        tell_dns PUT $2 $1
+        if is_cidr "$1" ; then
+            CIDR=$1
+            shift 1
+            tell_ipam PUT $1 $CIDR
+        else
+            CIDR="$(http_call $CONTAINER_NAME $HTTP_PORT GET /ip/$CONTAINER)"
+        fi
+        with_container_netns $1 attach $CIDR >/dev/null
+        tell_dns PUT $1 $CIDR
         ;;
     detach)
         [ $# -eq 2 ] || usage
