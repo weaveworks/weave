@@ -46,17 +46,32 @@ func TestDNSServer(t *testing.T) {
 	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
+	// Create a regular UDP client and a TCP client
 	c := new(dns.Client)
 	c.UDPSize = UDPBufSize
+	tc := new(dns.Client)
+	tc.Net = "tcp"
+
 	m := new(dns.Msg)
 	m.SetQuestion(successTestName, dns.TypeA)
 	m.RecursionDesired = true
+
 	r, _, err := c.Exchange(m, dnsAddr)
 	wt.AssertNoErr(t, err)
 	wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
 	wt.AssertEqualInt(t, len(r.Answer), 1, "Number of answers")
 	wt.AssertType(t, r.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, r.Answer[0].(*dns.A).A.String(), testAddr1, "IP address")
+
+	// Retry the query with the TCP client
+	tr, _, err := tc.Exchange(m, dnsAddr)
+	wt.AssertNoErr(t, err)
+	wt.AssertStatus(t, tr.Rcode, dns.RcodeSuccess, "DNS response code (TCP)")
+	wt.AssertEqualInt(t, len(tr.Answer), 1, "Number of answers (TCP)")
+	wt.AssertType(t, tr.Answer[0], (*dns.A)(nil), "DNS record (TCP)")
+	wt.AssertEqualString(t, tr.Answer[0].(*dns.A).A.String(), testAddr1, "IP address (TCP)")
+	// TODO: look for some way of testing the TCP fallback for truncated responses: it seems there is
+	// TODO: no client lib in Go that can do that...
 
 	m.SetQuestion(failTestName, dns.TypeA)
 	r, _, err = c.Exchange(m, dnsAddr)
