@@ -55,7 +55,7 @@ func (alloc *Allocator) HandleHttp() {
 				return
 			}
 			if err = alloc.Claim(ident, ip); err != nil {
-				reqError("Invalid claim", "Unable to perform IP claim: %s", err)
+				reqError("Invalid claim: "+err.Error(), "Unable to claim IP address %s: %s", ip, err)
 				return
 			}
 		case "GET":

@@ -312,7 +312,7 @@ func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 			return nil
 		}
 	}
-	return errors.New("Attempt to claim IP address not in range")
+	return errors.New("IP address not in range")
 }
 
 func (s *OurSpaceSet) Free(addr net.IP) error {
@@ -324,7 +324,7 @@ func (s *OurSpaceSet) Free(addr net.IP) error {
 			return nil
 		}
 	}
-	return errors.New("Attempt to free IP address not in range")
+	return errors.New("IP address not in range")
 }
 
 func (s *OurSpaceSet) DeleteRecordsFor(ident string) {

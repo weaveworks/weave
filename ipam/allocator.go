@@ -521,7 +521,7 @@ func (alloc *Allocator) Claim(ident string, addr net.IP) error {
 		if alloc.claims[pos].Ident == ident {
 			return nil
 		} else {
-			return errors.New("Attempt to claim IP address already claimed by " + alloc.claims[pos].Ident)
+			return errors.New("IP address already claimed by " + alloc.claims[pos].Ident)
 		}
 	}
 	if owner, err := alloc.checkClaim(ident, addr); err != nil {
