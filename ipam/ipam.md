@@ -115,3 +115,17 @@ deadlock: exposed functions (start with uppercase) take a lock;
 internal functions never take a lock and never call an exposed
 function.
 
+## Other open questions
+
+What should the flag to control the allocation "universe" be?
+Currently it is `--alloc`.
+
+How to use IPAM for WeaveDNS?  It needs its own special subnet.
+
+How should we add support for subnets in general?
+
+We get a lot of noise in the weave logs from containers going down,
+now that the weave script is calling ethtool and curl via containers.
+
+When you claim an address, free addresses in the gap are subsequently
+allocated in descending order.
