@@ -380,6 +380,11 @@ populate_ipam() {
     WEAVE_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $CONTAINER_NAME)
     WAIT_TIME=1
     while ! http_call_ip $WEAVE_IP $HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
+        status=$(docker inspect --format='{{.State.Running}}' $CONTAINER_NAME 2>/dev/null)
+        if [ ! "$status" = "true" ]; then
+            echo "weave container died" >&2
+            return 1
+        fi
         sleep $WAIT_TIME
         WAIT_TIME=$((WAIT_TIME+1))
     done
