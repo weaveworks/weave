@@ -2,8 +2,10 @@
 
 set -e
 
-echo Fetching assert script
-curl -sS https://raw.githubusercontent.com/lehmannro/assert.sh/master/assert.sh > ./assert.sh
+if ! [ -f "./assert.sh" ]; then
+    echo Fetching assert script
+    curl -sS https://raw.githubusercontent.com/lehmannro/assert.sh/master/assert.sh > ./assert.sh
+fi
 
 . ./config.sh
 
