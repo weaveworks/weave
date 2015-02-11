@@ -6,10 +6,10 @@ SCRIPT_VERSION="(unreleased version)"
 usage() {
     echo "Usage:"
     echo "weave setup"
-    echo "weave launch     [-password <password>] <peer> ..."
+    echo "weave launch     [-password <password>] [-alloc <cidr>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
-    echo "weave run        [--with-dns] <cidr> <docker run args> ..."
+    echo "weave run        [--with-dns] [cidr] <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
     echo "weave attach     <cidr> <container_id>"
     echo "weave detach     <cidr> <container_id>"
@@ -366,6 +366,15 @@ populate_dns() {
     done
 }
 
+# Perform operation $1 on container ID $2 to local IPAM database at address $3
+tell_ipam() {
+    # get the long form of the container ID
+    CONTAINER=$(docker inspect --format='{{.Id}}' $2 2>/dev/null)
+    # extract IP address from CIDR
+    WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/.*/\1/')
+    http_call $CONTAINER_NAME $HTTP_PORT $1 /ip/$CONTAINER/$WEAVE_ADDR_IP
+}
+
 # Tell the newly-started weave IP allocator about existing weave IPs
 populate_ipam() {
     WEAVE_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $CONTAINER_NAME)
@@ -592,6 +601,8 @@ case "$COMMAND" in
         CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@")
         if [ -z "$CIDR" ] ; then
             CIDR="$(http_call $CONTAINER_NAME $HTTP_PORT GET /ip/$CONTAINER)"
+        else
+            tell_ipam PUT $CONTAINER $CIDR
         fi
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
