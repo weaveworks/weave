@@ -62,6 +62,9 @@ func AssertStatus(t *testing.T, got int, wanted int, desc string) {
 
 func AssertErrorInterface(t *testing.T, got interface{}, wanted interface{}, desc string) {
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
+	if got == nil {
+		Fatalf(t, "Expected %s but got nil (%s)", wantedT.String(), desc)
+	}
 	if !gotT.Implements(wantedT) {
 		Fatalf(t, "Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
 	}
@@ -69,6 +72,9 @@ func AssertErrorInterface(t *testing.T, got interface{}, wanted interface{}, des
 
 func AssertErrorType(t *testing.T, got interface{}, wanted interface{}, desc string) {
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
+	if got == nil {
+		Fatalf(t, "Expected %s but got nil (%s)", wantedT.String(), desc)
+	}
 	if gotT != wantedT {
 		Fatalf(t, "Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
 	}
