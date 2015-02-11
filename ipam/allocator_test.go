@@ -541,3 +541,46 @@ func TestAllocatorClaim3(t *testing.T) {
 	wt.AssertEqualInt(t, len(alloc1.inflight), 0, "inflight")
 	wt.AssertEqualInt(t, len(alloc1.claims), 0, "claims")
 }
+
+// Claiming addresses with issues
+func TestAllocatorClaim4(t *testing.T) {
+	const (
+		containerID = "deadbeef"
+		container2  = "baddf00d"
+		testAddr1   = "10.0.1.5"
+		testAddr2   = "10.0.2.5"
+		oldUID      = 6464646
+	)
+
+	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
+	alloc1.startForTesting()
+	alloc1.manageSpace(net.ParseIP(testStart2), 64)
+
+	// Claim an address that nobody is managing
+	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
+	wt.AssertNoErr(t, err)
+	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
+	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 64, "free addresses")
+	// Claiming the same address twice for the same container should be idempotent
+	err = alloc1.Claim(containerID, net.ParseIP(testAddr1))
+	wt.AssertNoErr(t, err)
+	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
+	// Claiming the same address for different container should raise an error
+	err = alloc1.Claim(container2, net.ParseIP(testAddr1))
+	wt.AssertErrorInterface(t, err, (*error)(nil), "duplicate claim error")
+	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
+	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 64, "free addresses")
+
+	// Now do the same again but for space it is managing
+	err = alloc1.Claim(containerID, net.ParseIP(testAddr2))
+	wt.AssertNoErr(t, err)
+	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
+	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 63, "free addresses")
+	err = alloc1.Claim(containerID, net.ParseIP(testAddr2))
+	wt.AssertNoErr(t, err)
+	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 63, "free addresses")
+	err = alloc1.Claim(container2, net.ParseIP(testAddr2))
+	wt.AssertErrorInterface(t, err, (*error)(nil), "duplicate claim error")
+	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
+	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 63, "free addresses")
+}

@@ -516,6 +516,14 @@ func (alloc *Allocator) Claim(ident string, addr net.IP) error {
 	lg.Info.Printf("Address %s claimed by %s", addr, ident)
 	alloc.Lock()
 	defer alloc.Unlock()
+	// See if it's already claimed
+	if pos := alloc.claims.find(addr); pos >= 0 {
+		if alloc.claims[pos].Ident == ident {
+			return nil
+		} else {
+			return errors.New("Attempt to claim IP address already claimed by " + alloc.claims[pos].Ident)
+		}
+	}
 	if owner, err := alloc.checkClaim(ident, addr); err != nil {
 		return err
 	} else if owner != alloc.ourUID {

@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -76,14 +77,22 @@ func (aa *AllocationList) removeAt(pos int) {
 	(*aa) = append((*aa)[:pos], (*aa)[pos+1:]...)
 }
 
-func (aa *AllocationList) remove(addr net.IP) *Allocation {
+func (aa *AllocationList) find(addr net.IP) int {
 	for i, a := range *aa {
 		if a.IP.Equal(addr) {
-			// Delete by swapping the last element into this one and truncating
-			last := len(*aa) - 1
-			(*aa)[i], (*aa) = (*aa)[last], (*aa)[:last]
-			return &a
+			return i
 		}
+	}
+	return -1
+}
+
+func (aa *AllocationList) remove(addr net.IP) *Allocation {
+	if i := aa.find(addr); i >= 0 {
+		a := (*aa)[i]
+		// Delete by swapping the last element into this one and truncating
+		last := len(*aa) - 1
+		(*aa)[i], (*aa) = (*aa)[last], (*aa)[:last]
+		return &a
 	}
 	return nil
 }
@@ -110,12 +119,20 @@ func NewSpace(start net.IP, size uint32) *MutableSpace {
 }
 
 // Mark an address as allocated on behalf of some specific container
-func (space *MutableSpace) Claim(ident string, addr net.IP) bool {
+func (space *MutableSpace) Claim(ident string, addr net.IP) (bool, error) {
 	space.Lock()
 	defer space.Unlock()
 	offset := subtract(addr, space.Start)
 	if !(offset >= 0 && offset < int64(space.Size)) {
-		return false
+		return false, nil
+	}
+	// Is it already allocated?
+	if pos := space.allocated.find(addr); pos >= 0 {
+		if space.allocated[pos].Ident == ident {
+			return true, nil
+		} else {
+			return false, errors.New("Already allocated")
+		}
 	}
 	if uint32(offset) > space.MaxAllocated {
 		// Need to add all the addresses in the gap to the free list
@@ -126,7 +143,7 @@ func (space *MutableSpace) Claim(ident string, addr net.IP) bool {
 		space.MaxAllocated = uint32(offset)
 	}
 	space.allocated.add(&Allocation{ident, addr})
-	return true
+	return true, nil
 }
 
 func (space *MutableSpace) AllocateFor(ident string) net.IP {

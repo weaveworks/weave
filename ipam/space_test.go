@@ -74,7 +74,7 @@ func TestSpaceClaim(t *testing.T) {
 	wt.AssertEqualInt(t, len(space1.allocated), 2, "allocated records")
 	space1.checkInvariant(t)
 
-	if ret := space1.Claim(containerID, net.ParseIP(testAddr3)); ret {
+	if done, _ := space1.Claim(containerID, net.ParseIP(testAddr3)); done {
 		t.Fatalf("Space.Claim incorrect success")
 	}
 

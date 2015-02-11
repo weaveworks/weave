@@ -305,7 +305,9 @@ func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 	s.Lock()
 	defer s.Unlock()
 	for _, space := range s.spaces {
-		if space.(*MutableSpace).Claim(ident, addr) {
+		if done, err := space.(*MutableSpace).Claim(ident, addr); err != nil {
+			return err
+		} else if done {
 			s.version++
 			return nil
 		}
