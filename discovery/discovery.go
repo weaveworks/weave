@@ -1,4 +1,4 @@
-package rendezvous
+package discovery
 
 import (
 	"errors"
@@ -14,47 +14,47 @@ var (
 	errUnknownScheme = errors.New("Unknown scheme") // unknown scheme error
 )
 
-// Factories for rendezvous services
-type RendezvousServiceFactory struct {
+// Factories for discovery services
+type DiscoveryServiceFactory struct {
 	GetWorkerUrl func(url.URL, *net.Interface) *url.URL
-	NewWorker    func(*RendezvousManager, *url.URL) RendezvousWorker
+	NewWorker    func(*DiscoveryManager, *url.URL) DiscoveryWorker
 }
 
-// All the rendezvous services
-var rendezvousServices = map[string]RendezvousServiceFactory{
+// All the discovery services
+var discoveryServices = map[string]DiscoveryServiceFactory{
 	"mdns": {
 		MDnsWorkerUrl,
-		func(r *RendezvousManager, u *url.URL) RendezvousWorker { return NewMDnsWorker(r, u) },
+		func(r *DiscoveryManager, u *url.URL) DiscoveryWorker { return NewMDnsWorker(r, u) },
 	},
 }
 
-// Common interface for all the rendezvous workers
+// Common interface for all the discovery workers
 // There can be several workers for the same domain, depending on the service. For example,
 // when joining "mdns:///somegroup", we could start a worker for "eth0" (identified by
 // "mdns://eth0/somegroup") and another one for "eth1" (identified by "mdns://eth1/somegroup")
-type RendezvousWorker interface {
+type DiscoveryWorker interface {
 	Start([]externalIface, *net.Interface) error
 	Stop() error
 }
 
-type SimpleRendezvousWorker struct {
+type SimpleDiscoveryWorker struct {
 	Domain string // something like "mdns:///somedomain"
 }
 
 type managerEntry struct {
 	group  string
-	worker RendezvousWorker
+	worker DiscoveryWorker
 }
 
-type RendezvousManager struct {
+type DiscoveryManager struct {
 	endpoints  []externalIface
 	workers    map[string]managerEntry
 	notifyChan chan string
 }
 
-// Create a new rendezvous manager
-func NewRendezvousManager(endpoints []externalIface, weaveUrl *url.URL) *RendezvousManager {
-	r := &RendezvousManager{
+// Create a new discovery manager
+func NewDiscoveryManager(endpoints []externalIface, weaveUrl *url.URL) *DiscoveryManager {
+	r := &DiscoveryManager{
 		endpoints:  endpoints,
 		workers:    make(map[string]managerEntry),
 		notifyChan: make(chan string),
@@ -76,8 +76,8 @@ func NewRendezvousManager(endpoints []externalIface, weaveUrl *url.URL) *Rendezv
 	return r
 }
 
-// Connect to a rendezvous service/domain (ie, "mdns:///somedomain")
-func (r *RendezvousManager) Connect(group string) error {
+// Connect to a discovery service/domain (ie, "mdns:///somedomain")
+func (r *DiscoveryManager) Connect(group string) error {
 	Debug.Printf("Connecting to \"%s\"", group)
 	u, err := url.Parse(group)
 	if err != nil {
@@ -85,9 +85,9 @@ func (r *RendezvousManager) Connect(group string) error {
 		return errMalformedUrl
 	}
 
-	factory, found := rendezvousServices[u.Scheme]
+	factory, found := discoveryServices[u.Scheme]
 	if !found {
-		Error.Printf("Unknown rendezvous scheme %s", u.Scheme)
+		Error.Printf("Unknown discovery scheme %s", u.Scheme)
 		return errUnknownScheme
 	}
 
@@ -107,7 +107,7 @@ func (r *RendezvousManager) Connect(group string) error {
 		Debug.Printf("Starting new worker for \"%s\"", workerUrlStr)
 		worker := factory.NewWorker(r, workerUrl)
 		if err := worker.Start(r.endpoints, iface); err != nil {
-			Error.Printf("Failed rendezvous worker initialization for \"%s\": %s", workerUrlStr, err)
+			Error.Printf("Failed discovery worker initialization for \"%s\": %s", workerUrlStr, err)
 			worker.Stop()
 		} else {
 			r.workers[workerUrlStr] = managerEntry{group, worker}
@@ -117,8 +117,8 @@ func (r *RendezvousManager) Connect(group string) error {
 	return nil
 }
 
-// Leave a rendezvous service/domain (ie, "mdns:///somedomain")
-func (r *RendezvousManager) Leave(group string) error {
+// Leave a discovery service/domain (ie, "mdns:///somedomain")
+func (r *DiscoveryManager) Leave(group string) error {
 	Debug.Printf("Leaving group %s", group)
 	for key, entry := range r.workers {
 		if entry.group == group  {
@@ -131,14 +131,14 @@ func (r *RendezvousManager) Leave(group string) error {
 }
 
 // Notify the router about a new peer
-func (r *RendezvousManager) notifyAbout(ip string) error {
+func (r *DiscoveryManager) notifyAbout(ip string) error {
 	r.notifyChan <- ip
 	return nil
 }
 
-// Stop all the rendezvous workers
-func (r *RendezvousManager) Stop() error {
-	Debug.Printf("Stopping all workers in rendezvous manager")
+// Stop all the discovery workers
+func (r *DiscoveryManager) Stop() error {
+	Debug.Printf("Stopping all workers in discovery manager")
 	for key, entry := range r.workers {
 		Debug.Printf("... stopping %s", key)
 		entry.worker.Stop()
@@ -149,6 +149,6 @@ func (r *RendezvousManager) Stop() error {
 }
 
 // Return a simple status
-func (r *RendezvousManager) Status() string {
+func (r *DiscoveryManager) Status() string {
 	return fmt.Sprintf("%d workers", len(r.workers))
 }

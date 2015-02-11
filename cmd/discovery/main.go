@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	. "github.com/zettio/weave/common"
-	. "github.com/zettio/weave/rendezvous"
+	. "github.com/zettio/weave/discovery"
 	"io"
 	"log"
 	"net"
@@ -41,7 +41,7 @@ func main() {
 	nifaces = NewIfaceNamesList()
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.Var(&ifaces, "ifaces", "comma-separated list of interfaces to announce in rendezvous services (default:guess)")
+	flag.Var(&ifaces, "ifaces", "comma-separated list of interfaces to announce in discovery services (default:guess)")
 	flag.Var(&nifaces, "nifaces", "comma-separated list of interfaces to ignore when guessing external interfaces")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	flag.StringVar(&weaveUrl, "weave", defaultWeaveUrl, "weave API URL")
@@ -50,7 +50,7 @@ func main() {
 	domains = flag.Args()
 
 	if justVersion {
-		io.WriteString(os.Stdout, fmt.Sprintf("weave rendezvous service %s\n", version))
+		io.WriteString(os.Stdout, fmt.Sprintf("weave discovery service %s\n", version))
 		os.Exit(0)
 	}
 
@@ -71,7 +71,7 @@ func main() {
 
 	externals, err := ExternalsFromIfaces(parsedIfaces)
 	if err != nil {
-		log.Fatalf("Could not get rendezvous announced enpoints: %s", err)
+		log.Fatalf("Could not get discovery announced enpoints: %s", err)
 	}
 
 	parsedWeaveUrl, err := url.Parse(weaveUrl)
@@ -79,7 +79,7 @@ func main() {
 		log.Fatalf("Could not parse weave URL \"%s\": %s", weaveUrl, err)
 	}
 
-	manager := NewRendezvousManager(externals, parsedWeaveUrl)
+	manager := NewDiscoveryManager(externals, parsedWeaveUrl)
 	for _, domain := range domains {
 		manager.Connect(domain)
 	}
@@ -89,16 +89,16 @@ func main() {
 }
 
 // HTTP servers for REST requests
-func handleHttp(rm *RendezvousManager, httpPort int) {
+func handleHttp(rm *DiscoveryManager, httpPort int) {
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, fmt.Sprintln("weave rendezvous service version", version))
+		io.WriteString(w, fmt.Sprintln("weave discovery service version", version))
 		io.WriteString(w, rm.Status())
 	})
 	http.HandleFunc("/join", func(w http.ResponseWriter, r *http.Request) {
 		Debug.Printf("JOIN request from %s", r.RemoteAddr)
 		group := r.FormValue("group")
 		if err := rm.Connect(group); err != nil {
-			http.Error(w, fmt.Sprintf("weaverendezvous: error when connecting to group \"%s\": %s\n",
+			http.Error(w, fmt.Sprintf("weavediscovery: error when connecting to group \"%s\": %s\n",
 				group, err), http.StatusBadRequest)
 		}
 	})
@@ -106,7 +106,7 @@ func handleHttp(rm *RendezvousManager, httpPort int) {
 		Debug.Printf("LEAVE request from %s", r.RemoteAddr)
 		group := r.FormValue("group")
 		if err := rm.Leave(group); err != nil {
-			http.Error(w, fmt.Sprintf("weaverendezvous: error when leaving group \"%s\": %s\n",
+			http.Error(w, fmt.Sprintf("weavediscovery: error when leaving group \"%s\": %s\n",
 				group, err), http.StatusBadRequest)
 		}
 	})
@@ -120,7 +120,7 @@ func handleHttp(rm *RendezvousManager, httpPort int) {
 }
 
 // Signals handler
-func handleSignals(rm *RendezvousManager) {
+func handleSignals(rm *DiscoveryManager) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGQUIT)
 	buf := make([]byte, 1<<20)

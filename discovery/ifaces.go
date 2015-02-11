@@ -1,4 +1,4 @@
-package rendezvous
+package discovery
 
 import (
 	"errors"

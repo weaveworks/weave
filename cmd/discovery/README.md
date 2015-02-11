@@ -1,9 +1,9 @@
-# Weave Rendezvous service
+# Weave Discovery service
 
 The Weave rendevous service is responsible for finding new peers as well
 as announcing the local weave router in a group.
 
-## Using the Rendezvous service
+## Using the Discovery service
 
 You can use the `join` command for specifying a group to join.
 For example:

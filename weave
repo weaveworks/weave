@@ -47,22 +47,22 @@ IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 
 BASE_IMAGE=zettio/weave
 BASE_DNS_IMAGE=zettio/weavedns
-BASE_RENDEZVOUS_IMAGE=zettio/weaverendezvous
+BASE_DISCOVERY_IMAGE=zettio/weavediscovery
 BASE_TOOLS_IMAGE=zettio/weavetools
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
-RENDEZVOUS_IMAGE=$BASE_RENDEZVOUS_IMAGE:$IMAGE_VERSION
+DISCOVERY_IMAGE=$BASE_DISCOVERY_IMAGE:$IMAGE_VERSION
 TOOLS_IMAGE=$BASE_TOOLS_IMAGE:$IMAGE_VERSION
 CONTAINER_NAME=weave
 DNS_CONTAINER_NAME=weavedns
-RENDEZVOUS_CONTAINER_NAME=weaverendezvous
+DISCOVERY_CONTAINER_NAME=weavediscovery
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
 PORT=6783
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
-RENDEZVOUS_HTTP_PORT=6786
+DISCOVERY_HTTP_PORT=6786
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 PROCFS=${PROCFS:-/proc}
 
@@ -422,16 +422,16 @@ check_not_running() {
     esac
 }
 
-check_rendezvous_running() {
-    if ! container_is_running $RENDEZVOUS_CONTAINER_NAME ; then
+check_discovery_running() {
+    if ! container_is_running $DISCOVERY_CONTAINER_NAME ; then
         create_bridge
         docker_bridge_ip
         wait_for_container $CONTAINER_NAME
         weave_ip=$(container_ip $CONTAINER_NAME) || fatal "Weave container has no IP address"
-        docker rm $RENDEZVOUS_CONTAINER_NAME 2>/dev/null || /bin/true
-        RENDEZVOUS_CONTAINER=$(docker run --privileged -d --net=host --name=$RENDEZVOUS_CONTAINER_NAME \
-            -p $RENDEZVOUS_HTTP_PORT:$RENDEZVOUS_HTTP_PORT/tcp \
-            $RENDEZVOUS_IMAGE -port $RENDEZVOUS_HTTP_PORT \
+        docker rm $DISCOVERY_CONTAINER_NAME 2>/dev/null || /bin/true
+        DISCOVERY_CONTAINER=$(docker run --privileged -d --net=host --name=$DISCOVERY_CONTAINER_NAME \
+            -p $DISCOVERY_HTTP_PORT:$DISCOVERY_HTTP_PORT/tcp \
+            $DISCOVERY_IMAGE -port $DISCOVERY_HTTP_PORT \
             -nifaces $BRIDGE,$CONTAINER_IFNAME,$DOCKER_BRIDGE \
             -weave http://$weave_ip:$HTTP_PORT/ "$@")
     fi
@@ -543,17 +543,17 @@ case "$COMMAND" in
         ;;
     join)
         [ $# -eq 1 ] || usage
-        check_rendezvous_running
-        wait_for_http_status 127.0.0.1 $RENDEZVOUS_HTTP_PORT || \
-            fatal "Timeout waiting for rendezvous container. Check the logs with \"docker logs $RENDEZVOUS_CONTAINER_NAME\""
-        http_call_ip 127.0.0.1 $RENDEZVOUS_HTTP_PORT "POST" "/join" -d "group=$1"
+        check_discovery_running
+        wait_for_http_status 127.0.0.1 $DISCOVERY_HTTP_PORT || \
+            fatal "Timeout waiting for discovery container. Check the logs with \"docker logs $DISCOVERY_CONTAINER_NAME\""
+        http_call_ip 127.0.0.1 $DISCOVERY_HTTP_PORT "POST" "/join" -d "group=$1"
         ;;
     leave)
         [ $# -eq 1 ] || usage
-        check_rendezvous_running
-        wait_for_http_status 127.0.0.1 $RENDEZVOUS_HTTP_PORT || \
-            fatal "Timeout waiting for rendezvous container. Check the logs with \"docker logs $RENDEZVOUS_CONTAINER_NAME\""
-        http_call_ip 127.0.0.1 $RENDEZVOUS_HTTP_PORT "POST" "/leave" -d "group=$1"
+        check_discovery_running
+        wait_for_http_status 127.0.0.1 $DISCOVERY_HTTP_PORT || \
+            fatal "Timeout waiting for discovery container. Check the logs with \"docker logs $DISCOVERY_CONTAINER_NAME\""
+        http_call_ip 127.0.0.1 $DISCOVERY_HTTP_PORT "POST" "/leave" -d "group=$1"
         ;;
     status)
         http_call $CONTAINER_NAME $HTTP_PORT GET /status
@@ -573,7 +573,7 @@ case "$COMMAND" in
         echo weave script $SCRIPT_VERSION
         ask_version $CONTAINER_NAME $IMAGE
         ask_version $DNS_CONTAINER_NAME $DNS_IMAGE
-        ask_version $RENDEZVOUS_CONTAINER_NAME $RENDEZVOUS_IMAGE
+        ask_version $DISCOVERY_CONTAINER_NAME $DISCOVERY_IMAGE
         if ! TOOLS_IMAGE_ID=$(docker inspect --format='{{.Id}}' $TOOLS_IMAGE 2>/dev/null) ; then
             echo "Unable to find $TOOLS_IMAGE image." >&2
         else
@@ -680,10 +680,10 @@ case "$COMMAND" in
         [ $# -eq 0 ] || usage
         docker kill  $CONTAINER_NAME            >/dev/null 2>&1 || true
         docker kill  $DNS_CONTAINER_NAME        >/dev/null 2>&1 || true
-        docker kill  $RENDEZVOUS_CONTAINER_NAME >/dev/null 2>&1 || true
+        docker kill  $DISCOVERY_CONTAINER_NAME >/dev/null 2>&1 || true
         docker rm -f $CONTAINER_NAME            >/dev/null 2>&1 || true
         docker rm -f $DNS_CONTAINER_NAME        >/dev/null 2>&1 || true
-        docker rm -f $RENDEZVOUS_CONTAINER_NAME >/dev/null 2>&1 || true
+        docker rm -f $DISCOVERY_CONTAINER_NAME >/dev/null 2>&1 || true
         run_tool host conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         destroy_bridge
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do

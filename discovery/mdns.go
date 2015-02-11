@@ -1,4 +1,4 @@
-package rendezvous
+package discovery
 
 import (
 	"fmt"
@@ -44,16 +44,16 @@ func MDnsWorkerUrl(u url.URL, iface *net.Interface) *url.URL {
 }
 
 type mDnsWorker struct {
-	SimpleRendezvousWorker
+	SimpleDiscoveryWorker
 
-	manager    *RendezvousManager
+	manager    *DiscoveryManager
 	fullDomain string
 	stopChan   chan bool
 	skippedIps map[string]bool // keep track the IPs we have notified about or our own IPs
 }
 
-// Create a new mDNS rendezvous service for a domain
-func NewMDnsWorker(manager *RendezvousManager, domainUrl *url.URL) *mDnsWorker {
+// Create a new mDNS discovery service for a domain
+func NewMDnsWorker(manager *DiscoveryManager, domainUrl *url.URL) *mDnsWorker {
 	domain := domainFromPath(domainUrl.Path)
 	fullDomain := "weave.local."
 	if len(domain) > 0 {
@@ -61,7 +61,7 @@ func NewMDnsWorker(manager *RendezvousManager, domainUrl *url.URL) *mDnsWorker {
 	}
 
 	mdns := mDnsWorker{
-		SimpleRendezvousWorker: SimpleRendezvousWorker{
+		SimpleDiscoveryWorker: SimpleDiscoveryWorker{
 			Domain: domain,
 		},
 		manager:    manager,
