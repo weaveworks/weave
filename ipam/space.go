@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 )
 
 type Space interface {
@@ -111,7 +110,6 @@ type MutableSpace struct {
 	MaxAllocated uint32 // 0 if nothing allocated, 1 if first address allocated, etc.
 	allocated    AllocationList
 	free_list    AllocationList
-	sync.RWMutex
 }
 
 func NewSpace(start net.IP, size uint32) *MutableSpace {
@@ -120,8 +118,6 @@ func NewSpace(start net.IP, size uint32) *MutableSpace {
 
 // Mark an address as allocated on behalf of some specific container
 func (space *MutableSpace) Claim(ident string, addr net.IP) (bool, error) {
-	space.Lock()
-	defer space.Unlock()
 	offset := subtract(addr, space.Start)
 	if !(offset >= 0 && offset < int64(space.Size)) {
 		return false, nil
@@ -147,8 +143,6 @@ func (space *MutableSpace) Claim(ident string, addr net.IP) (bool, error) {
 }
 
 func (space *MutableSpace) AllocateFor(ident string) net.IP {
-	space.Lock()
-	defer space.Unlock()
 	ret := space.free_list.take()
 	if ret != nil {
 		ret.Ident = ident
@@ -166,8 +160,6 @@ func (space *MutableSpace) Free(addr net.IP) bool {
 	if !space.Contains(addr) {
 		return false
 	}
-	space.Lock()
-	defer space.Unlock()
 	if a := space.allocated.remove(addr); a != nil {
 		space.free_list.add(a)
 		// TODO: consolidate free space
@@ -177,8 +169,6 @@ func (space *MutableSpace) Free(addr net.IP) bool {
 }
 
 func (space *MutableSpace) DeleteRecordsFor(ident string) error {
-	space.Lock()
-	defer space.Unlock()
 	w := 0 // write index
 
 	for _, r := range space.allocated {
@@ -194,8 +184,6 @@ func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 }
 
 func (s *MutableSpace) NumFreeAddresses() uint32 {
-	s.RLock()
-	defer s.RUnlock()
 	return s.Size - uint32(len(s.allocated))
 }
 
@@ -212,19 +200,11 @@ func (a *MutableSpace) mergeBlank(b Space) bool {
 }
 
 func (space *MutableSpace) String() string {
-	space.RLock()
-	defer space.RUnlock()
-	return space.string()
-}
-
-func (space *MutableSpace) string() string {
 	return fmt.Sprintf("%s+%d, %d/%d", space.Start, space.Size, len(space.allocated), len(space.free_list))
 }
 
 // Divide a space into two new spaces at a given address, copying allocations and frees.
 func (space *MutableSpace) Split(addr net.IP) (*MutableSpace, *MutableSpace) {
-	space.Lock()
-	defer space.Unlock()
 	breakpoint := subtract(addr, space.Start)
 	if breakpoint < 0 || breakpoint >= int64(space.Size) {
 		return nil, nil // Not contained within this space

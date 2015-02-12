@@ -8,7 +8,6 @@ import (
 	lg "github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -84,7 +83,6 @@ type peerIdent struct {
 }
 
 type Allocator struct {
-	sync.RWMutex
 	queryChan   chan<- *interaction
 	ourName     router.PeerName
 	ourUID      uint64

@@ -273,12 +273,6 @@ func assertNoOverlaps(t *testing.T, allocs ...*Allocator) {
 	}
 }
 
-func (alloc *Allocator) considerWhileLocked() {
-	alloc.Lock()
-	alloc.considerOurPosition()
-	alloc.Unlock()
-}
-
 func TestGossip(t *testing.T) {
 	wt.RunWithTimeout(t, 1*time.Second, func() {
 		implTestGossip(t)
@@ -317,7 +311,7 @@ func implTestGossip(t *testing.T) {
 	// Give alloc1 some space so we can test the choosing algorithm
 	alloc1.manageSpace(net.ParseIP(testStart1), 1)
 	alloc1.state = allocStateNeutral
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// Now give alloc2 some space and tell alloc1 about it
@@ -334,7 +328,7 @@ func implTestGossip(t *testing.T) {
 
 	// Time out with no reply
 	mockTime.SetTime(baseTime.Add(5 * time.Second))
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 
 	mockGossip1.VerifyMessage(t, peerNameString, msgSpaceRequest, encode(alloc1.ourSpaceSet))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
@@ -356,7 +350,7 @@ func implTestGossip(t *testing.T) {
 	alloc1.OnDead(alloc2.ourName, alloc2.ourUID) // Simulate call from router
 	alloc1.String()                              // force sync
 	mockTime.SetTime(baseTime.Add(11 * time.Minute))
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 
 	// Now make it look like alloc2 is a tombstone so we can check the message
 	alloc2.ourSpaceSet.MakeTombstone()
@@ -364,12 +358,12 @@ func implTestGossip(t *testing.T) {
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// Allow alloc1 to note the leak, but at this point it doesn't do anything
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// Now move the time forward so alloc1 reclaims alloc2's storage
 	mockTime.SetTime(baseTime.Add(12 * time.Minute))
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	mockGossip1.VerifyBroadcastMessage(t, encode(alloc1.ourSpaceSet))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 }
@@ -397,17 +391,17 @@ func TestLeaks(t *testing.T) {
 
 	mockTime.SetTime(baseTime.Add(20 * time.Second))
 
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	noMoreGossip(t, alloc1.gossip)
 
 	// Allow alloc1 to note the leak
 	mockTime.SetTime(baseTime.Add(30 * time.Second))
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// Alloc2 tells alloc1 about itself
 	mockTime.SetTime(baseTime.Add(40 * time.Second))
-	alloc2.considerWhileLocked()
+	alloc2.considerOurPosition()
 	noMoreGossip(t, alloc2.gossip)
 
 	assertNoOverlaps(t, alloc1, alloc2)
@@ -420,12 +414,12 @@ func TestLeaks(t *testing.T) {
 
 	// Allow alloc1 to note the leak, but at this point it doesn't do anything
 	mockTime.SetTime(baseTime.Add(60 * time.Second))
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// Now move the time forward so alloc1 reclaims the leak
 	mockTime.SetTime(baseTime.Add(12 * time.Minute))
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	assertNoOverlaps(t, alloc1, alloc2)
@@ -445,7 +439,7 @@ func TestAllocatorClaim1(t *testing.T) {
 	defer alloc1.Stop()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 	noMoreGossip(t, alloc1.gossip)
 
@@ -461,7 +455,7 @@ func TestAllocatorClaim1(t *testing.T) {
 
 	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
 	wt.AssertNoErr(t, err)
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	mockGossip1 := alloc1.gossip.(*mockGossipComms)
 	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(alloc1.ourName, oldUID)))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
@@ -479,7 +473,7 @@ func TestAllocatorClaim2(t *testing.T) {
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
 	defer alloc1.Stop()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 
 	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22").addSpace(testStart3, 32)
 	defer alloc2.Stop()
@@ -489,13 +483,13 @@ func TestAllocatorClaim2(t *testing.T) {
 
 	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
 	wt.AssertNoErr(t, err)
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	alloc1.decodeUpdate(alloc2.Gossip())
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	mockGossip1 := alloc1.gossip.(*mockGossipComms)
 	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(alloc1.ourName, oldUID)))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
@@ -515,7 +509,7 @@ func TestAllocatorClaim3(t *testing.T) {
 	alloc1 := testAllocator(peer1NameString, ourUID, testStart1+"/22")
 	defer alloc1.Stop()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 
 	alloc2 := testAllocator(peer2NameString, peerUID, testStart1+"/22").addSpace(testStart3, 32)
 	defer alloc2.Stop()
@@ -531,7 +525,7 @@ func TestAllocatorClaim3(t *testing.T) {
 	err := alloc1.Claim(containerID, addr1)
 	wt.AssertNoErr(t, err)
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "claims")
-	alloc1.considerWhileLocked()
+	alloc1.considerOurPosition()
 	mockGossip1 := alloc1.gossip.(*mockGossipComms)
 	mockGossip2 := alloc2.gossip.(*mockGossipComms)
 	msgbuf := router.Concat(GobEncode(NewMinSpace(addr1, 1)), encode(alloc1.ourSpaceSet))

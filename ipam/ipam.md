@@ -129,3 +129,9 @@ now that the weave script is calling ethtool and curl via containers.
 
 When you claim an address, free addresses in the gap are subsequently
 allocated in descending order.
+
+[It would be good to move PeerName out of package router into a more
+central package so both ipam and router can depend on it.]
+
+[Perhaps Allocators should include the overal Universe in their gossip
+so they can detech mismatches.]

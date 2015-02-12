@@ -9,7 +9,6 @@ import (
 	"github.com/zettio/weave/router"
 	"math"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -37,7 +36,6 @@ type PeerSpaceSet struct {
 	lastSeen  time.Time
 	hasFree   bool
 	maybeDead bool
-	sync.RWMutex
 }
 
 func NewPeerSpace(pn router.PeerName, uid uint64) *PeerSpaceSet {
@@ -59,8 +57,6 @@ type peerSpaceTransport struct {
 }
 
 func (s *PeerSpaceSet) Encode(enc *gob.Encoder) error {
-	s.RLock()
-	defer s.RUnlock()
 	return s.encode(enc, s.HasFreeAddresses())
 }
 
@@ -78,8 +74,6 @@ func (s *PeerSpaceSet) Decode(decoder *gob.Decoder) error {
 	if err := decoder.Decode(&t); err != nil {
 		return err
 	}
-	s.Lock() // probably unnecessary - why would someone be decoding into an object that is also accessed from another thread?
-	defer s.Unlock()
 	s.peerName, s.uid, s.version, s.spaces, s.hasFree = t.PeerName, t.UID, t.Version, t.Spaces, t.HasFree
 	return nil
 }
@@ -90,16 +84,12 @@ func init() {
 }
 
 func (s *PeerSpaceSet) ForEachSpace(fun func(Space)) {
-	s.RLock()
-	defer s.RUnlock()
 	for _, space := range s.spaces {
 		fun(space)
 	}
 }
 
 func (s *PeerSpaceSet) String() string {
-	s.RLock()
-	defer s.RUnlock()
 	ver := " (tombstone)"
 	if !s.IsTombstone() {
 		ver = fmt.Sprint(" (v", s.version, ")")
@@ -124,8 +114,6 @@ func (s *PeerSpaceSet) describe(heading string) string {
 }
 
 func (s *PeerSpaceSet) Empty() bool {
-	s.RLock()
-	defer s.RUnlock()
 	return len(s.spaces) == 0
 }
 
@@ -133,8 +121,6 @@ func (s *PeerSpaceSet) Empty() bool {
 // We presume that if b gave up some space, it would be at the end of a reservation
 // so if b gives it to a then a can merge it
 func (a *PeerSpaceSet) NumSpacesMergeable(b SpaceSet, universe Space) (count int) {
-	a.RLock()
-	defer a.RUnlock()
 	for _, space1 := range a.spaces { // dumb O(n2) implementation
 		b.ForEachSpace(func(space2 Space) {
 			if space2.IsHeirTo(space1, universe) {
@@ -146,8 +132,6 @@ func (a *PeerSpaceSet) NumSpacesMergeable(b SpaceSet, universe Space) (count int
 }
 
 func (s *PeerSpaceSet) Overlaps(space Space) bool {
-	s.RLock()
-	defer s.RUnlock()
 	for _, space2 := range s.spaces {
 		if space.Overlaps(space2) {
 			return true
@@ -157,18 +141,14 @@ func (s *PeerSpaceSet) Overlaps(space Space) bool {
 }
 
 func (s *PeerSpaceSet) MarkMaybeDead(f bool, now time.Time) {
-	s.Lock()
 	s.maybeDead = f
 	s.lastSeen = now
-	s.Unlock()
 }
 
 func (s *PeerSpaceSet) MakeTombstone() {
-	s.Lock()
 	s.spaces = nil
 	s.version = math.MaxUint64
 	s.hasFree = false
-	s.Unlock()
 }
 
 func (s *PeerSpaceSet) IsTombstone() bool {
@@ -187,21 +167,15 @@ func NewSpaceSet(pn router.PeerName, uid uint64) *OurSpaceSet {
 }
 
 func (s *OurSpaceSet) Encode(enc *gob.Encoder) error {
-	s.RLock()
-	defer s.RUnlock()
 	return s.encode(enc, s.HasFreeAddresses())
 }
 
 func (s *OurSpaceSet) AddSpace(space *MutableSpace) {
-	s.Lock()
-	defer s.Unlock()
 	s.spaces = append(s.spaces, space)
 	s.version++
 }
 
 func (s *OurSpaceSet) NumFreeAddresses() uint32 {
-	s.RLock()
-	defer s.RUnlock()
 	// TODO: Optimize; perhaps maintain the count in allocate and free
 	var freeAddresses uint32 = 0
 	for _, space := range s.spaces {
@@ -211,16 +185,12 @@ func (s *OurSpaceSet) NumFreeAddresses() uint32 {
 }
 
 func (s *OurSpaceSet) HasFreeAddresses() bool {
-	s.RLock()
-	defer s.RUnlock()
 	return s.NumFreeAddresses() > 0
 }
 
 // Give up some space because one of our peers has asked for it.
 // Pick some large reasonably-sized chunk.
 func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
-	s.Lock()
-	defer s.Unlock()
 	totalFreeAddresses := s.NumFreeAddresses()
 	if totalFreeAddresses < MinSafeFreeAddresses {
 		return nil, false
@@ -256,8 +226,6 @@ func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 
 // If we can, give up the space requested and return true.
 func (s *OurSpaceSet) GiveUpSpecificSpace(spaceClaimed Space) bool {
-	s.Lock()
-	defer s.Unlock()
 	for i, space := range s.spaces {
 		mspace := space.(*MutableSpace)
 		if mspace.ContainsSpace(spaceClaimed) {
@@ -288,8 +256,6 @@ func (s *OurSpaceSet) GiveUpSpecificSpace(spaceClaimed Space) bool {
 }
 
 func (s *OurSpaceSet) AllocateFor(ident string) net.IP {
-	s.Lock()
-	defer s.Unlock()
 	// TODO: Optimize; perhaps cache last-used space
 	for _, space := range s.spaces {
 		if ret := space.(*MutableSpace).AllocateFor(ident); ret != nil {
@@ -302,8 +268,6 @@ func (s *OurSpaceSet) AllocateFor(ident string) net.IP {
 
 // Claim an address that we think we should own
 func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
-	s.Lock()
-	defer s.Unlock()
 	for _, space := range s.spaces {
 		if done, err := space.(*MutableSpace).Claim(ident, addr); err != nil {
 			return err
@@ -316,8 +280,6 @@ func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 }
 
 func (s *OurSpaceSet) Free(addr net.IP) error {
-	s.Lock()
-	defer s.Unlock()
 	for _, space := range s.spaces {
 		if space.(*MutableSpace).Free(addr) {
 			s.version++
@@ -328,8 +290,6 @@ func (s *OurSpaceSet) Free(addr net.IP) error {
 }
 
 func (s *OurSpaceSet) DeleteRecordsFor(ident string) {
-	s.Lock()
-	defer s.Unlock()
 	for _, space := range s.spaces {
 		space.(*MutableSpace).DeleteRecordsFor(ident)
 	}
@@ -341,8 +301,6 @@ func endOfBlock(a Space) net.IP {
 }
 
 func (s *OurSpaceSet) Exclude(a Space) bool {
-	s.Lock()
-	defer s.Unlock()
 	ns := make([]Space, 0)
 	aSize := int64(a.GetSize())
 	for _, b := range s.spaces {
