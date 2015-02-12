@@ -25,7 +25,7 @@ func TestUDPDNSServer(t *testing.T) {
 		nonLocalName    = "weave.works."
 		testAddr1       = "10.0.2.1"
 	)
-	dnsAddr := fmt.Sprintf("localhost:%d", port)
+	dnsAddr := fmt.Sprintf("127.0.0.1:%d", port)
 	testCIDR1 := testAddr1 + "/24"
 
 	InitDefaultLogging(true)
@@ -66,7 +66,8 @@ func TestUDPDNSServer(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv := NewDNSServer(config, zone, nil, port)
+	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Zone: zone, Port: port})
+	wt.AssertNoErr(t, err)
 	defer srv.Stop()
 	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
@@ -189,7 +190,8 @@ func TestTCPDNSServer(t *testing.T) {
 
 	t.Logf("Creating a WeaveDNS server instance, falling back to 127.0.0.1:%s", fallbackPort)
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv := NewDNSServer(config, zone, nil, port)
+	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Zone: zone, Port: port})
+	wt.AssertNoErr(t, err)
 	defer srv.Stop()
 	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
