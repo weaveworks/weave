@@ -18,8 +18,7 @@ func main() {
 		justVersion bool
 		ifaceName   string
 		apiPath     string
-		udpPort     int
-		tcpPort     int
+		dnsPort     int
 		httpPort    int
 		wait        int
 		watch       bool
@@ -30,8 +29,7 @@ func main() {
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
-	flag.IntVar(&udpPort, "udpport", 53, "UDP port to listen to DNS requests")
-	flag.IntVar(&tcpPort, "tcpport", 53, "TCP port to listen to DNS requests")
+	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
@@ -66,7 +64,7 @@ func main() {
 	}
 
 	go weavedns.ListenHttp(weavedns.LOCAL_DOMAIN, zone, httpPort)
-	srv, err := weavedns.NewDNSServer(zone, iface, udpPort, tcpPort)
+	srv, err := weavedns.NewDNSServer(zone, iface, dnsPort)
 	if err != nil {
 		Error.Fatal("Failed to start server", err)
 	}

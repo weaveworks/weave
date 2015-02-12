@@ -3,7 +3,7 @@ package nameserver
 import (
 	"fmt"
 	"github.com/miekg/dns"
-	"github.com/zettio/weave/common"
+	. "github.com/zettio/weave/common"
 	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
@@ -16,7 +16,7 @@ const (
 	testRDNSnonlocal = "8.8.8.8.in-addr.arpa."
 )
 
-func TestDNSServer(t *testing.T) {
+func TestUDPDNSServer(t *testing.T) {
 	const (
 		port            = 17625
 		successTestName = "test1.weave.local."
@@ -27,7 +27,7 @@ func TestDNSServer(t *testing.T) {
 	dnsAddr := fmt.Sprintf("localhost:%d", port)
 	testCIDR1 := testAddr1 + "/24"
 
-	common.InitDefaultLogging(true)
+	InitDefaultLogging(true)
 	var zone = new(ZoneDb)
 	ip, _, _ := net.ParseCIDR(testCIDR1)
 	zone.AddRecord(containerID, successTestName, ip)
@@ -41,17 +41,14 @@ func TestDNSServer(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServerWithConfig(config, zone, nil, port, port)
+	srv, err := NewDNSServerWithConfig(config, zone, nil, port)
 	wt.AssertNoErr(t, err)
+	defer srv.Stop()
 	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
-	// Create a regular UDP client and a TCP client
 	c := new(dns.Client)
 	c.UDPSize = UDPBufSize
-	tc := new(dns.Client)
-	tc.Net = "tcp"
-
 	m := new(dns.Msg)
 	m.SetQuestion(successTestName, dns.TypeA)
 	m.RecursionDesired = true
@@ -62,16 +59,6 @@ func TestDNSServer(t *testing.T) {
 	wt.AssertEqualInt(t, len(r.Answer), 1, "Number of answers")
 	wt.AssertType(t, r.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, r.Answer[0].(*dns.A).A.String(), testAddr1, "IP address")
-
-	// Retry the query with the TCP client
-	tr, _, err := tc.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, tr.Rcode, dns.RcodeSuccess, "DNS response code (TCP)")
-	wt.AssertEqualInt(t, len(tr.Answer), 1, "Number of answers (TCP)")
-	wt.AssertType(t, tr.Answer[0], (*dns.A)(nil), "DNS record (TCP)")
-	wt.AssertEqualString(t, tr.Answer[0].(*dns.A).A.String(), testAddr1, "IP address (TCP)")
-	// TODO: look for some way of testing the TCP fallback for truncated responses: it seems there is
-	// TODO: no client lib in Go that can do that...
 
 	m.SetQuestion(failTestName, dns.TypeA)
 	r, _, err = c.Exchange(m, dnsAddr)
@@ -127,6 +114,76 @@ func TestDNSServer(t *testing.T) {
 
 	// Not testing MDNS functionality of server here (yet), since it
 	// needs two servers, each listening on its own address
+}
+
+func TestTCPDNSServer(t *testing.T) {
+	const (
+		port          = 17625
+		localTestName = "test1.weave.local."
+		testAddr1     = "10.0.2.1"
+	)
+	dnsAddr := fmt.Sprintf("localhost:%d", port)
+
+	InitDefaultLogging(true)
+	var zone = new(ZoneDb)
+
+	// Insert a bunch of IPs for the same name
+	ansCount := 0
+	for i := 0; i < 255; i++ {
+		for j := 0; j < 10; j++ {
+			ip := net.ParseIP(fmt.Sprintf("10.0.%d.%d", i, j))
+			ansCount += 1
+			err := zone.AddRecord(containerID, localTestName, ip)
+			wt.AssertNoErr(t, err)
+		}
+	}
+
+	// Run another DNS server for fallback
+	s, fallbackAddr, err := RunLocalUDPServer("127.0.0.1:0")
+	wt.AssertNoErr(t, err)
+	defer s.Shutdown()
+
+	_, fallbackPort, err := net.SplitHostPort(fallbackAddr)
+	wt.AssertNoErr(t, err)
+
+	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
+	srv, err := NewDNSServerWithConfig(config, zone, nil, port)
+	wt.AssertNoErr(t, err)
+	defer srv.Stop()
+	go srv.Start()
+	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
+
+	// Create a regular UDP client and a TCP client
+	uc := new(dns.Client)
+	uc.UDPSize = UDPBufSize
+	tc := new(dns.Client)
+	tc.Net = "tcp"
+
+	m := new(dns.Msg)
+	m.SetQuestion(localTestName, dns.TypeA)
+	m.RecursionDesired = false
+
+	Debug.Printf("Using UDP for quering about %s", localTestName)
+	r, _, err := uc.Exchange(m, dnsAddr)
+	wt.AssertNoErr(t, err)
+	if len(r.Answer) > 1 { // TODO: remove this when we have proper support for multiple responses (zettio/weave#338)
+		wt.AssertStatus(t, r.Rcode, dns.RcodeBadTrunc, "DNS response code")
+		if len(r.Answer) == ansCount {
+			wt.Fatalf(t, "%d answers received, but we expected less than that", len(r.Answer))
+		}
+	} else {
+		Debug.Println("... multiple reponses not supported (yet)")
+		wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
+	}
+
+	Debug.Println("Using TCP for the same query")
+	tr, _, err := tc.Exchange(m, dnsAddr)
+	wt.AssertNoErr(t, err)
+	wt.AssertStatus(t, tr.Rcode, dns.RcodeSuccess, "DNS response code (TCP)")
+	if len(r.Answer) > 1 { // TODO: remove this when we have proper support for multiple responses (zettio/weave#338)
+		wt.AssertEqualInt(t, len(tr.Answer), ansCount, "Number of answers (TCP)")
+	}
+	wt.AssertType(t, tr.Answer[0], (*dns.A)(nil), "DNS record (TCP)") // assume they are all the same...
 }
 
 func fallbackHandler(w dns.ResponseWriter, req *dns.Msg) {

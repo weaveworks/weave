@@ -21,34 +21,31 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 }
 
 type DNSServer struct {
-	config  *dns.ClientConfig
-	zone    Zone
-	iface   *net.Interface
-	udpPort int
-	udpSrv  *dns.Server
-	tcpPort int
-	tcpSrv  *dns.Server
+	config *dns.ClientConfig
+	zone   Zone
+	iface  *net.Interface
+	port   int
+	udpSrv *dns.Server
+	tcpSrv *dns.Server
 }
 
 // Creates a new DNS server with a given config
-func NewDNSServerWithConfig(config *dns.ClientConfig, zone Zone, iface *net.Interface, udpPort int, tcpPort int) (*DNSServer, error) {
+func NewDNSServerWithConfig(config *dns.ClientConfig, zone Zone, iface *net.Interface, port int) (*DNSServer, error) {
 	return &DNSServer{
-		config:  config,
-		zone:    zone,
-		iface:   iface,
-		udpPort: udpPort,
-		tcpPort: tcpPort,
+		config: config,
+		zone:   zone,
+		iface:  iface,
+		port:   port,
 	}, nil
 }
 
 // Creates a new DNS server
-func NewDNSServer(zone Zone, iface *net.Interface, udpPort int, tcpPort int) (*DNSServer, error) {
+func NewDNSServer(zone Zone, iface *net.Interface, port int) (*DNSServer, error) {
 	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 	if err != nil {
 		return nil, err
 	}
-
-	return NewDNSServerWithConfig(config, zone, iface, udpPort, tcpPort)
+	return NewDNSServerWithConfig(config, zone, iface, port)
 }
 
 // Start the DNS server
@@ -75,19 +72,18 @@ func (s *DNSServer) Start() error {
 	err = mdnsServer.Start(s.iface)
 	checkFatal(err)
 
-	udpAddress := fmt.Sprintf(":%d", s.udpPort)
-	s.udpSrv = &dns.Server{Addr: udpAddress, Net: "udp", Handler: LocalServeMux}
-	tcpAddress := fmt.Sprintf(":%d", s.tcpPort)
-	s.tcpSrv = &dns.Server{Addr: tcpAddress, Net: "tcp", Handler: LocalServeMux}
+	address := fmt.Sprintf(":%d", s.port)
+	s.udpSrv = &dns.Server{Addr: address, Net: "udp", Handler: LocalServeMux}
+	s.tcpSrv = &dns.Server{Addr: address, Net: "tcp", Handler: LocalServeMux}
 
 	go func() {
-		Info.Printf("Listening for DNS on %s (UDP)", udpAddress)
+		Info.Printf("Listening for DNS on %s (UDP)", address)
 		err = s.udpSrv.ListenAndServe()
 		checkFatal(err)
 	}()
 
 	go func() {
-		Info.Printf("Listening for DNS on %s (TCP)", tcpAddress)
+		Info.Printf("Listening for DNS on %s (TCP)", address)
 		err = s.tcpSrv.ListenAndServe()
 		checkFatal(err)
 	}()
