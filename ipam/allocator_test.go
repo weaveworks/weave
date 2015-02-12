@@ -41,6 +41,7 @@ func TestAllocFree(t *testing.T) {
 	)
 
 	alloc := testAllocator("01:00:00:01:00:00", ourUID, testAddr1+"/30").addSpace(testAddr1, spaceSize)
+	defer alloc.Stop()
 
 	addr1 := alloc.AllocateFor("abcdef")
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
@@ -56,8 +57,8 @@ func TestAllocFree(t *testing.T) {
 	addr3 := alloc.AllocateFor(container2)
 	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
 
-	err := alloc.DeleteRecordsFor(container2)
-	wt.AssertNoErr(t, err)
+	alloc.DeleteRecordsFor(container2)
+	alloc.String() // force sync-up after async call
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), spaceSize, "Total free addresses")
 }
 
@@ -75,6 +76,7 @@ func equalByteBuffer(a, b []byte) bool {
 
 func TestMultiSpaces(t *testing.T) {
 	alloc := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/30")
+	defer alloc.Stop()
 	alloc.addSpace(testStart1, 1)
 	alloc.addSpace(testStart2, 3)
 
@@ -91,12 +93,14 @@ func TestMultiSpaces(t *testing.T) {
 
 func TestEncodeMerge(t *testing.T) {
 	alloc := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
+	defer alloc.Stop()
 	alloc.addSpace(testStart1, 16)
 	alloc.addSpace(testStart2, 32)
 
 	encodedState := alloc.Gossip()
 
 	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22").addSpace(testStart3, 32)
+	defer alloc2.Stop()
 	encodedState2 := alloc2.Gossip()
 
 	newBuf, err := alloc2.OnGossip(encodedState)
@@ -290,6 +294,7 @@ func implTestGossip(t *testing.T) {
 
 	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
+	defer alloc1.Stop()
 	mockTime := new(mockTimeProvider)
 	mockTime.SetTime(baseTime)
 	alloc1.timeProvider = mockTime
@@ -299,6 +304,7 @@ func implTestGossip(t *testing.T) {
 
 	// Simulate another peer on the gossip network
 	alloc2 := testAllocator(peerNameString, peerUID, testStart1+"/22")
+	defer alloc2.Stop()
 	alloc2.timeProvider = alloc1.timeProvider
 
 	mockTime.SetTime(baseTime.Add(2 * time.Second))
@@ -348,6 +354,7 @@ func implTestGossip(t *testing.T) {
 
 	// Now looking to trigger a timeout
 	alloc1.OnDead(alloc2.ourName, alloc2.ourUID) // Simulate call from router
+	alloc1.String()                              // force sync
 	mockTime.SetTime(baseTime.Add(11 * time.Minute))
 	alloc1.considerWhileLocked()
 
@@ -375,6 +382,7 @@ func TestLeaks(t *testing.T) {
 	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
 	// Give alloc1 the space from .0 to .7; nobody owns from .7 to .15
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/27").addSpace(testStart1, 8)
+	defer alloc1.Stop()
 	mockTime := new(mockTimeProvider)
 	mockTime.SetTime(baseTime)
 	alloc1.timeProvider = mockTime
@@ -383,6 +391,7 @@ func TestLeaks(t *testing.T) {
 
 	// Simulate another peer on the gossip network, that is managing some of that space
 	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/27")
+	defer alloc2.Stop()
 	alloc2.addSpace("10.0.1.8", 4)
 	alloc2.timeProvider = alloc1.timeProvider
 
@@ -433,6 +442,7 @@ func TestAllocatorClaim1(t *testing.T) {
 	)
 
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
+	defer alloc1.Stop()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 
 	alloc1.considerWhileLocked()
@@ -440,6 +450,7 @@ func TestAllocatorClaim1(t *testing.T) {
 	noMoreGossip(t, alloc1.gossip)
 
 	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22").addSpace(testStart3, 32)
+	defer alloc2.Stop()
 
 	// alloc2 has an echo of the former state of alloc1
 	alloc2.peerInfo[oldUID] = spaceSetWith(alloc1.ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
@@ -466,10 +477,12 @@ func TestAllocatorClaim2(t *testing.T) {
 	)
 
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
+	defer alloc1.Stop()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 	alloc1.considerWhileLocked()
 
 	alloc2 := testAllocator("02:00:00:02:00:00", peerUID, testStart1+"/22").addSpace(testStart3, 32)
+	defer alloc2.Stop()
 
 	// alloc2 has an echo of the former state of alloc1
 	alloc2.peerInfo[oldUID] = spaceSetWith(alloc1.ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
@@ -500,10 +513,12 @@ func TestAllocatorClaim3(t *testing.T) {
 
 	common.InitDefaultLogging(true)
 	alloc1 := testAllocator(peer1NameString, ourUID, testStart1+"/22")
+	defer alloc1.Stop()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 	alloc1.considerWhileLocked()
 
 	alloc2 := testAllocator(peer2NameString, peerUID, testStart1+"/22").addSpace(testStart3, 32)
+	defer alloc2.Stop()
 	// alloc2 is managing the space that alloc1 wants to claim part of
 	alloc2.manageSpace(net.ParseIP(testStart1), 64)
 
@@ -550,6 +565,7 @@ func TestAllocatorClaim4(t *testing.T) {
 	)
 
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
+	defer alloc1.Stop()
 	alloc1.manageSpace(net.ParseIP(testStart2), 64)
 
 	// Claim an address that nobody is managing

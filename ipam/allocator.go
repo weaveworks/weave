@@ -71,8 +71,21 @@ type defaultTime struct{}
 
 func (defaultTime) Now() time.Time { return time.Now() }
 
+type interaction struct {
+	code       int
+	resultChan chan<- interface{}
+	payload    interface{}
+	bytes      []byte
+}
+
+type peerIdent struct {
+	name router.PeerName
+	uid  uint64
+}
+
 type Allocator struct {
 	sync.RWMutex
+	queryChan   chan<- *interaction
 	ourName     router.PeerName
 	ourUID      uint64
 	state       int
@@ -125,51 +138,173 @@ func (alloc *Allocator) SetGossip(gossip router.Gossip) {
 
 func (alloc *Allocator) Start() {
 	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
-	go alloc.queryLoop()
+	queryChan := make(chan *interaction, router.ChannelSize)
+	alloc.queryChan = queryChan
+	gossipTimer := time.Tick(router.GossipInterval)
+	go alloc.queryLoop(queryChan, gossipTimer)
 }
 
 func (alloc *Allocator) startForTesting() {
 	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
+	queryChan := make(chan *interaction, router.ChannelSize)
+	alloc.queryChan = queryChan
+	go alloc.queryLoop(queryChan, nil)
 }
 
-// external interface
+// Actor client API
 
+const (
+	aStop = iota
+	aClaim
+	aAllocateFor
+	aFree
+	aString
+	aDeleteRecordsFor
+	aGossipUnicast
+	aGossipBroadcast
+	aGossipReceived
+	aGossipCreate
+	aAlive
+	aDead
+)
+
+// Sync.
+func (alloc *Allocator) Stop() {
+	alloc.queryChan <- &interaction{aStop, nil, nil, nil}
+}
+
+// Work round Go's dislike for casting a nil interface to another interface
+func interfaceToError(x interface{}) error {
+	if x == nil {
+		return nil
+	} else {
+		return x.(error)
+	}
+}
+
+// Sync.
 // Claim an address that we think we should own
 func (alloc *Allocator) Claim(ident string, addr net.IP) error {
 	lg.Info.Printf("Address %s claimed by %s", addr, ident)
-	alloc.Lock()
-	defer alloc.Unlock()
-	return alloc.handleClaim(ident, addr)
+	resultChan := make(chan interface{})
+	alloc.queryChan <- &interaction{aClaim, resultChan, ident, addr}
+	return interfaceToError(<-resultChan)
 }
 
+// Sync.
 func (alloc *Allocator) AllocateFor(ident string) net.IP {
-	alloc.Lock()
-	defer alloc.Unlock()
-	return alloc.ourSpaceSet.AllocateFor(ident)
+	resultChan := make(chan interface{})
+	alloc.queryChan <- &interaction{aAllocateFor, resultChan, ident, nil}
+	x := <-resultChan
+	if x == nil {
+		return nil
+	} else {
+		return x.(net.IP)
+	}
 }
 
+// Sync.
 func (alloc *Allocator) Free(addr net.IP) error {
-	alloc.Lock()
-	defer alloc.Unlock()
-	return alloc.ourSpaceSet.Free(addr)
+	resultChan := make(chan interface{})
+	alloc.queryChan <- &interaction{aFree, resultChan, nil, addr}
+	return interfaceToError(<-resultChan)
 }
 
+// Sync.
 func (alloc *Allocator) String() string {
-	alloc.RLock()
-	defer alloc.RUnlock()
-	return alloc.string()
+	resultChan := make(chan interface{})
+	alloc.queryChan <- &interaction{aString, resultChan, nil, nil}
+	return (<-resultChan).(string)
 }
 
-func (alloc *Allocator) DeleteRecordsFor(ident string) error {
-	alloc.Lock()
-	defer alloc.Unlock()
-	alloc.ourSpaceSet.DeleteRecordsFor(ident)
-	return nil
+// Async.
+func (alloc *Allocator) DeleteRecordsFor(ident string) {
+	alloc.queryChan <- &interaction{aDeleteRecordsFor, nil, ident, nil}
 }
 
-// NOTE: Go's locks are not re-entrant, so we have some rules to avoid deadlock:
-// exposed functions (start with uppercase) take a lock;
-// internal functions never take a lock and never call an exposed function.
+// Sync.
+func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) error {
+	lg.Debug.Printf("OnGossipUnicast from %s: %d bytes\n", sender, len(msg))
+	resultChan := make(chan interface{})
+	alloc.queryChan <- &interaction{aGossipUnicast, resultChan, sender, msg}
+	return interfaceToError(<-resultChan)
+}
+
+// Sync.
+func (alloc *Allocator) OnGossipBroadcast(msg []byte) error {
+	lg.Debug.Printf("OnGossipBroadcast: %d bytes\n", len(msg))
+	resultChan := make(chan interface{})
+	alloc.queryChan <- &interaction{aGossipBroadcast, resultChan, nil, msg}
+	return interfaceToError(<-resultChan)
+}
+
+// Sync.
+func (alloc *Allocator) OnGossip(msg []byte) ([]byte, error) {
+	lg.Debug.Printf("Allocator.OnGossip: %d bytes\n", len(msg))
+	resultChan := make(chan interface{})
+	alloc.queryChan <- &interaction{aGossipReceived, resultChan, nil, msg}
+	ret := (<-resultChan).(*interaction)
+	return ret.bytes, interfaceToError(ret.payload)
+}
+
+// Sync.
+func (alloc *Allocator) Gossip() []byte {
+	resultChan := make(chan interface{})
+	alloc.queryChan <- &interaction{aGossipCreate, resultChan, nil, nil}
+	return (<-resultChan).([]byte)
+}
+
+// No-op
+func (alloc *Allocator) OnAlive(name router.PeerName, uid uint64) {
+	// If it's new to us, nothing to do.
+	// If we previously believed it to be dead, need to figure that case out.
+}
+
+// Async.
+func (alloc *Allocator) OnDead(name router.PeerName, uid uint64) {
+	alloc.queryChan <- &interaction{aDead, nil, &peerIdent{name, uid}, nil}
+}
+
+// ACTOR server
+
+func (alloc *Allocator) queryLoop(queryChan <-chan *interaction, gossipTimer <-chan time.Time) {
+	for {
+		select {
+		case q, ok := <-queryChan:
+			if !ok {
+				return
+			}
+			switch q.code {
+			case aStop:
+				return
+			case aClaim:
+				q.resultChan <- alloc.handleClaim(q.payload.(string), q.bytes)
+			case aAllocateFor:
+				q.resultChan <- alloc.ourSpaceSet.AllocateFor(q.payload.(string))
+			case aFree:
+				q.resultChan <- alloc.ourSpaceSet.Free(q.bytes)
+			case aString:
+				q.resultChan <- alloc.string()
+			case aDeleteRecordsFor:
+				alloc.ourSpaceSet.DeleteRecordsFor(q.payload.(string))
+			case aGossipUnicast:
+				q.resultChan <- alloc.handleGossipUnicast(q.payload.(router.PeerName), q.bytes)
+			case aGossipBroadcast:
+				q.resultChan <- alloc.handleGossipBroadcast(q.bytes)
+			case aGossipReceived:
+				buf, err := alloc.handleGossipReceived(q.bytes)
+				q.resultChan <- &interaction{0, nil, err, buf}
+			case aGossipCreate:
+				q.resultChan <- alloc.handleGossipCreate()
+			case aDead:
+				peer := q.payload.(*peerIdent)
+				alloc.handleDead(peer.name, peer.uid)
+			}
+		case <-gossipTimer:
+			alloc.considerOurPosition()
+		}
+	}
+}
 
 func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
 	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, poolSize))
@@ -579,25 +714,8 @@ func (alloc *Allocator) string() string {
 	return buf.String()
 }
 
-// Actor (?)
-
-func (alloc *Allocator) queryLoop() {
-	gossipTimer := time.Tick(router.GossipInterval)
-	for {
-		select {
-		case <-gossipTimer:
-			alloc.Lock()
-			alloc.considerOurPosition()
-			alloc.Unlock()
-		}
-	}
-}
-
-// GossipDelegate methods
-func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) error {
-	lg.Debug.Printf("OnGossipUnicast from %s: %d bytes\n", sender, len(msg))
-	alloc.Lock()
-	defer alloc.Unlock()
+// GossipDelegate handlers
+func (alloc *Allocator) handleGossipUnicast(sender router.PeerName, msg []byte) error {
 	switch msg[0] {
 	case msgSpaceRequest:
 		alloc.handleSpaceRequest(sender, msg[1:])
@@ -613,9 +731,7 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 	return nil
 }
 
-func (alloc *Allocator) Gossip() []byte {
-	alloc.Lock()
-	defer alloc.Unlock()
+func (alloc *Allocator) handleGossipCreate() []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	panicOnError(enc.Encode(len(alloc.peerInfo)))
@@ -625,10 +741,7 @@ func (alloc *Allocator) Gossip() []byte {
 	return buf.Bytes()
 }
 
-func (alloc *Allocator) OnGossipBroadcast(buf []byte) error {
-	lg.Debug.Printf("OnGossipBroadcast: %d bytes\n", len(buf))
-	alloc.Lock()
-	defer alloc.Unlock()
+func (alloc *Allocator) handleGossipBroadcast(buf []byte) error {
 	_, err := alloc.decodeUpdate(buf)
 	if err != nil {
 		return err
@@ -639,10 +752,7 @@ func (alloc *Allocator) OnGossipBroadcast(buf []byte) error {
 
 // merge in state and return a buffer encoding those PeerSpaces which are newer
 // than what we had previously, or nil if none were newer
-func (alloc *Allocator) OnGossip(buf []byte) ([]byte, error) {
-	lg.Debug.Printf("Allocator.OnGossip: %d bytes\n", len(buf))
-	alloc.Lock()
-	defer alloc.Unlock()
+func (alloc *Allocator) handleGossipReceived(buf []byte) ([]byte, error) {
 	newerPeerSpaces, err := alloc.decodeUpdate(buf)
 	if err != nil {
 		return nil, err
@@ -661,14 +771,7 @@ func (alloc *Allocator) OnGossip(buf []byte) ([]byte, error) {
 	}
 }
 
-func (alloc *Allocator) OnAlive(name router.PeerName, uid uint64) {
-	// If it's new to us, nothing to do.
-	// If we previously believed it to be dead, need to figure that case out.
-}
-
-func (alloc *Allocator) OnDead(name router.PeerName, uid uint64) {
-	alloc.Lock()
-	defer alloc.Unlock()
+func (alloc *Allocator) handleDead(name router.PeerName, uid uint64) {
 	entry, found := alloc.peerInfo[uid]
 	if found {
 		if peerEntry, ok := entry.(*PeerSpaceSet); ok &&
