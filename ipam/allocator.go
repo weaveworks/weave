@@ -70,20 +70,64 @@ type defaultTime struct{}
 
 func (defaultTime) Now() time.Time { return time.Now() }
 
-type interaction struct {
-	code       int
-	resultChan chan<- interface{}
-	payload    interface{}
+type stop struct{}
+
+type makeString struct {
+	resultChan chan<- string
+}
+
+type claim struct {
+	resultChan chan<- error
+	Allocation
+}
+
+type allocateFor struct {
+	resultChan chan<- net.IP
+	Ident      string
+}
+
+type free struct {
+	resultChan chan<- error
+	addr       net.IP
+}
+
+type deleteRecordsFor struct {
+	Ident string
+}
+
+type gossipUnicast struct {
+	resultChan chan<- error
+	sender     router.PeerName
 	bytes      []byte
 }
 
-type peerIdent struct {
+type gossipBroadcast struct {
+	resultChan chan<- error
+	bytes      []byte
+}
+
+type gossipCreate struct {
+	resultChan chan<- []byte
+	bytes      []byte
+}
+
+type gossipReceived struct {
+	resultChan chan<- gossipReply
+	bytes      []byte
+}
+
+type gossipReply struct {
+	err   error
+	bytes []byte
+}
+
+type onDead struct {
 	name router.PeerName
 	uid  uint64
 }
 
 type Allocator struct {
-	queryChan   chan<- *interaction
+	queryChan   chan<- interface{}
 	ourName     router.PeerName
 	ourUID      uint64
 	state       int
@@ -136,7 +180,7 @@ func (alloc *Allocator) SetGossip(gossip router.Gossip) {
 
 func (alloc *Allocator) Start() {
 	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
-	queryChan := make(chan *interaction, router.ChannelSize)
+	queryChan := make(chan interface{}, router.ChannelSize)
 	alloc.queryChan = queryChan
 	gossipTimer := time.Tick(router.GossipInterval)
 	go alloc.queryLoop(queryChan, gossipTimer)
@@ -144,112 +188,83 @@ func (alloc *Allocator) Start() {
 
 func (alloc *Allocator) startForTesting() {
 	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
-	queryChan := make(chan *interaction, router.ChannelSize)
+	queryChan := make(chan interface{}, router.ChannelSize)
 	alloc.queryChan = queryChan
 	go alloc.queryLoop(queryChan, nil)
 }
 
 // Actor client API
 
-const (
-	aStop = iota
-	aClaim
-	aAllocateFor
-	aFree
-	aString
-	aDeleteRecordsFor
-	aGossipUnicast
-	aGossipBroadcast
-	aGossipReceived
-	aGossipCreate
-	aAlive
-	aDead
-)
-
 // Sync.
 func (alloc *Allocator) Stop() {
-	alloc.queryChan <- &interaction{aStop, nil, nil, nil}
-}
-
-// Work round Go's dislike for casting a nil interface to another interface
-func interfaceToError(x interface{}) error {
-	if x == nil {
-		return nil
-	} else {
-		return x.(error)
-	}
+	alloc.queryChan <- stop{}
 }
 
 // Sync.
 // Claim an address that we think we should own
 func (alloc *Allocator) Claim(ident string, addr net.IP) error {
 	lg.Info.Printf("Address %s claimed by %s", addr, ident)
-	resultChan := make(chan interface{})
-	alloc.queryChan <- &interaction{aClaim, resultChan, ident, addr}
-	return interfaceToError(<-resultChan)
+	resultChan := make(chan error)
+	alloc.queryChan <- claim{resultChan, Allocation{ident, addr}}
+	return <-resultChan
 }
 
 // Sync.
 func (alloc *Allocator) AllocateFor(ident string) net.IP {
-	resultChan := make(chan interface{})
-	alloc.queryChan <- &interaction{aAllocateFor, resultChan, ident, nil}
-	x := <-resultChan
-	if x == nil {
-		return nil
-	} else {
-		return x.(net.IP)
-	}
+	resultChan := make(chan net.IP)
+	alloc.queryChan <- allocateFor{resultChan, ident}
+	return <-resultChan
 }
 
 // Sync.
 func (alloc *Allocator) Free(addr net.IP) error {
-	resultChan := make(chan interface{})
-	alloc.queryChan <- &interaction{aFree, resultChan, nil, addr}
-	return interfaceToError(<-resultChan)
+	resultChan := make(chan error)
+	alloc.queryChan <- free{resultChan, addr}
+	return <-resultChan
 }
 
 // Sync.
 func (alloc *Allocator) String() string {
-	resultChan := make(chan interface{})
-	alloc.queryChan <- &interaction{aString, resultChan, nil, nil}
-	return (<-resultChan).(string)
+	resultChan := make(chan string)
+	alloc.queryChan <- makeString{resultChan}
+	return <-resultChan
 }
 
 // Async.
 func (alloc *Allocator) DeleteRecordsFor(ident string) {
-	alloc.queryChan <- &interaction{aDeleteRecordsFor, nil, ident, nil}
+	alloc.queryChan <- deleteRecordsFor{ident}
 }
 
 // Sync.
 func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) error {
 	lg.Debug.Printf("OnGossipUnicast from %s: %d bytes\n", sender, len(msg))
-	resultChan := make(chan interface{})
-	alloc.queryChan <- &interaction{aGossipUnicast, resultChan, sender, msg}
-	return interfaceToError(<-resultChan)
+	resultChan := make(chan error)
+	alloc.queryChan <- gossipUnicast{resultChan, sender, msg}
+	return <-resultChan
 }
 
 // Sync.
 func (alloc *Allocator) OnGossipBroadcast(msg []byte) error {
 	lg.Debug.Printf("OnGossipBroadcast: %d bytes\n", len(msg))
-	resultChan := make(chan interface{})
-	alloc.queryChan <- &interaction{aGossipBroadcast, resultChan, nil, msg}
-	return interfaceToError(<-resultChan)
+	resultChan := make(chan error)
+	alloc.queryChan <- gossipBroadcast{resultChan, msg}
+	return <-resultChan
 }
 
 // Sync.
 func (alloc *Allocator) OnGossip(msg []byte) ([]byte, error) {
 	lg.Debug.Printf("Allocator.OnGossip: %d bytes\n", len(msg))
-	resultChan := make(chan interface{})
-	alloc.queryChan <- &interaction{aGossipReceived, resultChan, nil, msg}
-	ret := (<-resultChan).(*interaction)
-	return ret.bytes, interfaceToError(ret.payload)
+	resultChan := make(chan gossipReply)
+	alloc.queryChan <- gossipReceived{resultChan, msg}
+	ret := <-resultChan
+	return ret.bytes, ret.err
 }
 
 // Sync.
 func (alloc *Allocator) Gossip() []byte {
-	resultChan := make(chan interface{})
-	alloc.queryChan <- &interaction{aGossipCreate, resultChan, nil, nil}
-	return (<-resultChan).([]byte)
+	resultChan := make(chan []byte)
+	alloc.queryChan <- gossipCreate{resultChan, nil}
+	return <-resultChan
 }
 
 // No-op
@@ -260,43 +275,42 @@ func (alloc *Allocator) OnAlive(name router.PeerName, uid uint64) {
 
 // Async.
 func (alloc *Allocator) OnDead(name router.PeerName, uid uint64) {
-	alloc.queryChan <- &interaction{aDead, nil, &peerIdent{name, uid}, nil}
+	alloc.queryChan <- onDead{name, uid}
 }
 
 // ACTOR server
 
-func (alloc *Allocator) queryLoop(queryChan <-chan *interaction, gossipTimer <-chan time.Time) {
+func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-chan time.Time) {
 	for {
 		select {
-		case q, ok := <-queryChan:
+		case query, ok := <-queryChan:
 			if !ok {
 				return
 			}
-			switch q.code {
-			case aStop:
+			switch q := query.(type) {
+			case stop:
 				return
-			case aClaim:
-				q.resultChan <- alloc.handleClaim(q.payload.(string), q.bytes)
-			case aAllocateFor:
-				q.resultChan <- alloc.ourSpaceSet.AllocateFor(q.payload.(string))
-			case aFree:
-				q.resultChan <- alloc.ourSpaceSet.Free(q.bytes)
-			case aString:
+			case makeString:
 				q.resultChan <- alloc.string()
-			case aDeleteRecordsFor:
-				alloc.ourSpaceSet.DeleteRecordsFor(q.payload.(string))
-			case aGossipUnicast:
-				q.resultChan <- alloc.handleGossipUnicast(q.payload.(router.PeerName), q.bytes)
-			case aGossipBroadcast:
+			case claim:
+				q.resultChan <- alloc.handleClaim(q.Ident, q.IP)
+			case allocateFor:
+				q.resultChan <- alloc.ourSpaceSet.AllocateFor(q.Ident)
+			case deleteRecordsFor:
+				alloc.ourSpaceSet.DeleteRecordsFor(q.Ident)
+			case free:
+				q.resultChan <- alloc.ourSpaceSet.Free(q.addr)
+			case gossipUnicast:
+				q.resultChan <- alloc.handleGossipUnicast(q.sender, q.bytes)
+			case gossipBroadcast:
 				q.resultChan <- alloc.handleGossipBroadcast(q.bytes)
-			case aGossipReceived:
+			case gossipReceived:
 				buf, err := alloc.handleGossipReceived(q.bytes)
-				q.resultChan <- &interaction{0, nil, err, buf}
-			case aGossipCreate:
+				q.resultChan <- gossipReply{err, buf}
+			case gossipCreate:
 				q.resultChan <- alloc.handleGossipCreate()
-			case aDead:
-				peer := q.payload.(*peerIdent)
-				alloc.handleDead(peer.name, peer.uid)
+			case onDead:
+				alloc.handleDead(q.name, q.uid)
 			}
 		case <-gossipTimer:
 			alloc.considerOurPosition()
