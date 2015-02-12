@@ -2,7 +2,6 @@ package ipam
 
 import (
 	"fmt"
-	"github.com/zettio/weave/router"
 	wt "github.com/zettio/weave/testing"
 	"io/ioutil"
 	"math/rand"
@@ -33,9 +32,7 @@ func TestHttp(t *testing.T) {
 		peerUID = 654321
 	)
 
-	ourName, _ := router.PeerNameFromString("08:00:27:01:c3:9a")
-	alloc, _ := NewAllocator(ourName, ourUID, testCIDR1)
-	alloc.manageSpace(net.ParseIP(testAddr1), 4)
+	alloc := testAllocator("08:00:27:01:c3:9a", ourUID, testCIDR1).addSpace(testAddr1, 4)
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
 	go ListenHttp(port, alloc)
