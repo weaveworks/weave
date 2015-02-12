@@ -98,22 +98,8 @@ requests. Donations do not state why they were sent.
 
 ## Concurrency
 
-Everything is hung off Allocator, which locks around every call from
-outside, and also its own periodic timer routine.  Concurrent calls
-can come in from the Gossip system (over different connections at the
-same time) and the http interface.
-
-All data structures (except MinSpace) are protected by
-RWMutex. MinSpace is not locked because it is read-only except when
-manipulated by MutableSpaceSet which has its own lock.
-
-[do we need to lock MutableSpaceSet?  There is only one, owned by
-Allocator, which is already locking]
-
-Go's locks are not re-entrant, so we have some rules to avoid
-deadlock: exposed functions (start with uppercase) take a lock;
-internal functions never take a lock and never call an exposed
-function.
+Everything is hung off Allocator, which runs as a single-threaded
+Actor, so no locks are used around data structures.
 
 ## Other open questions
 
