@@ -126,6 +126,25 @@ type onDead struct {
 	uid  uint64
 }
 
+type claimList []claim
+
+func (aa *claimList) add(a *claim) {
+	*aa = append(*aa, *a)
+}
+
+func (aa *claimList) removeAt(pos int) {
+	(*aa) = append((*aa)[:pos], (*aa)[pos+1:]...)
+}
+
+func (aa *claimList) find(addr net.IP) int {
+	for i, a := range *aa {
+		if a.IP.Equal(addr) {
+			return i
+		}
+	}
+	return -1
+}
+
 type Allocator struct {
 	queryChan   chan<- interface{}
 	ourName     router.PeerName
@@ -139,7 +158,7 @@ type Allocator struct {
 	ourSpaceSet *OurSpaceSet
 	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
 	leaked      map[time.Time]Space
-	claims      AllocationList
+	claims      claimList
 	inflight    requestList
 	timeProvider
 }
@@ -293,7 +312,7 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-ch
 			case makeString:
 				q.resultChan <- alloc.string()
 			case claim:
-				q.resultChan <- alloc.handleClaim(q.Ident, q.IP)
+				alloc.handleClaim(q.Ident, q.IP, q.resultChan)
 			case allocateFor:
 				q.resultChan <- alloc.ourSpaceSet.AllocateFor(q.Ident)
 			case deleteRecordsFor:
@@ -498,9 +517,8 @@ func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err
 func (alloc *Allocator) checkClaims() {
 	for i := 0; i < len(alloc.claims); i++ {
 		owner, err := alloc.checkClaim(alloc.claims[i].Ident, alloc.claims[i].IP)
-		if err != nil {
-			lg.Error.Println("checkClaims:", err)
-		} else if owner == alloc.ourUID {
+		if err != nil || owner == alloc.ourUID {
+			alloc.claims[i].resultChan <- err
 			alloc.claims.removeAt(i)
 			i--
 		}
@@ -689,27 +707,35 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 		return err
 	}
 	alloc.inflight.remove(sender, &claim)
-	// FIXME: what do we do now?
+	for i := 0; i < len(alloc.claims); i++ {
+		if claim.Contains(alloc.claims[i].IP) {
+			alloc.claims[i].resultChan <- errors.New("IP address owned by" + sender.String())
+			alloc.claims.removeAt(i)
+			i--
+		}
+	}
 	return nil
 }
 
 // Claim an address that we think we should own
-func (alloc *Allocator) handleClaim(ident string, addr net.IP) error {
+func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<- error) {
 	// See if it's already claimed
 	if pos := alloc.claims.find(addr); pos >= 0 {
 		if alloc.claims[pos].Ident == ident {
-			return nil
+			resultChan <- nil
+			return
 		} else {
-			return errors.New("IP address already claimed by " + alloc.claims[pos].Ident)
+			resultChan <- errors.New("IP address already claimed by " + alloc.claims[pos].Ident)
+			return
 		}
 	}
 	if owner, err := alloc.checkClaim(ident, addr); err != nil {
-		return err
+		resultChan <- err
 	} else if owner != alloc.ourUID {
-		alloc.claims.add(&Allocation{ident, addr})
+		alloc.claims.add(&claim{resultChan, Allocation{ident, addr}})
+	} else {
+		resultChan <- nil
 	}
-
-	return nil
 }
 
 func (alloc *Allocator) string() string {

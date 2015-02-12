@@ -2,7 +2,6 @@ package ipam
 
 import (
 	"fmt"
-	"github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
 	wt "github.com/zettio/weave/testing"
 	"net"
@@ -427,6 +426,25 @@ func TestLeaks(t *testing.T) {
 	// Fixme: why does nobody gossip anything here?
 }
 
+func AssertSent(t *testing.T, ch <-chan bool) {
+	timeout := time.After(time.Second)
+	select {
+	case <-ch:
+		// This case is ok
+	case <-timeout:
+		wt.Fatalf(t, "Nothing sent on channel")
+	}
+}
+
+func AssertNothingSent(t *testing.T, ch <-chan bool) {
+	select {
+	case val := <-ch:
+		wt.Fatalf(t, "Unexpected value on channel: %t", val)
+	default:
+		// no message received
+	}
+}
+
 func TestAllocatorClaim1(t *testing.T) {
 	const (
 		containerID = "deadbeef"
@@ -453,8 +471,14 @@ func TestAllocatorClaim1(t *testing.T) {
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
-	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
-	wt.AssertNoErr(t, err)
+	done := make(chan bool)
+	go func() {
+		err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
+		wt.AssertNoErr(t, err)
+		done <- true
+	}()
+	time.Sleep(100 * time.Millisecond)
+	AssertSent(t, done)
 	alloc1.considerOurPosition()
 	mockGossip1 := alloc1.gossip.(*mockGossipComms)
 	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(alloc1.ourName, oldUID)))
@@ -481,18 +505,27 @@ func TestAllocatorClaim2(t *testing.T) {
 	// alloc2 has an echo of the former state of alloc1
 	alloc2.peerInfo[oldUID] = spaceSetWith(alloc1.ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
 
-	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
-	wt.AssertNoErr(t, err)
+	done := make(chan bool)
+	go func() {
+		err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
+		wt.AssertNoErr(t, err)
+		done <- true
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	AssertNothingSent(t, done)
 	alloc1.considerOurPosition()
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	alloc1.decodeUpdate(alloc2.Gossip())
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
+	AssertNothingSent(t, done)
 	alloc1.considerOurPosition()
 	mockGossip1 := alloc1.gossip.(*mockGossipComms)
 	mockGossip1.VerifyBroadcastMessage(t, encode(tombstoneWith(alloc1.ourName, oldUID)))
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
+	AssertSent(t, done)
 }
 
 // Claiming from another peer
@@ -505,7 +538,6 @@ func TestAllocatorClaim3(t *testing.T) {
 		peer2NameString = "02:00:00:02:00:00"
 	)
 
-	common.InitDefaultLogging(true)
 	alloc1 := testAllocator(peer1NameString, ourUID, testStart1+"/22")
 	defer alloc1.Stop()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
@@ -522,8 +554,15 @@ func TestAllocatorClaim3(t *testing.T) {
 
 	// Tell alloc1 that we want addr1, and it will send a message to alloc2
 	addr1 := net.ParseIP(testAddr1)
-	err := alloc1.Claim(containerID, addr1)
-	wt.AssertNoErr(t, err)
+	done := make(chan bool)
+	go func() {
+		err := alloc1.Claim(containerID, addr1)
+		wt.AssertNoErr(t, err)
+		done <- true
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	AssertNothingSent(t, done)
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "claims")
 	alloc1.considerOurPosition()
 	mockGossip1 := alloc1.gossip.(*mockGossipComms)
@@ -533,8 +572,9 @@ func TestAllocatorClaim3(t *testing.T) {
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 
 	// alloc2 receives this request and replies
-	err = alloc2.OnGossipUnicast(alloc1.ourName, router.Concat([]byte{msgSpaceClaim}, msgbuf))
+	err := alloc2.OnGossipUnicast(alloc1.ourName, router.Concat([]byte{msgSpaceClaim}, msgbuf))
 	wt.AssertNoErr(t, err)
+	AssertNothingSent(t, done)
 	msgbuf = router.Concat(GobEncode(NewMinSpace(addr1, 1), 1, alloc2.ourSpaceSet))
 	mockGossip2.VerifyMessage(t, peer1NameString, msgSpaceDonate, msgbuf)
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
@@ -546,6 +586,7 @@ func TestAllocatorClaim3(t *testing.T) {
 	noMoreGossip(t, alloc1.gossip, alloc2.gossip)
 	wt.AssertEqualInt(t, len(alloc1.inflight), 0, "inflight")
 	wt.AssertEqualInt(t, len(alloc1.claims), 0, "claims")
+	AssertSent(t, done)
 }
 
 // Claiming addresses with issues
@@ -563,12 +604,18 @@ func TestAllocatorClaim4(t *testing.T) {
 	alloc1.manageSpace(net.ParseIP(testStart2), 64)
 
 	// Claim an address that nobody is managing
-	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
-	wt.AssertNoErr(t, err)
+	done := make(chan bool)
+	go func() {
+		err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
+		wt.AssertNoErr(t, err)
+		done <- true
+	}()
+	time.Sleep(100 * time.Millisecond)
+
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 64, "free addresses")
 	// Claiming the same address twice for the same container should be idempotent
-	err = alloc1.Claim(containerID, net.ParseIP(testAddr1))
+	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
 	wt.AssertNoErr(t, err)
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	// Claiming the same address for different container should raise an error
@@ -589,4 +636,7 @@ func TestAllocatorClaim4(t *testing.T) {
 	wt.AssertErrorInterface(t, err, (*error)(nil), "duplicate claim error")
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 63, "free addresses")
+
+	// Original claim never returns as we are still waiting for someone to own it
+	AssertNothingSent(t, done)
 }
