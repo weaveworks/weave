@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 )
 
 type LocalPeer struct {
@@ -17,12 +18,14 @@ type PeerInteraction struct {
 	payload interface{}
 }
 
-func StartLocalPeer(name PeerName, router *Router) *LocalPeer {
-	peer := &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
+func NewLocalPeer(name PeerName, router *Router) *LocalPeer {
+	return &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
+}
+
+func (peer *LocalPeer) Start() {
 	queryChan := make(chan *PeerInteraction, ChannelSize)
 	peer.queryChan = queryChan
 	go peer.queryLoop(queryChan)
-	return peer
 }
 
 func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
@@ -55,26 +58,8 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 }
 
 func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
-	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
-	if len(nextHops) == 0 {
-		return nil
-	}
-	// We must not hold a read lock on peer during the conn.Forward
-	// below, since that is a potentially blocking operation (e.g. if
-	// the channel is full).
-	nextConns := make([]*LocalConnection, 0, len(nextHops))
-	peer.RLock()
-	for _, hopName := range nextHops {
-		conn, found := peer.connections[hopName]
-		// Again, !found could just be due to a race.
-		if found {
-			nextConns = append(nextConns, conn.(*LocalConnection))
-		}
-	}
-	peer.RUnlock()
-	var err error
-	for _, conn := range nextConns {
-		err = conn.Forward(df, &ForwardedFrame{
+	for _, conn := range peer.NextBroadcastHops(srcPeer) {
+		err := conn.Forward(df, &ForwardedFrame{
 			srcPeer: srcPeer,
 			dstPeer: conn.Remote(),
 			frame:   frame},
@@ -84,6 +69,24 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec 
 		}
 	}
 	return nil
+}
+
+func (peer *LocalPeer) NextBroadcastHops(srcPeer *Peer) []*LocalConnection {
+	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
+	if len(nextHops) == 0 {
+		return nil
+	}
+	nextConns := make([]*LocalConnection, 0, len(nextHops))
+	peer.RLock()
+	defer peer.RUnlock()
+	for _, hopName := range nextHops {
+		conn, found := peer.connections[hopName]
+		// Again, !found could just be due to a race.
+		if found {
+			nextConns = append(nextConns, conn.(*LocalConnection))
+		}
+	}
+	return nextConns
 }
 
 func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) error {
@@ -105,8 +108,9 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 	if err != nil {
 		return err
 	}
-	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String())
-	NewLocalConnection(connRemote, acceptNewPeer, tcpConn, udpAddr, peer.Router)
+	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String(), false)
+	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.Router)
+	connLocal.Start(acceptNewPeer)
 	return nil
 }
 
@@ -114,16 +118,24 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 
 const (
 	PAddConnection = iota
-	PBroadcastTCP
-	PDeleteConnection
 	PConnectionEstablished
+	PDeleteConnection
+	PSendProtocolMsg
 )
 
-// Async: rely on the peer to shut us down if we shouldn't be adding
-// ourselves, so therefore this can be async
+// Sync.
 func (peer *LocalPeer) AddConnection(conn *LocalConnection) {
+	resultChan := make(chan interface{})
 	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PAddConnection},
+		Interaction: Interaction{code: PAddConnection, resultChan: resultChan},
+		payload:     conn}
+	<-resultChan
+}
+
+// Async.
+func (peer *LocalPeer) ConnectionEstablished(conn *LocalConnection) {
+	peer.queryChan <- &PeerInteraction{
+		Interaction: Interaction{code: PConnectionEstablished},
 		payload:     conn}
 }
 
@@ -137,42 +149,50 @@ func (peer *LocalPeer) DeleteConnection(conn *LocalConnection) {
 }
 
 // Async.
-func (peer *LocalPeer) ConnectionEstablished(conn *LocalConnection) {
+func (peer *LocalPeer) SendProtocolMsg(m ProtocolMsg) {
 	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PConnectionEstablished},
-		payload:     conn}
-}
-
-// Async.
-func (peer *LocalPeer) BroadcastTCP(msg []byte) {
-	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PBroadcastTCP},
-		payload:     msg}
+		Interaction: Interaction{code: PSendProtocolMsg},
+		payload:     m}
 }
 
 // ACTOR server
 
 func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
+	gossipTimer := time.Tick(GossipInterval)
 	for {
-		query, ok := <-queryChan
-		if !ok {
-			return
-		}
-		switch query.code {
-		case PAddConnection:
-			peer.handleAddConnection(query.payload.(*LocalConnection))
-		case PDeleteConnection:
-			peer.handleDeleteConnection(query.payload.(*LocalConnection))
-			query.resultChan <- nil
-		case PConnectionEstablished:
-			peer.handleConnectionEstablished(query.payload.(*LocalConnection))
-		case PBroadcastTCP:
-			peer.handleBroadcastTCP(query.payload.([]byte))
+		select {
+		case query, ok := <-queryChan:
+			if !ok {
+				return
+			}
+			switch query.code {
+			case PAddConnection:
+				conn := query.payload.(*LocalConnection)
+				if peer.handleAddConnection(conn) {
+					conn.log("connection added")
+				}
+				query.resultChan <- nil
+			case PConnectionEstablished:
+				conn := query.payload.(*LocalConnection)
+				if peer.handleConnectionEstablished(conn) {
+					conn.log("connection fully established")
+				}
+			case PDeleteConnection:
+				conn := query.payload.(*LocalConnection)
+				if peer.handleDeleteConnection(conn) {
+					conn.log("connection deleted")
+				}
+				query.resultChan <- nil
+			case PSendProtocolMsg:
+				peer.handleSendProtocolMsg(query.payload.(ProtocolMsg))
+			}
+		case <-gossipTimer:
+			peer.Router.SendAllGossip()
 		}
 	}
 }
 
-func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
+func (peer *LocalPeer) handleAddConnection(conn Connection) bool {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Attempt made to add connection to peer where peer is not the source of connection")
 	}
@@ -184,36 +204,47 @@ func (peer *LocalPeer) handleAddConnection(conn *LocalConnection) {
 	// deliberately non symmetrical
 	if dupConn, found := peer.connections[toName]; found {
 		if dupConn == conn {
-			return
+			return false
 		}
-		// conn.UID is used as the tie breaker here, in the
-		// knowledge that both sides will make the same decision.
-		dupConnLocal := dupConn.(*LocalConnection)
-		if conn.UID == dupConnLocal.UID {
+		switch conn.BreakTie(dupConn) {
+		case TieBreakWon:
+			dupConn.Shutdown(dupErr)
+			peer.handleDeleteConnection(dupConn)
+		case TieBreakLost:
+			conn.Shutdown(dupErr)
+			return false
+		case TieBreakTied:
 			// oh good grief. Sod it, just kill both of them.
-			conn.CheckFatal(dupErr)
-			dupConnLocal.CheckFatal(dupErr)
-			peer.handleDeleteConnection(dupConnLocal)
-			return
-		} else if conn.UID < dupConnLocal.UID {
-			dupConnLocal.CheckFatal(dupErr)
-			peer.handleDeleteConnection(dupConnLocal)
-		} else {
-			conn.CheckFatal(dupErr)
-			return
+			conn.Shutdown(dupErr)
+			dupConn.Shutdown(dupErr)
+			peer.handleDeleteConnection(dupConn)
+			return false
 		}
 	}
 	if err := peer.checkConnectionLimit(); err != nil {
-		conn.CheckFatal(err)
-		return
+		conn.Shutdown(err)
+		return false
 	}
-	peer.Lock()
-	peer.connections[toName] = conn
-	peer.Unlock()
-	conn.log("connection added")
+	peer.addConnection(conn)
+	peer.Router.SendAllGossipDown(conn)
+	peer.broadcastPeerUpdate(conn.Remote())
+	return true
 }
 
-func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
+func (peer *LocalPeer) handleConnectionEstablished(conn Connection) bool {
+	if peer.Peer != conn.Local() {
+		log.Fatal("Peer informed of active connection where peer is not the source of connection")
+	}
+	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
+		conn.Shutdown(fmt.Errorf("Cannot set unknown connection active"))
+		return false
+	}
+	peer.connectionEstablished(conn)
+	peer.broadcastPeerUpdate()
+	return true
+}
+
+func (peer *LocalPeer) handleDeleteConnection(conn Connection) bool {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Attempt made to delete connection from peer where peer is not the source of connection")
 	}
@@ -222,51 +253,32 @@ func (peer *LocalPeer) handleDeleteConnection(conn *LocalConnection) {
 	}
 	toName := conn.Remote().Name
 	if connFound, found := peer.connections[toName]; !found || connFound != conn {
-		return
+		return false
 	}
-	peer.Lock()
-	delete(peer.connections, toName)
-	peer.Unlock()
-	conn.log("connection deleted")
-	broadcast := false
-	if conn.Established() {
-		peer.Lock()
-		peer.version += 1
-		peer.Unlock()
-		broadcast = true
-	}
+	peer.deleteConnection(conn)
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
 	peer.Router.Peers.GarbageCollect()
-	if broadcast {
-		peer.broadcastPeerUpdate()
-	}
+	peer.broadcastPeerUpdate()
+	return true
 }
 
-func (peer *LocalPeer) handleConnectionEstablished(conn *LocalConnection) {
-	if peer.Peer != conn.Local() {
-		log.Fatal("Peer informed of active connection where peer is not the source of connection")
-	}
-	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
-		conn.CheckFatal(fmt.Errorf("Cannot set unknown connection active"))
-		return
-	}
-	peer.Lock()
-	peer.version += 1
-	peer.Unlock()
-	conn.log("connection fully established")
-	peer.broadcastPeerUpdate(conn.Remote())
-}
-
-func (peer *LocalPeer) handleBroadcastTCP(msg []byte) {
+func (peer *LocalPeer) handleSendProtocolMsg(m ProtocolMsg) {
 	peer.ForEachConnection(func(_ PeerName, conn Connection) {
-		conn.(*LocalConnection).SendTCP(msg)
+		conn.(ProtocolSender).SendProtocolMsg(m)
 	})
 }
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
-	peer.handleBroadcastTCP(Concat(ProtocolUpdateByte, EncodePeers(append(peers, peer.Peer)...)))
+	// TODO We should just be invoking TopologyGossip.GossipBroadcast
+	// here, but route calculation is asynchronous and in this
+	// particular case would likely result in the broadcast not
+	// reaching all peers. So instead we slightly break the Gossip
+	// abstraction (hence the cast) and send a regular update. This is
+	// less efficient though since it will almost certainly reach
+	// peers more than once.
+	peer.Router.TopologyGossip.(*GossipChannel).SendGossipMsg(EncodePeers(append(peers, peer.Peer)...))
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

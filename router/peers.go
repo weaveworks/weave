@@ -11,15 +11,21 @@ import (
 type Peers struct {
 	sync.RWMutex
 	ourself *Peer
-	macs    *MacCache
 	table   map[PeerName]*Peer
 	onGC    func(*Peer)
 }
 
-func NewPeers(ourself *Peer, macs *MacCache, onGC func(*Peer)) *Peers {
+type UnknownPeerError struct {
+	Name PeerName
+}
+
+type NameCollisionError struct {
+	Name PeerName
+}
+
+func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
-		macs:    macs,
 		table:   make(map[PeerName]*Peer),
 		onGC:    onGC}
 }
@@ -57,6 +63,12 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 	}
 }
 
+// Merge an incoming update with our own topology.
+//
+// We add peers hitherto unknown to us, and update peers for which the
+// update contains a more recent version than known to us. The return
+// value is an "improved" update containing just these new/updated
+// elements.
 func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
 	peers.Lock()
 
@@ -96,7 +108,7 @@ func EncodePeers(peers ...*Peer) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	for _, peer := range peers {
-		peer.encodePeer(enc)
+		peer.encode(enc)
 	}
 	return buf.Bytes()
 }
@@ -112,7 +124,11 @@ func (peers *Peers) String() string {
 	peers.ForEach(func(name PeerName, peer *Peer) {
 		buf.WriteString(fmt.Sprint(peer, "\n"))
 		peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
-			buf.WriteString(fmt.Sprintf("   -> %v [%v]\n", remoteName, conn.RemoteTCPAddr()))
+			established := ""
+			if !conn.Established() {
+				established = " (unestablished)"
+			}
+			buf.WriteString(fmt.Sprintf("   -> %v [%v%s]\n", remoteName, conn.RemoteTCPAddr(), established))
 		})
 	})
 	return buf.String()
@@ -132,12 +148,11 @@ func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
 
 func (peers *Peers) garbageCollect() []*Peer {
 	removed := []*Peer{}
+	_, reached := peers.ourself.Routes(nil, false)
 	for name, peer := range peers.table {
-		found, _ := peers.ourself.Routes(peer, false)
-		if !found && !peer.IsLocallyReferenced() {
-			peers.onGC(peer)
+		if _, found := reached[peer.Name]; !found && !peer.IsLocallyReferenced() {
 			delete(peers.table, name)
-			peers.macs.Delete(peer)
+			peers.onGC(peer)
 			removed = append(removed, peer)
 		}
 	}
@@ -148,7 +163,7 @@ func encodePeersMap(peers map[PeerName]*Peer) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	for _, peer := range peers {
-		peer.encodePeer(enc)
+		peer.encode(enc)
 	}
 	return buf.Bytes()
 }
@@ -183,9 +198,8 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 		}
 	}
 
-	unknownPeers := false
 	for _, connsBuf := range decodedConns {
-		connsIterator(connsBuf, func(remoteNameByte []byte, _ string) {
+		decErr := connsIterator(connsBuf, func(remoteNameByte []byte, _ string, _ bool) {
 			remoteName := PeerNameFromBin(remoteNameByte)
 			if _, found := newPeers[remoteName]; found {
 				return
@@ -195,12 +209,14 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			}
 			// Update refers to a peer which we have no knowledge
 			// of. Thus we can't apply the update. Abort.
-			unknownPeers = true
+			err = UnknownPeerError{remoteName}
 		})
-	}
-	if unknownPeers {
-		err = UnknownPeersError{}
-		return
+		if decErr != nil && decErr != io.EOF {
+			err = decErr
+		}
+		if err != nil {
+			return
+		}
 	}
 	return
 }
@@ -212,23 +228,12 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte) ma
 		name := newPeer.Name
 		// guaranteed to find peer in the peers.table
 		peer := peers.table[name]
-		if peer != newPeer {
-			if peer.Version() > newPeer.Version() {
-				// we know more about this one than the update. If
-				// peer is ourself, this is slightly racey (further
-				// changes could occur to ourself in the mean
-				// time). But it doesn't matter as we know that we're
-				// already > newPeer.Version() and that's not going to
-				// change.
-				newUpdate[name] = peer
-				continue
-			} else if peer == peers.ourself {
-				// nobody but us updates us
-				continue
-			} else if peer.Version() == newPeer.Version() {
-				// implication is that connections are equal too
-				continue
-			}
+		if peer != newPeer &&
+			(peer == peers.ourself || peer.Version() >= newPeer.Version()) {
+			// Nobody but us updates us. And if we know more about a
+			// peer than what's in the the update, we ignore the
+			// latter.
+			continue
 		}
 		// If we're here, either it was a new peer, or the update has
 		// more info about the peer than we do. Either case, we need
@@ -247,7 +252,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]byte) ma
 	return newUpdate
 }
 
-func (peer *Peer) encodePeer(enc *gob.Encoder) {
+func (peer *Peer) encode(enc *gob.Encoder) {
 	peer.RLock()
 	defer peer.RUnlock()
 
@@ -258,60 +263,62 @@ func (peer *Peer) encodePeer(enc *gob.Encoder) {
 	connsBuf := new(bytes.Buffer)
 	connsEnc := gob.NewEncoder(connsBuf)
 	for _, conn := range peer.connections {
-		// DANGER holding rlock on peer, going to take rlock on conn
-		if !conn.Established() {
-			continue
-		}
 		checkFatal(connsEnc.Encode(conn.Remote().NameByte))
 		checkFatal(connsEnc.Encode(conn.RemoteTCPAddr()))
+		// DANGER holding rlock on peer, going to take rlock on conn
+		checkFatal(connsEnc.Encode(conn.Established()))
 	}
 	checkFatal(enc.Encode(connsBuf.Bytes()))
 }
 
 func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, uid uint64, version uint64, conns []byte, err error) {
-	err = dec.Decode(&nameByte)
-	if err != nil {
+	if err = dec.Decode(&nameByte); err != nil {
 		return
 	}
-	err = dec.Decode(&uid)
-	if err != nil {
+	if err = dec.Decode(&uid); err != nil {
 		return
 	}
-	err = dec.Decode(&version)
-	if err != nil {
+	if err = dec.Decode(&version); err != nil {
 		return
 	}
-	err = dec.Decode(&conns)
-	if err == io.EOF {
-		err = nil
+	if err = dec.Decode(&conns); err != nil {
+		return
 	}
 	return
 }
 
-func connsIterator(input []byte, fun func([]byte, string)) {
+func connsIterator(input []byte, fun func([]byte, string, bool)) error {
 	buf := new(bytes.Buffer)
 	buf.Write(input)
 	dec := gob.NewDecoder(buf)
 	for {
 		var nameByte []byte
-		err := dec.Decode(&nameByte)
-		if err == io.EOF {
-			return
+		if err := dec.Decode(&nameByte); err != nil {
+			return err
 		}
-		checkFatal(err)
 		var foundAt string
-		checkFatal(dec.Decode(&foundAt))
-		fun(nameByte, string(foundAt))
+		if err := dec.Decode(&foundAt); err != nil {
+			return err
+		}
+		var established bool
+		if err := dec.Decode(&established); err != nil {
+			return err
+		}
+		fun(nameByte, foundAt, established)
 	}
 }
 
 func readConnsMap(peer *Peer, buf []byte, table map[PeerName]*Peer) map[PeerName]Connection {
 	conns := make(map[PeerName]Connection)
-	connsIterator(buf, func(nameByte []byte, remoteTCPAddr string) {
+	if err := connsIterator(buf, func(nameByte []byte, remoteTCPAddr string, established bool) {
 		name := PeerNameFromBin(nameByte)
 		remotePeer := table[name]
-		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr)
+		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr, established)
 		conns[name] = conn
-	})
+	}); err != io.EOF {
+		// this should never happen since we've already successfully
+		// decoded the same data in decodeUpdate
+		checkFatal(err)
+	}
 	return conns
 }

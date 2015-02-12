@@ -11,6 +11,8 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"net"
+	"sync"
 )
 
 func GenerateKeyPair() (publicKey, privateKey *[32]byte, err error) {
@@ -83,7 +85,8 @@ func EncodeNonce(df bool) (*[24]byte, []byte, error) {
 		flags = flags | 1
 	}
 	SetNonceLow15Bits(&nonce, flags)
-	return &nonce, Concat(ProtocolNonceByte, nonce[:]), nil
+	// NB: need to make a copy since callers may modify the array
+	return &nonce, Concat(nonce[:]), nil
 }
 
 func DecodeNonce(msg []byte) (bool, *[24]byte) {
@@ -98,6 +101,34 @@ func DecodeNonce(msg []byte) (bool, *[24]byte) {
 }
 
 // Frame Encryptors
+
+type Encryptor interface {
+	FrameOverhead() int
+	PacketOverhead() int
+	IsEmpty() bool
+	Bytes() []byte
+	AppendFrame(*ForwardedFrame)
+	TotalLen() int
+}
+
+type NonEncryptor struct {
+	buf       []byte
+	bufTail   []byte
+	buffered  int
+	prefixLen int
+}
+
+type NaClEncryptor struct {
+	NonEncryptor
+	buf       []byte
+	offset    uint16
+	nonce     *[24]byte
+	nonceChan chan *[24]byte
+	flags     uint16
+	prefixLen int
+	conn      *LocalConnection
+	df        bool
+}
 
 func NewNonEncryptor(prefix []byte) *NonEncryptor {
 	buf := make([]byte, MaxUDPPacketSize)
@@ -173,10 +204,11 @@ func (ne *NaClEncryptor) Bytes() []byte {
 	nonce := ne.nonce
 	if nonce == nil {
 		freshNonce, encodedNonce, err := EncodeNonce(ne.df)
-		if err = ne.conn.CheckFatal(err); err != nil {
+		if err != nil {
+			ne.conn.Shutdown(err)
 			return []byte{}
 		}
-		ne.conn.SendTCP(encodedNonce)
+		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 		ne.nonce = freshNonce
 		nonce = freshNonce
 	}
@@ -191,11 +223,12 @@ func (ne *NaClEncryptor) Bytes() []byte {
 		ne.nonce = <-ne.nonceChan
 	} else if offset == 1<<14 { // half way through range, send new nonce
 		nonce, encodedNonce, err := EncodeNonce(ne.df)
-		if err = ne.conn.CheckFatal(err); err != nil {
+		if err != nil {
+			ne.conn.Shutdown(err)
 			return []byte{}
 		}
 		ne.nonceChan <- nonce
-		ne.conn.SendTCP(encodedNonce)
+		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 	}
 	ne.offset = offset
 
@@ -211,6 +244,38 @@ func (ne *NaClEncryptor) TotalLen() int {
 }
 
 // Frame Decryptors
+
+type FrameConsumer func(*LocalConnection, *net.UDPAddr, []byte, []byte, uint16, []byte) error
+
+type Decryptor interface {
+	IterateFrames(FrameConsumer, *UDPPacket) error
+	ReceiveNonce([]byte)
+	Shutdown()
+}
+
+type NonDecryptor struct {
+	conn *LocalConnection
+}
+
+type NaClDecryptor struct {
+	NonDecryptor
+	instance   *NaClDecryptorInstance
+	instanceDF *NaClDecryptorInstance
+}
+
+type NaClDecryptorInstance struct {
+	nonce               *[24]byte
+	previousNonce       *[24]byte
+	usedOffsets         *bit.Set
+	previousUsedOffsets *bit.Set
+	highestOffsetSeen   uint16
+	nonceChan           chan *[24]byte
+}
+
+type PacketDecodingError struct {
+	Fatal bool
+	Desc  string
+}
 
 func NewNonDecryptor(conn *LocalConnection) *NonDecryptor {
 	return &NonDecryptor{conn: conn}
@@ -320,8 +385,9 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 		usedOffsets = decState.usedOffsets
 	} else {
 		highestOffsetSeen := decState.highestOffsetSeen
-		if offsetNoFlags < (1<<13) && highestOffsetSeen > ((1<<14)+(1<<13)) &&
-			(highestOffsetSeen-offsetNoFlags) > ((1<<14)+(1<<13)) {
+		switch {
+		case offsetNoFlags < (1<<13) && highestOffsetSeen > ((1<<14)+(1<<13)) &&
+			(highestOffsetSeen-offsetNoFlags) > ((1<<14)+(1<<13)):
 			// offset is in the first quarter, highestOffsetSeen is in
 			// the top quarter and under a quarter behind us. We
 			// interpret this as we need to move to the next nonce
@@ -335,29 +401,29 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 			decState.highestOffsetSeen = offsetNoFlags
 			nonce = decState.nonce
 			usedOffsets = decState.usedOffsets
-		} else if offsetNoFlags > highestOffsetSeen &&
-			(offsetNoFlags-highestOffsetSeen) < (1<<13) {
+		case offsetNoFlags > highestOffsetSeen &&
+			(offsetNoFlags-highestOffsetSeen) < (1<<13):
 			// offset is under a quarter above highestOffsetSeen. This
 			// is ok - maybe some packet loss
 			decState.highestOffsetSeen = offsetNoFlags
 			nonce = decState.nonce
 			usedOffsets = decState.usedOffsets
-		} else if offsetNoFlags <= highestOffsetSeen &&
-			(highestOffsetSeen-offsetNoFlags) < (1<<13) {
+		case offsetNoFlags <= highestOffsetSeen &&
+			(highestOffsetSeen-offsetNoFlags) < (1<<13):
 			// offset is within a quarter of the highest we've
 			// seen. This is ok - just assuming some out-of-order
 			// delivery.
 			nonce = decState.nonce
 			usedOffsets = decState.usedOffsets
-		} else if highestOffsetSeen < (1<<13) && offsetNoFlags > ((1<<14)+(1<<13)) &&
-			(offsetNoFlags-highestOffsetSeen) > ((1<<14)+(1<<13)) {
+		case highestOffsetSeen < (1<<13) && offsetNoFlags > ((1<<14)+(1<<13)) &&
+			(offsetNoFlags-highestOffsetSeen) > ((1<<14)+(1<<13)):
 			// offset is in the last quarter, highestOffsetSeen is in
 			// the first quarter, and offset is under a quarter behind
 			// us. This is ok - as above, just some out of order. But
 			// here it means we're dealing with the previous nonce
 			nonce = decState.previousNonce
 			usedOffsets = decState.previousUsedOffsets
-		} else {
+		default:
 			return nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
 		}
 	}
@@ -376,6 +442,28 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 }
 
 // TCP Senders
+
+type TCPSender interface {
+	Send([]byte) error
+}
+
+type SimpleTCPSender struct {
+	encoder *gob.Encoder
+}
+
+type EncryptedTCPSender struct {
+	sync.RWMutex
+	outerEncoder *gob.Encoder
+	innerEncoder *gob.Encoder
+	buffer       *bytes.Buffer
+	conn         *LocalConnection
+	msgCount     int
+}
+
+type EncryptedTCPMessage struct {
+	Number int
+	Body   []byte
+}
 
 func NewSimpleTCPSender(encoder *gob.Encoder) *SimpleTCPSender {
 	return &SimpleTCPSender{encoder: encoder}
@@ -415,6 +503,20 @@ func (sender *EncryptedTCPSender) Send(msg []byte) error {
 }
 
 // TCP Receivers
+
+type TCPReceiver interface {
+	Decode([]byte) ([]byte, error)
+}
+
+type SimpleTCPReceiver struct {
+}
+
+type EncryptedTCPReceiver struct {
+	conn     *LocalConnection
+	decoder  *gob.Decoder
+	buffer   *bytes.Buffer
+	msgCount int
+}
 
 func NewSimpleTCPReceiver() *SimpleTCPReceiver {
 	return &SimpleTCPReceiver{}

@@ -3,19 +3,73 @@ package router
 import (
 	"encoding/binary"
 	"encoding/gob"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
-	"strconv"
+	"sync"
 	"time"
 )
 
-func NewRemoteConnection(from, to *Peer, tcpAddr string) *RemoteConnection {
+type Connection interface {
+	Local() *Peer
+	Remote() *Peer
+	BreakTie(Connection) ConnectionTieBreak
+	RemoteTCPAddr() string
+	Established() bool
+	Shutdown(error)
+}
+
+type ConnectionTieBreak int
+
+const (
+	TieBreakWon ConnectionTieBreak = iota
+	TieBreakLost
+	TieBreakTied
+)
+
+type RemoteConnection struct {
+	local         *Peer
+	remote        *Peer
+	remoteTCPAddr string
+	established   bool
+}
+
+type LocalConnection struct {
+	sync.RWMutex
+	RemoteConnection
+	TCPConn            *net.TCPConn
+	tcpSender          TCPSender
+	remoteUDPAddr      *net.UDPAddr
+	receivedHeartbeat  bool
+	stackFrag          bool
+	effectivePMTU      int
+	SessionKey         *[32]byte
+	establishedTimeout *time.Timer
+	heartbeatFrame     *ForwardedFrame
+	heartbeat          *time.Ticker
+	fragTest           *time.Ticker
+	forwardChan        chan<- *ForwardedFrame
+	forwardChanDF      chan<- *ForwardedFrame
+	stopForward        chan<- interface{}
+	stopForwardDF      chan<- interface{}
+	verifyPMTU         chan<- int
+	Decryptor          Decryptor
+	Router             *Router
+	uid                uint64
+	queryChan          chan<- *ConnectionInteraction
+}
+
+type ConnectionInteraction struct {
+	Interaction
+	payload interface{}
+}
+
+func NewRemoteConnection(from, to *Peer, tcpAddr string, established bool) *RemoteConnection {
 	return &RemoteConnection{
 		local:         from,
 		remote:        to,
-		remoteTCPAddr: tcpAddr}
+		remoteTCPAddr: tcpAddr,
+		established:   established}
 }
 
 func (conn *RemoteConnection) Local() *Peer {
@@ -26,15 +80,19 @@ func (conn *RemoteConnection) Remote() *Peer {
 	return conn.remote
 }
 
+func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak {
+	return TieBreakTied
+}
+
 func (conn *RemoteConnection) RemoteTCPAddr() string {
 	return conn.remoteTCPAddr
 }
 
-func (conn *RemoteConnection) Shutdown(error) {
+func (conn *RemoteConnection) Established() bool {
+	return conn.established
 }
 
-func (conn *RemoteConnection) Established() bool {
-	return true
+func (conn *RemoteConnection) Shutdown(error) {
 }
 
 func (conn *RemoteConnection) String() string {
@@ -49,29 +107,38 @@ func (conn *RemoteConnection) String() string {
 	return fmt.Sprint("Connection ", from, "->", to)
 }
 
-// Async. Does not return anything. If the connection is successful,
-// it will end up in the local peer's connections map.
-func NewLocalConnection(connRemote *RemoteConnection, acceptNewPeer bool, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router) {
+func NewLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router) *LocalConnection {
 	if connRemote.local != router.Ourself.Peer {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
-
-	queryChan := make(chan *ConnectionInteraction, ChannelSize)
 	// NB, we're taking a copy of connRemote here.
-	connLocal := &LocalConnection{
+	return &LocalConnection{
 		RemoteConnection: *connRemote,
 		Router:           router,
 		TCPConn:          tcpConn,
 		remoteUDPAddr:    udpAddr,
-		effectivePMTU:    DefaultPMTU,
-		queryChan:        queryChan}
-	go connLocal.queryLoop(queryChan, acceptNewPeer)
+		effectivePMTU:    DefaultPMTU}
 }
 
-func (conn *LocalConnection) Established() bool {
-	conn.RLock()
-	defer conn.RUnlock()
-	return conn.established
+// Async. Does not return anything. If the connection is successful,
+// it will end up in the local peer's connections map.
+func (conn *LocalConnection) Start(acceptNewPeer bool) {
+	queryChan := make(chan *ConnectionInteraction, ChannelSize)
+	conn.queryChan = queryChan
+	go conn.run(queryChan, acceptNewPeer)
+}
+
+func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
+	dupConnLocal := dupConn.(*LocalConnection)
+	// conn.uid is used as the tie breaker here, in the knowledge that
+	// both sides will make the same decision.
+	if conn.uid < dupConnLocal.uid {
+		return TieBreakWon
+	} else if dupConnLocal.uid < conn.uid {
+		return TieBreakLost
+	} else {
+		return TieBreakTied
+	}
 }
 
 // Read by the forwarder processes when in the UDP senders
@@ -81,15 +148,10 @@ func (conn *LocalConnection) RemoteUDPAddr() *net.UDPAddr {
 	return conn.remoteUDPAddr
 }
 
-// Called by the forwarder processes in a few places (including
-// crypto), but the connection TCP receiver process, and by the local
-// peer actor process. Do not call this from the connection's actor
-// process itself.
-func (conn *LocalConnection) CheckFatal(err error) error {
-	if err != nil {
-		conn.Shutdown(err)
-	}
-	return err
+func (conn *LocalConnection) Established() bool {
+	conn.RLock()
+	defer conn.RUnlock()
+	return conn.established
 }
 
 // Called by forwarder processes, read in Forward (by sniffer and udp
@@ -113,17 +175,15 @@ func (conn *LocalConnection) setStackFrag(frag bool) {
 }
 
 func (conn *LocalConnection) log(args ...interface{}) {
-	v := append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name))
-	v = append(v, args...)
-	log.Println(v...)
+	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
 }
 
 // ACTOR client API
 
 const (
-	CSendTCP = iota
+	CSendProtocolMsg = iota
 	CSetEstablished
-	CSetRemoteUDPAddr
+	CReceivedHeartbeat
 	CShutdown
 )
 
@@ -131,16 +191,20 @@ const (
 func (conn *LocalConnection) Shutdown(err error) {
 	conn.queryChan <- &ConnectionInteraction{
 		Interaction: Interaction{code: CShutdown},
-	    payload:     err}
+		payload:     err}
 }
 
 // Async
-func (conn *LocalConnection) SetRemoteUDPAddr(remoteUDPAddr *net.UDPAddr) {
-	if remoteUDPAddr == nil {
+//
+// Heartbeating serves two purposes: a) keeping NAT paths alive, and
+// b) updating a remote peer's knowledge of our address, in the event
+// it changes (e.g. because NAT paths expired).
+func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connUID uint64) {
+	if remoteUDPAddr == nil || connUID != conn.uid {
 		return
 	}
 	conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: CSetRemoteUDPAddr},
+		Interaction: Interaction{code: CReceivedHeartbeat},
 		payload:     remoteUDPAddr}
 }
 
@@ -150,29 +214,74 @@ func (conn *LocalConnection) SetEstablished() {
 }
 
 // Async
-func (conn *LocalConnection) SendTCP(msg []byte) {
+func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 	conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: CSendTCP},
-		payload:     msg}
+		Interaction: Interaction{code: CSendProtocolMsg},
+		payload:     m}
 }
 
 // ACTOR server
 
-func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
-	err := conn.handshake(acceptNewPeer)
-	if err != nil {
+func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
+	defer conn.handleShutdown()
+
+	tcpConn := conn.TCPConn
+	tcpConn.SetLinger(0)
+	enc := gob.NewEncoder(tcpConn)
+	dec := gob.NewDecoder(tcpConn)
+
+	if err := conn.handshake(enc, dec, acceptNewPeer); err != nil {
 		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
-		conn.handleShutdown()
 		return
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
-	conn.Router.Ourself.AddConnection(conn)
+
+	// We invoke AddConnection in the same goroutine that subsequently
+	// becomes the tcp receive loop, rather than outside, because a)
+	// the ordering relative to the receive loop is the only one that
+	// matters [1], b) it prevents unnecessary delays in entering the
+	// main connection loop, and c) it guards against potential
+	// deadlocks.
+	go func() {
+		conn.Router.Ourself.AddConnection(conn)
+		conn.receiveTCP(dec)
+	}()
+
+	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
+	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.uid)
+	conn.heartbeatFrame = &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   heartbeatFrameBytes}
+
 	if conn.remoteUDPAddr != nil {
-		if err = conn.ensureForwarders(); err == nil {
-			conn.heartbeat = time.NewTicker(FastHeartbeat)
-			conn.forwardHeartbeatFrame() // avoid initial wait
+		if err := conn.sendFastHeartbeats(); err != nil {
+			conn.log("connection shutting down due to error:", err)
+			return
 		}
 	}
+
+	conn.establishedTimeout = time.NewTimer(EstablishedTimeout)
+
+	if err := conn.queryLoop(queryChan); err != nil {
+		conn.log("connection shutting down due to error:", err)
+	} else {
+		conn.log("connection shutting down")
+	}
+}
+
+// [1] In the absence of any indirect connectivity to the remote peer,
+// the first we hear about it (and any peers reachable from it) is
+// through topology gossip it sends us on the connection. We must
+// ensure that the connection has been added to Ourself prior to
+// processing any such gossip, otherwise we risk immediately gc'ing
+// part of that newly received portion of the topology (though not the
+// remote peer itself, since that will have a positive ref count),
+// leaving behind dangling references to peers. Therefore we invoke
+// AddConnection, which is *synchronous*, before entering the tcp
+// receive loop.
+
+func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) (err error) {
 	terminate := false
 	for !terminate && err == nil {
 		select {
@@ -184,90 +293,95 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction, 
 			case CShutdown:
 				err = query.payload.(error)
 				terminate = true
+			case CReceivedHeartbeat:
+				err = conn.handleReceivedHeartbeat(query.payload.(*net.UDPAddr))
 			case CSetEstablished:
+				conn.establishedTimeout.Stop()
 				err = conn.handleSetEstablished()
-			case CSetRemoteUDPAddr:
-				err = conn.handleSetRemoteUDPAddr(query.payload.(*net.UDPAddr))
-			case CSendTCP:
-				err = conn.handleSendTCP(query.payload.([]byte))
+			case CSendProtocolMsg:
+				err = conn.handleSendProtocolMsg(query.payload.(ProtocolMsg))
+			}
+		case <-conn.establishedTimeout.C:
+			if !conn.established {
+				err = fmt.Errorf("failed to establish UDP connectivity")
 			}
 		case <-tickerChan(conn.heartbeat):
-			conn.forwardHeartbeatFrame()
-		case <-tickerChan(conn.fetchAll):
-			err = conn.handleSendTCP(ProtocolFetchAllByte)
+			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
-			err = conn.handleSendTCP(ProtocolStartFragmentationTestByte)
-
+			err = conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest)
 		}
 	}
-	if netErr, ok := err.(net.Error); ok && netErr.Timeout() && !conn.established {
-		conn.log("connection shutting down due to timeout; possibly caused by blocked UDP connectivity")
-	} else if err != nil {
-		conn.log("connection shutting down due to error:", err)
-	} else {
-		conn.log("connection shutting down")
-	}
-	conn.handleShutdown()
+	return
 }
 
-func (conn *LocalConnection) handleSetRemoteUDPAddr(remoteUDPAddr *net.UDPAddr) error {
+// Handlers
+//
+// NB: The conn.* fields are only written by the connection actor
+// process, which is the caller of the handlers. Hence we do not need
+// locks for reading, and only need write locks for fields read by
+// other processes.
+
+func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr) error {
+	oldRemoteUDPAddr := conn.remoteUDPAddr
+	old := conn.receivedHeartbeat
 	conn.Lock()
-	old := conn.remoteUDPAddr
 	conn.remoteUDPAddr = remoteUDPAddr
+	conn.receivedHeartbeat = true
 	conn.Unlock()
-	if old == nil {
-		if err := conn.handleSendTCP(ProtocolConnectionEstablishedByte); err != nil {
+	if !old {
+		if err := conn.handleSendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
 			return err
 		}
-		return conn.handleSetEstablished()
-	} else if old.String() != remoteUDPAddr.String() {
+	}
+	if oldRemoteUDPAddr == nil {
+		return conn.sendFastHeartbeats()
+	} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
 		log.Println("Peer", conn.remote.Name, "moved from", old, "to", remoteUDPAddr)
 	}
 	return nil
 }
 
 func (conn *LocalConnection) handleSetEstablished() error {
-	conn.Lock()
+	stopTicker(conn.heartbeat)
 	old := conn.established
+	conn.Lock()
 	conn.established = true
 	conn.Unlock()
-	if !old {
-		conn.Router.Ourself.ConnectionEstablished(conn)
-		if err := conn.ensureForwarders(); err != nil {
-			return err
-		}
-		stopTicker(conn.heartbeat)
-		conn.heartbeat = time.NewTicker(SlowHeartbeat)
-		conn.fetchAll = time.NewTicker(FetchAllInterval)
-		conn.fragTest = time.NewTicker(FragTestInterval)
-		conn.forwardHeartbeatFrame() // avoid initial wait
-		// Send a large frame down the DF channel in order to prompt
-		// PMTU discovery to start.
-		conn.Forward(true, &ForwardedFrame{
-			srcPeer: conn.local,
-			dstPeer: conn.remote,
-			frame:   PMTUDiscovery},
-			nil)
-		conn.setStackFrag(false)
-		return conn.handleSendTCP(ProtocolStartFragmentationTestByte)
+	if old {
+		return nil
+	}
+	conn.Router.Ourself.ConnectionEstablished(conn)
+	if err := conn.ensureForwarders(); err != nil {
+		return err
+	}
+	// Send a large frame down the DF channel in order to prompt
+	// PMTU discovery to start.
+	conn.Forward(true, &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   PMTUDiscovery},
+		nil)
+	conn.heartbeat = time.NewTicker(SlowHeartbeat)
+	conn.fragTest = time.NewTicker(FragTestInterval)
+	// avoid initial waits for timers to fire
+	conn.Forward(true, conn.heartbeatFrame, nil)
+	conn.setStackFrag(false)
+	if err := conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (conn *LocalConnection) handleSendTCP(msg []byte) error {
-	return conn.tcpSender.Send(msg)
+func (conn *LocalConnection) handleSendSimpleProtocolMsg(tag ProtocolTag) error {
+	return conn.handleSendProtocolMsg(ProtocolMsg{tag: tag})
+}
+
+func (conn *LocalConnection) handleSendProtocolMsg(m ProtocolMsg) error {
+	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
 }
 
 func (conn *LocalConnection) handleShutdown() {
-	// Whilst some of these elements may have been written to whilst
-	// holding locks, they were only written to by the connection
-	// actor process. handleShutdown is only called by the connection
-	// actor process. So there is no need to take locks to read these
-	// (or write elements which are only read by the same
-	// process). Taking locks is only done for elements which are read
-	// by other processes.
-
 	if conn.TCPConn != nil {
 		checkWarn(conn.TCPConn.Close())
 	}
@@ -277,8 +391,11 @@ func (conn *LocalConnection) handleShutdown() {
 		conn.Router.Ourself.DeleteConnection(conn)
 	}
 
+	if conn.establishedTimeout != nil {
+		conn.establishedTimeout.Stop()
+	}
+
 	stopTicker(conn.heartbeat)
-	stopTicker(conn.fetchAll)
 	stopTicker(conn.fragTest)
 
 	// blank out the forwardChan so that the router processes don't
@@ -288,146 +405,11 @@ func (conn *LocalConnection) handleShutdown() {
 	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr)
 }
 
-func (conn *LocalConnection) handshake(acceptNewPeer bool) error {
-	// We do not need to worry about locking in here as at this point,
-	// the connection is not reachable by any go-routine other than
-	// ourself. Only when we add this connection to the conn.local
-	// peer will it be visible from multiple go-routines.
-	tcpConn := conn.TCPConn
-	tcpConn.SetLinger(0)
-	conn.extendReadDeadline()
+// Helpers
 
-	enc := gob.NewEncoder(tcpConn)
-
-	localConnID := randUint64()
-
-	versionStr := fmt.Sprint(ProtocolVersion)
-	handshakeSend := map[string]string{
-		"Protocol":        Protocol,
-		"ProtocolVersion": versionStr,
-		"PeerNameFlavour": PeerNameFlavour,
-		"Name":            conn.local.Name.String(),
-		"UID":             fmt.Sprint(conn.local.UID),
-		"ConnID":          fmt.Sprint(localConnID)}
-	handshakeRecv := map[string]string{}
-
-	usingPassword := conn.Router.UsingPassword()
-	var public, private *[32]byte
-	var err error
-	if usingPassword {
-		public, private, err = GenerateKeyPair()
-		if err != nil {
-			return err
-		}
-		handshakeSend["PublicKey"] = hex.EncodeToString(public[:])
-	}
-	enc.Encode(handshakeSend)
-
-	dec := gob.NewDecoder(tcpConn)
-	err = dec.Decode(&handshakeRecv)
-	if err != nil {
-		return err
-	}
-	_, err = checkHandshakeStringField("Protocol", Protocol, handshakeRecv)
-	if err != nil {
-		return err
-	}
-	_, err = checkHandshakeStringField("ProtocolVersion", versionStr, handshakeRecv)
-	if err != nil {
-		return err
-	}
-	_, err = checkHandshakeStringField("PeerNameFlavour", PeerNameFlavour, handshakeRecv)
-	if err != nil {
-		return err
-	}
-	nameStr, err := checkHandshakeStringField("Name", "", handshakeRecv)
-	if err != nil {
-		return err
-	}
-	name, err := PeerNameFromString(nameStr)
-	if err != nil {
-		return err
-	}
-	if !acceptNewPeer {
-		if _, found := conn.Router.Peers.Fetch(name); !found {
-			return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
-		}
-	}
-	if existingConn, found := conn.local.ConnectionTo(name); found && existingConn.Established() {
-		return fmt.Errorf("Already have connection to %s at %s", name, existingConn.RemoteTCPAddr())
-	}
-
-	uidStr, err := checkHandshakeStringField("UID", "", handshakeRecv)
-	if err != nil {
-		return err
-	}
-	uid, err := strconv.ParseUint(uidStr, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	remoteConnIdStr, err := checkHandshakeStringField("ConnID", "", handshakeRecv)
-	if err != nil {
-		return err
-	}
-	remoteConnID, err := strconv.ParseUint(remoteConnIdStr, 10, 64)
-	if err != nil {
-		return err
-	}
-	conn.UID = localConnID ^ remoteConnID
-
-	if usingPassword {
-		remotePublicStr, rpErr := checkHandshakeStringField("PublicKey", "", handshakeRecv)
-		if rpErr != nil {
-			return rpErr
-		}
-		remotePublicSlice, rpErr := hex.DecodeString(remotePublicStr)
-		if rpErr != nil {
-			return rpErr
-		}
-		remotePublic := [32]byte{}
-		for idx, elem := range remotePublicSlice {
-			remotePublic[idx] = elem
-		}
-		conn.SessionKey = FormSessionKey(&remotePublic, private, conn.Router.Password)
-		conn.tcpSender = NewEncryptedTCPSender(enc, conn)
-		conn.Decryptor = NewNaClDecryptor(conn)
-	} else {
-		if _, found := handshakeRecv["PublicKey"]; found {
-			return fmt.Errorf("Remote network is encrypted. Password required.")
-		}
-		conn.tcpSender = NewSimpleTCPSender(enc)
-		conn.Decryptor = NewNonDecryptor(conn)
-	}
-
-	toPeer := NewPeer(name, uid, 0)
-	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
-	if toPeer == nil {
-		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
-	} else if toPeer == conn.local {
-		// have to do assigment here to ensure Shutdown releases ref count
-		conn.remote = toPeer
-		return fmt.Errorf("Cannot connect to ourself")
-	}
-	conn.remote = toPeer
-
-	go conn.receiveTCP(dec, usingPassword)
-	return nil
-}
-
-func checkHandshakeStringField(fieldName string, expectedValue string, handshake map[string]string) (string, error) {
-	val, found := handshake[fieldName]
-	if !found {
-		return "", fmt.Errorf("Field %s is missing", fieldName)
-	}
-	if expectedValue != "" && val != expectedValue {
-		return "", fmt.Errorf("Field %s has wrong value; expected '%s', received '%s'", fieldName, expectedValue, val)
-	}
-	return val, nil
-}
-
-func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool) {
+func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	defer conn.Decryptor.Shutdown()
+	usingPassword := conn.SessionKey != nil
 	var receiver TCPReceiver
 	if usingPassword {
 		receiver = NewEncryptedTCPReceiver(conn)
@@ -438,94 +420,70 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder, usingPassword bool
 	for {
 		var msg []byte
 		conn.extendReadDeadline()
-		if conn.CheckFatal(decoder.Decode(&msg)) != nil {
-			return
+		if err = decoder.Decode(&msg); err != nil {
+			break
 		}
 		msg, err = receiver.Decode(msg)
 		if err != nil {
-			checkWarn(err)
-			// remote peer may be using wrong password. Or there could
-			// be some sort of injection attack going on. Just ignore
-			// the traffic rather than shutting down.
+			break
+		}
+		if len(msg) < 1 {
+			conn.log("ignoring blank msg")
 			continue
 		}
-		if msg[0] == ProtocolConnectionEstablished {
-			// We initiated the connection. We sent fast heartbeats to
-			// the remote side, which has now received at least one of
-			// them and thus has informed us via TCP that it considers
-			// the connection is now up. We now do a fetchAll on it.
-			conn.SetEstablished()
-			conn.SendTCP(ProtocolFetchAllByte)
-		} else if msg[0] == ProtocolStartFragmentationTest {
-			conn.Forward(false, &ForwardedFrame{
-				srcPeer: conn.local,
-				dstPeer: conn.remote,
-				frame:   FragTest},
-				nil)
-		} else if msg[0] == ProtocolFragmentationReceived {
-			conn.setStackFrag(true)
-		} else if usingPassword && msg[0] == ProtocolNonce {
-			conn.Decryptor.ReceiveNonce(msg[1:])
-		} else if msg[0] == ProtocolFetchAll {
-			// There are exactly two messages that relate to topology
-			// updates.
-			//
-			// 1. FetchAll. This carries no payload. The receiver
-			// responds with the entire topology model as the receiver
-			// has it.
-			//
-			// 2. Update. This carries a topology payload. The
-			// receiver merges it with its own topology model. If the
-			// payload is a subset of the receiver's topology, no
-			// further action is taken. Otherwise, the receiver sends
-			// out to all its connections an "improved" update:
-			//  - elements which the original payload added to the
-			//    receiver are included
-			//  - elements which the original payload updated in the
-			//    receiver are included
-			//  - elements which are equal between the receiver and
-			//    the payload are not included
-			//  - elements where the payload was older than the
-			//    receiver's version are updated
-			conn.SendTCP(Concat(ProtocolUpdateByte, conn.Router.Peers.EncodeAllPeers()))
-		} else if msg[0] == ProtocolUpdate {
-			newUpdate, err := conn.Router.Peers.ApplyUpdate(msg[1:])
-			if _, ok := err.(UnknownPeersError); err != nil && ok {
-				// That update contained a peer we didn't know about;
-				// request full update
-				conn.SendTCP(ProtocolFetchAllByte)
-				continue
-			}
-			if conn.CheckFatal(err) != nil {
-				return
-			}
-			if len(newUpdate) != 0 {
-				conn.Router.ConnectionMaker.Refresh()
-				conn.Router.Routes.Recalculate()
-				conn.Router.Ourself.BroadcastTCP(Concat(ProtocolUpdateByte, newUpdate))
-			}
-		} else if msg[0] == ProtocolPMTUVerified {
-			conn.verifyPMTU <- int(binary.BigEndian.Uint16(msg[1:]))
-		} else {
-			conn.log("received unknown msg:\n", msg)
+		if err = conn.handleProtocolMsg(ProtocolTag(msg[0]), msg[1:]); err != nil {
+			break
 		}
 	}
+	conn.Shutdown(err)
+}
+
+func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) error {
+	switch tag {
+	case ProtocolConnectionEstablished:
+		// We sent fast heartbeats to the remote peer, which has now
+		// received at least one of them and told us via this message.
+		// We can now consider the connection as established from our
+		// end.
+		conn.SetEstablished()
+	case ProtocolStartFragmentationTest:
+		conn.Forward(false, &ForwardedFrame{
+			srcPeer: conn.local,
+			dstPeer: conn.remote,
+			frame:   FragTest},
+			nil)
+	case ProtocolFragmentationReceived:
+		conn.setStackFrag(true)
+	case ProtocolNonce:
+		if conn.SessionKey == nil {
+			return fmt.Errorf("unexpected nonce on unencrypted connection")
+		}
+		conn.Decryptor.ReceiveNonce(payload)
+	case ProtocolPMTUVerified:
+		conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
+	case ProtocolGossipUnicast:
+		return conn.Router.handleGossip(payload, deliverGossipUnicast)
+	case ProtocolGossipBroadcast:
+		return conn.Router.handleGossip(payload, deliverGossipBroadcast)
+	case ProtocolGossip:
+		return conn.Router.handleGossip(payload, deliverGossip)
+	default:
+		conn.log("ignoring unknown protocol tag:", tag)
+	}
+	return nil
 }
 
 func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(ReadTimeout))
 }
 
-// Heartbeating serves two purposes: a) keeping NAT paths alive, and
-// b) updating a remote peer's knowledge of our address, in the event
-// it changes (e.g. because NAT paths expired).
-// Called only by connection actor process.
-func (conn *LocalConnection) forwardHeartbeatFrame() {
-	heartbeatFrame := &ForwardedFrame{
-		srcPeer: conn.local,
-		dstPeer: conn.remote,
-		frame:   []byte{}}
-	conn.Forward(true, heartbeatFrame, nil)
+func (conn *LocalConnection) sendFastHeartbeats() error {
+	err := conn.ensureForwarders()
+	if err == nil {
+		conn.heartbeat = time.NewTicker(FastHeartbeat)
+		conn.Forward(true, conn.heartbeatFrame, nil) // avoid initial wait
+	}
+	return err
 }
 
 func tickerChan(ticker *time.Ticker) <-chan time.Time {

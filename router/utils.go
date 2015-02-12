@@ -1,11 +1,19 @@
 package router
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/gob"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"net"
 )
+
+type Interaction struct {
+	code       int
+	resultChan chan<- interface{}
+}
 
 func checkFatal(e error) {
 	if e != nil {
@@ -38,8 +46,8 @@ func (ftbe FrameTooBigError) Error() string {
 	return fmt.Sprint("Frame too big error. Effective PMTU is ", ftbe.EPMTU)
 }
 
-func (upe UnknownPeersError) Error() string {
-	return fmt.Sprint("Reference to unknown peers")
+func (upe UnknownPeerError) Error() string {
+	return fmt.Sprint("Reference to unknown peer ", upe.Name)
 }
 
 func (nce NameCollisionError) Error() string {
@@ -48,10 +56,6 @@ func (nce NameCollisionError) Error() string {
 
 func (pde PacketDecodingError) Error() string {
 	return fmt.Sprint("Failed to decode packet: ", pde.Desc)
-}
-
-func (packet UDPPacket) String() string {
-	return fmt.Sprintf("UDP Packet\n name: %s\n sender: %v\n payload: % X", packet.Name, packet.Sender, packet.Packet)
 }
 
 func Concat(elems ...[]byte) []byte {
@@ -71,6 +75,21 @@ func randUint64() (r uint64) {
 		r |= uint64(v)
 	}
 	return
+}
+
+func hash(s string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return h.Sum32()
+}
+
+func GobEncode(items ...interface{}) []byte {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	for _, i := range items {
+		checkFatal(enc.Encode(i))
+	}
+	return buf.Bytes()
 }
 
 func macint(mac net.HardwareAddr) (r uint64) {

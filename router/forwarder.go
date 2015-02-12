@@ -3,11 +3,19 @@ package router
 import (
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
-	"log"
-	"net"
 	"syscall"
 	"time"
 )
+
+type ForwardedFrame struct {
+	srcPeer *Peer
+	dstPeer *Peer
+	frame   []byte
+}
+
+type FrameTooBigError struct {
+	EPMTU int // effective pmtu, i.e. what we tell packet senders
+}
 
 func (conn *LocalConnection) ensureForwarders() error {
 	if conn.forwardChan != nil || conn.forwardChanDF != nil {
@@ -52,8 +60,8 @@ func (conn *LocalConnection) ensureForwarders() error {
 	conn.effectivePMTU = forwarder.unverifiedPMTU
 	conn.Unlock()
 
-	go forwarder.Run()
-	go forwarderDF.Run()
+	forwarder.Start()
+	forwarderDF.Start()
 
 	return nil
 }
@@ -184,7 +192,7 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 			return err
 		}
 		// make copies of the frame we received
-		var segFrame ForwardedFrame = *frame
+		segFrame := *frame
 		segFrame.frame = buf.Bytes()
 		forward(&segFrame)
 	}
@@ -192,6 +200,22 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 }
 
 // Forwarder
+
+type Forwarder struct {
+	conn            *LocalConnection
+	ch              <-chan *ForwardedFrame
+	stop            <-chan interface{}
+	verifyPMTUTick  <-chan time.Time
+	verifyPMTU      <-chan int
+	pmtuVerifyCount uint
+	enc             Encryptor
+	udpSender       UDPSender
+	maxPayload      int
+	pmtuVerified    bool
+	highestGoodPMTU int
+	unverifiedPMTU  int
+	lowestBadPMTU   int
+}
 
 func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, stop <-chan interface{}, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
 	fwd := &Forwarder{
@@ -206,7 +230,11 @@ func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, stop <-chan 
 	return fwd
 }
 
-func (fwd *Forwarder) Run() {
+func (fwd *Forwarder) Start() {
+	go fwd.run()
+}
+
+func (fwd *Forwarder) run() {
 	defer fwd.udpSender.Shutdown()
 	var flushed, ok bool
 	var frame *ForwardedFrame
@@ -321,7 +349,7 @@ func (fwd *Forwarder) flush() {
 		} else if PosixError(err) == syscall.ENOBUFS {
 			// TODO handle this better
 		} else {
-			fwd.conn.CheckFatal(err)
+			fwd.conn.Shutdown(err)
 		}
 	}
 }
@@ -341,113 +369,4 @@ func (fwd *Forwarder) drain() {
 
 func (fwd *Forwarder) logDrop(frame *ForwardedFrame) {
 	fwd.conn.log("Dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", fwd.maxPayload+UDPOverhead-fwd.effectiveOverhead())
-}
-
-// UDP Senders
-
-func NewSimpleUDPSender(conn *LocalConnection) *SimpleUDPSender {
-	return &SimpleUDPSender{udpConn: conn.Router.UDPListener, conn: conn}
-}
-
-func (sender *SimpleUDPSender) Send(msg []byte) error {
-	_, err := sender.udpConn.WriteToUDP(msg, sender.conn.RemoteUDPAddr())
-	return err
-}
-
-func (sender *SimpleUDPSender) Shutdown() error {
-	return nil
-}
-
-func NewRawUDPSender(conn *LocalConnection) (*RawUDPSender, error) {
-	ipSocket, err := dialIP(conn)
-	if err != nil {
-		return nil, err
-	}
-	udpHeader := &layers.UDP{SrcPort: layers.UDPPort(Port)}
-	ipBuf := gopacket.NewSerializeBuffer()
-	opts := gopacket.SerializeOptions{
-		FixLengths: true,
-		// UDP header is calculated with a phantom IP
-		// header. Yes, it's totally nuts. Thankfully, for UDP
-		// over IPv4, the checksum is optional. It's not
-		// optional for IPv6, but we'll ignore that for
-		// now. TODO
-		ComputeChecksums: false}
-
-	return &RawUDPSender{
-		ipBuf:     ipBuf,
-		opts:      opts,
-		udpHeader: udpHeader,
-		socket:    ipSocket,
-		conn:      conn}, nil
-}
-
-func (sender *RawUDPSender) Send(msg []byte) error {
-	payload := gopacket.Payload(msg)
-	sender.udpHeader.DstPort = layers.UDPPort(sender.conn.RemoteUDPAddr().Port)
-
-	err := gopacket.SerializeLayers(sender.ipBuf, sender.opts, sender.udpHeader, &payload)
-	if err != nil {
-		return err
-	}
-	packet := sender.ipBuf.Bytes()
-	_, err = sender.socket.Write(packet)
-	if err == nil || PosixError(err) != syscall.EMSGSIZE {
-		return err
-	}
-	f, err := sender.socket.File()
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	fd := int(f.Fd())
-	log.Println("EMSGSIZE on send, expecting PMTU update (IP packet was",
-		len(packet), "bytes, payload was", len(msg), "bytes)")
-	pmtu, err := syscall.GetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU)
-	if err != nil {
-		return err
-	}
-	return MsgTooBigError{PMTU: pmtu}
-}
-
-func (sender *RawUDPSender) Shutdown() error {
-	defer func() { sender.socket = nil }()
-	return sender.socket.Close()
-}
-
-func dialIP(conn *LocalConnection) (*net.IPConn, error) {
-	ipLocalAddr, err := ipAddr(conn.TCPConn.LocalAddr())
-	if err != nil {
-		return nil, err
-	}
-	ipRemoteAddr, err := ipAddr(conn.TCPConn.RemoteAddr())
-	if err != nil {
-		return nil, err
-	}
-	ipSocket, err := net.DialIP("ip4:UDP", ipLocalAddr, ipRemoteAddr)
-	if err != nil {
-		return nil, err
-	}
-	f, err := ipSocket.File()
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	fd := int(f.Fd())
-	// This Makes sure all packets we send out have DF set on them.
-	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DO)
-	if err != nil {
-		return nil, err
-	}
-	return ipSocket, nil
-}
-
-func ipAddr(addr net.Addr) (*net.IPAddr, error) {
-	host, _, err := net.SplitHostPort(addr.String())
-	if err != nil {
-		return nil, err
-	}
-	return &net.IPAddr{
-		IP:   net.ParseIP(host),
-		Zone: ""}, nil
 }

@@ -11,7 +11,7 @@ func mdnsLookup(client *MDNSClient, name string, qtype uint16) (*Response, error
 	client.SendQuery(name, qtype, channel)
 	for resp := range channel {
 		if err := resp.Err; err != nil {
-			Debug.Printf("[mdns] Error for query type %s name %d: %s",
+			Debug.Printf("[mdns] Error for query type %s name %s: %s",
 				dns.TypeToString[qtype], name, err)
 			return nil, err
 		} else {

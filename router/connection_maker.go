@@ -41,16 +41,18 @@ type ConnectionMakerInteraction struct {
 	address string
 }
 
-func StartConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
-	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
-	state := &ConnectionMaker{
+func NewConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
+	return &ConnectionMaker{
 		ourself:        ourself,
 		peers:          peers,
-		queryChan:      queryChan,
 		cmdLineAddress: make(map[string]bool),
 		targets:        make(map[string]*Target)}
-	go state.queryLoop(queryChan)
-	return state
+}
+
+func (cm *ConnectionMaker) Start() {
+	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
+	cm.queryChan = queryChan
+	go cm.queryLoop(queryChan)
 }
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {
@@ -115,15 +117,15 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	validTarget := make(map[string]bool)
 
 	// copy the set of things we are connected to, so we can access them without locking
-	our_connected_peers := make(map[PeerName]bool)
-	our_connected_targets := make(map[string]bool)
+	ourConnectedPeers := make(map[PeerName]bool)
+	ourConnectedTargets := make(map[string]bool)
 	cm.ourself.ForEachConnection(func(peer PeerName, conn Connection) {
-		our_connected_peers[peer] = true
-		our_connected_targets[conn.RemoteTCPAddr()] = true
+		ourConnectedPeers[peer] = true
+		ourConnectedTargets[conn.RemoteTCPAddr()] = true
 	})
 
 	addTarget := func(address string) {
-		if !our_connected_targets[address] {
+		if !ourConnectedTargets[address] {
 			validTarget[address] = true
 			cm.addTarget(address)
 		}
@@ -138,7 +140,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	// aren't
 	cm.peers.ForEach(func(name PeerName, peer *Peer) {
 		peer.ForEachConnection(func(otherPeer PeerName, conn Connection) {
-			if otherPeer == cm.ourself.Name || our_connected_peers[otherPeer] {
+			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] {
 				return
 			}
 			address := conn.RemoteTCPAddr()
@@ -153,7 +155,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if our_connected_targets[address] {
+		if ourConnectedTargets[address] {
 			delete(cm.targets, address)
 			continue
 		}

@@ -122,6 +122,7 @@ func main() {
 	}
 
 	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
+	log.Println("Our name is", router.Ourself.Name)
 	router.Start()
 	for _, peer := range peers {
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
@@ -167,8 +168,8 @@ func handleSignals(router *weave.Router) {
 		sig := <-sigs
 		switch sig {
 		case syscall.SIGQUIT:
-			runtime.Stack(buf, true)
-			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf)
+			stacklen := runtime.Stack(buf, true)
+			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
 		case syscall.SIGUSR1:
 			log.Printf("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", router.Status())
 		}

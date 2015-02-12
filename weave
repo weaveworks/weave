@@ -150,11 +150,13 @@ create_bridge() {
         run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
         add_iptables_rule nat POSTROUTING -j WEAVE
     }
-    # disable offloading - we do this even when $BRIDGE already exists
-    # simply because it has the desirable side-effect of ensuring we
-    # have the $TOOLS_IMAGE and thus do not incur downloading-induced
-    # delays in more time-sensitive sections elsewhere.
-    run_tool host ethtool -K $BRIDGE tx off >/dev/null
+    if [ ! "$1" = "--without-ethtool" ] ; then
+        # disable offloading - we do this even when $BRIDGE already exists
+        # simply because it has the desirable side-effect of ensuring we
+        # have the $TOOLS_IMAGE and thus do not incur downloading-induced
+        # delays in more time-sensitive sections elsewhere.
+        run_tool host ethtool -K $BRIDGE tx off >/dev/null
+    fi
 
     ip link set dev $BRIDGE up
 }
@@ -343,8 +345,7 @@ http_call_ip() {
     http_verb="$3"
     url="$4"
     shift 4
-    command_exists curl || fatal "Cannot find curl, which is required for this operation."
-    curl -s -X $http_verb "$@" http://$ip:$port$url
+    run_tool host curl -s -X $http_verb "$@" http://$ip:$port$url
 }
 
 # Wait for a container with name $1 that provides a "/status" at port $2
@@ -441,9 +442,16 @@ container_weave_addrs() {
     ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
-uname -s -r | sed -n 's|^\([^ ]*\) \([0-9]\+\)\.\([0-9]\+\).*|\1 \2 \3|p' | {
-    read sys maj min     || fatal "Unable to parse operating system version $(uname -s -r)"
-    [ "$sys" = 'Linux' ] || fatal "Operating systems other than Linux are not supported (you have $sys)"
+uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
+    if ! read sys maj min ; then
+      echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
+      exit 1
+    fi
+
+    if [ "$sys" != 'Linux' ] ; then
+        echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
+        exit 1
+    fi
 
     if ! [ \( "$maj" -eq 3 -a "$min" -ge 5 \) -o "$maj" -gt 3 ] ; then
         echo "WARNING: Linux kernel version 3.5 or newer is required (you have ${maj}.${min})" >&2
@@ -470,7 +478,7 @@ if ! ip netns list >/dev/null 2>&1 ; then
     exit 1
 fi
 
-if ! DOCKER_VERSION=$(docker -v | sed -n 's|^Docker version \([0-9]\+\.[0-9]\+.[0-9]\+\).*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
+if ! DOCKER_VERSION=$(docker -v | sed -n -e 's|^Docker version \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
     echo "ERROR: Unable to parse docker version" >&2
     exit 1
 fi
@@ -491,6 +499,11 @@ case "$COMMAND" in
             docker pull $img
         done
         ;;
+    # intentionally undocumented since it assumes knowledge of weave
+    # internals
+    create-bridge)
+        create_bridge --without-ethtool
+        ;;
     launch)
         check_not_running $CONTAINER_NAME $BASE_IMAGE
         create_bridge
@@ -506,14 +519,12 @@ case "$COMMAND" in
             echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
             shift 1
         fi
-
         if [ "$1" = "-password" ] ; then
             [ $# -gt 1 ] || usage
             WEAVE_PASSWORD="$2"
             export WEAVE_PASSWORD
             shift 2
         fi
-
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
@@ -642,7 +653,7 @@ case "$COMMAND" in
     expose)
         [ $# -eq 1 ] || usage
         validate_cidr $1
-        create_bridge
+        create_bridge --without-ethtool
         if ! ip addr show dev $BRIDGE | grep -qF $1
         then
             ip addr add dev $BRIDGE $1
@@ -653,7 +664,7 @@ case "$COMMAND" in
     hide)
         [ $# -eq 1 ] || usage
         validate_cidr $1
-        create_bridge
+        create_bridge --without-ethtool
         if ip addr show dev $BRIDGE | grep -qF $1
         then
             ip addr del dev $BRIDGE $1
@@ -680,10 +691,10 @@ case "$COMMAND" in
         [ $# -eq 0 ] || usage
         docker kill  $CONTAINER_NAME            >/dev/null 2>&1 || true
         docker kill  $DNS_CONTAINER_NAME        >/dev/null 2>&1 || true
-        docker kill  $DISCOVERY_CONTAINER_NAME >/dev/null 2>&1 || true
+        docker kill  $DISCOVERY_CONTAINER_NAME  >/dev/null 2>&1 || true
         docker rm -f $CONTAINER_NAME            >/dev/null 2>&1 || true
         docker rm -f $DNS_CONTAINER_NAME        >/dev/null 2>&1 || true
-        docker rm -f $DISCOVERY_CONTAINER_NAME >/dev/null 2>&1 || true
+        docker rm -f $DISCOVERY_CONTAINER_NAME  >/dev/null 2>&1 || true
         run_tool host conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         destroy_bridge
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do

@@ -128,7 +128,7 @@ to each other.
  * [Troubleshooting](http://zettio.github.io/weave/troubleshooting.html)
  * [Building](http://zettio.github.io/weave/building.html)
  * [How it works](http://zettio.github.io/weave/how-it-works.html)
- * [Preview of weaveDNS](http://weaveblog.com/2014/11/04/have-you-met-weavedns/)
+ * [WeaveDNS README](https://github.com/zettio/weave/tree/master/weavedns#readme)
 
 ## Contact Us
 
@@ -138,7 +138,7 @@ help@weave.works. When reporting a bug, please include which version of
 weave you are running, as shown by `weave version`.
 
 Follow weave on Twitter:
-[@weavenetwork](https://twitter.com/weavenetwork).
+[@weaveworks](https://twitter.com/weaveworks).
 
 Read the Weave blog:
 [Weaveblog](http://weaveblog.com/).

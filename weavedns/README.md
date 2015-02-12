@@ -142,8 +142,7 @@ its hostname, you can register it using the HTTP API:
 
 ```bash
 $ docker start $shell2
-$ shell2_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' $shell2)
-$ curl -X PUT "http://$dns_ip:6785/name/$shell2/10.1.1.27" -d local_ip=$shell2_ip -d fqdn=shell2.weave.local
+$ curl -X PUT "http://$dns_ip:6785/name/$shell2/10.1.1.27" -d fqdn=shell2.weave.local
 ```
 
 ### Registering multiple containers with the same name

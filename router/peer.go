@@ -86,6 +86,26 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 	peer.connections = connections
 }
 
+func (peer *Peer) addConnection(conn Connection) {
+	peer.Lock()
+	defer peer.Unlock()
+	peer.connections[conn.Remote().Name] = conn
+	peer.version += 1
+}
+
+func (peer *Peer) deleteConnection(conn Connection) {
+	peer.Lock()
+	defer peer.Unlock()
+	delete(peer.connections, conn.Remote().Name)
+	peer.version += 1
+}
+
+func (peer *Peer) connectionEstablished(conn Connection) {
+	peer.Lock()
+	defer peer.Unlock()
+	peer.version += 1
+}
+
 // Calculate the routing table from this peer to all peers reachable
 // from it, returning a "next hop" map of PeerNameX -> PeerNameY,
 // which says "in order to send a message to X, the peer should send
@@ -99,9 +119,9 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 // same result. This is important since otherwise we risk message loss
 // or routing cycles.
 //
-// When the 'symmetric' flag is set, only symmetric connections are
-// considered, i.e. where both sides indicate they have a connection
-// to the other.
+// When the 'establishedAndSymmetric' flag is set, only connections
+// that are marked as 'established' and are symmetric (i.e. where both
+// sides indicate they have a connection to the other) are considered.
 //
 // When a non-nil stopAt peer is supplied, the widening stops when it
 // reaches that peer. The boolean return indicates whether that has
@@ -111,7 +131,7 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 // traversal. This prevents the connectivity graph from changing
 // underneath us in ways that would invalidate the result. Thus the
 // answer returned may be out of date, but never inconsistent.
-func (peer *Peer) Routes(stopAt *Peer, symmetric bool) (bool, map[PeerName]PeerName) {
+func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[PeerName]PeerName) {
 	peer.RLock()
 	defer peer.RUnlock()
 	routes := make(map[PeerName]PeerName)
@@ -127,12 +147,17 @@ func (peer *Peer) Routes(stopAt *Peer, symmetric bool) (bool, map[PeerName]PeerN
 			}
 			curName := curPeer.Name
 			for remoteName, conn := range curPeer.connections {
+				if establishedAndSymmetric && !conn.Established() {
+					continue
+				}
 				if _, found := routes[remoteName]; found {
 					continue
 				}
 				remote := conn.Remote()
 				remote.RLock()
-				if _, found := remote.connections[curName]; !symmetric || found {
+				// DANGER holding rlock on remote, possibly taking
+				// rlock on remoteConn
+				if remoteConn, found := remote.connections[curName]; !establishedAndSymmetric || (found && remoteConn.Established()) {
 					defer remote.RUnlock()
 					nextWorklist = append(nextWorklist, remote)
 					// We now know how to get to remoteName: the same

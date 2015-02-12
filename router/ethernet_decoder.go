@@ -8,6 +8,13 @@ import (
 	"net"
 )
 
+type EthernetDecoder struct {
+	eth     layers.Ethernet
+	ip      layers.IPv4
+	decoded []gopacket.LayerType
+	parser  *gopacket.DecodingLayerParser
+}
+
 func NewEthernetDecoder() *EthernetDecoder {
 	dec := &EthernetDecoder{}
 	dec.parser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &dec.eth, &dec.ip)
@@ -75,7 +82,7 @@ func (dec *EthernetDecoder) DropFrame() bool {
 	return bytes.Equal(stpMACPrefix, dec.eth.DstMAC[:len(stpMACPrefix)])
 }
 
-func (dec *EthernetDecoder) IsPMTUVerify() bool {
-	return bytes.Equal(zeroMAC, dec.eth.SrcMAC) &&
-		bytes.Equal(zeroMAC, dec.eth.DstMAC)
+func (dec *EthernetDecoder) IsSpecial() bool {
+	return dec.eth.Length == 0 && dec.eth.EthernetType == layers.EthernetTypeLLC &&
+		bytes.Equal(zeroMAC, dec.eth.SrcMAC) && bytes.Equal(zeroMAC, dec.eth.DstMAC)
 }
