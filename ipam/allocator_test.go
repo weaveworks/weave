@@ -24,6 +24,7 @@ func testAllocator(name string, ourUID uint64, universeCIDR string) *Allocator {
 	ourName, _ := router.PeerNameFromString(name)
 	alloc, _ := NewAllocator(ourName, ourUID, universeCIDR)
 	alloc.gossip = new(mockGossipComms)
+	alloc.startForTesting()
 	return alloc
 }
 
@@ -289,7 +290,6 @@ func implTestGossip(t *testing.T) {
 
 	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
-	alloc1.startForTesting()
 	mockTime := new(mockTimeProvider)
 	mockTime.SetTime(baseTime)
 	alloc1.timeProvider = mockTime
@@ -433,7 +433,6 @@ func TestAllocatorClaim1(t *testing.T) {
 	)
 
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
-	alloc1.startForTesting()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 
 	alloc1.considerWhileLocked()
@@ -467,7 +466,6 @@ func TestAllocatorClaim2(t *testing.T) {
 	)
 
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
-	alloc1.startForTesting()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 	alloc1.considerWhileLocked()
 
@@ -502,7 +500,6 @@ func TestAllocatorClaim3(t *testing.T) {
 
 	common.InitDefaultLogging(true)
 	alloc1 := testAllocator(peer1NameString, ourUID, testStart1+"/22")
-	alloc1.startForTesting()
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 	alloc1.considerWhileLocked()
 
@@ -553,7 +550,6 @@ func TestAllocatorClaim4(t *testing.T) {
 	)
 
 	alloc1 := testAllocator("01:00:00:01:00:00", ourUID, testStart1+"/22")
-	alloc1.startForTesting()
 	alloc1.manageSpace(net.ParseIP(testStart2), 64)
 
 	// Claim an address that nobody is managing
