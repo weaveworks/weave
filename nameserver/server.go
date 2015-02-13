@@ -12,7 +12,7 @@ const (
 	DEFAULT_LOCAL_DOMAIN = "weave.local."     // The default name used for the local domain
 	DEFAULT_SERVER_PORT  = 53                 // The default server port
 	DEFAULT_CLI_CFG_FILE = "/etc/resolv.conf" // default "resolv.conf" file to try to load
-	UDPBufSize           = 4096               // bigger than the default 512
+	DEFAULT_UDP_BUFLEN   = 4096               // bigger than the default 512
 )
 
 func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
@@ -81,13 +81,28 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 		ifaceName = config.Iface.Name
 	}
 
-	return &DNSServer{
+	s = &DNSServer{
 		config:     &config,
 		mdnsCli:    mdnsClient,
 		mdnsSrv:    mdnsServer,
 		IfaceName:  ifaceName,
 		ListenAddr: fmt.Sprintf(":%d", config.Port),
-	}, nil
+	}
+
+	// create two DNS request multiplexerers, depending on the protocol used by clients
+	// (we use the same protocol for asking upstream servers)
+	mux := func(client *dns.Client) *dns.ServeMux {
+		m := dns.NewServeMux()
+		m.HandleFunc(s.config.LocalDomain, s.queryHandler([]Lookup{s.config.Zone, s.mdnsCli}))
+		m.HandleFunc(RDNS_DOMAIN, s.rdnsHandler([]Lookup{s.config.Zone, s.mdnsCli}, client))
+		m.HandleFunc(".", s.notUsHandler(client))
+		return m
+	}
+
+	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(&dns.Client{Net: "udp", UDPSize: DEFAULT_UDP_BUFLEN})}
+	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(&dns.Client{Net: "tcp"})}
+
+	return
 }
 
 // Start the DNS server
@@ -108,15 +123,19 @@ func (s *DNSServer) Start() error {
 		return m
 	}
 
-	mdnsServer, err := NewMDNSServer(s.zone)
-	CheckFatal(err)
+	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(&dns.Client{Net: "udp", UDPSize: DEFAULT_UDP_BUFLEN})}
+	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(&dns.Client{Net: "tcp"})}
 
-	err = mdnsServer.Start(s.iface)
-	CheckFatal(err)
+	return
+}
 
-	address := fmt.Sprintf(":%d", s.port)
-	s.udpSrv = &dns.Server{Addr: address, Net: "udp", Handler: mux(&dns.Client{Net: "udp", UDPSize: UDPBufSize})}
-	s.tcpSrv = &dns.Server{Addr: address, Net: "tcp", Handler: mux(&dns.Client{Net: "tcp"})}
+// Start the DNS server
+func (s *DNSServer) Start() error {
+	Info.Printf("Using mDNS on %s", s.IfaceName)
+	err := s.mdnsCli.Start(s.config.Iface)
+	CheckFatal(err)
+	err = s.mdnsSrv.Start(s.config.Iface, s.config.LocalDomain)
+	CheckFatal(err)
 
 	wg := new(sync.WaitGroup)
 	wg.Add(2)

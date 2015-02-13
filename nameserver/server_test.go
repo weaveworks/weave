@@ -73,7 +73,7 @@ func TestUDPDNSServer(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
 	c := new(dns.Client)
-	c.UDPSize = UDPBufSize
+	c.UDPSize = DEFAULT_UDP_BUFLEN
 	m := new(dns.Msg)
 	m.SetQuestion(successTestName, dns.TypeA)
 	m.RecursionDesired = true
@@ -198,7 +198,7 @@ func TestTCPDNSServer(t *testing.T) {
 
 	t.Logf("Creating a UDP and a TCP client")
 	uc := new(dns.Client)
-	uc.UDPSize = UDPBufSize
+	uc.UDPSize = DEFAULT_UDP_BUFLEN
 	tc := new(dns.Client)
 	tc.Net = "tcp"
 
