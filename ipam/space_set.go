@@ -192,7 +192,7 @@ func (s *OurSpaceSet) HasFreeAddresses() bool {
 // Pick some large reasonably-sized chunk.
 func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 	totalFreeAddresses := s.NumFreeAddresses()
-	if totalFreeAddresses < MinSafeFreeAddresses {
+	if totalFreeAddresses == 0 {
 		return nil, false
 	}
 	var bestFree uint32 = 0
@@ -214,8 +214,8 @@ func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 			spaceToGiveUp = bestFree
 		}
 		// Don't give away more than half of our available addresses
-		if spaceToGiveUp > totalFreeAddresses/2 {
-			spaceToGiveUp = totalFreeAddresses / 2
+		if spaceToGiveUp > totalFreeAddresses/2+1 {
+			spaceToGiveUp = totalFreeAddresses/2 + 1
 		}
 		bestSpace.Size -= spaceToGiveUp
 		s.version++

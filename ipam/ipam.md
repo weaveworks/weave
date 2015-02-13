@@ -121,3 +121,5 @@ central package so both ipam and router can depend on it.]
 
 [Perhaps Allocators should include the overal Universe in their gossip
 so they can detech mismatches.]
+
+[Someone making a request should be able to cancel it]

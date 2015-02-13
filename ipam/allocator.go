@@ -15,7 +15,6 @@ const (
 	GossipReqTimeout     = 1 * time.Second
 	GossipWaitForLead    = 10 * time.Second
 	GossipDeadTimeout    = 10 * time.Second
-	MinSafeFreeAddresses = 5
 	MaxAddressesToGiveUp = 256
 )
 const (
@@ -46,6 +45,15 @@ func (list requestList) find(sender router.PeerName, space Space) int {
 			if r.kind == msgSpaceRequest || r.details.Start.Equal(space.GetStart()) {
 				return i
 			}
+		}
+	}
+	return -1
+}
+
+func (list requestList) findKind(kind byte) int {
+	for i, r := range list {
+		if r.kind == kind {
+			return i
 		}
 	}
 	return -1
@@ -150,7 +158,6 @@ type Allocator struct {
 	ourName     router.PeerName
 	ourUID      uint64
 	state       int
-	stateExpire time.Time
 	universeLen int
 	universe    MinSpace // all the addresses that could be allocated
 	gossip      router.Gossip
@@ -159,6 +166,7 @@ type Allocator struct {
 	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
 	leaked      map[time.Time]Space
 	claims      claimList
+	pending     []allocateFor
 	inflight    requestList
 	timeProvider
 }
@@ -198,7 +206,7 @@ func (alloc *Allocator) SetGossip(gossip router.Gossip) {
 }
 
 func (alloc *Allocator) Start() {
-	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
+	alloc.moveToState(allocStateLeaderless)
 	queryChan := make(chan interface{}, router.ChannelSize)
 	alloc.queryChan = queryChan
 	gossipTimer := time.Tick(router.GossipInterval)
@@ -206,7 +214,7 @@ func (alloc *Allocator) Start() {
 }
 
 func (alloc *Allocator) startForTesting() {
-	alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
+	alloc.moveToState(allocStateLeaderless)
 	queryChan := make(chan interface{}, router.ChannelSize)
 	alloc.queryChan = queryChan
 	go alloc.queryLoop(queryChan, nil)
@@ -313,9 +321,17 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-ch
 			case makeString:
 				q.resultChan <- alloc.string()
 			case claim:
+				if alloc.state == allocStateLeaderless {
+					alloc.electLeader()
+				}
 				alloc.handleClaim(q.Ident, q.IP, q.resultChan)
 			case allocateFor:
-				q.resultChan <- alloc.ourSpaceSet.AllocateFor(q.Ident)
+				if alloc.state == allocStateLeaderless {
+					alloc.electLeader()
+				}
+				if !alloc.tryAllocateFor(q.Ident, q.resultChan) {
+					alloc.pending = append(alloc.pending, allocateFor{q.resultChan, q.Ident})
+				}
 			case deleteRecordsFor:
 				alloc.ourSpaceSet.DeleteRecordsFor(q.Ident)
 			case free:
@@ -378,7 +394,7 @@ func (alloc *Allocator) decodeFromDecoder(decoder *gob.Decoder) ([]*PeerSpaceSet
 			lg.Debug.Println("Replacing data with newer version", newSpaceset)
 			alloc.peerInfo[newSpaceset.UID()] = newSpaceset
 			if alloc.state == allocStateLeaderless && !newSpaceset.Empty() {
-				alloc.moveToState(allocStateNeutral, 0)
+				alloc.moveToState(allocStateNeutral)
 			}
 			ret = append(ret, newSpaceset)
 		}
@@ -486,7 +502,6 @@ func (alloc *Allocator) reclaimPastLife() {
 }
 
 func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err error) {
-	lg.Debug.Println("checkClaim", addr, alloc.string())
 	testaddr := NewMinSpace(addr, 1)
 	if alloc.pastLife != nil && alloc.pastLife.Overlaps(testaddr) {
 		// We've been sent a peerInfo that matches our PeerName but not UID
@@ -521,6 +536,33 @@ func (alloc *Allocator) checkClaims() {
 			i--
 		}
 	}
+	alloc.checkPending()
+}
+
+// return true if the request is completed, false if pending
+func (alloc *Allocator) tryAllocateFor(ident string, resultChan chan<- net.IP) bool {
+	if addr := alloc.ourSpaceSet.AllocateFor(ident); addr != nil {
+		resultChan <- addr
+		return true
+	} else { // out of space
+		if alloc.inflight.findKind(msgSpaceRequest) < 0 { // is there already a request inflight
+			if !alloc.requestSpace() {
+				resultChan <- nil // Nobody to ask for more space, so fail now
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (alloc *Allocator) checkPending() {
+	i := 0
+	for ; i < len(alloc.pending); i++ {
+		if !alloc.tryAllocateFor(alloc.pending[i].Ident, alloc.pending[i].resultChan) {
+			break
+		}
+	}
+	alloc.pending = alloc.pending[i:]
 }
 
 // If somebody didn't come back to us, drop the record and we will ask again
@@ -545,23 +587,16 @@ func (alloc *Allocator) considerOurPosition() {
 		alloc.lookForDead(now)
 		changed := alloc.reclaimLeaks(now)
 		alloc.lookForNewLeaks(now)
-		alloc.checkClaims()
 		alloc.checkInflight(now)
+		alloc.checkClaims()
 		if changed {
 			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
-		} else if len(alloc.inflight) == 0 && alloc.ourSpaceSet.NumFreeAddresses() < MinSafeFreeAddresses {
-			alloc.requestSpace()
-		}
-	case allocStateLeaderless:
-		if now.After(alloc.stateExpire) {
-			alloc.electLeader()
 		}
 	}
 }
 
-func (alloc *Allocator) moveToState(newState int, timeout time.Duration) {
+func (alloc *Allocator) moveToState(newState int) {
 	alloc.state = newState
-	alloc.stateExpire = alloc.timeProvider.Now().Add(timeout)
 }
 
 func (alloc *Allocator) electLeader() {
@@ -572,6 +607,7 @@ func (alloc *Allocator) electLeader() {
 		if !spaceset.Empty() {
 			// If anyone is already managing some space, then we don't need to elect a leader
 			lg.Debug.Println("Peer", spaceset.PeerName(), "has some space; someone must have given it to her")
+			alloc.moveToState(allocStateNeutral)
 			return
 		}
 		if uid > highest {
@@ -583,14 +619,10 @@ func (alloc *Allocator) electLeader() {
 	if highest == alloc.ourUID {
 		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
 		// I'm the winner; take control of the whole universe
-		// But don't allocate the first and last addresses
 		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
-		alloc.moveToState(allocStateNeutral, 0)
+		alloc.moveToState(allocStateNeutral)
 		alloc.checkClaims()
 		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
-	} else {
-		// We expect the other guy to take control, but if he doesn't, try again.
-		alloc.moveToState(allocStateLeaderless, GossipWaitForLead)
 	}
 }
 
@@ -611,7 +643,7 @@ func (alloc *Allocator) sendReply(dest router.PeerName, kind byte, space Space) 
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
-func (alloc *Allocator) requestSpace() {
+func (alloc *Allocator) requestSpace() bool {
 	var best SpaceSet = nil
 	var bestNum int = 0
 	for _, spaceset := range alloc.peerInfo {
@@ -625,8 +657,10 @@ func (alloc *Allocator) requestSpace() {
 	if best != nil {
 		lg.Debug.Println("Decided to ask peer", best.PeerName(), "for space:", best)
 		alloc.sendRequest(best.PeerName(), msgSpaceRequest, nil)
+		return true
 	} else {
 		lg.Debug.Println("Nobody available to ask for space")
+		return false
 	}
 }
 
@@ -688,7 +722,7 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) er
 	alloc.ourSpaceSet.AddSpace(NewSpace(donation.Start, donation.Size))
 	alloc.inflight.removeAt(pos)
 	alloc.checkClaims()
-	alloc.moveToState(allocStateNeutral, 0)
+	alloc.moveToState(allocStateNeutral)
 	alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	return nil
 }
@@ -723,10 +757,13 @@ func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<-
 		resultChan <- nil
 		return
 	}
+	if alloc.state == allocStateLeaderless {
+		alloc.electLeader()
+	}
 	// See if it's already claimed
 	if pos := alloc.claims.find(addr); pos >= 0 {
 		if alloc.claims[pos].Ident == ident {
-			resultChan <- nil
+			resultChan <- nil // fixme - this implies the claim has succeeded
 			return
 		} else {
 			resultChan <- errors.New("IP address already claimed by " + alloc.claims[pos].Ident)
