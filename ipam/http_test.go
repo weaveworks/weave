@@ -32,7 +32,7 @@ func TestHttp(t *testing.T) {
 		peerUID = 654321
 	)
 
-	alloc := testAllocator("08:00:27:01:c3:9a", ourUID, testCIDR1).addSpace(testAddr1, 4)
+	alloc := testAllocator(t, "08:00:27:01:c3:9a", ourUID, testCIDR1).addSpace(testAddr1, 4)
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
 	go ListenHttp(port, alloc)
