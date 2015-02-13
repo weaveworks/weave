@@ -136,10 +136,6 @@ type onDead struct {
 
 type claimList []claim
 
-func (aa *claimList) add(a *claim) {
-	*aa = append(*aa, *a)
-}
-
 func (aa *claimList) removeAt(pos int) {
 	(*aa) = append((*aa)[:pos], (*aa)[pos+1:]...)
 }
@@ -321,14 +317,10 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-ch
 			case makeString:
 				q.resultChan <- alloc.string()
 			case claim:
-				if alloc.state == allocStateLeaderless {
-					alloc.electLeader()
-				}
+				alloc.electLeaderIfNecessary()
 				alloc.handleClaim(q.Ident, q.IP, q.resultChan)
 			case allocateFor:
-				if alloc.state == allocStateLeaderless {
-					alloc.electLeader()
-				}
+				alloc.electLeaderIfNecessary()
 				if !alloc.tryAllocateFor(q.Ident, q.resultChan) {
 					alloc.pending = append(alloc.pending, allocateFor{q.resultChan, q.Ident})
 				}
@@ -599,7 +591,10 @@ func (alloc *Allocator) moveToState(newState int) {
 	alloc.state = newState
 }
 
-func (alloc *Allocator) electLeader() {
+func (alloc *Allocator) electLeaderIfNecessary() {
+	if alloc.state != allocStateLeaderless {
+		return
+	}
 	lg.Debug.Println("Time to look for a leader")
 	// If anyone is already managing some space, then we don't need to elect a leader
 	highest := alloc.ourUID
@@ -757,9 +752,7 @@ func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<-
 		resultChan <- nil
 		return
 	}
-	if alloc.state == allocStateLeaderless {
-		alloc.electLeader()
-	}
+	alloc.electLeaderIfNecessary()
 	// See if it's already claimed
 	if pos := alloc.claims.find(addr); pos >= 0 {
 		if alloc.claims[pos].Ident == ident {
@@ -773,7 +766,7 @@ func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<-
 	if owner, err := alloc.checkClaim(ident, addr); err != nil {
 		resultChan <- err
 	} else if owner != alloc.ourUID {
-		alloc.claims.add(&claim{resultChan, Allocation{ident, addr}})
+		alloc.claims = append(alloc.claims, claim{resultChan, Allocation{ident, addr}})
 	} else {
 		resultChan <- nil
 	}
