@@ -306,6 +306,8 @@ func (alloc *Allocator) OnDead(name router.PeerName, uid uint64) {
 
 func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-chan time.Time) {
 	for {
+		prevState := alloc.ourSpaceSet.HasFreeAddresses()
+		changed := false
 		select {
 		case query, ok := <-queryChan:
 			if !ok {
@@ -341,7 +343,10 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-ch
 				alloc.handleDead(q.name, q.uid)
 			}
 		case <-gossipTimer:
-			alloc.considerOurPosition()
+			changed = alloc.considerOurPosition()
+		}
+		if changed || (prevState != alloc.ourSpaceSet.HasFreeAddresses()) {
+			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 		}
 	}
 }
@@ -568,23 +573,18 @@ func (alloc *Allocator) checkInflight(now time.Time) {
 	}
 }
 
-func (alloc *Allocator) considerOurPosition() {
-	if alloc.gossip == nil {
-		return // Can't do anything.
-	}
+func (alloc *Allocator) considerOurPosition() (changed bool) {
 	now := alloc.timeProvider.Now()
 	switch alloc.state {
 	case allocStateNeutral:
 		alloc.discardOldLeaks()
 		alloc.lookForDead(now)
-		changed := alloc.reclaimLeaks(now)
+		changed = alloc.reclaimLeaks(now)
 		alloc.lookForNewLeaks(now)
 		alloc.checkInflight(now)
 		alloc.checkClaims()
-		if changed {
-			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
-		}
 	}
+	return
 }
 
 func (alloc *Allocator) moveToState(newState int) {
@@ -617,7 +617,6 @@ func (alloc *Allocator) electLeaderIfNecessary() {
 		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
 		alloc.moveToState(allocStateNeutral)
 		alloc.checkClaims()
-		alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	}
 }
 
@@ -718,7 +717,6 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) er
 	alloc.inflight.removeAt(pos)
 	alloc.checkClaims()
 	alloc.moveToState(allocStateNeutral)
-	alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 	return nil
 }
 

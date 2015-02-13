@@ -306,6 +306,7 @@ func implTestGossip(t *testing.T) {
 	// Now give alloc2 some space and tell alloc1 about it
 	// Now let alloc2 tell alloc1 about its space
 	alloc2.manageSpace(net.ParseIP(testStart2), 10)
+	ExpectBroadcastMessage(alloc2, nil)
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
 
 	alloc1.OnGossipBroadcast(alloc2.Gossip())
@@ -456,6 +457,7 @@ func TestAllocatorClaim1(t *testing.T) {
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
 
 	ExpectBroadcastMessage(alloc1, encode(tombstoneWith(alloc1.ourName, oldUID)))
+	ExpectBroadcastMessage(alloc1, nil)
 	done := make(chan bool)
 	go func() {
 		err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
