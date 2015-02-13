@@ -61,7 +61,7 @@ func main() {
 	peers = flag.Args()
 
 	if justVersion {
-		io.WriteString(os.Stdout, fmt.Sprintf("weave router %s\n", version))
+		fmt.Printf("weave router %s\n", version)
 		os.Exit(0)
 	}
 
