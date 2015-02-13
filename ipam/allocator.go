@@ -331,7 +331,18 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-ch
 			case free:
 				q.resultChan <- alloc.ourSpaceSet.Free(q.addr)
 			case gossipUnicast:
-				q.resultChan <- alloc.handleGossipUnicast(q.sender, q.bytes)
+				switch q.bytes[0] {
+				case msgSpaceRequest:
+					q.resultChan <- alloc.handleSpaceRequest(q.sender, q.bytes[1:])
+				case msgSpaceDonate:
+					q.resultChan <- alloc.handleSpaceDonate(q.sender, q.bytes[1:])
+				case msgSpaceClaim:
+					q.resultChan <- alloc.handleSpaceClaim(q.sender, q.bytes[1:])
+				case msgSpaceClaimRefused:
+					q.resultChan <- alloc.handleSpaceClaimRefused(q.sender, q.bytes[1:])
+				default:
+					q.resultChan <- errors.New(fmt.Sprint("Unexpected gossip unicast message: ", q.bytes[0]))
+				}
 			case gossipBroadcast:
 				q.resultChan <- alloc.handleGossipBroadcast(q.bytes)
 			case gossipReceived:
@@ -782,23 +793,6 @@ func (alloc *Allocator) string() string {
 		buf.WriteString(claim.String())
 	}
 	return buf.String()
-}
-
-// GossipDelegate handlers
-func (alloc *Allocator) handleGossipUnicast(sender router.PeerName, msg []byte) error {
-	switch msg[0] {
-	case msgSpaceRequest:
-		alloc.handleSpaceRequest(sender, msg[1:])
-	case msgSpaceDonate:
-		return alloc.handleSpaceDonate(sender, msg[1:])
-	case msgSpaceClaim:
-		return alloc.handleSpaceClaim(sender, msg[1:])
-	case msgSpaceClaimRefused:
-		return alloc.handleSpaceClaimRefused(sender, msg[1:])
-	default:
-		return errors.New(fmt.Sprint("Unexpected gossip unicast message: ", msg[0]))
-	}
-	return nil
 }
 
 func (alloc *Allocator) handleGossipCreate() []byte {
