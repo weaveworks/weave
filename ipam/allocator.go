@@ -762,14 +762,9 @@ func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<-
 	}
 	alloc.electLeaderIfNecessary()
 	// See if it's already claimed
-	if pos := alloc.claims.find(addr); pos >= 0 {
-		if alloc.claims[pos].Ident == ident {
-			resultChan <- nil // fixme - this implies the claim has succeeded
-			return
-		} else {
-			resultChan <- errors.New("IP address already claimed by " + alloc.claims[pos].Ident)
-			return
-		}
+	if pos := alloc.claims.find(addr); pos >= 0 && alloc.claims[pos].Ident != ident {
+		resultChan <- errors.New("IP address already claimed by " + alloc.claims[pos].Ident)
+		return
 	}
 	if owner, err := alloc.checkClaim(ident, addr); err != nil {
 		resultChan <- err

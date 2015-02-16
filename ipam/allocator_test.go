@@ -432,6 +432,7 @@ func AssertNothingSent(t *testing.T, ch <-chan bool) {
 	}
 }
 
+// Re-claiming an address from a former life
 func TestAllocatorClaim1(t *testing.T) {
 	const (
 		containerID = "deadbeef"
@@ -512,6 +513,19 @@ func implAllocatorClaim3(t *testing.T) {
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "claims")
 	alloc1.considerOurPosition()
 
+	// Claiming the same address twice for the same container should stack up another claim record but not send another request
+	done2 := make(chan bool)
+	go func() {
+		err := alloc1.Claim(containerID, addr1)
+		wt.AssertNoErr(t, err)
+		done2 <- true
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	AssertNothingSent(t, done2)
+	wt.AssertEqualInt(t, len(alloc1.claims), 2, "claims")
+	alloc1.considerOurPosition()
+
 	// alloc2 receives this request and replies
 	ExpectMessage(alloc2, peer1NameString, msgSpaceDonate, nil)
 	err := alloc2.OnGossipUnicast(alloc1.ourName, router.Concat([]byte{msgSpaceClaim}, msgbuf))
@@ -526,6 +540,7 @@ func implAllocatorClaim3(t *testing.T) {
 	wt.AssertEqualInt(t, len(alloc1.inflight), 0, "inflight")
 	wt.AssertEqualInt(t, len(alloc1.claims), 0, "claims")
 	AssertSent(t, done)
+	AssertSent(t, done2)
 }
 
 // Claiming addresses with issues
@@ -553,12 +568,8 @@ func TestAllocatorClaim4(t *testing.T) {
 
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 64, "free addresses")
-	// Claiming the same address twice for the same container should be idempotent
-	err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
-	wt.AssertNoErr(t, err)
-	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	// Claiming the same address for different container should raise an error
-	err = alloc1.Claim(container2, net.ParseIP(testAddr1))
+	err := alloc1.Claim(container2, net.ParseIP(testAddr1))
 	wt.AssertErrorInterface(t, err, (*error)(nil), "duplicate claim error")
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 64, "free addresses")
