@@ -16,14 +16,6 @@ const (
 	DEFAULT_IFACE_NAME   = "default interface"
 )
 
-func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.RecursionAvailable = true
-	m.Rcode = dns.RcodeNameError
-	return m
-}
-
 type DNSServerConfig struct {
 	// (Optional) client config file for resolving upstream servers
 	UpstreamCfgFile string

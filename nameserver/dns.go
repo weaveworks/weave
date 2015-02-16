@@ -53,3 +53,11 @@ func makePTRReply(r *dns.Msg, q *dns.Question, names []string) *dns.Msg {
 	}
 	return makeReply(r, answers)
 }
+
+func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
+	m := new(dns.Msg)
+	m.SetReply(r)
+	m.RecursionAvailable = true
+	m.Rcode = dns.RcodeNameError
+	return m
+}
