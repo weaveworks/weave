@@ -63,12 +63,6 @@ func (list *requestList) removeAt(pos int) {
 	(*list) = append((*list)[:pos], (*list)[pos+1:]...)
 }
 
-func (list *requestList) remove(sender router.PeerName, space Space) {
-	if pos := list.find(sender, space); pos >= 0 {
-		list.removeAt(pos)
-	}
-}
-
 // To allow time itself to be stubbed out for testing
 type timeProvider interface {
 	Now() time.Time
@@ -737,12 +731,16 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 	if err := decoder.Decode(&claim); err != nil {
 		return err
 	}
+	pos := alloc.inflight.find(sender, &claim)
+	if pos < 0 {
+		lg.Error.Println("Not expecting to receive space donation refused from", sender, alloc.inflight[0].dest)
+		return nil // not a severe enough error to shut down the connection
+	}
 	lg.Debug.Println("Received space claim refused: sender", sender, "space", claim)
 	// Message is concluded by an update of state of the sender
 	if _, err := alloc.decodeFromDecoder(decoder); err != nil {
 		return err
 	}
-	alloc.inflight.remove(sender, &claim)
 	for i := 0; i < len(alloc.claims); i++ {
 		if claim.Contains(alloc.claims[i].IP) {
 			alloc.claims[i].resultChan <- errors.New("IP address owned by" + sender.String())
@@ -750,6 +748,7 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 			i--
 		}
 	}
+	alloc.inflight.removeAt(pos)
 	return nil
 }
 
