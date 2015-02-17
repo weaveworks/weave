@@ -45,9 +45,6 @@ Peer, is conceptually simple but the implementation is fiddly to
 maintain the various lists and limits within MutableSpace. Perhaps a
 different free-list implementation would make this easier.
 
-[MutableSpace has a RWMutex which may not be necessary - probably all
-accesses are via the owning OurSpaceSet which has its own lock]
-
 #### SpaceSet implementations
 
 PeerSpaceSet and MutableSpaceSet share the same data fields, but the
@@ -95,6 +92,9 @@ so we keep a 'claims' slice to examine periodically.
 Allocator maintains a list of 'inflight' requests so it can avoid
 sending the same request twice, and to match up donations against
 requests. Donations do not state why they were sent.
+
+Allocator broadcasts its own state any time the has-free flag changes,
+or when it reclaims a leak.
 
 ## Concurrency
 
