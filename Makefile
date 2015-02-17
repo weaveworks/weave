@@ -55,8 +55,8 @@ $(WEAVETOOLS_EXPORT): tools/Dockerfile $(WEAVETOOLS_EXES)
 
 # Add more directories in here as more tests are created
 tests:
-	cd router; go test -tags netgo
-	cd nameserver; go test -tags netgo
+	cd router; go test -cover -tags netgo
+	cd nameserver; go test -cover -tags netgo
 
 $(PUBLISH): publish_%:
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
