@@ -604,7 +604,7 @@ func (alloc *Allocator) electLeaderIfNecessary() {
 			highest = uid
 		}
 	}
-	lg.Debug.Println("Elected leader:", highest)
+	lg.Debug.Println("Elected leader:", alloc.peerInfo[highest].PeerName())
 	// The peer with the highest name is the leader
 	if highest == alloc.ourUID {
 		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
@@ -751,7 +751,6 @@ func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<-
 		resultChan <- nil
 		return
 	}
-	alloc.electLeaderIfNecessary()
 	// See if it's already claimed
 	if pos := alloc.claims.find(addr); pos >= 0 && alloc.claims[pos].Ident != ident {
 		resultChan <- errors.New("IP address already claimed by " + alloc.claims[pos].Ident)
