@@ -29,6 +29,24 @@ const (
 	allocStateLeaderless
 )
 
+type Allocator struct {
+	queryChan   chan<- interface{}
+	ourName     router.PeerName
+	ourUID      uint64
+	state       int
+	universeLen int
+	universe    MinSpace // all the addresses that could be allocated
+	gossip      router.Gossip
+	peerInfo    map[uint64]SpaceSet // indexed by peer UID
+	ourSpaceSet *OurSpaceSet
+	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
+	leaked      map[time.Time]Space
+	claims      claimList
+	pending     []allocateFor
+	inflight    requestList
+	timeProvider
+}
+
 // Some in-flight request that we have made to another peer
 type request struct {
 	dest    router.PeerName
@@ -72,57 +90,47 @@ type defaultTime struct{}
 
 func (defaultTime) Now() time.Time { return time.Now() }
 
+// Types used to send requests from Actor client to server
 type stop struct{}
-
 type makeString struct {
 	resultChan chan<- string
 }
-
 type claim struct {
 	resultChan chan<- error
 	Allocation
 }
-
 type allocateFor struct {
 	resultChan chan<- net.IP
 	Ident      string
 }
-
 type free struct {
 	resultChan chan<- error
 	addr       net.IP
 }
-
 type deleteRecordsFor struct {
 	Ident string
 }
-
 type gossipUnicast struct {
 	resultChan chan<- error
 	sender     router.PeerName
 	bytes      []byte
 }
-
 type gossipBroadcast struct {
 	resultChan chan<- error
 	bytes      []byte
 }
-
 type gossipCreate struct {
 	resultChan chan<- []byte
 	bytes      []byte
 }
-
 type gossipReceived struct {
 	resultChan chan<- gossipReply
 	bytes      []byte
 }
-
 type gossipReply struct {
 	err   error
 	bytes []byte
 }
-
 type onDead struct {
 	name router.PeerName
 	uid  uint64
@@ -141,24 +149,6 @@ func (aa *claimList) find(addr net.IP) int {
 		}
 	}
 	return -1
-}
-
-type Allocator struct {
-	queryChan   chan<- interface{}
-	ourName     router.PeerName
-	ourUID      uint64
-	state       int
-	universeLen int
-	universe    MinSpace // all the addresses that could be allocated
-	gossip      router.Gossip
-	peerInfo    map[uint64]SpaceSet // indexed by peer UID
-	ourSpaceSet *OurSpaceSet
-	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
-	leaked      map[time.Time]Space
-	claims      claimList
-	pending     []allocateFor
-	inflight    requestList
-	timeProvider
 }
 
 func NewAllocator(ourName router.PeerName, ourUID uint64, universeCIDR string) (*Allocator, error) {
@@ -658,6 +648,7 @@ func (alloc *Allocator) requestSpace() bool {
 		alloc.sendRequest(best.PeerName(), msgSpaceRequest, nil)
 		return true
 	} else {
+		lg.Debug.Println(alloc.String())
 		lg.Debug.Println("Nobody available to ask for space")
 		return false
 	}
