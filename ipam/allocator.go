@@ -13,7 +13,6 @@ import (
 
 const (
 	GossipReqTimeout     = 1 * time.Second
-	GossipWaitForLead    = 10 * time.Second
 	GossipDeadTimeout    = 10 * time.Second
 	MaxAddressesToGiveUp = 256
 )
@@ -190,15 +189,14 @@ func (alloc *Allocator) Start() {
 	alloc.state = allocStateLeaderless
 	queryChan := make(chan interface{}, router.ChannelSize)
 	alloc.queryChan = queryChan
-	gossipTimer := time.Tick(router.GossipInterval)
-	go alloc.queryLoop(queryChan, gossipTimer)
+	go alloc.queryLoop(queryChan, true)
 }
 
 func (alloc *Allocator) startForTesting() {
 	alloc.state = allocStateLeaderless
 	queryChan := make(chan interface{}, router.ChannelSize)
 	alloc.queryChan = queryChan
-	go alloc.queryLoop(queryChan, nil)
+	go alloc.queryLoop(queryChan, false)
 }
 
 // Actor client API
@@ -289,7 +287,12 @@ func (alloc *Allocator) OnDead(name router.PeerName, uid uint64) {
 
 // ACTOR server
 
-func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-chan time.Time) {
+func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool) {
+	var fastTimer, slowTimer <-chan time.Time
+	if withTimers {
+		fastTimer = time.Tick(GossipReqTimeout)
+		slowTimer = time.Tick(router.GossipInterval)
+	}
 	for {
 		prevState := alloc.ourSpaceSet.HasFreeAddresses()
 		changed := false
@@ -343,7 +346,9 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, gossipTimer <-ch
 			case onDead:
 				alloc.handleDead(q.name, q.uid)
 			}
-		case <-gossipTimer:
+		case <-slowTimer:
+			changed = alloc.slowConsiderOurPosition()
+		case <-fastTimer:
 			changed = alloc.considerOurPosition()
 		}
 		if changed || (prevState != alloc.ourSpaceSet.HasFreeAddresses()) {
@@ -574,14 +579,12 @@ func (alloc *Allocator) checkInflight(now time.Time) {
 	}
 }
 
+// Fairly quick check of what's going on; whether requests should now be
+// replied to, etc.
 func (alloc *Allocator) considerOurPosition() (changed bool) {
 	now := alloc.timeProvider.Now()
 	switch alloc.state {
 	case allocStateNeutral:
-		alloc.discardOldLeaks()
-		alloc.lookForDead(now)
-		changed = alloc.reclaimLeaks(now)
-		alloc.lookForNewLeaks(now)
 		alloc.checkInflight(now)
 		alloc.checkClaims()
 	case allocStateLeaderless:
@@ -589,6 +592,20 @@ func (alloc *Allocator) considerOurPosition() (changed bool) {
 		if len(alloc.pending) > 0 {
 			alloc.electLeaderIfNecessary()
 		}
+	}
+	return
+}
+
+// Slower check looking for leaks, etc.
+func (alloc *Allocator) slowConsiderOurPosition() (changed bool) {
+	now := alloc.timeProvider.Now()
+	changed = alloc.considerOurPosition()
+	switch alloc.state {
+	case allocStateNeutral:
+		alloc.discardOldLeaks()
+		alloc.lookForDead(now)
+		changed = alloc.reclaimLeaks(now)
+		alloc.lookForNewLeaks(now)
 	}
 	return
 }
