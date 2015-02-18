@@ -259,7 +259,6 @@ func (s *OurSpaceSet) AllocateFor(ident string) net.IP {
 	// TODO: Optimize; perhaps cache last-used space
 	for _, space := range s.spaces {
 		if ret := space.(*MutableSpace).AllocateFor(ident); ret != nil {
-			s.version++
 			return ret
 		}
 	}
@@ -272,7 +271,6 @@ func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 		if done, err := space.(*MutableSpace).Claim(ident, addr); err != nil {
 			return err
 		} else if done {
-			s.version++
 			return nil
 		}
 	}
@@ -282,7 +280,6 @@ func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 func (s *OurSpaceSet) Free(addr net.IP) error {
 	for _, space := range s.spaces {
 		if space.(*MutableSpace).Free(addr) {
-			s.version++
 			return nil
 		}
 	}
@@ -293,7 +290,6 @@ func (s *OurSpaceSet) DeleteRecordsFor(ident string) {
 	for _, space := range s.spaces {
 		space.(*MutableSpace).DeleteRecordsFor(ident)
 	}
-	s.version++
 }
 
 func endOfBlock(a Space) net.IP {

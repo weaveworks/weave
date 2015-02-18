@@ -295,7 +295,7 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 	}
 	for {
 		prevState := alloc.ourSpaceSet.HasFreeAddresses()
-		changed := false
+		prevVersion := alloc.ourSpaceSet.version
 		select {
 		case query, ok := <-queryChan:
 			if !ok {
@@ -347,11 +347,14 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 				alloc.handleDead(q.name, q.uid)
 			}
 		case <-slowTimer:
-			changed = alloc.slowConsiderOurPosition()
+			alloc.slowConsiderOurPosition()
 		case <-fastTimer:
-			changed = alloc.considerOurPosition()
+			alloc.considerOurPosition()
 		}
-		if changed || (prevState != alloc.ourSpaceSet.HasFreeAddresses()) {
+		if prevState != alloc.ourSpaceSet.HasFreeAddresses() {
+			alloc.ourSpaceSet.version++
+		}
+		if prevVersion != alloc.ourSpaceSet.version {
 			alloc.gossip.GossipBroadcast(encode(alloc.ourSpaceSet))
 		}
 	}

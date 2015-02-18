@@ -183,7 +183,7 @@ type mockGossipComms struct {
 
 func (m *mockGossipComms) GossipBroadcast(buf []byte) error {
 	if len(m.messages) == 0 {
-		wt.Fatalf(m.t, "%s: Gossip message unexpected: \n%s", m.name, buf)
+		wt.Fatalf(m.t, "%s: Gossip broadcast message unexpected: \n%x", m.name, buf)
 	} else if msg := m.messages[0]; msg.dst != router.UnknownPeerName {
 		wt.Fatalf(m.t, "%s: Expected Gossip message to %s but got broadcast", m.name, msg.dst)
 	} else if msg.buf != nil && !equalByteBuffer(msg.buf, buf) {
@@ -345,7 +345,7 @@ func implTestGossip(t *testing.T) {
 	ExpectBroadcastMessage(alloc1, nil)
 	alloc1.OnGossipUnicast(alloc2.ourName, msg)
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 4, "Total free addresses")
-	wt.AssertEqualuint64(t, alloc1.peerInfo[peerUID].Version(), 2, "Peer version")
+	wt.AssertEqualuint64(t, alloc1.peerInfo[peerUID].Version(), 3, "Peer version")
 	AssertSent(t, done)
 
 	// Now looking to trigger a timeout
@@ -612,8 +612,9 @@ func implAllocatorClaim3(t *testing.T) {
 	wt.AssertEqualInt(t, len(alloc1.claims), 2, "claims")
 	alloc1.considerOurPosition()
 
-	// alloc2 receives this request and replies
+	// alloc2 receives this request, replies and broadcasts its new status
 	ExpectMessage(alloc2, peer1NameString, msgSpaceDonate, nil)
+	ExpectBroadcastMessage(alloc2, nil)
 	err := alloc2.OnGossipUnicast(alloc1.ourName, router.Concat([]byte{msgSpaceClaim}, msgbuf))
 	wt.AssertNoErr(t, err)
 	AssertNothingSent(t, done)
