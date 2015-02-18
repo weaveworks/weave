@@ -741,10 +741,6 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) er
 	if _, err := alloc.decodeFromDecoder(decoder); err != nil {
 		return err
 	}
-	if owner := alloc.spaceOwner(&donation); owner != 0 {
-		lg.Error.Printf("Space donated: %+v is already owned by UID %d\n%+v", donation, owner, alloc.peerInfo[owner])
-		return nil
-	}
 	alloc.ourSpaceSet.AddSpace(NewSpace(donation.Start, donation.Size))
 	alloc.inflight.removeAt(pos)
 	alloc.checkClaims()
