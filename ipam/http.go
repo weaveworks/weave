@@ -66,7 +66,7 @@ func (alloc *Allocator) HandleHttp() {
 				io.WriteString(w, fmt.Sprintf("%s/%d", newAddr, alloc.universeLen))
 			} else {
 				httpErrorAndLog(
-					Error, w, "Internal error", http.StatusInternalServerError,
+					Error, w, "No free addresses", http.StatusServiceUnavailable,
 					"No free addresses")
 			}
 		}
