@@ -13,6 +13,7 @@ const (
 	DEFAULT_SERVER_PORT  = 53                 // The default server port
 	DEFAULT_CLI_CFG_FILE = "/etc/resolv.conf" // default "resolv.conf" file to try to load
 	DEFAULT_UDP_BUFLEN   = 4096               // bigger than the default 512
+    DEFAULT_CACHE_LEN    = -1                 // default cache capacity (0=disabled)
 	DEFAULT_IFACE_NAME   = "default interface"
 )
 
@@ -25,6 +26,8 @@ type DNSServerConfig struct {
 	Port int
 	// (Optional) local domain (ie, "weave.local.")
 	LocalDomain string
+	// (Optional) cache size (0=disabled)
+	CacheLen int
 }
 
 type DNSServer struct {
@@ -32,6 +35,7 @@ type DNSServer struct {
 	tcpSrv   *dns.Server
 	mdnsCli  *MDNSClient
 	mdnsSrv  *MDNSServer
+	cache    *Cache
 	zone     Zone
 	iface    *net.Interface
 	upstream *dns.ClientConfig
@@ -81,7 +85,16 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if iface != nil {
 		s.IfaceName = iface.Name
 	}
-
+	cacheLen := DEFAULT_CACHE_LEN
+	if config.CacheLen > 0 {
+		cacheLen = config.CacheLen
+	}
+	Debug.Printf("[dns] Initializing cache: %d entries", config.CacheLen)
+	s.cache, err = NewCache(config.CacheLen)
+	if err != nil {
+		return
+	}
+	
 	// create two DNS request multiplexerers, depending on the protocol used by clients
 	// (we use the same protocol for asking upstream servers)
 	mux := func(client *dns.Client) *dns.ServeMux {
@@ -149,7 +162,7 @@ func (s *DNSServer) Stop() error {
 func (s *DNSServer) queryHandler(lookups []Lookup) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("Query: %+v", q)
+		Debug.Printf("[dns] Query: %+v", q)
 		if q.Qtype == dns.TypeA {
 			for _, lookup := range lookups {
 				if ip, err := lookup.LookupName(q.Name); err == nil {
@@ -169,7 +182,7 @@ func (s *DNSServer) rdnsHandler(lookups []Lookup, client *dns.Client) dns.Handle
 	fallback := s.notUsHandler(client)
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("Reverse query: %+v", q)
+		Debug.Printf("[dns] Reverse query: %+v", q)
 		if q.Qtype == dns.TypePTR {
 			for _, lookup := range lookups {
 				if name, err := lookup.LookupInaddr(q.Name); err == nil {
