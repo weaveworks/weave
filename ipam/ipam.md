@@ -96,6 +96,24 @@ requests. Donations do not state why they were sent.
 Allocator broadcasts its own state any time the has-free flag changes,
 or when it reclaims a leak.
 
+## Elections
+
+At start-up, nobody owns any of the address space.  An election is
+triggered by some peer being asked to allocate or claim an address.
+
+If a peer elects itself as leader, then it can respond to the request directly.
+
+However, if the election is won by some different peer, then the peer
+that has the request must wait until the leader takes control before
+it can request space.
+
+The peer that triggered the election sends a message to the peer it
+has elected.  That peer then re-runs the election, to avoid races
+where further peers have joined the group and come to a different conclusion.
+
+The peer that sends the message sets a timeout, and if it does not
+hear back that someone has allocated some space, then 
+
 ## Concurrency
 
 Everything is hung off Allocator, which runs as a single-threaded

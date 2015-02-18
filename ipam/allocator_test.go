@@ -224,6 +224,15 @@ func ExpectBroadcastMessage(alloc *Allocator, buf []byte) {
 	m.messages = append(m.messages, mockMessage{router.UnknownPeerName, 0, buf})
 }
 
+func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
+	for _, alloc := range allocs {
+		m := alloc.gossip.(*mockGossipComms)
+		if len(m.messages) > 0 {
+			wt.Fatalf(m.t, "%s: Gossip message(s) not sent as expected: \n%x", m.name, m.messages)
+		}
+	}
+}
+
 type mockTimeProvider struct {
 	myTime time.Time
 }
@@ -304,7 +313,6 @@ func implTestGossip(t *testing.T) {
 	alloc1.considerOurPosition()
 
 	// Now give alloc2 some space and tell alloc1 about it
-	// Now let alloc2 tell alloc1 about its space
 	alloc2.manageSpace(net.ParseIP(testStart2), 10)
 	ExpectBroadcastMessage(alloc2, nil)
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
@@ -358,6 +366,84 @@ func implTestGossip(t *testing.T) {
 	mockTime.SetTime(baseTime.Add(12 * time.Minute))
 	ExpectBroadcastMessage(alloc1, nil)
 	alloc1.considerOurPosition()
+}
+
+// Test the election mechanism
+func TestGossip2(t *testing.T) {
+	wt.RunWithTimeout(t, 1*time.Second, func() { implTestGossip2(t) })
+}
+
+func implTestGossip2(t *testing.T) {
+	const (
+		donateSize     = 5
+		donateStart    = "10.0.1.7"
+		peerNameString = "02:00:00:02:00:00"
+	)
+
+	baseTime := time.Date(2014, 9, 7, 12, 0, 0, 0, time.UTC)
+	alloc1 := testAllocator(t, "01:00:00:01:00:00", ourUID, testStart1+"/22")
+	defer alloc1.Stop()
+	mockTime := new(mockTimeProvider)
+	mockTime.SetTime(baseTime)
+	alloc1.timeProvider = mockTime
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
+
+	mockTime.SetTime(baseTime.Add(1 * time.Second))
+
+	// Simulate another peer on the gossip network
+	alloc2 := testAllocator(t, peerNameString, peerUID, testStart1+"/22")
+	defer alloc2.Stop()
+	alloc2.timeProvider = alloc1.timeProvider
+
+	mockTime.SetTime(baseTime.Add(2 * time.Second))
+
+	alloc1.OnGossipBroadcast(alloc2.Gossip())
+	// At first, this peer has no space, so alloc1 should do nothing
+	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
+
+	mockTime.SetTime(baseTime.Add(3 * time.Second))
+	alloc1.considerOurPosition()
+
+	mockTime.SetTime(baseTime.Add(4 * time.Second))
+	// On receipt of the AllocateFor, alloc1 should elect alloc2 as leader, because it has a higher UID
+	ExpectMessage(alloc1, peerNameString, msgLeaderElected, nil)
+
+	done := make(chan bool)
+	go func() {
+		alloc1.AllocateFor("somecontainer")
+		done <- true
+	}()
+	time.Sleep(100 * time.Millisecond)
+	AssertNothingSent(t, done)
+	wt.AssertEqualInt(t, len(alloc1.inflight), 1, "inflight")
+
+	// Time out with no reply
+	mockTime.SetTime(baseTime.Add(15 * time.Second))
+	ExpectMessage(alloc1, peerNameString, msgLeaderElected, nil)
+	alloc1.considerOurPosition()
+	AssertNothingSent(t, done)
+	wt.AssertEqualInt(t, len(alloc1.inflight), 1, "inflight")
+
+	// alloc2 receives the leader election message and broadcasts its winning state
+	ExpectBroadcastMessage(alloc2, nil)
+	msg := router.Concat([]byte{msgLeaderElected}, encode(alloc1.ourSpaceSet))
+	alloc2.OnGossipUnicast(alloc1.ourName, msg)
+
+	// On receipt of the broadcast, alloc1 should ask alloc2 for space
+	ExpectMessage(alloc1, peerNameString, msgSpaceRequest, encode(alloc1.ourSpaceSet))
+	alloc1.OnGossipBroadcast(alloc2.Gossip())
+
+	// Now make it look like alloc2 has given up half its space
+	alloc2.ourSpaceSet.spaces[0].(*MutableSpace).MinSpace.Size = donateSize
+	alloc2.ourSpaceSet.version++
+
+	donation := NewMinSpace(net.ParseIP(donateStart), donateSize)
+	msg = router.Concat([]byte{msgSpaceDonate}, GobEncode(donation, 1, alloc2.ourSpaceSet))
+	ExpectBroadcastMessage(alloc1, nil)
+	alloc1.OnGossipUnicast(alloc2.ourName, msg)
+	AssertSent(t, done)
+
+	CheckAllExpectedMessagesSent(alloc1, alloc2)
 }
 
 func TestLeaks(t *testing.T) {
