@@ -1,4 +1,6 @@
 #!/bin/sh
+
+# Show the progress of this script, in case it fails.
 set -x -e
 
 sudo apt-get -y update
