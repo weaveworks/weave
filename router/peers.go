@@ -128,7 +128,7 @@ func (peers *Peers) String() string {
 			if !conn.Established() {
 				established = " (unestablished)"
 			}
-			buf.WriteString(fmt.Sprintf("   -> %v [%v%s]\n", remoteName, conn.RemoteTCPAddr(), established))
+			buf.WriteString(fmt.Sprintf("   -> %v (%v) [%v%s]\n", remoteName, conn.Remote().HostName, conn.RemoteTCPAddr(), established))
 		})
 	})
 	return buf.String()
