@@ -42,7 +42,7 @@ func NewDNSServer(config *dns.ClientConfig, zone Zone, iface *net.Interface, por
 // Start the DNS server
 func (s *DNSServer) Start() error {
 	mdnsClient, err := NewMDNSClient()
-	checkFatal(err)
+	CheckFatal(err)
 
 	ifaceName := "default interface"
 	if s.iface != nil {
@@ -50,7 +50,7 @@ func (s *DNSServer) Start() error {
 	}
 	Info.Printf("Using mDNS on %s", ifaceName)
 	err = mdnsClient.Start(s.iface)
-	checkFatal(err)
+	CheckFatal(err)
 
 	// create two DNS request multiplexerers, depending on the protocol used by clients
 	// (we use the same protocol for asking upstream servers)
@@ -63,10 +63,10 @@ func (s *DNSServer) Start() error {
 	}
 
 	mdnsServer, err := NewMDNSServer(s.zone)
-	checkFatal(err)
+	CheckFatal(err)
 
 	err = mdnsServer.Start(s.iface)
-	checkFatal(err)
+	CheckFatal(err)
 
 	address := fmt.Sprintf(":%d", s.port)
 	s.udpSrv = &dns.Server{Addr: address, Net: "udp", Handler: mux(&dns.Client{Net: "udp", UDPSize: UDPBufSize})}
@@ -75,13 +75,13 @@ func (s *DNSServer) Start() error {
 	go func() {
 		Info.Printf("Listening for DNS on %s (UDP)", address)
 		err = s.udpSrv.ListenAndServe()
-		checkFatal(err)
+		CheckFatal(err)
 	}()
 
 	go func() {
 		Info.Printf("Listening for DNS on %s (TCP)", address)
 		err = s.tcpSrv.ListenAndServe()
-		checkFatal(err)
+		CheckFatal(err)
 	}()
 
 	return nil
