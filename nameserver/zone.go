@@ -15,7 +15,7 @@ const (
 var rdnsDomainLen = len(RDNS_DOMAIN) + 1
 
 type Lookup interface {
-	LookupName(name string) (net.IP, error)
+	LookupName(name string) ([]net.IP, error)
 	LookupInaddr(inaddr string) (string, error)
 }
 
@@ -61,15 +61,19 @@ func (zone *ZoneDb) indexOf(match func(Record) bool) int {
 	return -1
 }
 
-func (zone *ZoneDb) LookupName(name string) (net.IP, error) {
+func (zone *ZoneDb) LookupName(name string) (res []net.IP, err error) {
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 	for _, r := range zone.recs {
 		if r.Name == name {
-			return r.IP, nil
+			res = append(res, r.IP)
 		}
 	}
-	return nil, LookupError(name)
+
+	if len(res) == 0 {
+		err = LookupError(name)
+	}
+	return
 }
 
 func (zone *ZoneDb) LookupInaddr(inaddr string) (string, error) {

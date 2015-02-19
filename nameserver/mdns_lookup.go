@@ -23,9 +23,9 @@ func mdnsLookup(client *MDNSClient, name string, qtype uint16) (*Response, error
 	return nil, LookupError(name)
 }
 
-func (client *MDNSClient) LookupName(name string) (net.IP, error) {
+func (client *MDNSClient) LookupName(name string) ([]net.IP, error) {
 	if r, e := mdnsLookup(client, name, dns.TypeA); r != nil {
-		return r.Addr, nil
+		return []net.IP{r.Addr}, nil
 	} else {
 		return nil, e
 	}

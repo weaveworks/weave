@@ -184,3 +184,44 @@ func TestAsLookup(t *testing.T) {
 		t.Fatalf("Expected name %s, got %s", successTestName, name)
 	}
 }
+
+func TestInflightCleanups(t *testing.T) {
+	client, _ := NewMDNSClient()
+	timeBase := time.Now()
+
+	client.inflight["A.local"] = &inflightQuery{
+		name: "A.local",
+		id:   0,
+		responseInfos: []*responseInfo{
+			&responseInfo{
+				timeout: timeBase.Add(1),
+				ch:      make(chan<- *Response),
+			},
+			&responseInfo{
+				timeout: timeBase.Add(2),
+				ch:      make(chan<- *Response),
+			},
+			&responseInfo{
+				timeout: timeBase.Add(3),
+				ch:      make(chan<- *Response),
+			},
+			&responseInfo{
+				timeout: timeBase.Add(4),
+				ch:      make(chan<- *Response),
+			},
+		},
+		backgroundResponseInfos: []*backgroundRespInfo{
+			&backgroundRespInfo{
+				ch:      make(chan <- *Response),
+			},
+		},
+	}
+	client.checkInFlightQueries(timeBase.Add(2))
+	afterCleanup := client.inflight["A.local"]
+	if len(afterCleanup.responseInfos) != 2 {
+		t.Fatalf("Inflight cleanup failed: %d found, 2 expected", len(client.inflight))
+	}
+	if len(afterCleanup.backgroundResponseInfos) != 1 {		// just in case, as nothing should change here...
+		t.Fatalf("Inflight cleanup failed: %d found, 1 expected", len(client.inflight))
+	}
+}

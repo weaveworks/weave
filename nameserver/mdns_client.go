@@ -37,14 +37,19 @@ type responseInfo struct {
 	ch      chan<- *Response
 }
 
+type backgroundRespInfo struct {
+	ch chan<- *Response
+}
+
 // Represents one query that we have sent for one name.
 // If we, internally, get several requests for the same name while we have
 // a query in flight, then we don't want to send more queries out.
 // Invariant on responseInfos: they are in ascending order of timeout.
 type inflightQuery struct {
-	name          string
-	id            uint16 // the DNS message ID
-	responseInfos []*responseInfo
+	name                    string
+	id                      uint16 // the DNS message ID
+	responseInfos           []*responseInfo
+	backgroundResponseInfos []*backgroundRespInfo
 }
 
 type MDNSClient struct {
@@ -105,6 +110,7 @@ func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 
 const (
 	CSendQuery = iota
+	CBackgroundQuery
 	CShutdown
 	CMessageReceived
 )
@@ -128,6 +134,14 @@ func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- 
 	}
 }
 
+// Perform a background query: a query that never times out
+func (c *MDNSClient) BackgroundQuery(name string, querytype uint16, responseCh chan<- *Response) {
+	c.queryChan <- &MDNSInteraction{
+		code:    CBackgroundQuery,
+		payload: mDNSQueryInfo{name, querytype, responseCh},
+	}
+}
+
 // Async - called from dns library multiplexer
 func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
 	c.queryChan <- &MDNSInteraction{code: CMessageReceived, payload: r}
@@ -137,8 +151,7 @@ func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
 
 // Check all in-flight queries, close all that have already timed out,
 // and return the duration until the next timeout
-func (c *MDNSClient) checkInFlightQueries() time.Duration {
-	now := time.Now()
+func (c *MDNSClient) checkInFlightQueries(now time.Time) time.Duration {
 	after := MaxDuration
 	for name, query := range c.inflight {
 		// Invariant on responseInfos: they are in ascending order of timeout.
@@ -157,7 +170,7 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 		}
 		// Remove timed-out items from the slice
 		query.responseInfos = query.responseInfos[numClosed:]
-		if len(query.responseInfos) == 0 {
+		if len(query.responseInfos) == 0 && len(query.backgroundResponseInfos) == 0 {
 			delete(c.inflight, name)
 		}
 	}
@@ -167,7 +180,7 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 	timer := time.NewTimer(MaxDuration)
 	run := func() {
-		timer.Reset(c.checkInFlightQueries())
+		timer.Reset(c.checkInFlightQueries(time.Now()))
 	}
 
 	terminate := false
@@ -182,7 +195,10 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 				c.listener.Shutdown()
 				terminate = true
 			case CSendQuery:
-				c.handleSendQuery(query.payload.(mDNSQueryInfo))
+				c.handleSendQuery(query.payload.(mDNSQueryInfo), time.Now().Add(mDNSTimeout))
+				run()
+			case CBackgroundQuery:
+				c.handleBackgroundQuery(query.payload.(mDNSQueryInfo))
 				run()
 			case CMessageReceived:
 				c.handleResponse(query.payload.(*dns.Msg))
@@ -198,10 +214,13 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 		for _, item := range query.responseInfos {
 			close(item.ch)
 		}
+		for _, item := range query.backgroundResponseInfos {
+			close(item.ch)
+		}
 	}
 }
 
-func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
+func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo, timeout time.Time) {
 	query, found := c.inflight[q.name]
 	if !found {
 		m := new(dns.Msg)
@@ -224,6 +243,9 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 		}
 		c.inflight[q.name] = query
 	}
+
+	// FIXME: response could reach us before we insert in the "responseInfos"
+
 	info := &responseInfo{
 		ch:      q.responseCh,
 		timeout: time.Now().Add(mDNSTimeout),
@@ -231,6 +253,42 @@ func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
 	// Invariant on responseInfos: they are in ascending order of timeout.
 	// Since we use a fixed interval from Now(), this must be after all existing timeouts.
 	query.responseInfos = append(query.responseInfos, info)
+}
+
+func (c *MDNSClient) handleBackgroundQuery(q mDNSQueryInfo) {
+	// send the query in any case, so we get more responses...
+	m := new(dns.Msg)
+	m.SetQuestion(q.name, q.querytype)
+	m.RecursionDesired = false
+	buf, err := m.Pack()
+	if err != nil {
+		q.responseCh <- &Response{Err: err}
+		return
+	}
+	if _, err = c.conn.WriteTo(buf, c.addr); err != nil {
+		q.responseCh <- &Response{Err: err}
+		return
+	}
+
+	receiverOngoing := false
+	query, found := c.inflight[q.name]
+	if !found {
+		query = &inflightQuery{
+			name: q.name,
+			id:   m.Id,
+		}
+		c.inflight[q.name] = query
+	} else {
+		// check if this receiver is already registered for this query
+		for _, item := range query.backgroundResponseInfos {
+			receiverOngoing = receiverOngoing || (item.ch == q.responseCh)
+		}
+	}
+
+	// FIXME: response could reach us before we insert in the "backgroundResponseInfos", and it would be discarded...
+	if !receiverOngoing {
+		query.backgroundResponseInfos = append(query.backgroundResponseInfos, &backgroundRespInfo{q.responseCh})
+	}
 }
 
 func (c *MDNSClient) handleResponse(r *dns.Msg) {
@@ -254,7 +312,17 @@ func (c *MDNSClient) handleResponse(r *dns.Msg) {
 				resp.ch <- res
 				close(resp.ch)
 			}
-			delete(c.inflight, name)
+			for _, resp := range query.backgroundResponseInfos {
+				resp.ch <- res
+			}
+
+			if len(query.backgroundResponseInfos) == 0 {
+				// no more clients: remove the whole query
+				delete(c.inflight, name)
+			} else {
+				// there are background clients: just remove the one-time cients
+				c.inflight[name].responseInfos = []*responseInfo{}
+			}
 		} else {
 			// We've received a response that didn't match a query
 			// Do we want to cache it?

@@ -53,7 +53,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 	handleLocal := s.makeHandler(dns.TypeA,
 		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
 			if ip, err := zone.LookupName(q.Name); err == nil {
-				return makeAddressReply(r, q, []net.IP{ip})
+				return makeAddressReply(r, q, ip)
 			} else {
 				return nil
 			}

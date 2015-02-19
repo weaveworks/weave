@@ -9,6 +9,8 @@ usage() {
     echo "weave launch     [-password <password>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
+    echo "weave join       <group>"
+    echo "weave leave      <group>"
     echo "weave run        [--with-dns] <cidr> <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
     echo "weave attach     <cidr> <container_id>"
@@ -22,7 +24,8 @@ usage() {
     echo "weave stop-dns"
     echo "weave reset"
     echo
-    echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>], and"
+    echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>],"
+    echo "      <group> is of the form <service>://[<domain>], and"
     echo "      <cidr> is of the form <ip_address>/<routing_prefix_length>"
     exit 1
 }
@@ -44,18 +47,22 @@ IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 
 BASE_IMAGE=zettio/weave
 BASE_DNS_IMAGE=zettio/weavedns
+BASE_DISCOVERY_IMAGE=zettio/weavediscovery
 BASE_TOOLS_IMAGE=zettio/weavetools
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
+DISCOVERY_IMAGE=$BASE_DISCOVERY_IMAGE:$IMAGE_VERSION
 TOOLS_IMAGE=$BASE_TOOLS_IMAGE:$IMAGE_VERSION
 CONTAINER_NAME=weave
 DNS_CONTAINER_NAME=weavedns
+DISCOVERY_CONTAINER_NAME=weavediscovery
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
 PORT=6783
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
+DISCOVERY_HTTP_PORT=6786
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 PROCFS=${PROCFS:-/proc}
 
@@ -68,6 +75,10 @@ shift 1
 command_exists () {
     command -v $1 >/dev/null 2>&1
 }
+
+log()   { echo "$1" >&2 ; }
+warn()  { log "WARNING: $1"; }
+fatal() { log "ERROR: $1"; exit 1; }
 
 run_tool() {
     TOOL_NET=$1
@@ -295,25 +306,35 @@ detach() {
     ip netns exec $NETNS ip link del $CONTAINER_IFNAME type veth
 }
 
-# Call url $4 with http verb $3 on container $1 at port $2
-http_call() {
-    if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null); then
-        echo "$1 container is not present; have you launched it?" >&2
+container_is_running() {
+    if ! status=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) || [ "$status" != "true" ] ; then
         return 1
     fi
-    case "$status" in
-        "true ")
-            echo "$1 container has no IP address; is Docker networking enabled?" >&2
-            return 1
-            ;;
-        true*)
-            ip="${status#true }"
-            ;;
-        *)
-            echo "$1 container is not running." >&2
-            return 1
-            ;;
-    esac
+}
+
+# Get the IP address of a container with name $1
+container_ip() {
+    container_name=$1
+    container_is_running $container_name || return 1
+    docker inspect --format='{{.NetworkSettings.IPAddress}}' $container_name 2>/dev/null
+}
+
+# wait for a for a container with name $1 to be up and running
+wait_for_container() {
+    container_name=$1
+    wait_time=1
+    while [ $wait_time -lt 4 ]; do
+        container_is_running $container_name && return 0
+        sleep 1
+        wait_time=$((wait_time+1))
+    done
+    [ $wait_time -eq 4 ] && return 1
+    return 0
+}
+
+# Call url $4 with http verb $3 on container $1 at port $2
+http_call() {
+    ip=$(container_ip $1) || fatal "$1 container has no IP address; is Docker networking enabled?"
     shift 1
     http_call_ip $ip "$@"
 }
@@ -325,6 +346,22 @@ http_call_ip() {
     url="$4"
     shift 4
     run_tool host curl -s -X $http_verb "$@" http://$ip:$port$url
+}
+
+# Wait for a container with name $1 that provides a "/status" at port $2
+wait_for_http_status() {
+    ip=$1
+    port=$2
+
+    [ -n "$ip" ] || fatal "no IP address for container"
+
+    wait_time=1
+    while ! http_call_ip $ip $port "GET" "/status" >/dev/null && [ $wait_time -lt 4 ]; do
+        sleep 1
+        wait_time=$((wait_time+1))
+    done
+    [ $wait_time = 4 ] && return 1
+    return 0
 }
 
 # Perform operation $1 on container ID $2 to local DNS database at address $3
@@ -344,23 +381,15 @@ tell_dns() {
 
 # Tell the newly-started weaveDNS about existing weave IPs
 populate_dns() {
-    DNS_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $DNS_CONTAINER_NAME)
-    WAIT_TIME=1
-    while ! http_call_ip $DNS_IP $DNS_HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
-        sleep $WAIT_TIME
-        WAIT_TIME=$((WAIT_TIME+1))
-    done
-    if [ $WAIT_TIME = 4 ]; then
-        echo "Timed out waiting for weaveDNS container to start." >&2
-        echo "If running, it will not be pre-populated." >&2
-    fi
+    dns_ip=$(container_ip $DNS_CONTAINER_NAME)
+    wait_for_http_status $dns_ip $DNS_HTTP_PORT || log "Timed out waiting for $DNS_CONTAINER_NAME container to start."
 
     for CONTAINER in $(docker ps -q --no-trunc); do
         MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
         if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
             CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
             for IP in $CONTAINER_IPS; do
-                http_call_ip $DNS_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
+                http_call_ip $dns_ip $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
             done
         fi
     done
@@ -392,6 +421,21 @@ check_not_running() {
             exit 1
             ;;
     esac
+}
+
+check_discovery_running() {
+    if ! container_is_running $DISCOVERY_CONTAINER_NAME ; then
+        create_bridge
+        docker_bridge_ip
+        wait_for_container $CONTAINER_NAME
+        weave_ip=$(container_ip $CONTAINER_NAME) || fatal "Weave container has no IP address"
+        docker rm $DISCOVERY_CONTAINER_NAME 2>/dev/null || /bin/true
+        DISCOVERY_CONTAINER=$(docker run --privileged -d --net=host --name=$DISCOVERY_CONTAINER_NAME \
+            -p $DISCOVERY_HTTP_PORT:$DISCOVERY_HTTP_PORT/tcp \
+            $DISCOVERY_IMAGE -port $DISCOVERY_HTTP_PORT \
+            -nifaces $BRIDGE,$CONTAINER_IFNAME,$DOCKER_BRIDGE \
+            -weave http://$weave_ip:$HTTP_PORT/ "$@")
+    fi
 }
 
 container_weave_addrs() {
@@ -506,7 +550,21 @@ case "$COMMAND" in
         ;;
     connect)
         [ $# -eq 1 ] || usage
-        http_call $CONTAINER_NAME $HTTP_PORT POST /connect -d "peer=$1"
+        http_call $CONTAINER_NAME $HTTP_PORT "POST" "/connect" -d "peer=$1"
+        ;;
+    join)
+        [ $# -eq 1 ] || usage
+        check_discovery_running
+        wait_for_http_status 127.0.0.1 $DISCOVERY_HTTP_PORT || \
+            fatal "Timeout waiting for discovery container. Check the logs with \"docker logs $DISCOVERY_CONTAINER_NAME\""
+        http_call_ip 127.0.0.1 $DISCOVERY_HTTP_PORT "POST" "/join" -d "group=$1"
+        ;;
+    leave)
+        [ $# -eq 1 ] || usage
+        check_discovery_running
+        wait_for_http_status 127.0.0.1 $DISCOVERY_HTTP_PORT || \
+            fatal "Timeout waiting for discovery container. Check the logs with \"docker logs $DISCOVERY_CONTAINER_NAME\""
+        http_call_ip 127.0.0.1 $DISCOVERY_HTTP_PORT "POST" "/leave" -d "group=$1"
         ;;
     status)
         http_call $CONTAINER_NAME $HTTP_PORT GET /status
@@ -526,6 +584,7 @@ case "$COMMAND" in
         echo weave script $SCRIPT_VERSION
         ask_version $CONTAINER_NAME $IMAGE
         ask_version $DNS_CONTAINER_NAME $DNS_IMAGE
+        ask_version $DISCOVERY_CONTAINER_NAME $DISCOVERY_IMAGE
         if ! TOOLS_IMAGE_ID=$(docker inspect --format='{{.Id}}' $TOOLS_IMAGE 2>/dev/null) ; then
             echo "Unable to find $TOOLS_IMAGE image." >&2
         else
@@ -630,10 +689,12 @@ case "$COMMAND" in
         ;;
     reset)
         [ $# -eq 0 ] || usage
-        docker kill  $CONTAINER_NAME     >/dev/null 2>&1 || true
-        docker kill  $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
-        docker rm -f $CONTAINER_NAME     >/dev/null 2>&1 || true
-        docker rm -f $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
+        docker kill  $CONTAINER_NAME            >/dev/null 2>&1 || true
+        docker kill  $DNS_CONTAINER_NAME        >/dev/null 2>&1 || true
+        docker kill  $DISCOVERY_CONTAINER_NAME  >/dev/null 2>&1 || true
+        docker rm -f $CONTAINER_NAME            >/dev/null 2>&1 || true
+        docker rm -f $DNS_CONTAINER_NAME        >/dev/null 2>&1 || true
+        docker rm -f $DISCOVERY_CONTAINER_NAME  >/dev/null 2>&1 || true
         run_tool host conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         destroy_bridge
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do

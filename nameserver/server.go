@@ -39,7 +39,7 @@ func queryHandler(lookups []Lookup) dns.HandlerFunc {
 		if q.Qtype == dns.TypeA {
 			for _, lookup := range lookups {
 				if ip, err := lookup.LookupName(q.Name); err == nil {
-					m := makeAddressReply(r, &q, []net.IP{ip})
+					m := makeAddressReply(r, &q, ip)
 					w.WriteMsg(m)
 					return
 				}
