@@ -481,12 +481,13 @@ case "$COMMAND" in
             export WEAVE_PASSWORD
             shift 2
         fi
+        HOSTNAME=$(hostname)
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
             -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD \
-            $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -iface $CONTAINER_IFNAME "$@")
+            $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -iface $CONTAINER_IFNAME -hostname $HOSTNAME "$@")
         with_container_netns $CONTAINER launch >/dev/null
         echo $CONTAINER
         ;;

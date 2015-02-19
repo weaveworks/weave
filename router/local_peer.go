@@ -18,8 +18,8 @@ type PeerInteraction struct {
 	payload interface{}
 }
 
-func NewLocalPeer(name PeerName, router *Router) *LocalPeer {
-	return &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
+func NewLocalPeer(name PeerName, hostName string, router *Router) *LocalPeer {
+	return &LocalPeer{Peer: NewPeer(name, hostName, 0, 0), Router: router}
 }
 
 func (peer *LocalPeer) Start() {

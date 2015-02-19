@@ -10,19 +10,21 @@ type Peer struct {
 	sync.RWMutex
 	Name          PeerName
 	NameByte      []byte
+	HostName      string
 	UID           uint64
 	version       uint64
 	localRefCount uint64
 	connections   map[PeerName]Connection
 }
 
-func NewPeer(name PeerName, uid uint64, version uint64) *Peer {
+func NewPeer(name PeerName, hostName string, uid uint64, version uint64) *Peer {
 	if uid == 0 {
 		uid = randUint64()
 	}
 	return &Peer{
 		Name:        name,
 		NameByte:    name.Bin(),
+		HostName:    hostName,
 		UID:         uid,
 		version:     version,
 		connections: make(map[PeerName]Connection)}
@@ -31,7 +33,7 @@ func NewPeer(name PeerName, uid uint64, version uint64) *Peer {
 func (peer *Peer) String() string {
 	peer.RLock()
 	defer peer.RUnlock()
-	return fmt.Sprint("Peer ", peer.Name, " (v", peer.version, ") (UID ", peer.UID, ")")
+	return fmt.Sprint("Peer ", peer.Name, " (", peer.HostName, ") (v", peer.version, ") (UID ", peer.UID, ")")
 }
 
 func (peer *Peer) Version() uint64 {

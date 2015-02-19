@@ -178,7 +178,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 	decoder := gob.NewDecoder(updateBuf)
 
 	for {
-		nameByte, uid, version, connsBuf, decErr := decodePeerNoConns(decoder)
+		nameByte, hostName, uid, version, connsBuf, decErr := decodePeerNoConns(decoder)
 		if decErr == io.EOF {
 			break
 		} else if decErr != nil {
@@ -186,7 +186,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			return
 		}
 		name := PeerNameFromBin(nameByte)
-		newPeer := NewPeer(name, uid, version)
+		newPeer := NewPeer(name, hostName, uid, version)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connsBuf)
 		existingPeer, found := peers.table[name]
@@ -257,6 +257,7 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	defer peer.RUnlock()
 
 	checkFatal(enc.Encode(peer.NameByte))
+	checkFatal(enc.Encode(peer.HostName))
 	checkFatal(enc.Encode(peer.UID))
 	checkFatal(enc.Encode(peer.version))
 
@@ -271,8 +272,11 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	checkFatal(enc.Encode(connsBuf.Bytes()))
 }
 
-func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, uid uint64, version uint64, conns []byte, err error) {
+func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, hostName string, uid uint64, version uint64, conns []byte, err error) {
 	if err = dec.Decode(&nameByte); err != nil {
+		return
+	}
+	if err = dec.Decode(&hostName); err != nil {
 		return
 	}
 	if err = dec.Decode(&uid); err != nil {
