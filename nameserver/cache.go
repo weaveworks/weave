@@ -22,22 +22,28 @@ const (
 	stUnresolved uint8 = iota // just inserted in the cache, not resolved yet
 	stPending    uint8 = iota // someone is waiting for the resolution
 	stResolved   uint8 = iota // resolved
+	stInvalid    uint8 = iota // invalid response in cache (ie, truncated)
 	stError      uint8 = iota // resolution did not succeed
+)
+
+const (
+	flagLocal uint8 = 1 << iota // the reply was obtained from a local resolution
 )
 
 // a cache entry
 type entry struct {
-	Status     uint8
-	question   *dns.Question
-	reply      *dns.Msg
+	Status uint8 // status of the entry
+	Flags  uint8 // some extra flags
+
+	reply      dns.Msg
 	validUntil time.Time // obtained from the reply and stored here for convenience/speed
 	waitChan   chan struct{}
 }
 
-func newEntry(question *dns.Question, reply *dns.Msg) *entry {
+func newEntry(reply *dns.Msg) *entry {
 	e := &entry{
 		Status:   stUnresolved,
-		question: question,
+		Flags:    0,
 	}
 
 	if reply == nil {
@@ -53,25 +59,37 @@ func newEntry(question *dns.Question, reply *dns.Msg) *entry {
 
 // Get a copy of the reply stored in the entry, but with some values adjusted like the TTL
 // (in the future, some other transformation could be done, like a round-robin of the responses...)
-func (e entry) getReply() (*dns.Msg, error) {
+func (e *entry) getReply(request *dns.Msg) (*dns.Msg, error) {
 	now := time.Now()
 
-	// if the reply has expired, just return nil: the caller will trigger a new resolution
-	if e.hasExpired(now) {
+	// if the reply has expired or is invalid, force the caller to start a new resolution
+	if e.hasExpired(now) || e.Status == stInvalid {
 		return nil, nil
 	}
 
-	// TODO: return a copy of the reply with the TTL adjusted, round-robin values, etc...
-	return e.reply, nil
+	// create a copy of the reply, with values for this particular query
+	reply := e.reply
+	reply.SetReply(request)
+	reply.Rcode = e.reply.Rcode
+	// TODO: adjust the TTL, round-robin values, etc...
+
+	return &reply, nil
 }
 
 func (e entry) hasExpired(now time.Time) bool {
 	return e.validUntil.Before(now)
 }
 
-func (e entry) setReply(reply *dns.Msg) {
-	// calculate the validUntil from the reply TTL
+// set the reply for
+func (e *entry) setReply(reply *dns.Msg) {
 	now := time.Now()
+
+	if reply.Truncated {
+		e.updateAndNotify(stInvalid, now)
+		return
+	}
+
+	// calculate the validUntil from the reply TTL
 	var minTtl uint32 = math.MaxUint32
 	for _, rr := range reply.Answer {
 		ttl := rr.Header().Ttl
@@ -79,28 +97,25 @@ func (e entry) setReply(reply *dns.Msg) {
 			minTtl = ttl // TODO: improve the minTTL calculation (maybe we should skip some RRs)
 		}
 	}
-	e.validUntil = now.Add(time.Second * time.Duration(minTtl))
-	e.reply = reply
-	e.notifyAndSetAs(stResolved)
+	e.reply = *reply
+	e.updateAndNotify(stResolved, now.Add(time.Second*time.Duration(minTtl)))
 }
 
-// Set a non-DNS error for this entry (ie, no DNS server has been found)
+// Set a non-DNS error for this entry (ie, no DNS server could be used)
 func (e *entry) setError() {
-	now := time.Now()
-	e.validUntil = now.Add(60 * time.Second) // TODO: calculate a better validUntil for errors
-	e.reply = nil
-	e.notifyAndSetAs(stError)
+	e.reply = dns.Msg{}
+	e.updateAndNotify(stError, time.Now().Add(60*time.Second)) // TODO: use a better validUntil for errors
 }
 
 // wait until a valid reply is set
-func (e entry) waitReply(timeout time.Duration) (reply *dns.Msg, err error) {
+func (e *entry) waitReply(request *dns.Msg, timeout time.Duration) (reply *dns.Msg, err error) {
 	if e.Status != stPending {
-		return e.getReply()
+		return e.getReply(request)
 	}
 
 	select {
 	case <-e.waitChan:
-		return e.getReply()
+		return e.getReply(request)
 	case <-time.After(time.Second * timeout):
 		return nil, errTimeout
 	}
@@ -108,11 +123,13 @@ func (e entry) waitReply(timeout time.Duration) (reply *dns.Msg, err error) {
 	return nil, errCouldNotResolve
 }
 
-func (e *entry) notifyAndSetAs(s uint8) {
-	if e.Status == stPending {
+func (e *entry) updateAndNotify(s uint8, validUntil time.Time) {
+	shouldNotify := (e.Status == stPending)
+	e.Status = s
+	e.validUntil = validUntil
+	if shouldNotify {
 		close(e.waitChan) // notify all the waiters by closing the channel
 	}
-	e.Status = s
 }
 
 type entries map[dns.Question]*entry
@@ -154,11 +171,12 @@ func (c *Cache) Purge() {
 }
 
 // Add adds a reply to the cache.
-func (c *Cache) Put(question *dns.Question, reply *dns.Msg) {
+func (c *Cache) Put(request *dns.Msg, reply *dns.Msg) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if ent, found := c.entries[*question]; found {
+	question := request.Question[0]
+	if ent, found := c.entries[question]; found {
 		ent.setReply(reply)
 	} else {
 		// If we will add a new item and the capacity has been exceeded, make some room...
@@ -166,23 +184,24 @@ func (c *Cache) Put(question *dns.Question, reply *dns.Msg) {
 			c.removeOldest(1)
 		}
 
-		c.entries[*question] = newEntry(question, reply)
+		c.entries[question] = newEntry(reply)
 	}
 }
 
 // Look up for a question's reply from the cache.
 // If no reply is stored in the cache, it returns a `nil` reply and error. The caller can then `Wait()`
 // for another goroutine `Put`ing a reply in the cache.
-func (c *Cache) Get(question *dns.Question) (reply *dns.Msg, err error) {
+func (c *Cache) Get(request *dns.Msg) (reply *dns.Msg, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	ent, found := c.entries[*question]
+	question := request.Question[0]
+	ent, found := c.entries[question]
 	if found {
-		return ent.getReply()
+		return ent.getReply(request)
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
-		c.entries[*question] = newEntry(question, nil)
+		c.entries[question] = newEntry(nil)
 		return nil, nil
 	}
 }
@@ -191,13 +210,14 @@ func (c *Cache) Get(question *dns.Question) (reply *dns.Msg, err error) {
 // Notice that the caller could Get() and then Wait() for a question, but the corresponding cache
 // entry could have been removed in between. In that case, the caller should retry the query (and
 // the user should increase the cache size!)
-func (c *Cache) Wait(question *dns.Question, timeout time.Duration) (*dns.Msg, error) {
+func (c *Cache) Wait(request *dns.Msg, timeout time.Duration) (*dns.Msg, error) {
 	// do not try to lock the cache: otherwise, no one else could `Put()` the reply
-	entry, found := c.entries[*question]
+	question := request.Question[0]
+	entry, found := c.entries[question]
 	if !found {
 		return nil, nil // client will trigger another query
 	}
-	return entry.waitReply(timeout)
+	return entry.waitReply(request, timeout)
 }
 
 // Remove removes the provided question from the cache.

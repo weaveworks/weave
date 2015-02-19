@@ -6,14 +6,17 @@ import (
 	. "github.com/zettio/weave/common"
 	"net"
 	"sync"
+	"time"
 )
 
 const (
-	DEFAULT_LOCAL_DOMAIN = "weave.local."     // The default name used for the local domain
-	DEFAULT_SERVER_PORT  = 53                 // The default server port
-	DEFAULT_CLI_CFG_FILE = "/etc/resolv.conf" // default "resolv.conf" file to try to load
-	DEFAULT_UDP_BUFLEN   = 4096               // bigger than the default 512
-    DEFAULT_CACHE_LEN    = -1                 // default cache capacity (0=disabled)
+	DEFAULT_LOCAL_DOMAIN   = "weave.local."     // The default name used for the local domain
+	DEFAULT_SERVER_PORT    = 53                 // The default server port
+	DEFAULT_CLI_CFG_FILE   = "/etc/resolv.conf" // default "resolv.conf" file to try to load
+	DEFAULT_UDP_BUFLEN     = 4096               // bigger than the default 512
+	DEFAULT_CACHE_LEN      = 1024               // default cache capacity
+	DEFAULT_RESOLV_WORKERS = 8                  // default number of resolution workers
+	DEFAULT_TIMEOUT        = 5                  // default timeout for DNS resolutions
 	DEFAULT_IFACE_NAME   = "default interface"
 )
 
@@ -26,8 +29,20 @@ type DNSServerConfig struct {
 	Port int
 	// (Optional) local domain (ie, "weave.local.")
 	LocalDomain string
-	// (Optional) cache size (0=disabled)
+	// (Optional) cache size
 	CacheLen int
+	// (Optional) number of resolution workers for local queries
+	NumLocalWorkers int
+	// (Optional) number of resolution workers for recursive queries
+	NumRecursiveWorkers int
+	// (Optional) timeout for DNS queries
+	Timeout int
+}
+
+// a query for a resolution worker
+type dnsQuery struct {
+	protocol string   // the protocol where we received this query
+	r        *dns.Msg // the query
 }
 
 type DNSServer struct {
@@ -40,6 +55,12 @@ type DNSServer struct {
 	iface    *net.Interface
 	upstream *dns.ClientConfig
 
+	numRecWorkers    int
+	numLocalWorkers  int
+	localQueriesChan chan dnsQuery // channel for sending queries to workers
+	recQueriesChan   chan dnsQuery // ... and the equivalent for recursive resolutions
+	wg               *sync.WaitGroup
+
 	Domain     string // the local domain
 	IfaceName  string // the interface where mDNS is working on
 	ListenAddr string // the address the server is listening at
@@ -51,28 +72,40 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 		zone:  zone,
 		iface: iface,
 
+		numLocalWorkers:  DEFAULT_RESOLV_WORKERS,
+		numRecWorkers:    DEFAULT_RESOLV_WORKERS,
+		localQueriesChan: make(chan dnsQuery),
+		recQueriesChan:   make(chan dnsQuery),
+		wg:               new(sync.WaitGroup),
+
 		Domain:     DEFAULT_LOCAL_DOMAIN,
 		IfaceName:  DEFAULT_IFACE_NAME,
 		ListenAddr: fmt.Sprintf(":%d", DEFAULT_SERVER_PORT),
 	}
 
-	// fill empty parameters with defaults...
 	if config.Port != 0 {
 		s.ListenAddr = fmt.Sprintf(":%d", config.Port)
 	}
 	if len(config.LocalDomain) > 0 {
 		s.Domain = config.LocalDomain
 	}
-	if config.UpstreamCfg != nil {
-		s.upstream = config.UpstreamCfg
-	} else {
-		cfgFile := DEFAULT_CLI_CFG_FILE
-		if len(config.UpstreamCfgFile) > 0 {
-			cfgFile = config.UpstreamCfgFile
-		}
-		if s.upstream, err = dns.ClientConfigFromFile(cfgFile); err != nil {
+	if config.CacheLen == 0 {
+		config.CacheLen = DEFAULT_CACHE_LEN
+	}
+	if len(config.UpstreamCfgFIle) == 0 {
+		config.UpstreamCfgFile = DEFAULT_CLI_CFG_FILE
+	}
+	if config.UpstreamCfg == nil {
+		if config.UpstreamCfg, err = dns.ClientConfigFromFile(config.UpstreamCfgFile); err != nil {
 			return nil, err
 		}
+	}
+
+	if config.NumLocalWorkers > 0 {
+		s.numLocalWorkers = config.NumLocalWorkers
+	}
+	if config.NumRecursiveWorkers > 0 {
+		s.numRecWorkers = config.NumRecursiveWorkers
 	}
 	s.mdnsCli, err = NewMDNSClient()
 	if err != nil {
@@ -88,32 +121,77 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	cacheLen := DEFAULT_CACHE_LEN
 	if config.CacheLen > 0 {
 		cacheLen = config.CacheLen
-	}
+
 	Debug.Printf("[dns] Initializing cache: %d entries", config.CacheLen)
-	s.cache, err = NewCache(config.CacheLen)
+	s.cache, err := NewCache(config.CacheLen)
 	if err != nil {
 		return
 	}
 	
 	// create two DNS request multiplexerers, depending on the protocol used by clients
 	// (we use the same protocol for asking upstream servers)
-	mux := func(client *dns.Client) *dns.ServeMux {
-		m := dns.NewServeMux()
-		m.HandleFunc(s.Domain, s.queryHandler([]Lookup{s.zone, s.mdnsCli}))
-		m.HandleFunc(RDNS_DOMAIN, s.rdnsHandler([]Lookup{s.zone, s.mdnsCli}, client))
-		m.HandleFunc(".", s.notUsHandler(client))
-		return m
-	}
+	udpMux := dns.NewServeMux()
+	udpMux.HandleFunc(s.config.LocalDomain, s.makeHandler("udp", s.localQueriesChan))
+	udpMux.HandleFunc(RDNS_DOMAIN, s.makeHandler("udp", s.localQueriesChan))
+	udpMux.HandleFunc(".", s.makeHandler("udp", s.recQueriesChan))
 
-	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(&dns.Client{Net: "udp", UDPSize: DEFAULT_UDP_BUFLEN})}
-	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(&dns.Client{Net: "tcp"})}
+	tcpMux := dns.NewServeMux()
+	tcpMux.HandleFunc(s.config.LocalDomain, s.makeHandler("tcp", s.localQueriesChan))
+	tcpMux.HandleFunc(RDNS_DOMAIN, s.makeHandler("tcp", s.localQueriesChan))
+	tcpMux.HandleFunc(".", s.makeHandler("tcp", s.recQueriesChan))
+
+	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: udpMux}
+	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: tcpMux}
 
 	return
 }
 
+// return a handler for a given protocol and channel
+func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsQuery) dns.HandlerFunc {
+	tout := time.Duration(s.config.Timeout)*time.Second
+
+	return func(w dns.ResponseWriter, r *dns.Msg) {
+		q := r.Question[0]
+		Debug.Printf("[dns] Query: %+v", q)
+		reply, err := s.cache.Get(r)
+		if err != nil {
+			Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
+			w.WriteMsg(makeDNSFailResponse(r))
+			return
+		}
+		if reply != nil {
+			Info.Printf("[dns msgid %d] Returning reply from cache: %d answers",
+				r.MsgHdr.Id, len(reply.Answer))
+			w.WriteMsg(reply)
+			return
+		}
+
+		// we got no reply and no error from the cache: send the query to a worker and wait
+		queriesChan <- dnsQuery{protocol: protocol, r: r}
+		Debug.Printf("[dns] Waiting up to %d seconds for %s-query for \"%s\"",
+			s.config.Timeout, dns.TypeToString[q.Qtype], q.Name)
+		reply, err = s.cache.Wait(r, tout)
+		if err != nil {
+			Debug.Printf("[dns msgid %d] Error from cache: %s",  r.MsgHdr.Id, err)
+			w.WriteMsg(makeDNSFailResponse(r))
+			return
+		}
+		if reply != nil {
+			Info.Printf("[dns msgid %d] Returning reply from cache: %d answers",
+				r.MsgHdr.Id, len(reply.Answer))
+			w.WriteMsg(reply)
+			return
+		}
+
+		Info.Printf("[dns msgid %d] No results for %s-query for \"%s\"",
+			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
+		w.WriteMsg(makeDNSFailResponse(r))
+	}
+}
+
 // Start the DNS server
 func (s *DNSServer) Start() error {
-	Info.Printf("Using mDNS on %s", s.IfaceName)
+	Info.Printf("[dns] Using mDNS on %s", s.IfaceName)
 	err := s.mdnsCli.Start(s.iface)
 	CheckFatal(err)
 	err = s.mdnsSrv.Start(s.iface, s.Domain)
@@ -125,7 +203,7 @@ func (s *DNSServer) Start() error {
 	go func() {
 		defer wg.Done()
 
-		Debug.Printf("Listening for DNS on %s (UDP)", s.ListenAddr)
+		Debug.Printf("[dns] Listening for DNS on %s (UDP)", s.ListenAddr)
 		err = s.udpSrv.ListenAndServe()
 		CheckFatal(err)
 		Debug.Printf("DNS UDP server exiting...")
@@ -134,16 +212,27 @@ func (s *DNSServer) Start() error {
 	go func() {
 		defer wg.Done()
 
-		Debug.Printf("Listening for DNS on %s (TCP)", s.ListenAddr)
+		Debug.Printf("[dns] Listening for DNS on %s (TCP)", s.ListenAddr)
 		err = s.tcpSrv.ListenAndServe()
 		CheckFatal(err)
 		Debug.Printf("DNS TCP server exiting...")
 	}()
 
+	// Start the resolution workers
+	for i := 0; i < s.config.NumLocalWorkers; i++ {
+		s.wg.Add(1)
+		go s.localLookupWorker()
+	}
+	for i := 0; i < s.config.NumRecursiveWorkers; i++ {
+		s.wg.Add(1)
+		go s.recLookupWorker()
+	}
+
 	// Waiting for all goroutines to finish (otherwise they die as main routine dies)
 	wg.Wait()
 
 	Info.Printf("WeaveDNS server exiting...")
+
 	return nil
 }
 
@@ -159,71 +248,115 @@ func (s *DNSServer) Stop() error {
 	return nil
 }
 
-func (s *DNSServer) queryHandler(lookups []Lookup) dns.HandlerFunc {
-	return func(w dns.ResponseWriter, r *dns.Msg) {
+// Worker for local resolutions
+func (s *DNSServer) localLookupWorker() {
+	defer s.wg.Done()
+
+	Debug.Printf("[dns] Starting local queries worker")
+	for query := range s.localQueriesChan {
+		r := query.r
 		q := r.Question[0]
-		Debug.Printf("[dns] Query: %+v", q)
-		if q.Qtype == dns.TypeA {
-			for _, lookup := range lookups {
+		resolved := false
+
+		Debug.Printf("[dns msgid %d] Resolving local %s-query for \"%+v\" [proto:%s]",
+			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, query.protocol)
+
+		switch q.Qtype {
+		case dns.TypeA:
+			for _, lookup := range []Lookup{s.config.Zone, s.mdnsCli} {
 				if ip, err := lookup.LookupName(q.Name); err == nil {
 					m := makeAddressReply(r, &q, []net.IP{ip})
-					w.WriteMsg(m)
-					return
+
+					Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
+						m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, ip, dns.RcodeToString[m.Rcode])
+					s.cache.Put(r, m)
+					resolved = true
+					break
 				}
 			}
-		}
-		Info.Printf("[dns msgid %d] No results for type %s query %s",
-			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
-		w.WriteMsg(makeDNSFailResponse(r))
-	}
-}
+			if !resolved {
+				Info.Printf("[dns msgid %d] No local results for %s-query for \"%s\" [proto:%s] [caching error]",
+					r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, query.protocol)
+				s.cache.Put(r, makeDNSFailResponse(r))
+			}
 
-func (s *DNSServer) rdnsHandler(lookups []Lookup, client *dns.Client) dns.HandlerFunc {
-	fallback := s.notUsHandler(client)
-	return func(w dns.ResponseWriter, r *dns.Msg) {
-		q := r.Question[0]
-		Debug.Printf("[dns] Reverse query: %+v", q)
-		if q.Qtype == dns.TypePTR {
-			for _, lookup := range lookups {
+		case dns.TypePTR:
+			for _, lookup := range []Lookup{s.config.Zone, s.mdnsCli} {
 				if name, err := lookup.LookupInaddr(q.Name); err == nil {
 					m := makePTRReply(r, &q, []string{name})
-					w.WriteMsg(m)
-					return
+
+					Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
+						m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, name, dns.RcodeToString[m.Rcode])
+					s.cache.Put(r, m)
+					resolved = true
+					break
 				}
 			}
-			fallback(w, r)
-			return
+			if !resolved {
+				Debug.Printf("[dns msgid %d] Falling back to recursive resolution for %s-query for \"%s\"",
+					r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
+				s.recQueriesChan <- query
+			}
+
+		default:
+			Info.Printf("[dns msgid %d] Unhandled %s-query for \"%s\" [proto:%s] [caching error]",
+				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, query.protocol)
+			s.cache.Put(r, makeDNSFailResponse(r))
 		}
-		Warning.Printf("[dns msgid %d] Unexpected reverse query type %s: %+v",
-			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q)
 	}
 }
 
-// When we receive a request for a name outside of our '.weave.local.'
-// domain, ask the configured DNS server as a fallback.
-func (s *DNSServer) notUsHandler(dnsClient *dns.Client) dns.HandlerFunc {
-	return func(w dns.ResponseWriter, r *dns.Msg) {
+// Worker for recursive resolutions
+func (s *DNSServer) recLookupWorker() {
+	defer s.wg.Done()
+
+	// each worker can use one of these two clients for forwarding queries, depending
+	// on the protocol used by the client for querying us...
+	udpClient := &dns.Client{Net: "udp", UDPSize: DEFAULT_UDP_BUFLEN}
+	tcpClient := &dns.Client{Net: "tcp"}
+
+	// When we receive a request for a name outside of our '.weave.local.'
+	// domain, ask the configured DNS server as a fallback.
+	Debug.Printf("[dns] Starting recursive queries worker")
+	for query := range s.recQueriesChan {
+		r := query.r
+		proto := query.protocol
 		q := r.Question[0]
-		Debug.Printf("[dns msgid %d] Fallback query: %+v", r.MsgHdr.Id, q)
-		for _, server := range s.upstream.Servers {
-			reply, _, err := dnsClient.Exchange(r, fmt.Sprintf("%s:%s", server, s.upstream.Port))
+		resolved := false
+
+		var dnsClient *dns.Client
+		switch proto {
+		case "tcp":
+			dnsClient = tcpClient
+		case "udp":
+			dnsClient = udpClient
+		}
+
+		Debug.Printf("[dns msgid %d] Fallback query: %+v [proto:%s]", r.MsgHdr.Id, q, proto)
+		for _, server := range s.config.UpstreamCfg.Servers {
+			reply, _, err := dnsClient.Exchange(r, fmt.Sprintf("%s:%s", server, s.config.UpstreamCfg.Port))
 			if err != nil {
-				Debug.Printf("[dns msgid %d] Network error trying %s (%s)",
+				Debug.Printf("[dns msgid %d] Network error trying \"%s\": %s",
 					r.MsgHdr.Id, server, err)
 				continue
 			}
 			if reply != nil && reply.Rcode != dns.RcodeSuccess {
-				Debug.Printf("[dns msgid %d] Failure reported by %s for query %s",
-					r.MsgHdr.Id, server, q.Name)
+				Debug.Printf("[dns msgid %d] Failure reported by \"%s\" for query \"%s\": %s",
+					r.MsgHdr.Id, server, q.Name, dns.RcodeToString[reply.Rcode])
 				continue
 			}
-			Debug.Printf("[dns msgid %d] Given answer by %s for query %s",
-				r.MsgHdr.Id, server, q.Name)
-			w.WriteMsg(reply)
-			return
+
+			Debug.Printf("[dns msgid %d] Given answer by %s for %s-query \"%s\": %d answers [caching response]",
+				r.MsgHdr.Id, server, dns.TypeToString[q.Qtype], q.Name, len(reply.Answer))
+			s.cache.Put(r, reply)
+			resolved = true
+			break
 		}
-		Warning.Printf("[dns msgid %d] Failed lookup for external name %s",
-			r.MsgHdr.Id, q.Name)
-		w.WriteMsg(makeDNSFailResponse(r))
+
+		if !resolved {
+			Warning.Printf("[dns msgid %d] Failed recursive lookup for external name \"%s\" [caching error]",
+				r.MsgHdr.Id, q.Name)
+			s.cache.Put(r, makeDNSFailResponse(r))
+		}
 	}
 }

@@ -28,7 +28,7 @@ func TestCacheSimple(t *testing.T) {
 		ips := []net.IP{ip}
 		reply := makeAddressReply(questionMsg, question, ips)
 
-		l.Put(question, reply)
+		l.Put(questionMsg, reply)
 	}
 
 	wt.AssertEqualInt(t, l.Len(), 128, "cache length")
@@ -42,7 +42,7 @@ func TestCacheBlockingOps(t *testing.T) {
 	l, err := NewCache(256)
 	wt.AssertNoErr(t, err)
 
-	questions := []*dns.Msg{}
+	requests := []*dns.Msg{}
 
 	// start 256 queries that will block
 	for i := 0; i < 256; i++ {
@@ -51,24 +51,22 @@ func TestCacheBlockingOps(t *testing.T) {
 		questionMsg.SetQuestion(questionName, dns.TypeA)
 		questionMsg.RecursionDesired = true
 
-		questions = append(questions, questionMsg)
+		requests = append(requests, questionMsg)
 
-		go func(question *dns.Question) {
-			_, err := l.Get(question)
+		go func(request *dns.Msg) {
+			_, err := l.Get(request)
 			wt.AssertNoErr(t, err)
-			_, err = l.Wait(question, 1 * time.Second)
+			_, err = l.Wait(request, 1 * time.Second)
 			wt.AssertNoErr(t, err)
-		}(&questionMsg.Question[0])
+		}(questionMsg)
 	}
 
 	// insert the IPs for those names
-	for i, questionMsg := range questions {
-		question := &questionMsg.Question[0]
+	for i, requestMsg := range requests {
 		ip := net.ParseIP(fmt.Sprintf("10.0.1.%d", i))
 		ips := []net.IP{ip}
-		reply := makeAddressReply(questionMsg, question, ips)
-
-		l.Put(question, reply)
+		reply := makeAddressReply(requestMsg, &requestMsg.Question[0], ips)
+		l.Put(requestMsg, reply)
 	}
 }
 
