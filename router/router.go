@@ -46,7 +46,7 @@ type PacketSourceSink interface {
 	PacketSink
 }
 
-func NewRouter(iface *net.Interface, name PeerName, hostName string, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
+func NewRouter(iface *net.Interface, name PeerName, nickName string, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
 	router := &Router{
 		Iface:          iface,
 		GossipChannels: make(map[uint32]*GossipChannel),
@@ -63,7 +63,7 @@ func NewRouter(iface *net.Interface, name PeerName, hostName string, password []
 		router.Macs.Delete(peer)
 		log.Println("Removed unreachable", peer)
 	}
-	router.Ourself = NewLocalPeer(name, hostName, router)
+	router.Ourself = NewLocalPeer(name, nickName, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
 	router.Peers = NewPeers(router.Ourself.Peer, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
@@ -94,7 +94,7 @@ func (router *Router) UsingPassword() bool {
 
 func (router *Router) Status() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name, "(" + router.Ourself.HostName + ")"))
+	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name, "(" + router.Ourself.NickName + ")"))
 	buf.WriteString(fmt.Sprintln("Sniffing traffic on", router.Iface))
 	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
 	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))

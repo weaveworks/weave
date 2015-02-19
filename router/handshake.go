@@ -59,7 +59,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 		"ProtocolVersion": versionStr,
 		"PeerNameFlavour": PeerNameFlavour,
 		"Name":            conn.local.Name.String(),
-		"HostName":        conn.local.HostName,
+		"NickName":        conn.local.NickName,
 		"UID":             fmt.Sprint(conn.local.UID),
 		"ConnID":          fmt.Sprint(localConnID)}
 	handshakeRecv := map[string]string{}
@@ -85,7 +85,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	fv.CheckEqual("ProtocolVersion", versionStr)
 	fv.CheckEqual("PeerNameFlavour", PeerNameFlavour)
 	nameStr, _ := fv.Value("Name")
-	hostNameStr, _ := fv.Value("HostName")
+	nickNameStr, _ := fv.Value("NickName")
 	uidStr, _ := fv.Value("UID")
 	remoteConnIdStr, _ := fv.Value("ConnID")
 	if err := fv.Err(); err != nil {
@@ -138,7 +138,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 		conn.Decryptor = NewNonDecryptor(conn)
 	}
 
-	toPeer := NewPeer(name, hostNameStr, uid, 0)
+	toPeer := NewPeer(name, nickNameStr, uid, 0)
 	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
 	switch toPeer {
 	case nil:
