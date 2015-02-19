@@ -30,22 +30,13 @@ type DNSServer struct {
 }
 
 // Creates a new DNS server with a given config
-func NewDNSServerWithConfig(config *dns.ClientConfig, zone Zone, iface *net.Interface, port int) (*DNSServer, error) {
+func NewDNSServer(config *dns.ClientConfig, zone Zone, iface *net.Interface, port int) *DNSServer {
 	return &DNSServer{
 		config: config,
 		zone:   zone,
 		iface:  iface,
 		port:   port,
-	}, nil
-}
-
-// Creates a new DNS server
-func NewDNSServer(zone Zone, iface *net.Interface, port int) (*DNSServer, error) {
-	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-	if err != nil {
-		return nil, err
 	}
-	return NewDNSServerWithConfig(config, zone, iface, port)
 }
 
 // Start the DNS server

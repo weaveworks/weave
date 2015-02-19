@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"github.com/miekg/dns"
 )
 
 var version = "(unreleased version)"
@@ -63,13 +64,14 @@ func main() {
 		}
 	}
 
-	go weavedns.ListenHttp(weavedns.LOCAL_DOMAIN, zone, httpPort)
-	srv, err := weavedns.NewDNSServer(zone, iface, dnsPort)
+	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 	if err != nil {
-		Error.Fatal("Failed to start server", err)
+		Error.Fatal("Failed obtain DNS client configuration", err)
 	}
 
-	srv.Start()
+	go weavedns.ListenHttp(weavedns.LOCAL_DOMAIN, zone, httpPort)
+	srv := weavedns.NewDNSServer(config, zone, iface, dnsPort)
+	err := srv.Start()
 	if err != nil {
 		Error.Fatal("Failed to start server", err)
 	}

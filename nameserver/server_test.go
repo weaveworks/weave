@@ -41,10 +41,10 @@ func TestUDPDNSServer(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServerWithConfig(config, zone, nil, port)
-	wt.AssertNoErr(t, err)
+	srv := NewDNSServer(config, zone, nil, port)
 	defer srv.Stop()
-	go srv.Start()
+	err = srv.Start()
+	wt.AssertNoErr(t, err)
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
 	c := new(dns.Client)
@@ -147,10 +147,10 @@ func TestTCPDNSServer(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServerWithConfig(config, zone, nil, port)
-	wt.AssertNoErr(t, err)
+	srv := NewDNSServer(config, zone, nil, port)
 	defer srv.Stop()
-	go srv.Start()
+	err = srv.Start()
+	wt.AssertNoErr(t, err)
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
 	// Create a regular UDP client and a TCP client
