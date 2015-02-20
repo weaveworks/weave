@@ -71,7 +71,7 @@ func main() {
 
 	go weavedns.ListenHttp(weavedns.LOCAL_DOMAIN, zone, httpPort)
 	srv := weavedns.NewDNSServer(config, zone, iface, dnsPort)
-	err := srv.Start()
+	err = srv.Start()
 	if err != nil {
 		Error.Fatal("Failed to start server", err)
 	}
