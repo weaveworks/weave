@@ -5,6 +5,7 @@ import (
 	"github.com/miekg/dns"
 	. "github.com/zettio/weave/common"
 	"net"
+	"sync"
 )
 
 const (
@@ -41,6 +42,8 @@ func NewDNSServer(config *dns.ClientConfig, zone Zone, iface *net.Interface, por
 
 // Start the DNS server
 func (s *DNSServer) Start() error {
+	Info.Printf("WeaveDNS server starting...")
+
 	mdnsClient, err := NewMDNSClient()
 	CheckFatal(err)
 
@@ -72,18 +75,31 @@ func (s *DNSServer) Start() error {
 	s.udpSrv = &dns.Server{Addr: address, Net: "udp", Handler: mux(&dns.Client{Net: "udp", UDPSize: UDPBufSize})}
 	s.tcpSrv = &dns.Server{Addr: address, Net: "tcp", Handler: mux(&dns.Client{Net: "tcp"})}
 
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
 	go func() {
-		Info.Printf("Listening for DNS on %s (UDP)", address)
+		defer wg.Done()
+
+		Debug.Printf("Listening for DNS on %s (UDP)", address)
 		err = s.udpSrv.ListenAndServe()
 		CheckFatal(err)
+		Debug.Printf("DNS UDP server exiting...")
 	}()
 
 	go func() {
-		Info.Printf("Listening for DNS on %s (TCP)", address)
+		defer wg.Done()
+
+		Debug.Printf("Listening for DNS on %s (TCP)", address)
 		err = s.tcpSrv.ListenAndServe()
 		CheckFatal(err)
+		Debug.Printf("DNS TCP server exiting...")
 	}()
 
+	// Waiting for all goroutines to finish (otherwise they die as main routine dies)
+	wg.Wait()
+
+	Info.Printf("WeaveDNS server exiting...")
 	return nil
 }
 
