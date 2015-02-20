@@ -58,7 +58,7 @@ This produces output like:
 ````
 weave router 0.7.0
 Encryption off
-Our name is 7a:f4:56:87:76:3b
+Our name is 7a:f4:56:87:76:3b (weave01)
 Sniffing traffic on &{39 65535 ethwe ae:e3:07:9c:8c:d4 up|broadcast|multicast}
 MACs:
 ba:8c:b9:dc:e1:c9 -> 7a:f4:56:87:76:3b (2014-10-23 16:39:19.482338935 +0000 UTC)
@@ -67,10 +67,10 @@ ce:15:34:a9:b5:6d -> 7a:f4:56:87:76:3b (2014-10-23 16:39:28.257103595 +0000 UTC)
 9e:95:0c:54:8e:39 -> 7a:16:dd:5b:83:de (2014-10-23 16:39:28.795601325 +0000 UTC)
 72:5f:a4:60:e5:ce -> 7a:16:dd:5b:83:de (2014-10-23 16:39:29.575995255 +0000 UTC)
 Peers:
-Peer 7a:16:dd:5b:83:de (v31) (UID 13151318985609435078)
-   -> 7a:f4:56:87:76:3b [37.157.33.76:7195]
-Peer 7a:f4:56:87:76:3b (v1) (UID 6913268221365110570)
-   -> 7a:16:dd:5b:83:de [191.235.147.190:6783]
+Peer 7a:16:dd:5b:83:de (weave02) (v31) (UID 13151318985609435078)
+   -> 7a:f4:56:87:76:3b (weave01) [37.157.33.76:7195]
+Peer 7a:f4:56:87:76:3b (weave01) (v1) (UID 6913268221365110570)
+   -> 7a:16:dd:5b:83:de (weave02) [191.235.147.190:6783]
 Routes:
 unicast:
 7a:f4:56:87:76:3b -> 00:00:00:00:00:00
@@ -86,7 +86,11 @@ The terms used here are explained further at
 [how it works](how-it-works.html).
 
 The 'Our name' line identifies the local weave router as a peer in the
-weave network.
+weave network. It displays both the peer name and the peer's nickname
+in parenthesis; the peer name defaults to a MAC address, whilst the
+nickname defaults to the name of the host on which the weave container
+was launched. If desired the nickname can be overriden by supplying
+the `-nickname` argument to `weave launch`.
 
 The 'Sniffing traffic' line shows details of the virtual ethernet
 interface that weave is using to receive packets on the local
@@ -100,12 +104,13 @@ router last saw some traffic from that MAC. The router forgets
 addresses which are inactive for longer than 10 minutes.
 
 The 'Peers' section lists all peers known to this router, including
-itself.  Each peer is shown with its name, version number (incremented
-on each reconnect) and the UID.  Then each line beginning `->` shows
-another peer that it is connected to, with the IP address and port
-number of the connection. In the above example, the local router has
-connected to its peer using address 191.235.147.190:6783, and its peer
-sees the same connection as coming from 37.157.33.76:7195.
+itself.  Each peer is shown with its name, nickname, version number
+(incremented on each reconnect) and the UID.  Then each line
+beginning `->` shows another peer that it is connected to, with the
+IP address and port number of the connection. In the above example,
+the local router has connected to its peer using address
+191.235.147.190:6783, and its peer sees the same connection as coming
+from 37.157.33.76:7195.
 
 The 'Routes' section summarised the information for deciding how to
 route packets between peers, which is mostly of interest when the
