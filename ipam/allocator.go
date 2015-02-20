@@ -42,7 +42,7 @@ type Allocator struct {
 	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
 	leaked      map[time.Time]Space
 	claims      claimList
-	pending     []allocateFor
+	pending     []getFor
 	inflight    requestList
 	timeProvider
 }
@@ -99,7 +99,7 @@ type claim struct {
 	resultChan chan<- error
 	Allocation
 }
-type allocateFor struct {
+type getFor struct {
 	resultChan chan<- net.IP
 	Ident      string
 }
@@ -216,9 +216,9 @@ func (alloc *Allocator) Claim(ident string, addr net.IP) error {
 }
 
 // Sync.
-func (alloc *Allocator) AllocateFor(ident string) net.IP {
+func (alloc *Allocator) GetFor(ident string) net.IP {
 	resultChan := make(chan net.IP)
-	alloc.queryChan <- allocateFor{resultChan, ident}
+	alloc.queryChan <- getFor{resultChan, ident}
 	return <-resultChan
 }
 
@@ -309,10 +309,12 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 			case claim:
 				alloc.electLeaderIfNecessary()
 				alloc.handleClaim(q.Ident, q.IP, q.resultChan)
-			case allocateFor:
+			case getFor:
 				alloc.electLeaderIfNecessary()
-				if !alloc.tryAllocateFor(q.Ident, q.resultChan) {
-					alloc.pending = append(alloc.pending, allocateFor{q.resultChan, q.Ident})
+				if addrs := alloc.ourSpaceSet.FindAddressesFor(q.Ident); len(addrs) > 0 {
+					q.resultChan <- addrs[0] // currently not supporting multiple allocations in the same subnet
+				} else if !alloc.tryAllocateFor(q.Ident, q.resultChan) {
+					alloc.pending = append(alloc.pending, getFor{q.resultChan, q.Ident})
 				}
 			case deleteRecordsFor:
 				alloc.ourSpaceSet.DeleteRecordsFor(q.Ident)

@@ -168,6 +168,16 @@ func (space *MutableSpace) Free(addr net.IP) bool {
 	return false
 }
 
+func (space *MutableSpace) FindAddressesFor(ident string) []net.IP {
+	ret := make([]net.IP, 0)
+	for _, r := range space.allocated {
+		if r.Ident == ident {
+			ret = append(ret, r.IP)
+		}
+	}
+	return ret
+}
+
 func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 	w := 0 // write index
 

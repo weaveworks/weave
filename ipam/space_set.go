@@ -286,6 +286,14 @@ func (s *OurSpaceSet) Free(addr net.IP) error {
 	return errors.New("IP address not in range")
 }
 
+func (s *OurSpaceSet) FindAddressesFor(ident string) []net.IP {
+	ret := make([]net.IP, 0)
+	for _, space := range s.spaces {
+		ret = append(ret, space.(*MutableSpace).FindAddressesFor(ident)...)
+	}
+	return ret
+}
+
 func (s *OurSpaceSet) DeleteRecordsFor(ident string) {
 	for _, space := range s.spaces {
 		space.(*MutableSpace).DeleteRecordsFor(ident)

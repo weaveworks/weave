@@ -34,7 +34,9 @@ func (alloc *Allocator) addSpace(startAddr string, length uint32) *Allocator {
 
 func TestAllocFree(t *testing.T) {
 	const (
+		container1 = "abcdef"
 		container2 = "baddf00d"
+		container3 = "b01df00d"
 		testAddr1  = "10.0.3.4"
 		spaceSize  = 4
 	)
@@ -42,21 +44,26 @@ func TestAllocFree(t *testing.T) {
 	alloc := testAllocator(t, "01:00:00:01:00:00", ourUID, testAddr1+"/30").addSpace(testAddr1, spaceSize)
 	defer alloc.Stop()
 
-	addr1 := alloc.AllocateFor("abcdef")
+	addr1 := alloc.GetFor(container1)
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
 
-	// Ask for another address and check it's different
-	addr2 := alloc.AllocateFor(container2)
+	// Ask for another address for a different container and check it's different
+	addr2 := alloc.GetFor(container2)
 	if addr2.String() == testAddr1 {
 		t.Fatalf("Expected different address but got %s", addr2)
 	}
 
+	// Ask for the first container again and we should get the same address again
+	addr1a := alloc.GetFor(container1)
+	wt.AssertEqualString(t, addr1a.String(), testAddr1, "address")
+
 	// Now free the first one, and we should get it back when we ask
 	alloc.Free(net.ParseIP(testAddr1))
-	addr3 := alloc.AllocateFor(container2)
+	addr3 := alloc.GetFor(container3)
 	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
 
 	alloc.DeleteRecordsFor(container2)
+	alloc.DeleteRecordsFor(container3)
 	alloc.String() // force sync-up after async call
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), spaceSize, "Total free addresses")
 }
@@ -81,11 +88,11 @@ func TestMultiSpaces(t *testing.T) {
 
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 4, "Total free addresses")
 
-	addr1 := alloc.AllocateFor("abcdef")
+	addr1 := alloc.GetFor("abcdef")
 	wt.AssertEqualString(t, addr1.String(), testStart1, "address")
 
 	// First space should now be full and this address should come from second space
-	addr2 := alloc.AllocateFor("fedcba")
+	addr2 := alloc.GetFor("fedcba")
 	wt.AssertEqualString(t, addr2.String(), testStart2, "address")
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 2, "Total free addresses")
 }
@@ -319,12 +326,12 @@ func implTestGossip(t *testing.T) {
 
 	alloc1.OnGossipBroadcast(alloc2.Gossip())
 
-	// Alloc1 should ask alloc2 for space when we call AllocateFor
+	// Alloc1 should ask alloc2 for space when we call GetFor
 	ExpectMessage(alloc1, peerNameString, msgSpaceRequest, encode(alloc1.ourSpaceSet))
 
 	done := make(chan bool)
 	go func() {
-		alloc1.AllocateFor("somecontainer")
+		alloc1.GetFor("somecontainer")
 		done <- true
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -405,12 +412,12 @@ func implTestGossip2(t *testing.T) {
 	alloc1.considerOurPosition()
 
 	mockTime.SetTime(baseTime.Add(4 * time.Second))
-	// On receipt of the AllocateFor, alloc1 should elect alloc2 as leader, because it has a higher UID
+	// On receipt of the GetFor, alloc1 should elect alloc2 as leader, because it has a higher UID
 	ExpectMessage(alloc1, peerNameString, msgLeaderElected, nil)
 
 	done := make(chan bool)
 	go func() {
-		alloc1.AllocateFor("somecontainer")
+		alloc1.GetFor("somecontainer")
 		done <- true
 	}()
 	time.Sleep(100 * time.Millisecond)

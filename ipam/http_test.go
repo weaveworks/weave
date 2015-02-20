@@ -24,6 +24,7 @@ func TestHttp(t *testing.T) {
 	var (
 		containerID = "deadbeef"
 		container2  = "baddf00d"
+		container3  = "b01df00d"
 		testAddr1   = "10.0.3.5"
 		testCIDR1   = "10.0.3.5/29"
 	)
@@ -47,11 +48,15 @@ func TestHttp(t *testing.T) {
 	cidr2 := HttpGet(t, fmt.Sprintf("http://localhost:%d/ip/%s", port, container2))
 	wt.AssertNotEqualString(t, cidr2, testCIDR1, "address")
 
+	// Ask for the first container again and we should get the same address again
+	cidr1a := HttpGet(t, fmt.Sprintf("http://localhost:%d/ip/%s", port, containerID))
+	wt.AssertEqualString(t, cidr1a, testCIDR1, "address")
+
 	// Now free the first one, and we should get it back when we ask
 	addr1, _, err := net.ParseCIDR(cidr1)
 	wt.AssertNoErr(t, err)
 	wt.AssertNoErr(t, alloc.Free(addr1))
-	cidr3 := HttpGet(t, fmt.Sprintf("http://localhost:%d/ip/%s", port, container2))
+	cidr3 := HttpGet(t, fmt.Sprintf("http://localhost:%d/ip/%s", port, container3))
 	wt.AssertEqualString(t, cidr3, testCIDR1, "address")
 
 	// Would like to shut down the http server at the end of this test

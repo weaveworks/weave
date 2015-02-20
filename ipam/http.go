@@ -43,7 +43,7 @@ func (alloc *Allocator) HandleHttp() {
 		}
 
 		switch r.Method {
-		case "PUT":
+		case "PUT": // caller supplies an address to reserve for a container
 			ident, ipStr, err := parseUrlWithIP(r.URL.Path)
 			if err != nil {
 				reqError("Invalid request", err.Error())
@@ -58,11 +58,11 @@ func (alloc *Allocator) HandleHttp() {
 				reqError("Invalid claim: "+err.Error(), "Unable to claim IP address %s: %s", ip, err)
 				return
 			}
-		case "GET":
+		case "GET": // caller requests one address for a container
 			ident, err := parseUrl(r.URL.Path)
 			if err != nil {
 				httpErrorAndLog(Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
-			} else if newAddr := alloc.AllocateFor(ident); newAddr != nil {
+			} else if newAddr := alloc.GetFor(ident); newAddr != nil {
 				io.WriteString(w, fmt.Sprintf("%s/%d", newAddr, alloc.universeLen))
 			} else {
 				httpErrorAndLog(
