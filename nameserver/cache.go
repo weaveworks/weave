@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/miekg/dns"
 	"math"
+	"sort"
 	"sync"
 	"time"
 )
@@ -35,15 +36,17 @@ type entry struct {
 	Status uint8 // status of the entry
 	Flags  uint8 // some extra flags
 
+	question   dns.Question
 	reply      dns.Msg
 	validUntil time.Time // obtained from the reply and stored here for convenience/speed
 	waitChan   chan struct{}
 }
 
-func newEntry(reply *dns.Msg) *entry {
+func newEntry(question *dns.Question, reply *dns.Msg) *entry {
 	e := &entry{
 		Status:   stUnresolved,
 		Flags:    0,
+		question: *question,
 	}
 
 	if reply == nil {
@@ -132,6 +135,15 @@ func (e *entry) updateAndNotify(s uint8, validUntil time.Time) {
 	}
 }
 
+// entriesSlice is used for sorting entries
+type entriesSlice []*entry
+
+func (p entriesSlice) Len() int           { return len(p) }
+func (p entriesSlice) Less(i, j int) bool { return p[i].validUntil.Before(p[j].validUntil) }
+func (p entriesSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+//////////////////////////////////////////////////////////////////////////////////////
+
 type entries map[dns.Question]*entry
 
 // Cache is a thread-safe fixed capacity LRU cache.
@@ -184,7 +196,7 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg) {
 			c.removeOldest(1)
 		}
 
-		c.entries[question] = newEntry(reply)
+		c.entries[question] = newEntry(&question, reply)
 	}
 }
 
@@ -201,7 +213,7 @@ func (c *Cache) Get(request *dns.Msg) (reply *dns.Msg, err error) {
 		return ent.getReply(request)
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
-		c.entries[question] = newEntry(nil)
+		c.entries[question] = newEntry(&question, nil)
 		return nil, nil
 	}
 }
@@ -253,5 +265,14 @@ func (c *Cache) removeOldest(atLeast int) {
 		}
 	}
 
-	// TODO: be more aggressive: remove the oldest replies...
+	// our last resort: sort the entries (by validUntil) and remove the first `atLeast` entries
+	var es entriesSlice
+	for _, e := range c.entries {
+		es = append(es, e)
+	}
+	sort.Sort(es)
+	for i := 0; i < atLeast; i++ {
+		question := es[i].question
+		delete(c.entries, question)
+	}
 }

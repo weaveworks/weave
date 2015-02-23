@@ -39,8 +39,8 @@ type DNSServerConfig struct {
 	Timeout int
 }
 
-// a query for a resolution worker
-type dnsQuery struct {
+// a request for a resolution worker
+type dnsWorkItem struct {
 	protocol string   // the protocol where we received this query
 	r        *dns.Msg // the query
 }
@@ -54,11 +54,12 @@ type DNSServer struct {
 	zone     Zone
 	iface    *net.Interface
 	upstream *dns.ClientConfig
+	timeout  int
 
 	numRecWorkers    int
 	numLocalWorkers  int
-	localQueriesChan chan dnsQuery // channel for sending queries to workers
-	recQueriesChan   chan dnsQuery // ... and the equivalent for recursive resolutions
+	localQueriesChan chan dnsWorkItem // channel for sending queries to workers
+	recQueriesChan   chan dnsWorkItem // ... and the equivalent for recursive resolutions
 	wg               *sync.WaitGroup
 
 	Domain     string // the local domain
@@ -69,13 +70,14 @@ type DNSServer struct {
 // Creates a new DNS server
 func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *DNSServer, err error) {
 	s = &DNSServer{
-		zone:  zone,
-		iface: iface,
-
+		zone:    zone,
+		iface:   iface,
+		timeout: DEFAULT_TIMEOUT,
+		
 		numLocalWorkers:  DEFAULT_RESOLV_WORKERS,
 		numRecWorkers:    DEFAULT_RESOLV_WORKERS,
-		localQueriesChan: make(chan dnsQuery),
-		recQueriesChan:   make(chan dnsQuery),
+		localQueriesChan: make(chan dnsWorkItem),
+		recQueriesChan:   make(chan dnsWorkItem),
 		wg:               new(sync.WaitGroup),
 
 		Domain:     DEFAULT_LOCAL_DOMAIN,
@@ -89,8 +91,8 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if len(config.LocalDomain) > 0 {
 		s.Domain = config.LocalDomain
 	}
-	if config.CacheLen == 0 {
-		config.CacheLen = DEFAULT_CACHE_LEN
+	if config.Timeout > 0 {
+		s.timeout = config.Timeout
 	}
 	if len(config.UpstreamCfgFIle) == 0 {
 		config.UpstreamCfgFile = DEFAULT_CLI_CFG_FILE
@@ -121,13 +123,17 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	cacheLen := DEFAULT_CACHE_LEN
 	if config.CacheLen > 0 {
 		cacheLen = config.CacheLen
-
+	}
+	if cacheLen < s.numLocalWorkers + s.numRecWorkers {
+		// make sure the cache is big enough for all the workers
+		cacheLen = s.numLocalWorkers + s.numRecWorkers
+	}
 	Debug.Printf("[dns] Initializing cache: %d entries", config.CacheLen)
-	s.cache, err := NewCache(config.CacheLen)
+	s.cache, err := NewCache(cacheLen)
 	if err != nil {
 		return
 	}
-	
+
 	// create two DNS request multiplexerers, depending on the protocol used by clients
 	// (we use the same protocol for asking upstream servers)
 	udpMux := dns.NewServeMux()
@@ -147,8 +153,8 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 }
 
 // return a handler for a given protocol and channel
-func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsQuery) dns.HandlerFunc {
-	tout := time.Duration(s.config.Timeout)*time.Second
+func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsWorkItem) dns.HandlerFunc {
+	tout := time.Duration(s.timeout)*time.Second
 
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
@@ -167,9 +173,9 @@ func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsQuery) dn
 		}
 
 		// we got no reply and no error from the cache: send the query to a worker and wait
-		queriesChan <- dnsQuery{protocol: protocol, r: r}
+		queriesChan <- dnsWorkItem{protocol: protocol, r: r}
 		Debug.Printf("[dns] Waiting up to %d seconds for %s-query for \"%s\"",
-			s.config.Timeout, dns.TypeToString[q.Qtype], q.Name)
+			s.timeout, dns.TypeToString[q.Qtype], q.Name)
 		reply, err = s.cache.Wait(r, tout)
 		if err != nil {
 			Debug.Printf("[dns msgid %d] Error from cache: %s",  r.MsgHdr.Id, err)
