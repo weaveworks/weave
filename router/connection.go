@@ -57,6 +57,7 @@ type LocalConnection struct {
 	Router             *Router
 	uid                uint64
 	queryChan          chan<- *ConnectionInteraction
+	finished           <-chan struct{} // closed to signal that queryLoop has finished
 }
 
 type ConnectionInteraction struct {
@@ -125,7 +126,9 @@ func NewLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpA
 func (conn *LocalConnection) Start(acceptNewPeer bool) {
 	queryChan := make(chan *ConnectionInteraction, ChannelSize)
 	conn.queryChan = queryChan
-	go conn.run(queryChan, acceptNewPeer)
+	finished := make(chan struct{})
+	conn.finished = finished
+	go conn.run(queryChan, finished, acceptNewPeer)
 }
 
 func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
@@ -187,11 +190,20 @@ const (
 	CShutdown
 )
 
+// Send an actor request to the queryLoop, but don't block if queryLoop has exited
+// - see http://blog.golang.org/pipelines for pattern
+func (conn *LocalConnection) sendQuery(code int, payload interface{}) {
+	select {
+	case conn.queryChan <- &ConnectionInteraction{
+		Interaction: Interaction{code: code},
+		payload:     payload}:
+	case <-conn.finished:
+	}
+}
+
 // Async
 func (conn *LocalConnection) Shutdown(err error) {
-	conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: CShutdown},
-		payload:     err}
+	conn.sendQuery(CShutdown, err)
 }
 
 // Async
@@ -203,27 +215,24 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 	if remoteUDPAddr == nil || connUID != conn.uid {
 		return
 	}
-	conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: CReceivedHeartbeat},
-		payload:     remoteUDPAddr}
+	conn.sendQuery(CReceivedHeartbeat, remoteUDPAddr)
 }
 
 // Async
 func (conn *LocalConnection) SetEstablished() {
-	conn.queryChan <- &ConnectionInteraction{Interaction: Interaction{code: CSetEstablished}}
+	conn.sendQuery(CSetEstablished, nil)
 }
 
 // Async
 func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
-	conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: CSendProtocolMsg},
-		payload:     m}
+	conn.sendQuery(CSendProtocolMsg, m)
 }
 
 // ACTOR server
 
-func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, acceptNewPeer bool) {
+func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, finished chan<- struct{}, acceptNewPeer bool) {
 	defer conn.handleShutdown()
+	defer close(finished)
 
 	tcpConn := conn.TCPConn
 	tcpConn.SetLinger(0)
