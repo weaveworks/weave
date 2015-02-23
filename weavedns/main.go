@@ -3,13 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/miekg/dns"
 	. "github.com/zettio/weave/common"
 	weavedns "github.com/zettio/weave/nameserver"
 	weavenet "github.com/zettio/weave/net"
 	"io"
 	"net"
 	"os"
-	"github.com/miekg/dns"
 )
 
 var version = "(unreleased version)"
@@ -19,11 +19,13 @@ func main() {
 		justVersion bool
 		ifaceName   string
 		apiPath     string
+		fallback    string
 		dnsPort     int
 		httpPort    int
 		wait        int
 		watch       bool
 		debug       bool
+		err         error
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -32,6 +34,7 @@ func main() {
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
+	flag.StringVar(&fallback, "fallback", "", "Fallback server and port (ie, '8.8.8.8:53')")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	flag.Parse()
@@ -64,9 +67,19 @@ func main() {
 		}
 	}
 
-	config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-	if err != nil {
-		Error.Fatal("Failed obtain DNS client configuration", err)
+	var config *dns.ClientConfig
+	if len(fallback) > 0 {
+		fallbackHost, fallbackPort, err := net.SplitHostPort(fallback)
+		if err != nil {
+			Error.Fatal("Fould not parse fallback host and port", err)
+		}
+		config = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
+		Debug.Printf("DNS fallback at %s:%s", fallbackHost, fallbackPort)
+	} else {
+		config, err = dns.ClientConfigFromFile("/etc/resolv.conf")
+		if err != nil {
+			Error.Fatal("Failed obtain DNS client configuration", err)
+		}
 	}
 
 	go weavedns.ListenHttp(weavedns.LOCAL_DOMAIN, zone, httpPort)

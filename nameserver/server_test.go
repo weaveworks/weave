@@ -68,8 +68,7 @@ func TestUDPDNSServer(t *testing.T) {
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
 	srv := NewDNSServer(config, zone, nil, port)
 	defer srv.Stop()
-	err = srv.Start()
-	wt.AssertNoErr(t, err)
+	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
 	c := new(dns.Client)
@@ -192,8 +191,7 @@ func TestTCPDNSServer(t *testing.T) {
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
 	srv := NewDNSServer(config, zone, nil, port)
 	defer srv.Stop()
-	err = srv.Start()
-	wt.AssertNoErr(t, err)
+	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
 	t.Logf("Creating a UDP and a TCP client")
@@ -266,7 +264,6 @@ func RunLocalTCPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dn
 		server.ActivateAndServe()
 		l.Close()
 	}()
-
 
 	t.Logf("Fallback TCP server listening at %s", l.Addr().String())
 	return server, l.Addr().String(), nil
