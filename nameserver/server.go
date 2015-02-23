@@ -166,10 +166,16 @@ func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsWorkItem)
 			return
 		}
 		if reply != nil {
-			Info.Printf("[dns msgid %d] Returning reply from cache: %d answers",
-				r.MsgHdr.Id, len(reply.Answer))
-			w.WriteMsg(reply)
-			return
+			if reply.Truncated && protocol == "tcp" {
+				Debug.Printf("[dns msgid %d] Truncated response: invalidating cache",
+					r.MsgHdr.Id)
+				s.cache.Invalidate(r)
+			} else {
+				Debug.Printf("[dns msgid %d] Returning reply from cache: %d answers",
+					r.MsgHdr.Id, len(reply.Answer))
+				w.WriteMsg(reply)
+				return
+			}
 		}
 
 		// we got no reply and no error from the cache: send the query to a worker and wait

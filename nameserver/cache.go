@@ -20,11 +20,10 @@ const (
 )
 
 const (
-	stUnresolved uint8 = iota // just inserted in the cache, not resolved yet
-	stPending    uint8 = iota // someone is waiting for the resolution
-	stResolved   uint8 = iota // resolved
-	stInvalid    uint8 = iota // invalid response in cache (ie, truncated)
-	stError      uint8 = iota // resolution did not succeed
+	stPending  uint8 = iota // someone is waiting for the resolution
+	stResolved uint8 = iota // resolved
+	stInvalid  uint8 = iota // invalid
+	stError    uint8 = iota // resolution did not succeed
 )
 
 const (
@@ -42,15 +41,14 @@ type entry struct {
 	waitChan   chan struct{}
 }
 
-func newEntry(question *dns.Question, reply *dns.Msg) *entry {
+func newEntry(question *dns.Question, reply *dns.Msg, status uint8) *entry {
 	e := &entry{
-		Status:   stUnresolved,
+		Status:   status,
 		Flags:    0,
 		question: *question,
 	}
 
-	if reply == nil {
-		e.Status = stPending
+	if e.Status == stPending {
 		e.validUntil = time.Now().Add(time.Duration(defPendingTimeout) * time.Second)
 		e.waitChan = make(chan struct{})
 	} else {
@@ -66,7 +64,7 @@ func (e *entry) getReply(request *dns.Msg) (*dns.Msg, error) {
 	now := time.Now()
 
 	// if the reply has expired or is invalid, force the caller to start a new resolution
-	if e.hasExpired(now) || e.Status == stInvalid {
+	if e.hasExpired(now) {
 		return nil, nil
 	}
 
@@ -86,11 +84,7 @@ func (e entry) hasExpired(now time.Time) bool {
 // set the reply for
 func (e *entry) setReply(reply *dns.Msg) {
 	now := time.Now()
-
-	if reply.Truncated {
-		e.updateAndNotify(stInvalid, now)
-		return
-	}
+	shouldNotify := (e.Status == stPending || e.Status == stInvalid)
 
 	// calculate the validUntil from the reply TTL
 	var minTtl uint32 = math.MaxUint32
@@ -100,19 +94,18 @@ func (e *entry) setReply(reply *dns.Msg) {
 			minTtl = ttl // TODO: improve the minTTL calculation (maybe we should skip some RRs)
 		}
 	}
+	e.Status = stResolved
+	e.validUntil = now.Add(time.Second*time.Duration(minTtl))
 	e.reply = *reply
-	e.updateAndNotify(stResolved, now.Add(time.Second*time.Duration(minTtl)))
+
+	if shouldNotify {
+		close(e.waitChan) // notify all the waiters by closing the channel
+	}
 }
 
-// Set a non-DNS error for this entry (ie, no DNS server could be used)
-func (e *entry) setError() {
-	e.reply = dns.Msg{}
-	e.updateAndNotify(stError, time.Now().Add(60*time.Second)) // TODO: use a better validUntil for errors
-}
-
-// wait until a valid reply is set
+// wait until a valid reply is set in the cache
 func (e *entry) waitReply(request *dns.Msg, timeout time.Duration) (reply *dns.Msg, err error) {
-	if e.Status != stPending {
+	if !(e.Status == stPending || e.Status == stInvalid) {
 		return e.getReply(request)
 	}
 
@@ -126,13 +119,12 @@ func (e *entry) waitReply(request *dns.Msg, timeout time.Duration) (reply *dns.M
 	return nil, errCouldNotResolve
 }
 
-func (e *entry) updateAndNotify(s uint8, validUntil time.Time) {
-	shouldNotify := (e.Status == stPending)
-	e.Status = s
-	e.validUntil = validUntil
-	if shouldNotify {
-		close(e.waitChan) // notify all the waiters by closing the channel
+func (e *entry) invalidate()  {
+	if e.Status != stPending {
+		e.validUntil = time.Now().Add(time.Duration(defPendingTimeout) * time.Second)
+		e.waitChan = make(chan struct{})
 	}
+	e.Status = stInvalid
 }
 
 // entriesSlice is used for sorting entries
@@ -196,7 +188,7 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg) {
 			c.removeOldest(1)
 		}
 
-		c.entries[question] = newEntry(&question, reply)
+		c.entries[question] = newEntry(&question, reply, stResolved)
 	}
 }
 
@@ -213,8 +205,19 @@ func (c *Cache) Get(request *dns.Msg) (reply *dns.Msg, err error) {
 		return ent.getReply(request)
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
-		c.entries[question] = newEntry(&question, nil)
+		c.entries[question] = newEntry(&question, nil, stPending)
 		return nil, nil
+	}
+}
+
+// Invalidate a cache entry, so it is not returned to clients
+func (c *Cache) Invalidate(request *dns.Msg) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	question := request.Question[0]
+	if ent, found := c.entries[question]; found {
+		ent.invalidate()
 	}
 }
 
