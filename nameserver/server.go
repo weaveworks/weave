@@ -25,7 +25,7 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 
 type DNSServerConfig struct {
 	// (Optional) client config file for resolving upstream servers
-	UpstreamCfgFIle string
+	UpstreamCfgFile string
 	// (Optional) DNS client config for the fallback server(s)
 	UpstreamCfg *dns.ClientConfig
 	// DNS zone served
@@ -58,11 +58,11 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 	if len(config.LocalDomain) == 0 {
 		config.LocalDomain = DEFAULT_LOCAL_DOMAIN
 	}
-	if len(config.UpstreamCfgFIle) == 0 {
-		config.UpstreamCfgFIle = DEFAULT_CLI_CFG_FILE
+	if len(config.UpstreamCfgFile) == 0 {
+		config.UpstreamCfgFile = DEFAULT_CLI_CFG_FILE
 	}
 	if config.UpstreamCfg == nil {
-		if config.UpstreamCfg, err = dns.ClientConfigFromFile(config.UpstreamCfgFIle); err != nil {
+		if config.UpstreamCfg, err = dns.ClientConfigFromFile(config.UpstreamCfgFile); err != nil {
 			return nil, err
 		}
 	}
@@ -113,37 +113,13 @@ func (s *DNSServer) Start() error {
 	err = s.mdnsSrv.Start(s.config.Iface, s.config.LocalDomain)
 	CheckFatal(err)
 
-	// create two DNS request multiplexerers, depending on the protocol used by clients
-	// (we use the same protocol for asking upstream servers)
-	mux := func(client *dns.Client) *dns.ServeMux {
-		m := dns.NewServeMux()
-		m.HandleFunc(s.config.LocalDomain, s.queryHandler([]Lookup{s.config.Zone, s.mdnsCli}))
-		m.HandleFunc(RDNS_DOMAIN, s.rdnsHandler([]Lookup{s.config.Zone, s.mdnsCli}, client))
-		m.HandleFunc(".", s.notUsHandler(client))
-		return m
-	}
-
-	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(&dns.Client{Net: "udp", UDPSize: DEFAULT_UDP_BUFLEN})}
-	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(&dns.Client{Net: "tcp"})}
-
-	return
-}
-
-// Start the DNS server
-func (s *DNSServer) Start() error {
-	Info.Printf("Using mDNS on %s", s.IfaceName)
-	err := s.mdnsCli.Start(s.config.Iface)
-	CheckFatal(err)
-	err = s.mdnsSrv.Start(s.config.Iface, s.config.LocalDomain)
-	CheckFatal(err)
-
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
 	go func() {
 		defer wg.Done()
 
-		Debug.Printf("Listening for DNS on %s (UDP)", address)
+		Debug.Printf("Listening for DNS on %s (UDP)", s.ListenAddr)
 		err = s.udpSrv.ListenAndServe()
 		CheckFatal(err)
 		Debug.Printf("DNS UDP server exiting...")
@@ -152,7 +128,7 @@ func (s *DNSServer) Start() error {
 	go func() {
 		defer wg.Done()
 
-		Debug.Printf("Listening for DNS on %s (TCP)", address)
+		Debug.Printf("Listening for DNS on %s (TCP)", s.ListenAddr)
 		err = s.tcpSrv.ListenAndServe()
 		CheckFatal(err)
 		Debug.Printf("DNS TCP server exiting...")
