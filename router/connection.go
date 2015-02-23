@@ -45,6 +45,7 @@ type LocalConnection struct {
 	effectivePMTU      int
 	SessionKey         *[32]byte
 	establishedTimeout *time.Timer
+	heartbeatTimeout   *time.Timer
 	heartbeatFrame     *ForwardedFrame
 	heartbeat          *time.Ticker
 	fragTest           *time.Ticker
@@ -301,10 +302,12 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 			case CSendProtocolMsg:
 				err = conn.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
-		case <-conn.establishedTimeout.C:
+		case <-timerChan(conn.establishedTimeout):
 			if !conn.established {
 				err = fmt.Errorf("failed to establish UDP connectivity")
 			}
+		case <-timerChan(conn.heartbeatTimeout):
+			err = fmt.Errorf("timed out waiting for UDP heartbeat")
 		case <-tickerChan(conn.heartbeat):
 			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fragTest):
@@ -329,6 +332,9 @@ func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr)
 	conn.remoteUDPAddr = remoteUDPAddr
 	conn.receivedHeartbeat = true
 	conn.Unlock()
+	if conn.established {
+		conn.heartbeatTimeout.Reset(HeartbeatTimeout)
+	}
 	if !old {
 		if err := conn.handleSendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
 			return err
@@ -362,6 +368,7 @@ func (conn *LocalConnection) handleSetEstablished() error {
 		dstPeer: conn.remote,
 		frame:   PMTUDiscovery},
 		nil)
+	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
 	conn.heartbeat = time.NewTicker(SlowHeartbeat)
 	conn.fragTest = time.NewTicker(FragTestInterval)
 	// avoid initial waits for timers to fire
@@ -391,10 +398,8 @@ func (conn *LocalConnection) handleShutdown() {
 		conn.Router.Ourself.DeleteConnection(conn)
 	}
 
-	if conn.establishedTimeout != nil {
-		conn.establishedTimeout.Stop()
-	}
-
+	stopTimer(conn.establishedTimeout)
+	stopTimer(conn.heartbeatTimeout)
 	stopTicker(conn.heartbeat)
 	stopTicker(conn.fragTest)
 
@@ -496,5 +501,18 @@ func tickerChan(ticker *time.Ticker) <-chan time.Time {
 func stopTicker(ticker *time.Ticker) {
 	if ticker != nil {
 		ticker.Stop()
+	}
+}
+
+func timerChan(timer *time.Timer) <-chan time.Time {
+	if timer != nil {
+		return timer.C
+	}
+	return nil
+}
+
+func stopTimer(timer *time.Timer) {
+	if timer != nil {
+		timer.Stop()
 	}
 }
