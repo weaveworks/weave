@@ -96,6 +96,32 @@ requests. Donations do not state why they were sent.
 Allocator broadcasts its own state any time the has-free flag changes,
 or when it reclaims a leak.
 
+## External interface
+
+IPAM exposes an interface so programs such as the `weave` script can
+call upon it to perform functions. This interface operates over the
+http protcol on port 6784 (same as used for `weave status`).
+
+The operations supported by this interface are:
+
+  * GET /ip/<containerid> - return a CIDR-format address for the
+    container with ID <containerid>.  This ID should be the full
+    long-format hex number ID that Docker has given it.  If you call
+    this multiple times for the same container it will always return
+    the same address. The return value is in CIDR format (preparatory
+    for future extension to support multiple subnets). If all
+    addresses are in use, returns http status 503
+  * PUT /ip/<containerid>/<ip> - state that address <ip> is associated
+    with <containerid>.  If you send an address outside of the space
+    managed by IPAM then this request is ignored.
+  * DELETE /ip/<containerid>/<ip> - state that address <ip> is no
+    longer associated with <containerid>
+  * DELETE /ip/<containerid>/* - equivalent to calling DELETE for all
+    ip addresses associated with <containerid>
+
+[what happens if you call PUT several times on the same container with
+different addreses? what should GET subsequently return?]
+
 ## Elections
 
 At start-up, nobody owns any of the address space.  An election is
@@ -124,6 +150,11 @@ Actor, so no locks are used around data structures.
 What should the flag to control the allocation "universe" be?
 Currently it is `--alloc`.
 
+Currently there is a fall-back range if you don't specify one; it
+would be better to pick from a set of possibilities so we can check
+the range is currently unused before we start using it.  Docker does
+this.
+
 How to use IPAM for WeaveDNS?  It needs its own special subnet.
 
 How should we add support for subnets in general?
@@ -141,3 +172,6 @@ central package so both ipam and router can depend on it.]
 so they can detech mismatches.]
 
 [Someone making a request should be able to cancel it]
+
+[There are a lot of `errors.New()` calls in the code; should probably
+re-write them to use specific error types]

@@ -105,7 +105,7 @@ type getFor struct {
 }
 type free struct {
 	resultChan chan<- error
-	addr       net.IP
+	Allocation
 }
 type deleteRecordsFor struct {
 	Ident string
@@ -223,9 +223,9 @@ func (alloc *Allocator) GetFor(ident string) net.IP {
 }
 
 // Sync.
-func (alloc *Allocator) Free(addr net.IP) error {
+func (alloc *Allocator) Free(ident string, addr net.IP) error {
 	resultChan := make(chan error)
-	alloc.queryChan <- free{resultChan, addr}
+	alloc.queryChan <- free{resultChan, Allocation{ident, addr}}
 	return <-resultChan
 }
 
@@ -319,7 +319,7 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 			case deleteRecordsFor:
 				alloc.ourSpaceSet.DeleteRecordsFor(q.Ident)
 			case free:
-				q.resultChan <- alloc.ourSpaceSet.Free(q.addr)
+				q.resultChan <- alloc.ourSpaceSet.Free(q.Ident, q.IP)
 			case gossipUnicast:
 				switch q.bytes[0] {
 				case msgSpaceRequest:

@@ -9,6 +9,8 @@ import (
 func TestSpaceAllocate(t *testing.T) {
 	const (
 		testAddr1   = "10.0.3.4"
+		testAddrx   = "10.0.3.19"
+		testAddry   = "10.0.9.19"
 		containerID = "deadbeef"
 	)
 
@@ -29,8 +31,13 @@ func TestSpaceAllocate(t *testing.T) {
 	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 18, "Free addresses")
 	space1.checkInvariant(t)
 
-	space1.Free(addr2)
+	space1.Free(containerID, addr2)
 	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
+
+	wt.AssertErrorInterface(t, space1.Free(containerID, addr2), (*error)(nil), "double free")
+	wt.AssertErrorInterface(t, space1.Free("other", addr1), (*error)(nil), "wrong container ID")
+	wt.AssertErrorInterface(t, space1.Free(containerID, net.ParseIP(testAddrx)), (*error)(nil), "address not allocated")
+	wt.AssertErrorInterface(t, space1.Free(containerID, net.ParseIP(testAddry)), (*error)(nil), "wrong out of range")
 
 	wt.AssertNoErr(t, space1.DeleteRecordsFor(containerID))
 	wt.AssertEqualInt(t, len(space1.allocated), 0, "allocated records")
@@ -78,7 +85,7 @@ func TestSpaceClaim(t *testing.T) {
 		t.Fatalf("Space.Claim incorrect success")
 	}
 
-	space1.Free(net.ParseIP(testAddr1))
+	space1.Free(containerID, net.ParseIP(testAddr1))
 	space1.checkInvariant(t)
 	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
 	wt.AssertEqualInt(t, space1.countMaxAllocations(), 19, "max allocations")
@@ -95,7 +102,7 @@ func TestSpaceSplit(t *testing.T) {
 	addr1 := space1.AllocateFor(containerID)
 	addr2 := space1.AllocateFor(containerID)
 	addr3 := space1.AllocateFor(containerID)
-	space1.Free(addr2)
+	space1.Free(containerID, addr2)
 	space1.checkInvariant(t)
 	split1, split2 := space1.Split(net.ParseIP(testAddr2))
 	wt.AssertEqualUint32(t, split1.GetSize(), 2, "split size")
@@ -105,10 +112,10 @@ func TestSpaceSplit(t *testing.T) {
 	space1.checkInvariant(t)
 	split1.checkInvariant(t)
 	split2.checkInvariant(t)
-	wt.AssertBool(t, split1.Free(addr1), true, "free")
-	wt.AssertBool(t, split1.Free(addr3), false, "free")
-	wt.AssertBool(t, split2.Free(addr1), false, "free")
-	wt.AssertBool(t, split2.Free(addr3), true, "free")
+	wt.AssertNoErr(t, split1.Free(containerID, addr1))
+	wt.AssertErrorInterface(t, split1.Free(containerID, addr3), (*error)(nil), "free")
+	wt.AssertErrorInterface(t, split2.Free(containerID, addr1), (*error)(nil), "free")
+	wt.AssertNoErr(t, split2.Free(containerID, addr3))
 }
 
 func TestSpaceOverlap(t *testing.T) {

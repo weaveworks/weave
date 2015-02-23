@@ -277,10 +277,10 @@ func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 	return errors.New("IP address not in range")
 }
 
-func (s *OurSpaceSet) Free(addr net.IP) error {
+func (s *OurSpaceSet) Free(ident string, addr net.IP) error {
 	for _, space := range s.spaces {
-		if space.(*MutableSpace).Free(addr) {
-			return nil
+		if space.(*MutableSpace).Contains(addr) {
+			return space.(*MutableSpace).Free(ident, addr)
 		}
 	}
 	return errors.New("IP address not in range")

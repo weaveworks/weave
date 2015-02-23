@@ -58,7 +58,7 @@ func TestAllocFree(t *testing.T) {
 	wt.AssertEqualString(t, addr1a.String(), testAddr1, "address")
 
 	// Now free the first one, and we should get it back when we ask
-	alloc.Free(net.ParseIP(testAddr1))
+	alloc.Free(container1, net.ParseIP(testAddr1))
 	addr3 := alloc.GetFor(container3)
 	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
 

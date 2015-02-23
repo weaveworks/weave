@@ -69,6 +69,18 @@ func (alloc *Allocator) HandleHttp() {
 					Error, w, "No free addresses", http.StatusServiceUnavailable,
 					"No free addresses")
 			}
+		case "DELETE": // opposite of PUT for one specific address or all addresses
+			ident, ipStr, err := parseUrlWithIP(r.URL.Path)
+			if err != nil {
+				httpErrorAndLog(Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
+			} else if ipStr == "*" {
+				alloc.DeleteRecordsFor(ident)
+			} else if ip := net.ParseIP(ipStr); ip == nil {
+				reqError("Invalid IP", "Invalid IP in request: %s", ipStr)
+				return
+			} else if err = alloc.Free(ident, ip); err != nil {
+				httpErrorAndLog(Warning, w, "Invalid Free", http.StatusBadRequest, err.Error())
+			}
 		}
 	})
 }

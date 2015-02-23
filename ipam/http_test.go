@@ -5,7 +5,6 @@ import (
 	wt "github.com/zettio/weave/testing"
 	"io/ioutil"
 	"math/rand"
-	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -18,6 +17,11 @@ func HttpGet(t *testing.T, url string) string {
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
 	return string(body)
+}
+
+func genHttp(method string, url string) (resp *http.Response, err error) {
+	req, err := http.NewRequest(method, url, nil)
+	return http.DefaultClient.Do(req)
 }
 
 func TestHttp(t *testing.T) {
@@ -53,9 +57,7 @@ func TestHttp(t *testing.T) {
 	wt.AssertEqualString(t, cidr1a, testCIDR1, "address")
 
 	// Now free the first one, and we should get it back when we ask
-	addr1, _, err := net.ParseCIDR(cidr1)
-	wt.AssertNoErr(t, err)
-	wt.AssertNoErr(t, alloc.Free(addr1))
+	genHttp("DELETE", fmt.Sprintf("http://localhost:%d/ip/%s/%s", port, containerID, testAddr1))
 	cidr3 := HttpGet(t, fmt.Sprintf("http://localhost:%d/ip/%s", port, container3))
 	wt.AssertEqualString(t, cidr3, testCIDR1, "address")
 

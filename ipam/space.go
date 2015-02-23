@@ -73,7 +73,9 @@ func (aa *AllocationList) add(a *Allocation) {
 }
 
 func (aa *AllocationList) removeAt(pos int) {
-	(*aa) = append((*aa)[:pos], (*aa)[pos+1:]...)
+	// Delete by swapping the last element into this one and truncating
+	last := len(*aa) - 1
+	(*aa)[pos], (*aa) = (*aa)[last], (*aa)[:last]
 }
 
 func (aa *AllocationList) find(addr net.IP) int {
@@ -83,17 +85,6 @@ func (aa *AllocationList) find(addr net.IP) int {
 		}
 	}
 	return -1
-}
-
-func (aa *AllocationList) remove(addr net.IP) *Allocation {
-	if i := aa.find(addr); i >= 0 {
-		a := (*aa)[i]
-		// Delete by swapping the last element into this one and truncating
-		last := len(*aa) - 1
-		(*aa)[i], (*aa) = (*aa)[last], (*aa)[:last]
-		return &a
-	}
-	return nil
 }
 
 func (aa *AllocationList) take() *Allocation {
@@ -156,16 +147,19 @@ func (space *MutableSpace) AllocateFor(ident string) net.IP {
 	return ret.IP
 }
 
-func (space *MutableSpace) Free(addr net.IP) bool {
-	if !space.Contains(addr) {
-		return false
+func (space *MutableSpace) Free(ident string, addr net.IP) error {
+	if pos := space.allocated.find(addr); pos >= 0 {
+		a := space.allocated[pos]
+		if a.Ident == ident {
+			space.allocated.removeAt(pos)
+			space.free_list.add(&a)
+			// TODO: consolidate free space
+			return nil
+		} else {
+			return errors.New("IP address owned by different container")
+		}
 	}
-	if a := space.allocated.remove(addr); a != nil {
-		space.free_list.add(a)
-		// TODO: consolidate free space
-		return true
-	}
-	return false
+	return errors.New("IP address not allocated")
 }
 
 func (space *MutableSpace) FindAddressesFor(ident string) []net.IP {
