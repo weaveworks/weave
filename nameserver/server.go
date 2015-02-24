@@ -91,6 +91,17 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if len(config.LocalDomain) > 0 {
 		s.Domain = config.LocalDomain
 	}
+	if config.UpstreamCfg != nil {
+		s.upstream = config.UpstreamCfg
+	} else {
+		cfgFile := DEFAULT_CLI_CFG_FILE
+		if len(config.UpstreamCfgFile) > 0 {
+			cfgFile = config.UpstreamCfgFile
+		}
+		if s.upstream, err = dns.ClientConfigFromFile(cfgFile); err != nil {
+			return nil, err
+		}
+	}
 	if config.Timeout > 0 {
 		s.timeout = config.Timeout
 	}
@@ -184,7 +195,7 @@ func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsWorkItem)
 			s.timeout, dns.TypeToString[q.Qtype], q.Name)
 		reply, err = s.cache.Wait(r, tout)
 		if err != nil {
-			Debug.Printf("[dns msgid %d] Error from cache: %s",  r.MsgHdr.Id, err)
+			Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
 			w.WriteMsg(makeDNSFailResponse(r))
 			return
 		}
@@ -281,7 +292,7 @@ func (s *DNSServer) localLookupWorker() {
 
 					Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
 						m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, ip, dns.RcodeToString[m.Rcode])
-					s.cache.Put(r, m)
+					s.cache.Put(r, m, CacheLocalReply)
 					resolved = true
 					break
 				}
@@ -289,7 +300,7 @@ func (s *DNSServer) localLookupWorker() {
 			if !resolved {
 				Info.Printf("[dns msgid %d] No local results for %s-query for \"%s\" [proto:%s] [caching error]",
 					r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, query.protocol)
-				s.cache.Put(r, makeDNSFailResponse(r))
+				s.cache.Put(r, makeDNSFailResponse(r), CacheLocalReply)
 			}
 
 		case dns.TypePTR:
@@ -299,7 +310,7 @@ func (s *DNSServer) localLookupWorker() {
 
 					Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
 						m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, name, dns.RcodeToString[m.Rcode])
-					s.cache.Put(r, m)
+					s.cache.Put(r, m, CacheLocalReply)
 					resolved = true
 					break
 				}
@@ -313,7 +324,7 @@ func (s *DNSServer) localLookupWorker() {
 		default:
 			Info.Printf("[dns msgid %d] Unhandled %s-query for \"%s\" [proto:%s] [caching error]",
 				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, query.protocol)
-			s.cache.Put(r, makeDNSFailResponse(r))
+			s.cache.Put(r, makeDNSFailResponse(r), 0)
 		}
 	}
 }
@@ -360,7 +371,7 @@ func (s *DNSServer) recLookupWorker() {
 
 			Debug.Printf("[dns msgid %d] Given answer by %s for %s-query \"%s\": %d answers [caching response]",
 				r.MsgHdr.Id, server, dns.TypeToString[q.Qtype], q.Name, len(reply.Answer))
-			s.cache.Put(r, reply)
+			s.cache.Put(r, reply, 0)
 			resolved = true
 			break
 		}
@@ -368,7 +379,7 @@ func (s *DNSServer) recLookupWorker() {
 		if !resolved {
 			Warning.Printf("[dns msgid %d] Failed recursive lookup for external name \"%s\" [caching error]",
 				r.MsgHdr.Id, q.Name)
-			s.cache.Put(r, makeDNSFailResponse(r))
+			s.cache.Put(r, makeDNSFailResponse(r), 0)
 		}
 	}
 }

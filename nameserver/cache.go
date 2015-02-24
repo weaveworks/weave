@@ -23,11 +23,10 @@ const (
 	stPending  uint8 = iota // someone is waiting for the resolution
 	stResolved uint8 = iota // resolved
 	stInvalid  uint8 = iota // invalid
-	stError    uint8 = iota // resolution did not succeed
 )
 
 const (
-	flagLocal uint8 = 1 << iota // the reply was obtained from a local resolution
+	CacheLocalReply uint8 = 1 << iota // the reply was obtained from a local resolution
 )
 
 // a cache entry
@@ -35,10 +34,13 @@ type entry struct {
 	Status uint8 // status of the entry
 	Flags  uint8 // some extra flags
 
-	question   dns.Question
-	reply      dns.Msg
+	question dns.Question
+	reply    dns.Msg
+
 	validUntil time.Time // obtained from the reply and stored here for convenience/speed
-	waitChan   chan struct{}
+	putTime    time.Time
+
+	waitChan chan struct{}
 }
 
 func newEntry(question *dns.Question, reply *dns.Msg, status uint8) *entry {
@@ -52,7 +54,7 @@ func newEntry(question *dns.Question, reply *dns.Msg, status uint8) *entry {
 		e.validUntil = time.Now().Add(time.Duration(defPendingTimeout) * time.Second)
 		e.waitChan = make(chan struct{})
 	} else {
-		e.setReply(reply)
+		e.setReply(reply, 0)
 	}
 
 	return e
@@ -72,7 +74,15 @@ func (e *entry) getReply(request *dns.Msg) (*dns.Msg, error) {
 	reply := e.reply
 	reply.SetReply(request)
 	reply.Rcode = e.reply.Rcode
-	// TODO: adjust the TTL, round-robin values, etc...
+	reply.Authoritative = (e.Flags & CacheLocalReply != 0)		// we are only authoritative for local questions
+
+	// adjust the TTLs
+	passedSecs := now.Sub(e.putTime).Seconds()
+	for _, rr := range reply.Answer {
+		rr.Header().Ttl -= uint32(passedSecs)
+	}
+
+	// TODO: shuffle the values, etc...
 
 	return &reply, nil
 }
@@ -82,7 +92,7 @@ func (e entry) hasExpired(now time.Time) bool {
 }
 
 // set the reply for
-func (e *entry) setReply(reply *dns.Msg) {
+func (e *entry) setReply(reply *dns.Msg, flags uint8) {
 	now := time.Now()
 	shouldNotify := (e.Status == stPending || e.Status == stInvalid)
 
@@ -95,7 +105,9 @@ func (e *entry) setReply(reply *dns.Msg) {
 		}
 	}
 	e.Status = stResolved
-	e.validUntil = now.Add(time.Second*time.Duration(minTtl))
+	e.Flags = flags
+	e.putTime = now
+	e.validUntil = now.Add(time.Second * time.Duration(minTtl))
 	e.reply = *reply
 
 	if shouldNotify {
@@ -105,7 +117,7 @@ func (e *entry) setReply(reply *dns.Msg) {
 
 // wait until a valid reply is set in the cache
 func (e *entry) waitReply(request *dns.Msg, timeout time.Duration) (reply *dns.Msg, err error) {
-	if !(e.Status == stPending || e.Status == stInvalid) {
+	if e.Status == stResolved {
 		return e.getReply(request)
 	}
 
@@ -119,7 +131,7 @@ func (e *entry) waitReply(request *dns.Msg, timeout time.Duration) (reply *dns.M
 	return nil, errCouldNotResolve
 }
 
-func (e *entry) invalidate()  {
+func (e *entry) invalidate() {
 	if e.Status != stPending {
 		e.validUntil = time.Now().Add(time.Duration(defPendingTimeout) * time.Second)
 		e.waitChan = make(chan struct{})
@@ -175,13 +187,13 @@ func (c *Cache) Purge() {
 }
 
 // Add adds a reply to the cache.
-func (c *Cache) Put(request *dns.Msg, reply *dns.Msg) {
+func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, flags uint8) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	question := request.Question[0]
 	if ent, found := c.entries[question]; found {
-		ent.setReply(reply)
+		ent.setReply(reply, flags)
 	} else {
 		// If we will add a new item and the capacity has been exceeded, make some room...
 		if len(c.entries) >= c.Capacity {

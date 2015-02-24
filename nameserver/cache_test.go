@@ -28,7 +28,7 @@ func TestCacheSimple(t *testing.T) {
 		ips := []net.IP{ip}
 		reply := makeAddressReply(questionMsg, question, ips)
 
-		l.Put(questionMsg, reply)
+		l.Put(questionMsg, reply, 0)
 	}
 
 	wt.AssertEqualInt(t, l.Len(), 128, "cache length")
@@ -66,7 +66,7 @@ func TestCacheBlockingOps(t *testing.T) {
 		ip := net.ParseIP(fmt.Sprintf("10.0.1.%d", i))
 		ips := []net.IP{ip}
 		reply := makeAddressReply(requestMsg, &requestMsg.Question[0], ips)
-		l.Put(requestMsg, reply)
+		l.Put(requestMsg, reply, 0)
 	}
 }
 
