@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
+	. "github.com/zettio/weave/common"
 	wt "github.com/zettio/weave/testing"
 	"log"
 	"net"
@@ -20,18 +21,18 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 
 	sendAnswer := func(m *dns.Msg) {
 		buf, err := m.Pack()
-		checkFatal(err)
+		CheckFatal(err)
 		if buf == nil {
 			log.Fatal("Nil buffer")
 		}
 		//log.Println("minimalServer sending:", buf)
 		// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
 		sendconn, err := net.DialUDP("udp", nil, ipv4Addr)
-		checkFatal(err)
+		CheckFatal(err)
 
 		_, err = sendconn.Write(buf)
 		sendconn.Close()
-		checkFatal(err)
+		CheckFatal(err)
 	}
 
 	//log.Println("minimalServer received:", req)
