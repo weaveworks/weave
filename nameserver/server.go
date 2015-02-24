@@ -243,7 +243,7 @@ func (s *DNSServer) Start() error {
 		Debug.Printf("[dns] Listening on %s (TCP)", s.ListenAddr)
 		err = s.tcpSrv.ListenAndServe()
 		CheckFatal(err)
-		Debug.Printf("[dns] TCP server exiting...")
+		Debug.Printf("[dns] Exiting TCP server...")
 	}()
 
 	// Start the resolution workers
