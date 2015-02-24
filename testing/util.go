@@ -7,6 +7,18 @@ import (
 	"time"
 )
 
+func AssertTrue(t *testing.T, cond bool, desc string) {
+	if !cond {
+		Fatalf(t, "Expected %s to be true", desc)
+	}
+}
+
+func AssertFalse(t *testing.T, cond bool, desc string) {
+	if cond {
+		Fatalf(t, "Expected %s to be false", desc)
+	}
+}
+
 func AssertNoErr(t *testing.T, err error) {
 	if err != nil {
 		Fatalf(t, "Unexpected error: %s", err)
@@ -22,6 +34,12 @@ func AssertEqualuint64(t *testing.T, got, wanted uint64, desc string) {
 func AssertEqualInt(t *testing.T, got, wanted int, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
+	}
+}
+
+func AssertNotEqualInt(t *testing.T, got, wanted int, desc string) {
+	if got == wanted {
+		Fatalf(t, "Expected %s %d to be different to %d", desc, wanted, got)
 	}
 }
 
