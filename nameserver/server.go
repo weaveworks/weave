@@ -120,11 +120,16 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if config.NumRecursiveWorkers > 0 {
 		s.numRecWorkers = config.NumRecursiveWorkers
 	}
-	s.mdnsCli, err = NewMDNSClient()
-	if err != nil {
-		return
+	if len(config.UpstreamCfgFile) == 0 {
+		config.UpstreamCfgFile = DEFAULT_CLI_CFG_FILE
 	}
-	s.mdnsSrv, err = NewMDNSServer(s.zone)
+	if config.UpstreamCfg == nil {
+		if config.UpstreamCfg, err = dns.ClientConfigFromFile(config.UpstreamCfgFile); err != nil {
+			return nil, err
+		}
+	}
+
+	s.mdnsServer, err := NewMDNSServer(config.Zone)
 	if err != nil {
 		return
 	}
@@ -165,80 +170,88 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 
 // return a handler for a given protocol and channel
 func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsWorkItem) dns.HandlerFunc {
-	tout := time.Duration(s.timeout)*time.Second
+	tout := time.Duration(s.timeout) * time.Second
+	resolveUntil := time.Now().Add(tout)
 
 	return func(w dns.ResponseWriter, r *dns.Msg) {
-		q := r.Question[0]
-		Debug.Printf("[dns] Query: %+v", q)
-		reply, err := s.cache.Get(r)
-		if err != nil {
-			Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
-			w.WriteMsg(makeDNSFailResponse(r))
-			return
-		}
-		if reply != nil {
-			if reply.Truncated && protocol == "tcp" {
-				Debug.Printf("[dns msgid %d] Truncated response: invalidating cache",
-					r.MsgHdr.Id)
-				s.cache.Invalidate(r)
-			} else {
-				Debug.Printf("[dns msgid %d] Returning reply from cache: %d answers",
+		for {
+			now := time.Now()
+			q := r.Question[0]
+			Debug.Printf("[dns] Query: %+v", q)
+			reply, err := s.cache.Get(r, now)
+			if err != nil {
+				Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
+				w.WriteMsg(makeDNSFailResponse(r))
+				return
+			}
+			if reply != nil {
+				if reply.Truncated && protocol == "tcp" {
+					Debug.Printf("[dns msgid %d] Truncated response: invalidating cache",
+						r.MsgHdr.Id)
+					s.cache.Invalidate(r, now)
+				} else {
+					Debug.Printf("[dns msgid %d] Returning reply from cache: %d answers",
+						r.MsgHdr.Id, len(reply.Answer))
+					w.WriteMsg(reply)
+					return
+				}
+			}
+
+			// we got no reply and no error from the cache: send the query to a worker and wait
+			queriesChan <- dnsWorkItem{protocol: protocol, r: r}
+			Debug.Printf("[dns] Waiting up to %d seconds for %s-query for \"%s\"",
+				s.config.Timeout, dns.TypeToString[q.Qtype], q.Name)
+			reply, err = s.cache.Wait(r, resolveUntil.Sub(now), now)
+			if err != nil {
+				if err == errTimeout {
+					Debug.Printf("[dns msgid %d] Timeout while waiting for response", r.MsgHdr.Id)
+				} else {
+					Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
+				}
+				w.WriteMsg(makeDNSFailResponse(r))
+				return
+			}
+			if reply != nil {
+				Info.Printf("[dns msgid %d] Returning reply from cache: %d answers",
 					r.MsgHdr.Id, len(reply.Answer))
 				w.WriteMsg(reply)
 				return
 			}
-		}
 
-		// we got no reply and no error from the cache: send the query to a worker and wait
-		queriesChan <- dnsWorkItem{protocol: protocol, r: r}
-		Debug.Printf("[dns] Waiting up to %d seconds for %s-query for \"%s\"",
-			s.timeout, dns.TypeToString[q.Qtype], q.Name)
-		reply, err = s.cache.Wait(r, tout)
-		if err != nil {
-			Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
-			w.WriteMsg(makeDNSFailResponse(r))
-			return
+			Info.Printf("[dns msgid %d] No results for %s-query for \"%s\": retrying...",
+				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
 		}
-		if reply != nil {
-			Info.Printf("[dns msgid %d] Returning reply from cache: %d answers",
-				r.MsgHdr.Id, len(reply.Answer))
-			w.WriteMsg(reply)
-			return
-		}
-
-		Info.Printf("[dns msgid %d] No results for %s-query for \"%s\"",
-			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
-		w.WriteMsg(makeDNSFailResponse(r))
 	}
 }
 
 // Start the DNS server
 func (s *DNSServer) Start() error {
-	Info.Printf("[dns] Using mDNS on %s", s.IfaceName)
-	err := s.mdnsCli.Start(s.iface)
-	CheckFatal(err)
-	err = s.mdnsSrv.Start(s.iface, s.Domain)
-	CheckFatal(err)
+	Info.Printf("[dns] Server starting...")
+
+	Debug.Printf("[dns] Starting mDNS server on %s", s.IfaceName)
+	err := s.mdnsSrv.Start(s.iface, s.Domain)
+	if err != nil {
+		Error.Printf("[dns] Could not start mDNS server: %s", err)
+		return err
+	}
 
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
 	go func() {
 		defer wg.Done()
-
-		Debug.Printf("[dns] Listening for DNS on %s (UDP)", s.ListenAddr)
+		Debug.Printf("[dns] Listening on %s (UDP)", s.ListenAddr)
 		err = s.udpSrv.ListenAndServe()
 		CheckFatal(err)
-		Debug.Printf("DNS UDP server exiting...")
+		Debug.Printf("[dns] UDP server exiting...")
 	}()
 
 	go func() {
 		defer wg.Done()
-
-		Debug.Printf("[dns] Listening for DNS on %s (TCP)", s.ListenAddr)
+		Debug.Printf("[dns] Listening on %s (TCP)", s.ListenAddr)
 		err = s.tcpSrv.ListenAndServe()
 		CheckFatal(err)
-		Debug.Printf("DNS TCP server exiting...")
+		Debug.Printf("[dns] TCP server exiting...")
 	}()
 
 	// Start the resolution workers
@@ -254,8 +267,7 @@ func (s *DNSServer) Start() error {
 	// Waiting for all goroutines to finish (otherwise they die as main routine dies)
 	wg.Wait()
 
-	Info.Printf("WeaveDNS server exiting...")
-
+	Info.Printf("[dns] Server exiting...")
 	return nil
 }
 
@@ -275,24 +287,33 @@ func (s *DNSServer) Stop() error {
 func (s *DNSServer) localLookupWorker() {
 	defer s.wg.Done()
 
+	// each local worker has its own mDNS client for resolving queries
+	mdnsCli, err := NewMDNSClient()
+	if err != nil {
+		return
+	}
+	err = mdnsCli.Start(s.config.Iface)
+	CheckFatal(err)
+
 	Debug.Printf("[dns] Starting local queries worker")
 	for query := range s.localQueriesChan {
 		r := query.r
 		q := r.Question[0]
 		resolved := false
+		now := time.Now()
 
 		Debug.Printf("[dns msgid %d] Resolving local %s-query for \"%+v\" [proto:%s]",
 			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, query.protocol)
 
 		switch q.Qtype {
 		case dns.TypeA:
-			for _, lookup := range []Lookup{s.config.Zone, s.mdnsCli} {
+			for _, lookup := range []Lookup{s.config.Zone, mdnsCli} {
 				if ip, err := lookup.LookupName(q.Name); err == nil {
 					m := makeAddressReply(r, &q, []net.IP{ip})
 
 					Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
 						m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, ip, dns.RcodeToString[m.Rcode])
-					s.cache.Put(r, m, CacheLocalReply)
+					s.cache.Put(r, m, CacheLocalReply, now)
 					resolved = true
 					break
 				}
@@ -300,17 +321,17 @@ func (s *DNSServer) localLookupWorker() {
 			if !resolved {
 				Info.Printf("[dns msgid %d] No local results for %s-query for \"%s\" [proto:%s] [caching error]",
 					r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, query.protocol)
-				s.cache.Put(r, makeDNSFailResponse(r), CacheLocalReply)
+				s.cache.Put(r, makeDNSFailResponse(r), CacheLocalReply, now)
 			}
 
 		case dns.TypePTR:
-			for _, lookup := range []Lookup{s.config.Zone, s.mdnsCli} {
+			for _, lookup := range []Lookup{s.config.Zone, mdnsCli} {
 				if name, err := lookup.LookupInaddr(q.Name); err == nil {
 					m := makePTRReply(r, &q, []string{name})
 
 					Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
 						m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, name, dns.RcodeToString[m.Rcode])
-					s.cache.Put(r, m, CacheLocalReply)
+					s.cache.Put(r, m, CacheLocalReply, now)
 					resolved = true
 					break
 				}
@@ -324,7 +345,7 @@ func (s *DNSServer) localLookupWorker() {
 		default:
 			Info.Printf("[dns msgid %d] Unhandled %s-query for \"%s\" [proto:%s] [caching error]",
 				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, query.protocol)
-			s.cache.Put(r, makeDNSFailResponse(r), 0)
+			s.cache.Put(r, makeDNSFailResponse(r), 0, now)
 		}
 	}
 }
@@ -346,6 +367,7 @@ func (s *DNSServer) recLookupWorker() {
 		proto := query.protocol
 		q := r.Question[0]
 		resolved := false
+		now := time.Now()
 
 		var dnsClient *dns.Client
 		switch proto {
@@ -371,7 +393,7 @@ func (s *DNSServer) recLookupWorker() {
 
 			Debug.Printf("[dns msgid %d] Given answer by %s for %s-query \"%s\": %d answers [caching response]",
 				r.MsgHdr.Id, server, dns.TypeToString[q.Qtype], q.Name, len(reply.Answer))
-			s.cache.Put(r, reply, 0)
+			s.cache.Put(r, reply, 0, now)
 			resolved = true
 			break
 		}
@@ -379,7 +401,7 @@ func (s *DNSServer) recLookupWorker() {
 		if !resolved {
 			Warning.Printf("[dns msgid %d] Failed recursive lookup for external name \"%s\" [caching error]",
 				r.MsgHdr.Id, q.Name)
-			s.cache.Put(r, makeDNSFailResponse(r), 0)
+			s.cache.Put(r, makeDNSFailResponse(r), 0, now)
 		}
 	}
 }
