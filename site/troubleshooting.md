@@ -86,11 +86,10 @@ The terms used here are explained further at
 [how it works](how-it-works.html).
 
 The 'Our name' line identifies the local weave router as a peer in the
-weave network. It displays both the peer name and the peer's nickname
-in parenthesis; the peer name defaults to a MAC address, whilst the
-nickname defaults to the name of the host on which the weave container
-was launched. If desired the nickname can be overriden by supplying
-the `-nickname` argument to `weave launch`.
+weave network, displaying the peer name followed by the peer's nickname
+in parenthesis. The nickname defaults to the name of the host on which
+the weave container was launched; if desired it can be overriden by
+supplying the `-nickname` argument to `weave launch`.
 
 The 'Sniffing traffic' line shows details of the virtual ethernet
 interface that weave is using to receive packets on the local

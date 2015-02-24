@@ -7,7 +7,8 @@ layout: default
 
 A weave network consists of a number of 'peers' - weave routers
 residing on different hosts. Each peer has a name, which tends to
-remain the same over restarts, and a unique identifier (UID) which is
+remain the same over restarts, a human friendly nickname for use in
+status and logging output and a unique identifier (UID) which is
 different each time it is run.  These are opaque identifiers as far as
 the router is concerned, although the name defaults to a MAC address.
 
@@ -147,6 +148,8 @@ The topology update payload is laid out like this:
     +-----------------------------------+
     | Peer 1: Name                      |
     +-----------------------------------+
+    | Peer 1: NickName                  |
+    +-----------------------------------+
     | Peer 1: UID                       |
     +-----------------------------------+
     | Peer 1: Version number            |
@@ -156,6 +159,8 @@ The topology update payload is laid out like this:
     |                ...                |
     +-----------------------------------+
     | Peer N: Name                      |
+    +-----------------------------------+
+    | Peer N: NickName                  |
     +-----------------------------------+
     | Peer N: UID                       |
     +-----------------------------------+
