@@ -32,3 +32,6 @@ weavedns/weavedns
 tools/bin
 tools/build
 releases
+weave.tar
+weavedns.tar
+weavetools.tar
