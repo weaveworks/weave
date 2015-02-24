@@ -94,7 +94,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-    	nickName = osHostname
+		nickName = osHostname
 	}
 
 	ourName, err := weave.PeerNameFromUserInput(routerName)
@@ -132,7 +132,7 @@ func main() {
 	}
 
 	router := weave.NewRouter(iface, ourName, nickName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
-	log.Println("Our name is", router.Ourself.Name, "(" + router.Ourself.NickName + ")")
+	log.Println("Our name is", router.Ourself.Name, "("+router.Ourself.NickName+")")
 	router.Start()
 	for _, peer := range peers {
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
