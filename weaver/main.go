@@ -50,7 +50,7 @@ func main() {
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
-	flag.StringVar(&nickName, "nickname", "", "nickname of host (defaults to container hostname)")
+	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0, i.e. don't wait)")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
