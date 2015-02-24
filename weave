@@ -59,7 +59,7 @@ exec_remote() {
         -e WEAVE_PASSWORD="$WEAVE_PASSWORD" \
         -e DOCKER_BRIDGE="$DOCKER_BRIDGE" \
         -e PROCFS=/hostproc --privileged --net=host \
-        $BASE_TOOLS_IMAGE --local "$@"
+        $TOOLS_IMAGE --local "$@"
 }
 
 if [ "$1" = "--local" ]; then
