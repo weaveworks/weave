@@ -16,8 +16,8 @@ libraries](http://fedoraproject.org/wiki/Packaging:Guidelines#Packaging_Static_L
 So we recommend building under Ubuntu.
 
 You can also build in a container under any system that supports
-Docker.  And naturally, you can run Ubuntu in a VM and build
-there.  These options are described below.
+Docker.  And you can run Ubuntu in a VM and build there.  These
+options are described below.
 
 ## Building directly on Ubuntu
 
@@ -59,7 +59,16 @@ install them for each build.  In the `weave` directory, do:
 $ docker build -t zettio/weave-build build
 ```
 
-Then to actually build, do:
+Next we run a container based on that image. That container requires
+access to the Docker daemon on the host, via
+`/var/run/docker.sock`. If you are building under a Fedora or RHEL
+Docker host (or another distribution that uses SELinux), and you have
+SELinux set to enforcing mode, it will block attempts to access
+`/var/run/docker.sock` inside the container.  See
+[dpw/selinux-dockersock](https://github.com/dpw/selinux-dockersock)
+for a way to work around this problem.
+
+To perform a build, run:
 
 ```bash
 $ docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-build https://github.com/zettio/weave.git
@@ -67,18 +76,10 @@ $ docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-build htt
 
 This will clone the weave git repository, then do the build.
 
-Note the `-v` option to give the container access to the Docker daemon
-on the host.  When the build completes, the resulting images are
-stored in docker on the host, as when building directly under
-Ubuntu. The exported images are present under `/var/tmp/` inside the
-container, and can be retrieved using `docker cp` if needed.
-
-If you are building under a Fedora or RHEL Docker host (or another
-distribution that uses SELinux), and you have SELinux set to enforcing
-mode, it will block attempts to access `/var/run/docker.sock` inside
-the container.  See
-[dpw/selinux-dockersock](https://github.com/dpw/selinux-dockersock)
-for a way to work around this problem.
+When the build completes, the resulting images are stored in docker on
+the host, as when building directly under Ubuntu. The exported images
+are present under `/var/tmp/` inside the container, and can be
+retrieved using `docker cp` if needed.
 
 The container arguments are passed to `git clone`, so for example, you
 can build from a forked repository and a specific branch with:
