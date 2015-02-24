@@ -90,11 +90,10 @@ func main() {
 	}
 
 	if nickName == "" {
-		osHostname, err := os.Hostname()
+		nickName, err = os.Hostname()
 		if err != nil {
 			log.Fatal(err)
 		}
-		nickName = osHostname
 	}
 
 	ourName, err := weave.PeerNameFromUserInput(routerName)
