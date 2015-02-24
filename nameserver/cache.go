@@ -199,7 +199,6 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, flags uint8) {
 		if len(c.entries) >= c.Capacity {
 			c.removeOldest(1)
 		}
-
 		c.entries[question] = newEntry(&question, reply, stResolved)
 	}
 }

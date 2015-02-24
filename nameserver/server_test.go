@@ -25,6 +25,7 @@ func TestUDPDNSServer(t *testing.T) {
 		nonLocalName    = "weave.works."
 		testAddr1       = "10.2.2.1"
 	)
+	dnsAddr := fmt.Sprintf("127.0.0.1:%d", testPort)
 	testCIDR1 := testAddr1 + "/24"
 
 	InitDefaultLogging(true)
@@ -133,6 +134,7 @@ func TestTCPDNSServer(t *testing.T) {
 	InitDefaultLogging(true)
 	var zone = new(ZoneDb)
 
+	// generate a list of `numAnswers` IP addresses
 	var addrs []net.IP
 	bs := make([]byte, 4)
 	for i := 0; i < numAnswers; i++ {
@@ -155,7 +157,7 @@ func TestTCPDNSServer(t *testing.T) {
 		w.WriteMsg(m)
 	}
 
-	// Run another DNS server for fallback
+	t.Logf("Running a DNS fallback server with UDP")
 	us, fallbackUdpAddr, err := RunLocalUDPServer(t, "127.0.0.1:0", fallbackUDPHandler)
 	wt.AssertNoErr(t, err)
 	defer us.Shutdown()
@@ -163,7 +165,7 @@ func TestTCPDNSServer(t *testing.T) {
 	_, fallbackPort, err := net.SplitHostPort(fallbackUdpAddr)
 	wt.AssertNoErr(t, err)
 
-	// start the TCP server on the same port as the UDP server
+	t.Logf("Starting another fallback server, with TCP, on the same port as the UDP server")
 	fallbackTcpAddr := fmt.Sprintf("127.0.0.1:%s", fallbackPort)
 	ts, fallbackTcpAddr, err := RunLocalTCPServer(t, fallbackTcpAddr, fallbackTCPHandler)
 	wt.AssertNoErr(t, err)
