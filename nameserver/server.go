@@ -60,7 +60,8 @@ type DNSServer struct {
 	numLocalWorkers  int
 	localQueriesChan chan dnsWorkItem // channel for sending queries to workers
 	recQueriesChan   chan dnsWorkItem // ... and the equivalent for recursive resolutions
-	wg               *sync.WaitGroup
+	workersWg        *sync.WaitGroup
+	listenersWg      *sync.WaitGroup
 
 	Domain     string // the local domain
 	IfaceName  string // the interface where mDNS is working on
@@ -78,7 +79,8 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 		numRecWorkers:    DEFAULT_RESOLV_WORKERS,
 		localQueriesChan: make(chan dnsWorkItem),
 		recQueriesChan:   make(chan dnsWorkItem),
-		wg:               new(sync.WaitGroup),
+		workersWg:        new(sync.WaitGroup),
+		listenersWg:      new(sync.WaitGroup),
 
 		Domain:     DEFAULT_LOCAL_DOMAIN,
 		IfaceName:  DEFAULT_IFACE_NAME,
@@ -120,15 +122,6 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if config.NumRecursiveWorkers > 0 {
 		s.numRecWorkers = config.NumRecursiveWorkers
 	}
-	if len(config.UpstreamCfgFile) == 0 {
-		config.UpstreamCfgFile = DEFAULT_CLI_CFG_FILE
-	}
-	if config.UpstreamCfg == nil {
-		if config.UpstreamCfg, err = dns.ClientConfigFromFile(config.UpstreamCfgFile); err != nil {
-			return nil, err
-		}
-	}
-
 	s.mdnsServer, err := NewMDNSServer(config.Zone)
 	if err != nil {
 		return
@@ -235,11 +228,10 @@ func (s *DNSServer) Start() error {
 		return err
 	}
 
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
+	s.listenersWg.Add(2)
 
 	go func() {
-		defer wg.Done()
+		defer s.listenersWg.Done()
 		Debug.Printf("[dns] Listening on %s (UDP)", s.ListenAddr)
 		err = s.udpSrv.ListenAndServe()
 		CheckFatal(err)
@@ -247,7 +239,7 @@ func (s *DNSServer) Start() error {
 	}()
 
 	go func() {
-		defer wg.Done()
+		defer s.listenersWg.Done()
 		Debug.Printf("[dns] Listening on %s (TCP)", s.ListenAddr)
 		err = s.tcpSrv.ListenAndServe()
 		CheckFatal(err)
@@ -256,16 +248,17 @@ func (s *DNSServer) Start() error {
 
 	// Start the resolution workers
 	for i := 0; i < s.config.NumLocalWorkers; i++ {
-		s.wg.Add(1)
-		go s.localLookupWorker()
+		s.workersWg.Add(1)
+		go s.localLookupWorker(i)
 	}
 	for i := 0; i < s.config.NumRecursiveWorkers; i++ {
-		s.wg.Add(1)
-		go s.recLookupWorker()
+		s.workersWg.Add(1)
+		go s.recLookupWorker(i)
 	}
 
-	// Waiting for all goroutines to finish (otherwise they die as main routine dies)
-	wg.Wait()
+	// Wait for all goroutines to finish
+	s.workersWg.Wait()
+	s.listenersWg.Wait()
 
 	Info.Printf("[dns] Server exiting...")
 	return nil
@@ -273,29 +266,43 @@ func (s *DNSServer) Start() error {
 
 // Perform a graceful shutdown
 func (s *DNSServer) Stop() error {
+	// Stop the listeners/handlers
 	if err := s.tcpSrv.Shutdown(); err != nil {
 		return err
 	}
 	if err := s.udpSrv.Shutdown(); err != nil {
 		return err
 	}
-	// TODO: shutdown the mDNS client/server
+	s.listenersWg.Wait()
+
+	// stop the workers by closing the items channels and wait for them...
+	close(s.localQueriesChan)
+	close(s.recQueriesChan)
+	s.workersWg.Wait()
+
+	// shutdown the mDNS server
+	s.mdnsSrv.Stop()
+
 	return nil
 }
 
 // Worker for local resolutions
-func (s *DNSServer) localLookupWorker() {
-	defer s.wg.Done()
+func (s *DNSServer) localLookupWorker(numWorker int) {
+	defer s.workersWg.Done()
 
 	// each local worker has its own mDNS client for resolving queries
 	mdnsCli, err := NewMDNSClient()
 	if err != nil {
+		Error.Printf("[dns] Could not initialize mDNS client in local worker: %s", err)
 		return
 	}
 	err = mdnsCli.Start(s.config.Iface)
-	CheckFatal(err)
+	if err != nil {
+		Error.Printf("[dns] Could not start mDNS client in local worker: %s", err)
+		return
+	}
 
-	Debug.Printf("[dns] Starting local queries worker")
+	Debug.Printf("[dns] Starting local queries worker #%d", numWorker)
 	for query := range s.localQueriesChan {
 		r := query.r
 		q := r.Question[0]
@@ -348,11 +355,13 @@ func (s *DNSServer) localLookupWorker() {
 			s.cache.Put(r, makeDNSFailResponse(r), 0, now)
 		}
 	}
+
+	Debug.Printf("[dns] Exiting local queries worker #%d", numWorker)
 }
 
 // Worker for recursive resolutions
-func (s *DNSServer) recLookupWorker() {
-	defer s.wg.Done()
+func (s *DNSServer) recLookupWorker(numWorker int) {
+	defer s.workersWg.Done()
 
 	// each worker can use one of these two clients for forwarding queries, depending
 	// on the protocol used by the client for querying us...
@@ -361,7 +370,7 @@ func (s *DNSServer) recLookupWorker() {
 
 	// When we receive a request for a name outside of our '.weave.local.'
 	// domain, ask the configured DNS server as a fallback.
-	Debug.Printf("[dns] Starting recursive queries worker")
+	Debug.Printf("[dns] Starting recursive queries worker #%d", numWorker)
 	for query := range s.recQueriesChan {
 		r := query.r
 		proto := query.protocol
@@ -404,4 +413,6 @@ func (s *DNSServer) recLookupWorker() {
 			s.cache.Put(r, makeDNSFailResponse(r), 0, now)
 		}
 	}
+
+	Debug.Printf("[dns] Exiting recursive queries worker #%d", numWorker)
 }

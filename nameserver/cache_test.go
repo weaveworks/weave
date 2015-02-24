@@ -14,7 +14,7 @@ import (
 func TestCacheLength(t *testing.T) {
 	InitDefaultLogging(true)
 
-	const cacheLen := 128
+	const cacheLen = 128
 
 	l, err := NewCache(cacheLen)
 	wt.AssertNoErr(t, err)
@@ -41,7 +41,7 @@ func TestCacheLength(t *testing.T) {
 func TestCacheBlockingOps(t *testing.T) {
 	InitDefaultLogging(true)
 
-	const cacheLen := 256
+	const cacheLen = 256
 
 	l, err := NewCache(cacheLen)
 	wt.AssertNoErr(t, err)
@@ -62,7 +62,7 @@ func TestCacheBlockingOps(t *testing.T) {
 			_, err := l.Get(request, time.Now())
 			wt.AssertNoErr(t, err)
 			t.Logf("Waiting for %s...", request.Question[0].Name)
-			r, err = l.Wait(request, 1 * time.Second, time.Now())
+			r, err := l.Wait(request, 1 * time.Second, time.Now())
 			t.Logf("Obtained response for %s:\n%s", request.Question[0].Name, r)
 			wt.AssertNoErr(t, err)
 		}(questionMsg)

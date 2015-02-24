@@ -135,6 +135,7 @@ func (e *entry) waitReply(request *dns.Msg, timeout time.Duration, now time.Time
 	return nil, errCouldNotResolve
 }
 
+// Invalidate the entry, so the cached value cannot be considered useful
 func (e *entry) invalidate(now time.Time) {
 	if e.Status != stPending {
 		e.validUntil = now.Add(time.Duration(defPendingTimeout) * time.Second)

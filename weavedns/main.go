@@ -10,6 +10,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
+	"runtime"
 )
 
 var version = "(unreleased version)"
@@ -36,7 +39,7 @@ func main() {
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
-	flag.StringVar(&fallback, "fallback", "", "fallback server and port (ie, '8.8.8.8:53')")
+	flag.StringVar(&fallback, "fallback", "", "force a fallback (ie, '8.8.8.8:53') instead of /etc/resolv.conf values")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	flag.Parse()
@@ -88,8 +91,30 @@ func main() {
 	if err != nil {
 		Error.Fatal("Failed to initialize the WeaveDNS server", err)
 	}
+
+	Debug.Printf("Starting the signals handler")
+	go handleSignals(srv)
+
 	err = srv.Start()
 	if err != nil {
 		Error.Fatal("Failed to start the WeaveDNS server", err)
+	}
+}
+
+func handleSignals(s *weavedns.DNSServer) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT)
+	buf := make([]byte, 1<<20)
+	for {
+		sig := <-sigs
+		switch sig {
+		case syscall.SIGINT:
+			Info.Printf("=== received SIGINT ===\n*** exiting\n")
+			s.Stop()
+			os.Exit(0)
+		case syscall.SIGQUIT:
+			stacklen := runtime.Stack(buf, true)
+			Info.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
+		}
 	}
 }
