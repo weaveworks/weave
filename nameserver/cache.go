@@ -63,6 +63,10 @@ func newEntry(question *dns.Question, reply *dns.Msg, status uint8, now time.Tim
 // Get a copy of the reply stored in the entry, but with some values adjusted like the TTL
 // (in the future, some other transformation could be done, like a round-robin of the responses...)
 func (e *entry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error) {
+	if e.Status != stResolved {
+		return nil, nil
+	}
+
 	// if the reply has expired or is invalid, force the caller to start a new resolution
 	if e.hasExpired(now) {
 		return nil, nil

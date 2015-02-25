@@ -22,7 +22,7 @@ func TestCacheLength(t *testing.T) {
 	insTime := time.Now()
 
 	t.Logf("Inserting 256 questions in the cache at '%s', with TTL from 0 to 255", insTime)
-	for i := 0; i < cacheLen * 2; i++ {
+	for i := 0; i < cacheLen*2; i++ {
 		questionMsg := new(dns.Msg)
 		questionMsg.SetQuestion(fmt.Sprintf("name%d", i), dns.TypeA)
 		questionMsg.RecursionDesired = true
@@ -57,14 +57,23 @@ func TestCacheEntries(t *testing.T) {
 	l, err := NewCache(cacheLen)
 	wt.AssertNoErr(t, err)
 
-	t.Logf("Trying to get a name")
 	questionMsg := new(dns.Msg)
 	questionMsg.SetQuestion("some.name", dns.TypeA)
 	questionMsg.RecursionDesired = true
+
+	t.Logf("Trying to get a name")
 	resp, err := l.Get(questionMsg, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp != nil {
-		t.Error("Did not expect a reponse from Get() yet")
+		t.Logf("Got '%s'", resp)
+		t.Error("ERROR: Did not expect a reponse from Get() yet")
+	}
+	t.Logf("Trying to get it again")
+	resp, err = l.Get(questionMsg, time.Now())
+	wt.AssertNoErr(t, err)
+	if resp != nil {
+		t.Logf("Got '%s'", resp)
+		t.Error("ERROR: Did not expect a reponse from Get() yet")
 	}
 
 	t.Logf("Inserting the reply")
@@ -74,21 +83,49 @@ func TestCacheEntries(t *testing.T) {
 	reply := makeAddressReply(questionMsg, question, ips)
 	l.Put(questionMsg, reply, 0, time.Now())
 
-	t.Logf("Checking we can Get() the reply")
-	resp, err = l.Get(questionMsg, time.Now())
+	timeGet1 := time.Now()
+	t.Logf("Checking we can Get() the reply now")
+	resp, err = l.Get(questionMsg, timeGet1)
 	wt.AssertNoErr(t, err)
 	if resp == nil {
-		t.Error("Did expect a reponse from Get()")
+		t.Error("ERROR: Did expect a reponse from Get()")
 	}
+	t.Logf("Received '%s'", resp.Answer[0])
+	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
+	ttlGet1 := resp.Answer[0].Header().Ttl
 
 	t.Logf("Checking a Wait() with timeout=0 gets the same result")
-	resp, err = l.Wait(questionMsg, time.Duration(0) * time.Second, time.Now())
+	resp, err = l.Wait(questionMsg, time.Duration(0)*time.Second, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp == nil {
-		t.Error("Did expect a reponse from Get()")
+		t.Error("ERROR: Did expect a reponse from Wait(timeout=0)")
+	}
+	t.Logf("Received '%s'", resp.Answer[0])
+	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
+
+	timeGet2 := timeGet1.Add(time.Duration(1) * time.Second)
+	t.Logf("Checking that a second Get(), after 1 second, gets the same result, but with reduced TTL")
+	resp, err = l.Get(questionMsg, timeGet2)
+	wt.AssertNoErr(t, err)
+	if resp == nil {
+		t.Error("ERROR: Did expect a reponse from the second Get()")
+	}
+	t.Logf("Received '%s'", resp.Answer[0])
+	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
+	ttlGet2 := resp.Answer[0].Header().Ttl
+	if ttlGet1-ttlGet2 != 1 {
+		t.Errorf("ERROR: TTL difference is not 1 (it is %d)", ttlGet1-ttlGet2)
+	}
+
+	timeGet3 := timeGet1.Add(time.Duration(localTTL) * time.Second)
+	t.Logf("Checking that a third Get(), after %d second, gets no result", localTTL)
+	resp, err = l.Get(questionMsg, timeGet3)
+	wt.AssertNoErr(t, err)
+	if resp != nil {
+		t.Logf("Got '%s'", resp)
+		t.Error("ERROR: Did NOT expect a reponse from the second Get()")
 	}
 }
-
 
 // Check that waiters are unblocked when the name they are waiting for is inserted
 func TestCacheBlockingOps(t *testing.T) {
@@ -115,7 +152,7 @@ func TestCacheBlockingOps(t *testing.T) {
 			_, err := l.Get(request, time.Now())
 			wt.AssertNoErr(t, err)
 			t.Logf("Waiting for %s...", request.Question[0].Name)
-			r, err := l.Wait(request, 1 * time.Second, time.Now())
+			r, err := l.Wait(request, 1*time.Second, time.Now())
 			t.Logf("Obtained response for %s:\n%s", request.Question[0].Name, r)
 			wt.AssertNoErr(t, err)
 		}(questionMsg)
@@ -131,5 +168,3 @@ func TestCacheBlockingOps(t *testing.T) {
 		l.Put(requestMsg, reply, 0, time.Now())
 	}
 }
-
-
