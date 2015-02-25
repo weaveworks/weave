@@ -79,11 +79,7 @@ clean:
 	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
 	$(SUDO) rm -rf $(WEAVETOOLS_EXES)
 
-prerequisites:
-	$(SUDO) apt-get -y update
-	$(SUDO) apt-get -y install --no-install-recommends build-essential git ca-certificates golang docker.io mercurial libpcap-dev
-
-build: prerequisites
+build:
 	$(SUDO) go clean -i net
 	$(SUDO) go install -tags netgo std
 	$(MAKE) build_weavetools_exes_in_container=
