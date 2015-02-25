@@ -11,8 +11,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"syscall"
 	"runtime"
+	"syscall"
 )
 
 var version = "(unreleased version)"
@@ -26,7 +26,11 @@ func main() {
 		fallback    string
 		dnsPort     int
 		httpPort    int
+		numLocWork  int
+		numRecWork  int
 		wait        int
+		timeout     int
+		udpbuf      int
 		watch       bool
 		debug       bool
 		err         error
@@ -40,6 +44,10 @@ func main() {
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
 	flag.StringVar(&fallback, "fallback", "", "force a fallback (ie, '8.8.8.8:53') instead of /etc/resolv.conf values")
+	flag.IntVar(&numLocWork, "localres", 0, "number of concurrent local resolvers")
+	flag.IntVar(&numRecWork, "recres", 0, "number of concurrent recursive resolvers")
+	flag.IntVar(&timeout, "timeout", 0, "timeout for resolutions")
+	flag.IntVar(&udpbuf, "udpbuf", 0, "UDP buffer length")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	flag.Parse()
@@ -73,8 +81,12 @@ func main() {
 	}
 
 	srvConfig := weavedns.DNSServerConfig{
-		Port:        dnsPort,
-		LocalDomain: localDomain,
+		Port:                dnsPort,
+		LocalDomain:         localDomain,
+		NumLocalWorkers:     numLocWork,
+		NumRecursiveWorkers: numRecWork,
+		Timeout:             timeout,
+		UdpBufLen:           udpbuf,
 	}
 
 	if len(fallback) > 0 {

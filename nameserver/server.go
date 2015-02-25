@@ -18,6 +18,7 @@ const (
 	DEFAULT_RESOLV_WORKERS = 8                  // default number of resolution workers
 	DEFAULT_TIMEOUT        = 5                  // default timeout for DNS resolutions
 	DEFAULT_IFACE_NAME   = "default interface"
+    DEFAULT_RESOLV_TRIES   = 3                  // max # of times a worker tries to resolve a query
 )
 
 type DNSServerConfig struct {
@@ -37,6 +38,8 @@ type DNSServerConfig struct {
 	NumRecursiveWorkers int
 	// (Optional) timeout for DNS queries
 	Timeout int
+	// (Optional) UDP buffer length
+	UdpBufLen int
 }
 
 // a request for a resolution worker
@@ -55,6 +58,7 @@ type DNSServer struct {
 	iface    *net.Interface
 	upstream *dns.ClientConfig
 	timeout  int
+	udpBuf   int
 
 	numRecWorkers    int
 	numLocalWorkers  int
@@ -74,6 +78,7 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 		zone:    zone,
 		iface:   iface,
 		timeout: DEFAULT_TIMEOUT,
+		udpBuf:  DEFAULT_UDP_BUFLEN,
 		
 		numLocalWorkers:  DEFAULT_RESOLV_WORKERS,
 		numRecWorkers:    DEFAULT_RESOLV_WORKERS,
@@ -107,15 +112,9 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if config.Timeout > 0 {
 		s.timeout = config.Timeout
 	}
-	if len(config.UpstreamCfgFIle) == 0 {
-		config.UpstreamCfgFile = DEFAULT_CLI_CFG_FILE
+	if config.UdpBufLen > 0 {
+		s.udpBuf = config.UdpBufLen 
 	}
-	if config.UpstreamCfg == nil {
-		if config.UpstreamCfg, err = dns.ClientConfigFromFile(config.UpstreamCfgFile); err != nil {
-			return nil, err
-		}
-	}
-
 	if config.NumLocalWorkers > 0 {
 		s.numLocalWorkers = config.NumLocalWorkers
 	}
@@ -164,11 +163,14 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 // return a handler for a given protocol and channel
 func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsWorkItem) dns.HandlerFunc {
 	tout := time.Duration(s.timeout) * time.Second
-	resolveUntil := time.Now().Add(tout)
 
 	return func(w dns.ResponseWriter, r *dns.Msg) {
+		now := time.Now()
+		resolveUntil := now.Add(tout)
+		remTries := DEFAULT_RESOLV_TRIES
+
+		// this loop can exit 1) due to a reply!=nil 2) with a timeout on Wait()
 		for {
-			now := time.Now()
 			q := r.Question[0]
 			Debug.Printf("[dns] Query: %+v", q)
 			reply, err := s.cache.Get(r, now)
@@ -192,9 +194,10 @@ func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsWorkItem)
 
 			// we got no reply and no error from the cache: send the query to a worker and wait
 			queriesChan <- dnsWorkItem{protocol: protocol, r: r}
-			Debug.Printf("[dns] Waiting up to %d seconds for %s-query for \"%s\"",
-				s.config.Timeout, dns.TypeToString[q.Qtype], q.Name)
-			reply, err = s.cache.Wait(r, resolveUntil.Sub(now), now)
+			remTime := resolveUntil.Sub(now)
+			Debug.Printf("[dns] Waiting up to %.2f secs for %s-query for \"%s\"",
+				remTime.Seconds(), dns.TypeToString[q.Qtype], q.Name)
+			reply, err = s.cache.Wait(r, remTime, now)
 			if err != nil {
 				if err == errTimeout {
 					Debug.Printf("[dns msgid %d] Timeout while waiting for response", r.MsgHdr.Id)
@@ -211,8 +214,17 @@ func (s *DNSServer) makeHandler(protocol string, queriesChan chan<- dnsWorkItem)
 				return
 			}
 
+			remTries -= 1
+			if remTries == 0 {
+				Info.Printf("[dns msgid %d] Too many tries for %s-query for \"%s\"",
+					r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
+				w.WriteMsg(makeDNSFailResponse(r))
+				return
+			}
+
 			Info.Printf("[dns msgid %d] No results for %s-query for \"%s\": retrying...",
 				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
+			now = time.Now()
 		}
 	}
 }
@@ -365,7 +377,7 @@ func (s *DNSServer) recLookupWorker(numWorker int) {
 
 	// each worker can use one of these two clients for forwarding queries, depending
 	// on the protocol used by the client for querying us...
-	udpClient := &dns.Client{Net: "udp", UDPSize: DEFAULT_UDP_BUFLEN}
+	udpClient := &dns.Client{Net: "udp", UDPSize: s.udpBuf}
 	tcpClient := &dns.Client{Net: "tcp"}
 
 	// When we receive a request for a name outside of our '.weave.local.'

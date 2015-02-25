@@ -152,6 +152,7 @@ func TestCacheEntries(t *testing.T) {
 	}
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
+	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.1.3", "IP address")
 	if resp.Answer[0].Header().Ttl != localTTL {
 		t.Errorf("ERROR: TTL is not %d (it is %d)", localTTL, resp.Answer[0].Header().Ttl)
 	}
