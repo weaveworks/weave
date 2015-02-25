@@ -12,7 +12,7 @@ const (
 	HttpPort           = Port + 1
 	DefaultPMTU        = 65535
 	MaxUDPPacketSize   = 65536
-	ChannelSize        = 16
+	ChannelSize        = 1024
 	UDPNonceSendAt     = 8192
 	FragTestSize       = 60001
 	PMTUDiscoverySize  = 60000
