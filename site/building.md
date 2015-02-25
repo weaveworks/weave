@@ -60,7 +60,7 @@ that has all the prerequisites.  This avoids the need to download and
 install them for each build.  In the `weave` directory, do:
 
 ```bash
-$ docker build -t zettio/weave-build build
+$ sudo docker build -t zettio/weave-build build
 ```
 
 Next we run a container based on that image. That container requires
@@ -75,7 +75,7 @@ for a way to work around this problem.
 To perform a build, run:
 
 ```bash
-$ docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-build https://github.com/zettio/weave.git
+$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-build https://github.com/zettio/weave.git
 ```
 
 This will clone the weave git repository, then do the build.
@@ -89,7 +89,7 @@ The container arguments are passed to `git clone`, so for example, you
 can build from a forked repository and a specific branch with:
 
 ```bash
-$ docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-build -b <branch name> <repo URI>
+$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-build -b <branch name> <repo URI>
 ```
 
 Alternatively, you might want to build from a weave source tree
@@ -99,7 +99,7 @@ to bind the bind your go workspace containing the weave repository to
 passed in this case:
 
 ```bash
-$ docker run -v /var/run/docker.sock:/var/run/docker.sock -v <host gopath>:/home/go zettio/weave-build
+$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock -v <host gopath>:/home/go zettio/weave-build
 ```
 
 This will leave the intermediate build artifacts on the host, so that
@@ -154,7 +154,7 @@ The docker daemon is also running in this VM, so you can then do
 
 ```bash
 vm$ sudo ./weave launch
-vm$ docker ps
+vm$ sudo docker ps
 ```
 
 and so on.
