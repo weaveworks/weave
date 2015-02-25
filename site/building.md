@@ -22,8 +22,8 @@ options are described below.
 ## Building directly on Ubuntu
 
 The weave git repository should be cloned into
-`$GOPATH/src/github.com/zettio/weave`, in accordance with (the go
-workspace conventions)[https://golang.org/doc/code.html#Workspaces]:
+`$GOPATH/src/github.com/zettio/weave`, in accordance with [the go
+workspace conventions](https://golang.org/doc/code.html#Workspaces):
 
 ```bash
 $ WEAVE=github.com/zettio/weave
@@ -32,8 +32,8 @@ $ cd $GOPATH/src/$WEAVE
 ```
 
 Some prerequisites are needed to build weave.  First, install Docker
-if you haven't already, by following the instructions (on the Docker
-site)[https://docs.docker.com/installation/ubuntulinux/].  Note that
+if you haven't already, by following the instructions [on the Docker
+site](https://docs.docker.com/installation/ubuntulinux/).  Note that
 we recommend using the Docker-maintained `lxc-docker` package, rather
 than the `docker.io` package which contains a very old version.  Then
 install the other prerequisites for building with:
