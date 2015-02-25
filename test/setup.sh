@@ -13,7 +13,7 @@ echo Copying weave images and script to hosts
 for HOST in $HOSTS; do
     docker_on $HOST load -i ../weave.tar
     docker_on $HOST load -i ../weavedns.tar
-    docker_on $HOST load -i ../weavetools.tar
+    docker_on $HOST load -i ../weaveexec.tar
     run_on $HOST mkdir -p `dirname $WEAVE`
     cat ../weave         | run_on $HOST sh -c "cat > $WEAVE"
     cat ../bin/docker-ns | run_on $HOST sh -c "cat > $DOCKER_NS"

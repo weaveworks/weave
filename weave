@@ -45,10 +45,10 @@ PROCFS=${PROCFS:-/proc}
 
 BASE_IMAGE=$DOCKERHUB_USER/weave
 BASE_DNS_IMAGE=$DOCKERHUB_USER/weavedns
-BASE_TOOLS_IMAGE=$DOCKERHUB_USER/weavetools
+BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
-TOOLS_IMAGE=$BASE_TOOLS_IMAGE:$IMAGE_VERSION
+EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 
 exec_remote() {
     docker run -t --rm \
@@ -59,7 +59,7 @@ exec_remote() {
         -e WEAVE_PASSWORD="$WEAVE_PASSWORD" \
         -e DOCKER_BRIDGE="$DOCKER_BRIDGE" \
         -e PROCFS=/hostproc --privileged --net=host \
-        $TOOLS_IMAGE --local "$@"
+        $EXEC_IMAGE --local "$@"
 }
 
 if [ "$1" = "--local" ]; then
@@ -496,7 +496,7 @@ DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
 
 case "$COMMAND" in
     setup)
-        for img in $IMAGE $DNS_IMAGE $TOOLS_IMAGE ; do
+        for img in $IMAGE $DNS_IMAGE $EXEC_IMAGE ; do
             docker pull $img
         done
         ;;
@@ -585,14 +585,14 @@ case "$COMMAND" in
         echo weave script $SCRIPT_VERSION
         ask_version $CONTAINER_NAME $IMAGE
         ask_version $DNS_CONTAINER_NAME $DNS_IMAGE
-        if ! TOOLS_IMAGE_ID=$(docker inspect --format='{{.Id}}' $TOOLS_IMAGE 2>/dev/null) ; then
-            echo "Unable to find $TOOLS_IMAGE image." >&2
+        if ! EXEC_IMAGE_ID=$(docker inspect --format='{{.Id}}' $EXEC_IMAGE 2>/dev/null) ; then
+            echo "Unable to find $EXEC_IMAGE image." >&2
         else
-            TOOLS_VERSION=$(docker images --no-trunc | grep $TOOLS_IMAGE_ID | grep -v latest | tr -s ' ' | cut -d ' ' -f 2 | tr "\n" ' ')
-            if [ -n "$TOOLS_VERSION" ] ; then
-                echo "weave tools $TOOLS_VERSION"
+            EXEC_VERSION=$(docker images --no-trunc | grep $EXEC_IMAGE_ID | grep -v latest | tr -s ' ' | cut -d ' ' -f 2 | tr "\n" ' ')
+            if [ -n "$EXEC_VERSION" ] ; then
+                echo "weave exec $EXEC_VERSION"
             else
-                echo "weave tools (unreleased version)"
+                echo "weave exec (unreleased version)"
             fi
         fi
         ;;

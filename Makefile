@@ -1,4 +1,4 @@
-PUBLISH=publish_weave publish_weavedns publish_weavetools
+PUBLISH=publish_weave publish_weavedns publish_weaveexec
 
 .DEFAULT: all
 .PHONY: all update tests publish $(PUBLISH) clean prerequisites build
@@ -12,12 +12,12 @@ WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
-WEAVETOOLS_IMAGE=$(DOCKERHUB_USER)/weavetools
+WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 WEAVER_EXPORT=weave.tar
 WEAVEDNS_EXPORT=weavedns.tar
-WEAVETOOLS_EXPORT=weavetools.tar
+WEAVEEXEC_EXPORT=weaveexec.tar
 
-all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
+all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 update:
 	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE))
@@ -45,10 +45,10 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-$(WEAVETOOLS_EXPORT): tools/Dockerfile weave
-	cp weave tools/weave
-	$(SUDO) docker build -t $(WEAVETOOLS_IMAGE) tools
-	$(SUDO) docker save $(WEAVETOOLS_IMAGE):latest > $@
+$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile weave
+	cp weave weaveexec/weave
+	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) weaveexec
+	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
 
 # Add more directories in here as more tests are created
 tests:
@@ -63,8 +63,8 @@ $(PUBLISH): publish_%:
 publish: $(PUBLISH)
 
 clean:
-	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE)
-	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
+	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
+	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 build:
 	$(SUDO) go clean -i net
