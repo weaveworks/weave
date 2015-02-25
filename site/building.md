@@ -81,9 +81,7 @@ $ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-buil
 This will clone the weave git repository, then do the build.
 
 When the build completes, the resulting images are stored in docker on
-the host, as when building directly under Ubuntu. The exported images
-are present under `/var/tmp/` inside the container, and can be
-retrieved using `docker cp` if needed.
+the host, as when building directly under Ubuntu.
 
 The container arguments are passed to `git clone`, so for example, you
 can build from a forked repository and a specific branch with:
