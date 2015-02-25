@@ -37,6 +37,7 @@ func main() {
 		justVersion bool
 		ifaceName   string
 		routerName  string
+		nickName    string
 		password    string
 		wait        int
 		debug       bool
@@ -49,6 +50,7 @@ func main() {
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
+	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0, i.e. don't wait)")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
@@ -87,6 +89,13 @@ func main() {
 		routerName = iface.HardwareAddr.String()
 	}
 
+	if nickName == "" {
+		nickName, err = os.Hostname()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	ourName, err := weave.PeerNameFromUserInput(routerName)
 	if err != nil {
 		log.Fatal(err)
@@ -121,8 +130,8 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	router := weave.NewRouter(iface, ourName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
-	log.Println("Our name is", router.Ourself.Name)
+	router := weave.NewRouter(iface, ourName, nickName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
+	log.Println("Our name is", router.Ourself.Name, "("+router.Ourself.NickName+")")
 	router.Start()
 	for _, peer := range peers {
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {

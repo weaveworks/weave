@@ -17,7 +17,7 @@ import (
 // - non-gc of peers that are only referenced locally
 
 func newNode(name PeerName) (*Peer, *Peers) {
-	peer := NewPeer(name, 0, 0)
+	peer := NewPeer(name, "", 0, 0)
 	peers := NewPeers(peer, func(*Peer) {})
 	peers.FetchWithDefault(peer)
 	return peer, peers
