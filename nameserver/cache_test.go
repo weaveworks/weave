@@ -61,6 +61,8 @@ func TestCacheEntries(t *testing.T) {
 	questionMsg.SetQuestion("some.name", dns.TypeA)
 	questionMsg.RecursionDesired = true
 
+	question := &questionMsg.Question[0]
+
 	t.Logf("Trying to get a name")
 	resp, err := l.Get(questionMsg, time.Now())
 	wt.AssertNoErr(t, err)
@@ -79,9 +81,8 @@ func TestCacheEntries(t *testing.T) {
 	t.Logf("Inserting the reply")
 	ip := net.ParseIP("10.0.1.1")
 	ips := []net.IP{ip}
-	question := &questionMsg.Question[0]
-	reply := makeAddressReply(questionMsg, question, ips)
-	l.Put(questionMsg, reply, 0, time.Now())
+	reply1 := makeAddressReply(questionMsg, question, ips)
+	l.Put(questionMsg, reply1, 0, time.Now())
 
 	timeGet1 := time.Now()
 	t.Logf("Checking we can Get() the reply now")
@@ -124,6 +125,35 @@ func TestCacheEntries(t *testing.T) {
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
 		t.Error("ERROR: Did NOT expect a reponse from the second Get()")
+	}
+
+	t.Logf("Checking that an Invalidate() results in Get() returning nothing")
+	l.Invalidate(questionMsg, timeGet1)
+	resp, err = l.Get(questionMsg, timeGet1)
+	wt.AssertNoErr(t, err)
+	if resp != nil {
+		t.Logf("Got '%s'", resp)
+		t.Error("ERROR: Did NOT expect a reponse after an Invalidate()")
+	}
+
+	t.Logf("Inserting a two replies for the same query")
+	timePut2 := time.Now()
+	reply2 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.2")})
+	l.Put(questionMsg, reply2, 0, timePut2)
+	timePut3 := timePut2.Add(time.Duration(1) * time.Second)
+	reply3 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.3")})
+	l.Put(questionMsg, reply3, 0, timePut3)
+
+	t.Logf("Checking we get the last one...")
+	resp, err = l.Get(questionMsg, timePut3)
+	wt.AssertNoErr(t, err)
+	if resp == nil {
+		t.Error("ERROR: Did expect a reponse from the Get()")
+	}
+	t.Logf("Received '%s'", resp.Answer[0])
+	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
+	if resp.Answer[0].Header().Ttl != localTTL {
+		t.Errorf("ERROR: TTL is not %d (it is %d)", localTTL, resp.Answer[0].Header().Ttl)
 	}
 }
 
