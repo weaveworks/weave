@@ -19,7 +19,7 @@ type mockChannelConnection struct {
 // We need to create some dummy channels otherwise tests hang on nil
 // channels when Router.OnGossip() calls async methods.
 func NewTestRouter(name PeerName) *Router {
-	router := NewRouter(nil, name, nil, 10, 1024, nil)
+	router := NewRouter(nil, name, "", nil, 10, 1024, nil)
 	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
 	router.Routes.queryChan = make(chan *Interaction, ChannelSize)
 	return router
@@ -35,8 +35,8 @@ func (router *Router) AddTestChannelConnection(r *Router) {
 	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
 
-	fromPeer := NewPeer(fromName, router.Ourself.Peer.UID, 0)
-	toPeer := NewPeer(toName, r.Ourself.Peer.UID, 0)
+	fromPeer := NewPeer(fromName, "", router.Ourself.Peer.UID, 0)
+	toPeer := NewPeer(toName, "", r.Ourself.Peer.UID, 0)
 
 	r.Peers.FetchWithDefault(fromPeer)    // Has side-effect of incrementing refcount
 	router.Peers.FetchWithDefault(toPeer) //
@@ -70,10 +70,10 @@ func TestGossipTopology(t *testing.T) {
 // the routers supplied as arguments, carrying across all UID and
 // version information.
 func (router *Router) tp(routers ...*Router) *Peer {
-	peer := NewPeer(router.Ourself.Peer.Name, router.Ourself.Peer.UID, 0)
+	peer := NewPeer(router.Ourself.Peer.Name, "", router.Ourself.Peer.UID, 0)
 	connections := make(map[PeerName]Connection)
 	for _, r := range routers {
-		p := NewPeer(r.Ourself.Peer.Name, r.Ourself.Peer.UID, r.Ourself.Peer.version)
+		p := NewPeer(r.Ourself.Peer.Name, "", r.Ourself.Peer.UID, r.Ourself.Peer.version)
 		connections[r.Ourself.Peer.Name] = newMockConnection(peer, p)
 	}
 	peer.SetVersionAndConnections(router.Ourself.Peer.version, connections)

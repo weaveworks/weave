@@ -128,7 +128,7 @@ func (peers *Peers) String() string {
 			if !conn.Established() {
 				established = " (unestablished)"
 			}
-			buf.WriteString(fmt.Sprintf("   -> %v [%v%s]\n", remoteName, conn.RemoteTCPAddr(), established))
+			buf.WriteString(fmt.Sprintf("   -> %v (%v) [%v%s]\n", remoteName, conn.Remote().NickName, conn.RemoteTCPAddr(), established))
 		})
 	})
 	return buf.String()
@@ -178,7 +178,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 	decoder := gob.NewDecoder(updateBuf)
 
 	for {
-		nameByte, uid, version, connsBuf, decErr := decodePeerNoConns(decoder)
+		nameByte, nickName, uid, version, connsBuf, decErr := decodePeerNoConns(decoder)
 		if decErr == io.EOF {
 			break
 		} else if decErr != nil {
@@ -186,7 +186,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			return
 		}
 		name := PeerNameFromBin(nameByte)
-		newPeer := NewPeer(name, uid, version)
+		newPeer := NewPeer(name, nickName, uid, version)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connsBuf)
 		existingPeer, found := peers.table[name]
@@ -257,6 +257,7 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	defer peer.RUnlock()
 
 	checkFatal(enc.Encode(peer.NameByte))
+	checkFatal(enc.Encode(peer.NickName))
 	checkFatal(enc.Encode(peer.UID))
 	checkFatal(enc.Encode(peer.version))
 
@@ -271,8 +272,11 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	checkFatal(enc.Encode(connsBuf.Bytes()))
 }
 
-func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, uid uint64, version uint64, conns []byte, err error) {
+func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, nickName string, uid uint64, version uint64, conns []byte, err error) {
 	if err = dec.Decode(&nameByte); err != nil {
+		return
+	}
+	if err = dec.Decode(&nickName); err != nil {
 		return
 	}
 	if err = dec.Decode(&uid); err != nil {

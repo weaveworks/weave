@@ -6,7 +6,7 @@ SCRIPT_VERSION="(unreleased version)"
 usage() {
     echo "Usage:"
     echo "weave setup"
-    echo "weave launch     [-password <password>] [-alloc <cidr>] <peer> ..."
+    echo "weave launch     [-password <password>] [-nickname <nickname>] [-alloc <cidr>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
     echo "weave run        [--with-dns] [<cidr>] <docker run args> ..."
@@ -512,18 +512,31 @@ case "$COMMAND" in
             echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
             shift 1
         fi
-        if [ "$1" = "-password" ] ; then
-            [ $# -gt 1 ] || usage
-            WEAVE_PASSWORD="$2"
-            export WEAVE_PASSWORD
-            shift 2
-        fi
+        NICKNAME=$(hostname)
+        while true; do
+            case "$1" in
+                -password)
+                    [ $# -gt 1 ] || usage
+                    WEAVE_PASSWORD="$2"
+                    export WEAVE_PASSWORD
+                    shift 2
+                    ;;
+                -nickname)
+                    [ $# -gt 1 ] || usage
+                    NICKNAME="$2"
+                    shift 2
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+        done
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
             -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
-            $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -iface $CONTAINER_IFNAME "$@")
+            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -name $MACADDR -nickname "$NICKNAME" "$@")
         with_container_netns $CONTAINER launch >/dev/null
         populate_ipam
         echo $CONTAINER

@@ -6,6 +6,7 @@
 # Folders
 _obj
 _test
+.vagrant
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -30,4 +31,8 @@ _testmain.go
 weaver/weaver
 weavedns/weavedns
 tools/bin
+tools/build
 releases
+weave.tar
+weavedns.tar
+weavetools.tar

@@ -122,9 +122,14 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 
 func (c *GossipChannel) SendGossipMsg(buf []byte) {
 	protocolMsg := c.gossipMsg(buf)
+	// Copy the connections so we don't hold a lock
+	connections := make([]Connection, 0)
 	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
-		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+		connections = append(connections, conn)
 	})
+	for _, conn := range connections {
+		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+	}
 }
 
 func (c *GossipChannel) gossipMsg(buf []byte) ProtocolMsg {

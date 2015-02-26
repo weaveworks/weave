@@ -1,8 +1,10 @@
 #!/bin/sh
-set -e
 
-apt-get -y update
-apt-get -y install curl make pkg-config gcc bison flex
+# Show the progress of this script, in case it fails.
+set -x -e
+
+sudo apt-get -y update
+sudo apt-get -y install curl make pkg-config gcc bison flex
 
 BASEDIR=$(dirname $0)
 mkdir -p "$BASEDIR"/bin
@@ -38,7 +40,7 @@ fetch() {
 
 for PACKAGE in $PACKAGES; do
     fetch $PACKAGE
-    (cd $PACKAGE; ./configure --disable-shared && make install)
+    (cd $PACKAGE; ./configure --disable-shared && make && sudo make install)
 done
 
 fetch $CONNTRACK

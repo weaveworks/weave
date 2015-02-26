@@ -18,8 +18,8 @@ type PeerInteraction struct {
 	payload interface{}
 }
 
-func NewLocalPeer(name PeerName, router *Router) *LocalPeer {
-	return &LocalPeer{Peer: NewPeer(name, 0, 0), Router: router}
+func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
+	return &LocalPeer{Peer: NewPeer(name, nickName, 0, 0), Router: router}
 }
 
 func (peer *LocalPeer) Start() {
@@ -120,7 +120,6 @@ const (
 	PAddConnection = iota
 	PConnectionEstablished
 	PDeleteConnection
-	PSendProtocolMsg
 )
 
 // Sync.
@@ -146,13 +145,6 @@ func (peer *LocalPeer) DeleteConnection(conn *LocalConnection) {
 		Interaction: Interaction{code: PDeleteConnection, resultChan: resultChan},
 		payload:     conn}
 	<-resultChan
-}
-
-// Async.
-func (peer *LocalPeer) SendProtocolMsg(m ProtocolMsg) {
-	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PSendProtocolMsg},
-		payload:     m}
 }
 
 // ACTOR server
@@ -183,8 +175,6 @@ func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
 					conn.log("connection deleted")
 				}
 				query.resultChan <- nil
-			case PSendProtocolMsg:
-				peer.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
 		case <-gossipTimer:
 			peer.Router.SendAllGossip()
@@ -261,12 +251,6 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) bool {
 	peer.Router.Peers.GarbageCollect()
 	peer.broadcastPeerUpdate()
 	return true
-}
-
-func (peer *LocalPeer) handleSendProtocolMsg(m ProtocolMsg) {
-	peer.ForEachConnection(func(_ PeerName, conn Connection) {
-		conn.(ProtocolSender).SendProtocolMsg(m)
-	})
 }
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {

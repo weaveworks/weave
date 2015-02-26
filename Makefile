@@ -1,7 +1,7 @@
 PUBLISH=publish_weave publish_weavedns publish_weavetools
 
 .DEFAULT: all
-.PHONY: all update tests publish $(PUBLISH) clean
+.PHONY: all update tests publish $(PUBLISH) clean prerequisites build
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
@@ -14,9 +14,9 @@ WEAVETOOLS_EXES=tools/bin
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
 WEAVETOOLS_IMAGE=$(DOCKERHUB_USER)/weavetools
-WEAVER_EXPORT=/var/tmp/weave.tar
-WEAVEDNS_EXPORT=/var/tmp/weavedns.tar
-WEAVETOOLS_EXPORT=/var/tmp/weavetools.tar
+WEAVER_EXPORT=weave.tar
+WEAVEDNS_EXPORT=weavedns.tar
+WEAVETOOLS_EXPORT=weavetools.tar
 
 all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
 
@@ -38,8 +38,17 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 $(WEAVER_EXE): router/*.go ipam/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
 
+build_weavetools_exes_in_container=yes
+
 $(WEAVETOOLS_EXES): tools/build.sh
+ifdef build_weavetools_exes_in_container
 	$(SUDO) docker run --rm -v $(realpath $(<D)):/home/weave ubuntu sh /home/weave/build.sh
+else
+	rm -rf tools/build
+	mkdir tools/build
+	cd tools/build && sh ../../$<
+	rm -rf tools/build
+endif
 
 $(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
@@ -55,9 +64,9 @@ $(WEAVETOOLS_EXPORT): tools/Dockerfile $(WEAVETOOLS_EXES)
 
 # Add more directories in here as more tests are created
 tests:
-	cd router; go test -tags netgo
-	cd ipam; go test -tags netgo
-	cd nameserver; go test -tags netgo
+	cd router; go test -cover -tags netgo
+	cd ipam; go test -cover -tags netgo
+	cd nameserver; go test -cover -tags netgo
 
 $(PUBLISH): publish_%:
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
@@ -70,3 +79,8 @@ clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE)
 	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
 	$(SUDO) rm -rf $(WEAVETOOLS_EXES)
+
+build:
+	$(SUDO) go clean -i net
+	$(SUDO) go install -tags netgo std
+	$(MAKE) build_weavetools_exes_in_container=
