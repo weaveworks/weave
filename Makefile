@@ -67,6 +67,10 @@ tests:
 	cd router; go test -cover -tags netgo
 	cd nameserver; go test -cover -tags netgo
 
+test-integration:
+	$(SUDO) cp $(CURDIR)/weave /usr/local/bin/weave
+	cd integration-cli; go test -cover
+
 $(PUBLISH): publish_%:
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 	$(SUDO) docker push   $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
