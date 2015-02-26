@@ -80,14 +80,14 @@ func (e *cacheEntry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error)
 	reply.Authoritative = (e.Flags&CacheLocalReply != 0) // we are only authoritative for local questions
 
 	// adjust the TTLs
-	passedSecs := now.Sub(e.putTime).Seconds()
+	passedSecs := uint32(now.Sub(e.putTime).Seconds())
 	for _, rr := range reply.Answer {
-		newTtl := rr.Header().Ttl
-		newTtl -= uint32(passedSecs)
-		if newTtl < 0 {
-			newTtl = 0
+		ttl := rr.Header().Ttl
+		if passedSecs < ttl {
+			rr.Header().Ttl = ttl - passedSecs
+		} else {
+			rr.Header().Ttl = 0
 		}
-		rr.Header().Ttl = newTtl
 	}
 
 	// TODO: shuffle the values, etc...
@@ -96,10 +96,10 @@ func (e *cacheEntry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error)
 }
 
 func (e cacheEntry) hasExpired(now time.Time) bool {
-	return e.validUntil.Before(now)
+	return e.validUntil.Before(now) || e.validUntil == now
 }
 
-// set the reply for
+// set the reply for the entry
 func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
 	shouldNotify := (e.Status == stPending)
 
@@ -138,6 +138,12 @@ func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, now time
 	}
 
 	return nil, errCouldNotResolve
+}
+
+func (e *cacheEntry) close() {
+	if e.Status == stPending {
+		close(e.waitChan)
+	}
 }
 
 // entriesSlice is used for sorting entries
@@ -242,10 +248,6 @@ func (c *Cache) Wait(request *dns.Msg, proto dnsProtocol, timeout time.Duration,
 	key := cacheKey{question, proto}
 	if entry, found := c.entries[key]; found {
 		reply, err = entry.waitReply(request, timeout, now)
-		if reply != nil && entry.hasExpired(now) {
-			delete(c.entries, key)
-			reply = nil
-		}
 	}
 	return
 }
@@ -274,6 +276,7 @@ func (c *Cache) removeOldest(atLeast int, now time.Time) {
 	// first, remove expired entries
 	for key, entry := range c.entries {
 		if entry.hasExpired(now) {
+			entry.close()
 			delete(c.entries, key)
 
 			removed += 1
@@ -291,6 +294,7 @@ func (c *Cache) removeOldest(atLeast int, now time.Time) {
 	sort.Sort(es)
 	for i := 0; i < atLeast; i++ {
 		key := cacheKey{es[i].question, es[i].protocol}
+		c.entries[key].close()
 		delete(c.entries, key)
 	}
 }

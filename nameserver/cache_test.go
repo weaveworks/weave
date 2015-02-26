@@ -52,6 +52,8 @@ func TestCacheLength(t *testing.T) {
 func TestCacheEntries(t *testing.T) {
 	InitDefaultLogging(true)
 
+	Info.Println("Checking cache consistency")
+
 	const cacheLen = 128
 
 	l, err := NewCache(cacheLen)
@@ -95,6 +97,14 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	ttlGet1 := resp.Answer[0].Header().Ttl
 
+	t.Logf("Checking that a Get() for different protocol return nothing")
+	resp, err = l.Get(questionMsg, protTcp, timeGet1)
+	wt.AssertNoErr(t, err)
+	if resp != nil {
+		t.Logf("Received '%s'", resp.Answer[0])
+		t.Error("ERROR: Did NOT expect a reponse from Get() with TCP")
+	}
+
 	t.Logf("Checking a Wait() with timeout=0 gets the same result")
 	resp, err = l.Wait(questionMsg, protUdp, time.Duration(0)*time.Second, time.Now())
 	wt.AssertNoErr(t, err)
@@ -137,13 +147,16 @@ func TestCacheEntries(t *testing.T) {
 		t.Error("ERROR: Did NOT expect a reponse after an Invalidate()")
 	}
 
-	t.Logf("Inserting a two replies for the same query")
+	t.Logf("Inserting a two UDP and one TCP replies for the same query")
 	timePut2 := time.Now()
 	reply2 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.2")})
 	l.Put(questionMsg, reply2, protUdp, 0, timePut2)
 	timePut3 := timePut2.Add(time.Duration(1) * time.Second)
 	reply3 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.3")})
 	l.Put(questionMsg, reply3, protUdp, 0, timePut3)
+	timePut4 := timePut3
+	reply4 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.10.10")})
+	l.Put(questionMsg, reply4, protTcp, 0, timePut4)
 
 	t.Logf("Checking we get the last one...")
 	resp, err = l.Get(questionMsg, protUdp, timePut3)
@@ -156,6 +169,26 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.1.3", "IP address")
 	if resp.Answer[0].Header().Ttl != localTTL {
 		t.Errorf("ERROR: TTL is not %d (it is %d)", localTTL, resp.Answer[0].Header().Ttl)
+	}
+
+	resp, err = l.Get(questionMsg, protTcp, timePut3.Add(time.Duration(localTTL - 1) * time.Second))
+	wt.AssertNoErr(t, err)
+	if resp == nil {
+		t.Error("ERROR: Did expect a reponse from the Get()")
+	}
+	t.Logf("Received '%s'", resp.Answer[0])
+	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
+	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.10.10", "IP address")
+	if resp.Answer[0].Header().Ttl != 1 {
+		t.Errorf("ERROR: TTL is not 1 (it is %d)", resp.Answer[0].Header().Ttl)
+	}
+
+	t.Logf("Checking we get empty replies when they are expired...")
+	resp, err = l.Get(questionMsg, protTcp, timePut3.Add(time.Duration(localTTL) * time.Second))
+	wt.AssertNoErr(t, err)
+	if resp != nil {
+		t.Logf("Received '%s'", resp.Answer[0])
+		t.Error("ERROR: Did NOT expect a reponse from the Get()")
 	}
 }
 
