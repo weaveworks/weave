@@ -121,13 +121,14 @@ func (space *MutableSpace) Claim(ident string, addr net.IP) (bool, error) {
 			return false, errors.New("Already allocated")
 		}
 	}
-	if uint32(offset) > space.MaxAllocated {
+	// MaxAllocated is one more than the offset of the last allocated address
+	if uint32(offset) >= space.MaxAllocated {
 		// Need to add all the addresses in the gap to the free list
-		for i := space.MaxAllocated + 1; i < uint32(offset); i++ {
+		for i := space.MaxAllocated; i < uint32(offset); i++ {
 			addr := add(space.Start, i)
 			space.free_list.add(&Allocation{"", addr})
 		}
-		space.MaxAllocated = uint32(offset)
+		space.MaxAllocated = uint32(offset) + 1
 	}
 	space.allocated.add(&Allocation{ident, addr})
 	return true, nil
@@ -187,6 +188,10 @@ func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 	return nil
 }
 
+func (s *MutableSpace) FreeChunkAtEnd() uint32 {
+	return s.Size - s.MaxAllocated
+}
+
 func (s *MutableSpace) NumFreeAddresses() uint32 {
 	return s.Size - uint32(len(s.allocated))
 }
@@ -204,7 +209,7 @@ func (a *MutableSpace) mergeBlank(b Space) bool {
 }
 
 func (space *MutableSpace) String() string {
-	return fmt.Sprintf("%s+%d, %d/%d", space.Start, space.Size, len(space.allocated), len(space.free_list))
+	return fmt.Sprintf("%s+%d, %d/%d/%d", space.Start, space.Size, space.MaxAllocated, len(space.allocated), len(space.free_list))
 }
 
 // Divide a space into two new spaces at a given address, copying allocations and frees.

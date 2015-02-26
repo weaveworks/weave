@@ -199,7 +199,7 @@ func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 	var bestSpace *MutableSpace = nil
 	for _, space := range s.spaces {
 		mSpace := space.(*MutableSpace)
-		numFree := mSpace.NumFreeAddresses()
+		numFree := mSpace.FreeChunkAtEnd()
 		if numFree > bestFree {
 			bestFree = numFree
 			bestSpace = mSpace

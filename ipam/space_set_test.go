@@ -158,3 +158,29 @@ func TestExclude(t *testing.T) {
 	}
 
 }
+
+func TestGiveUp(t *testing.T) {
+	const (
+		peer1     = "7a:9f:eb:b6:0c:6e"
+		peer1UID  = 123456
+		testAddr1 = "10.0.1.0"
+		testAddr2 = "10.0.1.16"
+	)
+
+	var (
+		ipAddr1 = net.ParseIP(testAddr1)
+		ipAddr2 = net.ParseIP(testAddr2)
+	)
+
+	pn1, _ := router.PeerNameFromString(peer1)
+	ps1 := spaceSetWith(pn1, peer1UID, NewSpace(ipAddr1, 48))
+	ret, ok := ps1.GiveUpSpace()
+	wt.AssertBool(t, ok, true, "GiveUpSpace result")
+	wt.AssertEqualUint32(t, ret.Size, 25, "GiveUpSpace 1 size")
+	wt.AssertNoErr(t, ps1.Claim("container", ipAddr2))
+	ret, ok = ps1.GiveUpSpace()
+	wt.AssertBool(t, ok, true, "GiveUpSpace result")
+	if ret.Contains(ipAddr2) {
+		t.Fatal("gave up space with claimed address")
+	}
+}
