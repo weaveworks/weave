@@ -123,7 +123,7 @@ func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
 }
 
 // wait until a valid reply is set in the cache
-func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, now time.Time) (reply *dns.Msg, err error) {
+func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, now time.Time) (*dns.Msg, error) {
 	if e.Status == stResolved {
 		return e.getReply(request, now)
 	}
@@ -219,29 +219,35 @@ func (c *Cache) Get(request *dns.Msg, proto dnsProtocol, now time.Time) (reply *
 
 	question := request.Question[0]
 	key := cacheKey{question, proto}
-	ent, found := c.entries[key]
-	if found {
-		return ent.getReply(request, now)
+	if ent, found := c.entries[key]; found {
+		reply, err = ent.getReply(request, now)
+		if reply != nil && ent.hasExpired(now) {
+			delete(c.entries, key)
+			reply = nil
+		}
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
 		c.entries[key] = newCacheEntry(&question, nil, stPending, now)
-		return nil, nil
 	}
+	return
 }
 
 // Wait for a reply for a question in the cache
 // Notice that the caller could Get() and then Wait() for a question, but the corresponding cache
 // entry could have been removed in between. In that case, the caller should retry the query (and
 // the user should increase the cache size!)
-func (c *Cache) Wait(request *dns.Msg, proto dnsProtocol, timeout time.Duration, now time.Time) (*dns.Msg, error) {
+func (c *Cache) Wait(request *dns.Msg, proto dnsProtocol, timeout time.Duration, now time.Time) (reply *dns.Msg, err error) {
 	// do not try to lock the cache: otherwise, no one else could `Put()` the reply
 	question := request.Question[0]
 	key := cacheKey{question, proto}
-	entry, found := c.entries[key]
-	if !found {
-		return nil, nil // client will trigger another query
+	if entry, found := c.entries[key]; found {
+		reply, err = entry.waitReply(request, timeout, now)
+		if reply != nil && entry.hasExpired(now) {
+			delete(c.entries, key)
+			reply = nil
+		}
 	}
-	return entry.waitReply(request, timeout, now)
+	return
 }
 
 // Remove removes the provided question from the cache.
