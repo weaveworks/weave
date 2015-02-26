@@ -7,6 +7,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	//"fmt"
 )
 
 var (
@@ -217,7 +218,7 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, proto dnsProtocol, flags u
 }
 
 // Look up for a question's reply from the cache.
-// If no reply is stored in the cache, it returns a `nil` reply and error. The caller can then `Wait()`
+// If no reply is stored in the cache, it returns a `nil` reply and no error. The caller can then `Wait()`
 // for another goroutine `Put`ing a reply in the cache.
 func (c *Cache) Get(request *dns.Msg, proto dnsProtocol, now time.Time) (reply *dns.Msg, err error) {
 	c.lock.Lock()
@@ -227,7 +228,7 @@ func (c *Cache) Get(request *dns.Msg, proto dnsProtocol, now time.Time) (reply *
 	key := cacheKey{question, proto}
 	if ent, found := c.entries[key]; found {
 		reply, err = ent.getReply(request, now)
-		if reply != nil && ent.hasExpired(now) {
+		if ent.hasExpired(now) {
 			delete(c.entries, key)
 			reply = nil
 		}

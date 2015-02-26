@@ -9,13 +9,13 @@ import (
 
 func AssertTrue(t *testing.T, cond bool, desc string) {
 	if !cond {
-		Fatalf(t, "Expected %s to be true", desc)
+		Fatalf(t, "Expected %s", desc)
 	}
 }
 
 func AssertFalse(t *testing.T, cond bool, desc string) {
 	if cond {
-		Fatalf(t, "Expected %s to be false", desc)
+		Fatalf(t, "Unexpected %s", desc)
 	}
 }
 

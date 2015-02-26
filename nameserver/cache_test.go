@@ -43,7 +43,7 @@ func TestCacheLength(t *testing.T) {
 	t.Logf("Checking all remaining entries expire after insert_time + %d secs='%s'", cacheLen, minExpectedTime)
 	for _, entry := range l.entries {
 		if entry.validUntil.Before(minExpectedTime) {
-			t.Errorf("Entry valid until %s", entry.validUntil)
+			t.Fatalf("Entry valid until %s", entry.validUntil)
 		}
 	}
 }
@@ -70,29 +70,25 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
-		t.Error("ERROR: Did not expect a reponse from Get() yet")
+		t.Fatalf("ERROR: Did not expect a reponse from Get() yet")
 	}
 	t.Logf("Trying to get it again")
 	resp, err = l.Get(questionMsg, protUdp, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
-		t.Error("ERROR: Did not expect a reponse from Get() yet")
+		t.Fatalf("ERROR: Did not expect a reponse from Get() yet")
 	}
 
 	t.Logf("Inserting the reply")
-	ip := net.ParseIP("10.0.1.1")
-	ips := []net.IP{ip}
-	reply1 := makeAddressReply(questionMsg, question, ips)
+	reply1 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.1")})
 	l.Put(questionMsg, reply1, protUdp, 0, time.Now())
 
 	timeGet1 := time.Now()
 	t.Logf("Checking we can Get() the reply now")
 	resp, err = l.Get(questionMsg, protUdp, timeGet1)
 	wt.AssertNoErr(t, err)
-	if resp == nil {
-		t.Error("ERROR: Did expect a reponse from Get()")
-	}
+	wt.AssertTrue(t, resp != nil, "reponse from Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	ttlGet1 := resp.Answer[0].Header().Ttl
@@ -102,15 +98,13 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Received '%s'", resp.Answer[0])
-		t.Error("ERROR: Did NOT expect a reponse from Get() with TCP")
+		t.Fatalf("ERROR: Did NOT expect a reponse from Get() with TCP")
 	}
 
 	t.Logf("Checking a Wait() with timeout=0 gets the same result")
 	resp, err = l.Wait(questionMsg, protUdp, time.Duration(0)*time.Second, time.Now())
 	wt.AssertNoErr(t, err)
-	if resp == nil {
-		t.Error("ERROR: Did expect a reponse from Wait(timeout=0)")
-	}
+	wt.AssertTrue(t, resp != nil, "reponse from a Wait(timeout=0)")
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 
@@ -118,15 +112,11 @@ func TestCacheEntries(t *testing.T) {
 	t.Logf("Checking that a second Get(), after 1 second, gets the same result, but with reduced TTL")
 	resp, err = l.Get(questionMsg, protUdp, timeGet2)
 	wt.AssertNoErr(t, err)
-	if resp == nil {
-		t.Error("ERROR: Did expect a reponse from the second Get()")
-	}
+	wt.AssertTrue(t, resp != nil, "reponse from a second Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	ttlGet2 := resp.Answer[0].Header().Ttl
-	if ttlGet1-ttlGet2 != 1 {
-		t.Errorf("ERROR: TTL difference is not 1 (it is %d)", ttlGet1-ttlGet2)
-	}
+	wt.AssertEqualInt(t, int(ttlGet1 - ttlGet2), 1, "TTL difference")
 
 	timeGet3 := timeGet1.Add(time.Duration(localTTL) * time.Second)
 	t.Logf("Checking that a third Get(), after %d second, gets no result", localTTL)
@@ -134,18 +124,21 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
-		t.Error("ERROR: Did NOT expect a reponse from the second Get()")
+		t.Fatalf("ERROR: Did NOT expect a reponse from the second Get()")
 	}
 
 	t.Logf("Checking that an Remove() results in Get() returning nothing")
+	replyTemp := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.9.9")})
+	l.Put(questionMsg, replyTemp, protUdp, 0, time.Now())
+	lenBefore := l.Len()
 	l.Remove(question, protUdp)
+	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length")
 	l.Remove(question, protUdp) // do it again: should have no effect...
+	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length")
+
 	resp, err = l.Get(questionMsg, protUdp, timeGet1)
 	wt.AssertNoErr(t, err)
-	if resp != nil {
-		t.Logf("Got '%s'", resp)
-		t.Error("ERROR: Did NOT expect a reponse after an Invalidate()")
-	}
+	wt.AssertTrue(t, resp == nil, "reponse from the Get() after a Remove()")
 
 	t.Logf("Inserting a two UDP and one TCP replies for the same query")
 	timePut2 := time.Now()
@@ -161,35 +154,31 @@ func TestCacheEntries(t *testing.T) {
 	t.Logf("Checking we get the last one...")
 	resp, err = l.Get(questionMsg, protUdp, timePut3)
 	wt.AssertNoErr(t, err)
-	if resp == nil {
-		t.Error("ERROR: Did expect a reponse from the Get()")
-	}
+	wt.AssertTrue(t, resp != nil, "reponse from the Get()")
+
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.1.3", "IP address")
-	if resp.Answer[0].Header().Ttl != localTTL {
-		t.Errorf("ERROR: TTL is not %d (it is %d)", localTTL, resp.Answer[0].Header().Ttl)
-	}
+	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), int(localTTL), "TTL")
 
 	resp, err = l.Get(questionMsg, protTcp, timePut3.Add(time.Duration(localTTL - 1) * time.Second))
 	wt.AssertNoErr(t, err)
-	if resp == nil {
-		t.Error("ERROR: Did expect a reponse from the Get()")
-	}
+	wt.AssertTrue(t, resp != nil, "reponse from the Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.10.10", "IP address")
-	if resp.Answer[0].Header().Ttl != 1 {
-		t.Errorf("ERROR: TTL is not 1 (it is %d)", resp.Answer[0].Header().Ttl)
-	}
+	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), 1, "TTL")
+
 
 	t.Logf("Checking we get empty replies when they are expired...")
+	lenBefore = l.Len()
 	resp, err = l.Get(questionMsg, protTcp, timePut3.Add(time.Duration(localTTL) * time.Second))
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Received '%s'", resp.Answer[0])
-		t.Error("ERROR: Did NOT expect a reponse from the Get()")
+		t.Fatalf("ERROR: Did NOT expect a reponse from the Get()")
 	}
+	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length (after getting an expired entry)")
 }
 
 // Check that waiters are unblocked when the name they are waiting for is inserted
