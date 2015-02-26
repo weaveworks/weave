@@ -160,7 +160,8 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	copy(frameCopy, frameData)
 
 	if !found {
-		return checkFrameTooBig(router.Ourself.Broadcast(df, frameCopy, dec))
+		router.Ourself.Broadcast(df, frameCopy, dec)
+		return nil
 	} else {
 		return checkFrameTooBig(router.Ourself.Forward(dstPeer, df, frameCopy, dec))
 	}
@@ -344,7 +345,8 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 		dstPeer, found = router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
-			return checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
+			router.LogFrame("Relaying broadcast", frame, &dec.eth)
+			router.Ourself.RelayBroadcast(srcPeer, df, frame, dec)
 		}
 
 		return nil
