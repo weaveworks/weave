@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 	//"fmt"
+	"math/rand"
 )
 
 var (
@@ -30,6 +31,19 @@ const (
 const (
 	CacheLocalReply uint8 = 1 << iota // the reply was obtained from a local resolution
 )
+
+// shuffleAnswers reorders answers for very basic load balancing
+func shuffleAnswers(answers []dns.RR) []dns.RR {
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	n := len(answers)
+	for i := 0; i < n; i++ {
+		r := i + rand.Intn(n-i)
+		answers[r], answers[i] = answers[i], answers[r]
+	}
+
+	return answers
+}
 
 // a cache entry
 type cacheEntry struct {
@@ -91,7 +105,10 @@ func (e *cacheEntry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error)
 		}
 	}
 
-	// TODO: shuffle the values, etc...
+	// shuffle the values, etc...
+	if e.Flags & CacheLocalReply != 0{
+		reply.Answer = shuffleAnswers(reply.Answer)
+	}
 
 	return &reply, nil
 }
