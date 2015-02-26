@@ -19,10 +19,11 @@ const (
 	defPendingTimeout int = 5 // timeout for a resolution
 )
 
+type entryStatus uint8
+
 const (
-	stPending  uint8 = iota // someone is waiting for the resolution
-	stResolved uint8 = iota // resolved
-	stInvalid  uint8 = iota // invalid
+	stPending  entryStatus = iota // someone is waiting for the resolution
+	stResolved entryStatus = iota // resolved
 )
 
 const (
@@ -30,11 +31,12 @@ const (
 )
 
 // a cache entry
-type entry struct {
-	Status uint8 // status of the entry
-	Flags  uint8 // some extra flags
+type cacheEntry struct {
+	Status entryStatus // status of the entry
+	Flags  uint8       // some extra flags
 
 	question dns.Question
+	protocol dnsProtocol
 	reply    dns.Msg
 
 	validUntil time.Time // obtained from the reply and stored here for convenience/speed
@@ -43,8 +45,8 @@ type entry struct {
 	waitChan chan struct{}
 }
 
-func newEntry(question *dns.Question, reply *dns.Msg, status uint8, now time.Time) *entry {
-	e := &entry{
+func newCacheEntry(question *dns.Question, reply *dns.Msg, status entryStatus, now time.Time) *cacheEntry {
+	e := &cacheEntry{
 		Status:   status,
 		Flags:    0,
 		question: *question,
@@ -61,8 +63,7 @@ func newEntry(question *dns.Question, reply *dns.Msg, status uint8, now time.Tim
 }
 
 // Get a copy of the reply stored in the entry, but with some values adjusted like the TTL
-// (in the future, some other transformation could be done, like a round-robin of the responses...)
-func (e *entry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error) {
+func (e *cacheEntry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error) {
 	if e.Status != stResolved {
 		return nil, nil
 	}
@@ -76,7 +77,7 @@ func (e *entry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error) {
 	reply := e.reply
 	reply.SetReply(request)
 	reply.Rcode = e.reply.Rcode
-	reply.Authoritative = (e.Flags & CacheLocalReply != 0)		// we are only authoritative for local questions
+	reply.Authoritative = (e.Flags&CacheLocalReply != 0) // we are only authoritative for local questions
 
 	// adjust the TTLs
 	passedSecs := now.Sub(e.putTime).Seconds()
@@ -94,13 +95,13 @@ func (e *entry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error) {
 	return &reply, nil
 }
 
-func (e entry) hasExpired(now time.Time) bool {
+func (e cacheEntry) hasExpired(now time.Time) bool {
 	return e.validUntil.Before(now)
 }
 
 // set the reply for
-func (e *entry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
-	shouldNotify := (e.Status == stPending || e.Status == stInvalid)
+func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
+	shouldNotify := (e.Status == stPending)
 
 	// calculate the validUntil from the reply TTL
 	var minTtl uint32 = math.MaxUint32
@@ -122,7 +123,7 @@ func (e *entry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
 }
 
 // wait until a valid reply is set in the cache
-func (e *entry) waitReply(request *dns.Msg, timeout time.Duration, now time.Time) (reply *dns.Msg, err error) {
+func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, now time.Time) (reply *dns.Msg, err error) {
 	if e.Status == stResolved {
 		return e.getReply(request, now)
 	}
@@ -139,25 +140,21 @@ func (e *entry) waitReply(request *dns.Msg, timeout time.Duration, now time.Time
 	return nil, errCouldNotResolve
 }
 
-// Invalidate the entry, so the cached value cannot be considered useful
-func (e *entry) invalidate(now time.Time) {
-	if e.Status != stPending {
-		e.validUntil = now.Add(time.Duration(defPendingTimeout) * time.Second)
-		e.waitChan = make(chan struct{})
-	}
-	e.Status = stInvalid
-}
-
 // entriesSlice is used for sorting entries
-type entriesSlice []*entry
+type cacheEntriesSlice []*cacheEntry
 
-func (p entriesSlice) Len() int           { return len(p) }
-func (p entriesSlice) Less(i, j int) bool { return p[i].validUntil.Before(p[j].validUntil) }
-func (p entriesSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p cacheEntriesSlice) Len() int           { return len(p) }
+func (p cacheEntriesSlice) Less(i, j int) bool { return p[i].validUntil.Before(p[j].validUntil) }
+func (p cacheEntriesSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 //////////////////////////////////////////////////////////////////////////////////////
 
-type entries map[dns.Question]*entry
+type cacheKey struct {
+	question dns.Question
+	protocol dnsProtocol
+}
+
+type entries map[cacheKey]*cacheEntry
 
 // Cache is a thread-safe fixed capacity LRU cache.
 type Cache struct {
@@ -196,48 +193,39 @@ func (c *Cache) Purge(now time.Time) {
 }
 
 // Add adds a reply to the cache.
-func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, flags uint8, now time.Time) {
+func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, proto dnsProtocol, flags uint8, now time.Time) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	question := request.Question[0]
-	if ent, found := c.entries[question]; found {
+	key := cacheKey{question, proto}
+	if ent, found := c.entries[key]; found {
 		ent.setReply(reply, flags, now)
 	} else {
 		// If we will add a new item and the capacity has been exceeded, make some room...
 		if len(c.entries) >= c.Capacity {
 			c.removeOldest(1, now)
 		}
-		c.entries[question] = newEntry(&question, reply, stResolved, now)
+		c.entries[key] = newCacheEntry(&question, reply, stResolved, now)
 	}
 }
 
 // Look up for a question's reply from the cache.
 // If no reply is stored in the cache, it returns a `nil` reply and error. The caller can then `Wait()`
 // for another goroutine `Put`ing a reply in the cache.
-func (c *Cache) Get(request *dns.Msg, now time.Time) (reply *dns.Msg, err error) {
+func (c *Cache) Get(request *dns.Msg, proto dnsProtocol, now time.Time) (reply *dns.Msg, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	question := request.Question[0]
-	ent, found := c.entries[question]
+	key := cacheKey{question, proto}
+	ent, found := c.entries[key]
 	if found {
 		return ent.getReply(request, now)
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
-		c.entries[question] = newEntry(&question, nil, stPending, now)
+		c.entries[key] = newCacheEntry(&question, nil, stPending, now)
 		return nil, nil
-	}
-}
-
-// Invalidate a cache entry, so it is not returned to clients
-func (c *Cache) Invalidate(request *dns.Msg, now time.Time) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	question := request.Question[0]
-	if ent, found := c.entries[question]; found {
-		ent.invalidate(now)
 	}
 }
 
@@ -245,10 +233,11 @@ func (c *Cache) Invalidate(request *dns.Msg, now time.Time) {
 // Notice that the caller could Get() and then Wait() for a question, but the corresponding cache
 // entry could have been removed in between. In that case, the caller should retry the query (and
 // the user should increase the cache size!)
-func (c *Cache) Wait(request *dns.Msg, timeout time.Duration, now time.Time) (*dns.Msg, error) {
+func (c *Cache) Wait(request *dns.Msg, proto dnsProtocol, timeout time.Duration, now time.Time) (*dns.Msg, error) {
 	// do not try to lock the cache: otherwise, no one else could `Put()` the reply
 	question := request.Question[0]
-	entry, found := c.entries[question]
+	key := cacheKey{question, proto}
+	entry, found := c.entries[key]
 	if !found {
 		return nil, nil // client will trigger another query
 	}
@@ -256,11 +245,12 @@ func (c *Cache) Wait(request *dns.Msg, timeout time.Duration, now time.Time) (*d
 }
 
 // Remove removes the provided question from the cache.
-func (c *Cache) Remove(question *dns.Question) {
+func (c *Cache) Remove(question *dns.Question, proto dnsProtocol) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	delete(c.entries, *question)
+	key := cacheKey{*question, proto}
+	delete(c.entries, key)
 }
 
 // Len returns the number of entries in the cache.
@@ -276,9 +266,9 @@ func (c *Cache) Len() int {
 func (c *Cache) removeOldest(atLeast int, now time.Time) {
 	removed := 0
 	// first, remove expired entries
-	for question, entry := range c.entries {
+	for key, entry := range c.entries {
 		if entry.hasExpired(now) {
-			delete(c.entries, question)
+			delete(c.entries, key)
 
 			removed += 1
 			if removed >= atLeast {
@@ -288,13 +278,13 @@ func (c *Cache) removeOldest(atLeast int, now time.Time) {
 	}
 
 	// our last resort: sort the entries (by validUntil) and remove the first `atLeast` entries
-	var es entriesSlice
+	var es cacheEntriesSlice
 	for _, e := range c.entries {
 		es = append(es, e)
 	}
 	sort.Sort(es)
 	for i := 0; i < atLeast; i++ {
-		question := es[i].question
-		delete(c.entries, question)
+		key := cacheKey{es[i].question, es[i].protocol}
+		delete(c.entries, key)
 	}
 }

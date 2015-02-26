@@ -34,7 +34,7 @@ func TestCacheLength(t *testing.T) {
 		reply := makeAddressReply(questionMsg, question, ips)
 		reply.Answer[0].Header().Ttl = uint32(i)
 
-		l.Put(questionMsg, reply, 0, insTime)
+		l.Put(questionMsg, reply, protUdp, 0, insTime)
 	}
 
 	wt.AssertEqualInt(t, l.Len(), cacheLen, "cache length")
@@ -64,14 +64,14 @@ func TestCacheEntries(t *testing.T) {
 	question := &questionMsg.Question[0]
 
 	t.Logf("Trying to get a name")
-	resp, err := l.Get(questionMsg, time.Now())
+	resp, err := l.Get(questionMsg, protUdp, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
 		t.Error("ERROR: Did not expect a reponse from Get() yet")
 	}
 	t.Logf("Trying to get it again")
-	resp, err = l.Get(questionMsg, time.Now())
+	resp, err = l.Get(questionMsg, protUdp, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
@@ -82,11 +82,11 @@ func TestCacheEntries(t *testing.T) {
 	ip := net.ParseIP("10.0.1.1")
 	ips := []net.IP{ip}
 	reply1 := makeAddressReply(questionMsg, question, ips)
-	l.Put(questionMsg, reply1, 0, time.Now())
+	l.Put(questionMsg, reply1, protUdp, 0, time.Now())
 
 	timeGet1 := time.Now()
 	t.Logf("Checking we can Get() the reply now")
-	resp, err = l.Get(questionMsg, timeGet1)
+	resp, err = l.Get(questionMsg, protUdp, timeGet1)
 	wt.AssertNoErr(t, err)
 	if resp == nil {
 		t.Error("ERROR: Did expect a reponse from Get()")
@@ -96,7 +96,7 @@ func TestCacheEntries(t *testing.T) {
 	ttlGet1 := resp.Answer[0].Header().Ttl
 
 	t.Logf("Checking a Wait() with timeout=0 gets the same result")
-	resp, err = l.Wait(questionMsg, time.Duration(0)*time.Second, time.Now())
+	resp, err = l.Wait(questionMsg, protUdp, time.Duration(0)*time.Second, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp == nil {
 		t.Error("ERROR: Did expect a reponse from Wait(timeout=0)")
@@ -106,7 +106,7 @@ func TestCacheEntries(t *testing.T) {
 
 	timeGet2 := timeGet1.Add(time.Duration(1) * time.Second)
 	t.Logf("Checking that a second Get(), after 1 second, gets the same result, but with reduced TTL")
-	resp, err = l.Get(questionMsg, timeGet2)
+	resp, err = l.Get(questionMsg, protUdp, timeGet2)
 	wt.AssertNoErr(t, err)
 	if resp == nil {
 		t.Error("ERROR: Did expect a reponse from the second Get()")
@@ -120,16 +120,17 @@ func TestCacheEntries(t *testing.T) {
 
 	timeGet3 := timeGet1.Add(time.Duration(localTTL) * time.Second)
 	t.Logf("Checking that a third Get(), after %d second, gets no result", localTTL)
-	resp, err = l.Get(questionMsg, timeGet3)
+	resp, err = l.Get(questionMsg, protUdp, timeGet3)
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
 		t.Error("ERROR: Did NOT expect a reponse from the second Get()")
 	}
 
-	t.Logf("Checking that an Invalidate() results in Get() returning nothing")
-	l.Invalidate(questionMsg, timeGet1)
-	resp, err = l.Get(questionMsg, timeGet1)
+	t.Logf("Checking that an Remove() results in Get() returning nothing")
+	l.Remove(question, protUdp)
+	l.Remove(question, protUdp) // do it again: should have no effect...
+	resp, err = l.Get(questionMsg, protUdp, timeGet1)
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
@@ -139,13 +140,13 @@ func TestCacheEntries(t *testing.T) {
 	t.Logf("Inserting a two replies for the same query")
 	timePut2 := time.Now()
 	reply2 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.2")})
-	l.Put(questionMsg, reply2, 0, timePut2)
+	l.Put(questionMsg, reply2, protUdp, 0, timePut2)
 	timePut3 := timePut2.Add(time.Duration(1) * time.Second)
 	reply3 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.3")})
-	l.Put(questionMsg, reply3, 0, timePut3)
+	l.Put(questionMsg, reply3, protUdp, 0, timePut3)
 
 	t.Logf("Checking we get the last one...")
-	resp, err = l.Get(questionMsg, timePut3)
+	resp, err = l.Get(questionMsg, protUdp, timePut3)
 	wt.AssertNoErr(t, err)
 	if resp == nil {
 		t.Error("ERROR: Did expect a reponse from the Get()")
@@ -180,10 +181,10 @@ func TestCacheBlockingOps(t *testing.T) {
 
 		go func(request *dns.Msg) {
 			t.Logf("Querying about %s...", request.Question[0].Name)
-			_, err := l.Get(request, time.Now())
+			_, err := l.Get(request, protUdp, time.Now())
 			wt.AssertNoErr(t, err)
 			t.Logf("Waiting for %s...", request.Question[0].Name)
-			r, err := l.Wait(request, 1*time.Second, time.Now())
+			r, err := l.Wait(request, protUdp, 1*time.Second, time.Now())
 			t.Logf("Obtained response for %s:\n%s", request.Question[0].Name, r)
 			wt.AssertNoErr(t, err)
 		}(questionMsg)
@@ -196,6 +197,6 @@ func TestCacheBlockingOps(t *testing.T) {
 		reply := makeAddressReply(requestMsg, &requestMsg.Question[0], ips)
 
 		t.Logf("Inserting response for %s...", requestMsg.Question[0].Name)
-		l.Put(requestMsg, reply, 0, time.Now())
+		l.Put(requestMsg, reply, protUdp, 0, time.Now())
 	}
 }
