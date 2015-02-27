@@ -73,7 +73,7 @@ run_tool() {
     TOOL_NET=$1
     TOOL_COMMAND=$2
     shift 2
-    docker run --rm --privileged --net=$TOOL_NET $TOOLS_IMAGE /bin/$TOOL_COMMAND "$@"
+    docker run --rm -t --privileged --net=$TOOL_NET $TOOLS_IMAGE /bin/$TOOL_COMMAND "$@"
 }
 
 is_cidr() {
