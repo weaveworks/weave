@@ -42,7 +42,7 @@ build_weavetools_exes_in_container=yes
 
 $(WEAVETOOLS_EXES): tools/build.sh
 ifdef build_weavetools_exes_in_container
-	$(SUDO) docker run --rm -v $(realpath $(<D)):/home/weave ubuntu sh /home/weave/build.sh
+	$(SUDO) docker run --rm -t -v $(realpath $(<D)):/home/weave ubuntu sh /home/weave/build.sh
 else
 	rm -rf tools/build
 	mkdir tools/build
