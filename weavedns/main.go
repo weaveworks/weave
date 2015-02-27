@@ -32,7 +32,7 @@ func main() {
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
-	flag.StringVar(&localDomain, "localDomain", "", "local domain (ie, 'weave.local.')")
+	flag.StringVar(&localDomain, "localDomain", weavedns.DEFAULT_LOCAL_DOMAIN, "local domain (e.g., 'weave.local.')")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
@@ -73,7 +73,7 @@ func main() {
 		Port:        dnsPort,
 		LocalDomain: localDomain,
 	}
-	
+
 	if len(fallback) > 0 {
 		fallbackHost, fallbackPort, err := net.SplitHostPort(fallback)
 		if err != nil {
@@ -82,7 +82,7 @@ func main() {
 		srvConfig.UpstreamCfg = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
 		Debug.Printf("DNS fallback at %s:%s", fallbackHost, fallbackPort)
 	}
-		
+
 	go weavedns.ListenHttp(localDomain, zone, httpPort)
 	srv, err := weavedns.NewDNSServer(srvConfig, zone, iface)
 	if err != nil {
