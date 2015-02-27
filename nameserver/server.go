@@ -36,7 +36,6 @@ type DNSServerConfig struct {
 }
 
 type DNSServer struct {
-	config   *DNSServerConfig
 	udpSrv   *dns.Server
 	tcpSrv   *dns.Server
 	mdnsCli  *MDNSClient
@@ -53,7 +52,6 @@ type DNSServer struct {
 // Creates a new DNS server
 func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *DNSServer, err error) {
 	s = &DNSServer{
-		config: &config,
 		zone:   zone,
 		iface:  iface,
 
