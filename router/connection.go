@@ -181,11 +181,19 @@ func (conn *LocalConnection) log(args ...interface{}) {
 	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
 }
 
+// Send directly - not via the Actor queryLoop.
+// note that tcpSender is immutable and guaranteed to be set by the
+// time anybody can get hold of a ref to the Connection
+func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
+	if err := conn.handleSendProtocolMsg(m); err != nil {
+		conn.Shutdown(err)
+	}
+}
+
 // ACTOR client API
 
 const (
-	CSendProtocolMsg = iota
-	CSetEstablished
+	CSetEstablished = iota
 	CReceivedHeartbeat
 	CShutdown
 )
@@ -203,7 +211,8 @@ func (conn *LocalConnection) sendQuery(code int, payload interface{}) {
 
 // Async
 func (conn *LocalConnection) Shutdown(err error) {
-	conn.sendQuery(CShutdown, err)
+	// Run on its own goroutine in case the channel is backed up
+	go conn.sendQuery(CShutdown, err)
 }
 
 // Async
@@ -221,11 +230,6 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 // Async
 func (conn *LocalConnection) SetEstablished() {
 	conn.sendQuery(CSetEstablished, nil)
-}
-
-// Async
-func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
-	conn.sendQuery(CSendProtocolMsg, m)
 }
 
 // ACTOR server
@@ -306,8 +310,6 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 				err = conn.handleReceivedHeartbeat(query.payload.(*net.UDPAddr))
 			case CSetEstablished:
 				err = conn.handleSetEstablished()
-			case CSendProtocolMsg:
-				err = conn.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
 		case <-conn.heartbeatTimeout.C:
 			err = fmt.Errorf("timed out waiting for UDP heartbeat")
