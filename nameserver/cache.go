@@ -34,12 +34,14 @@ const (
 
 // shuffleAnswers reorders answers for very basic load balancing
 func shuffleAnswers(answers []dns.RR) []dns.RR {
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	n := len(answers)
-	for i := 0; i < n; i++ {
-		r := i + rand.Intn(n-i)
-		answers[r], answers[i] = answers[i], answers[r]
+	if n > 1 {
+		rand.Seed(time.Now().UTC().UnixNano())
+
+		for i := 0; i < n; i++ {
+			r := i + rand.Intn(n-i)
+			answers[r], answers[i] = answers[i], answers[r]
+		}
 	}
 
 	return answers
@@ -106,7 +108,7 @@ func (e *cacheEntry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error)
 	}
 
 	// shuffle the values, etc...
-	if e.Flags & CacheLocalReply != 0{
+	if e.Flags&CacheLocalReply != 0 {
 		reply.Answer = shuffleAnswers(reply.Answer)
 	}
 

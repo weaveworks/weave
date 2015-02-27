@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	localTTL uint32 = 300 // somewhat arbitrary; we don't expect anyone
+	localTTL uint32 = 30 // somewhat arbitrary; we don't expect anyone
 	// downstream to cache results
 )
 
