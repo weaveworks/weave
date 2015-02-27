@@ -35,7 +35,7 @@ func (s *MDNSServer) addrIsLocal(testaddr net.Addr) bool {
 	return false
 }
 
-func (s *MDNSServer) Start(ifi *net.Interface) error {
+func (s *MDNSServer) Start(ifi *net.Interface, localDomain string) error {
 	conn, err := LinkLocalMulticastListener(ifi)
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) error {
 		})
 
 	mux := dns.NewServeMux()
-	mux.HandleFunc(LOCAL_DOMAIN, handleLocal)
+	mux.HandleFunc(localDomain, handleLocal)
 	mux.HandleFunc(RDNS_DOMAIN, handleReverse)
 
 	go dns.ActivateAndServe(nil, conn, mux)
