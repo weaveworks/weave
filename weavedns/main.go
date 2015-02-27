@@ -26,6 +26,8 @@ func main() {
 		fallback    string
 		dnsPort     int
 		httpPort    int
+		numLocWork  int
+		numRecWork  int
 		wait        int
 		timeout     int
 		udpbuf      int
@@ -43,6 +45,8 @@ func main() {
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DEFAULT_SERVER_PORT, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
 	flag.StringVar(&fallback, "fallback", "", "force a fallback (ie, '8.8.8.8:53') instead of /etc/resolv.conf values")
+	flag.IntVar(&numLocWork, "localres", weavedns.DEFAULT_RESOLV_WORKERS, "number of concurrent local resolvers")
+	flag.IntVar(&numRecWork, "recres", weavedns.DEFAULT_RESOLV_WORKERS, "number of concurrent recursive resolvers")
 	flag.IntVar(&timeout, "timeout", weavedns.DEFAULT_TIMEOUT, "timeout for resolutions")
 	flag.IntVar(&udpbuf, "udpbuf", weavedns.DEFAULT_UDP_BUFLEN, "UDP buffer length")
 	flag.IntVar(&cacheLen, "cache", weavedns.DEFAULT_CACHE_LEN, "cache length")
@@ -82,6 +86,8 @@ func main() {
 		Port:                dnsPort,
 		CacheLen:            cacheLen,
 		LocalDomain:         localDomain,
+		NumLocalWorkers:     numLocWork,
+		NumRecursiveWorkers: numRecWork,
 		Timeout:             timeout,
 		UdpBufLen:           udpbuf,
 	}

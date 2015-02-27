@@ -66,14 +66,15 @@ func TestCacheEntries(t *testing.T) {
 	question := &questionMsg.Question[0]
 
 	t.Logf("Trying to get a name")
-	resp, err := l.Get(questionMsg, minUdpSize, time.Now())
+	resp, respLen, err := l.Get(questionMsg, minUdpSize, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
 		t.Fatalf("ERROR: Did not expect a reponse from Get() yet")
 	}
+	wt.AssertTrue(t, respLen == 0, ">0 bytes response")
 	t.Logf("Trying to get it again")
-	resp, err = l.Get(questionMsg, minUdpSize, time.Now())
+	resp, respLen, err = l.Get(questionMsg, minUdpSize, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
@@ -86,23 +87,25 @@ func TestCacheEntries(t *testing.T) {
 
 	timeGet1 := time.Now()
 	t.Logf("Checking we can Get() the reply now")
-	resp, err = l.Get(questionMsg, minUdpSize, timeGet1)
+	resp, respLen, err = l.Get(questionMsg, minUdpSize, timeGet1)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from Get()")
+	wt.AssertTrue(t, respLen > 0, ">0 bytes response")
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	ttlGet1 := resp.Answer[0].Header().Ttl
 
 	t.Logf("Checking a Wait() with timeout=0 gets the same result")
-	resp, err = l.Wait(questionMsg, time.Duration(0)*time.Second, minUdpSize, time.Now())
+	resp, respLen, err = l.Wait(questionMsg, time.Duration(0)*time.Second, minUdpSize, time.Now())
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from a Wait(timeout=0)")
+	wt.AssertTrue(t, respLen > 0, ">0 bytes response")
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 
 	timeGet2 := timeGet1.Add(time.Duration(1) * time.Second)
 	t.Logf("Checking that a second Get(), after 1 second, gets the same result, but with reduced TTL")
-	resp, err = l.Get(questionMsg, minUdpSize, timeGet2)
+	resp, respLen, err = l.Get(questionMsg, minUdpSize, timeGet2)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from a second Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
@@ -112,7 +115,7 @@ func TestCacheEntries(t *testing.T) {
 
 	timeGet3 := timeGet1.Add(time.Duration(localTTL) * time.Second)
 	t.Logf("Checking that a third Get(), after %d second, gets no result", localTTL)
-	resp, err = l.Get(questionMsg, minUdpSize, timeGet3)
+	resp, respLen, err = l.Get(questionMsg, minUdpSize, timeGet3)
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
@@ -128,9 +131,10 @@ func TestCacheEntries(t *testing.T) {
 	l.Remove(question) // do it again: should have no effect...
 	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length")
 
-	resp, err = l.Get(questionMsg, minUdpSize, timeGet1)
+	resp, respLen, err = l.Get(questionMsg, minUdpSize, timeGet1)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp == nil, "reponse from the Get() after a Remove()")
+	wt.AssertTrue(t, respLen == 0, "0 bytes response")
 
 	t.Logf("Inserting a two replies for the same query")
 	timePut2 := time.Now()
@@ -141,18 +145,20 @@ func TestCacheEntries(t *testing.T) {
 	l.Put(questionMsg, reply3, 0, timePut3)
 
 	t.Logf("Checking we get the last one...")
-	resp, err = l.Get(questionMsg, minUdpSize, timePut3)
+	resp, respLen, err = l.Get(questionMsg, minUdpSize, timePut3)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from the Get()")
+	wt.AssertTrue(t, respLen > 0, ">0 bytes response")
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.1.3", "IP address")
 	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), int(localTTL), "TTL")
 
-	resp, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL - 1) * time.Second))
+	resp, respLen, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL - 1) * time.Second))
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from the Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
+	wt.AssertTrue(t, respLen > 0, ">0 bytes response")
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.1.3", "IP address")
 	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), 1, "TTL")
@@ -160,12 +166,13 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Checking we get empty replies when they are expired...")
 	lenBefore = l.Len()
-	resp, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL) * time.Second))
+	resp, respLen, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL) * time.Second))
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Received '%s'", resp.Answer[0])
 		t.Fatalf("ERROR: Did NOT expect a reponse from the Get()")
 	}
+	wt.AssertTrue(t, respLen == 0, "0 bytes response")
 	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length (after getting an expired entry)")
 }
 
@@ -191,10 +198,10 @@ func TestCacheBlockingOps(t *testing.T) {
 
 		go func(request *dns.Msg) {
 			t.Logf("Querying about %s...", request.Question[0].Name)
-			_, err := l.Get(request, minUdpSize, time.Now())
+			_, _, err := l.Get(request, minUdpSize, time.Now())
 			wt.AssertNoErr(t, err)
 			t.Logf("Waiting for %s...", request.Question[0].Name)
-			r, err := l.Wait(request, 1*time.Second, minUdpSize, time.Now())
+			r, _, err := l.Wait(request, 1*time.Second, minUdpSize, time.Now())
 			t.Logf("Obtained response for %s:\n%s", request.Question[0].Name, r)
 			wt.AssertNoErr(t, err)
 		}(questionMsg)

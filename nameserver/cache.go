@@ -81,19 +81,19 @@ func newCacheEntry(question *dns.Question, reply *dns.Msg, status entryStatus, n
 }
 
 // Get a copy of the reply stored in the entry, but with some values adjusted like the TTL
-func (e *cacheEntry) getReply(request *dns.Msg, maxLen int, now time.Time) (*dns.Msg, error) {
+func (e *cacheEntry) getReply(request *dns.Msg, maxLen int, now time.Time) (*dns.Msg, int, error) {
 	if e.Status != stResolved {
-		return nil, nil
+		return nil, 0, nil
 	}
 
 	// if the reply has expired or is invalid, force the caller to start a new resolution
 	if e.hasExpired(now) {
-		return nil, nil
+		return nil, 0, nil
 	}
 
 	if e.ReplyLen >= maxLen {
 		Debug.Printf("[cache] returning truncated reponse: %d > %d", e.ReplyLen, maxLen)
-		return makeTruncatedReply(request), nil
+		return makeTruncatedReply(request), minUdpSize, nil
 	}
 
 	// create a copy of the reply, with values for this particular query
@@ -118,7 +118,7 @@ func (e *cacheEntry) getReply(request *dns.Msg, maxLen int, now time.Time) (*dns
 		reply.Answer = shuffleAnswers(reply.Answer)
 	}
 
-	return &reply, nil
+	return &reply, e.ReplyLen, nil
 }
 
 func (e cacheEntry) hasExpired(now time.Time) bool {
@@ -150,7 +150,7 @@ func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
 }
 
 // wait until a valid reply is set in the cache
-func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, maxLen int, now time.Time) (*dns.Msg, error) {
+func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, maxLen int, now time.Time) (*dns.Msg, int, error) {
 	if e.Status == stResolved {
 		return e.getReply(request, maxLen, now)
 	}
@@ -160,11 +160,11 @@ func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, maxLen i
 		case <-e.waitChan:
 			return e.getReply(request, maxLen, now)
 		case <-time.After(time.Second * timeout):
-			return nil, errTimeout
+			return nil, 0, errTimeout
 		}
 	}
 
-	return nil, errCouldNotResolve
+	return nil, 0, errCouldNotResolve
 }
 
 func (e *cacheEntry) close() {
@@ -246,19 +246,19 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, flags uint8, now time.Time
 // Look up for a question's reply from the cache.
 // If no reply is stored in the cache, it returns a `nil` reply and no error. The caller can then `Wait()`
 // for another goroutine `Put`ing a reply in the cache.
-func (c *Cache) Get(request *dns.Msg, maxLen int, now time.Time) (reply *dns.Msg, err error) {
+func (c *Cache) Get(request *dns.Msg, maxLen int, now time.Time) (reply *dns.Msg, replyLen int, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	question := request.Question[0]
 	key := cacheKey(question)
 	if ent, found := c.entries[key]; found {
-		reply, err = ent.getReply(request, maxLen, now)
 		if ent.hasExpired(now) {
 			Debug.Printf("[cache msgid %d] expired: removing", request.MsgHdr.Id)
 			delete(c.entries, key)
-			reply = nil
+			return
 		}
+		reply, replyLen, err = ent.getReply(request, maxLen, now)
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
 		Debug.Printf("[cache msgid %d] addind in pending state", request.MsgHdr.Id)
@@ -271,11 +271,11 @@ func (c *Cache) Get(request *dns.Msg, maxLen int, now time.Time) (reply *dns.Msg
 // Notice that the caller could Get() and then Wait() for a question, but the corresponding cache
 // entry could have been removed in between. In that case, the caller should retry the query (and
 // the user should increase the cache size!)
-func (c *Cache) Wait(request *dns.Msg, timeout time.Duration, maxLen int, now time.Time) (reply *dns.Msg, err error) {
+func (c *Cache) Wait(request *dns.Msg, timeout time.Duration, maxLen int, now time.Time) (reply *dns.Msg, replyLen int, err error) {
 	// do not try to lock the cache: otherwise, no one else could `Put()` the reply
 	question := request.Question[0]
 	if entry, found := c.entries[cacheKey(question)]; found {
-		reply, err = entry.waitReply(request, timeout, maxLen, now)
+		reply, replyLen, err = entry.waitReply(request, timeout, maxLen, now)
 	}
 	return
 }
