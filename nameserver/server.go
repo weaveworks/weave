@@ -13,6 +13,7 @@ const (
 	DEFAULT_SERVER_PORT  = 53                 // The default server port
 	DEFAULT_CLI_CFG_FILE = "/etc/resolv.conf" // default "resolv.conf" file to try to load
 	DEFAULT_UDP_BUFLEN   = 4096               // bigger than the default 512
+	DEFAULT_IFACE_NAME   = "default interface"
 )
 
 func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
@@ -28,10 +29,6 @@ type DNSServerConfig struct {
 	UpstreamCfgFile string
 	// (Optional) DNS client config for the fallback server(s)
 	UpstreamCfg *dns.ClientConfig
-	// DNS zone served
-	Zone Zone
-	// Interface where serving
-	Iface *net.Interface
 	// (Optional) port number (for TCP and UDP)
 	Port int
 	// (Optional) local domain (ie, "weave.local.")
@@ -39,62 +36,68 @@ type DNSServerConfig struct {
 }
 
 type DNSServer struct {
-	config  *DNSServerConfig
-	udpSrv  *dns.Server
-	tcpSrv  *dns.Server
-	mdnsCli *MDNSClient
-	mdnsSrv *MDNSServer
+	config   *DNSServerConfig
+	udpSrv   *dns.Server
+	tcpSrv   *dns.Server
+	mdnsCli  *MDNSClient
+	mdnsSrv  *MDNSServer
+	zone     Zone
+	iface    *net.Interface
+	upstream *dns.ClientConfig
 
+	Domain     string // the local domain
 	IfaceName  string // the interface where mDNS is working on
 	ListenAddr string // the address the server is listening at
 }
 
 // Creates a new DNS server
-func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
+func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *DNSServer, err error) {
+	s = &DNSServer{
+		config: &config,
+		zone:   zone,
+		iface:  iface,
+
+		Domain:     DEFAULT_LOCAL_DOMAIN,
+		IfaceName:  DEFAULT_IFACE_NAME,
+		ListenAddr: fmt.Sprintf(":%d", DEFAULT_SERVER_PORT),
+	}
+
 	// fill empty parameters with defaults...
-	if config.Port == 0 {
-		config.Port = DEFAULT_SERVER_PORT
+	if config.Port != 0 {
+		s.ListenAddr = fmt.Sprintf(":%d", config.Port)
 	}
-	if len(config.LocalDomain) == 0 {
-		config.LocalDomain = DEFAULT_LOCAL_DOMAIN
+	if len(config.LocalDomain) > 0 {
+		s.Domain = config.LocalDomain
 	}
-	if len(config.UpstreamCfgFile) == 0 {
-		config.UpstreamCfgFile = DEFAULT_CLI_CFG_FILE
-	}
-	if config.UpstreamCfg == nil {
-		if config.UpstreamCfg, err = dns.ClientConfigFromFile(config.UpstreamCfgFile); err != nil {
+	if config.UpstreamCfg != nil {
+		s.upstream = config.UpstreamCfg
+	} else {
+		cfgFile := DEFAULT_CLI_CFG_FILE
+		if len(config.UpstreamCfgFile) > 0 {
+			cfgFile = config.UpstreamCfgFile
+		}
+		if s.upstream, err = dns.ClientConfigFromFile(cfgFile); err != nil {
 			return nil, err
 		}
 	}
-
-	mdnsClient, err := NewMDNSClient()
+	s.mdnsCli, err = NewMDNSClient()
 	if err != nil {
 		return
 	}
-	mdnsServer, err := NewMDNSServer(config.Zone)
+	s.mdnsSrv, err = NewMDNSServer(s.zone)
 	if err != nil {
 		return
 	}
-
-	ifaceName := "default interface"
-	if config.Iface != nil {
-		ifaceName = config.Iface.Name
-	}
-
-	s = &DNSServer{
-		config:     &config,
-		mdnsCli:    mdnsClient,
-		mdnsSrv:    mdnsServer,
-		IfaceName:  ifaceName,
-		ListenAddr: fmt.Sprintf(":%d", config.Port),
+	if iface != nil {
+		s.IfaceName = iface.Name
 	}
 
 	// create two DNS request multiplexerers, depending on the protocol used by clients
 	// (we use the same protocol for asking upstream servers)
 	mux := func(client *dns.Client) *dns.ServeMux {
 		m := dns.NewServeMux()
-		m.HandleFunc(s.config.LocalDomain, s.queryHandler([]Lookup{s.config.Zone, s.mdnsCli}))
-		m.HandleFunc(RDNS_DOMAIN, s.rdnsHandler([]Lookup{s.config.Zone, s.mdnsCli}, client))
+		m.HandleFunc(s.Domain, s.queryHandler([]Lookup{s.zone, s.mdnsCli}))
+		m.HandleFunc(RDNS_DOMAIN, s.rdnsHandler([]Lookup{s.zone, s.mdnsCli}, client))
 		m.HandleFunc(".", s.notUsHandler(client))
 		return m
 	}
@@ -108,9 +111,9 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 // Start the DNS server
 func (s *DNSServer) Start() error {
 	Info.Printf("Using mDNS on %s", s.IfaceName)
-	err := s.mdnsCli.Start(s.config.Iface)
+	err := s.mdnsCli.Start(s.iface)
 	CheckFatal(err)
-	err = s.mdnsSrv.Start(s.config.Iface, s.config.LocalDomain)
+	err = s.mdnsSrv.Start(s.iface, s.Domain)
 	CheckFatal(err)
 
 	wg := new(sync.WaitGroup)
@@ -199,8 +202,8 @@ func (s *DNSServer) notUsHandler(dnsClient *dns.Client) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] Fallback query: %+v", r.MsgHdr.Id, q)
-		for _, server := range s.config.UpstreamCfg.Servers {
-			reply, _, err := dnsClient.Exchange(r, fmt.Sprintf("%s:%s", server, s.config.UpstreamCfg.Port))
+		for _, server := range s.upstream.Servers {
+			reply, _, err := dnsClient.Exchange(r, fmt.Sprintf("%s:%s", server, s.upstream.Port))
 			if err != nil {
 				Debug.Printf("[dns msgid %d] Network error trying %s (%s)",
 					r.MsgHdr.Id, server, err)

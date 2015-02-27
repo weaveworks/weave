@@ -66,7 +66,7 @@ func TestUDPDNSServer(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Zone: zone, Port: port})
+	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Port: port}, zone, nil)
 	wt.AssertNoErr(t, err)
 	defer srv.Stop()
 	go srv.Start()
@@ -190,7 +190,7 @@ func TestTCPDNSServer(t *testing.T) {
 
 	t.Logf("Creating a WeaveDNS server instance, falling back to 127.0.0.1:%s", fallbackPort)
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Zone: zone, Port: port})
+	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Port: port}, zone, nil)
 	wt.AssertNoErr(t, err)
 	defer srv.Stop()
 	go srv.Start()

@@ -70,8 +70,6 @@ func main() {
 	}
 
 	srvConfig := weavedns.DNSServerConfig{
-		Zone:        zone,
-		Iface:       iface,
 		Port:        dnsPort,
 		LocalDomain: localDomain,
 	}
@@ -86,7 +84,7 @@ func main() {
 	}
 		
 	go weavedns.ListenHttp(localDomain, zone, httpPort)
-	srv, err := weavedns.NewDNSServer(srvConfig)
+	srv, err := weavedns.NewDNSServer(srvConfig, zone, iface)
 	if err != nil {
 		Error.Fatal("Failed to initialize the WeaveDNS server", err)
 	}
