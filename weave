@@ -54,10 +54,10 @@ exec_remote() {
     docker run -t --rm \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v "$PROCFS":/hostproc \
-        -e VERSION="$VERSION" \
-        -e WEAVE_DOCKER_ARGS="$WEAVE_DOCKER_ARGS" \
-        -e WEAVE_PASSWORD="$WEAVE_PASSWORD" \
-        -e DOCKER_BRIDGE="$DOCKER_BRIDGE" \
+        -e VERSION \
+        -e WEAVE_DOCKER_ARGS \
+        -e WEAVE_PASSWORD \
+        -e DOCKER_BRIDGE \
         -e PROCFS=/hostproc --privileged --net=host \
         $EXEC_IMAGE --local "$@"
 }
