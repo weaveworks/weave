@@ -158,7 +158,7 @@ If you would like to deploy a new version of a service, keep the old one running
 
 ### Not watching docker events
 
-By default, weaveDNS watchs docker events and removes entries for any
+By default, weaveDNS watches docker events and removes entries for any
 containers that die. You can tell it not to, by adding `--watch=false`
 to the container args:
 
