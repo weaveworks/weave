@@ -185,7 +185,7 @@ func (conn *LocalConnection) log(args ...interface{}) {
 // note that tcpSender is immutable and guaranteed to be set by the
 // time anybody can get hold of a ref to the Connection
 func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
-	if err := conn.handleSendProtocolMsg(m); err != nil {
+	if err := conn.sendProtocolMsg(m); err != nil {
 		conn.Shutdown(err)
 	}
 }
@@ -317,7 +317,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
-			err = conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest)
+			err = conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest)
 		}
 	}
 	return
@@ -339,7 +339,7 @@ func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr)
 	conn.Unlock()
 	conn.heartbeatTimeout.Reset(HeartbeatTimeout)
 	if !old {
-		if err := conn.handleSendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
+		if err := conn.sendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
 			return err
 		}
 	}
@@ -376,18 +376,10 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	// avoid initial waits for timers to fire
 	conn.Forward(true, conn.heartbeatFrame, nil)
 	conn.setStackFrag(false)
-	if err := conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
+	if err := conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
 		return err
 	}
 	return nil
-}
-
-func (conn *LocalConnection) handleSendSimpleProtocolMsg(tag ProtocolTag) error {
-	return conn.handleSendProtocolMsg(ProtocolMsg{tag: tag})
-}
-
-func (conn *LocalConnection) handleSendProtocolMsg(m ProtocolMsg) error {
-	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
 }
 
 func (conn *LocalConnection) handleShutdown() {
@@ -415,6 +407,14 @@ func (conn *LocalConnection) handleShutdown() {
 }
 
 // Helpers
+
+func (conn *LocalConnection) sendSimpleProtocolMsg(tag ProtocolTag) error {
+	return conn.sendProtocolMsg(ProtocolMsg{tag: tag})
+}
+
+func (conn *LocalConnection) sendProtocolMsg(m ProtocolMsg) error {
+	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
+}
 
 func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	defer conn.Decryptor.Shutdown()
