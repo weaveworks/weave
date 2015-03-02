@@ -175,3 +175,5 @@ so they can detech mismatches.]
 
 [There are a lot of `errors.New()` calls in the code; should probably
 re-write them to use specific error types]
+
+[Could randomise the process for picking a peer to talk to]
