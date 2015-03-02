@@ -236,14 +236,14 @@ func (s *OurSpaceSet) GiveUpSpecificSpace(spaceClaimed Space) bool {
 			}
 			lg.Debug.Println("GiveUpSpecificSpace", spaceClaimed, "from", mspace, "splits", split1, split2, split3)
 			if split2.NumFreeAddresses() == spaceClaimed.GetSize() {
-				newspaces := s.spaces[:i]
+				// Take out the old space, then add up to two new spaces.  Ordering of s.spaces is not important.
+				s.spaces = append(s.spaces[:i], s.spaces[i+1:]...)
 				if split1.GetSize() > 0 {
-					newspaces = append(newspaces, split1)
+					s.spaces = append(s.spaces, split1)
 				}
 				if split3 != nil {
-					newspaces = append(newspaces, split3)
+					s.spaces = append(s.spaces, split3)
 				}
-				s.spaces = append(newspaces, s.spaces[i+1:]...)
 				s.version++
 				return true
 			} else {
