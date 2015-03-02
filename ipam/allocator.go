@@ -404,7 +404,7 @@ func (alloc *Allocator) decodeFromDecoder(decoder *gob.Decoder) ([]*PeerSpaceSet
 			} else if oldSpaceset != nil && oldSpaceset.MaybeDead() {
 				lg.Info.Println("Received update for peer believed dead", newSpaceset)
 			}
-			lg.Debug.Println("Replacing data with newer version", newSpaceset)
+			lg.Debug.Println("Replacing data with newer version:", newSpaceset.peerName)
 			alloc.peerInfo[newSpaceset.UID()] = newSpaceset
 			if alloc.leaderless() && !newSpaceset.Empty() {
 				alloc.weHaveALeader()
@@ -707,7 +707,7 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) e
 	}
 
 	if space, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
-		lg.Debug.Println("Decided to give  peer", sender, "space", space)
+		lg.Debug.Println("Decided to give  peer", sender, "space", space, alloc.ourSpaceSet)
 		alloc.sendReply(sender, msgSpaceDonate, space)
 	}
 	return nil
