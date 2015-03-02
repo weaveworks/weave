@@ -164,7 +164,7 @@ func TestGiveUp(t *testing.T) {
 		peer1     = "7a:9f:eb:b6:0c:6e"
 		peer1UID  = 123456
 		testAddr1 = "10.0.1.0"
-		testAddr2 = "10.0.1.16"
+		testAddr2 = "10.0.1.32"
 	)
 
 	var (
@@ -176,11 +176,23 @@ func TestGiveUp(t *testing.T) {
 	ps1 := spaceSetWith(pn1, peer1UID, NewSpace(ipAddr1, 48))
 	ret, ok := ps1.GiveUpSpace()
 	wt.AssertBool(t, ok, true, "GiveUpSpace result")
-	wt.AssertEqualUint32(t, ret.Size, 25, "GiveUpSpace 1 size")
+	numGivenUp := ret.Size
+	wt.AssertEqualUint32(t, numGivenUp, 25, "GiveUpSpace 1 size")
+	wt.AssertEqualUint32(t, ps1.NumFreeAddresses(), 23, "num free addresses")
+	// Claim an address in the free region, to make things more interesting
 	wt.AssertNoErr(t, ps1.Claim("container", ipAddr2))
-	ret, ok = ps1.GiveUpSpace()
-	wt.AssertBool(t, ok, true, "GiveUpSpace result")
-	if ret.Contains(ipAddr2) {
-		t.Fatal("gave up space with claimed address")
+	wt.AssertEqualUint32(t, ps1.NumFreeAddresses(), 22, "num free addresses")
+	count := 0 // count to avoid infinite loop
+	for ; count < 1000; count++ {
+		ret, ok := ps1.GiveUpSpace()
+		if !ok {
+			break
+		}
+		numGivenUp += ret.Size
+		if ret.Contains(ipAddr2) {
+			t.Fatal("gave up space with claimed address")
+		}
 	}
+	wt.AssertEqualUint32(t, ps1.NumFreeAddresses(), 0, "num free addresses")
+	wt.AssertEqualUint32(t, numGivenUp, 47, "total space given up")
 }

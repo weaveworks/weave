@@ -196,14 +196,14 @@ func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 		return nil, false
 	}
 	var bestFree uint32 = 0
-	var bestSpace *MutableSpace = nil
+	var bestSpace *MinSpace = nil
 	for _, space := range s.spaces {
 		mSpace := space.(*MutableSpace)
-		numFree := mSpace.FreeChunkAtEnd()
-		if numFree > bestFree {
-			bestFree = numFree
-			bestSpace = mSpace
-			if numFree >= MaxAddressesToGiveUp {
+		chunk := mSpace.BiggestFreeChunk()
+		if chunk != nil && chunk.Size > bestFree {
+			bestFree = chunk.Size
+			bestSpace = chunk
+			if chunk.Size >= MaxAddressesToGiveUp {
 				break
 			}
 		}
@@ -217,9 +217,8 @@ func (s *OurSpaceSet) GiveUpSpace() (ret *MinSpace, ok bool) {
 		if spaceToGiveUp > totalFreeAddresses/2+1 {
 			spaceToGiveUp = totalFreeAddresses/2 + 1
 		}
-		bestSpace.Size -= spaceToGiveUp
-		s.version++
-		return NewMinSpace(add(bestSpace.Start, bestSpace.Size), spaceToGiveUp), true
+		bestSpace.Size = spaceToGiveUp
+		return bestSpace, s.GiveUpSpecificSpace(bestSpace)
 	}
 	return nil, false
 }

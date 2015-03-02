@@ -188,8 +188,14 @@ func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 	return nil
 }
 
-func (s *MutableSpace) FreeChunkAtEnd() uint32 {
-	return s.Size - s.MaxAllocated
+func (s *MutableSpace) BiggestFreeChunk() *MinSpace {
+	// Stupid implementation
+	if s.MaxAllocated < s.Size {
+		return NewMinSpace(add(s.Start, s.MaxAllocated), s.Size-s.MaxAllocated)
+	} else if len(s.free_list) > 0 {
+		return NewMinSpace(s.free_list[0].IP, 1)
+	}
+	return nil
 }
 
 func (s *MutableSpace) NumFreeAddresses() uint32 {
