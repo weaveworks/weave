@@ -15,17 +15,16 @@ const (
 	testRDNSsuccess  = "1.2.0.10.in-addr.arpa."
 	testRDNSfail     = "4.3.2.1.in-addr.arpa."
 	testRDNSnonlocal = "8.8.8.8.in-addr.arpa."
+	testPort         = 17625
 )
 
 func TestUDPDNSServer(t *testing.T) {
 	const (
-		port            = 17625
 		successTestName = "test1.weave.local."
 		failTestName    = "test2.weave.local."
 		nonLocalName    = "weave.works."
 		testAddr1       = "10.0.2.1"
 	)
-	dnsAddr := fmt.Sprintf("127.0.0.1:%d", port)
 	testCIDR1 := testAddr1 + "/24"
 
 	InitDefaultLogging(true)
@@ -38,14 +37,13 @@ func TestUDPDNSServer(t *testing.T) {
 		m.SetReply(req)
 		if len(req.Question) == 1 {
 			q := req.Question[0]
-			if q.Name == "weave.works." && q.Qtype == dns.TypeMX {
+			if q.Name == nonLocalName && q.Qtype == dns.TypeMX {
 				m.Answer = make([]dns.RR, 1)
-				m.Answer[0] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: "mail.weave.works."}
-			} else if q.Name == "weave.works." && q.Qtype == dns.TypeANY {
-				const N = 10
-				m.Extra = make([]dns.RR, N)
-				for i, _ := range m.Extra {
-					m.Extra[i] = &dns.TXT{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0}, Txt: []string{"Lots and lots and lots and lots and lots and lots and lots and lots and lots of data"}}
+				m.Answer[0] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: "mail." + nonLocalName}
+			} else if q.Name == nonLocalName && q.Qtype == dns.TypeANY {
+				m.Answer = make([]dns.RR, 512 / len("mailn."+nonLocalName) + 1)
+				for i, _ := range m.Answer {
+					m.Answer[i] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: fmt.Sprintf("mail%d.%s", i, nonLocalName)}
 				}
 			} else if q.Name == testRDNSnonlocal && q.Qtype == dns.TypePTR {
 				m.Answer = make([]dns.RR, 1)
@@ -66,88 +64,71 @@ func TestUDPDNSServer(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Port: port}, zone, nil)
+	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Port: testPort}, zone, nil)
 	wt.AssertNoErr(t, err)
 	defer srv.Stop()
 	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
-	c := new(dns.Client)
-	c.UDPSize = DEFAULT_UDP_BUFLEN
-	m := new(dns.Msg)
-	m.SetQuestion(successTestName, dns.TypeA)
-	m.RecursionDesired = true
+	var r *dns.Msg
 
-	r, _, err := c.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
-	wt.AssertEqualInt(t, len(r.Answer), 1, "Number of answers")
+	r = testExchange(t, successTestName, dns.TypeA, 1, 1)
 	wt.AssertType(t, r.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, r.Answer[0].(*dns.A).A.String(), testAddr1, "IP address")
 
-	m.SetQuestion(failTestName, dns.TypeA)
-	r, _, err = c.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeNameError, "DNS response code")
-	wt.AssertEqualInt(t, len(r.Answer), 0, "Number of answers")
+	testExchange(t, failTestName, dns.TypeA, 0, 0)
 
-	m.SetQuestion(testRDNSsuccess, dns.TypePTR)
-	r, _, err = c.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
-	wt.AssertEqualInt(t, len(r.Answer), 1, "Number of answers")
+	r = testExchange(t, testRDNSsuccess, dns.TypePTR, 1, 1)
 	wt.AssertType(t, r.Answer[0], (*dns.PTR)(nil), "DNS record")
 	wt.AssertEqualString(t, r.Answer[0].(*dns.PTR).Ptr, successTestName, "IP address")
-	m.SetQuestion(testRDNSfail, dns.TypePTR)
-	r, _, err = c.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeNameError, "DNS response code")
-	wt.AssertEqualInt(t, len(r.Answer), 0, "Number of answers")
+
+	testExchange(t, testRDNSfail, dns.TypePTR, 0, 0)
 
 	// This should fail because we don't handle MX records
-	m.SetQuestion(successTestName, dns.TypeMX)
-	r, _, err = c.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeNameError, "DNS response code")
-	wt.AssertEqualInt(t, len(r.Answer), 0, "Number of answers")
+	testExchange(t, successTestName, dns.TypeMX, 0, 0)
 
 	// This non-local query for an MX record should succeed by being
 	// passed on to the fallback server
-	m.SetQuestion(nonLocalName, dns.TypeMX)
-	r, _, err = c.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
-	if !(len(r.Answer) > 0) {
-		t.Fatal("Number of answers > 0")
-	}
-	// Now ask a query that we expect to return a lot of data.
-	m.SetQuestion(nonLocalName, dns.TypeANY)
-	r, _, err = c.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
-	if !(len(r.Extra) > 5) {
-		t.Fatal("Number of answers > 5")
-	}
+	testExchange(t, nonLocalName, dns.TypeMX, 1, -1)
 
-	m.SetQuestion(testRDNSnonlocal, dns.TypePTR)
-	r, _, err = c.Exchange(m, dnsAddr)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS success response code")
-	if !(len(r.Answer) > 0) {
-		t.Fatal("Number of answers > 0")
-	}
+	// Now ask a query that we expect to return a lot of data.
+	testExchange(t, nonLocalName, dns.TypeANY, 5, -1)
+
+	testExchange(t, testRDNSnonlocal, dns.TypePTR, 1, -1)
 
 	// Not testing MDNS functionality of server here (yet), since it
 	// needs two servers, each listening on its own address
 }
 
+func testExchange(t *testing.T, z string, ty uint16, minAnswers int, maxAnswers int) *dns.Msg {
+	c := new(dns.Client)
+	c.UDPSize = DEFAULT_UDP_BUFLEN
+	m := new(dns.Msg)
+	m.RecursionDesired = true
+	m.SetQuestion(z, ty)
+	r, _, err := c.Exchange(m, fmt.Sprintf("127.0.0.1:%d", testPort))
+	wt.AssertNoErr(t, err)
+	if minAnswers == 0 && maxAnswers == 0 {
+		wt.AssertStatus(t, r.Rcode, dns.RcodeNameError, "DNS response code")
+	} else {
+		wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
+	}
+	answers := len(r.Answer)
+	if minAnswers >= 0 && answers < minAnswers {
+		wt.Fatalf(t, "Number of answers >= %d", minAnswers)
+	}
+	if maxAnswers >= 0 && answers > maxAnswers {
+		wt.Fatalf(t, "Number of answers <= %d", maxAnswers)
+	}
+	return r
+}
+
 func TestTCPDNSServer(t *testing.T) {
 	const (
-		port         = 17625
 		numAnswers   = 512
 		nonLocalName = "weave.works."
 	)
-	dnsAddr := fmt.Sprintf("localhost:%d", port)
+	dnsAddr := fmt.Sprintf("localhost:%d", testPort)
 
 	InitDefaultLogging(true)
 	var zone = new(ZoneDb)
@@ -190,7 +171,7 @@ func TestTCPDNSServer(t *testing.T) {
 
 	t.Logf("Creating a WeaveDNS server instance, falling back to 127.0.0.1:%s", fallbackPort)
 	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Port: port}, zone, nil)
+	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Port: testPort}, zone, nil)
 	wt.AssertNoErr(t, err)
 	defer srv.Stop()
 	go srv.Start()
