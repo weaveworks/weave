@@ -43,7 +43,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	pn1, _ := router.PeerNameFromString(peer1)
 	ps1 := &OurSpaceSet{PeerSpaceSet{peerName: pn1, uid: peer1UID, version: 1234}}
-	ps1.AddSpace(&MutableSpace{MinSpace: MinSpace{Start: net.ParseIP(testAddr1), Size: 10}, MaxAllocated: 0})
+	ps1.spaces = []Space{&MutableSpace{MinSpace: MinSpace{Start: net.ParseIP(testAddr1), Size: 10}, MaxAllocated: 0}}
 
 	err := ps1.Encode(enc)
 	wt.AssertNoErr(t, err)

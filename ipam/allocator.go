@@ -405,18 +405,6 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 	}
 }
 
-func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
-	newspace := NewSpace(startAddr, poolSize)
-	// See if we can merge this space with an existing space
-	for _, space := range alloc.ourSpaceSet.spaces {
-		if space.(*MutableSpace).mergeBlank(newspace) {
-			alloc.ourSpaceSet.version++
-			return
-		}
-	}
-	alloc.ourSpaceSet.AddSpace(newspace)
-}
-
 func encode(spaceset SpaceSet) []byte {
 	return GobEncode(1, spaceset)
 }
@@ -491,7 +479,7 @@ func (alloc *Allocator) lookForDead(now time.Time) {
 
 func (alloc *Allocator) lookForNewLeaks(now time.Time) {
 	allSpace := NewSpaceSet(router.UnknownPeerName, 0)
-	allSpace.AddSpace(NewSpace(alloc.universe.Start, alloc.universe.Size))
+	allSpace.AddSpace(&alloc.universe)
 	for _, peerSpaceSet := range alloc.peerInfo {
 		peerSpaceSet.ForEachSpace(func(space Space) {
 			allSpace.Exclude(space)
@@ -535,7 +523,7 @@ func (alloc *Allocator) reclaimLeaks(now time.Time) (changed bool) {
 				if space.IsHeirTo(leak, &alloc.universe) {
 					lg.Info.Printf("Reclaiming leak %+v heir %+v", leak, space)
 					delete(alloc.leaked, age)
-					alloc.manageSpace(leak.GetStart(), leak.GetSize())
+					alloc.ourSpaceSet.AddSpace(leak)
 					break
 				}
 			}
@@ -547,7 +535,7 @@ func (alloc *Allocator) reclaimLeaks(now time.Time) (changed bool) {
 func (alloc *Allocator) reclaimPastLife() {
 	lg.Debug.Println("Reclaiming allocations from past life", alloc.pastLife)
 	for _, space := range alloc.pastLife.spaces {
-		alloc.manageSpace(space.GetStart(), space.GetSize())
+		alloc.ourSpaceSet.AddSpace(space)
 	}
 	alloc.pastLife.MakeTombstone()
 	alloc.gossip.GossipBroadcast(encode(alloc.pastLife))
@@ -703,7 +691,7 @@ func (alloc *Allocator) electLeaderIfNecessary() {
 	if highest == alloc.ourUID {
 		lg.Info.Printf("I was elected leader of the universe %+v", alloc.universe)
 		// I'm the winner; take control of the whole universe
-		alloc.manageSpace(alloc.universe.Start, alloc.universe.Size)
+		alloc.ourSpaceSet.AddSpace(&alloc.universe)
 		alloc.weHaveALeader()
 		alloc.checkClaims()
 	} else {
@@ -800,7 +788,7 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) er
 	if _, err := alloc.decodeFromDecoder(decoder); err != nil {
 		return err
 	}
-	alloc.manageSpace(donation.Start, donation.Size)
+	alloc.ourSpaceSet.AddSpace(&donation)
 	alloc.inflight.removeAt(pos)
 	alloc.checkClaims()
 	return nil

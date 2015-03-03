@@ -170,9 +170,15 @@ func (s *OurSpaceSet) Encode(enc *gob.Encoder) error {
 	return s.encode(enc, s.HasFreeAddresses())
 }
 
-func (s *OurSpaceSet) AddSpace(space *MutableSpace) {
-	s.spaces = append(s.spaces, space)
+func (s *OurSpaceSet) AddSpace(newspace Space) {
 	s.version++
+	// See if we can merge this space with an existing space
+	for _, space := range s.spaces {
+		if space.(*MutableSpace).mergeBlank(newspace) {
+			return
+		}
+	}
+	s.spaces = append(s.spaces, NewSpace(newspace.GetStart(), newspace.GetSize()))
 }
 
 func (s *OurSpaceSet) NumFreeAddresses() uint32 {

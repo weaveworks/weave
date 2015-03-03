@@ -28,7 +28,7 @@ func testAllocator(t *testing.T, name string, ourUID uint64, universeCIDR string
 }
 
 func (alloc *Allocator) addSpace(startAddr string, length uint32) *Allocator {
-	alloc.manageSpace(net.ParseIP(startAddr), length)
+	alloc.ourSpaceSet.AddSpace(&MinSpace{net.ParseIP(startAddr), length})
 	return alloc
 }
 
@@ -320,7 +320,7 @@ func implTestGossip(t *testing.T) {
 	alloc1.considerOurPosition()
 
 	// Now give alloc2 some space and tell alloc1 about it
-	alloc2.manageSpace(net.ParseIP(testStart2), 10)
+	alloc2.addSpace(testStart2, 10)
 	ExpectBroadcastMessage(alloc2, nil)
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
 
@@ -585,7 +585,7 @@ func implAllocatorClaim3(t *testing.T) {
 	alloc2 := testAllocator(t, peer2NameString, peerUID, testStart1+"/22").addSpace(testStart3, 32)
 	defer alloc2.Stop()
 	// alloc2 is managing the space that alloc1 wants to claim part of
-	alloc2.manageSpace(net.ParseIP(testStart1), 64)
+	alloc2.addSpace(testStart1, 64)
 
 	alloc1.decodeUpdate(alloc2.Gossip())
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
@@ -649,7 +649,7 @@ func TestAllocatorClaim4(t *testing.T) {
 
 	alloc1 := testAllocator(t, "01:00:00:01:00:00", ourUID, testStart1+"/22")
 	defer alloc1.Stop()
-	alloc1.manageSpace(net.ParseIP(testStart2), 64)
+	alloc1.addSpace(testStart2, 64)
 
 	// Claim an address that nobody is managing
 	done := make(chan bool)
