@@ -255,11 +255,10 @@ func (s *OurSpaceSet) GiveUpSpecificSpace(spaceClaimed Space) bool {
 	return false
 }
 
-func (s *OurSpaceSet) AllocateFor(ident string) net.IP {
+func (s *OurSpaceSet) Allocate() net.IP {
 	// TODO: Optimize; perhaps cache last-used space
 	for _, space := range s.spaces {
-		if ret := space.(*MutableSpace).AllocateFor(ident); ret != nil {
-			lg.Debug.Println("Allocated", ret, "for", ident)
+		if ret := space.(*MutableSpace).Allocate(); ret != nil {
 			return ret
 		}
 	}
@@ -267,9 +266,9 @@ func (s *OurSpaceSet) AllocateFor(ident string) net.IP {
 }
 
 // Claim an address that we think we should own
-func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
+func (s *OurSpaceSet) Claim(addr net.IP) error {
 	for _, space := range s.spaces {
-		if done, err := space.(*MutableSpace).Claim(ident, addr); err != nil {
+		if done, err := space.(*MutableSpace).Claim(addr); err != nil {
 			return err
 		} else if done {
 			return nil
@@ -278,28 +277,14 @@ func (s *OurSpaceSet) Claim(ident string, addr net.IP) error {
 	return errors.New(fmt.Sprintf("IP %s address not in range", addr))
 }
 
-func (s *OurSpaceSet) Free(ident string, addr net.IP) error {
+func (s *OurSpaceSet) Free(addr net.IP) error {
 	for _, space := range s.spaces {
 		if space.(*MutableSpace).Contains(addr) {
-			return space.(*MutableSpace).Free(ident, addr)
+			return space.(*MutableSpace).Free(addr)
 		}
 	}
 	lg.Debug.Println("Address", addr, "not in range", s)
 	return errors.New(fmt.Sprintf("IP %s address not in range", addr))
-}
-
-func (s *OurSpaceSet) FindAddressesFor(ident string) []net.IP {
-	ret := make([]net.IP, 0)
-	for _, space := range s.spaces {
-		ret = append(ret, space.(*MutableSpace).FindAddressesFor(ident)...)
-	}
-	return ret
-}
-
-func (s *OurSpaceSet) DeleteRecordsFor(ident string) {
-	for _, space := range s.spaces {
-		space.(*MutableSpace).DeleteRecordsFor(ident)
-	}
 }
 
 func endOfBlock(a Space) net.IP {

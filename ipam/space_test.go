@@ -15,34 +15,25 @@ func TestSpaceAllocate(t *testing.T) {
 	)
 
 	space1 := NewSpace(net.ParseIP(testAddr1), 20)
-	wt.AssertEqualInt(t, len(space1.allocated), 0, "allocated records")
 	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 20, "Free addresses")
 	space1.checkInvariant(t)
 
-	addr1 := space1.AllocateFor(containerID)
+	addr1 := space1.Allocate()
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
-	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
 	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 19, "Free addresses")
 	space1.checkInvariant(t)
 
-	addr2 := space1.AllocateFor(containerID)
+	addr2 := space1.Allocate()
 	wt.AssertNotEqualString(t, addr2.String(), testAddr1, "address")
-	wt.AssertEqualInt(t, len(space1.allocated), 2, "allocated records")
 	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 18, "Free addresses")
 	space1.checkInvariant(t)
 
-	space1.Free(containerID, addr2)
-	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
+	space1.Free(addr2)
 
-	wt.AssertErrorInterface(t, space1.Free(containerID, addr2), (*error)(nil), "double free")
-	wt.AssertErrorInterface(t, space1.Free("other", addr1), (*error)(nil), "wrong container ID")
-	wt.AssertErrorInterface(t, space1.Free(containerID, net.ParseIP(testAddrx)), (*error)(nil), "address not allocated")
-	wt.AssertErrorInterface(t, space1.Free(containerID, net.ParseIP(testAddry)), (*error)(nil), "wrong out of range")
+	wt.AssertErrorInterface(t, space1.Free(addr2), (*error)(nil), "double free")
+	wt.AssertErrorInterface(t, space1.Free(net.ParseIP(testAddrx)), (*error)(nil), "address not allocated")
+	wt.AssertErrorInterface(t, space1.Free(net.ParseIP(testAddry)), (*error)(nil), "wrong out of range")
 
-	wt.AssertNoErr(t, space1.DeleteRecordsFor(containerID))
-	wt.AssertEqualInt(t, len(space1.allocated), 0, "allocated records")
-	wt.AssertEqualInt(t, space1.countMaxAllocations(), 20, "max allocations")
-	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 20, "Free addresses")
 	space1.checkInvariant(t)
 }
 
@@ -50,20 +41,8 @@ func NewMinSpace(start net.IP, size uint32) *MinSpace {
 	return &MinSpace{Start: start, Size: size}
 }
 
-func (space *MutableSpace) countMaxAllocations() int {
-	const containerID = "counting-test"
-	count := 0
-	for ; ; count++ {
-		if space.AllocateFor(containerID) == nil {
-			break
-		}
-	}
-	space.DeleteRecordsFor(containerID)
-	return count
-}
-
 func (m *MutableSpace) checkInvariant(t *testing.T) {
-	wt.AssertEqualUint32(t, uint32(len(m.allocated)+len(m.free_list)), m.MaxAllocated, "MutableSpace invariant")
+	// we don't really have a good invariant over MutableSpace
 }
 
 func TestSpaceClaim(t *testing.T) {
@@ -77,22 +56,21 @@ func TestSpaceClaim(t *testing.T) {
 
 	space1 := NewSpace(net.ParseIP(testAddr0), 20)
 	space1.checkInvariant(t)
-	space1.Claim(containerID, net.ParseIP(testAddr1))
-	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
+	space1.Claim(net.ParseIP(testAddr1))
+	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 19, "free addresses")
 	space1.checkInvariant(t)
 
-	space1.Claim(containerID, net.ParseIP(testAddr2))
-	wt.AssertEqualInt(t, len(space1.allocated), 2, "allocated records")
+	space1.Claim(net.ParseIP(testAddr2))
+	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 18, "free addresses")
 	space1.checkInvariant(t)
 
-	if done, _ := space1.Claim(containerID, net.ParseIP(testAddr3)); done {
+	if done, _ := space1.Claim(net.ParseIP(testAddr3)); done {
 		t.Fatalf("Space.Claim incorrect success")
 	}
 
-	space1.Free(containerID, net.ParseIP(testAddr1))
+	space1.Free(net.ParseIP(testAddr1))
 	space1.checkInvariant(t)
-	wt.AssertEqualInt(t, len(space1.allocated), 1, "allocated records")
-	wt.AssertEqualInt(t, space1.countMaxAllocations(), 19, "max allocations")
+	wt.AssertEqualUint32(t, space1.NumFreeAddresses(), 19, "free addresses")
 }
 
 func TestSpaceSplit(t *testing.T) {
@@ -103,23 +81,23 @@ func TestSpaceSplit(t *testing.T) {
 	)
 
 	space1 := NewSpace(net.ParseIP(testAddr1), 10)
-	addr1 := space1.AllocateFor(containerID)
-	addr2 := space1.AllocateFor(containerID)
-	addr3 := space1.AllocateFor(containerID)
-	space1.Free(containerID, addr2)
+	addr1 := space1.Allocate()
+	addr2 := space1.Allocate()
+	addr3 := space1.Allocate()
+	space1.Free(addr2)
 	space1.checkInvariant(t)
 	split1, split2 := space1.Split(net.ParseIP(testAddr2))
 	wt.AssertEqualUint32(t, split1.GetSize(), 2, "split size")
 	wt.AssertEqualUint32(t, split2.GetSize(), 8, "split size")
-	wt.AssertEqualInt(t, len(split1.allocated), 1, "allocated records")
-	wt.AssertEqualInt(t, len(split2.allocated), 1, "allocated records")
+	wt.AssertEqualUint32(t, split1.NumFreeAddresses(), 1, "Free addresses")
+	wt.AssertEqualUint32(t, split2.NumFreeAddresses(), 7, "Free addresses")
 	space1.checkInvariant(t)
 	split1.checkInvariant(t)
 	split2.checkInvariant(t)
-	wt.AssertNoErr(t, split1.Free(containerID, addr1))
-	wt.AssertErrorInterface(t, split1.Free(containerID, addr3), (*error)(nil), "free")
-	wt.AssertErrorInterface(t, split2.Free(containerID, addr1), (*error)(nil), "free")
-	wt.AssertNoErr(t, split2.Free(containerID, addr3))
+	wt.AssertNoErr(t, split1.Free(addr1))
+	wt.AssertErrorInterface(t, split1.Free(addr3), (*error)(nil), "free")
+	wt.AssertErrorInterface(t, split2.Free(addr1), (*error)(nil), "free")
+	wt.AssertNoErr(t, split2.Free(addr3))
 }
 
 func TestSpaceOverlap(t *testing.T) {

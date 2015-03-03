@@ -27,11 +27,8 @@ MinSpace/MutableSpace and PeerSpaceSet/OurSpaceSet, respectively.
 
 MinSpace is also used to ship data around over the gossip mechanism.
 
-MutableSpace is used for allocation, so it has a free list.  We also
-need to be able to release any allocations when a container dies, so
-it retains a list of those. [this list could equally be maintained at
-Allocator level, but at present it participates in the Split()
-operation] 
+MutableSpace is used for allocation, so it has a free list, currently
+a simple slice of IP addresses.
 [further scope for enhancement: replace the free list with a bit-mask,
 or a run-length-encoded list of free/occupied runs]
 
@@ -68,10 +65,12 @@ we do extra work to reduce the number of increments?  When does the
 field wrap round?  Wrap-around is fatal to the CRDT algorithm.]
 
 [Currently, MutableSpaceSet.GiveUpSpace() does not follow the pattern
-suggested in the design doc of favouring smaller spaces, nor does it
-give up its last free address.]
+suggested in the design doc of favouring smaller spaces]
 
 #### Allocator
+
+We need to be able to release any allocations when a container dies, so
+Allocator retains a list of those, in a map indexed by container ID.
 
 When Allocator first detects a leak, i.e. a space with no owner, it
 puts it in its 'leaked' map against a timestamp.  In this way it can

@@ -39,7 +39,8 @@ type Allocator struct {
 	gossip      router.Gossip
 	peerInfo    map[uint64]SpaceSet // indexed by peer UID
 	ourSpaceSet *OurSpaceSet
-	pastLife    *PeerSpaceSet // Probably allocations from a previous incarnation
+	pastLife    *PeerSpaceSet       // Probably allocations from a previous incarnation
+	owned       map[string][]net.IP // indexed by container-ID
 	leaked      map[time.Time]Space
 	claims      claimList
 	pending     []getFor
@@ -81,6 +82,33 @@ func (list *requestList) removeAt(pos int) {
 	(*list) = append((*list)[:pos], (*list)[pos+1:]...)
 }
 
+func (alloc *Allocator) addOwned(ident string, addr net.IP) {
+	alloc.owned[ident] = append(alloc.owned[ident], addr)
+}
+
+func (alloc *Allocator) findOwner(addr net.IP) string {
+	for ident, addrs := range alloc.owned {
+		for _, ip := range addrs {
+			if ip.Equal(addr) {
+				return ident
+			}
+		}
+	}
+	return ""
+}
+
+func (alloc *Allocator) removeOwned(ident string, addr net.IP) bool {
+	if addrs, found := alloc.owned[ident]; found {
+		for i, ip := range addrs {
+			if ip.Equal(addr) {
+				alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // To allow time itself to be stubbed out for testing
 type timeProvider interface {
 	Now() time.Time
@@ -97,7 +125,8 @@ type makeString struct {
 }
 type claim struct {
 	resultChan chan<- error
-	Allocation
+	Ident      string
+	IP         net.IP
 }
 type getFor struct {
 	resultChan chan<- net.IP
@@ -105,7 +134,8 @@ type getFor struct {
 }
 type free struct {
 	resultChan chan<- error
-	Allocation
+	Ident      string
+	IP         net.IP
 }
 type deleteRecordsFor struct {
 	Ident string
@@ -174,6 +204,7 @@ func NewAllocator(ourName router.PeerName, ourUID uint64, universeCIDR string) (
 		universe:     MinSpace{Start: add(universeNet.IP, 1), Size: universeSize - 2},
 		peerInfo:     make(map[uint64]SpaceSet),
 		ourSpaceSet:  NewSpaceSet(ourName, ourUID),
+		owned:        make(map[string][]net.IP),
 		leaked:       make(map[time.Time]Space),
 		timeProvider: defaultTime{},
 	}
@@ -211,7 +242,7 @@ func (alloc *Allocator) Stop() {
 func (alloc *Allocator) Claim(ident string, addr net.IP) error {
 	lg.Info.Printf("Address %s claimed by %s", addr, ident)
 	resultChan := make(chan error)
-	alloc.queryChan <- claim{resultChan, Allocation{ident, addr}}
+	alloc.queryChan <- claim{resultChan, ident, addr}
 	return <-resultChan
 }
 
@@ -225,7 +256,7 @@ func (alloc *Allocator) GetFor(ident string) net.IP {
 // Sync.
 func (alloc *Allocator) Free(ident string, addr net.IP) error {
 	resultChan := make(chan error)
-	alloc.queryChan <- free{resultChan, Allocation{ident, addr}}
+	alloc.queryChan <- free{resultChan, ident, addr}
 	return <-resultChan
 }
 
@@ -311,15 +342,22 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 				alloc.handleClaim(q.Ident, q.IP, q.resultChan)
 			case getFor:
 				alloc.electLeaderIfNecessary()
-				if addrs := alloc.ourSpaceSet.FindAddressesFor(q.Ident); len(addrs) > 0 {
+				if addrs, found := alloc.owned[q.Ident]; found && len(addrs) > 0 {
 					q.resultChan <- addrs[0] // currently not supporting multiple allocations in the same subnet
 				} else if !alloc.tryAllocateFor(q.Ident, q.resultChan) {
 					alloc.pending = append(alloc.pending, getFor{q.resultChan, q.Ident})
 				}
 			case deleteRecordsFor:
-				alloc.ourSpaceSet.DeleteRecordsFor(q.Ident)
+				for _, ip := range alloc.owned[q.Ident] {
+					alloc.ourSpaceSet.Free(ip)
+				}
+				delete(alloc.owned, q.Ident)
 			case free:
-				q.resultChan <- alloc.ourSpaceSet.Free(q.Ident, q.IP)
+				if alloc.removeOwned(q.Ident, q.IP) {
+					q.resultChan <- alloc.ourSpaceSet.Free(q.IP)
+				} else {
+					q.resultChan <- fmt.Errorf("free: %s not owned by %s", q.IP, q.Ident)
+				}
 			case gossipUnicast:
 				switch q.bytes[0] {
 				case msgSpaceRequest:
@@ -529,8 +567,15 @@ func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err
 		return 0, nil
 	} else if spaceSet := alloc.peerInfo[owner]; spaceSet == alloc.ourSpaceSet {
 		// We own it, perhaps because we claimed it above.
-		err := alloc.ourSpaceSet.Claim(ident, addr)
-		return alloc.ourUID, err
+		if existingIdent := alloc.findOwner(addr); existingIdent == "" {
+			alloc.addOwned(ident, addr)
+			err := alloc.ourSpaceSet.Claim(addr)
+			return alloc.ourUID, err
+		} else if existingIdent == ident {
+			return alloc.ourUID, nil
+		} else {
+			return alloc.ourUID, fmt.Errorf("Claimed address %s is already owned by %s", addr, existingIdent)
+		}
 	} else {
 		// That address is owned by someone else
 		claimspace := MinSpace{addr, 1}
@@ -556,7 +601,9 @@ func (alloc *Allocator) checkClaims() {
 
 // return true if the request is completed, false if pending
 func (alloc *Allocator) tryAllocateFor(ident string, resultChan chan<- net.IP) bool {
-	if addr := alloc.ourSpaceSet.AllocateFor(ident); addr != nil {
+	if addr := alloc.ourSpaceSet.Allocate(); addr != nil {
+		lg.Debug.Println("Allocated", addr, "for", ident)
+		alloc.addOwned(ident, addr)
 		resultChan <- addr
 		return true
 	} else { // out of space
@@ -802,7 +849,7 @@ func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<-
 	if owner, err := alloc.checkClaim(ident, addr); err != nil {
 		resultChan <- err
 	} else if owner != alloc.ourUID {
-		alloc.claims = append(alloc.claims, claim{resultChan, Allocation{ident, addr}})
+		alloc.claims = append(alloc.claims, claim{resultChan, ident, addr})
 	} else {
 		resultChan <- nil
 	}
@@ -821,7 +868,7 @@ func (alloc *Allocator) string() string {
 	}
 	for _, claim := range alloc.claims {
 		buf.WriteString("\nClaim ")
-		buf.WriteString(claim.String())
+		buf.WriteString(fmt.Sprintf("%s %s", claim.Ident, claim.IP))
 	}
 	return buf.String()
 }

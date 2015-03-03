@@ -1,7 +1,6 @@
 package ipam
 
 import (
-	"errors"
 	"fmt"
 	"net"
 )
@@ -53,41 +52,32 @@ func (s *MinSpace) String() string {
 	return fmt.Sprintf("%s+%d", s.Start, s.Size)
 }
 
-type Allocation struct {
-	Ident string
-	IP    net.IP
+type addressList []net.IP
+
+func (aa *addressList) add(a net.IP) {
+	*aa = append(*aa, a)
 }
 
-func (a *Allocation) String() string {
-	return fmt.Sprintf("%s %s", a.Ident, a.IP)
-}
-
-type AllocationList []Allocation
-
-func (aa *AllocationList) add(a *Allocation) {
-	*aa = append(*aa, *a)
-}
-
-func (aa *AllocationList) removeAt(pos int) {
+func (aa *addressList) removeAt(pos int) {
 	// Delete by swapping the last element into this one and truncating
 	last := len(*aa) - 1
 	(*aa)[pos], (*aa) = (*aa)[last], (*aa)[:last]
 }
 
-func (aa *AllocationList) find(addr net.IP) int {
+func (aa *addressList) find(addr net.IP) int {
 	for i, a := range *aa {
-		if a.IP.Equal(addr) {
+		if a.Equal(addr) {
 			return i
 		}
 	}
 	return -1
 }
 
-func (aa *AllocationList) take() *Allocation {
+func (aa *addressList) take() net.IP {
 	if n := len(*aa); n > 0 {
 		ret := (*aa)[n-1]
 		*aa = (*aa)[:n-1]
-		return &ret
+		return ret
 	}
 	return nil
 }
@@ -95,8 +85,7 @@ func (aa *AllocationList) take() *Allocation {
 type MutableSpace struct {
 	MinSpace
 	MaxAllocated uint32 // 0 if nothing allocated, 1 if first address allocated, etc.
-	allocated    AllocationList
-	free_list    AllocationList
+	free_list    addressList
 }
 
 func NewSpace(start net.IP, size uint32) *MutableSpace {
@@ -104,83 +93,43 @@ func NewSpace(start net.IP, size uint32) *MutableSpace {
 }
 
 // Mark an address as allocated on behalf of some specific container
-func (space *MutableSpace) Claim(ident string, addr net.IP) (bool, error) {
+func (space *MutableSpace) Claim(addr net.IP) (bool, error) {
 	offset := subtract(addr, space.Start)
 	if !(offset >= 0 && offset < int64(space.Size)) {
 		return false, nil
 	}
-	// Is it already allocated?
-	if pos := space.allocated.find(addr); pos >= 0 {
-		if space.allocated[pos].Ident == ident {
-			return true, nil
-		} else {
-			return false, errors.New("Already allocated")
-		}
-	}
-	// MaxAllocated is one more than the offset of the last allocated address
+	// note: MaxAllocated is one more than the offset of the last allocated address
 	if uint32(offset) >= space.MaxAllocated {
 		// Need to add all the addresses in the gap to the free list
 		for i := space.MaxAllocated; i < uint32(offset); i++ {
 			addr := add(space.Start, i)
-			space.free_list.add(&Allocation{"", addr})
+			space.free_list.add(addr)
 		}
 		space.MaxAllocated = uint32(offset) + 1
 	}
-	space.allocated.add(&Allocation{ident, addr})
 	return true, nil
 }
 
-func (space *MutableSpace) AllocateFor(ident string) net.IP {
+func (space *MutableSpace) Allocate() net.IP {
 	ret := space.free_list.take()
-	if ret != nil {
-		ret.Ident = ident
-	} else if space.MaxAllocated < space.Size {
+	if ret == nil && space.MaxAllocated < space.Size {
 		space.MaxAllocated++
-		ret = &Allocation{ident, add(space.Start, space.MaxAllocated-1)}
-	} else {
-		return nil
-	}
-	space.allocated.add(ret)
-	return ret.IP
-}
-
-func (space *MutableSpace) Free(ident string, addr net.IP) error {
-	if pos := space.allocated.find(addr); pos >= 0 {
-		a := space.allocated[pos]
-		if a.Ident == ident {
-			space.allocated.removeAt(pos)
-			space.free_list.add(&a)
-			// TODO: consolidate free space
-			return nil
-		} else {
-			return errors.New("IP address owned by different container")
-		}
-	}
-	return errors.New("IP address not allocated")
-}
-
-func (space *MutableSpace) FindAddressesFor(ident string) []net.IP {
-	ret := make([]net.IP, 0)
-	for _, r := range space.allocated {
-		if r.Ident == ident {
-			ret = append(ret, r.IP)
-		}
+		ret = add(space.Start, space.MaxAllocated-1)
 	}
 	return ret
 }
 
-func (space *MutableSpace) DeleteRecordsFor(ident string) error {
-	w := 0 // write index
-
-	for _, r := range space.allocated {
-		if r.Ident == ident {
-			space.free_list.add(&r)
-		} else {
-			space.allocated[w] = r
-			w++
-		}
+func (space *MutableSpace) Free(addr net.IP) error {
+	offset := subtract(addr, space.Start)
+	if !(offset >= 0 && offset < int64(space.Size)) {
+		return fmt.Errorf("Free out of range: %s", addr)
+	} else if offset >= int64(space.MaxAllocated) {
+		return fmt.Errorf("IP address not allocated: %s", addr)
+	} else if space.free_list.find(addr) >= 0 {
+		return fmt.Errorf("Duplicate free: %s", addr)
 	}
-	space.allocated = space.allocated[:w]
+	space.free_list.add(addr)
+	// TODO: consolidate free space
 	return nil
 }
 
@@ -191,15 +140,15 @@ func (s *MutableSpace) BiggestFreeChunk() *MinSpace {
 	} else if len(s.free_list) > 0 {
 		// Find how many contiguous addresses are at the head of the free list
 		size := 1
-		for ; size < len(s.free_list) && subtract(s.free_list[size].IP, s.free_list[size-1].IP) == 1; size++ {
+		for ; size < len(s.free_list) && subtract(s.free_list[size], s.free_list[size-1]) == 1; size++ {
 		}
-		return &MinSpace{s.free_list[0].IP, uint32(size)}
+		return &MinSpace{s.free_list[0], uint32(size)}
 	}
 	return nil
 }
 
 func (s *MutableSpace) NumFreeAddresses() uint32 {
-	return s.Size - uint32(len(s.allocated))
+	return s.Size - s.MaxAllocated + uint32(len(s.free_list))
 }
 
 // Enlarge a space by merging in a blank space and return true
@@ -215,7 +164,7 @@ func (a *MutableSpace) mergeBlank(b Space) bool {
 }
 
 func (space *MutableSpace) String() string {
-	return fmt.Sprintf("%s+%d, %d/%d/%d", space.Start, space.Size, space.MaxAllocated, len(space.allocated), len(space.free_list))
+	return fmt.Sprintf("%s+%d, %d/%d", space.Start, space.Size, space.MaxAllocated, len(space.free_list))
 }
 
 // Divide a space into two new spaces at a given address, copying allocations and frees.
@@ -227,31 +176,25 @@ func (space *MutableSpace) Split(addr net.IP) (*MutableSpace, *MutableSpace) {
 	ret1 := NewSpace(space.GetStart(), uint32(breakpoint))
 	ret2 := NewSpace(addr, space.Size-uint32(breakpoint))
 
-	// Copy all the allocations and find the max-allocated point for each
-	for _, alloc := range space.allocated {
-		offset := subtract(alloc.IP, addr)
-		if offset < 0 {
-			ret1.allocated.add(&alloc)
-			if uint32(breakpoint+offset)+1 > ret1.MaxAllocated {
-				ret1.MaxAllocated = uint32(breakpoint+offset) + 1
-			}
-		} else {
-			ret2.allocated.add(&alloc)
-			if uint32(offset)+1 > ret2.MaxAllocated {
-				ret2.MaxAllocated = uint32(offset) + 1
-			}
-		}
+	// find the max-allocated point for each sub-space
+	if space.MaxAllocated > uint32(breakpoint) {
+		ret1.MaxAllocated = ret1.Size
+		ret2.MaxAllocated = space.MaxAllocated - ret1.Size
+	} else {
+		ret1.MaxAllocated = space.MaxAllocated
+		ret2.MaxAllocated = 0
 	}
+
 	// Now copy the free list, but omit anything above MaxAllocated in each case
 	for _, alloc := range space.free_list {
-		offset := subtract(alloc.IP, addr)
+		offset := subtract(alloc, addr)
 		if offset < 0 {
 			if uint32(offset+breakpoint) < ret1.MaxAllocated {
-				ret1.free_list.add(&alloc)
+				ret1.free_list.add(alloc)
 			}
 		} else {
 			if uint32(offset) < ret2.MaxAllocated {
-				ret2.free_list.add(&alloc)
+				ret2.free_list.add(alloc)
 			}
 		}
 	}

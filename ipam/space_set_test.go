@@ -180,7 +180,7 @@ func TestGiveUp(t *testing.T) {
 	wt.AssertEqualUint32(t, numGivenUp, 25, "GiveUpSpace 1 size")
 	wt.AssertEqualUint32(t, ps1.NumFreeAddresses(), 23, "num free addresses")
 	// Claim an address in the free region, to make things more interesting
-	wt.AssertNoErr(t, ps1.Claim("container", ipAddr2))
+	wt.AssertNoErr(t, ps1.Claim(ipAddr2))
 	wt.AssertEqualUint32(t, ps1.NumFreeAddresses(), 22, "num free addresses")
 	count := 0 // count to avoid infinite loop
 	for ; count < 1000; count++ {
