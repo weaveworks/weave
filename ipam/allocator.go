@@ -368,7 +368,15 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 }
 
 func (alloc *Allocator) manageSpace(startAddr net.IP, poolSize uint32) {
-	alloc.ourSpaceSet.AddSpace(NewSpace(startAddr, poolSize))
+	newspace := NewSpace(startAddr, poolSize)
+	// See if we can merge this space with an existing space
+	for _, space := range alloc.ourSpaceSet.spaces {
+		if space.(*MutableSpace).mergeBlank(newspace) {
+			alloc.ourSpaceSet.version++
+			return
+		}
+	}
+	alloc.ourSpaceSet.AddSpace(newspace)
 }
 
 func encode(spaceset SpaceSet) []byte {
@@ -489,17 +497,11 @@ func (alloc *Allocator) reclaimLeaks(now time.Time) (changed bool) {
 				if space.IsHeirTo(leak, &alloc.universe) {
 					lg.Info.Printf("Reclaiming leak %+v heir %+v", leak, space)
 					delete(alloc.leaked, age)
-					if !space.(*MutableSpace).mergeBlank(leak) { // If we can't merge the two, add another
-						alloc.manageSpace(leak.GetStart(), leak.GetSize())
-					}
-					changed = true
+					alloc.manageSpace(leak.GetStart(), leak.GetSize())
 					break
 				}
 			}
 		}
-	}
-	if changed {
-		alloc.ourSpaceSet.version++
 	}
 	return
 }
@@ -751,7 +753,7 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) er
 	if _, err := alloc.decodeFromDecoder(decoder); err != nil {
 		return err
 	}
-	alloc.ourSpaceSet.AddSpace(NewSpace(donation.Start, donation.Size))
+	alloc.manageSpace(donation.Start, donation.Size)
 	alloc.inflight.removeAt(pos)
 	alloc.checkClaims()
 	return nil
