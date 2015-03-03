@@ -185,11 +185,15 @@ func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 }
 
 func (s *MutableSpace) BiggestFreeChunk() *MinSpace {
-	// Stupid implementation
+	// Return some chunk, not necessarily _the_ biggest
 	if s.MaxAllocated < s.Size {
 		return &MinSpace{add(s.Start, s.MaxAllocated), s.Size - s.MaxAllocated}
 	} else if len(s.free_list) > 0 {
-		return &MinSpace{s.free_list[0].IP, 1}
+		// Find how many contiguous addresses are at the head of the free list
+		size := 1
+		for ; size < len(s.free_list) && subtract(s.free_list[size].IP, s.free_list[size-1].IP) == 1; size++ {
+		}
+		return &MinSpace{s.free_list[0].IP, uint32(size)}
 	}
 	return nil
 }
