@@ -515,7 +515,7 @@ func (alloc *Allocator) reclaimPastLife() {
 }
 
 func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err error) {
-	testaddr := NewMinSpace(addr, 1)
+	testaddr := &MinSpace{addr, 1}
 	if alloc.pastLife != nil && alloc.pastLife.Overlaps(testaddr) {
 		// We've been sent a peerInfo that matches our PeerName but not UID
 		// We've also been asked to claim an IP that is in the range it owned
@@ -786,7 +786,7 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 
 // Claim an address that we think we should own
 func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<- error) {
-	testaddr := NewMinSpace(addr, 1)
+	testaddr := &MinSpace{addr, 1}
 	if !alloc.universe.Overlaps(testaddr) {
 		// Address not within our universe; assume user knows what they are doing
 		resultChan <- nil

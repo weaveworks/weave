@@ -46,6 +46,10 @@ func TestSpaceAllocate(t *testing.T) {
 	space1.checkInvariant(t)
 }
 
+func NewMinSpace(start net.IP, size uint32) *MinSpace {
+	return &MinSpace{Start: start, Size: size}
+}
+
 func (space *MutableSpace) countMaxAllocations() int {
 	const containerID = "counting-test"
 	count := 0

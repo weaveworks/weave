@@ -53,10 +53,6 @@ func (s *MinSpace) String() string {
 	return fmt.Sprintf("%s+%d", s.Start, s.Size)
 }
 
-func NewMinSpace(start net.IP, size uint32) *MinSpace {
-	return &MinSpace{Start: start, Size: size}
-}
-
 type Allocation struct {
 	Ident string
 	IP    net.IP
@@ -191,9 +187,9 @@ func (space *MutableSpace) DeleteRecordsFor(ident string) error {
 func (s *MutableSpace) BiggestFreeChunk() *MinSpace {
 	// Stupid implementation
 	if s.MaxAllocated < s.Size {
-		return NewMinSpace(add(s.Start, s.MaxAllocated), s.Size-s.MaxAllocated)
+		return &MinSpace{add(s.Start, s.MaxAllocated), s.Size - s.MaxAllocated}
 	} else if len(s.free_list) > 0 {
-		return NewMinSpace(s.free_list[0].IP, 1)
+		return &MinSpace{s.free_list[0].IP, 1}
 	}
 	return nil
 }

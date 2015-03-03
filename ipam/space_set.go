@@ -313,13 +313,13 @@ func (s *OurSpaceSet) Exclude(a Space) bool {
 		bSize := int64(b.GetSize())
 		diff := subtract(a.GetStart(), b.GetStart())
 		if diff > 0 && diff < bSize {
-			ns = append(ns, NewMinSpace(b.GetStart(), uint32(diff)))
+			ns = append(ns, &MinSpace{b.GetStart(), uint32(diff)})
 			if bSize > aSize+diff {
-				ns = append(ns, NewMinSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
+				ns = append(ns, &MinSpace{endOfBlock(a), uint32(bSize - (aSize + diff))})
 			}
 		} else if diff <= 0 && -diff < aSize {
 			if aSize+diff < bSize {
-				ns = append(ns, NewMinSpace(endOfBlock(a), uint32(bSize-(aSize+diff))))
+				ns = append(ns, &MinSpace{endOfBlock(a), uint32(bSize - (aSize + diff))})
 			}
 		} else { // Pieces do not overlap; leave the existing one in place
 			ns = append(ns, b)
