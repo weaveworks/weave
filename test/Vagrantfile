@@ -14,7 +14,7 @@ def configure_docker(host, hostname, ip)
   host.vm.hostname = hostname
   host.vm.network "private_network", ip: ip
 
-  # host.vm.synced_folder "./", "/home/vagrant/src/github.com/zettio/weave"
+  host.vm.synced_folder ".", "/vagrant", disabled: true
 
   host.vm.provision :shell, :inline => "sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9"
   host.vm.provision :shell, :inline => "echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"
