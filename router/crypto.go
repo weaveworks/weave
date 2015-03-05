@@ -19,11 +19,11 @@ func GenerateKeyPair() (publicKey, privateKey *[32]byte, err error) {
 	return box.GenerateKey(rand.Reader)
 }
 
-func FormSessionKey(remotePublicKey, localPrivateKey *[32]byte, secretKey *[]byte) *[32]byte {
+func FormSessionKey(remotePublicKey, localPrivateKey *[32]byte, secretKey []byte) *[32]byte {
 	var sharedKey [32]byte
 	box.Precompute(&sharedKey, remotePublicKey, localPrivateKey)
 	sharedKeySlice := sharedKey[:]
-	sharedKeySlice = append(sharedKeySlice, *secretKey...)
+	sharedKeySlice = append(sharedKeySlice, secretKey...)
 	sessionKey := sha256.Sum256(sharedKeySlice)
 	return &sessionKey
 }

@@ -27,7 +27,7 @@ type Router struct {
 	GossipChannels  map[uint32]*GossipChannel
 	TopologyGossip  Gossip
 	UDPListener     *net.UDPConn
-	Password        *[]byte
+	Password        []byte
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
@@ -50,12 +50,10 @@ func NewRouter(iface *net.Interface, name PeerName, nickName string, password []
 	router := &Router{
 		Iface:          iface,
 		GossipChannels: make(map[uint32]*GossipChannel),
+		Password:       password,
 		ConnLimit:      connLimit,
 		BufSz:          bufSz,
 		LogFrame:       logFrame}
-	if len(password) > 0 {
-		router.Password = &password
-	}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer.Name)
 	}

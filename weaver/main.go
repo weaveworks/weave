@@ -104,9 +104,12 @@ func main() {
 	if password == "" {
 		password = os.Getenv("WEAVE_PASSWORD")
 	}
+
+	var pwSlice []byte
 	if password == "" {
 		log.Println("Communication between peers is unencrypted.")
 	} else {
+		pwSlice = []byte(password)
 		log.Println("Communication between peers is encrypted.")
 	}
 
@@ -130,7 +133,7 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	router := weave.NewRouter(iface, ourName, nickName, []byte(password), connLimit, bufSz*1024*1024, logFrame)
+	router := weave.NewRouter(iface, ourName, nickName, pwSlice, connLimit, bufSz*1024*1024, logFrame)
 	log.Println("Our name is", router.Ourself.Name, "("+router.Ourself.NickName+")")
 	router.Start()
 	for _, peer := range peers {
@@ -146,7 +149,7 @@ func main() {
 
 func handleHttp(router *weave.Router) {
 	encryption := "off"
-	if router.Password != nil && len(*router.Password) > 0 {
+	if router.Password != nil {
 		encryption = "on"
 	}
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
