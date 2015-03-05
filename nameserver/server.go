@@ -52,8 +52,8 @@ type DNSServer struct {
 // Creates a new DNS server
 func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *DNSServer, err error) {
 	s = &DNSServer{
-		zone:   zone,
-		iface:  iface,
+		zone:  zone,
+		iface: iface,
 
 		Domain:     DEFAULT_LOCAL_DOMAIN,
 		IfaceName:  DEFAULT_IFACE_NAME,

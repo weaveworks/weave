@@ -41,7 +41,7 @@ func TestUDPDNSServer(t *testing.T) {
 				m.Answer = make([]dns.RR, 1)
 				m.Answer[0] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: "mail." + nonLocalName}
 			} else if q.Name == nonLocalName && q.Qtype == dns.TypeANY {
-				m.Answer = make([]dns.RR, 512 / len("mailn."+nonLocalName) + 1)
+				m.Answer = make([]dns.RR, 512/len("mailn."+nonLocalName)+1)
 				for i, _ := range m.Answer {
 					m.Answer[i] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: fmt.Sprintf("mail%d.%s", i, nonLocalName)}
 				}

@@ -94,7 +94,7 @@ func (router *Router) UsingPassword() bool {
 
 func (router *Router) Status() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name, "(" + router.Ourself.NickName + ")"))
+	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name, "("+router.Ourself.NickName+")"))
 	buf.WriteString(fmt.Sprintln("Sniffing traffic on", router.Iface))
 	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
 	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))
