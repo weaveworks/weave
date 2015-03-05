@@ -149,7 +149,7 @@ func main() {
 
 func handleHttp(router *weave.Router) {
 	encryption := "off"
-	if router.Password != nil {
+	if router.UsingPassword() {
 		encryption = "on"
 	}
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
