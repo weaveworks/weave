@@ -114,16 +114,16 @@ func (router *Router) sniff(pio PacketSourceSink) {
 			pkt, err := pio.ReadPacket()
 			checkFatal(err)
 			router.LogFrame("Sniffed", pkt, nil)
-			checkWarn(router.handleCapturedPacket(pkt, dec, pio))
+			router.handleCapturedPacket(pkt, dec, pio)
 		}
 	}()
 }
 
-func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecoder, po PacketSink) error {
+func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecoder, po PacketSink) {
 	dec.DecodeLayers(frameData)
 	decodedLen := len(dec.decoded)
 	if decodedLen == 0 {
-		return nil
+		return
 	}
 	srcMac := dec.eth.SrcMAC
 	srcPeer, found := router.Macs.Lookup(srcMac)
@@ -131,18 +131,18 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	// frames, the srcMAC will have been recorded as associated with a
 	// different peer.
 	if found && srcPeer != router.Ourself.Peer {
-		return nil
+		return
 	}
 	if router.Macs.Enter(srcMac, router.Ourself.Peer) {
 		log.Println("Discovered local MAC", srcMac)
 	}
 	if dec.DropFrame() {
-		return nil
+		return
 	}
 	dstMac := dec.eth.DstMAC
 	dstPeer, found := router.Macs.Lookup(dstMac)
 	if found && dstPeer == router.Ourself.Peer {
-		return nil
+		return
 	}
 	df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
 	if df {
@@ -159,14 +159,13 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 
 	if !found {
 		router.Ourself.Broadcast(df, frameCopy, dec)
-		return nil
-	} else {
-		err := router.Ourself.Forward(dstPeer, df, frameCopy, dec)
-		if ftbe, ok := err.(FrameTooBigError); ok {
-			err = dec.sendICMPFragNeeded(ftbe.EPMTU, po.WritePacket)
-		}
-		return err
+		return
 	}
+	err := router.Ourself.Forward(dstPeer, df, frameCopy, dec)
+	if ftbe, ok := err.(FrameTooBigError); ok {
+		err = dec.sendICMPFragNeeded(ftbe.EPMTU, po.WritePacket)
+	}
+	checkWarn(err)
 }
 
 func (router *Router) listenTCP(localPort int) {
