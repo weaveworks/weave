@@ -37,14 +37,14 @@ container on `$HOST1` we can start a netcat "service" with
 
 and then connect to it from the container on `$HOST2` with
 
-    root@f76829496120:/# echo 'Hello, world.' | nc 10.0.1.1 4422
+    root@f76829496120:/# echo 'Hello, world.' | nc 10.2.1.1 4422
 
 Note that *any* protocol is supported. Doesn't even have to be over
 TCP/IP, e.g. a netcat UDP service would be run with
 
     root@28841bd02eff:/# nc -lu -p 5533
 
-    root@f76829496120:/# echo 'Hello, world.' | nc -u 10.0.1.1 5533
+    root@f76829496120:/# echo 'Hello, world.' | nc -u 10.2.1.1 5533
 
 We can deploy the entire arsenal of standard network tools and
 applications, developed over decades, to configure, secure, monitor,
@@ -63,28 +63,28 @@ To accomplish that, we assign each application a different subnet. So,
 in the above example, if we wanted to add another application similar
 to, but isolated from, our first, we'd launch the containers with...
 
-    host1# D=$(weave run 10.0.2.1/24 -t -i ubuntu)
-    host2# D=$(weave run 10.0.2.2/24 -t -i ubuntu)
+    host1# D=$(weave run 10.2.2.1/24 -t -i ubuntu)
+    host2# D=$(weave run 10.2.2.2/24 -t -i ubuntu)
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
 
     host1# docker attach $D
     
-    root@da50502598d5:/# ping -c 1 -q 10.0.2.2
-    PING 10.0.2.2 (10.0.2.2): 48 data bytes
-    --- 10.0.2.2 ping statistics ---
+    root@da50502598d5:/# ping -c 1 -q 10.2.2.2
+    PING 10.2.2.2 (10.2.2.2): 48 data bytes
+    --- 10.2.2.2 ping statistics ---
     1 packets transmitted, 1 packets received, 0% packet loss
     round-trip min/avg/max/stddev = 0.562/0.562/0.562/0.000 ms
     
-    root@da50502598d5:/# ping -c 1 -q 10.0.1.1
-    PING 10.0.1.1 (10.0.1.1) 56(84) bytes of data.
-    --- 10.0.1.1 ping statistics ---
+    root@da50502598d5:/# ping -c 1 -q 10.2.1.1
+    PING 10.2.1.1 (10.2.1.1) 56(84) bytes of data.
+    --- 10.2.1.1 ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
     
-    root@da50502598d5:/# ping -c 1 -q 10.0.1.2
-    PING 10.0.1.2 (10.0.1.2) 56(84) bytes of data.
-    --- 10.0.1.2 ping statistics ---
+    root@da50502598d5:/# ping -c 1 -q 10.2.1.2
+    PING 10.2.1.2 (10.2.1.2) 56(84) bytes of data.
+    --- 10.2.1.2 ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
 
 This isolation-through-subnets scheme is an example of carrying over a
@@ -110,23 +110,23 @@ to the weave network. To illustrate, we can achieve the same effect as
 the first example with
 
     host1# C=$(docker run -d -t -i ubuntu)
-    host1# weave attach 10.0.1.1/24 $C
+    host1# weave attach 10.2.1.1/24 $C
 
 There is a matching `weave detach` command:
 
-    host1# weave detach 10.0.1.1/24 $C
+    host1# weave detach 10.2.1.1/24 $C
 
 You can detach a container from one application network and attach it
 to another:
 
-    host1# weave detach 10.0.1.1/24 $C
-    host1# weave attach 10.0.2.1/24 $C
+    host1# weave detach 10.2.1.1/24 $C
+    host1# weave attach 10.2.2.1/24 $C
 
 or attach a container to multiple application networks, effectively
 sharing it between applications:
 
-    host1# weave attach 10.0.1.1/24 $C
-    host1# weave attach 10.0.2.1/24 $C
+    host1# weave attach 10.2.1.1/24 $C
+    host1# weave attach 10.2.2.1/24 $C
 
 ### <a name="security"></a>Security
 
@@ -158,18 +158,18 @@ anywhere.
 Let's say that in our example we want `$HOST2` to have access to the
 application containers. On `$HOST2` we run
 
-    host2# weave expose 10.0.1.102/24
+    host2# weave expose 10.2.1.102/24
 
 choosing an unused IP address in the application subnet. (There is a
 corresponding 'hide' command to revert this step.)
 
 Now
 
-    host2# ping 10.0.1.2
+    host2# ping 10.2.1.2
 
 will work. And, more interestingly,
 
-    host2# ping 10.0.1.1
+    host2# ping 10.2.1.1
 
 will work too, which is talking to a container that resides on `$HOST1`.
 
@@ -186,18 +186,18 @@ a container on `$HOST1`, accessible to the outside world via `$HOST2`.
 First we need to expose the application network to `$HOST2`, as
 explained [above](#host-network-integration), i.e.
 
-    host2# weave expose 10.0.1.102/24
+    host2# weave expose 10.2.1.102/24
 
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
     host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
-           -j DNAT --to-destination 10.0.1.1:4422
+           -j DNAT --to-destination 10.2.1.1:4422
 
 Here we are assuming that the "outside world" is connecting to `$HOST2`
 via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
 routed to our 'nc' service, which is running on port 4422 in the
-container with IP 10.0.1.1.
+container with IP 10.2.1.1.
 
 With the above in place, we can connect to our 'nc' service from
 anywhere with
@@ -226,23 +226,23 @@ First we need to expose the application network to the host, as
 explained [above](#host-network-integration), this time on `$HOST1`,
 i.e.
 
-    host1# weave expose 10.0.1.101/24
+    host1# weave expose 10.2.1.101/24
 
 Then we add a NAT rule to route from the above IP to the destination
 service.
 
-    host1# iptables -t nat -A PREROUTING -p tcp -d 10.0.1.101 --dport 3322 \
+    host1# iptables -t nat -A PREROUTING -p tcp -d 10.2.1.101 --dport 3322 \
            -j DNAT --to-destination $HOST3:2211
 
 This allows any application container to reach the service by
-connecting to 10.0.1.101:3322. So if `$HOST3` is indeed running a netcat
+connecting to 10.2.1.101:3322. So if `$HOST3` is indeed running a netcat
 service on port 2211, e.g.
 
     host3# nc -lk -p 2211
 
 then we can connect to it from our application container on `$HOST2` with
 
-    root@f76829496120:/# echo 'Hello, world.' | nc 10.0.1.101 3322
+    root@f76829496120:/# echo 'Hello, world.' | nc 10.2.1.101 3322
 
 The same command will work from any application container.
 
@@ -251,7 +251,7 @@ The same command will work from any application container.
 Importing a service provides a degree of indirection that allows late
 and dynamic binding, similar to what can be achieved with a proxy. In
 our example, application containers are unaware that the service they
-are accessing at `10.0.1.101:3322` is in fact residing on
+are accessing at `10.2.1.101:3322` is in fact residing on
 `$HOST3:2211`. We can point application containers at another service
 location by changing the above NAT rule, without having to alter the
 applications themselves.
@@ -273,14 +273,14 @@ In our example above, the netcat service on `$HOST3` is imported into
 weave via `$HOST1`. We can export it on `$HOST2` by first exposing the
 application network with
 
-    host2# weave expose 10.0.1.102/24
+    host2# weave expose 10.2.1.102/24
 
 and then adding a NAT rule which routes traffic from the `$HOST2`
 network (i.e. anything which can connect to `$HOST2`) to the service
 endpoint in the weave network
 
     host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
-           -j DNAT --to-destination 10.0.1.101:3322
+           -j DNAT --to-destination 10.2.1.101:3322
 
 Now any host on the same network as `$HOST2` can access the service with
 
@@ -289,7 +289,7 @@ Now any host on the same network as `$HOST2` can access the service with
 Furthermore, as explained in [service-binding](#service-binding), we
 can dynamically alter the service locations without having to touch
 the applications that access them, e.g. we could move the example
-netcat service to `$HOST4:2211` while retaining its 10.0.1.101:3322
+netcat service to `$HOST4:2211` while retaining its 10.2.1.101:3322
 endpoint in the weave network.
 
 ### <a name="multi-cloud-networking"></a>Multi-cloud networking

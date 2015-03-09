@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	testRDNSsuccess  = "1.2.0.10.in-addr.arpa."
+	testRDNSsuccess  = "1.2.2.10.in-addr.arpa."
 	testRDNSfail     = "4.3.2.1.in-addr.arpa."
 	testRDNSnonlocal = "8.8.8.8.in-addr.arpa."
 	testPort         = 17625
@@ -23,7 +23,7 @@ func TestUDPDNSServer(t *testing.T) {
 		successTestName = "test1.weave.local."
 		failTestName    = "test2.weave.local."
 		nonLocalName    = "weave.works."
-		testAddr1       = "10.0.2.1"
+		testAddr1       = "10.2.2.1"
 	)
 	testCIDR1 := testAddr1 + "/24"
 

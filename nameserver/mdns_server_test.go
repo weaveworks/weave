@@ -13,8 +13,8 @@ import (
 var (
 	containerID = "deadbeef"
 	testName    = "test.weave.local."
-	testAddr1   = "10.0.2.1/24"
-	testInAddr1 = "1.2.0.10.in-addr.arpa."
+	testAddr1   = "10.2.2.1/24"
+	testInAddr1 = "1.2.2.10.in-addr.arpa."
 )
 
 func sendQuery(name string, querytype uint16) error {

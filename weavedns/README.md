@@ -18,9 +18,9 @@ domain registers it in weaveDNS.  For example:
 
 ```bash
 $ weave launch
-$ weave launch-dns 10.1.254.1/24
-$ weave run 10.1.1.25/24 -ti -h pingme.weave.local ubuntu
-$ shell1=$(weave run --with-dns 10.1.1.26/24 -ti -h ubuntu.weave.local ubuntu)
+$ weave launch-dns 10.2.254.1/24
+$ weave run 10.2.1.25/24 -ti -h pingme.weave.local ubuntu
+$ shell1=$(weave run --with-dns 10.2.1.26/24 -ti -h ubuntu.weave.local ubuntu)
 $ docker attach $shell1
 
 # ping pingme
@@ -31,8 +31,8 @@ Each weaveDNS container started with `launch-dns` needs to be given
 its own, unique, IP address, in a subnet that is a) common to all
 weaveDNS containers, b) disjoint from the application subnets, and c)
 not in use on any of the hosts. In our example the weaveDNS address is
-in subnet 10.1.254.0/24 and the application containers are in
-subnet 10.1.1.0/24.
+in subnet 10.2.254.0/24 and the application containers are in
+subnet 10.2.1.0/24.
 
 WeaveDNS containers can be stopped with `stop-dns`.
 
@@ -67,7 +67,7 @@ hostnames across all sub-domains plus some external domains, you need
 behaviour.
 
 ```bash
-weave run --with-dns 10.1.1.4/24 -ti \
+weave run --with-dns 10.2.1.4/24 -ti \
   --dns-search=zone1.weave.local --dns-search=zone2.weave.local \
   --dns-search=corp1.com --dns-search=corp2.com \
   --dns-search=weave.local ubuntu
@@ -95,7 +95,7 @@ supply a different bridge device, use the environment variable
 `DOCKER_BRIDGE`, e.g.,
 
 ```bash
-$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.1.254.1/24
+$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.2.254.1/24
 ```
 
 ### Supplying the DNS server
@@ -107,7 +107,7 @@ make it use weaveDNS:
 ```bash
 $ docker_ip=$(docker inspect --format='{{ .NetworkSettings.Gateway }}' weavedns)
 $ shell2=$(docker run --dns=$docker_ip -ti ubuntu)
-$ weave attach 10.1.1.27/24 $shell2
+$ weave attach 10.2.1.27/24 $shell2
 ```
 
 This isn't very useful unless the container is also attached to the
@@ -142,7 +142,7 @@ its hostname, you can register it using the HTTP API:
 
 ```bash
 $ docker start $shell2
-$ curl -X PUT "http://$dns_ip:6785/name/$shell2/10.1.1.27" -d fqdn=shell2.weave.local
+$ curl -X PUT "http://$dns_ip:6785/name/$shell2/10.2.1.27" -d fqdn=shell2.weave.local
 ```
 
 ### Registering multiple containers with the same name
@@ -163,7 +163,7 @@ containers that die. You can tell it not to, by adding `--watch=false`
 to the container args:
 
 ```bash
-$ weave launch-dns 10.1.254.1/24 --watch=false
+$ weave launch-dns 10.2.254.1/24 --watch=false
 ```
 
 ### Unregistering
@@ -174,7 +174,7 @@ API with e.g., `curl`:
 ```bash
 $ docker stop $shell2
 $ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
-$ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.1.1.27"
+$ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.2.1.27"
 ```
 
 ## Present limitations

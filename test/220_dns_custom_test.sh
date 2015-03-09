@@ -9,7 +9,7 @@ start_suite "Resolve names in custom domain"
 
 run_on $HOST1 sudo $WEAVE stop || true
 run_on $HOST1 sudo $WEAVE stop-dns || true
-run_on $HOST1 sudo $WEAVE launch-dns 10.0.0.2/8 --localDomain foo.bar.
+run_on $HOST1 sudo $WEAVE launch-dns 10.2.254.1/24 --localDomain foo.bar.
 
 docker_on $HOST1 rm -f c1 c2 || true
 

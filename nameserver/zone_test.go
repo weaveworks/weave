@@ -11,7 +11,7 @@ func TestZone(t *testing.T) {
 		containerID      = "deadbeef"
 		otherContainerID = "cowjuice"
 		successTestName  = "test1.weave."
-		testAddr1        = "10.0.2.1/24"
+		testAddr1        = "10.2.2.1/24"
 	)
 
 	var zone = new(ZoneDb)
@@ -21,9 +21,9 @@ func TestZone(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	// Add a few more records to make the job harder
-	err = zone.AddRecord("abcdef0123", "adummy.weave.", net.ParseIP("10.0.0.1"))
+	err = zone.AddRecord("abcdef0123", "adummy.weave.", net.ParseIP("10.2.0.1"))
 	wt.AssertNoErr(t, err)
-	err = zone.AddRecord("0123abcdef", "zdummy.weave.", net.ParseIP("10.0.0.2"))
+	err = zone.AddRecord("0123abcdef", "zdummy.weave.", net.ParseIP("10.2.0.2"))
 	wt.AssertNoErr(t, err)
 
 	// Check that the address is now there.
@@ -35,7 +35,7 @@ func TestZone(t *testing.T) {
 	}
 
 	// See if we can find the address by IP.
-	foundName, err := zone.LookupInaddr("1.2.0.10.in-addr.arpa.")
+	foundName, err := zone.LookupInaddr("1.2.2.10.in-addr.arpa.")
 	wt.AssertNoErr(t, err)
 
 	if foundName != successTestName {
@@ -69,7 +69,7 @@ func TestDeleteFor(t *testing.T) {
 	var (
 		id    = "foobar"
 		name  = "foo.weave."
-		addr1 = "10.1.2.3/24"
+		addr1 = "10.2.2.3/24"
 		addr2 = "10.2.7.8/24"
 	)
 	zone := new(ZoneDb)
