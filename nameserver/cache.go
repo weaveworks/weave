@@ -1,14 +1,13 @@
 package nameserver
 
 import (
+	"container/heap"
 	"errors"
 	"github.com/miekg/dns"
 	"math"
-	"sort"
+	"math/rand"
 	"sync"
 	"time"
-	//"fmt"
-	"math/rand"
 )
 
 var (
@@ -60,6 +59,8 @@ type cacheEntry struct {
 	putTime    time.Time
 
 	waitChan chan struct{}
+
+	index int	// for fast lookups in the heap
 }
 
 func newCacheEntry(question *dns.Question, reply *dns.Msg, status entryStatus, now time.Time) *cacheEntry {
@@ -67,6 +68,7 @@ func newCacheEntry(question *dns.Question, reply *dns.Msg, status entryStatus, n
 		Status:   status,
 		Flags:    0,
 		question: *question,
+		index:    -1,
 	}
 
 	if e.Status == stPending {
@@ -120,8 +122,14 @@ func (e cacheEntry) hasExpired(now time.Time) bool {
 }
 
 // set the reply for the entry
-func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
+// returns True if the entry has changed the validUntil time
+func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) bool {
 	shouldNotify := (e.Status == stPending)
+
+	var prevValidUntil time.Time
+	if e.Status == stResolved {
+		prevValidUntil = e.validUntil
+	}
 
 	// calculate the validUntil from the reply TTL
 	var minTtl uint32 = math.MaxUint32
@@ -140,6 +148,8 @@ func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
 	if shouldNotify {
 		close(e.waitChan) // notify all the waiters by closing the channel
 	}
+
+	return (prevValidUntil != e.validUntil)
 }
 
 // wait until a valid reply is set in the cache
@@ -166,12 +176,36 @@ func (e *cacheEntry) close() {
 	}
 }
 
-// entriesSlice is used for sorting entries
-type cacheEntriesSlice []*cacheEntry
+//////////////////////////////////////////////////////////////////////////////////////
 
-func (p cacheEntriesSlice) Len() int           { return len(p) }
-func (p cacheEntriesSlice) Less(i, j int) bool { return p[i].validUntil.Before(p[j].validUntil) }
-func (p cacheEntriesSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+// An entriesPtrHeap is a min-heap of cache entries.
+type entriesPtrsHeap []*cacheEntry
+
+func (h entriesPtrsHeap) Len() int           { return len(h) }
+func (h entriesPtrsHeap) Less(i, j int) bool { return h[i].validUntil.Before(h[j].validUntil) }
+func (h entriesPtrsHeap) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+	h[i].index = i
+	h[j].index = j
+}
+
+func (h *entriesPtrsHeap) Push(x interface{}) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	n := len(*h)
+	entry := x.(*cacheEntry)
+	entry.index = n
+	*h = append(*h, entry)
+}
+
+func (h *entriesPtrsHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	item.index = -1 // for safety
+	*h = old[0 : n-1]
+	return item
+}
 
 //////////////////////////////////////////////////////////////////////////////////////
 
@@ -186,8 +220,9 @@ type entries map[cacheKey]*cacheEntry
 type Cache struct {
 	Capacity int
 
-	entries entries
-	lock    sync.RWMutex
+	entries  entries
+	entriesH entriesPtrsHeap // len(entriesH) <= len(entries), as pending entries can be in entries but not in entriesH
+	lock     sync.RWMutex
 }
 
 // NewCache creates a cache of the given capacity
@@ -199,6 +234,8 @@ func NewCache(capacity int) (*Cache, error) {
 		Capacity: capacity,
 		entries:  make(entries, capacity),
 	}
+
+	heap.Init(&c.entriesH)
 	return c, nil
 }
 
@@ -215,7 +252,14 @@ func (c *Cache) Purge(now time.Time) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.removeOldest(c.Capacity, now)
+	for i, entry := range c.entriesH {
+		if entry.hasExpired(now) {
+			heap.Remove(&c.entriesH, i)
+			delete(c.entries, cacheKey{entry.question, entry.protocol})
+		} else {
+			return // all remaining entries must be still valid...
+		}
+	}
 }
 
 // Add adds a reply to the cache.
@@ -226,13 +270,21 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, proto dnsProtocol, flags u
 	question := request.Question[0]
 	key := cacheKey{question, proto}
 	if ent, found := c.entries[key]; found {
-		ent.setReply(reply, flags, now)
+		updated := ent.setReply(reply, flags, now)
+		if updated {
+			heap.Fix(&c.entriesH, ent.index)
+		}
 	} else {
 		// If we will add a new item and the capacity has been exceeded, make some room...
-		if len(c.entries) >= c.Capacity {
-			c.removeOldest(1, now)
+		if len(c.entriesH) >= c.Capacity {
+			lowestEntry := heap.Pop(&c.entriesH).(*cacheEntry)
+			lowestEntry.close()
+			delete(c.entries, cacheKey{lowestEntry.question, lowestEntry.protocol})
 		}
-		c.entries[key] = newCacheEntry(&question, reply, stResolved, now)
+
+		newEntry := newCacheEntry(&question, reply, stResolved, now)
+		heap.Push(&c.entriesH, newEntry)
+		c.entries[key] = newEntry
 	}
 }
 
@@ -278,7 +330,12 @@ func (c *Cache) Remove(question *dns.Question, proto dnsProtocol) {
 	defer c.lock.Unlock()
 
 	key := cacheKey{*question, proto}
-	delete(c.entries, key)
+	if entry, found := c.entries[key]; found {
+		if entry.index > 0 {
+			heap.Remove(&c.entriesH, entry.index)
+		}
+		delete(c.entries, key)
+	}
 }
 
 // Len returns the number of entries in the cache.
@@ -287,34 +344,4 @@ func (c *Cache) Len() int {
 	defer c.lock.RUnlock()
 
 	return len(c.entries)
-}
-
-// removeOldest removes the oldest item(s) from the cache.
-// note: this method is not thread safe (it is a responsability of the caller function...)
-func (c *Cache) removeOldest(atLeast int, now time.Time) {
-	removed := 0
-	// first, remove expired entries
-	for key, entry := range c.entries {
-		if entry.hasExpired(now) {
-			entry.close()
-			delete(c.entries, key)
-
-			removed += 1
-			if removed >= atLeast {
-				return
-			}
-		}
-	}
-
-	// our last resort: sort the entries (by validUntil) and remove the first `atLeast` entries
-	var es cacheEntriesSlice
-	for _, e := range c.entries {
-		es = append(es, e)
-	}
-	sort.Sort(es)
-	for i := 0; i < atLeast; i++ {
-		key := cacheKey{es[i].question, es[i].protocol}
-		c.entries[key].close()
-		delete(c.entries, key)
-	}
 }
