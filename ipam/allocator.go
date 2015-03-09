@@ -58,10 +58,11 @@ type request struct {
 
 type requestList []*request
 
-func (list requestList) find(sender router.PeerName, space Space) int {
+func (list requestList) find(sender router.PeerName, spaces []Space) int {
 	for i, r := range list {
 		if r.dest == sender {
-			if r.kind == msgSpaceRequest || r.details.Start.Equal(space.GetStart()) {
+			if r.kind == msgSpaceRequest ||
+				r.kind == msgSpaceClaim && len(spaces) == 1 && r.details.Start.Equal(spaces[0].GetStart()) {
 				return i
 			}
 		}
@@ -567,7 +568,7 @@ func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner uint64, err
 	} else {
 		// That address is owned by someone else
 		claimspace := MinSpace{addr, 1}
-		if alloc.inflight.find(spaceSet.PeerName(), &claimspace) < 0 { // Have we already requested this one?
+		if alloc.inflight.find(spaceSet.PeerName(), []Space{&claimspace}) < 0 { // Have we already requested this one?
 			lg.Debug.Println("Claiming address", addr, "from peer:", spaceSet.PeerName())
 			alloc.sendRequest(spaceSet.PeerName(), msgSpaceClaim, &claimspace)
 		}
@@ -711,8 +712,8 @@ func (alloc *Allocator) sendRequest(dest router.PeerName, kind byte, space *MinS
 	alloc.inflight = append(alloc.inflight, req)
 }
 
-func (alloc *Allocator) sendReply(dest router.PeerName, kind byte, space Space) {
-	msg := router.Concat([]byte{kind}, GobEncode(space, 1, alloc.ourSpaceSet))
+func (alloc *Allocator) sendReply(dest router.PeerName, kind byte, data interface{}) {
+	msg := router.Concat([]byte{kind}, GobEncode(data, 1, alloc.ourSpaceSet))
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
@@ -745,7 +746,10 @@ func (alloc *Allocator) handleSpaceRequest(sender router.PeerName, msg []byte) e
 
 	if space, ok := alloc.ourSpaceSet.GiveUpSpace(); ok {
 		lg.Debug.Println("Decided to give  peer", sender, "space", space, alloc.ourSpaceSet)
-		alloc.sendReply(sender, msgSpaceDonate, space)
+		alloc.sendReply(sender, msgSpaceDonate, []Space{space})
+	} else {
+		lg.Debug.Println("No space available; sending back empty reply to", sender, alloc.ourSpaceSet)
+		alloc.sendReply(sender, msgSpaceDonate, []Space{})
 	}
 	return nil
 }
@@ -774,21 +778,23 @@ func (alloc *Allocator) handleSpaceClaim(sender router.PeerName, msg []byte) err
 func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) error {
 	reader := bytes.NewReader(msg)
 	decoder := gob.NewDecoder(reader)
-	var donation MinSpace
-	if err := decoder.Decode(&donation); err != nil {
+	var donations []Space
+	if err := decoder.Decode(&donations); err != nil {
 		return err
 	}
-	pos := alloc.inflight.find(sender, &donation)
+	pos := alloc.inflight.find(sender, donations)
 	if pos < 0 {
 		lg.Error.Println("Not expecting to receive space donation from", sender, alloc.inflight[0].dest)
 		return nil // not a severe enough error to shut down the connection
 	}
-	lg.Debug.Println("Received space donation: sender", sender, "space", donation)
+	lg.Debug.Println("Received space donation: sender", sender, "space", donations)
 	// Message is concluded by an update of state of the sender
 	if _, err := alloc.decodeFromDecoder(decoder); err != nil {
 		return err
 	}
-	alloc.ourSpaceSet.AddSpace(&donation)
+	for _, donation := range donations {
+		alloc.ourSpaceSet.AddSpace(donation)
+	}
 	alloc.inflight.removeAt(pos)
 	alloc.checkClaims()
 	return nil
@@ -800,7 +806,7 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 	if err := decoder.Decode(&claim); err != nil {
 		return err
 	}
-	pos := alloc.inflight.find(sender, &claim)
+	pos := alloc.inflight.find(sender, []Space{&claim})
 	if pos < 0 {
 		lg.Error.Println("Not expecting to receive space donation refused from", sender, alloc.inflight[0].dest)
 		return nil // not a severe enough error to shut down the connection

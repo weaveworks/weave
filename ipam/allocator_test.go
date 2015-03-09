@@ -347,7 +347,7 @@ func implTestGossip(t *testing.T) {
 	alloc2.ourSpaceSet.spaces[0].(*MutableSpace).MinSpace.Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	donation := NewMinSpace(net.ParseIP(donateStart), donateSize)
+	donation := []Space{NewMinSpace(net.ParseIP(donateStart), donateSize)}
 	msg := router.Concat([]byte{msgSpaceDonate}, GobEncode(donation, 1, alloc2.ourSpaceSet))
 	ExpectBroadcastMessage(alloc1, nil)
 	alloc1.OnGossipUnicast(alloc2.ourName, msg)
@@ -444,7 +444,7 @@ func implTestGossip2(t *testing.T) {
 	alloc2.ourSpaceSet.spaces[0].(*MutableSpace).MinSpace.Size = donateSize
 	alloc2.ourSpaceSet.version++
 
-	donation := NewMinSpace(net.ParseIP(donateStart), donateSize)
+	donation := []Space{NewMinSpace(net.ParseIP(donateStart), donateSize)}
 	msg = router.Concat([]byte{msgSpaceDonate}, GobEncode(donation, 1, alloc2.ourSpaceSet))
 	ExpectBroadcastMessage(alloc1, nil)
 	alloc1.OnGossipUnicast(alloc2.ourName, msg)
@@ -625,7 +625,7 @@ func implAllocatorClaim3(t *testing.T) {
 	err := alloc2.OnGossipUnicast(alloc1.ourName, router.Concat([]byte{msgSpaceClaim}, msgbuf))
 	wt.AssertNoErr(t, err)
 	AssertNothingSent(t, done)
-	msgbuf = router.Concat(GobEncode(NewMinSpace(addr1, 1), 1, alloc2.ourSpaceSet))
+	msgbuf = router.Concat(GobEncode([]Space{NewMinSpace(addr1, 1)}, 1, alloc2.ourSpaceSet))
 
 	// alloc1 processes the response
 	ExpectBroadcastMessage(alloc1, nil)
