@@ -42,7 +42,11 @@ func NewMinSpace(start net.IP, size uint32) *MinSpace {
 }
 
 func (m *MutableSpace) checkInvariant(t *testing.T) {
-	// we don't really have a good invariant over MutableSpace
+	for i := 0; i < len(m.free_list)-1; i++ {
+		if subtract(m.free_list[i], m.free_list[i+1]) > 0 {
+			t.Fatalf("Free list out of order: %v", m.free_list)
+		}
+	}
 }
 
 func TestSpaceClaim(t *testing.T) {

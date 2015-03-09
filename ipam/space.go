@@ -54,14 +54,22 @@ func (s *MinSpace) String() string {
 
 type addressList []net.IP
 
+// Maintain addresses in increasing order.
 func (aa *addressList) add(a net.IP) {
+	for i, b := range *aa {
+		if subtract(b, a) > 0 {
+			(*aa) = append((*aa), nil)   // make space
+			copy((*aa)[i+1:], (*aa)[i:]) // move up
+			(*aa)[i] = a                 // put in new element
+			return
+		}
+	}
 	*aa = append(*aa, a)
 }
 
 func (aa *addressList) removeAt(pos int) {
-	// Delete by swapping the last element into this one and truncating
-	last := len(*aa) - 1
-	(*aa)[pos], (*aa) = (*aa)[last], (*aa)[:last]
+	// Delete, preserving order
+	(*aa) = append((*aa)[:pos], (*aa)[pos+1:]...)
 }
 
 func (aa *addressList) find(addr net.IP) int {
