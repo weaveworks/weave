@@ -169,7 +169,6 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.10.10", "IP address")
 	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), 1, "TTL")
 
-
 	t.Logf("Checking we get empty replies when they are expired...")
 	lenBefore = l.Len()
 	resp, err = l.Get(questionMsg, protTcp, timePut3.Add(time.Duration(localTTL) * time.Second))
@@ -179,6 +178,34 @@ func TestCacheEntries(t *testing.T) {
 		t.Fatalf("ERROR: Did NOT expect a reponse from the Get()")
 	}
 	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length (after getting an expired entry)")
+
+	questionMsg2 := new(dns.Msg)
+	questionMsg2.SetQuestion("some.other.name", dns.TypeA)
+	questionMsg2.RecursionDesired = true
+
+	question2 := &questionMsg2.Question[0]
+
+	t.Logf("Trying to Get() a name")
+	resp, err = l.Get(questionMsg2, protUdp, time.Now())
+	wt.AssertNoErr(t, err)
+	if resp != nil {
+		t.Logf("Got '%s'", resp)
+		t.Fatalf("ERROR: Did not expect a reponse from Get() yet")
+	}
+	t.Logf("Checking that an Remove() between Get() and Put() does not break things")
+	replyTemp2 := makeAddressReply(questionMsg2, question2, []net.IP{net.ParseIP("10.0.9.9")})
+	l.Remove(question2, protUdp)
+	l.Put(questionMsg2, replyTemp2, protUdp, 0, time.Now())
+	resp, err = l.Get(questionMsg2, protUdp, time.Now())
+	wt.AssertNoErr(t, err)
+	if resp == nil {
+		t.Fatalf("ERROR: Did expect a reponse from Get()")
+	}
+	resp, err = l.Wait(questionMsg2, protUdp, time.Duration(0)*time.Second, time.Now())
+	wt.AssertNoErr(t, err)
+	if resp == nil {
+		t.Fatalf("ERROR: Did expect a reponse from Get()")
+	}
 }
 
 // Check that waiters are unblocked when the name they are waiting for is inserted

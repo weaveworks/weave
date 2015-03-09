@@ -245,6 +245,7 @@ func (c *Cache) Clear() {
 	defer c.lock.Unlock()
 
 	c.entries = make(entries, c.Capacity)
+	heap.Init(&c.entriesH)
 }
 
 // Purge removes the old elements in the cache
