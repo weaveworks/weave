@@ -2,16 +2,13 @@
 
 ## How does it work?
 
-See also https://github.com/zettio/weave/wiki/IP-allocation-design
-
-In this document I use the word 'allocation' to refer to a specific
-address being assigned so it can be given to a container, and
-'reservation' to refer to a block of addresses being given to a Peer
-to subsequently allocate.
+This document builds upon
+https://github.com/zettio/weave/wiki/IP-allocation-design, which
+should be read first to understand the terms and concepts used.
 
 ### Data Structures
 
-There are three levels in the data structure:
+There are three levels in the CRDT data structure:
 
 Allocator - controls my own allocations and has a view of everyone else's
 PeerSpace - all reservations for one Peer
@@ -22,6 +19,11 @@ PeerSpace and Space are interfaces which each have two implementations
 allocated and released, and one representing someone else's data which
 we only update via the CRDT mechanism.  The concrete classes are
 MinSpace/MutableSpace and PeerSpaceSet/OurSpaceSet, respectively.
+
+In addition to the CRDT, Allocator holds information on its own name
+and UID, a record of a past life (if observed), a map of which
+container owns which IP, and lists of outstanding claims, allocations
+and requests.
 
 #### Space implementations
 
@@ -92,10 +94,10 @@ Allocator maintains a list of 'inflight' requests so it can avoid
 sending the same request twice, and to match up donations against
 requests. Donations do not state why they were sent.
 
-Allocator broadcasts its own state any time the has-free flag changes,
-or when it reclaims a leak.
+Allocator broadcasts its own entry in the CRDT any time its has-free
+state or set of reservations changes.
 
-## External interface
+## External command interface
 
 IPAM exposes an interface so programs such as the `weave` script can
 call upon it to perform functions. This interface operates over the
@@ -137,7 +139,8 @@ has elected.  That peer then re-runs the election, to avoid races
 where further peers have joined the group and come to a different conclusion.
 
 The peer that sends the message sets a timeout, and if it does not
-hear back that someone has allocated some space, then 
+hear back that someone has allocated some space, then it will re-run
+the election.
 
 ## Concurrency
 
