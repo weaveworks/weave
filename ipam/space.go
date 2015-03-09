@@ -160,15 +160,26 @@ func (s *MutableSpace) NumFreeAddresses() uint32 {
 }
 
 // Enlarge a space by merging in a blank space and return true
-// or return false if the space supplied is not contiguous and directly after this one
+// or return false if we cannot merge
 func (a *MutableSpace) mergeBlank(b Space) bool {
 	diff := subtract(b.GetStart(), a.Start)
-	if diff != int64(a.Size) {
-		return false
-	} else {
+	if diff == int64(a.Size) { // b is directly after a
 		a.Size += b.GetSize()
 		return true
+	} else if diff == -int64(b.GetSize()) { // a is directly after b
+		a.Start = add(a.Start, -b.GetSize())
+		a.Size += b.GetSize()
+		if a.MaxAllocated > 0 {
+			a.MaxAllocated += b.GetSize()
+			addFree := make(addressList, b.GetSize())
+			for i := uint32(0); i < b.GetSize(); i++ {
+				addFree[i] = add(a.Start, i)
+			}
+			a.free_list = append(addFree, a.free_list...)
+		}
+		return true
 	}
+	return false
 }
 
 func (space *MutableSpace) String() string {

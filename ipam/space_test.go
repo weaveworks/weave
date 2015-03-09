@@ -42,6 +42,9 @@ func NewMinSpace(start net.IP, size uint32) *MinSpace {
 }
 
 func (m *MutableSpace) checkInvariant(t *testing.T) {
+	if m.MaxAllocated > m.Size {
+		t.Fatalf("MaxAllocated must not be greater than size: %v", m)
+	}
 	for i := 0; i < len(m.free_list)-1; i++ {
 		if subtract(m.free_list[i], m.free_list[i+1]) > 0 {
 			t.Fatalf("Free list out of order: %v", m.free_list)
@@ -168,12 +171,14 @@ func TestSpaceHeirs(t *testing.T) {
 		testAddr1 = "10.0.1.1"
 		testAddr2 = "10.0.1.10"
 		testAddr3 = "10.0.4.4"
+		testAddr6 = "10.0.1.19"
 	)
 
 	var (
 		ipAddr1 = net.ParseIP(testAddr1)
 		ipAddr2 = net.ParseIP(testAddr2)
 		ipAddr3 = net.ParseIP(testAddr3)
+		ipAddr6 = net.ParseIP(testAddr6)
 	)
 
 	universe := NewMinSpace(net.ParseIP(testAddr0), 256)
@@ -182,6 +187,7 @@ func TestSpaceHeirs(t *testing.T) {
 	space3 := NewMinSpace(ipAddr3, 8)   // 3 is nowhere near 1 or 2
 	space4 := NewMinSpace(ipAddr1, 8)   // 4 is just too small to be heir to 2
 	space5 := NewMinSpace(ipAddr2, 247) // 5 is heir to 1, considering wrap-around
+	space6 := NewMinSpace(ipAddr6, 2)   // 2 is heir to 6
 
 	if !space1.IsHeirTo(space2, universe) {
 		t.Fatalf("Space.IsHeirTo false negative: %+v / %+v", space1, space2)
@@ -202,15 +208,21 @@ func TestSpaceHeirs(t *testing.T) {
 		t.Fatalf("Space.IsHeirTo false negative: %+v / %+v", space5, space1)
 	}
 
-	spaceM := NewSpace(ipAddr1, 9)
+	spaceM := NewSpace(ipAddr2, 9)
 	merged := spaceM.mergeBlank(space3)
 	if merged {
 		t.Fatalf("Space.merge incorrect success")
 	}
-	merged = spaceM.mergeBlank(space2)
+	merged = spaceM.mergeBlank(space1)
 	if !merged {
 		t.Fatalf("Space.merge incorrect failure")
 	}
 	wt.AssertEqualUint32(t, spaceM.GetSize(), 18, "Merged size")
+	spaceM.checkInvariant(t)
+	merged = spaceM.mergeBlank(space6)
+	if !merged {
+		t.Fatalf("Space.merge incorrect failure")
+	}
+	wt.AssertEqualUint32(t, spaceM.GetSize(), 20, "Merged size")
 	spaceM.checkInvariant(t)
 }
