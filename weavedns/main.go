@@ -19,6 +19,7 @@ func main() {
 		justVersion bool
 		ifaceName   string
 		apiPath     string
+		localDomain string
 		fallback    string
 		dnsPort     int
 		httpPort    int
@@ -31,10 +32,11 @@ func main() {
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
+	flag.StringVar(&localDomain, "localDomain", weavedns.DEFAULT_LOCAL_DOMAIN, "local domain (e.g., 'weave.local.')")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
-	flag.StringVar(&fallback, "fallback", "", "Fallback server and port (ie, '8.8.8.8:53')")
+	flag.StringVar(&fallback, "fallback", "", "fallback server and port (ie, '8.8.8.8:53')")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	flag.Parse()
@@ -67,25 +69,27 @@ func main() {
 		}
 	}
 
-	var config *dns.ClientConfig
+	srvConfig := weavedns.DNSServerConfig{
+		Port:        dnsPort,
+		LocalDomain: localDomain,
+	}
+
 	if len(fallback) > 0 {
 		fallbackHost, fallbackPort, err := net.SplitHostPort(fallback)
 		if err != nil {
 			Error.Fatal("Fould not parse fallback host and port", err)
 		}
-		config = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
+		srvConfig.UpstreamCfg = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
 		Debug.Printf("DNS fallback at %s:%s", fallbackHost, fallbackPort)
-	} else {
-		config, err = dns.ClientConfigFromFile("/etc/resolv.conf")
-		if err != nil {
-			Error.Fatal("Failed obtain DNS client configuration", err)
-		}
 	}
 
-	go weavedns.ListenHttp(weavedns.LOCAL_DOMAIN, zone, httpPort)
-	srv := weavedns.NewDNSServer(config, zone, iface, dnsPort)
+	go weavedns.ListenHttp(localDomain, zone, httpPort)
+	srv, err := weavedns.NewDNSServer(srvConfig, zone, iface)
+	if err != nil {
+		Error.Fatal("Failed to initialize the WeaveDNS server", err)
+	}
 	err = srv.Start()
 	if err != nil {
-		Error.Fatal("Failed to start server", err)
+		Error.Fatal("Failed to start the WeaveDNS server", err)
 	}
 }

@@ -181,11 +181,21 @@ func (conn *LocalConnection) log(args ...interface{}) {
 	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
 }
 
+// Send directly, not via the Actor.  If it goes via the Actor we can
+// get a deadlock where LocalConnection is blocked talking to
+// LocalPeer and LocalPeer is blocked trying send a ProtocolMsg via
+// LocalConnection, and the channels are full in both directions so
+// nothing can proceed.
+func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
+	if err := conn.sendProtocolMsg(m); err != nil {
+		conn.Shutdown(err)
+	}
+}
+
 // ACTOR client API
 
 const (
-	CSendProtocolMsg = iota
-	CSetEstablished
+	CSetEstablished = iota
 	CReceivedHeartbeat
 	CShutdown
 )
@@ -203,7 +213,8 @@ func (conn *LocalConnection) sendQuery(code int, payload interface{}) {
 
 // Async
 func (conn *LocalConnection) Shutdown(err error) {
-	conn.sendQuery(CShutdown, err)
+	// Run on its own goroutine in case the channel is backed up
+	go conn.sendQuery(CShutdown, err)
 }
 
 // Async
@@ -221,11 +232,6 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 // Async
 func (conn *LocalConnection) SetEstablished() {
 	conn.sendQuery(CSetEstablished, nil)
-}
-
-// Async
-func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
-	conn.sendQuery(CSendProtocolMsg, m)
 }
 
 // ACTOR server
@@ -306,8 +312,6 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 				err = conn.handleReceivedHeartbeat(query.payload.(*net.UDPAddr))
 			case CSetEstablished:
 				err = conn.handleSetEstablished()
-			case CSendProtocolMsg:
-				err = conn.handleSendProtocolMsg(query.payload.(ProtocolMsg))
 			}
 		case <-conn.heartbeatTimeout.C:
 			err = fmt.Errorf("timed out waiting for UDP heartbeat")
@@ -315,7 +319,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fragTest):
 			conn.setStackFrag(false)
-			err = conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest)
+			err = conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest)
 		}
 	}
 	return
@@ -337,7 +341,7 @@ func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr)
 	conn.Unlock()
 	conn.heartbeatTimeout.Reset(HeartbeatTimeout)
 	if !old {
-		if err := conn.handleSendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
+		if err := conn.sendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
 			return err
 		}
 	}
@@ -374,18 +378,10 @@ func (conn *LocalConnection) handleSetEstablished() error {
 	// avoid initial waits for timers to fire
 	conn.Forward(true, conn.heartbeatFrame, nil)
 	conn.setStackFrag(false)
-	if err := conn.handleSendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
+	if err := conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
 		return err
 	}
 	return nil
-}
-
-func (conn *LocalConnection) handleSendSimpleProtocolMsg(tag ProtocolTag) error {
-	return conn.handleSendProtocolMsg(ProtocolMsg{tag: tag})
-}
-
-func (conn *LocalConnection) handleSendProtocolMsg(m ProtocolMsg) error {
-	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
 }
 
 func (conn *LocalConnection) handleShutdown() {
@@ -413,6 +409,14 @@ func (conn *LocalConnection) handleShutdown() {
 }
 
 // Helpers
+
+func (conn *LocalConnection) sendSimpleProtocolMsg(tag ProtocolTag) error {
+	return conn.sendProtocolMsg(ProtocolMsg{tag: tag})
+}
+
+func (conn *LocalConnection) sendProtocolMsg(m ProtocolMsg) error {
+	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
+}
 
 func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	defer conn.Decryptor.Shutdown()

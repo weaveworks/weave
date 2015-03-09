@@ -32,8 +32,8 @@ func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *Ethern
 	return peer.Relay(peer.Peer, dstPeer, df, frame, dec)
 }
 
-func (peer *LocalPeer) Broadcast(df bool, frame []byte, dec *EthernetDecoder) error {
-	return peer.RelayBroadcast(peer.Peer, df, frame, dec)
+func (peer *LocalPeer) Broadcast(df bool, frame []byte, dec *EthernetDecoder) {
+	peer.RelayBroadcast(peer.Peer, df, frame, dec)
 }
 
 func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
@@ -57,7 +57,7 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 		dec)
 }
 
-func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
+func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) {
 	for _, conn := range peer.NextBroadcastHops(srcPeer) {
 		err := conn.Forward(df, &ForwardedFrame{
 			srcPeer: srcPeer,
@@ -65,10 +65,13 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec 
 			frame:   frame},
 			dec)
 		if err != nil {
-			return err
+			if ftbe, ok := err.(FrameTooBigError); ok {
+				log.Printf("dropping too big DF broadcast frame (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.EPMTU)
+			} else {
+				log.Println(err)
+			}
 		}
 	}
-	return nil
 }
 
 func (peer *LocalPeer) NextBroadcastHops(srcPeer *Peer) []*LocalConnection {

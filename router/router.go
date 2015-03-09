@@ -27,7 +27,7 @@ type Router struct {
 	GossipChannels  map[uint32]*GossipChannel
 	TopologyGossip  Gossip
 	UDPListener     *net.UDPConn
-	Password        *[]byte
+	Password        []byte
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
@@ -50,12 +50,10 @@ func NewRouter(iface *net.Interface, name PeerName, nickName string, password []
 	router := &Router{
 		Iface:          iface,
 		GossipChannels: make(map[uint32]*GossipChannel),
+		Password:       password,
 		ConnLimit:      connLimit,
 		BufSz:          bufSz,
 		LogFrame:       logFrame}
-	if len(password) > 0 {
-		router.Password = &password
-	}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer.Name)
 	}
@@ -95,7 +93,7 @@ func (router *Router) UsingPassword() bool {
 
 func (router *Router) Status() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name, "(" + router.Ourself.NickName + ")"))
+	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name, "("+router.Ourself.NickName+")"))
 	buf.WriteString(fmt.Sprintln("Sniffing traffic on", router.Iface))
 	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
 	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))
@@ -108,8 +106,6 @@ func (router *Router) sniff(pio PacketSourceSink) {
 	log.Println("Sniffing traffic on", router.Iface)
 
 	dec := NewEthernetDecoder()
-	injectFrame := func(frame []byte) error { return pio.WritePacket(frame) }
-	checkFrameTooBig := func(err error) error { return dec.CheckFrameTooBig(err, injectFrame) }
 	mac := router.Iface.HardwareAddr
 	if router.Macs.Enter(mac, router.Ourself.Peer) {
 		log.Println("Discovered our MAC", mac)
@@ -119,16 +115,16 @@ func (router *Router) sniff(pio PacketSourceSink) {
 			pkt, err := pio.ReadPacket()
 			checkFatal(err)
 			router.LogFrame("Sniffed", pkt, nil)
-			checkWarn(router.handleCapturedPacket(pkt, dec, checkFrameTooBig))
+			router.handleCapturedPacket(pkt, dec, pio)
 		}
 	}()
 }
 
-func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecoder, checkFrameTooBig func(error) error) error {
+func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecoder, po PacketSink) {
 	dec.DecodeLayers(frameData)
 	decodedLen := len(dec.decoded)
 	if decodedLen == 0 {
-		return nil
+		return
 	}
 	srcMac := dec.eth.SrcMAC
 	srcPeer, found := router.Macs.Lookup(srcMac)
@@ -136,18 +132,18 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	// frames, the srcMAC will have been recorded as associated with a
 	// different peer.
 	if found && srcPeer != router.Ourself.Peer {
-		return nil
+		return
 	}
 	if router.Macs.Enter(srcMac, router.Ourself.Peer) {
 		log.Println("Discovered local MAC", srcMac)
 	}
 	if dec.DropFrame() {
-		return nil
+		return
 	}
 	dstMac := dec.eth.DstMAC
 	dstPeer, found := router.Macs.Lookup(dstMac)
 	if found && dstPeer == router.Ourself.Peer {
-		return nil
+		return
 	}
 	df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
 	if df {
@@ -163,10 +159,14 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	copy(frameCopy, frameData)
 
 	if !found {
-		return checkFrameTooBig(router.Ourself.Broadcast(df, frameCopy, dec))
-	} else {
-		return checkFrameTooBig(router.Ourself.Forward(dstPeer, df, frameCopy, dec))
+		router.Ourself.Broadcast(df, frameCopy, dec)
+		return
 	}
+	err := router.Ourself.Forward(dstPeer, df, frameCopy, dec)
+	if ftbe, ok := err.(FrameTooBigError); ok {
+		err = dec.sendICMPFragNeeded(ftbe.EPMTU, po.WritePacket)
+	}
+	checkWarn(err)
 }
 
 func (router *Router) listenTCP(localPort int) {
@@ -269,32 +269,22 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 }
 
 func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) FrameConsumer {
-	checkFrameTooBig := func(err error, srcPeer *Peer) error {
-		if err == nil { // optimisation: avoid closure creation in common case
-			return nil
-		}
-		return dec.CheckFrameTooBig(err,
-			func(icmpFrame []byte) error {
-				return router.Ourself.Forward(srcPeer, false, icmpFrame, nil)
-			})
-	}
-
-	return func(relayConn *LocalConnection, sender *net.UDPAddr, srcNameByte, dstNameByte []byte, frameLen uint16, frame []byte) error {
+	return func(relayConn *LocalConnection, sender *net.UDPAddr, srcNameByte, dstNameByte []byte, frameLen uint16, frame []byte) {
 		srcName := PeerNameFromBin(srcNameByte)
 		dstName := PeerNameFromBin(dstNameByte)
 		srcPeer, found := router.Peers.Fetch(srcName)
 		if !found {
-			return nil
+			return
 		}
 		dstPeer, found := router.Peers.Fetch(dstName)
 		if !found {
-			return nil
+			return
 		}
 
 		dec.DecodeLayers(frame)
 		decodedLen := len(dec.decoded)
 		if decodedLen == 0 {
-			return nil
+			return
 		}
 		// Handle special frames produced internally (rather than
 		// captured/forwarded) by the remote router.
@@ -308,7 +298,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			if srcPeer != relayConn.Remote() || dstPeer != router.Ourself.Peer {
 				// A special frame not originating from the remote, or
 				// not for us? How odd; let's just drop it.
-				return nil
+				return
 			}
 			switch {
 			case frameLen == EthernetOverhead+8:
@@ -321,7 +311,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 				binary.BigEndian.PutUint16(frameLenBytes, uint16(frameLen-EthernetOverhead))
 				relayConn.SendProtocolMsg(ProtocolMsg{ProtocolPMTUVerified, frameLenBytes})
 			}
-			return nil
+			return
 		}
 
 		df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
@@ -333,7 +323,16 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 			} else {
 				router.LogFrame("Relaying", frame, &dec.eth)
 			}
-			return checkFrameTooBig(router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec), srcPeer)
+
+			err := router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec)
+			if ftbe, ok := err.(FrameTooBigError); ok {
+				err = dec.sendICMPFragNeeded(ftbe.EPMTU, func(icmpFrame []byte) error {
+					return router.Ourself.Forward(srcPeer, false, icmpFrame, nil)
+				})
+			}
+
+			checkWarn(err)
+			return
 		}
 
 		srcMac := dec.eth.SrcMAC
@@ -347,10 +346,9 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 
 		dstPeer, found = router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
-			return checkFrameTooBig(router.Ourself.RelayBroadcast(srcPeer, df, frame, dec), srcPeer)
+			router.LogFrame("Relaying broadcast", frame, &dec.eth)
+			router.Ourself.RelayBroadcast(srcPeer, df, frame, dec)
 		}
-
-		return nil
 	}
 }
 

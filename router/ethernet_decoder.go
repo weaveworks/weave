@@ -25,21 +25,7 @@ func (dec *EthernetDecoder) DecodeLayers(data []byte) error {
 	return dec.parser.DecodeLayers(data, &dec.decoded)
 }
 
-func (dec *EthernetDecoder) CheckFrameTooBig(err error, sendFrame func([]byte) error) error {
-	if ftbe, ok := err.(FrameTooBigError); ok {
-		// we know: 1. ip is valid, 2. it was ip and DF was set
-		icmpFrame, err := dec.formICMPMTUPacket(ftbe.EPMTU)
-		if err != nil {
-			return err
-		}
-		log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.EPMTU)
-		return sendFrame(icmpFrame)
-	} else {
-		return err
-	}
-}
-
-func (dec *EthernetDecoder) formICMPMTUPacket(mtu int) ([]byte, error) {
+func (dec *EthernetDecoder) sendICMPFragNeeded(mtu int, sendFrame func([]byte) error) error {
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths:       true,
@@ -67,9 +53,11 @@ func (dec *EthernetDecoder) formICMPMTUPacket(mtu int) ([]byte, error) {
 			Seq:      uint16(mtu)},
 		&payload)
 	if err != nil {
-		return []byte{}, err
+		return err
 	}
-	return buf.Bytes(), nil
+
+	log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, mtu)
+	return sendFrame(buf.Bytes())
 }
 
 var (

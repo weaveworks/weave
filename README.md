@@ -34,6 +34,8 @@ Ensure you are running Linux (kernel 3.5 or later) and have Docker
       https://github.com/zettio/weave/releases/download/latest_release/weave
     sudo chmod a+x /usr/local/bin/weave
 
+CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing weave using cloud-config.
+
 ## Quick Start Screencast
 
 <a href="http://youtu.be/k6r7yuSr0hE" alt="Click to watch the screencast" target="_blank">
