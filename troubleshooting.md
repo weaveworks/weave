@@ -130,9 +130,9 @@ Produces a list of all the containers running on this host that are
 connected to the weave network, like this:
 
     b07565b06c53 ae:e3:07:9c:8c:d4
-    5245643870f1 ce:15:34:a9:b5:6d 10.0.5.1/24
-    e32a7d37a93a 7a:61:a2:49:4b:91 10.0.8.3/24
-    caa1d4ee2570 ba:8c:b9:dc:e1:c9 10.0.1.1/24 10.0.2.1/24
+    5245643870f1 ce:15:34:a9:b5:6d 10.2.5.1/24
+    e32a7d37a93a 7a:61:a2:49:4b:91 10.2.8.3/24
+    caa1d4ee2570 ba:8c:b9:dc:e1:c9 10.2.1.1/24 10.2.2.1/24
 
 On each line are the container ID, its MAC address, then the list of
 IP address/routing prefix length ([CIDR
