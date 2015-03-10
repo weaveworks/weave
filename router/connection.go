@@ -17,6 +17,7 @@ type Connection interface {
 	RemoteTCPAddr() string
 	Established() bool
 	Shutdown(error)
+	Log(args ...interface{})
 }
 
 type ConnectionTieBreak int
@@ -96,6 +97,10 @@ func (conn *RemoteConnection) Established() bool {
 func (conn *RemoteConnection) Shutdown(error) {
 }
 
+func (conn *RemoteConnection) Log(args ...interface{}) {
+	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
+}
+
 func (conn *RemoteConnection) String() string {
 	from := "<nil>"
 	if conn.local != nil {
@@ -164,7 +169,7 @@ func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 	defer conn.Unlock()
 	if conn.effectivePMTU != pmtu {
 		conn.effectivePMTU = pmtu
-		conn.log("Effective PMTU set to", pmtu)
+		conn.Log("Effective PMTU set to", pmtu)
 	}
 }
 
@@ -175,10 +180,6 @@ func (conn *LocalConnection) setStackFrag(frag bool) {
 	conn.Lock()
 	defer conn.Unlock()
 	conn.stackFrag = frag
-}
-
-func (conn *LocalConnection) log(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
 }
 
 // Send directly, not via the Actor.  If it goes via the Actor we can
@@ -271,7 +272,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, finish
 
 	if conn.remoteUDPAddr != nil {
 		if err := conn.sendFastHeartbeats(); err != nil {
-			conn.log("connection shutting down due to error:", err)
+			conn.Log("connection shutting down due to error:", err)
 			return
 		}
 	}
@@ -279,9 +280,9 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, finish
 	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
 
 	if err := conn.queryLoop(queryChan); err != nil {
-		conn.log("connection shutting down due to error:", err)
+		conn.Log("connection shutting down due to error:", err)
 	} else {
-		conn.log("connection shutting down")
+		conn.Log("connection shutting down")
 	}
 }
 
@@ -439,7 +440,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			break
 		}
 		if len(msg) < 1 {
-			conn.log("ignoring blank msg")
+			conn.Log("ignoring blank msg")
 			continue
 		}
 		if err = conn.handleProtocolMsg(ProtocolTag(msg[0]), msg[1:]); err != nil {
@@ -479,7 +480,7 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 	case ProtocolGossip:
 		return conn.Router.handleGossip(payload, deliverGossip)
 	default:
-		conn.log("ignoring unknown protocol tag:", tag)
+		conn.Log("ignoring unknown protocol tag:", tag)
 	}
 	return nil
 }

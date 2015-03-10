@@ -259,7 +259,7 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 			if pde.Fatal {
 				relayConn.Shutdown(pde)
 			} else {
-				relayConn.log(pde.Error())
+				relayConn.Log(pde.Error())
 			}
 		} else {
 			checkWarn(err)
