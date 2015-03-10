@@ -192,7 +192,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// start.
 	remoteAddrStr := tcpConn.RemoteAddr().String()
 	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
-	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr, false)
+	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr, false, false)
 	connLocal := NewLocalConnection(connRemote, tcpConn, nil, router)
 	connLocal.Start(true)
 }

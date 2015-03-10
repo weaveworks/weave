@@ -140,7 +140,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	// aren't
 	cm.peers.ForEach(func(name PeerName, peer *Peer) {
 		peer.ForEachConnection(func(otherPeer PeerName, conn Connection) {
-			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] {
+			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] || !conn.Outbound() {
 				return
 			}
 			address := conn.RemoteTCPAddr()

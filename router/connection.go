@@ -16,6 +16,7 @@ type Connection interface {
 	BreakTie(Connection) ConnectionTieBreak
 	RemoteTCPAddr() string
 	Established() bool
+	Outbound() bool
 	Shutdown(error)
 	Log(args ...interface{})
 }
@@ -33,6 +34,7 @@ type RemoteConnection struct {
 	remote        *Peer
 	remoteTCPAddr string
 	established   bool
+	outbound      bool
 }
 
 type LocalConnection struct {
@@ -66,12 +68,13 @@ type ConnectionInteraction struct {
 	payload interface{}
 }
 
-func NewRemoteConnection(from, to *Peer, tcpAddr string, established bool) *RemoteConnection {
+func NewRemoteConnection(from, to *Peer, tcpAddr string, established bool, outbound bool) *RemoteConnection {
 	return &RemoteConnection{
 		local:         from,
 		remote:        to,
 		remoteTCPAddr: tcpAddr,
-		established:   established}
+		established:   established,
+		outbound:      outbound}
 }
 
 func (conn *RemoteConnection) Local() *Peer {
@@ -92,6 +95,10 @@ func (conn *RemoteConnection) RemoteTCPAddr() string {
 
 func (conn *RemoteConnection) Established() bool {
 	return conn.established
+}
+
+func (conn *RemoteConnection) Outbound() bool {
+	return conn.outbound
 }
 
 func (conn *RemoteConnection) Shutdown(error) {
