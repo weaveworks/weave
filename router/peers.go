@@ -199,7 +199,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 	}
 
 	for _, connsBuf := range decodedConns {
-		decErr := connsIterator(connsBuf, func(remoteNameByte []byte, _ string, _ bool) {
+		decErr := connsIterator(connsBuf, func(remoteNameByte []byte, _ string, _, _ bool) {
 			remoteName := PeerNameFromBin(remoteNameByte)
 			if _, found := newPeers[remoteName]; found {
 				return
@@ -267,6 +267,7 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 		checkFatal(connsEnc.Encode(conn.Remote().NameByte))
 		checkFatal(connsEnc.Encode(conn.RemoteTCPAddr()))
 		// DANGER holding rlock on peer, going to take rlock on conn
+		checkFatal(connsEnc.Encode(conn.Outbound()))
 		checkFatal(connsEnc.Encode(conn.Established()))
 	}
 	checkFatal(enc.Encode(connsBuf.Bytes()))
@@ -291,7 +292,7 @@ func decodePeerNoConns(dec *gob.Decoder) (nameByte []byte, nickName string, uid 
 	return
 }
 
-func connsIterator(input []byte, fun func([]byte, string, bool)) error {
+func connsIterator(input []byte, fun func([]byte, string, bool, bool)) error {
 	buf := new(bytes.Buffer)
 	buf.Write(input)
 	dec := gob.NewDecoder(buf)
@@ -304,20 +305,24 @@ func connsIterator(input []byte, fun func([]byte, string, bool)) error {
 		if err := dec.Decode(&foundAt); err != nil {
 			return err
 		}
+		var outbound bool
+		if err := dec.Decode(&outbound); err != nil {
+			return err
+		}
 		var established bool
 		if err := dec.Decode(&established); err != nil {
 			return err
 		}
-		fun(nameByte, foundAt, established)
+		fun(nameByte, foundAt, outbound, established)
 	}
 }
 
 func readConnsMap(peer *Peer, buf []byte, table map[PeerName]*Peer) map[PeerName]Connection {
 	conns := make(map[PeerName]Connection)
-	if err := connsIterator(buf, func(nameByte []byte, remoteTCPAddr string, established bool) {
+	if err := connsIterator(buf, func(nameByte []byte, remoteTCPAddr string, outbound bool, established bool) {
 		name := PeerNameFromBin(nameByte)
 		remotePeer := table[name]
-		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr, established)
+		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr, outbound, established)
 		conns[name] = conn
 	}); err != io.EOF {
 		// this should never happen since we've already successfully
