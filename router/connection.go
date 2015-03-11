@@ -13,10 +13,10 @@ import (
 type Connection interface {
 	Local() *Peer
 	Remote() *Peer
-	BreakTie(Connection) ConnectionTieBreak
 	RemoteTCPAddr() string
-	Established() bool
 	Outbound() bool
+	Established() bool
+	BreakTie(Connection) ConnectionTieBreak
 	Shutdown(error)
 	Log(args ...interface{})
 }
@@ -33,8 +33,8 @@ type RemoteConnection struct {
 	local         *Peer
 	remote        *Peer
 	remoteTCPAddr string
-	established   bool
 	outbound      bool
+	established   bool
 }
 
 type LocalConnection struct {
@@ -68,41 +68,23 @@ type ConnectionInteraction struct {
 	payload interface{}
 }
 
-func NewRemoteConnection(from, to *Peer, tcpAddr string, established bool, outbound bool) *RemoteConnection {
+func NewRemoteConnection(from, to *Peer, tcpAddr string, outbound bool, established bool) *RemoteConnection {
 	return &RemoteConnection{
 		local:         from,
 		remote:        to,
 		remoteTCPAddr: tcpAddr,
+		outbound:      outbound,
 		established:   established,
-		outbound:      outbound}
+	}
 }
 
-func (conn *RemoteConnection) Local() *Peer {
-	return conn.local
-}
-
-func (conn *RemoteConnection) Remote() *Peer {
-	return conn.remote
-}
-
-func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak {
-	return TieBreakTied
-}
-
-func (conn *RemoteConnection) RemoteTCPAddr() string {
-	return conn.remoteTCPAddr
-}
-
-func (conn *RemoteConnection) Established() bool {
-	return conn.established
-}
-
-func (conn *RemoteConnection) Outbound() bool {
-	return conn.outbound
-}
-
-func (conn *RemoteConnection) Shutdown(error) {
-}
+func (conn *RemoteConnection) Local() *Peer                           { return conn.local }
+func (conn *RemoteConnection) Remote() *Peer                          { return conn.remote }
+func (conn *RemoteConnection) RemoteTCPAddr() string                  { return conn.remoteTCPAddr }
+func (conn *RemoteConnection) Outbound() bool                         { return conn.outbound }
+func (conn *RemoteConnection) Established() bool                      { return conn.established }
+func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak { return TieBreakTied }
+func (conn *RemoteConnection) Shutdown(error)                         {}
 
 func (conn *RemoteConnection) Log(args ...interface{}) {
 	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)

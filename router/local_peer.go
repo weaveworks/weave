@@ -111,7 +111,7 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 	if err != nil {
 		return err
 	}
-	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String(), false, true)
+	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String(), true, false)
 	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.Router)
 	connLocal.Start(acceptNewPeer)
 	return nil
