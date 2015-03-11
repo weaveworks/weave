@@ -140,12 +140,14 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	// aren't
 	cm.peers.ForEach(func(name PeerName, peer *Peer) {
 		peer.ForEachConnection(func(otherPeer PeerName, conn Connection) {
-			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] || !conn.Outbound() {
+			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] {
 				return
 			}
 			address := conn.RemoteTCPAddr()
-			// try both portnumber of connection and standard port
-			addTarget(address)
+			// try both portnumber of connection and standard port.  Don't use remote side of inbound connection.
+			if conn.Outbound() {
+				addTarget(address)
+			}
 			if host, _, err := net.SplitHostPort(address); err == nil {
 				addTarget(NormalisePeerAddr(host))
 			}
