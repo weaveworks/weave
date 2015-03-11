@@ -137,11 +137,17 @@ func (routes *Routes) calculateBroadcast() map[PeerName][]PeerName {
 	routes.peers.ForEach(func(name PeerName, peer *Peer) {
 		hops := []PeerName{}
 		if found, reached := peer.Routes(ourself, true); found {
+			// This is rather similar to the inner loop on
+			// peer.Routes(...); the main difference is in the
+			// locking.
 			ourself.ForEachConnection(func(remoteName PeerName, conn Connection) {
+				if !conn.Established() {
+					return
+				}
 				if _, found := reached[remoteName]; found {
 					return
 				}
-				if _, found := conn.Remote().ConnectionTo(ourself.Name); found {
+				if remoteConn, found := conn.Remote().ConnectionTo(ourself.Name); found && remoteConn.Established() {
 					hops = append(hops, remoteName)
 				}
 			})
