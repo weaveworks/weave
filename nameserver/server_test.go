@@ -16,6 +16,7 @@ const (
 	testRDNSfail     = "4.3.2.1.in-addr.arpa."
 	testRDNSnonlocal = "8.8.8.8.in-addr.arpa."
 	testPort         = 17625
+	testUdpBufSize   = 16384
 )
 
 func TestUDPDNSServer(t *testing.T) {
@@ -120,9 +121,10 @@ func TestTCPDNSServer(t *testing.T) {
 
 	// handler for the fallback server: it will just return a very long response
 	fallbackUDPHandler := func(w dns.ResponseWriter, req *dns.Msg) {
-		t.Logf("Fallback UDP server got asked: returning %d answers", numAnswers)
+		t.Logf("Fallback UDP server got asked: returning %d answers (truncated)", numAnswers)
 		q := req.Question[0]
 		m := makeAddressReply(req, &q, addrs)
+		m.SetEdns0(DEFAULT_UDP_BUFLEN, false)
 		m.Truncated = true
 		w.WriteMsg(m)
 	}
@@ -157,7 +159,7 @@ func TestTCPDNSServer(t *testing.T) {
 
 	t.Logf("Creating a UDP and a TCP client")
 	uc := new(dns.Client)
-	uc.UDPSize = DEFAULT_UDP_BUFLEN
+	uc.UDPSize = minUdpSize
 	tc := new(dns.Client)
 	tc.Net = "tcp"
 
@@ -176,19 +178,32 @@ func TestTCPDNSServer(t *testing.T) {
 
 	t.Logf("Checking the WeaveDNS server at %s returns a truncated reponse with UDP", dnsAddr)
 	r, _, err = uc.Exchange(m, dnsAddr)
-	t.Logf("Got response from WeaveDNS (UDP) with %d answers", len(r.Answer))
-	t.Logf("Response:\n%+v\n", r)
+	t.Logf("UDP Response:\n%+v\n", r)
 	wt.AssertNoErr(t, err)
+	wt.AssertNotNil(t, r, "response")
+	t.Logf("%d answers", len(r.Answer))
 	wt.AssertTrue(t, r.MsgHdr.Truncated, "DNS truncated reponse flag")
 	wt.AssertNotEqualInt(t, len(r.Answer), numAnswers, "number of answers (UDP)")
 
 	t.Logf("Checking the WeaveDNS server at %s does not return a truncated reponse with TCP", dnsAddr)
 	r, _, err = tc.Exchange(m, dnsAddr)
-	t.Logf("Got response from WeaveDNS (TCP) with %d answers", len(r.Answer))
-	t.Logf("Response:\n%+v\n", r)
+	t.Logf("TCP Response:\n%+v\n", r)
 	wt.AssertNoErr(t, err)
+	wt.AssertNotNil(t, r, "response")
+	t.Logf("%d answers", len(r.Answer))
 	wt.AssertFalse(t, r.MsgHdr.Truncated, "DNS truncated response flag")
 	wt.AssertEqualInt(t, len(r.Answer), numAnswers, "number of answers (TCP)")
+
+	t.Logf("Checking the WeaveDNS server at %s does not return a truncated reponse with UDP with a bigger buffer", dnsAddr)
+	m.SetEdns0(testUdpBufSize, false)
+	r, _, err = uc.Exchange(m, dnsAddr)
+	t.Logf("UDP-large Response:\n%+v\n", r)
+	wt.AssertNoErr(t, err)
+	wt.AssertNotNil(t, r, "response")
+	t.Logf("%d answers", len(r.Answer))
+	wt.AssertNoErr(t, err)
+	wt.AssertFalse(t, r.MsgHdr.Truncated, "DNS truncated response flag")
+	wt.AssertEqualInt(t, len(r.Answer), numAnswers, "number of answers (UDP-long)")
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -196,10 +211,12 @@ func TestTCPDNSServer(t *testing.T) {
 // perform a DNS query and assert the reply code, number or answers, etc
 func assertExchange(t *testing.T, z string, ty uint16, minAnswers int, maxAnswers int, port int) *dns.Msg {
 	c := new(dns.Client)
-	c.UDPSize = DEFAULT_UDP_BUFLEN
+	c.UDPSize = testUdpBufSize
 	m := new(dns.Msg)
 	m.RecursionDesired = true
 	m.SetQuestion(z, ty)
+	m.SetEdns0(testUdpBufSize, false)		// we don't want to play with truncation here...
+
 	r, _, err := c.Exchange(m, fmt.Sprintf("127.0.0.1:%d", port))
 	t.Logf("Response:\n%+v\n", r)
 	wt.AssertNoErr(t, err)

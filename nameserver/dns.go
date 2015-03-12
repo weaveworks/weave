@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	localTTL uint32 = 30 // somewhat arbitrary; we don't expect anyone
-	// downstream to cache results
+	localTTL   uint32 = 30 // somewhat arbitrary; we don't expect anyone downstream to cache results
+	minUdpSize        = 512
+	maxUdpSize        = 65535
 )
 
 func makeHeader(r *dns.Msg, q *dns.Question) *dns.RR_Header {
@@ -22,6 +23,15 @@ func makeReply(r *dns.Msg, as []dns.RR) *dns.Msg {
 	m.RecursionAvailable = true
 	m.Answer = as
 	return m
+}
+
+func makeTruncatedReply(r *dns.Msg) *dns.Msg {
+	// for truncated response, we create a minimal reply with the Truncated bit set
+	reply := new(dns.Msg)
+	reply.SetReply(r)
+	//reply.Rcode = dns.RcodeBadTrunc
+	reply.Truncated = true
+	return reply
 }
 
 func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []net.IP) *dns.Msg {
@@ -60,4 +70,15 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 	m.RecursionAvailable = true
 	m.Rcode = dns.RcodeNameError
 	return m
+}
+
+// get the maximum UDP-reply length
+func getMaxReplyLen(r *dns.Msg, proto dnsProtocol) int {
+	maxLen := minUdpSize
+	if proto == protTcp {
+		maxLen = maxUdpSize
+	} else if opt := r.IsEdns0(); opt != nil {
+		maxLen = int(opt.UDPSize())
+	}
+	return maxLen
 }

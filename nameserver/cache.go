@@ -2,13 +2,13 @@ package nameserver
 
 import (
 	"errors"
+	. "github.com/zettio/weave/common"
 	"github.com/miekg/dns"
 	"math"
+	"math/rand"
 	"sort"
 	"sync"
 	"time"
-	//"fmt"
-	"math/rand"
 )
 
 var (
@@ -49,8 +49,9 @@ func shuffleAnswers(answers []dns.RR) []dns.RR {
 
 // a cache entry
 type cacheEntry struct {
-	Status entryStatus // status of the entry
-	Flags  uint8       // some extra flags
+	Status   entryStatus // status of the entry
+	Flags    uint8       // some extra flags
+	ReplyLen int
 
 	question dns.Question
 	protocol dnsProtocol
@@ -80,7 +81,7 @@ func newCacheEntry(question *dns.Question, reply *dns.Msg, status entryStatus, n
 }
 
 // Get a copy of the reply stored in the entry, but with some values adjusted like the TTL
-func (e *cacheEntry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error) {
+func (e *cacheEntry) getReply(request *dns.Msg, maxLen int, now time.Time) (*dns.Msg, error) {
 	if e.Status != stResolved {
 		return nil, nil
 	}
@@ -88,6 +89,11 @@ func (e *cacheEntry) getReply(request *dns.Msg, now time.Time) (*dns.Msg, error)
 	// if the reply has expired or is invalid, force the caller to start a new resolution
 	if e.hasExpired(now) {
 		return nil, nil
+	}
+
+	if e.ReplyLen >= maxLen {
+		Debug.Printf("[cache] returning truncated reponse: %d > %d", e.ReplyLen, maxLen)
+		return makeTruncatedReply(request), nil
 	}
 
 	// create a copy of the reply, with values for this particular query
@@ -136,6 +142,7 @@ func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
 	e.putTime = now
 	e.validUntil = now.Add(time.Second * time.Duration(minTtl))
 	e.reply = *reply
+	e.ReplyLen = reply.Len()
 
 	if shouldNotify {
 		close(e.waitChan) // notify all the waiters by closing the channel
@@ -143,15 +150,15 @@ func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) {
 }
 
 // wait until a valid reply is set in the cache
-func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, now time.Time) (*dns.Msg, error) {
+func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, maxLen int, now time.Time) (*dns.Msg, error) {
 	if e.Status == stResolved {
-		return e.getReply(request, now)
+		return e.getReply(request, maxLen, now)
 	}
 
 	if timeout > 0 {
 		select {
 		case <-e.waitChan:
-			return e.getReply(request, now)
+			return e.getReply(request, maxLen, now)
 		case <-time.After(time.Second * timeout):
 			return nil, errTimeout
 		}
@@ -175,11 +182,7 @@ func (p cacheEntriesSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 //////////////////////////////////////////////////////////////////////////////////////
 
-type cacheKey struct {
-	question dns.Question
-	protocol dnsProtocol
-}
-
+type cacheKey dns.Question
 type entries map[cacheKey]*cacheEntry
 
 // Cache is a thread-safe fixed capacity LRU cache.
@@ -219,40 +222,46 @@ func (c *Cache) Purge(now time.Time) {
 }
 
 // Add adds a reply to the cache.
-func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, proto dnsProtocol, flags uint8, now time.Time) {
+func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, flags uint8, now time.Time) int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	question := request.Question[0]
-	key := cacheKey{question, proto}
-	if ent, found := c.entries[key]; found {
+	key := cacheKey(question)
+	ent, found := c.entries[key]
+	if found {
+		Debug.Printf("[cache msgid %d] replacing response in cache", request.MsgHdr.Id)
 		ent.setReply(reply, flags, now)
 	} else {
 		// If we will add a new item and the capacity has been exceeded, make some room...
 		if len(c.entries) >= c.Capacity {
 			c.removeOldest(1, now)
 		}
-		c.entries[key] = newCacheEntry(&question, reply, stResolved, now)
+		ent = newCacheEntry(&question, reply, stResolved, now)
+		c.entries[key] = ent
 	}
+	return ent.ReplyLen
 }
 
 // Look up for a question's reply from the cache.
 // If no reply is stored in the cache, it returns a `nil` reply and no error. The caller can then `Wait()`
 // for another goroutine `Put`ing a reply in the cache.
-func (c *Cache) Get(request *dns.Msg, proto dnsProtocol, now time.Time) (reply *dns.Msg, err error) {
+func (c *Cache) Get(request *dns.Msg, maxLen int, now time.Time) (reply *dns.Msg, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	question := request.Question[0]
-	key := cacheKey{question, proto}
+	key := cacheKey(question)
 	if ent, found := c.entries[key]; found {
-		reply, err = ent.getReply(request, now)
+		reply, err = ent.getReply(request, maxLen, now)
 		if ent.hasExpired(now) {
+			Debug.Printf("[cache msgid %d] expired: removing", request.MsgHdr.Id)
 			delete(c.entries, key)
 			reply = nil
 		}
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
+		Debug.Printf("[cache msgid %d] addind in pending state", request.MsgHdr.Id)
 		c.entries[key] = newCacheEntry(&question, nil, stPending, now)
 	}
 	return
@@ -262,23 +271,21 @@ func (c *Cache) Get(request *dns.Msg, proto dnsProtocol, now time.Time) (reply *
 // Notice that the caller could Get() and then Wait() for a question, but the corresponding cache
 // entry could have been removed in between. In that case, the caller should retry the query (and
 // the user should increase the cache size!)
-func (c *Cache) Wait(request *dns.Msg, proto dnsProtocol, timeout time.Duration, now time.Time) (reply *dns.Msg, err error) {
+func (c *Cache) Wait(request *dns.Msg, timeout time.Duration, maxLen int, now time.Time) (reply *dns.Msg, err error) {
 	// do not try to lock the cache: otherwise, no one else could `Put()` the reply
 	question := request.Question[0]
-	key := cacheKey{question, proto}
-	if entry, found := c.entries[key]; found {
-		reply, err = entry.waitReply(request, timeout, now)
+	if entry, found := c.entries[cacheKey(question)]; found {
+		reply, err = entry.waitReply(request, timeout, maxLen, now)
 	}
 	return
 }
 
 // Remove removes the provided question from the cache.
-func (c *Cache) Remove(question *dns.Question, proto dnsProtocol) {
+func (c *Cache) Remove(question *dns.Question) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	key := cacheKey{*question, proto}
-	delete(c.entries, key)
+	delete(c.entries, cacheKey(*question))
 }
 
 // Len returns the number of entries in the cache.
@@ -313,7 +320,7 @@ func (c *Cache) removeOldest(atLeast int, now time.Time) {
 	}
 	sort.Sort(es)
 	for i := 0; i < atLeast; i++ {
-		key := cacheKey{es[i].question, es[i].protocol}
+		key := cacheKey(es[i].question)
 		c.entries[key].close()
 		delete(c.entries, key)
 	}

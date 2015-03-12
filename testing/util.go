@@ -19,6 +19,12 @@ func AssertFalse(t *testing.T, cond bool, desc string) {
 	}
 }
 
+func AssertNotNil(t *testing.T, p interface{}, desc string) {
+	if p == nil {
+		Fatalf(t, "Unexpected nil pointer for %s", desc)
+	}
+}
+
 func AssertNoErr(t *testing.T, err error) {
 	if err != nil {
 		Fatalf(t, "Unexpected error: %s", err)

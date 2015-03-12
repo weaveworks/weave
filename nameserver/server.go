@@ -55,6 +55,17 @@ func (proto dnsProtocol) String() string {
 	return "unknown"
 }
 
+// get a new dns.Client for a protocol
+func (proto dnsProtocol) GetNewClient(bufsize int) *dns.Client {
+	switch proto {
+	case protTcp:
+		return &dns.Client{Net: "tcp"}
+	case protUdp:
+		return &dns.Client{Net: "udp", UDPSize: uint16(bufsize)}
+	}
+	return nil
+}
+
 type DNSServer struct {
 	udpSrv      *dns.Server
 	tcpSrv      *dns.Server
@@ -132,16 +143,16 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 
 	// create two DNS request multiplexerers, depending on the protocol used by clients
 	// (we use the same protocol for asking upstream servers)
-	mux := func(client *dns.Client, proto dnsProtocol) *dns.ServeMux {
+	mux := func(proto dnsProtocol) *dns.ServeMux {
 		m := dns.NewServeMux()
 		m.HandleFunc(s.Domain, s.queryHandler([]Lookup{s.zone, s.mdnsCli}, proto))
-		m.HandleFunc(RDNS_DOMAIN, s.rdnsHandler([]Lookup{s.zone, s.mdnsCli}, client, proto))
-		m.HandleFunc(".", s.notUsHandler(client, proto))
+		m.HandleFunc(RDNS_DOMAIN, s.rdnsHandler([]Lookup{s.zone, s.mdnsCli}, proto))
+		m.HandleFunc(".", s.notUsHandler(proto))
 		return m
 	}
 
-	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(&dns.Client{Net: "udp", UDPSize: DEFAULT_UDP_BUFLEN}, protUdp)}
-	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(&dns.Client{Net: "tcp"}, protTcp)}
+	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(protUdp)}
+	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(protTcp)}
 
 	return
 }
@@ -201,9 +212,10 @@ func (s *DNSServer) Stop() error {
 func (s *DNSServer) queryHandler(lookups []Lookup, proto dnsProtocol) dns.HandlerFunc {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
+		maxLen := getMaxReplyLen(r, proto)
 		Debug.Printf("Query: %+v", q)
 		if q.Qtype == dns.TypeA {
-			reply, err := s.cache.Get(r, proto, time.Now())
+			reply, err := s.cache.Get(r, maxLen, time.Now())
 			if err != nil {
 				Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
 				w.WriteMsg(makeDNSFailResponse(r))
@@ -222,7 +234,7 @@ func (s *DNSServer) queryHandler(lookups []Lookup, proto dnsProtocol) dns.Handle
 
 					Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
 						m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, ip, dns.RcodeToString[m.Rcode])
-					s.cache.Put(r, m, proto, CacheLocalReply, now)
+					s.cache.Put(r, m, CacheLocalReply, now)
 					w.WriteMsg(m)
 					return
 				}
@@ -234,13 +246,14 @@ func (s *DNSServer) queryHandler(lookups []Lookup, proto dnsProtocol) dns.Handle
 	}
 }
 
-func (s *DNSServer) rdnsHandler(lookups []Lookup, client *dns.Client, proto dnsProtocol) dns.HandlerFunc {
-	fallback := s.notUsHandler(client, proto)
+func (s *DNSServer) rdnsHandler(lookups []Lookup, proto dnsProtocol) dns.HandlerFunc {
+	fallback := s.notUsHandler(proto)
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
+		maxLen := getMaxReplyLen(r, proto)
 		Debug.Printf("Reverse query: %+v", q)
 		if q.Qtype == dns.TypePTR {
-			reply, err := s.cache.Get(r, proto, time.Now())
+			reply, err := s.cache.Get(r, maxLen, time.Now())
 			if err != nil {
 				Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
 				w.WriteMsg(makeDNSFailResponse(r))
@@ -258,7 +271,7 @@ func (s *DNSServer) rdnsHandler(lookups []Lookup, client *dns.Client, proto dnsP
 					m := makePTRReply(r, &q, []string{name})
 					Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
 						m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, name, dns.RcodeToString[m.Rcode])
-					s.cache.Put(r, m, proto, CacheLocalReply, now)
+					s.cache.Put(r, m, CacheLocalReply, now)
 
 					w.WriteMsg(m)
 					return
@@ -274,45 +287,71 @@ func (s *DNSServer) rdnsHandler(lookups []Lookup, client *dns.Client, proto dnsP
 
 // When we receive a request for a name outside of our '.weave.local.'
 // domain, ask the configured DNS server as a fallback.
-func (s *DNSServer) notUsHandler(dnsClient *dns.Client, protocol dnsProtocol) dns.HandlerFunc {
+func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
+	udpClient := protUdp.GetNewClient(DEFAULT_UDP_BUFLEN)
+	tcpClient := protTcp.GetNewClient(0)
+	dnsClients := []*dns.Client{udpClient, tcpClient}
+
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] Fallback query: %+v", r.MsgHdr.Id, q)
-		reply, err := s.cache.Get(r, protocol, time.Now())
+		maxLen := getMaxReplyLen(r, proto)
+		reply, err := s.cache.Get(r, maxLen, time.Now())
 		if err != nil {
 			Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
 			w.WriteMsg(makeDNSFailResponse(r))
 			return
 		}
 		if reply != nil {
-			Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers",
-				r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer))
+			Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers [%d bytes]",
+				r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer), reply.Len())
 			w.WriteMsg(reply)
 			return
 		}
+
+		// create a request where we announce our max payload size
+		m := r
+		m.SetEdns0(uint16(s.udpBuf), false)
+
+	ServersLoop:
 		for _, server := range s.upstream.Servers {
-			reply, _, err := dnsClient.Exchange(r, fmt.Sprintf("%s:%s", server, s.upstream.Port))
-			if err != nil {
-				Debug.Printf("[dns msgid %d] Network error trying \"%s\": %s",
-					r.MsgHdr.Id, server, err)
-				continue
+			for _, dnsClient := range dnsClients {
+				reply, _, err := dnsClient.Exchange(m, fmt.Sprintf("%s:%s", server, s.upstream.Port))
+				if err != nil {
+					Debug.Printf("[dns msgid %d] Network error trying \"%s\": %s",
+						r.MsgHdr.Id, server, err)
+					continue ServersLoop
+				}
+				if reply != nil && reply.Rcode != dns.RcodeSuccess {
+					Debug.Printf("[dns msgid %d] Failure reported by \"%s\" for query \"%s\": %s",
+						r.MsgHdr.Id, server, q.Name, dns.RcodeToString[reply.Rcode])
+					continue ServersLoop
+				}
+				if reply.Truncated {
+					Debug.Printf("[dns msgid %d] Truncated response received from %s: retrying with TCP",
+						r.MsgHdr.Id, server)
+				} else {
+					Debug.Printf("[dns msgid %d] Given answer by %s for %s-query \"%s\": %d answers [caching response]",
+						r.MsgHdr.Id, server, dns.TypeToString[q.Qtype], q.Name, len(reply.Answer))
+					replyLen := s.cache.Put(r, reply, 0, time.Now())
+
+					// check if we can send the full response (otherwise, truncate)
+					if replyLen > maxLen {
+						Debug.Printf("[dns msgid %d] Reply too long for this client (%d > %d): truncating",
+							r.MsgHdr.Id, replyLen, maxLen)
+						reply = makeTruncatedReply(r)
+					}
+					w.WriteMsg(reply)
+					return
+				}
 			}
-			if reply != nil && reply.Rcode != dns.RcodeSuccess {
-				Debug.Printf("[dns msgid %d] Failure reported by \"%s\" for query \"%s\": %s",
-					r.MsgHdr.Id, server, q.Name, dns.RcodeToString[reply.Rcode])
-				continue
-			}
-			Debug.Printf("[dns msgid %d] Given answer by %s for %s-query \"%s\": %d answers [caching response]",
-				r.MsgHdr.Id, server, dns.TypeToString[q.Qtype], q.Name, len(reply.Answer))
-			s.cache.Put(r, reply, protocol, 0, time.Now())
-			w.WriteMsg(reply)
-			return
 		}
+
 		Warning.Printf("[dns msgid %d] Failed lookup for external name %s",
 			r.MsgHdr.Id, q.Name)
 
 		reply = makeDNSFailResponse(r)
-		s.cache.Put(r, reply, protocol, 0, time.Now())
+		s.cache.Put(r, reply, 0, time.Now())
 		w.WriteMsg(reply)
 	}
 }
