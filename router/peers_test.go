@@ -30,7 +30,7 @@ func checkApplyUpdate(t *testing.T, peers *Peers) {
 	// into it.
 	_, testBedPeers := newNode(dummyName)
 	testBedPeers.AddTestConnection(peers.ourself)
-	testBedPeers.ApplyUpdate(peers.EncodeAllPeers())
+	testBedPeers.ApplyUpdate(peers.Encode(peers.AllKeys()))
 
 	checkTopologyPeers(t, true, testBedPeers.allPeersExcept(dummyName), peers.allPeers()...)
 }

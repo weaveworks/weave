@@ -67,7 +67,7 @@ func NewRouter(iface *net.Interface, name PeerName, nickName string, password []
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
-	router.TopologyGossip = router.NewGossip("topology", router)
+	router.TopologyGossip = router.NewGossip("topology", router, router)
 	return router
 }
 
@@ -361,14 +361,19 @@ func (router *Router) OnGossipBroadcast(msg []byte) error {
 	return fmt.Errorf("unexpected topology gossip broadcast: %v", msg)
 }
 
-// Return state of everything we know; intended to be called periodically
-func (router *Router) Gossip() []byte {
-	return router.Peers.EncodeAllPeers()
+// GossipData interface methods
+
+func (router *Router) AllKeys() GossipKeySet {
+	return router.Peers.AllKeys()
+}
+
+func (router *Router) Encode(keys GossipKeySet) []byte {
+	return router.Peers.Encode(keys)
 }
 
 // merge in state and return "everything new I've just learnt",
 // or nil if nothing in the received message was new
-func (router *Router) OnGossip(buf []byte) ([]byte, error) {
+func (router *Router) OnUpdate(buf []byte) (GossipKeySet, error) {
 	newUpdate, err := router.Peers.ApplyUpdate(buf)
 	if _, ok := err.(UnknownPeerError); err != nil && ok {
 		// That update contained a reference to a peer which wasn't

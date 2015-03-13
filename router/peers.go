@@ -69,7 +69,7 @@ func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
 // update contains a more recent version than known to us. The return
 // value is an "improved" update containing just these new/updated
 // elements.
-func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
+func (peers *Peers) ApplyUpdate(update []byte) (GossipKeySet, error) {
 	peers.Lock()
 
 	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
@@ -95,20 +95,22 @@ func (peers *Peers) ApplyUpdate(update []byte) ([]byte, error) {
 	// Don't need to hold peers lock any longer
 	peers.Unlock()
 
-	return encodePeersMap(newUpdate), nil
+	return keysFromPeersMap(newUpdate), nil
 }
 
-func (peers *Peers) EncodeAllPeers() []byte {
+func (peers *Peers) AllKeys() GossipKeySet {
 	peers.RLock()
 	defer peers.RUnlock()
-	return encodePeersMap(peers.table)
+	return keysFromPeersMap(peers.table)
 }
 
-func EncodePeers(peers ...*Peer) []byte {
+func (peers *Peers) Encode(keys GossipKeySet) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	for _, peer := range peers {
-		peer.encode(enc)
+	for key, _ := range keys {
+		if peer, found := peers.table[key.(PeerName)]; found {
+			peer.encode(enc)
+		}
 	}
 	return buf.Bytes()
 }
@@ -159,13 +161,12 @@ func (peers *Peers) garbageCollect() []*Peer {
 	return removed
 }
 
-func encodePeersMap(peers map[PeerName]*Peer) []byte {
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
-	for _, peer := range peers {
-		peer.encode(enc)
+func keysFromPeersMap(peers map[PeerName]*Peer) GossipKeySet {
+	retval := make(GossipKeySet)
+	for name, _ := range peers {
+		retval[name] = true
 	}
-	return buf.Bytes()
+	return retval
 }
 
 func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, decodedUpdate []*Peer, decodedConns [][]byte, err error) {
