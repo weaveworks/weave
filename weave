@@ -290,6 +290,17 @@ attach() {
     if ! ip netns exec $NETNS ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
         ip netns exec $NETNS ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
     fi
+
+    arp_update $CONTAINER_IFNAME $1 "ip netns exec $NETNS"
+}
+
+# Send out an unsolicated ARP response to flush ARP cache entries
+arp_update() {
+    # It's not the end of the world if this doesn't run - we configure
+    # ARP caches so that stale entries will be noticed quickly.
+    if command_exists arping ; then
+        $3 arping -U -q -I $1 -c 1 ${2%/*}
+    fi
 }
 
 detach() {
@@ -631,6 +642,7 @@ case "$COMMAND" in
         if ! ip addr show dev $BRIDGE | grep -qF $CIDR
         then
             ip addr add dev $BRIDGE $CIDR
+            arp_update $BRIDGE $CIDR
             add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
             add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
         fi
