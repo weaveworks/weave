@@ -353,9 +353,8 @@ tell_dns() {
     # get the long form of the container ID
     CONTAINER=$(docker inspect --format='{{.Id}}' $2 2>/dev/null)
     # extract IP address and routing prefix from CIDR
-    WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
     MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
-    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS || true
+    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/${3%/*} $MORE_ARGS || true
 }
 
 # Tell the newly-started weaveDNS about existing weave IPs
