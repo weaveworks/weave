@@ -148,6 +148,12 @@ create_bridge() {
     fi
 
     ip link set dev $BRIDGE up
+
+    # Configure the ARP cache parameters on the bridge interface for
+    # the sake of 'weave expose'
+    echo 5 >/proc/sys/net/ipv4/neigh/$BRIDGE/base_reachable_time
+    echo 2 >/proc/sys/net/ipv4/neigh/$BRIDGE/delay_first_probe_time
+    echo 1 >/proc/sys/net/ipv4/neigh/$BRIDGE/ucast_solicit
 }
 
 destroy_bridge() {
@@ -235,10 +241,15 @@ connect_container_to_bridge() {
         return 1
     fi
 
-    if ! ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ; then
+    if ! ip netns exec $NETNS sh -c "\
+            ip link set $GUEST_IFNAME name $CONTAINER_IFNAME &&
+            echo 5 >/proc/sys/net/ipv4/neigh/$CONTAINER_IFNAME/base_reachable_time &&
+            echo 2 >/proc/sys/net/ipv4/neigh/$CONTAINER_IFNAME/delay_first_probe_time &&
+            echo 1 >/proc/sys/net/ipv4/neigh/$CONTAINER_IFNAME/ucast_solicit" ; then
         # failed after we assigned the veth to the container's
-        # namespace
-        ip netns exec $NETNS ip link del $GUEST_IFNAME type veth || true
+        # namespace, and we don't know if it was renamed or not.
+        ip netns exec $NETNS ip link del $GUEST_IFNAME type veth 2>/dev/null || true
+        ip netns exec $NETNS ip link del $CONTAINER_IFNAME type veth 2>/dev/null || true
         return 1
     fi
 }
