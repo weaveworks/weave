@@ -522,6 +522,7 @@ case "$COMMAND" in
     launch-dns)
         [ $# -gt 0 ] || usage
         CIDR=$1
+        validate_cidr $CIDR
         shift 1
         check_not_running $DNS_CONTAINER_NAME $BASE_DNS_IMAGE
         create_bridge
@@ -589,8 +590,8 @@ case "$COMMAND" in
                 esac;
             done
         fi
-        validate_cidr $1
         CIDR=$1
+        validate_cidr $CIDR
         shift 1
         create_bridge
         CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@")
@@ -600,46 +601,51 @@ case "$COMMAND" in
         ;;
     start)
         [ $# -eq 2 ] || usage
-        validate_cidr $1
+        CIDR=$1
+        validate_cidr $CIDR
         create_bridge
         CONTAINER=$(docker start $2)
-        with_container_netns $CONTAINER attach $1 >/dev/null
-        tell_dns PUT $CONTAINER $1
+        with_container_netns $CONTAINER attach $CIDR >/dev/null
+        tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
         ;;
     attach)
         [ $# -eq 2 ] || usage
-        validate_cidr $1
+        CIDR=$1
+        validate_cidr $CIDR
         create_bridge
-        with_container_netns $2 attach $1 >/dev/null
-        tell_dns PUT $2 $1
+        with_container_netns $2 attach $CIDR >/dev/null
+        tell_dns PUT $2 $CIDR
         ;;
     detach)
         [ $# -eq 2 ] || usage
-        validate_cidr $1
-        with_container_netns $2 detach $1 >/dev/null
-        tell_dns DELETE $2 $1
+        CIDR=$1
+        validate_cidr $CIDR
+        with_container_netns $2 detach $CIDR >/dev/null
+        tell_dns DELETE $2 $CIDR
         ;;
     expose)
         [ $# -eq 1 ] || usage
-        validate_cidr $1
+        CIDR=$1
+        validate_cidr $CIDR
         create_bridge --without-ethtool
-        if ! ip addr show dev $BRIDGE | grep -qF $1
+        if ! ip addr show dev $BRIDGE | grep -qF $CIDR
         then
-            ip addr add dev $BRIDGE $1
-            add_iptables_rule nat WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
-            add_iptables_rule nat WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
+            ip addr add dev $BRIDGE $CIDR
+            add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+            add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
         fi
         ;;
     hide)
         [ $# -eq 1 ] || usage
-        validate_cidr $1
+        CIDR=$1
+        validate_cidr $CIDR
         create_bridge --without-ethtool
-        if ip addr show dev $BRIDGE | grep -qF $1
+        if ip addr show dev $BRIDGE | grep -qF $CIDR
         then
-            ip addr del dev $BRIDGE $1
-            delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
-            delete_iptables_rule nat WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
+            ip addr del dev $BRIDGE $CIDR
+            delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+            delete_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
         fi
         ;;
     stop)
