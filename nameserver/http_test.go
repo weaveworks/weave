@@ -23,7 +23,7 @@ func TestHttp(t *testing.T) {
 		containerID     = "deadbeef"
 		testDomain      = "weave.local."
 		successTestName = "test1." + testDomain
-		testAddr1       = "10.0.2.1/24"
+		testAddr1       = "10.2.2.1/24"
 		dockerIP        = "9.8.7.6"
 	)
 

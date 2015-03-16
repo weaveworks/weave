@@ -13,10 +13,12 @@ import (
 type Connection interface {
 	Local() *Peer
 	Remote() *Peer
-	BreakTie(Connection) ConnectionTieBreak
 	RemoteTCPAddr() string
+	Outbound() bool
 	Established() bool
+	BreakTie(Connection) ConnectionTieBreak
 	Shutdown(error)
+	Log(args ...interface{})
 }
 
 type ConnectionTieBreak int
@@ -31,6 +33,7 @@ type RemoteConnection struct {
 	local         *Peer
 	remote        *Peer
 	remoteTCPAddr string
+	outbound      bool
 	established   bool
 }
 
@@ -65,35 +68,26 @@ type ConnectionInteraction struct {
 	payload interface{}
 }
 
-func NewRemoteConnection(from, to *Peer, tcpAddr string, established bool) *RemoteConnection {
+func NewRemoteConnection(from, to *Peer, tcpAddr string, outbound bool, established bool) *RemoteConnection {
 	return &RemoteConnection{
 		local:         from,
 		remote:        to,
 		remoteTCPAddr: tcpAddr,
-		established:   established}
+		outbound:      outbound,
+		established:   established,
+	}
 }
 
-func (conn *RemoteConnection) Local() *Peer {
-	return conn.local
-}
+func (conn *RemoteConnection) Local() *Peer                           { return conn.local }
+func (conn *RemoteConnection) Remote() *Peer                          { return conn.remote }
+func (conn *RemoteConnection) RemoteTCPAddr() string                  { return conn.remoteTCPAddr }
+func (conn *RemoteConnection) Outbound() bool                         { return conn.outbound }
+func (conn *RemoteConnection) Established() bool                      { return conn.established }
+func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak { return TieBreakTied }
+func (conn *RemoteConnection) Shutdown(error)                         {}
 
-func (conn *RemoteConnection) Remote() *Peer {
-	return conn.remote
-}
-
-func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak {
-	return TieBreakTied
-}
-
-func (conn *RemoteConnection) RemoteTCPAddr() string {
-	return conn.remoteTCPAddr
-}
-
-func (conn *RemoteConnection) Established() bool {
-	return conn.established
-}
-
-func (conn *RemoteConnection) Shutdown(error) {
+func (conn *RemoteConnection) Log(args ...interface{}) {
+	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
 }
 
 func (conn *RemoteConnection) String() string {
@@ -164,7 +158,7 @@ func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 	defer conn.Unlock()
 	if conn.effectivePMTU != pmtu {
 		conn.effectivePMTU = pmtu
-		conn.log("Effective PMTU set to", pmtu)
+		conn.Log("Effective PMTU set to", pmtu)
 	}
 }
 
@@ -175,10 +169,6 @@ func (conn *LocalConnection) setStackFrag(frag bool) {
 	conn.Lock()
 	defer conn.Unlock()
 	conn.stackFrag = frag
-}
-
-func (conn *LocalConnection) log(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
 }
 
 // Send directly, not via the Actor.  If it goes via the Actor we can
@@ -271,7 +261,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, finish
 
 	if conn.remoteUDPAddr != nil {
 		if err := conn.sendFastHeartbeats(); err != nil {
-			conn.log("connection shutting down due to error:", err)
+			conn.Log("connection shutting down due to error:", err)
 			return
 		}
 	}
@@ -279,9 +269,9 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, finish
 	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
 
 	if err := conn.queryLoop(queryChan); err != nil {
-		conn.log("connection shutting down due to error:", err)
+		conn.Log("connection shutting down due to error:", err)
 	} else {
-		conn.log("connection shutting down")
+		conn.Log("connection shutting down")
 	}
 }
 
@@ -439,7 +429,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 			break
 		}
 		if len(msg) < 1 {
-			conn.log("ignoring blank msg")
+			conn.Log("ignoring blank msg")
 			continue
 		}
 		if err = conn.handleProtocolMsg(ProtocolTag(msg[0]), msg[1:]); err != nil {
@@ -479,7 +469,7 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 	case ProtocolGossip:
 		return conn.Router.handleGossip(payload, deliverGossip)
 	default:
-		conn.log("ignoring unknown protocol tag:", tag)
+		conn.Log("ignoring unknown protocol tag:", tag)
 	}
 	return nil
 }

@@ -41,7 +41,7 @@ func (router *Router) AddTestChannelConnection(r *Router) {
 	r.Peers.FetchWithDefault(fromPeer)    // Has side-effect of incrementing refcount
 	router.Peers.FetchWithDefault(toPeer) //
 
-	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, "", false}, r}
+	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r}
 	router.Ourself.handleAddConnection(conn)
 	router.Ourself.handleConnectionEstablished(conn)
 }

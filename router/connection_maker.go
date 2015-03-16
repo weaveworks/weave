@@ -144,8 +144,10 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 				return
 			}
 			address := conn.RemoteTCPAddr()
-			// try both portnumber of connection and standard port
-			addTarget(address)
+			// try both portnumber of connection and standard port.  Don't use remote side of inbound connection.
+			if conn.Outbound() {
+				addTarget(address)
+			}
 			if host, _, err := net.SplitHostPort(address); err == nil {
 				addTarget(NormalisePeerAddr(host))
 			}

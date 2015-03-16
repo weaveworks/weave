@@ -2,8 +2,8 @@
 
 . ./config.sh
 
-C1=10.1.1.4
-C2=10.1.1.7
+C1=10.2.1.4
+C2=10.2.1.7
 
 start_suite "Ping over cross-host weave network"
 

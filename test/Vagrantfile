@@ -33,6 +33,11 @@ end
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
+  config.vm.provider :virtualbox do |vb|
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
+  end
+
   (1..n_machines).each do |i|
     config.vm.define "host#{i}" do |host|
       ip_suffix = ip_suffix_base + i

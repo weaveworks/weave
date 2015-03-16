@@ -95,7 +95,7 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 	conn.RUnlock()
 
 	if forwardChan == nil || forwardChanDF == nil {
-		conn.log("Cannot forward frame yet - awaiting contact")
+		conn.Log("Cannot forward frame yet - awaiting contact")
 		return nil
 	}
 	// We could use non-blocking channel sends here, i.e. drop frames
@@ -272,7 +272,7 @@ func (fwd *Forwarder) run() {
 				fwd.pmtuVerified = true
 				fwd.maxPayload = epmtu + fwd.effectiveOverhead() - UDPOverhead
 				fwd.conn.setEffectivePMTU(epmtu)
-				fwd.conn.log("Effective PMTU verified at", epmtu)
+				fwd.conn.Log("Effective PMTU verified at", epmtu)
 			}
 		case frame = <-fwd.ch:
 			if !fwd.appendFrame(frame) {
@@ -368,5 +368,5 @@ func (fwd *Forwarder) drain() {
 }
 
 func (fwd *Forwarder) logDrop(frame *ForwardedFrame) {
-	fwd.conn.log("Dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", fwd.maxPayload+UDPOverhead-fwd.effectiveOverhead())
+	fwd.conn.Log("Dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", fwd.maxPayload+UDPOverhead-fwd.effectiveOverhead())
 }

@@ -16,8 +16,8 @@ done
 run_on $HOST1 sudo $WEAVE launch
 run_on $HOST2 sudo $WEAVE launch $HOST1
 
-run_on $HOST1 sudo $WEAVE launch-dns 10.3.3.2/24 -debug
-run_on $HOST2 sudo $WEAVE launch-dns 10.3.3.3/24 -debug
+run_on $HOST1 sudo $WEAVE launch-dns 10.2.254.1/24 -debug
+run_on $HOST2 sudo $WEAVE launch-dns 10.2.254.2/24 -debug
 
 run_on $HOST2 sudo $WEAVE run $C2/24 -t --name=c2 -h seetwo.weave.local ubuntu
 run_on $HOST1 sudo $WEAVE run --with-dns $C1/24 --name=c1 -t aanand/docker-dnsutils /bin/sh
