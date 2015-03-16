@@ -80,7 +80,7 @@ func equalByteBuffer(a, b []byte) bool {
 	return true
 }
 
-func equalKeySet(a, b router.GossipKeySet) bool {
+func equalUidSet(a, b uidSet) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -92,8 +92,8 @@ func equalKeySet(a, b router.GossipKeySet) bool {
 	return true
 }
 
-func assertEqualKeySet(t *testing.T, wanted, got router.GossipKeySet) {
-	if !equalKeySet(wanted, got) {
+func assertEqualKeySet(t *testing.T, wanted, got uidSet) {
+	if !equalUidSet(wanted, got) {
 		wt.Fatalf(t, "Generated set does not match: wanted %v but got %v", wanted, got)
 	}
 }
@@ -121,12 +121,12 @@ func TestEncodeMerge(t *testing.T) {
 	alloc.addSpace(testStart1, 16)
 	alloc.addSpace(testStart2, 32)
 
-	startKeys := alloc.AllKeys()
+	startKeys := alloc.FullSet()
 	encodedState := alloc.Encode(startKeys)
 
 	alloc2 := testAllocator(t, "02:00:00:02:00:00", peerUID, testStart1+"/22").addSpace(testStart3, 32)
 	defer alloc2.Stop()
-	peerKeySet := alloc2.AllKeys()
+	peerKeySet := alloc2.FullSet()
 
 	newSet, err := alloc2.OnUpdate(encodedState)
 	wt.AssertNoErr(t, err)
@@ -140,17 +140,17 @@ func TestEncodeMerge(t *testing.T) {
 	}
 
 	// Returned buffer should be all the new ones - i.e. everything we passed in
-	assertEqualKeySet(t, startKeys, newSet)
+	assertEqualKeySet(t, startKeys.(uidSet), newSet.(uidSet))
 
 	// Do it again, and nothing should be new
 	newSet, err = alloc2.OnUpdate(encodedState)
 	wt.AssertNoErr(t, err)
-	if len(newSet) != 0 {
+	if newSet != nil && len(newSet.(uidSet)) != 0 {
 		t.Fatal("Unexpected new items found")
 	}
 
 	// Now encode and merge the other way
-	buf := alloc2.Encode(alloc2.AllKeys())
+	buf := alloc2.Encode(alloc2.FullSet())
 
 	newSet, err = alloc.OnUpdate(buf)
 	wt.AssertNoErr(t, err)
@@ -165,12 +165,12 @@ func TestEncodeMerge(t *testing.T) {
 	}
 
 	// Returned set should be all the new ones - i.e. just alloc2's key
-	assertEqualKeySet(t, peerKeySet, newSet)
+	assertEqualKeySet(t, peerKeySet.(uidSet), newSet.(uidSet))
 
 	// Do it again, and nothing should be new
 	newSet, err = alloc.OnUpdate(buf)
 	wt.AssertNoErr(t, err)
-	if len(newSet) != 0 {
+	if newSet != nil && len(newSet.(uidSet)) != 0 {
 		t.Fatal("Unexpected new items found")
 	}
 }
@@ -328,7 +328,7 @@ func implTestGossip(t *testing.T) {
 
 	mockTime.SetTime(baseTime.Add(2 * time.Second))
 
-	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.AllKeys()))
+	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.FullSet()))
 	// At first, this peer has no space, so alloc1 should do nothing
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 
@@ -339,7 +339,7 @@ func implTestGossip(t *testing.T) {
 	ExpectBroadcastMessage(alloc2, nil)
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
 
-	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.AllKeys()))
+	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.FullSet()))
 
 	// Alloc1 should ask alloc2 for space when we call GetFor
 	ExpectMessage(alloc1, peerNameString, msgSpaceRequest, encode(alloc1.ourSpaceSet))
@@ -419,7 +419,7 @@ func implTestGossip2(t *testing.T) {
 
 	mockTime.SetTime(baseTime.Add(2 * time.Second))
 
-	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.AllKeys()))
+	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.FullSet()))
 	// At first, this peer has no space, so alloc1 should do nothing
 	wt.AssertStatus(t, alloc1.state, allocStateLeaderless, "allocator state")
 
@@ -453,7 +453,7 @@ func implTestGossip2(t *testing.T) {
 
 	// On receipt of the broadcast, alloc1 should ask alloc2 for space
 	ExpectMessage(alloc1, peerNameString, msgSpaceRequest, encode(alloc1.ourSpaceSet))
-	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.AllKeys()))
+	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.FullSet()))
 
 	// Now make it look like alloc2 has given up half its space
 	alloc2.ourSpaceSet.spaces[0].(*MutableSpace).MinSpace.Size = donateSize
@@ -504,7 +504,7 @@ func TestLeaks(t *testing.T) {
 	assertNoOverlaps(t, alloc1, alloc2)
 
 	mockTime.SetTime(baseTime.Add(50 * time.Second))
-	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.AllKeys()))
+	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.FullSet()))
 
 	assertNoOverlaps(t, alloc1, alloc2)
 
@@ -562,7 +562,7 @@ func TestAllocatorClaim1(t *testing.T) {
 	// alloc2 has an echo of the former state of alloc1
 	alloc2.peerInfo[oldUID] = spaceSetWith(alloc1.ourName, oldUID, NewSpace(net.ParseIP(testStart1), 64))
 
-	alloc1.decodeUpdate(alloc2.Encode(alloc2.AllKeys()))
+	alloc1.decodeUpdate(alloc2.Encode(alloc2.FullSet()))
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
 
 	ExpectBroadcastMessage(alloc1, encode(tombstoneWith(alloc1.ourName, oldUID)))
@@ -602,7 +602,7 @@ func implAllocatorClaim3(t *testing.T) {
 	// alloc2 is managing the space that alloc1 wants to claim part of
 	alloc2.addSpace(testStart1, 64)
 
-	alloc1.decodeUpdate(alloc2.Encode(alloc2.AllKeys()))
+	alloc1.decodeUpdate(alloc2.Encode(alloc2.FullSet()))
 	wt.AssertStatus(t, alloc1.state, allocStateNeutral, "allocator state")
 
 	// Tell alloc1 that we want addr1, and it will send a message to alloc2

@@ -119,6 +119,20 @@ type defaultTime struct{}
 
 func (defaultTime) Now() time.Time { return time.Now() }
 
+// Concrete implementation of router.GossipKeySet for Allocator CRDT
+
+type uidSet map[uint64]bool
+
+func (a uidSet) Merge(b router.GossipKeySet) {
+	for key, _ := range b.(uidSet) {
+		a[key] = true
+	}
+}
+
+func (alloc *Allocator) EmptySet() router.GossipKeySet {
+	return make(uidSet)
+}
+
 // Types used to send requests from Actor client to server
 type stop struct{}
 type makeString struct {
@@ -154,7 +168,7 @@ type gossipEncode struct {
 	resultChan chan<- []byte
 	keySet     router.GossipKeySet
 }
-type gossipAllKeys struct {
+type gossipFullSet struct {
 	resultChan chan<- router.GossipKeySet
 }
 type gossipUpdate struct {
@@ -294,9 +308,9 @@ func (alloc *Allocator) OnGossipBroadcast(msg []byte) error {
 }
 
 // Sync.
-func (alloc *Allocator) AllKeys() router.GossipKeySet {
+func (alloc *Allocator) FullSet() router.GossipKeySet {
 	resultChan := make(chan router.GossipKeySet)
-	alloc.queryChan <- gossipAllKeys{resultChan}
+	alloc.queryChan <- gossipFullSet{resultChan}
 	return <-resultChan
 }
 
@@ -398,9 +412,9 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 				updateSet, err := alloc.handleGossipReceived(q.bytes)
 				q.resultChan <- gossipReply{err, updateSet}
 			case gossipEncode:
-				q.resultChan <- alloc.handleGossipEncode(q.keySet)
-			case gossipAllKeys:
-				q.resultChan <- alloc.handleGossipAllKeys()
+				q.resultChan <- alloc.handleGossipEncode(q.keySet.(uidSet))
+			case gossipFullSet:
+				q.resultChan <- alloc.handleGossipFullSet()
 			case onDead:
 				alloc.handleDead(q.name, q.uid)
 			}
@@ -909,7 +923,7 @@ func (alloc *Allocator) handleGossipReceived(buf []byte) (router.GossipKeySet, e
 	if len(newerPeerSpaces) == 0 {
 		return nil, nil
 	} else {
-		updateSet := make(router.GossipKeySet)
+		updateSet := make(uidSet)
 		for _, spaceset := range newerPeerSpaces {
 			updateSet[spaceset.uid] = true
 		}
@@ -917,20 +931,20 @@ func (alloc *Allocator) handleGossipReceived(buf []byte) (router.GossipKeySet, e
 	}
 }
 
-func (alloc *Allocator) handleGossipAllKeys() router.GossipKeySet {
-	ret := make(router.GossipKeySet)
+func (alloc *Allocator) handleGossipFullSet() router.GossipKeySet {
+	ret := make(uidSet)
 	for _, spaceset := range alloc.peerInfo {
 		ret[spaceset.UID()] = true
 	}
 	return ret
 }
 
-func (alloc *Allocator) handleGossipEncode(keys router.GossipKeySet) []byte {
+func (alloc *Allocator) handleGossipEncode(uids uidSet) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	panicOnError(enc.Encode(len(keys)))
-	for uid, _ := range keys {
-		spaceset := alloc.peerInfo[uid.(uint64)]
+	panicOnError(enc.Encode(len(uids)))
+	for uid, _ := range uids {
+		spaceset := alloc.peerInfo[uid]
 		panicOnError(spaceset.Encode(enc))
 	}
 	return buf.Bytes()
