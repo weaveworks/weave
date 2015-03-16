@@ -25,7 +25,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     "apt-get update -qq; " \
     "apt-get install -qq --no-install-recommends #{pkgs}"
 
-  install_go_toolchain = "curl -s https://storage.googleapis.com/golang/go1.4.linux-amd64.tar.gz | tar xz -C /usr/local"
+  install_go_toolchain = "curl -s https://storage.googleapis.com/golang/go1.4.2.linux-amd64.tar.gz | tar xz -C /usr/local"
 
   config.vm.provision :shell, :inline => pkg_cmd
   config.vm.provision :shell, :inline => install_go_toolchain
