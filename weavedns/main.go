@@ -77,7 +77,7 @@ func main() {
 	if len(fallback) > 0 {
 		fallbackHost, fallbackPort, err := net.SplitHostPort(fallback)
 		if err != nil {
-			Error.Fatal("Fould not parse fallback host and port", err)
+			Error.Fatal("Could not parse fallback host and port", err)
 		}
 		srvConfig.UpstreamCfg = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
 		Debug.Printf("DNS fallback at %s:%s", fallbackHost, fallbackPort)
