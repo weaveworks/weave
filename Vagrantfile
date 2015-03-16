@@ -1,7 +1,7 @@
 VAGRANTFILE_API_VERSION = "2"
 
 vm_ip = "172.16.0.3" # arbitrary private IP
-pkgs = "lxc-docker build-essential ethtool libpcap-dev git mercurial bc"
+pkgs = "lxc-docker aufs-tools build-essential ethtool libpcap-dev git mercurial bc"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
