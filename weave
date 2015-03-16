@@ -121,6 +121,30 @@ delete_iptables_rule() {
     fi
 }
 
+# Configure the ARP cache parameters for the given interface.  This
+# makes containers react more quickly to a change in the MAC address
+# associated with an IP address.
+configure_arp_cache() {
+    $2 sh -c "echo 5 >/proc/sys/net/ipv4/neigh/$1/base_reachable_time &&
+              echo 2 >/proc/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
+              echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit"
+}
+
+# Send out an unsolicated ARP response to update ARP cache entries
+# accross the weave network.  We do this in addition to
+# configure_arp_cache because a) with those ARP cache settings it
+# still takes a few seconds to correct a stale ARP mapping, and b)
+# there is a kernel bug that means that the base_reachable_time
+# setting is not promptly obeyed
+# (<https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4bf6980dd0328530783fd657c776e3719b421d30>>).
+arp_update() {
+    # It's not the end of the world if this doesn't run - we configure
+    # ARP caches so that stale entries will be noticed quickly.
+    if command_exists arping ; then
+        $3 arping -U -q -I $1 -c 1 ${2%/*}
+    fi
+}
+
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
         ip link add name $BRIDGE type bridge
@@ -283,30 +307,6 @@ attach() {
     fi
 
     arp_update $CONTAINER_IFNAME $1 "ip netns exec $NETNS"
-}
-
-# Configure the ARP cache parameters for the given interface.  This
-# makes containers react more quickly to a change in the MAC address
-# associated with an IP address.
-configure_arp_cache() {
-    $2 sh -c "echo 5 >/proc/sys/net/ipv4/neigh/$1/base_reachable_time &&
-              echo 2 >/proc/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
-              echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit"
-}
-
-# Send out an unsolicated ARP response to update ARP cache entries
-# accross the weave network.  We do this in addition to
-# configure_arp_cache because a) with those ARP cache settings it
-# still takes a few seconds to correct a stale ARP mapping, and b)
-# there is a kernel bug that means that the base_reachable_time
-# setting is not promptly obeyed
-# (<https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4bf6980dd0328530783fd657c776e3719b421d30>>).
-arp_update() {
-    # It's not the end of the world if this doesn't run - we configure
-    # ARP caches so that stale entries will be noticed quickly.
-    if command_exists arping ; then
-        $3 arping -U -q -I $1 -c 1 ${2%/*}
-    fi
 }
 
 detach() {
