@@ -162,7 +162,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		allocator.SetGossip(router.NewGossip("IPallocation", allocator))
+		allocator.SetGossip(router.NewGossip("IPallocation", allocator, allocator))
 		allocator.Start()
 		allocator.HandleHttp()
 		err := lg.StartUpdater(apiPath, allocator)

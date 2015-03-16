@@ -150,17 +150,20 @@ type gossipBroadcast struct {
 	resultChan chan<- error
 	bytes      []byte
 }
-type gossipCreate struct {
+type gossipEncode struct {
 	resultChan chan<- []byte
-	bytes      []byte
+	keySet     router.GossipKeySet
 }
-type gossipReceived struct {
+type gossipAllKeys struct {
+	resultChan chan<- router.GossipKeySet
+}
+type gossipUpdate struct {
 	resultChan chan<- gossipReply
 	bytes      []byte
 }
 type gossipReply struct {
-	err   error
-	bytes []byte
+	err       error
+	updateSet router.GossipKeySet
 }
 type onDead struct {
 	name router.PeerName
@@ -291,19 +294,26 @@ func (alloc *Allocator) OnGossipBroadcast(msg []byte) error {
 }
 
 // Sync.
-func (alloc *Allocator) OnGossip(msg []byte) ([]byte, error) {
-	lg.Debug.Printf("Allocator.OnGossip: %d bytes\n", len(msg))
-	resultChan := make(chan gossipReply)
-	alloc.queryChan <- gossipReceived{resultChan, msg}
-	ret := <-resultChan
-	return ret.bytes, ret.err
+func (alloc *Allocator) AllKeys() router.GossipKeySet {
+	resultChan := make(chan router.GossipKeySet)
+	alloc.queryChan <- gossipAllKeys{resultChan}
+	return <-resultChan
 }
 
 // Sync.
-func (alloc *Allocator) Gossip() []byte {
+func (alloc *Allocator) Encode(keys router.GossipKeySet) []byte {
 	resultChan := make(chan []byte)
-	alloc.queryChan <- gossipCreate{resultChan, nil}
+	alloc.queryChan <- gossipEncode{resultChan, keys}
 	return <-resultChan
+}
+
+// Sync.
+func (alloc *Allocator) OnUpdate(msg []byte) (router.GossipKeySet, error) {
+	lg.Debug.Printf("Allocator.OnGossip: %d bytes\n", len(msg))
+	resultChan := make(chan gossipReply)
+	alloc.queryChan <- gossipUpdate{resultChan, msg}
+	ret := <-resultChan
+	return ret.updateSet, ret.err
 }
 
 // No-op
@@ -384,11 +394,13 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 				}
 			case gossipBroadcast:
 				q.resultChan <- alloc.handleGossipBroadcast(q.bytes)
-			case gossipReceived:
-				buf, err := alloc.handleGossipReceived(q.bytes)
-				q.resultChan <- gossipReply{err, buf}
-			case gossipCreate:
-				q.resultChan <- alloc.handleGossipCreate()
+			case gossipUpdate:
+				updateSet, err := alloc.handleGossipReceived(q.bytes)
+				q.resultChan <- gossipReply{err, updateSet}
+			case gossipEncode:
+				q.resultChan <- alloc.handleGossipEncode(q.keySet)
+			case gossipAllKeys:
+				q.resultChan <- alloc.handleGossipAllKeys()
 			case onDead:
 				alloc.handleDead(q.name, q.uid)
 			}
@@ -888,7 +900,7 @@ func (alloc *Allocator) handleGossipBroadcast(buf []byte) error {
 
 // merge in state and return a buffer encoding those PeerSpaces which are newer
 // than what we had previously, or nil if none were newer
-func (alloc *Allocator) handleGossipReceived(buf []byte) ([]byte, error) {
+func (alloc *Allocator) handleGossipReceived(buf []byte) (router.GossipKeySet, error) {
 	newerPeerSpaces, err := alloc.decodeUpdate(buf)
 	if err != nil {
 		return nil, err
@@ -897,14 +909,31 @@ func (alloc *Allocator) handleGossipReceived(buf []byte) ([]byte, error) {
 	if len(newerPeerSpaces) == 0 {
 		return nil, nil
 	} else {
-		buf := new(bytes.Buffer)
-		enc := gob.NewEncoder(buf)
-		panicOnError(enc.Encode(len(newerPeerSpaces)))
+		updateSet := make(router.GossipKeySet)
 		for _, spaceset := range newerPeerSpaces {
-			panicOnError(spaceset.Encode(enc))
+			updateSet[spaceset.uid] = true
 		}
-		return buf.Bytes(), nil
+		return updateSet, nil
 	}
+}
+
+func (alloc *Allocator) handleGossipAllKeys() router.GossipKeySet {
+	ret := make(router.GossipKeySet)
+	for _, spaceset := range alloc.peerInfo {
+		ret[spaceset.UID()] = true
+	}
+	return ret
+}
+
+func (alloc *Allocator) handleGossipEncode(keys router.GossipKeySet) []byte {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	panicOnError(enc.Encode(len(keys)))
+	for uid, _ := range keys {
+		spaceset := alloc.peerInfo[uid.(uint64)]
+		panicOnError(spaceset.Encode(enc))
+	}
+	return buf.Bytes()
 }
 
 func (alloc *Allocator) handleDead(name router.PeerName, uid uint64) {
