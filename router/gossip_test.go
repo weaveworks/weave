@@ -37,7 +37,7 @@ func (router *Router) sendAllPendingGossipUpdates() {
 		for {
 			any_pending := false
 			for _, sender := range channel.senders {
-				for len(sender.pending) > 0 {
+				for len(sender.pending.(peerNameSet)) > 0 {
 					any_pending = true
 					sender.sendAllPending()
 				}
