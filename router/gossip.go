@@ -11,14 +11,16 @@ import (
 
 const GossipInterval = 30 * time.Second
 
-// GossipData is some data structure keyed by a GossipKey, where each
-// part of the structure can be encoded and updated independently.
+// GossipData is some data structure where parts of the structure can
+// be encoded and updated independently, and updates can be merged.
 
-type GossipKey interface{}
-type GossipKeySet map[GossipKey]bool
+type GossipKeySet interface {
+	Merge(GossipKeySet)
+}
 
 type GossipData interface {
-	AllKeys() GossipKeySet
+	EmptySet() GossipKeySet
+	FullSet() GossipKeySet
 	Encode(keys GossipKeySet) []byte
 	// merge in state and return "set of names where I've just learnt something new",
 	OnUpdate(buf []byte) (GossipKeySet, error)
@@ -55,7 +57,7 @@ type gossipUpdateSender struct {
 
 func (c *GossipChannel) makeSender(data GossipData, conn Connection) *gossipUpdateSender {
 	sendChan := make(chan bool)
-	sender := &gossipUpdateSender{pending: make(map[GossipKey]bool), data: data, conn: conn, gossipChan: c, sendChan: sendChan}
+	sender := &gossipUpdateSender{pending: data.EmptySet(), data: data, conn: conn, gossipChan: c, sendChan: sendChan}
 	go sender.sendingLoop(sendChan)
 	return sender
 }
@@ -63,7 +65,7 @@ func (c *GossipChannel) makeSender(data GossipData, conn Connection) *gossipUpda
 func (sender *gossipUpdateSender) sendAllPending() {
 	sender.Lock()
 	buf := sender.data.Encode(sender.pending)
-	sender.pending = make(GossipKeySet) // Clear out the map
+	sender.pending = sender.data.EmptySet() // Clear out the map
 	sender.Unlock()
 	sender.conn.(ProtocolSender).SendProtocolMsg(sender.gossipChan.gossipMsg(buf))
 }
@@ -98,14 +100,14 @@ func (router *Router) NewGossip(channelName string, g Gossiper, d GossipData) Go
 
 func (router *Router) SendAllGossip() {
 	for _, channel := range router.GossipChannels {
-		channel.SendGossipUpdateFor(channel.data.AllKeys())
+		channel.SendGossipUpdateFor(channel.data.FullSet())
 		channel.garbageCollectSenders()
 	}
 }
 
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for _, channel := range router.GossipChannels {
-		protocolMsg := channel.gossipMsg(channel.data.Encode(channel.data.AllKeys()))
+		protocolMsg := channel.gossipMsg(channel.data.Encode(channel.data.FullSet()))
 		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 	}
 }
@@ -184,7 +186,7 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 	return nil
 }
 
-func (c *GossipChannel) SendGossipUpdateFor(keys GossipKeySet) {
+func (c *GossipChannel) SendGossipUpdateFor(updateSet GossipKeySet) {
 	c.Lock()
 	defer c.Unlock()
 	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
@@ -194,9 +196,7 @@ func (c *GossipChannel) SendGossipUpdateFor(keys GossipKeySet) {
 			c.senders[conn] = sender
 		}
 		sender.Lock()
-		for updateKey, _ := range keys {
-			sender.pending[updateKey] = true
-		}
+		sender.pending.Merge(updateSet)
 		sender.Unlock()
 		select { // non-blocking send
 		case sender.sendChan <- true:

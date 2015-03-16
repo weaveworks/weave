@@ -249,7 +249,7 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
-	keys := GossipKeySet{peer.Name: true} // create a set including ourself plus anything passed in
+	keys := peerNameSet{peer.Name: true} // create a set including ourself plus anything passed in
 	for _, p := range peers {
 		keys[p.Name] = true
 	}

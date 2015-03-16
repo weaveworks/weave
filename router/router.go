@@ -362,14 +362,28 @@ func (router *Router) OnGossipBroadcast(msg []byte) error {
 	return fmt.Errorf("unexpected topology gossip broadcast: %v", msg)
 }
 
+// Concrete implementation of GossipKeySet
+
+type peerNameSet map[PeerName]bool
+
+func (a peerNameSet) Merge(b GossipKeySet) {
+	for key, _ := range b.(peerNameSet) {
+		a[key] = true
+	}
+}
+
 // GossipData interface methods
 
-func (router *Router) AllKeys() GossipKeySet {
+func (router *Router) EmptySet() GossipKeySet {
+	return make(peerNameSet)
+}
+
+func (router *Router) FullSet() GossipKeySet {
 	return router.Peers.AllKeys()
 }
 
 func (router *Router) Encode(keys GossipKeySet) []byte {
-	return router.Peers.Encode(keys)
+	return router.Peers.Encode(keys.(peerNameSet))
 }
 
 // merge in state and return "everything new I've just learnt",
