@@ -51,7 +51,7 @@ type gossipUpdateSender struct {
 }
 
 func (c *GossipChannel) makeSender(data GossipData, conn Connection) *gossipUpdateSender {
-	sendChan := make(chan bool)
+	sendChan := make(chan bool, 1)
 	sender := &gossipUpdateSender{pending: data.EmptySet(), data: data, conn: conn, gossipChan: c, sendChan: sendChan}
 	go sender.sendingLoop(sendChan)
 	return sender
