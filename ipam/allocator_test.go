@@ -754,7 +754,7 @@ func implTestCancel(t *testing.T) {
 	alloc2.Start()
 
 	// This is needed to tell one another about each other
-	alloc1.OnGossipBroadcast(alloc2.Gossip())
+	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.FullSet()))
 	time.Sleep(100 * time.Millisecond)
 
 	// Get some IPs
@@ -772,10 +772,10 @@ func implTestCancel(t *testing.T) {
 
 	cancelChan := make(chan bool, 1)
 	doneChan := make(chan error)
-	go func () {
+	go func() {
 		err := alloc1.Claim("baz", res2, cancelChan)
 		doneChan <- err
-	} ()
+	}()
 
 	time.Sleep(1000 * time.Millisecond)
 	cancelChan <- true

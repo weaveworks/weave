@@ -35,8 +35,8 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf(logmsg, logargs...)
 }
 
-func (alloc *Allocator) HandleHttp() {
-	http.HandleFunc("/ip/", func(w http.ResponseWriter, r *http.Request) {
+func (alloc *Allocator) HandleHttp(mux *http.ServeMux) {
+	mux.HandleFunc("/ip/", func(w http.ResponseWriter, r *http.Request) {
 		reqError := func(msg string, logmsg string, logargs ...interface{}) {
 			httpErrorAndLog(Warning, w, msg, http.StatusBadRequest,
 				logmsg, logargs...)
@@ -88,13 +88,17 @@ func (alloc *Allocator) HandleHttp() {
 }
 
 func ListenHttp(port int, alloc *Allocator) {
-	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
-	alloc.HandleHttp()
+	alloc.HandleHttp(mux)
 
-	address := fmt.Sprintf(":%d", port)
-	if err := http.ListenAndServe(address, nil); err != nil {
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		Error.Fatal("Unable to create http listener: ", err)
 	}
 }
