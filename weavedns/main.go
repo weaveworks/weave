@@ -87,7 +87,7 @@ func main() {
 	if err != nil {
 		Error.Fatal("Failed to initialize the WeaveDNS server", err)
 	}
-	go weavedns.ListenHttp(version, srv, zone, httpPort)
+	go weavedns.ListenHttp(version, srv, localDomain, zone, httpPort)
 	err = srv.Start()
 	if err != nil {
 		Error.Fatal("Failed to start the WeaveDNS server", err)

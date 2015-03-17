@@ -17,7 +17,7 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf("[http] "+logmsg, logargs...)
 }
 
-func ListenHttp(version string, server *DNSServer, db Zone, port int) {
+func ListenHttp(version string, server *DNSServer, domain string, db Zone, port int) {
 
 	router := mux.NewRouter()
 
@@ -47,7 +47,7 @@ func ListenHttp(version string, server *DNSServer, db Zone, port int) {
 			return
 		}
 
-		if dns.IsSubDomain(server.Domain, name) {
+		if dns.IsSubDomain(domain, name) {
 			Info.Printf("[http] Adding %s -> %s", name, ipStr)
 			if err := db.AddRecord(ident, name, ip); err != nil {
 				if _, ok := err.(DuplicateError); !ok {
@@ -58,7 +58,7 @@ func ListenHttp(version string, server *DNSServer, db Zone, port int) {
 				} // oh, I already know this. whatever.
 			}
 		} else {
-			Info.Printf("[http] Ignoring name %s, not in %s", name, server.Domain)
+			Info.Printf("[http] Ignoring name %s, not in %s", name, domain)
 		}
 	})
 
