@@ -121,6 +121,30 @@ delete_iptables_rule() {
     fi
 }
 
+# Configure the ARP cache parameters for the given interface.  This
+# makes containers react more quickly to a change in the MAC address
+# associated with an IP address.
+configure_arp_cache() {
+    $2 sh -c "echo 5 >/proc/sys/net/ipv4/neigh/$1/base_reachable_time &&
+              echo 2 >/proc/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
+              echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit"
+}
+
+# Send out an unsolicated ARP response to update ARP cache entries
+# accross the weave network.  We do this in addition to
+# configure_arp_cache because a) with those ARP cache settings it
+# still takes a few seconds to correct a stale ARP mapping, and b)
+# there is a kernel bug that means that the base_reachable_time
+# setting is not promptly obeyed
+# (<https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4bf6980dd0328530783fd657c776e3719b421d30>>).
+arp_update() {
+    # It's not the end of the world if this doesn't run - we configure
+    # ARP caches so that stale entries will be noticed quickly.
+    if command_exists arping ; then
+        $3 arping -U -q -I $1 -c 1 ${2%/*}
+    fi
+}
+
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
         ip link add name $BRIDGE type bridge
@@ -148,6 +172,10 @@ create_bridge() {
     fi
 
     ip link set dev $BRIDGE up
+
+    # Configure the ARP cache parameters on the bridge interface for
+    # the sake of 'weave expose'
+    configure_arp_cache $BRIDGE
 }
 
 destroy_bridge() {
@@ -225,15 +253,18 @@ connect_container_to_bridge() {
         return 1
     fi
 
-    if run_tool host ethtool -K $GUEST_IFNAME tx off >/dev/null &&
-        ip link set $LOCAL_IFNAME master $BRIDGE &&
-        ip link set $LOCAL_IFNAME up &&
-        ip link set $GUEST_IFNAME netns $NETNS ; then
-        ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME
-    else
+    if ! run_tool host ethtool -K $GUEST_IFNAME tx off >/dev/null ||
+        ! ip link set $LOCAL_IFNAME master $BRIDGE ||
+        ! ip link set $LOCAL_IFNAME up ||
+        ! ip link set $GUEST_IFNAME netns $NETNS ; then
         # failed before we assigned the veth to the container's
-        # namespace - delete it
+        # namespace
         ip link del $LOCAL_IFNAME type veth || true
+        return 1
+    fi
+
+    if ! ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
+       ! configure_arp_cache $CONTAINER_IFNAME "ip netns exec $NETNS" ; then
         return 1
     fi
 }
@@ -274,6 +305,8 @@ attach() {
     if ! ip netns exec $NETNS ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
         ip netns exec $NETNS ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
     fi
+
+    arp_update $CONTAINER_IFNAME $1 "ip netns exec $NETNS"
 }
 
 detach() {
@@ -337,9 +370,8 @@ tell_dns() {
     # get the long form of the container ID
     CONTAINER=$(docker inspect --format='{{.Id}}' $2 2>/dev/null)
     # extract IP address and routing prefix from CIDR
-    WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/\(.*\)/\1/')
     MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
-    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/$WEAVE_ADDR_IP $MORE_ARGS || true
+    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/${3%/*} $MORE_ARGS || true
 }
 
 # Tell the newly-started weaveDNS about existing weave IPs
@@ -544,6 +576,7 @@ case "$COMMAND" in
     launch-dns)
         [ $# -gt 0 ] || usage
         CIDR=$1
+        validate_cidr $CIDR
         shift 1
         check_not_running $DNS_CONTAINER_NAME $BASE_DNS_IMAGE
         create_bridge
@@ -628,11 +661,12 @@ case "$COMMAND" in
         ;;
     start)
         [ $# -eq 2 ] || usage
-        validate_cidr $1
+        CIDR=$1
+        validate_cidr $CIDR
         create_bridge
         CONTAINER=$(docker start $2)
-        with_container_netns $CONTAINER attach $1 >/dev/null
-        tell_dns PUT $CONTAINER $1
+        with_container_netns $CONTAINER attach $CIDR >/dev/null
+        tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
         ;;
     attach)
@@ -650,30 +684,34 @@ case "$COMMAND" in
         ;;
     detach)
         [ $# -eq 2 ] || usage
-        validate_cidr $1
-        with_container_netns $2 detach $1 >/dev/null
-        tell_dns DELETE $2 $1
+        CIDR=$1
+        validate_cidr $CIDR
+        with_container_netns $2 detach $CIDR >/dev/null
+        tell_dns DELETE $2 $CIDR
         ;;
     expose)
         [ $# -eq 1 ] || usage
-        validate_cidr $1
+        CIDR=$1
+        validate_cidr $CIDR
         create_bridge --without-ethtool
-        if ! ip addr show dev $BRIDGE | grep -qF $1
+        if ! ip addr show dev $BRIDGE | grep -qF $CIDR
         then
-            ip addr add dev $BRIDGE $1
-            add_iptables_rule nat WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
-            add_iptables_rule nat WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
+            ip addr add dev $BRIDGE $CIDR
+            arp_update $BRIDGE $CIDR
+            add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+            add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
         fi
         ;;
     hide)
         [ $# -eq 1 ] || usage
-        validate_cidr $1
+        CIDR=$1
+        validate_cidr $CIDR
         create_bridge --without-ethtool
-        if ip addr show dev $BRIDGE | grep -qF $1
+        if ip addr show dev $BRIDGE | grep -qF $CIDR
         then
-            ip addr del dev $BRIDGE $1
-            delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $1 -j MASQUERADE
-            delete_iptables_rule nat WEAVE -s $1 ! -o $BRIDGE -j MASQUERADE
+            ip addr del dev $BRIDGE $CIDR
+            delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+            delete_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
         fi
         ;;
     stop)
