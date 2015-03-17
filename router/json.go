@@ -62,7 +62,7 @@ func (routes *Routes) MarshalJSON() ([]byte, error) {
 
 func (peer *Peer) MarshalJSON() ([]byte, error) {
 	conns := make([]Connection, 0)
-	peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
+	peer.ForEachConnection(func(_ PeerName, conn Connection) {
 		conns = append(conns, conn)
 	})
 	return json.Marshal(struct {
