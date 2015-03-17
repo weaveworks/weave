@@ -905,12 +905,6 @@ func (alloc *Allocator) handleCancelClaim(ident string, addr net.IP) {
 			alloc.claims.removeAt(i)
 		}
 	}
-
-	for i, request := range alloc.inflight {
-		if request.kind == msgSpaceClaim && request.details.Start.Equal(addr) {
-			alloc.inflight.removeAt(i)
-		}
-	}
 }
 
 func (alloc *Allocator) handleCancelGetFor(ident string) {
