@@ -24,6 +24,7 @@ func ListenHttp(version string, domain string, db Zone, port int) {
 	router.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln("weave DNS", version))
 		io.WriteString(w, fmt.Sprintln("Serving domain", domain))
+		io.WriteString(w, db.Status())
 	})
 
 	router.Methods("PUT").Path("/name/{identifier:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
