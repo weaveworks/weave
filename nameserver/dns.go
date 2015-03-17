@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	localTTL uint32 = 300 // somewhat arbitrary; we don't expect anyone
+	localTTL uint32 = 30 // somewhat arbitrary; we don't expect anyone
 	// downstream to cache results
 )
 
@@ -52,4 +52,12 @@ func makePTRReply(r *dns.Msg, q *dns.Question, names []string) *dns.Msg {
 		answers[i] = &dns.PTR{*header, name}
 	}
 	return makeReply(r, answers)
+}
+
+func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
+	m := new(dns.Msg)
+	m.SetReply(r)
+	m.RecursionAvailable = true
+	m.Rcode = dns.RcodeNameError
+	return m
 }

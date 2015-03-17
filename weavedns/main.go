@@ -10,6 +10,9 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
 )
 
 var version = "(unreleased version)"
@@ -23,7 +26,12 @@ func main() {
 		fallback    string
 		dnsPort     int
 		httpPort    int
+		numLocWork  int
+		numRecWork  int
 		wait        int
+		timeout     int
+		udpbuf      int
+		cacheLen    int
 		watch       bool
 		debug       bool
 		err         error
@@ -31,12 +39,17 @@ func main() {
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
-	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
-	flag.StringVar(&localDomain, "localDomain", weavedns.DEFAULT_LOCAL_DOMAIN, "local domain (e.g., 'weave.local.')")
+	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "path to Docker API socket")
+	flag.StringVar(&localDomain, "localDomain", weavedns.DEFAULT_LOCAL_DOMAIN, "local domain (ie, 'weave.local.')")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
-	flag.IntVar(&dnsPort, "dnsport", 53, "port to listen to DNS requests")
+	flag.IntVar(&dnsPort, "dnsport", weavedns.DEFAULT_SERVER_PORT, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
-	flag.StringVar(&fallback, "fallback", "", "fallback server and port (ie, '8.8.8.8:53')")
+	flag.StringVar(&fallback, "fallback", "", "force a fallback (ie, '8.8.8.8:53') instead of /etc/resolv.conf values")
+	flag.IntVar(&numLocWork, "localres", weavedns.DEFAULT_RESOLV_WORKERS, "number of concurrent local resolvers")
+	flag.IntVar(&numRecWork, "recres", weavedns.DEFAULT_RESOLV_WORKERS, "number of concurrent recursive resolvers")
+	flag.IntVar(&timeout, "timeout", weavedns.DEFAULT_TIMEOUT, "timeout for resolutions")
+	flag.IntVar(&udpbuf, "udpbuf", weavedns.DEFAULT_UDP_BUFLEN, "UDP buffer length")
+	flag.IntVar(&cacheLen, "cache", weavedns.DEFAULT_CACHE_LEN, "cache length")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	flag.Parse()
@@ -70,8 +83,13 @@ func main() {
 	}
 
 	srvConfig := weavedns.DNSServerConfig{
-		Port:        dnsPort,
-		LocalDomain: localDomain,
+		Port:                dnsPort,
+		CacheLen:            cacheLen,
+		LocalDomain:         localDomain,
+		NumLocalWorkers:     numLocWork,
+		NumRecursiveWorkers: numRecWork,
+		Timeout:             timeout,
+		UdpBufLen:           udpbuf,
 	}
 
 	if len(fallback) > 0 {
@@ -88,8 +106,30 @@ func main() {
 	if err != nil {
 		Error.Fatal("Failed to initialize the WeaveDNS server", err)
 	}
+
+	Debug.Printf("Starting the signals handler")
+	go handleSignals(srv)
+
 	err = srv.Start()
 	if err != nil {
 		Error.Fatal("Failed to start the WeaveDNS server", err)
+	}
+}
+
+func handleSignals(s *weavedns.DNSServer) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT)
+	buf := make([]byte, 1<<20)
+	for {
+		sig := <-sigs
+		switch sig {
+		case syscall.SIGINT:
+			Info.Printf("=== received SIGINT ===\n*** exiting\n")
+			s.Stop()
+			os.Exit(0)
+		case syscall.SIGQUIT:
+			stacklen := runtime.Stack(buf, true)
+			Info.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
+		}
 	}
 }

@@ -56,7 +56,7 @@ func TestUDPDNSServer(t *testing.T) {
 	}
 
 	// Run another DNS server for fallback
-	s, fallbackAddr, err := RunLocalUDPServer(t, "127.0.0.1:0", fallbackHandler)
+	s, fallbackAddr, err := runLocalUDPServer(t, "127.0.0.1:0", fallbackHandler)
 	wt.AssertNoErr(t, err)
 	defer s.Shutdown()
 
@@ -72,55 +72,32 @@ func TestUDPDNSServer(t *testing.T) {
 
 	var r *dns.Msg
 
-	r = testExchange(t, successTestName, dns.TypeA, 1, 1)
+	r = assertExchange(t, successTestName, dns.TypeA, 1, 1, testPort)
 	wt.AssertType(t, r.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, r.Answer[0].(*dns.A).A.String(), testAddr1, "IP address")
 
-	testExchange(t, failTestName, dns.TypeA, 0, 0)
+	assertExchange(t, failTestName, dns.TypeA, 0, 0, testPort)
 
-	r = testExchange(t, testRDNSsuccess, dns.TypePTR, 1, 1)
+	r = assertExchange(t, testRDNSsuccess, dns.TypePTR, 1, 1, testPort)
 	wt.AssertType(t, r.Answer[0], (*dns.PTR)(nil), "DNS record")
 	wt.AssertEqualString(t, r.Answer[0].(*dns.PTR).Ptr, successTestName, "IP address")
 
-	testExchange(t, testRDNSfail, dns.TypePTR, 0, 0)
+	assertExchange(t, testRDNSfail, dns.TypePTR, 0, 0, testPort)
 
 	// This should fail because we don't handle MX records
-	testExchange(t, successTestName, dns.TypeMX, 0, 0)
+	assertExchange(t, successTestName, dns.TypeMX, 0, 0, testPort)
 
 	// This non-local query for an MX record should succeed by being
 	// passed on to the fallback server
-	testExchange(t, nonLocalName, dns.TypeMX, 1, -1)
+	assertExchange(t, nonLocalName, dns.TypeMX, 1, -1, testPort)
 
 	// Now ask a query that we expect to return a lot of data.
-	testExchange(t, nonLocalName, dns.TypeANY, 5, -1)
+	assertExchange(t, nonLocalName, dns.TypeANY, 5, -1, testPort)
 
-	testExchange(t, testRDNSnonlocal, dns.TypePTR, 1, -1)
+	assertExchange(t, testRDNSnonlocal, dns.TypePTR, 1, -1, testPort)
 
 	// Not testing MDNS functionality of server here (yet), since it
 	// needs two servers, each listening on its own address
-}
-
-func testExchange(t *testing.T, z string, ty uint16, minAnswers int, maxAnswers int) *dns.Msg {
-	c := new(dns.Client)
-	c.UDPSize = DEFAULT_UDP_BUFLEN
-	m := new(dns.Msg)
-	m.RecursionDesired = true
-	m.SetQuestion(z, ty)
-	r, _, err := c.Exchange(m, fmt.Sprintf("127.0.0.1:%d", testPort))
-	wt.AssertNoErr(t, err)
-	if minAnswers == 0 && maxAnswers == 0 {
-		wt.AssertStatus(t, r.Rcode, dns.RcodeNameError, "DNS response code")
-	} else {
-		wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
-	}
-	answers := len(r.Answer)
-	if minAnswers >= 0 && answers < minAnswers {
-		wt.Fatalf(t, "Number of answers >= %d", minAnswers)
-	}
-	if maxAnswers >= 0 && answers > maxAnswers {
-		wt.Fatalf(t, "Number of answers <= %d", maxAnswers)
-	}
-	return r
 }
 
 func TestTCPDNSServer(t *testing.T) {
@@ -133,6 +110,7 @@ func TestTCPDNSServer(t *testing.T) {
 	InitDefaultLogging(true)
 	var zone = new(ZoneDb)
 
+	// generate a list of `numAnswers` IP addresses
 	var addrs []net.IP
 	bs := make([]byte, 4)
 	for i := 0; i < numAnswers; i++ {
@@ -155,17 +133,17 @@ func TestTCPDNSServer(t *testing.T) {
 		w.WriteMsg(m)
 	}
 
-	// Run another DNS server for fallback
-	us, fallbackUdpAddr, err := RunLocalUDPServer(t, "127.0.0.1:0", fallbackUDPHandler)
+	t.Logf("Running a DNS fallback server with UDP")
+	us, fallbackUdpAddr, err := runLocalUDPServer(t, "127.0.0.1:0", fallbackUDPHandler)
 	wt.AssertNoErr(t, err)
 	defer us.Shutdown()
 
 	_, fallbackPort, err := net.SplitHostPort(fallbackUdpAddr)
 	wt.AssertNoErr(t, err)
 
-	// start the TCP server on the same port as the UDP server
+	t.Logf("Starting another fallback server, with TCP, on the same port as the UDP server")
 	fallbackTcpAddr := fmt.Sprintf("127.0.0.1:%s", fallbackPort)
-	ts, fallbackTcpAddr, err := RunLocalTCPServer(t, fallbackTcpAddr, fallbackTCPHandler)
+	ts, fallbackTcpAddr, err := runLocalTCPServer(t, fallbackTcpAddr, fallbackTCPHandler)
 	wt.AssertNoErr(t, err)
 	defer ts.Shutdown()
 
@@ -190,24 +168,58 @@ func TestTCPDNSServer(t *testing.T) {
 
 	t.Logf("Checking the fallback server at %s returns a truncated response with UDP", fallbackUdpAddr)
 	r, _, err := uc.Exchange(m, fallbackUdpAddr)
+	t.Logf("Got response from fallback server (UDP) with %d answers", len(r.Answer))
+	t.Logf("Response:\n%+v\n", r)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, r.MsgHdr.Truncated, "DNS truncated reponse flag")
 	wt.AssertNotEqualInt(t, len(r.Answer), numAnswers, "number of answers (UDP)")
 
 	t.Logf("Checking the WeaveDNS server at %s returns a truncated reponse with UDP", dnsAddr)
 	r, _, err = uc.Exchange(m, dnsAddr)
+	t.Logf("Got response from WeaveDNS (UDP) with %d answers", len(r.Answer))
+	t.Logf("Response:\n%+v\n", r)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, r.MsgHdr.Truncated, "DNS truncated reponse flag")
 	wt.AssertNotEqualInt(t, len(r.Answer), numAnswers, "number of answers (UDP)")
 
 	t.Logf("Checking the WeaveDNS server at %s does not return a truncated reponse with TCP", dnsAddr)
 	r, _, err = tc.Exchange(m, dnsAddr)
+	t.Logf("Got response from WeaveDNS (TCP) with %d answers", len(r.Answer))
+	t.Logf("Response:\n%+v\n", r)
 	wt.AssertNoErr(t, err)
 	wt.AssertFalse(t, r.MsgHdr.Truncated, "DNS truncated response flag")
 	wt.AssertEqualInt(t, len(r.Answer), numAnswers, "number of answers (TCP)")
 }
 
-func RunLocalUDPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dns.Server, string, error) {
+//////////////////////////////////////////////////////////////////////////////
+
+// perform a DNS query and assert the reply code, number or answers, etc
+func assertExchange(t *testing.T, z string, ty uint16, minAnswers int, maxAnswers int, port int) *dns.Msg {
+	c := new(dns.Client)
+	c.UDPSize = DEFAULT_UDP_BUFLEN
+	m := new(dns.Msg)
+	m.RecursionDesired = true
+	m.SetQuestion(z, ty)
+	r, _, err := c.Exchange(m, fmt.Sprintf("127.0.0.1:%d", port))
+	t.Logf("Response:\n%+v\n", r)
+	wt.AssertNoErr(t, err)
+	if minAnswers == 0 && maxAnswers == 0 {
+		wt.AssertStatus(t, r.Rcode, dns.RcodeNameError, "DNS response code")
+	} else {
+		wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
+	}
+	answers := len(r.Answer)
+	if minAnswers >= 0 && answers < minAnswers {
+		wt.Fatalf(t, "Number of answers >= %d", minAnswers)
+	}
+	if maxAnswers >= 0 && answers > maxAnswers {
+		wt.Fatalf(t, "Number of answers <= %d", maxAnswers)
+	}
+	return r
+}
+
+// run a UDP fallback server
+func runLocalUDPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dns.Server, string, error) {
 	t.Logf("Starting fallback UDP server at %s", laddr)
 	pc, err := net.ListenPacket("udp", laddr)
 	if err != nil {
@@ -224,7 +236,8 @@ func RunLocalUDPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dn
 	return server, pc.LocalAddr().String(), nil
 }
 
-func RunLocalTCPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dns.Server, string, error) {
+// run a TCP fallback server
+func runLocalTCPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dns.Server, string, error) {
 	t.Logf("Starting fallback TCP server at %s", laddr)
 	laddrTcp, err := net.ResolveTCPAddr("tcp", laddr)
 	if err != nil {
