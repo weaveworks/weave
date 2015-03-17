@@ -17,14 +17,13 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf("[http] "+logmsg, logargs...)
 }
 
-func ListenHttp(version string, domain string, db Zone, port int) {
+func ListenHttp(version string, server *DNSServer, db Zone, port int) {
 
 	router := mux.NewRouter()
 
 	router.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln("weave DNS", version))
-		io.WriteString(w, fmt.Sprintln("Serving domain", domain))
-		io.WriteString(w, db.Status())
+		io.WriteString(w, server.Status())
 	})
 
 	router.Methods("PUT").Path("/name/{identifier:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +47,7 @@ func ListenHttp(version string, domain string, db Zone, port int) {
 			return
 		}
 
-		if dns.IsSubDomain(domain, name) {
+		if dns.IsSubDomain(server.Domain, name) {
 			Info.Printf("[http] Adding %s -> %s", name, ipStr)
 			if err := db.AddRecord(ident, name, ip); err != nil {
 				if _, ok := err.(DuplicateError); !ok {
@@ -59,7 +58,7 @@ func ListenHttp(version string, domain string, db Zone, port int) {
 				} // oh, I already know this. whatever.
 			}
 		} else {
-			Info.Printf("[http] Ignoring name %s, not in %s", name, domain)
+			Info.Printf("[http] Ignoring name %s, not in %s", name, server.Domain)
 		}
 	})
 

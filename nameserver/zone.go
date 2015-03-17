@@ -22,7 +22,6 @@ type Lookup interface {
 }
 
 type Zone interface {
-	Status() string
 	AddRecord(ident string, name string, ip net.IP) error
 	DeleteRecord(ident string, ip net.IP) error
 	DeleteRecordsFor(ident string) error
@@ -64,11 +63,10 @@ func (zone *ZoneDb) indexOf(match func(Record) bool) int {
 	return -1
 }
 
-func (zone *ZoneDb) Status() string {
+func (zone *ZoneDb) String() string {
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 	var buf bytes.Buffer
-	buf.WriteString("Records:\n")
 	for _, r := range zone.recs {
 		buf.WriteString(fmt.Sprintf("%s %s %v\n", r.Ident, r.IP, r.Name))
 	}
