@@ -833,7 +833,7 @@ func (alloc *Allocator) handleSpaceDonate(sender router.PeerName, msg []byte) er
 	}
 	pos := alloc.inflight.find(sender, donations)
 	if pos < 0 {
-		lg.Error.Println("Not expecting to receive space donation from", sender, alloc.inflight[0].dest)
+		lg.Error.Println("Not expecting to receive space donation from", sender)
 		return nil // not a severe enough error to shut down the connection
 	}
 	lg.Debug.Println("Received space donation: sender", sender, "space", donations)
@@ -857,7 +857,7 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 	}
 	pos := alloc.inflight.find(sender, []Space{&claim})
 	if pos < 0 {
-		lg.Error.Println("Not expecting to receive space donation refused from", sender, alloc.inflight[0].dest)
+		lg.Error.Println("Not expecting to receive space donation refused from", sender)
 		return nil // not a severe enough error to shut down the connection
 	}
 	lg.Debug.Println("Received space claim refused: sender", sender, "space", claim)
