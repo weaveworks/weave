@@ -17,12 +17,13 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf("[http] "+logmsg, logargs...)
 }
 
-func ListenHttp(domain string, db Zone, port int) {
+func ListenHttp(version string, domain string, db Zone, port int) {
 
 	router := mux.NewRouter()
 
 	router.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "ok")
+		io.WriteString(w, fmt.Sprintln("weave DNS", version))
+		io.WriteString(w, fmt.Sprintln("Serving domain", domain))
 	})
 
 	router.Methods("PUT").Path("/name/{identifier:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

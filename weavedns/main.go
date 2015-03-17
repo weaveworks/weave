@@ -83,7 +83,7 @@ func main() {
 		Debug.Printf("DNS fallback at %s:%s", fallbackHost, fallbackPort)
 	}
 
-	go weavedns.ListenHttp(localDomain, zone, httpPort)
+	go weavedns.ListenHttp(version, localDomain, zone, httpPort)
 	srv, err := weavedns.NewDNSServer(srvConfig, zone, iface)
 	if err != nil {
 		Error.Fatal("Failed to initialize the WeaveDNS server", err)
