@@ -44,22 +44,22 @@ func TestAllocFree(t *testing.T) {
 	alloc := testAllocator(t, "01:00:00:01:00:00", ourUID, testAddr1+"/30").addSpace(testAddr1, spaceSize)
 	defer alloc.Stop()
 
-	addr1 := alloc.GetFor(container1)
+	addr1 := alloc.GetFor(container1, nil)
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
 
 	// Ask for another address for a different container and check it's different
-	addr2 := alloc.GetFor(container2)
+	addr2 := alloc.GetFor(container2, nil)
 	if addr2.String() == testAddr1 {
 		t.Fatalf("Expected different address but got %s", addr2)
 	}
 
 	// Ask for the first container again and we should get the same address again
-	addr1a := alloc.GetFor(container1)
+	addr1a := alloc.GetFor(container1, nil)
 	wt.AssertEqualString(t, addr1a.String(), testAddr1, "address")
 
 	// Now free the first one, and we should get it back when we ask
 	alloc.Free(container1, net.ParseIP(testAddr1))
-	addr3 := alloc.GetFor(container3)
+	addr3 := alloc.GetFor(container3, nil)
 	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
 
 	alloc.DeleteRecordsFor(container2)
@@ -106,11 +106,11 @@ func TestMultiSpaces(t *testing.T) {
 
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 4, "Total free addresses")
 
-	addr1 := alloc.GetFor("abcdef")
+	addr1 := alloc.GetFor("abcdef", nil)
 	wt.AssertEqualString(t, addr1.String(), testStart1, "address")
 
 	// First space should now be full and this address should come from second space
-	addr2 := alloc.GetFor("fedcba")
+	addr2 := alloc.GetFor("fedcba", nil)
 	wt.AssertEqualString(t, addr2.String(), testStart2, "address")
 	wt.AssertEqualUint32(t, alloc.ourSpaceSet.NumFreeAddresses(), 2, "Total free addresses")
 }
@@ -346,7 +346,7 @@ func implTestGossip(t *testing.T) {
 
 	done := make(chan bool)
 	go func() {
-		alloc1.GetFor("somecontainer")
+		alloc1.GetFor("somecontainer", nil)
 		done <- true
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -432,7 +432,7 @@ func implTestGossip2(t *testing.T) {
 
 	done := make(chan bool)
 	go func() {
-		alloc1.GetFor("somecontainer")
+		alloc1.GetFor("somecontainer", nil)
 		done <- true
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -540,6 +540,15 @@ func AssertNothingSent(t *testing.T, ch <-chan bool) {
 	}
 }
 
+func AssertNothingSentErr(t *testing.T, ch <-chan error) {
+	select {
+	case val := <-ch:
+		wt.Fatalf(t, "Unexpected value on channel: %t", val)
+	default:
+		// no message received
+	}
+}
+
 // Re-claiming an address from a former life
 func TestAllocatorClaim1(t *testing.T) {
 	const (
@@ -569,7 +578,7 @@ func TestAllocatorClaim1(t *testing.T) {
 	ExpectBroadcastMessage(alloc1, nil)
 	done := make(chan bool)
 	go func() {
-		err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
+		err := alloc1.Claim(containerID, net.ParseIP(testAddr1), nil)
 		wt.AssertNoErr(t, err)
 		done <- true
 	}()
@@ -611,7 +620,7 @@ func implAllocatorClaim3(t *testing.T) {
 	ExpectMessage(alloc1, peer2NameString, msgSpaceClaim, msgbuf)
 	done := make(chan bool)
 	go func() {
-		err := alloc1.Claim(containerID, addr1)
+		err := alloc1.Claim(containerID, addr1, nil)
 		wt.AssertNoErr(t, err)
 		done <- true
 	}()
@@ -624,7 +633,7 @@ func implAllocatorClaim3(t *testing.T) {
 	// Claiming the same address twice for the same container should stack up another claim record but not send another request
 	done2 := make(chan bool)
 	go func() {
-		err := alloc1.Claim(containerID, addr1)
+		err := alloc1.Claim(containerID, addr1, nil)
 		wt.AssertNoErr(t, err)
 		done2 <- true
 	}()
@@ -669,7 +678,7 @@ func TestAllocatorClaim4(t *testing.T) {
 	// Claim an address that nobody is managing
 	done := make(chan bool)
 	go func() {
-		err := alloc1.Claim(containerID, net.ParseIP(testAddr1))
+		err := alloc1.Claim(containerID, net.ParseIP(testAddr1), nil)
 		wt.AssertNoErr(t, err)
 		done <- true
 	}()
@@ -678,24 +687,111 @@ func TestAllocatorClaim4(t *testing.T) {
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 64, "free addresses")
 	// Claiming the same address for different container should raise an error
-	err := alloc1.Claim(container2, net.ParseIP(testAddr1))
+	err := alloc1.Claim(container2, net.ParseIP(testAddr1), nil)
 	wt.AssertErrorInterface(t, err, (*error)(nil), "duplicate claim error")
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 64, "free addresses")
 
 	// Now do the same again but for space it is managing
-	err = alloc1.Claim(containerID, net.ParseIP(testAddr2))
+	err = alloc1.Claim(containerID, net.ParseIP(testAddr2), nil)
 	wt.AssertNoErr(t, err)
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 63, "free addresses")
-	err = alloc1.Claim(containerID, net.ParseIP(testAddr2))
+	err = alloc1.Claim(containerID, net.ParseIP(testAddr2), nil)
 	wt.AssertNoErr(t, err)
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 63, "free addresses")
-	err = alloc1.Claim(container2, net.ParseIP(testAddr2))
+	err = alloc1.Claim(container2, net.ParseIP(testAddr2), nil)
 	wt.AssertErrorInterface(t, err, (*error)(nil), "duplicate claim error")
 	wt.AssertEqualInt(t, len(alloc1.claims), 1, "number of claims")
 	wt.AssertEqualUint32(t, alloc1.ourSpaceSet.NumFreeAddresses(), 63, "free addresses")
 
 	// Original claim never returns as we are still waiting for someone to own it
 	AssertNothingSent(t, done)
+}
+
+func TestCancel(t *testing.T) {
+	wt.RunWithTimeout(t, 100*time.Second, func() { implTestCancel(t) })
+}
+
+type TestGossipRouter struct {
+	peers map[router.PeerName]router.Gossiper
+}
+
+type TestGossipRouterClient struct {
+	router *TestGossipRouter
+	sender router.PeerName
+}
+
+func (router *TestGossipRouter) makeGossipClientFor(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
+	router.peers[sender] = gossiper
+	return TestGossipRouterClient{router, sender}
+}
+
+func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
+	common.Debug.Printf("GossipUnicast from %s to %s", client.sender, dstPeerName)
+	go client.router.peers[dstPeerName].OnGossipUnicast(client.sender, buf)
+	return nil
+}
+
+func (client TestGossipRouterClient) GossipBroadcast(buf []byte) error {
+	common.Debug.Printf("GossipBroadcast from %s", client.sender)
+	for _, peer := range client.router.peers {
+		go peer.OnGossipBroadcast(buf)
+	}
+	return nil
+}
+
+func implTestCancel(t *testing.T) {
+	common.InitDefaultLogging(true)
+	const (
+		CIDR     = "10.0.1.7/22"
+		peer1UID = 123456
+		peer2UID = 789101
+	)
+	peer1Name, _ := router.PeerNameFromString("01:00:00:02:00:00")
+	peer2Name, _ := router.PeerNameFromString("02:00:00:02:00:00")
+
+	router := TestGossipRouter{make(map[router.PeerName]router.Gossiper)}
+
+	alloc1, _ := NewAllocator(peer1Name, peer1UID, CIDR)
+	alloc1.SetGossip(router.makeGossipClientFor(peer1Name, alloc1))
+
+	alloc2, _ := NewAllocator(peer2Name, peer2UID, CIDR)
+	alloc2.SetGossip(router.makeGossipClientFor(peer2Name, alloc2))
+
+	alloc1.Start()
+	alloc2.Start()
+
+	// This is needed to tell one another about each other
+	alloc1.OnGossipBroadcast(alloc2.Encode(alloc2.FullSet()))
+	time.Sleep(100 * time.Millisecond)
+
+	// Get some IPs
+	res1 := alloc1.GetFor("foo", nil)
+	common.Debug.Printf("res1 = %s", res1)
+	res2 := alloc2.GetFor("bar", nil)
+	common.Debug.Printf("res2 = %s", res2)
+	if res1.Equal(res2) {
+		wt.Fatalf(t, "Error: got same ips!")
+	}
+
+	// Now we're going to stop alloc2 and ask alloc1
+	// for an allocation in alloc2's range
+	alloc2.Stop()
+
+	cancelChan := make(chan bool, 1)
+	doneChan := make(chan error)
+	go func() {
+		err := alloc1.Claim("baz", res2, cancelChan)
+		doneChan <- err
+	}()
+
+	AssertNothingSentErr(t, doneChan)
+	time.Sleep(1000 * time.Millisecond)
+	AssertNothingSentErr(t, doneChan)
+	cancelChan <- true
+	err := <-doneChan
+	if err != nil {
+		wt.Fatalf(t, "Error: err should be nil!")
+	}
 }

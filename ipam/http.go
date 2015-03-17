@@ -35,12 +35,14 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf(logmsg, logargs...)
 }
 
-func (alloc *Allocator) HandleHttp() {
-	http.HandleFunc("/ip/", func(w http.ResponseWriter, r *http.Request) {
+func (alloc *Allocator) HandleHttp(mux *http.ServeMux) {
+	mux.HandleFunc("/ip/", func(w http.ResponseWriter, r *http.Request) {
 		reqError := func(msg string, logmsg string, logargs ...interface{}) {
 			httpErrorAndLog(Warning, w, msg, http.StatusBadRequest,
 				logmsg, logargs...)
 		}
+
+		var closedChan = w.(http.CloseNotifier).CloseNotify()
 
 		switch r.Method {
 		case "PUT": // caller supplies an address to reserve for a container
@@ -54,7 +56,7 @@ func (alloc *Allocator) HandleHttp() {
 				reqError("Invalid IP", "Invalid IP in request: %s", ipStr)
 				return
 			}
-			if err = alloc.Claim(ident, ip); err != nil {
+			if err = alloc.Claim(ident, ip, closedChan); err != nil {
 				reqError("Invalid claim: "+err.Error(), "Unable to claim IP address %s: %s", ip, err)
 				return
 			}
@@ -62,7 +64,7 @@ func (alloc *Allocator) HandleHttp() {
 			ident, err := parseUrl(r.URL.Path)
 			if err != nil {
 				httpErrorAndLog(Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
-			} else if newAddr := alloc.GetFor(ident); newAddr != nil {
+			} else if newAddr := alloc.GetFor(ident, closedChan); newAddr != nil {
 				io.WriteString(w, fmt.Sprintf("%s/%d", newAddr, alloc.universeLen))
 			} else {
 				httpErrorAndLog(
@@ -86,13 +88,17 @@ func (alloc *Allocator) HandleHttp() {
 }
 
 func ListenHttp(port int, alloc *Allocator) {
-	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
-	alloc.HandleHttp()
+	alloc.HandleHttp(mux)
 
-	address := fmt.Sprintf(":%d", port)
-	if err := http.ListenAndServe(address, nil); err != nil {
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		Error.Fatal("Unable to create http listener: ", err)
 	}
 }

@@ -143,9 +143,16 @@ type claim struct {
 	Ident      string
 	IP         net.IP
 }
+type cancelClaim struct {
+	Ident string
+	IP    net.IP
+}
 type getFor struct {
 	resultChan chan<- net.IP
 	Ident      string
+}
+type cancelGetFor struct {
+	Ident string
 }
 type free struct {
 	resultChan chan<- error
@@ -257,18 +264,30 @@ func (alloc *Allocator) Stop() {
 
 // Sync.
 // Claim an address that we think we should own
-func (alloc *Allocator) Claim(ident string, addr net.IP) error {
+func (alloc *Allocator) Claim(ident string, addr net.IP, cancelChan <-chan bool) error {
 	lg.Info.Printf("Address %s claimed by %s", addr, ident)
 	resultChan := make(chan error)
 	alloc.queryChan <- claim{resultChan, ident, addr}
-	return <-resultChan
+	select {
+	case result := <-resultChan:
+		return result
+	case <-cancelChan:
+		alloc.queryChan <- cancelClaim{ident, addr}
+		return nil
+	}
 }
 
 // Sync.
-func (alloc *Allocator) GetFor(ident string) net.IP {
+func (alloc *Allocator) GetFor(ident string, cancelChan <-chan bool) net.IP {
 	resultChan := make(chan net.IP)
 	alloc.queryChan <- getFor{resultChan, ident}
-	return <-resultChan
+	select {
+	case result := <-resultChan:
+		return result
+	case <-cancelChan:
+		alloc.queryChan <- cancelGetFor{ident}
+		return nil
+	}
 }
 
 // Sync.
@@ -365,6 +384,8 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 			case claim:
 				alloc.electLeaderIfNecessary()
 				alloc.handleClaim(q.Ident, q.IP, q.resultChan)
+			case cancelClaim:
+				alloc.handleCancelClaim(q.Ident, q.IP)
 			case getFor:
 				alloc.electLeaderIfNecessary()
 				if addrs, found := alloc.owned[q.Ident]; found && len(addrs) > 0 {
@@ -372,6 +393,8 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 				} else if !alloc.tryAllocateFor(q.Ident, q.resultChan) {
 					alloc.pending = append(alloc.pending, getFor{q.resultChan, q.Ident})
 				}
+			case cancelGetFor:
+				alloc.handleCancelGetFor(q.Ident)
 			case deleteRecordsFor:
 				for _, ip := range alloc.owned[q.Ident] {
 					alloc.ourSpaceSet.Free(ip)
@@ -844,6 +867,7 @@ func (alloc *Allocator) handleSpaceClaimRefused(sender router.PeerName, msg []by
 	}
 	for i := 0; i < len(alloc.claims); i++ {
 		if claim.Contains(alloc.claims[i].IP) {
+			lg.Debug.Println("Cancelling claim", alloc.claims[i])
 			alloc.claims[i].resultChan <- errors.New("IP address owned by" + sender.String())
 			alloc.claims.removeAt(i)
 			i--
@@ -872,6 +896,24 @@ func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<-
 		alloc.claims = append(alloc.claims, claim{resultChan, ident, addr})
 	} else {
 		resultChan <- nil
+	}
+}
+
+func (alloc *Allocator) handleCancelClaim(ident string, addr net.IP) {
+	for i, claim := range alloc.claims {
+		if claim.Ident == ident && claim.IP.Equal(addr) {
+			alloc.claims.removeAt(i)
+			break
+		}
+	}
+}
+
+func (alloc *Allocator) handleCancelGetFor(ident string) {
+	for i, pending := range alloc.pending {
+		if pending.Ident == ident {
+			alloc.pending = append(alloc.pending[:i], alloc.pending[i+1:]...)
+			break
+		}
 	}
 }
 

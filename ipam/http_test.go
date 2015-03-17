@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"fmt"
+	"github.com/zettio/weave/common"
 	wt "github.com/zettio/weave/testing"
 	"io/ioutil"
 	"math/rand"
@@ -64,4 +65,49 @@ func TestHttp(t *testing.T) {
 	// Would like to shut down the http server at the end of this test
 	// but it's complicated.
 	// See https://groups.google.com/forum/#!topic/golang-nuts/vLHWa5sHnCE
+}
+
+func TestHttpCancel(t *testing.T) {
+	wt.RunWithTimeout(t, 2*time.Second, func() {
+		impTestHttpCancel(t)
+	})
+}
+
+func impTestHttpCancel(t *testing.T) {
+	common.InitDefaultLogging(true)
+	var (
+		containerID = "deadbeef"
+		testAddr1   = "10.0.3.5"
+		testCIDR1   = "10.0.3.5/29"
+	)
+	const (
+		ourUID  = 123456
+		peerUID = 654321
+	)
+
+	alloc := testAllocator(t, "08:00:27:01:c3:9a", ourUID, testCIDR1).addSpace(testAddr1, 4)
+	port := rand.Intn(10000) + 32768
+	fmt.Println("Http test on port", port)
+	go ListenHttp(port, alloc)
+
+	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
+
+	// Stop the alloc so nothing actually works
+	alloc.Stop()
+
+	// Ask the http server for a new address
+	done := make(chan *http.Response)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("http://localhost:%d/ip/%s", port, containerID), nil)
+	go func() {
+		res, _ := http.DefaultClient.Do(req)
+		done <- res
+	}()
+
+	time.Sleep(1000 * time.Millisecond)
+	fmt.Println("Cancelling get")
+	http.DefaultTransport.(*http.Transport).CancelRequest(req)
+	res := <-done
+	if res != nil {
+		wt.Fatalf(t, "Error: Get returned non-nil")
+	}
 }
