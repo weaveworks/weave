@@ -187,8 +187,7 @@ type gossipReply struct {
 	updateSet router.GossipKeySet
 }
 type onDead struct {
-	name router.PeerName
-	uid  uint64
+	uid uint64
 }
 
 type claimList []claim
@@ -349,15 +348,13 @@ func (alloc *Allocator) OnUpdate(msg []byte) (router.GossipKeySet, error) {
 	return ret.updateSet, ret.err
 }
 
-// No-op
+// No-op - this method is in the LifeCycler interface but is never called
 func (alloc *Allocator) OnAlive(name router.PeerName, uid uint64) {
-	// If it's new to us, nothing to do.
-	// If we previously believed it to be dead, need to figure that case out.
 }
 
 // Async.
-func (alloc *Allocator) OnDead(name router.PeerName, uid uint64) {
-	alloc.queryChan <- onDead{name, uid}
+func (alloc *Allocator) OnDead(_ router.PeerName, uid uint64) {
+	alloc.queryChan <- onDead{uid}
 }
 
 // ACTOR server
@@ -439,7 +436,7 @@ func (alloc *Allocator) queryLoop(queryChan <-chan interface{}, withTimers bool)
 			case gossipFullSet:
 				q.resultChan <- alloc.handleGossipFullSet()
 			case onDead:
-				alloc.handleDead(q.name, q.uid)
+				alloc.handleDead(q.uid)
 			}
 		case <-slowTimer:
 			alloc.slowConsiderOurPosition()
@@ -485,8 +482,6 @@ func (alloc *Allocator) decodeFromDecoder(decoder *gob.Decoder) ([]*PeerSpaceSet
 					alloc.pastLife = newSpaceset
 				}
 				continue
-			} else if oldSpaceset != nil && oldSpaceset.MaybeDead() {
-				lg.Info.Println("Received update for peer believed dead", newSpaceset)
 			}
 			lg.Debug.Println("Replacing data with newer version:", newSpaceset.peerName)
 			alloc.peerInfo[newSpaceset.UID()] = newSpaceset
@@ -494,6 +489,10 @@ func (alloc *Allocator) decodeFromDecoder(decoder *gob.Decoder) ([]*PeerSpaceSet
 				alloc.weHaveALeader()
 			}
 			ret = append(ret, newSpaceset)
+		}
+		if peerEntry, ok := oldSpaceset.(*PeerSpaceSet); ok && peerEntry.MaybeDead() {
+			lg.Info.Printf("[allocator] Marking %s as not dead", peerEntry.PeerName())
+			peerEntry.MarkMaybeDead(false, alloc.timeProvider.Now())
 		}
 	}
 	return ret, nil
@@ -992,11 +991,9 @@ func (alloc *Allocator) handleGossipEncode(uids uidSet) []byte {
 	return buf.Bytes()
 }
 
-func (alloc *Allocator) handleDead(name router.PeerName, uid uint64) {
-	entry, found := alloc.peerInfo[uid]
-	if found {
-		if peerEntry, ok := entry.(*PeerSpaceSet); ok &&
-			!peerEntry.MaybeDead() {
+func (alloc *Allocator) handleDead(uid uint64) {
+	if entry, found := alloc.peerInfo[uid]; found {
+		if peerEntry, ok := entry.(*PeerSpaceSet); ok && !peerEntry.MaybeDead() {
 			lg.Info.Printf("[allocator] Marking %s as maybe dead", entry.PeerName())
 			peerEntry.MarkMaybeDead(true, alloc.timeProvider.Now())
 		}
