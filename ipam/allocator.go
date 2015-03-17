@@ -270,10 +270,8 @@ func (alloc *Allocator) Claim(ident string, addr net.IP, cancelChan <-chan bool)
 	alloc.queryChan <- claim{resultChan, ident, addr}
 	select {
 	case result := <-resultChan:
-		lg.Info.Printf("Result", result)
 		return result
 	case <-cancelChan:
-		lg.Info.Printf("Claim cancelled")
 		alloc.queryChan <- cancelClaim{ident, addr}
 		return nil
 	}
@@ -287,7 +285,6 @@ func (alloc *Allocator) GetFor(ident string, cancelChan <-chan bool) net.IP {
 	case result := <-resultChan:
 		return result
 	case <-cancelChan:
-		lg.Info.Printf("Claim cancelled")
 		alloc.queryChan <- cancelGetFor{ident}
 		return nil
 	}

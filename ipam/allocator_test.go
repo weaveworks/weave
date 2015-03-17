@@ -540,6 +540,15 @@ func AssertNothingSent(t *testing.T, ch <-chan bool) {
 	}
 }
 
+func AssertNothingSentErr(t *testing.T, ch <-chan error) {
+	select {
+	case val := <-ch:
+		wt.Fatalf(t, "Unexpected value on channel: %t", val)
+	default:
+		// no message received
+	}
+}
+
 // Re-claiming an address from a former life
 func TestAllocatorClaim1(t *testing.T) {
 	const (
@@ -777,7 +786,9 @@ func implTestCancel(t *testing.T) {
 		doneChan <- err
 	}()
 
+	AssertNothingSentErr(t, doneChan)
 	time.Sleep(1000 * time.Millisecond)
+	AssertNothingSentErr(t, doneChan)
 	cancelChan <- true
 	err := <-doneChan
 	if err != nil {
