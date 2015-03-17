@@ -16,6 +16,7 @@ for HOST in $HOSTS; do
     docker_on $HOST load -i ../weaveexec.tar
     run_on $HOST mkdir -p bin
     cat ../bin/docker-ns | run_on $HOST sh -c "cat > $DOCKER_NS"
-    run_on $HOST chmod a+x $DOCKER_NS
+    cat ../weave | run_on $HOST sh -c "cat > ./weave"
+    run_on $HOST chmod a+x $DOCKER_NS ./weave
     run_on $HOST sudo service docker restart
 done

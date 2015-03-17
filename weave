@@ -62,14 +62,19 @@ exec_remote() {
         $EXEC_IMAGE --local "$@"
 }
 
+# "run" is a special case because we want to use docker directly,
+# rather than the docker in $EXEC_IMAGE remotely. That's because we
+# are passing arbitrary arguments on to docker run, and we can't rely
+# on our baked-in docker to support those arguments.
 if [ "$1" = "--local" ]; then
+    LOCAL="$1"
     shift 1
-else
+elif [ "$1" != "run" ]; then
     exec_remote "$@"
     exit $?
 fi
 
-[ $(id -u) = 0 ] || {
+[ $(id -u) = 0 ] || ([ "$1" = "run" ] && [ -z "$LOCAL" ]) || {
     echo "weave must be run as 'root' when run locally" >&2
     exit 1
 }
@@ -86,6 +91,31 @@ DNS_HTTP_PORT=6785
 COMMAND=$1
 
 shift 1
+
+dns_args() {
+    if [ "$1" = "--with-dns" ] ; then
+        shift 1
+        if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
+            \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
+            "$DOCKER_VERSION_MINOR" -lt 2 \) ] ; then
+            echo "ERROR: The '--with-dns' option requires Docker 1.2.0 or later; you are running $DOCKER_VERSION" >&2
+            exit 1
+        fi
+        docker_bridge_ip
+        DNS_ARG="--dns $DOCKER_BRIDGE_IP"
+        DNS_SEARCH_ARG="--dns-search=."
+        for arg in "$@"; do
+            case $arg in
+                --dns-search=*)
+                    DNS_SEARCH_ARG=""
+                    ;;
+                *)
+                    ;;
+            esac;
+        done
+    fi
+    DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
+}
 
 # utility function to check whether a command can be executed by the shell
 # see http://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script
@@ -598,35 +628,28 @@ case "$COMMAND" in
         ;;
     run)
         [ $# -gt 0 ] || usage
-        if [ "$1" = "--with-dns" ] ; then
-            shift 1
-            if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
-                 \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
-                    "$DOCKER_VERSION_MINOR" -lt 2 \) ] ; then
-                echo "ERROR: The '--with-dns' option requires Docker 1.2.0 or later; you are running $DOCKER_VERSION" >&2
-                exit 1
-            fi
-            docker_bridge_ip
-            DNS_ARG="--dns $DOCKER_BRIDGE_IP"
-            DNS_SEARCH_ARG="--dns-search=."
-            for arg in "$@"; do
-                case $arg in
-                    --dns-search=*)
-                        DNS_SEARCH_ARG=""
-                        ;;
-                    *)
-                        ;;
-                esac;
-            done
+        if [ "$LOCAL" = "--local" ]; then
+            dns_args "$@"
+        else
+            DNS_ARGS=$(exec_remote dns-args "$@")
+            [ "$1" = "--with-dns" ] && shift 1
         fi
         CIDR=$1
-        validate_cidr $CIDR
         shift 1
-        create_bridge
-        CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@")
-        with_container_netns $CONTAINER attach $CIDR >/dev/null
-        tell_dns PUT $CONTAINER $CIDR
+        validate_cidr $CIDR
+        CONTAINER=$(docker run $DNS_ARGS -d "$@")
+        if [ "$LOCAL" = "--local" ]; then
+            create_bridge
+            with_container_netns $CONTAINER attach $CIDR >/dev/null
+            tell_dns PUT $CONTAINER $CIDR
+        else
+            exec_remote attach $CIDR $CONTAINER
+        fi
         echo $CONTAINER
+        ;;
+    dns-args)
+        dns_args "$@"
+        echo -n $DNS_ARGS
         ;;
     start)
         [ $# -eq 2 ] || usage
