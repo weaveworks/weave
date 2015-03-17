@@ -209,9 +209,14 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) {
 		conn.Shutdown(err)
 		return
 	}
+	_, isConnectedPeer := peer.Router.Routes.Unicast(toName)
 	peer.addConnection(conn)
-	conn.Log("connection added")
-	peer.Router.SendAllGossipDown(conn)
+	if isConnectedPeer {
+		conn.Log("connection added")
+	} else {
+		conn.Log("connection added (new peer)")
+		peer.Router.SendAllGossipDown(conn)
+	}
 	peer.broadcastPeerUpdate(conn.Remote())
 }
 
