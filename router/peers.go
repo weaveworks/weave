@@ -105,12 +105,18 @@ func (peers *Peers) AllKeys() peerNameSet {
 }
 
 func (peers *Peers) Encode(set peerNameSet) []byte {
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
+	peers.RLock()
+	peerList := make([]*Peer, 0)
 	for key, _ := range set {
 		if peer, found := peers.table[key]; found {
-			peer.encode(enc)
+			peerList = append(peerList, peer)
 		}
+	}
+	peers.RUnlock() // release lock so we don't hold it while encoding
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	for _, peer := range peerList {
+		peer.encode(enc)
 	}
 	return buf.Bytes()
 }

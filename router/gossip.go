@@ -59,9 +59,10 @@ func (c *GossipChannel) makeSender(data GossipData, conn Connection) *gossipUpda
 
 func (sender *gossipUpdateSender) sendAllPending() {
 	sender.Lock()
-	buf := sender.data.Encode(sender.pending)
+	pending := sender.pending
 	sender.pending = sender.data.EmptySet() // Clear out the map
-	sender.Unlock()
+	sender.Unlock()                         // don't hold the lock while calling Encode which may take other locks
+	buf := sender.data.Encode(pending)
 	sender.conn.(ProtocolSender).SendProtocolMsg(sender.gossipChan.gossipMsg(buf))
 }
 
@@ -111,6 +112,7 @@ func (c *GossipChannel) garbageCollectSenders() {
 	c.Lock()
 	defer c.Unlock()
 	newSenders := make(senderMap)
+	// holding a lock on GossipChannel, we call ForEachConnection which locks the Peer
 	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
 		newSenders[conn] = c.senders[conn]
 		delete(c.senders, conn)
@@ -184,12 +186,14 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 func (c *GossipChannel) SendGossipUpdateFor(updateSet GossipKeySet) {
 	c.Lock()
 	defer c.Unlock()
+	// holding a lock on GossipChannel, we call ForEachConnection which locks the Peer
 	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
 		sender, found := c.senders[conn]
 		if !found {
 			sender = c.makeSender(c.data, conn)
 			c.senders[conn] = sender
 		}
+		// holding a lock on GossipChannel and Peer, we lock Sender
 		sender.Lock()
 		sender.pending.Merge(updateSet)
 		sender.Unlock()
