@@ -903,6 +903,7 @@ func (alloc *Allocator) handleCancelClaim(ident string, addr net.IP) {
 	for i, claim := range alloc.claims {
 		if claim.Ident == ident && claim.IP.Equal(addr) {
 			alloc.claims.removeAt(i)
+			break
 		}
 	}
 }
@@ -911,6 +912,7 @@ func (alloc *Allocator) handleCancelGetFor(ident string) {
 	for i, pending := range alloc.pending {
 		if pending.Ident == ident {
 			alloc.pending = append(alloc.pending[:i], alloc.pending[i+1:]...)
+			break
 		}
 	}
 }
