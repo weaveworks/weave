@@ -42,6 +42,8 @@ func (alloc *Allocator) HandleHttp() {
 				logmsg, logargs...)
 		}
 
+		var closedChan = w.(http.CloseNotifier).CloseNotify()
+
 		switch r.Method {
 		case "PUT": // caller supplies an address to reserve for a container
 			ident, ipStr, err := parseUrlWithIP(r.URL.Path)
@@ -54,7 +56,7 @@ func (alloc *Allocator) HandleHttp() {
 				reqError("Invalid IP", "Invalid IP in request: %s", ipStr)
 				return
 			}
-			if err = alloc.Claim(ident, ip); err != nil {
+			if err = alloc.Claim(ident, ip, closedChan); err != nil {
 				reqError("Invalid claim: "+err.Error(), "Unable to claim IP address %s: %s", ip, err)
 				return
 			}
@@ -62,7 +64,7 @@ func (alloc *Allocator) HandleHttp() {
 			ident, err := parseUrl(r.URL.Path)
 			if err != nil {
 				httpErrorAndLog(Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
-			} else if newAddr := alloc.GetFor(ident); newAddr != nil {
+			} else if newAddr := alloc.GetFor(ident, closedChan); newAddr != nil {
 				io.WriteString(w, fmt.Sprintf("%s/%d", newAddr, alloc.universeLen))
 			} else {
 				httpErrorAndLog(
