@@ -164,7 +164,7 @@ func main() {
 		}
 		allocator.SetGossip(router.NewGossip("IPallocation", allocator, allocator))
 		allocator.Start()
-		allocator.HandleHttp()
+		allocator.HandleHttp(http.DefaultServeMux)
 		err := lg.StartUpdater(apiPath, allocator)
 		if err != nil {
 			lg.Error.Fatal("Unable to start watcher", err)
