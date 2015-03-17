@@ -610,7 +610,7 @@ case "$COMMAND" in
         validate_cidr $CIDR
         shift 1
         create_bridge
-        CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@")
+        CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG "$@")
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
