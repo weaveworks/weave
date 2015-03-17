@@ -556,6 +556,7 @@ case "$COMMAND" in
         ;;
     status)
         http_call $CONTAINER_NAME $HTTP_PORT GET /status
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status
         ;;
     ps)
         [ $# -eq 0 ] || usage
