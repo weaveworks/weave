@@ -187,20 +187,7 @@ reports on the current status of the weave router and DNS:
 
 ````
 weave router git-8f675f15c0b5
-Encryption off
-Our name is 7a:17:ee:72:ef:9c (ubuntu-14)
-Sniffing traffic on &{42 65535 ethwe 36:59:20:e5:a4:64 up|broadcast|multicast}
-MACs:
-32:ff:76:23:d3:f1 -> 7a:17:ee:72:ef:9c (2015-03-18 12:52:37.329938912 +0000 UTC)
-36:59:20:e5:a4:64 -> 7a:17:ee:72:ef:9c (2015-03-18 12:52:36.495276933 +0000 UTC)
-Peers:
-Peer 7a:17:ee:72:ef:9c (ubuntu-14) (v0) (UID 11664962155092689251)
-Routes:
-unicast:
-7a:17:ee:72:ef:9c -> 00:00:00:00:00:00
-broadcast:
-7a:17:ee:72:ef:9c -> []
-Reconnects:
+...
 
 weave DNS git-8f675f15c0b5
 Local domain weave.local.
@@ -223,14 +210,7 @@ The second section is pertinent to weaveDNS, and includes:
 * The address on which the DNS server is listening
 * The interface being used for multicast DNS
 * The fallback DNS which will be used to resolve non local names
-* The names known to this host's DNS server. Each entry comprises the container ID, IP address and it's fully qualified domain name
-
-In the case where weaveDNS has not been launched, the second section of `weave status`
-will report the following:
-
-````
-weavedns container is not present; have you launched it?
-````
+* The names known to the local weaveDNS server. Each entry comprises the container ID, IP address and its fully qualified domain name
 
 ## Present limitations
 
