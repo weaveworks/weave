@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"github.com/gorilla/mux"
 )
 
 var version = "(unreleased version)"
@@ -152,16 +153,21 @@ func handleHttp(router *weave.Router) {
 	if router.UsingPassword() {
 		encryption = "on"
 	}
-	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+
+	muxRouter := mux.NewRouter()
+
+	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln("weave router", version))
 		io.WriteString(w, fmt.Sprintln("Encryption", encryption))
 		io.WriteString(w, router.Status())
 	})
-	http.HandleFunc("/status-json", func(w http.ResponseWriter, r *http.Request) {
+
+	muxRouter.Methods("GET").Path("/status-json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json, _ := router.GenerateStatusJSON(version, encryption)
 		w.Write(json)
 	})
-	http.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
+
+	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
 			router.ConnectionMaker.InitiateConnection(addr.String())
@@ -169,6 +175,9 @@ func handleHttp(router *weave.Router) {
 			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
 		}
 	})
+
+	http.Handle("/", muxRouter)
+
 	address := fmt.Sprintf(":%d", weave.HttpPort)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
