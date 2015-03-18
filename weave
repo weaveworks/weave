@@ -555,10 +555,9 @@ case "$COMMAND" in
         http_call $CONTAINER_NAME $HTTP_PORT POST /connect -d "peer=$1"
         ;;
     status)
-        if http_call $CONTAINER_NAME $HTTP_PORT GET /status; then ROUTER_UP=true; else ROUTER_UP=false; fi
+        http_call $CONTAINER_NAME $HTTP_PORT GET /status || true
         echo
-        if http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status; then DNS_UP=true; else DNS_UP=false; fi
-        $ROUTER_UP && $DNS_UP
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status || true
         ;;
     ps)
         [ $# -eq 0 ] || usage
