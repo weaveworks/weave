@@ -51,7 +51,7 @@ The command
 
     weave status
 
-reports on the current status of the weave router.
+reports on the current status of the weave router and DNS.
 
 This produces output like:
 
@@ -80,6 +80,8 @@ broadcast:
 7a:16:dd:5b:83:de -> []
 Reconnects:
 192.168.32.1:6783 (next try at 2014-10-23 16:39:50.585932102 +0000 UTC)
+
+weavedns container is not present; have you launched it?
 ````
 
 The terms used here are explained further at
@@ -117,10 +119,15 @@ weave network is not fully connected.  See the
 [architecture documentation](https://raw.githubusercontent.com/zettio/weave/master/docs/architecture.txt)
 for a full explanation.
 
-Finally, 'Reconnects' lists peers that this router is aware of, but is
+The 'Reconnects' section lists peers that this router is aware of, but is
 not currently connected to.  Each line contains some information about
 whether it is attempting to connect or is waiting for a while before
 connecting again.
+
+Finally, status information from weave DNS is included. In this example,
+the DNS container has not been launched so no status information is
+available (see the [WeaveDNS README](https://github.com/zettio/weave/blob/master/weavedns/README.md)
+for more information).
 
 ### <a name="list-attached-containers"></a>List attached containers
 

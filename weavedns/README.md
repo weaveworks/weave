@@ -177,6 +177,61 @@ $ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
 $ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.2.1.27"
 ```
 
+## Troubleshooting
+
+The command
+
+    weave status
+
+reports on the current status of the weave router and DNS:
+
+````
+weave router git-8f675f15c0b5
+Encryption off
+Our name is 7a:17:ee:72:ef:9c (ubuntu-14)
+Sniffing traffic on &{42 65535 ethwe 36:59:20:e5:a4:64 up|broadcast|multicast}
+MACs:
+32:ff:76:23:d3:f1 -> 7a:17:ee:72:ef:9c (2015-03-18 12:52:37.329938912 +0000 UTC)
+36:59:20:e5:a4:64 -> 7a:17:ee:72:ef:9c (2015-03-18 12:52:36.495276933 +0000 UTC)
+Peers:
+Peer 7a:17:ee:72:ef:9c (ubuntu-14) (v0) (UID 11664962155092689251)
+Routes:
+unicast:
+7a:17:ee:72:ef:9c -> 00:00:00:00:00:00
+broadcast:
+7a:17:ee:72:ef:9c -> []
+Reconnects:
+
+weave DNS git-8f675f15c0b5
+Local domain weave.local.
+Listen address :53
+mDNS interface &{26 65535 ethwe fa:b6:b1:85:ac:9b up|broadcast|multicast}
+Fallback DNS config &{[66.28.0.45 8.8.8.8] [] 53 1 5 2}
+Zone database:
+710978857a888f3d9a126452bf58db12d3aeb4f6bf7f076eb639bc714aaa1f4b 10.2.1.26 wiff.weave.local.
+e8d85b1dcdb15053c8ca5a747812a886125a9150b060a66b66fe7d18ecdad762 10.2.1.27 waff.weave.local.
+26bd05f9a0cbef1d57425562126a725383027a23f7368518ad5162e1cb958c17 10.2.1.28 ping.weave.local.
+1ab0e8b17c391733057a1abdfd2c7842c15b415775571402c328d2735a46e323 10.2.1.29 pong.weave.local.
+````
+
+The first section covers the router; see the troubleshooting guide in
+the main documentation for more detail.
+
+The second section is pertinent to weaveDNS, and includes:
+
+* The local domain suffix which is being served
+* The address on which the DNS server is listening
+* The interface being used for multicast DNS
+* The fallback DNS which will be used to resolve non local names
+* The names known to this host's DNS server. Each entry comprises the container ID, IP address and it's fully qualified domain name
+
+In the case where weaveDNS has not been launched, the second section of `weave status`
+will report the following:
+
+````
+weavedns container is not present; have you launched it?
+````
+
 ## Present limitations
 
  * The server will not know about restarted containers, but if you
