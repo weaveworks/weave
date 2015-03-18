@@ -35,7 +35,6 @@ type Gossip interface {
 }
 
 type LifeCycle interface {
-	OnAlive(name PeerName, uid uint64)
 	OnDead(name PeerName, uid uint64)
 }
 
@@ -243,14 +242,6 @@ func (c *GossipChannel) relayGossipBroadcast(srcName PeerName, msg []byte) error
 		}
 	}
 	return nil
-}
-
-func (router *Router) NotifyAlive(peer *Peer) {
-	for _, channel := range router.GossipChannels {
-		if lifecycler, ok := channel.gossiper.(LifeCycle); ok {
-			lifecycler.OnAlive(peer.Name, peer.UID)
-		}
-	}
 }
 
 func (router *Router) NotifyDead(peer *Peer) {
