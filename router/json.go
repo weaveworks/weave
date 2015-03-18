@@ -61,16 +61,12 @@ func (routes *Routes) MarshalJSON() ([]byte, error) {
 }
 
 func (peer *Peer) MarshalJSON() ([]byte, error) {
-	conns := make([]Connection, 0)
-	peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
-		conns = append(conns, conn)
-	})
 	return json.Marshal(struct {
 		Name        string
 		UID         uint64
 		Version     uint64
 		Connections []Connection
-	}{peer.Name.String(), peer.UID, peer.version, conns})
+	}{peer.Name.String(), peer.UID, peer.version, peer.Connections()})
 }
 
 func (conn *RemoteConnection) MarshalJSON() ([]byte, error) {
