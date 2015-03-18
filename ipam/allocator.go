@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	GossipReqTimeout     = 1 * time.Second
-	GossipDeadTimeout    = 10 * time.Second
+	GossipReqTimeout     = 10 * time.Second
+	GossipDeadTimeout    = 60 * time.Second
 	MaxAddressesToGiveUp = 256
 )
 const (
