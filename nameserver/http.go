@@ -25,13 +25,13 @@ func ListenHttp(domain string, db Zone, port int) {
 		io.WriteString(w, "ok")
 	})
 
-	muxRouter.Methods("PUT").Path("/name/{identifier:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	muxRouter.Methods("PUT").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqError := func(msg string, logmsg string, logargs ...interface{}) {
 			httpErrorAndLog(Warning, w, msg, http.StatusBadRequest, logmsg, logargs...)
 		}
 
 		vars := mux.Vars(r)
-		ident := vars["identifier"]
+		idStr := vars["id"]
 		ipStr := vars["ip"]
 		name := r.FormValue("fqdn")
 
@@ -48,7 +48,7 @@ func ListenHttp(domain string, db Zone, port int) {
 
 		if dns.IsSubDomain(domain, name) {
 			Info.Printf("[http] Adding %s -> %s", name, ipStr)
-			if err := db.AddRecord(ident, name, ip); err != nil {
+			if err := db.AddRecord(idStr, name, ip); err != nil {
 				if _, ok := err.(DuplicateError); !ok {
 					httpErrorAndLog(
 						Error, w, "Internal error", http.StatusInternalServerError,
@@ -61,13 +61,13 @@ func ListenHttp(domain string, db Zone, port int) {
 		}
 	})
 
-	muxRouter.Methods("DELETE").Path("/name/{identifier:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	muxRouter.Methods("DELETE").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqError := func(msg string, logmsg string, logargs ...interface{}) {
 			httpErrorAndLog(Warning, w, msg, http.StatusBadRequest, logmsg, logargs...)
 		}
 
 		vars := mux.Vars(r)
-		ident := vars["identifier"]
+		idStr := vars["id"]
 		ipStr := vars["ip"]
 
 		ip := net.ParseIP(ipStr)
@@ -75,8 +75,8 @@ func ListenHttp(domain string, db Zone, port int) {
 			reqError("Invalid IP in request", "Invalid IP in request: %s", ipStr)
 			return
 		}
-		Info.Printf("[http] Deleting %s (%s)", ident, ipStr)
-		if err := db.DeleteRecord(ident, ip); err != nil {
+		Info.Printf("[http] Deleting %s (%s)", idStr, ipStr)
+		if err := db.DeleteRecord(idStr, ip); err != nil {
 			if _, ok := err.(LookupError); !ok {
 				httpErrorAndLog(
 					Error, w, "Internal error", http.StatusInternalServerError,
