@@ -36,3 +36,4 @@ releases
 weave.tar
 weavedns.tar
 weaveexec.tar
+weaveexec/docker*.tgz

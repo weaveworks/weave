@@ -17,6 +17,10 @@ WEAVER_EXPORT=weave.tar
 WEAVEDNS_EXPORT=weavedns.tar
 WEAVEEXEC_EXPORT=weaveexec.tar
 
+WEAVEEXEC_DOCKER_VERSION=1.3.1
+DOCKER_DISTRIB=weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
+DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
+
 all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 update:
@@ -45,10 +49,14 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile weave
+$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave
 	cp weave weaveexec/weave
+	cp $(DOCKER_DISTRIB) weaveexec/docker.tgz
 	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) weaveexec
 	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
+
+$(DOCKER_DISTRIB):
+	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
 # Add more directories in here as more tests are created
 tests:
