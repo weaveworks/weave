@@ -107,7 +107,7 @@ type Encryptor interface {
 	PacketOverhead() int
 	IsEmpty() bool
 	Bytes() []byte
-	AppendFrame(*ForwardedFrame)
+	AppendFrame(src []byte, dst []byte, frame []byte)
 	TotalLen() int
 }
 
@@ -159,18 +159,17 @@ func (ne *NonEncryptor) Bytes() []byte {
 	return buf
 }
 
-func (ne *NonEncryptor) AppendFrame(frame *ForwardedFrame) {
+func (ne *NonEncryptor) AppendFrame(src []byte, dst []byte, frame []byte) {
 	bufTail := ne.bufTail
-	srcLen := copy(bufTail, frame.srcPeer.NameByte)
+	srcLen := copy(bufTail, src)
 	bufTail = bufTail[srcLen:]
-	dstLen := copy(bufTail, frame.dstPeer.NameByte)
+	dstLen := copy(bufTail, dst)
 	bufTail = bufTail[dstLen:]
-	frameLen := len(frame.frame)
-	binary.BigEndian.PutUint16(bufTail, uint16(frameLen))
+	binary.BigEndian.PutUint16(bufTail, uint16(len(frame)))
 	bufTail = bufTail[2:]
-	copy(bufTail, frame.frame)
-	ne.bufTail = bufTail[frameLen:]
-	ne.buffered += srcLen + dstLen + 2 + frameLen
+	copy(bufTail, frame)
+	ne.bufTail = bufTail[len(frame):]
+	ne.buffered += srcLen + dstLen + 2 + len(frame)
 }
 
 func (ne *NonEncryptor) TotalLen() int {
@@ -245,7 +244,7 @@ func (ne *NaClEncryptor) TotalLen() int {
 
 // Frame Decryptors
 
-type FrameConsumer func(*LocalConnection, *net.UDPAddr, []byte, []byte, uint16, []byte)
+type FrameConsumer func(conn *LocalConnection, sender *net.UDPAddr, src []byte, dst []byte, len uint16, frame []byte)
 
 type Decryptor interface {
 	IterateFrames(FrameConsumer, *UDPPacket) error

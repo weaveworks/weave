@@ -281,11 +281,8 @@ func (fwd *Forwarder) verifyEffectivePMTU(newUnverifiedPMTU int) {
 }
 
 func (fwd *Forwarder) attemptVerifyEffectivePMTU() {
-	pmtuVerifyFrame := &ForwardedFrame{
-		srcPeer: fwd.conn.local,
-		dstPeer: fwd.conn.remote,
-		frame:   make([]byte, fwd.unverifiedPMTU+EthernetOverhead)}
-	fwd.enc.AppendFrame(pmtuVerifyFrame)
+	fwd.enc.AppendFrame(fwd.conn.local.NameByte, fwd.conn.remote.NameByte,
+		make([]byte, fwd.unverifiedPMTU+EthernetOverhead))
 	fwd.flush()
 	if fwd.verifyPMTUTick == nil {
 		fwd.verifyPMTUTick = time.After(PMTUVerifyTimeout << (PMTUVerifyAttempts - fwd.pmtuVerifyCount))
@@ -337,7 +334,7 @@ func (fwd *Forwarder) appendFrame(frame *ForwardedFrame) bool {
 	if fwd.enc.TotalLen()+fwd.enc.FrameOverhead()+frameLen > fwd.maxPayload {
 		return false
 	}
-	fwd.enc.AppendFrame(frame)
+	fwd.enc.AppendFrame(frame.srcPeer.NameByte, frame.dstPeer.NameByte, frame.frame)
 	return true
 }
 
