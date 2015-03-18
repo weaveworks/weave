@@ -55,11 +55,11 @@ func (peers *Peers) Fetch(name PeerName) (*Peer, bool) {
 	return peer, found // GRRR, why can't I inline this!?
 }
 
-func (peers *Peers) ForEach(fun func(PeerName, *Peer)) {
+func (peers *Peers) ForEach(fun func(*Peer)) {
 	peers.RLock()
 	defer peers.RUnlock()
-	for name, peer := range peers.table {
-		fun(name, peer)
+	for _, peer := range peers.table {
+		fun(peer)
 	}
 }
 
@@ -129,7 +129,7 @@ func (peers *Peers) GarbageCollect() []*Peer {
 
 func (peers *Peers) String() string {
 	var buf bytes.Buffer
-	peers.ForEach(func(name PeerName, peer *Peer) {
+	peers.ForEach(func(peer *Peer) {
 		fmt.Fprint(&buf, peer, "\n")
 		for _, conn := range peer.Connections() {
 			established := ""

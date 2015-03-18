@@ -36,7 +36,7 @@ func (cache *MacCache) MarshalJSON() ([]byte, error) {
 
 func (peers *Peers) MarshalJSON() ([]byte, error) {
 	var ps []*Peer
-	peers.ForEach(func(_ PeerName, peer *Peer) { ps = append(ps, peer) })
+	peers.ForEach(func(peer *Peer) { ps = append(ps, peer) })
 	return json.Marshal(ps)
 }
 
