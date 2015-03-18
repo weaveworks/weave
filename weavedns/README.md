@@ -195,10 +195,10 @@ Listen address :53
 mDNS interface &{26 65535 ethwe fa:b6:b1:85:ac:9b up|broadcast|multicast}
 Fallback DNS config &{[66.28.0.45 8.8.8.8] [] 53 1 5 2}
 Zone database:
-710978857a888f3d9a126452bf58db12d3aeb4f6bf7f076eb639bc714aaa1f4b 10.2.1.26 wiff.weave.local.
-e8d85b1dcdb15053c8ca5a747812a886125a9150b060a66b66fe7d18ecdad762 10.2.1.27 waff.weave.local.
-26bd05f9a0cbef1d57425562126a725383027a23f7368518ad5162e1cb958c17 10.2.1.28 ping.weave.local.
-1ab0e8b17c391733057a1abdfd2c7842c15b415775571402c328d2735a46e323 10.2.1.29 pong.weave.local.
+710978857a88 10.2.1.26 wiff.weave.local.
+e8d85b1dcdb1 10.2.1.27 waff.weave.local.
+26bd05f9a0cb 10.2.1.28 ping.weave.local.
+1ab0e8b17c39 10.2.1.29 pong.weave.local.
 ````
 
 The first section covers the router; see the troubleshooting guide in
