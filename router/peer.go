@@ -73,12 +73,14 @@ func (peer *Peer) ConnectionTo(name PeerName) (Connection, bool) {
 	return conn, found // yes, you really can't inline that. FFS.
 }
 
-func (peer *Peer) ForEachConnection(fun func(PeerName, Connection)) {
+func (peer *Peer) Connections() []Connection {
 	peer.RLock()
 	defer peer.RUnlock()
-	for name, conn := range peer.connections {
-		fun(name, conn)
+	connections := make([]Connection, 0, len(peer.connections))
+	for _, conn := range peer.connections {
+		connections = append(connections, conn)
 	}
+	return connections
 }
 
 func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerName]Connection) {

@@ -108,15 +108,16 @@ func (router *Router) SendAllGossipDown(conn Connection) {
 	}
 }
 
+// Copy senders corresponding to current connections, then close down any remaining senders.
 func (c *GossipChannel) garbageCollectSenders() {
+	connections := c.ourself.Connections() // do this outside the lock so they don't nest
+	newSenders := make(senderMap)
 	c.Lock()
 	defer c.Unlock()
-	newSenders := make(senderMap)
-	// holding a lock on GossipChannel, we call ForEachConnection which locks the Peer
-	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
+	for _, conn := range connections {
 		newSenders[conn] = c.senders[conn]
 		delete(c.senders, conn)
-	})
+	}
 	for _, sender := range c.senders {
 		close(sender.sendChan)
 	}
@@ -184,16 +185,16 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 }
 
 func (c *GossipChannel) SendGossipUpdateFor(updateSet GossipKeySet) {
+	connections := c.ourself.Connections() // do this outside the lock so they don't nest
 	c.Lock()
 	defer c.Unlock()
-	// holding a lock on GossipChannel, we call ForEachConnection which locks the Peer
-	c.ourself.ForEachConnection(func(_ PeerName, conn Connection) {
+	for _, conn := range connections {
 		sender, found := c.senders[conn]
 		if !found {
 			sender = c.makeSender(c.data, conn)
 			c.senders[conn] = sender
 		}
-		// holding a lock on GossipChannel and Peer, we lock Sender
+		// holding a lock on GossipChannel, we lock Sender
 		sender.Lock()
 		sender.pending.Merge(updateSet)
 		sender.Unlock()
@@ -201,7 +202,7 @@ func (c *GossipChannel) SendGossipUpdateFor(updateSet GossipKeySet) {
 		case sender.sendChan <- true:
 		default:
 		}
-	})
+	}
 }
 
 func (c *GossipChannel) gossipMsg(buf []byte) ProtocolMsg {

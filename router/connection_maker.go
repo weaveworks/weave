@@ -119,10 +119,10 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	// copy the set of things we are connected to, so we can access them without locking
 	ourConnectedPeers := make(map[PeerName]bool)
 	ourConnectedTargets := make(map[string]bool)
-	cm.ourself.ForEachConnection(func(peer PeerName, conn Connection) {
-		ourConnectedPeers[peer] = true
+	for _, conn := range cm.ourself.Connections() {
+		ourConnectedPeers[conn.Remote().Name] = true
 		ourConnectedTargets[conn.RemoteTCPAddr()] = true
-	})
+	}
 
 	addTarget := func(address string) {
 		if !ourConnectedTargets[address] {
@@ -139,7 +139,8 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	// Add targets for peers that someone else is connected to, but we
 	// aren't
 	cm.peers.ForEach(func(name PeerName, peer *Peer) {
-		peer.ForEachConnection(func(otherPeer PeerName, conn Connection) {
+		for _, conn := range peer.Connections() {
+			otherPeer := conn.Remote().Name
 			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] {
 				return
 			}
@@ -151,7 +152,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 			if host, _, err := net.SplitHostPort(address); err == nil {
 				addTarget(NormalisePeerAddr(host))
 			}
-		})
+		}
 	})
 
 	now := time.Now() // make sure we catch items just added
