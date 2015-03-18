@@ -177,6 +177,41 @@ $ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
 $ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.2.1.27"
 ```
 
+## Troubleshooting
+
+The command
+
+    weave status
+
+reports on the current status of the weave router and DNS:
+
+````
+weave router git-8f675f15c0b5
+...
+
+weave DNS git-8f675f15c0b5
+Local domain weave.local.
+Listen address :53
+mDNS interface &{26 65535 ethwe fa:b6:b1:85:ac:9b up|broadcast|multicast}
+Fallback DNS config &{[66.28.0.45 8.8.8.8] [] 53 1 5 2}
+Zone database:
+710978857a88 10.2.1.26 wiff.weave.local.
+e8d85b1dcdb1 10.2.1.27 waff.weave.local.
+26bd05f9a0cb 10.2.1.28 ping.weave.local.
+1ab0e8b17c39 10.2.1.29 pong.weave.local.
+````
+
+The first section covers the router; see the troubleshooting guide in
+the main documentation for more detail.
+
+The second section is pertinent to weaveDNS, and includes:
+
+* The local domain suffix which is being served
+* The address on which the DNS server is listening
+* The interface being used for multicast DNS
+* The fallback DNS which will be used to resolve non local names
+* The names known to the local weaveDNS server. Each entry comprises the container ID, IP address and its fully qualified domain name
+
 ## Present limitations
 
  * The server will not know about restarted containers, but if you

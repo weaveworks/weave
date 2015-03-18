@@ -5,6 +5,8 @@ import (
 	. "github.com/zettio/weave/common"
 	"net"
 	"sync"
+	"bytes"
+	"fmt"
 )
 
 const (
@@ -59,6 +61,16 @@ func (zone *ZoneDb) indexOf(match func(Record) bool) int {
 		}
 	}
 	return -1
+}
+
+func (zone *ZoneDb) String() string {
+	zone.mx.RLock()
+	defer zone.mx.RUnlock()
+	var buf bytes.Buffer
+	for _, r := range zone.recs {
+		buf.WriteString(fmt.Sprintf("%.12s %s %v\n", r.Ident, r.IP, r.Name))
+	}
+	return buf.String()
 }
 
 func (zone *ZoneDb) LookupName(name string) (net.IP, error) {

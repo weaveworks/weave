@@ -555,7 +555,9 @@ case "$COMMAND" in
         http_call $CONTAINER_NAME $HTTP_PORT POST /connect -d "peer=$1"
         ;;
     status)
-        http_call $CONTAINER_NAME $HTTP_PORT GET /status
+        http_call $CONTAINER_NAME $HTTP_PORT GET /status || true
+        echo
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status || true
         ;;
     ps)
         [ $# -eq 0 ] || usage
