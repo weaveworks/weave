@@ -244,7 +244,7 @@ func (ne *NaClEncryptor) TotalLen() int {
 
 // Frame Decryptors
 
-type FrameConsumer func(conn *LocalConnection, sender *net.UDPAddr, src []byte, dst []byte, len uint16, frame []byte)
+type FrameConsumer func(conn *LocalConnection, sender *net.UDPAddr, src []byte, dst []byte, frame []byte)
 
 type Decryptor interface {
 	IterateFrames(FrameConsumer, *UDPPacket) error
@@ -294,7 +294,7 @@ func (nd *NonDecryptor) IterateFrames(consumer FrameConsumer, packet *UDPPacket)
 		}
 		frame := buf[:length]
 		buf = buf[length:]
-		consumer(nd.conn, packet.Sender, srcNameByte, dstNameByte, length, frame)
+		consumer(nd.conn, packet.Sender, srcNameByte, dstNameByte, frame)
 	}
 	if len(buf) > 0 {
 		return PacketDecodingError{Desc: fmt.Sprintf("%d octets of trailing garbage", len(buf))}

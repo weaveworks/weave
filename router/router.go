@@ -268,7 +268,7 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 }
 
 func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) FrameConsumer {
-	return func(relayConn *LocalConnection, sender *net.UDPAddr, srcNameByte, dstNameByte []byte, frameLen uint16, frame []byte) {
+	return func(relayConn *LocalConnection, sender *net.UDPAddr, srcNameByte, dstNameByte []byte, frame []byte) {
 		srcPeer, found := router.Peers.Fetch(PeerNameFromBin(srcNameByte))
 		if !found {
 			return
@@ -293,7 +293,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 		// detecting special frames is cheaper post decoding than pre.
 		if decodedLen == 1 && dec.IsSpecial() {
 			if srcPeer == relayConn.Remote() && dstPeer == router.Ourself.Peer {
-				handleSpecialFrame(relayConn, sender, frameLen, frame)
+				handleSpecialFrame(relayConn, sender, frame)
 			}
 		}
 
@@ -335,7 +335,8 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) F
 	}
 }
 
-func handleSpecialFrame(relayConn *LocalConnection, sender *net.UDPAddr, frameLen uint16, frame []byte) {
+func handleSpecialFrame(relayConn *LocalConnection, sender *net.UDPAddr, frame []byte) {
+	frameLen := len(frame)
 	switch {
 	case frameLen == EthernetOverhead+8:
 		relayConn.ReceivedHeartbeat(sender, binary.BigEndian.Uint64(frame[EthernetOverhead:]))
