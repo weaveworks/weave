@@ -131,13 +131,13 @@ func (peers *Peers) String() string {
 	var buf bytes.Buffer
 	peers.ForEach(func(name PeerName, peer *Peer) {
 		buf.WriteString(fmt.Sprint(peer, "\n"))
-		peer.ForEachConnection(func(remoteName PeerName, conn Connection) {
+		for _, conn := range peer.Connections() {
 			established := ""
 			if !conn.Established() {
 				established = " (unestablished)"
 			}
-			buf.WriteString(fmt.Sprintf("   -> %v (%v) [%v%s]\n", remoteName, conn.Remote().NickName, conn.RemoteTCPAddr(), established))
-		})
+			buf.WriteString(fmt.Sprintf("   -> %v (%v) [%v%s]\n", conn.Remote().Name, conn.Remote().NickName, conn.RemoteTCPAddr(), established))
+		}
 	})
 	return buf.String()
 }
