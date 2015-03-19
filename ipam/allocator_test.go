@@ -858,11 +858,11 @@ func implTestCancel(t *testing.T) {
 func BenchmarkAllocator(b *testing.B) {
 	common.InitDefaultLogging(true)
 	const (
-		firstpass    = 1000
+		firstpass    = 1022
 		secondpass   = 5000
 		nodes        = 50
-		maxAddresses = 1000
-		concurrency  = 10
+		maxAddresses = 1022
+		concurrency  = 50
 		cidr         = "10.0.1.7/22"
 	)
 	allocs, _ := makeNetworkOfAllocators(nodes, cidr)
@@ -880,6 +880,7 @@ func BenchmarkAllocator(b *testing.B) {
 	// Keep a list of addresses issued, so we
 	// Can pick random ones
 	addrs := make([]string, 0)
+	numPending := 0
 
 	rand.Seed(0)
 
@@ -895,6 +896,14 @@ func BenchmarkAllocator(b *testing.B) {
 	// is unique.  Needs a unique container
 	// name.
 	getFor := func(name string) {
+		stateLock.Lock()
+		if len(addrs)+numPending >= maxAddresses {
+			stateLock.Unlock()
+			return
+		}
+		numPending++
+		stateLock.Unlock()
+
 		allocIndex := rand.Int31n(nodes)
 		alloc := allocs[allocIndex]
 		common.Info.Printf("GetFor: asking allocator %d", allocIndex)
@@ -917,13 +926,18 @@ func BenchmarkAllocator(b *testing.B) {
 
 		state[addrStr] = result{name, allocIndex}
 		addrs = append(addrs, addrStr)
+		numPending--
 	}
 
 	// Free a random address.
 	free := func() {
+		stateLock.Lock()
+		if len(addrs) == 0 {
+			stateLock.Unlock()
+			return
+		}
 		// Delete an existing allocation
 		// Pick random addr
-		stateLock.Lock()
 		addrIndex := rand.Int31n(int32(len(addrs)))
 		addr := addrs[addrIndex]
 		res := state[addr]
@@ -988,12 +1002,12 @@ func BenchmarkAllocator(b *testing.B) {
 	doConcurrentIterations(secondpass, func(iteration int) {
 		r := rand.Float32()
 		switch {
-		case 0.0 <= r && r < 0.4 && len(addrs) < maxAddresses:
+		case 0.0 <= r && r < 0.4:
 			// Ask for a new allocation
 			name := fmt.Sprintf("second%d", iteration)
 			getFor(name)
 
-		case (0.4 <= r && r < 0.8) || len(addrs) >= maxAddresses:
+		case (0.4 <= r && r < 0.8):
 			// free a random addr
 			free()
 
