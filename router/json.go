@@ -63,10 +63,11 @@ func (routes *Routes) MarshalJSON() ([]byte, error) {
 func (peer *Peer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Name        string
+		Nickname    string
 		UID         uint64
 		Version     uint64
 		Connections []Connection
-	}{peer.Name.String(), peer.UID, peer.version, peer.Connections()})
+	}{peer.Name.String(), peer.NickName, peer.UID, peer.version, peer.Connections()})
 }
 
 func (conn *RemoteConnection) MarshalJSON() ([]byte, error) {
