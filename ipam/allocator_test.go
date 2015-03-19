@@ -726,9 +726,12 @@ type TestGossipRouter struct {
 	loss        float32 // 0.0 means no loss
 }
 
-func (router TestGossipRouter) GossipBroadcast(buf []byte) error {
+func (router *TestGossipRouter) GossipBroadcast(buf []byte) error {
 	for _, gossipChan := range router.gossipChans {
-		gossipChan <- gossipMessage{false, nil, buf}
+		select {
+		case gossipChan <- gossipMessage{false, nil, buf}:
+		default: // drop the message if we cannot send it
+		}
 	}
 	return nil
 }
@@ -738,31 +741,39 @@ type TestGossipRouterClient struct {
 	sender router.PeerName
 }
 
-func (router *TestGossipRouter) connect(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
+func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
 	gossipChan := make(chan gossipMessage, 100)
 
 	go func() {
+		gossipTimer := time.Tick(router.GossipInterval)
 		for {
-			message := <-gossipChan
-			if rand.Float32() > (1.0 - router.loss) {
-				continue
-			}
+			select {
+			case message := <-gossipChan:
+				if rand.Float32() > (1.0 - grouter.loss) {
+					continue
+				}
 
-			if message.isUnicast {
-				gossiper.OnGossipUnicast(*message.sender, message.buf)
-			} else {
-				gossiper.OnGossipBroadcast(message.buf)
+				if message.isUnicast {
+					gossiper.OnGossipUnicast(*message.sender, message.buf)
+				} else {
+					gossiper.OnGossipBroadcast(message.buf)
+				}
+			case <-gossipTimer:
+				grouter.GossipBroadcast(gossiper.(router.GossipData).Encode(gossiper.(router.GossipData).FullSet()))
 			}
 		}
 	}()
 
-	router.gossipChans[sender] = gossipChan
-	return TestGossipRouterClient{router, sender}
+	grouter.gossipChans[sender] = gossipChan
+	return TestGossipRouterClient{grouter, sender}
 }
 
 func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
 	common.Debug.Printf("GossipUnicast from %s to %s", client.sender, dstPeerName)
-	client.router.gossipChans[dstPeerName] <- gossipMessage{true, &client.sender, buf}
+	select {
+	case client.router.gossipChans[dstPeerName] <- gossipMessage{true, &client.sender, buf}:
+	default: // drop the message if we cannot send it
+	}
 	return nil
 }
 
