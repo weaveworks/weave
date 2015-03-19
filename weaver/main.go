@@ -188,7 +188,7 @@ func initiateConnections(router *weave.Router, peers []string) {
 }
 
 func createAllocator(router *weave.Router, apiPath string, allocCIDR string) *ipam.Allocator {
-	allocator, err := ipam.NewAllocator(router.Ourself.Peer.Name, allocCIDR)
+	allocator, err := ipam.NewAllocator(router.Ourself.Peer.Name, allocCIDR, router.Peers)
 	if err != nil {
 		log.Fatal(err)
 	}

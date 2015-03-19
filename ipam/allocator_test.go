@@ -168,10 +168,10 @@ func TestCancel(t *testing.T) {
 
 	router := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
 
-	alloc1, _ := NewAllocator(peer1Name, CIDR)
+	alloc1, _ := NewAllocator(peer1Name, CIDR, nil)
 	alloc1.SetGossip(router.connect(peer1Name, alloc1))
 
-	alloc2, _ := NewAllocator(peer2Name, CIDR)
+	alloc2, _ := NewAllocator(peer2Name, CIDR, nil)
 	alloc2.SetGossip(router.connect(peer2Name, alloc2))
 
 	alloc1.Start()
@@ -278,12 +278,14 @@ func TestTombstoneEveryone(t *testing.T) {
 	addr = alloc3.GetFor("bar", nil)
 	wt.AssertTrue(t, addr != nil, "Failed to get address")
 
+	router.GossipBroadcast(alloc2.Gossip())
+	router.GossipBroadcast(alloc3.Gossip())
 	router.removePeer(alloc2.ourName)
 	router.removePeer(alloc3.ourName)
 	alloc2.Stop()
 	alloc3.Stop()
-	wt.AssertSuccess(t, alloc1.TombstonePeer(alloc2.ourName))
-	wt.AssertSuccess(t, alloc1.TombstonePeer(alloc3.ourName))
+	wt.AssertSuccess(t, alloc1.TombstonePeer(alloc2.ourName.String()))
+	wt.AssertSuccess(t, alloc1.TombstonePeer(alloc3.ourName.String()))
 
 	wt.AssertTrue(t, alloc1.ring.Empty(), "Ring not empy!")
 

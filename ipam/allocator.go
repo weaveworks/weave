@@ -46,10 +46,11 @@ type Allocator struct {
 	pendingClaims  []operation
 	gossip         router.Gossip
 	shuttingDown   bool
+	routerPeers    *router.Peers
 }
 
 // NewAllocator creats and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, universeCIDR string) (*Allocator, error) {
+func NewAllocator(ourName router.PeerName, universeCIDR string, peers *router.Peers) (*Allocator, error) {
 	_, universeNet, err := net.ParseCIDR(universeCIDR)
 	if err != nil {
 		return nil, err
@@ -70,6 +71,7 @@ func NewAllocator(ourName router.PeerName, universeCIDR string) (*Allocator, err
 		universeLen:   ones,
 		ring:          ring.New(utils.Add(universeNet.IP, 1), utils.Add(universeNet.IP, universeSize-1), ourName),
 		owned:         make(map[string][]net.IP),
+		routerPeers:   peers,
 	}
 	return alloc, nil
 }
@@ -225,29 +227,63 @@ func (alloc *Allocator) Shutdown() {
 
 // TombstonePeer (Sync) - inserts tombstones for given peer, freeing up the ranges the
 // peer owns.  Eventually the peer will go away.
-func (alloc *Allocator) TombstonePeer(peer router.PeerName) error {
-	alloc.debugln("TombstonePeer:", peer)
+func (alloc *Allocator) TombstonePeer(peerNameOrNickname string) error {
+	alloc.routerPeers.RLock()
+	defer alloc.routerPeers.RUnlock()
+	peer, found := alloc.routerPeers.Find(peerNameOrNickname)
+	var peername router.PeerName
+	if !found {
+		var err error
+		peername, err = router.PeerNameFromString(peerNameOrNickname)
+		if err != nil {
+			return fmt.Errorf("Cannot find peer '%s'", peerNameOrNickname)
+		}
+	} else {
+		peername = peer.Name
+	}
+
+	alloc.debugln("TombstonePeer:", peername)
+	if peername == alloc.ourName {
+		return fmt.Errorf("Cannot tombstone yourself!")
+	}
+
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
-		err := alloc.ring.TombstonePeer(peer, tombstoneTimeout)
+		err := alloc.ring.TombstonePeer(peername, tombstoneTimeout)
 		alloc.considerNewSpaces()
 		resultChan <- err
 	}
 	return <-resultChan
 }
 
+// Peer is the result type of ListPeers
+type Peer struct {
+	router.Peer
+	Missing bool
+}
+
 // ListPeers (Sync) - returns list of peer names known to the ring
-func (alloc *Allocator) ListPeers() []router.PeerName {
-	resultChan := make(chan []router.PeerName)
+func (alloc *Allocator) ListPeers() []Peer {
+	resultChan := make(chan []Peer)
 	alloc.actionChan <- func() {
 		peers := make(map[router.PeerName]bool)
 		for _, entry := range alloc.ring.Entries {
 			peers[entry.Peer] = true
 		}
 
-		result := make([]router.PeerName, 0, len(peers))
-		for peer := range peers {
-			result = append(result, peer)
+		result := make([]Peer, 0, len(peers))
+		alloc.routerPeers.RLock()
+		defer alloc.routerPeers.RUnlock()
+		for peerName := range peers {
+			peer, okay := alloc.routerPeers.Fetch(peerName)
+			if okay {
+				result = append(result, Peer{*peer, false})
+			} else {
+				var peer Peer
+				peer.Name = peerName
+				peer.Missing = true
+				result = append(result, peer)
+			}
 		}
 		resultChan <- result
 	}
@@ -358,7 +394,9 @@ func (alloc *Allocator) string() string {
 	fmt.Fprintf(&buf, "Allocator universe %s+%d\n", alloc.universeStart, alloc.universeSize)
 	fmt.Fprintf(&buf, alloc.ring.String())
 	fmt.Fprintf(&buf, alloc.spaceSet.String())
-	fmt.Fprintf(&buf, "\nPending requests for ")
+	if len(alloc.pendingGetFors)+len(alloc.pendingClaims) > 0 {
+		fmt.Fprintf(&buf, "\nPending requests for ")
+	}
 	for _, op := range alloc.pendingGetFors {
 		fmt.Fprintf(&buf, "%s, ", op.String())
 	}

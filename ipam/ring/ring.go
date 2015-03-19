@@ -44,6 +44,7 @@ var (
 	ErrNoFreeSpace      = errors.New("No free space found!")
 	ErrTooMuchFreeSpace = errors.New("Entry reporting too much free space!")
 	ErrInvalidTimeout   = errors.New("dt must be greater than 0")
+	ErrNotFound         = errors.New("No entries for peer found")
 )
 
 func (r *Ring) checkInvariants() error {
@@ -494,13 +495,19 @@ func (r *Ring) TombstonePeer(peer router.PeerName, dt time.Duration) error {
 		return ErrInvalidTimeout
 	}
 
+	found := false
 	absTimeout := time.Now().Unix() + int64(dt)
 
 	for _, entry := range r.Entries {
 		if entry.Peer == peer {
+			found = true
 			entry.Tombstone = absTimeout
 			entry.Version++
 		}
+	}
+
+	if !found {
+		return ErrNotFound
 	}
 
 	return nil
