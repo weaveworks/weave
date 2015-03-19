@@ -655,10 +655,7 @@ func (alloc *Allocator) tryAllocateFor(ident string, resultChan chan<- net.IP) b
 		return true
 	} else { // out of space
 		if alloc.inflight.findKind(msgSpaceRequest) < 0 && alloc.inflight.findKind(msgLeaderElected) < 0 { // is there already a request inflight
-			if !alloc.requestSpace() {
-				resultChan <- nil // Nobody to ask for more space, so fail now
-				return true
-			}
+			alloc.requestSpace()
 		}
 	}
 	return false
@@ -775,7 +772,7 @@ func (alloc *Allocator) sendReply(dest router.PeerName, kind byte, data interfac
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
-func (alloc *Allocator) requestSpace() bool {
+func (alloc *Allocator) requestSpace() {
 	var best SpaceSet = nil
 	var bestNum int = 0
 	for _, spaceset := range alloc.peerInfo {
@@ -789,10 +786,8 @@ func (alloc *Allocator) requestSpace() bool {
 	if best != nil {
 		alloc.Debugln("Decided to ask peer", best.PeerName(), "for space:", best)
 		alloc.sendRequest(best.PeerName(), msgSpaceRequest, nil)
-		return true
 	} else {
 		alloc.Debugln("Nobody available to ask for space")
-		return false
 	}
 }
 
