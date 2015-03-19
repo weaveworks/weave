@@ -5,8 +5,10 @@ import (
 	"github.com/zettio/weave/common"
 	"github.com/zettio/weave/router"
 	wt "github.com/zettio/weave/testing"
+	"math/rand"
 	"net"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 )
@@ -713,8 +715,22 @@ func TestCancel(t *testing.T) {
 	wt.RunWithTimeout(t, 100*time.Second, func() { implTestCancel(t) })
 }
 
+type gossipMessage struct {
+	isUnicast bool
+	sender    *router.PeerName
+	buf       []byte
+}
+
 type TestGossipRouter struct {
-	peers map[router.PeerName]router.Gossiper
+	gossipChans map[router.PeerName]chan gossipMessage
+	loss        float32 // 0.0 means no loss
+}
+
+func (router TestGossipRouter) GossipBroadcast(buf []byte) error {
+	for _, gossipChan := range router.gossipChans {
+		gossipChan <- gossipMessage{false, nil, buf}
+	}
+	return nil
 }
 
 type TestGossipRouterClient struct {
@@ -722,27 +738,59 @@ type TestGossipRouterClient struct {
 	sender router.PeerName
 }
 
-func (router *TestGossipRouter) makeGossipClientFor(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
-	router.peers[sender] = gossiper
+func (router *TestGossipRouter) connect(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
+	gossipChan := make(chan gossipMessage, 100)
+
+	go func() {
+		for {
+			message := <-gossipChan
+			if rand.Float32() > (1.0 - router.loss) {
+				continue
+			}
+
+			if message.isUnicast {
+				gossiper.OnGossipUnicast(*message.sender, message.buf)
+			} else {
+				gossiper.OnGossipBroadcast(message.buf)
+			}
+		}
+	}()
+
+	router.gossipChans[sender] = gossipChan
 	return TestGossipRouterClient{router, sender}
 }
 
 func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
 	common.Debug.Printf("GossipUnicast from %s to %s", client.sender, dstPeerName)
-	go client.router.peers[dstPeerName].OnGossipUnicast(client.sender, buf)
+	client.router.gossipChans[dstPeerName] <- gossipMessage{true, &client.sender, buf}
 	return nil
 }
 
 func (client TestGossipRouterClient) GossipBroadcast(buf []byte) error {
 	common.Debug.Printf("GossipBroadcast from %s", client.sender)
-	for _, peer := range client.router.peers {
-		go peer.OnGossipBroadcast(buf)
+	return client.router.GossipBroadcast(buf)
+}
+
+func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter) {
+	gossipRouter := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
+	allocs := make([]*Allocator, size)
+
+	for i := 0; i < size; i++ {
+		peerNameStr := fmt.Sprintf("%02d:00:00:02:00:00", i)
+		peerName, _ := router.PeerNameFromString(peerNameStr)
+		alloc, _ := NewAllocator(peerName, uint64(i), cidr)
+		alloc.SetGossip(gossipRouter.connect(peerName, alloc))
+		alloc.Start()
+		allocs[i] = alloc
 	}
-	return nil
+
+	gossipRouter.GossipBroadcast(allocs[size-1].Encode(allocs[size-1].FullSet()))
+	time.Sleep(1000 * time.Millisecond)
+	return allocs, gossipRouter
 }
 
 func implTestCancel(t *testing.T) {
-	common.InitDefaultLogging(true)
+	//common.InitDefaultLogging(true)
 	const (
 		CIDR     = "10.0.1.7/22"
 		peer1UID = 123456
@@ -751,13 +799,13 @@ func implTestCancel(t *testing.T) {
 	peer1Name, _ := router.PeerNameFromString("01:00:00:02:00:00")
 	peer2Name, _ := router.PeerNameFromString("02:00:00:02:00:00")
 
-	router := TestGossipRouter{make(map[router.PeerName]router.Gossiper)}
+	router := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
 
 	alloc1, _ := NewAllocator(peer1Name, peer1UID, CIDR)
-	alloc1.SetGossip(router.makeGossipClientFor(peer1Name, alloc1))
+	alloc1.SetGossip(router.connect(peer1Name, alloc1))
 
 	alloc2, _ := NewAllocator(peer2Name, peer2UID, CIDR)
-	alloc2.SetGossip(router.makeGossipClientFor(peer2Name, alloc2))
+	alloc2.SetGossip(router.connect(peer2Name, alloc2))
 
 	alloc1.Start()
 	alloc2.Start()
@@ -794,4 +842,153 @@ func implTestCancel(t *testing.T) {
 	if err != nil {
 		wt.Fatalf(t, "Error: err should be nil!")
 	}
+}
+
+func BenchmarkAllocator(b *testing.B) {
+	common.InitDefaultLogging(true)
+	const (
+		firstpass    = 1000
+		secondpass   = 5000
+		nodes        = 50
+		maxAddresses = 1000
+		concurrency  = 10
+		cidr         = "10.0.1.7/22"
+	)
+	allocs, _ := makeNetworkOfAllocators(nodes, cidr)
+
+	// Test state
+	// For each IP issued we store the allocator
+	// that issued it and the name of the container
+	// it was issued to.
+	type result struct {
+		name  string
+		alloc int32
+	}
+	stateLock := sync.Mutex{}
+	state := make(map[string]result)
+	// Keep a list of addresses issued, so we
+	// Can pick random ones
+	addrs := make([]string, 0)
+
+	rand.Seed(0)
+
+	// Remove item from list by swapping it with last
+	// and reducing slice length by 1
+	rm := func(xs []string, i int32) []string {
+		ls := len(xs) - 1
+		xs[i] = xs[ls]
+		return xs[:ls]
+	}
+
+	// Do a GetFor and check the address
+	// is unique.  Needs a unique container
+	// name.
+	getFor := func(name string) {
+		allocIndex := rand.Int31n(nodes)
+		alloc := allocs[allocIndex]
+		common.Info.Printf("GetFor: asking allocator %d", allocIndex)
+		addr := alloc.GetFor(name, nil)
+
+		if addr == nil {
+			panic(fmt.Sprintf("Could not allocate addr"))
+		}
+
+		common.Info.Printf("GetFor: got address %s for name %s", addr, name)
+		addrStr := addr.String()
+
+		stateLock.Lock()
+		defer stateLock.Unlock()
+
+		if res, existing := state[addrStr]; existing {
+			panic(fmt.Sprintf("Dup found for address %s - %s and %s", addrStr,
+				name, res.name))
+		}
+
+		state[addrStr] = result{name, allocIndex}
+		addrs = append(addrs, addrStr)
+	}
+
+	// Free a random address.
+	free := func() {
+		// Delete an existing allocation
+		// Pick random addr
+		stateLock.Lock()
+		addrIndex := rand.Int31n(int32(len(addrs)))
+		addr := addrs[addrIndex]
+		res := state[addr]
+		addrs = rm(addrs, addrIndex)
+		delete(state, addr)
+		stateLock.Unlock()
+
+		alloc := allocs[res.alloc]
+		common.Info.Printf("Freeing %s on allocator %d", addr, res.alloc)
+
+		err := alloc.Free(res.name, net.ParseIP(addr))
+		if err != nil {
+			panic(fmt.Sprintf("Cound not free address %s", addr))
+		}
+	}
+
+	// Do a GetFor on an existing container & allocator
+	// and check we get the right answer.
+	getForAgain := func() {
+		stateLock.Lock()
+		addrIndex := rand.Int31n(int32(len(addrs)))
+		addr := addrs[addrIndex]
+		res := state[addr]
+		stateLock.Unlock()
+		alloc := allocs[res.alloc]
+
+		common.Info.Printf("Asking for %s on allocator %d again", addr, res.alloc)
+
+		newAddr := alloc.GetFor(res.name, nil)
+		if !newAddr.Equal(net.ParseIP(addr)) {
+			panic(fmt.Sprintf("Got different address for repeat request"))
+		}
+	}
+
+	// Run function _f_ _iterations_ times, in _concurrency_
+	// number of goroutines
+	doConcurrentIterations := func(iterations int, f func(int)) {
+		iterationsPerThread := iterations / concurrency
+
+		wg := sync.WaitGroup{}
+		for i := 0; i < concurrency; i++ {
+			wg.Add(1)
+			go func(j int) {
+				defer wg.Done()
+				for k := 0; k < iterationsPerThread; k++ {
+					f((j * iterationsPerThread) + k)
+				}
+			}(i)
+		}
+		wg.Wait()
+	}
+
+	// First pass, just allocate a bunch of ips
+	doConcurrentIterations(firstpass, func(iteration int) {
+		name := fmt.Sprintf("first%d", iteration)
+		getFor(name)
+	})
+
+	// Second pass, random ask for more allocations,
+	// or remove existing ones, or ask for allocation
+	// again.
+	doConcurrentIterations(secondpass, func(iteration int) {
+		r := rand.Float32()
+		switch {
+		case 0.0 <= r && r < 0.4 && len(addrs) < maxAddresses:
+			// Ask for a new allocation
+			name := fmt.Sprintf("second%d", iteration)
+			getFor(name)
+
+		case (0.4 <= r && r < 0.8) || len(addrs) >= maxAddresses:
+			// free a random addr
+			free()
+
+		case 0.8 <= r && r < 1.0:
+			// ask for an existing name again, check we get same ip
+			getForAgain()
+		}
+	})
 }
