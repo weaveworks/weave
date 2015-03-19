@@ -353,7 +353,7 @@ func implTestGossip(t *testing.T) {
 	AssertNothingSent(t, done)
 
 	// Time out with no reply
-	mockTime.SetTime(baseTime.Add(5 * time.Second))
+	mockTime.SetTime(baseTime.Add(15 * time.Second))
 	ExpectMessage(alloc1, peerNameString, msgSpaceRequest, encode(alloc1.ourSpaceSet))
 	alloc1.considerOurPosition()
 	AssertNothingSent(t, done)
