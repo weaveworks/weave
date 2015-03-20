@@ -273,8 +273,8 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	for _, conn := range peer.connections {
 		checkFatal(connsEnc.Encode(conn.Remote().NameByte))
 		checkFatal(connsEnc.Encode(conn.RemoteTCPAddr()))
-		// DANGER holding rlock on peer, going to take rlock on conn
 		checkFatal(connsEnc.Encode(conn.Outbound()))
+		// DANGER holding rlock on peer, going to take rlock on conn
 		checkFatal(connsEnc.Encode(conn.Established()))
 	}
 	checkFatal(enc.Encode(connsBuf.Bytes()))

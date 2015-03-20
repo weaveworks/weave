@@ -33,8 +33,8 @@ to run everything named `*_test.sh`.
 
 By default the tests assume the Vagrant VMs are used.
 
-To use other VMs, set the environment variables <var>HOST1</var> and
-<var>HOST2</var> to the IP addresses of two docker hosts, and set the
+To use other VMs, set the environment variable <var>HOSTS</var> to the
+space-separated list of IP addresses of the docker hosts, and set the
 environment variable <var>SSH</var> to a command that will log into
 either (which may just be `ssh`).
 

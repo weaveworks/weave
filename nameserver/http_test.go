@@ -30,7 +30,7 @@ func TestHttp(t *testing.T) {
 	var zone = new(ZoneDb)
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
-	go ListenHttp(testDomain, zone, port)
+	go ListenHttp("", nil, testDomain, zone, port)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 

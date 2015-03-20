@@ -6,6 +6,7 @@ import (
 	. "github.com/zettio/weave/common"
 	"net"
 	"sync"
+	"bytes"
 )
 
 const (
@@ -140,6 +141,17 @@ func (s *DNSServer) Start() error {
 
 	Info.Printf("WeaveDNS server exiting...")
 	return nil
+}
+
+// Return status string
+func (s *DNSServer) Status() string {
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintln("Local domain", s.Domain))
+	buf.WriteString(fmt.Sprintln("Listen address", s.ListenAddr))
+	buf.WriteString(fmt.Sprintln("mDNS interface", s.iface))
+	buf.WriteString(fmt.Sprintln("Fallback DNS config", s.upstream))
+	buf.WriteString(fmt.Sprintf("Zone database:\n%s", s.zone))
+	return buf.String()
 }
 
 // Perform a graceful shutdown
