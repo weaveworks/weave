@@ -6,7 +6,7 @@ ip_prefix = "192.168.48"
 ip_suffix_base = 10
 
 def configure_docker(host, hostname, ip)
-  pkgs = "lxc-docker"
+  pkgs = "lxc-docker ethtool"
 
   host.vm.box = "phusion/ubuntu-14.04-amd64"
   host.vm.box_url = "https://oss-binaries.phusionpassenger.com/vagrant/boxes/latest/ubuntu-14.04-amd64-vbox.box"

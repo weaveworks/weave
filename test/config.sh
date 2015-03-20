@@ -50,6 +50,13 @@ docker_on() {
     docker -H tcp://$host:2375 $@
 }
 
+weave_on() {
+    host=$1
+    shift 1
+    greyly echo "Weave on $host: $@"
+    DOCKER_HOST=tcp://$host:2375 $WEAVE $@
+}
+
 start_suite() {
     whitely echo $@
 }
@@ -58,5 +65,5 @@ end_suite() {
     whitely assert_end
 }
 
-WEAVE=./bin/weave
+WEAVE=../weave
 DOCKER_NS=./bin/docker-ns

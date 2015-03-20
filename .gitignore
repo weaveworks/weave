@@ -35,4 +35,5 @@ tools/build
 releases
 weave.tar
 weavedns.tar
-weavetools.tar
+weaveexec.tar
+weaveexec/docker*.tgz
