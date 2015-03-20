@@ -6,12 +6,12 @@ SCRIPT_VERSION="(unreleased version)"
 usage() {
     echo "Usage:"
     echo "weave setup"
-    echo "weave launch     [-password <password>] [-nickname <nickname>] <peer> ..."
+    echo "weave launch     [-password <password>] [-nickname <nickname>] [-alloc <cidr>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
-    echo "weave run        [--with-dns] <cidr> <docker run args> ..."
+    echo "weave run        [--with-dns] [<cidr>] <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
-    echo "weave attach     <cidr> <container_id>"
+    echo "weave attach     [<cidr>] <container_id>"
     echo "weave detach     <cidr> <container_id>"
     echo "weave expose     <cidr>"
     echo "weave hide       <cidr>"
@@ -398,6 +398,43 @@ populate_dns() {
     done
 }
 
+# Perform operation $1 on container ID $2 to local IPAM database at address $3
+tell_ipam() {
+    # get the long form of the container ID
+    CONTAINER=$(docker inspect --format='{{.Id}}' $2 2>/dev/null)
+    # extract IP address from CIDR
+    WEAVE_ADDR_IP=$(echo $3 | sed -e 's/\([^/]*\)\/.*/\1/')
+    http_call $CONTAINER_NAME $HTTP_PORT $1 /ip/$CONTAINER/$WEAVE_ADDR_IP
+}
+
+# Tell the newly-started weave IP allocator about existing weave IPs
+populate_ipam() {
+    WEAVE_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $CONTAINER_NAME)
+    WAIT_TIME=1
+    while ! http_call_ip $WEAVE_IP $HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
+        status=$(docker inspect --format='{{.State.Running}}' $CONTAINER_NAME 2>/dev/null)
+        if [ ! "$status" = "true" ]; then
+            echo "weave container died" >&2
+            return 1
+        fi
+        sleep $WAIT_TIME
+        WAIT_TIME=$((WAIT_TIME+1))
+    done
+    if [ $WAIT_TIME = 4 ]; then
+        echo "Timed out waiting for weave container to start." >&2
+        echo "If running, it will not be pre-populated." >&2
+    fi
+
+    for CONTAINER in $(docker ps -q --no-trunc); do
+        if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
+            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
+            for IP in $CONTAINER_IPS; do
+                http_call_ip $WEAVE_IP $HTTP_PORT PUT /ip/$CONTAINER/$IP
+            done
+        fi
+    done
+}
+
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
     case $(docker inspect --format='{{.State.Running}} {{.Config.Image}}' $1 2>/dev/null) in
@@ -530,9 +567,10 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD \
+            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -name $MACADDR -nickname "$NICKNAME" "$@")
         with_container_netns $CONTAINER launch >/dev/null
+        populate_ipam
         echo $CONTAINER
         ;;
     launch-dns)
@@ -608,11 +646,17 @@ case "$COMMAND" in
                 esac;
             done
         fi
-        CIDR=$1
-        validate_cidr $CIDR
-        shift 1
+        if is_cidr "$1" ; then
+            CIDR=$1
+            shift 1
+        fi
         create_bridge
         CONTAINER=$(docker run $DNS_ARG $DNS_SEARCH_ARG -d "$@")
+        if [ -z "$CIDR" ] ; then
+            CIDR="$(http_call $CONTAINER_NAME $HTTP_PORT GET /ip/$CONTAINER)"
+        else
+            tell_ipam PUT $CONTAINER $CIDR
+        fi
         with_container_netns $CONTAINER attach $CIDR >/dev/null
         tell_dns PUT $CONTAINER $CIDR
         echo $CONTAINER
@@ -628,12 +672,17 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     attach)
-        [ $# -eq 2 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
+        [ $# -gt 0 ] || usage
         create_bridge
-        with_container_netns $2 attach $CIDR >/dev/null
-        tell_dns PUT $2 $CIDR
+        if is_cidr "$1" ; then
+            CIDR=$1
+            shift 1
+            tell_ipam PUT $1 $CIDR
+        else
+            CIDR="$(http_call $CONTAINER_NAME $HTTP_PORT GET /ip/$CONTAINER)"
+        fi
+        with_container_netns $1 attach $CIDR >/dev/null
+        tell_dns PUT $1 $CIDR
         ;;
     detach)
         [ $# -eq 2 ] || usage

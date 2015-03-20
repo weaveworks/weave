@@ -25,12 +25,29 @@ func AssertNoErr(t *testing.T, err error) {
 	}
 }
 
+func AssertBool(t *testing.T, got, wanted bool, desc string) {
+	if got != wanted {
+		Fatalf(t, "Expected %s %t but got %t", desc, wanted, got)
+	}
+}
+
+func AssertEqualUint32(t *testing.T, got, wanted uint32, desc string) {
+	if got != wanted {
+		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
+	}
+}
+
 func AssertEqualuint64(t *testing.T, got, wanted uint64, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
 	}
 }
 
+func AssertEqualInt64(t *testing.T, got, wanted int64, desc string) {
+	if got != wanted {
+		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
+	}
+}
 func AssertEqualInt(t *testing.T, got, wanted int, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
@@ -49,6 +66,12 @@ func AssertEqualString(t *testing.T, got, wanted string, desc string) {
 	}
 }
 
+func AssertNotEqualString(t *testing.T, got, wanted string, desc string) {
+	if got == wanted {
+		Fatalf(t, "Expected %s unlike '%s'", desc, wanted)
+	}
+}
+
 func AssertStatus(t *testing.T, got int, wanted int, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
@@ -57,6 +80,9 @@ func AssertStatus(t *testing.T, got int, wanted int, desc string) {
 
 func AssertErrorInterface(t *testing.T, got interface{}, wanted interface{}, desc string) {
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
+	if got == nil {
+		Fatalf(t, "Expected %s but got nil (%s)", wantedT.String(), desc)
+	}
 	if !gotT.Implements(wantedT) {
 		Fatalf(t, "Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
 	}
@@ -64,6 +90,9 @@ func AssertErrorInterface(t *testing.T, got interface{}, wanted interface{}, des
 
 func AssertErrorType(t *testing.T, got interface{}, wanted interface{}, desc string) {
 	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
+	if got == nil {
+		Fatalf(t, "Expected %s but got nil (%s)", wantedT.String(), desc)
+	}
 	if gotT != wantedT {
 		Fatalf(t, "Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
 	}

@@ -51,7 +51,7 @@ func main() {
 	var zone = new(weavedns.ZoneDb)
 
 	if watch {
-		err := weavedns.StartUpdater(apiPath, zone)
+		err := StartUpdater(apiPath, zone)
 		if err != nil {
 			Error.Fatal("Unable to start watcher", err)
 		}
