@@ -5,10 +5,16 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 )
 
 const GossipInterval = 30 * time.Second
+
+type GossipData interface {
+	Encode() []byte
+	Merge(GossipData)
+}
 
 type Gossip interface {
 	// specific message from one peer to another
@@ -21,37 +27,91 @@ type Gossip interface {
 type Gossiper interface {
 	OnGossipUnicast(sender PeerName, msg []byte) error
 	OnGossipBroadcast(msg []byte) error
-	// Return state of everything we know; gets called periodically
-	Gossip() []byte
+	// return state of everything we know; gets called periodically
+	Gossip() GossipData
 	// merge in state and return "everything new I've just learnt",
 	// or nil if nothing in the received message was new
-	OnGossip(buf []byte) ([]byte, error)
+	OnGossip(buf []byte) (GossipData, error)
 }
 
+// Accumulates GossipData that needs to be sent to one destination,
+// and sends it when possible.
+type GossipSender struct {
+	channel *GossipChannel
+	sender  ProtocolSender
+	cell    chan GossipData
+}
+
+func NewGossipSender(c *GossipChannel, ps ProtocolSender) *GossipSender {
+	return &GossipSender{channel: c, sender: ps}
+}
+
+func (sender *GossipSender) Start() {
+	sender.cell = make(chan GossipData, 1)
+	go sender.run()
+}
+
+func (sender *GossipSender) run() {
+	for {
+		if pending := <-sender.cell; pending == nil { // receive zero value when chan is closed
+			break
+		} else {
+			sender.sendPending(pending)
+		}
+	}
+}
+
+func (sender *GossipSender) sendPending(pending GossipData) {
+	sender.sender.SendProtocolMsg(sender.channel.gossipMsg(pending.Encode()))
+}
+
+func (sender *GossipSender) Send(data GossipData) {
+	// NB: this must not be invoked concurrently
+	select {
+	case pending := <-sender.cell:
+		pending.Merge(data)
+		sender.cell <- pending
+	default:
+		sender.cell <- data
+	}
+}
+
+func (sender *GossipSender) Stop() {
+	close(sender.cell)
+}
+
+type senderMap map[Connection]*GossipSender
+
 type GossipChannel struct {
+	sync.Mutex
 	ourself  *LocalPeer
 	name     string
 	hash     uint32
 	gossiper Gossiper
+	senders  senderMap
 }
 
 func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 	channelHash := hash(channelName)
-	channel := &GossipChannel{router.Ourself, channelName, channelHash, g}
+	channel := &GossipChannel{
+		ourself:  router.Ourself,
+		name:     channelName,
+		hash:     channelHash,
+		gossiper: g,
+		senders:  make(senderMap)}
 	router.GossipChannels[channelHash] = channel
 	return channel
 }
 
 func (router *Router) SendAllGossip() {
 	for _, channel := range router.GossipChannels {
-		channel.SendGossipMsg(channel.gossiper.Gossip())
+		channel.SendGossip(channel.gossiper.Gossip())
 	}
 }
 
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for _, channel := range router.GossipChannels {
-		protocolMsg := channel.gossipMsg(channel.gossiper.Gossip())
-		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+		channel.SendGossipDown(conn, channel.gossiper.Gossip())
 	}
 }
 
@@ -107,19 +167,45 @@ func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	if newBuf, err := channel.gossiper.OnGossip(payload); err != nil {
+	if data, err := channel.gossiper.OnGossip(payload); err != nil {
 		return err
-	} else if newBuf != nil {
-		channel.SendGossipMsg(newBuf)
+	} else if data != nil {
+		channel.SendGossip(data)
 	}
 	return nil
 }
 
-func (c *GossipChannel) SendGossipMsg(buf []byte) {
-	protocolMsg := c.gossipMsg(buf)
-	for _, conn := range c.ourself.Connections() {
-		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+func (c *GossipChannel) SendGossip(data GossipData) {
+	connections := c.ourself.Connections() // do this outside the lock so they don't nest
+	retainedSenders := make(senderMap)
+	c.Lock()
+	defer c.Unlock()
+	for _, conn := range connections {
+		c.sendGossipDown(conn, data)
+		retainedSenders[conn] = c.senders[conn]
+		delete(c.senders, conn)
 	}
+	// stop any senders for connections that are gone
+	for _, sender := range c.senders {
+		sender.Stop()
+	}
+	c.senders = retainedSenders
+}
+
+func (c *GossipChannel) SendGossipDown(conn Connection, data GossipData) {
+	c.Lock()
+	c.sendGossipDown(conn, data)
+	c.Unlock()
+}
+
+func (c *GossipChannel) sendGossipDown(conn Connection, data GossipData) {
+	sender, found := c.senders[conn]
+	if !found {
+		sender = NewGossipSender(c, conn.(ProtocolSender))
+		c.senders[conn] = sender
+		sender.Start()
+	}
+	sender.Send(data)
 }
 
 func (c *GossipChannel) gossipMsg(buf []byte) ProtocolMsg {
