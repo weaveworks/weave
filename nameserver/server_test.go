@@ -15,10 +15,18 @@ const (
 	testRDNSsuccess  = "1.2.2.10.in-addr.arpa."
 	testRDNSfail     = "4.3.2.1.in-addr.arpa."
 	testRDNSnonlocal = "8.8.8.8.in-addr.arpa."
-	testPort         = 17625
 )
 
+var (
+	testPort = 17625
+)
+
+func setupForTest() {
+	testPort++
+}
+
 func TestUDPDNSServer(t *testing.T) {
+	setupForTest()
 	const (
 		successTestName = "test1.weave.local."
 		failTestName    = "test2.weave.local."
@@ -124,6 +132,7 @@ func testExchange(t *testing.T, z string, ty uint16, minAnswers int, maxAnswers 
 }
 
 func TestTCPDNSServer(t *testing.T) {
+	setupForTest()
 	const (
 		numAnswers   = 512
 		nonLocalName = "weave.works."
