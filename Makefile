@@ -1,4 +1,4 @@
-PUBLISH=publish_weave publish_weavedns publish_weavetools
+PUBLISH=publish_weave publish_weavedns publish_weaveexec
 
 .DEFAULT: all
 .PHONY: all update tests publish $(PUBLISH) clean prerequisites build
@@ -10,15 +10,18 @@ DOCKERHUB_USER=zettio
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
-WEAVETOOLS_EXES=tools/bin
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
-WEAVETOOLS_IMAGE=$(DOCKERHUB_USER)/weavetools
+WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 WEAVER_EXPORT=weave.tar
 WEAVEDNS_EXPORT=weavedns.tar
-WEAVETOOLS_EXPORT=weavetools.tar
+WEAVEEXEC_EXPORT=weaveexec.tar
 
-all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
+WEAVEEXEC_DOCKER_VERSION=1.3.1
+DOCKER_DISTRIB=weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
+DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
+
+all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 update:
 	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE))
@@ -38,18 +41,6 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 $(WEAVER_EXE): router/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
 
-build_weavetools_exes_in_container=yes
-
-$(WEAVETOOLS_EXES): tools/build.sh
-ifdef build_weavetools_exes_in_container
-	$(SUDO) docker run --rm -t -v $(realpath $(<D)):/home/weave ubuntu sh /home/weave/build.sh
-else
-	rm -rf tools/build
-	mkdir tools/build
-	cd tools/build && sh ../../$<
-	rm -rf tools/build
-endif
-
 $(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
 	$(SUDO) docker save $(WEAVER_IMAGE):latest > $@
@@ -58,9 +49,14 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-$(WEAVETOOLS_EXPORT): tools/Dockerfile $(WEAVETOOLS_EXES)
-	$(SUDO) docker build -t $(WEAVETOOLS_IMAGE) tools
-	$(SUDO) docker save $(WEAVETOOLS_IMAGE):latest > $@
+$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave
+	cp weave weaveexec/weave
+	cp $(DOCKER_DISTRIB) weaveexec/docker.tgz
+	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) weaveexec
+	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
+
+$(DOCKER_DISTRIB):
+	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
 # Add more directories in here as more tests are created
 tests:
@@ -75,11 +71,10 @@ $(PUBLISH): publish_%:
 publish: $(PUBLISH)
 
 clean:
-	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVETOOLS_IMAGE)
-	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVETOOLS_EXPORT)
-	$(SUDO) rm -rf $(WEAVETOOLS_EXES)
+	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
+	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 build:
 	$(SUDO) go clean -i net
 	$(SUDO) go install -tags netgo std
-	$(MAKE) build_weavetools_exes_in_container=
+	$(MAKE)
