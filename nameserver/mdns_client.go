@@ -166,10 +166,7 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 
 func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 	timer := time.NewTimer(MaxDuration)
-	run := func() {
-		timer.Reset(c.checkInFlightQueries())
-	}
-
+	run := func() { timer.Reset(c.checkInFlightQueries()) }
 	terminate := false
 	for !terminate {
 		select {
