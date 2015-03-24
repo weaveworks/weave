@@ -177,15 +177,27 @@ which the structure is:
     +-----------------------------------+
     | Connection 1: Remote IP address   |
     +-----------------------------------+
+    | Connection 1: Outbound            |
+    +-----------------------------------+
+    | Connection 1: Established         |
+    +-----------------------------------+
     | Connection 2: Remote Peer Name    |
     +-----------------------------------+
     | Connection 2: Remote IP address   |
+    +-----------------------------------+
+    | Connection 2: Outbound            |
+    +-----------------------------------+
+    | Connection 2: Established         |
     +-----------------------------------+
     |                ...                |
     +-----------------------------------+
     | Connection N: Remote Peer Name    |
     +-----------------------------------+
     | Connection N: Remote IP address   |
+    +-----------------------------------+
+    | Connection N: Outbound            |
+    +-----------------------------------+
+    | Connection N: Established         |
     +-----------------------------------+
 
 #### Removal of peers
