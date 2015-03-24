@@ -21,7 +21,7 @@ type mockChannelConnection struct {
 func NewTestRouter(name PeerName) *Router {
 	router := NewRouter(nil, name, "", nil, 10, 1024, nil)
 	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
-	router.Routes.queryChan = make(chan *Interaction, ChannelSize)
+	router.Routes.actionChan = make(chan RoutesAction, ChannelSize)
 	return router
 }
 

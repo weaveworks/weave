@@ -3,17 +3,16 @@ package router
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"sync"
 )
 
 type Routes struct {
 	sync.RWMutex
-	ourself   *Peer
-	peers     *Peers
-	unicast   map[PeerName]PeerName
-	broadcast map[PeerName][]PeerName
-	queryChan chan<- *Interaction
+	ourself    *Peer
+	peers      *Peers
+	unicast    map[PeerName]PeerName
+	broadcast  map[PeerName][]PeerName
+	actionChan chan<- RoutesAction
 }
 
 func NewRoutes(ourself *Peer, peers *Peers) *Routes {
@@ -28,9 +27,9 @@ func NewRoutes(ourself *Peer, peers *Peers) *Routes {
 }
 
 func (routes *Routes) Start() {
-	queryChan := make(chan *Interaction, ChannelSize)
-	routes.queryChan = queryChan
-	go routes.queryLoop(queryChan)
+	actionChan := make(chan RoutesAction, ChannelSize)
+	routes.actionChan = actionChan
+	go routes.actorLoop(actionChan)
 }
 
 func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
@@ -67,34 +66,25 @@ func (routes *Routes) String() string {
 
 // ACTOR client API
 
-const (
-	RRecalculate = iota
-)
+type RoutesAction func()
 
 // Async.
 func (routes *Routes) Recalculate() {
-	routes.queryChan <- &Interaction{code: RRecalculate}
+	routes.actionChan <- func() {
+		unicast := routes.calculateUnicast()
+		broadcast := routes.calculateBroadcast()
+		routes.Lock()
+		routes.unicast = unicast
+		routes.broadcast = broadcast
+		routes.Unlock()
+	}
 }
 
 // ACTOR server
 
-func (routes *Routes) queryLoop(queryChan <-chan *Interaction) {
+func (routes *Routes) actorLoop(actionChan <-chan RoutesAction) {
 	for {
-		query, ok := <-queryChan
-		if !ok {
-			return
-		}
-		switch query.code {
-		case RRecalculate:
-			unicast := routes.calculateUnicast()
-			broadcast := routes.calculateBroadcast()
-			routes.Lock()
-			routes.unicast = unicast
-			routes.broadcast = broadcast
-			routes.Unlock()
-		default:
-			log.Fatal("Unexpected routes query:", query)
-		}
+		(<-actionChan)()
 	}
 }
 
