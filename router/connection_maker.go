@@ -102,7 +102,6 @@ func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteractio
 			case CMRefresh:
 				run()
 			case CMStatus:
-				run()
 				query.resultChan <- cm.status()
 			default:
 				log.Fatal("Unexpected connection maker query:", query)
