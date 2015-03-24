@@ -9,6 +9,7 @@ import (
 type MDNSServer struct {
 	localAddrs []net.Addr
 	sendconn   *net.UDPConn
+	srv        *dns.Server
 	zone       Zone
 }
 
@@ -72,8 +73,17 @@ func (s *MDNSServer) Start(ifi *net.Interface, localDomain string) error {
 	mux.HandleFunc(localDomain, handleLocal)
 	mux.HandleFunc(RDNS_DOMAIN, handleReverse)
 
-	go dns.ActivateAndServe(nil, conn, mux)
+	s.srv = &dns.Server{
+		Listener:   nil,
+		PacketConn: conn,
+		Handler:    mux,
+	}
+	go s.srv.ActivateAndServe()
 	return err
+}
+
+func (s *MDNSServer) Stop() error {
+	return s.srv.Shutdown()
 }
 
 type LookupFunc func(Lookup, *dns.Msg, *dns.Question) *dns.Msg
