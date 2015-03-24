@@ -9,13 +9,28 @@ import (
 
 func AssertTrue(t *testing.T, cond bool, desc string) {
 	if !cond {
-		Fatalf(t, "Expected %s to be true", desc)
+		Fatalf(t, "Expected %s", desc)
 	}
 }
 
 func AssertFalse(t *testing.T, cond bool, desc string) {
 	if cond {
-		Fatalf(t, "Expected %s to be false", desc)
+		Fatalf(t, "Unexpected %s", desc)
+	}
+}
+
+func AssertNil(t *testing.T, p interface{}, desc string) {
+	val := reflect.ValueOf(p)
+	if val.IsValid() && !val.IsNil() {
+		Fatalf(t, "Expected nil pointer for %s but got a \"%s\": \"%s\"",
+			desc, reflect.TypeOf(p), val.Interface())
+	}
+}
+
+func AssertNotNil(t *testing.T, p interface{}, desc string) {
+	val := reflect.ValueOf(p)
+	if !val.IsValid() || val.IsNil() {
+		Fatalf(t, "Unexpected nil pointer for %s", desc)
 	}
 }
 
