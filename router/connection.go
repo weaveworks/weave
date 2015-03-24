@@ -59,14 +59,11 @@ type LocalConnection struct {
 	Decryptor         Decryptor
 	Router            *Router
 	uid               uint64
-	queryChan         chan<- *ConnectionInteraction
-	finished          <-chan struct{} // closed to signal that queryLoop has finished
+	actionChan        chan<- ConnectionAction
+	finished          <-chan struct{} // closed to signal that actorLoop has finished
 }
 
-type ConnectionInteraction struct {
-	Interaction
-	payload interface{}
-}
+type ConnectionAction func() error
 
 func NewRemoteConnection(from, to *Peer, tcpAddr string, outbound bool, established bool) *RemoteConnection {
 	return &RemoteConnection{
@@ -118,11 +115,11 @@ func NewLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpA
 // Async. Does not return anything. If the connection is successful,
 // it will end up in the local peer's connections map.
 func (conn *LocalConnection) Start(acceptNewPeer bool) {
-	queryChan := make(chan *ConnectionInteraction, ChannelSize)
-	conn.queryChan = queryChan
+	actionChan := make(chan ConnectionAction, ChannelSize)
+	conn.actionChan = actionChan
 	finished := make(chan struct{})
 	conn.finished = finished
-	go conn.run(queryChan, finished, acceptNewPeer)
+	go conn.run(actionChan, finished, acceptNewPeer)
 }
 
 func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
@@ -182,29 +179,21 @@ func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 	}
 }
 
-// ACTOR client API
+// ACTOR methods
 
-const (
-	CSetEstablished = iota
-	CReceivedHeartbeat
-	CShutdown
-)
-
-// Send an actor request to the queryLoop, but don't block if queryLoop has exited
-// - see http://blog.golang.org/pipelines for pattern
-func (conn *LocalConnection) sendQuery(code int, payload interface{}) {
-	select {
-	case conn.queryChan <- &ConnectionInteraction{
-		Interaction: Interaction{code: code},
-		payload:     payload}:
-	case <-conn.finished:
-	}
-}
+// NB: The conn.* fields are only written by the connection actor
+// process, which is the caller of the ConnectionAction funs. Hence we
+// do not need locks for reading, and only need write locks for fields
+// read by other processes.
 
 // Async
 func (conn *LocalConnection) Shutdown(err error) {
-	// Run on its own goroutine in case the channel is backed up
-	go conn.sendQuery(CShutdown, err)
+	if err == nil {
+		conn.actionChan <- nil
+	} else {
+		// Run on its own goroutine in case the channel is backed up
+		go func() { conn.sendAction(func() error { return err }) }()
+	}
 }
 
 // Async
@@ -216,18 +205,76 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 	if remoteUDPAddr == nil || connUID != conn.uid {
 		return
 	}
-	conn.sendQuery(CReceivedHeartbeat, remoteUDPAddr)
+	conn.sendAction(func() error {
+		oldRemoteUDPAddr := conn.remoteUDPAddr
+		old := conn.receivedHeartbeat
+		conn.Lock()
+		conn.remoteUDPAddr = remoteUDPAddr
+		conn.receivedHeartbeat = true
+		conn.Unlock()
+		conn.heartbeatTimeout.Reset(HeartbeatTimeout)
+		if !old {
+			if err := conn.sendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
+				return err
+			}
+		}
+		if oldRemoteUDPAddr == nil {
+			return conn.sendFastHeartbeats()
+		} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
+			log.Println("Peer", conn.remote.Name, "moved from", old, "to", remoteUDPAddr)
+		}
+		return nil
+	})
 }
 
 // Async
 func (conn *LocalConnection) SetEstablished() {
-	conn.sendQuery(CSetEstablished, nil)
+	conn.sendAction(func() error {
+		stopTicker(conn.heartbeat)
+		old := conn.established
+		conn.Lock()
+		conn.established = true
+		conn.Unlock()
+		if old {
+			return nil
+		}
+		conn.Router.Ourself.ConnectionEstablished(conn)
+		if err := conn.ensureForwarders(); err != nil {
+			return err
+		}
+		// Send a large frame down the DF channel in order to prompt
+		// PMTU discovery to start.
+		conn.Forward(true, &ForwardedFrame{
+			srcPeer: conn.local,
+			dstPeer: conn.remote,
+			frame:   PMTUDiscovery},
+			nil)
+		conn.heartbeat = time.NewTicker(SlowHeartbeat)
+		conn.fragTest = time.NewTicker(FragTestInterval)
+		// avoid initial waits for timers to fire
+		conn.Forward(true, conn.heartbeatFrame, nil)
+		conn.setStackFrag(false)
+		if err := conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// Send an actor request to the actorLoop, but don't block if
+// actorLoop has exited - see http://blog.golang.org/pipelines for
+// pattern
+func (conn *LocalConnection) sendAction(action ConnectionAction) {
+	select {
+	case conn.actionChan <- action:
+	case <-conn.finished:
+	}
 }
 
 // ACTOR server
 
-func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, finished chan<- struct{}, acceptNewPeer bool) {
-	defer conn.handleShutdown()
+func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished chan<- struct{}, acceptNewPeer bool) {
+	defer conn.shutdown()
 	defer close(finished)
 
 	tcpConn := conn.TCPConn
@@ -268,7 +315,7 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, finish
 
 	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
 
-	if err := conn.queryLoop(queryChan); err != nil {
+	if err := conn.actorLoop(actionChan); err != nil {
 		conn.Log("connection shutting down due to error:", err)
 	} else {
 		conn.Log("connection shutting down")
@@ -286,23 +333,14 @@ func (conn *LocalConnection) run(queryChan <-chan *ConnectionInteraction, finish
 // AddConnection, which is *synchronous*, before entering the tcp
 // receive loop.
 
-func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) (err error) {
-	terminate := false
-	for !terminate && err == nil {
+func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
+	for err == nil {
 		select {
-		case query, ok := <-queryChan:
-			if !ok {
+		case action := <-actionChan:
+			if action == nil {
 				break
 			}
-			switch query.code {
-			case CShutdown:
-				err = query.payload.(error)
-				terminate = true
-			case CReceivedHeartbeat:
-				err = conn.handleReceivedHeartbeat(query.payload.(*net.UDPAddr))
-			case CSetEstablished:
-				err = conn.handleSetEstablished()
-			}
+			err = action()
 		case <-conn.heartbeatTimeout.C:
 			err = fmt.Errorf("timed out waiting for UDP heartbeat")
 		case <-tickerChan(conn.heartbeat):
@@ -315,66 +353,7 @@ func (conn *LocalConnection) queryLoop(queryChan <-chan *ConnectionInteraction) 
 	return
 }
 
-// Handlers
-//
-// NB: The conn.* fields are only written by the connection actor
-// process, which is the caller of the handlers. Hence we do not need
-// locks for reading, and only need write locks for fields read by
-// other processes.
-
-func (conn *LocalConnection) handleReceivedHeartbeat(remoteUDPAddr *net.UDPAddr) error {
-	oldRemoteUDPAddr := conn.remoteUDPAddr
-	old := conn.receivedHeartbeat
-	conn.Lock()
-	conn.remoteUDPAddr = remoteUDPAddr
-	conn.receivedHeartbeat = true
-	conn.Unlock()
-	conn.heartbeatTimeout.Reset(HeartbeatTimeout)
-	if !old {
-		if err := conn.sendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
-			return err
-		}
-	}
-	if oldRemoteUDPAddr == nil {
-		return conn.sendFastHeartbeats()
-	} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
-		log.Println("Peer", conn.remote.Name, "moved from", old, "to", remoteUDPAddr)
-	}
-	return nil
-}
-
-func (conn *LocalConnection) handleSetEstablished() error {
-	stopTicker(conn.heartbeat)
-	old := conn.established
-	conn.Lock()
-	conn.established = true
-	conn.Unlock()
-	if old {
-		return nil
-	}
-	conn.Router.Ourself.ConnectionEstablished(conn)
-	if err := conn.ensureForwarders(); err != nil {
-		return err
-	}
-	// Send a large frame down the DF channel in order to prompt
-	// PMTU discovery to start.
-	conn.Forward(true, &ForwardedFrame{
-		srcPeer: conn.local,
-		dstPeer: conn.remote,
-		frame:   PMTUDiscovery},
-		nil)
-	conn.heartbeat = time.NewTicker(SlowHeartbeat)
-	conn.fragTest = time.NewTicker(FragTestInterval)
-	// avoid initial waits for timers to fire
-	conn.Forward(true, conn.heartbeatFrame, nil)
-	conn.setStackFrag(false)
-	if err := conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (conn *LocalConnection) handleShutdown() {
+func (conn *LocalConnection) shutdown() {
 	if conn.TCPConn != nil {
 		checkWarn(conn.TCPConn.Close())
 	}
