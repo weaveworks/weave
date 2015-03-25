@@ -50,11 +50,11 @@ type inflightQuery struct {
 type MDNSClient struct {
 	// note unorthodox use of 'Server' class in client logic - using it to
 	// listen on a multicast socket and call callback whenever a message comes in.
-	listener  *dns.Server
-	conn      *net.UDPConn
-	addr      *net.UDPAddr
-	inflight  map[string]*inflightQuery
-	queryChan chan<- *MDNSInteraction
+	listener   *dns.Server
+	conn       *net.UDPConn
+	addr       *net.UDPAddr
+	inflight   map[string]*inflightQuery
+	actionChan chan<- MDNSAction
 }
 
 type mDNSQueryInfo struct {
@@ -90,9 +90,9 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 	c.listener = &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
 	go c.listener.ActivateAndServe()
 
-	queryChan := make(chan *MDNSInteraction, MailboxSize)
-	c.queryChan = queryChan
-	go c.queryLoop(queryChan)
+	actionChan := make(chan MDNSAction, MailboxSize)
+	c.actionChan = actionChan
+	go c.actorLoop(actionChan)
 
 	return nil
 }
@@ -103,34 +103,79 @@ func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 
 // ACTOR client API
 
-const (
-	CSendQuery = iota
-	CShutdown
-	CMessageReceived
-)
-
-type MDNSInteraction struct {
-	code       int
-	resultChan chan<- interface{}
-	payload    interface{}
-}
+type MDNSAction func()
 
 // Async
 func (c *MDNSClient) Shutdown() {
-	c.queryChan <- &MDNSInteraction{code: CShutdown}
+	c.actionChan <- nil
 }
 
 // Async
 func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- *Response) {
-	c.queryChan <- &MDNSInteraction{
-		code:    CSendQuery,
-		payload: mDNSQueryInfo{name, querytype, responseCh},
+	c.actionChan <- func() {
+		query, found := c.inflight[name]
+		if !found {
+			m := new(dns.Msg)
+			m.SetQuestion(name, querytype)
+			m.RecursionDesired = false
+			buf, err := m.Pack()
+			if err != nil {
+				responseCh <- &Response{Err: err}
+				close(responseCh)
+				return
+			}
+			query = &inflightQuery{
+				name: name,
+				id:   m.Id,
+			}
+			if _, err = c.conn.WriteTo(buf, c.addr); err != nil {
+				responseCh <- &Response{Err: err}
+				close(responseCh)
+				return
+			}
+			c.inflight[name] = query
+		}
+		info := &responseInfo{
+			ch:      responseCh,
+			timeout: time.Now().Add(mDNSTimeout),
+		}
+		// Invariant on responseInfos: they are in ascending order of
+		// timeout.  Since we use a fixed interval from Now(), this
+		// must be after all existing timeouts.
+		query.responseInfos = append(query.responseInfos, info)
 	}
 }
 
 // Async - called from dns library multiplexer
 func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
-	c.queryChan <- &MDNSInteraction{code: CMessageReceived, payload: r}
+	c.actionChan <- func() {
+		for _, answer := range r.Answer {
+			var name string
+			var res *Response
+
+			switch rr := answer.(type) {
+			case *dns.A:
+				name = rr.Hdr.Name
+				res = &Response{Addr: rr.A}
+			case *dns.PTR:
+				name = rr.Hdr.Name
+				res = &Response{Name: rr.Ptr}
+			default:
+				return
+			}
+
+			if query, found := c.inflight[name]; found {
+				for _, resp := range query.responseInfos {
+					resp.ch <- res
+					close(resp.ch)
+				}
+				delete(c.inflight, name)
+			} else {
+				// We've received a response that didn't match a query
+				// Do we want to cache it?
+			}
+		}
+	}
 }
 
 // ACTOR server
@@ -164,25 +209,18 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 	return after
 }
 
-func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
+func (c *MDNSClient) actorLoop(actionChan <-chan MDNSAction) {
 	timer := time.NewTimer(MaxDuration)
 	run := func() { timer.Reset(c.checkInFlightQueries()) }
 	terminate := false
 	for !terminate {
 		select {
-		case query, ok := <-queryChan:
-			if !ok {
-				break
-			}
-			switch query.code {
-			case CShutdown:
+		case action := <-actionChan:
+			if action == nil {
 				c.listener.Shutdown()
 				terminate = true
-			case CSendQuery:
-				c.handleSendQuery(query.payload.(mDNSQueryInfo))
-				run()
-			case CMessageReceived:
-				c.handleResponse(query.payload.(*dns.Msg))
+			} else {
+				action()
 				run()
 			}
 		case <-timer.C:
@@ -194,67 +232,6 @@ func (c *MDNSClient) queryLoop(queryChan <-chan *MDNSInteraction) {
 	for _, query := range c.inflight {
 		for _, item := range query.responseInfos {
 			close(item.ch)
-		}
-	}
-}
-
-func (c *MDNSClient) handleSendQuery(q mDNSQueryInfo) {
-	query, found := c.inflight[q.name]
-	if !found {
-		m := new(dns.Msg)
-		m.SetQuestion(q.name, q.querytype)
-		m.RecursionDesired = false
-		buf, err := m.Pack()
-		if err != nil {
-			q.responseCh <- &Response{Err: err}
-			close(q.responseCh)
-			return
-		}
-		query = &inflightQuery{
-			name: q.name,
-			id:   m.Id,
-		}
-		if _, err = c.conn.WriteTo(buf, c.addr); err != nil {
-			q.responseCh <- &Response{Err: err}
-			close(q.responseCh)
-			return
-		}
-		c.inflight[q.name] = query
-	}
-	info := &responseInfo{
-		ch:      q.responseCh,
-		timeout: time.Now().Add(mDNSTimeout),
-	}
-	// Invariant on responseInfos: they are in ascending order of timeout.
-	// Since we use a fixed interval from Now(), this must be after all existing timeouts.
-	query.responseInfos = append(query.responseInfos, info)
-}
-
-func (c *MDNSClient) handleResponse(r *dns.Msg) {
-	for _, answer := range r.Answer {
-		var name string
-		var res *Response
-
-		switch rr := answer.(type) {
-		case *dns.A:
-			name = rr.Hdr.Name
-			res = &Response{Addr: rr.A}
-		case *dns.PTR:
-			name = rr.Hdr.Name
-			res = &Response{Name: rr.Ptr}
-		default:
-			return
-		}
-
-		if query, found := c.inflight[name]; found {
-			for _, resp := range query.responseInfos {
-				resp.ch <- res
-				close(resp.ch)
-			}
-			delete(c.inflight, name)
-		} else {
-			// We've received a response that didn't match a query
-			// Do we want to cache it?
 		}
 	}
 }
