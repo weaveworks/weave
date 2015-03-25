@@ -14,19 +14,12 @@ const (
 	MaxInterval     = 10 * time.Minute
 )
 
-const (
-	CMInitiate = iota
-	CMTerminated
-	CMRefresh
-	CMStatus
-)
-
 type ConnectionMaker struct {
 	ourself        *LocalPeer
 	peers          *Peers
 	targets        map[string]*Target
 	cmdLineAddress map[string]bool
-	queryChan      chan<- *ConnectionMakerInteraction
+	actionChan     chan<- ConnectionMakerAction
 }
 
 // Information about an address where we may find a peer
@@ -36,10 +29,7 @@ type Target struct {
 	tryInterval time.Duration // backoff time on next failure
 }
 
-type ConnectionMakerInteraction struct {
-	Interaction
-	address string
-}
+type ConnectionMakerAction func() bool
 
 func NewConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
 	return &ConnectionMaker{
@@ -50,61 +40,59 @@ func NewConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
 }
 
 func (cm *ConnectionMaker) Start() {
-	queryChan := make(chan *ConnectionMakerInteraction, ChannelSize)
-	cm.queryChan = queryChan
-	go cm.queryLoop(queryChan)
+	actionChan := make(chan ConnectionMakerAction, ChannelSize)
+	cm.actionChan = actionChan
+	go cm.queryLoop(actionChan)
 }
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {
-	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMInitiate},
-		address:     address}
+	cm.actionChan <- func() bool {
+		cm.cmdLineAddress[NormalisePeerAddr(address)] = true
+		return true
+	}
 }
 
 func (cm *ConnectionMaker) ConnectionTerminated(address string) {
-	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMTerminated},
-		address:     address}
+	cm.actionChan <- func() bool {
+		if target, found := cm.targets[address]; found {
+			target.attempting = false
+			target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
+		}
+		return true
+	}
 }
 
 func (cm *ConnectionMaker) Refresh() {
-	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMRefresh}}
+	cm.actionChan <- func() bool { return true }
 }
 
 func (cm *ConnectionMaker) String() string {
-	resultChan := make(chan interface{}, 0)
-	cm.queryChan <- &ConnectionMakerInteraction{
-		Interaction: Interaction{code: CMStatus, resultChan: resultChan}}
-	result := <-resultChan
-	return result.(string)
+	resultChan := make(chan string, 0)
+	cm.actionChan <- func() bool {
+		var buf bytes.Buffer
+		for address, target := range cm.targets {
+			var fmtStr string
+			if target.attempting {
+				fmtStr = "%s (trying since %v)\n"
+			} else {
+				fmtStr = "%s (next try at %v)\n"
+			}
+			buf.WriteString(fmt.Sprintf(fmtStr, address, target.tryAfter))
+		}
+		resultChan <- buf.String()
+		return false
+	}
+	return <-resultChan
 }
 
-func (cm *ConnectionMaker) queryLoop(queryChan <-chan *ConnectionMakerInteraction) {
+func (cm *ConnectionMaker) queryLoop(actionChan <-chan ConnectionMakerAction) {
 	timer := time.NewTimer(MaxDuration)
 	run := func() { timer.Reset(cm.checkStateAndAttemptConnections()) }
 	for {
 		select {
-		case query, ok := <-queryChan:
-			if !ok {
-				return
-			}
-			switch query.code {
-			case CMInitiate:
-				cm.cmdLineAddress[NormalisePeerAddr(query.address)] = true
+		case action := <-actionChan:
+			if action() {
 				run()
-			case CMTerminated:
-				if target, found := cm.targets[query.address]; found {
-					target.attempting = false
-					target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
-				}
-				run()
-			case CMRefresh:
-				run()
-			case CMStatus:
-				query.resultChan <- cm.status()
-			default:
-				log.Fatal("Unexpected connection maker query:", query)
 			}
 		case <-timer.C:
 			run()
@@ -185,20 +173,6 @@ func (cm *ConnectionMaker) addTarget(address string) {
 		target.tryAfter, target.tryInterval = tryImmediately()
 		cm.targets[address] = target
 	}
-}
-
-func (cm *ConnectionMaker) status() string {
-	var buf bytes.Buffer
-	for address, target := range cm.targets {
-		var fmtStr string
-		if target.attempting {
-			fmtStr = "%s (trying since %v)\n"
-		} else {
-			fmtStr = "%s (next try at %v)\n"
-		}
-		buf.WriteString(fmt.Sprintf(fmtStr, address, target.tryAfter))
-	}
-	return buf.String()
 }
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {

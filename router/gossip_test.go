@@ -20,8 +20,8 @@ type mockChannelConnection struct {
 // channels when Router.OnGossip() calls async methods.
 func NewTestRouter(name PeerName) *Router {
 	router := NewRouter(nil, name, "", nil, 10, 1024, nil)
-	router.ConnectionMaker.queryChan = make(chan *ConnectionMakerInteraction, ChannelSize)
-	router.Routes.queryChan = make(chan *Interaction, ChannelSize)
+	router.ConnectionMaker.actionChan = make(chan ConnectionMakerAction, ChannelSize)
+	router.Routes.actionChan = make(chan RoutesAction, ChannelSize)
 	return router
 }
 

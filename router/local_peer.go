@@ -9,23 +9,20 @@ import (
 
 type LocalPeer struct {
 	*Peer
-	Router    *Router
-	queryChan chan<- *PeerInteraction
+	Router     *Router
+	actionChan chan<- LocalPeerAction
 }
 
-type PeerInteraction struct {
-	Interaction
-	payload interface{}
-}
+type LocalPeerAction func()
 
 func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
 	return &LocalPeer{Peer: NewPeer(name, nickName, 0, 0), Router: router}
 }
 
 func (peer *LocalPeer) Start() {
-	queryChan := make(chan *PeerInteraction, ChannelSize)
-	peer.queryChan = queryChan
-	go peer.queryLoop(queryChan)
+	actionChan := make(chan LocalPeerAction, ChannelSize)
+	peer.actionChan = actionChan
+	go peer.actorLoop(actionChan)
 }
 
 func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
@@ -128,48 +125,38 @@ const (
 // Sync.
 func (peer *LocalPeer) AddConnection(conn *LocalConnection) {
 	resultChan := make(chan interface{})
-	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PAddConnection, resultChan: resultChan},
-		payload:     conn}
+	peer.actionChan <- func() {
+		peer.handleAddConnection(conn)
+		resultChan <- nil
+	}
 	<-resultChan
 }
 
 // Async.
 func (peer *LocalPeer) ConnectionEstablished(conn *LocalConnection) {
-	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PConnectionEstablished},
-		payload:     conn}
+	peer.actionChan <- func() {
+		peer.handleConnectionEstablished(conn)
+	}
 }
 
 // Sync.
 func (peer *LocalPeer) DeleteConnection(conn *LocalConnection) {
 	resultChan := make(chan interface{})
-	peer.queryChan <- &PeerInteraction{
-		Interaction: Interaction{code: PDeleteConnection, resultChan: resultChan},
-		payload:     conn}
+	peer.actionChan <- func() {
+		peer.handleDeleteConnection(conn)
+		resultChan <- nil
+	}
 	<-resultChan
 }
 
 // ACTOR server
 
-func (peer *LocalPeer) queryLoop(queryChan <-chan *PeerInteraction) {
+func (peer *LocalPeer) actorLoop(actionChan <-chan LocalPeerAction) {
 	gossipTimer := time.Tick(GossipInterval)
 	for {
 		select {
-		case query, ok := <-queryChan:
-			if !ok {
-				return
-			}
-			switch query.code {
-			case PAddConnection:
-				peer.handleAddConnection(query.payload.(*LocalConnection))
-				query.resultChan <- nil
-			case PConnectionEstablished:
-				peer.handleConnectionEstablished(query.payload.(*LocalConnection))
-			case PDeleteConnection:
-				peer.handleDeleteConnection(query.payload.(*LocalConnection))
-				query.resultChan <- nil
-			}
+		case action := <-actionChan:
+			action()
 		case <-gossipTimer:
 			peer.Router.SendAllGossip()
 		}
