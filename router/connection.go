@@ -188,12 +188,13 @@ func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 
 // Async
 func (conn *LocalConnection) Shutdown(err error) {
-	if err == nil {
-		conn.actionChan <- nil
-	} else {
-		// Run on its own goroutine in case the channel is backed up
-		go func() { conn.sendAction(func() error { return err }) }()
-	}
+	// Run on its own goroutine in case the channel is backed up
+	go func() {
+		if err == nil {
+			conn.sendAction(nil)
+		} else {
+			conn.sendAction(func() error { return err }) }
+	}()
 }
 
 // Async
