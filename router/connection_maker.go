@@ -52,6 +52,13 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 	}
 }
 
+func (cm *ConnectionMaker) ForgetConnection(address string) {
+	cm.actionChan <- func() bool {
+		delete(cm.cmdLineAddress, NormalisePeerAddr(address))
+		return true
+	}
+}
+
 func (cm *ConnectionMaker) ConnectionTerminated(address string) {
 	cm.actionChan <- func() bool {
 		if target, found := cm.targets[address]; found {

@@ -176,6 +176,15 @@ func handleHttp(router *weave.Router) {
 		}
 	})
 
+	muxRouter.Methods("POST").Path("/forget").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		peer := r.FormValue("peer")
+		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+			router.ConnectionMaker.ForgetConnection(addr.String())
+		} else {
+			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
+		}
+	})
+
 	http.Handle("/", muxRouter)
 
 	address := fmt.Sprintf(":%d", weave.HttpPort)
