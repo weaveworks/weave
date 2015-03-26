@@ -107,7 +107,7 @@ func (peers *Peers) Names() PeerNameSet {
 func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
 	peers.RLock()
 	peerList := make([]*Peer, 0, len(names))
-	for name, _ := range names {
+	for name := range names {
 		if peer, found := peers.table[name]; found {
 			peerList = append(peerList, peer)
 		}
@@ -169,7 +169,7 @@ func (peers *Peers) garbageCollect() []*Peer {
 
 func setFromPeersMap(peers map[PeerName]*Peer) PeerNameSet {
 	names := make(PeerNameSet)
-	for name, _ := range peers {
+	for name := range peers {
 		names[name] = true
 	}
 	return names

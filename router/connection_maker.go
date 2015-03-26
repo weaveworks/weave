@@ -119,7 +119,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	}
 
 	// Add command-line targets that are not connected
-	for address, _ := range cm.cmdLineAddress {
+	for address := range cm.cmdLineAddress {
 		addTarget(address)
 	}
 

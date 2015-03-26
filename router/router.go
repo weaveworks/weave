@@ -377,7 +377,7 @@ func NewTopologyGossipData(peers *Peers, update ...*Peer) *TopologyGossipData {
 }
 
 func (d *TopologyGossipData) Merge(other GossipData) {
-	for name, _ := range other.(*TopologyGossipData).update {
+	for name := range other.(*TopologyGossipData).update {
 		d.update[name] = true
 	}
 }
