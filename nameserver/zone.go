@@ -1,12 +1,12 @@
 package nameserver
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/miekg/dns"
 	. "github.com/zettio/weave/common"
 	"net"
 	"sync"
-	"bytes"
-	"fmt"
 )
 
 const (
