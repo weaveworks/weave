@@ -1,0 +1,86 @@
+#!/bin/bash
+# This scipt lints go files for common errors.
+#
+# Its runs gofmt and go vet, and optionally golint and
+# gocyclo, if they are installed.
+#
+# With no arguments, it lints the current files staged
+# for git commit.  Or you can pass it explicit filenames
+# (or directories) and it will lint them.
+#
+# To use this script automatically, run:
+#   ln -s ../../bin/lint .git/hooks/pre-commit
+
+set -eu
+
+EXIT_CODE=0
+
+function lint_go {
+	filename=$1
+
+	if [ "$(gofmt -d $filename)" != "" ]; then
+		EXIT_CODE=1
+		echo "$filename: run gofmt -w $filename!"
+	fi
+
+	go tool vet ${filename} || EXIT_CODE=$?
+
+	# golint is completely optional.  If you don't like it
+	# don't have it installed.
+	if [ "$(which golint)" != "" ]; then
+		# golint doesn't set an exit code it seems
+		lintoutput=$(golint $filename)
+		if [ "$lintoutput" != "" ]; then
+			echo "$lintoutput"
+			EXIT_CODE=1
+		fi
+	fi
+
+	# gocyclo is completely optional.  If you don't like it
+	# don't have it installed.  Also never blocks a commit,
+	# it just warns.
+	if [ "$(which gocyclo)" != "" ]; then
+		gocyclo -over 25 ${filename} | while read line; do
+			echo ${filename}: higher than 25 cyclomatic complexity - ${line}
+		done
+	fi
+}
+
+function lint {
+	filename=$1
+	ext=${filename##*\.}
+
+	# If this is a directory, then lint the files in it
+	if [[ -d ${filename} ]]; then
+		for filename in $(find ${filename} -type f); do
+			lint ${filename}
+		done
+		return
+	fi
+
+	# Don't lint this script
+	if [ "${filename}" == "bin/lint" ]; then
+		return
+	fi
+
+	case "$ext" in
+		go) lint_go $filename
+		;;
+	esac
+}
+
+if [ $# -gt 0 ]; then
+	for filename in $@; do
+		lint ${filename}
+	done
+else
+	for filename in $(git diff --cached --name-only); do
+		if [ ! -e "${filename}" ]; then
+			continue
+		fi
+
+		lint ${filename}
+	done
+fi
+
+exit $EXIT_CODE
