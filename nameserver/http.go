@@ -2,13 +2,13 @@ package nameserver
 
 import (
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 	. "github.com/zettio/weave/common"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"github.com/gorilla/mux"
 )
 
 func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
@@ -22,8 +22,8 @@ func ListenHttp(version string, server *DNSServer, domain string, db Zone, port 
 	muxRouter := mux.NewRouter()
 
 	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			io.WriteString(w, fmt.Sprintln("weave DNS", version))
-			io.WriteString(w, server.Status())
+		io.WriteString(w, fmt.Sprintln("weave DNS", version))
+		io.WriteString(w, server.Status())
 	})
 
 	muxRouter.Methods("PUT").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

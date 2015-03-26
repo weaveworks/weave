@@ -19,7 +19,7 @@ var (
 )
 
 const (
-	defPendingTimeout int = 5  // timeout for a resolution
+	defPendingTimeout int = 5 // timeout for a resolution
 )
 
 type entryStatus uint8

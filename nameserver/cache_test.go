@@ -108,7 +108,7 @@ func TestCacheEntries(t *testing.T) {
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	ttlGet2 := resp.Answer[0].Header().Ttl
-	wt.AssertEqualInt(t, int(ttlGet1 - ttlGet2), 1, "TTL difference")
+	wt.AssertEqualInt(t, int(ttlGet1-ttlGet2), 1, "TTL difference")
 
 	timeGet3 := timeGet1.Add(time.Duration(localTTL) * time.Second)
 	t.Logf("Checking that a third Get(), after %d second, gets no result", localTTL)
@@ -124,9 +124,9 @@ func TestCacheEntries(t *testing.T) {
 	l.Put(questionMsg, replyTemp, 0, time.Now())
 	lenBefore := l.Len()
 	l.Remove(question)
-	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length")
+	wt.AssertEqualInt(t, l.Len(), lenBefore-1, "cache length")
 	l.Remove(question) // do it again: should have no effect...
-	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length")
+	wt.AssertEqualInt(t, l.Len(), lenBefore-1, "cache length")
 
 	resp, err = l.Get(questionMsg, minUdpSize, timeGet1)
 	wt.AssertNoErr(t, err)
@@ -149,7 +149,7 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.1.3", "IP address")
 	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), int(localTTL), "TTL")
 
-	resp, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL - 1) * time.Second))
+	resp, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL-1)*time.Second))
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from the Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
@@ -159,13 +159,13 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Checking we get empty replies when they are expired...")
 	lenBefore = l.Len()
-	resp, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL) * time.Second))
+	resp, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL)*time.Second))
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Received '%s'", resp.Answer[0])
 		t.Fatalf("ERROR: Did NOT expect a reponse from the Get()")
 	}
-	wt.AssertEqualInt(t, l.Len(), lenBefore - 1, "cache length (after getting an expired entry)")
+	wt.AssertEqualInt(t, l.Len(), lenBefore-1, "cache length (after getting an expired entry)")
 
 	questionMsg2 := new(dns.Msg)
 	questionMsg2.SetQuestion("some.other.name", dns.TypeA)
@@ -200,7 +200,7 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertNil(t, resp, "Get() response with CacheNoLocalReplies")
 	wt.AssertNotNil(t, err, "Get() error with CacheNoLocalReplies")
 
-	timeExpiredGet3 := timePut3.Add(time.Second * time.Duration(negLocalTTL + 1))
+	timeExpiredGet3 := timePut3.Add(time.Second * time.Duration(negLocalTTL+1))
 	t.Logf("Checking that we get an expired response after %f seconds", timeExpiredGet3.Sub(timePut3).Seconds())
 	resp, err = l.Get(questionMsg3, minUdpSize, timeExpiredGet3)
 	wt.AssertNil(t, resp, "expired Get() response with CacheNoLocalReplies")

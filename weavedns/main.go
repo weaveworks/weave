@@ -79,11 +79,11 @@ func main() {
 	}
 
 	srvConfig := weavedns.DNSServerConfig{
-		Port:                dnsPort,
-		CacheLen:            cacheLen,
-		LocalDomain:         localDomain,
-		Timeout:             timeout,
-		UdpBufLen:           udpbuf,
+		Port:        dnsPort,
+		CacheLen:    cacheLen,
+		LocalDomain: localDomain,
+		Timeout:     timeout,
+		UdpBufLen:   udpbuf,
 	}
 
 	if len(fallback) > 0 {
@@ -94,7 +94,7 @@ func main() {
 		srvConfig.UpstreamCfg = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
 		Debug.Printf("DNS fallback at %s:%s", fallbackHost, fallbackPort)
 	}
-	
+
 	srv, err := weavedns.NewDNSServer(srvConfig, zone, iface)
 	if err != nil {
 		Error.Fatal("Failed to initialize the WeaveDNS server", err)

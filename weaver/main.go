@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/davecheney/profile"
+	"github.com/gorilla/mux"
 	weavenet "github.com/zettio/weave/net"
 	weave "github.com/zettio/weave/router"
 	"io"
@@ -16,7 +17,6 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-	"github.com/gorilla/mux"
 )
 
 var version = "(unreleased version)"
