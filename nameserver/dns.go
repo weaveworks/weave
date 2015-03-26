@@ -47,7 +47,7 @@ func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []net.IP) *dns.Msg {
 			}
 		case dns.TypeAAAA:
 			if ip4 := addr.To4(); ip4 == nil {
-				answers[count] = &dns.AAAA{Hdr: *header, A: addr}
+				answers[count] = &dns.AAAA{Hdr: *header, AAAA: addr}
 				count++
 			}
 		}
