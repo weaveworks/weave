@@ -22,7 +22,7 @@ function lint_go {
 		echo "${filename}: run gofmt -w ${filename}!"
 	fi
 
-	go tool vet ${filename} || result=$?
+	go tool vet "${filename}" || result=$?
 
 	# golint is completely optional.  If you don't like it
 	# don't have it installed.
