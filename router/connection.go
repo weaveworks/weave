@@ -193,7 +193,8 @@ func (conn *LocalConnection) Shutdown(err error) {
 		if err == nil {
 			conn.sendAction(nil)
 		} else {
-			conn.sendAction(func() error { return err }) }
+			conn.sendAction(func() error { return err })
+		}
 	}()
 }
 
