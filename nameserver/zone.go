@@ -68,7 +68,7 @@ func (zone *ZoneDb) String() string {
 	defer zone.mx.RUnlock()
 	var buf bytes.Buffer
 	for _, r := range zone.recs {
-		buf.WriteString(fmt.Sprintf("%.12s %s %v\n", r.Ident, r.IP, r.Name))
+		fmt.Fprintf(&buf, "%.12s %s %v\n", r.Ident, r.IP, r.Name)
 	}
 	return buf.String()
 }

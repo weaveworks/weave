@@ -130,13 +130,13 @@ func (peers *Peers) GarbageCollect() []*Peer {
 func (peers *Peers) String() string {
 	var buf bytes.Buffer
 	peers.ForEach(func(name PeerName, peer *Peer) {
-		buf.WriteString(fmt.Sprint(peer, "\n"))
+		fmt.Fprint(&buf, peer, "\n")
 		for _, conn := range peer.Connections() {
 			established := ""
 			if !conn.Established() {
 				established = " (unestablished)"
 			}
-			buf.WriteString(fmt.Sprintf("   -> %v (%v) [%v%s]\n", conn.Remote().Name, conn.Remote().NickName, conn.RemoteTCPAddr(), established))
+			fmt.Fprintf(&buf, "   -> %v (%v) [%v%s]\n", conn.Remote().Name, conn.Remote().NickName, conn.RemoteTCPAddr(), established)
 		}
 	})
 	return buf.String()

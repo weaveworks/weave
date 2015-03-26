@@ -77,7 +77,7 @@ func (cm *ConnectionMaker) String() string {
 			} else {
 				fmtStr = "%s (next try at %v)\n"
 			}
-			buf.WriteString(fmt.Sprintf(fmtStr, address, target.tryAfter))
+			fmt.Fprintf(&buf, fmtStr, address, target.tryAfter)
 		}
 		resultChan <- buf.String()
 		return false

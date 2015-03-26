@@ -196,11 +196,11 @@ func (s *DNSServer) Start() error {
 // Return status string
 func (s *DNSServer) Status() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintln("Local domain", s.Domain))
-	buf.WriteString(fmt.Sprintln("Listen address", s.ListenAddr))
-	buf.WriteString(fmt.Sprintln("mDNS interface", s.iface))
-	buf.WriteString(fmt.Sprintln("Fallback DNS config", s.upstream))
-	buf.WriteString(fmt.Sprintf("Zone database:\n%s", s.zone))
+	fmt.Fprintln(&buf, "Local domain", s.Domain)
+	fmt.Fprintln(&buf, "Listen address", s.ListenAddr)
+	fmt.Fprintln(&buf, "mDNS interface", s.iface)
+	fmt.Fprintln(&buf, "Fallback DNS config", s.upstream)
+	fmt.Fprintf(&buf, "Zone database:\n%s", s.zone)
 	return buf.String()
 }
 

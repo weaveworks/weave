@@ -90,7 +90,7 @@ func (cache *MacCache) String() string {
 	cache.RLock()
 	defer cache.RUnlock()
 	for key, entry := range cache.table {
-		buf.WriteString(fmt.Sprintf("%v -> %s (%v)\n", intmac(key), entry.peer.Name, entry.lastSeen))
+		fmt.Fprintf(&buf, "%v -> %s (%v)\n", intmac(key), entry.peer.Name, entry.lastSeen)
 	}
 	return buf.String()
 }

@@ -53,13 +53,13 @@ func (routes *Routes) String() string {
 	var buf bytes.Buffer
 	routes.RLock()
 	defer routes.RUnlock()
-	buf.WriteString(fmt.Sprintln("unicast:"))
+	fmt.Fprintln(&buf, "unicast:")
 	for name, hop := range routes.unicast {
-		buf.WriteString(fmt.Sprintf("%s -> %s\n", name, hop))
+		fmt.Fprintf(&buf, "%s -> %s\n", name, hop)
 	}
-	buf.WriteString(fmt.Sprintln("broadcast:"))
+	fmt.Sprintln(&buf, "broadcast:")
 	for name, hops := range routes.broadcast {
-		buf.WriteString(fmt.Sprintf("%s -> %v\n", name, hops))
+		fmt.Fprintf(&buf, "%s -> %v\n", name, hops)
 	}
 	return buf.String()
 }

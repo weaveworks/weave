@@ -92,12 +92,12 @@ func (router *Router) UsingPassword() bool {
 
 func (router *Router) Status() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintln("Our name is", router.Ourself.Name, "("+router.Ourself.NickName+")"))
-	buf.WriteString(fmt.Sprintln("Sniffing traffic on", router.Iface))
-	buf.WriteString(fmt.Sprintf("MACs:\n%s", router.Macs))
-	buf.WriteString(fmt.Sprintf("Peers:\n%s", router.Peers))
-	buf.WriteString(fmt.Sprintf("Routes:\n%s", router.Routes))
-	buf.WriteString(fmt.Sprintf("Reconnects:\n%s", router.ConnectionMaker))
+	fmt.Fprintln(&buf, "Our name is", router.Ourself.Name, "("+router.Ourself.NickName+")")
+	fmt.Fprintln(&buf, "Sniffing traffic on", router.Iface)
+	fmt.Fprintf(&buf, "MACs:\n%s", router.Macs)
+	fmt.Fprintf(&buf, "Peers:\n%s", router.Peers)
+	fmt.Fprintf(&buf, "Routes:\n%s", router.Routes)
+	fmt.Fprintf(&buf, "Reconnects:\n%s", router.ConnectionMaker)
 	return buf.String()
 }
 
