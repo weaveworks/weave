@@ -339,7 +339,7 @@ to it via `weave launch` or `weave connect`:
 
 This will prevent the peer from trying to reconnect to that host once
 connectivity to it is lost, and thus can be used to administratively
-remove peers from the network.
+remove decommissioned peers from the network.
 
 ### <a name="container-mobility"></a>Container mobility
 
