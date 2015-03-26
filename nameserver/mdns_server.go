@@ -104,7 +104,7 @@ func (s *MDNSServer) makeHandler(qtype uint16, lookup LookupFunc) dns.HandlerFun
 					Debug.Printf("[mdns msgid %d] Found local answer to mDNS query %s",
 						r.MsgHdr.Id, q.Name)
 					if err := s.sendResponse(m); err != nil {
-						Warning.Printf("[mdns msgid %d] Error writing to %s",
+						Warning.Printf("[mdns msgid %d] Error writing to %v",
 							r.MsgHdr.Id, s.sendconn)
 					}
 				} else {

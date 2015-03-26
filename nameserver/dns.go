@@ -42,12 +42,12 @@ func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []net.IP) *dns.Msg {
 		switch q.Qtype {
 		case dns.TypeA:
 			if ip4 := addr.To4(); ip4 != nil {
-				answers[count] = &dns.A{*header, addr}
+				answers[count] = &dns.A{Hdr: *header, A: addr}
 				count++
 			}
 		case dns.TypeAAAA:
 			if ip4 := addr.To4(); ip4 == nil {
-				answers[count] = &dns.AAAA{*header, addr}
+				answers[count] = &dns.AAAA{Hdr: *header, A: addr}
 				count++
 			}
 		}
@@ -59,7 +59,7 @@ func makePTRReply(r *dns.Msg, q *dns.Question, names []string) *dns.Msg {
 	answers := make([]dns.RR, len(names))
 	header := makeHeader(r, q)
 	for i, name := range names {
-		answers[i] = &dns.PTR{*header, name}
+		answers[i] = &dns.PTR{Hdr: *header, Ptr: name}
 	}
 	return makeReply(r, answers)
 }

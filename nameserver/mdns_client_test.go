@@ -48,7 +48,7 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 		m.SetReply(req)
 		hdr := dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeA,
 			Class: dns.ClassINET, Ttl: 3600}
-		a := &dns.A{hdr, testAddr}
+		a := &dns.A{Hdr: hdr, A: testAddr}
 		m.Answer = append(m.Answer, a)
 		sendAnswer(m)
 	} else if req.Question[0].Qtype == dns.TypePTR && req.Question[0].Name == testInAddr {
@@ -56,7 +56,7 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 		m.SetReply(req)
 		hdr := dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypePTR,
 			Class: dns.ClassINET, Ttl: 3600}
-		a := &dns.PTR{hdr, successTestName}
+		a := &dns.PTR{Hdr: hdr, Ptr: successTestName}
 		m.Answer = append(m.Answer, a)
 		sendAnswer(m)
 	}
