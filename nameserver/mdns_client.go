@@ -106,11 +106,6 @@ func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 type MDNSAction func()
 
 // Async
-func (c *MDNSClient) Shutdown() {
-	c.actionChan <- nil
-}
-
-// Async
 func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- *Response) {
 	c.actionChan <- func() {
 		query, found := c.inflight[name]

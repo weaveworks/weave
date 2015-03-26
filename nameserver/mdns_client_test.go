@@ -85,6 +85,10 @@ func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 	return mdnsClient, server, err
 }
 
+func (c *MDNSClient) Shutdown() {
+	c.actionChan <- nil
+}
+
 type testContext struct {
 	receivedAddr  net.IP
 	receivedCount int
