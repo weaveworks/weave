@@ -55,7 +55,7 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 func (cm *ConnectionMaker) ForgetConnection(address string) {
 	cm.actionChan <- func() bool {
 		delete(cm.cmdLineAddress, NormalisePeerAddr(address))
-		return true
+		return false
 	}
 }
 
