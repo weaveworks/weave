@@ -21,8 +21,8 @@ usage() {
     echo "weave forget     <peer>"
     echo "weave run        [--with-dns] <cidr> <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
-    echo "weave attach     <cidr> <container_id>"
-    echo "weave detach     <cidr> <container_id>"
+    echo "weave attach     <cidr> [<cidr> ...] <container_id>"
+    echo "weave detach     <cidr> [<cidr> ...] <container_id>"
     echo "weave expose     <cidr>"
     echo "weave hide       <cidr>"
     echo "weave ps"
@@ -681,19 +681,39 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     attach)
-        [ $# -eq 2 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
+        [ $# -gt 1 ] || usage
+        CIDRS=""
+        while true; do
+            if is_cidr "$1"; then
+                CIDRS="$CIDRS $1"
+                shift 1
+            else
+                CONTAINER_ID="$1"
+                break
+            fi
+        done
         create_bridge
-        with_container_netns $2 attach $CIDR >/dev/null
-        tell_dns PUT $2 $CIDR
+        with_container_netns $CONTAINER_ID attach $CIDRS >/dev/null
+        for CIDR in $CIDRS; do
+            tell_dns PUT $CONTAINER_ID $CIDR
+        done
         ;;
     detach)
-        [ $# -eq 2 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
-        with_container_netns $2 detach $CIDR >/dev/null
-        tell_dns DELETE $2 $CIDR
+        [ $# -gt 1 ] || usage
+        CIDRS=""
+        while true; do
+            if is_cidr "$1"; then
+                CIDRS="$CIDRS $1"
+                shift 1
+            else
+                CONTAINER_ID="$1"
+                break
+            fi
+        done
+        with_container_netns $CONTAINER_ID detach $CIDRS >/dev/null
+        for CIDR in $CIDRS; do
+            tell_dns DELETE $CONTAINER_ID $CIDR
+        done
         ;;
     expose)
         [ $# -eq 1 ] || usage
