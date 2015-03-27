@@ -114,8 +114,8 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	}
 	conn.uid = localConnID ^ remoteConnID
 
+	remotePublicStr, rpErr := fv.Value("PublicKey")
 	if usingPassword {
-		remotePublicStr, rpErr := fv.Value("PublicKey")
 		if rpErr != nil {
 			return rpErr
 		}
@@ -131,7 +131,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 		conn.tcpSender = NewEncryptedTCPSender(enc, conn)
 		conn.Decryptor = NewNaClDecryptor(conn)
 	} else {
-		if _, found := handshakeRecv["PublicKey"]; found {
+		if rpErr == nil {
 			return fmt.Errorf("Remote network is encrypted. Password required.")
 		}
 		conn.tcpSender = NewSimpleTCPSender(enc)
