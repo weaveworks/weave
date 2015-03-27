@@ -306,6 +306,10 @@ func (fwd *Forwarder) accumulateAndSendFrames(frame *ForwardedFrame) bool {
 	}
 	if !fwd.appendFrame(frame) {
 		fwd.logDrop(frame)
+		// [1] The buffer is empty at this point and therefore we must
+		// not flush it. The easiest way to accomplish that is simply
+		// by returning to the surrounding run loop.
+		return true
 	}
 	for {
 		select {
@@ -318,6 +322,7 @@ func (fwd *Forwarder) accumulateAndSendFrames(frame *ForwardedFrame) bool {
 				fwd.flush()
 				if !fwd.appendFrame(frame) {
 					fwd.logDrop(frame)
+					return true // see [1]
 				}
 			}
 		default:
