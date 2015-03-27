@@ -325,23 +325,33 @@ launch() {
 
 attach() {
     if ip netns exec $NETNS ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        # container already has the expected network interface, so assume we set it up already;
-        # just add the IP address.
-        if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
-            # address was there already
-            return 0
-        fi
+        for addr; do
+            # container already has the expected network interface, so assume we set it up already;
+            # just add the IP address.
+            if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $addr >/dev/null ; then
+                # address was there already
+                continue
+            fi
 
-        if ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ; then
-            return 1
-        fi
+            if ! ip netns exec $NETNS ip addr add $addr dev $CONTAINER_IFNAME ; then
+                return 1
+            fi
+        done
 
         return 0
     fi
 
-    if ! connect_container_to_bridge ||
-        ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ||
-        ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ; then
+    if ! connect_container_to_bridge; then
+        return 1
+    fi
+
+    for addr; do
+        if ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME; then
+            return 1
+        fi
+    done
+
+    if ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ; then
         return 1
     fi
 
@@ -354,14 +364,16 @@ attach() {
 }
 
 detach() {
-    if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
-        # address is not there, leave the device alone
-        return 0
-    fi
+    for addr; do
+        if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $addr >/dev/null ; then
+            # address is not there, leave the device alone
+            continue
+        fi
 
-    if ! ip netns exec $NETNS ip addr del $1 dev $CONTAINER_IFNAME ; then
-        return 1
-    fi
+        if ! ip netns exec $NETNS ip addr del $addr dev $CONTAINER_IFNAME ; then
+            return 1
+        fi
+    done
 
     if [ -n "$(ip netns exec $NETNS ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
         # other addresses are left, leave the device alone
