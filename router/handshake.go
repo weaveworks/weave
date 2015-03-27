@@ -112,18 +112,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 		conn.Decryptor = NewNonDecryptor(conn)
 	}
 
-	toPeer := NewPeer(name, nickNameStr, uid, 0)
-	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
-	switch toPeer {
-	case nil:
-		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
-	case conn.local:
-		conn.remote = toPeer // have to do assigment here to ensure Shutdown releases ref count
-		return fmt.Errorf("Cannot connect to ourself")
-	default:
-		conn.remote = toPeer
-		return nil
-	}
+	return conn.setRemote(NewPeer(name, nickNameStr, uid, 0))
 }
 
 func (conn *LocalConnection) handshakeSendRecv(localConnID uint64, usingPassword bool, enc *gob.Encoder, dec *gob.Decoder) (*FieldValidator, *[32]byte, error) {
@@ -158,4 +147,18 @@ func (conn *LocalConnection) handshakeSendRecv(localConnID uint64, usingPassword
 	fv.CheckEqual("ProtocolVersion", versionStr)
 	fv.CheckEqual("PeerNameFlavour", PeerNameFlavour)
 	return &fv, private, nil
+}
+
+func (conn *LocalConnection) setRemote(toPeer *Peer) error {
+	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
+	switch toPeer {
+	case nil:
+		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
+	case conn.local:
+		conn.remote = toPeer // have to do assigment here to ensure Shutdown releases ref count
+		return fmt.Errorf("Cannot connect to ourself")
+	default:
+		conn.remote = toPeer
+		return nil
+	}
 }
