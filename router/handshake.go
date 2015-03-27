@@ -53,37 +53,11 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	conn.extendReadDeadline()
 
 	localConnID := randUint64()
-	versionStr := fmt.Sprint(ProtocolVersion)
-	handshakeSend := map[string]string{
-		"Protocol":        Protocol,
-		"ProtocolVersion": versionStr,
-		"PeerNameFlavour": PeerNameFlavour,
-		"Name":            conn.local.Name.String(),
-		"NickName":        conn.local.NickName,
-		"UID":             fmt.Sprint(conn.local.UID),
-		"ConnID":          fmt.Sprint(localConnID)}
-	handshakeRecv := map[string]string{}
-
 	usingPassword := conn.Router.UsingPassword()
-	var public, private *[32]byte
-	var err error
-	if usingPassword {
-		public, private, err = GenerateKeyPair()
-		if err != nil {
-			return err
-		}
-		handshakeSend["PublicKey"] = hex.EncodeToString(public[:])
-	}
-	enc.Encode(handshakeSend)
-
-	err = dec.Decode(&handshakeRecv)
+	fv, private, err := conn.handshakeSendRecv(localConnID, usingPassword, enc, dec)
 	if err != nil {
 		return err
 	}
-	fv := NewFieldValidator(handshakeRecv)
-	fv.CheckEqual("Protocol", Protocol)
-	fv.CheckEqual("ProtocolVersion", versionStr)
-	fv.CheckEqual("PeerNameFlavour", PeerNameFlavour)
 	nameStr, _ := fv.Value("Name")
 	nickNameStr, _ := fv.Value("NickName")
 	uidStr, _ := fv.Value("UID")
@@ -150,4 +124,38 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 		conn.remote = toPeer
 		return nil
 	}
+}
+
+func (conn *LocalConnection) handshakeSendRecv(localConnID uint64, usingPassword bool, enc *gob.Encoder, dec *gob.Decoder) (*FieldValidator, *[32]byte, error) {
+	versionStr := fmt.Sprint(ProtocolVersion)
+	handshakeSend := map[string]string{
+		"Protocol":        Protocol,
+		"ProtocolVersion": versionStr,
+		"PeerNameFlavour": PeerNameFlavour,
+		"Name":            conn.local.Name.String(),
+		"NickName":        conn.local.NickName,
+		"UID":             fmt.Sprint(conn.local.UID),
+		"ConnID":          fmt.Sprint(localConnID)}
+	handshakeRecv := map[string]string{}
+
+	var public, private *[32]byte
+	var err error
+	if usingPassword {
+		public, private, err = GenerateKeyPair()
+		if err != nil {
+			return nil, nil, err
+		}
+		handshakeSend["PublicKey"] = hex.EncodeToString(public[:])
+	}
+	enc.Encode(handshakeSend)
+
+	err = dec.Decode(&handshakeRecv)
+	if err != nil {
+		return nil, nil, err
+	}
+	fv := NewFieldValidator(handshakeRecv)
+	fv.CheckEqual("Protocol", Protocol)
+	fv.CheckEqual("ProtocolVersion", versionStr)
+	fv.CheckEqual("PeerNameFlavour", PeerNameFlavour)
+	return &fv, private, nil
 }
