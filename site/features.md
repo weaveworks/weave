@@ -331,7 +331,15 @@ then on one of the existing hosts runs
     host# weave connect $NEW_HOST
 
 Other hosts in the weave network will automatically attempt to
-establish connections to the new host too.
+establish connections to the new host too. Conversely, it is possible
+to instruct a peer to forget a particular host that was specified
+to it via `weave launch` or `weave connect`:
+
+    host# weave forget $DECOMMISSIONED_HOST
+
+This will prevent the peer from trying to reconnect to that host once
+connectivity to it is lost, and thus can be used to administratively
+remove decommissioned peers from the network.
 
 ### <a name="container-mobility"></a>Container mobility
 

@@ -18,6 +18,7 @@ usage() {
     echo "weave launch     [-password <password>] [-nickname <nickname>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
+    echo "weave forget     <peer>"
     echo "weave run        [--with-dns] <cidr> <docker run args> ..."
     echo "weave start      <cidr> <container_id>"
     echo "weave attach     <cidr> <container_id>"
@@ -596,6 +597,10 @@ case "$COMMAND" in
     connect)
         [ $# -eq 1 ] || usage
         http_call $CONTAINER_NAME $HTTP_PORT POST /connect -d "peer=$1"
+        ;;
+    forget)
+        [ $# -eq 1 ] || usage
+        http_call $CONTAINER_NAME $HTTP_PORT POST /forget -d "peer=$1"
         ;;
     status)
         http_call $CONTAINER_NAME $HTTP_PORT GET /status || true
