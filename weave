@@ -346,7 +346,7 @@ attach() {
     fi
 
     for addr; do
-        if ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME; then
+        if ! ip netns exec $NETNS ip addr add $addr dev $CONTAINER_IFNAME; then
             return 1
         fi
     done
@@ -671,27 +671,29 @@ case "$COMMAND" in
         echo -n $DNS_ARGS
         ;;
     start)
-        [ $# -eq 2 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
+        [ $# -gt 1 ] || usage
+        CIDRS=""
+        while is_cidr "$1"; do
+            CIDRS="$CIDRS $1"
+            shift 1
+        done
+        CONTAINER_ID="$1"
         create_bridge
-        CONTAINER=$(docker start $2)
-        with_container_netns $CONTAINER attach $CIDR >/dev/null
-        tell_dns PUT $CONTAINER $CIDR
+        CONTAINER=$(docker start $CONTAINER_ID)
+        with_container_netns $CONTAINER_ID attach $CIDRS >/dev/null
+        for CIDR in $CIDRS; do
+            tell_dns PUT $CONTAINER_ID $CIDR
+        done
         echo $CONTAINER
         ;;
     attach)
         [ $# -gt 1 ] || usage
         CIDRS=""
-        while true; do
-            if is_cidr "$1"; then
-                CIDRS="$CIDRS $1"
-                shift 1
-            else
-                CONTAINER_ID="$1"
-                break
-            fi
+        while is_cidr "$1"; do
+            CIDRS="$CIDRS $1"
+            shift 1
         done
+        CONTAINER_ID="$1"
         create_bridge
         with_container_netns $CONTAINER_ID attach $CIDRS >/dev/null
         for CIDR in $CIDRS; do
@@ -701,15 +703,11 @@ case "$COMMAND" in
     detach)
         [ $# -gt 1 ] || usage
         CIDRS=""
-        while true; do
-            if is_cidr "$1"; then
-                CIDRS="$CIDRS $1"
-                shift 1
-            else
-                CONTAINER_ID="$1"
-                break
-            fi
+        while is_cidr "$1"; do
+            CIDRS="$CIDRS $1"
+            shift 1
         done
+        CONTAINER_ID="$1"
         with_container_netns $CONTAINER_ID detach $CIDRS >/dev/null
         for CIDR in $CIDRS; do
             tell_dns DELETE $CONTAINER_ID $CIDR
