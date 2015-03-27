@@ -10,7 +10,7 @@ func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err erro
 	if iface, err = findInterface(ifaceName); err == nil || wait == 0 {
 		return
 	}
-	for ; err != nil && wait > 0; wait -= 1 {
+	for ; err != nil && wait > 0; wait-- {
 		time.Sleep(1 * time.Second)
 		iface, err = findInterface(ifaceName)
 	}
