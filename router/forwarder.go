@@ -303,6 +303,13 @@ func (fwd *Forwarder) attemptVerifyEffectivePMTU() {
 	}
 }
 
+// Drain the inbound channel of frames, aggregating them into larger
+// packets for efficient transmission.
+//
+// FIXME Depending on the golang scheduler, and the rate at which
+// franes get sent to the forwarder, we can be going around this loop
+// forever. That is bad since there may be other stuff for us to do,
+// i.e. the other branches in of the run loop.
 func (fwd *Forwarder) accumulateAndSendFrames() {
 	for {
 		select {
