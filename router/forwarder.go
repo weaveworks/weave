@@ -269,7 +269,6 @@ func (fwd *Forwarder) run() {
 			}
 			if !fwd.appendFrame(frame) {
 				fwd.logDrop(frame)
-				continue
 			}
 			if !fwd.accumulateAndSendFrames() {
 				return
