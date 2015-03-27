@@ -311,7 +311,6 @@ func (fwd *Forwarder) accumulateAndSendFrames() {
 				fwd.flush()
 				if !fwd.appendFrame(frame) {
 					fwd.logDrop(frame)
-					return
 				}
 			}
 		default:
