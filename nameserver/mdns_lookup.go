@@ -14,11 +14,10 @@ func mdnsLookup(client *MDNSClient, name string, qtype uint16) (*Response, error
 			Debug.Printf("[mdns] Error for query type %s name %s: %s",
 				dns.TypeToString[qtype], name, err)
 			return nil, err
-		} else {
-			Debug.Printf("[mdns] Got response name for query type %s name %s: name %s, addr %s",
-				dns.TypeToString[qtype], name, resp.Name, resp.Addr)
-			return resp, nil
 		}
+		Debug.Printf("[mdns] Got response name for query type %s name %s: name %s, addr %s",
+			dns.TypeToString[qtype], name, resp.Name, resp.Addr)
+		return resp, nil
 	}
 	return nil, LookupError(name)
 }

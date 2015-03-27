@@ -8,8 +8,8 @@ import (
 const (
 	localTTL    uint32 = 30 // somewhat arbitrary; we don't expect anyone downstream to cache results
 	negLocalTTL        = 30 // TTL for negative local resolutions
-	minUdpSize         = 512
-	maxUdpSize         = 65535
+	minUDPSize         = 512
+	maxUDPSize         = 65535
 )
 
 func makeHeader(r *dns.Msg, q *dns.Question) *dns.RR_Header {
@@ -82,9 +82,9 @@ func makeDNSNotImplResponse(r *dns.Msg) *dns.Msg {
 
 // get the maximum UDP-reply length
 func getMaxReplyLen(r *dns.Msg, proto dnsProtocol) int {
-	maxLen := minUdpSize
-	if proto == protTcp {
-		maxLen = maxUdpSize
+	maxLen := minUDPSize
+	if proto == protTCP {
+		maxLen = maxUDPSize
 	} else if opt := r.IsEdns0(); opt != nil {
 		maxLen = int(opt.UDPSize())
 	}

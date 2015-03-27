@@ -97,20 +97,17 @@ func (zone *ZoneDb) LookupInaddr(inaddr string) (string, error) {
 			}
 		}
 		return "", LookupError(inaddr)
-	} else {
-		Warning.Printf("[zonedb] Asked to reverse lookup %s", inaddr)
-		return "", LookupError(inaddr)
 	}
+	Warning.Printf("[zonedb] Asked to reverse lookup %s", inaddr)
+	return "", LookupError(inaddr)
 }
 
 func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	fqdn := dns.Fqdn(name)
-	if index := zone.indexOf(
-		func(r Record) bool {
-			return r.Name == fqdn && r.IP.Equal(ip) && r.Ident == ident
-		}); index != -1 {
+	pred := func(r Record) bool { return r.Name == fqdn && r.IP.Equal(ip) && r.Ident == ident }
+	if index := zone.indexOf(pred); index != -1 {
 		return DuplicateError{}
 	}
 	zone.recs = append(zone.recs, Record{ident, fqdn, ip})
@@ -120,15 +117,12 @@ func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) error {
 func (zone *ZoneDb) DeleteRecord(ident string, ip net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
-	if index := zone.indexOf(
-		func(r Record) bool {
-			return r.Ident == ident && r.IP.Equal(ip)
-		}); index == -1 {
-		return LookupError(ident)
-	} else {
+	pred := func(r Record) bool { return r.Ident == ident && r.IP.Equal(ip) }
+	if index := zone.indexOf(pred); index != -1 {
 		zone.recs = append(zone.recs[:index], zone.recs[index+1:]...)
+		return nil
 	}
-	return nil
+	return LookupError(ident)
 }
 
 func (zone *ZoneDb) DeleteRecordsFor(ident string) error {

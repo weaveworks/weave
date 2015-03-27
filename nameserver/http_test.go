@@ -30,14 +30,14 @@ func TestHttp(t *testing.T) {
 	var zone = new(ZoneDb)
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
-	go ListenHttp("", nil, testDomain, zone, port)
+	go ListenHTTP("", nil, testDomain, zone, port)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
 	// Ask the http server to add our test address into the database
 	addrParts := strings.Split(testAddr1, "/")
-	addrUrl := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, containerID, addrParts[0])
-	resp, err := genForm("PUT", addrUrl,
+	addrURL := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, containerID, addrParts[0])
+	resp, err := genForm("PUT", addrURL,
 		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
 	wt.AssertNoErr(t, err)
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
@@ -51,21 +51,21 @@ func TestHttp(t *testing.T) {
 	}
 
 	// Adding exactly the same address should be OK
-	resp, err = genForm("PUT", addrUrl,
+	resp, err = genForm("PUT", addrURL,
 		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
 	wt.AssertNoErr(t, err)
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http success response for duplicate add")
 
 	// Now try adding the same address again with a different ident --
 	// again should be fine
-	otherUrl := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addrParts[0])
-	resp, err = genForm("PUT", otherUrl,
+	otherURL := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addrParts[0])
+	resp, err = genForm("PUT", otherURL,
 		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
 	wt.AssertNoErr(t, err)
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Delete the address
-	resp, err = genForm("DELETE", addrUrl, nil)
+	resp, err = genForm("DELETE", addrURL, nil)
 	wt.AssertNoErr(t, err)
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
@@ -74,7 +74,7 @@ func TestHttp(t *testing.T) {
 	wt.AssertNoErr(t, err)
 
 	// Delete the address record mentioning the other container
-	resp, err = genForm("DELETE", otherUrl, nil)
+	resp, err = genForm("DELETE", otherURL, nil)
 	wt.AssertNoErr(t, err)
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 

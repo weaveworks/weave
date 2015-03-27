@@ -66,14 +66,14 @@ func TestCacheEntries(t *testing.T) {
 	question := &questionMsg.Question[0]
 
 	t.Logf("Trying to get a name")
-	resp, err := l.Get(questionMsg, minUdpSize, time.Now())
+	resp, err := l.Get(questionMsg, minUDPSize, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
 		t.Fatalf("ERROR: Did not expect a reponse from Get() yet")
 	}
 	t.Logf("Trying to get it again")
-	resp, err = l.Get(questionMsg, minUdpSize, time.Now())
+	resp, err = l.Get(questionMsg, minUDPSize, time.Now())
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
@@ -86,7 +86,7 @@ func TestCacheEntries(t *testing.T) {
 
 	timeGet1 := time.Now()
 	t.Logf("Checking we can Get() the reply now")
-	resp, err = l.Get(questionMsg, minUdpSize, timeGet1)
+	resp, err = l.Get(questionMsg, minUDPSize, timeGet1)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
@@ -94,7 +94,7 @@ func TestCacheEntries(t *testing.T) {
 	ttlGet1 := resp.Answer[0].Header().Ttl
 
 	t.Logf("Checking a Wait() with timeout=0 gets the same result")
-	resp, err = l.Wait(questionMsg, time.Duration(0)*time.Second, minUdpSize, time.Now())
+	resp, err = l.Wait(questionMsg, time.Duration(0)*time.Second, minUDPSize, time.Now())
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from a Wait(timeout=0)")
 	t.Logf("Received '%s'", resp.Answer[0])
@@ -102,7 +102,7 @@ func TestCacheEntries(t *testing.T) {
 
 	timeGet2 := timeGet1.Add(time.Duration(1) * time.Second)
 	t.Logf("Checking that a second Get(), after 1 second, gets the same result, but with reduced TTL")
-	resp, err = l.Get(questionMsg, minUdpSize, timeGet2)
+	resp, err = l.Get(questionMsg, minUDPSize, timeGet2)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from a second Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
@@ -112,7 +112,7 @@ func TestCacheEntries(t *testing.T) {
 
 	timeGet3 := timeGet1.Add(time.Duration(localTTL) * time.Second)
 	t.Logf("Checking that a third Get(), after %d second, gets no result", localTTL)
-	resp, err = l.Get(questionMsg, minUdpSize, timeGet3)
+	resp, err = l.Get(questionMsg, minUDPSize, timeGet3)
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Got '%s'", resp)
@@ -128,7 +128,7 @@ func TestCacheEntries(t *testing.T) {
 	l.Remove(question) // do it again: should have no effect...
 	wt.AssertEqualInt(t, l.Len(), lenBefore-1, "cache length")
 
-	resp, err = l.Get(questionMsg, minUdpSize, timeGet1)
+	resp, err = l.Get(questionMsg, minUDPSize, timeGet1)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp == nil, "reponse from the Get() after a Remove()")
 
@@ -141,7 +141,7 @@ func TestCacheEntries(t *testing.T) {
 	l.Put(questionMsg, reply3, 0, timePut3)
 
 	t.Logf("Checking we get the last one...")
-	resp, err = l.Get(questionMsg, minUdpSize, timePut3)
+	resp, err = l.Get(questionMsg, minUDPSize, timePut3)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from the Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
@@ -149,7 +149,7 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.1.3", "IP address")
 	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), int(localTTL), "TTL")
 
-	resp, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL-1)*time.Second))
+	resp, err = l.Get(questionMsg, minUDPSize, timePut3.Add(time.Duration(localTTL-1)*time.Second))
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from the Get()")
 	t.Logf("Received '%s'", resp.Answer[0])
@@ -159,7 +159,7 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Checking we get empty replies when they are expired...")
 	lenBefore = l.Len()
-	resp, err = l.Get(questionMsg, minUdpSize, timePut3.Add(time.Duration(localTTL)*time.Second))
+	resp, err = l.Get(questionMsg, minUDPSize, timePut3.Add(time.Duration(localTTL)*time.Second))
 	wt.AssertNoErr(t, err)
 	if resp != nil {
 		t.Logf("Received '%s'", resp.Answer[0])
@@ -173,7 +173,7 @@ func TestCacheEntries(t *testing.T) {
 	question2 := &questionMsg2.Question[0]
 
 	t.Logf("Trying to Get() a name")
-	resp, err = l.Get(questionMsg2, minUdpSize, time.Now())
+	resp, err = l.Get(questionMsg2, minUDPSize, time.Now())
 	wt.AssertNoErr(t, err)
 	wt.AssertNil(t, resp, "reponse from Get() yet")
 
@@ -181,10 +181,10 @@ func TestCacheEntries(t *testing.T) {
 	replyTemp2 := makeAddressReply(questionMsg2, question2, []net.IP{net.ParseIP("10.0.9.9")})
 	l.Remove(question2)
 	l.Put(questionMsg2, replyTemp2, 0, time.Now())
-	resp, err = l.Get(questionMsg2, minUdpSize, time.Now())
+	resp, err = l.Get(questionMsg2, minUDPSize, time.Now())
 	wt.AssertNoErr(t, err)
 	wt.AssertNotNil(t, resp, "reponse from Get()")
-	resp, err = l.Wait(questionMsg2, time.Duration(0)*time.Second, minUdpSize, time.Now())
+	resp, err = l.Wait(questionMsg2, time.Duration(0)*time.Second, minUDPSize, time.Now())
 	wt.AssertNoErr(t, err)
 	wt.AssertNotNil(t, resp, "reponse from Get()")
 
@@ -196,13 +196,13 @@ func TestCacheEntries(t *testing.T) {
 	t.Logf("Checking that a entry with CacheNoLocalReplies return an error")
 	timePut3 = time.Now()
 	l.Put(questionMsg3, nil, CacheNoLocalReplies, timePut3)
-	resp, err = l.Get(questionMsg3, minUdpSize, timePut3)
+	resp, err = l.Get(questionMsg3, minUDPSize, timePut3)
 	wt.AssertNil(t, resp, "Get() response with CacheNoLocalReplies")
 	wt.AssertNotNil(t, err, "Get() error with CacheNoLocalReplies")
 
 	timeExpiredGet3 := timePut3.Add(time.Second * time.Duration(negLocalTTL+1))
 	t.Logf("Checking that we get an expired response after %f seconds", timeExpiredGet3.Sub(timePut3).Seconds())
-	resp, err = l.Get(questionMsg3, minUdpSize, timeExpiredGet3)
+	resp, err = l.Get(questionMsg3, minUDPSize, timeExpiredGet3)
 	wt.AssertNil(t, resp, "expired Get() response with CacheNoLocalReplies")
 	wt.AssertNil(t, err, "expired Get() error with CacheNoLocalReplies")
 
@@ -210,7 +210,7 @@ func TestCacheEntries(t *testing.T) {
 	t.Logf("Checking that Put&Get with CacheNoLocalReplies with a Remove in the middle returns nothing")
 	l.Put(questionMsg3, nil, CacheNoLocalReplies, time.Now())
 	l.Remove(question3)
-	resp, err = l.Get(questionMsg3, minUdpSize, time.Now())
+	resp, err = l.Get(questionMsg3, minUDPSize, time.Now())
 	wt.AssertNil(t, resp, "Get() reponse with CacheNoLocalReplies")
 	wt.AssertNil(t, err, "Get() error with CacheNoLocalReplies")
 }
@@ -237,10 +237,10 @@ func TestCacheBlockingOps(t *testing.T) {
 
 		go func(request *dns.Msg) {
 			t.Logf("Querying about %s...", request.Question[0].Name)
-			_, err := l.Get(request, minUdpSize, time.Now())
+			_, err := l.Get(request, minUDPSize, time.Now())
 			wt.AssertNoErr(t, err)
 			t.Logf("Waiting for %s...", request.Question[0].Name)
-			r, err := l.Wait(request, 1*time.Second, minUdpSize, time.Now())
+			r, err := l.Wait(request, 1*time.Second, minUDPSize, time.Now())
 			t.Logf("Obtained response for %s:\n%s", request.Question[0].Name, r)
 			wt.AssertNoErr(t, err)
 		}(questionMsg)

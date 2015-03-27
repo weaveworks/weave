@@ -17,7 +17,7 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf("[http] "+logmsg, logargs...)
 }
 
-func ListenHttp(version string, server *DNSServer, domain string, db Zone, port int) {
+func ListenHTTP(version string, server *DNSServer, domain string, db Zone, port int) {
 
 	muxRouter := mux.NewRouter()
 

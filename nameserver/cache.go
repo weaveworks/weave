@@ -150,14 +150,14 @@ func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) bool {
 		e.validUntil = now.Add(time.Second * time.Duration(negLocalTTL))
 	} else {
 		// calculate the validUntil from the reply TTL
-		var minTtl uint32 = math.MaxUint32
+		var minTTL uint32 = math.MaxUint32
 		for _, rr := range reply.Answer {
 			ttl := rr.Header().Ttl
-			if ttl < minTtl {
-				minTtl = ttl // TODO: improve the minTTL calculation (maybe we should skip some RRs)
+			if ttl < minTTL {
+				minTTL = ttl // TODO: improve the minTTL calculation (maybe we should skip some RRs)
 			}
 		}
-		e.validUntil = now.Add(time.Second * time.Duration(minTtl))
+		e.validUntil = now.Add(time.Second * time.Duration(minTTL))
 	}
 
 	if reply != nil {

@@ -36,21 +36,21 @@ type DNSServerConfig struct {
 	// (Optional) timeout for DNS queries
 	Timeout int
 	// (Optional) UDP buffer length
-	UdpBufLen int
+	UDPBufLen int
 }
 
 type dnsProtocol uint8
 
 const (
-	protUdp dnsProtocol = iota // UDP protocol
-	protTcp dnsProtocol = iota // TCP protocol
+	protUDP dnsProtocol = iota // UDP protocol
+	protTCP dnsProtocol = iota // TCP protocol
 )
 
 func (proto dnsProtocol) String() string {
 	switch proto {
-	case protUdp:
+	case protUDP:
 		return "UDP"
-	case protTcp:
+	case protTCP:
 		return "TCP"
 	}
 	return "unknown"
@@ -59,9 +59,9 @@ func (proto dnsProtocol) String() string {
 // get a new dns.Client for a protocol
 func (proto dnsProtocol) GetNewClient(bufsize int) *dns.Client {
 	switch proto {
-	case protTcp:
+	case protTCP:
 		return &dns.Client{Net: "tcp"}
-	case protUdp:
+	case protUDP:
 		return &dns.Client{Net: "udp", UDPSize: uint16(bufsize)}
 	}
 	return nil
@@ -118,8 +118,8 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if config.Timeout > 0 {
 		s.timeout = config.Timeout
 	}
-	if config.UdpBufLen > 0 {
-		s.udpBuf = config.UdpBufLen
+	if config.UDPBufLen > 0 {
+		s.udpBuf = config.UDPBufLen
 	}
 	s.mdnsCli, err = NewMDNSClient()
 	if err != nil {
@@ -152,8 +152,8 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 		return m
 	}
 
-	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(protUdp)}
-	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(protTcp)}
+	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(protUDP)}
+	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(protTCP)}
 
 	return
 }

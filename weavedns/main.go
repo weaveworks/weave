@@ -83,7 +83,7 @@ func main() {
 		CacheLen:    cacheLen,
 		LocalDomain: localDomain,
 		Timeout:     timeout,
-		UdpBufLen:   udpbuf,
+		UDPBufLen:   udpbuf,
 	}
 
 	if len(fallback) > 0 {
@@ -103,7 +103,7 @@ func main() {
 	Debug.Printf("Starting the signals handler")
 	go handleSignals(srv)
 
-	go weavedns.ListenHttp(version, srv, localDomain, zone, httpPort)
+	go weavedns.ListenHTTP(version, srv, localDomain, zone, httpPort)
 	err = srv.Start()
 	if err != nil {
 		Error.Fatal("Failed to start the WeaveDNS server", err)

@@ -55,18 +55,16 @@ func (s *MDNSServer) Start(ifi *net.Interface, localDomain string) error {
 		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
 			if ip, err := zone.LookupName(q.Name); err == nil {
 				return makeAddressReply(r, q, []net.IP{ip})
-			} else {
-				return nil
 			}
+			return nil
 		})
 
 	handleReverse := s.makeHandler(dns.TypePTR,
 		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
 			if name, err := zone.LookupInaddr(q.Name); err == nil {
 				return makePTRReply(r, q, []string{name})
-			} else {
-				return nil
 			}
+			return nil
 		})
 
 	mux := dns.NewServeMux()
