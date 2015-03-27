@@ -263,14 +263,7 @@ func (fwd *Forwarder) run() {
 				fwd.conn.Log("Effective PMTU verified at", epmtu)
 			}
 		case frame := <-fwd.ch:
-			if frame == nil {
-				fwd.drain()
-				return
-			}
-			if !fwd.appendFrame(frame) {
-				fwd.logDrop(frame)
-			}
-			if !fwd.accumulateAndSendFrames() {
+			if !fwd.accumulateAndSendFrames(frame) {
 				return
 			}
 		}
@@ -306,10 +299,17 @@ func (fwd *Forwarder) attemptVerifyEffectivePMTU() {
 // franes get sent to the forwarder, we can be going around this loop
 // forever. That is bad since there may be other stuff for us to do,
 // i.e. the other branches in of the run loop.
-func (fwd *Forwarder) accumulateAndSendFrames() bool {
+func (fwd *Forwarder) accumulateAndSendFrames(frame *ForwardedFrame) bool {
+	if frame == nil {
+		fwd.drain()
+		return false
+	}
+	if !fwd.appendFrame(frame) {
+		fwd.logDrop(frame)
+	}
 	for {
 		select {
-		case frame := <-fwd.ch:
+		case frame = <-fwd.ch:
 			if frame == nil {
 				fwd.drain()
 				return false
