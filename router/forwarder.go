@@ -298,7 +298,7 @@ func (fwd *Forwarder) attemptVerifyEffectivePMTU() {
 // FIXME Depending on the golang scheduler, and the rate at which
 // franes get sent to the forwarder, we can be going around this loop
 // forever. That is bad since there may be other stuff for us to do,
-// i.e. the other branches in of the run loop.
+// i.e. the other branches in the run loop.
 func (fwd *Forwarder) accumulateAndSendFrames(frame *ForwardedFrame) bool {
 	if frame == nil {
 		fwd.drain()
