@@ -236,10 +236,7 @@ func (fwd *Forwarder) Start() {
 
 func (fwd *Forwarder) run() {
 	defer fwd.udpSender.Shutdown()
-	var flushed, ok bool
-	var frame *ForwardedFrame
 	for {
-		flushed = false
 		select {
 		case <-fwd.stop:
 			fwd.drain()
@@ -274,29 +271,12 @@ func (fwd *Forwarder) run() {
 				fwd.conn.setEffectivePMTU(epmtu)
 				fwd.conn.Log("Effective PMTU verified at", epmtu)
 			}
-		case frame = <-fwd.ch:
+		case frame := <-fwd.ch:
 			if !fwd.appendFrame(frame) {
 				fwd.logDrop(frame)
 				continue
 			}
-			for !flushed {
-				select {
-				case frame, ok = <-fwd.ch:
-					if !ok {
-						return
-					}
-					if !fwd.appendFrame(frame) {
-						fwd.flush()
-						if !fwd.appendFrame(frame) {
-							fwd.logDrop(frame)
-							flushed = true
-						}
-					}
-				default:
-					fwd.flush()
-					flushed = true
-				}
-			}
+			fwd.accumulateAndSendFrames()
 		}
 	}
 }
@@ -320,6 +300,24 @@ func (fwd *Forwarder) attemptVerifyEffectivePMTU() {
 	fwd.flush()
 	if fwd.verifyPMTUTick == nil {
 		fwd.verifyPMTUTick = time.After(PMTUVerifyTimeout << (PMTUVerifyAttempts - fwd.pmtuVerifyCount))
+	}
+}
+
+func (fwd *Forwarder) accumulateAndSendFrames() {
+	for {
+		select {
+		case frame := <-fwd.ch:
+			if !fwd.appendFrame(frame) {
+				fwd.flush()
+				if !fwd.appendFrame(frame) {
+					fwd.logDrop(frame)
+					return
+				}
+			}
+		default:
+			fwd.flush()
+			return
+		}
 	}
 }
 
