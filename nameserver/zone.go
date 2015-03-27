@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	RDNS_DOMAIN = "in-addr.arpa."
+	RDNSDomain = "in-addr.arpa."
 )
 
 // +1 to also exclude a dot
-var rdnsDomainLen = len(RDNS_DOMAIN) + 1
+var rdnsDomainLen = len(RDNSDomain) + 1
 
 type Lookup interface {
 	LookupName(name string) (net.IP, error)

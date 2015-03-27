@@ -44,7 +44,7 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	mdnsServer, err := NewMDNSServer(zone)
 	wt.AssertNoErr(t, err)
-	err = mdnsServer.Start(nil, DEFAULT_LOCAL_DOMAIN)
+	err = mdnsServer.Start(nil, DefaultLocalDomain)
 	wt.AssertNoErr(t, err)
 
 	var receivedAddr net.IP

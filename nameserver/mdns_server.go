@@ -69,7 +69,7 @@ func (s *MDNSServer) Start(ifi *net.Interface, localDomain string) error {
 
 	mux := dns.NewServeMux()
 	mux.HandleFunc(localDomain, handleLocal)
-	mux.HandleFunc(RDNS_DOMAIN, handleReverse)
+	mux.HandleFunc(RDNSDomain, handleReverse)
 
 	s.srv = &dns.Server{
 		Listener:   nil,

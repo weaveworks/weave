@@ -11,15 +11,15 @@ import (
 )
 
 const (
-	DEFAULT_LOCAL_DOMAIN   = "weave.local."     // The default name used for the local domain
-	DEFAULT_SERVER_PORT    = 53                 // The default server port
-	DEFAULT_CLI_CFG_FILE   = "/etc/resolv.conf" // default "resolv.conf" file to try to load
-	DEFAULT_UDP_BUFLEN     = 4096               // bigger than the default 512
-	DEFAULT_CACHE_LEN      = 8192               // default cache capacity
-	DEFAULT_RESOLV_WORKERS = 8                  // default number of resolution workers
-	DEFAULT_TIMEOUT        = 5                  // default timeout for DNS resolutions
-	DEFAULT_IFACE_NAME     = "default interface"
-	DEFAULT_RESOLV_TRIES   = 3 // max # of times a worker tries to resolve a query
+	DefaultLocalDomain   = "weave.local."     // The default name used for the local domain
+	DefaultServerPort    = 53                 // The default server port
+	DefaultCLICfgFile    = "/etc/resolv.conf" // default "resolv.conf" file to try to load
+	DefaultUDPBuflen     = 4096               // bigger than the default 512
+	DefaultCacheLen      = 8192               // default cache capacity
+	DefaultResolvWorkers = 8                  // default number of resolution workers
+	DefaultTimeout       = 5                  // default timeout for DNS resolutions
+	DefaultIfaceName     = "default interface"
+	DefaultResolvTries   = 3 // max # of times a worker tries to resolve a query
 )
 
 type DNSServerConfig struct {
@@ -92,9 +92,9 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 		iface:       iface,
 		listenersWg: new(sync.WaitGroup),
 
-		Domain:     DEFAULT_LOCAL_DOMAIN,
-		IfaceName:  DEFAULT_IFACE_NAME,
-		ListenAddr: fmt.Sprintf(":%d", DEFAULT_SERVER_PORT),
+		Domain:     DefaultLocalDomain,
+		IfaceName:  DefaultIfaceName,
+		ListenAddr: fmt.Sprintf(":%d", DefaultServerPort),
 	}
 
 	// fill empty parameters with defaults...
@@ -107,7 +107,7 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if config.UpstreamCfg != nil {
 		s.upstream = config.UpstreamCfg
 	} else {
-		cfgFile := DEFAULT_CLI_CFG_FILE
+		cfgFile := DefaultCLICfgFile
 		if len(config.UpstreamCfgFile) > 0 {
 			cfgFile = config.UpstreamCfgFile
 		}
@@ -132,7 +132,7 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if iface != nil {
 		s.IfaceName = iface.Name
 	}
-	cacheLen := DEFAULT_CACHE_LEN
+	cacheLen := DefaultCacheLen
 	if config.CacheLen > 0 {
 		cacheLen = config.CacheLen
 	}
@@ -147,7 +147,7 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	mux := func(proto dnsProtocol) *dns.ServeMux {
 		m := dns.NewServeMux()
 		m.HandleFunc(s.Domain, s.queryHandler([]Lookup{s.zone, s.mdnsCli}, proto))
-		m.HandleFunc(RDNS_DOMAIN, s.rdnsHandler([]Lookup{s.zone, s.mdnsCli}, proto))
+		m.HandleFunc(RDNSDomain, s.rdnsHandler([]Lookup{s.zone, s.mdnsCli}, proto))
 		m.HandleFunc(".", s.notUsHandler(proto))
 		return m
 	}
@@ -323,7 +323,7 @@ func (s *DNSServer) rdnsHandler(lookups []Lookup, proto dnsProtocol) dns.Handler
 // When we receive a request for a name outside of our '.weave.local.'
 // domain, ask the configured DNS server as a fallback.
 func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
-	dnsClient := proto.GetNewClient(DEFAULT_UDP_BUFLEN)
+	dnsClient := proto.GetNewClient(DefaultUDPBuflen)
 
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		maxLen := getMaxReplyLen(r, proto)
