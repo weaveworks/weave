@@ -136,7 +136,7 @@ func (peers *Peers) String() string {
 			if !conn.Established() {
 				established = " (unestablished)"
 			}
-			fmt.Fprintf(&buf, "   -> %v (%v) [%v%s]\n", conn.Remote().Name, conn.Remote().NickName, conn.RemoteTCPAddr(), established)
+			fmt.Fprintf(&buf, "   -> %s [%v%s]\n", conn.Remote().FullName(), conn.RemoteTCPAddr(), established)
 		}
 	})
 	return buf.String()

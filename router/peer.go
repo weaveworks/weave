@@ -33,7 +33,11 @@ func NewPeer(name PeerName, nickName string, uid uint64, version uint64) *Peer {
 func (peer *Peer) String() string {
 	peer.RLock()
 	defer peer.RUnlock()
-	return fmt.Sprint("Peer ", peer.Name, " (", peer.NickName, ") (v", peer.version, ") (UID ", peer.UID, ")")
+	return fmt.Sprint("Peer ", peer.FullName(), " (v", peer.version, ") (UID ", peer.UID, ")")
+}
+
+func (peer *Peer) FullName() string {
+	return fmt.Sprint(peer.Name, "(", peer.NickName, ")")
 }
 
 func (peer *Peer) Version() uint64 {

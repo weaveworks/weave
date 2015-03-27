@@ -38,7 +38,7 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 	if !found {
 		// Not necessarily an error as there could be a race with the
 		// dst disappearing whilst the frame is in flight
-		log.Println("Received packet for unknown destination:", dstPeer.Name)
+		log.Println("Received packet for unknown destination:", dstPeer.FullName())
 		return nil
 	}
 	conn, found := peer.ConnectionTo(relayPeerName)
@@ -171,7 +171,7 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) {
 		log.Fatal("Attempt made to add connection to peer with unknown remote peer")
 	}
 	toName := conn.Remote().Name
-	dupErr := fmt.Errorf("Multiple connections to %s added to %s", toName, peer.Name)
+	dupErr := fmt.Errorf("Multiple connections to %s added to %s", conn.Remote().FullName(), peer.FullName())
 	// deliberately non symmetrical
 	if dupConn, found := peer.connections[toName]; found {
 		if dupConn == conn {

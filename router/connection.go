@@ -84,17 +84,17 @@ func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak { return T
 func (conn *RemoteConnection) Shutdown(error)                         {}
 
 func (conn *RemoteConnection) Log(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.Name)), args...)...)
+	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.FullName())), args...)...)
 }
 
 func (conn *RemoteConnection) String() string {
 	from := "<nil>"
 	if conn.local != nil {
-		from = conn.local.Name.String()
+		from = conn.local.FullName()
 	}
 	to := "<nil>"
 	if conn.remote != nil {
-		to = conn.remote.Name.String()
+		to = conn.remote.FullName()
 	}
 	return fmt.Sprint("Connection ", from, "->", to)
 }
@@ -223,7 +223,7 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 		if oldRemoteUDPAddr == nil {
 			return conn.sendFastHeartbeats()
 		} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
-			log.Println("Peer", conn.remote.Name, "moved from", old, "to", remoteUDPAddr)
+			log.Println("Peer", conn.remote.FullName(), "moved from", old, "to", remoteUDPAddr)
 		}
 		return nil
 	})
@@ -288,7 +288,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
 		return
 	}
-	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.Name)
+	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.FullName())
 
 	// We invoke AddConnection in the same goroutine that subsequently
 	// becomes the tcp receive loop, rather than outside, because a)
