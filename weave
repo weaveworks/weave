@@ -653,16 +653,20 @@ case "$COMMAND" in
             DNS_ARGS=$(exec_remote dns-args "$@")
             [ "$1" = "--with-dns" ] && shift 1
         fi
-        CIDR=$1
-        shift 1
-        validate_cidr $CIDR
+        CIDRS=""
+        while is_cidr "$1"; do
+            CIDRS="$CIDRS $1"
+            shift 1
+        done
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
         if [ "$LOCAL" = "--local" ]; then
             create_bridge
-            with_container_netns $CONTAINER attach $CIDR >/dev/null
-            tell_dns PUT $CONTAINER $CIDR
+            with_container_netns $CONTAINER attach $CIDRS >/dev/null
+            for CIDR in $CIDRS; do
+                tell_dns PUT $CONTAINER_ID $CIDR
+            done
         else
-            exec_remote attach $CIDR $CONTAINER
+            exec_remote attach $CIDRS $CONTAINER
         fi
         echo $CONTAINER
         ;;
