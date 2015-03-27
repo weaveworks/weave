@@ -114,29 +114,35 @@ func main() {
 		log.Println("Communication between peers is encrypted.")
 	}
 
-	var logFrame func(string, []byte, *layers.Ethernet)
-	if debug {
-		logFrame = func(prefix string, frame []byte, eth *layers.Ethernet) {
-			h := fmt.Sprintf("%x", sha256.Sum256(frame))
-			if eth == nil {
-				log.Println(prefix, len(frame), "bytes (", h, ")")
-			} else {
-				log.Println(prefix, len(frame), "bytes (", h, "):", eth.SrcMAC, "->", eth.DstMAC)
-			}
-		}
-	} else {
-		logFrame = func(prefix string, frame []byte, eth *layers.Ethernet) {}
-	}
-
 	if prof != "" {
 		p := *profile.CPUProfile
 		p.ProfilePath = prof
 		defer profile.Start(&p).Stop()
 	}
 
-	router := weave.NewRouter(iface, ourName, nickName, pwSlice, connLimit, bufSz*1024*1024, logFrame)
+	router := weave.NewRouter(iface, ourName, nickName, pwSlice, connLimit, bufSz*1024*1024, logFrameFunc(debug))
 	log.Println("Our name is", router.Ourself.Name, "("+router.Ourself.NickName+")")
 	router.Start()
+	initiateConnections(router, peers)
+	go handleHTTP(router)
+	handleSignals(router)
+}
+
+func logFrameFunc(debug bool) func(string, []byte, *layers.Ethernet) {
+	if !debug {
+		return func(prefix string, frame []byte, eth *layers.Ethernet) {}
+	}
+	return func(prefix string, frame []byte, eth *layers.Ethernet) {
+		h := fmt.Sprintf("%x", sha256.Sum256(frame))
+		if eth == nil {
+			log.Println(prefix, len(frame), "bytes (", h, ")")
+		} else {
+			log.Println(prefix, len(frame), "bytes (", h, "):", eth.SrcMAC, "->", eth.DstMAC)
+		}
+	}
+}
+
+func initiateConnections(router *weave.Router, peers []string) {
 	for _, peer := range peers {
 		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
 			router.ConnectionMaker.InitiateConnection(addr.String())
@@ -144,8 +150,6 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	go handleHTTP(router)
-	handleSignals(router)
 }
 
 func handleHTTP(router *weave.Router) {
