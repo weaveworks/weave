@@ -149,6 +149,18 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 		}
 	})
 
+	return cm.connectToTargets(validTarget, ourConnectedTargets)
+}
+
+func (cm *ConnectionMaker) addTarget(address string) {
+	if _, found := cm.targets[address]; !found {
+		target := &Target{}
+		target.tryAfter, target.tryInterval = tryImmediately()
+		cm.targets[address] = target
+	}
+}
+
+func (cm *ConnectionMaker) connectToTargets(validTarget map[string]bool, ourConnectedTargets map[string]bool) time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
@@ -172,14 +184,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 		}
 	}
 	return after
-}
-
-func (cm *ConnectionMaker) addTarget(address string) {
-	if _, found := cm.targets[address]; !found {
-		target := &Target{}
-		target.tryAfter, target.tryInterval = tryImmediately()
-		cm.targets[address] = target
-	}
 }
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
