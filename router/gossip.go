@@ -140,15 +140,14 @@ func deliverGossipUnicast(channel *GossipChannel, srcName PeerName, origPayload 
 	if err := dec.Decode(&destName); err != nil {
 		return err
 	}
-	if channel.ourself.Name == destName {
-		var payload []byte
-		if err := dec.Decode(&payload); err != nil {
-			return err
-		}
-		return channel.gossiper.OnGossipUnicast(srcName, payload)
-	} else {
+	if channel.ourself.Name != destName {
 		return channel.relayGossipUnicast(destName, origPayload)
 	}
+	var payload []byte
+	if err := dec.Decode(&payload); err != nil {
+		return err
+	}
+	return channel.gossiper.OnGossipUnicast(srcName, payload)
 }
 
 func deliverGossipBroadcast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error {

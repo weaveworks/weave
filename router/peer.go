@@ -45,13 +45,13 @@ func (peer *Peer) Version() uint64 {
 func (peer *Peer) IncrementLocalRefCount() {
 	peer.Lock()
 	defer peer.Unlock()
-	peer.localRefCount += 1
+	peer.localRefCount++
 }
 
 func (peer *Peer) DecrementLocalRefCount() {
 	peer.Lock()
 	defer peer.Unlock()
-	peer.localRefCount -= 1
+	peer.localRefCount--
 }
 
 func (peer *Peer) IsLocallyReferenced() bool {
@@ -94,20 +94,20 @@ func (peer *Peer) addConnection(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	peer.connections[conn.Remote().Name] = conn
-	peer.version += 1
+	peer.version++
 }
 
 func (peer *Peer) deleteConnection(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	delete(peer.connections, conn.Remote().Name)
-	peer.version += 1
+	peer.version++
 }
 
 func (peer *Peer) connectionEstablished(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
-	peer.version += 1
+	peer.version++
 }
 
 // Calculate the routing table from this peer to all peers reachable

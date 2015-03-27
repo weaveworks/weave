@@ -87,7 +87,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	nameStr, _ := fv.Value("Name")
 	nickNameStr, _ := fv.Value("NickName")
 	uidStr, _ := fv.Value("UID")
-	remoteConnIdStr, _ := fv.Value("ConnID")
+	remoteConnIDStr, _ := fv.Value("ConnID")
 	if err := fv.Err(); err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	if err != nil {
 		return err
 	}
-	remoteConnID, err := strconv.ParseUint(remoteConnIdStr, 10, 64)
+	remoteConnID, err := strconv.ParseUint(remoteConnIDStr, 10, 64)
 	if err != nil {
 		return err
 	}

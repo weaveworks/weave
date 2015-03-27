@@ -45,7 +45,7 @@ func TestPeersEncoding(t *testing.T) {
 		peer[i], ps[i] = newNode(name)
 	}
 
-	conns := make([]struct{ from, to int }, 0)
+	var conns []struct{ from, to int }
 	for i := 0; i < numIters; i++ {
 		oper := rand.Intn(2)
 		switch oper {

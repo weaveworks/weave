@@ -9,7 +9,7 @@ const (
 	EthernetOverhead    = 14
 	UDPOverhead         = 28 // 20 bytes for IPv4, 8 bytes for UDP
 	Port                = 6783
-	HttpPort            = Port + 1
+	HTTPPort            = Port + 1
 	DefaultPMTU         = 65535
 	MaxUDPPacketSize    = 65536
 	ChannelSize         = 16

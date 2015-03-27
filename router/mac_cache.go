@@ -40,9 +40,8 @@ func (cache *MacCache) Enter(mac net.HardwareAddr, peer *Peer) bool {
 	if found && entry.peer == peer && now.Before(entry.lastSeen.Add(cache.maxAge/10)) {
 		cache.RUnlock()
 		return false
-	} else {
-		cache.RUnlock()
 	}
+	cache.RUnlock()
 	cache.Lock()
 	defer cache.Unlock()
 	entry, found = cache.table[key]

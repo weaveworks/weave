@@ -144,12 +144,11 @@ func (peers *Peers) String() string {
 
 func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
 	if existingPeer, found := peers.table[peer.Name]; found {
-		if existingPeer.UID == peer.UID {
-			existingPeer.IncrementLocalRefCount()
-			return existingPeer, true
-		} else {
+		if existingPeer.UID != peer.UID {
 			return nil, true
 		}
+		existingPeer.IncrementLocalRefCount()
+		return existingPeer, true
 	}
 	return nil, false
 }

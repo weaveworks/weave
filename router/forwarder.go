@@ -114,25 +114,25 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 			return nil
 		}
 		return FrameTooBigError{EPMTU: effectivePMTU}
-	} else {
-		if stackFrag || dec == nil || len(dec.decoded) < 2 {
-			forwardChan <- frame
-			return nil
-		}
-		// Don't have trustworthy stack, so we're going to have to
-		// send it DF in any case.
-		if !frameTooBig(frame, effectivePMTU) {
-			forwardChanDF <- frame
-			return nil
-		}
-		conn.Router.LogFrame("Fragmenting", frame.frame, &dec.eth)
-		// We can't trust the stack to fragment, we have IP, and we
-		// have a frame that's too big for the MTU, so we have to
-		// fragment it ourself.
-		return fragment(dec.eth, dec.ip, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
-			forwardChanDF <- segFrame
-		})
 	}
+
+	if stackFrag || dec == nil || len(dec.decoded) < 2 {
+		forwardChan <- frame
+		return nil
+	}
+	// Don't have trustworthy stack, so we're going to have to
+	// send it DF in any case.
+	if !frameTooBig(frame, effectivePMTU) {
+		forwardChanDF <- frame
+		return nil
+	}
+	conn.Router.LogFrame("Fragmenting", frame.frame, &dec.eth)
+	// We can't trust the stack to fragment, we have IP, and we
+	// have a frame that's too big for the MTU, so we have to
+	// fragment it ourself.
+	return fragment(dec.eth, dec.ip, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
+		forwardChanDF <- segFrame
+	})
 }
 
 func frameTooBig(frame *ForwardedFrame, effectivePMTU int) bool {

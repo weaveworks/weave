@@ -144,11 +144,11 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	go handleHttp(router)
+	go handleHTTP(router)
 	handleSignals(router)
 }
 
-func handleHttp(router *weave.Router) {
+func handleHTTP(router *weave.Router) {
 	encryption := "off"
 	if router.UsingPassword() {
 		encryption = "on"
@@ -178,7 +178,7 @@ func handleHttp(router *weave.Router) {
 
 	http.Handle("/", muxRouter)
 
-	address := fmt.Sprintf(":%d", weave.HttpPort)
+	address := fmt.Sprintf(":%d", weave.HTTPPort)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
 		log.Fatal("Unable to create http listener: ", err)

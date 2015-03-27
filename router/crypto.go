@@ -430,12 +430,11 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 	}
 	SetNonceLow15Bits(nonce, offsetNoFlags)
 	result, success := secretbox.Open(nil, buf[2:], nonce, nd.conn.SessionKey)
-	if success {
-		usedOffsets.Add(offsetNoFlagsInt)
-		return result, nil
-	} else {
+	if !success {
 		return nil, fmt.Errorf("Unable to decrypt UDP packet")
 	}
+	usedOffsets.Add(offsetNoFlagsInt)
+	return result, nil
 }
 
 // TCP Senders

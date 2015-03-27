@@ -122,7 +122,6 @@ func NormalisePeerAddr(peerAddr string) string {
 	_, _, err := net.SplitHostPort(peerAddr)
 	if err == nil {
 		return peerAddr
-	} else {
-		return fmt.Sprintf("%s:%d", peerAddr, Port)
 	}
+	return fmt.Sprintf("%s:%d", peerAddr, Port)
 }

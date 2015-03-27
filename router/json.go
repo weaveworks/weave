@@ -24,7 +24,7 @@ func (cache *MacCache) MarshalJSON() ([]byte, error) {
 		PeerName PeerName
 		LastSeen time.Time
 	}
-	entries := make([]*cacheEntry, 0)
+	var entries []*cacheEntry
 	for key, entry := range cache.table {
 		entries = append(entries, &cacheEntry{intmac(key).String(), entry.peer.Name, entry.lastSeen})
 	}
@@ -32,7 +32,7 @@ func (cache *MacCache) MarshalJSON() ([]byte, error) {
 }
 
 func (peers *Peers) MarshalJSON() ([]byte, error) {
-	ps := make([]*Peer, 0)
+	var ps []*Peer
 	peers.ForEach(func(_ PeerName, peer *Peer) { ps = append(ps, peer) })
 	return json.Marshal(ps)
 }
@@ -71,7 +71,7 @@ func (peer *Peer) MarshalJSON() ([]byte, error) {
 }
 
 func (conn *RemoteConnection) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct{ RemoteName, TcpAddr string }{conn.Remote().Name.String(), conn.RemoteTCPAddr()})
+	return json.Marshal(struct{ RemoteName, TCPAddr string }{conn.Remote().Name.String(), conn.RemoteTCPAddr()})
 }
 
 func (name PeerName) MarshalJSON() ([]byte, error) {
