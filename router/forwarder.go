@@ -40,22 +40,18 @@ func (conn *LocalConnection) ensureForwarders() error {
 	var (
 		forwardChan   = make(chan *ForwardedFrame, ChannelSize)
 		forwardChanDF = make(chan *ForwardedFrame, ChannelSize)
-		stopForward   = make(chan interface{}, 0)
-		stopForwardDF = make(chan interface{}, 0)
 		verifyPMTU    = make(chan int, ChannelSize)
 	)
 	//NB: only forwarderDF can ever encounter EMSGSIZE errors, and
 	//thus perform PMTU verification
-	forwarder := NewForwarder(conn, forwardChan, stopForward, nil, encryptor, udpSender, DefaultPMTU)
-	forwarderDF := NewForwarder(conn, forwardChanDF, stopForwardDF, verifyPMTU, encryptorDF, udpSenderDF, DefaultPMTU)
+	forwarder := NewForwarder(conn, forwardChan, nil, encryptor, udpSender, DefaultPMTU)
+	forwarderDF := NewForwarder(conn, forwardChanDF, verifyPMTU, encryptorDF, udpSenderDF, DefaultPMTU)
 
 	// Various fields in the conn struct are read by other processes,
 	// so we have to use locks.
 	conn.Lock()
 	conn.forwardChan = forwardChan
 	conn.forwardChanDF = forwardChanDF
-	conn.stopForward = stopForward
-	conn.stopForwardDF = stopForwardDF
 	conn.verifyPMTU = verifyPMTU
 	conn.effectivePMTU = forwarder.unverifiedPMTU
 	conn.Unlock()
@@ -68,16 +64,16 @@ func (conn *LocalConnection) ensureForwarders() error {
 
 func (conn *LocalConnection) stopForwarders() {
 	conn.Lock()
+	forwardChan := conn.forwardChan
+	forwardChanDF := conn.forwardChanDF
 	conn.forwardChan = nil
 	conn.forwardChanDF = nil
 	conn.Unlock()
 	// Now signal the forwarder loops to exit. They will drain the
 	// forwarder chans in order to unblock any router processes
 	// blocked on sending.
-	if conn.stopForward != nil {
-		conn.stopForward <- nil
-		conn.stopForwardDF <- nil
-	}
+	forwardChan <- nil
+	forwardChanDF <- nil
 }
 
 // Called from peer.Relay[Broadcast] which is itself invoked from
@@ -204,7 +200,6 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 type Forwarder struct {
 	conn            *LocalConnection
 	ch              <-chan *ForwardedFrame
-	stop            <-chan interface{}
 	verifyPMTUTick  <-chan time.Time
 	verifyPMTU      <-chan int
 	pmtuVerifyCount uint
@@ -217,11 +212,10 @@ type Forwarder struct {
 	lowestBadPMTU   int
 }
 
-func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, stop <-chan interface{}, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
+func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
 	fwd := &Forwarder{
 		conn:       conn,
 		ch:         ch,
-		stop:       stop,
 		verifyPMTU: verifyPMTU,
 		enc:        enc,
 		udpSender:  udpSender}
@@ -238,9 +232,6 @@ func (fwd *Forwarder) run() {
 	defer fwd.udpSender.Shutdown()
 	for {
 		select {
-		case <-fwd.stop:
-			fwd.drain()
-			return
 		case <-fwd.verifyPMTUTick:
 			// We only do this case here when we know the buffers are
 			// all empty so that we don't risk appending verify-frames
@@ -272,11 +263,17 @@ func (fwd *Forwarder) run() {
 				fwd.conn.Log("Effective PMTU verified at", epmtu)
 			}
 		case frame := <-fwd.ch:
+			if frame == nil {
+				fwd.drain()
+				return
+			}
 			if !fwd.appendFrame(frame) {
 				fwd.logDrop(frame)
 				continue
 			}
-			fwd.accumulateAndSendFrames()
+			if !fwd.accumulateAndSendFrames() {
+				return
+			}
 		}
 	}
 }
@@ -310,10 +307,14 @@ func (fwd *Forwarder) attemptVerifyEffectivePMTU() {
 // franes get sent to the forwarder, we can be going around this loop
 // forever. That is bad since there may be other stuff for us to do,
 // i.e. the other branches in of the run loop.
-func (fwd *Forwarder) accumulateAndSendFrames() {
+func (fwd *Forwarder) accumulateAndSendFrames() bool {
 	for {
 		select {
 		case frame := <-fwd.ch:
+			if frame == nil {
+				fwd.drain()
+				return false
+			}
 			if !fwd.appendFrame(frame) {
 				fwd.flush()
 				if !fwd.appendFrame(frame) {
@@ -322,7 +323,7 @@ func (fwd *Forwarder) accumulateAndSendFrames() {
 			}
 		default:
 			fwd.flush()
-			return
+			return true
 		}
 	}
 }
