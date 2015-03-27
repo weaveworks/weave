@@ -8,25 +8,28 @@ import (
 
 func (router *Router) GenerateStatusJSON(version, encryption string) ([]byte, error) {
 	return json.Marshal(struct {
-		Version         string
-		Encryption      string
-		Name, Interface string
-		Macs            *MacCache
-		Peers           *Peers
-		Routes          *Routes
-	}{version, encryption, router.Ourself.Name.String(), fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes})
+		Version    string
+		Encryption string
+		Name       string
+		NickName   string
+		Interface  string
+		Macs       *MacCache
+		Peers      *Peers
+		Routes     *Routes
+	}{version, encryption, router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes})
 	// leaving out ConectionMaker due to async complexities
 }
 
 func (cache *MacCache) MarshalJSON() ([]byte, error) {
 	type cacheEntry struct {
 		Mac      string
-		PeerName PeerName
+		Name     string
+		NickName string
 		LastSeen time.Time
 	}
 	var entries []*cacheEntry
 	for key, entry := range cache.table {
-		entries = append(entries, &cacheEntry{intmac(key).String(), entry.peer.Name, entry.lastSeen})
+		entries = append(entries, &cacheEntry{intmac(key).String(), entry.peer.Name.String(), entry.peer.NickName, entry.lastSeen})
 	}
 	return json.Marshal(entries)
 }
@@ -63,7 +66,7 @@ func (routes *Routes) MarshalJSON() ([]byte, error) {
 func (peer *Peer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Name        string
-		Nickname    string
+		NickName    string
 		UID         uint64
 		Version     uint64
 		Connections []Connection
@@ -71,7 +74,11 @@ func (peer *Peer) MarshalJSON() ([]byte, error) {
 }
 
 func (conn *RemoteConnection) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct{ RemoteName, TCPAddr string }{conn.Remote().Name.String(), conn.RemoteTCPAddr()})
+	return json.Marshal(struct {
+		Name     string
+		NickName string
+		TCPAddr  string
+	}{conn.Remote().Name.String(), conn.Remote().NickName, conn.RemoteTCPAddr()})
 }
 
 func (name PeerName) MarshalJSON() ([]byte, error) {
