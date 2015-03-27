@@ -216,7 +216,6 @@ func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {
 func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 	defer conn.Close()
 	dec := NewEthernetDecoder()
-	handleUDPPacket := router.handleUDPPacketFunc(dec, po)
 	buf := make([]byte, MaxUDPPacketSize)
 	for {
 		n, sender, err := conn.ReadFromUDP(buf)
@@ -240,7 +239,7 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 		if !ok {
 			continue
 		}
-		err = relayConn.Decryptor.IterateFrames(handleUDPPacket, packet, sender)
+		err = relayConn.Decryptor.IterateFrames(packet, router.handleUDPPacketFunc(dec, sender, po))
 		if pde, ok := err.(PacketDecodingError); ok {
 			if pde.Fatal {
 				relayConn.Shutdown(pde)
@@ -253,8 +252,8 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 	}
 }
 
-func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, po PacketSink) FrameConsumer {
-	return func(relayConn *LocalConnection, sender *net.UDPAddr, srcNameByte, dstNameByte []byte, frame []byte) {
+func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, sender *net.UDPAddr, po PacketSink) FrameConsumer {
+	return func(relayConn *LocalConnection, srcNameByte, dstNameByte []byte, frame []byte) {
 		srcPeer, found := router.Peers.Fetch(PeerNameFromBin(srcNameByte))
 		if !found {
 			return

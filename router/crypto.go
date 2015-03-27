@@ -11,7 +11,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
-	"net"
 	"sync"
 )
 
@@ -244,10 +243,10 @@ func (ne *NaClEncryptor) TotalLen() int {
 
 // Frame Decryptors
 
-type FrameConsumer func(conn *LocalConnection, sender *net.UDPAddr, src []byte, dst []byte, frame []byte)
+type FrameConsumer func(conn *LocalConnection, src []byte, dst []byte, frame []byte)
 
 type Decryptor interface {
-	IterateFrames(FrameConsumer, []byte, *net.UDPAddr) error
+	IterateFrames([]byte, FrameConsumer) error
 	ReceiveNonce([]byte)
 	Shutdown()
 }
@@ -280,7 +279,7 @@ func NewNonDecryptor(conn *LocalConnection) *NonDecryptor {
 	return &NonDecryptor{conn: conn}
 }
 
-func (nd *NonDecryptor) IterateFrames(consumer FrameConsumer, packet []byte, sender *net.UDPAddr) error {
+func (nd *NonDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) error {
 	for len(packet) >= (2 + NameSize + NameSize) {
 		srcNameByte := packet[:NameSize]
 		packet = packet[NameSize:]
@@ -293,7 +292,7 @@ func (nd *NonDecryptor) IterateFrames(consumer FrameConsumer, packet []byte, sen
 		}
 		frame := packet[:length]
 		packet = packet[length:]
-		consumer(nd.conn, sender, srcNameByte, dstNameByte, frame)
+		consumer(nd.conn, srcNameByte, dstNameByte, frame)
 	}
 	if len(packet) > 0 {
 		return PacketDecodingError{Desc: fmt.Sprintf("%d octets of trailing garbage", len(packet))}
@@ -343,12 +342,12 @@ func (nd *NaClDecryptor) ReceiveNonce(msg []byte) {
 	}
 }
 
-func (nd *NaClDecryptor) IterateFrames(consumer FrameConsumer, packet []byte, sender *net.UDPAddr) error {
+func (nd *NaClDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) error {
 	buf, err := nd.decrypt(packet)
 	if err != nil {
 		return PacketDecodingError{Fatal: true, Desc: fmt.Sprint("decryption failed; ", err)}
 	}
-	return nd.NonDecryptor.IterateFrames(consumer, buf, sender)
+	return nd.NonDecryptor.IterateFrames(buf, consumer)
 }
 
 func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
