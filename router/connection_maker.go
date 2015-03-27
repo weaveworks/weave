@@ -132,7 +132,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 
 	// Add targets for peers that someone else is connected to, but we
 	// aren't
-	cm.peers.ForEach(func(name PeerName, peer *Peer) {
+	cm.peers.ForEach(func(peer *Peer) {
 		for _, conn := range peer.Connections() {
 			otherPeer := conn.Remote().Name
 			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] {
