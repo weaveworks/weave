@@ -308,24 +308,14 @@ func (nd *NonDecryptor) ReceiveNonce(msg []byte) {
 }
 
 func NewNaClDecryptor(conn *LocalConnection) *NaClDecryptor {
-	inst := NaClDecryptorInstance{
-		nonce:               nil,
-		previousNonce:       nil,
-		usedOffsets:         bit.New(),
-		previousUsedOffsets: nil,
-		highestOffsetSeen:   0,
-		nonceChan:           make(chan *[24]byte, ChannelSize)}
-	instDF := NaClDecryptorInstance{
-		nonce:               nil,
-		previousNonce:       nil,
-		usedOffsets:         bit.New(),
-		previousUsedOffsets: nil,
-		highestOffsetSeen:   0,
-		nonceChan:           make(chan *[24]byte, ChannelSize)}
 	return &NaClDecryptor{
 		NonDecryptor: *NewNonDecryptor(conn),
-		instance:     &inst,
-		instanceDF:   &instDF}
+		instance: &NaClDecryptorInstance{
+			usedOffsets: bit.New(),
+			nonceChan:   make(chan *[24]byte, ChannelSize)},
+		instanceDF: &NaClDecryptorInstance{
+			usedOffsets: bit.New(),
+			nonceChan:   make(chan *[24]byte, ChannelSize)}}
 }
 
 func (nd *NaClDecryptor) Shutdown() {
