@@ -38,20 +38,24 @@ func (conn *LocalConnection) ensureForwarders() error {
 	}
 
 	var (
-		forwardChan   = make(chan *ForwardedFrame, ChannelSize)
-		forwardChanDF = make(chan *ForwardedFrame, ChannelSize)
-		verifyPMTU    = make(chan int, ChannelSize)
+		forwardChan       = make(chan *ForwardedFrame, ChannelSize)
+		forwardChanDF     = make(chan *ForwardedFrame, ChannelSize)
+		forwardFinished   = make(chan struct{})
+		forwardFinishedDF = make(chan struct{})
+		verifyPMTU        = make(chan int, ChannelSize)
 	)
 	//NB: only forwarderDF can ever encounter EMSGSIZE errors, and
 	//thus perform PMTU verification
-	forwarder := NewForwarder(conn, forwardChan, nil, encryptor, udpSender, DefaultPMTU)
-	forwarderDF := NewForwarder(conn, forwardChanDF, verifyPMTU, encryptorDF, udpSenderDF, DefaultPMTU)
+	forwarder := NewForwarder(conn, forwardChan, forwardFinished, nil, encryptor, udpSender, DefaultPMTU)
+	forwarderDF := NewForwarder(conn, forwardChanDF, forwardFinishedDF, verifyPMTU, encryptorDF, udpSenderDF, DefaultPMTU)
 
 	// Various fields in the conn struct are read by other processes,
 	// so we have to use locks.
 	conn.Lock()
 	conn.forwardChan = forwardChan
 	conn.forwardChanDF = forwardChanDF
+	conn.forwardFinished = forwardFinished
+	conn.forwardFinishedDF = forwardFinishedDF
 	conn.verifyPMTU = verifyPMTU
 	conn.effectivePMTU = forwarder.unverifiedPMTU
 	conn.Unlock()
@@ -63,17 +67,8 @@ func (conn *LocalConnection) ensureForwarders() error {
 }
 
 func (conn *LocalConnection) stopForwarders() {
-	conn.Lock()
-	forwardChan := conn.forwardChan
-	forwardChanDF := conn.forwardChanDF
-	conn.forwardChan = nil
-	conn.forwardChanDF = nil
-	conn.Unlock()
-	// Now signal the forwarder loops to exit. They will drain the
-	// forwarder chans in order to unblock any router processes
-	// blocked on sending.
-	forwardChan <- nil
-	forwardChanDF <- nil
+	conn.forwardChan <- nil
+	conn.forwardChanDF <- nil
 }
 
 // Called from peer.Relay[Broadcast] which is itself invoked from
@@ -83,17 +78,15 @@ func (conn *LocalConnection) stopForwarders() {
 func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *EthernetDecoder) error {
 	conn.RLock()
 	var (
-		forwardChan   = conn.forwardChan
-		forwardChanDF = conn.forwardChanDF
-		effectivePMTU = conn.effectivePMTU
-		stackFrag     = conn.stackFrag
+		forwardChan       = conn.forwardChan
+		forwardChanDF     = conn.forwardChanDF
+		forwardFinished   = conn.forwardFinished
+		forwardFinishedDF = conn.forwardFinishedDF
+		effectivePMTU     = conn.effectivePMTU
+		stackFrag         = conn.stackFrag
 	)
 	conn.RUnlock()
 
-	if forwardChan == nil || forwardChanDF == nil {
-		conn.Log("Cannot forward frame yet - awaiting contact")
-		return nil
-	}
 	// We could use non-blocking channel sends here, i.e. drop frames
 	// on the floor when the forwarder is busy. This would allow our
 	// caller - the capturing loop in the router - to read frames more
@@ -106,20 +99,20 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 	// of our pipeline.
 	if df {
 		if !frameTooBig(frame, effectivePMTU) {
-			forwardChanDF <- frame
+			forward(forwardChanDF, forwardFinishedDF, frame)
 			return nil
 		}
 		return FrameTooBigError{EPMTU: effectivePMTU}
 	}
 
 	if stackFrag || dec == nil || len(dec.decoded) < 2 {
-		forwardChan <- frame
+		forward(forwardChan, forwardFinished, frame)
 		return nil
 	}
 	// Don't have trustworthy stack, so we're going to have to
 	// send it DF in any case.
 	if !frameTooBig(frame, effectivePMTU) {
-		forwardChanDF <- frame
+		forward(forwardChanDF, forwardFinishedDF, frame)
 		return nil
 	}
 	conn.Router.LogFrame("Fragmenting", frame.frame, &dec.eth)
@@ -127,8 +120,15 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 	// have a frame that's too big for the MTU, so we have to
 	// fragment it ourself.
 	return fragment(dec.eth, dec.ip, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
-		forwardChanDF <- segFrame
+		forward(forwardChanDF, forwardFinishedDF, segFrame)
 	})
+}
+
+func forward(ch chan<- *ForwardedFrame, finished <-chan struct{}, frame *ForwardedFrame) {
+	select {
+	case ch <- frame:
+	case <-finished:
+	}
 }
 
 func frameTooBig(frame *ForwardedFrame, effectivePMTU int) bool {
@@ -200,6 +200,7 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 type Forwarder struct {
 	conn            *LocalConnection
 	ch              <-chan *ForwardedFrame
+	finished        chan<- struct{}
 	verifyPMTUTick  <-chan time.Time
 	verifyPMTU      <-chan int
 	pmtuVerifyCount uint
@@ -212,10 +213,11 @@ type Forwarder struct {
 	lowestBadPMTU   int
 }
 
-func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
+func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, finished chan<- struct{}, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
 	fwd := &Forwarder{
 		conn:       conn,
 		ch:         ch,
+		finished:   finished,
 		verifyPMTU: verifyPMTU,
 		enc:        enc,
 		udpSender:  udpSender}
@@ -264,6 +266,7 @@ func (fwd *Forwarder) run() {
 			}
 		case frame := <-fwd.ch:
 			if !fwd.accumulateAndSendFrames(frame) {
+				close(fwd.finished)
 				return
 			}
 		}
@@ -298,7 +301,6 @@ func (fwd *Forwarder) attemptVerifyEffectivePMTU() {
 // i.e. the other branches in the run loop.
 func (fwd *Forwarder) accumulateAndSendFrames(frame *ForwardedFrame) bool {
 	if frame == nil {
-		fwd.drain()
 		return false
 	}
 	if !fwd.appendFrame(frame) {
@@ -312,7 +314,6 @@ func (fwd *Forwarder) accumulateAndSendFrames(frame *ForwardedFrame) bool {
 		select {
 		case frame = <-fwd.ch:
 			if frame == nil {
-				fwd.drain()
 				return false
 			}
 			if !fwd.appendFrame(frame) {
@@ -356,19 +357,6 @@ func (fwd *Forwarder) flush() {
 			// TODO handle this better
 		} else {
 			fwd.conn.Shutdown(err)
-		}
-	}
-}
-
-func (fwd *Forwarder) drain() {
-	// We want to drain before exiting otherwise we could get the
-	// packet sniffer or udp listener blocked on sending to a full
-	// chan
-	for {
-		select {
-		case <-fwd.ch:
-		default:
-			return
 		}
 	}
 }

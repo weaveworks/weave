@@ -53,6 +53,8 @@ type LocalConnection struct {
 	fragTest          *time.Ticker
 	forwardChan       chan<- *ForwardedFrame
 	forwardChanDF     chan<- *ForwardedFrame
+	forwardFinished   <-chan struct{}
+	forwardFinishedDF <-chan struct{}
 	verifyPMTU        chan<- int
 	Decryptor         Decryptor
 	Router            *Router
