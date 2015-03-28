@@ -360,22 +360,36 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 	} else {
 		decState = nd.instance
 	}
-	var nonce *[24]byte
-	var usedOffsets *bit.Set
+	nonce, usedOffsets, err := decState.advanceState(offsetNoFlags)
+	if err != nil {
+		return nil, err
+	}
+	offsetNoFlagsInt := int(offsetNoFlags)
+	if usedOffsets.Contains(offsetNoFlagsInt) {
+		return nil, fmt.Errorf("Suspected replay attack detected when decrypting UDP packet")
+	}
+	SetNonceLow15Bits(nonce, offsetNoFlags)
+	result, success := secretbox.Open(nil, buf[2:], nonce, nd.conn.SessionKey)
+	if !success {
+		return nil, fmt.Errorf("Unable to decrypt UDP packet")
+	}
+	usedOffsets.Add(offsetNoFlagsInt)
+	return result, nil
+}
+
+func (decState *NaClDecryptorInstance) advanceState(offsetNoFlags uint16) (*[24]byte, *bit.Set, error) {
 	var ok bool
 	if decState.nonce == nil {
 		if offsetNoFlags > (1 << 13) {
 			// offset is already beyond the first quarter and it's the
 			// first thing we've seen?! I don't think so.
-			return nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
+			return nil, nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
 		}
 		decState.nonce, ok = <-decState.nonceChan
 		if !ok {
-			return nil, fmt.Errorf("Nonce chan closed")
+			return nil, nil, fmt.Errorf("Nonce chan closed")
 		}
 		decState.highestOffsetSeen = offsetNoFlags
-		nonce = decState.nonce
-		usedOffsets = decState.usedOffsets
 	} else {
 		highestOffsetSeen := decState.highestOffsetSeen
 		switch {
@@ -389,48 +403,31 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 			decState.previousNonce = decState.nonce
 			decState.nonce, ok = <-decState.nonceChan
 			if !ok {
-				return nil, fmt.Errorf("Nonce chan closed")
+				return nil, nil, fmt.Errorf("Nonce chan closed")
 			}
 			decState.highestOffsetSeen = offsetNoFlags
-			nonce = decState.nonce
-			usedOffsets = decState.usedOffsets
 		case offsetNoFlags > highestOffsetSeen &&
 			(offsetNoFlags-highestOffsetSeen) < (1<<13):
 			// offset is under a quarter above highestOffsetSeen. This
 			// is ok - maybe some packet loss
 			decState.highestOffsetSeen = offsetNoFlags
-			nonce = decState.nonce
-			usedOffsets = decState.usedOffsets
 		case offsetNoFlags <= highestOffsetSeen &&
 			(highestOffsetSeen-offsetNoFlags) < (1<<13):
 			// offset is within a quarter of the highest we've
 			// seen. This is ok - just assuming some out-of-order
 			// delivery.
-			nonce = decState.nonce
-			usedOffsets = decState.usedOffsets
 		case highestOffsetSeen < (1<<13) && offsetNoFlags > ((1<<14)+(1<<13)) &&
 			(offsetNoFlags-highestOffsetSeen) > ((1<<14)+(1<<13)):
 			// offset is in the last quarter, highestOffsetSeen is in
 			// the first quarter, and offset is under a quarter behind
 			// us. This is ok - as above, just some out of order. But
 			// here it means we're dealing with the previous nonce
-			nonce = decState.previousNonce
-			usedOffsets = decState.previousUsedOffsets
+			return decState.previousNonce, decState.previousUsedOffsets, nil
 		default:
-			return nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
+			return nil, nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
 		}
 	}
-	offsetNoFlagsInt := int(offsetNoFlags)
-	if usedOffsets.Contains(offsetNoFlagsInt) {
-		return nil, fmt.Errorf("Suspected replay attack detected when decrypting UDP packet")
-	}
-	SetNonceLow15Bits(nonce, offsetNoFlags)
-	result, success := secretbox.Open(nil, buf[2:], nonce, nd.conn.SessionKey)
-	if !success {
-		return nil, fmt.Errorf("Unable to decrypt UDP packet")
-	}
-	usedOffsets.Add(offsetNoFlagsInt)
-	return result, nil
+	return decState.nonce, decState.usedOffsets, nil
 }
 
 // TCP Senders
