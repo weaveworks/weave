@@ -344,13 +344,13 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 	offset := binary.BigEndian.Uint16(buf[:2])
 	df := (offset & (1 << 15)) != 0
 	offsetNoFlags := offset & ((1 << 15) - 1)
-	var decState *NaClDecryptorInstance
+	var di *NaClDecryptorInstance
 	if df {
-		decState = nd.instanceDF
+		di = nd.instanceDF
 	} else {
-		decState = nd.instance
+		di = nd.instance
 	}
-	nonce, usedOffsets, err := decState.advanceState(offsetNoFlags)
+	nonce, usedOffsets, err := di.advanceState(offsetNoFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -367,40 +367,40 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 	return result, nil
 }
 
-func (decState *NaClDecryptorInstance) advanceState(offsetNoFlags uint16) (*[24]byte, *bit.Set, error) {
+func (di *NaClDecryptorInstance) advanceState(offsetNoFlags uint16) (*[24]byte, *bit.Set, error) {
 	var ok bool
-	if decState.nonce == nil {
+	if di.nonce == nil {
 		if offsetNoFlags > (1 << 13) {
 			// offset is already beyond the first quarter and it's the
 			// first thing we've seen?! I don't think so.
 			return nil, nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
 		}
-		decState.nonce, ok = <-decState.nonceChan
+		di.nonce, ok = <-di.nonceChan
 		if !ok {
 			return nil, nil, fmt.Errorf("Nonce chan closed")
 		}
-		decState.highestOffsetSeen = offsetNoFlags
+		di.highestOffsetSeen = offsetNoFlags
 	} else {
-		highestOffsetSeen := decState.highestOffsetSeen
+		highestOffsetSeen := di.highestOffsetSeen
 		switch {
 		case offsetNoFlags < (1<<13) && highestOffsetSeen > ((1<<14)+(1<<13)) &&
 			(highestOffsetSeen-offsetNoFlags) > ((1<<14)+(1<<13)):
 			// offset is in the first quarter, highestOffsetSeen is in
 			// the top quarter and under a quarter behind us. We
 			// interpret this as we need to move to the next nonce
-			decState.previousUsedOffsets = decState.usedOffsets
-			decState.usedOffsets = bit.New()
-			decState.previousNonce = decState.nonce
-			decState.nonce, ok = <-decState.nonceChan
+			di.previousUsedOffsets = di.usedOffsets
+			di.usedOffsets = bit.New()
+			di.previousNonce = di.nonce
+			di.nonce, ok = <-di.nonceChan
 			if !ok {
 				return nil, nil, fmt.Errorf("Nonce chan closed")
 			}
-			decState.highestOffsetSeen = offsetNoFlags
+			di.highestOffsetSeen = offsetNoFlags
 		case offsetNoFlags > highestOffsetSeen &&
 			(offsetNoFlags-highestOffsetSeen) < (1<<13):
 			// offset is under a quarter above highestOffsetSeen. This
 			// is ok - maybe some packet loss
-			decState.highestOffsetSeen = offsetNoFlags
+			di.highestOffsetSeen = offsetNoFlags
 		case offsetNoFlags <= highestOffsetSeen &&
 			(highestOffsetSeen-offsetNoFlags) < (1<<13):
 			// offset is within a quarter of the highest we've
@@ -412,12 +412,12 @@ func (decState *NaClDecryptorInstance) advanceState(offsetNoFlags uint16) (*[24]
 			// the first quarter, and offset is under a quarter behind
 			// us. This is ok - as above, just some out of order. But
 			// here it means we're dealing with the previous nonce
-			return decState.previousNonce, decState.previousUsedOffsets, nil
+			return di.previousNonce, di.previousUsedOffsets, nil
 		default:
 			return nil, nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
 		}
 	}
-	return decState.nonce, decState.usedOffsets, nil
+	return di.nonce, di.usedOffsets, nil
 }
 
 // TCP Senders
