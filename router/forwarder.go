@@ -87,6 +87,10 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 	)
 	conn.RUnlock()
 
+	if forwardChan == nil || forwardChanDF == nil {
+		conn.Log("Cannot forward frame yet - awaiting contact")
+		return nil
+	}
 	// We could use non-blocking channel sends here, i.e. drop frames
 	// on the floor when the forwarder is busy. This would allow our
 	// caller - the capturing loop in the router - to read frames more
