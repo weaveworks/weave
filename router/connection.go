@@ -53,7 +53,6 @@ type LocalConnection struct {
 	fragTest          *time.Ticker
 	forwarder         *Forwarder
 	forwarderDF       *Forwarder
-	verifyPMTU        chan<- int
 	Decryptor         Decryptor
 	Router            *Router
 	uid               uint64
@@ -164,6 +163,16 @@ func (conn *LocalConnection) setStackFrag(frag bool) {
 	conn.Lock()
 	defer conn.Unlock()
 	conn.stackFrag = frag
+}
+
+// Called by the connection's TCP receiver process.
+func (conn *LocalConnection) pmtuVerified(pmtu int) {
+	conn.RLock()
+	fwd := conn.forwarderDF
+	conn.RUnlock()
+	if fwd != nil {
+		fwd.PMTUVerified(pmtu)
+	}
 }
 
 // Send directly, not via the Actor.  If it goes via the Actor we can
@@ -440,7 +449,7 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 		}
 		conn.Decryptor.ReceiveNonce(payload)
 	case ProtocolPMTUVerified:
-		conn.verifyPMTU <- int(binary.BigEndian.Uint16(payload))
+		conn.pmtuVerified(int(binary.BigEndian.Uint16(payload)))
 	case ProtocolGossipUnicast:
 		return conn.Router.handleGossip(payload, deliverGossipUnicast)
 	case ProtocolGossipBroadcast:

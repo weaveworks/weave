@@ -37,22 +37,20 @@ func (conn *LocalConnection) ensureForwarders() error {
 		encryptorDF = NewNonEncryptor(conn.local.NameByte)
 	}
 
-	verifyPMTU := make(chan int, ChannelSize)
-
+	forwarder := NewForwarder(conn, encryptor, udpSender, DefaultPMTU)
+	forwarderDF := NewForwarder(conn, encryptorDF, udpSenderDF, DefaultPMTU)
+	effectivePMTU := forwarderDF.unverifiedPMTU
 	//NB: only forwarderDF can ever encounter EMSGSIZE errors, and
 	//thus perform PMTU verification
-	forwarder := NewForwarder(conn, nil, encryptor, udpSender, DefaultPMTU)
-	forwarderDF := NewForwarder(conn, verifyPMTU, encryptorDF, udpSenderDF, DefaultPMTU)
-	forwarder.Start()
-	forwarderDF.Start()
+	forwarder.Start(nil)
+	forwarderDF.Start(make(chan int, ChannelSize))
 
 	// Various fields in the conn struct are read by other processes,
 	// so we have to use locks.
 	conn.Lock()
 	conn.forwarder = forwarder
 	conn.forwarderDF = forwarderDF
-	conn.verifyPMTU = verifyPMTU
-	conn.effectivePMTU = forwarder.unverifiedPMTU
+	conn.effectivePMTU = effectivePMTU
 	conn.Unlock()
 
 	return nil
@@ -192,7 +190,7 @@ type Forwarder struct {
 	ch              chan<- *ForwardedFrame
 	finished        <-chan struct{}
 	verifyPMTUTick  <-chan time.Time
-	verifyPMTU      <-chan int
+	verifyPMTU      chan<- int
 	pmtuVerifyCount uint
 	enc             Encryptor
 	udpSender       UDPSender
@@ -203,23 +201,23 @@ type Forwarder struct {
 	lowestBadPMTU   int
 }
 
-func NewForwarder(conn *LocalConnection, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
+func NewForwarder(conn *LocalConnection, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
 	fwd := &Forwarder{
-		conn:       conn,
-		verifyPMTU: verifyPMTU,
-		enc:        enc,
-		udpSender:  udpSender}
+		conn:      conn,
+		enc:       enc,
+		udpSender: udpSender}
 	fwd.unverifiedPMTU = pmtu - fwd.effectiveOverhead()
 	fwd.maxPayload = pmtu - UDPOverhead
 	return fwd
 }
 
-func (fwd *Forwarder) Start() {
+func (fwd *Forwarder) Start(verifyPMTU chan int) {
 	ch := make(chan *ForwardedFrame, ChannelSize)
 	fwd.ch = ch
 	finished := make(chan struct{})
 	fwd.finished = finished
-	go fwd.run(ch, finished)
+	fwd.verifyPMTU = verifyPMTU
+	go fwd.run(ch, finished, verifyPMTU)
 }
 
 func (fwd *Forwarder) Shutdown() {
@@ -233,7 +231,14 @@ func (fwd *Forwarder) Forward(frame *ForwardedFrame) {
 	}
 }
 
-func (fwd *Forwarder) run(ch <-chan *ForwardedFrame, finished chan<- struct{}) {
+func (fwd *Forwarder) PMTUVerified(pmtu int) {
+	select {
+	case fwd.verifyPMTU <- pmtu:
+	case <-fwd.finished:
+	}
+}
+
+func (fwd *Forwarder) run(ch <-chan *ForwardedFrame, finished chan<- struct{}, verifyPMTU <-chan int) {
 	defer fwd.udpSender.Shutdown()
 	for {
 		select {
@@ -254,7 +259,7 @@ func (fwd *Forwarder) run(ch <-chan *ForwardedFrame, finished chan<- struct{}) {
 				fwd.lowestBadPMTU = fwd.unverifiedPMTU
 				fwd.verifyEffectivePMTU((fwd.highestGoodPMTU + fwd.lowestBadPMTU) / 2)
 			}
-		case epmtu := <-fwd.verifyPMTU:
+		case epmtu := <-verifyPMTU:
 			if fwd.pmtuVerified || epmtu != fwd.unverifiedPMTU {
 				continue
 			}
