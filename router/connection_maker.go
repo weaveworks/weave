@@ -136,7 +136,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 		for _, conn := range peer.Connections() {
 			otherPeer := conn.Remote().Name
 			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] {
-				return
+				continue
 			}
 			address := conn.RemoteTCPAddr()
 			// try both portnumber of connection and standard port.  Don't use remote side of inbound connection.

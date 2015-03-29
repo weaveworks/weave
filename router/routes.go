@@ -132,11 +132,11 @@ func (routes *Routes) calculateBroadcast() map[PeerName][]PeerName {
 			// locking.
 			for _, conn := range ourself.Connections() {
 				if !conn.Established() {
-					return
+					continue
 				}
 				remoteName := conn.Remote().Name
 				if _, found := reached[remoteName]; found {
-					return
+					continue
 				}
 				if remoteConn, found := conn.Remote().ConnectionTo(ourself.Name); found && remoteConn.Established() {
 					hops = append(hops, remoteName)
