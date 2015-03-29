@@ -18,7 +18,7 @@ type FrameTooBigError struct {
 }
 
 func (conn *LocalConnection) ensureForwarders() error {
-	if conn.forwardChan != nil || conn.forwardChanDF != nil {
+	if conn.forwarder != nil || conn.forwarderDF != nil {
 		return nil
 	}
 	udpSender := NewSimpleUDPSender(conn)
@@ -37,38 +37,33 @@ func (conn *LocalConnection) ensureForwarders() error {
 		encryptorDF = NewNonEncryptor(conn.local.NameByte)
 	}
 
-	var (
-		forwardChan       = make(chan *ForwardedFrame, ChannelSize)
-		forwardChanDF     = make(chan *ForwardedFrame, ChannelSize)
-		forwardFinished   = make(chan struct{})
-		forwardFinishedDF = make(chan struct{})
-		verifyPMTU        = make(chan int, ChannelSize)
-	)
+	verifyPMTU := make(chan int, ChannelSize)
+
 	//NB: only forwarderDF can ever encounter EMSGSIZE errors, and
 	//thus perform PMTU verification
-	forwarder := NewForwarder(conn, forwardChan, forwardFinished, nil, encryptor, udpSender, DefaultPMTU)
-	forwarderDF := NewForwarder(conn, forwardChanDF, forwardFinishedDF, verifyPMTU, encryptorDF, udpSenderDF, DefaultPMTU)
+	forwarder := NewForwarder(conn, nil, encryptor, udpSender, DefaultPMTU)
+	forwarderDF := NewForwarder(conn, verifyPMTU, encryptorDF, udpSenderDF, DefaultPMTU)
+	forwarder.Start()
+	forwarderDF.Start()
 
 	// Various fields in the conn struct are read by other processes,
 	// so we have to use locks.
 	conn.Lock()
-	conn.forwardChan = forwardChan
-	conn.forwardChanDF = forwardChanDF
-	conn.forwardFinished = forwardFinished
-	conn.forwardFinishedDF = forwardFinishedDF
+	conn.forwarder = forwarder
+	conn.forwarderDF = forwarderDF
 	conn.verifyPMTU = verifyPMTU
 	conn.effectivePMTU = forwarder.unverifiedPMTU
 	conn.Unlock()
-
-	forwarder.Start()
-	forwarderDF.Start()
 
 	return nil
 }
 
 func (conn *LocalConnection) stopForwarders() {
-	conn.forwardChan <- nil
-	conn.forwardChanDF <- nil
+	if conn.forwarder == nil || conn.forwarderDF == nil {
+		return
+	}
+	conn.forwarder.Shutdown()
+	conn.forwarderDF.Shutdown()
 }
 
 // Called from peer.Relay[Broadcast] which is itself invoked from
@@ -78,16 +73,14 @@ func (conn *LocalConnection) stopForwarders() {
 func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *EthernetDecoder) error {
 	conn.RLock()
 	var (
-		forwardChan       = conn.forwardChan
-		forwardChanDF     = conn.forwardChanDF
-		forwardFinished   = conn.forwardFinished
-		forwardFinishedDF = conn.forwardFinishedDF
-		effectivePMTU     = conn.effectivePMTU
-		stackFrag         = conn.stackFrag
+		forwarder     = conn.forwarder
+		forwarderDF   = conn.forwarderDF
+		effectivePMTU = conn.effectivePMTU
+		stackFrag     = conn.stackFrag
 	)
 	conn.RUnlock()
 
-	if forwardChan == nil || forwardChanDF == nil {
+	if forwarder == nil || forwarderDF == nil {
 		conn.Log("Cannot forward frame yet - awaiting contact")
 		return nil
 	}
@@ -103,20 +96,20 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 	// of our pipeline.
 	if df {
 		if !frameTooBig(frame, effectivePMTU) {
-			forward(forwardChanDF, forwardFinishedDF, frame)
+			forwarderDF.Forward(frame)
 			return nil
 		}
 		return FrameTooBigError{EPMTU: effectivePMTU}
 	}
 
 	if stackFrag || dec == nil || len(dec.decoded) < 2 {
-		forward(forwardChan, forwardFinished, frame)
+		forwarder.Forward(frame)
 		return nil
 	}
 	// Don't have trustworthy stack, so we're going to have to
 	// send it DF in any case.
 	if !frameTooBig(frame, effectivePMTU) {
-		forward(forwardChanDF, forwardFinishedDF, frame)
+		forwarderDF.Forward(frame)
 		return nil
 	}
 	conn.Router.LogFrame("Fragmenting", frame.frame, &dec.eth)
@@ -124,15 +117,8 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 	// have a frame that's too big for the MTU, so we have to
 	// fragment it ourself.
 	return fragment(dec.eth, dec.ip, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
-		forward(forwardChanDF, forwardFinishedDF, segFrame)
+		forwarderDF.Forward(segFrame)
 	})
-}
-
-func forward(ch chan<- *ForwardedFrame, finished <-chan struct{}, frame *ForwardedFrame) {
-	select {
-	case ch <- frame:
-	case <-finished:
-	}
 }
 
 func frameTooBig(frame *ForwardedFrame, effectivePMTU int) bool {
@@ -203,8 +189,8 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int, frame *ForwardedFra
 
 type Forwarder struct {
 	conn            *LocalConnection
-	ch              <-chan *ForwardedFrame
-	finished        chan<- struct{}
+	ch              chan<- *ForwardedFrame
+	finished        <-chan struct{}
 	verifyPMTUTick  <-chan time.Time
 	verifyPMTU      <-chan int
 	pmtuVerifyCount uint
@@ -217,11 +203,9 @@ type Forwarder struct {
 	lowestBadPMTU   int
 }
 
-func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, finished chan<- struct{}, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
+func NewForwarder(conn *LocalConnection, verifyPMTU <-chan int, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
 	fwd := &Forwarder{
 		conn:       conn,
-		ch:         ch,
-		finished:   finished,
 		verifyPMTU: verifyPMTU,
 		enc:        enc,
 		udpSender:  udpSender}
@@ -231,10 +215,25 @@ func NewForwarder(conn *LocalConnection, ch <-chan *ForwardedFrame, finished cha
 }
 
 func (fwd *Forwarder) Start() {
-	go fwd.run()
+	ch := make(chan *ForwardedFrame, ChannelSize)
+	fwd.ch = ch
+	finished := make(chan struct{})
+	fwd.finished = finished
+	go fwd.run(ch, finished)
 }
 
-func (fwd *Forwarder) run() {
+func (fwd *Forwarder) Shutdown() {
+	fwd.ch <- nil
+}
+
+func (fwd *Forwarder) Forward(frame *ForwardedFrame) {
+	select {
+	case fwd.ch <- frame:
+	case <-fwd.finished:
+	}
+}
+
+func (fwd *Forwarder) run(ch <-chan *ForwardedFrame, finished chan<- struct{}) {
 	defer fwd.udpSender.Shutdown()
 	for {
 		select {
@@ -268,9 +267,9 @@ func (fwd *Forwarder) run() {
 				fwd.conn.setEffectivePMTU(epmtu)
 				fwd.conn.Log("Effective PMTU verified at", epmtu)
 			}
-		case frame := <-fwd.ch:
-			if !fwd.accumulateAndSendFrames(frame) {
-				close(fwd.finished)
+		case frame := <-ch:
+			if !fwd.accumulateAndSendFrames(ch, frame) {
+				close(finished)
 				return
 			}
 		}
@@ -303,7 +302,7 @@ func (fwd *Forwarder) attemptVerifyEffectivePMTU() {
 // franes get sent to the forwarder, we can be going around this loop
 // forever. That is bad since there may be other stuff for us to do,
 // i.e. the other branches in the run loop.
-func (fwd *Forwarder) accumulateAndSendFrames(frame *ForwardedFrame) bool {
+func (fwd *Forwarder) accumulateAndSendFrames(ch <-chan *ForwardedFrame, frame *ForwardedFrame) bool {
 	if frame == nil {
 		return false
 	}
@@ -316,7 +315,7 @@ func (fwd *Forwarder) accumulateAndSendFrames(frame *ForwardedFrame) bool {
 	}
 	for {
 		select {
-		case frame = <-fwd.ch:
+		case frame = <-ch:
 			if frame == nil {
 				return false
 			}

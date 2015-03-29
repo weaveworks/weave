@@ -51,10 +51,8 @@ type LocalConnection struct {
 	heartbeatFrame    *ForwardedFrame
 	heartbeat         *time.Ticker
 	fragTest          *time.Ticker
-	forwardChan       chan<- *ForwardedFrame
-	forwardChanDF     chan<- *ForwardedFrame
-	forwardFinished   <-chan struct{}
-	forwardFinishedDF <-chan struct{}
+	forwarder         *Forwarder
+	forwarderDF       *Forwarder
 	verifyPMTU        chan<- int
 	Decryptor         Decryptor
 	Router            *Router
