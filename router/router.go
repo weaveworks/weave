@@ -280,6 +280,7 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, sender *net.UDPA
 			if srcPeer == relayConn.Remote() && dstPeer == router.Ourself.Peer {
 				handleSpecialFrame(relayConn, sender, frame)
 			}
+			return
 		}
 
 		df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
