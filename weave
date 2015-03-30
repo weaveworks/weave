@@ -70,6 +70,7 @@ exec_remote() {
 if [ "$1" = "--local" ]; then
     LOCAL="$1"
     shift 1
+    [ -t 0 ] && stty -onlcr
 elif [ "$1" != "run" ]; then
     exec_remote "$@"
     exit $?
