@@ -676,7 +676,7 @@ case "$COMMAND" in
         if [ "$LOCAL" = "--local" ]; then
             create_bridge
             with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-            tell_dns PUT $CONTAINER_ID $CIDR_ARGS
+            tell_dns PUT $CONTAINER $CIDR_ARGS
         else
             exec_remote attach $CIDR_ARGS $CONTAINER
         fi
