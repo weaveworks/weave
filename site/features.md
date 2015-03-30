@@ -95,9 +95,6 @@ started:
 
     host1# weave run 10.2.2.1/24 10.2.3.1/24 -t -i ubuntu
 
-In this case, all of the addresses are added to the container's
-weave interface before it is brought up.
-
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
 isolation between application containers, that feature needs to be
