@@ -420,15 +420,21 @@ http_call_ip() {
 # Perform operation $1 on container ID $2 to local DNS database at address $3
 # This function is only called where we know $2 is a valid container name
 tell_dns() {
+    METHOD="$1"
+    CONTAINER_ID="$2"
+    shift 2
+
     if ! status=$(docker inspect --format='{{.State.Running}}' $DNS_CONTAINER_NAME 2>/dev/null) || [ "$status" != "true" ] ; then
         # weavedns not running - silently return
         return
     fi
     # get the long form of the container ID
-    CONTAINER=$(docker inspect --format='{{.Id}}' $2 2>/dev/null)
+    CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
     # extract IP address and routing prefix from CIDR
     MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
-    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/${3%/*} $MORE_ARGS || true
+    for addr; do
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${addr%/*} $MORE_ARGS || true
+    done
 }
 
 # Tell the newly-started weaveDNS about existing weave IPs
@@ -663,9 +669,7 @@ case "$COMMAND" in
         if [ "$LOCAL" = "--local" ]; then
             create_bridge
             with_container_netns $CONTAINER attach $CIDRS >/dev/null
-            for CIDR in $CIDRS; do
-                tell_dns PUT $CONTAINER_ID $CIDR
-            done
+            tell_dns PUT $CONTAINER_ID $CIDRS
         else
             exec_remote attach $CIDRS $CONTAINER
         fi
@@ -686,9 +690,7 @@ case "$COMMAND" in
         create_bridge
         CONTAINER=$(docker start $CONTAINER_ID)
         with_container_netns $CONTAINER_ID attach $CIDRS >/dev/null
-        for CIDR in $CIDRS; do
-            tell_dns PUT $CONTAINER_ID $CIDR
-        done
+        tell_dns PUT $CONTAINER_ID $CIDRS
         echo $CONTAINER
         ;;
     attach)
@@ -701,9 +703,7 @@ case "$COMMAND" in
         CONTAINER_ID="$1"
         create_bridge
         with_container_netns $CONTAINER_ID attach $CIDRS >/dev/null
-        for CIDR in $CIDRS; do
-            tell_dns PUT $CONTAINER_ID $CIDR
-        done
+        tell_dns PUT $CONTAINER_ID $CIDRS
         ;;
     detach)
         [ $# -gt 1 ] || usage
@@ -714,9 +714,7 @@ case "$COMMAND" in
         done
         CONTAINER_ID="$1"
         with_container_netns $CONTAINER_ID detach $CIDRS >/dev/null
-        for CIDR in $CIDRS; do
-            tell_dns DELETE $CONTAINER_ID $CIDR
-        done
+        tell_dns DELETE $CONTAINER_ID $CIDRS
         ;;
     expose)
         [ $# -eq 1 ] || usage
