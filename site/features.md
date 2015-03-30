@@ -128,6 +128,12 @@ sharing it between applications:
     host1# weave attach 10.2.1.1/24 $C
     host1# weave attach 10.2.2.1/24 $C
 
+Finally, multiple addresses can be attached or detached with a single
+invocation:
+
+    host1# weave attach 10.2.1.1/24 10.3.1.1/24 10.4.1.1/24 $C
+    host1# weave detach 10.2.1.1/24 10.3.1.1/24 10.4.1.1/24 $C
+
 ### <a name="security"></a>Security
 
 In order to connect containers across untrusted networks, weave peers
