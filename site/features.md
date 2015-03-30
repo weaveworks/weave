@@ -90,6 +90,14 @@ each other but not the containers of our first application...
 This isolation-through-subnets scheme is an example of carrying over a
 well-known technique from the 'on metal' days to containers.
 
+If desired, a container can be attached to multiple subnets when it is
+started:
+
+    host1# weave run 10.2.2.1/24 10.2.3.1/24 -t -i ubuntu
+
+In this case, all of the addresses are added to the container's
+weave interface before it is brought up.
+
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
 isolation between application containers, that feature needs to be
