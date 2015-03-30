@@ -52,7 +52,7 @@ assert_zone_records() {
 }
 
 # Run container with three cidrs
-CID=$(DOCKER_HOST=tcp://$host:2375 $WEAVE run 10.0.0.1/24 10.0.0.2/24 10.0.0.3/24 -t --name multicidr -h multicidr.weave.local ubuntu | cut -b 1-12)
+CID=$(DOCKER_HOST=tcp://$HOST1:2375 $WEAVE run 10.0.0.1/24 10.0.0.2/24 10.0.0.3/24 -t --name multicidr -h multicidr.weave.local ubuntu | cut -b 1-12)
 assert_container_cidrs $HOST1 $CID 10.0.0.1/24 10.0.0.2/24 10.0.0.3/24
 assert_zone_records $HOST1 $CID multicidr.weave.local. 10.0.0.1 10.0.0.2 10.0.0.3
 
@@ -62,7 +62,7 @@ assert_container_cidrs $HOST1 $CID 10.0.0.1/24
 assert_zone_records $HOST1 $CID multicidr.weave.local. 10.0.0.1
 
 # Put them both back
-weave_on $HOST1  attach 10.0.0.2/24 10.0.0.3/24 $CID
+weave_on $HOST1 attach 10.0.0.2/24 10.0.0.3/24 $CID
 assert_container_cidrs $HOST1 $CID 10.0.0.1/24 10.0.0.2/24 10.0.0.3/24
 assert_zone_records $HOST1 $CID multicidr.weave.local. 10.0.0.1 10.0.0.2 10.0.0.3
 
