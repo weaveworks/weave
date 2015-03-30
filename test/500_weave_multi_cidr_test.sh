@@ -12,7 +12,7 @@ docker_on $HOST1 rm -f multicidr || true
 weave_on $HOST1 launch
 weave_on $HOST1 launch-dns 10.254.254.254/24
 
-# status <host>
+# weave_status_on <host>
 weave_status_on() {
     HOST=$1; shift
 
