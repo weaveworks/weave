@@ -326,15 +326,15 @@ launch() {
 
 attach() {
     if ip netns exec $NETNS ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        for addr; do
+        for ADDR; do
             # container already has the expected network interface, so assume we set it up already;
             # just add the IP address.
-            if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $addr >/dev/null ; then
+            if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
                 # address was there already
                 continue
             fi
 
-            if ! ip netns exec $NETNS ip addr add $addr dev $CONTAINER_IFNAME ; then
+            if ! ip netns exec $NETNS ip addr add $ADDR dev $CONTAINER_IFNAME ; then
                 return 1
             fi
         done
@@ -346,8 +346,8 @@ attach() {
         return 1
     fi
 
-    for addr; do
-        if ! ip netns exec $NETNS ip addr add $addr dev $CONTAINER_IFNAME; then
+    for ADDR; do
+        if ! ip netns exec $NETNS ip addr add $ADDR dev $CONTAINER_IFNAME; then
             return 1
         fi
     done
@@ -365,13 +365,13 @@ attach() {
 }
 
 detach() {
-    for addr; do
-        if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $addr >/dev/null ; then
+    for ADDR; do
+        if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
             # address is not there, leave the device alone
             continue
         fi
 
-        if ! ip netns exec $NETNS ip addr del $addr dev $CONTAINER_IFNAME ; then
+        if ! ip netns exec $NETNS ip addr del $ADDR dev $CONTAINER_IFNAME ; then
             return 1
         fi
     done
@@ -432,8 +432,8 @@ tell_dns() {
     CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
     # extract IP address and routing prefix from CIDR
     MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
-    for addr; do
-        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${addr%/*} $MORE_ARGS || true
+    for ADDR; do
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${ADDR%/*} $MORE_ARGS || true
     done
 }
 
