@@ -715,29 +715,31 @@ case "$COMMAND" in
         tell_dns DELETE $CONTAINER_ID $CIDR_ARGS
         ;;
     expose)
-        [ $# -eq 1 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
-        create_bridge --without-ethtool
-        if ! ip addr show dev $BRIDGE | grep -qF $CIDR
-        then
-            ip addr add dev $BRIDGE $CIDR
-            arp_update $BRIDGE $CIDR
-            add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
-            add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
-        fi
+        [ $# -gt 0 ] || usage
+        for CIDR; do
+            validate_cidr $CIDR
+            create_bridge --without-ethtool
+            if ! ip addr show dev $BRIDGE | grep -qF $CIDR
+            then
+                ip addr add dev $BRIDGE $CIDR
+                arp_update $BRIDGE $CIDR
+                add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+                add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+            fi
+        done
         ;;
     hide)
-        [ $# -eq 1 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
-        create_bridge --without-ethtool
-        if ip addr show dev $BRIDGE | grep -qF $CIDR
-        then
-            ip addr del dev $BRIDGE $CIDR
-            delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
-            delete_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
-        fi
+        [ $# -gt 0 ] || usage
+        for CIDR; do
+            validate_cidr $CIDR
+            create_bridge --without-ethtool
+            if ip addr show dev $BRIDGE | grep -qF $CIDR
+            then
+                ip addr del dev $BRIDGE $CIDR
+                delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+                delete_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+            fi
+        done
         ;;
     stop)
         [ $# -eq 0 ] || usage

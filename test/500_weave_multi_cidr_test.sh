@@ -51,6 +51,17 @@ assert_zone_records() {
     done
 }
 
+# assert_bridge_cidrs <host> <dev> <cidr> [<cidr> ...]
+assert_bridge_cidrs() {
+    HOST=$1; shift
+    DEV=$1; shift
+    CIDRS=$@
+
+    BRIDGE_CIDRS=$($SSH $HOST ip addr show dev $DEV | grep -o 'inet .*' | cut -d ' ' -f 2)
+
+    assert "echo $BRIDGE_CIDRS" "$CIDRS"
+}
+
 # Run container with three cidrs
 CID=$(DOCKER_HOST=tcp://$HOST1:2375 $WEAVE run 10.0.0.1/24 10.0.0.2/24 10.0.0.3/24 -t --name multicidr -h multicidr.weave.local ubuntu | cut -b 1-12)
 assert_container_cidrs $HOST1 $CID 10.0.0.1/24 10.0.0.2/24 10.0.0.3/24
@@ -71,5 +82,13 @@ docker_on $HOST1 stop $CID
 weave_on $HOST1 start 10.0.0.1/24 10.0.0.2/24 10.0.0.3/24 $CID
 assert_container_cidrs $HOST1 $CID 10.0.0.1/24 10.0.0.2/24 10.0.0.3/24
 assert_zone_records $HOST1 $CID multicidr.weave.local. 10.0.0.1 10.0.0.2 10.0.0.3
+
+# Expose some cidrs
+weave_on $HOST1 expose 10.0.0.4/24 10.0.0.5/24 10.0.0.6/24
+assert_bridge_cidrs $HOST1 weave 10.0.0.4/24 10.0.0.5/24 10.0.0.6/24
+
+# Hide some cidrs
+weave_on $HOST1 hide 10.0.0.5/24 10.0.0.6/24
+assert_bridge_cidrs $HOST1 weave 10.0.0.4/24
 
 end_suite

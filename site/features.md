@@ -184,6 +184,12 @@ will work. And, more interestingly,
 
 will work too, which is talking to a container that resides on `$HOST1`.
 
+Multiple subnet addresses can be exposed or hidden with a single
+invocation:
+
+    host2# weave expose 10.2.1.102/24 10.3.1.102/24
+    host2# weave hide 10.2.1.102/24 10.3.1.102/24
+
 ### <a name="service-export"></a>Service export
 
 Services running in containers on a weave network can be made
