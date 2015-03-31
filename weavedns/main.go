@@ -87,6 +87,7 @@ func main() {
 	if err != nil {
 		Error.Fatal("Failed to initialize the WeaveDNS server", err)
 	}
+	Info.Println("Upstream", srv.Upstream)
 
 	Debug.Printf("Starting the signals handler")
 	go handleSignals(srv)
