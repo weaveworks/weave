@@ -48,6 +48,9 @@ func (cm *ConnectionMaker) Start() {
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.actionChan <- func() bool {
 		cm.cmdLineAddress[NormalisePeerAddr(address)] = true
+		if target, found := cm.targets[address]; found {
+			target.tryAfter, target.tryInterval = tryImmediately()
+		}
 		return true
 	}
 }
