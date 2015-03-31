@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/miekg/dns"
 	. "github.com/zettio/weave/common"
 	weavedns "github.com/zettio/weave/nameserver"
 	weavenet "github.com/zettio/weave/net"
@@ -23,7 +22,6 @@ func main() {
 		ifaceName   string
 		apiPath     string
 		localDomain string
-		fallback    string
 		dnsPort     int
 		httpPort    int
 		wait        int
@@ -42,7 +40,6 @@ func main() {
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
-	flag.StringVar(&fallback, "fallback", "", "force a fallback (ie, '8.8.8.8:53') instead of /etc/resolv.conf values")
 	flag.IntVar(&timeout, "timeout", weavedns.DefaultTimeout, "timeout for resolutions")
 	flag.IntVar(&udpbuf, "udpbuf", weavedns.DefaultUDPBuflen, "UDP buffer length")
 	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
@@ -84,15 +81,6 @@ func main() {
 		LocalDomain: localDomain,
 		Timeout:     timeout,
 		UDPBufLen:   udpbuf,
-	}
-
-	if len(fallback) > 0 {
-		fallbackHost, fallbackPort, err := net.SplitHostPort(fallback)
-		if err != nil {
-			Error.Fatal("Could not parse fallback host and port", err)
-		}
-		srvConfig.UpstreamCfg = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
-		Debug.Printf("DNS fallback at %s:%s", fallbackHost, fallbackPort)
 	}
 
 	srv, err := weavedns.NewDNSServer(srvConfig, zone, iface)

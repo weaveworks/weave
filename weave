@@ -57,6 +57,7 @@ exec_remote() {
         -v "$PROCFS":/hostproc \
         -e VERSION \
         -e WEAVE_DOCKER_ARGS \
+        -e WEAVEDNS_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
         -e DOCKER_BRIDGE \
         -e PROCFS=/hostproc --privileged --net=host \
@@ -587,9 +588,12 @@ case "$COMMAND" in
         check_not_running $DNS_CONTAINER_NAME $BASE_DNS_IMAGE
         create_bridge
         docker_bridge_ip
+        # Set WEAVEDNS_DOCKER_ARGS in the environment in order to supply
+        # additional parameters, such as resource limits, to docker
+        # when launching the weave container.
         DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME \
             -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock \
-            $DNS_IMAGE -iface $CONTAINER_IFNAME "$@")
+            $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE -iface $CONTAINER_IFNAME "$@")
         with_container_netns $DNS_CONTAINER attach $CIDR >/dev/null
         populate_dns
         echo $DNS_CONTAINER
