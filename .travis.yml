@@ -1,0 +1,16 @@
+language: go
+sudo: false
+go:
+  - 1.4
+
+addons:
+  apt:
+    packages:
+    - libpcap-dev
+
+install: 
+  - go clean -i net
+  - go install -tags netgo std
+  - make travis
+
+script: make tests
