@@ -289,7 +289,7 @@ with_container_netns () {
 }
 
 connect_container_to_bridge() {
-    if [ "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink $PROCFS/$$/ns/net)" ] ; then
+    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "$PROCFS/$$/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink $PROCFS/$$/ns/net)" ] ; then
         echo "Container is running in the host network namespace, and therefore cannot be" >&2
         echo "connected to weave. Perhaps the container was started with --net=host." >&2
         return 1
