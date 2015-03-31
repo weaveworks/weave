@@ -136,8 +136,8 @@ sharing it between applications:
 Finally, multiple addresses can be attached or detached with a single
 invocation:
 
-    host1# weave attach 10.2.1.1/24 10.3.1.1/24 10.4.1.1/24 $C
-    host1# weave detach 10.2.1.1/24 10.3.1.1/24 10.4.1.1/24 $C
+    host1# weave attach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
+    host1# weave detach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
 
 ### <a name="security"></a>Security
 
@@ -187,8 +187,8 @@ will work too, which is talking to a container that resides on `$HOST1`.
 Multiple subnet addresses can be exposed or hidden with a single
 invocation:
 
-    host2# weave expose 10.2.1.102/24 10.3.1.102/24
-    host2# weave hide 10.2.1.102/24 10.3.1.102/24
+    host2# weave expose 10.2.1.102/24 10.2.2.102/24
+    host2# weave hide 10.2.1.102/24 10.2.2.102/24
 
 ### <a name="service-export"></a>Service export
 
