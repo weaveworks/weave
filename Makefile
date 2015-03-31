@@ -58,10 +58,8 @@ $(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
-# Add more directories in here as more tests are created
 tests:
-	cd router; go test -cover -tags netgo
-	cd nameserver; go test -cover -tags netgo
+	go test -cover -tags netgo ./...
 
 $(PUBLISH): publish_%:
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
