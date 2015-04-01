@@ -19,10 +19,10 @@ usage() {
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
     echo "weave forget     <peer>"
-    echo "weave run        [--with-dns] <cidr> <docker run args> ..."
-    echo "weave start      <cidr> <container_id>"
-    echo "weave attach     <cidr> <container_id>"
-    echo "weave detach     <cidr> <container_id>"
+    echo "weave run        [--with-dns] <cidr> [<cidr> ...] <docker run args> ..."
+    echo "weave start      <cidr> [<cidr> ...] <container_id>"
+    echo "weave attach     <cidr> [<cidr> ...] <container_id>"
+    echo "weave detach     <cidr> [<cidr> ...] <container_id>"
     echo "weave expose     <cidr>"
     echo "weave hide       <cidr>"
     echo "weave ps"
@@ -71,6 +71,7 @@ exec_remote() {
 if [ "$1" = "--local" ]; then
     LOCAL="$1"
     shift 1
+    [ -t 0 ] && stty -onlcr
 elif [ "$1" != "run" ]; then
     exec_remote "$@"
     exit $?
@@ -136,6 +137,16 @@ validate_cidr() {
         echo "CIDR must of be of form <ip_address>/<routing_prefix_length>, e.g. 10.2.1.1/24" >&2
         exit 1
     fi
+}
+
+collect_cidr_args() {
+    CIDR_ARGS=""
+    CIDR_COUNT=0
+    while is_cidr "$1"; do
+        CIDR_ARGS="$CIDR_ARGS $1"
+        CIDR_COUNT=$(($CIDR_COUNT + 1))
+        shift 1
+    done
 }
 
 run_iptables() {
@@ -326,23 +337,33 @@ launch() {
 
 attach() {
     if ip netns exec $NETNS ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        # container already has the expected network interface, so assume we set it up already;
-        # just add the IP address.
-        if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
-            # address was there already
-            return 0
-        fi
+        for ADDR; do
+            # container already has the expected network interface, so assume we set it up already;
+            # just add the IP address.
+            if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
+                # address was there already
+                continue
+            fi
 
-        if ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ; then
-            return 1
-        fi
+            if ! ip netns exec $NETNS ip addr add $ADDR dev $CONTAINER_IFNAME ; then
+                return 1
+            fi
+        done
 
         return 0
     fi
 
-    if ! connect_container_to_bridge ||
-        ! ip netns exec $NETNS ip addr add $1 dev $CONTAINER_IFNAME ||
-        ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ; then
+    if ! connect_container_to_bridge; then
+        return 1
+    fi
+
+    for ADDR; do
+        if ! ip netns exec $NETNS ip addr add $ADDR dev $CONTAINER_IFNAME; then
+            return 1
+        fi
+    done
+
+    if ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ; then
         return 1
     fi
 
@@ -355,14 +376,16 @@ attach() {
 }
 
 detach() {
-    if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $1 >/dev/null ; then
-        # address is not there, leave the device alone
-        return 0
-    fi
+    for ADDR; do
+        if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
+            # address is not there, leave the device alone
+            continue
+        fi
 
-    if ! ip netns exec $NETNS ip addr del $1 dev $CONTAINER_IFNAME ; then
-        return 1
-    fi
+        if ! ip netns exec $NETNS ip addr del $ADDR dev $CONTAINER_IFNAME ; then
+            return 1
+        fi
+    done
 
     if [ -n "$(ip netns exec $NETNS ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
         # other addresses are left, leave the device alone
@@ -408,15 +431,21 @@ http_call_ip() {
 # Perform operation $1 on container ID $2 to local DNS database at address $3
 # This function is only called where we know $2 is a valid container name
 tell_dns() {
+    METHOD="$1"
+    CONTAINER_ID="$2"
+    shift 2
+
     if ! status=$(docker inspect --format='{{.State.Running}}' $DNS_CONTAINER_NAME 2>/dev/null) || [ "$status" != "true" ] ; then
         # weavedns not running - silently return
         return
     fi
     # get the long form of the container ID
-    CONTAINER=$(docker inspect --format='{{.Id}}' $2 2>/dev/null)
+    CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
     # extract IP address and routing prefix from CIDR
     MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
-    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $1 /name/$CONTAINER/${3%/*} $MORE_ARGS || true
+    for ADDR; do
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${ADDR%/*} $MORE_ARGS || true
+    done
 }
 
 # Tell the newly-started weaveDNS about existing weave IPs
@@ -645,16 +674,15 @@ case "$COMMAND" in
             DNS_ARGS=$(exec_remote dns-args "$@")
             [ "$1" = "--with-dns" ] && shift 1
         fi
-        CIDR=$1
-        shift 1
-        validate_cidr $CIDR
+        collect_cidr_args "$@"
+        shift $CIDR_COUNT
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
         if [ "$LOCAL" = "--local" ]; then
             create_bridge
-            with_container_netns $CONTAINER attach $CIDR >/dev/null
-            tell_dns PUT $CONTAINER $CIDR
+            with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
+            tell_dns PUT $CONTAINER $CIDR_ARGS
         else
-            exec_remote attach $CIDR $CONTAINER
+            exec_remote attach $CIDR_ARGS $CONTAINER
         fi
         echo $CONTAINER
         ;;
@@ -663,54 +691,59 @@ case "$COMMAND" in
         echo -n $DNS_ARGS
         ;;
     start)
-        [ $# -eq 2 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
+        [ $# -gt 1 ] || usage
+        collect_cidr_args "$@"
+        shift $CIDR_COUNT
+        CONTAINER_ID="$1"
         create_bridge
-        CONTAINER=$(docker start $2)
-        with_container_netns $CONTAINER attach $CIDR >/dev/null
-        tell_dns PUT $CONTAINER $CIDR
+        CONTAINER=$(docker start $CONTAINER_ID)
+        with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
+        tell_dns PUT $CONTAINER_ID $CIDR_ARGS
         echo $CONTAINER
         ;;
     attach)
-        [ $# -eq 2 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
+        [ $# -gt 1 ] || usage
+        collect_cidr_args "$@"
+        shift $CIDR_COUNT
+        CONTAINER_ID="$1"
         create_bridge
-        with_container_netns $2 attach $CIDR >/dev/null
-        tell_dns PUT $2 $CIDR
+        with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
+        tell_dns PUT $CONTAINER_ID $CIDR_ARGS
         ;;
     detach)
-        [ $# -eq 2 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
-        with_container_netns $2 detach $CIDR >/dev/null
-        tell_dns DELETE $2 $CIDR
+        [ $# -gt 1 ] || usage
+        collect_cidr_args "$@"
+        shift $CIDR_COUNT
+        CONTAINER_ID="$1"
+        with_container_netns $CONTAINER_ID detach $CIDR_ARGS >/dev/null
+        tell_dns DELETE $CONTAINER_ID $CIDR_ARGS
         ;;
     expose)
-        [ $# -eq 1 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
-        create_bridge --without-ethtool
-        if ! ip addr show dev $BRIDGE | grep -qF $CIDR
-        then
-            ip addr add dev $BRIDGE $CIDR
-            arp_update $BRIDGE $CIDR
-            add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
-            add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
-        fi
+        [ $# -gt 0 ] || usage
+        for CIDR; do
+            validate_cidr $CIDR
+            create_bridge --without-ethtool
+            if ! ip addr show dev $BRIDGE | grep -qF $CIDR
+            then
+                ip addr add dev $BRIDGE $CIDR
+                arp_update $BRIDGE $CIDR
+                add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+                add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+            fi
+        done
         ;;
     hide)
-        [ $# -eq 1 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
-        create_bridge --without-ethtool
-        if ip addr show dev $BRIDGE | grep -qF $CIDR
-        then
-            ip addr del dev $BRIDGE $CIDR
-            delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
-            delete_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
-        fi
+        [ $# -gt 0 ] || usage
+        for CIDR; do
+            validate_cidr $CIDR
+            create_bridge --without-ethtool
+            if ip addr show dev $BRIDGE | grep -qF $CIDR
+            then
+                ip addr del dev $BRIDGE $CIDR
+                delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+                delete_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+            fi
+        done
         ;;
     stop)
         [ $# -eq 0 ] || usage

@@ -90,6 +90,11 @@ each other but not the containers of our first application...
 This isolation-through-subnets scheme is an example of carrying over a
 well-known technique from the 'on metal' days to containers.
 
+If desired, a container can be attached to multiple subnets when it is
+started:
+
+    host1# weave run 10.2.2.1/24 10.2.3.1/24 -t -i ubuntu
+
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
 isolation between application containers, that feature needs to be
@@ -127,6 +132,12 @@ sharing it between applications:
 
     host1# weave attach 10.2.1.1/24 $C
     host1# weave attach 10.2.2.1/24 $C
+
+Finally, multiple addresses can be attached or detached with a single
+invocation:
+
+    host1# weave attach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
+    host1# weave detach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
 
 ### <a name="security"></a>Security
 
@@ -172,6 +183,12 @@ will work. And, more interestingly,
     host2# ping 10.2.1.1
 
 will work too, which is talking to a container that resides on `$HOST1`.
+
+Multiple subnet addresses can be exposed or hidden with a single
+invocation:
+
+    host2# weave expose 10.2.1.102/24 10.2.2.102/24
+    host2# weave hide 10.2.1.102/24 10.2.2.102/24
 
 ### <a name="service-export"></a>Service export
 
