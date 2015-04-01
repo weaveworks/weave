@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	. "github.com/zettio/weave/common"
+	"github.com/zettio/weave/common/updater"
 	weavedns "github.com/zettio/weave/nameserver"
 	weavenet "github.com/zettio/weave/net"
 	"io"
@@ -57,7 +58,7 @@ func main() {
 	var zone = new(weavedns.ZoneDb)
 
 	if watch {
-		err := weavedns.StartUpdater(apiPath, zone)
+		err := updater.Start(apiPath, zone)
 		if err != nil {
 			Error.Fatal("Unable to start watcher", err)
 		}
