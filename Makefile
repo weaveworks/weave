@@ -62,11 +62,12 @@ $(DOCKER_DISTRIB):
 
 tests:
 	echo "mode: count" > profile.cov
-	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do \
-	    go test -tags netgo -covermode=count -coverprofile=$$dir/profile.tmp $$dir;       \
-	    if [ -f $$dir/profile.tmp ]; then                                                 \
-	        cat $$dir/profile.tmp | tail -n +2 >> profile.cov;                            \
-	        rm $$dir/profile.tmp;                                                         \
+	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do     \
+	    output=$$(tempfile -p cover);                                                     \
+	    go test -tags netgo -covermode=count -coverprofile=$$output $$dir;                \
+	    if [ -f $$output ]; then                                                          \
+	        tail -n +2 <$$output >>profile.cov;                                           \
+	        rm $$output;                                                                  \
 	    fi                                                                                \
 	done
 	go tool cover -html=profile.cov -o=coverage.html
