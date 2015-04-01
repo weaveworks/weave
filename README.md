@@ -1,6 +1,6 @@
 # Weave - the Docker network
 
-[![Build Status](https://travis-ci.org/zettio/weave.svg?branch=master)](https://travis-ci.org/zettio/weave)
+[![Build Status](https://travis-ci.org/zettio/weave.svg?branch=master)](https://travis-ci.org/zettio/weave) [![Coverage Status](https://coveralls.io/repos/zettio/weave/badge.svg)](https://coveralls.io/r/zettio/weave)
 
 Weave creates a virtual network that connects Docker containers
 deployed across multiple hosts.

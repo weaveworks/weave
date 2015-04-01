@@ -61,7 +61,15 @@ $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
 tests:
-	go test -cover -tags netgo ./...
+	echo "mode: count" > profile.cov
+	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do \
+	    go test -tags netgo -covermode=count -coverprofile=$$dir/profile.tmp $$dir;       \
+	    if [ -f $$dir/profile.tmp ]; then                                                 \
+	        cat $$dir/profile.tmp | tail -n +2 >> profile.cov;                            \
+	        rm $$dir/profile.tmp;                                                         \
+	    fi                                                                                \
+	done
+	go tool cover -html=profile.cov -o=coverage.html
 
 $(PUBLISH): publish_%:
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
