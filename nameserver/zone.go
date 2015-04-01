@@ -139,3 +139,8 @@ func (zone *ZoneDb) DeleteRecordsFor(ident string) error {
 	zone.recs = zone.recs[:w]
 	return nil
 }
+
+func (zone *ZoneDb) ContainerDied(ident string) error {
+	Info.Printf("[zonedb] Container %s down. Removing records", ident)
+	return zone.DeleteRecordsFor(ident)
+}
