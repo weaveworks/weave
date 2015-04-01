@@ -759,7 +759,7 @@ case "$COMMAND" in
         ;;
     stop)
         [ $# -eq 0 ] || usage
-        if ! docker kill $CONTAINER_NAME >/dev/null 2>&1 ; then
+        if ! docker stop $CONTAINER_NAME >/dev/null 2>&1 ; then
             echo "Weave is not running." >&2
         fi
         docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
@@ -767,15 +767,15 @@ case "$COMMAND" in
         ;;
     stop-dns)
         [ $# -eq 0 ] || usage
-        if ! docker kill $DNS_CONTAINER_NAME >/dev/null 2>&1 ; then
+        if ! docker stop $DNS_CONTAINER_NAME >/dev/null 2>&1 ; then
             echo "WeaveDNS is not running." >&2
         fi
         docker rm -f $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         ;;
     reset)
         [ $# -eq 0 ] || usage
-        docker kill  $CONTAINER_NAME     >/dev/null 2>&1 || true
-        docker kill  $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
+        docker stop  $CONTAINER_NAME     >/dev/null 2>&1 || true
+        docker stop  $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         docker rm -f $CONTAINER_NAME     >/dev/null 2>&1 || true
         docker rm -f $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
