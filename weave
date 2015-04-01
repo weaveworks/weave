@@ -447,25 +447,37 @@ tell_dns() {
     done
 }
 
-# Tell the newly-started weaveDNS about existing weave IPs
-populate_dns() {
-    DNS_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $DNS_CONTAINER_NAME)
+# Wait until container $1 on port $2 is alive enough to respond to its status call
+wait_for_status() {
+    TARGET_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $1)
     WAIT_TIME=1
-    while ! http_call_ip $DNS_IP $DNS_HTTP_PORT GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
+    while ! http_call_ip $TARGET_IP $2 GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
+        if ! status=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) || [ "$status" != "true" ] ; then
+            echo "Container $1 died" >&2
+            return 1
+        fi
         sleep $WAIT_TIME
         WAIT_TIME=$((WAIT_TIME+1))
     done
     if [ $WAIT_TIME = 4 ]; then
-        echo "Timed out waiting for weaveDNS container to start." >&2
-        echo "If running, it will not be pre-populated." >&2
+        echo "Timed out waiting for $1 container to start." >&2
+        return 1
     fi
+    return 0
+}
 
+# Tell the newly-started weaveDNS about existing weave IPs
+populate_dns() {
+    if ! wait_for_status $DNS_CONTAINER_NAME $DNS_HTTP_PORT ; then
+        echo "If running, it will not be pre-populated." >&2
+        return 0
+    fi
     for CONTAINER in $(docker ps -q --no-trunc); do
         MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
         if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
             CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
             for IP in $CONTAINER_IPS; do
-                http_call_ip $DNS_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
+                http_call_ip $TARGET_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
             done
         fi
     done
@@ -606,6 +618,7 @@ case "$COMMAND" in
             -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD \
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -name $MACADDR -nickname "$NICKNAME" "$@")
         with_container_netns $CONTAINER launch >/dev/null
+        wait_for_status $CONTAINER_NAME $HTTP_PORT
         echo $CONTAINER
         ;;
     launch-dns)
