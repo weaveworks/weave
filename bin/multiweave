@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+
+N_WEAVES=${NUM_WEAVES:-29}
+
+case "$1" in
+    launch)
+        PREV=
+        for i in $(seq 1 $N_WEAVES); do
+            ID=$(WEAVE_CONTAINER_NAME=weave$i ./weave --local test-launch --connlimit=$N_WEAVES $PREV)
+            status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $ID)
+            PREV="${status#true }"
+            echo $ID $PREV
+        done
+        ;;
+    stop)
+        for i in $(seq 1 $N_WEAVES); do
+            echo Stopping weave$i
+            WEAVE_CONTAINER_NAME=weave$i ./weave --local stop
+        done
+        ;;
+esac
