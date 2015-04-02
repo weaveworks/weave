@@ -59,6 +59,7 @@ exec_remote() {
         -e WEAVE_DOCKER_ARGS \
         -e WEAVEDNS_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
+        -e WEAVE_CONTAINER_NAME \
         -e DOCKER_BRIDGE \
         -e PROCFS=/hostproc --privileged --net=host \
         $EXEC_IMAGE --local "$@"
