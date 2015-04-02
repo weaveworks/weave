@@ -334,6 +334,10 @@ launch() {
         ip netns exec $NETNS ip link set $CONTAINER_IFNAME up
 }
 
+test_launch() {
+    ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null
+}
+
 attach() {
     if ip netns exec $NETNS ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
         for ADDR; do
@@ -619,6 +623,23 @@ case "$COMMAND" in
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -name $MACADDR -nickname "$NICKNAME" "$@")
         with_container_netns $CONTAINER launch >/dev/null
         wait_for_status $CONTAINER_NAME $HTTP_PORT
+        echo $CONTAINER
+        ;;
+    test-launch)
+        # For testing purposes. Allows launching of several weave
+        # routers on the same machine, by invoking this multiple times
+        # with different WEAVE_CONTAINER_NAMEs
+        #
+        # Note that the routers are not connected to the $BRIDGE and
+        # do not perform any capture/injection. So this is mainly
+        # intended for testing of administrative and control plane
+        # functionality, rather than routing.
+        check_not_running $CONTAINER_NAME $BASE_IMAGE
+        MACADDR=7a:$(od -txC -An -N5 /dev/urandom | tr \  : | tail -c+2)
+        CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -e WEAVE_PASSWORD \
+            $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -nickname "$CONTAINER_NAME" "$@")
+        with_container_netns $CONTAINER test_launch >/dev/null
+        wait_for_status $CONTAINER $HTTP_PORT
         echo $CONTAINER
         ;;
     launch-dns)
