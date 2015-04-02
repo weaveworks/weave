@@ -49,7 +49,7 @@ func main() {
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.StringVar(&ifaceName, "iface", "", "name of interface to read from")
+	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if left blank)")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
 	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
@@ -77,13 +77,14 @@ func main() {
 	log.Println("Command line options:", options)
 	log.Println("Command line peers:", peers)
 
-	if ifaceName == "" {
-		fmt.Println("Missing required parameter 'iface'")
-		os.Exit(1)
-	}
-	iface, err := weavenet.EnsureInterface(ifaceName, wait)
-	if err != nil {
-		log.Fatal(err)
+	var err error
+
+	var iface *net.Interface
+	if ifaceName != "" {
+		iface, err = weavenet.EnsureInterface(ifaceName, wait)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if routerName == "" {

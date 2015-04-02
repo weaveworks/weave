@@ -73,17 +73,24 @@ func NewRouter(iface *net.Interface, name PeerName, nickName string, password []
 
 func (router *Router) Start() {
 	// we need two pcap handles since they aren't thread-safe
-	pio, err := NewPcapIO(router.Iface.Name, router.BufSz)
-	checkFatal(err)
-	po, err := NewPcapO(router.Iface.Name)
-	checkFatal(err)
+	var pio PacketSourceSink
+	var po PacketSink
+	var err error
+	if router.Iface != nil {
+		pio, err = NewPcapIO(router.Iface.Name, router.BufSz)
+		checkFatal(err)
+		po, err = NewPcapO(router.Iface.Name)
+		checkFatal(err)
+	}
 	router.Ourself.Start()
 	router.Macs.Start()
 	router.Routes.Start()
 	router.ConnectionMaker.Start()
 	router.UDPListener = router.listenUDP(Port, po)
 	router.listenTCP(Port)
-	router.sniff(pio)
+	if pio != nil {
+		router.sniff(pio)
+	}
 }
 
 func (router *Router) UsingPassword() bool {
@@ -310,8 +317,10 @@ func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, sender *net.UDPA
 		if router.Macs.Enter(srcMac, srcPeer) {
 			log.Println("Discovered remote MAC", srcMac, "at", srcPeer.FullName())
 		}
-		router.LogFrame("Injecting", frame, &dec.eth)
-		checkWarn(po.WritePacket(frame))
+		if po != nil {
+			router.LogFrame("Injecting", frame, &dec.eth)
+			checkWarn(po.WritePacket(frame))
+		}
 
 		dstPeer, found = router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
