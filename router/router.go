@@ -338,14 +338,6 @@ func handleSpecialFrame(relayConn *LocalConnection, sender *net.UDPAddr, frame [
 
 // Gossiper methods - the Router is the topology Gossiper
 
-func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
-	return fmt.Errorf("unexpected topology gossip unicast: %v", msg)
-}
-
-func (router *Router) OnGossipBroadcast(msg []byte) error {
-	return fmt.Errorf("unexpected topology gossip broadcast: %v", msg)
-}
-
 type PeerNameSet map[PeerName]bool
 
 type TopologyGossipData struct {
@@ -369,6 +361,14 @@ func (d *TopologyGossipData) Merge(other GossipData) {
 
 func (d *TopologyGossipData) Encode() []byte {
 	return d.peers.EncodePeers(d.update)
+}
+
+func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
+	return fmt.Errorf("unexpected topology gossip unicast: %v", msg)
+}
+
+func (router *Router) OnGossipBroadcast(msg []byte) error {
+	return fmt.Errorf("unexpected topology gossip broadcast: %v", msg)
 }
 
 func (router *Router) Gossip() GossipData {
