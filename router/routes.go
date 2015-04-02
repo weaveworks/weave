@@ -57,7 +57,7 @@ func (routes *Routes) String() string {
 	for name, hop := range routes.unicast {
 		fmt.Fprintf(&buf, "%s -> %s\n", name, hop)
 	}
-	fmt.Sprintln(&buf, "broadcast:")
+	fmt.Fprintln(&buf, "broadcast:")
 	for name, hops := range routes.broadcast {
 		fmt.Fprintf(&buf, "%s -> %v\n", name, hops)
 	}
