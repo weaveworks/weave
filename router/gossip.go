@@ -37,13 +37,12 @@ type Gossiper interface {
 // Accumulates GossipData that needs to be sent to one destination,
 // and sends it when possible.
 type GossipSender struct {
-	channel *GossipChannel
-	sender  ProtocolSender
-	cell    chan GossipData
+	send func(GossipData)
+	cell chan GossipData
 }
 
-func NewGossipSender(c *GossipChannel, ps ProtocolSender) *GossipSender {
-	return &GossipSender{channel: c, sender: ps}
+func NewGossipSender(send func(GossipData)) *GossipSender {
+	return &GossipSender{send: send}
 }
 
 func (sender *GossipSender) Start() {
@@ -56,13 +55,9 @@ func (sender *GossipSender) run() {
 		if pending := <-sender.cell; pending == nil { // receive zero value when chan is closed
 			break
 		} else {
-			sender.sendPending(pending)
+			sender.send(pending)
 		}
 	}
-}
-
-func (sender *GossipSender) sendPending(pending GossipData) {
-	sender.sender.SendProtocolMsg(sender.channel.gossipMsg(pending.Encode()))
 }
 
 func (sender *GossipSender) Send(data GossipData) {
@@ -200,7 +195,9 @@ func (c *GossipChannel) SendGossipDown(conn Connection, data GossipData) {
 func (c *GossipChannel) sendGossipDown(conn Connection, data GossipData) {
 	sender, found := c.senders[conn]
 	if !found {
-		sender = NewGossipSender(c, conn.(ProtocolSender))
+		sender = NewGossipSender(func(pending GossipData) {
+			conn.(ProtocolSender).SendProtocolMsg(c.gossipMsg(pending.Encode()))
+		})
 		c.senders[conn] = sender
 		sender.Start()
 	}

@@ -47,7 +47,7 @@ func (sender *GossipSender) flush() {
 	for {
 		select {
 		case pending := <-sender.cell:
-			sender.sendPending(pending)
+			sender.send(pending)
 		default:
 			return
 		}
