@@ -164,10 +164,13 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	frameCopy := make([]byte, frameLen, frameLen)
 	copy(frameCopy, frameData)
 
+	// If we don't know which peer corresponds to the dest MAC,
+	// broadcast it.
 	if !found {
 		router.Ourself.Broadcast(df, frameCopy, dec)
 		return
 	}
+
 	err := router.Ourself.Forward(dstPeer, df, frameCopy, dec)
 	if ftbe, ok := err.(FrameTooBigError); ok {
 		err = dec.sendICMPFragNeeded(ftbe.EPMTU, po.WritePacket)
