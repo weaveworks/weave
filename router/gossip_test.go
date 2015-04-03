@@ -26,7 +26,7 @@ func NewTestRouter(name PeerName) *Router {
 }
 
 func (conn *mockChannelConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
-	if err := conn.dest.handleGossip(protocolMsg.msg, deliverGossip); err != nil {
+	if err := conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg); err != nil {
 		panic(err)
 	}
 	conn.dest.sendPendingGossip()

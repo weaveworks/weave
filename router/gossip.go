@@ -110,7 +110,7 @@ func (router *Router) SendAllGossipDown(conn Connection) {
 	}
 }
 
-func (router *Router) handleGossip(payload []byte, onok func(*GossipChannel, PeerName, []byte, *gob.Decoder) error) error {
+func (router *Router) handleGossip(tag ProtocolTag, payload []byte) error {
 	decoder := gob.NewDecoder(bytes.NewReader(payload))
 	var channelHash uint32
 	if err := decoder.Decode(&channelHash); err != nil {
@@ -124,47 +124,52 @@ func (router *Router) handleGossip(payload []byte, onok func(*GossipChannel, Pee
 	if err := decoder.Decode(&srcName); err != nil {
 		return err
 	}
-	if err := onok(channel, srcName, payload, decoder); err != nil {
-		return err
+	switch tag {
+	case ProtocolGossipUnicast:
+		return channel.deliverGossipUnicast(srcName, payload, decoder)
+	case ProtocolGossipBroadcast:
+		return channel.deliverGossipBroadcast(srcName, payload, decoder)
+	case ProtocolGossip:
+		return channel.deliverGossip(srcName, payload, decoder)
 	}
 	return nil
 }
 
-func deliverGossipUnicast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliverGossipUnicast(srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
 	var destName PeerName
 	if err := dec.Decode(&destName); err != nil {
 		return err
 	}
-	if channel.ourself.Name != destName {
-		return channel.relayGossipUnicast(destName, origPayload)
+	if c.ourself.Name != destName {
+		return c.relayGossipUnicast(destName, origPayload)
 	}
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	return channel.gossiper.OnGossipUnicast(srcName, payload)
+	return c.gossiper.OnGossipUnicast(srcName, payload)
 }
 
-func deliverGossipBroadcast(channel *GossipChannel, srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliverGossipBroadcast(srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	if err := channel.gossiper.OnGossipBroadcast(payload); err != nil {
+	if err := c.gossiper.OnGossipBroadcast(payload); err != nil {
 		return err
 	}
-	return channel.relayGossipBroadcast(srcName, origPayload)
+	return c.relayGossipBroadcast(srcName, origPayload)
 }
 
-func deliverGossip(channel *GossipChannel, srcName PeerName, _ []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliverGossip(srcName PeerName, _ []byte, dec *gob.Decoder) error {
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	if data, err := channel.gossiper.OnGossip(payload); err != nil {
+	if data, err := c.gossiper.OnGossip(payload); err != nil {
 		return err
 	} else if data != nil {
-		channel.SendGossip(data)
+		c.SendGossip(data)
 	}
 	return nil
 }

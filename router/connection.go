@@ -450,12 +450,8 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 		conn.Decryptor.ReceiveNonce(payload)
 	case ProtocolPMTUVerified:
 		conn.pmtuVerified(int(binary.BigEndian.Uint16(payload)))
-	case ProtocolGossipUnicast:
-		return conn.Router.handleGossip(payload, deliverGossipUnicast)
-	case ProtocolGossipBroadcast:
-		return conn.Router.handleGossip(payload, deliverGossipBroadcast)
-	case ProtocolGossip:
-		return conn.Router.handleGossip(payload, deliverGossip)
+	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:
+		return conn.Router.handleGossip(tag, payload)
 	default:
 		conn.Log("ignoring unknown protocol tag:", tag)
 	}
