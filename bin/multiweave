@@ -3,7 +3,7 @@ set -e
 
 START=${FIRST_WEAVE:-1}
 COUNT=${NUM_WEAVES:-28}
-FINISH=$((FIRST_WEAVE+COUNT-1))
+FINISH=$((START+COUNT-1))
 
 case "$1" in
     launch)
