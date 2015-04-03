@@ -8,11 +8,11 @@ import (
 
 type Routes struct {
 	sync.RWMutex
-	ourself    *Peer
-	peers      *Peers
-	unicast    map[PeerName]PeerName
-	broadcast  map[PeerName][]PeerName
-	actionChan chan<- RoutesAction
+	ourself     *Peer
+	peers       *Peers
+	unicast     map[PeerName]PeerName
+	broadcast   map[PeerName][]PeerName
+	recalculate chan<- *struct{}
 }
 
 func NewRoutes(ourself *Peer, peers *Peers) *Routes {
@@ -27,9 +27,9 @@ func NewRoutes(ourself *Peer, peers *Peers) *Routes {
 }
 
 func (routes *Routes) Start() {
-	actionChan := make(chan RoutesAction, ChannelSize)
-	routes.actionChan = actionChan
-	go routes.actorLoop(actionChan)
+	recalculate := make(chan *struct{}, 1)
+	routes.recalculate = recalculate
+	go routes.run(recalculate)
 }
 
 func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
@@ -64,27 +64,22 @@ func (routes *Routes) String() string {
 	return buf.String()
 }
 
-// ACTOR client API
-
-type RoutesAction func()
-
-// Async.
 func (routes *Routes) Recalculate() {
-	routes.actionChan <- func() {
+	select {
+	case routes.recalculate <- nil:
+	default:
+	}
+}
+
+func (routes *Routes) run(recalculate <-chan *struct{}) {
+	for {
+		<-recalculate
 		unicast := routes.calculateUnicast()
 		broadcast := routes.calculateBroadcast()
 		routes.Lock()
 		routes.unicast = unicast
 		routes.broadcast = broadcast
 		routes.Unlock()
-	}
-}
-
-// ACTOR server
-
-func (routes *Routes) actorLoop(actionChan <-chan RoutesAction) {
-	for {
-		(<-actionChan)()
 	}
 }
 
