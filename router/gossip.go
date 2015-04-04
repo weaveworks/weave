@@ -244,3 +244,27 @@ func (c *GossipChannel) relayGossipBroadcast(srcName PeerName, msg []byte) error
 func (c *GossipChannel) log(args ...interface{}) {
 	log.Println(append(append([]interface{}{}, "[gossip "+c.name+"]:"), args...)...)
 }
+
+// for testing
+
+// FIXME this doesn't actually guarantee everything has been sent
+// since a GossipSender may be in the process of sending and there is
+// no easy way for us to know when that has completed.
+func (router *Router) sendPendingGossip() {
+	for _, channel := range router.GossipChannels {
+		for _, sender := range channel.senders {
+			sender.flush()
+		}
+	}
+}
+
+func (sender *GossipSender) flush() {
+	for {
+		select {
+		case pending := <-sender.cell:
+			sender.send(pending)
+		default:
+			return
+		}
+	}
+}
