@@ -201,16 +201,13 @@ func (c *GossipChannel) sendGossipDown(conn Connection, data GossipData) {
 	sender, found := c.senders[conn]
 	if !found {
 		sender = NewGossipSender(func(pending GossipData) {
-			conn.(ProtocolSender).SendProtocolMsg(c.gossipMsg(pending.Encode()))
+			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.hash, c.ourself.Name, pending.Encode())}
+			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 		})
 		c.senders[conn] = sender
 		sender.Start()
 	}
 	sender.Send(data)
-}
-
-func (c *GossipChannel) gossipMsg(buf []byte) ProtocolMsg {
-	return ProtocolMsg{ProtocolGossip, GobEncode(c.hash, c.ourself.Name, buf)}
 }
 
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
