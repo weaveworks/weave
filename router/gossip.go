@@ -75,7 +75,7 @@ func (sender *GossipSender) Stop() {
 	close(sender.cell)
 }
 
-type senderMap map[Connection]*GossipSender
+type connectionSenders map[Connection]*GossipSender
 
 type GossipChannel struct {
 	sync.Mutex
@@ -83,7 +83,7 @@ type GossipChannel struct {
 	name     string
 	hash     uint32
 	gossiper Gossiper
-	senders  senderMap
+	senders  connectionSenders
 }
 
 func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
@@ -93,7 +93,7 @@ func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 		name:     channelName,
 		hash:     channelHash,
 		gossiper: g,
-		senders:  make(senderMap)}
+		senders:  make(connectionSenders)}
 	router.GossipChannels[channelHash] = channel
 	return channel
 }
@@ -176,7 +176,7 @@ func (c *GossipChannel) deliverGossip(_ PeerName, _ []byte, dec *gob.Decoder) er
 
 func (c *GossipChannel) SendGossip(data GossipData) {
 	connections := c.ourself.Connections() // do this outside the lock so they don't nest
-	retainedSenders := make(senderMap)
+	retainedSenders := make(connectionSenders)
 	c.Lock()
 	defer c.Unlock()
 	for _, conn := range connections {
