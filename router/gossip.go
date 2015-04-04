@@ -161,7 +161,7 @@ func (c *GossipChannel) deliverGossipBroadcast(srcName PeerName, origPayload []b
 	return c.relayGossipBroadcast(srcName, origPayload)
 }
 
-func (c *GossipChannel) deliverGossip(srcName PeerName, _ []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliverGossip(_ PeerName, _ []byte, dec *gob.Decoder) error {
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
 		return err
