@@ -235,6 +235,7 @@ func (c *GossipChannel) relayBroadcast(srcName PeerName, msg []byte) error {
 		return nil
 	}
 	protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, msg}
+	// FIXME a single blocked connection can stall us
 	for _, conn := range c.ourself.ConnectionsTo(nextHops) {
 		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 	}
