@@ -29,8 +29,8 @@ type Gossiper interface {
 	OnGossipBroadcast(msg []byte) error
 	// return state of everything we know; gets called periodically
 	Gossip() GossipData
-	// merge in state and return "everything new I've just learnt",
-	// or nil if nothing in the received message was new
+	// merge received date into state and return "everything new I've
+	// just learnt", or nil if nothing in the received data was new
 	OnGossip(buf []byte) (GossipData, error)
 }
 
