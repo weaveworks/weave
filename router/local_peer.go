@@ -248,7 +248,7 @@ func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	// abstraction (hence the cast) and send a regular update. This is
 	// less efficient though since it will almost certainly reach
 	// peers more than once.
-	peer.Router.TopologyGossip.(*GossipChannel).SendGossip(NewTopologyGossipData(peer.Router.Peers, append(peers, peer.Peer)...))
+	peer.Router.TopologyGossip.(*GossipChannel).Send(NewTopologyGossipData(peer.Router.Peers, append(peers, peer.Peer)...))
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

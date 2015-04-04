@@ -100,13 +100,13 @@ func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 
 func (router *Router) SendAllGossip() {
 	for _, channel := range router.GossipChannels {
-		channel.SendGossip(channel.gossiper.Gossip())
+		channel.Send(channel.gossiper.Gossip())
 	}
 }
 
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for _, channel := range router.GossipChannels {
-		channel.SendGossipDown(conn, channel.gossiper.Gossip())
+		channel.SendDown(conn, channel.gossiper.Gossip())
 	}
 }
 
@@ -126,22 +126,22 @@ func (router *Router) handleGossip(tag ProtocolTag, payload []byte) error {
 	}
 	switch tag {
 	case ProtocolGossipUnicast:
-		return channel.deliverGossipUnicast(srcName, payload, decoder)
+		return channel.deliverUnicast(srcName, payload, decoder)
 	case ProtocolGossipBroadcast:
-		return channel.deliverGossipBroadcast(srcName, payload, decoder)
+		return channel.deliverBroadcast(srcName, payload, decoder)
 	case ProtocolGossip:
-		return channel.deliverGossip(srcName, payload, decoder)
+		return channel.deliver(srcName, payload, decoder)
 	}
 	return nil
 }
 
-func (c *GossipChannel) deliverGossipUnicast(srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliverUnicast(srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
 	var destName PeerName
 	if err := dec.Decode(&destName); err != nil {
 		return err
 	}
 	if c.ourself.Name != destName {
-		return c.relayGossipUnicast(destName, origPayload)
+		return c.relayUnicast(destName, origPayload)
 	}
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
@@ -150,7 +150,7 @@ func (c *GossipChannel) deliverGossipUnicast(srcName PeerName, origPayload []byt
 	return c.gossiper.OnGossipUnicast(srcName, payload)
 }
 
-func (c *GossipChannel) deliverGossipBroadcast(srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliverBroadcast(srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
 		return err
@@ -158,10 +158,10 @@ func (c *GossipChannel) deliverGossipBroadcast(srcName PeerName, origPayload []b
 	if err := c.gossiper.OnGossipBroadcast(payload); err != nil {
 		return err
 	}
-	return c.relayGossipBroadcast(srcName, origPayload)
+	return c.relayBroadcast(srcName, origPayload)
 }
 
-func (c *GossipChannel) deliverGossip(_ PeerName, _ []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliver(_ PeerName, _ []byte, dec *gob.Decoder) error {
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
 		return err
@@ -169,18 +169,18 @@ func (c *GossipChannel) deliverGossip(_ PeerName, _ []byte, dec *gob.Decoder) er
 	if data, err := c.gossiper.OnGossip(payload); err != nil {
 		return err
 	} else if data != nil {
-		c.SendGossip(data)
+		c.Send(data)
 	}
 	return nil
 }
 
-func (c *GossipChannel) SendGossip(data GossipData) {
+func (c *GossipChannel) Send(data GossipData) {
 	connections := c.ourself.Connections() // do this outside the lock so they don't nest
 	retainedSenders := make(connectionSenders)
 	c.Lock()
 	defer c.Unlock()
 	for _, conn := range connections {
-		c.sendGossipDown(conn, data)
+		c.sendDown(conn, data)
 		retainedSenders[conn] = c.senders[conn]
 		delete(c.senders, conn)
 	}
@@ -191,13 +191,13 @@ func (c *GossipChannel) SendGossip(data GossipData) {
 	c.senders = retainedSenders
 }
 
-func (c *GossipChannel) SendGossipDown(conn Connection, data GossipData) {
+func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
 	c.Lock()
-	c.sendGossipDown(conn, data)
+	c.sendDown(conn, data)
 	c.Unlock()
 }
 
-func (c *GossipChannel) sendGossipDown(conn Connection, data GossipData) {
+func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
 	sender, found := c.senders[conn]
 	if !found {
 		sender = NewGossipSender(func(pending GossipData) {
@@ -211,14 +211,14 @@ func (c *GossipChannel) sendGossipDown(conn Connection, data GossipData) {
 }
 
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
-	return c.relayGossipUnicast(dstPeerName, GobEncode(c.hash, c.ourself.Name, dstPeerName, buf))
+	return c.relayUnicast(dstPeerName, GobEncode(c.hash, c.ourself.Name, dstPeerName, buf))
 }
 
 func (c *GossipChannel) GossipBroadcast(buf []byte) error {
-	return c.relayGossipBroadcast(c.ourself.Name, GobEncode(c.hash, c.ourself.Name, buf))
+	return c.relayBroadcast(c.ourself.Name, GobEncode(c.hash, c.ourself.Name, buf))
 }
 
-func (c *GossipChannel) relayGossipUnicast(dstPeerName PeerName, msg []byte) error {
+func (c *GossipChannel) relayUnicast(dstPeerName PeerName, msg []byte) error {
 	if relayPeerName, found := c.ourself.Router.Routes.Unicast(dstPeerName); !found {
 		c.log("unknown relay destination:", dstPeerName)
 	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
@@ -229,7 +229,7 @@ func (c *GossipChannel) relayGossipUnicast(dstPeerName PeerName, msg []byte) err
 	return nil
 }
 
-func (c *GossipChannel) relayGossipBroadcast(srcName PeerName, msg []byte) error {
+func (c *GossipChannel) relayBroadcast(srcName PeerName, msg []byte) error {
 	nextHops := c.ourself.Router.Routes.Broadcast(srcName)
 	if len(nextHops) == 0 {
 		return nil
