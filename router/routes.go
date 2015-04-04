@@ -8,21 +8,29 @@ import (
 
 type Routes struct {
 	sync.RWMutex
-	ourself     *Peer
-	peers       *Peers
-	unicast     map[PeerName]PeerName
-	broadcast   map[PeerName][]PeerName
-	recalculate chan<- *struct{}
+	ourself      *Peer
+	peers        *Peers
+	unicast      map[PeerName]PeerName
+	unicastAll   map[PeerName]PeerName // [1]
+	broadcast    map[PeerName][]PeerName
+	broadcastAll map[PeerName][]PeerName // [1]
+	recalculate  chan<- *struct{}
+	// [1] based on *all* connections, not just established &
+	// symmetric ones
 }
 
 func NewRoutes(ourself *Peer, peers *Peers) *Routes {
 	routes := &Routes{
-		ourself:   ourself,
-		peers:     peers,
-		unicast:   make(map[PeerName]PeerName),
-		broadcast: make(map[PeerName][]PeerName)}
+		ourself:      ourself,
+		peers:        peers,
+		unicast:      make(map[PeerName]PeerName),
+		unicastAll:   make(map[PeerName]PeerName),
+		broadcast:    make(map[PeerName][]PeerName),
+		broadcastAll: make(map[PeerName][]PeerName)}
 	routes.unicast[ourself.Name] = UnknownPeerName
+	routes.unicastAll[ourself.Name] = UnknownPeerName
 	routes.broadcast[ourself.Name] = []PeerName{}
+	routes.broadcastAll[ourself.Name] = []PeerName{}
 	return routes
 }
 
@@ -39,10 +47,27 @@ func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
 	return hop, found
 }
 
+func (routes *Routes) UnicastAll(name PeerName) (PeerName, bool) {
+	routes.RLock()
+	defer routes.RUnlock()
+	hop, found := routes.unicastAll[name]
+	return hop, found
+}
+
 func (routes *Routes) Broadcast(name PeerName) []PeerName {
 	routes.RLock()
 	defer routes.RUnlock()
 	hops, found := routes.broadcast[name]
+	if !found {
+		return []PeerName{}
+	}
+	return hops
+}
+
+func (routes *Routes) BroadcastAll(name PeerName) []PeerName {
+	routes.RLock()
+	defer routes.RUnlock()
+	hops, found := routes.broadcastAll[name]
 	if !found {
 		return []PeerName{}
 	}
@@ -61,6 +86,8 @@ func (routes *Routes) String() string {
 	for name, hops := range routes.broadcast {
 		fmt.Fprintf(&buf, "%s -> %v\n", name, hops)
 	}
+	// We don't include the 'all' routes here since they are of
+	// limited utility in troubleshooting
 	return buf.String()
 }
 
@@ -74,13 +101,23 @@ func (routes *Routes) Recalculate() {
 func (routes *Routes) run(recalculate <-chan *struct{}) {
 	for {
 		<-recalculate
-		unicast := routes.calculateUnicast()
-		broadcast := routes.calculateBroadcast()
-		routes.Lock()
-		routes.unicast = unicast
-		routes.broadcast = broadcast
-		routes.Unlock()
+		routes.calculate()
 	}
+}
+
+func (routes *Routes) calculate() {
+	var (
+		unicast      = routes.calculateUnicast(true)
+		unicastAll   = routes.calculateUnicast(false)
+		broadcast    = routes.calculateBroadcast(true)
+		broadcastAll = routes.calculateBroadcast(false)
+	)
+	routes.Lock()
+	routes.unicast = unicast
+	routes.unicastAll = unicastAll
+	routes.broadcast = broadcast
+	routes.broadcastAll = broadcastAll
+	routes.Unlock()
 }
 
 // Calculate all the routes for the question: if *we* want to send a
@@ -92,8 +129,8 @@ func (routes *Routes) run(recalculate <-chan *struct{}) {
 // any knowledge of the MAC address at all. Thus there's no need
 // to exchange knowledge of MAC addresses, nor any constraints on
 // the routes that we construct.
-func (routes *Routes) calculateUnicast() map[PeerName]PeerName {
-	_, unicast := routes.ourself.Routes(nil, true)
+func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) map[PeerName]PeerName {
+	_, unicast := routes.ourself.Routes(nil, establishedAndSymmetric)
 	return unicast
 }
 
@@ -115,25 +152,25 @@ func (routes *Routes) calculateUnicast() map[PeerName]PeerName {
 //     Y =/= Z /\ X.Routes(Y) <= X.Routes(Z) =>
 //     X.Routes(Y) u [P | Y.HasSymmetricConnectionTo(P)] <= X.Routes(Z)
 // where <= is the subset relationship on keys of the returned map.
-func (routes *Routes) calculateBroadcast() map[PeerName][]PeerName {
+func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerName][]PeerName {
 	broadcast := make(map[PeerName][]PeerName)
 	ourself := routes.ourself
 
 	routes.peers.ForEach(func(peer *Peer) {
 		hops := []PeerName{}
-		if found, reached := peer.Routes(ourself, true); found {
+		if found, reached := peer.Routes(ourself, establishedAndSymmetric); found {
 			// This is rather similar to the inner loop on
 			// peer.Routes(...); the main difference is in the
 			// locking.
 			for _, conn := range ourself.Connections() {
-				if !conn.Established() {
+				if establishedAndSymmetric && !conn.Established() {
 					continue
 				}
 				remoteName := conn.Remote().Name
 				if _, found := reached[remoteName]; found {
 					continue
 				}
-				if remoteConn, found := conn.Remote().ConnectionTo(ourself.Name); found && remoteConn.Established() {
+				if remoteConn, found := conn.Remote().ConnectionTo(ourself.Name); !establishedAndSymmetric || (found && remoteConn.Established()) {
 					hops = append(hops, remoteName)
 				}
 			}

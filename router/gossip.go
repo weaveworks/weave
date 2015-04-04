@@ -219,7 +219,7 @@ func (c *GossipChannel) GossipBroadcast(buf []byte) error {
 }
 
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, msg []byte) error {
-	if relayPeerName, found := c.ourself.Router.Routes.Unicast(dstPeerName); !found {
+	if relayPeerName, found := c.ourself.Router.Routes.UnicastAll(dstPeerName); !found {
 		c.log("unknown relay destination:", dstPeerName)
 	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
 		c.log("unable to find connection to relay peer", relayPeerName)
@@ -230,7 +230,7 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, msg []byte) error {
 }
 
 func (c *GossipChannel) relayBroadcast(srcName PeerName, msg []byte) error {
-	nextHops := c.ourself.Router.Routes.Broadcast(srcName)
+	nextHops := c.ourself.Router.Routes.BroadcastAll(srcName)
 	if len(nextHops) == 0 {
 		return nil
 	}
