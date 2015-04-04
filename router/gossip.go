@@ -19,9 +19,9 @@ type GossipData interface {
 type Gossip interface {
 	// specific message from one peer to another
 	// intermediate peers relay it using unicast topology.
-	GossipUnicast(dstPeerName PeerName, buf []byte) error
+	GossipUnicast(dstPeerName PeerName, msg []byte) error
 	// send a message to every peer, relayed using broadcast topology.
-	GossipBroadcast(buf []byte) error
+	GossipBroadcast(msg []byte) error
 }
 
 type Gossiper interface {
@@ -29,9 +29,9 @@ type Gossiper interface {
 	OnGossipBroadcast(msg []byte) error
 	// return state of everything we know; gets called periodically
 	Gossip() GossipData
-	// merge received date into state and return "everything new I've
+	// merge received data into state and return "everything new I've
 	// just learnt", or nil if nothing in the received data was new
-	OnGossip(buf []byte) (GossipData, error)
+	OnGossip(update []byte) (GossipData, error)
 }
 
 // Accumulates GossipData that needs to be sent to one destination,
@@ -210,31 +210,31 @@ func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
 	sender.Send(data)
 }
 
-func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, buf []byte) error {
-	return c.relayUnicast(dstPeerName, GobEncode(c.hash, c.ourself.Name, dstPeerName, buf))
+func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, msg []byte) error {
+	return c.relayUnicast(dstPeerName, GobEncode(c.hash, c.ourself.Name, dstPeerName, msg))
 }
 
-func (c *GossipChannel) GossipBroadcast(buf []byte) error {
-	return c.relayBroadcast(c.ourself.Name, GobEncode(c.hash, c.ourself.Name, buf))
+func (c *GossipChannel) GossipBroadcast(msg []byte) error {
+	return c.relayBroadcast(c.ourself.Name, GobEncode(c.hash, c.ourself.Name, msg))
 }
 
-func (c *GossipChannel) relayUnicast(dstPeerName PeerName, msg []byte) error {
+func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) error {
 	if relayPeerName, found := c.ourself.Router.Routes.UnicastAll(dstPeerName); !found {
 		c.log("unknown relay destination:", dstPeerName)
 	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
 		c.log("unable to find connection to relay peer", relayPeerName)
 	} else {
-		conn.(ProtocolSender).SendProtocolMsg(ProtocolMsg{ProtocolGossipUnicast, msg})
+		conn.(ProtocolSender).SendProtocolMsg(ProtocolMsg{ProtocolGossipUnicast, buf})
 	}
 	return nil
 }
 
-func (c *GossipChannel) relayBroadcast(srcName PeerName, msg []byte) error {
+func (c *GossipChannel) relayBroadcast(srcName PeerName, buf []byte) error {
 	nextHops := c.ourself.Router.Routes.BroadcastAll(srcName)
 	if len(nextHops) == 0 {
 		return nil
 	}
-	protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, msg}
+	protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, buf}
 	// FIXME a single blocked connection can stall us
 	for _, conn := range c.ourself.ConnectionsTo(nextHops) {
 		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
