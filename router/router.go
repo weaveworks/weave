@@ -388,6 +388,17 @@ func (router *Router) Gossip() GossipData {
 }
 
 func (router *Router) OnGossip(buf []byte) (GossipData, error) {
+	newUpdate, err := router.applyTopologyUpdate(buf)
+	if err != nil {
+		return nil, err
+	}
+	if len(newUpdate) == 0 {
+		return nil, nil
+	}
+	return &TopologyGossipData{peers: router.Peers, update: newUpdate}, nil
+}
+
+func (router *Router) applyTopologyUpdate(buf []byte) (PeerNameSet, error) {
 	newUpdate, err := router.Peers.ApplyUpdate(buf)
 	if _, ok := err.(UnknownPeerError); err != nil && ok {
 		// That update contained a reference to a peer which wasn't
@@ -400,10 +411,9 @@ func (router *Router) OnGossip(buf []byte) (GossipData, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(newUpdate) == 0 {
-		return nil, nil
+	if len(newUpdate) > 0 {
+		router.ConnectionMaker.Refresh()
+		router.Routes.Recalculate()
 	}
-	router.ConnectionMaker.Refresh()
-	router.Routes.Recalculate()
-	return &TopologyGossipData{peers: router.Peers, update: newUpdate}, nil
+	return newUpdate, nil
 }
