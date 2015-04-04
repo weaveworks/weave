@@ -230,13 +230,13 @@ func (c *GossipChannel) relayGossipUnicast(dstPeerName PeerName, msg []byte) err
 }
 
 func (c *GossipChannel) relayGossipBroadcast(srcName PeerName, msg []byte) error {
-	if srcPeer, found := c.ourself.Router.Peers.Fetch(srcName); !found {
-		c.log("unable to relay broadcast from unknown peer", srcName)
-	} else {
-		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, msg}
-		for _, conn := range c.ourself.NextBroadcastHops(srcPeer) {
-			conn.SendProtocolMsg(protocolMsg)
-		}
+	nextHops := c.ourself.Router.Routes.Broadcast(srcName)
+	if len(nextHops) == 0 {
+		return nil
+	}
+	protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, msg}
+	for _, conn := range c.ourself.ConnectionsTo(nextHops) {
+		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 	}
 	return nil
 }

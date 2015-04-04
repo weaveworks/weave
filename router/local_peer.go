@@ -55,8 +55,12 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 }
 
 func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) {
-	for _, conn := range peer.NextBroadcastHops(srcPeer) {
-		err := conn.Forward(df, &ForwardedFrame{
+	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
+	if len(nextHops) == 0 {
+		return
+	}
+	for _, conn := range peer.ConnectionsTo(nextHops) {
+		err := conn.(*LocalConnection).Forward(df, &ForwardedFrame{
 			srcPeer: srcPeer,
 			dstPeer: conn.Remote(),
 			frame:   frame},
@@ -71,22 +75,18 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec 
 	}
 }
 
-func (peer *LocalPeer) NextBroadcastHops(srcPeer *Peer) []*LocalConnection {
-	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
-	if len(nextHops) == 0 {
-		return nil
-	}
-	nextConns := make([]*LocalConnection, 0, len(nextHops))
+func (peer *LocalPeer) ConnectionsTo(names []PeerName) []Connection {
+	conns := make([]Connection, 0, len(names))
 	peer.RLock()
 	defer peer.RUnlock()
-	for _, hopName := range nextHops {
-		conn, found := peer.connections[hopName]
+	for _, name := range names {
+		conn, found := peer.connections[name]
 		// Again, !found could just be due to a race.
 		if found {
-			nextConns = append(nextConns, conn.(*LocalConnection))
+			conns = append(conns, conn)
 		}
 	}
-	return nextConns
+	return conns
 }
 
 func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) error {
