@@ -389,11 +389,8 @@ func (router *Router) Gossip() GossipData {
 
 func (router *Router) OnGossip(update []byte) (GossipData, error) {
 	newUpdate, err := router.applyTopologyUpdate(update)
-	if err != nil {
+	if err != nil || len(newUpdate) == 0 {
 		return nil, err
-	}
-	if len(newUpdate) == 0 {
-		return nil, nil
 	}
 	return &TopologyGossipData{peers: router.Peers, update: newUpdate}, nil
 }
