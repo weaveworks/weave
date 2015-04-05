@@ -672,7 +672,7 @@ case "$COMMAND" in
     status)
         http_call $CONTAINER_NAME $HTTP_PORT GET /status || true
         echo
-        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status || true
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status 2>/dev/null || true
         ;;
     ps)
         [ $# -eq 0 ] || usage
