@@ -7,15 +7,20 @@ FINISH=$((START+COUNT-1))
 
 case "$1" in
     launch)
+        for i in $(seq $START $FINISH); do
+            WEAVE_CONTAINER_NAME=weave$i ./weave --local test-launch --connlimit=100
+        done
         if [ $START -ne 1 ] ; then
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$((START-1)))
             PREV="${status#true }"
         fi
         for i in $(seq $START $FINISH); do
-            ID=$(WEAVE_CONTAINER_NAME=weave$i ./weave --local test-launch --connlimit=100 $PREV)
-            status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $ID)
+            if [ -n "$PREV" ] ; then
+                echo connecting weave$i to $PREV
+                WEAVE_CONTAINER_NAME=weave$i ./weave --local connect $PREV
+            fi
+            status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$i)
             PREV="${status#true }"
-            echo $ID $PREV
         done
         ;;
     stop)
