@@ -269,6 +269,7 @@ func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) erro
 }
 
 func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
+	c.ourself.Router.Routes.EnsureRecalculated()
 	nextHops := c.ourself.Router.Routes.BroadcastAll(srcName)
 	if len(nextHops) == 0 {
 		return

@@ -378,7 +378,11 @@ func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
 }
 
 func (router *Router) OnGossipBroadcast(update []byte) (GossipData, error) {
-	return nil, fmt.Errorf("unexpected topology gossip broadcast: %v", update)
+	origUpdate, _, err := router.applyTopologyUpdate(update)
+	if err != nil || len(origUpdate) == 0 {
+		return nil, err
+	}
+	return &TopologyGossipData{peers: router.Peers, update: origUpdate}, nil
 }
 
 func (router *Router) Gossip() GossipData {
