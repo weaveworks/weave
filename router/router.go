@@ -377,8 +377,8 @@ func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
 	return fmt.Errorf("unexpected topology gossip unicast: %v", msg)
 }
 
-func (router *Router) OnGossipBroadcast(msg []byte) error {
-	return fmt.Errorf("unexpected topology gossip broadcast: %v", msg)
+func (router *Router) OnGossipBroadcast(update []byte) (GossipData, error) {
+	return nil, fmt.Errorf("unexpected topology gossip broadcast: %v", update)
 }
 
 func (router *Router) Gossip() GossipData {
