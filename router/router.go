@@ -386,29 +386,29 @@ func (router *Router) Gossip() GossipData {
 }
 
 func (router *Router) OnGossip(update []byte) (GossipData, error) {
-	newUpdate, err := router.applyTopologyUpdate(update)
+	_, newUpdate, err := router.applyTopologyUpdate(update)
 	if err != nil || len(newUpdate) == 0 {
 		return nil, err
 	}
 	return &TopologyGossipData{peers: router.Peers, update: newUpdate}, nil
 }
 
-func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, error) {
-	newUpdate, err := router.Peers.ApplyUpdate(update)
+func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
+	origUpdate, newUpdate, err := router.Peers.ApplyUpdate(update)
 	if _, ok := err.(UnknownPeerError); err != nil && ok {
 		// That update contained a reference to a peer which wasn't
 		// itself included in the update, and we didn't know about
 		// already. We ignore this; eventually we should receive an
 		// update containing a complete topology.
 		log.Println("Topology gossip:", err)
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(newUpdate) > 0 {
 		router.ConnectionMaker.Refresh()
 		router.Routes.Recalculate()
 	}
-	return newUpdate, nil
+	return origUpdate, newUpdate, nil
 }
