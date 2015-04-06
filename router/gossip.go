@@ -182,19 +182,25 @@ func (c *GossipChannel) deliver(_ PeerName, _ []byte, dec *gob.Decoder) error {
 
 func (c *GossipChannel) Send(data GossipData) {
 	connections := c.ourself.Connections() // do this outside the lock so they don't nest
-	retainedSenders := make(connectionSenders)
 	c.Lock()
 	defer c.Unlock()
+	// GC - randomly (courtesy of go's map iterator) pick some
+	// existing entries and stop&remove them if the associated
+	// connection is no longer active.  We stop as soon as we
+	// encounter a valid entry; the idea being that when there is
+	// little or no garbage then this executes close to O(1), whereas
+	// when there is lots of garbage we remove it quickly.
+	for conn, sender := range c.senders {
+		if foundConn, found := c.ourself.ConnectionTo(conn.Remote().Name); !found || foundConn != conn {
+			delete(c.senders, conn)
+			sender.Stop()
+		} else {
+			break
+		}
+	}
 	for conn := range connections {
 		c.sendDown(conn, data)
-		retainedSenders[conn] = c.senders[conn]
-		delete(c.senders, conn)
 	}
-	// stop any senders for connections that are gone
-	for _, sender := range c.senders {
-		sender.Stop()
-	}
-	c.senders = retainedSenders
 }
 
 func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
