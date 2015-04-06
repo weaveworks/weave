@@ -23,6 +23,8 @@ type NameCollisionError struct {
 	Name PeerName
 }
 
+type PeerNameSet map[PeerName]struct{}
+
 func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
@@ -169,7 +171,7 @@ func (peers *Peers) garbageCollect() []*Peer {
 func setFromPeersMap(peers map[PeerName]*Peer) PeerNameSet {
 	names := make(PeerNameSet)
 	for name := range peers {
-		names[name] = true
+		names[name] = void
 	}
 	return names
 }

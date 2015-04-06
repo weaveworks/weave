@@ -350,8 +350,6 @@ func handleSpecialFrame(relayConn *LocalConnection, sender *net.UDPAddr, frame [
 
 // Gossiper methods - the Router is the topology Gossiper
 
-type PeerNameSet map[PeerName]bool
-
 type TopologyGossipData struct {
 	peers  *Peers
 	update PeerNameSet
@@ -360,14 +358,14 @@ type TopologyGossipData struct {
 func NewTopologyGossipData(peers *Peers, update ...*Peer) *TopologyGossipData {
 	names := make(PeerNameSet)
 	for _, p := range update {
-		names[p.Name] = true
+		names[p.Name] = void
 	}
 	return &TopologyGossipData{peers: peers, update: names}
 }
 
 func (d *TopologyGossipData) Merge(other GossipData) {
 	for name := range other.(*TopologyGossipData).update {
-		d.update[name] = true
+		d.update[name] = void
 	}
 }
 
