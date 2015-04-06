@@ -16,10 +16,10 @@ const (
 	UDPNonceSendAt      = 8192
 	FragTestSize        = 60001
 	PMTUDiscoverySize   = 60000
+	TCPHeartbeat        = 30 * time.Second
 	FastHeartbeat       = 500 * time.Millisecond
 	SlowHeartbeat       = 10 * time.Second
 	FragTestInterval    = 5 * time.Minute
-	ReadTimeout         = 1 * time.Minute
 	PMTUVerifyAttempts  = 8
 	PMTUVerifyTimeout   = 10 * time.Millisecond // gets doubled with every attempt
 	MaxDuration         = time.Duration(math.MaxInt64)
