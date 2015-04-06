@@ -18,7 +18,7 @@ type ConnectionMaker struct {
 	ourself        *LocalPeer
 	peers          *Peers
 	targets        map[string]*Target
-	cmdLineAddress map[string]bool
+	cmdLineAddress map[string]struct{}
 	actionChan     chan<- ConnectionMakerAction
 }
 
@@ -35,7 +35,7 @@ func NewConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
 	return &ConnectionMaker{
 		ourself:        ourself,
 		peers:          peers,
-		cmdLineAddress: make(map[string]bool),
+		cmdLineAddress: make(map[string]struct{}),
 		targets:        make(map[string]*Target)}
 }
 
@@ -47,7 +47,7 @@ func (cm *ConnectionMaker) Start() {
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.actionChan <- func() bool {
-		cm.cmdLineAddress[NormalisePeerAddr(address)] = true
+		cm.cmdLineAddress[NormalisePeerAddr(address)] = struct{}{}
 		if target, found := cm.targets[address]; found {
 			target.tryAfter, target.tryInterval = tryImmediately()
 		}
@@ -111,19 +111,19 @@ func (cm *ConnectionMaker) queryLoop(actionChan <-chan ConnectionMakerAction) {
 }
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
-	validTarget := make(map[string]bool)
+	validTarget := make(map[string]struct{})
 
 	// copy the set of things we are connected to, so we can access them without locking
-	ourConnectedPeers := make(map[PeerName]bool)
-	ourConnectedTargets := make(map[string]bool)
+	ourConnectedPeers := make(map[PeerName]struct{})
+	ourConnectedTargets := make(map[string]struct{})
 	for _, conn := range cm.ourself.Connections() {
-		ourConnectedPeers[conn.Remote().Name] = true
-		ourConnectedTargets[conn.RemoteTCPAddr()] = true
+		ourConnectedPeers[conn.Remote().Name] = struct{}{}
+		ourConnectedTargets[conn.RemoteTCPAddr()] = struct{}{}
 	}
 
 	addTarget := func(address string) {
-		if !ourConnectedTargets[address] {
-			validTarget[address] = true
+		if _, connected := ourConnectedTargets[address]; !connected {
+			validTarget[address] = struct{}{}
 			cm.addTarget(address)
 		}
 	}
@@ -138,7 +138,10 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	cm.peers.ForEach(func(peer *Peer) {
 		for _, conn := range peer.Connections() {
 			otherPeer := conn.Remote().Name
-			if otherPeer == cm.ourself.Name || ourConnectedPeers[otherPeer] {
+			if otherPeer == cm.ourself.Name {
+				continue
+			}
+			if _, connected := ourConnectedPeers[otherPeer]; connected {
 				continue
 			}
 			address := conn.RemoteTCPAddr()
@@ -163,25 +166,26 @@ func (cm *ConnectionMaker) addTarget(address string) {
 	}
 }
 
-func (cm *ConnectionMaker) connectToTargets(validTarget map[string]bool, ourConnectedTargets map[string]bool) time.Duration {
+func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, ourConnectedTargets map[string]struct{}) time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if ourConnectedTargets[address] {
+		if _, connected := ourConnectedTargets[address]; connected {
 			delete(cm.targets, address)
 			continue
 		}
 		if target.attempting {
 			continue
 		}
-		if !validTarget[address] {
+		if _, valid := validTarget[address]; !valid {
 			delete(cm.targets, address)
 			continue
 		}
 		switch duration := target.tryAfter.Sub(now); {
 		case duration <= 0:
 			target.attempting = true
-			go cm.attemptConnection(address, cm.cmdLineAddress[address])
+			_, isCmdLineAddress := cm.cmdLineAddress[address]
+			go cm.attemptConnection(address, isCmdLineAddress)
 		case duration < after:
 			after = duration
 		}
