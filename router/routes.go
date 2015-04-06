@@ -162,7 +162,7 @@ func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerN
 			// This is rather similar to the inner loop on
 			// peer.Routes(...); the main difference is in the
 			// locking.
-			for _, conn := range ourself.Connections() {
+			for conn := range ourself.Connections() {
 				if establishedAndSymmetric && !conn.Established() {
 					continue
 				}

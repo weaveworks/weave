@@ -133,7 +133,7 @@ func (peers *Peers) String() string {
 	var buf bytes.Buffer
 	peers.ForEach(func(peer *Peer) {
 		fmt.Fprint(&buf, peer, "\n")
-		for _, conn := range peer.Connections() {
+		for conn := range peer.Connections() {
 			established := ""
 			if !conn.Established() {
 				established = " (unestablished)"

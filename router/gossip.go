@@ -179,7 +179,7 @@ func (c *GossipChannel) Send(data GossipData) {
 	retainedSenders := make(connectionSenders)
 	c.Lock()
 	defer c.Unlock()
-	for _, conn := range connections {
+	for conn := range connections {
 		c.sendDown(conn, data)
 		retainedSenders[conn] = c.senders[conn]
 		delete(c.senders, conn)

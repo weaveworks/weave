@@ -17,6 +17,8 @@ type Peer struct {
 	connections   map[PeerName]Connection
 }
 
+type ConnectionSet map[Connection]struct{}
+
 func NewPeer(name PeerName, nickName string, uid uint64, version uint64) *Peer {
 	if uid == 0 {
 		uid = randUint64()
@@ -77,12 +79,12 @@ func (peer *Peer) ConnectionTo(name PeerName) (Connection, bool) {
 	return conn, found // yes, you really can't inline that. FFS.
 }
 
-func (peer *Peer) Connections() []Connection {
+func (peer *Peer) Connections() ConnectionSet {
+	connections := make(ConnectionSet)
 	peer.RLock()
 	defer peer.RUnlock()
-	connections := make([]Connection, 0, len(peer.connections))
 	for _, conn := range peer.connections {
-		connections = append(connections, conn)
+		connections[conn] = void
 	}
 	return connections
 }
