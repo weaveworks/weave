@@ -171,7 +171,7 @@ func (peers *Peers) garbageCollect() []*Peer {
 func setFromPeersMap(peers map[PeerName]*Peer) PeerNameSet {
 	names := make(PeerNameSet)
 	for name := range peers {
-		names[name] = struct{}{}
+		names[name] = void
 	}
 	return names
 }

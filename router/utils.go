@@ -10,6 +10,8 @@ import (
 	"net"
 )
 
+var void = struct{}{}
+
 func checkFatal(e error) {
 	if e != nil {
 		log.Fatal(e)

@@ -358,14 +358,14 @@ type TopologyGossipData struct {
 func NewTopologyGossipData(peers *Peers, update ...*Peer) *TopologyGossipData {
 	names := make(PeerNameSet)
 	for _, p := range update {
-		names[p.Name] = struct{}{}
+		names[p.Name] = void
 	}
 	return &TopologyGossipData{peers: peers, update: names}
 }
 
 func (d *TopologyGossipData) Merge(other GossipData) {
 	for name := range other.(*TopologyGossipData).update {
-		d.update[name] = struct{}{}
+		d.update[name] = void
 	}
 }
 

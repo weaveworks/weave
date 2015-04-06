@@ -47,7 +47,7 @@ func (cm *ConnectionMaker) Start() {
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.actionChan <- func() bool {
-		cm.cmdLineAddress[NormalisePeerAddr(address)] = struct{}{}
+		cm.cmdLineAddress[NormalisePeerAddr(address)] = void
 		if target, found := cm.targets[address]; found {
 			target.tryAfter, target.tryInterval = tryImmediately()
 		}
@@ -117,13 +117,13 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	ourConnectedPeers := make(PeerNameSet)
 	ourConnectedTargets := make(map[string]struct{})
 	for _, conn := range cm.ourself.Connections() {
-		ourConnectedPeers[conn.Remote().Name] = struct{}{}
-		ourConnectedTargets[conn.RemoteTCPAddr()] = struct{}{}
+		ourConnectedPeers[conn.Remote().Name] = void
+		ourConnectedTargets[conn.RemoteTCPAddr()] = void
 	}
 
 	addTarget := func(address string) {
 		if _, connected := ourConnectedTargets[address]; !connected {
-			validTarget[address] = struct{}{}
+			validTarget[address] = void
 			cm.addTarget(address)
 		}
 	}
