@@ -114,7 +114,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	validTarget := make(map[string]struct{})
 
 	// copy the set of things we are connected to, so we can access them without locking
-	ourConnectedPeers := make(map[PeerName]struct{})
+	ourConnectedPeers := make(PeerNameSet)
 	ourConnectedTargets := make(map[string]struct{})
 	for _, conn := range cm.ourself.Connections() {
 		ourConnectedPeers[conn.Remote().Name] = struct{}{}

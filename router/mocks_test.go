@@ -48,7 +48,7 @@ func newMockConnection(from, to *Peer) Connection {
 }
 
 func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Connection) {
-	checkConns := make(map[PeerName]struct{})
+	checkConns := make(PeerNameSet)
 	for _, conn := range wanted {
 		checkConns[conn.Remote().Name] = struct{}{}
 	}

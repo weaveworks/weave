@@ -350,8 +350,6 @@ func handleSpecialFrame(relayConn *LocalConnection, sender *net.UDPAddr, frame [
 
 // Gossiper methods - the Router is the topology Gossiper
 
-type PeerNameSet map[PeerName]struct{}
-
 type TopologyGossipData struct {
 	peers  *Peers
 	update PeerNameSet
