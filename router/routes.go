@@ -15,6 +15,7 @@ type Routes struct {
 	broadcast    map[PeerName][]PeerName
 	broadcastAll map[PeerName][]PeerName // [1]
 	recalculate  chan<- *struct{}
+	wait         chan<- chan struct{}
 	// [1] based on *all* connections, not just established &
 	// symmetric ones
 }
@@ -36,8 +37,10 @@ func NewRoutes(ourself *Peer, peers *Peers) *Routes {
 
 func (routes *Routes) Start() {
 	recalculate := make(chan *struct{}, 1)
+	wait := make(chan chan struct{})
 	routes.recalculate = recalculate
-	go routes.run(recalculate)
+	routes.wait = wait
+	go routes.run(recalculate, wait)
 }
 
 func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
@@ -91,17 +94,39 @@ func (routes *Routes) String() string {
 	return buf.String()
 }
 
+// Request recalculation of the routing table. This is async but can
+// effectively be made synchronous with a subsequent call to
+// EnsureRecalculated.
 func (routes *Routes) Recalculate() {
+	// The use of a 1-capacity channel in combination with the
+	// non-blocking send is an optimisation that results in multiple
+	// requests being coalesced.
 	select {
 	case routes.recalculate <- nil:
 	default:
 	}
 }
 
-func (routes *Routes) run(recalculate <-chan *struct{}) {
+// Wait for any preceding Recalculate requests to be processed.
+func (routes *Routes) EnsureRecalculated() {
+	done := make(chan struct{})
+	routes.wait <- done
+	<-done
+}
+
+func (routes *Routes) run(recalculate <-chan *struct{}, wait <-chan chan struct{}) {
 	for {
-		<-recalculate
-		routes.calculate()
+		select {
+		case <-recalculate:
+			routes.calculate()
+		case done := <-wait:
+			select {
+			case <-recalculate:
+				routes.calculate()
+			default:
+			}
+			close(done)
+		}
 	}
 }
 

@@ -241,14 +241,7 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.Router.Routes.Recalculate()
-	// TODO We should just be invoking TopologyGossip.GossipBroadcast
-	// here, but route calculation is asynchronous and in this
-	// particular case would likely result in the broadcast not
-	// reaching all peers. So instead we slightly break the Gossip
-	// abstraction (hence the cast) and send a regular update. This is
-	// less efficient though since it will almost certainly reach
-	// peers more than once.
-	peer.Router.TopologyGossip.(*GossipChannel).Send(NewTopologyGossipData(peer.Router.Peers, append(peers, peer.Peer)...))
+	peer.Router.TopologyGossip.GossipBroadcast(NewTopologyGossipData(peer.Router.Peers, append(peers, peer.Peer)...))
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {

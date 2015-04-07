@@ -69,15 +69,15 @@ func (peers *Peers) ForEach(fun func(*Peer)) {
 //
 // We add peers hitherto unknown to us, and update peers for which the
 // update contains a more recent version than known to us. The return
-// value is an "improved" update containing just these new/updated
-// elements.
-func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, error) {
+// value is a) a representation of the received update, and b) an
+// "improved" update containing just these new/updated elements.
+func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
 	peers.Lock()
 
 	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
 	if err != nil {
 		peers.Unlock()
-		return nil, err
+		return nil, nil, err
 	}
 
 	// By this point, we know the update doesn't refer to any peers we
@@ -97,7 +97,11 @@ func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, error) {
 	// Don't need to hold peers lock any longer
 	peers.Unlock()
 
-	return setFromPeersMap(newUpdate), nil
+	updateNames := make(PeerNameSet)
+	for _, peer := range decodedUpdate {
+		updateNames[peer.Name] = void
+	}
+	return updateNames, setFromPeersMap(newUpdate), nil
 }
 
 func (peers *Peers) Names() PeerNameSet {
