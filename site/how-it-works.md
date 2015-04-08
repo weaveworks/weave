@@ -397,4 +397,4 @@ further.
 
 ### Further reading
 More details on the inner workings of weave can be found in the
-[architecture documentation](https://github.com/zettio/weave/blob/master/docs/architecture.txt).
+[architecture documentation](https://github.com/weaveworks/weave/blob/master/docs/architecture.txt).

@@ -33,7 +33,7 @@ Ensure you are running Linux (kernel 3.5 or later) and have Docker
 (version 0.9.1 or later) installed. Then install weave with
 
     sudo wget -O /usr/local/bin/weave \
-      https://github.com/zettio/weave/releases/download/latest_release/weave
+      https://github.com/weaveworks/weave/releases/download/latest_release/weave
     sudo chmod a+x /usr/local/bin/weave
 
 CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing weave using cloud-config.
@@ -135,12 +135,12 @@ to each other.
  * [Troubleshooting](http://zettio.github.io/weave/troubleshooting.html)
  * [Building](http://zettio.github.io/weave/building.html)
  * [How it works](http://zettio.github.io/weave/how-it-works.html)
- * [WeaveDNS README](https://github.com/zettio/weave/tree/master/weavedns#readme)
+ * [WeaveDNS README](https://github.com/weaveworks/weave/tree/master/weavedns#readme)
 
 ## Contact Us
 
 Found a bug, want to suggest a feature, or have a question?
-[File an issue](https://github.com/zettio/weave/issues), or email
+[File an issue](https://github.com/weaveworks/weave/issues), or email
 help@weave.works. When reporting a bug, please include which version of
 weave you are running, as shown by `weave version`.
 

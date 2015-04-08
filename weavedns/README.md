@@ -154,7 +154,7 @@ it does not attempt to do load-balancing.
 
 ### Replacing one container with another at the same name
 
-If you would like to deploy a new version of a service, keep the old one running because it has active connections but make all new requests go to the new version, then you can simply start the new server container and then [unregister](https://github.com/zettio/weave/tree/master/weavedns#unregistering) the old one from DNS. And finally, when all connections to the old server have terminated, stop the container as normal.
+If you would like to deploy a new version of a service, keep the old one running because it has active connections but make all new requests go to the new version, then you can simply start the new server container and then [unregister](https://github.com/weaveworks/weave/tree/master/weavedns#unregistering) the old one from DNS. And finally, when all connections to the old server have terminated, stop the container as normal.
 
 ### Not watching docker events
 

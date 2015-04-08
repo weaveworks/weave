@@ -1,3 +1,3 @@
 #! /bin/sh
 set -e
-git push git@github.com:zettio/weave gh-pages:gh-pages
+git push git@github.com:weaveworks/weave gh-pages:gh-pages

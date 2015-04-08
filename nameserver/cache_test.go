@@ -3,8 +3,8 @@ package nameserver
 import (
 	"fmt"
 	"github.com/miekg/dns"
-	. "github.com/zettio/weave/common"
-	wt "github.com/zettio/weave/testing"
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
 	"time"
