@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"github.com/davecheney/profile"
 	"github.com/gorilla/mux"
+	lg "github.com/zettio/weave/common"
+	"github.com/zettio/weave/common/updater"
+	"github.com/zettio/weave/ipam"
 	weavenet "github.com/zettio/weave/net"
 	weave "github.com/zettio/weave/router"
 	"io"
@@ -42,10 +45,13 @@ func main() {
 		password    string
 		wait        int
 		debug       bool
+		pktdebug    bool
 		prof        string
 		peers       []string
 		connLimit   int
 		bufSz       int
+		allocCIDR   string
+		apiPath     string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -54,13 +60,17 @@ func main() {
 	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0, i.e. don't wait)")
+	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (defaults to 30, set to 0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
+	flag.StringVar(&allocCIDR, "alloc", "", "CIDR of IP address space to allocate within")
+	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
 	flag.Parse()
 	peers = flag.Args()
 
+	lg.InitDefaultLogging(debug)
 	if justVersion {
 		fmt.Printf("weave router %s\n", version)
 		os.Exit(0)
@@ -121,11 +131,15 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	router := weave.NewRouter(iface, ourName, nickName, pwSlice, connLimit, bufSz*1024*1024, logFrameFunc(debug))
+	router := weave.NewRouter(iface, ourName, nickName, pwSlice, connLimit, bufSz*1024*1024, logFrameFunc(pktdebug))
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
 	initiateConnections(router, peers)
-	go handleHTTP(router)
+	var allocator *ipam.Allocator = nil
+	if allocCIDR != "" {
+		allocator = createAllocator(router, apiPath, allocCIDR)
+	}
+	go handleHttp(router, allocator)
 	handleSignals(router)
 }
 
@@ -153,7 +167,22 @@ func initiateConnections(router *weave.Router, peers []string) {
 	}
 }
 
-func handleHTTP(router *weave.Router) {
+func createAllocator(router *weave.Router, apiPath string, allocCIDR string) *ipam.Allocator {
+	allocator, err := ipam.NewAllocator(router.Ourself.Peer.Name, allocCIDR)
+	if err != nil {
+		log.Fatal(err)
+	}
+	allocator.SetGossip(router.NewGossip("IPallocation", allocator))
+	allocator.Start()
+	allocator.HandleHTTP(http.DefaultServeMux)
+	err = updater.Start(apiPath, allocator)
+	if err != nil {
+		lg.Error.Fatal("Unable to start watcher", err)
+	}
+	return allocator
+}
+
+func handleHttp(router *weave.Router, others ...interface{}) {
 	encryption := "off"
 	if router.UsingPassword() {
 		encryption = "on"
@@ -165,6 +194,9 @@ func handleHTTP(router *weave.Router) {
 		io.WriteString(w, fmt.Sprintln("weave router", version))
 		io.WriteString(w, fmt.Sprintln("Encryption", encryption))
 		io.WriteString(w, router.Status())
+		for _, x := range others {
+			io.WriteString(w, fmt.Sprintln(x))
+		}
 	})
 
 	muxRouter.Methods("GET").Path("/status-json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -40,7 +40,7 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 		false; \
 	}
 
-$(WEAVER_EXE): router/*.go weaver/main.go
+$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
 
 $(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)

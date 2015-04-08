@@ -15,15 +15,15 @@ IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 usage() {
     echo "Usage:"
     echo "weave setup"
-    echo "weave launch     [-password <password>] [-nickname <nickname>] <peer> ..."
+    echo "weave launch     [-password <password>] [-nickname <nickname>] [-alloc <cidr>] <peer> ..."
     echo "weave launch-dns <cidr>"
     echo "weave connect    <peer>"
     echo "weave forget     <peer>"
-    echo "weave run        [--with-dns] <cidr> [<cidr> ...] <docker run args> ..."
-    echo "weave start      <cidr> [<cidr> ...] <container_id>"
-    echo "weave attach     <cidr> [<cidr> ...] <container_id>"
+    echo "weave run        [--with-dns] [<cidr> ...] <docker run args> ..."
+    echo "weave start      [<cidr> ...] <container_id>"
+    echo "weave attach     [<cidr> ...] <container_id>"
     echo "weave detach     <cidr> [<cidr> ...] <container_id>"
-    echo "weave expose     <cidr>"
+    echo "weave expose     [<cidr>]"
     echo "weave hide       <cidr>"
     echo "weave ps"
     echo "weave status"
@@ -232,6 +232,17 @@ create_bridge() {
     # Configure the ARP cache parameters on the bridge interface for
     # the sake of 'weave expose'
     configure_arp_cache $BRIDGE
+}
+
+expose() {
+    CIDR="$1"
+    if ! ip addr show dev $BRIDGE | grep -qF $CIDR
+    then
+        ip addr add dev $BRIDGE $CIDR
+        arp_update $BRIDGE $CIDR
+        add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
+        add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+    fi
 }
 
 destroy_bridge() {
@@ -488,6 +499,44 @@ populate_dns() {
     done
 }
 
+# Tell the newly-started weave IP allocator about existing weave IPs
+populate_ipam() {
+    wait_for_status $CONTAINER_NAME $HTTP_PORT
+    for CONTAINER in $(docker ps -q --no-trunc); do
+        if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
+            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
+            for IP in $CONTAINER_IPS; do
+                http_call_ip $TARGET_IP $HTTP_PORT PUT /ip/$CONTAINER/$IP
+            done
+        fi
+    done
+}
+
+# If we don't already have any CIDRs passed from the command-line, get one from IPAM
+get_ipam_cidr() {
+    if [ -z $CIDR_ARGS ] ; then
+        # get the long form of the container ID
+        if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null); then
+            echo "Error: No such container: $1" >&2
+            return 1
+        fi
+        case "$status" in
+            true*)
+                CONTAINER="${status#true }"
+                ;;
+            *)
+                echo "$1 container is not running." >&2
+                return 1
+                ;;
+        esac
+        CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT GET /ip/$CONTAINER)"
+        if [ "$CIDR_ARGS" = "404 page not found" ] ; then
+            echo "At least one CIDR is required on the command-line if IPAM has not been configured." >&2
+            return 1
+        fi
+    fi
+}
+
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
     case $(docker inspect --format='{{.State.Running}} {{.Config.Image}}' $1 2>/dev/null) in
@@ -611,6 +660,12 @@ case "$COMMAND" in
                     NICKNAME="$2"
                     shift 2
                     ;;
+                -alloc)
+                    [ $# -gt 1 ] || usage
+                    validate_cidr $2
+                    ALLOC="-alloc $2"
+                    shift 2
+                    ;;
                 *)
                     break
                     ;;
@@ -620,10 +675,10 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD \
-            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -name $MACADDR -nickname "$NICKNAME" "$@")
+            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
+            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -name $MACADDR -nickname "$NICKNAME" $ALLOC "$@")
         with_container_netns $CONTAINER launch >/dev/null
-        wait_for_status $CONTAINER_NAME $HTTP_PORT
+        [ -z "$ALLOC" ] || populate_ipam
         echo $CONTAINER
         ;;
     test-launch)
@@ -713,6 +768,7 @@ case "$COMMAND" in
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
         if [ "$LOCAL" = "--local" ]; then
             create_bridge
+            get_ipam_cidr $CONTAINER
             with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
             tell_dns PUT $CONTAINER $CIDR_ARGS
         else
@@ -731,16 +787,18 @@ case "$COMMAND" in
         CONTAINER_ID="$1"
         create_bridge
         CONTAINER=$(docker start $CONTAINER_ID)
+        get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
         tell_dns PUT $CONTAINER_ID $CIDR_ARGS
         echo $CONTAINER
         ;;
     attach)
-        [ $# -gt 1 ] || usage
+        [ $# -gt 0 ] || usage
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         CONTAINER_ID="$1"
         create_bridge
+        get_ipam_cidr $CONTAINER_ID
         with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
         tell_dns PUT $CONTAINER_ID $CIDR_ARGS
         ;;
@@ -753,17 +811,11 @@ case "$COMMAND" in
         tell_dns DELETE $CONTAINER_ID $CIDR_ARGS
         ;;
     expose)
-        [ $# -gt 0 ] || usage
+        create_bridge --without-ethtool
+        [ $# -gt 0 ] || { get_ipam_cidr weave && expose $CIDR_ARGS ; }
         for CIDR; do
             validate_cidr $CIDR
-            create_bridge --without-ethtool
-            if ! ip addr show dev $BRIDGE | grep -qF $CIDR
-            then
-                ip addr add dev $BRIDGE $CIDR
-                arp_update $BRIDGE $CIDR
-                add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
-                add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
-            fi
+            expose $CIDR
         done
         ;;
     hide)
@@ -796,6 +848,7 @@ case "$COMMAND" in
         ;;
     reset)
         [ $# -eq 0 ] || usage
+        http_call $CONTAINER_NAME $HTTP_PORT POST /tombstone-self || true
         docker stop  $CONTAINER_NAME     >/dev/null 2>&1 || true
         docker stop  $DNS_CONTAINER_NAME >/dev/null 2>&1 || true
         docker rm -f $CONTAINER_NAME     >/dev/null 2>&1 || true

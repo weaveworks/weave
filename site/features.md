@@ -9,6 +9,7 @@ Weave has a few more features beyond those illustrated by the [basic
 example](https://github.com/zettio/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
+ * [IP Address Management](#ipam)
  * [Application isolation](#application-isolation)
  * [Dynamic network attachment](#dynamic-network-attachment)
  * [Security](#security)
@@ -52,6 +53,29 @@ and troubleshoot our container network. To put it another way, we can
 now re-use the same tools and techniques when deploying applications
 as containers as we would have done when deploying them 'on metal' in
 our data centre.
+
+### <a name="ipam"></a>IP Address Management
+
+Weave can assign unique IP addresses to each container across the
+network.  To make this work, weave must be told what range of
+addresses to allocate from, on each host.  For example:
+
+    host1# weave launch -alloc 10.2.3.0/24
+
+The `run` and `attach` commands will then allocate an address
+automatically if none is specified, i.e.:
+
+    host1# D=$(weave run -t -i ubuntu)
+
+Weave uses the Docker Events API to learn when a container has exited
+and hence can release its IP address.
+
+You may wish to `weave stop` and re-launch to change some config or to
+upgrade to a new version; provided the underlying protocol hasn't
+changed it will pick up where it left off and learn from peers in the
+network which address ranges it was previously using. If, however, you
+run `weave reset` this will remove the peer from the network so
+if Weave is run again on that node it will start from scratch.
 
 ### <a name="application-isolation"></a>Application isolation
 
