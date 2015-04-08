@@ -16,7 +16,7 @@ func checkArguments() {
 
 func installSignalHandler() chan os.Signal {
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, os.Interrupt)
+	signal.Notify(sc, syscall.SIGINT)
 
 	return sc
 }
@@ -38,11 +38,10 @@ func execCommand() *exec.Cmd {
 }
 
 func forwardSignals(sc chan os.Signal, cmd *exec.Cmd) {
-	// Unfortunately there's no way to convert the os.Signal type from
-	// the channel into a numeric signal number for syscall.Kill. Wait for
-	// (and discard) os.Interrupt, then deliver SIGINT to process group
-	<-sc
-	syscall.Kill(0, syscall.SIGINT)
+	for {
+		// Signalling PID 0 delivers to our process group
+		syscall.Kill(0, (<-sc).(syscall.Signal))
+	}
 }
 
 func waitAndExit(cmd *exec.Cmd) {
