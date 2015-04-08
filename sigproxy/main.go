@@ -37,7 +37,7 @@ func execCommand() *exec.Cmd {
 	return cmd
 }
 
-func forwardSignals(sc chan os.Signal, cmd *exec.Cmd) {
+func forwardSignals(sc chan os.Signal) {
 	for {
 		// Signalling PID 0 delivers to our process group
 		syscall.Kill(0, (<-sc).(syscall.Signal))
@@ -66,6 +66,6 @@ func main() {
 	checkArguments()
 	sc := installSignalHandler()
 	cmd := execCommand()
-	go forwardSignals(sc, cmd)
+	go forwardSignals(sc)
 	waitAndExit(cmd)
 }
