@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -31,10 +30,13 @@ func parseURLWithIP(url string) (identifier string, ipaddr string, err error) {
 	return parts[2], parts[3], nil
 }
 
-func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
-	status int, logmsg string, logargs ...interface{}) {
-	http.Error(w, msg, status)
-	level.Printf(logmsg, logargs...)
+func badRequest(w http.ResponseWriter, err error) {
+	http.Error(w, err.Error(), http.StatusBadRequest)
+	common.Warning.Println(err.Error())
+}
+
+func invalidIP(w http.ResponseWriter, ip string) {
+	badRequest(w, fmt.Errorf("Invalid IP in request: %s", ip))
 }
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
@@ -46,36 +48,31 @@ func (alloc *Allocator) HandleHTTP(mux *http.ServeMux) {
 		case "PUT": // caller supplies an address to reserve for a container
 			ident, ipStr, err := parseURLWithIP(r.URL.Path)
 			if err != nil {
-				httpErrorAndLog(common.Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
+				badRequest(w, err)
 			} else if ip := net.ParseIP(ipStr); ip == nil {
-				httpErrorAndLog(common.Warning, w, "Invalid IP", http.StatusBadRequest,
-					"Invalid IP in request: %s", ipStr)
+				invalidIP(w, ipStr)
 			} else if err = alloc.Claim(ident, ip, closedChan); err != nil {
-				httpErrorAndLog(common.Warning, w, "Unsuccessful claim: "+err.Error(), http.StatusBadRequest, "Unable to claim IP address %s: %s", ip, err)
+				badRequest(w, fmt.Errorf("Unable to claim IP address %s: %s", ip, err))
 			}
 		case "GET": // caller requests one address for a container
 			ident, err := parseURL(r.URL.Path)
 			if err != nil {
-				httpErrorAndLog(common.Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
+				badRequest(w, err)
 			} else if newAddr := alloc.GetFor(ident, closedChan); newAddr != nil {
 				fmt.Fprintf(w, "%s/%d", newAddr, alloc.universeLen)
 			} else {
-				httpErrorAndLog(
-					common.Error, w, "Shutting down", http.StatusServiceUnavailable,
-					"Allocator shutting down")
+				badRequest(w, fmt.Errorf("Allocator shutting down"))
 			}
 		case "DELETE": // opposite of PUT for one specific address or all addresses
 			ident, ipStr, err := parseURLWithIP(r.URL.Path)
 			if err != nil {
-				httpErrorAndLog(common.Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
+				badRequest(w, err)
 			} else if ipStr == "*" {
 				alloc.ContainerDied(ident)
 			} else if ip := net.ParseIP(ipStr); ip == nil {
-				httpErrorAndLog(common.Warning, w, "Invalid IP", http.StatusBadRequest,
-					"Invalid IP in request: %s", ipStr)
-				return
+				invalidIP(w, ipStr)
 			} else if err = alloc.Free(ident, ip); err != nil {
-				httpErrorAndLog(common.Warning, w, "Invalid Free", http.StatusBadRequest, err.Error())
+				badRequest(w, err)
 			}
 		default:
 			http.Error(w, "Verb not handled", http.StatusBadRequest)
@@ -98,19 +95,18 @@ func (alloc *Allocator) HandleHTTP(mux *http.ServeMux) {
 		case "DELETE": // opposite of PUT for one specific address or all addresses
 			ident, err := parseURL(r.URL.Path)
 			if err != nil {
-				httpErrorAndLog(common.Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
+				badRequest(w, err)
 				return
 			}
 
 			peername, err := router.PeerNameFromString(ident)
 			if err != nil {
-				httpErrorAndLog(common.Warning, w, "Invalid peername", http.StatusBadRequest, err.Error())
+				badRequest(w, err)
 				return
 			}
 
 			if err := alloc.TombstonePeer(peername); err != nil {
-				httpErrorAndLog(common.Warning, w, "Cannot remove peer", http.StatusBadRequest,
-					err.Error())
+				badRequest(w, err)
 				return
 			}
 
