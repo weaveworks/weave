@@ -31,6 +31,7 @@ type Router struct {
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
+	Port	        int
 }
 
 type PacketSource interface {
@@ -46,14 +47,15 @@ type PacketSourceSink interface {
 	PacketSink
 }
 
-func NewRouter(iface *net.Interface, name PeerName, nickName string, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
+func NewRouter(iface *net.Interface, name PeerName, nickName string, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet), port int) *Router {
 	router := &Router{
 		Iface:          iface,
 		GossipChannels: make(map[uint32]*GossipChannel),
 		Password:       password,
 		ConnLimit:      connLimit,
 		BufSz:          bufSz,
-		LogFrame:       logFrame}
+		LogFrame:       logFrame,
+		Port:           port}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer.FullName())
 	}
@@ -66,7 +68,7 @@ func NewRouter(iface *net.Interface, name PeerName, nickName string, password []
 	router.Peers = NewPeers(router.Ourself.Peer, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
-	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
+	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.NormalisePeerAddr)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	return router
 }
@@ -86,8 +88,8 @@ func (router *Router) Start() {
 	router.Macs.Start()
 	router.Routes.Start()
 	router.ConnectionMaker.Start()
-	router.UDPListener = router.listenUDP(Port, po)
-	router.listenTCP(Port)
+	router.UDPListener = router.listenUDP(router.Port, po)
+	router.listenTCP(router.Port)
 	if pio != nil {
 		router.sniff(pio)
 	}
@@ -198,7 +200,7 @@ func (router *Router) listenTCP(localPort int) {
 
 func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// someone else is dialing us, so our udp sender is the conn
-	// on Port and we wait for them to send us something on UDP to
+	// on router.Port and we wait for them to send us something on UDP to
 	// start.
 	remoteAddrStr := tcpConn.RemoteAddr().String()
 	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
@@ -415,4 +417,14 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 		router.Routes.Recalculate()
 	}
 	return origUpdate, newUpdate, nil
+}
+
+// given an address like '1.2.3.4:567', return the address if it has a port,
+// otherwise return the address with the default port number for the router
+func (router *Router) NormalisePeerAddr(peerAddr string) string {
+        _, _, err := net.SplitHostPort(peerAddr)
+        if err == nil {
+                return peerAddr
+        }
+        return fmt.Sprintf("%s:%d", peerAddr, router.Port)
 }
