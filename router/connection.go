@@ -297,50 +297,60 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.FullName())
 
-	// We invoke AddConnection in the same goroutine that subsequently
-	// becomes the tcp receive loop, rather than outside, because a)
-	// the ordering relative to the receive loop is the only one that
-	// matters [1], b) it prevents unnecessary delays in entering the
-	// main connection loop, and c) it guards against potential
-	// deadlocks.
-	go func() {
-		conn.Router.Ourself.AddConnection(conn)
-		conn.receiveTCP(dec)
-	}()
+	if err := conn.initHeartbeats(); err != nil { // [1]
+		conn.Log("connection shutting down due to error:", err)
+		return
+	}
 
+	conn.Router.Ourself.AddConnection(conn) // [1]
+
+	go conn.receiveTCP(dec) // [1]
+
+	if err := conn.actorLoop(actionChan); err != nil { // [1]
+		conn.Log("connection shutting down due to error:", err)
+		return
+	}
+	conn.Log("connection shutting down")
+}
+
+// [1] Ordering constraints:
+//
+// (a) initHeartbeats should precede AddConnection. That way we can
+// guarantee that a) the forwarder gets initialised before the router
+// can discover the connection and attempt to invoke Forward, and b)
+// Heartbeats are the first thing that get sent on connections.
+// Neither of these are essential, but they are desirable.
+//
+// (b) AddConnection must precede receiveTCP. In the absence of any
+// indirect connectivity to the remote peer, the first we hear about
+// it (and any peers reachable from it) is through topology gossip it
+// sends us on the connection. We must ensure that the connection has
+// been added to Ourself prior to processing any such gossip,
+// otherwise we risk immediately gc'ing part of that newly received
+// portion of the topology (though not the remote peer itself, since
+// that will have a positive ref count), leaving behind dangling
+// references to peers. Hence we must invoke AddConnection, which is
+// *synchronous*, first.
+//
+// (c) AddConnection must precede actorLoop. More precisely, it must
+// precede shutdown, since that invokes DeleteConnection and is
+// invoked on termination of this entire function. Essentially this
+// boils down to a prohibition on running AddConnection in a separate
+// goroutine, at least not without some synchronisation.
+
+func (conn *LocalConnection) initHeartbeats() error {
+	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
 	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
 	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.uid)
 	conn.heartbeatFrame = &ForwardedFrame{
 		srcPeer: conn.local,
 		dstPeer: conn.remote,
 		frame:   heartbeatFrameBytes}
-
-	if conn.remoteUDPAddr != nil {
-		if err := conn.sendFastHeartbeats(); err != nil {
-			conn.Log("connection shutting down due to error:", err)
-			return
-		}
+	if conn.remoteUDPAddr == nil {
+		return nil
 	}
-
-	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
-
-	if err := conn.actorLoop(actionChan); err != nil {
-		conn.Log("connection shutting down due to error:", err)
-	} else {
-		conn.Log("connection shutting down")
-	}
+	return conn.sendFastHeartbeats()
 }
-
-// [1] In the absence of any indirect connectivity to the remote peer,
-// the first we hear about it (and any peers reachable from it) is
-// through topology gossip it sends us on the connection. We must
-// ensure that the connection has been added to Ourself prior to
-// processing any such gossip, otherwise we risk immediately gc'ing
-// part of that newly received portion of the topology (though not the
-// remote peer itself, since that will have a positive ref count),
-// leaving behind dangling references to peers. Therefore we invoke
-// AddConnection, which is *synchronous*, before entering the tcp
-// receive loop.
 
 func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
 	for err == nil {
