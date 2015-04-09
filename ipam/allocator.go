@@ -87,7 +87,9 @@ func (alloc *Allocator) string() string {
 func (alloc *Allocator) checkPendingAllocations() {
 	i := 0
 	for ; i < len(alloc.pending); i++ {
-		if !alloc.tryAllocateFor(alloc.pending[i].Ident, alloc.pending[i].resultChan) {
+		if addr, success := alloc.tryAllocateFor(alloc.pending[i].Ident); success {
+			alloc.pending[i].resultChan <- addr
+		} else {
 			break
 		}
 	}
@@ -120,17 +122,16 @@ func (alloc *Allocator) electLeaderIfNecessary() {
 }
 
 // return true if the request is completed, false if pending
-func (alloc *Allocator) tryAllocateFor(ident string, resultChan chan<- net.IP) bool {
+func (alloc *Allocator) tryAllocateFor(ident string) (net.IP, bool) {
 	// If we have previously stored an address for this container, return it.
+	// FIXME: the data structure allows multiple addresses per (allocator per) ident but the code doesn't
 	if addrs, found := alloc.owned[ident]; found && len(addrs) > 0 {
-		resultChan <- addrs[0]
-		return true
+		return addrs[0], true
 	}
 	if addr := alloc.spaceSet.Allocate(); addr != nil {
 		alloc.debugln("Allocated", addr, "for", ident)
 		alloc.addOwned(ident, addr)
-		resultChan <- addr
-		return true
+		return addr, true
 	}
 
 	// out of space
@@ -139,7 +140,7 @@ func (alloc *Allocator) tryAllocateFor(ident string, resultChan chan<- net.IP) b
 		alloc.sendRequest(donor, msgSpaceRequest)
 	}
 
-	return false
+	return nil, false
 }
 
 func (alloc *Allocator) handleLeaderElected() error {

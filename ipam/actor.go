@@ -26,7 +26,9 @@ func (alloc *Allocator) GetFor(ident string, cancelChan <-chan bool) net.IP {
 			return
 		}
 		alloc.electLeaderIfNecessary()
-		if !alloc.tryAllocateFor(ident, resultChan) {
+		if addr, success := alloc.tryAllocateFor(ident); success {
+			resultChan <- addr
+		} else {
 			alloc.pending = append(alloc.pending, pendingAllocation{resultChan, ident})
 		}
 	}
