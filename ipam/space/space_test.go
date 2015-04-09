@@ -1,9 +1,10 @@
 package space
 
 import (
-	wt "github.com/zettio/weave/testing"
 	"net"
 	"testing"
+
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func TestSpaceAllocate(t *testing.T) {

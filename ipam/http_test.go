@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zettio/weave/common"
-	wt "github.com/zettio/weave/testing"
+	"github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func HTTPGet(t *testing.T, url string) string {

@@ -3,8 +3,8 @@ package ring
 import (
 	"sort"
 
-	"github.com/zettio/weave/ipam/utils"
-	"github.com/zettio/weave/router"
+	"github.com/weaveworks/weave/ipam/utils"
+	"github.com/weaveworks/weave/router"
 )
 
 // Entry represents entries around the ring
@@ -16,9 +16,9 @@ type entry struct {
 	Free      uint32          // Number of free IPs in this range
 }
 
-func (e1 *entry) Equal(e2 *entry) bool {
-	return e1.Token == e2.Token && e1.Peer == e2.Peer &&
-		e1.Tombstone == e2.Tombstone && e1.Version == e2.Version
+func (e *entry) Equal(e2 *entry) bool {
+	return e.Token == e2.Token && e.Peer == e2.Peer &&
+		e.Tombstone == e2.Tombstone && e.Version == e2.Version
 }
 
 func (e *entry) update(peername router.PeerName, free uint32) {

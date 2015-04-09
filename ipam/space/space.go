@@ -2,9 +2,10 @@ package space
 
 import (
 	"fmt"
-	"github.com/zettio/weave/ipam/utils"
 	"net"
 	"sort"
+
+	"github.com/weaveworks/weave/ipam/utils"
 )
 
 // Space repsents a range of addresses owned by this peer,
@@ -30,7 +31,7 @@ func (space *Space) contains(addr net.IP) bool {
 	return diff >= 0 && diff < int64(space.Size)
 }
 
-// Mark an address as allocated on behalf of some specific container
+// Claim marks an address as allocated on behalf of some specific container
 func (space *Space) Claim(addr net.IP) (bool, error) {
 	offset := utils.Subtract(addr, space.Start)
 	if !(offset >= 0 && offset < int64(space.Size)) {

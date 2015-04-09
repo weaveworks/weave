@@ -1,7 +1,7 @@
 package ipam
 
 import (
-	"github.com/zettio/weave/router"
+	"github.com/weaveworks/weave/router"
 )
 
 // GossipData implementation is trivial - we always gossip the whole ring

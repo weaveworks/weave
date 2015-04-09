@@ -1,10 +1,12 @@
-/* Exported variables for monitoring and management */
 package ring
+
+/* Exported variables for monitoring and management */
 
 import (
 	"expvar"
-	"github.com/zettio/weave/ipam/utils"
 	"strconv"
+
+	"github.com/weaveworks/weave/ipam/utils"
 )
 
 var (

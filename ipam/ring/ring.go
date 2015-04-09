@@ -13,9 +13,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/zettio/weave/common"
-	"github.com/zettio/weave/ipam/utils"
-	"github.com/zettio/weave/router"
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/utils"
+	"github.com/weaveworks/weave/router"
 )
 
 // Ring represents the ring itself
@@ -109,12 +109,10 @@ func (r *Ring) distance(start, end uint32) uint32 {
 // GrantRangeToHost modifies the ring such that range [start, end)
 // is assigned to peer.  This may insert up to two new tokens.
 // Note, due to wrapping, end can be less than start
-
 // Preconditions:
 // - startIP < endIP
 // - [start, end) must be owned by the calling peer
 // - there must not be any live tokens in the range
-
 func (r *Ring) GrantRangeToHost(startIP, endIP net.IP, peer router.PeerName) {
 	//fmt.Printf("%s GrantRangeToHost [%v,%v) -> %s\n", r.Peername, startIP, endIP, peer)
 

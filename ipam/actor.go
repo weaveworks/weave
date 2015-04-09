@@ -2,9 +2,10 @@ package ipam
 
 import (
 	"fmt"
-	"github.com/zettio/weave/router"
 	"net"
 	"time"
+
+	"github.com/weaveworks/weave/router"
 )
 
 // Start runs the allocator goroutine
@@ -79,17 +80,17 @@ func (alloc *Allocator) ContainerDied(ident string) error {
 	return nil // this is to satisfy the ContainerObserver interface
 }
 
-// OnShutdown (Sync)
+// Shutdown (Sync)
 func (alloc *Allocator) Shutdown() {
 	alloc.infof("Shutdown")
-	doneChan := make(chan bool)
+	doneChan := make(chan struct{})
 	alloc.actionChan <- func() {
 		alloc.shuttingDown = true
 		alloc.ring.TombstonePeer(alloc.ourName, 100)
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
 		alloc.spaceSet.Clear()
 		time.Sleep(100 * time.Millisecond)
-		doneChan <- true
+		doneChan <- struct{}{}
 	}
 	<-doneChan
 }

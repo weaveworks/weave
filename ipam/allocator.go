@@ -7,11 +7,11 @@ import (
 	"net"
 	"time"
 
-	lg "github.com/zettio/weave/common"
-	"github.com/zettio/weave/ipam/ring"
-	"github.com/zettio/weave/ipam/space"
-	"github.com/zettio/weave/ipam/utils"
-	"github.com/zettio/weave/router"
+	lg "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/ring"
+	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/ipam/utils"
+	"github.com/weaveworks/weave/router"
 )
 
 const (
@@ -74,13 +74,12 @@ func NewAllocator(ourName router.PeerName, universeCIDR string) (*Allocator, err
 
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("Allocator universe %s+%d\n", alloc.universeStart, alloc.universeSize))
-	buf.WriteString(alloc.ring.String())
-	buf.WriteString(alloc.spaceSet.String())
-	buf.WriteString("\nPending requests for ")
+	fmt.Fprintf(&buf, "Allocator universe %s+%d\n", alloc.universeStart, alloc.universeSize)
+	fmt.Fprintf(&buf, alloc.ring.String())
+	fmt.Fprintf(&buf, alloc.spaceSet.String())
+	fmt.Fprintf(&buf, "\nPending requests for ")
 	for _, pending := range alloc.pending {
-		buf.WriteString(pending.Ident)
-		buf.WriteString(", ")
+		fmt.Fprintf(&buf, "%s, ", pending.Ident)
 	}
 	return buf.String()
 }

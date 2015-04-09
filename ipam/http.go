@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
 	"strings"
 
-	"github.com/zettio/weave/common"
-	"github.com/zettio/weave/router"
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/router"
 )
 
 // Parse a URL of the form /xxx/<identifier>
@@ -59,7 +58,7 @@ func (alloc *Allocator) HandleHTTP(mux *http.ServeMux) {
 			if err != nil {
 				httpErrorAndLog(common.Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
 			} else if newAddr := alloc.GetFor(ident, closedChan); newAddr != nil {
-				io.WriteString(w, fmt.Sprintf("%s/%d", newAddr, alloc.universeLen))
+				fmt.Fprintf(w, "%s/%d", newAddr, alloc.universeLen)
 			} else {
 				httpErrorAndLog(
 					common.Error, w, "No free addresses", http.StatusServiceUnavailable,
