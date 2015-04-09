@@ -267,8 +267,7 @@ func (alloc *Allocator) OnGossip(msg []byte) (router.GossipData, error) {
 	alloc.actionChan <- func() {
 		resultChan <- alloc.updateRing(msg)
 	}
-	err := <-resultChan
-	return nil, err // for now, we never propagate updates. TBD
+	return nil, <-resultChan // for now, we never propagate updates. TBD
 }
 
 // GossipData implementation is trivial - we always gossip the whole ring
