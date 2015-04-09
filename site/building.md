@@ -49,8 +49,8 @@ $ make
 ```
 
 This will build the weave components and package them into three
-Docker images (`weaveworks/weave`, `weaveworks/weavedns`, and
-`weaveworks/weaveexec`).  These are then exported (as `weave.tar`,
+Docker images (`zettio/weave`, `zettio/weavedns`, and
+`zettio/weaveexec`).  These are then exported (as `weave.tar`,
 `weavedns.tar` and `weaveexec.tar`).
 
 ## Building in a Docker container
