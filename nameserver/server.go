@@ -253,6 +253,7 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 		for _, lookup := range lookups {
 			if ip, err := lookup.LookupName(q.Name); err == nil {
 				m := makeAddressReply(r, &q, []net.IP{ip})
+				m.Authoritative = true
 
 				Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
 					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, ip, dns.RcodeToString[m.Rcode])
@@ -310,6 +311,8 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 		for _, lookup := range lookups {
 			if name, err := lookup.LookupInaddr(q.Name); err == nil {
 				m := makePTRReply(r, &q, []string{name})
+				m.Authoritative = true
+
 				Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
 					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, name, dns.RcodeToString[m.Rcode])
 				s.cache.Put(r, m, nullTTL, 0, now)
