@@ -131,6 +131,9 @@ func (e cacheEntry) hasExpired(now time.Time) bool {
 func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Time) bool {
 	var prevValidUntil time.Time
 	if e.Status == stResolved {
+		if reply != nil {
+			Debug.Printf("[cache msgid %d] replacing response in cache", reply.MsgHdr.Id)
+		}
 		prevValidUntil = e.validUntil
 	}
 

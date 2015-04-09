@@ -18,7 +18,6 @@ const (
 	DefaultCacheLen      = 8192               // default cache capacity
 	DefaultResolvWorkers = 8                  // default number of resolution workers
 	DefaultTimeout       = 5                  // default timeout for DNS resolutions
-	DefaultResolvTries   = 3                  // max # of times a worker tries to resolve a query
 )
 
 type DNSServerConfig struct {
@@ -264,7 +263,7 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 			now = time.Now()
 		}
 
-		Info.Printf("[dns msgid %d] No results for type %s query %s",
+		Info.Printf("[dns msgid %d] No results for type %s query %s [caching no-local]",
 			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
 		s.cache.Put(r, nil, negLocalTTL, CacheNoLocalReplies, now)
 		w.WriteMsg(makeDNSFailResponse(r))
@@ -360,8 +359,7 @@ func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
 			w.WriteMsg(reply)
 			return
 		}
-		Warning.Printf("[dns msgid %d] Failed lookup for external name %s",
-			r.MsgHdr.Id, q.Name)
+		Warning.Printf("[dns msgid %d] Failed lookup for external name %s", r.MsgHdr.Id, q.Name)
 		w.WriteMsg(makeDNSFailResponse(r))
 	}
 }
