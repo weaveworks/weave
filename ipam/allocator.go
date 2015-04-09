@@ -338,11 +338,11 @@ func (alloc *Allocator) checkPendingAllocations() {
 	alloc.pending = alloc.pending[i:]
 }
 
-// Fairly quick check of what's going on; whether requests should now be
-// replied to, etc.
-func (alloc *Allocator) considerOurPosition() {
-	alloc.checkPendingAllocations()
+func (alloc *Allocator) checkPending() {
+	// Note we check claims before allocations, otherwise we might give out
+	// an address to an allocation which matches one that has been claimed
 	alloc.checkClaims()
+	alloc.checkPendingAllocations()
 }
 
 func (alloc *Allocator) electLeaderIfNecessary() {
@@ -357,7 +357,7 @@ func (alloc *Allocator) electLeaderIfNecessary() {
 		alloc.considerNewSpaces()
 		alloc.infof("I was elected leader of the universe\n%s", alloc.string())
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
-		alloc.considerOurPosition()
+		alloc.checkPending()
 	} else {
 		alloc.sendRequest(leader, msgLeaderElected)
 	}
@@ -393,7 +393,7 @@ func (alloc *Allocator) sendRequest(dest router.PeerName, kind byte) {
 func (alloc *Allocator) updateRing(msg []byte) error {
 	err := alloc.ring.UpdateRing(msg)
 	alloc.considerNewSpaces()
-	alloc.considerOurPosition()
+	alloc.checkPending()
 	return err
 }
 
