@@ -25,25 +25,27 @@ const (
 	msgRingUpdate
 )
 
-type pendingAllocation struct {
-	resultChan chan<- net.IP
-	Ident      string
+type operation interface {
+	// Try attempts this operations and returns false if needs to be tried again.
+	Try(alloc *Allocator) bool
+
+	String() string
 }
 
 // Allocator brings together Ring and space.Set, and does the nessecary plumbing.
 type Allocator struct {
-	actionChan    chan<- func()
-	ourName       router.PeerName
-	universeStart net.IP
-	universeSize  uint32
-	universeLen   int        // length of network prefix (e.g. 24 for a /24 network)
-	ring          *ring.Ring // it's for you!
-	spaceSet      space.Set
-	owned         map[string][]net.IP // who owns what address, indexed by container-ID
-	pending       []pendingAllocation
-	claims        claimList
-	gossip        router.Gossip
-	shuttingDown  bool
+	actionChan     chan<- func()
+	ourName        router.PeerName
+	universeStart  net.IP
+	universeSize   uint32
+	universeLen    int        // length of network prefix (e.g. 24 for a /24 network)
+	ring           *ring.Ring // it's for you!
+	spaceSet       space.Set
+	owned          map[string][]net.IP // who owns what address, indexed by container-ID
+	pendingGetFors []operation
+	pendingClaims  []operation
+	gossip         router.Gossip
+	shuttingDown   bool
 }
 
 // NewAllocator creats and initialises a new Allocator
@@ -79,34 +81,94 @@ func (alloc *Allocator) Start() {
 	go alloc.actorLoop(actionChan)
 }
 
+// Operation life cycle
+
+// Given an operation, try it, and add it to the pending queue if it didn't succeed
+func (alloc *Allocator) doOperation(op operation, ops *[]operation) {
+	alloc.electLeaderIfNecessary()
+	if !op.Try(alloc) {
+		*ops = append(*ops, op)
+	}
+}
+
+// Given an operaion, remove it form the pending queue
+func (alloc *Allocator) cancelOp(op operation, ops *[]operation) {
+	for i, op := range *ops {
+		if op == op {
+			*ops = append((*ops)[:i], (*ops)[i+1:]...)
+			break
+		}
+	}
+}
+
+// Try all pending operations
+func (alloc *Allocator) tryPendingOps() {
+	// Claims must be tried before GetFors
+	for i := 0; i < len(alloc.pendingClaims); {
+		op := alloc.pendingClaims[i]
+		if !op.Try(alloc) {
+			i++
+			continue
+		}
+		alloc.pendingClaims = append(alloc.pendingClaims[:i], alloc.pendingClaims[i+1:]...)
+	}
+
+	// When the first GetFor fails, bail - no need to
+	// send too many begs for space.
+	for i := 0; i < len(alloc.pendingGetFors); {
+		op := alloc.pendingGetFors[i]
+		if !op.Try(alloc) {
+			break
+		}
+		alloc.pendingGetFors = append(alloc.pendingGetFors[:i], alloc.pendingGetFors[i+1:]...)
+	}
+}
+
 // Actor client API
 
 // GetFor (Sync) - get IP address for container with given name
+// if there isn't any space we block indefinately
 func (alloc *Allocator) GetFor(ident string, cancelChan <-chan bool) net.IP {
 	resultChan := make(chan net.IP, 1) // len 1 so actor can send while cancel is in progress
+	op := &getfor{resultChan: resultChan, ident: ident}
+
 	alloc.actionChan <- func() {
 		if alloc.shuttingDown {
 			resultChan <- nil
 			return
 		}
-		alloc.electLeaderIfNecessary()
-		if addr, success := alloc.tryAllocateFor(ident); success {
-			resultChan <- addr
-		} else {
-			alloc.pending = append(alloc.pending, pendingAllocation{resultChan, ident})
+		alloc.doOperation(op, &alloc.pendingGetFors)
+	}
+
+	select {
+	case result := <-resultChan:
+		return result
+	case <-cancelChan:
+		alloc.actionChan <- func() {
+			alloc.cancelOp(op, &alloc.pendingGetFors)
 		}
+		return nil
+	}
+}
+
+// Claim an address that we think we should own (Sync)
+func (alloc *Allocator) Claim(ident string, addr net.IP, cancelChan <-chan bool) error {
+	resultChan := make(chan error, 1) // len 1 so actor can send while cancel is in progress
+	op := &claim{resultChan: resultChan, ident: ident, addr: addr}
+
+	alloc.actionChan <- func() {
+		if alloc.shuttingDown {
+			resultChan <- fmt.Errorf("Claim %s: allocator is shutting down", addr)
+			return
+		}
+		alloc.doOperation(op, &alloc.pendingClaims)
 	}
 	select {
 	case result := <-resultChan:
 		return result
 	case <-cancelChan:
 		alloc.actionChan <- func() {
-			for i, pending := range alloc.pending {
-				if pending.Ident == ident {
-					alloc.pending = append(alloc.pending[:i], alloc.pending[i+1:]...)
-					break
-				}
-			}
+			alloc.cancelOp(op, &alloc.pendingClaims)
 		}
 		return nil
 	}
@@ -190,28 +252,6 @@ func (alloc *Allocator) ListPeers() []router.PeerName {
 		resultChan <- result
 	}
 	return <-resultChan
-}
-
-// Claim an address that we think we should own (Sync)
-func (alloc *Allocator) Claim(ident string, addr net.IP, cancelChan <-chan bool) error {
-	resultChan := make(chan error, 1)
-	alloc.actionChan <- func() {
-		if alloc.shuttingDown {
-			resultChan <- fmt.Errorf("Claim %s: allocator is shutting down", addr)
-			return
-		}
-		alloc.electLeaderIfNecessary()
-		alloc.handleClaim(ident, addr, resultChan)
-	}
-	select {
-	case result := <-resultChan:
-		return result
-	case <-cancelChan:
-		alloc.actionChan <- func() {
-			alloc.handleCancelClaim(ident, addr)
-		}
-		return nil
-	}
 }
 
 // OnGossipUnicast (Sync)
@@ -318,32 +358,14 @@ func (alloc *Allocator) string() string {
 	fmt.Fprintf(&buf, "Allocator universe %s+%d\n", alloc.universeStart, alloc.universeSize)
 	fmt.Fprintf(&buf, alloc.ring.String())
 	fmt.Fprintf(&buf, alloc.spaceSet.String())
-	if len(alloc.pending) > 0 {
-		fmt.Fprintf(&buf, "\nPending requests for ")
-		for _, pending := range alloc.pending {
-			fmt.Fprintf(&buf, "%s, ", pending.Ident)
-		}
+	fmt.Fprintf(&buf, "\nPending requests for ")
+	for _, op := range alloc.pendingGetFors {
+		fmt.Fprintf(&buf, "%s, ", op.String())
+	}
+	for _, op := range alloc.pendingClaims {
+		fmt.Fprintf(&buf, "%s, ", op.String())
 	}
 	return buf.String()
-}
-
-func (alloc *Allocator) checkPendingAllocations() {
-	i := 0
-	for ; i < len(alloc.pending); i++ {
-		if addr, success := alloc.tryAllocateFor(alloc.pending[i].Ident); success {
-			alloc.pending[i].resultChan <- addr
-		} else {
-			break
-		}
-	}
-	alloc.pending = alloc.pending[i:]
-}
-
-func (alloc *Allocator) checkPending() {
-	// Note we check claims before allocations, otherwise we might give out
-	// an address to an allocation which matches one that has been claimed
-	alloc.checkClaims()
-	alloc.checkPendingAllocations()
 }
 
 func (alloc *Allocator) electLeaderIfNecessary() {
@@ -358,32 +380,10 @@ func (alloc *Allocator) electLeaderIfNecessary() {
 		alloc.considerNewSpaces()
 		alloc.infof("I was elected leader of the universe\n%s", alloc.string())
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
-		alloc.checkPending()
+		alloc.tryPendingOps()
 	} else {
 		alloc.sendRequest(leader, msgLeaderElected)
 	}
-}
-
-// return true if the request is completed, false if pending
-func (alloc *Allocator) tryAllocateFor(ident string) (net.IP, bool) {
-	// If we have previously stored an address for this container, return it.
-	// FIXME: the data structure allows multiple addresses per (allocator per) ident but the code doesn't
-	if addrs, found := alloc.owned[ident]; found && len(addrs) > 0 {
-		return addrs[0], true
-	}
-	if addr := alloc.spaceSet.Allocate(); addr != nil {
-		alloc.debugln("Allocated", addr, "for", ident)
-		alloc.addOwned(ident, addr)
-		return addr, true
-	}
-
-	// out of space
-	if donor, err := alloc.ring.ChoosePeerToAskForSpace(); err == nil {
-		alloc.debugln("Decided to ask peer", donor, "for space")
-		alloc.sendRequest(donor, msgSpaceRequest)
-	}
-
-	return nil, false
 }
 
 func (alloc *Allocator) sendRequest(dest router.PeerName, kind byte) {
@@ -394,7 +394,7 @@ func (alloc *Allocator) sendRequest(dest router.PeerName, kind byte) {
 func (alloc *Allocator) updateRing(msg []byte) error {
 	err := alloc.ring.UpdateRing(msg)
 	alloc.considerNewSpaces()
-	alloc.checkPending()
+	alloc.tryPendingOps()
 	return err
 }
 
@@ -465,90 +465,6 @@ func (alloc *Allocator) reportFreeSpace() {
 
 	for _, s := range spaces {
 		alloc.ring.ReportFree(s.Start, s.NumFreeAddresses())
-	}
-}
-
-// Handling Claims
-
-type pendingClaim struct {
-	resultChan chan<- error
-	Ident      string
-	IP         net.IP
-}
-
-type claimList []pendingClaim
-
-func (aa *claimList) removeAt(pos int) {
-	(*aa) = append((*aa)[:pos], (*aa)[pos+1:]...)
-}
-
-func (aa *claimList) find(addr net.IP) int {
-	for i, a := range *aa {
-		if a.IP.Equal(addr) {
-			return i
-		}
-	}
-	return -1
-}
-
-// Claim an address that we think we should own
-func (alloc *Allocator) handleClaim(ident string, addr net.IP, resultChan chan<- error) {
-	if !alloc.ring.Contains(addr) {
-		// Address not within our universe; assume user knows what they are doing
-		alloc.infof("Ignored address %s claimed by %s - not in our universe", addr, ident)
-		resultChan <- nil
-		return
-	}
-	// See if it's already claimed
-	if pos := alloc.claims.find(addr); pos >= 0 && alloc.claims[pos].Ident != ident {
-		resultChan <- fmt.Errorf("IP address %s already claimed by %s", addr, alloc.claims[pos].Ident)
-		return
-	}
-	alloc.infof("Address %s claimed by %s", addr, ident)
-	if owner, err := alloc.checkClaim(ident, addr); err != nil {
-		resultChan <- err
-	} else if owner != alloc.ourName {
-		alloc.infof("Address %s owned by %s", addr, owner)
-		alloc.claims = append(alloc.claims, pendingClaim{resultChan, ident, addr})
-	} else {
-		resultChan <- nil
-	}
-}
-
-func (alloc *Allocator) handleCancelClaim(ident string, addr net.IP) {
-	for i, claim := range alloc.claims {
-		if claim.Ident == ident && claim.IP.Equal(addr) {
-			alloc.claims = append(alloc.claims[:i], alloc.claims[i+1:]...)
-			break
-		}
-	}
-}
-
-func (alloc *Allocator) checkClaim(ident string, addr net.IP) (owner router.PeerName, err error) {
-	if owner := alloc.ring.Owner(addr); owner == alloc.ourName {
-		// We own the space; see if we already have an owner for that particular address
-		if existingIdent := alloc.findOwner(addr); existingIdent == "" {
-			alloc.addOwned(ident, addr)
-			err := alloc.spaceSet.Claim(addr)
-			return alloc.ourName, err
-		} else if existingIdent == ident { // same identifier is claiming same address; that's OK
-			return alloc.ourName, nil
-		} else {
-			return alloc.ourName, fmt.Errorf("Claimed address %s is already owned by %s", addr, existingIdent)
-		}
-	} else {
-		return owner, nil
-	}
-}
-
-func (alloc *Allocator) checkClaims() {
-	for i := 0; i < len(alloc.claims); i++ {
-		owner, err := alloc.checkClaim(alloc.claims[i].Ident, alloc.claims[i].IP)
-		if err != nil || owner == alloc.ourName {
-			alloc.claims[i].resultChan <- err
-			alloc.claims = append(alloc.claims[:i], alloc.claims[i+1:]...)
-			i--
-		}
 	}
 }
 

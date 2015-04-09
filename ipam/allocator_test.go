@@ -86,7 +86,7 @@ func TestElection(t *testing.T) {
 	// At first, this peer has no space, so alloc1 should do nothing
 
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
-	alloc1.checkPending()
+	alloc1.tryPendingOps()
 
 	mockTime.SetTime(baseTime.Add(4 * time.Second))
 	SetLeader(alloc1, peerNameString)
@@ -105,7 +105,7 @@ func TestElection(t *testing.T) {
 	mockTime.SetTime(baseTime.Add(15 * time.Second))
 	// fixme: not implemented yet
 	// ExpectMessage(alloc1, peerNameString, msgLeaderElected, nil)
-	alloc1.checkPending()
+	alloc1.tryPendingOps()
 	AssertNothingSent(t, done)
 
 	// alloc2 receives the leader election message and broadcasts its winning state
