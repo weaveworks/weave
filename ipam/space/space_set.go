@@ -28,9 +28,9 @@ func (s *Set) Spaces() []*Space {
 
 func (s *Set) String() string {
 	var buf bytes.Buffer
-	buf.WriteString("Set")
+	fmt.Fprintf(&buf, "Set")
 	for _, space := range s.spaces {
-		buf.WriteString(fmt.Sprintf("\n  %s", space))
+		fmt.Fprintf(&buf, "\n  %s", space)
 	}
 	return buf.String()
 }

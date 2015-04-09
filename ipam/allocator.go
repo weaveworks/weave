@@ -74,13 +74,12 @@ func NewAllocator(ourName router.PeerName, universeCIDR string) (*Allocator, err
 
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("Allocator universe %s+%d\n", alloc.universeStart, alloc.universeSize))
-	buf.WriteString(alloc.ring.String())
-	buf.WriteString(alloc.spaceSet.String())
-	buf.WriteString("\nPending requests for ")
+	fmt.Fprintf(&buf, "Allocator universe %s+%d\n", alloc.universeStart, alloc.universeSize)
+	fmt.Fprintf(&buf, alloc.ring.String())
+	fmt.Fprintf(&buf, alloc.spaceSet.String())
+	fmt.Fprintf(&buf, "\nPending requests for ")
 	for _, pending := range alloc.pending {
-		buf.WriteString(pending.Ident)
-		buf.WriteString(", ")
+		fmt.Fprintf(&buf, "%s, ", pending.Ident)
 	}
 	return buf.String()
 }

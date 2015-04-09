@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -59,7 +58,7 @@ func (alloc *Allocator) HandleHTTP(mux *http.ServeMux) {
 			if err != nil {
 				httpErrorAndLog(common.Warning, w, "Invalid request", http.StatusBadRequest, err.Error())
 			} else if newAddr := alloc.GetFor(ident, closedChan); newAddr != nil {
-				io.WriteString(w, fmt.Sprintf("%s/%d", newAddr, alloc.universeLen))
+				fmt.Fprintf(w, "%s/%d", newAddr, alloc.universeLen)
 			} else {
 				httpErrorAndLog(
 					common.Error, w, "No free addresses", http.StatusServiceUnavailable,
