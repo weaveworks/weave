@@ -102,7 +102,7 @@ Note that we could instead have told the weave on `$HOST1` to connect to
 weave automatically (re)connects to peers when they become
 available. Also, we can tell weave to connect to multiple peers by
 supplying multiple addresses, separated by spaces. And we can
-[add peers dynamically](http://zettio.github.io/weave/features.html#dynamic-topologies).
+[add peers dynamically](http://weaveworks.github.io/weave/features.html#dynamic-topologies).
 
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...
@@ -130,11 +130,11 @@ to each other.
 
 ## Find out more
 
- * [Documentation homepage](http://zettio.github.io/weave/)
- * [Features](http://zettio.github.io/weave/features.html)
- * [Troubleshooting](http://zettio.github.io/weave/troubleshooting.html)
- * [Building](http://zettio.github.io/weave/building.html)
- * [How it works](http://zettio.github.io/weave/how-it-works.html)
+ * [Documentation homepage](http://weaveworks.github.io/weave/)
+ * [Features](http://weaveworks.github.io/weave/features.html)
+ * [Troubleshooting](http://weaveworks.github.io/weave/troubleshooting.html)
+ * [Building](http://weaveworks.github.io/weave/building.html)
+ * [How it works](http://weaveworks.github.io/weave/how-it-works.html)
  * [WeaveDNS README](https://github.com/weaveworks/weave/tree/master/weavedns#readme)
 
 ## Contact Us
