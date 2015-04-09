@@ -2,14 +2,15 @@ package ipam
 
 import (
 	"fmt"
-	"github.com/zettio/weave/common"
-	"github.com/zettio/weave/ipam/space"
-	"github.com/zettio/weave/router"
-	wt "github.com/zettio/weave/testing"
 	"math/rand"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/router"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 // Utility function to set up initial conditions for test

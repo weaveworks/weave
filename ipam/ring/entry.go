@@ -3,8 +3,8 @@ package ring
 import (
 	"sort"
 
-	"github.com/zettio/weave/ipam/utils"
-	"github.com/zettio/weave/router"
+	"github.com/weaveworks/weave/ipam/utils"
+	"github.com/weaveworks/weave/router"
 )
 
 // Entry represents entries around the ring

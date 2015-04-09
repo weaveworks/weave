@@ -1,9 +1,10 @@
 package space
 
 import (
-	"github.com/zettio/weave/ipam/utils"
 	"net"
 	"sort"
+
+	"github.com/weaveworks/weave/ipam/utils"
 )
 
 // For compatibility with Sorting

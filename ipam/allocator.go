@@ -7,11 +7,11 @@ import (
 	"net"
 	"time"
 
-	lg "github.com/zettio/weave/common"
-	"github.com/zettio/weave/ipam/ring"
-	"github.com/zettio/weave/ipam/space"
-	"github.com/zettio/weave/ipam/utils"
-	"github.com/zettio/weave/router"
+	lg "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/ring"
+	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/ipam/utils"
+	"github.com/weaveworks/weave/router"
 )
 
 const (

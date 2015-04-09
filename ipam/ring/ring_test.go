@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zettio/weave/common"
-	"github.com/zettio/weave/ipam/utils"
-	"github.com/zettio/weave/router"
-	wt "github.com/zettio/weave/testing"
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/utils"
+	"github.com/weaveworks/weave/router"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 var (

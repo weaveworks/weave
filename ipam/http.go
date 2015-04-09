@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zettio/weave/common"
-	"github.com/zettio/weave/router"
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/router"
 )
 
 // Parse a URL of the form /xxx/<identifier>

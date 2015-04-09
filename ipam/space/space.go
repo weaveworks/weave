@@ -2,9 +2,10 @@ package space
 
 import (
 	"fmt"
-	"github.com/zettio/weave/ipam/utils"
 	"net"
 	"sort"
+
+	"github.com/weaveworks/weave/ipam/utils"
 )
 
 // Space repsents a range of addresses owned by this peer,

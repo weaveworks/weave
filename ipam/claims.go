@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/zettio/weave/router"
+	"github.com/weaveworks/weave/router"
 )
 
 type pendingClaim struct {

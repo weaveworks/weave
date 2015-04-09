@@ -3,10 +3,11 @@ package space
 import (
 	"bytes"
 	"fmt"
-	lg "github.com/zettio/weave/common"
-	"github.com/zettio/weave/ipam/utils"
 	"net"
 	"sort"
+
+	lg "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/utils"
 )
 
 // Set is a set of spaces...

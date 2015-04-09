@@ -4,9 +4,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/zettio/weave/common"
-	"github.com/zettio/weave/ipam/utils"
-	wt "github.com/zettio/weave/testing"
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/utils"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func equal(ms1 *Space, ms2 *Space) bool {

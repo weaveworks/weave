@@ -2,9 +2,10 @@ package ipam
 
 import (
 	"fmt"
-	"github.com/zettio/weave/router"
 	"net"
 	"time"
+
+	"github.com/weaveworks/weave/router"
 )
 
 // Start runs the allocator goroutine

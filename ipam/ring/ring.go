@@ -13,9 +13,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/zettio/weave/common"
-	"github.com/zettio/weave/ipam/utils"
-	"github.com/zettio/weave/router"
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/utils"
+	"github.com/weaveworks/weave/router"
 )
 
 // Ring represents the ring itself

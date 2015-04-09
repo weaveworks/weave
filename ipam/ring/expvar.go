@@ -3,8 +3,9 @@ package ring
 
 import (
 	"expvar"
-	"github.com/zettio/weave/ipam/utils"
 	"strconv"
+
+	"github.com/weaveworks/weave/ipam/utils"
 )
 
 var (
