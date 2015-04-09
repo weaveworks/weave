@@ -221,7 +221,15 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 	alloc.actionChan <- func() {
 		switch msg[0] {
 		case msgLeaderElected:
-			resultChan <- alloc.handleLeaderElected()
+			// some other peer decided we were the leader:
+			// if we already have tokens then they didn't get the memo; repeat
+			if !alloc.ring.Empty() {
+				alloc.gossip.GossipBroadcast(alloc.Gossip())
+			} else {
+				// re-run the election on this peer to avoid races
+				alloc.electLeaderIfNecessary()
+			}
+			resultChan <- nil
 		case msgSpaceRequest:
 			// some other peer asked us for space
 			alloc.donateSpace(sender)
@@ -375,18 +383,6 @@ func (alloc *Allocator) tryAllocateFor(ident string) (net.IP, bool) {
 	}
 
 	return nil, false
-}
-
-func (alloc *Allocator) handleLeaderElected() error {
-	// some other peer decided we were the leader:
-	// if we already have tokens then they didn't get the memo; repeat
-	if !alloc.ring.Empty() {
-		alloc.gossip.GossipBroadcast(alloc.Gossip())
-	} else {
-		// re-run the election here to avoid races
-		alloc.electLeaderIfNecessary()
-	}
-	return nil
 }
 
 func (alloc *Allocator) sendRequest(dest router.PeerName, kind byte) {
