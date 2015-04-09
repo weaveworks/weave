@@ -83,14 +83,14 @@ func (alloc *Allocator) ContainerDied(ident string) error {
 // Shutdown (Sync)
 func (alloc *Allocator) Shutdown() {
 	alloc.infof("Shutdown")
-	doneChan := make(chan bool)
+	doneChan := make(chan struct{})
 	alloc.actionChan <- func() {
 		alloc.shuttingDown = true
 		alloc.ring.TombstonePeer(alloc.ourName, 100)
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
 		alloc.spaceSet.Clear()
 		time.Sleep(100 * time.Millisecond)
-		doneChan <- true
+		doneChan <- struct{}{}
 	}
 	<-doneChan
 }
