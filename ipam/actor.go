@@ -80,7 +80,7 @@ func (alloc *Allocator) ContainerDied(ident string) error {
 	return nil // this is to satisfy the ContainerObserver interface
 }
 
-// OnShutdown (Sync)
+// Shutdown (Sync)
 func (alloc *Allocator) Shutdown() {
 	alloc.infof("Shutdown")
 	doneChan := make(chan bool)

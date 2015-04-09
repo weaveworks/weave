@@ -1,5 +1,6 @@
-/* Exported variables for monitoring and management */
 package ring
+
+/* Exported variables for monitoring and management */
 
 import (
 	"expvar"
