@@ -61,8 +61,8 @@ func (alloc *Allocator) HandleHTTP(mux *http.ServeMux) {
 				fmt.Fprintf(w, "%s/%d", newAddr, alloc.universeLen)
 			} else {
 				httpErrorAndLog(
-					common.Error, w, "No free addresses", http.StatusServiceUnavailable,
-					"No free addresses")
+					common.Error, w, "Shutting down", http.StatusServiceUnavailable,
+					"Allocator shutting down")
 			}
 		case "DELETE": // opposite of PUT for one specific address or all addresses
 			ident, ipStr, err := parseURLWithIP(r.URL.Path)
