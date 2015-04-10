@@ -31,15 +31,20 @@ $ git clone https://$WEAVE $GOPATH/src/$WEAVE
 $ cd $GOPATH/src/$WEAVE
 ```
 
-Some prerequisites are needed to build weave.  First, install Docker
-if you haven't already, by following the instructions [on the Docker
-site](https://docs.docker.com/installation/ubuntulinux/).  Note that
-we recommend using the Docker-maintained `lxc-docker` package, rather
-than the `docker.io` package which contains a very old version.  Then
-install the other prerequisites for building with:
+Some prerequisites are needed to build weave:
 
+* Install Docker if you haven't already, by following the instructions
+  [on the Docker
+  site](https://docs.docker.com/installation/ubuntulinux/).  Note that
+  we recommend using the Docker-maintained `lxc-docker` package, rather
+  than the `docker.io` package which contains a very old version.  Then
+  install the other prerequisites for building with:
+* Building weave requires Go 1.4.2, and the `golang` package in Ubuntu
+  14.04 LTS is too old.  So you may need to [install the tarball from
+  golang.org](http://golang.org/doc/install).
+* A few other packages are also needed:
 ```bash
-$ sudo apt-get install build-essential git golang mercurial libpcap-dev
+$ sudo apt-get install build-essential git mercurial libpcap-dev
 ```
 
 Then to actually build, simply do:

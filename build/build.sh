@@ -35,7 +35,7 @@ EOF
     echo "weave:x:$uid:$gid::$WEAVE_SRC:/bin/sh" >>/etc/passwd
     echo "weave:*:::::::" >>/etc/shadow
     echo "weave	ALL=(ALL)	NOPASSWD: ALL" >>/etc/sudoers
-    su weave -c "make -C $WEAVE_SRC build"
+    su weave -c "PATH=$PATH make -C $WEAVE_SRC build"
 else
     # There are arguments to pass to git-clone
     mkdir -p ${WEAVE_SRC%/*}
