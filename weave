@@ -678,7 +678,7 @@ case "$COMMAND" in
             -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -name $MACADDR -nickname "$NICKNAME" $ALLOC "$@")
         with_container_netns $CONTAINER launch >/dev/null
-        [ -z "$ALLOC" ] || populate_ipam
+        [ -z "$ALLOC" ] && wait_for_status $CONTAINER_NAME $HTTP_PORT || populate_ipam
         echo $CONTAINER
         ;;
     test-launch)
