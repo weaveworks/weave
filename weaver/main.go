@@ -203,7 +203,7 @@ func handleHTTP(router *weave.Router, httpAddr string) {
 
 	protocol := "tcp"
 	if strings.HasPrefix(httpAddr, "/") {
-		os.Remove(httpAddr); // in case it's there from last time
+		os.Remove(httpAddr) // in case it's there from last time
 		protocol = "unix"
 	}
 	l, err := net.Listen(protocol, httpAddr)

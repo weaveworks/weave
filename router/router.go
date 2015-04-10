@@ -31,7 +31,7 @@ type Router struct {
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
-	Port	        int
+	Port            int
 }
 
 type PacketSource interface {
@@ -422,9 +422,9 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 // given an address like '1.2.3.4:567', return the address if it has a port,
 // otherwise return the address with the default port number for the router
 func (router *Router) NormalisePeerAddr(peerAddr string) string {
-        _, _, err := net.SplitHostPort(peerAddr)
-        if err == nil {
-                return peerAddr
-        }
-        return fmt.Sprintf("%s:%d", peerAddr, router.Port)
+	_, _, err := net.SplitHostPort(peerAddr)
+	if err == nil {
+		return peerAddr
+	}
+	return fmt.Sprintf("%s:%d", peerAddr, router.Port)
 }
