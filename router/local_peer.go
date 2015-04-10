@@ -94,7 +94,7 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 		return err
 	}
 	// We're dialing the remote so that means connections will come from random ports
-	addrStr := NormalisePeerAddr(peerAddr)
+	addrStr := peer.Router.NormalisePeerAddr(peerAddr)
 	tcpAddr, tcpErr := net.ResolveTCPAddr("tcp4", addrStr)
 	udpAddr, udpErr := net.ResolveUDPAddr("udp4", addrStr)
 	if tcpErr != nil || udpErr != nil {

@@ -46,6 +46,8 @@ func main() {
 		peers       []string
 		connLimit   int
 		bufSz       int
+		port	    int
+		httpAddr    string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -58,6 +60,8 @@ func main() {
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (defaults to 30, set to 0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
+	flag.IntVar(&port, "port", weave.Port, fmt.Sprintf("router port (defaults to %d)", weave.Port))
+	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), fmt.Sprintf("address to bind HTTP interface to (defaults to :%d, set to \"\" to disable)", weave.HTTPPort))
 	flag.Parse()
 	peers = flag.Args()
 
@@ -121,11 +125,13 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	router := weave.NewRouter(iface, ourName, nickName, pwSlice, connLimit, bufSz*1024*1024, logFrameFunc(debug))
+	router := weave.NewRouter(iface, ourName, nickName, pwSlice, connLimit, bufSz*1024*1024, logFrameFunc(debug), port)
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
 	initiateConnections(router, peers)
-	go handleHTTP(router)
+	if httpAddr != "" {
+		go handleHTTP(router, httpAddr)
+	}
 	handleSignals(router)
 }
 
@@ -145,7 +151,7 @@ func logFrameFunc(debug bool) func(string, []byte, *layers.Ethernet) {
 
 func initiateConnections(router *weave.Router, peers []string) {
 	for _, peer := range peers {
-		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
 			router.ConnectionMaker.InitiateConnection(addr.String())
 		} else {
 			log.Fatal(err)
@@ -153,7 +159,7 @@ func initiateConnections(router *weave.Router, peers []string) {
 	}
 }
 
-func handleHTTP(router *weave.Router) {
+func handleHTTP(router *weave.Router, httpAddr string) {
 	encryption := "off"
 	if router.UsingPassword() {
 		encryption = "on"
@@ -174,7 +180,7 @@ func handleHTTP(router *weave.Router) {
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")
-		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
 			router.ConnectionMaker.InitiateConnection(addr.String())
 		} else {
 			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
@@ -183,7 +189,7 @@ func handleHTTP(router *weave.Router) {
 
 	muxRouter.Methods("POST").Path("/forget").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		peer := r.FormValue("peer")
-		if addr, err := net.ResolveTCPAddr("tcp4", weave.NormalisePeerAddr(peer)); err == nil {
+		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
 			router.ConnectionMaker.ForgetConnection(addr.String())
 		} else {
 			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
@@ -192,8 +198,7 @@ func handleHTTP(router *weave.Router) {
 
 	http.Handle("/", muxRouter)
 
-	address := fmt.Sprintf(":%d", weave.HTTPPort)
-	err := http.ListenAndServe(address, nil)
+	err := http.ListenAndServe(httpAddr, nil)
 	if err != nil {
 		log.Fatal("Unable to create http listener: ", err)
 	}

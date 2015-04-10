@@ -15,11 +15,12 @@ const (
 )
 
 type ConnectionMaker struct {
-	ourself        *LocalPeer
-	peers          *Peers
-	targets        map[string]*Target
-	cmdLineAddress map[string]struct{}
-	actionChan     chan<- ConnectionMakerAction
+	ourself           *LocalPeer
+	peers             *Peers
+	normalisePeerAddr func(string) string
+	targets           map[string]*Target
+	cmdLineAddress    map[string]struct{}
+	actionChan        chan<- ConnectionMakerAction
 }
 
 // Information about an address where we may find a peer
@@ -31,12 +32,13 @@ type Target struct {
 
 type ConnectionMakerAction func() bool
 
-func NewConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
+func NewConnectionMaker(ourself *LocalPeer, peers *Peers, normalisePeerAddr func(string) string) *ConnectionMaker {
 	return &ConnectionMaker{
-		ourself:        ourself,
-		peers:          peers,
-		cmdLineAddress: make(map[string]struct{}),
-		targets:        make(map[string]*Target)}
+		ourself:           ourself,
+		peers:             peers,
+		normalisePeerAddr: normalisePeerAddr,
+		cmdLineAddress:    make(map[string]struct{}),
+		targets:           make(map[string]*Target)}
 }
 
 func (cm *ConnectionMaker) Start() {
@@ -47,7 +49,7 @@ func (cm *ConnectionMaker) Start() {
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.actionChan <- func() bool {
-		cm.cmdLineAddress[NormalisePeerAddr(address)] = void
+		cm.cmdLineAddress[cm.normalisePeerAddr(address)] = void
 		if target, found := cm.targets[address]; found {
 			target.tryAfter, target.tryInterval = tryImmediately()
 		}
@@ -57,7 +59,7 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 
 func (cm *ConnectionMaker) ForgetConnection(address string) {
 	cm.actionChan <- func() bool {
-		delete(cm.cmdLineAddress, NormalisePeerAddr(address))
+		delete(cm.cmdLineAddress, cm.normalisePeerAddr(address))
 		return false
 	}
 }
@@ -150,7 +152,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 				addTarget(address)
 			}
 			if host, _, err := net.SplitHostPort(address); err == nil {
-				addTarget(NormalisePeerAddr(host))
+				addTarget(cm.normalisePeerAddr(host))
 			}
 		}
 	})
