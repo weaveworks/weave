@@ -44,6 +44,10 @@ func (routes *Routes) Start() {
 	go routes.run(recalculate, wait)
 }
 
+func (routes *Routes) PeerNames() PeerNameSet {
+	return routes.peers.Names()
+}
+
 func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
 	routes.RLock()
 	defer routes.RUnlock()

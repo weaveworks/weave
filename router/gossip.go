@@ -83,6 +83,7 @@ type peerSenders map[PeerName]*GossipSender
 type GossipChannel struct {
 	sync.Mutex
 	ourself      *LocalPeer
+	routes       *Routes
 	name         string
 	hash         uint32
 	gossiper     Gossiper
@@ -94,6 +95,7 @@ func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 	channelHash := hash(channelName)
 	channel := &GossipChannel{
 		ourself:      router.Ourself,
+		routes:       router.Routes,
 		name:         channelName,
 		hash:         channelHash,
 		gossiper:     g,
@@ -182,9 +184,9 @@ func (c *GossipChannel) deliver(srcName PeerName, _ []byte, dec *gob.Decoder) er
 
 func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
 	// do this outside the lock below so we avoid lock nesting
-	c.ourself.Router.Routes.EnsureRecalculated()
+	c.routes.EnsureRecalculated()
 	selectedConnections := make(ConnectionSet)
-	for name := range c.ourself.Router.Routes.RandomNeighbours(srcName) {
+	for name := range c.routes.RandomNeighbours(srcName) {
 		if conn, found := c.ourself.ConnectionTo(name); found {
 			selectedConnections[conn] = void
 		}
@@ -247,7 +249,7 @@ func (c *GossipChannel) GossipBroadcast(update GossipData) error {
 }
 
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) error {
-	if relayPeerName, found := c.ourself.Router.Routes.UnicastAll(dstPeerName); !found {
+	if relayPeerName, found := c.routes.UnicastAll(dstPeerName); !found {
 		c.log("unknown relay destination:", dstPeerName)
 	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
 		c.log("unable to find connection to relay peer", relayPeerName)
@@ -258,7 +260,7 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) error {
 }
 
 func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
-	names := c.ourself.Router.Peers.Names() // do this outside the lock so they don't nest
+	names := c.routes.PeerNames() // do this outside the lock so they don't nest
 	c.Lock()
 	defer c.Unlock()
 	// GC - randomly (courtesy of go's map iterator) pick some
@@ -291,8 +293,8 @@ func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) erro
 }
 
 func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
-	c.ourself.Router.Routes.EnsureRecalculated()
-	nextHops := c.ourself.Router.Routes.BroadcastAll(srcName)
+	c.routes.EnsureRecalculated()
+	nextHops := c.routes.BroadcastAll(srcName)
 	if len(nextHops) == 0 {
 		return
 	}
