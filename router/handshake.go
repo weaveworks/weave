@@ -12,11 +12,11 @@ type FieldValidator struct {
 	err    error
 }
 
-func NewFieldValidator(fields map[string]string) FieldValidator {
-	return FieldValidator{fields, nil}
+func NewFieldValidator(fields map[string]string) *FieldValidator {
+	return &FieldValidator{fields, nil}
 }
 
-func (fv FieldValidator) Value(fieldName string) (string, error) {
+func (fv *FieldValidator) Value(fieldName string) (string, error) {
 	if fv.err != nil {
 		return "", fv.err
 	}
@@ -28,7 +28,7 @@ func (fv FieldValidator) Value(fieldName string) (string, error) {
 	return val, nil
 }
 
-func (fv FieldValidator) CheckEqual(fieldName, expectedValue string) error {
+func (fv *FieldValidator) CheckEqual(fieldName, expectedValue string) error {
 	val, err := fv.Value(fieldName)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func (fv FieldValidator) CheckEqual(fieldName, expectedValue string) error {
 	return nil
 }
 
-func (fv FieldValidator) Err() error {
+func (fv *FieldValidator) Err() error {
 	return fv.err
 }
 
@@ -146,7 +146,7 @@ func (conn *LocalConnection) handshakeSendRecv(localConnID uint64, usingPassword
 	fv.CheckEqual("Protocol", Protocol)
 	fv.CheckEqual("ProtocolVersion", versionStr)
 	fv.CheckEqual("PeerNameFlavour", PeerNameFlavour)
-	return &fv, private, nil
+	return fv, private, nil
 }
 
 func (conn *LocalConnection) setRemote(toPeer *Peer) error {
