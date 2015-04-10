@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/mux"
 	weavenet "github.com/weaveworks/weave/net"
 	weave "github.com/weaveworks/weave/router"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -168,9 +167,9 @@ func handleHTTP(router *weave.Router, httpAddr string) {
 	muxRouter := mux.NewRouter()
 
 	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, fmt.Sprintln("weave router", version))
-		io.WriteString(w, fmt.Sprintln("Encryption", encryption))
-		io.WriteString(w, router.Status())
+		fmt.Fprintln(w, "weave router", version)
+		fmt.Fprintln(w, "Encryption", encryption)
+		fmt.Fprintln(w, router.Status())
 	})
 
 	muxRouter.Methods("GET").Path("/status-json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

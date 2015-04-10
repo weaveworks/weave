@@ -5,7 +5,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -22,8 +21,8 @@ func ListenHTTP(version string, server *DNSServer, domain string, db Zone, port 
 	muxRouter := mux.NewRouter()
 
 	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, fmt.Sprintln("weave DNS", version))
-		io.WriteString(w, server.Status())
+		fmt.Fprintln(w, "weave DNS", version)
+		fmt.Fprintln(w, server.Status())
 	})
 
 	muxRouter.Methods("PUT").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
