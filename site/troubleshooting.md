@@ -146,6 +146,12 @@ IP address/routing prefix length ([CIDR
 notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing))
 assigned on the weave network.
 
+You can also supply a list of container IDs/names to `weave ps`, like this:
+
+    $ sudo weave ps able baker
+    able ce:15:34:a9:b5:6d 10.2.5.1/24
+    baker 7a:61:a2:49:4b:91 10.2.8.3/24
+
 ### Reboots
 
 When a host reboots, docker's default behaviour is to restart any

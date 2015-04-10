@@ -25,7 +25,7 @@ usage() {
     echo "weave detach     <cidr> [<cidr> ...] <container_id>"
     echo "weave expose     <cidr>"
     echo "weave hide       <cidr>"
-    echo "weave ps"
+    echo "weave ps         [<container_id> ...]"
     echo "weave status"
     echo "weave version"
     echo "weave stop"
@@ -675,8 +675,8 @@ case "$COMMAND" in
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status 2>/dev/null || true
         ;;
     ps)
-        [ $# -eq 0 ] || usage
-        for CONTAINER_ID in $(docker ps -q) ; do
+        [ $# -eq 0 ] && CONTAINERS="$(docker ps -q)" || CONTAINERS="$@"
+        for CONTAINER_ID in $CONTAINERS ; do
             if CONTAINER_ADDRS=$(with_container_netns $CONTAINER_ID container_weave_addrs 2>&1) ; then
                 CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | grep -o 'link/ether .*' | cut -d ' ' -f 2)
                 CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*'       | cut -d ' ' -f 2)
