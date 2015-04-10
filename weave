@@ -520,22 +520,6 @@ container_weave_addrs() {
     ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
-uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
-    if ! read sys maj min ; then
-      echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
-      exit 1
-    fi
-
-    if [ "$sys" != 'Linux' ] ; then
-        echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
-        exit 1
-    fi
-
-    if ! [ \( "$maj" -eq 3 -a "$min" -ge 5 \) -o "$maj" -gt 3 ] ; then
-        echo "WARNING: Linux kernel version 3.5 or newer is required (you have ${maj}.${min})" >&2
-    fi
-}
-
 ask_version() {
     if ! DOCKERIMAGE=$(docker inspect --format='{{.Image}}' $1 2>/dev/null) ; then
             if ! DOCKERIMAGE=$(docker inspect --format='{{.Id}}' $2 2>/dev/null) ; then
@@ -545,15 +529,33 @@ ask_version() {
     [ -n "$DOCKERIMAGE" ] && docker run --rm $DOCKERIMAGE --version
 }
 
-if ! command_exists ip ; then
-    echo "ERROR: ip utility is missing. Please install it." >&2
-    exit 1
-fi
+if [ -n "$LOCAL" ]; then
+    uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
+      if ! read sys maj min ; then
+        echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
+        exit 1
+      fi
 
-if ! ip netns list >/dev/null 2>&1 ; then
-    echo "ERROR: $(ip -V) does not support network namespaces." >&2
-    echo "       Please install iproute2-ss111010 or later." >&2
-    exit 1
+      if [ "$sys" != 'Linux' ] ; then
+          echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
+          exit 1
+      fi
+
+      if ! [ \( "$maj" -eq 3 -a "$min" -ge 5 \) -o "$maj" -gt 3 ] ; then
+          echo "WARNING: Linux kernel version 3.5 or newer is required (you have ${maj}.${min})" >&2
+      fi
+    }
+
+    if ! command_exists ip ; then
+        echo "ERROR: ip utility is missing. Please install it." >&2
+        exit 1
+    fi
+
+    if ! ip netns list >/dev/null 2>&1 ; then
+        echo "ERROR: $(ip -V) does not support network namespaces." >&2
+        echo "       Please install iproute2-ss111010 or later." >&2
+        exit 1
+    fi
 fi
 
 if ! DOCKER_VERSION=$(docker -v | sed -n -e 's|^Docker version \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
