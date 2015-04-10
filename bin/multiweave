@@ -20,7 +20,7 @@ weavedir=$(dirname $0)/..
 case "$1" in
     launch)
         for i in $(seq $START $FINISH); do
-            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave --local test-launch --connlimit=100
+            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave test-launch --connlimit=100
         done
         if [ $START -ne 1 ] ; then
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$((START-1)))
@@ -29,7 +29,7 @@ case "$1" in
         for i in $(seq $START $FINISH); do
             if [ -n "$PREV" ] ; then
                 echo connecting weave$i to $PREV
-                WEAVE_CONTAINER_NAME=weave$i $weavedir/weave --local connect $PREV
+                WEAVE_CONTAINER_NAME=weave$i $weavedir/weave connect $PREV
             fi
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$i)
             PREV="${status#true }"
@@ -38,7 +38,7 @@ case "$1" in
     stop)
         for i in $(seq $START $FINISH); do
             echo Stopping weave$i
-            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave --local stop
+            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave stop
         done
         ;;
 esac
