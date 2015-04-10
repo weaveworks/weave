@@ -91,6 +91,9 @@ func main() {
 	}
 
 	if routerName == "" {
+		if iface == nil {
+			log.Fatal("Either an interface must be specified with -iface or a name with -name")
+		}
 		routerName = iface.HardwareAddr.String()
 	}
 
