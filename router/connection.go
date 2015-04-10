@@ -47,6 +47,7 @@ type LocalConnection struct {
 	stackFrag         bool
 	effectivePMTU     int
 	SessionKey        *[32]byte
+	heartbeatTCP      *time.Ticker
 	heartbeatTimeout  *time.Timer
 	heartbeatFrame    *ForwardedFrame
 	heartbeat         *time.Ticker
@@ -339,6 +340,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 // goroutine, at least not without some synchronisation.
 
 func (conn *LocalConnection) initHeartbeats() error {
+	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)
 	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
 	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
 	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.uid)
@@ -360,6 +362,8 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 				break
 			}
 			err = action()
+		case <-conn.heartbeatTCP.C:
+			err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
 		case <-conn.heartbeatTimeout.C:
 			err = fmt.Errorf("timed out waiting for UDP heartbeat")
 		case <-tickerChan(conn.heartbeat):
@@ -386,6 +390,7 @@ func (conn *LocalConnection) shutdown() {
 		conn.heartbeatTimeout.Stop()
 	}
 
+	stopTicker(conn.heartbeatTCP)
 	stopTicker(conn.heartbeat)
 	stopTicker(conn.fragTest)
 
@@ -439,6 +444,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 
 func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) error {
 	switch tag {
+	case ProtocolHeartbeat:
 	case ProtocolConnectionEstablished:
 		// We sent fast heartbeats to the remote peer, which has now
 		// received at least one of them and told us via this message.
@@ -469,7 +475,7 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 }
 
 func (conn *LocalConnection) extendReadDeadline() {
-	conn.TCPConn.SetReadDeadline(time.Now().Add(ReadTimeout))
+	conn.TCPConn.SetReadDeadline(time.Now().Add(TCPHeartbeat * 2))
 }
 
 func (conn *LocalConnection) sendFastHeartbeats() error {
