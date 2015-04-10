@@ -58,19 +58,19 @@ This produces output like:
 ````
 weave router 0.7.0
 Encryption off
-Our name is 7a:f4:56:87:76:3b (weave01)
+Our name is 7a:f4:56:87:76:3b(weave01)
 Sniffing traffic on &{39 65535 ethwe ae:e3:07:9c:8c:d4 up|broadcast|multicast}
 MACs:
-ba:8c:b9:dc:e1:c9 -> 7a:f4:56:87:76:3b (2014-10-23 16:39:19.482338935 +0000 UTC)
-ce:15:34:a9:b5:6d -> 7a:f4:56:87:76:3b (2014-10-23 16:39:28.257103595 +0000 UTC)
-7a:61:a2:49:4b:91 -> 7a:f4:56:87:76:3b (2014-10-23 16:39:27.482970752 +0000 UTC)
-9e:95:0c:54:8e:39 -> 7a:16:dd:5b:83:de (2014-10-23 16:39:28.795601325 +0000 UTC)
-72:5f:a4:60:e5:ce -> 7a:16:dd:5b:83:de (2014-10-23 16:39:29.575995255 +0000 UTC)
+ba:8c:b9:dc:e1:c9 -> 7a:f4:56:87:76:3b(weave01) (2014-10-23 16:39:19.482338935 +0000 UTC)
+ce:15:34:a9:b5:6d -> 7a:f4:56:87:76:3b(weave01) (2014-10-23 16:39:28.257103595 +0000 UTC)
+7a:61:a2:49:4b:91 -> 7a:f4:56:87:76:3b(weave01) (2014-10-23 16:39:27.482970752 +0000 UTC)
+9e:95:0c:54:8e:39 -> 7a:16:dd:5b:83:de(weave02) (2014-10-23 16:39:28.795601325 +0000 UTC)
+72:5f:a4:60:e5:ce -> 7a:16:dd:5b:83:de(weave02) (2014-10-23 16:39:29.575995255 +0000 UTC)
 Peers:
-Peer 7a:16:dd:5b:83:de (weave02) (v31) (UID 13151318985609435078)
-   -> 7a:f4:56:87:76:3b (weave01) [37.157.33.76:7195]
-Peer 7a:f4:56:87:76:3b (weave01) (v1) (UID 6913268221365110570)
-   -> 7a:16:dd:5b:83:de (weave02) [191.235.147.190:6783]
+Peer 7a:16:dd:5b:83:de(weave02) (v31) (UID 13151318985609435078)
+   -> 7a:f4:56:87:76:3b(weave01) [37.157.33.76:7195]
+Peer 7a:f4:56:87:76:3b(weave01) (v1) (UID 6913268221365110570)
+   -> 7a:16:dd:5b:83:de(weave02) [191.235.147.190:6783]
 Routes:
 unicast:
 7a:f4:56:87:76:3b -> 00:00:00:00:00:00
@@ -116,7 +116,7 @@ from 37.157.33.76:7195.
 The 'Routes' section summarised the information for deciding how to
 route packets between peers, which is mostly of interest when the
 weave network is not fully connected.  See the
-[architecture documentation](https://raw.githubusercontent.com/zettio/weave/master/docs/architecture.txt)
+[architecture documentation](https://raw.githubusercontent.com/weaveworks/weave/master/docs/architecture.txt)
 for a full explanation.
 
 The 'Reconnects' section lists peers that this router is aware of, but is
@@ -126,7 +126,7 @@ connecting again.
 
 Finally, status information from weave DNS is included. In this example,
 the DNS container has not been launched so no status information is
-available (see the [WeaveDNS README](https://github.com/zettio/weave/blob/master/weavedns/README.md)
+available (see the [WeaveDNS README](https://github.com/weaveworks/weave/blob/master/weavedns/README.md)
 for more information).
 
 ### <a name="list-attached-containers"></a>List attached containers
