@@ -43,6 +43,8 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 
 $(WEAVER_EXE): router/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
+
+# Sigproxy needs separate rule as it fails the netgo check in the main build stanza due to not importing net package 
 $(SIGPROXY_EXE): sigproxy/main.go
 	go build -o $@ ./$(shell dirname $@)
 

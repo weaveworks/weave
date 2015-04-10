@@ -52,7 +52,7 @@ DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 
 exec_remote() {
-    docker run --sig-proxy=true --rm \
+    docker run --rm \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v "$PROCFS":/hostproc \
         -e VERSION \
