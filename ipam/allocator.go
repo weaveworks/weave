@@ -318,9 +318,11 @@ func (alloc *Allocator) string() string {
 	fmt.Fprintf(&buf, "Allocator universe %s+%d\n", alloc.universeStart, alloc.universeSize)
 	fmt.Fprintf(&buf, alloc.ring.String())
 	fmt.Fprintf(&buf, alloc.spaceSet.String())
-	fmt.Fprintf(&buf, "\nPending requests for ")
-	for _, pending := range alloc.pending {
-		fmt.Fprintf(&buf, "%s, ", pending.Ident)
+	if len(alloc.pending) > 0 {
+		fmt.Fprintf(&buf, "\nPending requests for ")
+		for _, pending := range alloc.pending {
+			fmt.Fprintf(&buf, "%s, ", pending.Ident)
+		}
 	}
 	return buf.String()
 }

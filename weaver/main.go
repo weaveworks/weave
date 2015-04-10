@@ -135,11 +135,12 @@ func main() {
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
 	initiateConnections(router, peers)
-	var allocator *ipam.Allocator = nil
 	if allocCIDR != "" {
-		allocator = createAllocator(router, apiPath, allocCIDR)
+		allocator := createAllocator(router, apiPath, allocCIDR)
+		go handleHttp(router, allocator)
+	} else {
+		go handleHttp(router)
 	}
-	go handleHttp(router, allocator)
 	handleSignals(router)
 }
 

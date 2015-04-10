@@ -29,9 +29,13 @@ func (s *Set) Spaces() []*Space {
 
 func (s *Set) String() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Set")
-	for _, space := range s.spaces {
-		fmt.Fprintf(&buf, "\n  %s", space)
+	if len(s.spaces) > 0 {
+		fmt.Fprintf(&buf, "Address ranges we own:")
+		for _, space := range s.spaces {
+			fmt.Fprintf(&buf, "\n  %s", space)
+		}
+	} else {
+		fmt.Fprintf(&buf, "No address ranges owned")
 	}
 	return buf.String()
 }
