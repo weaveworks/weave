@@ -3,7 +3,7 @@
 set -e
 
 SUDO=${SUDO-sudo}
-GITHUB_USER=${GITHUB_USER:-zettio}
+GITHUB_USER=${GITHUB_USER:-weaveworks}
 DOCKERHUB_USER=${DOCKERHUB_USER:-zettio}
 RELEASE_NAME=${RELEASE_NAME:-"Weave"}
 RELEASE_DESCRIPTION=${RELEASE_DESCRIPTION:-"Weaving Containers into Applications"}

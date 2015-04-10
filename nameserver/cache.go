@@ -4,7 +4,7 @@ import (
 	"container/heap"
 	"errors"
 	"github.com/miekg/dns"
-	. "github.com/zettio/weave/common"
+	. "github.com/weaveworks/weave/common"
 	"math"
 	"math/rand"
 	"sync"

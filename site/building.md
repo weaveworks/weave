@@ -22,11 +22,11 @@ options are described below.
 ## Building directly on Ubuntu
 
 The weave git repository should be cloned into
-`$GOPATH/src/github.com/zettio/weave`, in accordance with [the go
+`$GOPATH/src/github.com/weaveworks/weave`, in accordance with [the go
 workspace conventions](https://golang.org/doc/code.html#Workspaces):
 
 ```bash
-$ WEAVE=github.com/zettio/weave
+$ WEAVE=github.com/weaveworks/weave
 $ git clone https://$WEAVE $GOPATH/src/$WEAVE
 $ cd $GOPATH/src/$WEAVE
 ```
@@ -60,7 +60,7 @@ that has all the prerequisites.  This avoids the need to download and
 install them for each build.  In the `weave` directory, do:
 
 ```bash
-$ sudo docker build -t zettio/weave-build build
+$ sudo docker build -t weaveworks/weave-build build
 ```
 
 Next we run a container based on that image. That container requires
@@ -75,7 +75,7 @@ for a way to work around this problem.
 To perform a build, run:
 
 ```bash
-$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-build https://github.com/zettio/weave.git
+$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock weaveworks/weave-build https://github.com/weaveworks/weave.git
 ```
 
 This will clone the weave git repository, then do the build.
@@ -87,7 +87,7 @@ The container arguments are passed to `git clone`, so for example, you
 can build from a forked repository and a specific branch with:
 
 ```bash
-$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock zettio/weave-build -b <branch name> <repo URI>
+$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock weaveworks/weave-build -b <branch name> <repo URI>
 ```
 
 Alternatively, you might want to build from a weave source tree
@@ -97,7 +97,7 @@ to bind the bind your go workspace containing the weave repository to
 passed in this case:
 
 ```bash
-$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock -v <host gopath>:/home/go zettio/weave-build
+$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock -v <host gopath>:/home/go weaveworks/weave-build
 ```
 
 This will leave the intermediate build artifacts on the host, so that
@@ -115,7 +115,7 @@ Vagrant to run VMs in.
 First, check out the code:
 
 ```bash
-$ git clone https://github.com/zettio/weave
+$ git clone https://github.com/weaveworks/weave
 $ cd weave
 ```
 
@@ -136,7 +136,7 @@ $ vagrant up
 
 and wait for a while (don't worry, the long download and package
 installation is done just once). The working directory is sync'ed with
-`~/src/github.com/zettio/weave` on the VM, so you can edit files and
+`~/src/github.com/weaveworks/weave` on the VM, so you can edit files and
 use git and so on in the regular filesystem.
 
 To build and run the code, you need to use the VM. To log in and build
@@ -144,7 +144,7 @@ the weave image, do
 
 ```bash
 $ vagrant ssh
-vm$ cd src/github.com/zettio/weave
+vm$ cd src/github.com/weaveworks/weave
 vm$ make
 ```
 

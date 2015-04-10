@@ -180,6 +180,7 @@ func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) map[PeerNam
 func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerName][]PeerName {
 	broadcast := make(map[PeerName][]PeerName)
 	ourself := routes.ourself
+	ourConnections := ourself.Connections()
 
 	routes.peers.ForEach(func(peer *Peer) {
 		hops := []PeerName{}
@@ -187,7 +188,7 @@ func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerN
 			// This is rather similar to the inner loop on
 			// peer.Routes(...); the main difference is in the
 			// locking.
-			for conn := range ourself.Connections() {
+			for conn := range ourConnections {
 				if establishedAndSymmetric && !conn.Established() {
 					continue
 				}

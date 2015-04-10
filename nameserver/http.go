@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
-	. "github.com/zettio/weave/common"
+	. "github.com/weaveworks/weave/common"
 	"io"
 	"log"
 	"net"

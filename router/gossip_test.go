@@ -1,7 +1,7 @@
 package router
 
 import (
-	wt "github.com/zettio/weave/testing"
+	wt "github.com/weaveworks/weave/testing"
 	"testing"
 	"time"
 )

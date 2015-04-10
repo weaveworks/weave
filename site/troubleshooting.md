@@ -116,7 +116,7 @@ from 37.157.33.76:7195.
 The 'Routes' section summarised the information for deciding how to
 route packets between peers, which is mostly of interest when the
 weave network is not fully connected.  See the
-[architecture documentation](https://raw.githubusercontent.com/zettio/weave/master/docs/architecture.txt)
+[architecture documentation](https://raw.githubusercontent.com/weaveworks/weave/master/docs/architecture.txt)
 for a full explanation.
 
 The 'Reconnects' section lists peers that this router is aware of, but is
@@ -126,7 +126,7 @@ connecting again.
 
 Finally, status information from weave DNS is included. In this example,
 the DNS container has not been launched so no status information is
-available (see the [WeaveDNS README](https://github.com/zettio/weave/blob/master/weavedns/README.md)
+available (see the [WeaveDNS README](https://github.com/weaveworks/weave/blob/master/weavedns/README.md)
 for more information).
 
 ### <a name="list-attached-containers"></a>List attached containers

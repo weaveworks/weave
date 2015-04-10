@@ -1,14 +1,26 @@
 #!/bin/bash
 set -e
 
+# You may need to adjust
+#    echo 4096 >/proc/sys/net/ipv4/neigh/default/gc_thresh3
+# where the number is greater than NUM_WEAVES*(NUM_WEAVES-1) plus some
+# fudge.
+#
+# Without that, some connections between the weaves may fail to get
+# established, and networking on the host in general becomes
+# broken. There will also be some "net_ratelimit: nnn callbacks
+# suppressed" messages in the syslog.
+
 START=${FIRST_WEAVE:-1}
 COUNT=${NUM_WEAVES:-28}
 FINISH=$((START+COUNT-1))
 
+weavedir=$(dirname $0)/..
+
 case "$1" in
     launch)
         for i in $(seq $START $FINISH); do
-            WEAVE_CONTAINER_NAME=weave$i ./weave --local test-launch --connlimit=100
+            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave --local test-launch --connlimit=100
         done
         if [ $START -ne 1 ] ; then
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$((START-1)))
@@ -17,7 +29,7 @@ case "$1" in
         for i in $(seq $START $FINISH); do
             if [ -n "$PREV" ] ; then
                 echo connecting weave$i to $PREV
-                WEAVE_CONTAINER_NAME=weave$i ./weave --local connect $PREV
+                WEAVE_CONTAINER_NAME=weave$i $weavedir/weave --local connect $PREV
             fi
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$i)
             PREV="${status#true }"
@@ -26,7 +38,7 @@ case "$1" in
     stop)
         for i in $(seq $START $FINISH); do
             echo Stopping weave$i
-            WEAVE_CONTAINER_NAME=weave$i ./weave --local stop
+            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave --local stop
         done
         ;;
 esac

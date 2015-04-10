@@ -6,7 +6,7 @@ layout: default
 # Weave features
 
 Weave has a few more features beyond those illustrated by the [basic
-example](https://github.com/zettio/weave#example):
+example](https://github.com/weaveworks/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
  * [IP Address Management](#ipam)
