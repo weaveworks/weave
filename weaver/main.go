@@ -45,22 +45,22 @@ func main() {
 		peers       []string
 		connLimit   int
 		bufSz       int
-		port	    int
+		port        int
 		httpAddr    string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if left blank)")
-	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC)")
+	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if blank)")
+	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
 	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
-	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0, i.e. don't wait)")
+	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (0 = don't wait)")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
-	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (defaults to 30, set to 0 for unlimited)")
-	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
-	flag.IntVar(&port, "port", weave.Port, fmt.Sprintf("router port (defaults to %d)", weave.Port))
-	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), fmt.Sprintf("address to bind HTTP interface to (defaults to :%d, set to \"\" to disable)", weave.HTTPPort))
+	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (0 for unlimited)")
+	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB")
+	flag.IntVar(&port, "port", weave.Port, "router port")
+	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank)")
 	flag.Parse()
 	peers = flag.Args()
 
