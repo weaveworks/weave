@@ -7,7 +7,6 @@ import (
 	"github.com/weaveworks/weave/common/updater"
 	weavedns "github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
-	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -49,7 +48,7 @@ func main() {
 	flag.Parse()
 
 	if justVersion {
-		io.WriteString(os.Stdout, fmt.Sprintf("weave DNS %s\n", version))
+		fmt.Printf("weave DNS %s\n", version)
 		os.Exit(0)
 	}
 
