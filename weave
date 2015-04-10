@@ -72,15 +72,14 @@ exec_remote() {
 if [ "$1" = "--local" ]; then
     LOCAL="$1"
     shift 1
+    [ $(id -u) = 0 ] || {
+        echo "weave must be run as 'root' when run locally" >&2
+        exit 1
+    }
 elif [ "$1" != "run" ]; then
     exec_remote "$@"
     exit $?
 fi
-
-[ $(id -u) = 0 ] || ([ "$1" = "run" ] && [ -z "$LOCAL" ]) || {
-    echo "weave must be run as 'root' when run locally" >&2
-    exit 1
-}
 
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 DNS_CONTAINER_NAME=weavedns
