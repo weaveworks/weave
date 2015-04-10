@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/miekg/dns"
-	. "github.com/zettio/weave/common"
+	. "github.com/weaveworks/weave/common"
 	"net"
 	"sync"
 )

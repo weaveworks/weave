@@ -2,7 +2,7 @@ package updater
 
 import (
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/zettio/weave/common"
+	. "github.com/weaveworks/weave/common"
 )
 
 type ContainerObserver interface {
