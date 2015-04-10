@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 )
 
@@ -60,7 +61,7 @@ func main() {
 	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB")
 	flag.IntVar(&port, "port", weave.Port, "router port")
-	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank)")
+	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, , absolute path indicates unix domain socket)")
 	flag.Parse()
 	peers = flag.Args()
 
@@ -200,9 +201,19 @@ func handleHTTP(router *weave.Router, httpAddr string) {
 
 	http.Handle("/", muxRouter)
 
-	err := http.ListenAndServe(httpAddr, nil)
+	protocol := "tcp"
+	if strings.HasPrefix(httpAddr, "/") {
+		os.Remove(httpAddr); // in case it's there from last time
+		protocol = "unix"
+	}
+	l, err := net.Listen(protocol, httpAddr)
 	if err != nil {
-		log.Fatal("Unable to create http listener: ", err)
+		log.Fatal("Unable to create http listener socket: ", err)
+	}
+
+	err = http.Serve(l, nil)
+	if err != nil {
+		log.Fatal("Unable to create http server", err)
 	}
 }
 
