@@ -10,6 +10,7 @@ DOCKERHUB_USER=zettio
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
+SIGPROXY_EXE=sigproxy/sigproxy
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
@@ -43,6 +44,11 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 $(WEAVER_EXE): router/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
 
+# Sigproxy needs separate rule as it fails the netgo check in the main
+# build stanza due to not importing net package
+$(SIGPROXY_EXE): sigproxy/main.go
+	go build -o $@ ./$(shell dirname $@)
+
 $(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
 	$(SUDO) docker save $(WEAVER_IMAGE):latest > $@
@@ -51,8 +57,9 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave
+$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE)
 	cp weave weaveexec/weave
+	cp sigproxy/sigproxy weaveexec/sigproxy
 	cp $(DOCKER_DISTRIB) weaveexec/docker.tgz
 	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) weaveexec
 	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
@@ -81,7 +88,7 @@ publish: $(PUBLISH)
 
 clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
-	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
+	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 build:
 	$(SUDO) go clean -i net
