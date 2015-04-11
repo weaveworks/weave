@@ -73,15 +73,16 @@ func RunLocalMulticastServer() (*dns.Server, error) {
 }
 
 func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
+	server, err := RunLocalMulticastServer()
+	if err != nil {
+		t.Fatalf("Unable to run test server: %s. No default multicast interface?", err)
+	}
+
 	mdnsClient, err := NewMDNSClient()
 	wt.AssertNoErr(t, err)
 	err = mdnsClient.Start(nil)
 	wt.AssertNoErr(t, err)
 
-	server, err := RunLocalMulticastServer()
-	if err != nil {
-		t.Fatalf("Unable to run test server: %s", err)
-	}
 	return mdnsClient, server, err
 }
 

@@ -22,12 +22,19 @@ var (
 	testPort = 17625
 )
 
-func setupForTest() {
+func setupForTest(t *testing.T) {
+	// fail early if we cannot find a default multicast interface
+	multicast, err := LinkLocalMulticastListener(nil)
+	if err != nil {
+		t.Fatalf("Unable to create multicast listener: %s. No default multicast interface?", err)
+	}
+	multicast.Close()
+
 	testPort++
 }
 
 func TestUDPDNSServer(t *testing.T) {
-	setupForTest()
+	setupForTest(t)
 	const (
 		successTestName = "test1.weave.local."
 		failTestName    = "test2.weave.local."
@@ -110,7 +117,7 @@ func TestUDPDNSServer(t *testing.T) {
 }
 
 func TestTCPDNSServer(t *testing.T) {
-	setupForTest()
+	setupForTest(t)
 	const (
 		numAnswers   = 512
 		nonLocalName = "weave.works."
