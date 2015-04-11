@@ -61,7 +61,7 @@ func main() {
 	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB")
 	flag.IntVar(&port, "port", weave.Port, "router port")
-	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, , absolute path indicates unix domain socket)")
+	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	flag.Parse()
 	peers = flag.Args()
 
