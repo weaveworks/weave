@@ -67,7 +67,10 @@ func RunLocalMulticastServer() (*dns.Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	server := &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(minimalServer)}
+	server := &dns.Server{
+		PacketConn:  multicast,
+		Handler:     dns.HandlerFunc(minimalServer),
+		ReadTimeout: 100 * time.Millisecond}
 	go server.ActivateAndServe()
 	return server, nil
 }

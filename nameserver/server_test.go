@@ -265,7 +265,7 @@ func runLocalUDPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dn
 	if err != nil {
 		return nil, "", err
 	}
-	server := &dns.Server{PacketConn: pc, Handler: handler}
+	server := &dns.Server{PacketConn: pc, Handler: handler, ReadTimeout: 100 * time.Millisecond}
 
 	go func() {
 		server.ActivateAndServe()
@@ -288,7 +288,7 @@ func runLocalTCPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dn
 	if err != nil {
 		return nil, "", err
 	}
-	server := &dns.Server{Listener: l, Handler: handler}
+	server := &dns.Server{Listener: l, Handler: handler, ReadTimeout: 100 * time.Millisecond}
 
 	go func() {
 		server.ActivateAndServe()

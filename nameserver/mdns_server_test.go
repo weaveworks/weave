@@ -86,7 +86,11 @@ func TestServerSimpleQuery(t *testing.T) {
 		}
 	}
 
-	listener := &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
+	listener := &dns.Server{
+		Unsafe:      true,
+		PacketConn:  multicast,
+		Handler:     dns.HandlerFunc(handleMDNS),
+		ReadTimeout: 100 * time.Millisecond}
 	go listener.ActivateAndServe()
 	defer listener.Shutdown()
 
