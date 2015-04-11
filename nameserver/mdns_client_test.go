@@ -63,7 +63,7 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 }
 
 func RunLocalMulticastServer() (*dns.Server, error) {
-	multicast, err := net.ListenMulticastUDP("udp", nil, ipv4Addr)
+	multicast, err := LinkLocalMulticastListener(nil)
 	if err != nil {
 		return nil, err
 	}
