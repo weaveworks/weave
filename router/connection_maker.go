@@ -79,6 +79,12 @@ func (cm *ConnectionMaker) Refresh() {
 }
 
 func (cm *ConnectionMaker) String() string {
+	// We need to Refresh first in order to clear out any 'attempting'
+	// connections from cm.targets that have been established since
+	// the last run of cm.checkStateAndAttemptConnections. These
+	// entries are harmless but do represent stale state that we do
+	// not want to report.
+	cm.Refresh()
 	resultChan := make(chan string, 0)
 	cm.actionChan <- func() bool {
 		var buf bytes.Buffer
