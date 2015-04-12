@@ -19,12 +19,13 @@ type ConnectionMaker struct {
 	peers             *Peers
 	normalisePeerAddr func(string) string
 	targets           map[string]*Target
-	cmdLineAddress    map[string]struct{}
+	cmdLinePeers      map[string]string // host[:port] -> last resolution error
 	actionChan        chan<- ConnectionMakerAction
 }
 
 // Information about an address where we may find a peer
 type Target struct {
+	fromCmdLine bool          // was this address supplied at the command line?
 	attempting  bool          // are we currently attempting to connect there?
 	tryAfter    time.Time     // next time to try this address
 	tryInterval time.Duration // backoff time on next failure
@@ -37,7 +38,7 @@ func NewConnectionMaker(ourself *LocalPeer, peers *Peers, normalisePeerAddr func
 		ourself:           ourself,
 		peers:             peers,
 		normalisePeerAddr: normalisePeerAddr,
-		cmdLineAddress:    make(map[string]struct{}),
+		cmdLinePeers:      make(map[string]string),
 		targets:           make(map[string]*Target)}
 }
 
@@ -47,19 +48,23 @@ func (cm *ConnectionMaker) Start() {
 	go cm.queryLoop(actionChan)
 }
 
-func (cm *ConnectionMaker) InitiateConnection(address string) {
+func (cm *ConnectionMaker) InitiateConnection(peer string) {
 	cm.actionChan <- func() bool {
-		cm.cmdLineAddress[cm.normalisePeerAddr(address)] = void
-		if target, found := cm.targets[address]; found {
-			target.tryAfter, target.tryInterval = tryImmediately()
+		address, errStr := cm.resolvePeerAddr(peer, "")
+		cm.cmdLinePeers[peer] = errStr
+		if address != "" {
+			// curtail any existing reconnect attempt interval
+			if target, found := cm.targets[address]; found {
+				target.tryAfter, target.tryInterval = tryImmediately()
+			}
 		}
 		return true
 	}
 }
 
-func (cm *ConnectionMaker) ForgetConnection(address string) {
+func (cm *ConnectionMaker) ForgetConnection(peer string) {
 	cm.actionChan <- func() bool {
-		delete(cm.cmdLineAddress, cm.normalisePeerAddr(address))
+		delete(cm.cmdLinePeers, peer)
 		return false
 	}
 }
@@ -137,8 +142,13 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	}
 
 	// Add command-line targets that are not connected
-	for address := range cm.cmdLineAddress {
-		addTarget(address)
+	for peer, lastErr := range cm.cmdLinePeers {
+		address, errStr := cm.resolvePeerAddr(peer, lastErr)
+		cm.cmdLinePeers[peer] = errStr
+		if address != "" {
+			addTarget(address)
+			cm.targets[address].fromCmdLine = true
+		}
 	}
 
 	// Add targets for peers that someone else is connected to, but we
@@ -166,6 +176,18 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	return cm.connectToTargets(validTarget)
 }
 
+func (cm *ConnectionMaker) resolvePeerAddr(peer string, lastErr string) (string, string) {
+	if addr, err := net.ResolveTCPAddr("tcp4", cm.normalisePeerAddr(peer)); err == nil {
+		return addr.String(), ""
+	} else {
+		errStr := err.Error()
+		if lastErr != errStr {
+			log.Printf("failed to resolve command line peer address: %s\n", errStr)
+		}
+		return "", errStr
+	}
+}
+
 func (cm *ConnectionMaker) addTarget(address string) {
 	if _, found := cm.targets[address]; !found {
 		target := &Target{}
@@ -176,7 +198,7 @@ func (cm *ConnectionMaker) addTarget(address string) {
 
 func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}) time.Duration {
 	now := time.Now() // make sure we catch items just added
-	after := MaxDuration
+	after := MaxInterval
 	for address, target := range cm.targets {
 		if target.attempting {
 			continue
@@ -188,8 +210,7 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}) tim
 		switch duration := target.tryAfter.Sub(now); {
 		case duration <= 0:
 			target.attempting = true
-			_, isCmdLineAddress := cm.cmdLineAddress[address]
-			go cm.attemptConnection(address, isCmdLineAddress)
+			go cm.attemptConnection(address, target.fromCmdLine)
 		case duration < after:
 			after = duration
 		}
