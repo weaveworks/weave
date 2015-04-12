@@ -157,7 +157,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 		}
 	})
 
-	return cm.connectToTargets(validTarget, ourConnectedTargets)
+	return cm.connectToTargets(validTarget)
 }
 
 func (cm *ConnectionMaker) addTarget(address string) {
@@ -168,14 +168,10 @@ func (cm *ConnectionMaker) addTarget(address string) {
 	}
 }
 
-func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, ourConnectedTargets map[string]struct{}) time.Duration {
+func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}) time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if _, connected := ourConnectedTargets[address]; connected {
-			delete(cm.targets, address)
-			continue
-		}
 		if target.attempting {
 			continue
 		}
