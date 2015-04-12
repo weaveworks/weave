@@ -128,7 +128,17 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	router := weave.NewRouter(iface, ourName, nickName, pwSlice, connLimit, bufSz*1024*1024, logFrameFunc(debug), port)
+	router := weave.NewRouter(
+		weave.RouterConfig{
+			Port:      port,
+			Iface:     iface,
+			Name:      ourName,
+			NickName:  nickName,
+			Password:  pwSlice,
+			ConnLimit: connLimit,
+			BufSz:     bufSz * 1024 * 1024,
+			LogFrame:  logFrameFunc(debug)})
+
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
 	initiateConnections(router, peers)
@@ -138,7 +148,7 @@ func main() {
 	handleSignals(router)
 }
 
-func logFrameFunc(debug bool) func(string, []byte, *layers.Ethernet) {
+func logFrameFunc(debug bool) weave.LogFrameFunc {
 	if !debug {
 		return func(prefix string, frame []byte, eth *layers.Ethernet) {}
 	}
