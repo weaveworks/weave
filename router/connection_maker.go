@@ -198,7 +198,7 @@ func (cm *ConnectionMaker) addTarget(address string) {
 
 func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}) time.Duration {
 	now := time.Now() // make sure we catch items just added
-	after := MaxDuration
+	after := MaxInterval
 	for address, target := range cm.targets {
 		if target.attempting {
 			continue
