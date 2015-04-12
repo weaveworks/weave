@@ -19,7 +19,7 @@ type ConnectionMaker struct {
 	peers             *Peers
 	normalisePeerAddr func(string) string
 	targets           map[string]*Target
-	cmdLinePeers      map[string]struct{}
+	cmdLinePeers      map[string]string // host[:port] -> last resolution error
 	actionChan        chan<- ConnectionMakerAction
 }
 
@@ -38,7 +38,7 @@ func NewConnectionMaker(ourself *LocalPeer, peers *Peers, normalisePeerAddr func
 		ourself:           ourself,
 		peers:             peers,
 		normalisePeerAddr: normalisePeerAddr,
-		cmdLinePeers:      make(map[string]struct{}),
+		cmdLinePeers:      make(map[string]string),
 		targets:           make(map[string]*Target)}
 }
 
@@ -50,10 +50,11 @@ func (cm *ConnectionMaker) Start() {
 
 func (cm *ConnectionMaker) InitiateConnection(peer string) {
 	cm.actionChan <- func() bool {
-		cm.cmdLinePeers[peer] = void
-		// curtail any existing reconnect attempt interval
-		if addr, err := net.ResolveTCPAddr("tcp4", cm.normalisePeerAddr(peer)); err == nil {
-			if target, found := cm.targets[addr.String()]; found {
+		address, errStr := cm.resolvePeerAddr(peer, "")
+		cm.cmdLinePeers[peer] = errStr
+		if address != "" {
+			// curtail any existing reconnect attempt interval
+			if target, found := cm.targets[address]; found {
 				target.tryAfter, target.tryInterval = tryImmediately()
 			}
 		}
@@ -141,13 +142,12 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	}
 
 	// Add command-line targets that are not connected
-	for peer := range cm.cmdLinePeers {
-		if addr, err := net.ResolveTCPAddr("tcp4", cm.normalisePeerAddr(peer)); err == nil {
-			address := addr.String()
+	for peer, lastErr := range cm.cmdLinePeers {
+		address, errStr := cm.resolvePeerAddr(peer, lastErr)
+		cm.cmdLinePeers[peer] = errStr
+		if address != "" {
 			addTarget(address)
 			cm.targets[address].fromCmdLine = true
-		} else {
-			log.Printf("failed to resolve command line peer address: %s\n", err)
 		}
 	}
 
@@ -174,6 +174,18 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	})
 
 	return cm.connectToTargets(validTarget)
+}
+
+func (cm *ConnectionMaker) resolvePeerAddr(peer string, lastErr string) (string, string) {
+	if addr, err := net.ResolveTCPAddr("tcp4", cm.normalisePeerAddr(peer)); err == nil {
+		return addr.String(), ""
+	} else {
+		errStr := err.Error()
+		if lastErr != errStr {
+			log.Printf("failed to resolve command line peer address: %s\n", errStr)
+		}
+		return "", errStr
+	}
 }
 
 func (cm *ConnectionMaker) addTarget(address string) {
