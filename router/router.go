@@ -18,6 +18,7 @@ const macMaxAge = 10 * time.Minute // [1]
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
 type Router struct {
+	Port            int
 	Iface           *net.Interface
 	Ourself         *LocalPeer
 	Macs            *MacCache
@@ -31,7 +32,6 @@ type Router struct {
 	ConnLimit       int
 	BufSz           int
 	LogFrame        func(string, []byte, *layers.Ethernet)
-	Port            int
 }
 
 type PacketSource interface {

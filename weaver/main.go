@@ -36,6 +36,7 @@ func main() {
 
 	var (
 		justVersion bool
+		port        int
 		ifaceName   string
 		routerName  string
 		nickName    string
@@ -46,11 +47,11 @@ func main() {
 		peers       []string
 		connLimit   int
 		bufSz       int
-		port        int
 		httpAddr    string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
+	flag.IntVar(&port, "port", weave.Port, "router port")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if blank)")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
 	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
@@ -60,7 +61,6 @@ func main() {
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (0 for unlimited)")
 	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB")
-	flag.IntVar(&port, "port", weave.Port, "router port")
 	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	flag.Parse()
 	peers = flag.Args()
