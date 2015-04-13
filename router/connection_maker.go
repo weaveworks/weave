@@ -145,10 +145,16 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	}
 
 	addTarget := func(address string) {
-		if _, connected := ourConnectedTargets[address]; !connected {
-			validTarget[address] = void
-			cm.addTarget(address)
+		if _, connected := ourConnectedTargets[address]; connected {
+			return
 		}
+		validTarget[address] = void
+		if _, found := cm.targets[address]; found {
+			return
+		}
+		target := &Target{}
+		target.tryAfter, target.tryInterval = tryImmediately()
+		cm.targets[address] = target
 	}
 
 	// Add command-line targets that are not connected
@@ -183,11 +189,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 }
 
 func (cm *ConnectionMaker) addTarget(address string) {
-	if _, found := cm.targets[address]; !found {
-		target := &Target{}
-		target.tryAfter, target.tryInterval = tryImmediately()
-		cm.targets[address] = target
-	}
 }
 
 func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, cmdLineTarget map[string]struct{}) time.Duration {
