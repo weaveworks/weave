@@ -70,15 +70,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	options := make(map[string]string)
-	flag.Visit(func(f *flag.Flag) {
-		value := f.Value.String()
-		if f.Name == "password" {
-			value = "<elided>"
-		}
-		options[f.Name] = value
-	})
-	log.Println("Command line options:", options)
+	log.Println("Command line options:", options())
 	log.Println("Command line peers:", peers)
 
 	var err error
@@ -141,15 +133,23 @@ func main() {
 
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
-	for _, peer := range peers {
-		if err := router.ConnectionMaker.InitiateConnection(peer); err != nil {
-			log.Fatal(err)
-		}
-	}
+	initiateConnections(router, peers)
 	if httpAddr != "" {
 		go handleHTTP(router, httpAddr)
 	}
 	handleSignals(router)
+}
+
+func options() map[string]string {
+	options := make(map[string]string)
+	flag.Visit(func(f *flag.Flag) {
+		value := f.Value.String()
+		if f.Name == "password" {
+			value = "<elided>"
+		}
+		options[f.Name] = value
+	})
+	return options
 }
 
 func logFrameFunc(debug bool) weave.LogFrameFunc {
@@ -162,6 +162,14 @@ func logFrameFunc(debug bool) weave.LogFrameFunc {
 			log.Println(prefix, len(frame), "bytes (", h, ")")
 		} else {
 			log.Println(prefix, len(frame), "bytes (", h, "):", eth.SrcMAC, "->", eth.DstMAC)
+		}
+	}
+}
+
+func initiateConnections(router *weave.Router, peers []string) {
+	for _, peer := range peers {
+		if err := router.ConnectionMaker.InitiateConnection(peer); err != nil {
+			log.Fatal(err)
 		}
 	}
 }
