@@ -134,8 +134,10 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	ourConnectedPeers := make(PeerNameSet)
 	ourConnectedTargets := make(map[string]struct{})
 	for conn := range cm.ourself.Connections() {
+		address := conn.RemoteTCPAddr()
 		ourConnectedPeers[conn.Remote().Name] = void
-		ourConnectedTargets[conn.RemoteTCPAddr()] = void
+		ourConnectedTargets[address] = void
+		delete(cm.targets, address)
 	}
 
 	addTarget := func(address string) {
