@@ -25,7 +25,6 @@ type ConnectionMaker struct {
 
 // Information about an address where we may find a peer
 type Target struct {
-	fromCmdLine bool          // did this address originate from the command line?
 	attempting  bool          // are we currently attempting to connect there?
 	tryAfter    time.Time     // next time to try this address
 	tryInterval time.Duration // backoff time on next failure
@@ -129,6 +128,7 @@ func (cm *ConnectionMaker) queryLoop(actionChan <-chan ConnectionMakerAction) {
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	validTarget := make(map[string]struct{})
+	cmdLineTarget := make(map[string]struct{})
 
 	// copy the set of things we are connected to, so we can access them without locking
 	ourConnectedPeers := make(PeerNameSet)
@@ -150,7 +150,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	// Add command-line targets that are not connected
 	for _, address := range cm.cmdLinePeers {
 		addTarget(address)
-		cm.targets[address].fromCmdLine = true
+		cmdLineTarget[address] = void
 	}
 
 	// Add targets for peers that someone else is connected to, but we
@@ -175,7 +175,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 		}
 	})
 
-	return cm.connectToTargets(validTarget)
+	return cm.connectToTargets(validTarget, cmdLineTarget)
 }
 
 func (cm *ConnectionMaker) addTarget(address string) {
@@ -186,7 +186,7 @@ func (cm *ConnectionMaker) addTarget(address string) {
 	}
 }
 
-func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}) time.Duration {
+func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, cmdLineTarget map[string]struct{}) time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
@@ -200,7 +200,8 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}) tim
 		switch duration := target.tryAfter.Sub(now); {
 		case duration <= 0:
 			target.attempting = true
-			go cm.attemptConnection(address, target.fromCmdLine)
+			_, isCmdLineTarget := cmdLineTarget[address]
+			go cm.attemptConnection(address, isCmdLineTarget)
 		case duration < after:
 			after = duration
 		}
