@@ -38,6 +38,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
   end
 
+  # Disable Vagrant 1.7 per host insecure key replacement
+  config.ssh.insert_key = false
+
   (1..n_machines).each do |i|
     config.vm.define "host#{i}" do |host|
       ip_suffix = ip_suffix_base + i
