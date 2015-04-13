@@ -70,7 +70,7 @@ $(DOCKER_DISTRIB):
 tests:
 	echo "mode: count" > profile.cov
 	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do     \
-	    output=$$(tempfile -p cover);                                                     \
+	    output=$$(mktemp cover.XXXXXXXXXX);                                               \
 	    go test -tags netgo -covermode=count -coverprofile=$$output $$dir;                \
 	    if [ -f $$output ]; then                                                          \
 	        tail -n +2 <$$output >>profile.cov;                                           \
