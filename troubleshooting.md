@@ -79,9 +79,7 @@ broadcast:
 7a:f4:56:87:76:3b -> [7a:16:dd:5b:83:de]
 7a:16:dd:5b:83:de -> []
 Reconnects:
-192.168.32.1:6783 (next try at 2014-10-23 16:39:50.585932102 +0000 UTC)
-
-weavedns container is not present; have you launched it?
+192.168.32.1:6783 (dial tcp4 192.168.32.1:6783: connection timed out) (next try at 2014-10-23 16:39:50.585932102 +0000 UTC)
 ````
 
 The terms used here are explained further at
@@ -121,13 +119,8 @@ for a full explanation.
 
 The 'Reconnects' section lists peers that this router is aware of, but is
 not currently connected to.  Each line contains some information about
-whether it is attempting to connect or is waiting for a while before
-connecting again.
-
-Finally, status information from weave DNS is included. In this example,
-the DNS container has not been launched so no status information is
-available (see the [WeaveDNS README](https://github.com/weaveworks/weave/blob/master/weavedns/README.md)
-for more information).
+what went wrong the last time; whether it is attempting to connect or
+is waiting for a while before connecting again.
 
 ### <a name="list-attached-containers"></a>List attached containers
 
