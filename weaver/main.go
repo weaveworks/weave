@@ -35,32 +35,29 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
+		config      weave.RouterConfig
 		justVersion bool
-		port        int
 		ifaceName   string
 		routerName  string
-		nickName    string
 		password    string
 		wait        int
 		debug       bool
 		prof        string
 		peers       []string
-		connLimit   int
-		bufSz       int
 		httpAddr    string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.IntVar(&port, "port", weave.Port, "router port")
+	flag.IntVar(&config.Port, "port", weave.Port, "router port")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if blank)")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
-	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
+	flag.StringVar(&config.NickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (0 = don't wait)")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
-	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (0 for unlimited)")
-	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB")
+	flag.IntVar(&config.ConnLimit, "connlimit", 30, "connection limit (0 for unlimited)")
+	flag.IntVar(&config.BufSz, "bufsz", 8, "capture buffer size in MB")
 	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	flag.Parse()
 	peers = flag.Args()
@@ -75,29 +72,28 @@ func main() {
 
 	var err error
 
-	var iface *net.Interface
 	if ifaceName != "" {
-		iface, err = weavenet.EnsureInterface(ifaceName, wait)
+		config.Iface, err = weavenet.EnsureInterface(ifaceName, wait)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if routerName == "" {
-		if iface == nil {
+		if config.Iface == nil {
 			log.Fatal("Either an interface must be specified with -iface or a name with -name")
 		}
-		routerName = iface.HardwareAddr.String()
+		routerName = config.Iface.HardwareAddr.String()
 	}
 
-	if nickName == "" {
-		nickName, err = os.Hostname()
+	if config.NickName == "" {
+		config.NickName, err = os.Hostname()
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	ourName, err := weave.PeerNameFromUserInput(routerName)
+	config.Name, err = weave.PeerNameFromUserInput(routerName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -106,11 +102,10 @@ func main() {
 		password = os.Getenv("WEAVE_PASSWORD")
 	}
 
-	var pwSlice []byte
 	if password == "" {
 		log.Println("Communication between peers is unencrypted.")
 	} else {
-		pwSlice = []byte(password)
+		config.Password = []byte(password)
 		log.Println("Communication between peers is encrypted.")
 	}
 
@@ -120,17 +115,11 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	router := weave.NewRouter(
-		weave.RouterConfig{
-			Port:      port,
-			Iface:     iface,
-			Name:      ourName,
-			NickName:  nickName,
-			Password:  pwSlice,
-			ConnLimit: connLimit,
-			BufSz:     bufSz * 1024 * 1024,
-			LogFrame:  logFrameFunc(debug)})
+	// bufsz flag is in MB
+	config.BufSz *= 1024 * 1024
+	config.LogFrame = logFrameFunc(debug)
 
+	router := weave.NewRouter(config)
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
 	initiateConnections(router, peers)
