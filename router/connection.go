@@ -402,7 +402,7 @@ func (conn *LocalConnection) shutdown(err error) {
 	// try to send any more
 	conn.stopForwarders()
 
-	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr)
+	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr, err)
 }
 
 // Helpers
