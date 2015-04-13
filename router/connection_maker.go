@@ -26,6 +26,7 @@ type ConnectionMaker struct {
 // Information about an address where we may find a peer
 type Target struct {
 	attempting  bool          // are we currently attempting to connect there?
+	lastError   error         // reason for disconnection last time
 	tryAfter    time.Time     // next time to try this address
 	tryInterval time.Duration // backoff time on next failure
 }
@@ -72,10 +73,11 @@ func (cm *ConnectionMaker) ForgetConnection(peer string) {
 	}
 }
 
-func (cm *ConnectionMaker) ConnectionTerminated(address string) {
+func (cm *ConnectionMaker) ConnectionTerminated(address string, err error) {
 	cm.actionChan <- func() bool {
 		if target, found := cm.targets[address]; found {
 			target.attempting = false
+			target.lastError = err
 			target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 		}
 		return true
@@ -97,13 +99,15 @@ func (cm *ConnectionMaker) String() string {
 	cm.actionChan <- func() bool {
 		var buf bytes.Buffer
 		for address, target := range cm.targets {
-			var fmtStr string
-			if target.attempting {
-				fmtStr = "%s (trying since %v)\n"
-			} else {
-				fmtStr = "%s (next try at %v)\n"
+			fmt.Fprint(&buf, address)
+			if target.lastError != nil {
+				fmt.Fprintf(&buf, " (%s)", target.lastError)
 			}
-			fmt.Fprintf(&buf, fmtStr, address, target.tryAfter)
+			if target.attempting {
+				fmt.Fprintf(&buf, " (trying since %v)\n", target.tryAfter)
+			} else {
+				fmt.Fprintf(&buf, " (next try at %v)\n", target.tryAfter)
+			}
 		}
 		resultChan <- buf.String()
 		return false
@@ -213,7 +217,7 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	log.Printf("->[%s] attempting connection\n", address)
 	if err := cm.ourself.CreateConnection(address, acceptNewPeer); err != nil {
 		log.Printf("->[%s] error during connection attempt: %v\n", address, err)
-		cm.ConnectionTerminated(address)
+		cm.ConnectionTerminated(address, err)
 	}
 }
 
