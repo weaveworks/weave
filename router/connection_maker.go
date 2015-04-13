@@ -188,9 +188,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	return cm.connectToTargets(validTarget, cmdLineTarget)
 }
 
-func (cm *ConnectionMaker) addTarget(address string) {
-}
-
 func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, cmdLineTarget map[string]struct{}) time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
