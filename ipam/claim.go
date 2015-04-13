@@ -56,6 +56,10 @@ func (c *claim) Try(alloc *Allocator) bool {
 	return true
 }
 
+func (c *claim) Cancel() {
+	c.resultChan <- fmt.Errorf("Allocator shutting down")
+}
+
 func (c *claim) String() string {
 	return fmt.Sprintf("Claim %s -> %s", c.ident, c.addr)
 }

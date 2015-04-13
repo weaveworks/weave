@@ -35,6 +35,10 @@ func (g *getfor) Try(alloc *Allocator) bool {
 	return false
 }
 
+func (g *getfor) Cancel() {
+	g.resultChan <- nil
+}
+
 func (g *getfor) String() string {
 	return fmt.Sprintf("GetFor %s", g.ident)
 }

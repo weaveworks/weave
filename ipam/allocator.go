@@ -29,6 +29,8 @@ type operation interface {
 	// Try attempts this operations and returns false if needs to be tried again.
 	Try(alloc *Allocator) bool
 
+	Cancel()
+
 	String() string
 }
 
@@ -86,21 +88,37 @@ func (alloc *Allocator) Start() {
 // Operation life cycle
 
 // Given an operation, try it, and add it to the pending queue if it didn't succeed
-func (alloc *Allocator) doOperation(op operation, ops *[]operation) {
+func (alloc *Allocator) doOperation(op operation, ops *[]operation) error {
+	if alloc.shuttingDown {
+		return fmt.Errorf("Allocator shutting down")
+	}
 	alloc.electLeaderIfNecessary()
 	if !op.Try(alloc) {
 		*ops = append(*ops, op)
 	}
+	return nil
 }
 
 // Given an operaion, remove it form the pending queue
+//  Note the op may not be on the queue; it may have
+//  already succeeded.  If it is on the queue, we call
+//  cancel on it, allowing callers waiting for the resultChans
+//  to unblock.
 func (alloc *Allocator) cancelOp(op operation, ops *[]operation) {
 	for i, op := range *ops {
 		if op == op {
 			*ops = append((*ops)[:i], (*ops)[i+1:]...)
+			op.Cancel()
 			break
 		}
 	}
+}
+
+func (alloc *Allocator) cancelOps(ops *[]operation) {
+	for _, op := range *ops {
+		op.Cancel()
+	}
+	*ops = []operation{}
 }
 
 // Try all pending operations
@@ -131,15 +149,13 @@ func (alloc *Allocator) tryPendingOps() {
 // GetFor (Sync) - get IP address for container with given name
 // if there isn't any space we block indefinately
 func (alloc *Allocator) GetFor(ident string, cancelChan <-chan bool) net.IP {
-	resultChan := make(chan net.IP, 1) // len 1 so actor can send while cancel is in progress
+	resultChan := make(chan net.IP)
 	op := &getfor{resultChan: resultChan, ident: ident}
 
 	alloc.actionChan <- func() {
-		if alloc.shuttingDown {
+		if err := alloc.doOperation(op, &alloc.pendingGetFors); err != nil {
 			resultChan <- nil
-			return
 		}
-		alloc.doOperation(op, &alloc.pendingGetFors)
 	}
 
 	select {
@@ -149,22 +165,21 @@ func (alloc *Allocator) GetFor(ident string, cancelChan <-chan bool) net.IP {
 		alloc.actionChan <- func() {
 			alloc.cancelOp(op, &alloc.pendingGetFors)
 		}
-		return nil
+		return <-resultChan
 	}
 }
 
 // Claim an address that we think we should own (Sync)
 func (alloc *Allocator) Claim(ident string, addr net.IP, cancelChan <-chan bool) error {
-	resultChan := make(chan error, 1) // len 1 so actor can send while cancel is in progress
+	resultChan := make(chan error)
 	op := &claim{resultChan: resultChan, ident: ident, addr: addr}
 
 	alloc.actionChan <- func() {
-		if alloc.shuttingDown {
-			resultChan <- fmt.Errorf("Claim %s: allocator is shutting down", addr)
-			return
+		if err := alloc.doOperation(op, &alloc.pendingClaims); err != nil {
+			resultChan <- err
 		}
-		alloc.doOperation(op, &alloc.pendingClaims)
 	}
+
 	select {
 	case result := <-resultChan:
 		return result
@@ -172,7 +187,7 @@ func (alloc *Allocator) Claim(ident string, addr net.IP, cancelChan <-chan bool)
 		alloc.actionChan <- func() {
 			alloc.cancelOp(op, &alloc.pendingClaims)
 		}
-		return nil
+		return <-resultChan
 	}
 }
 
@@ -216,6 +231,8 @@ func (alloc *Allocator) Shutdown() {
 	doneChan := make(chan struct{})
 	alloc.actionChan <- func() {
 		alloc.shuttingDown = true
+		alloc.cancelOps(&alloc.pendingClaims)
+		alloc.cancelOps(&alloc.pendingGetFors)
 		alloc.ring.TombstonePeer(alloc.ourName, 100)
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
 		alloc.spaceSet.Clear()
