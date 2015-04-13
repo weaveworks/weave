@@ -48,7 +48,7 @@ func NewRawUDPSender(conn *LocalConnection) (*RawUDPSender, error) {
 	if err != nil {
 		return nil, err
 	}
-	udpHeader := &layers.UDP{SrcPort: layers.UDPPort(Port)}
+	udpHeader := &layers.UDP{SrcPort: layers.UDPPort(conn.Router.Port)}
 	ipBuf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths: true,

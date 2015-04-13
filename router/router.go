@@ -17,7 +17,21 @@ const macMaxAge = 10 * time.Minute // [1]
 // [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
+type LogFrameFunc func(string, []byte, *layers.Ethernet)
+
+type RouterConfig struct {
+	Port      int
+	Iface     *net.Interface
+	Name      PeerName
+	NickName  string
+	Password  []byte
+	ConnLimit int
+	BufSz     int
+	LogFrame  LogFrameFunc
+}
+
 type Router struct {
+	Port            int
 	Iface           *net.Interface
 	Ourself         *LocalPeer
 	Macs            *MacCache
@@ -30,7 +44,7 @@ type Router struct {
 	Password        []byte
 	ConnLimit       int
 	BufSz           int
-	LogFrame        func(string, []byte, *layers.Ethernet)
+	LogFrame        LogFrameFunc
 }
 
 type PacketSource interface {
@@ -46,14 +60,15 @@ type PacketSourceSink interface {
 	PacketSink
 }
 
-func NewRouter(iface *net.Interface, name PeerName, nickName string, password []byte, connLimit int, bufSz int, logFrame func(string, []byte, *layers.Ethernet)) *Router {
+func NewRouter(config RouterConfig) *Router {
 	router := &Router{
-		Iface:          iface,
+		Port:           config.Port,
+		Iface:          config.Iface,
 		GossipChannels: make(map[uint32]*GossipChannel),
-		Password:       password,
-		ConnLimit:      connLimit,
-		BufSz:          bufSz,
-		LogFrame:       logFrame}
+		Password:       config.Password,
+		ConnLimit:      config.ConnLimit,
+		BufSz:          config.BufSz,
+		LogFrame:       config.LogFrame}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer.FullName())
 	}
@@ -61,12 +76,12 @@ func NewRouter(iface *net.Interface, name PeerName, nickName string, password []
 		router.Macs.Delete(peer)
 		log.Println("Removed unreachable peer", peer.FullName())
 	}
-	router.Ourself = NewLocalPeer(name, nickName, router)
+	router.Ourself = NewLocalPeer(config.Name, config.NickName, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
 	router.Peers = NewPeers(router.Ourself.Peer, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
-	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers)
+	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.NormalisePeerAddr)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	return router
 }
@@ -86,8 +101,8 @@ func (router *Router) Start() {
 	router.Macs.Start()
 	router.Routes.Start()
 	router.ConnectionMaker.Start()
-	router.UDPListener = router.listenUDP(Port, po)
-	router.listenTCP(Port)
+	router.UDPListener = router.listenUDP(router.Port, po)
+	router.listenTCP(router.Port)
 	if pio != nil {
 		router.sniff(pio)
 	}
@@ -198,7 +213,7 @@ func (router *Router) listenTCP(localPort int) {
 
 func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// someone else is dialing us, so our udp sender is the conn
-	// on Port and we wait for them to send us something on UDP to
+	// on router.Port and we wait for them to send us something on UDP to
 	// start.
 	remoteAddrStr := tcpConn.RemoteAddr().String()
 	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
@@ -415,4 +430,14 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 		router.Routes.Recalculate()
 	}
 	return origUpdate, newUpdate, nil
+}
+
+// given an address like '1.2.3.4:567', return the address if it has a port,
+// otherwise return the address with the default port number for the router
+func (router *Router) NormalisePeerAddr(peerAddr string) string {
+	_, _, err := net.SplitHostPort(peerAddr)
+	if err == nil {
+		return peerAddr
+	}
+	return fmt.Sprintf("%s:%d", peerAddr, router.Port)
 }

@@ -42,11 +42,6 @@ func TestServerSimpleQuery(t *testing.T) {
 	ip, _, _ := net.ParseCIDR(testAddr1)
 	zone.AddRecord(containerID, testName, ip)
 
-	mdnsServer, err := NewMDNSServer(zone)
-	wt.AssertNoErr(t, err)
-	err = mdnsServer.Start(nil, DefaultLocalDomain)
-	wt.AssertNoErr(t, err)
-
 	var receivedAddr net.IP
 	var receivedName string
 	var recvChan chan interface{}
@@ -70,7 +65,9 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	// Implement a minimal listener for responses
 	multicast, err := LinkLocalMulticastListener(nil)
-	wt.AssertNoErr(t, err)
+	if err != nil {
+		t.Fatalf("Unable to run test server: %s. No default multicast interface?", err)
+	}
 
 	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
 		// Only handle responses here
@@ -89,9 +86,18 @@ func TestServerSimpleQuery(t *testing.T) {
 		}
 	}
 
-	listener := &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
+	listener := &dns.Server{
+		Unsafe:      true,
+		PacketConn:  multicast,
+		Handler:     dns.HandlerFunc(handleMDNS),
+		ReadTimeout: 100 * time.Millisecond}
 	go listener.ActivateAndServe()
 	defer listener.Shutdown()
+
+	mdnsServer, err := NewMDNSServer(zone)
+	wt.AssertNoErr(t, err)
+	err = mdnsServer.Start(nil, DefaultLocalDomain)
+	wt.AssertNoErr(t, err)
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 

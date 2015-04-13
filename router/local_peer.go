@@ -9,14 +9,14 @@ import (
 
 type LocalPeer struct {
 	*Peer
-	Router     *Router
+	router     *Router
 	actionChan chan<- LocalPeerAction
 }
 
 type LocalPeerAction func()
 
 func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
-	return &LocalPeer{Peer: NewPeer(name, nickName, 0, 0), Router: router}
+	return &LocalPeer{Peer: NewPeer(name, nickName, 0, 0), router: router}
 }
 
 func (peer *LocalPeer) Start() {
@@ -34,7 +34,7 @@ func (peer *LocalPeer) Broadcast(df bool, frame []byte, dec *EthernetDecoder) {
 }
 
 func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
-	relayPeerName, found := peer.Router.Routes.Unicast(dstPeer.Name)
+	relayPeerName, found := peer.router.Routes.Unicast(dstPeer.Name)
 	if !found {
 		// Not necessarily an error as there could be a race with the
 		// dst disappearing whilst the frame is in flight
@@ -55,7 +55,7 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 }
 
 func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) {
-	nextHops := peer.Router.Routes.Broadcast(srcPeer.Name)
+	nextHops := peer.router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
 		return
 	}
@@ -94,7 +94,7 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 		return err
 	}
 	// We're dialing the remote so that means connections will come from random ports
-	addrStr := NormalisePeerAddr(peerAddr)
+	addrStr := peer.router.NormalisePeerAddr(peerAddr)
 	tcpAddr, tcpErr := net.ResolveTCPAddr("tcp4", addrStr)
 	udpAddr, udpErr := net.ResolveUDPAddr("udp4", addrStr)
 	if tcpErr != nil || udpErr != nil {
@@ -109,7 +109,7 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 		return err
 	}
 	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String(), true, false)
-	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.Router)
+	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.router)
 	connLocal.Start(acceptNewPeer)
 	return nil
 }
@@ -158,7 +158,7 @@ func (peer *LocalPeer) actorLoop(actionChan <-chan LocalPeerAction) {
 		case action := <-actionChan:
 			action()
 		case <-gossipTimer:
-			peer.Router.SendAllGossip()
+			peer.router.SendAllGossip()
 		}
 	}
 }
@@ -196,13 +196,13 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) {
 		conn.Shutdown(err)
 		return
 	}
-	_, isConnectedPeer := peer.Router.Routes.Unicast(toName)
+	_, isConnectedPeer := peer.router.Routes.Unicast(toName)
 	peer.addConnection(conn)
 	if isConnectedPeer {
 		conn.Log("connection added")
 	} else {
 		conn.Log("connection added (new peer)")
-		peer.Router.SendAllGossipDown(conn)
+		peer.router.SendAllGossipDown(conn)
 	}
 	peer.broadcastPeerUpdate(conn.Remote())
 }
@@ -235,18 +235,18 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
 	conn.Log("connection deleted")
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
-	peer.Router.Peers.GarbageCollect()
+	peer.router.Peers.GarbageCollect()
 	peer.broadcastPeerUpdate()
 }
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
-	peer.Router.Routes.Recalculate()
-	peer.Router.TopologyGossip.GossipBroadcast(NewTopologyGossipData(peer.Router.Peers, append(peers, peer.Peer)...))
+	peer.router.Routes.Recalculate()
+	peer.router.TopologyGossip.GossipBroadcast(NewTopologyGossipData(peer.router.Peers, append(peers, peer.Peer)...))
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {
-	if 0 != peer.Router.ConnLimit && peer.ConnectionCount() >= peer.Router.ConnLimit {
-		return fmt.Errorf("Connection limit reached (%v)", peer.Router.ConnLimit)
+	if 0 != peer.router.ConnLimit && peer.ConnectionCount() >= peer.router.ConnLimit {
+		return fmt.Errorf("Connection limit reached (%v)", peer.router.ConnLimit)
 	}
 	return nil
 }

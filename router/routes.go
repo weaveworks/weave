@@ -3,6 +3,7 @@ package router
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"sync"
 )
 
@@ -43,6 +44,10 @@ func (routes *Routes) Start() {
 	go routes.run(recalculate, wait)
 }
 
+func (routes *Routes) PeerNames() PeerNameSet {
+	return routes.peers.Names()
+}
+
 func (routes *Routes) Unicast(name PeerName) (PeerName, bool) {
 	routes.RLock()
 	defer routes.RUnlock()
@@ -75,6 +80,36 @@ func (routes *Routes) BroadcastAll(name PeerName) []PeerName {
 		return []PeerName{}
 	}
 	return hops
+}
+
+// Choose min(log2(n_peers), n_neighbouring_peers) neighbours, with a
+// random distribution that is topology-sensitive, favouring
+// neighbours at the end of "bottleneck links". We determine the
+// latter based on the unicast routing table. If a neighbour appears
+// as the value more frequently than others - meaning that we reach a
+// higher proportion of peers via that neighbour than other neighbours
+// - then it is chosen with a higher probability.
+//
+// Note that we choose log2(n_peers) *neighbours*, not
+// peers. Consequently, on sparsely connected peers this function
+// returns a higher proportion of neighbours than elsewhere. In
+// extremis, on peers with fewer than log2(n_peers) neighbours, all
+// neighbours are returned.
+func (routes *Routes) RandomNeighbours(except PeerName) PeerNameSet {
+	res := make(PeerNameSet)
+	routes.RLock()
+	defer routes.RUnlock()
+	count := int(math.Log2(float64(len(routes.unicastAll))))
+	// depends on go's random map iteration
+	for _, dst := range routes.unicastAll {
+		if dst != UnknownPeerName && dst != except {
+			res[dst] = void
+			if len(res) >= count {
+				break
+			}
+		}
+	}
+	return res
 }
 
 func (routes *Routes) String() string {

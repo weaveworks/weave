@@ -63,25 +63,29 @@ func minimalServer(w dns.ResponseWriter, req *dns.Msg) {
 }
 
 func RunLocalMulticastServer() (*dns.Server, error) {
-	multicast, err := net.ListenMulticastUDP("udp", nil, ipv4Addr)
+	multicast, err := LinkLocalMulticastListener(nil)
 	if err != nil {
 		return nil, err
 	}
-	server := &dns.Server{Listener: nil, PacketConn: multicast, Handler: dns.HandlerFunc(minimalServer)}
+	server := &dns.Server{
+		PacketConn:  multicast,
+		Handler:     dns.HandlerFunc(minimalServer),
+		ReadTimeout: 100 * time.Millisecond}
 	go server.ActivateAndServe()
 	return server, nil
 }
 
 func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
+	server, err := RunLocalMulticastServer()
+	if err != nil {
+		t.Fatalf("Unable to run test server: %s. No default multicast interface?", err)
+	}
+
 	mdnsClient, err := NewMDNSClient()
 	wt.AssertNoErr(t, err)
 	err = mdnsClient.Start(nil)
 	wt.AssertNoErr(t, err)
 
-	server, err := RunLocalMulticastServer()
-	if err != nil {
-		t.Fatalf("Unable to run test server: %s", err)
-	}
 	return mdnsClient, server, err
 }
 

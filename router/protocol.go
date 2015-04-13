@@ -8,7 +8,8 @@ const (
 type ProtocolTag byte
 
 const (
-	ProtocolConnectionEstablished ProtocolTag = iota
+	ProtocolHeartbeat ProtocolTag = iota
+	ProtocolConnectionEstablished
 	ProtocolFragmentationReceived
 	ProtocolStartFragmentationTest
 	ProtocolNonce

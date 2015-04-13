@@ -15,11 +15,12 @@ const (
 )
 
 type ConnectionMaker struct {
-	ourself        *LocalPeer
-	peers          *Peers
-	targets        map[string]*Target
-	cmdLineAddress map[string]struct{}
-	actionChan     chan<- ConnectionMakerAction
+	ourself           *LocalPeer
+	peers             *Peers
+	normalisePeerAddr func(string) string
+	targets           map[string]*Target
+	cmdLineAddress    map[string]struct{}
+	actionChan        chan<- ConnectionMakerAction
 }
 
 // Information about an address where we may find a peer
@@ -31,12 +32,13 @@ type Target struct {
 
 type ConnectionMakerAction func() bool
 
-func NewConnectionMaker(ourself *LocalPeer, peers *Peers) *ConnectionMaker {
+func NewConnectionMaker(ourself *LocalPeer, peers *Peers, normalisePeerAddr func(string) string) *ConnectionMaker {
 	return &ConnectionMaker{
-		ourself:        ourself,
-		peers:          peers,
-		cmdLineAddress: make(map[string]struct{}),
-		targets:        make(map[string]*Target)}
+		ourself:           ourself,
+		peers:             peers,
+		normalisePeerAddr: normalisePeerAddr,
+		cmdLineAddress:    make(map[string]struct{}),
+		targets:           make(map[string]*Target)}
 }
 
 func (cm *ConnectionMaker) Start() {
@@ -47,7 +49,7 @@ func (cm *ConnectionMaker) Start() {
 
 func (cm *ConnectionMaker) InitiateConnection(address string) {
 	cm.actionChan <- func() bool {
-		cm.cmdLineAddress[NormalisePeerAddr(address)] = void
+		cm.cmdLineAddress[cm.normalisePeerAddr(address)] = void
 		if target, found := cm.targets[address]; found {
 			target.tryAfter, target.tryInterval = tryImmediately()
 		}
@@ -57,7 +59,7 @@ func (cm *ConnectionMaker) InitiateConnection(address string) {
 
 func (cm *ConnectionMaker) ForgetConnection(address string) {
 	cm.actionChan <- func() bool {
-		delete(cm.cmdLineAddress, NormalisePeerAddr(address))
+		delete(cm.cmdLineAddress, cm.normalisePeerAddr(address))
 		return false
 	}
 }
@@ -77,6 +79,12 @@ func (cm *ConnectionMaker) Refresh() {
 }
 
 func (cm *ConnectionMaker) String() string {
+	// We need to Refresh first in order to clear out any 'attempting'
+	// connections from cm.targets that have been established since
+	// the last run of cm.checkStateAndAttemptConnections. These
+	// entries are harmless but do represent stale state that we do
+	// not want to report.
+	cm.Refresh()
 	resultChan := make(chan string, 0)
 	cm.actionChan <- func() bool {
 		var buf bytes.Buffer
@@ -150,12 +158,12 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 				addTarget(address)
 			}
 			if host, _, err := net.SplitHostPort(address); err == nil {
-				addTarget(NormalisePeerAddr(host))
+				addTarget(cm.normalisePeerAddr(host))
 			}
 		}
 	})
 
-	return cm.connectToTargets(validTarget, ourConnectedTargets)
+	return cm.connectToTargets(validTarget)
 }
 
 func (cm *ConnectionMaker) addTarget(address string) {
@@ -166,14 +174,10 @@ func (cm *ConnectionMaker) addTarget(address string) {
 	}
 }
 
-func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, ourConnectedTargets map[string]struct{}) time.Duration {
+func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}) time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if _, connected := ourConnectedTargets[address]; connected {
-			delete(cm.targets, address)
-			continue
-		}
 		if target.attempting {
 			continue
 		}
