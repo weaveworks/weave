@@ -22,6 +22,8 @@ const (
 	defPendingTimeout int = 5 // timeout for a resolution
 )
 
+const nullTTL = 0	// a null TTL
+
 type entryStatus uint8
 
 const (
@@ -61,24 +63,15 @@ type cacheEntry struct {
 	validUntil time.Time // obtained from the reply and stored here for convenience/speed
 	putTime    time.Time
 
-	waitChan chan struct{}
-
 	index int // for fast lookups in the heap
 }
 
-func newCacheEntry(question *dns.Question, reply *dns.Msg, status entryStatus, flags uint8, now time.Time) *cacheEntry {
+func newCacheEntry(question *dns.Question, now time.Time) *cacheEntry {
 	e := &cacheEntry{
-		Status:   status,
-		Flags:    flags,
-		question: *question,
-		index:    -1,
-	}
-
-	if e.Status == stPending {
-		e.validUntil = now.Add(time.Duration(defPendingTimeout) * time.Second)
-		e.waitChan = make(chan struct{})
-	} else {
-		e.setReply(reply, flags, now)
+		Status:     stPending,
+		validUntil: now.Add(time.Second * time.Duration(defPendingTimeout)),
+		question:   *question,
+		index:      -1,
 	}
 
 	return e
@@ -133,9 +126,7 @@ func (e cacheEntry) hasExpired(now time.Time) bool {
 
 // set the reply for the entry
 // returns True if the entry has changed the validUntil time
-func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) bool {
-	shouldNotify := (e.Status == stPending)
-
+func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Time) bool {
 	var prevValidUntil time.Time
 	if e.Status == stResolved {
 		prevValidUntil = e.validUntil
@@ -145,10 +136,9 @@ func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) bool {
 	e.Flags = flags
 	e.putTime = now
 
-	if e.Flags&CacheNoLocalReplies != 0 {
-		// use a fixed timeout for negative local resolutions
-		e.validUntil = now.Add(time.Second * time.Duration(negLocalTTL))
-	} else {
+	if ttl != nullTTL {
+		e.validUntil = now.Add(time.Second * time.Duration(ttl))
+	} else if reply != nil {
 		// calculate the validUntil from the reply TTL
 		var minTTL uint32 = math.MaxUint32
 		for _, rr := range reply.Answer {
@@ -165,35 +155,7 @@ func (e *cacheEntry) setReply(reply *dns.Msg, flags uint8, now time.Time) bool {
 		e.ReplyLen = reply.Len()
 	}
 
-	if shouldNotify {
-		close(e.waitChan) // notify all the waiters by closing the channel
-	}
-
 	return (prevValidUntil != e.validUntil)
-}
-
-// wait until a valid reply is set in the cache
-func (e *cacheEntry) waitReply(request *dns.Msg, timeout time.Duration, maxLen int, now time.Time) (*dns.Msg, error) {
-	if e.Status == stResolved {
-		return e.getReply(request, maxLen, now)
-	}
-
-	if timeout > 0 {
-		select {
-		case <-e.waitChan:
-			return e.getReply(request, maxLen, now)
-		case <-time.After(time.Second * timeout):
-			return nil, errTimeout
-		}
-	}
-
-	return nil, errCouldNotResolve
-}
-
-func (e *cacheEntry) close() {
-	if e.Status == stPending {
-		close(e.waitChan)
-	}
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -280,7 +242,7 @@ func (c *Cache) Purge(now time.Time) {
 }
 
 // Add adds a reply to the cache.
-func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, flags uint8, now time.Time) int {
+func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8, now time.Time) int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -288,8 +250,7 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, flags uint8, now time.Time
 	key := cacheKey(question)
 	ent, found := c.entries[key]
 	if found {
-		Debug.Printf("[cache msgid %d] replacing response in cache", request.MsgHdr.Id)
-		updated := ent.setReply(reply, flags, now)
+		updated := ent.setReply(reply, ttl, flags, now)
 		if updated {
 			heap.Fix(&c.entriesH, ent.index)
 		}
@@ -297,10 +258,10 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, flags uint8, now time.Time
 		// If we will add a new item and the capacity has been exceeded, make some room...
 		if len(c.entriesH) >= c.Capacity {
 			lowestEntry := heap.Pop(&c.entriesH).(*cacheEntry)
-			lowestEntry.close()
 			delete(c.entries, cacheKey(lowestEntry.question))
 		}
-		ent = newCacheEntry(&question, reply, stResolved, flags, now)
+		ent = newCacheEntry(&question, now)
+		ent.setReply(reply, ttl, flags, now)
 		heap.Push(&c.entriesH, ent)
 		c.entries[key] = ent
 	}
@@ -329,20 +290,7 @@ func (c *Cache) Get(request *dns.Msg, maxLen int, now time.Time) (reply *dns.Msg
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
 		Debug.Printf("[cache msgid %d] addind in pending state", request.MsgHdr.Id)
-		c.entries[key] = newCacheEntry(&question, nil, stPending, 0, now)
-	}
-	return
-}
-
-// Wait for a reply for a question in the cache
-// Notice that the caller could Get() and then Wait() for a question, but the corresponding cache
-// entry could have been removed in between. In that case, the caller should retry the query (and
-// the user should increase the cache size!)
-func (c *Cache) Wait(request *dns.Msg, timeout time.Duration, maxLen int, now time.Time) (reply *dns.Msg, err error) {
-	// do not try to lock the cache: otherwise, no one else could `Put()` the reply
-	question := request.Question[0]
-	if entry, found := c.entries[cacheKey(question)]; found {
-		reply, err = entry.waitReply(request, timeout, maxLen, now)
+		c.entries[key] = newCacheEntry(&question, now)
 	}
 	return
 }
