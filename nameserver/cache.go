@@ -93,31 +93,33 @@ func (e *cacheEntry) getReply(request *dns.Msg, maxLen int, now time.Time) (*dns
 	}
 
 	if e.ReplyLen >= maxLen {
-		Debug.Printf("[cache] returning truncated reponse: %d > %d", e.ReplyLen, maxLen)
+		Debug.Printf("[cache msgid %d] returning truncated reponse: %d > %d", request.MsgHdr.Id, e.ReplyLen, maxLen)
 		return makeTruncatedReply(request), nil
 	}
 
 	// create a copy of the reply, with values for this particular query
-	reply := e.reply
+	reply := e.reply.Copy()
 	reply.SetReply(request)
-	reply.Rcode = e.reply.Rcode
-	reply.Authoritative = true
 
 	// adjust the TTLs
 	passedSecs := uint32(now.Sub(e.putTime).Seconds())
 	for _, rr := range reply.Answer {
-		ttl := rr.Header().Ttl
+		hdr := rr.Header()
+		ttl := hdr.Ttl
 		if passedSecs < ttl {
-			rr.Header().Ttl = ttl - passedSecs
+			hdr.Ttl = ttl - passedSecs
 		} else {
-			rr.Header().Ttl = 0
+			return nil, nil // it is expired: do not spend more time and return nil...
 		}
 	}
+
+	reply.Rcode = e.reply.Rcode
+	reply.Authoritative = true
 
 	// shuffle the values, etc...
 	reply.Answer = shuffleAnswers(reply.Answer)
 
-	return &reply, nil
+	return reply, nil
 }
 
 func (e cacheEntry) hasExpired(now time.Time) bool {
@@ -129,6 +131,9 @@ func (e cacheEntry) hasExpired(now time.Time) bool {
 func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Time) bool {
 	var prevValidUntil time.Time
 	if e.Status == stResolved {
+		if reply != nil {
+			Debug.Printf("[cache msgid %d] replacing response in cache", reply.MsgHdr.Id)
+		}
 		prevValidUntil = e.validUntil
 	}
 
