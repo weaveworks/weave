@@ -44,6 +44,7 @@ func main() {
 		debug       bool
 		prof        string
 		peers       []string
+		bufSzMB     int
 		httpAddr    string
 	)
 
@@ -57,7 +58,7 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&config.ConnLimit, "connlimit", 30, "connection limit (0 for unlimited)")
-	flag.IntVar(&config.BufSz, "bufsz", 8, "capture buffer size in MB")
+	flag.IntVar(&bufSzMB, "bufsz", 8, "capture buffer size in MB")
 	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	flag.Parse()
 	peers = flag.Args()
@@ -115,8 +116,7 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	// bufsz flag is in MB
-	config.BufSz *= 1024 * 1024
+	config.BufSz = bufSzMB * 1024 * 1024
 	config.LogFrame = logFrameFunc(debug)
 
 	router := weave.NewRouter(config)
