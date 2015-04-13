@@ -141,7 +141,11 @@ func main() {
 
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
-	initiateConnections(router, peers)
+	for _, peer := range peers {
+		if err := router.ConnectionMaker.InitiateConnection(peer); err != nil {
+			log.Fatal(err)
+		}
+	}
 	if httpAddr != "" {
 		go handleHTTP(router, httpAddr)
 	}
@@ -158,16 +162,6 @@ func logFrameFunc(debug bool) weave.LogFrameFunc {
 			log.Println(prefix, len(frame), "bytes (", h, ")")
 		} else {
 			log.Println(prefix, len(frame), "bytes (", h, "):", eth.SrcMAC, "->", eth.DstMAC)
-		}
-	}
-}
-
-func initiateConnections(router *weave.Router, peers []string) {
-	for _, peer := range peers {
-		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
-			router.ConnectionMaker.InitiateConnection(addr.String())
-		} else {
-			log.Fatal(err)
 		}
 	}
 }
@@ -192,21 +186,13 @@ func handleHTTP(router *weave.Router, httpAddr string) {
 	})
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		peer := r.FormValue("peer")
-		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
-			router.ConnectionMaker.InitiateConnection(addr.String())
-		} else {
+		if err := router.ConnectionMaker.InitiateConnection(r.FormValue("peer")); err != nil {
 			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
 		}
 	})
 
 	muxRouter.Methods("POST").Path("/forget").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		peer := r.FormValue("peer")
-		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
-			router.ConnectionMaker.ForgetConnection(addr.String())
-		} else {
-			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
-		}
+		router.ConnectionMaker.ForgetConnection(r.FormValue("peer"))
 	})
 
 	http.Handle("/", muxRouter)
