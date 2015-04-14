@@ -51,6 +51,16 @@ func (peers *Peers) onNewPeer(peer *Peer) {
 	}
 }
 
+func (peers *Peers) LeaderElect() PeerName {
+	highest := PeerName(0)
+	peers.ForEach(func(peer *Peer) {
+		if highest < peer.Name {
+			highest = peer.Name
+		}
+	})
+	return highest
+}
+
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
 	peers.RLock()
 	res, found := peers.fetchAlias(peer)

@@ -48,6 +48,7 @@ type Allocator struct {
 	pendingGetFors     []operation
 	pendingClaims      []operation
 	gossip             router.Gossip
+	leadership         router.Leadership
 	shuttingDown       bool
 }
 
@@ -362,9 +363,10 @@ func (alloc *Allocator) Gossip() router.GossipData {
 	return &ipamGossipData{alloc}
 }
 
-// SetGossip gives the allocator an interface for talking to the outside world
-func (alloc *Allocator) SetGossip(gossip router.Gossip) {
+// SetInterfaces gives the allocator two interfaces for talking to the outside world
+func (alloc *Allocator) SetInterfaces(gossip router.Gossip, leadership router.Leadership) {
 	alloc.gossip = gossip
+	alloc.leadership = leadership
 }
 
 // ACTOR server
@@ -407,7 +409,7 @@ func (alloc *Allocator) electLeaderIfNecessary() {
 	if !alloc.ring.Empty() {
 		return
 	}
-	leader := alloc.gossip.(router.Leadership).LeaderElect()
+	leader := alloc.leadership.LeaderElect()
 	alloc.debugln("Elected leader:", leader)
 	if leader == alloc.ourName {
 		// I'm the winner; take control of the whole universe

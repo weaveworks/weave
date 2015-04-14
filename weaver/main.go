@@ -183,7 +183,7 @@ func createAllocator(router *weave.Router, apiPath string, allocCIDR string) *ip
 	if err != nil {
 		log.Fatal(err)
 	}
-	allocator.SetGossip(router.NewGossip("IPallocation", allocator))
+	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator), router.Peers)
 	allocator.Start()
 	allocator.HandleHTTP(http.DefaultServeMux)
 	err = updater.Start(apiPath, allocator)

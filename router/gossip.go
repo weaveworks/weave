@@ -252,16 +252,6 @@ func (c *GossipChannel) GossipBroadcast(update GossipData) error {
 	return c.relayBroadcast(c.ourself.Name, update)
 }
 
-func (c *GossipChannel) LeaderElect() PeerName {
-	highest := PeerName(0)
-	c.routes.peers.ForEach(func(peer *Peer) {
-		if highest < peer.Name {
-			highest = peer.Name
-		}
-	})
-	return highest
-}
-
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) error {
 	if relayPeerName, found := c.routes.UnicastAll(dstPeerName); !found {
 		c.log("unknown relay destination:", dstPeerName)
