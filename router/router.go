@@ -67,7 +67,7 @@ func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
 	router.Peers = NewPeers(router.Ourself.Peer, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
-	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.NormalisePeerAddr)
+	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	return router
 }
