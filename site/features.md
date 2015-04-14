@@ -80,7 +80,6 @@ network which address ranges it was previously using. If, however, you
 run `weave reset` this will remove the peer from the network so
 if Weave is run again on that node it will start from scratch.
 
-Peer identifiers and names can be listed using the `weave peers` command.
 For failed peers, the `weave rmpeer` command can be used to permanently
 remove the ranges allocated to said peer.  This will allow other peers
 to allocate IPs in the ranges previously owner by the rm'd peer, and as such

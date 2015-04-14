@@ -31,12 +31,11 @@ usage() {
     echo "weave stop"
     echo "weave stop-dns"
     echo "weave reset"
-    echo "weave peers"
     echo "weave rmpeer     <peerid>"
     echo
     echo "where <peer> is of the form <ip_address_or_fqdn>[:<port>], and"
     echo "      <cidr> is of the form <ip_address>/<routing_prefix_length>"
-    echo "      <peerid> is taken from weave peers"
+    echo "      <peerid> is a nickname or weave internal peer ID"
     exit 1
 }
 
@@ -862,10 +861,6 @@ case "$COMMAND" in
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do
             ip link del $LOCAL_IFNAME
         done
-        ;;
-    peers)
-        [ $# -eq 0 ] || usage
-        http_call $CONTAINER_NAME $HTTP_PORT GET /peer
         ;;
     rmpeer)
         [ $# -eq 1 ] || usage
