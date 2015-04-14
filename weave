@@ -676,9 +676,14 @@ case "$COMMAND" in
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status 2>/dev/null || true
         ;;
     ps)
-        [ $# -eq 0 ] && CONTAINERS="$(docker ps -q)" || CONTAINERS="$@"
+        [ $# -eq 0 ] && CONTAINERS="weave:expose $(docker ps -q)" || CONTAINERS="$@"
         for CONTAINER_ID in $CONTAINERS ; do
-            if CONTAINER_ADDRS=$(with_container_netns $CONTAINER_ID container_weave_addrs 2>&1) ; then
+            if [ "$CONTAINER_ID" = "weave:expose" ]; then
+                ADDRS_CMD="ip addr show dev $BRIDGE"
+            else
+                ADDRS_CMD="with_container_netns $CONTAINER_ID container_weave_addrs"
+            fi
+            if CONTAINER_ADDRS=$($ADDRS_CMD 2>&1) ; then
                 CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | grep -o 'link/ether .*' | cut -d ' ' -f 2)
                 CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*'       | cut -d ' ' -f 2)
                 echo $CONTAINER_ID $CONTAINER_MAC $CONTAINER_IPS

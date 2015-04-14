@@ -129,6 +129,7 @@ is waiting for a while before connecting again.
 Produces a list of all the containers running on this host that are
 connected to the weave network, like this:
 
+    weave:expose 7a:c4:8b:a1:e6:ad 10.2.5.2/24
     b07565b06c53 ae:e3:07:9c:8c:d4
     5245643870f1 ce:15:34:a9:b5:6d 10.2.5.1/24
     e32a7d37a93a 7a:61:a2:49:4b:91 10.2.8.3/24
@@ -137,7 +138,9 @@ connected to the weave network, like this:
 On each line are the container ID, its MAC address, then the list of
 IP address/routing prefix length ([CIDR
 notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing))
-assigned on the weave network.
+assigned on the weave network. The special container name `weave:expose`
+displays the weave bridge MAC and any IP addresses added to it via the
+`weave expose` command.
 
 You can also supply a list of container IDs/names to `weave ps`, like this:
 
