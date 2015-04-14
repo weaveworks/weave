@@ -38,8 +38,8 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
+		config      weave.RouterConfig
 		justVersion bool
-		port        int
 		ifaceName   string
 		routerName  string
 		nickName    string
@@ -49,28 +49,27 @@ func main() {
 		pktdebug    bool
 		prof        string
 		peers       []string
-		connLimit   int
-		bufSz       int
+		bufSzMB     int
+		httpAddr    string
 		allocCIDR   string
 		apiPath     string
-		httpAddr    string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.IntVar(&port, "port", weave.Port, "router port")
+	flag.IntVar(&config.Port, "port", weave.Port, "router port")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if blank)")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
 	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
-	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (defaults to 0, i.e. don't wait)")
+	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (0 = don't wait)")
 	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
-	flag.IntVar(&connLimit, "connlimit", 30, "connection limit (defaults to 30, set to 0 for unlimited)")
-	flag.IntVar(&bufSz, "bufsz", 8, "capture buffer size in MB (defaults to 8MB)")
+	flag.IntVar(&config.ConnLimit, "connlimit", 30, "connection limit (0 for unlimited)")
+	flag.IntVar(&bufSzMB, "bufsz", 8, "capture buffer size in MB")
+	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	flag.StringVar(&allocCIDR, "alloc", "", "CIDR of IP address space to allocate within")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
-	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	flag.Parse()
 	peers = flag.Args()
 
@@ -80,32 +79,27 @@ func main() {
 		os.Exit(0)
 	}
 
-	options := make(map[string]string)
-	flag.Visit(func(f *flag.Flag) {
-		value := f.Value.String()
-		if f.Name == "password" {
-			value = "<elided>"
-		}
-		options[f.Name] = value
-	})
-	log.Println("Command line options:", options)
+	log.Println("Command line options:", options())
 	log.Println("Command line peers:", peers)
 
 	var err error
 
-	var iface *net.Interface
 	if ifaceName != "" {
-		iface, err = weavenet.EnsureInterface(ifaceName, wait)
+		config.Iface, err = weavenet.EnsureInterface(ifaceName, wait)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if routerName == "" {
-		if iface == nil {
+		if config.Iface == nil {
 			log.Fatal("Either an interface must be specified with -iface or a name with -name")
 		}
-		routerName = iface.HardwareAddr.String()
+		routerName = config.Iface.HardwareAddr.String()
+	}
+	name, err := weave.PeerNameFromUserInput(routerName)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	if nickName == "" {
@@ -115,20 +109,14 @@ func main() {
 		}
 	}
 
-	ourName, err := weave.PeerNameFromUserInput(routerName)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	if password == "" {
 		password = os.Getenv("WEAVE_PASSWORD")
 	}
 
-	var pwSlice []byte
 	if password == "" {
 		log.Println("Communication between peers is unencrypted.")
 	} else {
-		pwSlice = []byte(password)
+		config.Password = []byte(password)
 		log.Println("Communication between peers is encrypted.")
 	}
 
@@ -138,17 +126,10 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	router := weave.NewRouter(
-		weave.RouterConfig{
-			Port:      port,
-			Iface:     iface,
-			Name:      ourName,
-			NickName:  nickName,
-			Password:  pwSlice,
-			ConnLimit: connLimit,
-			BufSz:     bufSz * 1024 * 1024,
-			LogFrame:  logFrameFunc(debug)})
+	config.BufSz = bufSzMB * 1024 * 1024
+	config.LogFrame = logFrameFunc(debug)
 
+	router := weave.NewRouter(config, name, nickName)
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
 	initiateConnections(router, peers)
@@ -162,6 +143,18 @@ func main() {
 		}
 	}
 	handleSignals(router)
+}
+
+func options() map[string]string {
+	options := make(map[string]string)
+	flag.Visit(func(f *flag.Flag) {
+		value := f.Value.String()
+		if f.Name == "password" {
+			value = "<elided>"
+		}
+		options[f.Name] = value
+	})
+	return options
 }
 
 func logFrameFunc(debug bool) weave.LogFrameFunc {
@@ -180,9 +173,7 @@ func logFrameFunc(debug bool) weave.LogFrameFunc {
 
 func initiateConnections(router *weave.Router, peers []string) {
 	for _, peer := range peers {
-		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
-			router.ConnectionMaker.InitiateConnection(addr.String())
-		} else {
+		if err := router.ConnectionMaker.InitiateConnection(peer); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -226,21 +217,13 @@ func handleHTTP(router *weave.Router, httpAddr string, others ...interface{}) {
 	})
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		peer := r.FormValue("peer")
-		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
-			router.ConnectionMaker.InitiateConnection(addr.String())
-		} else {
+		if err := router.ConnectionMaker.InitiateConnection(r.FormValue("peer")); err != nil {
 			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
 		}
 	})
 
 	muxRouter.Methods("POST").Path("/forget").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		peer := r.FormValue("peer")
-		if addr, err := net.ResolveTCPAddr("tcp4", router.NormalisePeerAddr(peer)); err == nil {
-			router.ConnectionMaker.ForgetConnection(addr.String())
-		} else {
-			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
-		}
+		router.ConnectionMaker.ForgetConnection(r.FormValue("peer"))
 	})
 
 	http.Handle("/", muxRouter)

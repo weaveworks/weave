@@ -245,8 +245,9 @@ func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {
-	if 0 != peer.router.ConnLimit && peer.ConnectionCount() >= peer.router.ConnLimit {
-		return fmt.Errorf("Connection limit reached (%v)", peer.router.ConnLimit)
+	limit := peer.router.ConnLimit
+	if 0 != limit && peer.ConnectionCount() >= limit {
+		return fmt.Errorf("Connection limit reached (%v)", limit)
 	}
 	return nil
 }

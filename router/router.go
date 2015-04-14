@@ -22,8 +22,6 @@ type LogFrameFunc func(string, []byte, *layers.Ethernet)
 type RouterConfig struct {
 	Port      int
 	Iface     *net.Interface
-	Name      PeerName
-	NickName  string
 	Password  []byte
 	ConnLimit int
 	BufSz     int
@@ -31,8 +29,7 @@ type RouterConfig struct {
 }
 
 type Router struct {
-	Port            int
-	Iface           *net.Interface
+	RouterConfig
 	Ourself         *LocalPeer
 	Macs            *MacCache
 	Peers           *Peers
@@ -41,10 +38,6 @@ type Router struct {
 	GossipChannels  map[uint32]*GossipChannel
 	TopologyGossip  Gossip
 	UDPListener     *net.UDPConn
-	Password        []byte
-	ConnLimit       int
-	BufSz           int
-	LogFrame        LogFrameFunc
 }
 
 type PacketSource interface {
@@ -60,15 +53,8 @@ type PacketSourceSink interface {
 	PacketSink
 }
 
-func NewRouter(config RouterConfig) *Router {
-	router := &Router{
-		Port:           config.Port,
-		Iface:          config.Iface,
-		GossipChannels: make(map[uint32]*GossipChannel),
-		Password:       config.Password,
-		ConnLimit:      config.ConnLimit,
-		BufSz:          config.BufSz,
-		LogFrame:       config.LogFrame}
+func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
+	router := &Router{RouterConfig: config, GossipChannels: make(map[uint32]*GossipChannel)}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer.FullName())
 	}
@@ -76,7 +62,7 @@ func NewRouter(config RouterConfig) *Router {
 		router.Macs.Delete(peer)
 		log.Println("Removed unreachable peer", peer.FullName())
 	}
-	router.Ourself = NewLocalPeer(config.Name, config.NickName, router)
+	router.Ourself = NewLocalPeer(name, nickName, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
 	router.Peers = NewPeers(router.Ourself.Peer, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)

@@ -31,7 +31,7 @@ update:
 
 $(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 	go get -tags netgo ./$(@D)
-	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(shell dirname $@)
+	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 		rm $@; \
 		echo "\nYour go standard library was built without the 'netgo' build tag."; \
@@ -47,7 +47,7 @@ $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
 # Sigproxy needs separate rule as it fails the netgo check in the main
 # build stanza due to not importing net package
 $(SIGPROXY_EXE): sigproxy/main.go
-	go build -o $@ ./$(shell dirname $@)
+	go build -o $@ ./$(@D)
 
 $(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
@@ -70,7 +70,7 @@ $(DOCKER_DISTRIB):
 tests:
 	echo "mode: count" > profile.cov
 	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do     \
-	    output=$$(tempfile -p cover);                                                     \
+	    output=$$(mktemp cover.XXXXXXXXXX);                                               \
 	    go test -tags netgo -covermode=count -coverprofile=$$output $$dir;                \
 	    if [ -f $$output ]; then                                                          \
 	        tail -n +2 <$$output >>profile.cov;                                           \

@@ -284,7 +284,8 @@ func (conn *LocalConnection) sendAction(action ConnectionAction) {
 // ACTOR server
 
 func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished chan<- struct{}, acceptNewPeer bool) {
-	defer conn.shutdown()
+	var err error // important to use this var and not create another one with 'err :='
+	defer func() { conn.shutdown(err) }()
 	defer close(finished)
 
 	tcpConn := conn.TCPConn
@@ -292,14 +293,12 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	enc := gob.NewEncoder(tcpConn)
 	dec := gob.NewDecoder(tcpConn)
 
-	if err := conn.handshake(enc, dec, acceptNewPeer); err != nil {
-		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
+	if err = conn.handshake(enc, dec, acceptNewPeer); err != nil {
 		return
 	}
 	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.FullName())
 
-	if err := conn.initHeartbeats(); err != nil { // [1]
-		conn.Log("connection shutting down due to error:", err)
+	if err = conn.initHeartbeats(); err != nil { // [1]
 		return
 	}
 
@@ -307,11 +306,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	go conn.receiveTCP(dec) // [1]
 
-	if err := conn.actorLoop(actionChan); err != nil { // [1]
-		conn.Log("connection shutting down due to error:", err)
-		return
-	}
-	conn.Log("connection shutting down")
+	err = conn.actorLoop(actionChan) // [1]
 }
 
 // [1] Ordering constraints:
@@ -376,7 +371,16 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 	return
 }
 
-func (conn *LocalConnection) shutdown() {
+func (conn *LocalConnection) shutdown(err error) {
+	switch {
+	case err != nil && conn.remote == nil:
+		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
+	case err != nil:
+		conn.Log("connection shutting down due to error:", err)
+	default:
+		conn.Log("connection shutting down")
+	}
+
 	if conn.TCPConn != nil {
 		checkWarn(conn.TCPConn.Close())
 	}
@@ -398,7 +402,7 @@ func (conn *LocalConnection) shutdown() {
 	// try to send any more
 	conn.stopForwarders()
 
-	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr)
+	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr, err)
 }
 
 // Helpers

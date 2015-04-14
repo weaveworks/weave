@@ -17,7 +17,7 @@ type mockChannelConnection struct {
 // Construct a "passive" Router, i.e. without any goroutines, except
 // for Routes and GossipSenders.
 func NewTestRouter(name PeerName) *Router {
-	router := NewRouter(RouterConfig{Name: name})
+	router := NewRouter(RouterConfig{}, name, "")
 	// need to create a dummy channel otherwise tests hang on nil
 	// channels when the Router invoked ConnectionMaker.Refresh
 	router.ConnectionMaker.actionChan = make(chan ConnectionMakerAction, ChannelSize)
