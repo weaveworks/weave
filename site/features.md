@@ -80,6 +80,13 @@ network which address ranges it was previously using. If, however, you
 run `weave reset` this will remove the peer from the network so
 if Weave is run again on that node it will start from scratch.
 
+Peer identifiers and names can be listed using the `weave peers` command.
+For failed peers, the `weave rmpeer` command can be used to permanently
+remove the ranges allocated to said peer.  This will allow other peers
+to allocate IPs in the ranges previously owner by the rm'd peer, and as such
+should be used with extreme caution - if the rm'd peer later rejoins
+the Weave network, the same IP address may be allocated twice.
+
 ### <a name="application-isolation"></a>Application isolation
 
 A single weave network can host multiple, isolated applications, with
@@ -97,18 +104,18 @@ A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
 
     host1# docker attach $D
-    
+
     root@da50502598d5:/# ping -c 1 -q 10.2.2.2
     PING 10.2.2.2 (10.2.2.2): 48 data bytes
     --- 10.2.2.2 ping statistics ---
     1 packets transmitted, 1 packets received, 0% packet loss
     round-trip min/avg/max/stddev = 0.562/0.562/0.562/0.000 ms
-    
+
     root@da50502598d5:/# ping -c 1 -q 10.2.1.1
     PING 10.2.1.1 (10.2.1.1) 56(84) bytes of data.
     --- 10.2.1.1 ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
-    
+
     root@da50502598d5:/# ping -c 1 -q 10.2.1.2
     PING 10.2.1.2 (10.2.1.2) 56(84) bytes of data.
     --- 10.2.1.2 ping statistics ---

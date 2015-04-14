@@ -304,6 +304,7 @@ func (client TestGossipRouterClient) GossipBroadcast(update router.GossipData) e
 }
 
 func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter) {
+
 	gossipRouter := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
 	allocs := make([]*Allocator, size)
 

@@ -10,9 +10,10 @@ import (
 
 type Peers struct {
 	sync.RWMutex
-	ourself *Peer
-	table   map[PeerName]*Peer
-	onGC    func(*Peer)
+	ourself  *Peer
+	table    map[PeerName]*Peer
+	onGC     func(*Peer)
+	watchers []NewPeerWatcher
 }
 
 type UnknownPeerError struct {
@@ -25,11 +26,33 @@ type NameCollisionError struct {
 
 type PeerNameSet map[PeerName]struct{}
 
+type NewPeerWatcher interface {
+	OnNewPeer(PeerName, string)
+}
+
 func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
 		table:   make(map[PeerName]*Peer),
 		onGC:    onGC}
+}
+
+func (peers *Peers) AddNewPeerWatcher(watcher NewPeerWatcher) {
+	peers.Lock()
+	defer peers.Unlock()
+
+	peers.watchers = append(peers.watchers, watcher)
+
+	watcher.OnNewPeer(peers.ourself.Name, peers.ourself.NickName)
+	for _, peer := range peers.table {
+		watcher.OnNewPeer(peer.Name, peer.NickName)
+	}
+}
+
+func (peers *Peers) onNewPeer(peer *Peer) {
+	for _, watcher := range peers.watchers {
+		watcher.OnNewPeer(peer.Name, peer.NickName)
+	}
 }
 
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
@@ -55,6 +78,28 @@ func (peers *Peers) Fetch(name PeerName) (*Peer, bool) {
 	defer peers.RUnlock()
 	peer, found := peers.table[name]
 	return peer, found // GRRR, why can't I inline this!?
+}
+
+// Find by name of nickname
+func (peers *Peers) Find(nameOrNickName string) (*Peer, bool) {
+	peers.RLock()
+	defer peers.RUnlock()
+
+	peername, err := PeerNameFromString(nameOrNickName)
+	if err == nil {
+		peer, found := peers.table[peername]
+		if found {
+			return peer, true
+		}
+	}
+
+	for _, peer := range peers.table {
+		if peer.NickName == nameOrNickName {
+			return peer, true
+		}
+	}
+
+	return nil, false
 }
 
 func (peers *Peers) ForEach(fun func(*Peer)) {
@@ -84,6 +129,7 @@ func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error)
 	// have no knowledge of. We can now apply the update. Start by
 	// adding in any new peers into the cache.
 	for name, newPeer := range newPeers {
+		peers.onNewPeer(newPeer)
 		peers.table[name] = newPeer
 	}
 

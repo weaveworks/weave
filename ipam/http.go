@@ -1,7 +1,6 @@
 package ipam
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -9,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/router"
 )
 
 // Parse a URL of the form /xxx/<identifier>
@@ -85,27 +83,23 @@ func (alloc *Allocator) HandleHTTP(mux *http.ServeMux) {
 		switch r.Method {
 		case "GET":
 			peers := alloc.ListPeers()
-			json.NewEncoder(w).Encode(peers)
+			for _, peer := range peers {
+				fmt.Fprintf(w, "%s\t%s\n", peer.Nickname, peer.Peername.String())
+			}
 		default:
 			http.Error(w, "Verb not handled", http.StatusBadRequest)
 		}
 	})
 	mux.HandleFunc("/peer/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
-		case "DELETE": // opposite of PUT for one specific address or all addresses
+		case "DELETE":
 			ident, err := parseURL(r.URL.Path)
 			if err != nil {
 				badRequest(w, err)
 				return
 			}
 
-			peername, err := router.PeerNameFromString(ident)
-			if err != nil {
-				badRequest(w, err)
-				return
-			}
-
-			if err := alloc.TombstonePeer(peername); err != nil {
+			if err := alloc.TombstonePeer(ident); err != nil {
 				badRequest(w, err)
 				return
 			}

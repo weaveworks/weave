@@ -86,7 +86,7 @@ func TestElection(t *testing.T) {
 	// At first, this peer has no space, so alloc1 should do nothing
 
 	mockTime.SetTime(baseTime.Add(3 * time.Second))
-	alloc1.checkPending()
+	alloc1.tryPendingOps()
 
 	mockTime.SetTime(baseTime.Add(4 * time.Second))
 	SetLeader(alloc1, peerNameString)
@@ -105,7 +105,7 @@ func TestElection(t *testing.T) {
 	mockTime.SetTime(baseTime.Add(15 * time.Second))
 	// fixme: not implemented yet
 	// ExpectMessage(alloc1, peerNameString, msgLeaderElected, nil)
-	alloc1.checkPending()
+	alloc1.tryPendingOps()
 	AssertNothingSent(t, done)
 
 	// alloc2 receives the leader election message and broadcasts its winning state
@@ -278,12 +278,14 @@ func TestTombstoneEveryone(t *testing.T) {
 	addr = alloc3.GetFor("bar", nil)
 	wt.AssertTrue(t, addr != nil, "Failed to get address")
 
+	router.GossipBroadcast(alloc2.Gossip())
+	router.GossipBroadcast(alloc3.Gossip())
 	router.removePeer(alloc2.ourName)
 	router.removePeer(alloc3.ourName)
 	alloc2.Stop()
 	alloc3.Stop()
-	wt.AssertSuccess(t, alloc1.TombstonePeer(alloc2.ourName))
-	wt.AssertSuccess(t, alloc1.TombstonePeer(alloc3.ourName))
+	wt.AssertSuccess(t, alloc1.TombstonePeer(alloc2.ourName.String()))
+	wt.AssertSuccess(t, alloc1.TombstonePeer(alloc3.ourName.String()))
 
 	wt.AssertTrue(t, alloc1.ring.Empty(), "Ring not empy!")
 
