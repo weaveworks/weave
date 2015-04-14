@@ -81,28 +81,6 @@ func (peers *Peers) Fetch(name PeerName) (*Peer, bool) {
 	return peer, found // GRRR, why can't I inline this!?
 }
 
-// Find by name of nickname
-func (peers *Peers) Find(nameOrNickName string) (*Peer, bool) {
-	peers.RLock()
-	defer peers.RUnlock()
-
-	peername, err := PeerNameFromString(nameOrNickName)
-	if err == nil {
-		peer, found := peers.table[peername]
-		if found {
-			return peer, true
-		}
-	}
-
-	for _, peer := range peers.table {
-		if peer.NickName == nameOrNickName {
-			return peer, true
-		}
-	}
-
-	return nil, false
-}
-
 func (peers *Peers) ForEach(fun func(*Peer)) {
 	peers.RLock()
 	defer peers.RUnlock()
