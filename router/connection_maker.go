@@ -131,18 +131,14 @@ func (cm *ConnectionMaker) queryLoop(actionChan <-chan ConnectionMakerAction) {
 }
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
-	validTarget := make(map[string]struct{})
-	cmdLineTarget := make(map[string]struct{})
-
-	// copy the set of things we are connected to, so we can access them without locking
-	ourConnectedPeers := make(PeerNameSet)
-	ourConnectedTargets := make(map[string]struct{})
-	for conn := range cm.ourself.Connections() {
-		address := conn.RemoteTCPAddr()
-		ourConnectedPeers[conn.Remote().Name] = void
-		ourConnectedTargets[address] = void
-		delete(cm.targets, address)
-	}
+	var (
+		validTarget   = make(map[string]struct{})
+		cmdLineTarget = make(map[string]struct{})
+	)
+	// Copy the set of things we are connected to, so we can access
+	// them without locking.  Also clear out any entries in cm.targets
+	// for existing connections.
+	ourConnectedPeers, ourConnectedTargets := cm.ourConnections()
 
 	addTarget := func(address string) {
 		if _, connected := ourConnectedTargets[address]; connected {
@@ -165,6 +161,26 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 
 	// Add targets for peers that someone else is connected to, but we
 	// aren't
+	cm.addPeerTargets(ourConnectedPeers, addTarget)
+
+	return cm.connectToTargets(validTarget, cmdLineTarget)
+}
+
+func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}) {
+	var (
+		ourConnectedPeers   = make(PeerNameSet)
+		ourConnectedTargets = make(map[string]struct{})
+	)
+	for conn := range cm.ourself.Connections() {
+		address := conn.RemoteTCPAddr()
+		ourConnectedPeers[conn.Remote().Name] = void
+		ourConnectedTargets[address] = void
+		delete(cm.targets, address)
+	}
+	return ourConnectedPeers, ourConnectedTargets
+}
+
+func (cm *ConnectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarget func(string)) {
 	cm.peers.ForEach(func(peer *Peer) {
 		for conn := range peer.Connections() {
 			otherPeer := conn.Remote().Name
@@ -175,7 +191,8 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 				continue
 			}
 			address := conn.RemoteTCPAddr()
-			// try both portnumber of connection and standard port.  Don't use remote side of inbound connection.
+			// Try both port of connection and standard port.  Don't
+			// use remote side of inbound connection.
 			if conn.Outbound() {
 				addTarget(address)
 			}
@@ -184,8 +201,6 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 			}
 		}
 	})
-
-	return cm.connectToTargets(validTarget, cmdLineTarget)
 }
 
 func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, cmdLineTarget map[string]struct{}) time.Duration {
