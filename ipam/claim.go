@@ -23,7 +23,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 	}
 
 	// If our ring doesn't know, it must be empty.  We will have tried
-	// to do a leader elect, so we want until we find some owner for this
+	// to do a leader elect, so we wait until we find some owner for this
 	// range (might be us).
 	owner := alloc.ring.Owner(c.addr)
 	if owner == router.UnknownPeerName {
@@ -34,7 +34,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 		c.resultChan <- fmt.Errorf("Address %s is owned by other peer %s", c.addr, owner)
 		return true
 	}
-	// We are the owner, check we haven't given it to another containe
+	// We are the owner, check we haven't given it to another container
 	existingIdent := alloc.findOwner(c.addr)
 	if existingIdent == c.ident {
 		// same identifier is claiming same address; that's OK

@@ -51,7 +51,7 @@ type Allocator struct {
 	shuttingDown       bool
 }
 
-// NewAllocator creats and initialises a new Allocator
+// NewAllocator creates and initialises a new Allocator
 func NewAllocator(ourName router.PeerName, universeCIDR string) (*Allocator, error) {
 	_, universeNet, err := net.ParseCIDR(universeCIDR)
 	if err != nil {
@@ -155,7 +155,7 @@ func (alloc *Allocator) tryPendingOps() {
 // Actor client API
 
 // GetFor (Sync) - get IP address for container with given name
-// if there isn't any space we block indefinately
+// if there isn't any space we block indefinitely
 func (alloc *Allocator) GetFor(ident string, cancelChan <-chan bool) net.IP {
 	resultChan := make(chan net.IP, 1)
 	op := &getfor{resultChan: resultChan, ident: ident}
