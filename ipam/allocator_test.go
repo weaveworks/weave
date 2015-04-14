@@ -168,10 +168,10 @@ func TestCancel(t *testing.T) {
 
 	router := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
 
-	alloc1, _ := NewAllocator(peer1Name, CIDR, nil)
+	alloc1, _ := NewAllocator(peer1Name, CIDR)
 	alloc1.SetGossip(router.connect(peer1Name, alloc1))
 
-	alloc2, _ := NewAllocator(peer2Name, CIDR, nil)
+	alloc2, _ := NewAllocator(peer2Name, CIDR)
 	alloc2.SetGossip(router.connect(peer2Name, alloc2))
 
 	alloc1.Start()

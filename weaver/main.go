@@ -155,6 +155,7 @@ func main() {
 	if httpAddr != "" {
 		if allocCIDR != "" {
 			allocator := createAllocator(router, apiPath, allocCIDR)
+			router.Peers.AddNewPeerWatcher(allocator)
 			go handleHTTP(router, httpAddr, allocator)
 		} else {
 			go handleHTTP(router, httpAddr)
@@ -188,7 +189,7 @@ func initiateConnections(router *weave.Router, peers []string) {
 }
 
 func createAllocator(router *weave.Router, apiPath string, allocCIDR string) *ipam.Allocator {
-	allocator, err := ipam.NewAllocator(router.Ourself.Peer.Name, allocCIDR, router.Peers)
+	allocator, err := ipam.NewAllocator(router.Ourself.Peer.Name, allocCIDR)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -84,11 +84,7 @@ func (alloc *Allocator) HandleHTTP(mux *http.ServeMux) {
 		case "GET":
 			peers := alloc.ListPeers()
 			for _, peer := range peers {
-				if peer.Missing {
-					fmt.Fprintf(w, "???\t%s (missing)\n", peer.Name.String())
-				} else {
-					fmt.Fprintf(w, "%s\t%s\n", peer.NickName, peer.Name.String())
-				}
+				fmt.Fprintf(w, "%s\t%s\n", peer.Nickname, peer.Peername.String())
 			}
 		default:
 			http.Error(w, "Verb not handled", http.StatusBadRequest)

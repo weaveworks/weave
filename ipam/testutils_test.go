@@ -162,7 +162,7 @@ func (m *mockTimeProvider) Now() time.Time      { return m.myTime }
 
 func testAllocator(t *testing.T, name string, universeCIDR string) *Allocator {
 	ourName, _ := router.PeerNameFromString(name)
-	alloc, _ := NewAllocator(ourName, universeCIDR, nil)
+	alloc, _ := NewAllocator(ourName, universeCIDR)
 	alloc.gossip = &mockGossipComms{t: t, name: name}
 	alloc.Start()
 	return alloc
@@ -311,8 +311,7 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRou
 	for i := 0; i < size; i++ {
 		peerNameStr := fmt.Sprintf("%02d:00:00:02:00:00", i)
 		peerName, _ := router.PeerNameFromString(peerNameStr)
-		peers := router.NewPeers(nil, func(peer *router.Peer) {})
-		alloc, _ := NewAllocator(peerName, cidr, peers)
+		alloc, _ := NewAllocator(peerName, cidr)
 		alloc.SetGossip(gossipRouter.connect(peerName, alloc))
 		alloc.Start()
 		allocs[i] = alloc

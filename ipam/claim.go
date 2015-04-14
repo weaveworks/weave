@@ -57,7 +57,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 }
 
 func (c *claim) Cancel() {
-	c.resultChan <- fmt.Errorf("Allocator shutting down")
+	c.resultChan <- fmt.Errorf("Operation cancelled.")
 }
 
 func (c *claim) String() string {
