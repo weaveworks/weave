@@ -69,6 +69,7 @@ func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
 		return res
 	}
 	peers.table[peer.Name] = peer
+	peers.onNewPeer(peer)
 	peer.IncrementLocalRefCount()
 	return peer
 }
