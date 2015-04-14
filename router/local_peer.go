@@ -93,10 +93,8 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 	if err := peer.checkConnectionLimit(); err != nil {
 		return err
 	}
-	// We're dialing the remote so that means connections will come from random ports
-	addrStr := peer.router.NormalisePeerAddr(peerAddr)
-	tcpAddr, tcpErr := net.ResolveTCPAddr("tcp4", addrStr)
-	udpAddr, udpErr := net.ResolveUDPAddr("udp4", addrStr)
+	tcpAddr, tcpErr := net.ResolveTCPAddr("tcp4", peerAddr)
+	udpAddr, udpErr := net.ResolveUDPAddr("udp4", peerAddr)
 	if tcpErr != nil || udpErr != nil {
 		// they really should have the same value, but just in case...
 		if tcpErr == nil {
