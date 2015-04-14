@@ -27,7 +27,8 @@ func TestHttp(t *testing.T) {
 		dockerIP        = "9.8.7.6"
 	)
 
-	var zone = new(ZoneDb)
+	zone := NewZoneDb(DefaultLocalDomain)
+
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
 	go ListenHTTP("", nil, testDomain, zone, port)
@@ -43,11 +44,11 @@ func TestHttp(t *testing.T) {
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is now there.
+	ip, _, _ := net.ParseCIDR(testAddr1)
 	foundIP, err := zone.LookupName(successTestName)
 	wt.AssertNoErr(t, err)
-	ip, _, _ := net.ParseCIDR(testAddr1)
-	if !foundIP.Equal(ip) {
-		t.Fatal("Unexpected result for", successTestName, foundIP)
+	if !foundIP[0].IP().Equal(ip) {
+		t.Fatalf("Unexpected result for %s: received %s, expected %s", successTestName, foundIP, ip)
 	}
 
 	// Adding exactly the same address should be OK
@@ -70,7 +71,8 @@ func TestHttp(t *testing.T) {
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is still resolvable.
-	_, err = zone.LookupName(successTestName)
+	x, err := zone.LookupName(successTestName)
+	t.Logf("Got %s", x)
 	wt.AssertNoErr(t, err)
 
 	// Delete the address record mentioning the other container
@@ -79,7 +81,8 @@ func TestHttp(t *testing.T) {
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
 	// Check that the address is gone
-	_, err = zone.LookupName(successTestName)
+	x, err = zone.LookupName(successTestName)
+	t.Logf("Got %s", x)
 	wt.AssertErrorType(t, err, (*LookupError)(nil), "fully-removed address")
 
 	// Would like to shut down the http server at the end of this test

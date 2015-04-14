@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
-	"net"
 )
 
 const (
@@ -34,20 +33,23 @@ func makeTruncatedReply(r *dns.Msg) *dns.Msg {
 	return reply
 }
 
-func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []net.IP) *dns.Msg {
+func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []ZoneRecord) *dns.Msg {
 	answers := make([]dns.RR, len(addrs))
 	header := makeHeader(r, q)
 	count := 0
 	for _, addr := range addrs {
+		ip := addr.IP()
+		ip4 := ip.To4()
+
 		switch q.Qtype {
 		case dns.TypeA:
-			if ip4 := addr.To4(); ip4 != nil {
-				answers[count] = &dns.A{Hdr: *header, A: addr}
+			if ip4 != nil {
+				answers[count] = &dns.A{Hdr: *header, A: ip}
 				count++
 			}
 		case dns.TypeAAAA:
-			if ip4 := addr.To4(); ip4 == nil {
-				answers[count] = &dns.AAAA{Hdr: *header, AAAA: addr}
+			if ip4 == nil {
+				answers[count] = &dns.AAAA{Hdr: *header, AAAA: ip}
 				count++
 			}
 		}
@@ -55,11 +57,11 @@ func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []net.IP) *dns.Msg {
 	return makeReply(r, answers[:count])
 }
 
-func makePTRReply(r *dns.Msg, q *dns.Question, names []string) *dns.Msg {
+func makePTRReply(r *dns.Msg, q *dns.Question, names []ZoneRecord) *dns.Msg {
 	answers := make([]dns.RR, len(names))
 	header := makeHeader(r, q)
 	for i, name := range names {
-		answers[i] = &dns.PTR{Hdr: *header, Ptr: name}
+		answers[i] = &dns.PTR{Hdr: *header, Ptr: name.Name()}
 	}
 	return makeReply(r, answers)
 }

@@ -108,9 +108,9 @@ func (c *testContext) checkResponse(t *testing.T, channelOk bool, resp *Response
 		c.channel = nil
 		return
 	}
-	wt.AssertNoErr(t, resp.Err)
-	log.Printf("Got address response %s addr %s", resp.Name, resp.Addr)
-	c.receivedAddr = resp.Addr
+	wt.AssertNoErr(t, resp.err)
+	log.Printf("Got address response %s addr %s", resp.Name, resp.IP())
+	c.receivedAddr = resp.IP()
 	c.receivedCount++
 }
 
@@ -123,7 +123,7 @@ func TestSimpleQuery(t *testing.T) {
 	context := newTestContext()
 
 	// First, a test we expect to succeed
-	mdnsClient.SendQuery(successTestName, dns.TypeA, context.channel)
+	mdnsClient.SendQuery(successTestName, dns.TypeA, false, context.channel)
 	for resp := range context.channel {
 		context.checkResponse(t, true, resp)
 	}
@@ -134,7 +134,7 @@ func TestSimpleQuery(t *testing.T) {
 
 	// Now, a test we expect to time out with no responses
 	context = newTestContext()
-	mdnsClient.SendQuery("test2.weave.", dns.TypeA, context.channel)
+	mdnsClient.SendQuery("test2.weave.", dns.TypeA, false, context.channel)
 	for resp := range context.channel {
 		context.checkResponse(t, true, resp)
 	}
@@ -153,8 +153,8 @@ func TestParallelQuery(t *testing.T) {
 	context1 := newTestContext()
 	context2 := newTestContext()
 
-	go mdnsClient.SendQuery(successTestName, dns.TypeA, context1.channel)
-	go mdnsClient.SendQuery(successTestName, dns.TypeA, context2.channel)
+	go mdnsClient.SendQuery(successTestName, dns.TypeA, false, context1.channel)
+	go mdnsClient.SendQuery(successTestName, dns.TypeA, false, context2.channel)
 	timeout := time.After(2 * time.Second)
 outerloop:
 	for context1.channel != nil || context2.channel != nil {
@@ -178,18 +178,18 @@ func TestAsLookup(t *testing.T) {
 	defer mdnsClient.Shutdown()
 	defer server.Shutdown()
 
-	ip, err := mdnsClient.LookupName(successTestName)
+	ips, err := mdnsClient.LookupName(successTestName)
 	wt.AssertNoErr(t, err)
-	if !testAddr.Equal(ip) {
-		t.Fatalf("Returned address incorrect %s", ip)
+	if !testAddr.Equal(ips[0].IP()) {
+		t.Fatalf("Returned address incorrect %s", ips)
 	}
 
-	ip, err = mdnsClient.LookupName("foo.example.com.")
+	ips, err = mdnsClient.LookupName("foo.example.com.")
 	wt.AssertErrorType(t, err, (*LookupError)(nil), "unknown hostname")
 
-	name, err := mdnsClient.LookupInaddr(testInAddr)
+	names, err := mdnsClient.LookupInaddr(testInAddr)
 	wt.AssertNoErr(t, err)
-	if !(successTestName == name) {
-		t.Fatalf("Expected name %s, got %s", successTestName, name)
+	if !(successTestName == names[0].Name()) {
+		t.Fatalf("Expected name %s, got %s", successTestName, names)
 	}
 }

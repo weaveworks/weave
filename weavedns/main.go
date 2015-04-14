@@ -55,7 +55,7 @@ func main() {
 	InitDefaultLogging(debug)
 	Info.Printf("WeaveDNS version %s\n", version) // first thing in log: the version
 
-	var zone = new(weavedns.ZoneDb)
+	var zone = weavedns.NewZoneDb(localDomain)
 
 	if watch {
 		err := updater.Start(apiPath, zone)

@@ -23,15 +23,17 @@ func TestCacheLength(t *testing.T) {
 
 	t.Logf("Inserting 256 questions in the cache at '%s', with TTL from 0 to 255", insTime)
 	for i := 0; i < cacheLen*2; i++ {
+		name := fmt.Sprintf("name%d", i)
 		questionMsg := new(dns.Msg)
-		questionMsg.SetQuestion(fmt.Sprintf("name%d", i), dns.TypeA)
+		questionMsg.SetQuestion(name, dns.TypeA)
 		questionMsg.RecursionDesired = true
 
 		question := &questionMsg.Question[0]
 
 		ip := net.ParseIP(fmt.Sprintf("10.0.1.%d", i))
-		ips := []net.IP{ip}
-		reply := makeAddressReply(questionMsg, question, ips)
+		records := []ZoneRecord{Record{name, ip, 0, 0}}
+
+		reply := makeAddressReply(questionMsg, question, records)
 		reply.Answer[0].Header().Ttl = uint32(i)
 
 		l.Put(questionMsg, reply, 0, 0, insTime)
@@ -81,7 +83,8 @@ func TestCacheEntries(t *testing.T) {
 	}
 
 	t.Logf("Inserting the reply")
-	reply1 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.1")})
+	records := []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.1"), 0, 0}}
+	reply1 := makeAddressReply(questionMsg, question, records)
 	l.Put(questionMsg, reply1, nullTTL, 0, time.Now())
 
 	timeGet1 := time.Now()
@@ -113,7 +116,8 @@ func TestCacheEntries(t *testing.T) {
 	}
 
 	t.Logf("Checking that an Remove() results in Get() returning nothing")
-	replyTemp := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.9.9")})
+	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.9.9"), 0, 0}}
+	replyTemp := makeAddressReply(questionMsg, question, records)
 	l.Put(questionMsg, replyTemp, nullTTL, 0, time.Now())
 	lenBefore := l.Len()
 	l.Remove(question)
@@ -127,10 +131,12 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Inserting a two replies for the same query")
 	timePut2 := time.Now()
-	reply2 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.2")})
+	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.2"), 0, 0}}
+	reply2 := makeAddressReply(questionMsg, question, records)
 	l.Put(questionMsg, reply2, nullTTL, 0, timePut2)
 	timePut3 := timePut2.Add(time.Duration(1) * time.Second)
-	reply3 := makeAddressReply(questionMsg, question, []net.IP{net.ParseIP("10.0.1.3")})
+	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.3"), 0, 0}}
+	reply3 := makeAddressReply(questionMsg, question, records)
 	l.Put(questionMsg, reply3, nullTTL, 0, timePut3)
 
 	t.Logf("Checking we get the last one...")
@@ -171,7 +177,8 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertNil(t, resp, "reponse from Get() yet")
 
 	t.Logf("Checking that an Remove() between Get() and Put() does not break things")
-	replyTemp2 := makeAddressReply(questionMsg2, question2, []net.IP{net.ParseIP("10.0.9.9")})
+	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.9.9"), 0, 0}}
+	replyTemp2 := makeAddressReply(questionMsg2, question2, records)
 	l.Remove(question2)
 	l.Put(questionMsg2, replyTemp2, nullTTL, 0, time.Now())
 	resp, err = l.Get(questionMsg2, minUDPSize, time.Now())
