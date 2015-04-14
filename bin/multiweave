@@ -19,8 +19,9 @@ weavedir=$(dirname $0)/..
 
 case "$1" in
     launch)
+        shift 1
         for i in $(seq $START $FINISH); do
-            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave test-launch --connlimit=100
+            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave test-launch "$@"
         done
         if [ $START -ne 1 ] ; then
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$((START-1)))
