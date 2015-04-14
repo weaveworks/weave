@@ -82,7 +82,6 @@ func NewAllocator(ourName router.PeerName, universeCIDR string) (*Allocator, err
 // code in router.Peers for every new peer found.
 func (alloc *Allocator) OnNewPeer(uid router.PeerName, nickname string) {
 	alloc.actionChan <- func() {
-		alloc.infof("OnNewPeer: %s(%s)", uid, nickname)
 		alloc.otherPeerNicknames[uid] = nickname
 	}
 }

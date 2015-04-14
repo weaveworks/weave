@@ -155,7 +155,7 @@ func main() {
 	if httpAddr != "" {
 		if allocCIDR != "" {
 			allocator := createAllocator(router, apiPath, allocCIDR)
-			router.Peers.AddNewPeerWatcher(allocator)
+			router.Peers.AddNewPeerFunc(func(peer *weave.Peer) { allocator.OnNewPeer(peer.Name, peer.NickName) })
 			go handleHTTP(router, httpAddr, allocator)
 		} else {
 			go handleHTTP(router, httpAddr)

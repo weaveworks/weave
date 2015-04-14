@@ -10,10 +10,10 @@ import (
 
 type Peers struct {
 	sync.RWMutex
-	ourself  *Peer
-	table    map[PeerName]*Peer
-	onGC     func(*Peer)
-	watchers []NewPeerWatcher
+	ourself *Peer
+	table   map[PeerName]*Peer
+	onGC    func(*Peer)
+	onNew   []func(*Peer)
 }
 
 type UnknownPeerError struct {
@@ -26,10 +26,6 @@ type NameCollisionError struct {
 
 type PeerNameSet map[PeerName]struct{}
 
-type NewPeerWatcher interface {
-	OnNewPeer(PeerName, string)
-}
-
 func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
@@ -37,21 +33,21 @@ func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 		onGC:    onGC}
 }
 
-func (peers *Peers) AddNewPeerWatcher(watcher NewPeerWatcher) {
+func (peers *Peers) AddNewPeerFunc(f func(*Peer)) {
 	peers.Lock()
 	defer peers.Unlock()
 
-	peers.watchers = append(peers.watchers, watcher)
+	peers.onNew = append(peers.onNew, f)
 
-	watcher.OnNewPeer(peers.ourself.Name, peers.ourself.NickName)
+	f(peers.ourself)
 	for _, peer := range peers.table {
-		watcher.OnNewPeer(peer.Name, peer.NickName)
+		f(peer)
 	}
 }
 
 func (peers *Peers) onNewPeer(peer *Peer) {
-	for _, watcher := range peers.watchers {
-		watcher.OnNewPeer(peer.Name, peer.NickName)
+	for _, f := range peers.onNew {
+		f(peer)
 	}
 }
 
