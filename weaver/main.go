@@ -39,6 +39,7 @@ func main() {
 		justVersion bool
 		ifaceName   string
 		routerName  string
+		nickName    string
 		password    string
 		wait        int
 		debug       bool
@@ -52,7 +53,7 @@ func main() {
 	flag.IntVar(&config.Port, "port", weave.Port, "router port")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if blank)")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
-	flag.StringVar(&config.NickName, "nickname", "", "nickname of peer (defaults to hostname)")
+	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (0 = don't wait)")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
@@ -86,17 +87,16 @@ func main() {
 		}
 		routerName = config.Iface.HardwareAddr.String()
 	}
+	name, err := weave.PeerNameFromUserInput(routerName)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	if config.NickName == "" {
-		config.NickName, err = os.Hostname()
+	if nickName == "" {
+		nickName, err = os.Hostname()
 		if err != nil {
 			log.Fatal(err)
 		}
-	}
-
-	config.Name, err = weave.PeerNameFromUserInput(routerName)
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	if password == "" {
@@ -119,7 +119,7 @@ func main() {
 	config.BufSz = bufSzMB * 1024 * 1024
 	config.LogFrame = logFrameFunc(debug)
 
-	router := weave.NewRouter(config)
+	router := weave.NewRouter(config, name, nickName)
 	log.Println("Our name is", router.Ourself.FullName())
 	router.Start()
 	initiateConnections(router, peers)
