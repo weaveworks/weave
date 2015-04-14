@@ -136,7 +136,6 @@ func main() {
 	if httpAddr != "" {
 		if allocCIDR != "" {
 			allocator := createAllocator(router, apiPath, allocCIDR)
-			router.Peers.AddNewPeerFunc(func(peer *weave.Peer) { allocator.OnNewPeer(peer.Name, peer.NickName) })
 			go handleHTTP(router, httpAddr, allocator)
 		} else {
 			go handleHTTP(router, httpAddr)
@@ -191,6 +190,9 @@ func createAllocator(router *weave.Router, apiPath string, allocCIDR string) *ip
 	if err != nil {
 		lg.Error.Fatal("Unable to start watcher", err)
 	}
+	router.Peers.AddNewPeerFunc(func(peer *weave.Peer) {
+		allocator.OnNewPeer(peer.Name, peer.NickName)
+	})
 	return allocator
 }
 
