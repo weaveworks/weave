@@ -79,17 +79,6 @@ func (alloc *Allocator) HandleHTTP(mux *http.ServeMux) {
 	mux.HandleFunc("/tombstone-self", func(w http.ResponseWriter, r *http.Request) {
 		alloc.Shutdown()
 	})
-	mux.HandleFunc("/peer", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			peers := alloc.ListPeers()
-			for _, peer := range peers {
-				fmt.Fprintf(w, "%s\t%s\n", peer.Nickname, peer.Peername.String())
-			}
-		default:
-			http.Error(w, "Verb not handled", http.StatusBadRequest)
-		}
-	})
 	mux.HandleFunc("/peer/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "DELETE":

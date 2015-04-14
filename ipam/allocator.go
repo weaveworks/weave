@@ -82,6 +82,7 @@ func NewAllocator(ourName router.PeerName, universeCIDR string) (*Allocator, err
 // code in router.Peers for every new peer found.
 func (alloc *Allocator) OnNewPeer(uid router.PeerName, nickname string) {
 	alloc.actionChan <- func() {
+		alloc.infof("OnNewPeer: %s(%s)", uid, nickname)
 		alloc.otherPeerNicknames[uid] = nickname
 	}
 }
@@ -287,34 +288,6 @@ func (alloc *Allocator) TombstonePeer(peerNameOrNickname string) error {
 	return <-resultChan
 }
 
-// Peer is the result type of ListPeers
-type Peer struct {
-	Nickname string
-	Peername router.PeerName
-}
-
-// ListPeers (Sync) - returns list of peer names known to the ring
-func (alloc *Allocator) ListPeers() []Peer {
-	resultChan := make(chan []Peer)
-	alloc.actionChan <- func() {
-		peers := make(map[router.PeerName]bool)
-		for _, entry := range alloc.ring.Entries {
-			peers[entry.Peer] = true
-		}
-
-		result := make([]Peer, 0, len(peers))
-		for peerName := range peers {
-			nickname := alloc.otherPeerNicknames[peerName]
-			result = append(result, Peer{
-				Nickname: nickname,
-				Peername: peerName,
-			})
-		}
-		resultChan <- result
-	}
-	return <-resultChan
-}
-
 // OnGossipUnicast (Sync)
 func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) error {
 	alloc.debugln("OnGossipUnicast from", sender, ": ", len(msg), "bytes")
@@ -417,7 +390,7 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "Allocator universe %s+%d\n", alloc.universeStart, alloc.universeSize)
-	fmt.Fprintf(&buf, alloc.ring.String())
+	alloc.ring.FprintWithNicknames(&buf, alloc.otherPeerNicknames)
 	fmt.Fprintf(&buf, alloc.spaceSet.String())
 	if len(alloc.pendingGetFors)+len(alloc.pendingClaims) > 0 {
 		fmt.Fprintf(&buf, "\nPending requests for ")

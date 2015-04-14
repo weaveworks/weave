@@ -8,6 +8,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"sort"
@@ -405,12 +406,17 @@ func (r *Ring) ClaimItAll() {
 	}
 }
 
+func (r *Ring) FprintWithNicknames(w io.Writer, m map[router.PeerName]string) {
+	for _, entry := range r.Entries {
+		nickname := m[entry.Peer]
+		fmt.Fprintf(w, "%s -> %s(%s) (%d, %d, %d)\n", utils.IntIP4(entry.Token),
+			entry.Peer, nickname, entry.Tombstone, entry.Version, entry.Free)
+	}
+}
+
 func (r *Ring) String() string {
 	var buffer bytes.Buffer
-	for _, entry := range r.Entries {
-		fmt.Fprintf(&buffer, "%s -> %s (%d, %d, %d)\n", utils.IntIP4(entry.Token),
-			entry.Peer, entry.Tombstone, entry.Version, entry.Free)
-	}
+	r.FprintWithNicknames(&buffer, make(map[router.PeerName]string))
 	return buffer.String()
 }
 
