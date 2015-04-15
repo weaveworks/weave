@@ -67,7 +67,7 @@ func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
 	router.Peers = NewPeers(router.Ourself.Peer, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself.Peer, router.Peers)
-	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.NormalisePeerAddr)
+	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	return router
 }
@@ -416,14 +416,4 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 		router.Routes.Recalculate()
 	}
 	return origUpdate, newUpdate, nil
-}
-
-// given an address like '1.2.3.4:567', return the address if it has a port,
-// otherwise return the address with the default port number for the router
-func (router *Router) NormalisePeerAddr(peerAddr string) string {
-	_, _, err := net.SplitHostPort(peerAddr)
-	if err == nil {
-		return peerAddr
-	}
-	return fmt.Sprintf("%s:%d", peerAddr, router.Port)
 }

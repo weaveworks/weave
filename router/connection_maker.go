@@ -15,12 +15,12 @@ const (
 )
 
 type ConnectionMaker struct {
-	ourself           *LocalPeer
-	peers             *Peers
-	normalisePeerAddr func(string) string
-	targets           map[string]*Target
-	cmdLinePeers      map[string]string
-	actionChan        chan<- ConnectionMakerAction
+	ourself      *LocalPeer
+	peers        *Peers
+	port         int
+	targets      map[string]*Target
+	cmdLinePeers map[string]*net.TCPAddr
+	actionChan   chan<- ConnectionMakerAction
 }
 
 // Information about an address where we may find a peer
@@ -33,13 +33,13 @@ type Target struct {
 
 type ConnectionMakerAction func() bool
 
-func NewConnectionMaker(ourself *LocalPeer, peers *Peers, normalisePeerAddr func(string) string) *ConnectionMaker {
+func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int) *ConnectionMaker {
 	return &ConnectionMaker{
-		ourself:           ourself,
-		peers:             peers,
-		normalisePeerAddr: normalisePeerAddr,
-		cmdLinePeers:      make(map[string]string),
-		targets:           make(map[string]*Target)}
+		ourself:      ourself,
+		peers:        peers,
+		port:         port,
+		cmdLinePeers: make(map[string]*net.TCPAddr),
+		targets:      make(map[string]*Target)}
 }
 
 func (cm *ConnectionMaker) Start() {
@@ -49,16 +49,19 @@ func (cm *ConnectionMaker) Start() {
 }
 
 func (cm *ConnectionMaker) InitiateConnection(peer string) error {
-	addr, err := net.ResolveTCPAddr("tcp4", cm.normalisePeerAddr(peer))
+	host, port, err := net.SplitHostPort(peer)
+	if err != nil {
+		host = peer
+		port = "0" // we use that as an indication that "no port was supplied"
+	}
+	addr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port))
 	if err != nil {
 		return err
 	}
-	address := addr.String()
-
 	cm.actionChan <- func() bool {
-		cm.cmdLinePeers[peer] = address
+		cm.cmdLinePeers[peer] = addr
 		// curtail any existing reconnect interval
-		if target, found := cm.targets[address]; found {
+		if target, found := cm.targets[addr.String()]; found {
 			target.tryAfter, target.tryInterval = tryImmediately()
 		}
 		return true
@@ -138,7 +141,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	// Copy the set of things we are connected to, so we can access
 	// them without locking.  Also clear out any entries in cm.targets
 	// for existing connections.
-	ourConnectedPeers, ourConnectedTargets := cm.ourConnections()
+	ourConnectedPeers, ourConnectedTargets, ourInboundIPs := cm.ourConnections()
 
 	addTarget := func(address string) {
 		if _, connected := ourConnectedTargets[address]; connected {
@@ -154,9 +157,23 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	}
 
 	// Add command-line targets that are not connected
-	for _, address := range cm.cmdLinePeers {
-		addTarget(address)
+	for _, addr := range cm.cmdLinePeers {
+		completeAddr := *addr
+		attempt := true
+		if completeAddr.Port == 0 {
+			completeAddr.Port = cm.port
+			// If a peer was specified w/o a port, then we do not
+			// attempt to connect to it if we have any inbound
+			// connections from that IP.
+			if _, connected := ourInboundIPs[completeAddr.IP.String()]; connected {
+				attempt = false
+			}
+		}
+		address := completeAddr.String()
 		cmdLineTarget[address] = void
+		if attempt {
+			addTarget(address)
+		}
 	}
 
 	// Add targets for peers that someone else is connected to, but we
@@ -166,18 +183,25 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	return cm.connectToTargets(validTarget, cmdLineTarget)
 }
 
-func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}) {
+func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}, map[string]struct{}) {
 	var (
 		ourConnectedPeers   = make(PeerNameSet)
 		ourConnectedTargets = make(map[string]struct{})
+		ourInboundIPs       = make(map[string]struct{})
 	)
 	for conn := range cm.ourself.Connections() {
 		address := conn.RemoteTCPAddr()
+		delete(cm.targets, address)
 		ourConnectedPeers[conn.Remote().Name] = void
 		ourConnectedTargets[address] = void
-		delete(cm.targets, address)
+		if conn.Outbound() {
+			continue
+		}
+		if ip, _, err := net.SplitHostPort(address); err == nil { // should always succeed
+			ourInboundIPs[ip] = void
+		}
 	}
-	return ourConnectedPeers, ourConnectedTargets
+	return ourConnectedPeers, ourConnectedTargets, ourInboundIPs
 }
 
 func (cm *ConnectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarget func(string)) {
@@ -196,8 +220,8 @@ func (cm *ConnectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarg
 			if conn.Outbound() {
 				addTarget(address)
 			}
-			if host, _, err := net.SplitHostPort(address); err == nil {
-				addTarget(cm.normalisePeerAddr(host))
+			if ip, _, err := net.SplitHostPort(address); err == nil {
+				addTarget(fmt.Sprintf("%s:%d", ip, cm.port))
 			}
 		}
 	})
