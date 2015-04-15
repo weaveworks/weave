@@ -82,7 +82,7 @@ func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak { return T
 func (conn *RemoteConnection) Shutdown(error)                         {}
 
 func (conn *RemoteConnection) Log(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s]:", conn.remote.FullName())), args...)...)
+	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s|%s]:", conn.remoteTCPAddr, conn.remote.FullName())), args...)...)
 }
 
 func (conn *RemoteConnection) String() string {
@@ -296,7 +296,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	if err = conn.handshake(enc, dec, acceptNewPeer); err != nil {
 		return
 	}
-	log.Printf("->[%s] completed handshake with %s\n", conn.remoteTCPAddr, conn.remote.FullName())
+	conn.Log("completed handshake")
 
 	if err = conn.initHeartbeats(); err != nil { // [1]
 		return

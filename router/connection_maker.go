@@ -99,14 +99,14 @@ func (cm *ConnectionMaker) String() string {
 	cm.actionChan <- func() bool {
 		var buf bytes.Buffer
 		for address, target := range cm.targets {
-			fmt.Fprint(&buf, address)
+			fmt.Fprintf(&buf, "->[%s]", address)
 			if target.lastError != nil {
 				fmt.Fprintf(&buf, " (%s)", target.lastError)
 			}
 			if target.attempting {
-				fmt.Fprintf(&buf, " (trying since %v)\n", target.tryAfter)
+				fmt.Fprintf(&buf, " trying since %v\n", target.tryAfter)
 			} else {
-				fmt.Fprintf(&buf, " (next try at %v)\n", target.tryAfter)
+				fmt.Fprintf(&buf, " next try at %v\n", target.tryAfter)
 			}
 		}
 		resultChan <- buf.String()

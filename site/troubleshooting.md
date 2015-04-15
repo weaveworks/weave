@@ -67,9 +67,9 @@ ce:15:34:a9:b5:6d -> 7a:f4:56:87:76:3b(weave01) (2014-10-23 16:39:28.257103595 +
 9e:95:0c:54:8e:39 -> 7a:16:dd:5b:83:de(weave02) (2014-10-23 16:39:28.795601325 +0000 UTC)
 72:5f:a4:60:e5:ce -> 7a:16:dd:5b:83:de(weave02) (2014-10-23 16:39:29.575995255 +0000 UTC)
 Peers:
-Peer 7a:16:dd:5b:83:de(weave02) (v31) (UID 13151318985609435078)
+7a:16:dd:5b:83:de(weave02) (v31) (UID 13151318985609435078)
    -> 7a:f4:56:87:76:3b(weave01) [37.157.33.76:7195]
-Peer 7a:f4:56:87:76:3b(weave01) (v1) (UID 6913268221365110570)
+7a:f4:56:87:76:3b(weave01) (v1) (UID 6913268221365110570)
    -> 7a:16:dd:5b:83:de(weave02) [191.235.147.190:6783]
 Routes:
 unicast:
@@ -79,7 +79,7 @@ broadcast:
 7a:f4:56:87:76:3b -> [7a:16:dd:5b:83:de]
 7a:16:dd:5b:83:de -> []
 Reconnects:
-192.168.32.1:6783 (dial tcp4 192.168.32.1:6783: connection timed out) (next try at 2014-10-23 16:39:50.585932102 +0000 UTC)
+->[192.168.32.1:6783] (dial tcp4 192.168.32.1:6783: connection timed out) next try at 2014-10-23 16:39:50.585932102 +0000 UTC
 ````
 
 The terms used here are explained further at
