@@ -12,7 +12,7 @@ func TestFieldValidator(t *testing.T) {
 	val, err := fv.Value("a")
 	wt.AssertNoErr(t, err)
 	wt.AssertNoErr(t, fv.Err())
-	wt.AssertEqualString(t, val, "a", "a")
+	wt.AssertEqualString(t, val, "a", "")
 	_, err = fv.Value("x")
 	wt.AssertFalse(t, err == nil || fv.Err() == nil, "Expected error")
 	_, err = fv.Value("a")
