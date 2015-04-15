@@ -298,17 +298,21 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	}
 	conn.Log("completed handshake")
 
-	if err = conn.Router.Ourself.AddConnection(conn); err != nil { // [1]
+	// The ordering of the following is very important. [1]
+
+	if conn.remoteUDPAddr != nil {
+		if err = conn.ensureForwarders(); err != nil {
+			return
+		}
+	}
+	if err = conn.Router.Ourself.AddConnection(conn); err != nil {
 		return
 	}
-
-	if err = conn.initHeartbeats(); err != nil { // [1]
+	if err = conn.initHeartbeats(); err != nil {
 		return
 	}
-
-	go conn.receiveTCP(dec) // [1]
-
-	err = conn.actorLoop(actionChan) // [1]
+	go conn.receiveTCP(dec)
+	err = conn.actorLoop(actionChan)
 }
 
 // [1] Ordering constraints:
@@ -348,6 +352,13 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 // LocalConnection fields accessed by the latter. Since the latter
 // runs in a separate goroutine, we'd have to add some synchronisation
 // if initHeartbeats isn't run first.
+//
+// (f) ensureForwarders should precede AddConnection. As soon as a
+// connection has been added to LocalPeer by the latter, it becomes
+// visible to the packet routing logic, which will end up dropping
+// packets if the forwarders haven't been created yet. We cannot
+// prevent that completely, since, for example, forwarder can only be
+// created when we know the remote UDP address, but it helps to try.
 
 func (conn *LocalConnection) initHeartbeats() error {
 	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)
