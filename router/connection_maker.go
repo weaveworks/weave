@@ -99,7 +99,7 @@ func (cm *ConnectionMaker) String() string {
 	cm.actionChan <- func() bool {
 		var buf bytes.Buffer
 		for address, target := range cm.targets {
-			fmt.Fprint(&buf, address)
+			fmt.Fprintf(&buf, "->[%s]", address)
 			if target.lastError != nil {
 				fmt.Fprintf(&buf, " (%s)", target.lastError)
 			}
