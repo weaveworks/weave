@@ -11,3 +11,10 @@ func CheckWarn(e error) {
 		Warning.Println(e)
 	}
 }
+
+// Assert test is true, panic otherwise
+func Assert(test bool) {
+	if !test {
+		panic("Assertion failure")
+	}
+}
