@@ -298,11 +298,13 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	}
 	conn.Log("completed handshake")
 
-	if err = conn.initHeartbeats(); err != nil { // [1]
+	if err = conn.Router.Ourself.AddConnection(conn); err != nil { // [1]
 		return
 	}
 
-	conn.Router.Ourself.AddConnection(conn) // [1]
+	if err = conn.initHeartbeats(); err != nil { // [1]
+		return
+	}
 
 	go conn.receiveTCP(dec) // [1]
 
@@ -311,11 +313,14 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 // [1] Ordering constraints:
 //
-// (a) initHeartbeats should precede AddConnection. That way we can
-// guarantee that a) the forwarder gets initialised before the router
-// can discover the connection and attempt to invoke Forward, and b)
-// Heartbeats are the first thing that get sent on connections.
-// Neither of these are essential, but they are desirable.
+// (a) AddConnections must precede initHeartbeats. It is only after
+// the former completes that we know the connection is valid, in
+// particular is not a duplicate connection to the same peer. Sending
+// heartbeats on a duplicate connection can trip up crypto at the
+// other end, since the associated UDP packets may get decoded by the
+// other connection. It is also generally wasteful to engage in any
+// interaction with the remote on a connection that turns out to be
+// invald.
 //
 // (b) AddConnection must precede receiveTCP. In the absence of any
 // indirect connectivity to the remote peer, the first we hear about
@@ -332,7 +337,17 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 // precede shutdown, since that invokes DeleteConnection and is
 // invoked on termination of this entire function. Essentially this
 // boils down to a prohibition on running AddConnection in a separate
-// goroutine, at least not without some synchronisation.
+// goroutine, at least not without some synchronisation. Which in turn
+// requires us the launching of the receiveTCP goroutine to precede
+// actorLoop.
+//
+// (d) AddConnection should precede receiveTCP. There is no point
+// starting the latter if the former fails.
+//
+// (e) initHeartbeats should precede actorLoop. The former is setting
+// LocalConnection fields accessed by the latter. Since the latter
+// runs in a separate goroutine, we'd have to add some synchronisation
+// if initHeartbeats isn't run first.
 
 func (conn *LocalConnection) initHeartbeats() error {
 	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)
