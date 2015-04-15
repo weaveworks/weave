@@ -114,12 +114,6 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 
 // ACTOR client API
 
-const (
-	PAddConnection = iota
-	PConnectionEstablished
-	PDeleteConnection
-)
-
 // Sync.
 func (peer *LocalPeer) AddConnection(conn *LocalConnection) {
 	resultChan := make(chan interface{})
