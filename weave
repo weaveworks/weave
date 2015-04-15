@@ -23,7 +23,7 @@ usage() {
     echo "weave start      <cidr> [<cidr> ...] <container_id>"
     echo "weave attach     <cidr> [<cidr> ...] <container_id>"
     echo "weave detach     <cidr> [<cidr> ...] <container_id>"
-    echo "weave expose     <cidr>"
+    echo "weave expose     <cidr> [-h <hostname>]"
     echo "weave hide       <cidr>"
     echo "weave ps         [<container_id> ...]"
     echo "weave status"
@@ -760,7 +760,15 @@ case "$COMMAND" in
         ;;
     expose)
         [ $# -gt 0 ] || usage
-        for CIDR; do
+        collect_cidr_args "$@"
+        shift $CIDR_COUNT
+        if [ $# -eq 0 ]; then
+            FQDN=""
+        else
+            [ $# -eq 2 -a "$1" = "-h" ] || usage
+            FQDN="$2"
+        fi
+        for CIDR in $CIDR_ARGS; do
             validate_cidr $CIDR
             create_bridge --without-ethtool
             if ! ip addr show dev $BRIDGE | grep -qF $CIDR
@@ -769,6 +777,9 @@ case "$COMMAND" in
                 arp_update $BRIDGE $CIDR
                 add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+                if [ "$FQDN" ]; then
+                    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT PUT /name/weave:expose/${CIDR%/*} --data-urlencode "fqdn=$FQDN" 2>/dev/null || true
+                fi
             fi
         done
         ;;
@@ -782,6 +793,7 @@ case "$COMMAND" in
                 ip addr del dev $BRIDGE $CIDR
                 delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
                 delete_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+                http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT DELETE /name/weave:expose/${CIDR%/*} 2>/dev/null || true
             fi
         done
         ;;
