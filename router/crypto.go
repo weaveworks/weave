@@ -271,8 +271,7 @@ type NaClDecryptorInstance struct {
 }
 
 type PacketDecodingError struct {
-	Fatal bool
-	Desc  string
+	Desc string
 }
 
 func NewNonDecryptor(conn *LocalConnection) *NonDecryptor {
@@ -335,7 +334,7 @@ func (nd *NaClDecryptor) ReceiveNonce(msg []byte) {
 func (nd *NaClDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) error {
 	buf, err := nd.decrypt(packet)
 	if err != nil {
-		return PacketDecodingError{Fatal: true, Desc: fmt.Sprint("decryption failed; ", err)}
+		return PacketDecodingError{Desc: fmt.Sprint("decryption failed; ", err)}
 	}
 	return nd.NonDecryptor.IterateFrames(buf, consumer)
 }
