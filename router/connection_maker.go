@@ -104,9 +104,9 @@ func (cm *ConnectionMaker) String() string {
 				fmt.Fprintf(&buf, " (%s)", target.lastError)
 			}
 			if target.attempting {
-				fmt.Fprintf(&buf, " (trying since %v)\n", target.tryAfter)
+				fmt.Fprintf(&buf, " trying since %v\n", target.tryAfter)
 			} else {
-				fmt.Fprintf(&buf, " (next try at %v)\n", target.tryAfter)
+				fmt.Fprintf(&buf, " next try at %v\n", target.tryAfter)
 			}
 		}
 		resultChan <- buf.String()
