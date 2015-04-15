@@ -204,10 +204,21 @@ arp_update() {
     fi
 }
 
+# Generate a random MAC value
+random_mac() {
+    # In the first byte of the MAC, the 'multicast' bit should be
+    # clear and 'locally administered' bit should be set.  All other
+    # bits should be random.
+    od -txC -An -N6 /dev/urandom | sed 's|^ ||;s| |:|;s|[0-3]:|2:|;s|[4-7]:|6:|;s|[89ab]:|a:|;s|[c-f]:|e:|;s| |:|g'
+}
+
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
         ip link add name $BRIDGE type bridge
-        ip link set dev $BRIDGE address 7a:$(od -txC -An -N5 /dev/urandom | tr \  : | tail -c+2)
+        # Set a random MAC address on the bridge.  Current Linux
+        # kernels already do this when creating a bridge, but there
+        # are rumours it was not always so.
+        ip link set dev $BRIDGE address $(random_mac)
         # Attempting to set the bridge MTU to a high value directly
         # fails. Bridges take the lowest MTU of their interfaces. So
         # instead we create a temporary interface with the desired
@@ -637,7 +648,7 @@ case "$COMMAND" in
         # intended for testing of administrative and control plane
         # functionality, rather than routing.
         check_not_running $CONTAINER_NAME $BASE_IMAGE
-        MACADDR=7a:$(od -txC -An -N5 /dev/urandom | tr \  : | tail -c+2)
+        MACADDR=$(random_mac)
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME -e WEAVE_PASSWORD \
             $WEAVE_DOCKER_ARGS $IMAGE -name $MACADDR -nickname "$CONTAINER_NAME" "$@")
         with_container_netns $CONTAINER test_launch >/dev/null
