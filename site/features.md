@@ -190,6 +190,11 @@ invocation:
     host2# weave expose 10.2.1.102/24 10.2.2.102/24
     host2# weave hide 10.2.1.102/24 10.2.2.102/24
 
+Finally, exposed addresses can be added to weaveDNS by supplying a
+hostname:
+
+    host2# weave expose 10.2.1.102/24 -h exposed.weave.local
+
 ### <a name="service-export"></a>Service export
 
 Services running in containers on a weave network can be made
