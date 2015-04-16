@@ -456,7 +456,6 @@ tell_dns() {
     fi
     # get the long form of the container ID
     CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
-    # extract IP address and routing prefix from CIDR
     MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
     for ADDR; do
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${ADDR%/*} $MORE_ARGS || true
