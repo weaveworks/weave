@@ -785,9 +785,9 @@ case "$COMMAND" in
             [ $# -eq 2 -a "$1" = "-h" ] || usage
             FQDN="$2"
         fi
+        create_bridge --without-ethtool
         for CIDR in $CIDR_ARGS; do
             validate_cidr $CIDR
-            create_bridge --without-ethtool
             if ! ip addr show dev $BRIDGE | grep -qF $CIDR
             then
                 ip addr add dev $BRIDGE $CIDR
@@ -802,9 +802,9 @@ case "$COMMAND" in
         ;;
     hide)
         [ $# -gt 0 ] || usage
+        create_bridge --without-ethtool
         for CIDR; do
             validate_cidr $CIDR
-            create_bridge --without-ethtool
             if ip addr show dev $BRIDGE | grep -qF $CIDR
             then
                 ip addr del dev $BRIDGE $CIDR
