@@ -316,7 +316,10 @@ data centres. So, for example, one could run an application consisting
 of containers on GCE, EC2 and in local data centres.
 
 To enable this, the network must be configured to permit TCP and UDP
-connections to port 6783 of the docker hosts.
+connections to the weave port of the docker hosts. The weave port
+defaults to 6783. This can be overriden by setting `WEAVE_PORT`, but
+it is highly recommended that all peers in a weave network are given
+the same port setting.
 
 ### <a name="multi-hop-routing"></a>Multi-hop routing
 

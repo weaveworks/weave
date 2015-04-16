@@ -59,6 +59,7 @@ exec_remote() {
         -e WEAVE_DOCKER_ARGS \
         -e WEAVEDNS_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
+        -e WEAVE_PORT \
         -e WEAVE_CONTAINER_NAME \
         -e DOCKER_BRIDGE \
         -e PROCFS=/hostproc --privileged --net=host \
@@ -86,7 +87,7 @@ DNS_CONTAINER_NAME=weavedns
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
-PORT=6783
+PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
 
@@ -610,6 +611,7 @@ case "$COMMAND" in
             shift 1
         fi
         NICKNAME=$(hostname)
+        CONTAINER_PORT=$PORT
         while true; do
             case "$1" in
                 -password)
@@ -623,6 +625,11 @@ case "$COMMAND" in
                     NICKNAME="$2"
                     shift 2
                     ;;
+                -port)
+                    [ $# -gt 1 ] || usage
+                    CONTAINER_PORT="$2"
+                    shift 2
+                    ;;
                 *)
                     break
                     ;;
@@ -632,8 +639,8 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-            -p $PORT:$PORT/tcp -p $PORT:$PORT/udp -e WEAVE_PASSWORD \
-            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -name $MACADDR -nickname "$NICKNAME" "$@")
+            -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp -e WEAVE_PASSWORD \
+            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name $MACADDR -nickname "$NICKNAME" "$@")
         with_container_netns $CONTAINER launch >/dev/null
         wait_for_status $CONTAINER_NAME $HTTP_PORT
         echo $CONTAINER
