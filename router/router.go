@@ -250,15 +250,19 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 		if !ok {
 			continue
 		}
-		err = relayConn.Decryptor.IterateFrames(packet, router.handleUDPPacketFunc(dec, sender, po))
-		if pde, ok := err.(PacketDecodingError); ok {
-			if pde.Fatal {
-				relayConn.Shutdown(pde)
-			} else {
-				relayConn.Log(pde.Error())
-			}
-		} else {
-			checkWarn(err)
+		if err := relayConn.Decryptor.IterateFrames(packet, router.handleUDPPacketFunc(dec, sender, po)); err != nil {
+			// Errors during UDP packet decoding / processing are
+			// non-fatal. One common cause is that we receive and
+			// attempt to decrypt a "stray" packet. This can actually
+			// happen quite easily if there is some connection churn
+			// between two peers. After all, UDP isn't a
+			// connection-oriented protocol, yet we pretend it is.
+			//
+			// If anything really is seriously, unrecoverably amiss
+			// with a connection, that will typically result in missed
+			// heartbeats and the connection getting shut down because
+			// of that.
+			relayConn.Log(err)
 		}
 	}
 }

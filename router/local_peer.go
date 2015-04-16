@@ -115,13 +115,12 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 // ACTOR client API
 
 // Sync.
-func (peer *LocalPeer) AddConnection(conn *LocalConnection) {
-	resultChan := make(chan interface{})
+func (peer *LocalPeer) AddConnection(conn *LocalConnection) error {
+	resultChan := make(chan error)
 	peer.actionChan <- func() {
-		peer.handleAddConnection(conn)
-		resultChan <- nil
+		resultChan <- peer.handleAddConnection(conn)
 	}
-	<-resultChan
+	return <-resultChan
 }
 
 // Async.
@@ -155,7 +154,7 @@ func (peer *LocalPeer) actorLoop(actionChan <-chan LocalPeerAction) {
 	}
 }
 
-func (peer *LocalPeer) handleAddConnection(conn Connection) {
+func (peer *LocalPeer) handleAddConnection(conn Connection) error {
 	if peer.Peer != conn.Local() {
 		log.Fatal("Attempt made to add connection to peer where peer is not the source of connection")
 	}
@@ -167,26 +166,23 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) {
 	// deliberately non symmetrical
 	if dupConn, found := peer.connections[toName]; found {
 		if dupConn == conn {
-			return
+			return nil
 		}
 		switch conn.BreakTie(dupConn) {
 		case TieBreakWon:
 			dupConn.Shutdown(dupErr)
 			peer.handleDeleteConnection(dupConn)
 		case TieBreakLost:
-			conn.Shutdown(dupErr)
-			return
+			return dupErr
 		case TieBreakTied:
 			// oh good grief. Sod it, just kill both of them.
-			conn.Shutdown(dupErr)
 			dupConn.Shutdown(dupErr)
 			peer.handleDeleteConnection(dupConn)
-			return
+			return dupErr
 		}
 	}
 	if err := peer.checkConnectionLimit(); err != nil {
-		conn.Shutdown(err)
-		return
+		return err
 	}
 	_, isConnectedPeer := peer.router.Routes.Unicast(toName)
 	peer.addConnection(conn)
@@ -197,6 +193,7 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) {
 		peer.router.SendAllGossipDown(conn)
 	}
 	peer.broadcastPeerUpdate(conn.Remote())
+	return nil
 }
 
 func (peer *LocalPeer) handleConnectionEstablished(conn Connection) {
