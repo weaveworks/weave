@@ -107,7 +107,7 @@ dns_args() {
         docker_bridge_ip
         DNS_ARG="--dns $DOCKER_BRIDGE_IP"
         DNS_SEARCH_ARG="--dns-search=."
-        for arg in "$@"; do
+        for arg; do
             case $arg in
                 --dns-search=*)
                     DNS_SEARCH_ARG=""
