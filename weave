@@ -147,6 +147,9 @@ collect_cidr_args() {
         CIDR_COUNT=$(($CIDR_COUNT + 1))
         shift 1
     done
+    if [ $CIDR_COUNT -eq 0 ]; then
+        [ $# -gt 0 ] && validate_cidr "$1" || usage
+    fi
 }
 
 run_iptables() {
@@ -747,9 +750,9 @@ case "$COMMAND" in
         echo -n $DNS_ARGS
         ;;
     start)
-        [ $# -gt 1 ] || usage
         collect_cidr_args "$@"
         shift $CIDR_COUNT
+        [ $# -eq 1 ] || usage
         CONTAINER_ID="$1"
         create_bridge
         CONTAINER=$(docker start $CONTAINER_ID)
@@ -758,24 +761,23 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     attach)
-        [ $# -gt 1 ] || usage
         collect_cidr_args "$@"
         shift $CIDR_COUNT
+        [ $# -eq 1 ] || usage
         CONTAINER_ID="$1"
         create_bridge
         with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
         tell_dns PUT $CONTAINER_ID $CIDR_ARGS
         ;;
     detach)
-        [ $# -gt 1 ] || usage
         collect_cidr_args "$@"
         shift $CIDR_COUNT
+        [ $# -eq 1 ] || usage
         CONTAINER_ID="$1"
         with_container_netns $CONTAINER_ID detach $CIDR_ARGS >/dev/null
         tell_dns DELETE $CONTAINER_ID $CIDR_ARGS
         ;;
     expose)
-        [ $# -gt 0 ] || usage
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         if [ $# -eq 0 ]; then
@@ -800,10 +802,11 @@ case "$COMMAND" in
         done
         ;;
     hide)
-        [ $# -gt 0 ] || usage
+        collect_cidr_args "$@"
+        shift $CIDR_COUNT
+        [ $# -eq 0 ] || usage
         create_bridge --without-ethtool
-        for CIDR; do
-            validate_cidr $CIDR
+        for CIDR in $CIDR_ARGS; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR
             then
                 ip addr del dev $BRIDGE $CIDR
