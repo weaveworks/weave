@@ -802,8 +802,10 @@ case "$COMMAND" in
         ;;
     hide)
         [ $# -gt 0 ] || usage
+        collect_cidr_args "$@"
+        shift $CIDR_COUNT
         create_bridge --without-ethtool
-        for CIDR; do
+        for CIDR in $CIDR_ARGS; do
             validate_cidr $CIDR
             if ip addr show dev $BRIDGE | grep -qF $CIDR
             then
