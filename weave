@@ -261,10 +261,10 @@ docker_bridge_ip() {
 
 # the following borrows from https://github.com/jpetazzo/pipework
 
-# Set $NETNS to the network namespace of container $1, $LOCAL_IFNAME
-# and $GUEST_IFNAME to suitable names for two ends of a veth pair,
-# specific to the container, and execute args $2 $3 ... as a command.
-# If an error is caused by container dying, swallow output from error.
+# Set $CONTAINER_PID to the PID of container $1, $LOCAL_IFNAME and
+# $GUEST_IFNAME to suitable names for two ends of a veth pair, specific
+# to the container, and execute args $2 $3 ... as a command. If an error
+# is caused by container dying, swallow output from error.
 with_container_netns () {
     CONTAINER="$1"
     CONTAINER_PID=$(docker inspect --format='{{.State.Pid}}' $CONTAINER)
@@ -278,11 +278,6 @@ with_container_netns () {
         echo "Container $CONTAINER unknown to Docker." >&2
         exit 1
     fi
-
-    NETNS=$CONTAINER_PID
-    [ ! -d /var/run/netns ] && mkdir -p /var/run/netns
-    rm -f /var/run/netns/$NETNS
-    ln -s $PROCFS/$CONTAINER_PID/ns/net /var/run/netns/$NETNS
 
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
@@ -305,8 +300,13 @@ with_container_netns () {
         cat $IP_TMPOUT
         cat $IP_TMPERR >&2
     fi
-    rm -f $IP_TMPOUT $IP_TMPERR /var/run/netns/$NETNS
+    rm -f $IP_TMPOUT $IP_TMPERR
     return $STATUS
+}
+
+# Execute arguments as a command within the network namespace of $CONTAINER_PID
+netnsenter() {
+    nsenter --net=$PROCFS/$CONTAINER_PID/ns/net "$@"
 }
 
 connect_container_to_bridge() {
@@ -322,15 +322,15 @@ connect_container_to_bridge() {
     if ! ethtool -K $GUEST_IFNAME tx off >/dev/null ||
         ! ip link set $LOCAL_IFNAME master $BRIDGE ||
         ! ip link set $LOCAL_IFNAME up ||
-        ! ip link set $GUEST_IFNAME netns $NETNS ; then
+        ! ip link set $GUEST_IFNAME netns $PROCFS/$CONTAINER_PID/ns/net ; then
         # failed before we assigned the veth to the container's
         # namespace
         ip link del $LOCAL_IFNAME type veth || true
         return 1
     fi
 
-    if ! ip netns exec $NETNS ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
-       ! configure_arp_cache $CONTAINER_IFNAME "ip netns exec $NETNS" ; then
+    if ! netnsenter ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
+       ! configure_arp_cache $CONTAINER_IFNAME "netnsenter" ; then
         return 1
     fi
 }
@@ -349,30 +349,30 @@ ask_version() {
 ######################################################################
 
 launch() {
-    if ! ip netns exec $NETNS ip link show eth0 >/dev/null ; then
+    if ! netnsenter ip link show eth0 >/dev/null ; then
         echo "Perhaps you are running the docker daemon with container networking disabled (-b=none)." >&2
         return 1
     fi
     connect_container_to_bridge &&
-        ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null &&
-        ip netns exec $NETNS ip link set $CONTAINER_IFNAME up
+        netnsenter ethtool -K eth0 tx off >/dev/null &&
+        netnsenter ip link set $CONTAINER_IFNAME up
 }
 
 test_launch() {
-    ip netns exec $NETNS ethtool -K eth0 tx off >/dev/null
+    netnsenter ethtool -K eth0 tx off >/dev/null
 }
 
 attach() {
-    if ip netns exec $NETNS ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
+    if netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
         for ADDR; do
             # container already has the expected network interface, so assume we set it up already;
             # just add the IP address.
-            if ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
+            if netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
                 # address was there already
                 continue
             fi
 
-            if ! ip netns exec $NETNS ip addr add $ADDR dev $CONTAINER_IFNAME ; then
+            if ! netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME ; then
                 return 1
             fi
         done
@@ -385,46 +385,46 @@ attach() {
     fi
 
     for ADDR; do
-        if ! ip netns exec $NETNS ip addr add $ADDR dev $CONTAINER_IFNAME; then
+        if ! netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME; then
             return 1
         fi
     done
 
-    if ! ip netns exec $NETNS ip link set $CONTAINER_IFNAME up ; then
+    if ! netnsenter ip link set $CONTAINER_IFNAME up ; then
         return 1
     fi
 
     # Route multicast packets across the weave network.
-    if ! ip netns exec $NETNS ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
-        ip netns exec $NETNS ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
+    if ! netnsenter ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
+        netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
     fi
 
-    arp_update $CONTAINER_IFNAME $1 "ip netns exec $NETNS"
+    arp_update $CONTAINER_IFNAME $1 "netnsenter"
 }
 
 detach() {
     for ADDR; do
-        if ! ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
+        if ! netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
             # address is not there, leave the device alone
             continue
         fi
 
-        if ! ip netns exec $NETNS ip addr del $ADDR dev $CONTAINER_IFNAME ; then
+        if ! netnsenter ip addr del $ADDR dev $CONTAINER_IFNAME ; then
             return 1
         fi
     done
 
-    if [ -n "$(ip netns exec $NETNS ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
+    if [ -n "$(netnsenter ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
         # other addresses are left, leave the device alone
         return 0
     fi
 
     # Deleting the interface will delete the multicast route we set up
-    ip netns exec $NETNS ip link del $CONTAINER_IFNAME type veth
+    netnsenter ip link del $CONTAINER_IFNAME type veth
 }
 
 container_weave_addrs() {
-    ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
+    netnsenter ip addr show dev $CONTAINER_IFNAME
 }
 
 ######################################################################
