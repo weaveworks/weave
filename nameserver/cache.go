@@ -22,7 +22,7 @@ const (
 	defPendingTimeout int = 5 // timeout for a resolution
 )
 
-const nullTTL = 0	// a null TTL
+const nullTTL = 0 // a null TTL
 
 type entryStatus uint8
 

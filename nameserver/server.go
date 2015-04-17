@@ -278,7 +278,7 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 		lookups := []Lookup{s.Zone, s.mdnsCli}
 		maxLen := getMaxReplyLen(r, proto)
 
- 		Debug.Printf("Reverse query: %+v", q)
+		Debug.Printf("Reverse query: %+v", q)
 		reply, err := s.cache.Get(r, maxLen, time.Now())
 		if err != nil {
 			if err == errNoLocalReplies {
@@ -300,7 +300,7 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 		// catch unsupported queries
 		if q.Qtype != dns.TypePTR {
 			Warning.Printf("[dns msgid %d] Unexpected reverse query type %s: %+v",
-			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q)
+				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q)
 			m := makeDNSNotImplResponse(r)
 			s.cache.Put(r, m, negLocalTTL, 0, now)
 			w.WriteMsg(m)
