@@ -478,8 +478,7 @@ populate_dns() {
     fi
     for CONTAINER in $(docker ps -q --no-trunc); do
         MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
-        if CONTAINER_ADDRS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1) ; then
-            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*' | sed -e 's/inet \([^/]*\)\/\(.*\)/\1/')
+        if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
             for IP in $CONTAINER_IPS; do
                 http_call_ip $TARGET_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
             done
