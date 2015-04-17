@@ -147,6 +147,9 @@ collect_cidr_args() {
         CIDR_COUNT=$(($CIDR_COUNT + 1))
         shift 1
     done
+    if [ $CIDR_COUNT -eq 0 ]; then
+        [ $# -gt 0 ] && validate_cidr "$1" || usage
+    fi
 }
 
 run_iptables() {
