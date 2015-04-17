@@ -8,12 +8,13 @@ addons:
     packages:
     - libpcap-dev
 
-install: 
+install:
   - go clean -i net
   - go install -tags netgo std
   - make travis
 
 script:
+  - bin/lint .
   - make tests
 
 after_success:
