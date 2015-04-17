@@ -63,11 +63,11 @@ function lint {
 }
 
 function lint_files {
-	result=0
+	lint_result=0
 	while read filename; do
-		lint "${filename}" || result=1
+		lint "${filename}" || lint_result=1
 	done
-	exit $result
+	exit $lint_result
 }
 
 function list_files {
