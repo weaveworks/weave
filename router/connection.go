@@ -53,7 +53,7 @@ type LocalConnection struct {
 	heartbeat         *time.Ticker
 	fragTest          *time.Ticker
 	forwarder         *Forwarder
-	forwarderDF       *Forwarder
+	forwarderDF       *ForwarderDF
 	Decryptor         Decryptor
 	Router            *Router
 	uid               uint64
