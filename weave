@@ -64,8 +64,6 @@ exec_remote() {
         $EXEC_IMAGE --local "$@"
 }
 
-[ $# -gt 0 ] || usage
-
 # "run" is a special case because we want to use docker directly,
 # rather than the docker in $EXEC_IMAGE remotely. That's because we
 # are passing arbitrary arguments on to docker run, and we can't rely
@@ -86,10 +84,6 @@ MTU=65535
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
-
-COMMAND=$1
-
-shift 1
 
 ######################################################################
 # general helpers; independent of docker and weave
@@ -607,6 +601,10 @@ fi
 DOCKER_VERSION_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f 1)
 DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
 DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
+
+[ $# -gt 0 ] || usage
+COMMAND=$1
+shift 1
 
 case "$COMMAND" in
     setup)
