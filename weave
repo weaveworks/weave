@@ -56,41 +56,17 @@ exec_remote() {
         $EXEC_IMAGE --local "$@"
 }
 
-# "run" is a special case because we want to use docker directly,
-# rather than the docker in $EXEC_IMAGE remotely. That's because we
-# are passing arbitrary arguments on to docker run, and we can't rely
-# on our baked-in docker to support those arguments.
-if [ "$1" = "--local" ]; then
-    LOCAL="$1"
-    shift 1
-elif [ "$1" != "run" ]; then
-    exec_remote "$@"
-    exit $?
-fi
+check_docker_version() {
+    if ! DOCKER_VERSION=$(docker -v | sed -n -e 's|^Docker version \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
+        echo "ERROR: Unable to parse docker version" >&2
+        exit 1
+    fi
 
-BASE_IMAGE=$DOCKERHUB_USER/weave
-BASE_DNS_IMAGE=$DOCKERHUB_USER/weavedns
-IMAGE=$BASE_IMAGE:$IMAGE_VERSION
-DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
-
-DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
-CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
-DNS_CONTAINER_NAME=weavedns
-BRIDGE=weave
-CONTAINER_IFNAME=ethwe
-MTU=65535
-PORT=${WEAVE_PORT:-6783}
-HTTP_PORT=6784
-DNS_HTTP_PORT=6785
-
-######################################################################
-# general helpers; independent of docker and weave
-######################################################################
-
-# utility function to check whether a command can be executed by the shell
-# see http://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script
-command_exists () {
-    command -v $1 >/dev/null 2>&1
+    # guard against https://github.com/docker/docker/issues/8632
+    if [ "$DOCKER_VERSION" = "1.3.0" ] ; then
+        echo "You are running Docker version $DOCKER_VERSION, which contains a bug that prevents weave from working properly. Please upgrade." >&2
+        exit 1
+    fi
 }
 
 is_cidr() {
@@ -117,6 +93,55 @@ collect_cidr_args() {
     if [ $CIDR_COUNT -eq 0 ]; then
         [ $# -gt 0 ] && validate_cidr "$1" || usage
     fi
+}
+
+# "run" is a special case because we want to use docker directly,
+# rather than the docker in $EXEC_IMAGE remotely. That's because we
+# are passing arbitrary arguments on to docker run, and we can't rely
+# on our baked-in docker to support those arguments.
+if [ "$1" = "run" ]; then
+    shift 1
+    check_docker_version
+    if [ "$1" = "--with-dns" ]; then
+        DNS_ARGS=$(exec_remote dns-args "$@")
+        shift 1
+    fi
+    collect_cidr_args "$@"
+    shift $CIDR_COUNT
+    CONTAINER=$(docker run $DNS_ARGS -d "$@")
+    exec_remote attach $CIDR_ARGS $CONTAINER
+    echo $CONTAINER
+    exit 0
+elif [ "$1" != "--local" ]; then
+    exec_remote "$@"
+    exit $?
+fi
+
+shift 1
+
+BASE_IMAGE=$DOCKERHUB_USER/weave
+BASE_DNS_IMAGE=$DOCKERHUB_USER/weavedns
+IMAGE=$BASE_IMAGE:$IMAGE_VERSION
+DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
+
+DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
+CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
+DNS_CONTAINER_NAME=weavedns
+BRIDGE=weave
+CONTAINER_IFNAME=ethwe
+MTU=65535
+PORT=${WEAVE_PORT:-6783}
+HTTP_PORT=6784
+DNS_HTTP_PORT=6785
+
+######################################################################
+# general helpers; independent of docker and weave
+######################################################################
+
+# utility function to check whether a command can be executed by the shell
+# see http://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script
+command_exists () {
+    command -v $1 >/dev/null 2>&1
 }
 
 run_iptables() {
@@ -551,51 +576,39 @@ populate_dns() {
 
 ##########################################################################################
 
-if [ -n "$LOCAL" ]; then
-    [ $(id -u) = 0 ] || {
-        echo "weave must be run as 'root' when run locally" >&2
-        exit 1
-    }
+[ $(id -u) = 0 ] || {
+    echo "weave must be run as 'root' when run locally" >&2
+    exit 1
+}
 
-    uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
-      if ! read sys maj min ; then
+uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
+    if ! read sys maj min ; then
         echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
         exit 1
-      fi
+    fi
 
-      if [ "$sys" != 'Linux' ] ; then
-          echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
-          exit 1
-      fi
-
-      if ! [ \( "$maj" -eq 3 -a "$min" -ge 5 \) -o "$maj" -gt 3 ] ; then
-          echo "WARNING: Linux kernel version 3.5 or newer is required (you have ${maj}.${min})" >&2
-      fi
-    }
-
-    if ! command_exists ip ; then
-        echo "ERROR: ip utility is missing. Please install it." >&2
+    if [ "$sys" != 'Linux' ] ; then
+        echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
         exit 1
     fi
 
-    if ! ip netns list >/dev/null 2>&1 ; then
-        echo "ERROR: $(ip -V) does not support network namespaces." >&2
-        echo "       Please install iproute2-ss111010 or later." >&2
-        exit 1
+    if ! [ \( "$maj" -eq 3 -a "$min" -ge 5 \) -o "$maj" -gt 3 ] ; then
+        echo "WARNING: Linux kernel version 3.5 or newer is required (you have ${maj}.${min})" >&2
     fi
-fi
+}
 
-if ! DOCKER_VERSION=$(docker -v | sed -n -e 's|^Docker version \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
-    echo "ERROR: Unable to parse docker version" >&2
+if ! command_exists ip ; then
+    echo "ERROR: ip utility is missing. Please install it." >&2
     exit 1
 fi
 
-# guard against https://github.com/docker/docker/issues/8632
-if [ "$DOCKER_VERSION" = "1.3.0" ] ; then
-    echo "You are running Docker version $DOCKER_VERSION, which contains a bug that prevents weave from working properly. Please upgrade." >&2
+if ! ip netns list >/dev/null 2>&1 ; then
+    echo "ERROR: $(ip -V) does not support network namespaces." >&2
+    echo "       Please install iproute2-ss111010 or later." >&2
     exit 1
 fi
 
+check_docker_version
 DOCKER_VERSION_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f 1)
 DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
 DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
@@ -746,22 +759,13 @@ case "$COMMAND" in
         ;;
     run)
         [ $# -gt 0 ] || usage
-        if [ -n "$LOCAL" ]; then
-            dns_args "$@"
-        else
-            DNS_ARGS=$(exec_remote dns-args "$@")
-            [ "$1" = "--with-dns" ] && shift 1
-        fi
+        dns_args "$@"
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
-        if [ -n "$LOCAL" ]; then
-            create_bridge
-            with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-            tell_dns PUT $CONTAINER $CIDR_ARGS
-        else
-            exec_remote attach $CIDR_ARGS $CONTAINER
-        fi
+        create_bridge
+        with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
+        tell_dns PUT $CONTAINER $CIDR_ARGS
         echo $CONTAINER
         ;;
     dns-args)
