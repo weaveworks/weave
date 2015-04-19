@@ -810,7 +810,6 @@ case "$COMMAND" in
         fi
         create_bridge --without-ethtool
         for CIDR in $CIDR_ARGS; do
-            validate_cidr $CIDR
             if ! ip addr show dev $BRIDGE | grep -qF $CIDR
             then
                 ip addr add dev $BRIDGE $CIDR
