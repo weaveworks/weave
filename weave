@@ -103,8 +103,8 @@ if [ "$1" = "run" ]; then
     shift 1
     check_docker_version
     if [ "$1" = "--with-dns" ]; then
-        DNS_ARGS=$(exec_remote dns-args "$@")
         shift 1
+        DNS_ARGS=$(exec_remote dns-args)
     fi
     collect_cidr_args "$@"
     shift $CIDR_COUNT
@@ -515,27 +515,24 @@ wait_for_status() {
 ######################################################################
 
 dns_args() {
-    if [ "$1" = "--with-dns" ] ; then
-        shift 1
-        if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
-            \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
-            "$DOCKER_VERSION_MINOR" -lt 2 \) ] ; then
-            echo "ERROR: The '--with-dns' option requires Docker 1.2.0 or later; you are running $DOCKER_VERSION" >&2
-            exit 1
-        fi
-        docker_bridge_ip
-        DNS_ARG="--dns $DOCKER_BRIDGE_IP"
-        DNS_SEARCH_ARG="--dns-search=."
-        for arg; do
-            case $arg in
-                --dns-search=*)
-                    DNS_SEARCH_ARG=""
-                    ;;
-                *)
-                    ;;
-            esac;
-        done
+    if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
+        \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
+        "$DOCKER_VERSION_MINOR" -lt 2 \) ] ; then
+        echo "ERROR: The '--with-dns' option requires Docker 1.2.0 or later; you are running $DOCKER_VERSION" >&2
+        exit 1
     fi
+    docker_bridge_ip
+    DNS_ARG="--dns $DOCKER_BRIDGE_IP"
+    DNS_SEARCH_ARG="--dns-search=."
+    for arg; do
+        case $arg in
+            --dns-search=*)
+                DNS_SEARCH_ARG=""
+                ;;
+            *)
+                ;;
+        esac;
+    done
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
 }
 
@@ -759,7 +756,10 @@ case "$COMMAND" in
         ;;
     run)
         [ $# -gt 0 ] || usage
-        dns_args "$@"
+        if [ "$1" = "--with-dns" ] ; then
+            shift 1
+            dns_args
+        fi
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
@@ -769,7 +769,7 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     dns-args)
-        dns_args "$@"
+        dns_args
         echo -n $DNS_ARGS
         ;;
     start)
