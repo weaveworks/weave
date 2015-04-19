@@ -2,18 +2,16 @@
 set -e
 
 SCRIPT_VERSION="(unreleased version)"
-DOCKERHUB_USER=zettio
-
 if [ "$SCRIPT_VERSION" = "(unreleased version)" ] ; then
     IMAGE_VERSION=latest
 else
     IMAGE_VERSION=$SCRIPT_VERSION
 fi
-
 IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 
 # These are potentially used for remote execs, and have defaults, so
 # we introduce them here
+DOCKERHUB_USER=zettio
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 PROCFS=${PROCFS:-/proc}
