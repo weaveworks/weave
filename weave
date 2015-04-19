@@ -73,10 +73,6 @@ exec_remote() {
 if [ "$1" = "--local" ]; then
     LOCAL="$1"
     shift 1
-    [ $(id -u) = 0 ] || {
-        echo "weave must be run as 'root' when run locally" >&2
-        exit 1
-    }
 elif [ "$1" != "run" ]; then
     exec_remote "$@"
     exit $?
@@ -564,6 +560,11 @@ populate_dns() {
 ##########################################################################################
 
 if [ -n "$LOCAL" ]; then
+    [ $(id -u) = 0 ] || {
+        echo "weave must be run as 'root' when run locally" >&2
+        exit 1
+    }
+
     uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
       if ! read sys maj min ; then
         echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
