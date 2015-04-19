@@ -95,30 +95,9 @@ COMMAND=$1
 
 shift 1
 
-dns_args() {
-    if [ "$1" = "--with-dns" ] ; then
-        shift 1
-        if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
-            \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
-            "$DOCKER_VERSION_MINOR" -lt 2 \) ] ; then
-            echo "ERROR: The '--with-dns' option requires Docker 1.2.0 or later; you are running $DOCKER_VERSION" >&2
-            exit 1
-        fi
-        docker_bridge_ip
-        DNS_ARG="--dns $DOCKER_BRIDGE_IP"
-        DNS_SEARCH_ARG="--dns-search=."
-        for arg; do
-            case $arg in
-                --dns-search=*)
-                    DNS_SEARCH_ARG=""
-                    ;;
-                *)
-                    ;;
-            esac;
-        done
-    fi
-    DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
-}
+######################################################################
+# general helpers; independent of docker and weave
+######################################################################
 
 # utility function to check whether a command can be executed by the shell
 # see http://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script
@@ -215,6 +194,10 @@ random_mac() {
     # bits should be random.
     od -txC -An -N6 /dev/urandom | sed 's|^ ||;s| |:|;s|[0-3]:|2:|;s|[4-7]:|6:|;s|[89ab]:|a:|;s|[c-f]:|e:|;s| |:|g'
 }
+
+######################################################################
+# weave and docker specific helpers
+######################################################################
 
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
@@ -339,6 +322,19 @@ connect_container_to_bridge() {
     fi
 }
 
+ask_version() {
+    if ! DOCKERIMAGE=$(docker inspect --format='{{.Image}}' $1 2>/dev/null) ; then
+            if ! DOCKERIMAGE=$(docker inspect --format='{{.Id}}' $2 2>/dev/null) ; then
+                echo "Unable to find $2 image." >&2
+            fi
+    fi
+    [ -n "$DOCKERIMAGE" ] && docker run --rm $DOCKERIMAGE --version
+}
+
+######################################################################
+# functions invoked through with_container_netns
+######################################################################
+
 launch() {
     if ! ip netns exec $NETNS ip link show eth0 >/dev/null ; then
         echo "Perhaps you are running the docker daemon with container networking disabled (-b=none)." >&2
@@ -414,91 +410,13 @@ detach() {
     ip netns exec $NETNS ip link del $CONTAINER_IFNAME type veth
 }
 
-# Call url $4 with http verb $3 on container $1 at port $2
-http_call() {
-    if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null); then
-        echo "$1 container is not present; have you launched it?" >&2
-        return 1
-    fi
-    case "$status" in
-        "true ")
-            echo "$1 container has no IP address; is Docker networking enabled?" >&2
-            return 1
-            ;;
-        true*)
-            ip="${status#true }"
-            ;;
-        *)
-            echo "$1 container is not running." >&2
-            return 1
-            ;;
-    esac
-    shift 1
-    http_call_ip $ip "$@"
+container_weave_addrs() {
+    ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
 }
 
-http_call_ip() {
-    ip="$1"
-    port="$2"
-    http_verb="$3"
-    url="$4"
-    shift 4
-    curl --connect-timeout 3 -s -X $http_verb "$@" http://$ip:$port$url
-}
-
-# Perform operation $1 on container ID $2 to local DNS database at address $3
-# This function is only called where we know $2 is a valid container name
-tell_dns() {
-    METHOD="$1"
-    CONTAINER_ID="$2"
-    shift 2
-
-    if ! status=$(docker inspect --format='{{.State.Running}}' $DNS_CONTAINER_NAME 2>/dev/null) || [ "$status" != "true" ] ; then
-        # weavedns not running - silently return
-        return
-    fi
-    # get the long form of the container ID
-    CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
-    MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
-    for ADDR; do
-        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${ADDR%/*} $MORE_ARGS || true
-    done
-}
-
-# Wait until container $1 on port $2 is alive enough to respond to its status call
-wait_for_status() {
-    TARGET_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $1)
-    WAIT_TIME=1
-    while ! http_call_ip $TARGET_IP $2 GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
-        if ! status=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) || [ "$status" != "true" ] ; then
-            echo "Container $1 died" >&2
-            return 1
-        fi
-        sleep $WAIT_TIME
-        WAIT_TIME=$((WAIT_TIME+1))
-    done
-    if [ $WAIT_TIME = 4 ]; then
-        echo "Timed out waiting for $1 container to start." >&2
-        return 1
-    fi
-    return 0
-}
-
-# Tell the newly-started weaveDNS about existing weave IPs
-populate_dns() {
-    if ! wait_for_status $DNS_CONTAINER_NAME $DNS_HTTP_PORT ; then
-        echo "If running, it will not be pre-populated." >&2
-        return 0
-    fi
-    for CONTAINER in $(docker ps -q --no-trunc); do
-        MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
-        if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
-            for IP in $CONTAINER_IPS; do
-                http_call_ip $TARGET_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
-            done
-        fi
-    done
-}
+######################################################################
+# functions for interacting with containers
+######################################################################
 
 # Check that a container named $1 with image $2 is not running
 check_not_running() {
@@ -528,18 +446,122 @@ check_not_running() {
     esac
 }
 
-container_weave_addrs() {
-    ip netns exec $NETNS ip addr show dev $CONTAINER_IFNAME
+http_call_ip() {
+    ip="$1"
+    port="$2"
+    http_verb="$3"
+    url="$4"
+    shift 4
+    curl --connect-timeout 3 -s -X $http_verb "$@" http://$ip:$port$url
 }
 
-ask_version() {
-    if ! DOCKERIMAGE=$(docker inspect --format='{{.Image}}' $1 2>/dev/null) ; then
-            if ! DOCKERIMAGE=$(docker inspect --format='{{.Id}}' $2 2>/dev/null) ; then
-                echo "Unable to find $2 image." >&2
-            fi
+# Call url $4 with http verb $3 on container $1 at port $2
+http_call() {
+    if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null); then
+        echo "$1 container is not present; have you launched it?" >&2
+        return 1
     fi
-    [ -n "$DOCKERIMAGE" ] && docker run --rm $DOCKERIMAGE --version
+    case "$status" in
+        "true ")
+            echo "$1 container has no IP address; is Docker networking enabled?" >&2
+            return 1
+            ;;
+        true*)
+            ip="${status#true }"
+            ;;
+        *)
+            echo "$1 container is not running." >&2
+            return 1
+            ;;
+    esac
+    shift 1
+    http_call_ip $ip "$@"
 }
+
+# Wait until container $1 on port $2 is alive enough to respond to its status call
+wait_for_status() {
+    TARGET_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $1)
+    WAIT_TIME=1
+    while ! http_call_ip $TARGET_IP $2 GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
+        if ! status=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) || [ "$status" != "true" ] ; then
+            echo "Container $1 died" >&2
+            return 1
+        fi
+        sleep $WAIT_TIME
+        WAIT_TIME=$((WAIT_TIME+1))
+    done
+    if [ $WAIT_TIME = 4 ]; then
+        echo "Timed out waiting for $1 container to start." >&2
+        return 1
+    fi
+    return 0
+}
+
+######################################################################
+# weaveDNS helpers
+######################################################################
+
+dns_args() {
+    if [ "$1" = "--with-dns" ] ; then
+        shift 1
+        if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
+            \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
+            "$DOCKER_VERSION_MINOR" -lt 2 \) ] ; then
+            echo "ERROR: The '--with-dns' option requires Docker 1.2.0 or later; you are running $DOCKER_VERSION" >&2
+            exit 1
+        fi
+        docker_bridge_ip
+        DNS_ARG="--dns $DOCKER_BRIDGE_IP"
+        DNS_SEARCH_ARG="--dns-search=."
+        for arg; do
+            case $arg in
+                --dns-search=*)
+                    DNS_SEARCH_ARG=""
+                    ;;
+                *)
+                    ;;
+            esac;
+        done
+    fi
+    DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
+}
+
+# Perform operation $1 on container ID $2 to local DNS database at address $3
+# This function is only called where we know $2 is a valid container name
+tell_dns() {
+    METHOD="$1"
+    CONTAINER_ID="$2"
+    shift 2
+
+    if ! status=$(docker inspect --format='{{.State.Running}}' $DNS_CONTAINER_NAME 2>/dev/null) || [ "$status" != "true" ] ; then
+        # weavedns not running - silently return
+        return
+    fi
+    # get the long form of the container ID
+    CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
+    MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
+    for ADDR; do
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${ADDR%/*} $MORE_ARGS || true
+    done
+}
+
+# Tell the newly-started weaveDNS about existing weave IPs
+populate_dns() {
+    if ! wait_for_status $DNS_CONTAINER_NAME $DNS_HTTP_PORT ; then
+        echo "If running, it will not be pre-populated." >&2
+        return 0
+    fi
+    for CONTAINER in $(docker ps -q --no-trunc); do
+        MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
+        if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
+            for IP in $CONTAINER_IPS; do
+                http_call_ip $TARGET_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
+            done
+        fi
+    done
+}
+
+##########################################################################################
 
 if [ -n "$LOCAL" ]; then
     uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
