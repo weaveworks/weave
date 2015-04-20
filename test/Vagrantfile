@@ -53,3 +53,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   end
 
 end
+
+begin
+  load 'Vagrantfile.local'
+rescue LoadError
+end
