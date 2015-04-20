@@ -1,5 +1,9 @@
 VAGRANTFILE_API_VERSION = "2"
 
+# Necessary because the switch disabling unwanted insecure key
+# replacement in Vagrant 1.7+ is not accepted by earlier versions
+Vagrant.require_version ">= 1.7.0"
+
 # these ought to match what is in config.sh
 n_machines = 2
 ip_prefix = "192.168.48"
