@@ -16,10 +16,10 @@ docker_on $HOST1 rm -f c1 c2 || true
 weave_on $HOST1 run $C2/24 -t --name=c2 -h seetwo.foo.bar ubuntu
 weave_on $HOST1 run --with-dns $C1/24 -t --name=c1 aanand/docker-dnsutils /bin/sh
 
-ok=$(docker -H tcp://$HOST1:2375 exec -i c1 sh -c "dig +short seetwo.foo.bar.")
+ok=$(docker -H tcp://$HOST1:2375 exec c1 sh -c "dig +short seetwo.foo.bar.")
 assert "echo $ok" "$C2"
 
-ok=$(docker -H tcp://$HOST1:2375 exec -i c1 sh -c "dig +short -x $C2")
+ok=$(docker -H tcp://$HOST1:2375 exec c1 sh -c "dig +short -x $C2")
 assert "echo $ok" "seetwo.foo.bar."
 
 end_suite
