@@ -104,7 +104,7 @@ if [ "$1" = "run" ]; then
     check_docker_version
     if [ "$1" = "--with-dns" ]; then
         shift 1
-        DNS_ARGS=$(exec_remote dns-args)
+        DNS_ARGS=$(exec_remote dns-args "$@")
     fi
     collect_cidr_args "$@"
     shift $CIDR_COUNT
@@ -758,7 +758,7 @@ case "$COMMAND" in
         [ $# -gt 0 ] || usage
         if [ "$1" = "--with-dns" ] ; then
             shift 1
-            dns_args
+            dns_args "$@"
         fi
         collect_cidr_args "$@"
         shift $CIDR_COUNT
@@ -769,7 +769,7 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     dns-args)
-        dns_args
+        dns_args "$@"
         echo -n $DNS_ARGS
         ;;
     start)
