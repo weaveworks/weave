@@ -42,3 +42,4 @@ weaveexec.tar
 weaveexec/weave
 weaveexec/sigproxy
 weaveexec/docker*.tgz
+Vagrantfile.local
