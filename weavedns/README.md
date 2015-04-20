@@ -136,17 +136,18 @@ the resolver use the container's domain, or e.g.,
 
 ### Using a different local domain
 
-By default, WeaveDNS uses `weave.local.` as the domain for local
-records. In general users do not need to change this domain, but you
+By default, WeaveDNS uses `weave.local.` as the domain for names on the
+Weave network. In general users do not need to change this domain, but you
 can force WeaveDNS to use a different domain by launching it
-with the `--localDomain` argument. For example,
+with the `--domain` argument. For example,
 
 ```bash
-$ weave launch-dns 10.2.254.1/24 --localDomain="mycompany.local."
+$ weave launch-dns 10.2.254.1/24 --domain="mycompany.local."
 ```
 
-The local domain should end with the `local.` suffix (it is
-not strictly neccessary).
+The local domain should end with `local.`, since these names are
+link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
+(though this is not strictly neccessary).
 
 ### Adding containers to DNS
 
