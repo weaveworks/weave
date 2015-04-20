@@ -21,7 +21,7 @@ func main() {
 		justVersion bool
 		ifaceName   string
 		apiPath     string
-		localDomain string
+		domain      string
 		dnsPort     int
 		httpPort    int
 		wait        int
@@ -36,7 +36,7 @@ func main() {
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "path to Docker API socket")
-	flag.StringVar(&localDomain, "localDomain", weavedns.DefaultLocalDomain, "local domain (ie, 'weave.local.')")
+	flag.StringVar(&domain, "domain", weavedns.DefaultLocalDomain, "local domain (ie, 'weave.local.')")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
@@ -79,7 +79,7 @@ func main() {
 	srvConfig := weavedns.DNSServerConfig{
 		Port:        dnsPort,
 		CacheLen:    cacheLen,
-		LocalDomain: localDomain,
+		LocalDomain: domain,
 		Timeout:     timeout,
 		UDPBufLen:   udpbuf,
 	}
@@ -93,7 +93,7 @@ func main() {
 	Debug.Printf("Starting the signals handler")
 	go handleSignals(srv)
 
-	go weavedns.ListenHTTP(version, srv, localDomain, zone, httpPort)
+	go weavedns.ListenHTTP(version, srv, domain, zone, httpPort)
 	err = srv.Start()
 	if err != nil {
 		Error.Fatal("Failed to start the WeaveDNS server", err)
