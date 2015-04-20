@@ -87,7 +87,7 @@ collect_cidr_args() {
     CIDR_COUNT=0
     while is_cidr "$1"; do
         CIDR_ARGS="$CIDR_ARGS $1"
-        CIDR_COUNT=$(($CIDR_COUNT + 1))
+        CIDR_COUNT=$((CIDR_COUNT + 1))
         shift 1
     done
     if [ $CIDR_COUNT -eq 0 ]; then
