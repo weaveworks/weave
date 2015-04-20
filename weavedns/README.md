@@ -134,6 +134,20 @@ that you can use unqualified hostnames. Use `--dns-search=.` to make
 the resolver use the container's domain, or e.g.,
 `--dns-search=weave.local` to make it look in `weave.local`.
 
+### Using a different local domain
+
+By default, WeaveDNS uses `weave.local.` as the domain for local
+records. In general users do not need to change this domain, but you
+can force WeaveDNS to use a different domain by launching it
+with the `--localDomain` argument. For example,
+
+```bash
+$ weave launch-dns 10.2.254.1/24 --localDomain="mycompany.local."
+```
+
+The local domain should end with the `local.` suffix (it is
+not strictly neccessary).
+
 ### Adding containers to DNS
 
 If DNS is started after you've attached a container to the weave
