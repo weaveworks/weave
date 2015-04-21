@@ -87,7 +87,7 @@ func addrToIPv4(addr string) (IPv4, error) {
 // Parse a reverse address (eg, "11.12.13.10.in-addr.arpa.") and return the corresponding IPv4 (eg, "10.13.12.11")
 func raddrToIPv4(addr string) (IPv4, error) {
 	l := len(addr)
-	if l < rdnsDomainLen + 1 {
+	if l < rdnsDomainLen+1 {
 		return IPv4{}, &net.ParseError{"too short reverse IP address", addr}
 	}
 

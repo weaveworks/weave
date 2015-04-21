@@ -51,9 +51,9 @@ func (r Response) Equal(r2 *Response) bool {
 }
 
 type responseInfo struct {
-	timeout    time.Time // if no answer by this time, give up
-	insistent  bool      // insistent queries are not removed on the first reply
-	ch         chan<- *Response
+	timeout   time.Time // if no answer by this time, give up
+	insistent bool      // insistent queries are not removed on the first reply
+	ch        chan<- *Response
 }
 
 // Represents one query that we have sent for one name.
@@ -161,9 +161,9 @@ func (c *MDNSClient) SendQuery(name string, querytype uint16, insistent bool, re
 			c.inflight[name] = query
 		}
 		info := &responseInfo{
-			ch:         responseCh,
-			timeout:    time.Now().Add(mDNSTimeout),
-			insistent:  insistent,
+			ch:        responseCh,
+			timeout:   time.Now().Add(mDNSTimeout),
+			insistent: insistent,
 		}
 		// Invariant on responseInfos: they are in ascending order of
 		// timeout.  Since we use a fixed interval from Now(), this

@@ -18,7 +18,7 @@ type mockedZone struct {
 }
 
 func NewMockedZone(zr ZoneRecord) *mockedZone { return &mockedZone{record: zr} }
-func (mz mockedZone) Domain() string         { return DefaultLocalDomain }
+func (mz mockedZone) Domain() string          { return DefaultLocalDomain }
 func (mz mockedZone) LookupName(name string) ([]ZoneRecord, error) {
 	Debug.Printf("[mocked zone]: LookupName: returning record %s", mz.record)
 	mz.NumLookupsName += 1
@@ -51,4 +51,3 @@ func (mz mockedZone) ObserveInaddr(inaddr string, observer ZoneRecordObserver) e
 	notImplWarn()
 	return nil
 }
-

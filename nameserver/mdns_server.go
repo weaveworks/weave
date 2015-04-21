@@ -97,7 +97,6 @@ func (s *MDNSServer) Stop() error {
 	return s.srv.Shutdown()
 }
 
-
 func (s *MDNSServer) Zone() Zone {
 	return s.zone
 }
