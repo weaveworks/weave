@@ -5,8 +5,8 @@ pkgs = "lxc-docker aufs-tools build-essential ethtool iputils-arping libpcap-dev
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
-  config.vm.box = "phusion/ubuntu-14.04-amd64"
-  config.vm.box_url = "https://oss-binaries.phusionpassenger.com/vagrant/boxes/latest/ubuntu-14.04-amd64-vbox.box"
+  config.vm.box = "ubuntu/ubuntu-14.10-amd64"
+  config.vm.box_url = "https://cloud-images.ubuntu.com/vagrant/utopic/current/utopic-server-cloudimg-amd64-vagrant-disk1.box"
 
   config.vm.network "private_network", ip: vm_ip
   config.vm.provider :virtualbox do |vb|
