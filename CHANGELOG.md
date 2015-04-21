@@ -1,3 +1,28 @@
+## Release 0.10.0
+
+**Highlights**:
+
+- **bug fixes**, in particular eradicating several deadlocks that could
+  cause peer connection failures and hangs.
+- **performance and scalability improvements** to the weave control plane,
+  as a result of which it is now possible to construct much larger
+  weave networks than previously.
+- **improved installation and administration**, particularly the
+  introduction of remote execution of the weave script in a container,
+  permitting fully containerised deployment of weave.
+- **improved diagnostics**, such as the reporting of connection failures
+  in `weave status`.
+- **new weaveDNS features**, most notably the caching of DNS records
+  for application containers, which makes finding container IP
+  addresses via weaveDNS much faster.
+
+More detail in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A0.10.0)
+
+*NB: This release changes the Weave Docker image names. To upgrade
+from an older version, 1) stop all application containers, 2) run
+`weave reset` from the old version to remove all traces of weave, and
+only then 3) install the new version.*
+
 ## Release 0.9.0
 
 - Improve WeaveDNS to the point where it can act as the name server
