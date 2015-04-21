@@ -9,7 +9,7 @@ start_suite "Resolve names in custom domain"
 
 weave_on $HOST1 stop || true
 weave_on $HOST1 stop-dns || true
-weave_on $HOST1 launch-dns 10.2.254.1/24 --localDomain foo.bar.
+weave_on $HOST1 launch-dns 10.2.254.1/24 --domain foo.bar.
 
 docker_on $HOST1 rm -f c1 c2 || true
 
