@@ -16,7 +16,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.synced_folder ".", "/home/vagrant/src/github.com/weaveworks/weave"
-  config.vm.provision :shell, :inline => "ln -s /home/vagrant/src/github.com/weaveworks/weave /home/vagrant/weave"
+  config.vm.provision :shell, :inline => "ln -sf /home/vagrant/src/github.com/weaveworks/weave /home/vagrant/"
 
   config.vm.provision :shell, :inline => "sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9"
   config.vm.provision :shell, :inline => "echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"
