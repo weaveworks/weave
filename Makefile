@@ -6,7 +6,7 @@ PUBLISH=publish_weave publish_weavedns publish_weaveexec
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
 
-DOCKERHUB_USER=zettio
+DOCKERHUB_USER=weaveworks
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns

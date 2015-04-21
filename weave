@@ -11,7 +11,7 @@ IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 
 # These are potentially used for remote execs, and have defaults, so
 # we introduce them here
-DOCKERHUB_USER=zettio
+DOCKERHUB_USER=weaveworks
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 PROCFS=${PROCFS:-/proc}
