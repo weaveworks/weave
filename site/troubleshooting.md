@@ -167,7 +167,7 @@ For a more permanent solution,
 and create appropriate startup scripts to launch weave and run
 application containers from your favourite process manager.
 
-### Snapshot Releases
+### <a name="snapshots"></a>Snapshot Releases
 
 We sometimes publish snapshot releases, to provide previews of new
 features, assist in validation of bug fixes, etc. One can install the
