@@ -30,7 +30,7 @@ capabilities, so these can continue to be used by containers.
 ## Installation
 
 Ensure you are running Linux (kernel 3.5 or later) and have Docker
-(version 0.9.1 or later) installed. Then install weave with
+(version 1.2.0 or later) installed. Then install weave with
 
     sudo wget -O /usr/local/bin/weave \
       https://github.com/weaveworks/weave/releases/download/latest_release/weave
