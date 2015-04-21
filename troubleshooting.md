@@ -5,10 +5,14 @@ layout: default
 
 ## Troubleshooting
 
-Make sure you are running the latest version - you can download it
-with
+Check what version of weave you are running with
 
-    docker pull zettio/weave:latest
+    weave version
+
+If it is not the latest version, as shown in the list of
+[releases](https://github.com/weaveworks/weave/releases), then it is
+highly recommended that you upgrade by following the
+[installation instructions](https://github.com/weaveworks/weave#installation).
 
 Check the weave container logs with
 
