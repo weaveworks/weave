@@ -25,7 +25,6 @@ weave_on $HOST1 run --with-dns $C1/24 --name=c1 -t aanand/docker-dnsutils /bin/s
 
 assert_dns_record $HOST1 c1 $NAME $C2
 
-ok=$(exec_on $HOST1 c1 getent hosts 8.8.8.8)
-assert_raises "echo $ok | grep google"
+assert_raises "exec_on $HOST1 c1 getent hosts 8.8.8.8 | grep google"
 
 end_suite

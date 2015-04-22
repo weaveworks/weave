@@ -90,10 +90,8 @@ exec_on() {
 
 # assert_dns_record <host> <container> <name> <ip>
 assert_dns_record() {
-    ok=$(exec_on $1 $2 getent hosts $3)
-    assert "echo $ok" "$4 $3"
-    ok=$(exec_on $1 $2 getent hosts $4)
-    assert "echo $ok" "$4 $3"
+    assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
+    assert "exec_on $1 $2 getent hosts $4 | tr -s ' '" "$4 $3"
 }
 
 start_suite() {
