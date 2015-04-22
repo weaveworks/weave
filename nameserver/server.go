@@ -277,7 +277,7 @@ func (s *DNSServer) commonQueryHandler(proto dnsProtocol, kind string, qtype uin
 		// catch unsupported queries
 		if q.Qtype != qtype {
 			Debug.Printf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
-			m := makeDNSNotImplResponse(r)
+			m := makeDNSFailResponse(r)
 			s.cache.Put(r, m, negLocalTTL, 0)
 			w.WriteMsg(m)
 			return
