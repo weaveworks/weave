@@ -52,6 +52,14 @@ greyly () {
     colourise '0;37' "$@"
 }
 
+redly() {
+    colourise '1;31' "$@"
+}
+
+greenly() {
+    colourise '1;32' "$@"
+}
+
 run_on() {
     host=$1
     shift 1
