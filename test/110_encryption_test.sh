@@ -18,7 +18,6 @@ weave_on $HOST2 launch -password notverysecure $HOST1
 
 weave_on $HOST2 run $C2/24 -t --name=c2 ubuntu
 weave_on $HOST1 run $C1/24 -t --name=c1 ubuntu
-ok=$(exec_on $HOST1 c1 ping -q -c 4 $C2 >&2 && echo ok)
-assert "echo $ok" "ok"
+assert_raises "exec_on $HOST1 c1 ping -q -c 4 $C2"
 
 end_suite
