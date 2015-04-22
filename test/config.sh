@@ -2,6 +2,13 @@
 
 set -e
 
+# Protect against being sourced multiple times to prevent
+# overwriting assert.sh global state
+if ! [ -z "$SOURCED_CONFIG_SH" ]; then
+    return
+fi
+SOURCED_CONFIG_SH=true
+
 # these ought to match what is in Vagrantfile
 N_MACHINES=${N_MACHINES:-2}
 IP_PREFIX=${IP_PREFIX:-192.168.48}
