@@ -18,7 +18,7 @@ weave_on $HOST2 launch $HOST1
 
 weave_on $HOST2 run $C2/24 -t --name=c2 ubuntu
 weave_on $HOST1 run $C1/24 -t --name=c1 ubuntu
-ok=$(docker -H tcp://$HOST1:2375 exec c1 sh -c "ping -q -c 4 $C2 >&2 && echo ok")
+ok=$(exec_on $HOST1 c1 ping -q -c 4 $C2 >&2 && echo ok)
 assert "echo $ok" "ok"
 
 end_suite

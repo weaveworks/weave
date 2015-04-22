@@ -57,6 +57,13 @@ weave_on() {
     DOCKER_HOST=tcp://$host:2375 $WEAVE $@
 }
 
+exec_on() {
+    host=$1
+    container=$2
+    shift 2
+    docker -H tcp://$host:2375 exec $container "$@"
+}
+
 start_suite() {
     whitely echo $@
 }

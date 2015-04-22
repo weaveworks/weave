@@ -22,13 +22,13 @@ weave_on $HOST2 launch-dns 10.2.254.2/24 -debug
 weave_on $HOST2 run $C2/24 -t --name=c2 -h seetwo.weave.local ubuntu
 weave_on $HOST1 run --with-dns $C1/24 --name=c1 -t aanand/docker-dnsutils /bin/sh
 
-ok=$(docker -H tcp://$HOST1:2375 exec c1 dig +short seetwo.weave.local)
+ok=$(exec_on $HOST1 c1 dig +short seetwo.weave.local)
 assert "echo $ok" "$C2"
 
-ok=$(docker -H tcp://$HOST1:2375 exec c1 dig +short -x $C2)
+ok=$(exec_on $HOST1 c1 dig +short -x $C2)
 assert "echo $ok" "seetwo.weave.local."
 
-ok=$(docker -H tcp://$HOST1:2375 exec c1 dig +short -x 8.8.8.8)
+ok=$(exec_on $HOST1 c1 dig +short -x 8.8.8.8)
 assert "test -n \"$ok\" && echo pass" "pass"
 
 end_suite
