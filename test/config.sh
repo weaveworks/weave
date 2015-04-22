@@ -35,12 +35,21 @@ remote() {
     $@ > >(while read line; do echo -e "\e[0;34m$rem>\e[0m $line"; done)
 }
 
+colourise() {
+    echo -ne '\e['$1'm'
+    shift
+    # It's important that we don't do this in a subshell, as some
+    # commands we execute need to modify global state
+    "$@"
+    echo -ne '\e[0m'
+}
+
 whitely() {
-    echo -e '\e[1;37m'`$@`'\e[0m'
+    colourise '1;37' "$@"
 }
 
 greyly () {
-    echo -e '\e[0;37m'`$@`'\e[0m'
+    colourise '0;37' "$@"
 }
 
 run_on() {
