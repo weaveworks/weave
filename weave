@@ -315,9 +315,7 @@ connect_container_to_bridge() {
         echo "connected to weave. Perhaps the container was started with --net=host." >&2
         return 1
     fi
-    if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ; then
-        return 1
-    fi
+    ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU || return 1
 
     if ! ethtool -K $GUEST_IFNAME tx off >/dev/null ||
         ! ip link set $LOCAL_IFNAME master $BRIDGE ||
@@ -371,28 +369,19 @@ attach() {
                 # address was there already
                 continue
             fi
-
-            if ! netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME ; then
-                return 1
-            fi
+            netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
         done
 
         return 0
     fi
 
-    if ! connect_container_to_bridge; then
-        return 1
-    fi
+    connect_container_to_bridge || return 1
 
     for ADDR; do
-        if ! netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME; then
-            return 1
-        fi
+        netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
     done
 
-    if ! netnsenter ip link set $CONTAINER_IFNAME up ; then
-        return 1
-    fi
+    netnsenter ip link set $CONTAINER_IFNAME up || return 1
 
     # Route multicast packets across the weave network.
     if ! netnsenter ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
@@ -408,10 +397,7 @@ detach() {
             # address is not there, leave the device alone
             continue
         fi
-
-        if ! netnsenter ip addr del $ADDR dev $CONTAINER_IFNAME ; then
-            return 1
-        fi
+        netnsenter ip addr del $ADDR dev $CONTAINER_IFNAME || return 1
     done
 
     if [ -n "$(netnsenter ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
