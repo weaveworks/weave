@@ -10,10 +10,7 @@ docker_on $HOST1 rm -f c1 || true
 
 weave_on $HOST1 run --with-dns 10.2.1.5/24 --name=c1 -t aanand/docker-dnsutils /bin/sh
 
-ok=$(exec_on $HOST1 c1 dig +short -t MX weave.works)
-assert "test -n \"$ok\" && echo pass" "pass"
-
-ok=$(exec_on $HOST1 c1 dig +short -x 8.8.8.8)
-assert "test -n \"$ok\" && echo pass" "pass"
+assert_raises "exec_on $HOST1 c1 host -t mx weave.works | grep google"
+assert_raises "exec_on $HOST1 c1 getent hosts 8.8.8.8   | grep google"
 
 end_suite

@@ -88,6 +88,12 @@ exec_on() {
     docker -H tcp://$host:2375 exec $container "$@"
 }
 
+# assert_dns_record <host> <container> <name> <ip>
+assert_dns_record() {
+    assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
+    assert "exec_on $1 $2 getent hosts $4 | tr -s ' '" "$4 $3"
+}
+
 start_suite() {
     whitely echo $@
 }
