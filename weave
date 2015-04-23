@@ -454,10 +454,9 @@ http_call_ip() {
     curl --connect-timeout 3 -s -X $http_verb "$@" http://$ip:$port$url
 }
 
-# Call url $4 with http verb $3 on container $1 at port $2
-http_call() {
+container_ip() {
     if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null); then
-        echo "$1 container is not present; have you launched it?" >&2
+        echo "$2" >&2
         return 1
     fi
     case "$status" in
@@ -466,34 +465,39 @@ http_call() {
             return 1
             ;;
         true*)
-            ip="${status#true }"
+            CONTAINER_IP="${status#true }"
             ;;
         *)
-            echo "$1 container is not running." >&2
+            echo "$3" >&2
             return 1
             ;;
     esac
+}
+
+# Call url $4 with http verb $3 on container $1 at port $2
+http_call() {
+    container_ip $1 \
+        "$1 container is not present. Have you launched it?" \
+        "$1 container is not running." \
+        || return 1
     shift 1
-    http_call_ip $ip "$@"
+    http_call_ip $CONTAINER_IP "$@"
 }
 
 # Wait until container $1 on port $2 is alive enough to respond to its status call
 wait_for_status() {
-    TARGET_IP=$(docker inspect --format='{{.NetworkSettings.IPAddress}}' $1)
-    WAIT_TIME=1
-    while ! http_call_ip $TARGET_IP $2 GET /status >/dev/null && [ $WAIT_TIME -lt 4 ]; do
-        if ! status=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) || [ "$status" != "true" ] ; then
-            echo "Container $1 died" >&2
-            return 1
-        fi
+    WAIT_TIME=0
+    while [ $WAIT_TIME -lt 3 ]; do
         sleep $WAIT_TIME
+        container_ip $1 \
+            "$1 container has died." \
+            "$1 container has died." \
+            || return 1
+        http_call_ip $CONTAINER_IP $2 GET /status >/dev/null && return 0
         WAIT_TIME=$((WAIT_TIME+1))
     done
-    if [ $WAIT_TIME = 4 ]; then
-        echo "Timed out waiting for $1 container to start." >&2
-        return 1
-    fi
-    return 0
+    echo "Timed out waiting for $1 container to start." >&2
+    return 1
 }
 
 ######################################################################
@@ -555,7 +559,9 @@ populate_dns() {
         MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
         if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
             for IP in $CONTAINER_IPS; do
-                http_call_ip $TARGET_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
+                # NB: CONTAINER_IP is the IP of the weavedns
+                # container; it is set by wait_for_status.
+                http_call_ip $CONTAINER_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
             done
         fi
     done
