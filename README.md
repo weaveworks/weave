@@ -53,10 +53,10 @@ Say you have docker running on two hosts, accessible to each other as
 `$HOST1` and `$HOST2`, and want to deploy an application consisting of
 two containers, one on each host.
 
-On `$HOST1` run (as root)
+On `$HOST1` run
 
-    host1# weave launch
-    host1# C=$(weave run 10.2.1.1/24 -t -i ubuntu)
+    host1$ weave launch
+    host1$ C=$(weave run 10.2.1.1/24 -t -i ubuntu)
 
 The first line starts the weave router, in a container. This needs to
 be done once on each host. The required docker image for the weave
@@ -87,8 +87,8 @@ addresses must, of course, be unique.
 
 We repeat similar steps on `$HOST2`...
 
-    host2# weave launch $HOST1
-    host2# C=$(weave run 10.2.1.2/24 -t -i ubuntu)
+    host2$ weave launch $HOST1
+    host2$ C=$(weave run 10.2.1.2/24 -t -i ubuntu)
 
 The only difference, apart from the choice of IP address for the
 application container, is that we tell our weave that it should peer
@@ -110,7 +110,7 @@ can talk to each other...
 
 On `$HOST1`...
 
-    host1# docker attach $C
+    host1$ docker attach $C
     root@28841bd02eff:/# ping -c 1 -q 10.2.1.2
     PING 10.2.1.2 (10.2.1.2): 48 data bytes
     --- 10.2.1.2 ping statistics ---
@@ -119,7 +119,7 @@ On `$HOST1`...
 
 Similarly, on `$HOST2`...
 
-    host2# docker attach $C
+    host2$ docker attach $C
     root@f76829496120:/# ping -c 1 -q 10.2.1.1
     PING 10.2.1.1 (10.2.1.1): 48 data bytes
     --- 10.2.1.1 ping statistics ---

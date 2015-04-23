@@ -23,7 +23,7 @@ example above, the 'launch' command would be run like this:
 
 and the 'run' command like this:
 
-    host1# C=$(boot2docker ssh "sudo ./weave run 10.2.1.1/24 -t -i ubuntu")
+    host1$ C=$(boot2docker ssh "sudo ./weave run 10.2.1.1/24 -t -i ubuntu")
 
 For more information about how to access services running in
 Boot2Docker from the host or other machines (i.e. outside of the weave

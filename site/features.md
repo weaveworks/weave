@@ -63,13 +63,13 @@ To accomplish that, we assign each application a different subnet. So,
 in the above example, if we wanted to add another application similar
 to, but isolated from, our first, we'd launch the containers with...
 
-    host1# D=$(weave run 10.2.2.1/24 -t -i ubuntu)
-    host2# D=$(weave run 10.2.2.2/24 -t -i ubuntu)
+    host1$ D=$(weave run 10.2.2.1/24 -t -i ubuntu)
+    host2$ D=$(weave run 10.2.2.2/24 -t -i ubuntu)
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
 
-    host1# docker attach $D
+    host1$ docker attach $D
     
     root@da50502598d5:/# ping -c 1 -q 10.2.2.2
     PING 10.2.2.2 (10.2.2.2): 48 data bytes
@@ -93,7 +93,7 @@ well-known technique from the 'on metal' days to containers.
 If desired, a container can be attached to multiple subnets when it is
 started:
 
-    host1# weave run 10.2.2.1/24 10.2.3.1/24 -t -i ubuntu
+    host1$ weave run 10.2.2.1/24 10.2.3.1/24 -t -i ubuntu
 
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
@@ -114,30 +114,30 @@ situations, weave allows an existing, running container to be attached
 to the weave network. To illustrate, we can achieve the same effect as
 the first example with
 
-    host1# C=$(docker run -d -t -i ubuntu)
-    host1# weave attach 10.2.1.1/24 $C
+    host1$ C=$(docker run -d -t -i ubuntu)
+    host1$ weave attach 10.2.1.1/24 $C
 
 There is a matching `weave detach` command:
 
-    host1# weave detach 10.2.1.1/24 $C
+    host1$ weave detach 10.2.1.1/24 $C
 
 You can detach a container from one application network and attach it
 to another:
 
-    host1# weave detach 10.2.1.1/24 $C
-    host1# weave attach 10.2.2.1/24 $C
+    host1$ weave detach 10.2.1.1/24 $C
+    host1$ weave attach 10.2.2.1/24 $C
 
 or attach a container to multiple application networks, effectively
 sharing it between applications:
 
-    host1# weave attach 10.2.1.1/24 $C
-    host1# weave attach 10.2.2.1/24 $C
+    host1$ weave attach 10.2.1.1/24 $C
+    host1$ weave attach 10.2.2.1/24 $C
 
 Finally, multiple addresses can be attached or detached with a single
 invocation:
 
-    host1# weave attach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
-    host1# weave detach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
+    host1$ weave attach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
+    host1$ weave detach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
 
 ### <a name="security"></a>Security
 
@@ -145,12 +145,12 @@ In order to connect containers across untrusted networks, weave peers
 can be told to encrypt traffic by supplying a `-password` option or
 `WEAVE_PASSWORD` environment variable when launching weave, e.g.
 
-    host1# weave launch -password wEaVe
+    host1$ weave launch -password wEaVe
 
 or
 
-    host1# export WEAVE_PASSWORD=wEaVe
-    host1# weave launch
+    host1$ export WEAVE_PASSWORD=wEaVe
+    host1$ weave launch
 
 _NOTE: The command line option takes precedence over the environment
 variable._
@@ -169,31 +169,31 @@ anywhere.
 Let's say that in our example we want `$HOST2` to have access to the
 application containers. On `$HOST2` we run
 
-    host2# weave expose 10.2.1.102/24
+    host2$ weave expose 10.2.1.102/24
 
 choosing an unused IP address in the application subnet. (There is a
 corresponding 'hide' command to revert this step.)
 
 Now
 
-    host2# ping 10.2.1.2
+    host2$ ping 10.2.1.2
 
 will work. And, more interestingly,
 
-    host2# ping 10.2.1.1
+    host2$ ping 10.2.1.1
 
 will work too, which is talking to a container that resides on `$HOST1`.
 
 Multiple subnet addresses can be exposed or hidden with a single
 invocation:
 
-    host2# weave expose 10.2.1.102/24 10.2.2.102/24
-    host2# weave hide 10.2.1.102/24 10.2.2.102/24
+    host2$ weave expose 10.2.1.102/24 10.2.2.102/24
+    host2$ weave hide 10.2.1.102/24 10.2.2.102/24
 
 Finally, exposed addresses can be added to weaveDNS by supplying a
 hostname:
 
-    host2# weave expose 10.2.1.102/24 -h exposed.weave.local
+    host2$ weave expose 10.2.1.102/24 -h exposed.weave.local
 
 ### <a name="service-export"></a>Service export
 
@@ -208,12 +208,12 @@ a container on `$HOST1`, accessible to the outside world via `$HOST2`.
 First we need to expose the application network to `$HOST2`, as
 explained [above](#host-network-integration), i.e.
 
-    host2# weave expose 10.2.1.102/24
+    host2$ weave expose 10.2.1.102/24
 
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
-    host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
+    host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
            -j DNAT --to-destination 10.2.1.1:4422
 
 Here we are assuming that the "outside world" is connecting to `$HOST2`
@@ -248,19 +248,19 @@ First we need to expose the application network to the host, as
 explained [above](#host-network-integration), this time on `$HOST1`,
 i.e.
 
-    host1# weave expose 10.2.1.101/24
+    host1$ weave expose 10.2.1.101/24
 
 Then we add a NAT rule to route from the above IP to the destination
 service.
 
-    host1# iptables -t nat -A PREROUTING -p tcp -d 10.2.1.101 --dport 3322 \
+    host1$ iptables -t nat -A PREROUTING -p tcp -d 10.2.1.101 --dport 3322 \
            -j DNAT --to-destination $HOST3:2211
 
 This allows any application container to reach the service by
 connecting to 10.2.1.101:3322. So if `$HOST3` is indeed running a netcat
 service on port 2211, e.g.
 
-    host3# nc -lk -p 2211
+    host3$ nc -lk -p 2211
 
 then we can connect to it from our application container on `$HOST2` with
 
@@ -295,13 +295,13 @@ In our example above, the netcat service on `$HOST3` is imported into
 weave via `$HOST1`. We can export it on `$HOST2` by first exposing the
 application network with
 
-    host2# weave expose 10.2.1.102/24
+    host2$ weave expose 10.2.1.102/24
 
 and then adding a NAT rule which routes traffic from the `$HOST2`
 network (i.e. anything which can connect to `$HOST2`) to the service
 endpoint in the weave network
 
-    host2# iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
+    host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
            -j DNAT --to-destination 10.2.1.101:3322
 
 Now any host on the same network as `$HOST2` can access the service with
