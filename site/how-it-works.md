@@ -102,30 +102,34 @@ MAC discovery.
 
 The topology information captures which peers are connected to which
 other peers. Weave peers communicate their knowledge of the topology
-(and changes to it) to their neighbours, who then pass this
-information on to their own neighbours, and so on, until the entire
-network knows about any change.
+(and changes to it) to others, so that all peers learn about the
+entire topology. This communication occurs over the TCP links between
+peers, using a) spanning-tree based broadcast mechanism, and b) a
+neighour gossip mechanism.
 
-Topology is communicated over the TCP links between peers, using a
-Gossip mechanism.  Topology messages are sent by a peer...
+Topology messages are sent by a peer...
 
-- when a connection has been added; the entire topology is sent to the
-  remote peer, and an incremental update, containing information on
-  just the two peers at the ends of the connection, is sent to all
-  neighbours,
+- when a connection has been added; if the remote peer appears to be
+  new to the network, the entire topology is sent to it, and an
+  incremental update, containing information on just the two peers at
+  the ends of the connection, is broadcast,
 - when a connection has been marked as 'established', indicating that
   the remote peer can receive UDP traffic from the peer; an update
-  containing just information about the local peer is sent to all
-  neighbours,
+  containing just information about the local peer is broadcast,
 - when a connection has been torn down; an update containing just
-  information about the local peer is sent to all neighbours,
-- periodically, on a timer, in case someone has missed an update.
+  information about the local peer is broadcast,
+- periodically, on a timer, the entire topology is "gossiped" to a
+  subset of neighbours, based on a topology-sensitive random
+  distribution. This is done in case some of the aforementioned
+  broadcasts do not reach all peers, due to rapid changes in the
+  topology causing broadcast routing tables to become outdated.
 
 The receiver of a topology update merges that update with its own
 topology model, adding peers hitherto unknown to it, and updating
 peers for which the update contains a more recent version than known
-to it. If there were any such new/updated peers, then an improved
-update containing them is sent out on all connections.
+to it. If there were any such new/updated peers, and the topology
+update was received over gossip (rather than broadcast), then an
+improved update containing them is gossiped.
 
 If the update mentions a peer that the receiver does not know, then
 the entire update is ignored.
@@ -206,8 +210,8 @@ no longer has any connections within the network, it drops all
 knowledge of that second peer.
 
 #### Out-of-date topology
-The peer-to-peer gossiping of updates is not instantaneous, so it is
-very possible for a node elsewhere in the network to have an
+The propagation of topology changes to all peers is not instantaneous,
+so it is very possible for a node elsewhere in the network to have an
 out-of-date view.
 
 If the destination peer for a packet is still reachable, then
