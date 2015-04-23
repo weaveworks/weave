@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/weaveworks/weave.svg?branch=master)](https://travis-ci.org/weaveworks/weave) [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
 
 Weave creates a virtual network that connects Docker containers
-deployed across multiple hosts.
+deployed across multiple hosts and enables their automatic discovery.
 
 ![Weave Virtual Network](/docs/virtual-network.png?raw=true "Weave Virtual Network")
 
@@ -136,7 +136,7 @@ to each other.
  * [Troubleshooting](http://weaveworks.github.io/weave/troubleshooting.html)
  * [Building](http://weaveworks.github.io/weave/building.html)
  * [How it works](http://weaveworks.github.io/weave/how-it-works.html)
- * [WeaveDNS README](https://github.com/weaveworks/weave/tree/master/weavedns#readme)
+ * [Automatic Discovery with WeaveDNS](https://github.com/weaveworks/weave/tree/master/weavedns#readme)
 
 ## Contact Us
 
