@@ -4,11 +4,6 @@
 
 start_suite "Weave run/start/attach/detach with multiple cidr arguments"
 
-# Cleanup from previous run
-weave_on $HOST1 stop || true
-weave_on $HOST1 stop-dns || true
-docker_on $HOST1 rm -f multicidr || true
-
 weave_on $HOST1 launch
 weave_on $HOST1 launch-dns 10.254.254.254/24
 

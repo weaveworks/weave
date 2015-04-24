@@ -7,12 +7,6 @@ C2=10.2.1.7
 
 start_suite "Ping over cross-host weave network"
 
-for HOST in $HOST1 $HOST2; do
-    weave_on $HOST stop || true
-    weave_on $HOST stop-dns || true
-    docker_on $HOST rm -f c1 c2 || true
-done
-
 weave_on $HOST1 launch
 weave_on $HOST2 launch $HOST1
 
