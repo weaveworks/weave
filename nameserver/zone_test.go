@@ -14,7 +14,7 @@ func TestZone(t *testing.T) {
 		testAddr1        = "10.2.2.1/24"
 	)
 
-	var zone = new(ZoneDb)
+	var zone = NewZoneDb(DefaultLocalDomain)
 
 	ip, _, _ := net.ParseCIDR(testAddr1)
 	err := zone.AddRecord(containerID, successTestName, ip)
@@ -30,7 +30,7 @@ func TestZone(t *testing.T) {
 	foundIP, err := zone.LookupName(successTestName)
 	wt.AssertNoErr(t, err)
 
-	if !foundIP.Equal(ip) {
+	if !foundIP[0].IP().Equal(ip) {
 		t.Fatal("Unexpected result for", successTestName, foundIP)
 	}
 
@@ -38,7 +38,7 @@ func TestZone(t *testing.T) {
 	foundName, err := zone.LookupInaddr("1.2.2.10.in-addr.arpa.")
 	wt.AssertNoErr(t, err)
 
-	if foundName != successTestName {
+	if foundName[0].Name() != successTestName {
 		t.Fatal("Unexpected result for", ip, foundName)
 	}
 
@@ -72,7 +72,7 @@ func TestDeleteFor(t *testing.T) {
 		addr1 = "10.2.2.3/24"
 		addr2 = "10.2.7.8/24"
 	)
-	zone := new(ZoneDb)
+	zone := NewZoneDb(DefaultLocalDomain)
 	for _, addr := range []string{addr1, addr2} {
 		ip, _, _ := net.ParseCIDR(addr)
 		err := zone.AddRecord(id, name, ip)

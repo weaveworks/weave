@@ -247,6 +247,7 @@ func (c *Cache) Purge(now time.Time) {
 }
 
 // Add adds a reply to the cache.
+// When `ttl` is equal to `nullTTL`, the cache entry will be valid until the closest TTL in the `reply`
 func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8, now time.Time) int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -274,8 +275,7 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8, now 
 }
 
 // Look up for a question's reply from the cache.
-// If no reply is stored in the cache, it returns a `nil` reply and no error. The caller can then `Wait()`
-// for another goroutine `Put`ing a reply in the cache.
+// If no reply is stored in the cache, it returns a `nil` reply and no error.
 func (c *Cache) Get(request *dns.Msg, maxLen int, now time.Time) (reply *dns.Msg, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -307,6 +307,7 @@ func (c *Cache) Remove(question *dns.Question) {
 
 	key := cacheKey(*question)
 	if entry, found := c.entries[key]; found {
+		Debug.Printf("[cache] removing %s-response for '%s'", dns.TypeToString[question.Qtype], question.Name)
 		if entry.index > 0 {
 			heap.Remove(&c.entriesH, entry.index)
 		}

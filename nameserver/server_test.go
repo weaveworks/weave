@@ -36,6 +36,7 @@ func setupForTest(t *testing.T) {
 func TestUDPDNSServer(t *testing.T) {
 	setupForTest(t)
 	const (
+		containerID     = "foobar"
 		successTestName = "test1.weave.local."
 		failTestName    = "test2.weave.local."
 		nonLocalName    = "weave.works."
@@ -44,7 +45,7 @@ func TestUDPDNSServer(t *testing.T) {
 	testCIDR1 := testAddr1 + "/24"
 
 	InitDefaultLogging(true)
-	var zone = new(ZoneDb)
+	var zone = NewZoneDb(DefaultLocalDomain)
 	ip, _, _ := net.ParseCIDR(testCIDR1)
 	zone.AddRecord(containerID, successTestName, ip)
 
@@ -125,14 +126,14 @@ func TestTCPDNSServer(t *testing.T) {
 	dnsAddr := fmt.Sprintf("localhost:%d", testPort)
 
 	InitDefaultLogging(true)
-	var zone = new(ZoneDb)
+	var zone = NewZoneDb(DefaultLocalDomain)
 
 	// generate a list of `numAnswers` IP addresses
-	var addrs []net.IP
+	var addrs []ZoneRecord
 	bs := make([]byte, 4)
 	for i := 0; i < numAnswers; i++ {
 		binary.LittleEndian.PutUint32(bs, uint32(i))
-		addrs = append(addrs, net.IPv4(bs[0], bs[1], bs[2], bs[3]))
+		addrs = append(addrs, Record{"", net.IPv4(bs[0], bs[1], bs[2], bs[3]), 0, 0})
 	}
 
 	// handler for the fallback server: it will just return a very long response

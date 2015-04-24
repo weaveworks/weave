@@ -27,14 +27,33 @@ var (
 )
 
 type Response struct {
-	Name string
-	Addr net.IP
-	Err  error
+	name string
+	addr net.IP
+	err  error
+}
+
+func (r Response) Name() string  { return r.name }
+func (r Response) IP() net.IP    { return r.addr }
+func (r Response) Priority() int { return 0 }
+func (r Response) Weight() int   { return 0 }
+
+func (r Response) Equal(r2 *Response) bool {
+	if r.name != r2.name {
+		return false
+	}
+	if !r.addr.Equal(r2.addr) {
+		return false
+	}
+	if r.err != r2.err {
+		return false
+	}
+	return true
 }
 
 type responseInfo struct {
-	timeout time.Time // if no answer by this time, give up
-	ch      chan<- *Response
+	timeout   time.Time // if no answer by this time, give up
+	insistent bool      // insistent queries are not removed on the first reply
+	ch        chan<- *Response
 }
 
 // Represents one query that we have sent for one name.
@@ -55,6 +74,7 @@ type MDNSClient struct {
 	addr       *net.UDPAddr
 	inflight   map[string]*inflightQuery
 	actionChan chan<- MDNSAction
+	running    bool
 }
 
 type mDNSQueryInfo struct {
@@ -64,17 +84,21 @@ type mDNSQueryInfo struct {
 }
 
 func NewMDNSClient() (*MDNSClient, error) {
-	if conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0}); err != nil {
-		return nil, err
-	} else {
-		return &MDNSClient{
-			conn:     conn,
-			addr:     ipv4Addr,
-			inflight: make(map[string]*inflightQuery)}, nil
-	}
+	return &MDNSClient{
+		addr:     ipv4Addr,
+		running:  false,
+		inflight: make(map[string]*inflightQuery)}, nil
 }
 
-func (c *MDNSClient) Start(ifi *net.Interface) error {
+func (c *MDNSClient) Start(ifi *net.Interface) (err error) {
+	if c.running {
+		return nil
+	}
+
+	if c.conn, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0}); err != nil {
+		return err
+	}
+
 	multicast, err := LinkLocalMulticastListener(ifi)
 	if err != nil {
 		return err
@@ -93,7 +117,13 @@ func (c *MDNSClient) Start(ifi *net.Interface) error {
 	actionChan := make(chan MDNSAction, MailboxSize)
 	c.actionChan = actionChan
 	go c.actorLoop(actionChan)
+	return nil
+}
 
+func (c *MDNSClient) Stop() error {
+	if c.running {
+		c.actionChan <- nil
+	}
 	return nil
 }
 
@@ -106,7 +136,7 @@ func LinkLocalMulticastListener(ifi *net.Interface) (net.PacketConn, error) {
 type MDNSAction func()
 
 // Async
-func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- *Response) {
+func (c *MDNSClient) SendQuery(name string, querytype uint16, insistent bool, responseCh chan<- *Response) {
 	c.actionChan <- func() {
 		query, found := c.inflight[name]
 		if !found {
@@ -115,7 +145,7 @@ func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- 
 			m.RecursionDesired = false
 			buf, err := m.Pack()
 			if err != nil {
-				responseCh <- &Response{Err: err}
+				responseCh <- &Response{err: err}
 				close(responseCh)
 				return
 			}
@@ -124,15 +154,16 @@ func (c *MDNSClient) SendQuery(name string, querytype uint16, responseCh chan<- 
 				id:   m.Id,
 			}
 			if _, err = c.conn.WriteTo(buf, c.addr); err != nil {
-				responseCh <- &Response{Err: err}
+				responseCh <- &Response{err: err}
 				close(responseCh)
 				return
 			}
 			c.inflight[name] = query
 		}
 		info := &responseInfo{
-			ch:      responseCh,
-			timeout: time.Now().Add(mDNSTimeout),
+			ch:        responseCh,
+			timeout:   time.Now().Add(mDNSTimeout),
+			insistent: insistent,
 		}
 		// Invariant on responseInfos: they are in ascending order of
 		// timeout.  Since we use a fixed interval from Now(), this
@@ -151,20 +182,30 @@ func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
 			switch rr := answer.(type) {
 			case *dns.A:
 				name = rr.Hdr.Name
-				res = &Response{Addr: rr.A}
+				res = &Response{addr: rr.A}
 			case *dns.PTR:
 				name = rr.Hdr.Name
-				res = &Response{Name: rr.Ptr}
+				res = &Response{name: rr.Ptr}
 			default:
 				return
 			}
 
 			if query, found := c.inflight[name]; found {
+				newResponseInfos := make([]*responseInfo, 0)
 				for _, resp := range query.responseInfos {
 					resp.ch <- res
-					close(resp.ch)
+					// insistent queries are not removed on the first reply, but on the timeout
+					if resp.insistent {
+						newResponseInfos = append(newResponseInfos, resp)
+					} else {
+						close(resp.ch)
+					}
 				}
-				delete(c.inflight, name)
+				if len(newResponseInfos) == 0 {
+					delete(c.inflight, name)
+				} else {
+					query.responseInfos = newResponseInfos
+				}
 			} else {
 				// We've received a response that didn't match a query
 				// Do we want to cache it?
@@ -207,13 +248,13 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 func (c *MDNSClient) actorLoop(actionChan <-chan MDNSAction) {
 	timer := time.NewTimer(MaxDuration)
 	run := func() { timer.Reset(c.checkInFlightQueries()) }
-	terminate := false
-	for !terminate {
+	c.running = true
+	for c.running {
 		select {
 		case action := <-actionChan:
 			if action == nil {
 				c.listener.Shutdown()
-				terminate = true
+				c.running = false
 			} else {
 				action()
 				run()

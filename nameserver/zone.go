@@ -16,19 +16,15 @@ const (
 // +1 to also exclude a dot
 var rdnsDomainLen = len(RDNSDomain) + 1
 
-type Lookup interface {
-	LookupName(name string) (net.IP, error)
-	LookupInaddr(inaddr string) (string, error)
-}
-
 type Zone interface {
 	AddRecord(ident string, name string, ip net.IP) error
 	DeleteRecord(ident string, ip net.IP) error
 	DeleteRecordsFor(ident string) error
-	Lookup
+	Domain() string
+	ZoneLookup
 }
 
-type Record struct {
+type dbRecord struct {
 	Ident string
 	Name  string
 	IP    net.IP
@@ -37,8 +33,9 @@ type Record struct {
 // Very simple data structure for now, with linear searching.
 // TODO: make more sophisticated to improve performance.
 type ZoneDb struct {
-	mx   sync.RWMutex
-	recs []Record
+	mx     sync.RWMutex
+	recs   []dbRecord
+	domain string
 }
 
 type LookupError string
@@ -54,7 +51,17 @@ func (dup DuplicateError) Error() string {
 	return "Tried to add a duplicate entry"
 }
 
-func (zone *ZoneDb) indexOf(match func(Record) bool) int {
+func NewZoneDb(domain string) *ZoneDb {
+	return &ZoneDb{
+		domain: domain,
+	}
+}
+
+func (zone *ZoneDb) Domain() string {
+	return zone.domain
+}
+
+func (zone *ZoneDb) indexOf(match func(dbRecord) bool) int {
 	for i, r := range zone.recs {
 		if match(r) {
 			return i
@@ -73,18 +80,18 @@ func (zone *ZoneDb) String() string {
 	return buf.String()
 }
 
-func (zone *ZoneDb) LookupName(name string) (net.IP, error) {
+func (zone *ZoneDb) LookupName(name string) ([]ZoneRecord, error) {
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 	for _, r := range zone.recs {
 		if r.Name == name {
-			return r.IP, nil
+			return []ZoneRecord{Record{r.Name, r.IP, 0, 0}}, nil
 		}
 	}
 	return nil, LookupError(name)
 }
 
-func (zone *ZoneDb) LookupInaddr(inaddr string) (string, error) {
+func (zone *ZoneDb) LookupInaddr(inaddr string) ([]ZoneRecord, error) {
 	if revIP := net.ParseIP(inaddr[:len(inaddr)-rdnsDomainLen]); revIP != nil {
 		revIP4 := revIP.To4()
 		ip := []byte{revIP4[3], revIP4[2], revIP4[1], revIP4[0]}
@@ -93,31 +100,31 @@ func (zone *ZoneDb) LookupInaddr(inaddr string) (string, error) {
 		defer zone.mx.RUnlock()
 		for _, r := range zone.recs {
 			if r.IP.Equal(ip) {
-				return r.Name, nil
+				return []ZoneRecord{Record{r.Name, r.IP, 0, 0}}, nil
 			}
 		}
-		return "", LookupError(inaddr)
+		return nil, LookupError(inaddr)
 	}
 	Warning.Printf("[zonedb] Asked to reverse lookup %s", inaddr)
-	return "", LookupError(inaddr)
+	return nil, LookupError(inaddr)
 }
 
 func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	fqdn := dns.Fqdn(name)
-	pred := func(r Record) bool { return r.Name == fqdn && r.IP.Equal(ip) && r.Ident == ident }
+	pred := func(r dbRecord) bool { return r.Name == fqdn && r.IP.Equal(ip) && r.Ident == ident }
 	if index := zone.indexOf(pred); index != -1 {
 		return DuplicateError{}
 	}
-	zone.recs = append(zone.recs, Record{ident, fqdn, ip})
+	zone.recs = append(zone.recs, dbRecord{ident, fqdn, ip})
 	return nil
 }
 
 func (zone *ZoneDb) DeleteRecord(ident string, ip net.IP) error {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
-	pred := func(r Record) bool { return r.Ident == ident && r.IP.Equal(ip) }
+	pred := func(r dbRecord) bool { return r.Ident == ident && r.IP.Equal(ip) }
 	if index := zone.indexOf(pred); index != -1 {
 		zone.recs = append(zone.recs[:index], zone.recs[index+1:]...)
 		return nil

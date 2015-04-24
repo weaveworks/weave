@@ -11,15 +11,13 @@ type MDNSServer struct {
 	sendconn   *net.UDPConn
 	srv        *dns.Server
 	zone       Zone
+	running    bool
 }
 
+// Create a new mDNS server
+// Nothing will be done (including port bindings) until you `Start()` the server
 func NewMDNSServer(zone Zone) (*MDNSServer, error) {
-	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
-	sendconn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
-	if err != nil {
-		return nil, err
-	}
-	return &MDNSServer{sendconn: sendconn, zone: zone}, nil
+	return &MDNSServer{zone: zone}, nil
 }
 
 // Return true if testaddr is a UDP address with IP matching my local i/f
@@ -36,7 +34,19 @@ func (s *MDNSServer) addrIsLocal(testaddr net.Addr) bool {
 	return false
 }
 
-func (s *MDNSServer) Start(ifi *net.Interface, localDomain string) error {
+// Start the mDNS server
+func (s *MDNSServer) Start(ifi *net.Interface) (err error) {
+	// skip double initialization
+	if s.running {
+		return nil
+	}
+
+	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
+	s.sendconn, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
+	if err != nil {
+		return err
+	}
+
 	conn, err := LinkLocalMulticastListener(ifi)
 	if err != nil {
 		return err
@@ -52,23 +62,23 @@ func (s *MDNSServer) Start(ifi *net.Interface, localDomain string) error {
 	}
 
 	handleLocal := s.makeHandler(dns.TypeA,
-		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
-			if ip, err := zone.LookupName(q.Name); err == nil {
-				return makeAddressReply(r, q, []net.IP{ip})
+		func(zone ZoneLookup, r *dns.Msg, q *dns.Question) *dns.Msg {
+			if ips, err := zone.LookupName(q.Name); err == nil {
+				return makeAddressReply(r, q, ips)
 			}
 			return nil
 		})
 
 	handleReverse := s.makeHandler(dns.TypePTR,
-		func(zone Lookup, r *dns.Msg, q *dns.Question) *dns.Msg {
-			if name, err := zone.LookupInaddr(q.Name); err == nil {
-				return makePTRReply(r, q, []string{name})
+		func(zone ZoneLookup, r *dns.Msg, q *dns.Question) *dns.Msg {
+			if names, err := zone.LookupInaddr(q.Name); err == nil {
+				return makePTRReply(r, q, names)
 			}
 			return nil
 		})
 
 	mux := dns.NewServeMux()
-	mux.HandleFunc(localDomain, handleLocal)
+	mux.HandleFunc(s.zone.Domain(), handleLocal)
 	mux.HandleFunc(RDNSDomain, handleReverse)
 
 	s.srv = &dns.Server{
@@ -77,17 +87,24 @@ func (s *MDNSServer) Start(ifi *net.Interface, localDomain string) error {
 		Handler:    mux,
 	}
 	go s.srv.ActivateAndServe()
+	s.running = true
 	return err
 }
 
+// Stop the mDNS server
 func (s *MDNSServer) Stop() error {
+	s.running = false
 	return s.srv.Shutdown()
 }
 
-type LookupFunc func(Lookup, *dns.Msg, *dns.Question) *dns.Msg
+func (s *MDNSServer) Zone() Zone {
+	return s.zone
+}
+
+type LookupFunc func(ZoneLookup, *dns.Msg, *dns.Question) *dns.Msg
 
 func (s *MDNSServer) makeHandler(qtype uint16, lookup LookupFunc) dns.HandlerFunc {
-	return func(_ dns.ResponseWriter, r *dns.Msg) {
+	return func(rw dns.ResponseWriter, r *dns.Msg) {
 		// Handle only questions, ignore answers. We might also ignore
 		// questions that arise locally (i.e., that come from an IP we
 		// think is local), but in the interest of avoiding
@@ -95,18 +112,20 @@ func (s *MDNSServer) makeHandler(qtype uint16, lookup LookupFunc) dns.HandlerFun
 		// assumption that the client wouldn't ask if it already knew
 		// the answer, and if it does ask, it'll be happy to get an
 		// answer.
+		// TODO: use any Answer in the query for adding records in the Zone database...
 		if len(r.Answer) == 0 && len(r.Question) > 0 {
 			q := &r.Question[0]
 			if q.Qtype == qtype {
+				Debug.Printf("[mdns msgid %d] Trying to answer to mDNS query '%s'", r.MsgHdr.Id, q.Name)
 				if m := lookup(s.zone, r, q); m != nil {
-					Debug.Printf("[mdns msgid %d] Found local answer to mDNS query %s",
-						r.MsgHdr.Id, q.Name)
+					Debug.Printf("[mdns msgid %d] - found local answer to mDNS query '%s'", r.MsgHdr.Id, q.Name)
 					if err := s.sendResponse(m); err != nil {
-						Warning.Printf("[mdns msgid %d] Error writing to %v",
-							r.MsgHdr.Id, s.sendconn)
+						Warning.Printf("[mdns msgid %d] - error writing to %v", r.MsgHdr.Id, s.sendconn)
+					} else {
+						Debug.Printf("[mdns msgid %d] - response sent: %d answers", r.MsgHdr.Id, len(m.Answer))
 					}
 				} else {
-					Debug.Printf("[mdns msgid %d] No local answer for mDNS query %s",
+					Debug.Printf("[mdns msgid %d] - no local answer for mDNS query '%s'",
 						r.MsgHdr.Id, q.Name)
 				}
 			}
