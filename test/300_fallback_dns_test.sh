@@ -4,9 +4,7 @@
 
 start_suite "Resolve a non-weave address"
 
-weave_on $HOST1 stop-dns || true
 weave_on $HOST1 launch-dns 10.2.254.1/24 -debug
-docker_on $HOST1 rm -f c1 || true
 
 weave_on $HOST1 run --with-dns 10.2.1.5/24 --name=c1 -t aanand/docker-dnsutils /bin/sh
 

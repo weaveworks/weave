@@ -8,12 +8,6 @@ NAME=seetwo.weave.local
 
 start_suite "Resolve names across hosts"
 
-for host in $HOST1 $HOST2; do
-    weave_on $host stop || true
-    weave_on $host stop-dns || true
-    docker_on $host rm -f c1 c2 || true
-done
-
 weave_on $HOST1 launch
 weave_on $HOST2 launch $HOST1
 
