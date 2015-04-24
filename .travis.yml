@@ -15,10 +15,7 @@ install:
   - go clean -i net
   - go install -tags netgo std
   - pip install --user --upgrade gcloud gsutil
-  - openssl aes-256-cbc
-    -K $encrypted_5ba036e89377_key -iv $encrypted_5ba036e89377_iv
-    -in bin/setup-ci-secrets.enc -out bin/setup-ci-secrets -d
-  - chmod +x bin/setup-ci-secrets
+  - bin/setup-ci-secrets $encrypted_5ba036e89377_key $encrypted_5ba036e89377_iv
   - make travis
 
 script:
@@ -28,5 +25,4 @@ script:
 after_success:
   - go get github.com/mattn/goveralls
   - $HOME/gopath/bin/goveralls -coverprofile=profile.cov -service=travis-ci
-  - bin/setup-ci-secrets
   - site/build-and-publish.sh
