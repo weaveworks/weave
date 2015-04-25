@@ -123,7 +123,6 @@ type NaClEncryptor struct {
 	offset    uint16
 	nonce     *[24]byte
 	nonceChan chan *[24]byte
-	flags     uint16
 	prefixLen int
 	conn      *LocalConnection
 	df        bool
@@ -178,17 +177,12 @@ func (ne *NonEncryptor) TotalLen() int {
 func NewNaClEncryptor(prefix []byte, conn *LocalConnection, df bool) *NaClEncryptor {
 	buf := make([]byte, MaxUDPPacketSize)
 	prefixLen := copy(buf, prefix)
-	flags := uint16(0)
-	if df {
-		flags = flags | (1 << 15)
-	}
 	return &NaClEncryptor{
 		NonEncryptor: *NewNonEncryptor([]byte{}),
 		buf:          buf,
 		offset:       0,
 		nonce:        nil,
 		nonceChan:    make(chan *[24]byte, ChannelSize),
-		flags:        flags,
 		prefixLen:    prefixLen,
 		conn:         conn,
 		df:           df}
@@ -196,7 +190,10 @@ func NewNaClEncryptor(prefix []byte, conn *LocalConnection, df bool) *NaClEncryp
 
 func (ne *NaClEncryptor) Bytes() []byte {
 	plaintext := ne.NonEncryptor.Bytes()
-	offsetFlags := ne.offset | ne.flags
+	offsetFlags := ne.offset
+	if ne.df {
+		offsetFlags |= (1 << 15)
+	}
 	ciphertext := ne.buf
 	binary.BigEndian.PutUint16(ciphertext[ne.prefixLen:], offsetFlags)
 	nonce := ne.nonce
