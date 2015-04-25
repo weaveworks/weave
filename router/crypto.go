@@ -81,7 +81,7 @@ func EncodeNonce(df bool) (*[24]byte, []byte, error) {
 	// wipe out lowest 15 bits, but encode the df right at the bottom
 	flags := uint16(0)
 	if df {
-		flags = flags | 1
+		flags |= 1
 	}
 	SetNonceLow15Bits(&nonce, flags)
 	// NB: need to make a copy since callers may modify the array
