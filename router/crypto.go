@@ -191,6 +191,12 @@ func NewNaClEncryptor(prefix []byte, conn *LocalConnection, df bool) *NaClEncryp
 func (ne *NaClEncryptor) Bytes() []byte {
 	plaintext := ne.NonEncryptor.Bytes()
 	offsetFlags := ne.offset
+	// We carry the DF flag in the (unencrypted portion of the)
+	// payload, rather than just extracting it from the packet headers
+	// at the receiving end, since we do not trust routers not to mess
+	// with headers. As we have different decryptors for non-DF and
+	// DF, that would result in hard to track down packet drops due to
+	// crypto errors.
 	if ne.df {
 		offsetFlags |= (1 << 15)
 	}
