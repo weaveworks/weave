@@ -350,54 +350,49 @@ bits of the nonce, which is treated as an offset from the "established
 nonce". The lifecycle of a nonce for UDP is:
 
 1. A fresh nonce is generated and the most significant 177 bits are
-sent to the receiving peer over the TCP connection. These upper most
-177 bits are used for the next 2^15 (32768) UDP messages. This is the
-"established nonce".
-
-2. Each UDP message carries the lowest 15 bits as a unique counter. Thus
-the lowest 15 bits are combined with (appended to) the uppermost 177
-bits to form the unique nonce for that message.
-
+   sent to the receiving peer over the TCP connection. These upper
+   most 177 bits are used for the next 2^15 (32768) UDP messages. This
+   is the "established nonce".
+2. Each UDP message carries the lowest 15 bits as a unique
+   counter. Thus the lowest 15 bits are combined with (appended to)
+   the uppermost 177 bits to form the unique nonce for that message.
 3. Once the sending side has sent the 16384'th message on the current
-nonce (50% of the way through the available range), it generates a new
-nonce (upper 177 bits only) and sends that over the TCP connection,
-thus hopefully ensuring it arrives and is ready before it is
-needed. The sending side will switch to using the new nonce once the
-full 32768 messages of the current nonce have been used. At this
-point, the sending side resets the offset to 0.
-
+   nonce (50% of the way through the available range), it generates a
+   new nonce (upper 177 bits only) and sends that over the TCP
+   connection, thus hopefully ensuring it arrives and is ready before
+   it is needed. The sending side will switch to using the new nonce
+   once the full 32768 messages of the current nonce have been
+   used. At this point, the sending side resets the offset to 0.
 4. The receiving side must deal with the fact that UDP is unreliable
-and unordered. The receiving side keeps track of the highest offset
-seen for each established nonce. The condition to switching to the new
-nonce it has received via the TCP connection is: the highest offset
-seen for the current nonce must be above 24576 (75% of the available
-range) _and_ the current message just received must have an offset
-less than 8192 (25% of the available range) _and_ the new offset must
-be less than 8192 messages *ahead* of the highest seen offset so far
-(assuming modulo 32768). If these conditions are met, the highest
-offset is set to the offset of the current message and the new nonce
-is used. If those conditions are not met, the receiving side continues
-with the current nonce (according to the rules below), updating the
-highest offset seen as appropriate. Thus in order for the nonce to not
-be updated correctly would require a loss of at least 8192 messages.
-
+   and unordered. The receiving side keeps track of the highest offset
+   seen for each established nonce. The condition to switching to the
+   new nonce it has received via the TCP connection is: the highest
+   offset seen for the current nonce must be above 24576 (75% of the
+   available range) _and_ the current message just received must have
+   an offset less than 8192 (25% of the available range) _and_ the new
+   offset must be less than 8192 messages *ahead* of the highest seen
+   offset so far (assuming modulo 32768). If these conditions are met,
+   the highest offset is set to the offset of the current message and
+   the new nonce is used. If those conditions are not met, the
+   receiving side continues with the current nonce (according to the
+   rules below), updating the highest offset seen as appropriate. Thus
+   in order for the nonce to not be updated correctly would require a
+   loss of at least 8192 messages.
 5. When the receiving side switches to the new nonce, it does not
-discard the old nonce. If the highest offset seen is below 8192 (25% of
-the range) _and_ the current message offset is above 24576 (75% of the
-range), _and_ the current message offset is less than 8192 behind the
-highest seen nonce (assuming modulo 32768), then the current message is
-decoded with the old nonce.
-
+   discard the old nonce. If the highest offset seen is below 8192
+   (25% of the range) _and_ the current message offset is above 24576
+   (75% of the range), _and_ the current message offset is less than
+   8192 behind the highest seen nonce (assuming modulo 32768), then
+   the current message is decoded with the old nonce.
 6. In the remaining cases, the current message is only decoded if its
-offset is within 8192 either side of the highest seen offset.
-
+   offset is within 8192 either side of the highest seen offset.
 7. To avoid replay attacks, the receiving side keeps a set of which
-offsets have been used with the current and previous nonce. If the
-offset doesn't exist in the set, and the message can be correctly
-decoded, the offset is added to the relevant set (thus we avoid
-poisoning attacks). If the offset already exists in the set, or the
-message cannot be correctly decoded, the message is not processed
-further.
+   offsets have been used with the current and previous nonce. If the
+   offset doesn't exist in the set, and the message can be correctly
+   decoded, the offset is added to the relevant set (thus we avoid
+   poisoning attacks). If the offset already exists in the set, or the
+   message cannot be correctly decoded, the message is not processed
+   further.
 
 ### Further reading
 More details on the inner workings of weave can be found in the
