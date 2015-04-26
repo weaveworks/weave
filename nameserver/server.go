@@ -215,12 +215,15 @@ func (s *DNSServer) Stop() error {
 }
 
 func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
+	fallback := func(w dns.ResponseWriter, r *dns.Msg) {
+		w.WriteMsg(makeDNSFailResponse(r))
+	}
 	return func(w dns.ResponseWriter, r *dns.Msg) {
-		now := time.Now()
 		q := r.Question[0]
+		Debug.Printf("[dns msgid %d] Query: %+v", r.MsgHdr.Id, q)
+		now := time.Now()
 		maxLen := getMaxReplyLen(r, proto)
 		lookups := []ZoneLookup{s.Zone, s.mdnsCli}
-		Debug.Printf("Query: %+v", q)
 
 		reply, err := s.cache.Get(r, maxLen, time.Now())
 		if err != nil {
@@ -242,7 +245,7 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 
 		// catch unsupported queries
 		if q.Qtype != dns.TypeA {
-			Debug.Printf("[dns msgid %d] Unsuported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
+			Debug.Printf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
 			m := makeDNSNotImplResponse(r)
 			s.cache.Put(r, m, negLocalTTL, 0, now)
 			w.WriteMsg(m)
@@ -254,7 +257,7 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 				m := makeAddressReply(r, &q, ips)
 				m.Authoritative = true
 
-				Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
+				Debug.Printf("[dns msgid %d] Caching response for type %s query for '%s': %s [code:%s]",
 					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, ips, dns.RcodeToString[m.Rcode])
 				s.cache.Put(r, m, nullTTL, 0, now)
 				w.WriteMsg(m)
@@ -263,22 +266,27 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 			now = time.Now()
 		}
 
-		Info.Printf("[dns msgid %d] No results for type %s query %s [caching no-local]",
+		Info.Printf("[dns msgid %d] No results for type %s query for '%s' [caching no-local]",
 			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
 		s.cache.Put(r, nil, negLocalTTL, CacheNoLocalReplies, now)
-		w.WriteMsg(makeDNSFailResponse(r))
+
+		fallback(w, r)
 	}
 }
 
 func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
-	fallback := s.notUsHandler(proto)
+	notUsHandler := s.notUsHandler(proto)
+	fallback := func(w dns.ResponseWriter, r *dns.Msg) {
+		Info.Printf("[dns msgid %d] -> sending to fallback server", r.MsgHdr.Id)
+		notUsHandler(w, r)
+	}
 	return func(w dns.ResponseWriter, r *dns.Msg) {
-		now := time.Now()
 		q := r.Question[0]
-		lookups := []ZoneLookup{s.Zone, s.mdnsCli}
+		Debug.Printf("[dns msgid %d] Reverse query: %+v", r.MsgHdr.Id, q)
+		now := time.Now()
 		maxLen := getMaxReplyLen(r, proto)
+		lookups := []ZoneLookup{s.Zone, s.mdnsCli}
 
-		Debug.Printf("Reverse query: %+v", q)
 		reply, err := s.cache.Get(r, maxLen, time.Now())
 		if err != nil {
 			if err == errNoLocalReplies {
@@ -299,8 +307,7 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 
 		// catch unsupported queries
 		if q.Qtype != dns.TypePTR {
-			Warning.Printf("[dns msgid %d] Unexpected reverse query type %s: %+v",
-				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q)
+			Debug.Printf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
 			m := makeDNSNotImplResponse(r)
 			s.cache.Put(r, m, negLocalTTL, 0, now)
 			w.WriteMsg(m)
@@ -312,7 +319,7 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 				m := makePTRReply(r, &q, names)
 				m.Authoritative = true
 
-				Debug.Printf("[dns msgid %d] Caching response for %s-query for \"%s\": %s [code:%s]",
+				Debug.Printf("[dns msgid %d] Caching response for type %s query for '%s': %s [code:%s]",
 					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, names, dns.RcodeToString[m.Rcode])
 				s.cache.Put(r, m, nullTTL, 0, now)
 				w.WriteMsg(m)
@@ -321,9 +328,10 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 			now = time.Now()
 		}
 
-		Info.Printf("[dns msgid %d] No results for %s-query about '%s' [caching no-local] -> sending to fallback server",
+		Info.Printf("[dns msgid %d] No results for type %s query for '%s' [caching no-local]",
 			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
 		s.cache.Put(r, nil, negLocalTTL, CacheNoLocalReplies, now)
+
 		fallback(w, r)
 	}
 }
