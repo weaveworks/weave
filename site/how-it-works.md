@@ -239,6 +239,16 @@ quite difficult to use NaCl incorrectly. Contrast this with libraries
 such as OpenSSL where the library and its APIs are vast in size,
 poorly documented, and easily used wrongly.
 
+There are some similarities between Weave's crypto and
+[TLS](https://tools.ietf.org/html/rfc4346). We do not need to cater
+for multiple cipher suites, certificate exchange and other
+requirements emanating from X509, and a number of other features. This
+simplifies the protocol and implementation considerably. On the other
+hand, we need to support UDP transports, and while there are
+extensions to TLS such as [DTLS](https://tools.ietf.org/html/rfc4347)
+which can operate over UDP, these are not widely implemented and
+deployed.
+
 #### Establishing the Ephemeral Session Key
 
 For every connection between peers, a fresh public/private key pair is
