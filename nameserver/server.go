@@ -215,9 +215,18 @@ func (s *DNSServer) Stop() error {
 }
 
 func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
+	zoneLookup := func(lookup ZoneLookup, q *dns.Question, r *dns.Msg) (*dns.Msg, []ZoneRecord, error) {
+		if ips, err := lookup.LookupName(q.Name); err != nil {
+			return nil, nil, err
+		} else {
+			return makeAddressReply(r, q, ips), ips, nil
+		}
+	}
+
 	fallback := func(w dns.ResponseWriter, r *dns.Msg) {
 		w.WriteMsg(makeDNSFailResponse(r))
 	}
+
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] Query: %+v", r.MsgHdr.Id, q)
@@ -253,12 +262,10 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 		}
 
 		for _, lookup := range lookups {
-			if ips, err := lookup.LookupName(q.Name); err == nil {
-				m := makeAddressReply(r, &q, ips)
+			if m, answers, err := zoneLookup(lookup, &q, r); err == nil {
 				m.Authoritative = true
-
 				Debug.Printf("[dns msgid %d] Caching response for type %s query for '%s': %s [code:%s]",
-					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, ips, dns.RcodeToString[m.Rcode])
+					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, answers, dns.RcodeToString[m.Rcode])
 				s.cache.Put(r, m, nullTTL, 0, now)
 				w.WriteMsg(m)
 				return
@@ -275,11 +282,20 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 }
 
 func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
+	zoneLookup := func(lookup ZoneLookup, q *dns.Question, r *dns.Msg) (*dns.Msg, []ZoneRecord, error) {
+		if names, err := lookup.LookupInaddr(q.Name); err != nil {
+			return nil, nil, err
+		} else {
+			return makePTRReply(r, q, names), names, nil
+		}
+	}
+
 	notUsHandler := s.notUsHandler(proto)
 	fallback := func(w dns.ResponseWriter, r *dns.Msg) {
 		Info.Printf("[dns msgid %d] -> sending to fallback server", r.MsgHdr.Id)
 		notUsHandler(w, r)
 	}
+
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] Reverse query: %+v", r.MsgHdr.Id, q)
@@ -315,12 +331,10 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 		}
 
 		for _, lookup := range lookups {
-			if names, err := lookup.LookupInaddr(q.Name); err == nil {
-				m := makePTRReply(r, &q, names)
+			if m, answers, err := zoneLookup(lookup, &q, r); err == nil {
 				m.Authoritative = true
-
 				Debug.Printf("[dns msgid %d] Caching response for type %s query for '%s': %s [code:%s]",
-					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, names, dns.RcodeToString[m.Rcode])
+					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, answers, dns.RcodeToString[m.Rcode])
 				s.cache.Put(r, m, nullTTL, 0, now)
 				w.WriteMsg(m)
 				return
