@@ -227,58 +227,7 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 		w.WriteMsg(makeDNSFailResponse(r))
 	}
 
-	return func(w dns.ResponseWriter, r *dns.Msg) {
-		q := r.Question[0]
-		Debug.Printf("[dns msgid %d] Query: %+v", r.MsgHdr.Id, q)
-		now := time.Now()
-		maxLen := getMaxReplyLen(r, proto)
-		lookups := []ZoneLookup{s.Zone, s.mdnsCli}
-
-		reply, err := s.cache.Get(r, maxLen, time.Now())
-		if err != nil {
-			if err == errNoLocalReplies {
-				Debug.Printf("[dns msgid %d] Cached 'no local replies' - skipping local lookup", r.MsgHdr.Id)
-				lookups = []ZoneLookup{s.Zone}
-			} else {
-				Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
-				w.WriteMsg(makeDNSFailResponse(r))
-				return
-			}
-		}
-		if reply != nil {
-			Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers",
-				r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer))
-			w.WriteMsg(reply)
-			return
-		}
-
-		// catch unsupported queries
-		if q.Qtype != dns.TypeA {
-			Debug.Printf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
-			m := makeDNSNotImplResponse(r)
-			s.cache.Put(r, m, negLocalTTL, 0, now)
-			w.WriteMsg(m)
-			return
-		}
-
-		for _, lookup := range lookups {
-			if m, answers, err := zoneLookup(lookup, &q, r); err == nil {
-				m.Authoritative = true
-				Debug.Printf("[dns msgid %d] Caching response for type %s query for '%s': %s [code:%s]",
-					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, answers, dns.RcodeToString[m.Rcode])
-				s.cache.Put(r, m, nullTTL, 0, now)
-				w.WriteMsg(m)
-				return
-			}
-			now = time.Now()
-		}
-
-		Info.Printf("[dns msgid %d] No results for type %s query for '%s' [caching no-local]",
-			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
-		s.cache.Put(r, nil, negLocalTTL, CacheNoLocalReplies, now)
-
-		fallback(w, r)
-	}
+	return s.commonQueryHandler(proto, "Query", dns.TypeA, zoneLookup, fallback)
 }
 
 func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
@@ -296,9 +245,15 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 		notUsHandler(w, r)
 	}
 
+	return s.commonQueryHandler(proto, "Reverse query", dns.TypePTR, zoneLookup, fallback)
+}
+
+func (s *DNSServer) commonQueryHandler(proto dnsProtocol, kind string, qtype uint16,
+	zoneLookup func(ZoneLookup, *dns.Question, *dns.Msg) (*dns.Msg, []ZoneRecord, error), fallback dns.HandlerFunc) dns.HandlerFunc {
+
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("[dns msgid %d] Reverse query: %+v", r.MsgHdr.Id, q)
+		Debug.Printf("[dns msgid %d] %s: %+v", r.MsgHdr.Id, kind, q)
 		now := time.Now()
 		maxLen := getMaxReplyLen(r, proto)
 		lookups := []ZoneLookup{s.Zone, s.mdnsCli}
@@ -322,7 +277,7 @@ func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 		}
 
 		// catch unsupported queries
-		if q.Qtype != dns.TypePTR {
+		if q.Qtype != qtype {
 			Debug.Printf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
 			m := makeDNSNotImplResponse(r)
 			s.cache.Put(r, m, negLocalTTL, 0, now)
