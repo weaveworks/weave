@@ -51,9 +51,8 @@ func DecryptPrefixNonce(ciphertxt []byte, secret *[32]byte) ([]byte, bool) {
 		return nil, false
 	}
 	var nonce [24]byte
-	copy(nonce[:], ciphertxt[0:24])
-	ciphertxt = ciphertxt[24:]
-	return secretbox.Open(nil, ciphertxt, &nonce, secret)
+	copy(nonce[:], ciphertxt[:24])
+	return secretbox.Open(nil, ciphertxt[24:], &nonce, secret)
 }
 
 func SetNonceLow15Bits(nonce *[24]byte, offset uint16) {
