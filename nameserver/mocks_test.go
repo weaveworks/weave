@@ -28,7 +28,7 @@ type mockedZoneWithRecords struct {
 func newMockedZoneWithRecords(zr []ZoneRecord) *mockedZoneWithRecords {
 	return &mockedZoneWithRecords{records: zr}
 }
-func (mz mockedZoneWithRecords) Domain() string { return DefaultLocalDomain }
+func (mz *mockedZoneWithRecords) Domain() string { return DefaultLocalDomain }
 func (mz *mockedZoneWithRecords) LookupName(name string) ([]ZoneRecord, error) {
 	Debug.Printf("[mocked zone]: LookupName: returning records %s", mz.records)
 	mz.Lock()
@@ -63,26 +63,29 @@ func (mz *mockedZoneWithRecords) LookupInaddr(inaddr string) ([]ZoneRecord, erro
 	return res, nil
 }
 
-func (mz mockedZoneWithRecords) DomainLookupName(name string) ([]ZoneRecord, error) {
+func (mz *mockedZoneWithRecords) DomainLookupName(name string) ([]ZoneRecord, error) {
 	return mz.LookupName(name)
 }
-func (mz mockedZoneWithRecords) DomainLookupInaddr(inaddr string) ([]ZoneRecord, error) {
+func (mz *mockedZoneWithRecords) DomainLookupInaddr(inaddr string) ([]ZoneRecord, error) {
 	return mz.LookupInaddr(inaddr)
 }
 
 // the following methods are not currently needed...
-func (mz mockedZoneWithRecords) AddRecord(ident string, name string, ip net.IP) error {
+func (mz *mockedZoneWithRecords) AddRecord(ident string, name string, ip net.IP) error {
 	notImplWarn()
 	return nil
 }
-func (mz mockedZoneWithRecords) DeleteRecord(ident string, ip net.IP) error { notImplWarn(); return nil }
-func (mz mockedZoneWithRecords) DeleteRecordsFor(ident string) error        { notImplWarn(); return nil }
-func (mz mockedZoneWithRecords) Status() string                             { notImplWarn(); return "nothing" }
-func (mz mockedZoneWithRecords) ObserveName(name string, observer ZoneRecordObserver) error {
+func (mz *mockedZoneWithRecords) DeleteRecord(ident string, ip net.IP) error {
 	notImplWarn()
 	return nil
 }
-func (mz mockedZoneWithRecords) ObserveInaddr(inaddr string, observer ZoneRecordObserver) error {
+func (mz *mockedZoneWithRecords) DeleteRecordsFor(ident string) error { notImplWarn(); return nil }
+func (mz *mockedZoneWithRecords) Status() string                      { notImplWarn(); return "nothing" }
+func (mz *mockedZoneWithRecords) ObserveName(name string, observer ZoneRecordObserver) error {
+	notImplWarn()
+	return nil
+}
+func (mz *mockedZoneWithRecords) ObserveInaddr(inaddr string, observer ZoneRecordObserver) error {
 	notImplWarn()
 	return nil
 }

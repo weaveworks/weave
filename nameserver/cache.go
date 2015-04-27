@@ -371,7 +371,7 @@ func (c *Cache) Len() int {
 }
 
 // Return the max capacity
-func (c Cache) Capacity() int {
+func (c *Cache) Capacity() int {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -379,7 +379,7 @@ func (c Cache) Capacity() int {
 }
 
 // Return the max capacity
-func (c Cache) String() string {
+func (c *Cache) String() string {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
