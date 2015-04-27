@@ -8,6 +8,11 @@ BRANCH=${TRAVIS_BRANCH:-`git rev-parse --abbrev-ref @`}
 COMMIT=${TRAVIS_COMMIT:-`git rev-parse @`}
 OUTPUT="weave/${BRANCH}/${COMMIT}"
 
+if [ -n "${TRAVIS_TAG}" ]; then
+  ## Travis will run separate build for commit and tag pushes,
+  OUTPUT="weave/${TRAVIS_TAG}"
+fi
+
 export BRANCH COMMIT OUTPUT
 
 bundle install --path=.bundle
@@ -17,8 +22,10 @@ gsutil -m cp -z html,css -a public-read -R _site "gs://docs.weave.works/${OUTPUT
 
 echo "Published at http://docs.weave.works/${OUTPUT}"
 
-echo "<meta http-equiv=\"refresh\" content=\"0; url=http://docs.weave.works/${OUTPUT}\" />" \
-  | gsutil \
-    -h "Content-Type:text/html" \
-    -h "Cache-Control:private, max-age=0, no-transform" \
-    cp -a "public-read" - "gs://docs.weave.works/weave/${BRANCH}/index.html"
+if [ -z "${TRAVIS_TAG}" ]; then
+  echo "<meta http-equiv=\"refresh\" content=\"0; url=http://docs.weave.works/${OUTPUT}\" />" \
+    | gsutil \
+      -h "Content-Type:text/html" \
+      -h "Cache-Control:private, max-age=0, no-transform" \
+      cp -a "public-read" - "gs://docs.weave.works/weave/${BRANCH}/index.html"
+fi
