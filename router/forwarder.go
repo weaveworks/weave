@@ -287,7 +287,11 @@ func (fwd *Forwarder) appendFrame(frame *ForwardedFrame) bool {
 }
 
 func (fwd *Forwarder) flush() {
-	err := fwd.processSendError(fwd.udpSender.Send(fwd.enc.Bytes()))
+	msg, err := fwd.enc.Bytes()
+	if err != nil {
+		fwd.conn.Shutdown(err)
+	}
+	err = fwd.processSendError(fwd.udpSender.Send(msg))
 	if err != nil && PosixError(err) != syscall.ENOBUFS {
 		fwd.conn.Shutdown(err)
 	}

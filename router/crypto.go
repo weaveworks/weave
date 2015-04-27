@@ -105,7 +105,7 @@ type Encryptor interface {
 	FrameOverhead() int
 	PacketOverhead() int
 	IsEmpty() bool
-	Bytes() []byte
+	Bytes() ([]byte, error)
 	AppendFrame(src []byte, dst []byte, frame []byte)
 	TotalLen() int
 }
@@ -150,11 +150,11 @@ func (ne *NonEncryptor) IsEmpty() bool {
 	return ne.buffered == ne.prefixLen
 }
 
-func (ne *NonEncryptor) Bytes() []byte {
+func (ne *NonEncryptor) Bytes() ([]byte, error) {
 	buf := ne.buf[:ne.buffered]
 	ne.buffered = ne.prefixLen
 	ne.bufTail = ne.buf[ne.prefixLen:]
-	return buf
+	return buf, nil
 }
 
 func (ne *NonEncryptor) AppendFrame(src []byte, dst []byte, frame []byte) {
@@ -185,11 +185,15 @@ func NewNaClEncryptor(prefix []byte, conn *LocalConnection, df bool) *NaClEncryp
 		nonceChan:    make(chan *[24]byte, ChannelSize),
 		prefixLen:    prefixLen,
 		conn:         conn,
+		sessionKey:   sessionKey,
 		df:           df}
 }
 
-func (ne *NaClEncryptor) Bytes() []byte {
-	plaintext := ne.NonEncryptor.Bytes()
+func (ne *NaClEncryptor) Bytes() ([]byte, error) {
+	plaintext, err := ne.NonEncryptor.Bytes()
+	if err != nil {
+		return nil, err
+	}
 	offsetFlags := ne.offset
 	// We carry the DF flag in the (unencrypted portion of the)
 	// payload, rather than just extracting it from the packet headers
@@ -206,8 +210,7 @@ func (ne *NaClEncryptor) Bytes() []byte {
 	if nonce == nil {
 		freshNonce, encodedNonce, err := EncodeNonce(ne.df)
 		if err != nil {
-			ne.conn.Shutdown(err)
-			return []byte{}
+			return nil, err
 		}
 		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 		ne.nonce = freshNonce
@@ -225,15 +228,14 @@ func (ne *NaClEncryptor) Bytes() []byte {
 	} else if offset == 1<<14 { // half way through range, send new nonce
 		nonce, encodedNonce, err := EncodeNonce(ne.df)
 		if err != nil {
-			ne.conn.Shutdown(err)
-			return []byte{}
+			return nil, err
 		}
 		ne.nonceChan <- nonce
 		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 	}
 	ne.offset = offset
 
-	return ciphertext
+	return ciphertext, nil
 }
 
 func (ne *NaClEncryptor) PacketOverhead() int {
