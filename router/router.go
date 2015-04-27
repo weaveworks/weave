@@ -250,7 +250,7 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 		if !ok {
 			continue
 		}
-		if err := relayConn.Decryptor.IterateFrames(packet, router.handleUDPPacketFunc(dec, sender, po)); err != nil {
+		if err := relayConn.Decryptor.IterateFrames(packet, router.handleUDPPacketFunc(relayConn, dec, sender, po)); err != nil {
 			// Errors during UDP packet decoding / processing are
 			// non-fatal. One common cause is that we receive and
 			// attempt to decrypt a "stray" packet. This can actually
@@ -267,8 +267,8 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 	}
 }
 
-func (router *Router) handleUDPPacketFunc(dec *EthernetDecoder, sender *net.UDPAddr, po PacketSink) FrameConsumer {
-	return func(relayConn *LocalConnection, srcNameByte, dstNameByte []byte, frame []byte) {
+func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *EthernetDecoder, sender *net.UDPAddr, po PacketSink) FrameConsumer {
+	return func(srcNameByte, dstNameByte []byte, frame []byte) {
 		srcPeer, found := router.Peers.Fetch(PeerNameFromBin(srcNameByte))
 		if !found {
 			return
