@@ -50,12 +50,8 @@ func DecryptPrefixNonce(ciphertxt []byte, secret *[32]byte) ([]byte, bool) {
 	if len(ciphertxt) < secretbox.Overhead+24 {
 		return nil, false
 	}
-	// There is no way to nicely convert from a slice to an
-	// array. So have to used the following loop.
 	var nonce [24]byte
-	for idx, e := range ciphertxt[0:24] {
-		nonce[idx] = e
-	}
+	copy(nonce[:], ciphertxt[0:24])
 	ciphertxt = ciphertxt[24:]
 	return secretbox.Open(nil, ciphertxt, &nonce, secret)
 }
@@ -91,11 +87,9 @@ func EncodeNonce(df bool) (*[24]byte, []byte, error) {
 func DecodeNonce(msg []byte) (bool, *[24]byte) {
 	flags := uint16(msg[23])
 	df := 0 != (flags & 1)
-	nonce := [24]byte{}
+	var nonce [24]byte
 	// upper bound is exclusive so this avoids copying the flags
-	for idx, elem := range msg[:23] {
-		nonce[idx] = elem
-	}
+	copy(nonce[:], msg[:23])
 	return df, &nonce
 }
 
