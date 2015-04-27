@@ -122,7 +122,7 @@ func (re *recordEntry) notifyIPObservers() {
 	}
 }
 
-func (re recordEntry) TTL() int {
+func (re *recordEntry) TTL() int {
 	// if we never set the TTL (eg, when using AddRecord()), return the standard value...
 	if re.ttl == 0 {
 		return int(localTTL)
@@ -131,11 +131,11 @@ func (re recordEntry) TTL() int {
 }
 
 // Check if the info in this record is still valid according to the TTL
-func (re recordEntry) hasExpired(now time.Time) bool {
+func (re *recordEntry) hasExpired(now time.Time) bool {
 	return re.ttl > 0 && now.Sub(re.insTime).Seconds() > float64(re.ttl)
 }
 
-func (re recordEntry) String() string {
+func (re *recordEntry) String() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s", re.Record)
 	lobs := len(re.observers)
@@ -163,10 +163,10 @@ func newName(n string) *name {
 		observers: make([]ZoneRecordObserver, 0),
 	}
 }
-func (n name) len() int             { return len(n.ipv4) }
-func (n name) empty() bool          { return n.len() == 0 }
-func (n name) hasIP(ip net.IP) bool { return n.hasIPv4(ipToIPv4(ip)) }
-func (n name) hasIPv4(ip IPv4) bool { _, found := n.ipv4[ip]; return found }
+func (n *name) len() int             { return len(n.ipv4) }
+func (n *name) empty() bool          { return n.len() == 0 }
+func (n *name) hasIP(ip net.IP) bool { return n.hasIPv4(ipToIPv4(ip)) }
+func (n *name) hasIPv4(ip IPv4) bool { _, found := n.ipv4[ip]; return found }
 
 // Get all the entries for this name
 func (n *name) getAllEntries() (res []*recordEntry) {
@@ -257,7 +257,7 @@ func (n *name) notifyNameObservers() {
 }
 
 // Convert a set of IP records to a comma-separated string
-func (n name) String() string {
+func (n *name) String() string {
 	var buf bytes.Buffer
 	for _, ip := range n.ipv4 {
 		fmt.Fprintf(&buf, "%s, ", ip)
@@ -276,10 +276,10 @@ type namesSet struct {
 	names map[string]*name
 }
 
-func newNamesSet() *namesSet    { return &namesSet{names: make(map[string]*name)} }
-func (ns namesSet) len() int    { return len(ns.names) }
-func (ns namesSet) empty() bool { return ns.len() == 0 }
-func (ns namesSet) hasName(name string) bool {
+func newNamesSet() *namesSet     { return &namesSet{names: make(map[string]*name)} }
+func (ns *namesSet) len() int    { return len(ns.names) }
+func (ns *namesSet) empty() bool { return ns.len() == 0 }
+func (ns *namesSet) hasName(name string) bool {
 	if n, found := ns.names[name]; !found {
 		return false
 	} else {
@@ -365,7 +365,7 @@ func (ns *namesSet) deleteIP(ip IPv4) error {
 }
 
 // Get the name query time
-func (ns namesSet) getNameLastAccess(n string) time.Time {
+func (ns *namesSet) getNameLastAccess(n string) time.Time {
 	if name, found := ns.names[n]; found {
 		return name.lastAccessTime
 	}
@@ -383,7 +383,7 @@ func (ns *namesSet) touchName(name string, now time.Time) {
 	}
 }
 
-func (ns namesSet) String() string {
+func (ns *namesSet) String() string {
 	var buf bytes.Buffer
 	for _, name := range ns.names {
 		fmt.Fprintf(&buf, "%s, ", name)

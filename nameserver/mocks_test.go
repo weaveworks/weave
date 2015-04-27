@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"fmt"
+	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	wt "github.com/weaveworks/weave/testing"
@@ -423,6 +424,22 @@ func runLocalTCPServer(laddr string, handler dns.HandlerFunc) (*dns.Server, stri
 
 //////////////////////////////////////////////////////////////////
 
+type mockedClock struct {
+	*clock.Mock
+}
+
+func newMockedClock() *mockedClock {
+	return &mockedClock{clock.NewMock()}
+}
+
+func (clk *mockedClock) Forward(secs int) {
+	Debug.Printf(">>>>>>> Moving clock forward %d seconds - Time traveling >>>>>>>", secs)
+	clk.Add(time.Duration(secs) * time.Second)
+	Debug.Printf("<<<<<<< Time travel finished! We are at %s <<<<<<<", clk.Now())
+}
+
+//////////////////////////////////////////////////////////////////
+
 // Perform a DNS query and assert the reply code, number or answers, etc
 func assertExchange(t *testing.T, z string, ty uint16, port int, minAnswers int, maxAnswers int, expErr int) (*dns.Msg, *dns.Msg) {
 	wt.AssertNotEqualInt(t, port, 0, "invalid DNS server port")
@@ -440,7 +457,7 @@ func assertExchange(t *testing.T, z string, ty uint16, port int, minAnswers int,
 	r, _, err := c.Exchange(m, lstAddr)
 	t.Logf("Response from '%s':\n%+v\n", lstAddr, r)
 	if err != nil {
-		t.Fatalf("Error when querying DNS server at %s: %s", lstAddr, err)
+		t.Errorf("Error when querying DNS server at %s: %s", lstAddr, err)
 	}
 	wt.AssertNoErr(t, err)
 	if minAnswers == 0 && maxAnswers == 0 {
