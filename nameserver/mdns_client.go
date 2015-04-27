@@ -1,6 +1,8 @@
 package nameserver
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/miekg/dns"
 	"math"
 	"net"
@@ -50,6 +52,24 @@ func (r Response) Equal(r2 *Response) bool {
 		return false
 	}
 	return true
+}
+
+func (i Response) String() string {
+	var buf bytes.Buffer
+	if i.err != nil {
+		fmt.Fprintf(&buf, "%s", i.err)
+	} else {
+		if len(i.Name()) > 0 {
+			fmt.Fprintf(&buf, "%s", i.Name())
+		}
+		if !i.IP().IsUnspecified() {
+			fmt.Fprintf(&buf, "[%s]", i.IP())
+		}
+		if i.ttl > 0 {
+			fmt.Fprintf(&buf, "(TTL:%d)", i.TTL())
+		}
+	}
+	return buf.String()
 }
 
 type responseInfo struct {

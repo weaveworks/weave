@@ -34,6 +34,11 @@ const (
 	stResolved entryStatus = iota // resolved
 )
 
+var statusToString = map[entryStatus]string{
+	stPending:  "pending",
+	stResolved: "resolved",
+}
+
 const (
 	CacheNoLocalReplies uint8 = 1 << iota // not found in local network (stored in the cache so we skip another local lookup or some time)
 )
@@ -164,6 +169,19 @@ func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Tim
 	}
 
 	return (prevValidUntil != e.validUntil)
+}
+
+func (e *cacheEntry) String() string {
+	var buf bytes.Buffer
+	q := e.question
+	fmt.Fprintf(&buf, "'%s'[%s]: ", q.Name, dns.TypeToString[q.Qtype])
+	if e.Flags&CacheNoLocalReplies != 0 {
+		fmt.Fprintf(&buf, "neg-local")
+	} else {
+		fmt.Fprintf(&buf, "%s", statusToString[e.Status])
+	}
+	fmt.Fprintf(&buf, "(%d bytes)", e.ReplyLen)
+	return buf.String()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
