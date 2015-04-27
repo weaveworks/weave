@@ -482,9 +482,8 @@ func (sender *EncryptedTCPSender) Send(msg []byte) error {
 	if err != nil {
 		return err
 	}
-	sender.msgCount = sender.msgCount + 1
-	return sender.outerEncoder.Encode(
-		EncryptPrefixNonce(buffer.Bytes(), &nonce, sender.sessionKey))
+	sender.msgCount += sender.msgCount
+	return sender.outerEncoder.Encode(EncryptPrefixNonce(buffer.Bytes(), &nonce, sender.sessionKey))
 }
 
 // TCP Receivers
@@ -538,6 +537,6 @@ func (receiver *EncryptedTCPReceiver) Decode(msg []byte) ([]byte, error) {
 	if wrappedMsg.Number != receiver.msgCount {
 		return msg, fmt.Errorf("Received TCP message with wrong sequence number; possible replay attack")
 	}
-	receiver.msgCount = receiver.msgCount + 1
+	receiver.msgCount += receiver.msgCount
 	return wrappedMsg.Body, nil
 }
