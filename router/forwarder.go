@@ -30,8 +30,8 @@ func (conn *LocalConnection) ensureForwarders() error {
 	usingPassword := conn.SessionKey != nil
 	var encryptor, encryptorDF Encryptor
 	if usingPassword {
-		encryptor = NewNaClEncryptor(conn.local.NameByte, conn, conn.SessionKey, false)
-		encryptorDF = NewNaClEncryptor(conn.local.NameByte, conn, conn.SessionKey, true)
+		encryptor = NewNaClEncryptor(conn.local.NameByte, conn.SessionKey, conn.sendNonce, false)
+		encryptorDF = NewNaClEncryptor(conn.local.NameByte, conn.SessionKey, conn.sendNonce, true)
 	} else {
 		encryptor = NewNonEncryptor(conn.local.NameByte)
 		encryptorDF = NewNonEncryptor(conn.local.NameByte)
@@ -60,6 +60,10 @@ func (conn *LocalConnection) stopForwarders() {
 	}
 	conn.forwarder.Shutdown()
 	conn.forwarderDF.Shutdown()
+}
+
+func (conn *LocalConnection) sendNonce(encodedNonce []byte) {
+	conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
 }
 
 // Called from peer.Relay[Broadcast] which is itself invoked from

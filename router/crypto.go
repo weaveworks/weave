@@ -124,8 +124,8 @@ type NaClEncryptor struct {
 	nonce      *[24]byte
 	nonceChan  chan *[24]byte
 	prefixLen  int
-	conn       *LocalConnection
 	sessionKey *[32]byte
+	sendNonce  func([]byte)
 	df         bool
 }
 
@@ -175,7 +175,7 @@ func (ne *NonEncryptor) TotalLen() int {
 	return ne.buffered
 }
 
-func NewNaClEncryptor(prefix []byte, conn *LocalConnection, sessionKey *[32]byte, df bool) *NaClEncryptor {
+func NewNaClEncryptor(prefix []byte, sessionKey *[32]byte, sendNonce func([]byte), df bool) *NaClEncryptor {
 	buf := make([]byte, MaxUDPPacketSize)
 	prefixLen := copy(buf, prefix)
 	return &NaClEncryptor{
@@ -185,8 +185,8 @@ func NewNaClEncryptor(prefix []byte, conn *LocalConnection, sessionKey *[32]byte
 		nonce:        nil,
 		nonceChan:    make(chan *[24]byte, ChannelSize),
 		prefixLen:    prefixLen,
-		conn:         conn,
 		sessionKey:   sessionKey,
+		sendNonce:    sendNonce,
 		df:           df}
 }
 
@@ -213,7 +213,7 @@ func (ne *NaClEncryptor) Bytes() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
+		ne.sendNonce(encodedNonce)
 		ne.nonce = freshNonce
 		nonce = freshNonce
 	}
@@ -232,7 +232,7 @@ func (ne *NaClEncryptor) Bytes() ([]byte, error) {
 			return nil, err
 		}
 		ne.nonceChan <- nonce
-		ne.conn.SendProtocolMsg(ProtocolMsg{ProtocolNonce, encodedNonce})
+		ne.sendNonce(encodedNonce)
 	}
 	ne.offset = offset
 
