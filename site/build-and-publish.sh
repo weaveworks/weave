@@ -16,3 +16,9 @@ bundle exec jekyll build --verbose
 gsutil -m cp -z html,css -a public-read -R _site "gs://docs.weave.works/${OUTPUT}"
 
 echo "Published at http://docs.weave.works/${OUTPUT}"
+
+echo "<meta http-equiv=\"refresh\" content=\"0; url=http://docs.weave.works/${OUTPUT}\" />" \
+  | gsutil \
+    -h "Content-Type:text/html" \
+    -h "Cache-Control:private, max-age=0, no-transform" \
+    cp -a "public-read" - "gs://docs.weave.works/weave/${BRANCH}/index.html"
