@@ -446,7 +446,7 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 	usingPassword := conn.SessionKey != nil
 	var receiver TCPReceiver
 	if usingPassword {
-		receiver = NewEncryptedTCPReceiver(conn)
+		receiver = NewEncryptedTCPReceiver(conn.SessionKey)
 	} else {
 		receiver = NewSimpleTCPReceiver()
 	}

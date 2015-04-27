@@ -119,13 +119,14 @@ type NonEncryptor struct {
 
 type NaClEncryptor struct {
 	NonEncryptor
-	buf       []byte
-	offset    uint16
-	nonce     *[24]byte
-	nonceChan chan *[24]byte
-	prefixLen int
-	conn      *LocalConnection
-	df        bool
+	buf        []byte
+	offset     uint16
+	nonce      *[24]byte
+	nonceChan  chan *[24]byte
+	prefixLen  int
+	conn       *LocalConnection
+	sessionKey *[32]byte
+	df         bool
 }
 
 func NewNonEncryptor(prefix []byte) *NonEncryptor {
@@ -174,7 +175,7 @@ func (ne *NonEncryptor) TotalLen() int {
 	return ne.buffered
 }
 
-func NewNaClEncryptor(prefix []byte, conn *LocalConnection, df bool) *NaClEncryptor {
+func NewNaClEncryptor(prefix []byte, conn *LocalConnection, sessionKey *[32]byte, df bool) *NaClEncryptor {
 	buf := make([]byte, MaxUDPPacketSize)
 	prefixLen := copy(buf, prefix)
 	return &NaClEncryptor{
@@ -219,7 +220,7 @@ func (ne *NaClEncryptor) Bytes() ([]byte, error) {
 	offset := ne.offset
 	SetNonceLow15Bits(nonce, offset)
 	// Seal *appends* to ciphertext
-	ciphertext = secretbox.Seal(ciphertext[:ne.prefixLen+2], plaintext, nonce, ne.conn.SessionKey)
+	ciphertext = secretbox.Seal(ciphertext[:ne.prefixLen+2], plaintext, nonce, ne.sessionKey)
 
 	offset = (offset + 1) & ((1 << 15) - 1)
 	if offset == 0 {
@@ -257,11 +258,11 @@ type Decryptor interface {
 }
 
 type NonDecryptor struct {
-	conn *LocalConnection
 }
 
 type NaClDecryptor struct {
 	NonDecryptor
+	sessionKey *[32]byte
 	instance   *NaClDecryptorInstance
 	instanceDF *NaClDecryptorInstance
 }
@@ -279,8 +280,8 @@ type PacketDecodingError struct {
 	Desc string
 }
 
-func NewNonDecryptor(conn *LocalConnection) *NonDecryptor {
-	return &NonDecryptor{conn: conn}
+func NewNonDecryptor() *NonDecryptor {
+	return &NonDecryptor{}
 }
 
 func (nd *NonDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) error {
@@ -311,9 +312,10 @@ func (nd *NonDecryptor) ReceiveNonce(msg []byte) {
 	log.Println("Received Nonce on non-encrypted channel. Ignoring.")
 }
 
-func NewNaClDecryptor(conn *LocalConnection) *NaClDecryptor {
+func NewNaClDecryptor(sessionKey *[32]byte) *NaClDecryptor {
 	return &NaClDecryptor{
-		NonDecryptor: *NewNonDecryptor(conn),
+		NonDecryptor: *NewNonDecryptor(),
+		sessionKey:   sessionKey,
 		instance: &NaClDecryptorInstance{
 			usedOffsets: bit.New(),
 			nonceChan:   make(chan *[24]byte, ChannelSize)},
@@ -363,7 +365,7 @@ func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
 		return nil, fmt.Errorf("Suspected replay attack detected when decrypting UDP packet")
 	}
 	SetNonceLow15Bits(nonce, offsetNoFlags)
-	result, success := secretbox.Open(nil, buf[2:], nonce, nd.conn.SessionKey)
+	result, success := secretbox.Open(nil, buf[2:], nonce, nd.sessionKey)
 	if !success {
 		return nil, fmt.Errorf("Unable to decrypt UDP packet")
 	}
@@ -439,7 +441,7 @@ type EncryptedTCPSender struct {
 	outerEncoder *gob.Encoder
 	innerEncoder *gob.Encoder
 	buffer       *bytes.Buffer
-	conn         *LocalConnection
+	sessionKey   *[32]byte
 	msgCount     int
 }
 
@@ -456,13 +458,13 @@ func (sender *SimpleTCPSender) Send(msg []byte) error {
 	return sender.encoder.Encode(msg)
 }
 
-func NewEncryptedTCPSender(encoder *gob.Encoder, conn *LocalConnection) *EncryptedTCPSender {
+func NewEncryptedTCPSender(encoder *gob.Encoder, sessionKey *[32]byte) *EncryptedTCPSender {
 	buffer := new(bytes.Buffer)
 	return &EncryptedTCPSender{
 		outerEncoder: encoder,
 		innerEncoder: gob.NewEncoder(buffer),
 		buffer:       buffer,
-		conn:         conn,
+		sessionKey:   sessionKey,
 		msgCount:     0}
 }
 
@@ -482,7 +484,7 @@ func (sender *EncryptedTCPSender) Send(msg []byte) error {
 	}
 	sender.msgCount = sender.msgCount + 1
 	return sender.outerEncoder.Encode(
-		EncryptPrefixNonce(buffer.Bytes(), &nonce, sender.conn.SessionKey))
+		EncryptPrefixNonce(buffer.Bytes(), &nonce, sender.sessionKey))
 }
 
 // TCP Receivers
@@ -495,10 +497,10 @@ type SimpleTCPReceiver struct {
 }
 
 type EncryptedTCPReceiver struct {
-	conn     *LocalConnection
-	decoder  *gob.Decoder
-	buffer   *bytes.Buffer
-	msgCount int
+	sessionKey *[32]byte
+	decoder    *gob.Decoder
+	buffer     *bytes.Buffer
+	msgCount   int
 }
 
 func NewSimpleTCPReceiver() *SimpleTCPReceiver {
@@ -509,17 +511,17 @@ func (receiver *SimpleTCPReceiver) Decode(msg []byte) ([]byte, error) {
 	return msg, nil
 }
 
-func NewEncryptedTCPReceiver(conn *LocalConnection) *EncryptedTCPReceiver {
+func NewEncryptedTCPReceiver(sessionKey *[32]byte) *EncryptedTCPReceiver {
 	buffer := new(bytes.Buffer)
 	return &EncryptedTCPReceiver{
-		conn:     conn,
-		decoder:  gob.NewDecoder(buffer),
-		buffer:   buffer,
-		msgCount: 0}
+		sessionKey: sessionKey,
+		decoder:    gob.NewDecoder(buffer),
+		buffer:     buffer,
+		msgCount:   0}
 }
 
 func (receiver *EncryptedTCPReceiver) Decode(msg []byte) ([]byte, error) {
-	plaintext, success := DecryptPrefixNonce(msg, receiver.conn.SessionKey)
+	plaintext, success := DecryptPrefixNonce(msg, receiver.sessionKey)
 	if !success {
 		return msg, fmt.Errorf("Unable to decrypt TCP msg")
 	}

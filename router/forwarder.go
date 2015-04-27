@@ -30,8 +30,8 @@ func (conn *LocalConnection) ensureForwarders() error {
 	usingPassword := conn.SessionKey != nil
 	var encryptor, encryptorDF Encryptor
 	if usingPassword {
-		encryptor = NewNaClEncryptor(conn.local.NameByte, conn, false)
-		encryptorDF = NewNaClEncryptor(conn.local.NameByte, conn, true)
+		encryptor = NewNaClEncryptor(conn.local.NameByte, conn, conn.SessionKey, false)
+		encryptorDF = NewNaClEncryptor(conn.local.NameByte, conn, conn.SessionKey, true)
 	} else {
 		encryptor = NewNonEncryptor(conn.local.NameByte)
 		encryptorDF = NewNonEncryptor(conn.local.NameByte)
