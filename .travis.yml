@@ -25,4 +25,4 @@ script:
 after_success:
   - go get github.com/mattn/goveralls
   - $HOME/gopath/bin/goveralls -coverprofile=profile.cov -service=travis-ci
-  - site/build-and-publish.sh
+  - test "${TRAVIS_PULL_REQUEST}" = "false" && site/build-and-publish.sh
