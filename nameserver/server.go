@@ -120,7 +120,7 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 	if err != nil {
 		return
 	}
-	s.mdnsSrv, err = NewMDNSServer(s.Zone)
+	s.mdnsSrv, err = NewMDNSServer(s.Zone, false)
 	if err != nil {
 		return
 	}

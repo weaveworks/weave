@@ -11,13 +11,14 @@ type MDNSServer struct {
 	sendconn   *net.UDPConn
 	srv        *dns.Server
 	zone       Zone
+	allowLocal bool
 	running    bool
 }
 
 // Create a new mDNS server
 // Nothing will be done (including port bindings) until you `Start()` the server
-func NewMDNSServer(zone Zone) (*MDNSServer, error) {
-	return &MDNSServer{zone: zone}, nil
+func NewMDNSServer(zone Zone, local bool) (*MDNSServer, error) {
+	return &MDNSServer{zone: zone, allowLocal: local}, nil
 }
 
 // Return true if testaddr is a UDP address with IP matching my local i/f
@@ -112,6 +113,12 @@ func (s *MDNSServer) makeHandler(qtype uint16, lookup LookupFunc) dns.HandlerFun
 		// assumption that the client wouldn't ask if it already knew
 		// the answer, and if it does ask, it'll be happy to get an
 		// answer.
+		remoteAddr := rw.RemoteAddr()
+		if s.addrIsLocal(remoteAddr) && !s.allowLocal {
+			Debug.Printf("[mdns] srv: mDNS query from local host ('%s'): ignored", remoteAddr)
+			return
+		}
+
 		// TODO: use any Answer in the query for adding records in the Zone database...
 		if len(r.Answer) == 0 && len(r.Question) > 0 {
 			q := &r.Question[0]

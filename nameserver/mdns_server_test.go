@@ -20,7 +20,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	Info.Println("TestServerSimpleQuery starting")
 
 	mzone := newMockedZoneWithRecords([]ZoneRecord{testRecord1, testRecord2})
-	mdnsServer, err := NewMDNSServer(mzone)
+	mdnsServer, err := NewMDNSServer(mzone, true)
 	wt.AssertNoErr(t, err)
 	err = mdnsServer.Start(nil)
 	wt.AssertNoErr(t, err)
