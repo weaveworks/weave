@@ -76,6 +76,8 @@ func RunLocalMulticastServer() (*dns.Server, error) {
 }
 
 func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
+	InitDefaultLogging(testing.Verbose())
+
 	server, err := RunLocalMulticastServer()
 	if err != nil {
 		t.Fatalf("Unable to run test server: %s. No default multicast interface?", err)
@@ -109,7 +111,7 @@ func (c *testContext) checkResponse(t *testing.T, channelOk bool, resp *Response
 		return
 	}
 	wt.AssertNoErr(t, resp.err)
-	log.Printf("Got address response %s addr %s", resp.Name, resp.IP())
+	log.Printf("Got address response %s addr %s", resp.Name(), resp.IP())
 	c.receivedAddr = resp.IP()
 	c.receivedCount++
 }

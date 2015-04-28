@@ -1,8 +1,11 @@
 package nameserver
 
 import (
+	"bytes"
 	"container/heap"
 	"errors"
+	"fmt"
+	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	"math"
@@ -30,6 +33,11 @@ const (
 	stPending  entryStatus = iota // someone is waiting for the resolution
 	stResolved entryStatus = iota // resolved
 )
+
+var statusToString = map[entryStatus]string{
+	stPending:  "pending",
+	stResolved: "resolved",
+}
 
 const (
 	CacheNoLocalReplies uint8 = 1 << iota // not found in local network (stored in the cache so we skip another local lookup or some time)
@@ -163,6 +171,19 @@ func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Tim
 	return (prevValidUntil != e.validUntil)
 }
 
+func (e *cacheEntry) String() string {
+	var buf bytes.Buffer
+	q := e.question
+	fmt.Fprintf(&buf, "'%s'[%s]: ", q.Name, dns.TypeToString[q.Qtype])
+	if e.Flags&CacheNoLocalReplies != 0 {
+		fmt.Fprintf(&buf, "neg-local")
+	} else {
+		fmt.Fprintf(&buf, "%s", statusToString[e.Status])
+	}
+	fmt.Fprintf(&buf, "(%d bytes)", e.ReplyLen)
+	return buf.String()
+}
+
 //////////////////////////////////////////////////////////////////////////////////////
 
 // An entriesPtrHeap is a min-heap of cache entries.
@@ -196,26 +217,49 @@ func (h *entriesPtrsHeap) Pop() interface{} {
 
 //////////////////////////////////////////////////////////////////////////////////////
 
+// The cache interface
+type ZoneCache interface {
+	// Get from the cache
+	Get(request *dns.Msg, maxLen int) (reply *dns.Msg, err error)
+	// Put in the cache
+	Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8) int
+	// Remove from the cache
+	Remove(question *dns.Question)
+	// Purge all expired entries from the cache
+	Purge()
+	// Remove all entries
+	Clear()
+	// Return the cache length
+	Len() int
+	// Return the max capacity
+	Capacity() int
+}
+
 type cacheKey dns.Question
 type entries map[cacheKey]*cacheEntry
 
 // Cache is a thread-safe fixed capacity LRU cache.
 type Cache struct {
-	Capacity int
-
+	capacity int
 	entries  entries
 	entriesH entriesPtrsHeap // len(entriesH) <= len(entries), as pending entries can be in entries but not in entriesH
+	clock    clock.Clock
 	lock     sync.RWMutex
 }
 
 // NewCache creates a cache of the given capacity
-func NewCache(capacity int) (*Cache, error) {
+func NewCache(capacity int, clk clock.Clock) (*Cache, error) {
 	if capacity <= 0 {
 		return nil, errInvalidCapacity
 	}
 	c := &Cache{
-		Capacity: capacity,
+		capacity: capacity,
 		entries:  make(entries, capacity),
+		clock:    clk,
+	}
+
+	if c.clock == nil {
+		c.clock = clock.New()
 	}
 
 	heap.Init(&c.entriesH)
@@ -227,15 +271,16 @@ func (c *Cache) Clear() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.entries = make(entries, c.Capacity)
+	c.entries = make(entries, c.capacity)
 	heap.Init(&c.entriesH)
 }
 
 // Purge removes the old elements in the cache
-func (c *Cache) Purge(now time.Time) {
+func (c *Cache) Purge() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	now := c.clock.Now()
 	for i, entry := range c.entriesH {
 		if entry.hasExpired(now) {
 			heap.Remove(&c.entriesH, i)
@@ -248,10 +293,11 @@ func (c *Cache) Purge(now time.Time) {
 
 // Add adds a reply to the cache.
 // When `ttl` is equal to `nullTTL`, the cache entry will be valid until the closest TTL in the `reply`
-func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8, now time.Time) int {
+func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8) int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	now := c.clock.Now()
 	question := request.Question[0]
 	key := cacheKey(question)
 	ent, found := c.entries[key]
@@ -262,7 +308,7 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8, now 
 		}
 	} else {
 		// If we will add a new item and the capacity has been exceeded, make some room...
-		if len(c.entriesH) >= c.Capacity {
+		if len(c.entriesH) >= c.capacity {
 			lowestEntry := heap.Pop(&c.entriesH).(*cacheEntry)
 			delete(c.entries, cacheKey(lowestEntry.question))
 		}
@@ -276,10 +322,11 @@ func (c *Cache) Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8, now 
 
 // Look up for a question's reply from the cache.
 // If no reply is stored in the cache, it returns a `nil` reply and no error.
-func (c *Cache) Get(request *dns.Msg, maxLen int, now time.Time) (reply *dns.Msg, err error) {
+func (c *Cache) Get(request *dns.Msg, maxLen int) (reply *dns.Msg, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	now := c.clock.Now()
 	question := request.Question[0]
 	key := cacheKey(question)
 	if ent, found := c.entries[key]; found {
@@ -321,4 +368,24 @@ func (c *Cache) Len() int {
 	defer c.lock.RUnlock()
 
 	return len(c.entries)
+}
+
+// Return the max capacity
+func (c *Cache) Capacity() int {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.capacity
+}
+
+// Return the max capacity
+func (c *Cache) String() string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	var buf bytes.Buffer
+	for _, entry := range c.entries {
+		fmt.Fprintf(&buf, "%s\n", entry)
+	}
+	return buf.String()
 }

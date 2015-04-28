@@ -133,7 +133,7 @@ func TestTCPDNSServer(t *testing.T) {
 	bs := make([]byte, 4)
 	for i := 0; i < numAnswers; i++ {
 		binary.LittleEndian.PutUint32(bs, uint32(i))
-		addrs = append(addrs, Record{"", net.IPv4(bs[0], bs[1], bs[2], bs[3]), 0, 0})
+		addrs = append(addrs, Record{"", net.IPv4(bs[0], bs[1], bs[2], bs[3]), 0, 0, 0})
 	}
 
 	// handler for the fallback server: it will just return a very long response

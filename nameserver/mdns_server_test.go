@@ -10,23 +10,25 @@ import (
 )
 
 func TestServerSimpleQuery(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
-
 	var (
-		testRecord1 = Record{"test.weave.local.", net.ParseIP("10.20.20.10"), 0, 0}
+		testRecord1 = Record{"test.weave.local.", net.ParseIP("10.20.20.10"), 0, 0, 0}
+		testRecord2 = Record{"test.weave.local.", net.ParseIP("10.20.20.20"), 0, 0, 0}
 		testInAddr1 = "10.20.20.10.in-addr.arpa."
 	)
 
-	mzone := NewMockedZone(testRecord1)
+	InitDefaultLogging(testing.Verbose())
+	Info.Println("TestServerSimpleQuery starting")
+
+	mzone := newMockedZoneWithRecords([]ZoneRecord{testRecord1, testRecord2})
 	mdnsServer, err := NewMDNSServer(mzone)
 	wt.AssertNoErr(t, err)
 	err = mdnsServer.Start(nil)
 	wt.AssertNoErr(t, err)
 	defer mdnsServer.Stop()
 
-	var receivedAddr net.IP
-	var receivedName string
-	var recvChan chan interface{}
+	receivedAddrs := make([]net.IP, 0)
+	receivedName := ""
+	recvChan := make(chan interface{})
 	receivedCount := 0
 
 	// Implement a minimal listener for responses
@@ -41,7 +43,7 @@ func TestServerSimpleQuery(t *testing.T) {
 				switch rr := answer.(type) {
 				case *dns.A:
 					t.Logf("... A:\n%+v", rr)
-					receivedAddr = rr.A
+					receivedAddrs = append(receivedAddrs, rr.A)
 					receivedCount++
 				case *dns.PTR:
 					t.Logf("... PTR:\n%+v", rr)
@@ -54,7 +56,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	}
 
 	sendQuery := func(name string, querytype uint16) {
-		receivedAddr = nil
+		receivedAddrs = make([]net.IP, 0)
 		receivedName = ""
 		receivedCount = 0
 		recvChan = make(chan interface{})
@@ -90,22 +92,25 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 
-	Debug.Printf("Query: %s dns.TypeA", testRecord1.Name())
+	Debug.Printf("Checking that we get 2 IPs fo name '%s' [A]", testRecord1.Name())
 	sendQuery(testRecord1.Name(), dns.TypeA)
-	if receivedCount != 1 {
+	if receivedCount != 2 {
 		t.Fatalf("Unexpected result count %d for %s", receivedCount, testRecord1.Name())
 	}
-	if !receivedAddr.Equal(testRecord1.IP()) {
-		t.Fatalf("Unexpected result %s for %s", receivedAddr, testRecord1.Name())
+	if !(receivedAddrs[0].Equal(testRecord1.IP()) || receivedAddrs[0].Equal(testRecord2.IP())) {
+		t.Fatalf("Unexpected result %s for %s", receivedAddrs, testRecord1.Name())
+	}
+	if !(receivedAddrs[1].Equal(testRecord1.IP()) || receivedAddrs[1].Equal(testRecord2.IP())) {
+		t.Fatalf("Unexpected result %s for %s", receivedAddrs, testRecord1.Name())
 	}
 
-	Debug.Printf("Query: testfail.weave. dns.TypeA")
+	Debug.Printf("Checking that 'testfail.weave.' [A] gets no answers")
 	sendQuery("testfail.weave.", dns.TypeA)
 	if receivedCount != 0 {
 		t.Fatalf("Unexpected result count %d for testfail.weave", receivedCount)
 	}
 
-	Debug.Printf("Query: %s dns.TypePTR", testInAddr1)
+	Debug.Printf("Checking that '%s' [PTR] gets one name", testInAddr1)
 	sendQuery(testInAddr1, dns.TypePTR)
 	if receivedCount != 1 {
 		t.Fatalf("Expected an answer to %s, got %d answers", testInAddr1, receivedCount)

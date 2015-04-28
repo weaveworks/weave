@@ -7,7 +7,6 @@ import (
 	. "github.com/weaveworks/weave/common"
 	"net"
 	"sync"
-	"time"
 )
 
 const (
@@ -130,7 +129,7 @@ func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *D
 		cacheLen = config.CacheLen
 	}
 	Debug.Printf("[dns] Initializing cache: %d entries", config.CacheLen)
-	s.cache, err = NewCache(cacheLen)
+	s.cache, err = NewCache(cacheLen, nil)
 	if err != nil {
 		return
 	}
@@ -254,11 +253,10 @@ func (s *DNSServer) commonQueryHandler(proto dnsProtocol, kind string, qtype uin
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] %s: %+v", r.MsgHdr.Id, kind, q)
-		now := time.Now()
 		maxLen := getMaxReplyLen(r, proto)
 		lookups := []ZoneLookup{s.Zone, s.mdnsCli}
 
-		reply, err := s.cache.Get(r, maxLen, time.Now())
+		reply, err := s.cache.Get(r, maxLen)
 		if err != nil {
 			if err == errNoLocalReplies {
 				Debug.Printf("[dns msgid %d] Cached 'no local replies' - skipping local lookup", r.MsgHdr.Id)
@@ -280,7 +278,7 @@ func (s *DNSServer) commonQueryHandler(proto dnsProtocol, kind string, qtype uin
 		if q.Qtype != qtype {
 			Debug.Printf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
 			m := makeDNSNotImplResponse(r)
-			s.cache.Put(r, m, negLocalTTL, 0, now)
+			s.cache.Put(r, m, negLocalTTL, 0)
 			w.WriteMsg(m)
 			return
 		}
@@ -290,16 +288,15 @@ func (s *DNSServer) commonQueryHandler(proto dnsProtocol, kind string, qtype uin
 				m.Authoritative = true
 				Debug.Printf("[dns msgid %d] Caching response for type %s query for '%s': %s [code:%s]",
 					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, answers, dns.RcodeToString[m.Rcode])
-				s.cache.Put(r, m, nullTTL, 0, now)
+				s.cache.Put(r, m, nullTTL, 0)
 				w.WriteMsg(m)
 				return
 			}
-			now = time.Now()
 		}
 
 		Info.Printf("[dns msgid %d] No results for type %s query for '%s' [caching no-local]",
 			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
-		s.cache.Put(r, nil, negLocalTTL, CacheNoLocalReplies, now)
+		s.cache.Put(r, nil, negLocalTTL, CacheNoLocalReplies)
 
 		fallback(w, r)
 	}
