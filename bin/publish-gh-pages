@@ -1,3 +1,0 @@
-#! /bin/sh
-set -e
-git push git@github.com:weaveworks/weave gh-pages:gh-pages
