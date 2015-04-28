@@ -109,3 +109,11 @@ func raddrToIPv4(addr string) (IPv4, error) {
 	revIP4 := revIP.To4()
 	return IPv4([4]byte{revIP4[3], revIP4[2], revIP4[1], revIP4[0]}), nil
 }
+
+func raddrToIP(addr string) (net.IP, error) {
+	r, err := raddrToIPv4(addr)
+	if err != nil {
+		return net.IP{}, err
+	}
+	return r.toNetIP(), nil
+}
