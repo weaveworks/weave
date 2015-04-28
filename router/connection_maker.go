@@ -215,12 +215,13 @@ func (cm *ConnectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarg
 				continue
 			}
 			address := conn.RemoteTCPAddr()
-			// Try both port of connection and standard port.  Don't
-			// use remote side of inbound connection.
 			if conn.Outbound() {
 				addTarget(address)
-			}
-			if ip, _, err := net.SplitHostPort(address); err == nil {
+			} else if ip, _, err := net.SplitHostPort(address); err == nil {
+				// There is no point connecting to the (likely
+				// ephemeral) remote port of an inbound connection
+				// that some peer has. Let's try to connect to on the
+				// weave port instead.
 				addTarget(fmt.Sprintf("%s:%d", ip, cm.port))
 			}
 		}
