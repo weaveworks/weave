@@ -109,7 +109,7 @@ func (c *testContext) checkResponse(t *testing.T, channelOk bool, resp *Response
 		return
 	}
 	wt.AssertNoErr(t, resp.err)
-	log.Printf("Got address response %s addr %s", resp.Name, resp.IP())
+	log.Printf("Got address response %s addr %s", resp.Name(), resp.IP())
 	c.receivedAddr = resp.IP()
 	c.receivedCount++
 }

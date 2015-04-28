@@ -15,6 +15,7 @@ type ZoneRecord interface {
 	IP() net.IP    // The IP (v4) address
 	Priority() int // The priority
 	Weight() int   // The weight
+	TTL() int      // TTL
 }
 
 type ZoneLookup interface {
@@ -41,12 +42,14 @@ type Record struct {
 	ip       net.IP
 	priority int
 	weight   int
+	ttl      int
 }
 
 func (r Record) Name() string  { return r.name }
 func (r Record) IP() net.IP    { return r.ip }
 func (r Record) Priority() int { return r.priority }
 func (r Record) Weight() int   { return r.weight }
+func (r Record) TTL() int      { return r.ttl }
 
 func (i Record) String() string {
 	var buf bytes.Buffer
@@ -61,6 +64,9 @@ func (i Record) String() string {
 	}
 	if i.Weight() > 0 {
 		fmt.Fprintf(&buf, "/W:%d", i.Weight())
+	}
+	if i.TTL() > 0 {
+		fmt.Fprintf(&buf, "/TTL:%d", i.TTL())
 	}
 
 	return buf.String()

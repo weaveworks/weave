@@ -31,7 +31,7 @@ func TestCacheLength(t *testing.T) {
 		question := &questionMsg.Question[0]
 
 		ip := net.ParseIP(fmt.Sprintf("10.0.1.%d", i))
-		records := []ZoneRecord{Record{name, ip, 0, 0}}
+		records := []ZoneRecord{Record{name, ip, 0, 0, 0}}
 
 		reply := makeAddressReply(questionMsg, question, records)
 		reply.Answer[0].Header().Ttl = uint32(i)
@@ -83,7 +83,7 @@ func TestCacheEntries(t *testing.T) {
 	}
 
 	t.Logf("Inserting the reply")
-	records := []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.1"), 0, 0}}
+	records := []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.1"), 0, 0, 0}}
 	reply1 := makeAddressReply(questionMsg, question, records)
 	l.Put(questionMsg, reply1, nullTTL, 0, time.Now())
 
@@ -116,7 +116,7 @@ func TestCacheEntries(t *testing.T) {
 	}
 
 	t.Logf("Checking that an Remove() results in Get() returning nothing")
-	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.9.9"), 0, 0}}
+	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.9.9"), 0, 0, 0}}
 	replyTemp := makeAddressReply(questionMsg, question, records)
 	l.Put(questionMsg, replyTemp, nullTTL, 0, time.Now())
 	lenBefore := l.Len()
@@ -131,11 +131,11 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Inserting a two replies for the same query")
 	timePut2 := time.Now()
-	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.2"), 0, 0}}
+	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.2"), 0, 0, 0}}
 	reply2 := makeAddressReply(questionMsg, question, records)
 	l.Put(questionMsg, reply2, nullTTL, 0, timePut2)
 	timePut3 := timePut2.Add(time.Duration(1) * time.Second)
-	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.3"), 0, 0}}
+	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.3"), 0, 0, 0}}
 	reply3 := makeAddressReply(questionMsg, question, records)
 	l.Put(questionMsg, reply3, nullTTL, 0, timePut3)
 
@@ -177,7 +177,7 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertNil(t, resp, "reponse from Get() yet")
 
 	t.Logf("Checking that an Remove() between Get() and Put() does not break things")
-	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.9.9"), 0, 0}}
+	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.9.9"), 0, 0, 0}}
 	replyTemp2 := makeAddressReply(questionMsg2, question2, records)
 	l.Remove(question2)
 	l.Put(questionMsg2, replyTemp2, nullTTL, 0, time.Now())

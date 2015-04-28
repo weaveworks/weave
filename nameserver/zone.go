@@ -85,7 +85,7 @@ func (zone *ZoneDb) LookupName(name string) ([]ZoneRecord, error) {
 	defer zone.mx.RUnlock()
 	for _, r := range zone.recs {
 		if r.Name == name {
-			return []ZoneRecord{Record{r.Name, r.IP, 0, 0}}, nil
+			return []ZoneRecord{Record{r.Name, r.IP, 0, 0, 0}}, nil
 		}
 	}
 	return nil, LookupError(name)
@@ -100,7 +100,7 @@ func (zone *ZoneDb) LookupInaddr(inaddr string) ([]ZoneRecord, error) {
 		defer zone.mx.RUnlock()
 		for _, r := range zone.recs {
 			if r.IP.Equal(ip) {
-				return []ZoneRecord{Record{r.Name, r.IP, 0, 0}}, nil
+				return []ZoneRecord{Record{r.Name, r.IP, 0, 0, 0}}, nil
 			}
 		}
 		return nil, LookupError(inaddr)

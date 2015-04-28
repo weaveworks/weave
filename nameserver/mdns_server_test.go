@@ -13,7 +13,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	InitDefaultLogging(testing.Verbose())
 
 	var (
-		testRecord1 = Record{"test.weave.local.", net.ParseIP("10.20.20.10"), 0, 0}
+		testRecord1 = Record{"test.weave.local.", net.ParseIP("10.20.20.10"), 0, 0, 0}
 		testInAddr1 = "10.20.20.10.in-addr.arpa."
 	)
 

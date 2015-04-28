@@ -29,6 +29,7 @@ var (
 type Response struct {
 	name string
 	addr net.IP
+	ttl  int
 	err  error
 }
 
@@ -36,6 +37,7 @@ func (r Response) Name() string  { return r.name }
 func (r Response) IP() net.IP    { return r.addr }
 func (r Response) Priority() int { return 0 }
 func (r Response) Weight() int   { return 0 }
+func (r Response) TTL() int      { return r.ttl }
 
 func (r Response) Equal(r2 *Response) bool {
 	if r.name != r2.name {
@@ -182,10 +184,11 @@ func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
 			switch rr := answer.(type) {
 			case *dns.A:
 				name = rr.Hdr.Name
-				res = &Response{addr: rr.A}
+				res = &Response{name: name, addr: rr.A, ttl: int(rr.Hdr.Ttl)}
 			case *dns.PTR:
 				name = rr.Hdr.Name
-				res = &Response{name: rr.Ptr}
+				raddr, _ := raddrToIP(name)
+				res = &Response{name: rr.Ptr, addr: raddr, ttl: int(rr.Hdr.Ttl)}
 			default:
 				return
 			}
