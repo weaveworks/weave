@@ -442,7 +442,6 @@ func (conn *LocalConnection) sendProtocolMsg(m ProtocolMsg) error {
 }
 
 func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
-	defer conn.Decryptor.Shutdown()
 	usingPassword := conn.SessionKey != nil
 	var receiver TCPReceiver
 	if usingPassword {

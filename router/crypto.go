@@ -152,7 +152,6 @@ type FrameConsumer func(src []byte, dst []byte, frame []byte)
 
 type Decryptor interface {
 	IterateFrames([]byte, FrameConsumer) error
-	Shutdown()
 }
 
 type NonDecryptor struct {
@@ -209,18 +208,12 @@ func (nd *NonDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) err
 	return nil
 }
 
-func (nd *NonDecryptor) Shutdown() {
-}
-
 func NewNaClDecryptor(sessionKey *[32]byte, outbound bool) *NaClDecryptor {
 	return &NaClDecryptor{
 		NonDecryptor: *NewNonDecryptor(),
 		sessionKey:   sessionKey,
 		instance:     NewNaClDecryptorInstance(outbound),
 		instanceDF:   NewNaClDecryptorInstance(outbound)}
-}
-
-func (nd *NaClDecryptor) Shutdown() {
 }
 
 func (nd *NaClDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) error {
