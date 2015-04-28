@@ -489,11 +489,6 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 			nil)
 	case ProtocolFragmentationReceived:
 		conn.setStackFrag(true)
-	case ProtocolNonce:
-		if conn.SessionKey == nil {
-			return fmt.Errorf("unexpected nonce on unencrypted connection")
-		}
-		conn.Decryptor.ReceiveNonce(payload)
 	case ProtocolPMTUVerified:
 		conn.pmtuVerified(int(binary.BigEndian.Uint16(payload)))
 	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:

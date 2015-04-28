@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"sync"
 )
 
@@ -153,7 +152,6 @@ type FrameConsumer func(src []byte, dst []byte, frame []byte)
 
 type Decryptor interface {
 	IterateFrames([]byte, FrameConsumer) error
-	ReceiveNonce([]byte)
 	Shutdown()
 }
 
@@ -214,10 +212,6 @@ func (nd *NonDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) err
 func (nd *NonDecryptor) Shutdown() {
 }
 
-func (nd *NonDecryptor) ReceiveNonce(msg []byte) {
-	log.Println("Received Nonce on non-encrypted channel. Ignoring.")
-}
-
 func NewNaClDecryptor(sessionKey *[32]byte, outbound bool) *NaClDecryptor {
 	return &NaClDecryptor{
 		NonDecryptor: *NewNonDecryptor(),
@@ -227,9 +221,6 @@ func NewNaClDecryptor(sessionKey *[32]byte, outbound bool) *NaClDecryptor {
 }
 
 func (nd *NaClDecryptor) Shutdown() {
-}
-
-func (nd *NaClDecryptor) ReceiveNonce(msg []byte) {
 }
 
 func (nd *NaClDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) error {
