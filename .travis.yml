@@ -3,6 +3,9 @@ sudo: false
 go:
   - 1.4
 
+env:
+  - PATH="${PATH}:${HOME}/.local/bin"
+
 addons:
   apt:
     packages:
@@ -11,6 +14,8 @@ addons:
 install:
   - go clean -i net
   - go install -tags netgo std
+  - pip install --user --upgrade gcloud gsutil
+  - bin/setup-ci-secrets $encrypted_5ba036e89377_key $encrypted_5ba036e89377_iv
   - make travis
 
 script:
@@ -20,3 +25,4 @@ script:
 after_success:
   - go get github.com/mattn/goveralls
   - $HOME/gopath/bin/goveralls -coverprofile=profile.cov -service=travis-ci
+  - test "${TRAVIS_PULL_REQUEST}" = "false" && site/build-and-publish.sh
