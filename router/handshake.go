@@ -102,7 +102,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 			remotePublic[idx] = elem
 		}
 		conn.SessionKey = FormSessionKey(&remotePublic, private, conn.Router.Password)
-		conn.tcpSender = NewEncryptedTCPSender(enc, conn.SessionKey)
+		conn.tcpSender = NewEncryptedTCPSender(enc, conn.SessionKey, conn.outbound)
 		conn.Decryptor = NewNaClDecryptor(conn.SessionKey)
 	} else {
 		if rpErr == nil {

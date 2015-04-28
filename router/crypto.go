@@ -1,7 +1,6 @@
 package router
 
 import (
-	"bytes"
 	"code.google.com/p/go-bit/bit"
 	"code.google.com/p/go.crypto/nacl/box"
 	"code.google.com/p/go.crypto/nacl/secretbox"
@@ -37,22 +36,6 @@ func GenerateRandomNonce() ([24]byte, error) {
 		return nonce, fmt.Errorf("Did not read enough - wanted 24, got %v", n)
 	}
 	return nonce, nil
-}
-
-func EncryptPrefixNonce(plaintxt []byte, nonce *[24]byte, secret *[32]byte) []byte {
-	buf := make([]byte, 24, 24+len(plaintxt)+secretbox.Overhead)
-	copy(buf, nonce[:])
-	// Seal *appends* to buf
-	return secretbox.Seal(buf, plaintxt, nonce, secret)
-}
-
-func DecryptPrefixNonce(ciphertxt []byte, secret *[32]byte) ([]byte, bool) {
-	if len(ciphertxt) < secretbox.Overhead+24 {
-		return nil, false
-	}
-	var nonce [24]byte
-	copy(nonce[:], ciphertxt[:24])
-	return secretbox.Open(nil, ciphertxt[24:], &nonce, secret)
 }
 
 func SetNonceLow15Bits(nonce *[24]byte, offset uint16) {
@@ -419,7 +402,32 @@ func (di *NaClDecryptorInstance) advanceState(offsetNoFlags uint16) (*[24]byte, 
 	return di.nonce, di.usedOffsets, nil
 }
 
-// TCP Senders
+// TCP Senders/Receivers
+
+// The lowest 64 bits of the nonce contain the message sequence
+// number. The top most bit indicates the connection polarity at the
+// sender - '1' for outbound. The remaining 127 bits are zero. The
+// polarity is needed so that the two ends of a connection do not use
+// the same nonces. This is a requirement of the NaCl Security Model;
+// see http://nacl.cr.yp.to/box.html.
+type TCPCryptoState struct {
+	sessionKey *[32]byte
+	nonce      [24]byte
+	seqNo      uint64
+}
+
+func NewTCPCryptoState(sessionKey *[32]byte, outbound bool) *TCPCryptoState {
+	s := &TCPCryptoState{sessionKey: sessionKey}
+	if outbound {
+		s.nonce[0] |= (1 << 7)
+	}
+	return s
+}
+
+func (s *TCPCryptoState) advance() {
+	s.seqNo++
+	binary.BigEndian.PutUint64(s.nonce[16:24], s.seqNo)
+}
 
 type TCPSender interface {
 	Send([]byte) error
@@ -430,17 +438,9 @@ type SimpleTCPSender struct {
 }
 
 type EncryptedTCPSender struct {
+	SimpleTCPSender
 	sync.RWMutex
-	outerEncoder *gob.Encoder
-	innerEncoder *gob.Encoder
-	buffer       *bytes.Buffer
-	sessionKey   *[32]byte
-	msgCount     int
-}
-
-type EncryptedTCPMessage struct {
-	Number int
-	Body   []byte
+	state *TCPCryptoState
 }
 
 func NewSimpleTCPSender(encoder *gob.Encoder) *SimpleTCPSender {
@@ -451,35 +451,19 @@ func (sender *SimpleTCPSender) Send(msg []byte) error {
 	return sender.encoder.Encode(msg)
 }
 
-func NewEncryptedTCPSender(encoder *gob.Encoder, sessionKey *[32]byte) *EncryptedTCPSender {
-	buffer := new(bytes.Buffer)
+func NewEncryptedTCPSender(encoder *gob.Encoder, sessionKey *[32]byte, outbound bool) *EncryptedTCPSender {
 	return &EncryptedTCPSender{
-		outerEncoder: encoder,
-		innerEncoder: gob.NewEncoder(buffer),
-		buffer:       buffer,
-		sessionKey:   sessionKey,
-		msgCount:     0}
+		SimpleTCPSender: *NewSimpleTCPSender(encoder),
+		state:           NewTCPCryptoState(sessionKey, outbound)}
 }
 
 func (sender *EncryptedTCPSender) Send(msg []byte) error {
-	nonce, err := GenerateRandomNonce()
-	if err != nil {
-		return err
-	}
 	sender.Lock()
 	defer sender.Unlock()
-	wrappedMsg := EncryptedTCPMessage{Number: sender.msgCount, Body: msg}
-	buffer := sender.buffer
-	buffer.Reset()
-	err = sender.innerEncoder.Encode(wrappedMsg)
-	if err != nil {
-		return err
-	}
-	sender.msgCount += 1
-	return sender.outerEncoder.Encode(EncryptPrefixNonce(buffer.Bytes(), &nonce, sender.sessionKey))
+	encodedMsg := secretbox.Seal(nil, msg, &sender.state.nonce, sender.state.sessionKey)
+	sender.state.advance()
+	return sender.SimpleTCPSender.Send(encodedMsg)
 }
-
-// TCP Receivers
 
 type TCPReceiver interface {
 	Decode([]byte) ([]byte, error)
@@ -489,10 +473,8 @@ type SimpleTCPReceiver struct {
 }
 
 type EncryptedTCPReceiver struct {
-	sessionKey *[32]byte
-	decoder    *gob.Decoder
-	buffer     *bytes.Buffer
-	msgCount   int
+	SimpleTCPReceiver
+	state *TCPCryptoState
 }
 
 func NewSimpleTCPReceiver() *SimpleTCPReceiver {
@@ -503,33 +485,17 @@ func (receiver *SimpleTCPReceiver) Decode(msg []byte) ([]byte, error) {
 	return msg, nil
 }
 
-func NewEncryptedTCPReceiver(sessionKey *[32]byte) *EncryptedTCPReceiver {
-	buffer := new(bytes.Buffer)
+func NewEncryptedTCPReceiver(sessionKey *[32]byte, outbound bool) *EncryptedTCPReceiver {
 	return &EncryptedTCPReceiver{
-		sessionKey: sessionKey,
-		decoder:    gob.NewDecoder(buffer),
-		buffer:     buffer,
-		msgCount:   0}
+		SimpleTCPReceiver: *NewSimpleTCPReceiver(),
+		state:             NewTCPCryptoState(sessionKey, !outbound)}
 }
 
 func (receiver *EncryptedTCPReceiver) Decode(msg []byte) ([]byte, error) {
-	plaintext, success := DecryptPrefixNonce(msg, receiver.sessionKey)
+	decodedMsg, success := secretbox.Open(nil, msg, &receiver.state.nonce, receiver.state.sessionKey)
 	if !success {
-		return msg, fmt.Errorf("Unable to decrypt TCP msg")
+		return nil, fmt.Errorf("Unable to decrypt TCP msg")
 	}
-	receiver.buffer.Reset()
-	_, err := receiver.buffer.Write(plaintext)
-	if err != nil {
-		return msg, err
-	}
-	wrappedMsg := new(EncryptedTCPMessage)
-	err = receiver.decoder.Decode(wrappedMsg)
-	if err != nil {
-		return msg, err
-	}
-	if wrappedMsg.Number != receiver.msgCount {
-		return msg, fmt.Errorf("Received TCP message with wrong sequence number; possible replay attack")
-	}
-	receiver.msgCount += 1
-	return wrappedMsg.Body, nil
+	receiver.state.advance()
+	return decodedMsg, nil
 }
