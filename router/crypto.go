@@ -26,55 +26,6 @@ func FormSessionKey(remotePublicKey, localPrivateKey *[32]byte, secretKey []byte
 	return &sessionKey
 }
 
-func GenerateRandomNonce() ([24]byte, error) {
-	var nonce [24]byte
-	n, err := rand.Read(nonce[:])
-	if err != nil {
-		return nonce, err
-	}
-	if n != 24 {
-		return nonce, fmt.Errorf("Did not read enough - wanted 24, got %v", n)
-	}
-	return nonce, nil
-}
-
-func SetNonceLow15Bits(nonce *[24]byte, offset uint16) {
-	// ensure top bit of offset is 0
-	offset = offset & ((1 << 15) - 1)
-	// grab top bit of nonce[22:24] (and clear out lower bits)
-	nonceBits := binary.BigEndian.Uint16(nonce[22:24]) & (1 << 15)
-	// Big endian => the MSB is stored at the *lowest* address. So
-	// that top bit in nonce[22] should stay as the top bit in
-	// nonce[22]
-	binary.BigEndian.PutUint16(nonce[22:24], nonceBits+offset)
-}
-
-// Nonce encoding/decoding
-
-func EncodeNonce(df bool) (*[24]byte, []byte, error) {
-	nonce, err := GenerateRandomNonce()
-	if err != nil {
-		return nil, []byte{}, err
-	}
-	// wipe out lowest 15 bits, but encode the df right at the bottom
-	flags := uint16(0)
-	if df {
-		flags |= 1
-	}
-	SetNonceLow15Bits(&nonce, flags)
-	// NB: need to make a copy since callers may modify the array
-	return &nonce, Concat(nonce[:]), nil
-}
-
-func DecodeNonce(msg []byte) (bool, *[24]byte) {
-	flags := uint16(msg[23])
-	df := 0 != (flags & 1)
-	var nonce [24]byte
-	// upper bound is exclusive so this avoids copying the flags
-	copy(nonce[:], msg[:23])
-	return df, &nonce
-}
-
 // Frame Encryptors
 
 type Encryptor interface {
@@ -96,12 +47,10 @@ type NonEncryptor struct {
 type NaClEncryptor struct {
 	NonEncryptor
 	buf        []byte
-	offset     uint16
-	nonce      *[24]byte
-	nonceChan  chan *[24]byte
 	prefixLen  int
 	sessionKey *[32]byte
-	sendNonce  func([]byte)
+	nonce      [24]byte
+	seqNo      uint64
 	df         bool
 }
 
@@ -151,19 +100,19 @@ func (ne *NonEncryptor) TotalLen() int {
 	return ne.buffered
 }
 
-func NewNaClEncryptor(prefix []byte, sessionKey *[32]byte, sendNonce func([]byte), df bool) *NaClEncryptor {
+func NewNaClEncryptor(prefix []byte, sessionKey *[32]byte, outbound bool, df bool) *NaClEncryptor {
 	buf := make([]byte, MaxUDPPacketSize)
 	prefixLen := copy(buf, prefix)
-	return &NaClEncryptor{
+	ne := &NaClEncryptor{
 		NonEncryptor: *NewNonEncryptor([]byte{}),
 		buf:          buf,
-		offset:       0,
-		nonce:        nil,
-		nonceChan:    make(chan *[24]byte, ChannelSize),
 		prefixLen:    prefixLen,
 		sessionKey:   sessionKey,
-		sendNonce:    sendNonce,
 		df:           df}
+	if outbound {
+		ne.nonce[0] |= (1 << 7)
+	}
+	return ne
 }
 
 func (ne *NaClEncryptor) Bytes() ([]byte, error) {
@@ -171,52 +120,27 @@ func (ne *NaClEncryptor) Bytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	offsetFlags := ne.offset
 	// We carry the DF flag in the (unencrypted portion of the)
 	// payload, rather than just extracting it from the packet headers
 	// at the receiving end, since we do not trust routers not to mess
 	// with headers. As we have different decryptors for non-DF and
 	// DF, that would result in hard to track down packet drops due to
 	// crypto errors.
+	seqNoAndDF := ne.seqNo
 	if ne.df {
-		offsetFlags |= (1 << 15)
+		seqNoAndDF |= (1 << 63)
 	}
 	ciphertext := ne.buf
-	binary.BigEndian.PutUint16(ciphertext[ne.prefixLen:], offsetFlags)
-	nonce := ne.nonce
-	if nonce == nil {
-		freshNonce, encodedNonce, err := EncodeNonce(ne.df)
-		if err != nil {
-			return nil, err
-		}
-		ne.sendNonce(encodedNonce)
-		ne.nonce = freshNonce
-		nonce = freshNonce
-	}
-	offset := ne.offset
-	SetNonceLow15Bits(nonce, offset)
+	binary.BigEndian.PutUint64(ciphertext[ne.prefixLen:], seqNoAndDF)
+	binary.BigEndian.PutUint64(ne.nonce[16:24], seqNoAndDF)
 	// Seal *appends* to ciphertext
-	ciphertext = secretbox.Seal(ciphertext[:ne.prefixLen+2], plaintext, nonce, ne.sessionKey)
-
-	offset = (offset + 1) & ((1 << 15) - 1)
-	if offset == 0 {
-		// need a new nonce please
-		ne.nonce = <-ne.nonceChan
-	} else if offset == 1<<14 { // half way through range, send new nonce
-		nonce, encodedNonce, err := EncodeNonce(ne.df)
-		if err != nil {
-			return nil, err
-		}
-		ne.nonceChan <- nonce
-		ne.sendNonce(encodedNonce)
-	}
-	ne.offset = offset
-
+	ciphertext = secretbox.Seal(ciphertext[:ne.prefixLen+8], plaintext, &ne.nonce, ne.sessionKey)
+	ne.seqNo++
 	return ciphertext, nil
 }
 
 func (ne *NaClEncryptor) PacketOverhead() int {
-	return ne.prefixLen + 2 + secretbox.Overhead + ne.NonEncryptor.PacketOverhead()
+	return ne.prefixLen + 8 + secretbox.Overhead + ne.NonEncryptor.PacketOverhead()
 }
 
 func (ne *NaClEncryptor) TotalLen() int {
@@ -244,12 +168,18 @@ type NaClDecryptor struct {
 }
 
 type NaClDecryptorInstance struct {
-	nonce               *[24]byte
-	previousNonce       *[24]byte
+	nonce               [24]byte
+	currentWindow       uint64
 	usedOffsets         *bit.Set
 	previousUsedOffsets *bit.Set
-	highestOffsetSeen   uint16
-	nonceChan           chan *[24]byte
+}
+
+func NewNaClDecryptorInstance(outbound bool) *NaClDecryptorInstance {
+	di := &NaClDecryptorInstance{usedOffsets: bit.New()}
+	if !outbound {
+		di.nonce[0] |= (1 << 7)
+	}
+	return di
 }
 
 type PacketDecodingError struct {
@@ -288,118 +218,103 @@ func (nd *NonDecryptor) ReceiveNonce(msg []byte) {
 	log.Println("Received Nonce on non-encrypted channel. Ignoring.")
 }
 
-func NewNaClDecryptor(sessionKey *[32]byte) *NaClDecryptor {
+func NewNaClDecryptor(sessionKey *[32]byte, outbound bool) *NaClDecryptor {
 	return &NaClDecryptor{
 		NonDecryptor: *NewNonDecryptor(),
 		sessionKey:   sessionKey,
-		instance: &NaClDecryptorInstance{
-			usedOffsets: bit.New(),
-			nonceChan:   make(chan *[24]byte, ChannelSize)},
-		instanceDF: &NaClDecryptorInstance{
-			usedOffsets: bit.New(),
-			nonceChan:   make(chan *[24]byte, ChannelSize)}}
+		instance:     NewNaClDecryptorInstance(outbound),
+		instanceDF:   NewNaClDecryptorInstance(outbound)}
 }
 
 func (nd *NaClDecryptor) Shutdown() {
-	close(nd.instance.nonceChan)
-	close(nd.instanceDF.nonceChan)
 }
 
 func (nd *NaClDecryptor) ReceiveNonce(msg []byte) {
-	df, nonce := DecodeNonce(msg)
-	if df {
-		nd.instanceDF.nonceChan <- nonce
-	} else {
-		nd.instance.nonceChan <- nonce
-	}
 }
 
 func (nd *NaClDecryptor) IterateFrames(packet []byte, consumer FrameConsumer) error {
-	buf, err := nd.decrypt(packet)
-	if err != nil {
-		return PacketDecodingError{Desc: fmt.Sprint("decryption failed; ", err)}
+	if len(packet) < 8 {
+		return PacketDecodingError{Desc: fmt.Sprintf("encrypted UDP packet too short; expected length >= 8, got %d", len(packet))}
+	}
+	buf, success := nd.decrypt(packet)
+	if !success {
+		return PacketDecodingError{Desc: fmt.Sprint("UDP packet decryption failed")}
 	}
 	return nd.NonDecryptor.IterateFrames(buf, consumer)
 }
 
-func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, error) {
-	offset := binary.BigEndian.Uint16(buf[:2])
-	df := (offset & (1 << 15)) != 0
-	offsetNoFlags := offset & ((1 << 15) - 1)
+func (nd *NaClDecryptor) decrypt(buf []byte) ([]byte, bool) {
+	seqNoAndDF := binary.BigEndian.Uint64(buf[:8])
+	df := (seqNoAndDF & (1 << 63)) != 0
+	seqNo := seqNoAndDF & ((1 << 63) - 1)
 	var di *NaClDecryptorInstance
 	if df {
 		di = nd.instanceDF
 	} else {
 		di = nd.instance
 	}
-	nonce, usedOffsets, err := di.advanceState(offsetNoFlags)
-	if err != nil {
-		return nil, err
-	}
-	offsetNoFlagsInt := int(offsetNoFlags)
-	if usedOffsets.Contains(offsetNoFlagsInt) {
-		return nil, fmt.Errorf("Suspected replay attack detected when decrypting UDP packet")
-	}
-	SetNonceLow15Bits(nonce, offsetNoFlags)
-	result, success := secretbox.Open(nil, buf[2:], nonce, nd.sessionKey)
+	binary.BigEndian.PutUint64(di.nonce[16:24], seqNoAndDF)
+	result, success := secretbox.Open(nil, buf[8:], &di.nonce, nd.sessionKey)
 	if !success {
-		return nil, fmt.Errorf("Unable to decrypt UDP packet")
+		return nil, false
 	}
-	usedOffsets.Add(offsetNoFlagsInt)
-	return result, nil
+	// Drop duplicates. We do this *after* decryption since we must
+	// not advance our state unless decryption succeeded. Doing so
+	// would open an easy attack vector where an adversary could
+	// inject a packet with a sequence number of (1 << 63) - 1,
+	// causing all subsequent genuine packets to get dropped.
+	offset, usedOffsets := di.advanceState(seqNo)
+	if usedOffsets == nil || usedOffsets.Contains(offset) {
+		// We have detected a possible replay attack, but it is
+		// possible we may have just received a very old packet, or
+		// duplication may have occurred in the network. So let's just
+		// drop the packet silently.
+		return nil, true
+	}
+	usedOffsets.Add(offset)
+	return result, success
 }
 
-func (di *NaClDecryptorInstance) advanceState(offsetNoFlags uint16) (*[24]byte, *bit.Set, error) {
-	var ok bool
-	if di.nonce == nil {
-		if offsetNoFlags > (1 << 13) {
-			// offset is already beyond the first quarter and it's the
-			// first thing we've seen?! I don't think so.
-			return nil, nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
-		}
-		di.nonce, ok = <-di.nonceChan
-		if !ok {
-			return nil, nil, fmt.Errorf("Nonce chan closed")
-		}
-		di.highestOffsetSeen = offsetNoFlags
-	} else {
-		highestOffsetSeen := di.highestOffsetSeen
-		switch {
-		case offsetNoFlags < (1<<13) && highestOffsetSeen > ((1<<14)+(1<<13)) &&
-			(highestOffsetSeen-offsetNoFlags) > ((1<<14)+(1<<13)):
-			// offset is in the first quarter, highestOffsetSeen is in
-			// the top quarter and under a quarter behind us. We
-			// interpret this as we need to move to the next nonce
-			di.previousUsedOffsets = di.usedOffsets
-			di.usedOffsets = bit.New()
-			di.previousNonce = di.nonce
-			di.nonce, ok = <-di.nonceChan
-			if !ok {
-				return nil, nil, fmt.Errorf("Nonce chan closed")
-			}
-			di.highestOffsetSeen = offsetNoFlags
-		case offsetNoFlags > highestOffsetSeen &&
-			(offsetNoFlags-highestOffsetSeen) < (1<<13):
-			// offset is under a quarter above highestOffsetSeen. This
-			// is ok - maybe some packet loss
-			di.highestOffsetSeen = offsetNoFlags
-		case offsetNoFlags <= highestOffsetSeen &&
-			(highestOffsetSeen-offsetNoFlags) < (1<<13):
-			// offset is within a quarter of the highest we've
-			// seen. This is ok - just assuming some out-of-order
-			// delivery.
-		case highestOffsetSeen < (1<<13) && offsetNoFlags > ((1<<14)+(1<<13)) &&
-			(offsetNoFlags-highestOffsetSeen) > ((1<<14)+(1<<13)):
-			// offset is in the last quarter, highestOffsetSeen is in
-			// the first quarter, and offset is under a quarter behind
-			// us. This is ok - as above, just some out of order. But
-			// here it means we're dealing with the previous nonce
-			return di.previousNonce, di.previousUsedOffsets, nil
-		default:
-			return nil, nil, fmt.Errorf("Unexpected offset when decrypting UDP packet")
-		}
+// We record seen message sequence numbers in a sliding window of
+// 2*WindowSize which slides in WindowSize increments. This allows us
+// to process out-of-order delivery within the window, while
+// accurately discarding duplicates. By contrast any messages with
+// sequence numbers below the window are discarded as potential
+// duplicates.
+//
+// There are two sets, corresponding to the lower and upper half of
+// the window. We slide the window s.t. that 2nd set always contains
+// the highest seen sequence number. We do this regardless of how far
+// ahead of the current window that sequence number might be, so we
+// can cope with large gaps resulting from packet loss.
+
+const (
+	WindowSize = 20 // bits
+)
+
+func (di *NaClDecryptorInstance) advanceState(seqNo uint64) (int, *bit.Set) {
+	var (
+		offset = int(seqNo & ((1 << WindowSize) - 1))
+		window = seqNo >> WindowSize
+	)
+	switch delta := int64(window - di.currentWindow); {
+	case delta < -1:
+		return offset, nil
+	case delta == -1:
+		return offset, di.previousUsedOffsets
+	default:
+		return offset, di.usedOffsets
+	case delta == +1:
+		di.currentWindow = window
+		di.previousUsedOffsets = di.usedOffsets
+		di.usedOffsets = bit.New()
+		return offset, di.usedOffsets
+	case delta > +1:
+		di.currentWindow = window
+		di.previousUsedOffsets = bit.New()
+		di.usedOffsets = bit.New()
+		return offset, di.usedOffsets
 	}
-	return di.nonce, di.usedOffsets, nil
 }
 
 // TCP Senders/Receivers
