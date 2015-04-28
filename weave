@@ -392,6 +392,8 @@ attach() {
 }
 
 detach() {
+    netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 || return 0
+
     for ADDR; do
         if ! netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
             # address is not there, leave the device alone
