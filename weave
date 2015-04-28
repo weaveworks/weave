@@ -585,8 +585,8 @@ uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \
         exit 1
     fi
 
-    if ! [ \( "$maj" -eq 3 -a "$min" -ge 5 \) -o "$maj" -gt 3 ] ; then
-        echo "WARNING: Linux kernel version 3.5 or newer is required (you have ${maj}.${min})" >&2
+    if ! [ \( "$maj" -eq 3 -a "$min" -ge 8 \) -o "$maj" -gt 3 ] ; then
+        echo "WARNING: Linux kernel version 3.8 or newer is required (you have ${maj}.${min})" >&2
     fi
 }
 
