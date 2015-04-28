@@ -15,7 +15,7 @@ normally place it in `/etc/systemd/system/weave.service`.
 
     [Unit]
     Description=Weave Network
-    Documentation=http://weaveworks.github.io/weave/
+    Documentation=http://docs.weave.works/weave/latest_release/
     Requires=docker.service
     After=docker.service
     [Service]
@@ -65,6 +65,6 @@ context with the commands shown below. You will need to have the
     sudo restorecon /usr/local/bin/weave
 
 [readme]: https://github.com/weaveworks/weave/blob/master/README.md#installation
-[connect]: http://weaveworks.github.io/weave/features.html#dynamic-topologies
+[connect]: features.html#dynamic-topologies
 [systemd]: http://www.freedesktop.org/wiki/Software/systemd/
-[encryption]: http://weaveworks.github.io/weave/how-it-works.html#crypto
+[encryption]: how-it-works.html#crypto
