@@ -36,12 +36,12 @@ remote() {
 }
 
 colourise() {
-    echo -ne '\e['$1'm'
+    [ -t 0 ] && echo -ne '\e['$1'm' || true
     shift
     # It's important that we don't do this in a subshell, as some
     # commands we execute need to modify global state
     "$@"
-    echo -ne '\e[0m'
+    [ -t 0 ] && echo -ne '\e[0m' || true
 }
 
 whitely() {
