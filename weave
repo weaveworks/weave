@@ -737,8 +737,8 @@ case "$COMMAND" in
     version)
         [ $# -eq 0 ] || usage
         echo weave script $SCRIPT_VERSION
-        ask_version $CONTAINER_NAME $IMAGE
-        ask_version $DNS_CONTAINER_NAME $DNS_IMAGE
+        ask_version $CONTAINER_NAME $IMAGE || true
+        ask_version $DNS_CONTAINER_NAME $DNS_IMAGE || true
         if ! EXEC_IMAGE_ID=$(docker inspect --format='{{.Id}}' $EXEC_IMAGE 2>/dev/null) ; then
             echo "Unable to find $EXEC_IMAGE image." >&2
         else
