@@ -217,20 +217,19 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 		}
 	}
 
+
 	for _, connSummaries := range decodedConns {
-		connsIterator(connSummaries, func(remoteNameByte []byte, _ string, _, _ bool) {
-			remoteName := PeerNameFromBin(remoteNameByte)
+		for _, connSummary := range connSummaries {
+			remoteName := PeerNameFromBin(connSummary.NameByte)
 			if _, found := newPeers[remoteName]; found {
-				return
+				continue
 			}
 			if _, found := peers.table[remoteName]; found {
-				return
+				continue
 			}
 			// Update refers to a peer which we have no knowledge
 			// of. Thus we can't apply the update. Abort.
 			err = UnknownPeerError{remoteName}
-		})
-		if err != nil {
 			return
 		}
 	}
@@ -310,19 +309,13 @@ func decodePeer(dec *gob.Decoder) (nameByte []byte, nickName string, uid uint64,
 	return
 }
 
-func connsIterator(connSummaries []ConnectionSummary, fun func([]byte, string, bool, bool)) {
-	for _, connSummary := range connSummaries {
-		fun(connSummary.NameByte, connSummary.RemoteTCPAddr, connSummary.Outbound, connSummary.Established)
-	}
-}
-
 func makeConnsMap(peer *Peer, connSummaries []ConnectionSummary, table map[PeerName]*Peer) map[PeerName]Connection {
 	conns := make(map[PeerName]Connection)
-	connsIterator(connSummaries, func(nameByte []byte, remoteTCPAddr string, outbound bool, established bool) {
-		name := PeerNameFromBin(nameByte)
+	for _, connSummary := range connSummaries {
+		name := PeerNameFromBin(connSummary.NameByte)
 		remotePeer := table[name]
-		conn := NewRemoteConnection(peer, remotePeer, remoteTCPAddr, outbound, established)
+		conn := NewRemoteConnection(peer, remotePeer, connSummary.RemoteTCPAddr, connSummary.Outbound, connSummary.Established)
 		conns[name] = conn
-	})
+	}
 	return conns
 }
