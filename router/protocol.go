@@ -2,7 +2,7 @@ package router
 
 const (
 	Protocol        = "weave"
-	ProtocolVersion = 15
+	ProtocolVersion = 16
 )
 
 type ProtocolTag byte
