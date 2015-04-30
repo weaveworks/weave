@@ -188,7 +188,7 @@ Multiple subnet addresses can be exposed or hidden with a single
 invocation:
 
     host2$ weave expose 10.2.1.102/24 10.2.2.102/24
-    host2$ weave hide 10.2.1.102/24 10.2.2.102/24
+    host2$ weave hide   10.2.1.102/24 10.2.2.102/24
 
 Finally, exposed addresses can be added to weaveDNS by supplying a
 hostname:
