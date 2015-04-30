@@ -14,7 +14,6 @@ IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 DOCKERHUB_USER=weaveworks
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
-PROCFS=${PROCFS:-/proc}
 
 usage() {
     echo "Usage:"
@@ -44,7 +43,7 @@ usage() {
 exec_remote() {
     docker run --rm --privileged --net=host \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -v "$PROCFS":/hostproc \
+        -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e VERSION \
         -e WEAVE_DOCKER_ARGS \
@@ -124,6 +123,7 @@ BASE_DNS_IMAGE=$DOCKERHUB_USER/weavedns
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
 
+PROCFS=${PROCFS:-/proc}
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 DNS_CONTAINER_NAME=weavedns
