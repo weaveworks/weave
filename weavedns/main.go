@@ -15,19 +15,21 @@ var version = "(unreleased version)"
 
 func main() {
 	var (
-		justVersion bool
-		ifaceName   string
-		apiPath     string
-		domain      string
-		dnsPort     int
-		httpPort    int
-		wait        int
-		timeout     int
-		udpbuf      int
-		cacheLen    int
-		watch       bool
-		debug       bool
-		err         error
+		justVersion     bool
+		ifaceName       string
+		apiPath         string
+		domain          string
+		dnsPort         int
+		httpPort        int
+		wait            int
+		timeout         int
+		udpbuf          int
+		refreshInterval int
+		relevantTime    int
+		cacheLen        int
+		watch           bool
+		debug           bool
+		err             error
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -42,6 +44,9 @@ func main() {
 	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
+	// advanced options
+	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
+	flag.IntVar(&relevantTime, "relevant", weavedns.DefaultRelevantTime, "life time for info in the absence of queries (in secs)")
 	flag.Parse()
 
 	if justVersion {
@@ -50,7 +55,7 @@ func main() {
 	}
 
 	InitDefaultLogging(debug)
-	Info.Printf("WeaveDNS version %s\n", version) // first thing in log: the version
+	Info.Printf("[main] WeaveDNS version %s\n", version) // first thing in log: the version
 
 	var iface *net.Interface
 	if ifaceName != "" {
@@ -67,6 +72,8 @@ func main() {
 	zoneConfig := weavedns.ZoneConfig{
 		Domain:          domain,
 		Iface:           iface,
+		RefreshInterval: refreshInterval,
+		RelevantTime:    relevantTime,
 	}
 	zone, err := weavedns.NewZoneDb(zoneConfig)
 	if err != nil {

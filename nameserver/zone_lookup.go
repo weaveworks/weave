@@ -3,6 +3,7 @@ package nameserver
 import (
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
+	"time"
 )
 
 // Perform a lookup for a name in the zone
@@ -83,6 +84,10 @@ func (zone *zoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 	}
 
 	if len(res) > 0 {
+		// start (if we need to) a background refresh for the name
+		// note: we do not spend time trying to update names that did not return an initial response...
+		zone.startUpdatingName(name)
+
 		return res, nil
 	}
 
@@ -174,6 +179,13 @@ func (zone *zoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 	}
 
 	if len(res) > 0 {
+		// note: even for reverse addresses, we perform the background updates in the name, not in the IP
+		//       this simplifies the process and produces basically the same results...
+		// note: we do not spend time trying to update names that did not return an initial response...
+		for _, name := range res {
+			zone.startUpdatingName(name.Name())
+		}
+
 		return res, nil
 	}
 
@@ -181,3 +193,140 @@ func (zone *zoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 
 }
 
+//////////////////////////////////////////////////////////////////////////////
+
+// Names updates try to find all the IPs for a given name with a mDNS query
+//
+// There are two types of names updates:
+//
+// - immediate updates.
+//   After a `DomainLookup*()` for a name not in the database we will return the
+//   first IP we can get with mDNS from other peers. Waiting for more responses would
+//   mean more latency in the response to the client, so we send only one answer BUT
+//   we also trigger an immediate update request for that name in order to get all
+//   the other IPs we didn't wait for...
+//
+// - periodic updates
+//   once we have obtained the first group of IPs for a name, we schedule a periodic
+//   refresh for that name, so we keep the list of IPs for that name up to date.
+//
+// These names updates are repeated until either
+//
+//  a) there is no interest in the name, determined by a global 'relevant time'
+//     and the last time some local client asked about the name,
+//     or
+//  b) no peers answer one of our refresh requests (because the name has probably
+//     disappeared from the network)
+//
+
+// TODO: for the sake of simplicity, we implement this mechanism with two channels: one for immediate
+//       updates and another one for scheduled requests. We could use a heap of "next-time"s and a timer,
+//       but that would require timers cancellations/updates/etc on insertions/removals/etc, and
+//       it is probably not worth the trouble as we always use the same refresh period.
+//       It could be useful if we move to a solution where we set update times from the responses TTLs,
+//       but we currently use a fixed TTL (30secs), the same as the refresh period...
+//       Anyway, maybe we will move to a gossip-based solution instead of doing this polling...
+
+// Check if we must start updating a name and, in that case, trigger a immediate update
+func (zone *zoneDb) startUpdatingName(name string) {
+	if zone.refreshInterval > 0 {
+		zone.mx.Lock()
+		defer zone.mx.Unlock()
+
+		// check if we should enqueue a refresh request for this name
+		n := zone.getNamesSet(defaultRemoteIdent).getName(name, true)
+		if n.lastRefreshTime.IsZero() {
+			now := zone.clock.Now()
+			n.lastRefreshTime = now
+
+			Debug.Printf("[zonedb] Creating new immediate refresh request for '%s'", name)
+			zone.refreshChan <- refreshRequest{name: name, time: now}
+		}
+	}
+}
+
+// A worker for updating the list of IPs we have for a name
+func (zone *zoneDb) updater(num int) {
+	defer zone.refreshWg.Done()
+
+	Debug.Printf("[zonedb] Starting background updater #%d...", num)
+	for {
+		select {
+		case <-zone.refreshCloseChan:
+			Debug.Printf("[zonedb] Background updater #%d: interrupted while waiting for requests: exiting", num)
+			return
+
+		case request := <-zone.refreshChan:
+			// if nobody has asked for this name for long time, just forget about it...
+			// this will eventually garbage collect the `refreshChan` and all remote info in absence of activity
+			if !zone.IsNameRelevant(request.name) || zone.IsNameExpired(request.name) {
+				Debug.Printf("[zonedb] '%s' seem to be irrelevant now: removing any remote information", request.name)
+				zone.mx.Lock()
+				zone.getNamesSet(defaultRemoteIdent).deleteName(request.name)
+				zone.mx.Unlock()
+				continue
+			}
+
+			// perform the refresh for this name
+			name := dns.Fqdn(request.name)
+			Debug.Printf("[zonedb] Refreshing name '%s' with mDNS...", name)
+			res, _ := zone.mdnsCli.InsistentLookupName(request.name)
+			if res != nil && len(res) > 0 {
+				numIps := len(res)
+				zone.mx.Lock()
+				now := zone.clock.Now()
+				added, removed := zone.getNamesSet(defaultRemoteIdent).getName(name, true).updateIPs(res, now)
+				zone.mx.Unlock()
+				Debug.Printf("[zonedb] Obtained %d IPs for name '%s' with mDNS: %d added, %d removed",
+					numIps, name, added, removed)
+
+				// once the name has been updated, we insert the request (back) in the periodic requests channel
+				now = zone.clock.Now()
+				request.time = now.Add(zone.refreshInterval)
+				Debug.Printf("[zonedb] Rescheduling update for '%s' in %.2f secs",
+					request.name, zone.refreshInterval.Seconds())
+				zone.refreshSchedChan <- request
+			} else {
+				Debug.Printf("[zonedb] nobody knows about '%s'... removing", name)
+				zone.mx.Lock()
+				zone.getNamesSet(defaultRemoteIdent).deleteName(request.name)
+				zone.mx.Unlock()
+			}
+		}
+	}
+}
+
+// The periodic updater
+// Consume requests from the `refreshSchedChan`, where requests with increasing scheduling time are enqueued
+// for refreshing names...
+func (zone *zoneDb) periodicUpdater() {
+	defer zone.refreshWg.Done()
+	for {
+		select {
+		case <-zone.refreshCloseChan:
+			Debug.Printf("[zonedb] Periodic updater: interrupted while waiting for requests: exiting")
+			return
+
+		case request := <-zone.refreshSchedChan:
+			now := zone.clock.Now()
+			// we can sleep until the update time has arrived, as requests are sorted by scheduled time (new request
+			// in this channel will always be scheduled later than the last item in the channel), so we can
+			// safely suspend this goroutine until then...
+			if request.time.After(now) {
+				ddiff := time.Duration(request.time.Sub(now).Nanoseconds())
+				timer := zone.clock.Timer(ddiff)
+				Debug.Printf("[zonedb] Periodic updater: new request for %s: sleeping for %.2f secs...",
+					request.name, ddiff.Seconds())
+				select {
+				case <-zone.refreshCloseChan:
+					Debug.Printf("[zonedb] Periodic updater: interrupted while sleeping: exiting")
+					return
+				case <-timer.C:
+				}
+			}
+
+			// once the time has arrived, we insert the request in the immediate refresh channel
+			zone.refreshChan <- request
+		}
+	}
+}
