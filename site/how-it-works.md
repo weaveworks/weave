@@ -282,25 +282,23 @@ between two peers.
 #### TCP
 
 TCP connection are only used to exchange topology information between
-peers, via a message-based protocol. The router generates a fresh
-192-bit random nonce for every message to be sent, and prepends the
-nonce to the encrypted message, as is normal in NaCl, so that the
-receiver knows the nonce. Encryption of each message is carried out
-using NaCl's `secretbox.Seal` function using the ephemeral session
-key. Each TCP connection has a monotonically incrementing message
-counter, the current value of which is included in the encrypted part
-of the message. Given the assumption that TCP is reliable and ordered,
-a message received via TCP is only acted upon if the message counter
-in the received message is the expected message counter. This prevents
-replay attacks on the TCP connection.
+peers, via a message-based protocol. Encryption of each message is
+carried out by NaCl's `secretbox.Seal` function using the ephemeral
+session key and a nonce. The nonce contains the message sequence
+number, which is incremented for every message sent, and a bit
+indicating the polarity of the connection at the sender ('1' for
+outbound). The latter is required by the
+[NaCl Security Model](http://nacl.cr.yp.to/box.html) in order to
+ensure that the two ends of the connection do not use the same nonces.
 
-As TCP connections do not carry captured traffic, minimising message
-size or latency is not a major concern, so the potentially substantial
-increase in length of messages by prepending the full nonce, or the
-cost of generating a fresh random nonce for each message is not
-considered likely to cause problems. The random nonces are created by
-the go `crypto/rand` package, which implements a cryptographically
-secure pseudorandom number generator.
+Decryption of a message at the receiver is carried out by NaCl's
+`secretbox.Open` function using the ephemeral session key and a
+nonce. The receiver maintains its own message sequence number, which
+it increments for every message it decrypted successfully. The nonce
+is constructed from that sequence number and the connection
+polarity. As a result the receiver will only be able to decrypt a
+message if it has the expected sequence number. This prevents replay
+attacks.
 
 #### UDP
 
@@ -311,7 +309,7 @@ follows:
     +-----------------------------------+
     | Name of sending peer              |
     +-----------------------------------+
-    | Nonce offset and flags            |
+    | Message Sequence No and flags     |
     +-----------------------------------+
     | NaCl SecretBox overheads          |
     +-----------------------------------+ -+
@@ -344,65 +342,37 @@ follows:
 
 This is very similar to the [non-crypto encapsulation](#encapsulation).
 
-All of the frames are encrypted with the same ephemeral session key
-and all must be decrypted by the receiving peer. Frames which are to
-be forwarded on to some further peer will be re-encrypted with the
-relevant ephemeral session keys for the onward connections. Thus all
-traffic is fully decrypted on every peer it passes through.
-Encryption is again done with the NaCl `secretbox.Seal` function.
+All of the frames on a connection are encrypted with the same
+ephemeral session key, and a nonce constructed from a message sequence
+number, flags and the connection polarity. This is very similar to the
+TCP encryption scheme, and encryption is again done with the NaCl
+`secretbox.Seal` function. The main difference is that the message
+sequence number and flags are transmitted as part of the message,
+unencrypted.
 
-The name of the sending peer enables the receiver to identify the peer
-who sent this UDP packet, and in turn to determine which ephemeral
-session key was used and which nonce, and perform decryption. To avoid
-sending a fresh 192-bit nonce with every UDP packet, which would pose
-an unacceptable overhead, each UDP packet only carries the lowest 15
-bits of the nonce, which is treated as an offset from the "established
-nonce". The lifecycle of a nonce for UDP is:
+The receiver uses the name of the sending peer to determine which
+ephemeral session key and local cryptographic state to use for
+decryption. Frames which are to be forwarded on to some further peer
+will be re-encrypted with the relevant ephemeral session keys for the
+onward connections. Thus all traffic is fully decrypted on every peer
+it passes through.
 
-1. A fresh nonce is generated and the most significant 177 bits are
-   sent to the receiving peer over the TCP connection. These upper
-   most 177 bits are used for the next 2^15 (32768) UDP messages. This
-   is the "established nonce".
-2. Each UDP message carries the lowest 15 bits as a unique
-   counter. Thus the lowest 15 bits are combined with (appended to)
-   the uppermost 177 bits to form the unique nonce for that message.
-3. Once the sending side has sent the 16384'th message on the current
-   nonce (50% of the way through the available range), it generates a
-   new nonce (upper 177 bits only) and sends that over the TCP
-   connection, thus hopefully ensuring it arrives and is ready before
-   it is needed. The sending side will switch to using the new nonce
-   once the full 32768 messages of the current nonce have been
-   used. At this point, the sending side resets the offset to 0.
-4. The receiving side must deal with the fact that UDP is unreliable
-   and unordered. The receiving side keeps track of the highest offset
-   seen for each established nonce. The condition to switching to the
-   new nonce it has received via the TCP connection is: the highest
-   offset seen for the current nonce must be above 24576 (75% of the
-   available range) _and_ the current message just received must have
-   an offset less than 8192 (25% of the available range) _and_ the new
-   offset must be less than 8192 messages *ahead* of the highest seen
-   offset so far (assuming modulo 32768). If these conditions are met,
-   the highest offset is set to the offset of the current message and
-   the new nonce is used. If those conditions are not met, the
-   receiving side continues with the current nonce (according to the
-   rules below), updating the highest offset seen as appropriate. Thus
-   in order for the nonce to not be updated correctly would require a
-   loss of at least 8192 messages.
-5. When the receiving side switches to the new nonce, it does not
-   discard the old nonce. If the highest offset seen is below 8192
-   (25% of the range) _and_ the current message offset is above 24576
-   (75% of the range), _and_ the current message offset is less than
-   8192 behind the highest seen nonce (assuming modulo 32768), then
-   the current message is decoded with the old nonce.
-6. In the remaining cases, the current message is only decoded if its
-   offset is within 8192 either side of the highest seen offset.
-7. To avoid replay attacks, the receiving side keeps a set of which
-   offsets have been used with the current and previous nonce. If the
-   offset doesn't exist in the set, and the message can be correctly
-   decoded, the offset is added to the relevant set (thus we avoid
-   poisoning attacks). If the offset already exists in the set, or the
-   message cannot be correctly decoded, the message is not processed
-   further.
+Decryption is once again carried out by NaCl's `secretbox.Open`
+function using the ephemeral session key and nonce. The latter is
+constructed from the message sequence number and flags that appeared
+in the unencrypted portion of the received message, and the connection
+polarity.
+
+To guard against replay attacks, the receiver maintains some state in
+which it remembers the highest message sequence number seen. It could
+simply reject messages with lower sequence numbers, but that could
+result in excessive message loss when messages are re-ordered. The
+receiver therefore additionally maintains a set of received message
+sequence numbers in a window below the highest number seen, and only
+rejects messages with a sequence number below that window, or
+contained in the set. The window spans at least 2^20 message sequence
+numbers, and hence any re-ordering between the most recent ~1 million
+messages is handled without dropping messages.
 
 ### Further reading
 More details on the inner workings of weave can be found in the
