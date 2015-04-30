@@ -32,6 +32,13 @@ type ConnectionSummary struct {
 	Established   bool
 }
 
+type PeerSummary struct {
+	NameByte []byte
+	NickName string
+	UID      uint64
+	Version  uint64
+}
+
 func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
@@ -197,15 +204,15 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 	decoder := gob.NewDecoder(updateBuf)
 
 	for {
-		nameByte, nickName, uid, version, connSummaries, decErr := decodePeer(decoder)
+		peerSummary, connSummaries, decErr := decodePeer(decoder)
 		if decErr == io.EOF {
 			break
 		} else if decErr != nil {
 			err = decErr
 			return
 		}
-		name := PeerNameFromBin(nameByte)
-		newPeer := NewPeer(name, nickName, uid, version)
+		name := PeerNameFromBin(peerSummary.NameByte)
+		newPeer := NewPeer(name, peerSummary.NickName, peerSummary.UID, peerSummary.Version)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connSummaries)
 		existingPeer, found := peers.table[name]
@@ -216,7 +223,6 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			return
 		}
 	}
-
 
 	for _, connSummaries := range decodedConns {
 		for _, connSummary := range connSummaries {
@@ -271,10 +277,11 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	peer.RLock()
 	defer peer.RUnlock()
 
-	checkFatal(enc.Encode(peer.NameByte))
-	checkFatal(enc.Encode(peer.NickName))
-	checkFatal(enc.Encode(peer.UID))
-	checkFatal(enc.Encode(peer.version))
+	checkFatal(enc.Encode(PeerSummary{
+		peer.NameByte,
+		peer.NickName,
+		peer.UID,
+		peer.version}))
 
 	connSummaries := []ConnectionSummary{}
 	for _, conn := range peer.connections {
@@ -290,17 +297,8 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	checkFatal(enc.Encode(connSummaries))
 }
 
-func decodePeer(dec *gob.Decoder) (nameByte []byte, nickName string, uid uint64, version uint64, connSummaries []ConnectionSummary, err error) {
-	if err = dec.Decode(&nameByte); err != nil {
-		return
-	}
-	if err = dec.Decode(&nickName); err != nil {
-		return
-	}
-	if err = dec.Decode(&uid); err != nil {
-		return
-	}
-	if err = dec.Decode(&version); err != nil {
+func decodePeer(dec *gob.Decoder) (peerSummary PeerSummary, connSummaries []ConnectionSummary, err error) {
+	if err = dec.Decode(&peerSummary); err != nil {
 		return
 	}
 	if err = dec.Decode(&connSummaries); err != nil {
