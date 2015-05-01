@@ -27,6 +27,7 @@ func main() {
 		refreshInterval int
 		relevantTime    int
 		cacheLen        int
+		cacheDisabled   bool
 		watch           bool
 		debug           bool
 		err             error
@@ -39,14 +40,16 @@ func main() {
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
-	flag.IntVar(&timeout, "timeout", weavedns.DefaultTimeout, "timeout for resolutions")
-	flag.IntVar(&udpbuf, "udpbuf", weavedns.DefaultUDPBuflen, "UDP buffer length")
 	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	// advanced options
 	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
 	flag.IntVar(&relevantTime, "relevant", weavedns.DefaultRelevantTime, "life time for info in the absence of queries (in secs)")
+	flag.IntVar(&udpbuf, "udpbuf", weavedns.DefaultUDPBuflen, "UDP buffer length")
+	flag.IntVar(&timeout, "timeout", weavedns.DefaultTimeout, "timeout for resolutions (in millisecs)")
+	flag.BoolVar(&cacheDisabled, "no-cache", false, "disable the cache")
+
 	flag.Parse()
 
 	if justVersion {
@@ -93,18 +96,16 @@ func main() {
 	}
 
 	srvConfig := weavedns.DNSServerConfig{
-		Port:        dnsPort,
-		CacheLen:    cacheLen,
-		LocalDomain: domain,
-		Timeout:     timeout,
-		UDPBufLen:   udpbuf,
+		Port:      dnsPort,
+		CacheLen:  cacheLen,
+		Timeout:   timeout,
+		UDPBufLen: udpbuf,
 	}
 
 	srv, err := weavedns.NewDNSServer(srvConfig, zone, iface)
 	if err != nil {
-		Error.Fatal("Failed to initialize the WeaveDNS server", err)
+		Error.Fatal("[main] Failed to initialize the WeaveDNS server", err)
 	}
-	Info.Println("Upstream", srv.Upstream)
 
 	go SignalHandlerLoop(srv)
 	go weavedns.ListenHTTP(version, srv, domain, zone, httpPort)
