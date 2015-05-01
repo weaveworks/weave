@@ -33,6 +33,8 @@ func makeTruncatedReply(r *dns.Msg) *dns.Msg {
 	return reply
 }
 
+type DNSResponseBuilder func(r *dns.Msg, q *dns.Question, addrs []ZoneRecord) *dns.Msg
+
 func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []ZoneRecord) *dns.Msg {
 	answers := make([]dns.RR, len(addrs))
 	header := makeHeader(r, q)

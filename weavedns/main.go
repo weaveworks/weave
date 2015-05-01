@@ -96,13 +96,15 @@ func main() {
 	}
 
 	srvConfig := weavedns.DNSServerConfig{
-		Port:      dnsPort,
-		CacheLen:  cacheLen,
-		Timeout:   timeout,
-		UDPBufLen: udpbuf,
+		Zone:          zone,
+		Port:          dnsPort,
+		CacheLen:      cacheLen,
+		Timeout:       timeout,
+		UDPBufLen:     udpbuf,
+		CacheDisabled: cacheDisabled,
 	}
 
-	srv, err := weavedns.NewDNSServer(srvConfig, zone, iface)
+	srv, err := weavedns.NewDNSServer(srvConfig)
 	if err != nil {
 		Error.Fatal("[main] Failed to initialize the WeaveDNS server", err)
 	}
