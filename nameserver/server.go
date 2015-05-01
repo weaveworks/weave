@@ -232,14 +232,21 @@ func (s *DNSServer) Status() string {
 // Perform a graceful shutdown
 func (s *DNSServer) Stop() error {
 	// Stop the listeners/handlers
-	if err := s.tcpSrv.Shutdown(); err != nil {
-		return err
+	if s.tcpSrv != nil {
+		if err := s.tcpSrv.Shutdown(); err != nil {
+			return err
+		}
+		s.lst.Close()
+		s.tcpSrv = nil
 	}
-	if err := s.udpSrv.Shutdown(); err != nil {
-		return err
+	if s.udpSrv != nil {
+		if err := s.udpSrv.Shutdown(); err != nil {
+			return err
+		}
+		s.pc.Close()
+		s.udpSrv = nil
 	}
 	s.listenersWg.Wait()
-
 	return nil
 }
 
