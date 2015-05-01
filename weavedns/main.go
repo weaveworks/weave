@@ -52,15 +52,6 @@ func main() {
 	InitDefaultLogging(debug)
 	Info.Printf("WeaveDNS version %s\n", version) // first thing in log: the version
 
-	var zone = weavedns.NewZoneDb(domain)
-
-	if watch {
-		err := updater.Start(apiPath, zone)
-		if err != nil {
-			Error.Fatal("Unable to start watcher", err)
-		}
-	}
-
 	var iface *net.Interface
 	if ifaceName != "" {
 		var err error
@@ -70,6 +61,27 @@ func main() {
 			Error.Fatal(err)
 		} else {
 			Info.Println("Interface", ifaceName, "is up")
+		}
+	}
+
+	zoneConfig := weavedns.ZoneConfig{
+		Domain:          domain,
+		Iface:           iface,
+	}
+	zone, err := weavedns.NewZoneDb(zoneConfig)
+	if err != nil {
+		Error.Fatal("[main] Unable to initialize the Zone database", err)
+	}
+	err = zone.Start()
+	if err != nil {
+		Error.Fatal("[main] Unable to start the Zone database", err)
+	}
+	defer zone.Stop()
+
+	if watch {
+		err := updater.Start(apiPath, zone)
+		if err != nil {
+			Error.Fatal("[main] Unable to start watcher", err)
 		}
 	}
 

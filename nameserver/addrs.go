@@ -25,7 +25,7 @@ type ZoneLookup interface {
 	LookupInaddr(inaddr string) ([]ZoneRecord, error)
 }
 
-type ZoneObserver interface {
+type ZoneObservable interface {
 	// Observe anything that affects a particular name in the zone
 	ObserveName(name string, observer ZoneRecordObserver) error
 	// Observe anything that affects a particular IP in the zone
