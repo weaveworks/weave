@@ -393,6 +393,6 @@ quickly enough.
 ### <a name="dns"></a>DNS
 
 WeaveDNS is a distributed DNS service for weave networks, enabling
-containers to address each other by name rather than IP address. A
-preview release of weaveDNS is described [on our
-blog](http://weaveblog.com/2014/11/04/have-you-met-weavedns/).
+containers to address each other by name rather than IP address. Find
+out more about WeaveDNS from its
+[documentation](https://github.com/weaveworks/weave/blob/master/weavedns/README.md).
