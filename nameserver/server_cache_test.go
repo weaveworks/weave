@@ -165,6 +165,93 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	assertNotInCache(t, cache, qotherName, "after removing container")
 	assertNotInCache(t, cache, qotherPtr, "after removing container")
 }
+
+// Check if the entries in the cache expire
+func TestServerCacheExpiration(t *testing.T) {
+	const (
+		containerID      = "somecontainer"
+		testName1        = "first.weave.local."
+		testName2        = "second.weave.local."
+		negativeLocalTTL = 10
+	)
+
+	InitDefaultLogging(testing.Verbose())
+	Info.Println("TestServerCacheExpiration starting")
+
+	clk := newMockedClock()
+
+	Debug.Printf("Creating 2 zone databases")
+	zoneConfig := ZoneConfig{
+		RefreshInterval: 0, // no name updates
+		Clock:           clk,
+	}
+	dbs := newZoneDbsWithMockedMDns(2, zoneConfig)
+	dbs.Start()
+	defer dbs.Stop()
+
+	Debug.Printf("Creating a cache")
+	cache, err := NewCache(1024, clk)
+	wt.AssertNoErr(t, err)
+
+	Debug.Printf("Creating a real DNS server for the first zone database and with the cache")
+	srv, err := NewDNSServer(DNSServerConfig{
+		Zone:              dbs[0].Zone,
+		Cache:             cache,
+		Clock:             clk,
+		ListenReadTimeout: testSocketTimeout,
+		CacheNegLocalTTL:  negativeLocalTTL,
+	})
+	wt.AssertNoErr(t, err)
+	go srv.Start()
+	defer srv.Stop()
+	time.Sleep(100 * time.Millisecond) // Allow server goroutine to start
+
+	testPort, err := srv.GetPort()
+	wt.AssertNoErr(t, err)
+	wt.AssertNotEqualInt(t, testPort, 0, "invalid listen port")
+
+	// Check that the DNS server knows nothing about testName1
+	qName1, _ := assertExchange(t, testName1, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
+	// there should be a negative reply cached during [0, negativeLocalTTL]
+	assertNotLocalInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
+	clk.Forward(negativeLocalTTL - 1)
+	assertNotLocalInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
+	// after negativeLocalTTL, there should be absolutely nothing in the cache
+	clk.Forward(2)
+	assertNotInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
+
+	// We add the IP in the second peer right after
+	Debug.Printf("Adding an IPs to %s in database #2", testName1)
+	dbs[1].Zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.1"))
+	t.Logf("Zone database #2:\n%s", dbs[1].Zone)
+
+	// Check that the DNS server returns updated information, and it will be
+	// cached during [0, localTTL]
+	qName1, _ = assertExchange(t, testName1, dns.TypeA, testPort, 1, 1, 0)
+
+	assertInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
+	clk.Forward(int(localTTL) - 1)
+	assertInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
+	// and it will expire after localTTL
+	clk.Forward(2)
+	assertNotInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
+
+	// We delete the IP in the second peer right after
+	Debug.Printf("Removing the IPs from %s in database #2", testName1)
+	dbs[1].Zone.DeleteRecord(containerID, net.ParseIP("10.2.2.1"))
+
+	// Check that we return to the initial state: a neg-local entry in the cache
+	qName1, _ = assertExchange(t, testName1, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
+	assertNotLocalInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
+	clk.Forward(negativeLocalTTL + 1)
+
+	// Check that all entries should be outdated
+	cache.Purge()
+	if cache.Len() != 0 {
+		t.Fatalf("Some entries still valid in cache:\n%s", cache)
+	}
+}
+
 // Check if the names updates lead to cache invalidations
 func TestServerCacheRefresh(t *testing.T) {
 	const (
