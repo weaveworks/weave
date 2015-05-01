@@ -27,7 +27,11 @@ func TestHttp(t *testing.T) {
 		dockerIP        = "9.8.7.6"
 	)
 
-	zone := NewZoneDb(DefaultLocalDomain)
+	zone, err := NewZoneDb(ZoneConfig{})
+	wt.AssertNoErr(t, err)
+	err = zone.Start()
+	wt.AssertNoErr(t, err)
+	defer zone.Stop()
 
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)

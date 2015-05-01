@@ -44,8 +44,15 @@ func TestUDPDNSServer(t *testing.T) {
 	)
 	testCIDR1 := testAddr1 + "/24"
 
-	InitDefaultLogging(true)
-	var zone = NewZoneDb(DefaultLocalDomain)
+	InitDefaultLogging(testing.Verbose())
+	Info.Println("TestUDPDNSServer starting")
+
+	zone, err := NewZoneDb(ZoneConfig{})
+	wt.AssertNoErr(t, err)
+	err = zone.Start()
+	wt.AssertNoErr(t, err)
+	defer zone.Stop()
+
 	ip, _, _ := net.ParseCIDR(testCIDR1)
 	zone.AddRecord(containerID, successTestName, ip)
 
@@ -125,9 +132,15 @@ func TestTCPDNSServer(t *testing.T) {
 	)
 	dnsAddr := fmt.Sprintf("localhost:%d", testPort)
 
-	InitDefaultLogging(true)
-	var zone = NewZoneDb(DefaultLocalDomain)
+	InitDefaultLogging(testing.Verbose())
+	Info.Println("TestTCPDNSServer starting")
 
+	zone, err := NewZoneDb(ZoneConfig{})
+	wt.AssertNoErr(t, err)
+	err = zone.Start()
+	wt.AssertNoErr(t, err)
+	defer zone.Stop()
+	
 	// generate a list of `numAnswers` IP addresses
 	var addrs []ZoneRecord
 	bs := make([]byte, 4)

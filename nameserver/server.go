@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	DefaultLocalDomain   = "weave.local."     // The default name used for the local domain
 	DefaultServerPort    = 53                 // The default server port
 	DefaultCLICfgFile    = "/etc/resolv.conf" // default "resolv.conf" file to try to load
 	DefaultUDPBuflen     = 4096               // bigger than the default 512
