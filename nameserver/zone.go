@@ -48,6 +48,10 @@ type Zone interface {
 	DeleteRecord(ident string, ip net.IP) error
 	// Delete all records for an ident in the local database
 	DeleteRecordsFor(ident string) error
+	// Lookup for a name in the whole domain
+	DomainLookupName(name string) ([]ZoneRecord, error)
+	// Lookup for an address in the whole domain
+	DomainLookupInaddr(inaddr string) ([]ZoneRecord, error)
 	// Return a status string
 	Status() string
 }
