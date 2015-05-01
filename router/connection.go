@@ -442,11 +442,10 @@ func (conn *LocalConnection) sendProtocolMsg(m ProtocolMsg) error {
 }
 
 func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
-	defer conn.Decryptor.Shutdown()
 	usingPassword := conn.SessionKey != nil
 	var receiver TCPReceiver
 	if usingPassword {
-		receiver = NewEncryptedTCPReceiver(conn.SessionKey)
+		receiver = NewEncryptedTCPReceiver(conn.SessionKey, conn.outbound)
 	} else {
 		receiver = NewSimpleTCPReceiver()
 	}
@@ -489,11 +488,6 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 			nil)
 	case ProtocolFragmentationReceived:
 		conn.setStackFrag(true)
-	case ProtocolNonce:
-		if conn.SessionKey == nil {
-			return fmt.Errorf("unexpected nonce on unencrypted connection")
-		}
-		conn.Decryptor.ReceiveNonce(payload)
 	case ProtocolPMTUVerified:
 		conn.pmtuVerified(int(binary.BigEndian.Uint16(payload)))
 	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:

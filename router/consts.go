@@ -13,7 +13,6 @@ const (
 	DefaultPMTU         = 65535
 	MaxUDPPacketSize    = 65536
 	ChannelSize         = 16
-	UDPNonceSendAt      = 8192
 	FragTestSize        = 60001
 	PMTUDiscoverySize   = 60000
 	TCPHeartbeat        = 30 * time.Second
