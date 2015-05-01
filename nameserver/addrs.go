@@ -32,6 +32,7 @@ type ZoneObservable interface {
 	ObserveInaddr(inaddr string, observer ZoneRecordObserver) error
 }
 
+type ZoneObserverFunc func(string, ZoneRecordObserver) error
 type ZoneRecordObserver func()
 
 /////////////////////////////////////////////////////////////
