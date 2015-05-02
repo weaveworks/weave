@@ -45,13 +45,12 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 		return
 	}
 	if err = inactive.SetImmediateMode(true); err != nil {
-		// If gopacket is compiled against an older pcap.h
-		// that doesn't have pcap_set_immediate_mode, it
-		// supplies a dummy definition that always returns
-		// PCAP_ERROR.  That becomes "Generic error", which is
-		// not very helpful.  The real pcap_set_set_immediate
-		// never returns PCAP_ERROR, so this turns it into a
-		// more informative message.
+		// If gopacket is compiled against an older pcap.h that
+		// doesn't have pcap_set_immediate_mode, it supplies a dummy
+		// definition that always returns PCAP_ERROR.  That becomes
+		// "Generic error", which is not very helpful.  The real
+		// pcap_set_immediate_mode never returns PCAP_ERROR, so this
+		// turns it into a more informative message.
 		if fmt.Sprint(err) == "Generic error" {
 			err = fmt.Errorf("compiled against an old version of libpcap; please compile against libpcap-1.5.0 or later")
 		}
