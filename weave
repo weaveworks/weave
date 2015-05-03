@@ -532,8 +532,9 @@ dns_args() {
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
 }
 
-# Perform operation $1 on container ID $2 to local DNS database at address $3
-# This function is only called where we know $2 is a valid container name
+# Perform operation $1 on local DNS database, for container ID $2 at
+# addresses $3, $4, ...  This function is only called when we know $2
+# is a valid container name
 tell_dns() {
     METHOD="$1"
     CONTAINER_ID="$2"
