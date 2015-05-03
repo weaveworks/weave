@@ -153,11 +153,19 @@ link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
 
 If DNS is started after you've attached a container to the weave
 network, or you want to give the container a name in DNS *other* than
-its hostname, you can register it using the HTTP API:
+its hostname, you can register it using the `dns-add` command. If no
+FQDN is specified, it is derived from the container's configured
+hostname and domain. For example:
 
 ```bash
 $ docker start $shell2
-$ curl -X PUT "http://$dns_ip:6785/name/$shell2/10.2.1.27" -d fqdn=shell2.weave.local
+$ weave dns-add 10.2.1.27 $shell2 -h shell2.example.org
+```
+
+The inverse operation can be carried out using the `dns-remove` command:
+
+```bash
+$ weave dns-remove 10.2.1.27 $shell2
 ```
 
 ### Registering multiple containers with the same name
