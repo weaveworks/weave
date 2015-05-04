@@ -817,8 +817,8 @@ case "$COMMAND" in
             then
                 ip addr add dev $BRIDGE $CIDR
                 arp_update $BRIDGE $CIDR
-                add_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
-                add_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+                add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
+                add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
                 if [ "$FQDN" ]; then
                     http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT PUT /name/weave:expose/${CIDR%/*} --data-urlencode "fqdn=$FQDN" 2>/dev/null || true
                 fi
@@ -834,8 +834,8 @@ case "$COMMAND" in
             if ip addr show dev $BRIDGE | grep -qF $CIDR
             then
                 ip addr del dev $BRIDGE $CIDR
-                delete_iptables_rule nat WEAVE -o $BRIDGE ! -s $CIDR -j MASQUERADE
-                delete_iptables_rule nat WEAVE -s $CIDR ! -o $BRIDGE -j MASQUERADE
+                delete_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
+                delete_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
                 http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT DELETE /name/weave:expose/${CIDR%/*} 2>/dev/null || true
             fi
         done
