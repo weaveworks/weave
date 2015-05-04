@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+[ -n "$WEAVE_DEBUG" ] && set -x
+
 SCRIPT_VERSION="(unreleased version)"
 if [ "$SCRIPT_VERSION" = "(unreleased version)" ] ; then
     IMAGE_VERSION=latest
@@ -46,6 +48,7 @@ exec_remote() {
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e VERSION \
+        -e WEAVE_DEBUG \
         -e WEAVE_DOCKER_ARGS \
         -e WEAVEDNS_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
