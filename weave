@@ -27,6 +27,7 @@ usage() {
     echo "weave setup"
     echo "weave launch     [-password <password>] [-nickname <nickname>] <peer> ..."
     echo "weave launch-dns <cidr>"
+    echo "weave launch-proxy"
     echo "weave connect    <peer>"
     echo "weave forget     <peer>"
     echo "weave run        [--with-dns] <cidr> [<cidr> ...] <docker run args> ..."
@@ -128,12 +129,44 @@ collect_ip_args() {
     fi
 }
 
-# "run" is a special case because we want to use docker directly,
-# rather than the docker in $EXEC_IMAGE remotely. That's because we
-# are passing arbitrary arguments on to docker run, and we can't rely
-# on our baked-in docker to support those arguments.
+PROXY_PORT=12375
+PROXY_CONTAINER_NAME=weaveproxy
+
+proxy_host() {
+    case $DOCKER_HOST in
+        tcp://*)
+            PROXY_HOST=$(echo $DOCKER_HOST | sed -e "s|\(tcp://[0-9.]*\):[0-9]*|\1:$PROXY_PORT|")
+            ;;
+        *)
+            PROXY_HOST="tcp://localhost:$PROXY_PORT"
+            ;;
+    esac
+}
+
+ensure_proxy_running() {
+    case $(docker inspect --format '{{.State.Running}} {{.Config.Image}}' $PROXY_CONTAINER_NAME 2>/dev/null) in
+        "true $EXEC_IMAGE")
+            return 0
+            ;;
+        true*)
+            echo "Proxy already running with unknown image" >&2
+            exit 1
+            ;;
+        false*)
+            docker rm -f $PROXY_CONTAINER_NAME >/dev/null
+            ;;
+    esac
+    docker run --privileged --net=host -d \
+        --name=$PROXY_CONTAINER_NAME \
+        -p $PROXY_PORT:12375/tcp -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /proc:/hostproc -e PROCFS=/hostproc \
+        --entrypoint=/home/weave/proxy $EXEC_IMAGE "$@"
+}
+
 if [ "$1" = "run" ]; then
     shift 1
+    ensure_proxy_running >/dev/null
+
     check_docker_version
     if [ "$1" = "--with-dns" ]; then
         shift 1
@@ -141,10 +174,8 @@ if [ "$1" = "run" ]; then
     fi
     collect_cidr_args "$@"
     shift $CIDR_COUNT
-    CONTAINER=$(docker run $DNS_ARGS -d "$@")
-    exec_remote attach $CIDR_ARGS $CONTAINER
-    echo $CONTAINER
-    exit 0
+    proxy_host
+    exec docker -H "$PROXY_HOST" run $DNS_ARGS -e "WEAVE_CIDR=$CIDR_ARGS" "$@"
 elif [ "$1" != "--local" ]; then
     exec_remote "$@"
     exit $?
@@ -729,6 +760,9 @@ case "$COMMAND" in
         with_container_netns $DNS_CONTAINER attach $CIDR >/dev/null
         populate_dns
         echo $DNS_CONTAINER
+        ;;
+    launch-proxy)
+        ensure_proxy_running "$@"
         ;;
     connect)
         [ $# -eq 1 ] || usage
