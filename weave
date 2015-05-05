@@ -28,7 +28,7 @@ usage() {
     echo "weave start      <cidr> [<cidr> ...] <container_id>"
     echo "weave attach     <cidr> [<cidr> ...] <container_id>"
     echo "weave detach     <cidr> [<cidr> ...] <container_id>"
-    echo "weave expose     <cidr> [<cidr> ...] [-h <hostname>]"
+    echo "weave expose     <cidr> [<cidr> ...] [-h <fqdn>]"
     echo "weave hide       <cidr> [<cidr> ...]"
     echo "weave ps         [<container_id> ...]"
     echo "weave status"
