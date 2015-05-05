@@ -25,18 +25,18 @@ type NameCollisionError struct {
 
 type PeerNameSet map[PeerName]struct{}
 
-type ConnectionSummary struct {
-	NameByte      []byte
-	RemoteTCPAddr string
-	Outbound      bool
-	Established   bool
-}
-
 type PeerSummary struct {
 	NameByte []byte
 	NickName string
 	UID      uint64
 	Version  uint64
+}
+
+type ConnectionSummary struct {
+	NameByte      []byte
+	RemoteTCPAddr string
+	Outbound      bool
+	Established   bool
 }
 
 func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
