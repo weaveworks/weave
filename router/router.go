@@ -94,6 +94,11 @@ func (router *Router) Start() {
 	}
 }
 
+func (router *Router) Stop() error {
+	// TODO: perform greceful shutdown...
+	return nil
+}
+
 func (router *Router) UsingPassword() bool {
 	return router.Password != nil
 }
