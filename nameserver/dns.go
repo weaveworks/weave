@@ -74,14 +74,6 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 	return m
 }
 
-func makeDNSNotImplResponse(r *dns.Msg) *dns.Msg {
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.RecursionAvailable = true
-	m.Rcode = dns.RcodeNotImplemented
-	return m
-}
-
 // get the maximum UDP-reply length
 func getMaxReplyLen(r *dns.Msg, proto dnsProtocol) int {
 	maxLen := minUDPSize

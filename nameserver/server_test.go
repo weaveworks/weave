@@ -101,8 +101,8 @@ func TestUDPDNSServer(t *testing.T) {
 
 	assertExchange(t, testRDNSfail, dns.TypePTR, 0, 0, dns.RcodeNameError)
 
-	// This should fail because we don't handle MX records
-	assertExchange(t, successTestName, dns.TypeMX, 0, 0, dns.RcodeNotImplemented)
+	// This should fail because we don't have information about MX records
+	assertExchange(t, successTestName, dns.TypeMX, 0, 0, dns.RcodeNameError)
 
 	// This non-local query for an MX record should succeed by being
 	// passed on to the fallback server
