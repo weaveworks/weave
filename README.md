@@ -1,6 +1,6 @@
 # Weave - the Docker network
 
-[![Build Status](https://travis-ci.org/weaveworks/weave.svg?branch=master)](https://travis-ci.org/weaveworks/weave) [![Integration Tests](https://circleci.com/gh/weaveworks/weave.svg?style=shield&circle-token=:circle-token)](https://circleci.com/gh/weaveworks/weave) [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
+[![Build Status](https://travis-ci.org/weaveworks/weave.svg?branch=master)](https://travis-ci.org/weaveworks/weave) [![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield&circle-token=4933c7dabb3d0383e62117565cb9d16df7b1a811)](https://circleci.com/gh/weaveworks/weave) [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
 
 Weave creates a virtual network that connects Docker containers
 deployed across multiple hosts and enables their automatic discovery.
