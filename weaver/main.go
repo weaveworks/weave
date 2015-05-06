@@ -7,16 +7,15 @@ import (
 	"fmt"
 	"github.com/davecheney/profile"
 	"github.com/gorilla/mux"
+	. "github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 	weave "github.com/weaveworks/weave/router"
 	"log"
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"runtime"
 	"strings"
-	"syscall"
 )
 
 var version = "(unreleased version)"
@@ -126,7 +125,8 @@ func main() {
 	if httpAddr != "" {
 		go handleHTTP(router, httpAddr)
 	}
-	handleSignals(router)
+
+	SignalHandlerLoop(router)
 }
 
 func options() map[string]string {
@@ -207,21 +207,5 @@ func handleHTTP(router *weave.Router, httpAddr string) {
 	err = http.Serve(l, nil)
 	if err != nil {
 		log.Fatal("Unable to create http server", err)
-	}
-}
-
-func handleSignals(router *weave.Router) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGQUIT, syscall.SIGUSR1)
-	buf := make([]byte, 1<<20)
-	for {
-		sig := <-sigs
-		switch sig {
-		case syscall.SIGQUIT:
-			stacklen := runtime.Stack(buf, true)
-			log.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
-		case syscall.SIGUSR1:
-			log.Printf("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", router.Status())
-		}
 	}
 }

@@ -9,9 +9,6 @@ import (
 	weavenet "github.com/weaveworks/weave/net"
 	"net"
 	"os"
-	"os/signal"
-	"runtime"
-	"syscall"
 )
 
 var version = "(unreleased version)"
@@ -90,30 +87,11 @@ func main() {
 	}
 	Info.Println("Upstream", srv.Upstream)
 
-	Debug.Printf("Starting the signals handler")
-	go handleSignals(srv)
-
+	go SignalHandlerLoop(srv)
 	go weavedns.ListenHTTP(version, srv, domain, zone, httpPort)
+
 	err = srv.Start()
 	if err != nil {
-		Error.Fatal("Failed to start the WeaveDNS server", err)
-	}
-}
-
-func handleSignals(s *weavedns.DNSServer) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT)
-	buf := make([]byte, 1<<20)
-	for {
-		sig := <-sigs
-		switch sig {
-		case syscall.SIGINT:
-			Info.Printf("=== received SIGINT ===\n*** exiting\n")
-			s.Stop()
-			os.Exit(0)
-		case syscall.SIGQUIT:
-			stacklen := runtime.Stack(buf, true)
-			Info.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
-		}
+		Error.Fatal("[main] Failed to start the WeaveDNS server: ", err)
 	}
 }
