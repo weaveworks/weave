@@ -8,18 +8,17 @@ import (
 )
 
 // A subsystem/server/... that can be stopped or queried about the status with a signal
-type SignalsReceiver interface {
-	Status() string
+type SignalReceiver interface {
 	Stop() error
+	Status() string
 }
 
-func SignalHandlerLoop(ss ...SignalsReceiver) {
+func SignalHandlerLoop(ss ...SignalReceiver) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGUSR1)
 	buf := make([]byte, 1<<20)
 	for {
-		sig := <-sigs
-		switch sig {
+		switch <-sigs {
 		case syscall.SIGINT:
 			Info.Printf("=== received SIGINT ===\n*** exiting\n")
 			for _, subsystem := range ss {
