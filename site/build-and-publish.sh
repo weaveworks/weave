@@ -13,6 +13,10 @@ if [ -n "${TRAVIS_TAG}" ]; then
   OUTPUT="weave/${TRAVIS_TAG}"
 fi
 
+if [ "${BRANCH}" = "latest_release_doc_updates" ]; then
+  OUTPUT="weave/latest_release"
+fi
+
 export BRANCH COMMIT OUTPUT
 
 bundle install --path=.bundle
