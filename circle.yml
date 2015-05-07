@@ -16,7 +16,6 @@ dependencies:
 
 test:
   pre:
-    - ls -al /var/run/docker.sock
     - mkdir -p $(dirname $SRCDIR)
     - cp -r $(pwd)/ $SRCDIR
   override:

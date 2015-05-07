@@ -52,13 +52,12 @@ EOF
 # Create new set of VMS
 function setup {
 	destroy
-
-	# Create and setup some VMs
+	names=
 	for i in $(seq 1 $NUM_HOSTS); do
-		name="host$i"
-		gcloud compute instances create $name --image $IMAGE --zone $ZONE
+		names="host$i $names"
 	done
 
+	gcloud compute instances create $names --image $IMAGE --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
 
 	hosts=
