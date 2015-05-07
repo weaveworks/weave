@@ -10,6 +10,7 @@ KEY_FILE=/tmp/gce_private_key.json
 SSH_KEY_FILE=$HOME/.ssh/gce_ssh_key
 PROJECT=positive-cocoa-90213
 IMAGE=ubuntu-14-04
+TEMPLATE_NAME="test-template"
 ZONE=us-central1-a
 NUM_HOSTS=2
 
@@ -57,14 +58,12 @@ function setup {
 		names="host$i $names"
 	done
 
-	gcloud compute instances create $names --image $IMAGE --zone $ZONE
+	gcloud compute instances create $names --image $TEMPLATE_NAME --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
 
 	hosts=
 	for i in $(seq 1 $NUM_HOSTS); do
 		name="host$i.$ZONE.$PROJECT"
-		install_docker_on $name
-
 		# Add the remote ip to the local /etc/hosts
 		sudo -- sh -c "echo \"$(external_ip host$i) $name\" >>/etc/hosts"
 		# Add the local ips to the remote /etc/hosts
@@ -75,6 +74,15 @@ function setup {
 			ssh -t $name "sudo -- sh -c \"echo \\\"$entry\\\" >>/etc/hosts\""
 		done
 	done
+}
+
+function make_template {
+	gcloud compute instances create template --image $IMAGE --zone $ZONE
+	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
+	name="template.$ZONE.$PROJECT"
+	install_docker_on $name
+	gcloud compute instances delete template --keep-disks boot -zone $ZONE
+	gcloud compute images create $TEMPLATE_NAME --source-disk example-disk --source-disk-zone $ZONE
 }
 
 function hosts {
@@ -102,4 +110,7 @@ hosts)
 destroy)
 	destroy
 	;;
+
+make_template)
+	make_template
 esac
