@@ -15,7 +15,7 @@ ZONE=us-central1-a
 NUM_HOSTS=2
 SUFFIX=""
 if [ -n "$CIRCLECI" ]; then
-	SUFFIX="-${CIRCLE_BUILD_NUM}"
+	SUFFIX="-${CIRCLE_BUILD_NUM}-$CIRCLE_NODE_INDEX"
 fi
 
 # Setup authentication
