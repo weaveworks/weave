@@ -12,7 +12,7 @@ start_suite "Resolve unqualified names"
 
 weave_on $HOST1 launch-dns 10.2.254.1/24
 
-weave_on $HOST1 run $C1/24 -t --name=c1 -h $NAME ubuntu
+weave_on $HOST1 run $C1/24 -t --name=c1 -h $NAME gliderlabs/alpine /bin/sh
 weave_on $HOST1 run --with-dns $C2/24 -t --name=c2 -h seetwo.$DOMAIN aanand/docker-dnsutils /bin/sh
 weave_on $HOST1 run --with-dns $C3/24 -t --name=c3 --dns-search=weave.local aanand/docker-dnsutils /bin/sh
 
