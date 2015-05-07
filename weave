@@ -17,6 +17,11 @@ DOCKERHUB_USER=weaveworks
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 
+# Define some regular expressions for matching addresses.
+# The regexp here is far from precise, but good enough.
+IP_REGEXP="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+CIDR_REGEXP="$IP_REGEXP/[0-9]{1,2}"
+
 usage() {
     echo "Usage:"
     echo "weave setup"
@@ -28,6 +33,8 @@ usage() {
     echo "weave start      <cidr> [<cidr> ...] <container_id>"
     echo "weave attach     <cidr> [<cidr> ...] <container_id>"
     echo "weave detach     <cidr> [<cidr> ...] <container_id>"
+    echo "weave dns-add    <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
+    echo "weave dns-remove <ip_address> [<ip_address> ...] <container_id>"
     echo "weave expose     <cidr> [<cidr> ...] [-h <fqdn>]"
     echo "weave hide       <cidr> [<cidr> ...]"
     echo "weave ps         [<container_id> ...]"
@@ -72,8 +79,7 @@ check_docker_version() {
 }
 
 is_cidr() {
-    # The regexp here is far from precise, but good enough.
-    echo "$1" | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$' >/dev/null
+    echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
 }
 
 validate_cidr() {
@@ -94,6 +100,31 @@ collect_cidr_args() {
     done
     if [ $CIDR_COUNT -eq 0 ]; then
         [ $# -gt 0 ] && validate_cidr "$1" || usage
+    fi
+}
+
+is_ip() {
+    echo "$1" | grep -E "^$IP_REGEXP$" >/dev/null
+}
+
+validate_ip() {
+    if ! is_ip "$1" ; then
+        echo "Invalid IP: $1" >&2
+        echo "IP must be of the form <aaa.bbb.ccc.ddd>, e.g. 10.2.1.1" >&2
+        exit 1
+    fi
+}
+
+collect_ip_args() {
+    IP_ARGS=""
+    IP_COUNT=0
+    while is_ip "$1"; do
+        IP_ARGS="$IP_ARGS $1"
+        IP_COUNT=$((IP_COUNT + 1))
+        shift 1
+    done
+    if [ $IP_COUNT -eq 0 ]; then
+        [ $# -gt 0 ] && validate_ip "$1" || usage
     fi
 }
 
@@ -535,21 +566,32 @@ dns_args() {
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
 }
 
-# Perform operation $1 on local DNS database, for container ID $2 at
-# addresses $3, $4, ...  This function is only called when we know $2
-# is a valid container name
+# Perform operation $1 on local DNS database, for container ID $2
+# with an FQDN obtained from the container's configured hostname and
+# domain, at addresses $3, $4 ...
 tell_dns() {
     METHOD="$1"
     CONTAINER_ID="$2"
     shift 2
+    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER_ID 2>/dev/null) && true
+    tell_dns_fqdn $METHOD $CONTAINER_ID $CONTAINER_FQDN $@
+}
 
+# Perform operation $1 on local DNS database, for container ID $2
+# with FQDN $3, at addresses $4, $5 ... This function is only called
+# where we know $2 is a valid container name
+tell_dns_fqdn() {
+    METHOD="$1"
+    CONTAINER_ID="$2"
+    CONTAINER_FQDN="$3"
+    shift 3
     if ! status=$(docker inspect --format='{{.State.Running}}' $DNS_CONTAINER_NAME 2>/dev/null) || [ "$status" != "true" ] ; then
         # weavedns not running - silently return
         return
     fi
     # get the long form of the container ID
     CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
-    MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
+    MORE_ARGS="--data-urlencode fqdn=$CONTAINER_FQDN"
     for ADDR; do
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${ADDR%/*} $MORE_ARGS || true
     done
@@ -801,6 +843,26 @@ case "$COMMAND" in
         CONTAINER_ID="$1"
         with_container_netns $CONTAINER_ID detach $CIDR_ARGS >/dev/null
         tell_dns DELETE $CONTAINER_ID $CIDR_ARGS
+        ;;
+    dns-add)
+        collect_ip_args "$@"
+        shift $IP_COUNT
+        [ $# -ge 1 ] || usage
+        CONTAINER_ID="$1"
+        if [ $# -eq 1 ]; then
+            tell_dns PUT $CONTAINER_ID $IP_ARGS
+        else
+            [ $# -eq 3 -a "$2" = "-h" ] || usage
+            FQDN="$3"
+            tell_dns_fqdn PUT $CONTAINER_ID $FQDN $IP_ARGS
+        fi
+        ;;
+    dns-remove)
+        collect_ip_args "$@"
+        shift $IP_COUNT
+        [ $# -eq 1 ] || usage
+        CONTAINER_ID="$1"
+        tell_dns DELETE $CONTAINER_ID $IP_ARGS
         ;;
     expose)
         collect_cidr_args "$@"
