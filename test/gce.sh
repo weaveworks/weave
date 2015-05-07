@@ -44,6 +44,14 @@ function internal_ip {
 	gcloud compute instances list $1 --format=yaml | grep "^  networkIP\:" | cut -d: -f2 | tr -d ' '
 }
 
+function try_connect {
+	for i in $(seq 0 10); do
+		if ssh -t $1 true; then
+			return
+		fi
+	done
+}
+
 function install_docker_on {
 	name=$1
 	ssh -t $name sudo bash -x -s <<EOF
@@ -71,6 +79,7 @@ function setup {
 		hostname="$name.$ZONE.$PROJECT"
 		# Add the remote ip to the local /etc/hosts
 		sudo -- sh -c "echo \"$(external_ip $name) $hostname\" >>/etc/hosts"
+		try_connect $hostname
 
 		# Add the local ips to the remote /etc/hosts
 		for othername in $names; do
