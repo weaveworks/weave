@@ -14,8 +14,8 @@ TEMPLATE_NAME="test-template"
 ZONE=us-central1-a
 NUM_HOSTS=2
 SUFFIX=""
-if [ -n "$CIRCLECI" -a -n "$CIRCLE_SHA1" ]; then
-	SUFFIX="-${CIRCLE_SHA1:0:7}"
+if [ -n "$CIRCLECI" ]; then
+	SUFFIX="-${CIRCLE_BUILD_NUM}"
 fi
 
 # Setup authentication
