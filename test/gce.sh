@@ -45,10 +45,9 @@ function internal_ip {
 }
 
 function try_connect {
-	for i in $(seq 0 10); do
-		if ssh -t $1 true; then
-			return
-		fi
+	for i in {0..10}; do
+		ssh -t $1 true && return
+		sleep 2
 	done
 }
 
