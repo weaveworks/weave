@@ -13,17 +13,27 @@ IMAGE=ubuntu-14-04
 TEMPLATE_NAME="test-template"
 ZONE=us-central1-a
 NUM_HOSTS=2
+SUFFIX=""
+if [ -n "$CIRCLECI" -a -n "$CIRCLE_SHA1" ]; then
+	SUFFIX="-${CIRCLE_SHA1:0:7}"
+fi
 
 # Setup authentication
 gcloud auth activate-service-account --key-file $KEY_FILE
 gcloud config set project $PROJECT
 
+function vm_names {
+	local names=
+	for i in $(seq 1 $NUM_HOSTS); do
+		names="host$i$SUFFIX $names"
+	done
+	echo "$names"
+}
+
 # Delete all vms in this account
 function destroy {
-	names="$(gcloud compute instances list --format=yaml | grep "^name\:" | cut -d: -f2 | xargs echo)"
-	if [ -n "$names" ]; then
-		gcloud compute instances delete --zone $ZONE -q $names
-	fi
+	names="$(vm_names)"
+	gcloud compute instances delete --zone $ZONE -q $names || true
 }
 
 function external_ip {
@@ -53,25 +63,19 @@ EOF
 # Create new set of VMS
 function setup {
 	destroy
-	names=
-	for i in $(seq 1 $NUM_HOSTS); do
-		names="host$i $names"
-	done
-
+	names="$(vm_names)"
 	gcloud compute instances create $names --image $TEMPLATE_NAME --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
 
-	hosts=
-	for i in $(seq 1 $NUM_HOSTS); do
-		name="host$i.$ZONE.$PROJECT"
+	for name in $names; do
+		hostname="$name.$ZONE.$PROJECT"
 		# Add the remote ip to the local /etc/hosts
-		sudo -- sh -c "echo \"$(external_ip host$i) $name\" >>/etc/hosts"
+		sudo -- sh -c "echo \"$(external_ip $name) $hostname\" >>/etc/hosts"
+
 		# Add the local ips to the remote /etc/hosts
-		for j in $(seq 1 $NUM_HOSTS); do
-			ipaddr=$(internal_ip host$j)
-			othername="host$j.$ZONE.$PROJECT"
-			entry="$ipaddr $othername"
-			ssh -t $name "sudo -- sh -c \"echo \\\"$entry\\\" >>/etc/hosts\""
+		for othername in $names; do
+			entry="$(internal_ip $othername) $othername.$ZONE.$PROJECT"
+			ssh -t "$hostname" "sudo -- sh -c \"echo \\\"$entry\\\" >>/etc/hosts\""
 		done
 	done
 }
@@ -88,10 +92,10 @@ function make_template {
 function hosts {
 	hosts=
 	args=
-	for i in $(seq 1 $NUM_HOSTS); do
-		name="host$i.$ZONE.$PROJECT"
-		hosts="$name $hosts"
-		args="--add-host=$name:$(internal_ip host$i) $args"
+	for name in $(vm_names); do
+		hostname="$name.$ZONE.$PROJECT"
+		hosts="$hostname $hosts"
+		args="--add-host=$hostname:$(internal_ip $name) $args"
 	done
 	export SSH=ssh
 	export HOSTS="$hosts"
