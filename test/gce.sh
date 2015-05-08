@@ -14,8 +14,8 @@ TEMPLATE_NAME="test-template"
 ZONE=us-central1-a
 NUM_HOSTS=2
 SUFFIX=""
-if [ -n "$CIRCLECI" -a -n "$CIRCLE_SHA1" ]; then
-	SUFFIX="-${CIRCLE_SHA1:0:7}"
+if [ -n "$CIRCLECI" ]; then
+	SUFFIX="-${CIRCLE_BUILD_NUM}-$CIRCLE_NODE_INDEX"
 fi
 
 # Setup authentication
@@ -45,10 +45,9 @@ function internal_ip {
 }
 
 function try_connect {
-	for i in $(seq 0 10); do
-		if ssh -t $1 true; then
-			return
-		fi
+	for i in {0..10}; do
+		ssh -t $1 true && return
+		sleep 2
 	done
 }
 
