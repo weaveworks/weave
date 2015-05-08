@@ -678,7 +678,7 @@ case "$COMMAND" in
         # TODO use the mac of one of the physical host interfaces
         # (eth0, wlan0, etc) so the name becomes stable across host
         # restarts.
-        MACADDR=$(cat /sys/class/net/$BRIDGE/address)
+        PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
         # backward compatibility...
         if is_cidr "$1" ; then
             echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
@@ -714,7 +714,7 @@ case "$COMMAND" in
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
             -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp -e WEAVE_PASSWORD \
-            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name $MACADDR -nickname "$NICKNAME" "$@")
+            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$NICKNAME" "$@")
         with_container_netns $CONTAINER launch >/dev/null
         wait_for_status $CONTAINER_NAME $HTTP_PORT
         echo $CONTAINER
