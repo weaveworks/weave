@@ -136,7 +136,7 @@ to each other.
  * [Troubleshooting](http://docs.weave.works/weave/latest_release/troubleshooting.html)
  * [Building](http://docs.weave.works/weave/latest_release/building.html)
  * [How it works](http://docs.weave.works/weave/latest_release/how-it-works.html)
- * [Automatic Discovery with WeaveDNS](https://github.com/weaveworks/weave/tree/master/weavedns#readme)
+ * [Automatic Discovery with WeaveDNS](https://github.com/weaveworks/weave/tree/latest_release/weavedns#readme)
 
 ## Contact Us
 
