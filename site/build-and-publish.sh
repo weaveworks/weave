@@ -26,7 +26,7 @@ gsutil -m cp -z html,css -a public-read -R _site "gs://docs.weave.works/${OUTPUT
 
 echo "Published at http://docs.weave.works/${OUTPUT}"
 
-if [ -z "${TRAVIS_TAG}" ]; then
+if [ -z "${TRAVIS_TAG}" -a ! "${BRANCH}" = "latest_release_doc_updates" ]; then
   echo "<meta http-equiv=\"refresh\" content=\"0; url=http://docs.weave.works/${OUTPUT}\" />" \
     | gsutil \
       -h "Content-Type:text/html" \
