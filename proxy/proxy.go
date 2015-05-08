@@ -20,6 +20,7 @@ const (
 
 type proxy struct {
 	Dial func() (net.Conn, error)
+	mux  *http.ServeMux
 }
 
 func targetNetwork(u *url.URL) string {
@@ -41,15 +42,31 @@ func NewProxy(targetUrl string) (*proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &proxy{
+	p := &proxy{
 		Dial: func() (net.Conn, error) {
 			return net.Dial(targetNetwork(u), targetAddress(u))
 		},
-	}, nil
+	}
+	p.setupMux()
+	return p, nil
+}
+
+func (proxy *proxy) setupMux() {
+	proxy.mux = http.NewServeMux()
+	proxy.mux.HandleFunc("/weave", proxy.WeaveStatus)
+	proxy.mux.HandleFunc("/", proxy.ProxyRequest)
 }
 
 func (proxy *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	Info.Printf("%s %s", r.Method, r.URL)
+	proxy.mux.ServeHTTP(w, r)
+}
+
+func (proxy *proxy) WeaveStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
+func (proxy *proxy) ProxyRequest(w http.ResponseWriter, r *http.Request) {
 	req, err := proxy.InterceptRequest(r)
 	if err != nil {
 		http.Error(w, "Unable to create proxied request", http.StatusInternalServerError)

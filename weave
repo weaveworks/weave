@@ -135,15 +135,29 @@ PROXY_CONTAINER_NAME=weaveproxy
 proxy_host() {
     case $DOCKER_HOST in
         tcp://*)
-            PROXY_HOST=$(echo $DOCKER_HOST | sed -e "s|\(tcp://[0-9.]*\):[0-9]*|\1:$PROXY_PORT|")
+            PROXY_HOST=$(echo $DOCKER_HOST | sed -e "s|tcp://\([^:]*\):[0-9]*|\1|")
             ;;
         *)
-            PROXY_HOST="tcp://localhost:$PROXY_PORT"
+            PROXY_HOST="localhost"
             ;;
     esac
+    PROXY_ARG="tcp://$PROXY_HOST:$PROXY_PORT"
+}
+
+wait_for_proxy_to_boot() {
+    for n in `seq 1 20`; do
+      if curl --max-time 1 --connect-timeout 1 -s -X GET http://$PROXY_HOST:$PROXY_PORT/weave ; then
+        return 0
+      else
+        sleep 0.5
+      fi
+    done
+    echo "Proxy did not start within 10 seconds" >&2
+    return 1
 }
 
 ensure_proxy_running() {
+    proxy_host
     case $(docker inspect --format '{{.State.Running}} {{.Config.Image}}' $PROXY_CONTAINER_NAME 2>/dev/null) in
         "true $EXEC_IMAGE")
             return 0
@@ -156,11 +170,13 @@ ensure_proxy_running() {
             docker rm -f $PROXY_CONTAINER_NAME >/dev/null
             ;;
     esac
-    docker run --privileged --net=host -d \
+    PROXY_CONTAINER=$(docker run --privileged --net=host -d \
         --name=$PROXY_CONTAINER_NAME \
         -p $PROXY_PORT:12375/tcp -v /var/run/docker.sock:/var/run/docker.sock \
         -v /proc:/hostproc -e PROCFS=/hostproc \
-        --entrypoint=/home/weave/proxy $EXEC_IMAGE "$@"
+        --entrypoint=/home/weave/proxy $EXEC_IMAGE "$@")
+
+    wait_for_proxy_to_boot
 }
 
 if [ "$1" = "run" ]; then
@@ -174,8 +190,7 @@ if [ "$1" = "run" ]; then
     fi
     collect_cidr_args "$@"
     shift $CIDR_COUNT
-    proxy_host
-    exec docker -H "$PROXY_HOST" run $DNS_ARGS -e "WEAVE_CIDR=$CIDR_ARGS" "$@"
+    exec docker -H "$PROXY_ARG" run $DNS_ARGS -e "WEAVE_CIDR=$CIDR_ARGS" "$@"
 elif [ "$1" != "--local" ]; then
     exec_remote "$@"
     exit $?
@@ -763,6 +778,7 @@ case "$COMMAND" in
         ;;
     launch-proxy)
         ensure_proxy_running "$@"
+        echo $PROXY_CONTAINER
         ;;
     connect)
         [ $# -eq 1 ] || usage
