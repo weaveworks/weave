@@ -14,14 +14,23 @@ set -e
 START=${FIRST_WEAVE:-1}
 COUNT=${NUM_WEAVES:-28}
 FINISH=$((START+COUNT-1))
+PORT=6783
 
 weavedir=$(dirname $0)/..
+
+# Generate a random MAC value - copied from 'weave' script
+random_mac() {
+    # In the first byte of the MAC, the 'multicast' bit should be
+    # clear and 'locally administered' bit should be set.  All other
+    # bits should be random.
+    od -txC -An -N6 /dev/urandom | sed 's|^ ||;s| |:|;s|[0-3]:|2:|;s|[4-7]:|6:|;s|[89ab]:|a:|;s|[c-f]:|e:|;s| |:|g'
+}
 
 case "$1" in
     launch)
         shift 1
         for i in $(seq $START $FINISH); do
-            WEAVE_CONTAINER_NAME=weave$i $weavedir/weave test-launch "$@"
+            WEAVE_CONTAINER_NAME=weave$i WEAVE_PORT=$((5000+i)) $weavedir/weave launch -iface '' -name $(random_mac) -nickname weave$i -port $PORT "$@"
         done
         if [ $START -ne 1 ] ; then
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$((START-1)))
