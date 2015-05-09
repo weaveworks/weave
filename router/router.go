@@ -95,7 +95,7 @@ func (router *Router) Start() {
 }
 
 func (router *Router) Stop() error {
-	// TODO: perform greceful shutdown...
+	// TODO: perform graceful shutdown...
 	return nil
 }
 
