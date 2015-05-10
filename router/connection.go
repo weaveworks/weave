@@ -82,17 +82,17 @@ func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak { return T
 func (conn *RemoteConnection) Shutdown(error)                         {}
 
 func (conn *RemoteConnection) Log(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s|%s]:", conn.remoteTCPAddr, conn.remote.FullName())), args...)...)
+	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s|%s]:", conn.remoteTCPAddr, conn.remote)), args...)...)
 }
 
 func (conn *RemoteConnection) String() string {
 	from := "<nil>"
 	if conn.local != nil {
-		from = conn.local.FullName()
+		from = conn.local.String()
 	}
 	to := "<nil>"
 	if conn.remote != nil {
-		to = conn.remote.FullName()
+		to = conn.remote.String()
 	}
 	return fmt.Sprint("Connection ", from, "->", to)
 }
@@ -231,7 +231,7 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 		if oldRemoteUDPAddr == nil {
 			return conn.sendFastHeartbeats()
 		} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
-			log.Println("Peer", conn.remote.FullName(), "moved from", old, "to", remoteUDPAddr)
+			log.Println("Peer", conn.remote, "moved from", old, "to", remoteUDPAddr)
 		}
 		return nil
 	})

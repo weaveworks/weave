@@ -56,11 +56,11 @@ type PacketSourceSink interface {
 func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
 	router := &Router{RouterConfig: config, GossipChannels: make(map[uint32]*GossipChannel)}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
-		log.Println("Expired MAC", mac, "at", peer.FullName())
+		log.Println("Expired MAC", mac, "at", peer)
 	}
 	onPeerGC := func(peer *Peer) {
 		router.Macs.Delete(peer)
-		log.Println("Removed unreachable peer", peer.FullName())
+		log.Println("Removed unreachable peer", peer)
 	}
 	router.Ourself = NewLocalPeer(name, nickName, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
@@ -105,7 +105,7 @@ func (router *Router) UsingPassword() bool {
 
 func (router *Router) Status() string {
 	var buf bytes.Buffer
-	fmt.Fprintln(&buf, "Our name is", router.Ourself.FullName())
+	fmt.Fprintln(&buf, "Our name is", router.Ourself)
 	fmt.Fprintln(&buf, "Sniffing traffic on", router.Iface)
 	fmt.Fprintf(&buf, "MACs:\n%s", router.Macs)
 	fmt.Fprintf(&buf, "Peers:\n%s", router.Peers)
@@ -328,7 +328,7 @@ func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *Ether
 		dstMac := dec.eth.DstMAC
 
 		if router.Macs.Enter(srcMac, srcPeer) {
-			log.Println("Discovered remote MAC", srcMac, "at", srcPeer.FullName())
+			log.Println("Discovered remote MAC", srcMac, "at", srcPeer)
 		}
 		if po != nil {
 			router.LogFrame("Injecting", frame, &dec.eth)

@@ -119,7 +119,7 @@ func main() {
 	config.LogFrame = logFrameFunc(debug)
 
 	router := weave.NewRouter(config, name, nickName)
-	log.Println("Our name is", router.Ourself.FullName())
+	log.Println("Our name is", router.Ourself)
 	router.Start()
 	initiateConnections(router, peers)
 	if httpAddr != "" {
