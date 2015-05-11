@@ -42,12 +42,6 @@ func (peer *Peer) Info() string {
 	return fmt.Sprint(peer.String(), " (v", peer.version, ") (UID ", peer.UID, ")")
 }
 
-func (peer *Peer) Version() uint64 {
-	peer.RLock()
-	defer peer.RUnlock()
-	return peer.version
-}
-
 func (peer *Peer) Connections() ConnectionSet {
 	connections := make(ConnectionSet)
 	peer.RLock()

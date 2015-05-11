@@ -242,7 +242,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// guaranteed to find peer in the peers.table
 		peer := peers.table[name]
 		if peer != newPeer &&
-			(peer == peers.ourself.Peer || peer.Version() >= newPeer.Version()) {
+			(peer == peers.ourself.Peer || peer.version >= newPeer.version) {
 			// Nobody but us updates us. And if we know more about a
 			// peer than what's in the the update, we ignore the
 			// latter.
@@ -259,7 +259,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
 		// the router.Peers, so there can be no race here.
 		conns := makeConnsMap(peer, connSummaries, peers.table)
-		peer.SetVersionAndConnections(newPeer.Version(), conns)
+		peer.SetVersionAndConnections(newPeer.version, conns)
 		newUpdate[name] = peer
 	}
 	return newUpdate
