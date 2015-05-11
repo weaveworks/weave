@@ -162,7 +162,7 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) error {
 		log.Fatal("Attempt made to add connection to peer with unknown remote peer")
 	}
 	toName := conn.Remote().Name
-	dupErr := fmt.Errorf("Multiple connections to %s added to %s", conn.Remote(), peer)
+	dupErr := fmt.Errorf("Multiple connections to %s added to %s", conn.Remote(), peer.String())
 	// deliberately non symmetrical
 	if dupConn, found := peer.connections[toName]; found {
 		if dupConn == conn {
