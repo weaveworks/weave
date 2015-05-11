@@ -51,22 +51,22 @@ func (r Record) Priority() int { return r.priority }
 func (r Record) Weight() int   { return r.weight }
 func (r Record) TTL() int      { return r.ttl }
 
-func (i Record) String() string {
+func (r Record) String() string {
 	var buf bytes.Buffer
-	if len(i.Name()) > 0 {
-		fmt.Fprintf(&buf, "%s", i.Name())
+	if len(r.Name()) > 0 {
+		fmt.Fprintf(&buf, "%s", r.Name())
 	}
-	if !i.IP().IsUnspecified() {
-		fmt.Fprintf(&buf, "[%s]", i.IP())
+	if !r.IP().IsUnspecified() {
+		fmt.Fprintf(&buf, "[%s]", r.IP())
 	}
-	if i.Priority() > 0 {
-		fmt.Fprintf(&buf, "/P:%d", i.Priority())
+	if r.Priority() > 0 {
+		fmt.Fprintf(&buf, "/P:%d", r.Priority())
 	}
-	if i.Weight() > 0 {
-		fmt.Fprintf(&buf, "/W:%d", i.Weight())
+	if r.Weight() > 0 {
+		fmt.Fprintf(&buf, "/W:%d", r.Weight())
 	}
-	if i.TTL() > 0 {
-		fmt.Fprintf(&buf, "/TTL:%d", i.TTL())
+	if r.TTL() > 0 {
+		fmt.Fprintf(&buf, "/TTL:%d", r.TTL())
 	}
 
 	return buf.String()

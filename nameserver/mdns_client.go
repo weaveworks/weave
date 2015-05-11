@@ -54,19 +54,19 @@ func (r Response) Equal(r2 *Response) bool {
 	return true
 }
 
-func (i Response) String() string {
+func (r Response) String() string {
 	var buf bytes.Buffer
-	if i.err != nil {
-		fmt.Fprintf(&buf, "%s", i.err)
+	if r.err != nil {
+		fmt.Fprintf(&buf, "%s", r.err)
 	} else {
-		if len(i.Name()) > 0 {
-			fmt.Fprintf(&buf, "%s", i.Name())
+		if len(r.Name()) > 0 {
+			fmt.Fprintf(&buf, "%s", r.Name())
 		}
-		if !i.IP().IsUnspecified() {
-			fmt.Fprintf(&buf, "[%s]", i.IP())
+		if !r.IP().IsUnspecified() {
+			fmt.Fprintf(&buf, "[%s]", r.IP())
 		}
-		if i.ttl > 0 {
-			fmt.Fprintf(&buf, "(TTL:%d)", i.TTL())
+		if r.ttl > 0 {
+			fmt.Fprintf(&buf, "(TTL:%d)", r.TTL())
 		}
 	}
 	return buf.String()
