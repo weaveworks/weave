@@ -231,7 +231,11 @@ func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerN
 				if _, found := reached[remoteName]; found {
 					continue
 				}
-				if remoteConn, found := conn.Remote().ConnectionTo(ourself.Name); !establishedAndSymmetric || (found && remoteConn.Established()) {
+				// conn.Remote() cannot by ourself. Modifying
+				// peer.connections requires a write lock on Peers,
+				// and since we are holding a read lock (due to the
+				// ForEach), access without locking the peer is safe.
+				if remoteConn, found := conn.Remote().connections[ourself.Name]; !establishedAndSymmetric || (found && remoteConn.Established()) {
 					hops = append(hops, remoteName)
 				}
 			}

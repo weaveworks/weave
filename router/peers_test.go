@@ -52,7 +52,7 @@ func TestPeersEncoding(t *testing.T) {
 		case 0:
 			from, to := rand.Intn(numNodes), rand.Intn(numNodes)
 			if from != to {
-				if _, found := peer[from].ConnectionTo(peer[to].Name); !found {
+				if _, found := peer[from].connections[peer[to].Name]; !found {
 					ps[from].AddTestConnection(peer[to])
 					conns = append(conns, struct{ from, to int }{from, to})
 					checkApplyUpdate(t, ps[from])

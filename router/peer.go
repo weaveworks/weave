@@ -48,13 +48,6 @@ func (peer *Peer) Version() uint64 {
 	return peer.version
 }
 
-func (peer *Peer) ConnectionTo(name PeerName) (Connection, bool) {
-	peer.RLock()
-	defer peer.RUnlock()
-	conn, found := peer.connections[name]
-	return conn, found // yes, you really can't inline that. FFS.
-}
-
 func (peer *Peer) Connections() ConnectionSet {
 	connections := make(ConnectionSet)
 	peer.RLock()

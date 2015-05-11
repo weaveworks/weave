@@ -75,7 +75,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 			return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
 		}
 	}
-	if existingConn, found := conn.local.ConnectionTo(name); found && existingConn.Established() {
+	if existingConn, found := conn.Router.Ourself.ConnectionTo(name); found && existingConn.Established() {
 		return fmt.Errorf("Already have connection to %s at %s", existingConn.Remote(), existingConn.RemoteTCPAddr())
 	}
 	uid, err := strconv.ParseUint(uidStr, 10, 64)

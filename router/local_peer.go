@@ -75,6 +75,13 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec 
 	}
 }
 
+func (peer *LocalPeer) ConnectionTo(name PeerName) (Connection, bool) {
+	peer.RLock()
+	defer peer.RUnlock()
+	conn, found := peer.connections[name]
+	return conn, found // yes, you really can't inline that. FFS.
+}
+
 func (peer *LocalPeer) ConnectionsTo(names []PeerName) []Connection {
 	conns := make([]Connection, 0, len(names))
 	peer.RLock()
