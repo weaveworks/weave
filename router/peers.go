@@ -47,20 +47,17 @@ func NewPeers(ourself *LocalPeer, onGC func(*Peer)) *Peers {
 }
 
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
-	peers.RLock()
-	res, found := peers.fetchAlias(peer)
-	peers.RUnlock()
-	if found {
-		return res
-	}
 	peers.Lock()
 	defer peers.Unlock()
-	res, found = peers.fetchAlias(peer)
-	if found {
-		return res
+	if existingPeer, found := peers.table[peer.Name]; found {
+		if existingPeer.UID != peer.UID {
+			return nil
+		}
+		existingPeer.localRefCount++
+		return existingPeer
 	}
 	peers.table[peer.Name] = peer
-	peer.IncrementLocalRefCount()
+	peer.localRefCount++
 	return peer
 }
 
@@ -69,6 +66,12 @@ func (peers *Peers) Fetch(name PeerName) (*Peer, bool) {
 	defer peers.RUnlock()
 	peer, found := peers.table[name]
 	return peer, found // GRRR, why can't I inline this!?
+}
+
+func (peers *Peers) Dereference(peer *Peer) {
+	peers.Lock()
+	defer peers.Unlock()
+	peer.localRefCount--
 }
 
 func (peers *Peers) ForEach(fun func(*Peer)) {
@@ -162,22 +165,11 @@ func (peers *Peers) String() string {
 	return buf.String()
 }
 
-func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
-	if existingPeer, found := peers.table[peer.Name]; found {
-		if existingPeer.UID != peer.UID {
-			return nil, true
-		}
-		existingPeer.IncrementLocalRefCount()
-		return existingPeer, true
-	}
-	return nil, false
-}
-
 func (peers *Peers) garbageCollect() []*Peer {
 	removed := []*Peer{}
 	_, reached := peers.ourself.Routes(nil, false)
 	for name, peer := range peers.table {
-		if _, found := reached[peer.Name]; !found && !peer.IsLocallyReferenced() {
+		if _, found := reached[peer.Name]; !found && peer.localRefCount == 0 {
 			delete(peers.table, name)
 			peers.onGC(peer)
 			removed = append(removed, peer)

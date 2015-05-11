@@ -55,8 +55,8 @@ func (router *Router) DeleteTestChannelConnection(r *Router) {
 	fromPeer, _ := r.Peers.Fetch(fromName)
 	toPeer, _ := router.Peers.Fetch(toName)
 
-	fromPeer.DecrementLocalRefCount()
-	toPeer.DecrementLocalRefCount()
+	r.Peers.Dereference(fromPeer)
+	router.Peers.Dereference(toPeer)
 
 	conn, _ := router.Ourself.ConnectionTo(toName)
 	router.Ourself.handleDeleteConnection(conn)

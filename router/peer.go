@@ -13,7 +13,7 @@ type Peer struct {
 	NickName      string
 	UID           uint64
 	version       uint64
-	localRefCount uint64
+	localRefCount uint64 // maintained by Peers
 	connections   map[PeerName]Connection
 }
 
@@ -46,24 +46,6 @@ func (peer *Peer) Version() uint64 {
 	peer.RLock()
 	defer peer.RUnlock()
 	return peer.version
-}
-
-func (peer *Peer) IncrementLocalRefCount() {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.localRefCount++
-}
-
-func (peer *Peer) DecrementLocalRefCount() {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.localRefCount--
-}
-
-func (peer *Peer) IsLocallyReferenced() bool {
-	peer.RLock()
-	defer peer.RUnlock()
-	return peer.localRefCount != 0
 }
 
 func (peer *Peer) ConnectionTo(name PeerName) (Connection, bool) {
