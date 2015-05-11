@@ -73,7 +73,6 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 			if curPeer == stopAt {
 				return true, routes
 			}
-			curName := curPeer.Name
 			for remoteName, conn := range curPeer.connections {
 				if establishedAndSymmetric && !conn.Established() {
 					continue
@@ -81,9 +80,8 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 				if _, found := routes[remoteName]; found {
 					continue
 				}
-				remote := conn.Remote()
-				if remoteConn, found := remote.connections[curName]; !establishedAndSymmetric || (found && remoteConn.Established()) {
-					nextWorklist = append(nextWorklist, remote)
+				if remoteConn, found := conn.Remote().connections[curPeer.Name]; !establishedAndSymmetric || (found && remoteConn.Established()) {
+					nextWorklist = append(nextWorklist, conn.Remote())
 					// We now know how to get to remoteName: the same
 					// way we get to curPeer. Except, if curPeer is
 					// the starting peer in which case we know we can
@@ -91,7 +89,7 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 					if curPeer == peer {
 						routes[remoteName] = remoteName
 					} else {
-						routes[remoteName] = routes[curName]
+						routes[remoteName] = routes[curPeer.Name]
 					}
 				}
 			}
