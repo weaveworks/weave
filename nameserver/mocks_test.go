@@ -35,7 +35,7 @@ func (mz *mockedZoneWithRecords) LookupName(name string) ([]ZoneRecord, error) {
 	defer mz.Unlock()
 
 	mz.NumLookupsName++
-	res := make([]ZoneRecord, 0)
+	var res []ZoneRecord
 	for _, r := range mz.records {
 		if r.Name() == name {
 			res = append(res, r)
@@ -50,7 +50,7 @@ func (mz *mockedZoneWithRecords) LookupInaddr(inaddr string) ([]ZoneRecord, erro
 	defer mz.Unlock()
 
 	mz.NumLookupsInaddr++
-	res := make([]ZoneRecord, 0)
+	var res []ZoneRecord
 	for _, r := range mz.records {
 		revIP, err := raddrToIP(inaddr)
 		if err != nil {

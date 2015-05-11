@@ -214,7 +214,7 @@ func (c *MDNSClient) ResponseCallback(r *dns.Msg) {
 			}
 
 			if query, found := c.inflight[name]; found {
-				newResponseInfos := make([]*responseInfo, 0)
+				var newResponseInfos []*responseInfo
 				for _, resp := range query.responseInfos {
 					resp.ch <- res
 					// insistent queries are not removed on the first reply, but on the timeout

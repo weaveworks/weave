@@ -26,7 +26,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	wt.AssertNoErr(t, err)
 	defer mdnsServer.Stop()
 
-	receivedAddrs := make([]net.IP, 0)
+	var receivedAddrs []net.IP
 	receivedName := ""
 	recvChan := make(chan interface{})
 	receivedCount := 0

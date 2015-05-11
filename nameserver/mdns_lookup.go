@@ -6,7 +6,7 @@ import (
 )
 
 func mdnsLookup(client *MDNSClient, name string, qtype uint16, insistent bool) ([]ZoneRecord, error) {
-	responses := make([]*Response, 0)
+	var responses []*Response
 	channel := make(chan *Response)
 	client.SendQuery(name, qtype, insistent, channel)
 
