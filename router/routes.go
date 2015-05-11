@@ -9,7 +9,7 @@ import (
 
 type Routes struct {
 	sync.RWMutex
-	ourself      *Peer
+	ourself      *LocalPeer
 	peers        *Peers
 	unicast      map[PeerName]PeerName
 	unicastAll   map[PeerName]PeerName // [1]
@@ -21,7 +21,7 @@ type Routes struct {
 	// symmetric ones
 }
 
-func NewRoutes(ourself *Peer, peers *Peers) *Routes {
+func NewRoutes(ourself *LocalPeer, peers *Peers) *Routes {
 	routes := &Routes{
 		ourself:      ourself,
 		peers:        peers,
@@ -219,7 +219,7 @@ func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerN
 
 	routes.peers.ForEach(func(peer *Peer) {
 		hops := []PeerName{}
-		if found, reached := peer.Routes(ourself, establishedAndSymmetric); found {
+		if found, reached := peer.Routes(ourself.Peer, establishedAndSymmetric); found {
 			// This is rather similar to the inner loop on
 			// peer.Routes(...); the main difference is in the
 			// locking.

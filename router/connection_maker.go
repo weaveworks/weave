@@ -206,8 +206,13 @@ func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}, m
 
 func (cm *ConnectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarget func(string)) {
 	cm.peers.ForEach(func(peer *Peer) {
-		for conn := range peer.Connections() {
-			otherPeer := conn.Remote().Name
+		if peer == cm.ourself.Peer {
+			return
+		}
+		// Modifying peer.connections requires a write lock on Peers,
+		// and since we are holding a read lock (due to the ForEach),
+		// access without locking the peer is safe.
+		for otherPeer, conn := range peer.connections {
 			if otherPeer == cm.ourself.Name {
 				continue
 			}

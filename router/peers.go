@@ -152,14 +152,26 @@ func (peers *Peers) GarbageCollect() []*Peer {
 
 func (peers *Peers) String() string {
 	var buf bytes.Buffer
+	printConnection := func(conn Connection) {
+		established := ""
+		if !conn.Established() {
+			established = " (unestablished)"
+		}
+		fmt.Fprintf(&buf, "   -> %s [%v%s]\n", conn.Remote(), conn.RemoteTCPAddr(), established)
+	}
 	peers.ForEach(func(peer *Peer) {
 		fmt.Fprintln(&buf, peer.Info())
-		for conn := range peer.Connections() {
-			established := ""
-			if !conn.Established() {
-				established = " (unestablished)"
+		if peer == peers.ourself.Peer {
+			for conn := range peers.ourself.Connections() {
+				printConnection(conn)
 			}
-			fmt.Fprintf(&buf, "   -> %s [%v%s]\n", conn.Remote(), conn.RemoteTCPAddr(), established)
+		} else {
+			// Modifying peer.connections requires a write lock on
+			// Peers, and since we are holding a read lock (due to the
+			// ForEach), access without locking the peer is safe.
+			for _, conn := range peer.connections {
+				printConnection(conn)
+			}
 		}
 	})
 	return buf.String()
