@@ -73,15 +73,10 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 			if curPeer == stopAt {
 				return true, routes
 			}
-			for remoteName, conn := range curPeer.connections {
-				if establishedAndSymmetric && !conn.Established() {
-					continue
-				}
-				if _, found := routes[remoteName]; found {
-					continue
-				}
-				if remoteConn, found := conn.Remote().connections[curPeer.Name]; !establishedAndSymmetric || (found && remoteConn.Established()) {
-					nextWorklist = append(nextWorklist, conn.Remote())
+			curPeer.ForEachConnectedPeer(establishedAndSymmetric, routes,
+				func(remotePeer *Peer) {
+					nextWorklist = append(nextWorklist, remotePeer)
+					remoteName := remotePeer.Name
 					// We now know how to get to remoteName: the same
 					// way we get to curPeer. Except, if curPeer is
 					// the starting peer in which case we know we can
@@ -91,9 +86,23 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 					} else {
 						routes[remoteName] = routes[curPeer.Name]
 					}
-				}
-			}
+				})
 		}
 	}
 	return false, routes
+}
+
+func (peer *Peer) ForEachConnectedPeer(establishedAndSymmetric bool, exclude map[PeerName]PeerName, f func(*Peer)) {
+	for remoteName, conn := range peer.connections {
+		if establishedAndSymmetric && !conn.Established() {
+			continue
+		}
+		if _, found := exclude[remoteName]; found {
+			continue
+		}
+		remotePeer := conn.Remote()
+		if remoteConn, found := remotePeer.connections[peer.Name]; !establishedAndSymmetric || (found && remoteConn.Established()) {
+			f(remotePeer)
+		}
+	}
 }

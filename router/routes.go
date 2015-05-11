@@ -222,20 +222,8 @@ func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerN
 	for _, peer := range routes.peers.table {
 		hops := []PeerName{}
 		if found, reached := peer.Routes(routes.ourself.Peer, establishedAndSymmetric); found {
-			// This is rather similar to the inner loop on
-			// peer.Routes(...); the main difference is in the
-			// locking.
-			for remoteName, conn := range routes.ourself.connections {
-				if establishedAndSymmetric && !conn.Established() {
-					continue
-				}
-				if _, found := reached[remoteName]; found {
-					continue
-				}
-				if remoteConn, found := conn.Remote().connections[routes.ourself.Name]; !establishedAndSymmetric || (found && remoteConn.Established()) {
-					hops = append(hops, remoteName)
-				}
-			}
+			routes.ourself.ForEachConnectedPeer(establishedAndSymmetric, reached,
+				func(remotePeer *Peer) { hops = append(hops, remotePeer.Name) })
 		}
 		broadcast[peer.Name] = hops
 	}
