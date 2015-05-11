@@ -10,7 +10,7 @@ import (
 
 type Peers struct {
 	sync.RWMutex
-	ourself *Peer
+	ourself *LocalPeer
 	table   map[PeerName]*Peer
 	onGC    func(*Peer)
 }
@@ -39,7 +39,7 @@ type ConnectionSummary struct {
 	Established   bool
 }
 
-func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
+func NewPeers(ourself *LocalPeer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
 		table:   make(map[PeerName]*Peer),
@@ -250,7 +250,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// guaranteed to find peer in the peers.table
 		peer := peers.table[name]
 		if peer != newPeer &&
-			(peer == peers.ourself || peer.Version() >= newPeer.Version()) {
+			(peer == peers.ourself.Peer || peer.Version() >= newPeer.Version()) {
 			// Nobody but us updates us. And if we know more about a
 			// peer than what's in the the update, we ignore the
 			// latter.

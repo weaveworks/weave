@@ -228,6 +228,8 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
 	peer.broadcastPeerUpdate()
 }
 
+// helpers
+
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 	peer.router.Routes.Recalculate()
 	peer.router.TopologyGossip.GossipBroadcast(NewTopologyGossipData(peer.router.Peers, append(peers, peer.Peer)...))
@@ -235,8 +237,34 @@ func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
 
 func (peer *LocalPeer) checkConnectionLimit() error {
 	limit := peer.router.ConnLimit
-	if 0 != limit && peer.ConnectionCount() >= limit {
+	if 0 != limit && peer.connectionCount() >= limit {
 		return fmt.Errorf("Connection limit reached (%v)", limit)
 	}
 	return nil
+}
+
+func (peer *LocalPeer) addConnection(conn Connection) {
+	peer.Lock()
+	defer peer.Unlock()
+	peer.connections[conn.Remote().Name] = conn
+	peer.version++
+}
+
+func (peer *LocalPeer) deleteConnection(conn Connection) {
+	peer.Lock()
+	defer peer.Unlock()
+	delete(peer.connections, conn.Remote().Name)
+	peer.version++
+}
+
+func (peer *LocalPeer) connectionEstablished(conn Connection) {
+	peer.Lock()
+	defer peer.Unlock()
+	peer.version++
+}
+
+func (peer *LocalPeer) connectionCount() int {
+	peer.RLock()
+	defer peer.RUnlock()
+	return len(peer.connections)
 }

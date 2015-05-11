@@ -66,12 +66,6 @@ func (peer *Peer) IsLocallyReferenced() bool {
 	return peer.localRefCount != 0
 }
 
-func (peer *Peer) ConnectionCount() int {
-	peer.RLock()
-	defer peer.RUnlock()
-	return len(peer.connections)
-}
-
 func (peer *Peer) ConnectionTo(name PeerName) (Connection, bool) {
 	peer.RLock()
 	defer peer.RUnlock()
@@ -94,26 +88,6 @@ func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerN
 	defer peer.Unlock()
 	peer.version = version
 	peer.connections = connections
-}
-
-func (peer *Peer) addConnection(conn Connection) {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.connections[conn.Remote().Name] = conn
-	peer.version++
-}
-
-func (peer *Peer) deleteConnection(conn Connection) {
-	peer.Lock()
-	defer peer.Unlock()
-	delete(peer.connections, conn.Remote().Name)
-	peer.version++
-}
-
-func (peer *Peer) connectionEstablished(conn Connection) {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.version++
 }
 
 // Calculate the routing table from this peer to all peers reachable
