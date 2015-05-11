@@ -14,7 +14,7 @@ import (
 func (peers *Peers) AddTestConnection(p *Peer) {
 	toPeer := NewPeer(p.Name, "", p.UID, 0)
 	peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
-	conn := newMockConnection(peers.ourself, toPeer)
+	conn := newMockConnection(peers.ourself.Peer, toPeer)
 	peers.ourself.addConnection(conn)
 	peers.ourself.connectionEstablished(conn)
 }
@@ -33,7 +33,7 @@ func (peers *Peers) AddTestRemoteConnection(p1, p2 *Peer) {
 func (peers *Peers) DeleteTestConnection(p *Peer) {
 	toName := p.Name
 	toPeer, _ := peers.Fetch(toName)
-	toPeer.DecrementLocalRefCount()
+	peers.Dereference(toPeer)
 	conn, _ := peers.ourself.ConnectionTo(toName)
 	peers.ourself.deleteConnection(conn)
 }

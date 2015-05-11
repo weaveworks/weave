@@ -17,10 +17,10 @@ import (
 // - non-gc of peers that are only referenced locally
 
 func newNode(name PeerName) (*Peer, *Peers) {
-	peer := NewPeer(name, "", 0, 0)
+	peer := NewLocalPeer(name, "", nil)
 	peers := NewPeers(peer, func(*Peer) {})
-	peers.FetchWithDefault(peer)
-	return peer, peers
+	peers.FetchWithDefault(peer.Peer)
+	return peer.Peer, peers
 }
 
 // Check that ApplyUpdate copies the whole topology from peers
@@ -29,7 +29,7 @@ func checkApplyUpdate(t *testing.T, peers *Peers) {
 	// We need a new node outside of the network, with a connection
 	// into it.
 	_, testBedPeers := newNode(dummyName)
-	testBedPeers.AddTestConnection(peers.ourself)
+	testBedPeers.AddTestConnection(peers.ourself.Peer)
 	testBedPeers.ApplyUpdate(peers.EncodePeers(peers.Names()))
 
 	checkTopologyPeers(t, true, testBedPeers.allPeersExcept(dummyName), peers.allPeers()...)
@@ -52,7 +52,7 @@ func TestPeersEncoding(t *testing.T) {
 		case 0:
 			from, to := rand.Intn(numNodes), rand.Intn(numNodes)
 			if from != to {
-				if _, found := peer[from].ConnectionTo(peer[to].Name); !found {
+				if _, found := peer[from].connections[peer[to].Name]; !found {
 					ps[from].AddTestConnection(peer[to])
 					conns = append(conns, struct{ from, to int }{from, to})
 					checkApplyUpdate(t, ps[from])

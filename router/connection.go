@@ -412,7 +412,7 @@ func (conn *LocalConnection) shutdown(err error) {
 	}
 
 	if conn.remote != nil {
-		conn.remote.DecrementLocalRefCount()
+		conn.Router.Peers.Dereference(conn.remote)
 		conn.Router.Ourself.DeleteConnection(conn)
 	}
 

@@ -35,8 +35,30 @@ func (cache *MacCache) MarshalJSON() ([]byte, error) {
 }
 
 func (peers *Peers) MarshalJSON() ([]byte, error) {
-	var ps []*Peer
-	peers.ForEach(func(peer *Peer) { ps = append(ps, peer) })
+	type p struct {
+		Name        string
+		NickName    string
+		UID         uint64
+		Version     uint64
+		Connections []Connection
+	}
+	var ps []*p
+	peers.ForEach(func(peer *Peer) {
+		var connections []Connection
+		if peer == peers.ourself.Peer {
+			for conn := range peers.ourself.Connections() {
+				connections = append(connections, conn)
+			}
+		} else {
+			// Modifying peer.connections requires a write lock on
+			// Peers, and since we are holding a read lock (due to the
+			// ForEach), access without locking the peer is safe.
+			for _, conn := range peer.connections {
+				connections = append(connections, conn)
+			}
+		}
+		ps = append(ps, &p{peer.Name.String(), peer.NickName, peer.UID, peer.version, connections})
+	})
 	return json.Marshal(ps)
 }
 
@@ -61,21 +83,6 @@ func (routes *Routes) MarshalJSON() ([]byte, error) {
 		r.Broadcast = append(r.Broadcast, &broad{name, hops})
 	}
 	return json.Marshal(r)
-}
-
-func (peer *Peer) MarshalJSON() ([]byte, error) {
-	conns := peer.Connections()
-	connections := make([]Connection, 0, len(conns))
-	for conn := range conns {
-		connections = append(connections, conn)
-	}
-	return json.Marshal(struct {
-		Name        string
-		NickName    string
-		UID         uint64
-		Version     uint64
-		Connections []Connection
-	}{peer.Name.String(), peer.NickName, peer.UID, peer.version, connections})
 }
 
 func (conn *RemoteConnection) MarshalJSON() ([]byte, error) {

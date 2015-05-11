@@ -3,17 +3,15 @@ package router
 import (
 	"fmt"
 	"sort"
-	"sync"
 )
 
 type Peer struct {
-	sync.RWMutex
 	Name          PeerName
 	NameByte      []byte
 	NickName      string
 	UID           uint64
 	version       uint64
-	localRefCount uint64
+	localRefCount uint64 // maintained by Peers
 	connections   map[PeerName]Connection
 }
 
@@ -37,83 +35,7 @@ func (peer *Peer) String() string {
 }
 
 func (peer *Peer) Info() string {
-	peer.RLock()
-	defer peer.RUnlock()
 	return fmt.Sprint(peer.String(), " (v", peer.version, ") (UID ", peer.UID, ")")
-}
-
-func (peer *Peer) Version() uint64 {
-	peer.RLock()
-	defer peer.RUnlock()
-	return peer.version
-}
-
-func (peer *Peer) IncrementLocalRefCount() {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.localRefCount++
-}
-
-func (peer *Peer) DecrementLocalRefCount() {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.localRefCount--
-}
-
-func (peer *Peer) IsLocallyReferenced() bool {
-	peer.RLock()
-	defer peer.RUnlock()
-	return peer.localRefCount != 0
-}
-
-func (peer *Peer) ConnectionCount() int {
-	peer.RLock()
-	defer peer.RUnlock()
-	return len(peer.connections)
-}
-
-func (peer *Peer) ConnectionTo(name PeerName) (Connection, bool) {
-	peer.RLock()
-	defer peer.RUnlock()
-	conn, found := peer.connections[name]
-	return conn, found // yes, you really can't inline that. FFS.
-}
-
-func (peer *Peer) Connections() ConnectionSet {
-	connections := make(ConnectionSet)
-	peer.RLock()
-	defer peer.RUnlock()
-	for _, conn := range peer.connections {
-		connections[conn] = void
-	}
-	return connections
-}
-
-func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerName]Connection) {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.version = version
-	peer.connections = connections
-}
-
-func (peer *Peer) addConnection(conn Connection) {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.connections[conn.Remote().Name] = conn
-	peer.version++
-}
-
-func (peer *Peer) deleteConnection(conn Connection) {
-	peer.Lock()
-	defer peer.Unlock()
-	delete(peer.connections, conn.Remote().Name)
-	peer.version++
-}
-
-func (peer *Peer) connectionEstablished(conn Connection) {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.version++
 }
 
 // Calculate the routing table from this peer to all peers reachable
@@ -137,13 +59,9 @@ func (peer *Peer) connectionEstablished(conn Connection) {
 // reaches that peer. The boolean return indicates whether that has
 // happened.
 //
-// We acquire read locks on peers as we encounter them during the
-// traversal. This prevents the connectivity graph from changing
-// underneath us in ways that would invalidate the result. Thus the
-// answer returned may be out of date, but never inconsistent.
+// NB: This function should generally be invoked while holding a read
+// lock on Peers and LocalPeer.
 func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[PeerName]PeerName) {
-	peer.RLock()
-	defer peer.RUnlock()
 	routes := make(map[PeerName]PeerName)
 	routes[peer.Name] = UnknownPeerName
 	nextWorklist := []*Peer{peer}
@@ -164,11 +82,7 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 					continue
 				}
 				remote := conn.Remote()
-				remote.RLock()
-				// DANGER holding rlock on remote, possibly taking
-				// rlock on remoteConn
 				if remoteConn, found := remote.connections[curName]; !establishedAndSymmetric || (found && remoteConn.Established()) {
-					defer remote.RUnlock()
 					nextWorklist = append(nextWorklist, remote)
 					// We now know how to get to remoteName: the same
 					// way we get to curPeer. Except, if curPeer is
@@ -179,8 +93,6 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 					} else {
 						routes[remoteName] = routes[curName]
 					}
-				} else {
-					remote.RUnlock()
 				}
 			}
 		}

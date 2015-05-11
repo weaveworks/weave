@@ -10,7 +10,7 @@ import (
 
 type Peers struct {
 	sync.RWMutex
-	ourself *Peer
+	ourself *LocalPeer
 	table   map[PeerName]*Peer
 	onGC    func(*Peer)
 }
@@ -39,7 +39,7 @@ type ConnectionSummary struct {
 	Established   bool
 }
 
-func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
+func NewPeers(ourself *LocalPeer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
 		table:   make(map[PeerName]*Peer),
@@ -47,20 +47,17 @@ func NewPeers(ourself *Peer, onGC func(*Peer)) *Peers {
 }
 
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
-	peers.RLock()
-	res, found := peers.fetchAlias(peer)
-	peers.RUnlock()
-	if found {
-		return res
-	}
 	peers.Lock()
 	defer peers.Unlock()
-	res, found = peers.fetchAlias(peer)
-	if found {
-		return res
+	if existingPeer, found := peers.table[peer.Name]; found {
+		if existingPeer.UID != peer.UID {
+			return nil
+		}
+		existingPeer.localRefCount++
+		return existingPeer
 	}
 	peers.table[peer.Name] = peer
-	peer.IncrementLocalRefCount()
+	peer.localRefCount++
 	return peer
 }
 
@@ -69,6 +66,12 @@ func (peers *Peers) Fetch(name PeerName) (*Peer, bool) {
 	defer peers.RUnlock()
 	peer, found := peers.table[name]
 	return peer, found // GRRR, why can't I inline this!?
+}
+
+func (peers *Peers) Dereference(peer *Peer) {
+	peers.Lock()
+	defer peers.Unlock()
+	peer.localRefCount--
 }
 
 func (peers *Peers) ForEach(fun func(*Peer)) {
@@ -125,18 +128,20 @@ func (peers *Peers) Names() PeerNameSet {
 }
 
 func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
 	peers.RLock()
+	defer peers.RUnlock()
 	peerList := make([]*Peer, 0, len(names))
 	for name := range names {
 		if peer, found := peers.table[name]; found {
+			if peer == peers.ourself.Peer {
+				peers.ourself.Peer.Encode(enc)
+			} else {
+				peer.Encode(enc)
+			}
 			peerList = append(peerList, peer)
 		}
-	}
-	peers.RUnlock() // release lock so we don't hold it while encoding
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
-	for _, peer := range peerList {
-		peer.encode(enc)
 	}
 	return buf.Bytes()
 }
@@ -149,35 +154,39 @@ func (peers *Peers) GarbageCollect() []*Peer {
 
 func (peers *Peers) String() string {
 	var buf bytes.Buffer
+	printConnection := func(conn Connection) {
+		established := ""
+		if !conn.Established() {
+			established = " (unestablished)"
+		}
+		fmt.Fprintf(&buf, "   -> %s [%v%s]\n", conn.Remote(), conn.RemoteTCPAddr(), established)
+	}
 	peers.ForEach(func(peer *Peer) {
-		fmt.Fprintln(&buf, peer.Info())
-		for conn := range peer.Connections() {
-			established := ""
-			if !conn.Established() {
-				established = " (unestablished)"
+		if peer == peers.ourself.Peer {
+			fmt.Fprintln(&buf, peers.ourself.Info())
+			for conn := range peers.ourself.Connections() {
+				printConnection(conn)
 			}
-			fmt.Fprintf(&buf, "   -> %s [%v%s]\n", conn.Remote(), conn.RemoteTCPAddr(), established)
+		} else {
+			fmt.Fprintln(&buf, peer.Info())
+			// Modifying peer.connections requires a write lock on
+			// Peers, and since we are holding a read lock (due to the
+			// ForEach), access without locking the peer is safe.
+			for _, conn := range peer.connections {
+				printConnection(conn)
+			}
 		}
 	})
 	return buf.String()
 }
 
-func (peers *Peers) fetchAlias(peer *Peer) (*Peer, bool) {
-	if existingPeer, found := peers.table[peer.Name]; found {
-		if existingPeer.UID != peer.UID {
-			return nil, true
-		}
-		existingPeer.IncrementLocalRefCount()
-		return existingPeer, true
-	}
-	return nil, false
-}
-
 func (peers *Peers) garbageCollect() []*Peer {
 	removed := []*Peer{}
+	peers.ourself.RLock()
 	_, reached := peers.ourself.Routes(nil, false)
+	peers.ourself.RUnlock()
 	for name, peer := range peers.table {
-		if _, found := reached[peer.Name]; !found && !peer.IsLocallyReferenced() {
+		if _, found := reached[peer.Name]; !found && peer.localRefCount == 0 {
 			delete(peers.table, name)
 			peers.onGC(peer)
 			removed = append(removed, peer)
@@ -250,7 +259,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// guaranteed to find peer in the peers.table
 		peer := peers.table[name]
 		if peer != newPeer &&
-			(peer == peers.ourself || peer.Version() >= newPeer.Version()) {
+			(peer == peers.ourself.Peer || peer.version >= newPeer.version) {
 			// Nobody but us updates us. And if we know more about a
 			// peer than what's in the the update, we ignore the
 			// latter.
@@ -266,17 +275,14 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// for an update would be someone else calling
 		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
 		// the router.Peers, so there can be no race here.
-		conns := makeConnsMap(peer, connSummaries, peers.table)
-		peer.SetVersionAndConnections(newPeer.Version(), conns)
+		peer.version = newPeer.version
+		peer.connections = makeConnsMap(peer, connSummaries, peers.table)
 		newUpdate[name] = peer
 	}
 	return newUpdate
 }
 
-func (peer *Peer) encode(enc *gob.Encoder) {
-	peer.RLock()
-	defer peer.RUnlock()
-
+func (peer *Peer) Encode(enc *gob.Encoder) {
 	checkFatal(enc.Encode(PeerSummary{
 		peer.NameByte,
 		peer.NickName,
@@ -295,6 +301,12 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	}
 
 	checkFatal(enc.Encode(connSummaries))
+}
+
+func (peer *LocalPeer) Encode(enc *gob.Encoder) {
+	peer.RLock()
+	defer peer.RUnlock()
+	peer.Peer.Encode(enc)
 }
 
 func decodePeer(dec *gob.Decoder) (peerSummary PeerSummary, connSummaries []ConnectionSummary, err error) {
