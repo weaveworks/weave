@@ -58,7 +58,7 @@ assert_bridge_cidrs() {
 }
 
 # Run container with three cidrs
-CID=$(DOCKER_HOST=tcp://$HOST1:2375 $WEAVE run 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 -t --name multicidr -h multicidr.weave.local gliderlabs/alpine /bin/sh | cut -b 1-12)
+CID=$(DOCKER_HOST=tcp://$HOST1:2375 $WEAVE run 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 -d -t --name multicidr -h multicidr.weave.local gliderlabs/alpine /bin/sh | cut -b 1-12)
 assert_container_cidrs $HOST1 $CID 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24
 assert_zone_records $HOST1 $CID multicidr.weave.local. 10.2.1.1 10.2.2.1 10.2.3.1
 

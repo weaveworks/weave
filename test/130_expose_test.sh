@@ -34,7 +34,7 @@ start_suite "exposing weave network to host"
 weave_on $HOST1 launch
 
 for c in $C1 $C2 $C3 $C4; do
-    weave_on $HOST1 run ${c#*:}/24 -t --name=${c%:*} gliderlabs/alpine /bin/sh
+    weave_on $HOST1 run ${c#*:}/24 -d -t --name=${c%:*} gliderlabs/alpine /bin/sh
 done
 
 # absence of host connectivity by default
