@@ -42,13 +42,6 @@ func (peer *Peer) Info() string {
 	return fmt.Sprint(peer.String(), " (v", peer.version, ") (UID ", peer.UID, ")")
 }
 
-func (peer *Peer) SetVersionAndConnections(version uint64, connections map[PeerName]Connection) {
-	peer.Lock()
-	defer peer.Unlock()
-	peer.version = version
-	peer.connections = connections
-}
-
 // Calculate the routing table from this peer to all peers reachable
 // from it, returning a "next hop" map of PeerNameX -> PeerNameY,
 // which says "in order to send a message to X, the peer should send

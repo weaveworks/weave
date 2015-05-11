@@ -270,8 +270,8 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// for an update would be someone else calling
 		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
 		// the router.Peers, so there can be no race here.
-		conns := makeConnsMap(peer, connSummaries, peers.table)
-		peer.SetVersionAndConnections(newPeer.version, conns)
+		peer.version = newPeer.version
+		peer.connections = makeConnsMap(peer, connSummaries, peers.table)
 		newUpdate[name] = peer
 	}
 	return newUpdate
