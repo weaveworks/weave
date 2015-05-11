@@ -128,18 +128,20 @@ func (peers *Peers) Names() PeerNameSet {
 }
 
 func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
 	peers.RLock()
+	defer peers.RUnlock()
 	peerList := make([]*Peer, 0, len(names))
 	for name := range names {
 		if peer, found := peers.table[name]; found {
+			if peer == peers.ourself.Peer {
+				peers.ourself.Peer.Encode(enc)
+			} else {
+				peer.Encode(enc)
+			}
 			peerList = append(peerList, peer)
 		}
-	}
-	peers.RUnlock() // release lock so we don't hold it while encoding
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
-	for _, peer := range peerList {
-		peer.encode(enc)
 	}
 	return buf.Bytes()
 }
@@ -278,10 +280,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 	return newUpdate
 }
 
-func (peer *Peer) encode(enc *gob.Encoder) {
-	peer.RLock()
-	defer peer.RUnlock()
-
+func (peer *Peer) Encode(enc *gob.Encoder) {
 	checkFatal(enc.Encode(PeerSummary{
 		peer.NameByte,
 		peer.NickName,
@@ -300,6 +299,12 @@ func (peer *Peer) encode(enc *gob.Encoder) {
 	}
 
 	checkFatal(enc.Encode(connSummaries))
+}
+
+func (peer *LocalPeer) Encode(enc *gob.Encoder) {
+	peer.RLock()
+	defer peer.RUnlock()
+	peer.Peer.Encode(enc)
 }
 
 func decodePeer(dec *gob.Decoder) (peerSummary PeerSummary, connSummaries []ConnectionSummary, err error) {
