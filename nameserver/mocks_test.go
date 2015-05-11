@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"fmt"
+	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	wt "github.com/weaveworks/weave/testing"
@@ -419,6 +420,22 @@ func runLocalTCPServer(laddr string, handler dns.HandlerFunc) (*dns.Server, stri
 
 	Debug.Printf("[mocked fallback] Fallback TCP server listening at %s", l.Addr().String())
 	return server, l.Addr().String(), nil
+}
+
+//////////////////////////////////////////////////////////////////
+
+type mockedClock struct {
+	*clock.Mock
+}
+
+func newMockedClock() *mockedClock {
+	return &mockedClock{clock.NewMock()}
+}
+
+func (clk *mockedClock) Forward(secs int) {
+	Debug.Printf(">>>>>>> Moving clock forward %d seconds - Time traveling >>>>>>>", secs)
+	clk.Add(time.Duration(secs) * time.Second)
+	Debug.Printf("<<<<<<< Time travel finished! We are at %s <<<<<<<", clk.Now())
 }
 
 //////////////////////////////////////////////////////////////////

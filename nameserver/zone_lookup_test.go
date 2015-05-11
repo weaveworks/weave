@@ -1,7 +1,6 @@
 package nameserver
 
 import (
-	"github.com/benbjohnson/clock"
 	. "github.com/weaveworks/weave/common"
 	wt "github.com/weaveworks/weave/testing"
 	"net"
@@ -26,12 +25,7 @@ func TestZoneRefresh(t *testing.T) {
 	InitDefaultLogging(testing.Verbose())
 	Info.Println("TestZoneRefresh starting")
 
-	clk := clock.NewMock()
-	forwardClock := func(secs int) {
-		Debug.Printf(">>>>>>> Moving clock forward %d seconds - Time traveling >>>>>>>", secs)
-		clk.Add(time.Duration(secs) * time.Second)
-		Debug.Printf("<<<<<<< Time travel finished! We are at %s <<<<<<<", clk.Now())
-	}
+	clk := newMockedClock()
 
 	// Create multiple zone databases, linked through mocked mDNS connections
 	zc := ZoneConfig{
@@ -60,14 +54,14 @@ func TestZoneRefresh(t *testing.T) {
 	t.Logf("Db #1 after the lookup:\n%s", dbs[0].Zone)
 	wt.AssertEqualInt(t, len(res), 1, "lookup result")
 
-	forwardClock(refreshInterval / 2)
+	clk.Forward(refreshInterval / 2)
 	Debug.Printf("A couple of seconds later, we should still have one IP for that name")
 	res, err = dbs[0].Zone.DomainLookupName(name)
 	wt.AssertNoErr(t, err)
 	wt.AssertEqualInt(t, len(res), 1, "lookup result")
 
 	Debug.Printf("And then we add 2 IPs for that name at ZoneDb 2")
-	forwardClock(1)
+	clk.Forward(1)
 	Debug.Printf("Adding 2 IPs to '%s' in Db #2", name)
 	dbs[1].Zone.AddRecord("someident", name, net.ParseIP(addr2))
 	dbs[1].Zone.AddRecord("someident", name, net.ParseIP(addr3))
@@ -76,7 +70,7 @@ func TestZoneRefresh(t *testing.T) {
 	dbs[0].Zone.DomainLookupName(name)
 
 	Debug.Printf("Wait for a while, until a refresh is performed...")
-	forwardClock(refreshInterval + 1)
+	clk.Forward(refreshInterval + 1)
 
 	Debug.Printf("A refresh should have been scheduled now: we should have 3 IPs:")
 	Debug.Printf("the first (local) IP and the others obtained from zone2 with a mDNS query")
@@ -87,7 +81,7 @@ func TestZoneRefresh(t *testing.T) {
 	wt.AssertEqualInt(t, len(res), 3, "lookup result length")
 
 	Debug.Printf("We will not ask for `name` for a while, so it will become irrelevant and will be removed...")
-	forwardClock(relevantTime + refreshInterval + 1)
+	clk.Forward(relevantTime + refreshInterval + 1)
 
 	// the name should be irrelevant now, and all remote info should have been
 	// removed from the zone database
@@ -97,17 +91,17 @@ func TestZoneRefresh(t *testing.T) {
 	wt.AssertFalse(t, dbs[0].Zone.HasNameRemoteInfo(name), "remote name info")
 
 	Debug.Printf("There is no remote info about this name at zone 1: a new IP appears remotely meanwhile...")
-	forwardClock(1)
+	clk.Forward(1)
 	Debug.Printf("Adding '%s' to Db #2", name)
 	dbs[1].Zone.AddRecord("someident", name, net.ParseIP(addr4))
 
 	Debug.Printf("When we ask about this name again, we get 4 IPs (1 local, 3 remote)")
-	forwardClock(1)
+	clk.Forward(1)
 	Debug.Printf("Asking for '%s' again... the first lookup will return only the local results", name)
 	res, err = dbs[0].Zone.DomainLookupName(name)
 	wt.AssertEqualInt(t, len(res), 1, "lookup result length")
 	Debug.Printf("... but a second lookup should return all the results in the network")
-	forwardClock(1)
+	clk.Forward(1)
 	res, err = dbs[0].Zone.DomainLookupName(name)
 	Debug.Printf("Got: %s", res)
 	wt.AssertEqualInt(t, len(res), 4, "lookup result length") // TODO: this fails 1% of the runs... !!??

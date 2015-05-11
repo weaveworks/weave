@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"fmt"
-	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	wt "github.com/weaveworks/weave/testing"
@@ -22,13 +21,7 @@ func TestServerCacheRefresh(t *testing.T) {
 
 	InitDefaultLogging(testing.Verbose())
 	Info.Println("TestServerCacheRefresh starting")
-
-	clk := clock.NewMock()
-	forwardClock := func(secs int) {
-		Debug.Printf(">>>>>>> Moving clock forward %d seconds - Time traveling >>>>>>>", secs)
-		clk.Add(time.Duration(secs) * time.Second)
-		Debug.Printf("<<<<<<< Time travel finished! We are at %s <<<<<<<", clk.Now())
-	}
+	clk := newMockedClock()
 
 	Debug.Printf("Creating 2 zone databases")
 	zoneConfig := ZoneConfig{
@@ -71,7 +64,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	assertInCache(t, cache, qName1, "after asking for first name")
 	assertNotLocalInCache(t, cache, qName2, "after asking for second name")
 
-	forwardClock(refreshInterval / 2)
+	clk.Forward(refreshInterval / 2)
 
 	Debug.Printf("Adding an IP to %s and to %s", testName1, testName2)
 	dbs[1].Zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.2"))
@@ -80,7 +73,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	// Zone database #2 at this point:
 	//   first.weave.local    = 10.2.2.1 10.2.2.2
 	//   second.weave.local   = 10.9.9.2
-	forwardClock(refreshInterval/2 + 2)
+	clk.Forward(refreshInterval/2 + 2)
 
 	// at this point, the testName1 should have been refreshed
 	// so it should have two IPs, and the cache entry should have been invalidated
@@ -95,7 +88,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	// delete the IPs, and some time passes by so the cache should be purged...
 	dbs[1].Zone.DeleteRecord(containerID, net.ParseIP("10.2.2.1"))
 	dbs[1].Zone.DeleteRecord(containerID, net.ParseIP("10.2.2.2"))
-	forwardClock(refreshInterval + 1)
+	clk.Forward(refreshInterval + 1)
 
 	qName1, _ = assertExchange(t, testName1, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
 	qName2, _ = assertExchange(t, testName2, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)

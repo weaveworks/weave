@@ -25,6 +25,8 @@ type ZoneLookup interface {
 	LookupInaddr(inaddr string) ([]ZoneRecord, error)
 }
 
+type ZoneLookupFunc func(target string) ([]ZoneRecord, error)
+
 type ZoneObservable interface {
 	// Observe anything that affects a particular name in the zone
 	ObserveName(name string, observer ZoneRecordObserver) error
