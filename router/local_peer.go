@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
 type LocalPeer struct {
+	sync.RWMutex
 	*Peer
 	router     *Router
 	actionChan chan<- LocalPeerAction

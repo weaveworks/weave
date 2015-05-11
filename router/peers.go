@@ -182,7 +182,9 @@ func (peers *Peers) String() string {
 
 func (peers *Peers) garbageCollect() []*Peer {
 	removed := []*Peer{}
+	peers.ourself.RLock()
 	_, reached := peers.ourself.Routes(nil, false)
+	peers.ourself.RUnlock()
 	for name, peer := range peers.table {
 		if _, found := reached[peer.Name]; !found && peer.localRefCount == 0 {
 			delete(peers.table, name)

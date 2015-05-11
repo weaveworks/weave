@@ -166,12 +166,17 @@ func (routes *Routes) run(recalculate <-chan *struct{}, wait <-chan chan struct{
 }
 
 func (routes *Routes) calculate() {
+	routes.peers.RLock()
+	routes.ourself.RLock()
 	var (
 		unicast      = routes.calculateUnicast(true)
 		unicastAll   = routes.calculateUnicast(false)
 		broadcast    = routes.calculateBroadcast(true)
 		broadcastAll = routes.calculateBroadcast(false)
 	)
+	routes.ourself.RUnlock()
+	routes.peers.RUnlock()
+
 	routes.Lock()
 	routes.unicast = unicast
 	routes.unicastAll = unicastAll
@@ -214,16 +219,13 @@ func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) map[PeerNam
 // where <= is the subset relationship on keys of the returned map.
 func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerName][]PeerName {
 	broadcast := make(map[PeerName][]PeerName)
-	ourself := routes.ourself
-	ourConnections := ourself.Connections()
-
-	routes.peers.ForEach(func(peer *Peer) {
+	for _, peer := range routes.peers.table {
 		hops := []PeerName{}
-		if found, reached := peer.Routes(ourself.Peer, establishedAndSymmetric); found {
+		if found, reached := peer.Routes(routes.ourself.Peer, establishedAndSymmetric); found {
 			// This is rather similar to the inner loop on
 			// peer.Routes(...); the main difference is in the
 			// locking.
-			for conn := range ourConnections {
+			for _, conn := range routes.ourself.connections {
 				if establishedAndSymmetric && !conn.Established() {
 					continue
 				}
@@ -235,12 +237,12 @@ func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerN
 				// peer.connections requires a write lock on Peers,
 				// and since we are holding a read lock (due to the
 				// ForEach), access without locking the peer is safe.
-				if remoteConn, found := conn.Remote().connections[ourself.Name]; !establishedAndSymmetric || (found && remoteConn.Established()) {
+				if remoteConn, found := conn.Remote().connections[routes.ourself.Name]; !establishedAndSymmetric || (found && remoteConn.Established()) {
 					hops = append(hops, remoteName)
 				}
 			}
 		}
 		broadcast[peer.Name] = hops
-	})
+	}
 	return broadcast
 }

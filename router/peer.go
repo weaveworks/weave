@@ -3,11 +3,9 @@ package router
 import (
 	"fmt"
 	"sort"
-	"sync"
 )
 
 type Peer struct {
-	sync.RWMutex
 	Name          PeerName
 	NameByte      []byte
 	NickName      string
@@ -61,13 +59,9 @@ func (peer *Peer) Info() string {
 // reaches that peer. The boolean return indicates whether that has
 // happened.
 //
-// We acquire read locks on peers as we encounter them during the
-// traversal. This prevents the connectivity graph from changing
-// underneath us in ways that would invalidate the result. Thus the
-// answer returned may be out of date, but never inconsistent.
+// NB: This function should generally be invoked while holding a read
+// lock on Peers and LocalPeer.
 func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[PeerName]PeerName) {
-	peer.RLock()
-	defer peer.RUnlock()
 	routes := make(map[PeerName]PeerName)
 	routes[peer.Name] = UnknownPeerName
 	nextWorklist := []*Peer{peer}
@@ -88,11 +82,7 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 					continue
 				}
 				remote := conn.Remote()
-				remote.RLock()
-				// DANGER holding rlock on remote, possibly taking
-				// rlock on remoteConn
 				if remoteConn, found := remote.connections[curName]; !establishedAndSymmetric || (found && remoteConn.Established()) {
-					defer remote.RUnlock()
 					nextWorklist = append(nextWorklist, remote)
 					// We now know how to get to remoteName: the same
 					// way we get to curPeer. Except, if curPeer is
@@ -103,8 +93,6 @@ func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[
 					} else {
 						routes[remoteName] = routes[curName]
 					}
-				} else {
-					remote.RUnlock()
 				}
 			}
 		}
