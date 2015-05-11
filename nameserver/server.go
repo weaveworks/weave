@@ -215,11 +215,11 @@ func (s *DNSServer) Stop() error {
 
 func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 	zoneLookup := func(lookup ZoneLookup, q *dns.Question, r *dns.Msg) (*dns.Msg, []ZoneRecord, error) {
-		if ips, err := lookup.LookupName(q.Name); err != nil {
+		ips, err := lookup.LookupName(q.Name)
+		if err != nil {
 			return nil, nil, err
-		} else {
-			return makeAddressReply(r, q, ips), ips, nil
 		}
+		return makeAddressReply(r, q, ips), ips, nil
 	}
 
 	fallback := func(w dns.ResponseWriter, r *dns.Msg) {
@@ -231,11 +231,11 @@ func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
 
 func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
 	zoneLookup := func(lookup ZoneLookup, q *dns.Question, r *dns.Msg) (*dns.Msg, []ZoneRecord, error) {
-		if names, err := lookup.LookupInaddr(q.Name); err != nil {
+		names, err := lookup.LookupInaddr(q.Name)
+		if err != nil {
 			return nil, nil, err
-		} else {
-			return makePTRReply(r, q, names), names, nil
 		}
+		return makePTRReply(r, q, names), names, nil
 	}
 
 	notUsHandler := s.notUsHandler(proto)
