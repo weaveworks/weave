@@ -112,6 +112,7 @@ func main() {
 	if prof != "" {
 		p := *profile.CPUProfile
 		p.ProfilePath = prof
+		p.NoShutdownHook = true
 		defer profile.Start(&p).Stop()
 	}
 

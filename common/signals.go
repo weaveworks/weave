@@ -24,7 +24,7 @@ func SignalHandlerLoop(ss ...SignalReceiver) {
 			for _, subsystem := range ss {
 				subsystem.Stop()
 			}
-			os.Exit(0)
+			return
 		case syscall.SIGQUIT:
 			stacklen := runtime.Stack(buf, true)
 			Info.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
