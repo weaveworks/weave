@@ -37,8 +37,6 @@ func (peer *Peer) String() string {
 }
 
 func (peer *Peer) Info() string {
-	peer.RLock()
-	defer peer.RUnlock()
 	return fmt.Sprint(peer.String(), " (v", peer.version, ") (UID ", peer.UID, ")")
 }
 

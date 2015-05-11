@@ -160,12 +160,13 @@ func (peers *Peers) String() string {
 		fmt.Fprintf(&buf, "   -> %s [%v%s]\n", conn.Remote(), conn.RemoteTCPAddr(), established)
 	}
 	peers.ForEach(func(peer *Peer) {
-		fmt.Fprintln(&buf, peer.Info())
 		if peer == peers.ourself.Peer {
+			fmt.Fprintln(&buf, peers.ourself.Info())
 			for conn := range peers.ourself.Connections() {
 				printConnection(conn)
 			}
 		} else {
+			fmt.Fprintln(&buf, peer.Info())
 			// Modifying peer.connections requires a write lock on
 			// Peers, and since we are holding a read lock (due to the
 			// ForEach), access without locking the peer is safe.

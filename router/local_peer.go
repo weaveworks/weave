@@ -75,6 +75,12 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec 
 	}
 }
 
+func (peer *LocalPeer) Info() string {
+	peer.RLock()
+	defer peer.RUnlock()
+	return peer.Peer.Info()
+}
+
 func (peer *LocalPeer) Connections() ConnectionSet {
 	connections := make(ConnectionSet)
 	peer.RLock()
