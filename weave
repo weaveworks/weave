@@ -84,8 +84,8 @@ is_cidr() {
 
 validate_cidr() {
     if ! is_cidr "$1" ; then
-        echo "Invalid CIDR: $1" >&2
-        echo "CIDR must be of the form <ip_address>/<routing_prefix_length>, e.g. 10.2.1.1/24" >&2
+        echo "Invalid address prefix: $1" >&2
+        echo "Must be in CIDR notation <ip_address>/<prefix_length>, e.g. 10.2.1.1/24" >&2
         exit 1
     fi
 }
