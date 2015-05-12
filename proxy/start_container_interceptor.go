@@ -38,7 +38,7 @@ func (i *startContainerInterceptor) InterceptResponse(res *http.Response) (*http
 	if cidr, ok := weaveAddrFromConfig(container.Config); ok {
 		Info.Printf("Container %s was started with CIDR \"%s\"", containerId, cidr)
 		args := []string{"attach"}
-		args = append(args, strings.Split(cidr, " ")...)
+		args = append(args, strings.Split(strings.TrimSpace(cidr), " ")...)
 		args = append(args, containerId)
 		if out, err := callWeave(args...); err != nil {
 			Warning.Print("Calling weave failed: ", err, string(out))
