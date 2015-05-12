@@ -283,7 +283,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 		Debug.Printf("[dns msgid %d] %s: %+v", r.MsgHdr.Id, kind, q)
 		maxLen := getMaxReplyLen(r, proto)
 
-		// cache a reponse if the cache is enabled, and observe the name/IP
+		// cache a response if the cache is enabled, and observe the name/IP
 		maybeCache := func(m *dns.Msg, ttl int, flags uint8) {
 			if !s.cacheDisabled {
 				s.cache.Put(r, m, ttl, flags)
@@ -311,6 +311,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 			if reply != nil {
 				Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers",
 					r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer))
+				reply.Answer = shuffleAnswers(reply.Answer)
 				w.WriteMsg(reply)
 				return
 			}
@@ -333,6 +334,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 		} else {
 			m := msgBuilder(r, &q, answers)
 			m.Authoritative = true
+			m.Answer = shuffleAnswers(m.Answer)
 			Debug.Printf("[dns msgid %d] Sending response: %s/%s:%s [code:%s]",
 				m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, answers, dns.RcodeToString[m.Rcode])
 			maybeCache(m, nullTTL, 0)
