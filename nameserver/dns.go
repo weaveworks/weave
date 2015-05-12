@@ -2,6 +2,8 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
+	"math/rand"
+	"time"
 )
 
 const (
@@ -85,4 +87,21 @@ func getMaxReplyLen(r *dns.Msg, proto dnsProtocol) int {
 		maxLen = int(opt.UDPSize())
 	}
 	return maxLen
+}
+
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+}
+
+// shuffleAnswers reorders answers for very basic load balancing
+func shuffleAnswers(answers []dns.RR) []dns.RR {
+	if len(answers) > 1 {
+		for i := range answers {
+			j := rand.Intn(i + 1)
+			answers[i], answers[j] = answers[j], answers[i]
+		}
+	}
+
+	return answers
 }
