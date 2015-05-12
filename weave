@@ -605,7 +605,10 @@ populate_dns() {
             for IP in $CONTAINER_IPS; do
                 # NB: CONTAINER_IP is the IP of the weavedns
                 # container; it is set by wait_for_status.
-                http_call_ip $CONTAINER_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS
+                if ! http_call_ip $CONTAINER_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS ; then
+                    echo "Failed to fully populate DNS."
+                    return 1
+                fi
             done
         fi
     done
