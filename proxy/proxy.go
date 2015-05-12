@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -15,7 +16,8 @@ const (
 )
 
 type proxy struct {
-	Dial func() (net.Conn, error)
+	Dial   func() (net.Conn, error)
+	client *docker.Client
 }
 
 func targetNetwork(u *url.URL) string {
@@ -37,10 +39,15 @@ func NewProxy(targetUrl string) (*proxy, error) {
 	if err != nil {
 		return nil, err
 	}
+	client, err := docker.NewClient(targetUrl)
+	if err != nil {
+		return nil, err
+	}
 	return &proxy{
 		Dial: func() (net.Conn, error) {
 			return net.Dial(targetNetwork(u), targetAddress(u))
 		},
+		client: client,
 	}, nil
 }
 
@@ -76,11 +83,11 @@ func (proxy *proxy) WeaveStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (proxy *proxy) CreateContainer(w http.ResponseWriter, r *http.Request) {
-	NewClient(proxy.Dial, NullInterceptor).ServeHTTP(w, r)
+	NewClient(proxy.Dial, CreateContainerInterceptor(proxy.client)).ServeHTTP(w, r)
 }
 
 func (proxy *proxy) StartContainer(w http.ResponseWriter, r *http.Request) {
-	NewClient(proxy.Dial, StartContainerInterceptor(proxy.transport())).ServeHTTP(w, r)
+	NewClient(proxy.Dial, StartContainerInterceptor(proxy.client)).ServeHTTP(w, r)
 }
 
 func (proxy *proxy) ProxyRequest(w http.ResponseWriter, r *http.Request) {

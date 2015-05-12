@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -8,16 +9,17 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 )
 
 type startContainerInterceptor struct {
-	*http.Transport
+	client *docker.Client
 }
 
-func StartContainerInterceptor(t *http.Transport) Interceptor {
+func StartContainerInterceptor(client *docker.Client) Interceptor {
 	return &startContainerInterceptor{
-		Transport: t,
+		client: client,
 	}
 }
 
@@ -27,21 +29,25 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) (*http.Req
 
 func (i *startContainerInterceptor) InterceptResponse(res *http.Response) (*http.Response, error) {
 	containerId := containerFromPath(res.Request.URL.Path)
-	if info, err := containerInfo(i, containerId); err == nil {
-		if cidr, ok := weaveAddrFromConfig(info["Config"].(map[string]interface{})); ok {
-			Info.Printf("Container %s was started with CIDR \"%s\"", containerId, cidr)
-			args := []string{"attach"}
-			args = append(args, strings.Split(cidr, " ")...)
-			args = append(args, containerId)
-			if out, err := callWeave(args...); err != nil {
-				Warning.Print("Calling weave failed:", err, string(out))
-			}
-		} else {
-			Debug.Print("No Weave CIDR, ignoring")
+
+	container, err := i.client.InspectContainer(containerId)
+	if err != nil {
+		Warning.Print("Error Inspecting Container: ", err)
+		return res, nil
+	}
+
+	if cidr, ok := weaveAddrFromConfig(container.Config); ok {
+		Info.Printf("Container %s was started with CIDR \"%s\"", containerId, cidr)
+		args := []string{"attach"}
+		args = append(args, strings.Split(cidr, " ")...)
+		args = append(args, containerId)
+		if out, err := callWeave(args...); err != nil {
+			Warning.Print("Calling weave failed: ", err, string(out))
 		}
 	} else {
-		Warning.Print("Cound not parse container config from request", err)
+		Debug.Print("No Weave CIDR, ignoring")
 	}
+
 	return res, nil
 }
 
@@ -78,22 +84,10 @@ func callWeave(args ...string) ([]byte, error) {
 	return out, err
 }
 
-func weaveAddrFromConfig(config map[string]interface{}) (string, bool) {
-	env, found := config["Env"]
-	if !found || env == nil {
-		return "", false
-	}
-
-	entries, ok := env.([]interface{})
-	if !ok {
-		Warning.Print("Unexpected format for config: ", config)
-		return "", false
-	}
-
-	for _, e := range entries {
-		entry, entryIsAString := e.(string)
-		if entryIsAString && strings.HasPrefix(entry, "WEAVE_CIDR=") {
-			return strings.Trim(entry[11:], " "), true
+func weaveAddrFromConfig(config *docker.Config) (string, bool) {
+	for _, e := range config.Env {
+		if strings.HasPrefix(e, "WEAVE_CIDR=") {
+			return strings.Trim(e[11:], " "), true
 		}
 	}
 	return "", false
