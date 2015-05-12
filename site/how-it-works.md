@@ -239,7 +239,7 @@ quite difficult to use NaCl incorrectly. Contrast this with libraries
 such as OpenSSL where the library and its APIs are vast in size,
 poorly documented, and easily used wrongly.
 
-There are some similarities between Weave's crypto and
+There are some similarities between weave's crypto and
 [TLS](https://tools.ietf.org/html/rfc4346). We do not need to cater
 for multiple cipher suites, certificate exchange and other
 requirements emanating from X509, and a number of other features. This
