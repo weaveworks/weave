@@ -31,7 +31,7 @@ usage() {
     echo "weave connect    <peer>"
     echo "weave forget     <peer>"
     echo "weave run        [--with-dns] <cidr> [<cidr> ...] <docker run args> ..."
-    echo "weave start      <cidr> [<cidr> ...] <container_id>"
+    echo "weave start      <container_id> [<container_id> ...]"
     echo "weave attach     <cidr> [<cidr> ...] <container_id>"
     echo "weave detach     <cidr> [<cidr> ...] <container_id>"
     echo "weave dns-add    <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
@@ -843,15 +843,10 @@ case "$COMMAND" in
         echo -n $DNS_ARGS
         ;;
     start)
-        collect_cidr_args "$@"
-        shift $CIDR_COUNT
-        [ $# -eq 1 ] || usage
-        CONTAINER_ID="$1"
+        [ $# -gt 0 ] || usage
+        ensure_proxy_running >/dev/null
         create_bridge
-        CONTAINER=$(docker start $CONTAINER_ID)
-        with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
-        tell_dns PUT $CONTAINER_ID $CIDR_ARGS
-        echo $CONTAINER
+        docker -H "$PROXY_ARG" start $@
         ;;
     attach)
         collect_cidr_args "$@"
