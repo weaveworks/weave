@@ -49,6 +49,8 @@ type Zone interface {
 	Domain() string
 	// Add a record in the local database
 	AddRecord(ident string, name string, ip net.IP) error
+	// Delete matching records (uninitialised values act as wildcards)
+	DeleteRecords(ident string, name string, ip net.IP) (count int)
 	// Delete a record in the local database
 	DeleteRecord(ident string, ip net.IP) error
 	// Delete all records for an ident in the local database
@@ -590,6 +592,47 @@ func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) (err error) 
 	record := Record{dns.Fqdn(name), ip, 0, 0, 0}
 	_, err = zone.getNamesSet(ident).addIPToName(record, zone.clock.Now())
 	return
+}
+
+// Delete matching records (uninitialised values act as wildcards)
+func (zone *ZoneDb) DeleteRecords(ident string, name string, ip net.IP) int {
+	zone.mx.Lock()
+	defer zone.mx.Unlock()
+
+	count := 0
+
+	if name != "" {
+		name = dns.Fqdn(name)
+	}
+
+	for identK, identV := range zone.idents {
+		if ident == "" || ident == identK {
+			for nameK, nameV := range identV.names {
+				nameModified := false
+				if name == "" || name == nameK {
+					for ipv4K, ipv4V := range nameV.ipv4 {
+						if ip.Equal(net.IP{}) || ip.Equal(ipv4K.toNetIP()) {
+							ipv4V.notifyIPObservers()
+							delete(nameV.ipv4, ipv4K)
+							nameModified = true
+							count++
+						}
+					}
+				}
+				if nameModified {
+					nameV.notifyNameObservers()
+					if nameV.empty() {
+						delete(identV.names, nameK)
+					}
+				}
+			}
+		}
+		if identV.empty() {
+			delete(zone.idents, identK)
+		}
+	}
+
+	return count
 }
 
 // Delete all records for an ident
