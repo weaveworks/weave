@@ -63,8 +63,8 @@ To accomplish that, we assign each application a different subnet. So,
 in the above example, if we wanted to add another application similar
 to, but isolated from, our first, we'd launch the containers with...
 
-    host1$ D=$(weave run 10.2.2.1/24 -t -i ubuntu)
-    host2$ D=$(weave run 10.2.2.2/24 -t -i ubuntu)
+    host1$ D=$(weave run 10.2.2.1/24 -d -t -i ubuntu)
+    host2$ D=$(weave run 10.2.2.2/24 -d -t -i ubuntu)
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
@@ -93,7 +93,7 @@ well-known technique from the 'on metal' days to containers.
 If desired, a container can be attached to multiple subnets when it is
 started:
 
-    host1$ weave run 10.2.2.1/24 10.2.3.1/24 -t -i ubuntu
+    host1$ weave run 10.2.2.1/24 10.2.3.1/24 -d -t -i ubuntu
 
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
@@ -372,6 +372,9 @@ Containers can be moved between hosts without requiring any
 reconfiguration or, in many cases, restarts of other containers. All
 that is required is for the migrated container to be started with the
 same IP address as it was given originally.
+
+Containers created through weave will depend on volumes from the "weaveexec"
+image, so ensure that it is present on the new host.
 
 ### <a name="fault-tolerance"></a>Fault tolerance
 

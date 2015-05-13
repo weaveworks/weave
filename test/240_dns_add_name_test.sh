@@ -11,8 +11,8 @@ start_suite "Add and remove names on a single host"
 
 weave_on $HOST1 launch-dns 10.2.254.1/24
 
-weave_on $HOST1 run $C2/24 -t --name=c2 gliderlabs/alpine /bin/sh
-weave_on $HOST1 run --with-dns $C1/24 -t --name=c1 aanand/docker-dnsutils /bin/sh
+weave_on $HOST1 run $C2/24 -d -t --name=c2 gliderlabs/alpine /bin/sh
+weave_on $HOST1 run --with-dns $C1/24 -d -t --name=c1 aanand/docker-dnsutils /bin/sh
 
 weave_on $HOST1 dns-add $C2 c2 -h $NAME2
 

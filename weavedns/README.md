@@ -19,8 +19,8 @@ domain registers it in weaveDNS.  For example:
 ```bash
 $ weave launch
 $ weave launch-dns 10.2.254.1/24
-$ weave run 10.2.1.25/24 -ti -h pingme.weave.local ubuntu
-$ shell1=$(weave run --with-dns 10.2.1.26/24 -ti -h ubuntu.weave.local ubuntu)
+$ weave run 10.2.1.25/24 -dti -h pingme.weave.local ubuntu
+$ shell1=$(weave run --with-dns 10.2.1.26/24 -dti -h ubuntu.weave.local ubuntu)
 $ docker attach $shell1
 
 # ping pingme
@@ -67,7 +67,7 @@ hostnames across all sub-domains plus some external domains, you need
 behaviour.
 
 ```bash
-weave run --with-dns 10.2.1.4/24 -ti \
+weave run --with-dns 10.2.1.4/24 -dti \
   --dns-search=zone1.weave.local --dns-search=zone2.weave.local \
   --dns-search=corp1.com --dns-search=corp2.com \
   --dns-search=weave.local ubuntu

@@ -56,7 +56,7 @@ two containers, one on each host.
 On `$HOST1` run
 
     host1$ weave launch
-    host1$ C=$(weave run 10.2.1.1/24 -t -i ubuntu)
+    host1$ C=$(weave run 10.2.1.1/24 -d -t -i ubuntu)
 
 The first line starts the weave router, in a container. This needs to
 be done once on each host. The required docker image for the weave
@@ -70,7 +70,7 @@ downloading.
 The second line runs our application container. We give it an IP
 address and network, in
 [CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation).
-`weave run` invokes `docker run -d` with all the parameters following
+`weave run` invokes `docker run` with all the parameters following
 the IP address and network. So we could be launching any container
 this way; here we just take a stock ubuntu container and launch a
 shell in it. There's also a `weave start` command, which invokes
@@ -88,7 +88,7 @@ addresses must, of course, be unique.
 We repeat similar steps on `$HOST2`...
 
     host2$ weave launch $HOST1
-    host2$ C=$(weave run 10.2.1.2/24 -t -i ubuntu)
+    host2$ C=$(weave run 10.2.1.2/24 -d -t -i ubuntu)
 
 The only difference, apart from the choice of IP address for the
 application container, is that we tell our weave that it should peer

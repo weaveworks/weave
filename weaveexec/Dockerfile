@@ -5,5 +5,8 @@ RUN ["apk", "add", "--update", "ethtool", "conntrack-tools", "curl", "iptables",
 RUN ["sh", "-c", "rm -rf /var/cache/apk/*"]
 ADD ./weave /home/weave/
 ADD ./sigproxy /home/weave/
+ADD ./proxy /home/weave/
 ADD ./docker.tgz /
+ADD ./wait-for-weave /home/weavewait/wait-for-weave
+VOLUME /home/weavewait
 ENTRYPOINT ["/home/weave/sigproxy", "/home/weave/weave"]

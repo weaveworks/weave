@@ -63,21 +63,21 @@ greenly() {
 run_on() {
     host=$1
     shift 1
-    greyly echo "Running on $host: $@"
+    greyly echo "Running on $host: $@" >&2
     remote $host $SSH $host $@
 }
 
 docker_on() {
     host=$1
     shift 1
-    greyly echo "Docker on $host: $@"
+    greyly echo "Docker on $host: $@" >&2
     docker -H tcp://$host:2375 $@
 }
 
 weave_on() {
     host=$1
     shift 1
-    greyly echo "Weave on $host: $@"
+    greyly echo "Weave on $host: $@" >&2
     DOCKER_HOST=tcp://$host:2375 $WEAVE $@
 }
 
