@@ -64,7 +64,7 @@ func addToVolumesFrom(config *docker.HostConfig, mounts ...string) error {
 
 func setWeaveWaitEntrypoint(image, container *docker.Config) {
 	container.Cmd = combineEntrypoints(image, container)
-	container.Entrypoint = []string{"/home/weavewait/wait-for-weave"}
+	container.Entrypoint = []string{"/home/weavewait/weavewait"}
 }
 
 func combineEntrypoints(image, container *docker.Config) []string {

@@ -12,6 +12,7 @@ WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
 SIGPROXY_EXE=sigproxy/sigproxy
 PROXY_EXE=weaveexec/proxy
+WEAVEWAIT_EXE=weavewait/weavewait
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
@@ -30,7 +31,7 @@ travis: $(WEAVER_EXE) $(WEAVEDNS_EXE)
 update:
 	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE)) ./$(dir $(SIGPROXY_EXE)) ./$(dir $(PROXY_EXE))
 
-$(WEAVER_EXE) $(WEAVEDNS_EXE) $(PROXY_EXE): common/*.go
+$(WEAVER_EXE) $(WEAVEDNS_EXE) $(PROXY_EXE) $(WEAVEWAIT_EXE): common/*.go
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
@@ -45,6 +46,7 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(PROXY_EXE): common/*.go
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
 $(PROXY_EXE): proxy/*.go weaveexec/main.go
+$(WEAVEWAIT_EXE): weavewait/*.go weavewait/main.go
 
 # Sigproxy needs separate rule as it fails the netgo check in the main
 # build stanza due to not importing net package
@@ -59,9 +61,10 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(PROXY_EXE)
+$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(PROXY_EXE) $(WEAVEWAIT_EXE)
 	cp weave weaveexec/weave
-	cp sigproxy/sigproxy weaveexec/sigproxy
+	cp $(SIGPROXY_EXE) weaveexec/sigproxy
+	cp $(WEAVEWAIT_EXE) weaveexec/weavewait
 	cp $(DOCKER_DISTRIB) weaveexec/docker.tgz
 	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) weaveexec
 	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
@@ -94,7 +97,7 @@ publish: $(PUBLISH)
 
 clean:
 	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
-	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
+	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(PROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 build:
 	$(SUDO) go clean -i net
