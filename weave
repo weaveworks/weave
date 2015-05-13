@@ -35,7 +35,7 @@ usage() {
     echo "weave attach       [<cidr> ...] <container_id>"
     echo "weave detach       <cidr> [<cidr> ...] <container_id>"
     echo "weave dns-add      <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
-    echo "weave dns-remove   <ip_address> [<ip_address> ...] <container_id>"
+    echo "weave dns-remove   <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
     echo "weave expose       [<cidr> ...] [-h <fqdn>]"
     echo "weave hide         [<cidr> ...]"
     echo "weave ps           [<container_id> ...]"
@@ -644,34 +644,84 @@ dns_args() {
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
 }
 
-# Perform operation $1 on local DNS database, for container ID $2
-# with an FQDN obtained from the container's configured hostname and
-# domain, at addresses $3, $4 ...
-tell_dns() {
-    METHOD="$1"
-    CONTAINER_ID="$2"
-    shift 2
-    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER_ID 2>/dev/null) || true
-    tell_dns_fqdn $METHOD $CONTAINER_ID $CONTAINER_FQDN $@
+# Print an error to stderr and return with an indicative exit status
+# if the weaveDNS container does not exist or isn't running.
+check_dns_running() {
+    if ! STATUS=$(docker inspect --format='{{.State.Running}}' $DNS_CONTAINER_NAME 2>/dev/null); then
+        echo  "$DNS_CONTAINER_NAME container is not present. Have you launched it?" >&2
+        return 1
+    elif [ "$STATUS" != "true" ] ; then
+        echo "$DNS_CONTAINER_NAME container is not running." >&2
+        return 2
+    fi
 }
 
-# Perform operation $1 on local DNS database, for container ID $2
-# with FQDN $3, at addresses $4, $5 ... This function is only called
-# where we know $2 is a valid container name
-tell_dns_fqdn() {
-    METHOD="$1"
-    CONTAINER_ID="$2"
-    CONTAINER_FQDN="$3"
-    shift 3
-    if ! status=$(docker inspect --format='{{.State.Running}}' $DNS_CONTAINER_NAME 2>/dev/null) || [ "$status" != "true" ] ; then
-        # weavedns not running - silently return
-        return
+# Execute $@ only if the weaveDNS container is running
+when_dns_running() {
+    if check_dns_running 2>/dev/null; then
+        "$@"
     fi
-    # get the long form of the container ID
-    CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
-    MORE_ARGS="--data-urlencode fqdn=$CONTAINER_FQDN"
+}
+
+# Iff the container in $1 has an FQDN, invoke $2 as a command passing
+# the container as the first argument, the FQDN as the second argument
+# and $3.. as additional arguments
+when_has_fqdn() {
+    CONTAINER="$1"
+    COMMAND="$2"
+    shift 2
+
+    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) || return 0
+
+    if echo "$CONTAINER_FQDN" | grep -qv '\.\.$' ; then
+        $COMMAND "$CONTAINER" "$CONTAINER_FQDN" "$@"
+    fi
+}
+
+# Convert the container name or short ID in $1 to its full form, then
+# invoke $2 as a command passing the full form as the first argument and
+# $3.. as additional arguments
+with_full_container_id() {
+    CONTAINER="$1"
+    COMMAND="$2"
+    shift 2
+
+    if FULL_CONTAINER_ID=$(container_id $CONTAINER); then
+        $COMMAND $FULL_CONTAINER_ID "$@"
+    else
+        return $?
+    fi
+}
+
+# Register FQDN in $2 as names for addresses $3.. under full container ID $1
+put_dns_fqdn() {
+    CONTAINER_ID="$1"
+    FQDN="$2"
+    shift 2
+
     for ADDR in "$@" ; do
-        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${ADDR%/*} $MORE_ARGS || true
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT PUT /name/$CONTAINER_ID/${ADDR%/*} --data-urlencode fqdn=$FQDN || true
+    done
+}
+
+# Delete all names for addresses $3.. under full container ID $1
+delete_dns() {
+    CONTAINER_ID="$1"
+    shift 1
+
+    for ADDR in "$@" ; do
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT DELETE /name/$CONTAINER_ID/${ADDR%/*} || true
+    done
+}
+
+# Delete any FQDNs $2 from addresses $3.. under full container ID $1
+delete_dns_fqdn() {
+    CONTAINER_ID="$1"
+    FQDN="$2"
+    shift 2
+
+    for ADDR in "$@" ; do
+        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT DELETE /name/$CONTAINER_ID/${ADDR%/*}?fqdn=$FQDN || true
     done
 }
 
@@ -682,17 +732,9 @@ populate_dns() {
         return 0
     fi
     for CONTAINER in $(docker ps -q --no-trunc) ; do
-        MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) || true
         if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
-            for IP in $CONTAINER_IPS ; do
-                # NB: CONTAINER_IP is the IP of the weavedns
-                # container; it is set by wait_for_status.
-                if ! http_call_ip $CONTAINER_IP $DNS_HTTP_PORT PUT /name/$CONTAINER/$IP $MORE_ARGS ; then
-                    echo "Failed to fully populate DNS."
-                    return 1
-                fi
-            done
-        fi
+            when_has_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
+        fi 
     done
 }
 
@@ -920,7 +962,7 @@ case "$COMMAND" in
         create_bridge
         get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-        tell_dns PUT $CONTAINER $CIDR_ARGS
+        when_dns_running when_has_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         echo $CONTAINER
         ;;
     dns-args)
@@ -939,7 +981,7 @@ case "$COMMAND" in
         create_bridge
         get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-        tell_dns PUT $CONTAINER $CIDR_ARGS
+        when_dns_running when_has_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         echo $CONTAINER
         ;;
     attach)
@@ -950,7 +992,7 @@ case "$COMMAND" in
         create_bridge
         get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-        tell_dns PUT $CONTAINER $CIDR_ARGS
+        when_dns_running when_has_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         ;;
     detach)
         collect_cidr_args "$@"
@@ -958,7 +1000,7 @@ case "$COMMAND" in
         [ $# -eq 1 ] || usage
         CONTAINER_ID="$1"
         with_container_netns $CONTAINER_ID detach $CIDR_ARGS >/dev/null
-        tell_dns DELETE $CONTAINER_ID $CIDR_ARGS
+        when_dns_running with_full_container_id $CONTAINER_ID when_has_fqdn delete_dns_fqdn $CIDR_ARGS
         ;;
     dns-add)
         collect_ip_args "$@"
@@ -966,19 +1008,29 @@ case "$COMMAND" in
         [ $# -ge 1 ] || usage
         CONTAINER_ID="$1"
         if [ $# -eq 1 ] ; then
-            tell_dns PUT $CONTAINER_ID $IP_ARGS
+            check_dns_running
+            with_full_container_id $CONTAINER_ID when_has_fqdn put_dns_fqdn $IP_ARGS
         else
             [ $# -eq 3 -a "$2" = "-h" ] || usage
             FQDN="$3"
-            tell_dns_fqdn PUT $CONTAINER_ID $FQDN $IP_ARGS
+            check_dns_running
+            with_full_container_id $CONTAINER_ID put_dns_fqdn $FQDN $IP_ARGS
         fi
         ;;
     dns-remove)
         collect_ip_args "$@"
         shift $IP_COUNT
-        [ $# -eq 1 ] || usage
+        [ $# -ge 1 ] || usage
         CONTAINER_ID="$1"
-        tell_dns DELETE $CONTAINER_ID $IP_ARGS
+        if [ $# -eq 1 ] ; then
+            check_dns_running
+            with_full_container_id $CONTAINER_ID delete_dns $IP_ARGS
+        else
+            [ $# -eq 3 -a "$2" = "-h" ] || usage
+            FQDN="$3"
+            check_dns_running
+            with_full_container_id $CONTAINER_ID delete_dns_fqdn $FQDN $IP_ARGS
+        fi
         ;;
     expose)
         collect_cidr_args "$@"
@@ -998,7 +1050,7 @@ case "$COMMAND" in
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
                 if [ "$FQDN" ] ; then
-                    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT PUT /name/weave:expose/${CIDR%/*} --data-urlencode "fqdn=$FQDN" 2>/dev/null || true
+                    when_dns_running put_dns_fqdn 'weave:expose' $FQDN $CIDR
                 fi
             fi
         done
@@ -1013,7 +1065,7 @@ case "$COMMAND" in
                 ip addr del dev $BRIDGE $CIDR
                 delete_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 delete_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-                http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT DELETE /name/weave:expose/${CIDR%/*} 2>/dev/null || true
+                when_dns_running delete_dns 'weave:expose' $CIDR
             fi
         done
         [ $CIDR_COUNT -eq 0 ] && http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/weave:expose 2>/dev/null || true
