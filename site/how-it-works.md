@@ -5,6 +5,14 @@ layout: default
 
 ## How does it work?
 
+ * [Overview](#overview)
+ * [Encapsulation](#encapsulation)
+ * [Topology](#topology)
+ * [Crypto](#crypto)
+ * [Further reading](#further-reading)
+
+## Overview
+
 A weave network consists of a number of 'peers' - weave routers
 residing on different hosts. Each peer has a name, which tends to
 remain the same over restarts, a human friendly nickname for use in
@@ -374,6 +382,6 @@ contained in the set. The window spans at least 2^20 message sequence
 numbers, and hence any re-ordering between the most recent ~1 million
 messages is handled without dropping messages.
 
-### Further reading
+### <a name="further-reading"></a>Further reading
 More details on the inner workings of weave can be found in the
 [architecture documentation](https://github.com/weaveworks/weave/blob/master/docs/architecture.txt).
