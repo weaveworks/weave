@@ -1,5 +1,5 @@
 ---
-title: WeaveDNS User Guide
+title: Automatic Discovery with WeaveDNS
 layout: default
 ---
 
