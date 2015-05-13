@@ -86,7 +86,8 @@ func callWeave(args ...string) ([]byte, error) {
 func weaveAddrFromConfig(config *docker.Config) (string, bool) {
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
-			return strings.Trim(e[11:], " "), true
+			result := strings.Trim(e[11:], " ")
+			return result, result != ""
 		}
 	}
 	return "", false
