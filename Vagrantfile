@@ -32,8 +32,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.provision :shell, :inline => pkg_cmd
   config.vm.provision :shell, :inline => install_go_toolchain
   config.vm.provision :shell, :inline => "usermod -a -G docker vagrant"
-  config.vm.provision :shell, :inline => "echo export GOPATH=\"\${HOME\}\" >> ~vagrant/.profile"
-  config.vm.provision :shell, :inline => "echo export PATH=\"\${HOME}/bin:#{go_path}:\${PATH}\" >> ~vagrant/.profile"
+  config.vm.provision :shell, :inline => "echo export GOPATH=\"\${HOME\}\" >> ~vagrant/.profile", :privileged => false
+  config.vm.provision :shell, :inline => "echo export PATH=\"\${HOME}/bin:#{go_path}:\${PATH}\" >> ~vagrant/.profile", :privileged => false
+
   config.vm.provision :shell, :inline => "chown -R vagrant:vagrant ~vagrant/src"
   config.vm.provision :shell, :inline => "#{go_path}/go clean -i net; #{go_path}/go install -tags netgo std"
 
