@@ -22,7 +22,7 @@ export BRANCH COMMIT OUTPUT
 bundle install --path=.bundle
 bundle exec jekyll build --verbose
 
-gsutil -m rsync -d _site "gs://docs.weave.works/${OUTPUT}"
+gsutil -m rsync -r -d _site "gs://docs.weave.works/${OUTPUT}"
 
 echo "Published at http://docs.weave.works/${OUTPUT}"
 
