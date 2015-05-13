@@ -1,3 +1,8 @@
+---
+title: WeaveDNS User Guide
+layout: default
+---
+
 # Weave DNS server
 
 The Weave DNS server answers name queries in a Weave network. This
