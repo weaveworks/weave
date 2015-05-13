@@ -162,6 +162,23 @@ vm$ sudo docker ps
 
 and so on.
 
+If you are looking to just do a build and not run anything on this VM,
+you can do so with
+```bash
+$ vagrant ssh -c 'make -C src/github.com/weaveworks/weave'
+```
+
+you should then find container snapshot tarballs in the top-level
+directory. You can use these snapshots with `docker load` agains a
+different host, e.g.
+
+```bash
+$ export DOCKER_HOST=tcp://<HOST:PORT>
+$ docker load < weave.tar
+$ docker load < weavedns.tar
+$ docker load < weaveexec.tar
+```
+
 You can provide extra Vagrant configuration by putting a file
 `Vagrant.local` in the same place as `Vagrantfile`; for instance, to
 forward additional ports.
