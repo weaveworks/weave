@@ -373,6 +373,9 @@ reconfiguration or, in many cases, restarts of other containers. All
 that is required is for the migrated container to be started with the
 same IP address as it was given originally.
 
+Containers created through weave will depend on volumes from the "weaveexec"
+image, so ensure that it is present on the new host.
+
 ### <a name="fault-tolerance"></a>Fault tolerance
 
 Weave peers continually exchange topology information, and monitor
