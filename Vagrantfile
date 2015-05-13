@@ -27,13 +27,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   install_go_toolchain = "curl -s https://storage.googleapis.com/golang/go1.4.2.linux-amd64.tar.gz | tar xz -C /usr/local"
 
+  go_path = "/usr/local/go/bin"
+
   config.vm.provision :shell, :inline => pkg_cmd
   config.vm.provision :shell, :inline => install_go_toolchain
-  config.vm.provision :shell, :inline => "usermod -a -G docker vagrant; "
-  config.vm.provision :shell, :inline => "echo export GOPATH=/home/vagrant >> /home/vagrant/.bashrc"
-  config.vm.provision :shell, :inline => "echo export PATH=/usr/local/go/bin:${PATH} >> /home/vagrant/.bashrc"
-  config.vm.provision :shell, :inline => "chown -R vagrant:vagrant /home/vagrant/src"
-  config.vm.provision :shell, :inline => "/usr/local/go/bin/go clean -i net; /usr/local/go/bin/go install -tags netgo std"
+  config.vm.provision :shell, :inline => "usermod -a -G docker vagrant"
+  config.vm.provision :shell, :inline => "echo export GOPATH=\"\${HOME\}\" >> ~vagrant/.profile"
+  config.vm.provision :shell, :inline => "echo export PATH=\"\${HOME}/bin:#{go_path}:\${PATH}\" >> ~vagrant/.profile"
+  config.vm.provision :shell, :inline => "chown -R vagrant:vagrant ~vagrant/src"
+  config.vm.provision :shell, :inline => "#{go_path}/go clean -i net; #{go_path}/go install -tags netgo std"
 
   config.vm.provision :shell, :inline => "echo 'DOCKER_OPTS=\"-H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\"' >> /etc/default/docker"
   config.vm.provision :shell, :inline => "service docker restart"
