@@ -6,18 +6,52 @@ import (
 	"time"
 )
 
+type uniqZoneRecordKey struct {
+	name string
+	ipv4 IPv4
+}
+
+// A group of ZoneRecords where there are no duplicates (according to the name & IPv4)
+type uniqZoneRecords map[uniqZoneRecordKey]ZoneRecord
+
+func newUniqZoneRecords() uniqZoneRecords {
+	return make(uniqZoneRecords, 0)
+}
+
+// Add a new ZoneRecord to the group
+func (uzr *uniqZoneRecords) add(zr ZoneRecord) {
+	key := uniqZoneRecordKey{zr.Name(), ipToIPv4(zr.IP())}
+	(*uzr)[key] = zr
+}
+
+// Return the group as an slice
+func (uzr *uniqZoneRecords) toSlice() []ZoneRecord {
+	res := make([]ZoneRecord, len(*uzr))
+	i := 0
+	for _, r := range *uzr {
+		res[i] = r
+		i++
+	}
+	return res
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+// Lookup in the database for locally-introduced information
 func (zone *zoneDb) lookup(target string, lfun func(ns *namesSet) []*recordEntry) (res []ZoneRecord, err error) {
+	uniq := newUniqZoneRecords()
 	for identName, nameset := range zone.idents {
 		if identName != defaultRemoteIdent {
 			for _, ze := range lfun(nameset) {
-				res = append(res, ze)
+				uniq.add(ze)
 			}
 		}
 	}
-	if len(res) == 0 {
-		err = LookupError(target)
+	if len(uniq) == 0 {
+		return nil, LookupError(target)
+	} else {
+		return uniq.toSlice(), nil
 	}
-	return
 }
 
 // Perform a lookup for a name in the zone
@@ -63,17 +97,20 @@ func (zone *zoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []Zone
 	res = make([]ZoneRecord, len(lanswers))
 	zone.mx.Lock()
 	now := zone.clock.Now()
+	uniq := newUniqZoneRecords()
 	remoteIdent := zone.getNamesSet(defaultRemoteIdent)
-	for i, answer := range lanswers {
-		res[i], err = remoteIdent.addIPToName(answer, now)
+	for _, answer := range lanswers {
+		r, err := remoteIdent.addIPToName(answer, now)
 		if err != nil {
 			zone.mx.Unlock()
 			Warning.Printf("[zonedb] '%s' insertion for %s failed: %s", answer, target, err)
 			return nil, err
 		}
+		uniq.add(r)
 	}
 	zone.mx.Unlock()
-	return
+
+	return uniq.toSlice(), nil
 }
 
 // Perform a lookup for a name in the zone
@@ -84,6 +121,7 @@ func (zone *zoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 
 	zone.mx.RLock()
 	now := zone.clock.Now()
+	uniq := newUniqZoneRecords()
 	for identName, nameset := range zone.idents {
 		for _, ze := range nameset.getEntriesForName(name) {
 			// filter the entries with expired TTL
@@ -92,7 +130,7 @@ func (zone *zoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 				Debug.Printf("[zonedb] '%s': expired entry '%s' ignored: removing", name, ze)
 				nameset.deleteName(name)
 			} else {
-				res = append(res, ze)
+				uniq.add(ze)
 			}
 		}
 		if identName != defaultRemoteIdent {
@@ -101,8 +139,9 @@ func (zone *zoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 	}
 	zone.mx.RUnlock()
 
-	if len(res) > 0 {
+	if len(uniq) > 0 {
 		Debug.Printf("[zonedb] '%s' resolved in local database", name)
+		res = uniq.toSlice()
 	} else {
 		res, err = zone.domainLookup(name, zone.mdnsCli.LookupName)
 	}
@@ -127,6 +166,7 @@ func (zone *zoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 
 	zone.mx.RLock()
 	now := zone.clock.Now()
+	uniq := newUniqZoneRecords()
 	for identName, nameset := range zone.idents {
 		for _, ze := range nameset.getEntriesForIP(revIPv4) {
 			// filter the entries with expired TTL
@@ -135,7 +175,7 @@ func (zone *zoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 				Debug.Printf("[zonedb] '%s': expired entry '%s' ignored: removing", revIPv4, ze)
 				nameset.deleteIP(revIPv4)
 			} else {
-				res = append(res, ZoneRecord(ze))
+				uniq.add(ze)
 				if identName != defaultRemoteIdent {
 					nameset.touchName(ze.Name(), now)
 				}
@@ -144,8 +184,9 @@ func (zone *zoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 	}
 	zone.mx.RUnlock()
 
-	if len(res) > 0 {
+	if len(uniq) > 0 {
 		Debug.Printf("[zonedb] '%s' resolved in local database", inaddr)
+		res = uniq.toSlice()
 	} else {
 		res, err = zone.domainLookup(inaddr, zone.mdnsCli.LookupInaddr)
 	}
