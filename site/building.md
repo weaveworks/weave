@@ -164,6 +164,7 @@ and so on.
 
 If you are looking to just do a build and not run anything on this VM,
 you can do so with
+
 ```bash
 $ vagrant ssh -c 'make -C src/github.com/weaveworks/weave'
 ```
