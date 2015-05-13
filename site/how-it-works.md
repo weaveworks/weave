@@ -11,7 +11,7 @@ layout: default
  * [Crypto](#crypto)
  * [Further reading](#further-reading)
 
-## Overview
+### <a name="overview"></a>Overview
 
 A weave network consists of a number of 'peers' - weave routers
 residing on different hosts. Each peer has a name, which tends to
