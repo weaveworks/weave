@@ -107,13 +107,17 @@ func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 
 func (router *Router) SendAllGossip() {
 	for _, channel := range router.GossipChannels {
-		channel.Send(router.Ourself.Name, channel.gossiper.Gossip())
+		if gossip := channel.gossiper.Gossip(); gossip != nil {
+			channel.Send(router.Ourself.Name, gossip)
+		}
 	}
 }
 
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for _, channel := range router.GossipChannels {
-		channel.SendDown(conn, channel.gossiper.Gossip())
+		if gossip := channel.gossiper.Gossip(); gossip != nil {
+			channel.SendDown(conn, channel.gossiper.Gossip())
+		}
 	}
 }
 
