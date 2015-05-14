@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 
+	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 )
 

@@ -3,20 +3,17 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 )
 
 type createContainerInterceptor struct {
-	client *docker.Client
-}
-
-func CreateContainerInterceptor(client *docker.Client) *createContainerInterceptor {
-	return &createContainerInterceptor{
-		client: client,
-	}
+	client  *docker.Client
+	withDNS bool
 }
 
 type createContainerRequestBody struct {
@@ -37,14 +34,14 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) (*http.Re
 		return nil, err
 	}
 
-	if _, ok := weaveAddrFromConfig(container.Config); ok {
-		image, err := i.client.InspectImage(container.Config.Image)
-		if err != nil {
+	if _, ok := weaveCIDRsFromConfig(container.Config); ok {
+		i.addToVolumesFrom(container.HostConfig, "weaveproxy")
+		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return nil, err
 		}
-
-		addToVolumesFrom(container.HostConfig, "weaveproxy")
-		setWeaveWaitEntrypoint(image.Config, container.Config)
+		if err := i.setWeaveDNS(&container); err != nil {
+			return nil, err
+		}
 	}
 
 	newBody, err := json.Marshal(container)
@@ -57,30 +54,79 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) (*http.Re
 	return r, nil
 }
 
-func addToVolumesFrom(config *docker.HostConfig, mounts ...string) error {
+func (i *createContainerInterceptor) addToVolumesFrom(config *docker.HostConfig, mounts ...string) {
 	config.VolumesFrom = append(config.VolumesFrom, mounts...)
-	return nil
 }
 
-func setWeaveWaitEntrypoint(image, container *docker.Config) {
-	container.Cmd = combineEntrypoints(image, container)
-	container.Entrypoint = []string{"/home/weavewait/weavewait"}
-}
+func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
+	var image *docker.Config
+	if !configHasEntrypoint(container) || !configHasCmd(container) {
+		imageInfo, err := i.client.InspectImage(container.Image)
+		if err != nil {
+			return err
+		}
+		image = imageInfo.Config
+	}
 
-func combineEntrypoints(image, container *docker.Config) []string {
 	var entry, command []string
-	if len(container.Entrypoint) > 0 {
+	if configHasEntrypoint(container) {
 		entry = container.Entrypoint
-	} else if len(image.Entrypoint) > 0 {
+	} else if configHasEntrypoint(image) {
 		entry = image.Entrypoint
 	}
-	if len(container.Cmd) > 0 {
+	if configHasCmd(container) {
 		command = container.Cmd
-	} else if len(image.Cmd) > 0 {
+	} else if configHasCmd(image) {
 		command = image.Cmd
 	}
 
-	return append(entry, command...)
+	container.Entrypoint = []string{"/home/weavewait/weavewait"}
+	container.Cmd = append(entry, command...)
+	return nil
+}
+
+func configHasEntrypoint(c *docker.Config) bool {
+	return c != nil && len(c.Entrypoint) > 0
+}
+func configHasCmd(c *docker.Config) bool {
+	return c != nil && len(c.Cmd) > 0
+}
+
+func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody) error {
+	if !i.withDNS {
+		return nil
+	}
+
+	dockerBridgeIP, err := getDockerBridgeIP()
+	if err != nil {
+		return err
+	}
+	container.HostConfig.DNS = append(container.HostConfig.DNS, dockerBridgeIP)
+
+	if len(container.HostConfig.DNSSearch) == 0 {
+		container.HostConfig.DNSSearch = []string{"."}
+	}
+	return nil
+}
+
+func getDockerBridgeIP() (string, error) {
+	out, err := callWeave("dns-args")
+	if err != nil {
+		return "", fmt.Errorf("Error fetching weave dns-args: %s", err)
+	}
+
+	var dockerBridgeIP string
+	segments := strings.Split(string(out), " ")
+	for i := 0; i < len(segments)-1; i++ {
+		if segments[i] == "--dns" {
+			dockerBridgeIP = segments[i+1]
+		}
+	}
+
+	if dockerBridgeIP == "" {
+		return "", fmt.Errorf("Docker bridge IP not found in weave output: %s", string(out))
+	}
+	return dockerBridgeIP, nil
 }
 
 func (i *createContainerInterceptor) InterceptResponse(res *http.Response) (*http.Response, error) {

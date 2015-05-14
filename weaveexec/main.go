@@ -1,27 +1,42 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	"net/http"
 
+	"code.google.com/p/getopt"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/proxy"
 )
 
+var (
+	defaultTarget = "unix:///var/run/docker.sock"
+	defaultListen = ":12375"
+)
+
 func main() {
 	var target, listen string
-	var debug bool
+	var withDNS, debug bool
 
-	flag.StringVar(&target, "H", "unix:///var/run/docker.sock", "docker daemon URL to proxy")
-	flag.StringVar(&listen, "L", ":12375", "address on which to listen")
-	flag.BoolVar(&debug, "debug", false, "log debugging information")
-	flag.Parse()
+	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
+	getopt.StringVar(&target, 'H', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultTarget))
+	getopt.StringVar(&listen, 'L', fmt.Sprintf("address on which to listen (default %s)", defaultListen))
+	getopt.BoolVarLong(&withDNS, "with-dns", 'w', "register connected containers with weaveDNS")
+	getopt.Parse()
+
+	if target == "" {
+		target = defaultTarget
+	}
+
+	if listen == "" {
+		listen = defaultListen
+	}
 
 	if debug {
 		InitDefaultLogging(true)
 	}
 
-	p, err := proxy.NewProxy(target)
+	p, err := proxy.NewProxy(target, withDNS)
 	if err != nil {
 		Error.Fatalf("Could not start proxy: %s", err)
 	}

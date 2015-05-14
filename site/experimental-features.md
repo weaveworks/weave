@@ -47,6 +47,18 @@ or, equivalently with
 
 Multiple IP addresses and networks can be supplied in the WEAVE_CIDR variable by space-separating them, as in `WEAVE_CIDR=10.2.1.1/24 10.2.2.1/24`.
 
+#### Usage with WeaveDNS
+
+Containers started via the proxy can be automatically configured to use WeaveDNS for name resolution. To accomplish this we need to launch the proxy with the `--with-dns` option
+
+    host1$ weave launch
+    host1$ weave launch-dns 10.2.254.1/24
+    host1$ weave launch-proxy --with-dns
+
+With this done, any containers launched through the proxy will use weaveDNS for name resolution. WeaveDNS is used in addition to any dns servers specified via the `--dns` option. More details on weaveDNS can be found in the [weaveDNS documentation](weavedns-readme.html).
+
+More details on weaveDNS can be found in the [weaveDNS documentation](weavedns-readme.html).
+
 #### Limitations
 
 * The proxy does not currently support TLS.

@@ -11,13 +11,28 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
-const (
-	RAW_STREAM = "application/vnd.docker.raw-stream"
-)
+type Proxy struct {
+	Dial    func() (net.Conn, error)
+	client  *docker.Client
+	withDNS bool
+}
 
-type proxy struct {
-	Dial   func() (net.Conn, error)
-	client *docker.Client
+func NewProxy(targetURL string, withDNS bool) (*Proxy, error) {
+	u, err := url.Parse(targetURL)
+	if err != nil {
+		return nil, err
+	}
+	client, err := docker.NewClient(targetURL)
+	if err != nil {
+		return nil, err
+	}
+	return &Proxy{
+		Dial: func() (net.Conn, error) {
+			return net.Dial(targetNetwork(u), targetAddress(u))
+		},
+		client:  client,
+		withDNS: withDNS,
+	}, nil
 }
 
 func targetNetwork(u *url.URL) string {
@@ -34,23 +49,6 @@ func targetAddress(u *url.URL) (addr string) {
 	return
 }
 
-func NewProxy(targetUrl string) (*proxy, error) {
-	u, err := url.Parse(targetUrl)
-	if err != nil {
-		return nil, err
-	}
-	client, err := docker.NewClient(targetUrl)
-	if err != nil {
-		return nil, err
-	}
-	return &proxy{
-		Dial: func() (net.Conn, error) {
-			return net.Dial(targetNetwork(u), targetAddress(u))
-		},
-		client: client,
-	}, nil
-}
-
 func isWeaveStatus(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, "/weave")
 }
@@ -65,32 +63,32 @@ func isStartContainer(r *http.Request) bool {
 	return err == nil && ok
 }
 
-func (proxy *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	Info.Printf("%s %s", r.Method, r.URL)
 	switch {
 	case isCreateContainer(r):
-		proxy.CreateContainer(w, r)
+		proxy.createContainer(w, r)
 	case isStartContainer(r):
-		proxy.StartContainer(w, r)
+		proxy.startContainer(w, r)
 	case isWeaveStatus(r):
-		proxy.WeaveStatus(w, r)
+		proxy.weaveStatus(w, r)
 	default:
-		proxy.ProxyRequest(w, r)
+		proxy.proxyRequest(w, r)
 	}
 }
 
-func (proxy *proxy) WeaveStatus(w http.ResponseWriter, r *http.Request) {
+func (proxy *Proxy) weaveStatus(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (proxy *proxy) CreateContainer(w http.ResponseWriter, r *http.Request) {
-	NewClient(proxy.Dial, CreateContainerInterceptor(proxy.client)).ServeHTTP(w, r)
+func (proxy *Proxy) createContainer(w http.ResponseWriter, r *http.Request) {
+	newClient(proxy.Dial, &createContainerInterceptor{proxy.client, proxy.withDNS}).ServeHTTP(w, r)
 }
 
-func (proxy *proxy) StartContainer(w http.ResponseWriter, r *http.Request) {
-	NewClient(proxy.Dial, StartContainerInterceptor(proxy.client)).ServeHTTP(w, r)
+func (proxy *Proxy) startContainer(w http.ResponseWriter, r *http.Request) {
+	newClient(proxy.Dial, &startContainerInterceptor{proxy.client, proxy.withDNS}).ServeHTTP(w, r)
 }
 
-func (proxy *proxy) ProxyRequest(w http.ResponseWriter, r *http.Request) {
-	NewClient(proxy.Dial, NullInterceptor).ServeHTTP(w, r)
+func (proxy *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
+	newClient(proxy.Dial, &nullInterceptor{}).ServeHTTP(w, r)
 }
