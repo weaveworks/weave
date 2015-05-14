@@ -38,7 +38,7 @@ func (peers *Peers) MarshalJSON() ([]byte, error) {
 	type p struct {
 		Name        string
 		NickName    string
-		UID         uint64
+		UID         PeerUID
 		Version     uint64
 		Connections []Connection
 	}

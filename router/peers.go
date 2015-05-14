@@ -28,7 +28,7 @@ type PeerNameSet map[PeerName]struct{}
 type PeerSummary struct {
 	NameByte []byte
 	NickName string
-	UID      uint64
+	UID      PeerUID
 	Version  uint64
 }
 
