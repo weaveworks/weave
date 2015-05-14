@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func (router *Router) GenerateStatusJSON(version, encryption string) ([]byte, error) {
+func (router *Router) StatusJSON(version, encryption string) ([]byte, error) {
 	return json.Marshal(struct {
 		Version    string
 		Encryption string

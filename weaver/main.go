@@ -179,7 +179,7 @@ func handleHTTP(router *weave.Router, httpAddr string) {
 	})
 
 	muxRouter.Methods("GET").Path("/status-json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json, _ := router.GenerateStatusJSON(version, encryption)
+		json, _ := router.StatusJSON(version, encryption)
 		w.Write(json)
 	})
 
