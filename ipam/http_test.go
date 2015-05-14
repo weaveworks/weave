@@ -74,7 +74,7 @@ func TestHttp(t *testing.T) {
 
 	// Ask the http server for another address and check it's different
 	cidr2 := HTTPPost(t, allocURL(port, container2))
-	wt.AssertNotEqualString(t, cidr2, testAddr1+netSuffix, "address")
+	wt.AssertFalse(t, cidr2 == testAddr1+netSuffix, "address")
 
 	// Ask for the first container again and we should get the same address again
 	cidr1a := HTTPPost(t, allocURL(port, containerID))

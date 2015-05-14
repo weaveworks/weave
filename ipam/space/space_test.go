@@ -101,7 +101,7 @@ func TestSpaceAllocate(t *testing.T) {
 	space1.assertInvariants()
 
 	_, addr2 := space1.Allocate()
-	wt.AssertNotEqualString(t, addr2.String(), testAddr1, "address")
+	wt.AssertFalse(t, addr2.String() == testAddr1, "address")
 	wt.AssertEquals(t, space1.NumFreeAddresses(), address.Offset(18))
 	wt.AssertEquals(t, space1.NumFreeAddressesInRange(ip(testAddr1), ip(testAddrx)), address.Offset(13))
 	wt.AssertEquals(t, space1.NumFreeAddressesInRange(ip(testAddr1), ip(testAddry)), address.Offset(18))
@@ -194,7 +194,7 @@ func TestDonateSimple(t *testing.T) {
 
 	// Empty space set should split in two and give me the second half
 	start, numGivenUp, ok := ps1.Donate()
-	wt.AssertBool(t, ok, true, "Donate result")
+	wt.AssertTrue(t, ok, "Donate result")
 	wt.AssertEqualString(t, start.String(), "10.0.1.24", "Invalid start")
 	wt.AssertEquals(t, numGivenUp, address.Offset(24))
 	wt.AssertEquals(t, ps1.NumFreeAddresses(), address.Offset(24))
@@ -236,7 +236,7 @@ func TestDonateHard(t *testing.T) {
 
 	// Now split
 	newRange, numGivenUp, ok := spaceset.Donate()
-	wt.AssertBool(t, ok, true, "GiveUpSpace result")
+	wt.AssertTrue(t, ok, "GiveUpSpace result")
 	wt.AssertEquals(t, newRange, ip("10.0.1.23"))
 	wt.AssertEquals(t, numGivenUp, address.Offset(24))
 	wt.AssertEquals(t, spaceset.NumFreeAddresses(), address.Offset(23))

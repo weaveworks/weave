@@ -40,29 +40,12 @@ func AssertNoErr(t *testing.T, err error) {
 	}
 }
 
-func AssertBool(t *testing.T, got, wanted bool, desc string) {
-	if got != wanted {
-		Fatalf(t, "Expected %s %t but got %t", desc, wanted, got)
-	}
-}
-
-func AssertEqualUint32(t *testing.T, got, wanted uint32, desc string) {
-	if got != wanted {
-		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
-	}
-}
-
 func AssertEqualuint64(t *testing.T, got, wanted uint64, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
 	}
 }
 
-func AssertEqualInt64(t *testing.T, got, wanted int64, desc string) {
-	if got != wanted {
-		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
-	}
-}
 func AssertEqualInt(t *testing.T, got, wanted int, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
@@ -78,12 +61,6 @@ func AssertNotEqualInt(t *testing.T, got, wanted int, desc string) {
 func AssertEqualString(t *testing.T, got, wanted string, desc string) {
 	if got != wanted {
 		Fatalf(t, "Expected %s '%s' but got '%s'", desc, wanted, got)
-	}
-}
-
-func AssertNotEqualString(t *testing.T, got, wanted string, desc string) {
-	if got == wanted {
-		Fatalf(t, "Expected %s unlike '%s'", desc, wanted)
 	}
 }
 
