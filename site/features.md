@@ -395,4 +395,4 @@ quickly enough.
 WeaveDNS is a distributed DNS service for weave networks, enabling
 containers to address each other by name rather than IP address. Find
 out more about WeaveDNS from its
-[documentation](weavedns-readme.html)
+[documentation](weavedns-readme.html).
