@@ -18,10 +18,7 @@ weave_on $HOST1 run --with-dns --name=c1 -t aanand/docker-dnsutils /bin/sh
 # Note can't use weave_on here because it echoes the command
 C2IP=$(DOCKER_HOST=tcp://$HOST2:2375 $WEAVE ps c2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
 
-ok=$(docker -H tcp://$HOST1:2375 exec -i c1 dig +short seetwo.weave.local)
-assert "echo $ok" "$C2IP"
-
-ok=$(docker -H tcp://$HOST1:2375 exec -i c1 dig +short -x $C2IP)
-assert "echo $ok" "seetwo.weave.local."
+assert "exec_on $HOST1 c1 dig +short seetwo.weave.local" "$C2IP"
+assert "exec_on $HOST1 c1 dig +short -x $C2IP" "seetwo.weave.local."
 
 end_suite
