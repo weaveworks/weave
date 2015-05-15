@@ -129,23 +129,26 @@ func main() {
 
 	router := weave.NewRouter(config, name, nickName)
 	log.Println("Our name is", router.Ourself)
+
 	var allocator *ipam.Allocator
-	if httpAddr != "" {
-		if iprangeCIDR != "" {
-			allocator = createAllocator(router, apiPath, iprangeCIDR, determineQuorum(peerCount, peers))
-		} else {
-			if peerCount > 0 {
-				log.Fatal("-initpeercount flag specified without -iprange")
-			}
-		}
-	}
-	if httpAddr == "" || iprangeCIDR == "" {
+	if iprangeCIDR != "" {
+		allocator = createAllocator(router, apiPath, iprangeCIDR, determineQuorum(peerCount, peers))
+	} else if peerCount > 0 {
+		log.Fatal("-initpeercount flag specified without -iprange")
+	} else {
 		router.NewGossip("IPallocation", &ipam.DummyAllocator{})
 	}
 
 	router.Start()
 	initiateConnections(router, peers)
-	go handleHTTP(router, httpAddr, allocator)
+
+	// The weave script always waits for a status call to succeed,
+	// so there is no point in doing "weave launch -httpaddr ''".
+	// This is here to support stand-alone use of weaver.
+	if httpAddr != "" {
+		go handleHTTP(router, httpAddr, allocator)
+	}
+
 	SignalHandlerLoop(router)
 }
 
