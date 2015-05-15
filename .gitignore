@@ -32,6 +32,7 @@ coverage.html
 # Project specific
 weaver/weaver
 weavedns/weavedns
+weaveproxy/weaveproxy
 sigproxy/sigproxy
 weavewait/weavewait
 tools/bin
@@ -40,8 +41,8 @@ releases
 weave.tar
 weavedns.tar
 weaveexec.tar
-weaveexec/proxy
 weaveexec/weave
+weaveexec/weaveproxy
 weaveexec/weavewait
 weaveexec/sigproxy
 weaveexec/docker*.tgz

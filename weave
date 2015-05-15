@@ -730,7 +730,7 @@ ensure_proxy_running() {
         --name=$PROXY_CONTAINER_NAME \
         -p $PROXY_PORT:$PROXY_PORT/tcp -v /var/run/docker.sock:/var/run/docker.sock \
         -v /proc:/hostproc -e PROCFS=/hostproc \
-        --entrypoint=/home/weave/proxy \
+        --entrypoint=/home/weave/weaveproxy \
         $WEAVE_DOCKER_ARGS $WEAVEPROXY_DOCKER_ARGS \
         $EXEC_IMAGE "$@")
 

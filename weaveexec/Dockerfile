@@ -15,7 +15,7 @@ WORKDIR /home/weave
 
 ADD ./weave /home/weave/
 ADD ./sigproxy /home/weave/
-ADD ./proxy /home/weave/
+ADD ./weaveproxy /home/weave/
 ADD ./weavewait /home/weavewait/weavewait
 ADD ./docker.tgz /
 
