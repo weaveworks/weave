@@ -22,7 +22,7 @@ example](https://github.com/weaveworks/weave#example):
  * [Dynamic topologies](#dynamic-topologies)
  * [Container mobility](#container-mobility)
  * [Fault tolerance](#fault-tolerance)
- * [DNS](#dns)
+ * [Automatic discovery with WeaveDNS](#dns)
 
 ### <a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
@@ -390,7 +390,7 @@ restarted in that event, and indeed may not even experience a
 temporary connectivity failure if the weave container is restarted
 quickly enough.
 
-### <a name="dns"></a>DNS
+### <a name="dns"></a>Automatic discovery with WeaveDNS
 
 WeaveDNS is a distributed DNS service for weave networks, enabling
 containers to address each other by name rather than IP address. Find
