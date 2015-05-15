@@ -639,7 +639,9 @@ populate_dns() {
 # IP Allocation Management helpers
 ######################################################################
 
-populate_1_ipam() {
+# Claim addresses for a container in IPAM.  Expects to be called from
+# with_container_addresses.
+ipam_claim() {
     for CIDR in $3; do
         # NB: CONTAINER_IP is the IP of the weave container; it is set by wait_for_status.
         http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$1/${CIDR%/*}
@@ -781,7 +783,7 @@ case "$COMMAND" in
         wait_for_status $CONTAINER_NAME $HTTP_PORT
         if [ -n "$IPRANGE" ] ; then
             # Tell the newly-started weave IP allocator about existing weave IPs
-            with_container_addresses populate_1_ipam weave:expose $(docker ps -q)
+            with_container_addresses ipam_claim weave:expose $(docker ps -q)
         fi
 
         echo $CONTAINER
