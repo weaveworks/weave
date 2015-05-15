@@ -24,6 +24,7 @@ example](https://github.com/weaveworks/weave#example):
  * [Fault tolerance](#fault-tolerance)
  * [Automatic IP address management](#ipam)
  * [Automatic discovery with WeaveDNS](#dns)
+ * [Proxy](#proxy)
 
 ### <a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
@@ -403,4 +404,11 @@ to enable and use this feature.
 
 WeaveDNS is a distributed DNS service for weave networks, enabling
 containers to address each other by name rather than IP address. Find
-out more about weaveDNS from its [documentation](weavedns.html).
+out more about WeaveDNS from its [documentation](weavedns.html).
+
+### <a name="proxy"></a>Proxy
+
+The weave proxy enables you to use the docker command-line utility, allowing
+weave-enabled containers to be started in the foreground, and to wait for the
+weave network interface before running. Find out more about the weave proxy
+from its [documentation](proxy.html).

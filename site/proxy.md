@@ -1,20 +1,16 @@
 ---
-title: Experimental features
+title: Weave Proxy
 layout: default
 ---
 
-# Experimental features
-
- * [Proxy](#proxy)
-
-### <a name="proxy"></a>Proxy
+# <a name="weave-proxy"></a>Weave Proxy
 
 Instead of the weave command-line utility, you may prefer to use the standard
 docker command-line utility to manage containers. This will allow containers to
 be started in foreground mode. It will also ensure that the weave network
 interface is available before running your container.
 
-#### Setup
+## Setup
 
 To do this, while still connecting containers to the weave network, you can use
 the weave proxy. We can start the proxy with
@@ -29,7 +25,7 @@ to globally adjust your `DOCKER_HOST`.
     host1$ export DOCKER_HOST="tcp://host1:12375"
     host1$ docker ps
 
-#### Usage
+## Usage
 
 When containers are created via the weave proxy, their entrypoint will be
 modified to wait for the weave network interface to become available. When they are
@@ -47,7 +43,7 @@ or, equivalently with
 
 Multiple IP addresses and networks can be supplied in the WEAVE_CIDR variable by space-separating them, as in `WEAVE_CIDR=10.2.1.1/24 10.2.2.1/24`.
 
-#### Usage with WeaveDNS
+## Usage with WeaveDNS
 
 Containers started via the proxy can be automatically configured to use WeaveDNS for name resolution. To accomplish this we need to launch the proxy with the `--with-dns` option
 
@@ -55,11 +51,9 @@ Containers started via the proxy can be automatically configured to use WeaveDNS
     host1$ weave launch-dns 10.2.254.1/24
     host1$ weave launch-proxy --with-dns
 
-With this done, any containers launched through the proxy will use weaveDNS for name resolution. WeaveDNS is used in addition to any dns servers specified via the `--dns` option. More details on weaveDNS can be found in the [weaveDNS documentation](weavedns-readme.html).
+With this done, any containers launched through the proxy will use weaveDNS for name resolution. WeaveDNS is used in addition to any dns servers specified via the `--dns` option. More details on weaveDNS can be found in the [weaveDNS documentation](weavedns.html).
 
-More details on weaveDNS can be found in the [weaveDNS documentation](weavedns-readme.html).
-
-#### Limitations
+## Limitations
 
 * The proxy does not currently support TLS.
 * If you have a firewall, you will need to make sure port 12375 is open.
