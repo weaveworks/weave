@@ -133,10 +133,10 @@ to each other.
 
  * [Documentation homepage](http://docs.weave.works/weave/latest_release/)
  * [Features](http://docs.weave.works/weave/latest_release/features.html)
+ * [Automatic Discovery with WeaveDNS](http://docs.weave.works/weave/latest_release/weavedns.html)
  * [Troubleshooting](http://docs.weave.works/weave/latest_release/troubleshooting.html)
  * [Building](http://docs.weave.works/weave/latest_release/building.html)
  * [How it works](http://docs.weave.works/weave/latest_release/how-it-works.html)
- * [Automatic Discovery with WeaveDNS](http://docs.weave.works/weave/latest_release/weavedns.html)
 
 ## Contact Us
 
