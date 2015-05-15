@@ -12,9 +12,10 @@ import (
 )
 
 type Proxy struct {
-	Dial    func() (net.Conn, error)
-	client  *docker.Client
-	withDNS bool
+	Dial           func() (net.Conn, error)
+	client         *docker.Client
+	withDNS        bool
+	dockerBridgeIP string
 }
 
 func NewProxy(targetURL string, withDNS bool) (*Proxy, error) {
@@ -22,6 +23,15 @@ func NewProxy(targetURL string, withDNS bool) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	var dockerBridgeIP []byte
+	if withDNS {
+		dockerBridgeIP, err = callWeave("docker-bridge-ip")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	client, err := docker.NewClient(targetURL)
 	if err != nil {
 		return nil, err
@@ -30,8 +40,9 @@ func NewProxy(targetURL string, withDNS bool) (*Proxy, error) {
 		Dial: func() (net.Conn, error) {
 			return net.Dial(targetNetwork(u), targetAddress(u))
 		},
-		client:  client,
-		withDNS: withDNS,
+		client:         client,
+		withDNS:        withDNS,
+		dockerBridgeIP: string(dockerBridgeIP),
 	}, nil
 }
 
@@ -82,7 +93,7 @@ func (proxy *Proxy) weaveStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (proxy *Proxy) createContainer(w http.ResponseWriter, r *http.Request) {
-	newClient(proxy.Dial, &createContainerInterceptor{proxy.client, proxy.withDNS}).ServeHTTP(w, r)
+	newClient(proxy.Dial, &createContainerInterceptor{proxy.client, proxy.withDNS, proxy.dockerBridgeIP}).ServeHTTP(w, r)
 }
 
 func (proxy *Proxy) startContainer(w http.ResponseWriter, r *http.Request) {

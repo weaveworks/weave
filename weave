@@ -921,6 +921,10 @@ case "$COMMAND" in
         dns_args "$@"
         echo -n $DNS_ARGS
         ;;
+    docker-bridge-ip)
+        docker_bridge_ip
+        echo -n $DOCKER_BRIDGE_IP
+        ;;
     start)
         collect_cidr_args "$@"
         shift $CIDR_COUNT

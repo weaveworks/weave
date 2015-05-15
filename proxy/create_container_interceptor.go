@@ -3,17 +3,16 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 )
 
 type createContainerInterceptor struct {
-	client  *docker.Client
-	withDNS bool
+	client         *docker.Client
+	withDNS        bool
+	dockerBridgeIP string
 }
 
 type createContainerRequestBody struct {
@@ -97,36 +96,12 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 		return nil
 	}
 
-	dockerBridgeIP, err := getDockerBridgeIP()
-	if err != nil {
-		return err
-	}
-	container.HostConfig.DNS = append(container.HostConfig.DNS, dockerBridgeIP)
+	container.HostConfig.DNS = append(container.HostConfig.DNS, i.dockerBridgeIP)
 
 	if len(container.HostConfig.DNSSearch) == 0 {
 		container.HostConfig.DNSSearch = []string{"."}
 	}
 	return nil
-}
-
-func getDockerBridgeIP() (string, error) {
-	out, err := callWeave("dns-args")
-	if err != nil {
-		return "", fmt.Errorf("Error fetching weave dns-args: %s", err)
-	}
-
-	var dockerBridgeIP string
-	segments := strings.Split(string(out), " ")
-	for i := 0; i < len(segments)-1; i++ {
-		if segments[i] == "--dns" {
-			dockerBridgeIP = segments[i+1]
-		}
-	}
-
-	if dockerBridgeIP == "" {
-		return "", fmt.Errorf("Docker bridge IP not found in weave output: %s", string(out))
-	}
-	return dockerBridgeIP, nil
 }
 
 func (i *createContainerInterceptor) InterceptResponse(res *http.Response) (*http.Response, error) {
