@@ -646,12 +646,6 @@ populate_1_ipam() {
     done
 }
 
-# Tell the newly-started weave IP allocator about existing weave IPs
-populate_ipam() {
-    wait_for_status $CONTAINER_NAME $HTTP_PORT
-    with_container_addresses populate_1_ipam weave:expose $(docker ps -q)
-}
-
 # If we don't already have any CIDRs passed from the command-line, get one from IPAM
 # $1 is the name of the container and $2, if set, is the ID to use inside IPAM
 get_ipam_cidr() {
@@ -783,7 +777,13 @@ case "$COMMAND" in
             -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" $IPRANGE "$@")
         with_container_netns $CONTAINER launch >/dev/null
-        [ -z "$IPRANGE" ] && wait_for_status $CONTAINER_NAME $HTTP_PORT || populate_ipam
+
+        wait_for_status $CONTAINER_NAME $HTTP_PORT
+        if [ -n "$IPRANGE" ] ; then
+            # Tell the newly-started weave IP allocator about existing weave IPs
+            with_container_addresses populate_1_ipam weave:expose $(docker ps -q)
+        fi
+
         echo $CONTAINER
         ;;
     launch-dns)
