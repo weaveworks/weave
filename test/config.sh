@@ -88,18 +88,6 @@ exec_on() {
     docker -H tcp://$host:2375 exec $container "$@"
 }
 
-dig_on() {
-    host=$1
-    cont=$2
-    query=$3
-    docker -H tcp://$host:2375 exec $cont sh -c "dig $query"
-}
-
-# assert_dns_status <host> <container> <name> <query> <status>
-assert_dns_status() {
-    assert_raises "dig_on \"$1\" \"$2\" \"$3\" | grep -q \"status: $4\""
-}
-
 # assert_dns_record <host> <container> <name> <ip>
 assert_dns_record() {
     assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
