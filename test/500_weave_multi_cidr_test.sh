@@ -2,6 +2,8 @@
 
 . ./config.sh
 
+NAME=multicidr.weave.local
+
 # assert_container_cidrs <host> <cid> <cidr> [<cidr> ...]
 assert_container_cidrs() {
     HOST=$1; shift
@@ -44,25 +46,25 @@ weave_on $HOST1 launch
 weave_on $HOST1 launch-dns 10.254.254.254/24
 
 # Run container with three cidrs
-CID=$(start_container $HOST1 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 --name=multicidr -h multicidr.weave.local | cut -b 1-12)
+CID=$(start_container $HOST1 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 --name=multicidr -h $NAME | cut -b 1-12)
 assert_container_cidrs $HOST1 $CID 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24
-assert_zone_records $HOST1 $CID multicidr.weave.local. 10.2.1.1 10.2.2.1 10.2.3.1
+assert_zone_records $HOST1 $CID $NAME. 10.2.1.1 10.2.2.1 10.2.3.1
 
 # Remove two of them
 weave_on $HOST1 detach 10.2.1.1/24 10.2.3.1/24 $CID
 assert_container_cidrs $HOST1 $CID 10.2.2.1/24
-assert_zone_records $HOST1 $CID multicidr.weave.local. 10.2.2.1
+assert_zone_records $HOST1 $CID $NAME. 10.2.2.1
 
 # Put them both back
 weave_on $HOST1 attach 10.2.1.1/24 10.2.3.1/24 $CID
 assert_container_cidrs $HOST1 $CID 10.2.2.1/24 10.2.1.1/24 10.2.3.1/24
-assert_zone_records $HOST1 $CID multicidr.weave.local. 10.2.2.1 10.2.1.1 10.2.3.1
+assert_zone_records $HOST1 $CID $NAME. 10.2.2.1 10.2.1.1 10.2.3.1
 
 # Stop the container, restart with three IPs
 docker_on $HOST1 stop $CID
 weave_on $HOST1 start 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $CID
 assert_container_cidrs $HOST1 $CID 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24
-assert_zone_records $HOST1 $CID multicidr.weave.local. 10.2.1.1 10.2.2.1 10.2.3.1
+assert_zone_records $HOST1 $CID $NAME. 10.2.1.1 10.2.2.1 10.2.3.1
 
 # Expose some cidrs
 weave_on $HOST1 expose 10.2.1.2/24 10.2.2.2/24 10.2.3.2/24
