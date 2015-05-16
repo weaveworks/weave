@@ -85,7 +85,7 @@ exec_on() {
     host=$1
     container=$2
     shift 2
-    docker -H tcp://$host:2375 exec $container "$@"
+    docker -H tcp://$host:2375 exec $container $@
 }
 
 # assert_dns_record <host> <container> <name> <ip>
