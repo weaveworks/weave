@@ -14,7 +14,7 @@ weave_on $HOST2 launch-dns 10.2.254.2/24
 
 weave_on $HOST2 run -t --name=c2 -h seetwo.weave.local gliderlabs/alpine /bin/sh
 weave_on $HOST1 run --with-dns --name=c1 -t aanand/docker-dnsutils /bin/sh
-C2=$(weave_on $HOST2 ps c2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+C2=$(container_ip $HOST2 c2)
 
 assert "exec_on $HOST1 c1 dig +short seetwo.weave.local" "$C2"
 assert "exec_on $HOST1 c1 dig +short -x $C2" "seetwo.weave.local."

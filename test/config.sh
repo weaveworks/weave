@@ -88,6 +88,10 @@ exec_on() {
     docker -H tcp://$host:2375 exec $container $@
 }
 
+container_ip() {
+    weave_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
+}
+
 # assert_dns_record <host> <container> <name> <ip>
 assert_dns_record() {
     assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"

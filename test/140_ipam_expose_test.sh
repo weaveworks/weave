@@ -35,7 +35,7 @@ weave_on $HOST1 run -t --name=c1 gliderlabs/alpine /bin/sh
 weave_on $HOST1 run -t --name=c2 gliderlabs/alpine /bin/sh
 weave_on $HOST1 run $C3/24 -t --name=c3 gliderlabs/alpine /bin/sh
 weave_on $HOST1 run $C4/24 -t --name=c4 gliderlabs/alpine /bin/sh
-C1=$(weave_on $HOST1 ps c1 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+C1=$(container_ip $HOST1 c1)
 
 # absence of host connectivity by default
 run_on1 "! $PING $C1"
