@@ -7,20 +7,6 @@ start_suite "Weave run/start/attach/detach with multiple cidr arguments"
 weave_on $HOST1 launch
 weave_on $HOST1 launch-dns 10.254.254.254/24
 
-# weave_status_on <host>
-weave_status_on() {
-    HOST=$1; shift
-
-    DOCKER_HOST=tcp://$HOST:2375 $WEAVE status
-}
-
-# weave_ps_on <host>
-weave_ps_on() {
-    HOST=$1; shift
-
-    DOCKER_HOST=tcp://$HOST:2375 $WEAVE ps
-}
-
 # assert_container_cidrs <host> <cid> <cidr> [<cidr> ...]
 assert_container_cidrs() {
     HOST=$1; shift
@@ -28,7 +14,7 @@ assert_container_cidrs() {
     CIDRS=$@
 
     # Assert container has attached CIDRs
-    assert_raises "weave_ps_on $HOST | grep \"^$CID [^ ]* $CIDRS$\""
+    assert_raises "weave_on $HOST ps | grep \"^$CID [^ ]* $CIDRS$\""
 }
 
 # assert_zone_records <host> <cid> <fqdn> <ip> [<ip> ...]
@@ -38,11 +24,11 @@ assert_zone_records() {
     FQDN=$1; shift
 
     # Assert correct number of records exist
-    assert "weave_status_on $HOST | grep \"^$CID\" | wc -l" $#
+    assert "weave_on $HOST status | grep \"^$CID\" | wc -l" $#
 
     # Assert correct records exist
     for IP in $@; do
-        assert_raises "weave_status_on $HOST | grep \"^$CID $IP $FQDN$\""
+        assert_raises "weave_on $HOST status | grep \"^$CID $IP $FQDN$\""
     done
 }
 
@@ -58,7 +44,7 @@ assert_bridge_cidrs() {
 }
 
 # Run container with three cidrs
-CID=$(DOCKER_HOST=tcp://$HOST1:2375 $WEAVE run 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 -t --name multicidr -h multicidr.weave.local gliderlabs/alpine /bin/sh | cut -b 1-12)
+CID=$(weave_on $HOST1 run 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 -t --name multicidr -h multicidr.weave.local gliderlabs/alpine /bin/sh | cut -b 1-12)
 assert_container_cidrs $HOST1 $CID 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24
 assert_zone_records $HOST1 $CID multicidr.weave.local. 10.2.1.1 10.2.2.1 10.2.3.1
 
