@@ -27,7 +27,7 @@ check_container_connectivity() {
     # exec_on1 "c3 ! $PING $C1"
 }
 
-start_suite "exposing weave network to host"
+start_suite "exposing weave network to host with IPAM"
 
 weave_on $HOST1 launch -iprange $R1
 
