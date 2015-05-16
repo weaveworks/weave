@@ -674,7 +674,7 @@ get_ipam_cidr() {
     fi
     CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER)"
     if [ "$CIDR_ARGS" = "404 page not found" ] ; then
-        echo "No IP address supplied (use the -iprange option on 'weave launch'\nto enable IP allocation)" >&2
+        echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
         return 1
     fi
 }
