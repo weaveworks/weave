@@ -27,7 +27,7 @@ all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 travis: $(WEAVER_EXE) $(WEAVEDNS_EXE)
 
 update:
-	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE))
+	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE)) ./$(dir $(SIGPROXY_EXE))
 
 $(WEAVER_EXE) $(WEAVEDNS_EXE): common/*.go
 	go get -tags netgo ./$(@D)
