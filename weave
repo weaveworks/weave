@@ -651,30 +651,31 @@ ipam_claim() {
 # If we don't already have any CIDRs passed from the command-line, get one from IPAM
 # $1 is the name of the container and $2, if set, is the ID to use inside IPAM
 get_ipam_cidr() {
-    if [ -z "$CIDR_ARGS" ] ; then
-        if [ -z "$2" ] ; then
-            # get the long form of the container ID
-            if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null); then
-                echo "Error: No such container: $1" >&2
-                return 1
-            fi
-            case "$status" in
-                true*)
-                    CONTAINER="${status#true }"
-                    ;;
-                *)
-                    echo "$1 container is not running." >&2
-                    return 1
-                    ;;
-            esac
-        else
-            CONTAINER="$2"
-        fi
-        CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER)"
-        if [ "$CIDR_ARGS" = "404 page not found" ] ; then
-            echo "No IP address supplied (use the -iprange option on 'weave launch'\nto enable IP allocation)" >&2
+    if [ -n "$CIDR_ARGS" ] ; then
+        return 0
+    fi
+    if [ -z "$2" ] ; then
+        # get the long form of the container ID
+        if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null); then
+            echo "Error: No such container: $1" >&2
             return 1
         fi
+        case "$status" in
+            true*)
+                CONTAINER="${status#true }"
+                ;;
+            *)
+                echo "$1 container is not running." >&2
+                return 1
+                ;;
+        esac
+    else
+        CONTAINER="$2"
+    fi
+    CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER)"
+    if [ "$CIDR_ARGS" = "404 page not found" ] ; then
+        echo "No IP address supplied (use the -iprange option on 'weave launch'\nto enable IP allocation)" >&2
+        return 1
     fi
 }
 
