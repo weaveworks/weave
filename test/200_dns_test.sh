@@ -15,6 +15,6 @@ weave_on $HOST1 run --with-dns $C1/24 -t --name=c1 aanand/docker-dnsutils /bin/s
 
 assert_dns_record $HOST1 c1 $NAME $C2
 
-assert_raises "exec_on $HOST1 c1 dig MX seetwo.weave.local | grep -q \"status: NXDOMAIN\""
+assert_raises "exec_on $HOST1 c1 dig MX $NAME | grep -q \"status: NXDOMAIN\""
 
 end_suite

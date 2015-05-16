@@ -14,7 +14,7 @@ weave_on $HOST1 launch-dns 10.2.254.1/24
 
 start_container $HOST1 $C1/24 --name=c1 -h $NAME
 weave_on $HOST1 run --with-dns $C2/24 -t --name=c2 -h seetwo.$DOMAIN aanand/docker-dnsutils /bin/sh
-weave_on $HOST1 run --with-dns $C3/24 -t --name=c3 --dns-search=weave.local aanand/docker-dnsutils /bin/sh
+weave_on $HOST1 run --with-dns $C3/24 -t --name=c3 --dns-search=$DOMAIN aanand/docker-dnsutils /bin/sh
 
 assert "exec_on $HOST1 c2 getent hosts seeone | tr -s ' '" "$C1 $NAME"
 assert "exec_on $HOST1 c3 getent hosts seeone | tr -s ' '" "$C1 $NAME"
