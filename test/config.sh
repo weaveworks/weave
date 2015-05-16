@@ -107,11 +107,11 @@ assert_dns_record() {
 }
 
 start_suite() {
-    for HOST in $HOST1 $HOST2; do
-        echo "Cleaning up on $HOST: removing all containers and resetting weave"
-        CONTAINERS=$(docker -H tcp://$HOST:2375 ps -aq)
-        [ -n "$CONTAINERS" ] && docker -H tcp://$HOST:2375 rm -f $CONTAINERS > /dev/null
-        weave_on $HOST reset > /dev/null
+    for host in $HOST1 $HOST2; do
+        echo "Cleaning up on $host: removing all containers and resetting weave"
+        containers=$(docker_on $host ps -aq 2>/dev/null)
+        [ -n "$containers" ] && docker_on $host rm -f $containers >/dev/null 2>&1
+        weave_on $host reset 2>/dev/null
     done
     whitely echo $@
 }
