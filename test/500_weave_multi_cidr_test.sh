@@ -2,11 +2,6 @@
 
 . ./config.sh
 
-start_suite "Weave run/start/attach/detach with multiple cidr arguments"
-
-weave_on $HOST1 launch
-weave_on $HOST1 launch-dns 10.254.254.254/24
-
 # assert_container_cidrs <host> <cid> <cidr> [<cidr> ...]
 assert_container_cidrs() {
     HOST=$1; shift
@@ -42,6 +37,11 @@ assert_bridge_cidrs() {
 
     assert "echo $BRIDGE_CIDRS" "$CIDRS"
 }
+
+start_suite "Weave run/start/attach/detach with multiple cidr arguments"
+
+weave_on $HOST1 launch
+weave_on $HOST1 launch-dns 10.254.254.254/24
 
 # Run container with three cidrs
 CID=$(weave_on $HOST1 run 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 -t --name multicidr -h multicidr.weave.local gliderlabs/alpine /bin/sh | cut -b 1-12)
