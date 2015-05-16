@@ -651,8 +651,8 @@ ipam_claim() {
 # If we don't already have any CIDRs passed from the command-line, get one from IPAM
 # $1 is the name of the container and $2, if set, is the ID to use inside IPAM
 get_ipam_cidr() {
-    if [ -z $CIDR_ARGS ] ; then
-        if [ -z $2 ] ; then
+    if [ -z "$CIDR_ARGS" ] ; then
+        if [ -z "$2" ] ; then
             # get the long form of the container ID
             if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null); then
                 echo "Error: No such container: $1" >&2
