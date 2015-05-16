@@ -29,18 +29,14 @@ check_container_connectivity() {
     # exec_on1 "c3 ! $PING $C1"
 }
 
-start_container() {
-    weave_on $HOST1 run $2/24 --name=$1 -t gliderlabs/alpine /bin/sh
-}
-
 start_suite "exposing weave network to host"
 
 weave_on $HOST1 launch
 
-start_container c1 $C1
-start_container c2 $C2
-start_container c3 $C3
-start_container c4 $C4
+start_container $HOST1 $C1/24 --name=c1
+start_container $HOST1 $C2/24 --name=c2
+start_container $HOST1 $C3/24 --name=c3
+start_container $HOST1 $C4/24 --name=c4
 
 # absence of host connectivity by default
 run_on1 "! $PING $C1"

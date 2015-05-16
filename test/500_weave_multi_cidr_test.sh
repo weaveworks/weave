@@ -44,7 +44,7 @@ weave_on $HOST1 launch
 weave_on $HOST1 launch-dns 10.254.254.254/24
 
 # Run container with three cidrs
-CID=$(weave_on $HOST1 run 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 -t --name=multicidr -h multicidr.weave.local gliderlabs/alpine /bin/sh | cut -b 1-12)
+CID=$(start_container $HOST1 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 --name=multicidr -h multicidr.weave.local | cut -b 1-12)
 assert_container_cidrs $HOST1 $CID 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24
 assert_zone_records $HOST1 $CID multicidr.weave.local. 10.2.1.1 10.2.2.1 10.2.3.1
 

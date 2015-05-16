@@ -14,7 +14,7 @@ weave_on $HOST2 launch $HOST1
 weave_on $HOST1 launch-dns 10.2.254.1/24 -debug
 weave_on $HOST2 launch-dns 10.2.254.2/24 -debug
 
-weave_on $HOST2 run $C2/24 -t --name=c2 -h $NAME gliderlabs/alpine /bin/sh
+start_container $HOST2 $C2/24 --name=c2 -h $NAME
 weave_on $HOST1 run --with-dns $C1/24 -t --name=c1 aanand/docker-dnsutils /bin/sh
 
 assert_dns_record $HOST1 c1 $NAME $C2
