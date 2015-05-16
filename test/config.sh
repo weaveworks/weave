@@ -94,6 +94,12 @@ start_container() {
     weave_on $host run $@ -t gliderlabs/alpine /bin/sh
 }
 
+start_container_with_dns() {
+    host=$1
+    shift 1
+    weave_on $host run --with-dns $@ -t aanand/docker-dnsutils /bin/sh
+}
+
 container_ip() {
     weave_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 }
