@@ -12,6 +12,6 @@ weave_on $HOST2 launch -iprange $UNIVERSE $HOST1
 start_container $HOST1 --name=c1
 start_container $HOST2 --name=c2
 C2=$(container_ip $HOST2 c2)
-assert_raises "exec_on $HOST1 c1 ping -q -c 4 $C2"
+assert_raises "exec_on $HOST1 c1 $PING $C2"
 
 end_suite

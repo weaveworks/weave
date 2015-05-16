@@ -8,8 +8,6 @@ C3=10.2.2.34
 C4=10.2.2.37
 EXP=10.2.1.101
 
-PING="ping -nq -W 1 -c 1"
-
 weave_on1() {
     assert_raises "weave_on $HOST1 $@"
 }
