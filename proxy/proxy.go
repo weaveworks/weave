@@ -70,7 +70,7 @@ func isCreateContainer(r *http.Request) bool {
 }
 
 func isStartContainer(r *http.Request) bool {
-	ok, err := regexp.MatchString("^/v[0-9\\.]*/containers/[^/]*/start$", r.URL.Path)
+	ok, err := regexp.MatchString("^/v[0-9\\.]*/containers/[^/]*/(re)?start$", r.URL.Path)
 	return err == nil && ok
 }
 
