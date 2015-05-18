@@ -403,4 +403,4 @@ to enable and use this feature.
 
 WeaveDNS is a distributed DNS service for weave networks, enabling
 containers to address each other by name rather than IP address. Find
-out more about WeaveDNS from its [documentation](weavedns.html).
+out more about weaveDNS from its [documentation](weavedns.html).

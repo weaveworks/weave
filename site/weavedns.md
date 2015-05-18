@@ -28,7 +28,7 @@ WeaveDNS is deployed as a set of containers that communicate with each
 other over the weave network. One such container needs to be started
 on every weave host, by invoking the weave script command
 `launch-dns`. Application containers are then instructed to use
-WeaveDNS as their nameserver by supplying the `--with-dns` option when
+weaveDNS as their nameserver by supplying the `--with-dns` option when
 starting them. Giving any container a hostname in the `.weave.local`
 domain registers it in weaveDNS.  For example:
 
@@ -145,9 +145,9 @@ weave run --with-dns 10.2.1.4/24 -ti \
 
 ## <a name="local-domain"></a>Using a different local domain
 
-By default, WeaveDNS uses `weave.local.` as the domain for names on the
+By default, weaveDNS uses `weave.local.` as the domain for names on the
 Weave network. In general users do not need to change this domain, but you
-can force WeaveDNS to use a different domain by launching it
+can force weaveDNS to use a different domain by launching it
 with the `--domain` argument. For example,
 
 ```bash
