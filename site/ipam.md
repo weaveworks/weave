@@ -22,6 +22,22 @@ You can see which address was allocated with
     host1# weave ps $C
     a7aff7249393 7a:51:d1:09:21:78 10.2.3.1/24
 
+The `-iprange` parameter is given in [CIDR
+notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)
+format - in this example "/24" means the first 24 bits of the address
+form the network address and the allocator is to allocate container
+addresses that all start 10.2.3. The ".0" and ".-1" addresses in a
+subnet are not used, as required by [RFC
+1122](https://tools.ietf.org/html/rfc1122#page-29).
+
+Once you have given a range of addresses to the IP allocator, you must
+not use any addresses in that range for anything else.  If, in our
+example, you subsequently did `weave run 10.2.3.x/24`, you run the
+risk that that address will be allocated to another container, which
+will make network traffic delivery intermittent or non-existent for
+the containers that share the same IP address. No diagnostic message
+is output by weave if you break this rule.
+
 Weave will automatically learn when a container has exited
 and hence can release its IP address.
 
@@ -42,6 +58,25 @@ peers in the network to `weave launch` or add the `-initpeercount`
 flag to specify how many peers there will be.  It isn't a problem to
 over-estimate by a bit, but if you supply a number that is too small
 then multiple independent groups may form.
+
+To illustrate, suppose you have three hosts, accessible to each other
+as `$HOST1`, `$HOST2` and `$HOST3`. You can start weave on those three
+hosts with these three commands:
+
+    host1$ weave launch -iprange 10.3.0.0/16 $HOST2 $HOST3
+
+    host2$ weave launch -iprange 10.3.0.0/16 $HOST1 $HOST3
+
+    host3$ weave launch -iprange 10.3.0.0/16 $HOST1 $HOST2
+
+Or, if it is not convenient to name all the other hosts at launch
+time, you can give the number of peers like this:
+
+    host1$ weave launch -iprange 10.3.0.0/16 -initpeercount 3
+
+    host2$ weave launch -iprange 10.3.0.0/16 -initpeercount 3 $HOST3
+
+    host3$ weave launch -iprange 10.3.0.0/16 -initpeercount 3 $HOST2
 
 ### Stopping and removing peers
 
