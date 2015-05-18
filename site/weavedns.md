@@ -160,10 +160,10 @@ link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
 
 ## <a name="without-run"></a>Using weaveDNS without `weave run`
 
-If you use the `--with-dns` option, `weave run` automatically supplies
-the DNS server address to the new container. And both `weave run` and
-`weave attach` register the hostname of the given container against
-the given weave network IP address.
+When weaveDNS is running, both `weave run` and `weave attach` register
+the hostname of the given container against the given weave network IP
+address. And if you use the `--with-dns` option, `weave run`
+automatically supplies the DNS server address to the new container.
 
 In some circumstances, you may not want to use the `weave run` command
 to start containers. You can still take advantage of a running
