@@ -59,6 +59,25 @@ flag to specify how many peers there will be.  It isn't a problem to
 over-estimate by a bit, but if you supply a number that is too small
 then multiple independent groups may form.
 
+To illustrate, suppose you have three hosts, accessible to each other
+as `$HOST1`, `$HOST2` and `$HOST3`. You can start weave on those three
+hosts with these three commands:
+
+    host1$ weave launch -iprange 10.3.0.0/16 $HOST2 $HOST3
+
+    host2$ weave launch -iprange 10.3.0.0/16 $HOST1 $HOST3
+
+    host3$ weave launch -iprange 10.3.0.0/16 $HOST1 $HOST2
+
+Or, if it is not convenient to name all the other hosts at launch
+time, you can give the number of peers like this:
+
+    host1$ weave launch -iprange 10.3.0.0/16 -initpeercount 3
+
+    host2$ weave launch -iprange 10.3.0.0/16 -initpeercount 3 $HOST3
+
+    host3$ weave launch -iprange 10.3.0.0/16 -initpeercount 3 $HOST2
+
 ### Stopping and removing peers
 
 You may wish to `weave stop` and re-launch to change some config or to
