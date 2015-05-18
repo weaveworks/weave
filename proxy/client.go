@@ -104,31 +104,26 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 		return
 	}
 
-	end := make(chan bool)
-	go func() {
-		defer close(end)
-		if _, err := io.Copy(up, downBuf); err != nil {
-			Warning.Print(err)
-		}
-		err = up.(interface {
-			CloseWrite() error
-		}).CloseWrite()
-		if err != nil {
-			Debug.Printf("Error Closing upstream: %s", err)
-		}
-	}()
+	upDone := make(chan struct{})
+	downDone := make(chan struct{})
+	go copyStream(down, io.MultiReader(rem, up), upDone)
+	go copyStream(up, downBuf, downDone)
+	<-upDone
+	<-downDone
+}
 
-	if _, err := io.Copy(down, io.MultiReader(rem, up)); err != nil {
+func copyStream(dst io.Writer, src io.Reader, done chan struct{}) {
+	defer close(done)
+	if _, err := io.Copy(dst, src); err != nil {
 		Warning.Print(err)
 	}
-	err = down.(interface {
+	if c, ok := dst.(interface {
 		CloseWrite() error
-	}).CloseWrite()
-	if err != nil {
-		Debug.Printf("Error Closing downstream: %s", err)
+	}); ok {
+		if err := c.CloseWrite(); err != nil {
+			Warning.Printf("Error closing connection: %s", err)
+		}
 	}
-
-	<-end
 }
 
 func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httputil.ClientConn) {
