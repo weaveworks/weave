@@ -34,7 +34,7 @@ PING="ping -nq -W 1 -c 1"
 remote() {
     rem=$1
     shift 1
-    $@ > >(while read line; do echo -e "\e[0;34m$rem>\e[0m $line"; done)
+    "$@" > >(while read line; do echo -e "\e[0;34m$rem>\e[0m $line"; done)
 }
 
 colourise() {
@@ -66,40 +66,40 @@ run_on() {
     host=$1
     shift 1
     greyly echo "Running on $host: $@" >&2
-    remote $host $SSH $host $@
+    remote $host $SSH $host "$@"
 }
 
 docker_on() {
     host=$1
     shift 1
     greyly echo "Docker on $host: $@" >&2
-    docker -H tcp://$host:2375 $@
+    docker -H tcp://$host:2375 "$@"
 }
 
 weave_on() {
     host=$1
     shift 1
     greyly echo "Weave on $host: $@" >&2
-    DOCKER_HOST=tcp://$host:2375 $WEAVE $@
+    DOCKER_HOST=tcp://$host:2375 $WEAVE "$@"
 }
 
 exec_on() {
     host=$1
     container=$2
     shift 2
-    docker -H tcp://$host:2375 exec $container $@
+    docker -H tcp://$host:2375 exec $container "$@"
 }
 
 start_container() {
     host=$1
     shift 1
-    weave_on $host run $@ -t gliderlabs/alpine /bin/sh
+    weave_on $host run "$@" -t gliderlabs/alpine /bin/sh
 }
 
 start_container_with_dns() {
     host=$1
     shift 1
-    weave_on $host run --with-dns $@ -t aanand/docker-dnsutils /bin/sh
+    weave_on $host run --with-dns "$@" -t aanand/docker-dnsutils /bin/sh
 }
 
 container_ip() {
@@ -119,7 +119,7 @@ start_suite() {
         [ -n "$containers" ] && docker_on $host rm -f $containers >/dev/null 2>&1
         weave_on $host reset 2>/dev/null
     done
-    whitely echo $@
+    whitely echo "$@"
 }
 
 end_suite() {

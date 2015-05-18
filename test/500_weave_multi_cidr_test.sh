@@ -8,7 +8,7 @@ NAME=multicidr.weave.local
 assert_container_cidrs() {
     HOST=$1; shift
     CID=$1; shift
-    CIDRS=$@
+    CIDRS="$@"
 
     # Assert container has attached CIDRs
     assert_raises "weave_on $HOST ps | grep \"^$CID [^ ]* $CIDRS$\""
@@ -24,7 +24,7 @@ assert_zone_records() {
     assert "weave_on $HOST status | grep \"^$CID\" | wc -l" $#
 
     # Assert correct records exist
-    for IP in $@; do
+    for IP; do
         assert_raises "weave_on $HOST status | grep \"^$CID $IP $FQDN$\""
     done
 }
@@ -33,7 +33,7 @@ assert_zone_records() {
 assert_bridge_cidrs() {
     HOST=$1; shift
     DEV=$1; shift
-    CIDRS=$@
+    CIDRS="$@"
 
     BRIDGE_CIDRS=$($SSH $HOST ip addr show dev $DEV | grep -o 'inet .*' | cut -d ' ' -f 2)
 
