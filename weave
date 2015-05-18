@@ -590,7 +590,7 @@ tell_dns() {
     METHOD="$1"
     CONTAINER_ID="$2"
     shift 2
-    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER_ID 2>/dev/null) && true
+    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER_ID 2>/dev/null) || true
     tell_dns_fqdn $METHOD $CONTAINER_ID $CONTAINER_FQDN $@
 }
 
@@ -621,7 +621,7 @@ populate_dns() {
         return 0
     fi
     for CONTAINER in $(docker ps -q --no-trunc); do
-        MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) && true
+        MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) || true
         if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
             for IP in $CONTAINER_IPS; do
                 # NB: CONTAINER_IP is the IP of the weavedns
