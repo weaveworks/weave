@@ -44,6 +44,7 @@ func main() {
 		password    string
 		wait        int
 		debug       bool
+		pktdebug    bool
 		prof        string
 		peers       []string
 		bufSzMB     int
@@ -61,6 +62,7 @@ func main() {
 	flag.StringVar(&password, "password", "", "network password")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (0 = don't wait)")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
+	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&config.ConnLimit, "connlimit", 30, "connection limit (0 for unlimited)")
 	flag.IntVar(&bufSzMB, "bufsz", 8, "capture buffer size in MB")
@@ -71,6 +73,7 @@ func main() {
 	flag.Parse()
 	peers = flag.Args()
 
+	InitDefaultLogging(debug)
 	if justVersion {
 		fmt.Printf("weave router %s\n", version)
 		os.Exit(0)
@@ -125,7 +128,7 @@ func main() {
 	}
 
 	config.BufSz = bufSzMB * 1024 * 1024
-	config.LogFrame = logFrameFunc(debug)
+	config.LogFrame = logFrameFunc(pktdebug)
 
 	router := weave.NewRouter(config, name, nickName)
 	log.Println("Our name is", router.Ourself)
