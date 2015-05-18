@@ -16,6 +16,12 @@ fetch an address automatically if none is specified, i.e.:
 
     host1# C=$(weave run -ti ubuntu)
 
+You can see which address was allocated with
+[`weave ps`](troubleshooting.html#list-attached-containers):
+
+    host1# weave ps $C
+    a7aff7249393 7a:51:d1:09:21:78 10.2.3.1/24
+
 Weave will automatically learn when a container has exited
 and hence can release its IP address.
 
