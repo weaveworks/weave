@@ -115,10 +115,32 @@ container_ip() {
     weave_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 }
 
-# assert_dns_record <host> <container> <name> <ip>
+# assert_dns_record <host> <container> <name> [<ip> ...]
 assert_dns_record() {
-    assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
-    assert "exec_on $1 $2 getent hosts $4 | tr -s ' '" "$4 $3"
+    host=$1
+    container=$2
+    name=$3
+    shift 3
+    exp_ips_regex=$(echo "$@" | sed -r 's/ /\\\|/g')
+
+    [[ -z "$DEBUG" ]] || greyly echo "Checking whether $name exists at $host:$container"
+    got_ip=$(exec_on $host $container getent hosts $name)
+    assert_raises "echo \"$got_ip\" | grep -q \"$exp_ips_regex\""
+
+    [[ -z "$DEBUG" ]] || greyly echo "Checking whether the IPs \"$@\" exists at $host:$container"
+    for ip in "$@" ; do
+        assert "exec_on $host $container getent hosts $ip | tr -s ' '" "$ip $name"
+    done
+}
+
+# assert_no_dns_record <host> <container> <name>
+assert_no_dns_record() {
+    host=$1
+    container=$2
+    name=$3
+
+    [[ -z "$DEBUG" ]] || greyly echo "Checking if \"$name\" does not exist at $host:$container"
+    assert_raises "exec_on $host $container getent hosts $name" 2
 }
 
 start_suite() {
