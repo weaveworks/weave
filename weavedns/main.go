@@ -27,6 +27,7 @@ func main() {
 		refreshInterval int
 		refreshWorkers  int
 		relevantTime    int
+		maxAnswers      int
 		cacheLen        int
 		cacheDisabled   bool
 		watch           bool
@@ -47,6 +48,7 @@ func main() {
 	// advanced options
 	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
 	flag.IntVar(&refreshWorkers, "refresh-workers", weavedns.DefaultNumUpdaters, "default number of background updaters")
+	flag.IntVar(&maxAnswers, "max-answers", weavedns.DefaultMaxAnswers, "maximum number of answers returned to clients (0=unlimited)")
 	flag.IntVar(&relevantTime, "relevant", weavedns.DefaultRelevantTime, "life time for info in the absence of queries (in secs)")
 	flag.IntVar(&udpbuf, "udpbuf", weavedns.DefaultUDPBuflen, "UDP buffer length")
 	flag.IntVar(&timeout, "timeout", weavedns.DefaultTimeout, "timeout for resolutions (in millisecs)")
@@ -102,6 +104,7 @@ func main() {
 		Zone:          zone,
 		Port:          dnsPort,
 		CacheLen:      cacheLen,
+		MaxAnswers:    maxAnswers,
 		Timeout:       timeout,
 		UDPBufLen:     udpbuf,
 		CacheDisabled: cacheDisabled,
