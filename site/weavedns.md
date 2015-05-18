@@ -11,13 +11,24 @@ them hostnames and tell other containers to connect to those names.
 Unlike Docker 'links', this requires no code changes and works across
 hosts.
 
-## Using weaveDNS
+* [Using weaveDNS](#usage)
+* [How it works](#how-it-works)
+* [Adding and removing extra DNS entries](#add-remove)
+* [Hot-swapping service containers](#hot-swapping)
+* [Retaining DNS entries when containers stop](#retain-stopped)
+* [Configuring the domain search path](#domain-search-path)
+* [Using a different local domain](#local-domain)
+* [Using weaveDNS without `weave run`](#without-run)
+* [Troubleshooting](#troubleshooting)
+* [Present limitations](#limitations)
+
+## <a name="usage"></a>Using weaveDNS
 
 WeaveDNS is deployed as a set of containers that communicate with each
 other over the weave network. One such container needs to be started
 on every weave host, by invoking the weave script command
 `launch-dns`. Application containers are then instructed to use
-WeaveDNS as their nameserver by supplying the `--with-dns` option when
+weaveDNS as their nameserver by supplying the `--with-dns` option when
 starting them. Giving any container a hostname in the `.weave.local`
 domain registers it in weaveDNS.  For example:
 
@@ -32,6 +43,12 @@ $ docker attach $shell1
 ...
 ```
 
+Note that it is permissible to register multiple containers with the
+same name. weaveDNS picks one address to return when asked for the
+name. Since weaveDNS removes any container that dies, this is a simple
+way to implement redundancy.  In the current implementation it does
+not attempt to do load-balancing.
+
 Each weaveDNS container started with `launch-dns` needs to be given
 its own, unique, IP address, in a subnet that is a) common to all
 weaveDNS containers, b) disjoint from the application subnets, and c)
@@ -41,7 +58,7 @@ subnet 10.2.1.0/24.
 
 WeaveDNS containers can be stopped with `stop-dns`.
 
-## How it works
+## <a name="how-it-works"></a>How it works
 
 The weaveDNS container running on every host acts as the nameserver
 for containers on that host. It is told about hostnames for local
@@ -57,7 +74,55 @@ When weaveDNS is queried for a name in a domain other than
 `.weave.local`, it queries the host's configured nameserver,
 which is the standard behaviour for Docker containers.
 
-## Domain search paths
+So that containers can connect to a stable and always routable IP
+address, weaveDNS publishes its port 53 to the Docker bridge device,
+which is assumed to be `docker0`. Some configurations may use a
+different Docker bridge device. To supply a different bridge device,
+use the environment variable `DOCKER_BRIDGE`, e.g.,
+
+```bash
+$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.2.254.1/24
+```
+
+## <a name="add-remove"></a>Adding and removing extra DNS entries
+
+If you want to give the container a name in DNS *other* than its
+hostname, you can register it using the `dns-add` command. For example:
+
+```bash
+$ docker start $shell2
+$ weave dns-add 10.2.1.27 $shell2 -h shell2.example.org
+```
+
+If no FQDN is specified, it is derived from the container's configured
+hostname and domain.
+
+The inverse operation can be carried out using the `dns-remove` command:
+
+```bash
+$ weave dns-remove 10.2.1.27 $shell2
+```
+
+## <a name="hot-swapping"></a>Hot-swapping service containers
+
+If you would like to deploy a new version of a service, keep the old
+one running because it has active connections but make all new
+requests go to the new version, then you can simply start the new
+server container and then [remove](#add-remove) the entry for the old
+server container. Later, when all connections to the old server have
+terminated, stop the container as normal.
+
+## <a name="retain-stopped"></a>Retaining DNS entries when containers stop
+
+By default, weaveDNS watches docker events and removes entries for any
+containers that die. You can tell it not to, by adding `--watch=false`
+to the container args:
+
+```bash
+$ weave launch-dns 10.2.254.1/24 --watch=false
+```
+
+## <a name="domain-search-path"></a>Configuring the domain search paths
 
 If you don't supply a domain search path (with `--dns-search=`),
 `weave run ...` tells a container to look for "bare" hostnames, like
@@ -78,30 +143,31 @@ weave run --with-dns 10.2.1.4/24 -ti \
   --dns-search=weave.local ubuntu
 ```
 
-## Doing things more manually
+## <a name="local-domain"></a>Using a different local domain
 
-If you use the `--with-dns` option, `weave run` automatically supplies
-the DNS server address to the new container. And both `weave run` and
-`weave attach` register the hostname of the given container against
-the given weave network IP address.
-
-In some circumstances, you may not want to use the `weave`
-command. You can still take advantage of a running weaveDNS, with some
-extra manual steps.
-
-### Using a different docker bridge
-
-So that containers can connect to a stable and always routable IP
-address, weaveDNS publishes its port 53 to the Docker bridge device,
-which is assumed to be `docker0`.
-
-Some configurations may use a different Docker bridge device. To
-supply a different bridge device, use the environment variable
-`DOCKER_BRIDGE`, e.g.,
+By default, weaveDNS uses `weave.local.` as the domain for names on the
+Weave network. In general users do not need to change this domain, but you
+can force weaveDNS to use a different domain by launching it
+with the `--domain` argument. For example,
 
 ```bash
-$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.2.254.1/24
+$ weave launch-dns 10.2.254.1/24 --domain="mycompany.local."
 ```
+
+The local domain should end with `local.`, since these names are
+link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
+(though this is not strictly neccessary).
+
+## <a name="without-run"></a>Using weaveDNS without `weave run`
+
+When weaveDNS is running, both `weave run` and `weave attach` register
+the hostname of the given container against the given weave network IP
+address. And if you use the `--with-dns` option, `weave run`
+automatically supplies the DNS server address to the new container.
+
+In some circumstances, you may not want to use the `weave run` command
+to start containers. You can still take advantage of a running
+weaveDNS, with some extra manual steps.
 
 ### Supplying the DNS server
 
@@ -139,73 +205,7 @@ that you can use unqualified hostnames. Use `--dns-search=.` to make
 the resolver use the container's domain, or e.g.,
 `--dns-search=weave.local` to make it look in `weave.local`.
 
-### Using a different local domain
-
-By default, WeaveDNS uses `weave.local.` as the domain for names on the
-Weave network. In general users do not need to change this domain, but you
-can force WeaveDNS to use a different domain by launching it
-with the `--domain` argument. For example,
-
-```bash
-$ weave launch-dns 10.2.254.1/24 --domain="mycompany.local."
-```
-
-The local domain should end with `local.`, since these names are
-link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
-(though this is not strictly neccessary).
-
-### Adding containers to DNS
-
-If DNS is started after you've attached a container to the weave
-network, or you want to give the container a name in DNS *other* than
-its hostname, you can register it using the `dns-add` command. If no
-FQDN is specified, it is derived from the container's configured
-hostname and domain. For example:
-
-```bash
-$ docker start $shell2
-$ weave dns-add 10.2.1.27 $shell2 -h shell2.example.org
-```
-
-The inverse operation can be carried out using the `dns-remove` command:
-
-```bash
-$ weave dns-remove 10.2.1.27 $shell2
-```
-
-### Registering multiple containers with the same name
-
-This is supported; weaveDNS picks one address to return when you ask
-for the name. Since weaveDNS removes any container that dies, this is
-a simple way to implement redundancy.  In the current implementation
-it does not attempt to do load-balancing.
-
-### Replacing one container with another at the same name
-
-If you would like to deploy a new version of a service, keep the old one running because it has active connections but make all new requests go to the new version, then you can simply start the new server container and then [unregister](https://github.com/weaveworks/weave/tree/master/weavedns#unregistering) the old one from DNS. And finally, when all connections to the old server have terminated, stop the container as normal.
-
-### Not watching docker events
-
-By default, weaveDNS watches docker events and removes entries for any
-containers that die. You can tell it not to, by adding `--watch=false`
-to the container args:
-
-```bash
-$ weave launch-dns 10.2.254.1/24 --watch=false
-```
-
-### Unregistering
-
-You can manually delete entries for a host, by poking weaveDNS's HTTP
-API with e.g., `curl`:
-
-```bash
-$ docker stop $shell2
-$ dns_ip=$(docker inspect --format='{{ .NetworkSettings.IPAddress }}' weavedns)
-$ curl -X DELETE "http://$dns_ip:6785/name/$shell2/10.2.1.27"
-```
-
-## Troubleshooting
+## <a name="troubleshooting"></a>Troubleshooting
 
 The command
 
@@ -240,7 +240,7 @@ The second section is pertinent to weaveDNS, and includes:
 * The fallback DNS which will be used to resolve non local names
 * The names known to the local weaveDNS server. Each entry comprises the container ID, IP address and its fully qualified domain name
 
-## Present limitations
+## <a name="limitations"></a>Present limitations
 
  * The server will not know about restarted containers, but if you
    re-attach a restarted container to the weave network, it will be
@@ -250,4 +250,4 @@ The second section is pertinent to weaveDNS, and includes:
    hostnames with the subnets.
  * We use UDP multicast to find out about remote names (from weaveDNS
    servers on other hosts); this likely won't scale well beyond a
-   certain point T.B.D., so we'll have to come up with another scheme.
+   certain point T.B.D.
