@@ -34,7 +34,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) (*http.Re
 	}
 
 	if _, ok := weaveCIDRsFromConfig(container.Config); ok {
-		i.addToVolumesFrom(container.HostConfig, "weaveproxy")
+		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy")
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return nil, err
 		}
@@ -51,10 +51,6 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) (*http.Re
 	r.ContentLength = int64(len(newBody))
 
 	return r, nil
-}
-
-func (i *createContainerInterceptor) addToVolumesFrom(config *docker.HostConfig, mounts ...string) {
-	config.VolumesFrom = append(config.VolumesFrom, mounts...)
 }
 
 func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
@@ -104,6 +100,6 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 	return nil
 }
 
-func (i *createContainerInterceptor) InterceptResponse(res *http.Response) (*http.Response, error) {
-	return res, nil
+func (i *createContainerInterceptor) InterceptResponse(r *http.Response) (*http.Response, error) {
+	return r, nil
 }

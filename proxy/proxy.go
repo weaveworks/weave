@@ -11,6 +11,11 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
+var (
+	containerCreateRegexp = regexp.MustCompile("/v[0-9\\.]*/containers/create")
+	containerStartRegexp  = regexp.MustCompile("^/v[0-9\\.]*/containers/[^/]*/(re)?start$")
+)
+
 type Proxy struct {
 	Dial           func() (net.Conn, error)
 	client         *docker.Client
@@ -36,9 +41,18 @@ func NewProxy(targetURL string, withDNS bool) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	targetAddr := ""
+	switch u.Scheme {
+	case "tcp":
+		targetAddr = u.Host
+	case "unix":
+		targetAddr = u.Path
+	}
+
 	return &Proxy{
 		Dial: func() (net.Conn, error) {
-			return net.Dial(targetNetwork(u), targetAddress(u))
+			return net.Dial(u.Scheme, targetAddr)
 		},
 		client:         client,
 		withDNS:        withDNS,
@@ -46,60 +60,21 @@ func NewProxy(targetURL string, withDNS bool) (*Proxy, error) {
 	}, nil
 }
 
-func targetNetwork(u *url.URL) string {
-	return u.Scheme
-}
-
-func targetAddress(u *url.URL) (addr string) {
-	switch u.Scheme {
-	case "tcp":
-		addr = u.Host
-	case "unix":
-		addr = u.Path
-	}
-	return
-}
-
-func isWeaveStatus(r *http.Request) bool {
-	return strings.HasPrefix(r.URL.Path, "/weave")
-}
-
-func isCreateContainer(r *http.Request) bool {
-	ok, err := regexp.MatchString("/v[0-9\\.]*/containers/create", r.URL.Path)
-	return err == nil && ok
-}
-
-func isStartContainer(r *http.Request) bool {
-	ok, err := regexp.MatchString("^/v[0-9\\.]*/containers/[^/]*/(re)?start$", r.URL.Path)
-	return err == nil && ok
-}
-
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	Info.Printf("%s %s", r.Method, r.URL)
+	path := r.URL.Path
 	switch {
-	case isCreateContainer(r):
-		proxy.createContainer(w, r)
-	case isStartContainer(r):
-		proxy.startContainer(w, r)
-	case isWeaveStatus(r):
-		proxy.weaveStatus(w, r)
+	case containerCreateRegexp.MatchString(path):
+		proxy.serveWithInterceptor(&createContainerInterceptor{proxy.client, proxy.withDNS, proxy.dockerBridgeIP}, w, r)
+	case containerStartRegexp.MatchString(path):
+		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.withDNS}, w, r)
+	case strings.HasPrefix(path, "/weave"):
+		w.WriteHeader(http.StatusOK)
 	default:
-		proxy.proxyRequest(w, r)
+		proxy.serveWithInterceptor(&nullInterceptor{}, w, r)
 	}
 }
 
-func (proxy *Proxy) weaveStatus(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-}
-
-func (proxy *Proxy) createContainer(w http.ResponseWriter, r *http.Request) {
-	newClient(proxy.Dial, &createContainerInterceptor{proxy.client, proxy.withDNS, proxy.dockerBridgeIP}).ServeHTTP(w, r)
-}
-
-func (proxy *Proxy) startContainer(w http.ResponseWriter, r *http.Request) {
-	newClient(proxy.Dial, &startContainerInterceptor{proxy.client, proxy.withDNS}).ServeHTTP(w, r)
-}
-
-func (proxy *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
-	newClient(proxy.Dial, &nullInterceptor{}).ServeHTTP(w, r)
+func (proxy *Proxy) serveWithInterceptor(i interceptor, w http.ResponseWriter, r *http.Request) {
+	newClient(proxy.Dial, i).ServeHTTP(w, r)
 }

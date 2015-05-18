@@ -33,7 +33,7 @@ func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, "Unable to create proxied request", http.StatusInternalServerError)
+		http.Error(w, "Unable to intercept request", http.StatusInternalServerError)
 		Warning.Print("Error intercepting request: ", err)
 		return
 	}
@@ -49,7 +49,7 @@ func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := client.Do(req)
 	if err != nil && err != httputil.ErrPersistEOF {
-		http.Error(w, fmt.Sprintf("Could not make request to target: %s", err.Error()), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Could not make request to target: %v", err), http.StatusInternalServerError)
 		Warning.Print("Error forwarding request: ", err)
 		return
 	}
