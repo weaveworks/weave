@@ -8,6 +8,7 @@ layout: default
  * [Introduction, Installation and Example](https://github.com/weaveworks/weave#readme)
  * [Getting Started Guides](http://weave.works/guides/)
  * [Features](features.html)
+ * [Experimental features](experimental-features.html)
  * [Automatic IP Address Management](ipam.html)
  * [Automatic Discovery with WeaveDNS](weavedns.html)
  * [Troubleshooting](troubleshooting.html)
