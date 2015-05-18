@@ -10,12 +10,11 @@ start_suite "Resolve names on a single host"
 
 weave_on $HOST1 launch-dns 10.2.254.1/24
 
-weave_on $HOST1 run $C2/24 -t --name=c2 -h $NAME gliderlabs/alpine /bin/sh
-weave_on $HOST1 run --with-dns $C1/24 -t --name=c1 aanand/docker-dnsutils /bin/sh
+start_container          $HOST1 $C2/24 --name=c2 -h $NAME
+start_container_with_dns $HOST1 $C1/24 --name=c1
 
 assert_dns_record $HOST1 c1 $NAME $C2
 
-assert_dns_status $HOST1 c1 "MX   seetwo.weave.local" NXDOMAIN
-assert_dns_status $HOST1 c1 "AAAA seetwo.weave.local" NXDOMAIN
+assert_raises "exec_on $HOST1 c1 dig MX $NAME | grep -q \"status: NXDOMAIN\""
 
 end_suite

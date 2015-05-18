@@ -29,10 +29,12 @@ HOST2=$(echo $HOSTS | cut -f 2 -d ' ')
 
 SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key -o UserKnownHostsFile=./.ssh_known_hosts -o CheckHostIP=no -o StrictHostKeyChecking=no}
 
+PING="ping -nq -W 1 -c 1"
+
 remote() {
     rem=$1
     shift 1
-    $@ > >(while read line; do echo -e "\e[0;34m$rem>\e[0m $line"; done)
+    "$@" > >(while read line; do echo -e "\e[0;34m$rem>\e[0m $line"; done)
 }
 
 colourise() {
@@ -64,21 +66,21 @@ run_on() {
     host=$1
     shift 1
     greyly echo "Running on $host: $@" >&2
-    remote $host $SSH $host $@
+    remote $host $SSH $host "$@"
 }
 
 docker_on() {
     host=$1
     shift 1
     greyly echo "Docker on $host: $@" >&2
-    docker -H tcp://$host:2375 $@
+    docker -H tcp://$host:2375 "$@"
 }
 
 weave_on() {
     host=$1
     shift 1
     greyly echo "Weave on $host: $@" >&2
-    DOCKER_HOST=tcp://$host:2375 $WEAVE $@
+    DOCKER_HOST=tcp://$host:2375 $WEAVE "$@"
 }
 
 exec_on() {
@@ -88,16 +90,20 @@ exec_on() {
     docker -H tcp://$host:2375 exec $container "$@"
 }
 
-dig_on() {
+start_container() {
     host=$1
-    cont=$2
-    query=$3
-    docker -H tcp://$host:2375 exec $cont sh -c "dig $query"
+    shift 1
+    weave_on $host run "$@" -t gliderlabs/alpine /bin/sh
 }
 
-# assert_dns_status <host> <container> <name> <query> <status>
-assert_dns_status() {
-    assert_raises "dig_on \"$1\" \"$2\" \"$3\" | grep -q \"status: $4\""
+start_container_with_dns() {
+    host=$1
+    shift 1
+    weave_on $host run --with-dns "$@" -t aanand/docker-dnsutils /bin/sh
+}
+
+container_ip() {
+    weave_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 }
 
 # assert_dns_record <host> <container> <name> <ip>
@@ -113,7 +119,7 @@ start_suite() {
         [ -n "$containers" ] && docker_on $host rm -f $containers >/dev/null 2>&1
         weave_on $host reset 2>/dev/null
     done
-    whitely echo $@
+    whitely echo "$@"
 }
 
 end_suite() {

@@ -6,8 +6,6 @@ R1=10.2.1.0/24
 C3=10.2.2.34
 C4=10.2.2.37
 
-PING="ping -nq -W 1 -c 1"
-
 weave_on1() {
     assert_raises "weave_on $HOST1 $@"
 }
@@ -31,13 +29,11 @@ start_suite "exposing weave network to host with IPAM"
 
 weave_on $HOST1 launch -iprange $R1
 
-weave_on $HOST1 run -t --name=c1 gliderlabs/alpine /bin/sh
-weave_on $HOST1 run -t --name=c2 gliderlabs/alpine /bin/sh
-weave_on $HOST1 run $C3/24 -t --name=c3 gliderlabs/alpine /bin/sh
-weave_on $HOST1 run $C4/24 -t --name=c4 gliderlabs/alpine /bin/sh
-
-# Note can't use weave_on here because it echoes the command
-C1=$(DOCKER_HOST=tcp://$HOST1:2375 $WEAVE ps c1 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
+start_container $HOST1        --name=c1
+start_container $HOST1        --name=c2
+start_container $HOST1 $C3/24 --name=c3
+start_container $HOST1 $C4/24 --name=c4
+C1=$(container_ip $HOST1 c1)
 
 # absence of host connectivity by default
 run_on1 "! $PING $C1"
