@@ -19,8 +19,8 @@ const (
 	DefaultLocalDomain     = "weave.local." // The default name used for the local domain
 	DefaultRefreshInterval = int(localTTL)  // Period for background updates with mDNS
 	DefaultRelevantTime    = 60             // When to forget info about remote info if nobody asks...
+	DefaultNumUpdaters     = 4              // Default number of background updaters
 
-	defaultNumUpdaters    = 1              // Number of background updaters
 	defaultRefreshMailbox = 1000           // Number of on-the-fly background queries
 	defaultRemoteIdent    = "weave:remote" // Ident used for info obtained from mDNS
 )
@@ -423,6 +423,8 @@ type ZoneConfig struct {
 	Iface *net.Interface
 	// Refresh interval for local names in the zone database (disabled by default) (in seconds)
 	RefreshInterval int
+	// Number of background updaters for names
+	RefreshWorkers int
 	// Forget about remote info if nobody asks for it in this time (in seconds)
 	RelevantTime int
 	// Max pending refresh requests
@@ -455,6 +457,7 @@ type zoneDb struct {
 	refreshCloseChan chan bool
 	refreshWg        sync.WaitGroup
 	refreshInterval  time.Duration
+	refreshWorkers   int
 }
 
 // Create a new zone database
@@ -475,6 +478,7 @@ func NewZoneDb(config ZoneConfig) (zone *zoneDb, err error) {
 		refreshChan:      make(chan refreshRequest, maxRefreshRequests),
 		refreshSchedChan: make(chan refreshRequest, maxRefreshRequests),
 		refreshCloseChan: make(chan bool),
+		refreshWorkers:   DefaultNumUpdaters,
 	}
 
 	// fix the default configuration parameters
@@ -489,6 +493,9 @@ func NewZoneDb(config ZoneConfig) (zone *zoneDb, err error) {
 	}
 	if config.RelevantTime > 0 {
 		zone.relevantLimit = time.Duration(config.RelevantTime) * time.Second
+	}
+	if config.RefreshWorkers > 0 {
+		zone.refreshWorkers = config.RefreshWorkers
 	}
 
 	// Create the mDNS client and server
@@ -523,8 +530,8 @@ func (zone *zoneDb) Start() (err error) {
 
 	// Start some name refreshers...
 	if zone.refreshInterval > 0 {
-		Info.Printf("[zonedb] Starting %d background name updaters", defaultNumUpdaters)
-		for i := 0; i < defaultNumUpdaters; i++ {
+		Info.Printf("[zonedb] Starting %d background name updaters", zone.refreshWorkers)
+		for i := 0; i < zone.refreshWorkers; i++ {
 			zone.refreshWg.Add(1)
 			go zone.updater(i)
 		}

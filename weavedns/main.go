@@ -25,6 +25,7 @@ func main() {
 		timeout         int
 		udpbuf          int
 		refreshInterval int
+		refreshWorkers  int
 		relevantTime    int
 		cacheLen        int
 		cacheDisabled   bool
@@ -45,6 +46,7 @@ func main() {
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	// advanced options
 	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
+	flag.IntVar(&refreshWorkers, "refresh-workers", weavedns.DefaultNumUpdaters, "default number of background updaters")
 	flag.IntVar(&relevantTime, "relevant", weavedns.DefaultRelevantTime, "life time for info in the absence of queries (in secs)")
 	flag.IntVar(&udpbuf, "udpbuf", weavedns.DefaultUDPBuflen, "UDP buffer length")
 	flag.IntVar(&timeout, "timeout", weavedns.DefaultTimeout, "timeout for resolutions (in millisecs)")
@@ -76,6 +78,7 @@ func main() {
 		Domain:          domain,
 		Iface:           iface,
 		RefreshInterval: refreshInterval,
+		RefreshWorkers:  refreshWorkers,
 		RelevantTime:    relevantTime,
 	}
 	zone, err := weavedns.NewZoneDb(zoneConfig)
