@@ -42,6 +42,7 @@ func TestServerCacheRefresh(t *testing.T) {
 		Cache:             cache,
 		Clock:             clk,
 		ListenReadTimeout: testSocketTimeout,
+		MaxAnswers:        4,
 	})
 	wt.AssertNoErr(t, err)
 	go srv.Start()

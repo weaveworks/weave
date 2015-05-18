@@ -89,7 +89,6 @@ func getMaxReplyLen(r *dns.Msg, proto dnsProtocol) int {
 	return maxLen
 }
 
-
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
@@ -103,5 +102,14 @@ func shuffleAnswers(answers []dns.RR) []dns.RR {
 		}
 	}
 
+	return answers
+}
+
+// only take the first `num` answers
+func pruneAnswers(answers []dns.RR, num int) []dns.RR {
+	if num > 0 && len(answers) > num {
+		// TODO: we should have some prefer locally-introduced answers, etc...
+		return answers[:num]
+	}
 	return answers
 }

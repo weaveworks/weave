@@ -18,6 +18,7 @@ const (
 	DefaultUDPBuflen  = 4096               // bigger than the default 512
 	DefaultCacheLen   = 8192               // default cache capacity
 	DefaultTimeout    = 5                  // default timeout for DNS resolutions
+	DefaultMaxAnswers = 1                  // default number of answers provided to users
 )
 
 type DNSServerConfig struct {
@@ -45,6 +46,8 @@ type DNSServerConfig struct {
 	Clock clock.Clock
 	// (Optional) Listening socket read timeout (in milliseconds)
 	ListenReadTimeout int
+	// Maximum number of answers provided to users
+	MaxAnswers int
 }
 
 type dnsProtocol uint8
@@ -88,6 +91,7 @@ type DNSServer struct {
 	lst           net.Listener
 	cache         ZoneCache
 	cacheDisabled bool
+	maxAnswers    int
 	negLocalTTL   int
 	timeout       time.Duration
 	readTimeout   time.Duration
@@ -107,6 +111,7 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 		timeout:       time.Duration(config.Timeout) * time.Millisecond,
 		readTimeout:   time.Duration(config.ListenReadTimeout) * time.Millisecond,
 		cacheDisabled: false,
+		maxAnswers:    DefaultMaxAnswers,
 		negLocalTTL:   negLocalTTL,
 		clock:         config.Clock,
 	}
@@ -139,6 +144,9 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 	}
 	if config.UDPBufLen > 0 {
 		s.udpBuf = config.UDPBufLen
+	}
+	if config.MaxAnswers > 0 {
+		s.maxAnswers = config.MaxAnswers
 	}
 	if config.CacheNegLocalTTL > 0 {
 		s.negLocalTTL = config.CacheNegLocalTTL
@@ -301,17 +309,16 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 				if err == errNoLocalReplies {
 					Debug.Printf("[dns msgid %d] Cached no-local-replies", r.MsgHdr.Id)
 					fallback(w, r)
-					return
 				} else {
 					Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
 					w.WriteMsg(makeDNSFailResponse(r))
-					return
 				}
+				return
 			}
 			if reply != nil {
+				reply.Answer = pruneAnswers(shuffleAnswers(reply.Answer), s.maxAnswers)
 				Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers",
 					r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer))
-				reply.Answer = shuffleAnswers(reply.Answer)
 				w.WriteMsg(reply)
 				return
 			}
@@ -334,10 +341,10 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 		} else {
 			m := msgBuilder(r, &q, answers)
 			m.Authoritative = true
-			m.Answer = shuffleAnswers(m.Answer)
-			Debug.Printf("[dns msgid %d] Sending response: %s/%s:%s [code:%s]",
-				m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, answers, dns.RcodeToString[m.Rcode])
 			maybeCache(m, nullTTL, 0)
+			m.Answer = pruneAnswers(shuffleAnswers(m.Answer), s.maxAnswers)
+			Debug.Printf("[dns msgid %d] Sending response: %s/%d answers [code:%s]",
+				m.MsgHdr.Id, dns.TypeToString[q.Qtype], len(m.Answer), dns.RcodeToString[m.Rcode])
 			w.WriteMsg(m)
 		}
 	}
