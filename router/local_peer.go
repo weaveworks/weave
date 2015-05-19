@@ -18,13 +18,14 @@ type LocalPeer struct {
 type LocalPeerAction func()
 
 func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
-	return &LocalPeer{Peer: NewPeer(name, nickName, 0, 0), router: router}
-}
-
-func (peer *LocalPeer) Start() {
 	actionChan := make(chan LocalPeerAction, ChannelSize)
-	peer.actionChan = actionChan
+	peer := &LocalPeer{
+		Peer:       NewPeer(name, nickName, 0, 0),
+		router:     router,
+		actionChan: actionChan,
+	}
 	go peer.actorLoop(actionChan)
+	return peer
 }
 
 func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
