@@ -459,7 +459,7 @@ func (alloc *Allocator) string() string {
 	fmt.Fprintf(&buf, "Allocator subnet %s/%d\n", alloc.subnetStart.String(), alloc.prefixLen)
 
 	if alloc.ring.Empty() {
-		fmt.Fprintf(&buf, "Paxos: %s", alloc.paxos.String())
+		fmt.Fprintf(&buf, "Awaiting consensus: %s", alloc.paxos.String())
 	} else {
 		localFreeSpace := alloc.space.NumFreeAddresses()
 		remoteFreeSpace := alloc.ring.TotalRemoteFree()
