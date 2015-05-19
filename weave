@@ -563,8 +563,13 @@ echo_addresses() {
 }
 
 peer_args() {
-  local joined=$(printf "&peer=%s" "${@}")
-  echo ${joined:1}
+  res=''
+  sep=''
+  for p in "$@" ; do
+    res="$res${sep}peer=$p"
+    sep="&"
+  done
+  echo "$res"
 }
 
 ######################################################################
