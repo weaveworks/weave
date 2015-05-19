@@ -97,6 +97,14 @@ exec_on() {
     docker -H tcp://$host:2375 exec $container "$@"
 }
 
+proxy_exec_on() {
+    host=$1
+    container=$2
+    shift 2
+    docker -H tcp://$host:12375 exec $container "$@"
+}
+
+
 start_container() {
     host=$1
     shift 1
