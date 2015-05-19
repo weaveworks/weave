@@ -34,18 +34,16 @@ type Target struct {
 type ConnectionMakerAction func() bool
 
 func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int) *ConnectionMaker {
-	return &ConnectionMaker{
+	actionChan := make(chan ConnectionMakerAction, ChannelSize)
+	cm := &ConnectionMaker{
 		ourself:      ourself,
 		peers:        peers,
 		port:         port,
 		cmdLinePeers: make(map[string]*net.TCPAddr),
-		targets:      make(map[string]*Target)}
-}
-
-func (cm *ConnectionMaker) Start() {
-	actionChan := make(chan ConnectionMakerAction, ChannelSize)
-	cm.actionChan = actionChan
+		targets:      make(map[string]*Target),
+		actionChan:   actionChan}
 	go cm.queryLoop(actionChan)
+	return cm
 }
 
 func (cm *ConnectionMaker) InitiateConnection(peer string) error {
