@@ -347,20 +347,20 @@ func (r *Ring) ClaimItAll() {
 }
 
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[router.PeerName]string) {
-	fmt.Fprintf(w, "Ring [%s, %s)\n", r.Start, r.End)
 	for _, entry := range r.Entries {
 		nickname, found := m[entry.Peer]
 		if found {
 			nickname = fmt.Sprintf(" (%s)", nickname)
 		}
 
-		fmt.Fprintf(w, "  %s -> %s%s (version: %d, free: %d)\n", entry.Token,
-			entry.Peer, nickname, entry.Version, entry.Free)
+		fmt.Fprintf(w, "\n  %s -> %s%s (v%d)", entry.Token,
+			entry.Peer, nickname, entry.Version)
 	}
 }
 
 func (r *Ring) String() string {
 	var buffer bytes.Buffer
+	fmt.Fprintf(&buffer, "Ring [%s, %s)", r.Start, r.End)
 	r.FprintWithNicknames(&buffer, make(map[router.PeerName]string))
 	return buffer.String()
 }
