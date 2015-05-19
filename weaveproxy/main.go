@@ -21,7 +21,7 @@ func main() {
 	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
 	getopt.StringVar(&target, 'H', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultTarget))
 	getopt.StringVar(&listen, 'L', fmt.Sprintf("address on which to listen (default %s)", defaultListen))
-	getopt.BoolVarLong(&withDNS, "with-dns", 'w', "register connected containers with weaveDNS")
+	getopt.BoolVarLong(&withDNS, "with-dns", 'w', "instruct created containers to use weaveDNS as their nameserver")
 	getopt.Parse()
 
 	if target == "" {
