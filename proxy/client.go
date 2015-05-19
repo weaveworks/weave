@@ -27,14 +27,17 @@ func newClient(dial func() (net.Conn, error), i interceptor) *client {
 }
 
 func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	err := c.InterceptRequest(r)
-	if err == docker.ErrNoSuchImage {
-		http.NotFound(w, r)
-		return
-	}
-	if err != nil {
-		http.Error(w, "Unable to intercept request", http.StatusInternalServerError)
-		Warning.Print("Error intercepting request: ", err)
+	if err := c.InterceptRequest(r); err != nil {
+		_, isNoSuchContainer := err.(*docker.NoSuchContainer)
+		switch {
+		case isNoSuchContainer:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		case err == docker.ErrNoSuchImage:
+			http.Error(w, err.Error(), http.StatusNotFound)
+		default:
+			http.Error(w, "Unable to intercept request", http.StatusInternalServerError)
+			Warning.Print("Error intercepting request: ", err)
+		}
 		return
 	}
 

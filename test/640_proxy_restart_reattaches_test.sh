@@ -14,7 +14,7 @@ docker_proxy_on $HOST1 run -e WEAVE_CIDR=$C2/24 -dt --name=c2 -h $NAME gliderlab
 docker_proxy_on $HOST1 run -e WEAVE_CIDR=$C1/24 -dt --name=c1 aanand/docker-dnsutils /bin/sh
 
 docker_proxy_on $HOST1 restart c2
-assert_raises "exec_on $HOST1 c2 ip link show ethwe | grep 'state UP'"
+assert_raises "proxy_exec_on $HOST1 c2 ip link show ethwe | grep 'state \\(UP\\|UNKNOWN\\)'"
 assert_dns_record $HOST1 c1 $NAME $C2
 
 end_suite
