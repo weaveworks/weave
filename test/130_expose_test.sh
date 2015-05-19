@@ -25,10 +25,9 @@ check_container_connectivity() {
     exec_on1 "c1 $PING $C2"
     exec_on1 "c3 $PING $C4"
     exec_on1 "c5 $PING $C6"
-    # fails due to #620
-    # exec_on1 "c3 ! $PING $C1"
-    # exec_on1 "c5 ! $PING $C1"
-    # exec_on1 "c5 ! $PING $C3"
+    exec_on1 "c3 sh -c \"! $PING $C1\""
+    exec_on1 "c5 sh -c \"! $PING $C1\""
+    exec_on1 "c5 sh -c \"! $PING $C3\""
 }
 
 start_suite "exposing weave network to host"
