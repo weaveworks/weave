@@ -83,7 +83,7 @@ func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.ClientConn) {
 	down, downBuf, up, rem, err := hijack(w, client)
 	if err != nil {
-		Error.Fatal(w, "Unable to hijack connection for raw stream mode", http.StatusInternalServerError)
+		http.Error(w, "Unable to hijack connection for raw stream mode", http.StatusInternalServerError)
 		return
 	}
 	defer down.Close()
@@ -135,7 +135,7 @@ func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httpu
 
 	down, _, up, rem, err := hijack(w, client)
 	if err != nil {
-		Error.Fatal("Unable to hijack response stream for chunked response", http.StatusInternalServerError)
+		http.Error(w, "Unable to hijack response stream for chunked response", http.StatusInternalServerError)
 		return
 	}
 	defer up.Close()
@@ -144,7 +144,7 @@ func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httpu
 	// stopping at the end of the chunked section.
 	rawResponseBody := io.MultiReader(rem, up)
 	if _, err := io.Copy(ioutil.Discard, httputil.NewChunkedReader(io.TeeReader(rawResponseBody, down))); err != nil {
-		Error.Fatal("Error copying chunked response body", http.StatusInternalServerError)
+		http.Error(w, "Error copying chunked response body", http.StatusInternalServerError)
 		return
 	}
 	resp.Trailer.Write(down)
