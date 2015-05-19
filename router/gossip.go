@@ -40,13 +40,15 @@ type GossipSender struct {
 }
 
 func NewGossipSender(send func(GossipData)) *GossipSender {
-	return &GossipSender{send: send}
-}
-
-func (sender *GossipSender) Start() {
-	sender.cell = make(chan GossipData, 1)
-	sender.flushch = make(chan chan bool)
+	cell := make(chan GossipData, 1)
+	flushch := make(chan chan bool)
+	sender := &GossipSender{
+		send:    send,
+		cell:    cell,
+		flushch: flushch,
+	}
 	go sender.run()
+	return sender
 }
 
 func (sender *GossipSender) run() {
