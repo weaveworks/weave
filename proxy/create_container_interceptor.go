@@ -21,36 +21,36 @@ type createContainerRequestBody struct {
 	MacAddress string             `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
 }
 
-func (i *createContainerInterceptor) InterceptRequest(r *http.Request) (*http.Request, error) {
+func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	r.Body.Close()
 
 	container := createContainerRequestBody{}
 	if err := json.Unmarshal(body, &container); err != nil {
-		return nil, err
+		return err
 	}
 
 	if _, ok := weaveCIDRsFromConfig(container.Config); ok {
 		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy")
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
-			return nil, err
+			return err
 		}
 		if err := i.setWeaveDNS(&container); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	newBody, err := json.Marshal(container)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
 
-	return r, nil
+	return nil
 }
 
 func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
@@ -100,6 +100,6 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 	return nil
 }
 
-func (i *createContainerInterceptor) InterceptResponse(r *http.Response) (*http.Response, error) {
-	return r, nil
+func (i *createContainerInterceptor) InterceptResponse(r *http.Response) error {
+	return nil
 }

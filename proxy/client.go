@@ -27,7 +27,7 @@ func newClient(dial func() (net.Conn, error), i interceptor) *client {
 }
 
 func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	req, err := c.InterceptRequest(r)
+	err := c.InterceptRequest(r)
 	if err == docker.ErrNoSuchImage {
 		http.NotFound(w, r)
 		return
@@ -47,13 +47,13 @@ func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client := httputil.NewClientConn(conn, nil)
 	defer client.Close()
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(r)
 	if err != nil && err != httputil.ErrPersistEOF {
 		http.Error(w, fmt.Sprintf("Could not make request to target: %v", err), http.StatusInternalServerError)
 		Warning.Print("Error forwarding request: ", err)
 		return
 	}
-	resp, err = c.InterceptResponse(resp)
+	err = c.InterceptResponse(resp)
 	if err != nil {
 		http.Error(w, "Unable to intercept response", http.StatusInternalServerError)
 		Warning.Print("Error intercepting response: ", err)
