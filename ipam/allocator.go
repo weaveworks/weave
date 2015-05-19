@@ -242,7 +242,7 @@ func (alloc *Allocator) free(ident string) error {
 		found = alloc.cancelOpsFor(&alloc.pendingClaims, ident) || found
 
 		if !found {
-			errChan <- fmt.Errorf("No addresses for %s", ident)
+			errChan <- fmt.Errorf("Free: no addresses for %s", ident)
 			return
 		}
 		errChan <- nil

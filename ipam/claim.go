@@ -37,7 +37,11 @@ func (c *claim) Try(alloc *Allocator) bool {
 		return false
 	}
 	if owner != alloc.ourName {
-		c.resultChan <- fmt.Errorf("Address %s is owned by other peer %s", c.addr.String(), owner)
+		name, found := alloc.nicknames[owner]
+		if found {
+			name = " (" + name + ")"
+		}
+		c.resultChan <- fmt.Errorf("address %s is owned by other peer %s%s", c.addr.String(), owner, name)
 		return true
 	}
 	// We are the owner, check we haven't given it to another container
@@ -58,7 +62,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 		return true
 	}
 	// Addr already owned by container on this machine
-	c.resultChan <- fmt.Errorf("Claimed address %s is already owned by %s", c.addr.String(), existingIdent)
+	c.resultChan <- fmt.Errorf("address %s is already owned by %s", c.addr.String(), existingIdent)
 	return true
 }
 

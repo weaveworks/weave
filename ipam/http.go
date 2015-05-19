@@ -12,7 +12,7 @@ import (
 
 func badRequest(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusBadRequest)
-	common.Warning.Println(err.Error())
+	common.Warning.Println("[allocator]:", err.Error())
 }
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
@@ -26,7 +26,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 			badRequest(w, err)
 			return
 		} else if err := alloc.Claim(ident, ip, closedChan); err != nil {
-			badRequest(w, fmt.Errorf("Unable to claim IP address %s: %s", ip, err))
+			badRequest(w, fmt.Errorf("Unable to claim: %s", err))
 			return
 		}
 
