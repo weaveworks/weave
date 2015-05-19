@@ -21,13 +21,11 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 }
 
 func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
-	containerID := ""
 	if subs := containerIDRegexp.FindStringSubmatch(r.Request.URL.Path); subs == nil {
 		Warning.Printf("No container id found in request with path %s", r.Request.URL.Path)
 		return nil
-	} else {
-		containerID = subs[1]
 	}
+	containerID := subs[1]
 
 	container, err := i.client.InspectContainer(containerID)
 	if err != nil {
