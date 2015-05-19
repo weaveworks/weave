@@ -28,12 +28,12 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 		Debug.Print("No Weave CIDR, ignoring")
 		return nil
 	}
-	Info.Printf("Container %s was started with CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
+	Info.Printf("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
 	args := []string{"attach"}
 	args = append(args, cidrs...)
 	args = append(args, container.ID)
 	if _, err := callWeave(args...); err != nil {
-		Warning.Printf("Attaching container %s to weave failed: %v", container.ID, err)
+		Warning.Printf("Attaching container %s to weave network failed: %v", container.ID, err)
 		return nil
 	}
 	return nil

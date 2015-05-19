@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/fsouza/go-dockerclient"
+	. "github.com/weaveworks/weave/common"
 )
 
 type createExecInterceptor struct {
@@ -35,7 +37,8 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if _, ok := weaveCIDRsFromConfig(container.Config); ok {
+	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok {
+		Info.Printf("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
 		options.Cmd = append(weaveWaitEntrypoint, options.Cmd...)
 	}
 

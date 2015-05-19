@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/fsouza/go-dockerclient"
+	. "github.com/weaveworks/weave/common"
 )
 
 type createContainerInterceptor struct {
@@ -33,7 +35,8 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if _, ok := weaveCIDRsFromConfig(container.Config); ok {
+	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok {
+		Info.Printf("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
 		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy")
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
