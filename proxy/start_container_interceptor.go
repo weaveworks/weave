@@ -21,7 +21,8 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 }
 
 func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
-	if subs := containerIDRegexp.FindStringSubmatch(r.Request.URL.Path); subs == nil {
+	subs := containerIDRegexp.FindStringSubmatch(r.Request.URL.Path)
+	if subs == nil {
 		Warning.Printf("No container id found in request with path %s", r.Request.URL.Path)
 		return nil
 	}
