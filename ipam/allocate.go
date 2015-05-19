@@ -46,7 +46,7 @@ func (g *allocate) Try(alloc *Allocator) bool {
 }
 
 func (g *allocate) Cancel() {
-	g.resultChan <- allocateResult{0, fmt.Errorf("Allocate request for %s cancelled, g.ident")}
+	g.resultChan <- allocateResult{0, fmt.Errorf("Allocate request for %s cancelled", g.ident)}
 }
 
 func (g *allocate) String() string {
