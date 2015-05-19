@@ -8,6 +8,10 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
+var (
+	weaveWaitEntrypoint = []string{"/home/weavewait/weavewait"}
+)
+
 func callWeave(args ...string) ([]byte, error) {
 	args = append([]string{"--local"}, args...)
 	Debug.Print("Calling weave", args)
