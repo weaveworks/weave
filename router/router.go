@@ -96,7 +96,6 @@ func (router *Router) Start() {
 		checkFatal(err)
 	}
 	router.Ourself.Start()
-	router.Macs.Start()
 	router.Routes.Start()
 	router.ConnectionMaker.Start()
 	router.UDPListener = router.listenUDP(router.Port, po)
