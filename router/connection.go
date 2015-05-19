@@ -97,26 +97,23 @@ func (conn *RemoteConnection) String() string {
 	return fmt.Sprint("Connection ", from, "->", to)
 }
 
-func NewLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router) *LocalConnection {
+// Does not return anything. If the connection is successful, it will
+// end up in the local peer's connections map.
+func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router, acceptNewPeer bool) {
 	if connRemote.local != router.Ourself.Peer {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
 	// NB, we're taking a copy of connRemote here.
-	return &LocalConnection{
+	actionChan := make(chan ConnectionAction, ChannelSize)
+	finished := make(chan struct{})
+	conn := &LocalConnection{
 		RemoteConnection: *connRemote,
 		Router:           router,
 		TCPConn:          tcpConn,
 		remoteUDPAddr:    udpAddr,
-		effectivePMTU:    DefaultPMTU}
-}
-
-// Async. Does not return anything. If the connection is successful,
-// it will end up in the local peer's connections map.
-func (conn *LocalConnection) Start(acceptNewPeer bool) {
-	actionChan := make(chan ConnectionAction, ChannelSize)
-	conn.actionChan = actionChan
-	finished := make(chan struct{})
-	conn.finished = finished
+		effectivePMTU:    DefaultPMTU,
+		actionChan:       actionChan,
+		finished:         finished}
 	go conn.run(actionChan, finished, acceptNewPeer)
 }
 
