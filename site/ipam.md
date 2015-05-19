@@ -135,11 +135,11 @@ Owned Ranges:
   10.2.1.192 -> ea:6c:21:09:cf:f0 (host3) (v9)
 ````
 
-The first section covers the router; see the troubleshooting guide in
-the main documentation for full details.
+The first section covers the router; see the [troubleshooting
+guide](troubleshooting.html#status-report) for full details.
 
 The 'Allocator' section, which is only present if weave has been
-started with the `-iprange` option, summarises the overal position and
+started with the `-iprange` option, summarises the overall position and
 lists which address ranges have been assigned to which peer. Each
 range begins at the address shown and ends just before the next
 address, or wraps around at the end of the subnet. The 'v' number
