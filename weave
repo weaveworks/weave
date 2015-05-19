@@ -700,7 +700,7 @@ proxy_host() {
 
 wait_for_proxy_to_boot() {
     proxy_host
-    for n in `seq 1 10`; do
+    for n in $(seq 1 10); do
       if curl --max-time 1 --connect-timeout 1 -s -X GET http://$PROXY_HOST:$PROXY_PORT/weave ; then
         return 0
       fi
