@@ -229,8 +229,8 @@ e8d85b1dcdb1 10.2.1.27 waff.weave.local.
 1ab0e8b17c39 10.2.1.29 pong.weave.local.
 ````
 
-The first section covers the router; see the troubleshooting guide in
-the main documentation for more detail.
+The first section covers the router; see the [troubleshooting
+guide](troubleshooting.html#status-report) for more detail.
 
 The second section is pertinent to weaveDNS, and includes:
 
