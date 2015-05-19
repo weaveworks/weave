@@ -22,26 +22,23 @@ type Routes struct {
 }
 
 func NewRoutes(ourself *LocalPeer, peers *Peers) *Routes {
+	recalculate := make(chan *struct{}, 1)
+	wait := make(chan chan struct{})
 	routes := &Routes{
 		ourself:      ourself,
 		peers:        peers,
 		unicast:      make(map[PeerName]PeerName),
 		unicastAll:   make(map[PeerName]PeerName),
 		broadcast:    make(map[PeerName][]PeerName),
-		broadcastAll: make(map[PeerName][]PeerName)}
+		broadcastAll: make(map[PeerName][]PeerName),
+		recalculate:  recalculate,
+		wait:         wait}
 	routes.unicast[ourself.Name] = UnknownPeerName
 	routes.unicastAll[ourself.Name] = UnknownPeerName
 	routes.broadcast[ourself.Name] = []PeerName{}
 	routes.broadcastAll[ourself.Name] = []PeerName{}
-	return routes
-}
-
-func (routes *Routes) Start() {
-	recalculate := make(chan *struct{}, 1)
-	wait := make(chan chan struct{})
-	routes.recalculate = recalculate
-	routes.wait = wait
 	go routes.run(recalculate, wait)
+	return routes
 }
 
 func (routes *Routes) PeerNames() PeerNameSet {
