@@ -115,3 +115,35 @@ brackets, like this:
 So, in our example, we could equivalently do:
 
     host1$ weave rmpeer ea:6c:21:09:cf:f0
+
+## <a name="troubleshooting"></a>Troubleshooting
+
+The command
+
+    weave status
+
+reports on the current status of the weave router and IP allocator:
+
+````
+weave router git-8f675f15c0b5
+...
+Allocator subnet 10.2.1.0/24
+  Free IPs: ~98.0%, 62 local, ~189 remote
+Owned Ranges:
+  10.2.1.1 -> 96:e9:e2:2e:2d:bc (host1) (v3)
+  10.2.1.128 -> ea:84:25:9b:31:2e (host2) (v3)
+  10.2.1.192 -> ea:6c:21:09:cf:f0 (host3) (v9)
+````
+
+The first section covers the router; see the troubleshooting guide in
+the main documentation for full details.
+
+The 'Allocator' section, which is only present if weave has been
+started with the `-iprange` option, summarises the overal position and
+lists which address ranges have been assigned to which peer. Each
+range begins at the address shown and ends just before the next
+address, or wraps around at the end of the subnet. The 'v' number
+denotes how many times that entry has been updated.
+
+The 'Free IPs' information may be out of date with respect to changes
+happening elsewhere in the network.
