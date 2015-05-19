@@ -112,6 +112,12 @@ start_container() {
     weave_on $host run "$@" -t gliderlabs/alpine /bin/sh
 }
 
+proxy_start_container() {
+    host=$1
+    shift 1
+    docker -H tcp://$host:12375 run "$@" -dt gliderlabs/alpine /bin/sh
+}
+
 start_container_with_dns() {
     host=$1
     shift 1

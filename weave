@@ -928,6 +928,9 @@ case "$COMMAND" in
         docker_bridge_ip
         echo -n $DOCKER_BRIDGE_IP
         ;;
+    ipam-cidr)
+        get_ipam_cidr "$@" && echo "$CIDR_ARGS"
+        ;;
     start)
         collect_cidr_args "$@"
         shift $CIDR_COUNT

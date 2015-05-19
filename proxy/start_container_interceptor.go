@@ -28,6 +28,14 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 		Debug.Print("No Weave CIDR, ignoring")
 		return nil
 	}
+	if len(cidrs) == 0 {
+		ipamCIDR, err := callWeave("ipam-cidr", container.ID)
+		if err != nil {
+			Warning.Printf("Determining container %s IP via IPAM failed: %v, %v", container.ID, err, string(ipamCIDR))
+			return nil
+		}
+		cidrs = strings.Fields(string(ipamCIDR))
+	}
 	Info.Printf("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
 	args := []string{"attach"}
 	args = append(args, cidrs...)
