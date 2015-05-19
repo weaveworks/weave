@@ -95,7 +95,6 @@ func (router *Router) Start() {
 		po, err = NewPcapO(router.Iface.Name)
 		checkFatal(err)
 	}
-	router.ConnectionMaker.Start()
 	router.UDPListener = router.listenUDP(router.Port, po)
 	router.listenTCP(router.Port)
 	if pio != nil {
