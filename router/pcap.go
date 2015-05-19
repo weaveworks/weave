@@ -3,16 +3,38 @@ package router
 import (
 	"code.google.com/p/gopacket/pcap"
 	"fmt"
+	"log"
+	"net"
+	"sync"
 )
 
-type PcapIO struct {
-	handle *pcap.Handle
+type Pcap struct {
+	iface *net.Interface
+	bufSz int
+
+	// The libpcap handle for writing packets. It's possible thata
+	// single handle could be used for reading and writing, but
+	// we'd have to examine the performance implications.
+	writeHandle *pcap.Handle
+
+	// pcap handles are single-threaded, so we need to lock around
+	// uses of writeHandle.
+	writeHandleMutex sync.Mutex
 }
 
-func NewPcapIO(ifName string, bufSz int) (PacketSourceSink, error) {
-	pio, err := newPcapIO(ifName, true, 65535, bufSz)
+func NewPcap(iface *net.Interface, bufSz int) (IntraHost, error) {
+	wh, err := newPcapHandle(iface.Name, false, 0, 0)
 	if err != nil {
-		return pio, err
+		return nil, err
+	}
+
+	return &Pcap{iface: iface, bufSz: bufSz, writeHandle: wh}, nil
+}
+
+func (p *Pcap) ConsumePackets(consumer IntraHostConsumer) error {
+	rh, err := newPcapHandle(p.iface.Name, true, 65535, p.bufSz)
+	if err != nil {
+		return err
 	}
 
 	// Under Linux, libpcap implements the SetDirection filtering
@@ -20,16 +42,16 @@ func NewPcapIO(ifName string, bufSz int) (PacketSourceSink, error) {
 	// packets inside the kernel.  We do this here rather than in
 	// newPcapIO because libpcap doesn't like this in combination
 	// with a 0 snaplen.
-	err = pio.handle.SetBPFFilter("inbound")
-	return pio, err
+	err = rh.SetBPFFilter("inbound")
+	if err != nil {
+		return err
+	}
+
+	go p.sniff(rh, consumer)
+	return nil
 }
 
-func NewPcapO(ifName string) (po PacketSink, err error) {
-	po, err = newPcapIO(ifName, false, 0, 0)
-	return
-}
-
-func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *PcapIO, err error) {
+func newPcapHandle(ifName string, promisc bool, snaplen int, bufSz int) (handle *pcap.Handle, err error) {
 	inactive, err := pcap.NewInactiveHandle(ifName)
 	if err != nil {
 		return
@@ -60,26 +82,35 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 	if err = inactive.SetBufferSize(bufSz); err != nil {
 		return
 	}
-	active, err := inactive.Activate()
+	handle, err = inactive.Activate()
 	if err != nil {
 		return
 	}
-	if err = active.SetDirection(pcap.DirectionIn); err != nil {
-		return
-	}
-	return &PcapIO{handle: active}, nil
-}
-
-func (pi *PcapIO) ReadPacket() (data []byte, err error) {
-	for {
-		data, _, err = pi.handle.ZeroCopyReadPacketData()
-		if err == nil || err != pcap.NextErrorTimeoutExpired {
-			break
-		}
-	}
+	err = handle.SetDirection(pcap.DirectionIn)
 	return
 }
 
-func (po *PcapIO) WritePacket(data []byte) error {
-	return po.handle.WritePacketData(data)
+func (p *Pcap) String() string {
+	return fmt.Sprint(p.iface, "(via pcap)")
+}
+
+func (p *Pcap) InjectPacket(pkt []byte) error {
+	p.writeHandleMutex.Lock()
+	defer p.writeHandleMutex.Unlock()
+	return p.writeHandle.WritePacketData(pkt)
+}
+
+func (p *Pcap) sniff(readHandle *pcap.Handle, consumer IntraHostConsumer) {
+	log.Println("Sniffing traffic on", p.iface)
+	dec := NewEthernetDecoder()
+
+	for {
+		pkt, _, err := readHandle.ZeroCopyReadPacketData()
+		if err == pcap.NextErrorTimeoutExpired {
+			continue
+		}
+
+		checkFatal(err)
+		consumer.CapturedPacket(pkt, dec)
+	}
 }

@@ -22,7 +22,6 @@ import (
 var version = "(unreleased version)"
 
 func main() {
-
 	log.SetPrefix(weave.Protocol + " ")
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
@@ -51,6 +50,7 @@ func main() {
 		iprangeCIDR string
 		peerCount   int
 		apiPath     string
+		iface       *net.Interface
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -84,18 +84,25 @@ func main() {
 	var err error
 
 	if ifaceName != "" {
-		config.Iface, err = weavenet.EnsureInterface(ifaceName, wait)
+		iface, err := weavenet.EnsureInterface(ifaceName, wait)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// bufsz flag is in MB
+		config.IntraHost, err = weave.NewPcap(iface, bufSzMB*1024*1024)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if routerName == "" {
-		if config.Iface == nil {
+		if iface == nil {
 			log.Fatal("Either an interface must be specified with -iface or a name with -name")
 		}
-		routerName = config.Iface.HardwareAddr.String()
+		routerName = iface.HardwareAddr.String()
 	}
+
 	name, err := weave.PeerNameFromUserInput(routerName)
 	if err != nil {
 		log.Fatal(err)
@@ -126,7 +133,6 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	config.BufSz = bufSzMB * 1024 * 1024
 	config.LogFrame = logFrameFunc(pktdebug)
 
 	router := weave.NewRouter(config, name, nickName)

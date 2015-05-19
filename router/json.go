@@ -16,7 +16,7 @@ func (router *Router) StatusJSON(version, encryption string) ([]byte, error) {
 		Macs       *MacCache
 		Peers      *Peers
 		Routes     *Routes
-	}{version, encryption, router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes})
+	}{version, encryption, router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprint(router.IntraHost), router.Macs, router.Peers, router.Routes})
 	// leaving out ConectionMaker due to async complexities
 }
 
