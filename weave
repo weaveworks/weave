@@ -27,6 +27,7 @@ usage() {
     echo "weave setup"
     echo "weave launch     [-password <password>] [-nickname <nickname>] [-iprange <cidr>] <peer> ..."
     echo "weave launch-dns <cidr>"
+    echo "weave launch-proxy [-H <docker_endpoint>] [--with-dns]"
     echo "weave connect    <peer>"
     echo "weave forget     <peer>"
     echo "weave run        [--with-dns] [<cidr> ...] <docker run args> ..."
@@ -679,6 +680,63 @@ get_ipam_cidr() {
     fi
 }
 
+######################################################################
+# weave proxy helpers
+######################################################################
+
+PROXY_PORT=12375
+PROXY_CONTAINER_NAME=weaveproxy
+
+proxy_host() {
+    case $DOCKER_HOST in
+        tcp://*)
+            PROXY_HOST=$(echo $DOCKER_HOST | sed -e "s|tcp://\([^:]*\):[0-9]*|\1|")
+            ;;
+        *)
+            PROXY_HOST="localhost"
+            ;;
+    esac
+}
+
+wait_for_proxy_to_boot() {
+    proxy_host
+    for n in `seq 1 10`; do
+      if curl --max-time 1 --connect-timeout 1 -s -X GET http://$PROXY_HOST:$PROXY_PORT/weave ; then
+        return 0
+      fi
+      sleep 1
+    done
+    echo "Proxy did not start within 10 seconds" >&2
+    return 1
+}
+
+ensure_proxy_running() {
+    case $(docker inspect --format '{{.State.Running}} {{.Config.Image}}' $PROXY_CONTAINER_NAME 2>/dev/null) in
+        "true $EXEC_IMAGE")
+            return 0
+            ;;
+        true*)
+            echo "Proxy already running with unknown image" >&2
+            exit 1
+            ;;
+        false*)
+            docker rm -f $PROXY_CONTAINER_NAME >/dev/null
+            ;;
+    esac
+    # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
+    # additional parameters, such as resource limits, to docker
+    # when launching the weave proxy container.
+    PROXY_CONTAINER=$(docker run --privileged --net=host -d \
+        --name=$PROXY_CONTAINER_NAME \
+        -p $PROXY_PORT:$PROXY_PORT/tcp -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /proc:/hostproc -e PROCFS=/hostproc \
+        --entrypoint=/home/weave/weaveproxy \
+        $WEAVE_DOCKER_ARGS $WEAVEPROXY_DOCKER_ARGS \
+        $EXEC_IMAGE "$@")
+
+    wait_for_proxy_to_boot
+}
+
 ##########################################################################################
 
 [ $(id -u) = 0 ] || {
@@ -807,6 +865,10 @@ case "$COMMAND" in
         populate_dns
         echo $DNS_CONTAINER
         ;;
+    launch-proxy)
+        ensure_proxy_running "$@"
+        echo $PROXY_CONTAINER
+        ;;
     connect)
         [ $# -eq 1 ] || usage
         http_call $CONTAINER_NAME $HTTP_PORT POST /connect -d "peer=$1"
@@ -858,6 +920,10 @@ case "$COMMAND" in
     dns-args)
         dns_args "$@"
         echo -n $DNS_ARGS
+        ;;
+    docker-bridge-ip)
+        docker_bridge_ip
+        echo -n $DOCKER_BRIDGE_IP
         ;;
     start)
         collect_cidr_args "$@"

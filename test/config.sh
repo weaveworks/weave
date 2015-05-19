@@ -76,6 +76,13 @@ docker_on() {
     docker -H tcp://$host:2375 "$@"
 }
 
+docker_proxy_on() {
+    host=$1
+    shift 1
+    greyly echo "Docker (with proxy) on $host: $@" >&2
+    docker -H tcp://$host:12375 "$@"
+}
+
 weave_on() {
     host=$1
     shift 1
