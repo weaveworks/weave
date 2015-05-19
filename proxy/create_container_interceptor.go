@@ -75,7 +75,7 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 		command = image.Cmd
 	}
 
-	container.Entrypoint = []string{"/home/weavewait/weavewait"}
+	container.Entrypoint = weaveWaitEntrypoint
 	container.Cmd = append(entry, command...)
 	return nil
 }

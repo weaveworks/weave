@@ -14,6 +14,7 @@ import (
 var (
 	containerCreateRegexp = regexp.MustCompile("/v[0-9\\.]*/containers/create")
 	containerStartRegexp  = regexp.MustCompile("^/v[0-9\\.]*/containers/[^/]*/(re)?start$")
+	execCreateRegexp      = regexp.MustCompile("^/v[0-9\\.]*/containers/[^/]*/exec$")
 )
 
 type Proxy struct {
@@ -68,6 +69,8 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		proxy.serveWithInterceptor(&createContainerInterceptor{proxy.client, proxy.withDNS, proxy.dockerBridgeIP}, w, r)
 	case containerStartRegexp.MatchString(path):
 		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.withDNS}, w, r)
+	case execCreateRegexp.MatchString(path):
+		proxy.serveWithInterceptor(&createExecInterceptor{proxy.client}, w, r)
 	case strings.HasPrefix(path, "/weave"):
 		w.WriteHeader(http.StatusOK)
 	default:
