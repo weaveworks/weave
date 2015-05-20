@@ -51,10 +51,6 @@ type Zone interface {
 	AddRecord(ident string, name string, ip net.IP) error
 	// Delete matching records (uninitialised values act as wildcards)
 	DeleteRecords(ident string, name string, ip net.IP) (count int)
-	// Delete a record in the local database
-	DeleteRecord(ident string, ip net.IP) error
-	// Delete all records for an ident in the local database
-	DeleteRecordsFor(ident string) error
 	// Lookup for a name in the whole domain
 	DomainLookupName(name string) ([]ZoneRecord, error)
 	// Lookup for an address in the whole domain
@@ -635,32 +631,6 @@ func (zone *ZoneDb) DeleteRecords(ident string, name string, ip net.IP) int {
 	return count
 }
 
-// Delete all records for an ident
-func (zone *ZoneDb) DeleteRecordsFor(ident string) (err error) {
-	zone.mx.Lock()
-	defer zone.mx.Unlock()
-	Debug.Printf("[zonedb] Deleting records for ident '%s'", ident)
-	zone.deleteIdent(ident)
-	return
-}
-
-// Delete an IP in a ident
-func (zone *ZoneDb) DeleteRecord(ident string, ip net.IP) (err error) {
-	zone.mx.Lock()
-	defer zone.mx.Unlock()
-
-	Debug.Printf("[zonedb] Deleting record '%s'/[%s]", ident, ip)
-	if _, found := zone.idents[ident]; found {
-		err = zone.idents[ident].deleteIP(ipToIPv4(ip))
-		if zone.idents[ident].empty() {
-			zone.deleteIdent(ident)
-		}
-	} else {
-		err = LookupError(ident)
-	}
-	return
-}
-
 // Observe a name.
 // The name must have at least one valid IP address.
 // Name observers are notified when
@@ -727,7 +697,8 @@ func (zone *ZoneDb) String() string {
 // Notify that a container has died
 func (zone *ZoneDb) ContainerDied(ident string) error {
 	Info.Printf("[zonedb] Container %s down. Removing records", ident)
-	return zone.DeleteRecordsFor(ident)
+	zone.DeleteRecords(ident, "", net.IP{})
+	return nil
 }
 
 // Return true if a remote name is still relevant
