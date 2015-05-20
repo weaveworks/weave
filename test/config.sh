@@ -65,28 +65,35 @@ greenly() {
 run_on() {
     host=$1
     shift 1
-    greyly echo "Running on $host: $@" >&2
+    [[ -z "$DEBUG" ]] || greyly echo "Running on $host: $@" >&2
     remote $host $SSH $host "$@"
 }
 
 docker_on() {
     host=$1
     shift 1
-    greyly echo "Docker on $host: $@" >&2
+    [[ -z "$DEBUG" ]] || greyly echo "Docker on $host: $@" >&2
     docker -H tcp://$host:2375 "$@"
 }
 
 docker_proxy_on() {
     host=$1
     shift 1
-    greyly echo "Docker (with proxy) on $host: $@" >&2
+    [[ -z "$DEBUG" ]] || greyly echo "Docker (with proxy) on $host: $@" >&2
     docker -H tcp://$host:12375 "$@"
 }
 
 weave_on() {
     host=$1
     shift 1
-    greyly echo "Weave on $host: $@" >&2
+    [[ -z "$DEBUG" ]] || greyly echo "Weave on $host: $@" >&2
+    CONTAINERID=$(DOCKER_HOST=tcp://$host:2375 $WEAVE "$@")
+}
+
+weave_cmd_on() {
+    host=$1
+    shift 1
+    [[ -z "$DEBUG" ]] || greyly echo "Weave on $host: $@" >&2
     DOCKER_HOST=tcp://$host:2375 $WEAVE "$@"
 }
 
@@ -118,7 +125,7 @@ start_container_with_dns() {
 }
 
 container_ip() {
-    weave_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
+    weave_cmd_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 }
 
 # assert_dns_record <host> <container> <name> <ip>
@@ -128,13 +135,13 @@ assert_dns_record() {
 }
 
 start_suite() {
+    whitely echo "$@"
     for host in $HOST1 $HOST2; do
-        echo "Cleaning up on $host: removing all containers and resetting weave"
+        [[ -z "$DEBUG" ]] || echo "Cleaning up on $host: removing all containers and resetting weave"
         containers=$(docker_on $host ps -aq 2>/dev/null)
         [ -n "$containers" ] && docker_on $host rm -f $containers >/dev/null 2>&1
         weave_on $host reset 2>/dev/null
     done
-    whitely echo "$@"
 }
 
 end_suite() {
