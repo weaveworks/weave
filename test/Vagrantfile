@@ -9,6 +9,16 @@ n_machines = 2
 ip_prefix = "192.168.48"
 ip_suffix_base = 10
 
+$cleanup = <<SCRIPT
+export DEBIAN_FRONTEND=noninteractive
+## Who the hell thinks official images have to have both of these?
+/etc/init.d/chef-client stop
+/etc/init.d/puppet stop
+apt-get -qq remove puppet chef
+apt-get -qq autoremove
+killall -9 chef-client
+SCRIPT
+
 def configure_docker(host, hostname, ip)
   pkgs = "lxc-docker ethtool"
 
@@ -32,6 +42,7 @@ def configure_docker(host, hostname, ip)
   # Listen on the remote API
   host.vm.provision :shell, :inline => "echo 'DOCKER_OPTS=\"-H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\"' >> /etc/default/docker"
   host.vm.provision :shell, :inline => "service docker restart"
+  host.vm.provision :shell, :inline => $cleanup
 end
 
 
