@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
 
 	"github.com/weaveworks/weave/net"
 )
@@ -16,11 +17,15 @@ func main() {
 	if len(os.Args) <= 1 {
 		os.Exit(0)
 	}
-	cmd := exec.Command(os.Args[1], os.Args[2:]...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+
+	binary, err := exec.LookPath(os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	if err := syscall.Exec(binary, os.Args[1:], os.Environ()); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
