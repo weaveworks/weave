@@ -32,6 +32,8 @@ SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key -o UserKnownHostsFile=./.ssh
 PING="ping -nq -W 1 -c 1"
 CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 
+DOCKER_PORT=2375
+
 remote() {
     rem=$1
     shift 1
@@ -73,49 +75,32 @@ run_on() {
 docker_on() {
     host=$1
     shift 1
-    greyly echo "Docker on $host: $@" >&2
-    docker -H tcp://$host:2375 "$@"
+    greyly echo "Docker on $host:$DOCKER_PORT: $@" >&2
+    docker -H tcp://$host:$DOCKER_PORT "$@"
 }
 
-docker_proxy_on() {
-    host=$1
-    shift 1
-    greyly echo "Docker (with proxy) on $host: $@" >&2
-    docker -H tcp://$host:12375 "$@"
+proxy() {
+  DOCKER_PORT=12375 "$@"
 }
 
 weave_on() {
     host=$1
     shift 1
-    greyly echo "Weave on $host: $@" >&2
-    DOCKER_HOST=tcp://$host:2375 $WEAVE "$@"
+    greyly echo "Weave on $host:$DOCKER_PORT: $@" >&2
+    DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
 exec_on() {
     host=$1
     container=$2
     shift 2
-    docker -H tcp://$host:2375 exec $container "$@"
+    docker -H tcp://$host:$DOCKER_PORT exec $container "$@"
 }
-
-proxy_exec_on() {
-    host=$1
-    container=$2
-    shift 2
-    docker -H tcp://$host:12375 exec $container "$@"
-}
-
 
 start_container() {
     host=$1
     shift 1
     weave_on $host run "$@" -t gliderlabs/alpine /bin/sh
-}
-
-proxy_start_container() {
-    host=$1
-    shift 1
-    docker -H tcp://$host:12375 run "$@" -dt gliderlabs/alpine /bin/sh
 }
 
 start_container_with_dns() {

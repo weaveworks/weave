@@ -9,6 +9,6 @@ docker_on $HOST1 build -t inspect-ethwe - <<- EOF
   ENTRYPOINT ["ip", "link", "show", "ethwe"]
 EOF
 
-assert_raises "docker_proxy_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.1/24' inspect-ethwe | grep 'state UP'"
+assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.1/24' inspect-ethwe | grep 'state UP'"
 
 end_suite

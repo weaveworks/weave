@@ -10,6 +10,6 @@ if (docker_on $HOST1 images $BASE_IMAGE | grep $BASE_IMAGE); then
   docker_on $HOST1 rmi $BASE_IMAGE
 fi
 
-assert_raises "docker_proxy_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.1/24' $BASE_IMAGE $CHECK_ETHWE_UP"
+assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.1/24' $BASE_IMAGE $CHECK_ETHWE_UP"
 
 end_suite
