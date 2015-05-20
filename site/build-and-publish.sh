@@ -32,4 +32,5 @@ if [ -z "${TRAVIS_TAG}" -a ! "${BRANCH}" = "latest_release_doc_updates" ]; then
       -h "Content-Type:text/html" \
       -h "Cache-Control:private, max-age=0, no-transform" \
       cp -a "public-read" - "gs://docs.weave.works/weave/${BRANCH}/index.html"
+  gsutil -m rsync -r -d -p gs://docs.weave.works/${OUTPUT} gs://docs.weave.works/weave/${BRANCH}/head
 fi
