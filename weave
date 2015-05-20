@@ -27,7 +27,7 @@ usage() {
     echo "weave setup"
     echo "weave launch       [-password <password>] [-nickname <nickname>] [-iprange <cidr>] <peer> ..."
     echo "weave launch-dns   <cidr>"
-    echo "weave launch-proxy [-H <docker_endpoint>] [--with-dns]"
+    echo "weave launch-proxy [-H <docker_endpoint>] [--with-dns] [--with-ipam]"
     echo "weave connect      <peer>"
     echo "weave forget       <peer>"
     echo "weave run          [--with-dns] [<cidr> ...] <docker run args> ..."
@@ -927,9 +927,6 @@ case "$COMMAND" in
     docker-bridge-ip)
         docker_bridge_ip
         echo -n $DOCKER_BRIDGE_IP
-        ;;
-    ipam-cidr)
-        get_ipam_cidr "$@" && echo "$CIDR_ARGS"
         ;;
     start)
         collect_cidr_args "$@"

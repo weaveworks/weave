@@ -65,7 +65,11 @@ With this done, we can automtaically assign an address to a container by providi
 
     host1$ docker run -e WEAVE_CIDR= -ti ubuntu /bin/sh
 
-More details on IPAM can be found in the [IPAM documentstion](ipam.html).
+Alternatively, to enable automatic allocation of all containers without a `WEAVE_CIDR`, we can launch the proxy with the `--with-ipam` option. For example:
+
+    host1$ weave launch-proxy --with-ipam
+
+More details on IPAM can be found in the [IPAM documentation](ipam.html).
 
 ## Limitations
 

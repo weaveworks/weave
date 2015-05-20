@@ -9,8 +9,9 @@ import (
 )
 
 type startContainerInterceptor struct {
-	client  *docker.Client
-	withDNS bool
+	client   *docker.Client
+	withDNS  bool
+	withIPAM bool
 }
 
 func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
@@ -24,17 +25,9 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 	}
 
 	cidrs, ok := weaveCIDRsFromConfig(container.Config)
-	if !ok {
+	if !ok && !i.withIPAM {
 		Debug.Print("No Weave CIDR, ignoring")
 		return nil
-	}
-	if len(cidrs) == 0 {
-		ipamCIDR, err := callWeave("ipam-cidr", container.ID)
-		if err != nil {
-			Warning.Printf("Determining container %s IP via IPAM failed: %v, %v", container.ID, err, string(ipamCIDR))
-			return nil
-		}
-		cidrs = strings.Fields(string(ipamCIDR))
 	}
 	Info.Printf("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
 	args := []string{"attach"}
@@ -42,7 +35,6 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 	args = append(args, container.ID)
 	if _, err := callWeave(args...); err != nil {
 		Warning.Printf("Attaching container %s to weave network failed: %v", container.ID, err)
-		return nil
 	}
 	return nil
 }
