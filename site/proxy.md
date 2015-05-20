@@ -22,7 +22,7 @@ and listen on port 12375. However, we can adjust the connection to docker via
 the `-H` argument. All docker commands can be run via the proxy, so it is safe
 to globally adjust your `DOCKER_HOST`.
 
-    host1$ export DOCKER_HOST="tcp://host1:12375"
+    host1$ export DOCKER_HOST=tcp://host1:12375
     host1$ docker ps
 
 ## Usage
@@ -52,6 +52,20 @@ Containers started via the proxy can be automatically configured to use WeaveDNS
     host1$ weave launch-proxy --with-dns
 
 With this done, any containers launched through the proxy will use weaveDNS for name resolution. WeaveDNS is used in addition to any dns servers specified via the `--dns` option. More details on weaveDNS can be found in the [weaveDNS documentation](weavedns.html).
+
+## Usage with IPAM
+
+To automatically assign a unique IP address to a container, weave must be told on startup what range of addresses to allocate from. For example:
+
+    host1# weave launch -iprange 10.2.3.0/24
+    host1$ weave launch-proxy
+    host1$ export DOCKER_HOST=tcp://host1:12375
+
+With this done, we can automtaically assign an address to a container by providing a blank `WEAVE_CIDR` value, as in
+
+    host1$ docker run -e WEAVE_CIDR= -ti ubuntu /bin/sh
+
+More details on IPAM can be found in the [IPAM documentstion](ipam.html).
 
 ## Limitations
 
