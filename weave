@@ -981,7 +981,7 @@ case "$COMMAND" in
     expose)
         collect_cidr_args "$@"
         shift $CIDR_COUNT
-        [ $CIDR_COUNT -gt 0 ] || get_ipam_cidr weave weave:expose
+        get_ipam_cidr weave weave:expose
         if [ $# -eq 0 ]; then
             FQDN=""
         else
