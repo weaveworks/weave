@@ -21,13 +21,14 @@ exec_on1() {
     assert_raises "exec_on  $HOST1 $@"
 }
 
+# Containers in the same subnet should be able to talk; different subnet not.
 check_container_connectivity() {
     exec_on1 "c1 $PING $C2"
     exec_on1 "c3 $PING $C4"
     exec_on1 "c5 $PING $C6"
-    exec_on1 "c3 sh -c \"! $PING $C1\""
+    exec_on1 "c1 sh -c \"! $PING $C3\""
+    exec_on1 "c3 sh -c \"! $PING $C5\""
     exec_on1 "c5 sh -c \"! $PING $C1\""
-    exec_on1 "c5 sh -c \"! $PING $C3\""
 }
 
 start_suite "exposing weave network to host"
