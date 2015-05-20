@@ -11,7 +11,7 @@ assert_container_cidrs() {
     CIDRS="$@"
 
     # Assert container has attached CIDRs
-    assert_raises "weave_on $HOST ps | grep \"^$CID [^ ]* $CIDRS$\""
+    assert_raises "weave_cmd_on $HOST ps | grep \"^$CID [^ ]* $CIDRS$\""
 }
 
 # assert_zone_records <host> <cid> <fqdn> <ip> [<ip> ...]
@@ -21,11 +21,11 @@ assert_zone_records() {
     FQDN=$1; shift
 
     # Assert correct number of records exist
-    assert "weave_on $HOST status | grep \"^$CID\" | wc -l" $#
+    assert "weave_cmd_on $HOST status | grep \"^$CID\" | wc -l" $#
 
     # Assert correct records exist
     for IP; do
-        assert_raises "weave_on $HOST status | grep \"^$CID $IP $FQDN$\""
+        assert_raises "weave_cmd_on $HOST status | grep \"^$CID $IP $FQDN$\""
     done
 }
 
@@ -46,7 +46,8 @@ weave_on $HOST1 launch
 weave_on $HOST1 launch-dns 10.254.254.254/24
 
 # Run container with three cidrs
-CID=$(start_container $HOST1 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 --name=multicidr -h $NAME | cut -b 1-12)
+start_container $HOST1 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 --name=multicidr -h $NAME
+CID=$(echo $CONTAINERID | cut -b 1-12)
 assert_container_cidrs $HOST1 $CID 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24
 assert_zone_records $HOST1 $CID $NAME. 10.2.1.1 10.2.2.1 10.2.3.1
 
