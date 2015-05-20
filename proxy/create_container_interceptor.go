@@ -57,29 +57,22 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 }
 
 func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
-	var image *docker.Config
-	if !configHasEntrypoint(container) || !configHasCmd(container) {
-		imageInfo, err := i.client.InspectImage(container.Image)
+	if len(container.Entrypoint) == 0 {
+		image, err := i.client.InspectImage(container.Image)
 		if err != nil {
 			return err
 		}
-		image = imageInfo.Config
+
+		if len(container.Cmd) == 0 {
+			container.Cmd = image.Config.Cmd
+		}
+
+		if container.Entrypoint == nil {
+			container.Entrypoint = image.Config.Entrypoint
+		}
 	}
 
-	var entry, command []string
-	if configHasEntrypoint(container) {
-		entry = container.Entrypoint
-	} else if configHasEntrypoint(image) {
-		entry = image.Entrypoint
-	}
-	if configHasCmd(container) {
-		command = container.Cmd
-	} else if configHasCmd(image) {
-		command = image.Cmd
-	}
-
-	container.Entrypoint = weaveWaitEntrypoint
-	container.Cmd = append(entry, command...)
+	container.Entrypoint = append(weaveWaitEntrypoint, container.Entrypoint...)
 	return nil
 }
 
