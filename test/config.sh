@@ -30,6 +30,7 @@ HOST2=$(echo $HOSTS | cut -f 2 -d ' ')
 SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key -o UserKnownHostsFile=./.ssh_known_hosts -o CheckHostIP=no -o StrictHostKeyChecking=no}
 
 PING="ping -nq -W 1 -c 1"
+CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 
 remote() {
     rem=$1
