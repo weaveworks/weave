@@ -545,7 +545,7 @@ with_container_addresses() {
         else
             ADDRS_CMD="with_container_netns $CONTAINER_ID container_weave_addrs"
         fi
-        if CONTAINER_ADDRS=$($ADDRS_CMD 2>&1) ; then
+        if CONTAINER_ADDRS=$($ADDRS_CMD 2>/dev/null) ; then
             CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | grep -o 'link/ether .*' | cut -d ' ' -f 2)
             CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*'       | cut -d ' ' -f 2)
             $COMMAND "$CONTAINER_ID" "$CONTAINER_MAC" "$CONTAINER_IPS"
