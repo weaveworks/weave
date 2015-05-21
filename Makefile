@@ -1,7 +1,7 @@
 PUBLISH=publish_weave publish_weavedns publish_weaveexec
 
 .DEFAULT: all
-.PHONY: all update tests publish $(PUBLISH) clean prerequisites build travis
+.PHONY: all update tests publish $(PUBLISH) clean prerequisites build travis run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
@@ -104,3 +104,6 @@ build:
 	$(SUDO) go clean -i net
 	$(SUDO) go install -tags netgo std
 	$(MAKE)
+
+run-smoketests: all
+	cd test && ./setup.sh && ./run_all.sh
