@@ -261,7 +261,7 @@ create_bridge() {
         ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
         ip link del dev v${CONTAINER_IFNAME}du
         # Drop traffic from Docker bridge to Weave; it can break subnet isolation
-        add_iptables_rule filter FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP
+        run_iptables -t filter -I FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP
         # Work around the situation where there are no rules allowing traffic
         # across our bridge. E.g. ufw
         add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
