@@ -5,7 +5,7 @@
 start_suite "Proxy allows overridden entrypoint from the container with weavewait"
 weave_on $HOST1 launch-proxy
 docker_on $HOST1 build -t false - <<- EOF
-  FROM gliderlabs/alpine
+  FROM $SMALL_IMAGE
   ENTRYPOINT ["/bin/false"]
 EOF
 

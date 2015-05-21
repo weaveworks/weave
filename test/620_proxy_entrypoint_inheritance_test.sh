@@ -5,7 +5,7 @@
 start_suite "Proxy uses entrypoint from the image with weavewait"
 weave_on $HOST1 launch-proxy
 docker_on $HOST1 build -t inspect-ethwe - <<- EOF
-  FROM gliderlabs/alpine
+  FROM $SMALL_IMAGE
   ENTRYPOINT ["ip", "link", "show", "ethwe"]
 EOF
 

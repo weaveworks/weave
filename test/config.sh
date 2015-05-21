@@ -29,6 +29,8 @@ HOST2=$(echo $HOSTS | cut -f 2 -d ' ')
 
 SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key -o UserKnownHostsFile=./.ssh_known_hosts -o CheckHostIP=no -o StrictHostKeyChecking=no}
 
+SMALL_IMAGE="gliderlabs/alpine"
+DNS_IMAGE="aanand/docker-dnsutils"
 PING="ping -nq -W 1 -c 1"
 CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 
@@ -100,13 +102,13 @@ exec_on() {
 start_container() {
     host=$1
     shift 1
-    weave_on $host run "$@" -t gliderlabs/alpine /bin/sh
+    weave_on $host run "$@" -t $SMALL_IMAGE /bin/sh
 }
 
 start_container_with_dns() {
     host=$1
     shift 1
-    weave_on $host run --with-dns "$@" -t aanand/docker-dnsutils /bin/sh
+    weave_on $host run --with-dns "$@" -t $DNS_IMAGE /bin/sh
 }
 
 container_ip() {
