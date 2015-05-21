@@ -48,7 +48,8 @@ func (cm *ConnectionMaker) Start() {
 	go cm.queryLoop(actionChan)
 }
 
-func (cm *ConnectionMaker) InitiateConnections(peers []string) error {
+func (cm *ConnectionMaker) InitiateConnections(peers []string) []error {
+	errors := []error{}
 	addrs := make(map[string]*net.TCPAddr)
 	for _, peer := range peers {
 		host, port, err := net.SplitHostPort(peer)
@@ -56,11 +57,11 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string) error {
 			host = peer
 			port = "0" // we use that as an indication that "no port was supplied"
 		}
-		addr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port))
-		if err != nil {
-			return err
+		if addr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port)); err != nil {
+			errors = append(errors, err)
+		} else {
+			addrs[peer] = addr
 		}
-		addrs[peer] = addr
 	}
 	cm.actionChan <- func() bool {
 		for peer, addr := range addrs {
@@ -72,7 +73,7 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string) error {
 		}
 		return true
 	}
-	return nil
+	return errors
 }
 
 func (cm *ConnectionMaker) ForgetConnections(peers []string) {

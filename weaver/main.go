@@ -144,8 +144,8 @@ func main() {
 	}
 
 	router.Start()
-	if err := router.ConnectionMaker.InitiateConnections(peers); err != nil {
-		log.Fatal(err)
+	if errors := router.ConnectionMaker.InitiateConnections(peers); len(errors) > 0 {
+		log.Fatal(errorMessages(errors))
 	}
 
 	// The weave script always waits for a status call to succeed,
@@ -156,6 +156,14 @@ func main() {
 	}
 
 	SignalHandlerLoop(router)
+}
+
+func errorMessages(errors []error) string {
+	var result []string
+	for _, err := range errors {
+		result = append(result, err.Error())
+	}
+	return strings.Join(result, "\n")
 }
 
 func options() map[string]string {
@@ -248,8 +256,8 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
 		}
-		if err := router.ConnectionMaker.InitiateConnections(r.Form["peer"]); err != nil {
-			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
+		if errors := router.ConnectionMaker.InitiateConnections(r.Form["peer"]); len(errors) > 0 {
+			http.Error(w, errorMessages(errors), http.StatusBadRequest)
 		}
 	})
 
