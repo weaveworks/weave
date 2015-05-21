@@ -2,7 +2,6 @@ package router
 
 import (
 	"bytes"
-	"code.google.com/p/gopacket/layers"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -10,6 +9,8 @@ import (
 	"net"
 	"syscall"
 	"time"
+
+	"code.google.com/p/gopacket/layers"
 )
 
 const macMaxAge = 10 * time.Minute // [1]
@@ -110,7 +111,7 @@ func (router *Router) Status() string {
 	fmt.Fprintf(&buf, "MACs:\n%s", router.Macs)
 	fmt.Fprintf(&buf, "Peers:\n%s", router.Peers)
 	fmt.Fprintf(&buf, "Routes:\n%s", router.Routes)
-	fmt.Fprintf(&buf, "Reconnects:\n%s", router.ConnectionMaker)
+	fmt.Fprint(&buf, router.ConnectionMaker.Status())
 	return buf.String()
 }
 

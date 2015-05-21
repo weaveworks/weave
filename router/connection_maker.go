@@ -15,12 +15,12 @@ const (
 )
 
 type ConnectionMaker struct {
-	ourself      *LocalPeer
-	peers        *Peers
-	port         int
-	targets      map[string]*Target
-	cmdLinePeers map[string]*net.TCPAddr
-	actionChan   chan<- ConnectionMakerAction
+	ourself     *LocalPeer
+	peers       *Peers
+	port        int
+	targets     map[string]*Target
+	directPeers map[string]*net.TCPAddr
+	actionChan  chan<- ConnectionMakerAction
 }
 
 // Information about an address where we may find a peer
@@ -35,11 +35,11 @@ type ConnectionMakerAction func() bool
 
 func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int) *ConnectionMaker {
 	return &ConnectionMaker{
-		ourself:      ourself,
-		peers:        peers,
-		port:         port,
-		cmdLinePeers: make(map[string]*net.TCPAddr),
-		targets:      make(map[string]*Target)}
+		ourself:     ourself,
+		peers:       peers,
+		port:        port,
+		directPeers: make(map[string]*net.TCPAddr),
+		targets:     make(map[string]*Target)}
 }
 
 func (cm *ConnectionMaker) Start() {
@@ -79,7 +79,7 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string) []error {
 func (cm *ConnectionMaker) ForgetConnections(peers []string) {
 	cm.actionChan <- func() bool {
 		for _, peer := range peers {
-			delete(cm.cmdLinePeers, peer)
+			delete(cm.directPeers, peer)
 		}
 		return false
 	}
@@ -100,7 +100,7 @@ func (cm *ConnectionMaker) Refresh() {
 	cm.actionChan <- func() bool { return true }
 }
 
-func (cm *ConnectionMaker) String() string {
+func (cm *ConnectionMaker) Status() string {
 	// We need to Refresh first in order to clear out any 'attempting'
 	// connections from cm.targets that have been established since
 	// the last run of cm.checkStateAndAttemptConnections. These
@@ -110,6 +110,12 @@ func (cm *ConnectionMaker) String() string {
 	resultChan := make(chan string, 0)
 	cm.actionChan <- func() bool {
 		var buf bytes.Buffer
+		fmt.Fprintln(&buf, "Direct Peers:")
+		for peer := range cm.directPeers {
+			fmt.Fprintln(&buf, peer)
+		}
+
+		fmt.Fprintln(&buf, "Reconnects:")
 		for address, target := range cm.targets {
 			fmt.Fprintf(&buf, "->[%s]", address)
 			if target.lastError != nil {
@@ -144,8 +150,8 @@ func (cm *ConnectionMaker) queryLoop(actionChan <-chan ConnectionMakerAction) {
 
 func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	var (
-		validTarget   = make(map[string]struct{})
-		cmdLineTarget = make(map[string]struct{})
+		validTarget  = make(map[string]struct{})
+		directTarget = make(map[string]struct{})
 	)
 	// Copy the set of things we are connected to, so we can access
 	// them without locking.  Also clear out any entries in cm.targets
@@ -165,8 +171,8 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 		cm.targets[address] = target
 	}
 
-	// Add command-line targets that are not connected
-	for _, addr := range cm.cmdLinePeers {
+	// Add direct targets that are not connected
+	for _, addr := range cm.directPeers {
 		completeAddr := *addr
 		attempt := true
 		if completeAddr.Port == 0 {
@@ -179,7 +185,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 			}
 		}
 		address := completeAddr.String()
-		cmdLineTarget[address] = void
+		directTarget[address] = void
 		if attempt {
 			addTarget(address)
 		}
@@ -189,7 +195,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	// aren't
 	cm.addPeerTargets(ourConnectedPeers, addTarget)
 
-	return cm.connectToTargets(validTarget, cmdLineTarget)
+	return cm.connectToTargets(validTarget, directTarget)
 }
 
 func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}, map[string]struct{}) {
@@ -242,7 +248,7 @@ func (cm *ConnectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarg
 	})
 }
 
-func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, cmdLineTarget map[string]struct{}) time.Duration {
+func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, directTarget map[string]struct{}) time.Duration {
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
@@ -256,7 +262,7 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, cmd
 		switch duration := target.tryAfter.Sub(now); {
 		case duration <= 0:
 			target.attempting = true
-			_, isCmdLineTarget := cmdLineTarget[address]
+			_, isCmdLineTarget := directTarget[address]
 			go cm.attemptConnection(address, isCmdLineTarget)
 		case duration < after:
 			after = duration
