@@ -196,13 +196,14 @@ func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 
 // Async
 func (conn *LocalConnection) Shutdown(err error) {
+	// err should always be a real error, even if only io.EOF
+	if err == nil {
+		panic("nil error")
+	}
+
 	// Run on its own goroutine in case the channel is backed up
 	go func() {
-		if err == nil {
-			conn.sendAction(nil)
-		} else {
-			conn.sendAction(func() error { return err })
-		}
+		conn.sendAction(func() error { return err })
 	}()
 }
 
@@ -379,9 +380,6 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 	for err == nil {
 		select {
 		case action := <-actionChan:
-			if action == nil {
-				break
-			}
 			err = action()
 		case <-conn.heartbeatTCP.C:
 			err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
@@ -398,13 +396,10 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 }
 
 func (conn *LocalConnection) shutdown(err error) {
-	switch {
-	case err != nil && conn.remote == nil:
+	if conn.remote == nil {
 		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
-	case err != nil:
+	} else {
 		conn.Log("connection shutting down due to error:", err)
-	default:
-		conn.Log("connection shutting down")
 	}
 
 	if conn.TCPConn != nil {
