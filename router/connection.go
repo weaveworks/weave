@@ -202,9 +202,7 @@ func (conn *LocalConnection) Shutdown(err error) {
 	}
 
 	// Run on its own goroutine in case the channel is backed up
-	go func() {
-		conn.sendAction(func() error { return err })
-	}()
+	go func() { conn.sendAction(func() error { return err }) }()
 }
 
 // Async
