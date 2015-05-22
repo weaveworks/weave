@@ -24,7 +24,7 @@ check_test_status() {
 # Overwrite assert.sh _assert_cleanup trap with our own
 trap check_test_status EXIT
 
-TESTS=*_test.sh
+TESTS="${@:-*_test.sh}"
 
 # If running on circle, use the scheduler to work out what tests to run
 if [ -n "$CIRCLECI" ]; then
