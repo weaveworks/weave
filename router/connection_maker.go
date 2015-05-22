@@ -25,10 +25,10 @@ type ConnectionMaker struct {
 
 // Information about an address where we may find a peer
 type Target struct {
-	attempting  bool          // are we currently attempting to connect there?
-	lastError   error         // reason for disconnection last time
-	tryAfter    time.Time     // next time to try this address
-	tryInterval time.Duration // backoff time on next failure
+	Attempting  bool          `json:"Attempting,omitempty"`  // are we currently attempting to connect there?
+	LastError   error         `json:"LastError,omitempty"`   // reason for disconnection last time
+	TryAfter    time.Time     `json:"TryAfter,omitempty"`    // next time to try this address
+	TryInterval time.Duration `json:"TryInterval,omitempty"` // backoff time on next failure
 }
 
 type ConnectionMakerAction func() bool
@@ -65,10 +65,10 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string) []error {
 	}
 	cm.actionChan <- func() bool {
 		for peer, addr := range addrs {
-			cm.cmdLinePeers[peer] = addr
+			cm.directPeers[peer] = addr
 			// curtail any existing reconnect interval
 			if target, found := cm.targets[addr.String()]; found {
-				target.tryAfter, target.tryInterval = tryImmediately()
+				target.TryAfter, target.TryInterval = tryImmediately()
 			}
 		}
 		return true
@@ -88,9 +88,9 @@ func (cm *ConnectionMaker) ForgetConnections(peers []string) {
 func (cm *ConnectionMaker) ConnectionTerminated(address string, err error) {
 	cm.actionChan <- func() bool {
 		if target, found := cm.targets[address]; found {
-			target.attempting = false
-			target.lastError = err
-			target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
+			target.Attempting = false
+			target.LastError = err
+			target.TryAfter, target.TryInterval = tryAfter(target.TryInterval)
 		}
 		return true
 	}
@@ -100,37 +100,57 @@ func (cm *ConnectionMaker) Refresh() {
 	cm.actionChan <- func() bool { return true }
 }
 
-func (cm *ConnectionMaker) Status() string {
+func (cm *ConnectionMaker) Status() ConnectionMakerStatus {
 	// We need to Refresh first in order to clear out any 'attempting'
 	// connections from cm.targets that have been established since
 	// the last run of cm.checkStateAndAttemptConnections. These
 	// entries are harmless but do represent stale state that we do
 	// not want to report.
 	cm.Refresh()
-	resultChan := make(chan string, 0)
+	resultChan := make(chan ConnectionMakerStatus, 0)
 	cm.actionChan <- func() bool {
-		var buf bytes.Buffer
-		fmt.Fprintln(&buf, "Direct Peers:")
+		status := ConnectionMakerStatus{
+			DirectPeers: []string{},
+			Reconnects:  make(map[string]Target),
+		}
 		for peer := range cm.directPeers {
-			fmt.Fprintln(&buf, peer)
+			status.DirectPeers = append(status.DirectPeers, peer)
 		}
 
-		fmt.Fprintln(&buf, "Reconnects:")
 		for address, target := range cm.targets {
-			fmt.Fprintf(&buf, "->[%s]", address)
-			if target.lastError != nil {
-				fmt.Fprintf(&buf, " (%s)", target.lastError)
-			}
-			if target.attempting {
-				fmt.Fprintf(&buf, " trying since %v\n", target.tryAfter)
-			} else {
-				fmt.Fprintf(&buf, " next try at %v\n", target.tryAfter)
-			}
+			status.Reconnects[address] = *target
 		}
-		resultChan <- buf.String()
+		resultChan <- status
 		return false
 	}
 	return <-resultChan
+}
+
+type ConnectionMakerStatus struct {
+	DirectPeers []string
+	Reconnects  map[string]Target
+}
+
+func (status ConnectionMakerStatus) String() string {
+	var buf bytes.Buffer
+	fmt.Fprintln(&buf, "Direct Peers:")
+	for _, peer := range status.DirectPeers {
+		fmt.Fprintln(&buf, peer)
+	}
+
+	fmt.Fprintln(&buf, "Reconnects:")
+	for address, target := range status.Reconnects {
+		fmt.Fprintf(&buf, "->[%s]", address)
+		if target.LastError != nil {
+			fmt.Fprintf(&buf, " (%s)", target.LastError)
+		}
+		if target.Attempting {
+			fmt.Fprintf(&buf, " trying since %v\n", target.TryAfter)
+		} else {
+			fmt.Fprintf(&buf, " next try at %v\n", target.TryAfter)
+		}
+	}
+	return buf.String()
 }
 
 func (cm *ConnectionMaker) queryLoop(actionChan <-chan ConnectionMakerAction) {
@@ -167,7 +187,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 			return
 		}
 		target := &Target{}
-		target.tryAfter, target.tryInterval = tryImmediately()
+		target.TryAfter, target.TryInterval = tryImmediately()
 		cm.targets[address] = target
 	}
 
@@ -252,16 +272,16 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if target.attempting {
+		if target.Attempting {
 			continue
 		}
 		if _, valid := validTarget[address]; !valid {
 			delete(cm.targets, address)
 			continue
 		}
-		switch duration := target.tryAfter.Sub(now); {
+		switch duration := target.TryAfter.Sub(now); {
 		case duration <= 0:
-			target.attempting = true
+			target.Attempting = true
 			_, isCmdLineTarget := directTarget[address]
 			go cm.attemptConnection(address, isCmdLineTarget)
 		case duration < after:
