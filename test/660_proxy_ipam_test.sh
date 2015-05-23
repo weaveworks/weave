@@ -12,7 +12,7 @@ weave_on $HOST2 launch -iprange $UNIVERSE $HOST1
 weave_on $HOST2 launch-proxy --with-ipam
 
 proxy docker_on $HOST1 run -e WEAVE_CIDR= --name=c1 -dt $SMALL_IMAGE /bin/sh
-proxy docker_on $HOST2 run --name=c2 -dt $SMALL_IMAGE /bin/sh
+proxy docker_on $HOST2 run                --name=c2 -dt $SMALL_IMAGE /bin/sh
 
 C1=$(container_ip $HOST1 c1)
 C2=$(container_ip $HOST2 c2)
