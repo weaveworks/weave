@@ -61,7 +61,7 @@ To automatically assign a unique IP address to a container, weave must be told o
     host1$ weave launch-proxy
     host1$ export DOCKER_HOST=tcp://host1:12375
 
-With this done, we can automtaically assign an address to a container by providing a blank `WEAVE_CIDR` value, as in
+With this done, we can automatically assign an address to a container by providing a blank `WEAVE_CIDR` value, as in
 
     host1$ docker run -e WEAVE_CIDR= -ti ubuntu /bin/sh
 
