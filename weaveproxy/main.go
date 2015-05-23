@@ -16,12 +16,13 @@ var (
 
 func main() {
 	var target, listen string
-	var withDNS, debug bool
+	var withDNS, withIPAM, debug bool
 
 	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
 	getopt.StringVar(&target, 'H', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultTarget))
 	getopt.StringVar(&listen, 'L', fmt.Sprintf("address on which to listen (default %s)", defaultListen))
 	getopt.BoolVarLong(&withDNS, "with-dns", 'w', "instruct created containers to use weaveDNS as their nameserver")
+	getopt.BoolVarLong(&withIPAM, "with-ipam", 'i', "automatically allocate addresses for containers without a WEAVE_CIDR")
 	getopt.Parse()
 
 	if target == "" {
@@ -36,7 +37,7 @@ func main() {
 		InitDefaultLogging(true)
 	}
 
-	p, err := proxy.NewProxy(target, withDNS)
+	p, err := proxy.NewProxy(target, withDNS, withIPAM)
 	if err != nil {
 		Error.Fatalf("Could not start proxy: %s", err)
 	}

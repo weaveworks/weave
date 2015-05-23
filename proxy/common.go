@@ -31,8 +31,7 @@ func callWeave(args ...string) ([]byte, error) {
 func weaveCIDRsFromConfig(config *docker.Config) ([]string, bool) {
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
-			result := strings.Trim(e[11:], " ")
-			return strings.Split(strings.TrimSpace(result), " "), result != ""
+			return strings.Fields(e[11:]), true
 		}
 	}
 	return nil, false

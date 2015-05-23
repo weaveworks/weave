@@ -22,9 +22,10 @@ type Proxy struct {
 	client         *docker.Client
 	withDNS        bool
 	dockerBridgeIP string
+	withIPAM       bool
 }
 
-func NewProxy(targetURL string, withDNS bool) (*Proxy, error) {
+func NewProxy(targetURL string, withDNS, withIPAM bool) (*Proxy, error) {
 	u, err := url.Parse(targetURL)
 	if err != nil {
 		return nil, err
@@ -58,6 +59,7 @@ func NewProxy(targetURL string, withDNS bool) (*Proxy, error) {
 		client:         client,
 		withDNS:        withDNS,
 		dockerBridgeIP: string(dockerBridgeIP),
+		withIPAM:       withIPAM,
 	}, nil
 }
 
@@ -68,7 +70,7 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case containerCreateRegexp.MatchString(path):
 		proxy.serveWithInterceptor(&createContainerInterceptor{proxy.client, proxy.withDNS, proxy.dockerBridgeIP}, w, r)
 	case containerStartRegexp.MatchString(path):
-		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.withDNS}, w, r)
+		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.withDNS, proxy.withIPAM}, w, r)
 	case execCreateRegexp.MatchString(path):
 		proxy.serveWithInterceptor(&createExecInterceptor{proxy.client}, w, r)
 	case strings.HasPrefix(path, "/weave"):
