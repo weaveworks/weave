@@ -3,13 +3,17 @@ title: Weave Proxy
 layout: default
 ---
 
-# <a name="weave-proxy"></a>Weave Proxy
+# Proxy
 
-Instead of the weave command-line utility, you may prefer to use the
-standard docker command-line utility to manage containers. This will
-allow containers to be started in foreground mode. It will also ensure
-that the weave network interface is available before running your
-container.
+The weave proxy automatically attaches containers to the weave network
+that have been started using the ordinary Docker command-line
+interface or Docker remote API.
+
+Using the proxy brings some additional benefits over `weave run`. The
+proxy ensures that the weave network interface is available before
+starting a container's application process. Furthermore, containers
+can be started in foreground mode, and can be automatically removed
+(with the ususal `--rm`).
 
 ## Setup
 
