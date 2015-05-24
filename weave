@@ -1016,7 +1016,7 @@ case "$COMMAND" in
                 http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT DELETE /name/weave:expose/${CIDR%/*} 2>/dev/null || true
             fi
         done
-        http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/weave:expose 2>/dev/null || true
+        [ $CIDR_COUNT -eq 0 ] && http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/weave:expose 2>/dev/null || true
         ;;
     stop)
         [ $# -eq 0 ] || usage
