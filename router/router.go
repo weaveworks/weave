@@ -27,7 +27,7 @@ const (
 // against brute-force attacks on the password when encryption is in
 // use. It is also a basic DoS defence.
 
-type LogFrameFunc func(string, []byte, *layers.Ethernet)
+type LogFrameFunc func(string, []byte, *EthernetDecoder)
 
 type Config struct {
 	Port          int
@@ -151,7 +151,7 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	if decodedLen == 0 {
 		return
 	}
-	srcMac := dec.eth.SrcMAC
+	srcMac := dec.Eth.SrcMAC
 	srcPeer, found := router.Macs.Lookup(srcMac)
 	// We need to filter out frames we injected ourselves. For such
 	// frames, the srcMAC will have been recorded as associated with a
@@ -165,16 +165,16 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	if dec.DropFrame() {
 		return
 	}
-	dstMac := dec.eth.DstMAC
+	dstMac := dec.Eth.DstMAC
 	dstPeer, found := router.Macs.Lookup(dstMac)
 	if found && dstPeer == router.Ourself.Peer {
 		return
 	}
-	df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
+	df := decodedLen == 2 && (dec.IP.Flags&layers.IPv4DontFragment != 0)
 	if df {
-		router.LogFrame("Forwarding DF", frameData, &dec.eth)
+		router.LogFrame("Forwarding DF", frameData, dec)
 	} else {
-		router.LogFrame("Forwarding", frameData, &dec.eth)
+		router.LogFrame("Forwarding", frameData, dec)
 	}
 	// at this point we are handing over the frame to forwarders, so
 	// we need to make a copy of it in order to prevent the next
@@ -316,14 +316,14 @@ func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *Ether
 			return
 		}
 
-		df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
+		df := decodedLen == 2 && (dec.IP.Flags&layers.IPv4DontFragment != 0)
 
 		if dstPeer != router.Ourself.Peer {
 			// it's not for us, we're just relaying it
 			if df {
-				router.LogFrame("Relaying DF", frame, &dec.eth)
+				router.LogFrame("Relaying DF", frame, dec)
 			} else {
-				router.LogFrame("Relaying", frame, &dec.eth)
+				router.LogFrame("Relaying", frame, dec)
 			}
 
 			err := router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec)
@@ -337,20 +337,20 @@ func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *Ether
 			return
 		}
 
-		srcMac := dec.eth.SrcMAC
-		dstMac := dec.eth.DstMAC
+		srcMac := dec.Eth.SrcMAC
+		dstMac := dec.Eth.DstMAC
 
 		if router.Macs.Enter(srcMac, srcPeer) {
 			log.Println("Discovered remote MAC", srcMac, "at", srcPeer)
 		}
 		if po != nil {
-			router.LogFrame("Injecting", frame, &dec.eth)
+			router.LogFrame("Injecting", frame, dec)
 			checkWarn(po.WritePacket(frame))
 		}
 
 		dstPeer, found = router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
-			router.LogFrame("Relaying broadcast", frame, &dec.eth)
+			router.LogFrame("Relaying broadcast", frame, dec)
 			router.Ourself.RelayBroadcast(srcPeer, df, frame, dec)
 		}
 	}

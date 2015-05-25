@@ -105,11 +105,11 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		forwarderDF.Forward(frame)
 		return nil
 	}
-	conn.Router.LogFrame("Fragmenting", frame.frame, &dec.eth)
+	conn.Router.LogFrame("Fragmenting", frame.frame, dec)
 	// We can't trust the stack to fragment, we have IP, and we
 	// have a frame that's too big for the MTU, so we have to
 	// fragment it ourself.
-	return fragment(dec.eth, dec.ip, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
+	return fragment(dec.Eth, dec.IP, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
 		forwarderDF.Forward(segFrame)
 	})
 }
