@@ -1,7 +1,6 @@
 package main
 
 import (
-	"code.google.com/p/gopacket/layers"
 	"crypto/sha256"
 	"flag"
 	"fmt"
@@ -169,14 +168,14 @@ func options() map[string]string {
 
 func logFrameFunc(debug bool) weave.LogFrameFunc {
 	if !debug {
-		return func(prefix string, frame []byte, eth *layers.Ethernet) {}
+		return func(prefix string, frame []byte, dec *weave.EthernetDecoder) {}
 	}
-	return func(prefix string, frame []byte, eth *layers.Ethernet) {
+	return func(prefix string, frame []byte, dec *weave.EthernetDecoder) {
 		h := fmt.Sprintf("%x", sha256.Sum256(frame))
-		if eth == nil {
+		if dec == nil {
 			log.Println(prefix, len(frame), "bytes (", h, ")")
 		} else {
-			log.Println(prefix, len(frame), "bytes (", h, "):", eth.SrcMAC, "->", eth.DstMAC)
+			log.Println(prefix, len(frame), "bytes (", h, "):", dec.Eth.SrcMAC, "->", dec.Eth.DstMAC)
 		}
 	}
 }
