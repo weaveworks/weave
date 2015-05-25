@@ -172,11 +172,17 @@ func logFrameFunc(debug bool) weave.LogFrameFunc {
 	}
 	return func(prefix string, frame []byte, dec *weave.EthernetDecoder) {
 		h := fmt.Sprintf("%x", sha256.Sum256(frame))
-		if dec == nil {
-			log.Println(prefix, len(frame), "bytes (", h, ")")
-		} else {
-			log.Println(prefix, len(frame), "bytes (", h, "):", dec.Eth.SrcMAC, "->", dec.Eth.DstMAC)
+		parts := []interface{}{prefix, len(frame), "bytes (", h, ")"}
+
+		if dec != nil {
+			parts = append(parts, dec.Eth.SrcMAC, "->", dec.Eth.DstMAC)
+
+			if dec.DF() {
+				parts = append(parts, "(DF)")
+			}
 		}
+
+		log.Println(parts...)
 	}
 }
 
