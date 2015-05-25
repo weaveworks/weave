@@ -28,15 +28,15 @@ func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
 	return peer
 }
 
-func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
-	return peer.Relay(peer.Peer, dstPeer, df, frame, dec)
+func (peer *LocalPeer) Forward(dstPeer *Peer, frame []byte, dec *EthernetDecoder) error {
+	return peer.Relay(peer.Peer, dstPeer, frame, dec)
 }
 
-func (peer *LocalPeer) Broadcast(df bool, frame []byte, dec *EthernetDecoder) {
-	peer.RelayBroadcast(peer.Peer, df, frame, dec)
+func (peer *LocalPeer) Broadcast(frame []byte, dec *EthernetDecoder) {
+	peer.RelayBroadcast(peer.Peer, frame, dec)
 }
 
-func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
+func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, frame []byte, dec *EthernetDecoder) error {
 	relayPeerName, found := peer.router.Routes.Unicast(dstPeer.Name)
 	if !found {
 		// Not necessarily an error as there could be a race with the
@@ -50,20 +50,20 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec 
 		log.Println("Unable to find connection to relay peer", relayPeerName)
 		return nil
 	}
-	return conn.(*LocalConnection).Forward(df, &ForwardedFrame{
+	return conn.(*LocalConnection).Forward(false, &ForwardedFrame{
 		srcPeer: srcPeer,
 		dstPeer: dstPeer,
 		frame:   frame},
 		dec)
 }
 
-func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) {
+func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, frame []byte, dec *EthernetDecoder) {
 	nextHops := peer.router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
 		return
 	}
 	for _, conn := range peer.ConnectionsTo(nextHops) {
-		err := conn.(*LocalConnection).Forward(df, &ForwardedFrame{
+		err := conn.(*LocalConnection).Forward(false, &ForwardedFrame{
 			srcPeer: srcPeer,
 			dstPeer: conn.Remote(),
 			frame:   frame},
