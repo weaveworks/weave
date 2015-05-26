@@ -2,8 +2,6 @@ package nameserver
 
 import (
 	"github.com/miekg/dns"
-	"math/rand"
-	"time"
 )
 
 const (
@@ -34,8 +32,6 @@ func makeTruncatedReply(r *dns.Msg) *dns.Msg {
 	reply.Truncated = true
 	return reply
 }
-
-type DNSResponseBuilder func(r *dns.Msg, q *dns.Question, addrs []ZoneRecord) *dns.Msg
 
 func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []ZoneRecord) *dns.Msg {
 	answers := make([]dns.RR, len(addrs))
@@ -87,29 +83,4 @@ func getMaxReplyLen(r *dns.Msg, proto dnsProtocol) int {
 		maxLen = int(opt.UDPSize())
 	}
 	return maxLen
-}
-
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
-}
-
-// shuffleAnswers reorders answers for very basic load balancing
-func shuffleAnswers(answers []dns.RR) []dns.RR {
-	if len(answers) > 1 {
-		for i := range answers {
-			j := rand.Intn(i + 1)
-			answers[i], answers[j] = answers[j], answers[i]
-		}
-	}
-
-	return answers
-}
-
-// only take the first `num` answers
-func pruneAnswers(answers []dns.RR, num int) []dns.RR {
-	if num > 0 && len(answers) > num {
-		// TODO: we should have some prefer locally-introduced answers, etc...
-		return answers[:num]
-	}
-	return answers
 }
