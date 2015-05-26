@@ -6,7 +6,10 @@ layout: default
 # Proxy
 
 Instead of the `weave` command-line utility, you may prefer to use the
-standard Docker command-line interface, or the Docker remote API. The
+standard [Docker command-line
+interface](https://docs.docker.com/reference/commandline/cli/), or the
+[Docker remote
+API](https://docs.docker.com/reference/api/docker_remote_api/). The
 weave proxy sits between the `docker` command or API and the Docker
 daemon, so that it can automatically attach containers to the weave
 network.
