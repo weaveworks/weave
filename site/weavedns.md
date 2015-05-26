@@ -84,18 +84,25 @@ use the environment variable `DOCKER_BRIDGE`, e.g.,
 $ sudo DOCKER_BRIDGE=someother weave launch-dns 10.2.254.1/24
 ```
 
+In the event that weaveDNS is launched in this way, it's important that
+other calls to `weave` also specify the bridge device:
+
+```bash
+$ sudo DOCKER_BRIDGE=someother weave run --with-dns ...
+```
+
 ## <a name="add-remove"></a>Adding and removing extra DNS entries
 
 If you want to give the container a name in DNS *other* than its
 hostname, you can register it using the `dns-add` command. For example:
 
 ```bash
-$ docker start $shell2
-$ weave dns-add 10.2.1.27 $shell2 -h shell2.example.org
+$ shell2=(weave run 10.2.1.27/24 -ti ubuntu)
+$ weave dns-add 10.2.1.28 $shell2 -h pingme2.weave.local
 ```
 
-If no FQDN is specified, it is derived from the container's configured
-hostname and domain.
+You can also use `dns-add` to add the container's configured hostname
+and domain, simply by omitting `-h <fqdn>`.
 
 The inverse operation can be carried out using the `dns-remove` command:
 
