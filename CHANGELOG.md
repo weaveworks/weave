@@ -1,3 +1,23 @@
+## Release 0.11.0
+
+**Highlights**:
+
+- **automatic IP Address Management (IPAM)**, which allows application
+  containers to be started and attached to the weave network without
+  needing to supply an IP address.
+- **proxy** for automatically attaching containers started with
+  ordinary `docker run`, or the Docker remote API, to the weave
+  network.
+- ability to **add/remove extra DNS records**.
+- performance and scalability improvements
+- fixes for a small number of bugs discovered during testing
+
+More detail in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A0.11.0)
+
+*NB: This release changes the weave protocol version. Therefore, when
+upgrading an existing installation, all hosts need to be upgraded in
+order to for them to be able to communicate and form a network.*
+
 ## Release 0.10.0
 
 **Highlights**:
