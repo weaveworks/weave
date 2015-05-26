@@ -5,9 +5,11 @@ layout: default
 
 # Proxy
 
-The weave proxy automatically attaches containers to the weave network
-that have been started using the ordinary Docker command-line
-interface or Docker remote API.
+Instead of the `weave` command-line utility, you may prefer to use the
+standard Docker command-line interface, or the Docker remote API. The
+weave proxy sits between the `docker` command or API and the Docker
+daemon, so that it can automatically attach containers to the weave
+network.
 
 Using the proxy brings some additional benefits over `weave run`. The
 proxy ensures that the weave network interface is available before
@@ -17,8 +19,7 @@ can be started in foreground mode, and can be automatically removed
 
 ## Setup
 
-To do this, while still connecting containers to the weave network,
-you can use the weave proxy. We can start the proxy with
+Start the proxy with
 
     host1$ weave launch-proxy
 

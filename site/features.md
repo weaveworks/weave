@@ -408,7 +408,7 @@ out more about WeaveDNS from its [documentation](weavedns.html).
 
 ### <a name="proxy"></a>Starting containers with Docker
 
-Instead of the weave command-line utility, you may prefer to use the
+Instead of the `weave` command-line utility, you may prefer to use the
 standard Docker command-line interface, or the Docker remote API, for
 starting weave-enabled containers. This can be accomplished with the
 [Weave Proxy](proxy.html).
