@@ -3,51 +3,37 @@ package nameserver
 import (
 	"bytes"
 	"fmt"
-	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	"net"
-	"strconv"
 	"sync"
-	"time"
 )
 
 const (
-	DefaultServerPort = 53                 // The default server port
-	DefaultCLICfgFile = "/etc/resolv.conf" // default "resolv.conf" file to try to load
-	DefaultUDPBuflen  = 4096               // bigger than the default 512
-	DefaultCacheLen   = 8192               // default cache capacity
-	DefaultTimeout    = 5                  // default timeout for DNS resolutions
-	DefaultMaxAnswers = 1                  // default number of answers provided to users
+	DefaultLocalDomain   = "weave.local."     // The default name used for the local domain
+	DefaultServerPort    = 53                 // The default server port
+	DefaultCLICfgFile    = "/etc/resolv.conf" // default "resolv.conf" file to try to load
+	DefaultUDPBuflen     = 4096               // bigger than the default 512
+	DefaultCacheLen      = 8192               // default cache capacity
+	DefaultResolvWorkers = 8                  // default number of resolution workers
+	DefaultTimeout       = 5                  // default timeout for DNS resolutions
 )
 
 type DNSServerConfig struct {
-	// The zone
-	Zone Zone
 	// (Optional) client config file for resolving upstream servers
 	UpstreamCfgFile string
 	// (Optional) DNS client config for the fallback server(s)
 	UpstreamCfg *dns.ClientConfig
 	// (Optional) port number (for TCP and UDP)
 	Port int
+	// (Optional) local domain (ie, "weave.local.")
+	LocalDomain string
 	// (Optional) cache size
 	CacheLen int
-	// (Optional) disable the cache
-	CacheDisabled bool
 	// (Optional) timeout for DNS queries
 	Timeout int
 	// (Optional) UDP buffer length
 	UDPBufLen int
-	// (Optional) force a specific cache
-	Cache ZoneCache
-	// (Optional) TTL for negative results in the local domain
-	CacheNegLocalTTL int
-	// (Optional) for a specific clock provider
-	Clock clock.Clock
-	// (Optional) Listening socket read timeout (in milliseconds)
-	ListenReadTimeout int
-	// Maximum number of answers provided to users
-	MaxAnswers int
 }
 
 type dnsProtocol uint8
@@ -68,66 +54,51 @@ func (proto dnsProtocol) String() string {
 }
 
 // get a new dns.Client for a protocol
-func (proto dnsProtocol) GetNewClient(bufsize int, timeout time.Duration) *dns.Client {
+func (proto dnsProtocol) GetNewClient(bufsize int) *dns.Client {
 	switch proto {
 	case protTCP:
-		return &dns.Client{Net: "tcp", ReadTimeout: timeout}
+		return &dns.Client{Net: "tcp"}
 	case protUDP:
-		return &dns.Client{Net: "udp", ReadTimeout: timeout, UDPSize: uint16(bufsize)}
+		return &dns.Client{Net: "udp", UDPSize: uint16(bufsize)}
 	}
 	return nil
 }
 
-// a DNS server
 type DNSServer struct {
-	Zone       Zone
-	Upstream   *dns.ClientConfig
+	Zone        Zone
+	Iface       *net.Interface
+	Upstream    *dns.ClientConfig
+	udpSrv      *dns.Server
+	tcpSrv      *dns.Server
+	mdnsCli     *MDNSClient
+	mdnsSrv     *MDNSServer
+	cache       *Cache
+	timeout     int
+	udpBuf      int
+	listenersWg *sync.WaitGroup
+
 	Domain     string // the local domain
 	ListenAddr string // the address the server is listening at
-
-	udpSrv        *dns.Server
-	tcpSrv        *dns.Server
-	pc            net.PacketConn
-	lst           net.Listener
-	cache         ZoneCache
-	cacheDisabled bool
-	maxAnswers    int
-	negLocalTTL   int
-	timeout       time.Duration
-	readTimeout   time.Duration
-	udpBuf        int
-	listenersWg   *sync.WaitGroup
-	clock         clock.Clock
 }
 
 // Creates a new DNS server
-func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
+func NewDNSServer(config DNSServerConfig, zone Zone, iface *net.Interface) (s *DNSServer, err error) {
 	s = &DNSServer{
-		Zone:       config.Zone,
+		Zone:        zone,
+		Iface:       iface,
+		listenersWg: new(sync.WaitGroup),
+
 		Domain:     DefaultLocalDomain,
-		ListenAddr: fmt.Sprintf(":%d", config.Port),
-
-		listenersWg:   new(sync.WaitGroup),
-		timeout:       time.Duration(config.Timeout) * time.Millisecond,
-		readTimeout:   time.Duration(config.ListenReadTimeout) * time.Millisecond,
-		cacheDisabled: false,
-		maxAnswers:    DefaultMaxAnswers,
-		negLocalTTL:   negLocalTTL,
-		clock:         config.Clock,
-	}
-
-	// check some basic parameters are valid
-	if s.Zone == nil {
-		return nil, fmt.Errorf("No valid Zone provided in server initialization")
-	}
-	if len(s.Domain) == 0 {
-		return nil, fmt.Errorf("No valid Domain provided in server initialization")
-	}
-	if s.clock == nil {
-		s.clock = clock.New()
+		ListenAddr: fmt.Sprintf(":%d", DefaultServerPort),
 	}
 
 	// fill empty parameters with defaults...
+	if config.Port != 0 {
+		s.ListenAddr = fmt.Sprintf(":%d", config.Port)
+	}
+	if len(config.LocalDomain) > 0 {
+		s.Domain = config.LocalDomain
+	}
 	if config.UpstreamCfg != nil {
 		s.Upstream = config.UpstreamCfg
 	} else {
@@ -140,226 +111,207 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 		}
 	}
 	if config.Timeout > 0 {
-		s.timeout = time.Duration(config.Timeout) * time.Millisecond
+		s.timeout = config.Timeout
 	}
 	if config.UDPBufLen > 0 {
 		s.udpBuf = config.UDPBufLen
 	}
-	if config.MaxAnswers > 0 {
-		s.maxAnswers = config.MaxAnswers
+	s.mdnsCli, err = NewMDNSClient()
+	if err != nil {
+		return
 	}
-	if config.CacheNegLocalTTL > 0 {
-		s.negLocalTTL = config.CacheNegLocalTTL
+	s.mdnsSrv, err = NewMDNSServer(s.Zone)
+	if err != nil {
+		return
 	}
-	if config.CacheDisabled {
-		s.cacheDisabled = true
+	cacheLen := DefaultCacheLen
+	if config.CacheLen > 0 {
+		cacheLen = config.CacheLen
 	}
-	if !s.cacheDisabled {
-		if config.Cache != nil {
-			s.cache = config.Cache
-		} else {
-			cacheLen := DefaultCacheLen
-			if config.CacheLen > 0 {
-				cacheLen = config.CacheLen
-			}
-			if s.cache, err = NewCache(cacheLen, s.clock); err != nil {
-				return
-			}
-		}
+	Debug.Printf("[dns] Initializing cache: %d entries", config.CacheLen)
+	s.cache, err = NewCache(cacheLen, nil)
+	if err != nil {
+		return
 	}
+
+	// create two DNS request multiplexerers, depending on the protocol used by clients
+	// (we use the same protocol for asking upstream servers)
+	mux := func(proto dnsProtocol) *dns.ServeMux {
+		m := dns.NewServeMux()
+		m.HandleFunc(s.Domain, s.queryHandler(proto))
+		m.HandleFunc(RDNSDomain, s.rdnsHandler(proto))
+		m.HandleFunc(".", s.notUsHandler(proto))
+		return m
+	}
+
+	s.udpSrv = &dns.Server{Addr: s.ListenAddr, Net: "udp", Handler: mux(protUDP)}
+	s.tcpSrv = &dns.Server{Addr: s.ListenAddr, Net: "tcp", Handler: mux(protTCP)}
 
 	return
 }
 
 // Start the DNS server
 func (s *DNSServer) Start() error {
-	Info.Printf("[dns] Upstream server(s): %+v", s.Upstream)
-	if s.cacheDisabled {
-		Info.Printf("[dns] Cache: disabled")
-	} else {
-		Info.Printf("[dns] Cache: %d entries", s.cache.Capacity())
-	}
-
-	pc, err := net.ListenPacket("udp", s.ListenAddr)
-	if err != nil {
-		return err
-	}
-	s.pc = pc
-
-	_, port, err := net.SplitHostPort(pc.LocalAddr().String())
-	if err != nil {
-		return err
-	}
-	s.ListenAddr = fmt.Sprintf(":%s", port)
-	s.udpSrv = &dns.Server{PacketConn: s.pc, Handler: s.createMux(protUDP), ReadTimeout: s.readTimeout}
-
-	// Bind the TCP socket at the same port, aborting otherwise
-	l, err := net.Listen("tcp", s.ListenAddr)
-	if err != nil {
-		s.Stop()
-		return err
-	}
-	s.lst = l
-	s.tcpSrv = &dns.Server{Listener: l, Handler: s.createMux(protTCP), ReadTimeout: s.readTimeout}
+	Info.Printf("Using mDNS on %v", s.Iface)
+	err := s.mdnsCli.Start(s.Iface)
+	CheckFatal(err)
+	err = s.mdnsSrv.Start(s.Iface)
+	CheckFatal(err)
 
 	s.listenersWg.Add(2)
 
 	go func() {
 		defer s.listenersWg.Done()
 
-		Info.Printf("[dns] Listening for DNS on %s (UDP)", s.ListenAddr)
-		err := s.udpSrv.ActivateAndServe()
+		Debug.Printf("Listening for DNS on %s (UDP)", s.ListenAddr)
+		err = s.udpSrv.ListenAndServe()
 		CheckFatal(err)
-		Debug.Printf("[dns] DNS UDP server exiting...")
+		Debug.Printf("DNS UDP server exiting...")
 	}()
 
 	go func() {
 		defer s.listenersWg.Done()
 
-		Info.Printf("[dns] Listening for DNS on %s (TCP)", s.ListenAddr)
-		err := s.tcpSrv.ActivateAndServe()
+		Debug.Printf("Listening for DNS on %s (TCP)", s.ListenAddr)
+		err = s.tcpSrv.ListenAndServe()
 		CheckFatal(err)
-		Debug.Printf("[dns] DNS TCP server exiting...")
+		Debug.Printf("DNS TCP server exiting...")
 	}()
 
 	// Waiting for all goroutines to finish (otherwise they die as main routine dies)
 	s.listenersWg.Wait()
 
-	Info.Printf("[dns] Server exiting...")
+	Info.Printf("WeaveDNS server exiting...")
 	return nil
 }
 
 // Return status string
 func (s *DNSServer) Status() string {
 	var buf bytes.Buffer
+	fmt.Fprintln(&buf, "Local domain", s.Domain)
 	fmt.Fprintln(&buf, "Listen address", s.ListenAddr)
+	fmt.Fprintln(&buf, "mDNS interface", s.Iface)
 	fmt.Fprintln(&buf, "Fallback DNS config", s.Upstream)
+	fmt.Fprintf(&buf, "Zone database:\n%s", s.Zone)
 	return buf.String()
 }
 
 // Perform a graceful shutdown
 func (s *DNSServer) Stop() error {
 	// Stop the listeners/handlers
-	if s.tcpSrv != nil {
-		if err := s.tcpSrv.Shutdown(); err != nil {
-			return err
-		}
-		s.lst.Close()
-		s.tcpSrv = nil
+	if err := s.tcpSrv.Shutdown(); err != nil {
+		return err
 	}
-	if s.udpSrv != nil {
-		if err := s.udpSrv.Shutdown(); err != nil {
-			return err
-		}
-		s.pc.Close()
-		s.udpSrv = nil
+	if err := s.udpSrv.Shutdown(); err != nil {
+		return err
 	}
 	s.listenersWg.Wait()
+
+	// shutdown the mDNS server
+	s.mdnsSrv.Stop()
+
 	return nil
 }
 
-// Create a multiplexer for requests
-// We must create two DNS request multiplexers, depending on the protocol used by
-// clients (as we use the same protocol for asking upstream servers)
-func (s *DNSServer) createMux(proto dnsProtocol) *dns.ServeMux {
-	failFallback := func(w dns.ResponseWriter, r *dns.Msg) {
+func (s *DNSServer) queryHandler(proto dnsProtocol) dns.HandlerFunc {
+	zoneLookup := func(lookup ZoneLookup, q *dns.Question, r *dns.Msg) (*dns.Msg, []ZoneRecord, error) {
+		ips, err := lookup.LookupName(q.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		return makeAddressReply(r, q, ips), ips, nil
+	}
+
+	fallback := func(w dns.ResponseWriter, r *dns.Msg) {
 		w.WriteMsg(makeDNSFailResponse(r))
 	}
+
+	return s.commonQueryHandler(proto, "Query", dns.TypeA, zoneLookup, fallback)
+}
+
+func (s *DNSServer) rdnsHandler(proto dnsProtocol) dns.HandlerFunc {
+	zoneLookup := func(lookup ZoneLookup, q *dns.Question, r *dns.Msg) (*dns.Msg, []ZoneRecord, error) {
+		names, err := lookup.LookupInaddr(q.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		return makePTRReply(r, q, names), names, nil
+	}
+
 	notUsHandler := s.notUsHandler(proto)
-	notUsFallback := func(w dns.ResponseWriter, r *dns.Msg) {
+	fallback := func(w dns.ResponseWriter, r *dns.Msg) {
 		Info.Printf("[dns msgid %d] -> sending to fallback server", r.MsgHdr.Id)
 		notUsHandler(w, r)
 	}
 
-	// create the multiplexer
-	m := dns.NewServeMux()
-	m.HandleFunc(s.Zone.Domain(), s.localHandler(proto, "Query", dns.TypeA,
-		s.Zone.DomainLookupName, makeAddressReply, s.Zone.ObserveName, failFallback))
-	m.HandleFunc(RDNSDomain, s.localHandler(proto, "Reverse query", dns.TypePTR,
-		s.Zone.DomainLookupInaddr, makePTRReply, s.Zone.ObserveInaddr, notUsFallback))
-	m.HandleFunc(".", s.notUsHandler(proto))
-	return m
+	return s.commonQueryHandler(proto, "Reverse query", dns.TypePTR, zoneLookup, fallback)
 }
 
-// Process a request for a name/address in the '.weave.local.' zone
-func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
-	lookup func(inaddr string) ([]ZoneRecord, error),
-	msgBuilder DNSResponseBuilder, observer ZoneObserverFunc, fallback dns.HandlerFunc) dns.HandlerFunc {
+func (s *DNSServer) commonQueryHandler(proto dnsProtocol, kind string, qtype uint16,
+	zoneLookup func(ZoneLookup, *dns.Question, *dns.Msg) (*dns.Msg, []ZoneRecord, error), fallback dns.HandlerFunc) dns.HandlerFunc {
 
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
 		Debug.Printf("[dns msgid %d] %s: %+v", r.MsgHdr.Id, kind, q)
 		maxLen := getMaxReplyLen(r, proto)
+		lookups := []ZoneLookup{s.Zone, s.mdnsCli}
 
-		// cache a response if the cache is enabled, and observe the name/IP
-		maybeCache := func(m *dns.Msg, ttl int, flags uint8) {
-			if !s.cacheDisabled {
-				s.cache.Put(r, m, ttl, flags)
-				// any change in the Zone database for this IP/name will lead to this
-				// cache entry being removed...
-				// TODO: this closure results in unnecessary `Remove`s and some wasted
-				// mem... but we can live with that.
-				observer(q.Name, func() { s.cache.Remove(&q) })
+		reply, err := s.cache.Get(r, maxLen)
+		if err != nil {
+			if err == errNoLocalReplies {
+				Debug.Printf("[dns msgid %d] Cached 'no local replies' - skipping local lookup", r.MsgHdr.Id)
+				lookups = []ZoneLookup{s.Zone}
+			} else {
+				Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
+				w.WriteMsg(makeDNSFailResponse(r))
+				return
 			}
 		}
-
-		if !s.cacheDisabled {
-			reply, err := s.cache.Get(r, maxLen)
-			if err != nil {
-				if err == errNoLocalReplies {
-					Debug.Printf("[dns msgid %d] Cached no-local-replies", r.MsgHdr.Id)
-					fallback(w, r)
-				} else {
-					Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
-					w.WriteMsg(makeDNSFailResponse(r))
-				}
-				return
-			}
-			if reply != nil {
-				reply.Answer = pruneAnswers(shuffleAnswers(reply.Answer), s.maxAnswers)
-				Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers",
-					r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer))
-				w.WriteMsg(reply)
-				return
-			}
+		if reply != nil {
+			Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers",
+				r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer))
+			w.WriteMsg(reply)
+			return
 		}
 
 		// catch unsupported queries
 		if q.Qtype != qtype {
 			Debug.Printf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
 			m := makeDNSFailResponse(r)
-			maybeCache(m, s.negLocalTTL, 0)
+			s.cache.Put(r, m, negLocalTTL, 0)
 			w.WriteMsg(m)
 			return
 		}
 
-		if answers, err := lookup(q.Name); err != nil {
-			Info.Printf("[dns msgid %d] No results for type %s query for '%s' [caching no-local]",
-				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
-			maybeCache(nil, s.negLocalTTL, CacheNoLocalReplies)
-			fallback(w, r)
-		} else {
-			m := msgBuilder(r, &q, answers)
-			m.Authoritative = true
-			maybeCache(m, nullTTL, 0)
-			m.Answer = pruneAnswers(shuffleAnswers(m.Answer), s.maxAnswers)
-			Debug.Printf("[dns msgid %d] Sending response: %s/%d answers [code:%s]",
-				m.MsgHdr.Id, dns.TypeToString[q.Qtype], len(m.Answer), dns.RcodeToString[m.Rcode])
-			w.WriteMsg(m)
+		for _, lookup := range lookups {
+			if m, answers, err := zoneLookup(lookup, &q, r); err == nil {
+				m.Authoritative = true
+				Debug.Printf("[dns msgid %d] Caching response for type %s query for '%s': %s [code:%s]",
+					m.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name, answers, dns.RcodeToString[m.Rcode])
+				s.cache.Put(r, m, nullTTL, 0)
+				w.WriteMsg(m)
+				return
+			}
 		}
+
+		Info.Printf("[dns msgid %d] No results for type %s query for '%s' [caching no-local]",
+			r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
+		s.cache.Put(r, nil, negLocalTTL, CacheNoLocalReplies)
+
+		fallback(w, r)
 	}
 }
 
 // When we receive a request for a name outside of our '.weave.local.'
 // domain, ask the configured DNS server as a fallback.
 func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
-	dnsClient := proto.GetNewClient(DefaultUDPBuflen, s.timeout)
+	dnsClient := proto.GetNewClient(DefaultUDPBuflen)
 
 	return func(w dns.ResponseWriter, r *dns.Msg) {
+		maxLen := getMaxReplyLen(r, proto)
 		q := r.Question[0]
 
-		// announce our max payload size as the max payload our client supports
-		maxLen := getMaxReplyLen(r, proto)
+		// create a request where we announce our max payload size
 		rcopy := r
 		rcopy.SetEdns0(uint16(maxLen), false)
 
@@ -384,13 +336,4 @@ func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
 		Warning.Printf("[dns msgid %d] Failed lookup for external name %s", r.MsgHdr.Id, q.Name)
 		w.WriteMsg(makeDNSFailResponse(r))
 	}
-}
-
-// Get the listen port
-func (s *DNSServer) GetPort() (int, error) {
-	_, portS, err := net.SplitHostPort(s.ListenAddr)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.Atoi(portS)
 }

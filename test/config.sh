@@ -99,25 +99,6 @@ exec_on() {
     docker -H tcp://$host:$DOCKER_PORT exec $container "$@"
 }
 
-# get a container IP: <host> <container>
-get_container_ip() {
-    docker -H tcp://$1:2375 inspect --format '{{ .NetworkSettings.IPAddress }}' $2
-}
-
-tell_dns() {
-    method=$1
-    host=$2
-    container=$3
-    name=$4
-    ip=$5
-    
-    dns=$(get_container_ip $host weavedns)
-    [[ -z "$DEBUG" ]] || greyly echo "$method'ing $name=$ip at $host/$dns"
-    run_on $host  \
-        curl --connect-timeout 3 -s -X $method \
-        "http://$dns:6785/name/$container/$ip" -d fqdn=$name
-}
-
 start_container() {
     host=$1
     shift 1
@@ -136,20 +117,8 @@ container_ip() {
 
 # assert_dns_record <host> <container> <name> <ip>
 assert_dns_record() {
-    host=$1
-    container=$2
-    name=$3
-    shift 3
-    exp_ips_regex=$(echo $@ | sed -r 's/ /\\\|/g')
-
-    [[ -z "$DEBUG" ]] || greyly echo "Checking wether $name exists at $host"
-    got_ip=$(exec_on $host $container getent hosts $name | tr -s ' ')
-    assert "echo \"$got_ip\" | grep -q \"$exp_ips_regex\" && echo found" "found"
-
-    [[ -z "$DEBUG" ]] || greyly echo "Checking wether the IPs \"$ips\" exists at $host"
-    for ip ; do
-        assert "exec_on $host $container getent hosts $ip | tr -s ' '" "$ip $name"
-    done
+    assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
+    assert "exec_on $1 $2 getent hosts $4 | tr -s ' '" "$4 $3"
 }
 
 start_suite() {

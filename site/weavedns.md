@@ -44,9 +44,10 @@ $ docker attach $shell1
 ```
 
 Note that it is permissible to register multiple containers with the
-same name: weaveDNS picks one address at random on each request. Since
-weaveDNS removes any container that dies, this is a simple way to
-implement redundancy.
+same name. weaveDNS picks one address to return when asked for the
+name. Since weaveDNS removes any container that dies, this is a simple
+way to implement redundancy.  In the current implementation it does
+not attempt to do load-balancing.
 
 Each weaveDNS container started with `launch-dns` needs to be given
 its own, unique, IP address, in a subnet that is a) common to all
@@ -101,9 +102,6 @@ The inverse operation can be carried out using the `dns-remove` command:
 ```bash
 $ weave dns-remove 10.2.1.27 $shell2
 ```
-
-When queried about a name with multiple IPs, weaveDNS returns a random
-result from the set of IPs available.
 
 ## <a name="hot-swapping"></a>Hot-swapping service containers
 
