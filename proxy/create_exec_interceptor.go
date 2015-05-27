@@ -11,7 +11,8 @@ import (
 )
 
 type createExecInterceptor struct {
-	client *docker.Client
+	client   *docker.Client
+	withIPAM bool
 }
 
 type createExecRequestBody struct {
@@ -37,7 +38,7 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok {
+	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok || i.withIPAM {
 		Info.Printf("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
 		options.Cmd = append(weaveWaitEntrypoint, options.Cmd...)
 	}
