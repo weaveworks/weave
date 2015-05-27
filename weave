@@ -245,7 +245,7 @@ random_mac() {
 ######################################################################
 
 create_bridge() {
-    [ ! -d /sys/class/net/$BRIDGE ] && {
+    if [ ! -d /sys/class/net/$BRIDGE ] ; then
         ip link add name $BRIDGE type bridge
         # Set a random MAC address on the bridge.  Current Linux
         # kernels already do this when creating a bridge, but there
@@ -269,7 +269,7 @@ create_bridge() {
         # create a chain for masquerading
         run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
         add_iptables_rule nat POSTROUTING -j WEAVE
-    }
+    fi
     if [ ! "$1" = "--without-ethtool" ] ; then
         ethtool -K $BRIDGE tx off >/dev/null
     fi
