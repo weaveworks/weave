@@ -117,9 +117,8 @@ func (node *Node) Update(from GossipState) bool {
 func max(a uint, b uint) uint {
 	if a > b {
 		return a
-	} else {
-		return b
 	}
+	return b
 }
 
 // Initiate a new proposal, i.e. the Paxos "Prepare" step.  This is
