@@ -21,11 +21,11 @@ assert_zone_records() {
     FQDN=$1; shift
 
     # Assert correct number of records exist
-    assert "weave_on $HOST status | grep \"^$CID\" | wc -l" $#
+    assert "weave_on $HOST status | grep \"^$CID\" | grep -oE \"\b([0-9]{1,3}\.){3}[0-9]{1,3}\b\" | wc -l" $#
 
     # Assert correct records exist
     for IP; do
-        assert_raises "weave_on $HOST status | grep \"^$CID $IP $FQDN$\""
+        assert_raises "weave_on $HOST status | grep \"$CID\" | grep \"$IP\" | grep \"$FQDN\""
     done
 }
 

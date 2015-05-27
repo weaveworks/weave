@@ -23,6 +23,7 @@ func ListenHTTP(version string, server *DNSServer, domain string, db Zone, port 
 	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "weave DNS", version)
 		fmt.Fprintln(w, server.Status())
+		fmt.Fprintln(w, db.Status())
 	})
 
 	muxRouter.Methods("PUT").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
