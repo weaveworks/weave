@@ -34,6 +34,11 @@ def configure_docker(host, hostname, ip)
   cleanup(host.vm)
 end
 
+def configure_resolv_conf(host)
+  # Fix the resolution errors by using 8.8.8.8
+  host.vm.provision :shell, :inline => "echo 'nameserver 8.8.8.8' > /etc/resolv.conf"
+end
+
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
@@ -48,6 +53,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   (1..n_machines).each do |i|
     config.vm.define "host#{i}" do |host|
       ip_suffix = ip_suffix_base + i
+      configure_resolv_conf(host)
       configure_docker(host, "host#{i}", "#{ip_prefix}.#{ip_suffix}")
     end
   end
