@@ -70,9 +70,9 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 	return &PcapIO{handle: active}, nil
 }
 
-func (pi *PcapIO) ReadPacket() (data []byte, err error) {
+func (pio *PcapIO) ReadPacket() (data []byte, err error) {
 	for {
-		data, _, err = pi.handle.ZeroCopyReadPacketData()
+		data, _, err = pio.handle.ZeroCopyReadPacketData()
 		if err == nil || err != pcap.NextErrorTimeoutExpired {
 			break
 		}
@@ -80,6 +80,6 @@ func (pi *PcapIO) ReadPacket() (data []byte, err error) {
 	return
 }
 
-func (po *PcapIO) WritePacket(data []byte) error {
-	return po.handle.WritePacketData(data)
+func (pio *PcapIO) WritePacket(data []byte) error {
+	return pio.handle.WritePacketData(data)
 }
