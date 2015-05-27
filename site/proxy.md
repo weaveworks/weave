@@ -52,7 +52,7 @@ or, equivalently with
     5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
     host1$ docker start 5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
 
-Multiple IP addresses and networks can be supplied in the WEAVE_CIDR
+Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
 `WEAVE_CIDR=10.2.1.1/24 10.2.2.1/24`.
 
