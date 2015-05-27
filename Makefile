@@ -64,8 +64,8 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 $(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
 	cp weave weaveexec/weave
 	cp $(SIGPROXY_EXE) weaveexec/sigproxy
-	cp $(WEAVEWAIT_EXE) weaveexec/weavewait
 	cp $(WEAVEPROXY_EXE) weaveexec/weaveproxy
+	cp $(WEAVEWAIT_EXE) weaveexec/weavewait
 	cp $(DOCKER_DISTRIB) weaveexec/docker.tgz
 	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) weaveexec
 	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
