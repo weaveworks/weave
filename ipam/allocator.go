@@ -296,7 +296,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) error {
 		}
 
 		delete(alloc.nicknames, peername)
-		err, newRanges := alloc.ring.Transfer(peername, alloc.ourName)
+		newRanges, err := alloc.ring.Transfer(peername, alloc.ourName)
 		alloc.space.AddRanges(newRanges)
 		resultChan <- err
 	}
@@ -320,7 +320,7 @@ func (alloc *Allocator) lookupPeername(name string) (router.PeerName, error) {
 // Restrict the peers in "nicknames" to those in the ring and our own
 func (alloc *Allocator) pruneNicknames() {
 	ringPeers := alloc.ring.PeerNames()
-	for name, _ := range alloc.nicknames {
+	for name := range alloc.nicknames {
 		if _, ok := ringPeers[name]; !ok && name != alloc.ourName {
 			delete(alloc.nicknames, name)
 		}

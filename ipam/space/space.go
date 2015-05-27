@@ -40,12 +40,11 @@ func (s *Space) Clear() {
 func (s *Space) Allocate() (bool, address.Address) {
 	if len(s.free) == 0 {
 		return false, 0
-	} else {
-		res := s.free[0]
-		s.ours = add(s.ours, res, res+1)
-		s.free = subtract(s.free, res, res+1)
-		return true, res
 	}
+	res := s.free[0]
+	s.ours = add(s.ours, res, res+1)
+	s.free = subtract(s.free, res, res+1)
+	return true, res
 }
 
 func (s *Space) Claim(addr address.Address) error {
@@ -152,25 +151,25 @@ func subtract(addrs []address.Address, start address.Address, end address.Addres
 }
 
 func addSub(addrs []address.Address, start address.Address, end address.Address, sense int) []address.Address {
-	start_pos := firstGreaterOrEq(addrs, start)
-	end_pos := firstGreater(addrs[start_pos:], end) + start_pos
+	startPos := firstGreaterOrEq(addrs, start)
+	endPos := firstGreater(addrs[startPos:], end) + startPos
 
-	// Boundaries up to start_pos are unaffected
-	res := make([]address.Address, start_pos, len(addrs)+2)
+	// Boundaries up to startPos are unaffected
+	res := make([]address.Address, startPos, len(addrs)+2)
 	copy(res, addrs)
 
 	// Include start and end as new boundaries if they lie
 	// outside/inside existing ranges (according to sense).
-	if start_pos&1 == sense {
+	if startPos&1 == sense {
 		res = append(res, start)
 	}
 
-	if end_pos&1 == sense {
+	if endPos&1 == sense {
 		res = append(res, end)
 	}
 
-	// Boundaries after end_pos are unaffected
-	return append(res, addrs[end_pos:]...)
+	// Boundaries after endPos are unaffected
+	return append(res, addrs[endPos:]...)
 }
 
 func (s *Space) String() string {

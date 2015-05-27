@@ -255,7 +255,6 @@ func (node *Node) Consensus() (bool, AcceptedValue) {
 func (node *Node) String() string {
 	if ok, val := node.Consensus(); ok {
 		return fmt.Sprintf("Consensus reached with size %d", len(val.Value))
-	} else {
-		return fmt.Sprintf("Nodes known: %d, Quorum size: %d", len(node.knows), node.quorum)
 	}
+	return fmt.Sprintf("Nodes known: %d, Quorum size: %d", len(node.knows), node.quorum)
 }

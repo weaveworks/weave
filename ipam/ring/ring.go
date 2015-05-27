@@ -461,7 +461,7 @@ func (r *Ring) PickPeerForTransfer() router.PeerName {
 
 // Transfer will mark all entries associated with 'from' peer as owned by 'to' peer
 // and return ranges indicating the new space we picked up
-func (r *Ring) Transfer(from, to router.PeerName) (error, []address.Range) {
+func (r *Ring) Transfer(from, to router.PeerName) ([]address.Range, error) {
 	r.assertInvariants()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
@@ -479,10 +479,10 @@ func (r *Ring) Transfer(from, to router.PeerName) (error, []address.Range) {
 	}
 
 	if !found {
-		return ErrNotFound, nil
+		return nil, ErrNotFound
 	}
 
-	return nil, r.splitRangesOverZero(newRanges)
+	return r.splitRangesOverZero(newRanges), nil
 }
 
 // Contains returns true if addr is in this ring
