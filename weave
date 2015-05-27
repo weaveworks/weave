@@ -587,7 +587,7 @@ dns_args() {
                 ;;
             *)
                 ;;
-        esac;
+        esac
     done
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
 }
