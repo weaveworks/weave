@@ -25,10 +25,10 @@ type ConnectionMaker struct {
 
 // Information about an address where we may find a peer
 type Target struct {
-	Attempting  bool          `json:"Attempting,omitempty"`  // are we currently attempting to connect there?
-	LastError   error         `json:"LastError,omitempty"`   // reason for disconnection last time
-	TryAfter    time.Time     `json:"TryAfter,omitempty"`    // next time to try this address
-	TryInterval time.Duration `json:"TryInterval,omitempty"` // backoff time on next failure
+	attempting  bool          // are we currently attempting to connect there?
+	lastError   error         // reason for disconnection last time
+	tryAfter    time.Time     // next time to try this address
+	tryInterval time.Duration // backoff time on next failure
 }
 
 type ConnectionMakerAction func() bool
@@ -68,7 +68,7 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string) []error {
 			cm.directPeers[peer] = addr
 			// curtail any existing reconnect interval
 			if target, found := cm.targets[addr.String()]; found {
-				target.TryAfter, target.TryInterval = tryImmediately()
+				target.tryAfter, target.tryInterval = tryImmediately()
 			}
 		}
 		return true
@@ -88,9 +88,9 @@ func (cm *ConnectionMaker) ForgetConnections(peers []string) {
 func (cm *ConnectionMaker) ConnectionTerminated(address string, err error) {
 	cm.actionChan <- func() bool {
 		if target, found := cm.targets[address]; found {
-			target.Attempting = false
-			target.LastError = err
-			target.TryAfter, target.TryInterval = tryAfter(target.TryInterval)
+			target.attempting = false
+			target.lastError = err
+			target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
 		}
 		return true
 	}
@@ -141,13 +141,13 @@ func (status ConnectionMakerStatus) String() string {
 	fmt.Fprintln(&buf, "Reconnects:")
 	for address, target := range status.Reconnects {
 		fmt.Fprintf(&buf, "->[%s]", address)
-		if target.LastError != nil {
-			fmt.Fprintf(&buf, " (%s)", target.LastError)
+		if target.lastError != nil {
+			fmt.Fprintf(&buf, " (%s)", target.lastError)
 		}
-		if target.Attempting {
-			fmt.Fprintf(&buf, " trying since %v\n", target.TryAfter)
+		if target.attempting {
+			fmt.Fprintf(&buf, " trying since %v\n", target.tryAfter)
 		} else {
-			fmt.Fprintf(&buf, " next try at %v\n", target.TryAfter)
+			fmt.Fprintf(&buf, " next try at %v\n", target.tryAfter)
 		}
 	}
 	return buf.String()
@@ -187,7 +187,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 			return
 		}
 		target := &Target{}
-		target.TryAfter, target.TryInterval = tryImmediately()
+		target.tryAfter, target.tryInterval = tryImmediately()
 		cm.targets[address] = target
 	}
 
@@ -272,16 +272,16 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if target.Attempting {
+		if target.attempting {
 			continue
 		}
 		if _, valid := validTarget[address]; !valid {
 			delete(cm.targets, address)
 			continue
 		}
-		switch duration := target.TryAfter.Sub(now); {
+		switch duration := target.tryAfter.Sub(now); {
 		case duration <= 0:
-			target.Attempting = true
+			target.attempting = true
 			_, isCmdLineTarget := directTarget[address]
 			go cm.attemptConnection(address, isCmdLineTarget)
 		case duration < after:
