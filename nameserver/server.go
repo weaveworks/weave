@@ -17,7 +17,7 @@ const (
 	DefaultCLICfgFile = "/etc/resolv.conf" // default "resolv.conf" file to try to load
 	DefaultUDPBuflen  = 4096               // bigger than the default 512
 	DefaultCacheLen   = 8192               // default cache capacity
-	DefaultTimeout    = 5                  // default timeout for DNS resolutions
+	DefaultTimeout    = 5000               // default timeout for DNS resolutions (millisecs)
 	DefaultMaxAnswers = 1                  // default number of answers provided to users
 )
 
@@ -69,6 +69,7 @@ func (proto dnsProtocol) String() string {
 
 // get a new dns.Client for a protocol
 func (proto dnsProtocol) GetNewClient(bufsize int, timeout time.Duration) *dns.Client {
+	Debug.Printf("[dns] Creating %s DNS client with %s timeout", proto, timeout)
 	switch proto {
 	case protTCP:
 		return &dns.Client{Net: "tcp", ReadTimeout: timeout}
@@ -108,8 +109,8 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 		ListenAddr: fmt.Sprintf(":%d", config.Port),
 
 		listenersWg:   new(sync.WaitGroup),
-		timeout:       time.Duration(config.Timeout) * time.Millisecond,
-		readTimeout:   time.Duration(config.ListenReadTimeout) * time.Millisecond,
+		timeout:       DefaultTimeout * time.Millisecond,
+		readTimeout:   DefaultTimeout * time.Millisecond,
 		cacheDisabled: false,
 		maxAnswers:    DefaultMaxAnswers,
 		negLocalTTL:   negLocalTTL,
@@ -141,6 +142,9 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 	}
 	if config.Timeout > 0 {
 		s.timeout = time.Duration(config.Timeout) * time.Millisecond
+	}
+	if config.ListenReadTimeout > 0 {
+		s.readTimeout = time.Duration(config.ListenReadTimeout) * time.Millisecond
 	}
 	if config.UDPBufLen > 0 {
 		s.udpBuf = config.UDPBufLen
