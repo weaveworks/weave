@@ -35,7 +35,7 @@ type Router struct {
 	Peers           *Peers
 	Routes          *Routes
 	ConnectionMaker *ConnectionMaker
-	GossipChannels  map[uint32]*GossipChannel
+	GossipChannels  GossipChannels
 	TopologyGossip  Gossip
 	UDPListener     *net.UDPConn
 }
@@ -54,7 +54,7 @@ type PacketSourceSink interface {
 }
 
 func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
-	router := &Router{RouterConfig: config, GossipChannels: make(map[uint32]*GossipChannel)}
+	router := &Router{RouterConfig: config, GossipChannels: make(GossipChannels)}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer)
 	}
