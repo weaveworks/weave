@@ -28,7 +28,7 @@ function lint_go {
 	# don't have it installed.
 	if type golint >/dev/null 2>&1; then
 		# golint doesn't set an exit code it seems
-		lintoutput=$(golint "${filename}")
+		lintoutput=$(golint "${filename}" | grep -vE 'comment|dot imports')
 		if [ "$lintoutput" != "" ]; then
 			result=1
 			echo "$lintoutput"

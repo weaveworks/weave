@@ -26,7 +26,7 @@ DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC
 
 all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
-travis: $(WEAVER_EXE) $(WEAVEDNS_EXE)
+travis: $(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
 
 update:
 	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE)) ./$(dir $(SIGPROXY_EXE)) ./$(dir $(WEAVEPROXY_EXE))
