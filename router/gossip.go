@@ -85,23 +85,22 @@ type GossipChannel struct {
 	ourself      *LocalPeer
 	routes       *Routes
 	name         string
-	hash         uint32
 	gossiper     Gossiper
 	senders      connectionSenders
 	broadcasters peerSenders
 }
 
+type GossipChannels map[string]*GossipChannel
+
 func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
-	channelHash := hash(channelName)
 	channel := &GossipChannel{
 		ourself:      router.Ourself,
 		routes:       router.Routes,
 		name:         channelName,
-		hash:         channelHash,
 		gossiper:     g,
 		senders:      make(connectionSenders),
 		broadcasters: make(peerSenders)}
-	router.GossipChannels[channelHash] = channel
+	router.GossipChannels[channelName] = channel
 	return channel
 }
 
@@ -123,13 +122,13 @@ func (router *Router) SendAllGossipDown(conn Connection) {
 
 func (router *Router) handleGossip(tag ProtocolTag, payload []byte) error {
 	decoder := gob.NewDecoder(bytes.NewReader(payload))
-	var channelHash uint32
-	if err := decoder.Decode(&channelHash); err != nil {
+	var channelName string
+	if err := decoder.Decode(&channelName); err != nil {
 		return err
 	}
-	channel, found := router.GossipChannels[channelHash]
+	channel, found := router.GossipChannels[channelName]
 	if !found {
-		return fmt.Errorf("[gossip] received unknown channel with hash %v", channelHash)
+		return fmt.Errorf("[gossip] received unknown channel with name %s", channelName)
 	}
 	var srcName PeerName
 	if err := decoder.Decode(&srcName); err != nil {
@@ -235,7 +234,7 @@ func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
 	sender, found := c.senders[conn]
 	if !found {
 		sender = NewGossipSender(func(pending GossipData) {
-			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.hash, c.ourself.Name, pending.Encode())}
+			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, pending.Encode())}
 			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 		})
 		c.senders[conn] = sender
@@ -245,7 +244,7 @@ func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
 }
 
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, msg []byte) error {
-	return c.relayUnicast(dstPeerName, GobEncode(c.hash, c.ourself.Name, dstPeerName, msg))
+	return c.relayUnicast(dstPeerName, GobEncode(c.name, c.ourself.Name, dstPeerName, msg))
 }
 
 func (c *GossipChannel) GossipBroadcast(update GossipData) error {
@@ -302,7 +301,7 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 	if len(nextHops) == 0 {
 		return
 	}
-	protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.hash, srcName, update.Encode())}
+	protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, update.Encode())}
 	// FIXME a single blocked connection can stall us
 	for _, conn := range c.ourself.ConnectionsTo(nextHops) {
 		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
