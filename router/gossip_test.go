@@ -1,9 +1,10 @@
 package router
 
 import (
-	wt "github.com/weaveworks/weave/testing"
 	"testing"
 	"time"
+
+	wt "github.com/weaveworks/weave/testing"
 )
 
 // TODO test gossip unicast and broadcast; atm we only test topology
@@ -17,7 +18,7 @@ type mockChannelConnection struct {
 // Construct a "passive" Router, i.e. without any goroutines, except
 // for Routes and GossipSenders.
 func NewTestRouter(name PeerName) *Router {
-	router := NewRouter(RouterConfig{}, name, "")
+	router := NewRouter(Config{}, name, "")
 	// need to create a dummy channel otherwise tests hang on nil
 	// channels when the Router invoked ConnectionMaker.Refresh
 	router.ConnectionMaker.actionChan = make(chan ConnectionMakerAction, ChannelSize)
