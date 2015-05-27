@@ -96,7 +96,7 @@ validate_cidr() {
 collect_cidr_args() {
     CIDR_ARGS=""
     CIDR_COUNT=0
-    while is_cidr "$1"; do
+    while is_cidr "$1" ; do
         CIDR_ARGS="$CIDR_ARGS $1"
         CIDR_COUNT=$((CIDR_COUNT + 1))
         shift 1
@@ -118,12 +118,12 @@ validate_ip() {
 collect_ip_args() {
     IP_ARGS=""
     IP_COUNT=0
-    while is_ip "$1"; do
+    while is_ip "$1" ; do
         IP_ARGS="$IP_ARGS $1"
         IP_COUNT=$((IP_COUNT + 1))
         shift 1
     done
-    if [ $IP_COUNT -eq 0 ]; then
+    if [ $IP_COUNT -eq 0 ] ; then
         [ $# -gt 0 ] && validate_ip "$1" || usage
     fi
 }
@@ -132,10 +132,10 @@ collect_ip_args() {
 # rather than the docker in $EXEC_IMAGE remotely. That's because we
 # are passing arbitrary arguments on to docker run, and we can't rely
 # on our baked-in docker to support those arguments.
-if [ "$1" = "run" ]; then
+if [ "$1" = "run" ] ; then
     shift 1
     check_docker_version
-    if [ "$1" = "--with-dns" ]; then
+    if [ "$1" = "--with-dns" ] ; then
         shift 1
         DNS_ARGS=$(exec_remote dns-args "$@")
     fi
@@ -145,7 +145,7 @@ if [ "$1" = "run" ]; then
     exec_remote attach $CIDR_ARGS $CONTAINER
     echo $CONTAINER
     exit 0
-elif [ "$1" != "--local" ]; then
+elif [ "$1" != "--local" ] ; then
     exec_remote "$@"
     exit $?
 fi
@@ -495,7 +495,7 @@ http_call_ip() {
 }
 
 container_ip() {
-    if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null); then
+    if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null) ; then
         echo "$2" >&2
         return 1
     fi
@@ -527,7 +527,7 @@ http_call() {
 # Wait until container $1 on port $2 is alive enough to respond to its status call
 wait_for_status() {
     WAIT_TIME=0
-    while [ $WAIT_TIME -lt 3 ]; do
+    while [ $WAIT_TIME -lt 3 ] ; do
         sleep $WAIT_TIME
         container_ip $1 \
             "$1 container has died." \
@@ -545,7 +545,7 @@ with_container_addresses() {
     COMMAND=$1
     shift 1
     for CONTAINER_ID in "$@" ; do
-        if [ "$CONTAINER_ID" = "weave:expose" ]; then
+        if [ "$CONTAINER_ID" = "weave:expose" ] ; then
             ADDRS_CMD="ip addr show dev $BRIDGE"
         else
             ADDRS_CMD="with_container_netns $CONTAINER_ID container_weave_addrs"
@@ -629,7 +629,7 @@ populate_dns() {
         echo "If running, it will not be pre-populated." >&2
         return 0
     fi
-    for CONTAINER in $(docker ps -q --no-trunc); do
+    for CONTAINER in $(docker ps -q --no-trunc) ; do
         MORE_ARGS=$(docker inspect --format='--data-urlencode fqdn={{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) || true
         if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
             for IP in $CONTAINER_IPS; do
@@ -651,7 +651,7 @@ populate_dns() {
 # Claim addresses for a container in IPAM.  Expects to be called from
 # with_container_addresses.
 ipam_claim() {
-    for CIDR in $3; do
+    for CIDR in $3 ; do
         # NB: CONTAINER_IP is the IP of the weave container; it is set by wait_for_status.
         http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$1/${CIDR%/*}
     done
@@ -665,7 +665,7 @@ get_ipam_cidr() {
     fi
     if [ -z "$2" ] ; then
         # get the long form of the container ID
-        if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null); then
+        if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null) ; then
             echo "Error: No such container: $1" >&2
             return 1
         fi
@@ -708,7 +708,7 @@ proxy_host() {
 
 wait_for_proxy_to_boot() {
     proxy_host
-    for n in $(seq 1 10); do
+    for n in $(seq 1 10) ; do
       if curl --max-time 1 --connect-timeout 1 -s -X GET http://$PROXY_HOST:$PROXY_PORT/weave ; then
         return 0
       fi
@@ -815,7 +815,7 @@ case "$COMMAND" in
             shift 1
         fi
         CONTAINER_PORT=$PORT
-        while true; do
+        while true ; do
             case "$1" in
                 -password)
                     [ $# -gt 1 ] || usage
@@ -968,7 +968,7 @@ case "$COMMAND" in
         shift $IP_COUNT
         [ $# -ge 1 ] || usage
         CONTAINER_ID="$1"
-        if [ $# -eq 1 ]; then
+        if [ $# -eq 1 ] ; then
             tell_dns PUT $CONTAINER_ID $IP_ARGS
         else
             [ $# -eq 3 -a "$2" = "-h" ] || usage
@@ -987,21 +987,21 @@ case "$COMMAND" in
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         get_ipam_cidr $CONTAINER_NAME weave:expose
-        if [ $# -eq 0 ]; then
+        if [ $# -eq 0 ] ; then
             FQDN=""
         else
             [ $# -eq 2 -a "$1" = "-h" ] || usage
             FQDN="$2"
         fi
         create_bridge --without-ethtool
-        for CIDR in $CIDR_ARGS; do
+        for CIDR in $CIDR_ARGS ; do
             if ! ip addr show dev $BRIDGE | grep -qF $CIDR
             then
                 ip addr add dev $BRIDGE $CIDR
                 arp_update $BRIDGE $CIDR
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-                if [ "$FQDN" ]; then
+                if [ "$FQDN" ] ; then
                     http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT PUT /name/weave:expose/${CIDR%/*} --data-urlencode "fqdn=$FQDN" 2>/dev/null || true
                 fi
             fi
@@ -1012,7 +1012,7 @@ case "$COMMAND" in
         shift $CIDR_COUNT
         get_ipam_cidr $CONTAINER_NAME weave:expose
         create_bridge --without-ethtool
-        for CIDR in $CIDR_ARGS; do
+        for CIDR in $CIDR_ARGS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR
             then
                 ip addr del dev $BRIDGE $CIDR
