@@ -8,28 +8,37 @@ SUDO=sudo
 
 DOCKERHUB_USER=weaveworks
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
+
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
 WEAVEPROXY_EXE=weaveproxy/weaveproxy
 SIGPROXY_EXE=sigproxy/sigproxy
 WEAVEWAIT_EXE=weavewait/weavewait
+
+EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
+
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
+
+IMAGES=$(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
+
 WEAVER_EXPORT=weave.tar
 WEAVEDNS_EXPORT=weavedns.tar
 WEAVEEXEC_EXPORT=weaveexec.tar
+
+EXPORTS=$(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 WEAVEEXEC_DOCKER_VERSION=1.3.1
 DOCKER_DISTRIB=weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 
-all: $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
+all: $(EXPORTS)
 
-travis: $(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
+travis: $(EXES)
 
-update:
-	go get -u -f -v -tags -netgo ./$(dir $(WEAVER_EXE)) ./$(dir $(WEAVEDNS_EXE)) ./$(dir $(SIGPROXY_EXE)) ./$(dir $(WEAVEPROXY_EXE)) ./$(dir $(WEAVEWAIT_EXE))
+update: $(EXES)
+	go get -u -f -v -tags -netgo $(addprefix ./,$(dir $(EXES)))
 
 $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE): common/*.go
 	go get -tags netgo ./$(@D)
@@ -97,8 +106,8 @@ $(PUBLISH): publish_%:
 publish: $(PUBLISH)
 
 clean:
-	-$(SUDO) docker rmi $(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
-	rm -f $(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
+	-$(SUDO) docker rmi $(IMAGES)
+	rm -f $(EXES) $(EXPORTS)
 
 build:
 	$(SUDO) go clean -i net
