@@ -48,30 +48,39 @@ func (cm *ConnectionMaker) Start() {
 	go cm.queryLoop(actionChan)
 }
 
-func (cm *ConnectionMaker) InitiateConnection(peer string) error {
-	host, port, err := net.SplitHostPort(peer)
-	if err != nil {
-		host = peer
-		port = "0" // we use that as an indication that "no port was supplied"
-	}
-	addr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port))
-	if err != nil {
-		return err
+func (cm *ConnectionMaker) InitiateConnections(peers []string) []error {
+	errors := []error{}
+	addrs := make(map[string]*net.TCPAddr)
+	for _, peer := range peers {
+		host, port, err := net.SplitHostPort(peer)
+		if err != nil {
+			host = peer
+			port = "0" // we use that as an indication that "no port was supplied"
+		}
+		if addr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:%s", host, port)); err != nil {
+			errors = append(errors, err)
+		} else {
+			addrs[peer] = addr
+		}
 	}
 	cm.actionChan <- func() bool {
-		cm.cmdLinePeers[peer] = addr
-		// curtail any existing reconnect interval
-		if target, found := cm.targets[addr.String()]; found {
-			target.tryAfter, target.tryInterval = tryImmediately()
+		for peer, addr := range addrs {
+			cm.cmdLinePeers[peer] = addr
+			// curtail any existing reconnect interval
+			if target, found := cm.targets[addr.String()]; found {
+				target.tryAfter, target.tryInterval = tryImmediately()
+			}
 		}
 		return true
 	}
-	return nil
+	return errors
 }
 
-func (cm *ConnectionMaker) ForgetConnection(peer string) {
+func (cm *ConnectionMaker) ForgetConnections(peers []string) {
 	cm.actionChan <- func() bool {
-		delete(cm.cmdLinePeers, peer)
+		for _, peer := range peers {
+			delete(cm.cmdLinePeers, peer)
+		}
 		return false
 	}
 }

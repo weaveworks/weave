@@ -1,10 +1,17 @@
 package main
 
 import (
-	"code.google.com/p/gopacket/layers"
 	"crypto/sha256"
 	"flag"
 	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"runtime"
+	"strings"
+
+	"code.google.com/p/gopacket/layers"
 	"github.com/davecheney/profile"
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
@@ -12,12 +19,6 @@ import (
 	"github.com/weaveworks/weave/ipam"
 	weavenet "github.com/weaveworks/weave/net"
 	weave "github.com/weaveworks/weave/router"
-	"log"
-	"net"
-	"net/http"
-	"os"
-	"runtime"
-	"strings"
 )
 
 var version = "(unreleased version)"
@@ -143,7 +144,9 @@ func main() {
 	}
 
 	router.Start()
-	initiateConnections(router, peers)
+	if errors := router.ConnectionMaker.InitiateConnections(peers); len(errors) > 0 {
+		log.Fatal(errorMessages(errors))
+	}
 
 	// The weave script always waits for a status call to succeed,
 	// so there is no point in doing "weave launch -httpaddr ''".
@@ -153,6 +156,14 @@ func main() {
 	}
 
 	SignalHandlerLoop(router)
+}
+
+func errorMessages(errors []error) string {
+	var result []string
+	for _, err := range errors {
+		result = append(result, err.Error())
+	}
+	return strings.Join(result, "\n")
 }
 
 func options() map[string]string {
@@ -177,14 +188,6 @@ func logFrameFunc(debug bool) weave.LogFrameFunc {
 			log.Println(prefix, len(frame), "bytes (", h, ")")
 		} else {
 			log.Println(prefix, len(frame), "bytes (", h, "):", eth.SrcMAC, "->", eth.DstMAC)
-		}
-	}
-}
-
-func initiateConnections(router *weave.Router, peers []string) {
-	for _, peer := range peers {
-		if err := router.ConnectionMaker.InitiateConnection(peer); err != nil {
-			log.Fatal(err)
 		}
 	}
 }
@@ -250,13 +253,19 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 	})
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := router.ConnectionMaker.InitiateConnection(r.FormValue("peer")); err != nil {
-			http.Error(w, fmt.Sprint("invalid peer address: ", err), http.StatusBadRequest)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
+		}
+		if errors := router.ConnectionMaker.InitiateConnections(r.Form["peer"]); len(errors) > 0 {
+			http.Error(w, errorMessages(errors), http.StatusBadRequest)
 		}
 	})
 
 	muxRouter.Methods("POST").Path("/forget").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		router.ConnectionMaker.ForgetConnection(r.FormValue("peer"))
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
+		}
+		router.ConnectionMaker.ForgetConnections(r.Form["peer"])
 	})
 
 	http.Handle("/", muxRouter)
