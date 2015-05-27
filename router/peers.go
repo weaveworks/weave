@@ -132,7 +132,6 @@ func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
 	enc := gob.NewEncoder(buf)
 	peers.RLock()
 	defer peers.RUnlock()
-	peerList := make([]*Peer, 0, len(names))
 	for name := range names {
 		if peer, found := peers.table[name]; found {
 			if peer == peers.ourself.Peer {
@@ -140,7 +139,6 @@ func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
 			} else {
 				peer.Encode(enc)
 			}
-			peerList = append(peerList, peer)
 		}
 	}
 	return buf.Bytes()
