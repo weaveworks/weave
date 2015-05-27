@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +12,12 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
+)
+
+const (
+	defaultCaFile   = "ca.pem"
+	defaultKeyFile  = "key.pem"
+	defaultCertFile = "cert.pem"
 )
 
 var (
@@ -24,13 +31,14 @@ type Proxy struct {
 	version        string
 	client         *docker.Client
 	dockerAddr     string
-	listenAddr     string
-	withDNS        bool
 	dockerBridgeIP string
+	listenAddr     string
+	tlsConfig      *TLSConfig
+	withDNS        bool
 	withIPAM       bool
 }
 
-func NewProxy(version, dockerAddr, listenAddr string, withDNS, withIPAM bool) (*Proxy, error) {
+func NewProxy(version, dockerAddr, listenAddr string, withDNS, withIPAM bool, tlsConfig *TLSConfig) (*Proxy, error) {
 	u, err := url.Parse(dockerAddr)
 	if err != nil {
 		return nil, err
@@ -42,6 +50,10 @@ func NewProxy(version, dockerAddr, listenAddr string, withDNS, withIPAM bool) (*
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if err := tlsConfig.loadCerts(); err != nil {
+		Error.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
 	client, err := docker.NewClient(dockerAddr)
@@ -65,8 +77,9 @@ func NewProxy(version, dockerAddr, listenAddr string, withDNS, withIPAM bool) (*
 		client:         client,
 		dockerAddr:     dockerAddr,
 		listenAddr:     listenAddr,
-		withDNS:        withDNS,
 		dockerBridgeIP: string(dockerBridgeIP),
+		tlsConfig:      tlsConfig,
+		withDNS:        withDNS,
 		withIPAM:       withIPAM,
 	}, nil
 }
@@ -112,8 +125,18 @@ func (proxy *Proxy) Status() string {
 }
 
 func (proxy *Proxy) ListenAndServe() error {
-	return (&http.Server{
-		Addr:    proxy.listenAddr,
-		Handler: proxy,
-	}).ListenAndServe()
+	listener, err := net.Listen("tcp", proxy.listenAddr)
+	if err != nil {
+		return err
+	}
+
+	if proxy.tlsConfig.enabled() {
+		listener = tls.NewListener(listener, proxy.tlsConfig.Config)
+		Info.Println("TLS Enabled")
+	}
+
+	Info.Printf("Listening on %s", proxy.listenAddr)
+	Info.Printf("Proxying %s", proxy.dockerAddr)
+
+	return (&http.Server{Handler: proxy}).Serve(listener)
 }

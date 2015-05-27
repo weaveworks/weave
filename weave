@@ -722,6 +722,40 @@ get_ipam_cidr() {
     fi
 }
 
+######################################################################
+# weave proxy helpers
+######################################################################
+
+# TODO: Handle args with spaces
+# TODO: Handle non-absolute paths for certs
+proxy_args() {
+    PROXY_VOLUMES=""
+    PROXY_ARGS=""
+    while [ $# -gt 0 ]; do
+        case $1 in
+          --tlscacert|--tlscacert=*)
+            [[ "${1#*=}" != "$1" ]] || shift
+            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#--tlscacert=}:/home/weave/tls/ca.pem"
+            PROXY_ARGS="$PROXY_ARGS --tlscacert /home/weave/tls/ca.pem"
+            ;;
+          --tlscert|--tlscert=*)
+            [[ "${1#*=}" != "$1" ]] || shift
+            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#--tlscert=}:/home/weave/tls/cert.pem"
+            PROXY_ARGS="$PROXY_ARGS --tlscert /home/weave/tls/cert.pem"
+            ;;
+          --tlskey|--tlskey=*)
+            [[ "${1#*=}" != "$1" ]] || shift
+            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#--tlskey=}:/home/weave/tls/key.pem"
+            PROXY_ARGS="$PROXY_ARGS --tlskey /home/weave/tls/key.pem"
+            ;;
+          *)
+            PROXY_ARGS="$PROXY_ARGS $1"
+            ;;
+        esac
+        shift
+    done
+}
+
 ##########################################################################################
 
 [ $(id -u) = 0 ] || {
@@ -855,14 +889,16 @@ case "$COMMAND" in
         # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weaveproxy container.
+        proxy_args "$@"
         PROXY_CONTAINER=$(docker run --privileged --net=host -d \
             --name=$PROXY_CONTAINER_NAME \
             -p $PROXY_PORT:$PROXY_PORT/tcp \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /proc:/hostproc -e PROCFS=/hostproc \
+            $PROXY_VOLUMES \
             --entrypoint=/home/weave/weaveproxy \
             $WEAVEPROXY_DOCKER_ARGS \
-            $EXEC_IMAGE "$@")
+            $EXEC_IMAGE $PROXY_ARGS)
 
         wait_for_status_ip 127.0.0.1 $PROXY_PORT
         echo $PROXY_CONTAINER
