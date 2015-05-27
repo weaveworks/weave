@@ -400,7 +400,7 @@ launch() {
 
 attach() {
     if netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        for ADDR; do
+        for ADDR in "$@" ; do
             # container already has the expected network interface, so assume we set it up already;
             # just add the IP address.
             if netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
@@ -415,7 +415,7 @@ attach() {
 
     connect_container_to_bridge || return 1
 
-    for ADDR; do
+    for ADDR in "$@" ; do
         netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
     done
 
@@ -432,7 +432,7 @@ attach() {
 detach() {
     netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 || return 0
 
-    for ADDR; do
+    for ADDR in "$@" ; do
         if ! netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
             # address is not there, leave the device alone
             continue
@@ -580,7 +580,7 @@ dns_args() {
     docker_bridge_ip
     DNS_ARG="--dns $DOCKER_BRIDGE_IP"
     DNS_SEARCH_ARG="--dns-search=."
-    for arg; do
+    for arg in "$@" ; do
         case $arg in
             --dns-search=*)
                 DNS_SEARCH_ARG=""
@@ -618,7 +618,7 @@ tell_dns_fqdn() {
     # get the long form of the container ID
     CONTAINER=$(docker inspect --format='{{.Id}}' $CONTAINER_ID 2>/dev/null)
     MORE_ARGS="--data-urlencode fqdn=$CONTAINER_FQDN"
-    for ADDR; do
+    for ADDR in "$@" ; do
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT $METHOD /name/$CONTAINER/${ADDR%/*} $MORE_ARGS || true
     done
 }
