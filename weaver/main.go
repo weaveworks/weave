@@ -37,7 +37,7 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		config      weave.RouterConfig
+		config      weave.Config
 		justVersion bool
 		ifaceName   string
 		routerName  string

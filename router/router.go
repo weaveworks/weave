@@ -19,7 +19,7 @@ const macMaxAge = 10 * time.Minute // [1]
 
 type LogFrameFunc func(string, []byte, *layers.Ethernet)
 
-type RouterConfig struct {
+type Config struct {
 	Port      int
 	Iface     *net.Interface
 	Password  []byte
@@ -29,7 +29,7 @@ type RouterConfig struct {
 }
 
 type Router struct {
-	RouterConfig
+	Config
 	Ourself         *LocalPeer
 	Macs            *MacCache
 	Peers           *Peers
@@ -53,8 +53,8 @@ type PacketSourceSink interface {
 	PacketSink
 }
 
-func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
-	router := &Router{RouterConfig: config, GossipChannels: make(GossipChannels)}
+func NewRouter(config Config, name PeerName, nickName string) *Router {
+	router := &Router{Config: config, GossipChannels: make(GossipChannels)}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer)
 	}
