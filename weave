@@ -726,26 +726,38 @@ get_ipam_cidr() {
 # weave proxy helpers
 ######################################################################
 
-# TODO: Handle args with spaces
-# TODO: Handle non-absolute paths for certs
+
+# TODO: Handle relative paths for args
 proxy_args() {
     PROXY_VOLUMES=""
     PROXY_ARGS=""
     while [ $# -gt 0 ]; do
-        case $1 in
-          --tlscacert|--tlscacert=*)
-            [[ "${1#*=}" != "$1" ]] || shift
-            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#--tlscacert=}:/home/weave/tls/ca.pem"
+        case "$1" in
+          --tlscacert)
+            shift
+            PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/ca.pem"
             PROXY_ARGS="$PROXY_ARGS --tlscacert /home/weave/tls/ca.pem"
             ;;
-          --tlscert|--tlscert=*)
-            [[ "${1#*=}" != "$1" ]] || shift
-            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#--tlscert=}:/home/weave/tls/cert.pem"
+          --tlscacert=*)
+            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#*=}:/home/weave/tls/ca.pem"
+            PROXY_ARGS="$PROXY_ARGS --tlscacert /home/weave/tls/ca.pem"
+            ;;
+          --tlscert)
+            shift
+            PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/cert.pem"
             PROXY_ARGS="$PROXY_ARGS --tlscert /home/weave/tls/cert.pem"
             ;;
-          --tlskey|--tlskey=*)
-            [[ "${1#*=}" != "$1" ]] || shift
-            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#--tlskey=}:/home/weave/tls/key.pem"
+          --tlscert=*)
+            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#*=}:/home/weave/tls/cert.pem"
+            PROXY_ARGS="$PROXY_ARGS --tlscert /home/weave/tls/cert.pem"
+            ;;
+          --tlskey)
+            shift
+            PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/key.pem"
+            PROXY_ARGS="$PROXY_ARGS --tlskey /home/weave/tls/key.pem"
+            ;;
+          --tlskey=*)
+            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#*=}:/home/weave/tls/key.pem"
             PROXY_ARGS="$PROXY_ARGS --tlskey /home/weave/tls/key.pem"
             ;;
           *)
