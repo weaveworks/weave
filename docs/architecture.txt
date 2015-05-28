@@ -160,7 +160,7 @@ if a node receives a packet that is bigger than the next MTU, it is
 required to drop the packet and send back an ICMP 3,4 packet which
 informs the sending node of the next hop MTU (RFC 1191). In theory,
 these ICMP packets should have all the reverse NAT and so forth
-applied, to make it all the way back to the sender. In practise this
+applied, to make it all the way back to the sender. In practice, this
 does often work, but in some cases all ICMP are sometimes blocked,
 often by idiots who don't understand that ICMP is really the error
 channel of all network traffic.
@@ -187,16 +187,16 @@ If weave determines that fragmentation is reliable then when weave
 sniffs large packets (i.e. packets larger than the MTU and thus don't
 have DF set) then weave will encapsulate these packets as necessary
 and similarly send them out as-is, without DF set, trusting to the
-network to do all necessary fragementation and reassembly.
+network to do all necessary fragmentation and reassembly.
 
-However, if weave determines that fragementation is not reliable
+However, if weave determines that fragmentation is not reliable
 between any two peers then it will manually fragment larger packets
 correctly according to the IP spec, and will then send them between
 weave peers with the DF flag set (i.e. the fragmentation will ensure
-that the encapsulatated traffic will not be greater than the PMTU
+that the encapsulated traffic will not be greater than the PMTU
 between weave peers). Because the fragmentation is done according to
 the IP spec, we don't need to do reassembly ourselves - on the
-receiving weave, we jus inject all the fragments and rely on the
+receiving weave, we just inject all the fragments and rely on the
 stack to do reassembly.
 
 Sometimes PMTU discovery doesn't work as ICMP packets sometimes get
