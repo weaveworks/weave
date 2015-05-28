@@ -107,6 +107,8 @@ exec_remote() {
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
         -e WEAVE_CONTAINER_NAME \
+        -e WEAVE_MTU \
+        -e WEAVE_NO_FASTDP \
         -e DOCKER_BRIDGE \
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
         -e DOCKER_CLIENT_TLS_VERIFY="$DOCKER_CLIENT_TLS_VERIFY" \
@@ -263,7 +265,8 @@ DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
-MTU=65535
+# ROUTER_HOSTNETNS_IFNAME is only used for fastdp with encryption
+ROUTER_HOSTNETNS_IFNAME=weave2
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 PROXY_PORT=12375
@@ -366,33 +369,57 @@ random_mac() {
 ######################################################################
 
 create_bridge() {
+    BRIDGE_TYPE=
+
     if [ ! -d /sys/class/net/$BRIDGE ] ; then
-        ip link add name $BRIDGE type bridge
-        # Set a random MAC address on the bridge.  Current Linux
-        # kernels already do this when creating a bridge, but there
-        # are rumours it was not always so.
-        ip link set dev $BRIDGE address $(random_mac)
-        # Attempting to set the bridge MTU to a high value directly
-        # fails. Bridges take the lowest MTU of their interfaces. So
-        # instead we create a temporary interface with the desired
-        # MTU, attach that to the bridge, and then remove it again.
-        ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
-        ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
-        ip link del dev v${CONTAINER_IFNAME}du
-        # Drop traffic from Docker bridge to Weave; it can break subnet isolation
+        if [ -n "$WEAVE_NO_FASTDP" ] ; then
+            BRIDGE_TYPE=bridge
+        elif docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --create-datapath --datapath=$BRIDGE ; then
+            BRIDGE_TYPE=fastdp
+        elif [ $? = 17 ] ; then
+            # Exit status of 17 means the kernel doesn't have ODP
+            BRIDGE_TYPE=bridge
+        else
+            return 1
+        fi
+
+        init_bridge_$BRIDGE_TYPE
+
+        # Drop traffic from Docker bridge to Weave; it can break
+        # subnet isolation
         if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
             # Note using -I to insert ahead of Docker's bridge rules
             run_iptables -t filter -I FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP
         fi
+
         # Work around the situation where there are no rules allowing traffic
         # across our bridge. E.g. ufw
         add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
+
         # create a chain for masquerading
         run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
         add_iptables_rule nat POSTROUTING -j WEAVE
+    else
+        # Detect whether fast datapath is in use on
+        # $BRIDGE. Unfortunately there's no simple way to positively
+        # check whether $BRIDGE is a ODP netdev, so we have to check
+        # whether it is a bridge instead.
+        if [ -d /sys/class/net/$BRIDGE/bridge ] ; then
+            BRIDGE_TYPE=bridge
+        else
+            BRIDGE_TYPE=fastdp
+        fi
+
+        # WEAVE_MTU may have been specified when the bridge was
+        # created (perhaps implicitly with WEAVE_NO_FASTDP).  So take
+        # the MTU from the bridge unless it is explicitly specified
+        # for this invocation.
+        MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
     fi
 
-    [ "$1" != "--without-ethtool" ] && ethtool -K $BRIDGE tx off >/dev/null
+    if [ "$1" != "--without-ethtool" ] ; then
+        ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
+    fi
 
     ip link set dev $BRIDGE up
 
@@ -401,11 +428,58 @@ create_bridge() {
     configure_arp_cache $BRIDGE
 }
 
+init_bridge_fastdp () {
+    # GCE has the lowest underlay network MTU we're likely to encounter on
+    # a local network, at 1460 bytes.  To get the overlay MTU from that we
+    # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
+    # UDP header, 8 bytes for the vxlan header, and 14 bytes for the inner
+    # ethernet header.
+    MTU=${WEAVE_MTU:-1410}
+
+    # create_bridge already created the datapath netdev
+    ip link set dev $BRIDGE mtu $MTU
+}
+
+init_bridge_bridge () {
+    MTU=${WEAVE_MTU:-65535}
+
+    ip link add name $BRIDGE type bridge
+
+    # Set a random MAC address on the bridge.  Current Linux
+    # kernels already do this when creating a bridge, but there
+    # are rumours it was not always so.
+    ip link set dev $BRIDGE address $(random_mac)
+
+    # Attempting to set the bridge MTU to a high value directly
+    # fails. Bridges take the lowest MTU of their interfaces. So
+    # instead we create a temporary interface with the desired
+    # MTU, attach that to the bridge, and then remove it again.
+    ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
+    ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
+    ip link del dev v${CONTAINER_IFNAME}du
+}
+
+ethtool_tx_off_fastdp () {
+    true
+}
+
+ethtool_tx_off_bridge () {
+    ethtool -K $1 tx off >/dev/null
+}
+
 destroy_bridge() {
-    [ -d /sys/class/net/$BRIDGE ] && ip link del dev $BRIDGE
+    if [ -d /sys/class/net/$BRIDGE ] ; then
+        if [ -d /sys/class/net/$BRIDGE/bridge ] ; then
+            ip link del dev $BRIDGE
+        else
+            docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --delete-datapath --datapath=$BRIDGE
+        fi
+    fi
+
     if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
         run_iptables -t filter -D FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP 2>/dev/null || true
     fi
+
     run_iptables -t filter -D FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT 2>/dev/null || true
     run_iptables -t nat -F WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
@@ -474,17 +548,11 @@ netnsenter() {
     nsenter --net=$PROCFS/$CONTAINER_PID/ns/net "$@"
 }
 
+# connect_container_to_bridge <container inteface name>
 connect_container_to_bridge() {
-    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/$$/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/$$/ns/net)" ] ; then
-        echo "Container is running in the host network namespace, and therefore cannot be" >&2
-        echo "connected to weave. Perhaps the container was started with --net=host." >&2
-        return 1
-    fi
     ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU || return 1
 
-    if ! ethtool -K $GUEST_IFNAME tx off >/dev/null ||
-        ! ip link set $LOCAL_IFNAME master $BRIDGE ||
-        ! ip link set $LOCAL_IFNAME up ||
+    if ! ethtool_tx_off_$BRIDGE_TYPE $GUEST_IFNAME ||
         ! ip link set $GUEST_IFNAME netns $PROCFS/$CONTAINER_PID/ns/net ; then
         # failed before we assigned the veth to the container's
         # namespace
@@ -492,10 +560,28 @@ connect_container_to_bridge() {
         return 1
     fi
 
-    if ! netnsenter ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
-       ! configure_arp_cache $CONTAINER_IFNAME "netnsenter" ; then
+    # Versions of the 'ip' command differ in whether they create a
+    # veth pair in the 'up' or 'down' state.  Furthermore, moving one
+    # end into a netns normally sets them to 'down'.  But, moving an
+    # end into the default netns is a null operation, so they stay up,
+    # which leads to errors later on.  So to get a consistent result,
+    # we have to be explicit in setting them 'up' or 'down' as
+    # necessary.
+    if ! netnsenter ip link set $GUEST_IFNAME down ||
+       ! netnsenter ip link set $GUEST_IFNAME name $1 up ||
+       ! ip link set $LOCAL_IFNAME up ||
+       ! add_iface_$BRIDGE_TYPE $LOCAL_IFNAME ||
+       ! configure_arp_cache $1 "netnsenter" ; then
         return 1
     fi
+}
+
+add_iface_fastdp () {
+    docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --datapath=$BRIDGE --add-datapath-iface=$1
+}
+
+add_iface_bridge () {
+    ip link set $1 master $BRIDGE
 }
 
 ask_version() {
@@ -507,23 +593,65 @@ ask_version() {
     [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
 }
 
+router_opts_fastdp () {
+    if [ -z "$WEAVE_PASSWORD" ] ; then
+        echo "--datapath $BRIDGE"
+    else
+        # When using encryption, we still do bridging on the ODP
+        # datapath, because you can 'weave launch' without encryption
+        # and then later restart the router with encryption, or vice
+        # versa.  Encryption disables the use of the fastdp Overlay,
+        # but the router could still use the fastdp Bridge to receive
+        # packets.  However, pcap has better performance when sniffing
+        # every packet.  So we pass --iface to use the pcap Bridge.
+        #
+        # Why don't we simply pass "--iface $BRIDGE".  We could,
+        # except for the fact that NetworkManager likes to down the
+        # odp $BRIDGE netdev (at least under ubuntu), and you can only
+        # use pcap on an interface that is up.  We avoid that by use
+        # pcap via a veth pair (NetworkManager leaves them alone).
+        # Having a netdev in the host netns called "ethwe" might
+        # surprise people, so it is called $ROUTER_HOSTNETNS_IFNAME
+        # instead.
+        echo "--datapath $BRIDGE --iface $ROUTER_HOSTNETNS_IFNAME"
+    fi
+}
+
+router_opts_bridge () {
+    echo "--iface $CONTAINER_IFNAME"
+}
+
 ######################################################################
 # functions invoked through with_container_netns
 ######################################################################
 
-launch() {
+setup_router_iface_fastdp() {
+    if [ -n "$WEAVE_PASSWORD" ] ; then
+        # See router_opts_fastdp
+        connect_container_to_bridge $ROUTER_HOSTNETNS_IFNAME &&
+            ip link set $ROUTER_HOSTNETNS_IFNAME up
+    fi
+}
+
+setup_router_iface_bridge() {
     if ! netnsenter ip link show eth0 >/dev/null ; then
         echo "Perhaps you are running the docker daemon with container networking disabled (-b=none)." >&2
         return 1
     fi
-    connect_container_to_bridge &&
+    connect_container_to_bridge $CONTAINER_IFNAME &&
         netnsenter ethtool -K eth0 tx off >/dev/null &&
         netnsenter ip link set $CONTAINER_IFNAME up
 }
 
 attach() {
+    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/$$/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/$$/ns/net)" ] ; then
+        echo "Container is running in the host network namespace, and therefore cannot be" >&2
+        echo "connected to weave. Perhaps the container was started with --net=host." >&2
+        return 1
+    fi
+
     if ! netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        connect_container_to_bridge || return 1
+        connect_container_to_bridge $CONTAINER_IFNAME || return 1
     fi
 
     NEW_ADDRS=
@@ -645,8 +773,8 @@ container_ip() {
     fi
     case "$status" in
         "true ")
-            echo "$1 container has no IP address; is Docker networking enabled?" >&2
-            return 1
+            #echo "$1 container has no IP address; is Docker networking enabled?" >&2
+            CONTAINER_IP=127.0.0.1
             ;;
         true*)
             CONTAINER_IP="${status#true }"
@@ -1127,10 +1255,17 @@ launch_router() {
         shift 1
     fi
     CONTAINER_PORT=$PORT
-    ARGS=""
+    ARGS=
     IPRANGE=
     IPRANGE_SPECIFIED=
+
+    # DNS_PORT_MAPPING is only used if the router runs in a container
+    # netns.  DNS_ROUTER_OPTS is only used if the router runs in the
+    # host netns.
     DNS_PORT_MAPPING="-p $DOCKER_BRIDGE_IP:53:53/udp -p $DOCKER_BRIDGE_IP:53:53/tcp"
+    DNS_ROUTER_OPTS="--dns-listen-address $DOCKER_BRIDGE_IP:53"
+    NO_DNS_OPT=
+
     while [ $# -gt 0 ] ; do
         case "$1" in
             -password|--password)
@@ -1163,6 +1298,8 @@ launch_router() {
                 ;;
             --no-dns)
                 DNS_PORT_MAPPING=
+                DNS_ROUTER_OPTS=
+                NO_DNS_OPT="--no-dns"
                 ARGS="$ARGS $1"
                 ;;
             *)
@@ -1185,16 +1322,28 @@ launch_router() {
                 echo "Unless this is deliberate, you must pick another range and set it on all hosts." >&2
         fi
     fi
+
+    if [ "$BRIDGE_TYPE" = fastdp ] ; then
+        NETHOST_OPT="--net=host"
+    fi
+
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
     ROUTER_CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-        -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp $DNS_PORT_MAPPING \
         -v /var/run/docker.sock:/var/run/docker.sock \
+        -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp \
+        ${NETHOST_OPT:-$DNS_PORT_MAPPING} \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
-        $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS --iface $CONTAINER_IFNAME --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" --ipalloc-range "$IPRANGE" --dns-effective-listen-address "$DOCKER_BRIDGE_IP" --docker-api "unix:///var/run/docker.sock" "$@")
-    with_container_netns_or_die $ROUTER_CONTAINER launch
+        $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
+        --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" \
+        $(router_opts_$BRIDGE_TYPE) \
+        --ipalloc-range "$IPRANGE" \
+        --dns-effective-listen-address $DOCKER_BRIDGE_IP \
+        ${NETHOST_OPT:+$DNS_ROUTER_OPTS} $NO_DNS_OPT \
+        --docker-api "unix:///var/run/docker.sock" "$@")
+    with_container_netns_or_die $ROUTER_CONTAINER setup_router_iface_$BRIDGE_TYPE
     err_msg=$(death_msg $CONTAINER_NAME)
     container_ip $CONTAINER_NAME "$err_msg" "$err_msg" || return 1
     wait_for_status $CONTAINER_NAME http_call $CONTAINER_IP:$HTTP_PORT
@@ -1202,7 +1351,7 @@ launch_router() {
         # Tell the newly-started weave IP allocator about existing weave IPs
         with_container_addresses ipam_reclaim weave:expose $(docker ps -q --no-trunc)
     fi
-    if [ -n "$DNS_PORT_MAPPING" ] ; then
+    if [ -z "$NO_DNS_OPT" ] ; then
         # Tell the newly-started weaveDNS about existing weave IPs
         for CONTAINER in $(docker ps -q --no-trunc) ; do
             if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
