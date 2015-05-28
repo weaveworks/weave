@@ -3,6 +3,7 @@ package ipam
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,12 +31,15 @@ func toStringArray(messages []mockMessage) []string {
 }
 
 type mockGossipComms struct {
+	sync.RWMutex
 	t        *testing.T
 	name     string
 	messages []mockMessage
 }
 
 func (m *mockGossipComms) String() string {
+	m.RLock()
+	defer m.RUnlock()
 	return fmt.Sprintf("[mockGossipComms %s]", m.name)
 }
 
@@ -44,6 +48,8 @@ func (m *mockGossipComms) String() string {
 // requires they are not based off iterating through a map.
 
 func (m *mockGossipComms) GossipBroadcast(update router.GossipData) error {
+	m.Lock()
+	defer m.Unlock()
 	buf := []byte{}
 	if len(m.messages) == 0 {
 		m.Fatalf("%s: Gossip broadcast message unexpected: \n%x", m.name, buf)
@@ -76,6 +82,8 @@ func (m *mockGossipComms) Fatalf(format string, args ...interface{}) {
 }
 
 func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
+	m.Lock()
+	defer m.Unlock()
 	if len(m.messages) == 0 {
 		m.Fatalf("%s: Gossip message to %s unexpected: \n%s", m.name, dstPeerName, buf)
 	} else if msg := m.messages[0]; msg.dst == router.UnknownPeerName {
@@ -96,20 +104,26 @@ func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte)
 func ExpectMessage(alloc *Allocator, dst string, msgType byte, buf []byte) {
 	m := alloc.gossip.(*mockGossipComms)
 	dstPeerName, _ := router.PeerNameFromString(dst)
+	m.Lock()
 	m.messages = append(m.messages, mockMessage{dstPeerName, msgType, buf})
+	m.Unlock()
 }
 
 func ExpectBroadcastMessage(alloc *Allocator, buf []byte) {
 	m := alloc.gossip.(*mockGossipComms)
+	m.Lock()
 	m.messages = append(m.messages, mockMessage{router.UnknownPeerName, 0, buf})
+	m.Unlock()
 }
 
 func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 	for _, alloc := range allocs {
 		m := alloc.gossip.(*mockGossipComms)
+		m.RLock()
 		if len(m.messages) > 0 {
 			wt.Fatalf(m.t, "%s: Gossip message(s) not sent as expected: \n%x", m.name, m.messages)
 		}
+		m.RUnlock()
 	}
 }
 
