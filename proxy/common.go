@@ -16,7 +16,7 @@ import (
 
 var (
 	containerIDRegexp   = regexp.MustCompile("^/v[0-9\\.]*/containers/([^/]*)/.*")
-	weaveWaitEntrypoint = []string{"/home/weavewait/weavewait"}
+	weaveWaitEntrypoint = []string{"/w/w"}
 )
 
 func callWeave(args ...string) ([]byte, error) {
