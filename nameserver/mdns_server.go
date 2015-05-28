@@ -1,9 +1,10 @@
 package nameserver
 
 import (
+	"net"
+
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
-	"net"
 )
 
 type MDNSServer struct {

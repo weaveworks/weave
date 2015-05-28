@@ -2,12 +2,13 @@ package nameserver
 
 import (
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
 )
 
 func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,

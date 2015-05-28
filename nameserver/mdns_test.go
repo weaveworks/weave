@@ -1,12 +1,13 @@
 package nameserver
 
 import (
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 // Check that we can use a regular mDNS server with a regular mDNS client

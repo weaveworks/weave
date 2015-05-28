@@ -3,10 +3,11 @@ package nameserver
 import (
 	"bytes"
 	"fmt"
-	"github.com/miekg/dns"
 	"math"
 	"net"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 // Portions of this code taken from github.com/armon/mdns

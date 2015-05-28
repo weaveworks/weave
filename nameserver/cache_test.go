@@ -2,13 +2,14 @@ package nameserver
 
 import (
 	"fmt"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	wt "github.com/weaveworks/weave/testing"
-	"net"
-	"testing"
-	"time"
 )
 
 // Check that the cache keeps its intended capacity constant
@@ -201,7 +202,7 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertNotNil(t, err, "Get() error with CacheNoLocalReplies")
 
 	clk.Add(time.Second * time.Duration(negLocalTTL+1))
-	t.Logf("Checking that we get an expired response after %f seconds", negLocalTTL)
+	t.Logf("Checking that we get an expired response after %d seconds", negLocalTTL)
 	resp, err = l.Get(questionMsg3, minUDPSize)
 	wt.AssertNil(t, resp, "expired Get() response with CacheNoLocalReplies")
 	wt.AssertNil(t, err, "expired Get() error with CacheNoLocalReplies")

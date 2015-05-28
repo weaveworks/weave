@@ -3,12 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
+	"os"
+
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/updater"
 	weavedns "github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
-	"net"
-	"os"
 )
 
 var version = "(unreleased version)"

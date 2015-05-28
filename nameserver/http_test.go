@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"fmt"
-	wt "github.com/weaveworks/weave/testing"
 	"math/rand"
 	"net"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func genForm(method string, url string, data url.Values) (resp *http.Response, err error) {

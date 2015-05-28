@@ -1,9 +1,10 @@
 package nameserver
 
 import (
-	"github.com/miekg/dns"
 	"math/rand"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 const (

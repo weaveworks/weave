@@ -1,13 +1,14 @@
 package nameserver
 
 import (
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"log"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 var (

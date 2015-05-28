@@ -2,12 +2,13 @@ package nameserver
 
 import (
 	"fmt"
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 // Check if the names updates lead to cache invalidations

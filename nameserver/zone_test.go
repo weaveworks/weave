@@ -2,10 +2,11 @@ package nameserver
 
 import (
 	"fmt"
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
+
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func TestZone(t *testing.T) {

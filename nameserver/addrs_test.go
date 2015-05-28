@@ -1,10 +1,11 @@
 package nameserver
 
 import (
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
+
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func TestAddrs(t *testing.T) {

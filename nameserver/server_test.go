@@ -3,12 +3,13 @@ package nameserver
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 const (
@@ -180,7 +181,7 @@ func TestTCPDNSServer(t *testing.T) {
 	fallback.Start()
 	defer fallback.Stop()
 
-	t.Logf("Creating a WeaveDNS server instance, falling back to 127.0.0.1:%s", fallback.Port)
+	t.Logf("Creating a WeaveDNS server instance, falling back to 127.0.0.1:%d", fallback.Port)
 	srv, err := NewDNSServer(DNSServerConfig{
 		Zone:              zone,
 		UpstreamCfg:       fallback.CliConfig,

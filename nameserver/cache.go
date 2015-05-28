@@ -5,12 +5,13 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
-	"github.com/benbjohnson/clock"
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/benbjohnson/clock"
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
 )
 
 var (

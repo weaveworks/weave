@@ -3,12 +3,13 @@ package nameserver
 import (
 	"bytes"
 	"fmt"
-	"github.com/benbjohnson/clock"
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/benbjohnson/clock"
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
 )
 
 const (
@@ -103,8 +104,8 @@ func newRecordEntry(zr ZoneRecord, now time.Time) *recordEntry {
 	}
 }
 
-func (i *recordEntry) addIPObserver(zro ZoneRecordObserver) {
-	i.observers = append(i.observers, zro)
+func (re *recordEntry) addIPObserver(zro ZoneRecordObserver) {
+	re.observers = append(re.observers, zro)
 }
 
 // Notify all the IP observers and then remove them all
@@ -280,24 +281,24 @@ func newNamesSet() *namesSet     { return &namesSet{names: make(map[string]*name
 func (ns *namesSet) len() int    { return len(ns.names) }
 func (ns *namesSet) empty() bool { return ns.len() == 0 }
 func (ns *namesSet) hasName(name string) bool {
-	if n, found := ns.names[name]; !found {
+	n, found := ns.names[name]
+	if !found {
 		return false
-	} else {
-		// the name must have some valid IPs in order to be considered as "existent"
-		return len(n.ipv4) > 0
 	}
+	// the name must have some valid IPs in order to be considered as "existent"
+	return len(n.ipv4) > 0
 }
 
 // Get the zone entries for a name
 // If the name does not exist and `create` is true, a new name will be created
 func (ns *namesSet) getName(name string, create bool) (n *name) {
-	if n, found := ns.names[name]; !found && create {
+	n, found := ns.names[name]
+	if !found && create {
 		newName := newName(name)
 		ns.names[name] = newName
 		return newName
-	} else {
-		return n
 	}
+	return n
 }
 
 // Get all the entries for a name
@@ -333,16 +334,16 @@ func (ns *namesSet) addIPToName(zr ZoneRecord, now time.Time) (*recordEntry, err
 
 // Delete a name in the names set
 func (ns *namesSet) deleteName(n string) error {
-	if name, found := ns.names[n]; found {
+	name, found := ns.names[n]
+	if found {
 		for _, ipRecord := range name.getAllEntries() {
 			ipRecord.notifyIPObservers()
 		}
 		name.notifyNameObservers()
 		delete(ns.names, n)
 		return nil
-	} else {
-		return LookupError(fmt.Sprintf("%+v", name))
 	}
+	return LookupError(fmt.Sprintf("%+v", name))
 }
 
 // Delete an IPv4 from all names
@@ -441,7 +442,7 @@ type ZoneConfig struct {
 // The zone database contains the locally known information about the zone.
 // The zone database uses some other mechanisms (eg, mDNS) for finding unknown
 // information or for keeping current information up to date.
-type zoneDb struct {
+type ZoneDb struct {
 	mx     sync.RWMutex
 	idents identRecordsSet
 
@@ -461,13 +462,13 @@ type zoneDb struct {
 }
 
 // Create a new zone database
-func NewZoneDb(config ZoneConfig) (zone *zoneDb, err error) {
+func NewZoneDb(config ZoneConfig) (zone *ZoneDb, err error) {
 	maxRefreshRequests := defaultRefreshMailbox
 	if config.MaxRefreshRequests > 0 {
 		maxRefreshRequests = config.MaxRefreshRequests
 	}
 
-	zone = &zoneDb{
+	zone = &ZoneDb{
 		domain:           config.Domain,
 		idents:           make(identRecordsSet),
 		mdnsCli:          config.MDNSClient,
@@ -514,7 +515,7 @@ func NewZoneDb(config ZoneConfig) (zone *zoneDb, err error) {
 }
 
 // Start the zone database
-func (zone *zoneDb) Start() (err error) {
+func (zone *ZoneDb) Start() (err error) {
 	if zone.iface != nil {
 		Info.Printf("[zonedb] Using mDNS on %+v", zone.iface)
 	} else {
@@ -548,7 +549,7 @@ func (zone *zoneDb) Start() (err error) {
 }
 
 // Perform a graceful shutdown of the zone database
-func (zone *zoneDb) Stop() error {
+func (zone *ZoneDb) Stop() error {
 	if zone.refreshInterval > 0 {
 		Debug.Printf("[zonedb] Closing background updaters...")
 		close(zone.refreshCloseChan)
@@ -562,12 +563,12 @@ func (zone *zoneDb) Stop() error {
 }
 
 // Obtain the domain where this database keeps information for
-func (zone *zoneDb) Domain() string {
+func (zone *ZoneDb) Domain() string {
 	return zone.domain
 }
 
 // Return the status string
-func (zone *zoneDb) Status() string {
+func (zone *ZoneDb) Status() string {
 	var buf bytes.Buffer
 	fmt.Fprintln(&buf, "Local domain", zone.domain)
 	fmt.Fprintln(&buf, "Interface", zone.iface)
@@ -576,7 +577,7 @@ func (zone *zoneDb) Status() string {
 }
 
 // Add a record with `name` pointing to `ip`
-func (zone *zoneDb) AddRecord(ident string, name string, ip net.IP) (err error) {
+func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) (err error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	Debug.Printf("[zonedb] Adding record: '%s'/'%s'[%s]", ident, name, ip)
@@ -586,7 +587,7 @@ func (zone *zoneDb) AddRecord(ident string, name string, ip net.IP) (err error) 
 }
 
 // Delete all records for an ident
-func (zone *zoneDb) DeleteRecordsFor(ident string) (err error) {
+func (zone *ZoneDb) DeleteRecordsFor(ident string) (err error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 	Debug.Printf("[zonedb] Deleting records for ident '%s'", ident)
@@ -595,7 +596,7 @@ func (zone *zoneDb) DeleteRecordsFor(ident string) (err error) {
 }
 
 // Delete an IP in a ident
-func (zone *zoneDb) DeleteRecord(ident string, ip net.IP) (err error) {
+func (zone *ZoneDb) DeleteRecord(ident string, ip net.IP) (err error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
@@ -620,7 +621,7 @@ func (zone *zoneDb) DeleteRecord(ident string, ip net.IP) (err error) {
 // The observer will be invoked on any change/removal that affects this name.
 // Each observer will be invoked at least once (but possibly more). After that, they will be removed.
 // The observer should not try to lock the ZoneDB (you will get a deadlock)
-func (zone *zoneDb) ObserveName(name string, observer ZoneRecordObserver) (err error) {
+func (zone *ZoneDb) ObserveName(name string, observer ZoneRecordObserver) (err error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
@@ -629,7 +630,7 @@ func (zone *zoneDb) ObserveName(name string, observer ZoneRecordObserver) (err e
 	for _, nameset := range zone.idents {
 		if n := nameset.getName(name, false); n != nil {
 			n.addNameObserver(observer)
-			cnt += 1
+			cnt++
 		}
 	}
 	if cnt == 0 {
@@ -646,7 +647,7 @@ func (zone *zoneDb) ObserveName(name string, observer ZoneRecordObserver) (err e
 // The observer will be invoked on any change/removal that affects this IP.
 // Each observer will be invoked at least once (but possibly more). After that, they will be removed.
 // The observer should not try to lock the ZoneDB (you will get a deadlock)
-func (zone *zoneDb) ObserveInaddr(inaddr string, observer ZoneRecordObserver) (err error) {
+func (zone *ZoneDb) ObserveInaddr(inaddr string, observer ZoneRecordObserver) (err error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
@@ -658,7 +659,7 @@ func (zone *zoneDb) ObserveInaddr(inaddr string, observer ZoneRecordObserver) (e
 	for _, nameset := range zone.idents {
 		for _, entry := range nameset.getEntriesForIP(revIP) {
 			entry.addIPObserver(observer)
-			cnt += 1
+			cnt++
 		}
 	}
 	if cnt == 0 {
@@ -668,20 +669,20 @@ func (zone *zoneDb) ObserveInaddr(inaddr string, observer ZoneRecordObserver) (e
 }
 
 // Get the string representation of a zone
-func (zone *zoneDb) String() string {
+func (zone *ZoneDb) String() string {
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 	return zone.idents.String()
 }
 
 // Notify that a container has died
-func (zone *zoneDb) ContainerDied(ident string) error {
+func (zone *ZoneDb) ContainerDied(ident string) error {
 	Info.Printf("[zonedb] Container %s down. Removing records", ident)
 	return zone.DeleteRecordsFor(ident)
 }
 
 // Return true if a remote name is still relevant
-func (zone *zoneDb) IsNameRelevant(n string) bool {
+func (zone *ZoneDb) IsNameRelevant(n string) bool {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
@@ -699,7 +700,7 @@ func (zone *zoneDb) IsNameRelevant(n string) bool {
 
 // Returns true if the info we have for a remote name has expired. Local names are never expired
 // Returns false if we do not have info for this name from remote peers.
-func (zone *zoneDb) IsNameExpired(n string) bool {
+func (zone *ZoneDb) IsNameExpired(n string) bool {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
@@ -716,7 +717,7 @@ func (zone *zoneDb) IsNameExpired(n string) bool {
 	return false
 }
 
-func (zone *zoneDb) HasNameLocalInfo(n string) bool {
+func (zone *ZoneDb) HasNameLocalInfo(n string) bool {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
@@ -734,7 +735,7 @@ func (zone *zoneDb) HasNameLocalInfo(n string) bool {
 // Return true if the we have obtained some information for a name from remote peers
 // We can have both local (eg, introduced through the HTTP API) and remote (eg, mDNS)
 // information for a name. This method only checks if there is remote information...
-func (zone *zoneDb) HasNameRemoteInfo(n string) bool {
+func (zone *ZoneDb) HasNameRemoteInfo(n string) bool {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
@@ -746,7 +747,7 @@ func (zone *zoneDb) HasNameRemoteInfo(n string) bool {
 }
 
 // Get or create a names set
-func (zone *zoneDb) getNamesSet(ident string) *namesSet {
+func (zone *ZoneDb) getNamesSet(ident string) *namesSet {
 	ns, found := zone.idents[ident]
 	if !found {
 		ns = newNamesSet()
@@ -756,7 +757,7 @@ func (zone *zoneDb) getNamesSet(ident string) *namesSet {
 }
 
 // Delete a ident
-func (zone *zoneDb) deleteIdent(ident string) {
+func (zone *ZoneDb) deleteIdent(ident string) {
 	Info.Printf("[zonedb] Removing everything for ident '%s'", ident)
 	if ns, found := zone.idents[ident]; found {
 		for _, n := range ns.names {

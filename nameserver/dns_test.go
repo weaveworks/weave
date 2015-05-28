@@ -1,11 +1,12 @@
 package nameserver
 
 import (
+	"net"
+	"testing"
+
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	wt "github.com/weaveworks/weave/testing"
-	"net"
-	"testing"
 )
 
 // Check that we can prune an answer

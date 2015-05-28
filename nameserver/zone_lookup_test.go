@@ -1,11 +1,12 @@
 package nameserver
 
 import (
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
 	"time"
+
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 // Check that the refreshing mechanism works as expected

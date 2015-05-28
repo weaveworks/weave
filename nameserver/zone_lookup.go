@@ -1,9 +1,10 @@
 package nameserver
 
 import (
+	"time"
+
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
-	"time"
 )
 
 type uniqZoneRecordKey struct {
@@ -38,7 +39,7 @@ func (uzr *uniqZoneRecords) toSlice() []ZoneRecord {
 //////////////////////////////////////////////////////////////////////////////
 
 // Lookup in the database for locally-introduced information
-func (zone *zoneDb) lookup(target string, lfun func(ns *namesSet) []*recordEntry) (res []ZoneRecord, err error) {
+func (zone *ZoneDb) lookup(target string, lfun func(ns *namesSet) []*recordEntry) (res []ZoneRecord, err error) {
 	uniq := newUniqZoneRecords()
 	for identName, nameset := range zone.idents {
 		if identName != defaultRemoteIdent {
@@ -49,14 +50,13 @@ func (zone *zoneDb) lookup(target string, lfun func(ns *namesSet) []*recordEntry
 	}
 	if len(uniq) == 0 {
 		return nil, LookupError(target)
-	} else {
-		return uniq.toSlice(), nil
 	}
+	return uniq.toSlice(), nil
 }
 
 // Perform a lookup for a name in the zone
 // The name can be resolved locally with the local database
-func (zone *zoneDb) LookupName(name string) (res []ZoneRecord, err error) {
+func (zone *ZoneDb) LookupName(name string) (res []ZoneRecord, err error) {
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 
@@ -68,7 +68,7 @@ func (zone *zoneDb) LookupName(name string) (res []ZoneRecord, err error) {
 
 // Perform a lookup for a IP address in the zone
 // The address can be resolved locally with the local database
-func (zone *zoneDb) LookupInaddr(inaddr string) (res []ZoneRecord, err error) {
+func (zone *ZoneDb) LookupInaddr(inaddr string) (res []ZoneRecord, err error) {
 	zone.mx.RLock()
 	defer zone.mx.RUnlock()
 
@@ -82,7 +82,7 @@ func (zone *zoneDb) LookupInaddr(inaddr string) (res []ZoneRecord, err error) {
 }
 
 // Perform a domain lookup with mDNS
-func (zone *zoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []ZoneRecord, err error) {
+func (zone *ZoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []ZoneRecord, err error) {
 	// no local results have been obtained in the local database: try with a mDNS query
 	Debug.Printf("[zonedb] '%s' not in local database... trying with mDNS", target)
 	lanswers, err := lfun(target)
@@ -115,7 +115,7 @@ func (zone *zoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []Zone
 
 // Perform a lookup for a name in the zone
 // The name can be resolved locally with the local database or with some other resolution method (eg, a mDNS query)
-func (zone *zoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) {
+func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) {
 	name = dns.Fqdn(name)
 	Debug.Printf("[zonedb] Looking for name '%s' in local(&remote) database", name)
 
@@ -156,7 +156,7 @@ func (zone *zoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 // Perform a lookup for a IP address in the zone
 // The address can be resolved either with the local database or
 // with some other resolution method (eg, a mDNS query)
-func (zone *zoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err error) {
+func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err error) {
 	revIPv4, err := raddrToIPv4(inaddr)
 	if err != nil {
 		return nil, newParseError("lookup address", inaddr)
@@ -239,7 +239,7 @@ func (zone *zoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 //       Anyway, maybe we will move to a gossip-based solution instead of doing this polling...
 
 // Check if we must start updating a name and, in that case, trigger a immediate update
-func (zone *zoneDb) startUpdatingName(name string) {
+func (zone *ZoneDb) startUpdatingName(name string) {
 	if zone.refreshInterval > 0 {
 		zone.mx.Lock()
 		defer zone.mx.Unlock()
@@ -257,7 +257,7 @@ func (zone *zoneDb) startUpdatingName(name string) {
 }
 
 // A worker for updating the list of IPs we have for a name
-func (zone *zoneDb) updater(num int) {
+func (zone *ZoneDb) updater(num int) {
 	defer zone.refreshWg.Done()
 
 	Debug.Printf("[zonedb] Starting background updater #%d...", num)
@@ -310,7 +310,7 @@ func (zone *zoneDb) updater(num int) {
 // The periodic updater
 // Consume requests from the `refreshSchedChan`, where requests with increasing scheduling time are enqueued
 // for refreshing names...
-func (zone *zoneDb) periodicUpdater() {
+func (zone *ZoneDb) periodicUpdater() {
 	defer zone.refreshWg.Done()
 	for {
 		select {

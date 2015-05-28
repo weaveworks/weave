@@ -2,15 +2,16 @@ package nameserver
 
 import (
 	"fmt"
-	"github.com/benbjohnson/clock"
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/benbjohnson/clock"
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 const (
@@ -153,7 +154,7 @@ func (mc *mockedMDNSClient) LookupName(name string) ([]ZoneRecord, error) {
 	defer mc.Unlock()
 
 	// get a random result
-	mc.NumLookupsName += 1
+	mc.NumLookupsName++
 	for _, server := range mc.servers {
 		r, err := server.Zone().LookupName(name)
 		if err == nil {
@@ -168,7 +169,7 @@ func (mc *mockedMDNSClient) LookupInaddr(inaddr string) ([]ZoneRecord, error) {
 	defer mc.Unlock()
 
 	// get a random result
-	mc.NumLookupsInaddr += 1
+	mc.NumLookupsInaddr++
 	for _, server := range mc.servers {
 		r, err := server.Zone().LookupInaddr(inaddr)
 		if err == nil {
@@ -182,8 +183,8 @@ func (mc *mockedMDNSClient) InsistentLookupName(name string) ([]ZoneRecord, erro
 	mc.Lock()
 	defer mc.Unlock()
 
-	res := make([]ZoneRecord, 0)
-	mc.NumInsLookupsName += 1
+	var res []ZoneRecord
+	mc.NumInsLookupsName++
 	for _, server := range mc.servers {
 		r, err := server.Zone().LookupName(name)
 		if err == nil {
@@ -200,8 +201,8 @@ func (mc *mockedMDNSClient) InsistentLookupInaddr(inaddr string) ([]ZoneRecord, 
 	mc.Lock()
 	defer mc.Unlock()
 
-	res := make([]ZoneRecord, 0)
-	mc.NumInsLookupsInaddr += 1
+	var res []ZoneRecord
+	mc.NumInsLookupsInaddr++
 	for _, server := range mc.servers {
 		r, err := server.Zone().LookupInaddr(inaddr)
 		if err == nil {
@@ -231,7 +232,7 @@ func (mc *mockedMDNSClient) RemoveServer(srv ZoneMDNSServer) {
 type zbmEntry struct {
 	Server *mockedMDNSServer
 	Client *mockedMDNSClient
-	Zone   *zoneDb
+	Zone   *ZoneDb
 }
 type zoneDbsWithMockedMDns []*zbmEntry
 
@@ -303,14 +304,14 @@ type mockedCache struct {
 func newMockedCache() *mockedCache { return &mockedCache{} }
 
 func (c *mockedCache) Get(request *dns.Msg, maxLen int) (reply *dns.Msg, err error) {
-	c.NumGets += 1
+	c.NumGets++
 	return nil, nil
 }
 func (c *mockedCache) Put(request *dns.Msg, reply *dns.Msg, ttl int, flags uint8) int {
-	c.NumPuts += 1
+	c.NumPuts++
 	return 0
 }
-func (c *mockedCache) Remove(question *dns.Question) { c.NumRemovals += 1 }
+func (c *mockedCache) Remove(question *dns.Question) { c.NumRemovals++ }
 func (c *mockedCache) Purge()                        {}
 func (c *mockedCache) Clear()                        {}
 func (c *mockedCache) Len() int                      { return 0 }
