@@ -360,16 +360,14 @@ netnsenter() {
 }
 
 connect_container_to_bridge() {
-    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "$PROCFS/$$/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink $PROCFS/$$/ns/net)" ] ; then
-        echo "Container is running in the host network namespace, and therefore cannot be" >&2
-        echo "connected to weave. Perhaps the container was started with --net=host." >&2
-        return 1
-    fi
+    #if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "$PROCFS/$$/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink $PROCFS/$$/ns/net)" ] ; then
+    #    echo "Container is running in the host network namespace, and therefore cannot be" >&2
+    #    echo "connected to weave. Perhaps the container was started with --net=host." >&2
+    #    return 1
+    #fi
     ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU || return 1
 
     if ! ethtool -K $GUEST_IFNAME tx off >/dev/null ||
-        ! ip link set $LOCAL_IFNAME master $BRIDGE ||
-        ! ip link set $LOCAL_IFNAME up ||
         ! ip link set $GUEST_IFNAME netns $PROCFS/$CONTAINER_PID/ns/net ; then
         # failed before we assigned the veth to the container's
         # namespace
@@ -377,8 +375,18 @@ connect_container_to_bridge() {
         return 1
     fi
 
-    if ! netnsenter ip link set $GUEST_IFNAME name $CONTAINER_IFNAME ||
-       ! configure_arp_cache $CONTAINER_IFNAME "netnsenter" ; then
+    # Versions of the 'ip' command differ in whether they create a
+    # veth pair in the 'up' or 'down' state.  Furthermore, moving one
+    # end into a netns normally sets them to 'down'.  But, moving an
+    # end into the default netns is a null operation, so they stay up,
+    # which leads to errors later on.  So to get a consistent result,
+    # we have to be explicit in setting them 'up' or 'down' as
+    # necessary.
+    if ! netnsenter ip link set $GUEST_IFNAME down ||
+        ! netnsenter ip link set $GUEST_IFNAME name $CONTAINER_IFNAME up ||
+        ! ip link set $LOCAL_IFNAME up ||
+        ! ip link set $LOCAL_IFNAME master $BRIDGE ||
+        ! configure_arp_cache $CONTAINER_IFNAME "netnsenter" ; then
         return 1
     fi
 }
@@ -397,12 +405,12 @@ ask_version() {
 ######################################################################
 
 launch() {
-    if ! netnsenter ip link show eth0 >/dev/null ; then
-        echo "Perhaps you are running the docker daemon with container networking disabled (-b=none)." >&2
-        return 1
-    fi
+    #if ! netnsenter ip link show eth0 >/dev/null ; then
+    #    echo "Perhaps you are running the docker daemon with container networking disabled (-b=none)." >&2
+    #    return 1
+    #fi
     connect_container_to_bridge &&
-        netnsenter ethtool -K eth0 tx off >/dev/null &&
+        #netnsenter ethtool -K eth0 tx off >/dev/null &&
         netnsenter ip link set $CONTAINER_IFNAME up
 }
 
@@ -509,8 +517,8 @@ container_ip() {
     fi
     case "$status" in
         "true ")
-            echo "$1 container has no IP address; is Docker networking enabled?" >&2
-            return 1
+            #echo "$1 container has no IP address; is Docker networking enabled?" >&2
+            CONTAINER_IP=127.0.0.1
             ;;
         true*)
             CONTAINER_IP="${status#true }"
@@ -806,7 +814,7 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-            -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
+            -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock --net=host \
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" $IPRANGE "$@")
         with_container_netns $CONTAINER launch >/dev/null
 
