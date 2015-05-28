@@ -61,6 +61,7 @@ exec_remote() {
         -e WEAVE_DEBUG \
         -e WEAVE_DOCKER_ARGS \
         -e WEAVEDNS_DOCKER_ARGS \
+        -e WEAVEPROXY_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
         -e WEAVE_CONTAINER_NAME \
@@ -839,14 +840,13 @@ case "$COMMAND" in
         check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
         # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
-        # when launching the weave proxy container.
+        # when launching the weaveproxy container.
         PROXY_CONTAINER=$(docker run --privileged --net=host -d \
             --name=$PROXY_CONTAINER_NAME \
             -p $PROXY_PORT:$PROXY_PORT/tcp \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /proc:/hostproc -e PROCFS=/hostproc \
             --entrypoint=/home/weave/weaveproxy \
-            $WEAVE_DOCKER_ARGS \
             $WEAVEPROXY_DOCKER_ARGS \
             $EXEC_IMAGE "$@")
 
