@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/updater"
 	weavedns "github.com/weaveworks/weave/nameserver"
@@ -25,6 +26,7 @@ func main() {
 		wait            int
 		timeout         int
 		udpbuf          int
+		fallback        string
 		refreshInterval int
 		refreshWorkers  int
 		relevantTime    int
@@ -54,7 +56,7 @@ func main() {
 	flag.IntVar(&udpbuf, "udpbuf", weavedns.DefaultUDPBuflen, "UDP buffer length")
 	flag.IntVar(&timeout, "timeout", weavedns.DefaultTimeout, "timeout for resolutions (in millisecs)")
 	flag.BoolVar(&cacheDisabled, "no-cache", false, "disable the cache")
-
+	flag.StringVar(&fallback, "fallback", "", "force a fallback server (ie, '8.8.8.8:53') (instead of /etc/resolv.conf values)")
 	flag.Parse()
 
 	if justVersion {
@@ -109,6 +111,15 @@ func main() {
 		Timeout:       timeout,
 		UDPBufLen:     udpbuf,
 		CacheDisabled: cacheDisabled,
+	}
+
+	if len(fallback) > 0 {
+		fallbackHost, fallbackPort, err := net.SplitHostPort(fallback)
+		if err != nil {
+			Error.Fatal("[main] Could not parse fallback host and port", err)
+		}
+		srvConfig.UpstreamCfg = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
+		Debug.Printf("[main] DNS fallback at %s:%s", fallbackHost, fallbackPort)
 	}
 
 	srv, err := weavedns.NewDNSServer(srvConfig)
