@@ -16,8 +16,8 @@ func (router *Router) StatusJSON(version, encryption string) ([]byte, error) {
 		Macs       *MacCache
 		Peers      *Peers
 		Routes     *Routes
-	}{version, encryption, router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes})
-	// leaving out ConectionMaker due to async complexities
+		ConnectionMakerStatus
+	}{version, encryption, router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes, router.ConnectionMaker.Status()})
 }
 
 func (cache *MacCache) MarshalJSON() ([]byte, error) {
@@ -95,4 +95,21 @@ func (conn *RemoteConnection) MarshalJSON() ([]byte, error) {
 
 func (name PeerName) MarshalJSON() ([]byte, error) {
 	return json.Marshal(name.String())
+}
+
+func (target Target) MarshalJSON() ([]byte, error) {
+	t := struct {
+		Attempting  bool      `json:"Attempting,omitempty"`
+		TryAfter    time.Time `json:"TryAfter,omitempty"`
+		TryInterval string    `json:"TryInterval,omitempty"`
+		LastError   string    `json:"LastError,omitempty"`
+	}{
+		Attempting:  target.attempting,
+		TryAfter:    target.tryAfter,
+		TryInterval: target.tryInterval.String(),
+	}
+	if target.lastError != nil {
+		t.LastError = target.lastError.Error()
+	}
+	return json.Marshal(t)
 }
