@@ -15,12 +15,6 @@ type createExecInterceptor struct {
 	withIPAM bool
 }
 
-type createExecRequestBody struct {
-	*docker.Config
-	HostConfig *docker.HostConfig `json:"HostConfig,omitempty" yaml:"HostConfig,omitempty"`
-	MacAddress string             `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
-}
-
 func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
