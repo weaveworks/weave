@@ -88,7 +88,7 @@ func TestBootstrap(t *testing.T) {
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
-	alloc1.tryPendingOps()
+	alloc1.actionChan <- func() { alloc1.tryPendingOps() }
 	AssertNothingSent(t, done)
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)

@@ -201,13 +201,18 @@ type TestGossipRouter struct {
 	loss        float32 // 0.0 means no loss
 }
 
-func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
+func (grouter *TestGossipRouter) deliverGossipBroadcast(buf []byte) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
-		case gossipChan <- gossipMessage{buf: update.(*ipamGossipData).alloc.encode()}:
+		case gossipChan <- gossipMessage{buf: buf}:
 		default: // drop the message if we cannot send it
 		}
 	}
+	return nil
+}
+
+func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
+	grouter.deliverGossipBroadcast(update.Encode())
 	return nil
 }
 
@@ -271,8 +276,10 @@ func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, 
 	return nil
 }
 
+// Called from actor routine of allocator, so (a) we can't re-enter the actor and
+// (b) it's thread-safe to cast through and get the data
 func (client TestGossipRouterClient) GossipBroadcast(update router.GossipData) error {
-	return client.router.GossipBroadcast(update)
+	return client.router.deliverGossipBroadcast(update.(*ipamGossipData).alloc.encode())
 }
 
 func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter) {
