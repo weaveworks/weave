@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/address"
 	"github.com/weaveworks/weave/router"
 	wt "github.com/weaveworks/weave/testing"
 )
@@ -159,6 +160,14 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 	alloc.space.AddRanges(alloc.ring.OwnedRanges())
 }
 
+func (alloc *Allocator) NumFreeAddresses() address.Offset {
+	resultChan := make(chan address.Offset)
+	alloc.actionChan <- func() {
+		resultChan <- alloc.space.NumFreeAddresses()
+	}
+	return <-resultChan
+}
+
 // Check whether or not something was sent on a channel
 func AssertSent(t *testing.T, ch <-chan bool) {
 	timeout := time.After(10 * time.Second)
@@ -192,7 +201,8 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 type gossipMessage struct {
 	isUnicast bool
 	sender    *router.PeerName
-	buf       []byte
+	buf       []byte            // for unicast
+	data      router.GossipData // for broadcast
 	exitChan  chan bool
 }
 
@@ -204,7 +214,7 @@ type TestGossipRouter struct {
 func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
-		case gossipChan <- gossipMessage{buf: update.(*ipamGossipData).alloc.encode()}:
+		case gossipChan <- gossipMessage{data: update}:
 		default: // drop the message if we cannot send it
 		}
 	}
@@ -247,7 +257,7 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 						panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", sender, err))
 					}
 				} else {
-					_, err := gossiper.OnGossipBroadcast(message.buf)
+					_, err := gossiper.OnGossipBroadcast(message.data.Encode())
 					if err != nil {
 						panic(fmt.Sprintf("Error doing gossip broadcast to %s: %s", sender, err))
 					}
