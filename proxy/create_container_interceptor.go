@@ -38,7 +38,13 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 
 	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok || i.withIPAM {
 		Info.Printf("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
+		if container.HostConfig == nil {
+			container.HostConfig = &docker.HostConfig{}
+		}
 		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy")
+		if container.Config == nil {
+			container.Config = &docker.Config{}
+		}
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
