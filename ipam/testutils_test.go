@@ -192,7 +192,8 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 type gossipMessage struct {
 	isUnicast bool
 	sender    *router.PeerName
-	buf       []byte
+	unibuf    []byte
+	data      router.GossipData
 	exitChan  chan bool
 }
 
@@ -201,18 +202,13 @@ type TestGossipRouter struct {
 	loss        float32 // 0.0 means no loss
 }
 
-func (grouter *TestGossipRouter) deliverGossipBroadcast(buf []byte) error {
+func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
-		case gossipChan <- gossipMessage{buf: buf}:
+		case gossipChan <- gossipMessage{data: update}:
 		default: // drop the message if we cannot send it
 		}
 	}
-	return nil
-}
-
-func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
-	grouter.deliverGossipBroadcast(update.Encode())
 	return nil
 }
 
@@ -247,12 +243,12 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 				}
 
 				if message.isUnicast {
-					err := gossiper.OnGossipUnicast(*message.sender, message.buf)
+					err := gossiper.OnGossipUnicast(*message.sender, message.unibuf)
 					if err != nil {
 						panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", sender, err))
 					}
 				} else {
-					_, err := gossiper.OnGossipBroadcast(message.buf)
+					_, err := gossiper.OnGossipBroadcast(message.data.Encode())
 					if err != nil {
 						panic(fmt.Sprintf("Error doing gossip broadcast to %s: %s", sender, err))
 					}
@@ -269,7 +265,7 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 
 func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
 	select {
-	case client.router.gossipChans[dstPeerName] <- gossipMessage{isUnicast: true, sender: &client.sender, buf: buf}:
+	case client.router.gossipChans[dstPeerName] <- gossipMessage{isUnicast: true, sender: &client.sender, unibuf: buf}:
 	default: // drop the message if we cannot send it
 		common.Error.Printf("Dropping message")
 	}
@@ -279,7 +275,7 @@ func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, 
 // Called from actor routine of allocator, so (a) we can't re-enter the actor and
 // (b) it's thread-safe to cast through and get the data
 func (client TestGossipRouterClient) GossipBroadcast(update router.GossipData) error {
-	return client.router.deliverGossipBroadcast(update.(*ipamGossipData).alloc.encode())
+	return client.router.GossipBroadcast(update)
 }
 
 func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter) {
