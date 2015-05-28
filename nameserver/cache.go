@@ -5,13 +5,13 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
+	"math"
+	"sync"
+	"time"
+
 	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
-	"math"
-	"math/rand"
-	"sync"
-	"time"
 )
 
 var (
@@ -42,21 +42,6 @@ var statusToString = map[entryStatus]string{
 const (
 	CacheNoLocalReplies uint8 = 1 << iota // not found in local network (stored in the cache so we skip another local lookup or some time)
 )
-
-// shuffleAnswers reorders answers for very basic load balancing
-func shuffleAnswers(answers []dns.RR) []dns.RR {
-	n := len(answers)
-	if n > 1 {
-		rand.Seed(time.Now().UTC().UnixNano())
-
-		for i := 0; i < n; i++ {
-			r := i + rand.Intn(n-i)
-			answers[r], answers[i] = answers[i], answers[r]
-		}
-	}
-
-	return answers
-}
 
 // a cache entry
 type cacheEntry struct {
@@ -123,9 +108,6 @@ func (e *cacheEntry) getReply(request *dns.Msg, maxLen int, now time.Time) (*dns
 
 	reply.Rcode = e.reply.Rcode
 	reply.Authoritative = true
-
-	// shuffle the values, etc...
-	reply.Answer = shuffleAnswers(reply.Answer)
 
 	return reply, nil
 }

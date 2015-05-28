@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"fmt"
-	wt "github.com/weaveworks/weave/testing"
 	"math/rand"
 	"net"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func genForm(method string, url string, data url.Values) (resp *http.Response, err error) {
@@ -24,10 +25,15 @@ func TestHttp(t *testing.T) {
 		testDomain      = "weave.local."
 		successTestName = "test1." + testDomain
 		testAddr1       = "10.2.2.1/24"
+		testAddr2       = "10.2.2.2/24"
 		dockerIP        = "9.8.7.6"
 	)
 
-	zone := NewZoneDb(DefaultLocalDomain)
+	zone, err := NewZoneDb(ZoneConfig{})
+	wt.AssertNoErr(t, err)
+	err = zone.Start()
+	wt.AssertNoErr(t, err)
+	defer zone.Stop()
 
 	port := rand.Intn(10000) + 32768
 	fmt.Println("Http test on port", port)
@@ -65,6 +71,31 @@ func TestHttp(t *testing.T) {
 	wt.AssertNoErr(t, err)
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 
+	// Adding a new IP for the same name should be OK
+	addrParts2 := strings.Split(testAddr2, "/")
+	addrURL2 := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, containerID, addrParts2[0])
+	resp, err = genForm("PUT", addrURL2,
+		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts2[1]}})
+	wt.AssertNoErr(t, err)
+	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http success response for second IP")
+
+	// Check that we can get two IPs for that name
+	ip2, _, _ := net.ParseCIDR(testAddr2)
+	foundIP, err = zone.LookupName(successTestName)
+	wt.AssertNoErr(t, err)
+	if len(foundIP) != 2 {
+		t.Logf("IPs found: %s", foundIP)
+		t.Fatalf("Unexpected result length: received %d responses", len(foundIP))
+	}
+	if !(foundIP[0].IP().Equal(ip) || foundIP[0].IP().Equal(ip2)) {
+		t.Logf("IPs found: %s", foundIP)
+		t.Fatalf("Unexpected result for %s: received %s, expected %s", successTestName, foundIP, ip)
+	}
+	if !(foundIP[1].IP().Equal(ip) || foundIP[1].IP().Equal(ip2)) {
+		t.Logf("IPs found: %s", foundIP)
+		t.Fatalf("Unexpected result for %s: received %s, expected %s", successTestName, foundIP, ip)
+	}
+
 	// Delete the address
 	resp, err = genForm("DELETE", addrURL, nil)
 	wt.AssertNoErr(t, err)
@@ -77,6 +108,11 @@ func TestHttp(t *testing.T) {
 
 	// Delete the address record mentioning the other container
 	resp, err = genForm("DELETE", otherURL, nil)
+	wt.AssertNoErr(t, err)
+	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
+
+	// Delete the second IP
+	resp, err = genForm("DELETE", addrURL2, nil)
 	wt.AssertNoErr(t, err)
 	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
 

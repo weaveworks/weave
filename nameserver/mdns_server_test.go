@@ -1,12 +1,13 @@
 package nameserver
 
 import (
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func TestServerSimpleQuery(t *testing.T) {
@@ -20,7 +21,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	Info.Println("TestServerSimpleQuery starting")
 
 	mzone := newMockedZoneWithRecords([]ZoneRecord{testRecord1, testRecord2})
-	mdnsServer, err := NewMDNSServer(mzone)
+	mdnsServer, err := NewMDNSServer(mzone, true)
 	wt.AssertNoErr(t, err)
 	err = mdnsServer.Start(nil)
 	wt.AssertNoErr(t, err)

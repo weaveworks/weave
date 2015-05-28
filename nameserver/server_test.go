@@ -3,12 +3,13 @@ package nameserver
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
+	wt "github.com/weaveworks/weave/testing"
 )
 
 const (
@@ -18,10 +19,6 @@ const (
 	testUDPBufSize   = 16384
 )
 
-var (
-	testPort = 17625
-)
-
 func setupForTest(t *testing.T) {
 	// fail early if we cannot find a default multicast interface
 	multicast, err := LinkLocalMulticastListener(nil)
@@ -29,23 +26,29 @@ func setupForTest(t *testing.T) {
 		t.Fatalf("Unable to create multicast listener: %s. No default multicast interface?", err)
 	}
 	multicast.Close()
-
-	testPort++
 }
 
 func TestUDPDNSServer(t *testing.T) {
 	setupForTest(t)
+
 	const (
-		containerID     = "foobar"
 		successTestName = "test1.weave.local."
-		failTestName    = "test2.weave.local."
+		failTestName    = "fail.weave.local."
 		nonLocalName    = "weave.works."
 		testAddr1       = "10.2.2.1"
+		containerID     = "somecontainer"
 	)
 	testCIDR1 := testAddr1 + "/24"
 
-	InitDefaultLogging(true)
-	var zone = NewZoneDb(DefaultLocalDomain)
+	InitDefaultLogging(testing.Verbose())
+	Info.Println("TestUDPDNSServer starting")
+
+	zone, err := NewZoneDb(ZoneConfig{})
+	wt.AssertNoErr(t, err)
+	err = zone.Start()
+	wt.AssertNoErr(t, err)
+	defer zone.Stop()
+
 	ip, _, _ := net.ParseCIDR(testCIDR1)
 	zone.AddRecord(containerID, successTestName, ip)
 
@@ -73,15 +76,17 @@ func TestUDPDNSServer(t *testing.T) {
 	}
 
 	// Run another DNS server for fallback
-	s, fallbackAddr, err := runLocalUDPServer(t, "127.0.0.1:0", fallbackHandler)
+	fallback, err := newMockedFallback(fallbackHandler, nil)
 	wt.AssertNoErr(t, err)
-	defer s.Shutdown()
+	fallback.Start()
+	defer fallback.Stop()
 
-	_, fallbackPort, err := net.SplitHostPort(fallbackAddr)
-	wt.AssertNoErr(t, err)
-
-	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Port: testPort}, zone, nil)
+	srv, err := NewDNSServer(DNSServerConfig{
+		Zone:              zone,
+		UpstreamCfg:       fallback.CliConfig,
+		CacheDisabled:     true,
+		ListenReadTimeout: testSocketTimeout,
+	})
 	wt.AssertNoErr(t, err)
 	defer srv.Stop()
 	go srv.Start()
@@ -89,29 +94,33 @@ func TestUDPDNSServer(t *testing.T) {
 
 	var r *dns.Msg
 
-	r = assertExchange(t, successTestName, dns.TypeA, 1, 1, 0)
+	testPort, err := srv.GetPort()
+	wt.AssertNoErr(t, err)
+	wt.AssertNotEqualInt(t, testPort, 0, "invalid listen port")
+
+	_, r = assertExchange(t, successTestName, dns.TypeA, testPort, 1, 1, 0)
 	wt.AssertType(t, r.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, r.Answer[0].(*dns.A).A.String(), testAddr1, "IP address")
 
-	assertExchange(t, failTestName, dns.TypeA, 0, 0, dns.RcodeNameError)
+	assertExchange(t, failTestName, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
 
-	r = assertExchange(t, testRDNSsuccess, dns.TypePTR, 1, 1, 0)
+	_, r = assertExchange(t, testRDNSsuccess, dns.TypePTR, testPort, 1, 1, 0)
 	wt.AssertType(t, r.Answer[0], (*dns.PTR)(nil), "DNS record")
 	wt.AssertEqualString(t, r.Answer[0].(*dns.PTR).Ptr, successTestName, "IP address")
 
-	assertExchange(t, testRDNSfail, dns.TypePTR, 0, 0, dns.RcodeNameError)
+	assertExchange(t, testRDNSfail, dns.TypePTR, testPort, 0, 0, dns.RcodeNameError)
 
-	// This should fail because we don't have information about MX records
-	assertExchange(t, successTestName, dns.TypeMX, 0, 0, dns.RcodeNameError)
+	// This should fail because we don't handle MX records
+	assertExchange(t, successTestName, dns.TypeMX, testPort, 0, 0, dns.RcodeNameError)
 
 	// This non-local query for an MX record should succeed by being
 	// passed on to the fallback server
-	assertExchange(t, nonLocalName, dns.TypeMX, 1, -1, 0)
+	assertExchange(t, nonLocalName, dns.TypeMX, testPort, 1, -1, 0)
 
 	// Now ask a query that we expect to return a lot of data.
-	assertExchange(t, nonLocalName, dns.TypeANY, 5, -1, 0)
+	assertExchange(t, nonLocalName, dns.TypeANY, testPort, 5, -1, 0)
 
-	assertExchange(t, testRDNSnonlocal, dns.TypePTR, 1, -1, 0)
+	assertExchange(t, testRDNSnonlocal, dns.TypePTR, testPort, 1, -1, 0)
 
 	// Not testing MDNS functionality of server here (yet), since it
 	// needs two servers, each listening on its own address
@@ -119,21 +128,28 @@ func TestUDPDNSServer(t *testing.T) {
 
 func TestTCPDNSServer(t *testing.T) {
 	setupForTest(t)
+
 	const (
 		numAnswers   = 512
 		nonLocalName = "weave.works."
 	)
-	dnsAddr := fmt.Sprintf("localhost:%d", testPort)
 
-	InitDefaultLogging(true)
-	var zone = NewZoneDb(DefaultLocalDomain)
+	InitDefaultLogging(testing.Verbose())
+	Info.Println("TestTCPDNSServer starting")
+
+	zone, err := NewZoneDb(ZoneConfig{})
+	wt.AssertNoErr(t, err)
+	err = zone.Start()
+	wt.AssertNoErr(t, err)
+	defer zone.Stop()
 
 	// generate a list of `numAnswers` IP addresses
 	var addrs []ZoneRecord
 	bs := make([]byte, 4)
 	for i := 0; i < numAnswers; i++ {
 		binary.LittleEndian.PutUint32(bs, uint32(i))
-		addrs = append(addrs, Record{"", net.IPv4(bs[0], bs[1], bs[2], bs[3]), 0, 0, 0})
+		ip := net.IPv4(bs[0], bs[1], bs[2], bs[3])
+		addrs = append(addrs, ZoneRecord(Record{"", ip, 0, 0, 0}))
 	}
 
 	// handler for the fallback server: it will just return a very long response
@@ -160,26 +176,27 @@ func TestTCPDNSServer(t *testing.T) {
 	}
 
 	t.Logf("Running a DNS fallback server with UDP")
-	us, fallbackUDPAddr, err := runLocalUDPServer(t, "127.0.0.1:0", fallbackUDPHandler)
+	fallback, err := newMockedFallback(fallbackUDPHandler, fallbackTCPHandler)
 	wt.AssertNoErr(t, err)
-	defer us.Shutdown()
+	fallback.Start()
+	defer fallback.Stop()
 
-	_, fallbackPort, err := net.SplitHostPort(fallbackUDPAddr)
-	wt.AssertNoErr(t, err)
-
-	t.Logf("Starting another fallback server, with TCP, on the same port as the UDP server")
-	fallbackTCPAddr := fmt.Sprintf("127.0.0.1:%s", fallbackPort)
-	ts, fallbackTCPAddr, err := runLocalTCPServer(t, fallbackTCPAddr, fallbackTCPHandler)
-	wt.AssertNoErr(t, err)
-	defer ts.Shutdown()
-
-	t.Logf("Creating a WeaveDNS server instance, falling back to 127.0.0.1:%s", fallbackPort)
-	config := &dns.ClientConfig{Servers: []string{"127.0.0.1"}, Port: fallbackPort}
-	srv, err := NewDNSServer(DNSServerConfig{UpstreamCfg: config, Port: testPort}, zone, nil)
+	t.Logf("Creating a WeaveDNS server instance, falling back to 127.0.0.1:%d", fallback.Port)
+	srv, err := NewDNSServer(DNSServerConfig{
+		Zone:              zone,
+		UpstreamCfg:       fallback.CliConfig,
+		CacheDisabled:     true,
+		ListenReadTimeout: testSocketTimeout,
+	})
 	wt.AssertNoErr(t, err)
 	defer srv.Stop()
 	go srv.Start()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
+
+	testPort, err := srv.GetPort()
+	wt.AssertNoErr(t, err)
+	wt.AssertNotEqualInt(t, testPort, 0, "listen port")
+	dnsAddr := fmt.Sprintf("127.0.0.1:%d", testPort)
 
 	t.Logf("Creating a UDP and a TCP client")
 	uc := new(dns.Client)
@@ -192,8 +209,8 @@ func TestTCPDNSServer(t *testing.T) {
 	m.RecursionDesired = true
 	m.SetQuestion(nonLocalName, dns.TypeA)
 
-	t.Logf("Checking the fallback server at %s returns a truncated response with UDP", fallbackUDPAddr)
-	r, _, err := uc.Exchange(m, fallbackUDPAddr)
+	t.Logf("Checking the fallback server at %s returns a truncated response with UDP", fallback.Addr)
+	r, _, err := uc.Exchange(m, fallback.Addr)
 	t.Logf("Got response from fallback server (UDP) with %d answers", len(r.Answer))
 	t.Logf("Response:\n%+v\n", r)
 	wt.AssertNoErr(t, err)
@@ -228,74 +245,4 @@ func TestTCPDNSServer(t *testing.T) {
 	wt.AssertNoErr(t, err)
 	wt.AssertFalse(t, r.MsgHdr.Truncated, "DNS truncated response flag")
 	wt.AssertEqualInt(t, len(r.Answer), numAnswers, "number of answers (UDP-long)")
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-// perform a DNS query and assert the reply code, number or answers, etc
-func assertExchange(t *testing.T, z string, ty uint16, minAnswers int, maxAnswers int, expErr int) *dns.Msg {
-	c := new(dns.Client)
-	c.UDPSize = testUDPBufSize
-	m := new(dns.Msg)
-	m.RecursionDesired = true
-	m.SetQuestion(z, ty)
-	m.SetEdns0(testUDPBufSize, false) // we don't want to play with truncation here...
-
-	r, _, err := c.Exchange(m, fmt.Sprintf("127.0.0.1:%d", testPort))
-	t.Logf("Response:\n%+v\n", r)
-	wt.AssertNoErr(t, err)
-	if minAnswers == 0 && maxAnswers == 0 {
-		wt.AssertStatus(t, r.Rcode, expErr, "DNS response code")
-	} else {
-		wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
-	}
-	answers := len(r.Answer)
-	if minAnswers >= 0 && answers < minAnswers {
-		wt.Fatalf(t, "Number of answers >= %d", minAnswers)
-	}
-	if maxAnswers >= 0 && answers > maxAnswers {
-		wt.Fatalf(t, "Number of answers <= %d", maxAnswers)
-	}
-	return r
-}
-
-// run a UDP fallback server
-func runLocalUDPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dns.Server, string, error) {
-	t.Logf("Starting fallback UDP server at %s", laddr)
-	pc, err := net.ListenPacket("udp", laddr)
-	if err != nil {
-		return nil, "", err
-	}
-	server := &dns.Server{PacketConn: pc, Handler: handler, ReadTimeout: 100 * time.Millisecond}
-
-	go func() {
-		server.ActivateAndServe()
-		pc.Close()
-	}()
-
-	t.Logf("Fallback UDP server listening at %s", pc.LocalAddr())
-	return server, pc.LocalAddr().String(), nil
-}
-
-// run a TCP fallback server
-func runLocalTCPServer(t *testing.T, laddr string, handler dns.HandlerFunc) (*dns.Server, string, error) {
-	t.Logf("Starting fallback TCP server at %s", laddr)
-	laddrTCP, err := net.ResolveTCPAddr("tcp", laddr)
-	if err != nil {
-		return nil, "", err
-	}
-
-	l, err := net.ListenTCP("tcp", laddrTCP)
-	if err != nil {
-		return nil, "", err
-	}
-	server := &dns.Server{Listener: l, Handler: handler, ReadTimeout: 100 * time.Millisecond}
-
-	go func() {
-		server.ActivateAndServe()
-		l.Close()
-	}()
-
-	t.Logf("Fallback TCP server listening at %s", l.Addr().String())
-	return server, l.Addr().String(), nil
 }
