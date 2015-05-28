@@ -43,11 +43,6 @@ root@ubuntu:/# ping pingme
 ...
 ```
 
-Note that it is permissible to register multiple containers with the
-same name: weaveDNS picks one address at random on each request. Since
-weaveDNS removes any container that dies, this is a simple way to
-implement redundancy.
-
 Each weaveDNS container started with `launch-dns` needs to be given
 its own, unique, IP address, in a subnet that is a) common to all
 weaveDNS containers, b) disjoint from the application subnets, and c)
@@ -104,6 +99,44 @@ other calls to `weave` also specify the bridge device:
 ```bash
 $ sudo DOCKER_BRIDGE=someother weave run --with-dns ...
 ```
+
+## <a name="load-balancing"></a>Load balancing
+
+It is permissible to register multiple containers with the same name:
+weaveDNS picks one address at random on each request. This provides a
+basic load balancing capability.
+
+Returning to our earlier example, let us start an additional `pingme`
+container, this time on the 2nd host, and then run some ping tests...
+
+```bash
+host2$ weave run 10.2.1.35/24 -ti -h pingme.weave.local ubuntu
+host2$ docker attach $shell2
+
+root@ubuntu2:/# ping -nq -c 1 pingme
+PING pingme.weave.local (10.2.1.35) 56(84) bytes of data.
+...
+root@ubuntu2:/# ping -nq -c 1 pingme
+PING pingme.weave.local (10.2.1.25) 56(84) bytes of data.
+...
+root@ubuntu2:/# ping -nq -c 1 pingme
+PING pingme.weave.local (10.2.1.25) 56(84) bytes of data.
+...
+root@ubuntu2:/# ping -nq -c 1 pingme
+PING pingme.weave.local (10.2.1.35) 56(84) bytes of data.
+...
+```
+
+Notice how the ping reaches different addresses.
+
+## <a name="fault-resilience"></a>Fault resilience
+
+WeaveDNS removes the addresses of any container that dies. This offers
+a simple way to implement redundancy. E.g. if in our example we stop
+one of the `pingme` containers and re-run the ping tests, eventually
+(within ~30s at most, since that is the weaveDNS cache expiry time) we
+will only be hitting the address of the container that is still alive.
+
 
 ## <a name="add-remove"></a>Adding and removing extra DNS entries
 
