@@ -77,13 +77,6 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 	return nil
 }
 
-func configHasEntrypoint(c *docker.Config) bool {
-	return c != nil && len(c.Entrypoint) > 0
-}
-func configHasCmd(c *docker.Config) bool {
-	return c != nil && len(c.Cmd) > 0
-}
-
 func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody) error {
 	if !i.withDNS {
 		return nil
