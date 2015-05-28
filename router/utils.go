@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/gob"
 	"fmt"
-	"hash/fnv"
 	"log"
 	"net"
 )
@@ -72,12 +71,6 @@ func randUint64() (r uint64) {
 		r |= uint64(v)
 	}
 	return
-}
-
-func hash(s string) uint32 {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return h.Sum32()
 }
 
 func GobEncode(items ...interface{}) []byte {
