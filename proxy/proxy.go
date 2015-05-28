@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	containerCreateRegexp = regexp.MustCompile("/v[0-9\\.]*/containers/create")
-	containerStartRegexp  = regexp.MustCompile("^/v[0-9\\.]*/containers/[^/]*/(re)?start$")
-	execCreateRegexp      = regexp.MustCompile("^/v[0-9\\.]*/containers/[^/]*/exec$")
+	containerCreateRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
+	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
+	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
 )
 
 type Proxy struct {
