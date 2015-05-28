@@ -39,7 +39,7 @@ $ weave run 10.2.1.25/24 -ti -h pingme.weave.local ubuntu
 $ shell1=$(weave run --with-dns 10.2.1.26/24 -ti -h ubuntu.weave.local ubuntu)
 $ docker attach $shell1
 
-# ping pingme
+root@ubuntu:/# ping pingme
 ...
 ```
 
@@ -63,7 +63,7 @@ host2$ weave launch-dns 10.2.254.2/24
 host2$ shell2=$(weave run --with-dns 10.2.1.36/24 -ti -h ubuntu2.weave.local ubuntu)
 host2$ docker attach $shell2
 
-# ping pingme
+root@ubuntu2:/# ping pingme
 ...
 ```
 
