@@ -165,7 +165,7 @@ $ weave launch-dns 10.2.254.1/24 --domain="mycompany.local."
 
 The local domain should end with `local.`, since these names are
 link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
-(though this is not strictly neccessary).
+(though this is not strictly necessary).
 
 ## <a name="without-run"></a>Using weaveDNS without `weave run`
 
