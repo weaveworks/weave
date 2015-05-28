@@ -170,7 +170,7 @@ $ vagrant ssh -c 'make -C src/github.com/weaveworks/weave'
 ```
 
 you should then find container snapshot tarballs in the top-level
-directory. You can use these snapshots with `docker load` agains a
+directory. You can use these snapshots with `docker load` against a
 different host, e.g.
 
 ```bash
