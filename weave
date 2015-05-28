@@ -894,9 +894,11 @@ case "$COMMAND" in
         http_call $CONTAINER_NAME $HTTP_PORT POST /forget -d $(peer_args "$@")
         ;;
     status)
-        http_call $CONTAINER_NAME $HTTP_PORT GET /status || true
+        res=0
+        http_call $CONTAINER_NAME $HTTP_PORT GET /status || res=1
         echo
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status 2>/dev/null || true
+        [ $res -eq 0 ]
         ;;
     ps)
         [ $# -eq 0 ] && CONTAINERS="weave:expose $(docker ps -q)" || CONTAINERS="$@"
