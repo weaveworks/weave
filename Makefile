@@ -52,10 +52,10 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE): common/*.go
 		false; \
 	}
 
-$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go weaver/main.go
-$(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
-$(WEAVEPROXY_EXE): proxy/*.go weaveproxy/main.go
-$(WEAVEWAIT_EXE): weavewait/*.go weavewait/main.go
+$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go common/*.go common/*/*.go net/*.go weaver/main.go
+$(WEAVEDNS_EXE): nameserver/*.go common/*.go common/*/*.go net/*.go weavedns/main.go
+$(WEAVEPROXY_EXE): proxy/*.go common/*.go weaveproxy/main.go
+$(WEAVEWAIT_EXE): weavewait/*.go net/*.go weavewait/main.go
 
 # Sigproxy needs separate rule as it fails the netgo check in the main
 # build stanza due to not importing net package
