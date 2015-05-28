@@ -8,16 +8,17 @@ import (
 )
 
 const (
-	localTTL    uint32 = 30 // somewhat arbitrary; we don't expect anyone downstream to cache results
-	negLocalTTL        = 30 // TTL for negative local resolutions
-	minUDPSize         = 512
-	maxUDPSize         = 65535
+	minUDPSize = 512
+	maxUDPSize = 65535
 )
 
-func makeHeader(r *dns.Msg, q *dns.Question) *dns.RR_Header {
+func makeHeader(r *dns.Msg, q *dns.Question, ttl int) *dns.RR_Header {
 	return &dns.RR_Header{
-		Name: q.Name, Rrtype: q.Qtype,
-		Class: dns.ClassINET, Ttl: localTTL}
+		Name:   q.Name,
+		Rrtype: q.Qtype,
+		Class:  dns.ClassINET,
+		Ttl:    uint32(ttl),
+	}
 }
 
 func makeReply(r *dns.Msg, as []dns.RR) *dns.Msg {
@@ -36,11 +37,11 @@ func makeTruncatedReply(r *dns.Msg) *dns.Msg {
 	return reply
 }
 
-type DNSResponseBuilder func(r *dns.Msg, q *dns.Question, addrs []ZoneRecord) *dns.Msg
+type DNSResponseBuilder func(r *dns.Msg, q *dns.Question, addrs []ZoneRecord, ttl int) *dns.Msg
 
-func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []ZoneRecord) *dns.Msg {
+func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []ZoneRecord, ttl int) *dns.Msg {
 	answers := make([]dns.RR, len(addrs))
-	header := makeHeader(r, q)
+	header := makeHeader(r, q, ttl)
 	count := 0
 	for _, addr := range addrs {
 		ip := addr.IP()
@@ -62,9 +63,9 @@ func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []ZoneRecord) *dns.Msg 
 	return makeReply(r, answers[:count])
 }
 
-func makePTRReply(r *dns.Msg, q *dns.Question, names []ZoneRecord) *dns.Msg {
+func makePTRReply(r *dns.Msg, q *dns.Question, names []ZoneRecord, ttl int) *dns.Msg {
 	answers := make([]dns.RR, len(names))
-	header := makeHeader(r, q)
+	header := makeHeader(r, q, ttl)
 	for i, name := range names {
 		answers[i] = &dns.PTR{Hdr: *header, Ptr: name.Name()}
 	}

@@ -36,7 +36,7 @@ func TestCacheLength(t *testing.T) {
 		ip := net.ParseIP(fmt.Sprintf("10.0.1.%d", i))
 		records := []ZoneRecord{Record{name, ip, 0, 0, 0}}
 
-		reply := makeAddressReply(questionMsg, question, records)
+		reply := makeAddressReply(questionMsg, question, records, DefaultLocalTTL)
 		reply.Answer[0].Header().Ttl = uint32(i)
 
 		l.Put(questionMsg, reply, 0, 0)
@@ -89,7 +89,7 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Inserting the reply")
 	records := []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.1"), 0, 0, 0}}
-	reply1 := makeAddressReply(questionMsg, question, records)
+	reply1 := makeAddressReply(questionMsg, question, records, DefaultLocalTTL)
 	l.Put(questionMsg, reply1, nullTTL, 0)
 
 	t.Logf("Checking we can Get() the reply now")
@@ -110,8 +110,8 @@ func TestCacheEntries(t *testing.T) {
 	ttlGet2 := resp.Answer[0].Header().Ttl
 	wt.AssertEqualInt(t, int(ttlGet1-ttlGet2), 1, "TTL difference")
 
-	clk.Add(time.Duration(localTTL) * time.Second)
-	t.Logf("Checking that a third Get(), after %d second, gets no result", localTTL)
+	clk.Add(time.Duration(DefaultLocalTTL) * time.Second)
+	t.Logf("Checking that a third Get(), after %d second, gets no result", DefaultLocalTTL)
 	resp, err = l.Get(questionMsg, minUDPSize)
 	wt.AssertNoErr(t, err)
 	if resp != nil {
@@ -121,7 +121,7 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Checking that an Remove() results in Get() returning nothing")
 	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.9.9"), 0, 0, 0}}
-	replyTemp := makeAddressReply(questionMsg, question, records)
+	replyTemp := makeAddressReply(questionMsg, question, records, DefaultLocalTTL)
 	l.Put(questionMsg, replyTemp, nullTTL, 0)
 	lenBefore := l.Len()
 	l.Remove(question)
@@ -135,11 +135,11 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Inserting a two replies for the same query")
 	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.2"), 0, 0, 0}}
-	reply2 := makeAddressReply(questionMsg, question, records)
+	reply2 := makeAddressReply(questionMsg, question, records, DefaultLocalTTL)
 	l.Put(questionMsg, reply2, nullTTL, 0)
 	clk.Add(time.Duration(1) * time.Second)
 	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.1.3"), 0, 0, 0}}
-	reply3 := makeAddressReply(questionMsg, question, records)
+	reply3 := makeAddressReply(questionMsg, question, records, DefaultLocalTTL)
 	l.Put(questionMsg, reply3, nullTTL, 0)
 
 	t.Logf("Checking we get the last one...")
@@ -149,9 +149,9 @@ func TestCacheEntries(t *testing.T) {
 	t.Logf("Received '%s'", resp.Answer[0])
 	wt.AssertType(t, resp.Answer[0], (*dns.A)(nil), "DNS record")
 	wt.AssertEqualString(t, resp.Answer[0].(*dns.A).A.String(), "10.0.1.3", "IP address")
-	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), int(localTTL), "TTL")
+	wt.AssertEqualInt(t, int(resp.Answer[0].Header().Ttl), int(DefaultLocalTTL), "TTL")
 
-	clk.Add(time.Duration(localTTL-1) * time.Second)
+	clk.Add(time.Duration(DefaultLocalTTL-1) * time.Second)
 	resp, err = l.Get(questionMsg, minUDPSize)
 	wt.AssertNoErr(t, err)
 	wt.AssertTrue(t, resp != nil, "reponse from the Get()")
@@ -162,7 +162,7 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Checking we get empty replies when they are expired...")
 	lenBefore = l.Len()
-	clk.Add(time.Duration(localTTL) * time.Second)
+	clk.Add(time.Duration(DefaultLocalTTL) * time.Second)
 	resp, err = l.Get(questionMsg, minUDPSize)
 	wt.AssertNoErr(t, err)
 	if resp != nil {
@@ -183,7 +183,7 @@ func TestCacheEntries(t *testing.T) {
 
 	t.Logf("Checking that an Remove() between Get() and Put() does not break things")
 	records = []ZoneRecord{Record{"some.name", net.ParseIP("10.0.9.9"), 0, 0, 0}}
-	replyTemp2 := makeAddressReply(questionMsg2, question2, records)
+	replyTemp2 := makeAddressReply(questionMsg2, question2, records, DefaultLocalTTL)
 	l.Remove(question2)
 	l.Put(questionMsg2, replyTemp2, nullTTL, 0)
 	resp, err = l.Get(questionMsg2, minUDPSize)
@@ -201,8 +201,8 @@ func TestCacheEntries(t *testing.T) {
 	wt.AssertNil(t, resp, "Get() response with CacheNoLocalReplies")
 	wt.AssertNotNil(t, err, "Get() error with CacheNoLocalReplies")
 
-	clk.Add(time.Second * time.Duration(negLocalTTL+1))
-	t.Logf("Checking that we get an expired response after %d seconds", negLocalTTL)
+	clk.Add(time.Second * time.Duration(DefaultCacheNegLocalTTL+1))
+	t.Logf("Checking that we get an expired response after %d seconds", DefaultCacheNegLocalTTL)
 	resp, err = l.Get(questionMsg3, minUDPSize)
 	wt.AssertNil(t, resp, "expired Get() response with CacheNoLocalReplies")
 	wt.AssertNil(t, err, "expired Get() error with CacheNoLocalReplies")

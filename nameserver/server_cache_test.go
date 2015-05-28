@@ -17,7 +17,7 @@ func TestServerCacheRefresh(t *testing.T) {
 		containerID     = "somecontainer"
 		testName1       = "first.weave.local."
 		testName2       = "second.weave.local."
-		refreshInterval = int(localTTL) / 3
+		refreshInterval = int(DefaultLocalTTL) / 3
 	)
 
 	InitDefaultLogging(testing.Verbose())

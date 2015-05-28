@@ -24,6 +24,7 @@ func main() {
 		dnsPort         int
 		httpPort        int
 		wait            int
+		ttl             int
 		timeout         int
 		udpbuf          int
 		fallback        string
@@ -46,6 +47,7 @@ func main() {
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
 	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
+	flag.IntVar(&ttl, "ttl", weavedns.DefaultLocalTTL, "TTL (in secs) for responses for local names")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	// advanced options
@@ -82,6 +84,7 @@ func main() {
 	zoneConfig := weavedns.ZoneConfig{
 		Domain:          domain,
 		Iface:           iface,
+		LocalTTL:        ttl,
 		RefreshInterval: refreshInterval,
 		RefreshWorkers:  refreshWorkers,
 		RelevantTime:    relevantTime,
@@ -107,6 +110,7 @@ func main() {
 		Zone:          zone,
 		Port:          dnsPort,
 		CacheLen:      cacheLen,
+		LocalTTL:      ttl,
 		MaxAnswers:    maxAnswers,
 		Timeout:       timeout,
 		UDPBufLen:     udpbuf,

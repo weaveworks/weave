@@ -25,8 +25,8 @@ func TestPrune(t *testing.T) {
 		Record{"name", net.ParseIP("10.0.1.4"), 0, 0, 0},
 	}
 
-	reply := makeAddressReply(questionMsg, question, records)
-	reply.Answer[0].Header().Ttl = localTTL
+	reply := makeAddressReply(questionMsg, question, records, DefaultLocalTTL)
+	reply.Answer[0].Header().Ttl = DefaultLocalTTL
 
 	pruned := pruneAnswers(reply.Answer, 1)
 	wt.AssertEqualInt(t, len(pruned), 1, "wrong number of answers")
