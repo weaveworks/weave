@@ -125,9 +125,9 @@ assert_dns_record() {
 
     [[ -z "$DEBUG" ]] || greyly echo "Checking whether $name exists at $host:$container"
     got_ip=$(exec_on $host $container getent hosts $name)
-    assert_raises "echo \"$got_ip\" | grep -q \"$exp_ips_regex\""
+    assert_raises "echo '$got_ip' | grep -q '$exp_ips_regex'"
 
-    [[ -z "$DEBUG" ]] || greyly echo "Checking whether the IPs \"$@\" exists at $host:$container"
+    [[ -z "$DEBUG" ]] || greyly echo "Checking whether the IPs '$@' exists at $host:$container"
     for ip in "$@" ; do
         assert "exec_on $host $container getent hosts $ip | tr -s ' '" "$ip $name"
     done
@@ -139,7 +139,7 @@ assert_no_dns_record() {
     container=$2
     name=$3
 
-    [[ -z "$DEBUG" ]] || greyly echo "Checking if \"$name\" does not exist at $host:$container"
+    [[ -z "$DEBUG" ]] || greyly echo "Checking if '$name' does not exist at $host:$container"
     assert_raises "exec_on $host $container getent hosts $name" 2
 }
 
