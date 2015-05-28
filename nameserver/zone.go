@@ -334,8 +334,7 @@ func (ns *namesSet) addIPToName(zr ZoneRecord, now time.Time) (*recordEntry, err
 
 // Delete a name in the names set
 func (ns *namesSet) deleteName(n string) error {
-	name, found := ns.names[n]
-	if found {
+	if name, found := ns.names[n]; found {
 		for _, ipRecord := range name.getAllEntries() {
 			ipRecord.notifyIPObservers()
 		}
@@ -343,7 +342,7 @@ func (ns *namesSet) deleteName(n string) error {
 		delete(ns.names, n)
 		return nil
 	}
-	return LookupError(fmt.Sprintf("%+v", name))
+	return LookupError(n)
 }
 
 // Delete an IPv4 from all names
