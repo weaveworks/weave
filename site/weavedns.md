@@ -52,9 +52,24 @@ not attempt to do load-balancing.
 Each weaveDNS container started with `launch-dns` needs to be given
 its own, unique, IP address, in a subnet that is a) common to all
 weaveDNS containers, b) disjoint from the application subnets, and c)
-not in use on any of the hosts. In our example the weaveDNS address is
-in subnet 10.2.254.0/24 and the application containers are in
-subnet 10.2.1.0/24.
+not in use on any of the hosts.
+
+In our example the weaveDNS address is in subnet 10.2.254.0/24 and the
+application containers are in subnet 10.2.1.0/24. So, to launch and
+use weaveDNS on a second host we would run:
+
+```bash
+host2$ weave launch $HOST1
+host2$ weave launch-dns 10.2.254.2/24
+host2$ shell2=$(weave run --with-dns 10.2.1.36/24 -ti -h ubuntu2.weave.local ubuntu)
+host2$ docker attach $shell2
+
+# ping pingme
+...
+```
+
+Notice the different IP address in the 10.2.254.0/24 subnet we gave to
+`weave launch-dns`, compared to what we supplied on the first host.
 
 WeaveDNS containers can be stopped with `stop-dns`.
 
