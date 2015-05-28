@@ -167,7 +167,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer router.PeerName
 	pos := preceedingPos + 1
 	for ; pos < len(r.Entries) && r.Entries.entry(pos).Token < end; pos++ {
 		entry := r.Entries.entry(pos)
-		entry.update(peer, entry.Free)
+		entry.update(peer, address.Min(entry.Free, r.distance(entry.Token, end)))
 	}
 
 	// There is never an entry with a token of r.End, as the end of
