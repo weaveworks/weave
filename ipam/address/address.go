@@ -51,3 +51,10 @@ func Subtract(a, b Address) Offset {
 	common.Assert(a >= b)
 	return Offset(a - b)
 }
+
+func Min(a, b Offset) Offset {
+	if a > b {
+		return b
+	}
+	return a
+}
