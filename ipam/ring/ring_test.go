@@ -20,6 +20,7 @@ var (
 
 	start, end    = ParseIP("10.0.0.0"), ParseIP("10.0.0.255")
 	dot10, dot245 = ParseIP("10.0.0.10"), ParseIP("10.0.0.245")
+	dot36, dot38  = ParseIP("10.0.0.36"), ParseIP("10.0.0.38")
 	dot250        = ParseIP("10.0.0.250")
 	middle        = ParseIP("10.0.0.128")
 )
@@ -117,23 +118,27 @@ func TestGrantSimple(t *testing.T) {
 	// Claim everything for peer1
 	ring1.ClaimItAll()
 	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer1name, Free: 255}})
+	ring1.assertInvariants()
 
 	// Now grant everything to peer2
 	ring1.GrantRangeToHost(start, end, peer2name)
 	ring2.Entries = []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}}
 	wt.AssertEquals(t, ring1.Entries, ring2.Entries)
+	ring1.assertInvariants()
 
 	// Now spint back to peer 1
 	ring2.GrantRangeToHost(dot10, end, peer1name)
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 10, Version: 2},
 		{Token: dot10, Peer: peer1name, Free: 245}}
 	wt.AssertEquals(t, ring1.Entries, ring2.Entries)
+	ring2.assertInvariants()
 
 	// And spint back to peer 2 again
 	ring1.GrantRangeToHost(dot245, end, peer2name)
 	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer2name, Free: 10, Version: 2},
 		{Token: dot10, Peer: peer1name, Free: 235, Version: 1},
 		{Token: dot245, Peer: peer2name, Free: 10}})
+	ring1.assertInvariants()
 
 	// Grant range spanning a live token
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 10, Version: 2},
@@ -142,6 +147,43 @@ func TestGrantSimple(t *testing.T) {
 	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer1name, Free: 10, Version: 2},
 		{Token: dot10, Peer: peer2name, Free: 235, Version: 1},
 		{Token: dot245, Peer: peer2name, Free: 10, Version: 1}})
+	ring1.assertInvariants()
+
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer1name, Free: 235}, {Token: dot245, Peer: peer1name, Free: 10}}
+	ring1.GrantRangeToHost(dot10, dot38, peer2name)
+	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer2name, Free: 28, Version: 1},
+		{Token: dot38, Peer: peer1name, Free: 207, Version: 0},
+		{Token: dot245, Peer: peer1name, Free: 10, Version: 0}})
+	ring1.assertInvariants()
+
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer1name, Free: 235}, {Token: dot245, Peer: peer1name, Free: 10}}
+	ring1.GrantRangeToHost(dot36, dot38, peer2name)
+	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer1name, Free: 26, Version: 1},
+		{Token: dot36, Peer: peer2name, Free: 2, Version: 0},
+		{Token: dot38, Peer: peer1name, Free: 207, Version: 0},
+		{Token: dot245, Peer: peer1name, Free: 10, Version: 0}})
+	ring1.assertInvariants()
+
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer1name, Free: 235}, {Token: dot245, Peer: peer1name, Free: 10}}
+	ring1.GrantRangeToHost(dot36, dot245, peer2name)
+	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer1name, Free: 26, Version: 1},
+		{Token: dot36, Peer: peer2name, Free: 209, Version: 0},
+		{Token: dot245, Peer: peer1name, Free: 10, Version: 0}})
+	ring1.assertInvariants()
+
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer1name, Free: 235}, {Token: dot245, Peer: peer1name, Free: 10}}
+	ring1.GrantRangeToHost(dot10, dot245, peer2name)
+	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer2name, Free: 235, Version: 1},
+		{Token: dot245, Peer: peer1name, Free: 10, Version: 0}})
+	ring1.assertInvariants()
 }
 
 func TestGrantSplit(t *testing.T) {
