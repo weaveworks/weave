@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	containerIDRegexp   = regexp.MustCompile("^/v[0-9\\.]*/containers/([^/]*)/.*")
+	containerIDRegexp   = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/([^/]*)/.*")
 	weaveWaitEntrypoint = []string{"/w/w"}
 )
 
@@ -54,7 +54,7 @@ func inspectContainerInPath(client *docker.Client, path string) (*docker.Contain
 		Warning.Println(err)
 		return nil, err
 	}
-	containerID := subs[1]
+	containerID := subs[2]
 
 	container, err := client.InspectContainer(containerID)
 	if err != nil {
