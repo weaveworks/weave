@@ -122,6 +122,9 @@ weave network is not fully connected.  See the
 [architecture documentation](https://raw.githubusercontent.com/weaveworks/weave/master/docs/architecture.txt)
 for a full explanation.
 
+'Direct Peers' lists the hosts which weave was told to connect to in
+`weave launch` and `weave connect`.
+
 The 'Reconnects' section lists peers that this router is aware of, but is
 not currently connected to.  Each line contains some information about
 what went wrong the last time; whether it is attempting to connect or
