@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -30,20 +30,25 @@ func doHTTP(method string, url string) (resp *http.Response, err error) {
 	return http.DefaultClient.Do(req)
 }
 
-func listenHTTP(port int, alloc *Allocator) {
+func listenHTTP(alloc *Allocator) int {
 	router := mux.NewRouter()
 	router.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
 	alloc.HandleHTTP(router)
 
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: router,
-	}
-	if err := srv.ListenAndServe(); err != nil {
+	httpListener, err := net.Listen("tcp", ":0")
+	if err != nil {
 		common.Error.Fatal("Unable to create http listener: ", err)
 	}
+
+	go func() {
+		srv := &http.Server{Handler: router}
+		if err := srv.Serve(httpListener); err != nil {
+			common.Error.Fatal("Unable to serve http: ", err)
+		}
+	}()
+	return httpListener.Addr().(*net.TCPAddr).Port
 }
 
 func allocURL(port int, containerID string) string {
@@ -61,9 +66,8 @@ func TestHttp(t *testing.T) {
 	)
 
 	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
-	port := rand.Intn(10000) + 32768
+	port := listenHTTP(alloc)
 	fmt.Println("Http test on port", port)
-	go listenHTTP(port, alloc)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
@@ -98,9 +102,8 @@ func TestBadHttp(t *testing.T) {
 
 	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
-	port := rand.Intn(10000) + 32768
-	fmt.Println("BadHttp test on port", port)
-	go listenHTTP(port, alloc)
+	port := listenHTTP(alloc)
+	fmt.Println("Http test on port", port)
 
 	alloc.claimRingForTesting()
 	cidr1 := HTTPPost(t, allocURL(port, containerID))
@@ -136,9 +139,8 @@ func impTestHTTPCancel(t *testing.T) {
 	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
 	alloc.claimRingForTesting()
-	port := rand.Intn(10000) + 32768
+	port := listenHTTP(alloc)
 	fmt.Println("Http test on port", port)
-	go listenHTTP(port, alloc)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
