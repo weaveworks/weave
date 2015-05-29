@@ -192,15 +192,27 @@ func (n *name) addIP(zr ZoneRecord, now time.Time) (*recordEntry, error) {
 	return ne, nil
 }
 
-// Delete an IP for this name
-func (n *name) deleteIP(ip IPv4) bool {
-	if ipRecord, found := n.ipv4[ip]; found {
-		ipRecord.notifyIPObservers()
-		n.notifyNameObservers()
-		delete(n.ipv4, ip)
-		return true
+// Delete by IP. Pass uninitialized value for wildcard
+func (n *name) deleteIP(ip net.IP) int {
+	count := 0
+	if !ip.Equal(net.IP{}) {
+		ipv4 := ipToIPv4(ip)
+		if ipv4V, found := n.ipv4[ipv4]; found {
+			ipv4V.notifyIPObservers()
+			delete(n.ipv4, ipv4)
+			count++
+		}
+	} else {
+		for ipv4K, ipv4V := range n.ipv4 {
+			ipv4V.notifyIPObservers()
+			delete(n.ipv4, ipv4K)
+			count++
+		}
 	}
-	return false
+	if count > 0 {
+		n.notifyNameObservers()
+	}
+	return count
 }
 
 // Update the list of IPs for this name, adding new ones and removing old IPs...
@@ -330,36 +342,25 @@ func (ns *namesSet) addIPToName(zr ZoneRecord, now time.Time) (*recordEntry, err
 	return n.addIP(zr, now)
 }
 
-// Delete a name in the names set
-func (ns *namesSet) deleteName(n string) error {
-	if name, found := ns.names[n]; found {
-		for _, ipRecord := range name.getAllEntries() {
-			ipRecord.notifyIPObservers()
+// Delete by name and IP. Pass uninitialized values for wildcard
+func (ns namesSet) deleteNameIP(name string, ip net.IP) int {
+	count := 0
+	if name != "" {
+		if nameV, found := ns.names[name]; found {
+			count += nameV.deleteIP(ip)
+			if nameV.empty() {
+				delete(ns.names, name)
+			}
 		}
-		name.notifyNameObservers()
-		delete(ns.names, n)
-		return nil
-	}
-	return LookupError(n)
-}
-
-// Delete an IPv4 from all names
-func (ns *namesSet) deleteIP(ip IPv4) error {
-	cnt := 0
-	for nkey, n := range ns.names {
-		if n.deleteIP(ip) {
-			cnt++
-		}
-		if n.empty() {
-			delete(ns.names, nkey)
+	} else {
+		for nameK, nameV := range ns.names {
+			count += nameV.deleteIP(ip)
+			if nameV.empty() {
+				delete(ns.names, nameK)
+			}
 		}
 	}
-
-	// we must return an error if no records have been found and deleted
-	if cnt == 0 {
-		return LookupError(fmt.Sprintf("%+v", ip))
-	}
-	return nil
+	return count
 }
 
 // Get the name query time
@@ -592,43 +593,14 @@ func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) (err error) 
 
 // Delete matching records (uninitialised values act as wildcards)
 func (zone *ZoneDb) DeleteRecords(ident string, name string, ip net.IP) int {
-	zone.mx.Lock()
-	defer zone.mx.Unlock()
-
-	count := 0
-
 	if name != "" {
 		name = dns.Fqdn(name)
 	}
 
-	for identK, identV := range zone.idents {
-		if ident == "" || ident == identK {
-			for nameK, nameV := range identV.names {
-				nameModified := false
-				if name == "" || name == nameK {
-					for ipv4K, ipv4V := range nameV.ipv4 {
-						if ip.Equal(net.IP{}) || ip.Equal(ipv4K.toNetIP()) {
-							ipv4V.notifyIPObservers()
-							delete(nameV.ipv4, ipv4K)
-							nameModified = true
-							count++
-						}
-					}
-				}
-				if nameModified {
-					nameV.notifyNameObservers()
-					if nameV.empty() {
-						delete(identV.names, nameK)
-					}
-				}
-			}
-		}
-		if identV.empty() {
-			delete(zone.idents, identK)
-		}
-	}
+	zone.mx.Lock()
+	defer zone.mx.Unlock()
 
-	return count
+	return zone.deleteIdentNameIP(ident, name, ip)
 }
 
 // Observe a name.
@@ -776,16 +748,23 @@ func (zone *ZoneDb) getNamesSet(ident string) *namesSet {
 	return ns
 }
 
-// Delete a ident
-func (zone *ZoneDb) deleteIdent(ident string) {
-	Info.Printf("[zonedb] Removing everything for ident '%s'", ident)
-	if ns, found := zone.idents[ident]; found {
-		for _, n := range ns.names {
-			for _, entry := range n.getAllEntries() {
-				entry.notifyIPObservers()
+// Delete by ident, name and IP. Pass uninitialized value for wildcard
+func (zone *ZoneDb) deleteIdentNameIP(ident string, name string, ip net.IP) int {
+	count := 0
+	if ident != "" {
+		if identV, found := zone.idents[ident]; found {
+			count += identV.deleteNameIP(name, ip)
+			if identV.empty() {
+				delete(zone.idents, ident)
 			}
-			n.notifyNameObservers()
 		}
-		delete(zone.idents, ident)
+	} else {
+		for identK, identV := range zone.idents {
+			count += identV.deleteNameIP(name, ip)
+			if identV.empty() {
+				delete(zone.idents, identK)
+			}
+		}
 	}
+	return count
 }
