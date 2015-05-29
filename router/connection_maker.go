@@ -14,12 +14,14 @@ const (
 	MaxInterval     = 10 * time.Minute
 )
 
+type peerAddrs map[string]*net.TCPAddr
+
 type ConnectionMaker struct {
 	ourself     *LocalPeer
 	peers       *Peers
 	port        int
 	targets     map[string]*Target
-	directPeers map[string]*net.TCPAddr
+	directPeers peerAddrs
 	actionChan  chan<- ConnectionMakerAction
 }
 
@@ -38,7 +40,7 @@ func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int) *ConnectionM
 		ourself:     ourself,
 		peers:       peers,
 		port:        port,
-		directPeers: make(map[string]*net.TCPAddr),
+		directPeers: peerAddrs{},
 		targets:     make(map[string]*Target)}
 }
 
@@ -48,9 +50,9 @@ func (cm *ConnectionMaker) Start() {
 	go cm.queryLoop(actionChan)
 }
 
-func (cm *ConnectionMaker) InitiateConnections(peers []string) []error {
+func (cm *ConnectionMaker) InitiateConnections(peers []string, replace bool) []error {
 	errors := []error{}
-	addrs := make(map[string]*net.TCPAddr)
+	addrs := peerAddrs{}
 	for _, peer := range peers {
 		host, port, err := net.SplitHostPort(peer)
 		if err != nil {
@@ -64,6 +66,9 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string) []error {
 		}
 	}
 	cm.actionChan <- func() bool {
+		if replace {
+			cm.directPeers = peerAddrs{}
+		}
 		for peer, addr := range addrs {
 			cm.directPeers[peer] = addr
 			// curtail any existing reconnect interval

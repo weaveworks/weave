@@ -144,7 +144,7 @@ func main() {
 	}
 
 	router.Start()
-	if errors := router.ConnectionMaker.InitiateConnections(peers); len(errors) > 0 {
+	if errors := router.ConnectionMaker.InitiateConnections(peers, false); len(errors) > 0 {
 		log.Fatal(errorMessages(errors))
 	}
 
@@ -256,7 +256,7 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
 		}
-		if errors := router.ConnectionMaker.InitiateConnections(r.Form["peer"]); len(errors) > 0 {
+		if errors := router.ConnectionMaker.InitiateConnections(r.Form["peer"], r.FormValue("replace") == "true"); len(errors) > 0 {
 			http.Error(w, errorMessages(errors), http.StatusBadRequest)
 		}
 	})
