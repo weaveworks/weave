@@ -40,7 +40,6 @@ func TestHttp(t *testing.T) {
 	}
 
 	port := httpListener.Addr().(*net.TCPAddr).Port
-	fmt.Println("Http test on port", port)
 	go ServeHTTP(httpListener, "", nil, testDomain, zone)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going

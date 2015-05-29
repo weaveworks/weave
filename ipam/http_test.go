@@ -67,7 +67,6 @@ func TestHttp(t *testing.T) {
 
 	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	port := listenHTTP(alloc)
-	fmt.Println("Http test on port", port)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
@@ -103,7 +102,6 @@ func TestBadHttp(t *testing.T) {
 	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
 	port := listenHTTP(alloc)
-	fmt.Println("Http test on port", port)
 
 	alloc.claimRingForTesting()
 	cidr1 := HTTPPost(t, allocURL(port, containerID))
@@ -140,7 +138,6 @@ func impTestHTTPCancel(t *testing.T) {
 	defer alloc.Stop()
 	alloc.claimRingForTesting()
 	port := listenHTTP(alloc)
-	fmt.Println("Http test on port", port)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
