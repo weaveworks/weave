@@ -25,6 +25,7 @@ func main() {
 		httpPort        int
 		wait            int
 		ttl             int
+		negTTL          int
 		timeout         int
 		udpbuf          int
 		fallback        string
@@ -51,6 +52,7 @@ func main() {
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	// advanced options
+	flag.IntVar(&negTTL, "neg-ttl", weavedns.DefaultCacheNegLocalTTL, "negative TTL (in secs) for unanswered queries for local names")
 	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
 	flag.IntVar(&refreshWorkers, "refresh-workers", weavedns.DefaultNumUpdaters, "default number of background updaters")
 	flag.IntVar(&maxAnswers, "max-answers", weavedns.DefaultMaxAnswers, "maximum number of answers returned to clients (0=unlimited)")
@@ -107,14 +109,15 @@ func main() {
 	}
 
 	srvConfig := weavedns.DNSServerConfig{
-		Zone:          zone,
-		Port:          dnsPort,
-		CacheLen:      cacheLen,
-		LocalTTL:      ttl,
-		MaxAnswers:    maxAnswers,
-		Timeout:       timeout,
-		UDPBufLen:     udpbuf,
-		CacheDisabled: cacheDisabled,
+		Zone:             zone,
+		Port:             dnsPort,
+		CacheLen:         cacheLen,
+		LocalTTL:         ttl,
+		CacheNegLocalTTL: negTTL,
+		MaxAnswers:       maxAnswers,
+		Timeout:          timeout,
+		UDPBufLen:        udpbuf,
+		CacheDisabled:    cacheDisabled,
 	}
 
 	if len(fallback) > 0 {
