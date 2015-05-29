@@ -559,7 +559,7 @@ wait_for_status_ip() {
     WAIT_TIME=0
     while [ $WAIT_TIME -lt 3 ]; do
         sleep $WAIT_TIME
-        http_call_ip $1 $2 GET ${3:-/status} >/dev/null && return 0
+        http_call_ip $1 $2 GET /status >/dev/null && return 0
         WAIT_TIME=$((WAIT_TIME+1))
     done
     echo "Timed out waiting for container to start." >&2
@@ -866,7 +866,7 @@ case "$COMMAND" in
             $WEAVEPROXY_DOCKER_ARGS \
             $EXEC_IMAGE "$@")
 
-        wait_for_status_ip $PROXY_HOST $PROXY_PORT /weave
+        wait_for_status_ip $PROXY_HOST $PROXY_PORT
         echo $PROXY_CONTAINER
         ;;
     connect)
@@ -886,6 +886,8 @@ case "$COMMAND" in
         http_call $CONTAINER_NAME $HTTP_PORT GET /status || res=1
         echo
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status 2>/dev/null || true
+        echo
+        http_call_ip $PROXY_HOST $PROXY_PORT GET /status 2>/dev/null || true
         [ $res -eq 0 ]
         ;;
     ps)
