@@ -33,7 +33,14 @@ function vm_names {
 # Delete all vms in this account
 function destroy {
 	names="$(vm_names)"
-	gcloud compute instances delete --zone $ZONE -q $names || true
+	for i in {0..10}; do
+		# gcloud instances delete can sometimes hang.
+		timeout 60s /bin/bash -c "gcloud compute instances delete --zone $ZONE -q $names || true"
+		# 124 means it timed out
+		if [ $? -ne 124 ]; then
+			return
+		fi
+	done
 }
 
 function external_ip {
