@@ -3,10 +3,12 @@ package ipam
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/address"
 	"github.com/weaveworks/weave/router"
 	wt "github.com/weaveworks/weave/testing"
 )
@@ -30,12 +32,15 @@ func toStringArray(messages []mockMessage) []string {
 }
 
 type mockGossipComms struct {
+	sync.RWMutex
 	t        *testing.T
 	name     string
 	messages []mockMessage
 }
 
 func (m *mockGossipComms) String() string {
+	m.RLock()
+	defer m.RUnlock()
 	return fmt.Sprintf("[mockGossipComms %s]", m.name)
 }
 
@@ -44,6 +49,8 @@ func (m *mockGossipComms) String() string {
 // requires they are not based off iterating through a map.
 
 func (m *mockGossipComms) GossipBroadcast(update router.GossipData) error {
+	m.Lock()
+	defer m.Unlock()
 	buf := []byte{}
 	if len(m.messages) == 0 {
 		m.Fatalf("%s: Gossip broadcast message unexpected: \n%x", m.name, buf)
@@ -76,6 +83,8 @@ func (m *mockGossipComms) Fatalf(format string, args ...interface{}) {
 }
 
 func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
+	m.Lock()
+	defer m.Unlock()
 	if len(m.messages) == 0 {
 		m.Fatalf("%s: Gossip message to %s unexpected: \n%s", m.name, dstPeerName, buf)
 	} else if msg := m.messages[0]; msg.dst == router.UnknownPeerName {
@@ -96,20 +105,26 @@ func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte)
 func ExpectMessage(alloc *Allocator, dst string, msgType byte, buf []byte) {
 	m := alloc.gossip.(*mockGossipComms)
 	dstPeerName, _ := router.PeerNameFromString(dst)
+	m.Lock()
 	m.messages = append(m.messages, mockMessage{dstPeerName, msgType, buf})
+	m.Unlock()
 }
 
 func ExpectBroadcastMessage(alloc *Allocator, buf []byte) {
 	m := alloc.gossip.(*mockGossipComms)
+	m.Lock()
 	m.messages = append(m.messages, mockMessage{router.UnknownPeerName, 0, buf})
+	m.Unlock()
 }
 
 func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 	for _, alloc := range allocs {
 		m := alloc.gossip.(*mockGossipComms)
+		m.RLock()
 		if len(m.messages) > 0 {
 			wt.Fatalf(m.t, "%s: Gossip message(s) not sent as expected: \n%x", m.name, m.messages)
 		}
+		m.RUnlock()
 	}
 }
 
@@ -145,6 +160,14 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 	alloc.space.AddRanges(alloc.ring.OwnedRanges())
 }
 
+func (alloc *Allocator) NumFreeAddresses() address.Offset {
+	resultChan := make(chan address.Offset)
+	alloc.actionChan <- func() {
+		resultChan <- alloc.space.NumFreeAddresses()
+	}
+	return <-resultChan
+}
+
 // Check whether or not something was sent on a channel
 func AssertSent(t *testing.T, ch <-chan bool) {
 	timeout := time.After(10 * time.Second)
@@ -178,7 +201,8 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 type gossipMessage struct {
 	isUnicast bool
 	sender    *router.PeerName
-	buf       []byte
+	buf       []byte            // for unicast
+	data      router.GossipData // for broadcast
 	exitChan  chan bool
 }
 
@@ -190,7 +214,7 @@ type TestGossipRouter struct {
 func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
-		case gossipChan <- gossipMessage{buf: update.(*ipamGossipData).alloc.encode()}:
+		case gossipChan <- gossipMessage{data: update}:
 		default: // drop the message if we cannot send it
 		}
 	}
@@ -233,7 +257,7 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 						panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", sender, err))
 					}
 				} else {
-					_, err := gossiper.OnGossipBroadcast(message.buf)
+					_, err := gossiper.OnGossipBroadcast(message.data.Encode())
 					if err != nil {
 						panic(fmt.Sprintf("Error doing gossip broadcast to %s: %s", sender, err))
 					}

@@ -54,7 +54,7 @@ func TestAllocFree(t *testing.T) {
 	alloc.ContainerDied(container2)
 	alloc.ContainerDied(container3)
 	alloc.String() // force sync-up after async call
-	wt.AssertEquals(t, alloc.space.NumFreeAddresses(), address.Offset(spaceSize))
+	wt.AssertEquals(t, alloc.NumFreeAddresses(), address.Offset(spaceSize))
 }
 
 func TestBootstrap(t *testing.T) {
@@ -73,9 +73,9 @@ func TestBootstrap(t *testing.T) {
 	alloc2 := makeAllocatorWithMockGossip(t, peerNameString, testStart1+"/22", 2)
 	defer alloc2.Stop()
 
-	alloc1.OnGossipBroadcast(alloc2.encode())
+	alloc1.OnGossipBroadcast(alloc2.Encode())
 
-	alloc1.tryPendingOps()
+	alloc1.actionChan <- func() { alloc1.tryPendingOps() }
 
 	ExpectBroadcastMessage(alloc1, nil) // alloc1 will try to form consensus
 	done := make(chan bool)
@@ -88,26 +88,26 @@ func TestBootstrap(t *testing.T) {
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
-	alloc1.tryPendingOps()
+	alloc1.actionChan <- func() { alloc1.tryPendingOps() }
 	AssertNothingSent(t, done)
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
 	// alloc2 receives paxos update and broadcasts its reply
 	ExpectBroadcastMessage(alloc2, nil)
-	alloc2.OnGossipBroadcast(alloc1.encode())
+	alloc2.OnGossipBroadcast(alloc1.Encode())
 
 	ExpectBroadcastMessage(alloc1, nil)
-	alloc1.OnGossipBroadcast(alloc2.encode())
+	alloc1.OnGossipBroadcast(alloc2.Encode())
 
 	// both nodes will get consensus now so initialize the ring
 	ExpectBroadcastMessage(alloc2, nil)
 	ExpectBroadcastMessage(alloc2, nil)
-	alloc2.OnGossipBroadcast(alloc1.encode())
+	alloc2.OnGossipBroadcast(alloc1.Encode())
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
-	alloc1.OnGossipBroadcast(alloc2.encode())
+	alloc1.OnGossipBroadcast(alloc2.Encode())
 	// now alloc1 should have space
 
 	AssertSent(t, done)
@@ -172,7 +172,7 @@ func TestCancel(t *testing.T) {
 	alloc2.Start()
 
 	// tell peers about each other
-	alloc1.OnGossipBroadcast(alloc2.encode())
+	alloc1.OnGossipBroadcast(alloc2.Encode())
 
 	// Get some IPs, so each allocator has some space
 	res1, _ := alloc1.Allocate("foo", nil)
@@ -188,7 +188,7 @@ func TestCancel(t *testing.T) {
 	unpause := alloc2.pause()
 
 	// Use up all the IPs that alloc1 owns, so the allocation after this will prompt a request to alloc2
-	for i := 0; alloc1.space.NumFreeAddresses() > 0; i++ {
+	for i := 0; alloc1.NumFreeAddresses() > 0; i++ {
 		alloc1.Allocate(fmt.Sprintf("tmp%d", i), nil)
 	}
 	cancelChan := make(chan bool, 1)
@@ -256,7 +256,7 @@ func TestTransfer(t *testing.T) {
 	wt.AssertSuccess(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
 	wt.AssertSuccess(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
 
-	wt.AssertEquals(t, alloc1.space.NumFreeAddresses(), address.Offset(1022))
+	wt.AssertEquals(t, alloc1.NumFreeAddresses(), address.Offset(1022))
 
 	_, err = alloc1.Allocate("foo", nil)
 	wt.AssertTrue(t, err == nil, "Failed to get address")
@@ -447,7 +447,7 @@ func TestGossipSkew(t *testing.T) {
 	alloc2.now = func() time.Time { return time.Now().Add(time.Hour * 2) }
 	defer alloc2.Stop()
 
-	if _, err := alloc1.OnGossipBroadcast(alloc2.encode()); err == nil {
+	if _, err := alloc1.OnGossipBroadcast(alloc2.Encode()); err == nil {
 		t.Fail()
 	}
 }
