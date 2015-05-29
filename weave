@@ -28,7 +28,7 @@ usage() {
     echo "weave launch       [-password <password>] [-nickname <nickname>] [-iprange <cidr>] <peer> ..."
     echo "weave launch-dns   <cidr>"
     echo "weave launch-proxy [-H <docker_endpoint>] [--with-dns] [--with-ipam]"
-    echo "weave connect      <peer> ..."
+    echo "weave connect      [--replace] [<peer> ...]"
     echo "weave forget       <peer> ..."
     echo "weave run          [--with-dns] [<cidr> ...] <docker run args> ..."
     echo "weave start        [<cidr> ...] <container_id>"
@@ -871,7 +871,11 @@ case "$COMMAND" in
         ;;
     connect)
         [ $# -gt 0 ] || usage
-        http_call $CONTAINER_NAME $HTTP_PORT POST /connect -d $(peer_args "$@")
+        if [ "$1" == "--replace" ]; then
+          replace="-d replace=true"
+          shift
+        fi
+        http_call $CONTAINER_NAME $HTTP_PORT POST /connect $replace -d $(peer_args "$@")
         ;;
     forget)
         [ $# -gt 0 ] || usage

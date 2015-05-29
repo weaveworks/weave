@@ -368,6 +368,11 @@ This will prevent the peer from trying to reconnect to that host once
 connectivity to it is lost, and thus can be used to administratively
 remove decommissioned peers from the network.
 
+Hosts can also be bulk-replaced. All existing hosts will be forgotten,
+and the new hosts will be added, when one runs
+
+    host# weave connect --replace $NEW_HOST1 $NEW_HOST2
+
 ### <a name="container-mobility"></a>Container mobility
 
 Containers can be moved between hosts without requiring any
