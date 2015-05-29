@@ -298,6 +298,7 @@ func TestAllocatorFuzz(t *testing.T) {
 	type result struct {
 		name  string
 		alloc int32
+		block bool
 	}
 	stateLock := sync.Mutex{}
 	state := make(map[string]result)
@@ -348,7 +349,7 @@ func TestAllocatorFuzz(t *testing.T) {
 				name, res.name))
 		}
 
-		state[addrStr] = result{name, allocIndex}
+		state[addrStr] = result{name, allocIndex, false}
 		addrs = append(addrs, addrStr)
 		numPending--
 	}
@@ -365,12 +366,16 @@ func TestAllocatorFuzz(t *testing.T) {
 		addrIndex := rand.Int31n(int32(len(addrs)))
 		addr := addrs[addrIndex]
 		res := state[addr]
+		if res.block {
+			stateLock.Unlock()
+			return
+		}
 		addrs = rm(addrs, addrIndex)
 		delete(state, addr)
 		stateLock.Unlock()
 
 		alloc := allocs[res.alloc]
-		//common.Info.Printf("Freeing %s on allocator %d", addr, res.alloc)
+		//common.Info.Printf("Freeing %s (%s) on allocator %d", res.name, addr, res.alloc)
 
 		wt.AssertSuccess(t, alloc.Free(res.name))
 	}
@@ -382,6 +387,8 @@ func TestAllocatorFuzz(t *testing.T) {
 		addrIndex := rand.Int31n(int32(len(addrs)))
 		addr := addrs[addrIndex]
 		res := state[addr]
+		res.block = true
+		state[addr] = res
 		stateLock.Unlock()
 		alloc := allocs[res.alloc]
 
@@ -390,8 +397,13 @@ func TestAllocatorFuzz(t *testing.T) {
 		newAddr, _ := alloc.Allocate(res.name, nil)
 		oldAddr, _ := address.ParseIP(addr)
 		if newAddr != oldAddr {
-			panic(fmt.Sprintf("Got different address for repeat request"))
+			panic(fmt.Sprintf("Got different address for repeat request for %s: %s != %s", res.name, newAddr, oldAddr))
 		}
+
+		stateLock.Lock()
+		res.block = false
+		state[addr] = res
+		stateLock.Unlock()
 	}
 
 	// Run function _f_ _iterations_ times, in _concurrency_
