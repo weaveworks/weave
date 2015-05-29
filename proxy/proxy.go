@@ -73,7 +73,7 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.withDNS, proxy.withIPAM}, w, r)
 	case execCreateRegexp.MatchString(path):
 		proxy.serveWithInterceptor(&createExecInterceptor{proxy.client, proxy.withIPAM}, w, r)
-	case strings.HasPrefix(path, "/weave"):
+	case strings.HasPrefix(path, "/status"):
 		w.WriteHeader(http.StatusOK)
 	default:
 		proxy.serveWithInterceptor(&nullInterceptor{}, w, r)
