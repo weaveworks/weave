@@ -61,6 +61,7 @@ exec_remote() {
         -e WEAVE_DEBUG \
         -e WEAVE_DOCKER_ARGS \
         -e WEAVEDNS_DOCKER_ARGS \
+        -e WEAVEPROXY_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
         -e WEAVE_CONTAINER_NAME \
@@ -167,6 +168,13 @@ MTU=65535
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
+PROXY_PORT=12375
+PROXY_CONTAINER_NAME=weaveproxy
+PROXY_HOST="localhost"
+if [[ "$DOCKER_HOST" == "tcp://"* ]]; then
+    PROXY_HOST=$(echo "$DOCKER_HOST" | sed -e "s|tcp://\([^:]*\):[0-9]*|\1|")
+fi
+
 
 ######################################################################
 # general helpers; independent of docker and weave
@@ -540,6 +548,18 @@ wait_for_status() {
     return 1
 }
 
+# Just like wait_for_status, but takes the IP instead of a container ID
+wait_for_status_ip() {
+    WAIT_TIME=0
+    while [ $WAIT_TIME -lt 3 ]; do
+        sleep $WAIT_TIME
+        http_call_ip $1 $2 GET ${3:-/status} >/dev/null && return 0
+        WAIT_TIME=$((WAIT_TIME+1))
+    done
+    echo "Timed out waiting for container to start." >&2
+    return 1
+}
+
 # Call $1 for all containers, passing container ID, all MACs and all IPs
 with_container_addresses() {
     COMMAND=$1
@@ -688,63 +708,6 @@ get_ipam_cidr() {
     fi
 }
 
-######################################################################
-# weave proxy helpers
-######################################################################
-
-PROXY_PORT=12375
-PROXY_CONTAINER_NAME=weaveproxy
-
-proxy_host() {
-    case $DOCKER_HOST in
-        tcp://*)
-            PROXY_HOST=$(echo $DOCKER_HOST | sed -e "s|tcp://\([^:]*\):[0-9]*|\1|")
-            ;;
-        *)
-            PROXY_HOST="localhost"
-            ;;
-    esac
-}
-
-wait_for_proxy_to_boot() {
-    proxy_host
-    for n in $(seq 1 10); do
-      if curl --max-time 1 --connect-timeout 1 -s -X GET http://$PROXY_HOST:$PROXY_PORT/weave ; then
-        return 0
-      fi
-      sleep 1
-    done
-    echo "Proxy did not start within 10 seconds" >&2
-    return 1
-}
-
-ensure_proxy_running() {
-    case $(docker inspect --format '{{.State.Running}} {{.Config.Image}}' $PROXY_CONTAINER_NAME 2>/dev/null) in
-        "true $EXEC_IMAGE")
-            return 0
-            ;;
-        true*)
-            echo "Proxy already running with unknown image" >&2
-            exit 1
-            ;;
-        false*)
-            docker rm -f $PROXY_CONTAINER_NAME >/dev/null
-            ;;
-    esac
-    # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
-    # additional parameters, such as resource limits, to docker
-    # when launching the weave proxy container.
-    PROXY_CONTAINER=$(docker run --privileged --net=host -d \
-        --name=$PROXY_CONTAINER_NAME \
-        -p $PROXY_PORT:$PROXY_PORT/tcp -v /var/run/docker.sock:/var/run/docker.sock \
-        -v /proc:/hostproc -e PROCFS=/hostproc \
-        --entrypoint=/home/weave/weaveproxy \
-        $WEAVE_DOCKER_ARGS $WEAVEPROXY_DOCKER_ARGS \
-        $EXEC_IMAGE "$@")
-
-    wait_for_proxy_to_boot
-}
-
 ##########################################################################################
 
 [ $(id -u) = 0 ] || {
@@ -874,7 +837,20 @@ case "$COMMAND" in
         echo $DNS_CONTAINER
         ;;
     launch-proxy)
-        ensure_proxy_running "$@"
+        check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
+        # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
+        # additional parameters, such as resource limits, to docker
+        # when launching the weaveproxy container.
+        PROXY_CONTAINER=$(docker run --privileged --net=host -d \
+            --name=$PROXY_CONTAINER_NAME \
+            -p $PROXY_PORT:$PROXY_PORT/tcp \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /proc:/hostproc -e PROCFS=/hostproc \
+            --entrypoint=/home/weave/weaveproxy \
+            $WEAVEPROXY_DOCKER_ARGS \
+            $EXEC_IMAGE "$@")
+
+        wait_for_status_ip $PROXY_HOST $PROXY_PORT /weave
         echo $PROXY_CONTAINER
         ;;
     connect)
