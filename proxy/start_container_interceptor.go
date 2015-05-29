@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -33,8 +34,10 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 	args := []string{"attach"}
 	args = append(args, cidrs...)
 	args = append(args, container.ID)
-	if _, err := callWeave(args...); err != nil {
-		Warning.Printf("Attaching container %s to weave network failed: %v", container.ID, err)
+	if output, err := callWeave(args...); err != nil {
+		i.client.KillContainer(docker.KillContainerOptions{ID: container.ID})
+		Warning.Printf("Attaching container %s to weave network failed: %s", container.ID, string(output))
+		return errors.New(string(output))
 	}
 	return nil
 }
