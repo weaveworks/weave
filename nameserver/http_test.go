@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	wt "github.com/weaveworks/weave/testing"
 )
@@ -41,8 +40,6 @@ func TestHttp(t *testing.T) {
 
 	port := httpListener.Addr().(*net.TCPAddr).Port
 	go ServeHTTP(httpListener, "", nil, testDomain, zone)
-
-	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 
 	// Ask the http server to add our test address into the database
 	addrParts := strings.Split(testAddr1, "/")
