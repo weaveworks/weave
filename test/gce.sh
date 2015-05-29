@@ -50,12 +50,12 @@ function destroy {
 	done
 }
 
-function external_ip {
-	gcloud compute instances list $1 --format=yaml | grep "^    natIP\:" | cut -d: -f2 | tr -d ' '
+function internal_ip {
+	jq -r ".[] | select(.name == \"$2\") | .networkInterfaces[0].networkIP" $1
 }
 
-function internal_ip {
-	gcloud compute instances list $1 --format=yaml | grep "^  networkIP\:" | cut -d: -f2 | tr -d ' '
+function external_ip {
+	jq -r ".[] | select(.name == \"$2\") | .networkInterfaces[0].accessConfigs[0].natIP" $1
 }
 
 function try_connect {
@@ -81,32 +81,42 @@ EOF
 	ssh -t $name sudo docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 }
 
-# Create new set of VMS
+# Create new set of VMs
 function setup {
 	destroy
 	names="$(vm_names)"
 	gcloud compute instances create $names --image $TEMPLATE_NAME --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
+	sed -i '/UserKnownHostsFile=\/dev\/null/d' ~/.ssh/config
+
+	# build an /etc/hosts file for these vms
+	hosts=$(mktemp hosts.XXXXXXXXXX)
+	json=$(mktemp json.XXXXXXXXXX)
+	gcloud compute instances list --format=json >$json
+	for name in $names; do
+		echo "$(internal_ip $json $name) $name.$ZONE.$PROJECT" >>$hosts
+	done
 
 	for name in $names; do
 		hostname="$name.$ZONE.$PROJECT"
+
 		# Add the remote ip to the local /etc/hosts
-		sudo -- sh -c "echo \"$(external_ip $name) $hostname\" >>/etc/hosts"
+		sudo sed -i "/$hostname/d" /etc/hosts
+		sudo sh -c "echo \"$(external_ip $json $name) $hostname\" >>/etc/hosts"
 		try_connect $hostname
 
-		# Add the local ips to the remote /etc/hosts
-		for othername in $names; do
-			entry="$(internal_ip $othername) $othername.$ZONE.$PROJECT"
-			ssh -t "$hostname" "sudo -- sh -c \"echo \\\"$entry\\\" >>/etc/hosts\""
-		done
+		# Copy the /etc/hosts we built over
+		cat $hosts | ssh -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
 	done
+
+	rm $hosts $json
 }
 
 function make_template {
 	gcloud compute instances create $TEMPLATE_NAME --image $IMAGE --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
 	name="$TEMPLATE_NAME.$ZONE.$PROJECT"
-  try_connect $name
+	try_connect $name
 	install_docker_on $name
 	gcloud -q compute instances delete $TEMPLATE_NAME --keep-disks boot --zone $ZONE
 	gcloud compute images create $TEMPLATE_NAME --source-disk $TEMPLATE_NAME --source-disk-zone $ZONE
@@ -115,14 +125,17 @@ function make_template {
 function hosts {
 	hosts=
 	args=
+	json=$(mktemp json.XXXXXXXXXX)
+	gcloud compute instances list --format=json >$json
 	for name in $(vm_names); do
 		hostname="$name.$ZONE.$PROJECT"
 		hosts="$hostname $hosts"
-		args="--add-host=$hostname:$(internal_ip $name) $args"
+		args="--add-host=$hostname:$(internal_ip $json $name) $args"
 	done
 	echo export SSH=ssh
 	echo export HOSTS=\"$hosts\"
 	echo export WEAVE_DOCKER_ARGS=\"$args\"
+	rm $json
 }
 
 case "$1" in
