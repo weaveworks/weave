@@ -138,12 +138,11 @@ type ConnectionMakerStatus struct {
 
 func (status ConnectionMakerStatus) String() string {
 	var buf bytes.Buffer
-	fmt.Fprintln(&buf, "Direct Peers:")
+	fmt.Fprint(&buf, "Direct Peers:")
 	for _, peer := range status.DirectPeers {
-		fmt.Fprintln(&buf, peer)
+		fmt.Fprintf(&buf, " %s", peer)
 	}
-
-	fmt.Fprintln(&buf, "Reconnects:")
+	fmt.Fprintln(&buf, "\nReconnects:")
 	for address, target := range status.Reconnects {
 		fmt.Fprintf(&buf, "->[%s]", address)
 		if target.lastError != nil {
