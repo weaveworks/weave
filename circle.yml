@@ -21,7 +21,7 @@ dependencies:
     - if [[ -e "$WEAVE_BUILD" ]]; then
         docker load -i $WEAVE_BUILD;
       else
-        docker pull weaveworks/weave-build;
+        docker build -t weaveworks/weave-build build;
         mkdir -p $(dirname "$WEAVE_BUILD");
         docker save weaveworks/weave-build >$WEAVE_BUILD;
       fi
