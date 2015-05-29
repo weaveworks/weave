@@ -35,7 +35,7 @@ func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case err == docker.ErrNoSuchImage:
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
-			http.Error(w, "Unable to intercept request", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			Warning.Print("Error intercepting request: ", err)
 		}
 		return
@@ -58,7 +58,7 @@ func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	err = c.InterceptResponse(resp)
 	if err != nil {
-		http.Error(w, "Unable to intercept response", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		Warning.Print("Error intercepting response: ", err)
 		return
 	}
