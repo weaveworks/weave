@@ -3,6 +3,7 @@ package ipam
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,12 +31,15 @@ func toStringArray(messages []mockMessage) []string {
 }
 
 type mockGossipComms struct {
+	sync.RWMutex
 	t        *testing.T
 	name     string
 	messages []mockMessage
 }
 
 func (m *mockGossipComms) String() string {
+	m.RLock()
+	defer m.RUnlock()
 	return fmt.Sprintf("[mockGossipComms %s]", m.name)
 }
 
@@ -44,6 +48,8 @@ func (m *mockGossipComms) String() string {
 // requires they are not based off iterating through a map.
 
 func (m *mockGossipComms) GossipBroadcast(update router.GossipData) error {
+	m.Lock()
+	defer m.Unlock()
 	buf := []byte{}
 	if len(m.messages) == 0 {
 		m.Fatalf("%s: Gossip broadcast message unexpected: \n%x", m.name, buf)
@@ -76,6 +82,8 @@ func (m *mockGossipComms) Fatalf(format string, args ...interface{}) {
 }
 
 func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
+	m.Lock()
+	defer m.Unlock()
 	if len(m.messages) == 0 {
 		m.Fatalf("%s: Gossip message to %s unexpected: \n%s", m.name, dstPeerName, buf)
 	} else if msg := m.messages[0]; msg.dst == router.UnknownPeerName {
@@ -96,20 +104,26 @@ func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte)
 func ExpectMessage(alloc *Allocator, dst string, msgType byte, buf []byte) {
 	m := alloc.gossip.(*mockGossipComms)
 	dstPeerName, _ := router.PeerNameFromString(dst)
+	m.Lock()
 	m.messages = append(m.messages, mockMessage{dstPeerName, msgType, buf})
+	m.Unlock()
 }
 
 func ExpectBroadcastMessage(alloc *Allocator, buf []byte) {
 	m := alloc.gossip.(*mockGossipComms)
+	m.Lock()
 	m.messages = append(m.messages, mockMessage{router.UnknownPeerName, 0, buf})
+	m.Unlock()
 }
 
 func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 	for _, alloc := range allocs {
 		m := alloc.gossip.(*mockGossipComms)
+		m.RLock()
 		if len(m.messages) > 0 {
 			wt.Fatalf(m.t, "%s: Gossip message(s) not sent as expected: \n%x", m.name, m.messages)
 		}
+		m.RUnlock()
 	}
 }
 
@@ -178,7 +192,8 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 type gossipMessage struct {
 	isUnicast bool
 	sender    *router.PeerName
-	buf       []byte
+	unibuf    []byte
+	data      router.GossipData
 	exitChan  chan bool
 }
 
@@ -190,7 +205,7 @@ type TestGossipRouter struct {
 func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
-		case gossipChan <- gossipMessage{buf: update.(*ipamGossipData).alloc.encode()}:
+		case gossipChan <- gossipMessage{data: update}:
 		default: // drop the message if we cannot send it
 		}
 	}
@@ -228,12 +243,12 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 				}
 
 				if message.isUnicast {
-					err := gossiper.OnGossipUnicast(*message.sender, message.buf)
+					err := gossiper.OnGossipUnicast(*message.sender, message.unibuf)
 					if err != nil {
 						panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", sender, err))
 					}
 				} else {
-					_, err := gossiper.OnGossipBroadcast(message.buf)
+					_, err := gossiper.OnGossipBroadcast(message.data.Encode())
 					if err != nil {
 						panic(fmt.Sprintf("Error doing gossip broadcast to %s: %s", sender, err))
 					}
@@ -250,13 +265,15 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 
 func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
 	select {
-	case client.router.gossipChans[dstPeerName] <- gossipMessage{isUnicast: true, sender: &client.sender, buf: buf}:
+	case client.router.gossipChans[dstPeerName] <- gossipMessage{isUnicast: true, sender: &client.sender, unibuf: buf}:
 	default: // drop the message if we cannot send it
 		common.Error.Printf("Dropping message")
 	}
 	return nil
 }
 
+// Called from actor routine of allocator, so (a) we can't re-enter the actor and
+// (b) it's thread-safe to cast through and get the data
 func (client TestGossipRouterClient) GossipBroadcast(update router.GossipData) error {
 	return client.router.GossipBroadcast(update)
 }
