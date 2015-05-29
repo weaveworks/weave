@@ -24,20 +24,22 @@ check_test_status() {
 # Overwrite assert.sh _assert_cleanup trap with our own
 trap check_test_status EXIT
 
-# If running on circle, only run the tests for my "shard".
-# CIRCLE_NODE_TOTAL is the total number of shards, and
-# CIRCLE_NODE_INDEX is my index.
-i=0
-TESTS=
-for test in *_test.sh; do
-    if [ -z "$CIRCLECI" ] || [ $(($i % $CIRCLE_NODE_TOTAL)) -eq $CIRCLE_NODE_INDEX ]; then
-          TESTS="$TESTS $test"
-    fi
-    i=$(($i + 1))
-done
+TESTS=*_test.sh
+
+# If running on circle, use the scheduler to work out what tests to run
+if [ -n "$CIRCLECI" ]; then
+    TESTS=$(echo $TESTS | ./sched sched $CIRCLE_BUILD_NUM $CIRCLE_NODE_TOTAL $CIRCLE_NODE_INDEX)
+fi
+
+echo Running $TESTS
 
 for t in $TESTS; do
     echo
     greyly echo "---= Running $t =---"
     . $t
+
+    # Report test runtime when running on circle, to help scheduler
+    if [ -n "$CIRCLECI" ]; then
+        ./sched time $t $(bc -l <<< "$tests_time/1000000000")
+    fi
 done
