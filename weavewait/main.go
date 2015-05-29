@@ -10,21 +10,21 @@ import (
 )
 
 func main() {
-	if _, err := net.EnsureInterface("ethwe", 20); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
+	_, err := net.EnsureInterface("ethwe", 20)
+	checkErr(err)
 
 	if len(os.Args) <= 1 {
 		os.Exit(0)
 	}
 
 	binary, err := exec.LookPath(os.Args[1])
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	checkErr(err)
 
-	if err := syscall.Exec(binary, os.Args[1:], os.Environ()); err != nil {
+	checkErr(syscall.Exec(binary, os.Args[1:], os.Environ()))
+}
+
+func checkErr(err error) {
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
