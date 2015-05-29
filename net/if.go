@@ -6,12 +6,16 @@ import (
 	"time"
 )
 
+const (
+	sleepTime = 100 * time.Millisecond
+)
+
 func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
 	if iface, err = findInterface(ifaceName); err == nil || wait == 0 {
 		return
 	}
-	for ; err != nil && wait > 0; wait-- {
-		time.Sleep(1 * time.Second)
+	for i := time.Duration(wait) * time.Second / sleepTime; err != nil && i > 0; i-- {
+		time.Sleep(sleepTime)
 		iface, err = findInterface(ifaceName)
 	}
 	return
