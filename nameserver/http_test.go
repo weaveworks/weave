@@ -2,13 +2,11 @@ package nameserver
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	wt "github.com/weaveworks/weave/testing"
 )
@@ -35,11 +33,13 @@ func TestHttp(t *testing.T) {
 	wt.AssertNoErr(t, err)
 	defer zone.Stop()
 
-	port := rand.Intn(10000) + 32768
-	fmt.Println("Http test on port", port)
-	go ListenHTTP("", nil, testDomain, zone, port)
+	httpListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal("Unable to create http listener: ", err)
+	}
 
-	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
+	port := httpListener.Addr().(*net.TCPAddr).Port
+	go ServeHTTP(httpListener, "", nil, testDomain, zone)
 
 	// Ask the http server to add our test address into the database
 	addrParts := strings.Split(testAddr1, "/")

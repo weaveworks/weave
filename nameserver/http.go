@@ -17,7 +17,7 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf("[http] "+logmsg, logargs...)
 }
 
-func ListenHTTP(version string, server *DNSServer, domain string, db Zone, port int) {
+func ServeHTTP(listener net.Listener, version string, server *DNSServer, domain string, db Zone) {
 
 	muxRouter := mux.NewRouter()
 
@@ -90,8 +90,7 @@ func ListenHTTP(version string, server *DNSServer, domain string, db Zone, port 
 
 	http.Handle("/", muxRouter)
 
-	address := fmt.Sprintf(":%d", port)
-	if err := http.ListenAndServe(address, nil); err != nil {
-		Error.Fatal("[http] Unable to create http listener: ", err)
+	if err := http.Serve(listener, nil); err != nil {
+		Error.Fatal("[http] Unable to serve http: ", err)
 	}
 }
