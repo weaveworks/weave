@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -35,9 +34,14 @@ func TestHttp(t *testing.T) {
 	wt.AssertNoErr(t, err)
 	defer zone.Stop()
 
-	port := rand.Intn(10000) + 32768
+	httpListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatal("Unable to create http listener: ", err)
+	}
+
+	port := httpListener.Addr().(*net.TCPAddr).Port
 	fmt.Println("Http test on port", port)
-	go ListenHTTP("", nil, testDomain, zone, port)
+	go ServeHTTP(httpListener, "", nil, testDomain, zone)
 
 	time.Sleep(100 * time.Millisecond) // Allow for http server to get going
 

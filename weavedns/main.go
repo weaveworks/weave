@@ -127,8 +127,13 @@ func main() {
 		Error.Fatal("[main] Failed to initialize the WeaveDNS server", err)
 	}
 
+	httpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", httpPort))
+	if err != nil {
+		Error.Fatal("[main] Unable to create http listener: ", err)
+	}
+
 	go SignalHandlerLoop(srv)
-	go weavedns.ListenHTTP(version, srv, domain, zone, httpPort)
+	go weavedns.ServeHTTP(httpListener, version, srv, domain, zone)
 
 	err = srv.Start()
 	if err != nil {
