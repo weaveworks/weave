@@ -82,6 +82,7 @@ unicast:
 broadcast:
 7a:f4:56:87:76:3b -> [7a:16:dd:5b:83:de]
 7a:16:dd:5b:83:de -> []
+Direct Peers: 191.235.147.190 192.168.32.1
 Reconnects:
 ->[192.168.32.1:6783] (dial tcp4 192.168.32.1:6783: connection timed out) next try at 2014-10-23 16:39:50.585932102 +0000 UTC
 ````
