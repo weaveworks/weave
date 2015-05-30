@@ -256,7 +256,8 @@ random_mac() {
 
 create_bridge() {
     [ ! -d /sys/class/net/$BRIDGE ] && {
-        ip link add name $BRIDGE type bridge
+        docker run --rm --privileged --net=host $IMAGE --createdp --dpname=$BRIDGE
+        #ip link add name $BRIDGE type bridge
         # Set a random MAC address on the bridge.  Current Linux
         # kernels already do this when creating a bridge, but there
         # are rumours it was not always so.
@@ -265,9 +266,9 @@ create_bridge() {
         # fails. Bridges take the lowest MTU of their interfaces. So
         # instead we create a temporary interface with the desired
         # MTU, attach that to the bridge, and then remove it again.
-        ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
-        ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
-        ip link del dev v${CONTAINER_IFNAME}du
+        #ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
+        #ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
+        #ip link del dev v${CONTAINER_IFNAME}du
         # Drop traffic from Docker bridge to Weave; it can break subnet isolation
         if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
             # Note using -I to insert ahead of Docker's bridge rules
@@ -293,7 +294,8 @@ create_bridge() {
 
 destroy_bridge() {
     if [ -d /sys/class/net/$BRIDGE ] ; then
-        ip link del dev $BRIDGE
+        docker run --rm --privileged --net=host $IMAGE --deletedp --dpname=$BRIDGE
+        #ip link del dev $BRIDGE
     fi
     if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
         run_iptables -t filter -D FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP 2>/dev/null || true
@@ -385,7 +387,7 @@ connect_container_to_bridge() {
     if ! netnsenter ip link set $GUEST_IFNAME down ||
         ! netnsenter ip link set $GUEST_IFNAME name $CONTAINER_IFNAME up ||
         ! ip link set $LOCAL_IFNAME up ||
-        ! ip link set $LOCAL_IFNAME master $BRIDGE ||
+        ! docker run --rm --privileged --net=host $IMAGE --adddpif=$LOCAL_IFNAME --dpname=$BRIDGE ||
         ! configure_arp_cache $CONTAINER_IFNAME "netnsenter" ; then
         return 1
     fi
@@ -815,7 +817,7 @@ case "$COMMAND" in
         # when launching the weave container.
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
             -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock --net=host \
-            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" $IPRANGE "$@")
+            $WEAVE_DOCKER_ARGS $IMAGE -dpname $BRIDGE -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" $IPRANGE "$@")
         with_container_netns $CONTAINER launch >/dev/null
 
         wait_for_status $CONTAINER_NAME $HTTP_PORT

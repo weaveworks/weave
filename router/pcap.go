@@ -31,7 +31,7 @@ func NewPcap(iface *net.Interface, bufSz int) (IntraHost, error) {
 	return &Pcap{iface: iface, bufSz: bufSz, writeHandle: wh}, nil
 }
 
-func (p *Pcap) ConsumePackets(consumer IntraHostConsumer) error {
+func (p *Pcap) ConsumeIntraHostPackets(consumer IntraHostConsumer) error {
 	rh, err := newPcapHandle(p.iface.Name, true, 65535, p.bufSz)
 	if err != nil {
 		return err

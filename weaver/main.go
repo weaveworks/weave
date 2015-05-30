@@ -34,26 +34,36 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		config      weave.RouterConfig
-		justVersion bool
-		ifaceName   string
-		routerName  string
-		nickName    string
-		password    string
-		wait        int
-		debug       bool
-		pktdebug    bool
-		prof        string
-		peers       []string
-		bufSzMB     int
-		httpAddr    string
-		iprangeCIDR string
-		peerCount   int
-		apiPath     string
-		iface       *net.Interface
+		// flags that cause immediate exit
+		justVersion          bool
+		createDatapath       bool
+		deleteDatapath       bool
+		addDatapathInterface string
+
+		config       weave.RouterConfig
+		ifaceName    string
+		routerName   string
+		nickName     string
+		password     string
+		wait         int
+		debug        bool
+		pktdebug     bool
+		prof         string
+		peers        []string
+		bufSzMB      int
+		httpAddr     string
+		iprangeCIDR  string
+		peerCount    int
+		apiPath      string
+		iface        *net.Interface
+		datapathName string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
+	flag.BoolVar(&createDatapath, "createdp", false, "create ODP datapath and exit")
+	flag.BoolVar(&deleteDatapath, "deletedp", false, "delete ODP datapath and exit")
+	flag.StringVar(&addDatapathInterface, "adddpif", "", "add a network interface to the ODP datapath and exit")
+
 	flag.IntVar(&config.Port, "port", weave.Port, "router port")
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if blank)")
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
@@ -69,12 +79,24 @@ func main() {
 	flag.StringVar(&iprangeCIDR, "iprange", "", "IP address range to allocate within, in CIDR notation")
 	flag.IntVar(&peerCount, "initpeercount", 0, "number of peers in network (for IP address allocation)")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
+	flag.StringVar(&datapathName, "dpname", "", "ODP datapath name")
 	flag.Parse()
 	peers = flag.Args()
 
 	InitDefaultLogging(debug)
-	if justVersion {
+
+	switch {
+	case justVersion:
 		fmt.Printf("weave router %s\n", version)
+		os.Exit(0)
+	case createDatapath:
+		checkFatal(weave.CreateDatapath(datapathName))
+		os.Exit(0)
+	case deleteDatapath:
+		checkFatal(weave.DeleteDatapath(datapathName))
+		os.Exit(0)
+	case addDatapathInterface != "":
+		checkFatal(weave.AddDatapathInterface(datapathName, addDatapathInterface))
 		os.Exit(0)
 	}
 
@@ -83,17 +105,32 @@ func main() {
 
 	var err error
 
+	if password == "" {
+		password = os.Getenv("WEAVE_PASSWORD")
+	}
+
 	if ifaceName != "" {
 		iface, err := weavenet.EnsureInterface(ifaceName, wait)
-		if err != nil {
-			log.Fatal(err)
-		}
-
+		checkFatal(err)
 		// bufsz flag is in MB
 		config.IntraHost, err = weave.NewPcap(iface, bufSzMB*1024*1024)
-		if err != nil {
-			log.Fatal(err)
+		checkFatal(err)
+		config.InterHost = weave.NewSleeveInterHost(config.Port)
+	}
+
+	if datapathName != "" {
+		if ifaceName != "" {
+			log.Fatal("Both -iface and -dpname supplied")
 		}
+
+		if password != "" {
+			log.Fatal("-password supplied; encryption is not suppoorted with fast datapath")
+		}
+
+		fastdp, err := weave.NewFastDatapath(datapathName, config.Port)
+		checkFatal(err)
+		config.IntraHost = fastdp
+		config.InterHost = fastdp
 	}
 
 	if routerName == "" {
@@ -104,19 +141,11 @@ func main() {
 	}
 
 	name, err := weave.PeerNameFromUserInput(routerName)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkFatal(err)
 
 	if nickName == "" {
 		nickName, err = os.Hostname()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	if password == "" {
-		password = os.Getenv("WEAVE_PASSWORD")
+		checkFatal(err)
 	}
 
 	if password == "" {
@@ -133,7 +162,6 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	config.InterHost = weave.NewSleeveInterHost(config.Port)
 	config.LogFrame = logFrameFunc(pktdebug)
 
 	router := weave.NewRouter(config, name, nickName)
@@ -195,17 +223,13 @@ func logFrameFunc(debug bool) weave.LogFrameFunc {
 
 func initiateConnections(router *weave.Router, peers []string) {
 	for _, peer := range peers {
-		if err := router.ConnectionMaker.InitiateConnection(peer); err != nil {
-			log.Fatal(err)
-		}
+		checkFatal(router.ConnectionMaker.InitiateConnection(peer))
 	}
 }
 
 func createAllocator(router *weave.Router, apiPath string, iprangeCIDR string, quorum uint) *ipam.Allocator {
 	allocator, err := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, iprangeCIDR, quorum)
-	if err != nil {
-		log.Fatal(err)
-	}
+	checkFatal(err)
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
 	err = updater.Start(apiPath, allocator)
@@ -286,5 +310,11 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 	err = http.Serve(l, nil)
 	if err != nil {
 		log.Fatal("Unable to create http server", err)
+	}
+}
+
+func checkFatal(e error) {
+	if e != nil {
+		log.Fatal(e)
 	}
 }

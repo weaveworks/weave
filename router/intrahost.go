@@ -6,7 +6,7 @@ type IntraHost interface {
 	InjectPacket(PacketKey) FlowOp
 
 	// Start consuming packets
-	ConsumePackets(IntraHostConsumer) error
+	ConsumeIntraHostPackets(IntraHostConsumer) error
 }
 
 type IntraHostConsumer interface {
@@ -22,7 +22,7 @@ func (NullIntraHost) InjectPacket(PacketKey) FlowOp {
 	return nil
 }
 
-func (NullIntraHost) ConsumePackets(IntraHostConsumer) error {
+func (NullIntraHost) ConsumeIntraHostPackets(IntraHostConsumer) error {
 	return nil
 }
 

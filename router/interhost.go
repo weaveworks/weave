@@ -7,7 +7,7 @@ import (
 // Interface to inter-host (i.e. overlay network) packet handling
 type InterHost interface {
 	// Start consuming forwarded packets.
-	ConsumePackets(*Peer, *Peers, InterHostConsumer) error
+	ConsumeInterHostPackets(*Peer, *Peers, InterHostConsumer) error
 
 	// The routes have changed, so any cached information should
 	// be discarded.

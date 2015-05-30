@@ -39,8 +39,8 @@ func NewSleeveInterHost(localPort int) InterHost {
 	return &SleeveInterHost{localPort: localPort}
 }
 
-func (sleeve *SleeveInterHost) ConsumePackets(localPeer *Peer, peers *Peers,
-	consumer InterHostConsumer) error {
+func (sleeve *SleeveInterHost) ConsumeInterHostPackets(localPeer *Peer,
+	peers *Peers, consumer InterHostConsumer) error {
 	localAddr, err := net.ResolveUDPAddr("udp4",
 		fmt.Sprint(":", sleeve.localPort))
 	if err != nil {

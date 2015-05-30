@@ -67,8 +67,8 @@ func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
 // Start listening for packets from containers, TCP connections and
 // packets forwarded over UDP.
 func (router *Router) Start() {
-	checkFatal(router.InterHost.ConsumePackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
-	checkFatal(router.IntraHost.ConsumePackets(router))
+	checkFatal(router.InterHost.ConsumeInterHostPackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
+	checkFatal(router.IntraHost.ConsumeIntraHostPackets(router))
 	router.listenTCP(router.Port)
 }
 
