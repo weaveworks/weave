@@ -528,6 +528,26 @@ container_ip() {
     esac
 }
 
+# Given a container name or short ID in $1, ensure the specified
+# container is running and then print its full ID to stdout. If
+# it's not running or doesn't exist, print an error to stderr and
+# return with an indicative non-zero exit code.
+container_id() {
+    if ! STATUS=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null) ; then
+        echo "Error: No such container: $1" >&2
+        return 1
+    fi
+    case "$STATUS" in
+        true*)
+            echo "${STATUS#true }"
+            ;;
+        *)
+            echo "$1 container is not running." >&2
+            return 2
+            ;;
+    esac
+}
+
 # Call url $4 with http verb $3 on container $1 at port $2
 http_call() {
     container_ip $1 \
@@ -693,31 +713,13 @@ ipam_claim() {
     done
 }
 
-# If we don't already have any CIDRs passed from the command-line, get one from IPAM
-# $1 is the name of the container and $2, if set, is the ID to use inside IPAM
+# If we don't already have any CIDRs passed from the command-line, get
+# one from IPAM. $1 is the full container id.
 get_ipam_cidr() {
     if [ -n "$CIDR_ARGS" ] ; then
         return 0
     fi
-    if [ -z "$2" ] ; then
-        # get the long form of the container ID
-        if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null) ; then
-            echo "Error: No such container: $1" >&2
-            return 1
-        fi
-        case "$status" in
-            true*)
-                CONTAINER="${status#true }"
-                ;;
-            *)
-                echo "$1 container is not running." >&2
-                return 1
-                ;;
-        esac
-    else
-        CONTAINER="$2"
-    fi
-    CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER)"
+    CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$1)"
     if [ "$CIDR_ARGS" = "404 page not found" ] ; then
         echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
         return 1
@@ -920,7 +922,7 @@ case "$COMMAND" in
         shift $CIDR_COUNT
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
         create_bridge
-        get_ipam_cidr $CONTAINER $CONTAINER
+        get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
         tell_dns PUT $CONTAINER $CIDR_ARGS
         echo $CONTAINER
@@ -940,7 +942,7 @@ case "$COMMAND" in
         CONTAINER_ID="$1"
         create_bridge
         CONTAINER=$(docker start $CONTAINER_ID)
-        get_ipam_cidr $CONTAINER_ID $CONTAINER
+        get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
         tell_dns PUT $CONTAINER_ID $CIDR_ARGS
         echo $CONTAINER
@@ -950,8 +952,9 @@ case "$COMMAND" in
         shift $CIDR_COUNT
         [ $# -eq 1 ] || usage
         CONTAINER_ID="$1"
+        CONTAINER=$(container_id $CONTAINER_ID)
         create_bridge
-        get_ipam_cidr $CONTAINER_ID
+        get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
         tell_dns PUT $CONTAINER_ID $CIDR_ARGS
         ;;
@@ -986,7 +989,7 @@ case "$COMMAND" in
     expose)
         collect_cidr_args "$@"
         shift $CIDR_COUNT
-        get_ipam_cidr $CONTAINER_NAME weave:expose
+        get_ipam_cidr weave:expose
         if [ $# -eq 0 ] ; then
             FQDN=""
         else
@@ -1009,7 +1012,7 @@ case "$COMMAND" in
     hide)
         collect_cidr_args "$@"
         shift $CIDR_COUNT
-        get_ipam_cidr $CONTAINER_NAME weave:expose
+        get_ipam_cidr weave:expose
         create_bridge --without-ethtool
         for CIDR in $CIDR_ARGS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
