@@ -941,7 +941,7 @@ case "$COMMAND" in
         create_bridge
         CONTAINER=$(docker start $CONTAINER_ID)
         get_ipam_cidr $CONTAINER_ID $CONTAINER
-        with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
+        with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
         tell_dns PUT $CONTAINER_ID $CIDR_ARGS
         echo $CONTAINER
         ;;
