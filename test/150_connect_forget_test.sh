@@ -6,11 +6,11 @@ C1=10.2.1.4
 C2=10.2.1.7
 
 direct_peers() {
-  weave_on $1 status | awk "/^Direct Peers:$/{f=1;next} /Reconnects:/{f=0} f" | sort
+  weave_on $1 status | sed -n -e 's|^Direct Peers: \(.*\)|\1|p' | tr -s ' ' '\n'
 }
 
 assert_peers() {
-  assert "direct_peers $1" "$(echo "$2" | sort)"
+  assert "direct_peers $1 | sort" "$(echo "$2" | sort)"
 }
 
 start_suite "Connecting and forgetting routers after launch"
