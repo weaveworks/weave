@@ -939,24 +939,22 @@ case "$COMMAND" in
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         [ $# -eq 1 ] || usage
-        CONTAINER_ID="$1"
+        CONTAINER=$(docker start $1)
         create_bridge
-        CONTAINER=$(docker start $CONTAINER_ID)
         get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-        tell_dns PUT $CONTAINER_ID $CIDR_ARGS
+        tell_dns PUT $CONTAINER $CIDR_ARGS
         echo $CONTAINER
         ;;
     attach)
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         [ $# -eq 1 ] || usage
-        CONTAINER_ID="$1"
-        CONTAINER=$(container_id $CONTAINER_ID)
+        CONTAINER=$(container_id $1)
         create_bridge
         get_ipam_cidr $CONTAINER
-        with_container_netns $CONTAINER_ID attach $CIDR_ARGS >/dev/null
-        tell_dns PUT $CONTAINER_ID $CIDR_ARGS
+        with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
+        tell_dns PUT $CONTAINER $CIDR_ARGS
         ;;
     detach)
         collect_cidr_args "$@"
