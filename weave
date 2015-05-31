@@ -171,7 +171,7 @@ DNS_HTTP_PORT=6785
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 PROXY_HOST="localhost"
-if [[ "$DOCKER_HOST" == "tcp://"* ]]; then
+if [ "$DOCKER_HOST" != "${DOCKER_HOST#tcp://}" ] ; then
     PROXY_HOST=$(echo "$DOCKER_HOST" | sed -e "s|tcp://\([^:]*\):[0-9]*|\1|")
 fi
 
