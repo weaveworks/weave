@@ -103,18 +103,8 @@ host3 has caught fire, we can go to one of the other hosts and run:
 Weave will take all the IP address ranges owned by host3 and transfer
 them to be owned by host1. The name "host3" is resolved via the
 'nickname' feature of weave, which defaults to the local host
-name. You can see the full set of range assignments in the output from
-`weave status`, which will show the internal hex ID and nickname in
-brackets, like this:
-
-    Ring [10.2.1.1, 10.2.1.255)
-      10.2.1.1 -> 96:e9:e2:2e:2d:bc (host1) (version: 3, free: 126)
-      10.2.1.128 -> ea:84:25:9b:31:2e (host2) (version: 2, free: 64)
-      10.2.1.192 -> ea:6c:21:09:cf:f0 (host3) (version: 1, free: 62)
-
-So, in our example, we could equivalently do:
-
-    host1$ weave rmpeer ea:6c:21:09:cf:f0
+name. Alternatively, one can supply a peer name as shown in `weave
+status`.
 
 ## <a name="troubleshooting"></a>Troubleshooting
 
