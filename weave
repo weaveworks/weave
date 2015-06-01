@@ -990,28 +990,24 @@ case "$COMMAND" in
     dns-add)
         collect_ip_args "$@"
         shift $IP_COUNT
-        [ $# -ge 1 ] || usage
+        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
+        check_dns_running
         CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
-            check_dns_running
             when_has_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
         else
-            [ $# -eq 3 -a "$2" = "-h" ] || usage
-            check_dns_running
             put_dns_fqdn $CONTAINER "$3" $IP_ARGS
         fi
         ;;
     dns-remove)
         collect_ip_args "$@"
         shift $IP_COUNT
-        [ $# -ge 1 ] || usage
+        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
+        check_dns_running
         CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
-            check_dns_running
             delete_dns $CONTAINER $IP_ARGS
         else
-            [ $# -eq 3 -a "$2" = "-h" ] || usage
-            check_dns_running
             delete_dns_fqdn $CONTAINER "$3" $IP_ARGS
         fi
         ;;
