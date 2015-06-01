@@ -456,10 +456,12 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Allocator subnet %s/%d\n", alloc.subnetStart.String(), alloc.prefixLen)
+	fmt.Fprintf(&buf, "Allocator subnet %s/%d", alloc.subnetStart.String(), alloc.prefixLen)
 
 	if alloc.ring.Empty() {
-		fmt.Fprintf(&buf, "Awaiting consensus: %s", alloc.paxos.String())
+		if alloc.paxosTicker != nil {
+			fmt.Fprintf(&buf, " awaiting consensus: %s", alloc.paxos.String())
+		}
 	} else {
 		localFreeSpace := alloc.space.NumFreeAddresses()
 		remoteFreeSpace := alloc.ring.TotalRemoteFree()
@@ -469,14 +471,14 @@ func (alloc *Allocator) string() string {
 
 		fmt.Fprint(&buf, "Owned Ranges:")
 		alloc.ring.FprintWithNicknames(&buf, alloc.nicknames)
-		if len(alloc.pendingAllocates)+len(alloc.pendingClaims) > 0 {
-			fmt.Fprintf(&buf, "\nPending requests for ")
-			for _, op := range alloc.pendingAllocates {
-				fmt.Fprintf(&buf, "%s, ", op.String())
-			}
-			for _, op := range alloc.pendingClaims {
-				fmt.Fprintf(&buf, "%s, ", op.String())
-			}
+	}
+	if len(alloc.pendingAllocates)+len(alloc.pendingClaims) > 0 {
+		fmt.Fprintf(&buf, "\nPending requests:")
+		for _, op := range alloc.pendingAllocates {
+			fmt.Fprintf(&buf, "\n  %s", op.String())
+		}
+		for _, op := range alloc.pendingClaims {
+			fmt.Fprintf(&buf, "\n  %s", op.String())
 		}
 	}
 	return buf.String()
