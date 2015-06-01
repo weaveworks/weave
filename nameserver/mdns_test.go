@@ -18,7 +18,7 @@ func TestClientServerSimpleQuery(t *testing.T) {
 	testInAddr1 := "1.2.2.10.in-addr.arpa."
 
 	mzone := newMockedZoneWithRecords([]ZoneRecord{testRecord1})
-	mdnsServer, err := NewMDNSServer(mzone, true)
+	mdnsServer, err := NewMDNSServer(mzone, true, DefaultLocalTTL)
 	wt.AssertNoErr(t, err)
 	err = mdnsServer.Start(nil)
 	wt.AssertNoErr(t, err)
@@ -94,21 +94,21 @@ func TestClientServerInsistentQuery(t *testing.T) {
 	testInAddr2 := "2.2.2.10.in-addr.arpa."
 
 	mzone1 := newMockedZoneWithRecords([]ZoneRecord{testRecord1})
-	mdnsServer1, err := NewMDNSServer(mzone1, true)
+	mdnsServer1, err := NewMDNSServer(mzone1, true, DefaultLocalTTL)
 	wt.AssertNoErr(t, err)
 	err = mdnsServer1.Start(nil)
 	wt.AssertNoErr(t, err)
 	defer mdnsServer1.Stop()
 
 	mzone2 := newMockedZoneWithRecords([]ZoneRecord{testRecord2})
-	mdnsServer2, err := NewMDNSServer(mzone2, true)
+	mdnsServer2, err := NewMDNSServer(mzone2, true, DefaultLocalTTL)
 	wt.AssertNoErr(t, err)
 	err = mdnsServer2.Start(nil)
 	wt.AssertNoErr(t, err)
 	defer mdnsServer2.Stop()
 
 	// create a third server with exactly the same info as the second server (so we can test duplicates removals)
-	mdnsServer3, err := NewMDNSServer(mzone2, true)
+	mdnsServer3, err := NewMDNSServer(mzone2, true, DefaultLocalTTL)
 	wt.AssertNoErr(t, err)
 	err = mdnsServer3.Start(nil)
 	wt.AssertNoErr(t, err)

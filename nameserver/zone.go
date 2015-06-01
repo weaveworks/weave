@@ -17,10 +17,10 @@ const (
 )
 
 const (
-	DefaultLocalDomain     = "weave.local." // The default name used for the local domain
-	DefaultRefreshInterval = int(localTTL)  // Period for background updates with mDNS
-	DefaultRelevantTime    = 60             // When to forget info about remote info if nobody asks...
-	DefaultNumUpdaters     = 4              // Default number of background updaters
+	DefaultLocalDomain     = "weave.local."       // The default name used for the local domain
+	DefaultRefreshInterval = int(DefaultLocalTTL) // Period for background updates with mDNS
+	DefaultRelevantTime    = 60                   // When to forget info about remote info if nobody asks...
+	DefaultNumUpdaters     = 4                    // Default number of background updaters
 
 	defaultRefreshMailbox = 1000           // Number of on-the-fly background queries
 	defaultRemoteIdent    = "weave:remote" // Ident used for info obtained from mDNS
@@ -126,7 +126,7 @@ func (re *recordEntry) notifyIPObservers() {
 func (re *recordEntry) TTL() int {
 	// if we never set the TTL (eg, when using AddRecord()), return the standard value...
 	if re.ttl == 0 {
-		return int(localTTL)
+		return int(DefaultLocalTTL)
 	}
 	return re.ttl
 }
@@ -429,6 +429,8 @@ type ZoneConfig struct {
 	RelevantTime int
 	// Max pending refresh requests
 	MaxRefreshRequests int
+	// TTL returnined in local asnwers (with mDNS)
+	LocalTTL int
 	// Force a specific mDNS client
 	MDNSClient ZoneMDNSClient
 	// Force a specific mDNS server
@@ -505,7 +507,12 @@ func NewZoneDb(config ZoneConfig) (zone *ZoneDb, err error) {
 		}
 	}
 	if zone.mdnsSrv == nil {
-		if zone.mdnsSrv, err = NewMDNSServer(zone, false); err != nil {
+		mdnsTTL := DefaultLocalTTL
+		if config.LocalTTL > 0 {
+			mdnsTTL = config.LocalTTL
+		}
+
+		if zone.mdnsSrv, err = NewMDNSServer(zone, false, mdnsTTL); err != nil {
 			return
 		}
 	}

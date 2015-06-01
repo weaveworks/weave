@@ -16,6 +16,7 @@ import (
 const (
 	DefaultServerPort = 53                 // The default server port
 	DefaultCLICfgFile = "/etc/resolv.conf" // default "resolv.conf" file to try to load
+	DefaultLocalTTL   = 30                 // default TTL for responses for local domain queries
 	DefaultUDPBuflen  = 4096               // bigger than the default 512
 	DefaultCacheLen   = 8192               // default cache capacity
 	DefaultTimeout    = 5000               // default timeout for DNS resolutions (millisecs)
@@ -41,6 +42,8 @@ type DNSServerConfig struct {
 	UDPBufLen int
 	// (Optional) force a specific cache
 	Cache ZoneCache
+	// (Optional) TTL for local domain responses
+	LocalTTL int
 	// (Optional) TTL for negative results in the local domain
 	CacheNegLocalTTL int
 	// (Optional) for a specific clock provider
@@ -94,6 +97,7 @@ type DNSServer struct {
 	cache         ZoneCache
 	cacheDisabled bool
 	maxAnswers    int
+	localTTL      int
 	negLocalTTL   int
 	timeout       time.Duration
 	readTimeout   time.Duration
@@ -114,7 +118,8 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 		readTimeout:   DefaultTimeout * time.Millisecond,
 		cacheDisabled: false,
 		maxAnswers:    DefaultMaxAnswers,
-		negLocalTTL:   negLocalTTL,
+		localTTL:      DefaultLocalTTL,
+		negLocalTTL:   DefaultCacheNegLocalTTL,
 		clock:         config.Clock,
 	}
 
@@ -152,6 +157,9 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 	}
 	if config.MaxAnswers > 0 {
 		s.maxAnswers = config.MaxAnswers
+	}
+	if config.LocalTTL > 0 {
+		s.localTTL = config.LocalTTL
 	}
 	if config.CacheNegLocalTTL > 0 {
 		s.negLocalTTL = config.CacheNegLocalTTL
@@ -344,7 +352,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 			maybeCache(nil, s.negLocalTTL, CacheNoLocalReplies)
 			fallback(w, r)
 		} else {
-			m := msgBuilder(r, &q, answers)
+			m := msgBuilder(r, &q, answers, s.localTTL)
 			m.Authoritative = true
 			maybeCache(m, nullTTL, 0)
 			m.Answer = pruneAnswers(shuffleAnswers(m.Answer), s.maxAnswers)

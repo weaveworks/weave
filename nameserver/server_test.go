@@ -158,7 +158,7 @@ func TestTCPDNSServer(t *testing.T) {
 
 		t.Logf("Fallback UDP server got asked: returning %d answers", numAnswers)
 		q := req.Question[0]
-		m := makeAddressReply(req, &q, addrs)
+		m := makeAddressReply(req, &q, addrs, DefaultLocalTTL)
 		mLen := m.Len()
 		m.SetEdns0(uint16(maxLen), false)
 
@@ -171,7 +171,7 @@ func TestTCPDNSServer(t *testing.T) {
 	fallbackTCPHandler := func(w dns.ResponseWriter, req *dns.Msg) {
 		t.Logf("Fallback TCP server got asked: returning %d answers", numAnswers)
 		q := req.Question[0]
-		m := makeAddressReply(req, &q, addrs)
+		m := makeAddressReply(req, &q, addrs, DefaultLocalTTL)
 		w.WriteMsg(m)
 	}
 

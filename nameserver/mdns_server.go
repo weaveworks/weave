@@ -13,13 +13,18 @@ type MDNSServer struct {
 	srv        *dns.Server
 	zone       Zone
 	allowLocal bool
+	ttl        int
 	running    bool
 }
 
 // Create a new mDNS server
 // Nothing will be done (including port bindings) until you `Start()` the server
-func NewMDNSServer(zone Zone, local bool) (*MDNSServer, error) {
-	return &MDNSServer{zone: zone, allowLocal: local}, nil
+func NewMDNSServer(zone Zone, local bool, ttl int) (*MDNSServer, error) {
+	return &MDNSServer{
+		zone:       zone,
+		allowLocal: local,
+		ttl:        ttl,
+	}, nil
 }
 
 // Return true if testaddr is a UDP address with IP matching my local i/f
@@ -66,7 +71,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) (err error) {
 	handleLocal := s.makeHandler(dns.TypeA,
 		func(zone ZoneLookup, r *dns.Msg, q *dns.Question) *dns.Msg {
 			if ips, err := zone.LookupName(q.Name); err == nil {
-				return makeAddressReply(r, q, ips)
+				return makeAddressReply(r, q, ips, s.ttl)
 			}
 			return nil
 		})
@@ -74,7 +79,7 @@ func (s *MDNSServer) Start(ifi *net.Interface) (err error) {
 	handleReverse := s.makeHandler(dns.TypePTR,
 		func(zone ZoneLookup, r *dns.Msg, q *dns.Question) *dns.Msg {
 			if names, err := zone.LookupInaddr(q.Name); err == nil {
-				return makePTRReply(r, q, names)
+				return makePTRReply(r, q, names, s.ttl)
 			}
 			return nil
 		})

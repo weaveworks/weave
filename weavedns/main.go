@@ -24,6 +24,8 @@ func main() {
 		dnsPort         int
 		httpPort        int
 		wait            int
+		ttl             int
+		negTTL          int
 		timeout         int
 		udpbuf          int
 		fallback        string
@@ -46,9 +48,11 @@ func main() {
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
 	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
 	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
+	flag.IntVar(&ttl, "ttl", weavedns.DefaultLocalTTL, "TTL (in secs) for responses for local names")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	// advanced options
+	flag.IntVar(&negTTL, "neg-ttl", weavedns.DefaultCacheNegLocalTTL, "negative TTL (in secs) for unanswered queries for local names")
 	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
 	flag.IntVar(&refreshWorkers, "refresh-workers", weavedns.DefaultNumUpdaters, "default number of background updaters")
 	flag.IntVar(&maxAnswers, "max-answers", weavedns.DefaultMaxAnswers, "maximum number of answers returned to clients (0=unlimited)")
@@ -82,6 +86,7 @@ func main() {
 	zoneConfig := weavedns.ZoneConfig{
 		Domain:          domain,
 		Iface:           iface,
+		LocalTTL:        ttl,
 		RefreshInterval: refreshInterval,
 		RefreshWorkers:  refreshWorkers,
 		RelevantTime:    relevantTime,
@@ -104,13 +109,15 @@ func main() {
 	}
 
 	srvConfig := weavedns.DNSServerConfig{
-		Zone:          zone,
-		Port:          dnsPort,
-		CacheLen:      cacheLen,
-		MaxAnswers:    maxAnswers,
-		Timeout:       timeout,
-		UDPBufLen:     udpbuf,
-		CacheDisabled: cacheDisabled,
+		Zone:             zone,
+		Port:             dnsPort,
+		CacheLen:         cacheLen,
+		LocalTTL:         ttl,
+		CacheNegLocalTTL: negTTL,
+		MaxAnswers:       maxAnswers,
+		Timeout:          timeout,
+		UDPBufLen:        udpbuf,
+		CacheDisabled:    cacheDisabled,
 	}
 
 	if len(fallback) > 0 {

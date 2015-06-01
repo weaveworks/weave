@@ -134,7 +134,7 @@ Notice how the ping reaches different addresses.
 WeaveDNS removes the addresses of any container that dies. This offers
 a simple way to implement redundancy. E.g. if in our example we stop
 one of the `pingme` containers and re-run the ping tests, eventually
-(within ~30s at most, since that is the weaveDNS cache expiry time) we
+(within ~30s at most, since that is the weaveDNS [cache expiry time](#ttl)) we
 will only be hitting the address of the container that is still alive.
 
 
@@ -178,6 +178,25 @@ to the container args:
 ```bash
 $ weave launch-dns 10.2.254.1/24 --watch=false
 ```
+
+## <a name="ttl"></a>Using a different TTL value
+
+By default, weaveDNS specifies a TTL of 30 seconds in any reply sent to
+another peer. Peers will honor the TTL received and cache the answer
+until it is considered invalid.
+
+However, you can force a different TTL value by launching weaveDNS with
+the `--ttl` argument:
+
+```bash
+$ weave launch-dns 10.2.254.1/24 --ttl=10
+```
+
+This will shorten the lifespan of answers sent to other peers,
+so you will be effectively reducing the probability of them having stale
+information, but you will also be increasing their resolution times (as
+their cache hit rate will be reduced) and the number of request this
+weaveDNS instance will receive.
 
 ## <a name="domain-search-path"></a>Configuring the domain search paths
 
