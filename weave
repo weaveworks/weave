@@ -678,21 +678,6 @@ when_has_fqdn() {
     fi
 }
 
-# Convert the container name or short ID in $1 to its full form, then
-# invoke $2 as a command passing the full form as the first argument and
-# $3.. as additional arguments
-with_full_container_id() {
-    CONTAINER="$1"
-    COMMAND="$2"
-    shift 2
-
-    if FULL_CONTAINER_ID=$(container_id $CONTAINER); then
-        $COMMAND $FULL_CONTAINER_ID "$@"
-    else
-        return $?
-    fi
-}
-
 # Register FQDN in $2 as names for addresses $3.. under full container ID $1
 put_dns_fqdn() {
     CONTAINER_ID="$1"
@@ -998,38 +983,36 @@ case "$COMMAND" in
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         [ $# -eq 1 ] || usage
-        CONTAINER_ID="$1"
-        with_container_netns $CONTAINER_ID detach $CIDR_ARGS >/dev/null
-        when_dns_running with_full_container_id $CONTAINER_ID when_has_fqdn delete_dns_fqdn $CIDR_ARGS
+        CONTAINER=$(container_id $1)
+        with_container_netns $CONTAINER detach $CIDR_ARGS >/dev/null
+        when_dns_running when_has_fqdn $CONTAINER delete_dns_fqdn $CIDR_ARGS
         ;;
     dns-add)
         collect_ip_args "$@"
         shift $IP_COUNT
         [ $# -ge 1 ] || usage
-        CONTAINER_ID="$1"
+        CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
             check_dns_running
-            with_full_container_id $CONTAINER_ID when_has_fqdn put_dns_fqdn $IP_ARGS
+            when_has_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
         else
             [ $# -eq 3 -a "$2" = "-h" ] || usage
-            FQDN="$3"
             check_dns_running
-            with_full_container_id $CONTAINER_ID put_dns_fqdn $FQDN $IP_ARGS
+            put_dns_fqdn $CONTAINER "$3" $IP_ARGS
         fi
         ;;
     dns-remove)
         collect_ip_args "$@"
         shift $IP_COUNT
         [ $# -ge 1 ] || usage
-        CONTAINER_ID="$1"
+        CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
             check_dns_running
-            with_full_container_id $CONTAINER_ID delete_dns $IP_ARGS
+            delete_dns $CONTAINER $IP_ARGS
         else
             [ $# -eq 3 -a "$2" = "-h" ] || usage
-            FQDN="$3"
             check_dns_running
-            with_full_container_id $CONTAINER_ID delete_dns_fqdn $FQDN $IP_ARGS
+            delete_dns_fqdn $CONTAINER "$3" $IP_ARGS
         fi
         ;;
     expose)
