@@ -885,7 +885,7 @@ case "$COMMAND" in
         echo
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status 2>/dev/null || true
         echo
-        http_call_ip $PROXY_HOST $PROXY_PORT GET /status 2>/dev/null || true
+        http_call_ip 127.0.0.1 $PROXY_PORT GET /status 2>/dev/null || true
         [ $res -eq 0 ]
         ;;
     ps)
