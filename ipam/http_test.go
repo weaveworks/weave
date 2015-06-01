@@ -59,8 +59,12 @@ func listenHTTP(alloc *Allocator) int {
 	return httpListener.Addr().(*net.TCPAddr).Port
 }
 
-func allocURL(port int, containerID string) string {
+func identURL(port int, containerID string) string {
 	return fmt.Sprintf("http://localhost:%d/ip/%s", port, containerID)
+}
+
+func allocURL(port int, cidr string, containerID string) string {
+	return fmt.Sprintf("http://localhost:%d/ip/%s/%s", port, containerID, cidr)
 }
 
 func TestHttp(t *testing.T) {
@@ -68,36 +72,36 @@ func TestHttp(t *testing.T) {
 		containerID = "deadbeef"
 		container2  = "baddf00d"
 		container3  = "b01df00d"
-		testAddr1   = "10.0.3.9"
-		netSuffix   = "/29"
-		testCIDR1   = "10.0.3.8" + netSuffix
+		universe    = "10.0.0.0/8"
+		testAddr1   = "10.0.3.9/29"
+		testCIDR1   = "10.0.3.8/29"
+		testCIDR2   = "10.2.0.0/16"
+		testAddr2   = "10.2.0.1/16"
 	)
 
-	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
+	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", universe, 1)
 	port := listenHTTP(alloc)
 
 	alloc.claimRingForTesting()
-	// Ask the http server for a new address
-	cidr1 := HTTPPost(t, allocURL(port, containerID))
-	wt.AssertEqualString(t, cidr1, testAddr1+netSuffix, "address")
-	check := HTTPGet(t, allocURL(port, containerID))
-	wt.AssertEqualString(t, check, cidr1, "address")
+	cidr1a := HTTPPost(t, allocURL(port, testCIDR1, containerID))
+	wt.AssertEqualString(t, cidr1a, testAddr1, "address")
 
-	// Ask the http server for another address and check it's different
-	cidr2 := HTTPPost(t, allocURL(port, container2))
-	wt.AssertFalse(t, cidr2 == testAddr1+netSuffix, "address")
+	cidr2a := HTTPPost(t, allocURL(port, testCIDR2, containerID))
+	wt.AssertEqualString(t, cidr2a, testAddr2, "address")
 
-	// Ask for the first container again and we should get the same address again
-	cidr1a := HTTPPost(t, allocURL(port, containerID))
-	wt.AssertEqualString(t, cidr1a, testAddr1+netSuffix, "address")
-	// Now free the first one, and we should get it back when we ask
-	doHTTP("DELETE", allocURL(port, containerID))
-	resp, err := doHTTP("GET", allocURL(port, containerID))
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusNotFound, "http response")
+	// Ask the http server for a pair of addresses for another container and check they're different
+	cidr1b := HTTPPost(t, allocURL(port, testCIDR1, container2))
+	wt.AssertFalse(t, cidr1b == testAddr1, "address")
+	cidr2b := HTTPPost(t, allocURL(port, testCIDR2, container2))
+	wt.AssertFalse(t, cidr2b == testAddr2, "address")
 
-	cidr3 := HTTPPost(t, allocURL(port, container3))
-	wt.AssertEqualString(t, cidr3, testAddr1+netSuffix, "address")
+	// Now free the first container, and we should get it back when we ask
+	doHTTP("DELETE", identURL(port, containerID))
+
+	cidr1c := HTTPPost(t, allocURL(port, testCIDR1, container3))
+	wt.AssertEqualString(t, cidr1c, testAddr1, "address")
+	cidr2c := HTTPPost(t, allocURL(port, testCIDR2, container3))
+	wt.AssertEqualString(t, cidr2c, testAddr2, "address")
 
 	// Would like to shut down the http server at the end of this test
 	// but it's complicated.
@@ -115,7 +119,7 @@ func TestBadHttp(t *testing.T) {
 	port := listenHTTP(alloc)
 
 	alloc.claimRingForTesting()
-	cidr1 := HTTPPost(t, allocURL(port, containerID))
+	cidr1 := HTTPPost(t, allocURL(port, testCIDR1, containerID))
 	parts := strings.Split(cidr1, "/")
 	testAddr1 := parts[0]
 	// Verb that's not handled
@@ -142,7 +146,7 @@ func impTestHTTPCancel(t *testing.T) {
 	common.InitDefaultLogging(true)
 	var (
 		containerID = "deadbeef"
-		testCIDR1   = "10.0.3.5/29"
+		testCIDR1   = "10.0.3.0/29"
 	)
 
 	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
@@ -155,7 +159,7 @@ func impTestHTTPCancel(t *testing.T) {
 
 	// Ask the http server for a new address
 	done := make(chan *http.Response)
-	req, _ := http.NewRequest("POST", allocURL(port, containerID), nil)
+	req, _ := http.NewRequest("POST", allocURL(port, testCIDR1, containerID), nil)
 	go func() {
 		res, _ := http.DefaultClient.Do(req)
 		done <- res
