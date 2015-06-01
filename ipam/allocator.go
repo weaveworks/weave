@@ -473,12 +473,12 @@ func (alloc *Allocator) string() string {
 		alloc.ring.FprintWithNicknames(&buf, alloc.nicknames)
 	}
 	if len(alloc.pendingAllocates)+len(alloc.pendingClaims) > 0 {
-		fmt.Fprintf(&buf, "\nPending requests for ")
+		fmt.Fprintf(&buf, "\nPending requests:")
 		for _, op := range alloc.pendingAllocates {
-			fmt.Fprintf(&buf, "%s, ", op.String())
+			fmt.Fprintf(&buf, "\n  %s", op.String())
 		}
 		for _, op := range alloc.pendingClaims {
-			fmt.Fprintf(&buf, "%s, ", op.String())
+			fmt.Fprintf(&buf, "\n  %s", op.String())
 		}
 	}
 	return buf.String()
