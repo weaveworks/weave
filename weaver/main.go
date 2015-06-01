@@ -113,7 +113,6 @@ func main() {
 	if password == "" {
 		password = os.Getenv("WEAVE_PASSWORD")
 	}
-
 	if password == "" {
 		log.Println("Communication between peers is unencrypted.")
 	} else {
