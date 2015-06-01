@@ -666,7 +666,7 @@ when_dns_running() {
 # Iff the container in $1 has an FQDN, invoke $2 as a command passing
 # the container as the first argument, the FQDN as the second argument
 # and $3.. as additional arguments
-when_has_fqdn() {
+with_container_fqdn() {
     CONTAINER="$1"
     COMMAND="$2"
     shift 2
@@ -718,7 +718,7 @@ populate_dns() {
     fi
     for CONTAINER in $(docker ps -q --no-trunc) ; do
         if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
-            when_has_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
+            with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
         fi 
     done
 }
@@ -947,7 +947,7 @@ case "$COMMAND" in
         create_bridge
         get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-        when_dns_running when_has_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
+        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         echo $CONTAINER
         ;;
     dns-args)
@@ -966,7 +966,7 @@ case "$COMMAND" in
         create_bridge
         get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-        when_dns_running when_has_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
+        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         echo $CONTAINER
         ;;
     attach)
@@ -977,7 +977,7 @@ case "$COMMAND" in
         create_bridge
         get_ipam_cidr $CONTAINER
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-        when_dns_running when_has_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
+        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         ;;
     detach)
         collect_cidr_args "$@"
@@ -985,7 +985,7 @@ case "$COMMAND" in
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         with_container_netns $CONTAINER detach $CIDR_ARGS >/dev/null
-        when_dns_running when_has_fqdn $CONTAINER delete_dns_fqdn $CIDR_ARGS
+        when_dns_running with_container_fqdn $CONTAINER delete_dns_fqdn $CIDR_ARGS
         ;;
     dns-add)
         collect_ip_args "$@"
@@ -994,7 +994,7 @@ case "$COMMAND" in
         check_dns_running
         CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
-            when_has_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
+            with_container_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
         else
             put_dns_fqdn $CONTAINER "$3" $IP_ARGS
         fi
