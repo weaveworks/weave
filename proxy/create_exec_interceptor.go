@@ -34,7 +34,8 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 
 	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok || i.withIPAM {
 		Info.Printf("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
-		options.Cmd = append(weaveWaitEntrypoint, options.Cmd...)
+		cmd := append(weaveWaitEntrypoint, "-s")
+		options.Cmd = append(cmd, options.Cmd...)
 	}
 
 	if err := marshalRequestBody(r, options); err != nil {
