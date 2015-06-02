@@ -179,7 +179,7 @@ PROXY_CONTAINER_NAME=weaveproxy
 
 # utility function to check whether a command can be executed by the shell
 # see http://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script
-command_exists () {
+command_exists() {
     command -v $1 >/dev/null 2>&1
 }
 
@@ -310,7 +310,7 @@ docker_bridge_ip() {
 # $GUEST_IFNAME to suitable names for two ends of a veth pair, specific
 # to the container, and execute args $2 $3 ... as a command. If an error
 # is caused by container dying, swallow output from error.
-with_container_netns () {
+with_container_netns() {
     CONTAINER="$1"
     CONTAINER_PID=$(docker inspect --format='{{.State.Pid}}' $CONTAINER)
 
