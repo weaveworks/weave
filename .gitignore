@@ -30,7 +30,7 @@ coverage.html
 *~
 
 # Project specific
-weaver/weaver
+prog/weaver/weaver
 prog/weavedns/weavedns
 prog/weaveproxy/weaveproxy
 prog/sigproxy/sigproxy

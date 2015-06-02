@@ -9,7 +9,7 @@ SUDO=sudo
 DOCKERHUB_USER=weaveworks
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 
-WEAVER_EXE=weaver/weaver
+WEAVER_EXE=prog/weaver/weaver
 WEAVEDNS_EXE=prog/weavedns/weavedns
 WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
@@ -52,7 +52,7 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE): common/*.go co
 		false; \
 	}
 
-$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go weaver/main.go
+$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go prog/weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go prog/weavedns/main.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go
@@ -62,8 +62,8 @@ $(WEAVEWAIT_EXE): prog/weavewait/*.go
 $(SIGPROXY_EXE): prog/sigproxy/main.go
 	go build -o $@ ./$(@D)
 
-$(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
-	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
+$(WEAVER_EXPORT): prog/weaver/Dockerfile $(WEAVER_EXE)
+	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
 	$(SUDO) docker save $(WEAVER_IMAGE):latest > $@
 
 $(WEAVEDNS_EXPORT): prog/weavedns/Dockerfile $(WEAVEDNS_EXE)
