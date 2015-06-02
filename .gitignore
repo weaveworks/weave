@@ -30,20 +30,20 @@ coverage.html
 *~
 
 # Project specific
-weaver/weaver
-weavedns/weavedns
-weaveproxy/weaveproxy
-sigproxy/sigproxy
-weavewait/weavewait
+prog/weaver/weaver
+prog/weavedns/weavedns
+prog/weaveproxy/weaveproxy
+prog/sigproxy/sigproxy
+prog/weavewait/weavewait
 tools/bin
 tools/build
 releases
 weave.tar
 weavedns.tar
 weaveexec.tar
-weaveexec/weave
-weaveexec/weaveproxy
-weaveexec/weavewait
-weaveexec/sigproxy
-weaveexec/docker*.tgz
+prog/weaveexec/weave
+prog/weaveexec/weaveproxy
+prog/weaveexec/weavewait
+prog/weaveexec/sigproxy
+prog/weaveexec/docker*.tgz
 Vagrantfile.local

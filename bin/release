@@ -61,7 +61,7 @@ build() {
     fi
 
     ## Run tests with the distributables, including version check
-    v=$(./weaver/weaver --version | grep -o '[0-9].*')
+    v=$(./prog/weaver/weaver --version | grep -o '[0-9].*')
     if ! [ "$v" == "$VERSION" ]; then
         echo "Version of distributable "$v" does not match release version $VERSION" >&2
         exit 1

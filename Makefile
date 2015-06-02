@@ -9,11 +9,11 @@ SUDO=sudo
 DOCKERHUB_USER=weaveworks
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 
-WEAVER_EXE=weaver/weaver
-WEAVEDNS_EXE=weavedns/weavedns
-WEAVEPROXY_EXE=weaveproxy/weaveproxy
-SIGPROXY_EXE=sigproxy/sigproxy
-WEAVEWAIT_EXE=weavewait/weavewait
+WEAVER_EXE=prog/weaver/weaver
+WEAVEDNS_EXE=prog/weavedns/weavedns
+WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
+SIGPROXY_EXE=prog/sigproxy/sigproxy
+WEAVEWAIT_EXE=prog/weavewait/weavewait
 
 EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
 
@@ -30,7 +30,7 @@ WEAVEEXEC_EXPORT=weaveexec.tar
 EXPORTS=$(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 WEAVEEXEC_DOCKER_VERSION=1.3.1
-DOCKER_DISTRIB=weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
+DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 
 all: $(EXPORTS)
@@ -52,31 +52,31 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE): common/*.go co
 		false; \
 	}
 
-$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go weaver/main.go
-$(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
-$(WEAVEPROXY_EXE): proxy/*.go weaveproxy/main.go
-$(WEAVEWAIT_EXE): weavewait/*.go weavewait/main.go
+$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go prog/weaver/main.go
+$(WEAVEDNS_EXE): nameserver/*.go prog/weavedns/main.go
+$(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
+$(WEAVEWAIT_EXE): prog/weavewait/*.go
 
 # Sigproxy needs separate rule as it fails the netgo check in the main
 # build stanza due to not importing net package
-$(SIGPROXY_EXE): sigproxy/main.go
+$(SIGPROXY_EXE): prog/sigproxy/main.go
 	go build -o $@ ./$(@D)
 
-$(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)
-	$(SUDO) docker build -t $(WEAVER_IMAGE) weaver
+$(WEAVER_EXPORT): prog/weaver/Dockerfile $(WEAVER_EXE)
+	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
 	$(SUDO) docker save $(WEAVER_IMAGE):latest > $@
 
-$(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
-	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
+$(WEAVEDNS_EXPORT): prog/weavedns/Dockerfile $(WEAVEDNS_EXE)
+	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) prog/weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
-	cp weave weaveexec/weave
-	cp $(SIGPROXY_EXE) weaveexec/sigproxy
-	cp $(WEAVEPROXY_EXE) weaveexec/weaveproxy
-	cp $(WEAVEWAIT_EXE) weaveexec/weavewait
-	cp $(DOCKER_DISTRIB) weaveexec/docker.tgz
-	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) weaveexec
+$(WEAVEEXEC_EXPORT): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
+	cp weave prog/weaveexec/weave
+	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
+	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
+	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
+	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
+	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
 
 $(DOCKER_DISTRIB):
