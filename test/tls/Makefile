@@ -27,10 +27,15 @@ $(SERVER_PEMS): %.server.pem: %.server.csr ca-key.pem %.ca.pem
 client.csr: client-key.pem
 	openssl req -subj '/CN=client' -new -key client-key.pem -out $@
 
-$(CLIENT_PEMS): %.client.pem: client.csr ca-key.pem %.ca.pem
+$(CLIENT_PEMS): %.client.pem: client.csr ca-key.pem %.ca.pem client-extfile.cnf
 	openssl x509 -req -days 3650 -in client.csr \
 		-CA $(@:.client.pem=.ca.pem) -CAkey ca-key.pem -CAcreateserial \
-		-extfile <(echo "extendedKeyUsage = clientAuth") -out $@
+		-extfile client-extfile.cnf \
+		-out $@
+
+client-extfile.cnf:
+	IPS=$$(ip -4 addr ls | sed -n -e 's|\s*inet \([^/]*\).*|IP:\1|p' | tr '\n' ','); \
+	echo -e "extendedKeyUsage = clientAuth\nsubjectAltName = $${IPS%,}" > client-extfile.cnf
 
 clean:
-	rm -f *.pem *.csr *.srl
+	rm -f *.pem *.csr *.srl *.cnf

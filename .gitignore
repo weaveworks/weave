@@ -50,3 +50,4 @@ Vagrantfile.local
 test/tls/*.pem
 test/tls/*.srl
 test/tls/*.csr
+test/tls/*.cnf
