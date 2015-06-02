@@ -529,13 +529,13 @@ container_ip() {
 # it's not running or doesn't exist, print an error to stderr and
 # return with an indicative non-zero exit code.
 container_id() {
-    if ! STATUS=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null) ; then
+    if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null) ; then
         echo "Error: No such container: $1" >&2
         return 1
     fi
-    case "$STATUS" in
+    case "$status" in
         true*)
-            echo "${STATUS#true }"
+            echo "${status#true }"
             ;;
         *)
             echo "$1 container is not running." >&2
