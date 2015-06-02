@@ -33,6 +33,15 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 		w.WriteHeader(204)
 	})
 
+	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		addr, err := alloc.Lookup(mux.Vars(r)["id"])
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintf(w, "%s/%d", addr.String(), alloc.prefixLen)
+	})
+
 	router.Methods("POST").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		closedChan := w.(http.CloseNotifier).CloseNotify()
 		ident := mux.Vars(r)["id"]
