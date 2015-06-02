@@ -854,7 +854,7 @@ case "$COMMAND" in
         wait_for_status $CONTAINER_NAME $HTTP_PORT
         if [ -n "$IPRANGE" ] ; then
             # Tell the newly-started weave IP allocator about existing weave IPs
-            with_container_addresses ipam_claim weave:expose $(docker ps -q)
+            with_container_addresses ipam_claim weave:expose $(docker ps -q --no-trunc)
         fi
 
         echo $CONTAINER
