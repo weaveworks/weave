@@ -1,17 +1,23 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"syscall"
-
-	"github.com/weaveworks/weave/net"
+	"time"
 )
 
 func main() {
-	_, err := net.EnsureInterface("ethwe", 20)
-	checkErr(err)
+	usr2 := make(chan os.Signal)
+	signal.Notify(usr2, syscall.SIGUSR2)
+	select {
+	case <-usr2:
+	case <-time.After(20 * time.Second):
+		checkErr(errors.New("Container timed out waiting for signal from proxy"))
+	}
 
 	if len(os.Args) <= 1 {
 		os.Exit(0)
