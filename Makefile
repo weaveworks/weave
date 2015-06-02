@@ -30,7 +30,7 @@ WEAVEEXEC_EXPORT=weaveexec.tar
 EXPORTS=$(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
 
 WEAVEEXEC_DOCKER_VERSION=1.3.1
-DOCKER_DISTRIB=weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
+DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 
 all: $(EXPORTS)
@@ -70,13 +70,13 @@ $(WEAVEDNS_EXPORT): weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) weavedns
 	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
 
-$(WEAVEEXEC_EXPORT): weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
-	cp weave weaveexec/weave
-	cp $(SIGPROXY_EXE) weaveexec/sigproxy
-	cp $(WEAVEPROXY_EXE) weaveexec/weaveproxy
-	cp $(WEAVEWAIT_EXE) weaveexec/weavewait
-	cp $(DOCKER_DISTRIB) weaveexec/docker.tgz
-	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) weaveexec
+$(WEAVEEXEC_EXPORT): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
+	cp weave prog/weaveexec/weave
+	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
+	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
+	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
+	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
+	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
 
 $(DOCKER_DISTRIB):

@@ -41,9 +41,9 @@ releases
 weave.tar
 weavedns.tar
 weaveexec.tar
-weaveexec/weave
-weaveexec/weaveproxy
-weaveexec/weavewait
-weaveexec/sigproxy
-weaveexec/docker*.tgz
+prog/weaveexec/weave
+prog/weaveexec/weaveproxy
+prog/weaveexec/weavewait
+prog/weaveexec/sigproxy
+prog/weaveexec/docker*.tgz
 Vagrantfile.local
