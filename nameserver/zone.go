@@ -283,14 +283,14 @@ func (n *name) String() string {
 ///////////////////////////////////////////////////////////////////
 
 // all the names in a ident
-type namesSet struct {
+type nameSet struct {
 	names map[string]*name
 }
 
-func newNamesSet() *namesSet     { return &namesSet{names: make(map[string]*name)} }
-func (ns *namesSet) len() int    { return len(ns.names) }
-func (ns *namesSet) empty() bool { return ns.len() == 0 }
-func (ns *namesSet) hasName(name string) bool {
+func newNameSet() *nameSet      { return &nameSet{names: make(map[string]*name)} }
+func (ns *nameSet) len() int    { return len(ns.names) }
+func (ns *nameSet) empty() bool { return ns.len() == 0 }
+func (ns *nameSet) hasName(name string) bool {
 	n, found := ns.names[name]
 	if !found {
 		return false
@@ -301,7 +301,7 @@ func (ns *namesSet) hasName(name string) bool {
 
 // Get the zone entries for a name
 // If the name does not exist and `create` is true, a new name will be created
-func (ns *namesSet) getName(name string, create bool) (n *name) {
+func (ns *nameSet) getName(name string, create bool) (n *name) {
 	n, found := ns.names[name]
 	if !found && create {
 		newName := newName(name)
@@ -312,7 +312,7 @@ func (ns *namesSet) getName(name string, create bool) (n *name) {
 }
 
 // Get all the entries for a name
-func (ns *namesSet) getEntriesForName(name string) (res []*recordEntry) {
+func (ns *nameSet) getEntriesForName(name string) (res []*recordEntry) {
 	n := ns.getName(name, false)
 	if n != nil {
 		res = n.getAllEntries()
@@ -321,7 +321,7 @@ func (ns *namesSet) getEntriesForName(name string) (res []*recordEntry) {
 }
 
 // Get all the entries for an IP, for all names
-func (ns *namesSet) getEntriesForIP(ip IPv4) (res []*recordEntry) {
+func (ns *nameSet) getEntriesForIP(ip IPv4) (res []*recordEntry) {
 	for _, name := range ns.names {
 		entry := name.getEntryForIP(ip)
 		if entry != nil {
@@ -332,7 +332,7 @@ func (ns *namesSet) getEntriesForIP(ip IPv4) (res []*recordEntry) {
 }
 
 // Add a new IPv4 to a name
-func (ns *namesSet) addIPToName(zr ZoneRecord, now time.Time) (*recordEntry, error) {
+func (ns *nameSet) addIPToName(zr ZoneRecord, now time.Time) (*recordEntry, error) {
 	n := ns.getName(zr.Name(), true)
 	ipv4 := ipToIPv4(zr.IP())
 	if n.hasIPv4(ipv4) {
@@ -343,7 +343,7 @@ func (ns *namesSet) addIPToName(zr ZoneRecord, now time.Time) (*recordEntry, err
 }
 
 // Delete by name and IP. Pass uninitialized values for wildcard
-func (ns namesSet) deleteNameIP(name string, ip net.IP) int {
+func (ns nameSet) deleteNameIP(name string, ip net.IP) int {
 	count := 0
 	if name != "" {
 		if nameV, found := ns.names[name]; found {
@@ -364,7 +364,7 @@ func (ns namesSet) deleteNameIP(name string, ip net.IP) int {
 }
 
 // Get the name query time
-func (ns *namesSet) getNameLastAccess(n string) time.Time {
+func (ns *nameSet) getNameLastAccess(n string) time.Time {
 	if name, found := ns.names[n]; found {
 		return name.lastAccessTime
 	}
@@ -374,7 +374,7 @@ func (ns *namesSet) getNameLastAccess(n string) time.Time {
 // Touch the last access time for a name
 // The access time is saved only for locally-introduced records (otherwise it could
 // be lost when names are irrelevant...)
-func (ns *namesSet) touchName(name string, now time.Time) {
+func (ns *nameSet) touchName(name string, now time.Time) {
 	Debug.Printf("[zonedb] Touching name %s", name)
 	n := ns.getName(name, false)
 	if n != nil {
@@ -382,7 +382,7 @@ func (ns *namesSet) touchName(name string, now time.Time) {
 	}
 }
 
-func (ns *namesSet) String() string {
+func (ns *nameSet) String() string {
 	var buf bytes.Buffer
 	for _, name := range ns.names {
 		fmt.Fprintf(&buf, "%s, ", name)
@@ -396,10 +396,10 @@ func (ns *namesSet) String() string {
 
 ///////////////////////////////////////////////////////////////////
 
-// Names sets, by ident name
-type identRecordsSet map[string]*namesSet
+// Name sets, by ident name
+type identRecordSet map[string]*nameSet
 
-func (irs identRecordsSet) String() string {
+func (irs identRecordSet) String() string {
 	var buf bytes.Buffer
 	for ident, nameset := range irs {
 		fmt.Fprintf(&buf, "%.12s: %s\n", ident, nameset)
@@ -444,7 +444,7 @@ type ZoneConfig struct {
 // information or for keeping current information up to date.
 type ZoneDb struct {
 	mx     sync.RWMutex
-	idents identRecordsSet
+	idents identRecordSet
 
 	mdnsCli       ZoneMDNSClient
 	mdnsSrv       ZoneMDNSServer
@@ -470,7 +470,7 @@ func NewZoneDb(config ZoneConfig) (zone *ZoneDb, err error) {
 
 	zone = &ZoneDb{
 		domain:           config.Domain,
-		idents:           make(identRecordsSet),
+		idents:           make(identRecordSet),
 		mdnsCli:          config.MDNSClient,
 		mdnsSrv:          config.MDNSServer,
 		iface:            config.Iface,
@@ -587,7 +587,7 @@ func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) (err error) 
 	defer zone.mx.Unlock()
 	Debug.Printf("[zonedb] Adding record: '%s'/'%s'[%s]", ident, name, ip)
 	record := Record{dns.Fqdn(name), ip, 0, 0, 0}
-	_, err = zone.getNamesSet(ident).addIPToName(record, zone.clock.Now())
+	_, err = zone.getNameSet(ident).addIPToName(record, zone.clock.Now())
 	return
 }
 
@@ -697,8 +697,8 @@ func (zone *ZoneDb) IsNameExpired(n string) bool {
 	defer zone.mx.Unlock()
 
 	now := zone.clock.Now()
-	remoteNamesSet := zone.getNamesSet(defaultRemoteIdent)
-	entries := remoteNamesSet.getEntriesForName(n)
+	remoteNameSet := zone.getNameSet(defaultRemoteIdent)
+	entries := remoteNameSet.getEntriesForName(n)
 	if entries != nil {
 		for _, entry := range entries {
 			if entry.hasExpired(now) {
@@ -713,9 +713,9 @@ func (zone *ZoneDb) HasNameLocalInfo(n string) bool {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
-	remoteNamesSet := zone.getNamesSet(defaultRemoteIdent)
+	remoteNameSet := zone.getNameSet(defaultRemoteIdent)
 	for _, nameset := range zone.idents {
-		if nameset != remoteNamesSet {
+		if nameset != remoteNameSet {
 			if nameset.hasName(n) {
 				return true
 			}
@@ -731,18 +731,18 @@ func (zone *ZoneDb) HasNameRemoteInfo(n string) bool {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
 
-	remoteNamesSet := zone.getNamesSet(defaultRemoteIdent)
-	if remoteNamesSet != nil {
-		return remoteNamesSet.hasName(n)
+	remoteNameSet := zone.getNameSet(defaultRemoteIdent)
+	if remoteNameSet != nil {
+		return remoteNameSet.hasName(n)
 	}
 	return false
 }
 
-// Get or create a names set
-func (zone *ZoneDb) getNamesSet(ident string) *namesSet {
+// Get or create a name set
+func (zone *ZoneDb) getNameSet(ident string) *nameSet {
 	ns, found := zone.idents[ident]
 	if !found {
-		ns = newNamesSet()
+		ns = newNameSet()
 		zone.idents[ident] = ns
 	}
 	return ns
