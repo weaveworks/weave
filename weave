@@ -495,13 +495,24 @@ stop() {
     docker rm -f $1 >/dev/null 2>&1 || true
 }
 
-http_call_ip() {
-    ip="$1"
-    port="$2"
-    http_verb="$3"
-    url="$4"
-    shift 4
-    curl --connect-timeout 3 -s -X $http_verb "$@" http://$ip:$port$url
+# Given a container name or short ID in $1, ensure the specified
+# container is running and then print its full ID to stdout. If
+# it's not running or doesn't exist, print an error to stderr and
+# return with an indicative non-zero exit code.
+container_id() {
+    if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null) ; then
+        echo "Error: No such container: $1" >&2
+        return 1
+    fi
+    case "$status" in
+        true*)
+            echo "${status#true }"
+            ;;
+        *)
+            echo "$1 container is not running." >&2
+            return 2
+            ;;
+    esac
 }
 
 container_ip() {
@@ -524,24 +535,13 @@ container_ip() {
     esac
 }
 
-# Given a container name or short ID in $1, ensure the specified
-# container is running and then print its full ID to stdout. If
-# it's not running or doesn't exist, print an error to stderr and
-# return with an indicative non-zero exit code.
-container_id() {
-    if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null) ; then
-        echo "Error: No such container: $1" >&2
-        return 1
-    fi
-    case "$status" in
-        true*)
-            echo "${status#true }"
-            ;;
-        *)
-            echo "$1 container is not running." >&2
-            return 2
-            ;;
-    esac
+http_call_ip() {
+    ip="$1"
+    port="$2"
+    http_verb="$3"
+    url="$4"
+    shift 4
+    curl --connect-timeout 3 -s -X $http_verb "$@" http://$ip:$port$url
 }
 
 # Call url $4 with http verb $3 on container $1 at port $2
