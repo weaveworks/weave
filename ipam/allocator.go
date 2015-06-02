@@ -208,6 +208,20 @@ func (alloc *Allocator) Allocate(ident string, cancelChan <-chan bool) (address.
 	return result.addr, result.err
 }
 
+func (alloc *Allocator) Lookup(ident string) (address.Address, error) {
+	resultChan := make(chan allocateResult)
+	alloc.actionChan <- func() {
+		addr, found := alloc.owned[ident]
+		if found {
+			resultChan <- allocateResult{addr: addr}
+			return
+		}
+		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found")}
+	}
+	result := <-resultChan
+	return result.addr, result.err
+}
+
 // Claim an address that we think we should own (Sync)
 func (alloc *Allocator) Claim(ident string, addr address.Address, cancelChan <-chan bool) error {
 	resultChan := make(chan error)
