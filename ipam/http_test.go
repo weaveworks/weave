@@ -25,6 +25,14 @@ func HTTPPost(t *testing.T, url string) string {
 	return string(body)
 }
 
+func HTTPGet(t *testing.T, url string) string {
+	resp, err := http.Get(url)
+	wt.AssertNoErr(t, err)
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	return string(body)
+}
+
 func doHTTP(method string, url string) (resp *http.Response, err error) {
 	req, _ := http.NewRequest(method, url, nil)
 	return http.DefaultClient.Do(req)
@@ -72,6 +80,8 @@ func TestHttp(t *testing.T) {
 	// Ask the http server for a new address
 	cidr1 := HTTPPost(t, allocURL(port, containerID))
 	wt.AssertEqualString(t, cidr1, testAddr1+netSuffix, "address")
+	check := HTTPGet(t, allocURL(port, containerID))
+	wt.AssertEqualString(t, check, cidr1, "address")
 
 	// Ask the http server for another address and check it's different
 	cidr2 := HTTPPost(t, allocURL(port, container2))
@@ -80,9 +90,12 @@ func TestHttp(t *testing.T) {
 	// Ask for the first container again and we should get the same address again
 	cidr1a := HTTPPost(t, allocURL(port, containerID))
 	wt.AssertEqualString(t, cidr1a, testAddr1+netSuffix, "address")
-
 	// Now free the first one, and we should get it back when we ask
 	doHTTP("DELETE", allocURL(port, containerID))
+	resp, err := doHTTP("GET", allocURL(port, containerID))
+	wt.AssertNoErr(t, err)
+	wt.AssertStatus(t, resp.StatusCode, http.StatusNotFound, "http response")
+
 	cidr3 := HTTPPost(t, allocURL(port, container3))
 	wt.AssertEqualString(t, cidr3, testAddr1+netSuffix, "address")
 
