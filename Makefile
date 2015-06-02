@@ -111,6 +111,7 @@ publish: $(PUBLISH)
 clean:
 	-$(SUDO) docker rmi $(IMAGES)
 	rm -f $(EXES) $(EXPORTS)
+	rm -f test/tls/*.pem
 
 build:
 	$(SUDO) go clean -i net

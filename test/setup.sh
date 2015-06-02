@@ -4,7 +4,9 @@ set -e
 
 . ./config.sh
 
-echo Copying weave images and script to hosts
+(cd ./tls && go get ./... && go run generate_certs.go $HOSTS)
+
+echo Copying weave images, scripts, and certificates to hosts
 for HOST in $HOSTS; do
     docker_on $HOST load -i ../weave.tar
     docker_on $HOST load -i ../weavedns.tar
@@ -13,5 +15,6 @@ for HOST in $HOSTS; do
     cat ../bin/docker-ns | run_on $HOST sh -c "cat > $DOCKER_NS"
     cat ../weave | run_on $HOST sh -c "cat > ./weave"
     run_on $HOST chmod a+x $DOCKER_NS ./weave
+    rsync -az -e "$SSH" ./tls/ $HOST:~/tls
     run_on $HOST sudo service docker restart
 done
