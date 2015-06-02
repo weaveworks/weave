@@ -850,13 +850,11 @@ case "$COMMAND" in
             -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" $IPRANGE "$@")
         with_container_netns $CONTAINER launch >/dev/null
-
         wait_for_status $CONTAINER_NAME $HTTP_PORT
         if [ -n "$IPRANGE" ] ; then
             # Tell the newly-started weave IP allocator about existing weave IPs
             with_container_addresses ipam_claim weave:expose $(docker ps -q --no-trunc)
         fi
-
         echo $CONTAINER
         ;;
     launch-dns)
@@ -890,7 +888,6 @@ case "$COMMAND" in
             --entrypoint=/home/weave/weaveproxy \
             $WEAVEPROXY_DOCKER_ARGS \
             $EXEC_IMAGE "$@")
-
         wait_for_status_ip 127.0.0.1 $PROXY_PORT
         echo $PROXY_CONTAINER
         ;;
