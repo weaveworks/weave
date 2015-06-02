@@ -70,14 +70,14 @@ greenly() {
 run_on() {
     host=$1
     shift 1
-    greyly echo "Running on $host: $@" >&2
+    [ -z "$DEBUG" ] || greyly echo "Running on $host: $@" >&2
     remote $host $SSH $host "$@"
 }
 
 docker_on() {
     host=$1
     shift 1
-    greyly echo "Docker on $host:$DOCKER_PORT: $@" >&2
+    [ -z "$DEBUG" ] || greyly echo "Docker on $host:$DOCKER_PORT: $@" >&2
     docker -H tcp://$host:$DOCKER_PORT "$@"
 }
 
@@ -88,7 +88,7 @@ proxy() {
 weave_on() {
     host=$1
     shift 1
-    greyly echo "Weave on $host:$DOCKER_PORT: $@" >&2
+    [ -z "$DEBUG" ] || greyly echo "Weave on $host:$DOCKER_PORT: $@" >&2
     DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
@@ -145,7 +145,7 @@ assert_no_dns_record() {
 
 start_suite() {
     for host in $HOST1 $HOST2; do
-        echo "Cleaning up on $host: removing all containers and resetting weave"
+        [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
         containers=$(docker_on $host ps -aq 2>/dev/null)
         [ -n "$containers" ] && docker_on $host rm -f $containers >/dev/null 2>&1
         weave_on $host reset 2>/dev/null

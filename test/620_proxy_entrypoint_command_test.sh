@@ -3,7 +3,7 @@
 . ./config.sh
 
 build_image() {
-    docker_on $HOST1 build -t $1 - <<- EOF
+    docker_on $HOST1 build -t $1 >/dev/null - <<- EOF
   FROM $SMALL_IMAGE
   ENTRYPOINT $2
   CMD $3
