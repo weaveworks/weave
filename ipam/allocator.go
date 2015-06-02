@@ -45,14 +45,14 @@ type Allocator struct {
 	actionChan       chan<- func()
 	ourName          router.PeerName
 	defaultSubnet    address.CIDR
-	universe         address.CIDR               // superset of all ranges
-	ring             *ring.Ring                 // information on ranges owned by all peers
-	space            space.Space                // more detail on ranges owned by us
-	owned            map[string]address.Address // who owns what address, indexed by container-ID -- fixme - needs to be multi-subnet
-	nicknames        map[router.PeerName]string // so we can map nicknames for rmpeer
-	pendingAllocates []operation                // held until we get some free space
-	pendingClaims    []operation                // held until we know who owns the space
-	gossip           router.Gossip              // our link to the outside world for sending messages
+	universe         address.CIDR                 // superset of all ranges
+	ring             *ring.Ring                   // information on ranges owned by all peers
+	space            space.Space                  // more detail on ranges owned by us
+	owned            map[string][]address.Address // who owns what address, indexed by container-ID
+	nicknames        map[router.PeerName]string   // so we can map nicknames for rmpeer
+	pendingAllocates []operation                  // held until we get some free space
+	pendingClaims    []operation                  // held until we know who owns the space
+	gossip           router.Gossip                // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosTicker      *time.Ticker
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
@@ -65,7 +65,7 @@ func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname st
 		ourName:   ourName,
 		universe:  universe,
 		ring:      ring.New(universe.Start, address.Add(universe.Start, universe.Size()), ourName),
-		owned:     make(map[string]address.Address),
+		owned:     make(map[string][]address.Address),
 		paxos:     paxos.NewNode(ourName, ourUID, quorum),
 		nicknames: map[router.PeerName]string{ourName: ourNickname},
 		now:       time.Now,
@@ -205,7 +205,7 @@ func (alloc *Allocator) Lookup(ident string) (address.Address, error) {
 	alloc.actionChan <- func() {
 		addr, found := alloc.owned[ident]
 		if found {
-			resultChan <- allocateResult{addr: addr}
+			resultChan <- allocateResult{addr: addr[0]}
 			return
 		}
 		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found")}
@@ -237,8 +237,8 @@ func (alloc *Allocator) ContainerDied(ident string) error {
 func (alloc *Allocator) free(ident string) error {
 	errChan := make(chan error)
 	alloc.actionChan <- func() {
-		addr, found := alloc.owned[ident]
-		if found {
+		addrs, found := alloc.owned[ident]
+		for _, addr := range addrs {
 			alloc.space.Free(addr)
 		}
 		delete(alloc.owned, ident)
@@ -669,13 +669,15 @@ func (alloc *Allocator) reportFreeSpace() {
 // Owned addresses
 
 func (alloc *Allocator) addOwned(ident string, addr address.Address) {
-	alloc.owned[ident] = addr
+	alloc.owned[ident] = append(alloc.owned[ident], addr)
 }
 
 func (alloc *Allocator) findOwner(addr address.Address) string {
-	for ident, candidate := range alloc.owned {
-		if candidate == addr {
-			return ident
+	for ident, addrs := range alloc.owned {
+		for _, candidate := range addrs {
+			if candidate == addr {
+				return ident
+			}
 		}
 	}
 	return ""

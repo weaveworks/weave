@@ -46,6 +46,15 @@ func (cidr CIDR) String() string {
 	return fmt.Sprintf("%s/%d", cidr.Start.String(), cidr.PrefixLen)
 }
 
+func (cidr1 CIDR) Overlaps(cidr2 CIDR) bool {
+	return cidr1.Start >= cidr2.Start && cidr1.Start < cidr2.End() ||
+		cidr2.Start >= cidr1.Start && cidr2.Start < cidr1.End()
+}
+
+func (cidr CIDR) Contains(addr Address) bool {
+	return addr >= cidr.Start && addr < cidr.End()
+}
+
 // FromIP4 converts an ipv4 address to our integer address type
 func FromIP4(ip4 net.IP) (r Address) {
 	for _, b := range ip4.To4() {
