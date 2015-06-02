@@ -349,6 +349,13 @@ with_container_netns() {
     return $STATUS
 }
 
+with_container_netns_or_die() {
+    if ! with_container_netns "$@" >/dev/null ; then
+        docker kill $1 2>/dev/null || true
+        exit 1
+    fi
+}
+
 # Execute arguments as a command within the network namespace of $CONTAINER_PID
 netnsenter() {
     nsenter --net=$PROCFS/$CONTAINER_PID/ns/net "$@"
@@ -849,7 +856,7 @@ case "$COMMAND" in
         CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
             -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp -e WEAVE_PASSWORD -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" $IPRANGE "$@")
-        with_container_netns $CONTAINER launch >/dev/null
+        with_container_netns_or_die $CONTAINER launch
         wait_for_status $CONTAINER_NAME $HTTP_PORT
         if [ -n "$IPRANGE" ] ; then
             # Tell the newly-started weave IP allocator about existing weave IPs
@@ -871,7 +878,7 @@ case "$COMMAND" in
         DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME \
             -p $DOCKER_BRIDGE_IP:53:53/udp -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE -iface $CONTAINER_IFNAME "$@")
-        with_container_netns $DNS_CONTAINER attach $CIDR >/dev/null
+        with_container_netns_or_die $DNS_CONTAINER attach $CIDR
         populate_dns
         echo $DNS_CONTAINER
         ;;
@@ -943,7 +950,7 @@ case "$COMMAND" in
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
         create_bridge
         get_ipam_cidr $CONTAINER
-        with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
+        with_container_netns_or_die $CONTAINER attach $CIDR_ARGS
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         echo $CONTAINER
         ;;
@@ -962,7 +969,7 @@ case "$COMMAND" in
         CONTAINER=$(docker start $1)
         create_bridge
         get_ipam_cidr $CONTAINER
-        with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
+        with_container_netns_or_die $CONTAINER attach $CIDR_ARGS
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         echo $CONTAINER
         ;;
