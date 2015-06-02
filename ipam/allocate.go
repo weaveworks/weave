@@ -14,6 +14,7 @@ type allocate struct {
 	resultChan       chan<- allocateResult
 	hasBeenCancelled func() bool
 	ident            string
+	subnet           address.CIDR
 }
 
 // Try returns true if the request is completed, false if pending
@@ -29,15 +30,17 @@ func (g *allocate) Try(alloc *Allocator) bool {
 		return true
 	}
 
-	if ok, addr := alloc.space.Allocate(); ok {
-		alloc.debugln("Allocated", addr, "for", g.ident)
+	// Respect RFC1122 exclusions of first and last addresses
+	start, end := g.subnet.Start+1, g.subnet.End()-1
+	if ok, addr := alloc.space.Allocate(start, end); ok {
+		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.subnet)
 		alloc.addOwned(g.ident, addr)
 		g.resultChan <- allocateResult{addr, nil}
 		return true
 	}
 
 	// out of space
-	if donor, err := alloc.ring.ChoosePeerToAskForSpace(); err == nil {
+	if donor, err := alloc.ring.ChoosePeerToAskForSpace(start, end); err == nil {
 		alloc.debugln("Decided to ask peer", donor, "for space")
 		alloc.sendRequest(donor, msgSpaceRequest)
 	}

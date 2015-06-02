@@ -3,9 +3,7 @@ package ipam
 import (
 	"bytes"
 	"encoding/gob"
-	"errors"
 	"fmt"
-	"net"
 	"sort"
 	"time"
 
@@ -46,12 +44,11 @@ type operation interface {
 type Allocator struct {
 	actionChan       chan<- func()
 	ourName          router.PeerName
-	subnetStart      address.Address            // start address of space all peers are allocating from
-	subnetSize       address.Offset             // length of space all peers are allocating from
-	prefixLen        int                        // network prefix length, e.g. 24 for a /24 network
+	defaultSubnet    address.CIDR
+	universe         address.CIDR               // superset of all ranges
 	ring             *ring.Ring                 // information on ranges owned by all peers
 	space            space.Space                // more detail on ranges owned by us
-	owned            map[string]address.Address // who owns what address, indexed by container-ID
+	owned            map[string]address.Address // who owns what address, indexed by container-ID -- fixme - needs to be multi-subnet
 	nicknames        map[router.PeerName]string // so we can map nicknames for rmpeer
 	pendingAllocates []operation                // held until we get some free space
 	pendingClaims    []operation                // held until we know who owns the space
@@ -63,34 +60,16 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, subnetCIDR string, quorum uint) (*Allocator, error) {
-	_, subnet, err := net.ParseCIDR(subnetCIDR)
-	if err != nil {
-		return nil, err
-	}
-	if subnet.IP.To4() == nil {
-		return nil, errors.New("Non-IPv4 address not supported")
-	}
-	// Get the size of the network from the mask
-	ones, bits := subnet.Mask.Size()
-	var subnetSize address.Offset = 1 << uint(bits-ones)
-	if subnetSize < 4 {
-		return nil, errors.New("Allocation subnet too small")
-	}
-	subnetStart := address.FromIP4(subnet.IP)
-	alloc := &Allocator{
-		ourName:     ourName,
-		subnetStart: subnetStart,
-		subnetSize:  subnetSize,
-		prefixLen:   ones,
-		// per RFC 1122, don't allocate the first and last address in the subnet
-		ring:      ring.New(address.Add(subnetStart, 1), address.Add(subnetStart, subnetSize-1), ourName),
+func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.CIDR, quorum uint) *Allocator {
+	return &Allocator{
+		ourName:   ourName,
+		universe:  universe,
+		ring:      ring.New(universe.Start, address.Add(universe.Start, universe.Size()), ourName),
 		owned:     make(map[string]address.Address),
 		paxos:     paxos.NewNode(ourName, ourUID, quorum),
 		nicknames: map[router.PeerName]string{ourName: ourNickname},
 		now:       time.Now,
 	}
-	return alloc, nil
 }
 
 // Start runs the allocator goroutine
@@ -197,11 +176,24 @@ func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 
 // Actor client API
 
+func (alloc *Allocator) SetDefaultSubnet(subnet address.CIDR) error {
+	resultChan := make(chan error)
+	if subnet.Size() < 4 {
+		return fmt.Errorf("Allocation range smaller than minimum size 4: %s", subnet)
+	}
+	alloc.actionChan <- func() {
+		// todo: check default subnet is in range
+		alloc.defaultSubnet = subnet
+		resultChan <- nil
+	}
+	return <-resultChan
+}
+
 // Allocate (Sync) - get IP address for container with given name
 // if there isn't any space we block indefinitely
-func (alloc *Allocator) Allocate(ident string, cancelChan <-chan bool) (address.Address, error) {
+func (alloc *Allocator) Allocate(ident string, subnet address.CIDR, cancelChan <-chan bool) (address.Address, error) {
 	resultChan := make(chan allocateResult)
-	op := &allocate{resultChan: resultChan, ident: ident,
+	op := &allocate{subnet: subnet, resultChan: resultChan, ident: ident,
 		hasBeenCancelled: hasBeenCancelled(cancelChan)}
 	alloc.doOperation(op, &alloc.pendingAllocates)
 	result := <-resultChan
@@ -470,20 +462,17 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Allocator subnet %s/%d", alloc.subnetStart.String(), alloc.prefixLen)
+	fmt.Fprintf(&buf, "Allocator universe %s", alloc.universe)
+	if !alloc.defaultSubnet.Blank() {
+		fmt.Fprintf(&buf, " (default subnet %s)", alloc.defaultSubnet)
+	}
 
 	if alloc.ring.Empty() {
 		if alloc.paxosTicker != nil {
 			fmt.Fprintf(&buf, " awaiting consensus: %s", alloc.paxos.String())
 		}
 	} else {
-		localFreeSpace := alloc.space.NumFreeAddresses()
-		remoteFreeSpace := alloc.ring.TotalRemoteFree()
-		percentFree := 100 * float64(localFreeSpace+remoteFreeSpace) / float64(alloc.subnetSize)
-		fmt.Fprintf(&buf, "  Free IPs: ~%.1f%%, %d local, ~%d remote\n",
-			percentFree, localFreeSpace, remoteFreeSpace)
-
-		fmt.Fprint(&buf, "Owned Ranges:")
+		fmt.Fprint(&buf, "\nOwned Ranges:")
 		alloc.ring.FprintWithNicknames(&buf, alloc.nicknames)
 	}
 	if len(alloc.pendingAllocates)+len(alloc.pendingClaims) > 0 {

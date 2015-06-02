@@ -28,7 +28,7 @@ usage() {
     echo "Usage:"
     echo "weave setup"
     echo "weave launch       [-password <password>] [-nickname <nickname>] [-nodiscovery]"
-    echo "                       [-iprange <cidr>] <peer> ..."
+    echo "                       [-iprange <cidr> [-ipsubnet <cidr>]] <peer> ..."
     echo "weave launch-dns   <cidr>"
     echo "weave launch-proxy [-D <docker_endpoint>] [-H <address>] [--with-dns] [--with-ipam]"
     echo "weave connect      [--replace] [<peer> ...]"

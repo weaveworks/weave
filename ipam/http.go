@@ -34,24 +34,51 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 	})
 
 	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if alloc.defaultSubnet.Blank() {
+			badRequest(w, fmt.Errorf("No subnet specified"))
+			return
+		}
 		addr, err := alloc.Lookup(mux.Vars(r)["id"])
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprintf(w, "%s/%d", addr.String(), alloc.prefixLen)
+		fmt.Fprintf(w, "%s/%d", addr.String(), alloc.defaultSubnet.PrefixLen)
+	})
+
+	router.Methods("POST").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		closedChan := w.(http.CloseNotifier).CloseNotify()
+		vars := mux.Vars(r)
+		ident := vars["id"]
+		cidrStr := vars["ip"] + "/" + vars["prefixlen"]
+		_, cidr, err := address.ParseCIDR(cidrStr)
+		if err != nil {
+			badRequest(w, err)
+			return
+		}
+		addr, err := alloc.Allocate(ident, cidr, closedChan)
+		if err != nil {
+			badRequest(w, fmt.Errorf("Unable to allocate: %s", err))
+			return
+		}
+
+		fmt.Fprintf(w, "%s/%d", addr.String(), cidr.PrefixLen)
 	})
 
 	router.Methods("POST").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if alloc.defaultSubnet.Blank() {
+			badRequest(w, fmt.Errorf("No subnet specified"))
+			return
+		}
 		closedChan := w.(http.CloseNotifier).CloseNotify()
 		ident := mux.Vars(r)["id"]
-		newAddr, err := alloc.Allocate(ident, closedChan)
+		newAddr, err := alloc.Allocate(ident, alloc.defaultSubnet, closedChan)
 		if err != nil {
 			badRequest(w, err)
 			return
 		}
 
-		fmt.Fprintf(w, "%s/%d", newAddr.String(), alloc.prefixLen)
+		fmt.Fprintf(w, "%s/%d", newAddr.String(), alloc.defaultSubnet.PrefixLen)
 	})
 
 	router.Methods("DELETE").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

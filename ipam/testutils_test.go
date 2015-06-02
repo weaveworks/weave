@@ -128,17 +128,19 @@ func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 	}
 }
 
-func makeAllocator(name string, cidr string, quorum uint) *Allocator {
+func makeAllocator(name string, cidrStr string, quorum uint) *Allocator {
 	peername, err := router.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
 	}
 
-	alloc, err := NewAllocator(peername, router.PeerUID(rand.Int63()),
-		"nick-"+name, cidr, quorum)
+	_, cidr, err := address.ParseCIDR(cidrStr)
 	if err != nil {
 		panic(err)
 	}
+	alloc := NewAllocator(peername, router.PeerUID(rand.Int63()),
+		"nick-"+name, cidr, quorum)
+	alloc.defaultSubnet = cidr
 
 	return alloc
 }
@@ -163,7 +165,7 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 func (alloc *Allocator) NumFreeAddresses() address.Offset {
 	resultChan := make(chan address.Offset)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.space.NumFreeAddresses()
+		resultChan <- alloc.space.NumFreeAddressesInRange(alloc.defaultSubnet.Start+1, alloc.defaultSubnet.End()-1)
 	}
 	return <-resultChan
 }

@@ -37,14 +37,26 @@ func (s *Space) Clear() {
 	s.ours = s.ours[:0]
 }
 
-func (s *Space) Allocate() (bool, address.Address) {
-	if len(s.free) == 0 {
-		return false, 0
+func (s *Space) Allocate(rangeStart, rangeEnd address.Address) (bool, address.Address) {
+	// Need to walk forward to the range, then check free space, then pick an address
+	// Walk down the free spaces, looking for one in range
+	for i := 0; i < len(s.free); i += 2 {
+		start, end := s.free[i], s.free[i+1]
+		if end-1 < rangeStart {
+			continue
+		}
+		if start > rangeEnd {
+			break
+		}
+		res := start
+		if res < rangeStart {
+			res = rangeStart
+		}
+		s.ours = add(s.ours, res, res+1)
+		s.free = subtract(s.free, res, res+1)
+		return true, res
 	}
-	res := s.free[0]
-	s.ours = add(s.ours, res, res+1)
-	s.free = subtract(s.free, res, res+1)
-	return true, res
+	return false, 0
 }
 
 func (s *Space) Claim(addr address.Address) error {
