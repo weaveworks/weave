@@ -16,29 +16,13 @@ var (
 )
 
 func main() {
-	var (
-		debug       bool
-		justVersion bool
-		listen      string
-		target      string
-		tlsCACert   string
-		tlsCert     string
-		tlsEnabled  bool
-		tlsKey      string
-		tlsVerify   bool
-		withDNS     bool
-		withIPAM    bool
-	)
+	var target, listen string
+	var withDNS, withIPAM, debug, justVersion bool
 
 	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
 	getopt.BoolVarLong(&justVersion, "version", 0, "print version and exit")
-	getopt.StringVar(&listen, 'L', fmt.Sprintf("address on which to listen (default %s)", defaultListen))
 	getopt.StringVar(&target, 'H', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultTarget))
-	getopt.StringVarLong(&tlsCACert, "tlscacert", 0, "Trust certs signed only by this CA")
-	getopt.StringVarLong(&tlsCert, "tlscert", 0, "Path to TLS certificate file")
-	getopt.BoolVarLong(&tlsEnabled, "tls", 0, "Use TLS; implied by --tlsverify")
-	getopt.StringVarLong(&tlsKey, "tlskey", 0, "Path to TLS key file")
-	getopt.BoolVarLong(&tlsVerify, "tlsverify", 0, "Use TLS and verify the remote")
+	getopt.StringVar(&listen, 'L', fmt.Sprintf("address on which to listen (default %s)", defaultListen))
 	getopt.BoolVarLong(&withDNS, "with-dns", 'w', "instruct created containers to use weaveDNS as their nameserver")
 	getopt.BoolVarLong(&withIPAM, "with-ipam", 'i', "automatically allocate addresses for containers without a WEAVE_CIDR")
 	getopt.Parse()
@@ -46,10 +30,6 @@ func main() {
 	if justVersion {
 		fmt.Printf("weave proxy %s\n", version)
 		os.Exit(0)
-	}
-
-	if debug {
-		InitDefaultLogging(true)
 	}
 
 	if target == "" {
@@ -60,23 +40,17 @@ func main() {
 		listen = defaultListen
 	}
 
-	p, err := proxy.NewProxy(
-		version,
-		target,
-		listen,
-		withDNS,
-		withIPAM,
-		&proxy.TLSConfig{
-			Enabled: tlsEnabled,
-			Verify:  tlsVerify,
-			Cert:    tlsCert,
-			Key:     tlsKey,
-			CACert:  tlsCACert,
-		},
-	)
+	if debug {
+		InitDefaultLogging(true)
+	}
+
+	p, err := proxy.NewProxy(version, target, listen, withDNS, withIPAM)
 	if err != nil {
 		Error.Fatalf("Could not start proxy: %s", err)
 	}
+
+	Info.Printf("Listening on %s", listen)
+	Info.Printf("Proxying %s", target)
 
 	if err := p.ListenAndServe(); err != nil {
 		Error.Fatalf("Could not listen on %s: %s", listen, err)

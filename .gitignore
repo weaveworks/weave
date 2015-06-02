@@ -47,7 +47,3 @@ weaveexec/weavewait
 weaveexec/sigproxy
 weaveexec/docker*.tgz
 Vagrantfile.local
-test/tls/*.pem
-test/tls/*.srl
-test/tls/*.csr
-test/tls/*.cnf

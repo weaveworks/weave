@@ -15,10 +15,3 @@ for HOST in $HOSTS; do
     run_on $HOST chmod a+x $DOCKER_NS ./weave
     run_on $HOST sudo service docker restart
 done
-
-echo Setting up Docker TLS on hosts
-(cd ./tls && make)
-chmod 0600 tls/*
-for HOST in $HOSTS; do
-    rsync -az -e "$SSH" ./tls/ $HOST:~/tls/
-done
