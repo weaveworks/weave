@@ -11,9 +11,9 @@ WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 
 WEAVER_EXE=weaver/weaver
 WEAVEDNS_EXE=weavedns/weavedns
-WEAVEPROXY_EXE=weaveproxy/weaveproxy
-SIGPROXY_EXE=sigproxy/sigproxy
-WEAVEWAIT_EXE=weavewait/weavewait
+WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
+SIGPROXY_EXE=prog/sigproxy/sigproxy
+WEAVEWAIT_EXE=prog/weavewait/weavewait
 
 EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE)
 
@@ -54,12 +54,12 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE): common/*.go co
 
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go weavedns/main.go
-$(WEAVEPROXY_EXE): proxy/*.go weaveproxy/main.go
-$(WEAVEWAIT_EXE): weavewait/*.go weavewait/main.go
+$(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
+$(WEAVEWAIT_EXE): prog/weavewait/*.go
 
 # Sigproxy needs separate rule as it fails the netgo check in the main
 # build stanza due to not importing net package
-$(SIGPROXY_EXE): sigproxy/main.go
+$(SIGPROXY_EXE): prog/sigproxy/main.go
 	go build -o $@ ./$(@D)
 
 $(WEAVER_EXPORT): weaver/Dockerfile $(WEAVER_EXE)

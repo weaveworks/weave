@@ -32,9 +32,9 @@ coverage.html
 # Project specific
 weaver/weaver
 weavedns/weavedns
-weaveproxy/weaveproxy
-sigproxy/sigproxy
-weavewait/weavewait
+prog/weaveproxy/weaveproxy
+prog/sigproxy/sigproxy
+prog/weavewait/weavewait
 tools/bin
 tools/build
 releases
