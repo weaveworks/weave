@@ -5,6 +5,7 @@ import (
 
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
+	"net"
 )
 
 type uniqZoneRecordKey struct {
@@ -128,7 +129,7 @@ func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 			// locally introduced entries are never expired: they always have TTL=0
 			if ze.hasExpired(now) {
 				Debug.Printf("[zonedb] '%s': expired entry '%s' ignored: removing", name, ze)
-				nameset.deleteName(name)
+				nameset.deleteNameIP(name, net.IP{})
 			} else {
 				uniq.add(ze)
 			}
@@ -173,7 +174,7 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 			// locally introduced entries are never expired: they always have TTL=0
 			if ze.hasExpired(now) {
 				Debug.Printf("[zonedb] '%s': expired entry '%s' ignored: removing", revIPv4, ze)
-				nameset.deleteIP(revIPv4)
+				nameset.deleteNameIP("", revIPv4.toNetIP())
 			} else {
 				uniq.add(ze)
 				if identName != defaultRemoteIdent {
@@ -273,7 +274,7 @@ func (zone *ZoneDb) updater(num int) {
 			if !zone.IsNameRelevant(request.name) || zone.IsNameExpired(request.name) {
 				Debug.Printf("[zonedb] '%s' seem to be irrelevant now: removing any remote information", request.name)
 				zone.mx.Lock()
-				zone.getNamesSet(defaultRemoteIdent).deleteName(request.name)
+				zone.getNamesSet(defaultRemoteIdent).deleteNameIP(request.name, net.IP{})
 				zone.mx.Unlock()
 				continue
 			}
@@ -300,7 +301,7 @@ func (zone *ZoneDb) updater(num int) {
 			} else {
 				Debug.Printf("[zonedb] nobody knows about '%s'... removing", name)
 				zone.mx.Lock()
-				zone.getNamesSet(defaultRemoteIdent).deleteName(request.name)
+				zone.getNamesSet(defaultRemoteIdent).deleteNameIP(request.name, net.IP{})
 				zone.mx.Unlock()
 			}
 		}

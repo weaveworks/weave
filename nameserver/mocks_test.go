@@ -83,12 +83,11 @@ func (mz *mockedZoneWithRecords) AddRecord(ident string, name string, ip net.IP)
 	notImplWarn()
 	return nil
 }
-func (mz *mockedZoneWithRecords) DeleteRecord(ident string, ip net.IP) error {
+func (mz *mockedZoneWithRecords) DeleteRecords(ident string, name string, ip net.IP) int {
 	notImplWarn()
-	return nil
+	return 0
 }
-func (mz *mockedZoneWithRecords) DeleteRecordsFor(ident string) error { notImplWarn(); return nil }
-func (mz *mockedZoneWithRecords) Status() string                      { notImplWarn(); return "nothing" }
+func (mz *mockedZoneWithRecords) Status() string { notImplWarn(); return "nothing" }
 func (mz *mockedZoneWithRecords) ObserveName(name string, observer ZoneRecordObserver) error {
 	notImplWarn()
 	return nil

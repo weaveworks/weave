@@ -17,6 +17,13 @@ func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
 	level.Printf("[http] "+logmsg, logargs...)
 }
 
+func extractFQDN(r *http.Request) (string, string) {
+	if fqdnStr := r.FormValue("fqdn"); fqdnStr != "" {
+		return fqdnStr, fqdnStr
+	}
+	return "*", ""
+}
+
 func ServeHTTP(listener net.Listener, version string, server *DNSServer, domain string, db Zone) {
 
 	muxRouter := mux.NewRouter()
@@ -64,28 +71,39 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer, domain 
 	})
 
 	muxRouter.Methods("DELETE").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqError := func(msg string, logmsg string, logargs ...interface{}) {
-			httpErrorAndLog(Warning, w, msg, http.StatusBadRequest, logmsg, logargs...)
-		}
-
 		vars := mux.Vars(r)
 		idStr := vars["id"]
 		ipStr := vars["ip"]
 
 		ip := net.ParseIP(ipStr)
 		if ip == nil {
-			reqError("Invalid IP in request", "Invalid IP in request: %s", ipStr)
+			httpErrorAndLog(
+				Warning, w, "Invalid IP in request", http.StatusBadRequest,
+				"Invalid IP in request: %s", ipStr)
 			return
 		}
-		Info.Printf("[http] Deleting %s (%s)", idStr, ipStr)
-		if err := db.DeleteRecord(idStr, ip); err != nil {
-			if _, ok := err.(LookupError); !ok {
-				httpErrorAndLog(
-					Error, w, "Internal error", http.StatusInternalServerError,
-					"Unexpected error from DB: %s", err)
-				return
-			}
-		}
+
+		fqdnStr, fqdn := extractFQDN(r)
+
+		Info.Printf("[http] Deleting ID %s, IP %s, FQDN %s", idStr, ipStr, fqdnStr)
+		db.DeleteRecords(idStr, fqdn, ip)
+	})
+
+	muxRouter.Methods("DELETE").Path("/name/{id:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		idStr := vars["id"]
+
+		fqdnStr, fqdn := extractFQDN(r)
+
+		Info.Printf("[http] Deleting ID %s, IP *, FQDN %s", idStr, fqdnStr)
+		db.DeleteRecords(idStr, fqdn, net.IP{})
+	})
+
+	muxRouter.Methods("DELETE").Path("/name").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fqdnStr, fqdn := extractFQDN(r)
+
+		Info.Printf("[http] Deleting ID *, IP *, FQDN %s", fqdnStr)
+		db.DeleteRecords("", fqdn, net.IP{})
 	})
 
 	http.Handle("/", muxRouter)

@@ -143,6 +143,16 @@ assert_no_dns_record() {
     assert_raises "exec_on $host $container getent hosts $name" 2
 }
 
+# assert_dns_a_record <host> <container> <name> <ip>
+assert_dns_a_record() {
+    assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
+}
+
+# assert_dns_ptr_record <host> <container> <name> <ip>
+assert_dns_ptr_record() {
+    assert "exec_on $1 $2 getent hosts $4 | tr -s ' '" "$4 $3"
+}
+
 start_suite() {
     for host in $HOST1 $HOST2; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"

@@ -98,8 +98,8 @@ func TestZone(t *testing.T) {
 
 	t.Logf("Zone database:\n%s", zone)
 	t.Logf("Deleting the %s in %s", ip1, container1)
-	err = zone.DeleteRecord(container1, ip1)
-	wt.AssertNoErr(t, err)
+	count := zone.DeleteRecords(container1, "", ip1)
+	wt.AssertEqualInt(t, count, 1, "delete failed")
 	t.Logf("Zone database:\n%s", zone)
 
 	t.Logf("Checking %s's observers have been notified on removal", name1)
@@ -114,19 +114,20 @@ func TestZone(t *testing.T) {
 
 	t.Logf("Checking %s is not found after removing %s it in %s and %s in %s",
 		name1, ip1, container2, ip2, container1)
-	err = zone.DeleteRecord(container1, ip2)
-	err = zone.DeleteRecord(container2, ip1)
-	wt.AssertNoErr(t, err)
+	count = zone.DeleteRecords(container1, "", ip2)
+	wt.AssertEqualInt(t, count, 1, "delete failed")
+	count = zone.DeleteRecords(container2, "", ip1)
+	wt.AssertEqualInt(t, count, 1, "delete failed")
 	t.Logf("Zone database:\n%s", zone)
 	_, err = zone.LookupName(name1)
 	wt.AssertErrorType(t, err, (*LookupError)(nil), "after deleting record")
 
 	t.Logf("Checking if removing an unknown record results in an error")
-	err = zone.DeleteRecord(container1, net.ParseIP("0.0.0.0"))
-	wt.AssertErrorType(t, err, (*LookupError)(nil), "when deleting record that doesn't exist")
+	count = zone.DeleteRecords(container1, "", net.ParseIP("0.0.0.0"))
+	wt.AssertEqualInt(t, count, 0, "delete failed")
 }
 
-func TestDeleteFor(t *testing.T) {
+func TestDeleteRecords(t *testing.T) {
 	var (
 		id    = "foobar"
 		name  = "foo.weave."
@@ -151,7 +152,8 @@ func TestDeleteFor(t *testing.T) {
 	_, err = zone.LookupName(name)
 	wt.AssertNoErr(t, err)
 
-	err = zone.DeleteRecordsFor(id)
+	count := zone.DeleteRecords(id, "", net.IP{})
+	wt.AssertEqualInt(t, count, 2, "wildcard delete failed")
 	_, err = zone.LookupName(name)
 	wt.AssertErrorType(t, err, (*LookupError)(nil), "after deleting records for ident")
 }

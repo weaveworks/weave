@@ -103,7 +103,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	q, _ = assertExchange(t, testName1, dns.TypeA, testPort, 3, 4, 0)
 	assertInCache(t, cache, q, "after asking about the name")
 	Debug.Printf("... and removing one of the IP addresses")
-	zone.DeleteRecord(containerID, net.ParseIP("10.2.2.2"))
+	zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.2"))
 	assertNotInCache(t, cache, q, "after deleting IP for 10.2.2.2")
 
 	// Zone database at this point:
@@ -125,7 +125,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 
 	// now we will check if a removal affects all the responses
 	Debug.Printf("... and removing an IP should invalidate both the cached responses for name and raddr")
-	zone.DeleteRecord(containerID, net.ParseIP("10.2.2.1"))
+	zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.1"))
 	assertNotInCache(t, cache, qptr, "after deleting record")
 	assertNotInCache(t, cache, qname, "after deleting record")
 	assertInCache(t, cache, qotherName, "after deleting record")
@@ -161,7 +161,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	//   first.weave.local  = 10.2.2.3 10.2.2.7
 	//   second.weave.local = 10.9.9.1
 
-	zone.DeleteRecordsFor(containerID)
+	zone.DeleteRecords(containerID, "", net.IP{})
 	assertNotInCache(t, cache, qotherName, "after removing container")
 	assertNotInCache(t, cache, qotherPtr, "after removing container")
 }
@@ -238,7 +238,7 @@ func TestServerCacheExpiration(t *testing.T) {
 
 	// We delete the IP in the second peer right after
 	Debug.Printf("Removing the IPs from %s in database #2", testName1)
-	dbs[1].Zone.DeleteRecord(containerID, net.ParseIP("10.2.2.1"))
+	dbs[1].Zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.1"))
 
 	// Check that we return to the initial state: a neg-local entry in the cache
 	qName1, _ = assertExchange(t, testName1, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
@@ -329,8 +329,8 @@ func TestServerCacheRefresh(t *testing.T) {
 	assertNotLocalInCache(t, cache, qName2, "after asking for a unknown name")
 
 	// delete the IPs, and some time passes by so the cache should be purged...
-	dbs[1].Zone.DeleteRecord(containerID, net.ParseIP("10.2.2.1"))
-	dbs[1].Zone.DeleteRecord(containerID, net.ParseIP("10.2.2.2"))
+	dbs[1].Zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.1"))
+	dbs[1].Zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.2"))
 	clk.Forward(refreshInterval + 1)
 
 	qName1, _ = assertExchange(t, testName1, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
