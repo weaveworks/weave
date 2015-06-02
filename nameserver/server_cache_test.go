@@ -69,8 +69,8 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 		MaxAnswers:        4,
 	})
 	wt.AssertNoErr(t, err)
-	defer srv.Stop()
 	go srv.Start()
+	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow server goroutine to start
 
 	testPort, err := srv.GetPort()
@@ -153,7 +153,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	assertInCache(t, cache, qotherPtr, "after adding a new IP")
 
 	// check that after some time, the cache entry is expired
-	clk.Forward(int(localTTL) + 1)
+	clk.Forward(int(DefaultLocalTTL) + 1)
 	assertNotInCache(t, cache, qotherName, "after passing some time")
 	assertNotInCache(t, cache, qwrongName, "after passing some time")
 
@@ -226,13 +226,13 @@ func TestServerCacheExpiration(t *testing.T) {
 	t.Logf("Zone database #2:\n%s", dbs[1].Zone)
 
 	// Check that the DNS server returns updated information, and it will be
-	// cached during [0, localTTL]
+	// cached during [0, DefaultLocalTTL]
 	qName1, _ = assertExchange(t, testName1, dns.TypeA, testPort, 1, 1, 0)
 
 	assertInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
-	clk.Forward(int(localTTL) - 1)
+	clk.Forward(int(DefaultLocalTTL) - 1)
 	assertInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
-	// and it will expire after localTTL
+	// and it will expire after DefaultLocalTTL
 	clk.Forward(2)
 	assertNotInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
 
