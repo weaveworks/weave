@@ -719,7 +719,7 @@ populate_dns() {
     for CONTAINER in $(docker ps -q --no-trunc) ; do
         if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
             with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
-        fi 
+        fi
     done
 }
 
