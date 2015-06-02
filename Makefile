@@ -40,7 +40,7 @@ travis: $(EXES)
 update: $(EXES)
 	go get -u -f -v -tags -netgo $(addprefix ./,$(dir $(EXES)))
 
-$(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE): common/*.go common/*/*.go net/*.go
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
@@ -55,11 +55,14 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE): common/*.go co
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go prog/weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go prog/weavedns/main.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
-$(WEAVEWAIT_EXE): prog/weavewait/*.go
 
-# Sigproxy needs separate rule as it fails the netgo check in the main
-# build stanza due to not importing net package
+# Sigproxy and weavewait need separate rules as they fail the netgo check in
+# the main build stanza due to not importing net package
+
 $(SIGPROXY_EXE): prog/sigproxy/main.go
+	go build -o $@ ./$(@D)
+
+$(WEAVEWAIT_EXE): prog/weavewait/main.go
 	go build -o $@ ./$(@D)
 
 $(WEAVER_EXPORT): prog/weaver/Dockerfile $(WEAVER_EXE)

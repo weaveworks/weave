@@ -39,5 +39,6 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 		Warning.Printf("Attaching container %s to weave network failed: %s", container.ID, string(output))
 		return errors.New(string(output))
 	}
-	return nil
+
+	return i.client.KillContainer(docker.KillContainerOptions{ID: container.ID, Signal: docker.SIGUSR2})
 }
