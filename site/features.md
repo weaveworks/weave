@@ -157,10 +157,7 @@ or
 _NOTE: The command line option takes precedence over the environment
 variable._
 
-The same password must be specified for all weave peers; it is a
-component in the creation of ephemeral session keys for connections
-between peers. See the [crypto documentation](how-it-works.html#crypto)
-for more details.
+The same password must be specified for all weave peers.
 
 ### <a name="host-network-integration"></a>Host network integration
 

@@ -69,4 +69,4 @@ context with the commands shown below. You will need to have the
 [readme]: https://github.com/weaveworks/weave/blob/master/README.md#installation
 [connect]: features.html#dynamic-topologies
 [systemd]: http://www.freedesktop.org/wiki/Software/systemd/
-[encryption]: how-it-works.html#crypto
+[encryption]: features.html#security
