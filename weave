@@ -1156,8 +1156,10 @@ case "$COMMAND" in
                 delete_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
                 when_dns_running delete_dns 'weave:expose' $CIDR
             fi
+            # Tell IPAM we don't need this address, but ignore errors because
+            # the address might not have come from IPAM
+            http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/weave:expose/${CIDR%/*} >/dev/null 2>&1 || true
         done
-        [ $CIDR_COUNT -eq 0 ] && http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/weave:expose 2>/dev/null || true
         ;;
     stop)
         [ $# -eq 0 ] || usage
