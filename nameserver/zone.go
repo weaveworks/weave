@@ -20,10 +20,8 @@ const (
 	DefaultLocalDomain     = "weave.local."       // The default name used for the local domain
 	DefaultRefreshInterval = int(DefaultLocalTTL) // Period for background updates with mDNS
 	DefaultRelevantTime    = 60                   // When to forget info about remote info if nobody asks...
-	DefaultNumUpdaters     = 4                    // Default number of background updaters
 
-	defaultRefreshMailbox = 1000           // Number of on-the-fly background queries
-	defaultRemoteIdent    = "weave:remote" // Ident used for info obtained from mDNS
+	defaultRemoteIdent = "weave:remote" // Ident used for info obtained from mDNS
 )
 
 // +1 to also exclude a dot
@@ -422,12 +420,8 @@ type ZoneConfig struct {
 	Iface *net.Interface
 	// Refresh interval for local names in the zone database (disabled by default) (in seconds)
 	RefreshInterval int
-	// Number of background updaters for names
-	RefreshWorkers int
 	// Forget about remote info if nobody asks for it in this time (in seconds)
 	RelevantTime int
-	// Max pending refresh requests
-	MaxRefreshRequests int
 	// TTL returnined in local asnwers (with mDNS)
 	LocalTTL int
 	// Force a specific mDNS client
@@ -453,21 +447,13 @@ type ZoneDb struct {
 	relevantLimit time.Duration // if no one asks for something in this time, it is not relevant a anymore...
 	clock         clock.Clock
 
-	refreshChan      chan refreshRequest // channel for enqueing requests for updating names
-	refreshSchedChan chan refreshRequest // channel for enqueing requests for updating names
+	refreshScheds    *SchedQueue
 	refreshCloseChan chan bool
-	refreshWg        sync.WaitGroup
 	refreshInterval  time.Duration
-	refreshWorkers   int
 }
 
 // Create a new zone database
 func NewZoneDb(config ZoneConfig) (zone *ZoneDb, err error) {
-	maxRefreshRequests := defaultRefreshMailbox
-	if config.MaxRefreshRequests > 0 {
-		maxRefreshRequests = config.MaxRefreshRequests
-	}
-
 	zone = &ZoneDb{
 		domain:           config.Domain,
 		idents:           make(identRecordSet),
@@ -476,10 +462,7 @@ func NewZoneDb(config ZoneConfig) (zone *ZoneDb, err error) {
 		iface:            config.Iface,
 		clock:            config.Clock,
 		relevantLimit:    time.Duration(DefaultRelevantTime) * time.Second,
-		refreshChan:      make(chan refreshRequest, maxRefreshRequests),
-		refreshSchedChan: make(chan refreshRequest, maxRefreshRequests),
 		refreshCloseChan: make(chan bool),
-		refreshWorkers:   DefaultNumUpdaters,
 	}
 
 	// fix the default configuration parameters
@@ -495,8 +478,9 @@ func NewZoneDb(config ZoneConfig) (zone *ZoneDb, err error) {
 	if config.RelevantTime > 0 {
 		zone.relevantLimit = time.Duration(config.RelevantTime) * time.Second
 	}
-	if config.RefreshWorkers > 0 {
-		zone.refreshWorkers = config.RefreshWorkers
+
+	if zone.refreshInterval > 0 {
+		zone.refreshScheds = NewSchedQueue(zone.clock)
 	}
 
 	// Create the mDNS client and server
@@ -533,21 +517,8 @@ func (zone *ZoneDb) Start() (err error) {
 	if err = zone.mdnsSrv.Start(zone.iface); err != nil {
 		return
 	}
-
-	// Start some name refreshers...
 	if zone.refreshInterval > 0 {
-		Info.Printf("[zonedb] Starting %d background name updaters", zone.refreshWorkers)
-		for i := 0; i < zone.refreshWorkers; i++ {
-			zone.refreshWg.Add(1)
-			go zone.updater(i)
-		}
-
-		zone.refreshWg.Add(1)
-		go zone.periodicUpdater()
-	} else {
-		// TODO: the refresher also garbage collects irrelevant remote info... we should have an alternative mechanism
-		//       when we don't use refreshers.
-		Warning.Printf("[zonedb] Remote info will not be garbage collected")
+		zone.refreshScheds.Start()
 	}
 
 	return
@@ -557,8 +528,7 @@ func (zone *ZoneDb) Start() (err error) {
 func (zone *ZoneDb) Stop() error {
 	if zone.refreshInterval > 0 {
 		Debug.Printf("[zonedb] Closing background updaters...")
-		close(zone.refreshCloseChan)
-		zone.refreshWg.Wait()
+		zone.refreshScheds.Stop()
 	}
 
 	Debug.Printf("[zonedb] Exiting mDNS client and server...")
@@ -680,14 +650,13 @@ func (zone *ZoneDb) IsNameRelevant(n string) bool {
 
 	lastAccess := time.Time{}
 	for _, nameset := range zone.idents {
-		if t := nameset.getNameLastAccess(n); !t.IsZero() {
-			if lastAccess.IsZero() || t.After(lastAccess) {
-				lastAccess = t
-			}
+		t := nameset.getNameLastAccess(n)
+		if !t.IsZero() && (lastAccess.IsZero() || t.After(lastAccess)) {
+			lastAccess = t
 		}
 	}
 
-	return !lastAccess.IsZero() && zone.clock.Now().Sub(lastAccess) < zone.relevantLimit
+	return !lastAccess.IsZero() && zone.clock.Now().Sub(lastAccess) <= zone.relevantLimit
 }
 
 // Returns true if the info we have for a remote name has expired. Local names are never expired
