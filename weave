@@ -554,32 +554,22 @@ http_call() {
     http_call_ip $CONTAINER_IP "$@"
 }
 
-# Wait until container $1 on port $2 is alive enough to respond to its status call
-wait_for_status() {
-    WAIT_TIME=0
-    while [ $WAIT_TIME -lt 3 ] ; do
-        sleep $WAIT_TIME
-        container_ip $1 \
-            "$1 container has died." \
-            "$1 container has died." \
-            || return 1
-        http_call_ip $CONTAINER_IP $2 GET /status >/dev/null && return 0
-        WAIT_TIME=$((WAIT_TIME+1))
+# Wait until container $1 on IP $2, port $3 is alive enough to respond
+# to its status call
+wait_for_status_ip() {
+    while true ; do
+        http_call_ip $2 $3 GET /status >/dev/null && return 0
+        if ! container_id $1 >/dev/null 2>&1 ; then
+            echo "$1 container has died." >&2
+            return 1
+        fi
+        sleep 1
     done
-    echo "Timed out waiting for $1 container to start." >&2
-    return 1
 }
 
-# Just like wait_for_status, but takes the IP instead of a container ID
-wait_for_status_ip() {
-    WAIT_TIME=0
-    while [ $WAIT_TIME -lt 3 ]; do
-        sleep $WAIT_TIME
-        http_call_ip $1 $2 GET /status >/dev/null && return 0
-        WAIT_TIME=$((WAIT_TIME+1))
-    done
-    echo "Timed out waiting for container to start." >&2
-    return 1
+wait_for_status() {
+    container_ip $1 "$1 container has died." "$1 container has died." || return 1
+    wait_for_status_ip $1 $CONTAINER_IP $2
 }
 
 # Call $1 for all containers, passing container ID, all MACs and all IPs
@@ -888,7 +878,7 @@ case "$COMMAND" in
             --entrypoint=/home/weave/weaveproxy \
             $WEAVEPROXY_DOCKER_ARGS \
             $EXEC_IMAGE "$@")
-        wait_for_status_ip 127.0.0.1 $PROXY_PORT
+        wait_for_status_ip $PROXY_CONTAINER_NAME 127.0.0.1 $PROXY_PORT
         echo $PROXY_CONTAINER
         ;;
     connect)
