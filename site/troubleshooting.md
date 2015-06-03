@@ -3,7 +3,7 @@ title: Troubleshooting Weave
 layout: default
 ---
 
-## Troubleshooting
+# Troubleshooting Weave
 
 Check what version of weave you are running with
 

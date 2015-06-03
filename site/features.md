@@ -1,9 +1,9 @@
 ---
-title: Weave features
+title: Weave Features
 layout: default
 ---
 
-# Weave features
+# Weave Features
 
 Weave has a few more features beyond those illustrated by the [basic
 example](https://github.com/weaveworks/weave#example):

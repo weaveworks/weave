@@ -3,7 +3,7 @@ title: Weave Proxy
 layout: default
 ---
 
-# Proxy
+# Weave Proxy
 
 Instead of the `weave` command-line utility, you may prefer to use the
 standard [Docker command-line
