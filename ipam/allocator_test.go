@@ -27,8 +27,8 @@ func TestAllocFree(t *testing.T) {
 		universe   = "10.0.3.0/26"
 		subnet1    = "10.0.3.0/28"
 		subnet2    = "10.0.3.32/28"
-		testAddr1  = "10.0.3.1"
-		testAddr2  = "10.0.3.33"
+		testAddr1  = "10.0.3.1/28"
+		testAddr2  = "10.0.3.33/28"
 		spaceSize  = 62 // 64 IP addresses in /26, minus .0 and .63
 	)
 
@@ -134,7 +134,7 @@ func TestAllocatorClaim(t *testing.T) {
 		container2 = "baddf00d"
 		container3 = "b01df00d"
 		universe   = "10.0.3.0/30"
-		testAddr1  = "10.0.3.1" // first address allocated should be .1 because .0 is network addr
+		testAddr1  = "10.0.3.1/30" // first address allocated should be .1 because .0 is network addr
 	)
 
 	alloc := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
@@ -224,15 +224,13 @@ func TestGossipShutdown(t *testing.T) {
 		container1 = "abcdef"
 		container2 = "baddf00d"
 		universe   = "10.0.3.0/30"
-		testAddr1  = "10.0.3.1" // first address allocated should be .1 because .0 is network addr
 	)
 
 	alloc := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
 	defer alloc.Stop()
 
 	alloc.claimRingForTesting()
-	addr1, _ := alloc.Allocate(container1, alloc.defaultSubnet, nil)
-	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
+	alloc.Allocate(container1, alloc.defaultSubnet, nil)
 
 	alloc.Shutdown()
 
@@ -284,8 +282,7 @@ func TestFakeRouterSimple(t *testing.T) {
 	alloc1 := allocs[0]
 	//alloc2 := allocs[1]
 
-	addr, _ := alloc1.Allocate("foo", alloc1.defaultSubnet, nil)
-	println("Got addr", addr)
+	alloc1.Allocate("foo", alloc1.defaultSubnet, nil)
 }
 
 func TestAllocatorFuzz(t *testing.T) {
@@ -387,7 +384,10 @@ func TestAllocatorFuzz(t *testing.T) {
 		alloc := allocs[res.alloc]
 		//common.Info.Printf("Freeing %s (%s) on allocator %d", res.name, addr, res.alloc)
 
-		oldAddr, _ := address.ParseIP(addr)
+		oldAddr, _, err := address.ParseCIDR(addr)
+		if err != nil {
+			panic(err)
+		}
 		wt.AssertSuccess(t, alloc.Free(res.name, oldAddr))
 	}
 
@@ -406,8 +406,8 @@ func TestAllocatorFuzz(t *testing.T) {
 		//common.Info.Printf("Asking for %s on allocator %d again", addr, res.alloc)
 
 		newAddr, _ := alloc.Allocate(res.name, alloc.defaultSubnet, nil)
-		oldAddr, _ := address.ParseIP(addr)
-		if newAddr != oldAddr {
+		oldAddr, _, _ := address.ParseCIDR(addr)
+		if newAddr.Start != oldAddr {
 			panic(fmt.Sprintf("Got different address for repeat request for %s: %s != %s", res.name, newAddr, oldAddr))
 		}
 

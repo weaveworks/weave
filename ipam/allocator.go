@@ -191,16 +191,16 @@ func (alloc *Allocator) SetDefaultSubnet(subnet address.CIDR) error {
 
 // Allocate (Sync) - get IP address for container with given name
 // if there isn't any space we block indefinitely
-func (alloc *Allocator) Allocate(ident string, subnet address.CIDR, cancelChan <-chan bool) (address.Address, error) {
+func (alloc *Allocator) Allocate(ident string, subnet address.CIDR, cancelChan <-chan bool) (address.CIDR, error) {
 	resultChan := make(chan allocateResult)
 	op := &allocate{subnet: subnet, resultChan: resultChan, ident: ident,
 		hasBeenCancelled: hasBeenCancelled(cancelChan)}
 	alloc.doOperation(op, &alloc.pendingAllocates)
 	result := <-resultChan
-	return result.addr, result.err
+	return address.CIDR{Start: result.addr, PrefixLen: subnet.PrefixLen}, result.err
 }
 
-func (alloc *Allocator) Lookup(ident string, subnet address.CIDR) (address.Address, error) {
+func (alloc *Allocator) Lookup(ident string, subnet address.CIDR) (address.CIDR, error) {
 	resultChan := make(chan allocateResult)
 	alloc.actionChan <- func() {
 		for _, addr := range alloc.owned[ident] {
@@ -212,7 +212,7 @@ func (alloc *Allocator) Lookup(ident string, subnet address.CIDR) (address.Addre
 		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found")}
 	}
 	result := <-resultChan
-	return result.addr, result.err
+	return address.CIDR{Start: result.addr, PrefixLen: subnet.PrefixLen}, result.err
 }
 
 // Claim an address that we think we should own (Sync)

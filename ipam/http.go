@@ -46,7 +46,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprintf(w, "%s/%d", addr.String(), subnet.PrefixLen)
+		fmt.Fprint(w, addr)
 	})
 
 	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +59,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprintf(w, "%s/%d", addr.String(), alloc.defaultSubnet.PrefixLen)
+		fmt.Fprint(w, addr)
 	})
 
 	router.Methods("POST").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +78,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 			return
 		}
 
-		fmt.Fprintf(w, "%s/%d", addr.String(), cidr.PrefixLen)
+		fmt.Fprint(w, addr)
 	})
 
 	router.Methods("POST").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +94,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 			return
 		}
 
-		fmt.Fprintf(w, "%s/%d", newAddr.String(), alloc.defaultSubnet.PrefixLen)
+		fmt.Fprint(w, newAddr)
 	})
 
 	router.Methods("DELETE").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
