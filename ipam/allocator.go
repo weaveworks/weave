@@ -370,7 +370,7 @@ func (alloc *Allocator) OnGossipBroadcast(msg []byte) (router.GossipData, error)
 
 type gossipState struct {
 	// We send a timstamp along with the information to be
-	// gossipped in order to do detect skewed clocks
+	// gossipped in order to detect skewed clocks
 	Now       int64
 	Nicknames map[router.PeerName]string
 
