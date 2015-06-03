@@ -8,3 +8,6 @@ exclude:
   - 'Gemfile.lock'
   - 'params.json'
   - 'build-and-publish.sh'
+
+google:
+  analytics: "UA-57286487-1"
