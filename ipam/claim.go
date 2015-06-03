@@ -57,6 +57,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 			c.resultChan <- err
 			return true
 		}
+		alloc.debugln("Claimed", c.addr, "for", c.ident)
 		alloc.addOwned(c.ident, c.addr)
 		c.resultChan <- nil
 		return true

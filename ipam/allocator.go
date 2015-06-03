@@ -223,18 +223,8 @@ func (alloc *Allocator) Claim(ident string, addr address.Address, cancelChan <-c
 	return <-resultChan
 }
 
-// Free (Sync) - release IP address for container with given name
-func (alloc *Allocator) Free(ident string) error {
-	return alloc.free(ident)
-}
-
-// ContainerDied is provided to satisfy the updater interface; does a free underneath.  Async.
-func (alloc *Allocator) ContainerDied(ident string) error {
-	alloc.debugln("Container", ident, "died; releasing addresses")
-	return alloc.free(ident)
-}
-
-func (alloc *Allocator) free(ident string) error {
+// Delete (Sync) - release all IP addresses for container with given name
+func (alloc *Allocator) Delete(ident string) error {
 	errChan := make(chan error)
 	alloc.actionChan <- func() {
 		addrs, found := alloc.owned[ident]
@@ -248,12 +238,39 @@ func (alloc *Allocator) free(ident string) error {
 		found = alloc.cancelOpsFor(&alloc.pendingClaims, ident) || found
 
 		if !found {
-			errChan <- fmt.Errorf("Free: no addresses for %s", ident)
+			errChan <- fmt.Errorf("Delete: no addresses for %s", ident)
 			return
 		}
 		errChan <- nil
 	}
 	return <-errChan
+}
+
+// Free (Sync) - release single IP address for container
+func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
+	errChan := make(chan error)
+	alloc.actionChan <- func() {
+		addrs := alloc.owned[ident]
+		for i, ownedAddr := range addrs {
+			if ownedAddr == addrToFree {
+				alloc.debugln("Freed", addrToFree, "for", ident)
+				addrs = append(addrs[:i], addrs[i+1:]...)
+				alloc.owned[ident] = addrs
+				alloc.space.Free(addrToFree)
+				errChan <- nil
+				return
+			}
+		}
+
+		errChan <- fmt.Errorf("Free: address %s not found for %s", addrToFree, ident)
+	}
+	return <-errChan
+}
+
+// ContainerDied is provided to satisfy the updater interface; does a 'Delete' underneath.  Sync.
+func (alloc *Allocator) ContainerDied(ident string) error {
+	alloc.debugln("Container", ident, "died; releasing addresses")
+	return alloc.Delete(ident)
 }
 
 // Sync.

@@ -81,9 +81,24 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 		fmt.Fprintf(w, "%s/%d", newAddr.String(), alloc.defaultSubnet.PrefixLen)
 	})
 
+	router.Methods("DELETE").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		ident := vars["id"]
+		ipStr := vars["ip"]
+		if ip, err := address.ParseIP(ipStr); err != nil {
+			badRequest(w, err)
+			return
+		} else if err := alloc.Free(ident, ip); err != nil {
+			badRequest(w, fmt.Errorf("Unable to free: %s", err))
+			return
+		}
+
+		w.WriteHeader(204)
+	})
+
 	router.Methods("DELETE").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ident := mux.Vars(r)["id"]
-		if err := alloc.Free(ident); err != nil {
+		if err := alloc.Delete(ident); err != nil {
 			badRequest(w, err)
 			return
 		}
