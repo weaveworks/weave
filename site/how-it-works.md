@@ -274,15 +274,19 @@ local peer in the usual Diffie-Hellman way, resulting in both peers
 arriving at the same shared key. To this is appended the supplied
 password, and the result is hashed through SHA256, to form the final
 ephemeral session key. Thus the supplied password is never exchanged
-directly, and is thoroughly mixed into the shared secret. The shared
-key formed by Diffie-Hellman is 256 bits long, appending the password
-to this obviously makes it longer by an unknown amount, and the use of
-SHA256 reduces this back to 256 bits, to form the final ephemeral
-session key. This late combination with the password eliminates "Man
-In The Middle" attacks: sniffing the public key exchange between the
-two peers and faking their responses will not grant an attacker
-knowledge of the password, and so an attacker would not be able to
-form valid ephemeral session keys.
+directly, and is thoroughly mixed into the shared secret. Furthermore,
+the rate at which TCP connections are accepted is limited by weave to
+1kHz, which twarts online dictionary attacks on reasonably strong
+passwords.
+
+The shared key formed by Diffie-Hellman is 256 bits long, appending
+the password to this obviously makes it longer by an unknown amount,
+and the use of SHA256 reduces this back to 256 bits, to form the final
+ephemeral session key. This late combination with the password
+eliminates "Man In The Middle" attacks: sniffing the public key
+exchange between the two peers and faking their responses will not
+grant an attacker knowledge of the password, and so an attacker would
+not be able to form valid ephemeral session keys.
 
 The same ephemeral session key is used for both TCP and UDP traffic
 between two peers.
