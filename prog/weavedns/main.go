@@ -33,7 +33,6 @@ func main() {
 		udpbuf          int
 		fallback        string
 		refreshInterval int
-		refreshWorkers  int
 		relevantTime    int
 		maxAnswers      int
 		cacheLen        int
@@ -58,7 +57,6 @@ func main() {
 	// advanced options
 	flag.IntVar(&negTTL, "neg-ttl", weavedns.DefaultCacheNegLocalTTL, "negative TTL (in secs) for unanswered queries for local names")
 	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
-	flag.IntVar(&refreshWorkers, "refresh-workers", weavedns.DefaultNumUpdaters, "default number of background updaters")
 	flag.IntVar(&maxAnswers, "max-answers", weavedns.DefaultMaxAnswers, "maximum number of answers returned to clients (0=unlimited)")
 	flag.IntVar(&relevantTime, "relevant", weavedns.DefaultRelevantTime, "life time for info in the absence of queries (in secs)")
 	flag.IntVar(&udpbuf, "udpbuf", weavedns.DefaultUDPBuflen, "UDP buffer length")
@@ -122,7 +120,6 @@ func main() {
 		Iface:           iface,
 		LocalTTL:        ttl,
 		RefreshInterval: refreshInterval,
-		RefreshWorkers:  refreshWorkers,
 		RelevantTime:    relevantTime,
 	}
 	zone, err := weavedns.NewZoneDb(zoneConfig)
