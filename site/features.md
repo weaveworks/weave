@@ -157,6 +157,13 @@ or
 _NOTE: The command line option takes precedence over the environment
 variable._
 
+The password needs to be reasonably strong to guard against brute
+forcing by an attacker attempting to establish connections to a
+peer. We recommend at least 50 bits of entropy. An easy way to
+generate a random password which satsifies this requirement is
+
+    < /dev/urandom tr -dc A-Za-z0-9 | head -c9 ; echo
+
 The same password must be specified for all weave peers.
 
 ### <a name="host-network-integration"></a>Host network integration
