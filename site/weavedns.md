@@ -3,7 +3,7 @@ title: Automatic Discovery with WeaveDNS
 layout: default
 ---
 
-# Weave DNS server
+# Automatic Discovery with WeaveDNS
 
 The Weave DNS server answers name queries in a Weave network. This
 provides a simple way for containers to find each other: just give

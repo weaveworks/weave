@@ -1,9 +1,9 @@
 ---
-title: How Weave works
+title: How Weave Works
 layout: default
 ---
 
-## How does it work?
+# How Weave Works
 
  * [Overview](#overview)
  * [Encapsulation](#encapsulation)

@@ -3,7 +3,7 @@ title: Installing Weave with Boot2Docker
 layout: default
 ---
 
-## Installation with Boot2Docker
+# Installing Weave with Boot2Docker
 
 If you are running Docker inside the Boot2Docker VM, e.g. because you
 are on a Mac, then the following changes are required to the weave

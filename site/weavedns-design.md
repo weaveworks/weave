@@ -1,9 +1,9 @@
 ---
-title: WeaveDNS Design Notes
+title: WeaveDNS (service discovery) Design Notes
 layout: default
 ---
 
-# Weave DNS (service discovery) design
+# WeaveDNS (service discovery) Design Notes
 
 The model is that each host has a service that is notified of
 hostnames and weave addresses for containers on the host. It binds to
