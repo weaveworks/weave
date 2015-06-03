@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	InitialInterval = 5 * time.Second
-	MaxInterval     = 10 * time.Minute
+	InitialInterval = 2 * time.Second
+	MaxInterval     = 6 * time.Minute
 )
 
 type peerAddrs map[string]*net.TCPAddr
@@ -30,7 +30,7 @@ type Target struct {
 	attempting  bool          // are we currently attempting to connect there?
 	lastError   error         // reason for disconnection last time
 	tryAfter    time.Time     // next time to try this address
-	tryInterval time.Duration // backoff time on next failure
+	tryInterval time.Duration // retry delay on next failure
 }
 
 type ConnectionMakerAction func() bool
@@ -73,7 +73,7 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string, replace bool) []e
 			cm.directPeers[peer] = addr
 			// curtail any existing reconnect interval
 			if target, found := cm.targets[addr.String()]; found {
-				target.tryAfter, target.tryInterval = tryImmediately()
+				target.tryNow()
 			}
 		}
 		return true
@@ -95,7 +95,7 @@ func (cm *ConnectionMaker) ConnectionTerminated(address string, err error) {
 		if target, found := cm.targets[address]; found {
 			target.attempting = false
 			target.lastError = err
-			target.tryAfter, target.tryInterval = tryAfter(target.tryInterval)
+			target.retry()
 		}
 		return true
 	}
@@ -191,7 +191,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 			return
 		}
 		target := &Target{}
-		target.tryAfter, target.tryInterval = tryImmediately()
+		target.tryNow()
 		cm.targets[address] = target
 	}
 
@@ -303,15 +303,17 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	}
 }
 
-func tryImmediately() (time.Time, time.Duration) {
-	interval := time.Duration(rand.Int63n(int64(InitialInterval)))
-	return time.Now(), interval
+func (t *Target) tryNow() {
+	t.tryAfter = time.Now()
+	t.tryInterval = InitialInterval
 }
 
-func tryAfter(interval time.Duration) (time.Time, time.Duration) {
-	interval += time.Duration(rand.Int63n(int64(interval)))
-	if interval > MaxInterval {
-		interval = MaxInterval
+// The delay at the nth retry is a random value in the range
+// [i-i/2,i+i/2], where i = InitialInterval * 1.5^(n-1).
+func (t *Target) retry() {
+	t.tryAfter = time.Now().Add(t.tryInterval/2 + time.Duration(rand.Int63n(int64(t.tryInterval))))
+	t.tryInterval = t.tryInterval * 3 / 2
+	if t.tryInterval > MaxInterval {
+		t.tryInterval = MaxInterval
 	}
-	return time.Now().Add(interval), interval
 }
