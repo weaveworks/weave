@@ -200,13 +200,14 @@ func (alloc *Allocator) Allocate(ident string, subnet address.CIDR, cancelChan <
 	return result.addr, result.err
 }
 
-func (alloc *Allocator) Lookup(ident string) (address.Address, error) {
+func (alloc *Allocator) Lookup(ident string, subnet address.CIDR) (address.Address, error) {
 	resultChan := make(chan allocateResult)
 	alloc.actionChan <- func() {
-		addr, found := alloc.owned[ident]
-		if found {
-			resultChan <- allocateResult{addr: addr[0]}
-			return
+		for _, addr := range alloc.owned[ident] {
+			if subnet.Contains(addr) {
+				resultChan <- allocateResult{addr: addr}
+				return
+			}
 		}
 		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found")}
 	}

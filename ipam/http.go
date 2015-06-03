@@ -33,12 +33,28 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 		w.WriteHeader(204)
 	})
 
+	router.Methods("GET").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		cidr := vars["ip"] + "/" + vars["prefixlen"]
+		_, subnet, err := address.ParseCIDR(cidr)
+		if err != nil {
+			badRequest(w, err)
+			return
+		}
+		addr, err := alloc.Lookup(vars["id"], subnet)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintf(w, "%s/%d", addr.String(), subnet.PrefixLen)
+	})
+
 	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if alloc.defaultSubnet.Blank() {
 			badRequest(w, fmt.Errorf("No subnet specified"))
 			return
 		}
-		addr, err := alloc.Lookup(mux.Vars(r)["id"])
+		addr, err := alloc.Lookup(mux.Vars(r)["id"], alloc.defaultSubnet)
 		if err != nil {
 			http.NotFound(w, r)
 			return

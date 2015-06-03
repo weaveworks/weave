@@ -89,6 +89,11 @@ func TestHttp(t *testing.T) {
 	cidr2a := HTTPPost(t, allocURL(port, testCIDR2, containerID))
 	wt.AssertEqualString(t, cidr2a, testAddr2, "address")
 
+	check := HTTPGet(t, allocURL(port, testCIDR1, containerID))
+	wt.AssertEqualString(t, check, cidr1a, "address")
+	check = HTTPGet(t, allocURL(port, testCIDR2, containerID))
+	wt.AssertEqualString(t, check, cidr2a, "address")
+
 	// Ask the http server for a pair of addresses for another container and check they're different
 	cidr1b := HTTPPost(t, allocURL(port, testCIDR1, container2))
 	wt.AssertFalse(t, cidr1b == testAddr1, "address")
