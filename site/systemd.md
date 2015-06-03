@@ -1,7 +1,9 @@
 ---
-title: Using Weave with systemd
+title: Using Weave with Systemd
 layout: default
 ---
+
+# Using Weave with Systemd
 
 Having installed `weave` as per [readme][], you might wish to configure the
 init daemon to start it on boot. Most recent Linux distribution releases are

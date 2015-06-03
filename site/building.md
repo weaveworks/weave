@@ -3,6 +3,8 @@ title: Building Weave
 layout: default
 ---
 
+# Building Weave
+
 You only need to build weave if you want to work on the weave codebase
 (or you just enjoy building software).
 

@@ -3,7 +3,7 @@ title: weave, the Docker network
 layout: default
 ---
 
-# weave documentation
+# Weave Documentation
 
  * [Introduction, Installation and Example](https://github.com/weaveworks/weave#readme)
  * [Getting Started Guides](http://weave.works/guides/)
