@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	InitialInterval = 5 * time.Second
-	MaxInterval     = 10 * time.Minute
+	InitialInterval = 2 * time.Second
+	MaxInterval     = 6 * time.Minute
 )
 
 type peerAddrs map[string]*net.TCPAddr
@@ -30,7 +30,7 @@ type Target struct {
 	attempting  bool          // are we currently attempting to connect there?
 	lastError   error         // reason for disconnection last time
 	tryAfter    time.Time     // next time to try this address
-	tryInterval time.Duration // backoff time on next failure
+	tryInterval time.Duration // retry delay on next failure
 }
 
 type ConnectionMakerAction func() bool
@@ -304,14 +304,16 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 }
 
 func tryImmediately() (time.Time, time.Duration) {
-	interval := time.Duration(rand.Int63n(int64(InitialInterval)))
-	return time.Now(), interval
+	return time.Now(), InitialInterval
 }
 
+// The delay at the nth retry is a random value in the range
+// [i-i/2,i+i/2], where i = InitialInterval * 1.5^(n-1).
 func tryAfter(interval time.Duration) (time.Time, time.Duration) {
-	interval += time.Duration(rand.Int63n(int64(interval)))
-	if interval > MaxInterval {
-		interval = MaxInterval
+	delay := interval/2 + time.Duration(rand.Int63n(int64(interval)))
+	nextInterval := interval * 3 / 2
+	if nextInterval > MaxInterval {
+		nextInterval = MaxInterval
 	}
-	return time.Now().Add(interval), interval
+	return time.Now().Add(delay), nextInterval
 }

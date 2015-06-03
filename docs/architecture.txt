@@ -34,7 +34,7 @@ Router:
   the known locations of peers as they're discovered and is informed
   when connections we have made die. It proactively tries to create
   connections to remote peers we're not connected to using a random
-  binary exponential backoff to regulate the period between connection
+  exponential backoff to regulate the period between connection
   attempts.
 
 - Local Peer
