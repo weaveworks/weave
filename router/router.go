@@ -13,10 +13,17 @@ import (
 	"code.google.com/p/gopacket/layers"
 )
 
-const macMaxAge = 10 * time.Minute // [1]
+const (
+	macMaxAge      = 10 * time.Minute     // [1]
+	tcpAcceptDelay = 1 * time.Millisecond // [2]
+)
 
 // [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
+
+// [2] time to wait between accepting tcp connections. This guards
+// against brute-force attacks on the password when encryption is in
+// use. It is also a basic DoS defence.
 
 type LogFrameFunc func(string, []byte, *layers.Ethernet)
 
@@ -199,6 +206,7 @@ func (router *Router) listenTCP(localPort int) {
 				continue
 			}
 			router.acceptTCP(tcpConn)
+			time.Sleep(tcpAcceptDelay)
 		}
 	}()
 }
