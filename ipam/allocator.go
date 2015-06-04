@@ -341,7 +341,13 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 		switch msg[0] {
 		case msgSpaceRequest:
 			// some other peer asked us for space
-			alloc.donateSpace(sender)
+			decoder := gob.NewDecoder(bytes.NewReader(msg[1:]))
+			var cidr address.CIDR
+			if err := decoder.Decode(&cidr); err != nil {
+				resultChan <- err
+				return
+			}
+			alloc.donateSpace(cidr, sender)
 			resultChan <- nil
 		case msgRingUpdate:
 			resultChan <- alloc.update(msg[1:])
@@ -562,8 +568,18 @@ func (alloc *Allocator) propose() {
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
-func (alloc *Allocator) sendRequest(dest router.PeerName, kind byte) {
-	msg := router.Concat([]byte{kind}, alloc.encode())
+func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, subnet address.CIDR) {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	if err := enc.Encode(subnet); err != nil {
+		panic(err)
+	}
+	msg := router.Concat([]byte{msgSpaceRequest}, buf.Bytes())
+	alloc.gossip.GossipUnicast(dest, msg)
+}
+
+func (alloc *Allocator) sendRingUpdate(dest router.PeerName) {
+	msg := router.Concat([]byte{msgRingUpdate}, alloc.encode())
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
@@ -615,18 +631,18 @@ func (alloc *Allocator) update(msg []byte) error {
 	return nil
 }
 
-func (alloc *Allocator) donateSpace(to router.PeerName) {
+func (alloc *Allocator) donateSpace(subnet address.CIDR, to router.PeerName) {
 	// No matter what we do, we'll send a unicast gossip
 	// of our ring back to tha chap who asked for space.
 	// This serves to both tell him of any space we might
 	// have given him, or tell him where he might find some
 	// more.
-	defer alloc.sendRequest(to, msgRingUpdate)
+	defer alloc.sendRingUpdate(to)
 
 	alloc.debugln("Peer", to, "asked me for space")
-	start, size, ok := alloc.space.Donate()
+	start, size, ok := alloc.space.Donate(subnet.Start, subnet.End())
 	if !ok {
-		free := alloc.space.NumFreeAddresses()
+		free := alloc.space.NumFreeAddressesInRange(subnet.Start, subnet.End())
 		common.Assert(free == 0)
 		alloc.debugln("No space to give to peer", to)
 		return

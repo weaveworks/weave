@@ -50,8 +50,8 @@ func (g *allocate) Try(alloc *Allocator) bool {
 
 	// out of space
 	if donor, err := alloc.ring.ChoosePeerToAskForSpace(start, end); err == nil {
-		alloc.debugln("Decided to ask peer", donor, "for space")
-		alloc.sendRequest(donor, msgSpaceRequest)
+		alloc.debugln("Decided to ask peer", donor, "for space in subnet", g.subnet)
+		alloc.sendSpaceRequest(donor, g.subnet)
 	}
 
 	return false

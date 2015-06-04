@@ -108,12 +108,19 @@ func (s *Space) Free(addr address.Address) error {
 	return nil
 }
 
-func (s *Space) biggestFreeRange() (int, address.Offset) {
+func (s *Space) biggestFreeRange(rangeStart, rangeEnd address.Address) (int, address.Offset) {
 	pos := -1
 	biggest := address.Offset(0)
 
 	for i := 0; i < len(s.free); i += 2 {
-		size := address.Subtract(s.free[i+1], s.free[i])
+		start, end := s.free[i], s.free[i+1]
+		if start < rangeStart {
+			start = rangeStart
+		}
+		if end > rangeEnd {
+			end = rangeEnd
+		}
+		size := address.Subtract(end, start)
 		if size >= biggest {
 			pos = i
 			biggest = size
@@ -122,12 +129,12 @@ func (s *Space) biggestFreeRange() (int, address.Offset) {
 	return pos, biggest
 }
 
-func (s *Space) Donate() (address.Address, address.Offset, bool) {
+func (s *Space) Donate(rangeStart, rangeEnd address.Address) (address.Address, address.Offset, bool) {
 	if len(s.free) == 0 {
 		return 0, 0, false
 	}
 
-	pos, biggest := s.biggestFreeRange()
+	pos, biggest := s.biggestFreeRange(rangeStart, rangeEnd)
 
 	// Donate half of that biggest free range, rounding up so
 	// that the donation can't be empty
