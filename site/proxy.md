@@ -123,7 +123,7 @@ you have generated your certificates and keys into the docker host's
     host1$ weave launch-proxy --tlsverify --tlscacert=/tls/ca.pem \
              --tlscert=/tls/server-cert.pem --tlskey=/tls/server-key.pem
 
-The paths to your certificates and key, must be provided as absolute
+The paths to your certificates and key must be provided as absolute
 paths which exist on the docker host.
 
 With the proxy running over TLS, we can configure our regular docker
@@ -134,6 +134,15 @@ client
 
 The certificates and keys used by the client will need to be present
 on your client machine.
+
+Because the proxy connects to the docker daemon at
+`unix:///var/run/docker.sock`, you must ensure that the daemon is
+listening there. To do this, you will need to pass the `-H
+unix:///var/run/docker.sock` option when booting the docker daemon, in
+addition to the `-H` options for configuring the TCP listener. Passing
+multiple `-H` options to the docker daemon is documented on the
+[docker basics
+documentation](https://docs.docker.com/articles/basics/).
 
 More details on generating certificates, and configuring docker with
 TLS can be found in the [docker
