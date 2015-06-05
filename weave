@@ -753,6 +753,12 @@ get_ipam_cidr() {
 
 # TODO: Handle relative paths for args
 # TODO: Handle args with spaces
+tls_arg() {
+    filename=${3:-$2}
+    PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/$filename.pem"
+    PROXY_ARGS="$PROXY_ARGS --tls$2 /home/weave/tls/$filename.pem"
+}
+
 proxy_args() {
     PROXY_VOLUMES=""
     PROXY_ARGS=""
@@ -760,30 +766,24 @@ proxy_args() {
         case "$1" in
           --tlscacert)
             shift
-            PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/ca.pem"
-            PROXY_ARGS="$PROXY_ARGS --tlscacert /home/weave/tls/ca.pem"
+            tls_arg "$1" cacert ca
             ;;
           --tlscacert=*)
-            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#*=}:/home/weave/tls/ca.pem"
-            PROXY_ARGS="$PROXY_ARGS --tlscacert /home/weave/tls/ca.pem"
+            tls_arg "${1#*=}" cacert ca
             ;;
           --tlscert)
             shift
-            PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/cert.pem"
-            PROXY_ARGS="$PROXY_ARGS --tlscert /home/weave/tls/cert.pem"
+            tls_arg "$1" cert
             ;;
           --tlscert=*)
-            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#*=}:/home/weave/tls/cert.pem"
-            PROXY_ARGS="$PROXY_ARGS --tlscert /home/weave/tls/cert.pem"
+            tls_arg "${1#*=}" cert
             ;;
           --tlskey)
             shift
-            PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/key.pem"
-            PROXY_ARGS="$PROXY_ARGS --tlskey /home/weave/tls/key.pem"
+            tls_arg "$1" key
             ;;
           --tlskey=*)
-            PROXY_VOLUMES="$PROXY_VOLUMES -v ${1#*=}:/home/weave/tls/key.pem"
-            PROXY_ARGS="$PROXY_ARGS --tlskey /home/weave/tls/key.pem"
+            tls_arg "${1#*=}" key
             ;;
           *)
             PROXY_ARGS="$PROXY_ARGS $1"
