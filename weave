@@ -142,7 +142,7 @@ if [ "$1" = "run" ]; then
     fi
     collect_cidr_args "$@"
     shift $CIDR_COUNT
-    CONTAINER=$(docker run $DNS_ARGS -d "$@")
+    CONTAINER=$(docker $DOCKER_CLIENT_ARGS run $DNS_ARGS -d "$@")
     exec_remote attach $CIDR_ARGS $CONTAINER
     echo $CONTAINER
     exit 0
