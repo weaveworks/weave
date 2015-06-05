@@ -145,7 +145,7 @@ func main() {
 	}
 
 	go SignalHandlerLoop(srv)
-	go weavedns.ServeHTTP(httpListener, version, srv, domain, zone)
+	go weavedns.ServeHTTP(httpListener, version, srv)
 
 	err = srv.Start()
 	if err != nil {
