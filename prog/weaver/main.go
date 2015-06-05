@@ -226,11 +226,6 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 }
 
 func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator) {
-	encryption := "off"
-	if router.UsingPassword() {
-		encryption = "on"
-	}
-
 	muxRouter := mux.NewRouter()
 
 	if allocator != nil {
@@ -239,7 +234,6 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 
 	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "weave router", version)
-		fmt.Fprintln(w, "Encryption", encryption)
 		fmt.Fprintln(w, router.Status())
 		if allocator != nil {
 			fmt.Fprintln(w, allocator.String())
@@ -247,7 +241,7 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 	})
 
 	muxRouter.Methods("GET").Path("/status-json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json, _ := router.StatusJSON(version, encryption)
+		json, _ := router.StatusJSON(version)
 		w.Write(json)
 	})
 

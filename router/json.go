@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-func (router *Router) StatusJSON(version, encryption string) ([]byte, error) {
+func (router *Router) StatusJSON(version string) ([]byte, error) {
 	return json.Marshal(struct {
 		Version    string
-		Encryption string
+		Encryption bool
 		Name       string
 		NickName   string
 		Interface  string
@@ -17,7 +17,7 @@ func (router *Router) StatusJSON(version, encryption string) ([]byte, error) {
 		Peers      *Peers
 		Routes     *Routes
 		ConnectionMakerStatus
-	}{version, encryption, router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes, router.ConnectionMaker.Status()})
+	}{version, router.UsingPassword(), router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes, router.ConnectionMaker.Status()})
 }
 
 func (cache *MacCache) MarshalJSON() ([]byte, error) {

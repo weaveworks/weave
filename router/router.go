@@ -112,8 +112,13 @@ func (router *Router) UsingPassword() bool {
 }
 
 func (router *Router) Status() string {
+	encryption := "off"
+	if router.UsingPassword() {
+		encryption = "on"
+	}
 	var buf bytes.Buffer
 	fmt.Fprintln(&buf, "Our name is", router.Ourself)
+	fmt.Fprintln(&buf, "Encryption", encryption)
 	fmt.Fprintln(&buf, "Sniffing traffic on", router.Iface)
 	fmt.Fprintf(&buf, "MACs:\n%s", router.Macs)
 	fmt.Fprintf(&buf, "Peers:\n%s", router.Peers)

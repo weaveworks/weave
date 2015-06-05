@@ -61,8 +61,8 @@ This produces output like:
 
 ````
 weave router 0.7.0
-Encryption off
 Our name is 7a:f4:56:87:76:3b(weave01)
+Encryption off
 Sniffing traffic on &{39 65535 ethwe ae:e3:07:9c:8c:d4 up|broadcast|multicast}
 MACs:
 ba:8c:b9:dc:e1:c9 -> 7a:f4:56:87:76:3b(weave01) (2014-10-23 16:39:19.482338935 +0000 UTC)
