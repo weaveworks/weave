@@ -40,15 +40,13 @@ func ParseCIDR(s string) (Address, CIDR, error) {
 
 func (cidr CIDR) Size() Offset { return 1 << uint(32-cidr.PrefixLen) }
 func (cidr CIDR) End() Address { return Add(cidr.Start, cidr.Size()) }
-func (cidr CIDR) Blank() bool  { return cidr.Start == 0 && cidr.PrefixLen == 0 }
 
 func (cidr CIDR) String() string {
 	return fmt.Sprintf("%s/%d", cidr.Start.String(), cidr.PrefixLen)
 }
 
 func (cidr1 CIDR) Overlaps(cidr2 CIDR) bool {
-	return cidr1.Start >= cidr2.Start && cidr1.Start < cidr2.End() ||
-		cidr2.Start >= cidr1.Start && cidr2.Start < cidr1.End()
+	return !(cidr1.Start >= cidr2.End() || cidr1.End() <= cidr2.Start)
 }
 
 func (cidr CIDR) Contains(addr Address) bool {

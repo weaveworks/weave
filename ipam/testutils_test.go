@@ -134,13 +134,11 @@ func makeAllocator(name string, cidrStr string, quorum uint) *Allocator {
 		panic(err)
 	}
 
-	_, cidr, err := address.ParseCIDR(cidrStr)
+	alloc, err := NewAllocator(peername, router.PeerUID(rand.Int63()),
+		"nick-"+name, cidrStr, quorum)
 	if err != nil {
 		panic(err)
 	}
-	alloc := NewAllocator(peername, router.PeerUID(rand.Int63()),
-		"nick-"+name, cidr, quorum)
-	alloc.defaultSubnet = cidr
 
 	return alloc
 }

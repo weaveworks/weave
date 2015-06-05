@@ -50,10 +50,6 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 	})
 
 	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if alloc.defaultSubnet.Blank() {
-			badRequest(w, fmt.Errorf("No subnet specified"))
-			return
-		}
 		addr, err := alloc.Lookup(mux.Vars(r)["id"], alloc.defaultSubnet)
 		if err != nil {
 			http.NotFound(w, r)
@@ -86,10 +82,6 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 	})
 
 	router.Methods("POST").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if alloc.defaultSubnet.Blank() {
-			badRequest(w, fmt.Errorf("No subnet specified"))
-			return
-		}
 		closedChan := w.(http.CloseNotifier).CloseNotify()
 		ident := mux.Vars(r)["id"]
 		newAddr, err := alloc.Allocate(ident, alloc.defaultSubnet, closedChan)

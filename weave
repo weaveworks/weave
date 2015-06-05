@@ -782,10 +782,6 @@ ipam_cidrs() {
     fi
     # If no addresses passed in, get one in the default subnet
     CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID)"
-    if [ "$CIDR_ARGS" = "No subnet specified" ] ; then
-        echo "No IP address supplied (use the -iprange and -defaultsubnet options on 'weave launch' to enable IP address allocation)" >&2
-        return 1
-    fi
     if [ "$CIDR_ARGS" = "404 page not found" ] ; then
         echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
         return 1

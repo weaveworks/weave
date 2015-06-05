@@ -17,7 +17,6 @@ import (
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/updater"
 	"github.com/weaveworks/weave/ipam"
-	"github.com/weaveworks/weave/ipam/address"
 	weavenet "github.com/weaveworks/weave/net"
 	weave "github.com/weaveworks/weave/router"
 )
@@ -38,24 +37,24 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		config      weave.Config
-		justVersion bool
-		ifaceName   string
-		routerName  string
-		nickName    string
-		password    string
-		wait        int
-		debug       bool
-		pktdebug    bool
-		prof        string
-		bufSzMB     int
-		noDiscovery bool
-		httpAddr    string
-		iprangeCIDR string
-		defltSubnet string
-		peerCount   int
-		apiPath     string
-		peers       []string
+		config       weave.Config
+		justVersion  bool
+		ifaceName    string
+		routerName   string
+		nickName     string
+		password     string
+		wait         int
+		debug        bool
+		pktdebug     bool
+		prof         string
+		bufSzMB      int
+		noDiscovery  bool
+		httpAddr     string
+		iprangeCIDR  string
+		ipsubnetCIDR string
+		peerCount    int
+		apiPath      string
+		peers        []string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -72,8 +71,8 @@ func main() {
 	flag.BoolVar(&noDiscovery, "nodiscovery", false, "disable peer discovery")
 	flag.IntVar(&bufSzMB, "bufsz", 8, "capture buffer size in MB")
 	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
-	flag.StringVar(&iprangeCIDR, "iprange", "", "IP address range to allocate within, in CIDR notation")
-	flag.StringVar(&defltSubnet, "defaultsubnet", "", "default subnet for IP address allocation, in CIDR notation")
+	flag.StringVar(&iprangeCIDR, "iprange", "", "IP address range reserved for automatic allocation, in CIDR notation")
+	flag.StringVar(&ipsubnetCIDR, "ipsubnet", "", "subnet to allocate within by default, in CIDR notation")
 	flag.IntVar(&peerCount, "initpeercount", 0, "number of peers in network (for IP address allocation)")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
 	flag.Parse()
@@ -141,9 +140,9 @@ func main() {
 
 	var allocator *ipam.Allocator
 	if iprangeCIDR != "" {
-		allocator = createAllocator(router, apiPath, iprangeCIDR, defltSubnet, determineQuorum(peerCount, peers))
+		allocator = createAllocator(router, apiPath, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
 	} else if peerCount > 0 {
-		log.Fatal("-initpeercount flag specified without -iprange or -ipuniverse")
+		log.Fatal("-initpeercount flag specified without -iprange")
 	} else {
 		router.NewGossip("IPallocation", &ipam.DummyAllocator{})
 	}
@@ -197,23 +196,15 @@ func logFrameFunc(debug bool) weave.LogFrameFunc {
 	}
 }
 
-func createAllocator(router *weave.Router, apiPath string, ipUniverse string, defaultSubnet string, quorum uint) *ipam.Allocator {
-	_, universe, err := address.ParseCIDR(ipUniverse)
+func createAllocator(router *weave.Router, apiPath string, ipRangeStr string, defaultSubnetStr string, quorum uint) *ipam.Allocator {
+	allocator, err := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRangeStr, quorum)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if universe.Size() < 4 {
-		log.Fatal("IP allocation range too small")
-	}
-	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, universe, quorum)
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
-	if defaultSubnet != "" {
-		_, subnet, err := address.ParseCIDR(defaultSubnet)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err = allocator.SetDefaultSubnet(subnet); err != nil {
+	if defaultSubnetStr != "" {
+		if err = allocator.SetDefaultSubnet(defaultSubnetStr); err != nil {
 			log.Fatal(err)
 		}
 	}
