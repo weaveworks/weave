@@ -100,6 +100,10 @@ The 'Sniffing traffic' line shows details of the virtual ethernet
 interface that weave is using to receive packets on the local
 machine.
 
+The 'Encryption' line indicates whether
+[encryption](features.html#security) is in use for communication
+between peers.
+
 The 'MACs' section lists all MAC addresses known to this router. These
 identify containers in the weave network, as well as points for
 [host network integration](features.html#host-network-integration). For
