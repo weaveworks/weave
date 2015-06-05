@@ -19,7 +19,10 @@ func main() {
 	var (
 		debug       bool
 		justVersion bool
-		c           proxy.Config
+		c           = proxy.Config{
+			DockerAddr: defaultDockerAddr,
+			ListenAddr: defaultListenAddr,
+		}
 	)
 
 	c.Version = version
@@ -43,14 +46,6 @@ func main() {
 
 	if debug {
 		InitDefaultLogging(true)
-	}
-
-	if c.DockerAddr == "" {
-		c.DockerAddr = defaultDockerAddr
-	}
-
-	if c.ListenAddr == "" {
-		c.ListenAddr = defaultListenAddr
 	}
 
 	p, err := proxy.NewProxy(c)
