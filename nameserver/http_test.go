@@ -42,7 +42,7 @@ func TestHttp(t *testing.T) {
 	srv, _ := NewDNSServer(DNSServerConfig{Zone: zone})
 
 	port := httpListener.Addr().(*net.TCPAddr).Port
-	go ServeHTTP(httpListener, "", srv)
+	go ServeHTTP(httpListener, "", srv, nil)
 
 	// Ask the http server to add our test address into the database
 	addrParts := strings.Split(testAddr1, "/")

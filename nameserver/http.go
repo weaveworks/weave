@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/docker"
 )
 
 func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
@@ -24,7 +25,7 @@ func extractFQDN(r *http.Request) (string, string) {
 	return "*", ""
 }
 
-func ServeHTTP(listener net.Listener, version string, server *DNSServer) {
+func ServeHTTP(listener net.Listener, version string, server *DNSServer, dockerCli *docker.Client) {
 
 	muxRouter := mux.NewRouter()
 
@@ -65,6 +66,20 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer) {
 						"Unexpected error from DB: %s", err)
 					return
 				} // oh, I already know this. whatever.
+			}
+
+			if dockerCli != nil {
+				if !docker.IsContainerID(idStr) {
+					Debug.Printf("[http] '%s' does not seem a container id", idStr)
+					return
+				}
+
+				if running, err := dockerCli.IsContainerRunning(idStr); err != nil {
+					Error.Printf("[http] Could not check container status: %s", err)
+				} else if !running {
+					Info.Printf("[http] '%s' is not running: removing", idStr)
+					server.Zone.DeleteRecords(idStr, name, ip)
+				}
 			}
 		} else {
 			Info.Printf("[http] Ignoring name %s, not in %s", name, domain)
