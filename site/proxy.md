@@ -114,8 +114,8 @@ via the `--dns` option. More details on weaveDNS can be found in the
 
 ## <a name="usage-with-tls"></a>Usage with TLS
 
-If you are using docker with TLS enabled, you probably want to talk to
-the proxy over TLS. Launching the proxy with TLS support is done
+If you are using docker with TLS, you probably want to talk to
+the proxy over TLS. Launching the proxy with TLS is done
 with the same command-line flags as the docker daemon. For example, if
 you have generated your certificates and keys into the docker host's
 `/tls` directory, we can launch the proxy with:
@@ -126,6 +126,14 @@ you have generated your certificates and keys into the docker host's
 The paths to your certificates and key must be provided as absolute
 paths which exist on the docker host.
 
+Because the proxy connects to the docker daemon at
+`unix:///var/run/docker.sock`, you must ensure that the daemon is
+listening there. To do this, you will need to pass the `-H
+unix:///var/run/docker.sock` option when starting the docker daemon, in
+addition to the `-H` options for configuring the TCP listener. See
+[the Docker
+documentation](https://docs.docker.com/articles/basics/#bind-docker-to-another-hostport-or-a-unix-socket) for an example.
+
 With the proxy running over TLS, we can configure our regular docker
 client
 
@@ -134,15 +142,6 @@ client
 
 The certificates and keys used by the client will need to be present
 on your client machine.
-
-Because the proxy connects to the docker daemon at
-`unix:///var/run/docker.sock`, you must ensure that the daemon is
-listening there. To do this, you will need to pass the `-H
-unix:///var/run/docker.sock` option when booting the docker daemon, in
-addition to the `-H` options for configuring the TCP listener. Passing
-multiple `-H` options to the docker daemon is documented on the
-[docker basics
-documentation](https://docs.docker.com/articles/basics/).
 
 More details on generating certificates, and configuring docker with
 TLS can be found in the [docker
