@@ -29,12 +29,13 @@ const (
 type LogFrameFunc func(string, []byte, *layers.Ethernet)
 
 type Config struct {
-	Port      int
-	Iface     *net.Interface
-	Password  []byte
-	ConnLimit int
-	BufSz     int
-	LogFrame  LogFrameFunc
+	Port          int
+	Iface         *net.Interface
+	Password      []byte
+	ConnLimit     int
+	PeerDiscovery bool
+	BufSz         int
+	LogFrame      LogFrameFunc
 }
 
 type Router struct {
@@ -76,7 +77,7 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 	router.Peers = NewPeers(router.Ourself, onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself, router.Peers)
-	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port)
+	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	return router
 }
@@ -116,6 +117,7 @@ func (router *Router) Status() string {
 	var buf bytes.Buffer
 	fmt.Fprintln(&buf, "Our name is", router.Ourself)
 	fmt.Fprintln(&buf, "Encryption", OnOff(router.UsingPassword()))
+	fmt.Fprintln(&buf, "Peer discovery", OnOff(router.PeerDiscovery))
 	fmt.Fprintln(&buf, "Sniffing traffic on", router.Iface)
 	fmt.Fprintf(&buf, "MACs:\n%s", router.Macs)
 	fmt.Fprintf(&buf, "Peers:\n%s", router.Peers)

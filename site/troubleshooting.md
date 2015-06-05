@@ -63,6 +63,7 @@ This produces output like:
 weave router 0.7.0
 Our name is 7a:f4:56:87:76:3b(weave01)
 Encryption off
+Peer discovery on
 Sniffing traffic on &{39 65535 ethwe ae:e3:07:9c:8c:d4 up|broadcast|multicast}
 MACs:
 ba:8c:b9:dc:e1:c9 -> 7a:f4:56:87:76:3b(weave01) (2014-10-23 16:39:19.482338935 +0000 UTC)
@@ -103,6 +104,10 @@ machine.
 The 'Encryption' line indicates whether
 [encryption](features.html#security) is in use for communication
 between peers.
+
+The 'Peer discovery' line indicates whether
+[automatic peer discovery](features.html#dynamic-topologies) is
+enabled (which is the default).
 
 The 'MACs' section lists all MAC addresses known to this router. These
 identify containers in the weave network, as well as points for
