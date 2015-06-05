@@ -18,7 +18,7 @@ start_container $HOST2 $C2/24 --name=c2
 assert_raises "exec_on $HOST1 c1 $PING $C2"
 
 start_container $HOST1 --name=c3
-start_container $HOST2 --name=c4
+start_container $HOST2 --subnet default --name=c4
 C4=$(container_ip $HOST2 c4)
 assert_raises "exec_on $HOST1 c3 $PING $C4"
 

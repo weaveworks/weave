@@ -108,6 +108,12 @@ collect_cidr_args() {
     while is_cidr "$1" || [ "$1" = "--subnet" ] ; do
         CIDR_ARGS="$CIDR_ARGS $1"
         CIDR_COUNT=$((CIDR_COUNT + 1))
+        # only accept 'default' after '--subnet', in case someone has a container called 'default'
+        if [ "$1" = "--subnet" -a "$2" = "default" ] ; then
+            CIDR_ARGS="$CIDR_ARGS $2"
+            CIDR_COUNT=$((CIDR_ARG_COUNT + 1))
+            shift 1
+        fi
         shift 1
     done
 }
@@ -762,7 +768,11 @@ ipam_cidrs() {
         while [ $# -gt 0 ] ; do
             if [ $# -gt 1 -a "$1" = "--subnet" ] ; then
                 shift 1
-                CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID/$1)
+                if [ "$1" = "default" ] ; then
+                    CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID)
+                else
+                    CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID/$1)
+                fi
                 if [ "$CIDR" = "404 page not found" ] ; then
                     echo "IP address allocation must be enabled to use --subnet (use the -iprange option on 'weave launch')" >&2
                     return 1
