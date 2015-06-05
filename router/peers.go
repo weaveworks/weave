@@ -206,9 +206,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 	decodedUpdate = []*Peer{}
 	decodedConns = [][]ConnectionSummary{}
 
-	updateBuf := new(bytes.Buffer)
-	updateBuf.Write(update)
-	decoder := gob.NewDecoder(updateBuf)
+	decoder := gob.NewDecoder(bytes.NewReader(update))
 
 	for {
 		peerSummary, connSummaries, decErr := decodePeer(decoder)
