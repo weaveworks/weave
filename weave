@@ -33,14 +33,14 @@ usage() {
     echo "weave launch-proxy [-D <docker_endpoint>] [-H <address>] [--with-dns] [--with-ipam]"
     echo "weave connect      [--replace] [<peer> ...]"
     echo "weave forget       <peer> ..."
-    echo "weave run          [--with-dns] [<cidr> ...] <docker run args> ..."
-    echo "weave start        [<cidr> ...] <container_id>"
-    echo "weave attach       [<cidr> ...] <container_id>"
-    echo "weave detach       <cidr> [<cidr> ...] <container_id>"
+    echo "weave run          [--with-dns] [[--subnet] <cidr> ...] <docker run args> ..."
+    echo "weave start        [[--subnet] <cidr> ...] <container_id>"
+    echo "weave attach       [[--subnet] <cidr> ...] <container_id>"
+    echo "weave detach       [[--subnet] <cidr> ...] <container_id>"
     echo "weave dns-add      <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
     echo "weave dns-remove   <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
-    echo "weave expose       [<cidr> ...] [-h <fqdn>]"
-    echo "weave hide         [<cidr> ...]"
+    echo "weave expose       [[--subnet] <cidr> ...] [-h <fqdn>]"
+    echo "weave hide         [[--subnet] <cidr> ...]"
     echo "weave ps           [<container_id> ...]"
     echo "weave status"
     echo "weave proxy-env"
@@ -105,7 +105,7 @@ validate_cidr() {
 collect_cidr_args() {
     CIDR_ARGS=""
     CIDR_COUNT=0
-    while is_cidr "$1" ; do
+    while is_cidr "$1" || [ "$1" = "--subnet" ] ; do
         CIDR_ARGS="$CIDR_ARGS $1"
         CIDR_COUNT=$((CIDR_COUNT + 1))
         shift 1
@@ -751,13 +751,35 @@ ipam_claim() {
     done
 }
 
-# If we don't already have any CIDRs passed from the command-line, get
-# one from IPAM. $1 is the full container id.
-get_ipam_cidr() {
-    if [ -n "$CIDR_ARGS" ] ; then
+# Pass all CIDRs to IPAM so that network addresses can be interpreted
+# as subnets to allocate within. $1 is the full container id; following
+# args are previously parsed CIDR_ARGS.
+ipam_cidrs() {
+    CONTAINER_ID="$1"
+    shift 1
+    if [ $# -gt 0 ] ; then
+        CIDR_ARGS=""
+        while [ $# -gt 0 ] ; do
+            if [ $# -gt 1 -a "$1" = "--subnet" ] ; then
+                shift 1
+                # (assuming weave is now listening to /ip URLs all the time)
+                CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID/$1)
+                CIDR_COUNT=$((CIDR_COUNT - 1))
+            else
+                CIDR=$1
+            fi
+            CIDR_ARGS="$CIDR_ARGS $CIDR"
+            shift 1
+        done
         return 0
     fi
-    CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$1)"
+    # If no addresses passed in, get one in the default subnet
+    CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID)"
+    if [ "$CIDR_ARGS" = "No subnet specified" ] ; then
+        echo "No IP address supplied (use the -iprange and -defaultsubnet options on 'weave launch' to enable IP address allocation)" >&2
+        return 1
+    fi
+    # todo: do we still have to handle this error?  Considering above assumption?
     if [ "$CIDR_ARGS" = "404 page not found" ] ; then
         echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
         return 1
@@ -1031,7 +1053,7 @@ case "$COMMAND" in
         shift $CIDR_COUNT
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
         create_bridge
-        get_ipam_cidr $CONTAINER
+        ipam_cidrs $CONTAINER $CIDR_ARGS
         with_container_netns_or_die $CONTAINER attach $CIDR_ARGS
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         echo $CONTAINER
@@ -1051,7 +1073,7 @@ case "$COMMAND" in
         RES=$(docker start $1)
         CONTAINER=$(container_id $1)
         create_bridge
-        get_ipam_cidr $CONTAINER
+        ipam_cidrs $CONTAINER $CIDR_ARGS
         with_container_netns_or_die $CONTAINER attach $CIDR_ARGS
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         echo $RES
@@ -1062,7 +1084,7 @@ case "$COMMAND" in
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         create_bridge
-        get_ipam_cidr $CONTAINER
+        ipam_cidrs $CONTAINER $CIDR_ARGS
         with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
         ;;
@@ -1071,6 +1093,7 @@ case "$COMMAND" in
         shift $CIDR_COUNT
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
+        ipam_cidrs $CONTAINER $CIDR_ARGS
         with_container_netns $CONTAINER detach $CIDR_ARGS >/dev/null
         when_dns_running with_container_fqdn $CONTAINER delete_dns_fqdn $CIDR_ARGS
         ;;
@@ -1101,7 +1124,7 @@ case "$COMMAND" in
     expose)
         collect_cidr_args "$@"
         shift $CIDR_COUNT
-        get_ipam_cidr weave:expose
+        ipam_cidrs weave:expose $CIDR_ARGS
         if [ $# -eq 0 ] ; then
             FQDN=""
         else
@@ -1124,7 +1147,7 @@ case "$COMMAND" in
     hide)
         collect_cidr_args "$@"
         shift $CIDR_COUNT
-        get_ipam_cidr weave:expose
+        ipam_cidrs weave:expose $CIDR_ARGS
         create_bridge --without-ethtool
         for CIDR in $CIDR_ARGS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
