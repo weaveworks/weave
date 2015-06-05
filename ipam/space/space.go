@@ -69,14 +69,6 @@ func (s *Space) Claim(addr address.Address) error {
 	return nil
 }
 
-func (s *Space) NumFreeAddresses() address.Offset {
-	res := address.Offset(0)
-	for i := 0; i < len(s.free); i += 2 {
-		res += address.Subtract(s.free[i+1], s.free[i])
-	}
-	return res
-}
-
 func (s *Space) NumFreeAddressesInRange(start, end address.Address) address.Offset {
 	res := address.Offset(0)
 	for i := 0; i < len(s.free); i += 2 {

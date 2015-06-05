@@ -19,6 +19,16 @@ func ip(s string) address.Address {
 	return addr
 }
 
+// Helper function to avoid 'NumFreeAddressesInRange(start, end)'
+// dozens of times in tests
+func (s *Space) NumFreeAddresses() address.Offset {
+	res := address.Offset(0)
+	for i := 0; i < len(s.free); i += 2 {
+		res += address.Subtract(s.free[i+1], s.free[i])
+	}
+	return res
+}
+
 func TestLowlevel(t *testing.T) {
 	a := []address.Address{}
 	a = add(a, 100, 200)
