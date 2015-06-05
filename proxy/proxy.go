@@ -119,16 +119,8 @@ func (proxy *Proxy) Status() string {
 	default:
 		fmt.Fprintln(&buf, "TLS off")
 	}
-	if proxy.WithDNS {
-		fmt.Fprintln(&buf, "DNS on")
-	} else {
-		fmt.Fprintln(&buf, "DNS off")
-	}
-	if proxy.WithIPAM {
-		fmt.Fprintln(&buf, "IPAM on")
-	} else {
-		fmt.Fprintln(&buf, "IPAM off")
-	}
+	fmt.Fprintln(&buf, "DNS", OnOff(proxy.WithDNS))
+	fmt.Fprintln(&buf, "IPAM", OnOff(proxy.WithIPAM))
 	return buf.String()
 }
 
