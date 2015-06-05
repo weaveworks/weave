@@ -20,6 +20,7 @@ type ConnectionMaker struct {
 	ourself     *LocalPeer
 	peers       *Peers
 	port        int
+	discovery   bool
 	targets     map[string]*Target
 	directPeers peerAddrs
 	actionChan  chan<- ConnectionMakerAction
@@ -35,11 +36,12 @@ type Target struct {
 
 type ConnectionMakerAction func() bool
 
-func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int) *ConnectionMaker {
+func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int, discovery bool) *ConnectionMaker {
 	return &ConnectionMaker{
 		ourself:     ourself,
 		peers:       peers,
 		port:        port,
+		discovery:   discovery,
 		directPeers: peerAddrs{},
 		targets:     make(map[string]*Target)}
 }
@@ -217,7 +219,9 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 
 	// Add targets for peers that someone else is connected to, but we
 	// aren't
-	cm.addPeerTargets(ourConnectedPeers, addTarget)
+	if cm.discovery {
+		cm.addPeerTargets(ourConnectedPeers, addTarget)
+	}
 
 	return cm.connectToTargets(validTarget, directTarget)
 }

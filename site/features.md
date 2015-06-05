@@ -377,6 +377,11 @@ and the new hosts will be added, when one runs
 
     host# weave connect --replace $NEW_HOST1 $NEW_HOST2
 
+For complete control over the peer topology, automatic discovery can
+be disabled with the `-nodiscovery` option to `weave launch`. In this
+mode, weave will only connect to the addresses specified at launch
+time and with `weave connect`.
+
 ### <a name="container-mobility"></a>Container mobility
 
 Containers can be moved between hosts without requiring any

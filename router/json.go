@@ -8,16 +8,17 @@ import (
 
 func (router *Router) StatusJSON(version string) ([]byte, error) {
 	return json.Marshal(struct {
-		Version    string
-		Encryption bool
-		Name       string
-		NickName   string
-		Interface  string
-		Macs       *MacCache
-		Peers      *Peers
-		Routes     *Routes
+		Version       string
+		Encryption    bool
+		PeerDiscovery bool
+		Name          string
+		NickName      string
+		Interface     string
+		Macs          *MacCache
+		Peers         *Peers
+		Routes        *Routes
 		ConnectionMakerStatus
-	}{version, router.UsingPassword(), router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes, router.ConnectionMaker.Status()})
+	}{version, router.UsingPassword(), router.PeerDiscovery, router.Ourself.Name.String(), router.Ourself.NickName, fmt.Sprintf("%v", router.Iface), router.Macs, router.Peers, router.Routes, router.ConnectionMaker.Status()})
 }
 
 func (cache *MacCache) MarshalJSON() ([]byte, error) {

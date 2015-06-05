@@ -48,6 +48,7 @@ func main() {
 		pktdebug    bool
 		prof        string
 		bufSzMB     int
+		noDiscovery bool
 		httpAddr    string
 		iprangeCIDR string
 		peerCount   int
@@ -66,6 +67,7 @@ func main() {
 	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
 	flag.IntVar(&config.ConnLimit, "connlimit", 30, "connection limit (0 for unlimited)")
+	flag.BoolVar(&noDiscovery, "nodiscovery", false, "disable peer discovery")
 	flag.IntVar(&bufSzMB, "bufsz", 8, "capture buffer size in MB")
 	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	flag.StringVar(&iprangeCIDR, "iprange", "", "IP address range to allocate within, in CIDR notation")
@@ -129,6 +131,7 @@ func main() {
 
 	config.BufSz = bufSzMB * 1024 * 1024
 	config.LogFrame = logFrameFunc(pktdebug)
+	config.PeerDiscovery = !noDiscovery
 
 	router := weave.NewRouter(config, name, nickName)
 	log.Println("Our name is", router.Ourself)
