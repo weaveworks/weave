@@ -930,12 +930,12 @@ case "$COMMAND" in
         proxy_args "$@"
         PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
             -p $PROXY_PORT:$PROXY_PORT/tcp \
-            -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/hostproc \
-            -e PROCFS=/hostproc \
             $PROXY_VOLUMES \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /proc:/hostproc \
+            -e PROCFS=/hostproc \
             --entrypoint=/home/weave/weaveproxy \
             $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $PROXY_ARGS)
-
         wait_for_status_ip $PROXY_CONTAINER_NAME 127.0.0.1 $PROXY_PORT
         echo $PROXY_CONTAINER
         ;;
