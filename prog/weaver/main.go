@@ -47,12 +47,12 @@ func main() {
 		debug       bool
 		pktdebug    bool
 		prof        string
-		peers       []string
 		bufSzMB     int
 		httpAddr    string
 		iprangeCIDR string
 		peerCount   int
 		apiPath     string
+		peers       []string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
