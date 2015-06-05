@@ -47,3 +47,4 @@ prog/weaveexec/weavewait
 prog/weaveexec/sigproxy
 prog/weaveexec/docker*.tgz
 Vagrantfile.local
+test/tls/*.pem

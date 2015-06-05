@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,6 +14,12 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
+const (
+	defaultCaFile   = "ca.pem"
+	defaultKeyFile  = "key.pem"
+	defaultCertFile = "cert.pem"
+)
+
 var (
 	containerCreateRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
 	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
@@ -20,31 +27,24 @@ var (
 )
 
 type Proxy struct {
-	Dial           func() (net.Conn, error)
-	version        string
+	Config
+
+	dial           func() (net.Conn, error)
 	client         *docker.Client
-	dockerAddr     string
-	listenAddr     string
-	withDNS        bool
 	dockerBridgeIP string
-	withIPAM       bool
 }
 
-func NewProxy(version, dockerAddr, listenAddr string, withDNS, withIPAM bool) (*Proxy, error) {
-	u, err := url.Parse(dockerAddr)
-	if err != nil {
-		return nil, err
-	}
+type Config struct {
+	DockerAddr string
+	ListenAddr string
+	TLSConfig  TLSConfig
+	Version    string
+	WithDNS    bool
+	WithIPAM   bool
+}
 
-	var dockerBridgeIP []byte
-	if withDNS {
-		dockerBridgeIP, err = callWeave("docker-bridge-ip")
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	client, err := docker.NewClient(dockerAddr)
+func NewProxy(c Config) (*Proxy, error) {
+	u, err := url.Parse(c.DockerAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -57,18 +57,31 @@ func NewProxy(version, dockerAddr, listenAddr string, withDNS, withIPAM bool) (*
 		targetAddr = u.Path
 	}
 
-	return &Proxy{
-		Dial: func() (net.Conn, error) {
+	p := &Proxy{
+		Config: c,
+		dial: func() (net.Conn, error) {
 			return net.Dial(u.Scheme, targetAddr)
 		},
-		version:        version,
-		client:         client,
-		dockerAddr:     dockerAddr,
-		listenAddr:     listenAddr,
-		withDNS:        withDNS,
-		dockerBridgeIP: string(dockerBridgeIP),
-		withIPAM:       withIPAM,
-	}, nil
+	}
+
+	if p.WithDNS {
+		dockerBridgeIP, err := callWeave("docker-bridge-ip")
+		if err != nil {
+			return nil, err
+		}
+		p.dockerBridgeIP = string(dockerBridgeIP)
+	}
+
+	if err := p.TLSConfig.loadCerts(); err != nil {
+		Error.Fatalf("Could not configure tls for proxy: %s", err)
+	}
+
+	p.client, err = docker.NewClient(p.DockerAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -76,13 +89,13 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	switch {
 	case containerCreateRegexp.MatchString(path):
-		proxy.serveWithInterceptor(&createContainerInterceptor{proxy.client, proxy.withDNS, proxy.dockerBridgeIP, proxy.withIPAM}, w, r)
+		proxy.serveWithInterceptor(&createContainerInterceptor{proxy.client, proxy.WithDNS, proxy.dockerBridgeIP, proxy.WithIPAM}, w, r)
 	case containerStartRegexp.MatchString(path):
-		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.withDNS, proxy.withIPAM}, w, r)
+		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.WithDNS, proxy.WithIPAM}, w, r)
 	case execCreateRegexp.MatchString(path):
-		proxy.serveWithInterceptor(&createExecInterceptor{proxy.client, proxy.withIPAM}, w, r)
+		proxy.serveWithInterceptor(&createExecInterceptor{proxy.client, proxy.WithIPAM}, w, r)
 	case strings.HasPrefix(path, "/status"):
-		fmt.Fprintln(w, "weave proxy", proxy.version)
+		fmt.Fprintln(w, "weave proxy", proxy.Version)
 		fmt.Fprintln(w, proxy.Status())
 	default:
 		proxy.serveWithInterceptor(&nullInterceptor{}, w, r)
@@ -90,20 +103,28 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (proxy *Proxy) serveWithInterceptor(i interceptor, w http.ResponseWriter, r *http.Request) {
-	newClient(proxy.Dial, i).ServeHTTP(w, r)
+	newClient(proxy.dial, i).ServeHTTP(w, r)
 }
 
 // Return status string
 func (proxy *Proxy) Status() string {
 	var buf bytes.Buffer
-	fmt.Fprintln(&buf, "Listen address is", proxy.listenAddr)
-	fmt.Fprintln(&buf, "Docker address is", proxy.dockerAddr)
-	if proxy.withDNS {
+	fmt.Fprintln(&buf, "Listen address is", proxy.ListenAddr)
+	fmt.Fprintln(&buf, "Docker address is", proxy.DockerAddr)
+	switch {
+	case proxy.TLSConfig.Verify:
+		fmt.Fprintln(&buf, "TLS verify")
+	case proxy.TLSConfig.Enabled:
+		fmt.Fprintln(&buf, "TLS on")
+	default:
+		fmt.Fprintln(&buf, "TLS off")
+	}
+	if proxy.WithDNS {
 		fmt.Fprintln(&buf, "DNS on")
 	} else {
 		fmt.Fprintln(&buf, "DNS off")
 	}
-	if proxy.withIPAM {
+	if proxy.WithIPAM {
 		fmt.Fprintln(&buf, "IPAM on")
 	} else {
 		fmt.Fprintln(&buf, "IPAM off")
@@ -112,8 +133,18 @@ func (proxy *Proxy) Status() string {
 }
 
 func (proxy *Proxy) ListenAndServe() error {
-	return (&http.Server{
-		Addr:    proxy.listenAddr,
-		Handler: proxy,
-	}).ListenAndServe()
+	listener, err := net.Listen("tcp", proxy.ListenAddr)
+	if err != nil {
+		return err
+	}
+
+	if proxy.TLSConfig.enabled() {
+		listener = tls.NewListener(listener, proxy.TLSConfig.Config)
+		Info.Println("TLS Enabled")
+	}
+
+	Info.Printf("Listening on %s", proxy.ListenAddr)
+	Info.Printf("Proxying %s", proxy.DockerAddr)
+
+	return (&http.Server{Handler: proxy}).Serve(listener)
 }

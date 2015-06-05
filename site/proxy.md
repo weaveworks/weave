@@ -5,6 +5,16 @@ layout: default
 
 # Weave Proxy
 
+ * [Advantages](#advantages)
+ * [Setup](#setup)
+ * [Usage](#usage)
+ * [Usage with IPAM](#usage-with-ipam)
+ * [Usage with WeaveDNS](#usage-with-weavedns)
+ * [Usage with TLS](#usage-with-tls)
+ * [Limitations](#limitations)
+
+## <a name="advantages"></a>Advantages
+
 Instead of the `weave` command-line utility, you may prefer to use the
 standard [Docker command-line
 interface](https://docs.docker.com/reference/commandline/cli/), or the
@@ -20,7 +30,7 @@ starting a container's application process. Furthermore, containers
 can be started in foreground mode, and can be automatically removed
 (with the ususal `--rm`).
 
-## Setup
+## <a name="setup"></a>Setup
 
 Start the proxy with
 
@@ -35,7 +45,7 @@ your `DOCKER_HOST`.
     host1$ export DOCKER_HOST=tcp://host1:12375
     host1$ docker ps
 
-## Usage
+## <a name="usage"></a>Usage
 
 When containers are created via the weave proxy, their entrypoint will
 be modified to wait for the weave network interface to become
@@ -56,7 +66,7 @@ Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
 `WEAVE_CIDR="10.2.1.1/24 10.2.2.1/24"`.
 
-## Usage with IPAM
+## <a name="usage-with-ipam"></a>Usage with IPAM
 
 To automatically assign a unique IP address to a container, weave must
 be told on startup what range of addresses to allocate from. For
@@ -86,7 +96,7 @@ and attached to the weave network when we start them. For example:
 More details on IPAM can be found in the [IPAM
 documentation](ipam.html).
 
-## Usage with WeaveDNS
+## <a name="usage-with-weavedns"></a>Usage with WeaveDNS
 
 Containers started via the proxy can be automatically configured to
 use WeaveDNS for name resolution. To accomplish this we need to launch
@@ -102,7 +112,41 @@ resolution. WeaveDNS is used in addition to any dns servers specified
 via the `--dns` option. More details on weaveDNS can be found in the
 [weaveDNS documentation](weavedns.html).
 
-## Limitations
+## <a name="usage-with-tls"></a>Usage with TLS
 
-* The proxy does not currently support TLS.
+If you are using docker with TLS, you probably want to talk to
+the proxy over TLS. Launching the proxy with TLS is done
+with the same command-line flags as the docker daemon. For example, if
+you have generated your certificates and keys into the docker host's
+`/tls` directory, we can launch the proxy with:
+
+    host1$ weave launch-proxy --tlsverify --tlscacert=/tls/ca.pem \
+             --tlscert=/tls/server-cert.pem --tlskey=/tls/server-key.pem
+
+The paths to your certificates and key must be provided as absolute
+paths which exist on the docker host.
+
+Because the proxy connects to the docker daemon at
+`unix:///var/run/docker.sock`, you must ensure that the daemon is
+listening there. To do this, you will need to pass the `-H
+unix:///var/run/docker.sock` option when starting the docker daemon, in
+addition to the `-H` options for configuring the TCP listener. See
+[the Docker
+documentation](https://docs.docker.com/articles/basics/#bind-docker-to-another-hostport-or-a-unix-socket) for an example.
+
+With the proxy running over TLS, we can configure our regular docker
+client
+
+    host1$ docker --tlsverify --tlscacert=ca.pem --tlscert=cert.pem \
+             --tlskey=key.pem -H=tcp://host1:12375 version
+
+The certificates and keys used by the client will need to be present
+on your client machine.
+
+More details on generating certificates, and configuring docker with
+TLS can be found in the [docker
+documentation](https://docs.docker.com/articles/https/).
+
+## <a name="limitations"></a>Limitations
+
 * If you have a firewall, you will need to make sure port 12375 is open.
