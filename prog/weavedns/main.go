@@ -8,7 +8,7 @@ import (
 
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/updater"
+	"github.com/weaveworks/weave/common/docker"
 	weavedns "github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 )
@@ -18,6 +18,7 @@ var version = "(unreleased version)"
 func main() {
 	var (
 		justVersion     bool
+		dockerCli       *docker.Client
 		ifaceName       string
 		apiPath         string
 		domain          string
@@ -95,14 +96,18 @@ func main() {
 	if err != nil {
 		Error.Fatal("[main] Unable to initialize the Zone database", err)
 	}
-	err = zone.Start()
-	if err != nil {
+	if err := zone.Start(); err != nil {
 		Error.Fatal("[main] Unable to start the Zone database", err)
 	}
 	defer zone.Stop()
 
+	dockerCli, err = docker.NewClient(apiPath)
+	if err != nil {
+		Error.Fatal("[main] Unable to start docker client", err)
+	}
+
 	if watch {
-		err := updater.Start(apiPath, zone)
+		err := dockerCli.AddObserver(zone)
 		if err != nil {
 			Error.Fatal("[main] Unable to start watcher", err)
 		}

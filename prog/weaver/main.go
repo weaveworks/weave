@@ -15,7 +15,7 @@ import (
 	"github.com/davecheney/profile"
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/updater"
+	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/ipam/address"
 	weavenet "github.com/weaveworks/weave/net"
@@ -222,10 +222,15 @@ func createAllocator(router *weave.Router, apiPath string, ipRangeStr string, de
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
-	err := updater.Start(apiPath, allocator)
+
+	dockerCli, err := docker.NewClient(apiPath)
 	if err != nil {
-		log.Fatal("Unable to start watcher", err)
+		Error.Fatal("Unable to start docker client", err)
 	}
+	if err = dockerCli.AddObserver(allocator); err != nil {
+		Error.Fatal("Unable to start watcher", err)
+	}
+
 	return allocator, defaultSubnet
 }
 
