@@ -111,6 +111,14 @@ func (proxy *Proxy) Status() string {
 	var buf bytes.Buffer
 	fmt.Fprintln(&buf, "Listen address is", proxy.ListenAddr)
 	fmt.Fprintln(&buf, "Docker address is", proxy.DockerAddr)
+	switch {
+	case proxy.TLSConfig.Verify:
+		fmt.Fprintln(&buf, "TLS verify")
+	case proxy.TLSConfig.Enabled:
+		fmt.Fprintln(&buf, "TLS on")
+	default:
+		fmt.Fprintln(&buf, "TLS off")
+	}
 	if proxy.WithDNS {
 		fmt.Fprintln(&buf, "DNS on")
 	} else {
