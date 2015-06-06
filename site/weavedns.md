@@ -287,7 +287,8 @@ The command
 
     weave status
 
-reports on the current status of the weave router and DNS:
+reports on the current status of various weave components, including
+DNS:
 
 ````
 weave router git-8f675f15c0b5
@@ -314,7 +315,13 @@ The second section is pertinent to weaveDNS, and includes:
 * The address on which the DNS server is listening
 * The interface being used for multicast DNS
 * The fallback DNS which will be used to resolve non local names
-* The names known to the local weaveDNS server. Each entry comprises the container ID, IP address and its fully qualified domain name
+* The names known to the local weaveDNS server. Each entry comprises
+  the container ID, IP address and its fully qualified domain name
+
+Information on the processing of queries, and the general operation of
+weaveDNS, can be obtained from the container logs with
+
+    docker logs weavedns
 
 ## <a name="limitations"></a>Present limitations
 
