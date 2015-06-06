@@ -9,7 +9,8 @@ layout: default
  * [Setup](#setup)
  * [Usage](#usage)
  * [Automatic IP address assignment](#ipam)
- * [Usage with WeaveDNS](#usage-with-weavedns)
+ * [Automatic discovery](#dns)
+ * [Multi-host example](#multi-host)
  * [Usage with TLS](#usage-with-tls)
 
 ## <a name="advantages"></a>Advantages
@@ -100,21 +101,55 @@ gets attached to the weave network with an automatically assigned IP
 address. Containers started with a `WEAVE_CIDR` environment variable
 are handled as before.
 
-## <a name="usage-with-weavedns"></a>Usage with WeaveDNS
+## <a name="dns"></a>Automatic discovery
 
-Containers started via the proxy can be automatically configured to
-use WeaveDNS for name resolution. To accomplish this we need to launch
-the proxy with the `--with-dns` option
+Containers started via the proxy are automatically registered in
+[weaveDNS](weavedns.html) if they have a hostname in the weaveDNS
+domain (usually `.weave.local`). In order for containers to be able to
+look up such names, their DNS resolver needs to be configured to point
+at weaveDNS. This can be done [manually](weavedns.html#without-run),
+or automatically by the proxy by launching it with the `--with-dns`
+option, i.e.
 
-    host1$ weave launch
-    host1$ weave launch-dns 10.2.254.1/24
     host1$ weave launch-proxy --with-dns
 
-With this done, any containers connected via IPAM or `WEAVE_CIDR=...`,
-which are launched through the proxy will use weaveDNS for name
-resolution. WeaveDNS is used in addition to any dns servers specified
-via the `--dns` option. More details on weaveDNS can be found in the
-[weaveDNS documentation](weavedns.html).
+Now any containers started via the proxy, and with a `WEAVE_CIDR=...`
+environment variable (or even without it, if IPAM is
+[configured](#ipam)), will use weaveDNS for name resolution.
+
+## <a name="multi-host"></a>Multi-host example
+
+Here's a complete example of using weave proxies configured with
+[automatic IP address assignment](#ipam) and
+[automatic discovery](#dns) to start containers on two hosts such that
+they can reach each other by name.
+
+First, let us start weave, weaveDNS and the proxy, and set DOCKER_HOST
+to point at the latter:
+
+    host1$ weave launch -iprange 10.2.3.0/24
+    host1$ weave launch-dns 10.2.4.1/24
+    host1$ weave launch-proxy --with-ipam --with-dns
+    host1$ export DOCKER_HOST=localhost:12375
+
+    host2$ weave launch -iprange 10.2.3.0/24 host1
+    host2$ weave launch-dns 10.2.4.2/24
+    host2$ weave launch-proxy --with-ipam --with-dns
+    host2$ export DOCKER_HOST=localhost:12375
+
+NB: Note that the two weaveDNS instances must be given unique IPs, on
+a subnet different from that used for IP allocation.
+
+Now let us start a couple of containers, and ping one from the other,
+by name.
+
+    host1$ docker run -h pingme.weave.local -dti ubuntu
+
+    host2$ docker run -h pinger.weave.local  -ti ubuntu
+    root@pinger:/# ping pingme
+    PING pingme.weave.local (10.2.3.1) 56(84) bytes of data.
+    64 bytes from pingme.weave.local (10.2.3.1): icmp_seq=1 ttl=64 time=0.047 ms
+    ...
 
 ## <a name="usage-with-tls"></a>Usage with TLS
 
