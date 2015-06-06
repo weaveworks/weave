@@ -42,7 +42,7 @@ can adjust the connection to docker via the `-H` argument. All docker
 commands can be run via the proxy, so it is safe to globally adjust
 your `DOCKER_HOST`, e.g.
 
-    host1$ export DOCKER_HOST=localhost:12375
+    host1$ export DOCKER_HOST=tcp://localhost:12375
     host1$ docker ps
     ...
 
@@ -130,12 +130,12 @@ to point at the latter:
     host1$ weave launch -iprange 10.2.3.0/24
     host1$ weave launch-dns 10.2.4.1/24
     host1$ weave launch-proxy --with-ipam --with-dns
-    host1$ export DOCKER_HOST=localhost:12375
+    host1$ export DOCKER_HOST=tcp://localhost:12375
 
     host2$ weave launch -iprange 10.2.3.0/24 host1
     host2$ weave launch-dns 10.2.4.2/24
     host2$ weave launch-proxy --with-ipam --with-dns
-    host2$ export DOCKER_HOST=localhost:12375
+    host2$ export DOCKER_HOST=tcp://localhost:12375
 
 NB: Note that the two weaveDNS instances must be given unique IPs, on
 a subnet different from that used for IP allocation.
