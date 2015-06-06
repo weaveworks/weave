@@ -11,7 +11,7 @@ layout: default
  * [Automatic IP address assignment](#ipam)
  * [Automatic discovery](#dns)
  * [Multi-host example](#multi-host)
- * [Usage with TLS](#usage-with-tls)
+ * [Securing the docker communication with TLS](#tls)
 
 ## <a name="advantages"></a>Advantages
 
@@ -151,13 +151,15 @@ by name.
     64 bytes from pingme.weave.local (10.2.3.1): icmp_seq=1 ttl=64 time=0.047 ms
     ...
 
-## <a name="usage-with-tls"></a>Usage with TLS
+## <a name="tls"></a>Securing the docker communication with TLS
 
-If you are using docker with TLS, you probably want to talk to
-the proxy over TLS. Launching the proxy with TLS is done
-with the same command-line flags as the docker daemon. For example, if
-you have generated your certificates and keys into the docker host's
-`/tls` directory, we can launch the proxy with:
+If you are
+[connecting to the docker daemon with TLS](https://docs.docker.com/articles/https/),
+you will probably want to do the same when connecting to the
+proxy. That is accomplished by launching the proxy with the same
+TLS-related command-line flags as supplied to the docker daemon. For
+example, if you have generated your certificates and keys into the
+docker host's `/tls` directory, we can launch the proxy with:
 
     host1$ weave launch-proxy --tlsverify --tlscacert=/tls/ca.pem \
              --tlscert=/tls/server-cert.pem --tlskey=/tls/server-key.pem
@@ -167,21 +169,29 @@ paths which exist on the docker host.
 
 Because the proxy connects to the docker daemon at
 `unix:///var/run/docker.sock`, you must ensure that the daemon is
-listening there. To do this, you will need to pass the `-H
+listening there. To do this, you need to pass the `-H
 unix:///var/run/docker.sock` option when starting the docker daemon,
 in addition to the `-H` options for configuring the TCP listener. See
 [the Docker documentation](https://docs.docker.com/articles/basics/#bind-docker-to-another-hostport-or-a-unix-socket)
 for an example.
 
 With the proxy running over TLS, we can configure our regular docker
-client
+client to use TLS on a per-invocation basis with
 
-    host1$ docker --tlsverify --tlscacert=ca.pem --tlscert=cert.pem \
-             --tlskey=key.pem -H=tcp://host1:12375 version
+    $ docker --tlsverify --tlscacert=ca.pem --tlscert=cert.pem \
+         --tlskey=key.pem -H=tcp://host1:12375 version
+    ...
 
-The certificates and keys used by the client will need to be present
-on your client machine.
+or,
+[by default](https://docs.docker.com/articles/https/#secure-by-default),
+with
 
-More details on generating certificates, and configuring docker with
-TLS can be found in the [docker
-documentation](https://docs.docker.com/articles/https/).
+    $ mkdir -pv ~/.docker
+    $ cp -v {ca,cert,key}.pem ~/.docker
+    $ export DOCKER_HOST=tcp://host1:12375 DOCKER_TLS_VERIFY=1
+    $ docker version
+    ...
+
+which is exactly the same configuration as when connecting to the
+docker daemon directly, except that the specified port is the weave
+proxy port.
