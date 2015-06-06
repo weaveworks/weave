@@ -5,7 +5,13 @@ layout: default
 
 # Weave Proxy
 
- * [Advantages](#advantages)
+The proxy automatically attaches containers to the weave network when
+they are started using the ordinary Docker
+[command-line interface](https://docs.docker.com/reference/commandline/cli/)
+or
+[remote API](https://docs.docker.com/reference/api/docker_remote_api/),
+instead of `weave run`.
+
  * [Setup](#setup)
  * [Usage](#usage)
  * [Automatic IP address assignment](#ipam)
@@ -13,34 +19,22 @@ layout: default
  * [Multi-host example](#multi-host)
  * [Securing the docker communication with TLS](#tls)
 
-## <a name="advantages"></a>Advantages
-
-Instead of the `weave` command-line utility, you may prefer to use the
-standard [Docker command-line
-interface](https://docs.docker.com/reference/commandline/cli/), or the
-[Docker remote
-API](https://docs.docker.com/reference/api/docker_remote_api/). The
-weave proxy sits between the `docker` command or API and the Docker
-daemon, so that it can automatically attach containers to the weave
-network.
-
-Using the proxy brings some additional benefits over `weave run`. The
-proxy ensures that the weave network interface is available before
-starting a container's application process. Furthermore, containers
-can be started in foreground mode, and can be automatically removed
-(with the ususal `--rm`).
-
 ## <a name="setup"></a>Setup
 
-Start the proxy with
+The proxy sits between the Docker client (command line or API) and the
+Docker daemon, intercepting the communication between the two.
+
+To start the proxy, run
 
     host1$ weave launch-proxy
 
-By default, the proxy will connect to docker at
-`unix:///var/run/docker.sock`, and listen on port 12375. However, we
-can adjust the connection to docker via the `-H` argument. All docker
-commands can be run via the proxy, so it is safe to globally adjust
-your `DOCKER_HOST`, e.g.
+By default, the proxy listens on port 12375, on all network
+interfaces. This can be adjusted with the `-H` argument, e.g.
+
+    host1$ weave launch-proxy -H tcp://localhost:12375
+
+All docker commands can be run via the proxy, so it is safe to
+globally adjust your `DOCKER_HOST`, e.g.
 
     host1$ export DOCKER_HOST=tcp://localhost:12375
     host1$ docker ps
@@ -71,6 +65,12 @@ or, equivalently with
 Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
 `WEAVE_CIDR="10.2.1.1/24 10.2.2.1/24"`.
+
+Using the proxy brings some additional benefits over `weave run`. The
+proxy ensures that the weave network interface is available before
+starting a container's application process. Furthermore, containers
+can be started in foreground mode, and can be automatically removed
+(with the ususal `--rm`).
 
 ## <a name="ipam"></a>Automatic IP address assignment
 
