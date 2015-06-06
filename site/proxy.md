@@ -8,7 +8,7 @@ layout: default
  * [Advantages](#advantages)
  * [Setup](#setup)
  * [Usage](#usage)
- * [Usage with IPAM](#usage-with-ipam)
+ * [Automatic IP address assignment](#ipam)
  * [Usage with WeaveDNS](#usage-with-weavedns)
  * [Usage with TLS](#usage-with-tls)
  * [Limitations](#limitations)
@@ -66,35 +66,34 @@ Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
 `WEAVE_CIDR="10.2.1.1/24 10.2.2.1/24"`.
 
-## <a name="usage-with-ipam"></a>Usage with IPAM
+## <a name="ipam"></a>Automatic IP address assignment
 
-To automatically assign a unique IP address to a container, weave must
-be told on startup what range of addresses to allocate from. For
-example:
+If [automatic IP address assignment](ipam.html) is enabled in weave,
+e.g. by launching it with
 
     host1# weave launch -iprange 10.2.3.0/24
-    host1$ weave launch-proxy
-    host1$ export DOCKER_HOST=tcp://host1:12375
 
-With this done, we can automatically assign an address to a container
-by providing a blank `WEAVE_CIDR` value, as in
+then containers started via the proxy can be automatically assigned an
+IP address by providing a blank `WEAVE_CIDR` environment variable, as
+in
 
     host1$ docker run -e WEAVE_CIDR= -ti ubuntu /bin/sh
 
-Alternatively, to enable automatic allocation of all containers
-without a `WEAVE_CIDR`, we can launch the proxy with the `--with-ipam`
-option. For example:
+Furthermore, it is possible to configure the proxy such that all
+containers started via it are automatically assigned an IP address and
+attached to weave network, *without having to specify any special
+environment variables or other options*. To do this we launch the
+proxy with the `--with-ipam` option, e.g.
 
     host1$ weave launch-proxy --with-ipam
-    host1$ export DOCKER_HOST=tcp://host1:12375
 
-Now, containers will always be automatically assigned an IP address
-and attached to the weave network when we start them. For example:
+Now any container started normally, e.g.
 
     host1$ docker run -ti ubuntu /bin/sh
 
-More details on IPAM can be found in the [IPAM
-documentation](ipam.html).
+gets attached to the weave network with an automatically assigned IP
+address. Containers started with a `WEAVE_CIDR` environment variable
+are handled as before.
 
 ## <a name="usage-with-weavedns"></a>Usage with WeaveDNS
 
