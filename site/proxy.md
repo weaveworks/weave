@@ -93,7 +93,7 @@ proxy with the `--with-ipam` option, e.g.
 
     host1$ weave launch-proxy --with-ipam
 
-Now any container started normally, e.g.
+Now any container started via the proxy, e.g. with
 
     host1$ docker run -ti ubuntu
 
