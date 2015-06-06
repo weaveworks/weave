@@ -60,11 +60,11 @@ and networks specified in the `WEAVE_CIDR` environment variable will
 be attached. We can create and start a container via the weave proxy
 with
 
-    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu /bin/sh
+    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
 
 or, equivalently with
 
-    host1$ docker create -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu /bin/sh
+    host1$ docker create -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
     5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
     host1$ docker start 5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
 
@@ -83,7 +83,7 @@ then containers started via the proxy can be automatically assigned an
 IP address by providing a blank `WEAVE_CIDR` environment variable, as
 in
 
-    host1$ docker run -e WEAVE_CIDR= -ti ubuntu /bin/sh
+    host1$ docker run -e WEAVE_CIDR= -ti ubuntu
 
 Furthermore, it is possible to configure the proxy such that all
 containers started via it are automatically assigned an IP address and
@@ -95,7 +95,7 @@ proxy with the `--with-ipam` option, e.g.
 
 Now any container started normally, e.g.
 
-    host1$ docker run -ti ubuntu /bin/sh
+    host1$ docker run -ti ubuntu
 
 gets attached to the weave network with an automatically assigned IP
 address. Containers started with a `WEAVE_CIDR` environment variable
