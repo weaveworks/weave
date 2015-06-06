@@ -11,7 +11,6 @@ layout: default
  * [Automatic IP address assignment](#ipam)
  * [Usage with WeaveDNS](#usage-with-weavedns)
  * [Usage with TLS](#usage-with-tls)
- * [Limitations](#limitations)
 
 ## <a name="advantages"></a>Advantages
 
@@ -151,7 +150,3 @@ on your client machine.
 More details on generating certificates, and configuring docker with
 TLS can be found in the [docker
 documentation](https://docs.docker.com/articles/https/).
-
-## <a name="limitations"></a>Limitations
-
-* If you have a firewall, you will need to make sure port 12375 is open.
