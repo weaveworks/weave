@@ -77,7 +77,7 @@ variable by space-separating them, as in
 If [automatic IP address assignment](ipam.html) is enabled in weave,
 e.g. by launching it with
 
-    host1# weave launch -iprange 10.2.3.0/24
+    host1$ weave launch -iprange 10.2.3.0/24
 
 then containers started via the proxy can be automatically assigned an
 IP address by providing a blank `WEAVE_CIDR` environment variable, as
