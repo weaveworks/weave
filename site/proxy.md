@@ -40,10 +40,16 @@ By default, the proxy will connect to docker at
 `unix:///var/run/docker.sock`, and listen on port 12375. However, we
 can adjust the connection to docker via the `-H` argument. All docker
 commands can be run via the proxy, so it is safe to globally adjust
-your `DOCKER_HOST`.
+your `DOCKER_HOST`, e.g.
 
-    host1$ export DOCKER_HOST=tcp://host1:12375
+    host1$ export DOCKER_HOST=localhost:12375
     host1$ docker ps
+    ...
+
+If you are working with a remote docker daemon, then `localhost` in
+the above needs to be replaced with the docker daemon host, and any
+firewalls inbetween need to be configured to permit access to
+port 12375.
 
 ## <a name="usage"></a>Usage
 
