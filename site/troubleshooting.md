@@ -139,9 +139,10 @@ not currently connected to.  Each line contains some information about
 what went wrong the last time; whether it is attempting to connect or
 is waiting for a while before connecting again.
 
-There may also be further sections for
-[IP allocator](ipam.html#troubleshooting) and
-[weaveDNS](weavedns.html#troubleshooting).
+There may also be further sections for the
+[IP address allocator](ipam.html#troubleshooting),
+[weaveDNS](weavedns.html#troubleshooting), and
+[proxy](proxy.html#troubleshooting).
 
 ### <a name="list-attached-containers"></a>List attached containers
 

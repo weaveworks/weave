@@ -18,6 +18,7 @@ instead of `weave run`.
  * [Automatic discovery](#dns)
  * [Multi-host example](#multi-host)
  * [Securing the docker communication with TLS](#tls)
+ * [Troubleshooting](#troubleshooting)
 
 ## <a name="setup"></a>Setup
 
@@ -195,3 +196,28 @@ with
 which is exactly the same configuration as when connecting to the
 docker daemon directly, except that the specified port is the weave
 proxy port.
+
+## <a name="troubleshooting"></a>Troubleshooting
+
+The command
+
+    weave status
+
+reports on the current status of various weave components, including
+the proxy:
+
+````
+...
+weave proxy git-03ede29e7ee4
+Listen address is :12375
+Docker address is unix:///var/run/docker.sock
+TLS off
+DNS off
+IPAM off
+````
+
+Information on the operation of the proxy can be obtained from the
+weaveproxy container logs with
+
+    docker logs weaveproxy
+
