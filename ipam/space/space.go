@@ -37,26 +37,46 @@ func (s *Space) Clear() {
 	s.ours = s.ours[:0]
 }
 
-func (s *Space) Allocate(rangeStart, rangeEnd address.Address) (bool, address.Address) {
-	// Need to walk forward to the range, then check free space, then pick an address
-	// Walk down the free spaces, looking for one in range
+// Walk down the free list calling f() on the in-range portions, until
+// f() returns true or we run out of free space.  Return true iff f() returned true
+func (s *Space) walkFree(rangeStart, rangeEnd address.Address, f func(pos int, start, end address.Address) bool) bool {
+	if rangeStart >= rangeEnd { // degenerate case
+		return false
+	}
 	for i := 0; i < len(s.free); i += 2 {
 		start, end := s.free[i], s.free[i+1]
-		if end-1 < rangeStart {
+		if end <= rangeStart { // this chunk comes before the range
 			continue
 		}
-		if start > rangeEnd {
+		if start >= rangeEnd {
+			// all remaining free space is completely after range
 			break
 		}
-		res := start
-		if res < rangeStart {
-			res = rangeStart
+		// at this point we know end>start && end>rangeStart && rangeEnd>start && rangeEnd>rangeStart
+		// therefore max(start, rangeStart) < min(end, rangeEnd)
+		// Restrict this block of free space to be in range
+		if start < rangeStart {
+			start = rangeStart
 		}
-		s.ours = add(s.ours, res, res+1)
-		s.free = subtract(s.free, res, res+1)
-		return true, res
+		if end > rangeEnd {
+			end = rangeEnd
+		}
+		// at this point we know start<end
+		if f(i, start, end) {
+			return true
+		}
 	}
-	return false, 0
+	return false
+}
+
+func (s *Space) Allocate(rangeStart, rangeEnd address.Address) (bool, address.Address) {
+	var result address.Address
+	return s.walkFree(rangeStart, rangeEnd, func(_ int, start, end address.Address) bool {
+		result = start
+		s.ours = add(s.ours, result, result+1)
+		s.free = subtract(s.free, result, result+1)
+		return true
+	}), result
 }
 
 func (s *Space) Claim(addr address.Address) error {
@@ -69,21 +89,12 @@ func (s *Space) Claim(addr address.Address) error {
 	return nil
 }
 
-func (s *Space) NumFreeAddressesInRange(start, end address.Address) address.Offset {
+func (s *Space) NumFreeAddressesInRange(rangeStart, rangeEnd address.Address) address.Offset {
 	res := address.Offset(0)
-	for i := 0; i < len(s.free); i += 2 {
-		s, e := s.free[i], s.free[i+1]
-		if s < start {
-			s = start
-		}
-		if e > end {
-			e = end
-		}
-		if s >= e {
-			continue
-		}
-		res += address.Subtract(e, s)
-	}
+	s.walkFree(rangeStart, rangeEnd, func(_ int, start, end address.Address) bool {
+		res += address.Subtract(end, start)
+		return false
+	})
 	return res
 }
 
@@ -104,20 +115,14 @@ func (s *Space) biggestFreeRange(rangeStart, rangeEnd address.Address) (int, add
 	pos := -1
 	biggest := address.Offset(0)
 
-	for i := 0; i < len(s.free); i += 2 {
-		start, end := s.free[i], s.free[i+1]
-		if start < rangeStart {
-			start = rangeStart
-		}
-		if end > rangeEnd {
-			end = rangeEnd
-		}
+	s.walkFree(rangeStart, rangeEnd, func(i int, start, end address.Address) bool {
 		size := address.Subtract(end, start)
 		if size >= biggest {
 			pos = i
 			biggest = size
 		}
-	}
+		return false
+	})
 	return pos, biggest
 }
 
