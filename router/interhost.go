@@ -9,6 +9,10 @@ type InterHost interface {
 	// Start consuming forwarded packets.
 	ConsumePackets(*Peer, *Peers, InterHostConsumer) error
 
+	// The routes have changed, so any cached information should
+	// be discarded.
+	InvalidateRoutes()
+
 	// Form a packet-forwarding connection.  The remote UDPAddr
 	// can be nil if unknown (in which case the implementation
 	// needs to discover it).
@@ -53,8 +57,12 @@ type InterHostForwarderListener interface {
 
 type NullInterHost struct{}
 
-func (NullInterHost) ConsumePackets(*Peer, *Peers, InterHostConsumer) error {
+func (NullInterHost) ConsumeInterHostPackets(*Peer, *Peers,
+	InterHostConsumer) error {
 	return nil
+}
+
+func (NullInterHost) InvalidateRoutes() {
 }
 
 func (NullInterHost) MakeForwarder(*Peer, net.IP, *net.UDPAddr, uint64,

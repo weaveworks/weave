@@ -7,14 +7,17 @@ import (
 	"sync"
 )
 
+type unicastRoutes map[PeerName]PeerName
+type broadcastRoutes map[PeerName][]PeerName
+
 type Routes struct {
 	sync.RWMutex
 	ourself      *LocalPeer
 	peers        *Peers
-	unicast      map[PeerName]PeerName
-	unicastAll   map[PeerName]PeerName // [1]
-	broadcast    map[PeerName][]PeerName
-	broadcastAll map[PeerName][]PeerName // [1]
+	unicast      unicastRoutes
+	unicastAll   unicastRoutes // [1]
+	broadcast    broadcastRoutes
+	broadcastAll broadcastRoutes // [1]
 	recalculate  chan<- *struct{}
 	wait         chan<- chan struct{}
 	// [1] based on *all* connections, not just established &
@@ -27,10 +30,10 @@ func NewRoutes(ourself *LocalPeer, peers *Peers) *Routes {
 	routes := &Routes{
 		ourself:      ourself,
 		peers:        peers,
-		unicast:      make(map[PeerName]PeerName),
-		unicastAll:   make(map[PeerName]PeerName),
-		broadcast:    make(map[PeerName][]PeerName),
-		broadcastAll: make(map[PeerName][]PeerName),
+		unicast:      make(unicastRoutes),
+		unicastAll:   make(unicastRoutes),
+		broadcast:    make(broadcastRoutes),
+		broadcastAll: make(broadcastRoutes),
 		recalculate:  recalculate,
 		wait:         wait}
 	routes.unicast[ourself.Name] = UnknownPeerName
@@ -166,6 +169,8 @@ func (routes *Routes) calculate() {
 	routes.peers.RLock()
 	routes.ourself.RLock()
 	var (
+		oldUnicast   = routes.unicast
+		oldBroadcast = routes.broadcast
 		unicast      = routes.calculateUnicast(true)
 		unicastAll   = routes.calculateUnicast(false)
 		broadcast    = routes.calculateBroadcast(true)
@@ -180,6 +185,10 @@ func (routes *Routes) calculate() {
 	routes.broadcast = broadcast
 	routes.broadcastAll = broadcastAll
 	routes.Unlock()
+
+	if !unicast.equals(oldUnicast) || !broadcast.equals(oldBroadcast) {
+		routes.ourself.router.InterHost.InvalidateRoutes()
+	}
 }
 
 // Calculate all the routes for the question: if *we* want to send a
@@ -191,7 +200,7 @@ func (routes *Routes) calculate() {
 // any knowledge of the MAC address at all. Thus there's no need
 // to exchange knowledge of MAC addresses, nor any constraints on
 // the routes that we construct.
-func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) map[PeerName]PeerName {
+func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) unicastRoutes {
 	_, unicast := routes.ourself.Routes(nil, establishedAndSymmetric)
 	return unicast
 }
@@ -214,8 +223,8 @@ func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) map[PeerNam
 //     Y =/= Z /\ X.Routes(Y) <= X.Routes(Z) =>
 //     X.Routes(Y) u [P | Y.HasSymmetricConnectionTo(P)] <= X.Routes(Z)
 // where <= is the subset relationship on keys of the returned map.
-func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerName][]PeerName {
-	broadcast := make(map[PeerName][]PeerName)
+func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) broadcastRoutes {
+	broadcast := make(broadcastRoutes)
 	for _, peer := range routes.peers.table {
 		hops := []PeerName{}
 		if found, reached := peer.Routes(routes.ourself.Peer, establishedAndSymmetric); found {
@@ -225,4 +234,56 @@ func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) map[PeerN
 		broadcast[peer.Name] = hops
 	}
 	return broadcast
+}
+
+func (a unicastRoutes) equals(b unicastRoutes) bool {
+	for key, aval := range a {
+		if bval, ok := b[key]; !ok || bval != aval {
+			return false
+		}
+	}
+
+	for key := range b {
+		if _, ok := a[key]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (a broadcastRoutes) equals(b broadcastRoutes) bool {
+	set := make(map[PeerName]struct{})
+
+	for key, aval := range a {
+		bval, ok := b[key]
+		if !ok {
+			return false
+		}
+
+		for _, peer := range aval {
+			set[peer] = struct{}{}
+		}
+
+		for _, peer := range bval {
+			if _, ok := set[peer]; !ok {
+				return false
+			}
+
+			delete(set, peer)
+		}
+
+		if len(set) != 0 {
+			return false
+		}
+
+	}
+
+	for key := range b {
+		if _, ok := a[key]; !ok {
+			return false
+		}
+	}
+
+	return true
 }

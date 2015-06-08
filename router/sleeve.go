@@ -86,6 +86,10 @@ func (sleeve *SleeveInterHost) ConsumePackets(localPeer *Peer, peers *Peers,
 	return nil
 }
 
+func (*SleeveInterHost) InvalidateRoutes() {
+	// no cached information, so nothing to do
+}
+
 func (sleeve *SleeveInterHost) logFrame(string, []byte, *layers.Ethernet) {
 	// XXX
 }
