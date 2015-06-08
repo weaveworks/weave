@@ -50,11 +50,7 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, frame []byte, dec *Ethernet
 		log.Println("Unable to find connection to relay peer", relayPeerName)
 		return nil
 	}
-	return conn.(*LocalConnection).Forward(false, &ForwardedFrame{
-		srcPeer: srcPeer,
-		dstPeer: dstPeer,
-		frame:   frame},
-		dec)
+	return conn.(*LocalConnection).Forward(srcPeer, dstPeer, frame, dec)
 }
 
 func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, frame []byte, dec *EthernetDecoder) {
@@ -63,11 +59,8 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, frame []byte, dec *Ethernet
 		return
 	}
 	for _, conn := range peer.ConnectionsTo(nextHops) {
-		err := conn.(*LocalConnection).Forward(false, &ForwardedFrame{
-			srcPeer: srcPeer,
-			dstPeer: conn.Remote(),
-			frame:   frame},
-			dec)
+		err := conn.(*LocalConnection).Forward(srcPeer, conn.Remote(),
+			frame, dec)
 		if err != nil {
 			if ftbe, ok := err.(FrameTooBigError); ok {
 				log.Printf("dropping too big DF broadcast frame (%v -> %v): PMTU= %v\n", dec.IP.DstIP, dec.IP.SrcIP, ftbe.EPMTU)

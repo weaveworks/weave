@@ -2,12 +2,9 @@ package router
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"syscall"
 	"time"
 )
 
@@ -24,6 +21,7 @@ type RouterConfig struct {
 	ConnLimit int
 	LogFrame  LogFrameFunc
 	IntraHost IntraHost
+	InterHost InterHost
 }
 
 type Router struct {
@@ -35,7 +33,6 @@ type Router struct {
 	ConnectionMaker *ConnectionMaker
 	GossipChannels  map[uint32]*GossipChannel
 	TopologyGossip  Gossip
-	UDPListener     *net.UDPConn
 }
 
 func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
@@ -45,6 +42,10 @@ func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
 	// null implementation
 	if router.IntraHost == nil {
 		router.IntraHost = NullIntraHost{}
+	}
+
+	if router.InterHost == nil {
+		router.InterHost = NullInterHost{}
 	}
 
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
@@ -67,8 +68,8 @@ func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
 // Start listening for packets from containers, TCP connections and
 // packets forwarded over UDP.
 func (router *Router) Start() {
+	checkFatal(router.InterHost.ConsumePackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
 	checkFatal(router.IntraHost.ConsumePackets(router))
-	router.UDPListener = router.listenUDP(router.Port)
 	router.listenTCP(router.Port)
 }
 
@@ -169,140 +170,36 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	StartLocalConnection(connRemote, tcpConn, nil, router, true)
 }
 
-func (router *Router) listenUDP(localPort int) *net.UDPConn {
-	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", localPort))
-	checkFatal(err)
-	conn, err := net.ListenUDP("udp4", localAddr)
-	checkFatal(err)
-	f, err := conn.File()
-	defer f.Close()
-	checkFatal(err)
-	fd := int(f.Fd())
-	// This one makes sure all packets we send out do not have DF set on them.
-	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DONT)
-	checkFatal(err)
-	go router.udpReader(conn)
-	return conn
-}
+func (router *Router) handleForwardedPacket(srcPeer *Peer, dstPeer *Peer,
+	frame []byte, dec *EthernetDecoder) {
+	if dstPeer != router.Ourself.Peer {
+		// it's not for us, we're just relaying it
+		router.LogFrame("Relaying", frame, dec)
+		err := router.Ourself.Relay(srcPeer, dstPeer, frame, dec)
+		if ftbe, ok := err.(FrameTooBigError); ok {
+			err = dec.sendICMPFragNeeded(ftbe.EPMTU, func(icmpFrame []byte) error {
+				return router.Ourself.Forward(srcPeer, icmpFrame, nil)
+			})
+		}
 
-func (router *Router) udpReader(conn *net.UDPConn) {
-	defer conn.Close()
-	dec := NewEthernetDecoder()
-	buf := make([]byte, MaxUDPPacketSize)
-	for {
-		n, sender, err := conn.ReadFromUDP(buf)
-		if err == io.EOF {
-			return
-		} else if err != nil {
-			log.Println("ignoring UDP read error", err)
-			continue
-		} else if n < NameSize {
-			log.Println("ignoring too short UDP packet from", sender)
-			continue
-		}
-		name := PeerNameFromBin(buf[:NameSize])
-		packet := make([]byte, n-NameSize)
-		copy(packet, buf[NameSize:n])
-		peerConn, found := router.Ourself.ConnectionTo(name)
-		if !found {
-			continue
-		}
-		relayConn, ok := peerConn.(*LocalConnection)
-		if !ok {
-			continue
-		}
-		if err := relayConn.Decryptor.IterateFrames(packet, router.handleUDPPacketFunc(relayConn, dec, sender)); err != nil {
-			// Errors during UDP packet decoding / processing are
-			// non-fatal. One common cause is that we receive and
-			// attempt to decrypt a "stray" packet. This can actually
-			// happen quite easily if there is some connection churn
-			// between two peers. After all, UDP isn't a
-			// connection-oriented protocol, yet we pretend it is.
-			//
-			// If anything really is seriously, unrecoverably amiss
-			// with a connection, that will typically result in missed
-			// heartbeats and the connection getting shut down because
-			// of that.
-			relayConn.Log(err)
-		}
+		checkWarn(err)
+		return
 	}
-}
 
-func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *EthernetDecoder, sender *net.UDPAddr) FrameConsumer {
-	return func(srcNameByte, dstNameByte []byte, frame []byte) {
-		srcPeer, found := router.Peers.Fetch(PeerNameFromBin(srcNameByte))
-		if !found {
-			return
-		}
-		dstPeer, found := router.Peers.Fetch(PeerNameFromBin(dstNameByte))
-		if !found {
-			return
-		}
+	srcMac := dec.Eth.SrcMAC
+	dstMac := dec.Eth.DstMAC
 
-		dec.DecodeLayers(frame)
-		decodedLen := len(dec.decoded)
-		if decodedLen == 0 {
-			return
-		}
-		// Handle special frames produced internally (rather than
-		// captured/forwarded) by the remote router.
-		//
-		// We really shouldn't be decoding these above, since they are
-		// not genuine Ethernet frames. However, it is actually more
-		// efficient to do so, as we want to optimise for the common
-		// (i.e. non-special) frames. These always need decoding, and
-		// detecting special frames is cheaper post decoding than pre.
-		if decodedLen == 1 && dec.IsSpecial() {
-			if srcPeer == relayConn.Remote() && dstPeer == router.Ourself.Peer {
-				handleSpecialFrame(relayConn, sender, frame)
-			}
-			return
-		}
-
-		if dstPeer != router.Ourself.Peer {
-			// it's not for us, we're just relaying it
-			router.LogFrame("Relaying", frame, dec)
-			err := router.Ourself.Relay(srcPeer, dstPeer, frame, dec)
-			if ftbe, ok := err.(FrameTooBigError); ok {
-				err = dec.sendICMPFragNeeded(ftbe.EPMTU, func(icmpFrame []byte) error {
-					return router.Ourself.Forward(srcPeer, icmpFrame, nil)
-				})
-			}
-
-			checkWarn(err)
-			return
-		}
-
-		srcMac := dec.Eth.SrcMAC
-		dstMac := dec.Eth.DstMAC
-
-		if router.Macs.Enter(srcMac, srcPeer) {
-			log.Println("Discovered remote MAC", srcMac, "at", srcPeer)
-		}
-
-		router.LogFrame("Injecting", frame, dec)
-		checkWarn(router.IntraHost.InjectPacket(frame))
-
-		dstPeer, found = router.Macs.Lookup(dstMac)
-		if !found || dstPeer != router.Ourself.Peer {
-			router.LogFrame("Relaying broadcast", frame, dec)
-			router.Ourself.RelayBroadcast(srcPeer, frame, dec)
-		}
+	if router.Macs.Enter(srcMac, srcPeer) {
+		log.Println("Discovered remote MAC", srcMac, "at", srcPeer)
 	}
-}
 
-func handleSpecialFrame(relayConn *LocalConnection, sender *net.UDPAddr, frame []byte) {
-	frameLen := len(frame)
-	switch {
-	case frameLen == EthernetOverhead+8:
-		relayConn.ReceivedHeartbeat(sender, binary.BigEndian.Uint64(frame[EthernetOverhead:]))
-	case frameLen == FragTestSize && bytes.Equal(frame, FragTest):
-		relayConn.SendProtocolMsg(ProtocolMsg{ProtocolFragmentationReceived, nil})
-	case frameLen == PMTUDiscoverySize && bytes.Equal(frame, PMTUDiscovery):
-	default:
-		frameLenBytes := []byte{0, 0}
-		binary.BigEndian.PutUint16(frameLenBytes, uint16(frameLen-EthernetOverhead))
-		relayConn.SendProtocolMsg(ProtocolMsg{ProtocolPMTUVerified, frameLenBytes})
+	router.LogFrame("Injecting", frame, dec)
+	checkWarn(router.IntraHost.InjectPacket(frame))
+
+	dstPeer, found := router.Macs.Lookup(dstMac)
+	if !found || dstPeer != router.Ourself.Peer {
+		router.LogFrame("Relaying broadcast", frame, dec)
+		router.Ourself.RelayBroadcast(srcPeer, frame, dec)
 	}
 }
 

@@ -1,0 +1,79 @@
+package router
+
+import (
+	"net"
+)
+
+// Interface to inter-host (i.e. overlay network) packet handling
+type InterHost interface {
+	// Start consuming forwarded packets.
+	ConsumePackets(*Peer, *Peers, InterHostConsumer) error
+
+	// Form a packet-forwarding connection.  The remote UDPAddr
+	// can be nil if unknown (in which case the implementation
+	// needs to discover it).
+	MakeForwarder(remotePeer *Peer, localIP net.IP, remote *net.UDPAddr,
+		connUID uint64, crypto InterHostCrypto,
+		sendControlMessage func([]byte) error) (InterHostForwarder, error)
+}
+
+// When a consumer is called, the decoder will already have been used
+// to decode the frame.
+type InterHostConsumer func(src *Peer, dst *Peer, frame []byte,
+	dec *EthernetDecoder)
+
+// Crypto settings for a forwarder.
+type InterHostCrypto struct {
+	Dec   Decryptor
+	Enc   Encryptor
+	EncDF Encryptor
+}
+
+// All of the machinery to forward packets to a particular peer
+type InterHostForwarder interface {
+	// Register a callback for forwarder state changes.
+	// side-effect, calling this confirms that the connection is
+	// really wanted, and so the provider should activate it.
+	// However, Forward might be called before this is called
+	// (e.g. on another thread).
+	SetListener(InterHostForwarderListener)
+
+	// Forward a packet across the connection.  The caller must
+	// supply an EthernetDecoder specific to this thread, which
+	// has already been used to decode the frame.
+	Forward(src *Peer, dest *Peer, frame []byte, dec *EthernetDecoder) error
+
+	Close()
+
+	// Handle a message from the peer
+	ControlMessage([]byte)
+}
+
+type InterHostForwarderListener interface {
+	Established()
+	Error(error)
+}
+
+type NullInterHost struct{}
+
+func (NullInterHost) ConsumePackets(*Peer, *Peers, InterHostConsumer) error {
+	return nil
+}
+
+func (NullInterHost) MakeForwarder(*Peer, net.IP, *net.UDPAddr, uint64,
+	InterHostCrypto, func([]byte) error) (InterHostForwarder, error) {
+	return NullInterHost{}, nil
+}
+
+func (NullInterHost) SetListener(InterHostForwarderListener) {
+}
+
+func (NullInterHost) Forward(*Peer, *Peer, []byte, *EthernetDecoder) error {
+	return nil
+}
+
+func (NullInterHost) Close() {
+}
+
+func (NullInterHost) ControlMessage([]byte) {
+}

@@ -1,7 +1,6 @@
 package router
 
 import (
-	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"log"
@@ -40,25 +39,16 @@ type RemoteConnection struct {
 type LocalConnection struct {
 	sync.RWMutex
 	RemoteConnection
-	TCPConn           *net.TCPConn
-	tcpSender         TCPSender
-	remoteUDPAddr     *net.UDPAddr
-	receivedHeartbeat bool
-	stackFrag         bool
-	effectivePMTU     int
-	SessionKey        *[32]byte
-	heartbeatTCP      *time.Ticker
-	heartbeatTimeout  *time.Timer
-	heartbeatFrame    *ForwardedFrame
-	heartbeat         *time.Ticker
-	fragTest          *time.Ticker
-	forwarder         *Forwarder
-	forwarderDF       *ForwarderDF
-	Decryptor         Decryptor
-	Router            *Router
-	uid               uint64
-	actionChan        chan<- ConnectionAction
-	finished          <-chan struct{} // closed to signal that actorLoop has finished
+	TCPConn       *net.TCPConn
+	tcpSender     TCPSender
+	remoteUDPAddr *net.UDPAddr
+	SessionKey    *[32]byte
+	heartbeatTCP  *time.Ticker
+	Router        *Router
+	uid           uint64
+	actionChan    chan<- ConnectionAction
+	finished      <-chan struct{} // closed to signal that actorLoop has finished
+	forwarder     InterHostForwarder
 }
 
 type ConnectionAction func() error
@@ -111,7 +101,6 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ud
 		Router:           router,
 		TCPConn:          tcpConn,
 		remoteUDPAddr:    udpAddr,
-		effectivePMTU:    DefaultPMTU,
 		actionChan:       actionChan,
 		finished:         finished}
 	go conn.run(actionChan, finished, acceptNewPeer)
@@ -130,47 +119,10 @@ func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
 	}
 }
 
-// Read by the forwarder processes when in the UDP senders
-func (conn *LocalConnection) RemoteUDPAddr() *net.UDPAddr {
-	conn.RLock()
-	defer conn.RUnlock()
-	return conn.remoteUDPAddr
-}
-
 func (conn *LocalConnection) Established() bool {
 	conn.RLock()
 	defer conn.RUnlock()
 	return conn.established
-}
-
-// Called by forwarder processes, read in Forward (by sniffer and udp
-// listener process in router).
-func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
-	conn.Lock()
-	defer conn.Unlock()
-	if conn.effectivePMTU != pmtu {
-		conn.effectivePMTU = pmtu
-		conn.Log("Effective PMTU set to", pmtu)
-	}
-}
-
-// Called by the connection's actor process, and by the connection's
-// TCP received process. StackFrag is read in conn.Forward (called by
-// router udp listener and sniffer processes)
-func (conn *LocalConnection) setStackFrag(frag bool) {
-	conn.Lock()
-	defer conn.Unlock()
-	conn.stackFrag = frag
-}
-
-// Called by the connection's TCP receiver process.
-func (conn *LocalConnection) pmtuVerified(pmtu int) {
-	conn.RLock()
-	fwd := conn.forwarderDF
-	conn.RUnlock()
-	if fwd != nil {
-		fwd.PMTUVerified(pmtu)
-	}
 }
 
 // Send directly, not via the Actor.  If it goes via the Actor we can
@@ -202,71 +154,6 @@ func (conn *LocalConnection) Shutdown(err error) {
 	go func() { conn.sendAction(func() error { return err }) }()
 }
 
-// Async
-//
-// Heartbeating serves two purposes: a) keeping NAT paths alive, and
-// b) updating a remote peer's knowledge of our address, in the event
-// it changes (e.g. because NAT paths expired).
-func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connUID uint64) {
-	if remoteUDPAddr == nil || connUID != conn.uid {
-		return
-	}
-	conn.sendAction(func() error {
-		oldRemoteUDPAddr := conn.remoteUDPAddr
-		old := conn.receivedHeartbeat
-		conn.Lock()
-		conn.remoteUDPAddr = remoteUDPAddr
-		conn.receivedHeartbeat = true
-		conn.Unlock()
-		conn.heartbeatTimeout.Reset(HeartbeatTimeout)
-		if !old {
-			if err := conn.sendSimpleProtocolMsg(ProtocolConnectionEstablished); err != nil {
-				return err
-			}
-		}
-		if oldRemoteUDPAddr == nil {
-			return conn.sendFastHeartbeats()
-		} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
-			log.Println("Peer", conn.remote, "moved from", old, "to", remoteUDPAddr)
-		}
-		return nil
-	})
-}
-
-// Async
-func (conn *LocalConnection) SetEstablished() {
-	conn.sendAction(func() error {
-		stopTicker(conn.heartbeat)
-		old := conn.established
-		conn.Lock()
-		conn.established = true
-		conn.Unlock()
-		if old {
-			return nil
-		}
-		conn.Router.Ourself.ConnectionEstablished(conn)
-		if err := conn.ensureForwarders(); err != nil {
-			return err
-		}
-		// Send a large frame down the DF channel in order to prompt
-		// PMTU discovery to start.
-		conn.Forward(true, &ForwardedFrame{
-			srcPeer: conn.local,
-			dstPeer: conn.remote,
-			frame:   PMTUDiscovery},
-			nil)
-		conn.heartbeat = time.NewTicker(SlowHeartbeat)
-		conn.fragTest = time.NewTicker(FragTestInterval)
-		// avoid initial waits for timers to fire
-		conn.Forward(true, conn.heartbeatFrame, nil)
-		conn.setStackFrag(false)
-		if err := conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
 // Send an actor request to the actorLoop, but don't block if
 // actorLoop has exited - see http://blog.golang.org/pipelines for
 // pattern
@@ -296,17 +183,19 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	// The ordering of the following is very important. [1]
 
-	if conn.remoteUDPAddr != nil {
-		if err = conn.ensureForwarders(); err != nil {
-			return
-		}
+	localIP := tcpConn.LocalAddr().(*net.TCPAddr).IP
+	if conn.forwarder, err = conn.Router.InterHost.MakeForwarder(conn.remote, localIP, conn.remoteUDPAddr, conn.uid, conn.udpCrypto(), conn.sendInterHostControlMessage); err != nil {
+		return
 	}
+
 	if err = conn.Router.Ourself.AddConnection(conn); err != nil {
 		return
 	}
-	if err = conn.initHeartbeats(); err != nil {
-		return
-	}
+
+	// Tell the forwarder that the connection is confirmed
+	conn.forwarder.SetListener(ConnectionAsForwarderListener{conn})
+
+	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)
 	go conn.receiveTCP(dec)
 	err = conn.actorLoop(actionChan)
 }
@@ -356,21 +245,6 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 // prevent that completely, since, for example, forwarder can only be
 // created when we know the remote UDP address, but it helps to try.
 
-func (conn *LocalConnection) initHeartbeats() error {
-	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)
-	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
-	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
-	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.uid)
-	conn.heartbeatFrame = &ForwardedFrame{
-		srcPeer: conn.local,
-		dstPeer: conn.remote,
-		frame:   heartbeatFrameBytes}
-	if conn.remoteUDPAddr == nil {
-		return nil
-	}
-	return conn.sendFastHeartbeats()
-}
-
 func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
 	for err == nil {
 		select {
@@ -378,13 +252,6 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 			err = action()
 		case <-conn.heartbeatTCP.C:
 			err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
-		case <-conn.heartbeatTimeout.C:
-			err = fmt.Errorf("timed out waiting for UDP heartbeat")
-		case <-tickerChan(conn.heartbeat):
-			conn.Forward(true, conn.heartbeatFrame, nil)
-		case <-tickerChan(conn.fragTest):
-			conn.setStackFrag(false)
-			err = conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest)
 		}
 	}
 	return
@@ -406,19 +273,53 @@ func (conn *LocalConnection) shutdown(err error) {
 		conn.Router.Ourself.DeleteConnection(conn)
 	}
 
-	if conn.heartbeatTimeout != nil {
-		conn.heartbeatTimeout.Stop()
+	stopTicker(conn.heartbeatTCP)
+
+	if conn.forwarder != nil {
+		conn.forwarder.Close()
 	}
 
-	stopTicker(conn.heartbeatTCP)
-	stopTicker(conn.heartbeat)
-	stopTicker(conn.fragTest)
-
-	// blank out the forwardChan so that the router processes don't
-	// try to send any more
-	conn.stopForwarders()
-
 	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr, err)
+}
+
+func (conn *LocalConnection) udpCrypto() InterHostCrypto {
+	name := conn.local.NameByte
+	if conn.Router.UsingPassword() {
+		return InterHostCrypto{
+			Dec:   NewNaClDecryptor(conn.SessionKey, conn.outbound),
+			Enc:   NewNaClEncryptor(name, conn.SessionKey, conn.outbound, false),
+			EncDF: NewNaClEncryptor(name, conn.SessionKey, conn.outbound, true),
+		}
+	} else {
+		return InterHostCrypto{
+			Dec:   NewNonDecryptor(),
+			Enc:   NewNonEncryptor(name),
+			EncDF: NewNonEncryptor(name),
+		}
+	}
+}
+
+func (conn *LocalConnection) sendInterHostControlMessage(msg []byte) error {
+	return conn.sendProtocolMsg(ProtocolMsg{ProtocolInterHostControlMsg, msg})
+}
+
+type ConnectionAsForwarderListener struct{ conn *LocalConnection }
+
+func (l ConnectionAsForwarderListener) Established() {
+	l.conn.sendAction(func() error {
+		old := l.conn.established
+		l.conn.Lock()
+		l.conn.established = true
+		l.conn.Unlock()
+		if !old {
+			l.conn.Router.Ourself.ConnectionEstablished(l.conn)
+		}
+		return nil
+	})
+}
+
+func (l ConnectionAsForwarderListener) Error(err error) {
+	l.conn.sendAction(func() error { return err })
 }
 
 // Helpers
@@ -464,22 +365,8 @@ func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
 func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) error {
 	switch tag {
 	case ProtocolHeartbeat:
-	case ProtocolConnectionEstablished:
-		// We sent fast heartbeats to the remote peer, which has now
-		// received at least one of them and told us via this message.
-		// We can now consider the connection as established from our
-		// end.
-		conn.SetEstablished()
-	case ProtocolStartFragmentationTest:
-		conn.Forward(false, &ForwardedFrame{
-			srcPeer: conn.local,
-			dstPeer: conn.remote,
-			frame:   FragTest},
-			nil)
-	case ProtocolFragmentationReceived:
-		conn.setStackFrag(true)
-	case ProtocolPMTUVerified:
-		conn.pmtuVerified(int(binary.BigEndian.Uint16(payload)))
+	case ProtocolInterHostControlMsg:
+		conn.forwarder.ControlMessage(payload)
 	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:
 		return conn.Router.handleGossip(tag, payload)
 	default:
@@ -492,13 +379,8 @@ func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(TCPHeartbeat * 2))
 }
 
-func (conn *LocalConnection) sendFastHeartbeats() error {
-	err := conn.ensureForwarders()
-	if err == nil {
-		conn.heartbeat = time.NewTicker(FastHeartbeat)
-		conn.Forward(true, conn.heartbeatFrame, nil) // avoid initial wait
-	}
-	return err
+func (conn *LocalConnection) Forward(srcPeer, dstPeer *Peer, frame []byte, dec *EthernetDecoder) error {
+	return conn.forwarder.Forward(srcPeer, dstPeer, frame, dec)
 }
 
 func tickerChan(ticker *time.Ticker) <-chan time.Time {

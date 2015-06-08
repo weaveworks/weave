@@ -35,14 +35,6 @@ func PosixError(err error) error {
 	return operr.Err
 }
 
-func (mtbe MsgTooBigError) Error() string {
-	return fmt.Sprint("Msg too big error. PMTU is ", mtbe.PMTU)
-}
-
-func (ftbe FrameTooBigError) Error() string {
-	return fmt.Sprint("Frame too big error. Effective PMTU is ", ftbe.EPMTU)
-}
-
 func (upe UnknownPeerError) Error() string {
 	return fmt.Sprint("Reference to unknown peer ", upe.Name)
 }

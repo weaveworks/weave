@@ -133,6 +133,7 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
+	config.InterHost = weave.NewSleeveInterHost(config.Port)
 	config.LogFrame = logFrameFunc(pktdebug)
 
 	router := weave.NewRouter(config, name, nickName)
