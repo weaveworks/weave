@@ -1,3 +1,17 @@
+## Release 0.11.2
+
+This is a bug fix release, addressing the following issues:
+
+- `weave run` did not respect DOCKER_CLIENT_ARGS. #855
+- Negative result cache did not expire if requeried within TTL. #845
+
+More details in the [change
+log](https://github.com/weaveworks/weave/issues?q=milestone%3A0.11.2).
+
+*NB: This release does not change the weave protocol version.
+Therefore, when upgrading an existing 0.11 installation incrementally,
+connectivity between peers will be retained.*
+
 ## Release 0.11.1
 
 This is a bug fix release, addressing the following issues:
