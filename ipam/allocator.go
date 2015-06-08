@@ -178,22 +178,20 @@ func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 
 // Allocate (Sync) - get IP address for container with given name
 // if there isn't any space we block indefinitely
-func (alloc *Allocator) Allocate(ident string, subnet address.CIDR, cancelChan <-chan bool) (address.CIDR, error) {
+func (alloc *Allocator) Allocate(ident string, r address.Range, cancelChan <-chan bool) (address.Address, error) {
 	resultChan := make(chan allocateResult)
-	// Respect RFC1122 exclusions of first and last addresses
-	r := address.Range{Start: subnet.Start + 1, End: subnet.End() - 1}
 	op := &allocate{r: r, resultChan: resultChan, ident: ident,
 		hasBeenCancelled: hasBeenCancelled(cancelChan)}
 	alloc.doOperation(op, &alloc.pendingAllocates)
 	result := <-resultChan
-	return address.CIDR{Start: result.addr, PrefixLen: subnet.PrefixLen}, result.err
+	return result.addr, result.err
 }
 
-func (alloc *Allocator) Lookup(ident string, subnet address.CIDR) (address.CIDR, error) {
+func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
 	resultChan := make(chan allocateResult)
 	alloc.actionChan <- func() {
 		for _, addr := range alloc.owned[ident] {
-			if subnet.Contains(addr) {
+			if r.Contains(addr) {
 				resultChan <- allocateResult{addr: addr}
 				return
 			}
@@ -201,7 +199,7 @@ func (alloc *Allocator) Lookup(ident string, subnet address.CIDR) (address.CIDR,
 		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found")}
 	}
 	result := <-resultChan
-	return address.CIDR{Start: result.addr, PrefixLen: subnet.PrefixLen}, result.err
+	return result.addr, result.err
 }
 
 // Claim an address that we think we should own (Sync)

@@ -49,17 +49,13 @@ func (cidr CIDR) Size() Offset { return 1 << uint(32-cidr.PrefixLen) }
 // End is exclusive, same as in Range
 func (cidr CIDR) End() Address { return Add(cidr.Start, cidr.Size()) }
 func (cidr CIDR) Range() Range { return Range{Start: cidr.Start, End: Add(cidr.Start, cidr.Size())} }
+func (cidr CIDR) HostRange() Range {
+	// Respect RFC1122 exclusions of first and last addresses
+	return Range{Start: cidr.Start + 1, End: cidr.End() - 1}
+}
 
 func (cidr CIDR) String() string {
 	return fmt.Sprintf("%s/%d", cidr.Start.String(), cidr.PrefixLen)
-}
-
-func (cidr1 CIDR) Overlaps(cidr2 CIDR) bool {
-	return !(cidr1.Start >= cidr2.End() || cidr1.End() <= cidr2.Start)
-}
-
-func (cidr CIDR) Contains(addr Address) bool {
-	return addr >= cidr.Start && addr < cidr.End()
 }
 
 // FromIP4 converts an ipv4 address to our integer address type

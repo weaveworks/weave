@@ -80,8 +80,9 @@ func TestHttp(t *testing.T) {
 		testAddr2   = "10.2.0.1/16"
 	)
 
-	alloc, subnet := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", universe, 1)
-	port := listenHTTP(alloc, subnet)
+	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", universe, 1)
+	_, cidr, _ := address.ParseCIDR(universe)
+	port := listenHTTP(alloc, cidr)
 	alloc.claimRingForTesting()
 
 	// Allocate an address in each subnet, and check we got what we expected
@@ -120,9 +121,10 @@ func TestBadHttp(t *testing.T) {
 		testCIDR1   = "10.0.0.0/8"
 	)
 
-	alloc, subnet := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
+	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
-	port := listenHTTP(alloc, subnet)
+	_, cidr, _ := address.ParseCIDR(testCIDR1)
+	port := listenHTTP(alloc, cidr)
 
 	alloc.claimRingForTesting()
 	cidr1 := HTTPPost(t, allocURL(port, testCIDR1, containerID))
@@ -155,10 +157,11 @@ func impTestHTTPCancel(t *testing.T) {
 		testCIDR1   = "10.0.3.0/29"
 	)
 
-	alloc, subnet := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
+	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
 	alloc.claimRingForTesting()
-	port := listenHTTP(alloc, subnet)
+	_, cidr, _ := address.ParseCIDR(testCIDR1)
+	port := listenHTTP(alloc, cidr)
 
 	// Stop the alloc so nothing actually works
 	unpause := alloc.pause()

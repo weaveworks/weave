@@ -214,7 +214,7 @@ func createAllocator(router *weave.Router, apiPath string, ipRangeStr string, de
 	defaultSubnet := ipRange
 	if defaultSubnetStr != "" {
 		defaultSubnet = parseAndCheckCIDR(defaultSubnetStr)
-		if !ipRange.Overlaps(defaultSubnet) {
+		if !ipRange.Range().Overlaps(defaultSubnet.Range()) {
 			log.Fatalf("Default subnet %s out of bounds: %s", defaultSubnet, ipRange)
 		}
 	}

@@ -27,8 +27,8 @@ func TestAllocFree(t *testing.T) {
 		universe   = "10.0.3.0/26"
 		subnet1    = "10.0.3.0/28"
 		subnet2    = "10.0.3.32/28"
-		testAddr1  = "10.0.3.1/28"
-		testAddr2  = "10.0.3.33/28"
+		testAddr1  = "10.0.3.1"
+		testAddr2  = "10.0.3.33"
 		spaceSize  = 62 // 64 IP addresses in /26, minus .0 and .63
 	)
 
@@ -38,31 +38,31 @@ func TestAllocFree(t *testing.T) {
 	_, cidr2, _ := address.ParseCIDR(subnet2)
 
 	alloc.claimRingForTesting()
-	addr1, err := alloc.Allocate(container1, cidr1, nil)
+	addr1, err := alloc.Allocate(container1, cidr1.HostRange(), nil)
 	wt.AssertNoErr(t, err)
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
 
-	addr2, err := alloc.Allocate(container1, cidr2, nil)
+	addr2, err := alloc.Allocate(container1, cidr2.HostRange(), nil)
 	wt.AssertNoErr(t, err)
 	wt.AssertEqualString(t, addr2.String(), testAddr2, "address")
 
 	// Ask for another address for a different container and check it's different
-	addr1b, _ := alloc.Allocate(container2, cidr1, nil)
+	addr1b, _ := alloc.Allocate(container2, cidr1.HostRange(), nil)
 	if addr1b.String() == testAddr1 {
 		t.Fatalf("Expected different address but got %s", addr1b.String())
 	}
 
 	// Ask for the first container again and we should get the same addresses again
-	addr1a, _ := alloc.Allocate(container1, cidr1, nil)
+	addr1a, _ := alloc.Allocate(container1, cidr1.HostRange(), nil)
 	wt.AssertEqualString(t, addr1a.String(), testAddr1, "address")
-	addr2a, _ := alloc.Allocate(container1, cidr2, nil)
+	addr2a, _ := alloc.Allocate(container1, cidr2.HostRange(), nil)
 	wt.AssertEqualString(t, addr2a.String(), testAddr2, "address")
 
 	// Now delete the first container, and we should get its addresses back
 	wt.AssertSuccess(t, alloc.Delete(container1))
-	addr3, _ := alloc.Allocate(container3, cidr1, nil)
+	addr3, _ := alloc.Allocate(container3, cidr1.HostRange(), nil)
 	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
-	addr4, _ := alloc.Allocate(container3, cidr2, nil)
+	addr4, _ := alloc.Allocate(container3, cidr2.HostRange(), nil)
 	wt.AssertEqualString(t, addr4.String(), testAddr2, "address")
 
 	alloc.ContainerDied(container2)
@@ -134,7 +134,7 @@ func TestAllocatorClaim(t *testing.T) {
 		container2 = "baddf00d"
 		container3 = "b01df00d"
 		universe   = "10.0.3.0/30"
-		testAddr1  = "10.0.3.1/30" // first address allocated should be .1 because .0 is network addr
+		testAddr1  = "10.0.3.1" // first address allocated should be .1 because .0 is network addr
 	)
 
 	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
@@ -384,7 +384,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		alloc := allocs[res.alloc]
 		//common.Info.Printf("Freeing %s (%s) on allocator %d", res.name, addr, res.alloc)
 
-		oldAddr, _, err := address.ParseCIDR(addr)
+		oldAddr, err := address.ParseIP(addr)
 		if err != nil {
 			panic(err)
 		}
@@ -406,8 +406,8 @@ func TestAllocatorFuzz(t *testing.T) {
 		//common.Info.Printf("Asking for %s on allocator %d again", addr, res.alloc)
 
 		newAddr, _ := alloc.Allocate(res.name, subnet, nil)
-		oldAddr, _, _ := address.ParseCIDR(addr)
-		if newAddr.Start != oldAddr {
+		oldAddr, _ := address.ParseIP(addr)
+		if newAddr != oldAddr {
 			panic(fmt.Sprintf("Got different address for repeat request for %s: %s != %s", res.name, newAddr, oldAddr))
 		}
 

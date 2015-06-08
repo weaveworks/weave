@@ -128,7 +128,7 @@ func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 	}
 }
 
-func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.CIDR) {
+func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.Range) {
 	peername, err := router.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
@@ -142,10 +142,10 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 	alloc := NewAllocator(peername, router.PeerUID(rand.Int63()),
 		"nick-"+name, cidr.Range(), quorum)
 
-	return alloc, cidr
+	return alloc, cidr.HostRange()
 }
 
-func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.CIDR) {
+func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.Range) {
 	alloc, subnet := makeAllocator(name, universeCIDR, quorum)
 	gossip := &mockGossipComms{t: t, name: name}
 	alloc.SetInterfaces(gossip)
@@ -162,10 +162,10 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 	alloc.space.AddRanges(alloc.ring.OwnedRanges())
 }
 
-func (alloc *Allocator) NumFreeAddresses(subnet address.CIDR) address.Offset {
+func (alloc *Allocator) NumFreeAddresses(r address.Range) address.Offset {
 	resultChan := make(chan address.Offset)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.space.NumFreeAddressesInRange(address.MakeRange(subnet.Start+1, subnet.Size()-2))
+		resultChan <- alloc.space.NumFreeAddressesInRange(r)
 	}
 	return <-resultChan
 }
@@ -287,11 +287,11 @@ func (client TestGossipRouterClient) GossipBroadcast(update router.GossipData) e
 	return client.router.GossipBroadcast(update)
 }
 
-func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter, address.CIDR) {
+func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter, address.Range) {
 
 	gossipRouter := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
 	allocs := make([]*Allocator, size)
-	var subnet address.CIDR
+	var subnet address.Range
 
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
