@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/address"
 	wt "github.com/weaveworks/weave/testing"
 )
 
@@ -38,12 +39,12 @@ func doHTTP(method string, url string) (resp *http.Response, err error) {
 	return http.DefaultClient.Do(req)
 }
 
-func listenHTTP(alloc *Allocator) int {
+func listenHTTP(alloc *Allocator, subnet address.CIDR) int {
 	router := mux.NewRouter()
 	router.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
-	alloc.HandleHTTP(router)
+	alloc.HandleHTTP(router, subnet)
 
 	httpListener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -79,8 +80,8 @@ func TestHttp(t *testing.T) {
 		testAddr2   = "10.2.0.1/16"
 	)
 
-	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", universe, 1)
-	port := listenHTTP(alloc)
+	alloc, subnet := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", universe, 1)
+	port := listenHTTP(alloc, subnet)
 
 	alloc.claimRingForTesting()
 	cidr1a := HTTPPost(t, allocURL(port, testCIDR1, containerID))
@@ -119,9 +120,9 @@ func TestBadHttp(t *testing.T) {
 		testCIDR1   = "10.0.0.0/8"
 	)
 
-	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
+	alloc, subnet := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
-	port := listenHTTP(alloc)
+	port := listenHTTP(alloc, subnet)
 
 	alloc.claimRingForTesting()
 	cidr1 := HTTPPost(t, allocURL(port, testCIDR1, containerID))
@@ -154,10 +155,10 @@ func impTestHTTPCancel(t *testing.T) {
 		testCIDR1   = "10.0.3.0/29"
 	)
 
-	alloc := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
+	alloc, subnet := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
 	alloc.claimRingForTesting()
-	port := listenHTTP(alloc)
+	port := listenHTTP(alloc, subnet)
 
 	// Stop the alloc so nothing actually works
 	unpause := alloc.pause()

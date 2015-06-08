@@ -145,11 +145,12 @@ reports on the current status of the weave router and IP allocator:
 ````
 weave router git-8f675f15c0b5
 ...
-Allocator universe 10.2.0.0/16 (default subnet 10.2.1.0/24)
+Allocator universe 10.2.0.0/16
 Owned Ranges:
   10.2.1.1 -> 96:e9:e2:2e:2d:bc (host1) (v3)
   10.2.1.128 -> ea:84:25:9b:31:2e (host2) (v3)
   10.2.1.192 -> ea:6c:21:09:cf:f0 (host3) (v9)
+Allocator default subnet: 10.2.1.0/24
 ````
 
 The first section covers the router; see the [troubleshooting

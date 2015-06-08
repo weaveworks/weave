@@ -21,9 +21,14 @@ plugin) uses to request IP addresses.
 The commands supported by the allocator via the http interface are:
 
 - Allocate: request one IP address for a container in a subnet
+- Lookup: fetch the previously-allocated IP address for a container in a subnet
 - Free: return an IP address that is currently allocated
 - Claim: request a specific IP address for a container (e.g. because
   it is already using that address)
+
+Each http request either specifies a subnet, or if no subnet is
+specified this is taken as a request to allocate in a pre-defined
+default subnet.
 
 The allocator also watches via the Docker event mechanism: if a
 container dies then all IP addresses allocated to that container are
@@ -45,10 +50,6 @@ freed.
    more ranges.
 
 ### The Allocation Process
-
-Each allocation request either specifies a subnet to allocate within,
-or if no subnet is specified this is taken as a request to allocate in
-a pre-defined default subnet.
 
 When a peer owns some range(s), it can allocate freely from within
 those ranges to containers on the same machine. If it runs out of

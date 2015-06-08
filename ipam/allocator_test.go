@@ -32,7 +32,7 @@ func TestAllocFree(t *testing.T) {
 		spaceSize  = 62 // 64 IP addresses in /26, minus .0 and .63
 	)
 
-	alloc := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
+	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
 	defer alloc.Stop()
 	_, cidr1, _ := address.ParseCIDR(subnet1)
 	_, cidr2, _ := address.ParseCIDR(subnet2)
@@ -67,7 +67,7 @@ func TestAllocFree(t *testing.T) {
 
 	alloc.ContainerDied(container2)
 	alloc.ContainerDied(container3)
-	wt.AssertEquals(t, alloc.NumFreeAddresses(), address.Offset(spaceSize))
+	wt.AssertEquals(t, alloc.NumFreeAddresses(subnet), address.Offset(spaceSize))
 }
 
 func TestBootstrap(t *testing.T) {
@@ -79,11 +79,11 @@ func TestBootstrap(t *testing.T) {
 		peerNameString = "02:00:00:02:00:00"
 	)
 
-	alloc1 := makeAllocatorWithMockGossip(t, ourNameString, testStart1+"/22", 2)
+	alloc1, subnet := makeAllocatorWithMockGossip(t, ourNameString, testStart1+"/22", 2)
 	defer alloc1.Stop()
 
 	// Simulate another peer on the gossip network
-	alloc2 := makeAllocatorWithMockGossip(t, peerNameString, testStart1+"/22", 2)
+	alloc2, _ := makeAllocatorWithMockGossip(t, peerNameString, testStart1+"/22", 2)
 	defer alloc2.Stop()
 
 	alloc1.OnGossipBroadcast(alloc2.Encode())
@@ -93,7 +93,7 @@ func TestBootstrap(t *testing.T) {
 	ExpectBroadcastMessage(alloc1, nil) // alloc1 will try to form consensus
 	done := make(chan bool)
 	go func() {
-		alloc1.Allocate("somecontainer", alloc1.defaultSubnet, nil)
+		alloc1.Allocate("somecontainer", subnet, nil)
 		done <- true
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -137,7 +137,7 @@ func TestAllocatorClaim(t *testing.T) {
 		testAddr1  = "10.0.3.1/30" // first address allocated should be .1 because .0 is network addr
 	)
 
-	alloc := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
+	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
 	defer alloc.Stop()
 
 	alloc.claimRingForTesting()
@@ -146,7 +146,7 @@ func TestAllocatorClaim(t *testing.T) {
 	err := alloc.Claim(container3, addr1, nil)
 	wt.AssertNoErr(t, err)
 	// Check we get this address back if we try an allocate
-	addr3, _ := alloc.Allocate(container3, alloc.defaultSubnet, nil)
+	addr3, _ := alloc.Allocate(container3, subnet, nil)
 	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
 }
 
@@ -170,10 +170,10 @@ func TestCancel(t *testing.T) {
 
 	router := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
 
-	alloc1 := makeAllocator("01:00:00:02:00:00", CIDR, 2)
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
 	alloc1.SetInterfaces(router.connect(alloc1.ourName, alloc1))
 
-	alloc2 := makeAllocator("02:00:00:02:00:00", CIDR, 2)
+	alloc2, subnet := makeAllocator("02:00:00:02:00:00", CIDR, 2)
 	alloc2.SetInterfaces(router.connect(alloc2.ourName, alloc2))
 	alloc1.claimRingForTesting(alloc1, alloc2)
 	alloc2.claimRingForTesting(alloc1, alloc2)
@@ -185,9 +185,9 @@ func TestCancel(t *testing.T) {
 	alloc1.OnGossipBroadcast(alloc2.Encode())
 
 	// Get some IPs, so each allocator has some space
-	res1, _ := alloc1.Allocate("foo", alloc1.defaultSubnet, nil)
+	res1, _ := alloc1.Allocate("foo", subnet, nil)
 	common.Debug.Printf("res1 = %s", res1.String())
-	res2, _ := alloc2.Allocate("bar", alloc2.defaultSubnet, nil)
+	res2, _ := alloc2.Allocate("bar", subnet, nil)
 	common.Debug.Printf("res2 = %s", res2.String())
 	if res1 == res2 {
 		wt.Fatalf(t, "Error: got same ips!")
@@ -198,13 +198,13 @@ func TestCancel(t *testing.T) {
 	unpause := alloc2.pause()
 
 	// Use up all the IPs that alloc1 owns, so the allocation after this will prompt a request to alloc2
-	for i := 0; alloc1.NumFreeAddresses() > 0; i++ {
-		alloc1.Allocate(fmt.Sprintf("tmp%d", i), alloc1.defaultSubnet, nil)
+	for i := 0; alloc1.NumFreeAddresses(subnet) > 0; i++ {
+		alloc1.Allocate(fmt.Sprintf("tmp%d", i), subnet, nil)
 	}
 	cancelChan := make(chan bool, 1)
 	doneChan := make(chan bool)
 	go func() {
-		_, ok := alloc1.Allocate("baz", alloc1.defaultSubnet, cancelChan)
+		_, ok := alloc1.Allocate("baz", subnet, cancelChan)
 		doneChan <- ok == nil
 	}()
 
@@ -226,15 +226,15 @@ func TestGossipShutdown(t *testing.T) {
 		universe   = "10.0.3.0/30"
 	)
 
-	alloc := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
+	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
 	defer alloc.Stop()
 
 	alloc.claimRingForTesting()
-	alloc.Allocate(container1, alloc.defaultSubnet, nil)
+	alloc.Allocate(container1, subnet, nil)
 
 	alloc.Shutdown()
 
-	_, err := alloc.Allocate(container2, alloc.defaultSubnet, nil) // trying to allocate after shutdown should fail
+	_, err := alloc.Allocate(container2, subnet, nil) // trying to allocate after shutdown should fail
 	wt.AssertFalse(t, err == nil, "no address")
 
 	CheckAllExpectedMessagesSent(alloc)
@@ -244,15 +244,15 @@ func TestTransfer(t *testing.T) {
 	const (
 		cidr = "10.0.1.7/22"
 	)
-	allocs, router := makeNetworkOfAllocators(3, cidr)
+	allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
 	alloc1 := allocs[0]
 	alloc2 := allocs[1]
 	alloc3 := allocs[2] // This will be 'master' and get the first range
 
-	_, err := alloc2.Allocate("foo", alloc2.defaultSubnet, nil)
+	_, err := alloc2.Allocate("foo", subnet, nil)
 	wt.AssertTrue(t, err == nil, "Failed to get address")
 
-	_, err = alloc3.Allocate("bar", alloc3.defaultSubnet, nil)
+	_, err = alloc3.Allocate("bar", subnet, nil)
 	wt.AssertTrue(t, err == nil, "Failed to get address")
 
 	router.GossipBroadcast(alloc2.Gossip())
@@ -264,9 +264,9 @@ func TestTransfer(t *testing.T) {
 	wt.AssertSuccess(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
 	wt.AssertSuccess(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
 
-	wt.AssertEquals(t, alloc1.NumFreeAddresses(), address.Offset(1022))
+	wt.AssertEquals(t, alloc1.NumFreeAddresses(subnet), address.Offset(1022))
 
-	_, err = alloc1.Allocate("foo", alloc1.defaultSubnet, nil)
+	_, err = alloc1.Allocate("foo", subnet, nil)
 	wt.AssertTrue(t, err == nil, "Failed to get address")
 	alloc1.Stop()
 }
@@ -276,13 +276,13 @@ func TestFakeRouterSimple(t *testing.T) {
 	const (
 		cidr = "10.0.1.7/22"
 	)
-	allocs, _ := makeNetworkOfAllocators(2, cidr)
+	allocs, _, subnet := makeNetworkOfAllocators(2, cidr)
 	defer stopNetworkOfAllocators(allocs)
 
 	alloc1 := allocs[0]
 	//alloc2 := allocs[1]
 
-	alloc1.Allocate("foo", alloc1.defaultSubnet, nil)
+	alloc1.Allocate("foo", subnet, nil)
 }
 
 func TestAllocatorFuzz(t *testing.T) {
@@ -295,7 +295,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		concurrency  = 10
 		cidr         = "10.0.1.7/22"
 	)
-	allocs, _ := makeNetworkOfAllocators(nodes, cidr)
+	allocs, _, subnet := makeNetworkOfAllocators(nodes, cidr)
 	defer stopNetworkOfAllocators(allocs)
 
 	// Test state
@@ -339,7 +339,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		allocIndex := rand.Int31n(nodes)
 		alloc := allocs[allocIndex]
 		//common.Info.Printf("Allocate: asking allocator %d", allocIndex)
-		addr, err := alloc.Allocate(name, alloc.defaultSubnet, nil)
+		addr, err := alloc.Allocate(name, subnet, nil)
 
 		if err != nil {
 			panic(fmt.Sprintf("Could not allocate addr"))
@@ -405,7 +405,7 @@ func TestAllocatorFuzz(t *testing.T) {
 
 		//common.Info.Printf("Asking for %s on allocator %d again", addr, res.alloc)
 
-		newAddr, _ := alloc.Allocate(res.name, alloc.defaultSubnet, nil)
+		newAddr, _ := alloc.Allocate(res.name, subnet, nil)
 		oldAddr, _, _ := address.ParseCIDR(addr)
 		if newAddr.Start != oldAddr {
 			panic(fmt.Sprintf("Got different address for repeat request for %s: %s != %s", res.name, newAddr, oldAddr))
@@ -464,9 +464,9 @@ func TestAllocatorFuzz(t *testing.T) {
 }
 
 func TestGossipSkew(t *testing.T) {
-	alloc1 := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", "10.0.1.0/22", 2)
+	alloc1, _ := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", "10.0.1.0/22", 2)
 	defer alloc1.Stop()
-	alloc2 := makeAllocatorWithMockGossip(t, "02:00:00:02:00:00", "10.0.1.0/22", 2)
+	alloc2, _ := makeAllocatorWithMockGossip(t, "02:00:00:02:00:00", "10.0.1.0/22", 2)
 	alloc2.now = func() time.Time { return time.Now().Add(time.Hour * 2) }
 	defer alloc2.Stop()
 

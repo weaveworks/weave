@@ -16,7 +16,7 @@ func badRequest(w http.ResponseWriter, err error) {
 }
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
-func (alloc *Allocator) HandleHTTP(router *mux.Router) {
+func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR) {
 	router.Methods("PUT").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		closedChan := w.(http.CloseNotifier).CloseNotify()
 		vars := mux.Vars(r)
@@ -50,7 +50,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 	})
 
 	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		addr, err := alloc.Lookup(mux.Vars(r)["id"], alloc.defaultSubnet)
+		addr, err := alloc.Lookup(mux.Vars(r)["id"], defaultSubnet)
 		if err != nil {
 			http.NotFound(w, r)
 			return
@@ -84,7 +84,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 	router.Methods("POST").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		closedChan := w.(http.CloseNotifier).CloseNotify()
 		ident := mux.Vars(r)["id"]
-		newAddr, err := alloc.Allocate(ident, alloc.defaultSubnet, closedChan)
+		newAddr, err := alloc.Allocate(ident, defaultSubnet, closedChan)
 		if err != nil {
 			badRequest(w, err)
 			return

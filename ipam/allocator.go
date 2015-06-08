@@ -21,7 +21,7 @@ const (
 	msgRingUpdate
 
 	paxosInterval = time.Second * 5
-	minSubnetSize = 4 // first and last addresses are excluded, so 2 would be too small
+	MinSubnetSize = 4 // first and last addresses are excluded, so 2 would be too small
 )
 
 // operation represents something which Allocator wants to do, but
@@ -45,7 +45,6 @@ type operation interface {
 type Allocator struct {
 	actionChan       chan<- func()
 	ourName          router.PeerName
-	defaultSubnet    address.CIDR
 	universe         address.CIDR                 // superset of all ranges
 	ring             *ring.Ring                   // information on ranges owned by all peers
 	space            space.Space                  // more detail on ranges owned by us
@@ -61,21 +60,16 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universeStr string, quorum uint) (*Allocator, error) {
-	universe, err := parseAndCheckCIDR(universeStr)
-	if err != nil {
-		return nil, err
-	}
+func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.CIDR, quorum uint) *Allocator {
 	return &Allocator{
-		ourName:       ourName,
-		universe:      universe,
-		defaultSubnet: universe,
-		ring:          ring.New(universe.Start, address.Add(universe.Start, universe.Size()), ourName),
-		owned:         make(map[string][]address.Address),
-		paxos:         paxos.NewNode(ourName, ourUID, quorum),
-		nicknames:     map[router.PeerName]string{ourName: ourNickname},
-		now:           time.Now,
-	}, nil
+		ourName:   ourName,
+		universe:  universe,
+		ring:      ring.New(universe.Start, address.Add(universe.Start, universe.Size()), ourName),
+		owned:     make(map[string][]address.Address),
+		paxos:     paxos.NewNode(ourName, ourUID, quorum),
+		nicknames: map[router.PeerName]string{ourName: ourNickname},
+		now:       time.Now,
+	}
 }
 
 // Start runs the allocator goroutine
@@ -181,23 +175,6 @@ func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 }
 
 // Actor client API
-
-func (alloc *Allocator) SetDefaultSubnet(subnetStr string) error {
-	subnet, err := parseAndCheckCIDR(subnetStr)
-	if err != nil {
-		return err
-	}
-	resultChan := make(chan error)
-	alloc.actionChan <- func() {
-		if !alloc.universe.Overlaps(subnet) {
-			resultChan <- fmt.Errorf("Default subnet %s out of bounds: %s", subnet, alloc.universe)
-			return
-		}
-		alloc.defaultSubnet = subnet
-		resultChan <- nil
-	}
-	return <-resultChan
-}
 
 // Allocate (Sync) - get IP address for container with given name
 // if there isn't any space we block indefinitely
@@ -494,20 +471,9 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 
 // Helper functions
 
-func parseAndCheckCIDR(cidrStr string) (address.CIDR, error) {
-	_, cidr, err := address.ParseCIDR(cidrStr)
-	if err != nil {
-		return address.CIDR{}, err
-	}
-	if cidr.Size() < minSubnetSize {
-		return address.CIDR{}, fmt.Errorf("Allocation range smaller than minimum size %d: %s", minSubnetSize, cidrStr)
-	}
-	return cidr, nil
-}
-
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Allocator range %s (default subnet %s)", alloc.universe, alloc.defaultSubnet)
+	fmt.Fprintf(&buf, "Allocator range %s", alloc.universe)
 
 	if alloc.ring.Empty() {
 		if alloc.paxosTicker != nil {
