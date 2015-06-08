@@ -642,15 +642,14 @@ func (alloc *Allocator) donateSpace(subnet address.CIDR, to router.PeerName) {
 	defer alloc.sendRingUpdate(to)
 
 	alloc.debugln("Peer", to, "asked me for space")
-	start, size, ok := alloc.space.Donate(subnet.Start, subnet.End())
+	start, end, ok := alloc.space.Donate(subnet.Start, subnet.End())
 	if !ok {
 		free := alloc.space.NumFreeAddressesInRange(subnet.Start, subnet.End())
 		common.Assert(free == 0)
 		alloc.debugln("No space to give to peer", to)
 		return
 	}
-	end := address.Add(start, size)
-	alloc.debugln("Giving range", start, end, size, "to", to)
+	alloc.debugln("Giving range", start, end, "to", to)
 	alloc.ring.GrantRangeToHost(start, end, to)
 }
 

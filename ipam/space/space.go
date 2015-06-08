@@ -39,7 +39,7 @@ func (s *Space) Clear() {
 
 // Walk down the free list calling f() on the in-range portions, until
 // f() returns true or we run out of free space.  Return true iff f() returned true
-func (s *Space) walkFree(rangeStart, rangeEnd address.Address, f func(pos int, start, end address.Address) bool) bool {
+func (s *Space) walkFree(rangeStart, rangeEnd address.Address, f func(start, end address.Address) bool) bool {
 	if rangeStart >= rangeEnd { // degenerate case
 		return false
 	}
@@ -62,7 +62,7 @@ func (s *Space) walkFree(rangeStart, rangeEnd address.Address, f func(pos int, s
 			end = rangeEnd
 		}
 		// at this point we know start<end
-		if f(i, start, end) {
+		if f(start, end) {
 			return true
 		}
 	}
@@ -71,7 +71,7 @@ func (s *Space) walkFree(rangeStart, rangeEnd address.Address, f func(pos int, s
 
 func (s *Space) Allocate(rangeStart, rangeEnd address.Address) (bool, address.Address) {
 	var result address.Address
-	return s.walkFree(rangeStart, rangeEnd, func(_ int, start, end address.Address) bool {
+	return s.walkFree(rangeStart, rangeEnd, func(start, end address.Address) bool {
 		result = start
 		s.ours = add(s.ours, result, result+1)
 		s.free = subtract(s.free, result, result+1)
@@ -91,7 +91,7 @@ func (s *Space) Claim(addr address.Address) error {
 
 func (s *Space) NumFreeAddressesInRange(rangeStart, rangeEnd address.Address) address.Offset {
 	res := address.Offset(0)
-	s.walkFree(rangeStart, rangeEnd, func(_ int, start, end address.Address) bool {
+	s.walkFree(rangeStart, rangeEnd, func(start, end address.Address) bool {
 		res += address.Subtract(end, start)
 		return false
 	})
@@ -111,36 +111,34 @@ func (s *Space) Free(addr address.Address) error {
 	return nil
 }
 
-func (s *Space) biggestFreeRange(rangeStart, rangeEnd address.Address) (int, address.Offset) {
-	pos := -1
-	biggest := address.Offset(0)
-
-	s.walkFree(rangeStart, rangeEnd, func(i int, start, end address.Address) bool {
+func (s *Space) biggestFreeRange(rangeStart, rangeEnd address.Address) (biggestStart, biggestEnd address.Address) {
+	var biggestSize address.Offset
+	s.walkFree(rangeStart, rangeEnd, func(start, end address.Address) bool {
 		size := address.Subtract(end, start)
-		if size >= biggest {
-			pos = i
-			biggest = size
+		if size >= biggestSize {
+			biggestStart, biggestEnd = start, end
+			biggestSize = size
 		}
 		return false
 	})
-	return pos, biggest
+	return
 }
 
-func (s *Space) Donate(rangeStart, rangeEnd address.Address) (address.Address, address.Offset, bool) {
-	if len(s.free) == 0 {
+func (s *Space) Donate(rangeStart, rangeEnd address.Address) (address.Address, address.Address, bool) {
+	start, end := s.biggestFreeRange(rangeStart, rangeEnd)
+	size := address.Subtract(end, start)
+
+	if size == 0 {
 		return 0, 0, false
 	}
 
-	pos, biggest := s.biggestFreeRange(rangeStart, rangeEnd)
-
-	// Donate half of that biggest free range, rounding up so
-	// that the donation can't be empty
-	end := s.free[pos+1]
-	start := end - address.Address((biggest+1)/2)
+	// Donate half of that biggest free range. Note size/2 rounds down, so
+	// the resulting donation size rounds up, and in particular can't be empty.
+	start = address.Add(start, size/2)
 
 	s.ours = subtract(s.ours, start, end)
 	s.free = subtract(s.free, start, end)
-	return start, address.Subtract(end, start), true
+	return start, end, true
 }
 
 func firstGreater(a []address.Address, x address.Address) int {
