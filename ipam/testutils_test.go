@@ -140,7 +140,7 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 	}
 
 	alloc := NewAllocator(peername, router.PeerUID(rand.Int63()),
-		"nick-"+name, cidr, quorum)
+		"nick-"+name, cidr.Range(), quorum)
 
 	return alloc, cidr
 }
@@ -165,7 +165,7 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 func (alloc *Allocator) NumFreeAddresses(subnet address.CIDR) address.Offset {
 	resultChan := make(chan address.Offset)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.space.NumFreeAddressesInRange(subnet.Start+1, subnet.End()-1)
+		resultChan <- alloc.space.NumFreeAddressesInRange(address.MakeRange(subnet.Start+1, subnet.Size()-2))
 	}
 	return <-resultChan
 }

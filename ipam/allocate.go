@@ -14,7 +14,7 @@ type allocate struct {
 	resultChan       chan<- allocateResult
 	hasBeenCancelled func() bool
 	ident            string
-	subnet           address.CIDR
+	r                address.Range // Range we are trying to allocate within
 }
 
 // Try returns true if the request is completed, false if pending
@@ -27,31 +27,29 @@ func (g *allocate) Try(alloc *Allocator) bool {
 	// If we have previously stored an address for this container in this subnet, return it.
 	if addrs, found := alloc.owned[g.ident]; found {
 		for _, addr := range addrs {
-			if g.subnet.Contains(addr) {
+			if g.r.Contains(addr) {
 				g.resultChan <- allocateResult{addr, nil}
 				return true
 			}
 		}
 	}
 
-	if !alloc.universe.Overlaps(g.subnet) {
-		g.resultChan <- allocateResult{0, fmt.Errorf("Subnet %s out of bounds: %s", g.subnet, alloc.universe)}
+	if !alloc.universe.Overlaps(g.r) {
+		g.resultChan <- allocateResult{0, fmt.Errorf("range %s out of bounds: %s", g.r, alloc.universe)}
 		return true
 	}
 
-	// Respect RFC1122 exclusions of first and last addresses
-	start, end := g.subnet.Start+1, g.subnet.End()-1
-	if ok, addr := alloc.space.Allocate(start, end); ok {
-		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.subnet)
+	if ok, addr := alloc.space.Allocate(g.r); ok {
+		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.r)
 		alloc.addOwned(g.ident, addr)
 		g.resultChan <- allocateResult{addr, nil}
 		return true
 	}
 
 	// out of space
-	if donor, err := alloc.ring.ChoosePeerToAskForSpace(start, end); err == nil {
-		alloc.debugln("Decided to ask peer", donor, "for space in subnet", g.subnet)
-		alloc.sendSpaceRequest(donor, g.subnet)
+	if donor, err := alloc.ring.ChoosePeerToAskForSpace(g.r.Start, g.r.End); err == nil {
+		alloc.debugln("Decided to ask peer", donor, "for space in range", g.r)
+		alloc.sendSpaceRequest(donor, g.r)
 	}
 
 	return false

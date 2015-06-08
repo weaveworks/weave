@@ -218,7 +218,7 @@ func createAllocator(router *weave.Router, apiPath string, ipRangeStr string, de
 			log.Fatalf("Default subnet %s out of bounds: %s", defaultSubnet, ipRange)
 		}
 	}
-	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange, quorum)
+	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum)
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()

@@ -45,7 +45,7 @@ type operation interface {
 type Allocator struct {
 	actionChan       chan<- func()
 	ourName          router.PeerName
-	universe         address.CIDR                 // superset of all ranges
+	universe         address.Range                // superset of all ranges
 	ring             *ring.Ring                   // information on ranges owned by all peers
 	space            space.Space                  // more detail on ranges owned by us
 	owned            map[string][]address.Address // who owns what address, indexed by container-ID
@@ -60,7 +60,7 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.CIDR, quorum uint) *Allocator {
+func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint) *Allocator {
 	return &Allocator{
 		ourName:   ourName,
 		universe:  universe,
@@ -180,7 +180,9 @@ func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 // if there isn't any space we block indefinitely
 func (alloc *Allocator) Allocate(ident string, subnet address.CIDR, cancelChan <-chan bool) (address.CIDR, error) {
 	resultChan := make(chan allocateResult)
-	op := &allocate{subnet: subnet, resultChan: resultChan, ident: ident,
+	// Respect RFC1122 exclusions of first and last addresses
+	r := address.Range{Start: subnet.Start + 1, End: subnet.End() - 1}
+	op := &allocate{r: r, resultChan: resultChan, ident: ident,
 		hasBeenCancelled: hasBeenCancelled(cancelChan)}
 	alloc.doOperation(op, &alloc.pendingAllocates)
 	result := <-resultChan
@@ -347,12 +349,12 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 		case msgSpaceRequest:
 			// some other peer asked us for space
 			decoder := gob.NewDecoder(bytes.NewReader(msg[1:]))
-			var cidr address.CIDR
-			if err := decoder.Decode(&cidr); err != nil {
+			var r address.Range
+			if err := decoder.Decode(&r); err != nil {
 				resultChan <- err
 				return
 			}
-			alloc.donateSpace(cidr, sender)
+			alloc.donateSpace(r, sender)
 			resultChan <- nil
 		case msgRingUpdate:
 			resultChan <- alloc.update(msg[1:])
@@ -570,10 +572,10 @@ func (alloc *Allocator) propose() {
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
-func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, subnet address.CIDR) {
+func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	if err := enc.Encode(subnet); err != nil {
+	if err := enc.Encode(r); err != nil {
 		panic(err)
 	}
 	msg := router.Concat([]byte{msgSpaceRequest}, buf.Bytes())
@@ -633,7 +635,7 @@ func (alloc *Allocator) update(msg []byte) error {
 	return nil
 }
 
-func (alloc *Allocator) donateSpace(subnet address.CIDR, to router.PeerName) {
+func (alloc *Allocator) donateSpace(r address.Range, to router.PeerName) {
 	// No matter what we do, we'll send a unicast gossip
 	// of our ring back to tha chap who asked for space.
 	// This serves to both tell him of any space we might
@@ -642,15 +644,15 @@ func (alloc *Allocator) donateSpace(subnet address.CIDR, to router.PeerName) {
 	defer alloc.sendRingUpdate(to)
 
 	alloc.debugln("Peer", to, "asked me for space")
-	start, end, ok := alloc.space.Donate(subnet.Start, subnet.End())
+	chunk, ok := alloc.space.Donate(r)
 	if !ok {
-		free := alloc.space.NumFreeAddressesInRange(subnet.Start, subnet.End())
+		free := alloc.space.NumFreeAddressesInRange(r)
 		common.Assert(free == 0)
 		alloc.debugln("No space to give to peer", to)
 		return
 	}
-	alloc.debugln("Giving range", start, end, "to", to)
-	alloc.ring.GrantRangeToHost(start, end, to)
+	alloc.debugln("Giving range", chunk, "to", to)
+	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -678,7 +680,7 @@ func (alloc *Allocator) reportFreeSpace() {
 
 	freespace := make(map[address.Address]address.Offset)
 	for _, r := range ranges {
-		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r.Start, r.End)
+		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}
 	alloc.ring.ReportFree(freespace)
 }

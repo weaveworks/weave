@@ -39,40 +39,41 @@ func (s *Space) Clear() {
 
 // Walk down the free list calling f() on the in-range portions, until
 // f() returns true or we run out of free space.  Return true iff f() returned true
-func (s *Space) walkFree(rangeStart, rangeEnd address.Address, f func(start, end address.Address) bool) bool {
-	if rangeStart >= rangeEnd { // degenerate case
+func (s *Space) walkFree(r address.Range, f func(address.Range) bool) bool {
+	if r.Start >= r.End { // degenerate case
 		return false
 	}
 	for i := 0; i < len(s.free); i += 2 {
-		start, end := s.free[i], s.free[i+1]
-		if end <= rangeStart { // this chunk comes before the range
+		chunk := address.Range{Start: s.free[i], End: s.free[i+1]}
+		if chunk.End <= r.Start { // this chunk comes before the range
 			continue
 		}
-		if start >= rangeEnd {
+		if chunk.Start >= r.End {
 			// all remaining free space is completely after range
 			break
 		}
-		// at this point we know end>start && end>rangeStart && rangeEnd>start && rangeEnd>rangeStart
-		// therefore max(start, rangeStart) < min(end, rangeEnd)
+		// at this point we know chunk.End>chunk.Start &&
+		// chunk.End>r.Start && r.End>chunk.Start && r.End>r.Start
+		// therefore max(start, r.Start) < min(end, r.End)
 		// Restrict this block of free space to be in range
-		if start < rangeStart {
-			start = rangeStart
+		if chunk.Start < r.Start {
+			chunk.Start = r.Start
 		}
-		if end > rangeEnd {
-			end = rangeEnd
+		if chunk.End > r.End {
+			chunk.End = r.End
 		}
 		// at this point we know start<end
-		if f(start, end) {
+		if f(chunk) {
 			return true
 		}
 	}
 	return false
 }
 
-func (s *Space) Allocate(rangeStart, rangeEnd address.Address) (bool, address.Address) {
+func (s *Space) Allocate(r address.Range) (bool, address.Address) {
 	var result address.Address
-	return s.walkFree(rangeStart, rangeEnd, func(start, end address.Address) bool {
-		result = start
+	return s.walkFree(r, func(chunk address.Range) bool {
+		result = chunk.Start
 		s.ours = add(s.ours, result, result+1)
 		s.free = subtract(s.free, result, result+1)
 		return true
@@ -89,10 +90,10 @@ func (s *Space) Claim(addr address.Address) error {
 	return nil
 }
 
-func (s *Space) NumFreeAddressesInRange(rangeStart, rangeEnd address.Address) address.Offset {
+func (s *Space) NumFreeAddressesInRange(r address.Range) address.Offset {
 	res := address.Offset(0)
-	s.walkFree(rangeStart, rangeEnd, func(start, end address.Address) bool {
-		res += address.Subtract(end, start)
+	s.walkFree(r, func(chunk address.Range) bool {
+		res += chunk.Size()
 		return false
 	})
 	return res
@@ -111,12 +112,11 @@ func (s *Space) Free(addr address.Address) error {
 	return nil
 }
 
-func (s *Space) biggestFreeRange(rangeStart, rangeEnd address.Address) (biggestStart, biggestEnd address.Address) {
-	var biggestSize address.Offset
-	s.walkFree(rangeStart, rangeEnd, func(start, end address.Address) bool {
-		size := address.Subtract(end, start)
-		if size >= biggestSize {
-			biggestStart, biggestEnd = start, end
+func (s *Space) biggestFreeRange(r address.Range) (biggest address.Range) {
+	biggestSize := address.Offset(0)
+	s.walkFree(r, func(chunk address.Range) bool {
+		if size := chunk.Size(); size >= biggestSize {
+			biggest = chunk
 			biggestSize = size
 		}
 		return false
@@ -124,21 +124,20 @@ func (s *Space) biggestFreeRange(rangeStart, rangeEnd address.Address) (biggestS
 	return
 }
 
-func (s *Space) Donate(rangeStart, rangeEnd address.Address) (address.Address, address.Address, bool) {
-	start, end := s.biggestFreeRange(rangeStart, rangeEnd)
-	size := address.Subtract(end, start)
+func (s *Space) Donate(r address.Range) (address.Range, bool) {
+	biggest := s.biggestFreeRange(r)
 
-	if size == 0 {
-		return 0, 0, false
+	if biggest.Size() == 0 {
+		return address.Range{}, false
 	}
 
 	// Donate half of that biggest free range. Note size/2 rounds down, so
 	// the resulting donation size rounds up, and in particular can't be empty.
-	start = address.Add(start, size/2)
+	biggest.Start = address.Add(biggest.Start, biggest.Size()/2)
 
-	s.ours = subtract(s.ours, start, end)
-	s.free = subtract(s.free, start, end)
-	return start, end, true
+	s.ours = subtract(s.ours, biggest.Start, biggest.End)
+	s.free = subtract(s.free, biggest.Start, biggest.End)
+	return biggest, true
 }
 
 func firstGreater(a []address.Address, x address.Address) int {
