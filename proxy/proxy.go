@@ -87,11 +87,11 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var i interceptor
 	switch {
 	case containerCreateRegexp.MatchString(path):
-		i = &createContainerInterceptor{proxy.client, proxy.dockerBridgeIP, proxy.WithDNS, proxy.WithIPAM}
+		i = &createContainerInterceptor{proxy}
 	case containerStartRegexp.MatchString(path):
-		i = &startContainerInterceptor{proxy.client, proxy.WithDNS, proxy.WithIPAM}
+		i = &startContainerInterceptor{proxy}
 	case execCreateRegexp.MatchString(path):
-		i = &createExecInterceptor{proxy.client, proxy.WithIPAM}
+		i = &createExecInterceptor{proxy}
 	default:
 		i = &nullInterceptor{}
 	}

@@ -9,24 +9,20 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
-type startContainerInterceptor struct {
-	client   *docker.Client
-	withDNS  bool
-	withIPAM bool
-}
+type startContainerInterceptor struct{ proxy *Proxy }
 
 func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 	return nil
 }
 
 func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
-	container, err := inspectContainerInPath(i.client, r.Request.URL.Path)
+	container, err := inspectContainerInPath(i.proxy.client, r.Request.URL.Path)
 	if err != nil {
 		return err
 	}
 
 	cidrs, ok := weaveCIDRsFromConfig(container.Config)
-	if !ok && !i.withIPAM {
+	if !ok && !i.proxy.WithIPAM {
 		Debug.Print("No Weave CIDR, ignoring")
 		return nil
 	}
@@ -35,10 +31,10 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 	args = append(args, cidrs...)
 	args = append(args, container.ID)
 	if output, err := callWeave(args...); err != nil {
-		i.client.KillContainer(docker.KillContainerOptions{ID: container.ID})
+		i.proxy.client.KillContainer(docker.KillContainerOptions{ID: container.ID})
 		Warning.Printf("Attaching container %s to weave network failed: %s", container.ID, string(output))
 		return errors.New(string(output))
 	}
 
-	return i.client.KillContainer(docker.KillContainerOptions{ID: container.ID, Signal: docker.SIGUSR2})
+	return i.proxy.client.KillContainer(docker.KillContainerOptions{ID: container.ID, Signal: docker.SIGUSR2})
 }
