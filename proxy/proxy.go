@@ -95,7 +95,7 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		i = &nullInterceptor{}
 	}
-	newClient(proxy.dial, i).ServeHTTP(w, r)
+	proxy.Intercept(i, w, r)
 }
 
 func (proxy *Proxy) ListenAndServe() error {
