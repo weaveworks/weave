@@ -379,8 +379,8 @@ func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(TCPHeartbeat * 2))
 }
 
-func (conn *LocalConnection) Forward(srcPeer, dstPeer *Peer, frame []byte, dec *EthernetDecoder, broadcast bool) {
-	conn.forwarder.Forward(srcPeer, dstPeer, frame, dec, broadcast)
+func (conn *LocalConnection) Forward(key ForwardPacketKey) FlowOp {
+	return conn.forwarder.Forward(key)
 }
 
 func tickerChan(ticker *time.Ticker) <-chan time.Time {

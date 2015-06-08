@@ -28,40 +28,54 @@ func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
 	return peer
 }
 
-func (peer *LocalPeer) Forward(dstPeer *Peer, frame []byte, dec *EthernetDecoder) {
-	peer.Relay(peer.Peer, dstPeer, frame, dec)
+func (peer *LocalPeer) Forward(dstPeer *Peer, key PacketKey) FlowOp {
+	return peer.Relay(ForwardPacketKey{
+		PacketKey: key,
+		SrcPeer:   peer.Peer,
+		DstPeer:   dstPeer,
+	})
 }
 
-func (peer *LocalPeer) Broadcast(frame []byte, dec *EthernetDecoder) {
-	peer.RelayBroadcast(peer.Peer, frame, dec)
+func (peer *LocalPeer) Broadcast(key PacketKey) FlowOp {
+	return peer.RelayBroadcast(peer.Peer, key)
 }
 
-func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, frame []byte, dec *EthernetDecoder) {
-	relayPeerName, found := peer.router.Routes.Unicast(dstPeer.Name)
+func (peer *LocalPeer) Relay(key ForwardPacketKey) FlowOp {
+	relayPeerName, found := peer.router.Routes.Unicast(key.DstPeer.Name)
 	if !found {
 		// Not necessarily an error as there could be a race with the
 		// dst disappearing whilst the frame is in flight
-		log.Println("Received packet for unknown destination:", dstPeer)
-		return
+		log.Println("Received packet for unknown destination:", key.DstPeer)
+		return nil
 	}
+
 	conn, found := peer.ConnectionTo(relayPeerName)
 	if !found {
 		// Again, could just be a race, not necessarily an error
 		log.Println("Unable to find connection to relay peer", relayPeerName)
-		return
+		return nil
 	}
-	conn.(*LocalConnection).Forward(srcPeer, dstPeer, frame, dec, false)
+
+	return conn.(*LocalConnection).Forward(key)
 }
 
-func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, frame []byte, dec *EthernetDecoder) {
+func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
 	nextHops := peer.router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
-		return
+		return nil
 	}
+
+	op := NewMultiFlowOp(true)
+
 	for _, conn := range peer.ConnectionsTo(nextHops) {
-		conn.(*LocalConnection).Forward(srcPeer, conn.Remote(), frame,
-			dec, true)
+		op.Add(conn.(*LocalConnection).Forward(ForwardPacketKey{
+			PacketKey: key,
+			SrcPeer:   srcPeer,
+			DstPeer:   conn.Remote(),
+		}))
 	}
+
+	return op
 }
 
 func (peer *LocalPeer) Info() string {

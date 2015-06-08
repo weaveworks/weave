@@ -58,15 +58,15 @@ func (cache *MacCache) Enter(mac net.HardwareAddr, peer *Peer) bool {
 	return false
 }
 
-func (cache *MacCache) Lookup(mac net.HardwareAddr) (*Peer, bool) {
+func (cache *MacCache) Lookup(mac net.HardwareAddr) *Peer {
 	key := macint(mac)
 	cache.RLock()
 	defer cache.RUnlock()
 	entry, found := cache.table[key]
 	if !found {
-		return nil, false
+		return nil
 	}
-	return entry.peer, true
+	return entry.peer
 }
 
 func (cache *MacCache) Delete(peer *Peer) bool {

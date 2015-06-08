@@ -19,8 +19,7 @@ type InterHost interface {
 
 // When a consumer is called, the decoder will already have been used
 // to decode the frame.
-type InterHostConsumer func(src *Peer, dst *Peer, frame []byte,
-	dec *EthernetDecoder)
+type InterHostConsumer func(ForwardPacketKey) FlowOp
 
 // Crypto settings for a forwarder.
 type InterHostCrypto struct {
@@ -38,11 +37,8 @@ type InterHostForwarder interface {
 	// (e.g. on another thread).
 	SetListener(InterHostForwarderListener)
 
-	// Forward a packet across the connection.  The caller must
-	// supply an EthernetDecoder specific to this thread, which
-	// has already been used to decode the frame.
-	Forward(src *Peer, dest *Peer, frame []byte, dec *EthernetDecoder,
-		broadcast bool)
+	// Forward a packet across the connection.
+	Forward(ForwardPacketKey) FlowOp
 
 	Close()
 
@@ -69,8 +65,8 @@ func (NullInterHost) MakeForwarder(*Peer, net.IP, *net.UDPAddr, uint64,
 func (NullInterHost) SetListener(InterHostForwarderListener) {
 }
 
-func (NullInterHost) Forward(*Peer, *Peer, []byte, *EthernetDecoder,
-	bool) {
+func (NullInterHost) Forward(ForwardPacketKey) FlowOp {
+	return nil
 }
 
 func (NullInterHost) Close() {
