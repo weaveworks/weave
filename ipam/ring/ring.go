@@ -40,7 +40,6 @@ var (
 	ErrInvalidEntry     = errors.New("Received invalid state update!")
 	ErrEntryInMyRange   = errors.New("Received new entry in my range!")
 	ErrNoFreeSpace      = errors.New("No free space found!")
-	ErrTooMuchFreeSpace = errors.New("Entry reporting too much free space!")
 	ErrInvalidTimeout   = errors.New("dt must be greater than 0")
 	ErrNotFound         = errors.New("No entries for peer found")
 )
@@ -76,7 +75,7 @@ func (r *Ring) checkInvariants() error {
 		distance := r.distance(entry.Token, next.Token)
 
 		if entry.Free > distance {
-			return ErrTooMuchFreeSpace
+			return fmt.Errorf("Entry %s-%s reporting too much free space: %d > %d", entry.Token, next.Token, entry.Free, distance)
 		}
 	}
 
@@ -167,7 +166,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer router.PeerName
 	pos := preceedingPos + 1
 	for ; pos < len(r.Entries) && r.Entries.entry(pos).Token < end; pos++ {
 		entry := r.Entries.entry(pos)
-		entry.update(peer, entry.Free)
+		entry.update(peer, address.Min(entry.Free, r.distance(entry.Token, end)))
 	}
 
 	// There is never an entry with a token of r.End, as the end of

@@ -76,8 +76,31 @@ without a `WEAVE_CIDR`, we can launch the proxy with the `--with-ipam`
 option. For example:
 
     host1$ weave launch-proxy --with-ipam
+    host1$ export DOCKER_HOST=tcp://host1:12375
 
-More details on IPAM can be found in the [IPAM documentation](ipam.html).
+Now, containers will always be automatically assigned an IP address
+and attached to the weave network when we start them. For example:
+
+    host1$ docker run -ti ubuntu /bin/sh
+
+More details on IPAM can be found in the [IPAM
+documentation](ipam.html).
+
+## Usage with WeaveDNS
+
+Containers started via the proxy can be automatically configured to
+use WeaveDNS for name resolution. To accomplish this we need to launch
+the proxy with the `--with-dns` option
+
+    host1$ weave launch
+    host1$ weave launch-dns 10.2.254.1/24
+    host1$ weave launch-proxy --with-dns
+
+With this done, any containers connected via IPAM or `WEAVE_CIDR=...`,
+which are launched through the proxy will use weaveDNS for name
+resolution. WeaveDNS is used in addition to any dns servers specified
+via the `--dns` option. More details on weaveDNS can be found in the
+[weaveDNS documentation](weavedns.html).
 
 ## Usage with WeaveDNS
 

@@ -1,3 +1,59 @@
+## Release 0.11.2
+
+This is a bug fix release, addressing the following issues:
+
+- `weave run` did not respect DOCKER_CLIENT_ARGS. #855
+- Negative result cache did not expire if requeried within TTL. #845
+
+More details in the [change
+log](https://github.com/weaveworks/weave/issues?q=milestone%3A0.11.2).
+
+*NB: This release does not change the weave protocol version.
+Therefore, when upgrading an existing 0.11 installation incrementally,
+connectivity between peers will be retained.*
+
+## Release 0.11.1
+
+This is a bug fix release, addressing the following issues:
+
+- The IP Allocator could crash in some relatively rare
+  circumstances. #782/#783.
+- When the proxy failed to attach a container to the weave network,
+  there was no failure indication and descriptive error anywhere, and
+  the application process would still start. Now an error is reported
+  to the client (i.e. typically the Docker CLI), recorded in the proxy
+  logs, and the container is terminated. #788/#799.
+- `weave launch-proxy --with-ipam` failed to configure the entrypoint
+  and DNS unless a (possibly blank) `WEAVE_CIDR` was
+  specified. Affected containers could start the application process
+  w/o the weave network interface being available, and without
+  functioning name resolution for the weaveDNS domain.
+  #744/#747/#751/#752
+- The `weave status` output for the IP Allocator was misleadingly
+  conveying a sense of brokenness when no IP allocation requests had
+  been made yet. #787/#801
+- When invoking `weave launch-proxy` twice, the second invocation
+  would output a blank line and terminate with a success exit
+  status. Now it reports that the proxy is already running and exits
+  with a non-zero status. #767/#780
+- `weave launch-proxy` was not respecting WEAVEPROXY_DOCKER_ARGS, so
+  any user-supplied custom configuration for the weaveproxy container
+  was ignored. #755/#780
+- The proxy was not intercepting API calls to the unversioned (1.0)
+  Docker Remote API. Hence none of the weave functionality was
+  available when Docker clients were using that version of the
+  API. #770/#774/#777,#809
+- The proxy would crash when certain elements of the
+  `/containers/create` JSON were missing. We are not aware of any
+  Docker clients doing this, but it's been fixed regardless. #778/#777
+
+More details in the [change
+log](https://github.com/weaveworks/weave/issues?q=milestone%3A0.11.1).
+
+*NB: This release does not change the weave protocol version.
+Therefore, when upgrading an existing 0.11 installation incrementally,
+connectivity between peers will be retained.*
+
 ## Release 0.11.0
 
 **Highlights**:

@@ -5,13 +5,14 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
-	"github.com/benbjohnson/clock"
-	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
 	"math"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/benbjohnson/clock"
+	"github.com/miekg/dns"
+	. "github.com/weaveworks/weave/common"
 )
 
 var (
@@ -145,9 +146,12 @@ func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Tim
 		prevValidUntil = e.validUntil
 	}
 
-	e.Status = stResolved
-	e.Flags = flags
-	e.putTime = now
+	// make sure we do not overwrite noLocalReplies entries
+	if flags&CacheNoLocalReplies != 0 {
+		if e.Flags&CacheNoLocalReplies != 0 {
+			return false
+		}
+	}
 
 	if ttl != nullTTL {
 		e.validUntil = now.Add(time.Second * time.Duration(ttl))
@@ -161,7 +165,13 @@ func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Tim
 			}
 		}
 		e.validUntil = now.Add(time.Second * time.Duration(minTTL))
+	} else {
+		Warning.Printf("[cache] no valid TTL could be calculated")
 	}
+
+	e.Status = stResolved
+	e.Flags = flags
+	e.putTime = now
 
 	if reply != nil {
 		e.reply = *reply

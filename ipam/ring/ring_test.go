@@ -158,6 +158,17 @@ func TestGrantSplit(t *testing.T) {
 	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer1name, Free: 10, Version: 1},
 		{Token: dot10, Peer: peer2name, Free: 235},
 		{Token: dot245, Peer: peer1name, Free: 10}})
+	ring1.assertInvariants()
+
+	// Grant range spanning a live token, and inserting a new token
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer1name, Free: 118}, {Token: middle, Peer: peer1name, Free: 127}}
+	ring1.GrantRangeToHost(dot10, dot245, peer2name)
+	wt.AssertEquals(t, ring1.Entries, entries{{Token: start, Peer: peer1name, Free: 10, Version: 2},
+		{Token: dot10, Peer: peer2name, Free: 118, Version: 1},
+		{Token: middle, Peer: peer2name, Free: 117, Version: 1},
+		{Token: dot245, Peer: peer1name, Free: 10, Version: 0}})
+	ring1.assertInvariants()
 }
 
 func TestMergeSimple(t *testing.T) {

@@ -26,4 +26,28 @@ run_container "grep ^1$ /sys/class/net/ethwe/carrier"
 build_image false '["/bin/false"]' ''
 run_container "--entrypoint='grep' false ^1$ /sys/class/net/ethwe/carrier"
 
+weave_on $HOST1 launch -iprange 10.2.2.0/24
+docker_on $HOST1 kill weaveproxy
+weave_on $HOST1 launch-proxy --with-ipam
+
+assert_raises "proxy docker_on $HOST1 run check-ethwe-up"
+
+create_container_json=$(cat <<-EOF
+{
+  "Hostname":"c1",
+  "AttachStdin":false,
+  "AttachStdout":true,
+  "AttachStderr":true,
+  "Tty":false,
+  "OpenStdin":false,
+  "StdinOnce":false,
+  "Image":"check-ethwe-up"
+}
+EOF
+)
+
+# Test a minimal request to the unversioned (v1.0) docker api
+CONTAINER_ID=$(curl -s -X POST --header "Content-Type: application/json" http://$HOST1:12375/containers/create -d "$create_container_json" | sed -e 's/.*"Id":"\([^"]*\)".*/\1/')
+assert_raises "proxy docker_on $HOST1 start -ai $CONTAINER_ID"
+
 end_suite
