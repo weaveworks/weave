@@ -29,13 +29,15 @@ To start the proxy, run
 
     host1$ weave launch-proxy
 
-By default, the proxy listens on port 12375, on all network
-interfaces. This can be adjusted with the `-H` argument, e.g.
+By default, the proxy will connect to docker at
+`unix:///var/run/docker.sock`. This can be adjusted with the `-H`
+argument, e.g.
 
-    host1$ weave launch-proxy -H tcp://localhost:12375
+    host1$ weave launch-proxy -H tcp://127.0.0.1:4243
 
-All docker commands can be run via the proxy, so it is safe to
-globally adjust your `DOCKER_HOST`, e.g.
+The proxy listens on port 12375, on all network interfaces. All docker
+commands can be run via the proxy, so it is safe to globally adjust
+your `DOCKER_HOST` to point at the proxy, e.g.
 
     host1$ export DOCKER_HOST=tcp://localhost:12375
     host1$ docker ps
