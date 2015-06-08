@@ -38,13 +38,13 @@ func TestAllocFree(t *testing.T) {
 	_, cidr2, _ := address.ParseCIDR(subnet2)
 
 	alloc.claimRingForTesting()
-	addr1, _ := alloc.Allocate(container1, cidr1, nil)
+	addr1, err := alloc.Allocate(container1, cidr1, nil)
+	wt.AssertNoErr(t, err)
 	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
 
 	addr2, err := alloc.Allocate(container1, cidr2, nil)
 	wt.AssertNoErr(t, err)
 	wt.AssertEqualString(t, addr2.String(), testAddr2, "address")
-	CheckAllExpectedMessagesSent(alloc)
 
 	// Ask for another address for a different container and check it's different
 	addr1b, _ := alloc.Allocate(container2, cidr1, nil)

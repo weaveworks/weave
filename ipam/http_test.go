@@ -74,22 +74,22 @@ func TestHttp(t *testing.T) {
 		container2  = "baddf00d"
 		container3  = "b01df00d"
 		universe    = "10.0.0.0/8"
-		testAddr1   = "10.0.3.9/29"
 		testCIDR1   = "10.0.3.8/29"
 		testCIDR2   = "10.2.0.0/16"
+		testAddr1   = "10.0.3.9/29"
 		testAddr2   = "10.2.0.1/16"
 	)
 
 	alloc, subnet := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", universe, 1)
 	port := listenHTTP(alloc, subnet)
-
 	alloc.claimRingForTesting()
+
+	// Allocate an address in each subnet, and check we got what we expected
 	cidr1a := HTTPPost(t, allocURL(port, testCIDR1, containerID))
 	wt.AssertEqualString(t, cidr1a, testAddr1, "address")
-
 	cidr2a := HTTPPost(t, allocURL(port, testCIDR2, containerID))
 	wt.AssertEqualString(t, cidr2a, testAddr2, "address")
-
+	// Now, make the same requests again to check the operation is idempotent
 	check := HTTPGet(t, allocURL(port, testCIDR1, containerID))
 	wt.AssertEqualString(t, check, cidr1a, "address")
 	check = HTTPGet(t, allocURL(port, testCIDR2, containerID))
@@ -101,7 +101,7 @@ func TestHttp(t *testing.T) {
 	cidr2b := HTTPPost(t, allocURL(port, testCIDR2, container2))
 	wt.AssertFalse(t, cidr2b == testAddr2, "address")
 
-	// Now free the first container, and we should get it back when we ask
+	// Now free the first container, and we should get its addresses back when we ask
 	doHTTP("DELETE", identURL(port, containerID))
 
 	cidr1c := HTTPPost(t, allocURL(port, testCIDR1, container3))
