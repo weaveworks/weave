@@ -864,7 +864,8 @@ case "$COMMAND" in
             shift 1
         fi
         CONTAINER_PORT=$PORT
-        while true ; do
+        ARGS=""
+        while [ $# -gt 0 ] ; do
             case "$1" in
                 -password)
                     [ $# -gt 1 ] || usage
@@ -884,10 +885,12 @@ case "$COMMAND" in
                     shift 2
                     ;;
                 *)
-                    break
+                    ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
+                    shift
                     ;;
             esac
         done
+        eval "set -- $ARGS"
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
         # additional parameters, such as resource limits, to docker
         # when launching the weave container.
