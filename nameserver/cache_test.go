@@ -2,13 +2,14 @@ package nameserver
 
 import (
 	"fmt"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	wt "github.com/weaveworks/weave/testing"
-	"net"
-	"testing"
-	"time"
 )
 
 // Check that the cache keeps its intended capacity constant
@@ -195,12 +196,23 @@ func TestCacheEntries(t *testing.T) {
 	question3 := &questionMsg3.Question[0]
 
 	t.Logf("Checking that a entry with CacheNoLocalReplies return an error")
-	l.Put(questionMsg3, nil, nullTTL, CacheNoLocalReplies)
+	l.Put(questionMsg3, nil, negLocalTTL, CacheNoLocalReplies)
 	resp, err = l.Get(questionMsg3, minUDPSize)
 	wt.AssertNil(t, resp, "Get() response with CacheNoLocalReplies")
-	wt.AssertNotNil(t, err, "Get() error with CacheNoLocalReplies")
+	wt.AssertTrue(t, err == errNoLocalReplies, "Get() error with CacheNoLocalReplies")
 
-	clk.Add(time.Second * time.Duration(negLocalTTL+1))
+	t.Logf("Checking that more Put's do not make the negative TTL longer")
+	clk.Add(time.Duration(negLocalTTL/2) * time.Second)
+	l.Put(questionMsg3, nil, negLocalTTL, CacheNoLocalReplies)
+	clk.Add(time.Duration(1) * time.Second)
+	l.Put(questionMsg3, nil, negLocalTTL, CacheNoLocalReplies)
+	clk.Add(time.Duration(1) * time.Second)
+	l.Put(questionMsg3, nil, negLocalTTL, CacheNoLocalReplies)
+	resp, err = l.Get(questionMsg3, minUDPSize)
+	wt.AssertNil(t, resp, "Get() response with CacheNoLocalReplies")
+	wt.AssertTrue(t, err == errNoLocalReplies, "Get() error with CacheNoLocalReplies")
+
+	clk.Add(time.Duration(negLocalTTL/2) * time.Second)
 	t.Logf("Checking that we get an expired response after %f seconds", negLocalTTL)
 	resp, err = l.Get(questionMsg3, minUDPSize)
 	wt.AssertNil(t, resp, "expired Get() response with CacheNoLocalReplies")
