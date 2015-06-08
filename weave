@@ -562,11 +562,12 @@ http_call() {
     http_call_ip $CONTAINER_IP "$@"
 }
 
-# Wait until container $1 on IP $2, port $3 is alive enough to respond
-# to its status call
-wait_for_status_ip() {
+# Wait until container $1 is alive enough to respond to "GET /status"
+# http request on its docker-assigned IP, port $2
+wait_for_status() {
+    container_ip $1 "$1 container has died." "$1 container has died." || return 1
     while true ; do
-        http_call_ip $2 $3 GET /status >/dev/null && return 0
+        http_call_ip $CONTAINER_IP $2 GET /status >/dev/null && return 0
         if ! container_id $1 >/dev/null 2>&1 ; then
             echo "$1 container has died." >&2
             return 1
@@ -575,9 +576,19 @@ wait_for_status_ip() {
     done
 }
 
-wait_for_status() {
-    container_ip $1 "$1 container has died." "$1 container has died." || return 1
-    wait_for_status_ip $1 $CONTAINER_IP $2
+# Wait until container $1 outputs a line containing $2 in its log
+wait_for_log() {
+    fifo=/tmp/tmpfifo.$$
+    mkfifo $fifo || exit 1
+    docker logs -f $1 2>/dev/null >$fifo &
+    res=0
+    grep -q "$2" $fifo || res=1
+    kill $! 2>/dev/null || true
+    rm $fifo
+    if [ $res -eq 1 ] ; then
+        echo "$1 container has died." >&2
+    fi
+    return $res
 }
 
 # Call $1 for all containers, passing container ID, all MACs and all IPs
@@ -643,20 +654,20 @@ dns_args() {
 }
 
 # Print an error to stderr and return with an indicative exit status
-# if the weaveDNS container does not exist or isn't running.
-check_dns_running() {
-    if ! STATUS=$(docker inspect --format='{{.State.Running}}' $DNS_CONTAINER_NAME 2>/dev/null); then
-        echo  "$DNS_CONTAINER_NAME container is not present. Have you launched it?" >&2
+# if the container $1 does not exist or isn't running.
+check_running() {
+    if ! STATUS=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null); then
+        echo  "$1 container is not present. Have you launched it?" >&2
         return 1
     elif [ "$STATUS" != "true" ] ; then
-        echo "$DNS_CONTAINER_NAME container is not running." >&2
+        echo "$1 container is not running." >&2
         return 2
     fi
 }
 
 # Execute $@ only if the weaveDNS container is running
 when_dns_running() {
-    if check_dns_running 2>/dev/null; then
+    if check_running $DNS_CONTAINER_NAME 2>/dev/null; then
         "$@"
     fi
 }
@@ -940,7 +951,7 @@ case "$COMMAND" in
             -e PROCFS=/hostproc \
             --entrypoint=/home/weave/weaveproxy \
             $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $PROXY_ARGS)
-        wait_for_status_ip $PROXY_CONTAINER_NAME 127.0.0.1 $PROXY_PORT
+        wait_for_log $PROXY_CONTAINER_NAME "proxy listening"
         echo $PROXY_CONTAINER
         ;;
     connect)
@@ -960,8 +971,10 @@ case "$COMMAND" in
         http_call $CONTAINER_NAME $HTTP_PORT GET /status || res=1
         echo
         http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status 2>/dev/null || true
-        echo
-        http_call_ip 127.0.0.1 $PROXY_PORT GET /status 2>/dev/null || true
+        if check_running $PROXY_CONTAINER_NAME 2>/dev/null ; then
+            echo
+            echo "weave proxy is running"
+        fi
         [ $res -eq 0 ]
         ;;
     ps)
@@ -1040,7 +1053,7 @@ case "$COMMAND" in
         collect_ip_args "$@"
         shift $IP_COUNT
         [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
-        check_dns_running
+        check_running $DNS_CONTAINER_NAME
         CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
             with_container_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
@@ -1052,7 +1065,7 @@ case "$COMMAND" in
         collect_ip_args "$@"
         shift $IP_COUNT
         [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
-        check_dns_running
+        check_running $DNS_CONTAINER_NAME
         CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
             delete_dns $CONTAINER $IP_ARGS

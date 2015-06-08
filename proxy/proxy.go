@@ -1,14 +1,11 @@
 package proxy
 
 import (
-	"bytes"
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -94,9 +91,6 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.WithDNS, proxy.WithIPAM}, w, r)
 	case execCreateRegexp.MatchString(path):
 		proxy.serveWithInterceptor(&createExecInterceptor{proxy.client, proxy.WithIPAM}, w, r)
-	case strings.HasPrefix(path, "/status"):
-		fmt.Fprintln(w, "weave proxy", proxy.Version)
-		fmt.Fprintln(w, proxy.Status())
 	default:
 		proxy.serveWithInterceptor(&nullInterceptor{}, w, r)
 	}
@@ -104,24 +98,6 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (proxy *Proxy) serveWithInterceptor(i interceptor, w http.ResponseWriter, r *http.Request) {
 	newClient(proxy.dial, i).ServeHTTP(w, r)
-}
-
-// Return status string
-func (proxy *Proxy) Status() string {
-	var buf bytes.Buffer
-	fmt.Fprintln(&buf, "Listen address is", proxy.ListenAddr)
-	fmt.Fprintln(&buf, "Docker address is", proxy.DockerAddr)
-	switch {
-	case proxy.TLSConfig.Verify:
-		fmt.Fprintln(&buf, "TLS verify")
-	case proxy.TLSConfig.Enabled:
-		fmt.Fprintln(&buf, "TLS on")
-	default:
-		fmt.Fprintln(&buf, "TLS off")
-	}
-	fmt.Fprintln(&buf, "DNS", OnOff(proxy.WithDNS))
-	fmt.Fprintln(&buf, "IPAM", OnOff(proxy.WithIPAM))
-	return buf.String()
 }
 
 func (proxy *Proxy) ListenAndServe() error {
@@ -132,11 +108,9 @@ func (proxy *Proxy) ListenAndServe() error {
 
 	if proxy.TLSConfig.enabled() {
 		listener = tls.NewListener(listener, proxy.TLSConfig.Config)
-		Info.Println("TLS Enabled")
 	}
 
-	Info.Printf("Listening on %s", proxy.ListenAddr)
-	Info.Printf("Proxying %s", proxy.DockerAddr)
+	Info.Println("proxy listening")
 
 	return (&http.Server{Handler: proxy}).Serve(listener)
 }
