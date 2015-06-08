@@ -89,7 +89,7 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	switch {
 	case containerCreateRegexp.MatchString(path):
-		proxy.serveWithInterceptor(&createContainerInterceptor{proxy.client, proxy.WithDNS, proxy.dockerBridgeIP, proxy.WithIPAM}, w, r)
+		proxy.serveWithInterceptor(&createContainerInterceptor{proxy.client, proxy.dockerBridgeIP, proxy.WithDNS, proxy.WithIPAM}, w, r)
 	case containerStartRegexp.MatchString(path):
 		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.WithDNS, proxy.WithIPAM}, w, r)
 	case execCreateRegexp.MatchString(path):

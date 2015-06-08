@@ -13,8 +13,8 @@ import (
 
 type createContainerInterceptor struct {
 	client         *docker.Client
-	withDNS        bool
 	dockerBridgeIP string
+	withDNS        bool
 	withIPAM       bool
 }
 
