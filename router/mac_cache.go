@@ -93,7 +93,7 @@ func (cache *MacCache) String() string {
 }
 
 func (cache *MacCache) setExpiryTimer() {
-	cache.expiryTimer = time.AfterFunc(cache.maxAge/10, func() { cache.expire() })
+	//cache.expiryTimer = time.AfterFunc(cache.maxAge/10, func() { cache.expire() })
 }
 
 func (cache *MacCache) expire() {
