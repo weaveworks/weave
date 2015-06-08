@@ -48,9 +48,9 @@ usage() {
     echo "weave reset"
     echo "weave rmpeer       <peer_id>"
     echo
-    echo "where <peer>    is of the form <ip_address_or_fqdn>[:<port>], and"
-    echo "      <cidr>    is of the form <ip_address>/<routing_prefix_length>"
-    echo "      <peer_id> is a <nickname> or weave internal peer ID"
+    echo "where <peer>    = <ip_address_or_fqdn>[:<port>]"
+    echo "      <cidr>    = <ip_address>/<routing_prefix_length>"
+    echo "      <peer_id> = <nickname> or weave internal peer ID"
     exit 1
 }
 
