@@ -65,6 +65,7 @@ exec_remote() {
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
         -e WEAVE_CONTAINER_NAME \
+        -e WEAVE_MTU \
         -e DOCKER_BRIDGE \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
@@ -164,7 +165,6 @@ CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 DNS_CONTAINER_NAME=weavedns
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
-MTU=65535
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
@@ -175,6 +175,13 @@ if [ "$DOCKER_HOST" != "${DOCKER_HOST#tcp://}" ] ; then
     PROXY_HOST=$(echo "$DOCKER_HOST" | sed -e "s|tcp://\([^:]*\):[0-9]*|\1|")
 fi
 
+
+# GCE has the lowest underlay network MTU we're likely to encounter on
+# a local network, at 1460 bytes.  To get the overlay MTU from that we
+# subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
+# UDP hear, 8 bytes for the vxlan header, and 14 bytes for the inner
+# ethernet header.
+MTU=${WEAVE_MTU:-1410}
 
 ######################################################################
 # general helpers; independent of docker and weave
@@ -269,6 +276,7 @@ create_bridge() {
         #ip link add name v${CONTAINER_IFNAME}du mtu $MTU type dummy
         #ip link set dev v${CONTAINER_IFNAME}du master $BRIDGE
         #ip link del dev v${CONTAINER_IFNAME}du
+        ip link set dev $BRIDGE mtu $MTU
         # Drop traffic from Docker bridge to Weave; it can break subnet isolation
         if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
             # Note using -I to insert ahead of Docker's bridge rules
