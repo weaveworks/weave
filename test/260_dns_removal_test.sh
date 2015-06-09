@@ -1,0 +1,33 @@
+#! /bin/bash
+
+. ./config.sh
+
+C1=10.2.0.67
+C2=10.2.0.43
+NAME=seetwo.weave.local
+
+DOPTS="--name=c2 -h $NAME"
+
+check() {
+    assert_dns_record $HOST1 c1 $NAME $C2
+    docker_on $HOST1 rm -f c2 >/dev/null
+    assert_no_dns_record $HOST1 c1 $NAME
+}
+
+start_suite "Automatic DNS record removal on container death"
+
+weave_on $HOST1 launch-dns 10.2.254.1/24 --no-cache
+start_container_with_dns $HOST1 $C1/24 --name=c1
+
+start_container $HOST1 $C2/24 $DOPTS
+check
+
+docker_on $HOST1 run    $DOPTS -dt $SMALL_IMAGE /bin/sh
+weave_on  $HOST1 attach $C2/24 c2
+check
+
+docker_on $HOST1 create $DOPTS  -t $SMALL_IMAGE /bin/sh
+weave_on  $HOST1 start  $C2/24 c2
+check
+
+end_suite
