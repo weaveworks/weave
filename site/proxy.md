@@ -35,9 +35,13 @@ argument, e.g.
 
     host1$ weave launch-proxy -H tcp://127.0.0.1:4243
 
-The proxy listens on port 12375, on all network interfaces. All docker
-commands can be run via the proxy, so it is safe to globally adjust
-your `DOCKER_HOST` to point at the proxy, e.g.
+By default, the proxy listens on port 12375, on all network
+interfaces. This can be adjusted with the `-L` argument, e.g.
+
+    host1$ weave launch-proxy -L 127.0.0.1:9999
+
+All docker commands can be run via the proxy, so it is safe to
+globally adjust your `DOCKER_HOST` to point at the proxy, e.g.
 
     host1$ export DOCKER_HOST=tcp://localhost:12375
     host1$ docker ps
@@ -46,7 +50,7 @@ your `DOCKER_HOST` to point at the proxy, e.g.
 If you are working with a remote docker daemon, then `localhost` in
 the above needs to be replaced with the docker daemon host, and any
 firewalls inbetween need to be configured to permit access to
-port 12375.
+the proxy port.
 
 ## <a name="usage"></a>Usage
 

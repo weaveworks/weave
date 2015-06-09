@@ -28,7 +28,7 @@ usage() {
     echo "weave launch       [-password <password>] [-nickname <nickname>] [-nodiscovery]"
     echo "                       [-iprange <cidr>] <peer> ..."
     echo "weave launch-dns   <cidr>"
-    echo "weave launch-proxy [-H <docker_endpoint>] [--with-dns] [--with-ipam]"
+    echo "weave launch-proxy [-H <docker_endpoint>] [-L <address>] [--with-dns] [--with-ipam]"
     echo "weave connect      [--replace] [<peer> ...]"
     echo "weave forget       <peer> ..."
     echo "weave run          [--with-dns] [<cidr> ...] <docker run args> ..."
@@ -51,6 +51,7 @@ usage() {
     echo "where <peer>    = <ip_address_or_fqdn>[:<port>]"
     echo "      <cidr>    = <ip_address>/<routing_prefix_length>"
     echo "      <peer_id> = <nickname> or weave internal peer ID"
+    echo "      <address> = [<ip_address>]:<port>"
     exit 1
 }
 
