@@ -75,7 +75,7 @@ weave_on $HOST1 hide 10.2.1.2/24  --subnet 10.2.3.0/24
 assert_bridge_cidrs $HOST1 weave 10.2.2.2/24
 
 # Now detach and run another container to check we have released IPs in IPAM
-weave_on $HOST1 detach --subnet 10.2.3.0/24 $CID
+weave_on $HOST1 detach $CID
 CID2=$(start_container $HOST1 --subnet 10.2.3.0/24)
 assert_container_cidrs $HOST1 $CID2 10.2.3.1/24
 
