@@ -30,7 +30,6 @@ func (conn *mockChannelConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
 	if err := conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg); err != nil {
 		panic(err)
 	}
-	conn.dest.sendPendingGossip()
 }
 
 func (router *Router) AddTestChannelConnection(r *Router) {
@@ -87,7 +86,9 @@ func (router *Router) tp(routers ...*Router) *Peer {
 
 // Check that the topology of router matches the peers and all of their connections
 func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
+	router.Peers.RLock()
 	checkTopologyPeers(t, true, router.Peers.allPeers(), wantedPeers...)
+	router.Peers.RUnlock()
 }
 
 func implTestGossipTopology(t *testing.T) {
