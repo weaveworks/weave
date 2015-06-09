@@ -10,10 +10,7 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
-type createExecInterceptor struct {
-	client   *docker.Client
-	withIPAM bool
-}
+type createExecInterceptor struct{ proxy *Proxy }
 
 func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 	body, err := ioutil.ReadAll(r.Body)
@@ -27,12 +24,12 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	container, err := inspectContainerInPath(i.client, r.URL.Path)
+	container, err := inspectContainerInPath(i.proxy.client, r.URL.Path)
 	if err != nil {
 		return err
 	}
 
-	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok || i.withIPAM {
+	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok || i.proxy.WithIPAM {
 		Info.Printf("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
 		cmd := append(weaveWaitEntrypoint, "-s")
 		options.Cmd = append(cmd, options.Cmd...)

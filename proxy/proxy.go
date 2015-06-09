@@ -84,20 +84,18 @@ func NewProxy(c Config) (*Proxy, error) {
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	Info.Printf("%s %s", r.Method, r.URL)
 	path := r.URL.Path
+	var i interceptor
 	switch {
 	case containerCreateRegexp.MatchString(path):
-		proxy.serveWithInterceptor(&createContainerInterceptor{proxy.client, proxy.dockerBridgeIP, proxy.WithDNS, proxy.WithIPAM}, w, r)
+		i = &createContainerInterceptor{proxy}
 	case containerStartRegexp.MatchString(path):
-		proxy.serveWithInterceptor(&startContainerInterceptor{proxy.client, proxy.WithDNS, proxy.WithIPAM}, w, r)
+		i = &startContainerInterceptor{proxy}
 	case execCreateRegexp.MatchString(path):
-		proxy.serveWithInterceptor(&createExecInterceptor{proxy.client, proxy.WithIPAM}, w, r)
+		i = &createExecInterceptor{proxy}
 	default:
-		proxy.serveWithInterceptor(&nullInterceptor{}, w, r)
+		i = &nullInterceptor{}
 	}
-}
-
-func (proxy *Proxy) serveWithInterceptor(i interceptor, w http.ResponseWriter, r *http.Request) {
-	newClient(proxy.dial, i).ServeHTTP(w, r)
+	proxy.Intercept(i, w, r)
 }
 
 func (proxy *Proxy) ListenAndServe() error {

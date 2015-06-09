@@ -14,20 +14,8 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
-type client struct {
-	interceptor
-	Dial func() (net.Conn, error)
-}
-
-func newClient(dial func() (net.Conn, error), i interceptor) *client {
-	return &client{
-		interceptor: i,
-		Dial:        dial,
-	}
-}
-
-func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := c.InterceptRequest(r); err != nil {
+func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Request) {
+	if err := i.InterceptRequest(r); err != nil {
 		_, isNoSuchContainer := err.(*docker.NoSuchContainer)
 		switch {
 		case isNoSuchContainer:
@@ -41,7 +29,7 @@ func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := c.Dial()
+	conn, err := proxy.dial()
 	if err != nil {
 		http.Error(w, "Could not connect to target", http.StatusInternalServerError)
 		Warning.Print(err)
@@ -56,7 +44,7 @@ func (c *client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Warning.Print("Error forwarding request: ", err)
 		return
 	}
-	err = c.InterceptResponse(resp)
+	err = i.InterceptResponse(resp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		Warning.Print("Error intercepting response: ", err)

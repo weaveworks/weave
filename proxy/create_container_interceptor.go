@@ -11,12 +11,7 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
-type createContainerInterceptor struct {
-	client         *docker.Client
-	dockerBridgeIP string
-	withDNS        bool
-	withIPAM       bool
-}
+type createContainerInterceptor struct{ proxy *Proxy }
 
 type createContainerRequestBody struct {
 	*docker.Config
@@ -36,7 +31,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok || i.withIPAM {
+	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok || i.proxy.WithIPAM {
 		Info.Printf("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
 		if container.HostConfig == nil {
 			container.HostConfig = &docker.HostConfig{}
@@ -65,7 +60,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 
 func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
 	if len(container.Entrypoint) == 0 {
-		image, err := i.client.InspectImage(container.Image)
+		image, err := i.proxy.client.InspectImage(container.Image)
 		if err != nil {
 			return err
 		}
@@ -84,11 +79,11 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 }
 
 func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody) error {
-	if !i.withDNS {
+	if !i.proxy.WithDNS {
 		return nil
 	}
 
-	container.HostConfig.DNS = append(container.HostConfig.DNS, i.dockerBridgeIP)
+	container.HostConfig.DNS = append(container.HostConfig.DNS, i.proxy.dockerBridgeIP)
 
 	if len(container.HostConfig.DNSSearch) == 0 {
 		container.HostConfig.DNSSearch = []string{"."}
