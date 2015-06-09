@@ -135,7 +135,7 @@ func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
 	for name := range names {
 		if peer, found := peers.table[name]; found {
 			if peer == peers.ourself.Peer {
-				peers.ourself.Peer.Encode(enc)
+				peers.ourself.Encode(enc)
 			} else {
 				peer.Encode(enc)
 			}
