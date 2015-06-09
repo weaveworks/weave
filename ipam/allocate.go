@@ -12,9 +12,9 @@ type allocateResult struct {
 
 type allocate struct {
 	resultChan       chan<- allocateResult
-	hasBeenCancelled func() bool
 	ident            string
 	r                address.Range // Range we are trying to allocate within
+	hasBeenCancelled func() bool
 }
 
 // Try returns true if the request is completed, false if pending

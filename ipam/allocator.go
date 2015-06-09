@@ -176,17 +176,18 @@ func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 
 // Actor client API
 
-// Allocate (Sync) - get IP address for container with given name
-// if there isn't any space we block indefinitely
+// Allocate (Sync) - get new IP address for container with given name in range
+// if there isn't any space in that range we block indefinitely
 func (alloc *Allocator) Allocate(ident string, r address.Range, cancelChan <-chan bool) (address.Address, error) {
 	resultChan := make(chan allocateResult)
-	op := &allocate{r: r, resultChan: resultChan, ident: ident,
+	op := &allocate{resultChan: resultChan, ident: ident, r: r,
 		hasBeenCancelled: hasBeenCancelled(cancelChan)}
 	alloc.doOperation(op, &alloc.pendingAllocates)
 	result := <-resultChan
 	return result.addr, result.err
 }
 
+// Lookup (Sync) - get existing IP address for container with given name in range
 func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
 	resultChan := make(chan allocateResult)
 	alloc.actionChan <- func() {

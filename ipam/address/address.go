@@ -15,11 +15,13 @@ type Range struct {
 	Start, End Address // [Start, End); Start <= End
 }
 
-func MakeRange(start Address, size Offset) Range { return Range{Start: start, End: Add(start, size)} }
-func (r Range) Size() Offset                     { return Subtract(r.End, r.Start) }
-func (r Range) String() string                   { return fmt.Sprintf("[%s-%s)", r.Start, r.End) }
-func (r1 Range) Overlaps(r2 Range) bool          { return !(r1.Start >= r2.End || r1.End <= r2.Start) }
-func (r Range) Contains(addr Address) bool       { return addr >= r.Start && addr < r.End }
+func NewRange(start Address, size Offset) Range {
+	return Range{Start: start, End: Add(start, size)}
+}
+func (r Range) Size() Offset               { return Subtract(r.End, r.Start) }
+func (r Range) String() string             { return fmt.Sprintf("[%s-%s)", r.Start, r.End) }
+func (r Range) Overlaps(or Range) bool     { return !(r.Start >= or.End || r.End <= or.Start) }
+func (r Range) Contains(addr Address) bool { return addr >= r.Start && addr < r.End }
 
 type CIDR struct {
 	Start     Address
@@ -46,12 +48,12 @@ func ParseCIDR(s string) (Address, CIDR, error) {
 
 func (cidr CIDR) Size() Offset { return 1 << uint(32-cidr.PrefixLen) }
 
-// End is exclusive, same as in Range
-func (cidr CIDR) End() Address { return Add(cidr.Start, cidr.Size()) }
-func (cidr CIDR) Range() Range { return Range{Start: cidr.Start, End: Add(cidr.Start, cidr.Size())} }
+func (cidr CIDR) Range() Range {
+	return NewRange(cidr.Start, cidr.Size())
+}
 func (cidr CIDR) HostRange() Range {
 	// Respect RFC1122 exclusions of first and last addresses
-	return Range{Start: cidr.Start + 1, End: cidr.End() - 1}
+	return NewRange(cidr.Start+1, cidr.Size()-2)
 }
 
 func (cidr CIDR) String() string {

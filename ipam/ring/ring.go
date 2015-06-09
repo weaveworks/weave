@@ -91,18 +91,6 @@ func New(start, end address.Address, peer router.PeerName) *Ring {
 	return ring
 }
 
-// TotalRemoteFree returns the approximate number of free IPs
-// on other hosts.
-func (r *Ring) TotalRemoteFree() address.Offset {
-	result := address.Offset(0)
-	for _, entry := range r.Entries {
-		if entry.Peer != r.Peer {
-			result += entry.Free
-		}
-	}
-	return result
-}
-
 // Returns the distance between two tokens on this ring, dealing
 // with ranges which cross the origin
 func (r *Ring) distance(start, end address.Address) address.Offset {
@@ -339,10 +327,6 @@ func (r *Ring) ClaimForPeers(peers []router.PeerName) {
 	}
 
 	common.Assert(pos == r.End)
-}
-
-func (r *Ring) ClaimItAll() {
-	r.ClaimForPeers([]router.PeerName{r.Peer})
 }
 
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[router.PeerName]string) {

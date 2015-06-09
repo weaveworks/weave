@@ -716,6 +716,10 @@ func TestFuzzRingHard(t *testing.T) {
 	}
 }
 
+func (r *Ring) ClaimItAll() {
+	r.ClaimForPeers([]router.PeerName{r.Peer})
+}
+
 func (es entries) String() string {
 	var buffer bytes.Buffer
 	fmt.Fprintf(&buffer, "[")

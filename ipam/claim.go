@@ -9,9 +9,9 @@ import (
 
 type claim struct {
 	resultChan       chan<- error
-	hasBeenCancelled func() bool
 	ident            string
 	addr             address.Address
+	hasBeenCancelled func() bool
 }
 
 // Try returns true for success (or failure), false if we need to try again later

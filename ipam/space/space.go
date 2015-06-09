@@ -9,8 +9,6 @@ import (
 	"github.com/weaveworks/weave/ipam/address"
 )
 
-type Addr address.Address
-
 type Space struct {
 	// ours and free represent a set of addresses as a sorted
 	// sequences of ranges.  Even elements give the inclusive
