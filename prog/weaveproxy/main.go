@@ -13,7 +13,7 @@ import (
 var (
 	version           = "(unreleased version)"
 	defaultDockerAddr = "unix:///var/run/docker.sock"
-	defaultListenAddr = ":12375"
+	defaultListenAddr = "tcp://0.0.0.0:12375"
 )
 
 func main() {
@@ -51,6 +51,16 @@ func main() {
 
 	Info.Println("weave proxy", version)
 	Info.Println("Command line arguments:", strings.Join(os.Args[1:], " "))
+
+	protoAddrParts := strings.SplitN(c.ListenAddr, "://", 2)
+	if len(protoAddrParts) == 2 {
+		if protoAddrParts[0] != "tcp" {
+			Error.Fatalf("Invalid protocol format: %q", protoAddrParts[0])
+		}
+		c.ListenAddr = protoAddrParts[1]
+	} else {
+		c.ListenAddr = protoAddrParts[0]
+	}
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {

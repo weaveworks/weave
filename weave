@@ -51,7 +51,7 @@ usage() {
     echo "where <peer>    = <ip_address_or_fqdn>[:<port>]"
     echo "      <cidr>    = <ip_address>/<routing_prefix_length>"
     echo "      <peer_id> = <nickname> or weave internal peer ID"
-    echo "      <address> = [<ip_address>]:<port>"
+    echo "      <address> = [tcp://][<ip_address>]:<port>"
     exit 1
 }
 
