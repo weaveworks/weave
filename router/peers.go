@@ -75,49 +75,16 @@ func (peers *Peers) ForEach(fun func(*Peer)) {
 	}
 }
 
-// Merge an incoming update with our own topology.
-//
-// We add peers hitherto unknown to us, and update peers for which the
-// update contains a more recent version than known to us. The return
-// value is a) a representation of the received update, and b) an
-// "improved" update containing just these new/updated elements.
-func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
-	peers.Lock()
-
-	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
-	if err != nil {
-		peers.Unlock()
-		return nil, nil, err
-	}
-
-	// By this point, we know the update doesn't refer to any peers we
-	// have no knowledge of. We can now apply the update. Start by
-	// adding in any new peers into the cache.
-	for name, newPeer := range newPeers {
-		peers.table[name] = newPeer
-	}
-
-	// Now apply the updates
-	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns)
-
-	for _, peerRemoved := range peers.garbageCollect() {
-		delete(newUpdate, peerRemoved.Name)
-	}
-
-	// Don't need to hold peers lock any longer
-	peers.Unlock()
-
-	updateNames := make(PeerNameSet)
-	for _, peer := range decodedUpdate {
-		updateNames[peer.Name] = void
-	}
-	return updateNames, setFromPeersMap(newUpdate), nil
-}
-
 func (peers *Peers) Names() PeerNameSet {
 	peers.RLock()
 	defer peers.RUnlock()
-	return setFromPeersMap(peers.table)
+
+	names := make(PeerNameSet)
+	for name := range peers.table {
+		names[name] = void
+	}
+
+	return names
 }
 
 func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
@@ -188,12 +155,66 @@ func (peers *Peers) garbageCollect() []*Peer {
 	return removed
 }
 
-func setFromPeersMap(peers map[PeerName]*Peer) PeerNameSet {
-	names := make(PeerNameSet)
-	for name := range peers {
-		names[name] = void
+// Merge an incoming update with our own topology.
+//
+// We add peers hitherto unknown to us, and update peers for which the
+// update contains a more recent version than known to us. The return
+// value is a) a representation of the received update, and b) an
+// "improved" update containing just these new/updated elements.
+func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
+	peers.Lock()
+	defer peers.Unlock()
+
+	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
+	if err != nil {
+		return nil, nil, err
 	}
-	return names
+
+	// By this point, we know the update doesn't refer to any peers we
+	// have no knowledge of. We can now apply the update. Start by
+	// adding in any new peers into the cache.
+	for name, newPeer := range newPeers {
+		peers.table[name] = newPeer
+	}
+
+	newUpdate := make(PeerNameSet)
+	for idx, newPeer := range decodedUpdate {
+		connSummaries := decodedConns[idx]
+		name := newPeer.Name
+		// guaranteed to find peer in the peers.table
+		peer := peers.table[name]
+		if peer != newPeer &&
+			(peer == peers.ourself.Peer || peer.Version >= newPeer.Version) {
+			// Nobody but us updates us. And if we know more about a
+			// peer than what's in the the update, we ignore the
+			// latter.
+			continue
+		}
+		// If we're here, either it was a new peer, or the update has
+		// more info about the peer than we do. Either case, we need
+		// to set version and conns and include the updated peer in
+		// the outgoing update.
+
+		// Can peer have been updated by anyone else in the mean time?
+		// No - we know that peer is not ourself, so the only prospect
+		// for an update would be someone else calling
+		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
+		// the router.Peers, so there can be no race here.
+		peer.Version = newPeer.Version
+		peer.connections = makeConnsMap(peer, connSummaries, peers.table)
+		newUpdate[name] = void
+	}
+
+	for _, peerRemoved := range peers.garbageCollect() {
+		delete(newUpdate, peerRemoved.Name)
+	}
+
+	updateNames := make(PeerNameSet)
+	for _, peer := range decodedUpdate {
+		updateNames[peer.Name] = void
+	}
+
+	return updateNames, newUpdate, nil
 }
 
 func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, decodedUpdate []*Peer, decodedConns [][]ConnectionSummary, err error) {
@@ -241,37 +262,6 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 		}
 	}
 	return
-}
-
-func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]ConnectionSummary) map[PeerName]*Peer {
-	newUpdate := make(map[PeerName]*Peer)
-	for idx, newPeer := range decodedUpdate {
-		connSummaries := decodedConns[idx]
-		name := newPeer.Name
-		// guaranteed to find peer in the peers.table
-		peer := peers.table[name]
-		if peer != newPeer &&
-			(peer == peers.ourself.Peer || peer.Version >= newPeer.Version) {
-			// Nobody but us updates us. And if we know more about a
-			// peer than what's in the the update, we ignore the
-			// latter.
-			continue
-		}
-		// If we're here, either it was a new peer, or the update has
-		// more info about the peer than we do. Either case, we need
-		// to set version and conns and include the updated peer in
-		// the outgoing update.
-
-		// Can peer have been updated by anyone else in the mean time?
-		// No - we know that peer is not ourself, so the only prospect
-		// for an update would be someone else calling
-		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
-		// the router.Peers, so there can be no race here.
-		peer.Version = newPeer.Version
-		peer.connections = makeConnsMap(peer, connSummaries, peers.table)
-		newUpdate[name] = peer
-	}
-	return newUpdate
 }
 
 func (peer *Peer) Encode(enc *gob.Encoder) {
