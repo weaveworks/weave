@@ -171,7 +171,6 @@ MTU=65535
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
-PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 
 
@@ -945,7 +944,6 @@ case "$COMMAND" in
         # when launching the weaveproxy container.
         proxy_args "$@"
         PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
-            -p $PROXY_PORT:$PROXY_PORT/tcp \
             $PROXY_VOLUMES \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /proc:/hostproc \
