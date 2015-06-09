@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"code.google.com/p/getopt"
 	. "github.com/weaveworks/weave/common"
@@ -47,6 +48,9 @@ func main() {
 	if debug {
 		InitDefaultLogging(true)
 	}
+
+	Info.Println("weave proxy", version)
+	Info.Println("Command line arguments:", strings.Join(os.Args[1:], " "))
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {

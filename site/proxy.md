@@ -206,16 +206,11 @@ The command
     weave status
 
 reports on the current status of various weave components, including
-the proxy:
+the proxy, if it is running:
 
 ````
 ...
-weave proxy git-03ede29e7ee4
-Listen address is :12375
-Docker address is unix:///var/run/docker.sock
-TLS off
-DNS off
-IPAM off
+weave proxy is running
 ````
 
 Information on the operation of the proxy can be obtained from the
