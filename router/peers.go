@@ -291,7 +291,6 @@ func (peer *Peer) Encode(enc *gob.Encoder) {
 			conn.Remote().NameByte,
 			conn.RemoteTCPAddr(),
 			conn.Outbound(),
-			// DANGER holding rlock on peer, going to take rlock on conn
 			conn.Established(),
 		})
 	}
