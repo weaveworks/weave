@@ -30,11 +30,8 @@ func (conn *mockChannelConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
 }
 
 func (router *Router) AddTestChannelConnection(r *Router) {
-	fromName := router.Ourself.Peer.Name
-	toName := r.Ourself.Peer.Name
-
-	fromPeer := NewPeer(fromName, "", router.Ourself.Peer.UID, 0)
-	toPeer := NewPeer(toName, "", r.Ourself.Peer.UID, 0)
+	fromPeer := NewPeerFromSummary(router.Ourself.Peer.PeerSummary)
+	toPeer := NewPeerFromSummary(r.Ourself.Peer.PeerSummary)
 
 	r.Peers.FetchWithDefault(fromPeer)    // Has side-effect of incrementing refcount
 	router.Peers.FetchWithDefault(toPeer) //
@@ -70,13 +67,13 @@ func TestGossipTopology(t *testing.T) {
 // the routers supplied as arguments, carrying across all UID and
 // version information.
 func (router *Router) tp(routers ...*Router) *Peer {
-	peer := NewPeer(router.Ourself.Peer.Name, "", router.Ourself.Peer.UID, 0)
+	peer := NewPeerFromSummary(router.Ourself.Peer.PeerSummary)
 	connections := make(map[PeerName]Connection)
 	for _, r := range routers {
-		p := NewPeer(r.Ourself.Peer.Name, "", r.Ourself.Peer.UID, r.Ourself.Peer.version)
+		p := NewPeerFromSummary(r.Ourself.Peer.PeerSummary)
 		connections[r.Ourself.Peer.Name] = newMockConnection(peer, p)
 	}
-	peer.version = router.Ourself.Peer.version
+	peer.Version = router.Ourself.Peer.Version
 	peer.connections = connections
 	return peer
 }

@@ -20,7 +20,7 @@ type LocalPeerAction func()
 func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
 	actionChan := make(chan LocalPeerAction, ChannelSize)
 	peer := &LocalPeer{
-		Peer:       NewPeer(name, nickName, 0, 0),
+		Peer:       NewPeer(name, nickName, randomPeerUID(), 0),
 		router:     router,
 		actionChan: actionChan,
 	}
@@ -272,20 +272,20 @@ func (peer *LocalPeer) addConnection(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	peer.connections[conn.Remote().Name] = conn
-	peer.version++
+	peer.Version++
 }
 
 func (peer *LocalPeer) deleteConnection(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	delete(peer.connections, conn.Remote().Name)
-	peer.version++
+	peer.Version++
 }
 
 func (peer *LocalPeer) connectionEstablished(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
-	peer.version++
+	peer.Version++
 }
 
 func (peer *LocalPeer) connectionCount() int {

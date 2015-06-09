@@ -57,7 +57,7 @@ func (peers *Peers) MarshalJSON() ([]byte, error) {
 				connections = append(connections, conn)
 			}
 		}
-		ps = append(ps, &p{peer.Name.String(), peer.NickName, peer.UID, peer.version, connections})
+		ps = append(ps, &p{peer.Name.String(), peer.NickName, peer.UID, peer.Version, connections})
 	})
 	return json.Marshal(ps)
 }
