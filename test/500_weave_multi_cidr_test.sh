@@ -11,7 +11,7 @@ assert_container_cidrs() {
     CIDRS="$@"
 
     # Assert container has attached CIDRs
-    assert_raises "weave_on $HOST ps $CID | grep '$CIDRS$'"
+    assert_raises "weave_on $HOST ps $CID | grep -E '^$CID [0-9a-f:]{17} $CIDRS$'"
 }
 
 # assert_zone_records <host> <cid> <fqdn> <ip> [<ip> ...]
@@ -41,6 +41,10 @@ assert_bridge_cidrs() {
 }
 
 start_suite "Weave run/start/attach/detach with multiple cidr arguments"
+
+# NOTE: in these tests, --subnet arguments are checked against a
+# specific address, i.e. we are assuming that IPAM always returns the
+# lowest available address in the subnet
 
 weave_on $HOST1 launch -debug -iprange 10.2.3.0/24
 weave_on $HOST1 launch-dns 10.254.254.254/24
