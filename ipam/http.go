@@ -67,9 +67,13 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 		vars := mux.Vars(r)
 		ident := vars["id"]
 		cidrStr := vars["ip"] + "/" + vars["prefixlen"]
-		_, cidr, err := address.ParseCIDR(cidrStr)
+		subnetAddr, cidr, err := address.ParseCIDR(cidrStr)
 		if err != nil {
 			badRequest(w, err)
+			return
+		}
+		if cidr.Start != subnetAddr {
+			badRequest(w, fmt.Errorf("Invalid subnet %s - bits after network prefix are not all zero", cidrStr))
 			return
 		}
 		addr, err := alloc.Allocate(ident, cidr, closedChan)

@@ -182,7 +182,10 @@ func (alloc *Allocator) SetDefaultSubnet(subnet address.CIDR) error {
 		return fmt.Errorf("Allocation range smaller than minimum size 4: %s", subnet)
 	}
 	alloc.actionChan <- func() {
-		// todo: check default subnet is in range
+		if !alloc.universe.Overlaps(subnet) {
+			resultChan <- fmt.Errorf("Default subnet %s out of bounds: %s", subnet, alloc.universe)
+			return
+		}
 		alloc.defaultSubnet = subnet
 		resultChan <- nil
 	}
