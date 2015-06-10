@@ -34,6 +34,10 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer, domain 
 		fmt.Fprintln(w, db.Status())
 	})
 
+	muxRouter.Methods("GET").Path("/domain").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, db.Domain())
+	})
+
 	muxRouter.Methods("PUT").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqError := func(msg string, logmsg string, logargs ...interface{}) {
 			httpErrorAndLog(Warning, w, msg, http.StatusBadRequest, logmsg, logargs...)
