@@ -12,8 +12,9 @@ type allocateResult struct {
 
 type allocate struct {
 	resultChan       chan<- allocateResult
-	hasBeenCancelled func() bool
 	ident            string
+	r                address.Range // Range we are trying to allocate within
+	hasBeenCancelled func() bool
 }
 
 // Try returns true if the request is completed, false if pending
@@ -23,23 +24,27 @@ func (g *allocate) Try(alloc *Allocator) bool {
 		return true
 	}
 
-	// If we have previously stored an address for this container, return it.
-	if addr, found := alloc.owned[g.ident]; found {
+	if addr, found := alloc.lookupOwned(g.ident, g.r); found {
 		g.resultChan <- allocateResult{addr, nil}
 		return true
 	}
 
-	if ok, addr := alloc.space.Allocate(); ok {
-		alloc.debugln("Allocated", addr, "for", g.ident)
+	if !alloc.universe.Overlaps(g.r) {
+		g.resultChan <- allocateResult{0, fmt.Errorf("range %s out of bounds: %s", g.r, alloc.universe)}
+		return true
+	}
+
+	if ok, addr := alloc.space.Allocate(g.r); ok {
+		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.r)
 		alloc.addOwned(g.ident, addr)
 		g.resultChan <- allocateResult{addr, nil}
 		return true
 	}
 
 	// out of space
-	if donor, err := alloc.ring.ChoosePeerToAskForSpace(); err == nil {
-		alloc.debugln("Decided to ask peer", donor, "for space")
-		alloc.sendRequest(donor, msgSpaceRequest)
+	if donor, err := alloc.ring.ChoosePeerToAskForSpace(g.r.Start, g.r.End); err == nil {
+		alloc.debugln("Decided to ask peer", donor, "for space in range", g.r)
+		alloc.sendSpaceRequest(donor, g.r)
 	}
 
 	return false

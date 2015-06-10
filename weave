@@ -28,19 +28,19 @@ usage() {
     echo "Usage:"
     echo "weave setup"
     echo "weave launch       [-password <password>] [-nickname <nickname>] [-nodiscovery]"
-    echo "                       [-iprange <cidr>] <peer> ..."
+    echo "                       [-iprange <cidr> [-ipsubnet <cidr>]] <peer> ..."
     echo "weave launch-dns   <cidr>"
     echo "weave launch-proxy [-D <docker_endpoint>] [-H <address>] [--with-dns] [--with-ipam]"
     echo "weave connect      [--replace] [<peer> ...]"
     echo "weave forget       <peer> ..."
-    echo "weave run          [--with-dns] [<cidr> ...] <docker run args> ..."
-    echo "weave start        [<cidr> ...] <container_id>"
-    echo "weave attach       [<cidr> ...] <container_id>"
-    echo "weave detach       <cidr> [<cidr> ...] <container_id>"
+    echo "weave run          [--with-dns] [<address_spec> ...] <docker run args> ..."
+    echo "weave start        [<address_spec> ...] <container_id>"
+    echo "weave attach       [<address_spec> ...] <container_id>"
+    echo "weave detach       [<address_spec> ...] <container_id>"
     echo "weave dns-add      <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
     echo "weave dns-remove   <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
-    echo "weave expose       [<cidr> ...] [-h <fqdn>]"
-    echo "weave hide         [<cidr> ...]"
+    echo "weave expose       [<address_spec> ...] [-h <fqdn>]"
+    echo "weave hide         [<address_spec> ...]"
     echo "weave ps           [<container_id> ...]"
     echo "weave status"
     echo "weave proxy-env"
@@ -52,9 +52,10 @@ usage() {
     echo "weave reset"
     echo "weave rmpeer       <peer_id>"
     echo
-    echo "where <peer>    = <ip_address_or_fqdn>[:<port>]"
-    echo "      <cidr>    = <ip_address>/<routing_prefix_length>"
-    echo "      <peer_id> = <nickname> or weave internal peer ID"
+    echo "where <peer>         = <ip_address_or_fqdn>[:<port>]"
+    echo "      <cidr>         = <ip_address>/<routing_prefix_length>"
+    echo "      <peer_id>      = <nickname> or weave internal peer ID"
+    echo "      <address_spec> = [ip:]<cidr> | net:<cidr> | net:default"
     echo "      <address> = [tcp://][<ip_address>]:<port>"
     exit 1
 }
@@ -104,10 +105,10 @@ validate_cidr() {
 
 collect_cidr_args() {
     CIDR_ARGS=""
-    CIDR_COUNT=0
-    while is_cidr "$1" ; do
-        CIDR_ARGS="$CIDR_ARGS $1"
-        CIDR_COUNT=$((CIDR_COUNT + 1))
+    CIDR_ARG_COUNT=0
+    while [ "$1" = "net:default" ] || is_cidr "$1" || is_cidr "${1#ip:}" || is_cidr "${1#net:}" ; do
+        CIDR_ARGS="$CIDR_ARGS ${1#ip:}"
+        CIDR_ARG_COUNT=$((CIDR_ARG_COUNT + 1))
         shift 1
     done
 }
@@ -149,7 +150,7 @@ if [ "$1" = "run" ] ; then
         DNS_ARGS=$(exec_remote dns-args "$@")
     fi
     collect_cidr_args "$@"
-    shift $CIDR_COUNT
+    shift $CIDR_ARG_COUNT
     CONTAINER=$(docker $DOCKER_CLIENT_ARGS run $DNS_ARGS -d "$@")
     exec_remote attach $CIDR_ARGS $CONTAINER
     echo $CONTAINER
@@ -751,17 +752,45 @@ ipam_claim() {
     done
 }
 
-# If we don't already have any CIDRs passed from the command-line, get
-# one from IPAM. $1 is the full container id.
-get_ipam_cidr() {
-    if [ -n "$CIDR_ARGS" ] ; then
-        return 0
+# Call IPAM as necessary to allocate addresses
+# $1 is the full container id and following args are previously parsed CIDR_ARGS.
+# Returns ALL_CIDRS and IPAM_CIDRS
+ipam_cidrs() {
+    CONTAINER_ID="$1"
+    shift 1
+    ALL_CIDRS=""
+    IPAM_CIDRs=""
+    if [ $# -eq 0 ] ; then
+        # If no addresses passed in, get one in the default subnet
+        IPAM_CIDRS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID)"
+        if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
+            echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
+            return 1
+        fi
+        ALL_CIDRS="$IPAM_CIDRS"
     fi
-    CIDR_ARGS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$1)"
-    if [ "$CIDR_ARGS" = "404 page not found" ] ; then
-        echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
-        return 1
-    fi
+    while [ $# -gt 0 ] ; do
+        if [ "${1%:*}" = "net" ] ; then
+            if [ "$1" = "net:default" ] ; then
+                CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID)
+            else
+                CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID/"${1#net:}")
+            fi
+            if [ "$CIDR" = "404 page not found" ] ; then
+                echo "IP address allocation must be enabled to use --subnet (use the -iprange option on 'weave launch')" >&2
+                return 1
+            fi
+            if ! is_cidr "$CIDR" ; then
+                echo "$CIDR" >&2
+                return 1
+            fi
+            IPAM_CIDRS="$IPAM_CIDRS $CIDR"
+            ALL_CIDRS="$ALL_CIDRS $CIDR"
+        else
+            ALL_CIDRS="$ALL_CIDRS $1"
+        fi
+        shift 1
+    done
 }
 
 ######################################################################
@@ -1028,12 +1057,12 @@ case "$COMMAND" in
             dns_args "$@"
         fi
         collect_cidr_args "$@"
-        shift $CIDR_COUNT
+        shift $CIDR_ARG_COUNT
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
         create_bridge
-        get_ipam_cidr $CONTAINER
-        with_container_netns_or_die $CONTAINER attach $CIDR_ARGS
-        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
+        ipam_cidrs $CONTAINER $CIDR_ARGS
+        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $CONTAINER
         ;;
     dns-args)
@@ -1046,33 +1075,37 @@ case "$COMMAND" in
         ;;
     start)
         collect_cidr_args "$@"
-        shift $CIDR_COUNT
+        shift $CIDR_ARG_COUNT
         [ $# -eq 1 ] || usage
         RES=$(docker start $1)
         CONTAINER=$(container_id $1)
         create_bridge
-        get_ipam_cidr $CONTAINER
-        with_container_netns_or_die $CONTAINER attach $CIDR_ARGS
-        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
+        ipam_cidrs $CONTAINER $CIDR_ARGS
+        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
         ;;
     attach)
         collect_cidr_args "$@"
-        shift $CIDR_COUNT
+        shift $CIDR_ARG_COUNT
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         create_bridge
-        get_ipam_cidr $CONTAINER
-        with_container_netns $CONTAINER attach $CIDR_ARGS >/dev/null
-        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
+        ipam_cidrs $CONTAINER $CIDR_ARGS
+        with_container_netns $CONTAINER attach $ALL_CIDRS >/dev/null
+        when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         ;;
     detach)
         collect_cidr_args "$@"
-        shift $CIDR_COUNT
+        shift $CIDR_ARG_COUNT
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
-        with_container_netns $CONTAINER detach $CIDR_ARGS >/dev/null
-        when_dns_running with_container_fqdn $CONTAINER delete_dns_fqdn $CIDR_ARGS
+        ipam_cidrs $CONTAINER $CIDR_ARGS
+        with_container_netns $CONTAINER detach $ALL_CIDRS >/dev/null
+        when_dns_running with_container_fqdn $CONTAINER delete_dns_fqdn $ALL_CIDRS
+        for CIDR in $IPAM_CIDRS ; do
+            http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/$CONTAINER/${CIDR%/*}
+        done
         ;;
     dns-add)
         collect_ip_args "$@"
@@ -1100,8 +1133,8 @@ case "$COMMAND" in
         ;;
     expose)
         collect_cidr_args "$@"
-        shift $CIDR_COUNT
-        get_ipam_cidr weave:expose
+        shift $CIDR_ARG_COUNT
+        ipam_cidrs weave:expose $CIDR_ARGS
         if [ $# -eq 0 ] ; then
             FQDN=""
         else
@@ -1109,7 +1142,7 @@ case "$COMMAND" in
             FQDN="$2"
         fi
         create_bridge --without-ethtool
-        for CIDR in $CIDR_ARGS ; do
+        for CIDR in $ALL_CIDRS ; do
             if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr add dev $BRIDGE $CIDR
                 arp_update $BRIDGE $CIDR
@@ -1123,10 +1156,10 @@ case "$COMMAND" in
         ;;
     hide)
         collect_cidr_args "$@"
-        shift $CIDR_COUNT
-        get_ipam_cidr weave:expose
+        shift $CIDR_ARG_COUNT
+        ipam_cidrs weave:expose $CIDR_ARGS
         create_bridge --without-ethtool
-        for CIDR in $CIDR_ARGS ; do
+        for CIDR in $ALL_CIDRS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr del dev $BRIDGE $CIDR
                 delete_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
@@ -1134,7 +1167,9 @@ case "$COMMAND" in
                 when_dns_running delete_dns 'weave:expose' $CIDR
             fi
         done
-        [ $CIDR_COUNT -eq 0 ] && http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/weave:expose 2>/dev/null || true
+        for CIDR in $IPAM_CIDRS ; do
+            http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/weave:expose/${CIDR%/*}
+        done
         ;;
     stop)
         [ $# -eq 0 ] || usage

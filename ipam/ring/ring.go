@@ -91,18 +91,6 @@ func New(start, end address.Address, peer router.PeerName) *Ring {
 	return ring
 }
 
-// TotalRemoteFree returns the approximate number of free IPs
-// on other hosts.
-func (r *Ring) TotalRemoteFree() address.Offset {
-	result := address.Offset(0)
-	for _, entry := range r.Entries {
-		if entry.Peer != r.Peer {
-			result += entry.Free
-		}
-	}
-	return result
-}
-
 // Returns the distance between two tokens on this ring, dealing
 // with ranges which cross the origin
 func (r *Ring) distance(start, end address.Address) address.Offset {
@@ -341,10 +329,6 @@ func (r *Ring) ClaimForPeers(peers []router.PeerName) {
 	common.Assert(pos == r.End)
 }
 
-func (r *Ring) ClaimItAll() {
-	r.ClaimForPeers([]router.PeerName{r.Peer})
-}
-
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[router.PeerName]string) {
 	for _, entry := range r.Entries {
 		nickname, found := m[entry.Peer]
@@ -409,15 +393,22 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
 }
 
 // ChoosePeerToAskForSpace chooses a weighted-random peer to ask
-// for space.
-func (r *Ring) ChoosePeerToAskForSpace() (result router.PeerName, err error) {
+// for space in the range [start, end).  Assumes start<end.
+func (r *Ring) ChoosePeerToAskForSpace(start, end address.Address) (result router.PeerName, err error) {
 	var (
 		sum               address.Offset
 		totalSpacePerPeer = make(map[router.PeerName]address.Offset) // Compute total free space per peer
 	)
 
 	// iterate through tokens
-	for _, entry := range r.Entries {
+	for i, entry := range r.Entries {
+		// Ignore entries that don't span the range we want
+		if i+1 < len(r.Entries) && r.Entries.entry(i+1).Token-1 < start {
+			continue
+		}
+		if entry.Token >= end {
+			break
+		}
 		// Ignore ranges with no free space
 		if entry.Free <= 0 {
 			continue

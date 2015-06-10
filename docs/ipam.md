@@ -20,10 +20,15 @@ plugin) uses to request IP addresses.
 
 The commands supported by the allocator via the http interface are:
 
-- Allocate: request one IP address for a container
+- Allocate: request one IP address for a container in a subnet
+- Lookup: fetch the previously-allocated IP address for a container in a subnet
 - Free: return an IP address that is currently allocated
 - Claim: request a specific IP address for a container (e.g. because
   it is already using that address)
+
+Each http request either specifies a subnet, or if no subnet is
+specified this is taken as a request to allocate in a pre-defined
+default subnet.
 
 The allocator also watches via the Docker event mechanism: if a
 container dies then all IP addresses allocated to that container are
@@ -48,16 +53,17 @@ freed.
 
 When a peer owns some range(s), it can allocate freely from within
 those ranges to containers on the same machine. If it runs out of
-space (all owned ranges are full), it will ask another peer for space:
+space in a subnet (all owned ranges are full), it will ask another
+peer for space:
   - it picks a peer to ask at random, weighted by the amount of space
-    owned by each peer
+    owned by each peer in the subnet
     - if the target peer decides to give up space, it unicasts a message
       back to the asker with the newly-updated ring.
     - if the target peer has no space, it unicasts a message back to the
       asker with its current copy of the ring, on the basis that the
       requestor must have acted on out-of-date information.
   - it will continue to ask for space until it receives some, or its
-    copy of the ring tells it all peers are full.
+    copy of the ring tells it all peers are full in that subnet.
 
 ### Claiming an address
 

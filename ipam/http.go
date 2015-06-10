@@ -16,7 +16,7 @@ func badRequest(w http.ResponseWriter, err error) {
 }
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
-func (alloc *Allocator) HandleHTTP(router *mux.Router) {
+func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR) {
 	router.Methods("PUT").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		closedChan := w.(http.CloseNotifier).CloseNotify()
 		vars := mux.Vars(r)
@@ -33,30 +33,84 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router) {
 		w.WriteHeader(204)
 	})
 
-	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		addr, err := alloc.Lookup(mux.Vars(r)["id"])
+	router.Methods("GET").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		cidr := vars["ip"] + "/" + vars["prefixlen"]
+		_, subnet, err := address.ParseCIDR(cidr)
+		if err != nil {
+			badRequest(w, err)
+			return
+		}
+		addr, err := alloc.Lookup(vars["id"], subnet.HostRange())
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprintf(w, "%s/%d", addr.String(), alloc.prefixLen)
+		fmt.Fprintf(w, "%s/%d", addr, subnet.PrefixLen)
+	})
+
+	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		addr, err := alloc.Lookup(mux.Vars(r)["id"], defaultSubnet.HostRange())
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintf(w, "%s/%d", addr, defaultSubnet.PrefixLen)
+	})
+
+	router.Methods("POST").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		closedChan := w.(http.CloseNotifier).CloseNotify()
+		vars := mux.Vars(r)
+		ident := vars["id"]
+		cidrStr := vars["ip"] + "/" + vars["prefixlen"]
+		subnetAddr, cidr, err := address.ParseCIDR(cidrStr)
+		if err != nil {
+			badRequest(w, err)
+			return
+		}
+		if cidr.Start != subnetAddr {
+			badRequest(w, fmt.Errorf("Invalid subnet %s - bits after network prefix are not all zero", cidrStr))
+			return
+		}
+		addr, err := alloc.Allocate(ident, cidr.HostRange(), closedChan)
+		if err != nil {
+			badRequest(w, fmt.Errorf("Unable to allocate: %s", err))
+			return
+		}
+
+		fmt.Fprintf(w, "%s/%d", addr, cidr.PrefixLen)
 	})
 
 	router.Methods("POST").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		closedChan := w.(http.CloseNotifier).CloseNotify()
 		ident := mux.Vars(r)["id"]
-		newAddr, err := alloc.Allocate(ident, closedChan)
+		newAddr, err := alloc.Allocate(ident, defaultSubnet.HostRange(), closedChan)
 		if err != nil {
 			badRequest(w, err)
 			return
 		}
 
-		fmt.Fprintf(w, "%s/%d", newAddr.String(), alloc.prefixLen)
+		fmt.Fprintf(w, "%s/%d", newAddr, defaultSubnet.PrefixLen)
+	})
+
+	router.Methods("DELETE").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		ident := vars["id"]
+		ipStr := vars["ip"]
+		if ip, err := address.ParseIP(ipStr); err != nil {
+			badRequest(w, err)
+			return
+		} else if err := alloc.Free(ident, ip); err != nil {
+			badRequest(w, fmt.Errorf("Unable to free: %s", err))
+			return
+		}
+
+		w.WriteHeader(204)
 	})
 
 	router.Methods("DELETE").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ident := mux.Vars(r)["id"]
-		if err := alloc.Free(ident); err != nil {
+		if err := alloc.Delete(ident); err != nil {
 			badRequest(w, err)
 			return
 		}

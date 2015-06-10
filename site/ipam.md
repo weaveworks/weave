@@ -9,10 +9,10 @@ Weave can automatically assign unique IP addresses to each container
 across the network. To make this work, weave must be told on startup
 what range of addresses to allocate from, for example:
 
-    host1# weave launch -iprange 10.2.3.0/24
+    host1# weave launch -iprange 10.2.0.0/16
 
-The `run`, `start`, `attach`, `expose` and `hide` commands will then
-fetch an address automatically if none is specified, i.e.:
+The `run`, `start`, `attach`, `detach`, `expose` and `hide` commands
+will then fetch an address automatically if none is specified, i.e.:
 
     host1# C=$(weave run -ti ubuntu)
 
@@ -22,7 +22,40 @@ You can see which address was allocated with
     host1# weave ps $C
     a7aff7249393 7a:51:d1:09:21:78 10.2.3.1/24
 
-The `-iprange` parameter is given in [CIDR
+You may wish to [run containers on different
+subnets](features.html#application-isolation). To set a default
+subnet, launch with `-ipsubnet`:
+
+    host1# weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.3.0/24
+
+`-iprange` should cover the entire range that you will ever use for
+allocation, and `-ipsubnet` is the subnet that will be used when
+you don't explicitly specify one.
+
+Then, to request the allocation of an address from a subnet other than
+the default, use the `net:` prefix:
+
+    host1# C=$(weave run net:10.2.7.0/24 -ti ubuntu)
+
+To explicitly request the default subnet, use `net:default`.
+
+And, you can ask for multiple addresses in different subnets and add
+in manually-assigned addresses on the same line, for instance:
+
+    host1# C=$(weave run net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24 -ti ubuntu)
+
+Note that `-iprange` can be smaller than `-ipsubnet`, if you want to
+use a mixture of automatically-allocated addresses and manually-chosen
+addresses, and have the containers communicate with each other. For
+example, if you say:
+
+    host1# weave launch -iprange 10.9.0.0/17 -ipsubnet 10.9.0.0/16
+
+then you can run all containers in the 10.9.0.0/16 subnet, with IPAM
+using the lower half and leaving the upper half free for manual
+allocation.
+
+The subnet parameters are written in [CIDR
 notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)
 format - in this example "/24" means the first 24 bits of the address
 form the network address and the allocator is to allocate container
@@ -117,12 +150,12 @@ reports on the current status of the weave router and IP allocator:
 ````
 weave router git-8f675f15c0b5
 ...
-Allocator subnet 10.2.1.0/24
-  Free IPs: ~98.0%, 62 local, ~189 remote
+Allocator universe 10.2.0.0/16
 Owned Ranges:
   10.2.1.1 -> 96:e9:e2:2e:2d:bc (host1) (v3)
   10.2.1.128 -> ea:84:25:9b:31:2e (host2) (v3)
   10.2.1.192 -> ea:6c:21:09:cf:f0 (host3) (v9)
+Allocator default subnet: 10.2.1.0/24
 ````
 
 The first section covers the router; see the [troubleshooting

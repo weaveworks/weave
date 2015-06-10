@@ -128,27 +128,29 @@ func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 	}
 }
 
-func makeAllocator(name string, cidr string, quorum uint) *Allocator {
+func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.Range) {
 	peername, err := router.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
 	}
 
-	alloc, err := NewAllocator(peername, router.PeerUID(rand.Int63()),
-		"nick-"+name, cidr, quorum)
+	_, cidr, err := address.ParseCIDR(cidrStr)
 	if err != nil {
 		panic(err)
 	}
 
-	return alloc
+	alloc := NewAllocator(peername, router.PeerUID(rand.Int63()),
+		"nick-"+name, cidr.Range(), quorum)
+
+	return alloc, cidr.HostRange()
 }
 
-func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) *Allocator {
-	alloc := makeAllocator(name, universeCIDR, quorum)
+func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.Range) {
+	alloc, subnet := makeAllocator(name, universeCIDR, quorum)
 	gossip := &mockGossipComms{t: t, name: name}
 	alloc.SetInterfaces(gossip)
 	alloc.Start()
-	return alloc
+	return alloc, subnet
 }
 
 func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
@@ -160,10 +162,10 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 	alloc.space.AddRanges(alloc.ring.OwnedRanges())
 }
 
-func (alloc *Allocator) NumFreeAddresses() address.Offset {
+func (alloc *Allocator) NumFreeAddresses(r address.Range) address.Offset {
 	resultChan := make(chan address.Offset)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.space.NumFreeAddresses()
+		resultChan <- alloc.space.NumFreeAddressesInRange(r)
 	}
 	return <-resultChan
 }
@@ -285,13 +287,15 @@ func (client TestGossipRouterClient) GossipBroadcast(update router.GossipData) e
 	return client.router.GossipBroadcast(update)
 }
 
-func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter) {
+func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter, address.Range) {
 
 	gossipRouter := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
 	allocs := make([]*Allocator, size)
+	var subnet address.Range
 
 	for i := 0; i < size; i++ {
-		alloc := makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", i),
+		var alloc *Allocator
+		alloc, subnet = makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", i),
 			cidr, uint(size/2+1))
 		alloc.SetInterfaces(gossipRouter.connect(alloc.ourName, alloc))
 		alloc.Start()
@@ -300,7 +304,7 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRou
 
 	gossipRouter.GossipBroadcast(allocs[size-1].Gossip())
 	time.Sleep(1000 * time.Millisecond)
-	return allocs, gossipRouter
+	return allocs, gossipRouter, subnet
 }
 
 func stopNetworkOfAllocators(allocs []*Allocator) {

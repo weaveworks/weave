@@ -345,34 +345,40 @@ func TestGossip(t *testing.T) {
 func TestFindFree(t *testing.T) {
 	ring1 := New(start, end, peer1name)
 
-	_, err := ring1.ChoosePeerToAskForSpace()
+	_, err := ring1.ChoosePeerToAskForSpace(start, end)
 	wt.AssertTrue(t, err == ErrNoFreeSpace, "Expected ErrNoFreeSpace")
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
-	_, err = ring1.ChoosePeerToAskForSpace()
+	_, err = ring1.ChoosePeerToAskForSpace(start, end)
 	wt.AssertTrue(t, err == ErrNoFreeSpace, "Expected ErrNoFreeSpace")
 
 	// We shouldn't return outselves
 	ring1.ReportFree(map[address.Address]address.Offset{start: 10})
-	_, err = ring1.ChoosePeerToAskForSpace()
+	_, err = ring1.ChoosePeerToAskForSpace(start, end)
 	wt.AssertTrue(t, err == ErrNoFreeSpace, "Expected ErrNoFreeSpace")
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 1},
-		{Token: start, Peer: peer1name, Free: 1}}
-	_, err = ring1.ChoosePeerToAskForSpace()
+		{Token: middle, Peer: peer1name, Free: 1}}
+	_, err = ring1.ChoosePeerToAskForSpace(start, end)
 	wt.AssertTrue(t, err == ErrNoFreeSpace, "Expected ErrNoFreeSpace")
+	ring1.assertInvariants()
 
 	// We should return others
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 1}}
-	peer, err := ring1.ChoosePeerToAskForSpace()
+	peer, err := ring1.ChoosePeerToAskForSpace(start, end)
 	wt.AssertSuccess(t, err)
 	wt.AssertEquals(t, peer, peer2name)
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 1},
-		{Token: start, Peer: peer2name, Free: 1}}
-	peer, err = ring1.ChoosePeerToAskForSpace()
+		{Token: middle, Peer: peer3name, Free: 1}}
+	peer, err = ring1.ChoosePeerToAskForSpace(start, middle)
 	wt.AssertSuccess(t, err)
 	wt.AssertEquals(t, peer, peer2name)
+
+	peer, err = ring1.ChoosePeerToAskForSpace(middle, end)
+	wt.AssertSuccess(t, err)
+	wt.AssertEquals(t, peer, peer3name)
+	ring1.assertInvariants()
 }
 
 func TestReportFree(t *testing.T) {
@@ -708,6 +714,10 @@ func TestFuzzRingHard(t *testing.T) {
 			doGrantOrGossip()
 		}
 	}
+}
+
+func (r *Ring) ClaimItAll() {
+	r.ClaimForPeers([]router.PeerName{r.Peer})
 }
 
 func (es entries) String() string {

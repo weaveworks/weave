@@ -3,9 +3,7 @@ package ipam
 import (
 	"bytes"
 	"encoding/gob"
-	"errors"
 	"fmt"
-	"net"
 	"sort"
 	"time"
 
@@ -23,6 +21,7 @@ const (
 	msgRingUpdate
 
 	paxosInterval = time.Second * 5
+	MinSubnetSize = 4 // first and last addresses are excluded, so 2 would be too small
 )
 
 // operation represents something which Allocator wants to do, but
@@ -46,16 +45,14 @@ type operation interface {
 type Allocator struct {
 	actionChan       chan<- func()
 	ourName          router.PeerName
-	subnetStart      address.Address            // start address of space all peers are allocating from
-	subnetSize       address.Offset             // length of space all peers are allocating from
-	prefixLen        int                        // network prefix length, e.g. 24 for a /24 network
-	ring             *ring.Ring                 // information on ranges owned by all peers
-	space            space.Space                // more detail on ranges owned by us
-	owned            map[string]address.Address // who owns what address, indexed by container-ID
-	nicknames        map[router.PeerName]string // so we can map nicknames for rmpeer
-	pendingAllocates []operation                // held until we get some free space
-	pendingClaims    []operation                // held until we know who owns the space
-	gossip           router.Gossip              // our link to the outside world for sending messages
+	universe         address.Range                // superset of all ranges
+	ring             *ring.Ring                   // information on ranges owned by all peers
+	space            space.Space                  // more detail on ranges owned by us
+	owned            map[string][]address.Address // who owns what addresses, indexed by container-ID
+	nicknames        map[router.PeerName]string   // so we can map nicknames for rmpeer
+	pendingAllocates []operation                  // held until we get some free space
+	pendingClaims    []operation                  // held until we know who owns the space
+	gossip           router.Gossip                // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosTicker      *time.Ticker
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
@@ -63,34 +60,16 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, subnetCIDR string, quorum uint) (*Allocator, error) {
-	_, subnet, err := net.ParseCIDR(subnetCIDR)
-	if err != nil {
-		return nil, err
-	}
-	if subnet.IP.To4() == nil {
-		return nil, errors.New("Non-IPv4 address not supported")
-	}
-	// Get the size of the network from the mask
-	ones, bits := subnet.Mask.Size()
-	var subnetSize address.Offset = 1 << uint(bits-ones)
-	if subnetSize < 4 {
-		return nil, errors.New("Allocation subnet too small")
-	}
-	subnetStart := address.FromIP4(subnet.IP)
-	alloc := &Allocator{
-		ourName:     ourName,
-		subnetStart: subnetStart,
-		subnetSize:  subnetSize,
-		prefixLen:   ones,
-		// per RFC 1122, don't allocate the first and last address in the subnet
-		ring:      ring.New(address.Add(subnetStart, 1), address.Add(subnetStart, subnetSize-1), ourName),
-		owned:     make(map[string]address.Address),
+func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint) *Allocator {
+	return &Allocator{
+		ourName:   ourName,
+		universe:  universe,
+		ring:      ring.New(universe.Start, address.Add(universe.Start, universe.Size()), ourName),
+		owned:     make(map[string][]address.Address),
 		paxos:     paxos.NewNode(ourName, ourUID, quorum),
 		nicknames: map[router.PeerName]string{ourName: ourNickname},
 		now:       time.Now,
 	}
-	return alloc, nil
 }
 
 // Start runs the allocator goroutine
@@ -197,26 +176,26 @@ func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 
 // Actor client API
 
-// Allocate (Sync) - get IP address for container with given name
-// if there isn't any space we block indefinitely
-func (alloc *Allocator) Allocate(ident string, cancelChan <-chan bool) (address.Address, error) {
+// Allocate (Sync) - get new IP address for container with given name in range
+// if there isn't any space in that range we block indefinitely
+func (alloc *Allocator) Allocate(ident string, r address.Range, cancelChan <-chan bool) (address.Address, error) {
 	resultChan := make(chan allocateResult)
-	op := &allocate{resultChan: resultChan, ident: ident,
+	op := &allocate{resultChan: resultChan, ident: ident, r: r,
 		hasBeenCancelled: hasBeenCancelled(cancelChan)}
 	alloc.doOperation(op, &alloc.pendingAllocates)
 	result := <-resultChan
 	return result.addr, result.err
 }
 
-func (alloc *Allocator) Lookup(ident string) (address.Address, error) {
+// Lookup (Sync) - get existing IP address for container with given name in range
+func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
 	resultChan := make(chan allocateResult)
 	alloc.actionChan <- func() {
-		addr, found := alloc.owned[ident]
-		if found {
+		if addr, found := alloc.lookupOwned(ident, r); found {
 			resultChan <- allocateResult{addr: addr}
 			return
 		}
-		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found")}
+		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
 	}
 	result := <-resultChan
 	return result.addr, result.err
@@ -231,22 +210,21 @@ func (alloc *Allocator) Claim(ident string, addr address.Address, cancelChan <-c
 	return <-resultChan
 }
 
-// Free (Sync) - release IP address for container with given name
-func (alloc *Allocator) Free(ident string) error {
-	return alloc.free(ident)
-}
-
-// ContainerDied is provided to satisfy the updater interface; does a free underneath.  Async.
+// ContainerDied is provided to satisfy the updater interface; does a 'Delete' underneath.  Sync.
 func (alloc *Allocator) ContainerDied(ident string) error {
-	alloc.debugln("Container", ident, "died; releasing addresses")
-	return alloc.free(ident)
+	err := alloc.Delete(ident)
+	if err == nil {
+		alloc.debugln("Container", ident, "died; released addresses")
+	}
+	return err
 }
 
-func (alloc *Allocator) free(ident string) error {
+// Delete (Sync) - release all IP addresses for container with given name
+func (alloc *Allocator) Delete(ident string) error {
 	errChan := make(chan error)
 	alloc.actionChan <- func() {
-		addr, found := alloc.owned[ident]
-		if found {
+		addrs, found := alloc.owned[ident]
+		for _, addr := range addrs {
 			alloc.space.Free(addr)
 		}
 		delete(alloc.owned, ident)
@@ -256,10 +234,34 @@ func (alloc *Allocator) free(ident string) error {
 		found = alloc.cancelOpsFor(&alloc.pendingClaims, ident) || found
 
 		if !found {
-			errChan <- fmt.Errorf("Free: no addresses for %s", ident)
+			errChan <- fmt.Errorf("Delete: no addresses for %s", ident)
 			return
 		}
 		errChan <- nil
+	}
+	return <-errChan
+}
+
+// Free (Sync) - release single IP address for container
+func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
+	errChan := make(chan error)
+	alloc.actionChan <- func() {
+		addrs := alloc.owned[ident]
+		for i, ownedAddr := range addrs {
+			if ownedAddr == addrToFree {
+				alloc.debugln("Freed", addrToFree, "for", ident)
+				if len(addrs) == 1 {
+					delete(alloc.owned, ident)
+				} else {
+					alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
+				}
+				alloc.space.Free(addrToFree)
+				errChan <- nil
+				return
+			}
+		}
+
+		errChan <- fmt.Errorf("Free: address %s not found for %s", addrToFree, ident)
 	}
 	return <-errChan
 }
@@ -349,7 +351,13 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 		switch msg[0] {
 		case msgSpaceRequest:
 			// some other peer asked us for space
-			alloc.donateSpace(sender)
+			decoder := gob.NewDecoder(bytes.NewReader(msg[1:]))
+			var r address.Range
+			if err := decoder.Decode(&r); err != nil {
+				resultChan <- err
+				return
+			}
+			alloc.donateSpace(r, sender)
 			resultChan <- nil
 		case msgRingUpdate:
 			resultChan <- alloc.update(msg[1:])
@@ -470,20 +478,14 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 
 func (alloc *Allocator) string() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Allocator subnet %s/%d", alloc.subnetStart.String(), alloc.prefixLen)
+	fmt.Fprintf(&buf, "Allocator range %s", alloc.universe)
 
 	if alloc.ring.Empty() {
 		if alloc.paxosTicker != nil {
 			fmt.Fprintf(&buf, " awaiting consensus: %s", alloc.paxos.String())
 		}
 	} else {
-		localFreeSpace := alloc.space.NumFreeAddresses()
-		remoteFreeSpace := alloc.ring.TotalRemoteFree()
-		percentFree := 100 * float64(localFreeSpace+remoteFreeSpace) / float64(alloc.subnetSize)
-		fmt.Fprintf(&buf, "  Free IPs: ~%.1f%%, %d local, ~%d remote\n",
-			percentFree, localFreeSpace, remoteFreeSpace)
-
-		fmt.Fprint(&buf, "Owned Ranges:")
+		fmt.Fprint(&buf, "\nOwned Ranges:")
 		alloc.ring.FprintWithNicknames(&buf, alloc.nicknames)
 	}
 	if len(alloc.pendingAllocates)+len(alloc.pendingClaims) > 0 {
@@ -573,8 +575,18 @@ func (alloc *Allocator) propose() {
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
-func (alloc *Allocator) sendRequest(dest router.PeerName, kind byte) {
-	msg := router.Concat([]byte{kind}, alloc.encode())
+func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	if err := enc.Encode(r); err != nil {
+		panic(err)
+	}
+	msg := router.Concat([]byte{msgSpaceRequest}, buf.Bytes())
+	alloc.gossip.GossipUnicast(dest, msg)
+}
+
+func (alloc *Allocator) sendRingUpdate(dest router.PeerName) {
+	msg := router.Concat([]byte{msgRingUpdate}, alloc.encode())
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
@@ -626,25 +638,24 @@ func (alloc *Allocator) update(msg []byte) error {
 	return nil
 }
 
-func (alloc *Allocator) donateSpace(to router.PeerName) {
+func (alloc *Allocator) donateSpace(r address.Range, to router.PeerName) {
 	// No matter what we do, we'll send a unicast gossip
 	// of our ring back to tha chap who asked for space.
 	// This serves to both tell him of any space we might
 	// have given him, or tell him where he might find some
 	// more.
-	defer alloc.sendRequest(to, msgRingUpdate)
+	defer alloc.sendRingUpdate(to)
 
 	alloc.debugln("Peer", to, "asked me for space")
-	start, size, ok := alloc.space.Donate()
+	chunk, ok := alloc.space.Donate(r)
 	if !ok {
-		free := alloc.space.NumFreeAddresses()
+		free := alloc.space.NumFreeAddressesInRange(r)
 		common.Assert(free == 0)
 		alloc.debugln("No space to give to peer", to)
 		return
 	}
-	end := address.Add(start, size)
-	alloc.debugln("Giving range", start, end, size, "to", to)
-	alloc.ring.GrantRangeToHost(start, end, to)
+	alloc.debugln("Giving range", chunk, "to", to)
+	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -672,21 +683,33 @@ func (alloc *Allocator) reportFreeSpace() {
 
 	freespace := make(map[address.Address]address.Offset)
 	for _, r := range ranges {
-		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r.Start, r.End)
+		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}
 	alloc.ring.ReportFree(freespace)
 }
 
 // Owned addresses
 
+// NB: addr must not be owned by ident already
 func (alloc *Allocator) addOwned(ident string, addr address.Address) {
-	alloc.owned[ident] = addr
+	alloc.owned[ident] = append(alloc.owned[ident], addr)
+}
+
+func (alloc *Allocator) lookupOwned(ident string, r address.Range) (address.Address, bool) {
+	for _, addr := range alloc.owned[ident] {
+		if r.Contains(addr) {
+			return addr, true
+		}
+	}
+	return 0, false
 }
 
 func (alloc *Allocator) findOwner(addr address.Address) string {
-	for ident, candidate := range alloc.owned {
-		if candidate == addr {
-			return ident
+	for ident, addrs := range alloc.owned {
+		for _, candidate := range addrs {
+			if candidate == addr {
+				return ident
+			}
 		}
 	}
 	return ""

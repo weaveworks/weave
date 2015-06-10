@@ -9,9 +9,9 @@ import (
 
 type claim struct {
 	resultChan       chan<- error
-	hasBeenCancelled func() bool
 	ident            string
 	addr             address.Address
+	hasBeenCancelled func() bool
 }
 
 // Try returns true for success (or failure), false if we need to try again later
@@ -57,6 +57,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 			c.resultChan <- err
 			return true
 		}
+		alloc.debugln("Claimed", c.addr, "for", c.ident)
 		alloc.addOwned(c.ident, c.addr)
 		c.resultChan <- nil
 		return true
