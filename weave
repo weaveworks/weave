@@ -650,16 +650,26 @@ dns_args() {
     DNS_SEARCH_ARG="--dns-search=."
     HOSTNAME_ARG=""
     HOSTNAME_SPECIFIED=false
-    for arg in "$@" ; do
-        case $arg in
+    while [ $# -gt 0 ] ; do
+        case "$1" in
             --dns-search=*)
                 DNS_SEARCH_ARG=""
+                shift
+                ;;
+            --name)
+                HOSTNAME_ARG="--hostname=$2.$(dns_domain)"
+                shift 2
                 ;;
             --name=*)
-                HOSTNAME_ARG="--hostname=${arg#--name=}.$(dns_domain)"
+                HOSTNAME_ARG="--hostname=${1#*=}.$(dns_domain)"
+                shift
                 ;;
-            -h|--hostname=*)
+            -h|--hostname|--hostname=*)
                 HOSTNAME_SPECIFIED=true
+                shift
+                ;;
+            *)
+                shift
                 ;;
         esac
     done
