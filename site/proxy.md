@@ -127,7 +127,9 @@ option, i.e.
 
 Now any containers started via the proxy, and with a `WEAVE_CIDR=...`
 environment variable (or even without it, if IPAM is
-[configured](#ipam)), will use weaveDNS for name resolution.
+[configured](#ipam)), will use weaveDNS for name resolution. If not
+provided, the hostname will default to the container name and will be
+registered in weaveDNS.
 
 ## <a name="multi-host"></a>Multi-host example
 
