@@ -660,6 +660,16 @@ dns_args() {
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
 }
 
+# Use the weaveDNS REST API to determine the local domain. If weaveDNS is not
+# running, return the default value ('weave.local.')
+dns_domain() {
+    if DOMAIN=$(http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /domain 2>/dev/null) ; then
+        echo $DOMAIN
+    else
+        echo 'weave.local.'
+    fi
+}
+
 # Print an error to stderr and return with an indicative exit status
 # if the container $1 does not exist or isn't running.
 check_running() {
@@ -1068,6 +1078,9 @@ case "$COMMAND" in
     dns-args)
         dns_args "$@"
         echo -n $DNS_ARGS
+        ;;
+    dns-domain)
+        echo $(dns_domain)
         ;;
     docker-bridge-ip)
         docker_bridge_ip
