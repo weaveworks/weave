@@ -20,7 +20,6 @@ import (
 func newNode(name PeerName) (*Peer, *Peers) {
 	peer := NewLocalPeer(name, "", nil)
 	peers := NewPeers(peer)
-	peers.FetchWithDefault(peer.Peer)
 	return peer.Peer, peers
 }
 
