@@ -13,7 +13,7 @@ import (
 var (
 	version           = "(unreleased version)"
 	defaultDockerAddr = "unix:///var/run/docker.sock"
-	defaultListenAddr = ":12375"
+	defaultListenAddr = "tcp://0.0.0.0:12375"
 )
 
 func main() {
@@ -29,8 +29,8 @@ func main() {
 	c.Version = version
 	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
 	getopt.BoolVarLong(&justVersion, "version", 0, "print version and exit")
-	getopt.StringVar(&c.ListenAddr, 'L', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddr))
-	getopt.StringVar(&c.DockerAddr, 'H', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultDockerAddr))
+	getopt.StringVar(&c.ListenAddr, 'H', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddr))
+	getopt.StringVar(&c.DockerAddr, 'D', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultDockerAddr))
 	getopt.StringVarLong(&c.TLSConfig.CACert, "tlscacert", 0, "Trust certs signed only by this CA")
 	getopt.StringVarLong(&c.TLSConfig.Cert, "tlscert", 0, "Path to TLS certificate file")
 	getopt.BoolVarLong(&c.TLSConfig.Enabled, "tls", 0, "Use TLS; implied by --tlsverify")
@@ -51,6 +51,16 @@ func main() {
 
 	Info.Println("weave proxy", version)
 	Info.Println("Command line arguments:", strings.Join(os.Args[1:], " "))
+
+	protoAddrParts := strings.SplitN(c.ListenAddr, "://", 2)
+	if len(protoAddrParts) == 2 {
+		if protoAddrParts[0] != "tcp" {
+			Error.Fatalf("Invalid protocol format: %q", protoAddrParts[0])
+		}
+		c.ListenAddr = protoAddrParts[1]
+	} else {
+		c.ListenAddr = protoAddrParts[0]
+	}
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {
