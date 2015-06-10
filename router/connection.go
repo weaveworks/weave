@@ -262,10 +262,7 @@ func (conn *LocalConnection) SetEstablished() {
 		conn.fragTest = time.NewTicker(FragTestInterval)
 		// avoid initial waits for timers to fire
 		conn.Forward(true, conn.heartbeatFrame, nil)
-		conn.setStackFrag(false)
-		if err := conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest); err != nil {
-			return err
-		}
+		conn.performFragTest()
 		return nil
 	})
 }
@@ -386,8 +383,7 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 		case <-tickerChan(conn.heartbeat):
 			conn.Forward(true, conn.heartbeatFrame, nil)
 		case <-tickerChan(conn.fragTest):
-			conn.setStackFrag(false)
-			err = conn.sendSimpleProtocolMsg(ProtocolStartFragmentationTest)
+			conn.performFragTest()
 		}
 	}
 	return
@@ -473,12 +469,6 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 		// We can now consider the connection as established from our
 		// end.
 		conn.SetEstablished()
-	case ProtocolStartFragmentationTest:
-		conn.Forward(false, &ForwardedFrame{
-			srcPeer: conn.local,
-			dstPeer: conn.remote,
-			frame:   FragTest},
-			nil)
 	case ProtocolFragmentationReceived:
 		conn.setStackFrag(true)
 	case ProtocolPMTUVerified:
@@ -502,6 +492,15 @@ func (conn *LocalConnection) sendFastHeartbeats() error {
 		conn.Forward(true, conn.heartbeatFrame, nil) // avoid initial wait
 	}
 	return err
+}
+
+func (conn *LocalConnection) performFragTest() {
+	conn.setStackFrag(false)
+	conn.Forward(false, &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   FragTest},
+		nil)
 }
 
 func tickerChan(ticker *time.Ticker) <-chan time.Time {

@@ -11,7 +11,6 @@ const (
 	ProtocolHeartbeat ProtocolTag = iota
 	ProtocolConnectionEstablished
 	ProtocolFragmentationReceived
-	ProtocolStartFragmentationTest
 	ProtocolPMTUVerified
 	ProtocolGossip
 	ProtocolGossipUnicast
