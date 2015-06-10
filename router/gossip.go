@@ -329,22 +329,18 @@ func (c *GossipChannel) log(args ...interface{}) {
 // for testing
 
 func (router *Router) sendPendingGossip() {
-	// copy the senders so we don't hold the lock for long
-	var allSenders []*GossipSender
 	for _, channel := range router.GossipChannels {
 		channel.Lock()
 		for _, sender := range channel.senders {
-			allSenders = append(allSenders, sender)
+			ch := make(chan struct{})
+			sender.flushch <- ch
+			<-ch
 		}
 		for _, sender := range channel.broadcasters {
-			allSenders = append(allSenders, sender)
+			ch := make(chan struct{})
+			sender.flushch <- ch
+			<-ch
 		}
 		channel.Unlock()
-	}
-
-	for _, sender := range allSenders {
-		ch := make(chan struct{})
-		sender.flushch <- ch
-		<-ch
 	}
 }
