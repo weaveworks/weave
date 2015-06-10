@@ -58,7 +58,6 @@ func NewRouter(config RouterConfig, name PeerName, nickName string) *Router {
 	router.Ourself = NewLocalPeer(name, nickName, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
 	router.Peers = NewPeers(router.Ourself, onPeerGC)
-	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself, router.Peers)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port)
 	router.TopologyGossip = router.NewGossip("topology", router)

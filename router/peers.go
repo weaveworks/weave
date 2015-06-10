@@ -33,10 +33,12 @@ type ConnectionSummary struct {
 }
 
 func NewPeers(ourself *LocalPeer, onGC func(*Peer)) *Peers {
-	return &Peers{
+	peers := &Peers{
 		ourself: ourself,
 		table:   make(map[PeerName]*Peer),
 		onGC:    onGC}
+	peers.FetchWithDefault(ourself.Peer)
+	return peers
 }
 
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
