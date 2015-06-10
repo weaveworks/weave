@@ -332,15 +332,17 @@ func (router *Router) sendPendingGossip() {
 	for _, channel := range router.GossipChannels {
 		channel.Lock()
 		for _, sender := range channel.senders {
-			ch := make(chan struct{})
-			sender.flushch <- ch
-			<-ch
+			sender.flush()
 		}
 		for _, sender := range channel.broadcasters {
-			ch := make(chan struct{})
-			sender.flushch <- ch
-			<-ch
+			sender.flush()
 		}
 		channel.Unlock()
 	}
+}
+
+func (sender *GossipSender) flush() {
+	ch := make(chan struct{})
+	sender.flushch <- ch
+	<-ch
 }
