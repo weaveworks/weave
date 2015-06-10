@@ -30,7 +30,8 @@ on every weave host, by invoking the weave script command
 `launch-dns`. Application containers are then instructed to use
 weaveDNS as their nameserver by supplying the `--with-dns` option when
 starting them. Giving any container a hostname in the `.weave.local`
-domain registers it in weaveDNS.  For example:
+domain registers it in weaveDNS; containers started with `--with-dns`
+have a default hostname derived from their container name. For example:
 
 ```bash
 $ weave launch
