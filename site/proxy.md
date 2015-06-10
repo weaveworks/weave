@@ -40,12 +40,17 @@ interfaces. This can be adjusted with the `-H` argument, e.g.
 
     host1$ weave launch-proxy -H tcp://127.0.0.1:9999
 
-All docker commands can be run via the proxy, so it is safe to
-globally adjust your `DOCKER_HOST` to point at the proxy, e.g.
+All docker commands can be run via the proxy, so it is safe to adjust
+your `DOCKER_HOST` to point at the proxy. Weave provides a convenient
+command for this:
 
-    host1$ export DOCKER_HOST=tcp://localhost:12375
+    host1$ eval "$(weave proxy-env)"
     host1$ docker ps
     ...
+
+Alternatively, the proxy host can be set on a per-command basis with
+
+    host1$ docker $(weave proxy-config) ps
 
 If you are working with a remote docker daemon, then `localhost` in
 the above needs to be replaced with the docker daemon host, and any
@@ -137,12 +142,12 @@ to point at the latter:
     host1$ weave launch -iprange 10.2.3.0/24
     host1$ weave launch-dns 10.2.4.1/24
     host1$ weave launch-proxy --with-ipam --with-dns
-    host1$ export DOCKER_HOST=tcp://localhost:12375
+    host1$ eval "$(weave proxy-env)"
 
     host2$ weave launch -iprange 10.2.3.0/24 host1
     host2$ weave launch-dns 10.2.4.2/24
     host2$ weave launch-proxy --with-ipam --with-dns
-    host2$ export DOCKER_HOST=tcp://localhost:12375
+    host1$ eval "$(weave proxy-env)"
 
 NB: Note that the two weaveDNS instances must be given unique IPs, on
 a subnet different from that used for IP allocation.
@@ -195,7 +200,8 @@ with
 
     $ mkdir -pv ~/.docker
     $ cp -v {ca,cert,key}.pem ~/.docker
-    $ export DOCKER_HOST=tcp://host1:12375 DOCKER_TLS_VERIFY=1
+    $ eval "$(weave proxy-env)"
+    $ export DOCKER_TLS_VERIFY=1
     $ docker version
     ...
 

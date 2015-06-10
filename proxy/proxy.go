@@ -108,7 +108,7 @@ func (proxy *Proxy) ListenAndServe() error {
 		listener = tls.NewListener(listener, proxy.TLSConfig.Config)
 	}
 
-	Info.Println("proxy listening")
+	Info.Println("proxy listening on", proxy.ListenAddr)
 
 	return (&http.Server{Handler: proxy}).Serve(listener)
 }
