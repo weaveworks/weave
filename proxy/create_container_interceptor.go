@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -93,11 +94,34 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 	name := r.URL.Query().Get("name")
 	if container.Hostname == "" && name != "" {
 		container.Hostname = name
-		// TODO: Get weaveDNS domain
-		container.Domainname = nameserver.DefaultLocalDomain
+		container.Domainname = i.getDNSDomain()
 	}
 
 	return nil
+}
+
+func (i *createContainerInterceptor) getDNSDomain() (domain string) {
+	domain = nameserver.DefaultLocalDomain
+	dnsContainer, err := i.proxy.client.InspectContainer("weavedns")
+	if err != nil ||
+		dnsContainer.NetworkSettings == nil ||
+		dnsContainer.NetworkSettings.IPAddress == "" {
+		return
+	}
+
+	url := fmt.Sprintf("http://%s:6785/domain", dnsContainer.NetworkSettings.IPAddress)
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	return string(b)
 }
 
 func (i *createContainerInterceptor) InterceptResponse(r *http.Response) error {
