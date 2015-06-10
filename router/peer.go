@@ -17,11 +17,24 @@ func ParsePeerUID(s string) (PeerUID, error) {
 	return PeerUID(uid), err
 }
 
+// Short IDs exist for the sake of fast datapath.  They are 12 bits,
+// randomly assigned, but we detect and recover from collisions.  This
+// does limit us to 4096 peers, but that should be sufficient for a
+// while.
+type PeerShortID uint16
+
+const PeerShortIDBits = 12
+
+func randomPeerShortID() PeerShortID {
+	return PeerShortID(randUint64() & (1<<PeerShortIDBits - 1))
+}
+
 type PeerSummary struct {
 	NameByte []byte
 	NickName string
 	UID      PeerUID
 	Version  uint64
+	ShortID  PeerShortID
 }
 
 type Peer struct {
@@ -33,7 +46,7 @@ type Peer struct {
 
 type ConnectionSet map[Connection]struct{}
 
-func NewPeer(name PeerName, nickName string, uid PeerUID, version uint64) *Peer {
+func NewPeer(name PeerName, nickName string, uid PeerUID, version uint64, shortID PeerShortID) *Peer {
 	return &Peer{
 		Name: name,
 		PeerSummary: PeerSummary{
@@ -41,6 +54,7 @@ func NewPeer(name PeerName, nickName string, uid PeerUID, version uint64) *Peer 
 			NickName: nickName,
 			UID:      uid,
 			Version:  version,
+			ShortID:  shortID,
 		},
 		connections: make(map[PeerName]Connection)}
 }

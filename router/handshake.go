@@ -61,6 +61,7 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	nameStr, _ := fv.Value("Name")
 	nickNameStr, _ := fv.Value("NickName")
 	uidStr, _ := fv.Value("UID")
+	shortIDStr, _ := fv.Value("ShortID")
 	remoteConnIDStr, _ := fv.Value("ConnID")
 	if err := fv.Err(); err != nil {
 		return err
@@ -70,18 +71,27 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 	if err != nil {
 		return err
 	}
+
 	if !acceptNewPeer {
 		if _, found := conn.Router.Peers.Fetch(name); !found {
 			return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
 		}
 	}
+
 	if existingConn, found := conn.Router.Ourself.ConnectionTo(name); found && existingConn.Established() {
 		return fmt.Errorf("Already have connection to %s at %s", existingConn.Remote(), existingConn.RemoteTCPAddr())
 	}
+
 	uid, err := ParsePeerUID(uidStr)
 	if err != nil {
 		return err
 	}
+
+	shortID, err := strconv.ParseUint(shortIDStr, 10, PeerShortIDBits)
+	if err != nil {
+		return err
+	}
+
 	remoteConnID, err := strconv.ParseUint(remoteConnIDStr, 10, 64)
 	if err != nil {
 		return err
@@ -110,7 +120,8 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 		conn.tcpSender = NewSimpleTCPSender(enc)
 	}
 
-	return conn.setRemote(NewPeer(name, nickNameStr, uid, 0))
+	return conn.setRemote(NewPeer(name, nickNameStr, uid, 0,
+		PeerShortID(shortID)))
 }
 
 func (conn *LocalConnection) handshakeSendRecv(localConnID uint64, usingPassword bool, enc *gob.Encoder, dec *gob.Decoder) (*FieldValidator, *[32]byte, error) {
@@ -122,6 +133,7 @@ func (conn *LocalConnection) handshakeSendRecv(localConnID uint64, usingPassword
 		"Name":            conn.local.Name.String(),
 		"NickName":        conn.local.NickName,
 		"UID":             fmt.Sprint(conn.local.UID),
+		"ShortID":         fmt.Sprint(conn.local.ShortID),
 		"ConnID":          fmt.Sprint(localConnID)}
 	handshakeRecv := map[string]string{}
 

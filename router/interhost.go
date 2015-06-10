@@ -13,6 +13,9 @@ type InterHost interface {
 	// be discarded.
 	InvalidateRoutes()
 
+	// A mapping of a short id to a peer has changed
+	InvalidateShortIDs()
+
 	// Form a packet-forwarding connection.  The remote UDPAddr
 	// can be nil if unknown (in which case the implementation
 	// needs to discover it).
@@ -63,6 +66,9 @@ func (NullInterHost) ConsumeInterHostPackets(*Peer, *Peers,
 }
 
 func (NullInterHost) InvalidateRoutes() {
+}
+
+func (NullInterHost) InvalidateShortIDs() {
 }
 
 func (NullInterHost) MakeForwarder(*Peer, net.IP, *net.UDPAddr, uint64,

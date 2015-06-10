@@ -90,6 +90,10 @@ func (*SleeveInterHost) InvalidateRoutes() {
 	// no cached information, so nothing to do
 }
 
+func (*SleeveInterHost) InvalidateShortIDs() {
+	// no cached information, so nothing to do
+}
+
 func (sleeve *SleeveInterHost) logFrame(string, []byte, *layers.Ethernet) {
 	// XXX
 }
