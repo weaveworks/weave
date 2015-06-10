@@ -2,7 +2,7 @@ package router
 
 const (
 	Protocol        = "weave"
-	ProtocolVersion = 18
+	ProtocolVersion = 19
 )
 
 type ProtocolTag byte
@@ -11,7 +11,6 @@ const (
 	ProtocolHeartbeat ProtocolTag = iota
 	ProtocolConnectionEstablished
 	ProtocolFragmentationReceived
-	ProtocolStartFragmentationTest
 	ProtocolPMTUVerified
 	ProtocolGossip
 	ProtocolGossipUnicast
