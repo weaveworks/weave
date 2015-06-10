@@ -1048,12 +1048,13 @@ case "$COMMAND" in
         collect_cidr_args "$@"
         shift $CIDR_COUNT
         [ $# -eq 1 ] || usage
-        CONTAINER=$(docker start $1)
+        RES=$(docker start $1)
+        CONTAINER=$(container_id $1)
         create_bridge
         get_ipam_cidr $CONTAINER
         with_container_netns_or_die $CONTAINER attach $CIDR_ARGS
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $CIDR_ARGS
-        echo $CONTAINER
+        echo $RES
         ;;
     attach)
         collect_cidr_args "$@"
