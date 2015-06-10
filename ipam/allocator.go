@@ -250,8 +250,11 @@ func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 		for i, ownedAddr := range addrs {
 			if ownedAddr == addrToFree {
 				alloc.debugln("Freed", addrToFree, "for", ident)
-				addrs = append(addrs[:i], addrs[i+1:]...)
-				alloc.owned[ident] = addrs
+				if len(addrs) == 1 {
+					delete(alloc.owned, ident)
+				} else {
+					alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
+				}
 				alloc.space.Free(addrToFree)
 				errChan <- nil
 				return
