@@ -60,9 +60,8 @@ func (sender *GossipSender) run() {
 		case pending := <-sender.cell:
 			if pending == nil { // receive zero value when chan is closed
 				return
-			} else {
-				sender.send(pending)
 			}
+			sender.send(pending)
 		case ch := <-sender.flushch:
 			sender.flush()
 			close(ch)
@@ -324,7 +323,7 @@ func (c *GossipChannel) log(args ...interface{}) {
 
 func (router *Router) sendPendingGossip() {
 	// copy the senders so we don't hold the lock for long
-	allSenders := make([]*GossipSender, 0)
+	var allSenders []*GossipSender
 	for _, channel := range router.GossipChannels {
 		channel.Lock()
 		for _, sender := range channel.senders {
