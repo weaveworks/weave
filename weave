@@ -16,6 +16,8 @@ IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 DOCKERHUB_USER=weaveworks
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
+PROXY_HOST=${PROXY_HOST:-$(echo "${DOCKER_HOST#tcp://}" | cut -s -d: -f1)}
+PROXY_HOST=${PROXY_HOST:-127.0.0.1}
 
 # Define some regular expressions for matching addresses.
 # The regexp here is far from precise, but good enough.
@@ -41,6 +43,8 @@ usage() {
     echo "weave hide         [<cidr> ...]"
     echo "weave ps           [<container_id> ...]"
     echo "weave status"
+    echo "weave proxy-env"
+    echo "weave proxy-config"
     echo "weave version"
     echo "weave stop"
     echo "weave stop-dns"
@@ -69,6 +73,7 @@ exec_remote() {
         -e WEAVE_PORT \
         -e WEAVE_CONTAINER_NAME \
         -e DOCKER_BRIDGE \
+        -e PROXY_HOST="$PROXY_HOST" \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
@@ -171,6 +176,7 @@ MTU=65535
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
+PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 
 
@@ -805,6 +811,19 @@ proxy_args() {
     done
 }
 
+proxy_addr() {
+    if addr=$(docker logs weaveproxy | head -n3 | grep -oE "proxy listening on .*"); then
+      addr=${addr##* }
+      host=${addr%:*}
+      [ "$host" = "0.0.0.0" ] && host=$PROXY_HOST
+      port=${addr#*:}
+      echo "${1}tcp://${host:-$PROXY_HOST}:${port:-$PROXY_PORT}"
+      return 0
+    fi
+    echo  "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
+    return 1
+}
+
 ##########################################################################################
 
 [ $(id -u) = 0 ] || {
@@ -952,6 +971,12 @@ case "$COMMAND" in
             $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $PROXY_ARGS)
         wait_for_log $PROXY_CONTAINER_NAME "proxy listening"
         echo $PROXY_CONTAINER
+        ;;
+    proxy-env)
+        proxy_addr "export DOCKER_HOST="
+        ;;
+    proxy-config)
+        proxy_addr "-H="
         ;;
     connect)
         [ $# -gt 0 ] || usage
