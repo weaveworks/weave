@@ -29,8 +29,8 @@ func main() {
 	c.Version = version
 	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
 	getopt.BoolVarLong(&justVersion, "version", 0, "print version and exit")
-	getopt.StringVar(&c.ListenAddr, 'L', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddr))
-	getopt.StringVar(&c.DockerAddr, 'H', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultDockerAddr))
+	getopt.StringVar(&c.ListenAddr, 'H', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddr))
+	getopt.StringVar(&c.DockerAddr, 'D', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultDockerAddr))
 	getopt.StringVarLong(&c.TLSConfig.CACert, "tlscacert", 0, "Trust certs signed only by this CA")
 	getopt.StringVarLong(&c.TLSConfig.Cert, "tlscert", 0, "Path to TLS certificate file")
 	getopt.BoolVarLong(&c.TLSConfig.Enabled, "tls", 0, "Use TLS; implied by --tlsverify")
