@@ -762,8 +762,15 @@ ipam_cidrs() {
         while [ $# -gt 0 ] ; do
             if [ $# -gt 1 -a "$1" = "--subnet" ] ; then
                 shift 1
-                # (assuming weave is now listening to /ip URLs all the time)
                 CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID/$1)
+                if [ "$CIDR" = "404 page not found" ] ; then
+                    echo "IP address allocation must be enabled to use --subnet (use the -iprange option on 'weave launch')" >&2
+                    return 1
+                fi
+                if ! is_cidr "$CIDR" ; then
+                    echo "$CIDR" >&2
+                    return 1
+                fi
                 CIDR_COUNT=$((CIDR_COUNT - 1))
             else
                 CIDR=$1
@@ -779,7 +786,6 @@ ipam_cidrs() {
         echo "No IP address supplied (use the -iprange and -defaultsubnet options on 'weave launch' to enable IP address allocation)" >&2
         return 1
     fi
-    # todo: do we still have to handle this error?  Considering above assumption?
     if [ "$CIDR_ARGS" = "404 page not found" ] ; then
         echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
         return 1
