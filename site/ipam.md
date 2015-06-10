@@ -33,16 +33,16 @@ allocation, and `-ipsubnet` is the subnet that will be used when
 you don't explicitly specify one.
 
 Then, to request the allocation of an address from a subnet other than
-the default, use `--subnet`:
+the default, use the `net:` prefix:
 
-    host1# C=$(weave run --subnet 10.2.7.0/24 -ti ubuntu)
+    host1# C=$(weave run net:10.2.7.0/24 -ti ubuntu)
 
-To explicitly request the default subnet, use `--subnet default`.
+To explicitly request the default subnet, use `net:default`.
 
 And, you can ask for multiple addresses in different subnets and add
 in manually-assigned addresses on the same line, for instance:
 
-    host1# C=$(weave run --subnet 10.2.7.0/24 --subnet 10.2.8.0/24 10.3.9.1/24 -ti ubuntu)
+    host1# C=$(weave run net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24 -ti ubuntu)
 
 Note that `-iprange` can be smaller than `-ipsubnet`, if you want to
 use a mixture of automatically-allocated addresses and manually-chosen

@@ -55,7 +55,7 @@ usage() {
     echo "where <peer>         = <ip_address_or_fqdn>[:<port>]"
     echo "      <cidr>         = <ip_address>/<routing_prefix_length>"
     echo "      <peer_id>      = <nickname> or weave internal peer ID"
-    echo "      <address_spec> = <cidr> | --subnet <cidr> | --subnet default"
+    echo "      <address_spec> = [ip:]<cidr> | net:<cidr> | net:default"
     echo "      <address> = [tcp://][<ip_address>]:<port>"
     exit 1
 }
@@ -106,15 +106,9 @@ validate_cidr() {
 collect_cidr_args() {
     CIDR_ARGS=""
     CIDR_ARG_COUNT=0
-    while is_cidr "$1" || [ "$1" = "--subnet" ] ; do
-        CIDR_ARGS="$CIDR_ARGS $1"
+    while [ "$1" = "net:default" ] || is_cidr "$1" || is_cidr "${1#ip:}" || is_cidr "${1#net:}" ; do
+        CIDR_ARGS="$CIDR_ARGS ${1#ip:}"
         CIDR_ARG_COUNT=$((CIDR_ARG_COUNT + 1))
-        # only accept 'default' after '--subnet', in case someone has a container called 'default'
-        if [ "$1" = "--subnet" -a "$2" = "default" ] ; then
-            CIDR_ARGS="$CIDR_ARGS $2"
-            CIDR_ARG_COUNT=$((CIDR_ARG_COUNT + 1))
-            shift 1
-        fi
         shift 1
     done
 }
@@ -776,12 +770,11 @@ ipam_cidrs() {
         ALL_CIDRS="$IPAM_CIDRS"
     fi
     while [ $# -gt 0 ] ; do
-        if [ $# -gt 1 -a "$1" = "--subnet" ] ; then
-            shift 1
-            if [ "$1" = "default" ] ; then
+        if [ "${1%:*}" = "net" ] ; then
+            if [ "$1" = "net:default" ] ; then
                 CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID)
             else
-                CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID/$1)
+                CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID/"${1#net:}")
             fi
             if [ "$CIDR" = "404 page not found" ] ; then
                 echo "IP address allocation must be enabled to use --subnet (use the -iprange option on 'weave launch')" >&2

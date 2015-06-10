@@ -14,16 +14,16 @@ weave_on $HOST1 launch -iprange $UNIVERSE -ipsubnet $SUBNET_1
 weave_on $HOST2 launch -iprange $UNIVERSE -ipsubnet $SUBNET_1 $HOST1
 
 start_container $HOST1 $C1/24 --name=c1
-start_container $HOST2 $C2/24 --name=c2
+start_container $HOST2 ip:$C2/24 --name=c2
 assert_raises "exec_on $HOST1 c1 $PING $C2"
 
 start_container $HOST1 --name=c3
-start_container $HOST2 --subnet default --name=c4
+start_container $HOST2 net:default --name=c4
 C4=$(container_ip $HOST2 c4)
 assert_raises "exec_on $HOST1 c3 $PING $C4"
 
-start_container $HOST1 --subnet $SUBNET_2 --name=c5
-start_container $HOST2 --subnet $SUBNET_2 --name=c6
+start_container $HOST1 net:$SUBNET_2 --name=c5
+start_container $HOST2 net:$SUBNET_2 --name=c6
 C6=$(container_ip $HOST2 c6)
 assert_raises "exec_on $HOST1 c5 $PING $C6"
 
