@@ -39,6 +39,11 @@ the default, use `--subnet`:
 
 To explicitly request the default subnet, use `--subnet default`.
 
+And, you can ask for multiple addresses in different subnets and add
+in manually-assigned addresses on the same line, for instance:
+
+    host1# C=$(weave run --subnet 10.2.7.0/24 --subnet 10.2.8.0/24 10.3.9.1/24 -ti ubuntu)
+
 Note that `-iprange` can be smaller than `-ipsubnet`, if you want to
 use a mixture of automatically-allocated addresses and manually-chosen
 addresses, and have the containers communicate with each other. For
