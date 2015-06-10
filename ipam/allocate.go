@@ -24,14 +24,9 @@ func (g *allocate) Try(alloc *Allocator) bool {
 		return true
 	}
 
-	// If we have previously stored an address for this container in this subnet, return it.
-	if addrs, found := alloc.owned[g.ident]; found {
-		for _, addr := range addrs {
-			if g.r.Contains(addr) {
-				g.resultChan <- allocateResult{addr, nil}
-				return true
-			}
-		}
+	if addr, found := alloc.lookupOwned(g.ident, g.r); found {
+		g.resultChan <- allocateResult{addr, nil}
+		return true
 	}
 
 	if !alloc.universe.Overlaps(g.r) {

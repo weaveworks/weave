@@ -48,7 +48,7 @@ type Allocator struct {
 	universe         address.Range                // superset of all ranges
 	ring             *ring.Ring                   // information on ranges owned by all peers
 	space            space.Space                  // more detail on ranges owned by us
-	owned            map[string][]address.Address // who owns what address, indexed by container-ID
+	owned            map[string][]address.Address // who owns what addresses, indexed by container-ID
 	nicknames        map[router.PeerName]string   // so we can map nicknames for rmpeer
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
@@ -191,13 +191,11 @@ func (alloc *Allocator) Allocate(ident string, r address.Range, cancelChan <-cha
 func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
 	resultChan := make(chan allocateResult)
 	alloc.actionChan <- func() {
-		for _, addr := range alloc.owned[ident] {
-			if r.Contains(addr) {
-				resultChan <- allocateResult{addr: addr}
-				return
-			}
+		if addr, found := alloc.lookupOwned(ident, r); found {
+			resultChan <- allocateResult{addr: addr}
+			return
 		}
-		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found")}
+		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
 	}
 	result := <-resultChan
 	return result.addr, result.err
@@ -689,8 +687,18 @@ func (alloc *Allocator) reportFreeSpace() {
 
 // Owned addresses
 
+// NB: addr must not be owned by ident already
 func (alloc *Allocator) addOwned(ident string, addr address.Address) {
 	alloc.owned[ident] = append(alloc.owned[ident], addr)
+}
+
+func (alloc *Allocator) lookupOwned(ident string, r address.Range) (address.Address, bool) {
+	for _, addr := range alloc.owned[ident] {
+		if r.Contains(addr) {
+			return addr, true
+		}
+	}
+	return 0, false
 }
 
 func (alloc *Allocator) findOwner(addr address.Address) string {
