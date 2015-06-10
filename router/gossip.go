@@ -63,7 +63,14 @@ func (sender *GossipSender) run() {
 			}
 			sender.send(pending)
 		case ch := <-sender.flushch:
-			sender.flush()
+			// ensure anything pending is sent, then close the channel we were given
+			select {
+			case pending := <-sender.cell:
+				if pending != nil {
+					sender.send(pending)
+				}
+			default:
+			}
 			close(ch)
 		}
 	}
@@ -339,16 +346,5 @@ func (router *Router) sendPendingGossip() {
 		ch := make(chan struct{})
 		sender.flushch <- ch
 		<-ch
-	}
-}
-
-func (sender *GossipSender) flush() {
-	for {
-		select {
-		case pending := <-sender.cell:
-			sender.send(pending)
-		default:
-			return
-		}
 	}
 }
