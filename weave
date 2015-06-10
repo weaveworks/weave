@@ -670,12 +670,12 @@ dns_args() {
 }
 
 # Use the weaveDNS REST API to determine the local domain. If weaveDNS is not
-# running, return the default value ('weave.local')
+# running, return the default value ('weave.local.')
 dns_domain() {
     if DOMAIN=$(http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /domain 2>/dev/null) ; then
-        echo ${DOMAIN%.}
+        echo $DOMAIN
     else
-        echo 'weave.local'
+        echo 'weave.local.'
     fi
 }
 
@@ -706,9 +706,9 @@ with_container_fqdn() {
     COMMAND="$2"
     shift 2
 
-    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) || return 0
+    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}' $CONTAINER 2>/dev/null) || return 0
 
-    if echo "$CONTAINER_FQDN" | grep -qv '\.\.$' ; then
+    if echo "$CONTAINER_FQDN" | grep -Eq '[^.]+\..+' ; then
         $COMMAND "$CONTAINER" "$CONTAINER_FQDN" "$@"
     fi
 }
