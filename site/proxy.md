@@ -115,25 +115,18 @@ are handled as before.
 
 ## <a name="dns"></a>Automatic discovery
 
-Containers started via the proxy are
-automatically registered in [weaveDNS](weavedns.html) if they have a
-hostname in the weaveDNS domain (usually `.weave.local`). In order for
-containers to be able to look up such names, their DNS resolver needs
-to be configured to point at weaveDNS. This will be done automatically by the proxy
- while weaveDNS is running. To disable this launch the proxy with the `--without-dns` option, i.e.
-
-    host1$ weave launch-proxy --without-dns
-
-To enable weaveDNS resolution when weaveDNS is not running, launch the
-proxy with the `--with-dns` option, i.e.
-
-    host1$ weave launch-proxy --with-dns
-
-Now any containers started via the proxy, and with a `WEAVE_CIDR=...`
-environment variable (or even without it, if IPAM is
-[configured](#ipam)), will use weaveDNS for name resolution. If not
-provided, the hostname will default to the container name and will be
-registered in weaveDNS.
+Containers started via the proxy are automatically registered in
+[weaveDNS](weavedns.html) if they have a hostname in the weaveDNS
+domain (usually `.weave.local`). In order for containers to be able to
+look up such names, their DNS resolver needs to be configured to point
+at weaveDNS. This will be done automatically by the proxy while
+weaveDNS is running. To override this behaviour launch the proxy with
+either `--with-dns` or `--without-dns`, which will force the proxy to
+always/never set the resolver to weaveDNS. If there is no hostname
+provided, the container will be registered in weaveDNS using its
+container name. Otherwise, if there is no container name, and no
+hostname (or a hostname outside the weaveDNS domain), the container
+will not be registered in weaveDNS.
 
 ## <a name="multi-host"></a>Multi-host example
 
