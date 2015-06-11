@@ -648,7 +648,7 @@ dns_args() {
     docker_bridge_ip
     DNS_ARG="--dns $DOCKER_BRIDGE_IP"
     DNS_SEARCH_ARG="--dns-search=."
-    HOSTNAME_ARG=""
+    NAME_ARG=""
     HOSTNAME_SPECIFIED=false
     while [ $# -gt 0 ] ; do
         case "$1" in
@@ -657,11 +657,11 @@ dns_args() {
                 shift
                 ;;
             --name)
-                HOSTNAME_ARG="--hostname=$2.$(dns_domain)"
+                NAME_ARG="$2"
                 shift 2
                 ;;
             --name=*)
-                HOSTNAME_ARG="--hostname=${1#*=}.$(dns_domain)"
+                NAME_ARG="${1#*=}"
                 shift
                 ;;
             -h|--hostname|--hostname=*)
@@ -673,10 +673,10 @@ dns_args() {
                 ;;
         esac
     done
-    if [ "$HOSTNAME_SPECIFIED" = "true" ] ; then
-        HOSTNAME_ARG=""
+    DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
+    if [ -n "$NAME_ARG" -a "$HOSTNAME_SPECIFIED" = "false" ] ; then
+        DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.$(dns_domain)"
     fi
-    DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG $HOSTNAME_ARG"
 }
 
 # Use the weaveDNS REST API to determine the local domain. If weaveDNS is not
