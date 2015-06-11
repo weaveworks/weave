@@ -5,16 +5,10 @@ layout: default
 
 # Automatic IP Address Management
 
-By default, weave automatically assigns unique IP addresses to each
-container across the network. To make this work, weave must know on
-startup what range of addresses to allocate from - if you don't
-specify a range then it will use 10.128.0.0/9, but you can choose your
-own range, for example:
-
-    host1# weave launch -iprange 10.2.0.0/16
-
+By default, weave automatically assigns a unique IP addresses to each
+container across the network. 
 The `run`, `start`, `attach`, `detach`, `expose` and `hide` commands
-will then fetch an address automatically if none is specified, i.e.:
+will fetch an address automatically if none is specified, i.e.:
 
     host1# C=$(weave run -ti ubuntu)
 
@@ -22,29 +16,36 @@ You can see which address was allocated with
 [`weave ps`](troubleshooting.html#list-attached-containers):
 
     host1# weave ps $C
-    a7aff7249393 7a:51:d1:09:21:78 10.2.3.1/24
+    a7aff7249393 7a:51:d1:09:21:78 10.128.0.1/9
 
 You may wish to [run containers on different
-subnets](features.html#application-isolation). To set a default
-subnet, launch with `-ipsubnet`:
+subnets](features.html#application-isolation). To request the
+allocation of an address from a particular subnet, use the `net:`
+prefix:
+
+    host1# C=$(weave run net:10.2.7.0/24 -ti ubuntu)
+
+You can ask for multiple addresses in different subnets and add in
+manually-assigned addresses on the same line, for instance:
+
+    host1# C=$(weave run net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24 -ti ubuntu)
+
+To explicitly request the default subnet, use `net:default`.
+
+To make this work, weave must know on startup what range of addresses
+to allocate from, and this must be the same on every host. If you
+don't specify a range then it will use 10.128.0.0/9, but you can
+choose your own range, for example:
+
+    host1# weave launch -iprange 10.2.0.0/16
+
+To set a default subnet, launch with `-ipsubnet`:
 
     host1# weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.3.0/24
 
 `-iprange` should cover the entire range that you will ever use for
 allocation, and `-ipsubnet` is the subnet that will be used when
 you don't explicitly specify one.
-
-Then, to request the allocation of an address from a subnet other than
-the default, use the `net:` prefix:
-
-    host1# C=$(weave run net:10.2.7.0/24 -ti ubuntu)
-
-To explicitly request the default subnet, use `net:default`.
-
-And, you can ask for multiple addresses in different subnets and add
-in manually-assigned addresses on the same line, for instance:
-
-    host1# C=$(weave run net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24 -ti ubuntu)
 
 Note that `-iprange` can be smaller than `-ipsubnet`, if you want to
 use a mixture of automatically-allocated addresses and manually-chosen
