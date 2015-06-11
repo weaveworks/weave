@@ -29,7 +29,7 @@ usage() {
     echo "weave launch       [-password <password>] [-nickname <nickname>] [-nodiscovery]"
     echo "                       [-iprange <cidr> [-ipsubnet <cidr>]] <peer> ..."
     echo "weave launch-dns   [<addr>]"
-    echo "weave launch-proxy [-D <endpoint>] [-H <endpoint>] [--with-dns] [--with-ipam]"
+    echo "weave launch-proxy [-D <endpoint>] [-H <endpoint>] [--with-dns|--without-dns] [--with-ipam]"
     echo "weave connect      [--replace] [<peer> ...]"
     echo "weave forget       <peer> ..."
     echo "weave run          [--with-dns] [<addr> ...] <docker run args> ..."

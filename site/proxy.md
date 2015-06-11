@@ -115,13 +115,17 @@ are handled as before.
 
 ## <a name="dns"></a>Automatic discovery
 
-Containers started via the proxy are automatically registered in
-[weaveDNS](weavedns.html) if they have a hostname in the weaveDNS
-domain (usually `.weave.local`). In order for containers to be able to
-look up such names, their DNS resolver needs to be configured to point
-at weaveDNS. This can be done [manually](weavedns.html#without-run),
-or automatically by the proxy by launching it with the `--with-dns`
-option, i.e.
+Containers started via the proxy are
+automatically registered in [weaveDNS](weavedns.html) if they have a
+hostname in the weaveDNS domain (usually `.weave.local`). In order for
+containers to be able to look up such names, their DNS resolver needs
+to be configured to point at weaveDNS. This will be done automatically by the proxy
+ while weaveDNS is running. To disable this launch the proxy with the `--without-dns` option, i.e.
+
+    host1$ weave launch-proxy --without-dns
+
+To enable weaveDNS resolution when weaveDNS is not running, launch the
+proxy with the `--with-dns` option, i.e.
 
     host1$ weave launch-proxy --with-dns
 

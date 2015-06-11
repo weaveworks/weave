@@ -37,6 +37,7 @@ type Config struct {
 	TLSConfig  TLSConfig
 	Version    string
 	WithDNS    bool
+	WithoutDNS bool
 	WithIPAM   bool
 }
 
@@ -61,7 +62,7 @@ func NewProxy(c Config) (*Proxy, error) {
 		},
 	}
 
-	if p.WithDNS {
+	if !p.WithoutDNS {
 		dockerBridgeIP, err := callWeave("docker-bridge-ip")
 		if err != nil {
 			return nil, err
