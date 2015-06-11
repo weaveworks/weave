@@ -986,7 +986,7 @@ case "$COMMAND" in
         eval "set -- $ARGS"
         if [ -z "$IPRANGE" ] ; then
             IPRANGE="-iprange 10.128.0.0/9"
-            if ! netcheck ${IPRANGE#* } ; then
+            if command_exists netcheck && ! netcheck ${IPRANGE#* } ; then
                 echo "Default" $IPRANGE "overlaps with existing route." >&2
                 echo "Please pick another range and set it on all hosts." >&2
                 exit 1
