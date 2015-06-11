@@ -29,19 +29,26 @@ other over the weave network. One such container needs to be started
 on every weave host, by invoking the weave script command
 `launch-dns`. Application containers are then instructed to use
 weaveDNS as their nameserver by supplying the `--with-dns` option when
-starting them. Giving any container a hostname in the `.weave.local`
-domain registers it in weaveDNS; containers started with `--with-dns`
-have a default hostname derived from their container name. For example:
+starting them; containers so started also automatically register their
+container name in the weaveDNS domain. For example:
 
 ```bash
 $ weave launch
 $ weave launch-dns 10.2.254.1/24
-$ weave run 10.2.1.25/24 -ti -h pingme.weave.local ubuntu
+$ weave run --with-dns 10.2.1.25/24 -ti --name=pingme ubuntu
 $ shell1=$(weave run --with-dns 10.2.1.26/24 -ti --name=ubuntu ubuntu)
 $ docker attach $shell1
 
 root@ubuntu:/# ping pingme
 ...
+```
+
+If you start an application container sans `--with-dns` you can still register
+it in weaveDNS simply by giving the container a hostname in the
+`.weave.local.` domain:
+
+```
+$ weave run 10.2.1.25/24 -ti -h pingme.weave.local ubuntu
 ```
 
 Each weaveDNS container started with `launch-dns` needs to be given
