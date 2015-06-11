@@ -11,9 +11,8 @@ else
 fi
 IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 
-# These are potentially used for remote execs, and have defaults, so
-# we introduce them here
-DOCKERHUB_USER=weaveworks
+# These are needed for remote execs, hence we introduce them here
+DOCKERHUB_USER=${DOCKERHUB_USER:-weaveworks}
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 PROXY_HOST=${PROXY_HOST:-$(echo "${DOCKER_HOST#tcp://}" | cut -s -d: -f1)}
@@ -65,6 +64,7 @@ exec_remote() {
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
+        -e DOCKERHUB_USER="$DOCKERHUB_USER" \
         -e VERSION \
         -e WEAVE_DEBUG \
         -e WEAVE_DOCKER_ARGS \
