@@ -218,7 +218,6 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) error {
 		conn.Log("connection added (new peer)")
 		peer.router.SendAllGossipDown(conn)
 	}
-	peer.broadcastPeerUpdate(conn.Remote())
 	return nil
 }
 
@@ -232,7 +231,7 @@ func (peer *LocalPeer) handleConnectionEstablished(conn Connection) {
 	}
 	peer.connectionEstablished(conn)
 	conn.Log("connection fully established")
-	peer.broadcastPeerUpdate()
+	peer.router.broadcastPeerUpdate()
 }
 
 func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
@@ -251,15 +250,10 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
 	// Must do garbage collection first to ensure we don't send out an
 	// update with unreachable peers (can cause looping)
 	peer.router.Peers.GarbageCollect()
-	peer.broadcastPeerUpdate()
+	peer.router.broadcastPeerUpdate()
 }
 
 // helpers
-
-func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
-	peer.router.Routes.Recalculate()
-	peer.router.TopologyGossip.GossipBroadcast(NewTopologyGossipData(peer.router.Peers, append(peers, peer.Peer)...))
-}
 
 func (peer *LocalPeer) checkConnectionLimit() error {
 	limit := peer.router.ConnLimit

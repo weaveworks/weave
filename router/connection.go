@@ -171,24 +171,8 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	defer func() { conn.shutdown(err) }()
 	defer close(finished)
 
-	tcpConn := conn.TCPConn
-	tcpConn.SetLinger(0)
-	enc := gob.NewEncoder(tcpConn)
-	dec := gob.NewDecoder(tcpConn)
-
-	if err = conn.handshake(enc, dec, acceptNewPeer); err != nil {
-		return
-	}
-	conn.Log("completed handshake")
-
-	// The ordering of the following is very important. [1]
-
-	localIP := tcpConn.LocalAddr().(*net.TCPAddr).IP
-	if conn.forwarder, err = conn.Router.InterHost.MakeForwarder(conn.remote, localIP, conn.remoteUDPAddr, conn.uid, conn.udpCrypto(), conn.sendInterHostControlMessage); err != nil {
-		return
-	}
-
-	if err = conn.Router.Ourself.AddConnection(conn); err != nil {
+	dec, err := conn.prepareConnection(acceptNewPeer)
+	if err != nil {
 		return
 	}
 
@@ -198,6 +182,41 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)
 	go conn.receiveTCP(dec)
 	err = conn.actorLoop(actionChan)
+}
+
+func (conn *LocalConnection) prepareConnection(acceptNewPeer bool) (*gob.Decoder, error) {
+	tcpConn := conn.TCPConn
+	tcpConn.SetLinger(0)
+	enc := gob.NewEncoder(tcpConn)
+	dec := gob.NewDecoder(tcpConn)
+
+	remotePeer, err := conn.handshake(enc, dec, acceptNewPeer)
+	if err != nil {
+		return nil, err
+	}
+	conn.Log("completed handshake")
+
+	if err = conn.setRemote(remotePeer); err != nil {
+		return nil, err
+	}
+
+	// setRemote may have resulted in the local short id changing.
+	// So we need to ensure we gossip that, even if we error out
+	// below.
+	defer conn.Router.broadcastPeerUpdate(remotePeer)
+
+	// The ordering of the following is very important. [1]
+
+	localIP := tcpConn.LocalAddr().(*net.TCPAddr).IP
+	if conn.forwarder, err = conn.Router.InterHost.MakeForwarder(conn.remote, localIP, conn.remoteUDPAddr, conn.uid, conn.udpCrypto(), conn.sendInterHostControlMessage); err != nil {
+		return nil, err
+	}
+
+	if err = conn.Router.Ourself.AddConnection(conn); err != nil {
+		return nil, err
+	}
+
+	return dec, nil
 }
 
 // [1] Ordering constraints:
@@ -244,6 +263,20 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 // packets if the forwarders haven't been created yet. We cannot
 // prevent that completely, since, for example, forwarder can only be
 // created when we know the remote UDP address, but it helps to try.
+
+func (conn *LocalConnection) setRemote(toPeer *Peer) error {
+	toPeer = conn.Router.Peers.FetchWithDefault(toPeer)
+	switch toPeer {
+	case nil:
+		return fmt.Errorf("multiple peers with the same Name")
+	case conn.local:
+		conn.remote = toPeer // have to do assigment here to ensure Shutdown releases ref count
+		return fmt.Errorf("Cannot connect to ourself")
+	default:
+		conn.remote = toPeer
+		return nil
+	}
+}
 
 func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
 	for err == nil {

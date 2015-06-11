@@ -38,6 +38,7 @@ func (router *Router) AddTestChannelConnection(r *Router) {
 
 	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r}
 	router.Ourself.handleAddConnection(conn)
+	router.broadcastPeerUpdate(conn.Remote())
 	router.Ourself.handleConnectionEstablished(conn)
 	router.sendPendingGossip()
 }

@@ -264,3 +264,8 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 	}
 	return origUpdate, newUpdate, nil
 }
+
+func (router *Router) broadcastPeerUpdate(peers ...*Peer) {
+	router.Routes.Recalculate()
+	router.TopologyGossip.GossipBroadcast(NewTopologyGossipData(router.Peers, append(peers, router.Ourself.Peer)...))
+}
