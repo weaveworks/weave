@@ -128,7 +128,7 @@ assert_dns_record() {
 
     [ -z "$DEBUG" ] || greyly echo "Checking whether the IPs '$@' exists at $host:$container"
     for ip in "$@" ; do
-        assert "exec_on $host $container getent hosts $ip | awk '{print \$2}'" "$name"
+        assert "exec_on $host $container getent hosts $ip | tr -s ' '" "$ip $name"
     done
 }
 
