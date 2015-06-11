@@ -46,7 +46,7 @@ func main() {
 	flag.StringVar(&domain, "domain", weavedns.DefaultLocalDomain, "local domain (ie, 'weave.local.')")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
-	flag.IntVar(&httpPort, "httpport", 6785, "port to listen to HTTP requests")
+	flag.IntVar(&httpPort, "httpport", weavedns.DefaultHTTPPort, "port to listen to HTTP requests")
 	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
 	flag.IntVar(&ttl, "ttl", weavedns.DefaultLocalTTL, "TTL (in secs) for responses for local names")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")

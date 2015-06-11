@@ -3,12 +3,14 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/nameserver"
 )
 
 type createContainerInterceptor struct{ proxy *Proxy }
@@ -43,7 +45,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
-		if err := i.setWeaveDNS(&container); err != nil {
+		if err := i.setWeaveDNS(&container, r); err != nil {
 			return err
 		}
 	}
@@ -78,7 +80,7 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 	return nil
 }
 
-func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody) error {
+func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody, r *http.Request) error {
 	if !i.proxy.WithDNS {
 		return nil
 	}
@@ -88,7 +90,38 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 	if len(container.HostConfig.DNSSearch) == 0 {
 		container.HostConfig.DNSSearch = []string{"."}
 	}
+
+	name := r.URL.Query().Get("name")
+	if container.Hostname == "" && name != "" {
+		container.Hostname = name
+		container.Domainname = i.getDNSDomain()
+	}
+
 	return nil
+}
+
+func (i *createContainerInterceptor) getDNSDomain() (domain string) {
+	domain = nameserver.DefaultLocalDomain
+	dnsContainer, err := i.proxy.client.InspectContainer("weavedns")
+	if err != nil ||
+		dnsContainer.NetworkSettings == nil ||
+		dnsContainer.NetworkSettings.IPAddress == "" {
+		return
+	}
+
+	url := fmt.Sprintf("http://%s:%d/domain", dnsContainer.NetworkSettings.IPAddress, nameserver.DefaultHTTPPort)
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	return string(b)
 }
 
 func (i *createContainerInterceptor) InterceptResponse(r *http.Response) error {

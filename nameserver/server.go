@@ -15,6 +15,7 @@ import (
 
 const (
 	DefaultServerPort = 53                 // The default server port
+	DefaultHTTPPort   = 6785               // The default http port
 	DefaultCLICfgFile = "/etc/resolv.conf" // default "resolv.conf" file to try to load
 	DefaultLocalTTL   = 30                 // default TTL for responses for local domain queries
 	DefaultUDPBuflen  = 4096               // bigger than the default 512

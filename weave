@@ -648,16 +648,45 @@ dns_args() {
     docker_bridge_ip
     DNS_ARG="--dns $DOCKER_BRIDGE_IP"
     DNS_SEARCH_ARG="--dns-search=."
-    for arg in "$@" ; do
-        case $arg in
+    NAME_ARG=""
+    HOSTNAME_SPECIFIED=false
+    while [ $# -gt 0 ] ; do
+        case "$1" in
             --dns-search=*)
                 DNS_SEARCH_ARG=""
+                shift
+                ;;
+            --name)
+                NAME_ARG="$2"
+                shift 2
+                ;;
+            --name=*)
+                NAME_ARG="${1#*=}"
+                shift
+                ;;
+            -h|--hostname|--hostname=*)
+                HOSTNAME_SPECIFIED=true
+                shift
                 ;;
             *)
+                shift
                 ;;
         esac
     done
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
+    if [ -n "$NAME_ARG" -a "$HOSTNAME_SPECIFIED" = "false" ] ; then
+        DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.$(dns_domain)"
+    fi
+}
+
+# Use the weaveDNS REST API to determine the local domain. If weaveDNS is not
+# running, return the default value ('weave.local.')
+dns_domain() {
+    if DOMAIN=$(http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /domain 2>/dev/null) ; then
+        echo $DOMAIN
+    else
+        echo 'weave.local.'
+    fi
 }
 
 # Print an error to stderr and return with an indicative exit status
@@ -687,9 +716,9 @@ with_container_fqdn() {
     COMMAND="$2"
     shift 2
 
-    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}.' $CONTAINER 2>/dev/null) || return 0
+    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}' $CONTAINER 2>/dev/null) || return 0
 
-    if echo "$CONTAINER_FQDN" | grep -qv '\.\.$' ; then
+    if echo "$CONTAINER_FQDN" | grep -Eq '[^.]+\..+' ; then
         $COMMAND "$CONTAINER" "$CONTAINER_FQDN" "$@"
     fi
 }
@@ -1068,6 +1097,9 @@ case "$COMMAND" in
     dns-args)
         dns_args "$@"
         echo -n $DNS_ARGS
+        ;;
+    dns-domain)
+        echo $(dns_domain)
         ;;
     docker-bridge-ip)
         docker_bridge_ip
