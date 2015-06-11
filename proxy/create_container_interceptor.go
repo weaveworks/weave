@@ -109,7 +109,7 @@ func (i *createContainerInterceptor) getDNSDomain() (domain string) {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:6785/domain", dnsContainer.NetworkSettings.IPAddress)
+	url := fmt.Sprintf("http://%s:%d/domain", dnsContainer.NetworkSettings.IPAddress, nameserver.DefaultHTTPPort)
 	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return
