@@ -92,15 +92,19 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 
 	container.HostConfig.DNS = append(container.HostConfig.DNS, i.proxy.dockerBridgeIP)
 
-	if len(container.HostConfig.DNSSearch) == 0 {
-		container.HostConfig.DNSSearch = []string{"."}
-	}
-
 	name := r.URL.Query().Get("name")
 	if container.Hostname == "" && name != "" {
 		container.Hostname = name
 		// Strip trailing period because it's unusual to see it used on the end of a host name
 		container.Domainname = strings.TrimSuffix(dnsDomain, ".")
+	}
+
+	if len(container.HostConfig.DNSSearch) == 0 {
+		if container.Hostname == "" {
+			container.HostConfig.DNSSearch = []string{dnsDomain}
+		} else {
+			container.HostConfig.DNSSearch = []string{"."}
+		}
 	}
 
 	return nil
