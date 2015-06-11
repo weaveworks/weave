@@ -916,6 +916,11 @@ if ! ip netns list >/dev/null 2>&1 ; then
     exit 1
 fi
 
+if ! command_exists nsenter ; then
+    echo "ERROR: nsenter utility missing. Please install it." >&2
+    exit 1
+fi
+
 check_docker_version
 DOCKER_VERSION_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f 1)
 DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
