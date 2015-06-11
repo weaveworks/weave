@@ -37,7 +37,7 @@ have a default hostname derived from their container name. For example:
 $ weave launch
 $ weave launch-dns 10.2.254.1/24
 $ weave run 10.2.1.25/24 -ti -h pingme.weave.local ubuntu
-$ shell1=$(weave run --with-dns 10.2.1.26/24 -ti -h ubuntu.weave.local ubuntu)
+$ shell1=$(weave run --with-dns 10.2.1.26/24 -ti --name=ubuntu ubuntu)
 $ docker attach $shell1
 
 root@ubuntu:/# ping pingme
@@ -56,7 +56,7 @@ use weaveDNS on a second host we would run:
 ```bash
 host2$ weave launch $HOST1
 host2$ weave launch-dns 10.2.254.2/24
-host2$ shell2=$(weave run --with-dns 10.2.1.36/24 -ti -h ubuntu2.weave.local ubuntu)
+host2$ shell2=$(weave run --with-dns 10.2.1.36/24 -ti --name=ubuntu2 ubuntu)
 host2$ docker attach $shell2
 
 root@ubuntu2:/# ping pingme
@@ -111,7 +111,7 @@ Returning to our earlier example, let us start an additional `pingme`
 container, this time on the 2nd host, and then run some ping tests...
 
 ```bash
-host2$ weave run 10.2.1.35/24 -ti -h pingme.weave.local ubuntu
+host2$ weave run --with-dns 10.2.1.35/24 -ti --name=pingme ubuntu
 host2$ docker attach $shell2
 
 root@ubuntu2:/# ping -nq -c 1 pingme
