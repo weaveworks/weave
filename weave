@@ -359,7 +359,7 @@ with_container_netns() {
 
 with_container_netns_or_die() {
     if ! with_container_netns "$@" >/dev/null ; then
-        docker kill $1 2>/dev/null || true
+        docker kill $1 >/dev/null 2>&1 || true
         exit 1
     fi
 }
