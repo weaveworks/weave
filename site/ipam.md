@@ -5,9 +5,11 @@ layout: default
 
 # Automatic IP Address Management
 
-Weave can automatically assign unique IP addresses to each container
-across the network. To make this work, weave must be told on startup
-what range of addresses to allocate from, for example:
+By default, weave automatically assigns unique IP addresses to each
+container across the network. To make this work, weave must know on
+startup what range of addresses to allocate from - if you don't
+specify a range then it will use 10.128.0.0/9, but you can choose your
+own range, for example:
 
     host1# weave launch -iprange 10.2.0.0/16
 
@@ -55,7 +57,7 @@ then you can run all containers in the 10.9.0.0/16 subnet, with IPAM
 using the lower half and leaving the upper half free for manual
 allocation.
 
-The subnet parameters are written in [CIDR
+The range and subnet parameters are written in [CIDR
 notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)
 format - in this example "/24" means the first 24 bits of the address
 form the network address and the allocator is to allocate container
