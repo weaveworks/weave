@@ -11,6 +11,7 @@ import (
 	"github.com/weaveworks/weave/common/updater"
 	weavedns "github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
+	"strconv"
 )
 
 var version = "(unreleased version)"
@@ -22,6 +23,7 @@ func main() {
 		apiPath         string
 		domain          string
 		dnsPort         int
+		httpIfaceName   string
 		httpPort        int
 		wait            int
 		ttl             int
@@ -46,6 +48,7 @@ func main() {
 	flag.StringVar(&domain, "domain", weavedns.DefaultLocalDomain, "local domain (ie, 'weave.local.')")
 	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
+	flag.StringVar(&httpIfaceName, "httpiface", "", "interface on which to listen for HTTP requests (defaults to empty string which listens on all interfaces)")
 	flag.IntVar(&httpPort, "httpport", weavedns.DefaultHTTPPort, "port to listen to HTTP requests")
 	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
 	flag.IntVar(&ttl, "ttl", weavedns.DefaultLocalTTL, "TTL (in secs) for responses for local names")
@@ -74,14 +77,44 @@ func main() {
 	var iface *net.Interface
 	if ifaceName != "" {
 		var err error
-		Info.Println("Waiting for interface", ifaceName, "to come up")
+		Info.Println("[main] Waiting for mDNS interface", ifaceName, "to come up")
 		iface, err = weavenet.EnsureInterface(ifaceName, wait)
 		if err != nil {
 			Error.Fatal(err)
 		} else {
-			Info.Println("Interface", ifaceName, "is up")
+			Info.Println("[main] Interface", ifaceName, "is up")
 		}
 	}
+
+	var httpIP string
+	if httpIfaceName == "" {
+		httpIP = "0.0.0.0"
+	} else {
+		Info.Println("[main] Waiting for HTTP interface", httpIfaceName, "to come up")
+		httpIface, err := weavenet.EnsureInterface(httpIfaceName, wait)
+		if err != nil {
+			Error.Fatal(err)
+		}
+		Info.Println("[main] Interface", httpIfaceName, "is up")
+
+		addrs, err := httpIface.Addrs()
+		if err != nil {
+			Error.Fatal(err)
+		}
+
+		if len(addrs) == 0 {
+			Error.Fatal("[main] No addresses on HTTP interface")
+		}
+
+		ip, _, err := net.ParseCIDR(addrs[0].String())
+		if err != nil {
+			Error.Fatal(err)
+		}
+
+		httpIP = ip.String()
+
+	}
+	httpAddr := net.JoinHostPort(httpIP, strconv.Itoa(httpPort))
 
 	zoneConfig := weavedns.ZoneConfig{
 		Domain:          domain,
@@ -134,10 +167,11 @@ func main() {
 		Error.Fatal("[main] Failed to initialize the WeaveDNS server", err)
 	}
 
-	httpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", httpPort))
+	httpListener, err := net.Listen("tcp", httpAddr)
 	if err != nil {
 		Error.Fatal("[main] Unable to create http listener: ", err)
 	}
+	Info.Println("[main] HTTP API listening on", httpAddr)
 
 	go SignalHandlerLoop(srv)
 	go weavedns.ServeHTTP(httpListener, version, srv, domain, zone)

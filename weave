@@ -177,6 +177,7 @@ MTU=65535
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
+DNS_HTTP_IFNAME=eth0
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 
@@ -1021,7 +1022,7 @@ case "$COMMAND" in
         DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME \
             -p $DOCKER_BRIDGE_IP:53:53/udp \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE -iface $CONTAINER_IFNAME "$@")
+            $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE -iface $CONTAINER_IFNAME -httpiface "$DNS_HTTP_IFNAME" "$@")
         ipam_cidrs $DNS_CONTAINER $CIDR_ARGS
         with_container_netns_or_die $DNS_CONTAINER attach $ALL_CIDRS
         populate_dns
