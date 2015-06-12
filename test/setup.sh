@@ -16,5 +16,4 @@ for HOST in $HOSTS; do
     cat ../weave | run_on $HOST sh -c "cat > ./weave"
     run_on $HOST chmod a+x $DOCKER_NS ./weave
     rsync -az -e "$SSH" ./tls/ $HOST:~/tls
-    run_on $HOST sudo service docker restart
 done
