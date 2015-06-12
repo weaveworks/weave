@@ -8,14 +8,14 @@ TARGET_IP=10.2.0.78
 
 assert_no_resolution() {
     container=$(weave_on $HOST1 run "$@" $IP/24 -t $DNS_IMAGE /bin/sh)
-    assert_no_dns_record $HOST1 "$container" $TARGET
-    docker_on $HOST1 rm -f "$container" >/dev/null
+    assert_no_dns_record $HOST1 $container $TARGET
+    rm_containers $HOST1 $container
 }
 
 assert_resolution() {
     container=$(weave_on $HOST1 run "$@" $IP/24 -t $DNS_IMAGE /bin/sh)
-    assert_dns_record $HOST1 "$container" $TARGET $TARGET_IP
-    docker_on $HOST1 rm -f "$container" >/dev/null
+    assert_dns_record $HOST1 $container $TARGET $TARGET_IP
+    rm_containers $HOST1 $container
 }
 
 start_suite "With or without DNS test"

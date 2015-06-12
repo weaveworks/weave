@@ -13,33 +13,39 @@ boot_containers() {
 }
 
 kill_containers() {
-  docker_on $HOST1 kill c1 c2
-  docker_on $HOST1 rm   c1 c2
+  rm_containers $HOST1 c1 c2
+}
+
+assert_no_resolution() {
+  boot_containers
+  assert_no_dns_record $HOST1 c1 $C2_NAME $C2
+  assert_no_dns_record $HOST1 c2 $C1_NAME $C1
+  kill_containers
 }
 
 start_suite "Proxy registers containers with dns"
 
 bridge_ip=$(weave_on $HOST1 docker-bridge-ip)
 
+# Assert behaviour without weaveDNS running, but dns forced
 weave_on $HOST1 launch-proxy --with-dns
-boot_containers
-assert "exec_on $HOST1 c1 cat /etc/resolv.conf" "nameserver $bridge_ip"
-assert "exec_on $HOST1 c2 cat /etc/resolv.conf" "nameserver $bridge_ip"
+assert_no_resolution
 weave_on $HOST1 stop-proxy
-kill_containers
 
-weave_on $HOST1 launch-dns 10.2.254.1/24 $WEAVEDNS_ARGS
-
+# Assert behaviour without weaveDNS
 weave_on $HOST1 launch-proxy
+assert_no_resolution
+
+# Assert behaviour with weaveDNS running
+weave_on $HOST1 launch-dns 10.2.254.1/24 $WEAVEDNS_ARGS
 boot_containers
 assert_dns_record $HOST1 c1 $C2_NAME $C2
 assert_dns_record $HOST1 c2 $C1_NAME $C1
-weave_on $HOST1 stop-proxy
 kill_containers
+weave_on $HOST1 stop-proxy
 
+# Assert behaviour with weaveDNS running, but dns forced off
 weave_on $HOST1 launch-proxy --without-dns
-boot_containers
-assert_no_dns_record $HOST1 c1 $C2_NAME
-assert_no_dns_record $HOST1 c2 $C1_NAME
+assert_no_resolution
 
 end_suite
