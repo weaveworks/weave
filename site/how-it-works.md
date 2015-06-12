@@ -48,6 +48,7 @@ peer. Weave can route packets in partially connected networks with
 changing topology. For example, in this network, peer 1 is connected
 directly to 2 and 3, but if 1 needs to send a packet to 4 or 5 it must
 first send it to peer 3:
+
 ![Partially connected Weave Network](images/top-diag1.png "Partially connected Weave Network")
 
 ### <a name="encapsulation"></a>Encapsulation
