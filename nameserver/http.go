@@ -36,7 +36,7 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer, dockerC
 	})
 
 	muxRouter.Methods("GET").Path("/domain").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, db.Domain())
+		fmt.Fprintln(w, server.Zone.Domain())
 	})
 
 	muxRouter.Methods("PUT").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
