@@ -103,7 +103,7 @@ func main() {
 
 	dockerCli, err = docker.NewClient(apiPath)
 	if err != nil {
-		Error.Fatal("[main] Unable to start docker client", err)
+		Error.Fatal("[main] Unable to start docker client: ", err)
 	}
 
 	if watch {

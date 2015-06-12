@@ -225,7 +225,7 @@ func createAllocator(router *weave.Router, apiPath string, ipRangeStr string, de
 
 	dockerCli, err := docker.NewClient(apiPath)
 	if err != nil {
-		Error.Fatal("Unable to start docker client", err)
+		Error.Fatal("Unable to start docker client: ", err)
 	}
 	if err = dockerCli.AddObserver(allocator); err != nil {
 		Error.Fatal("Unable to start watcher", err)
