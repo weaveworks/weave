@@ -33,7 +33,7 @@ Weave detects when a container has exited and releases its
 automatically allocated addresses so they can be re-used.
 
 Automatic IP address assignment is available for the `run`, `start`,
-`attach`, `detach`, `expose` and `hide` commands.
+`attach`, `detach`, `expose`, `hide` and `launch-dns` commands.
 
 ## <a name="initialisation"></a>Initialisation
 
