@@ -52,9 +52,8 @@ $ weave run 10.2.1.25/24 -ti -h pingme.weave.local ubuntu
 ```
 
 Each weaveDNS container started with `launch-dns` needs to be given
-its own, unique, IP address, in a subnet that is a) common to all
-weaveDNS containers, b) disjoint from the application subnets, and c)
-not in use on any of the hosts.
+its own, unique, IP address, in a subnet that is common to all
+weaveDNS containers and not in use on any of the hosts.
 
 In our example the weaveDNS address is in subnet 10.2.254.0/24 and the
 application containers are in subnet 10.2.1.0/24. So, to launch and
