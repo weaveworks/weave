@@ -191,8 +191,7 @@ We sometimes publish snapshot releases, to provide previews of new
 features, assist in validation of bug fixes, etc. One can install the
 latest snapshot release with
 
-    sudo wget -O /usr/local/bin/weave \
-      https://raw.githubusercontent.com/weaveworks/weave/master/weave
+    sudo curl -L git.io/weave -o /usr/local/bin/weave
     sudo chmod a+x /usr/local/bin/weave
     sudo weave setup
 
