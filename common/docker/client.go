@@ -60,16 +60,21 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 	return nil
 }
 
-// IsContainerRunning returns true if the container is up and running
-func (c *Client) IsContainerRunning(idStr string) (bool, error) {
-	// check with Docker whether the container is really running
-	container, err := c.InspectContainer(idStr)
-	if err != nil {
-		if _, notThere := err.(*docker.NoSuchContainer); notThere {
-			return false, nil
-		}
-		return false, err
+// IsContainerNotRunning returns true if we have checked with Docker that the ID is not running
+func (c *Client) IsContainerNotRunning(idStr string) bool {
+	if !IsContainerID(idStr) {
+		Debug.Printf("[docker] '%s' does not seem to be a container id", idStr)
+		return false
 	}
 
-	return container.State.Running, nil
+	// check with Docker whether the container is really running
+	container, err := c.InspectContainer(idStr)
+	if err == nil {
+		return !container.State.Running
+	}
+	if _, notThere := err.(*docker.NoSuchContainer); notThere {
+		return true
+	}
+	Error.Printf("[docker] Could not check container status: %s", err)
+	return false
 }

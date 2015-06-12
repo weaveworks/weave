@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/ipam/address"
 )
 
@@ -16,7 +17,7 @@ func badRequest(w http.ResponseWriter, err error) {
 }
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
-func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR) {
+func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR, dockerCli *docker.Client) {
 	router.Methods("PUT").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		closedChan := w.(http.CloseNotifier).CloseNotify()
 		vars := mux.Vars(r)
@@ -77,6 +78,11 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			badRequest(w, fmt.Errorf("Unable to allocate: %s", err))
 			return
 		}
+		if dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
+			common.Info.Printf("[allocator] '%s' is not running: freeing %s", ident, addr)
+			alloc.Free(ident, addr)
+			return
+		}
 
 		fmt.Fprintf(w, "%s/%d", addr, cidr.PrefixLen)
 	})
@@ -87,6 +93,11 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		newAddr, err := alloc.Allocate(ident, defaultSubnet.HostRange(), closedChan)
 		if err != nil {
 			badRequest(w, err)
+			return
+		}
+		if dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
+			common.Info.Printf("[allocator] '%s' is not running: freeing %s", ident, newAddr)
+			alloc.Free(ident, newAddr)
 			return
 		}
 

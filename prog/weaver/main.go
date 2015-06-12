@@ -141,8 +141,16 @@ func main() {
 
 	var allocator *ipam.Allocator
 	var defaultSubnet address.CIDR
+	var dockerCli *docker.Client
 	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router, apiPath, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
+		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
+		dockerCli, err = docker.NewClient(apiPath)
+		if err != nil {
+			Error.Fatal("Unable to start docker client: ", err)
+		}
+		if err = dockerCli.AddObserver(allocator); err != nil {
+			Error.Fatal("Unable to start watcher", err)
+		}
 	} else if peerCount > 0 {
 		log.Fatal("-initpeercount flag specified without -iprange")
 	} else {
@@ -158,7 +166,7 @@ func main() {
 	// so there is no point in doing "weave launch -httpaddr ''".
 	// This is here to support stand-alone use of weaver.
 	if httpAddr != "" {
-		go handleHTTP(router, httpAddr, allocator, defaultSubnet)
+		go handleHTTP(router, httpAddr, allocator, defaultSubnet, dockerCli)
 	}
 
 	SignalHandlerLoop(router)
@@ -209,7 +217,7 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	return cidr
 }
 
-func createAllocator(router *weave.Router, apiPath string, ipRangeStr string, defaultSubnetStr string, quorum uint) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr string, quorum uint) (*ipam.Allocator, address.CIDR) {
 	ipRange := parseAndCheckCIDR(ipRangeStr)
 	defaultSubnet := ipRange
 	if defaultSubnetStr != "" {
@@ -222,14 +230,6 @@ func createAllocator(router *weave.Router, apiPath string, ipRangeStr string, de
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
-
-	dockerCli, err := docker.NewClient(apiPath)
-	if err != nil {
-		Error.Fatal("Unable to start docker client: ", err)
-	}
-	if err = dockerCli.AddObserver(allocator); err != nil {
-		Error.Fatal("Unable to start watcher", err)
-	}
 
 	return allocator, defaultSubnet
 }
@@ -254,11 +254,11 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	return quorum
 }
 
-func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator, defaultSubnet address.CIDR) {
+func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator, defaultSubnet address.CIDR, docker *docker.Client) {
 	muxRouter := mux.NewRouter()
 
 	if allocator != nil {
-		allocator.HandleHTTP(muxRouter, defaultSubnet)
+		allocator.HandleHTTP(muxRouter, defaultSubnet, docker)
 	}
 
 	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
