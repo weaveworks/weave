@@ -32,6 +32,16 @@ func (conn *mockChannelConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
 	}
 }
 
+func sendPendingGossip(routers ...*Router) {
+	// Loop until all routers report they didn't send anything
+	for sentSomething := true; sentSomething; {
+		sentSomething = false
+		for _, router := range routers {
+			sentSomething = router.sendPendingGossip() || sentSomething
+		}
+	}
+}
+
 func (router *Router) AddTestChannelConnection(r *Router) {
 	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
@@ -45,7 +55,6 @@ func (router *Router) AddTestChannelConnection(r *Router) {
 	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r}
 	router.Ourself.handleAddConnection(conn)
 	router.Ourself.handleConnectionEstablished(conn)
-	router.sendPendingGossip()
 }
 
 func (router *Router) DeleteTestChannelConnection(r *Router) {
@@ -60,11 +69,10 @@ func (router *Router) DeleteTestChannelConnection(r *Router) {
 
 	conn, _ := router.Ourself.ConnectionTo(toName)
 	router.Ourself.handleDeleteConnection(conn)
-	router.sendPendingGossip()
 }
 
 func TestGossipTopology(t *testing.T) {
-	wt.RunWithTimeout(t, 1*time.Second, func() {
+	wt.RunWithTimeout(t, 5*time.Second, func() {
 		implTestGossipTopology(t)
 	})
 }
@@ -106,14 +114,17 @@ func implTestGossipTopology(t *testing.T) {
 
 	// Now try adding some connections
 	r1.AddTestChannelConnection(r2)
+	sendPendingGossip(r1, r2)
 	checkTopology(t, r1, r1.tp(r2), r2.tp())
 	checkTopology(t, r2, r1.tp(r2), r2.tp())
 	r2.AddTestChannelConnection(r1)
+	sendPendingGossip(r1, r2)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
 
 	// Currently, the connection from 2 to 3 is one-way only
 	r2.AddTestChannelConnection(r3)
+	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp())
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp())
 	// When r2 gossiped to r3, 1 was unreachable from r3 so it got removed from the
@@ -122,23 +133,27 @@ func implTestGossipTopology(t *testing.T) {
 
 	// Add a connection from 3 to 1 and now r1 is reachable.
 	r3.AddTestChannelConnection(r1)
+	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r1))
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r1))
 	checkTopology(t, r3, r1.tp(), r2.tp(r1, r3), r3.tp(r1))
 
 	r1.AddTestChannelConnection(r3)
+	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
 	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
 
 	// Drop the connection from 2 to 3
 	r2.DeleteTestChannelConnection(r3)
+	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1))
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 
 	// Drop the connection from 1 to 3
 	r1.DeleteTestChannelConnection(r3)
+	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
 
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
@@ -148,5 +163,6 @@ func implTestGossipTopology(t *testing.T) {
 
 	// On a timer, r3 will gossip to r1
 	r3.SendAllGossip()
+	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
 }

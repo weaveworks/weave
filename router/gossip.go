@@ -39,9 +39,11 @@ type Gossiper interface {
 // Accumulates GossipData that needs to be sent to one destination,
 // and sends it when possible.
 type GossipSender struct {
-	send    func(GossipData)
-	cell    chan GossipData
-	flushch chan chan struct{}
+	send func(GossipData)
+	cell chan GossipData
+	// for testing
+	sent    bool
+	flushch chan chan bool
 }
 
 func NewGossipSender(send func(GossipData)) *GossipSender {
@@ -50,7 +52,7 @@ func NewGossipSender(send func(GossipData)) *GossipSender {
 
 func (sender *GossipSender) Start() {
 	sender.cell = make(chan GossipData, 1)
-	sender.flushch = make(chan chan struct{})
+	sender.flushch = make(chan chan bool)
 	go sender.run()
 }
 
@@ -62,16 +64,18 @@ func (sender *GossipSender) run() {
 				return
 			}
 			sender.send(pending)
+			sender.sent = true
 		case ch := <-sender.flushch:
-			// ensure anything pending is sent, then close the channel we were given
+			// send anything pending, then reply back whether we sent
+			// anything since previous flush
 			select {
 			case pending := <-sender.cell:
-				if pending != nil {
-					sender.send(pending)
-				}
+				sender.send(pending)
+				sender.sent = true
 			default:
 			}
-			close(ch)
+			ch <- sender.sent
+			sender.sent = false
 		}
 	}
 }
@@ -328,21 +332,23 @@ func (c *GossipChannel) log(args ...interface{}) {
 
 // for testing
 
-func (router *Router) sendPendingGossip() {
+func (router *Router) sendPendingGossip() bool {
+	sentSomething := false
 	for _, channel := range router.GossipChannels {
 		channel.Lock()
 		for _, sender := range channel.senders {
-			sender.flush()
+			sentSomething = sender.flush() || sentSomething
 		}
 		for _, sender := range channel.broadcasters {
-			sender.flush()
+			sentSomething = sender.flush() || sentSomething
 		}
 		channel.Unlock()
 	}
+	return sentSomething
 }
 
-func (sender *GossipSender) flush() {
-	ch := make(chan struct{})
+func (sender *GossipSender) flush() bool {
+	ch := make(chan bool)
 	sender.flushch <- ch
-	<-ch
+	return <-ch
 }
