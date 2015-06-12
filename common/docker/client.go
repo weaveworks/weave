@@ -24,30 +24,20 @@ type Client struct {
 	*docker.Client
 }
 
-// NewClient creates a new Docker client
+// NewClient creates a new Docker client and checks we can talk to Docker
 func NewClient(apiPath string) (*Client, error) {
 	dc, err := docker.NewClient(apiPath)
 	if err != nil {
 		return nil, err
 	}
-	return &Client{dc}, nil
-}
-
-// Start starts the client
-func (c *Client) Start(apiPath string) error {
-	client, err := docker.NewClient(apiPath)
-	if err != nil {
-		Error.Printf("[docker] Unable to connect to Docker API on %s: %s", apiPath, err)
-		return err
-	}
+	client := &Client{dc}
 
 	env, err := client.Version()
 	if err != nil {
-		Error.Printf("[docker] Unable to connect to Docker API on %s: %s", apiPath, err)
-		return err
+		return nil, err
 	}
 	Info.Printf("[docker] Using Docker API on %s: %v", apiPath, env)
-	return nil
+	return client, nil
 }
 
 // AddObserver adds an observer for docker events
