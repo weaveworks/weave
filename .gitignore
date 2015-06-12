@@ -35,6 +35,7 @@ prog/weavedns/weavedns
 prog/weaveproxy/weaveproxy
 prog/sigproxy/sigproxy
 prog/weavewait/weavewait
+prog/netcheck/netcheck
 tools/bin
 tools/build
 releases
@@ -45,6 +46,7 @@ prog/weaveexec/weave
 prog/weaveexec/weaveproxy
 prog/weaveexec/weavewait
 prog/weaveexec/sigproxy
+prog/weaveexec/netcheck
 prog/weaveexec/docker*.tgz
 Vagrantfile.local
 test/tls/*.pem

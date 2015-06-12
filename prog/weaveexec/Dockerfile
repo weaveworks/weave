@@ -16,6 +16,7 @@ WORKDIR /home/weave
 ADD ./weave /home/weave/
 ADD ./sigproxy /home/weave/
 ADD ./weaveproxy /home/weave/
+ADD ./netcheck /usr/bin/
 ADD ./weavewait /w/w
 ADD ./docker.tgz /
 
