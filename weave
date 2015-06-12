@@ -28,7 +28,7 @@ usage() {
     echo "weave setup"
     echo "weave launch       [-password <password>] [-nickname <nickname>] [-nodiscovery]"
     echo "                       [-iprange <cidr> [-ipsubnet <cidr>]] <peer> ..."
-    echo "weave launch-dns   <cidr>"
+    echo "weave launch-dns   [<addr>]"
     echo "weave launch-proxy [-D <endpoint>] [-H <endpoint>] [--with-dns] [--with-ipam]"
     echo "weave connect      [--replace] [<peer> ...]"
     echo "weave forget       <peer> ..."
@@ -1009,10 +1009,9 @@ case "$COMMAND" in
         echo $CONTAINER
         ;;
     launch-dns)
-        [ $# -gt 0 ] || usage
-        CIDR=$1
-        validate_cidr $CIDR
-        shift 1
+        collect_cidr_args "$@"
+        [ $CIDR_ARG_COUNT -lt 2 ] || usage
+        shift $CIDR_ARG_COUNT
         check_not_running $DNS_CONTAINER_NAME $BASE_DNS_IMAGE
         create_bridge
         docker_bridge_ip
@@ -1023,7 +1022,8 @@ case "$COMMAND" in
             -p $DOCKER_BRIDGE_IP:53:53/udp \
             -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE -iface $CONTAINER_IFNAME "$@")
-        with_container_netns_or_die $DNS_CONTAINER attach $CIDR
+        ipam_cidrs $DNS_CONTAINER $CIDR_ARGS
+        with_container_netns_or_die $DNS_CONTAINER attach $ALL_CIDRS
         populate_dns
         echo $DNS_CONTAINER
         ;;
