@@ -75,18 +75,9 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer, dockerC
 			} // oh, I already know this. whatever.
 		}
 
-		if dockerCli != nil {
-			if !docker.IsContainerID(idStr) {
-				Debug.Printf("[http] '%s' does not seem to be a container id", idStr)
-				return
-			}
-
-			if running, err := dockerCli.IsContainerRunning(idStr); err != nil {
-				Error.Printf("[http] Could not check container status: %s", err)
-			} else if !running {
-				Info.Printf("[http] '%s' is not running: removing", idStr)
-				server.Zone.DeleteRecords(idStr, name, ip)
-			}
+		if dockerCli != nil && dockerCli.IsContainerNotRunning(idStr) {
+			Info.Printf("[http] '%s' is not running: removing", idStr)
+			server.Zone.DeleteRecords(idStr, name, ip)
 		}
 	})
 
