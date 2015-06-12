@@ -1,3 +1,8 @@
+## Fast datapath preview release 20150612
+
+This is a preview release for fast datapath.  Its release notes are
+in an associated blog post.
+
 ## Release 0.11.2
 
 This is a bug fix release, addressing the following issues:
