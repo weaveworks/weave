@@ -225,9 +225,10 @@ weaveDNS instance will receive.
 
 If you don't supply a domain search path (with `--dns-search=`),
 `weave run ...` tells a container to look for "bare" hostnames, like
-`pingme`, in its own domain. That's why you can just invoke `ping
-pingme` above -- since the hostname is `ubuntu.weave.local`, it will
-look for `pingme.weave.local`.
+`pingme`, in its own domain (or in `weave.local` if it has no domain).
+That's why you can just invoke `ping pingme` above -- since the
+hostname is `ubuntu.weave.local`, it will look for
+`pingme.weave.local`.
 
 If you want to supply other entries for the domain search path,
 e.g. if you want containers in different sub-domains to resolve
