@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/docker"
 )
 
 func httpErrorAndLog(level *log.Logger, w http.ResponseWriter, msg string,
@@ -24,14 +25,14 @@ func extractFQDN(r *http.Request) (string, string) {
 	return "*", ""
 }
 
-func ServeHTTP(listener net.Listener, version string, server *DNSServer, domain string, db Zone) {
+func ServeHTTP(listener net.Listener, version string, server *DNSServer, dockerCli *docker.Client) {
 
 	muxRouter := mux.NewRouter()
 
 	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "weave DNS", version)
 		fmt.Fprintln(w, server.Status())
-		fmt.Fprintln(w, db.Status())
+		fmt.Fprintln(w, server.Zone.Status())
 	})
 
 	muxRouter.Methods("GET").Path("/domain").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -59,18 +60,33 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer, domain 
 			return
 		}
 
-		if dns.IsSubDomain(domain, name) {
-			Info.Printf("[http] Adding %s -> %s", name, ipStr)
-			if err := db.AddRecord(idStr, name, ip); err != nil {
-				if _, ok := err.(DuplicateError); !ok {
-					httpErrorAndLog(
-						Error, w, "Internal error", http.StatusInternalServerError,
-						"Unexpected error from DB: %s", err)
-					return
-				} // oh, I already know this. whatever.
-			}
-		} else {
+		domain := server.Zone.Domain()
+		if !dns.IsSubDomain(domain, name) {
 			Info.Printf("[http] Ignoring name %s, not in %s", name, domain)
+			return
+		}
+		Info.Printf("[http] Adding %s -> %s", name, ipStr)
+		if err := server.Zone.AddRecord(idStr, name, ip); err != nil {
+			if _, ok := err.(DuplicateError); !ok {
+				httpErrorAndLog(
+					Error, w, "Internal error", http.StatusInternalServerError,
+					"Unexpected error from DB: %s", err)
+				return
+			} // oh, I already know this. whatever.
+		}
+
+		if dockerCli != nil {
+			if !docker.IsContainerID(idStr) {
+				Debug.Printf("[http] '%s' does not seem to be a container id", idStr)
+				return
+			}
+
+			if running, err := dockerCli.IsContainerRunning(idStr); err != nil {
+				Error.Printf("[http] Could not check container status: %s", err)
+			} else if !running {
+				Info.Printf("[http] '%s' is not running: removing", idStr)
+				server.Zone.DeleteRecords(idStr, name, ip)
+			}
 		}
 	})
 
@@ -90,7 +106,7 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer, domain 
 		fqdnStr, fqdn := extractFQDN(r)
 
 		Info.Printf("[http] Deleting ID %s, IP %s, FQDN %s", idStr, ipStr, fqdnStr)
-		db.DeleteRecords(idStr, fqdn, ip)
+		server.Zone.DeleteRecords(idStr, fqdn, ip)
 	})
 
 	muxRouter.Methods("DELETE").Path("/name/{id:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -100,14 +116,14 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer, domain 
 		fqdnStr, fqdn := extractFQDN(r)
 
 		Info.Printf("[http] Deleting ID %s, IP *, FQDN %s", idStr, fqdnStr)
-		db.DeleteRecords(idStr, fqdn, net.IP{})
+		server.Zone.DeleteRecords(idStr, fqdn, net.IP{})
 	})
 
 	muxRouter.Methods("DELETE").Path("/name").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fqdnStr, fqdn := extractFQDN(r)
 
 		Info.Printf("[http] Deleting ID *, IP *, FQDN %s", fqdnStr)
-		db.DeleteRecords("", fqdn, net.IP{})
+		server.Zone.DeleteRecords("", fqdn, net.IP{})
 	})
 
 	http.Handle("/", muxRouter)

@@ -27,7 +27,7 @@ func TestHttp(t *testing.T) {
 		dockerIP        = "9.8.7.6"
 	)
 
-	zone, err := NewZoneDb(ZoneConfig{})
+	zone, err := NewZoneDb(ZoneConfig{Domain: testDomain})
 	wt.AssertNoErr(t, err)
 	err = zone.Start()
 	wt.AssertNoErr(t, err)
@@ -38,8 +38,11 @@ func TestHttp(t *testing.T) {
 		t.Fatal("Unable to create http listener: ", err)
 	}
 
+	// Create a useless server... it will not even be started
+	srv, _ := NewDNSServer(DNSServerConfig{Zone: zone})
+
 	port := httpListener.Addr().(*net.TCPAddr).Port
-	go ServeHTTP(httpListener, "", nil, testDomain, zone)
+	go ServeHTTP(httpListener, "", srv, nil)
 
 	// Ask the http server to add our test address into the database
 	addrParts := strings.Split(testAddr1, "/")
