@@ -27,7 +27,7 @@ You can see which address was allocated with
 [`weave ps`](troubleshooting.html#list-attached-containers):
 
     host1# weave ps $C
-    a7aff7249393 7a:51:d1:09:21:78 10.128.0.1/9
+    a7aff7249393 7a:51:d1:09:21:78 10.128.0.1/10
 
 Weave detects when a container has exited and releases its
 automatically allocated addresses so they can be re-used.
@@ -68,7 +68,7 @@ time, you can give the number of peers like this:
 
 ## <a name="range"></a>Choosing an allocation range
 
-By default, weave will allocate IP addresses in the 10.128.0.0/9
+By default, weave will allocate IP addresses in the 10.128.0.0/10
 range. This can be overridden with the `-iprange` option, e.g.
 
     host1# weave launch -iprange 10.2.0.0/16
