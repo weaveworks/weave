@@ -6,8 +6,20 @@ layout: default
 # Automatic IP Address Management
 
 Weave can automatically assign containers an IP address that is unique
-across the network. This is triggered by running containers without
-specifying an address, e.g.
+across the network.
+
+ * [Usage](#usage)
+ * [Initialisation](#initialisation)
+ * [Choosing an allocation range](#range)
+ * [Automatic allocation across multiple subnets](#subnets)
+ * [Mixing automatic and manual allocation](#manual)
+ * [Stopping and removing peers](#stop)
+ * [Troubleshooting](#troubleshooting)
+
+## <a name="usage"></a>Usage
+
+Containers are automatically allocated an IP address when none is
+specified when the container is started, e.g.
 
     host1# C=$(weave run -ti ubuntu)
 
@@ -23,7 +35,7 @@ automatically allocated addresses so they can be re-used.
 Automatic IP address assignment is available for the `run`, `start`,
 `attach`, `detach`, `expose` and `hide` commands.
 
-### Initialisation
+## <a name="initialisation"></a>Initialisation
 
 Just once, when the first automatic IP address allocation is requested
 in the whole network, weave needs a majority of peers to be present in
@@ -54,7 +66,7 @@ time, you can give the number of peers like this:
 
     host3$ weave launch -initpeercount 3 $HOST2
 
-### Choosing the IP address allocation range
+## <a name="range"></a>Choosing an allocation range
 
 By default, weave will allocate IP addresses in the 10.128.0.0/9
 range. This can be overridden with the `-iprange` option, e.g.
@@ -85,7 +97,7 @@ another container, which will make network traffic delivery
 intermittent or non-existent for the containers that share the same IP
 address.
 
-### Automatic allocation across multiple subnets
+## <a name="subnets"></a>Automatic allocation across multiple subnets
 
 When
 [running containers on different subnets](features.html#application-isolation),
@@ -115,11 +127,11 @@ don't explicitly specify one.
 When specifying addresses, the default subnet can be denoted
 symbolically with `net:default`.
 
-### Mixing automatic and manual allocation in the same subnet
+## <a name="manual"></a>Mixing automatic and manual allocation
 
 If you want to start containers with a mixture of
-automatically-allocated addresses and manually-chosen addresses, and
-have the containers communicate with each other, you can choose a
+automatically-allocated addresses and manually-chosen addresses, *and
+have the containers communicate with each other*, you can choose a
 `-iprange` that is smaller than `-ipsubnet`, For example, if you
 launch weave with:
 
@@ -129,7 +141,7 @@ then you can run all containers in the 10.9.0.0/16 subnet, with
 automatic allocation using the lower half, leaving the upper half free
 for manual allocation.
 
-### Stopping and removing peers
+## <a name="stop"></a>Stopping and removing peers
 
 You may wish to `weave stop` and re-launch to change some config or to
 upgrade to a new version; provided the underlying protocol hasn't
