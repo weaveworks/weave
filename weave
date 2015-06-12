@@ -1094,7 +1094,6 @@ case "$COMMAND" in
         fi
         ;;
     run)
-        [ $# -gt 0 ] || usage
         if [ "$1" = "--with-dns" ] ; then
             shift 1
             dns_args "$@"
