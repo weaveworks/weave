@@ -650,7 +650,7 @@ dns_args() {
     DNS_ARG="--dns $DOCKER_BRIDGE_IP"
     DNS_SEARCH_ARG="--dns-search=."
     NAME_ARG=""
-    HOSTNAME_SPECIFIED=false
+    HOSTNAME_SPECIFIED=
     while [ $# -gt 0 ] ; do
         case "$1" in
             --dns-search=*)
@@ -666,7 +666,7 @@ dns_args() {
                 shift
                 ;;
             -h|--hostname|--hostname=*)
-                HOSTNAME_SPECIFIED=true
+                HOSTNAME_SPECIFIED=1
                 shift
                 ;;
             *)
@@ -675,7 +675,7 @@ dns_args() {
         esac
     done
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
-    if [ -n "$NAME_ARG" -a "$HOSTNAME_SPECIFIED" = "false" ] ; then
+    if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.$(dns_domain)"
     fi
 }
