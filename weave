@@ -562,6 +562,14 @@ http_call() {
     http_call_ip $CONTAINER_IP "$@"
 }
 
+call_weave() {
+    http_call $CONTAINER_NAME $HTTP_PORT "$@"
+}
+
+call_dns() {
+    http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT "$@"
+}
+
 # Wait until container $1 is alive enough to respond to "GET /status"
 # http request on its docker-assigned IP, port $2
 wait_for_status() {
@@ -675,7 +683,7 @@ dns_args() {
 # Use the weaveDNS REST API to determine the local domain. If weaveDNS is not
 # running, return the default value ('weave.local.')
 dns_domain() {
-    if DOMAIN=$(http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /domain 2>/dev/null) ; then
+    if DOMAIN=$(call_dns GET /domain 2>/dev/null) ; then
         echo $DOMAIN
     else
         echo 'weave.local.'
@@ -723,7 +731,7 @@ put_dns_fqdn() {
     shift 2
 
     for ADDR in "$@" ; do
-        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT PUT /name/$CONTAINER_ID/${ADDR%/*} --data-urlencode fqdn=$FQDN || true
+        call_dns PUT /name/$CONTAINER_ID/${ADDR%/*} --data-urlencode fqdn=$FQDN || true
     done
 }
 
@@ -733,7 +741,7 @@ delete_dns() {
     shift 1
 
     for ADDR in "$@" ; do
-        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT DELETE /name/$CONTAINER_ID/${ADDR%/*} || true
+        call_dns DELETE /name/$CONTAINER_ID/${ADDR%/*} || true
     done
 }
 
@@ -744,7 +752,7 @@ delete_dns_fqdn() {
     shift 2
 
     for ADDR in "$@" ; do
-        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT DELETE /name/$CONTAINER_ID/${ADDR%/*}?fqdn=$FQDN || true
+        call_dns DELETE /name/$CONTAINER_ID/${ADDR%/*}?fqdn=$FQDN || true
     done
 }
 
@@ -784,7 +792,7 @@ ipam_cidrs() {
     IPAM_CIDRs=""
     if [ $# -eq 0 ] ; then
         # If no addresses passed in, get one in the default subnet
-        IPAM_CIDRS="$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID)"
+        IPAM_CIDRS="$(call_weave POST /ip/$CONTAINER_ID)"
         if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
             echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
             return 1
@@ -794,9 +802,9 @@ ipam_cidrs() {
     while [ $# -gt 0 ] ; do
         if [ "${1%:*}" = "net" ] ; then
             if [ "$1" = "net:default" ] ; then
-                CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID)
+                CIDR=$(call_weave POST /ip/$CONTAINER_ID)
             else
-                CIDR=$(http_call $CONTAINER_NAME $HTTP_PORT POST /ip/$CONTAINER_ID/"${1#net:}")
+                CIDR=$(call_weave POST /ip/$CONTAINER_ID/"${1#net:}")
             fi
             if [ "$CIDR" = "404 page not found" ] ; then
                 echo "IP address allocation must be enabled to use --subnet (use the -iprange option on 'weave launch')" >&2
@@ -1050,17 +1058,17 @@ case "$COMMAND" in
           replace="-d replace=true"
           shift
         fi
-        http_call $CONTAINER_NAME $HTTP_PORT POST /connect $replace -d $(peer_args "$@")
+        call_weave POST /connect $replace -d $(peer_args "$@")
         ;;
     forget)
         [ $# -gt 0 ] || usage
-        http_call $CONTAINER_NAME $HTTP_PORT POST /forget -d $(peer_args "$@")
+        call_weave POST /forget -d $(peer_args "$@")
         ;;
     status)
         res=0
-        http_call $CONTAINER_NAME $HTTP_PORT GET /status || res=1
+        call_weave GET /status || res=1
         echo
-        http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT GET /status 2>/dev/null || true
+        call_dns GET /status 2>/dev/null || true
         if check_running $PROXY_CONTAINER_NAME 2>/dev/null ; then
             echo
             echo "weave proxy is running"
@@ -1143,7 +1151,7 @@ case "$COMMAND" in
         with_container_netns $CONTAINER detach $ALL_CIDRS >/dev/null
         when_dns_running with_container_fqdn $CONTAINER delete_dns_fqdn $ALL_CIDRS
         for CIDR in $IPAM_CIDRS ; do
-            http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/$CONTAINER/${CIDR%/*}
+            call_weave DELETE /ip/$CONTAINER/${CIDR%/*}
         done
         ;;
     dns-add)
@@ -1207,7 +1215,7 @@ case "$COMMAND" in
             fi
         done
         for CIDR in $IPAM_CIDRS ; do
-            http_call $CONTAINER_NAME $HTTP_PORT DELETE /ip/weave:expose/${CIDR%/*}
+            call_weave DELETE /ip/weave:expose/${CIDR%/*}
         done
         ;;
     stop)
@@ -1225,7 +1233,7 @@ case "$COMMAND" in
         ;;
     reset)
         [ $# -eq 0 ] || usage
-        http_call $CONTAINER_NAME $HTTP_PORT DELETE /peer >/dev/null 2>&1 || true
+        call_weave DELETE /peer >/dev/null 2>&1 || true
         for NAME in $CONTAINER_NAME $DNS_CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true
@@ -1239,7 +1247,7 @@ case "$COMMAND" in
     rmpeer)
         [ $# -eq 1 ] || usage
         PEER=$1
-        http_call $CONTAINER_NAME $HTTP_PORT DELETE /peer/$PEER
+        call_weave DELETE /peer/$PEER
         ;;
     *)
         echo "Unknown weave command '$COMMAND'" >&2
