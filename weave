@@ -95,14 +95,6 @@ is_cidr() {
     echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
 }
 
-validate_cidr() {
-    if ! is_cidr "$1" ; then
-        echo "Invalid address prefix: $1" >&2
-        echo "Must be in CIDR notation <ip_address>/<prefix_length>, e.g. 10.2.1.1/24" >&2
-        exit 1
-    fi
-}
-
 collect_cidr_args() {
     CIDR_ARGS=""
     CIDR_ARG_COUNT=0
@@ -976,7 +968,6 @@ case "$COMMAND" in
                     ;;
                 -iprange)
                     [ $# -gt 1 ] || usage
-                    [ -z "$2" ] || validate_cidr "$2"
                     IPRANGE="$2"
                     IPRANGE_SPECIFIED=1
                     shift 2
