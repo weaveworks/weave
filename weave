@@ -959,6 +959,8 @@ case "$COMMAND" in
         fi
         CONTAINER_PORT=$PORT
         ARGS=""
+        IPRANGE=
+        IPRANGE_SPECIFIED=
         while [ $# -gt 0 ] ; do
             case "$1" in
                 -password)
@@ -974,8 +976,9 @@ case "$COMMAND" in
                     ;;
                 -iprange)
                     [ $# -gt 1 ] || usage
-                    validate_cidr $2
-                    IPRANGE="-iprange $2"
+                    [ -z "$2" ] || validate_cidr "$2"
+                    IPRANGE="$2"
+                    IPRANGE_SPECIFIED=1
                     shift 2
                     ;;
                 *)
@@ -985,10 +988,10 @@ case "$COMMAND" in
             esac
         done
         eval "set -- $ARGS"
-        if [ -z "$IPRANGE" ] ; then
-            IPRANGE="-iprange 10.128.0.0/10"
-            if command_exists netcheck && ! netcheck ${IPRANGE#* } ; then
-                echo "Default" $IPRANGE "overlaps with existing route." >&2
+        if [ -z "$IPRANGE_SPECIFIED" ] ; then
+            IPRANGE="10.128.0.0/10"
+            if command_exists netcheck && ! netcheck $IPRANGE ; then
+                echo "Default -iprange $IPRANGE overlaps with existing route." >&2
                 echo "Please pick another range and set it on all hosts." >&2
                 exit 1
             fi
@@ -1000,7 +1003,7 @@ case "$COMMAND" in
             -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -e WEAVE_PASSWORD \
-            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" $IPRANGE "$@")
+            $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" -iprange "$IPRANGE" "$@")
         with_container_netns_or_die $CONTAINER launch
         wait_for_status $CONTAINER_NAME $HTTP_PORT
         if [ -n "$IPRANGE" ] ; then
