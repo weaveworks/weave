@@ -197,6 +197,3 @@ lists which address ranges have been assigned to which peer. Each
 range begins at the address shown and ends just before the next
 address, or wraps around at the end of the subnet. The 'v' number
 denotes how many times that entry has been updated.
-
-The 'Free IPs' information may be out of date with respect to changes
-happening elsewhere in the network.
