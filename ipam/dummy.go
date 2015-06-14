@@ -30,7 +30,3 @@ func (alloc *DummyAllocator) OnGossip(msg []byte) (router.GossipData, error) {
 func (alloc *DummyAllocator) Gossip() router.GossipData {
 	return nil
 }
-
-func (alloc *DummyAllocator) Encode() []byte {
-	return nil
-}
