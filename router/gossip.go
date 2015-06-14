@@ -100,9 +100,9 @@ type peerSenders map[PeerName]*GossipSender
 
 type GossipChannel struct {
 	sync.Mutex
+	name         string
 	ourself      *LocalPeer
 	routes       *Routes
-	name         string
 	gossiper     Gossiper
 	senders      connectionSenders
 	broadcasters peerSenders
@@ -110,14 +110,18 @@ type GossipChannel struct {
 
 type GossipChannels map[string]*GossipChannel
 
-func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
-	channel := &GossipChannel{
-		ourself:      router.Ourself,
-		routes:       router.Routes,
+func NewGossipChannel(channelName string, ourself *LocalPeer, routes *Routes, g Gossiper) *GossipChannel {
+	return &GossipChannel{
 		name:         channelName,
+		ourself:      ourself,
+		routes:       routes,
 		gossiper:     g,
 		senders:      make(connectionSenders),
 		broadcasters: make(peerSenders)}
+}
+
+func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
+	channel := NewGossipChannel(channelName, router.Ourself, router.Routes, g)
 	router.GossipChannels[channelName] = channel
 	return channel
 }
