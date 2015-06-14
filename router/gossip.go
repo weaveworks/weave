@@ -92,6 +92,11 @@ func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 	return channel
 }
 
+func (router *Router) gossipChannel(channelName string) (*GossipChannel, bool) {
+	channel, found := router.GossipChannels[channelName]
+	return channel, found
+}
+
 func (router *Router) SendAllGossip() {
 	for _, channel := range router.GossipChannels {
 		if gossip := channel.gossiper.Gossip(); gossip != nil {

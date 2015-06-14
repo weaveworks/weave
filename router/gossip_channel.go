@@ -37,7 +37,7 @@ func (router *Router) handleGossip(tag ProtocolTag, payload []byte) error {
 	if err := decoder.Decode(&channelName); err != nil {
 		return err
 	}
-	channel, found := router.GossipChannels[channelName]
+	channel, found := router.gossipChannel(channelName)
 	if !found {
 		return fmt.Errorf("[gossip] received unknown channel with name %s", channelName)
 	}
