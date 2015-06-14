@@ -254,13 +254,11 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 				}
 
 				if message.isUnicast {
-					err := gossiper.OnGossipUnicast(*message.sender, message.buf)
-					if err != nil {
+					if err := gossiper.OnGossipUnicast(*message.sender, message.buf); err != nil {
 						panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", sender, err))
 					}
 				} else {
-					_, err := gossiper.OnGossipBroadcast(message.data.Encode())
-					if err != nil {
+					if _, err := gossiper.OnGossipBroadcast(message.data.Encode()); err != nil {
 						panic(fmt.Sprintf("Error doing gossip broadcast to %s: %s", sender, err))
 					}
 				}
