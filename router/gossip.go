@@ -5,7 +5,7 @@ import (
 )
 
 type GossipData interface {
-	Encode() []byte
+	Encode() [][]byte
 	Merge(GossipData)
 }
 

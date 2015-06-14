@@ -394,8 +394,8 @@ func (d *TopologyGossipData) Merge(other GossipData) {
 	}
 }
 
-func (d *TopologyGossipData) Encode() []byte {
-	return d.peers.EncodePeers(d.update)
+func (d *TopologyGossipData) Encode() [][]byte {
+	return [][]byte{d.peers.EncodePeers(d.update)}
 }
 
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {

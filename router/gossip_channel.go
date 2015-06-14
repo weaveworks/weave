@@ -145,8 +145,10 @@ func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
 	sender, found := c.senders[conn]
 	if !found {
 		sender = NewGossipSender(func(pending GossipData) {
-			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, pending.Encode())}
-			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+			for _, msg := range pending.Encode() {
+				protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, msg)}
+				conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+			}
 		})
 		c.senders[conn] = sender
 		sender.Start()
@@ -212,10 +214,13 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 	if len(nextHops) == 0 {
 		return
 	}
-	protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, update.Encode())}
-	// FIXME a single blocked connection can stall us
-	for _, conn := range c.ourself.ConnectionsTo(nextHops) {
-		conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+	connections := c.ourself.ConnectionsTo(nextHops)
+	for _, msg := range update.Encode() {
+		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
+		// FIXME a single blocked connection can stall us
+		for _, conn := range connections {
+			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+		}
 	}
 }
 

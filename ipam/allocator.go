@@ -435,8 +435,8 @@ func (d *ipamGossipData) Merge(other router.GossipData) {
 	// no-op
 }
 
-func (d *ipamGossipData) Encode() []byte {
-	return d.alloc.Encode()
+func (d *ipamGossipData) Encode() [][]byte {
+	return [][]byte{d.alloc.Encode()}
 }
 
 // Gossip returns a GossipData implementation, which in this case always
