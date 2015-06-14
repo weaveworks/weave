@@ -153,8 +153,6 @@ func main() {
 		}
 	} else if peerCount > 0 {
 		log.Fatal("-initpeercount flag specified without -iprange")
-	} else {
-		router.NewGossip("IPallocation", &ipam.DummyAllocator{})
 	}
 
 	router.Start()
