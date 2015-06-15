@@ -7,8 +7,8 @@ import (
 	wt "github.com/weaveworks/weave/testing"
 )
 
-// TODO test gossip unicast and broadcast; atm we only test topology
-// gossip, which does not employ unicast or broadcast.
+// TODO test gossip unicast; atm we only test topology gossip, which
+// does not employ unicast.
 
 type mockChannelConnection struct {
 	RemoteConnection
