@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"syscall"
 	"time"
 
@@ -45,7 +46,8 @@ type Router struct {
 	Peers           *Peers
 	Routes          *Routes
 	ConnectionMaker *ConnectionMaker
-	GossipChannels  GossipChannels
+	gossipLock      sync.RWMutex
+	gossipChannels  GossipChannels
 	TopologyGossip  Gossip
 	UDPListener     *net.UDPConn
 }
@@ -64,7 +66,7 @@ type PacketSourceSink interface {
 }
 
 func NewRouter(config Config, name PeerName, nickName string) *Router {
-	router := &Router{Config: config, GossipChannels: make(GossipChannels)}
+	router := &Router{Config: config, gossipChannels: make(GossipChannels)}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
 		log.Println("Expired MAC", mac, "at", peer)
 	}
@@ -392,8 +394,8 @@ func (d *TopologyGossipData) Merge(other GossipData) {
 	}
 }
 
-func (d *TopologyGossipData) Encode() []byte {
-	return d.peers.EncodePeers(d.update)
+func (d *TopologyGossipData) Encode() [][]byte {
+	return [][]byte{d.peers.EncodePeers(d.update)}
 }
 
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {

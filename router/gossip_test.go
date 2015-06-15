@@ -1,14 +1,15 @@
 package router
 
 import (
+	"sync"
 	"testing"
 	"time"
 
 	wt "github.com/weaveworks/weave/testing"
 )
 
-// TODO test gossip unicast; atm we only test topology gossip, which
-// does not employ unicast.
+// TODO test gossip unicast; atm we only test topology gossip and
+// surrogates, neither of which employ unicast.
 
 type mockChannelConnection struct {
 	RemoteConnection
@@ -163,4 +164,102 @@ func implTestGossipTopology(t *testing.T) {
 	r3.SendAllGossip()
 	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
+}
+
+func TestGossipSurrogate(t *testing.T) {
+	// create the topology r1 <-> r2 <-> r3
+	r1 := NewTestRouter("01:00:00:01:00:00")
+	r2 := NewTestRouter("02:00:00:02:00:00")
+	r3 := NewTestRouter("03:00:00:03:00:00")
+	r1.AddTestChannelConnection(r2)
+	r2.AddTestChannelConnection(r1)
+	r3.AddTestChannelConnection(r2)
+	r2.AddTestChannelConnection(r3)
+	sendPendingGossip(r1, r2, r3)
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
+	checkTopology(t, r3, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
+
+	// create a gossiper at either end, but not the middle
+	g1 := newTestGossiper()
+	g3 := newTestGossiper()
+	s1 := r1.NewGossip("Test", g1)
+	s3 := r3.NewGossip("Test", g3)
+
+	// broadcast a message from each end, check it reaches the other
+	broadcast(s1, 1)
+	broadcast(s3, 2)
+	sendPendingGossip(r1, r2, r3)
+	g1.checkHas(t, 2)
+	g3.checkHas(t, 1)
+
+	// check that each end gets their message back through periodic
+	// gossip
+	r1.SendAllGossip()
+	r3.SendAllGossip()
+	sendPendingGossip(r1, r2, r3)
+	g1.checkHas(t, 1, 2)
+	g3.checkHas(t, 1, 2)
+}
+
+type testGossiper struct {
+	sync.RWMutex
+	state map[byte]struct{}
+}
+
+func newTestGossiper() *testGossiper {
+	return &testGossiper{state: make(map[byte]struct{})}
+}
+
+func (g *testGossiper) OnGossipUnicast(sender PeerName, msg []byte) error {
+	return nil
+}
+
+func (g *testGossiper) OnGossipBroadcast(update []byte) (GossipData, error) {
+	g.Lock()
+	defer g.Unlock()
+	for _, v := range update {
+		g.state[v] = void
+	}
+	return NewSurrogateGossipData(update), nil
+}
+
+func (g *testGossiper) Gossip() GossipData {
+	g.RLock()
+	defer g.RUnlock()
+	state := make([]byte, len(g.state))
+	for v := range g.state {
+		state = append(state, v)
+	}
+	return NewSurrogateGossipData(state)
+}
+
+func (g *testGossiper) OnGossip(update []byte) (GossipData, error) {
+	g.Lock()
+	defer g.Unlock()
+	var delta []byte
+	for _, v := range update {
+		if _, found := g.state[v]; !found {
+			delta = append(delta, v)
+			g.state[v] = void
+		}
+	}
+	if len(delta) > 0 {
+		return NewSurrogateGossipData(delta), nil
+	}
+	return nil, nil
+}
+
+func (g *testGossiper) checkHas(t *testing.T, vs ...byte) {
+	g.RLock()
+	defer g.RUnlock()
+	for _, v := range vs {
+		if _, found := g.state[v]; !found {
+			wt.Fatalf(t, "%d is missing", v)
+		}
+	}
+}
+
+func broadcast(s Gossip, v byte) {
+	s.GossipBroadcast(NewSurrogateGossipData([]byte{v}))
 }

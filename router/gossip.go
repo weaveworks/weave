@@ -1,7 +1,11 @@
 package router
 
+import (
+	"fmt"
+)
+
 type GossipData interface {
-	Encode() []byte
+	Encode() [][]byte
 	Merge(GossipData)
 }
 
@@ -88,17 +92,45 @@ type GossipChannels map[string]*GossipChannel
 
 func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 	channel := NewGossipChannel(channelName, router.Ourself, router.Routes, g)
-	router.GossipChannels[channelName] = channel
+	router.gossipLock.Lock()
+	defer router.gossipLock.Unlock()
+	if _, found := router.gossipChannels[channelName]; found {
+		checkFatal(fmt.Errorf("[gossip] duplicate channel %s", channelName))
+	}
+	router.gossipChannels[channelName] = channel
 	return channel
 }
 
-func (router *Router) gossipChannel(channelName string) (*GossipChannel, bool) {
-	channel, found := router.GossipChannels[channelName]
-	return channel, found
+func (router *Router) gossipChannel(channelName string) *GossipChannel {
+	router.gossipLock.RLock()
+	channel, found := router.gossipChannels[channelName]
+	router.gossipLock.RUnlock()
+	if found {
+		return channel
+	}
+	router.gossipLock.Lock()
+	defer router.gossipLock.Unlock()
+	if channel, found = router.gossipChannels[channelName]; found {
+		return channel
+	}
+	channel = NewGossipChannel(channelName, router.Ourself, router.Routes, &surrogateGossiper)
+	channel.log("created surrogate channel")
+	router.gossipChannels[channelName] = channel
+	return channel
+}
+
+func (router *Router) gossipChannelSet() map[*GossipChannel]struct{} {
+	channels := make(map[*GossipChannel]struct{})
+	router.gossipLock.RLock()
+	defer router.gossipLock.RUnlock()
+	for _, channel := range router.gossipChannels {
+		channels[channel] = void
+	}
+	return channels
 }
 
 func (router *Router) SendAllGossip() {
-	for _, channel := range router.GossipChannels {
+	for channel := range router.gossipChannelSet() {
 		if gossip := channel.gossiper.Gossip(); gossip != nil {
 			channel.Send(router.Ourself.Name, gossip)
 		}
@@ -106,7 +138,7 @@ func (router *Router) SendAllGossip() {
 }
 
 func (router *Router) SendAllGossipDown(conn Connection) {
-	for _, channel := range router.GossipChannels {
+	for channel := range router.gossipChannelSet() {
 		if gossip := channel.gossiper.Gossip(); gossip != nil {
 			channel.SendDown(conn, channel.gossiper.Gossip())
 		}
@@ -117,7 +149,7 @@ func (router *Router) SendAllGossipDown(conn Connection) {
 
 func (router *Router) sendPendingGossip() bool {
 	sentSomething := false
-	for _, channel := range router.GossipChannels {
+	for channel := range router.gossipChannelSet() {
 		channel.Lock()
 		for _, sender := range channel.senders {
 			sentSomething = sender.flush() || sentSomething

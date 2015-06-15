@@ -258,8 +258,10 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 						panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", sender, err))
 					}
 				} else {
-					if _, err := gossiper.OnGossipBroadcast(message.data.Encode()); err != nil {
-						panic(fmt.Sprintf("Error doing gossip broadcast to %s: %s", sender, err))
+					for _, msg := range message.data.Encode() {
+						if _, err := gossiper.OnGossipBroadcast(msg); err != nil {
+							panic(fmt.Sprintf("Error doing gossip broadcast to %s: %s", sender, err))
+						}
 					}
 				}
 			case <-gossipTimer:
