@@ -291,6 +291,12 @@ func (zbs zoneDbsWithMockedMDns) Stop() {
 	}
 }
 
+func (zbs zoneDbsWithMockedMDns) Flush() {
+	for _, entry := range zbs {
+		entry.Zone.refreshScheds.Flush()
+	}
+}
+
 //////////////////////////////////////////////////////////////////
 
 // A mocked cache where we never find a single thing... ;)

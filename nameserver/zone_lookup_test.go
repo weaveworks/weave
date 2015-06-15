@@ -56,6 +56,7 @@ func TestZoneRefresh(t *testing.T) {
 	wt.AssertEqualInt(t, len(res), 1, "lookup result")
 
 	clk.Forward(refreshInterval / 2)
+	dbs.Flush()
 	Debug.Printf("A couple of seconds later, we should still have one IP for that name")
 	res, err = dbs[0].Zone.DomainLookupName(name)
 	wt.AssertNoErr(t, err)
@@ -63,6 +64,7 @@ func TestZoneRefresh(t *testing.T) {
 
 	Debug.Printf("And then we add 2 IPs for that name at ZoneDb 2")
 	clk.Forward(1)
+	dbs.Flush()
 	Debug.Printf("Adding 2 IPs to '%s' in Db #2", name)
 	dbs[1].Zone.AddRecord("someident", name, net.ParseIP(addr2))
 	dbs[1].Zone.AddRecord("someident", name, net.ParseIP(addr3))
@@ -72,6 +74,7 @@ func TestZoneRefresh(t *testing.T) {
 
 	Debug.Printf("Wait for a while, until a refresh is performed...")
 	clk.Forward(refreshInterval + 1)
+	dbs.Flush()
 	Debug.Printf("A refresh should have been scheduled now: we should have 3 IPs:")
 	Debug.Printf("the first (local) IP and the others obtained from zone2 with a mDNS query")
 	Debug.Printf("Asking for '%s' again... we should have 3 IPs now", name)
@@ -82,6 +85,7 @@ func TestZoneRefresh(t *testing.T) {
 
 	Debug.Printf("We will not ask for `name` for a while, so it will become irrelevant and will be removed...")
 	clk.Forward(refreshInterval + relevantTime + 1)
+	dbs.Flush()
 
 	// the name should be irrelevant now, and all remote info should have been
 	// removed from the zone database
@@ -92,6 +96,7 @@ func TestZoneRefresh(t *testing.T) {
 
 	Debug.Printf("There is no remote info about this name at zone 1: a new IP appears remotely meanwhile...")
 	clk.Forward(1)
+	dbs.Flush()
 
 	Debug.Printf("Adding '%s' to Db #2", name)
 	dbs[1].Zone.AddRecord("someident", name, net.ParseIP(addr4))
@@ -103,6 +108,7 @@ func TestZoneRefresh(t *testing.T) {
 	Debug.Printf("... but a second lookup should return all the results in the network")
 
 	clk.Forward(refreshInterval + 1)
+	dbs.Flush()
 
 	res, err = dbs[0].Zone.DomainLookupName(name)
 	Debug.Printf("Got: %s", res)

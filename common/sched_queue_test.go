@@ -24,8 +24,10 @@ func TestSchedCallsBasic(t *testing.T) {
 	}
 
 	schedQueue.Add(c, clk.Now().Add(time.Second))
+	schedQueue.Flush()
 	for i := 0; i < testSecs; i++ {
 		clk.Add(time.Second)
+		schedQueue.Flush()
 	}
 
 	t.Logf("Now: %s - calls: %d", clk.Now(), schedQueue.Count())
@@ -51,8 +53,10 @@ func TestSchedCallsGap(t *testing.T) {
 	}
 
 	schedQueue.Add(c2, clk.Now().Add(time.Second))
+	schedQueue.Flush()
 	for i := 0; i < testSecs; i++ {
 		clk.Add(time.Second)
+		schedQueue.Flush()
 	}
 
 	t.Logf("Now: %s - calls: %d", clk.Now(), schedQueue.Count())
@@ -77,8 +81,10 @@ func TestSchedCallsStop(t *testing.T) {
 	}
 
 	schedQueue.Add(c2, clk.Now().Add(time.Second))
+	schedQueue.Flush()
 	for i := 0; i < testSecs; i++ {
 		clk.Add(time.Second)
+		schedQueue.Flush()
 	}
 
 	t.Logf("Now: %s - calls: %d", clk.Now(), schedQueue.Count())
