@@ -17,8 +17,9 @@ type mockChannelConnection struct {
 
 // Construct a "passive" Router, i.e. without any goroutines, except
 // for Routes and GossipSenders.
-func NewTestRouter(name PeerName) *Router {
-	router := NewRouter(Config{}, name, "")
+func NewTestRouter(name string) *Router {
+	peerName, _ := PeerNameFromString(name)
+	router := NewRouter(Config{}, peerName, "")
 	// need to create a dummy channel otherwise tests hang on nil
 	// channels when the Router invoked ConnectionMaker.Refresh
 	router.ConnectionMaker.actionChan = make(chan ConnectionMakerAction, ChannelSize)
@@ -101,12 +102,9 @@ func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
 
 func implTestGossipTopology(t *testing.T) {
 	// Create some peers that will talk to each other
-	peer1Name, _ := PeerNameFromString("01:00:00:01:00:00")
-	peer2Name, _ := PeerNameFromString("02:00:00:02:00:00")
-	peer3Name, _ := PeerNameFromString("03:00:00:03:00:00")
-	r1 := NewTestRouter(peer1Name)
-	r2 := NewTestRouter(peer2Name)
-	r3 := NewTestRouter(peer3Name)
+	r1 := NewTestRouter("01:00:00:01:00:00")
+	r2 := NewTestRouter("02:00:00:02:00:00")
+	r3 := NewTestRouter("03:00:00:03:00:00")
 
 	// Check state when they have no connections
 	checkTopology(t, r1, r1.tp())
