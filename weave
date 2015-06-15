@@ -265,9 +265,8 @@ create_bridge() {
         run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
         add_iptables_rule nat POSTROUTING -j WEAVE
     fi
-    if [ ! "$1" = "--without-ethtool" ] ; then
-        ethtool -K $BRIDGE tx off >/dev/null
-    fi
+
+    [ "$1" != "--without-ethtool" ] && ethtool -K $BRIDGE tx off >/dev/null
 
     ip link set dev $BRIDGE up
 
@@ -277,9 +276,7 @@ create_bridge() {
 }
 
 destroy_bridge() {
-    if [ -d /sys/class/net/$BRIDGE ] ; then
-        ip link del dev $BRIDGE
-    fi
+    [ -d /sys/class/net/$BRIDGE ] && ip link del dev $BRIDGE
     if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
         run_iptables -t filter -D FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP 2>/dev/null || true
     fi
@@ -582,9 +579,7 @@ wait_for_log() {
     grep -q "$2" $fifo || res=1
     kill $! 2>/dev/null || true
     rm $fifo
-    if [ $res -eq 1 ] ; then
-        echo "$1 container has died." >&2
-    fi
+    [ $res -eq 1 ] && echo "$1 container has died." >&2
     return $res
 }
 
@@ -1184,9 +1179,7 @@ case "$COMMAND" in
                 arp_update $BRIDGE $CIDR
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-                if [ "$FQDN" ] ; then
-                    when_dns_running put_dns_fqdn 'weave:expose' $FQDN $CIDR
-                fi
+                [ -n "$FQDN" ] && when_dns_running put_dns_fqdn 'weave:expose' $FQDN $CIDR
             fi
         done
         ;;
