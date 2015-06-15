@@ -109,14 +109,6 @@ is_ip() {
     echo "$1" | grep -E "^$IP_REGEXP$" >/dev/null
 }
 
-validate_ip() {
-    if ! is_ip "$1" ; then
-        echo "Invalid IP: $1" >&2
-        echo "IP must be of the form <aaa.bbb.ccc.ddd>, e.g. 10.2.1.1" >&2
-        exit 1
-    fi
-}
-
 collect_ip_args() {
     IP_ARGS=""
     IP_COUNT=0
@@ -125,9 +117,6 @@ collect_ip_args() {
         IP_COUNT=$((IP_COUNT + 1))
         shift 1
     done
-    if [ $IP_COUNT -eq 0 ] ; then
-        [ $# -gt 0 ] && validate_ip "$1" || usage
-    fi
 }
 
 # "run" is a special case because we want to use docker directly,
@@ -1157,7 +1146,7 @@ case "$COMMAND" in
     dns-add)
         collect_ip_args "$@"
         shift $IP_COUNT
-        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
+        [ $IP_COUNT -gt 0 -a \( $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) \) ] || usage
         check_running $DNS_CONTAINER_NAME
         CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
@@ -1169,7 +1158,7 @@ case "$COMMAND" in
     dns-remove)
         collect_ip_args "$@"
         shift $IP_COUNT
-        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
+        [ $IP_COUNT -gt 0 -a \( $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) \) ] || usage
         check_running $DNS_CONTAINER_NAME
         CONTAINER=$(container_id $1)
         if [ $# -eq 1 ] ; then
