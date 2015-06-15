@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"runtime"
 	"sync/atomic"
 )
 

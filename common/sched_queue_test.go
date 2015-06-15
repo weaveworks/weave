@@ -6,7 +6,6 @@ import (
 
 	"github.com/benbjohnson/clock"
 	wt "github.com/weaveworks/weave/testing"
-	"log"
 )
 
 // Ensure we can add new calls while forwarding the clock
