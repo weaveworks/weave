@@ -3,7 +3,6 @@ package router
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"log"
 	"sync"
 )
@@ -37,10 +36,7 @@ func (router *Router) handleGossip(tag ProtocolTag, payload []byte) error {
 	if err := decoder.Decode(&channelName); err != nil {
 		return err
 	}
-	channel, found := router.gossipChannel(channelName)
-	if !found {
-		return fmt.Errorf("[gossip] received unknown channel with name %s", channelName)
-	}
+	channel := router.gossipChannel(channelName)
 	var srcName PeerName
 	if err := decoder.Decode(&srcName); err != nil {
 		return err

@@ -101,11 +101,22 @@ func (router *Router) NewGossip(channelName string, g Gossiper) Gossip {
 	return channel
 }
 
-func (router *Router) gossipChannel(channelName string) (*GossipChannel, bool) {
+func (router *Router) gossipChannel(channelName string) *GossipChannel {
 	router.gossipLock.RLock()
-	defer router.gossipLock.RUnlock()
 	channel, found := router.gossipChannels[channelName]
-	return channel, found
+	router.gossipLock.RUnlock()
+	if found {
+		return channel
+	}
+	router.gossipLock.Lock()
+	defer router.gossipLock.Unlock()
+	if channel, found = router.gossipChannels[channelName]; found {
+		return channel
+	}
+	channel = NewGossipChannel(channelName, router.Ourself, router.Routes, &surrogateGossiper)
+	channel.log("created surrogate channel")
+	router.gossipChannels[channelName] = channel
+	return channel
 }
 
 func (router *Router) gossipChannelSet() map[*GossipChannel]struct{} {
