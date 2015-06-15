@@ -5,8 +5,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/benbjohnson/clock"
 	"sync/atomic"
+
+	"github.com/benbjohnson/clock"
 )
 
 // A callable is a function that is called and return an (optional) next scheduled time
@@ -86,7 +87,6 @@ func (cq *SchedQueue) Start() {
 			case ce := <-cq.schedChan:
 				heap.Push(&cq.callablesH, ce)
 				now = cq.clock.Now()
-				Debug.Printf("[sched-q] Call scheduled [len:%d]", len(cq.callablesH))
 			case <-cq.closeChan:
 				return
 			case now = <-timer.C:
@@ -101,7 +101,6 @@ func (cq *SchedQueue) Start() {
 				schedNextTime := sched.c()
 
 				if !schedNextTime.IsZero() {
-					Debug.Printf("[sched-q] Re-scheduled at %s", schedNextTime)
 					sched.t = schedNextTime
 					heap.Push(&cq.callablesH, sched) // TODO: use a Fix() instead of Pop()&Push()
 				}
