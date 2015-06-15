@@ -111,6 +111,12 @@ start_container_with_dns() {
     weave_on $host run --with-dns "$@" -t $DNS_IMAGE /bin/sh
 }
 
+rm_containers() {
+    host=$1
+    shift
+    [ $# -eq 0 ] || docker_on $host rm -f "$@" >/dev/null
+}
+
 container_ip() {
     weave_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 }
@@ -155,8 +161,7 @@ assert_dns_ptr_record() {
 start_suite() {
     for host in $HOST1 $HOST2; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
-        containers=$(docker_on $host ps -aq 2>/dev/null)
-        [ -n "$containers" ] && docker_on $host rm -f $containers >/dev/null 2>&1
+        rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
         weave_on $host reset 2>/dev/null
     done
     whitely echo "$@"

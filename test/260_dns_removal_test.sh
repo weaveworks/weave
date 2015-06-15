@@ -10,7 +10,7 @@ DOPTS="--name=c2 -h $NAME"
 
 check() {
     assert_dns_record $HOST1 c1 $NAME $C2
-    docker_on $HOST1 rm -f c2 >/dev/null
+    rm_containers $HOST1 c2
     assert_no_dns_record $HOST1 c1 $NAME
 }
 

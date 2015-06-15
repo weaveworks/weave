@@ -17,7 +17,7 @@ assert_expected_fqdn() {
     shift
     start_container_with_dns $HOST1 "$@"
     assert "docker_inspect_fqdn $HOST1 $NAME" $EXPECTED_FQDN
-    docker_on $HOST1 rm -f $NAME >/dev/null
+    rm_containers $HOST1 $NAME
 }
 
 start_suite "Use container name as hostname"
