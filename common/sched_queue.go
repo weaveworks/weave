@@ -142,3 +142,15 @@ func (cq *SchedQueue) durationUntilNext(now time.Time) time.Duration {
 	}
 	return time.Duration(math.MaxInt64)
 }
+
+// ensure that the background goroutine has executed any pending callbacks
+func (cq *SchedQueue) Flush() {
+	ch := make(chan struct{})
+	flushFunc := func() time.Time {
+		atomic.AddUint64(&cq.counter, ^uint64(0)) // decrement so nobody sees this
+		close(ch)
+		return time.Time{}
+	}
+	cq.schedChan <- &schedCall{c: flushFunc, t: time.Time{}}
+	<-ch
+}
