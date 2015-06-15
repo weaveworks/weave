@@ -1166,7 +1166,9 @@ case "$COMMAND" in
                 arp_update $BRIDGE $CIDR
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-                [ -n "$FQDN" ] && when_dns_running put_dns_fqdn 'weave:expose' $FQDN $CIDR
+                if [ -n "$FQDN" ] ; then
+                    when_dns_running put_dns_fqdn 'weave:expose' $FQDN $CIDR
+                fi
             fi
         done
         ;;
