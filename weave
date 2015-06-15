@@ -643,24 +643,19 @@ dns_args() {
         case "$1" in
             --dns-search=*)
                 DNS_SEARCH_ARG=""
-                shift
                 ;;
             --name)
                 NAME_ARG="$2"
-                shift 2
+                shift
                 ;;
             --name=*)
                 NAME_ARG="${1#*=}"
-                shift
                 ;;
             -h|--hostname|--hostname=*)
                 HOSTNAME_SPECIFIED=1
-                shift
-                ;;
-            *)
-                shift
                 ;;
         esac
+        shift
     done
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
