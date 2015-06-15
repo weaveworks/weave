@@ -297,6 +297,7 @@ func TestServerCacheRefresh(t *testing.T) {
 
 	Debug.Printf("Adding an IPs to %s", testName1)
 	dbs[1].Zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.1"))
+	dbs.Flush() // ensure the immediate refresh is done
 
 	// Zone database #2 at this point:
 	//   first.weave.local  = 10.2.2.1
@@ -308,6 +309,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	assertNotLocalInCache(t, cache, qName2, "after asking for second name")
 
 	clk.Forward(refreshInterval / 2)
+	dbs.Flush()
 
 	Debug.Printf("Adding an IP to %s and to %s", testName1, testName2)
 	dbs[1].Zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.2"))
@@ -317,6 +319,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	//   first.weave.local    = 10.2.2.1 10.2.2.2
 	//   second.weave.local   = 10.9.9.2
 	clk.Forward(refreshInterval/2 + 2)
+	dbs.Flush()
 
 	// at this point, the testName1 should have been refreshed
 	// so it should have two IPs, and the cache entry should have been invalidated
@@ -332,6 +335,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	dbs[1].Zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.1"))
 	dbs[1].Zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.2"))
 	clk.Forward(refreshInterval + 1)
+	dbs.Flush()
 
 	qName1, _ = assertExchange(t, testName1, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
 	qName2, _ = assertExchange(t, testName2, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)

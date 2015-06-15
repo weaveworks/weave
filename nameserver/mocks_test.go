@@ -291,6 +291,12 @@ func (zbs zoneDbsWithMockedMDns) Stop() {
 	}
 }
 
+func (zbs zoneDbsWithMockedMDns) Flush() {
+	for _, entry := range zbs {
+		entry.Zone.refreshScheds.Flush()
+	}
+}
+
 //////////////////////////////////////////////////////////////////
 
 // A mocked cache where we never find a single thing... ;)
@@ -432,6 +438,9 @@ func newMockedClock() *mockedClock {
 	return &mockedClock{clock.NewMock()}
 }
 
+// Note: moving the clock forward does not take into account the data that could
+//       be waiting in channels. So your code should not depend on the channels
+//       for creating new timers. Otherwise, time travelling will not be reliable...
 func (clk *mockedClock) Forward(secs int) {
 	Debug.Printf(">>>>>>> Moving clock forward %d seconds - Time traveling >>>>>>>", secs)
 	clk.Add(time.Duration(secs) * time.Second)

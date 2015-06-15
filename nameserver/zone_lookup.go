@@ -1,11 +1,11 @@
 package nameserver
 
 import (
+	"net"
 	"time"
 
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
-	"net"
 )
 
 type uniqZoneRecordKey struct {
@@ -231,14 +231,6 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 //     disappeared from the network)
 //
 
-// TODO: for the sake of simplicity, we implement this mechanism with two channels: one for immediate
-//       updates and another one for scheduled requests. We could use a heap of "next-time"s and a timer,
-//       but that would require timers cancellations/updates/etc on insertions/removals/etc, and
-//       it is probably not worth the trouble as we always use the same refresh period.
-//       It could be useful if we move to a solution where we set update times from the responses TTLs,
-//       but we currently use a fixed TTL (30secs), the same as the refresh period...
-//       Anyway, maybe we will move to a gossip-based solution instead of doing this polling...
-
 // Check if we must start updating a name and, in that case, trigger a immediate update
 func (zone *ZoneDb) startUpdatingName(name string) {
 	if zone.refreshInterval > 0 {
@@ -252,93 +244,46 @@ func (zone *ZoneDb) startUpdatingName(name string) {
 			n.lastRefreshTime = now
 
 			Debug.Printf("[zonedb] Creating new immediate refresh request for '%s'", name)
-			zone.refreshChan <- refreshRequest{name: name, time: now}
+			zone.refreshScheds.Add(func() time.Time { return zone.updater(name) }, now)
 		}
 	}
 }
 
-// A worker for updating the list of IPs we have for a name
-func (zone *ZoneDb) updater(num int) {
-	defer zone.refreshWg.Done()
-
-	Debug.Printf("[zonedb] Starting background updater #%d...", num)
-	for {
-		select {
-		case <-zone.refreshCloseChan:
-			Debug.Printf("[zonedb] Background updater #%d: interrupted while waiting for requests: exiting", num)
-			return
-
-		case request := <-zone.refreshChan:
-			// if nobody has asked for this name for long time, just forget about it...
-			// this will eventually garbage collect the `refreshChan` and all remote info in absence of activity
-			if !zone.IsNameRelevant(request.name) || zone.IsNameExpired(request.name) {
-				Debug.Printf("[zonedb] '%s' seem to be irrelevant now: removing any remote information", request.name)
-				zone.mx.Lock()
-				zone.getNameSet(defaultRemoteIdent).deleteNameIP(request.name, net.IP{})
-				zone.mx.Unlock()
-				continue
-			}
-
-			// perform the refresh for this name
-			name := dns.Fqdn(request.name)
-			Debug.Printf("[zonedb] Refreshing name '%s' with mDNS...", name)
-			res, _ := zone.mdnsCli.InsistentLookupName(request.name)
-			if res != nil && len(res) > 0 {
-				numIps := len(res)
-				zone.mx.Lock()
-				now := zone.clock.Now()
-				added, removed := zone.getNameSet(defaultRemoteIdent).getName(name, true).updateIPs(res, now)
-				zone.mx.Unlock()
-				Debug.Printf("[zonedb] Obtained %d IPs for name '%s' with mDNS: %d added, %d removed",
-					numIps, name, added, removed)
-
-				// once the name has been updated, we insert the request (back) in the periodic requests channel
-				now = zone.clock.Now()
-				request.time = now.Add(zone.refreshInterval)
-				Debug.Printf("[zonedb] Rescheduling update for '%s' in %.2f secs",
-					request.name, zone.refreshInterval.Seconds())
-				zone.refreshSchedChan <- request
-			} else {
-				Debug.Printf("[zonedb] nobody knows about '%s'... removing", name)
-				zone.mx.Lock()
-				zone.getNameSet(defaultRemoteIdent).deleteNameIP(request.name, net.IP{})
-				zone.mx.Unlock()
-			}
-		}
+// Update the IPs we have for a name
+func (zone *ZoneDb) updater(name string) (nextTime time.Time) {
+	deleteRemoteInfo := func() {
+		zone.mx.Lock()
+		zone.getNameSet(defaultRemoteIdent).deleteNameIP(name, net.IP{})
+		zone.mx.Unlock()
 	}
-}
 
-// The periodic updater
-// Consume requests from the `refreshSchedChan`, where requests with increasing scheduling time are enqueued
-// for refreshing names...
-func (zone *ZoneDb) periodicUpdater() {
-	defer zone.refreshWg.Done()
-	for {
-		select {
-		case <-zone.refreshCloseChan:
-			Debug.Printf("[zonedb] Periodic updater: interrupted while waiting for requests: exiting")
-			return
-
-		case request := <-zone.refreshSchedChan:
-			now := zone.clock.Now()
-			// we can sleep until the update time has arrived, as requests are sorted by scheduled time (new request
-			// in this channel will always be scheduled later than the last item in the channel), so we can
-			// safely suspend this goroutine until then...
-			if request.time.After(now) {
-				ddiff := time.Duration(request.time.Sub(now).Nanoseconds())
-				timer := zone.clock.Timer(ddiff)
-				Debug.Printf("[zonedb] Periodic updater: new request for %s: sleeping for %.2f secs...",
-					request.name, ddiff.Seconds())
-				select {
-				case <-zone.refreshCloseChan:
-					Debug.Printf("[zonedb] Periodic updater: interrupted while sleeping: exiting")
-					return
-				case <-timer.C:
-				}
-			}
-
-			// once the time has arrived, we insert the request in the immediate refresh channel
-			zone.refreshChan <- request
-		}
+	// if nobody has asked for this name for long time, just forget about it...
+	if !zone.IsNameRelevant(name) || zone.IsNameExpired(name) {
+		Debug.Printf("[zonedb] '%s' seem to be irrelevant now: removing any remote information", name)
+		deleteRemoteInfo()
+		return
 	}
+
+	// perform the refresh for this name
+	fullName := dns.Fqdn(name)
+	startTime := zone.clock.Now()
+	Debug.Printf("[zonedb] Refreshing name '%s' with mDNS...", fullName)
+	res, _ := zone.mdnsCli.InsistentLookupName(fullName)
+	if res != nil && len(res) > 0 {
+		numIps := len(res)
+		zone.mx.Lock()
+		now := zone.clock.Now()
+		added, removed := zone.getNameSet(defaultRemoteIdent).getName(name, true).updateIPs(res, now)
+		zone.mx.Unlock()
+		Debug.Printf("[zonedb] Obtained %d IPs for name '%s' with mDNS: %d added, %d removed",
+			numIps, name, added, removed)
+
+		// once the name has been updated, we re-schedule the update
+		nextTime = startTime.Add(zone.refreshInterval)
+		Debug.Printf("[zonedb] Rescheduling update for '%s' in %s", name, nextTime.Sub(zone.clock.Now()))
+	} else {
+		Debug.Printf("[zonedb] nobody knows about '%s'... removing", name)
+		deleteRemoteInfo()
+	}
+	return
 }
