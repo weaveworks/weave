@@ -289,10 +289,10 @@ func TestAllocatorFuzz(t *testing.T) {
 	common.InitDefaultLogging(false)
 	const (
 		firstpass    = 1000
-		secondpass   = 5000
+		secondpass   = 20000
 		nodes        = 10
 		maxAddresses = 1000
-		concurrency  = 10
+		concurrency  = 30
 		cidr         = "10.0.1.7/22"
 	)
 	allocs, _, subnet := makeNetworkOfAllocators(nodes, cidr)
@@ -398,12 +398,16 @@ func TestAllocatorFuzz(t *testing.T) {
 		addrIndex := rand.Int31n(int32(len(addrs)))
 		addr := addrs[addrIndex]
 		res := state[addr]
+		if res.block {
+			stateLock.Unlock()
+			return
+		}
 		res.block = true
 		state[addr] = res
 		stateLock.Unlock()
 		alloc := allocs[res.alloc]
 
-		//common.Info.Printf("Asking for %s on allocator %d again", addr, res.alloc)
+		//common.Info.Printf("Asking for %s (%s) on allocator %d again", res.name, addr, res.alloc)
 
 		newAddr, _ := alloc.Allocate(res.name, subnet, nil)
 		oldAddr, _ := address.ParseIP(addr)
