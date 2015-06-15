@@ -535,17 +535,21 @@ http_call_ip() {
     http_verb="$3"
     url="$4"
     shift 4
-    curl --connect-timeout 3 -s -X $http_verb "$@" http://$ip:$port$url
+    curl --connect-timeout 3 -s -S -X $http_verb "$@" http://$ip:$port$url
 }
 
 # Call url $4 with http verb $3 on container $1 at port $2
 http_call() {
-    container_ip $1 \
-        "$1 container is not present. Have you launched it?" \
-        "$1 container is not running." \
+    HTTP_CALL_CONTAINER=$1
+    container_ip $HTTP_CALL_CONTAINER \
+        "$HTTP_CALL_CONTAINER container is not present. Have you launched it?" \
+        "$HTTP_CALL_CONTAINER container is not running." \
         || return 1
     shift 1
-    http_call_ip $CONTAINER_IP "$@"
+    if ! http_call_ip $CONTAINER_IP "$@" ; then
+        echo "Call to $HTTP_CALL_CONTAINER failed." >&2
+        return 1
+    fi
 }
 
 call_weave() {
@@ -561,7 +565,7 @@ call_dns() {
 wait_for_status() {
     container_ip $1 "$1 container has died." "$1 container has died." || return 1
     while true ; do
-        http_call_ip $CONTAINER_IP $2 GET /status >/dev/null && return 0
+        http_call_ip $CONTAINER_IP $2 GET /status >/dev/null 2>&1 && return 0
         if ! container_id $1 >/dev/null 2>&1 ; then
             echo "$1 container has died." >&2
             return 1
