@@ -767,7 +767,7 @@ ipam_cidrs() {
     IPAM_CIDRs=""
     if [ $# -eq 0 ] ; then
         # If no addresses passed in, get one in the default subnet
-        IPAM_CIDRS="$(call_weave POST /ip/$CONTAINER_ID)"
+        IPAM_CIDRS=$(call_weave POST /ip/$CONTAINER_ID)
         if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
             echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
             return 1
