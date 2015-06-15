@@ -660,17 +660,8 @@ dns_args() {
     done
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
-        DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.$(dns_domain)"
-    fi
-}
-
-# Use the weaveDNS REST API to determine the local domain. If weaveDNS is not
-# running, return the default value ('weave.local.')
-dns_domain() {
-    if DOMAIN=$(call_dns GET /domain 2>/dev/null) ; then
-        echo $DOMAIN
-    else
-        echo 'weave.local.'
+        DOMAIN=$(call_dns GET /domain 2>/dev/null) || DOMAIN=weave.local.
+        DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.$DOMAIN"
     fi
 }
 
@@ -1096,9 +1087,6 @@ case "$COMMAND" in
     dns-args)
         dns_args "$@"
         echo -n $DNS_ARGS
-        ;;
-    dns-domain)
-        echo $(dns_domain)
         ;;
     docker-bridge-ip)
         docker_bridge_ip
