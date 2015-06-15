@@ -41,6 +41,7 @@ type LocalConnection struct {
 	sync.RWMutex
 	RemoteConnection
 	TCPConn           *net.TCPConn
+	version           byte
 	tcpSender         TCPSender
 	remoteUDPAddr     *net.UDPAddr
 	receivedHeartbeat bool
@@ -284,15 +285,13 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	defer func() { conn.shutdown(err) }()
 	defer close(finished)
 
-	tcpConn := conn.TCPConn
-	tcpConn.SetLinger(0)
-	enc := gob.NewEncoder(tcpConn)
-	dec := gob.NewDecoder(tcpConn)
+	conn.TCPConn.SetLinger(0)
 
-	if err = conn.handshake(enc, dec, acceptNewPeer); err != nil {
+	_, dec, err := conn.handshake(acceptNewPeer)
+	if err != nil {
 		return
 	}
-	conn.Log("completed handshake")
+	conn.Log("completed handshake; using protocol version", conn.version)
 
 	// The ordering of the following is very important. [1]
 
