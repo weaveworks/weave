@@ -120,7 +120,7 @@ func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 	name = dns.Fqdn(name)
 	Debug.Printf("[zonedb] Looking for name '%s' in local(&remote) database", name)
 
-	zone.mx.RLock()
+	zone.mx.Lock()
 	now := zone.clock.Now()
 	uniq := newUniqZoneRecords()
 	for identName, nameset := range zone.idents {
@@ -138,7 +138,7 @@ func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 			nameset.touchName(name, now)
 		}
 	}
-	zone.mx.RUnlock()
+	zone.mx.Unlock()
 
 	if len(uniq) > 0 {
 		Debug.Printf("[zonedb] '%s' resolved in local database", name)
@@ -165,7 +165,7 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 
 	Debug.Printf("[zonedb] Looking for address in local(&remote) database: '%s' (%s)", revIPv4, inaddr)
 
-	zone.mx.RLock()
+	zone.mx.Lock()
 	now := zone.clock.Now()
 	uniq := newUniqZoneRecords()
 	for identName, nameset := range zone.idents {
@@ -183,7 +183,7 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 			}
 		}
 	}
-	zone.mx.RUnlock()
+	zone.mx.Unlock()
 
 	if len(uniq) > 0 {
 		Debug.Printf("[zonedb] '%s' resolved in local database", inaddr)
