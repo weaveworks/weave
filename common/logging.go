@@ -19,6 +19,7 @@ var (
 	Info    *log.Logger
 	Warning *log.Logger
 	Error   *log.Logger
+	debugF  bool
 )
 
 func InitLogging(debugHandle io.Writer,
@@ -33,6 +34,10 @@ func InitLogging(debugHandle io.Writer,
 }
 
 func InitDefaultLogging(debug bool) {
+	if debug == debugF {
+		return
+	}
+	debugF = debug
 	debugOut := ioutil.Discard
 	if debug {
 		debugOut = os.Stderr
