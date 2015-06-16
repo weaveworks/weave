@@ -155,7 +155,7 @@ func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Tim
 	e.putTime = now
 
 	if reply != nil {
-		e.reply = *reply
+		e.reply = *reply.Copy()
 		e.ReplyLen = reply.Len()
 	}
 
