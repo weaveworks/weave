@@ -47,7 +47,7 @@ start_suite "Weave run/start/attach/detach with multiple cidr arguments"
 # lowest available address in the subnet
 
 weave_on $HOST1 launch -debug -iprange 10.2.3.0/24
-weave_on $HOST1 launch-dns 10.254.254.254/24
+weave_on $HOST1 launch-dns 10.254.254.254/24 $WEAVEDNS_ARGS
 
 # Run container with three cidrs
 CID=$(start_container $HOST1 ip:10.2.1.1/24 10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME | cut -b 1-12)

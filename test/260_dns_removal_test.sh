@@ -16,7 +16,7 @@ check() {
 
 start_suite "Automatic DNS record removal on container death"
 
-weave_on $HOST1 launch-dns 10.2.254.1/24 --no-cache
+weave_on $HOST1 launch-dns 10.2.254.1/24 $WEAVEDNS_ARGS
 start_container_with_dns $HOST1 $C1/24 --name=c1
 
 start_container $HOST1 $C2/24 $DOPTS
