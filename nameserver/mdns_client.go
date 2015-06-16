@@ -128,12 +128,13 @@ func (c *MDNSClient) Start(ifi *net.Interface) (err error) {
 		}
 	}
 
-	c.listener = &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
-	go c.listener.ActivateAndServe()
-
 	actionChan := make(chan MDNSAction, MailboxSize)
 	c.actionChan = actionChan
 	go c.actorLoop(actionChan)
+
+	c.listener = &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
+	go c.listener.ActivateAndServe()
+
 	return nil
 }
 
