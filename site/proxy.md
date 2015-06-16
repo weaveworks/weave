@@ -129,7 +129,7 @@ will not be registered in weaveDNS.
 Here's a complete example of using weave proxies configured with
 [automatic IP address assignment](#ipam) and
 [automatic discovery](#dns) to start containers on two hosts such that
-they can reach each other by name.
+one can reach the other by name.
 
 First, let us start weave, weaveDNS and the proxy, and set DOCKER_HOST
 to point at the latter:
@@ -144,15 +144,14 @@ to point at the latter:
     host2$ weave launch-proxy --with-ipam
     host2$ eval "$(weave proxy-env)"
 
-Now let us start a couple of containers, and ping one from the other,
-by name.
+Now let us start a named container on one host, and ping it, by name,
+from a container on the other host.
 
-    host1$ docker run -h pingme.weave.local -dti ubuntu
+    host1$ docker run --name=pingme -dti ubuntu
 
-    host2$ docker run -h pinger.weave.local  -ti ubuntu
-    root@pinger:/# ping pingme
-    PING pingme.weave.local (10.2.3.1) 56(84) bytes of data.
-    64 bytes from pingme.weave.local (10.2.3.1): icmp_seq=1 ttl=64 time=0.047 ms
+    host2$ docker run -ti ubuntu ping pingme
+    PING pingme.weave.local (10.128.0.2) 56(84) bytes of data.
+    64 bytes from pingme.weave.local (10.128.0.2): icmp_seq=1 ttl=64 time=0.047 ms
     ...
 
 ## <a name="tls"></a>Securing the docker communication with TLS
