@@ -135,12 +135,12 @@ First, let us start weave, weaveDNS and the proxy, and set DOCKER_HOST
 to point at the latter:
 
     host1$ weave launch
-    host1$ weave launch-dns 10.2.4.1/24
+    host1$ weave launch-dns
     host1$ weave launch-proxy --with-ipam
     host1$ eval "$(weave proxy-env)"
 
     host2$ weave launch host1
-    host2$ weave launch-dns 10.2.4.2/24
+    host2$ weave launch-dns
     host2$ weave launch-proxy --with-ipam
     host2$ eval "$(weave proxy-env)"
 
