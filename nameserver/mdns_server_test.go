@@ -60,7 +60,6 @@ func TestServerSimpleQuery(t *testing.T) {
 		receivedAddrs = make([]net.IP, 0)
 		receivedName = ""
 		receivedCount = 0
-		recvChan = make(chan interface{})
 
 		m := new(dns.Msg)
 		m.SetQuestion(name, querytype)
