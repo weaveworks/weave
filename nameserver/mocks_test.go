@@ -10,8 +10,8 @@ import (
 
 	"github.com/benbjohnson/clock"
 	"github.com/miekg/dns"
+	"github.com/stretchr/testify/require"
 	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 const (
@@ -451,7 +451,7 @@ func (clk *mockedClock) Forward(secs int) {
 
 // Perform a DNS query and assert the reply code, number or answers, etc
 func assertExchange(t *testing.T, z string, ty uint16, port int, minAnswers int, maxAnswers int, expErr int) (*dns.Msg, *dns.Msg) {
-	wt.AssertNotEqualInt(t, port, 0, "invalid DNS server port")
+	require.NotEqual(t, 0, port, "invalid DNS server port")
 
 	c := &dns.Client{
 		UDPSize: testUDPBufSize,
@@ -468,18 +468,18 @@ func assertExchange(t *testing.T, z string, ty uint16, port int, minAnswers int,
 	if err != nil {
 		t.Errorf("Error when querying DNS server at %s: %s", lstAddr, err)
 	}
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	if minAnswers == 0 && maxAnswers == 0 {
-		wt.AssertStatus(t, r.Rcode, expErr, "DNS response code")
+		require.Equal(t, expErr, r.Rcode, "DNS response code")
 	} else {
-		wt.AssertStatus(t, r.Rcode, dns.RcodeSuccess, "DNS response code")
+		require.Equal(t, dns.RcodeSuccess, r.Rcode, "DNS response code")
 	}
 	answers := len(r.Answer)
 	if minAnswers >= 0 && answers < minAnswers {
-		wt.Fatalf(t, "Number of answers >= %d", minAnswers)
+		require.FailNow(t, fmt.Sprintf("Number of answers >= %d", minAnswers))
 	}
 	if maxAnswers >= 0 && answers > maxAnswers {
-		wt.Fatalf(t, "Number of answers <= %d", maxAnswers)
+		require.FailNow(t, fmt.Sprintf("Number of answers <= %d", maxAnswers))
 	}
 	return m, r
 }
@@ -487,8 +487,8 @@ func assertExchange(t *testing.T, z string, ty uint16, port int, minAnswers int,
 // Assert that we have a response in the cache for a query `q`
 func assertInCache(t *testing.T, cache ZoneCache, q *dns.Msg, desc string) {
 	r, err := cache.Get(q, maxUDPSize)
-	wt.AssertNoErr(t, err)
-	wt.AssertNotNil(t, r, fmt.Sprintf("value in the cache: %s", desc))
+	require.NoError(t, err)
+	require.NotNil(t, r, fmt.Sprintf("value in the cache: %s", desc))
 }
 
 // Assert that we have a response in the cache for a query `q`
@@ -502,6 +502,6 @@ func assertNotLocalInCache(t *testing.T, cache ZoneCache, q *dns.Msg, desc strin
 // Assert that we do not have a response in the cache for a query `q`
 func assertNotInCache(t *testing.T, cache ZoneCache, q *dns.Msg, desc string) {
 	r, err := cache.Get(q, maxUDPSize)
-	wt.AssertNoErr(t, err)
-	wt.AssertNil(t, r, fmt.Sprintf("value in the cache: %s\n%s", desc, r))
+	require.NoError(t, err)
+	require.Nil(t, r, fmt.Sprintf("value in the cache: %s\n%s", desc, r))
 }

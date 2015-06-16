@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/stretchr/testify/require"
 	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 const (
@@ -44,9 +44,9 @@ func TestUDPDNSServer(t *testing.T) {
 	Info.Println("TestUDPDNSServer starting")
 
 	zone, err := NewZoneDb(ZoneConfig{})
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = zone.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer zone.Stop()
 
 	ip, _, _ := net.ParseCIDR(testCIDR1)
@@ -78,7 +78,7 @@ func TestUDPDNSServer(t *testing.T) {
 
 	// Run another DNS server for fallback
 	fallback, err := newMockedFallback(fallbackHandler, nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	fallback.Start()
 	defer fallback.Stop()
 
@@ -88,9 +88,9 @@ func TestUDPDNSServer(t *testing.T) {
 		CacheDisabled:     true,
 		ListenReadTimeout: testSocketTimeout,
 	})
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = srv.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
@@ -98,18 +98,18 @@ func TestUDPDNSServer(t *testing.T) {
 	var r *dns.Msg
 
 	testPort, err := srv.GetPort()
-	wt.AssertNoErr(t, err)
-	wt.AssertNotEqualInt(t, testPort, 0, "invalid listen port")
+	require.NoError(t, err)
+	require.NotEqual(t, 0, testPort, "invalid listen port")
 
 	_, r = assertExchange(t, successTestName, dns.TypeA, testPort, 1, 1, 0)
-	wt.AssertType(t, r.Answer[0], (*dns.A)(nil), "DNS record")
-	wt.AssertEqualString(t, r.Answer[0].(*dns.A).A.String(), testAddr1, "IP address")
+	require.IsType(t, (*dns.A)(nil), r.Answer[0], "DNS record")
+	require.Equal(t, testAddr1, r.Answer[0].(*dns.A).A.String(), "IP address")
 
 	assertExchange(t, failTestName, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
 
 	_, r = assertExchange(t, testRDNSsuccess, dns.TypePTR, testPort, 1, 1, 0)
-	wt.AssertType(t, r.Answer[0], (*dns.PTR)(nil), "DNS record")
-	wt.AssertEqualString(t, r.Answer[0].(*dns.PTR).Ptr, successTestName, "IP address")
+	require.IsType(t, (*dns.PTR)(nil), r.Answer[0], "DNS record")
+	require.Equal(t, successTestName, r.Answer[0].(*dns.PTR).Ptr, "IP address")
 
 	assertExchange(t, testRDNSfail, dns.TypePTR, testPort, 0, 0, dns.RcodeNameError)
 
@@ -141,9 +141,9 @@ func TestTCPDNSServer(t *testing.T) {
 	Info.Println("TestTCPDNSServer starting")
 
 	zone, err := NewZoneDb(ZoneConfig{})
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = zone.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer zone.Stop()
 
 	// generate a list of `numAnswers` IP addresses
@@ -185,7 +185,7 @@ func TestTCPDNSServer(t *testing.T) {
 
 	t.Logf("Running a DNS fallback server with UDP")
 	fallback, err := newMockedFallback(fallbackUDPHandler, fallbackTCPHandler)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	fallback.Start()
 	defer fallback.Stop()
 
@@ -196,16 +196,16 @@ func TestTCPDNSServer(t *testing.T) {
 		CacheDisabled:     true,
 		ListenReadTimeout: testSocketTimeout,
 	})
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = srv.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
 	testPort, err := srv.GetPort()
-	wt.AssertNoErr(t, err)
-	wt.AssertNotEqualInt(t, testPort, 0, "listen port")
+	require.NoError(t, err)
+	require.NotEqual(t, 0, testPort, "listen port")
 	dnsAddr := fmt.Sprintf("127.0.0.1:%d", testPort)
 
 	t.Logf("Creating a UDP and a TCP client")
@@ -223,36 +223,36 @@ func TestTCPDNSServer(t *testing.T) {
 	r, _, err := uc.Exchange(m, fallback.Addr)
 	t.Logf("Got response from fallback server (UDP) with %d answers", len(r.Answer))
 	t.Logf("Response:\n%+v\n", r)
-	wt.AssertNoErr(t, err)
-	wt.AssertTrue(t, r.MsgHdr.Truncated, "DNS truncated reponse flag")
-	wt.AssertNotEqualInt(t, len(r.Answer), numAnswers, "number of answers (UDP)")
+	require.NoError(t, err)
+	require.True(t, r.MsgHdr.Truncated, "DNS truncated reponse flag")
+	require.NotEqual(t, numAnswers, len(r.Answer), "number of answers (UDP)")
 
 	t.Logf("Checking the WeaveDNS server at %s returns a truncated reponse with UDP", dnsAddr)
 	r, _, err = uc.Exchange(m, dnsAddr)
 	t.Logf("UDP Response:\n%+v\n", r)
-	wt.AssertNoErr(t, err)
-	wt.AssertNotNil(t, r, "response")
+	require.NoError(t, err)
+	require.NotNil(t, r, "response")
 	t.Logf("%d answers", len(r.Answer))
-	wt.AssertTrue(t, r.MsgHdr.Truncated, "DNS truncated reponse flag")
-	wt.AssertNotEqualInt(t, len(r.Answer), numAnswers, "number of answers (UDP)")
+	require.True(t, r.MsgHdr.Truncated, "DNS truncated reponse flag")
+	require.NotEqual(t, numAnswers, len(r.Answer), "number of answers (UDP)")
 
 	t.Logf("Checking the WeaveDNS server at %s does not return a truncated reponse with TCP", dnsAddr)
 	r, _, err = tc.Exchange(m, dnsAddr)
 	t.Logf("TCP Response:\n%+v\n", r)
-	wt.AssertNoErr(t, err)
-	wt.AssertNotNil(t, r, "response")
+	require.NoError(t, err)
+	require.NotNil(t, r, "response")
 	t.Logf("%d answers", len(r.Answer))
-	wt.AssertFalse(t, r.MsgHdr.Truncated, "DNS truncated response flag")
-	wt.AssertEqualInt(t, len(r.Answer), numAnswers, "number of answers (TCP)")
+	require.False(t, r.MsgHdr.Truncated, "DNS truncated response flag")
+	require.Equal(t, numAnswers, len(r.Answer), "number of answers (TCP)")
 
 	t.Logf("Checking the WeaveDNS server at %s does not return a truncated reponse with UDP with a bigger buffer", dnsAddr)
 	m.SetEdns0(testUDPBufSize, false)
 	r, _, err = uc.Exchange(m, dnsAddr)
 	t.Logf("UDP-large Response:\n%+v\n", r)
-	wt.AssertNoErr(t, err)
-	wt.AssertNotNil(t, r, "response")
+	require.NoError(t, err)
+	require.NotNil(t, r, "response")
 	t.Logf("%d answers", len(r.Answer))
-	wt.AssertNoErr(t, err)
-	wt.AssertFalse(t, r.MsgHdr.Truncated, "DNS truncated response flag")
-	wt.AssertEqualInt(t, len(r.Answer), numAnswers, "number of answers (UDP-long)")
+	require.NoError(t, err)
+	require.False(t, r.MsgHdr.Truncated, "DNS truncated response flag")
+	require.Equal(t, numAnswers, len(r.Answer), "number of answers (UDP-long)")
 }

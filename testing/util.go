@@ -1,141 +1,32 @@
 package testing
 
 import (
+	"fmt"
 	"reflect"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
-func AssertTrue(t *testing.T, cond bool, desc string) {
-	if !cond {
-		Fatalf(t, "Expected %s", desc)
-	}
+func AssertErrorInterface(t *testing.T, expected interface{}, actual error, desc string) {
+	require.Error(t, actual, desc)
+	require.Implements(t, expected, actual, desc)
 }
 
-func AssertFalse(t *testing.T, cond bool, desc string) {
-	if cond {
-		Fatalf(t, "Unexpected %s", desc)
+func AssertErrorType(t *testing.T, expected interface{}, actual error, desc string) {
+	require.Error(t, actual, desc)
+	// require.IsType doesn't take the pointer element, and doesn't resolve
+	// through interfaces, so we have to do this one ourselves.
+	actualT, expectedT := reflect.TypeOf(actual), reflect.TypeOf(expected).Elem()
+	if actualT != expectedT {
+		require.FailNow(
+			t,
+			fmt.Sprintf("Expected %s but got %s", expectedT.String(), actualT.String()),
+			desc,
+		)
 	}
-}
-
-func AssertNil(t *testing.T, p interface{}, desc string) {
-	val := reflect.ValueOf(p)
-	if val.IsValid() && !val.IsNil() {
-		Fatalf(t, "Expected nil pointer for %s but got a \"%s\": \"%s\"",
-			desc, reflect.TypeOf(p), val.Interface())
-	}
-}
-
-func AssertNotNil(t *testing.T, p interface{}, desc string) {
-	val := reflect.ValueOf(p)
-	if !val.IsValid() || val.IsNil() {
-		Fatalf(t, "Unexpected nil pointer for %s", desc)
-	}
-}
-
-func AssertNoErr(t *testing.T, err error) {
-	if err != nil {
-		Fatalf(t, "Unexpected error: %s", err)
-	}
-}
-
-func AssertEqualuint64(t *testing.T, got, wanted uint64, desc string) {
-	if got != wanted {
-		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
-	}
-}
-
-func AssertEqualInt(t *testing.T, got, wanted int, desc string) {
-	if got != wanted {
-		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
-	}
-}
-
-func AssertNotEqualInt(t *testing.T, got, wanted int, desc string) {
-	if got == wanted {
-		Fatalf(t, "Expected %s %d to be different to %d", desc, wanted, got)
-	}
-}
-
-func AssertEqualString(t *testing.T, got, wanted string, desc string) {
-	if got != wanted {
-		Fatalf(t, "Expected %s '%s' but got '%s'", desc, wanted, got)
-	}
-}
-
-func AssertEquals(t *testing.T, a1, a2 interface{}) {
-	if !reflect.DeepEqual(a1, a2) {
-		Fatalf(t, "Expected %+v == %+v", a1, a2)
-	}
-}
-
-func AssertStatus(t *testing.T, got int, wanted int, desc string) {
-	if got != wanted {
-		Fatalf(t, "Expected %s %d but got %d", desc, wanted, got)
-	}
-}
-
-func AssertErrorInterface(t *testing.T, got interface{}, wanted interface{}, desc string) {
-	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
-	if got == nil {
-		Fatalf(t, "Expected %s but got nil (%s)", wantedT.String(), desc)
-	}
-	if !gotT.Implements(wantedT) {
-		Fatalf(t, "Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
-	}
-}
-
-func AssertErrorType(t *testing.T, got interface{}, wanted interface{}, desc string) {
-	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted).Elem()
-	if got == nil {
-		Fatalf(t, "Expected %s but got nil (%s)", wantedT.String(), desc)
-	}
-	if gotT != wantedT {
-		Fatalf(t, "Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
-	}
-}
-
-func AssertType(t *testing.T, got interface{}, wanted interface{}, desc string) {
-	gotT, wantedT := reflect.TypeOf(got), reflect.TypeOf(wanted)
-	if gotT != wantedT {
-		Fatalf(t, "Expected %s but got %s (%s)", wantedT.String(), gotT.String(), desc)
-	}
-}
-
-func AssertEmpty(t *testing.T, array interface{}, desc string) {
-	if reflect.ValueOf(array).Len() != 0 {
-		Fatalf(t, "Expected empty %s but got %s", desc, array)
-	}
-}
-
-func AssertSuccess(t *testing.T, err error) {
-	if err != nil {
-		Fatalf(t, "Expected success, got '%s'", err.Error())
-	}
-}
-
-func AssertPanic(t *testing.T, f func()) {
-	wrapper := func() (paniced bool) {
-		defer func() {
-			if err := recover(); err != nil {
-				paniced = true
-			}
-		}()
-
-		f()
-		return
-	}
-	AssertTrue(t, wrapper(), "Expected panic")
-}
-
-// Like testing.Fatalf, but adds the stack trace of the current call
-func Fatalf(t *testing.T, format string, args ...interface{}) {
-	t.Fatalf(format+"\n%s", append(args, StackTrace())...)
-}
-
-func StackTrace() string {
-	return stackTrace(false)
 }
 
 func stackTrace(all bool) string {

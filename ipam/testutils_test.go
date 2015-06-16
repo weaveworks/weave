@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam/address"
 	"github.com/weaveworks/weave/router"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 type mockMessage struct {
@@ -33,7 +33,7 @@ func toStringArray(messages []mockMessage) []string {
 
 type mockGossipComms struct {
 	sync.RWMutex
-	t        *testing.T
+	*testing.T
 	name     string
 	messages []mockMessage
 }
@@ -53,11 +53,11 @@ func (m *mockGossipComms) GossipBroadcast(update router.GossipData) error {
 	defer m.Unlock()
 	buf := []byte{}
 	if len(m.messages) == 0 {
-		m.Fatalf("%s: Gossip broadcast message unexpected: \n%x", m.name, buf)
+		require.FailNow(m, fmt.Sprintf("%s: Gossip broadcast message unexpected: \n%x", m.name, buf))
 	} else if msg := m.messages[0]; msg.dst != router.UnknownPeerName {
-		m.Fatalf("%s: Expected Gossip message to %s but got broadcast", m.name, msg.dst)
+		require.FailNow(m, fmt.Sprintf("%s: Expected Gossip message to %s but got broadcast", m.name, msg.dst))
 	} else if msg.buf != nil && !equalByteBuffer(msg.buf, buf) {
-		m.Fatalf("%s: Gossip message not sent as expected: \nwant: %x\ngot : %x", m.name, msg.buf, buf)
+		require.FailNow(m, fmt.Sprintf("%s: Gossip message not sent as expected: \nwant: %x\ngot : %x", m.name, msg.buf, buf))
 	} else {
 		// Swallow this message
 		m.messages = m.messages[1:]
@@ -77,24 +77,19 @@ func equalByteBuffer(a, b []byte) bool {
 	return true
 }
 
-func (m *mockGossipComms) Fatalf(format string, args ...interface{}) {
-	// this sometimes hangs: wt.Fatalf(m.t, args...)
-	panic(fmt.Sprintf(format, args...))
-}
-
 func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
 	m.Lock()
 	defer m.Unlock()
 	if len(m.messages) == 0 {
-		m.Fatalf("%s: Gossip message to %s unexpected: \n%s", m.name, dstPeerName, buf)
+		require.FailNow(m, fmt.Sprintf("%s: Gossip message to %s unexpected: \n%s", m.name, dstPeerName, buf))
 	} else if msg := m.messages[0]; msg.dst == router.UnknownPeerName {
-		m.Fatalf("%s: Expected Gossip broadcast message but got dest %s", m.name, dstPeerName)
+		require.FailNow(m, fmt.Sprintf("%s: Expected Gossip broadcast message but got dest %s", m.name, dstPeerName))
 	} else if msg.dst != dstPeerName {
-		m.Fatalf("%s: Expected Gossip message to %s but got dest %s", m.name, msg.dst, dstPeerName)
+		require.FailNow(m, fmt.Sprintf("%s: Expected Gossip message to %s but got dest %s", m.name, msg.dst, dstPeerName))
 	} else if buf[0] != msg.msgType {
-		m.Fatalf("%s: Expected Gossip message of type %d but got type %d", m.name, msg.msgType, buf[0])
+		require.FailNow(m, fmt.Sprintf("%s: Expected Gossip message of type %d but got type %d", m.name, msg.msgType, buf[0]))
 	} else if msg.buf != nil && !equalByteBuffer(msg.buf, buf[1:]) {
-		m.Fatalf("%s: Gossip message not sent as expected: \nwant: %x\ngot : %x", m.name, msg.buf, buf[1:])
+		require.FailNow(m, fmt.Sprintf("%s: Gossip message not sent as expected: \nwant: %x\ngot : %x", m.name, msg.buf, buf[1:]))
 	} else {
 		// Swallow this message
 		m.messages = m.messages[1:]
@@ -122,7 +117,7 @@ func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 		m := alloc.gossip.(*mockGossipComms)
 		m.RLock()
 		if len(m.messages) > 0 {
-			wt.Fatalf(m.t, "%s: Gossip message(s) not sent as expected: \n%x", m.name, m.messages)
+			require.FailNow(m, fmt.Sprintf("%s: Gossip message(s) not sent as expected: \n%x", m.name, m.messages))
 		}
 		m.RUnlock()
 	}
@@ -147,7 +142,7 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 
 func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.Range) {
 	alloc, subnet := makeAllocator(name, universeCIDR, quorum)
-	gossip := &mockGossipComms{t: t, name: name}
+	gossip := &mockGossipComms{T: t, name: name}
 	alloc.SetInterfaces(gossip)
 	alloc.Start()
 	return alloc, subnet
@@ -177,14 +172,14 @@ func AssertSent(t *testing.T, ch <-chan bool) {
 	case <-ch:
 		// This case is ok
 	case <-timeout:
-		wt.Fatalf(t, "Nothing sent on channel")
+		require.FailNow(t, "Nothing sent on channel")
 	}
 }
 
 func AssertNothingSent(t *testing.T, ch <-chan bool) {
 	select {
 	case val := <-ch:
-		wt.Fatalf(t, "Unexpected value on channel: %t", val)
+		require.FailNow(t, fmt.Sprintf("Unexpected value on channel: %v", val))
 	default:
 		// no message received
 	}
@@ -193,7 +188,7 @@ func AssertNothingSent(t *testing.T, ch <-chan bool) {
 func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 	select {
 	case val := <-ch:
-		wt.Fatalf(t, "Unexpected value on channel: %t", val)
+		require.FailNow(t, fmt.Sprintf("Unexpected value on channel: %v", val))
 	default:
 		// no message received
 	}

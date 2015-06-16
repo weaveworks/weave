@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 // Check that the refreshing mechanism works as expected
@@ -44,23 +44,23 @@ func TestZoneRefresh(t *testing.T) {
 	dbs[0].Zone.AddRecord("someident", name, net.ParseIP(addr1))
 
 	Debug.Printf("Checking that the name %s is relevant (as it has been locally inserted) and not remote", name)
-	wt.AssertTrue(t, dbs[0].Zone.IsNameRelevant(name), "name relevant")
-	wt.AssertTrue(t, dbs[0].Zone.HasNameLocalInfo(name), "local name info")
-	wt.AssertFalse(t, dbs[0].Zone.HasNameRemoteInfo(name), "remote name info")
+	require.True(t, dbs[0].Zone.IsNameRelevant(name), "name relevant")
+	require.True(t, dbs[0].Zone.HasNameLocalInfo(name), "local name info")
+	require.False(t, dbs[0].Zone.HasNameRemoteInfo(name), "remote name info")
 
 	Debug.Printf("Asking for '%s' to Db #1: should get 1 IP from the local database...", name)
 	res, err := dbs[0].Zone.DomainLookupName(name)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	Debug.Printf("Got: %s", res)
 	t.Logf("Db #1 after the lookup:\n%s", dbs[0].Zone)
-	wt.AssertEqualInt(t, len(res), 1, "lookup result")
+	require.Equal(t, 1, len(res), "lookup result")
 
 	clk.Forward(refreshInterval / 2)
 	dbs.Flush()
 	Debug.Printf("A couple of seconds later, we should still have one IP for that name")
 	res, err = dbs[0].Zone.DomainLookupName(name)
-	wt.AssertNoErr(t, err)
-	wt.AssertEqualInt(t, len(res), 1, "lookup result")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(res), "lookup result")
 
 	Debug.Printf("And then we add 2 IPs for that name at ZoneDb 2")
 	clk.Forward(1)
@@ -81,7 +81,7 @@ func TestZoneRefresh(t *testing.T) {
 	res, err = dbs[0].Zone.DomainLookupName(name)
 	Debug.Printf("Got: %s", res)
 	t.Logf("Db #1 after the second lookup:\n%s", dbs[0].Zone)
-	wt.AssertEqualInt(t, len(res), 3, "lookup result length")
+	require.Equal(t, 3, len(res), "lookup result length")
 
 	Debug.Printf("We will not ask for `name` for a while, so it will become irrelevant and will be removed...")
 	clk.Forward(refreshInterval + relevantTime + 1)
@@ -90,9 +90,9 @@ func TestZoneRefresh(t *testing.T) {
 	// the name should be irrelevant now, and all remote info should have been
 	// removed from the zone database
 	Debug.Printf("Name '%s' should not be in the remote database in ZoneDb 1", name)
-	wt.AssertFalse(t, dbs[0].Zone.IsNameRelevant(name), "name still relevant after some inactivity time")
-	wt.AssertTrue(t, dbs[0].Zone.HasNameLocalInfo(name), "local name info")
-	wt.AssertFalse(t, dbs[0].Zone.HasNameRemoteInfo(name), "remote name info")
+	require.False(t, dbs[0].Zone.IsNameRelevant(name), "name still relevant after some inactivity time")
+	require.True(t, dbs[0].Zone.HasNameLocalInfo(name), "local name info")
+	require.False(t, dbs[0].Zone.HasNameRemoteInfo(name), "remote name info")
 
 	Debug.Printf("There is no remote info about this name at zone 1: a new IP appears remotely meanwhile...")
 	clk.Forward(1)
@@ -104,7 +104,7 @@ func TestZoneRefresh(t *testing.T) {
 	Debug.Printf("When we ask about this name again, we get 4 IPs (1 local, 3 remote)")
 	Debug.Printf("Asking for '%s' again... the first lookup will return only the local results", name)
 	res, err = dbs[0].Zone.DomainLookupName(name)
-	wt.AssertEqualInt(t, len(res), 1, "lookup result length")
+	require.Equal(t, 1, len(res), "lookup result length")
 	Debug.Printf("... but a second lookup should return all the results in the network")
 
 	clk.Forward(refreshInterval + 1)
@@ -112,5 +112,5 @@ func TestZoneRefresh(t *testing.T) {
 
 	res, err = dbs[0].Zone.DomainLookupName(name)
 	Debug.Printf("Got: %s", res)
-	wt.AssertEqualInt(t, len(res), 4, "lookup result length")
+	require.Equal(t, 4, len(res), "lookup result length")
 }

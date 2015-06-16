@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam/address"
 	"github.com/weaveworks/weave/router"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 const (
@@ -39,12 +39,12 @@ func TestAllocFree(t *testing.T) {
 
 	alloc.claimRingForTesting()
 	addr1, err := alloc.Allocate(container1, cidr1.HostRange(), nil)
-	wt.AssertNoErr(t, err)
-	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
+	require.NoError(t, err)
+	require.Equal(t, testAddr1, addr1.String(), "address")
 
 	addr2, err := alloc.Allocate(container1, cidr2.HostRange(), nil)
-	wt.AssertNoErr(t, err)
-	wt.AssertEqualString(t, addr2.String(), testAddr2, "address")
+	require.NoError(t, err)
+	require.Equal(t, testAddr2, addr2.String(), "address")
 
 	// Ask for another address for a different container and check it's different
 	addr1b, _ := alloc.Allocate(container2, cidr1.HostRange(), nil)
@@ -54,20 +54,20 @@ func TestAllocFree(t *testing.T) {
 
 	// Ask for the first container again and we should get the same addresses again
 	addr1a, _ := alloc.Allocate(container1, cidr1.HostRange(), nil)
-	wt.AssertEqualString(t, addr1a.String(), testAddr1, "address")
+	require.Equal(t, testAddr1, addr1a.String(), "address")
 	addr2a, _ := alloc.Allocate(container1, cidr2.HostRange(), nil)
-	wt.AssertEqualString(t, addr2a.String(), testAddr2, "address")
+	require.Equal(t, testAddr2, addr2a.String(), "address")
 
 	// Now delete the first container, and we should get its addresses back
-	wt.AssertSuccess(t, alloc.Delete(container1))
+	require.NoError(t, alloc.Delete(container1))
 	addr3, _ := alloc.Allocate(container3, cidr1.HostRange(), nil)
-	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
+	require.Equal(t, testAddr1, addr3.String(), "address")
 	addr4, _ := alloc.Allocate(container3, cidr2.HostRange(), nil)
-	wt.AssertEqualString(t, addr4.String(), testAddr2, "address")
+	require.Equal(t, testAddr2, addr4.String(), "address")
 
 	alloc.ContainerDied(container2)
 	alloc.ContainerDied(container3)
-	wt.AssertEquals(t, alloc.NumFreeAddresses(subnet), address.Offset(spaceSize))
+	require.Equal(t, address.Offset(spaceSize), alloc.NumFreeAddresses(subnet))
 }
 
 func TestBootstrap(t *testing.T) {
@@ -144,10 +144,10 @@ func TestAllocatorClaim(t *testing.T) {
 	addr1, _ := address.ParseIP(testAddr1)
 
 	err := alloc.Claim(container3, addr1, nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
 	addr3, _ := alloc.Allocate(container3, subnet, nil)
-	wt.AssertEqualString(t, addr3.String(), testAddr1, "address")
+	require.Equal(t, testAddr1, addr3.String(), "address")
 }
 
 func (alloc *Allocator) pause() func() {
@@ -190,7 +190,7 @@ func TestCancel(t *testing.T) {
 	res2, _ := alloc2.Allocate("bar", subnet, nil)
 	common.Debug.Printf("res2 = %s", res2.String())
 	if res1 == res2 {
-		wt.Fatalf(t, "Error: got same ips!")
+		require.FailNow(t, "Error: got same ips!")
 	}
 
 	// Now we're going to pause alloc2 and ask alloc1
@@ -215,7 +215,7 @@ func TestCancel(t *testing.T) {
 	cancelChan <- true
 	unpause()
 	if <-doneChan {
-		wt.Fatalf(t, "Error: got result from Allocate")
+		require.FailNow(t, "Error: got result from Allocate")
 	}
 }
 
@@ -235,7 +235,7 @@ func TestGossipShutdown(t *testing.T) {
 	alloc.Shutdown()
 
 	_, err := alloc.Allocate(container2, subnet, nil) // trying to allocate after shutdown should fail
-	wt.AssertFalse(t, err == nil, "no address")
+	require.False(t, err == nil, "no address")
 
 	CheckAllExpectedMessagesSent(alloc)
 }
@@ -250,10 +250,10 @@ func TestTransfer(t *testing.T) {
 	alloc3 := allocs[2] // This will be 'master' and get the first range
 
 	_, err := alloc2.Allocate("foo", subnet, nil)
-	wt.AssertTrue(t, err == nil, "Failed to get address")
+	require.True(t, err == nil, "Failed to get address")
 
 	_, err = alloc3.Allocate("bar", subnet, nil)
-	wt.AssertTrue(t, err == nil, "Failed to get address")
+	require.True(t, err == nil, "Failed to get address")
 
 	router.GossipBroadcast(alloc2.Gossip())
 	router.GossipBroadcast(alloc3.Gossip())
@@ -261,13 +261,13 @@ func TestTransfer(t *testing.T) {
 	router.removePeer(alloc3.ourName)
 	alloc2.Stop()
 	alloc3.Stop()
-	wt.AssertSuccess(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
-	wt.AssertSuccess(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
+	require.NoError(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
+	require.NoError(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
 
-	wt.AssertEquals(t, alloc1.NumFreeAddresses(subnet), address.Offset(1022))
+	require.Equal(t, address.Offset(1022), alloc1.NumFreeAddresses(subnet))
 
 	_, err = alloc1.Allocate("foo", subnet, nil)
-	wt.AssertTrue(t, err == nil, "Failed to get address")
+	require.True(t, err == nil, "Failed to get address")
 	alloc1.Stop()
 }
 
@@ -388,7 +388,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		wt.AssertSuccess(t, alloc.Free(res.name, oldAddr))
+		require.NoError(t, alloc.Free(res.name, oldAddr))
 	}
 
 	// Do a Allocate on an existing container & allocator

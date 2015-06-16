@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/stretchr/testify/require"
 	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 // Check that AddRecord/DeleteRecord/... in the Zone database lead to cache invalidations
@@ -35,14 +35,14 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 		Clock:      clk,
 	}
 	zone, err := NewZoneDb(zoneConfig)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = zone.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer zone.Stop()
 
 	Debug.Printf("Creating a cache")
 	cache, err := NewCache(1024, clk)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 
 	fallbackHandler := func(w dns.ResponseWriter, req *dns.Msg) {
 		m := new(dns.Msg)
@@ -55,7 +55,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 
 	// Run another DNS server for fallback
 	fallback, err := newMockedFallback(fallbackHandler, nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	fallback.Start()
 	defer fallback.Stop()
 
@@ -68,16 +68,16 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 		UpstreamCfg:       fallback.CliConfig,
 		MaxAnswers:        4,
 	})
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = srv.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow server goroutine to start
 
 	testPort, err := srv.GetPort()
-	wt.AssertNoErr(t, err)
-	wt.AssertNotEqualInt(t, testPort, 0, "invalid listen port")
+	require.NoError(t, err)
+	require.NotEqual(t, 0, testPort, "invalid listen port")
 
 	Debug.Printf("Adding two IPs to %s", testName1)
 	zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.1"))
@@ -193,7 +193,7 @@ func TestServerCacheExpiration(t *testing.T) {
 
 	Debug.Printf("Creating a cache")
 	cache, err := NewCache(1024, clk)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 
 	Debug.Printf("Creating a real DNS server for the first zone database and with the cache")
 	srv, err := NewDNSServer(DNSServerConfig{
@@ -203,16 +203,16 @@ func TestServerCacheExpiration(t *testing.T) {
 		ListenReadTimeout: testSocketTimeout,
 		CacheNegLocalTTL:  negativeLocalTTL,
 	})
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = srv.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow server goroutine to start
 
 	testPort, err := srv.GetPort()
-	wt.AssertNoErr(t, err)
-	wt.AssertNotEqualInt(t, testPort, 0, "invalid listen port")
+	require.NoError(t, err)
+	require.NotEqual(t, 0, testPort, "invalid listen port")
 
 	// Check that the DNS server knows nothing about testName1
 	qName1, _ := assertExchange(t, testName1, dns.TypeA, testPort, 0, 0, dns.RcodeNameError)
@@ -280,7 +280,7 @@ func TestServerCacheRefresh(t *testing.T) {
 
 	Debug.Printf("Creating a cache")
 	cache, err := NewCache(1024, clk)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 
 	Debug.Printf("Creating a real DNS server for the first zone database and with the cache")
 	srv, err := NewDNSServer(DNSServerConfig{
@@ -290,16 +290,16 @@ func TestServerCacheRefresh(t *testing.T) {
 		ListenReadTimeout: testSocketTimeout,
 		MaxAnswers:        4,
 	})
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = srv.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
 	testPort, err := srv.GetPort()
-	wt.AssertNoErr(t, err)
-	wt.AssertNotEqualInt(t, testPort, 0, "listen port")
+	require.NoError(t, err)
+	require.NotEqual(t, 0, testPort, "listen port")
 
 	Debug.Printf("Adding an IPs to %s", testName1)
 	dbs[1].Zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.1"))

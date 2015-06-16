@@ -3,7 +3,7 @@ package router
 import (
 	"testing"
 
-	wt "github.com/weaveworks/weave/testing"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFieldValidator(t *testing.T) {
@@ -11,20 +11,20 @@ func TestFieldValidator(t *testing.T) {
 
 	fv := NewFieldValidator(testMap)
 	val, err := fv.Value("a")
-	wt.AssertNoErr(t, err)
-	wt.AssertNoErr(t, fv.Err())
-	wt.AssertEqualString(t, val, "a", "")
+	require.NoError(t, err)
+	require.NoError(t, fv.Err())
+	require.Equal(t, "a", val, "")
 	_, err = fv.Value("x")
-	wt.AssertFalse(t, err == nil || fv.Err() == nil, "Expected error")
+	require.False(t, err == nil || fv.Err() == nil, "Expected error")
 	_, err = fv.Value("a")
-	wt.AssertFalse(t, err == nil || fv.Err() == nil, "Previous error should be retained")
+	require.False(t, err == nil || fv.Err() == nil, "Previous error should be retained")
 
 	fv = NewFieldValidator(testMap)
 	err = fv.CheckEqual("a", "a")
-	wt.AssertNoErr(t, err)
-	wt.AssertNoErr(t, fv.Err())
+	require.NoError(t, err)
+	require.NoError(t, fv.Err())
 	err = fv.CheckEqual("a", "b")
-	wt.AssertFalse(t, err == nil || fv.Err() == nil, "Expected error")
+	require.False(t, err == nil || fv.Err() == nil, "Expected error")
 	err = fv.CheckEqual("a", "a")
-	wt.AssertFalse(t, err == nil || fv.Err() == nil, "Previous error should be retained")
+	require.False(t, err == nil || fv.Err() == nil, "Previous error should be retained")
 }

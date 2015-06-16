@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/stretchr/testify/require"
 	. "github.com/weaveworks/weave/common"
 	wt "github.com/weaveworks/weave/testing"
 )
@@ -85,9 +86,9 @@ func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
 	}
 
 	mdnsClient, err := NewMDNSClient()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = mdnsClient.Start(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 
 	return mdnsClient, server, err
 }
@@ -111,7 +112,7 @@ func (c *testContext) checkResponse(t *testing.T, channelOk bool, resp *Response
 		c.channel = nil
 		return
 	}
-	wt.AssertNoErr(t, resp.err)
+	require.NoError(t, resp.err)
 	log.Printf("Got address response %s addr %s", resp.Name(), resp.IP())
 	c.receivedAddr = resp.IP()
 	c.receivedCount++
@@ -182,16 +183,16 @@ func TestAsLookup(t *testing.T) {
 	defer server.Shutdown()
 
 	ips, err := mdnsClient.LookupName(successTestName)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	if !testAddr.Equal(ips[0].IP()) {
 		t.Fatalf("Returned address incorrect %s", ips)
 	}
 
 	ips, err = mdnsClient.LookupName("foo.example.com.")
-	wt.AssertErrorType(t, err, (*LookupError)(nil), "unknown hostname")
+	wt.AssertErrorType(t, (*LookupError)(nil), err, "unknown hostname")
 
 	names, err := mdnsClient.LookupInaddr(testInAddr)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	if !(successTestName == names[0].Name()) {
 		t.Fatalf("Expected name %s, got %s", successTestName, names)
 	}

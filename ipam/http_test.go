@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-
+	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam/address"
 	wt "github.com/weaveworks/weave/testing"
@@ -19,8 +19,8 @@ import (
 
 func HTTPPost(t *testing.T, url string) string {
 	resp, err := http.Post(url, "", nil)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "http response")
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
 	return string(body)
@@ -28,7 +28,7 @@ func HTTPPost(t *testing.T, url string) string {
 
 func HTTPGet(t *testing.T, url string) string {
 	resp, err := http.Get(url)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
 	return string(body)
@@ -87,28 +87,28 @@ func TestHttp(t *testing.T) {
 
 	// Allocate an address in each subnet, and check we got what we expected
 	cidr1a := HTTPPost(t, allocURL(port, testCIDR1, containerID))
-	wt.AssertEqualString(t, cidr1a, testAddr1, "address")
+	require.Equal(t, testAddr1, cidr1a, "address")
 	cidr2a := HTTPPost(t, allocURL(port, testCIDR2, containerID))
-	wt.AssertEqualString(t, cidr2a, testAddr2, "address")
+	require.Equal(t, testAddr2, cidr2a, "address")
 	// Now, make the same requests again to check the operation is idempotent
 	check := HTTPGet(t, allocURL(port, testCIDR1, containerID))
-	wt.AssertEqualString(t, check, cidr1a, "address")
+	require.Equal(t, cidr1a, check, "address")
 	check = HTTPGet(t, allocURL(port, testCIDR2, containerID))
-	wt.AssertEqualString(t, check, cidr2a, "address")
+	require.Equal(t, cidr2a, check, "address")
 
 	// Ask the http server for a pair of addresses for another container and check they're different
 	cidr1b := HTTPPost(t, allocURL(port, testCIDR1, container2))
-	wt.AssertFalse(t, cidr1b == testAddr1, "address")
+	require.False(t, cidr1b == testAddr1, "address")
 	cidr2b := HTTPPost(t, allocURL(port, testCIDR2, container2))
-	wt.AssertFalse(t, cidr2b == testAddr2, "address")
+	require.False(t, cidr2b == testAddr2, "address")
 
 	// Now free the first container, and we should get its addresses back when we ask
 	doHTTP("DELETE", identURL(port, containerID))
 
 	cidr1c := HTTPPost(t, allocURL(port, testCIDR1, container3))
-	wt.AssertEqualString(t, cidr1c, testAddr1, "address")
+	require.Equal(t, testAddr1, cidr1c, "address")
 	cidr2c := HTTPPost(t, allocURL(port, testCIDR2, container3))
-	wt.AssertEqualString(t, cidr2c, testAddr2, "address")
+	require.Equal(t, testAddr2, cidr2c, "address")
 
 	// Would like to shut down the http server at the end of this test
 	// but it's complicated.
@@ -132,16 +132,16 @@ func TestBadHttp(t *testing.T) {
 	testAddr1 := parts[0]
 	// Verb that's not handled
 	resp, err := doHTTP("HEAD", fmt.Sprintf("http://localhost:%d/ip/%s/%s", port, containerID, testAddr1))
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusNotFound, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode, "http response")
 	// Mis-spelled URL
 	resp, err = doHTTP("POST", fmt.Sprintf("http://localhost:%d/xip/%s/", port, containerID))
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusNotFound, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode, "http response")
 	// Malformed URL
 	resp, err = doHTTP("POST", fmt.Sprintf("http://localhost:%d/ip/%s/foo/bar/baz", port, containerID))
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusNotFound, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode, "http response")
 }
 
 func TestHTTPCancel(t *testing.T) {
@@ -180,6 +180,6 @@ func impTestHTTPCancel(t *testing.T) {
 	unpause()
 	res := <-done
 	if res != nil {
-		wt.Fatalf(t, "Error: Allocate returned non-nil")
+		require.FailNow(t, "Error: Allocate returned non-nil")
 	}
 }

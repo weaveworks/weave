@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/miekg/dns"
+	"github.com/stretchr/testify/require"
 	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 // Check that we can prune an answer
@@ -29,11 +29,11 @@ func TestPrune(t *testing.T) {
 	reply.Answer[0].Header().Ttl = DefaultLocalTTL
 
 	pruned := pruneAnswers(reply.Answer, 1)
-	wt.AssertEqualInt(t, len(pruned), 1, "wrong number of answers")
+	require.Equal(t, 1, len(pruned), "wrong number of answers")
 
 	pruned = pruneAnswers(reply.Answer, 2)
-	wt.AssertEqualInt(t, len(pruned), 2, "wrong number of answers")
+	require.Equal(t, 2, len(pruned), "wrong number of answers")
 
 	pruned = pruneAnswers(reply.Answer, 0)
-	wt.AssertEqualInt(t, len(pruned), len(records), "wrong number of answers")
+	require.Equal(t, len(records), len(pruned), "wrong number of answers")
 }
