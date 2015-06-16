@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"fmt"
+
 	"github.com/weaveworks/weave/ipam/address"
 )
 

@@ -1,8 +1,9 @@
 package router
 
 import (
-	"code.google.com/p/gopacket/pcap"
 	"fmt"
+
+	"code.google.com/p/gopacket/pcap"
 )
 
 type PcapIO struct {
