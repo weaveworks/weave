@@ -305,10 +305,12 @@ func (di *NaClDecryptorInstance) advanceState(seqNo uint64) (int, *bit.Set) {
 
 // The lowest 64 bits of the nonce contain the message sequence
 // number. The top most bit indicates the connection polarity at the
-// sender - '1' for outbound. The remaining 127 bits are zero. The
-// polarity is needed so that the two ends of a connection do not use
-// the same nonces. This is a requirement of the NaCl Security Model;
-// see http://nacl.cr.yp.to/box.html.
+// sender - '1' for outbound; the next indicates protocol type - '1'
+// for TCP. The remaining 126 bits are zero. The polarity is needed so
+// that the two ends of a connection do not use the same nonces; the
+// protocol type so that the TCP and UDP sender nonces are disjoint.
+// This is a requirement of the NaCl Security Model; see
+// http://nacl.cr.yp.to/box.html.
 type TCPCryptoState struct {
 	sessionKey *[32]byte
 	nonce      [24]byte
@@ -320,6 +322,8 @@ func NewTCPCryptoState(sessionKey *[32]byte, outbound bool) *TCPCryptoState {
 	if outbound {
 		s.nonce[0] |= (1 << 7)
 	}
+	// Ensure that TCP and UDP sequences are disjoint
+	s.nonce[0] |= (1 << 6)
 	return s
 }
 
