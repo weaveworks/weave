@@ -12,8 +12,8 @@ start_suite "Add and remove names on a single host"
 
 weave_on $HOST1 launch-dns 10.2.254.1/24 $WEAVEDNS_ARGS
 
-start_container          $HOST1 $C2/24 --name=c2
-start_container_with_dns $HOST1 $C1/24 --name=c1
+start_container          $HOST1 --without-dns $C2/24 --name=c2
+start_container_with_dns $HOST1               $C1/24 --name=c1
 
 weave_on $HOST1 dns-add $C2 c2 -h $NAME2
 

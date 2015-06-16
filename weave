@@ -29,10 +29,11 @@ usage() {
     echo "weave launch       [-password <password>] [-nickname <nickname>] [-nodiscovery]"
     echo "                       [-iprange <cidr> [-ipsubnet <cidr>]] <peer> ..."
     echo "weave launch-dns   [<addr>]"
-    echo "weave launch-proxy [-D <endpoint>] [-H <endpoint>] [--with-dns] [--with-ipam]"
+    echo "weave launch-proxy [-D <endpoint>] [-H <endpoint>]"
+    echo "                       [--with-dns | --without-dns] [--with-ipam]"
     echo "weave connect      [--replace] [<peer> ...]"
     echo "weave forget       <peer> ..."
-    echo "weave run          [--with-dns] [<addr> ...] <docker run args> ..."
+    echo "weave run          [--with-dns | --without-dns] [<addr> ...] <docker run args> ..."
     echo "weave start        [<addr> ...] <container_id>"
     echo "weave attach       [<addr> ...] <container_id>"
     echo "weave detach       [<addr> ...] <container_id>"
@@ -119,6 +120,14 @@ collect_ip_args() {
     done
 }
 
+dns_arg_count() {
+    if [ "$1" = "--with-dns" -o "$1" = "--without-dns" ]; then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
 # "run" is a special case because we want to use docker directly,
 # rather than the docker in $EXEC_IMAGE remotely. That's because we
 # are passing arbitrary arguments on to docker run, and we can't rely
@@ -126,10 +135,10 @@ collect_ip_args() {
 if [ "$1" = "run" ] ; then
     shift 1
     check_docker_version
-    if [ "$1" = "--with-dns" ] ; then
-        shift 1
-        DNS_ARGS=$(exec_remote dns-args "$@")
+    if [ "$1" != "--without-dns" ] ; then
+      DNS_ARGS=$(exec_remote dns-args "$@" || true)
     fi
+    shift $(dns_arg_count "$@")
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
     CONTAINER=$(docker $DOCKER_CLIENT_ARGS run $DNS_ARGS -d "$@")
@@ -631,7 +640,7 @@ dns_args() {
         # versions prior to 1.3.0 fail to include the domain when
         # setting the hostname, so lookups for non-fully-qualified
         # names fail.
-        echo "ERROR: The '--with-dns' option requires Docker 1.3.0 or later; you are running $DOCKER_VERSION" >&2
+        echo "ERROR: Need Docker 1.3.0 or later to configure container DNS; you are running $DOCKER_VERSION" >&2
         exit 1
     fi
     docker_bridge_ip
@@ -639,6 +648,8 @@ dns_args() {
     DNS_SEARCH_ARG="--dns-search=."
     NAME_ARG=""
     HOSTNAME_SPECIFIED=
+    WITH_DNS=
+    WITHOUT_DNS=
     while [ $# -gt 0 ] ; do
         case "$1" in
             --dns-search=*)
@@ -654,9 +665,19 @@ dns_args() {
             -h|--hostname|--hostname=*)
                 HOSTNAME_SPECIFIED=1
                 ;;
+            --with-dns)
+                WITH_DNS=1
+                ;;
+            --without-dns)
+                WITHOUT_DNS=1
+                ;;
         esac
         shift
     done
+    [ -n "$WITHOUT_DNS" ] && return 0
+    if [ -z "$WITH_DNS" ] ; then
+        check_running $DNS_CONTAINER_NAME 2>/dev/null || return 0
+    fi
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         DOMAIN=$(call_dns GET /domain 2>/dev/null) || DOMAIN=weave.local.
@@ -1071,10 +1092,8 @@ case "$COMMAND" in
         fi
         ;;
     run)
-        if [ "$1" = "--with-dns" ] ; then
-            shift 1
-            dns_args "$@"
-        fi
+        dns_args "$@"
+        shift $(dns_arg_count "$@")
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         CONTAINER=$(docker run $DNS_ARGS -d "$@")

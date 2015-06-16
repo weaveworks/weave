@@ -36,13 +36,18 @@ func main() {
 	getopt.BoolVarLong(&c.TLSConfig.Enabled, "tls", 0, "Use TLS; implied by --tlsverify")
 	getopt.StringVarLong(&c.TLSConfig.Key, "tlskey", 0, "Path to TLS key file")
 	getopt.BoolVarLong(&c.TLSConfig.Verify, "tlsverify", 0, "Use TLS and verify the remote")
-	getopt.BoolVarLong(&c.WithDNS, "with-dns", 'w', "instruct created containers to use weaveDNS as their nameserver")
+	getopt.BoolVarLong(&c.WithDNS, "with-dns", 'w', "instruct created containers to always use weaveDNS as their nameserver")
+	getopt.BoolVarLong(&c.WithoutDNS, "without-dns", 0, "instruct created containers to never use weaveDNS as their nameserver")
 	getopt.BoolVarLong(&c.WithIPAM, "with-ipam", 'i', "automatically allocate addresses for containers without a WEAVE_CIDR")
 	getopt.Parse()
 
 	if justVersion {
 		fmt.Printf("weave proxy %s\n", version)
 		os.Exit(0)
+	}
+
+	if c.WithDNS && c.WithoutDNS {
+		Error.Fatalf("Cannot use both '--with-dns' and '--without-dns' flags")
 	}
 
 	if debug {
