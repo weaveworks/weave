@@ -142,7 +142,7 @@ if [ "$1" = "run" ] ; then
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
     CONTAINER=$(docker $DOCKER_CLIENT_ARGS run $DNS_ARGS -d "$@")
-    exec_remote attach $CIDR_ARGS $CONTAINER
+    exec_remote attach $CIDR_ARGS --or-die $CONTAINER
     echo $CONTAINER
     exit 0
 elif [ "$1" != "--local" ] ; then
@@ -788,7 +788,9 @@ ipam_cidrs() {
     IPAM_CIDRs=""
     if [ $# -eq 0 ] ; then
         # If no addresses passed in, get one in the default subnet
-        IPAM_CIDRS=$(call_weave POST /ip/$CONTAINER_ID)
+        if ! IPAM_CIDRS=$(call_weave POST /ip/$CONTAINER_ID) ; then
+            return 1
+        fi
         if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
             echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
             return 1
@@ -798,9 +800,12 @@ ipam_cidrs() {
     while [ $# -gt 0 ] ; do
         if [ "${1%:*}" = "net" ] ; then
             if [ "$1" = "net:default" ] ; then
-                CIDR=$(call_weave POST /ip/$CONTAINER_ID)
+                IPAM_URL=/ip/$CONTAINER_ID
             else
-                CIDR=$(call_weave POST /ip/$CONTAINER_ID/"${1#net:}")
+                IPAM_URL=/ip/$CONTAINER_ID/"${1#net:}"
+            fi
+            if ! CIDR=$(call_weave POST $IPAM_URL) ; then
+                return 1
             fi
             if [ "$CIDR" = "404 page not found" ] ; then
                 echo "IP address allocation must be enabled to use --subnet (use the -iprange option on 'weave launch')" >&2
@@ -817,6 +822,13 @@ ipam_cidrs() {
         fi
         shift 1
     done
+}
+
+ipam_cidrs_or_die() {
+    if ! ipam_cidrs "$@" ; then
+        docker kill $1 >/dev/null 2>&1 || true
+        exit 1
+    fi
 }
 
 ######################################################################
@@ -1021,7 +1033,7 @@ case "$COMMAND" in
             -p $DOCKER_BRIDGE_IP:53:53/udp \
             -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE -iface $CONTAINER_IFNAME -httpiface "$DNS_HTTP_IFNAME" "$@")
-        ipam_cidrs $DNS_CONTAINER $CIDR_ARGS
+        ipam_cidrs_or_die $DNS_CONTAINER $CIDR_ARGS
         with_container_netns_or_die $DNS_CONTAINER attach $ALL_CIDRS
         populate_dns
         echo $DNS_CONTAINER
@@ -1098,7 +1110,7 @@ case "$COMMAND" in
         shift $CIDR_ARG_COUNT
         CONTAINER=$(docker run $DNS_ARGS -d "$@")
         create_bridge
-        ipam_cidrs $CONTAINER $CIDR_ARGS
+        ipam_cidrs_or_die $CONTAINER $CIDR_ARGS
         with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $CONTAINER
@@ -1118,7 +1130,7 @@ case "$COMMAND" in
         RES=$(docker start $1)
         CONTAINER=$(container_id $1)
         create_bridge
-        ipam_cidrs $CONTAINER $CIDR_ARGS
+        ipam_cidrs_or_die $CONTAINER $CIDR_ARGS
         with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
@@ -1126,11 +1138,15 @@ case "$COMMAND" in
     attach)
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
+        if [ "$1" = "--or-die" ]; then
+          ATTACH_TYPE="_or_die"
+          shift
+        fi
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         create_bridge
-        ipam_cidrs $CONTAINER $CIDR_ARGS
-        with_container_netns $CONTAINER attach $ALL_CIDRS >/dev/null
+        ipam_cidrs$ATTACH_TYPE $CONTAINER $CIDR_ARGS
+        with_container_netns$ATTACH_TYPE $CONTAINER attach $ALL_CIDRS >/dev/null
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         ;;
     detach)

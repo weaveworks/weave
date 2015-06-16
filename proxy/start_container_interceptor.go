@@ -29,9 +29,8 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 	Info.Printf("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
 	args := []string{"attach"}
 	args = append(args, cidrs...)
-	args = append(args, container.ID)
+	args = append(args, "--or-die", container.ID)
 	if output, err := callWeave(args...); err != nil {
-		i.proxy.client.KillContainer(docker.KillContainerOptions{ID: container.ID})
 		Warning.Printf("Attaching container %s to weave network failed: %s", container.ID, string(output))
 		return errors.New(string(output))
 	}
