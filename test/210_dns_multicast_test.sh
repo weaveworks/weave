@@ -11,8 +11,8 @@ NAME2=seetwo.weave.local
 NAME4=seefour.weave.local
 
 start() {
-    weave_on $HOST1 launch-dns $1 $WEAVEDNS_ARGS >/dev/null
-    weave_on $HOST2 launch-dns $2 $WEAVEDNS_ARGS >/dev/null
+    launch_dns_on $HOST1 $1 >/dev/null
+    launch_dns_on $HOST2 $2 >/dev/null
 }
 
 stop() {

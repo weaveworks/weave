@@ -37,7 +37,7 @@ CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 DOCKER_PORT=2375
 
 WEAVEDNS_ARGS="--no-cache"
-[ -n "$DEBUG" ] && WEAVEDNS_ARGS="--debug"
+[ -n "$DEBUG" ] && WEAVEDNS_ARGS="$WEAVEDNS_ARGS --debug"
 
 remote() {
     rem=$1
@@ -100,6 +100,12 @@ exec_on() {
     container=$2
     shift 2
     docker -H tcp://$host:$DOCKER_PORT exec $container "$@"
+}
+
+launch_dns_on() {
+    host=$1
+    shift 1
+    weave_on $host launch-dns $@ $WEAVEDNS_ARGS
 }
 
 start_container() {
