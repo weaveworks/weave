@@ -144,9 +144,6 @@ to point at the latter:
     host2$ weave launch-proxy --with-ipam
     host2$ eval "$(weave proxy-env)"
 
-NB: Note that the two weaveDNS instances must be given unique IPs, on
-a subnet different from that used for IP allocation.
-
 Now let us start a couple of containers, and ping one from the other,
 by name.
 
