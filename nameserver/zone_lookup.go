@@ -235,12 +235,11 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 func (zone *ZoneDb) startUpdatingName(name string) {
 	if zone.refreshInterval > 0 {
 		zone.mx.Lock()
-		defer zone.mx.Unlock()
-
 		// check if we should enqueue a refresh request for this name
 		n := zone.getNameSet(defaultRemoteIdent).getName(name, true)
+		now := zone.clock.Now()
+		zone.mx.Unlock() // Don't hold the lock while talking to the SchedQueue
 		if n.lastRefreshTime.IsZero() {
-			now := zone.clock.Now()
 			n.lastRefreshTime = now
 
 			Debug.Printf("[zonedb] Creating new immediate refresh request for '%s'", name)
