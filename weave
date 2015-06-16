@@ -632,6 +632,13 @@ peer_args() {
 # weaveDNS helpers
 ######################################################################
 
+# Memoized function to query the weaveDNS server for our dns domain.
+dns_domain() {
+  DNS_DOMAIN=${DNS_DOMAIN:-$(call_dns GET /domain 2>/dev/null || true)}
+  DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
+  echo $DNS_DOMAIN
+}
+
 dns_args() {
     if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
         \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
@@ -644,16 +651,15 @@ dns_args() {
         exit 1
     fi
     docker_bridge_ip
-    DNS_ARG="--dns $DOCKER_BRIDGE_IP"
-    DNS_SEARCH_ARG="--dns-search=."
     NAME_ARG=""
     HOSTNAME_SPECIFIED=
+    DNS_SEARCH_SPECIFIED=
     WITH_DNS=
     WITHOUT_DNS=
     while [ $# -gt 0 ] ; do
         case "$1" in
             --dns-search=*)
-                DNS_SEARCH_ARG=""
+                DNS_SEARCH_SPECIFIED=1
                 ;;
             --name)
                 NAME_ARG="$2"
@@ -678,11 +684,18 @@ dns_args() {
     if [ -z "$WITH_DNS" ] ; then
         check_running $DNS_CONTAINER_NAME 2>/dev/null || return 0
     fi
-    DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
+    DNS_ARGS="--dns $DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
-        DOMAIN=$(call_dns GET /domain 2>/dev/null) || DOMAIN=weave.local.
-        # Strip trailing period off DNS domain to reduce surprise
+        DOMAIN=$(dns_domain)
         DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.${DOMAIN%.}"
+        HOSTNAME_SPECIFIED=1
+    fi
+    if [ -z "$DNS_SEARCH_SPECIFIED" ] ; then
+      if [ -z "$HOSTNAME_SPECIFIED" ] ; then
+        DNS_ARGS="$DNS_ARGS --dns-search=$(dns_domain)"
+      else
+        DNS_ARGS="$DNS_ARGS --dns-search=."
+      fi
     fi
 }
 
