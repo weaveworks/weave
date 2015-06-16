@@ -53,24 +53,25 @@ func TestUDPDNSServer(t *testing.T) {
 	zone.AddRecord(containerID, successTestName, ip)
 
 	fallbackHandler := func(w dns.ResponseWriter, req *dns.Msg) {
+		if len(req.Question) == 0 {
+			return // ignore empty queries (sent when shutting down the server)
+		}
 		m := new(dns.Msg)
 		m.SetReply(req)
-		if len(req.Question) == 1 {
-			q := req.Question[0]
-			if q.Name == nonLocalName && q.Qtype == dns.TypeMX {
-				m.Answer = make([]dns.RR, 1)
-				m.Answer[0] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: "mail." + nonLocalName}
-			} else if q.Name == nonLocalName && q.Qtype == dns.TypeANY {
-				m.Answer = make([]dns.RR, 512/len("mailn."+nonLocalName)+1)
-				for i := range m.Answer {
-					m.Answer[i] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: fmt.Sprintf("mail%d.%s", i, nonLocalName)}
-				}
-			} else if q.Name == testRDNSnonlocal && q.Qtype == dns.TypePTR {
-				m.Answer = make([]dns.RR, 1)
-				m.Answer[0] = &dns.PTR{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: 0}, Ptr: "ns1.google.com."}
-			} else if q.Name == testRDNSfail && q.Qtype == dns.TypePTR {
-				m.Rcode = dns.RcodeNameError
+		q := req.Question[0]
+		if q.Name == nonLocalName && q.Qtype == dns.TypeMX {
+			m.Answer = make([]dns.RR, 1)
+			m.Answer[0] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: "mail." + nonLocalName}
+		} else if q.Name == nonLocalName && q.Qtype == dns.TypeANY {
+			m.Answer = make([]dns.RR, 512/len("mailn."+nonLocalName)+1)
+			for i := range m.Answer {
+				m.Answer[i] = &dns.MX{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: 0}, Mx: fmt.Sprintf("mail%d.%s", i, nonLocalName)}
 			}
+		} else if q.Name == testRDNSnonlocal && q.Qtype == dns.TypePTR {
+			m.Answer = make([]dns.RR, 1)
+			m.Answer[0] = &dns.PTR{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: 0}, Ptr: "ns1.google.com."}
+		} else if q.Name == testRDNSfail && q.Qtype == dns.TypePTR {
+			m.Rcode = dns.RcodeNameError
 		}
 		w.WriteMsg(m)
 	}
@@ -154,8 +155,10 @@ func TestTCPDNSServer(t *testing.T) {
 
 	// handler for the fallback server: it will just return a very long response
 	fallbackUDPHandler := func(w dns.ResponseWriter, req *dns.Msg) {
+		if len(req.Question) == 0 {
+			return // ignore empty queries (sent when shutting down the server)
+		}
 		maxLen := getMaxReplyLen(req, protUDP)
-
 		t.Logf("Fallback UDP server got asked: returning %d answers", numAnswers)
 		q := req.Question[0]
 		m := makeAddressReply(req, &q, addrs, DefaultLocalTTL)
@@ -169,6 +172,9 @@ func TestTCPDNSServer(t *testing.T) {
 		w.WriteMsg(m)
 	}
 	fallbackTCPHandler := func(w dns.ResponseWriter, req *dns.Msg) {
+		if len(req.Question) == 0 {
+			return // ignore empty queries (sent when shutting down the server)
+		}
 		t.Logf("Fallback TCP server got asked: returning %d answers", numAnswers)
 		q := req.Question[0]
 		m := makeAddressReply(req, &q, addrs, DefaultLocalTTL)
