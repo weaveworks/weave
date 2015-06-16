@@ -3,7 +3,7 @@
 . ./config.sh
 
 NAME=c1
-DOMAIN=weave.local.
+DOMAIN=weave.local
 HOSTNAME=$NAME-hostname.$DOMAIN
 
 # Docker inspect hostname + domainname of container $2 on host $1

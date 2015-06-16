@@ -94,7 +94,8 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 	name := r.URL.Query().Get("name")
 	if container.Hostname == "" && name != "" {
 		container.Hostname = name
-		container.Domainname = i.getDNSDomain()
+		// Strip trailing period because it's unusual to see it used on the end of a host name
+		container.Domainname = strings.TrimSuffix(i.getDNSDomain(), ".")
 	}
 
 	return nil
