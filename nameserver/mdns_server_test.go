@@ -41,16 +41,7 @@ func TestServerSimpleQuery(t *testing.T) {
 		if len(r.Answer) > 0 {
 			t.Logf("Received %d answer(s)", len(r.Answer))
 			for _, answer := range r.Answer {
-				switch rr := answer.(type) {
-				case *dns.A:
-					t.Logf("... A:\n%+v", rr)
-					receivedAddrs = append(receivedAddrs, rr.A)
-					receivedCount++
-				case *dns.PTR:
-					t.Logf("... PTR:\n%+v", rr)
-					receivedName = rr.Ptr
-					receivedCount++
-				}
+				recvChan <- answer
 			}
 			recvChan <- "ok"
 		}
@@ -73,12 +64,25 @@ func TestServerSimpleQuery(t *testing.T) {
 		wt.AssertNoErr(t, err)
 
 		Debug.Printf("Waiting for response")
-		select {
-		case <-recvChan:
-			return
-		case <-time.After(100 * time.Millisecond):
-			Debug.Printf("Timeout while waiting for response")
-			return
+		for {
+			select {
+			case x := <-recvChan:
+				switch rr := x.(type) {
+				case *dns.A:
+					t.Logf("... A:\n%+v", rr)
+					receivedAddrs = append(receivedAddrs, rr.A)
+					receivedCount++
+				case *dns.PTR:
+					t.Logf("... PTR:\n%+v", rr)
+					receivedName = rr.Ptr
+					receivedCount++
+				case string:
+					return
+				}
+			case <-time.After(100 * time.Millisecond):
+				Debug.Printf("Timeout while waiting for response")
+				return
+			}
 		}
 	}
 
