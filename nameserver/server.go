@@ -218,7 +218,10 @@ func (s *DNSServer) Start() error {
 	s.tcpSrv = &dns.Server{Listener: l, Handler: s.createMux(protTCP), ReadTimeout: s.readTimeout}
 
 	s.listenersWg.Add(2)
+	return nil
+}
 
+func (s *DNSServer) ActivateAndServe() {
 	go func() {
 		defer s.listenersWg.Done()
 
@@ -241,7 +244,6 @@ func (s *DNSServer) Start() error {
 	s.listenersWg.Wait()
 
 	Info.Printf("[dns] Server exiting...")
-	return nil
 }
 
 // Return status string
