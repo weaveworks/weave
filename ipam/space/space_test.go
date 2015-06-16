@@ -188,7 +188,7 @@ func TestSpaceFree(t *testing.T) {
 	r = space.biggestFreeRange(entireRange)
 	wt.AssertTrue(t, r.Start == ip("10.0.3.10") && r.Size() == 4, "Wrong space")
 
-	wt.AssertEquals(t, space.OwnedRanges(), []address.Range{address.Range{Start: ip("10.0.3.4"), End: ip("10.0.3.24")}})
+	wt.AssertEquals(t, space.OwnedRanges(), []address.Range{{Start: ip("10.0.3.4"), End: ip("10.0.3.24")}})
 }
 
 func TestDonateSimple(t *testing.T) {
