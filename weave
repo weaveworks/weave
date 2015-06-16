@@ -660,7 +660,8 @@ dns_args() {
     DNS_ARGS="$DNS_ARG $DNS_SEARCH_ARG"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         DOMAIN=$(call_dns GET /domain 2>/dev/null) || DOMAIN=weave.local.
-        DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.$DOMAIN"
+        # Strip trailing period off DNS domain to reduce surprise
+        DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.${DOMAIN%.}"
     fi
 }
 
