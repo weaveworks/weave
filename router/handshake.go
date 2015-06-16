@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"time"
 )
 
 type FieldValidator struct {
@@ -44,58 +45,68 @@ func (fv *FieldValidator) Err() error {
 	return fv.err
 }
 
-func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, acceptNewPeer bool) error {
+func (conn *LocalConnection) handshake(acceptNewPeer bool) (*gob.Encoder, *gob.Decoder, error) {
 	// We do not need to worry about locking in here as at this point
 	// the connection is not reachable by any go-routine other than
 	// ourself. Only when we add this connection to the conn.local
 	// peer will it be visible from multiple go-routines.
 
+	conn.TCPConn.SetDeadline(time.Now().Add(HeaderTimeout))
+	version, err := exchangeProtocolHeader(conn.TCPConn, conn.TCPConn)
+	if err != nil {
+		return nil, nil, err
+	}
+	conn.version = version
+	conn.TCPConn.SetDeadline(time.Time{})
 	conn.extendReadDeadline()
 
 	localConnID := randUint64()
 	usingPassword := conn.Router.UsingPassword()
-	fv, private, err := conn.handshakeSendRecv(localConnID, usingPassword, enc, dec)
+	enc := gob.NewEncoder(conn.TCPConn)
+	dec := gob.NewDecoder(conn.TCPConn)
+	fv, private, err := conn.exchangeHandshake(localConnID, usingPassword, enc, dec)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
+
 	nameStr, _ := fv.Value("Name")
 	nickNameStr, _ := fv.Value("NickName")
 	uidStr, _ := fv.Value("UID")
 	remoteConnIDStr, _ := fv.Value("ConnID")
 	if err := fv.Err(); err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	name, err := PeerNameFromString(nameStr)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	if !acceptNewPeer {
 		if _, found := conn.Router.Peers.Fetch(name); !found {
-			return fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
+			return nil, nil, fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
 		}
 	}
 	if existingConn, found := conn.Router.Ourself.ConnectionTo(name); found && existingConn.Established() {
-		return fmt.Errorf("Already have connection to %s at %s", existingConn.Remote(), existingConn.RemoteTCPAddr())
+		return nil, nil, fmt.Errorf("Already have connection to %s at %s", existingConn.Remote(), existingConn.RemoteTCPAddr())
 	}
 	uid, err := ParsePeerUID(uidStr)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	remoteConnID, err := strconv.ParseUint(remoteConnIDStr, 10, 64)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	conn.uid = localConnID ^ remoteConnID
 
 	remotePublicStr, rpErr := fv.Value("PublicKey")
 	if usingPassword {
 		if rpErr != nil {
-			return rpErr
+			return nil, nil, rpErr
 		}
 		remotePublicSlice, rpErr := hex.DecodeString(remotePublicStr)
 		if rpErr != nil {
-			return rpErr
+			return nil, nil, rpErr
 		}
 		remotePublic := [32]byte{}
 		for idx, elem := range remotePublicSlice {
@@ -106,27 +117,23 @@ func (conn *LocalConnection) handshake(enc *gob.Encoder, dec *gob.Decoder, accep
 		conn.Decryptor = NewNaClDecryptor(conn.SessionKey, conn.outbound)
 	} else {
 		if rpErr == nil {
-			return fmt.Errorf("Remote network is encrypted. Password required.")
+			return nil, nil, fmt.Errorf("Remote network is encrypted. Password required.")
 		}
 		conn.tcpSender = NewSimpleTCPSender(enc)
 		conn.Decryptor = NewNonDecryptor()
 	}
 
-	return conn.setRemote(NewPeer(name, nickNameStr, uid, 0))
+	return enc, dec, conn.setRemote(NewPeer(name, nickNameStr, uid, 0))
 }
 
-func (conn *LocalConnection) handshakeSendRecv(localConnID uint64, usingPassword bool, enc *gob.Encoder, dec *gob.Decoder) (*FieldValidator, *[32]byte, error) {
-	versionStr := fmt.Sprint(ProtocolVersion)
+func (conn *LocalConnection) exchangeHandshake(localConnID uint64, usingPassword bool, enc *gob.Encoder, dec *gob.Decoder) (*FieldValidator, *[32]byte, error) {
 	handshakeSend := map[string]string{
-		"Protocol":        Protocol,
-		"ProtocolVersion": versionStr,
 		"PeerNameFlavour": PeerNameFlavour,
 		"Name":            conn.local.Name.String(),
 		"NickName":        conn.local.NickName,
 		"UID":             fmt.Sprint(conn.local.UID),
 		"ConnID":          fmt.Sprint(localConnID)}
 	handshakeRecv := map[string]string{}
-
 	var public, private *[32]byte
 	var err error
 	if usingPassword {
@@ -137,14 +144,10 @@ func (conn *LocalConnection) handshakeSendRecv(localConnID uint64, usingPassword
 		handshakeSend["PublicKey"] = hex.EncodeToString(public[:])
 	}
 	enc.Encode(handshakeSend)
-
-	err = dec.Decode(&handshakeRecv)
-	if err != nil {
+	if err = dec.Decode(&handshakeRecv); err != nil {
 		return nil, nil, err
 	}
 	fv := NewFieldValidator(handshakeRecv)
-	fv.CheckEqual("Protocol", Protocol)
-	fv.CheckEqual("ProtocolVersion", versionStr)
 	fv.CheckEqual("PeerNameFlavour", PeerNameFlavour)
 	return fv, private, nil
 }
