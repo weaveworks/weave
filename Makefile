@@ -92,7 +92,7 @@ tests:
 	fail=0 ;                                                                              \
 	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do     \
 	    output=$$(mktemp cover.XXXXXXXXXX) ;                                              \
-	    if ! go test -tags netgo -covermode=count -coverprofile=$$output $$dir ; then     \
+	    if ! go test -cpu 4 -tags netgo -covermode=count -coverprofile=$$output $$dir ; then     \
             fail=1 ;                                                                          \
         fi ;                                                                                  \
 	    if [ -f $$output ]; then                                                          \
