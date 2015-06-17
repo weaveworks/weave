@@ -32,13 +32,13 @@ type Proxy struct {
 }
 
 type Config struct {
-	DockerAddr string
-	ListenAddr string
-	TLSConfig  TLSConfig
-	Version    string
-	WithDNS    bool
-	WithoutDNS bool
-	WithIPAM   bool
+	DockerAddr    string
+	ListenAddr    string
+	NoDefaultIPAM bool
+	TLSConfig     TLSConfig
+	Version       string
+	WithDNS       bool
+	WithoutDNS    bool
 }
 
 func NewProxy(c Config) (*Proxy, error) {

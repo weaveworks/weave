@@ -28,7 +28,7 @@ run_container "--entrypoint='grep' false ^1$ /sys/class/net/ethwe/carrier"
 
 weave_on $HOST1 launch -iprange 10.2.2.0/24
 docker_on $HOST1 kill weaveproxy
-weave_on $HOST1 launch-proxy --with-ipam
+weave_on $HOST1 launch-proxy
 
 assert_raises "proxy docker_on $HOST1 run check-ethwe-up"
 
