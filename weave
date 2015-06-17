@@ -892,7 +892,7 @@ proxy_args() {
 }
 
 proxy_addr() {
-    if addr=$(docker logs weaveproxy | head -n3 | grep -oE "proxy listening on .*"); then
+    if addr=$(docker logs $PROXY_CONTAINER_NAME 2>/dev/null | head -n3 | grep -oE "proxy listening on .*"); then
       addr=${addr##* }
       host=${addr%:*}
       [ "$host" = "0.0.0.0" ] && host=$PROXY_HOST
