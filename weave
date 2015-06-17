@@ -570,14 +570,19 @@ call_dns() {
     http_call $DNS_CONTAINER_NAME $DNS_HTTP_PORT "$@"
 }
 
+death_msg() {
+    echo "The $1 container has died. Consult the logs with 'docker logs $1' for further details."
+}
+
 # Wait until container $1 is alive enough to respond to "GET /status"
 # http request on its docker-assigned IP, port $2
 wait_for_status() {
-    container_ip $1 "$1 container has died." "$1 container has died." || return 1
+    err_msg=$(death_msg $1)
+    container_ip $1 "$err_msg" "$err_msg" || return 1
     while true ; do
         http_call_ip $CONTAINER_IP $2 GET /status >/dev/null 2>&1 && return 0
         if ! container_id $1 >/dev/null 2>&1 ; then
-            echo "$1 container has died." >&2
+            echo "$err_msg" >&2
             return 1
         fi
         sleep 1
@@ -593,7 +598,7 @@ wait_for_log() {
     grep -q "$2" $fifo || res=1
     kill $! 2>/dev/null || true
     rm $fifo
-    [ $res -eq 1 ] && echo "$1 container has died." >&2
+    [ $res -eq 1 ] && echo "$(death_msg $1)" >&2
     return $res
 }
 
