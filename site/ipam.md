@@ -43,9 +43,7 @@ order to avoid formation of isolated groups, which could lead to
 inconsistency, i.e. the same IP address being allocated to two
 different containers. Therefore, you must either supply the list of
 all peers in the network to `weave launch` or add the `-initpeercount`
-flag to specify how many peers there will be.  It isn't a problem to
-over-estimate by a bit, but if you supply a number that is too small
-then multiple independent groups may form.
+flag to specify how many peers there will be.
 
 To illustrate, suppose you have three hosts, accessible to each other
 as `$HOST1`, `$HOST2` and `$HOST3`. You can start weave on those three
@@ -65,6 +63,43 @@ time, you can give the number of peers like this:
     host2$ weave launch -initpeercount 3 $HOST3
 
     host3$ weave launch -initpeercount 3 $HOST2
+
+### More on `-initpeercount`
+
+TL;DR: it isn't a problem to over-estimate by a bit, but if you supply
+a number that is too small then multiple independent groups may form.
+
+Weave uses the estimate of the number of peers at initialization to
+compute a majority or quorum number - specifically floor(n/2) + 1. So,
+if the actual number of peers is less than half the number stated then
+they will keep waiting for someone else to join to reach a quorum.  On
+the other hand, if the actual number is more than twice the quorum
+number then you could have two sets of peers each reach a quorum and
+initialize independent data structures. You'd have to be quite unlucky
+for that to happen in practice, as they have to go through the whole
+agreement process without learning about each other, but it's
+definitely possible.
+
+The quorum number is only used once at start-up (specifically, the
+first time someone tries to allocate or claim an IP address), so once
+a set of peers is initialized you can add more and they will join on
+to the data structure used by the existing set.  The one thing you
+have to watch is if the early ones get restarted, you must restart
+them with the current number of peers - if they use the smaller number
+that was correct when they first started then they could form an
+independent set again.
+
+To illustrate this last point, the following sequence of operations
+would be safe wrt weave's startup quorum:
+
+    host1$ weave launch
+    ...time passes...
+    host2$ weave launch $HOST1
+    ...time passes...
+    host3$ weave launch $HOST1 $HOST2
+    ...time passes...
+    ...host1 is rebooted...
+    host1$ weave launch $HOST2 $HOST3
 
 ## <a name="range"></a>Choosing an allocation range
 
