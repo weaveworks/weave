@@ -45,7 +45,7 @@ type DNSServerConfig struct {
 	Cache ZoneCache
 	// (Optional) TTL for local domain responses
 	LocalTTL int
-	// (Optional) TTL for negative results in the local domain
+	// (Optional) TTL for negative results in the local domain (defaults to LocalTTL)
 	CacheNegLocalTTL int
 	// (Optional) for a specific clock provider
 	Clock clock.Clock
@@ -120,7 +120,6 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 		cacheDisabled: false,
 		maxAnswers:    DefaultMaxAnswers,
 		localTTL:      DefaultLocalTTL,
-		negLocalTTL:   DefaultCacheNegLocalTTL,
 		clock:         config.Clock,
 	}
 
@@ -164,6 +163,8 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 	}
 	if config.CacheNegLocalTTL > 0 {
 		s.negLocalTTL = config.CacheNegLocalTTL
+	} else {
+		s.negLocalTTL = s.localTTL
 	}
 	if config.CacheDisabled {
 		s.cacheDisabled = true
