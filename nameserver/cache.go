@@ -22,8 +22,6 @@ var (
 )
 
 const (
-	DefaultCacheNegLocalTTL = 30 // Default TTL for negative local resolutions
-
 	defPendingTimeout int = 5 // timeout for a resolution
 )
 

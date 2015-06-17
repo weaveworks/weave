@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	weavedns "github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
-	"strconv"
 )
 
 var version = "(unreleased version)"
@@ -55,7 +55,7 @@ func main() {
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
 	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
 	// advanced options
-	flag.IntVar(&negTTL, "neg-ttl", weavedns.DefaultCacheNegLocalTTL, "negative TTL (in secs) for unanswered queries for local names")
+	flag.IntVar(&negTTL, "neg-ttl", 0, "negative TTL (in secs) for unanswered queries for local names")
 	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
 	flag.IntVar(&maxAnswers, "max-answers", weavedns.DefaultMaxAnswers, "maximum number of answers returned to clients (0=unlimited)")
 	flag.IntVar(&relevantTime, "relevant", weavedns.DefaultRelevantTime, "life time for info in the absence of queries (in secs)")
