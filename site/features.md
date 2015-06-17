@@ -278,18 +278,21 @@ a container on `$HOST1`, accessible to the outside world via `$HOST2`.
 First we need to expose the application network to `$HOST2`, as
 explained [above](#host-network-integration), i.e.
 
-    host2$ weave expose 10.2.1.102/24
+    host2$ weave expose
 
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
+    host1$ weave ps h1c1
+    h1c1 1e:88:d7:5b:77:68 10.2.1.2/24
+
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
-           -j DNAT --to-destination 10.2.1.1:4422
+           -j DNAT --to-destination 10.2.1.2:4422
 
 Here we are assuming that the "outside world" is connecting to `$HOST2`
 via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
 routed to our 'nc' service, which is running on port 4422 in the
-container with IP 10.2.1.1.
+container h1c1.
 
 With the above in place, we can connect to our 'nc' service from
 anywhere with
