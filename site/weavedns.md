@@ -13,7 +13,7 @@ hosts.
 
 * [Using weaveDNS](#usage)
 * [How it works](#how-it-works)
-* [Load Balancing](#load-balancing)
+* [Load balancing](#load-balancing)
 * [Fault resilience](#fault-resilience)
 * [Adding and removing extra DNS entries](#add-remove)
 * [Hot-swapping service containers](#hot-swapping)
