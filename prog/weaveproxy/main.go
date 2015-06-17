@@ -31,6 +31,7 @@ func main() {
 	getopt.BoolVarLong(&justVersion, "version", 0, "print version and exit")
 	getopt.StringVar(&c.ListenAddr, 'H', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddr))
 	getopt.StringVar(&c.DockerAddr, 'D', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultDockerAddr))
+	getopt.BoolVarLong(&c.NoDefaultIPAM, "no-default-ipam", 0, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
 	getopt.StringVarLong(&c.TLSConfig.CACert, "tlscacert", 0, "Trust certs signed only by this CA")
 	getopt.StringVarLong(&c.TLSConfig.Cert, "tlscert", 0, "Path to TLS certificate file")
 	getopt.BoolVarLong(&c.TLSConfig.Enabled, "tls", 0, "Use TLS; implied by --tlsverify")
@@ -38,7 +39,6 @@ func main() {
 	getopt.BoolVarLong(&c.TLSConfig.Verify, "tlsverify", 0, "Use TLS and verify the remote")
 	getopt.BoolVarLong(&c.WithDNS, "with-dns", 'w', "instruct created containers to always use weaveDNS as their nameserver")
 	getopt.BoolVarLong(&c.WithoutDNS, "without-dns", 0, "instruct created containers to never use weaveDNS as their nameserver")
-	getopt.BoolVarLong(&c.WithIPAM, "with-ipam", 'i', "automatically allocate addresses for containers without a WEAVE_CIDR")
 	getopt.Parse()
 
 	if justVersion {

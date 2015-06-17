@@ -68,18 +68,23 @@ revert to the original setting.
 
 When containers are created via the weave proxy, their entrypoint will
 be modified to wait for the weave network interface to become
-available. When they are started via the weave proxy, any IP addresses
-and networks specified in the `WEAVE_CIDR` environment variable will
-be attached. We can create and start a container via the weave proxy
+available. When they are started via the weave proxy, containers will
+be [automatically assigned IP addresses](#ipam) and connected to the
+weave network. We can create and start a container via the weave proxy
 with
 
-    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
+    host1$ docker run -ti ubuntu
 
 or, equivalently with
 
-    host1$ docker create -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
+    host1$ docker create -ti ubuntu
     5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
     host1$ docker start 5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
+
+Specific IP addresses and networks can be supplied in the `WEAVE_CIDR`
+environment variable, e.g.
+
+    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
 
 Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
@@ -94,27 +99,28 @@ can be started in foreground mode, and can be automatically removed
 ## <a name="ipam"></a>Automatic IP address assignment
 
 If [automatic IP address assignment](ipam.html) is enabled in weave,
-which it is by default, then containers started via the proxy can be
-automatically assigned an IP address by providing a blank `WEAVE_CIDR`
-environment variable, as in
-
-    host1$ docker run -e WEAVE_CIDR= -ti ubuntu
-
-Furthermore, it is possible to configure the proxy such that all
-containers started via it are automatically assigned an IP address and
-attached to weave network, *without having to specify any special
-environment variables or other options*. To do this we launch the
-proxy with the `--with-ipam` option, e.g.
-
-    host1$ weave launch-proxy --with-ipam
-
-Now any container started via the proxy, e.g. with
+which it is by default, then containers started via the proxy will be
+automatically assigned an IP address, *without having to specify any
+special environment variables or other options*.
 
     host1$ docker run -ti ubuntu
 
-gets attached to the weave network with an automatically assigned IP
-address. Containers started with a `WEAVE_CIDR` environment variable
-are handled as before.
+To use a specific IP, we pass a `WEAVE_CIDR` to the container, e.g.
+
+    host1$ docker run -ti -e WEAVE_CIDR=10.2.1.1/24 ubuntu
+
+To start containers without connecting them to the weave network, the
+proxy needs to be passed the `--no-default-ipam` flag, e.g.
+
+    host1$ docker launch-proxy --no-default-ipam
+
+In this configuration, containers with no `WEAVE_CIDR` environment
+variable will not be connected to the weave network. Containers
+started with a `WEAVE_CIDR` environment variable are handled as
+before. To automatically assign an address in this mode, we start the
+container with a blank `WEAVE_CIDR`, e.g.
+
+    host1$ docker run -ti -e WEAVE_CIDR= ubuntu
 
 ## <a name="dns"></a>Automatic discovery
 
@@ -143,12 +149,12 @@ to point at the latter:
 
     host1$ weave launch
     host1$ weave launch-dns
-    host1$ weave launch-proxy --with-ipam
+    host1$ weave launch-proxy
     host1$ eval "$(weave proxy-env)"
 
     host2$ weave launch host1
     host2$ weave launch-dns
-    host2$ weave launch-proxy --with-ipam
+    host2$ weave launch-proxy
     host2$ eval "$(weave proxy-env)"
 
 Now let us start a named container on one host, and ping it, by name,
