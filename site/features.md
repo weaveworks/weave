@@ -371,14 +371,17 @@ In our example above, the netcat service on `$HOST3` is imported into
 weave via `$HOST1`. We can export it on `$HOST2` by first exposing the
 application network with
 
-    host2$ weave expose 10.2.1.102/24
+    host2$ weave expose
 
 and then adding a NAT rule which routes traffic from the `$HOST2`
 network (i.e. anything which can connect to `$HOST2`) to the service
 endpoint in the weave network
 
+    host1$ weave ps weave:expose
+    weave:expose 66:46:f5:ac:7b:c9 10.2.1.3/24
+
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
-           -j DNAT --to-destination 10.2.1.101:3322
+           -j DNAT --to-destination 10.2.1.3:3322
 
 Now any host on the same network as `$HOST2` can access the service with
 
