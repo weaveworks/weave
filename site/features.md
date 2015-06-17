@@ -104,33 +104,48 @@ A single weave network can host multiple, isolated applications, with
 each application's containers being able to communicate with each
 other but not containers of other applications.
 
-To accomplish that, we assign each application a different subnet. So,
-in the above example, if we wanted to add another application similar
-to, but isolated from, our first, we'd launch the containers with...
+To accomplish that, we assign each application a different subnet.
+Let's begin by configuring weave's allocator to manage multiple
+subnets:
 
-    host1$ D=$(weave run 10.2.2.1/24 -t -i ubuntu)
-    host2$ D=$(weave run 10.2.2.2/24 -t -i ubuntu)
+    host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24
+    host1$ weave launch-dns
+    host2$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24 $HOST1
+    host2$ weave launch-dns
+
+This delegates the entire 10.2.0.0/16 subnet to weave, and instructs
+it to allocate from 10.2.1.0/24 within that if no specific subnet is
+specified. Now we can launch some containers in the default subnet:
+
+    host1$ weave run --name h1c1 -t -i ubuntu
+    host2$ weave run --name h2c1 -t -i ubuntu
+
+And some more containers in a different subnet:
+
+    host1$ weave run net:10.2.2.0/24 --name h1c2 -t -i ubuntu
+    host2$ weave run net:10.2.2.0.24 --name h2c2 -t -i ubuntu
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
 
-    host1$ docker attach $D
-    
-    root@da50502598d5:/# ping -c 1 -q 10.2.2.2
-    PING 10.2.2.2 (10.2.2.2): 48 data bytes
-    --- 10.2.2.2 ping statistics ---
-    1 packets transmitted, 1 packets received, 0% packet loss
-    round-trip min/avg/max/stddev = 0.562/0.562/0.562/0.000 ms
-    
-    root@da50502598d5:/# ping -c 1 -q 10.2.1.1
-    PING 10.2.1.1 (10.2.1.1) 56(84) bytes of data.
-    --- 10.2.1.1 ping statistics ---
+    host1:~$ docker attach h1c2
+
+    root@h1c2:/# ping -c 1 -q h2c2
+    PING h2c2.weave.local (10.2.2.128) 56(84) bytes of data.
+    --- h2c2.weave.local ping statistics ---
+    1 packets transmitted, 1 received, 0% packet loss, time 0ms
+    rtt min/avg/max/mdev = 1.338/1.338/1.338/0.000 ms
+
+    root@h1c2:/# ping -c 1 -q h1c1
+    PING h1c1.weave.local (10.2.1.2) 56(84) bytes of data.
+    --- h1c1.weave.local ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
-    
-    root@da50502598d5:/# ping -c 1 -q 10.2.1.2
-    PING 10.2.1.2 (10.2.1.2) 56(84) bytes of data.
-    --- 10.2.1.2 ping statistics ---
+
+    root@h1c2:/# ping -c 1 -q h2c1
+    PING h2c1.weave.local (10.2.1.130) 56(84) bytes of data.
+    --- h2c1.weave.local ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
+
 
 This isolation-through-subnets scheme is an example of carrying over a
 well-known technique from the 'on metal' days to containers.
