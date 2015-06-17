@@ -153,7 +153,7 @@ well-known technique from the 'on metal' days to containers.
 If desired, a container can be attached to multiple subnets when it is
 started:
 
-    host1$ weave run 10.2.2.1/24 10.2.3.1/24 -t -i ubuntu
+    host1$ weave run net:default net:10.2.2.0/24 -t -i ubuntu
 
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
