@@ -175,29 +175,29 @@ to the weave network. To illustrate, we can achieve the same effect as
 the first example with
 
     host1$ C=$(docker run -d -t -i ubuntu)
-    host1$ weave attach 10.2.1.1/24 $C
+    host1$ weave attach $C
 
 There is a matching `weave detach` command:
 
-    host1$ weave detach 10.2.1.1/24 $C
+    host1$ weave detach $C
 
 You can detach a container from one application network and attach it
 to another:
 
-    host1$ weave detach 10.2.1.1/24 $C
-    host1$ weave attach 10.2.2.1/24 $C
+    host1$ weave detach net:default $C
+    host1$ weave attach net:10.2.2.0/24 $C
 
 or attach a container to multiple application networks, effectively
 sharing it between applications:
 
-    host1$ weave attach 10.2.1.1/24 $C
-    host1$ weave attach 10.2.2.1/24 $C
+    host1$ weave attach net:default
+    host1$ weave attach net:10.2.2.0/24
 
 Finally, multiple addresses can be attached or detached with a single
 invocation:
 
-    host1$ weave attach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
-    host1$ weave detach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
+    host1$ weave attach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
+    host1$ weave detach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
 
 ### <a name="security"></a>Security
 
