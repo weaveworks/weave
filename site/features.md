@@ -232,31 +232,38 @@ anywhere.
 Let's say that in our example we want `$HOST2` to have access to the
 application containers. On `$HOST2` we run
 
-    host2$ weave expose 10.2.1.102/24
+    host2$ weave expose
 
-choosing an unused IP address in the application subnet. (There is a
-corresponding 'hide' command to revert this step.)
+(There is a corresponding 'hide' command to revert this step.)
 
-Now
+Now,  after finding allocated IPs via `weave ps`
 
-    host2$ ping 10.2.1.2
+    host2$ weave ps weave:expose
+    weave:expose 02:80:5c:02:f1:b2 10.2.1.132/24
+
+    host1$ weave ps h1c1
+    h1c1 1e:88:d7:5b:77:68 10.2.1.2/24
+
+this
+
+    host2$ ping 10.2.1.132
 
 will work. And, more interestingly,
 
-    host2$ ping 10.2.1.1
+    host2$ ping 10.2.1.2
 
 will work too, which is talking to a container that resides on `$HOST1`.
 
 Multiple subnet addresses can be exposed or hidden with a single
 invocation:
 
-    host2$ weave expose 10.2.1.102/24 10.2.2.102/24
-    host2$ weave hide   10.2.1.102/24 10.2.2.102/24
+    host2$ weave expose net:default net:10.2.2.0/24
+    host2$ weave hide   net:default net:10.2.2.0/24
 
 Finally, exposed addresses can be added to weaveDNS by supplying a
 fully-qualified domain name:
 
-    host2$ weave expose 10.2.1.102/24 -h exposed.weave.local
+    host2$ weave expose -h exposed.weave.local
 
 ### <a name="service-export"></a>Service export
 
