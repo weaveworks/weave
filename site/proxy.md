@@ -57,6 +57,13 @@ the above needs to be replaced with the docker daemon host, and any
 firewalls inbetween need to be configured to permit access to
 the proxy port.
 
+The proxy can be stopped with
+
+    host1$ weave stop-proxy
+
+If you set your `DOCKER_HOST` to point at the proxy, remember to
+revert to the original setting.
+
 ## <a name="usage"></a>Usage
 
 When containers are created via the weave proxy, their entrypoint will
