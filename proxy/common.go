@@ -28,13 +28,16 @@ func callWeave(args ...string) ([]byte, error) {
 	return out, err
 }
 
-func weaveCIDRsFromConfig(config *docker.Config) ([]string, bool) {
+func weaveCIDRsFromConfig(config *docker.Config, noDefaultIPAM bool) ([]string, bool) {
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
+			if e[11:] == "none" {
+				return nil, false
+			}
 			return strings.Fields(e[11:]), true
 		}
 	}
-	return nil, false
+	return nil, !noDefaultIPAM
 }
 
 func marshalRequestBody(r *http.Request, body interface{}) error {

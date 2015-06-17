@@ -21,8 +21,8 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 		return err
 	}
 
-	cidrs, ok := weaveCIDRsFromConfig(container.Config)
-	if !ok && i.proxy.NoDefaultIPAM {
+	cidrs, ok := weaveCIDRsFromConfig(container.Config, i.proxy.NoDefaultIPAM)
+	if !ok {
 		Debug.Print("No Weave CIDR, ignoring")
 		return nil
 	}

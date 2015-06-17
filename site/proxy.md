@@ -109,8 +109,13 @@ To use a specific IP, we pass a `WEAVE_CIDR` to the container, e.g.
 
     host1$ docker run -ti -e WEAVE_CIDR=10.2.1.1/24 ubuntu
 
-To start containers without connecting them to the weave network, the
-proxy needs to be passed the `--no-default-ipam` flag, e.g.
+To start a container without connecting it to the weave network, pass
+`WEAVE_CIDR=none`, e.g.
+
+    host1$ docker run -ti -e WEAVE_CIDR=none ubuntu
+
+If you do not want IPAM to be used by default, the proxy needs to be
+passed the `--no-default-ipam` flag, e.g.
 
     host1$ docker launch-proxy --no-default-ipam
 
