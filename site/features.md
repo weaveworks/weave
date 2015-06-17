@@ -35,18 +35,18 @@ connected.
 Containers can easily access services from each other; e.g. in the
 container on `$HOST1` we can start a netcat "service" with
 
-    root@28841bd02eff:/# nc -lk -p 4422
+    root@h1c1:/# nc -lk -p 4422
 
 and then connect to it from the container on `$HOST2` with
 
-    root@f76829496120:/# echo 'Hello, world.' | nc 10.2.1.1 4422
+    root@h2c1:/# echo 'Hello, world.' | nc h1c1 4422
 
 Note that *any* protocol is supported. Doesn't even have to be over
 TCP/IP, e.g. a netcat UDP service would be run with
 
-    root@28841bd02eff:/# nc -lu -p 5533
+    root@h1c1:/# nc -lu -p 5533
 
-    root@f76829496120:/# echo 'Hello, world.' | nc -u 10.2.1.1 5533
+    root@h2c1:/# echo 'Hello, world.' | nc -u h1c1 5533
 
 We can deploy the entire arsenal of standard network tools and
 applications, developed over decades, to configure, secure, monitor,
