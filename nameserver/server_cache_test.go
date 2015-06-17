@@ -69,7 +69,9 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 		MaxAnswers:        4,
 	})
 	wt.AssertNoErr(t, err)
-	go srv.Start()
+	err = srv.Start()
+	wt.AssertNoErr(t, err)
+	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow server goroutine to start
 
@@ -202,7 +204,9 @@ func TestServerCacheExpiration(t *testing.T) {
 		CacheNegLocalTTL:  negativeLocalTTL,
 	})
 	wt.AssertNoErr(t, err)
-	go srv.Start()
+	err = srv.Start()
+	wt.AssertNoErr(t, err)
+	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow server goroutine to start
 
@@ -287,7 +291,9 @@ func TestServerCacheRefresh(t *testing.T) {
 		MaxAnswers:        4,
 	})
 	wt.AssertNoErr(t, err)
-	go srv.Start()
+	err = srv.Start()
+	wt.AssertNoErr(t, err)
+	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 

@@ -182,4 +182,5 @@ func main() {
 	if err != nil {
 		Error.Fatal("[main] Failed to start the WeaveDNS server: ", err)
 	}
+	srv.ActivateAndServe()
 }

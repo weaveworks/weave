@@ -14,7 +14,6 @@ type MDNSServer struct {
 	zone       Zone
 	allowLocal bool
 	ttl        int
-	running    bool
 }
 
 // Create a new mDNS server
@@ -43,11 +42,6 @@ func (s *MDNSServer) addrIsLocal(testaddr net.Addr) bool {
 
 // Start the mDNS server
 func (s *MDNSServer) Start(ifi *net.Interface) (err error) {
-	// skip double initialization
-	if s.running {
-		return nil
-	}
-
 	// This is a bit of a kludge - per the RFC we should send responses from 5353, but that doesn't seem to work
 	s.sendconn, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
@@ -94,13 +88,11 @@ func (s *MDNSServer) Start(ifi *net.Interface) (err error) {
 		Handler:    mux,
 	}
 	go s.srv.ActivateAndServe()
-	s.running = true
 	return err
 }
 
 // Stop the mDNS server
 func (s *MDNSServer) Stop() error {
-	s.running = false
 	return s.srv.Shutdown()
 }
 

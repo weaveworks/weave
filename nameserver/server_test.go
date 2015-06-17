@@ -89,7 +89,9 @@ func TestUDPDNSServer(t *testing.T) {
 		ListenReadTimeout: testSocketTimeout,
 	})
 	wt.AssertNoErr(t, err)
-	go srv.Start()
+	err = srv.Start()
+	wt.AssertNoErr(t, err)
+	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 
@@ -195,7 +197,9 @@ func TestTCPDNSServer(t *testing.T) {
 		ListenReadTimeout: testSocketTimeout,
 	})
 	wt.AssertNoErr(t, err)
-	go srv.Start()
+	err = srv.Start()
+	wt.AssertNoErr(t, err)
+	go srv.ActivateAndServe()
 	defer srv.Stop()
 	time.Sleep(100 * time.Millisecond) // Allow sever goroutine to start
 

@@ -97,7 +97,6 @@ type MDNSClient struct {
 	addr       *net.UDPAddr
 	inflight   map[string]*inflightQuery
 	actionChan chan<- MDNSAction
-	running    bool
 }
 
 type mDNSQueryInfo struct {
@@ -109,15 +108,10 @@ type mDNSQueryInfo struct {
 func NewMDNSClient() (*MDNSClient, error) {
 	return &MDNSClient{
 		addr:     ipv4Addr,
-		running:  false,
 		inflight: make(map[string]*inflightQuery)}, nil
 }
 
 func (c *MDNSClient) Start(ifi *net.Interface) (err error) {
-	if c.running {
-		return nil
-	}
-
 	if c.conn, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0}); err != nil {
 		return err
 	}
@@ -134,19 +128,18 @@ func (c *MDNSClient) Start(ifi *net.Interface) (err error) {
 		}
 	}
 
-	c.listener = &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
-	go c.listener.ActivateAndServe()
-
 	actionChan := make(chan MDNSAction, MailboxSize)
 	c.actionChan = actionChan
 	go c.actorLoop(actionChan)
+
+	c.listener = &dns.Server{Unsafe: true, PacketConn: multicast, Handler: dns.HandlerFunc(handleMDNS)}
+	go c.listener.ActivateAndServe()
+
 	return nil
 }
 
 func (c *MDNSClient) Stop() error {
-	if c.running {
-		c.actionChan <- nil
-	}
+	c.actionChan <- nil
 	return nil
 }
 
@@ -272,13 +265,13 @@ func (c *MDNSClient) checkInFlightQueries() time.Duration {
 func (c *MDNSClient) actorLoop(actionChan <-chan MDNSAction) {
 	timer := time.NewTimer(MaxDuration)
 	run := func() { timer.Reset(c.checkInFlightQueries()) }
-	c.running = true
-	for c.running {
+loop:
+	for {
 		select {
 		case action := <-actionChan:
 			if action == nil {
 				c.listener.Shutdown()
-				c.running = false
+				break loop
 			} else {
 				action()
 				run()
