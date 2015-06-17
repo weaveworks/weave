@@ -9,6 +9,7 @@ Weave has a few more features beyond those illustrated by the [basic
 example](https://github.com/weaveworks/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
+ * [Manual addressing](#manual-addressing)
  * [Application isolation](#application-isolation)
  * [Dynamic network attachment](#dynamic-network-attachment)
  * [Security](#security)
@@ -54,6 +55,48 @@ and troubleshoot our container network. To put it another way, we can
 now re-use the same tools and techniques when deploying applications
 as containers as we would have done when deploying them 'on metal' in
 our data centre.
+
+### <a name="manual-addressing"></a>Manual addressing
+
+The examples so far have leveraged weave's [address allocation](#ipam)
+and [discovery](#dns) features, meaning that we've not had to concern
+ourselves with IP addresses at all. It is, however, possible to
+specify address and network explicitly using [CIDR
+notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation)
+- let's see how the first example would have looked:
+
+On $HOST1:
+
+    host1$ C=$(weave run 10.2.1.1/24 -t -i ubuntu)
+
+And $HOST2:
+
+    host2$ C=$(weave run 10.2.1.2/24 -t -i ubuntu)
+
+Then on $HOST1...
+
+    host1$ docker attach $C
+    root@28841bd02eff:/# ping -c 1 -q 10.2.1.2
+    PING 10.2.1.2 (10.2.1.2): 48 data bytes
+    --- 10.2.1.2 ping statistics ---
+    1 packets transmitted, 1 packets received, 0% packet loss
+    round-trip min/avg/max/stddev = 1.048/1.048/1.048/0.000 ms
+
+Similarly, on $HOST2...
+
+    host2$ docker attach $C
+    root@f76829496120:/# ping -c 1 -q 10.2.1.1
+    PING 10.2.1.1 (10.2.1.1): 48 data bytes
+    --- 10.2.1.1 ping statistics ---
+    1 packets transmitted, 1 packets received, 0% packet loss
+    round-trip min/avg/max/stddev = 1.034/1.034/1.034/0.000 ms
+
+The IP addresses and netmasks can be anything you like, but make sure
+they don't conflict with any IP ranges in use on the hosts (including
+those delegated to IPAM) or IP addresses of external services the
+hosts or containers need to connect to. The same IP range must be used
+everywhere, and the individual IP addresses must, of course, be
+unique.
 
 ### <a name="application-isolation"></a>Application isolation
 
