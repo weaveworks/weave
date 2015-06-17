@@ -349,7 +349,7 @@ The same command will work from any application container.
 Importing a service provides a degree of indirection that allows late
 and dynamic binding, similar to what can be achieved with a proxy. In
 our example, application containers are unaware that the service they
-are accessing at `10.2.1.101:3322` is in fact residing on
+are accessing at `10.2.1.3:3322` is in fact residing on
 `$HOST3:2211`. We can point application containers at another service
 location by changing the above NAT rule, without having to alter the
 applications themselves.
