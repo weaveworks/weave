@@ -166,7 +166,7 @@ displays the weave bridge MAC and any IP addresses added to it via the
 
 You can also supply a list of container IDs/names to `weave ps`, like this:
 
-    $ sudo weave ps able baker
+    $ weave ps able baker
     able ce:15:34:a9:b5:6d 10.2.5.1/24
     baker 7a:61:a2:49:4b:91 10.2.8.3/24
 
@@ -193,7 +193,7 @@ latest snapshot release with
 
     sudo curl -L git.io/weave-snapshot -o /usr/local/bin/weave
     sudo chmod a+x /usr/local/bin/weave
-    sudo weave setup
+    weave setup
 
 Snapshot releases report the script version as "(unreleased version)",
 and the container image versions as git hashes.
