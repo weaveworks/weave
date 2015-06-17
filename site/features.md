@@ -321,12 +321,15 @@ First we need to expose the application network to the host, as
 explained [above](#host-network-integration), this time on `$HOST1`,
 i.e.
 
-    host1$ weave expose 10.2.1.101/24
+    host1$ weave expose -h host1.weave.local
 
 Then we add a NAT rule to route from the above IP to the destination
 service.
 
-    host1$ iptables -t nat -A PREROUTING -p tcp -d 10.2.1.101 --dport 3322 \
+    host1$ weave ps weave:expose
+    weave:expose 66:46:f5:ac:7b:c9 10.2.1.3/24
+
+    host1$ iptables -t nat -A PREROUTING -p tcp -d 10.2.1.3 --dport 3322 \
            -j DNAT --to-destination $HOST3:2211
 
 This allows any application container to reach the service by
@@ -337,7 +340,7 @@ service on port 2211, e.g.
 
 then we can connect to it from our application container on `$HOST2` with
 
-    root@f76829496120:/# echo 'Hello, world.' | nc 10.2.1.101 3322
+    root@h2c1:/# echo 'Hello, world.' | nc host1 3322
 
 The same command will work from any application container.
 
