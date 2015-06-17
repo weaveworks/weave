@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -112,4 +113,16 @@ func (proxy *Proxy) ListenAndServe() error {
 	Info.Println("proxy listening on", proxy.ListenAddr)
 
 	return (&http.Server{Handler: proxy}).Serve(listener)
+}
+
+func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config) ([]string, bool) {
+	for _, e := range config.Env {
+		if strings.HasPrefix(e, "WEAVE_CIDR=") {
+			if e[11:] == "none" {
+				return nil, false
+			}
+			return strings.Fields(e[11:]), true
+		}
+	}
+	return nil, !proxy.NoDefaultIPAM
 }

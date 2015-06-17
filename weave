@@ -76,6 +76,7 @@ exec_remote() {
         -e WEAVE_CONTAINER_NAME \
         -e DOCKER_BRIDGE \
         -e PROXY_HOST="$PROXY_HOST" \
+        -e WEAVE_CIDR=none \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
@@ -387,7 +388,7 @@ ask_version() {
                 echo "Unable to find $2 image." >&2
             fi
     fi
-    [ -n "$DOCKERIMAGE" ] && docker run --rm $DOCKERIMAGE --version
+    [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $DOCKERIMAGE --version
 }
 
 ######################################################################
@@ -1023,6 +1024,7 @@ case "$COMMAND" in
             -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -e WEAVE_PASSWORD \
+            -e WEAVE_CIDR=none \
             $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" -iprange "$IPRANGE" "$@")
         with_container_netns_or_die $CONTAINER launch
         wait_for_status $CONTAINER_NAME $HTTP_PORT
@@ -1044,6 +1046,7 @@ case "$COMMAND" in
         # when launching the weave container.
         DNS_CONTAINER=$(docker run --privileged -d --name=$DNS_CONTAINER_NAME \
             -p $DOCKER_BRIDGE_IP:53:53/udp \
+            -e WEAVE_CIDR=none \
             -v /var/run/docker.sock:/var/run/docker.sock \
             $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE -iface $CONTAINER_IFNAME -httpiface "$DNS_HTTP_IFNAME" "$@")
         ipam_cidrs_or_die $DNS_CONTAINER $CIDR_ARGS
@@ -1062,6 +1065,7 @@ case "$COMMAND" in
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /proc:/hostproc \
             -e PROCFS=/hostproc \
+            -e WEAVE_CIDR=none \
             --entrypoint=/home/weave/weaveproxy \
             $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $PROXY_ARGS)
         wait_for_log $PROXY_CONTAINER_NAME "proxy listening"

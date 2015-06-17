@@ -29,7 +29,7 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if cidrs, ok := weaveCIDRsFromConfig(container.Config); ok || !i.proxy.NoDefaultIPAM {
+	if cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config); ok {
 		Info.Printf("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
 		cmd := append(weaveWaitEntrypoint, "-s")
 		options.Cmd = append(cmd, options.Cmd...)
