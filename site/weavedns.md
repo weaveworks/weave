@@ -18,6 +18,7 @@ hosts.
 * [Adding and removing extra DNS entries](#add-remove)
 * [Hot-swapping service containers](#hot-swapping)
 * [Retaining DNS entries when containers stop](#retain-stopped)
+* [Configuring a custom TTL](#ttl)
 * [Configuring the domain search path](#domain-search-path)
 * [Using a different local domain](#local-domain)
 * [Using weaveDNS without `weave run`](#without-run)
@@ -204,7 +205,7 @@ to the container args:
 $ weave launch-dns 10.2.254.1/24 --watch=false
 ```
 
-## <a name="ttl"></a>Using a different TTL value
+## <a name="ttl"></a>Configuring a custom TTL
 
 By default, weaveDNS specifies a TTL of 30 seconds in any reply sent to
 another peer. Peers will honor the TTL received and cache the answer
