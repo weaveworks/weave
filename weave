@@ -821,7 +821,7 @@ ipam_cidrs() {
                 return 1
             fi
             if [ "$CIDR" = "404 page not found" ] ; then
-                echo "IP address allocation must be enabled to use --subnet (use the -iprange option on 'weave launch')" >&2
+                echo "IP address allocation must be enabled to use 'net:'" >&2
                 return 1
             fi
             if ! is_cidr "$CIDR" ; then
