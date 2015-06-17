@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os/exec"
 	"regexp"
-	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -26,18 +25,6 @@ func callWeave(args ...string) ([]byte, error) {
 	cmd.Env = []string{"PROCFS=/hostproc", "PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 	out, err := cmd.CombinedOutput()
 	return out, err
-}
-
-func weaveCIDRsFromConfig(config *docker.Config, noDefaultIPAM bool) ([]string, bool) {
-	for _, e := range config.Env {
-		if strings.HasPrefix(e, "WEAVE_CIDR=") {
-			if e[11:] == "none" {
-				return nil, false
-			}
-			return strings.Fields(e[11:]), true
-		}
-	}
-	return nil, !noDefaultIPAM
 }
 
 func marshalRequestBody(r *http.Request, body interface{}) error {
