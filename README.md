@@ -56,7 +56,7 @@ On `$HOST1` run
 
     host1$ weave launch
     host1$ weave launch-dns
-    host1$ weave run --name h1c1 -t -i ubuntu
+    host1$ weave run --name h1c1 -ti ubuntu
 
 The first two lines start the weave router and DNS, each inside their
 own container - this needs to be done once per host. Whilst the
@@ -81,7 +81,7 @@ Next we repeat similar steps on `$HOST2`...
 
     host2$ weave launch $HOST1
     host2$ weave launch-dns
-    host2$ weave run --name h2c1 -t -i ubuntu
+    host2$ weave run --name h2c1 -ti ubuntu
 
 The only difference, apart from the name of the application container,
 is that we tell our weave that it should peer with the weave on

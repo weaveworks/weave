@@ -67,11 +67,11 @@ notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notat
 
 On $HOST1:
 
-    host1$ C=$(weave run 10.2.1.1/24 -t -i ubuntu)
+    host1$ C=$(weave run 10.2.1.1/24 -ti ubuntu)
 
 And $HOST2:
 
-    host2$ C=$(weave run 10.2.1.2/24 -t -i ubuntu)
+    host2$ C=$(weave run 10.2.1.2/24 -ti ubuntu)
 
 Then on $HOST1...
 
@@ -117,13 +117,13 @@ This delegates the entire 10.2.0.0/16 subnet to weave, and instructs
 it to allocate from 10.2.1.0/24 within that if no specific subnet is
 specified. Now we can launch some containers in the default subnet:
 
-    host1$ weave run --name h1c1 -t -i ubuntu
-    host2$ weave run --name h2c1 -t -i ubuntu
+    host1$ weave run --name h1c1 -ti ubuntu
+    host2$ weave run --name h2c1 -ti ubuntu
 
 And some more containers in a different subnet:
 
-    host1$ weave run net:10.2.2.0/24 --name h1c2 -t -i ubuntu
-    host2$ weave run net:10.2.2.0.24 --name h2c2 -t -i ubuntu
+    host1$ weave run net:10.2.2.0/24 --name h1c2 -ti ubuntu
+    host2$ weave run net:10.2.2.0.24 --name h2c2 -ti ubuntu
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
@@ -153,7 +153,7 @@ well-known technique from the 'on metal' days to containers.
 If desired, a container can be attached to multiple subnets when it is
 started:
 
-    host1$ weave run net:default net:10.2.2.0/24 -t -i ubuntu
+    host1$ weave run net:default net:10.2.2.0/24 -ti ubuntu
 
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
