@@ -93,17 +93,12 @@ To illustrate this last point, the following sequence of operations
 would be safe wrt weave's startup quorum:
 
     host1$ weave launch
-
-[time passes]
-
+    ...time passes...
     host2$ weave launch $HOST1
-
-[time passes]
-
+    ...time passes...
     host3$ weave launch $HOST1 $HOST2
-
-[time passes; host1 is rebooted]
-
+    ...time passes...
+    ...host1 is rebooted...
     host1$ weave launch $HOST2 $HOST3
 
 ## <a name="range"></a>Choosing an allocation range
