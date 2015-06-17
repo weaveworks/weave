@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"code.google.com/p/gopacket/layers"
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -170,12 +169,9 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	if found && dstPeer == router.Ourself.Peer {
 		return
 	}
-	df := decodedLen == 2 && (dec.IP.Flags&layers.IPv4DontFragment != 0)
-	if df {
-		router.LogFrame("Forwarding DF", frameData, dec)
-	} else {
-		router.LogFrame("Forwarding", frameData, dec)
-	}
+	df := dec.DF()
+	router.LogFrame("Forwarding", frameData, dec)
+
 	// at this point we are handing over the frame to forwarders, so
 	// we need to make a copy of it in order to prevent the next
 	// capture from overwriting the data
@@ -316,16 +312,11 @@ func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *Ether
 			return
 		}
 
-		df := decodedLen == 2 && (dec.IP.Flags&layers.IPv4DontFragment != 0)
+		df := dec.DF()
 
 		if dstPeer != router.Ourself.Peer {
 			// it's not for us, we're just relaying it
-			if df {
-				router.LogFrame("Relaying DF", frame, dec)
-			} else {
-				router.LogFrame("Relaying", frame, dec)
-			}
-
+			router.LogFrame("Relaying", frame, dec)
 			err := router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec)
 			if ftbe, ok := err.(FrameTooBigError); ok {
 				err = dec.sendICMPFragNeeded(ftbe.EPMTU, func(icmpFrame []byte) error {

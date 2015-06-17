@@ -75,3 +75,7 @@ func (dec *EthernetDecoder) IsSpecial() bool {
 	return dec.Eth.Length == 0 && dec.Eth.EthernetType == layers.EthernetTypeLLC &&
 		bytes.Equal(zeroMAC, dec.Eth.SrcMAC) && bytes.Equal(zeroMAC, dec.Eth.DstMAC)
 }
+
+func (dec *EthernetDecoder) DF() bool {
+	return len(dec.decoded) == 2 && (dec.IP.Flags&layers.IPv4DontFragment != 0)
+}
