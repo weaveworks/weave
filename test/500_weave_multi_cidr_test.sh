@@ -4,7 +4,7 @@
 
 NAME=multicidr.weave.local
 
-# assert_container_cidrs <host> <cid> <cidr> [<cidr> ...]
+# assert_container_cidrs <host> <cid> [<cidr> ...]
 assert_container_cidrs() {
     HOST=$1; shift
     CID=$1; shift
@@ -18,7 +18,7 @@ assert_container_cidrs() {
     fi
 }
 
-# assert_zone_records <host> <cid> <fqdn> <ip> [<ip> ...]
+# assert_zone_records <host> <cid> <fqdn> [<ip> ...]
 assert_zone_records() {
     HOST=$1; shift
     CID=$1; shift
