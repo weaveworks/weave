@@ -174,8 +174,13 @@ situations, weave allows an existing, running container to be attached
 to the weave network. To illustrate, we can achieve the same effect as
 the first example with
 
-    host1$ C=$(docker run -d -t -i ubuntu)
+    host1$ C=$(docker run -e WEAVE_CIDR=none -dti ubuntu)
     host1$ weave attach $C
+
+(Note that since we modified `DOCKER_HOST` to point to the proxy
+earlier, we have to pass `-e WEAVE_CIDR=none` to start a container
+that _doesn't_ get automatically attached to the weave network for the
+purposes of this example.)
 
 There is a matching `weave detach` command:
 
