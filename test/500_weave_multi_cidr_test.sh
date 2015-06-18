@@ -11,7 +11,11 @@ assert_container_cidrs() {
     CIDRS="$@"
 
     # Assert container has attached CIDRs
-    assert_raises "weave_on $HOST ps $CID | grep -E '^$CID [0-9a-f:]{17} $CIDRS$'"
+    if [ -z "$CIDRS" ] ; then
+        assert        "weave_on $HOST ps $CID" ""
+    else
+        assert_raises "weave_on $HOST ps $CID | grep -E '^$CID [0-9a-f:]{17} $CIDRS$'"
+    fi
 }
 
 # assert_zone_records <host> <cid> <fqdn> <ip> [<ip> ...]
@@ -40,7 +44,9 @@ assert_bridge_cidrs() {
     assert "echo $BRIDGE_CIDRS" "$CIDRS"
 }
 
-start_suite "Weave run/start/attach/detach with multiple cidr arguments"
+start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr arguments"
+
+# also check that these commands understand all address flavours
 
 # NOTE: in these tests, net: arguments are checked against a
 # specific address, i.e. we are assuming that IPAM always returns the
@@ -54,19 +60,31 @@ CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.
 assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.1
 
+# Stop the container
+docker_on              $HOST1 stop $CID
+assert_container_cidrs $HOST1 $CID
+assert_zone_records    $HOST1 $CID $NAME.
+
+# Restart with three IPs
+weave_on               $HOST1 start       10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 $CID
+assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
+assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.1
+
 # Remove two of them
 weave_on               $HOST1 detach                  ip:10.2.2.1/24 net:10.2.3.0/24 $CID
 assert_container_cidrs $HOST1 $CID        10.2.1.1/24
 assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1
+# ...and the remaining one
+weave_on               $HOST1 detach      10.2.1.1/24                                $CID
+assert_container_cidrs $HOST1 $CID
+assert_zone_records    $HOST1 $CID $NAME.
 
-# Put them both back
+# Put one back
+weave_on               $HOST1 attach      10.2.1.1/24                                $CID
+assert_container_cidrs $HOST1 $CID        10.2.1.1/24
+assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1
+# ...and the remaining two
 weave_on               $HOST1 attach                  ip:10.2.2.1/24 net:10.2.3.0/24 $CID
-assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
-assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.1
-
-# Stop the container, restart with three IPs
-docker_on              $HOST1 stop $CID
-weave_on               $HOST1 start       10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 $CID
 assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.1
 
@@ -77,6 +95,9 @@ assert_bridge_cidrs    $HOST1 weave       10.2.1.2/24    10.2.2.2/24     10.2.3.
 # Hide two of them
 weave_on               $HOST1 hide                    ip:10.2.2.2/24 net:10.2.3.0/24
 assert_bridge_cidrs    $HOST1 weave       10.2.1.2/24
+# ...and the remaining one
+weave_on               $HOST1 hide        10.2.1.2/24
+assert_bridge_cidrs    $HOST1 weave
 
 # Now detach and run another container to check we have released IPs in IPAM
 weave_on               $HOST1 detach $CID
