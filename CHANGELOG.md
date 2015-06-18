@@ -14,14 +14,14 @@
       root@d11e9287f65b:/# ping pingme
       ````
 - Containers can now be
-  [load-balanced](http://docs.weave.works/weave/master/head/weavedns.html#load-balancing)
+  [load-balanced](http://docs.weave.works/weave/latest_release/weavedns.html#load-balancing)
   easily.
 - IP address allocation is now available across [multiple
-  subnets](http://docs.weave.works/weave/master/head/ipam.html#range),
+  subnets](http://docs.weave.works/weave/latest_release/ipam.html#range),
   and hence can be employed when running multiple, isolated
   applications.
 - The proxy now supports [TLS
-  connections](http://docs.weave.works/weave/master/head/proxy.html#tls),
+  connections](http://docs.weave.works/weave/latest_release/proxy.html#tls),
   enabling its deployment when the communication between docker
   clients and the server must be secured.
 
