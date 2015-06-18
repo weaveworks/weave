@@ -66,9 +66,9 @@ assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.
 
 # Stop the container, restart with three IPs
 docker_on              $HOST1 stop $CID
-weave_on               $HOST1 start       10.2.1.1/24 ip:10.2.2.1/24  net:10.2.3.0/24 $CID
-assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24      10.2.3.1/24
-assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1         10.2.3.1
+weave_on               $HOST1 start       10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 $CID
+assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
+assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.1
 
 # Expose three cidrs
 weave_on               $HOST1 expose      10.2.1.2/24 ip:10.2.2.2/24 net:10.2.3.0/24
