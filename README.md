@@ -55,47 +55,41 @@ two containers, one on each host.
 On `$HOST1` run
 
     host1$ weave launch
-    host1$ C=$(weave run 10.2.1.1/24 -t -i ubuntu)
+    host1$ weave launch-dns
+    host1$ weave run --name a1 -ti ubuntu
 
-The first line starts the weave router, in a container. This needs to
-be done once on each host. The required docker image for the weave
-router container is downloaded automatically. There is also a `weave
-setup` command for downloading this and other images required for
+The first two lines start the weave router and DNS, each inside their
+own container - this needs to be done once per host. Whilst the
+required docker images are downloaded automatically, there is also a
+`weave setup` command for downloading all the images required for
 weave operation; this is a strictly optional step which is especially
 useful for automated installation of weave and ensures that any
 subsequent weave commands do not encounter delays due to image
 downloading.
 
-The second line runs our application container. We give it an IP
-address and network, in
-[CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation).
-`weave run` invokes `docker run -d` with all the parameters following
-the IP address and network. So we could be launching any container
-this way; here we just take a stock ubuntu container and launch a
-shell in it. There's also a `weave start` command, which invokes
-`docker start` for starting existing containers.
+The third line runs our application container, allocating it an IP
+address on the weave network and registering it in DNS.  `weave run`
+invokes `docker run -d` behind the scenes, so we could be launching
+any container this way; here we just take a stock ubuntu container and
+launch a shell in it.  There's also a `weave start` command, which
+invokes `docker start` for starting existing containers.
 
 If our application consists of more than one container on this host we
-simply launch them with a variation on that second line.
+simply launch them with a variation on third second line.
 
-The IP addresses and netmasks can be anything you like, but make sure
-they don't conflict with any IP ranges in use on the hosts or IP
-addresses of external services the hosts or containers need to connect
-to. The same IP range must be used everywhere, and the individual IP
-addresses must, of course, be unique.
-
-We repeat similar steps on `$HOST2`...
+Next we repeat similar steps on `$HOST2`...
 
     host2$ weave launch $HOST1
-    host2$ C=$(weave run 10.2.1.2/24 -t -i ubuntu)
+    host2$ weave launch-dns
+    host2$ weave run --name a2 -ti ubuntu
 
-The only difference, apart from the choice of IP address for the
-application container, is that we tell our weave that it should peer
-with the weave on `$HOST1` (specified as the IP address or hostname,
-and optional `:port`, by which `$HOST2` can reach it). NB: if there is
-a firewall between `$HOST1` and `$HOST2`, you must open the weave port
-(6783 by default; this can be overriden by setting `WEAVE_PORT`) for
-TCP and UDP.
+The only difference, apart from the name of the application container,
+is that we tell our weave that it should peer with the weave on
+`$HOST1` (specified as the IP address or hostname, and optional
+`:port`, by which `$HOST2` can reach it). NB: if there is a firewall
+between `$HOST1` and `$HOST2`, you must open the weave port (6783 by
+default; this can be overriden by setting `WEAVE_PORT`) for TCP and
+UDP.
 
 Note that we could instead have told the weave on `$HOST1` to connect to
 `$HOST2`, or told both about each other. Order does not matter here;
@@ -109,21 +103,21 @@ can talk to each other...
 
 On `$HOST1`...
 
-    host1$ docker attach $C
-    root@28841bd02eff:/# ping -c 1 -q 10.2.1.2
-    PING 10.2.1.2 (10.2.1.2): 48 data bytes
-    --- 10.2.1.2 ping statistics ---
-    1 packets transmitted, 1 packets received, 0% packet loss
-    round-trip min/avg/max/stddev = 1.048/1.048/1.048/0.000 ms
+    host1$ docker attach a1
+    root@a1:/# ping -c 1 -q a2
+    PING a2.weave.local (10.160.0.2) 56(84) bytes of data.
+    --- a2.weave.local ping statistics ---
+    1 packets transmitted, 1 received, 0% packet loss, time 0ms
+    rtt min/avg/max/mdev = 0.341/0.341/0.341/0.000 ms
 
 Similarly, on `$HOST2`...
 
-    host2$ docker attach $C
-    root@f76829496120:/# ping -c 1 -q 10.2.1.1
-    PING 10.2.1.1 (10.2.1.1): 48 data bytes
-    --- 10.2.1.1 ping statistics ---
-    1 packets transmitted, 1 packets received, 0% packet loss
-    round-trip min/avg/max/stddev = 1.034/1.034/1.034/0.000 ms
+    host2$ docker attach a2
+    root@a2:/# ping -c 1 -q a1
+    PING a1.weave.local (10.128.0.2) 56(84) bytes of data.
+    --- a1.weave.local ping statistics ---
+    1 packets transmitted, 1 received, 0% packet loss, time 0ms
+    rtt min/avg/max/mdev = 0.366/0.366/0.366/0.000 ms
 
 So there we have it, two containers on separate hosts happily talking
 to each other.

@@ -9,6 +9,7 @@ Weave has a few more features beyond those illustrated by the [basic
 example](https://github.com/weaveworks/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
+ * [Manual addressing](#manual-addressing)
  * [Application isolation](#application-isolation)
  * [Dynamic network attachment](#dynamic-network-attachment)
  * [Security](#security)
@@ -35,18 +36,18 @@ connected.
 Containers can easily access services from each other; e.g. in the
 container on `$HOST1` we can start a netcat "service" with
 
-    root@28841bd02eff:/# nc -lk -p 4422
+    root@a1:/# nc -lk -p 4422
 
 and then connect to it from the container on `$HOST2` with
 
-    root@f76829496120:/# echo 'Hello, world.' | nc 10.2.1.1 4422
+    root@a2:/# echo 'Hello, world.' | nc a1 4422
 
 Note that *any* protocol is supported. Doesn't even have to be over
 TCP/IP, e.g. a netcat UDP service would be run with
 
-    root@28841bd02eff:/# nc -lu -p 5533
+    root@a1:/# nc -lu -p 5533
 
-    root@f76829496120:/# echo 'Hello, world.' | nc -u 10.2.1.1 5533
+    root@a2:/# echo 'Hello, world.' | nc -u a1 5533
 
 We can deploy the entire arsenal of standard network tools and
 applications, developed over decades, to configure, secure, monitor,
@@ -55,39 +56,96 @@ now re-use the same tools and techniques when deploying applications
 as containers as we would have done when deploying them 'on metal' in
 our data centre.
 
+### <a name="manual-addressing"></a>Manual addressing
+
+The examples so far have leveraged weave's [address allocation](#ipam)
+and [discovery](#dns) features, meaning that we've not had to concern
+ourselves with IP addresses at all. It is, however, possible to
+specify address and network explicitly using [CIDR
+notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation)
+- let's see how the first example would have looked:
+
+On $HOST1:
+
+    host1$ C=$(weave run 10.2.1.1/24 -ti ubuntu)
+
+And $HOST2:
+
+    host2$ C=$(weave run 10.2.1.2/24 -ti ubuntu)
+
+Then on $HOST1...
+
+    host1$ docker attach $C
+    root@28841bd02eff:/# ping -c 1 -q 10.2.1.2
+    PING 10.2.1.2 (10.2.1.2): 48 data bytes
+    --- 10.2.1.2 ping statistics ---
+    1 packets transmitted, 1 packets received, 0% packet loss
+    round-trip min/avg/max/stddev = 1.048/1.048/1.048/0.000 ms
+
+Similarly, on $HOST2...
+
+    host2$ docker attach $C
+    root@f76829496120:/# ping -c 1 -q 10.2.1.1
+    PING 10.2.1.1 (10.2.1.1): 48 data bytes
+    --- 10.2.1.1 ping statistics ---
+    1 packets transmitted, 1 packets received, 0% packet loss
+    round-trip min/avg/max/stddev = 1.034/1.034/1.034/0.000 ms
+
+The IP addresses and netmasks can be anything you like, but make sure
+they don't conflict with any IP ranges in use on the hosts (including
+those delegated to IPAM) or IP addresses of external services the
+hosts or containers need to connect to. The same IP range must be used
+everywhere, and the individual IP addresses must, of course, be
+unique.
+
 ### <a name="application-isolation"></a>Application isolation
 
 A single weave network can host multiple, isolated applications, with
 each application's containers being able to communicate with each
 other but not containers of other applications.
 
-To accomplish that, we assign each application a different subnet. So,
-in the above example, if we wanted to add another application similar
-to, but isolated from, our first, we'd launch the containers with...
+To accomplish that, we assign each application a different subnet.
+Let's begin by configuring weave's allocator to manage multiple
+subnets:
 
-    host1$ D=$(weave run 10.2.2.1/24 -t -i ubuntu)
-    host2$ D=$(weave run 10.2.2.2/24 -t -i ubuntu)
+    host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24
+    host1$ weave launch-dns
+    host2$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24 $HOST1
+    host2$ weave launch-dns
+
+This delegates the entire 10.2.0.0/16 subnet to weave, and instructs
+it to allocate from 10.2.1.0/24 within that if no specific subnet is
+specified. Now we can launch some containers in the default subnet:
+
+    host1$ weave run --name a1 -ti ubuntu
+    host2$ weave run --name a2 -ti ubuntu
+
+And some more containers in a different subnet:
+
+    host1$ weave run net:10.2.2.0/24 --name b1 -ti ubuntu
+    host2$ weave run net:10.2.2.0.24 --name b2 -ti ubuntu
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
 
-    host1$ docker attach $D
-    
-    root@da50502598d5:/# ping -c 1 -q 10.2.2.2
-    PING 10.2.2.2 (10.2.2.2): 48 data bytes
-    --- 10.2.2.2 ping statistics ---
-    1 packets transmitted, 1 packets received, 0% packet loss
-    round-trip min/avg/max/stddev = 0.562/0.562/0.562/0.000 ms
-    
-    root@da50502598d5:/# ping -c 1 -q 10.2.1.1
-    PING 10.2.1.1 (10.2.1.1) 56(84) bytes of data.
-    --- 10.2.1.1 ping statistics ---
+    host1:~$ docker attach b1
+
+    root@b1:/# ping -c 1 -q b2
+    PING b2.weave.local (10.2.2.128) 56(84) bytes of data.
+    --- b2.weave.local ping statistics ---
+    1 packets transmitted, 1 received, 0% packet loss, time 0ms
+    rtt min/avg/max/mdev = 1.338/1.338/1.338/0.000 ms
+
+    root@b1:/# ping -c 1 -q a1
+    PING a1.weave.local (10.2.1.2) 56(84) bytes of data.
+    --- a1.weave.local ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
-    
-    root@da50502598d5:/# ping -c 1 -q 10.2.1.2
-    PING 10.2.1.2 (10.2.1.2) 56(84) bytes of data.
-    --- 10.2.1.2 ping statistics ---
+
+    root@b1:/# ping -c 1 -q a2
+    PING a2.weave.local (10.2.1.130) 56(84) bytes of data.
+    --- a2.weave.local ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
+
 
 This isolation-through-subnets scheme is an example of carrying over a
 well-known technique from the 'on metal' days to containers.
@@ -95,7 +153,7 @@ well-known technique from the 'on metal' days to containers.
 If desired, a container can be attached to multiple subnets when it is
 started:
 
-    host1$ weave run 10.2.2.1/24 10.2.3.1/24 -t -i ubuntu
+    host1$ weave run net:default net:10.2.2.0/24 -ti ubuntu
 
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
@@ -117,29 +175,29 @@ to the weave network. To illustrate, we can achieve the same effect as
 the first example with
 
     host1$ C=$(docker run -d -t -i ubuntu)
-    host1$ weave attach 10.2.1.1/24 $C
+    host1$ weave attach $C
 
 There is a matching `weave detach` command:
 
-    host1$ weave detach 10.2.1.1/24 $C
+    host1$ weave detach $C
 
 You can detach a container from one application network and attach it
 to another:
 
-    host1$ weave detach 10.2.1.1/24 $C
-    host1$ weave attach 10.2.2.1/24 $C
+    host1$ weave detach net:default $C
+    host1$ weave attach net:10.2.2.0/24 $C
 
 or attach a container to multiple application networks, effectively
 sharing it between applications:
 
-    host1$ weave attach 10.2.1.1/24 $C
-    host1$ weave attach 10.2.2.1/24 $C
+    host1$ weave attach net:default
+    host1$ weave attach net:10.2.2.0/24
 
 Finally, multiple addresses can be attached or detached with a single
 invocation:
 
-    host1$ weave attach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
-    host1$ weave detach 10.2.1.1/24 10.2.2.1/24 10.2.3.1/24 $C
+    host1$ weave attach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
+    host1$ weave detach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
 
 ### <a name="security"></a>Security
 
@@ -174,31 +232,38 @@ anywhere.
 Let's say that in our example we want `$HOST2` to have access to the
 application containers. On `$HOST2` we run
 
-    host2$ weave expose 10.2.1.102/24
+    host2$ weave expose
 
-choosing an unused IP address in the application subnet. (There is a
-corresponding 'hide' command to revert this step.)
+(There is a corresponding 'hide' command to revert this step.)
 
-Now
+Now,  after finding allocated IPs via `weave ps`
 
-    host2$ ping 10.2.1.2
+    host2$ weave ps weave:expose
+    weave:expose 02:80:5c:02:f1:b2 10.2.1.132/24
+
+    host1$ weave ps a1
+    a1 1e:88:d7:5b:77:68 10.2.1.2/24
+
+this
+
+    host2$ ping 10.2.1.132
 
 will work. And, more interestingly,
 
-    host2$ ping 10.2.1.1
+    host2$ ping 10.2.1.2
 
 will work too, which is talking to a container that resides on `$HOST1`.
 
 Multiple subnet addresses can be exposed or hidden with a single
 invocation:
 
-    host2$ weave expose 10.2.1.102/24 10.2.2.102/24
-    host2$ weave hide   10.2.1.102/24 10.2.2.102/24
+    host2$ weave expose net:default net:10.2.2.0/24
+    host2$ weave hide   net:default net:10.2.2.0/24
 
 Finally, exposed addresses can be added to weaveDNS by supplying a
 fully-qualified domain name:
 
-    host2$ weave expose 10.2.1.102/24 -h exposed.weave.local
+    host2$ weave expose -h exposed.weave.local
 
 ### <a name="service-export"></a>Service export
 
@@ -213,18 +278,21 @@ a container on `$HOST1`, accessible to the outside world via `$HOST2`.
 First we need to expose the application network to `$HOST2`, as
 explained [above](#host-network-integration), i.e.
 
-    host2$ weave expose 10.2.1.102/24
+    host2$ weave expose
 
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
+    host1$ weave ps a1
+    a1 1e:88:d7:5b:77:68 10.2.1.2/24
+
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
-           -j DNAT --to-destination 10.2.1.1:4422
+           -j DNAT --to-destination 10.2.1.2:4422
 
 Here we are assuming that the "outside world" is connecting to `$HOST2`
 via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
 routed to our 'nc' service, which is running on port 4422 in the
-container with IP 10.2.1.1.
+container a1.
 
 With the above in place, we can connect to our 'nc' service from
 anywhere with
@@ -253,12 +321,15 @@ First we need to expose the application network to the host, as
 explained [above](#host-network-integration), this time on `$HOST1`,
 i.e.
 
-    host1$ weave expose 10.2.1.101/24
+    host1$ weave expose -h host1.weave.local
 
 Then we add a NAT rule to route from the above IP to the destination
 service.
 
-    host1$ iptables -t nat -A PREROUTING -p tcp -d 10.2.1.101 --dport 3322 \
+    host1$ weave ps weave:expose
+    weave:expose 66:46:f5:ac:7b:c9 10.2.1.3/24
+
+    host1$ iptables -t nat -A PREROUTING -p tcp -d 10.2.1.3 --dport 3322 \
            -j DNAT --to-destination $HOST3:2211
 
 This allows any application container to reach the service by
@@ -269,7 +340,7 @@ service on port 2211, e.g.
 
 then we can connect to it from our application container on `$HOST2` with
 
-    root@f76829496120:/# echo 'Hello, world.' | nc 10.2.1.101 3322
+    root@a2:/# echo 'Hello, world.' | nc host1 3322
 
 The same command will work from any application container.
 
@@ -278,7 +349,7 @@ The same command will work from any application container.
 Importing a service provides a degree of indirection that allows late
 and dynamic binding, similar to what can be achieved with a proxy. In
 our example, application containers are unaware that the service they
-are accessing at `10.2.1.101:3322` is in fact residing on
+are accessing at `10.2.1.3:3322` is in fact residing on
 `$HOST3:2211`. We can point application containers at another service
 location by changing the above NAT rule, without having to alter the
 applications themselves.
@@ -300,14 +371,17 @@ In our example above, the netcat service on `$HOST3` is imported into
 weave via `$HOST1`. We can export it on `$HOST2` by first exposing the
 application network with
 
-    host2$ weave expose 10.2.1.102/24
+    host2$ weave expose
 
 and then adding a NAT rule which routes traffic from the `$HOST2`
 network (i.e. anything which can connect to `$HOST2`) to the service
 endpoint in the weave network
 
+    host1$ weave ps weave:expose
+    weave:expose 66:46:f5:ac:7b:c9 10.2.1.3/24
+
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
-           -j DNAT --to-destination 10.2.1.101:3322
+           -j DNAT --to-destination 10.2.1.3:3322
 
 Now any host on the same network as `$HOST2` can access the service with
 
