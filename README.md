@@ -56,7 +56,7 @@ On `$HOST1` run
 
     host1$ weave launch
     host1$ weave launch-dns
-    host1$ weave run --name h1c1 -ti ubuntu
+    host1$ weave run --name a1 -ti ubuntu
 
 The first two lines start the weave router and DNS, each inside their
 own container - this needs to be done once per host. Whilst the
@@ -81,7 +81,7 @@ Next we repeat similar steps on `$HOST2`...
 
     host2$ weave launch $HOST1
     host2$ weave launch-dns
-    host2$ weave run --name h2c1 -ti ubuntu
+    host2$ weave run --name a2 -ti ubuntu
 
 The only difference, apart from the name of the application container,
 is that we tell our weave that it should peer with the weave on
@@ -103,19 +103,19 @@ can talk to each other...
 
 On `$HOST1`...
 
-    host1$ docker attach h1c1
-    root@h1c1:/# ping -c 1 -q h2c1
-    PING h2c1.weave.local (10.160.0.2) 56(84) bytes of data.
-    --- h2c1.weave.local ping statistics ---
+    host1$ docker attach a1
+    root@a1:/# ping -c 1 -q a2
+    PING a2.weave.local (10.160.0.2) 56(84) bytes of data.
+    --- a2.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.341/0.341/0.341/0.000 ms
 
 Similarly, on `$HOST2`...
 
-    host2$ docker attach h2c1
-    root@h2c1:/# ping -c 1 -q h1c1
-    PING h1c1.weave.local (10.128.0.2) 56(84) bytes of data.
-    --- h1c1.weave.local ping statistics ---
+    host2$ docker attach a2
+    root@a2:/# ping -c 1 -q a1
+    PING a1.weave.local (10.128.0.2) 56(84) bytes of data.
+    --- a1.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.366/0.366/0.366/0.000 ms
 

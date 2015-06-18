@@ -36,18 +36,18 @@ connected.
 Containers can easily access services from each other; e.g. in the
 container on `$HOST1` we can start a netcat "service" with
 
-    root@h1c1:/# nc -lk -p 4422
+    root@a1:/# nc -lk -p 4422
 
 and then connect to it from the container on `$HOST2` with
 
-    root@h2c1:/# echo 'Hello, world.' | nc h1c1 4422
+    root@a2:/# echo 'Hello, world.' | nc a1 4422
 
 Note that *any* protocol is supported. Doesn't even have to be over
 TCP/IP, e.g. a netcat UDP service would be run with
 
-    root@h1c1:/# nc -lu -p 5533
+    root@a1:/# nc -lu -p 5533
 
-    root@h2c1:/# echo 'Hello, world.' | nc -u h1c1 5533
+    root@a2:/# echo 'Hello, world.' | nc -u a1 5533
 
 We can deploy the entire arsenal of standard network tools and
 applications, developed over decades, to configure, secure, monitor,
@@ -117,33 +117,33 @@ This delegates the entire 10.2.0.0/16 subnet to weave, and instructs
 it to allocate from 10.2.1.0/24 within that if no specific subnet is
 specified. Now we can launch some containers in the default subnet:
 
-    host1$ weave run --name h1c1 -ti ubuntu
-    host2$ weave run --name h2c1 -ti ubuntu
+    host1$ weave run --name a1 -ti ubuntu
+    host2$ weave run --name a2 -ti ubuntu
 
 And some more containers in a different subnet:
 
-    host1$ weave run net:10.2.2.0/24 --name h1c2 -ti ubuntu
-    host2$ weave run net:10.2.2.0.24 --name h2c2 -ti ubuntu
+    host1$ weave run net:10.2.2.0/24 --name b1 -ti ubuntu
+    host2$ weave run net:10.2.2.0.24 --name b2 -ti ubuntu
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
 
-    host1:~$ docker attach h1c2
+    host1:~$ docker attach b1
 
-    root@h1c2:/# ping -c 1 -q h2c2
-    PING h2c2.weave.local (10.2.2.128) 56(84) bytes of data.
-    --- h2c2.weave.local ping statistics ---
+    root@b1:/# ping -c 1 -q b2
+    PING b2.weave.local (10.2.2.128) 56(84) bytes of data.
+    --- b2.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 1.338/1.338/1.338/0.000 ms
 
-    root@h1c2:/# ping -c 1 -q h1c1
-    PING h1c1.weave.local (10.2.1.2) 56(84) bytes of data.
-    --- h1c1.weave.local ping statistics ---
+    root@b1:/# ping -c 1 -q a1
+    PING a1.weave.local (10.2.1.2) 56(84) bytes of data.
+    --- a1.weave.local ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
 
-    root@h1c2:/# ping -c 1 -q h2c1
-    PING h2c1.weave.local (10.2.1.130) 56(84) bytes of data.
-    --- h2c1.weave.local ping statistics ---
+    root@b1:/# ping -c 1 -q a2
+    PING a2.weave.local (10.2.1.130) 56(84) bytes of data.
+    --- a2.weave.local ping statistics ---
     1 packets transmitted, 0 received, 100% packet loss, time 0ms
 
 
@@ -241,8 +241,8 @@ Now,  after finding allocated IPs via `weave ps`
     host2$ weave ps weave:expose
     weave:expose 02:80:5c:02:f1:b2 10.2.1.132/24
 
-    host1$ weave ps h1c1
-    h1c1 1e:88:d7:5b:77:68 10.2.1.2/24
+    host1$ weave ps a1
+    a1 1e:88:d7:5b:77:68 10.2.1.2/24
 
 this
 
@@ -283,8 +283,8 @@ explained [above](#host-network-integration), i.e.
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
-    host1$ weave ps h1c1
-    h1c1 1e:88:d7:5b:77:68 10.2.1.2/24
+    host1$ weave ps a1
+    a1 1e:88:d7:5b:77:68 10.2.1.2/24
 
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
            -j DNAT --to-destination 10.2.1.2:4422
@@ -292,7 +292,7 @@ destination container service.
 Here we are assuming that the "outside world" is connecting to `$HOST2`
 via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
 routed to our 'nc' service, which is running on port 4422 in the
-container h1c1.
+container a1.
 
 With the above in place, we can connect to our 'nc' service from
 anywhere with
@@ -340,7 +340,7 @@ service on port 2211, e.g.
 
 then we can connect to it from our application container on `$HOST2` with
 
-    root@h2c1:/# echo 'Hello, world.' | nc host1 3322
+    root@a2:/# echo 'Hello, world.' | nc host1 3322
 
 The same command will work from any application container.
 
