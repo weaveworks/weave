@@ -1,15 +1,16 @@
 package router
 
 import (
-	"code.google.com/p/go-bit/bit"
-	"code.google.com/p/go.crypto/nacl/box"
-	"code.google.com/p/go.crypto/nacl/secretbox"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"sync"
+
+	"code.google.com/p/go-bit/bit"
+	"code.google.com/p/go.crypto/nacl/box"
+	"code.google.com/p/go.crypto/nacl/secretbox"
 )
 
 func GenerateKeyPair() (publicKey, privateKey *[32]byte, err error) {

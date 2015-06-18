@@ -2,9 +2,10 @@ package router
 
 import (
 	"fmt"
-	wt "github.com/weaveworks/weave/testing"
 	"math/rand"
 	"testing"
+
+	wt "github.com/weaveworks/weave/testing"
 )
 
 // TODO we should also test:

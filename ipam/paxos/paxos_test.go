@@ -2,10 +2,11 @@ package paxos
 
 import (
 	"fmt"
-	"github.com/weaveworks/weave/router"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/weaveworks/weave/router"
 )
 
 type TestNode struct {

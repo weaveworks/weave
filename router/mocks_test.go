@@ -6,8 +6,9 @@
 package router
 
 import (
-	wt "github.com/weaveworks/weave/testing"
 	"testing"
+
+	wt "github.com/weaveworks/weave/testing"
 )
 
 // Add to peers a connection from peers.ourself to p

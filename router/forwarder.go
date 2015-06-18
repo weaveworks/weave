@@ -1,10 +1,11 @@
 package router
 
 import (
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
 	"syscall"
 	"time"
+
+	"code.google.com/p/gopacket"
+	"code.google.com/p/gopacket/layers"
 )
 
 type ForwardedFrame struct {
