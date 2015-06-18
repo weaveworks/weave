@@ -67,25 +67,25 @@ notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notat
 
 On $HOST1:
 
-    host1$ C=$(weave run 10.2.1.1/24 -ti ubuntu)
+    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
+    root@7ca0f6ecf59f:/#
 
 And $HOST2:
 
-    host2$ C=$(weave run 10.2.1.2/24 -ti ubuntu)
+    host2$ docker run -e WEAVE_CIDR=10.2.1.2/24 -ti ubuntu
+    root@04c4831fafd3:/#
 
-Then on $HOST1...
+Then in the container on $HOST1...
 
-    host1$ docker attach $C
-    root@28841bd02eff:/# ping -c 1 -q 10.2.1.2
+    root@7ca0f6ecf59f:/# ping -c 1 -q 10.2.1.2
     PING 10.2.1.2 (10.2.1.2): 48 data bytes
     --- 10.2.1.2 ping statistics ---
     1 packets transmitted, 1 packets received, 0% packet loss
     round-trip min/avg/max/stddev = 1.048/1.048/1.048/0.000 ms
 
-Similarly, on $HOST2...
+Similarly, in the container on $HOST2...
 
-    host2$ docker attach $C
-    root@f76829496120:/# ping -c 1 -q 10.2.1.1
+    root@04c4831fafd3:/# ping -c 1 -q 10.2.1.1
     PING 10.2.1.1 (10.2.1.1): 48 data bytes
     --- 10.2.1.1 ping statistics ---
     1 packets transmitted, 1 packets received, 0% packet loss
