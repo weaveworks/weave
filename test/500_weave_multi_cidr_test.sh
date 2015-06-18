@@ -36,6 +36,17 @@ assert_zone_records() {
     done
 }
 
+# assert_ips_and_dns <host> <cid> <fqdn> [<cidr> ...]
+assert_ips_and_dns() {
+    HOST=$1
+    CID=$2
+    FQDN=$3
+    shift 3
+
+    assert_container_cidrs $HOST $CID       "$@"
+    assert_zone_records    $HOST $CID $FQDN "$@"
+}
+
 # assert_bridge_cidrs <host> <dev> <cidr> [<cidr> ...]
 assert_bridge_cidrs() {
     HOST=$1
@@ -60,36 +71,29 @@ launch_dns_on $HOST1 10.254.254.254/24
 
 # Run container with three cidrs
 CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME | cut -b 1-12)
-assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
-assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.1
+assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Stop the container
 docker_on              $HOST1 stop $CID
-assert_container_cidrs $HOST1 $CID
-assert_zone_records    $HOST1 $CID $NAME.
+assert_ips_and_dns     $HOST1 $CID $NAME.
 
 # Restart with three IPs
 weave_on               $HOST1 start       10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 $CID
-assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
-assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.1
+assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Remove two of them
 weave_on               $HOST1 detach                  ip:10.2.2.1/24 net:10.2.3.0/24 $CID
-assert_container_cidrs $HOST1 $CID        10.2.1.1/24
-assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1
+assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24
 # ...and the remaining one
 weave_on               $HOST1 detach      10.2.1.1/24                                $CID
-assert_container_cidrs $HOST1 $CID
-assert_zone_records    $HOST1 $CID $NAME.
+assert_ips_and_dns     $HOST1 $CID $NAME.
 
 # Put one back
 weave_on               $HOST1 attach      10.2.1.1/24                                $CID
-assert_container_cidrs $HOST1 $CID        10.2.1.1/24
-assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1
+assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24
 # ...and the remaining two
 weave_on               $HOST1 attach                  ip:10.2.2.1/24 net:10.2.3.0/24 $CID
-assert_container_cidrs $HOST1 $CID        10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
-assert_zone_records    $HOST1 $CID $NAME. 10.2.1.1       10.2.2.1        10.2.3.1
+assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Expose three cidrs
 weave_on               $HOST1 expose      10.2.1.2/24 ip:10.2.2.2/24 net:10.2.3.0/24
