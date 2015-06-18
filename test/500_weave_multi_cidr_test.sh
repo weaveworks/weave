@@ -26,12 +26,13 @@ assert_zone_records() {
     FQDN=$3
     shift 3
 
+    records=$(weave_on $HOST status | grep "^$CID") || true
     # Assert correct number of records exist
-    assert "weave_on $HOST status | grep '^$CID' | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | wc -l" $#
+    assert "echo $records | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | wc -l" $#
 
     # Assert correct records exist
     for ADDR; do
-        assert_raises "weave_on $HOST status | grep '$CID' | grep '${ADDR%/*}' | grep '$FQDN'"
+        assert_raises "echo $records | grep '${ADDR%/*}' | grep '$FQDN'"
     done
 }
 
