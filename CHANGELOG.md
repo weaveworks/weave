@@ -1,3 +1,38 @@
+## Release 1.0.0
+
+**Highlights**:
+
+- It is now easier than ever to start containers and for them to
+  communicate, across multiple hosts. Automatic IP address allocation,
+  and name resolution via weaveDNS are now enabled by default, and the
+  proxy has become more fully-featured. In short, once weave has been
+  launched the following is possible:
+
+      ````
+      host1$ docker run --name=pingme -dti ubuntu
+      host2$ docker run -ti ubuntu
+      root@d11e9287f65b:/# ping pingme
+      ````
+- Containers can now be
+  [load-balanced](http://docs.weave.works/weave/master/head/weavedns.html#load-balancing)
+  easily.
+- IP address allocation is now available across [multiple
+  subnets](http://docs.weave.works/weave/master/head/ipam.html#range),
+  and hence can be employed when running multiple, isolated
+  applications.
+- The proxy now supports [TLS
+  connections](http://docs.weave.works/weave/master/head/proxy.html#tls),
+  enabling its deployment when the communication between docker
+  clients and the server must be secured.
+
+There are many other new features, plus the usual assortment of bug
+fixes and improvements under the hood. More detail below and in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.0.0).
+
+*NB: This release changes the weave protocol version. Therefore, when
+ upgrading an existing installation, all hosts need to be upgraded in
+ order to for them to be able to communicate and form a network.*
+
 ## Release 0.11.2
 
 This is a bug fix release, addressing the following issues:
