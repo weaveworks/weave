@@ -58,9 +58,6 @@ func NewProxy(c Config) (*Proxy, error) {
 
 	p := &Proxy{
 		Config: c,
-		dial: func() (net.Conn, error) {
-			return net.Dial(u.Scheme, targetAddr)
-		},
 	}
 
 	if !p.WithoutDNS {
@@ -75,7 +72,24 @@ func NewProxy(c Config) (*Proxy, error) {
 		Error.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
-	p.client, err = docker.NewClient(p.DockerAddr)
+	if p.TLSConfig.enabled() && u.Scheme == "tcp" {
+		p.dial = func() (net.Conn, error) {
+			return p.TLSConfig.Dial(u.Scheme, targetAddr)
+		}
+
+		p.client, err = docker.NewTLSClient(
+			p.DockerAddr,
+			p.TLSConfig.CertFile,
+			p.TLSConfig.KeyFile,
+			p.TLSConfig.CAFile,
+		)
+	} else {
+		p.dial = func() (net.Conn, error) {
+			return net.Dial(u.Scheme, targetAddr)
+		}
+
+		p.client, err = docker.NewClient(p.DockerAddr)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +121,7 @@ func (proxy *Proxy) ListenAndServe() error {
 	}
 
 	if proxy.TLSConfig.enabled() {
-		listener = tls.NewListener(listener, proxy.TLSConfig.Config)
+		listener = tls.NewListener(listener, proxy.TLSConfig.server)
 	}
 
 	Info.Println("proxy listening on", proxy.ListenAddr)

@@ -2,19 +2,19 @@ package proxy
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"fmt"
-	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 
 	"github.com/docker/docker/pkg/homedir"
+	"github.com/docker/docker/pkg/tlsconfig"
 )
 
 type TLSConfig struct {
-	Enabled, Verify   bool
-	Cert, Key, CACert string
-	*tls.Config
+	Enabled, Verify bool
+	tlsconfig.Options
+	server *tls.Config
+	client *tls.Config
 }
 
 func (c *TLSConfig) enabled() bool {
@@ -34,43 +34,30 @@ func (c *TLSConfig) loadCerts() error {
 		dockerCertPath = filepath.Join(homedir.Get(), ".docker")
 	}
 
-	if c.CACert == "" {
-		c.CACert = filepath.Join(dockerCertPath, defaultCaFile)
+	if c.CAFile == "" {
+		c.CAFile = filepath.Join(dockerCertPath, defaultCaFile)
 	}
-	if c.Cert == "" {
-		c.Cert = filepath.Join(dockerCertPath, defaultCertFile)
+	if c.CertFile == "" {
+		c.CertFile = filepath.Join(dockerCertPath, defaultCertFile)
 	}
-	if c.Key == "" {
-		c.Key = filepath.Join(dockerCertPath, defaultKeyFile)
-	}
-
-	tlsConfig := &tls.Config{
-		NextProtos: []string{"http/1.1"},
-		// Avoid fallback on insecure SSL protocols
-		MinVersion: tls.VersionTLS10,
+	if c.KeyFile == "" {
+		c.KeyFile = filepath.Join(dockerCertPath, defaultKeyFile)
 	}
 
+	var err error
+	c.InsecureSkipVerify = !c.Verify
 	if c.Verify {
-		certPool := x509.NewCertPool()
-		file, err := ioutil.ReadFile(c.CACert)
-		if err != nil {
-			return fmt.Errorf("Couldn't read CA certificate: %v", err)
-		}
-		certPool.AppendCertsFromPEM(file)
-		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		tlsConfig.ClientCAs = certPool
+		c.ClientAuth = tls.RequireAndVerifyClientCert
 	}
 
-	_, errCert := os.Stat(c.Cert)
-	_, errKey := os.Stat(c.Key)
-	if errCert == nil && errKey == nil {
-		cert, err := tls.LoadX509KeyPair(c.Cert, c.Key)
-		if err != nil {
-			return fmt.Errorf("Couldn't load X509 key pair: %q. Make sure the key is encrypted", err)
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
+	if c.client, err = tlsconfig.Client(c.Options); err != nil {
+		return err
 	}
 
-	c.Config = tlsConfig
-	return nil
+	c.server, err = tlsconfig.Server(c.Options)
+	return err
+}
+
+func (c *TLSConfig) Dial(scheme, targetAddr string) (net.Conn, error) {
+	return tls.Dial(scheme, targetAddr, c.client)
 }
