@@ -67,25 +67,25 @@ notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notat
 
 On $HOST1:
 
-    host1$ C=$(weave run 10.2.1.1/24 -ti ubuntu)
+    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
+    root@7ca0f6ecf59f:/#
 
 And $HOST2:
 
-    host2$ C=$(weave run 10.2.1.2/24 -ti ubuntu)
+    host2$ docker run -e WEAVE_CIDR=10.2.1.2/24 -ti ubuntu
+    root@04c4831fafd3:/#
 
-Then on $HOST1...
+Then in the container on $HOST1...
 
-    host1$ docker attach $C
-    root@28841bd02eff:/# ping -c 1 -q 10.2.1.2
+    root@7ca0f6ecf59f:/# ping -c 1 -q 10.2.1.2
     PING 10.2.1.2 (10.2.1.2): 48 data bytes
     --- 10.2.1.2 ping statistics ---
     1 packets transmitted, 1 packets received, 0% packet loss
     round-trip min/avg/max/stddev = 1.048/1.048/1.048/0.000 ms
 
-Similarly, on $HOST2...
+Similarly, in the container on $HOST2...
 
-    host2$ docker attach $C
-    root@f76829496120:/# ping -c 1 -q 10.2.1.1
+    root@04c4831fafd3:/# ping -c 1 -q 10.2.1.1
     PING 10.2.1.1 (10.2.1.1): 48 data bytes
     --- 10.2.1.1 ping statistics ---
     1 packets transmitted, 1 packets received, 0% packet loss
@@ -109,26 +109,26 @@ Let's begin by configuring weave's allocator to manage multiple
 subnets:
 
     host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24
-    host1$ weave launch-dns
+    host1$ weave launch-dns && weave launch-proxy
+    host1$ eval $(weave proxy-env)
     host2$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24 $HOST1
-    host2$ weave launch-dns
+    host2$ weave launch-dns && weave launch-proxy
+    host2$ eval $(weave proxy-env)
 
 This delegates the entire 10.2.0.0/16 subnet to weave, and instructs
 it to allocate from 10.2.1.0/24 within that if no specific subnet is
 specified. Now we can launch some containers in the default subnet:
 
-    host1$ weave run --name a1 -ti ubuntu
-    host2$ weave run --name a2 -ti ubuntu
+    host1$ docker run --name a1 -ti ubuntu
+    host2$ docker run --name a2 -ti ubuntu
 
 And some more containers in a different subnet:
 
-    host1$ weave run net:10.2.2.0/24 --name b1 -ti ubuntu
-    host2$ weave run net:10.2.2.0.24 --name b2 -ti ubuntu
+    host1$ docker run -e WEAVE_CIDR=net:10.2.2.0/24 --name b1 -ti ubuntu
+    host2$ docker run -e WEAVE_CIDR=net:10.2.2.0.24 --name b2 -ti ubuntu
 
 A quick 'ping' test in the containers confirms that they can talk to
 each other but not the containers of our first application...
-
-    host1:~$ docker attach b1
 
     root@b1:/# ping -c 1 -q b2
     PING b2.weave.local (10.2.2.128) 56(84) bytes of data.
@@ -153,7 +153,7 @@ well-known technique from the 'on metal' days to containers.
 If desired, a container can be attached to multiple subnets when it is
 started:
 
-    host1$ weave run net:default net:10.2.2.0/24 -ti ubuntu
+    host1$ docker run -e WEAVE_CIDR="net:default net:10.2.2.0/24" -ti ubuntu
 
 NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
@@ -174,8 +174,13 @@ situations, weave allows an existing, running container to be attached
 to the weave network. To illustrate, we can achieve the same effect as
 the first example with
 
-    host1$ C=$(docker run -d -t -i ubuntu)
+    host1$ C=$(docker run -e WEAVE_CIDR=none -dti ubuntu)
     host1$ weave attach $C
+
+(Note that since we modified `DOCKER_HOST` to point to the proxy
+earlier, we have to pass `-e WEAVE_CIDR=none` to start a container
+that _doesn't_ get automatically attached to the weave network for the
+purposes of this example.)
 
 There is a matching `weave detach` command:
 
