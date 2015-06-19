@@ -16,8 +16,8 @@ instead of `weave run`.
  * [Usage](#usage)
  * [Automatic IP address assignment](#ipam)
  * [Automatic discovery](#dns)
- * [Multi-host example](#multi-host)
  * [Securing the docker communication with TLS](#tls)
+ * [Launching containers without the proxy](#without-proxy)
  * [Troubleshooting](#troubleshooting)
 
 ## <a name="setup"></a>Setup
@@ -90,12 +90,6 @@ Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
 `WEAVE_CIDR="10.2.1.1/24 10.2.2.1/24"`.
 
-Using the proxy brings some additional benefits over `weave run`. The
-proxy ensures that the weave network interface is available before
-starting a container's application process. Furthermore, containers
-can be started in foreground mode, and can be automatically removed
-(with the ususal `--rm`).
-
 ## <a name="ipam"></a>Automatic IP address assignment
 
 If [automatic IP address assignment](ipam.html) is enabled in weave,
@@ -129,48 +123,10 @@ container with a blank `WEAVE_CIDR`, e.g.
 
 ## <a name="dns"></a>Automatic discovery
 
-Containers started via the proxy are automatically registered in
-[weaveDNS](weavedns.html) if they have a hostname in the weaveDNS
-domain (usually `.weave.local`). In order for containers to be able to
-look up such names, their DNS resolver needs to be configured to point
-at weaveDNS. This will be done automatically by the proxy while
-weaveDNS is running. To override this behaviour launch the proxy with
-either `--with-dns` or `--without-dns`, which will force the proxy to
-always/never set the resolver to weaveDNS. If there is no hostname
-provided, the container will be registered in weaveDNS using its
-container name. Otherwise, if there is no container name, and no
-hostname (or a hostname outside the weaveDNS domain), the container
-will not be registered in weaveDNS.
-
-## <a name="multi-host"></a>Multi-host example
-
-Here's a complete example of using weave proxies configured with
-[automatic IP address assignment](#ipam) and
-[automatic discovery](#dns) to start containers on two hosts such that
-one can reach the other by name.
-
-First, let us start weave, weaveDNS and the proxy, and set DOCKER_HOST
-to point at the latter:
-
-    host1$ weave launch
-    host1$ weave launch-dns
-    host1$ weave launch-proxy
-    host1$ eval "$(weave proxy-env)"
-
-    host2$ weave launch host1
-    host2$ weave launch-dns
-    host2$ weave launch-proxy
-    host2$ eval "$(weave proxy-env)"
-
-Now let us start a named container on one host, and ping it, by name,
-from a container on the other host.
-
-    host1$ docker run --name=pingme -dti ubuntu
-
-    host2$ docker run -ti ubuntu ping pingme
-    PING pingme.weave.local (10.128.0.2) 56(84) bytes of data.
-    64 bytes from pingme.weave.local (10.128.0.2): icmp_seq=1 ttl=64 time=0.047 ms
-    ...
+Containers launched via the proxy will use [weaveDNS](weavedns.html)
+automatically if it is running at the point when they are started -
+see the [weaveDNS usage](weavedns.html#usage) section for an in-depth
+explanation of the behaviour and how to control it.
 
 ## <a name="tls"></a>Securing the docker communication with TLS
 
@@ -217,6 +173,33 @@ with
 which is exactly the same configuration as when connecting to the
 docker daemon directly, except that the specified port is the weave
 proxy port.
+
+## <a name="without-proxy"></a>Launching containers without the proxy
+
+If you cannot or do not want to use the proxy you can launch
+containers on the weave network with `weave run`:
+
+    $ weave run -ti ubuntu
+
+The arguments after `run` are passed through to `docker run` so you
+can freely specify whichever docker options are appropriate. Once the
+container is started, `weave run` attaches it to the weave network, in
+this example with an address allocated by IPAM. If you wish you can
+specify addresses manually instead:
+
+    $ weave run 10.2.1.1/24 -ti ubuntu
+
+There are some limitations to starting containers with `weave run`:
+
+* containers are always started in the background, i.e. the equivalent
+  of always supplying the -d option to docker run
+* the --rm option to docker run, for automatically removing containers
+  after they stop, is not available
+* the weave network interface may not be available immediately on
+  container startup.
+
+Finally, there is a `weave start` command which starts existing
+containers with `docker start` and attaches them to the weave network.
 
 ## <a name="troubleshooting"></a>Troubleshooting
 
