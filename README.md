@@ -2,6 +2,14 @@
 
 [![Build Status](https://travis-ci.org/weaveworks/weave.svg?branch=master)](https://travis-ci.org/weaveworks/weave) [![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield&circle-token=4933c7dabb3d0383e62117565cb9d16df7b1a811)](https://circleci.com/gh/weaveworks/weave) [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
 
+# About Weaveworks
+
+[Come meet Weaveworks at Dockercon](http://weave.works/dockercon)
+
+[Weaveworks](http://weave.works) is the company that develops Weave - the most productive way for developers to connect, observe and control Docker containers. To learn about our products, including getting started tutorials, visit our [website](http://weave.works), read about the [1.0 release of Weave](http://blog.weave.works/2015/06/18/weave-1-0-is-out-and-it-is-good/), visit our [documentation](http://docs.weave.works) or continue to read about some of the more technical aspects of Weave in this readme.  
+
+# Weave
+
 Weave creates a virtual network that connects Docker containers
 deployed across multiple hosts and enables their automatic discovery.
 
