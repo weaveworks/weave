@@ -16,11 +16,10 @@ import (
 
 func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Request) {
 	if err := i.InterceptRequest(r); err != nil {
-		_, isNoSuchContainer := err.(*docker.NoSuchContainer)
-		switch {
-		case isNoSuchContainer:
+		switch err.(type) {
+		case *docker.NoSuchContainer:
 			http.Error(w, err.Error(), http.StatusNotFound)
-		case err == docker.ErrNoSuchImage:
+		case *ErrNoSuchImage:
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)

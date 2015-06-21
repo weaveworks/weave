@@ -21,6 +21,17 @@ type createContainerRequestBody struct {
 	MacAddress string             `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
 }
 
+// Replacement for docker.NoSuchImage, which does not contain the
+// image name, which in turn breaks docker clients post 1.7.0 since
+// they expect the image name to be present in errors.
+type ErrNoSuchImage struct {
+	Name string
+}
+
+func (err *ErrNoSuchImage) Error() string {
+	return "No such image: " + err.Name
+}
+
 func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -63,7 +74,9 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
 	if len(container.Entrypoint) == 0 {
 		image, err := i.proxy.client.InspectImage(container.Image)
-		if err != nil {
+		if err == docker.ErrNoSuchImage {
+			return &ErrNoSuchImage{container.Image}
+		} else if err != nil {
 			return err
 		}
 
