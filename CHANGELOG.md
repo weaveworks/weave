@@ -1,3 +1,11 @@
+## Release 1.0.1
+
+This is a bug fix release, addressing the following issue:
+
+- executing `docker run` from a Docker 1.7 client against the weave
+  proxy would report a `no such image` error when the requested image
+  wasn't present on the Docker host, instead of downloading it.
+
 ## Release 1.0.0
 
 **Highlights**:
