@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 
@@ -25,7 +24,6 @@ var (
 )
 
 type Config struct {
-	DockerAddr    string
 	ListenAddr    string
 	NoDefaultIPAM bool
 	TLSConfig     TLSConfig
@@ -36,32 +34,12 @@ type Config struct {
 
 type Proxy struct {
 	Config
-
-	dial           func() (net.Conn, error)
 	client         *docker.Client
 	dockerBridgeIP string
 }
 
 func NewProxy(c Config) (*Proxy, error) {
-	u, err := url.Parse(c.DockerAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	targetAddr := ""
-	switch u.Scheme {
-	case "tcp":
-		targetAddr = u.Host
-	case "unix":
-		targetAddr = u.Path
-	}
-
-	p := &Proxy{
-		Config: c,
-		dial: func() (net.Conn, error) {
-			return net.Dial(u.Scheme, targetAddr)
-		},
-	}
+	p := &Proxy{Config: c}
 
 	if !p.WithoutDNS {
 		dockerBridgeIP, err := callWeave("docker-bridge-ip")
@@ -75,12 +53,16 @@ func NewProxy(c Config) (*Proxy, error) {
 		Error.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
-	p.client, err = docker.NewClient(p.DockerAddr)
+	client, err := docker.NewClient("unix:///var/run/docker.sock")
 	if err != nil {
 		return nil, err
 	}
-
+	p.client = client
 	return p, nil
+}
+
+func (proxy *Proxy) Dial() (net.Conn, error) {
+	return net.Dial("unix", "/var/run/docker.sock")
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {

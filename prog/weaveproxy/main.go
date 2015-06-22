@@ -12,7 +12,6 @@ import (
 
 var (
 	version           = "(unreleased version)"
-	defaultDockerAddr = "unix:///var/run/docker.sock"
 	defaultListenAddr = "tcp://0.0.0.0:12375"
 )
 
@@ -20,17 +19,13 @@ func main() {
 	var (
 		debug       bool
 		justVersion bool
-		c           = proxy.Config{
-			DockerAddr: defaultDockerAddr,
-			ListenAddr: defaultListenAddr,
-		}
+		c           = proxy.Config{ListenAddr: defaultListenAddr}
 	)
 
 	c.Version = version
 	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
 	getopt.BoolVarLong(&justVersion, "version", 0, "print version and exit")
 	getopt.StringVar(&c.ListenAddr, 'H', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddr))
-	getopt.StringVar(&c.DockerAddr, 'D', fmt.Sprintf("docker daemon URL to proxy (default %s)", defaultDockerAddr))
 	getopt.BoolVarLong(&c.NoDefaultIPAM, "no-default-ipam", 0, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
 	getopt.StringVarLong(&c.TLSConfig.CACert, "tlscacert", 0, "Trust certs signed only by this CA")
 	getopt.StringVarLong(&c.TLSConfig.Cert, "tlscert", 0, "Path to TLS certificate file")
