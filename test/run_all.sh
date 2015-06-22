@@ -1,9 +1,10 @@
 #!/bin/bash
 
-. ./config.sh
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$DIR/config.sh"
 
 whitely echo Sanity checks
-if ! bash ./sanity_check.sh; then
+if ! bash "$DIR/sanity_check.sh"; then
     whitely echo ...failed
     exit 1
 fi
@@ -27,8 +28,8 @@ trap check_test_status EXIT
 TESTS="${@:-*_test.sh}"
 
 # If running on circle, use the scheduler to work out what tests to run
-if [ -n "$CIRCLECI" ]; then
-    TESTS=$(echo $TESTS | ./sched sched $CIRCLE_BUILD_NUM $CIRCLE_NODE_TOTAL $CIRCLE_NODE_INDEX)
+if [ -n "$CIRCLECI" -a -z "$NO_SCHEDULER" ]; then
+    TESTS=$(echo $TESTS | "$DIR/sched" sched $CIRCLE_BUILD_NUM $CIRCLE_NODE_TOTAL $CIRCLE_NODE_INDEX)
 fi
 
 echo Running $TESTS
@@ -39,7 +40,7 @@ for t in $TESTS; do
     . $t
 
     # Report test runtime when running on circle, to help scheduler
-    if [ -n "$CIRCLECI" ]; then
-        ./sched time $t $(bc -l <<< "$tests_time/1000000000")
+    if [ -n "$CIRCLECI" -a -z "$NO_SCHEDULER" ]; then
+        "$DIR/sched" time $t $(bc -l <<< "$tests_time/1000000000")
     fi
 done
