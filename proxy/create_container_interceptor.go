@@ -89,7 +89,10 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 		}
 	}
 
-	container.Entrypoint = append(weaveWaitEntrypoint, container.Entrypoint...)
+	if len(container.Entrypoint) == 0 || container.Entrypoint[0] != weaveWaitEntrypoint[0] {
+		container.Entrypoint = append(weaveWaitEntrypoint, container.Entrypoint...)
+	}
+
 	return nil
 }
 
