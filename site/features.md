@@ -175,33 +175,44 @@ illustrate, we can achieve the same effect as the first example with
 
     host1$ C=$(docker run -e WEAVE_CIDR=none -dti ubuntu)
     host1$ weave attach $C
+    10.2.1.3
 
 (Note that since we modified `DOCKER_HOST` to point to the proxy
 earlier, we have to pass `-e WEAVE_CIDR=none` to start a container
 that _doesn't_ get automatically attached to the weave network for the
 purposes of this example.)
 
+The output shows the IP address that got allocated, in this case on
+the default subnet.
+
 There is a matching `weave detach` command:
 
     host1$ weave detach $C
+    10.2.1.3
 
 You can detach a container from one application network and attach it
 to another:
 
     host1$ weave detach net:default $C
+    10.2.1.3
     host1$ weave attach net:10.2.2.0/24 $C
+    10.2.2.3
 
 or attach a container to multiple application networks, effectively
 sharing it between applications:
 
     host1$ weave attach net:default
+    10.2.1.3
     host1$ weave attach net:10.2.2.0/24
+    10.2.2.3
 
 Finally, multiple addresses can be attached or detached with a single
 invocation:
 
     host1$ weave attach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
+    10.2.1.3 10.2.2.3 10.2.3.1
     host1$ weave detach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
+    10.2.1.3 10.2.2.3 10.2.3.1
 
 ### <a name="security"></a>Security
 
@@ -237,37 +248,36 @@ Let's say that in our example we want `$HOST2` to have access to the
 application containers. On `$HOST2` we run
 
     host2$ weave expose
+    10.2.1.132
 
-(There is a corresponding 'hide' command to revert this step.)
+This grants the host access to all application containers in the
+default subnet. An IP address is allocated for that purpose, which is
+returned. So now
 
-Now,  after finding allocated IPs via `weave ps`
+    host2$ ping 10.2.1.132
 
-    host2$ weave ps weave:expose
-    weave:expose 02:80:5c:02:f1:b2 10.2.1.132/24
+will work, and, more interestingly, we can ping our `a1` application
+container, which is residing on `$HOST1`, after finding its IP
+address:
 
     host1$ weave ps a1
     a1 1e:88:d7:5b:77:68 10.2.1.2/24
 
-this
-
-    host2$ ping 10.2.1.132
-
-will work. And, more interestingly,
-
     host2$ ping 10.2.1.2
-
-will work too, which is talking to a container that resides on `$HOST1`.
 
 Multiple subnet addresses can be exposed or hidden with a single
 invocation:
 
     host2$ weave expose net:default net:10.2.2.0/24
+    10.2.1.132 10.2.2.130
     host2$ weave hide   net:default net:10.2.2.0/24
+    10.2.1.132 10.2.2.130
 
 Finally, exposed addresses can be added to weaveDNS by supplying a
 fully-qualified domain name:
 
     host2$ weave expose -h exposed.weave.local
+    10.2.1.132
 
 ### <a name="service-export"></a>Service export
 
@@ -283,6 +293,7 @@ First we need to expose the application network to `$HOST2`, as
 explained [above](#host-network-integration), i.e.
 
     host2$ weave expose
+    10.2.1.132
 
 Then we add a NAT rule to route from the outside world to the
 destination container service.
@@ -326,12 +337,10 @@ explained [above](#host-network-integration), this time on `$HOST1`,
 i.e.
 
     host1$ weave expose -h host1.weave.local
+    10.2.1.3
 
 Then we add a NAT rule to route from the above IP to the destination
 service.
-
-    host1$ weave ps weave:expose
-    weave:expose 66:46:f5:ac:7b:c9 10.2.1.3/24
 
     host1$ iptables -t nat -A PREROUTING -p tcp -d 10.2.1.3 --dport 3322 \
            -j DNAT --to-destination $HOST3:2211
@@ -376,13 +385,11 @@ weave via `$HOST1`. We can export it on `$HOST2` by first exposing the
 application network with
 
     host2$ weave expose
+    10.2.1.3
 
 and then adding a NAT rule which routes traffic from the `$HOST2`
 network (i.e. anything which can connect to `$HOST2`) to the service
 endpoint in the weave network
-
-    host1$ weave ps weave:expose
-    weave:expose 66:46:f5:ac:7b:c9 10.2.1.3/24
 
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
            -j DNAT --to-destination 10.2.1.3:3322

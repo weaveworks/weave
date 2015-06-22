@@ -143,7 +143,7 @@ if [ "$1" = "run" ] ; then
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
     CONTAINER=$(docker $DOCKER_CLIENT_ARGS run $DNS_ARGS -d "$@")
-    exec_remote attach $CIDR_ARGS --or-die $CONTAINER
+    exec_remote attach $CIDR_ARGS --or-die $CONTAINER >/dev/null
     echo $CONTAINER
     exit 0
 elif [ "$1" != "--local" ] ; then
@@ -850,6 +850,14 @@ ipam_cidrs_or_die() {
     fi
 }
 
+show_addrs() {
+    addrs=
+    for cidr in "$@" ; do
+        addrs="$addrs ${cidr%/*}"
+    done
+    echo $addrs
+}
+
 ######################################################################
 # weave proxy helpers
 ######################################################################
@@ -1170,6 +1178,7 @@ case "$COMMAND" in
         ipam_cidrs$ATTACH_TYPE $CONTAINER $CIDR_ARGS
         with_container_netns$ATTACH_TYPE $CONTAINER attach $ALL_CIDRS >/dev/null
         when_dns_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
+        show_addrs $ALL_CIDRS
         ;;
     detach)
         collect_cidr_args "$@"
@@ -1182,6 +1191,7 @@ case "$COMMAND" in
         for CIDR in $IPAM_CIDRS ; do
             call_weave DELETE /ip/$CONTAINER/${CIDR%/*}
         done
+        show_addrs $ALL_CIDRS
         ;;
     dns-add)
         collect_ip_args "$@"
@@ -1229,6 +1239,7 @@ case "$COMMAND" in
                 fi
             fi
         done
+        show_addrs $ALL_CIDRS
         ;;
     hide)
         collect_cidr_args "$@"
@@ -1246,6 +1257,7 @@ case "$COMMAND" in
         for CIDR in $IPAM_CIDRS ; do
             call_weave DELETE /ip/weave:expose/${CIDR%/*}
         done
+        show_addrs $ALL_CIDRS
         ;;
     stop)
         [ $# -eq 0 ] || usage

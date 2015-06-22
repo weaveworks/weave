@@ -58,6 +58,13 @@ assert_bridge_cidrs() {
     assert "echo $BRIDGE_CIDRS" "$CIDRS"
 }
 
+assert_equal() {
+    result=$1
+    shift
+    expected="$@"
+    assert "echo $result" "$expected"
+}
+
 start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr arguments"
 
 # also check that these commands understand all address flavours
@@ -82,33 +89,41 @@ weave_on               $HOST1 start       10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Remove two of them
-weave_on               $HOST1 detach                  ip:10.2.2.1/24 net:10.2.3.0/24 $CID
+IPS=$(weave_on         $HOST1 detach                  ip:10.2.2.1/24 net:10.2.3.0/24 $CID)
+assert_equal "$IPS"                                      10.2.2.1        10.2.3.1
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24
 # ...and the remaining one
-weave_on               $HOST1 detach      10.2.1.1/24                                $CID
+IPS=$(weave_on         $HOST1 detach      10.2.1.1/24                                $CID)
+assert_equal "$IPS"                       10.2.1.1
 assert_ips_and_dns     $HOST1 $CID $NAME.
 
 # Put one back
-weave_on               $HOST1 attach      10.2.1.1/24                                $CID
+IPS=$(weave_on         $HOST1 attach      10.2.1.1/24                                $CID)
+assert_equal "$IPS"                       10.2.1.1
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24
 # ...and the remaining two
-weave_on               $HOST1 attach                  ip:10.2.2.1/24 net:10.2.3.0/24 $CID
+IPS=$(weave_on         $HOST1 attach                  ip:10.2.2.1/24 net:10.2.3.0/24 $CID)
+assert_equal "$IPS"                                      10.2.2.1        10.2.3.1
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Expose three cidrs
-weave_on               $HOST1 expose      10.2.1.2/24 ip:10.2.2.2/24 net:10.2.3.0/24
+IPS=$(weave_on         $HOST1 expose      10.2.1.2/24 ip:10.2.2.2/24 net:10.2.3.0/24)
+assert_equal "$IPS"                       10.2.1.2       10.2.2.2        10.2.3.2
 assert_bridge_cidrs    $HOST1 weave       10.2.1.2/24    10.2.2.2/24     10.2.3.2/24
 
 # Hide two of them
-weave_on               $HOST1 hide                    ip:10.2.2.2/24 net:10.2.3.0/24
+IPS=$(weave_on         $HOST1 hide                    ip:10.2.2.2/24 net:10.2.3.0/24)
+assert_equal "$IPS"                                      10.2.2.2        10.2.3.2
 assert_bridge_cidrs    $HOST1 weave       10.2.1.2/24
 # ...and the remaining one
-weave_on               $HOST1 hide        10.2.1.2/24
+IPS=$(weave_on         $HOST1 hide        10.2.1.2/24)
+assert_equal "$IPS"                       10.2.1.2
 assert_bridge_cidrs    $HOST1 weave
 
 # Now detach and run another container to check we have released IPs in IPAM
-weave_on               $HOST1 detach $CID
-CID2=$(start_container $HOST1         net:10.2.3.0/24)
-assert_container_cidrs $HOST1 $CID2       10.2.3.1/24
+IPS=$(weave_on         $HOST1 detach                                                 $CID)
+assert_equal "$IPS"                                                      10.2.3.1
+CID2=$(start_container $HOST1                                        net:10.2.3.0/24)
+assert_container_cidrs $HOST1 $CID2                                      10.2.3.1/24
 
 end_suite
