@@ -41,14 +41,6 @@ type Proxy struct {
 func NewProxy(c Config) (*Proxy, error) {
 	p := &Proxy{Config: c}
 
-	if !p.WithoutDNS {
-		dockerBridgeIP, err := callWeave("docker-bridge-ip")
-		if err != nil {
-			return nil, err
-		}
-		p.dockerBridgeIP = string(dockerBridgeIP)
-	}
-
 	if err := p.TLSConfig.loadCerts(); err != nil {
 		Error.Fatalf("Could not configure tls for proxy: %s", err)
 	}
@@ -58,6 +50,15 @@ func NewProxy(c Config) (*Proxy, error) {
 		return nil, err
 	}
 	p.client = client
+
+	if !p.WithoutDNS {
+		dockerBridgeIP, err := callWeave("docker-bridge-ip")
+		if err != nil {
+			return nil, err
+		}
+		p.dockerBridgeIP = string(dockerBridgeIP)
+	}
+
 	return p, nil
 }
 
