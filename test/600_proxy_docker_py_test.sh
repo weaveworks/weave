@@ -4,6 +4,8 @@
 
 start_suite "Run docker-py test suite against the proxy"
 
+docker_on $HOST1 pull joffrey/docker-py >/dev/null
+
 weave_on $HOST1 launch-proxy --no-default-ipam
 
 if docker_on $HOST1 run \
