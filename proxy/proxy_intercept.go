@@ -28,7 +28,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	conn, err := proxy.dial()
+	conn, err := proxy.Dial()
 	if err != nil {
 		http.Error(w, "Could not connect to target", http.StatusInternalServerError)
 		Warning.Print(err)
