@@ -337,7 +337,7 @@ service.
            -j DNAT --to-destination $HOST3:2211
 
 This allows any application container to reach the service by
-connecting to 10.2.1.101:3322. So if `$HOST3` is indeed running a netcat
+connecting to 10.2.1.3:3322. So if `$HOST3` is indeed running a netcat
 service on port 2211, e.g.
 
     host3$ nc -lk -p 2211
@@ -394,7 +394,7 @@ Now any host on the same network as `$HOST2` can access the service with
 Furthermore, as explained in [service-binding](#service-binding), we
 can dynamically alter the service locations without having to touch
 the applications that access them, e.g. we could move the example
-netcat service to `$HOST4:2211` while retaining its 10.2.1.101:3322
+netcat service to `$HOST4:2211` while retaining its 10.2.1.3:3322
 endpoint in the weave network.
 
 ### <a name="multi-cloud-networking"></a>Multi-cloud networking
