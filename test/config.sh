@@ -85,7 +85,7 @@ docker_on() {
 }
 
 proxy() {
-  DOCKER_PORT=12375 "$@"
+    DOCKER_PORT=12375 "$@"
 }
 
 weave_on() {
