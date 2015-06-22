@@ -5,7 +5,6 @@
 start_suite "Run docker-py test suite against the proxy"
 
 weave_on $HOST1 launch-proxy --no-default-ipam
-assert_raises "docker_on $HOST1 ps | grep weaveproxy"
 
 if docker_on $HOST1 run \
     -e NOT_ON_HOST=true \
