@@ -56,7 +56,7 @@ our data centre.
 
 ### <a name="manual-addressing"></a>Manual addressing
 
-The examples so far have leveraged weave's [address allocation](#ipam)
+The examples so far have leveraged weave's [address allocation](ipam.html)
 and [discovery](#dns) features, meaning that we've not had to concern
 ourselves with IP addresses at all. It is, however, possible to
 specify address and network explicitly using [CIDR
@@ -91,7 +91,7 @@ Similarly, in the container on $HOST2...
 
 The IP addresses and netmasks can be anything you like, but make sure
 they don't conflict with any IP ranges in use on the hosts (including
-those delegated to weave's [automatic IP address allocator](#ipam)) or
+those delegated to weave's [automatic IP address allocator](ipam.html)) or
 IP addresses of external services the hosts or containers need to
 connect to. The same IP range must be used everywhere, and the
 individual IP addresses must, of course, be unique.
