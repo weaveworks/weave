@@ -21,7 +21,6 @@ hosts.
 * [Configuring a custom TTL](#ttl)
 * [Configuring the domain search path](#domain-search-path)
 * [Using a different local domain](#local-domain)
-* [Using weaveDNS without `weave run`](#without-run)
 * [Troubleshooting](#troubleshooting)
 * [Present limitations](#limitations)
 
@@ -30,76 +29,53 @@ hosts.
 WeaveDNS is deployed as a set of containers that communicate with each
 other over the weave network. One such container needs to be started
 on every weave host, by invoking the weave script command
-`launch-dns`.
+`launch-dns`:
 
 ```bash
-$ weave launch
-$ weave launch-dns 10.2.254.1/24
+host1$ weave launch && weave launch-dns && weave launch-proxy
+host1$ eval $(weave proxy-env)
 ```
 
-Containers started while weaveDNS is running are automatically
-registered in [weaveDNS](weavedns.html) if they have a hostname in the
-weaveDNS domain (usually `.weave.local`). In order for containers to
-be able to look up such names, their DNS resolver needs to be
-configured to point at weaveDNS. This will be done automatically while
-weaveDNS is running. If there is no hostname provided, the container
-will be registered in weaveDNS using its container name. Otherwise, if
-there is no container name, and no hostname (or a hostname outside the
-weaveDNS domain), the container will not be registered in weaveDNS.
-For example, to use the container name as the hostname:
+Application containers will use weaveDNS automatically if it is
+running at the point when they are started. They will use it for name
+resolution, and will register themselves if they have either a
+hostname in the weaveDNS domain (`weave.local` by default) or have
+been given an explicit container name:
 
 ```bash
-$ weave run 10.2.1.25/24 -ti --name=pingme ubuntu
-$ shell1=$(weave run 10.2.1.26/24 -ti --name=ubuntu ubuntu)
-$ docker attach $shell1
-
+host1$ docker run -dti --name=pingme ubuntu
+host1$ docker run -ti  --hostname=ubuntu.weave.local ubuntu
 root@ubuntu:/# ping pingme
 ...
 ```
 
-If you start an application container sans `--with-dns` you can still register
-it in weaveDNS simply by giving the container a hostname in the
-`.weave.local.` domain:
-
-```
-$ weave run 10.2.1.25/24 -ti -h pingme.weave.local ubuntu
-```
+If both hostname and container name are specified at the same time the
+hostname takes precedence; in this circumstance if the hostname is not
+in the weaveDNS domain the container will not be registered, but will
+still use weaveDNS for resolution.
 
 It is also possible to force or forbid an application container's use
 of weaveDNS with the `--with-dns` and `--without-dns` options to
-`weave run`; these override the runtime detection of the weaveDNS
-container.
+`weave run` and `weave launch-proxy`; these override the runtime
+detection of the weaveDNS container.
 
-Each weaveDNS container started with `launch-dns` needs to be given
-its own, unique, IP address, in a subnet that is common to all
-weaveDNS containers and not in use on any of the hosts.
+Each weaveDNS container started with `launch-dns` needs its own unique
+IP address in a subnet that is common to all weaveDNS containers. In
+the example above we did not specify such an address, so one was
+allocated automatically by IPAM from the default subnet; you can
+however specify an address in CIDR format manually. In this case you
+are responsible for ensuring that the IP addresses specified are
+uniquely allocated and not in use by any other container.
 
-In our example the weaveDNS address is in subnet 10.2.254.0/24 and the
-application containers are in subnet 10.2.1.0/24. So, to launch and
-use weaveDNS on a second host we would run:
-
-```bash
-host2$ weave launch $HOST1
-host2$ weave launch-dns 10.2.254.2/24
-host2$ shell2=$(weave run 10.2.1.36/24 -ti --name=ubuntu2 ubuntu)
-host2$ docker attach $shell2
-
-root@ubuntu2:/# ping pingme
-...
-```
-
-Notice the different IP address in the 10.2.254.0/24 subnet we gave to
-`weave launch-dns`, compared to what we supplied on the first host.
-
-WeaveDNS containers can be stopped with `stop-dns`.
+Finally, WeaveDNS containers can be stopped with `stop-dns`.
 
 ## <a name="how-it-works"></a>How it works
 
 The weaveDNS container running on every host acts as the nameserver
-for containers on that host. It is told about hostnames for local
-containers by the `weave run` command. If a hostname is in the
-`.weave.local` domain then weaveDNS records the association of that
-name with the container's weave IP address(es).
+for containers on that host. It learns about hostnames for local
+containers from the proxy and from the `weave run` command. If a
+hostname is in the `.weave.local` domain then weaveDNS records the
+association of that name with the container's weave IP address(es).
 
 When weaveDNS is queried for a name in the `.weave.local` domain, it
 first checks its own records. If the name is not found there, it asks
@@ -116,7 +92,7 @@ different Docker bridge device. To supply a different bridge device,
 use the environment variable `DOCKER_BRIDGE`, e.g.,
 
 ```bash
-$ sudo DOCKER_BRIDGE=someother weave launch-dns 10.2.254.1/24
+$ sudo DOCKER_BRIDGE=someother weave launch-dns
 ```
 
 In the event that weaveDNS is launched in this way, it's important that
@@ -136,20 +112,21 @@ Returning to our earlier example, let us start an additional `pingme`
 container, this time on the 2nd host, and then run some ping tests...
 
 ```bash
-host2$ weave run 10.2.1.35/24 -ti --name=pingme ubuntu
-host2$ docker attach $shell2
+host2$ weave launch && weave launch-dns && weave launch-proxy
+host2$ eval $(weave proxy-env)
+host2$ docker run -dti --name=pingme ubuntu
 
-root@ubuntu2:/# ping -nq -c 1 pingme
-PING pingme.weave.local (10.2.1.35) 56(84) bytes of data.
+root@ubuntu:/# ping -nq -c 1 pingme
+PING pingme.weave.local (10.128.0.2) 56(84) bytes of data.
 ...
-root@ubuntu2:/# ping -nq -c 1 pingme
-PING pingme.weave.local (10.2.1.25) 56(84) bytes of data.
+root@ubuntu:/# ping -nq -c 1 pingme
+PING pingme.weave.local (10.160.0.1) 56(84) bytes of data.
 ...
-root@ubuntu2:/# ping -nq -c 1 pingme
-PING pingme.weave.local (10.2.1.25) 56(84) bytes of data.
+root@ubuntu:/# ping -nq -c 1 pingme
+PING pingme.weave.local (10.160.0.1) 56(84) bytes of data.
 ...
-root@ubuntu2:/# ping -nq -c 1 pingme
-PING pingme.weave.local (10.2.1.35) 56(84) bytes of data.
+root@ubuntu:/# ping -nq -c 1 pingme
+PING pingme.weave.local (10.128.0.2) 56(84) bytes of data.
 ...
 ```
 
@@ -170,8 +147,8 @@ If you want to give the container a name in DNS *other* than its
 hostname, you can register it using the `dns-add` command. For example:
 
 ```bash
-$ shell2=(weave run 10.2.1.27/24 -ti ubuntu)
-$ weave dns-add 10.2.1.28 $shell2 -h pingme2.weave.local
+$ C=$(docker run -e WEAVE_CIDR=10.2.1.27/24 -ti ubuntu)
+$ weave dns-add 10.2.1.27 $C -h pingme2.weave.local
 ```
 
 You can also use `dns-add` to add the container's configured hostname
@@ -180,7 +157,7 @@ and domain, simply by omitting `-h <fqdn>`.
 The inverse operation can be carried out using the `dns-remove` command:
 
 ```bash
-$ weave dns-remove 10.2.1.27 $shell2
+$ weave dns-remove 10.2.1.27 $C
 ```
 
 When queried about a name with multiple IPs, weaveDNS returns a random
@@ -202,7 +179,7 @@ containers that die. You can tell it not to, by adding `--watch=false`
 to the container args:
 
 ```bash
-$ weave launch-dns 10.2.254.1/24 --watch=false
+$ weave launch-dns --watch=false
 ```
 
 ## <a name="ttl"></a>Configuring a custom TTL
@@ -215,7 +192,7 @@ However, you can force a different TTL value by launching weaveDNS with
 the `--ttl` argument:
 
 ```bash
-$ weave launch-dns 10.2.254.1/24 --ttl=10
+$ weave launch-dns --ttl=10
 ```
 
 This will shorten the lifespan of answers sent to other peers,
@@ -240,7 +217,7 @@ hostnames across all sub-domains plus some external domains, you need
 behaviour.
 
 ```bash
-weave run --with-dns 10.2.1.4/24 -ti \
+docker run -ti \
   --dns-search=zone1.weave.local --dns-search=zone2.weave.local \
   --dns-search=corp1.com --dns-search=corp2.com \
   --dns-search=weave.local ubuntu
@@ -254,59 +231,12 @@ can force weaveDNS to use a different domain by launching it
 with the `--domain` argument. For example,
 
 ```bash
-$ weave launch-dns 10.2.254.1/24 --domain="mycompany.local."
+$ weave launch-dns --domain="mycompany.local."
 ```
 
 The local domain should end with `local.`, since these names are
 link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
 (though this is not strictly necessary).
-
-## <a name="without-run"></a>Using weaveDNS without `weave run`
-
-When weaveDNS is running, both `weave run` and `weave attach` register
-the hostname of the given container against the given weave network IP
-address. And if you use the `--with-dns` option, `weave run`
-automatically supplies the DNS server address to the new container.
-
-In some circumstances, you may not want to use the `weave run` command
-to start containers. You can still take advantage of a running
-weaveDNS, with some extra manual steps.
-
-### Supplying the DNS server
-
-If you want to start containers with `docker run` rather than `weave
-run`, you can supply the docker bridge IP as the `--dns` option to
-make it use weaveDNS:
-
-```bash
-$ docker_ip=$(docker inspect --format='{{ .NetworkSettings.Gateway }}' weavedns)
-$ shell2=$(docker run --dns=$docker_ip -ti ubuntu)
-$ weave attach 10.2.1.27/24 $shell2
-```
-
-This isn't very useful unless the container is also attached to the
-weave network (as in the last line above).
-
-Also note that this means of finding the Docker bridge's IP address
-requires a running container (any one would do); another way to find
-it is:
-
-```bash
-$ docker_ip=$(ip -4 addr show dev docker0 | grep -o 'inet [0-9.]*' | cut -d ' ' -f 2)
-```
-
-### Supplying the domain search path
-
-By default, Docker provides containers with a `/etc/resolv.conf` that
-matches that for the host. In some circumstances, this may include a
-DNS search path, which will break the nice "bare names resolve"
-property above.
-
-Therefore, when starting containers with `docker run` instead of
-`weave run`, you will usually want to supply a domain search path so
-that you can use unqualified hostnames. Use `--dns-search=.` to make
-the resolver use the container's domain, or e.g.,
-`--dns-search=weave.local` to make it look in `weave.local`.
 
 ## <a name="troubleshooting"></a>Troubleshooting
 
@@ -318,19 +248,20 @@ reports on the current status of various weave components, including
 DNS:
 
 ````
-weave router git-8f675f15c0b5
 ...
 
-weave DNS git-8f675f15c0b5
-Local domain weave.local.
+weave DNS 1.0.0
 Listen address :53
-mDNS interface &{26 65535 ethwe fa:b6:b1:85:ac:9b up|broadcast|multicast}
-Fallback DNS config &{[66.28.0.45 8.8.8.8] [] 53 1 5 2}
+Fallback DNS config &{[10.0.2.3] [] 53 1 5 2}
+
+Local domain weave.local.
+Interface &{74 65535 ethwe 82:0c:92:84:0e:88 up|broadcast|multicast}
 Zone database:
-710978857a88 10.2.1.26 wiff.weave.local.
-e8d85b1dcdb1 10.2.1.27 waff.weave.local.
-26bd05f9a0cb 10.2.1.28 ping.weave.local.
-1ab0e8b17c39 10.2.1.29 pong.weave.local.
+144b75a9b873: pingme.weave.local.[10.160.0.1]/OBS:1
+74a5510a91ad: ubuntu.weave.local.[10.160.0.2]
+weave:remote: pingme.weave.local.[10.128.0.2]/TTL:30
+
+...
 ````
 
 The first section covers the router; see the [troubleshooting
