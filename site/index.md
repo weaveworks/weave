@@ -10,7 +10,7 @@ layout: default
  * [Features](features.html)
  * [Automatic IP Address Management](ipam.html)
  * [Automatic Discovery with WeaveDNS](weavedns.html)
- * [Working with the Docker CLI and API](proxy.html)
+ * [Configuring the interaction with Docker](proxy.html)
  * [Troubleshooting](troubleshooting.html)
  * [Building](building.html)
  * [How it works](how-it-works.html)

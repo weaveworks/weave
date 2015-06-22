@@ -21,12 +21,14 @@ across the network.
 Containers are automatically allocated an IP address when none is
 specified when the container is started, e.g.
 
-    host1# C=$(weave run -ti ubuntu)
+    host1$ weave launch && weave launch-proxy
+    host1$ eval $(weave proxy-env)
+    host1$ C=$(docker run -ti ubuntu)
 
 You can see which address was allocated with
 [`weave ps`](troubleshooting.html#list-attached-containers):
 
-    host1# weave ps $C
+    host1$ weave ps $C
     a7aff7249393 7a:51:d1:09:21:78 10.128.0.1/10
 
 Weave detects when a container has exited and releases its
@@ -106,7 +108,7 @@ would be safe wrt weave's startup quorum:
 By default, weave will allocate IP addresses in the 10.128.0.0/10
 range. This can be overridden with the `-iprange` option, e.g.
 
-    host1# weave launch -iprange 10.2.0.0/16
+    host1$ weave launch -iprange 10.2.0.0/16
 
 and must be the same on every host.
 
@@ -126,7 +128,7 @@ to the rest of the network without any conflicts arising.
 
 Once you have given a range of addresses to the IP allocator, you must
 not use any addresses in that range for anything else.  If, in our
-example, you subsequently executed `weave run 10.2.3.1/24 -ti ubuntu`,
+example, you subsequently executed `docker run -e WEAVE_CIDR=10.2.3.1/24 -ti ubuntu`,
 you run the risk that the IP allocator will assign the same address to
 another container, which will make network traffic delivery
 intermittent or non-existent for the containers that share the same IP
@@ -140,20 +142,20 @@ you may wish to request the allocation of an address from a particular
 subnet. This is done by specifying the subnet with `net:<subnet>`, in
 CIDR notation, e.g.
 
-    host1# C=$(weave run net:10.2.7.0/24 -ti ubuntu)
+    host1$ docker run -e WEAVE_CIDR=net:10.2.7.0/24 -ti ubuntu
 
 You can ask for multiple addresses in different subnets and add in
 manually-assigned addresses (outside the automatic allocation range),
 for instance:
 
-    host1# C=$(weave run net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24 -ti ubuntu)
+    host1$ docker run -e WEAVE_CIDR="net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24" -ti ubuntu
 
 When working with multiple subnets in this way, it is usually
 desirable to constrain the default subnet - i.e. the one chosen by the
 allocator when no subnet is supplied - so that it does not overlap
 with others. One can specify that with `-ipsubnet`:
 
-    host1# weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.3.0/24
+    host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.3.0/24
 
 `-iprange` should cover the entire range that you will ever use for
 allocation, and `-ipsubnet` is the subnet that will be used when you
@@ -170,7 +172,7 @@ have the containers communicate with each other*, you can choose a
 `-iprange` that is smaller than `-ipsubnet`, For example, if you
 launch weave with:
 
-    host1# weave launch -iprange 10.9.0.0/17 -ipsubnet 10.9.0.0/16
+    host1$ weave launch -iprange 10.9.0.0/17 -ipsubnet 10.9.0.0/16
 
 then you can run all containers in the 10.9.0.0/16 subnet, with
 automatic allocation using the lower half, leaving the upper half free
@@ -213,14 +215,16 @@ The command
 reports on the current status of the weave router and IP allocator:
 
 ````
-weave router git-8f675f15c0b5
 ...
+
 Allocator universe 10.2.0.0/16
 Owned Ranges:
   10.2.1.1 -> 96:e9:e2:2e:2d:bc (host1) (v3)
   10.2.1.128 -> ea:84:25:9b:31:2e (host2) (v3)
   10.2.1.192 -> ea:6c:21:09:cf:f0 (host3) (v9)
 Allocator default subnet: 10.2.1.0/24
+
+...
 ````
 
 The first section covers the router; see the [troubleshooting
