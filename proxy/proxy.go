@@ -24,14 +24,6 @@ var (
 	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
 )
 
-type Proxy struct {
-	Config
-
-	dial           func() (net.Conn, error)
-	client         *docker.Client
-	dockerBridgeIP string
-}
-
 type Config struct {
 	DockerAddr    string
 	ListenAddr    string
@@ -40,6 +32,14 @@ type Config struct {
 	Version       string
 	WithDNS       bool
 	WithoutDNS    bool
+}
+
+type Proxy struct {
+	Config
+
+	dial           func() (net.Conn, error)
+	client         *docker.Client
+	dockerBridgeIP string
 }
 
 func NewProxy(c Config) (*Proxy, error) {
