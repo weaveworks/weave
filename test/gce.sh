@@ -3,6 +3,7 @@
 # ./gce.sh setup -  starts two VMs on GCE and configures them to run our integration tests
 # . ./gce.sh; ./run_all.sh - set a bunch of environment variables for the tests
 # ./gce.sh destroy - tear down the VMs
+# ./gce.sh make_template - make a fresh VM template; update TEMPLATE_NAME first!
 
 set -ex
 
@@ -10,7 +11,7 @@ KEY_FILE=/tmp/gce_private_key.json
 SSH_KEY_FILE=$HOME/.ssh/gce_ssh_key
 PROJECT=positive-cocoa-90213
 IMAGE=ubuntu-14-04
-TEMPLATE_NAME="test-template"
+TEMPLATE_NAME="test-template-2"
 ZONE=us-central1-a
 NUM_HOSTS=2
 SUFFIX=""
@@ -96,12 +97,13 @@ function setup {
 }
 
 function make_template {
-	gcloud compute instances create template --image $IMAGE --zone $ZONE
+	gcloud compute instances create $TEMPLATE_NAME --image $IMAGE --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
-	name="template.$ZONE.$PROJECT"
+	name="$TEMPLATE_NAME.$ZONE.$PROJECT"
+  try_connect $name
 	install_docker_on $name
-	gcloud compute instances delete template --keep-disks boot -zone $ZONE
-	gcloud compute images create $TEMPLATE_NAME --source-disk example-disk --source-disk-zone $ZONE
+	gcloud -q compute instances delete $TEMPLATE_NAME --keep-disks boot --zone $ZONE
+	gcloud compute images create $TEMPLATE_NAME --source-disk $TEMPLATE_NAME --source-disk-zone $ZONE
 }
 
 function hosts {
