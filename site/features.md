@@ -10,6 +10,7 @@ example](https://github.com/weaveworks/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
  * [Address allocation](#addressing)
+ * [Naming and discovery](#naming-and-discovery)
  * [Application isolation](#application-isolation)
  * [Dynamic network attachment](#dynamic-network-attachment)
  * [Security](#security)
@@ -107,6 +108,20 @@ those delegated to weave's [automatic IP address allocator](ipam.html)) or
 IP addresses of external services the hosts or containers need to
 connect to. The same IP range must be used everywhere, and the
 individual IP addresses must, of course, be unique.
+
+### <a name="naming-and-discovery"></a>Naming and discovery
+
+Named containers are automatically registered in
+[weaveDNS](weavedns.html), which makes them discoverable through
+simple name lookups:
+
+    host1$ docker run -dti --name=service ubuntu
+    host1$ docker run -ti ubuntu
+    root@7b21498fb103:/# ping service
+
+This feature supports load balancing, fault resilience and hot
+swapping; see the [weaveDNS](weavedns.html) documentation for more
+details.
 
 ### <a name="application-isolation"></a>Application isolation
 
