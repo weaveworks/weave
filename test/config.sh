@@ -31,6 +31,8 @@ SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key -o UserKnownHostsFile=./.ssh
 
 SMALL_IMAGE="gliderlabs/alpine"
 DNS_IMAGE="aanand/docker-dnsutils"
+TEST_IMAGES="$SMALL_IMAGE $DNS_IMAGE"
+
 PING="ping -nq -W 1 -c 1"
 CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 
