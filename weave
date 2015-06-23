@@ -183,6 +183,21 @@ command_exists() {
     command -v $1 >/dev/null 2>&1
 }
 
+fractional_sleep() {
+    case $1 in
+        *.*)
+            if [ -z "$NO_FRACTIONAL_SLEEP" ] ; then
+                sleep $1 >/dev/null 2>&1 && return 0
+                NO_FRACTIONAL_SLEEP=1
+            fi
+            sleep $((${1%.*} + 1))
+            ;;
+        *)
+            sleep $1
+            ;;
+    esac
+}
+
 run_iptables() {
     # -w is recent addition to iptables
     if [ -z "$CHECKED_IPTABLES_W" ] ; then
@@ -585,7 +600,7 @@ wait_for_status() {
             echo "$err_msg" >&2
             return 1
         fi
-        sleep 1
+        fractional_sleep 0.1
     done
 }
 
