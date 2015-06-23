@@ -22,8 +22,12 @@ func NewEthernetDecoder() *EthernetDecoder {
 	return dec
 }
 
-func (dec *EthernetDecoder) DecodeLayers(data []byte) error {
-	return dec.parser.DecodeLayers(data, &dec.decoded)
+func (dec *EthernetDecoder) DecodeLayers(data []byte) {
+	// We intentionally discard the error return here, because it
+	// is normal for gopacket to return an error saying that it
+	// cannot decode a layer beyond the ones we specified when
+	// setting up the parser.
+	dec.parser.DecodeLayers(data, &dec.decoded)
 }
 
 func (dec *EthernetDecoder) sendICMPFragNeeded(mtu int, sendFrame func([]byte) error) error {
