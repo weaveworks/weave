@@ -9,6 +9,7 @@ Weave has a few more features beyond those illustrated by the [basic
 example](https://github.com/weaveworks/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
+ * [Seamless Docker integration](#docker)
  * [Address allocation](#addressing)
  * [Naming and discovery](#naming-and-discovery)
  * [Application isolation](#application-isolation)
@@ -24,7 +25,6 @@ example](https://github.com/weaveworks/weave#example):
  * [Dynamic topologies](#dynamic-topologies)
  * [Container mobility](#container-mobility)
  * [Fault tolerance](#fault-tolerance)
- * [Further reading](#further-reading)
 
 ### <a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
@@ -54,6 +54,13 @@ and troubleshoot our container network. To put it another way, we can
 now re-use the same tools and techniques when deploying applications
 as containers as we would have done when deploying them 'on metal' in
 our data centre.
+
+### <a name="docker"></a>Seamless Docker integration
+
+Weave includes a [proxy](proxy.html) so that containers launched via
+the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or
+[remote API](https://docs.docker.com/reference/api/docker_remote_api/)
+are attached to the weave network before they begin execution.
 
 ### <a name="addressing"></a>Address allocation
 
@@ -509,13 +516,3 @@ stop`) and restart it. Application containers do *not* have to be
 restarted in that event, and indeed may not even experience a
 temporary connectivity failure if the weave container is restarted
 quickly enough.
-
-### <a name="further-reading"></a>Further reading
-
-We have made use of weave's automatic IP address allocation, DNS
-server, and proxy throughout the examples. Each of these components
-offers additional functionality which you can read about here:
-
- * [Automatic IP address management](ipam.html)
- * [Automatic discovery with WeaveDNS](weavedns.html)
- * [Configuring the interaction with Docker](proxy.html)
