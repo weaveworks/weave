@@ -25,7 +25,6 @@ example](https://github.com/weaveworks/weave#example):
  * [Dynamic topologies](#dynamic-topologies)
  * [Container mobility](#container-mobility)
  * [Fault tolerance](#fault-tolerance)
- * [Further reading](#further-reading)
 
 ### <a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
@@ -517,13 +516,3 @@ stop`) and restart it. Application containers do *not* have to be
 restarted in that event, and indeed may not even experience a
 temporary connectivity failure if the weave container is restarted
 quickly enough.
-
-### <a name="further-reading"></a>Further reading
-
-We have made use of weave's automatic IP address allocation, DNS
-server, and proxy throughout the examples. Each of these components
-offers additional functionality which you can read about here:
-
- * [Automatic IP address management](ipam.html)
- * [Automatic discovery with WeaveDNS](weavedns.html)
- * [Configuring the interaction with Docker](proxy.html)
