@@ -39,9 +39,10 @@ prog/netcheck/netcheck
 tools/bin
 tools/build
 releases
+.weaver.uptodate
+.weavedns.uptodate
+.weaveexec.uptodate
 weave.tar
-weavedns.tar
-weaveexec.tar
 prog/weaveexec/weave
 prog/weaveexec/weaveproxy
 prog/weaveexec/weavewait
