@@ -9,7 +9,7 @@ Weave has a few more features beyond those illustrated by the [basic
 example](https://github.com/weaveworks/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
- * [Seamless Docker integration](#seamless-docker-integration)
+ * [Seamless Docker integration](#docker)
  * [Address allocation](#addressing)
  * [Application isolation](#application-isolation)
  * [Dynamic network attachment](#dynamic-network-attachment)
@@ -54,7 +54,7 @@ now re-use the same tools and techniques when deploying applications
 as containers as we would have done when deploying them 'on metal' in
 our data centre.
 
-### <a name="seamless-docker-integration"></a>Seamless Docker integration
+### <a name="docker"></a>Seamless Docker integration
 
 Weave includes a [proxy](proxy.html) so that containers launched via
 the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or
