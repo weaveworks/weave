@@ -5,37 +5,19 @@ layout: default
 
 # Automatic IP Address Management
 
-Weave can automatically assign containers an IP address that is unique
-across the network.
+Weave automatically assigns containers an IP address that is unique
+across the network, and releases that address when a container
+exits. This happens for all invocations of the `run`, `start`,
+`attach`, `detach`, `expose`, `hide` and `launch-dns` commands, unless
+the user explictly specified an address. Weave can also assign
+addresses in multiple subnets.
 
- * [Usage](#usage)
  * [Initialisation](#initialisation)
  * [Choosing an allocation range](#range)
  * [Automatic allocation across multiple subnets](#subnets)
  * [Mixing automatic and manual allocation](#manual)
  * [Stopping and removing peers](#stop)
  * [Troubleshooting](#troubleshooting)
-
-## <a name="usage"></a>Usage
-
-Containers are automatically allocated an IP address when none is
-specified when the container is started, e.g.
-
-    host1$ weave launch && weave launch-proxy
-    host1$ eval $(weave proxy-env)
-    host1$ C=$(docker run -ti ubuntu)
-
-You can see which address was allocated with
-[`weave ps`](troubleshooting.html#list-attached-containers):
-
-    host1$ weave ps $C
-    a7aff7249393 7a:51:d1:09:21:78 10.128.0.1/10
-
-Weave detects when a container has exited and releases its
-automatically allocated addresses so they can be re-used.
-
-Automatic IP address assignment is available for the `run`, `start`,
-`attach`, `detach`, `expose`, `hide` and `launch-dns` commands.
 
 ## <a name="initialisation"></a>Initialisation
 
