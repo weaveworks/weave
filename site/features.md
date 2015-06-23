@@ -9,7 +9,7 @@ Weave has a few more features beyond those illustrated by the [basic
 example](https://github.com/weaveworks/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
- * [Manual addressing](#manual-addressing)
+ * [Address allocation](#addressing)
  * [Application isolation](#application-isolation)
  * [Dynamic network attachment](#dynamic-network-attachment)
  * [Security](#security)
@@ -54,13 +54,25 @@ now re-use the same tools and techniques when deploying applications
 as containers as we would have done when deploying them 'on metal' in
 our data centre.
 
-### <a name="manual-addressing"></a>Manual addressing
+### <a name="addressing"></a>Address allocation
 
-The examples so far have leveraged weave's [address allocation](ipam.html)
-and [discovery](#dns) features, meaning that we've not had to concern
-ourselves with IP addresses at all. It is, however, possible to
-specify address and network explicitly using [CIDR
-notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation)
+Containers are automatically allocated an IP address that is unique
+across the weave network. You can see which address was allocated with
+[`weave ps`](troubleshooting.html#list-attached-containers):
+
+    host1$ weave ps a1
+    a7aee7233393 7a:44:d3:11:10:70 10.128.0.2/10
+
+Weave detects when a container has exited and releases its
+automatically allocated addresses so they can be re-used.
+
+See the [Automatic IP Address Management](#ipam) documentation for
+further details.
+
+Instead of getting weave to allocate IP addresses automatically, it is
+also possible to specify an address and network explicitly, expressed
+in
+[CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation)
 - let's see how the first example would have looked:
 
 On $HOST1:
