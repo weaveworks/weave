@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	wt "github.com/weaveworks/weave/testing"
+	"github.com/stretchr/testify/require"
 )
 
 // TODO we should also test:
@@ -98,14 +98,14 @@ func TestPeersGarbageCollection(t *testing.T) {
 	ps2.AddTestRemoteConnection(p3, p1)
 
 	// Every peer is referenced, so nothing should be dropped
-	wt.AssertEmpty(t, ps1.GarbageCollect(), "peers removed")
-	wt.AssertEmpty(t, ps2.GarbageCollect(), "peers removed")
-	wt.AssertEmpty(t, ps3.GarbageCollect(), "peers removed")
+	require.Empty(t, ps1.GarbageCollect(), "peers removed")
+	require.Empty(t, ps2.GarbageCollect(), "peers removed")
+	require.Empty(t, ps3.GarbageCollect(), "peers removed")
 
 	// Drop the connection from 2 to 3, and 3 isn't garbage-collected
 	// because 1 has a connection to 3
 	ps2.DeleteTestConnection(p3)
-	wt.AssertEmpty(t, ps2.GarbageCollect(), "peers removed")
+	require.Empty(t, ps2.GarbageCollect(), "peers removed")
 
 	// Drop the connection from 1 to 3, and 3 will get removed by
 	// garbage-collection

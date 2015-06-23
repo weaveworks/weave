@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	wt "github.com/weaveworks/weave/testing"
+	"github.com/stretchr/testify/require"
 )
 
 // Ensure we can add new calls while forwarding the clock
@@ -31,7 +31,7 @@ func TestSchedCallsBasic(t *testing.T) {
 	}
 
 	t.Logf("Now: %s - calls: %d", clk.Now(), schedQueue.Count())
-	wt.AssertEqualInt(t, (int)(schedQueue.Count()), testSecs, "Number of calls")
+	require.Equal(t, testSecs, (int)(schedQueue.Count()), "Number of calls")
 }
 
 // Ensure we can create a 100 seconds gap in the middle of the time travel
@@ -60,7 +60,7 @@ func TestSchedCallsGap(t *testing.T) {
 	}
 
 	t.Logf("Now: %s - calls: %d", clk.Now(), schedQueue.Count())
-	wt.AssertEqualInt(t, (int)(schedQueue.Count()), testSecs-100+1, "Number of calls")
+	require.Equal(t, testSecs-100+1, (int)(schedQueue.Count()), "Number of calls")
 }
 
 func TestSchedCallsStop(t *testing.T) {
@@ -88,5 +88,5 @@ func TestSchedCallsStop(t *testing.T) {
 	}
 
 	t.Logf("Now: %s - calls: %d", clk.Now(), schedQueue.Count())
-	wt.AssertEqualInt(t, (int)(schedQueue.Count()), testSecs/2, "Number of calls")
+	require.Equal(t, testSecs/2, (int)(schedQueue.Count()), "Number of calls")
 }

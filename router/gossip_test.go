@@ -1,10 +1,12 @@
 package router
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	wt "github.com/weaveworks/weave/testing"
 )
 
@@ -255,7 +257,7 @@ func (g *testGossiper) checkHas(t *testing.T, vs ...byte) {
 	defer g.RUnlock()
 	for _, v := range vs {
 		if _, found := g.state[v]; !found {
-			wt.Fatalf(t, "%d is missing", v)
+			require.FailNow(t, fmt.Sprintf("%d is missing", v))
 		}
 	}
 }

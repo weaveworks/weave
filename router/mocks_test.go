@@ -6,9 +6,10 @@
 package router
 
 import (
+	"fmt"
 	"testing"
 
-	wt "github.com/weaveworks/weave/testing"
+	"github.com/stretchr/testify/require"
 )
 
 // Add to peers a connection from peers.ourself to p
@@ -58,11 +59,11 @@ func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Co
 		if _, found := checkConns[remoteName]; found {
 			delete(checkConns, remoteName)
 		} else {
-			wt.Fatalf(t, "Unexpected connection from %s to %s", ourName, remoteName)
+			require.FailNow(t, fmt.Sprintf("Unexpected connection from %s to %s", ourName, remoteName))
 		}
 	}
 	if len(checkConns) > 0 {
-		wt.Fatalf(t, "Expected connections not found: from %s to %v", ourName, checkConns)
+		require.FailNow(t, fmt.Sprintf("Expected connections not found: from %s to %v", ourName, checkConns))
 	}
 }
 
@@ -105,10 +106,10 @@ func checkTopologyPeers(t *testing.T, checkConns bool, peers []*Peer, wantedPeer
 			}
 			delete(check, name)
 		} else {
-			wt.Fatalf(t, "Unexpected peer: %s", name)
+			require.FailNow(t, fmt.Sprintf("Unexpected peer: %s", name))
 		}
 	}
 	if len(check) > 0 {
-		wt.Fatalf(t, "Expected peers not found: %v", check)
+		require.FailNow(t, fmt.Sprintf("Expected peers not found: %v", check))
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/stretchr/testify/require"
 	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 func TestServerSimpleQuery(t *testing.T) {
@@ -22,9 +22,9 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	mzone := newMockedZoneWithRecords([]ZoneRecord{testRecord1, testRecord2})
 	mdnsServer, err := NewMDNSServer(mzone, true, DefaultLocalTTL)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = mdnsServer.Start(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer mdnsServer.Stop()
 
 	var receivedAddrs []net.IP
@@ -34,7 +34,7 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	// Implement a minimal listener for responses
 	multicast, err := LinkLocalMulticastListener(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 
 	handleMDNS := func(w dns.ResponseWriter, r *dns.Msg) {
 		// Only handle responses here
@@ -56,12 +56,12 @@ func TestServerSimpleQuery(t *testing.T) {
 		m.SetQuestion(name, querytype)
 		m.RecursionDesired = false
 		buf, err := m.Pack()
-		wt.AssertNoErr(t, err)
+		require.NoError(t, err)
 		conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
-		wt.AssertNoErr(t, err)
+		require.NoError(t, err)
 		Debug.Printf("Sending UDP packet to %s", ipv4Addr)
 		_, err = conn.WriteTo(buf, ipv4Addr)
-		wt.AssertNoErr(t, err)
+		require.NoError(t, err)
 
 		Debug.Printf("Waiting for response")
 		for {

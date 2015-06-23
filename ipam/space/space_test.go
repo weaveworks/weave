@@ -3,6 +3,7 @@ package space
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/ipam/address"
 	wt "github.com/weaveworks/weave/testing"
 )
@@ -31,65 +32,65 @@ func (s *Space) NumFreeAddresses() address.Offset {
 func TestLowlevel(t *testing.T) {
 	a := []address.Address{}
 	a = add(a, 100, 200)
-	wt.AssertEquals(t, a, []address.Address{100, 200})
-	wt.AssertTrue(t, !contains(a, 99), "")
-	wt.AssertTrue(t, contains(a, 100), "")
-	wt.AssertTrue(t, contains(a, 199), "")
-	wt.AssertTrue(t, !contains(a, 200), "")
+	require.Equal(t, []address.Address{100, 200}, a)
+	require.True(t, !contains(a, 99), "")
+	require.True(t, contains(a, 100), "")
+	require.True(t, contains(a, 199), "")
+	require.True(t, !contains(a, 200), "")
 	a = add(a, 700, 800)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 700, 800})
+	require.Equal(t, []address.Address{100, 200, 700, 800}, a)
 	a = add(a, 300, 400)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 300, 400, 700, 800})
+	require.Equal(t, []address.Address{100, 200, 300, 400, 700, 800}, a)
 	a = add(a, 400, 500)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 300, 500, 700, 800})
+	require.Equal(t, []address.Address{100, 200, 300, 500, 700, 800}, a)
 	a = add(a, 600, 700)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 300, 500, 600, 800})
+	require.Equal(t, []address.Address{100, 200, 300, 500, 600, 800}, a)
 	a = add(a, 500, 600)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 300, 800})
+	require.Equal(t, []address.Address{100, 200, 300, 800}, a)
 	a = subtract(a, 500, 600)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 300, 500, 600, 800})
+	require.Equal(t, []address.Address{100, 200, 300, 500, 600, 800}, a)
 	a = subtract(a, 600, 700)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 300, 500, 700, 800})
+	require.Equal(t, []address.Address{100, 200, 300, 500, 700, 800}, a)
 	a = subtract(a, 400, 500)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 300, 400, 700, 800})
+	require.Equal(t, []address.Address{100, 200, 300, 400, 700, 800}, a)
 	a = subtract(a, 300, 400)
-	wt.AssertEquals(t, a, []address.Address{100, 200, 700, 800})
+	require.Equal(t, []address.Address{100, 200, 700, 800}, a)
 	a = subtract(a, 700, 800)
-	wt.AssertEquals(t, a, []address.Address{100, 200})
+	require.Equal(t, []address.Address{100, 200}, a)
 	a = subtract(a, 100, 200)
-	wt.AssertEquals(t, a, []address.Address{})
+	require.Equal(t, []address.Address{}, a)
 
 	s := New()
-	wt.AssertEquals(t, s.NumFreeAddresses(), address.Offset(0))
+	require.Equal(t, address.Offset(0), s.NumFreeAddresses())
 	ok, got := s.Allocate(address.NewRange(0, 1000))
-	wt.AssertFalse(t, ok, "allocate in empty space should fail")
+	require.False(t, ok, "allocate in empty space should fail")
 
 	s.Add(100, 100)
-	wt.AssertEquals(t, s.NumFreeAddresses(), address.Offset(100))
+	require.Equal(t, address.Offset(100), s.NumFreeAddresses())
 	ok, got = s.Allocate(address.NewRange(0, 1000))
-	wt.AssertTrue(t, ok && got == 100, "allocate")
-	wt.AssertEquals(t, s.NumFreeAddresses(), address.Offset(99))
-	wt.AssertNoErr(t, s.Claim(150))
-	wt.AssertEquals(t, s.NumFreeAddresses(), address.Offset(98))
-	wt.AssertNoErr(t, s.Free(100))
-	wt.AssertEquals(t, s.NumFreeAddresses(), address.Offset(99))
-	wt.AssertErrorInterface(t, s.Free(0), (*error)(nil), "free not allocated")
-	wt.AssertErrorInterface(t, s.Free(100), (*error)(nil), "double free")
+	require.True(t, ok && got == 100, "allocate")
+	require.Equal(t, address.Offset(99), s.NumFreeAddresses())
+	require.NoError(t, s.Claim(150))
+	require.Equal(t, address.Offset(98), s.NumFreeAddresses())
+	require.NoError(t, s.Free(100))
+	require.Equal(t, address.Offset(99), s.NumFreeAddresses())
+	wt.AssertErrorInterface(t, (*error)(nil), s.Free(0), "free not allocated")
+	wt.AssertErrorInterface(t, (*error)(nil), s.Free(100), "double free")
 
 	r, ok := s.Donate(address.NewRange(0, 1000))
-	wt.AssertTrue(t, ok && r.Start == 125 && r.Size() == 25, "donate")
+	require.True(t, ok && r.Start == 125 && r.Size() == 25, "donate")
 
 	// test Donate when addresses are scarce
 	s = New()
 	r, ok = s.Donate(address.NewRange(0, 1000))
-	wt.AssertTrue(t, !ok, "donate on empty space should fail")
+	require.True(t, !ok, "donate on empty space should fail")
 	s.Add(0, 3)
-	wt.AssertNoErr(t, s.Claim(0))
-	wt.AssertNoErr(t, s.Claim(2))
+	require.NoError(t, s.Claim(0))
+	require.NoError(t, s.Claim(2))
 	r, ok = s.Donate(address.NewRange(0, 1000))
-	wt.AssertTrue(t, ok && r.Start == 1 && r.End == 2, "donate")
+	require.True(t, ok && r.Start == 1 && r.End == 2, "donate")
 	r, ok = s.Donate(address.NewRange(0, 1000))
-	wt.AssertTrue(t, !ok, "donate should fail")
+	require.True(t, !ok, "donate should fail")
 }
 
 func TestSpaceAllocate(t *testing.T) {
@@ -106,27 +107,27 @@ func TestSpaceAllocate(t *testing.T) {
 	)
 
 	space1 := makeSpace(start, size)
-	wt.AssertEquals(t, space1.NumFreeAddresses(), address.Offset(20))
+	require.Equal(t, address.Offset(20), space1.NumFreeAddresses())
 	space1.assertInvariants()
 
 	_, addr1 := space1.Allocate(address.NewRange(start, size))
-	wt.AssertEqualString(t, addr1.String(), testAddr1, "address")
-	wt.AssertEquals(t, space1.NumFreeAddresses(), address.Offset(19))
+	require.Equal(t, testAddr1, addr1.String(), "address")
+	require.Equal(t, address.Offset(19), space1.NumFreeAddresses())
 	space1.assertInvariants()
 
 	_, addr2 := space1.Allocate(address.NewRange(start, size))
-	wt.AssertFalse(t, addr2.String() == testAddr1, "address")
-	wt.AssertEquals(t, space1.NumFreeAddresses(), address.Offset(18))
-	wt.AssertEquals(t, space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddrx)}), address.Offset(13))
-	wt.AssertEquals(t, space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddry)}), address.Offset(18))
+	require.False(t, addr2.String() == testAddr1, "address")
+	require.Equal(t, address.Offset(18), space1.NumFreeAddresses())
+	require.Equal(t, address.Offset(13), space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddrx)}))
+	require.Equal(t, address.Offset(18), space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddry)}))
 	space1.assertInvariants()
 
 	space1.Free(addr2)
 	space1.assertInvariants()
 
-	wt.AssertErrorInterface(t, space1.Free(addr2), (*error)(nil), "double free")
-	wt.AssertErrorInterface(t, space1.Free(ip(testAddrx)), (*error)(nil), "address not allocated")
-	wt.AssertErrorInterface(t, space1.Free(ip(testAddry)), (*error)(nil), "wrong out of range")
+	wt.AssertErrorInterface(t, (*error)(nil), space1.Free(addr2), "double free")
+	wt.AssertErrorInterface(t, (*error)(nil), space1.Free(ip(testAddrx)), "address not allocated")
+	wt.AssertErrorInterface(t, (*error)(nil), space1.Free(ip(testAddry)), "wrong out of range")
 
 	space1.assertInvariants()
 }
@@ -144,51 +145,51 @@ func TestSpaceFree(t *testing.T) {
 
 	// Check we are prepared to give up the entire space
 	r := space.biggestFreeRange(entireRange)
-	wt.AssertTrue(t, r.Start == ip(testAddr1) && r.Size() == 20, "Wrong space")
+	require.True(t, r.Start == ip(testAddr1) && r.Size() == 20, "Wrong space")
 
 	for i := 0; i < 20; i++ {
 		ok, _ := space.Allocate(entireRange)
-		wt.AssertTrue(t, ok, "Failed to get address")
+		require.True(t, ok, "Failed to get address")
 	}
 
 	// Check we are full
 	ok, _ := space.Allocate(entireRange)
-	wt.AssertTrue(t, !ok, "Should have failed to get address")
+	require.True(t, !ok, "Should have failed to get address")
 	r, ok = space.Donate(entireRange)
-	wt.AssertTrue(t, r.Size() == 0, "Wrong space")
+	require.True(t, r.Size() == 0, "Wrong space")
 
 	// Free in the middle
-	wt.AssertSuccess(t, space.Free(ip("10.0.3.13")))
+	require.NoError(t, space.Free(ip("10.0.3.13")))
 	r = space.biggestFreeRange(entireRange)
-	wt.AssertTrue(t, r.Start == ip("10.0.3.13") && r.Size() == 1, "Wrong space")
+	require.True(t, r.Start == ip("10.0.3.13") && r.Size() == 1, "Wrong space")
 
 	// Free one at the end
-	wt.AssertSuccess(t, space.Free(ip("10.0.3.23")))
+	require.NoError(t, space.Free(ip("10.0.3.23")))
 	r = space.biggestFreeRange(entireRange)
-	wt.AssertTrue(t, r.Start == ip("10.0.3.23") && r.Size() == 1, "Wrong space")
+	require.True(t, r.Start == ip("10.0.3.23") && r.Size() == 1, "Wrong space")
 
 	// Now free a few at the end
-	wt.AssertSuccess(t, space.Free(ip("10.0.3.22")))
-	wt.AssertSuccess(t, space.Free(ip("10.0.3.21")))
+	require.NoError(t, space.Free(ip("10.0.3.22")))
+	require.NoError(t, space.Free(ip("10.0.3.21")))
 
-	wt.AssertEquals(t, space.NumFreeAddresses(), address.Offset(4))
+	require.Equal(t, address.Offset(4), space.NumFreeAddresses())
 
 	// Now get the biggest free space; should be 3.21
 	r = space.biggestFreeRange(entireRange)
-	wt.AssertTrue(t, r.Start == ip("10.0.3.21") && r.Size() == 3, "Wrong space")
+	require.True(t, r.Start == ip("10.0.3.21") && r.Size() == 3, "Wrong space")
 
 	// Now free a few in the middle
-	wt.AssertSuccess(t, space.Free(ip("10.0.3.12")))
-	wt.AssertSuccess(t, space.Free(ip("10.0.3.11")))
-	wt.AssertSuccess(t, space.Free(ip("10.0.3.10")))
+	require.NoError(t, space.Free(ip("10.0.3.12")))
+	require.NoError(t, space.Free(ip("10.0.3.11")))
+	require.NoError(t, space.Free(ip("10.0.3.10")))
 
-	wt.AssertEquals(t, space.NumFreeAddresses(), address.Offset(7))
+	require.Equal(t, address.Offset(7), space.NumFreeAddresses())
 
 	// Now get the biggest free space; should be 3.21
 	r = space.biggestFreeRange(entireRange)
-	wt.AssertTrue(t, r.Start == ip("10.0.3.10") && r.Size() == 4, "Wrong space")
+	require.True(t, r.Start == ip("10.0.3.10") && r.Size() == 4, "Wrong space")
 
-	wt.AssertEquals(t, space.OwnedRanges(), []address.Range{{Start: ip("10.0.3.4"), End: ip("10.0.3.24")}})
+	require.Equal(t, []address.Range{{Start: ip("10.0.3.4"), End: ip("10.0.3.24")}}, space.OwnedRanges())
 }
 
 func TestDonateSimple(t *testing.T) {
@@ -207,10 +208,10 @@ func TestDonateSimple(t *testing.T) {
 	// Empty space set should split in two and give me the second half
 	r, ok := ps1.Donate(address.NewRange(ip(testAddr1), size))
 	numGivenUp := r.Size()
-	wt.AssertTrue(t, ok, "Donate result")
-	wt.AssertEqualString(t, r.Start.String(), "10.0.1.24", "Invalid start")
-	wt.AssertEquals(t, numGivenUp, address.Offset(size/2))
-	wt.AssertEquals(t, ps1.NumFreeAddresses(), address.Offset(size/2))
+	require.True(t, ok, "Donate result")
+	require.Equal(t, "10.0.1.24", r.Start.String(), "Invalid start")
+	require.Equal(t, address.Offset(size/2), numGivenUp)
+	require.Equal(t, address.Offset(size/2), ps1.NumFreeAddresses())
 
 	// Now check we can give the rest up.
 	count := 0 // count to avoid infinite loop
@@ -221,8 +222,8 @@ func TestDonateSimple(t *testing.T) {
 		}
 		numGivenUp += r.Size()
 	}
-	wt.AssertEquals(t, ps1.NumFreeAddresses(), address.Offset(0))
-	wt.AssertEquals(t, numGivenUp, address.Offset(size))
+	require.Equal(t, address.Offset(0), ps1.NumFreeAddresses())
+	require.Equal(t, address.Offset(size), numGivenUp)
 }
 
 func TestDonateHard(t *testing.T) {
@@ -236,27 +237,27 @@ func TestDonateHard(t *testing.T) {
 	spaceset := makeSpace(start, size)
 	for i := address.Offset(0); i < size; i++ {
 		ok, _ := spaceset.Allocate(address.NewRange(start, size))
-		wt.AssertTrue(t, ok, "Failed to get IP!")
+		require.True(t, ok, "Failed to get IP!")
 	}
 
-	wt.AssertEquals(t, spaceset.NumFreeAddresses(), address.Offset(0))
+	require.Equal(t, address.Offset(0), spaceset.NumFreeAddresses())
 
 	// Now free all but the last address
 	// this will force us to split the free list
 	for i := address.Offset(0); i < size-1; i++ {
-		wt.AssertSuccess(t, spaceset.Free(address.Add(start, i)))
+		require.NoError(t, spaceset.Free(address.Add(start, i)))
 	}
 
 	// Now split
 	newRange, ok := spaceset.Donate(address.NewRange(start, size))
-	wt.AssertTrue(t, ok, "GiveUpSpace result")
-	wt.AssertEquals(t, newRange.Start, ip("10.0.1.23"))
-	wt.AssertEquals(t, newRange.Size(), address.Offset(24))
-	wt.AssertEquals(t, spaceset.NumFreeAddresses(), address.Offset(23))
+	require.True(t, ok, "GiveUpSpace result")
+	require.Equal(t, ip("10.0.1.23"), newRange.Start)
+	require.Equal(t, address.Offset(24), newRange.Size())
+	require.Equal(t, address.Offset(23), spaceset.NumFreeAddresses())
 
 	//Space set should now have 2 spaces
 	expected := New()
 	expected.Add(start, 23)
 	expected.ours = add(nil, ip("10.0.1.47"), ip("10.0.1.48"))
-	wt.AssertEquals(t, spaceset, expected)
+	require.Equal(t, expected, spaceset)
 }

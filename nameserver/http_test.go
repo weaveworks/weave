@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	wt "github.com/weaveworks/weave/testing"
 )
 
@@ -28,9 +29,9 @@ func TestHttp(t *testing.T) {
 	)
 
 	zone, err := NewZoneDb(ZoneConfig{Domain: testDomain})
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = zone.Start()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer zone.Stop()
 
 	httpListener, err := net.Listen("tcp", ":0")
@@ -49,13 +50,13 @@ func TestHttp(t *testing.T) {
 	addrURL := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, containerID, addrParts[0])
 	resp, err := genForm("PUT", addrURL,
 		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "http response")
 
 	// Check that the address is now there.
 	ip, _, _ := net.ParseCIDR(testAddr1)
 	foundIP, err := zone.LookupName(successTestName)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	if !foundIP[0].IP().Equal(ip) {
 		t.Fatalf("Unexpected result for %s: received %s, expected %s", successTestName, foundIP, ip)
 	}
@@ -63,29 +64,29 @@ func TestHttp(t *testing.T) {
 	// Adding exactly the same address should be OK
 	resp, err = genForm("PUT", addrURL,
 		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http success response for duplicate add")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "http success response for duplicate add")
 
 	// Now try adding the same address again with a different ident --
 	// again should be fine
 	otherURL := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, "other", addrParts[0])
 	resp, err = genForm("PUT", otherURL,
 		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts[1]}})
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "http response")
 
 	// Adding a new IP for the same name should be OK
 	addrParts2 := strings.Split(testAddr2, "/")
 	addrURL2 := fmt.Sprintf("http://localhost:%d/name/%s/%s", port, containerID, addrParts2[0])
 	resp, err = genForm("PUT", addrURL2,
 		url.Values{"fqdn": {successTestName}, "local_ip": {dockerIP}, "routing_prefix": {addrParts2[1]}})
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http success response for second IP")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "http success response for second IP")
 
 	// Check that we can get two IPs for that name
 	ip2, _, _ := net.ParseCIDR(testAddr2)
 	foundIP, err = zone.LookupName(successTestName)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	if len(foundIP) != 2 {
 		t.Logf("IPs found: %s", foundIP)
 		t.Fatalf("Unexpected result length: received %d responses", len(foundIP))
@@ -101,28 +102,28 @@ func TestHttp(t *testing.T) {
 
 	// Delete the address
 	resp, err = genForm("DELETE", addrURL, nil)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "http response")
 
 	// Check that the address is still resolvable.
 	x, err := zone.LookupName(successTestName)
 	t.Logf("Got %s", x)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 
 	// Delete the address record mentioning the other container
 	resp, err = genForm("DELETE", otherURL, nil)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "http response")
 
 	// Delete the second IP
 	resp, err = genForm("DELETE", addrURL2, nil)
-	wt.AssertNoErr(t, err)
-	wt.AssertStatus(t, resp.StatusCode, http.StatusOK, "http response")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode, "http response")
 
 	// Check that the address is gone
 	x, err = zone.LookupName(successTestName)
 	t.Logf("Got %s", x)
-	wt.AssertErrorType(t, err, (*LookupError)(nil), "fully-removed address")
+	wt.AssertErrorType(t, (*LookupError)(nil), err, "fully-removed address")
 
 	// Would like to shut down the http server at the end of this test
 	// but it's complicated.

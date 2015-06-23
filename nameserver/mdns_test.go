@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/stretchr/testify/require"
 	. "github.com/weaveworks/weave/common"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 // Check that we can use a regular mDNS server with a regular mDNS client
@@ -19,9 +19,9 @@ func TestClientServerSimpleQuery(t *testing.T) {
 
 	mzone := newMockedZoneWithRecords([]ZoneRecord{testRecord1})
 	mdnsServer, err := NewMDNSServer(mzone, true, DefaultLocalTTL)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = mdnsServer.Start(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer mdnsServer.Stop()
 
 	var receivedAddr net.IP
@@ -29,9 +29,9 @@ func TestClientServerSimpleQuery(t *testing.T) {
 	receivedCount := 0
 
 	mdnsCli, err := NewMDNSClient()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = mdnsCli.Start(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 
 	sendQuery := func(name string, querytype uint16) {
 		receivedAddr = nil
@@ -95,23 +95,23 @@ func TestClientServerInsistentQuery(t *testing.T) {
 
 	mzone1 := newMockedZoneWithRecords([]ZoneRecord{testRecord1})
 	mdnsServer1, err := NewMDNSServer(mzone1, true, DefaultLocalTTL)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = mdnsServer1.Start(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer mdnsServer1.Stop()
 
 	mzone2 := newMockedZoneWithRecords([]ZoneRecord{testRecord2})
 	mdnsServer2, err := NewMDNSServer(mzone2, true, DefaultLocalTTL)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = mdnsServer2.Start(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer mdnsServer2.Stop()
 
 	// create a third server with exactly the same info as the second server (so we can test duplicates removals)
 	mdnsServer3, err := NewMDNSServer(mzone2, true, DefaultLocalTTL)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = mdnsServer3.Start(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	defer mdnsServer3.Stop()
 
 	var receivedAddrs []ZoneRecord
@@ -119,9 +119,9 @@ func TestClientServerInsistentQuery(t *testing.T) {
 	receivedCount := 0
 
 	mdnsCli, err := NewMDNSClient()
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 	err = mdnsCli.Start(nil)
-	wt.AssertNoErr(t, err)
+	require.NoError(t, err)
 
 	sendQuery := func(name string, querytype uint16) {
 		receivedAddrs = nil

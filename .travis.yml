@@ -18,6 +18,7 @@ install:
   - pip install --user --upgrade gcloud gsutil
   - bin/setup-ci-secrets $encrypted_5ba036e89377_key $encrypted_5ba036e89377_iv
   - make travis
+  - go get ./...
 
 script:
   - bin/lint .
