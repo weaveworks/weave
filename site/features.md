@@ -74,7 +74,7 @@ across the weave network. You can see which address was allocated with
 Weave detects when a container has exited and releases its
 automatically allocated addresses so they can be re-used.
 
-See the [Automatic IP Address Management](#ipam) documentation for
+See the [Automatic IP Address Management](ipam.html) documentation for
 further details.
 
 Instead of getting weave to allocate IP addresses automatically, it is
