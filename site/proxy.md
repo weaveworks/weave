@@ -141,7 +141,7 @@ Because the proxy connects to the docker daemon at
 listening there. To do this, you need to pass the `-H
 unix:///var/run/docker.sock` option when starting the docker daemon,
 in addition to the `-H` options for configuring the TCP listener. See
-[the Docker documentation](https://docs.docker.com/articles/basics/#bind-docker-to-another-hostport-or-a-unix-socket)
+[the Docker documentation](https://docs.docker.com/articles/basics/#bind-docker-to-another-host-port-or-a-unix-socket)
 for an example.
 
 With the proxy running over TLS, we can configure our regular docker
