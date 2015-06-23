@@ -7,7 +7,7 @@ set -e
 (cd ./tls && go get ./... && go run generate_certs.go $HOSTS)
 
 echo "Copying weave images, scripts, and certificates to hosts, and"
-echo "  prefetch docker images"
+echo "  prefetch test images"
 for HOST in $HOSTS; do
     docker_on $HOST load -i ../weave.tar
     docker_on $HOST load -i ../weavedns.tar
