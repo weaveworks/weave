@@ -26,22 +26,22 @@ CIDR_REGEXP="$IP_REGEXP/[0-9]{1,2}"
 usage() {
     echo "Usage:"
     echo "weave setup"
-    echo "weave launch       [-password <password>] [-nickname <nickname>] [-nodiscovery]"
-    echo "                       [-iprange <cidr> [-ipsubnet <cidr>]] <peer> ..."
-    echo "weave launch-dns   [<addr>]"
-    echo "weave launch-proxy [-H <endpoint>] [--with-dns | --without-dns]"
-    echo "                       [--no-default-ipam]"
-    echo "weave connect      [--replace] [<peer> ...]"
-    echo "weave forget       <peer> ..."
-    echo "weave run          [--with-dns | --without-dns] [<addr> ...] <docker run args> ..."
-    echo "weave start        [<addr> ...] <container_id>"
-    echo "weave attach       [<addr> ...] <container_id>"
-    echo "weave detach       [<addr> ...] <container_id>"
-    echo "weave dns-add      <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
-    echo "weave dns-remove   <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
-    echo "weave expose       [<addr> ...] [-h <fqdn>]"
-    echo "weave hide         [<addr> ...]"
-    echo "weave ps           [<container_id> ...]"
+    echo "weave launch-router [-password <password>] [-nickname <nickname>] [-nodiscovery]"
+    echo "                        [-iprange <cidr> [-ipsubnet <cidr>]] <peer> ..."
+    echo "weave launch-dns    [<addr>]"
+    echo "weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]"
+    echo "                        [--no-default-ipam]"
+    echo "weave connect       [--replace] [<peer> ...]"
+    echo "weave forget        <peer> ..."
+    echo "weave run           [--with-dns | --without-dns] [<addr> ...] <docker run args> ..."
+    echo "weave start         [<addr> ...] <container_id>"
+    echo "weave attach        [<addr> ...] <container_id>"
+    echo "weave detach        [<addr> ...] <container_id>"
+    echo "weave dns-add       <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
+    echo "weave dns-remove    <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
+    echo "weave expose        [<addr> ...] [-h <fqdn>]"
+    echo "weave hide          [<addr> ...]"
+    echo "weave ps            [<container_id> ...]"
     echo "weave status"
     echo "weave proxy-env"
     echo "weave proxy-config"
@@ -50,7 +50,7 @@ usage() {
     echo "weave stop-dns"
     echo "weave stop-proxy"
     echo "weave reset"
-    echo "weave rmpeer       <peer_id>"
+    echo "weave rmpeer        <peer_id>"
     echo
     echo "where <peer>     = <ip_address_or_fqdn>[:<port>]"
     echo "      <cidr>     = <ip_address>/<routing_prefix_length>"
@@ -977,7 +977,7 @@ case "$COMMAND" in
     create-bridge)
         create_bridge --without-ethtool
         ;;
-    launch)
+    launch-router)
         check_not_running $CONTAINER_NAME $BASE_IMAGE
         create_bridge
         # We set the router name to the bridge mac since that is
