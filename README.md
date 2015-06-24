@@ -4,8 +4,6 @@
 
 # About Weaveworks
 
-[Come meet Weaveworks at Dockercon](http://weave.works/dockercon)
-
 [Weaveworks](http://weave.works) is the company that develops Weave - the most productive way for developers to connect, observe and control Docker containers. To learn about our products, including getting started tutorials, visit our [website](http://weave.works), read about the [1.0 release of Weave](http://blog.weave.works/2015/06/18/weave-1-0-is-out-and-it-is-good/), visit our [documentation](http://docs.weave.works) or continue to read about some of the more technical aspects of Weave in this readme.  
 
 # Weave
