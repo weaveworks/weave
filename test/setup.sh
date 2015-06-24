@@ -10,8 +10,6 @@ echo "Copying weave images, scripts, and certificates to hosts, and"
 echo "  prefetch test images"
 for HOST in $HOSTS; do
     docker_on $HOST load -i ../weave.tar
-    docker_on $HOST load -i ../weavedns.tar
-    docker_on $HOST load -i ../weaveexec.tar
     run_on $HOST mkdir -p bin
     cat ../bin/docker-ns | run_on $HOST sh -c "cat > $DOCKER_NS"
     cat ../weave | run_on $HOST sh -c "cat > ./weave"

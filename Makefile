@@ -18,23 +18,25 @@ NETCHECK_EXE=prog/netcheck/netcheck
 
 EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)
 
+WEAVER_UPTODATE=.weaver.uptodate
+WEAVEDNS_UPTODATE=.weavedns.uptodate
+WEAVEEXEC_UPTODATE=.weaveexec.uptodate
+
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEDNS_UPTODATE) $(WEAVEEXEC_UPTODATE)
+
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 
 IMAGES=$(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
 
-WEAVER_EXPORT=weave.tar
-WEAVEDNS_EXPORT=weavedns.tar
-WEAVEEXEC_EXPORT=weaveexec.tar
-
-EXPORTS=$(WEAVER_EXPORT) $(WEAVEDNS_EXPORT) $(WEAVEEXEC_EXPORT)
+WEAVE_EXPORT=weave.tar
 
 WEAVEEXEC_DOCKER_VERSION=1.3.1
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 
-all: $(EXPORTS)
+all: $(WEAVE_EXPORT)
 
 travis: $(EXES)
 
@@ -66,15 +68,15 @@ $(SIGPROXY_EXE): prog/sigproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/main.go
 	go build -o $@ ./$(@D)
 
-$(WEAVER_EXPORT): prog/weaver/Dockerfile $(WEAVER_EXE)
+$(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
-	$(SUDO) docker save $(WEAVER_IMAGE):latest > $@
+	touch $@
 
-$(WEAVEDNS_EXPORT): prog/weavedns/Dockerfile $(WEAVEDNS_EXE)
+$(WEAVEDNS_UPTODATE): prog/weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) prog/weavedns
-	$(SUDO) docker save $(WEAVEDNS_IMAGE):latest > $@
+	touch $@
 
-$(WEAVEEXEC_EXPORT): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)
+$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)
 	cp weave prog/weaveexec/weave
 	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
 	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
@@ -82,7 +84,10 @@ $(WEAVEEXEC_EXPORT): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROX
 	cp $(NETCHECK_EXE) prog/weaveexec/netcheck
 	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
 	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
-	$(SUDO) docker save $(WEAVEEXEC_IMAGE):latest > $@
+	touch $@
+
+$(WEAVE_EXPORT): $(IMAGES_UPTODATE)
+	$(SUDO) docker save $(addsuffix :latest,$(IMAGES)) > $@
 
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
@@ -112,7 +117,7 @@ publish: $(PUBLISH)
 
 clean:
 	-$(SUDO) docker rmi $(IMAGES)
-	rm -f $(EXES) $(EXPORTS)
+	rm -f $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT)
 	rm -f test/tls/*.pem
 
 build:

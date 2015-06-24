@@ -57,8 +57,7 @@ $ make
 
 This will build the weave components and package them into three
 Docker images (`weaveworks/weave`, `weaveworks/weavedns`, and
-`weaveworks/weaveexec`).  These are then exported (as `weave.tar`,
-`weavedns.tar` and `weaveexec.tar`).
+`weaveworks/weaveexec`).  These are then exported as `weave.tar`.
 
 ## Building in a Docker container
 
@@ -171,15 +170,13 @@ you can do so with
 $ vagrant ssh -c 'make -C src/github.com/weaveworks/weave'
 ```
 
-you should then find container snapshot tarballs in the top-level
-directory. You can use these snapshots with `docker load` against a
-different host, e.g.
+you should then find a `weave.tar` container snapshot tarball in the
+top-level directory. You can use that snapshot with `docker load`
+against a different host, e.g.
 
 ```bash
 $ export DOCKER_HOST=tcp://<HOST:PORT>
 $ docker load < weave.tar
-$ docker load < weavedns.tar
-$ docker load < weaveexec.tar
 ```
 
 You can provide extra Vagrant configuration by putting a file
