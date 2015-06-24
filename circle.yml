@@ -1,4 +1,4 @@
 general:
   branches:
     ignore:
-      - gh\-pages
+      - /gh\-pages/
