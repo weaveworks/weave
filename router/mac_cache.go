@@ -22,14 +22,12 @@ type MacCache struct {
 }
 
 func NewMacCache(maxAge time.Duration, onExpiry func(net.HardwareAddr, *Peer)) *MacCache {
-	return &MacCache{
+	cache := &MacCache{
 		table:    make(map[uint64]*MacCacheEntry),
 		maxAge:   maxAge,
 		onExpiry: onExpiry}
-}
-
-func (cache *MacCache) Start() {
 	cache.setExpiryTimer()
+	return cache
 }
 
 func (cache *MacCache) Enter(mac net.HardwareAddr, peer *Peer) bool {

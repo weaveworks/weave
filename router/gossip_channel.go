@@ -147,7 +147,6 @@ func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
 			}
 		})
 		c.senders[conn] = sender
-		sender.Start()
 	}
 	sender.Send(data)
 }
@@ -198,7 +197,6 @@ func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) erro
 	if !found {
 		broadcaster = NewGossipSender(func(pending GossipData) { c.sendBroadcast(srcName, pending) })
 		c.broadcasters[srcName] = broadcaster
-		broadcaster.Start()
 	}
 	broadcaster.Send(update)
 	return nil

@@ -84,6 +84,9 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 	return router
 }
 
+// Start listening for TCP connections, locally captured packets, and
+// packets forwarded over UDP.  This is separate from NewRouter so
+// that gossipers can register before we start forming connections.
 func (router *Router) Start() {
 	// we need two pcap handles since they aren't thread-safe
 	var pio PacketSourceSink
@@ -95,10 +98,6 @@ func (router *Router) Start() {
 		po, err = NewPcapO(router.Iface.Name)
 		checkFatal(err)
 	}
-	router.Ourself.Start()
-	router.Macs.Start()
-	router.Routes.Start()
-	router.ConnectionMaker.Start()
 	router.UDPListener = router.listenUDP(router.Port, po)
 	router.listenTCP(router.Port)
 	if pio != nil {
@@ -224,8 +223,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	remoteAddrStr := tcpConn.RemoteAddr().String()
 	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
 	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr, false, false)
-	connLocal := NewLocalConnection(connRemote, tcpConn, nil, router)
-	connLocal.Start(true)
+	StartLocalConnection(connRemote, tcpConn, nil, router, true)
 }
 
 func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {

@@ -40,16 +40,12 @@ func (conn *LocalConnection) ensureForwarders() error {
 
 	forwarder := NewForwarder(conn, encryptor, udpSender, DefaultPMTU)
 	forwarderDF := NewForwarderDF(conn, encryptorDF, udpSenderDF, DefaultPMTU)
-	effectivePMTU := forwarderDF.unverifiedPMTU
-	forwarder.Start()
-	forwarderDF.Start()
 
 	// Various fields in the conn struct are read by other processes,
 	// so we have to use locks.
 	conn.Lock()
 	conn.forwarder = forwarder
 	conn.forwarderDF = forwarderDF
-	conn.effectivePMTU = effectivePMTU
 	conn.Unlock()
 
 	return nil
@@ -195,20 +191,18 @@ type Forwarder struct {
 }
 
 func NewForwarder(conn *LocalConnection, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
-	return &Forwarder{
+	ch := make(chan *ForwardedFrame, ChannelSize)
+	finished := make(chan struct{})
+	fwd := &Forwarder{
 		conn:             conn,
+		ch:               ch,
+		finished:         finished,
 		enc:              enc,
 		udpSender:        udpSender,
 		maxPayload:       pmtu - UDPOverhead,
 		processSendError: func(err error) error { return err }}
-}
-
-func (fwd *Forwarder) Start() {
-	ch := make(chan *ForwardedFrame, ChannelSize)
-	fwd.ch = ch
-	finished := make(chan struct{})
-	fwd.finished = finished
 	go fwd.run(ch, finished)
+	return fwd
 }
 
 func (fwd *Forwarder) Shutdown() {
@@ -310,25 +304,23 @@ type ForwarderDF struct {
 }
 
 func NewForwarderDF(conn *LocalConnection, enc Encryptor, udpSender UDPSender, pmtu int) *ForwarderDF {
+	ch := make(chan *ForwardedFrame, ChannelSize)
+	finished := make(chan struct{})
+	verifyPMTU := make(chan int, ChannelSize)
 	fwd := &ForwarderDF{
 		Forwarder: Forwarder{
 			conn:       conn,
+			ch:         ch,
+			finished:   finished,
 			enc:        enc,
 			udpSender:  udpSender,
-			maxPayload: pmtu - UDPOverhead}}
+			maxPayload: pmtu - UDPOverhead},
+		verifyPMTU: verifyPMTU}
 	fwd.Forwarder.processSendError = fwd.processSendError
 	fwd.unverifiedPMTU = pmtu - fwd.effectiveOverhead()
-	return fwd
-}
-
-func (fwd *ForwarderDF) Start() {
-	ch := make(chan *ForwardedFrame, ChannelSize)
-	fwd.ch = ch
-	finished := make(chan struct{})
-	fwd.finished = finished
-	verifyPMTU := make(chan int, ChannelSize)
-	fwd.verifyPMTU = verifyPMTU
+	conn.setEffectivePMTU(fwd.unverifiedPMTU)
 	go fwd.run(ch, finished, verifyPMTU)
+	return fwd
 }
 
 func (fwd *ForwarderDF) PMTUVerified(pmtu int) {

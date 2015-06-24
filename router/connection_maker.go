@@ -37,19 +37,17 @@ type Target struct {
 type ConnectionMakerAction func() bool
 
 func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int, discovery bool) *ConnectionMaker {
-	return &ConnectionMaker{
+	actionChan := make(chan ConnectionMakerAction, ChannelSize)
+	cm := &ConnectionMaker{
 		ourself:     ourself,
 		peers:       peers,
 		port:        port,
 		discovery:   discovery,
 		directPeers: peerAddrs{},
-		targets:     make(map[string]*Target)}
-}
-
-func (cm *ConnectionMaker) Start() {
-	actionChan := make(chan ConnectionMakerAction, ChannelSize)
-	cm.actionChan = actionChan
+		targets:     make(map[string]*Target),
+		actionChan:  actionChan}
 	go cm.queryLoop(actionChan)
+	return cm
 }
 
 func (cm *ConnectionMaker) InitiateConnections(peers []string, replace bool) []error {
