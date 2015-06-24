@@ -56,7 +56,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
-		if err := i.setWeaveDNS(&container, r); err != nil {
+		if err := i.setWeaveDNS(&container, r.URL.Query().Get("name")); err != nil {
 			return err
 		}
 	}
@@ -96,7 +96,7 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 	return nil
 }
 
-func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody, r *http.Request) error {
+func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody, name string) error {
 	if i.proxy.WithoutDNS {
 		return nil
 	}
@@ -108,7 +108,6 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 
 	container.HostConfig.DNS = append(container.HostConfig.DNS, i.proxy.dockerBridgeIP)
 
-	name := r.URL.Query().Get("name")
 	if container.Hostname == "" && name != "" {
 		container.Hostname = name
 		// Strip trailing period because it's unusual to see it used on the end of a host name
