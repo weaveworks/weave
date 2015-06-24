@@ -48,6 +48,7 @@ usage() {
     echo "weave proxy-env"
     echo "weave proxy-config"
     echo "weave version"
+    echo "weave stop"
     echo "weave stop-router"
     echo "weave stop-dns"
     echo "weave stop-proxy"
@@ -1284,6 +1285,13 @@ case "$COMMAND" in
             call_weave DELETE /ip/weave:expose/${CIDR%/*}
         done
         show_addrs $ALL_CIDRS
+        ;;
+    stop)
+        [ $# -eq 0 ] || usage
+        stop $PROXY_CONTAINER_NAME "Proxy"
+        stop $DNS_CONTAINER_NAME   "WeaveDNS"
+        stop $CONTAINER_NAME       "Weave"
+        conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         ;;
     stop-router)
         [ $# -eq 0 ] || usage
