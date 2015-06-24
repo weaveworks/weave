@@ -48,7 +48,7 @@ usage() {
     echo "weave proxy-env"
     echo "weave proxy-config"
     echo "weave version"
-    echo "weave stop"
+    echo "weave stop-router"
     echo "weave stop-dns"
     echo "weave stop-proxy"
     echo "weave reset"
@@ -1285,7 +1285,7 @@ case "$COMMAND" in
         done
         show_addrs $ALL_CIDRS
         ;;
-    stop)
+    stop-router)
         [ $# -eq 0 ] || usage
         stop $CONTAINER_NAME "Weave"
         conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
