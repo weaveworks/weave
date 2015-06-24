@@ -392,13 +392,9 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
 	}
 }
 
-// ChoosePeerToAskForSpace chooses a weighted-random peer to ask
-// for space in the range [start, end).  Assumes start<end.
-func (r *Ring) ChoosePeerToAskForSpace(start, end address.Address) (result router.PeerName, err error) {
-	var (
-		sum               address.Offset
-		totalSpacePerPeer = make(map[router.PeerName]address.Offset) // Compute total free space per peer
-	)
+func (r *Ring) computeFreeSpacePerPeer(start, end address.Address) (sum address.Offset,
+	totalSpacePerPeer map[router.PeerName]address.Offset) {
+	totalSpacePerPeer = make(map[router.PeerName]address.Offset)
 
 	// iterate through tokens
 	for i, entry := range r.Entries {
@@ -422,6 +418,13 @@ func (r *Ring) ChoosePeerToAskForSpace(start, end address.Address) (result route
 		totalSpacePerPeer[entry.Peer] += entry.Free
 		sum += entry.Free
 	}
+	return
+}
+
+// ChoosePeerToAskForSpace chooses a weighted-random peer to ask
+// for space in the range [start, end).  Assumes start<end.
+func (r *Ring) ChoosePeerToAskForSpace(start, end address.Address) (result router.PeerName, err error) {
+	sum, totalSpacePerPeer := r.computeFreeSpacePerPeer(start, end)
 
 	if sum == 0 {
 		err = ErrNoFreeSpace
@@ -438,6 +441,11 @@ func (r *Ring) ChoosePeerToAskForSpace(start, end address.Address) (result route
 	}
 
 	panic("Should never reach this point")
+}
+
+func (r *Ring) NumPeersToAskForSpace(start, end address.Address) int {
+	_, totalSpacePerPeer := r.computeFreeSpacePerPeer(start, end)
+	return len(totalSpacePerPeer)
 }
 
 func (r *Ring) PickPeerForTransfer() router.PeerName {

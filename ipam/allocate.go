@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/weaveworks/weave/ipam/address"
+	"github.com/weaveworks/weave/router"
 )
 
 type allocateResult struct {
@@ -43,9 +44,18 @@ func (g *allocate) Try(alloc *Allocator) bool {
 	}
 
 	// out of space
-	if donor, err := alloc.ring.ChoosePeerToAskForSpace(g.r.Start, g.r.End); err == nil {
+	tried := make(map[router.PeerName]struct{})
+	numPeersToAsk := alloc.ring.NumPeersToAskForSpace(g.r.Start, g.r.End)
+	for len(tried) < numPeersToAsk {
+		donor, _ := alloc.ring.ChoosePeerToAskForSpace(g.r.Start, g.r.End)
+		if _, triedAlready := tried[donor]; triedAlready {
+			continue
+		}
 		alloc.debugln("Decided to ask peer", donor, "for space in range", g.r)
-		alloc.sendSpaceRequest(donor, g.r)
+		if err := alloc.sendSpaceRequest(donor, g.r); err == nil {
+			break
+		}
+		tried[donor] = struct{}{}
 	}
 
 	return false
