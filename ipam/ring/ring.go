@@ -392,10 +392,23 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
 	}
 }
 
-// ChoosePeerToAskForSpace returns all peers we can ask for space in
+type weightedPeer struct {
+	weight   float64
+	peername router.PeerName
+}
+type weightedPeers []weightedPeer
+
+func (ws weightedPeers) Len() int           { return len(ws) }
+func (ws weightedPeers) Less(i, j int) bool { return ws[i].weight < ws[j].weight }
+func (ws weightedPeers) Swap(i, j int)      { ws[i], ws[j] = ws[j], ws[i] }
+
+// ChoosePeersToAskForSpace returns all peers we can ask for space in
 // the range [start, end), in weighted-random order.  Assumes start<end.
 func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) (result []router.PeerName) {
-	totalSpacePerPeer := make(map[router.PeerName]address.Offset)
+	var (
+		sum               address.Offset
+		totalSpacePerPeer = make(map[router.PeerName]address.Offset) // Compute total free space per peer
+	)
 
 	// iterate through tokens
 	for i, entry := range r.Entries {
@@ -417,33 +430,20 @@ func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) (result []ro
 		}
 
 		totalSpacePerPeer[entry.Peer] += entry.Free
+		sum += entry.Free
 	}
 
-	// Compute cumulative distribution of spaces
-	type spaceCDF struct {
-		sum      address.Offset
-		peername router.PeerName
-	}
-	var cdf []spaceCDF
-	var sum address.Offset
+	// Compute weighted random numbers, then sort.
+	// This isn't perfect, e.g. an item with weight 2 will get chosen more than
+	// twice as often as an item with weight 1, but it's good enough for our purposes.
+	var ws weightedPeers
 	for peername, space := range totalSpacePerPeer {
-		sum += space
-		cdf = append(cdf, spaceCDF{sum: sum, peername: peername})
+		ws = append(ws, weightedPeer{weight: float64(space) * rand.Float64(), peername: peername})
 	}
-
-	for len(cdf) > 0 {
-		// Pick a number up to remaining free space
-		// (note using 64-bit because rand.Intn is signed int)
-		rn := rand.Int63n(int64(cdf[len(cdf)-1].sum))
-		// Find where this number lands in the CDF, and take that peer
-		i := sort.Search(len(cdf), func(j int) bool { return int64(cdf[j].sum) > rn })
-		result = append(result, cdf[i].peername)
-		// Remove this entry from the CDF and adjust all following sums
-		space := totalSpacePerPeer[cdf[i].peername]
-		for j := i; j < len(cdf); j++ {
-			cdf[j].sum -= space
-		}
-		cdf = append(cdf[:i], cdf[i+1:]...)
+	sort.Sort(ws)
+	// Reverse order (bigger weights come last after sort) and copy to result
+	for i := range ws {
+		result = append(result, ws[len(ws)-i-1].peername)
 	}
 	return
 }
