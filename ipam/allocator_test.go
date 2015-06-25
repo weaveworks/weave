@@ -286,7 +286,8 @@ func TestFakeRouterSimple(t *testing.T) {
 	alloc1 := allocs[0]
 	//alloc2 := allocs[1]
 
-	alloc1.Allocate("foo", subnet, nil)
+	_, err := alloc1.Allocate("foo", subnet, nil)
+	require.True(t, err == nil, "Failed to get address")
 }
 
 func TestAllocatorFuzz(t *testing.T) {
