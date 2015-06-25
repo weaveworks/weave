@@ -60,7 +60,7 @@ two containers, one on each host.
 
 First start weave on $HOST1:
 
-    host1$ weave launch && weave launch-dns && weave launch-proxy
+    host1$ weave launch
 
 this runs the weave router, DNS and proxy, each in their own
 container. Next we configure our `DOCKER_HOST` environment variable to
@@ -79,7 +79,7 @@ this host we simply launch them with `docker run` as appropriate.
 
 Next we repeat similar steps on `$HOST2`...
 
-    host2$ weave launch $HOST1 && weave launch-dns && weave launch-proxy
+    host2$ weave launch $HOST1
     host2$ eval $(weave proxy-env)
     host2$ docker run --name a2 -ti ubuntu
 
