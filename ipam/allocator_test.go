@@ -168,7 +168,7 @@ func TestCancel(t *testing.T) {
 		CIDR = "10.0.1.7/26"
 	)
 
-	router := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
+	router := TestGossipRouter{make(map[router.PeerName]chan interface{}), 0.0}
 
 	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
 	alloc1.SetInterfaces(router.connect(alloc1.ourName, alloc1))
