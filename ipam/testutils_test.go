@@ -205,7 +205,7 @@ type gossipMessage struct {
 	sender    *router.PeerName
 	buf       []byte            // for unicast
 	data      router.GossipData // for broadcast
-	exitChan  chan bool
+	exitChan  chan struct{}
 }
 
 type TestGossipRouter struct {
@@ -225,7 +225,7 @@ func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error
 
 func (grouter *TestGossipRouter) removePeer(peer router.PeerName) {
 	gossipChan := grouter.gossipChans[peer]
-	resultChan := make(chan bool)
+	resultChan := make(chan struct{})
 	gossipChan <- gossipMessage{exitChan: resultChan}
 	<-resultChan
 	delete(grouter.gossipChans, peer)
@@ -245,7 +245,7 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 			select {
 			case message := <-gossipChan:
 				if message.exitChan != nil {
-					message.exitChan <- true
+					close(message.exitChan)
 					return
 				}
 
