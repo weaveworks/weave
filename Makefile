@@ -44,7 +44,7 @@ update: $(EXES)
 	go get -u -f -v -tags -netgo $(addprefix ./,$(dir $(EXES)))
 
 $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
-	go get -tags netgo ./$(@D)
+	go get -t -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 		rm $@; \
