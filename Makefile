@@ -44,7 +44,7 @@ update: $(EXES)
 	go get -u -f -v -tags -netgo $(addprefix ./,$(dir $(EXES)))
 
 $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
-	go get -t -tags netgo ./$(@D)
+	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 		rm $@; \
@@ -96,6 +96,7 @@ tests:
 	echo "mode: count" > profile.cov
 	fail=0 ;                                                                              \
 	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do     \
+	    go get -t -tags netgo $$dir ;                                                     \
 	    output=$$(mktemp cover.XXXXXXXXXX) ;                                              \
 	    if ! go test -cpu 4 -tags netgo -covermode=count -coverprofile=$$output $$dir ; then     \
             fail=1 ;                                                                          \
