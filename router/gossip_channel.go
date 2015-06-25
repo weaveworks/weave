@@ -3,6 +3,7 @@ package router
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"log"
 	"sync"
 )
@@ -58,7 +59,12 @@ func (c *GossipChannel) deliverUnicast(srcName PeerName, origPayload []byte, dec
 		return err
 	}
 	if c.ourself.Name != destName {
-		return c.relayUnicast(destName, origPayload)
+		if err := c.relayUnicast(destName, origPayload); err != nil {
+			// just log errors from relayUnicast; a problem between us and destination
+			// is not enough reason to break the connection from the source
+			c.log(err)
+		}
+		return nil
 	}
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
@@ -160,15 +166,15 @@ func (c *GossipChannel) GossipBroadcast(update GossipData) error {
 	return c.relayBroadcast(c.ourself.Name, update)
 }
 
-func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) error {
+func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
 	if relayPeerName, found := c.routes.UnicastAll(dstPeerName); !found {
-		c.log("unknown relay destination:", dstPeerName)
+		err = fmt.Errorf("unknown relay destination: %s", dstPeerName)
 	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
-		c.log("unable to find connection to relay peer", relayPeerName)
+		err = fmt.Errorf("unable to find connection to relay peer %s", relayPeerName)
 	} else {
 		conn.(ProtocolSender).SendProtocolMsg(ProtocolMsg{ProtocolGossipUnicast, buf})
 	}
-	return nil
+	return err
 }
 
 func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
