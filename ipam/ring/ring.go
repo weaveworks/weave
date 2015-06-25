@@ -395,10 +395,7 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
 // ChoosePeerToAskForSpace returns all peers we can ask for space in
 // the range [start, end), in weighted-random order.  Assumes start<end.
 func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) (result []router.PeerName) {
-	var (
-		sum               address.Offset
-		totalSpacePerPeer = make(map[router.PeerName]address.Offset) // Compute total free space per peer
-	)
+	totalSpacePerPeer := make(map[router.PeerName]address.Offset)
 
 	// iterate through tokens
 	for i, entry := range r.Entries {
@@ -420,21 +417,33 @@ func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) (result []ro
 		}
 
 		totalSpacePerPeer[entry.Peer] += entry.Free
-		sum += entry.Free
 	}
 
-	for len(totalSpacePerPeer) > 0 {
-		// Pick random peer, weighted by total free space
-		rn := rand.Int63n(int64(sum)) // note using 64-bit because rand.Intn uses signed int
-		for peername, space := range totalSpacePerPeer {
-			rn -= int64(space)
-			if rn < 0 {
-				result = append(result, peername)
-				sum -= space
-				delete(totalSpacePerPeer, peername)
-				break
-			}
+	// Compute cumulative distribution of spaces
+	type spaceCDF struct {
+		sum      address.Offset
+		peername router.PeerName
+	}
+	var cdf []spaceCDF
+	var sum address.Offset
+	for peername, space := range totalSpacePerPeer {
+		sum += space
+		cdf = append(cdf, spaceCDF{sum: sum, peername: peername})
+	}
+
+	for len(cdf) > 0 {
+		// Pick a number up to remaining free space
+		// (note using 64-bit because rand.Intn is signed int)
+		rn := rand.Int63n(int64(cdf[len(cdf)-1].sum))
+		// Find where this number lands in the CDF, and take that peer
+		i := sort.Search(len(cdf), func(j int) bool { return int64(cdf[j].sum) > rn })
+		result = append(result, cdf[i].peername)
+		// Remove this entry from the CDF and adjust all following sums
+		space := totalSpacePerPeer[cdf[i].peername]
+		for j := i; j < len(cdf); j++ {
+			cdf[j].sum -= space
 		}
+		cdf = append(cdf[:i], cdf[i+1:]...)
 	}
 	return
 }
