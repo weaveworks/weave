@@ -94,18 +94,19 @@ $(DOCKER_DISTRIB):
 
 tests:
 	echo "mode: count" > profile.cov
-	fail=0 ;                                                                              \
-	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do     \
-	    go get -t -tags netgo $$dir ;                                                     \
-	    output=$$(mktemp cover.XXXXXXXXXX) ;                                              \
-	    if ! go test -cpu 4 -tags netgo -covermode=count -coverprofile=$$output $$dir ; then     \
-            fail=1 ;                                                                          \
-        fi ;                                                                                  \
-	    if [ -f $$output ]; then                                                          \
-	        tail -n +2 <$$output >>profile.cov;                                           \
-	        rm $$output;                                                                  \
-	    fi                                                                                \
-	done ;                                                                                \
+	fail=0 ; \
+	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | sort -u); do \
+		go get -t -tags netgo $$dir ; \
+		output=$$(mktemp cover.XXXXXXXXXX) ; \
+		if ! go test -cpu 4 -tags netgo \
+			-covermode=count -coverprofile=$$output $$dir ; then \
+		fail=1 ; \
+        fi ; \
+	if [ -f $$output ]; then \
+		tail -n +2 <$$output >>profile.cov; \
+		rm $$output; \
+	fi \
+	done ; \
 	exit $$fail
 	go tool cover -html=profile.cov -o=coverage.html
 
