@@ -392,9 +392,20 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
 	}
 }
 
-// ChoosePeerToAskForSpace chooses a weighted-random peer to ask
-// for space in the range [start, end).  Assumes start<end.
-func (r *Ring) ChoosePeerToAskForSpace(start, end address.Address) (result router.PeerName, err error) {
+type weightedPeer struct {
+	weight   float64
+	peername router.PeerName
+}
+type weightedPeers []weightedPeer
+
+// Note Less is using > so that bigger weights sort earlier
+func (ws weightedPeers) Less(i, j int) bool { return ws[i].weight > ws[j].weight }
+func (ws weightedPeers) Len() int           { return len(ws) }
+func (ws weightedPeers) Swap(i, j int)      { ws[i], ws[j] = ws[j], ws[i] }
+
+// ChoosePeersToAskForSpace returns all peers we can ask for space in
+// the range [start, end), in weighted-random order.  Assumes start<end.
+func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []router.PeerName {
 	var (
 		sum               address.Offset
 		totalSpacePerPeer = make(map[router.PeerName]address.Offset) // Compute total free space per peer
@@ -423,21 +434,19 @@ func (r *Ring) ChoosePeerToAskForSpace(start, end address.Address) (result route
 		sum += entry.Free
 	}
 
-	if sum == 0 {
-		err = ErrNoFreeSpace
-		return
-	}
-
-	// Pick random peer, weighted by total free space
-	rn := rand.Int63n(int64(sum))
+	// Compute weighted random numbers, then sort.
+	// This isn't perfect, e.g. an item with weight 2 will get chosen more than
+	// twice as often as an item with weight 1, but it's good enough for our purposes.
+	ws := make(weightedPeers, 0, len(totalSpacePerPeer))
 	for peername, space := range totalSpacePerPeer {
-		rn -= int64(space)
-		if rn < 0 {
-			return peername, nil
-		}
+		ws = append(ws, weightedPeer{weight: float64(space) * rand.Float64(), peername: peername})
 	}
-
-	panic("Should never reach this point")
+	sort.Sort(ws)
+	result := make([]router.PeerName, len(ws))
+	for i, wp := range ws {
+		result[i] = wp.peername
+	}
+	return result
 }
 
 func (r *Ring) PickPeerForTransfer() router.PeerName {
