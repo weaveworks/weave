@@ -59,9 +59,11 @@ func (c *GossipChannel) deliverUnicast(srcName PeerName, origPayload []byte, dec
 		return err
 	}
 	if c.ourself.Name != destName {
-		c.relayUnicast(destName, origPayload)
-		// ignore errors in passing on data; a problem between us and destination
-		// is not enough reason to break the connection from the source
+		if err := c.relayUnicast(destName, origPayload); err != nil {
+			// just log errors from relayUnicast; a problem between us and destination
+			// is not enough reason to break the connection from the source
+			c.log(err)
+		}
 		return nil
 	}
 	var payload []byte
@@ -171,9 +173,6 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err erro
 		err = fmt.Errorf("unable to find connection to relay peer %s", relayPeerName)
 	} else {
 		conn.(ProtocolSender).SendProtocolMsg(ProtocolMsg{ProtocolGossipUnicast, buf})
-	}
-	if err != nil {
-		c.log(err)
 	}
 	return err
 }

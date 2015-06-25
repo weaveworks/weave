@@ -44,8 +44,10 @@ func (g *allocate) Try(alloc *Allocator) bool {
 	// out of space
 	donors := alloc.ring.ChoosePeersToAskForSpace(g.r.Start, g.r.End)
 	for _, donor := range donors {
-		alloc.debugln("Decided to ask peer", donor, "for space in range", g.r)
-		if err := alloc.sendSpaceRequest(donor, g.r); err == nil {
+		if err := alloc.sendSpaceRequest(donor, g.r); err != nil {
+			alloc.debugln("Problem asking peer", donor, "for space:", err)
+		} else {
+			alloc.debugln("Decided to ask peer", donor, "for space in range", g.r)
 			break
 		}
 	}
