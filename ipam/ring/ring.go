@@ -398,13 +398,14 @@ type weightedPeer struct {
 }
 type weightedPeers []weightedPeer
 
+// Note Less is using > so that bigger weights sort earlier
+func (ws weightedPeers) Less(i, j int) bool { return ws[i].weight > ws[j].weight }
 func (ws weightedPeers) Len() int           { return len(ws) }
-func (ws weightedPeers) Less(i, j int) bool { return ws[i].weight < ws[j].weight }
 func (ws weightedPeers) Swap(i, j int)      { ws[i], ws[j] = ws[j], ws[i] }
 
 // ChoosePeersToAskForSpace returns all peers we can ask for space in
 // the range [start, end), in weighted-random order.  Assumes start<end.
-func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) (result []router.PeerName) {
+func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []router.PeerName {
 	var (
 		sum               address.Offset
 		totalSpacePerPeer = make(map[router.PeerName]address.Offset) // Compute total free space per peer
@@ -436,16 +437,16 @@ func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) (result []ro
 	// Compute weighted random numbers, then sort.
 	// This isn't perfect, e.g. an item with weight 2 will get chosen more than
 	// twice as often as an item with weight 1, but it's good enough for our purposes.
-	var ws weightedPeers
+	ws := make(weightedPeers, 0, len(totalSpacePerPeer))
 	for peername, space := range totalSpacePerPeer {
 		ws = append(ws, weightedPeer{weight: float64(space) * rand.Float64(), peername: peername})
 	}
 	sort.Sort(ws)
-	// Reverse order (bigger weights come last after sort) and copy to result
-	for i := range ws {
-		result = append(result, ws[len(ws)-i-1].peername)
+	result := make([]router.PeerName, len(ws))
+	for i, wp := range ws {
+		result[i] = wp.peername
 	}
-	return
+	return result
 }
 
 func (r *Ring) PickPeerForTransfer() router.PeerName {
