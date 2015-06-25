@@ -575,14 +575,14 @@ func (alloc *Allocator) propose() {
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
-func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) {
+func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) error {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	if err := enc.Encode(r); err != nil {
 		panic(err)
 	}
 	msg := router.Concat([]byte{msgSpaceRequest}, buf.Bytes())
-	alloc.gossip.GossipUnicast(dest, msg)
+	return alloc.gossip.GossipUnicast(dest, msg)
 }
 
 func (alloc *Allocator) sendRingUpdate(dest router.PeerName) {
