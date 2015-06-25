@@ -351,45 +351,45 @@ func TestGossip(t *testing.T) {
 	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
 }
 
+func assertPeersWithSpace(t *testing.T, ring *Ring, start, end address.Address, expected int) []router.PeerName {
+	peers := ring.ChoosePeersToAskForSpace(start, end)
+	require.Equal(t, expected, len(peers))
+	return peers
+}
+
 func TestFindFree(t *testing.T) {
 	ring1 := New(start, end, peer1name)
 
-	peers := ring1.ChoosePeersToAskForSpace(start, end)
-	require.Equal(t, 0, len(peers), "Expected no peers")
+	assertPeersWithSpace(t, ring1, start, end, 0)
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
-	peers = ring1.ChoosePeersToAskForSpace(start, end)
-	require.Equal(t, 0, len(peers), "Expected no peers")
+	assertPeersWithSpace(t, ring1, start, end, 0)
 
 	// We shouldn't return outselves
 	ring1.ReportFree(map[address.Address]address.Offset{start: 10})
-	peers = ring1.ChoosePeersToAskForSpace(start, end)
-	require.Equal(t, 0, len(peers), "Expected no peers")
+	assertPeersWithSpace(t, ring1, start, end, 0)
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 1},
 		{Token: middle, Peer: peer1name, Free: 1}}
-	peers = ring1.ChoosePeersToAskForSpace(start, end)
-	require.Equal(t, 0, len(peers), "Expected no peers")
+	assertPeersWithSpace(t, ring1, start, end, 0)
 	ring1.assertInvariants()
 
 	// We should return others
+	var peers []router.PeerName
+
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 1}}
-	peers = ring1.ChoosePeersToAskForSpace(start, end)
-	require.Equal(t, 1, len(peers), "Expected one peer")
+	peers = assertPeersWithSpace(t, ring1, start, end, 1)
 	require.Equal(t, peer2name, peers[0])
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 1},
 		{Token: middle, Peer: peer3name, Free: 1}}
-	peers = ring1.ChoosePeersToAskForSpace(start, middle)
-	require.Equal(t, 1, len(peers), "Expected one peer")
+	peers = assertPeersWithSpace(t, ring1, start, middle, 1)
 	require.Equal(t, peer2name, peers[0])
 
-	peers = ring1.ChoosePeersToAskForSpace(middle, end)
-	require.Equal(t, 1, len(peers), "Expected one peer")
+	peers = assertPeersWithSpace(t, ring1, middle, end, 1)
 	require.Equal(t, peer3name, peers[0])
 
-	peers = ring1.ChoosePeersToAskForSpace(start, end)
-	require.Equal(t, 2, len(peers), "Expected two peer")
+	assertPeersWithSpace(t, ring1, start, end, 2)
 	ring1.assertInvariants()
 }
 
