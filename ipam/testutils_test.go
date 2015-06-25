@@ -210,6 +210,9 @@ type broadcastMessage struct {
 type exitMessage struct {
 	exitChan chan struct{}
 }
+type flushMessage struct {
+	flushChan chan struct{}
+}
 
 type TestGossipRouter struct {
 	gossipChans map[router.PeerName]chan interface{}
@@ -224,6 +227,14 @@ func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error
 		}
 	}
 	return nil
+}
+
+func (grouter *TestGossipRouter) flush() {
+	for _, gossipChan := range grouter.gossipChans {
+		flushChan := make(chan struct{})
+		gossipChan <- flushMessage{flushChan: flushChan}
+		<-flushChan
+	}
 }
 
 func (grouter *TestGossipRouter) removePeer(peer router.PeerName) {
@@ -250,6 +261,9 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 				if message, isExit := gossip.(exitMessage); isExit {
 					close(message.exitChan)
 					return
+				}
+				if message, isFlush := gossip.(flushMessage); isFlush {
+					close(message.flushChan)
 				}
 				if rand.Float32() > (1.0 - grouter.loss) {
 					continue
@@ -305,7 +319,7 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRou
 	}
 
 	gossipRouter.GossipBroadcast(allocs[size-1].Gossip())
-	time.Sleep(1000 * time.Millisecond)
+	gossipRouter.flush()
 	return allocs, gossipRouter, subnet
 }
 

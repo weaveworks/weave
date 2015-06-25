@@ -256,13 +256,17 @@ func TestTransfer(t *testing.T) {
 	wt.AssertTrue(t, err == nil, "Failed to get address")
 
 	router.GossipBroadcast(alloc2.Gossip())
+	router.flush()
 	router.GossipBroadcast(alloc3.Gossip())
+	router.flush()
 	router.removePeer(alloc2.ourName)
 	router.removePeer(alloc3.ourName)
 	alloc2.Stop()
 	alloc3.Stop()
+	router.flush()
 	wt.AssertSuccess(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
 	wt.AssertSuccess(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
+	router.flush()
 
 	wt.AssertEquals(t, alloc1.NumFreeAddresses(subnet), address.Offset(1022))
 
