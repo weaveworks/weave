@@ -141,10 +141,8 @@ Let's begin by configuring weave's allocator to manage multiple
 subnets:
 
     host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24
-    host1$ weave launch-dns && weave launch-proxy
     host1$ eval $(weave proxy-env)
     host2$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24 $HOST1
-    host2$ weave launch-dns && weave launch-proxy
     host2$ eval $(weave proxy-env)
 
 This delegates the entire 10.2.0.0/16 subnet to weave, and instructs

@@ -28,13 +28,23 @@ hosts.
 
 WeaveDNS is deployed as a set of containers that communicate with each
 other over the weave network. One such container needs to be started
-on every weave host, by invoking the weave script command
-`launch-dns`:
+on every weave host, either simultaneously with the router and proxy
+via `launch`:
 
 ```bash
-host1$ weave launch && weave launch-dns && weave launch-proxy
+host1$ weave launch
 host1$ eval $(weave proxy-env)
 ```
+or independently via `launch-dns`:
+
+```bash
+host1$ weave launch-router && weave launch-dns && weave launch-proxy
+host1$ eval $(weave proxy-env)
+```
+
+The first form is more convenient, however you can only pass weaveDNS
+related configuration arguments to `launch-dns` so if you need to
+modify the default behaviour you will have to use the latter.
 
 Application containers will use weaveDNS automatically if it is
 running at the point when they are started. They will use it for name
@@ -67,7 +77,11 @@ however specify an address in CIDR format manually. In this case you
 are responsible for ensuring that the IP addresses specified are
 uniquely allocated and not in use by any other container.
 
-Finally, WeaveDNS containers can be stopped with `stop-dns`.
+Finally, weaveDNS can be stopped independently with
+
+    host1$ weave stop-dns
+
+or in conjunction with the router and proxy via `stop`.
 
 ## <a name="how-it-works"></a>How it works
 
@@ -112,7 +126,7 @@ Returning to our earlier example, let us start an additional `pingme`
 container, this time on the 2nd host, and then run some ping tests...
 
 ```bash
-host2$ weave launch && weave launch-dns && weave launch-proxy
+host2$ weave launch
 host2$ eval $(weave proxy-env)
 host2$ docker run -dti --name=pingme ubuntu
 

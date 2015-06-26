@@ -29,8 +29,8 @@ check() {
 
 start_suite "Resolve names across hosts (with and without IPAM), and repopulate on restart"
 
-weave_on $HOST1 launch -iprange $UNIVERSE
-weave_on $HOST2 launch -iprange $UNIVERSE $HOST1
+weave_on $HOST1 launch-router -iprange $UNIVERSE
+weave_on $HOST2 launch-router -iprange $UNIVERSE $HOST1
 
 start_container          $HOST2 $C2/24 --name=c2 -h $NAME2
 start_container_with_dns $HOST1 $C1/24 --name=c1

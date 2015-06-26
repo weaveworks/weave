@@ -73,7 +73,7 @@ start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr argume
 # specific address, i.e. we are assuming that IPAM always returns the
 # lowest available address in the subnet
 
-weave_on $HOST1 launch -debug -iprange 10.2.3.0/24
+weave_on $HOST1 launch-router -debug -iprange 10.2.3.0/24
 launch_dns_on $HOST1 10.254.254.254/24
 
 # Run container with three cidrs

@@ -20,7 +20,7 @@ assert_resolution() {
 
 start_suite "With or without DNS test"
 
-weave_on $HOST1 launch
+weave_on $HOST1 launch-router
 
 DNS_IP=$(weave_on $HOST1 docker-bridge-ip)
 
