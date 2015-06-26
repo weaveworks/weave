@@ -213,7 +213,7 @@ func TestCacheEntries(t *testing.T) {
 	require.True(t, err == errNoLocalReplies, "Get() error with CacheNoLocalReplies")
 
 	clk.Add(time.Duration(DefaultLocalTTL/2) * time.Second)
-	t.Logf("Checking that we get an expired response after %f seconds", DefaultLocalTTL)
+	t.Logf("Checking that we get an expired response after %d seconds", DefaultLocalTTL)
 	clk.Add(time.Second * time.Duration(DefaultLocalTTL+1))
 	t.Logf("Checking that we get an expired response after %d seconds", DefaultLocalTTL)
 	resp, err = l.Get(questionMsg3, minUDPSize)
