@@ -74,7 +74,7 @@ func (proto dnsProtocol) String() string {
 
 // get a new dns.Client for a protocol
 func (proto dnsProtocol) GetNewClient(bufsize int, timeout time.Duration) *dns.Client {
-	Debug.Printf("[dns] Creating %s DNS client with %s timeout", proto, timeout)
+	Log.Debugf("[dns] Creating %s DNS client with %s timeout", proto, timeout)
 	switch proto {
 	case protTCP:
 		return &dns.Client{Net: "tcp", ReadTimeout: timeout}
@@ -228,7 +228,7 @@ func (s *DNSServer) ActivateAndServe() {
 		Info.Printf("[dns] Listening for DNS on %s (UDP)", s.ListenAddr)
 		err := s.udpSrv.ActivateAndServe()
 		CheckFatal(err)
-		Debug.Printf("[dns] DNS UDP server exiting...")
+		Log.Debugf("[dns] DNS UDP server exiting...")
 	}()
 
 	go func() {
@@ -237,7 +237,7 @@ func (s *DNSServer) ActivateAndServe() {
 		Info.Printf("[dns] Listening for DNS on %s (TCP)", s.ListenAddr)
 		err := s.tcpSrv.ActivateAndServe()
 		CheckFatal(err)
-		Debug.Printf("[dns] DNS TCP server exiting...")
+		Log.Debugf("[dns] DNS TCP server exiting...")
 	}()
 
 	// Waiting for all goroutines to finish (otherwise they die as main routine dies)
@@ -305,7 +305,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		Debug.Printf("[dns msgid %d] %s: %+v", r.MsgHdr.Id, kind, q)
+		Log.Debugf("[dns msgid %d] %s: %+v", r.MsgHdr.Id, kind, q)
 		maxLen := getMaxReplyLen(r, proto)
 
 		// cache a response if the cache is enabled, and observe the name/IP
@@ -324,17 +324,17 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 			reply, err := s.cache.Get(r, maxLen)
 			if err != nil {
 				if err == errNoLocalReplies {
-					Debug.Printf("[dns msgid %d] Cached no-local-replies", r.MsgHdr.Id)
+					Log.Debugf("[dns msgid %d] Cached no-local-replies", r.MsgHdr.Id)
 					fallback(w, r)
 				} else {
-					Debug.Printf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
+					Log.Debugf("[dns msgid %d] Error from cache: %s", r.MsgHdr.Id, err)
 					w.WriteMsg(makeDNSFailResponse(r))
 				}
 				return
 			}
 			if reply != nil {
 				reply.Answer = pruneAnswers(shuffleAnswers(reply.Answer), s.maxAnswers)
-				Debug.Printf("[dns msgid %d] Returning reply from cache: %s/%d answers",
+				Log.Debugf("[dns msgid %d] Returning reply from cache: %s/%d answers",
 					r.MsgHdr.Id, dns.RcodeToString[reply.MsgHdr.Rcode], len(reply.Answer))
 				w.WriteMsg(reply)
 				return
@@ -343,7 +343,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 
 		// catch unsupported queries
 		if q.Qtype != qtype {
-			Debug.Printf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
+			Log.Debugf("[dns msgid %d] Unsupported query type %s", r.MsgHdr.Id, dns.TypeToString[q.Qtype])
 			m := makeDNSFailResponse(r)
 			maybeCache(m, s.negLocalTTL, 0)
 			w.WriteMsg(m)
@@ -360,7 +360,7 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 			m.Authoritative = true
 			maybeCache(m, nullTTL, 0)
 			m.Answer = pruneAnswers(shuffleAnswers(m.Answer), s.maxAnswers)
-			Debug.Printf("[dns msgid %d] Sending response: %s/%d answers [code:%s]",
+			Log.Debugf("[dns msgid %d] Sending response: %s/%d answers [code:%s]",
 				m.MsgHdr.Id, dns.TypeToString[q.Qtype], len(m.Answer), dns.RcodeToString[m.Rcode])
 			w.WriteMsg(m)
 		}
@@ -380,25 +380,25 @@ func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
 		rcopy := r
 		rcopy.SetEdns0(uint16(maxLen), false)
 
-		Debug.Printf("[dns msgid %d] Fallback query: %+v [%s, max:%d bytes]", rcopy.MsgHdr.Id, q, proto, maxLen)
+		Log.Debugf("[dns msgid %d] Fallback query: %+v [%s, max:%d bytes]", rcopy.MsgHdr.Id, q, proto, maxLen)
 		for _, server := range s.Upstream.Servers {
 			reply, _, err := dnsClient.Exchange(rcopy, fmt.Sprintf("%s:%s", server, s.Upstream.Port))
 			if err != nil {
-				Debug.Printf("[dns msgid %d] Network error trying %s (%s)",
+				Log.Debugf("[dns msgid %d] Network error trying %s (%s)",
 					r.MsgHdr.Id, server, err)
 				continue
 			}
 			if reply != nil && reply.Rcode != dns.RcodeSuccess {
-				Debug.Printf("[dns msgid %d] Failure reported by %s for query %s",
+				Log.Debugf("[dns msgid %d] Failure reported by %s for query %s",
 					r.MsgHdr.Id, server, q.Name)
 				continue
 			}
-			Debug.Printf("[dns msgid %d] Given answer by %s for query %s",
+			Log.Debugf("[dns msgid %d] Given answer by %s for query %s",
 				r.MsgHdr.Id, server, q.Name)
 			w.WriteMsg(reply)
 			return
 		}
-		Warning.Printf("[dns msgid %d] Failed lookup for external name %s", r.MsgHdr.Id, q.Name)
+		Log.Warningf("[dns msgid %d] Failed lookup for external name %s", r.MsgHdr.Id, q.Name)
 		w.WriteMsg(makeDNSFailResponse(r))
 	}
 }

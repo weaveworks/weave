@@ -20,7 +20,7 @@ var (
 
 func callWeave(args ...string) ([]byte, error) {
 	args = append([]string{"--local"}, args...)
-	Debug.Print("Calling weave", args)
+	Log.Debug("Calling weave", args)
 	cmd := exec.Command("./weave", args...)
 	cmd.Env = []string{"PROCFS=/hostproc", "PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
 	out, err := cmd.CombinedOutput()
@@ -41,14 +41,14 @@ func inspectContainerInPath(client *docker.Client, path string) (*docker.Contain
 	subs := containerIDRegexp.FindStringSubmatch(path)
 	if subs == nil {
 		err := fmt.Errorf("No container id found in request with path %s", path)
-		Warning.Println(err)
+		Log.Warningln(err)
 		return nil, err
 	}
 	containerID := subs[2]
 
 	container, err := client.InspectContainer(containerID)
 	if err != nil {
-		Warning.Printf("Error inspecting container %s: %v", containerID, err)
+		Log.Warningf("Error inspecting container %s: %v", containerID, err)
 	}
 	return container, err
 }

@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -24,10 +23,6 @@ import (
 var version = "(unreleased version)"
 
 func main() {
-
-	log.SetPrefix(weave.Protocol + " ")
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
 	// for that plus at least one more.
@@ -84,33 +79,33 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Println("Command line options:", options())
-	log.Println("Command line peers:", peers)
+	Log.Println("Command line options:", options())
+	Log.Println("Command line peers:", peers)
 
 	var err error
 
 	if ifaceName != "" {
 		config.Iface, err = weavenet.EnsureInterface(ifaceName, wait)
 		if err != nil {
-			log.Fatal(err)
+			Log.Fatal(err)
 		}
 	}
 
 	if routerName == "" {
 		if config.Iface == nil {
-			log.Fatal("Either an interface must be specified with -iface or a name with -name")
+			Log.Fatal("Either an interface must be specified with -iface or a name with -name")
 		}
 		routerName = config.Iface.HardwareAddr.String()
 	}
 	name, err := weave.PeerNameFromUserInput(routerName)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 
 	if nickName == "" {
 		nickName, err = os.Hostname()
 		if err != nil {
-			log.Fatal(err)
+			Log.Fatal(err)
 		}
 	}
 
@@ -118,10 +113,10 @@ func main() {
 		password = os.Getenv("WEAVE_PASSWORD")
 	}
 	if password == "" {
-		log.Println("Communication between peers is unencrypted.")
+		Log.Println("Communication between peers is unencrypted.")
 	} else {
 		config.Password = []byte(password)
-		log.Println("Communication between peers is encrypted.")
+		Log.Println("Communication between peers is encrypted.")
 	}
 
 	if prof != "" {
@@ -136,7 +131,7 @@ func main() {
 	config.PeerDiscovery = !noDiscovery
 
 	router := weave.NewRouter(config, name, nickName)
-	log.Println("Our name is", router.Ourself)
+	Log.Println("Our name is", router.Ourself)
 
 	var allocator *ipam.Allocator
 	var defaultSubnet address.CIDR
@@ -145,18 +140,18 @@ func main() {
 		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
 		dockerCli, err = docker.NewClient(apiPath)
 		if err != nil {
-			Error.Fatal("Unable to start docker client: ", err)
+			Log.Fatal("Unable to start docker client: ", err)
 		}
 		if err = dockerCli.AddObserver(allocator); err != nil {
-			Error.Fatal("Unable to start watcher", err)
+			Log.Fatal("Unable to start watcher", err)
 		}
 	} else if peerCount > 0 {
-		log.Fatal("-initpeercount flag specified without -iprange")
+		Log.Fatal("-initpeercount flag specified without -iprange")
 	}
 
 	router.Start()
 	if errors := router.ConnectionMaker.InitiateConnections(peers, false); len(errors) > 0 {
-		log.Fatal(errorMessages(errors))
+		Log.Fatal(errorMessages(errors))
 	}
 
 	// The weave script always waits for a status call to succeed,
@@ -205,17 +200,17 @@ func logFrameFunc(debug bool) weave.LogFrameFunc {
 			}
 		}
 
-		log.Println(parts...)
+		Log.Println(parts...)
 	}
 }
 
 func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	_, cidr, err := address.ParseCIDR(cidrStr)
 	if err != nil {
-		log.Fatal(err)
+		Log.Fatal(err)
 	}
 	if cidr.Size() < ipam.MinSubnetSize {
-		log.Fatalf("Allocation range smaller than minimum size %d: %s", ipam.MinSubnetSize, cidrStr)
+		Log.Fatalf("Allocation range smaller than minimum size %d: %s", ipam.MinSubnetSize, cidrStr)
 	}
 	return cidr
 }
@@ -226,7 +221,7 @@ func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr s
 	if defaultSubnetStr != "" {
 		defaultSubnet = parseAndCheckCIDR(defaultSubnetStr)
 		if !ipRange.Range().Overlaps(defaultSubnet.Range()) {
-			log.Fatalf("Default subnet %s out of bounds: %s", defaultSubnet, ipRange)
+			Log.Fatalf("Default subnet %s out of bounds: %s", defaultSubnet, ipRange)
 		}
 	}
 	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum)
@@ -253,7 +248,7 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	// specify it explicitly if that becomes a problem.
 	clusterSize := uint(len(peers) + 1)
 	quorum := clusterSize/2 + 1
-	log.Println("Assuming quorum size of", quorum)
+	Log.Println("Assuming quorum size of", quorum)
 	return quorum
 }
 
@@ -303,11 +298,11 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 	}
 	l, err := net.Listen(protocol, httpAddr)
 	if err != nil {
-		log.Fatal("Unable to create http listener socket: ", err)
+		Log.Fatal("Unable to create http listener socket: ", err)
 	}
 
 	err = http.Serve(l, nil)
 	if err != nil {
-		log.Fatal("Unable to create http server", err)
+		Log.Fatal("Unable to create http server", err)
 	}
 }

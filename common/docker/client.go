@@ -44,7 +44,7 @@ func NewClient(apiPath string) (*Client, error) {
 func (c *Client) AddObserver(ob ContainerObserver) error {
 	events := make(chan *docker.APIEvents)
 	if err := c.AddEventListener(events); err != nil {
-		Error.Printf("[docker] Unable to add listener to Docker API: %s", err)
+		Log.Errorf("[docker] Unable to add listener to Docker API: %s", err)
 		return err
 	}
 
@@ -63,7 +63,7 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 // IsContainerNotRunning returns true if we have checked with Docker that the ID is not running
 func (c *Client) IsContainerNotRunning(idStr string) bool {
 	if !IsContainerID(idStr) {
-		Debug.Printf("[docker] '%s' does not seem to be a container id", idStr)
+		Log.Debugf("[docker] '%s' does not seem to be a container id", idStr)
 		return false
 	}
 
@@ -75,6 +75,6 @@ func (c *Client) IsContainerNotRunning(idStr string) bool {
 	if _, notThere := err.(*docker.NoSuchContainer); notThere {
 		return true
 	}
-	Error.Printf("[docker] Could not check container status: %s", err)
+	Log.Errorf("[docker] Could not check container status: %s", err)
 	return false
 }

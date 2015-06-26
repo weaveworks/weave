@@ -113,7 +113,7 @@ func (s *MDNSServer) makeHandler(qtype uint16, lookup LookupFunc) dns.HandlerFun
 		// answer.
 		remoteAddr := rw.RemoteAddr()
 		if s.addrIsLocal(remoteAddr) && !s.allowLocal {
-			Debug.Printf("[mdns] srv: mDNS query from local host ('%s'): ignored", remoteAddr)
+			Log.Debugf("[mdns] srv: mDNS query from local host ('%s'): ignored", remoteAddr)
 			return
 		}
 
@@ -121,16 +121,16 @@ func (s *MDNSServer) makeHandler(qtype uint16, lookup LookupFunc) dns.HandlerFun
 		if len(r.Answer) == 0 && len(r.Question) > 0 {
 			q := &r.Question[0]
 			if q.Qtype == qtype {
-				Debug.Printf("[mdns msgid %d] srv: trying to answer to mDNS query '%s'", r.MsgHdr.Id, q.Name)
+				Log.Debugf("[mdns msgid %d] srv: trying to answer to mDNS query '%s'", r.MsgHdr.Id, q.Name)
 				if m := lookup(s.zone, r, q); m != nil {
-					Debug.Printf("[mdns msgid %d] srv: found local answer to mDNS query '%s'", r.MsgHdr.Id, q.Name)
+					Log.Debugf("[mdns msgid %d] srv: found local answer to mDNS query '%s'", r.MsgHdr.Id, q.Name)
 					if err := s.sendResponse(m); err != nil {
-						Warning.Printf("[mdns msgid %d] srv: error writing mDNS response to %v", r.MsgHdr.Id, s.sendconn)
+						Log.Warningf("[mdns msgid %d] srv: error writing mDNS response to %v", r.MsgHdr.Id, s.sendconn)
 					} else {
-						Debug.Printf("[mdns msgid %d] srv: response sent: %d answers", r.MsgHdr.Id, len(m.Answer))
+						Log.Debugf("[mdns msgid %d] srv: response sent: %d answers", r.MsgHdr.Id, len(m.Answer))
 					}
 				} else {
-					Debug.Printf("[mdns msgid %d] srv: no local answer for answering mDNS query '%s'",
+					Log.Debugf("[mdns msgid %d] srv: no local answer for answering mDNS query '%s'",
 						r.MsgHdr.Id, q.Name)
 				}
 			}

@@ -59,11 +59,11 @@ func TestServerSimpleQuery(t *testing.T) {
 		require.NoError(t, err)
 		conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 		require.NoError(t, err)
-		Debug.Printf("Sending UDP packet to %s", ipv4Addr)
+		Log.Debugf("Sending UDP packet to %s", ipv4Addr)
 		_, err = conn.WriteTo(buf, ipv4Addr)
 		require.NoError(t, err)
 
-		Debug.Printf("Waiting for response")
+		Log.Debugf("Waiting for response")
 		for {
 			select {
 			case x := <-recvChan:
@@ -80,7 +80,7 @@ func TestServerSimpleQuery(t *testing.T) {
 					return
 				}
 			case <-time.After(100 * time.Millisecond):
-				Debug.Printf("Timeout while waiting for response")
+				Log.Debugf("Timeout while waiting for response")
 				return
 			}
 		}
@@ -96,7 +96,7 @@ func TestServerSimpleQuery(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 
-	Debug.Printf("Checking that we get 2 IPs fo name '%s' [A]", testRecord1.Name())
+	Log.Debugf("Checking that we get 2 IPs fo name '%s' [A]", testRecord1.Name())
 	sendQuery(testRecord1.Name(), dns.TypeA)
 	if receivedCount != 2 {
 		t.Fatalf("Unexpected result count %d for %s", receivedCount, testRecord1.Name())
@@ -108,13 +108,13 @@ func TestServerSimpleQuery(t *testing.T) {
 		t.Fatalf("Unexpected result %s for %s", receivedAddrs, testRecord1.Name())
 	}
 
-	Debug.Printf("Checking that 'testfail.weave.' [A] gets no answers")
+	Log.Debugf("Checking that 'testfail.weave.' [A] gets no answers")
 	sendQuery("testfail.weave.", dns.TypeA)
 	if receivedCount != 0 {
 		t.Fatalf("Unexpected result count %d for testfail.weave", receivedCount)
 	}
 
-	Debug.Printf("Checking that '%s' [PTR] gets one name", testInAddr1)
+	Log.Debugf("Checking that '%s' [PTR] gets one name", testInAddr1)
 	sendQuery(testInAddr1, dns.TypePTR)
 	if receivedCount != 1 {
 		t.Fatalf("Expected an answer to %s, got %d answers", testInAddr1, receivedCount)

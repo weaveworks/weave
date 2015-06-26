@@ -35,11 +35,9 @@ var (
 )
 
 var (
-	Debug   *logrus.Logger
-	Info    *logrus.Logger
-	Warning *logrus.Logger
-	Error   *logrus.Logger
-	debugF  bool
+	Log    *logrus.Logger
+	Info   *logrus.Logger
+	debugF bool
 )
 
 func InitLogging(debugHandle io.Writer,
@@ -47,30 +45,13 @@ func InitLogging(debugHandle io.Writer,
 	warningHandle io.Writer,
 	errorHandle io.Writer) {
 
-	Debug = &logrus.Logger{
-		Out:       debugHandle,
-		Formatter: standardTextFormatter,
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.DebugLevel,
-	}
 	Info = &logrus.Logger{
 		Out:       infoHandle,
 		Formatter: standardTextFormatter,
 		Hooks:     make(logrus.LevelHooks),
 		Level:     logrus.InfoLevel,
 	}
-	Warning = &logrus.Logger{
-		Out:       warningHandle,
-		Formatter: standardTextFormatter,
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.WarnLevel,
-	}
-	Error = &logrus.Logger{
-		Out:       errorHandle,
-		Formatter: standardTextFormatter,
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.ErrorLevel,
-	}
+	Log = Info
 }
 
 func InitDefaultLogging(debug bool) {

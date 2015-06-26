@@ -13,7 +13,7 @@ import (
 
 func badRequest(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusBadRequest)
-	common.Warning.Println("[allocator]:", err.Error())
+	common.Log.Warningln("[allocator]:", err.Error())
 }
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.

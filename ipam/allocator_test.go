@@ -186,9 +186,9 @@ func TestCancel(t *testing.T) {
 
 	// Get some IPs, so each allocator has some space
 	res1, _ := alloc1.Allocate("foo", subnet, nil)
-	common.Debug.Printf("res1 = %s", res1.String())
+	common.Log.Debugf("res1 = %s", res1.String())
 	res2, _ := alloc2.Allocate("bar", subnet, nil)
-	common.Debug.Printf("res2 = %s", res2.String())
+	common.Log.Debugf("res2 = %s", res2.String())
 	if res1 == res2 {
 		require.FailNow(t, "Error: got same ips!")
 	}

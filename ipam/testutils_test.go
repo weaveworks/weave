@@ -295,7 +295,7 @@ func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, 
 	select {
 	case client.router.gossipChans[dstPeerName] <- unicastMessage{sender: client.sender, buf: buf}:
 	default: // drop the message if we cannot send it
-		common.Error.Printf("Dropping message")
+		common.Log.Errorf("Dropping message")
 	}
 	return nil
 }

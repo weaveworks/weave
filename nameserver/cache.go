@@ -86,7 +86,7 @@ func (e *cacheEntry) getReply(request *dns.Msg, maxLen int, now time.Time) (*dns
 	}
 
 	if e.ReplyLen >= maxLen {
-		Debug.Printf("[cache msgid %d] returning truncated reponse: %d > %d", request.MsgHdr.Id, e.ReplyLen, maxLen)
+		Log.Debugf("[cache msgid %d] returning truncated reponse: %d > %d", request.MsgHdr.Id, e.ReplyLen, maxLen)
 		return makeTruncatedReply(request), nil
 	}
 
@@ -122,7 +122,7 @@ func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Tim
 	var prevValidUntil time.Time
 	if e.Status == stResolved {
 		if reply != nil {
-			Debug.Printf("[cache msgid %d] replacing response in cache", reply.MsgHdr.Id)
+			Log.Debugf("[cache msgid %d] replacing response in cache", reply.MsgHdr.Id)
 		}
 		prevValidUntil = e.validUntil
 	}
@@ -147,7 +147,7 @@ func (e *cacheEntry) setReply(reply *dns.Msg, ttl int, flags uint8, now time.Tim
 		}
 		e.validUntil = now.Add(time.Second * time.Duration(minTTL))
 	} else {
-		Warning.Printf("[cache] no valid TTL could be calculated")
+		Log.Warningf("[cache] no valid TTL could be calculated")
 	}
 
 	e.Status = stResolved
@@ -323,7 +323,7 @@ func (c *Cache) Get(request *dns.Msg, maxLen int) (reply *dns.Msg, err error) {
 	if ent, found := c.entries[key]; found {
 		reply, err = ent.getReply(request, maxLen, now)
 		if ent.hasExpired(now) {
-			Debug.Printf("[cache msgid %d] expired: removing", request.MsgHdr.Id)
+			Log.Debugf("[cache msgid %d] expired: removing", request.MsgHdr.Id)
 			if ent.index > 0 {
 				heap.Remove(&c.entriesH, ent.index)
 			}
@@ -332,7 +332,7 @@ func (c *Cache) Get(request *dns.Msg, maxLen int) (reply *dns.Msg, err error) {
 		}
 	} else {
 		// we are the first asking for this name: create an entry with no reply... the caller must wait
-		Debug.Printf("[cache msgid %d] addind in pending state", request.MsgHdr.Id)
+		Log.Debugf("[cache msgid %d] addind in pending state", request.MsgHdr.Id)
 		c.entries[key] = newCacheEntry(&question, now)
 	}
 	return
@@ -345,7 +345,7 @@ func (c *Cache) Remove(question *dns.Question) {
 
 	key := cacheKey(*question)
 	if entry, found := c.entries[key]; found {
-		Debug.Printf("[cache] removing %s-response for '%s'", dns.TypeToString[question.Qtype], question.Name)
+		Log.Debugf("[cache] removing %s-response for '%s'", dns.TypeToString[question.Qtype], question.Name)
 		if entry.index > 0 {
 			heap.Remove(&c.entriesH, entry.index)
 		}

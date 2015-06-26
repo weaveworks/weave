@@ -24,11 +24,11 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 
 	clk := newMockedClock()
 
-	Debug.Printf("Creating mocked mDNS client and server")
+	Log.Debugf("Creating mocked mDNS client and server")
 	mdnsServer1 := newMockedMDNSServerWithRecord(Record{testName1, net.ParseIP("10.2.2.9"), 0, 0, 0})
 	mdnsCli1 := newMockedMDNSClient([]*mockedMDNSServer{mdnsServer1})
 
-	Debug.Printf("Creating zone database with the mocked mDNS client and server")
+	Log.Debugf("Creating zone database with the mocked mDNS client and server")
 	zoneConfig := ZoneConfig{
 		MDNSServer: mdnsServer1,
 		MDNSClient: mdnsCli1,
@@ -40,7 +40,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	require.NoError(t, err)
 	defer zone.Stop()
 
-	Debug.Printf("Creating a cache")
+	Log.Debugf("Creating a cache")
 	cache, err := NewCache(1024, clk)
 	require.NoError(t, err)
 
@@ -59,7 +59,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	fallback.Start()
 	defer fallback.Stop()
 
-	Debug.Printf("Creating a real DNS server with a mocked cache")
+	Log.Debugf("Creating a real DNS server with a mocked cache")
 	srv, err := NewDNSServer(DNSServerConfig{
 		Zone:              zone,
 		Cache:             cache,
@@ -79,7 +79,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, 0, testPort, "invalid listen port")
 
-	Debug.Printf("Adding two IPs to %s", testName1)
+	Log.Debugf("Adding two IPs to %s", testName1)
 	zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.1"))
 	zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.2"))
 	q, _ := assertExchange(t, testName1, dns.TypeA, testPort, 2, 2, 0)
@@ -93,7 +93,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 
 	// we should have an entry in the cache for this query
 	// if we add another IP, that cache entry should be removed
-	Debug.Printf("Adding a new IP to %s: the cache entry should be removed", testName1)
+	Log.Debugf("Adding a new IP to %s: the cache entry should be removed", testName1)
 	zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.3"))
 	assertNotInCache(t, cache, q, fmt.Sprintf("after adding a new IP for %s", testName1))
 
@@ -101,10 +101,10 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	//   first.weave.local  = 10.2.2.1 10.2.2.2 10.2.2.3
 	//   second.weave.local = 10.9.9.1
 
-	Debug.Printf("Querying again (so a cache entry will be created)")
+	Log.Debugf("Querying again (so a cache entry will be created)")
 	q, _ = assertExchange(t, testName1, dns.TypeA, testPort, 3, 4, 0)
 	assertInCache(t, cache, q, "after asking about the name")
-	Debug.Printf("... and removing one of the IP addresses")
+	Log.Debugf("... and removing one of the IP addresses")
 	zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.2"))
 	assertNotInCache(t, cache, q, "after deleting IP for 10.2.2.2")
 
@@ -113,7 +113,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	//   second.weave.local = 10.9.9.1
 
 	// generate cache responses
-	Debug.Printf("Querying for a raddr")
+	Log.Debugf("Querying for a raddr")
 	qname, _ := assertExchange(t, testName1, dns.TypeA, testPort, 2, 2, 0)
 	qptr, _ := assertExchange(t, "1.2.2.10.in-addr.arpa.", dns.TypePTR, testPort, 1, 1, 0)
 	qotherName, _ := assertExchange(t, testName2, dns.TypeA, testPort, 1, 1, 0)
@@ -126,7 +126,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	assertNotLocalInCache(t, cache, qwrongName, "after asking for a wrong name")
 
 	// now we will check if a removal affects all the responses
-	Debug.Printf("... and removing an IP should invalidate both the cached responses for name and raddr")
+	Log.Debugf("... and removing an IP should invalidate both the cached responses for name and raddr")
 	zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.1"))
 	assertNotInCache(t, cache, qptr, "after deleting record")
 	assertNotInCache(t, cache, qname, "after deleting record")
@@ -137,7 +137,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	//   second.weave.local = 10.9.9.1
 
 	// generate cache responses
-	Debug.Printf("Querying for a raddr")
+	Log.Debugf("Querying for a raddr")
 	qptr, _ = assertExchange(t, "3.2.2.10.in-addr.arpa.", dns.TypePTR, testPort, 1, 1, 0)
 	qname, _ = assertExchange(t, testName1, dns.TypeA, testPort, 1, 1, 0)
 	qotherName, _ = assertExchange(t, testName2, dns.TypeA, testPort, 1, 1, 0)
@@ -148,7 +148,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	assertInCache(t, cache, qotherPtr, "after asking for second address")
 
 	// let's repeat this, but adding an IP
-	Debug.Printf("... and adding a new IP should invalidate both the cached responses for the name")
+	Log.Debugf("... and adding a new IP should invalidate both the cached responses for the name")
 	zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.7"))
 	assertNotInCache(t, cache, qname, "after adding a new IP")
 	assertInCache(t, cache, qotherName, "after adding a new IP")
@@ -182,7 +182,7 @@ func TestServerCacheExpiration(t *testing.T) {
 
 	clk := newMockedClock()
 
-	Debug.Printf("Creating 2 zone databases")
+	Log.Debugf("Creating 2 zone databases")
 	zoneConfig := ZoneConfig{
 		RefreshInterval: 0, // no name updates
 		Clock:           clk,
@@ -191,11 +191,11 @@ func TestServerCacheExpiration(t *testing.T) {
 	dbs.Start()
 	defer dbs.Stop()
 
-	Debug.Printf("Creating a cache")
+	Log.Debugf("Creating a cache")
 	cache, err := NewCache(1024, clk)
 	require.NoError(t, err)
 
-	Debug.Printf("Creating a real DNS server for the first zone database and with the cache")
+	Log.Debugf("Creating a real DNS server for the first zone database and with the cache")
 	srv, err := NewDNSServer(DNSServerConfig{
 		Zone:              dbs[0].Zone,
 		Cache:             cache,
@@ -225,7 +225,7 @@ func TestServerCacheExpiration(t *testing.T) {
 	assertNotInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
 
 	// We add the IP in the second peer right after
-	Debug.Printf("Adding an IPs to %s in database #2", testName1)
+	Log.Debugf("Adding an IPs to %s in database #2", testName1)
 	dbs[1].Zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.1"))
 	t.Logf("Zone database #2:\n%s", dbs[1].Zone)
 
@@ -241,7 +241,7 @@ func TestServerCacheExpiration(t *testing.T) {
 	assertNotInCache(t, cache, qName1, fmt.Sprintf("after asking for %s", testName1))
 
 	// We delete the IP in the second peer right after
-	Debug.Printf("Removing the IPs from %s in database #2", testName1)
+	Log.Debugf("Removing the IPs from %s in database #2", testName1)
 	dbs[1].Zone.DeleteRecords(containerID, "", net.ParseIP("10.2.2.1"))
 
 	// Check that we return to the initial state: a neg-local entry in the cache
@@ -269,7 +269,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	Info.Println("TestServerCacheRefresh starting")
 	clk := newMockedClock()
 
-	Debug.Printf("Creating 2 zone databases")
+	Log.Debugf("Creating 2 zone databases")
 	zoneConfig := ZoneConfig{
 		RefreshInterval: refreshInterval,
 		Clock:           clk,
@@ -278,11 +278,11 @@ func TestServerCacheRefresh(t *testing.T) {
 	dbs.Start()
 	defer dbs.Stop()
 
-	Debug.Printf("Creating a cache")
+	Log.Debugf("Creating a cache")
 	cache, err := NewCache(1024, clk)
 	require.NoError(t, err)
 
-	Debug.Printf("Creating a real DNS server for the first zone database and with the cache")
+	Log.Debugf("Creating a real DNS server for the first zone database and with the cache")
 	srv, err := NewDNSServer(DNSServerConfig{
 		Zone:              dbs[0].Zone,
 		Cache:             cache,
@@ -301,7 +301,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, 0, testPort, "listen port")
 
-	Debug.Printf("Adding an IPs to %s", testName1)
+	Log.Debugf("Adding an IPs to %s", testName1)
 	dbs[1].Zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.1"))
 	dbs.Flush() // ensure the immediate refresh is done
 
@@ -317,7 +317,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	clk.Forward(refreshInterval / 2)
 	dbs.Flush()
 
-	Debug.Printf("Adding an IP to %s and to %s", testName1, testName2)
+	Log.Debugf("Adding an IP to %s and to %s", testName1, testName2)
 	dbs[1].Zone.AddRecord(containerID, testName1, net.ParseIP("10.2.2.2"))
 	dbs[1].Zone.AddRecord(containerID, testName2, net.ParseIP("10.9.9.2"))
 

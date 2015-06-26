@@ -111,7 +111,7 @@ func (re *recordEntry) addIPObserver(zro ZoneRecordObserver) {
 func (re *recordEntry) notifyIPObservers() {
 	numObservers := len(re.observers)
 	if numObservers > 0 {
-		Debug.Printf("[zonedb] Notifying %d observers of '%s'", numObservers, re.ip)
+		Log.Debugf("[zonedb] Notifying %d observers of '%s'", numObservers, re.ip)
 		for _, observer := range re.observers {
 			observer()
 		}
@@ -257,7 +257,7 @@ func (n *name) addNameObserver(observer ZoneRecordObserver) {
 func (n *name) notifyNameObservers() {
 	numObservers := len(n.observers)
 	if numObservers > 0 {
-		Debug.Printf("[zonedb] Notifying %d observers of '%s'", numObservers, n.name)
+		Log.Debugf("[zonedb] Notifying %d observers of '%s'", numObservers, n.name)
 		for _, observer := range n.observers {
 			observer()
 		}
@@ -373,7 +373,7 @@ func (ns *nameSet) getNameLastAccess(n string) time.Time {
 // The access time is saved only for locally-introduced records (otherwise it could
 // be lost when names are irrelevant...)
 func (ns *nameSet) touchName(name string, now time.Time) {
-	Debug.Printf("[zonedb] Touching name %s", name)
+	Log.Debugf("[zonedb] Touching name %s", name)
 	n := ns.getName(name, false)
 	if n != nil {
 		n.lastAccessTime = now
@@ -527,11 +527,11 @@ func (zone *ZoneDb) Start() (err error) {
 // Perform a graceful shutdown of the zone database
 func (zone *ZoneDb) Stop() error {
 	if zone.refreshInterval > 0 {
-		Debug.Printf("[zonedb] Closing background updaters...")
+		Log.Debugf("[zonedb] Closing background updaters...")
 		zone.refreshScheds.Stop()
 	}
 
-	Debug.Printf("[zonedb] Exiting mDNS client and server...")
+	Log.Debugf("[zonedb] Exiting mDNS client and server...")
 	zone.mdnsCli.Stop()
 	zone.mdnsSrv.Stop()
 	return nil
@@ -555,7 +555,7 @@ func (zone *ZoneDb) Status() string {
 func (zone *ZoneDb) AddRecord(ident string, name string, ip net.IP) (err error) {
 	zone.mx.Lock()
 	defer zone.mx.Unlock()
-	Debug.Printf("[zonedb] Adding record: '%s'/'%s'[%s]", ident, name, ip)
+	Log.Debugf("[zonedb] Adding record: '%s'/'%s'[%s]", ident, name, ip)
 	record := Record{dns.Fqdn(name), ip, 0, 0, 0}
 	_, err = zone.getNameSet(ident).addIPToName(record, zone.clock.Now())
 	return
