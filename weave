@@ -714,8 +714,13 @@ dns_args() {
     DNS_ARGS="--dns $DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         DOMAIN=$(dns_domain)
-        DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.${DOMAIN%.}"
-        HOSTNAME_SPECIFIED=1
+        HOSTNAME="$NAME_ARG.${DOMAIN%.}"
+        if [ ${#HOSTNAME} -gt 64 ] ; then
+            echo "Container name too long to be used as hostname" >&2
+        else
+            DNS_ARGS="$DNS_ARGS --hostname=$HOSTNAME"
+            HOSTNAME_SPECIFIED=1
+        fi
     fi
     if [ -z "$DNS_SEARCH_SPECIFIED" ] ; then
       if [ -z "$HOSTNAME_SPECIFIED" ] ; then
