@@ -2,10 +2,13 @@ package proxy
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -15,6 +18,8 @@ const (
 	defaultCaFile   = "ca.pem"
 	defaultKeyFile  = "key.pem"
 	defaultCertFile = "cert.pem"
+	dockerSock      = "/var/run/docker.sock"
+	dockerSockUnix  = "unix://" + dockerSock
 )
 
 var (
@@ -24,7 +29,7 @@ var (
 )
 
 type Config struct {
-	ListenAddr    string
+	ListenAddrs   []string
 	NoDefaultIPAM bool
 	TLSConfig     TLSConfig
 	Version       string
@@ -45,7 +50,7 @@ func NewProxy(c Config) (*Proxy, error) {
 		Error.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
-	client, err := docker.NewClient("unix:///var/run/docker.sock")
+	client, err := docker.NewClient(dockerSockUnix)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +68,7 @@ func NewProxy(c Config) (*Proxy, error) {
 }
 
 func (proxy *Proxy) Dial() (net.Conn, error) {
-	return net.Dial("unix", "/var/run/docker.sock")
+	return net.Dial("unix", dockerSock)
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -83,19 +88,97 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxy.Intercept(i, w, r)
 }
 
-func (proxy *Proxy) ListenAndServe() error {
-	listener, err := net.Listen("tcp", proxy.ListenAddr)
+func (proxy *Proxy) ListenAndServe() {
+	listeners := []net.Listener{}
+	addrs := []string{}
+	for _, addr := range proxy.ListenAddrs {
+		listener, normalisedAddr, err := proxy.listen(addr)
+		if err != nil {
+			Error.Fatalf("Cannot listen on %s: %s", addr, err)
+		}
+		listeners = append(listeners, listener)
+		addrs = append(addrs, normalisedAddr)
+	}
+
+	for _, addr := range addrs {
+		Info.Println("proxy listening on", addr)
+	}
+
+	errs := make(chan error)
+	for _, listener := range listeners {
+		go func(listener net.Listener) {
+			errs <- (&http.Server{Handler: proxy}).Serve(listener)
+		}(listener)
+	}
+	for range listeners {
+		err := <-errs
+		if err != nil {
+			Error.Fatalf("Serve failed: %s", err)
+		}
+	}
+}
+
+func copyOwnerAndPermissions(from, to string) error {
+	stat, err := os.Stat(from)
 	if err != nil {
 		return err
 	}
-
-	if proxy.TLSConfig.enabled() {
-		listener = tls.NewListener(listener, proxy.TLSConfig.Config)
+	if err = os.Chmod(to, stat.Mode()); err != nil {
+		return err
 	}
 
-	Info.Println("proxy listening on", proxy.ListenAddr)
+	moreStat, ok := stat.Sys().(*syscall.Stat_t)
+	if !ok {
+		return nil
+	}
 
-	return (&http.Server{Handler: proxy}).Serve(listener)
+	if err = os.Chown(to, int(moreStat.Uid), int(moreStat.Gid)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
+	var (
+		listener    net.Listener
+		err         error
+		proto, addr string
+	)
+
+	if protoAddrParts := strings.SplitN(protoAndAddr, "://", 2); len(protoAddrParts) == 2 {
+		proto, addr = protoAddrParts[0], protoAddrParts[1]
+	} else if strings.HasPrefix(protoAndAddr, "/") {
+		proto, addr = "unix", protoAndAddr
+	} else {
+		proto, addr = "tcp", protoAndAddr
+	}
+
+	switch proto {
+	case "tcp":
+		listener, err = net.Listen(proto, addr)
+		if err != nil {
+			return nil, "", err
+		}
+		if proxy.TLSConfig.enabled() {
+			listener = tls.NewListener(listener, proxy.TLSConfig.Config)
+		}
+
+	case "unix":
+		os.Remove(addr) // remove socket from last invocation
+		listener, err = net.Listen(proto, addr)
+		if err != nil {
+			return nil, "", err
+		}
+		if err = copyOwnerAndPermissions(dockerSock, addr); err != nil {
+			return nil, "", err
+		}
+
+	default:
+		Error.Fatalf("Invalid protocol format: %q", proto)
+	}
+
+	return listener, fmt.Sprintf("%s://%s", proto, addr), nil
 }
 
 func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config) ([]string, bool) {
