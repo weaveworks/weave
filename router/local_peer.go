@@ -50,7 +50,7 @@ func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, frame []byte, dec *Ethernet
 		log.Println("Unable to find connection to relay peer", relayPeerName)
 		return nil
 	}
-	return conn.(*LocalConnection).Forward(false, &ForwardedFrame{
+	return conn.(*LocalConnection).Forward(&ForwardedFrame{
 		srcPeer: srcPeer,
 		dstPeer: dstPeer,
 		frame:   frame},
@@ -63,7 +63,7 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, frame []byte, dec *Ethernet
 		return
 	}
 	for _, conn := range peer.ConnectionsTo(nextHops) {
-		err := conn.(*LocalConnection).Forward(false, &ForwardedFrame{
+		err := conn.(*LocalConnection).Forward(&ForwardedFrame{
 			srcPeer: srcPeer,
 			dstPeer: conn.Remote(),
 			frame:   frame},

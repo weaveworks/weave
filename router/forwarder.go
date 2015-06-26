@@ -59,11 +59,23 @@ func (conn *LocalConnection) stopForwarders() {
 	conn.forwarderDF.Shutdown()
 }
 
-// Called from peer.Relay[Broadcast] which is itself invoked from
-// router (both UDP listener process and sniffer process). Also called
-// from connection's heartbeat process, and from the connection's TCP
-// receiver process.
-func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *EthernetDecoder) error {
+// Called from connection's actor process, and from the connection's
+// TCP receiver process.
+func (conn *LocalConnection) Send(df bool, frameBytes []byte) error {
+	frame := &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   frameBytes}
+	return conn.forward(frame, nil, df)
+}
+
+// Called from LocalPeer.Relay[Broadcast] which is itself invoked from
+// router (both UDP listener process and sniffer process).
+func (conn *LocalConnection) Forward(frame *ForwardedFrame, dec *EthernetDecoder) error {
+	return conn.forward(frame, dec, dec != nil && dec.DF())
+}
+
+func (conn *LocalConnection) forward(frame *ForwardedFrame, dec *EthernetDecoder, df bool) error {
 	conn.RLock()
 	var (
 		forwarder     = conn.forwarder
@@ -76,10 +88,6 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 	if forwarder == nil || forwarderDF == nil {
 		conn.Log("Cannot forward frame yet - awaiting contact")
 		return nil
-	}
-
-	if dec != nil {
-		df = dec.DF()
 	}
 
 	// We could use non-blocking channel sends here, i.e. drop frames

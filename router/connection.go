@@ -50,7 +50,7 @@ type LocalConnection struct {
 	SessionKey        *[32]byte
 	heartbeatTCP      *time.Ticker
 	heartbeatTimeout  *time.Timer
-	heartbeatFrame    *ForwardedFrame
+	heartbeatFrame    []byte
 	heartbeat         *time.Ticker
 	fragTest          *time.Ticker
 	forwarder         *Forwarder
@@ -156,8 +156,7 @@ func (conn *LocalConnection) setEffectivePMTU(pmtu int) {
 }
 
 // Called by the connection's actor process, and by the connection's
-// TCP received process. StackFrag is read in conn.Forward (called by
-// router udp listener and sniffer processes)
+// TCP receiver process. StackFrag is read in conn.forward
 func (conn *LocalConnection) setStackFrag(frag bool) {
 	conn.Lock()
 	defer conn.Unlock()
@@ -251,15 +250,11 @@ func (conn *LocalConnection) SetEstablished() {
 		}
 		// Send a large frame down the DF channel in order to prompt
 		// PMTU discovery to start.
-		conn.Forward(true, &ForwardedFrame{
-			srcPeer: conn.local,
-			dstPeer: conn.remote,
-			frame:   PMTUDiscovery},
-			nil)
+		conn.Send(true, PMTUDiscovery)
 		conn.heartbeat = time.NewTicker(SlowHeartbeat)
 		conn.fragTest = time.NewTicker(FragTestInterval)
 		// avoid initial waits for timers to fire
-		conn.Forward(true, conn.heartbeatFrame, nil)
+		conn.Send(true, conn.heartbeatFrame)
 		conn.performFragTest()
 		return nil
 	})
@@ -355,12 +350,8 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 func (conn *LocalConnection) initHeartbeats() error {
 	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)
 	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
-	heartbeatFrameBytes := make([]byte, EthernetOverhead+8)
-	binary.BigEndian.PutUint64(heartbeatFrameBytes[EthernetOverhead:], conn.uid)
-	conn.heartbeatFrame = &ForwardedFrame{
-		srcPeer: conn.local,
-		dstPeer: conn.remote,
-		frame:   heartbeatFrameBytes}
+	conn.heartbeatFrame = make([]byte, EthernetOverhead+8)
+	binary.BigEndian.PutUint64(conn.heartbeatFrame[EthernetOverhead:], conn.uid)
 	if conn.remoteUDPAddr == nil {
 		return nil
 	}
@@ -377,7 +368,7 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 		case <-conn.heartbeatTimeout.C:
 			err = fmt.Errorf("timed out waiting for UDP heartbeat")
 		case <-tickerChan(conn.heartbeat):
-			conn.Forward(true, conn.heartbeatFrame, nil)
+			conn.Send(true, conn.heartbeatFrame)
 		case <-tickerChan(conn.fragTest):
 			conn.performFragTest()
 		}
@@ -485,18 +476,14 @@ func (conn *LocalConnection) sendFastHeartbeats() error {
 	err := conn.ensureForwarders()
 	if err == nil {
 		conn.heartbeat = time.NewTicker(FastHeartbeat)
-		conn.Forward(true, conn.heartbeatFrame, nil) // avoid initial wait
+		conn.Send(true, conn.heartbeatFrame) // avoid initial wait
 	}
 	return err
 }
 
 func (conn *LocalConnection) performFragTest() {
 	conn.setStackFrag(false)
-	conn.Forward(false, &ForwardedFrame{
-		srcPeer: conn.local,
-		dstPeer: conn.remote,
-		frame:   FragTest},
-		nil)
+	conn.Send(false, FragTest)
 }
 
 func tickerChan(ticker *time.Ticker) <-chan time.Time {
