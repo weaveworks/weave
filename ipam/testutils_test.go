@@ -195,33 +195,47 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 }
 
 // Router to convey gossip from one gossiper to another, for testing
-type gossipMessage struct {
-	isUnicast bool
-	sender    *router.PeerName
-	buf       []byte            // for unicast
-	data      router.GossipData // for broadcast
-	exitChan  chan bool
+type unicastMessage struct {
+	sender router.PeerName
+	buf    []byte
+}
+type broadcastMessage struct {
+	data router.GossipData
+}
+type exitMessage struct {
+	exitChan chan struct{}
+}
+type flushMessage struct {
+	flushChan chan struct{}
 }
 
 type TestGossipRouter struct {
-	gossipChans map[router.PeerName]chan gossipMessage
+	gossipChans map[router.PeerName]chan interface{}
 	loss        float32 // 0.0 means no loss
 }
 
 func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
-		case gossipChan <- gossipMessage{data: update}:
+		case gossipChan <- broadcastMessage{data: update}:
 		default: // drop the message if we cannot send it
 		}
 	}
 	return nil
 }
 
+func (grouter *TestGossipRouter) flush() {
+	for _, gossipChan := range grouter.gossipChans {
+		flushChan := make(chan struct{})
+		gossipChan <- flushMessage{flushChan: flushChan}
+		<-flushChan
+	}
+}
+
 func (grouter *TestGossipRouter) removePeer(peer router.PeerName) {
 	gossipChan := grouter.gossipChans[peer]
-	resultChan := make(chan bool)
-	gossipChan <- gossipMessage{exitChan: resultChan}
+	resultChan := make(chan struct{})
+	gossipChan <- exitMessage{exitChan: resultChan}
 	<-resultChan
 	delete(grouter.gossipChans, peer)
 }
@@ -231,39 +245,47 @@ type TestGossipRouterClient struct {
 	sender router.PeerName
 }
 
-func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
-	gossipChan := make(chan gossipMessage, 100)
+func (grouter *TestGossipRouter) run(gossiper router.Gossiper, gossipChan chan interface{}) {
+	gossipTimer := time.Tick(10 * time.Second)
+	for {
+		select {
+		case gossip := <-gossipChan:
+			switch message := gossip.(type) {
+			case exitMessage:
+				close(message.exitChan)
+				return
 
-	go func() {
-		gossipTimer := time.Tick(10 * time.Second)
-		for {
-			select {
-			case message := <-gossipChan:
-				if message.exitChan != nil {
-					message.exitChan <- true
-					return
-				}
+			case flushMessage:
+				close(message.flushChan)
 
+			case unicastMessage:
 				if rand.Float32() > (1.0 - grouter.loss) {
 					continue
 				}
+				if err := gossiper.OnGossipUnicast(message.sender, message.buf); err != nil {
+					panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", message.sender, err))
+				}
 
-				if message.isUnicast {
-					if err := gossiper.OnGossipUnicast(*message.sender, message.buf); err != nil {
-						panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", sender, err))
-					}
-				} else {
-					for _, msg := range message.data.Encode() {
-						if _, err := gossiper.OnGossipBroadcast(msg); err != nil {
-							panic(fmt.Sprintf("Error doing gossip broadcast to %s: %s", sender, err))
-						}
+			case broadcastMessage:
+				if rand.Float32() > (1.0 - grouter.loss) {
+					continue
+				}
+				for _, msg := range message.data.Encode() {
+					if _, err := gossiper.OnGossipBroadcast(msg); err != nil {
+						panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
 					}
 				}
-			case <-gossipTimer:
-				grouter.GossipBroadcast(gossiper.Gossip())
 			}
+		case <-gossipTimer:
+			grouter.GossipBroadcast(gossiper.Gossip())
 		}
-	}()
+	}
+}
+
+func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
+	gossipChan := make(chan interface{}, 100)
+
+	go grouter.run(gossiper, gossipChan)
 
 	grouter.gossipChans[sender] = gossipChan
 	return TestGossipRouterClient{grouter, sender}
@@ -271,7 +293,7 @@ func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router
 
 func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
 	select {
-	case client.router.gossipChans[dstPeerName] <- gossipMessage{isUnicast: true, sender: &client.sender, buf: buf}:
+	case client.router.gossipChans[dstPeerName] <- unicastMessage{sender: client.sender, buf: buf}:
 	default: // drop the message if we cannot send it
 		common.Error.Printf("Dropping message")
 	}
@@ -284,7 +306,7 @@ func (client TestGossipRouterClient) GossipBroadcast(update router.GossipData) e
 
 func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter, address.Range) {
 
-	gossipRouter := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
+	gossipRouter := TestGossipRouter{make(map[router.PeerName]chan interface{}), 0.0}
 	allocs := make([]*Allocator, size)
 	var subnet address.Range
 
@@ -298,7 +320,7 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRou
 	}
 
 	gossipRouter.GossipBroadcast(allocs[size-1].Gossip())
-	time.Sleep(1000 * time.Millisecond)
+	gossipRouter.flush()
 	return allocs, gossipRouter, subnet
 }
 
