@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strings"
 
-	"code.google.com/p/gopacket/layers"
 	"github.com/davecheney/profile"
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
@@ -192,15 +191,21 @@ func options() map[string]string {
 
 func logFrameFunc(debug bool) weave.LogFrameFunc {
 	if !debug {
-		return func(prefix string, frame []byte, eth *layers.Ethernet) {}
+		return func(prefix string, frame []byte, dec *weave.EthernetDecoder) {}
 	}
-	return func(prefix string, frame []byte, eth *layers.Ethernet) {
+	return func(prefix string, frame []byte, dec *weave.EthernetDecoder) {
 		h := fmt.Sprintf("%x", sha256.Sum256(frame))
-		if eth == nil {
-			log.Println(prefix, len(frame), "bytes (", h, ")")
-		} else {
-			log.Println(prefix, len(frame), "bytes (", h, "):", eth.SrcMAC, "->", eth.DstMAC)
+		parts := []interface{}{prefix, len(frame), "bytes (", h, ")"}
+
+		if dec != nil {
+			parts = append(parts, dec.Eth.SrcMAC, "->", dec.Eth.DstMAC)
+
+			if dec.DF() {
+				parts = append(parts, "(DF)")
+			}
 		}
+
+		log.Println(parts...)
 	}
 }
 
