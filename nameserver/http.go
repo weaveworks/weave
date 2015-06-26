@@ -2,10 +2,10 @@ package nameserver
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"

@@ -1,24 +1,44 @@
 package common
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
+	"strings"
+
+	"github.com/Sirupsen/logrus"
 )
 
-const (
-	standardLogFlags = log.Ldate | log.Ltime | log.Lmicroseconds
-)
+type textFormatter struct {
+}
 
-// Largely taken from
-// http://www.goinggo.net/2013/11/using-log-package-in-go.html
+// Based off logrus.TextFormatter, which behaves completely
+// differently when you don't want colored output
+func (f *textFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	b := &bytes.Buffer{}
+
+	levelText := strings.ToUpper(entry.Level.String())[0:4]
+	timeStamp := entry.Time.Format("2006/01/02 15:04:05.000000")
+	fmt.Fprintf(b, "%s: %s %-44s ", levelText, timeStamp, entry.Message)
+	for k, v := range entry.Data {
+		fmt.Fprintf(b, " %s=%v", k, v)
+	}
+
+	b.WriteByte('\n')
+	return b.Bytes(), nil
+}
 
 var (
-	Debug   *log.Logger
-	Info    *log.Logger
-	Warning *log.Logger
-	Error   *log.Logger
+	standardTextFormatter = &textFormatter{}
+)
+
+var (
+	Debug   *logrus.Logger
+	Info    *logrus.Logger
+	Warning *logrus.Logger
+	Error   *logrus.Logger
 	debugF  bool
 )
 
@@ -27,10 +47,30 @@ func InitLogging(debugHandle io.Writer,
 	warningHandle io.Writer,
 	errorHandle io.Writer) {
 
-	Debug = log.New(debugHandle, "DEBUG: ", standardLogFlags)
-	Info = log.New(infoHandle, "INFO: ", standardLogFlags)
-	Warning = log.New(warningHandle, "WARNING: ", standardLogFlags)
-	Error = log.New(errorHandle, "ERROR: ", standardLogFlags)
+	Debug = &logrus.Logger{
+		Out:       debugHandle,
+		Formatter: standardTextFormatter,
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.DebugLevel,
+	}
+	Info = &logrus.Logger{
+		Out:       infoHandle,
+		Formatter: standardTextFormatter,
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.InfoLevel,
+	}
+	Warning = &logrus.Logger{
+		Out:       warningHandle,
+		Formatter: standardTextFormatter,
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.WarnLevel,
+	}
+	Error = &logrus.Logger{
+		Out:       errorHandle,
+		Formatter: standardTextFormatter,
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.ErrorLevel,
+	}
 }
 
 func InitDefaultLogging(debug bool) {
