@@ -58,7 +58,7 @@ usage() {
     echo "where <peer>     = <ip_address_or_fqdn>[:<port>]"
     echo "      <cidr>     = <ip_address>/<routing_prefix_length>"
     echo "      <addr>     = [ip:]<cidr> | net:<cidr> | net:default"
-    echo "      <endpoint> = [tcp://][<ip_address>]:<port>"
+    echo "      <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket"
     echo "      <peer_id>  = <nickname> or weave internal peer ID"
     exit 1
 }
@@ -925,11 +925,7 @@ proxy_args() {
 
 proxy_addr() {
     if addr=$(docker logs $PROXY_CONTAINER_NAME 2>/dev/null | head -n3 | grep -oE "proxy listening on .*"); then
-      addr=${addr##* }
-      host=${addr%:*}
-      [ "$host" = "0.0.0.0" ] && host=$PROXY_HOST
-      port=${addr#*:}
-      echo "${1}tcp://${host:-$PROXY_HOST}:${port:-$PROXY_PORT}"
+      echo "${1}${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
       return 0
     fi
     echo  "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
@@ -1035,7 +1031,7 @@ launch_proxy() {
     proxy_args "$@"
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
-        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/run:/var/run \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e WEAVE_CIDR=none \

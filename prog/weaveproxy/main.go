@@ -11,21 +11,21 @@ import (
 )
 
 var (
-	version           = "(unreleased version)"
-	defaultListenAddr = "tcp://0.0.0.0:12375"
+	version            = "(unreleased version)"
+	defaultListenAddrs = []string{"tcp://0.0.0.0:12375", "unix:///var/run/weave.sock"}
 )
 
 func main() {
 	var (
 		debug       bool
 		justVersion bool
-		c           = proxy.Config{ListenAddr: defaultListenAddr}
+		c           = proxy.Config{ListenAddrs: defaultListenAddrs}
 	)
 
 	c.Version = version
 	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
 	getopt.BoolVarLong(&justVersion, "version", 0, "print version and exit")
-	getopt.StringVar(&c.ListenAddr, 'H', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddr))
+	getopt.ListVar(&c.ListenAddrs, 'H', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddrs))
 	getopt.BoolVarLong(&c.NoDefaultIPAM, "no-default-ipam", 0, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
 	getopt.StringVarLong(&c.TLSConfig.CACert, "tlscacert", 0, "Trust certs signed only by this CA")
 	getopt.StringVarLong(&c.TLSConfig.Cert, "tlscert", 0, "Path to TLS certificate file")
@@ -52,22 +52,10 @@ func main() {
 	Info.Println("weave proxy", version)
 	Info.Println("Command line arguments:", strings.Join(os.Args[1:], " "))
 
-	protoAddrParts := strings.SplitN(c.ListenAddr, "://", 2)
-	if len(protoAddrParts) == 2 {
-		if protoAddrParts[0] != "tcp" {
-			Error.Fatalf("Invalid protocol format: %q", protoAddrParts[0])
-		}
-		c.ListenAddr = protoAddrParts[1]
-	} else {
-		c.ListenAddr = protoAddrParts[0]
-	}
-
 	p, err := proxy.NewProxy(c)
 	if err != nil {
 		Error.Fatalf("Could not start proxy: %s", err)
 	}
 
-	if err := p.ListenAndServe(); err != nil {
-		Error.Fatalf("Could not listen on %s: %s", p.ListenAddr, err)
-	}
+	p.ListenAndServe()
 }
