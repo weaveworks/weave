@@ -31,7 +31,7 @@ assert_raises "weave_on $HOST2 connect --replace $HOST1 $HOST2"
 assert_peers $HOST2 "$HOST1\n$HOST2"
 assert_raises "exec_on $HOST1 c1 $PING $C2"
 
-# Forget everyone and disonnect
+# Forget everyone and disconnect
 assert_raises "weave_on $HOST2 forget $HOST1 $HOST2"
 assert_raises "weave_on $HOST1 stop-router"
 assert_raises "weave_on $HOST1 launch-router"
