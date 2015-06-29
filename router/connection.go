@@ -279,7 +279,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.TCPConn.SetLinger(0)
 
-	_, dec, err := conn.handshake(acceptNewPeer)
+	dec, err := conn.handshake(acceptNewPeer)
 	if err != nil {
 		return
 	}
