@@ -21,9 +21,14 @@ func (f *textFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 	levelText := strings.ToUpper(entry.Level.String())[0:4]
 	timeStamp := entry.Time.Format("2006/01/02 15:04:05.000000")
-	fmt.Fprintf(b, "%s: %s %-44s ", levelText, timeStamp, entry.Message)
-	for k, v := range entry.Data {
-		fmt.Fprintf(b, " %s=%v", k, v)
+	if len(entry.Data) > 0 {
+		fmt.Fprintf(b, "%s: %s %-44s ", levelText, timeStamp, entry.Message)
+		for k, v := range entry.Data {
+			fmt.Fprintf(b, " %s=%v", k, v)
+		}
+	} else {
+		// No padding when there's no fields
+		fmt.Fprintf(b, "%s: %s %s", levelText, timeStamp, entry.Message)
 	}
 
 	b.WriteByte('\n')
