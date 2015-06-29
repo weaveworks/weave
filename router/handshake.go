@@ -45,7 +45,7 @@ func (fv *FieldValidator) Err() error {
 	return fv.err
 }
 
-func (conn *LocalConnection) handshake(acceptNewPeer bool) (*gob.Decoder, error) {
+func (conn *LocalConnection) handshake(acceptNewPeer bool) (TCPReceiver, error) {
 	// We do not need to worry about locking in here as at this point
 	// the connection is not reachable by any go-routine other than
 	// ourself. Only when we add this connection to the conn.local
@@ -99,6 +99,7 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) (*gob.Decoder, error)
 	}
 	conn.uid = localConnID ^ remoteConnID
 
+	var tcpReceiver TCPReceiver
 	remotePublicStr, rpErr := fv.Value("PublicKey")
 	if usingPassword {
 		if rpErr != nil {
@@ -114,16 +115,18 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) (*gob.Decoder, error)
 		}
 		conn.SessionKey = FormSessionKey(&remotePublic, private, conn.Router.Password)
 		conn.tcpSender = NewEncryptedTCPSender(enc, conn.SessionKey, conn.outbound)
+		tcpReceiver = NewEncryptedTCPReceiver(dec, conn.SessionKey, conn.outbound)
 		conn.Decryptor = NewNaClDecryptor(conn.SessionKey, conn.outbound)
 	} else {
 		if rpErr == nil {
 			return nil, fmt.Errorf("Remote network is encrypted. Password required.")
 		}
 		conn.tcpSender = NewSimpleTCPSender(enc)
+		tcpReceiver = NewSimpleTCPReceiver(dec)
 		conn.Decryptor = NewNonDecryptor()
 	}
 
-	return dec, conn.setRemote(NewPeer(name, nickNameStr, uid, 0))
+	return tcpReceiver, conn.setRemote(NewPeer(name, nickNameStr, uid, 0))
 }
 
 func (conn *LocalConnection) exchangeHandshake(localConnID uint64, usingPassword bool, enc *gob.Encoder, dec *gob.Decoder) (*FieldValidator, *[32]byte, error) {

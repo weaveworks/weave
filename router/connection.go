@@ -2,7 +2,6 @@ package router
 
 import (
 	"encoding/binary"
-	"encoding/gob"
 	"fmt"
 	"net"
 	"sync"
@@ -284,7 +283,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.TCPConn.SetLinger(0)
 
-	dec, err := conn.handshake(acceptNewPeer)
+	tcpReceiver, err := conn.handshake(acceptNewPeer)
 	if err != nil {
 		return
 	}
@@ -303,7 +302,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	if err = conn.initHeartbeats(); err != nil {
 		return
 	}
-	go conn.receiveTCP(dec)
+	go conn.receiveTCP(tcpReceiver)
 	err = conn.actorLoop(actionChan)
 }
 
@@ -422,23 +421,13 @@ func (conn *LocalConnection) sendProtocolMsg(m ProtocolMsg) error {
 	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
 }
 
-func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
-	usingPassword := conn.SessionKey != nil
-	var receiver TCPReceiver
-	if usingPassword {
-		receiver = NewEncryptedTCPReceiver(conn.SessionKey, conn.outbound)
-	} else {
-		receiver = NewSimpleTCPReceiver()
-	}
+func (conn *LocalConnection) receiveTCP(receiver TCPReceiver) {
 	var err error
 	for {
-		var msg []byte
 		conn.extendReadDeadline()
-		if err = decoder.Decode(&msg); err != nil {
-			break
-		}
-		msg, err = receiver.Decode(msg)
-		if err != nil {
+
+		var msg []byte
+		if msg, err = receiver.Receive(); err != nil {
 			break
 		}
 		if len(msg) < 1 {

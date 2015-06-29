@@ -370,10 +370,11 @@ func (sender *EncryptedTCPSender) Send(msg []byte) error {
 }
 
 type TCPReceiver interface {
-	Decode([]byte) ([]byte, error)
+	Receive() ([]byte, error)
 }
 
 type SimpleTCPReceiver struct {
+	decoder *gob.Decoder
 }
 
 type EncryptedTCPReceiver struct {
@@ -381,25 +382,33 @@ type EncryptedTCPReceiver struct {
 	state *TCPCryptoState
 }
 
-func NewSimpleTCPReceiver() *SimpleTCPReceiver {
-	return &SimpleTCPReceiver{}
+func NewSimpleTCPReceiver(decoder *gob.Decoder) *SimpleTCPReceiver {
+	return &SimpleTCPReceiver{decoder: decoder}
 }
 
-func (receiver *SimpleTCPReceiver) Decode(msg []byte) ([]byte, error) {
-	return msg, nil
+func (receiver *SimpleTCPReceiver) Receive() ([]byte, error) {
+	var msg []byte
+	err := receiver.decoder.Decode(&msg)
+	return msg, err
 }
 
-func NewEncryptedTCPReceiver(sessionKey *[32]byte, outbound bool) *EncryptedTCPReceiver {
+func NewEncryptedTCPReceiver(decoder *gob.Decoder, sessionKey *[32]byte, outbound bool) *EncryptedTCPReceiver {
 	return &EncryptedTCPReceiver{
-		SimpleTCPReceiver: *NewSimpleTCPReceiver(),
+		SimpleTCPReceiver: *NewSimpleTCPReceiver(decoder),
 		state:             NewTCPCryptoState(sessionKey, !outbound)}
 }
 
-func (receiver *EncryptedTCPReceiver) Decode(msg []byte) ([]byte, error) {
+func (receiver *EncryptedTCPReceiver) Receive() ([]byte, error) {
+	msg, err := receiver.SimpleTCPReceiver.Receive()
+	if err != nil {
+		return nil, err
+	}
+
 	decodedMsg, success := secretbox.Open(nil, msg, &receiver.state.nonce, receiver.state.sessionKey)
 	if !success {
 		return nil, fmt.Errorf("Unable to decrypt TCP msg")
 	}
+
 	receiver.state.advance()
 	return decodedMsg, nil
 }
