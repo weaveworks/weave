@@ -72,10 +72,10 @@ detection of the weaveDNS container.
 Each weaveDNS container started with `launch-dns` needs its own unique
 IP address in a subnet that is common to all weaveDNS containers. In
 the example above we did not specify such an address, so one was
-allocated automatically by IPAM from the default subnet; you can
-however specify an address in CIDR format manually. In this case you
-are responsible for ensuring that the IP addresses specified are
-uniquely allocated and not in use by any other container.
+allocated automatically from the default subnet; you can however
+specify an address in CIDR format manually. In this case you are
+responsible for ensuring that the IP addresses specified are uniquely
+allocated and not in use by any other container.
 
 Finally, weaveDNS can be stopped independently with
 
