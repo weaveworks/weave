@@ -110,10 +110,10 @@ To start a container without connecting it to the weave network, pass
 
     host1$ docker run -ti -e WEAVE_CIDR=none ubuntu
 
-If you do not want IPAM to be used by default, the proxy needs to be
-passed the `--no-default-ipam` flag, e.g.
+If you do not want an IP to be assigned by default, the proxy needs to
+be passed the `--no-default-ipalloc` flag, e.g.,
 
-    host1$ docker launch-proxy --no-default-ipam
+    host1$ docker launch-proxy --no-default-ipalloc
 
 In this configuration, containers with no `WEAVE_CIDR` environment
 variable will not be connected to the weave network. Containers
@@ -121,7 +121,7 @@ started with a `WEAVE_CIDR` environment variable are handled as
 before. To automatically assign an address in this mode, we start the
 container with a blank `WEAVE_CIDR`, e.g.
 
-    host1$ docker run -ti -e WEAVE_CIDR= ubuntu
+    host1$ docker run -ti -e WEAVE_CIDR="" ubuntu
 
 ## <a name="dns"></a>Automatic discovery
 
@@ -186,7 +186,7 @@ containers on the weave network with `weave run`:
 The arguments after `run` are passed through to `docker run` so you
 can freely specify whichever docker options are appropriate. Once the
 container is started, `weave run` attaches it to the weave network, in
-this example with an address allocated by IPAM. If you wish you can
+this example with an automatically allocated IP. If you wish you can
 specify addresses manually instead:
 
     $ weave run 10.2.1.1/24 -ti ubuntu

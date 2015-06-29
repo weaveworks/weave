@@ -32,7 +32,7 @@ usage() {
     echo "                        [-iprange <cidr> [-ipsubnet <cidr>]] <peer> ..."
     echo "weave launch-dns    [<addr>]"
     echo "weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]"
-    echo "                        [--no-default-ipam]"
+    echo "                        [--no-default-ipalloc]"
     echo "weave connect       [--replace] [<peer> ...]"
     echo "weave forget        <peer> ..."
     echo "weave run           [--with-dns | --without-dns] [<addr> ...] <docker run args> ..."
