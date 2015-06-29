@@ -2,6 +2,8 @@
 
 set -e
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Protect against being sourced multiple times to prevent
 # overwriting assert.sh global state
 if ! [ -z "$SOURCED_CONFIG_SH" ]; then
@@ -25,9 +27,11 @@ fi
 HOST1=$(echo $HOSTS | cut -f 1 -d ' ')
 HOST2=$(echo $HOSTS | cut -f 2 -d ' ')
 
-. ./assert.sh
+. "$DIR/assert.sh"
 
-SSH=${SSH:-ssh -l vagrant -i ./insecure_private_key -o UserKnownHostsFile=./.ssh_known_hosts -o CheckHostIP=no -o StrictHostKeyChecking=no}
+
+SSH_DIR=${SSH_DIR:-$DIR}
+SSH=${SSH:-ssh -l vagrant -i "$SSH_DIR/insecure_private_key" -o "UserKnownHostsFile=$SSH_DIR/.ssh_known_hosts" -o CheckHostIP=no -o StrictHostKeyChecking=no}
 
 SMALL_IMAGE="gliderlabs/alpine"
 DNS_IMAGE="aanand/docker-dnsutils"
@@ -40,6 +44,18 @@ DOCKER_PORT=2375
 
 WEAVEDNS_ARGS="--no-cache"
 [ -n "$DEBUG" ] && WEAVEDNS_ARGS="$WEAVEDNS_ARGS --debug"
+
+
+upload_executable() {
+    host=$1
+    file=$2
+    prefix=${3:-/usr/local/bin/}
+    suffix=$(basename "$file")
+    target="$prefix$suffix"
+    [ -z "$DEBUG" ] || greyly echo "Uploading to $host: $file -> $target" >&2
+    <"$file" remote $host $SSH $host sh -c "cat | sudo tee $target >/dev/null"
+    run_on $host "sudo chmod a+x $target"
+}
 
 remote() {
     rem=$1
@@ -182,5 +198,5 @@ end_suite() {
     whitely assert_end
 }
 
-WEAVE=../weave
-DOCKER_NS=./bin/docker-ns
+WEAVE=$DIR/../weave
+DOCKER_NS=$DIR/../bin/docker-ns

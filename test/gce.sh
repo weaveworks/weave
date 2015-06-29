@@ -9,7 +9,7 @@ set -ex
 
 KEY_FILE=/tmp/gce_private_key.json
 SSH_KEY_FILE=$HOME/.ssh/gce_ssh_key
-PROJECT=positive-cocoa-90213
+PROJECT=${PROJECT:-positive-cocoa-90213}
 IMAGE=ubuntu-14-04
 TEMPLATE_NAME="test-template-2"
 ZONE=us-central1-a
