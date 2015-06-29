@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"sync"
+
+	. "github.com/weaveworks/weave/common"
 )
 
 type GossipChannel struct {
@@ -225,5 +226,5 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 }
 
 func (c *GossipChannel) log(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, "[gossip "+c.name+"]:"), args...)...)
+	Log.Println(append(append([]interface{}{}, "[gossip "+c.name+"]:"), args...)...)
 }

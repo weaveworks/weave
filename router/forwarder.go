@@ -281,7 +281,7 @@ func (fwd *Forwarder) accumulateAndSendFrames(ch <-chan *ForwardedFrame, frame *
 }
 
 func (fwd *Forwarder) logDrop(frame *ForwardedFrame) {
-	fwd.conn.Log("Dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", fwd.maxPayload+UDPOverhead-fwd.effectiveOverhead())
+	fwd.conn.ErrorLog("Dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", fwd.maxPayload+UDPOverhead-fwd.effectiveOverhead())
 }
 
 func (fwd *Forwarder) appendFrame(frame *ForwardedFrame) bool {
