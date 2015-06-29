@@ -78,7 +78,7 @@ func RunLocalMulticastServer() (*dns.Server, error) {
 }
 
 func setup(t *testing.T) (*MDNSClient, *dns.Server, error) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 
 	server, err := RunLocalMulticastServer()
 	if err != nil {

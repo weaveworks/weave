@@ -40,7 +40,7 @@ func TestUDPDNSServer(t *testing.T) {
 	)
 	testCIDR1 := testAddr1 + "/24"
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestUDPDNSServer starting")
 
 	zone, err := NewZoneDb(ZoneConfig{})
@@ -137,7 +137,7 @@ func TestTCPDNSServer(t *testing.T) {
 		nonLocalName = "weave.works."
 	)
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestTCPDNSServer starting")
 
 	zone, err := NewZoneDb(ZoneConfig{})

@@ -43,7 +43,7 @@ CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 DOCKER_PORT=2375
 
 WEAVEDNS_ARGS="--no-cache"
-[ -n "$DEBUG" ] && WEAVEDNS_ARGS="$WEAVEDNS_ARGS --debug"
+[ -n "$DEBUG" ] && WEAVEDNS_ARGS="$WEAVEDNS_ARGS --log-level=debug"
 
 
 upload_executable() {

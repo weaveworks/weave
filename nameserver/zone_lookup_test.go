@@ -23,7 +23,7 @@ func TestZoneRefresh(t *testing.T) {
 		addr4 = "10.2.8.7"
 	)
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestZoneRefresh starting")
 
 	clk := newMockedClock()

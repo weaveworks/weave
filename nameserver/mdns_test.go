@@ -12,7 +12,7 @@ import (
 
 // Check that we can use a regular mDNS server with a regular mDNS client
 func TestClientServerSimpleQuery(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 
 	testRecord1 := Record{"test.weave.local.", net.ParseIP("10.2.2.1"), 0, 0, 0}
 	testInAddr1 := "1.2.2.10.in-addr.arpa."
@@ -86,7 +86,7 @@ func TestClientServerSimpleQuery(t *testing.T) {
 
 // Check that we can use a use "insistent" queries
 func TestClientServerInsistentQuery(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 
 	testRecord1 := Record{"test.weave.local.", net.ParseIP("10.2.2.1"), 0, 0, 0}
 	testInAddr1 := "1.2.2.10.in-addr.arpa."

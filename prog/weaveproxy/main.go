@@ -17,14 +17,14 @@ var (
 
 func main() {
 	var (
-		debug       bool
 		justVersion bool
+		logLevel    = "info"
 		c           = proxy.Config{ListenAddrs: defaultListenAddrs}
 	)
 
 	c.Version = version
-	getopt.BoolVarLong(&debug, "debug", 'd', "log debugging information")
 	getopt.BoolVarLong(&justVersion, "version", 0, "print version and exit")
+	getopt.StringVarLong(&logLevel, "log-level", 0, "logging level (debug, info, warning, error)", "info")
 	getopt.ListVar(&c.ListenAddrs, 'H', fmt.Sprintf("address on which to listen (default %s)", defaultListenAddrs))
 	getopt.BoolVarLong(&c.NoDefaultIPAM, "no-default-ipalloc", 0, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
 	getopt.BoolVarLong(&c.NoDefaultIPAM, "no-default-ipam", 0, "do not automatically allocate addresses for containers without a WEAVE_CIDR (deprecated; please use --no-default-ipalloc")
@@ -46,9 +46,7 @@ func main() {
 		Log.Fatalf("Cannot use both '--with-dns' and '--without-dns' flags")
 	}
 
-	if debug {
-		InitDefaultLogging(true)
-	}
+	SetLogLevel(logLevel)
 
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))

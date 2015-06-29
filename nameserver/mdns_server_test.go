@@ -17,7 +17,7 @@ func TestServerSimpleQuery(t *testing.T) {
 		testInAddr1 = "10.20.20.10.in-addr.arpa."
 	)
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestServerSimpleQuery starting")
 
 	mzone := newMockedZoneWithRecords([]ZoneRecord{testRecord1, testRecord2})

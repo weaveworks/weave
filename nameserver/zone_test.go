@@ -20,7 +20,7 @@ func TestZone(t *testing.T) {
 		revName1Addr1 = "1.2.9.10.in-addr.arpa."
 	)
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 
 	zone, err := NewZoneDb(ZoneConfig{})
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestDeleteRecords(t *testing.T) {
 		addr2 = "10.2.7.8/24"
 	)
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 
 	zone, err := NewZoneDb(ZoneConfig{})
 	require.NoError(t, err)

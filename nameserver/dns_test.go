@@ -11,7 +11,7 @@ import (
 
 // Check that we can prune an answer
 func TestPrune(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestPrune starting")
 
 	questionMsg := new(dns.Msg)

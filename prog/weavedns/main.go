@@ -38,7 +38,7 @@ func main() {
 		cacheLen        int
 		cacheDisabled   bool
 		watch           bool
-		debug           bool
+		logLevel        string
 		err             error
 	)
 
@@ -53,7 +53,7 @@ func main() {
 	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
 	flag.IntVar(&ttl, "ttl", weavedns.DefaultLocalTTL, "TTL (in secs) for responses for local names")
 	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
-	flag.BoolVar(&debug, "debug", false, "output debugging info to stderr")
+	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	// advanced options
 	flag.IntVar(&negTTL, "neg-ttl", 0, "negative TTL (in secs) for unanswered queries for local names (0=same value as -ttl")
 	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
@@ -70,7 +70,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	InitDefaultLogging(debug)
+	SetLogLevel(logLevel)
 	Log.Infof("[main] WeaveDNS version %s\n", version) // first thing in log: the version
 
 	var iface *net.Interface
