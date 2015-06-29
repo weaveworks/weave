@@ -133,12 +133,6 @@ exec_on() {
     docker -H tcp://$host:$DOCKER_PORT exec $container "$@"
 }
 
-launch_dns_on() {
-    host=$1
-    shift 1
-    weave_on $host launch-dns $@ $WEAVEDNS_ARGS
-}
-
 start_container() {
     host=$1
     shift 1

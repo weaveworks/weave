@@ -10,7 +10,7 @@ NAME3=seethree.weave.local
 
 start_suite "Add and remove names on a single host"
 
-launch_dns_on $HOST1 10.2.254.1/24
+weave_on $HOST1 launch
 
 start_container          $HOST1 --without-dns $C2/24 --name=c2
 start_container_with_dns $HOST1               $C1/24 --name=c1

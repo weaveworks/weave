@@ -11,7 +11,7 @@ NAME=seeone.$DOMAIN
 
 start_suite "Resolve unqualified names"
 
-launch_dns_on $HOST1 10.2.254.1/24
+weave_on $HOST1 launch
 
 start_container          $HOST1 $C1/24 --name=c1 -h $NAME
 start_container_with_dns $HOST1 $C2/24 --name=c2 -h seetwo.$DOMAIN

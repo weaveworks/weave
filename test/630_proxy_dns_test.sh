@@ -37,7 +37,7 @@ weave_on $HOST1 launch-proxy
 assert_no_resolution
 
 # Assert behaviour with weaveDNS running
-launch_dns_on $HOST1 10.2.254.1/24
+weave_on $HOST1 launch-router
 boot_containers
 assert_dns_record $HOST1 c1 $C2_NAME $C2
 assert_dns_record $HOST1 c2 $C1_NAME $C1

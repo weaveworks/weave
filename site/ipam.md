@@ -8,7 +8,7 @@ layout: default
 Weave automatically assigns containers an IP address that is unique
 across the network, and releases that address when a container
 exits. This happens for all invocations of the `run`, `start`,
-`attach`, `detach`, `expose`, `hide` and `launch-dns` commands, unless
+`attach`, `detach`, `expose`, and `hide` commands, unless
 the user explictly specified an address. Weave can also assign
 addresses in multiple subnets.
 

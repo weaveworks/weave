@@ -30,7 +30,7 @@ start it simultaneously with the router and weaveDNS via `launch`:
 
 or independently via `launch-proxy`:
 
-    host1$ weave launch-router && weave launch-dns && weave launch-proxy
+    host1$ weave launch-router && weave launch-proxy
 
 The first form is more convenient, however you can only pass proxy
 related configuration arguments to `launch-proxy` so if you need to

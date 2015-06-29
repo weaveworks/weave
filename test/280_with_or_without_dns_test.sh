@@ -20,19 +20,12 @@ assert_resolution() {
 
 start_suite "With or without DNS test"
 
+# Assert behaviour without weaveDNS running
 weave_on $HOST1 launch-router
 
+start_container $HOST1 $TARGET_IP/24 --name c2 -h $TARGET
 DNS_IP=$(weave_on $HOST1 docker-bridge-ip)
 
-# Assert behaviour without weaveDNS running
-assert_no_resolution --without-dns
-assert_no_resolution
-assert_no_resolution --with-dns
-
-weave_on $HOST1 launch-dns 10.2.254.1/24 $WEAVEDNS_ARGS
-start_container $HOST1 $TARGET_IP/24 --name c2 -h $TARGET
-
-# Assert behaviour with weaveDNS running
 assert_no_resolution --without-dns
 assert_resolution
 assert_resolution --with-dns
