@@ -3,8 +3,6 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -40,33 +38,27 @@ var (
 )
 
 var (
-	Log    *logrus.Logger
-	Info   *logrus.Logger
-	debugF bool
+	Log  *logrus.Logger
+	Info *logrus.Logger
 )
 
-func InitLogging(debugHandle io.Writer,
-	infoHandle io.Writer,
-	warningHandle io.Writer,
-	errorHandle io.Writer) {
-
-	Info = &logrus.Logger{
-		Out:       infoHandle,
-		Formatter: standardTextFormatter,
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.InfoLevel,
+func InitLogging(level logrus.Level) {
+	if Info == nil {
+		Info = &logrus.Logger{
+			Out:       os.Stderr,
+			Formatter: standardTextFormatter,
+			Hooks:     make(logrus.LevelHooks),
+			Level:     level,
+		}
+		Log = Info
 	}
-	Log = Info
+	Info.Level = level
 }
 
 func InitDefaultLogging(debug bool) {
-	if debug == debugF {
-		return
-	}
-	debugF = debug
-	debugOut := ioutil.Discard
+	level := logrus.InfoLevel
 	if debug {
-		debugOut = os.Stderr
+		level = logrus.DebugLevel
 	}
-	InitLogging(debugOut, os.Stdout, os.Stdout, os.Stderr)
+	InitLogging(level)
 }
