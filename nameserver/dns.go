@@ -80,6 +80,10 @@ func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
 	return m
 }
 
+func failHandleFunc(w dns.ResponseWriter, r *dns.Msg) {
+	w.WriteMsg(makeDNSFailResponse(r))
+}
+
 // get the maximum UDP-reply length
 func getMaxReplyLen(r *dns.Msg, proto dnsProtocol) int {
 	maxLen := minUDPSize
