@@ -1,5 +1,7 @@
 # Weave - weaving containers into applications
 
+[![Join the chat at https://gitter.im/weaveworks/weave](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/weaveworks/weave?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 [![Build Status](https://travis-ci.org/weaveworks/weave.svg?branch=master)](https://travis-ci.org/weaveworks/weave) [![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield&circle-token=4933c7dabb3d0383e62117565cb9d16df7b1a811)](https://circleci.com/gh/weaveworks/weave) [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
 
 # About Weaveworks
