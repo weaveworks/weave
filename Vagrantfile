@@ -30,6 +30,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
   config.vm.synced_folder ".", "/home/vagrant/src/github.com/weaveworks/weave"
 
+  config.ssh.forward_agent = true
+
   install_build_deps config.vm, pkgs
   install_go_toochain config.vm
   tweak_user_env config.vm
