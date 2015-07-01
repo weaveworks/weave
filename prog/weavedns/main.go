@@ -46,7 +46,7 @@ func main() {
 	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
 	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "path to Docker API socket")
 	flag.StringVar(&domain, "domain", weavedns.DefaultLocalDomain, "local domain (ie, 'weave.local.')")
-	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up")
+	flag.IntVar(&wait, "wait", -1, "number of seconds to wait for interfaces to come up (0=don't wait, -1=wait forever)")
 	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
 	flag.StringVar(&httpIfaceName, "httpiface", "", "interface on which to listen for HTTP requests (defaults to empty string which listens on all interfaces)")
 	flag.IntVar(&httpPort, "httpport", weavedns.DefaultHTTPPort, "port to listen to HTTP requests")
