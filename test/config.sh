@@ -188,8 +188,8 @@ assert_dns_ptr_record() {
 start_suite() {
     for host in $HOST1 $HOST2; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
-        rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
         weave_on $host reset 2>/dev/null
+        rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
     done
     whitely echo "$@"
 }
