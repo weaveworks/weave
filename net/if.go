@@ -2,6 +2,7 @@ package net
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"time"
 )
@@ -10,11 +11,17 @@ const (
 	sleepTime = 100 * time.Millisecond
 )
 
+// Wait `wait` seconds for an interface to come up. Pass zero to check once
+// and return immediately, or a negative value to wait indefinitely.
 func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
 	if iface, err = findInterface(ifaceName); err == nil || wait == 0 {
 		return
 	}
-	for i := time.Duration(wait) * time.Second / sleepTime; err != nil && i > 0; i-- {
+	i := int64(math.MaxInt64)
+	if wait > 0 {
+		i = int64(time.Duration(wait) * time.Second / sleepTime)
+	}
+	for ; err != nil && i > 0; i-- {
 		time.Sleep(sleepTime)
 		iface, err = findInterface(ifaceName)
 	}
