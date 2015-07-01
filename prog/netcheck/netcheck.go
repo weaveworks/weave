@@ -1,4 +1,4 @@
-/* netcheck: check whether a given network overlaps with any existing routes */
+/* netcheck: check whether a given network or address overlaps with any existing routes */
 package main
 
 import (
@@ -19,12 +19,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	ipRangeStr := os.Args[1]
-	_, ipnet, err := net.ParseCIDR(ipRangeStr)
+	cidrStr := os.Args[1]
+	addr, ipnet, err := net.ParseCIDR(cidrStr)
 	if err != nil {
 		fatal(err)
 	}
-	if err := weavenet.CheckNetworkFree(ipnet); err != nil {
+	if ipnet.IP.Equal(addr) {
+		err = weavenet.CheckNetworkFree(ipnet)
+	} else {
+		err = weavenet.CheckAddressOverlap(addr)
+	}
+	if err != nil {
 		fatal(err)
 	}
 	os.Exit(0)
