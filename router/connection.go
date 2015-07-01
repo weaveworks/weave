@@ -4,10 +4,11 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
+
+	. "github.com/weaveworks/weave/common"
 )
 
 type Connection interface {
@@ -83,7 +84,11 @@ func (conn *RemoteConnection) BreakTie(Connection) ConnectionTieBreak { return T
 func (conn *RemoteConnection) Shutdown(error)                         {}
 
 func (conn *RemoteConnection) Log(args ...interface{}) {
-	log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s|%s]:", conn.remoteTCPAddr, conn.remote)), args...)...)
+	Log.Println(append(append([]interface{}{}, fmt.Sprintf("->[%s|%s]:", conn.remoteTCPAddr, conn.remote)), args...)...)
+}
+
+func (conn *RemoteConnection) ErrorLog(args ...interface{}) {
+	Log.Errorln(append(append([]interface{}{}, fmt.Sprintf("->[%s|%s]:", conn.remoteTCPAddr, conn.remote)), args...)...)
 }
 
 func (conn *RemoteConnection) String() string {
@@ -102,7 +107,7 @@ func (conn *RemoteConnection) String() string {
 // end up in the local peer's connections map.
 func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router, acceptNewPeer bool) {
 	if connRemote.local != router.Ourself.Peer {
-		log.Fatal("Attempt to create local connection from a peer which is not ourself")
+		Log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
 	// NB, we're taking a copy of connRemote here.
 	actionChan := make(chan ConnectionAction, ChannelSize)
@@ -227,7 +232,7 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 		if oldRemoteUDPAddr == nil {
 			return conn.sendFastHeartbeats()
 		} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
-			log.Println("Peer", conn.remote, "moved from", old, "to", remoteUDPAddr)
+			Log.Println("Peer", conn.remote, "moved from", old, "to", remoteUDPAddr)
 		}
 		return nil
 	})
@@ -378,9 +383,9 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 
 func (conn *LocalConnection) shutdown(err error) {
 	if conn.remote == nil {
-		log.Printf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
+		Log.Errorf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
 	} else {
-		conn.Log("connection shutting down due to error:", err)
+		conn.ErrorLog("connection shutting down due to error:", err)
 	}
 
 	if conn.TCPConn != nil {

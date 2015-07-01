@@ -1,46 +1,62 @@
 package common
 
 import (
-	"io"
-	"io/ioutil"
-	"log"
+	"bytes"
+	"fmt"
 	"os"
+	"strings"
+
+	"github.com/Sirupsen/logrus"
 )
 
-const (
-	standardLogFlags = log.Ldate | log.Ltime | log.Lmicroseconds
-)
+type textFormatter struct {
+}
 
-// Largely taken from
-// http://www.goinggo.net/2013/11/using-log-package-in-go.html
+// Based off logrus.TextFormatter, which behaves completely
+// differently when you don't want colored output
+func (f *textFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	b := &bytes.Buffer{}
+
+	levelText := strings.ToUpper(entry.Level.String())[0:4]
+	timeStamp := entry.Time.Format("2006/01/02 15:04:05.000000")
+	if len(entry.Data) > 0 {
+		fmt.Fprintf(b, "%s: %s %-44s ", levelText, timeStamp, entry.Message)
+		for k, v := range entry.Data {
+			fmt.Fprintf(b, " %s=%v", k, v)
+		}
+	} else {
+		// No padding when there's no fields
+		fmt.Fprintf(b, "%s: %s %s", levelText, timeStamp, entry.Message)
+	}
+
+	b.WriteByte('\n')
+	return b.Bytes(), nil
+}
 
 var (
-	Debug   *log.Logger
-	Info    *log.Logger
-	Warning *log.Logger
-	Error   *log.Logger
-	debugF  bool
+	standardTextFormatter = &textFormatter{}
 )
 
-func InitLogging(debugHandle io.Writer,
-	infoHandle io.Writer,
-	warningHandle io.Writer,
-	errorHandle io.Writer) {
+var (
+	Log *logrus.Logger
+)
 
-	Debug = log.New(debugHandle, "DEBUG: ", standardLogFlags)
-	Info = log.New(infoHandle, "INFO: ", standardLogFlags)
-	Warning = log.New(warningHandle, "WARNING: ", standardLogFlags)
-	Error = log.New(errorHandle, "ERROR: ", standardLogFlags)
+func InitLogging(level logrus.Level) {
+	if Log == nil {
+		Log = &logrus.Logger{
+			Out:       os.Stderr,
+			Formatter: standardTextFormatter,
+			Hooks:     make(logrus.LevelHooks),
+			Level:     level,
+		}
+	}
+	Log.Level = level
 }
 
 func InitDefaultLogging(debug bool) {
-	if debug == debugF {
-		return
-	}
-	debugF = debug
-	debugOut := ioutil.Discard
+	level := logrus.InfoLevel
 	if debug {
-		debugOut = os.Stderr
+		level = logrus.DebugLevel
 	}
-	InitLogging(debugOut, os.Stdout, os.Stdout, os.Stderr)
+	InitLogging(level)
 }

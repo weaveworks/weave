@@ -23,15 +23,15 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 
 	cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config)
 	if !ok {
-		Debug.Print("No Weave CIDR, ignoring")
+		Log.Debug("No Weave CIDR, ignoring")
 		return nil
 	}
-	Info.Printf("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
+	Log.Infof("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
 	args := []string{"attach"}
 	args = append(args, cidrs...)
 	args = append(args, "--or-die", container.ID)
 	if output, err := callWeave(args...); err != nil {
-		Warning.Printf("Attaching container %s to weave network failed: %s", container.ID, string(output))
+		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(output))
 		return errors.New(string(output))
 	}
 

@@ -3,10 +3,11 @@ package router
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"time"
+
+	. "github.com/weaveworks/weave/common"
 )
 
 const (
@@ -298,9 +299,9 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 }
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
-	log.Printf("->[%s] attempting connection\n", address)
+	Log.Printf("->[%s] attempting connection\n", address)
 	if err := cm.ourself.CreateConnection(address, acceptNewPeer); err != nil {
-		log.Printf("->[%s] error during connection attempt: %v\n", address, err)
+		Log.Errorf("->[%s] error during connection attempt: %v\n", address, err)
 		cm.ConnectionTerminated(address, err)
 	}
 }

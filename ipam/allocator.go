@@ -718,11 +718,11 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 // Logging
 
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
-	common.Info.Printf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+	common.Log.Infof("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
 func (alloc *Allocator) debugln(args ...interface{}) {
-	common.Debug.Println(append([]interface{}{fmt.Sprintf("[allocator %s]:", alloc.ourName)}, args...)...)
+	common.Log.Debugln(append([]interface{}{fmt.Sprintf("[allocator %s]:", alloc.ourName)}, args...)...)
 }
 func (alloc *Allocator) debugf(fmt string, args ...interface{}) {
-	common.Debug.Printf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+	common.Log.Debugf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }

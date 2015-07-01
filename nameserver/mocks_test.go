@@ -19,7 +19,7 @@ const (
 )
 
 // Warn about some methods that some day should be implemented...
-func notImplWarn() { Warning.Printf("Mocked method. Not implemented.") }
+func notImplWarn() { Log.Warningf("Mocked method. Not implemented.") }
 
 // A mocked Zone that always returns the same records
 // * it does not send/receive any mDNS query
@@ -38,7 +38,7 @@ func newMockedZoneWithRecords(zr []ZoneRecord) *mockedZoneWithRecords {
 }
 func (mz *mockedZoneWithRecords) Domain() string { return DefaultLocalDomain }
 func (mz *mockedZoneWithRecords) LookupName(name string) ([]ZoneRecord, error) {
-	Debug.Printf("[mocked zone]: LookupName: returning records %s", mz.records)
+	Log.Debugf("[mocked zone]: LookupName: returning records %s", mz.records)
 	mz.Lock()
 	defer mz.Unlock()
 
@@ -53,7 +53,7 @@ func (mz *mockedZoneWithRecords) LookupName(name string) ([]ZoneRecord, error) {
 }
 
 func (mz *mockedZoneWithRecords) LookupInaddr(inaddr string) ([]ZoneRecord, error) {
-	Debug.Printf("[mocked zone]: LookupInaddr: returning records %s", mz.records)
+	Log.Debugf("[mocked zone]: LookupInaddr: returning records %s", mz.records)
 	mz.Lock()
 	defer mz.Unlock()
 
@@ -243,17 +243,17 @@ func newZoneDbsWithMockedMDns(num int, config ZoneConfig) zoneDbsWithMockedMDns 
 	for i := 0; i < num; i++ {
 		res[i] = new(zbmEntry)
 
-		Debug.Printf("[test] Creating mocked mDNS server #%d", i)
+		Log.Debugf("[test] Creating mocked mDNS server #%d", i)
 		res[i].Server = newMockedMDNSServer(nil)
 
-		Debug.Printf("[test] Creating mocked mDNS client #%d", i)
+		Log.Debugf("[test] Creating mocked mDNS client #%d", i)
 		res[i].Client = newMockedMDNSClient([]*mockedMDNSServer{})
 
 		cfg := config
 		cfg.MDNSClient = res[i].Client
 		cfg.MDNSServer = res[i].Server
 
-		Debug.Printf("[test] Creating ZoneDb #%d", i)
+		Log.Debugf("[test] Creating ZoneDb #%d", i)
 		res[i].Zone, _ = NewZoneDb(cfg)
 
 		// link the mDNS server to its zone
@@ -270,7 +270,7 @@ func newZoneDbsWithMockedMDns(num int, config ZoneConfig) zoneDbsWithMockedMDns 
 			// this is not what we currently do, but can be convenient in some cases
 			// for finding some bugs...
 			if i != j {
-				Debug.Printf("[test] Linking mocked mDNS client #%d to server #%d", i, j)
+				Log.Debugf("[test] Linking mocked mDNS client #%d to server #%d", i, j)
 				res[i].Client.AddServer(res[j].Server)
 			}
 		}
@@ -389,7 +389,7 @@ func (mf *mockedFallback) Stop() error {
 
 // Run a UDP fallback server
 func runLocalUDPServer(laddr string, handler dns.HandlerFunc) (*dns.Server, string, error) {
-	Debug.Printf("[mocked fallback] Starting fallback UDP server at %s", laddr)
+	Log.Debugf("[mocked fallback] Starting fallback UDP server at %s", laddr)
 	pc, err := net.ListenPacket("udp", laddr)
 	if err != nil {
 		return nil, "", err
@@ -401,13 +401,13 @@ func runLocalUDPServer(laddr string, handler dns.HandlerFunc) (*dns.Server, stri
 		pc.Close()
 	}()
 
-	Debug.Printf("[mocked fallback] Fallback UDP server listening at %s", pc.LocalAddr())
+	Log.Debugf("[mocked fallback] Fallback UDP server listening at %s", pc.LocalAddr())
 	return server, pc.LocalAddr().String(), nil
 }
 
 // Run a TCP fallback server
 func runLocalTCPServer(laddr string, handler dns.HandlerFunc) (*dns.Server, string, error) {
-	Debug.Printf("[mocked fallback] Starting fallback TCP server at %s", laddr)
+	Log.Debugf("[mocked fallback] Starting fallback TCP server at %s", laddr)
 	laddrTCP, err := net.ResolveTCPAddr("tcp", laddr)
 	if err != nil {
 		return nil, "", err
@@ -424,7 +424,7 @@ func runLocalTCPServer(laddr string, handler dns.HandlerFunc) (*dns.Server, stri
 		l.Close()
 	}()
 
-	Debug.Printf("[mocked fallback] Fallback TCP server listening at %s", l.Addr().String())
+	Log.Debugf("[mocked fallback] Fallback TCP server listening at %s", l.Addr().String())
 	return server, l.Addr().String(), nil
 }
 
@@ -442,9 +442,9 @@ func newMockedClock() *mockedClock {
 //       be waiting in channels. So your code should not depend on the channels
 //       for creating new timers. Otherwise, time travelling will not be reliable...
 func (clk *mockedClock) Forward(secs int) {
-	Debug.Printf(">>>>>>> Moving clock forward %d seconds - Time traveling >>>>>>>", secs)
+	Log.Debugf(">>>>>>> Moving clock forward %d seconds - Time traveling >>>>>>>", secs)
 	clk.Add(time.Duration(secs) * time.Second)
-	Debug.Printf("<<<<<<< Time travel finished! We are at %s <<<<<<<", clk.Now())
+	Log.Debugf("<<<<<<< Time travel finished! We are at %s <<<<<<<", clk.Now())
 }
 
 //////////////////////////////////////////////////////////////////

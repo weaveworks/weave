@@ -20,17 +20,17 @@ func SignalHandlerLoop(ss ...SignalReceiver) {
 	for {
 		switch <-sigs {
 		case syscall.SIGINT:
-			Info.Printf("=== received SIGINT ===\n*** exiting\n")
+			Log.Infof("=== received SIGINT ===\n*** exiting\n")
 			for _, subsystem := range ss {
 				subsystem.Stop()
 			}
 			return
 		case syscall.SIGQUIT:
 			stacklen := runtime.Stack(buf, true)
-			Info.Printf("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
+			Log.Infof("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
 		case syscall.SIGUSR1:
 			for _, subsystem := range ss {
-				Info.Printf("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", subsystem.Status())
+				Log.Infof("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", subsystem.Status())
 			}
 		}
 	}

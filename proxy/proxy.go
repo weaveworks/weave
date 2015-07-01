@@ -47,7 +47,7 @@ func NewProxy(c Config) (*Proxy, error) {
 	p := &Proxy{Config: c}
 
 	if err := p.TLSConfig.loadCerts(); err != nil {
-		Error.Fatalf("Could not configure tls for proxy: %s", err)
+		Log.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
 	client, err := docker.NewClient(dockerSockUnix)
@@ -72,7 +72,7 @@ func (proxy *Proxy) Dial() (net.Conn, error) {
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	Info.Printf("%s %s", r.Method, r.URL)
+	Log.Infof("%s %s", r.Method, r.URL)
 	path := r.URL.Path
 	var i interceptor
 	switch {
@@ -94,14 +94,14 @@ func (proxy *Proxy) ListenAndServe() {
 	for _, addr := range proxy.ListenAddrs {
 		listener, normalisedAddr, err := proxy.listen(addr)
 		if err != nil {
-			Error.Fatalf("Cannot listen on %s: %s", addr, err)
+			Log.Fatalf("Cannot listen on %s: %s", addr, err)
 		}
 		listeners = append(listeners, listener)
 		addrs = append(addrs, normalisedAddr)
 	}
 
 	for _, addr := range addrs {
-		Info.Println("proxy listening on", addr)
+		Log.Infoln("proxy listening on", addr)
 	}
 
 	errs := make(chan error)
@@ -113,7 +113,7 @@ func (proxy *Proxy) ListenAndServe() {
 	for range listeners {
 		err := <-errs
 		if err != nil {
-			Error.Fatalf("Serve failed: %s", err)
+			Log.Fatalf("Serve failed: %s", err)
 		}
 	}
 }
@@ -175,7 +175,7 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 		}
 
 	default:
-		Error.Fatalf("Invalid protocol format: %q", proto)
+		Log.Fatalf("Invalid protocol format: %q", proto)
 	}
 
 	return listener, fmt.Sprintf("%s://%s", proto, addr), nil
