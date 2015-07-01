@@ -58,6 +58,7 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go com
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go prog/weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go prog/weavedns/main.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
+$(NETCHECK_EXE): prog/netcheck/netcheck.go
 
 # Sigproxy and weavewait need separate rules as they fail the netgo check in
 # the main build stanza due to not importing net package
