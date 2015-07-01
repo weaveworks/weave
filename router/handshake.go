@@ -86,9 +86,6 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) (TCPReceiver, error) 
 			return nil, fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
 		}
 	}
-	if existingConn, found := conn.Router.Ourself.ConnectionTo(name); found && existingConn.Established() {
-		return nil, fmt.Errorf("Already have connection to %s at %s", existingConn.Remote(), existingConn.RemoteTCPAddr())
-	}
 	uid, err := ParsePeerUID(uidStr)
 	if err != nil {
 		return nil, err
