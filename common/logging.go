@@ -38,21 +38,19 @@ var (
 )
 
 var (
-	Log  *logrus.Logger
-	Info *logrus.Logger
+	Log *logrus.Logger
 )
 
 func InitLogging(level logrus.Level) {
-	if Info == nil {
-		Info = &logrus.Logger{
+	if Log == nil {
+		Log = &logrus.Logger{
 			Out:       os.Stderr,
 			Formatter: standardTextFormatter,
 			Hooks:     make(logrus.LevelHooks),
 			Level:     level,
 		}
-		Log = Info
 	}
-	Info.Level = level
+	Log.Level = level
 }
 
 func InitDefaultLogging(debug bool) {

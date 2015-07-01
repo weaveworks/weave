@@ -36,7 +36,7 @@ func NewClient(apiPath string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	Info.Printf("[docker] Using Docker API on %s: %v", apiPath, env)
+	Log.Infof("[docker] Using Docker API on %s: %v", apiPath, env)
 	return client, nil
 }
 

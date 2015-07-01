@@ -24,7 +24,7 @@ func TestZoneRefresh(t *testing.T) {
 	)
 
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestZoneRefresh starting")
+	Log.Infoln("TestZoneRefresh starting")
 
 	clk := newMockedClock()
 

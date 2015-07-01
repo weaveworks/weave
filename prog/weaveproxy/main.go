@@ -50,8 +50,8 @@ func main() {
 		InitDefaultLogging(true)
 	}
 
-	Info.Println("weave proxy", version)
-	Info.Println("Command line arguments:", strings.Join(os.Args[1:], " "))
+	Log.Infoln("weave proxy", version)
+	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {

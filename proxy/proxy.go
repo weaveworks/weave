@@ -72,7 +72,7 @@ func (proxy *Proxy) Dial() (net.Conn, error) {
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	Info.Printf("%s %s", r.Method, r.URL)
+	Log.Infof("%s %s", r.Method, r.URL)
 	path := r.URL.Path
 	var i interceptor
 	switch {
@@ -101,7 +101,7 @@ func (proxy *Proxy) ListenAndServe() {
 	}
 
 	for _, addr := range addrs {
-		Info.Println("proxy listening on", addr)
+		Log.Infoln("proxy listening on", addr)
 	}
 
 	errs := make(chan error)

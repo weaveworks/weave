@@ -79,7 +79,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			return
 		}
 		if dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
-			common.Info.Printf("[allocator] '%s' is not running: freeing %s", ident, addr)
+			common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, addr)
 			alloc.Free(ident, addr)
 			return
 		}
@@ -96,7 +96,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			return
 		}
 		if dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
-			common.Info.Printf("[allocator] '%s' is not running: freeing %s", ident, newAddr)
+			common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, newAddr)
 			alloc.Free(ident, newAddr)
 			return
 		}

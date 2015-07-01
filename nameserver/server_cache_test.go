@@ -20,7 +20,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 	)
 
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestServerDbCacheInvalidation starting")
+	Log.Infoln("TestServerDbCacheInvalidation starting")
 
 	clk := newMockedClock()
 
@@ -178,7 +178,7 @@ func TestServerCacheExpiration(t *testing.T) {
 	)
 
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestServerCacheExpiration starting")
+	Log.Infoln("TestServerCacheExpiration starting")
 
 	clk := newMockedClock()
 
@@ -266,7 +266,7 @@ func TestServerCacheRefresh(t *testing.T) {
 	)
 
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestServerCacheRefresh starting")
+	Log.Infoln("TestServerCacheRefresh starting")
 	clk := newMockedClock()
 
 	Log.Debugf("Creating 2 zone databases")

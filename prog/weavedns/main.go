@@ -71,17 +71,17 @@ func main() {
 	}
 
 	InitDefaultLogging(debug)
-	Info.Printf("[main] WeaveDNS version %s\n", version) // first thing in log: the version
+	Log.Infof("[main] WeaveDNS version %s\n", version) // first thing in log: the version
 
 	var iface *net.Interface
 	if ifaceName != "" {
 		var err error
-		Info.Println("[main] Waiting for mDNS interface", ifaceName, "to come up")
+		Log.Infoln("[main] Waiting for mDNS interface", ifaceName, "to come up")
 		iface, err = weavenet.EnsureInterface(ifaceName, wait)
 		if err != nil {
 			Log.Fatal(err)
 		} else {
-			Info.Println("[main] Interface", ifaceName, "is up")
+			Log.Infoln("[main] Interface", ifaceName, "is up")
 		}
 	}
 
@@ -89,12 +89,12 @@ func main() {
 	if httpIfaceName == "" {
 		httpIP = "0.0.0.0"
 	} else {
-		Info.Println("[main] Waiting for HTTP interface", httpIfaceName, "to come up")
+		Log.Infoln("[main] Waiting for HTTP interface", httpIfaceName, "to come up")
 		httpIface, err := weavenet.EnsureInterface(httpIfaceName, wait)
 		if err != nil {
 			Log.Fatal(err)
 		}
-		Info.Println("[main] Interface", httpIfaceName, "is up")
+		Log.Infoln("[main] Interface", httpIfaceName, "is up")
 
 		addrs, err := httpIface.Addrs()
 		if err != nil {
@@ -173,7 +173,7 @@ func main() {
 	if err != nil {
 		Log.Fatal("[main] Unable to create http listener: ", err)
 	}
-	Info.Println("[main] HTTP API listening on", httpAddr)
+	Log.Infoln("[main] HTTP API listening on", httpAddr)
 
 	go SignalHandlerLoop(srv)
 	go weavedns.ServeHTTP(httpListener, version, srv, dockerCli)

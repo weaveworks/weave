@@ -506,9 +506,9 @@ func NewZoneDb(config ZoneConfig) (zone *ZoneDb, err error) {
 // Start the zone database
 func (zone *ZoneDb) Start() (err error) {
 	if zone.iface != nil {
-		Info.Printf("[zonedb] Using mDNS on %+v", zone.iface)
+		Log.Infof("[zonedb] Using mDNS on %+v", zone.iface)
 	} else {
-		Info.Printf("[zonedb] Using mDNS on all interfaces")
+		Log.Infof("[zonedb] Using mDNS on all interfaces")
 	}
 
 	if err = zone.mdnsCli.Start(zone.iface); err != nil {
@@ -638,7 +638,7 @@ func (zone *ZoneDb) String() string {
 
 // Notify that a container has died
 func (zone *ZoneDb) ContainerDied(ident string) error {
-	Info.Printf("[zonedb] Container %s down. Removing records", ident)
+	Log.Infof("[zonedb] Container %s down. Removing records", ident)
 	zone.DeleteRecords(ident, "", net.IP{})
 	return nil
 }

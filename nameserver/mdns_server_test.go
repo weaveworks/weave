@@ -18,7 +18,7 @@ func TestServerSimpleQuery(t *testing.T) {
 	)
 
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestServerSimpleQuery starting")
+	Log.Infoln("TestServerSimpleQuery starting")
 
 	mzone := newMockedZoneWithRecords([]ZoneRecord{testRecord1, testRecord2})
 	mdnsServer, err := NewMDNSServer(mzone, true, DefaultLocalTTL)

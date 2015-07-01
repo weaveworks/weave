@@ -343,14 +343,14 @@ func TestAllocatorFuzz(t *testing.T) {
 
 		allocIndex := rand.Int31n(nodes)
 		alloc := allocs[allocIndex]
-		//common.Info.Printf("Allocate: asking allocator %d", allocIndex)
+		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
 		addr, err := alloc.Allocate(name, subnet, nil)
 
 		if err != nil {
 			panic(fmt.Sprintf("Could not allocate addr"))
 		}
 
-		//common.Info.Printf("Allocate: got address %s for name %s", addr, name)
+		//common.Log.Infof("Allocate: got address %s for name %s", addr, name)
 		addrStr := addr.String()
 
 		stateLock.Lock()
@@ -387,7 +387,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		stateLock.Unlock()
 
 		alloc := allocs[res.alloc]
-		//common.Info.Printf("Freeing %s (%s) on allocator %d", res.name, addr, res.alloc)
+		//common.Log.Infof("Freeing %s (%s) on allocator %d", res.name, addr, res.alloc)
 
 		oldAddr, err := address.ParseIP(addr)
 		if err != nil {
@@ -412,7 +412,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		stateLock.Unlock()
 		alloc := allocs[res.alloc]
 
-		//common.Info.Printf("Asking for %s (%s) on allocator %d again", res.name, addr, res.alloc)
+		//common.Log.Infof("Asking for %s (%s) on allocator %d again", res.name, addr, res.alloc)
 
 		newAddr, _ := alloc.Allocate(res.name, subnet, nil)
 		oldAddr, _ := address.ParseIP(addr)

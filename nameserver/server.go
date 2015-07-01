@@ -188,11 +188,11 @@ func NewDNSServer(config DNSServerConfig) (s *DNSServer, err error) {
 
 // Start the DNS server
 func (s *DNSServer) Start() error {
-	Info.Printf("[dns] Upstream server(s): %+v", s.Upstream)
+	Log.Infof("[dns] Upstream server(s): %+v", s.Upstream)
 	if s.cacheDisabled {
-		Info.Printf("[dns] Cache: disabled")
+		Log.Infof("[dns] Cache: disabled")
 	} else {
-		Info.Printf("[dns] Cache: %d entries", s.cache.Capacity())
+		Log.Infof("[dns] Cache: %d entries", s.cache.Capacity())
 	}
 
 	pc, err := net.ListenPacket("udp", s.ListenAddr)
@@ -225,7 +225,7 @@ func (s *DNSServer) ActivateAndServe() {
 	go func() {
 		defer s.listenersWg.Done()
 
-		Info.Printf("[dns] Listening for DNS on %s (UDP)", s.ListenAddr)
+		Log.Infof("[dns] Listening for DNS on %s (UDP)", s.ListenAddr)
 		err := s.udpSrv.ActivateAndServe()
 		CheckFatal(err)
 		Log.Debugf("[dns] DNS UDP server exiting...")
@@ -234,7 +234,7 @@ func (s *DNSServer) ActivateAndServe() {
 	go func() {
 		defer s.listenersWg.Done()
 
-		Info.Printf("[dns] Listening for DNS on %s (TCP)", s.ListenAddr)
+		Log.Infof("[dns] Listening for DNS on %s (TCP)", s.ListenAddr)
 		err := s.tcpSrv.ActivateAndServe()
 		CheckFatal(err)
 		Log.Debugf("[dns] DNS TCP server exiting...")
@@ -243,7 +243,7 @@ func (s *DNSServer) ActivateAndServe() {
 	// Waiting for all goroutines to finish (otherwise they die as main routine dies)
 	s.listenersWg.Wait()
 
-	Info.Printf("[dns] Server exiting...")
+	Log.Infof("[dns] Server exiting...")
 }
 
 // Return status string
@@ -284,7 +284,7 @@ func (s *DNSServer) createMux(proto dnsProtocol) *dns.ServeMux {
 	}
 	notUsHandler := s.notUsHandler(proto)
 	notUsFallback := func(w dns.ResponseWriter, r *dns.Msg) {
-		Info.Printf("[dns msgid %d] -> sending to fallback server", r.MsgHdr.Id)
+		Log.Infof("[dns msgid %d] -> sending to fallback server", r.MsgHdr.Id)
 		notUsHandler(w, r)
 	}
 
@@ -351,8 +351,9 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 		}
 
 		if answers, err := lookup(q.Name); err != nil {
-			Info.Printf("[dns msgid %d] No results for type %s query for '%s' [caching no-local]",
+			Log.Infof("[dns msgid %d] No results for type %s query for '%s' [caching no-local]",
 				r.MsgHdr.Id, dns.TypeToString[q.Qtype], q.Name)
+
 			maybeCache(nil, s.negLocalTTL, CacheNoLocalReplies)
 			fallback(w, r)
 		} else {
