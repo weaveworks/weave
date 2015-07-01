@@ -7,9 +7,11 @@ import (
 )
 
 // A zone record
-// Note: we will try to keep all the zone records information is concentrated here. Maybe not all queries will
-//       use things like priorities or weights, but we do not want to create a hierarchy for dealing with all
-//       possible queries...
+//
+// Note: all the zone records information is concentrated here. Maybe
+// not all queries will use things like priorities or weights, but we
+// do not want to create a hierarchy for dealing with all possible
+// queries...
 type ZoneRecord interface {
 	Name() string  // The name for this IP
 	IP() net.IP    // The IP (v4) address
