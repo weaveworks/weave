@@ -858,6 +858,8 @@ ipam_cidrs() {
             IPAM_CIDRS="$IPAM_CIDRS $CIDR"
             ALL_CIDRS="$ALL_CIDRS $CIDR"
         else
+            # This is a plain IP address; warn if it clashes but carry on
+            command_exists netcheck && netcheck $1 || true
             ALL_CIDRS="$ALL_CIDRS $1"
         fi
         shift 1
