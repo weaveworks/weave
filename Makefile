@@ -40,7 +40,7 @@ all: $(WEAVE_EXPORT)
 
 travis: $(EXES)
 
-update: $(EXES)
+update:
 	go get -u -f -v -tags -netgo $(addprefix ./,$(dir $(EXES)))
 
 $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
