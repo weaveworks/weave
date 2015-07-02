@@ -16,7 +16,7 @@ func CheckNetworkFree(subnet *net.IPNet) error {
 	}
 	for _, route := range routes {
 		if route.Dst != nil && overlaps(route.Dst, subnet) {
-			return fmt.Errorf("Network %s overlaps with existing route %s", subnet, route.Dst)
+			return fmt.Errorf("Network %s overlaps with existing route %s on host.", subnet, route.Dst)
 		}
 	}
 	return nil
@@ -36,7 +36,7 @@ func CheckAddressOverlap(addr net.IP) error {
 	}
 	for _, route := range routes {
 		if route.Dst != nil && route.Dst.Contains(addr) {
-			return fmt.Errorf("Address %s overlaps with existing route %s", addr, route.Dst)
+			return fmt.Errorf("Address %s overlaps with existing route %s on host.", addr, route.Dst)
 		}
 	}
 	return nil
