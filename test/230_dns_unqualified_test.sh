@@ -11,19 +11,19 @@ NAME=seeone.$DOMAIN
 
 start_suite "Resolve unqualified names"
 
-launch_dns_on $HOST1 10.2.254.1/24
+launch_dns_on $HOST1 10.2.254.1/24 --debug
 
 start_container          $HOST1 $C1/24 --name=c1 -h $NAME
 start_container_with_dns $HOST1 $C2/24 --name=c2 -h seetwo.$DOMAIN
 start_container_with_dns $HOST1 $C3/24 --name=c3 --dns-search=$DOMAIN
 container=$(start_container_with_dns $HOST1 $C4/24)
 
-check() {
-  assert "exec_on $HOST1 $1 getent hosts seeone | tr -s ' '" "$C1 $NAME"
-}
+assert_dns_a_record $HOST1 c2           seeone     $C1 $NAME
+assert_dns_a_record $HOST1 c3           seeone     $C1 $NAME
+assert_dns_a_record $HOST1 "$container" seeone     $C1 $NAME
 
-check c2
-check c3
-check "$container"
+# check that unqualified names are automatically qualified for broken resolvers
+weave_on $HOST1 dns-add $C1 c1 -h mysql.weave.local
+assert_dns_a_record $HOST1 c1 mysql $C1
 
 end_suite
