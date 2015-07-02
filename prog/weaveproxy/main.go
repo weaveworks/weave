@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"code.google.com/p/getopt"
+	"github.com/pborman/getopt"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/proxy"
 )
