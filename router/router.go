@@ -16,11 +16,17 @@ import (
 )
 
 const (
-	macMaxAge = 10 * time.Minute // [1]
+	macMaxAge        = 10 * time.Minute       // [1]
+	acceptMaxTokens  = 100                    // [2]
+	acceptTokenDelay = 100 * time.Millisecond // [3]
 )
 
 // [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
+
+// [2] capacity of token bucket for rate limiting accepts
+
+// [3] control rate at which new tokens are added to the bucket
 
 type LogFrameFunc func(string, []byte, *layers.Ethernet)
 
@@ -45,6 +51,7 @@ type Router struct {
 	gossipChannels  GossipChannels
 	TopologyGossip  Gossip
 	UDPListener     *net.UDPConn
+	acceptLimiter   *TokenBucket
 }
 
 type PacketSource interface {
@@ -76,6 +83,7 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 	router.Routes = NewRoutes(router.Ourself, router.Peers)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
+	router.acceptLimiter = NewTokenBucket(acceptMaxTokens, acceptTokenDelay)
 	return router
 }
 
@@ -207,6 +215,7 @@ func (router *Router) listenTCP(localPort int) {
 				continue
 			}
 			router.acceptTCP(tcpConn)
+			router.acceptLimiter.Wait()
 		}
 	}()
 }
