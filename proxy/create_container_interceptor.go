@@ -13,6 +13,8 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 )
 
+const MaxDockerHostname = 64
+
 type createContainerInterceptor struct{ proxy *Proxy }
 
 type createContainerRequestBody struct {
@@ -109,9 +111,14 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 	container.HostConfig.DNS = append(container.HostConfig.DNS, i.proxy.dockerBridgeIP)
 
 	if container.Hostname == "" && name != "" {
-		container.Hostname = name
 		// Strip trailing period because it's unusual to see it used on the end of a host name
-		container.Domainname = strings.TrimSuffix(dnsDomain, ".")
+		trimmedDNSDomain := strings.TrimSuffix(dnsDomain, ".")
+		if len(name)+1+len(trimmedDNSDomain) > MaxDockerHostname {
+			Warning.Printf("Container name [%s] too long to be used as hostname", name)
+		} else {
+			container.Hostname = name
+			container.Domainname = trimmedDNSDomain
+		}
 	}
 
 	if len(container.HostConfig.DNSSearch) == 0 {
