@@ -3,10 +3,10 @@ title: Weave Proxy
 layout: default
 ---
 
-# Weave Proxy
+# Weave Docker API Proxy
 
-The proxy automatically attaches containers to the weave network when
-they are started using the ordinary Docker
+The Docker API proxy automatically attaches containers to the weave
+network when they are started using the ordinary Docker
 [command-line interface](https://docs.docker.com/reference/commandline/cli/)
 or
 [remote API](https://docs.docker.com/reference/api/docker_remote_api/),
