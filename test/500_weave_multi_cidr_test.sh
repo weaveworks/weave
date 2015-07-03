@@ -28,7 +28,7 @@ assert_zone_records() {
 
     records=$(weave_on $HOST status | grep "^$CID") || true
     # Assert correct number of records exist
-    assert "echo $records | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | wc -l" $#
+    assert "echo $records | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | wc -l | tr -d '[:space:]'" $#
 
     # Assert correct records exist
     for ADDR; do
