@@ -10,6 +10,7 @@ import (
 	"io"
 	"math/rand"
 	"sort"
+	"time"
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam/address"
@@ -517,4 +518,8 @@ func (r *Ring) PeerNames() map[router.PeerName]struct{} {
 	}
 
 	return res
+}
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
 }
