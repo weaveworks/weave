@@ -2,10 +2,11 @@ package router
 
 import (
 	"bytes"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"log"
 	"net"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 type EthernetDecoder struct {

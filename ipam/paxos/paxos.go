@@ -2,6 +2,7 @@ package paxos
 
 import (
 	"fmt"
+
 	"github.com/weaveworks/weave/router"
 )
 
