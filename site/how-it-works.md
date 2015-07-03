@@ -29,8 +29,9 @@ encrypted, which carry encapsulated network packets. These
 
 Weave creates a network bridge on the host. Each container is
 connected to that bridge via a veth pair, the container side of which
-is given the IP address & netmask supplied by the proxy. Also
-connected to the bridge is the weave router container.
+is given an IP address & netmask supplied either by the user or
+Weave's IP address allocator. Also connected to the bridge is the
+weave router container.
 
 A weave router captures Ethernet packets from its bridge-connected
 interface in promiscuous mode, using 'pcap'. This typically excludes

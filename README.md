@@ -56,10 +56,10 @@ First start weave on $HOST1:
 
     host1$ weave launch && weave launch-dns && weave launch-proxy
 
-this runs the weave router, DNS and proxy, each in their own
-container. Next we configure our `DOCKER_HOST` environment variable to
-point to the proxy, so that containers launched via the docker command
-line are automatically attached to the weave network:
+this runs the weave router, DNS and Docker API proxy, each in their
+own container. Next we configure our `DOCKER_HOST` environment
+variable to point to the proxy, so that containers launched via the
+docker command line are automatically attached to the weave network:
 
     host1$ eval $(weave proxy-env)
 
@@ -92,11 +92,11 @@ available. Also, we can tell weave to connect to multiple peers by
 supplying multiple addresses, separated by spaces. And we can
 [add peers dynamically](http://docs.weave.works/weave/latest_release/features.html#dynamic-topologies).
 
-The router, DNS and proxy need to be started once per host. The
-relevant container images are pulled down on demand, but if you wish
-you can preload them by running `weave setup` - this is particularly
-useful for automated deployments, and ensures that there are no delays
-during later operations.
+The router, DNS and Docker API proxy need to be started once per
+host. The relevant container images are pulled down on demand, but if
+you wish you can preload them by running `weave setup` - this is
+particularly useful for automated deployments, and ensures that there
+are no delays during later operations.
 
 Now that we've got everything set up, let's see whether our containers
 can talk to each other...

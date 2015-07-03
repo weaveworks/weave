@@ -142,7 +142,7 @@ is waiting for a while before connecting again.
 There may also be further sections for the
 [IP address allocator](ipam.html#troubleshooting),
 [weaveDNS](weavedns.html#troubleshooting), and
-[proxy](proxy.html#troubleshooting).
+[Weave Docker API Proxy](proxy.html#troubleshooting).
 
 ### <a name="list-attached-containers"></a>List attached containers
 
