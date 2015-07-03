@@ -348,9 +348,9 @@ func (r *Ring) String() string {
 	return buffer.String()
 }
 
-// ReportFree is used by the allocator to tell the ring
-// how many free ips are in a given range, so that ChoosePeerToAskForSpace
-// can make more intelligent decisions.
+// ReportFree is used by the allocator to tell the ring how many free
+// ips are in a given range, so that ChoosePeersToAskForSpace can make
+// more intelligent decisions.
 func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
 	r.assertInvariants()
 	defer r.assertInvariants()
