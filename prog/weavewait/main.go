@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,20 +18,19 @@ func main() {
 	}
 
 	args := os.Args[1:]
-	signalWait := 20
+	signalWait := time.Duration(math.MaxInt64)
 	if args[0] == "-s" {
 		signalWait = 0
 		args = args[1:]
 	}
-	interfaceWait := 20 - signalWait
 
 	usr2 := make(chan os.Signal)
 	signal.Notify(usr2, syscall.SIGUSR2)
 	select {
 	case <-usr2:
-	case <-time.After(time.Duration(signalWait) * time.Second):
+	case <-time.After(signalWait):
 	}
-	_, err := net.EnsureInterface("ethwe", interfaceWait)
+	_, err := net.EnsureInterface("ethwe", -1)
 	checkErr(err)
 
 	binary, err := exec.LookPath(args[0])
