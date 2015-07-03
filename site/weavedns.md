@@ -28,8 +28,8 @@ hosts.
 
 WeaveDNS is deployed as a set of containers that communicate with each
 other over the weave network. One such container needs to be started
-on every weave host, either simultaneously with the router and proxy
-via `launch`:
+on every weave host, either simultaneously with the Weave router and
+Weave Docker API proxy via `launch`:
 
 ```bash
 host1$ weave launch
