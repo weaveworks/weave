@@ -890,9 +890,8 @@ show_addrs() {
 # TODO: Handle relative paths for args
 # TODO: Handle args with spaces
 tls_arg() {
-    filename=${3:-$2}
-    PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/$filename.pem"
-    PROXY_ARGS="$PROXY_ARGS --tls$2 /home/weave/tls/$filename.pem"
+    PROXY_VOLUMES="$PROXY_VOLUMES -v $2:/home/weave/tls/$3.pem"
+    PROXY_ARGS="$PROXY_ARGS $1 /home/weave/tls/$3.pem"
 }
 
 proxy_args() {
@@ -901,25 +900,25 @@ proxy_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
           --tlscacert)
+            tls_arg "$1" "$2" ca
             shift
-            tls_arg "$1" cacert ca
             ;;
           --tlscacert=*)
-            tls_arg "${1#*=}" cacert ca
+            tls_arg "${1%%=*}" "${1#*=}" ca
             ;;
           --tlscert)
+            tls_arg "$1" "$2" cert
             shift
-            tls_arg "$1" cert
             ;;
           --tlscert=*)
-            tls_arg "${1#*=}" cert
+            tls_arg "${1%%=*}" "${1#*=}" cert
             ;;
           --tlskey)
+            tls_arg "$1" "$2" key
             shift
-            tls_arg "$1" key
             ;;
           --tlskey=*)
-            tls_arg "${1#*=}" key
+            tls_arg "${1%%=*}" "${1#*=}" key
             ;;
           *)
             PROXY_ARGS="$PROXY_ARGS $1"
@@ -973,18 +972,18 @@ launch_router() {
     IPRANGE_SPECIFIED=
     while [ $# -gt 0 ] ; do
         case "$1" in
-            -password)
+            -password|--password)
                 [ $# -gt 1 ] || usage
                 WEAVE_PASSWORD="$2"
                 export WEAVE_PASSWORD
                 shift 2
                 ;;
-            -port)
+            -port|--port)
                 [ $# -gt 1 ] || usage
                 CONTAINER_PORT="$2"
                 shift 2
                 ;;
-            -iprange)
+            -iprange|--iprange|--ipalloc-range)
                 [ $# -gt 1 ] || usage
                 IPRANGE="$2"
                 IPRANGE_SPECIFIED=1
@@ -1000,7 +999,7 @@ launch_router() {
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
         IPRANGE="10.32.0.0/12"
         if command_exists netcheck && ! netcheck $IPRANGE ; then
-            echo "Default -iprange $IPRANGE overlaps with existing route on host." >&2
+            echo "Default --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
             echo "Please pick another range and set it on all hosts." >&2
             exit 1
         fi
@@ -1013,7 +1012,7 @@ launch_router() {
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
-        $WEAVE_DOCKER_ARGS $IMAGE -iface $CONTAINER_IFNAME -port $CONTAINER_PORT -name "$PEERNAME" -nickname "$(hostname)" -iprange "$IPRANGE" "$@")
+        $WEAVE_DOCKER_ARGS $IMAGE --iface $CONTAINER_IFNAME --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" --ipalloc-range "$IPRANGE" "$@")
     with_container_netns_or_die $CONTAINER launch
     wait_for_status $CONTAINER_NAME $HTTP_PORT
     if [ -n "$IPRANGE" ] ; then
@@ -1035,7 +1034,7 @@ launch_dns() {
         -p $DOCKER_BRIDGE_IP:53:53/udp \
         -e WEAVE_CIDR=none \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE -iface $CONTAINER_IFNAME -httpiface "$DNS_HTTP_IFNAME" "$@")
+        $WEAVEDNS_DOCKER_ARGS $DNS_IMAGE --iface $CONTAINER_IFNAME --http-iface "$DNS_HTTP_IFNAME" "$@")
     ipam_cidrs_or_die $DNS_CONTAINER $CIDR_ARGS
     with_container_netns_or_die $DNS_CONTAINER attach $ALL_CIDRS
     populate_dns

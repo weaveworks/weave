@@ -1,12 +1,12 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
 
+	"github.com/docker/docker/pkg/mflag"
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
@@ -42,28 +42,28 @@ func main() {
 		err             error
 	)
 
-	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.StringVar(&ifaceName, "iface", "", "name of interface to use for multicast")
-	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "path to Docker API socket")
-	flag.StringVar(&domain, "domain", weavedns.DefaultLocalDomain, "local domain (ie, 'weave.local.')")
-	flag.IntVar(&wait, "wait", -1, "number of seconds to wait for interfaces to come up (0=don't wait, -1=wait forever)")
-	flag.IntVar(&dnsPort, "dnsport", weavedns.DefaultServerPort, "port to listen to DNS requests")
-	flag.StringVar(&httpIfaceName, "httpiface", "", "interface on which to listen for HTTP requests (defaults to empty string which listens on all interfaces)")
-	flag.IntVar(&httpPort, "httpport", weavedns.DefaultHTTPPort, "port to listen to HTTP requests")
-	flag.IntVar(&cacheLen, "cache", weavedns.DefaultCacheLen, "cache length")
-	flag.IntVar(&ttl, "ttl", weavedns.DefaultLocalTTL, "TTL (in secs) for responses for local names")
-	flag.BoolVar(&watch, "watch", true, "watch the docker socket for container events")
-	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
+	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
+	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to use for multicast")
+	mflag.StringVar(&apiPath, []string{"#api", "-api"}, "unix:///var/run/docker.sock", "path to Docker API socket")
+	mflag.StringVar(&domain, []string{"#domain", "-domain"}, weavedns.DefaultLocalDomain, "local domain (ie, 'weave.local.')")
+	mflag.IntVar(&wait, []string{"#wait", "-wait"}, -1, "number of seconds to wait for interfaces to come up (0=don't wait, -1=wait forever)")
+	mflag.IntVar(&dnsPort, []string{"#dnsport", "#-dnsport", "-dns-port"}, weavedns.DefaultServerPort, "port to listen to DNS requests")
+	mflag.StringVar(&httpIfaceName, []string{"#httpiface", "#-httpiface", "-http-iface"}, "", "interface on which to listen for HTTP requests (empty string means listen on all interfaces)")
+	mflag.IntVar(&httpPort, []string{"#httpport", "#-httpport", "-http-port"}, weavedns.DefaultHTTPPort, "port to listen to HTTP requests")
+	mflag.IntVar(&cacheLen, []string{"#cache", "-cache"}, weavedns.DefaultCacheLen, "cache length")
+	mflag.IntVar(&ttl, []string{"#ttl", "-ttl"}, weavedns.DefaultLocalTTL, "TTL (in secs) for responses for local names")
+	mflag.BoolVar(&watch, []string{"#watch", "-watch"}, true, "watch the docker socket for container events")
+	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
 	// advanced options
-	flag.IntVar(&negTTL, "neg-ttl", 0, "negative TTL (in secs) for unanswered queries for local names (0=same value as -ttl")
-	flag.IntVar(&refreshInterval, "refresh", weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
-	flag.IntVar(&maxAnswers, "max-answers", weavedns.DefaultMaxAnswers, "maximum number of answers returned to clients (0=unlimited)")
-	flag.IntVar(&relevantTime, "relevant", weavedns.DefaultRelevantTime, "life time for info in the absence of queries (in secs)")
-	flag.IntVar(&udpbuf, "udpbuf", weavedns.DefaultUDPBuflen, "UDP buffer length")
-	flag.IntVar(&timeout, "timeout", weavedns.DefaultTimeout, "timeout for resolutions (in millisecs)")
-	flag.BoolVar(&cacheDisabled, "no-cache", false, "disable the cache")
-	flag.StringVar(&fallback, "fallback", "", "force a fallback server (ie, '8.8.8.8:53') (instead of /etc/resolv.conf values)")
-	flag.Parse()
+	mflag.IntVar(&negTTL, []string{"#neg-ttl", "-neg-ttl"}, 0, "negative TTL (in secs) for unanswered queries for local names (0=same value as --ttl")
+	mflag.IntVar(&refreshInterval, []string{"#refresh", "-refresh"}, weavedns.DefaultRefreshInterval, "refresh interval (in secs) for local names (0=disable)")
+	mflag.IntVar(&maxAnswers, []string{"#max-answers", "#-max-answers", "-dns-max-answers"}, weavedns.DefaultMaxAnswers, "maximum number of answers returned to clients (0=unlimited)")
+	mflag.IntVar(&relevantTime, []string{"#relevant", "-relevant"}, weavedns.DefaultRelevantTime, "life time for info in the absence of queries (in secs)")
+	mflag.IntVar(&udpbuf, []string{"#udpbuf", "#-udpbuf", "-dns-udpbuf"}, weavedns.DefaultUDPBuflen, "UDP buffer length for DNS")
+	mflag.IntVar(&timeout, []string{"#timeout", "#-timeout", "-dns-timeout"}, weavedns.DefaultTimeout, "timeout for resolutions (in millisecs)")
+	mflag.BoolVar(&cacheDisabled, []string{"#no-cache", "-no-cache"}, false, "disable the cache")
+	mflag.StringVar(&fallback, []string{"#fallback", "#-fallback", "-dns-fallback"}, "", "force a fallback server (ie, '8.8.8.8:53') (instead of /etc/resolv.conf values)")
+	mflag.Parse()
 
 	if justVersion {
 		fmt.Printf("weave DNS %s\n", version)
