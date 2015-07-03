@@ -92,7 +92,11 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 	}
 
 	if len(container.Entrypoint) == 0 || container.Entrypoint[0] != weaveWaitEntrypoint[0] {
-		container.Entrypoint = append(weaveWaitEntrypoint, container.Entrypoint...)
+		entrypoint := weaveWaitEntrypoint
+		if i.proxy.NoRewriteHosts {
+			entrypoint = append(entrypoint, "-h")
+		}
+		container.Entrypoint = append(entrypoint, container.Entrypoint...)
 	}
 
 	return nil

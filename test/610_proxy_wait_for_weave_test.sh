@@ -19,4 +19,7 @@ COMMITTED_IMAGE=$(proxy docker_on $HOST1 commit c1)
 assert_raises "proxy docker_on $HOST1 run --name c2 $COMMITTED_IMAGE"
 assert "entrypoint c2" "$(entrypoint $COMMITTED_IMAGE)"
 
+# Check weave IP is first ip returned, so java (etc) prefer weave.
+assert "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.1/24' $BASE_IMAGE hostname -i | cut -d' ' -f1" "10.2.1.1"
+
 end_suite
