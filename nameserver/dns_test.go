@@ -12,7 +12,7 @@ import (
 // Check that we can prune an answer
 func TestPrune(t *testing.T) {
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestPrune starting")
+	Log.Infoln("TestPrune starting")
 
 	questionMsg := new(dns.Msg)
 	questionMsg.SetQuestion("name", dns.TypeA)

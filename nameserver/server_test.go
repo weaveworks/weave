@@ -41,7 +41,7 @@ func TestUDPDNSServer(t *testing.T) {
 	testCIDR1 := testAddr1 + "/24"
 
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestUDPDNSServer starting")
+	Log.Infoln("TestUDPDNSServer starting")
 
 	zone, err := NewZoneDb(ZoneConfig{})
 	require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestTCPDNSServer(t *testing.T) {
 	)
 
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestTCPDNSServer starting")
+	Log.Infoln("TestTCPDNSServer starting")
 
 	zone, err := NewZoneDb(ZoneConfig{})
 	require.NoError(t, err)

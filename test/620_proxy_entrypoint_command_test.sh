@@ -26,7 +26,7 @@ run_container "grep ^1$ /sys/class/net/ethwe/carrier"
 build_image false '["/bin/false"]' ''
 run_container "--entrypoint='grep' false ^1$ /sys/class/net/ethwe/carrier"
 
-weave_on $HOST1 launch -iprange 10.2.2.0/24
+weave_on $HOST1 launch-router -iprange 10.2.2.0/24
 docker_on $HOST1 kill weaveproxy
 weave_on $HOST1 launch-proxy
 

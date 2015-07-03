@@ -5,21 +5,22 @@ import (
 	"crypto/rand"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"net"
+
+	. "github.com/weaveworks/weave/common"
 )
 
 var void = struct{}{}
 
 func checkFatal(e error) {
 	if e != nil {
-		log.Fatal(e)
+		Log.Fatal(e)
 	}
 }
 
 func checkWarn(e error) {
 	if e != nil {
-		log.Println(e)
+		Log.Warnln(e)
 	}
 }
 

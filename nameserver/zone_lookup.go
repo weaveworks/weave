@@ -63,7 +63,7 @@ func (zone *ZoneDb) LookupName(name string) (res []ZoneRecord, err error) {
 
 	// note: LookupName() is usually called from the mDNS server, so we do not touch the name
 	name = dns.Fqdn(name)
-	Debug.Printf("[zonedb] Looking for name '%s' in local database", name)
+	Log.Debugf("[zonedb] Looking for name '%s' in local database", name)
 	return zone.lookup(name, func(ns *nameSet) []*recordEntry { return ns.getEntriesForName(name) })
 }
 
@@ -78,23 +78,23 @@ func (zone *ZoneDb) LookupInaddr(inaddr string) (res []ZoneRecord, err error) {
 	if err != nil {
 		return nil, newParseError("lookup address", inaddr)
 	}
-	Debug.Printf("[zonedb] Looking for address in local database: '%s' (%s)", revIPv4, inaddr)
+	Log.Debugf("[zonedb] Looking for address in local database: '%s' (%s)", revIPv4, inaddr)
 	return zone.lookup(inaddr, func(ns *nameSet) []*recordEntry { return ns.getEntriesForIP(revIPv4) })
 }
 
 // Perform a domain lookup with mDNS
 func (zone *ZoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []ZoneRecord, err error) {
 	// no local results have been obtained in the local database: try with a mDNS query
-	Debug.Printf("[zonedb] '%s' not in local database... trying with mDNS", target)
+	Log.Debugf("[zonedb] '%s' not in local database... trying with mDNS", target)
 	lanswers, err := lfun(target)
 	if err != nil {
-		Debug.Printf("[zonedb] mDNS lookup error for '%s': %s", target, err)
+		Log.Debugf("[zonedb] mDNS lookup error for '%s': %s", target, err)
 		return nil, err
 	}
 
 	// if the request has been successful, save the IP in the local database and return the corresponding ZoneRecord
 	// (we do not get the remote ident in the mDNS reply, so we save it in a "remote" ident)
-	Debug.Printf("[zonedb] adding '%s' (obtained with mDNS) to '%s'", lanswers, target)
+	Log.Debugf("[zonedb] adding '%s' (obtained with mDNS) to '%s'", lanswers, target)
 	res = make([]ZoneRecord, len(lanswers))
 	zone.mx.Lock()
 	now := zone.clock.Now()
@@ -104,7 +104,7 @@ func (zone *ZoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []Zone
 		r, err := remoteIdent.addIPToName(answer, now)
 		if err != nil {
 			zone.mx.Unlock()
-			Warning.Printf("[zonedb] '%s' insertion for %s failed: %s", answer, target, err)
+			Log.Warningf("[zonedb] '%s' insertion for %s failed: %s", answer, target, err)
 			return nil, err
 		}
 		uniq.add(r)
@@ -118,7 +118,7 @@ func (zone *ZoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []Zone
 // The name can be resolved locally with the local database or with some other resolution method (eg, a mDNS query)
 func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) {
 	name = dns.Fqdn(name)
-	Debug.Printf("[zonedb] Looking for name '%s' in local(&remote) database", name)
+	Log.Debugf("[zonedb] Looking for name '%s' in local(&remote) database", name)
 
 	zone.mx.Lock()
 	now := zone.clock.Now()
@@ -128,7 +128,7 @@ func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 			// filter the entries with expired TTL
 			// locally introduced entries are never expired: they always have TTL=0
 			if ze.hasExpired(now) {
-				Debug.Printf("[zonedb] '%s': expired entry '%s' ignored: removing", name, ze)
+				Log.Debugf("[zonedb] '%s': expired entry '%s' ignored: removing", name, ze)
 				nameset.deleteNameIP(name, net.IP{})
 			} else {
 				uniq.add(ze)
@@ -141,7 +141,7 @@ func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 	zone.mx.Unlock()
 
 	if len(uniq) > 0 {
-		Debug.Printf("[zonedb] '%s' resolved in local database", name)
+		Log.Debugf("[zonedb] '%s' resolved in local database", name)
 		res = uniq.toSlice()
 	} else {
 		res, err = zone.domainLookup(name, zone.mdnsCli.LookupName)
@@ -163,7 +163,7 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 		return nil, newParseError("lookup address", inaddr)
 	}
 
-	Debug.Printf("[zonedb] Looking for address in local(&remote) database: '%s' (%s)", revIPv4, inaddr)
+	Log.Debugf("[zonedb] Looking for address in local(&remote) database: '%s' (%s)", revIPv4, inaddr)
 
 	zone.mx.Lock()
 	now := zone.clock.Now()
@@ -173,7 +173,7 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 			// filter the entries with expired TTL
 			// locally introduced entries are never expired: they always have TTL=0
 			if ze.hasExpired(now) {
-				Debug.Printf("[zonedb] '%s': expired entry '%s' ignored: removing", revIPv4, ze)
+				Log.Debugf("[zonedb] '%s': expired entry '%s' ignored: removing", revIPv4, ze)
 				nameset.deleteNameIP("", revIPv4.toNetIP())
 			} else {
 				uniq.add(ze)
@@ -186,7 +186,7 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 	zone.mx.Unlock()
 
 	if len(uniq) > 0 {
-		Debug.Printf("[zonedb] '%s' resolved in local database", inaddr)
+		Log.Debugf("[zonedb] '%s' resolved in local database", inaddr)
 		res = uniq.toSlice()
 	} else {
 		res, err = zone.domainLookup(inaddr, zone.mdnsCli.LookupInaddr)
@@ -243,7 +243,7 @@ func (zone *ZoneDb) startUpdatingName(name string) {
 			n.lastRefreshTime = now
 			zone.mx.Unlock()
 
-			Debug.Printf("[zonedb] Creating new immediate refresh request for '%s'", name)
+			Log.Debugf("[zonedb] Creating new immediate refresh request for '%s'", name)
 			zone.refreshScheds.Add(func() time.Time { return zone.updater(name) }, now)
 		} else {
 			zone.mx.Unlock()
@@ -261,7 +261,7 @@ func (zone *ZoneDb) updater(name string) (nextTime time.Time) {
 
 	// if nobody has asked for this name for long time, just forget about it...
 	if !zone.IsNameRelevant(name) || zone.IsNameExpired(name) {
-		Debug.Printf("[zonedb] '%s' seem to be irrelevant now: removing any remote information", name)
+		Log.Debugf("[zonedb] '%s' seem to be irrelevant now: removing any remote information", name)
 		deleteRemoteInfo()
 		return
 	}
@@ -269,7 +269,7 @@ func (zone *ZoneDb) updater(name string) (nextTime time.Time) {
 	// perform the refresh for this name
 	fullName := dns.Fqdn(name)
 	startTime := zone.clock.Now()
-	Debug.Printf("[zonedb] Refreshing name '%s' with mDNS...", fullName)
+	Log.Debugf("[zonedb] Refreshing name '%s' with mDNS...", fullName)
 	res, _ := zone.mdnsCli.InsistentLookupName(fullName)
 	if res != nil && len(res) > 0 {
 		numIps := len(res)
@@ -277,14 +277,14 @@ func (zone *ZoneDb) updater(name string) (nextTime time.Time) {
 		now := zone.clock.Now()
 		added, removed := zone.getNameSet(defaultRemoteIdent).getName(name, true).updateIPs(res, now)
 		zone.mx.Unlock()
-		Debug.Printf("[zonedb] Obtained %d IPs for name '%s' with mDNS: %d added, %d removed",
+		Log.Debugf("[zonedb] Obtained %d IPs for name '%s' with mDNS: %d added, %d removed",
 			numIps, name, added, removed)
 
 		// once the name has been updated, we re-schedule the update
 		nextTime = startTime.Add(zone.refreshInterval)
-		Debug.Printf("[zonedb] Rescheduling update for '%s' in %s", name, nextTime.Sub(zone.clock.Now()))
+		Log.Debugf("[zonedb] Rescheduling update for '%s' in %s", name, nextTime.Sub(zone.clock.Now()))
 	} else {
-		Debug.Printf("[zonedb] nobody knows about '%s'... removing", name)
+		Log.Debugf("[zonedb] nobody knows about '%s'... removing", name)
 		deleteRemoteInfo()
 	}
 	return

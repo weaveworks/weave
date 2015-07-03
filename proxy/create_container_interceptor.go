@@ -13,6 +13,8 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 )
 
+const MaxDockerHostname = 64
+
 type createContainerInterceptor struct{ proxy *Proxy }
 
 type createContainerRequestBody struct {
@@ -45,7 +47,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 	}
 
 	if cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config); ok {
-		Info.Printf("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
+		Log.Infof("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
 		if container.HostConfig == nil {
 			container.HostConfig = &docker.HostConfig{}
 		}
@@ -56,7 +58,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
-		if err := i.setWeaveDNS(&container, r); err != nil {
+		if err := i.setWeaveDNS(&container, r.URL.Query().Get("name")); err != nil {
 			return err
 		}
 	}
@@ -96,7 +98,7 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 	return nil
 }
 
-func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody, r *http.Request) error {
+func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody, name string) error {
 	if i.proxy.WithoutDNS {
 		return nil
 	}
@@ -108,11 +110,15 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 
 	container.HostConfig.DNS = append(container.HostConfig.DNS, i.proxy.dockerBridgeIP)
 
-	name := r.URL.Query().Get("name")
 	if container.Hostname == "" && name != "" {
-		container.Hostname = name
 		// Strip trailing period because it's unusual to see it used on the end of a host name
-		container.Domainname = strings.TrimSuffix(dnsDomain, ".")
+		trimmedDNSDomain := strings.TrimSuffix(dnsDomain, ".")
+		if len(name)+1+len(trimmedDNSDomain) > MaxDockerHostname {
+			Log.Warningf("Container name [%s] too long to be used as hostname", name)
+		} else {
+			container.Hostname = name
+			container.Domainname = trimmedDNSDomain
+		}
 	}
 
 	if len(container.HostConfig.DNSSearch) == 0 {

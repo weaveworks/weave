@@ -15,7 +15,7 @@ import (
 // Check that the cache keeps its intended capacity constant
 func TestCacheLength(t *testing.T) {
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestCacheLength starting")
+	Log.Infoln("TestCacheLength starting")
 
 	const cacheLen = 128
 
@@ -56,9 +56,9 @@ func TestCacheLength(t *testing.T) {
 // Check that the cache entries are ok
 func TestCacheEntries(t *testing.T) {
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestCacheEntries starting")
+	Log.Infoln("TestCacheEntries starting")
 
-	Info.Println("Checking cache consistency")
+	Log.Infoln("Checking cache consistency")
 
 	const cacheLen = 128
 	clk := clock.NewMock()
@@ -213,7 +213,7 @@ func TestCacheEntries(t *testing.T) {
 	require.True(t, err == errNoLocalReplies, "Get() error with CacheNoLocalReplies")
 
 	clk.Add(time.Duration(DefaultLocalTTL/2) * time.Second)
-	t.Logf("Checking that we get an expired response after %f seconds", DefaultLocalTTL)
+	t.Logf("Checking that we get an expired response after %d seconds", DefaultLocalTTL)
 	clk.Add(time.Second * time.Duration(DefaultLocalTTL+1))
 	t.Logf("Checking that we get an expired response after %d seconds", DefaultLocalTTL)
 	resp, err = l.Get(questionMsg3, minUDPSize)

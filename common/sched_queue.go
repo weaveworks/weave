@@ -76,7 +76,7 @@ func NewSchedQueue(clock clock.Clock) *SchedQueue {
 // Start starts the scheduled queue
 func (cq *SchedQueue) Start() {
 	go func() {
-		defer func() { Debug.Printf("[sched-q] Quitting (%d calls pending)", len(cq.callablesH)) }()
+		defer func() { Log.Debugf("[sched-q] Quitting (%d calls pending)", len(cq.callablesH)) }()
 
 		var now time.Time
 		timer := cq.clock.Timer(time.Duration(math.MaxInt64))
@@ -116,14 +116,14 @@ func (cq *SchedQueue) Start() {
 
 // Stop stops the scheduled queue
 func (cq *SchedQueue) Stop() {
-	Debug.Printf("[sched-q] Stopping...")
+	Log.Debugf("[sched-q] Stopping...")
 	cq.closeChan <- true
 }
 
 // Add schedules a call.
 // The callable should not modify the scheduled queue in any way.
 func (cq *SchedQueue) Add(c callable, t time.Time) {
-	Debug.Printf("[sched-q] Adding call at %s", t)
+	Log.Debugf("[sched-q] Adding call at %s", t)
 	ce := schedCall{c: c, t: t}
 	cq.schedChan <- &ce
 }

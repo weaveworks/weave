@@ -37,7 +37,7 @@ func TestClientServerSimpleQuery(t *testing.T) {
 		receivedAddr = nil
 		receivedName = ""
 		receivedCount = 0
-		Debug.Printf("Sending query...")
+		Log.Debugf("Sending query...")
 		switch querytype {
 		case dns.TypeA:
 			r, err := mdnsCli.LookupName(name)
@@ -60,7 +60,7 @@ func TestClientServerSimpleQuery(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 
-	Debug.Printf("Query: %s dns.TypeA", testRecord1.Name())
+	Log.Debugf("Query: %s dns.TypeA", testRecord1.Name())
 	sendQuery(testRecord1.Name(), dns.TypeA)
 	if receivedCount != 1 {
 		t.Fatalf("Unexpected result count %d for %s", receivedCount, testRecord1.Name())
@@ -69,13 +69,13 @@ func TestClientServerSimpleQuery(t *testing.T) {
 		t.Fatalf("Unexpected result %s for %s", receivedAddr, testRecord1.Name())
 	}
 
-	Debug.Printf("Query: testfail.weave. dns.TypeA")
+	Log.Debugf("Query: testfail.weave. dns.TypeA")
 	sendQuery("testfail.weave.", dns.TypeA)
 	if receivedCount != 0 {
 		t.Fatalf("Unexpected result count %d for testfail.weave", receivedCount)
 	}
 
-	Debug.Printf("Query: %s dns.TypePTR", testInAddr1)
+	Log.Debugf("Query: %s dns.TypePTR", testInAddr1)
 	sendQuery(testInAddr1, dns.TypePTR)
 	if receivedCount != 1 {
 		t.Fatalf("Expected an answer to %s, got %d answers", testInAddr1, receivedCount)
@@ -127,7 +127,7 @@ func TestClientServerInsistentQuery(t *testing.T) {
 		receivedAddrs = nil
 		receivedNames = nil
 		receivedCount = 0
-		Debug.Printf("Sending query...")
+		Log.Debugf("Sending query...")
 		switch querytype {
 		case dns.TypeA:
 			receivedAddrs, err = mdnsCli.InsistentLookupName(name)
@@ -144,25 +144,25 @@ func TestClientServerInsistentQuery(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond) // Allow for server to get going
 
-	Debug.Printf("Query: %s dns.TypeA", testRecord1.Name())
+	Log.Debugf("Query: %s dns.TypeA", testRecord1.Name())
 	sendQuery(testRecord1.Name(), dns.TypeA)
 	if receivedCount != 2 {
 		t.Fatalf("Unexpected result count %d for %s", receivedCount, testRecord1.Name())
 	}
 
-	Debug.Printf("Query: testfail.weave. dns.TypeA")
+	Log.Debugf("Query: testfail.weave. dns.TypeA")
 	sendQuery("testfail.weave.", dns.TypeA)
 	if receivedCount != 0 {
 		t.Fatalf("Unexpected result count %d for testfail.weave", receivedCount)
 	}
 
-	Debug.Printf("Query: %s dns.TypePTR", testInAddr1)
+	Log.Debugf("Query: %s dns.TypePTR", testInAddr1)
 	sendQuery(testInAddr1, dns.TypePTR)
 	if receivedCount != 1 {
 		t.Fatalf("Expected an answer to %s, got %d answers", testInAddr1, receivedCount)
 	}
 
-	Debug.Printf("Query: %s dns.TypePTR", testInAddr2)
+	Log.Debugf("Query: %s dns.TypePTR", testInAddr2)
 	sendQuery(testInAddr2, dns.TypePTR)
 	if receivedCount != 1 {
 		t.Fatalf("Expected an answer to %s, got %d answers", testInAddr2, receivedCount)

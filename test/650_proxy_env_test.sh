@@ -13,6 +13,6 @@ assert_raises "docker $(weave_on $HOST1 proxy-config) $CMD"
 # Check we can use the weave script through the proxy
 assert_raises "eval '$(weave_on $HOST1 proxy-env)' ; $WEAVE version"
 assert_raises "eval '$(weave_on $HOST1 proxy-env)' ; $WEAVE ps"
-assert_raises "eval '$(weave_on $HOST1 proxy-env)' ; $WEAVE launch"
+assert_raises "eval '$(weave_on $HOST1 proxy-env)' ; $WEAVE launch-router"
 
 end_suite

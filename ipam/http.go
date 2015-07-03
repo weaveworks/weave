@@ -13,7 +13,7 @@ import (
 
 func badRequest(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusBadRequest)
-	common.Warning.Println("[allocator]:", err.Error())
+	common.Log.Warningln("[allocator]:", err.Error())
 }
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
@@ -79,7 +79,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			return
 		}
 		if dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
-			common.Info.Printf("[allocator] '%s' is not running: freeing %s", ident, addr)
+			common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, addr)
 			alloc.Free(ident, addr)
 			return
 		}
@@ -96,7 +96,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			return
 		}
 		if dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
-			common.Info.Printf("[allocator] '%s' is not running: freeing %s", ident, newAddr)
+			common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, newAddr)
 			alloc.Free(ident, newAddr)
 			return
 		}

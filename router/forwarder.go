@@ -4,8 +4,8 @@ import (
 	"syscall"
 	"time"
 
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 type ForwardedFrame struct {
@@ -40,16 +40,12 @@ func (conn *LocalConnection) ensureForwarders() error {
 
 	forwarder := NewForwarder(conn, encryptor, udpSender, DefaultPMTU)
 	forwarderDF := NewForwarderDF(conn, encryptorDF, udpSenderDF, DefaultPMTU)
-	effectivePMTU := forwarderDF.unverifiedPMTU
-	forwarder.Start()
-	forwarderDF.Start()
 
 	// Various fields in the conn struct are read by other processes,
 	// so we have to use locks.
 	conn.Lock()
 	conn.forwarder = forwarder
 	conn.forwarderDF = forwarderDF
-	conn.effectivePMTU = effectivePMTU
 	conn.Unlock()
 
 	return nil
@@ -63,11 +59,23 @@ func (conn *LocalConnection) stopForwarders() {
 	conn.forwarderDF.Shutdown()
 }
 
-// Called from peer.Relay[Broadcast] which is itself invoked from
-// router (both UDP listener process and sniffer process). Also called
-// from connection's heartbeat process, and from the connection's TCP
-// receiver process.
-func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *EthernetDecoder) error {
+// Called from connection's actor process, and from the connection's
+// TCP receiver process.
+func (conn *LocalConnection) Send(df bool, frameBytes []byte) error {
+	frame := &ForwardedFrame{
+		srcPeer: conn.local,
+		dstPeer: conn.remote,
+		frame:   frameBytes}
+	return conn.forward(frame, nil, df)
+}
+
+// Called from LocalPeer.Relay[Broadcast] which is itself invoked from
+// router (both UDP listener process and sniffer process).
+func (conn *LocalConnection) Forward(frame *ForwardedFrame, dec *EthernetDecoder) error {
+	return conn.forward(frame, dec, dec != nil && dec.DF())
+}
+
+func (conn *LocalConnection) forward(frame *ForwardedFrame, dec *EthernetDecoder, df bool) error {
 	conn.RLock()
 	var (
 		forwarder     = conn.forwarder
@@ -81,6 +89,7 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		conn.Log("Cannot forward frame yet - awaiting contact")
 		return nil
 	}
+
 	// We could use non-blocking channel sends here, i.e. drop frames
 	// on the floor when the forwarder is busy. This would allow our
 	// caller - the capturing loop in the router - to read frames more
@@ -109,11 +118,10 @@ func (conn *LocalConnection) Forward(df bool, frame *ForwardedFrame, dec *Ethern
 		forwarderDF.Forward(frame)
 		return nil
 	}
-	conn.Router.LogFrame("Fragmenting", frame.frame, &dec.eth)
 	// We can't trust the stack to fragment, we have IP, and we
 	// have a frame that's too big for the MTU, so we have to
 	// fragment it ourself.
-	return fragment(dec.eth, dec.ip, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
+	return fragment(dec.Eth, dec.IP, effectivePMTU, frame, func(segFrame *ForwardedFrame) {
 		forwarderDF.Forward(segFrame)
 	})
 }
@@ -195,20 +203,18 @@ type Forwarder struct {
 }
 
 func NewForwarder(conn *LocalConnection, enc Encryptor, udpSender UDPSender, pmtu int) *Forwarder {
-	return &Forwarder{
+	ch := make(chan *ForwardedFrame, ChannelSize)
+	finished := make(chan struct{})
+	fwd := &Forwarder{
 		conn:             conn,
+		ch:               ch,
+		finished:         finished,
 		enc:              enc,
 		udpSender:        udpSender,
 		maxPayload:       pmtu - UDPOverhead,
 		processSendError: func(err error) error { return err }}
-}
-
-func (fwd *Forwarder) Start() {
-	ch := make(chan *ForwardedFrame, ChannelSize)
-	fwd.ch = ch
-	finished := make(chan struct{})
-	fwd.finished = finished
 	go fwd.run(ch, finished)
+	return fwd
 }
 
 func (fwd *Forwarder) Shutdown() {
@@ -275,7 +281,7 @@ func (fwd *Forwarder) accumulateAndSendFrames(ch <-chan *ForwardedFrame, frame *
 }
 
 func (fwd *Forwarder) logDrop(frame *ForwardedFrame) {
-	fwd.conn.Log("Dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", fwd.maxPayload+UDPOverhead-fwd.effectiveOverhead())
+	fwd.conn.ErrorLog("Dropping too big frame during forwarding: frame len:", len(frame.frame), "; effective PMTU:", fwd.maxPayload+UDPOverhead-fwd.effectiveOverhead())
 }
 
 func (fwd *Forwarder) appendFrame(frame *ForwardedFrame) bool {
@@ -310,25 +316,23 @@ type ForwarderDF struct {
 }
 
 func NewForwarderDF(conn *LocalConnection, enc Encryptor, udpSender UDPSender, pmtu int) *ForwarderDF {
+	ch := make(chan *ForwardedFrame, ChannelSize)
+	finished := make(chan struct{})
+	verifyPMTU := make(chan int, ChannelSize)
 	fwd := &ForwarderDF{
 		Forwarder: Forwarder{
 			conn:       conn,
+			ch:         ch,
+			finished:   finished,
 			enc:        enc,
 			udpSender:  udpSender,
-			maxPayload: pmtu - UDPOverhead}}
+			maxPayload: pmtu - UDPOverhead},
+		verifyPMTU: verifyPMTU}
 	fwd.Forwarder.processSendError = fwd.processSendError
 	fwd.unverifiedPMTU = pmtu - fwd.effectiveOverhead()
-	return fwd
-}
-
-func (fwd *ForwarderDF) Start() {
-	ch := make(chan *ForwardedFrame, ChannelSize)
-	fwd.ch = ch
-	finished := make(chan struct{})
-	fwd.finished = finished
-	verifyPMTU := make(chan int, ChannelSize)
-	fwd.verifyPMTU = verifyPMTU
+	conn.setEffectivePMTU(fwd.unverifiedPMTU)
 	go fwd.run(ch, finished, verifyPMTU)
+	return fwd
 }
 
 func (fwd *ForwarderDF) PMTUVerified(pmtu int) {

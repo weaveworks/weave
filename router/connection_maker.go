@@ -3,10 +3,11 @@ package router
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"time"
+
+	. "github.com/weaveworks/weave/common"
 )
 
 const (
@@ -37,19 +38,17 @@ type Target struct {
 type ConnectionMakerAction func() bool
 
 func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int, discovery bool) *ConnectionMaker {
-	return &ConnectionMaker{
+	actionChan := make(chan ConnectionMakerAction, ChannelSize)
+	cm := &ConnectionMaker{
 		ourself:     ourself,
 		peers:       peers,
 		port:        port,
 		discovery:   discovery,
 		directPeers: peerAddrs{},
-		targets:     make(map[string]*Target)}
-}
-
-func (cm *ConnectionMaker) Start() {
-	actionChan := make(chan ConnectionMakerAction, ChannelSize)
-	cm.actionChan = actionChan
+		targets:     make(map[string]*Target),
+		actionChan:  actionChan}
 	go cm.queryLoop(actionChan)
+	return cm
 }
 
 func (cm *ConnectionMaker) InitiateConnections(peers []string, replace bool) []error {
@@ -300,9 +299,9 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 }
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
-	log.Printf("->[%s] attempting connection\n", address)
+	Log.Printf("->[%s] attempting connection\n", address)
 	if err := cm.ourself.CreateConnection(address, acceptNewPeer); err != nil {
-		log.Printf("->[%s] error during connection attempt: %v\n", address, err)
+		Log.Errorf("->[%s] error during connection attempt: %v\n", address, err)
 		cm.ConnectionTerminated(address, err)
 	}
 }

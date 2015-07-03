@@ -351,42 +351,45 @@ func TestGossip(t *testing.T) {
 	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
 }
 
+func assertPeersWithSpace(t *testing.T, ring *Ring, start, end address.Address, expected int) []router.PeerName {
+	peers := ring.ChoosePeersToAskForSpace(start, end)
+	require.Equal(t, expected, len(peers))
+	return peers
+}
+
 func TestFindFree(t *testing.T) {
 	ring1 := New(start, end, peer1name)
 
-	_, err := ring1.ChoosePeerToAskForSpace(start, end)
-	require.True(t, err == ErrNoFreeSpace, "Expected ErrNoFreeSpace")
+	assertPeersWithSpace(t, ring1, start, end, 0)
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
-	_, err = ring1.ChoosePeerToAskForSpace(start, end)
-	require.True(t, err == ErrNoFreeSpace, "Expected ErrNoFreeSpace")
+	assertPeersWithSpace(t, ring1, start, end, 0)
 
 	// We shouldn't return outselves
 	ring1.ReportFree(map[address.Address]address.Offset{start: 10})
-	_, err = ring1.ChoosePeerToAskForSpace(start, end)
-	require.True(t, err == ErrNoFreeSpace, "Expected ErrNoFreeSpace")
+	assertPeersWithSpace(t, ring1, start, end, 0)
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 1},
 		{Token: middle, Peer: peer1name, Free: 1}}
-	_, err = ring1.ChoosePeerToAskForSpace(start, end)
-	require.True(t, err == ErrNoFreeSpace, "Expected ErrNoFreeSpace")
+	assertPeersWithSpace(t, ring1, start, end, 0)
 	ring1.assertInvariants()
 
 	// We should return others
+	var peers []router.PeerName
+
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 1}}
-	peer, err := ring1.ChoosePeerToAskForSpace(start, end)
-	require.NoError(t, err)
-	require.Equal(t, peer2name, peer)
+	peers = assertPeersWithSpace(t, ring1, start, end, 1)
+	require.Equal(t, peer2name, peers[0])
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 1},
 		{Token: middle, Peer: peer3name, Free: 1}}
-	peer, err = ring1.ChoosePeerToAskForSpace(start, middle)
-	require.NoError(t, err)
-	require.Equal(t, peer2name, peer)
+	peers = assertPeersWithSpace(t, ring1, start, middle, 1)
+	require.Equal(t, peer2name, peers[0])
 
-	peer, err = ring1.ChoosePeerToAskForSpace(middle, end)
-	require.NoError(t, err)
-	require.Equal(t, peer3name, peer)
+	peers = assertPeersWithSpace(t, ring1, middle, end, 1)
+	require.Equal(t, peer3name, peers[0])
+
+	assertPeersWithSpace(t, ring1, start, end, 2)
 	ring1.assertInvariants()
 }
 
@@ -605,7 +608,7 @@ func TestFuzzRingHard(t *testing.T) {
 
 	addPeer := func() {
 		peer, _ := router.PeerNameFromString(fmt.Sprintf("%02d:%02d:00:00:00:00", nextPeerID/10, nextPeerID%10))
-		common.Debug.Printf("%s: Adding peer", peer)
+		common.Log.Debugf("%s: Adding peer", peer)
 		nextPeerID++
 		peers = append(peers, peer)
 		rings = append(rings, New(start, end, peer))
@@ -655,7 +658,7 @@ func TestFuzzRingHard(t *testing.T) {
 			require.NoError(t, otherRing.Merge(*ring))
 		}
 
-		common.Debug.Printf("%s: transferring from peer %s", otherPeername, peername)
+		common.Log.Debugf("%s: transferring from peer %s", otherPeername, peername)
 		otherRing.Transfer(peername, peername)
 
 		// And now tell everyone about the transfer - rmpeer is
@@ -684,12 +687,12 @@ func TestFuzzRingHard(t *testing.T) {
 			size := address.Subtract(rangeToSplit.End, rangeToSplit.Start)
 			ipInRange := address.Add(rangeToSplit.Start, address.Offset(rand.Intn(int(size))))
 			_, peerToGiveTo, _ := randomPeer(-1)
-			common.Debug.Printf("%s: Granting [%v, %v) to %s", ring.Peer, ipInRange, rangeToSplit.End, peerToGiveTo)
+			common.Log.Debugf("%s: Granting [%v, %v) to %s", ring.Peer, ipInRange, rangeToSplit.End, peerToGiveTo)
 			ring.GrantRangeToHost(ipInRange, rangeToSplit.End, peerToGiveTo)
 
 			// Now 'gossip' this to a random host (note, note could be same host as above)
 			otherIndex, _, otherRing := randomPeer(-1)
-			common.Debug.Printf("%s: 'Gossiping' to %s", ring.Peer, otherRing.Peer)
+			common.Log.Debugf("%s: 'Gossiping' to %s", ring.Peer, otherRing.Peer)
 			require.NoError(t, otherRing.Merge(*ring))
 
 			theRanges[indexWithRanges] = ring.OwnedRanges()
@@ -708,7 +711,7 @@ func TestFuzzRingHard(t *testing.T) {
 		}
 		ring1 := ringsWithEntries[rand.Intn(len(ringsWithEntries))]
 		ring2index, _, ring2 := randomPeer(-1)
-		common.Debug.Printf("%s: 'Gossiping' to %s", ring1.Peer, ring2.Peer)
+		common.Log.Debugf("%s: 'Gossiping' to %s", ring1.Peer, ring2.Peer)
 		require.NoError(t, ring2.Merge(*ring1))
 		theRanges[ring2index] = ring2.OwnedRanges()
 	}

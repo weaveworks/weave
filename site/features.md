@@ -57,8 +57,10 @@ our data centre.
 
 ### <a name="docker"></a>Seamless Docker integration
 
-Weave includes a [proxy](proxy.html) so that containers launched via
-the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or
+Weave includes a [Docker API proxy](proxy.html) so that containers
+launched via the Docker
+[command-line interface](https://docs.docker.com/reference/commandline/cli/)
+or
 [remote API](https://docs.docker.com/reference/api/docker_remote_api/)
 are attached to the weave network before they begin execution.
 
@@ -141,10 +143,8 @@ Let's begin by configuring weave's allocator to manage multiple
 subnets:
 
     host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24
-    host1$ weave launch-dns && weave launch-proxy
     host1$ eval $(weave proxy-env)
     host2$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24 $HOST1
-    host2$ weave launch-dns && weave launch-proxy
     host2$ eval $(weave proxy-env)
 
 This delegates the entire 10.2.0.0/16 subnet to weave, and instructs

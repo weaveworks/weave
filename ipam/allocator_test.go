@@ -168,7 +168,7 @@ func TestCancel(t *testing.T) {
 		CIDR = "10.0.1.7/26"
 	)
 
-	router := TestGossipRouter{make(map[router.PeerName]chan gossipMessage), 0.0}
+	router := TestGossipRouter{make(map[router.PeerName]chan interface{}), 0.0}
 
 	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
 	alloc1.SetInterfaces(router.connect(alloc1.ourName, alloc1))
@@ -186,9 +186,9 @@ func TestCancel(t *testing.T) {
 
 	// Get some IPs, so each allocator has some space
 	res1, _ := alloc1.Allocate("foo", subnet, nil)
-	common.Debug.Printf("res1 = %s", res1.String())
+	common.Log.Debugf("res1 = %s", res1.String())
 	res2, _ := alloc2.Allocate("bar", subnet, nil)
-	common.Debug.Printf("res2 = %s", res2.String())
+	common.Log.Debugf("res2 = %s", res2.String())
 	if res1 == res2 {
 		require.FailNow(t, "Error: got same ips!")
 	}
@@ -256,13 +256,17 @@ func TestTransfer(t *testing.T) {
 	require.True(t, err == nil, "Failed to get address")
 
 	router.GossipBroadcast(alloc2.Gossip())
+	router.flush()
 	router.GossipBroadcast(alloc3.Gossip())
+	router.flush()
 	router.removePeer(alloc2.ourName)
 	router.removePeer(alloc3.ourName)
 	alloc2.Stop()
 	alloc3.Stop()
+	router.flush()
 	require.NoError(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
 	require.NoError(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
+	router.flush()
 
 	require.Equal(t, address.Offset(1022), alloc1.NumFreeAddresses(subnet))
 
@@ -282,7 +286,8 @@ func TestFakeRouterSimple(t *testing.T) {
 	alloc1 := allocs[0]
 	//alloc2 := allocs[1]
 
-	alloc1.Allocate("foo", subnet, nil)
+	_, err := alloc1.Allocate("foo", subnet, nil)
+	require.NoError(t, err, "Failed to get address")
 }
 
 func TestAllocatorFuzz(t *testing.T) {
@@ -338,14 +343,14 @@ func TestAllocatorFuzz(t *testing.T) {
 
 		allocIndex := rand.Int31n(nodes)
 		alloc := allocs[allocIndex]
-		//common.Info.Printf("Allocate: asking allocator %d", allocIndex)
+		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
 		addr, err := alloc.Allocate(name, subnet, nil)
 
 		if err != nil {
 			panic(fmt.Sprintf("Could not allocate addr"))
 		}
 
-		//common.Info.Printf("Allocate: got address %s for name %s", addr, name)
+		//common.Log.Infof("Allocate: got address %s for name %s", addr, name)
 		addrStr := addr.String()
 
 		stateLock.Lock()
@@ -382,7 +387,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		stateLock.Unlock()
 
 		alloc := allocs[res.alloc]
-		//common.Info.Printf("Freeing %s (%s) on allocator %d", res.name, addr, res.alloc)
+		//common.Log.Infof("Freeing %s (%s) on allocator %d", res.name, addr, res.alloc)
 
 		oldAddr, err := address.ParseIP(addr)
 		if err != nil {
@@ -407,7 +412,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		stateLock.Unlock()
 		alloc := allocs[res.alloc]
 
-		//common.Info.Printf("Asking for %s (%s) on allocator %d again", res.name, addr, res.alloc)
+		//common.Log.Infof("Asking for %s (%s) on allocator %d again", res.name, addr, res.alloc)
 
 		newAddr, _ := alloc.Allocate(res.name, subnet, nil)
 		oldAddr, _ := address.ParseIP(addr)

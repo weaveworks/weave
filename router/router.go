@@ -5,13 +5,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"syscall"
 	"time"
 
-	"code.google.com/p/gopacket/layers"
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -27,7 +25,7 @@ const (
 // against brute-force attacks on the password when encryption is in
 // use. It is also a basic DoS defence.
 
-type LogFrameFunc func(string, []byte, *layers.Ethernet)
+type LogFrameFunc func(string, []byte, *EthernetDecoder)
 
 type Config struct {
 	Port          int
@@ -68,11 +66,11 @@ type PacketSourceSink interface {
 func NewRouter(config Config, name PeerName, nickName string) *Router {
 	router := &Router{Config: config, gossipChannels: make(GossipChannels)}
 	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
-		log.Println("Expired MAC", mac, "at", peer)
+		Log.Println("Expired MAC", mac, "at", peer)
 	}
 	onPeerGC := func(peer *Peer) {
 		router.Macs.Delete(peer)
-		log.Println("Removed unreachable peer", peer)
+		Log.Println("Removed unreachable peer", peer)
 	}
 	router.Ourself = NewLocalPeer(name, nickName, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
@@ -84,6 +82,9 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 	return router
 }
 
+// Start listening for TCP connections, locally captured packets, and
+// packets forwarded over UDP.  This is separate from NewRouter so
+// that gossipers can register before we start forming connections.
 func (router *Router) Start() {
 	// we need two pcap handles since they aren't thread-safe
 	var pio PacketSourceSink
@@ -95,10 +96,6 @@ func (router *Router) Start() {
 		po, err = NewPcapO(router.Iface.Name)
 		checkFatal(err)
 	}
-	router.Ourself.Start()
-	router.Macs.Start()
-	router.Routes.Start()
-	router.ConnectionMaker.Start()
 	router.UDPListener = router.listenUDP(router.Port, po)
 	router.listenTCP(router.Port)
 	if pio != nil {
@@ -129,12 +126,12 @@ func (router *Router) Status() string {
 }
 
 func (router *Router) sniff(pio PacketSourceSink) {
-	log.Println("Sniffing traffic on", router.Iface)
+	Log.Println("Sniffing traffic on", router.Iface)
 
 	dec := NewEthernetDecoder()
 	mac := router.Iface.HardwareAddr
 	if router.Macs.Enter(mac, router.Ourself.Peer) {
-		log.Println("Discovered our MAC", mac)
+		Log.Println("Discovered our MAC", mac)
 	}
 	go func() {
 		for {
@@ -152,7 +149,7 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	if decodedLen == 0 {
 		return
 	}
-	srcMac := dec.eth.SrcMAC
+	srcMac := dec.Eth.SrcMAC
 	srcPeer, found := router.Macs.Lookup(srcMac)
 	// We need to filter out frames we injected ourselves. For such
 	// frames, the srcMAC will have been recorded as associated with a
@@ -161,22 +158,18 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 		return
 	}
 	if router.Macs.Enter(srcMac, router.Ourself.Peer) {
-		log.Println("Discovered local MAC", srcMac)
+		Log.Println("Discovered local MAC", srcMac)
 	}
 	if dec.DropFrame() {
 		return
 	}
-	dstMac := dec.eth.DstMAC
+	dstMac := dec.Eth.DstMAC
 	dstPeer, found := router.Macs.Lookup(dstMac)
 	if found && dstPeer == router.Ourself.Peer {
 		return
 	}
-	df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
-	if df {
-		router.LogFrame("Forwarding DF", frameData, &dec.eth)
-	} else {
-		router.LogFrame("Forwarding", frameData, &dec.eth)
-	}
+	router.LogFrame("Forwarding", frameData, dec)
+
 	// at this point we are handing over the frame to forwarders, so
 	// we need to make a copy of it in order to prevent the next
 	// capture from overwriting the data
@@ -187,11 +180,11 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 	// If we don't know which peer corresponds to the dest MAC,
 	// broadcast it.
 	if !found {
-		router.Ourself.Broadcast(df, frameCopy, dec)
+		router.Ourself.Broadcast(frameCopy, dec)
 		return
 	}
 
-	err := router.Ourself.Forward(dstPeer, df, frameCopy, dec)
+	err := router.Ourself.Forward(dstPeer, frameCopy, dec)
 	if ftbe, ok := err.(FrameTooBigError); ok {
 		err = dec.sendICMPFragNeeded(ftbe.EPMTU, po.WritePacket)
 	}
@@ -208,7 +201,7 @@ func (router *Router) listenTCP(localPort int) {
 		for {
 			tcpConn, err := ln.AcceptTCP()
 			if err != nil {
-				log.Println(err)
+				Log.Errorln(err)
 				continue
 			}
 			router.acceptTCP(tcpConn)
@@ -222,10 +215,9 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// on router.Port and we wait for them to send us something on UDP to
 	// start.
 	remoteAddrStr := tcpConn.RemoteAddr().String()
-	log.Printf("->[%s] connection accepted\n", remoteAddrStr)
+	Log.Printf("->[%s] connection accepted\n", remoteAddrStr)
 	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr, false, false)
-	connLocal := NewLocalConnection(connRemote, tcpConn, nil, router)
-	connLocal.Start(true)
+	StartLocalConnection(connRemote, tcpConn, nil, router, true)
 }
 
 func (router *Router) listenUDP(localPort int, po PacketSink) *net.UDPConn {
@@ -253,10 +245,10 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 		if err == io.EOF {
 			return
 		} else if err != nil {
-			log.Println("ignoring UDP read error", err)
+			Log.Warnln("ignoring UDP read error", err)
 			continue
 		} else if n < NameSize {
-			log.Println("ignoring too short UDP packet from", sender)
+			Log.Warnln("ignoring too short UDP packet from", sender)
 			continue
 		}
 		name := PeerNameFromBin(buf[:NameSize])
@@ -318,20 +310,13 @@ func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *Ether
 			return
 		}
 
-		df := decodedLen == 2 && (dec.ip.Flags&layers.IPv4DontFragment != 0)
-
 		if dstPeer != router.Ourself.Peer {
 			// it's not for us, we're just relaying it
-			if df {
-				router.LogFrame("Relaying DF", frame, &dec.eth)
-			} else {
-				router.LogFrame("Relaying", frame, &dec.eth)
-			}
-
-			err := router.Ourself.Relay(srcPeer, dstPeer, df, frame, dec)
+			router.LogFrame("Relaying", frame, dec)
+			err := router.Ourself.Relay(srcPeer, dstPeer, frame, dec)
 			if ftbe, ok := err.(FrameTooBigError); ok {
 				err = dec.sendICMPFragNeeded(ftbe.EPMTU, func(icmpFrame []byte) error {
-					return router.Ourself.Forward(srcPeer, false, icmpFrame, nil)
+					return router.Ourself.Forward(srcPeer, icmpFrame, nil)
 				})
 			}
 
@@ -339,21 +324,21 @@ func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *Ether
 			return
 		}
 
-		srcMac := dec.eth.SrcMAC
-		dstMac := dec.eth.DstMAC
+		srcMac := dec.Eth.SrcMAC
+		dstMac := dec.Eth.DstMAC
 
 		if router.Macs.Enter(srcMac, srcPeer) {
-			log.Println("Discovered remote MAC", srcMac, "at", srcPeer)
+			Log.Println("Discovered remote MAC", srcMac, "at", srcPeer)
 		}
 		if po != nil {
-			router.LogFrame("Injecting", frame, &dec.eth)
+			router.LogFrame("Injecting", frame, dec)
 			checkWarn(po.WritePacket(frame))
 		}
 
 		dstPeer, found = router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
-			router.LogFrame("Relaying broadcast", frame, &dec.eth)
-			router.Ourself.RelayBroadcast(srcPeer, df, frame, dec)
+			router.LogFrame("Relaying broadcast", frame, dec)
+			router.Ourself.RelayBroadcast(srcPeer, frame, dec)
 		}
 	}
 }
@@ -429,7 +414,7 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 		// itself included in the update, and we didn't know about
 		// already. We ignore this; eventually we should receive an
 		// update containing a complete topology.
-		log.Println("Topology gossip:", err)
+		Log.Println("Topology gossip:", err)
 		return nil, nil, nil
 	}
 	if err != nil {

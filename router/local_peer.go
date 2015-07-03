@@ -2,10 +2,11 @@ package router
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
+
+	. "github.com/weaveworks/weave/common"
 )
 
 type LocalPeer struct {
@@ -18,60 +19,61 @@ type LocalPeer struct {
 type LocalPeerAction func()
 
 func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
-	return &LocalPeer{Peer: NewPeer(name, nickName, 0, 0), router: router}
-}
-
-func (peer *LocalPeer) Start() {
 	actionChan := make(chan LocalPeerAction, ChannelSize)
-	peer.actionChan = actionChan
+	peer := &LocalPeer{
+		Peer:       NewPeer(name, nickName, 0, 0),
+		router:     router,
+		actionChan: actionChan,
+	}
 	go peer.actorLoop(actionChan)
+	return peer
 }
 
-func (peer *LocalPeer) Forward(dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
-	return peer.Relay(peer.Peer, dstPeer, df, frame, dec)
+func (peer *LocalPeer) Forward(dstPeer *Peer, frame []byte, dec *EthernetDecoder) error {
+	return peer.Relay(peer.Peer, dstPeer, frame, dec)
 }
 
-func (peer *LocalPeer) Broadcast(df bool, frame []byte, dec *EthernetDecoder) {
-	peer.RelayBroadcast(peer.Peer, df, frame, dec)
+func (peer *LocalPeer) Broadcast(frame []byte, dec *EthernetDecoder) {
+	peer.RelayBroadcast(peer.Peer, frame, dec)
 }
 
-func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) error {
+func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, frame []byte, dec *EthernetDecoder) error {
 	relayPeerName, found := peer.router.Routes.Unicast(dstPeer.Name)
 	if !found {
 		// Not necessarily an error as there could be a race with the
 		// dst disappearing whilst the frame is in flight
-		log.Println("Received packet for unknown destination:", dstPeer)
+		Log.Println("Received packet for unknown destination:", dstPeer)
 		return nil
 	}
 	conn, found := peer.ConnectionTo(relayPeerName)
 	if !found {
 		// Again, could just be a race, not necessarily an error
-		log.Println("Unable to find connection to relay peer", relayPeerName)
+		Log.Println("Unable to find connection to relay peer", relayPeerName)
 		return nil
 	}
-	return conn.(*LocalConnection).Forward(df, &ForwardedFrame{
+	return conn.(*LocalConnection).Forward(&ForwardedFrame{
 		srcPeer: srcPeer,
 		dstPeer: dstPeer,
 		frame:   frame},
 		dec)
 }
 
-func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, df bool, frame []byte, dec *EthernetDecoder) {
+func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, frame []byte, dec *EthernetDecoder) {
 	nextHops := peer.router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
 		return
 	}
 	for _, conn := range peer.ConnectionsTo(nextHops) {
-		err := conn.(*LocalConnection).Forward(df, &ForwardedFrame{
+		err := conn.(*LocalConnection).Forward(&ForwardedFrame{
 			srcPeer: srcPeer,
 			dstPeer: conn.Remote(),
 			frame:   frame},
 			dec)
 		if err != nil {
 			if ftbe, ok := err.(FrameTooBigError); ok {
-				log.Printf("dropping too big DF broadcast frame (%v -> %v): PMTU= %v\n", dec.ip.DstIP, dec.ip.SrcIP, ftbe.EPMTU)
+				Log.Warningf("dropping too big DF broadcast frame (%v -> %v): PMTU= %v\n", dec.IP.DstIP, dec.IP.SrcIP, ftbe.EPMTU)
 			} else {
-				log.Println(err)
+				Log.Errorln(err)
 			}
 		}
 	}
@@ -132,8 +134,7 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 		return err
 	}
 	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String(), true, false)
-	connLocal := NewLocalConnection(connRemote, tcpConn, udpAddr, peer.router)
-	connLocal.Start(acceptNewPeer)
+	StartLocalConnection(connRemote, tcpConn, udpAddr, peer.router, acceptNewPeer)
 	return nil
 }
 
@@ -181,10 +182,10 @@ func (peer *LocalPeer) actorLoop(actionChan <-chan LocalPeerAction) {
 
 func (peer *LocalPeer) handleAddConnection(conn Connection) error {
 	if peer.Peer != conn.Local() {
-		log.Fatal("Attempt made to add connection to peer where peer is not the source of connection")
+		Log.Fatal("Attempt made to add connection to peer where peer is not the source of connection")
 	}
 	if conn.Remote() == nil {
-		log.Fatal("Attempt made to add connection to peer with unknown remote peer")
+		Log.Fatal("Attempt made to add connection to peer with unknown remote peer")
 	}
 	toName := conn.Remote().Name
 	dupErr := fmt.Errorf("Multiple connections to %s added to %s", conn.Remote(), peer.String())
@@ -223,7 +224,7 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) error {
 
 func (peer *LocalPeer) handleConnectionEstablished(conn Connection) {
 	if peer.Peer != conn.Local() {
-		log.Fatal("Peer informed of active connection where peer is not the source of connection")
+		Log.Fatal("Peer informed of active connection where peer is not the source of connection")
 	}
 	if dupConn, found := peer.connections[conn.Remote().Name]; !found || conn != dupConn {
 		conn.Shutdown(fmt.Errorf("Cannot set unknown connection active"))
@@ -236,10 +237,10 @@ func (peer *LocalPeer) handleConnectionEstablished(conn Connection) {
 
 func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
 	if peer.Peer != conn.Local() {
-		log.Fatal("Attempt made to delete connection from peer where peer is not the source of connection")
+		Log.Fatal("Attempt made to delete connection from peer where peer is not the source of connection")
 	}
 	if conn.Remote() == nil {
-		log.Fatal("Attempt made to delete connection to peer with unknown remote peer")
+		Log.Fatal("Attempt made to delete connection to peer with unknown remote peer")
 	}
 	toName := conn.Remote().Name
 	if connFound, found := peer.connections[toName]; !found || connFound != conn {

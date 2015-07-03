@@ -48,13 +48,13 @@ func listenHTTP(alloc *Allocator, subnet address.CIDR) int {
 
 	httpListener, err := net.Listen("tcp", ":0")
 	if err != nil {
-		common.Error.Fatal("Unable to create http listener: ", err)
+		common.Log.Fatal("Unable to create http listener: ", err)
 	}
 
 	go func() {
 		srv := &http.Server{Handler: router}
 		if err := srv.Serve(httpListener); err != nil {
-			common.Error.Fatal("Unable to serve http: ", err)
+			common.Log.Fatal("Unable to serve http: ", err)
 		}
 	}()
 	return httpListener.Addr().(*net.TCPAddr).Port

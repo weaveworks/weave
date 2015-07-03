@@ -10,7 +10,7 @@ import (
 
 func TestAddrs(t *testing.T) {
 	InitDefaultLogging(testing.Verbose())
-	Info.Println("TestAddrs starting")
+	Log.Infoln("TestAddrs starting")
 
 	ip, err := addrToIPv4("10.13.12.11")
 	require.NoError(t, err)

@@ -1,12 +1,12 @@
 ---
-title: Weave Proxy
+title: Weave Docker API Proxy
 layout: default
 ---
 
-# Weave Proxy
+# Weave Docker API Proxy
 
-The proxy automatically attaches containers to the weave network when
-they are started using the ordinary Docker
+The Docker API proxy automatically attaches containers to the weave
+network when they are started using the ordinary Docker
 [command-line interface](https://docs.docker.com/reference/commandline/cli/)
 or
 [remote API](https://docs.docker.com/reference/api/docker_remote_api/),
@@ -23,19 +23,27 @@ instead of `weave run`.
 ## <a name="setup"></a>Setup
 
 The proxy sits between the Docker client (command line or API) and the
-Docker daemon, intercepting the communication between the two.
+Docker daemon, intercepting the communication between the two. You can
+start it simultaneously with the router and weaveDNS via `launch`:
 
-To start the proxy, run
+    host1$ weave launch
 
-    host1$ weave launch-proxy
+or independently via `launch-proxy`:
 
-By default, the proxy listens on port 12375, on all network
-interfaces. This can be adjusted with the `-H` argument, e.g.
+    host1$ weave launch-router && weave launch-dns && weave launch-proxy
+
+The first form is more convenient, however you can only pass proxy
+related configuration arguments to `launch-proxy` so if you need to
+modify the default behaviour you will have to use the latter.
+
+By default, the proxy listens on /var/run/weave.sock and port 12375, on
+all network interfaces. This can be adjusted with the `-H` argument, e.g.
 
     host1$ weave launch-proxy -H tcp://127.0.0.1:9999
 
-If you are working with a remote docker daemon, then any firewalls
-inbetween need to be configured to permit access to the proxy port.
+Multiple -H arguments can be specified. If you are working with a remote
+docker daemon, then any firewalls inbetween need to be configured to permit
+access to the proxy port.
 
 All docker commands can be run via the proxy, so it is safe to adjust
 your `DOCKER_HOST` to point at the proxy. Weave provides a convenient
@@ -49,9 +57,11 @@ Alternatively, the proxy host can be set on a per-command basis with
 
     host1$ docker $(weave proxy-config) ps
 
-The proxy can be stopped with
+The proxy can be stopped independently with
 
     host1$ weave stop-proxy
+
+or in conjunction with the router and weaveDNS via `stop`.
 
 If you set your `DOCKER_HOST` to point at the proxy, remember to
 revert to the original setting.
@@ -100,10 +110,10 @@ To start a container without connecting it to the weave network, pass
 
     host1$ docker run -ti -e WEAVE_CIDR=none ubuntu
 
-If you do not want IPAM to be used by default, the proxy needs to be
-passed the `--no-default-ipam` flag, e.g.
+If you do not want an IP to be assigned by default, the proxy needs to
+be passed the `--no-default-ipalloc` flag, e.g.,
 
-    host1$ docker launch-proxy --no-default-ipam
+    host1$ docker launch-proxy --no-default-ipalloc
 
 In this configuration, containers with no `WEAVE_CIDR` environment
 variable will not be connected to the weave network. Containers
@@ -111,7 +121,7 @@ started with a `WEAVE_CIDR` environment variable are handled as
 before. To automatically assign an address in this mode, we start the
 container with a blank `WEAVE_CIDR`, e.g.
 
-    host1$ docker run -ti -e WEAVE_CIDR= ubuntu
+    host1$ docker run -ti -e WEAVE_CIDR="" ubuntu
 
 ## <a name="dns"></a>Automatic discovery
 
@@ -176,7 +186,7 @@ containers on the weave network with `weave run`:
 The arguments after `run` are passed through to `docker run` so you
 can freely specify whichever docker options are appropriate. Once the
 container is started, `weave run` attaches it to the weave network, in
-this example with an address allocated by IPAM. If you wish you can
+this example with an automatically allocated IP. If you wish you can
 specify addresses manually instead:
 
     $ weave run 10.2.1.1/24 -ti ubuntu

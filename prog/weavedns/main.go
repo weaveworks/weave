@@ -71,17 +71,17 @@ func main() {
 	}
 
 	InitDefaultLogging(debug)
-	Info.Printf("[main] WeaveDNS version %s\n", version) // first thing in log: the version
+	Log.Infof("[main] WeaveDNS version %s\n", version) // first thing in log: the version
 
 	var iface *net.Interface
 	if ifaceName != "" {
 		var err error
-		Info.Println("[main] Waiting for mDNS interface", ifaceName, "to come up")
+		Log.Infoln("[main] Waiting for mDNS interface", ifaceName, "to come up")
 		iface, err = weavenet.EnsureInterface(ifaceName, wait)
 		if err != nil {
-			Error.Fatal(err)
+			Log.Fatal(err)
 		} else {
-			Info.Println("[main] Interface", ifaceName, "is up")
+			Log.Infoln("[main] Interface", ifaceName, "is up")
 		}
 	}
 
@@ -89,25 +89,25 @@ func main() {
 	if httpIfaceName == "" {
 		httpIP = "0.0.0.0"
 	} else {
-		Info.Println("[main] Waiting for HTTP interface", httpIfaceName, "to come up")
+		Log.Infoln("[main] Waiting for HTTP interface", httpIfaceName, "to come up")
 		httpIface, err := weavenet.EnsureInterface(httpIfaceName, wait)
 		if err != nil {
-			Error.Fatal(err)
+			Log.Fatal(err)
 		}
-		Info.Println("[main] Interface", httpIfaceName, "is up")
+		Log.Infoln("[main] Interface", httpIfaceName, "is up")
 
 		addrs, err := httpIface.Addrs()
 		if err != nil {
-			Error.Fatal(err)
+			Log.Fatal(err)
 		}
 
 		if len(addrs) == 0 {
-			Error.Fatal("[main] No addresses on HTTP interface")
+			Log.Fatal("[main] No addresses on HTTP interface")
 		}
 
 		ip, _, err := net.ParseCIDR(addrs[0].String())
 		if err != nil {
-			Error.Fatal(err)
+			Log.Fatal(err)
 		}
 
 		httpIP = ip.String()
@@ -124,22 +124,22 @@ func main() {
 	}
 	zone, err := weavedns.NewZoneDb(zoneConfig)
 	if err != nil {
-		Error.Fatal("[main] Unable to initialize the Zone database", err)
+		Log.Fatal("[main] Unable to initialize the Zone database", err)
 	}
 	if err := zone.Start(); err != nil {
-		Error.Fatal("[main] Unable to start the Zone database", err)
+		Log.Fatal("[main] Unable to start the Zone database", err)
 	}
 	defer zone.Stop()
 
 	dockerCli, err = docker.NewClient(apiPath)
 	if err != nil {
-		Error.Fatal("[main] Unable to start docker client: ", err)
+		Log.Fatal("[main] Unable to start docker client: ", err)
 	}
 
 	if watch {
 		err := dockerCli.AddObserver(zone)
 		if err != nil {
-			Error.Fatal("[main] Unable to start watcher", err)
+			Log.Fatal("[main] Unable to start watcher", err)
 		}
 	}
 
@@ -158,29 +158,29 @@ func main() {
 	if len(fallback) > 0 {
 		fallbackHost, fallbackPort, err := net.SplitHostPort(fallback)
 		if err != nil {
-			Error.Fatal("[main] Could not parse fallback host and port", err)
+			Log.Fatal("[main] Could not parse fallback host and port", err)
 		}
 		srvConfig.UpstreamCfg = &dns.ClientConfig{Servers: []string{fallbackHost}, Port: fallbackPort}
-		Debug.Printf("[main] DNS fallback at %s:%s", fallbackHost, fallbackPort)
+		Log.Debugf("[main] DNS fallback at %s:%s", fallbackHost, fallbackPort)
 	}
 
 	srv, err := weavedns.NewDNSServer(srvConfig)
 	if err != nil {
-		Error.Fatal("[main] Failed to initialize the WeaveDNS server", err)
+		Log.Fatal("[main] Failed to initialize the WeaveDNS server", err)
 	}
 
 	httpListener, err := net.Listen("tcp", httpAddr)
 	if err != nil {
-		Error.Fatal("[main] Unable to create http listener: ", err)
+		Log.Fatal("[main] Unable to create http listener: ", err)
 	}
-	Info.Println("[main] HTTP API listening on", httpAddr)
+	Log.Infoln("[main] HTTP API listening on", httpAddr)
 
 	go SignalHandlerLoop(srv)
 	go weavedns.ServeHTTP(httpListener, version, srv, dockerCli)
 
 	err = srv.Start()
 	if err != nil {
-		Error.Fatal("[main] Failed to start the WeaveDNS server: ", err)
+		Log.Fatal("[main] Failed to start the WeaveDNS server: ", err)
 	}
 	srv.ActivateAndServe()
 }

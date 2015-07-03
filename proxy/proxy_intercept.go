@@ -23,7 +23,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			Warning.Print("Error intercepting request: ", err)
+			Log.Warning("Error intercepting request: ", err)
 		}
 		return
 	}
@@ -31,7 +31,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 	conn, err := proxy.Dial()
 	if err != nil {
 		http.Error(w, "Could not connect to target", http.StatusInternalServerError)
-		Warning.Print(err)
+		Log.Warning(err)
 		return
 	}
 	client := httputil.NewClientConn(conn, nil)
@@ -40,13 +40,13 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 	resp, err := client.Do(r)
 	if err != nil && err != httputil.ErrPersistEOF {
 		http.Error(w, fmt.Sprintf("Could not make request to target: %v", err), http.StatusInternalServerError)
-		Warning.Print("Error forwarding request: ", err)
+		Log.Warning("Error forwarding request: ", err)
 		return
 	}
 	err = i.InterceptResponse(resp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		Warning.Print("Error intercepting response: ", err)
+		Log.Warning("Error intercepting response: ", err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 			hdr.Add(k, v)
 		}
 	}
-	Debug.Printf("Response from target: %s %v", resp.Status, w.Header())
+	Log.Debugf("Response from target: %s %v", resp.Status, w.Header())
 
 	if resp.Header.Get("Content-Type") == "application/vnd.docker.raw-stream" {
 		doRawStream(w, resp, client)
@@ -65,7 +65,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 	} else {
 		w.WriteHeader(resp.StatusCode)
 		if _, err := io.Copy(w, resp.Body); err != nil {
-			Warning.Print(err)
+			Log.Warning(err)
 		}
 	}
 }
@@ -80,17 +80,17 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 	defer up.Close()
 
 	if _, err := down.Write([]byte("HTTP/1.1 200 OK\n")); err != nil {
-		Warning.Print(err)
+		Log.Warning(err)
 		return
 	}
 
 	if err := resp.Header.Write(down); err != nil {
-		Warning.Print(err)
+		Log.Warning(err)
 		return
 	}
 
 	if _, err := down.Write([]byte("\n")); err != nil {
-		Warning.Print(err)
+		Log.Warning(err)
 		return
 	}
 
@@ -105,13 +105,13 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 func copyStream(dst io.Writer, src io.Reader, done chan struct{}) {
 	defer close(done)
 	if _, err := io.Copy(dst, src); err != nil {
-		Warning.Print(err)
+		Log.Warning(err)
 	}
 	if c, ok := dst.(interface {
 		CloseWrite() error
 	}); ok {
 		if err := c.CloseWrite(); err != nil {
-			Warning.Printf("Error closing connection: %s", err)
+			Log.Warningf("Error closing connection: %s", err)
 		}
 	}
 }
