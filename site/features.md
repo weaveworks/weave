@@ -57,8 +57,10 @@ our data centre.
 
 ### <a name="docker"></a>Seamless Docker integration
 
-Weave includes a [proxy](proxy.html) so that containers launched via
-the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or
+Weave includes a [Docker API proxy](proxy.html) so that containers
+launched via the Docker
+[command-line interface](https://docs.docker.com/reference/commandline/cli/)
+or
 [remote API](https://docs.docker.com/reference/api/docker_remote_api/)
 are attached to the weave network before they begin execution.
 

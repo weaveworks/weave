@@ -87,9 +87,10 @@ or in conjunction with the router and proxy via `stop`.
 
 The weaveDNS container running on every host acts as the nameserver
 for containers on that host. It learns about hostnames for local
-containers from the proxy and from the `weave run` command. If a
-hostname is in the `.weave.local` domain then weaveDNS records the
-association of that name with the container's weave IP address(es).
+containers from the Weave Docker API proxy and from the `weave run`
+command. If a hostname is in the `.weave.local` domain then weaveDNS
+records the association of that name with the container's weave IP
+address(es).
 
 When weaveDNS is queried for a name in the `.weave.local` domain, it
 first checks its own records. If the name is not found there, it asks
