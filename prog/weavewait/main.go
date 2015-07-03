@@ -2,12 +2,10 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/weaveworks/weave/net"
 )
@@ -16,20 +14,16 @@ func main() {
 	if len(os.Args) <= 1 {
 		os.Exit(0)
 	}
-
 	args := os.Args[1:]
-	signalWait := time.Duration(math.MaxInt64)
+
 	if args[0] == "-s" {
-		signalWait = 0
 		args = args[1:]
+	} else {
+		usr2 := make(chan os.Signal)
+		signal.Notify(usr2, syscall.SIGUSR2)
+		<-usr2
 	}
 
-	usr2 := make(chan os.Signal)
-	signal.Notify(usr2, syscall.SIGUSR2)
-	select {
-	case <-usr2:
-	case <-time.After(signalWait):
-	}
 	_, err := net.EnsureInterface("ethwe", -1)
 	checkErr(err)
 
