@@ -1,5 +1,5 @@
 ---
-title: Weave Proxy
+title: Weave Docker API Proxy
 layout: default
 ---
 
