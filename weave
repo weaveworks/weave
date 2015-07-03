@@ -986,7 +986,7 @@ launch_router() {
     done
     eval "set -- $ARGS"
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
-        IPRANGE="10.128.0.0/10"
+        IPRANGE="10.32.0.0/12"
         if command_exists netcheck && ! netcheck $IPRANGE ; then
             echo "Default -iprange $IPRANGE overlaps with existing route on host." >&2
             echo "Please pick another range and set it on all hosts." >&2

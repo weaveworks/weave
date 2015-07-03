@@ -71,7 +71,7 @@ across the weave network. You can see which address was allocated with
 [`weave ps`](troubleshooting.html#list-attached-containers):
 
     host1$ weave ps a1
-    a7aee7233393 7a:44:d3:11:10:70 10.128.0.2/10
+    a7aee7233393 7a:44:d3:11:10:70 10.32.0.2/12
 
 Weave detects when a container has exited and releases its
 automatically allocated addresses so they can be re-used.
