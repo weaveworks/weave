@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"code.google.com/p/gopacket/layers"
+	"github.com/google/gopacket/layers"
 	. "github.com/weaveworks/weave/common"
 )
 

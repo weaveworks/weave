@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	"code.google.com/p/gopacket/layers"
 	"github.com/davecheney/profile"
+	"github.com/google/gopacket/layers"
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
