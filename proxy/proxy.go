@@ -57,9 +57,9 @@ func NewProxy(c Config) (*Proxy, error) {
 	p.client = client
 
 	if !p.WithoutDNS {
-		dockerBridgeIP, err := callWeave("docker-bridge-ip")
+		dockerBridgeIP, stderr, err := callWeave("docker-bridge-ip")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf(string(stderr))
 		}
 		p.dockerBridgeIP = string(dockerBridgeIP)
 	}

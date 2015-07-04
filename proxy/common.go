@@ -18,13 +18,16 @@ var (
 	weaveWaitEntrypoint = []string{"/w/w"}
 )
 
-func callWeave(args ...string) ([]byte, error) {
+func callWeave(args ...string) ([]byte, []byte, error) {
 	args = append([]string{"--local"}, args...)
 	Log.Debug("Calling weave", args)
 	cmd := exec.Command("./weave", args...)
 	cmd.Env = []string{"PROCFS=/hostproc", "PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
-	out, err := cmd.CombinedOutput()
-	return out, err
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.Bytes(), stderr.Bytes(), err
 }
 
 func marshalRequestBody(r *http.Request, body interface{}) error {
