@@ -1279,7 +1279,7 @@ case "$COMMAND" in
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
                 if [ -n "$FQDN" ] ; then
-                    when_dns_running put_dns_fqdn 'weave:expose' $FQDN $CIDR
+                    when_dns_running put_dns_fqdn weave:expose $FQDN $CIDR
                 fi
             fi
         done
@@ -1295,7 +1295,7 @@ case "$COMMAND" in
                 ip addr del dev $BRIDGE $CIDR
                 delete_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 delete_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-                when_dns_running delete_dns 'weave:expose' $CIDR
+                when_dns_running delete_dns weave:expose $CIDR
             fi
         done
         for CIDR in $IPAM_CIDRS ; do
