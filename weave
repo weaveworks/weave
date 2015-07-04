@@ -833,9 +833,7 @@ ipam_cidrs() {
     IPAM_CIDRs=""
     if [ $# -eq 0 ] ; then
         # If no addresses passed in, get one in the default subnet
-        if ! IPAM_CIDRS=$(call_weave POST /ip/$CONTAINER_ID) ; then
-            return 1
-        fi
+        IPAM_CIDRS=$(call_weave POST /ip/$CONTAINER_ID) || return 1
         if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
             echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
             return 1
@@ -849,9 +847,7 @@ ipam_cidrs() {
             else
                 IPAM_URL=/ip/$CONTAINER_ID/"${1#net:}"
             fi
-            if ! CIDR=$(call_weave POST $IPAM_URL) ; then
-                return 1
-            fi
+            CIDR=$(call_weave POST $IPAM_URL) || return 1
             if [ "$CIDR" = "404 page not found" ] ; then
                 echo "IP address allocation must be enabled to use 'net:'" >&2
                 return 1
