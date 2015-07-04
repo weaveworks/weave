@@ -2,9 +2,6 @@
 
 . ./config.sh
 
-DNS_ARGS="--no-cache"
-[ -n "$DEBUG" ] && DNS_ARGS="--debug"
-
 start_suite "Resolve a non-weave address"
 
 launch_dns_on $HOST1 10.2.254.1/24
