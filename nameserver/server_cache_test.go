@@ -19,7 +19,7 @@ func TestServerDbCacheInvalidation(t *testing.T) {
 		testName2   = "second.weave.local."
 	)
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestServerDbCacheInvalidation starting")
 
 	clk := newMockedClock()
@@ -177,7 +177,7 @@ func TestServerCacheExpiration(t *testing.T) {
 		negativeLocalTTL = 10
 	)
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestServerCacheExpiration starting")
 
 	clk := newMockedClock()
@@ -265,7 +265,7 @@ func TestServerCacheRefresh(t *testing.T) {
 		refreshInterval = int(DefaultLocalTTL) / 3
 	)
 
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestServerCacheRefresh starting")
 	clk := newMockedClock()
 

@@ -20,9 +20,10 @@ Check the weave container logs with
 
 A reasonable amount of information, and all errors, get logged there.
 
-The log verbosity can be increased by supplying the `-debug` flag when
-launching weave. To log information on a per-packet basis use
-`-pktdebug` - be warned, this can produce a lot of output.
+The log verbosity can be increased by supplying the
+`--log-level=debug` option when launching weave. To log information on
+a per-packet basis use `-pktdebug` - be warned, this can produce a lot
+of output.
 
 Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the

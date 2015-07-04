@@ -10,7 +10,7 @@ import (
 
 // Ensure we can add new calls while forwarding the clock
 func TestSchedCallsBasic(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestSchedCallsBasic starting")
 
 	const testSecs = 1000
@@ -36,7 +36,7 @@ func TestSchedCallsBasic(t *testing.T) {
 
 // Ensure we can create a 100 seconds gap in the middle of the time travel
 func TestSchedCallsGap(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestSchedCallsGap starting")
 
 	const testSecs = 1000
@@ -64,7 +64,7 @@ func TestSchedCallsGap(t *testing.T) {
 }
 
 func TestSchedCallsStop(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestSchedCallsStop starting")
 
 	const testSecs = 1000

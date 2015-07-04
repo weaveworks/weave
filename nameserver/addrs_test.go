@@ -9,7 +9,7 @@ import (
 )
 
 func TestAddrs(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestAddrs starting")
 
 	ip, err := addrToIPv4("10.13.12.11")

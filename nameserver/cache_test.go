@@ -14,7 +14,7 @@ import (
 
 // Check that the cache keeps its intended capacity constant
 func TestCacheLength(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestCacheLength starting")
 
 	const cacheLen = 128
@@ -55,7 +55,7 @@ func TestCacheLength(t *testing.T) {
 
 // Check that the cache entries are ok
 func TestCacheEntries(t *testing.T) {
-	InitDefaultLogging(testing.Verbose())
+	EnableDebugLogging(testing.Verbose())
 	Log.Infoln("TestCacheEntries starting")
 
 	Log.Infoln("Checking cache consistency")

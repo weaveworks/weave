@@ -151,7 +151,6 @@ func TestHTTPCancel(t *testing.T) {
 }
 
 func impTestHTTPCancel(t *testing.T) {
-	common.InitDefaultLogging(true)
 	var (
 		containerID = "deadbeef"
 		testCIDR1   = "10.0.3.0/29"
