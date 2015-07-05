@@ -261,6 +261,7 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 
 	muxRouter.Methods("GET").Path("/status").Headers("Accept", "application/json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json, _ := router.StatusJSON(version)
+		w.Header().Set("Content-Type", "application/json")
 		w.Write(json)
 	})
 
