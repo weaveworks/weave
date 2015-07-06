@@ -33,13 +33,13 @@ Weave Docker API proxy via `launch`:
 
 ```bash
 host1$ weave launch
-host1$ eval $(weave proxy-env)
+host1$ eval $(weave env)
 ```
 or independently via `launch-dns`:
 
 ```bash
 host1$ weave launch-router && weave launch-dns && weave launch-proxy
-host1$ eval $(weave proxy-env)
+host1$ eval $(weave env)
 ```
 
 The first form is more convenient, however you can only pass weaveDNS
@@ -128,7 +128,7 @@ container, this time on the 2nd host, and then run some ping tests...
 
 ```bash
 host2$ weave launch
-host2$ eval $(weave proxy-env)
+host2$ eval $(weave env)
 host2$ docker run -dti --name=pingme ubuntu
 
 root@ubuntu:/# ping -nq -c 1 pingme

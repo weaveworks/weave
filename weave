@@ -48,8 +48,8 @@ usage() {
     echo "weave hide          [<addr> ...]"
     echo "weave ps            [<container_id> ...]"
     echo "weave status"
-    echo "weave proxy-env"
-    echo "weave proxy-config"
+    echo "weave env"
+    echo "weave config"
     echo "weave version"
     echo "weave stop"
     echo "weave stop-router"
@@ -932,10 +932,9 @@ proxy_args() {
 proxy_addr() {
     if addr=$(docker logs $PROXY_CONTAINER_NAME 2>&1 | head -n3 | grep -oE "proxy listening on .*"); then
       echo "${1}${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
-      return 0
+    else
+      echo  "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
     fi
-    echo  "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
-    return 1
 }
 
 ######################################################################
@@ -1128,10 +1127,12 @@ case "$COMMAND" in
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
-    proxy-env)
+    env|proxy-env)
+        [ "$COMMAND" = "env" ] || echo "$COMMAND is deprecated, please use 'weave env'" >&2
         proxy_addr "export DOCKER_HOST="
         ;;
-    proxy-config)
+    config|proxy-config)
+        [ "$COMMAND" = "config" ] || echo "$COMMAND is deprecated, please use 'weave config'" >&2
         proxy_addr "-H="
         ;;
     connect)

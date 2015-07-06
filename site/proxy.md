@@ -49,13 +49,13 @@ All docker commands can be run via the proxy, so it is safe to adjust
 your `DOCKER_HOST` to point at the proxy. Weave provides a convenient
 command for this:
 
-    host1$ eval "$(weave proxy-env)"
+    host1$ eval "$(weave env)"
     host1$ docker ps
     ...
 
 Alternatively, the proxy host can be set on a per-command basis with
 
-    host1$ docker $(weave proxy-config) ps
+    host1$ docker $(weave config) ps
 
 The proxy can be stopped independently with
 
@@ -167,7 +167,7 @@ with
 
     $ mkdir -pv ~/.docker
     $ cp -v {ca,cert,key}.pem ~/.docker
-    $ eval "$(weave proxy-env)"
+    $ eval "$(weave env)"
     $ export DOCKER_TLS_VERIFY=1
     $ docker version
     ...
