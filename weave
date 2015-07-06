@@ -664,7 +664,7 @@ dns_args() {
     WITHOUT_DNS=
     while [ $# -gt 0 ] ; do
         case "$1" in
-            --dns-search=*)
+            --dns-search|--dns-search=*)
                 DNS_SEARCH_SPECIFIED=1
                 ;;
             --name)
