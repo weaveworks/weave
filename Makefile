@@ -11,24 +11,27 @@ WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 
 WEAVER_EXE=prog/weaver/weaver
 WEAVEDNS_EXE=prog/weavedns/weavedns
+WEAVEDISCOVERY_EXE=prog/weavediscovery/weavediscovery
 WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 NETCHECK_EXE=prog/netcheck/netcheck
 
-EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)
+EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEDISCOVERY_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEDNS_UPTODATE=.weavedns.uptodate
+WEAVEDISCOVERY_UPTODATE=.weavediscovery.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEDNS_UPTODATE) $(WEAVEEXEC_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEDNS_UPTODATE) $(WEAVEDISCOVERY_UPTODATE) $(WEAVEEXEC_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
+WEAVEDISCOVERY_IMAGE=$(DOCKERHUB_USER)/weavediscovery
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEDISCOVERY_IMAGE) $(WEAVEEXEC_IMAGE)
 
 WEAVE_EXPORT=weave.tar
 
@@ -43,7 +46,7 @@ travis: $(EXES)
 update:
 	go get -u -f -v -tags -netgo $(addprefix ./,$(dir $(EXES)))
 
-$(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEDISCOVERY_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
@@ -57,6 +60,7 @@ $(WEAVER_EXE) $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go com
 
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go prog/weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go prog/weavedns/main.go
+$(WEAVEDISCOVERY_EXE): prog/weavediscovery/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
 $(NETCHECK_EXE): prog/netcheck/netcheck.go
 
@@ -75,6 +79,10 @@ $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 
 $(WEAVEDNS_UPTODATE): prog/weavedns/Dockerfile $(WEAVEDNS_EXE)
 	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) prog/weavedns
+	touch $@
+
+$(WEAVEDISCOVERY_UPTODATE): prog/weavediscovery/Dockerfile $(WEAVEDISCOVERY_EXE)
+	$(SUDO) docker build -t $(WEAVEDISCOVERY_IMAGE) prog/weavediscovery
 	touch $@
 
 $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)

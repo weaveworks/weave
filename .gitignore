@@ -36,12 +36,11 @@ prog/weaveproxy/weaveproxy
 prog/sigproxy/sigproxy
 prog/weavewait/weavewait
 prog/netcheck/netcheck
+prog/weavediscovery/weavediscovery
 tools/bin
 tools/build
 releases
-.weaver.uptodate
-.weavedns.uptodate
-.weaveexec.uptodate
+*.uptodate
 weave.tar
 prog/weaveexec/weave
 prog/weaveexec/weaveproxy

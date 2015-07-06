@@ -33,6 +33,7 @@ usage() {
     echo "                        [-iprange <cidr> [-ipsubnet <cidr>]]"
     echo "                        [-initpeercount <count>] <peer> ..."
     echo "weave launch-dns    [<addr>]"
+    echo "weave launch-discovery"
     echo "weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]"
     echo "                        [--no-default-ipalloc]"
     echo "weave connect       [--replace] [<peer> ...]"
@@ -44,6 +45,8 @@ usage() {
     echo "weave detach        [<addr> ...] <container_id>"
     echo "weave dns-add       <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
     echo "weave dns-remove    <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
+    echo "weave join          <discovery_url>"
+    echo "weave leave         <discovery_url>"
     echo "weave expose        [<addr> ...] [-h <fqdn>]"
     echo "weave hide          [<addr> ...]"
     echo "weave ps            [<container_id> ...]"
@@ -161,13 +164,16 @@ shift 1
 
 BASE_IMAGE=$DOCKERHUB_USER/weave
 BASE_DNS_IMAGE=$DOCKERHUB_USER/weavedns
+BASE_DISCOVERY_IMAGE=$DOCKERHUB_USER/weavediscovery
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 DNS_IMAGE=$BASE_DNS_IMAGE:$IMAGE_VERSION
+DISCOVERY_IMAGE=$BASE_DISCOVERY_IMAGE:$IMAGE_VERSION
 
 PROCFS=${PROCFS:-/proc}
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 DNS_CONTAINER_NAME=weavedns
+DISCOVERY_CONTAINER_NAME=weavediscovery
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 MTU=65535
@@ -175,6 +181,8 @@ PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 DNS_HTTP_PORT=6785
 DNS_HTTP_IFNAME=eth0
+DISCOVERY_HTTP_PORT=6789
+DISCOVERY_HTTP_IFNAME=eth0
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 
@@ -811,6 +819,26 @@ populate_dns() {
 }
 
 ######################################################################
+# Discovery helpers
+######################################################################
+
+call_discovery() {
+    http_call $DISCOVERY_CONTAINER_NAME $DISCOVERY_HTTP_PORT "$@"
+}
+
+put_discovery() {
+    for URL in "$@" ; do
+        call_discovery PUT /endpoint --data-urlencode url=$URL || true
+    done
+}
+
+delete_discovery() {
+    for URL in "$@" ; do
+        call_discovery DELETE /endpoint --data-urlencode url=$URL  || true
+    done
+}
+
+######################################################################
 # IP Allocation Management helpers
 ######################################################################
 
@@ -1041,6 +1069,19 @@ launch_dns() {
     populate_dns
 }
 
+launch_discovery() {
+    container_ip $CONTAINER_NAME || { echo "Error: could not determine router IP: router not running" ; exit 1 ; }
+    WEAVE_URL=http://$CONTAINER_IP:$HTTP_PORT
+    LOCAL_ADDR=$(/sbin/ip route | awk '/default/ { print $3 }')   # TODO: any better solution for guessing the local, reachable address?
+
+    # Set WEAVEDISCOVERY_DOCKER_ARGS in the environment in order to supply
+    # additional parameters, such as resource limits, to docker
+    # when launching the weave container.
+    DISCOVERY_CONTAINER=$(docker run -d --name=$DISCOVERY_CONTAINER_NAME \
+        -e WEAVE_CIDR=none \
+        $WEAVEDISCOVERY_DOCKER_ARGS $DISCOVERY_IMAGE -http-iface "$DISCOVERY_HTTP_IFNAME" -local $LOCAL_ADDR -weave "$WEAVE_URL" "$@")
+}
+
 launch_proxy() {
     # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
@@ -1117,13 +1158,15 @@ case "$COMMAND" in
         create_bridge --without-ethtool
         ;;
     launch)
-        check_not_running $CONTAINER_NAME       $BASE_IMAGE
-        check_not_running $DNS_CONTAINER_NAME   $BASE_DNS_IMAGE
-        check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
+        check_not_running $CONTAINER_NAME           $BASE_IMAGE
+        check_not_running $DNS_CONTAINER_NAME       $BASE_DNS_IMAGE
+        check_not_running $DISCOVERY_CONTAINER_NAME $BASE_DISCOVERY_IMAGE
+        check_not_running $PROXY_CONTAINER_NAME     $EXEC_IMAGE
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
-        launch_dns    $COMMON_ARGS
-        launch_proxy  $COMMON_ARGS
+        launch_dns       $COMMON_ARGS
+        launch_discovery $COMMON_ARGS
+        launch_proxy     $COMMON_ARGS
         ;;
     launch-router)
         check_not_running $CONTAINER_NAME $BASE_IMAGE
@@ -1134,6 +1177,11 @@ case "$COMMAND" in
         check_not_running $DNS_CONTAINER_NAME $BASE_DNS_IMAGE
         launch_dns "$@"
         echo $DNS_CONTAINER
+        ;;
+    launch-discovery)
+        check_not_running $DISCOVERY_CONTAINER_NAME $BASE_DISCOVERY_IMAGE
+        launch_discovery "$@"
+        echo $DISCOVERY_CONTAINER
         ;;
     launch-proxy)
         check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
@@ -1275,6 +1323,14 @@ case "$COMMAND" in
             delete_dns_fqdn $CONTAINER "$3" $IP_ARGS
         fi
         ;;
+    join)
+        check_running $DISCOVERY_CONTAINER_NAME
+        put_discovery "$1"
+        ;;
+    leave)
+        check_running $DISCOVERY_CONTAINER_NAME
+        delete_discovery "$1"
+        ;;
     expose)
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
@@ -1332,6 +1388,10 @@ case "$COMMAND" in
     stop-dns)
         [ $# -eq 0 ] || usage
         stop $DNS_CONTAINER_NAME "WeaveDNS"
+        ;;
+    stop-discovery)
+        [ $# -eq 0 ] || usage
+        stop $DISCOVERY_CONTAINER_NAME "WeaveDiscovery"
         ;;
     stop-proxy)
         [ $# -eq 0 ] || usage
