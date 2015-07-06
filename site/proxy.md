@@ -91,9 +91,9 @@ special environment variables or other options*.
 
     host1$ docker run -ti ubuntu
 
-To use a specific IP, we pass a `WEAVE_CIDR` to the container, e.g.
+To use a specific subnet, we pass a `WEAVE_CIDR` to the container, e.g.
 
-    host1$ docker run -ti -e WEAVE_CIDR=10.2.1.1/24 ubuntu
+    host1$ docker run -ti -e WEAVE_CIDR=net:10.128.0.0/24 ubuntu
 
 To start a container without connecting it to the weave network, pass
 `WEAVE_CIDR=none`, e.g.
