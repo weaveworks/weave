@@ -72,7 +72,7 @@ First start weave on $HOST1:
 Next we configure our environment so that containers launched via the
 docker command line are automatically attached to the weave network:
 
-    host1$ eval $(weave proxy-env)
+    host1$ eval $(weave env)
 
 Finally we run our application container:
 
@@ -84,7 +84,7 @@ this host we simply launch them with `docker run` as appropriate.
 Next we repeat similar steps on `$HOST2`...
 
     host2$ weave launch $HOST1
-    host2$ eval $(weave proxy-env)
+    host2$ eval $(weave env)
     host2$ docker run --name a2 -ti ubuntu
 
 The only difference, apart from the name of the application container,
