@@ -60,16 +60,16 @@ upload_executable() {
 remote() {
     rem=$1
     shift 1
-    "$@" > >(while read line; do echo -e "\e[0;34m$rem>\e[0m $line"; done)
+    "$@" > >(while read line; do echo -e $'\e[0;34m'"$rem>"$'\e[0m'" $line"; done)
 }
 
 colourise() {
-    [ -t 0 ] && echo -ne '\e['$1'm' || true
+    [ -t 0 ] && echo -ne $'\e['$1'm' || true
     shift
     # It's important that we don't do this in a subshell, as some
     # commands we execute need to modify global state
     "$@"
-    [ -t 0 ] && echo -ne '\e[0m' || true
+    [ -t 0 ] && echo -ne $'\e[0m' || true
 }
 
 whitely() {
@@ -154,7 +154,7 @@ assert_dns_record() {
     container=$2
     name=$3
     shift 3
-    exp_ips_regex=$(echo "$@" | sed -r 's/ /\\\|/g')
+    exp_ips_regex=$(echo "$@" | sed -e 's/ /\\\|/g')
 
     [ -z "$DEBUG" ] || greyly echo "Checking whether $name exists at $host:$container"
     assert_raises "exec_on $host $container getent hosts $name | grep -q '$exp_ips_regex'"
