@@ -941,6 +941,18 @@ proxy_addr() {
 # launch helpers
 ######################################################################
 
+common_launch_args() {
+    args=""
+    while [ $# -gt 0 ] ; do
+        case "$1" in
+            --log-level=*)
+                args="$args $1"
+        esac
+        shift
+    done
+    echo "$args"
+}
+
 launch_router() {
     create_bridge
     # We set the router name to the bridge mac since that is
@@ -1108,9 +1120,10 @@ case "$COMMAND" in
         check_not_running $CONTAINER_NAME       $BASE_IMAGE
         check_not_running $DNS_CONTAINER_NAME   $BASE_DNS_IMAGE
         check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
+        COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
-        launch_dns
-        launch_proxy
+        launch_dns    $COMMON_ARGS
+        launch_proxy  $COMMON_ARGS
         ;;
     launch-router)
         check_not_running $CONTAINER_NAME $BASE_IMAGE
