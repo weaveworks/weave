@@ -10,8 +10,8 @@ SUBNET_2=10.2.3.0/24
 
 start_suite "Ping over cross-host weave network (with and without IPAM)"
 
-weave_on $HOST1 launch -iprange $UNIVERSE -ipsubnet $SUBNET_1
-weave_on $HOST2 launch -iprange $UNIVERSE -ipsubnet $SUBNET_1 $HOST1
+weave_on $HOST1 launch --ipalloc-range $UNIVERSE --ipalloc-default-subnet $SUBNET_1
+weave_on $HOST2 launch --ipalloc-range $UNIVERSE --ipalloc-default-subnet $SUBNET_1 $HOST1
 
 start_container $HOST1    $C1/24     --name=c1
 start_container $HOST2 ip:$C2/24     --name=c2

@@ -142,9 +142,9 @@ To accomplish that, we assign each application a different subnet.
 Let's begin by configuring weave's allocator to manage multiple
 subnets:
 
-    host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24
+    host1$ weave launch --ipalloc-range 10.2.0.0/16 --ipalloc-default-subnet 10.2.1.0/24
     host1$ eval $(weave env)
-    host2$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24 $HOST1
+    host2$ weave launch --ipalloc-range 10.2.0.0/16 --ipalloc-default-subnet 10.2.1.0/24 $HOST1
     host2$ eval $(weave env)
 
 This delegates the entire 10.2.0.0/16 subnet to weave, and instructs
@@ -251,10 +251,10 @@ invocation:
 ### <a name="security"></a>Security
 
 In order to connect containers across untrusted networks, weave peers
-can be told to encrypt traffic by supplying a `-password` option or
+can be told to encrypt traffic by supplying a `--password` option or
 `WEAVE_PASSWORD` environment variable when launching weave, e.g.
 
-    host1$ weave launch -password wEaVe
+    host1$ weave launch --password wEaVe
 
 or
 
@@ -496,9 +496,9 @@ and the new hosts will be added, when one runs
     host# weave connect --replace $NEW_HOST1 $NEW_HOST2
 
 For complete control over the peer topology, automatic discovery can
-be disabled with the `-nodiscovery` option to `weave launch`. In this
-mode, weave will only connect to the addresses specified at launch
-time and with `weave connect`.
+be disabled with the `--no-discovery` option to `weave launch`. In
+this mode, weave will only connect to the addresses specified at
+launch time and with `weave connect`.
 
 ### <a name="container-mobility"></a>Container mobility
 

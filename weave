@@ -1148,30 +1148,6 @@ deprecation_warnings() {
             -no-default-ipam|--no-default-ipam)
                 deprecation_warning $1 "--no-default-ipalloc"
                 ;;
-            --tlscacert|--tlscacert=*)
-                deprecation_warning "--tlscacert" "--tls-cacert"
-                [ "$1" == "--tlscacert" ] && shift
-                ;;
-            --tls-cacert)
-                shift
-                ;;
-            --tlscert|--tlscert=*)
-                deprecation_warning "--tlscert" "--tls-cert"
-                [ "$1" == "--tlscert" ] && shift
-                ;;
-            --tls-cert)
-                shift
-                ;;
-            --tlskey|--tlskey=*)
-                deprecation_warning "--tlskey" "--tls-key"
-                [ "$1" == "--tlskey" ] && shift
-                ;;
-            --tls-key)
-                shift
-                ;;
-            --tlsverify)
-                deprecation_warning "--tlsverify" "--tls-verify"
-                ;;
         esac
         shift
     done
