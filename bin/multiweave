@@ -23,7 +23,7 @@ random_mac() {
     # In the first byte of the MAC, the 'multicast' bit should be
     # clear and 'locally administered' bit should be set.  All other
     # bits should be random.
-    od -txC -An -N6 /dev/urandom | sed 's|^ ||;s| |:|;s|[0-3]:|2:|;s|[4-7]:|6:|;s|[89ab]:|a:|;s|[c-f]:|e:|;s| |:|g'
+    od -txC -An -N6 /dev/urandom | ( read a b c d e f && printf "%02x:$b:$c:$d:$e:$f" $((0x$a & ~1 | 2)) )
 }
 
 case "$1" in
