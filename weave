@@ -24,45 +24,48 @@ IP_REGEXP="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 CIDR_REGEXP="$IP_REGEXP/[0-9]{1,2}"
 
 usage() {
-    echo "Usage:"
-    echo "weave setup"
-    echo "weave launch        [--password <password>] [--nickname <nickname>]"
-    echo "                      [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]"
-    echo "                      [--no-discovery] [--init-peer-count <count>] <peer> ..."
-    echo "weave launch-router [--password <password>] [--nickname <nickname>]"
-    echo "                      [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]"
-    echo "                      [--no-discovery] [--init-peer-count <count>] <peer> ..."
-    echo "weave launch-dns    [<addr>]"
-    echo "weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]"
-    echo "                      [--no-default-ipalloc]"
-    echo "weave connect       [--replace] [<peer> ...]"
-    echo "weave forget        <peer> ..."
-    echo "weave run           [--with-dns | --without-dns] [<addr> ...]"
-    echo "                      <docker run args> ..."
-    echo "weave start         [<addr> ...] <container_id>"
-    echo "weave attach        [<addr> ...] <container_id>"
-    echo "weave detach        [<addr> ...] <container_id>"
-    echo "weave dns-add       <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
-    echo "weave dns-remove    <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]"
-    echo "weave expose        [<addr> ...] [-h <fqdn>]"
-    echo "weave hide          [<addr> ...]"
-    echo "weave ps            [<container_id> ...]"
-    echo "weave status"
-    echo "weave env"
-    echo "weave config"
-    echo "weave version"
-    echo "weave stop"
-    echo "weave stop-router"
-    echo "weave stop-dns"
-    echo "weave stop-proxy"
-    echo "weave reset"
-    echo "weave rmpeer        <peer_id>"
-    echo
-    echo "where <peer>     = <ip_address_or_fqdn>[:<port>]"
-    echo "      <cidr>     = <ip_address>/<routing_prefix_length>"
-    echo "      <addr>     = [ip:]<cidr> | net:<cidr> | net:default"
-    echo "      <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket"
-    echo "      <peer_id>  = <nickname> or weave internal peer ID"
+    cat >&2 <<EOF
+Usage:
+
+weave setup
+weave launch        [--password <password>] [--nickname <nickname>]
+                      [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
+                      [--no-discovery] [--init-peer-count <count>] <peer> ...
+weave launch-router [--password <password>] [--nickname <nickname>]
+                      [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
+                      [--no-discovery] [--init-peer-count <count>] <peer> ...
+weave launch-dns    [<addr>]
+weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
+                      [--no-default-ipalloc]
+weave connect       [--replace] [<peer> ...]
+weave forget        <peer> ...
+weave run           [--with-dns | --without-dns] [<addr> ...]
+                      <docker run args> ...
+weave start         [<addr> ...] <container_id>
+weave attach        [<addr> ...] <container_id>
+weave detach        [<addr> ...] <container_id>
+weave dns-add       <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]
+weave dns-remove    <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]
+weave expose        [<addr> ...] [-h <fqdn>]
+weave hide          [<addr> ...]
+weave ps            [<container_id> ...]
+weave status
+weave env
+weave config
+weave version
+weave stop
+weave stop-router
+weave stop-dns
+weave stop-proxy
+weave reset
+weave rmpeer        <peer_id>
+
+where <peer>     = <ip_address_or_fqdn>[:<port>]
+      <cidr>     = <ip_address>/<routing_prefix_length>
+      <addr>     = [ip:]<cidr> | net:<cidr> | net:default
+      <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket
+      <peer_id>  = <nickname> or weave internal peer ID
+EOF
     exit 1
 }
 
