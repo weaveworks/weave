@@ -15,10 +15,21 @@ func fatal(err error) {
 	os.Exit(1)
 }
 
-func main() {
-	var ignoreIfaceName string
+type stringList map[string]struct{}
 
-	mflag.StringVar(&ignoreIfaceName, []string{"-ignore-iface"}, "", "name of interface to ignore)")
+func (ss *stringList) Set(value string) error {
+	(*ss)[value] = struct{}{}
+	return nil
+}
+
+func (ss *stringList) String() string {
+	return fmt.Sprintf("%v", *ss)
+}
+
+func main() {
+	ignoreIfaceNames := make(stringList)
+
+	mflag.Var(&ignoreIfaceNames, []string{"-ignore-iface"}, "name of interface to ignore)")
 	mflag.Parse()
 
 	if len(mflag.Args()) < 1 {
@@ -32,9 +43,9 @@ func main() {
 		fatal(err)
 	}
 	if ipnet.IP.Equal(addr) {
-		err = weavenet.CheckNetworkFree(ipnet, ignoreIfaceName)
+		err = weavenet.CheckNetworkFree(ipnet, ignoreIfaceNames)
 	} else {
-		err = weavenet.CheckAddressOverlap(addr, ignoreIfaceName)
+		err = weavenet.CheckAddressOverlap(addr, ignoreIfaceNames)
 	}
 	if err != nil {
 		fatal(err)
