@@ -87,7 +87,7 @@ would be safe wrt weave's startup quorum:
 
 ## <a name="range"></a>Choosing an allocation range
 
-By default, weave will allocate IP addresses in the 10.128.0.0/10
+By default, weave will allocate IP addresses in the 10.32.0.0/12
 range. This can be overridden with the `-iprange` option, e.g.
 
     host1$ weave launch -iprange 10.2.0.0/16

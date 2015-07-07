@@ -132,16 +132,16 @@ host2$ eval $(weave env)
 host2$ docker run -dti --name=pingme ubuntu
 
 root@ubuntu:/# ping -nq -c 1 pingme
-PING pingme.weave.local (10.128.0.2) 56(84) bytes of data.
+PING pingme.weave.local (10.32.0.2) 56(84) bytes of data.
 ...
 root@ubuntu:/# ping -nq -c 1 pingme
-PING pingme.weave.local (10.160.0.1) 56(84) bytes of data.
+PING pingme.weave.local (10.40.0.1) 56(84) bytes of data.
 ...
 root@ubuntu:/# ping -nq -c 1 pingme
-PING pingme.weave.local (10.160.0.1) 56(84) bytes of data.
+PING pingme.weave.local (10.40.0.1) 56(84) bytes of data.
 ...
 root@ubuntu:/# ping -nq -c 1 pingme
-PING pingme.weave.local (10.128.0.2) 56(84) bytes of data.
+PING pingme.weave.local (10.32.0.2) 56(84) bytes of data.
 ...
 ```
 
@@ -272,9 +272,9 @@ Fallback DNS config &{[10.0.2.3] [] 53 1 5 2}
 Local domain weave.local.
 Interface &{74 65535 ethwe 82:0c:92:84:0e:88 up|broadcast|multicast}
 Zone database:
-144b75a9b873: pingme.weave.local.[10.160.0.1]/OBS:1
-74a5510a91ad: ubuntu.weave.local.[10.160.0.2]
-weave:remote: pingme.weave.local.[10.128.0.2]/TTL:30
+144b75a9b873: pingme.weave.local.[10.40.0.1]/OBS:1
+74a5510a91ad: ubuntu.weave.local.[10.40.0.2]
+weave:remote: pingme.weave.local.[10.32.0.2]/TTL:30
 
 ...
 ````
