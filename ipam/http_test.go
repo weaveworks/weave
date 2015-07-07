@@ -13,7 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/ipam/address"
+	"github.com/weaveworks/weave/net/address"
 	wt "github.com/weaveworks/weave/testing"
 )
 

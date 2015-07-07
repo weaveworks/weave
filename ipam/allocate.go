@@ -3,7 +3,7 @@ package ipam
 import (
 	"fmt"
 
-	"github.com/weaveworks/weave/ipam/address"
+	"github.com/weaveworks/weave/net/address"
 )
 
 type allocateResult struct {
