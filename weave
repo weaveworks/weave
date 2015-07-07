@@ -860,7 +860,7 @@ ipam_cidrs() {
             ALL_CIDRS="$ALL_CIDRS $CIDR"
         else
             # This is a plain IP address; warn if it clashes but carry on
-            command_exists netcheck && netcheck $1 || true
+            command_exists netcheck && netcheck --ignore-iface=$BRIDGE $1 || true
             ALL_CIDRS="$ALL_CIDRS $1"
         fi
         shift 1
@@ -1018,7 +1018,7 @@ launch_router() {
     eval "set -- $ARGS"
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
         IPRANGE="10.32.0.0/12"
-        if command_exists netcheck && ! netcheck $IPRANGE ; then
+        if command_exists netcheck && ! netcheck --ignore-iface=$BRIDGE $IPRANGE ; then
             echo "Default --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
             echo "Please pick another range and set it on all hosts." >&2
             exit 1
