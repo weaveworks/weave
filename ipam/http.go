@@ -78,7 +78,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			badRequest(w, fmt.Errorf("Unable to allocate: %s", err))
 			return
 		}
-		if dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
+		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
 			common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, addr)
 			alloc.Free(ident, addr)
 			return
@@ -95,7 +95,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			badRequest(w, err)
 			return
 		}
-		if dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
+		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
 			common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, newAddr)
 			alloc.Free(ident, newAddr)
 			return

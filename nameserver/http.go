@@ -74,7 +74,7 @@ func ServeHTTP(listener net.Listener, version string, server *DNSServer, dockerC
 			} // oh, I already know this. whatever.
 		}
 
-		if dockerCli != nil && dockerCli.IsContainerNotRunning(idStr) {
+		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(idStr) {
 			Log.Infof("[http] '%s' is not running: removing", idStr)
 			server.Zone.DeleteRecords(idStr, name, ip)
 		}
