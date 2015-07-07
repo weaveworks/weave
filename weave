@@ -685,8 +685,11 @@ dns_args() {
     WITHOUT_DNS=
     while [ $# -gt 0 ] ; do
         case "$1" in
-            --dns-search=*)
-                DNS_SEARCH_SPECIFIED=1
+            --with-dns)
+                WITH_DNS=1
+                ;;
+            --without-dns)
+                WITHOUT_DNS=1
                 ;;
             --name)
                 NAME_ARG="$2"
@@ -698,11 +701,8 @@ dns_args() {
             -h|--hostname|--hostname=*)
                 HOSTNAME_SPECIFIED=1
                 ;;
-            --with-dns)
-                WITH_DNS=1
-                ;;
-            --without-dns)
-                WITHOUT_DNS=1
+            --dns-search|--dns-search=*)
+                DNS_SEARCH_SPECIFIED=1
                 ;;
         esac
         shift
