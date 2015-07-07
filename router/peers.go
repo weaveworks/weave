@@ -61,11 +61,10 @@ func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
 	return peer
 }
 
-func (peers *Peers) Fetch(name PeerName) (*Peer, bool) {
+func (peers *Peers) Fetch(name PeerName) *Peer {
 	peers.RLock()
 	defer peers.RUnlock()
-	peer, found := peers.table[name]
-	return peer, found // GRRR, why can't I inline this!?
+	return peers.table[name]
 }
 
 func (peers *Peers) Dereference(peer *Peer) {

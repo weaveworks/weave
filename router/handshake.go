@@ -82,7 +82,7 @@ func (conn *LocalConnection) handshake(acceptNewPeer bool) (TCPReceiver, error) 
 		return nil, err
 	}
 	if !acceptNewPeer {
-		if _, found := conn.Router.Peers.Fetch(name); !found {
+		if conn.Router.Peers.Fetch(name) != nil {
 			return nil, fmt.Errorf("Found unknown remote name: %s at %s", name, conn.remoteTCPAddr)
 		}
 	}

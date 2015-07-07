@@ -281,12 +281,9 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 
 func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *EthernetDecoder, sender *net.UDPAddr, po PacketSink) FrameConsumer {
 	return func(srcNameByte, dstNameByte []byte, frame []byte) {
-		srcPeer, found := router.Peers.Fetch(PeerNameFromBin(srcNameByte))
-		if !found {
-			return
-		}
-		dstPeer, found := router.Peers.Fetch(PeerNameFromBin(dstNameByte))
-		if !found {
+		srcPeer := router.Peers.Fetch(PeerNameFromBin(srcNameByte))
+		dstPeer := router.Peers.Fetch(PeerNameFromBin(dstNameByte))
+		if srcPeer == nil || dstPeer == nil {
 			return
 		}
 
@@ -335,7 +332,7 @@ func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *Ether
 			checkWarn(po.WritePacket(frame))
 		}
 
-		dstPeer, found = router.Macs.Lookup(dstMac)
+		dstPeer, found := router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
 			router.LogFrame("Relaying broadcast", frame, dec)
 			router.Ourself.RelayBroadcast(srcPeer, frame, dec)

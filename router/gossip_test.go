@@ -60,8 +60,8 @@ func (router *Router) DeleteTestChannelConnection(r *Router) {
 	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
 
-	fromPeer, _ := r.Peers.Fetch(fromName)
-	toPeer, _ := router.Peers.Fetch(toName)
+	fromPeer := r.Peers.Fetch(fromName)
+	toPeer := router.Peers.Fetch(toName)
 
 	r.Peers.Dereference(fromPeer)
 	router.Peers.Dereference(toPeer)
