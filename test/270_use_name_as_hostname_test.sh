@@ -22,7 +22,7 @@ assert_expected_fqdn() {
 
 start_suite "Use container name as hostname"
 
-weave_on $HOST1 launch -iprange 10.2.0.0/24
+weave_on $HOST1 launch --ipalloc-range 10.2.0.0/24
 
 assert_expected_fqdn "$NAME.$DOMAIN" --name=$NAME
 assert_expected_fqdn "$NAME.$DOMAIN" --name $NAME

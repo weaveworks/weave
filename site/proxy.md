@@ -140,8 +140,8 @@ TLS-related command-line flags as supplied to the docker daemon. For
 example, if you have generated your certificates and keys into the
 docker host's `/tls` directory, we can launch the proxy with:
 
-    host1$ weave launch-proxy --tlsverify --tlscacert=/tls/ca.pem \
-             --tlscert=/tls/server-cert.pem --tlskey=/tls/server-key.pem
+    host1$ weave launch-proxy --tls-verify --tls-cacert=/tls/ca.pem \
+             --tls-cert=/tls/server-cert.pem --tls-key=/tls/server-key.pem
 
 The paths to your certificates and key must be provided as absolute
 paths which exist on the docker host.
@@ -157,8 +157,8 @@ for an example.
 With the proxy running over TLS, we can configure our regular docker
 client to use TLS on a per-invocation basis with
 
-    $ docker --tlsverify --tlscacert=ca.pem --tlscert=cert.pem \
-         --tlskey=key.pem -H=tcp://host1:12375 version
+    $ docker --tls-verify --tls-cacert=ca.pem --tls-cert=cert.pem \
+         --tls-key=key.pem -H=tcp://host1:12375 version
     ...
 
 or,

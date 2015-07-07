@@ -30,7 +30,7 @@ case "$1" in
     launch)
         shift 1
         for i in $(seq $START $FINISH); do
-            WEAVE_CONTAINER_NAME=weave$i WEAVE_PORT=$((5000+i)) $weavedir/weave launch-router -iface '' -name $(random_mac) -nickname weave$i -port $PORT "$@"
+            WEAVE_CONTAINER_NAME=weave$i WEAVE_PORT=$((5000+i)) $weavedir/weave launch-router --iface '' --name $(random_mac) --nickname weave$i --port $PORT "$@"
         done
         if [ $START -ne 1 ] ; then
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$((START-1)))

@@ -22,8 +22,8 @@ A reasonable amount of information, and all errors, get logged there.
 
 The log verbosity can be increased by supplying the
 `--log-level=debug` option when launching weave. To log information on
-a per-packet basis use `-pktdebug` - be warned, this can produce a lot
-of output.
+a per-packet basis use `--pktdebug` - be warned, this can produce a
+lot of output.
 
 Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the
@@ -96,7 +96,7 @@ The 'Our name' line identifies the local weave router as a peer in the
 weave network, displaying the peer name followed by the peer's nickname
 in parenthesis. The nickname defaults to the name of the host on which
 the weave container was launched; if desired it can be overriden by
-supplying the `-nickname` argument to `weave launch`.
+supplying the `--nickname` argument to `weave launch`.
 
 The 'Sniffing traffic' line shows details of the virtual ethernet
 interface that weave is using to receive packets on the local

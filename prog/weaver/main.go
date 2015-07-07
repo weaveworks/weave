@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/sha256"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/davecheney/profile"
+	"github.com/docker/docker/pkg/mflag"
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
@@ -52,26 +52,26 @@ func main() {
 		peers        []string
 	)
 
-	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.IntVar(&config.Port, "port", weave.Port, "router port")
-	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if blank)")
-	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
-	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
-	flag.StringVar(&password, "password", "", "network password")
-	flag.IntVar(&wait, "wait", -1, "number of seconds to wait for interface to come up (0=don't wait, -1=wait forever)")
-	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
-	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
-	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
-	flag.IntVar(&config.ConnLimit, "connlimit", 30, "connection limit (0 for unlimited)")
-	flag.BoolVar(&noDiscovery, "nodiscovery", false, "disable peer discovery")
-	flag.IntVar(&bufSzMB, "bufsz", 8, "capture buffer size in MB")
-	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
-	flag.StringVar(&iprangeCIDR, "iprange", "", "IP address range reserved for automatic allocation, in CIDR notation")
-	flag.StringVar(&ipsubnetCIDR, "ipsubnet", "", "subnet to allocate within by default, in CIDR notation")
-	flag.IntVar(&peerCount, "initpeercount", 0, "number of peers in network (for IP address allocation)")
-	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
-	flag.Parse()
-	peers = flag.Args()
+	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
+	mflag.IntVar(&config.Port, []string{"#port", "-port"}, weave.Port, "router port")
+	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
+	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
+	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
+	mflag.StringVar(&password, []string{"#password", "-password"}, "", "network password")
+	mflag.IntVar(&wait, []string{"#wait", "-wait"}, -1, "number of seconds to wait for interface to come up (0=don't wait, -1=wait forever)")
+	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
+	mflag.BoolVar(&pktdebug, []string{"#pktdebug", "#-pktdebug", "-pkt-debug"}, false, "enable per-packet debug logging")
+	mflag.StringVar(&prof, []string{"#profile", "-profile"}, "", "enable profiling and write profiles to given path")
+	mflag.IntVar(&config.ConnLimit, []string{"#connlimit", "#-connlimit", "-conn-limit"}, 30, "connection limit (0 for unlimited)")
+	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
+	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
+	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
+	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
+	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
+	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
+	mflag.StringVar(&apiPath, []string{"#api", "-api"}, "unix:///var/run/docker.sock", "Path to Docker API socket")
+	mflag.Parse()
+	peers = mflag.Args()
 
 	SetLogLevel(logLevel)
 	if justVersion {
@@ -93,7 +93,7 @@ func main() {
 
 	if routerName == "" {
 		if config.Iface == nil {
-			Log.Fatal("Either an interface must be specified with -iface or a name with -name")
+			Log.Fatal("Either an interface must be specified with --iface or a name with -name")
 		}
 		routerName = config.Iface.HardwareAddr.String()
 	}
@@ -146,7 +146,7 @@ func main() {
 			Log.Fatal("Unable to start watcher", err)
 		}
 	} else if peerCount > 0 {
-		Log.Fatal("-initpeercount flag specified without -iprange")
+		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}
 
 	router.Start()
@@ -155,7 +155,7 @@ func main() {
 	}
 
 	// The weave script always waits for a status call to succeed,
-	// so there is no point in doing "weave launch -httpaddr ''".
+	// so there is no point in doing "weave launch --http-addr ''".
 	// This is here to support stand-alone use of weaver.
 	if httpAddr != "" {
 		go handleHTTP(router, httpAddr, allocator, defaultSubnet, dockerCli)
@@ -174,14 +174,24 @@ func errorMessages(errors []error) string {
 
 func options() map[string]string {
 	options := make(map[string]string)
-	flag.Visit(func(f *flag.Flag) {
+	mflag.Visit(func(f *mflag.Flag) {
 		value := f.Value.String()
-		if f.Name == "password" {
+		name := canonicalName(f)
+		if name == "password" {
 			value = "<elided>"
 		}
-		options[f.Name] = value
+		options[name] = value
 	})
 	return options
+}
+
+func canonicalName(f *mflag.Flag) string {
+	for _, n := range f.Names {
+		if n[0] != '#' {
+			return strings.TrimLeft(n, "#-")
+		}
+	}
+	return ""
 }
 
 func logFrameFunc(debug bool) weave.LogFrameFunc {

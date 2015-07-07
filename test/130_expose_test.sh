@@ -40,7 +40,7 @@ run_on1   "  $PING $EXP"
 weave_on1 "hide    $EXP/24"
 run_on1   "! $PING $EXP"
 
-weave_on $HOST1 launch -iprange $UNIVERSE
+weave_on $HOST1 launch --ipalloc-range $UNIVERSE
 
 start_container $HOST1 $C1/24 --name=c1
 start_container $HOST1 $C2/24 --name=c2
