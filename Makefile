@@ -1,4 +1,4 @@
-PUBLISH=publish_weave publish_weavedns publish_weaveexec
+PUBLISH=publish_weave publish_weaveexec
 
 .DEFAULT: all
 .PHONY: all update tests publish $(PUBLISH) clean prerequisites build travis run-smoketests
@@ -10,26 +10,23 @@ DOCKERHUB_USER=weaveworks
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 
 WEAVER_EXE=prog/weaver/weaver
-WEAVEDNS_EXE=prog/weavedns/weavedns
 WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 NETCHECK_EXE=prog/netcheck/netcheck
 COVER_EXE=testing/cover/cover
 
-EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE) $(COVER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE) $(COVER_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
-WEAVEDNS_UPTODATE=.weavedns.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEDNS_UPTODATE) $(WEAVEEXEC_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
-WEAVEDNS_IMAGE=$(DOCKERHUB_USER)/weavedns
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEDNS_IMAGE) $(WEAVEEXEC_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE)
 
 WEAVE_EXPORT=weave.tar
 
@@ -64,13 +61,12 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go prog/weaver/main.go
-$(WEAVEDNS_EXE): nameserver/*.go prog/weavedns/main.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
 $(NETCHECK_EXE): prog/netcheck/netcheck.go
 
@@ -86,10 +82,6 @@ $(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(COVER_EXE):
 
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
-	touch $@
-
-$(WEAVEDNS_UPTODATE): prog/weavedns/Dockerfile $(WEAVEDNS_EXE)
-	$(SUDO) docker build -t $(WEAVEDNS_IMAGE) prog/weavedns
 	touch $@
 
 $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)
