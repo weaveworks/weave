@@ -8,7 +8,7 @@ import (
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
-	"github.com/weaveworks/weave/ipam/address"
+	"github.com/weaveworks/weave/net/address"
 )
 
 func badRequest(w http.ResponseWriter, err error) {
