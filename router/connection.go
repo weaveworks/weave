@@ -283,10 +283,15 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.TCPConn.SetLinger(0)
 
-	tcpReceiver, err := conn.handshake(acceptNewPeer)
+	tcpReceiver, remote, err := conn.handshake()
 	if err != nil {
 		return
 	}
+
+	if err = conn.registerRemote(remote, acceptNewPeer); err != nil {
+		return
+	}
+
 	conn.Log("completed handshake; using protocol version", conn.version)
 
 	// The ordering of the following is very important. [1]
@@ -350,6 +355,27 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 // packets if the forwarders haven't been created yet. We cannot
 // prevent that completely, since, for example, forwarder can only be
 // created when we know the remote UDP address, but it helps to try.
+
+func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) error {
+	if acceptNewPeer {
+		conn.remote = conn.Router.Peers.FetchWithDefault(remote)
+	} else {
+		conn.remote = conn.Router.Peers.FetchAndAddRef(remote.Name)
+		if conn.remote == nil {
+			return fmt.Errorf("Found unknown remote name: %s at %s", remote.Name, conn.remoteTCPAddr)
+		}
+	}
+
+	if conn.remote.UID != remote.UID {
+		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
+	}
+
+	if conn.remote == conn.local {
+		return fmt.Errorf("Cannot connect to ourself")
+	}
+
+	return nil
+}
 
 func (conn *LocalConnection) initHeartbeats() error {
 	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)

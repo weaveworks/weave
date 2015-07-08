@@ -64,9 +64,6 @@ func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
 	peers.Lock()
 	defer peers.Unlock()
 	if existingPeer, found := peers.table[peer.Name]; found {
-		if existingPeer.UID != peer.UID {
-			return nil
-		}
 		existingPeer.localRefCount++
 		return existingPeer
 	}
@@ -79,6 +76,16 @@ func (peers *Peers) Fetch(name PeerName) *Peer {
 	peers.RLock()
 	defer peers.RUnlock()
 	return peers.table[name]
+}
+
+func (peers *Peers) FetchAndAddRef(name PeerName) *Peer {
+	peers.Lock()
+	defer peers.Unlock()
+	peer := peers.table[name]
+	if peer != nil {
+		peer.localRefCount++
+	}
+	return peer
 }
 
 func (peers *Peers) Dereference(peer *Peer) {
