@@ -12,7 +12,7 @@ type Peers struct {
 	sync.RWMutex
 	ourself *LocalPeer
 	table   map[PeerName]*Peer
-	onGC    func(*Peer)
+	onGC    []func(*Peer)
 }
 
 type UnknownPeerError struct {
@@ -43,7 +43,21 @@ func NewPeers(ourself *LocalPeer, onGC func(*Peer)) *Peers {
 	return &Peers{
 		ourself: ourself,
 		table:   make(map[PeerName]*Peer),
-		onGC:    onGC}
+		onGC:    []func(*Peer){onGC}}
+}
+
+func (peers *Peers) OnGC(callback func(*Peer)) {
+	peers.Lock()
+	defer peers.Unlock()
+	peers.onGC = append(peers.onGC, callback)
+}
+
+func (peers *Peers) invokeOnGCCallbacks(removed []*Peer) {
+	for _, callback := range peers.onGC {
+		for _, peer := range removed {
+			callback(peer)
+		}
+	}
 }
 
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
@@ -105,13 +119,14 @@ func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error)
 
 	// Now apply the updates
 	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns)
-
-	for _, peerRemoved := range peers.garbageCollect() {
+	removed := peers.garbageCollect()
+	for _, peerRemoved := range removed {
 		delete(newUpdate, peerRemoved.Name)
 	}
 
 	// Don't need to hold peers lock any longer
 	peers.Unlock()
+	peers.invokeOnGCCallbacks(removed)
 
 	updateNames := make(PeerNameSet)
 	for _, peer := range decodedUpdate {
@@ -145,8 +160,10 @@ func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
 
 func (peers *Peers) GarbageCollect() []*Peer {
 	peers.Lock()
-	defer peers.Unlock()
-	return peers.garbageCollect()
+	removed := peers.garbageCollect()
+	peers.Unlock()
+	peers.invokeOnGCCallbacks(removed)
+	return removed
 }
 
 func (peers *Peers) String() string {
@@ -185,7 +202,6 @@ func (peers *Peers) garbageCollect() []*Peer {
 	for name, peer := range peers.table {
 		if _, found := reached[peer.Name]; !found && peer.localRefCount == 0 {
 			delete(peers.table, name)
-			peers.onGC(peer)
 			removed = append(removed, peer)
 		}
 	}
