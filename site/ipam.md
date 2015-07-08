@@ -94,6 +94,14 @@ range. This can be overridden with the `-iprange` option, e.g.
 
 and must be the same on every host.
 
+> The specified range is for *exclusive* use by the IP allocator. In
+> particular, when starting containers with manually assigned IP
+> addresses, these must be outside the IP allocator's range.  If, in
+> our example, you subsequently executed `docker run -e
+> WEAVE_CIDR=10.2.3.1/24 -ti ubuntu`, the IP allocator might assign
+> the same address to another container, which will break IP routing
+> for the containers sharing an address.
+
 The range parameter is written in
 [CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) -
 in this example "/16" means the first 16 bits of the address form the
@@ -107,14 +115,6 @@ according to their needs.  If a group of peers becomes isolated from
 the rest (a partition), they can continue to work with the address
 ranges they had before isolation, and can subsequently be re-connected
 to the rest of the network without any conflicts arising.
-
-Once you have given a range of addresses to the IP allocator, you must
-not use any addresses in that range for anything else.  If, in our
-example, you subsequently executed `docker run -e WEAVE_CIDR=10.2.3.1/24 -ti ubuntu`,
-you run the risk that the IP allocator will assign the same address to
-another container, which will make network traffic delivery
-intermittent or non-existent for the containers that share the same IP
-address.
 
 ## <a name="subnets"></a>Automatic allocation across multiple subnets
 
