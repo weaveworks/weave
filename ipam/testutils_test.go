@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/router"
+	"github.com/weaveworks/weave/testing/gossip"
 )
 
 type mockMessage struct {
@@ -194,119 +194,8 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 	}
 }
 
-// Router to convey gossip from one gossiper to another, for testing
-type unicastMessage struct {
-	sender router.PeerName
-	buf    []byte
-}
-type broadcastMessage struct {
-	data router.GossipData
-}
-type exitMessage struct {
-	exitChan chan struct{}
-}
-type flushMessage struct {
-	flushChan chan struct{}
-}
-
-type TestGossipRouter struct {
-	gossipChans map[router.PeerName]chan interface{}
-	loss        float32 // 0.0 means no loss
-}
-
-func (grouter *TestGossipRouter) GossipBroadcast(update router.GossipData) error {
-	for _, gossipChan := range grouter.gossipChans {
-		select {
-		case gossipChan <- broadcastMessage{data: update}:
-		default: // drop the message if we cannot send it
-		}
-	}
-	return nil
-}
-
-func (grouter *TestGossipRouter) flush() {
-	for _, gossipChan := range grouter.gossipChans {
-		flushChan := make(chan struct{})
-		gossipChan <- flushMessage{flushChan: flushChan}
-		<-flushChan
-	}
-}
-
-func (grouter *TestGossipRouter) removePeer(peer router.PeerName) {
-	gossipChan := grouter.gossipChans[peer]
-	resultChan := make(chan struct{})
-	gossipChan <- exitMessage{exitChan: resultChan}
-	<-resultChan
-	delete(grouter.gossipChans, peer)
-}
-
-type TestGossipRouterClient struct {
-	router *TestGossipRouter
-	sender router.PeerName
-}
-
-func (grouter *TestGossipRouter) run(gossiper router.Gossiper, gossipChan chan interface{}) {
-	gossipTimer := time.Tick(10 * time.Second)
-	for {
-		select {
-		case gossip := <-gossipChan:
-			switch message := gossip.(type) {
-			case exitMessage:
-				close(message.exitChan)
-				return
-
-			case flushMessage:
-				close(message.flushChan)
-
-			case unicastMessage:
-				if rand.Float32() > (1.0 - grouter.loss) {
-					continue
-				}
-				if err := gossiper.OnGossipUnicast(message.sender, message.buf); err != nil {
-					panic(fmt.Sprintf("Error doing gossip unicast to %s: %s", message.sender, err))
-				}
-
-			case broadcastMessage:
-				if rand.Float32() > (1.0 - grouter.loss) {
-					continue
-				}
-				for _, msg := range message.data.Encode() {
-					if _, err := gossiper.OnGossipBroadcast(msg); err != nil {
-						panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
-					}
-				}
-			}
-		case <-gossipTimer:
-			grouter.GossipBroadcast(gossiper.Gossip())
-		}
-	}
-}
-
-func (grouter *TestGossipRouter) connect(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
-	gossipChan := make(chan interface{}, 100)
-
-	go grouter.run(gossiper, gossipChan)
-
-	grouter.gossipChans[sender] = gossipChan
-	return TestGossipRouterClient{grouter, sender}
-}
-
-func (client TestGossipRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
-	select {
-	case client.router.gossipChans[dstPeerName] <- unicastMessage{sender: client.sender, buf: buf}:
-	default: // drop the message if we cannot send it
-		common.Log.Errorf("Dropping message")
-	}
-	return nil
-}
-
-func (client TestGossipRouterClient) GossipBroadcast(update router.GossipData) error {
-	return client.router.GossipBroadcast(update)
-}
-
-func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRouter, address.Range) {
-
-	gossipRouter := TestGossipRouter{make(map[router.PeerName]chan interface{}), 0.0}
+func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestRouter, address.Range) {
+	gossipRouter := gossip.NewTestRouter(0.0)
 	allocs := make([]*Allocator, size)
 	var subnet address.Range
 
@@ -314,13 +203,13 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, TestGossipRou
 		var alloc *Allocator
 		alloc, subnet = makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", i),
 			cidr, uint(size/2+1))
-		alloc.SetInterfaces(gossipRouter.connect(alloc.ourName, alloc))
+		alloc.SetInterfaces(gossipRouter.Connect(alloc.ourName, alloc))
 		alloc.Start()
 		allocs[i] = alloc
 	}
 
 	gossipRouter.GossipBroadcast(allocs[size-1].Gossip())
-	gossipRouter.flush()
+	gossipRouter.Flush()
 	return allocs, gossipRouter, subnet
 }
 

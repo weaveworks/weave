@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
+	"github.com/weaveworks/weave/testing/gossip"
 )
 
 const (
@@ -166,13 +167,13 @@ func TestCancel(t *testing.T) {
 		CIDR = "10.0.1.7/26"
 	)
 
-	router := TestGossipRouter{make(map[router.PeerName]chan interface{}), 0.0}
+	router := gossip.NewTestRouter(0.0)
 
 	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
-	alloc1.SetInterfaces(router.connect(alloc1.ourName, alloc1))
+	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 
 	alloc2, _ := makeAllocator("02:00:00:02:00:00", CIDR, 2)
-	alloc2.SetInterfaces(router.connect(alloc2.ourName, alloc2))
+	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc1.claimRingForTesting(alloc1, alloc2)
 	alloc2.claimRingForTesting(alloc1, alloc2)
 
@@ -254,17 +255,17 @@ func TestTransfer(t *testing.T) {
 	require.True(t, err == nil, "Failed to get address")
 
 	router.GossipBroadcast(alloc2.Gossip())
-	router.flush()
+	router.Flush()
 	router.GossipBroadcast(alloc3.Gossip())
-	router.flush()
-	router.removePeer(alloc2.ourName)
-	router.removePeer(alloc3.ourName)
+	router.Flush()
+	router.RemovePeer(alloc2.ourName)
+	router.RemovePeer(alloc3.ourName)
 	alloc2.Stop()
 	alloc3.Stop()
-	router.flush()
+	router.Flush()
 	require.NoError(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
 	require.NoError(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
-	router.flush()
+	router.Flush()
 
 	require.Equal(t, address.Offset(1022), alloc1.NumFreeAddresses(subnet))
 
