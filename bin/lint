@@ -56,6 +56,11 @@ function lint {
 		return
 	fi
 
+	# Don't lint files that don't exist
+	if ! [ -a "${filename}" ]; then
+		return
+	fi
+
 	case "$ext" in
 		go) lint_go "${filename}"
 		;;
