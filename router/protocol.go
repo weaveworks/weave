@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	Protocol                = "weave"
-	ProtocolMinVersion byte = 1
-	ProtocolVersion    byte = 2
+	Protocol           = "weave"
+	ProtocolMinVersion = 1
+	ProtocolMaxVersion = 2
 )
 
 var (
@@ -48,10 +48,12 @@ type ProtocolIntroConn interface {
 }
 
 type ProtocolIntroParams struct {
-	Features map[string]string
-	Conn     ProtocolIntroConn
-	Password []byte
-	Outbound bool
+	MinVersion byte
+	MaxVersion byte
+	Features   map[string]string
+	Conn       ProtocolIntroConn
+	Password   []byte
+	Outbound   bool
 }
 
 type ProtocolIntroResults struct {
@@ -63,15 +65,11 @@ type ProtocolIntroResults struct {
 }
 
 func (params ProtocolIntroParams) DoIntro() (res ProtocolIntroResults, err error) {
-	return params.doIntro(ProtocolVersion)
-}
-
-func (params ProtocolIntroParams) doIntro(maxVersion byte) (res ProtocolIntroResults, err error) {
 	if err = params.Conn.SetDeadline(time.Now().Add(HeaderTimeout)); err != nil {
 		return
 	}
 
-	if res.Version, err = params.exchangeProtocolHeader(maxVersion); err != nil {
+	if res.Version, err = params.exchangeProtocolHeader(); err != nil {
 		return
 	}
 
@@ -101,12 +99,12 @@ func (params ProtocolIntroParams) doIntro(maxVersion byte) (res ProtocolIntroRes
 	return
 }
 
-func (params ProtocolIntroParams) exchangeProtocolHeader(maxVersion byte) (byte, error) {
+func (params ProtocolIntroParams) exchangeProtocolHeader() (byte, error) {
 	// Write in a separate goroutine to avoid the possibility of
 	// deadlock.  The result channel is of size 1 so that the
 	// goroutine does not linger even if we encounter an error on
 	// the read side.
-	sendHeader := append(ProtocolBytes, ProtocolMinVersion, maxVersion)
+	sendHeader := append(ProtocolBytes, params.MinVersion, params.MaxVersion)
 	writeDone := make(chan error, 1)
 	go func() {
 		_, err := params.Conn.Write(sendHeader)
@@ -127,27 +125,27 @@ func (params ProtocolIntroParams) exchangeProtocolHeader(maxVersion byte) (byte,
 
 	theirMinVersion := header[len(ProtocolBytes)]
 	minVersion := theirMinVersion
-	if ProtocolMinVersion > minVersion {
-		minVersion = ProtocolMinVersion
+	if params.MinVersion > minVersion {
+		minVersion = params.MinVersion
 	}
 
-	theirVersion := header[len(ProtocolBytes)+1]
-	version := theirVersion
-	if version > maxVersion {
-		version = maxVersion
+	theirMaxVersion := header[len(ProtocolBytes)+1]
+	maxVersion := theirMaxVersion
+	if maxVersion > params.MaxVersion {
+		maxVersion = params.MaxVersion
 	}
 
-	if minVersion > version {
+	if minVersion > maxVersion {
 		return 0, fmt.Errorf("remote version range [%d,%d] is incompatible with ours [%d,%d]",
-			theirMinVersion, theirVersion,
-			ProtocolMinVersion, maxVersion)
+			theirMinVersion, theirMaxVersion,
+			params.MinVersion, params.MaxVersion)
 	}
 
 	if err := <-writeDone; err != nil {
 		return 0, err
 	}
 
-	return version, nil
+	return maxVersion, nil
 }
 
 // The V1 procotol consists of the protocol identification/version

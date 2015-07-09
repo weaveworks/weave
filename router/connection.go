@@ -285,10 +285,12 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.TCPConn.SetLinger(0)
 	intro, err := ProtocolIntroParams{
-		Features: conn.makeFeatures(),
-		Conn:     conn.TCPConn,
-		Password: conn.Router.Password,
-		Outbound: conn.outbound,
+		MinVersion: conn.Router.ProtocolMinVersion,
+		MaxVersion: ProtocolMaxVersion,
+		Features:   conn.makeFeatures(),
+		Conn:       conn.TCPConn,
+		Password:   conn.Router.Password,
+		Outbound:   conn.outbound,
 	}.DoIntro()
 	if err != nil {
 		return

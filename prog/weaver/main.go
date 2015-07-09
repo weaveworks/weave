@@ -32,28 +32,30 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		config       weave.Config
-		justVersion  bool
-		ifaceName    string
-		routerName   string
-		nickName     string
-		password     string
-		wait         int
-		pktdebug     bool
-		logLevel     string
-		prof         string
-		bufSzMB      int
-		noDiscovery  bool
-		httpAddr     string
-		iprangeCIDR  string
-		ipsubnetCIDR string
-		peerCount    int
-		apiPath      string
-		peers        []string
+		config             weave.Config
+		justVersion        bool
+		protocolMinVersion int
+		ifaceName          string
+		routerName         string
+		nickName           string
+		password           string
+		wait               int
+		pktdebug           bool
+		logLevel           string
+		prof               string
+		bufSzMB            int
+		noDiscovery        bool
+		httpAddr           string
+		iprangeCIDR        string
+		ipsubnetCIDR       string
+		peerCount          int
+		apiPath            string
+		peers              []string
 	)
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
 	mflag.IntVar(&config.Port, []string{"#port", "-port"}, weave.Port, "router port")
+	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, weave.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
@@ -81,6 +83,11 @@ func main() {
 
 	Log.Println("Command line options:", options())
 	Log.Println("Command line peers:", peers)
+
+	if protocolMinVersion < weave.ProtocolMinVersion || protocolMinVersion > weave.ProtocolMaxVersion {
+		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", weave.ProtocolMinVersion, weave.ProtocolMaxVersion)
+	}
+	config.ProtocolMinVersion = byte(protocolMinVersion)
 
 	var err error
 

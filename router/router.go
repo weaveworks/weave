@@ -28,13 +28,14 @@ const (
 type LogFrameFunc func(string, []byte, *EthernetDecoder)
 
 type Config struct {
-	Port          int
-	Iface         *net.Interface
-	Password      []byte
-	ConnLimit     int
-	PeerDiscovery bool
-	BufSz         int
-	LogFrame      LogFrameFunc
+	Port               int
+	ProtocolMinVersion byte
+	Iface              *net.Interface
+	Password           []byte
+	ConnLimit          int
+	PeerDiscovery      bool
+	BufSz              int
+	LogFrame           LogFrameFunc
 }
 
 type Router struct {

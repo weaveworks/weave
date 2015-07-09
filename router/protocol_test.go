@@ -33,10 +33,10 @@ func connPair() (ProtocolIntroConn, ProtocolIntroConn) {
 	return &a, &b
 }
 
-func doIntro(t *testing.T, ver byte, params ProtocolIntroParams) <-chan ProtocolIntroResults {
+func doIntro(t *testing.T, params ProtocolIntroParams) <-chan ProtocolIntroResults {
 	ch := make(chan ProtocolIntroResults, 1)
 	go func() {
-		res, err := params.doIntro(ver)
+		res, err := params.DoIntro()
 		require.Nil(t, err)
 		ch <- res
 	}()
@@ -45,17 +45,21 @@ func doIntro(t *testing.T, ver byte, params ProtocolIntroParams) <-chan Protocol
 
 func doProtocolIntro(t *testing.T, aver, bver byte, password []byte) byte {
 	aconn, bconn := connPair()
-	aresch := doIntro(t, aver, ProtocolIntroParams{
-		Features: map[string]string{"Name": "A"},
-		Conn:     aconn,
-		Outbound: true,
-		Password: password,
+	aresch := doIntro(t, ProtocolIntroParams{
+		MinVersion: ProtocolMinVersion,
+		MaxVersion: aver,
+		Features:   map[string]string{"Name": "A"},
+		Conn:       aconn,
+		Outbound:   true,
+		Password:   password,
 	})
-	bresch := doIntro(t, bver, ProtocolIntroParams{
-		Features: map[string]string{"Name": "B"},
-		Conn:     bconn,
-		Outbound: false,
-		Password: password,
+	bresch := doIntro(t, ProtocolIntroParams{
+		MinVersion: ProtocolMinVersion,
+		MaxVersion: bver,
+		Features:   map[string]string{"Name": "B"},
+		Conn:       bconn,
+		Outbound:   false,
+		Password:   password,
 	})
 	ares := <-aresch
 	bres := <-bresch
