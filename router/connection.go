@@ -392,56 +392,42 @@ func (conn *LocalConnection) makeFeatures() map[string]string {
 
 type features map[string]string
 
-func (features features) Get(key string) (string, error) {
-	val, ok := features[key]
-	if !ok {
-		return "", fmt.Errorf("Field %s is missing", key)
+func (features features) MustHave(keys []string) error {
+	for _, key := range keys {
+		if _, ok := features[key]; !ok {
+			return fmt.Errorf("Field %s is missing", key)
+		}
 	}
+	return nil
+}
 
-	return val, nil
+func (features features) Get(key string) string {
+	return features[key]
 }
 
 func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
-	str, err := features.Get("PeerNameFlavour")
+	if err := features.MustHave([]string{"PeerNameFlavour", "Name", "NickName", "UID", "ConnID"}); err != nil {
+		return nil, err
+	}
+
+	remotePeerNameFlavour := features.Get("PeerNameFlavour")
+	if remotePeerNameFlavour != PeerNameFlavour {
+		return nil, fmt.Errorf("Peer name flavour mismatch (ours: '%s', theirs: '%s')", PeerNameFlavour, remotePeerNameFlavour)
+	}
+
+	name, err := PeerNameFromString(features.Get("Name"))
 	if err != nil {
 		return nil, err
 	}
 
-	if str != PeerNameFlavour {
-		return nil, fmt.Errorf("Peer name flavour mismatch (ours: \"%s\", theirs: \"%s\")", PeerNameFlavour, str)
-	}
+	nickName := features.Get("NickName")
 
-	str, err = features.Get("Name")
+	uid, err := ParsePeerUID(features.Get("UID"))
 	if err != nil {
 		return nil, err
 	}
 
-	name, err := PeerNameFromString(str)
-	if err != nil {
-		return nil, err
-	}
-
-	nickName, err := features.Get("NickName")
-	if err != nil {
-		return nil, err
-	}
-
-	str, err = features.Get("UID")
-	if err != nil {
-		return nil, err
-	}
-
-	uid, err := ParsePeerUID(str)
-	if err != nil {
-		return nil, err
-	}
-
-	str, err = features.Get("ConnID")
-	if err != nil {
-		return nil, err
-	}
-
-	remoteConnID, err := strconv.ParseUint(str, 10, 64)
+	remoteConnID, err := strconv.ParseUint(features.Get("ConnID"), 10, 64)
 	if err != nil {
 		return nil, err
 	}
