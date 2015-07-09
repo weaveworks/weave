@@ -35,15 +35,22 @@ dependencies:
 
 test:
   override:
-    - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go weaveworks/weave-build:
+    - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go -e COVERAGE=true weaveworks/weave-build:
         parallel: true
     - cd $SRCDIR/test; ./gce.sh setup:
         parallel: true
     - cd $SRCDIR/test; . ./gce.sh hosts; ./setup.sh:
         parallel: true
-    - cd $SRCDIR/test; . ./gce.sh hosts; ./run_all.sh:
+    - cd $SRCDIR/test; . ./gce.sh hosts; export COVERAGE=true; ./run_all.sh:
         parallel: true
         timeout: 300
   post:
     - cd $SRCDIR/test; ./gce.sh destroy:
+        parallel: true
+
+teardown:
+  pre:
+    - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh):
+        parallel: true
+    - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; cp coverage.* $CIRCLE_ARTIFACTS):
         parallel: true

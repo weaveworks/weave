@@ -113,6 +113,15 @@ weave_on() {
     DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
+weave_stop_router() {
+    host=$1
+    shift 1
+    docker_on $host stop weave 1>/dev/null 2>&1 || true
+    if [ -n "$COVERAGE" ] ; then
+        collect_coverage $host
+    fi
+}
+
 exec_on() {
     host=$1
     container=$2
@@ -196,6 +205,19 @@ start_suite() {
 
 end_suite() {
     whitely assert_end
+    for host in $HOSTS; do
+        weave_stop_router $host
+    done
+}
+
+collect_coverage() {
+    host=$1
+    rm -f cover.router.prof
+    docker_on $host cp weave:/home/weave/cover.router.prof . || true
+
+    # ideally we'd know the name of the test here, and put that in the filename
+    mkdir -p ./coverage
+    mv cover.router.prof $(mktemp -u ./coverage/integration.XXXXXXXX) || true
 }
 
 WEAVE=$DIR/../weave
