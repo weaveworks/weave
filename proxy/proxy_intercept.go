@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -117,29 +116,29 @@ func copyStream(dst io.Writer, src io.Reader, done chan struct{}) {
 }
 
 func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httputil.ClientConn) {
-	// Because we can't go back to request/response after we
-	// hijack the connection, we need to close it and make the
-	// client open another.
-	w.Header().Add("Connection", "close")
+	wf, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Error forwarding chunked response body: flush not available", http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(resp.StatusCode)
 
-	down, _, up, rem, err := hijack(w, client)
-	if err != nil {
-		http.Error(w, "Unable to hijack response stream for chunked response", http.StatusInternalServerError)
-		return
-	}
+	up, rem := client.Hijack()
 	defer up.Close()
-	defer down.Close()
-	// Copy the chunked response body to downstream,
-	// stopping at the end of the chunked section.
-	rawResponseBody := io.MultiReader(rem, up)
-	if _, err := io.Copy(ioutil.Discard, httputil.NewChunkedReader(io.TeeReader(rawResponseBody, down))); err != nil {
-		http.Error(w, "Error copying chunked response body", http.StatusInternalServerError)
-		return
+
+	var err error
+	chunks := NewChunkedReader(io.MultiReader(rem, up))
+	for chunks.Next() && err == nil {
+		_, err = io.Copy(w, chunks.Chunk())
+		wf.Flush()
 	}
-	resp.Trailer.Write(down)
-	// a chunked response ends with a CRLF
-	down.Write([]byte("\r\n"))
+	if err == nil {
+		err = chunks.Err()
+	}
+	if err != nil {
+		Error.Printf("Error forwarding chunked response body: %s", err)
+	}
 }
 
 func hijack(w http.ResponseWriter, client *httputil.ClientConn) (down net.Conn, downBuf *bufio.ReadWriter, up net.Conn, rem io.Reader, err error) {

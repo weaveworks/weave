@@ -1,156 +1,106 @@
-// Copyright 2011 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
+// Based on net/http/internal
 package proxy
 
 import (
-	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
-	"strings"
 	"testing"
 )
 
 func TestChunk(t *testing.T) {
-	var b bytes.Buffer
+	r := NewChunkedReader(bytes.NewBufferString(
+		"7\r\nhello, \r\n17\r\nworld! 0123456789abcdef\r\n0\r\n",
+	))
 
-	w := NewChunkedWriter(&b)
-	const chunk1 = "hello, "
-	const chunk2 = "world! 0123456789abcdef"
-	w.Write([]byte(chunk1))
-	w.Write([]byte(chunk2))
-	w.Close()
+	assertNextChunk(t, r, "hello, ")
+	assertNextChunk(t, r, "world! 0123456789abcdef")
+	assertNoMoreChunks(t, r)
+}
 
-	if g, e := b.String(), "7\r\nhello, \r\n17\r\nworld! 0123456789abcdef\r\n0\r\n"; g != e {
-		t.Fatalf("chunk writer wrote %q; want %q", g, e)
+func TestIncompleteReadOfChunk(t *testing.T) {
+	r := NewChunkedReader(bytes.NewBufferString(
+		"7\r\nhello, \r\n17\r\nworld! 0123456789abcdef\r\n0\r\n",
+	))
+
+	// Incomplete read of first chunk
+	{
+		if !r.Next() {
+			t.Fatalf("Expected chunk, but ran out early: %v", r.Err())
+		}
+		if r.Err() != nil {
+			t.Fatalf("Error reading chunk: %q", r.Err())
+		}
+		// Read just 2 bytes
+		buf := make([]byte, 2)
+		if _, err := io.ReadFull(r.Chunk(), buf[:2]); err != nil {
+			t.Fatalf("Error reading first bytes of chunk: %q", err)
+		}
+		if buf[0] != 'h' || buf[1] != 'e' {
+			t.Fatalf("Unexpected first 2 bytes of chunk: %s", string(buf))
+		}
 	}
 
-	r := NewChunkedReader(&b)
-	data, err := ioutil.ReadAll(r)
+	// Second chunk still reads ok
+	assertNextChunk(t, r, "world! 0123456789abcdef")
+
+	assertNoMoreChunks(t, r)
+}
+
+func TestMalformedChunks(t *testing.T) {
+	r := NewChunkedReader(bytes.NewBufferString(
+		"7\r\nhello, GARBAGEBYTES17\r\nworld! 0123456789abcdef\r\n0\r\n",
+	))
+
+	// First chunk is ok
+	assertNextChunk(t, r, "hello, ")
+
+	// Second chunk fails
+	{
+		if r.Next() {
+			t.Errorf("Expected failure when reading chunks, but got one")
+		}
+		e := "malformed chunked encoding"
+		if r.Err() == nil || r.Err().Error() != e {
+			t.Errorf("chunk reader errored %q; want %q", r.Err(), e)
+		}
+		data, err := ioutil.ReadAll(r.Chunk())
+		if len(data) != 0 {
+			t.Errorf("chunk should have been empty. got %q", string(data))
+		}
+		if err != nil {
+			t.Logf(`data: "%s"`, data)
+			t.Errorf("reading chunk: %v", err)
+		}
+	}
+
+	if r.Next() {
+		t.Errorf("Expected no more chunks, but found too many")
+	}
+}
+
+func assertNextChunk(t *testing.T, r *ChunkedReader, expected string) {
+	if !r.Next() {
+		t.Fatalf("Expected chunk, but ran out early: %v", r.Err())
+	}
+	if r.Err() != nil {
+		t.Fatalf("Error reading chunk: %q", r.Err())
+	}
+	data, err := ioutil.ReadAll(r.Chunk())
+	if g := string(data); g != expected {
+		t.Errorf("chunk reader read %q; want %q", g, expected)
+	}
 	if err != nil {
 		t.Logf(`data: "%s"`, data)
-		t.Fatalf("ReadAll from reader: %v", err)
-	}
-	if g, e := string(data), chunk1+chunk2; g != e {
-		t.Errorf("chunk reader read %q; want %q", g, e)
+		t.Fatalf("reading chunk: %v", err)
 	}
 }
 
-func TestChunkReadMultiple(t *testing.T) {
-	// Bunch of small chunks, all read together.
-	{
-		var b bytes.Buffer
-		w := NewChunkedWriter(&b)
-		w.Write([]byte("foo"))
-		w.Write([]byte("bar"))
-		w.Close()
-
-		r := NewChunkedReader(&b)
-		buf := make([]byte, 10)
-		n, err := r.Read(buf)
-		if n != 6 || err != io.EOF {
-			t.Errorf("Read = %d, %v; want 6, EOF", n, err)
-		}
-		buf = buf[:n]
-		if string(buf) != "foobar" {
-			t.Errorf("Read = %q; want %q", buf, "foobar")
-		}
+func assertNoMoreChunks(t *testing.T, r *ChunkedReader) {
+	if r.Next() {
+		t.Errorf("Expected no more chunks, but found too many")
 	}
-
-	// One big chunk followed by a little chunk, but the small bufio.Reader size
-	// should prevent the second chunk header from being read.
-	{
-		var b bytes.Buffer
-		w := NewChunkedWriter(&b)
-		// fillBufChunk is 11 bytes + 3 bytes header + 2 bytes footer = 16 bytes,
-		// the same as the bufio ReaderSize below (the minimum), so even
-		// though we're going to try to Read with a buffer larger enough to also
-		// receive "foo", the second chunk header won't be read yet.
-		const fillBufChunk = "0123456789a"
-		const shortChunk = "foo"
-		w.Write([]byte(fillBufChunk))
-		w.Write([]byte(shortChunk))
-		w.Close()
-
-		r := NewChunkedReader(bufio.NewReaderSize(&b, 16))
-		buf := make([]byte, len(fillBufChunk)+len(shortChunk))
-		n, err := r.Read(buf)
-		if n != len(fillBufChunk) || err != nil {
-			t.Errorf("Read = %d, %v; want %d, nil", n, err, len(fillBufChunk))
-		}
-		buf = buf[:n]
-		if string(buf) != fillBufChunk {
-			t.Errorf("Read = %q; want %q", buf, fillBufChunk)
-		}
-
-		n, err = r.Read(buf)
-		if n != len(shortChunk) || err != io.EOF {
-			t.Errorf("Read = %d, %v; want %d, EOF", n, err, len(shortChunk))
-		}
-	}
-
-	// And test that we see an EOF chunk, even though our buffer is already full:
-	{
-		r := NewChunkedReader(bufio.NewReader(strings.NewReader("3\r\nfoo\r\n0\r\n")))
-		buf := make([]byte, 3)
-		n, err := r.Read(buf)
-		if n != 3 || err != io.EOF {
-			t.Errorf("Read = %d, %v; want 3, EOF", n, err)
-		}
-		if string(buf) != "foo" {
-			t.Errorf("buf = %q; want foo", buf)
-		}
-	}
-}
-
-func TestChunkReaderAllocs(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping in short mode")
-	}
-	var buf bytes.Buffer
-	w := NewChunkedWriter(&buf)
-	a, b, c := []byte("aaaaaa"), []byte("bbbbbbbbbbbb"), []byte("cccccccccccccccccccccccc")
-	w.Write(a)
-	w.Write(b)
-	w.Write(c)
-	w.Close()
-
-	readBuf := make([]byte, len(a)+len(b)+len(c)+1)
-	byter := bytes.NewReader(buf.Bytes())
-	bufr := bufio.NewReader(byter)
-	mallocs := testing.AllocsPerRun(100, func() {
-		byter.Seek(0, 0)
-		bufr.Reset(byter)
-		r := NewChunkedReader(bufr)
-		n, err := io.ReadFull(r, readBuf)
-		if n != len(readBuf)-1 {
-			t.Fatalf("read %d bytes; want %d", n, len(readBuf)-1)
-		}
-		if err != io.ErrUnexpectedEOF {
-			t.Fatalf("read error = %v; want ErrUnexpectedEOF", err)
-		}
-	})
-	if mallocs > 1.5 {
-		t.Errorf("mallocs = %v; want 1", mallocs)
-	}
-}
-
-func TestParseHexUint(t *testing.T) {
-	for i := uint64(0); i <= 1234; i++ {
-		line := []byte(fmt.Sprintf("%x", i))
-		got, err := parseHexUint(line)
-		if err != nil {
-			t.Fatalf("on %d: %v", i, err)
-		}
-		if got != i {
-			t.Errorf("for input %q = %d; want %d", line, got, i)
-		}
-	}
-	_, err := parseHexUint([]byte("bogus"))
-	if err == nil {
-		t.Error("expected error on bogus input")
+	if r.Err() != nil {
+		t.Errorf("Expected no error, but found: %q", r.Err())
 	}
 }
