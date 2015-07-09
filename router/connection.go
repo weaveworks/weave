@@ -231,7 +231,7 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 		if oldRemoteUDPAddr == nil {
 			return conn.sendFastHeartbeats()
 		} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
-			log.Println("Peer", conn.remote, "moved from", old, "to", remoteUDPAddr)
+			log.Println("Peer", conn.remote, "moved from", oldRemoteUDPAddr, "to", remoteUDPAddr)
 		}
 		return nil
 	})
