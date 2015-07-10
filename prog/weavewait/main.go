@@ -64,7 +64,6 @@ func checkErr(err error) {
 	}
 }
 
-// Prepend the addresses to /etc/hosts, removing the docker address
 func updateHosts(iface *net.Interface) {
 	addrs, err := iface.Addrs()
 	checkErr(err)
@@ -117,7 +116,7 @@ func parseHosts() map[string][]string {
 
 		fields := strings.Fields(line)
 		if len(fields) > 0 {
-			ips[fields[0]] = fields[1:]
+			ips[fields[0]] = append(ips[fields[0]], fields[1:]...)
 		}
 	}
 	checkErr(scanner.Err())
@@ -132,10 +131,24 @@ func writeHosts(contents map[string][]string) {
 	sort.Strings(ips)
 
 	buf := &bytes.Buffer{}
+	fmt.Fprintln(buf, "# modified by weave")
 	for _, ip := range ips {
 		if addrs := contents[ip]; len(addrs) > 0 {
-			fmt.Fprintf(buf, "%s\t%s\n", ip, strings.Join(addrs, " "))
+			fmt.Fprintf(buf, "%s\t%s\n", ip, strings.Join(uniqueStrs(addrs), " "))
 		}
 	}
 	checkErr(ioutil.WriteFile("/etc/hosts", buf.Bytes(), 644))
+}
+
+func uniqueStrs(s []string) []string {
+	m := map[string]struct{}{}
+	result := []string{}
+	for _, str := range s {
+		if _, ok := m[str]; !ok {
+			m[str] = struct{}{}
+			result = append(result, str)
+		}
+	}
+	sort.Strings(result)
+	return result
 }
