@@ -212,11 +212,10 @@ end_suite() {
 
 collect_coverage() {
     host=$1
+    mkdir -p ./coverage
     rm -f cover.router.prof
     docker_on $host cp weave:/home/weave/cover.router.prof . 2>/dev/null || return 0
-
     # ideally we'd know the name of the test here, and put that in the filename
-    mkdir -p ./coverage
     mv cover.router.prof $(mktemp -u ./coverage/integration.XXXXXXXX) || true
 }
 
