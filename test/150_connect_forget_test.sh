@@ -33,7 +33,7 @@ assert_raises "exec_on $HOST1 c1 $PING $C2"
 
 # Forget everyone and disconnect
 assert_raises "weave_on $HOST2 forget $HOST1 $HOST2"
-assert_raises "weave_on $HOST1 stop-router"
+assert_raises "weave_stop_router $HOST1"
 assert_raises "weave_on $HOST1 launch-router"
 assert_peers $HOST2 ""
 assert_raises "exec_on $HOST1 c1 sh -c '! $PING $C2'"

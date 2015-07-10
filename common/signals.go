@@ -15,12 +15,12 @@ type SignalReceiver interface {
 
 func SignalHandlerLoop(ss ...SignalReceiver) {
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGUSR1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGUSR1, syscall.SIGTERM)
 	buf := make([]byte, 1<<20)
 	for {
 		switch <-sigs {
-		case syscall.SIGINT:
-			Log.Infof("=== received SIGINT ===\n*** exiting\n")
+		case syscall.SIGINT, syscall.SIGTERM:
+			Log.Infof("=== received SIGINT/SIGTERM ===\n*** exiting\n")
 			for _, subsystem := range ss {
 				subsystem.Stop()
 			}
