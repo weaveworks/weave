@@ -35,6 +35,8 @@ dependencies:
 
 test:
   override:
+    - test "$CIRCLE_NODE_INDEX" != "0" || (docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go -e "COVERDIR=test/coverage" weaveworks/weave-build tests):
+        parallel: true
     - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go -e COVERAGE=true weaveworks/weave-build:
         parallel: true
     - cd $SRCDIR/test; ./gce.sh setup:
@@ -52,5 +54,6 @@ teardown:
   pre:
     - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh):
         parallel: true
+    - test "$CIRCLE_NODE_INDEX" != "0" || (go get github.com/mattn/goveralls && goveralls -repotoken $COVERALLS_REPO_TOKEN -coverprofile=$SRCDIR/test/profile.cov -service=circleci || true)
     - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; cp coverage.* $CIRCLE_ARTIFACTS):
         parallel: true

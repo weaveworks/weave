@@ -107,22 +107,7 @@ $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
 tests:
-	echo "mode: count" > profile.cov
-	fail=0 ; \
-	for dir in $$(find . -type f -name '*_test.go' | xargs -n1 dirname | grep -v prog | sort -u); do \
-		go get -t -tags netgo $$dir ; \
-		output=$$(mktemp cover.XXXXXXXXXX) ; \
-		if ! go test -cpu 4 -tags netgo \
-			-covermode=count -coverprofile=$$output $$dir ; then \
-		fail=1 ; \
-        fi ; \
-	if [ -f $$output ]; then \
-		tail -n +2 <$$output >>profile.cov; \
-		rm $$output; \
-	fi \
-	done ; \
-	exit $$fail
-	go tool cover -html=profile.cov -o=coverage.html
+	@test/units.sh
 
 $(PUBLISH): publish_%:
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
@@ -133,6 +118,7 @@ publish: $(PUBLISH)
 
 clean:
 	-$(SUDO) docker rmi $(IMAGES)
+	go clean -r ./...
 	rm -f $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT)
 	rm -f test/tls/*.pem
 
