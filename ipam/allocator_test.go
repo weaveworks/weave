@@ -143,7 +143,7 @@ func TestAllocatorClaim(t *testing.T) {
 	alloc.claimRingForTesting()
 	addr1, _ := address.ParseIP(testAddr1)
 
-	err := alloc.Claim(container3, addr1, nil)
+	err := alloc.Claim(container3, addr1)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
 	addr3, _ := alloc.Allocate(container3, subnet, nil)
