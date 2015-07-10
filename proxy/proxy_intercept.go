@@ -2,16 +2,29 @@ package proxy
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
+)
+
+const (
+	maxLineLength = 4096 // assumed <= bufio.defaultBufSize
+	maxChunkSize  = bufio.MaxScanTokenSize
+)
+
+var (
+	ErrChunkTooLong           = errors.New("chunk too long")
+	ErrInvalidChunkLength     = errors.New("invalid byte in chunk length")
+	ErrLineTooLong            = errors.New("header line too long")
+	ErrMalformedChunkEncoding = errors.New("malformed chunked encoding")
 )
 
 func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Request) {
@@ -71,7 +84,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 }
 
 func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.ClientConn) {
-	down, downBuf, up, rem, err := hijack(w, client)
+	down, downBuf, up, remaining, err := hijack(w, client)
 	if err != nil {
 		http.Error(w, "Unable to hijack connection for raw stream mode", http.StatusInternalServerError)
 		return
@@ -96,7 +109,7 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 
 	upDone := make(chan struct{})
 	downDone := make(chan struct{})
-	go copyStream(down, io.MultiReader(rem, up), upDone)
+	go copyStream(down, io.MultiReader(remaining, up), upDone)
 	go copyStream(up, downBuf, downDone)
 	<-upDone
 	<-downDone
@@ -116,33 +129,81 @@ func copyStream(dst io.Writer, src io.Reader, done chan struct{}) {
 	}
 }
 
-func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httputil.ClientConn) {
-	// Because we can't go back to request/response after we
-	// hijack the connection, we need to close it and make the
-	// client open another.
-	w.Header().Add("Connection", "close")
-	w.WriteHeader(resp.StatusCode)
-
-	down, _, up, rem, err := hijack(w, client)
-	if err != nil {
-		http.Error(w, "Unable to hijack response stream for chunked response", http.StatusInternalServerError)
-		return
-	}
-	defer up.Close()
-	defer down.Close()
-	// Copy the chunked response body to downstream,
-	// stopping at the end of the chunked section.
-	rawResponseBody := io.MultiReader(rem, up)
-	if _, err := io.Copy(ioutil.Discard, httputil.NewChunkedReader(io.TeeReader(rawResponseBody, down))); err != nil {
-		http.Error(w, "Error copying chunked response body", http.StatusInternalServerError)
-		return
-	}
-	resp.Trailer.Write(down)
-	// a chunked response ends with a CRLF
-	down.Write([]byte("\r\n"))
+type writeFlusher interface {
+	io.Writer
+	http.Flusher
 }
 
-func hijack(w http.ResponseWriter, client *httputil.ClientConn) (down net.Conn, downBuf *bufio.ReadWriter, up net.Conn, rem io.Reader, err error) {
+func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httputil.ClientConn) {
+	wf, ok := w.(writeFlusher)
+	if !ok {
+		http.Error(w, "Error forwarding chunked response body: flush not available", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(resp.StatusCode)
+
+	up, remaining := client.Hijack()
+	defer up.Close()
+
+	var err error
+	chunks := bufio.NewScanner(io.MultiReader(remaining, up))
+	chunks.Split(splitChunks)
+	for chunks.Scan() && err == nil {
+		_, err = wf.Write(chunks.Bytes())
+		wf.Flush()
+	}
+	if err == nil {
+		err = chunks.Err()
+	}
+	if err != nil {
+		Log.Errorf("Error forwarding chunked response body: %s", err)
+	}
+}
+
+// a bufio.SplitFunc for http chunks
+func splitChunks(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+
+	i := bytes.IndexByte(data, '\n')
+	if i < 0 {
+		return 0, nil, nil
+	}
+	if i > maxLineLength {
+		return 0, nil, ErrLineTooLong
+	}
+
+	chunkSize64, err := strconv.ParseInt(
+		string(bytes.TrimRight(data[:i], " \t\r\n")),
+		16,
+		64,
+	)
+	switch {
+	case err != nil:
+		return 0, nil, ErrInvalidChunkLength
+	case chunkSize64 > maxChunkSize:
+		return 0, nil, ErrChunkTooLong
+	case chunkSize64 == 0:
+		return 0, nil, io.EOF
+	}
+	chunkSize := int(chunkSize64)
+
+	data = data[i+1:]
+
+	if len(data) < chunkSize+2 {
+		return 0, nil, nil
+	}
+
+	if data[chunkSize] != '\r' || data[chunkSize+1] != '\n' {
+		return 0, nil, ErrMalformedChunkEncoding
+	}
+
+	return i + chunkSize + 3, data[:chunkSize], nil
+}
+
+func hijack(w http.ResponseWriter, client *httputil.ClientConn) (down net.Conn, downBuf *bufio.ReadWriter, up net.Conn, remaining io.Reader, err error) {
 	hj, ok := w.(http.Hijacker)
 	if !ok {
 		err = errors.New("Unable to cast to Hijack")
@@ -152,6 +213,6 @@ func hijack(w http.ResponseWriter, client *httputil.ClientConn) (down net.Conn, 
 	if err != nil {
 		return
 	}
-	up, rem = client.Hijack()
+	up, remaining = client.Hijack()
 	return
 }
