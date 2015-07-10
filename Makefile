@@ -36,6 +36,14 @@ WEAVEEXEC_DOCKER_VERSION=1.3.1
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 COVERAGE_MODULES=./common,./common/docker,./ipam,./ipam/paxos,./ipam/ring,./ipam/space,./net,./net/address,./router
+NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
+	rm $@; \
+	echo "\nYour go standard library was built without the 'netgo' build tag."; \
+	echo "To fix that, run"; \
+	echo "    sudo go clean -i net"; \
+	echo "    sudo go install -tags netgo std"; \
+	false; \
+}
 
 all: $(WEAVE_EXPORT)
 
@@ -53,26 +61,12 @@ else
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 endif
-	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
-		rm $@; \
-		echo "\nYour go standard library was built without the 'netgo' build tag."; \
-		echo "To fix that, run"; \
-		echo "    sudo go clean -i net"; \
-		echo "    sudo go install -tags netgo std"; \
-		false; \
-	}
+	$(NETGO_CHECK)
 
 $(WEAVEDNS_EXE) $(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
-	@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
-		rm $@; \
-		echo "\nYour go standard library was built without the 'netgo' build tag."; \
-		echo "To fix that, run"; \
-		echo "    sudo go clean -i net"; \
-		echo "    sudo go install -tags netgo std"; \
-		false; \
-	}
+	$(NETGO_CHECK)
 
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go prog/weaver/main.go
 $(WEAVEDNS_EXE): nameserver/*.go prog/weavedns/main.go
