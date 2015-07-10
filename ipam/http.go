@@ -19,14 +19,13 @@ func badRequest(w http.ResponseWriter, err error) {
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
 func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR, dockerCli *docker.Client) {
 	router.Methods("PUT").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		closedChan := w.(http.CloseNotifier).CloseNotify()
 		vars := mux.Vars(r)
 		ident := vars["id"]
 		ipStr := vars["ip"]
 		if ip, err := address.ParseIP(ipStr); err != nil {
 			badRequest(w, err)
 			return
-		} else if err := alloc.Claim(ident, ip, closedChan); err != nil {
+		} else if err := alloc.Claim(ident, ip); err != nil {
 			badRequest(w, fmt.Errorf("Unable to claim: %s", err))
 			return
 		}
