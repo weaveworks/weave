@@ -181,7 +181,10 @@ DNS_HTTP_PORT=6785
 DNS_HTTP_IFNAME=eth0
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
-
+COVERAGE_ARGS=""
+if [ -n "$COVERAGE" ] ; then
+    COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.router.prof --"
+fi
 
 ######################################################################
 # general helpers; independent of docker and weave
@@ -413,11 +416,11 @@ ask_version() {
                 echo "Unable to find $2 image." >&2
             fi
     fi
-    COVERAGE_ARGS=""
-    if [ -n "$COVERAGE" -a "$1" = "$CONTAINER_NAME" ] ; then
-        COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.router.prof --"
+    VERSION_COVERAGE_ARGS=""
+    if [ "$1" = "$CONTAINER_NAME" ] ; then
+        VERSION_COVERAGE_ARGS="$COVERAGE_ARGS"
     fi
-    [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $DOCKERIMAGE $COVERAGE_ARGS --version
+    [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $DOCKERIMAGE $VERSION_COVERAGE_ARGS --version
 }
 
 ######################################################################
@@ -1041,10 +1044,6 @@ launch_router() {
             echo "Please pick another range and set it on all hosts." >&2
             exit 1
         fi
-    fi
-    COVERAGE_ARGS=""
-    if [ -n "$COVERAGE" ] ; then
-        COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.router.prof --"
     fi
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
