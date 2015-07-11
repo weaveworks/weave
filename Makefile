@@ -120,7 +120,7 @@ clean:
 	-$(SUDO) docker rmi $(IMAGES)
 	go clean -r ./...
 	rm -f $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT)
-	rm -f test/tls/*.pem
+	rm -rf test/tls/*.pem test/coverage.* test/coverage
 
 build:
 	$(SUDO) go clean -i net

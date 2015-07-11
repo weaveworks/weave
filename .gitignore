@@ -51,3 +51,5 @@ prog/weaveexec/netcheck
 prog/weaveexec/docker*.tgz
 Vagrantfile.local
 test/tls/*.pem
+test/coverage
+test/coverage.*
