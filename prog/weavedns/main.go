@@ -71,7 +71,7 @@ func main() {
 	}
 
 	SetLogLevel(logLevel)
-	Log.Infof("[main] WeaveDNS version %s\n", version) // first thing in log: the version
+	Log.Infof("[main] WeaveDNS version %s", version) // first thing in log: the version
 
 	var iface *net.Interface
 	if ifaceName != "" {

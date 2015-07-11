@@ -408,7 +408,7 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 
 func (conn *LocalConnection) shutdown(err error) {
 	if conn.remote == nil {
-		Log.Errorf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
+		Log.Errorf("->[%s] connection shutting down due to error during handshake: %v", conn.remoteTCPAddr, err)
 	} else {
 		conn.ErrorLog("connection shutting down due to error:", err)
 	}

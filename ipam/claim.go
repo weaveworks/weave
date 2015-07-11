@@ -30,7 +30,7 @@ func (c *claim) sendResult(result error) {
 func (c *claim) Try(alloc *Allocator) bool {
 	if !alloc.ring.Contains(c.addr) {
 		// Address not within our universe; assume user knows what they are doing
-		alloc.infof("Ignored address %s claimed by %s - not in our universe\n", c.addr, c.ident)
+		alloc.infof("Ignored address %s claimed by %s - not in our universe", c.addr, c.ident)
 		c.sendResult(nil)
 		return true
 	}
@@ -42,7 +42,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 	case alloc.ourName:
 		// success
 	case router.UnknownPeerName:
-		alloc.infof("Ring is empty; will try later.\n", c.addr, owner)
+		alloc.infof("Ring is empty; will try later.", c.addr, owner)
 		c.sendResult(nil) // don't make the caller wait
 		return false
 	default:

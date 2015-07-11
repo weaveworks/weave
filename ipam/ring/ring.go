@@ -218,7 +218,7 @@ func (r *Ring) Merge(gossip Ring) error {
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					common.Log.Debugf("Error merging entries at %s - %v != %v\n", mine.Token, mine, theirs)
+					common.Log.Debugf("Error merging entries at %s - %v != %v", mine.Token, mine, theirs)
 					return ErrInvalidEntry
 				}
 				addToResult(*mine)
