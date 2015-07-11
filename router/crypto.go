@@ -31,7 +31,6 @@ func FormSessionKey(remotePublicKey, localPrivateKey *[32]byte, secretKey []byte
 type Encryptor interface {
 	FrameOverhead() int
 	PacketOverhead() int
-	IsEmpty() bool
 	Bytes() ([]byte, error)
 	AppendFrame(src []byte, dst []byte, frame []byte)
 	TotalLen() int
@@ -70,10 +69,6 @@ func (ne *NonEncryptor) PacketOverhead() int {
 
 func (ne *NonEncryptor) FrameOverhead() int {
 	return NameSize + NameSize + 2
-}
-
-func (ne *NonEncryptor) IsEmpty() bool {
-	return ne.buffered == ne.prefixLen
 }
 
 func (ne *NonEncryptor) Bytes() ([]byte, error) {
