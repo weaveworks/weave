@@ -39,11 +39,8 @@ type ConnectionSummary struct {
 	Established   bool
 }
 
-func NewPeers(ourself *LocalPeer, onGC func(*Peer)) *Peers {
-	return &Peers{
-		ourself: ourself,
-		table:   make(map[PeerName]*Peer),
-		onGC:    []func(*Peer){onGC}}
+func NewPeers(ourself *LocalPeer) *Peers {
+	return &Peers{ourself: ourself, table: make(map[PeerName]*Peer)}
 }
 
 func (peers *Peers) OnGC(callback func(*Peer)) {
