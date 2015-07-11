@@ -57,12 +57,12 @@ func (c *claim) Try(alloc *Allocator) bool {
 	// We are the owner, check we haven't given it to another container
 	switch existingIdent := alloc.findOwner(c.addr); existingIdent {
 	case "":
-		if err := alloc.space.Claim(c.addr); err != nil {
-			c.sendResult(err)
-		} else {
+		if err := alloc.space.Claim(c.addr); err == nil {
 			alloc.debugln("Claimed", c.addr, "for", c.ident)
 			alloc.addOwned(c.ident, c.addr)
 			c.sendResult(nil)
+		} else {
+			c.sendResult(err)
 		}
 	case c.ident:
 		// same identifier is claiming same address; that's OK
