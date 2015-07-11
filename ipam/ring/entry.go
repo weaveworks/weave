@@ -68,10 +68,6 @@ func (es entries) get(token address.Address) (*entry, bool) {
 	return nil, false
 }
 
-func (es *entries) remove(i int) {
-	*es = (*es)[:i+copy((*es)[i:], (*es)[i+1:])]
-}
-
 // Is token between entries at i and j?
 // NB i and j can overflow and will wrap
 // NBB this function does not work very well if there is only one
