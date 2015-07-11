@@ -7,11 +7,11 @@ C3=10.2.1.71
 
 launch_all() {
     weave_on $HOST1 launch-router $1
-    weave_on $HOST2 launch-router $1 $HOST1
-    weave_on $HOST3 launch-router $1 $HOST2
+    weave_on $HOST2 launch-router $1 --ipalloc-range="" $HOST1
+    weave_on $HOST3 launch-router $1                    $HOST2
 }
 
-start_suite "Peer discovery and multi-hop routing"
+start_suite "Peer discovery, multi-hop routing and gossip forwarding"
 
 launch_all
 
@@ -28,6 +28,11 @@ stop_router_on $HOST3
 launch_all --no-discovery
 
 assert_raises "exec_on $HOST1 c1 $PING $C3"
+
+# this stalls if gossip forwarding doesn't work. We wait for slightly
+# longer than the gossip interval (30s) before giving up.
+assert_raises "timeout 40 cat <( start_container $HOST3 )"
+
 stop_router_on $HOST2
 assert_raises "exec_on $HOST1 c1 sh -c '! $PING $C3'"
 
