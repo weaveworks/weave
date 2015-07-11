@@ -113,13 +113,14 @@ weave_on() {
     DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
-weave_stop_router() {
+stop_router_on() {
     host=$1
     shift 1
     docker_on $host stop weave 1>/dev/null 2>&1 || true
     if [ -n "$COVERAGE" ] ; then
         collect_coverage $host
     fi
+    weave_on $host stop-router 2>/dev/null
 }
 
 exec_on() {
@@ -206,7 +207,7 @@ start_suite() {
 end_suite() {
     whitely assert_end
     for host in $HOSTS; do
-        weave_stop_router $host
+        stop_router_on $host
     done
 }
 
