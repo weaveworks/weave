@@ -2,13 +2,13 @@
 
 . ./config.sh
 
-start_suite "Run weave with --local"
-
 weave_local_on() {
     host=$1
     shift 1
     run_on $host sudo COVERAGE=$COVERAGE weave --local $@
 }
+
+start_suite "Run weave with --local"
 
 weave_local_on $HOST1 reset
 
