@@ -27,6 +27,8 @@ stop_router_on $HOST3
 
 launch_all --no-discovery
 
+sleep 5 # give topology gossip some time to propagate
+
 assert_raises "exec_on $HOST1 c1 $PING $C3"
 
 # this stalls if gossip forwarding doesn't work. We wait for slightly
