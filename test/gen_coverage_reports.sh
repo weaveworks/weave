@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eux
+set -ex
 
 if [ -n "$CIRCLECI" ]; then
     for i in $(seq 1 $(($CIRCLE_NODE_TOTAL - 1))); do
