@@ -19,7 +19,7 @@ class Test(ndb.Model):
 class Schedule(ndb.Model):
   shards = ndb.JsonProperty()
 
-@app.route('/record/<test_name>/<runtime>', methods=['POST'])
+@app.route('/record/<path:test_name>/<runtime>', methods=['POST'])
 @ndb.transactional
 def record(test_name, runtime):
   test = Test.get_by_id(test_name)
@@ -30,13 +30,13 @@ def record(test_name, runtime):
   test.put()
   return ('', 204)
 
-@app.route('/schedule/<int:test_run>/<int:shard_count>/<int:shard>', methods=['POST'])
+@app.route('/schedule/<test_run>/<int:shard_count>/<int:shard>', methods=['POST'])
 def schedule(test_run, shard_count, shard):
   # read tests from body
   test_names = flask.request.get_json(force=True)['tests']
 
   # first see if we have a scedule already
-  schedule_id = "%d-%d" % (test_run, shard_count)
+  schedule_id = "%s-%d" % (test_run, shard_count)
   schedule = Schedule.get_by_id(schedule_id)
   if schedule is not None:
     return flask.json.jsonify(tests=schedule.shards[str(shard)])

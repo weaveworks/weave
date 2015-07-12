@@ -29,7 +29,7 @@ TESTS="${@:-*_test.sh}"
 
 # If running on circle, use the scheduler to work out what tests to run
 if [ -n "$CIRCLECI" -a -z "$NO_SCHEDULER" ]; then
-    TESTS=$(echo $TESTS | "$DIR/sched" sched $CIRCLE_BUILD_NUM $CIRCLE_NODE_TOTAL $CIRCLE_NODE_INDEX)
+    TESTS=$(echo $TESTS | "$DIR/sched" sched integration-$CIRCLE_BUILD_NUM $CIRCLE_NODE_TOTAL $CIRCLE_NODE_INDEX)
 fi
 
 echo Running $TESTS
