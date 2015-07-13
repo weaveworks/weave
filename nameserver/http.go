@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 
 	"github.com/weaveworks/weave/net/address"
+	weaverouter "github.com/weaveworks/weave/router"
 )
 
 func (n *Nameserver) badRequest(w http.ResponseWriter, err error) {
@@ -88,6 +90,66 @@ func (n *Nameserver) HandleHTTP(router *mux.Router) {
 		defer n.RUnlock()
 		if err := json.NewEncoder(w).Encode(n.entries); err != nil {
 			n.badRequest(w, fmt.Errorf("Error marshalling response: %v", err))
+		}
+	})
+
+	router.Methods("GET").Path("/quarantine").Headers("Accept", "application/json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		qs := n.Quarantines.List()
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(&qs); err != nil {
+			n.badRequest(w, fmt.Errorf("Unable to serialise: %v", err))
+		}
+	})
+
+	router.Methods("GET").Path("/quarantine").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "%-16s %-12s %-17s %s\n", "ID", "Container", "Peer", "Duration")
+		for _, q := range n.Quarantines.List() {
+			containerid := q.ContainerID
+			if len(containerid) > 12 {
+				containerid = containerid[:12]
+			}
+			peer := q.Peer.String()
+			if q.Peer == weaverouter.UnknownPeerName {
+				peer = ""
+			}
+			fmt.Fprintf(w, "%16s %12s %17s %s\n", q.ID, containerid, peer, time.Unix(q.ValidUntil, 0).String())
+		}
+	})
+
+	router.Methods("POST").Path("/quarantine").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var (
+			containerid = r.FormValue("containerid")
+			peernameStr = r.FormValue("peer")
+			durationStr = r.FormValue("duration")
+		)
+
+		peername, err := weaverouter.PeerNameFromString(peernameStr)
+		if peernameStr != "" && err != nil {
+			n.badRequest(w, fmt.Errorf("Cannot parse %s: %v", peernameStr, err))
+		} else if peernameStr == "" {
+			peername = weaverouter.UnknownPeerName
+		}
+
+		duration, err := time.ParseDuration(durationStr)
+		if err != nil {
+			n.badRequest(w, fmt.Errorf("Cannot parse %s: %v", durationStr, err))
+		}
+
+		id, err := n.Quarantines.Add(containerid, peername, duration)
+		if err != nil {
+			n.badRequest(w, fmt.Errorf("Unable to add quarantine: %v", err))
+		}
+		fmt.Fprintf(w, "%s\n", id)
+	})
+
+	router.Methods("DELETE").Path("/quarantine/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var (
+			vars  = mux.Vars(r)
+			ident = vars["id"]
+		)
+		if err := n.Quarantines.Delete(ident); err != nil {
+			n.badRequest(w, fmt.Errorf("Unable to delete quarantine: %v", err))
 		}
 	})
 }

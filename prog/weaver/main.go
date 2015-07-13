@@ -191,6 +191,9 @@ func main() {
 		}
 		ns.Start()
 		defer ns.Stop()
+
+		ns.Quarantines.SetGossip(router.NewGossip("quarantines", &ns.Quarantines))
+
 		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsListenAddress, uint32(dnsTTL), dnsClientTimeout)
 		if err != nil {
 			Log.Fatal("Unable to start dns server: ", err)
