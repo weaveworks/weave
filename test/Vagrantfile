@@ -5,7 +5,7 @@ VAGRANTFILE_API_VERSION = "2"
 Vagrant.require_version ">= 1.7.0"
 
 # these ought to match what is in config.sh
-n_machines = 2
+n_machines = 3
 ip_prefix = "192.168.48"
 ip_suffix_base = 10
 

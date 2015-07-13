@@ -12,7 +12,7 @@ fi
 SOURCED_CONFIG_SH=true
 
 # these ought to match what is in Vagrantfile
-N_MACHINES=${N_MACHINES:-2}
+N_MACHINES=${N_MACHINES:-3}
 IP_PREFIX=${IP_PREFIX:-192.168.48}
 IP_SUFFIX_BASE=${IP_SUFFIX_BASE:-10}
 
@@ -26,6 +26,7 @@ fi
 # these are used by the tests
 HOST1=$(echo $HOSTS | cut -f 1 -d ' ')
 HOST2=$(echo $HOSTS | cut -f 2 -d ' ')
+HOST3=$(echo $HOSTS | cut -f 3 -d ' ')
 
 . "$DIR/assert.sh"
 
