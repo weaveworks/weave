@@ -52,6 +52,7 @@ func main() {
 	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
 	ListVar(&c.ListenAddrs, []string{"H"}, defaultListenAddrs, "addresses on which to listen")
 	mflag.BoolVar(&c.NoDefaultIPAM, []string{"#-no-default-ipam", "-no-default-ipalloc"}, false, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
+	mflag.BoolVar(&c.NoRewriteHosts, []string{"no-rewrite-hosts"}, false, "do not automatically rewrite /etc/hosts. Use if you need the docker IP to remain in /etc/hosts")
 	mflag.StringVar(&c.TLSConfig.CACert, []string{"#tlscacert", "-tlscacert"}, "", "Trust certs signed only by this CA")
 	mflag.StringVar(&c.TLSConfig.Cert, []string{"#tlscert", "-tlscert"}, "", "Path to TLS certificate file")
 	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tls-verify")

@@ -29,12 +29,13 @@ var (
 )
 
 type Config struct {
-	ListenAddrs   []string
-	NoDefaultIPAM bool
-	TLSConfig     TLSConfig
-	Version       string
-	WithDNS       bool
-	WithoutDNS    bool
+	ListenAddrs    []string
+	NoDefaultIPAM  bool
+	NoRewriteHosts bool
+	TLSConfig      TLSConfig
+	Version        string
+	WithDNS        bool
+	WithoutDNS     bool
 }
 
 type Proxy struct {
