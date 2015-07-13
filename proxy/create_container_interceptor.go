@@ -58,7 +58,9 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
-		if err := i.setWeaveDNS(&container, r.URL.Query().Get("name")); err != nil {
+		containerName := r.URL.Query().Get("name")
+		hostname := i.proxy.hostnameMatchRegexp.ReplaceAllString(containerName, i.proxy.HostnameReplacement)
+		if err := i.setWeaveDNS(&container, hostname); err != nil {
 			return err
 		}
 	}

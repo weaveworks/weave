@@ -15,11 +15,13 @@ import (
 )
 
 const (
-	defaultCaFile   = "ca.pem"
-	defaultKeyFile  = "key.pem"
-	defaultCertFile = "cert.pem"
-	dockerSock      = "/var/run/docker.sock"
-	dockerSockUnix  = "unix://" + dockerSock
+	defaultCaFile               = "ca.pem"
+	defaultKeyFile              = "key.pem"
+	defaultCertFile             = "cert.pem"
+	dockerSock                  = "/var/run/docker.sock"
+	dockerSockUnix              = "unix://" + dockerSock
+	substitutionPatternName     = "pattern"
+	substitutionReplacementName = "replacement"
 )
 
 var (
@@ -29,19 +31,22 @@ var (
 )
 
 type Config struct {
-	ListenAddrs    []string
-	NoDefaultIPAM  bool
-	NoRewriteHosts bool
-	TLSConfig      TLSConfig
-	Version        string
-	WithDNS        bool
-	WithoutDNS     bool
+	HostnameMatch       string
+	HostnameReplacement string
+	ListenAddrs         []string
+	NoDefaultIPAM       bool
+	NoRewriteHosts      bool
+	TLSConfig           TLSConfig
+	Version             string
+	WithDNS             bool
+	WithoutDNS          bool
 }
 
 type Proxy struct {
 	Config
-	client         *docker.Client
-	dockerBridgeIP string
+	client              *docker.Client
+	dockerBridgeIP      string
+	hostnameMatchRegexp *regexp.Regexp
 }
 
 func NewProxy(c Config) (*Proxy, error) {
@@ -63,6 +68,12 @@ func NewProxy(c Config) (*Proxy, error) {
 			return nil, fmt.Errorf(string(stderr))
 		}
 		p.dockerBridgeIP = string(dockerBridgeIP)
+	}
+
+	p.hostnameMatchRegexp, err = regexp.Compile(c.HostnameMatch)
+	if err != nil {
+		err := fmt.Errorf("Incorrect hostname match '%s': %s", c.HostnameMatch, err.Error())
+		return nil, err
 	}
 
 	return p, nil
