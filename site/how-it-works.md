@@ -278,7 +278,7 @@ password, and the result is hashed through SHA256, to form the final
 ephemeral session key. Thus the supplied password is never exchanged
 directly, and is thoroughly mixed into the shared secret. Furthermore,
 the rate at which TCP connections are accepted is limited by weave to
-1kHz, which twarts online dictionary attacks on reasonably strong
+10Hz, which twarts online dictionary attacks on reasonably strong
 passwords.
 
 The shared key formed by Diffie-Hellman is 256 bits long, appending
@@ -292,6 +292,39 @@ not be able to form valid ephemeral session keys.
 
 The same ephemeral session key is used for both TCP and UDP traffic
 between two peers.
+
+<a name="csprng"></a> Generating fresh keys for every connection
+provides forward secrecy at the cost of placing a demand on the Linux
+CSPRNG (accessed by `GenerateKey` via `/dev/urandom`) proportional to
+the number of inbound connection attempts. Weave has accept throttling
+to mitigate against denial of service attacks that seek to deplete the
+CSPRNG entropy pool, however even at the lower bound of ten requests
+per second there may not be enough entropy gathered on a headless
+system to keep pace.
+
+Under such conditions, the consequences will be limited to slowing
+down processes reading from the blocking `/dev/random` device as the
+kernel waits for enough new entropy to be harvested. It is important
+to note that contrary to intuition this low entropy state does not
+compromise the ongoing use of `/dev/urandom` - [expert
+opinion](http://blog.cr.yp.to/20140205-entropy.html)
+asserts that as long as the CSPRNG is seeded with enough entropy (e.g.
+256 bits) before random number generation commences then the output is
+entirely safe for use as key material.
+
+By way of comparison, this is exactly how OpenSSL works - it reads 256
+bits of entropy at startup, and uses that to seed an internal CSPRNG
+which is used thenceforth to generate keys. Whilst we could have taken
+the same approach and built our own CSPRNG to work around the
+potential `/dev/random` blocking issue, we thought it was much more
+prudent to rely on the [heavily
+scrutinised](http://eprint.iacr.org/2012/251.pdf) Linux random number
+generator as [advised
+here](http://cr.yp.to/highspeed/coolnacl-20120725.pdf) (page 10,
+'Centralizing randomness'). The aforementioned notwithstanding, if
+weave's demand on `/dev/urandom` is causing you problems with blocking
+`/dev/random` reads, please get in touch with us - we'd love to hear
+about your use case.
 
 #### TCP
 
