@@ -15,8 +15,9 @@ WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 NETCHECK_EXE=prog/netcheck/netcheck
+COVER_EXE=testing/cover/cover
 
-EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)
+EXES=$(WEAVER_EXE) $(WEAVEDNS_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE) $(COVER_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEDNS_UPTODATE=.weavedns.uptodate
@@ -75,11 +76,12 @@ $(NETCHECK_EXE): prog/netcheck/netcheck.go
 
 # Sigproxy and weavewait need separate rules as they fail the netgo check in
 # the main build stanza due to not importing net package
-
 $(SIGPROXY_EXE): prog/sigproxy/main.go
-	go build -o $@ ./$(@D)
-
 $(WEAVEWAIT_EXE): prog/weavewait/main.go
+$(COVER_EXE): testing/cover/cover.go
+
+$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(COVER_EXE):
+	go get ./$(@D)
 	go build -o $@ ./$(@D)
 
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
@@ -106,7 +108,7 @@ $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
-tests:
+tests: $(COVER_EXE)
 	@test/units.sh
 
 $(PUBLISH): publish_%:
