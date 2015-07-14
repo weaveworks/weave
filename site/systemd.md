@@ -38,9 +38,11 @@ the following format:
 
 You can also use the [connect][] command to add participating hosts dynamically.
 
-Additionally, if you want to enable [encryption][] you can specify a password with
-`WEAVE_PASSWORD="MakeSureThisIsSecure"` in the `/etc/sysconfig/weave` environment
-file, and it will get picked up by weave on launch.
+Additionally, if you want to enable [encryption][] you can specify a
+password with e.g. `WEAVE_PASSWORD="wfvAwt7sj"` in the
+`/etc/sysconfig/weave` environment file, and it will get picked up by
+weave on launch. Recommendations for choosing a suitably strong
+password can be found [here](features.html#security).
 
 You now should be able to launch weave with
 
