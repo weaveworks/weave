@@ -18,7 +18,7 @@ start_container() {
 
 start_suite "Hostname derivation through container name substitutions"
 
-weave_on $HOST1 launch-dns 10.2.254.1/24
+weave_on $HOST1 launch-router
 weave_on $HOST1 launch-proxy --hostname-match '^[^-]+-(?P<appname>[^-]*)-[^-]+$' --hostname-replacement '$appname'
 
 start_container -e WEAVE_CIDR=$C1/24 --name=$CNAME1
