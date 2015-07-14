@@ -1076,6 +1076,7 @@ case "$COMMAND" in
             -v /proc:/hostproc \
             -e PROCFS=/hostproc \
             -e WEAVE_CIDR=none \
+            -e DOCKER_BRIDGE \
             --entrypoint=/home/weave/weaveproxy \
             $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $PROXY_ARGS)
         wait_for_log $PROXY_CONTAINER_NAME "proxy listening"

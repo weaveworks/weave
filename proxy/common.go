@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
 
@@ -22,7 +23,13 @@ func callWeave(args ...string) ([]byte, error) {
 	args = append([]string{"--local"}, args...)
 	Debug.Print("Calling weave", args)
 	cmd := exec.Command("./weave", args...)
-	cmd.Env = []string{"PROCFS=/hostproc", "PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+	cmd.Env = []string{
+		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"PROCFS=/hostproc",
+	}
+	if bridge := os.Getenv("DOCKER_BRIDGE"); bridge != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("DOCKER_BRIDGE=%s", bridge))
+	}
 	out, err := cmd.CombinedOutput()
 	return out, err
 }
