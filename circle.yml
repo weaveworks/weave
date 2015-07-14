@@ -50,7 +50,10 @@ test:
         parallel: true
     - cd $SRCDIR/test; eval $(./gce.sh hosts); ./setup.sh:
         parallel: true
-    - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; export PERFORMANCE=true; ./run_all.sh:
+    - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
+        parallel: true
+        timeout: 300
+    - cd $SRCDIR/test; eval $(./gce.sh hosts); $SRCDIR/bin/circleci/perf-tests start:
         parallel: true
         timeout: 300
     - cd $SRCDIR; make clean-bin:
@@ -69,9 +72,7 @@ teardown:
         parallel: true
     - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; cp coverage.* $CIRCLE_ARTIFACTS):
         parallel: true
-    - $SRCDIR/bin/circleci/setup-perf-graphs:
-        parallel: true
-    - $SRCDIR/bin/circleci/do-perf-graphs:
+    - $SRCDIR/bin/circleci/perf-tests post:
         parallel: true
 
 deployment:

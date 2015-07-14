@@ -150,8 +150,8 @@ if __name__ == "__main__":
                 if any(fnmatch(name, pattern) for pattern in args.pattern):
                     logging.info('Retrieving {build_num}:{name}...'.format(
                         name=name, build_num=build_num))
-                    stats = BuildStats(num=int(build_num), file=parse_log(urlopen(url)))
-                    fs.append()
+                    stats = BuildStats(num=int(build_num), file=urlopen(url))
+                    fs.append(stats)
                 else:
                     logging.debug('Skipping {name}'.format(name=name))
 
@@ -206,7 +206,7 @@ if __name__ == "__main__":
         fig = Figure(data=data, layout=layout)
 
         logging.info("Plotting to plotly...")
-        unique_url = py.plot(fig, filename = args.plot_name)
+        unique_url = py.plot(fig, filename = args.branch + "/" + args.plot_name)
         logging.info("Plot can be found at {}".format(unique_url))
         if args.plot_save_to:
             logging.info("Saving PNG to {}".format(args.plot_save_to))

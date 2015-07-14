@@ -62,3 +62,4 @@ Vagrantfile.local
 test/tls/*.pem
 test/coverage
 test/coverage.*
+test/performance

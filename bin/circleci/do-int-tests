@@ -1,7 +1,6 @@
 #!/bin/sh
 
 export COVERAGE=1
-export PERFORMANCE=1
 
 cd $SRCDIR/test
 
