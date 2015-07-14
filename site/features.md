@@ -254,15 +254,20 @@ In order to connect containers across untrusted networks, weave peers
 can be told to encrypt traffic by supplying a `--password` option or
 `WEAVE_PASSWORD` environment variable when launching weave, e.g.
 
-    host1$ weave launch --password wEaVe
+    host1$ weave launch --password wfvAwt7sj
 
 or
 
-    host1$ export WEAVE_PASSWORD=wEaVe
+    host1$ export WEAVE_PASSWORD=wfvAwt7sj
     host1$ weave launch
 
 _NOTE: The command line option takes precedence over the environment
 variable._
+
+> To avoid leaking your password via the kernel process table or your
+> shell history, we recommend you store it in a file and capture it
+> into a shell variable prior to launching weave: `export
+> WEAVE_PASSWORD=$(cat /path/to/password-file)`
 
 The password needs to be reasonably strong to guard against online
 dictionary attacks. We recommend at least 50 bits of entropy. An easy
