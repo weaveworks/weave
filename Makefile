@@ -46,7 +46,7 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	false; \
 }
 
-all: $(WEAVE_EXPORT)
+all: $(WEAVE_EXPORT) $(COVER_EXE)
 
 travis: $(EXES)
 

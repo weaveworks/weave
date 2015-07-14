@@ -28,10 +28,10 @@ if [ -n "$CIRCLECI" -a -z "$NO_SCHEDULER" ]; then
 fi
 
 for dir in $TESTDIRS; do
+    go get -t -tags netgo $dir
 
     GO_TEST_ARGS_RUN="$GO_TEST_ARGS"
     if [ -n "$SLOW" ]; then
-        go get -t -tags netgo $dir
         output=$(mktemp $coverdir/unit.XXXXXXXXXX)
         GO_TEST_ARGS_RUN="$GO_TEST_ARGS -coverprofile=$output"
     fi
