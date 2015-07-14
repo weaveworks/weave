@@ -9,36 +9,6 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
-func TestZoneLookups(t *testing.T) {
-	var (
-		id    = "foobar"
-		name  = "foo.weave.local"
-		addr1 = "10.2.2.3/24"
-		addr2 = "10.2.7.8/24"
-	)
-
-	EnableDebugLogging(testing.Verbose())
-
-	zone, err := NewZoneDb(ZoneConfig{})
-	require.NoError(t, err)
-	err = zone.Start()
-	require.NoError(t, err)
-	defer zone.Stop()
-
-	for _, addr := range []string{addr1, addr2} {
-		ip, _, _ := net.ParseCIDR(addr)
-		err := zone.AddRecord(id, name, ip)
-		require.NoError(t, err)
-	}
-
-	// Check we can query for the name in many different ways...
-	for _, qName := range []string{"foo.weave.local", "foo.weave.local.", "foo", "foo."} {
-		res, err := zone.LookupName(qName)
-		require.NoError(t, err)
-		require.Equal(t, len(res), 2, "Unexpected number of responses")
-	}
-}
-
 // Check that the refreshing mechanism works as expected
 func TestZoneRefresh(t *testing.T) {
 	const (

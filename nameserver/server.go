@@ -279,6 +279,9 @@ func (s *DNSServer) Stop() error {
 // We must create two DNS request multiplexers, depending on the protocol used by
 // clients (as we use the same protocol for asking upstream servers)
 func (s *DNSServer) createMux(proto dnsProtocol) *dns.ServeMux {
+	failFallback := func(w dns.ResponseWriter, r *dns.Msg) {
+		w.WriteMsg(makeDNSFailResponse(r))
+	}
 	notUsHandler := s.notUsHandler(proto)
 	notUsFallback := func(w dns.ResponseWriter, r *dns.Msg) {
 		Log.Infof("[dns msgid %d] -> sending to fallback server", r.MsgHdr.Id)
@@ -288,7 +291,7 @@ func (s *DNSServer) createMux(proto dnsProtocol) *dns.ServeMux {
 	// create the multiplexer
 	m := dns.NewServeMux()
 	m.HandleFunc(s.Zone.Domain(), s.localHandler(proto, "Query", dns.TypeA,
-		s.Zone.DomainLookupName, makeAddressReply, s.Zone.ObserveName, failHandleFunc))
+		s.Zone.DomainLookupName, makeAddressReply, s.Zone.ObserveName, failFallback))
 	m.HandleFunc(RDNSDomain, s.localHandler(proto, "Reverse query", dns.TypePTR,
 		s.Zone.DomainLookupInaddr, makePTRReply, s.Zone.ObserveInaddr, notUsFallback))
 	m.HandleFunc(".", s.notUsHandler(proto))
@@ -370,42 +373,32 @@ func (s *DNSServer) localHandler(proto dnsProtocol, kind string, qtype uint16,
 func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
 	dnsClient := proto.GetNewClient(DefaultUDPBuflen, s.timeout)
 
-	localNameResolver := s.localHandler(proto, "Query", dns.TypeA,
-		s.Zone.DomainLookupName, makeAddressReply, s.Zone.ObserveName, failHandleFunc)
-
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		q := r.Question[0]
-		nc := nameNumComponents(q.Name)
-		if nc == 1 {
-			Log.Debugf("[dns msgid %d] Unqualified query: '%+v' ", r.MsgHdr.Id, q)
-			localNameResolver(w, r) // short names (eg, "redis.") will follow a local resolution process
-			return
-		} else if nc > 1 {
-			// announce our max payload size as the max payload our client supports
-			maxLen := getMaxReplyLen(r, proto)
-			rcopy := r
-			rcopy.SetEdns0(uint16(maxLen), false)
 
-			Log.Debugf("[dns msgid %d] Fallback query: %+v [%s, max:%d bytes]", rcopy.MsgHdr.Id, q, proto, maxLen)
-			for _, server := range s.Upstream.Servers {
-				reply, _, err := dnsClient.Exchange(rcopy, fmt.Sprintf("%s:%s", server, s.Upstream.Port))
-				if err != nil {
-					Log.Debugf("[dns msgid %d] Network error trying %s (%s)",
-						r.MsgHdr.Id, server, err)
-					continue
-				}
-				if reply != nil && reply.Rcode != dns.RcodeSuccess {
-					Log.Debugf("[dns msgid %d] Failure reported by %s for query %s",
-						r.MsgHdr.Id, server, q.Name)
-					continue
-				}
-				Log.Debugf("[dns msgid %d] Given answer by %s for query %s",
-					r.MsgHdr.Id, server, q.Name)
-				w.WriteMsg(reply)
-				return
+		// announce our max payload size as the max payload our client supports
+		maxLen := getMaxReplyLen(r, proto)
+		rcopy := r
+		rcopy.SetEdns0(uint16(maxLen), false)
+
+		Log.Debugf("[dns msgid %d] Fallback query: %+v [%s, max:%d bytes]", rcopy.MsgHdr.Id, q, proto, maxLen)
+		for _, server := range s.Upstream.Servers {
+			reply, _, err := dnsClient.Exchange(rcopy, fmt.Sprintf("%s:%s", server, s.Upstream.Port))
+			if err != nil {
+				Log.Debugf("[dns msgid %d] Network error trying %s (%s)",
+					r.MsgHdr.Id, server, err)
+				continue
 			}
+			if reply != nil && reply.Rcode != dns.RcodeSuccess {
+				Log.Debugf("[dns msgid %d] Failure reported by %s for query %s",
+					r.MsgHdr.Id, server, q.Name)
+				continue
+			}
+			Log.Debugf("[dns msgid %d] Given answer by %s for query %s",
+				r.MsgHdr.Id, server, q.Name)
+			w.WriteMsg(reply)
+			return
 		}
-
 		Log.Warningf("[dns msgid %d] Failed lookup for external name %s", r.MsgHdr.Id, q.Name)
 		w.WriteMsg(makeDNSFailResponse(r))
 	}
