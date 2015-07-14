@@ -130,21 +130,21 @@ automatically if it is running at the point when they are started -
 see the [weaveDNS usage](weavedns.html#usage) section for an in-depth
 explanation of the behaviour and how to control it.
 
-Typicaly, the proxy will pass on container names as-is to [weaveDNS](weavedns.html)
+Typically, the proxy will pass on container names as-is to [weaveDNS](weavedns.html)
 for registration. However, there are situations in which the final container
 name is out of the user's control (e.g. when using Docker orchestrators which
 append control/namespacing identifiers to the original container names).
 
 For those situations, the proxy provides two flags: `--hostname-match <regexp>`
 and `--hostname-replacement <replacement>`. When launching a container, its name
-matched against regular expression `<regexp>`. Then, based on that match,
+is matched against regular expression `<regexp>`. Then, based on that match,
 `<replacement>` will be used to generate a hostname, which will ultimately be
 handed over to weaveDNS for registration.
 
 For instance, if we launch the proxy using
 `--hostname-match '^aws-[0-9]+-(.*)$'` and `--hostname-replacement 'my-app-$1'`
 
-    host1$ weave launch-router && weave launch-dns && weave launch-proxy --hostname-match '^aws-[0-9]+-(.*)$' and --hostname-replacement 'my-app-$1'
+    host1$ weave launch-router && weave launch-dns && weave launch-proxy --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
     host1$ eval "$(weave env)"
 
 then, running a container named `aws-12798186823-foo` will lead to weaveDNS registering

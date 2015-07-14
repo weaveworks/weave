@@ -15,13 +15,11 @@ import (
 )
 
 const (
-	defaultCaFile               = "ca.pem"
-	defaultKeyFile              = "key.pem"
-	defaultCertFile             = "cert.pem"
-	dockerSock                  = "/var/run/docker.sock"
-	dockerSockUnix              = "unix://" + dockerSock
-	substitutionPatternName     = "pattern"
-	substitutionReplacementName = "replacement"
+	defaultCaFile   = "ca.pem"
+	defaultKeyFile  = "key.pem"
+	defaultCertFile = "cert.pem"
+	dockerSock      = "/var/run/docker.sock"
+	dockerSockUnix  = "unix://" + dockerSock
 )
 
 var (

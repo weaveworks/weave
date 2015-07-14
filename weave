@@ -37,7 +37,7 @@ weave launch-router [--password <password>] [--nickname <nickname>]
 weave launch-dns    [<addr>]
 weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--no-default-ipalloc] [--no-rewrite-hosts]
-                      [[--hostname-match <regexp>] [--hostname-replacement <replacement>]]
+                      [--hostname-match <regexp>] [--hostname-replacement <replacement>]
 weave connect       [--replace] [<peer> ...]
 weave forget        <peer> ...
 weave run           [--with-dns | --without-dns] [<addr> ...]
