@@ -9,6 +9,7 @@ RUN apk add --update \
     iproute2 \
     util-linux \
     conntrack-tools \
+    bind-tools \
   && rm -rf /var/cache/apk/*
 
 WORKDIR /home/weave

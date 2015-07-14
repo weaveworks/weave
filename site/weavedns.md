@@ -16,6 +16,7 @@ hosts.
 * [Load balancing](#load-balancing)
 * [Fault resilience](#fault-resilience)
 * [Adding and removing extra DNS entries](#add-remove)
+* [Resolve weaveDNS entries from host](#resolve-weavedns-entries-from-host)
 * [Hot-swapping service containers](#hot-swapping)
 * [Retaining DNS entries when containers stop](#retain-stopped)
 * [Configuring a custom TTL](#ttl)
@@ -133,7 +134,6 @@ one of the `pingme` containers and re-run the ping tests, eventually
 [cache expiry time](#ttl)) we will only be hitting the address of the
 container that is still alive.
 
-
 ## <a name="add-remove"></a>Adding and removing extra DNS entries
 
 If you want to give the container a name in DNS *other* than its
@@ -156,6 +156,14 @@ $ weave dns-remove 10.2.1.27 $C
 
 When queried about a name with multiple IPs, weaveDNS returns all IPs
 available in a random order.
+
+## <a name="resolve-weavedns-entries-from-host"></a>Resolve weaveDNS entries from host
+
+You can resolve entries from any host running weaveDNS with `weave
+dns-lookup`:
+
+    host1$ weave dns-lookup pingme
+    10.40.0.1
 
 ## <a name="hot-swapping"></a>Hot-swapping service containers
 
