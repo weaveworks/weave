@@ -296,13 +296,9 @@ returned. So now
     host2$ ping 10.2.1.132
 
 will work, and, more interestingly, we can ping our `a1` application
-container, which is residing on `$HOST1`, after finding its IP
-address:
+container, which is residing on `$HOST1`:
 
-    host1$ weave ps a1
-    a1 1e:88:d7:5b:77:68 10.2.1.2/24
-
-    host2$ ping 10.2.1.2
+    host2$ ping $(weave dns-lookup a1)
 
 Multiple subnet addresses can be exposed or hidden with a single
 invocation:
@@ -337,11 +333,8 @@ explained [above](#host-network-integration), i.e.
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
-    host1$ weave ps a1
-    a1 1e:88:d7:5b:77:68 10.2.1.2/24
-
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
-           -j DNAT --to-destination 10.2.1.2:4422
+           -j DNAT --to-destination $(weave dns-lookup a1):4422
 
 Here we are assuming that the "outside world" is connecting to `$HOST2`
 via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
