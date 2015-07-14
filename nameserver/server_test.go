@@ -32,11 +32,12 @@ func TestUDPDNSServer(t *testing.T) {
 	setupForTest(t)
 
 	const (
-		successTestName = "test1.weave.local."
-		failTestName    = "fail.weave.local."
-		nonLocalName    = "weave.works."
-		testAddr1       = "10.2.2.1"
-		containerID     = "somecontainer"
+		successTestName      = "test1.weave.local."
+		successTestNameShort = "test1."
+		failTestName         = "fail.weave.local."
+		nonLocalName         = "weave.works."
+		testAddr1            = "10.2.2.1"
+		containerID          = "somecontainer"
 	)
 	testCIDR1 := testAddr1 + "/24"
 
@@ -102,6 +103,11 @@ func TestUDPDNSServer(t *testing.T) {
 	require.NotEqual(t, 0, testPort, "invalid listen port")
 
 	_, r = assertExchange(t, successTestName, dns.TypeA, testPort, 1, 1, 0)
+	require.IsType(t, (*dns.A)(nil), r.Answer[0], "DNS record")
+	require.Equal(t, testAddr1, r.Answer[0].(*dns.A).A.String(), "IP address")
+
+	// Assert that we can get the same result when asking for the same name but with no domain
+	_, r = assertExchange(t, successTestNameShort, dns.TypeA, testPort, 1, 1, 0)
 	require.IsType(t, (*dns.A)(nil), r.Answer[0], "DNS record")
 	require.Equal(t, testAddr1, r.Answer[0].(*dns.A).A.String(), "IP address")
 

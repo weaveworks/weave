@@ -4,7 +4,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -62,7 +61,7 @@ func (zone *ZoneDb) LookupName(name string) (res []ZoneRecord, err error) {
 	defer zone.mx.RUnlock()
 
 	// note: LookupName() is usually called from the mDNS server, so we do not touch the name
-	name = dns.Fqdn(name)
+	name = normalizeName(name, zone.domain)
 	Log.Debugf("[zonedb] Looking for name '%s' in local database", name)
 	return zone.lookup(name, func(ns *nameSet) []*recordEntry { return ns.getEntriesForName(name) })
 }
@@ -117,7 +116,7 @@ func (zone *ZoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []Zone
 // Perform a lookup for a name in the zone
 // The name can be resolved locally with the local database or with some other resolution method (eg, a mDNS query)
 func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) {
-	name = dns.Fqdn(name)
+	name = normalizeName(name, zone.domain)
 	Log.Debugf("[zonedb] Looking for name '%s' in local(&remote) database", name)
 
 	zone.mx.Lock()
@@ -267,7 +266,7 @@ func (zone *ZoneDb) updater(name string) (nextTime time.Time) {
 	}
 
 	// perform the refresh for this name
-	fullName := dns.Fqdn(name)
+	fullName := normalizeName(name, zone.domain)
 	startTime := zone.clock.Now()
 	Log.Debugf("[zonedb] Refreshing name '%s' with mDNS...", fullName)
 	res, _ := zone.mdnsCli.InsistentLookupName(fullName)
