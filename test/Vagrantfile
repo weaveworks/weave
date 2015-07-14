@@ -14,10 +14,10 @@ require '../vagrant-common.rb'
 def configure_docker(host, hostname, ip)
   pkgs = %w(lxc-docker ethtool)
 
-  host.vm.box = "ubuntu/ubuntu-14.10-amd64"
-  host.vm.box_url = "https://cloud-images.ubuntu.com/vagrant/utopic/current/utopic-server-cloudimg-amd64-vagrant-disk1.box"
+  host.vm.box = "ubuntu/ubuntu-15.04-amd64"
+  host.vm.box_url = "https://cloud-images.ubuntu.com/vagrant/vivid/current/vivid-server-cloudimg-amd64-vagrant-disk1.box"
 
-  host.vm.hostname = hostname
+  host.vm.provision :shell, :inline => "hostnamectl set-hostname "+hostname
   host.vm.network "private_network", ip: ip
 
   host.vm.synced_folder ".", "/vagrant", disabled: true
@@ -28,9 +28,12 @@ def configure_docker(host, hostname, ip)
   install_packages host.vm, pkgs
   host.vm.provision :shell, :inline => "usermod -a -G docker vagrant; "
 
-  # Listen on the remote API
-  host.vm.provision :shell, :inline => "echo 'DOCKER_OPTS=\"-H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375\"' >> /etc/default/docker"
-  host.vm.provision :shell, :inline => "service docker restart"
+  # Listen on the remote API and use overlay storage driver
+  host.vm.provision :shell, :inline => "sed -i -e's%-H fd://%-H fd:// -H tcp://0.0.0.0:2375 -s overlay%' /lib/systemd/system/docker.service"
+  host.vm.provision :shell, :inline => "systemctl daemon-reload"
+
+  host.vm.provision :shell, :inline => "systemctl start docker"
+  host.vm.provision :shell, :inline => "systemctl enable docker"
   cleanup(host.vm)
 end
 
