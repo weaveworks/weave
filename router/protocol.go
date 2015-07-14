@@ -265,8 +265,7 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return ErrExpectedCrypto
 		}
 
-		res.setupNoCrypto(gob.NewEncoder(params.Conn),
-			gob.NewDecoder(params.Conn))
+		res.setupNoCrypto(gob.NewEncoder(params.Conn), gob.NewDecoder(params.Conn))
 
 	case 1:
 		if pubKey == nil {
@@ -278,8 +277,7 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return err
 		}
 
-		res.setupCrypto(params, gob.NewEncoder(params.Conn),
-			gob.NewDecoder(params.Conn), rbuf, privKey)
+		res.setupCrypto(params, gob.NewEncoder(params.Conn), gob.NewDecoder(params.Conn), rbuf, privKey)
 
 	default:
 		return fmt.Errorf("Bad encryption flag %d", rbuf[0])
