@@ -129,7 +129,11 @@ func (d *DNSServer) handleLocal(defaultMaxResponseSize int) func(dns.ResponseWri
 			return
 		}
 
-		hostname := req.Question[0].Name
+		hostname := dns.Fqdn(req.Question[0].Name)
+		if strings.Count(hostname, ".") == 1 {
+			hostname = hostname + d.domain
+		}
+
 		addrs := d.ns.Lookup(hostname)
 
 		response := dns.Msg{}
@@ -139,7 +143,7 @@ func (d *DNSServer) handleLocal(defaultMaxResponseSize int) func(dns.ResponseWri
 		response.Answer = make([]dns.RR, len(addrs))
 
 		header := dns.RR_Header{
-			Name:   hostname,
+			Name:   req.Question[0].Name,
 			Rrtype: dns.TypeA,
 			Class:  dns.ClassINET,
 			Ttl:    d.ttl,
@@ -211,15 +215,25 @@ func (d *DNSServer) handleReverse(client *dns.Client, defaultMaxResponseSize int
 
 func (d *DNSServer) handleRecursive(client *dns.Client, defaultMaxResponseSize int) func(dns.ResponseWriter, *dns.Msg) {
 	return func(w dns.ResponseWriter, req *dns.Msg) {
-		d.ns.debugf("recursive cdrequest: %+v", *req)
+		d.ns.debugf("recursive request: %+v", *req)
+
+		// Resolve unqualified names locally
+		if len(req.Question) == 1 && req.Question[0].Qtype == dns.TypeA {
+			hostname := dns.Fqdn(req.Question[0].Name)
+			if strings.Count(hostname, ".") == 1 {
+				d.handleLocal(defaultMaxResponseSize)(w, req)
+				return
+			}
+		}
+
 		for _, server := range d.upstream.Servers {
 			response, _, err := client.Exchange(req, fmt.Sprintf("%s:%s", server, d.upstream.Port))
 			if err != nil || response == nil {
-				d.ns.debugf("network error trying %s (%s)", server, err)
+				d.ns.debugf("error trying %s: %v", server, err)
 				continue
 			}
 			if response.Rcode != dns.RcodeSuccess && !response.Authoritative {
-				d.ns.debugf("network error trying %s (%s)", server, err)
+				d.ns.debugf("non-authoritative error trying %s: %v", server, response.Rcode)
 				continue
 			}
 			d.ns.debugf("response: %+v", response)
