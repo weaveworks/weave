@@ -43,10 +43,6 @@ CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 
 DOCKER_PORT=2375
 
-WEAVEDNS_ARGS="--no-cache"
-[ -n "$DEBUG" ] && WEAVEDNS_ARGS="$WEAVEDNS_ARGS --log-level=debug"
-
-
 upload_executable() {
     host=$1
     file=$2
@@ -133,12 +129,6 @@ exec_on() {
     docker -H tcp://$host:$DOCKER_PORT exec $container "$@"
 }
 
-launch_dns_on() {
-    host=$1
-    shift 1
-    weave_on $host launch-dns $@ $WEAVEDNS_ARGS
-}
-
 start_container() {
     host=$1
     shift 1
@@ -188,9 +178,10 @@ assert_no_dns_record() {
     assert_raises "exec_on $host $container getent hosts $name" 2
 }
 
-# assert_dns_a_record <host> <container> <name> <ip>
+# assert_dns_a_record <host> <container> <name> <ip> [<expected_name>]
 assert_dns_a_record() {
-    assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
+    exp_name=${5:-$3}
+    assert "exec_on $1 $2 getent hosts $3 | tr -s ' ' | cut -d ' ' -f 1,2" "$4 $exp_name"
 }
 
 # assert_dns_ptr_record <host> <container> <name> <ip>

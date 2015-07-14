@@ -74,7 +74,6 @@ start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr argume
 # lowest available address in the subnet
 
 weave_on $HOST1 launch-router --ipalloc-range 10.2.3.0/24
-launch_dns_on $HOST1 10.254.254.254/24
 
 # Run container with three cidrs
 CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME | cut -b 1-12)

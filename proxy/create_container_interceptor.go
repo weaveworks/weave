@@ -9,8 +9,10 @@ import (
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
+
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/nameserver"
+	"github.com/weaveworks/weave/router"
 )
 
 const MaxDockerHostname = 64
@@ -137,15 +139,15 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 }
 
 func (i *createContainerInterceptor) getDNSDomain() (domain string, running bool) {
-	domain = nameserver.DefaultLocalDomain
-	dnsContainer, err := i.proxy.client.InspectContainer("weavedns")
+	domain = nameserver.DefaultDomain
+	weaveContainer, err := i.proxy.client.InspectContainer("weave")
 	if err != nil ||
-		dnsContainer.NetworkSettings == nil ||
-		dnsContainer.NetworkSettings.IPAddress == "" {
+		weaveContainer.NetworkSettings == nil ||
+		weaveContainer.NetworkSettings.IPAddress == "" {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/domain", dnsContainer.NetworkSettings.IPAddress, nameserver.DefaultHTTPPort)
+	url := fmt.Sprintf("http://%s:%d/domain", weaveContainer.NetworkSettings.IPAddress, router.HTTPPort)
 	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return

@@ -6,15 +6,36 @@ layout: default
 # WeaveDNS (service discovery) Design Notes
 
 The model is that each host has a service that is notified of
-hostnames and weave addresses for containers on the host. It binds to
-the host bridge to answer DNS queries from local containers; anything
-it can't answer, it asks with mDNS on the weave network.
+hostnames and weave addresses for containers on the host.  Like IPAM,
+this service is embedded within the router.  It binds to
+the host bridge to answer DNS queries from local containers; for
+anything it can't answer, it uses the infomation in the host's
+/etc/resolv.conf to query an 'fallback' server.
 
-The service is divided into two components: the first is the DNS
-server, which serves the records it is told about, and otherwise asks
-via mDNS on the weave network. The other component is the DNS updater,
-specific to Docker, which monitors the running containers so to add
-and remove records from the DNS server.
+The service is comprised of a DNS server, which answers all DNS queries
+from containers, and a in-memory database of hostnames and IPs.  The
+database on each node contains a complete copy of the hostnames and IPs
+for every containers in the cluster.
+
+For hostname queries in the local domain (default weave.local), the DNS
+server will consult the in-memory database.  For reverse queries, we
+first consult the local database, and if not found we query the
+upstream server.  For all other queries, we consult the upstream
+server.
+
+Updates to the in-memory database are broadcast to other DNS servers
+within the cluster.  The in-memory database only contains entries from
+connected DNS servers; if a DNS server becomes partitioned from the
+cluster, entries belonging to that server are removed from each node in
+the cluster.  When the partitioned DNS server reconnects, the entries
+are re-broadcast around the cluster.
+
+The DNS server also listens to the Docker event stream, and removes
+entries for containers when they die.  Entries removed in this way are
+tombstoned, and the tombstone lazily broadcast around the cluster.
+After a short timeout the tombstones are independantly removed from
+each host.
+
 
 ## DNS server API
 
@@ -24,60 +45,21 @@ and methods:
 `PUT /name/<identifier>/<ip-address>`
 
 Put a record for an IP, bound to a host-scoped identifier (e.g., a
-container ID), in the DNS database.
+container ID), in the DNS database.  The request body must contain
+a `fqdn=foo.weave.local` key pair.
 
 `DELETE /name/<identifier>/<ip-address>`
 
-Remove a specific record for an IP and host-scoped identifier.
+Remove a specific record for an IP and host-scoped identifier. The request
+body can optionally contain a `fqdn=foo.weave.local` key pair.
 
 `DELETE /name/<identifier>`
 
 Remove all records for the host-scoped identifier.
 
-`GET /name/`
+`GET /name/<fqdn>`
 
-List all the records in the database.
-
-`GET /name/<identifier>`
-
-List all the records for a host-scoped identifier.
-
-`GET /status`
-
-Give the server status.
-
-### Record structure
-
-The record structure is *either* form fields (useful for scripting
-PUTs), or a JSON object with the same fields. The fields are:
-
-```js
-    {
-        "fqdn": string,
-        "routing_prefix": number,
-        "local_ip": string
-    }
-```
-
-> Also TTL?
-
-## DNS server behaviour
-
-The DNS server listens for the HTTP requests as above, and maintains a
-database of host-local names accordingly.
-
-It also listens on the host-local network for DNS queries (port
-53). Anything that is in its database it responds to immediately. For
-other requests, it asks using multicast DNS on the weave network.
-
-Meanwhile, the DNS server is listening for mDNS queries, and responds
-if it the queried name is in its database.
-
-### Caching mDNS answers
-
-The DNS server will hear the answers to its own and other servers'
-mDNS queries sent on the weave network. It can cache these, to respond
-to local DNS requests; the cache is consulted before using mDNS.
+List of all IPs (in JSON format) for givne FQDN.
 
 ## DNS updater
 
@@ -99,17 +81,3 @@ network attachment of the container, and updates the DNS server.
 > Perhaps it could put containers on a watch list when it's noticed
 > them.
 
-## Container startup
-
-> TBD
-
-## Grouping and load balancing
-
-> TBD
-
-## Extensions
-
- * An updater that checks health more specifically, e.g., by testing
-   that a particular port is being listened to, or that it can get a
-   200 OK. These could be encoded in the container environment
-   variables, as per registrator.

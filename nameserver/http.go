@@ -2,123 +2,84 @@ package nameserver
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
-	. "github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/docker"
+
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/net/address"
 )
 
-func httpErrorAndLog(w http.ResponseWriter, msg string,
-	status int, logmsg string, logargs ...interface{}) {
-	http.Error(w, msg, status)
-	Log.Warningf("[http] "+logmsg, logargs...)
+func badRequest(w http.ResponseWriter, err error) {
+	http.Error(w, err.Error(), http.StatusBadRequest)
+	common.Log.Warningf("[gossipdns]: %v", err)
 }
 
-func extractFQDN(r *http.Request) (string, string) {
-	if fqdnStr := r.FormValue("fqdn"); fqdnStr != "" {
-		return fqdnStr, fqdnStr
+func (n *Nameserver) HandleHTTP(router *mux.Router) {
+	router.Methods("GET").Path("/domain").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, n.domain)
+	})
+
+	router.Methods("PUT").Path("/name/{container}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var (
+			vars      = mux.Vars(r)
+			container = vars["container"]
+			ipStr     = vars["ip"]
+			hostname  = r.FormValue("fqdn")
+			ip, err   = address.ParseIP(ipStr)
+		)
+		if err != nil {
+			badRequest(w, err)
+			return
+		}
+
+		if err := n.AddEntry(dns.Fqdn(hostname), container, n.ourName, ip); err != nil {
+			badRequest(w, fmt.Errorf("Unable to add entry: %v", err))
+			return
+		}
+
+		if r.FormValue("check-alive") == "true" && n.docker.IsContainerNotRunning(container) {
+			common.Log.Infof("[gossipdns] '%s' is not running: removing", container)
+			if err := n.Delete(hostname, container, ipStr, ip); err != nil {
+				common.Log.Infof("[gossipdns] failed to remove: %v", err)
+			}
+		}
+
+		w.WriteHeader(204)
+	})
+
+	deleteHandler := func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+
+		hostname := r.FormValue("fqdn")
+		if hostname == "" {
+			hostname = "*"
+		} else {
+			hostname = dns.Fqdn(hostname)
+		}
+
+		container, ok := vars["container"]
+		if !ok {
+			container = "*"
+		}
+
+		ipStr, ok := vars["ip"]
+		ip, err := address.ParseIP(ipStr)
+		if ok && err != nil {
+			badRequest(w, err)
+			return
+		} else if !ok {
+			ipStr = "*"
+		}
+
+		if err := n.Delete(hostname, container, ipStr, ip); err != nil {
+			badRequest(w, fmt.Errorf("Unable to delete entries: %v", err))
+			return
+		}
+		w.WriteHeader(204)
 	}
-	return "*", ""
-}
-
-func ServeHTTP(listener net.Listener, version string, server *DNSServer, dockerCli *docker.Client) {
-
-	muxRouter := mux.NewRouter()
-
-	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "weave DNS", version)
-		fmt.Fprintln(w, server.Status())
-		fmt.Fprintln(w, server.Zone.Status())
-	})
-
-	muxRouter.Methods("GET").Path("/domain").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, server.Zone.Domain())
-	})
-
-	muxRouter.Methods("PUT").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqError := func(msg string, logmsg string, logargs ...interface{}) {
-			httpErrorAndLog(w, msg, http.StatusBadRequest, logmsg, logargs...)
-		}
-
-		vars := mux.Vars(r)
-		idStr := vars["id"]
-		ipStr := vars["ip"]
-		name := r.FormValue("fqdn")
-
-		if name == "" {
-			reqError("Invalid FQDN", "Invalid FQDN in request: %s, %s", r.URL, r.Form)
-			return
-		}
-
-		ip := net.ParseIP(ipStr)
-		if ip == nil {
-			reqError("Invalid IP", "Invalid IP in request: %s", ipStr)
-			return
-		}
-
-		domain := server.Zone.Domain()
-		if !dns.IsSubDomain(domain, name) {
-			Log.Infof("[http] Ignoring name %s, not in %s", name, domain)
-			return
-		}
-		Log.Infof("[http] Adding %s -> %s", name, ipStr)
-		if err := server.Zone.AddRecord(idStr, name, ip); err != nil {
-			if _, ok := err.(DuplicateError); !ok {
-				httpErrorAndLog(
-					w, "Internal error", http.StatusInternalServerError,
-					"Unexpected error from DB: %s", err)
-				return
-			} // oh, I already know this. whatever.
-		}
-
-		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(idStr) {
-			Log.Infof("[http] '%s' is not running: removing", idStr)
-			server.Zone.DeleteRecords(idStr, name, ip)
-		}
-	})
-
-	muxRouter.Methods("DELETE").Path("/name/{id:.+}/{ip:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		idStr := vars["id"]
-		ipStr := vars["ip"]
-
-		ip := net.ParseIP(ipStr)
-		if ip == nil {
-			httpErrorAndLog(
-				w, "Invalid IP in request", http.StatusBadRequest,
-				"Invalid IP in request: %s", ipStr)
-			return
-		}
-
-		fqdnStr, fqdn := extractFQDN(r)
-
-		Log.Infof("[http] Deleting ID %s, IP %s, FQDN %s", idStr, ipStr, fqdnStr)
-		server.Zone.DeleteRecords(idStr, fqdn, ip)
-	})
-
-	muxRouter.Methods("DELETE").Path("/name/{id:.+}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		idStr := vars["id"]
-
-		fqdnStr, fqdn := extractFQDN(r)
-
-		Log.Infof("[http] Deleting ID %s, IP *, FQDN %s", idStr, fqdnStr)
-		server.Zone.DeleteRecords(idStr, fqdn, net.IP{})
-	})
-
-	muxRouter.Methods("DELETE").Path("/name").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fqdnStr, fqdn := extractFQDN(r)
-
-		Log.Infof("[http] Deleting ID *, IP *, FQDN %s", fqdnStr)
-		server.Zone.DeleteRecords("", fqdn, net.IP{})
-	})
-
-	http.Handle("/", muxRouter)
-
-	if err := http.Serve(listener, nil); err != nil {
-		Log.Fatal("[http] Unable to serve http: ", err)
-	}
+	router.Methods("DELETE").Path("/name/{container}/{ip}").HandlerFunc(deleteHandler)
+	router.Methods("DELETE").Path("/name/{container}").HandlerFunc(deleteHandler)
+	router.Methods("DELETE").Path("/name").HandlerFunc(deleteHandler)
 }

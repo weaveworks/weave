@@ -1,117 +1,289 @@
 package nameserver
 
 import (
+	"bytes"
+	"fmt"
 	"math/rand"
+	"net"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/miekg/dns"
+
+	"github.com/weaveworks/weave/net/address"
 )
 
 const (
-	minUDPSize = 512
-	maxUDPSize = 65535
+	topDomain        = "."
+	reverseDNSdomain = "in-addr.arpa."
+	etcResolvConf    = "/etc/resolv.conf"
+	udpBuffSize      = uint16(4096)
+	minUDPSize       = 512
+
+	DefaultPort          = 53
+	DefaultTTL           = 1
+	DefaultClientTimeout = 5 * time.Second
 )
 
-func makeHeader(r *dns.Msg, q *dns.Question, ttl int) *dns.RR_Header {
-	return &dns.RR_Header{
-		Name:   q.Name,
-		Rrtype: q.Qtype,
-		Class:  dns.ClassINET,
-		Ttl:    uint32(ttl),
+type DNSServer struct {
+	ns     *Nameserver
+	domain string
+	ttl    uint32
+	port   int
+
+	servers   []*dns.Server
+	upstream  *dns.ClientConfig
+	tcpClient *dns.Client
+	udpClient *dns.Client
+}
+
+func NewDNSServer(ns *Nameserver, domain string, port int, ttl uint32,
+	clientTimeout time.Duration) (*DNSServer, error) {
+
+	s := &DNSServer{
+		ns:        ns,
+		domain:    dns.Fqdn(domain),
+		ttl:       ttl,
+		port:      port,
+		tcpClient: &dns.Client{Net: "tcp", ReadTimeout: clientTimeout},
+		udpClient: &dns.Client{Net: "udp", ReadTimeout: clientTimeout, UDPSize: udpBuffSize},
+	}
+	var err error
+	if s.upstream, err = dns.ClientConfigFromFile(etcResolvConf); err != nil {
+		return nil, err
+	}
+
+	err = s.listen(port)
+	return s, err
+}
+
+func (d *DNSServer) String() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "WeaveDNS (%s)\n", d.ns.ourName)
+	fmt.Fprintf(&buf, "  listening on port %d, for domain %s\n", d.port, d.domain)
+	fmt.Fprintf(&buf, "  response ttl %d\n", d.ttl)
+	return buf.String()
+}
+
+func (d *DNSServer) listen(port int) error {
+	udpListener, err := net.ListenPacket("udp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return err
+	}
+	udpServer := &dns.Server{PacketConn: udpListener, Handler: d.createMux(d.udpClient, minUDPSize)}
+
+	tcpListener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		udpServer.Shutdown()
+		return err
+	}
+	tcpServer := &dns.Server{Listener: tcpListener, Handler: d.createMux(d.tcpClient, -1)}
+
+	d.servers = []*dns.Server{udpServer, tcpServer}
+	return nil
+}
+
+func (d *DNSServer) ActivateAndServe() {
+	for _, server := range d.servers {
+		go func(server *dns.Server) {
+			server.ActivateAndServe()
+		}(server)
 	}
 }
 
-func makeReply(r *dns.Msg, as []dns.RR) *dns.Msg {
-	m := new(dns.Msg)
+func (d *DNSServer) Stop() error {
+	for _, server := range d.servers {
+		if err := server.Shutdown(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *DNSServer) errorResponse(r *dns.Msg, code int, w dns.ResponseWriter) {
+	m := dns.Msg{}
 	m.SetReply(r)
 	m.RecursionAvailable = true
-	m.Answer = as
+	m.Rcode = code
+
+	d.ns.debugf("error response: %+v", m)
+	if err := w.WriteMsg(&m); err != nil {
+		d.ns.infof("error responding: %v", err)
+	}
+}
+
+func (d *DNSServer) createMux(client *dns.Client, defaultMaxResponseSize int) *dns.ServeMux {
+	m := dns.NewServeMux()
+	m.HandleFunc(d.domain, d.handleLocal(defaultMaxResponseSize))
+	m.HandleFunc(reverseDNSdomain, d.handleReverse(client, defaultMaxResponseSize))
+	m.HandleFunc(topDomain, d.handleRecursive(client, defaultMaxResponseSize))
 	return m
 }
 
-func makeTruncatedReply(r *dns.Msg) *dns.Msg {
-	// for truncated response, we create a minimal reply with the Truncated bit set
-	reply := new(dns.Msg)
-	reply.SetReply(r)
-	reply.Truncated = true
-	return reply
-}
+func (d *DNSServer) handleLocal(defaultMaxResponseSize int) func(dns.ResponseWriter, *dns.Msg) {
+	return func(w dns.ResponseWriter, req *dns.Msg) {
+		d.ns.debugf("local request: %+v", *req)
+		if len(req.Question) != 1 || req.Question[0].Qtype != dns.TypeA {
+			d.errorResponse(req, dns.RcodeNameError, w)
+			return
+		}
 
-type DNSResponseBuilder func(r *dns.Msg, q *dns.Question, addrs []ZoneRecord, ttl int) *dns.Msg
+		hostname := dns.Fqdn(req.Question[0].Name)
+		if strings.Count(hostname, ".") == 1 {
+			hostname = hostname + d.domain
+		}
 
-func makeAddressReply(r *dns.Msg, q *dns.Question, addrs []ZoneRecord, ttl int) *dns.Msg {
-	answers := make([]dns.RR, len(addrs))
-	header := makeHeader(r, q, ttl)
-	count := 0
-	for _, addr := range addrs {
-		ip := addr.IP()
-		ip4 := ip.To4()
+		addrs := d.ns.Lookup(hostname)
 
-		switch q.Qtype {
-		case dns.TypeA:
-			if ip4 != nil {
-				answers[count] = &dns.A{Hdr: *header, A: ip}
-				count++
-			}
-		case dns.TypeAAAA:
-			if ip4 == nil {
-				answers[count] = &dns.AAAA{Hdr: *header, AAAA: ip}
-				count++
-			}
+		response := dns.Msg{}
+		response.RecursionAvailable = true
+		response.Authoritative = true
+		response.SetReply(req)
+		response.Answer = make([]dns.RR, len(addrs))
+
+		header := dns.RR_Header{
+			Name:   req.Question[0].Name,
+			Rrtype: dns.TypeA,
+			Class:  dns.ClassINET,
+			Ttl:    d.ttl,
+		}
+
+		for i, addr := range addrs {
+			ip := addr.IP4()
+			response.Answer[i] = &dns.A{Hdr: header, A: ip}
+		}
+
+		shuffleAnswers(&response.Answer)
+		maxResponseSize := getMaxResponseSize(req, defaultMaxResponseSize)
+		truncateResponse(&response, maxResponseSize)
+
+		d.ns.debugf("response: %+v", response)
+		if err := w.WriteMsg(&response); err != nil {
+			d.ns.infof("error responding: %v", err)
 		}
 	}
-	return makeReply(r, answers[:count])
 }
 
-func makePTRReply(r *dns.Msg, q *dns.Question, names []ZoneRecord, ttl int) *dns.Msg {
-	answers := make([]dns.RR, len(names))
-	header := makeHeader(r, q, ttl)
-	for i, name := range names {
-		answers[i] = &dns.PTR{Hdr: *header, Ptr: name.Name()}
-	}
-	return makeReply(r, answers)
-}
+func (d *DNSServer) handleReverse(client *dns.Client, defaultMaxResponseSize int) func(dns.ResponseWriter, *dns.Msg) {
+	return func(w dns.ResponseWriter, req *dns.Msg) {
+		d.ns.debugf("reverse request: %+v", *req)
+		if len(req.Question) != 1 || req.Question[0].Qtype != dns.TypePTR {
+			d.errorResponse(req, dns.RcodeNameError, w)
+			return
+		}
 
-func makeDNSFailResponse(r *dns.Msg) *dns.Msg {
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.RecursionAvailable = true
-	m.Rcode = dns.RcodeNameError
-	return m
-}
+		ipStr := strings.TrimSuffix(req.Question[0].Name, "."+reverseDNSdomain)
+		ip, err := address.ParseIP(ipStr)
+		if err != nil {
+			d.errorResponse(req, dns.RcodeNameError, w)
+			return
+		}
 
-// get the maximum UDP-reply length
-func getMaxReplyLen(r *dns.Msg, proto dnsProtocol) int {
-	maxLen := minUDPSize
-	if proto == protTCP {
-		maxLen = maxUDPSize
-	} else if opt := r.IsEdns0(); opt != nil {
-		maxLen = int(opt.UDPSize())
-	}
-	return maxLen
-}
+		hostname, err := d.ns.ReverseLookup(ip.Reverse())
+		if err != nil {
+			d.handleRecursive(client, defaultMaxResponseSize)(w, req)
+			return
+		}
 
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
-}
+		response := dns.Msg{}
+		response.RecursionAvailable = true
+		response.Authoritative = true
+		response.SetReply(req)
 
-// shuffleAnswers reorders answers for very basic load balancing
-func shuffleAnswers(answers []dns.RR) []dns.RR {
-	if len(answers) > 1 {
-		for i := range answers {
-			j := rand.Intn(i + 1)
-			answers[i], answers[j] = answers[j], answers[i]
+		header := dns.RR_Header{
+			Name:   req.Question[0].Name,
+			Rrtype: dns.TypePTR,
+			Class:  dns.ClassINET,
+			Ttl:    d.ttl,
+		}
+
+		response.Answer = []dns.RR{&dns.PTR{
+			Hdr: header,
+			Ptr: hostname,
+		}}
+
+		maxResponseSize := getMaxResponseSize(req, defaultMaxResponseSize)
+		truncateResponse(&response, maxResponseSize)
+
+		d.ns.debugf("response: %+v", response)
+		if err := w.WriteMsg(&response); err != nil {
+			d.ns.infof("error responding: %v", err)
 		}
 	}
-
-	return answers
 }
 
-// only take the first `num` answers
-func pruneAnswers(answers []dns.RR, num int) []dns.RR {
-	if num > 0 && len(answers) > num {
-		// TODO: we should have some prefer locally-introduced answers, etc...
-		return answers[:num]
+func (d *DNSServer) handleRecursive(client *dns.Client, defaultMaxResponseSize int) func(dns.ResponseWriter, *dns.Msg) {
+	return func(w dns.ResponseWriter, req *dns.Msg) {
+		d.ns.debugf("recursive request: %+v", *req)
+
+		// Resolve unqualified names locally
+		if len(req.Question) == 1 && req.Question[0].Qtype == dns.TypeA {
+			hostname := dns.Fqdn(req.Question[0].Name)
+			if strings.Count(hostname, ".") == 1 {
+				d.handleLocal(defaultMaxResponseSize)(w, req)
+				return
+			}
+		}
+
+		for _, server := range d.upstream.Servers {
+			response, _, err := client.Exchange(req, fmt.Sprintf("%s:%s", server, d.upstream.Port))
+			if err != nil || response == nil {
+				d.ns.debugf("error trying %s: %v", server, err)
+				continue
+			}
+			if response.Rcode != dns.RcodeSuccess && !response.Authoritative {
+				d.ns.debugf("non-authoritative error trying %s: %v", server, response.Rcode)
+				continue
+			}
+			d.ns.debugf("response: %+v", response)
+			if err := w.WriteMsg(response); err != nil {
+				d.ns.infof("error responding: %v", err)
+			}
+			return
+		}
+
+		d.errorResponse(req, dns.RcodeServerFailure, w)
 	}
-	return answers
+}
+
+func shuffleAnswers(answers *[]dns.RR) {
+	if len(*answers) <= 1 {
+		return
+	}
+
+	for i := range *answers {
+		j := rand.Intn(i + 1)
+		(*answers)[i], (*answers)[j] = (*answers)[j], (*answers)[i]
+	}
+}
+
+func truncateResponse(response *dns.Msg, maxSize int) {
+	if len(response.Answer) <= 1 || maxSize <= 0 {
+		return
+	}
+
+	// take a copy of answers, as we're going to mutate response
+	answers := response.Answer
+
+	// search for smallest i that is too big
+	i := sort.Search(len(response.Answer), func(i int) bool {
+		// return true if too big
+		response.Answer = answers[:i+1]
+		return response.Len() > maxSize
+	})
+	if i == len(answers) {
+		response.Answer = answers
+		return
+	}
+
+	response.Answer = answers[:i]
+	response.Truncated = true
+}
+
+func getMaxResponseSize(req *dns.Msg, defaultMaxResponseSize int) int {
+	if opt := req.IsEdns0(); opt != nil {
+		return int(opt.UDPSize())
+	}
+	return defaultMaxResponseSize
 }

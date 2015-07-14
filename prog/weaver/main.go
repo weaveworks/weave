@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/davecheney/profile"
 	"github.com/docker/docker/pkg/mflag"
@@ -16,6 +17,7 @@ import (
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/ipam"
+	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
@@ -52,6 +54,10 @@ func main() {
 		peerCount          int
 		apiPath            string
 		peers              []string
+		dnsDomain          string
+		dnsPort            int
+		dnsTTL             int
+		dnsClientTimeout   time.Duration
 	)
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
@@ -73,6 +79,11 @@ func main() {
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
 	mflag.StringVar(&apiPath, []string{"#api", "-api"}, "unix:///var/run/docker.sock", "Path to Docker API socket")
+	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
+	mflag.IntVar(&dnsPort, []string{"-dns-port"}, nameserver.DefaultPort, "port to listen on for DNS requests")
+	mflag.IntVar(&dnsTTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
+	mflag.DurationVar(&dnsClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
+
 	mflag.Parse()
 	peers = mflag.Args()
 
@@ -141,21 +152,37 @@ func main() {
 	router := weave.NewRouter(config, name, nickName)
 	Log.Println("Our name is", router.Ourself)
 
+	dockerCli, err := docker.NewClient(apiPath)
+	if err != nil {
+		Log.Fatal("Unable to start docker client: ", err)
+	}
+
 	var allocator *ipam.Allocator
 	var defaultSubnet address.CIDR
-	var dockerCli *docker.Client
 	if iprangeCIDR != "" {
 		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
-		dockerCli, err = docker.NewClient(apiPath)
-		if err != nil {
-			Log.Fatal("Unable to start docker client: ", err)
-		}
 		if err = dockerCli.AddObserver(allocator); err != nil {
 			Log.Fatal("Unable to start watcher", err)
 		}
 	} else if peerCount > 0 {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}
+
+	ns := nameserver.New(router.Ourself.Peer.Name, router.Peers, dockerCli, dnsDomain)
+	ns.SetGossip(router.NewGossip("nameserver", ns))
+	if err = dockerCli.AddObserver(ns); err != nil {
+		Log.Fatal("Unable to start watcher", err)
+	}
+	ns.Start()
+	defer ns.Stop()
+
+	dnsserver, err := nameserver.NewDNSServer(ns, dnsDomain, dnsPort,
+		uint32(dnsTTL), dnsClientTimeout)
+	if err != nil {
+		Log.Fatal("Unable to start dns server: ", err)
+	}
+	dnsserver.ActivateAndServe()
+	defer dnsserver.Stop()
 
 	router.Start()
 	if errors := router.ConnectionMaker.InitiateConnections(peers, false); len(errors) > 0 {
@@ -166,7 +193,7 @@ func main() {
 	// so there is no point in doing "weave launch --http-addr ''".
 	// This is here to support stand-alone use of weaver.
 	if httpAddr != "" {
-		go handleHTTP(router, httpAddr, allocator, defaultSubnet, dockerCli)
+		go handleHTTP(router, httpAddr, allocator, defaultSubnet, dockerCli, ns, dnsserver)
 	}
 
 	SignalHandlerLoop(router)
@@ -270,12 +297,14 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	return quorum
 }
 
-func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator, defaultSubnet address.CIDR, docker *docker.Client) {
+func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator, defaultSubnet address.CIDR, docker *docker.Client, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
 	muxRouter := mux.NewRouter()
 
 	if allocator != nil {
 		allocator.HandleHTTP(muxRouter, defaultSubnet, docker)
 	}
+
+	ns.HandleHTTP(muxRouter)
 
 	muxRouter.Methods("GET").Path("/status").Headers("Accept", "application/json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json, _ := router.StatusJSON(version)
@@ -290,6 +319,9 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 			fmt.Fprintln(w, allocator.String())
 			fmt.Fprintln(w, "Allocator default subnet:", defaultSubnet)
 		}
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, dnsserver.String())
+		fmt.Fprintln(w, ns.String())
 	})
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
