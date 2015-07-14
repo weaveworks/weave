@@ -38,11 +38,15 @@ func (uzr *uniqZoneRecords) toSlice() []ZoneRecord {
 
 //////////////////////////////////////////////////////////////////////////////
 
+func (zone *ZoneDb) isExportableIdent(ident string) bool {
+	return (ident != defaultRemoteIdent) && (ident != defaultPrivateIdent)
+}
+
 // Lookup in the database for locally-introduced information
 func (zone *ZoneDb) lookup(target string, lfun func(ns *nameSet) []*recordEntry) (res []ZoneRecord, err error) {
 	uniq := newUniqZoneRecords()
 	for identName, nameset := range zone.idents {
-		if identName != defaultRemoteIdent {
+		if zone.isExportableIdent(identName) {
 			for _, ze := range lfun(nameset) {
 				uniq.add(ze)
 			}
@@ -133,7 +137,7 @@ func (zone *ZoneDb) DomainLookupName(name string) (res []ZoneRecord, err error) 
 				uniq.add(ze)
 			}
 		}
-		if identName != defaultRemoteIdent {
+		if zone.isExportableIdent(identName) {
 			nameset.touchName(name, now)
 		}
 	}
@@ -176,7 +180,7 @@ func (zone *ZoneDb) DomainLookupInaddr(inaddr string) (res []ZoneRecord, err err
 				nameset.deleteNameIP("", revIPv4.toNetIP())
 			} else {
 				uniq.add(ze)
-				if identName != defaultRemoteIdent {
+				if zone.isExportableIdent(identName) {
 					nameset.touchName(ze.Name(), now)
 				}
 			}

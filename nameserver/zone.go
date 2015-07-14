@@ -21,7 +21,8 @@ const (
 	DefaultRefreshInterval = int(DefaultLocalTTL) // Period for background updates with mDNS
 	DefaultRelevantTime    = 60                   // When to forget info about remote info if nobody asks...
 
-	defaultRemoteIdent = "weave:remote" // Ident used for info obtained from mDNS
+	defaultRemoteIdent  = "weave:remote"  // Ident used for info obtained from mDNS
+	defaultPrivateIdent = "weave:private" // Ident used for local host data (we never export)
 )
 
 // +1 to also exclude a dot

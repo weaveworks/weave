@@ -1079,6 +1079,8 @@ launch_dns() {
     ipam_cidrs_or_die $DNS_CONTAINER $CIDR_ARGS
     with_container_netns_or_die $DNS_CONTAINER attach $ALL_CIDRS
     populate_dns
+    # register "dns.weave.local." privately (not exported via mDNS)
+    put_dns_fqdn weave:private dns.$(dns_domain) $ALL_CIDRS
 }
 
 launch_proxy() {
