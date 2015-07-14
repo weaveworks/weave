@@ -32,7 +32,7 @@ def configure_docker(host, hostname, ip)
   host.vm.provision :shell, :inline => "sed -i -e's%-H fd://%-H fd:// -H tcp://0.0.0.0:2375 -s overlay%' /lib/systemd/system/docker.service"
   host.vm.provision :shell, :inline => "systemctl daemon-reload"
 
-  host.vm.provision :shell, :inline => "systemctl start docker"
+  host.vm.provision :shell, :inline => "systemctl restart docker"
   host.vm.provision :shell, :inline => "systemctl enable docker"
   cleanup(host.vm)
 end
