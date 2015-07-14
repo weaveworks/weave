@@ -188,10 +188,9 @@ assert_no_dns_record() {
     assert_raises "exec_on $host $container getent hosts $name" 2
 }
 
-# assert_dns_a_record <host> <container> <name> <ip> [<expected_name>]
+# assert_dns_a_record <host> <container> <name> <ip>
 assert_dns_a_record() {
-    exp_name=${5:-$3}
-    assert "exec_on $1 $2 getent hosts $3 | tr -s ' ' | cut -d ' ' -f 1,2" "$4 $exp_name"
+    assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
 }
 
 # assert_dns_ptr_record <host> <container> <name> <ip>
