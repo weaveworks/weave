@@ -238,7 +238,7 @@ func (n *Nameserver) OnGossip(msg []byte) (router.GossipData, error) {
 
 // merge received data into state and return a representation of
 // the received data, for further propagation
-func (n *Nameserver) OnGossipBroadcast(msg []byte) (router.GossipData, error) {
+func (n *Nameserver) OnGossipBroadcast(_ router.PeerName, msg []byte) (router.GossipData, error) {
 	_, entries, err := n.receiveGossip(msg)
 	return entries, err
 }

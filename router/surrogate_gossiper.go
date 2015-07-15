@@ -24,7 +24,7 @@ func (*SurrogateGossiper) OnGossipUnicast(sender PeerName, msg []byte) error {
 	return nil
 }
 
-func (*SurrogateGossiper) OnGossipBroadcast(update []byte) (GossipData, error) {
+func (*SurrogateGossiper) OnGossipBroadcast(_ PeerName, update []byte) (GossipData, error) {
 	return NewSurrogateGossipData(update), nil
 }
 

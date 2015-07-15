@@ -366,8 +366,8 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 }
 
 // OnGossipBroadcast (Sync)
-func (alloc *Allocator) OnGossipBroadcast(msg []byte) (router.GossipData, error) {
-	alloc.debugln("OnGossipBroadcast:", len(msg), "bytes")
+func (alloc *Allocator) OnGossipBroadcast(sender router.PeerName, msg []byte) (router.GossipData, error) {
+	alloc.debugln("OnGossipBroadcast from", sender, ":", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
 		resultChan <- alloc.update(msg)

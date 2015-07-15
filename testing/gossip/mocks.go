@@ -15,7 +15,8 @@ type unicastMessage struct {
 	buf    []byte
 }
 type broadcastMessage struct {
-	data router.GossipData
+	sender router.PeerName
+	data   router.GossipData
 }
 type exitMessage struct {
 	exitChan chan struct{}
@@ -91,7 +92,7 @@ func (grouter *TestRouter) run(gossiper router.Gossiper, gossipChan chan interfa
 					continue
 				}
 				for _, msg := range message.data.Encode() {
-					if _, err := gossiper.OnGossipBroadcast(msg); err != nil {
+					if _, err := gossiper.OnGossipBroadcast(message.sender, msg); err != nil {
 						panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
 					}
 				}
