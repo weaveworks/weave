@@ -212,7 +212,7 @@ func (g *testGossiper) OnGossipUnicast(sender PeerName, msg []byte) error {
 	return nil
 }
 
-func (g *testGossiper) OnGossipBroadcast(update []byte) (GossipData, error) {
+func (g *testGossiper) OnGossipBroadcast(_ PeerName, update []byte) (GossipData, error) {
 	g.Lock()
 	defer g.Unlock()
 	for _, v := range update {

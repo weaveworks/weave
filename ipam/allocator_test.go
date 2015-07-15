@@ -86,7 +86,7 @@ func TestBootstrap(t *testing.T) {
 	alloc2, _ := makeAllocatorWithMockGossip(t, peerNameString, testStart1+"/22", 2)
 	defer alloc2.Stop()
 
-	alloc1.OnGossipBroadcast(alloc2.Encode())
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
 	alloc1.actionChan <- func() { alloc1.tryPendingOps() }
 
@@ -108,19 +108,19 @@ func TestBootstrap(t *testing.T) {
 
 	// alloc2 receives paxos update and broadcasts its reply
 	ExpectBroadcastMessage(alloc2, nil)
-	alloc2.OnGossipBroadcast(alloc1.Encode())
+	alloc2.OnGossipBroadcast(alloc1.ourName, alloc1.Encode())
 
 	ExpectBroadcastMessage(alloc1, nil)
-	alloc1.OnGossipBroadcast(alloc2.Encode())
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
 	// both nodes will get consensus now so initialize the ring
 	ExpectBroadcastMessage(alloc2, nil)
 	ExpectBroadcastMessage(alloc2, nil)
-	alloc2.OnGossipBroadcast(alloc1.Encode())
+	alloc2.OnGossipBroadcast(alloc1.ourName, alloc1.Encode())
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
-	alloc1.OnGossipBroadcast(alloc2.Encode())
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 	// now alloc1 should have space
 
 	AssertSent(t, done)
@@ -181,7 +181,7 @@ func TestCancel(t *testing.T) {
 	alloc2.Start()
 
 	// tell peers about each other
-	alloc1.OnGossipBroadcast(alloc2.Encode())
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
 	// Get some IPs, so each allocator has some space
 	res1, _ := alloc1.Allocate("foo", subnet, nil)
@@ -254,9 +254,9 @@ func TestTransfer(t *testing.T) {
 	_, err = alloc3.Allocate("bar", subnet, nil)
 	require.True(t, err == nil, "Failed to get address")
 
-	router.GossipBroadcast(alloc2.Gossip())
+	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
 	router.Flush()
-	router.GossipBroadcast(alloc3.Gossip())
+	alloc2.gossip.GossipBroadcast(alloc3.Gossip())
 	router.Flush()
 	router.RemovePeer(alloc2.ourName)
 	router.RemovePeer(alloc3.ourName)
@@ -476,7 +476,7 @@ func TestGossipSkew(t *testing.T) {
 	alloc2.now = func() time.Time { return time.Now().Add(time.Hour * 2) }
 	defer alloc2.Stop()
 
-	if _, err := alloc1.OnGossipBroadcast(alloc2.Encode()); err == nil {
+	if _, err := alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode()); err == nil {
 		t.Fail()
 	}
 }
