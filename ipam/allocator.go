@@ -19,6 +19,7 @@ import (
 const (
 	msgSpaceRequest = iota
 	msgRingUpdate
+	msgSpaceRequestDenied
 
 	paxosInterval = time.Second * 5
 	MinSubnetSize = 4 // first and last addresses are excluded, so 2 would be too small
@@ -160,6 +161,18 @@ func (alloc *Allocator) tryPendingOps() {
 			break
 		}
 		alloc.pendingAllocates = append(alloc.pendingAllocates[:i], alloc.pendingAllocates[i+1:]...)
+	}
+}
+
+func (alloc *Allocator) spaceRequestDenied(sender router.PeerName, r address.Range) {
+	for i := 0; i < len(alloc.pendingClaims); {
+		claim := alloc.pendingClaims[i].(*claim)
+		if r.Contains(claim.addr) {
+			claim.DeniedBy(alloc, sender)
+			alloc.pendingClaims = append(alloc.pendingClaims[:i], alloc.pendingClaims[i+1:]...)
+			continue
+		}
+		i++
 	}
 }
 
@@ -358,6 +371,12 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 			r, err := decodeRange(msg[1:])
 			if err == nil {
 				alloc.donateSpace(r, sender)
+			}
+			resultChan <- err
+		case msgSpaceRequestDenied:
+			r, err := decodeRange(msg[1:])
+			if err == nil {
+				alloc.spaceRequestDenied(sender, r)
 			}
 			resultChan <- err
 		case msgRingUpdate:
@@ -576,13 +595,22 @@ func (alloc *Allocator) propose() {
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
-func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) error {
+func encodeRange(r address.Range) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	if err := enc.Encode(r); err != nil {
 		panic(err)
 	}
-	msg := router.Concat([]byte{msgSpaceRequest}, buf.Bytes())
+	return buf.Bytes()
+}
+
+func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) error {
+	msg := router.Concat([]byte{msgSpaceRequest}, encodeRange(r))
+	return alloc.gossip.GossipUnicast(dest, msg)
+}
+
+func (alloc *Allocator) sendSpaceRequestDenied(dest router.PeerName, r address.Range) error {
+	msg := router.Concat([]byte{msgSpaceRequestDenied}, encodeRange(r))
 	return alloc.gossip.GossipUnicast(dest, msg)
 }
 
@@ -659,10 +687,14 @@ func (alloc *Allocator) donateSpace(r address.Range, to router.PeerName) {
 		free := alloc.space.NumFreeAddressesInRange(r)
 		common.Assert(free == 0)
 		alloc.debugln("No space to give to peer", to)
+		// separate message maintains backwards-compatibility:
+		// down-level peers will ignore this and still get the ring update.
+		alloc.sendSpaceRequestDenied(to, r)
 		return
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
+	alloc.sendRingUpdate(to)
 }
 
 func (alloc *Allocator) assertInvariants() {

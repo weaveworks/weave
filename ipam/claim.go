@@ -44,12 +44,9 @@ func (c *claim) Try(alloc *Allocator) bool {
 		c.sendResult(nil) // don't make the caller wait
 		return false
 	default:
-		name, found := alloc.nicknames[owner]
-		if found {
-			name = " (" + name + ")"
-		}
-		c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.addr.String(), owner, name))
-		return true
+		alloc.debugf("requesting address %s from other peer %s", c.addr, owner)
+		alloc.sendSpaceRequest(owner, address.NewRange(c.addr, 1))
+		return false
 	}
 
 	// We are the owner, check we haven't given it to another container
@@ -70,6 +67,14 @@ func (c *claim) Try(alloc *Allocator) bool {
 		c.sendResult(fmt.Errorf("address %s is already owned by %s", c.addr.String(), existingIdent))
 	}
 	return true
+}
+
+func (c *claim) DeniedBy(alloc *Allocator, owner router.PeerName) {
+	name, found := alloc.nicknames[owner]
+	if found {
+		name = " (" + name + ")"
+	}
+	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.addr.String(), owner, name))
 }
 
 func (c *claim) Cancel() {
