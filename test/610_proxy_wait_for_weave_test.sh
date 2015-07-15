@@ -22,4 +22,8 @@ assert "entrypoint c2" "$(entrypoint $COMMITTED_IMAGE)"
 # Check weave IP is first ip returned, so java (etc) prefer weave.
 assert "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.1/24' $BASE_IMAGE hostname -i | cut -d' ' -f1" "10.2.1.1"
 
+# Check exec works on containers without weavewait
+docker_on $HOST1 run -dit --name c3 $SMALL_IMAGE /bin/sh
+assert_raises "proxy docker_on $HOST1 exec c3 true"
+
 end_suite
