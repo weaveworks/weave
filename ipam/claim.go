@@ -35,14 +35,12 @@ func (c *claim) Try(alloc *Allocator) bool {
 		return true
 	}
 
-	// If our ring doesn't know, it must be empty.  We will have initiated the
-	// bootstrap of the ring, so wait until we find some owner for this
-	// range (might be us).
 	switch owner := alloc.ring.Owner(c.addr); owner {
 	case alloc.ourName:
 		// success
 	case router.UnknownPeerName:
-		alloc.infof("Ring is empty; will try later.", c.addr, owner)
+		// If our ring doesn't know, it must be empty.
+		alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.addr, c.ident)
 		c.sendResult(nil) // don't make the caller wait
 		return false
 	default:
