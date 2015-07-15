@@ -342,6 +342,11 @@ func (alloc *Allocator) pruneNicknames() {
 	}
 }
 
+func decodeRange(msg []byte) (r address.Range, err error) {
+	decoder := gob.NewDecoder(bytes.NewReader(msg))
+	return r, decoder.Decode(&r)
+}
+
 // OnGossipUnicast (Sync)
 func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) error {
 	alloc.debugln("OnGossipUnicast from", sender, ": ", len(msg), "bytes")
@@ -350,14 +355,11 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 		switch msg[0] {
 		case msgSpaceRequest:
 			// some other peer asked us for space
-			decoder := gob.NewDecoder(bytes.NewReader(msg[1:]))
-			var r address.Range
-			if err := decoder.Decode(&r); err != nil {
-				resultChan <- err
-				return
+			r, err := decodeRange(msg[1:])
+			if err == nil {
+				alloc.donateSpace(r, sender)
 			}
-			alloc.donateSpace(r, sender)
-			resultChan <- nil
+			resultChan <- err
 		case msgRingUpdate:
 			resultChan <- alloc.update(sender, msg[1:])
 		}
