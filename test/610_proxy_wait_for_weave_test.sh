@@ -21,4 +21,8 @@ COMMITTED_IMAGE=$(proxy docker_on $HOST1 commit c1)
 assert_raises "proxy docker_on $HOST1 run --name c2 $COMMITTED_IMAGE"
 assert "entrypoint c2" "$(entrypoint $COMMITTED_IMAGE)"
 
+# Check exec works on containers without weavewait
+docker_on $HOST1 run -dit --name c3 $SMALL_IMAGE /bin/sh
+assert_raises "proxy docker_on $HOST1 exec c3 true"
+
 end_suite
