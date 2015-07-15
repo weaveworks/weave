@@ -29,7 +29,9 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config); ok {
+	_, hasWeaveWait := container.Volumes["/w"]
+	cidrs, hasCIDRs := i.proxy.weaveCIDRsFromConfig(container.Config)
+	if hasCIDRs && hasWeaveWait {
 		Log.Infof("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
 		cmd := append(weaveWaitEntrypoint, "-s")
 		options.Cmd = append(cmd, options.Cmd...)
