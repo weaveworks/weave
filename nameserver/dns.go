@@ -227,9 +227,9 @@ func (d *DNSServer) handleRecursive(client *dns.Client, defaultMaxResponseSize i
 		}
 
 		for _, server := range d.upstream.Servers {
-			reqCopy := *req
+			reqCopy := req.Copy()
 			reqCopy.Id = dns.Id()
-			response, _, err := client.Exchange(&reqCopy, fmt.Sprintf("%s:%s", server, d.upstream.Port))
+			response, _, err := client.Exchange(reqCopy, fmt.Sprintf("%s:%s", server, d.upstream.Port))
 			if err != nil || response == nil {
 				d.ns.debugf("error trying %s: %v", server, err)
 				continue
