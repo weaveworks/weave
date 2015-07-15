@@ -92,8 +92,23 @@ func (grouter *TestRouter) run(sender router.PeerName, gossiper router.Gossiper,
 					continue
 				}
 				for _, msg := range message.data.Encode() {
-					if _, err := gossiper.OnGossipBroadcast(message.sender, msg); err != nil {
+					// TODO: this should call OnGossipBroadcast, and we should implement
+					// 'trickle' gossip correctly in this mock.  But no one depends on this
+					// difference for testing right now, so we abuse the interface here.
+					diff, err := gossiper.OnGossip(msg)
+					if err != nil {
 						panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
+					}
+					if diff == nil {
+						continue
+					}
+					// Sanity check - reconsuming the diff should yield nil
+					for _, diffMsg := range diff.Encode() {
+						if nextDiff, err := gossiper.OnGossip(diffMsg); err != nil {
+							panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
+						} else if nextDiff != nil {
+							panic(fmt.Sprintf("Breach of gossip interface: %v != nil", nextDiff))
+						}
 					}
 				}
 			}

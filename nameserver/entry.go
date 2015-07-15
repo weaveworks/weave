@@ -54,8 +54,9 @@ func (e1 *Entry) merge(e2 *Entry) bool {
 	if e2.Version > e1.Version {
 		e1.Version = e2.Version
 		e1.Tombstone = e2.Tombstone
+		return true
 	}
-	return e2.Version != e1.Version
+	return false
 }
 
 func (e1 *Entry) String() string {
@@ -87,8 +88,10 @@ func (es *Entries) add(hostname, containerid string, origin router.PeerName, add
 		return !(*es)[i].less(&entry)
 	})
 	if i < len(*es) && (*es)[i].equal(&entry) {
-		(*es)[i].Tombstone = 0
-		(*es)[i].Version++
+		if (*es)[i].Tombstone > 0 {
+			(*es)[i].Tombstone = 0
+			(*es)[i].Version++
+		}
 	} else {
 		*es = append(*es, Entry{})
 		copy((*es)[i+1:], (*es)[i:])
@@ -99,24 +102,23 @@ func (es *Entries) add(hostname, containerid string, origin router.PeerName, add
 
 func (es *Entries) merge(incoming Entries) Entries {
 	defer es.checkAndPanic()
-	var (
-		newEntries Entries
-		i          = 0
-	)
+	newEntries := Entries{}
+	i := 0
 
 	for _, entry := range incoming {
 		for i < len(*es) && (*es)[i].less(&entry) {
 			i++
 		}
 		if i < len(*es) && (*es)[i].equal(&entry) {
-			if !(*es)[i].merge(&entry) {
-				continue
+			if (*es)[i].merge(&entry) {
+				newEntries = append(newEntries, entry)
 			}
+		} else {
+			*es = append(*es, Entry{})
+			copy((*es)[i+1:], (*es)[i:])
+			(*es)[i] = entry
+			newEntries = append(newEntries, entry)
 		}
-		*es = append(*es, Entry{})
-		copy((*es)[i+1:], (*es)[i:])
-		(*es)[i] = entry
-		newEntries = append(newEntries, entry)
 	}
 
 	return newEntries

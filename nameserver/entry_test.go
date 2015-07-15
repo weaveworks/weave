@@ -48,7 +48,13 @@ func TestMerge(t *testing.T) {
 		Entry{Hostname: "F"},
 	}
 
-	e1.merge(e2)
+	diff := e1.merge(e2)
+	expectedDiff := Entries{
+		Entry{Hostname: "B"},
+		Entry{Hostname: "E"},
+	}
+	require.Equal(t, expectedDiff, diff)
+
 	expected := Entries{
 		Entry{Hostname: "A"},
 		Entry{Hostname: "B"},
@@ -57,8 +63,21 @@ func TestMerge(t *testing.T) {
 		Entry{Hostname: "E"},
 		Entry{Hostname: "F"},
 	}
+	require.Equal(t, expected, e1)
 
-	require.Equal(t, e1, expected)
+	diff = e1.merge(e1)
+	require.Equal(t, Entries{}, diff)
+}
+
+func TestOldMerge(t *testing.T) {
+	e1 := Entries{Entry{Hostname: "A", Version: 0}}
+	diff := e1.merge(Entries{Entry{Hostname: "A", Version: 1}})
+	require.Equal(t, Entries{Entry{Hostname: "A", Version: 1}}, diff)
+	require.Equal(t, Entries{Entry{Hostname: "A", Version: 1}}, e1)
+
+	diff = e1.merge(Entries{Entry{Hostname: "A", Version: 0}})
+	require.Equal(t, Entries{}, diff)
+	require.Equal(t, Entries{Entry{Hostname: "A", Version: 1}}, e1)
 }
 
 func TestTombstone(t *testing.T) {

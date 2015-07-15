@@ -12,13 +12,29 @@ NAME4=seefour.weave.local
 
 start_suite "Resolve names across hosts"
 
-weave_on $HOST1 launch --ipalloc-range $UNIVERSE
-weave_on $HOST2 launch --ipalloc-range $UNIVERSE $HOST1
+for host in $HOSTS; do
+    weave_on $host launch --ipalloc-range $UNIVERSE $HOSTS
+done
 
+# Basic test
 start_container          $HOST2 $C2/24 --name=c2 -h $NAME2
 start_container_with_dns $HOST1 $C1/24 --name=c1
 
 assert_dns_record $HOST1 c1 $NAME2 $C2
+
+# 2 containers on each host, all with the same names
+FOO_IPS=
+for host in $HOSTS; do
+    CID=$(proxy docker_on $host run -dti --name=foo $SMALL_IMAGE /bin/sh)
+    FOO_IPS="$FOO_IPS $(container_ip $host foo)"
+
+    CID=$(proxy docker_on $host run -dti --name=bar $SMALL_IMAGE /bin/sh)
+    BAR_IPS="$BAR_IPS $(container_ip $host bar)"
+done
+
+start_container_with_dns $HOST1 --name=baz
+assert_dns_record $HOST1 baz foo.weave.local $FOO_IPS
+assert_dns_record $HOST1 baz bar.weave.local $BAR_IPS
 
 # resolution for names mapped to multiple addresses
 weave_on $HOST2 dns-add $C2a c2 -h $NAME2

@@ -226,7 +226,10 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 	}
 
 	newEntries := n.entries.merge(entries)
-	return &newEntries, &entries, nil
+	if len(newEntries) > 0 {
+		return &newEntries, &entries, nil
+	}
+	return nil, &entries, nil
 }
 
 // merge received data into state and return "everything new I've
