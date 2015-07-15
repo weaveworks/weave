@@ -359,7 +359,7 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 			alloc.donateSpace(r, sender)
 			resultChan <- nil
 		case msgRingUpdate:
-			resultChan <- alloc.update(msg[1:])
+			resultChan <- alloc.update(sender, msg[1:])
 		}
 	}
 	return <-resultChan
@@ -370,7 +370,7 @@ func (alloc *Allocator) OnGossipBroadcast(sender router.PeerName, msg []byte) (r
 	alloc.debugln("OnGossipBroadcast from", sender, ":", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.update(msg)
+		resultChan <- alloc.update(sender, msg)
 	}
 	return alloc.Gossip(), <-resultChan
 }
@@ -419,7 +419,7 @@ func (alloc *Allocator) OnGossip(msg []byte) (router.GossipData, error) {
 	alloc.debugln("Allocator.OnGossip:", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.update(msg)
+		resultChan <- alloc.update(router.UnknownPeerName, msg)
 	}
 	return nil, <-resultChan // for now, we never propagate updates. TBD
 }
@@ -589,7 +589,7 @@ func (alloc *Allocator) sendRingUpdate(dest router.PeerName) {
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
-func (alloc *Allocator) update(msg []byte) error {
+func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 	reader := bytes.NewReader(msg)
 	decoder := gob.NewDecoder(reader)
 	var data gossipState
@@ -621,16 +621,22 @@ func (alloc *Allocator) update(msg []byte) error {
 		return err
 	}
 
-	if data.Paxos != nil && alloc.ring.Empty() {
-		if alloc.paxos.Update(data.Paxos) {
-			if alloc.paxos.Think() {
-				// If something important changed, broadcast
-				alloc.gossip.GossipBroadcast(alloc.Gossip())
-			}
+	if data.Paxos != nil {
+		if alloc.ring.Empty() {
+			if alloc.paxos.Update(data.Paxos) {
+				if alloc.paxos.Think() {
+					// If something important changed, broadcast
+					alloc.gossip.GossipBroadcast(alloc.Gossip())
+				}
 
-			if ok, cons := alloc.paxos.Consensus(); ok {
-				alloc.createRing(cons.Value)
+				if ok, cons := alloc.paxos.Consensus(); ok {
+					alloc.createRing(cons.Value)
+				}
 			}
+		} else if sender != router.UnknownPeerName {
+			// Sender is trying to initialize a ring, but we have one
+			// already - send it straight back
+			alloc.sendRingUpdate(sender)
 		}
 	}
 
