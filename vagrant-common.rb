@@ -47,7 +47,7 @@ def tweak_docker_daemon(vm)
 usermod -a -G docker vagrant
 sed -i -e's%-H fd://%-H fd:// -H tcp://0.0.0.0:2375 -s overlay%' /lib/systemd/system/docker.service
 systemctl daemon-reload
-systemctl start docker
+systemctl restart docker
 systemctl enable docker
 SCRIPT
 end

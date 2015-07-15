@@ -26,15 +26,8 @@ def configure_docker(host, hostname, ip)
   host.vm.provision :shell, :inline => "echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"
 
   install_packages host.vm, pkgs
-  host.vm.provision :shell, :inline => "usermod -a -G docker vagrant; "
-
-  # Listen on the remote API and use overlay storage driver
-  host.vm.provision :shell, :inline => "sed -i -e's%-H fd://%-H fd:// -H tcp://0.0.0.0:2375 -s overlay%' /lib/systemd/system/docker.service"
-  host.vm.provision :shell, :inline => "systemctl daemon-reload"
-
-  host.vm.provision :shell, :inline => "systemctl restart docker"
-  host.vm.provision :shell, :inline => "systemctl enable docker"
-  cleanup(host.vm)
+  tweak_docker_daemon host.vm
+  cleanup host.vm
 end
 
 def configure_resolv_conf(host)
