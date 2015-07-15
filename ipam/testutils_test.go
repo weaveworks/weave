@@ -208,7 +208,7 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestR
 		allocs[i] = alloc
 	}
 
-	gossipRouter.GossipBroadcast(allocs[size-1].Gossip())
+	allocs[size-1].gossip.GossipBroadcast(allocs[size-1].Gossip())
 	gossipRouter.Flush()
 	return allocs, gossipRouter, subnet
 }

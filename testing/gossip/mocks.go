@@ -34,10 +34,10 @@ func NewTestRouter(loss float32) *TestRouter {
 	return &TestRouter{make(map[router.PeerName]chan interface{}, 100), loss}
 }
 
-func (grouter *TestRouter) GossipBroadcast(update router.GossipData) error {
+func (grouter *TestRouter) gossipBroadcast(sender router.PeerName, update router.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
-		case gossipChan <- broadcastMessage{data: update}:
+		case gossipChan <- broadcastMessage{sender: sender, data: update}:
 		default: // drop the message if we cannot send it
 			common.Log.Errorf("Dropping message")
 		}
@@ -66,7 +66,7 @@ type TestRouterClient struct {
 	sender router.PeerName
 }
 
-func (grouter *TestRouter) run(gossiper router.Gossiper, gossipChan chan interface{}) {
+func (grouter *TestRouter) run(sender router.PeerName, gossiper router.Gossiper, gossipChan chan interface{}) {
 	gossipTimer := time.Tick(10 * time.Second)
 	for {
 		select {
@@ -98,7 +98,7 @@ func (grouter *TestRouter) run(gossiper router.Gossiper, gossipChan chan interfa
 				}
 			}
 		case <-gossipTimer:
-			grouter.GossipBroadcast(gossiper.Gossip())
+			grouter.gossipBroadcast(sender, gossiper.Gossip())
 		}
 	}
 }
@@ -106,7 +106,7 @@ func (grouter *TestRouter) run(gossiper router.Gossiper, gossipChan chan interfa
 func (grouter *TestRouter) Connect(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
 	gossipChan := make(chan interface{}, 100)
 
-	go grouter.run(gossiper, gossipChan)
+	go grouter.run(sender, gossiper, gossipChan)
 
 	grouter.gossipChans[sender] = gossipChan
 	return TestRouterClient{grouter, sender}
@@ -122,5 +122,5 @@ func (client TestRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []
 }
 
 func (client TestRouterClient) GossipBroadcast(update router.GossipData) error {
-	return client.router.GossipBroadcast(update)
+	return client.router.gossipBroadcast(client.sender, update)
 }
