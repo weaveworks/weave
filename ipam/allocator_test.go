@@ -131,23 +131,45 @@ func TestBootstrap(t *testing.T) {
 func TestAllocatorClaim(t *testing.T) {
 	const (
 		container1 = "abcdef"
-		container2 = "baddf00d"
 		container3 = "b01df00d"
-		universe   = "10.0.3.0/30"
-		testAddr1  = "10.0.3.1" // first address allocated should be .1 because .0 is network addr
+		universe   = "10.0.3.0/24"
+		testAddr1  = "10.0.3.2"
+		testAddr2  = "10.0.4.2"
 	)
 
-	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
+	allocs, _, subnet := makeNetworkOfAllocators(2, universe)
+	alloc := allocs[1]
 	defer alloc.Stop()
-
-	alloc.claimRingForTesting()
 	addr1, _ := address.ParseIP(testAddr1)
 
+	// First claim should trigger "dunno, I'm going to wait"
 	err := alloc.Claim(container3, addr1)
+	require.NoError(t, err)
+
+	// Do one allocate to ensure paxos is all done
+	alloc.Allocate("unused", subnet, nil)
+	// Do an allocate on the other peer, which we will try to claim later
+	addrx, err := allocs[0].Allocate(container1, subnet, nil)
+
+	// Now try the claim again
+	err = alloc.Claim(container3, addr1)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
 	addr3, _ := alloc.Allocate(container3, subnet, nil)
 	require.Equal(t, testAddr1, addr3.String(), "address")
+	// one more claim should still work
+	err = alloc.Claim(container3, addr1)
+	require.NoError(t, err)
+	// claim for a different container should fail
+	err = alloc.Claim(container1, addr1)
+	require.Error(t, err)
+	// claiming the address allocated on the other peer should fail
+	err = alloc.Claim(container1, addrx)
+	require.Error(t, err, "claiming address allocated on other peer should fail")
+	// Check an address outside of our universe
+	addr2, _ := address.ParseIP(testAddr2)
+	err = alloc.Claim(container1, addr2)
+	require.NoError(t, err)
 }
 
 func (alloc *Allocator) pause() func() {
