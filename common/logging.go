@@ -56,13 +56,3 @@ func SetLogLevel(levelname string) {
 	}
 	Log.Level = level
 }
-
-// For backwards-compatibility with code that only has a boolean
-func EnableDebugLogging(flag bool) {
-	switch {
-	case flag && Log.Level < logrus.DebugLevel:
-		Log.Level = logrus.DebugLevel
-	case !flag && Log.Level >= logrus.DebugLevel:
-		Log.Level = logrus.InfoLevel
-	}
-}
