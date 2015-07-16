@@ -21,13 +21,9 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 		return err
 	}
 
-	if !validNetworkMode(container.HostConfig) {
-		Debug.Printf("Ignoring container %s with --net=%s", container.ID, networkMode(container.HostConfig))
-		return nil
-	}
-	cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
-	if !ok {
-		Debug.Print("No Weave CIDR, ignoring")
+	cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
+	if err != nil {
+		Info.Printf("Ignoring container %s due to %s", container.ID, err)
 		return nil
 	}
 	Info.Printf("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))

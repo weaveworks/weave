@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"crypto/tls"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -22,6 +23,10 @@ var (
 	containerCreateRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
 	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
 	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
+
+	ErrInvalidNetworkMode = errors.New("--net option")
+	ErrWeaveCIDRNone      = errors.New("WEAVE_CIDR=none")
+	ErrNoDefaultIPAM      = errors.New("--no-default-ipam option")
 )
 
 type Proxy struct {
@@ -115,28 +120,22 @@ func (proxy *Proxy) ListenAndServe() error {
 	return (&http.Server{Handler: proxy}).Serve(listener)
 }
 
-func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, bool) {
-	if !validNetworkMode(hostConfig) {
-		return nil, false
+func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, error) {
+	if hostConfig != nil &&
+		hostConfig.NetworkMode != "" &&
+		hostConfig.NetworkMode != "bridge" {
+		return nil, ErrInvalidNetworkMode
 	}
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
 			if e[11:] == "none" {
-				return nil, false
+				return nil, ErrWeaveCIDRNone
 			}
-			return strings.Fields(e[11:]), true
+			return strings.Fields(e[11:]), nil
 		}
 	}
-	return nil, !proxy.NoDefaultIPAM
-}
-
-func validNetworkMode(hostConfig *docker.HostConfig) bool {
-	return networkMode(hostConfig) == "bridge"
-}
-
-func networkMode(hostConfig *docker.HostConfig) string {
-	if hostConfig == nil || hostConfig.NetworkMode == "" {
-		return "bridge"
+	if proxy.NoDefaultIPAM {
+		return nil, ErrNoDefaultIPAM
 	}
-	return hostConfig.NetworkMode
+	return nil, nil
 }
