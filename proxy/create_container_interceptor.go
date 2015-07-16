@@ -23,9 +23,9 @@ type createContainerRequestBody struct {
 	MacAddress string             `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
 }
 
-// Replacement for docker.NoSuchImage, which does not contain the
-// image name, which in turn breaks docker clients post 1.7.0 since
-// they expect the image name to be present in errors.
+// ErrNoSuchImage replaces docker.NoSuchImage, which does not contain the image
+// name, which in turn breaks docker clients post 1.7.0 since they expect the
+// image name to be present in errors.
 type ErrNoSuchImage struct {
 	Name string
 }
@@ -46,7 +46,9 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config); ok {
+	if cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig); err != nil {
+		Info.Printf("Ignoring container due to %s", err)
+	} else {
 		Info.Printf("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
 		if container.HostConfig == nil {
 			container.HostConfig = &docker.HostConfig{}
