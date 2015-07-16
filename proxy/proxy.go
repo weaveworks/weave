@@ -115,7 +115,12 @@ func (proxy *Proxy) ListenAndServe() error {
 	return (&http.Server{Handler: proxy}).Serve(listener)
 }
 
-func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config) ([]string, bool) {
+func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, bool) {
+	if hostConfig != nil &&
+		hostConfig.NetworkMode != "" &&
+		hostConfig.NetworkMode != "bridge" {
+		return nil, false
+	}
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
 			if e[11:] == "none" {
