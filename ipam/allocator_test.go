@@ -348,27 +348,18 @@ func TestAllocatorFuzz(t *testing.T) {
 		return xs[:ls]
 	}
 
-	// Do a Allocate and check the address
-	// is unique.  Needs a unique container
-	// name.
-	allocate := func(name string) {
+	bumpPending := func() bool {
 		stateLock.Lock()
 		if len(addrs)+numPending >= maxAddresses {
 			stateLock.Unlock()
-			return
+			return false
 		}
 		numPending++
 		stateLock.Unlock()
+		return true
+	}
 
-		allocIndex := rand.Int31n(nodes)
-		alloc := allocs[allocIndex]
-		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
-		addr, err := alloc.Allocate(name, subnet, nil)
-
-		if err != nil {
-			panic(fmt.Sprintf("Could not allocate addr"))
-		}
-
+	noteAllocation := func(allocIndex int32, name string, addr address.Address) {
 		//common.Log.Infof("Allocate: got address %s for name %s", addr, name)
 		addrStr := addr.String()
 
@@ -383,6 +374,26 @@ func TestAllocatorFuzz(t *testing.T) {
 		state[addrStr] = result{name, allocIndex, false}
 		addrs = append(addrs, addrStr)
 		numPending--
+	}
+
+	// Do a Allocate and check the address
+	// is unique.  Needs a unique container
+	// name.
+	allocate := func(name string) {
+		if !bumpPending() {
+			return
+		}
+
+		allocIndex := rand.Int31n(nodes)
+		alloc := allocs[allocIndex]
+		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
+		addr, err := alloc.Allocate(name, subnet, nil)
+
+		if err != nil {
+			panic(fmt.Sprintf("Could not allocate addr"))
+		}
+
+		noteAllocation(allocIndex, name, addr)
 	}
 
 	// Free a random address.
@@ -445,6 +456,21 @@ func TestAllocatorFuzz(t *testing.T) {
 		stateLock.Unlock()
 	}
 
+	// Claim a random address for a unique container name - may not succeed
+	claim := func(name string) {
+		if !bumpPending() {
+			return
+		}
+		allocIndex := rand.Int31n(nodes)
+		addressIndex := rand.Int31n(int32(subnet.Size()))
+		alloc := allocs[allocIndex]
+		addr := address.Add(subnet.Start, address.Offset(addressIndex))
+		err := alloc.Claim(name, addr)
+		if err == nil {
+			noteAllocation(allocIndex, name, addr)
+		}
+	}
+
 	// Run function _f_ _iterations_ times, in _concurrency_
 	// number of goroutines
 	doConcurrentIterations := func(iterations int, f func(int)) {
@@ -484,9 +510,13 @@ func TestAllocatorFuzz(t *testing.T) {
 			// free a random addr
 			free()
 
-		case 0.8 <= r && r < 1.0:
+		case 0.8 <= r && r < 0.95:
 			// ask for an existing name again, check we get same ip
 			allocateAgain()
+
+		case 0.95 <= r && r < 1.0:
+			name := fmt.Sprintf("second%d", iteration)
+			claim(name)
 		}
 	})
 }
