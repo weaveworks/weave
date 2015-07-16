@@ -317,27 +317,7 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 
 	router.HandleHTTP(muxRouter)
 
-	muxRouter.Methods("GET").Path("/status").Headers("Accept", "application/json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json, _ := router.StatusJSON(version)
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(json)
-	})
-
-	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "weave router", version)
-		fmt.Fprintln(w, router.Status())
-		if allocator != nil {
-			fmt.Fprintln(w, allocator.String())
-			fmt.Fprintln(w, "Allocator default subnet:", defaultSubnet)
-		}
-		fmt.Fprintln(w, "")
-		if dnsserver == nil {
-			fmt.Fprintln(w, "WeaveDNS is disabled")
-		} else {
-			fmt.Fprintln(w, dnsserver.String())
-			fmt.Fprintln(w, ns.String())
-		}
-	})
+	HandleHTTP(muxRouter, router, allocator, defaultSubnet, ns, dnsserver)
 
 	http.Handle("/", muxRouter)
 
