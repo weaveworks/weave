@@ -116,9 +116,7 @@ func (proxy *Proxy) ListenAndServe() error {
 }
 
 func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, bool) {
-	if hostConfig != nil &&
-		hostConfig.NetworkMode != "" &&
-		hostConfig.NetworkMode != "bridge" {
+	if !validNetworkMode(hostConfig) {
 		return nil, false
 	}
 	for _, e := range config.Env {
@@ -130,4 +128,15 @@ func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *dock
 		}
 	}
 	return nil, !proxy.NoDefaultIPAM
+}
+
+func validNetworkMode(hostConfig *docker.HostConfig) bool {
+	return networkMode(hostConfig) == "bridge"
+}
+
+func networkMode(hostConfig *docker.HostConfig) string {
+	if hostConfig == nil || hostConfig.NetworkMode == "" {
+		return "bridge"
+	}
+	return hostConfig.NetworkMode
 }
