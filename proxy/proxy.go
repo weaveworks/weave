@@ -191,7 +191,12 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 	return listener, fmt.Sprintf("%s://%s", proto, addr), nil
 }
 
-func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config) ([]string, bool) {
+func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, bool) {
+	if hostConfig != nil &&
+		hostConfig.NetworkMode != "" &&
+		hostConfig.NetworkMode != "bridge" {
+		return nil, false
+	}
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
 			if e[11:] == "none" {
