@@ -45,7 +45,11 @@ func (c *claim) Try(alloc *Allocator) bool {
 		return false
 	default:
 		alloc.debugf("requesting address %s from other peer %s", c.addr, owner)
-		alloc.sendSpaceRequest(owner, address.NewRange(c.addr, 1))
+		err := alloc.sendSpaceRequest(owner, address.NewRange(c.addr, 1))
+		if err != nil { // can't speak to owner right now; figure it out later
+			alloc.infof("Claim %s for %s: %s; will try later.", c.addr, c.ident, err)
+			c.sendResult(nil)
+		}
 		return false
 	}
 

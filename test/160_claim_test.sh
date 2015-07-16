@@ -27,4 +27,14 @@ assert_raises "[ $C3 != $C1 ]"
 
 assert_raises "exec_on $HOST1 c1 $PING $C3"
 
+stop_router_on $HOST1
+stop_router_on $HOST2
+
+# Now make host1 attempt to claim from host2, when host2 is stopped
+weave_on $HOST2 launch-router
+# Introduce host3 to remember the IPAM CRDT when we stop host2
+weave_on $HOST3 launch-router $HOST2
+stop_router_on $HOST2
+weave_on $HOST1 launch-router --log-level=debug $HOST3
+
 end_suite
