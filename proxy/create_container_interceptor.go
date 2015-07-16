@@ -25,9 +25,9 @@ type createContainerRequestBody struct {
 	MacAddress string             `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
 }
 
-// Replacement for docker.NoSuchImage, which does not contain the
-// image name, which in turn breaks docker clients post 1.7.0 since
-// they expect the image name to be present in errors.
+// ErrNoSuchImage replaces docker.NoSuchImage, which does not contain the image
+// name, which in turn breaks docker clients post 1.7.0 since they expect the
+// image name to be present in errors.
 type ErrNoSuchImage struct {
 	Name string
 }
