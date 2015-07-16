@@ -40,8 +40,8 @@ assert_dns_record $HOST1 baz bar.weave.local $BAR_IPS
 # this tests gossip dns tombstone behaviour
 for i in $(seq 5); do
     for host in $HOSTS; do
-        proxy docker_on $host stop foo 1>/dev/null
-        proxy docker_on $host stop bar 1>/dev/null
+        proxy docker_on $host kill foo 1>/dev/null
+        proxy docker_on $host kill bar 1>/dev/null
     done
 
     assert_no_dns_record $HOST1 baz foo.weave.local
