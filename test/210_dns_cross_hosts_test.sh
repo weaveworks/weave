@@ -36,6 +36,31 @@ start_container_with_dns $HOST1 --name=baz
 assert_dns_record $HOST1 baz foo.weave.local $FOO_IPS
 assert_dns_record $HOST1 baz bar.weave.local $BAR_IPS
 
+# now stop and start the containers a bunch of times
+# this tests gossip dns tombstone behaviour
+for i in $(seq 5); do
+    for host in $HOSTS; do
+        proxy docker_on $host kill foo 1>/dev/null
+        proxy docker_on $host kill bar 1>/dev/null
+    done
+
+    assert_no_dns_record $HOST1 baz foo.weave.local
+    assert_no_dns_record $HOST1 baz bar.weave.local
+
+    FOO_IPS=
+    BAR_IPS=
+    for host in $HOSTS; do
+        proxy docker_on $host start foo 1>/dev/null
+        proxy docker_on $host start bar 1>/dev/null
+
+        FOO_IPS="$FOO_IPS $(container_ip $host foo)"
+        BAR_IPS="$BAR_IPS $(container_ip $host bar)"
+    done
+
+    assert_dns_record $HOST1 baz foo.weave.local $FOO_IPS
+    assert_dns_record $HOST1 baz bar.weave.local $BAR_IPS
+done
+
 # resolution for names mapped to multiple addresses
 weave_on $HOST2 dns-add $C2a c2 -h $NAME2
 weave_on $HOST2 dns-add $C2b c2 -h $NAME2
