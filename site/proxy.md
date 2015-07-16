@@ -151,7 +151,7 @@ handed over to weaveDNS for registration.
 For instance, if we launch the proxy using
 `--hostname-match '^aws-[0-9]+-(.*)$'` and `--hostname-replacement 'my-app-$1'`
 
-    host1$ weave launch-router && weave launch-dns && weave launch-proxy --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
+    host1$ weave launch-router && weave launch-proxy --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
     host1$ eval "$(weave env)"
 
 then, running a container named `aws-12798186823-foo` will lead to weaveDNS registering
