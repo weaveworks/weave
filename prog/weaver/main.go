@@ -315,6 +315,8 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 		ns.HandleHTTP(muxRouter)
 	}
 
+	router.HandleHTTP(muxRouter)
+
 	muxRouter.Methods("GET").Path("/status").Headers("Accept", "application/json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json, _ := router.StatusJSON(version)
 		w.Header().Set("Content-Type", "application/json")
@@ -335,22 +337,6 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 			fmt.Fprintln(w, dnsserver.String())
 			fmt.Fprintln(w, ns.String())
 		}
-	})
-
-	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
-		}
-		if errors := router.ConnectionMaker.InitiateConnections(r.Form["peer"], r.FormValue("replace") == "true"); len(errors) > 0 {
-			http.Error(w, errorMessages(errors), http.StatusBadRequest)
-		}
-	})
-
-	muxRouter.Methods("POST").Path("/forget").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
-		}
-		router.ConnectionMaker.ForgetConnections(r.Form["peer"])
 	})
 
 	http.Handle("/", muxRouter)
