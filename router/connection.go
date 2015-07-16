@@ -89,18 +89,6 @@ func (conn *RemoteConnection) ErrorLog(args ...interface{}) {
 	log.Errorln(append(append([]interface{}{}, fmt.Sprintf("->[%s|%s]:", conn.remoteTCPAddr, conn.remote)), args...)...)
 }
 
-func (conn *RemoteConnection) String() string {
-	from := "<nil>"
-	if conn.local != nil {
-		from = conn.local.String()
-	}
-	to := "<nil>"
-	if conn.remote != nil {
-		to = conn.remote.String()
-	}
-	return fmt.Sprint("Connection ", from, "->", to)
-}
-
 // Does not return anything. If the connection is successful, it will
 // end up in the local peer's connections map.
 func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router, acceptNewPeer bool) {

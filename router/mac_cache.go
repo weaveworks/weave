@@ -1,8 +1,6 @@
 package router
 
 import (
-	"bytes"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -80,16 +78,6 @@ func (cache *MacCache) Delete(peer *Peer) bool {
 		}
 	}
 	return found
-}
-
-func (cache *MacCache) String() string {
-	var buf bytes.Buffer
-	cache.RLock()
-	defer cache.RUnlock()
-	for key, entry := range cache.table {
-		fmt.Fprintf(&buf, "%v -> %s (%v)\n", intmac(key), entry.peer, entry.lastSeen)
-	}
-	return buf.String()
 }
 
 func (cache *MacCache) setExpiryTimer() {
