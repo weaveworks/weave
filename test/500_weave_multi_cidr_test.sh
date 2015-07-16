@@ -7,7 +7,7 @@ NAME=multicidr.weave.local
 # assert_container_cidrs <host> <cid> [<cidr> ...]
 assert_container_cidrs() {
     HOST=$1
-    CID=$2
+    local CID=$(echo $2|cut -b 1-12)
     shift 2
     CIDRS="$@"
 
@@ -26,7 +26,15 @@ assert_zone_records() {
     FQDN=$3
     shift 3
 
-    records=$(weave_on $HOST status | grep "^$CID") || true
+    FORMAT="{{range .DNS.Entries}}\
+{{if eq \"$CID\" .ContainerID}}\
+{{if eq .Tombstone 0}}\
+{{.Hostname}} {{.Address}}
+{{end}}\
+{{end}}\
+{{end}}"
+
+    records=$(weave_on $HOST report -f "$FORMAT") || true
     # Assert correct number of records exist
     assert "echo $records | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | wc -l | tr -d '[:space:]'" $#
 
@@ -76,7 +84,7 @@ start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr argume
 weave_on $HOST1 launch-router --ipalloc-range 10.2.3.0/24
 
 # Run container with three cidrs
-CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME | cut -b 1-12)
+CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME)
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Stop the container

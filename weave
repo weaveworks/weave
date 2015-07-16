@@ -53,7 +53,8 @@ weave dns-lookup    <unqualified_name>
 weave expose        [<addr> ...] [-h <fqdn>]
 weave hide          [<addr> ...]
 weave ps            [<container_id> ...]
-weave status
+weave report        [-f <format>]
+weave status        [peers | connections | dns]
 weave env
 weave config
 weave version
@@ -1295,13 +1296,28 @@ case "$COMMAND" in
         [ $# -gt 0 ] || usage
         call_weave POST /forget -d $(peer_args "$@")
         ;;
+    report)
+        if [ $# -gt 0 ] ; then
+            [ $# -eq 2 -a "$1" = "-f" ] || usage
+            call_weave GET /report --get --data-urlencode "format=$2"
+        else
+            call_weave GET /report -H 'Accept: application/json'
+        fi
+        ;;
     status)
         res=0
-        call_weave GET /status || res=1
-        echo
-        if check_running $PROXY_CONTAINER_NAME 2>/dev/null ; then
+        OMIT_PROXY=
+        STATUS_URL="/status"
+        while [ $# -gt 0 ] ; do
+            OMIT_PROXY=1
+            STATUS_URL="$STATUS_URL/$1"
+            shift
+        done
+        call_weave GET $STATUS_URL || res=1
+        if [ -z "$OMIT_PROXY" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null ; then
             echo
-            echo "weave proxy is running"
+            echo "          Service: proxy"
+            echo "          Address: $(proxy_addr)"
         fi
         [ $res -eq 0 ]
         ;;

@@ -6,7 +6,10 @@ C1=10.2.1.4
 C2=10.2.1.7
 
 direct_peers() {
-  weave_on $1 status | sed -n -e 's|^Direct Peers: \(.*\)|\1|p' | tr -s ' ' '\n'
+    FORMAT="{{range .Router.ConnectionMaker.DirectPeers}}{{.}}
+{{end}}"
+
+    weave_on $1 report -f "$FORMAT"
 }
 
 assert_peers() {

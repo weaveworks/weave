@@ -62,10 +62,6 @@ func (g *allocate) Cancel() {
 	g.resultChan <- allocateResult{0, fmt.Errorf("Allocate request for %s cancelled", g.ident)}
 }
 
-func (g *allocate) String() string {
-	return fmt.Sprintf("Allocate for %s", g.ident)
-}
-
 func (g *allocate) ForContainer(ident string) bool {
 	return g.ident == ident
 }
