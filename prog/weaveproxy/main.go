@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	version            = "(unreleased version)"
-	defaultListenAddrs = []string{"tcp://0.0.0.0:12375", "unix:///var/run/weave.sock"}
+	version = "(unreleased version)"
 )
 
 type listOpts struct {
@@ -50,7 +49,7 @@ func main() {
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
 	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
-	ListVar(&c.ListenAddrs, []string{"H"}, defaultListenAddrs, "addresses on which to listen")
+	ListVar(&c.ListenAddrs, []string{"H"}, nil, "addresses on which to listen")
 	mflag.StringVar(&c.HostnameMatch, []string{"-hostname-match"}, "(.*)", "Regexp pattern to apply on container names (e.g. '^aws-[0-9]+-(.*)$')")
 	mflag.StringVar(&c.HostnameReplacement, []string{"-hostname-replacement"}, "$1", "Expression to generate hostnames based on matches from --hostname-match (e.g. 'my-app-$1')")
 	mflag.BoolVar(&c.NoDefaultIPAM, []string{"#-no-default-ipam", "-no-default-ipalloc"}, false, "do not automatically allocate addresses for containers without a WEAVE_CIDR")

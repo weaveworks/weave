@@ -36,14 +36,21 @@ The first form is more convenient, however you can only pass proxy
 related configuration arguments to `launch-proxy` so if you need to
 modify the default behaviour you will have to use the latter.
 
-By default, the proxy listens on /var/run/weave.sock and port 12375, on
-all network interfaces. This can be adjusted with the `-H` argument, e.g.
+By default, the proxy decides where to listen based on how the
+launching client connects to docker. If the launching client connected
+over a unix socket, the proxy will listen on /var/run/weave.sock. If
+the launching client connected over TCP, the proxy will listen on port
+12375, on all network interfaces. This can be adjusted with the `-H`
+argument, e.g.
 
     host1$ weave launch-proxy -H tcp://127.0.0.1:9999
 
-Multiple -H arguments can be specified. If you are working with a remote
-docker daemon, then any firewalls inbetween need to be configured to permit
-access to the proxy port.
+When launching the proxy via TLS, `-H` and/or [TLS options](#tls) are
+required.
+
+Multiple `-H` arguments can be specified. If you are working with a
+remote docker daemon, then any firewalls inbetween need to be
+configured to permit access to the proxy port.
 
 All docker commands can be run via the proxy, so it is safe to adjust
 your `DOCKER_HOST` to point at the proxy. Weave provides a convenient

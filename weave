@@ -17,6 +17,8 @@ BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 PROXY_HOST=${PROXY_HOST:-$(echo "${DOCKER_HOST#tcp://}" | cut -s -d: -f1)}
 PROXY_HOST=${PROXY_HOST:-127.0.0.1}
+DOCKER_CLIENT_HOST=${DOCKER_CLIENT_HOST:-$DOCKER_HOST}
+DOCKER_CLIENT_TLS_VERIFY=${DOCKER_CLIENT_TLS_VERIFY:-$DOCKER_TLS_VERIFY}
 
 # Define some regular expressions for matching addresses.
 # The regexp here is far from precise, but good enough.
@@ -84,6 +86,9 @@ exec_remote() {
         -e WEAVE_PORT \
         -e WEAVE_CONTAINER_NAME \
         -e DOCKER_BRIDGE \
+        -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
+        -e DOCKER_CLIENT_TLS_VERIFY="$DOCKER_CLIENT_TLS_VERIFY" \
+        -e DOCKER_CLIENT_ARGS \
         -e PROXY_HOST="$PROXY_HOST" \
         -e WEAVE_CIDR=none \
         -e COVERAGE \
@@ -895,6 +900,25 @@ show_addrs() {
 # weave proxy helpers
 ######################################################################
 
+docker_client_args() {
+    CLIENT_TLS_ENABLED=""
+    [ -z "$DOCKER_CLIENT_TLS_VERIFY" ] || CLIENT_TLS_ENABLED=1
+    while [ $# -gt 0 ]; do
+        case "$1" in
+          -H|--host)
+            DOCKER_CLIENT_HOST="$2"
+            shift
+            ;;
+          -H=*|--host=*)
+            DOCKER_CLIENT_HOST="${1#*=}"
+            ;;
+          -tls|--tls|-tlsverify|--tlsverify)
+            CLIENT_TLS_ENABLED=1
+            ;;
+        esac
+        shift
+    done
+}
 
 # TODO: Handle relative paths for args
 # TODO: Handle args with spaces
@@ -906,8 +930,23 @@ tls_arg() {
 proxy_args() {
     PROXY_VOLUMES=""
     PROXY_ARGS=""
+    PROXY_TLS_ENABLED=""
+    PROXY_HOST=""
     while [ $# -gt 0 ]; do
         case "$1" in
+          -H)
+            PROXY_HOST="$2"
+            PROXY_ARGS="$PROXY_ARGS $1 $2"
+            shift
+            ;;
+          -H=*)
+            PROXY_HOST="${1#*=}"
+            PROXY_ARGS="$PROXY_ARGS $1"
+            ;;
+          -tls|--tls|-tlsverify|--tlsverify)
+            PROXY_TLS_ENABLED=1
+            PROXY_ARGS="$PROXY_ARGS $1"
+            ;;
           --tlscacert)
             tls_arg "$1" "$2" ca
             shift
@@ -935,6 +974,22 @@ proxy_args() {
         esac
         shift
     done
+
+    if [ -z "$PROXY_HOST" -a -n "$CLIENT_TLS_ENABLED" -a -z "$PROXY_TLS_ENABLED" ]; then
+      echo "When launching the proxy via TLS, -H and/or TLS options are required." >&2
+      exit 1
+    fi
+    if [ -z "$PROXY_HOST" ]; then
+      case "$DOCKER_CLIENT_HOST" in
+        ""|unix://*)
+          PROXY_HOST="unix:///var/run/weave.sock"
+          ;;
+        *)
+          PROXY_HOST="tcp://0.0.0.0:12375"
+          ;;
+      esac
+      PROXY_ARGS="$PROXY_ARGS -H $PROXY_HOST"
+    fi
 }
 
 proxy_addr() {
@@ -1057,6 +1112,7 @@ launch_proxy() {
     # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weaveproxy container.
+    docker_client_args $DOCKER_CLIENT_ARGS
     proxy_args "$@"
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
