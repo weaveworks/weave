@@ -64,7 +64,7 @@ func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname st
 	return &Allocator{
 		ourName:   ourName,
 		universe:  universe,
-		ring:      ring.New(universe.Start, address.Add(universe.Start, universe.Size()), ourName),
+		ring:      ring.New(universe.Start, universe.End, ourName),
 		owned:     make(map[string][]address.Address),
 		paxos:     paxos.NewNode(ourName, ourUID, quorum),
 		nicknames: map[router.PeerName]string{ourName: ourNickname},
