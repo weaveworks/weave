@@ -102,17 +102,23 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 	wg.Wait()
 }
 
-func copyStream(dst io.Writer, src io.Reader, wg *sync.WaitGroup) {
+type closeWriter interface {
+	CloseWrite() error
+}
+
+func copyStream(dst io.WriteCloser, src io.Reader, wg *sync.WaitGroup) {
 	defer wg.Done()
 	if _, err := io.Copy(dst, src); err != nil {
 		Warning.Print(err)
 	}
-	if c, ok := dst.(interface {
-		CloseWrite() error
-	}); ok {
-		if err := c.CloseWrite(); err != nil {
-			Warning.Printf("Error closing connection: %s", err)
-		}
+	var err error
+	if c, ok := dst.(closeWriter); ok {
+		err = c.CloseWrite()
+	} else {
+		err = dst.Close()
+	}
+	if err != nil {
+		Warning.Printf("Error closing connection: %s", err)
 	}
 }
 
