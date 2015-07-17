@@ -33,16 +33,16 @@ func (r *Ring) assertInvariants() {
 
 // Errors returned by Merge
 var (
-	ErrNotSorted        = errors.New("Ring not sorted")
-	ErrTokenRepeated    = errors.New("Token appears twice in ring")
-	ErrTokenOutOfRange  = errors.New("Token is out of range")
-	ErrDifferentSubnets = errors.New("IP Allocator with different subnet detected")
-	ErrNewerVersion     = errors.New("Received new version for entry I own!")
-	ErrInvalidEntry     = errors.New("Received invalid state update!")
-	ErrEntryInMyRange   = errors.New("Received new entry in my range!")
-	ErrNoFreeSpace      = errors.New("No free space found!")
-	ErrInvalidTimeout   = errors.New("dt must be greater than 0")
-	ErrNotFound         = errors.New("No entries for peer found")
+	ErrNotSorted       = errors.New("Ring not sorted")
+	ErrTokenRepeated   = errors.New("Token appears twice in ring")
+	ErrTokenOutOfRange = errors.New("Token is out of range")
+	ErrDifferentRange  = errors.New("Received range differs from ours!")
+	ErrNewerVersion    = errors.New("Received new version for entry I own!")
+	ErrInvalidEntry    = errors.New("Received invalid state update!")
+	ErrEntryInMyRange  = errors.New("Received new entry in my range!")
+	ErrNoFreeSpace     = errors.New("No free space found!")
+	ErrInvalidTimeout  = errors.New("dt must be greater than 0")
+	ErrNotFound        = errors.New("No entries for peer found")
 )
 
 func (r *Ring) checkInvariants() error {
@@ -191,7 +191,7 @@ func (r *Ring) Merge(gossip Ring) error {
 	}
 
 	if r.Start != gossip.Start || r.End != gossip.End {
-		return ErrDifferentSubnets
+		return ErrDifferentRange
 	}
 
 	// Now merge their ring with yours, in a temporary ring.
