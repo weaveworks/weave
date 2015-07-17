@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/andybalholm/go-bit"
@@ -336,6 +337,10 @@ type GobTCPSender struct {
 	encoder *gob.Encoder
 }
 
+type LengthPrefixTCPSender struct {
+	writer io.Writer
+}
+
 type EncryptedTCPSender struct {
 	sync.RWMutex
 	sender TCPSender
@@ -348,6 +353,21 @@ func NewGobTCPSender(encoder *gob.Encoder) *GobTCPSender {
 
 func (sender *GobTCPSender) Send(msg []byte) error {
 	return sender.encoder.Encode(msg)
+}
+
+func NewLengthPrefixTCPSender(writer io.Writer) *LengthPrefixTCPSender {
+	return &LengthPrefixTCPSender{writer: writer}
+}
+
+func (sender *LengthPrefixTCPSender) Send(msg []byte) error {
+	l := len(msg)
+	// We copy the message so we can send it in a single Write
+	// operation, thus making this thread-safe without locking.
+	prefixedMsg := make([]byte, 4+l)
+	binary.BigEndian.PutUint32(prefixedMsg, uint32(l))
+	copy(prefixedMsg[4:], msg)
+	_, err := sender.writer.Write(prefixedMsg)
+	return err
 }
 
 func NewEncryptedTCPSender(sender TCPSender, sessionKey *[32]byte, outbound bool) *EncryptedTCPSender {
@@ -370,6 +390,10 @@ type GobTCPReceiver struct {
 	decoder *gob.Decoder
 }
 
+type LengthPrefixTCPReceiver struct {
+	reader io.Reader
+}
+
 type EncryptedTCPReceiver struct {
 	receiver TCPReceiver
 	state    *TCPCryptoState
@@ -382,6 +406,21 @@ func NewGobTCPReceiver(decoder *gob.Decoder) *GobTCPReceiver {
 func (receiver *GobTCPReceiver) Receive() ([]byte, error) {
 	var msg []byte
 	err := receiver.decoder.Decode(&msg)
+	return msg, err
+}
+
+func NewLengthPrefixTCPReceiver(reader io.Reader) *LengthPrefixTCPReceiver {
+	return &LengthPrefixTCPReceiver{reader: reader}
+}
+
+func (receiver *LengthPrefixTCPReceiver) Receive() ([]byte, error) {
+	lenPrefix := make([]byte, 4)
+	if _, err := io.ReadFull(receiver.reader, lenPrefix); err != nil {
+		return nil, err
+	}
+	l := binary.BigEndian.Uint32(lenPrefix)
+	msg := make([]byte, l)
+	_, err := io.ReadFull(receiver.reader, msg)
 	return msg, err
 }
 

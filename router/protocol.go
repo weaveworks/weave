@@ -228,12 +228,11 @@ func filterV1Features(intro map[string]string) map[string]string {
 // - When the connection is encrypted, 32 bytes follow containing the
 // public key.
 //
-// - Then a stream of gobified values.
+// - Then a stream of length-prefixed messages, which are encrypted
+// for an encrypted connection.
 //
-// The gobified values are the messages on the connection (encrypted
-// for an encrypted connection).  The first message contains the
-// encoded features map (so in contrast to V1, it will be encrypted on
-// an encrypted connection).
+// The first message contains the encoded features map (so in contrast
+// to V1, it will be encrypted on an encrypted connection).
 func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, privKey *[32]byte) error {
 	// Public key exchange
 	var wbuf []byte
@@ -266,8 +265,8 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return ErrExpectedCrypto
 		}
 
-		res.Sender = NewGobTCPSender(gob.NewEncoder(params.Conn))
-		res.Receiver = NewGobTCPReceiver(gob.NewDecoder(params.Conn))
+		res.Sender = NewLengthPrefixTCPSender(params.Conn)
+		res.Receiver = NewLengthPrefixTCPReceiver(params.Conn)
 
 	case 1:
 		if pubKey == nil {
@@ -279,8 +278,8 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return err
 		}
 
-		res.Sender = NewGobTCPSender(gob.NewEncoder(params.Conn))
-		res.Receiver = NewGobTCPReceiver(gob.NewDecoder(params.Conn))
+		res.Sender = NewLengthPrefixTCPSender(params.Conn)
+		res.Receiver = NewLengthPrefixTCPReceiver(params.Conn)
 		res.setupCrypto(params, rbuf, privKey)
 
 	default:
