@@ -361,6 +361,9 @@ func NewLengthPrefixTCPSender(writer io.Writer) *LengthPrefixTCPSender {
 
 func (sender *LengthPrefixTCPSender) Send(msg []byte) error {
 	l := len(msg)
+	if l > MaxTCPMsgSize {
+		return fmt.Errorf("outgoing message exceeds maximum size: %d > %d", l, MaxTCPMsgSize)
+	}
 	// We copy the message so we can send it in a single Write
 	// operation, thus making this thread-safe without locking.
 	prefixedMsg := make([]byte, 4+l)
@@ -419,6 +422,9 @@ func (receiver *LengthPrefixTCPReceiver) Receive() ([]byte, error) {
 		return nil, err
 	}
 	l := binary.BigEndian.Uint32(lenPrefix)
+	if l > MaxTCPMsgSize {
+		return nil, fmt.Errorf("incoming message exceeds maximum size: %d > %d", l, MaxTCPMsgSize)
+	}
 	msg := make([]byte, l)
 	_, err := io.ReadFull(receiver.reader, msg)
 	return msg, err
