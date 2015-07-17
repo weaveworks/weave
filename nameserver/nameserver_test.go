@@ -72,6 +72,13 @@ func (m mapping) Addrs() []address.Address {
 func TestNameservers(t *testing.T) {
 	//common.SetLogLevel("debug")
 
+	actions := []string{}
+	defer func() {
+		if t.Failed() {
+			t.Logf("\nActions:\n\t%s", strings.Join(actions, "\n\n\t"))
+		}
+	}()
+
 	lookupTimeout := 20 // ms
 	nameservers, grouter := makeNetwork(50)
 	defer stopNetwork(nameservers)
@@ -99,6 +106,7 @@ func TestNameservers(t *testing.T) {
 		nameserver := nameservers[rand.Intn(len(nameservers))]
 		addr := address.Address(rand.Int31())
 		hostname := fmt.Sprintf("hostname%d", rand.Int63())
+		actions = append(actions, fmt.Sprintf("addMapping address=%v hostname=%s", addr, hostname))
 		mapping := mapping{hostname, []pair{{nameserver.ourName, addr}}}
 		mappings = append(mappings, mapping)
 
@@ -114,6 +122,7 @@ func TestNameservers(t *testing.T) {
 		i := rand.Intn(len(mappings))
 		mapping := mappings[i]
 		addr := address.Address(rand.Int31())
+		actions = append(actions, fmt.Sprintf("addExtraMapping mapping=%+v address=%v", mapping, addr))
 		mapping.addrs = append(mapping.addrs, pair{nameserver.ourName, addr})
 		mappings[i] = mapping
 
@@ -132,6 +141,7 @@ func TestNameservers(t *testing.T) {
 		}
 		j := rand.Intn(len(mapping.addrs))
 		pair := mapping.addrs[j]
+		actions = append(actions, fmt.Sprintf("deleteMapping mapping=%+v pair=%+v", mapping, pair))
 		mapping.addrs = append(mapping.addrs[:j], mapping.addrs[j+1:]...)
 		mappings[i] = mapping
 		nameserver := nameserversByName[pair.origin]
@@ -146,6 +156,7 @@ func TestNameservers(t *testing.T) {
 		}
 		mapping := mappings[rand.Intn(len(mappings))]
 		nameserver := nameservers[rand.Intn(len(nameservers))]
+		actions = append(actions, fmt.Sprintf("doLookup mapping=%+v", mapping))
 		check(nameserver, mapping)
 	}
 
@@ -159,6 +170,7 @@ func TestNameservers(t *testing.T) {
 		}
 		nameserver := nameservers[rand.Intn(len(nameservers))]
 		hostname := ""
+		actions = append(actions, fmt.Sprintf("doReverseLookup mapping=%+v", mapping))
 		var err error
 		for i := 0; i < lookupTimeout; i++ {
 			hostname, err = nameserver.ReverseLookup(mapping.addrs[0].addr)
@@ -173,6 +185,7 @@ func TestNameservers(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		if i%10 == 0 {
+			actions = append(actions, "grouterFlush")
 			grouter.Flush()
 		}
 
