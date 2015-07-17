@@ -31,10 +31,11 @@ func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
 	return nameservers, gossipRouter
 }
 
-func stopNetwork(nameservers []*Nameserver) {
+func stopNetwork(nameservers []*Nameserver, grouter *gossip.TestRouter) {
 	for _, nameserver := range nameservers {
 		nameserver.Stop()
 	}
+	grouter.Stop()
 }
 
 type pair struct {
@@ -74,7 +75,7 @@ func TestNameservers(t *testing.T) {
 
 	lookupTimeout := 20 // ms
 	nameservers, grouter := makeNetwork(50)
-	defer stopNetwork(nameservers)
+	defer stopNetwork(nameservers, grouter)
 	nameserversByName := map[router.PeerName]*Nameserver{}
 	for _, n := range nameservers {
 		nameserversByName[n.ourName] = n
