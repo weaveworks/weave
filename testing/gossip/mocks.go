@@ -34,6 +34,12 @@ func NewTestRouter(loss float32) *TestRouter {
 	return &TestRouter{make(map[router.PeerName]chan interface{}, 100), loss}
 }
 
+func (grouter *TestRouter) Stop() {
+	for peer := range grouter.gossipChans {
+		grouter.RemovePeer(peer)
+	}
+}
+
 func (grouter *TestRouter) gossipBroadcast(sender router.PeerName, update router.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
