@@ -65,7 +65,7 @@ func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname st
 	return &Allocator{
 		ourName:   ourName,
 		universe:  universe,
-		ring:      ring.New(universe.Start, address.Add(universe.Start, universe.Size()), ourName),
+		ring:      ring.New(universe.Start, universe.End, ourName),
 		owned:     make(map[string][]address.Address),
 		paxos:     paxos.NewNode(ourName, ourUID, quorum),
 		nicknames: map[router.PeerName]string{ourName: ourNickname},
@@ -643,6 +643,10 @@ func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 	// shouldn't get updates for a empty Ring. But tolerate
 	// them just in case.
 	if data.Ring != nil {
+		if data.Ring.Range() != alloc.universe {
+			return fmt.Errorf("Incompatible IP allocation range %s; ours is %s",
+				data.Ring.Range().AsCIDRString(), alloc.universe.AsCIDRString())
+		}
 		err = alloc.ring.Merge(*data.Ring)
 		if !alloc.ring.Empty() {
 			alloc.pruneNicknames()

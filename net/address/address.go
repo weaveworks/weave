@@ -23,6 +23,17 @@ func (r Range) String() string             { return fmt.Sprintf("[%s-%s)", r.Sta
 func (r Range) Overlaps(or Range) bool     { return !(r.Start >= or.End || r.End <= or.Start) }
 func (r Range) Contains(addr Address) bool { return addr >= r.Start && addr < r.End }
 
+func (r Range) AsCIDRString() string {
+	prefixLen := 32
+	for size := r.Size(); size > 1; size = size / 2 {
+		if size%2 != 0 { // Size not a power of two; cannot be expressed as a CIDR.
+			return r.String()
+		}
+		prefixLen--
+	}
+	return CIDR{Start: r.Start, PrefixLen: prefixLen}.String()
+}
+
 type CIDR struct {
 	Start     Address
 	PrefixLen int
