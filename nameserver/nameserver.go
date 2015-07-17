@@ -120,7 +120,7 @@ func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
 	return match.Hostname, nil
 }
 
-func (n *Nameserver) ContainerDied(ident string) error {
+func (n *Nameserver) ContainerDied(ident string) {
 	n.Lock()
 	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
 		if e.ContainerID == ident {
@@ -130,10 +130,12 @@ func (n *Nameserver) ContainerDied(ident string) error {
 		return false
 	})
 	n.Unlock()
-	if n.gossip != nil {
-		return n.gossip.GossipBroadcast(entries)
+	if n.gossip != nil && len(*entries) > 0 {
+		err := n.gossip.GossipBroadcast(entries)
+		if err != nil {
+			n.errorf("Failed to broadcast container '%s' death: %v", ident, err)
+		}
 	}
-	return nil
 }
 
 func (n *Nameserver) PeerGone(peer *router.Peer) {
@@ -252,4 +254,7 @@ func (n *Nameserver) infof(fmt string, args ...interface{}) {
 }
 func (n *Nameserver) debugf(fmt string, args ...interface{}) {
 	Log.Debugf("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
+}
+func (n *Nameserver) errorf(fmt string, args ...interface{}) {
+	Log.Errorf("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
 }

@@ -205,8 +205,7 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
-	err = nameserver.ContainerDied("containerid")
-	require.Nil(t, err)
+	nameserver.ContainerDied("containerid")
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
 
 	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
