@@ -5489,6 +5489,40 @@ p {
 pre {
   padding: 30px;
 }
+/* making this more look like a note, as opposed to a quote */
+blockquote {
+  padding: 15px;
+  margin-bottom: 17pt;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background-color: #fcf8e3;
+  border-color: #faebcc;
+  color: #8a6d3b;
+  font-size: inherit;
+}
+blockquote h4 {
+  margin-top: 0;
+  color: inherit;
+}
+blockquote .alert-link {
+  font-weight: bold;
+}
+blockquote > p,
+blockquote > ul {
+  margin-bottom: 0;
+}
+blockquote > p + p {
+  margin-top: 5px;
+}
+blockquote hr {
+  border-top-color: #f7e1b5;
+}
+blockquote .alert-link {
+  color: #66512c;
+}
+blockquote p {
+  margin-top: 0;
+}
 .navbar {
   padding-top: 15px;
 }
