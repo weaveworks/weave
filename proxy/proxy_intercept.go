@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"sync"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -94,16 +95,15 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 		return
 	}
 
-	upDone := make(chan struct{})
-	downDone := make(chan struct{})
-	go copyStream(down, io.MultiReader(rem, up), upDone)
-	go copyStream(up, downBuf, downDone)
-	<-upDone
-	<-downDone
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go copyStream(down, io.MultiReader(rem, up), &wg)
+	go copyStream(up, downBuf, &wg)
+	wg.Wait()
 }
 
-func copyStream(dst io.Writer, src io.Reader, done chan struct{}) {
-	defer close(done)
+func copyStream(dst io.Writer, src io.Reader, wg *sync.WaitGroup) {
+	defer wg.Done()
 	if _, err := io.Copy(dst, src); err != nil {
 		Warning.Print(err)
 	}
