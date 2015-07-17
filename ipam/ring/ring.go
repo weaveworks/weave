@@ -40,8 +40,6 @@ var (
 	ErrNewerVersion    = errors.New("Received new version for entry I own!")
 	ErrInvalidEntry    = errors.New("Received invalid state update!")
 	ErrEntryInMyRange  = errors.New("Received new entry in my range!")
-	ErrNoFreeSpace     = errors.New("No free space found!")
-	ErrInvalidTimeout  = errors.New("dt must be greater than 0")
 	ErrNotFound        = errors.New("No entries for peer found")
 )
 
