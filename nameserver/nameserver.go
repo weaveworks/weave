@@ -20,10 +20,13 @@ const (
 	// we delete entries for disconnected peers.  Therefore they just need to hang
 	// around to account for propagation delay through gossip.  10 minutes sounds
 	// long enough.
-	tombstoneTimeout = time.Minute * 10
+	tombstoneTimeout = time.Minute * 30
 
 	// Used by prog/weaver/main.go and proxy/create_container_interceptor.go
 	DefaultDomain = "weave.local."
+
+	// Maximum age of acceptable gossip messages (to account for clock skew)
+	gossipWindow = int64(tombstoneTimeout/time.Second) / 2
 )
 
 // Nameserver: gossip-based, in memory nameserver.
@@ -78,16 +81,22 @@ func (n *Nameserver) Stop() {
 	n.quit <- struct{}{}
 }
 
+func (n *Nameserver) broadcastEntries(es ...Entry) error {
+	if n.gossip != nil {
+		return n.gossip.GossipBroadcast(&GossipData{
+			Entries:   Entries(es),
+			Timestamp: now(),
+		})
+	}
+	return nil
+}
+
 func (n *Nameserver) AddEntry(hostname, containerid string, origin router.PeerName, addr address.Address) error {
 	n.infof("adding entry %s -> %s", hostname, addr.String())
 	n.Lock()
 	entry := n.entries.add(hostname, containerid, origin, addr)
 	n.Unlock()
-
-	if n.gossip != nil {
-		return n.gossip.GossipBroadcast(&Entries{entry})
-	}
-	return nil
+	return n.broadcastEntries(entry)
 }
 
 func (n *Nameserver) Lookup(hostname string) []address.Address {
@@ -130,9 +139,8 @@ func (n *Nameserver) ContainerDied(ident string) {
 		return false
 	})
 	n.Unlock()
-	if n.gossip != nil && len(entries) > 0 {
-		err := n.gossip.GossipBroadcast(&entries)
-		if err != nil {
+	if len(entries) > 0 {
+		if err := n.broadcastEntries(entries...); err != nil {
 			n.errorf("Failed to broadcast container '%s' death: %v", ident, err)
 		}
 	}
@@ -165,10 +173,7 @@ func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Addr
 		return true
 	})
 	n.Unlock()
-	if n.gossip != nil {
-		return n.gossip.GossipBroadcast(&entries)
-	}
-	return nil
+	return n.broadcastEntries(entries...)
 }
 
 func (n *Nameserver) deleteTombstones() {
@@ -200,9 +205,12 @@ func (n *Nameserver) String() string {
 func (n *Nameserver) Gossip() router.GossipData {
 	n.RLock()
 	defer n.RUnlock()
-	result := make(Entries, len(n.entries))
-	copy(result, n.entries)
-	return &result
+	gossip := &GossipData{
+		Entries:   make(Entries, len(n.entries)),
+		Timestamp: now(),
+	}
+	copy(gossip.Entries, n.entries)
+	return gossip
 }
 
 func (n *Nameserver) OnGossipUnicast(sender router.PeerName, msg []byte) error {
@@ -210,12 +218,16 @@ func (n *Nameserver) OnGossipUnicast(sender router.PeerName, msg []byte) error {
 }
 
 func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.GossipData, error) {
-	var entries Entries
-	if err := gob.NewDecoder(bytes.NewReader(msg)).Decode(&entries); err != nil {
+	var gossip GossipData
+	if err := gob.NewDecoder(bytes.NewReader(msg)).Decode(&gossip); err != nil {
 		return nil, nil, err
 	}
 
-	if err := entries.check(); err != nil {
+	if delta := gossip.Timestamp - now(); delta > gossipWindow || delta < -gossipWindow {
+		return nil, nil, fmt.Errorf("clock skew of %d detected", delta)
+	}
+
+	if err := gossip.Entries.check(); err != nil {
 		return nil, nil, err
 	}
 
@@ -223,16 +235,16 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 	defer n.Unlock()
 
 	if n.peers != nil {
-		entries.filter(func(e *Entry) bool {
+		gossip.Entries.filter(func(e *Entry) bool {
 			return n.peers.Fetch(e.Origin) != nil
 		})
 	}
 
-	newEntries := n.entries.merge(entries)
+	newEntries := n.entries.merge(gossip.Entries)
 	if len(newEntries) > 0 {
-		return &newEntries, &entries, nil
+		return &GossipData{Entries: newEntries, Timestamp: now()}, &gossip, nil
 	}
-	return nil, &entries, nil
+	return nil, &gossip, nil
 }
 
 // merge received data into state and return "everything new I've

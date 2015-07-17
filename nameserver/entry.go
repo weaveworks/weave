@@ -187,13 +187,22 @@ func (es *Entries) first(f func(*Entry) bool) (*Entry, error) {
 	return nil, fmt.Errorf("Not found")
 }
 
-func (es *Entries) Merge(other router.GossipData) {
-	es.merge(*other.(*Entries))
+type GossipData struct {
+	Timestamp int64
+	Entries
 }
 
-func (es *Entries) Encode() [][]byte {
+func (g *GossipData) Merge(o router.GossipData) {
+	other := o.(*GossipData)
+	g.Entries.merge(other.Entries)
+	if g.Timestamp < other.Timestamp {
+		g.Timestamp = other.Timestamp
+	}
+}
+
+func (g *GossipData) Encode() [][]byte {
 	buf := &bytes.Buffer{}
-	if err := gob.NewEncoder(buf).Encode(es); err != nil {
+	if err := gob.NewEncoder(buf).Encode(g); err != nil {
 		panic(err)
 	}
 	return [][]byte{buf.Bytes()}
