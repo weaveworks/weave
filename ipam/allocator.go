@@ -223,12 +223,10 @@ func (alloc *Allocator) Claim(ident string, addr address.Address) error {
 }
 
 // ContainerDied is provided to satisfy the updater interface; does a 'Delete' underneath.  Sync.
-func (alloc *Allocator) ContainerDied(ident string) error {
-	err := alloc.Delete(ident)
-	if err == nil {
+func (alloc *Allocator) ContainerDied(ident string) {
+	if err := alloc.Delete(ident); err == nil {
 		alloc.debugln("Container", ident, "died; released addresses")
 	}
-	return err
 }
 
 // Delete (Sync) - release all IP addresses for container with given name

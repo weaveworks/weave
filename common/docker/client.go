@@ -7,7 +7,7 @@ import (
 
 // An observer for container events
 type ContainerObserver interface {
-	ContainerDied(ident string) error
+	ContainerDied(ident string)
 }
 
 type Client struct {
