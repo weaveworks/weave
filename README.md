@@ -55,7 +55,7 @@ it locally to control a weave network on a remote host.
 
 ## Quick Start Screencast
 
-<a href="http://youtu.be/k6r7yuSr0hE" alt="Click to watch the screencast" target="_blank">
+<a href="https://youtu.be/BF9YJSPQUcY" alt="Click to watch the screencast" target="_blank">
   <img src="/docs/hello-screencast.png" />
 </a>
 
