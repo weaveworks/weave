@@ -332,7 +332,7 @@ type TCPSender interface {
 	Send([]byte) error
 }
 
-type SimpleTCPSender struct {
+type GobTCPSender struct {
 	encoder *gob.Encoder
 }
 
@@ -342,11 +342,11 @@ type EncryptedTCPSender struct {
 	state  *TCPCryptoState
 }
 
-func NewSimpleTCPSender(encoder *gob.Encoder) *SimpleTCPSender {
-	return &SimpleTCPSender{encoder: encoder}
+func NewGobTCPSender(encoder *gob.Encoder) *GobTCPSender {
+	return &GobTCPSender{encoder: encoder}
 }
 
-func (sender *SimpleTCPSender) Send(msg []byte) error {
+func (sender *GobTCPSender) Send(msg []byte) error {
 	return sender.encoder.Encode(msg)
 }
 
@@ -366,7 +366,7 @@ type TCPReceiver interface {
 	Receive() ([]byte, error)
 }
 
-type SimpleTCPReceiver struct {
+type GobTCPReceiver struct {
 	decoder *gob.Decoder
 }
 
@@ -375,11 +375,11 @@ type EncryptedTCPReceiver struct {
 	state    *TCPCryptoState
 }
 
-func NewSimpleTCPReceiver(decoder *gob.Decoder) *SimpleTCPReceiver {
-	return &SimpleTCPReceiver{decoder: decoder}
+func NewGobTCPReceiver(decoder *gob.Decoder) *GobTCPReceiver {
+	return &GobTCPReceiver{decoder: decoder}
 }
 
-func (receiver *SimpleTCPReceiver) Receive() ([]byte, error) {
+func (receiver *GobTCPReceiver) Receive() ([]byte, error) {
 	var msg []byte
 	err := receiver.decoder.Decode(&msg)
 	return msg, err

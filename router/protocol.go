@@ -180,8 +180,8 @@ func (res *ProtocolIntroResults) doIntroV1(params ProtocolIntroParams, pubKey, p
 		return err
 	}
 
-	res.Sender = NewSimpleTCPSender(enc)
-	res.Receiver = NewSimpleTCPReceiver(dec)
+	res.Sender = NewGobTCPSender(enc)
+	res.Receiver = NewGobTCPReceiver(dec)
 
 	if pubKey == nil {
 		if _, present := res.Features["PublicKey"]; present {
@@ -266,8 +266,8 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return ErrExpectedCrypto
 		}
 
-		res.Sender = NewSimpleTCPSender(gob.NewEncoder(params.Conn))
-		res.Receiver = NewSimpleTCPReceiver(gob.NewDecoder(params.Conn))
+		res.Sender = NewGobTCPSender(gob.NewEncoder(params.Conn))
+		res.Receiver = NewGobTCPReceiver(gob.NewDecoder(params.Conn))
 
 	case 1:
 		if pubKey == nil {
@@ -279,8 +279,8 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return err
 		}
 
-		res.Sender = NewSimpleTCPSender(gob.NewEncoder(params.Conn))
-		res.Receiver = NewSimpleTCPReceiver(gob.NewDecoder(params.Conn))
+		res.Sender = NewGobTCPSender(gob.NewEncoder(params.Conn))
+		res.Receiver = NewGobTCPReceiver(gob.NewDecoder(params.Conn))
 		res.setupCrypto(params, rbuf, privKey)
 
 	default:
