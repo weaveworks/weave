@@ -97,7 +97,7 @@ func TestTombstone(t *testing.T) {
 		Entry{Hostname: "A"},
 		Entry{Hostname: "B", Version: 1, Tombstone: 1234},
 	}
-	require.Equal(t, es, expected)
+	require.Equal(t, expected, es)
 }
 
 func TestDelete(t *testing.T) {
@@ -112,21 +112,21 @@ func TestDelete(t *testing.T) {
 	expected := Entries{
 		Entry{Hostname: "B"},
 	}
-	require.Equal(t, es, expected)
+	require.Equal(t, expected, es)
 }
 
 func TestLookup(t *testing.T) {
 	es := Entries{
 		Entry{Hostname: "A"},
-		Entry{Hostname: "B", ContainerID: "foo"},
 		Entry{Hostname: "B", ContainerID: "bar"},
+		Entry{Hostname: "B", ContainerID: "foo"},
 		Entry{Hostname: "C"},
 	}
 
 	have := es.lookup("B")
 	want := Entries{
-		Entry{Hostname: "B", ContainerID: "foo"},
 		Entry{Hostname: "B", ContainerID: "bar"},
+		Entry{Hostname: "B", ContainerID: "foo"},
 	}
 	require.Equal(t, have, want)
 }

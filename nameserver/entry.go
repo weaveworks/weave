@@ -67,9 +67,14 @@ func (es Entries) Len() int           { return len(es) }
 func (es Entries) Swap(i, j int)      { panic("Swap") }
 func (es Entries) Less(i, j int) bool { return es[i].less(&es[j]) }
 
-func (es *Entries) check() error {
+func (es Entries) check() error {
 	if !sort.IsSorted(es) {
 		return fmt.Errorf("Not sorted!")
+	}
+	for i := 1; i < len(es); i++ {
+		if es[i].equal(&es[i-1]) {
+			return fmt.Errorf("Duplicate entry: %d:%v and %d:%v", i-1, es[i-1], i, es[i])
+		}
 	}
 	return nil
 }
@@ -81,6 +86,7 @@ func (es *Entries) checkAndPanic() {
 }
 
 func (es *Entries) add(hostname, containerid string, origin router.PeerName, addr address.Address) Entry {
+	es.checkAndPanic()
 	defer es.checkAndPanic()
 
 	entry := Entry{Hostname: hostname, Origin: origin, ContainerID: containerid, Addr: addr}
@@ -101,6 +107,7 @@ func (es *Entries) add(hostname, containerid string, origin router.PeerName, add
 }
 
 func (es *Entries) merge(incoming Entries) Entries {
+	es.checkAndPanic()
 	defer es.checkAndPanic()
 	newEntries := Entries{}
 	i := 0
@@ -125,6 +132,8 @@ func (es *Entries) merge(incoming Entries) Entries {
 }
 
 func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) *Entries {
+	es.checkAndPanic()
+	defer es.checkAndPanic()
 	tombstoned := Entries{}
 	for i, e := range *es {
 		if f(&e) && e.Origin == ourname {
@@ -138,6 +147,8 @@ func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) *Entr
 }
 
 func (es *Entries) filter(f func(*Entry) bool) {
+	es.checkAndPanic()
+	defer es.checkAndPanic()
 	i := 0
 	for _, e := range *es {
 		if !f(&e) {
@@ -150,6 +161,7 @@ func (es *Entries) filter(f func(*Entry) bool) {
 }
 
 func (es Entries) lookup(hostname string) Entries {
+	es.checkAndPanic()
 	i := sort.Search(len(es), func(i int) bool {
 		return es[i].Hostname >= hostname
 	})
@@ -165,6 +177,7 @@ func (es Entries) lookup(hostname string) Entries {
 }
 
 func (es *Entries) first(f func(*Entry) bool) (*Entry, error) {
+	es.checkAndPanic()
 	for _, e := range *es {
 		if f(&e) {
 			return &e, nil
