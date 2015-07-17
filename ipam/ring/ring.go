@@ -92,6 +92,10 @@ func New(start, end address.Address, peer router.PeerName) *Ring {
 	return ring
 }
 
+func (r *Ring) Range() address.Range {
+	return address.Range{Start: r.Start, End: r.End}
+}
+
 // Returns the distance between two tokens on this ring, dealing
 // with ranges which cross the origin
 func (r *Ring) distance(start, end address.Address) address.Offset {

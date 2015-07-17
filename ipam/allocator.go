@@ -613,6 +613,10 @@ func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 	// shouldn't get updates for a empty Ring. But tolerate
 	// them just in case.
 	if data.Ring != nil {
+		if data.Ring.Range() != alloc.universe {
+			return fmt.Errorf("Incompatible IP allocation range %s; ours is %s",
+				data.Ring.Range().AsCIDRString(), alloc.universe.AsCIDRString())
+		}
 		err = alloc.ring.Merge(*data.Ring)
 		if !alloc.ring.Empty() {
 			alloc.pruneNicknames()
