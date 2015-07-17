@@ -1,0 +1,5 @@
+#!/bin/sh
+
+cd $SRCDIR/test
+
+./gce.sh destroy

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+cd $SRCDIR/test
+
+./gce.sh setup
+eval $(./gce.sh hosts); ./setup.sh

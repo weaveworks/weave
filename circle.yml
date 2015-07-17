@@ -13,6 +13,11 @@ machine:
     PATH: $PATH:$HOME/.local/bin:$HOME/google-cloud-sdk/bin/
     CLOUDSDK_CORE_DISABLE_PROMPTS: 1
     WEAVE_TEST: $HOME/docker/weave-test.tar
+    # performance graphs parameters (TODO: move the API key to some better place...)
+    PLOTLY_USERNAME: inercia
+    PLOTLY_API_KEY: agdnvosyjk
+    # performance graph: the number of previous builds to use
+    PERF_GRAPH_HISTORY: 10
 
 dependencies:
   cache_directories:
@@ -45,7 +50,7 @@ test:
         parallel: true
     - cd $SRCDIR/test; eval $(./gce.sh hosts); ./setup.sh:
         parallel: true
-    - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
+    - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; export PERFORMANCE=true; ./run_all.sh:
         parallel: true
         timeout: 300
     - cd $SRCDIR; make clean-bin:
@@ -63,6 +68,10 @@ teardown:
     - test "$CIRCLE_NODE_INDEX" != "0" || (go get github.com/mattn/goveralls && goveralls -repotoken $COVERALLS_REPO_TOKEN -coverprofile=$SRCDIR/test/profile.cov -service=circleci || true):
         parallel: true
     - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; cp coverage.* $CIRCLE_ARTIFACTS):
+        parallel: true
+    - $SRCDIR/bin/circleci/setup-perf-graphs:
+        parallel: true
+    - $SRCDIR/bin/circleci/do-perf-graphs:
         parallel: true
 
 deployment:

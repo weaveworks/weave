@@ -1,0 +1,13 @@
+#!/bin/sh
+
+[ $CIRCLE_NODE_INDEX -eq 0 ] || exit 0
+
+cd $SRCDIR/test && ./gen_coverage_reports.sh
+
+go get github.com/mattn/goveralls && \
+    goveralls -repotoken $COVERALLS_REPO_TOKEN \
+        -coverprofile=$SRCDIR/test/profile.cov \
+        -service=circleci || true
+
+cd $SRCDIR/test && cp coverage.* $CIRCLE_ARTIFACTS
+

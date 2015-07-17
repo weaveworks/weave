@@ -3,8 +3,12 @@
 IN_DIR=$SRCDIR/test/performance
 OUT_DIR=$CIRCLE_ARTIFACTS/
 
+###########################################################################
+
+[ $CIRCLE_NODE_INDEX -eq 0 ] || exit 0
 
 log()   { echo "$1" >&2 ;            }
+abort() { log "ABORT: $1" ; exit 0 ; }
 fatal() { log "FATAL: $1" ; exit 1 ; }
 
 ###########################################################################
@@ -12,9 +16,8 @@ fatal() { log "FATAL: $1" ; exit 1 ; }
 [ -n "$CIRCLE_ARTIFACTS" ] || fatal "no artifacts folder in environment"
 [ -n "$PLOTLY_USERNAME" ]  || fatal "no PlotLy user name in environment"
 [ -n "$PLOTLY_API_KEY" ]   || fatal "no PlotLy API key in environment"
-[ -d $IN_DIR ]             || fatal "no performance directory found"
-[ -d $OUT_DIR ]            || fatal "no output directory found"
-
+[ -d $IN_DIR ]             || abort "no performance directory found"
+[ -d $OUT_DIR ]            || { log "creating output directory" ; mkdir -p $OUT_DIR ; }
 
 log "Processing performance logs in $IN_DIR"
 for csv_file in $IN_DIR/*.csv ; do
@@ -27,7 +30,7 @@ for csv_file in $IN_DIR/*.csv ; do
         --plot-username $PLOTLY_USERNAME \
         --plot-key $PLOTLY_API_KEY \
         --plot-name $name \
-        --num 5 \
+        --num $PERF_GRAPH_HISTORY \
         --plot-save-to $OUT_DIR/$name.png \
         --pattern $(basename $csv_file) \
         --num $PERF_GRAPH_HISTORY "$csv_file"
