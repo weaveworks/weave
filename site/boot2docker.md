@@ -18,13 +18,12 @@ it is in the current directory, launch weave on the Boot2Docker VM and
 configure our shell. Because Boot2Docker uses TLS, we have to pass a
 few extra options when launching the docker API proxy:
 
-    host1$ ./weave launch
-    host1$ ./weave launch-dns
+    host1$ ./weave launch-router
     host1$ ./weave launch-proxy --tls \
              --tlscacert /var/lib/boot2docker/tls/ca.pem \
              --tlscert /var/lib/boot2docker/tls/server.pem \
              --tlskey /var/lib/boot2docker/tls/serverkey.pem
-    host1$ eval "$(./weave proxy-env)"
+    host1$ eval "$(./weave env)"
 
 Now, we can use the docker command to run our containers, as shown in
 the [proxy documentation](proxy.html):
