@@ -35,23 +35,22 @@ func (c *claim) Try(alloc *Allocator) bool {
 		return true
 	}
 
-	// If our ring doesn't know, it must be empty.  We will have initiated the
-	// bootstrap of the ring, so wait until we find some owner for this
-	// range (might be us).
 	switch owner := alloc.ring.Owner(c.addr); owner {
 	case alloc.ourName:
 		// success
 	case router.UnknownPeerName:
-		alloc.infof("Ring is empty; will try later.", c.addr, owner)
+		// If our ring doesn't know, it must be empty.
+		alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.addr, c.ident)
 		c.sendResult(nil) // don't make the caller wait
 		return false
 	default:
-		name, found := alloc.nicknames[owner]
-		if found {
-			name = " (" + name + ")"
+		alloc.debugf("requesting address %s from other peer %s", c.addr, owner)
+		err := alloc.sendSpaceRequest(owner, address.NewRange(c.addr, 1))
+		if err != nil { // can't speak to owner right now; figure it out later
+			alloc.infof("Claim %s for %s: %s; will try later.", c.addr, c.ident, err)
+			c.sendResult(nil)
 		}
-		c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.addr.String(), owner, name))
-		return true
+		return false
 	}
 
 	// We are the owner, check we haven't given it to another container
@@ -72,6 +71,14 @@ func (c *claim) Try(alloc *Allocator) bool {
 		c.sendResult(fmt.Errorf("address %s is already owned by %s", c.addr.String(), existingIdent))
 	}
 	return true
+}
+
+func (c *claim) DeniedBy(alloc *Allocator, owner router.PeerName) {
+	name, found := alloc.nicknames[owner]
+	if found {
+		name = " (" + name + ")"
+	}
+	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.addr.String(), owner, name))
 }
 
 func (c *claim) Cancel() {

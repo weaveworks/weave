@@ -131,23 +131,45 @@ func TestBootstrap(t *testing.T) {
 func TestAllocatorClaim(t *testing.T) {
 	const (
 		container1 = "abcdef"
-		container2 = "baddf00d"
 		container3 = "b01df00d"
-		universe   = "10.0.3.0/30"
-		testAddr1  = "10.0.3.1" // first address allocated should be .1 because .0 is network addr
+		universe   = "10.0.3.0/24"
+		testAddr1  = "10.0.3.2"
+		testAddr2  = "10.0.4.2"
 	)
 
-	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
+	allocs, _, subnet := makeNetworkOfAllocators(2, universe)
+	alloc := allocs[1]
 	defer alloc.Stop()
-
-	alloc.claimRingForTesting()
 	addr1, _ := address.ParseIP(testAddr1)
 
+	// First claim should trigger "dunno, I'm going to wait"
 	err := alloc.Claim(container3, addr1)
+	require.NoError(t, err)
+
+	// Do one allocate to ensure paxos is all done
+	alloc.Allocate("unused", subnet, nil)
+	// Do an allocate on the other peer, which we will try to claim later
+	addrx, err := allocs[0].Allocate(container1, subnet, nil)
+
+	// Now try the claim again
+	err = alloc.Claim(container3, addr1)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
 	addr3, _ := alloc.Allocate(container3, subnet, nil)
 	require.Equal(t, testAddr1, addr3.String(), "address")
+	// one more claim should still work
+	err = alloc.Claim(container3, addr1)
+	require.NoError(t, err)
+	// claim for a different container should fail
+	err = alloc.Claim(container1, addr1)
+	require.Error(t, err)
+	// claiming the address allocated on the other peer should fail
+	err = alloc.Claim(container1, addrx)
+	require.Error(t, err, "claiming address allocated on other peer should fail")
+	// Check an address outside of our universe
+	addr2, _ := address.ParseIP(testAddr2)
+	err = alloc.Claim(container1, addr2)
+	require.NoError(t, err)
 }
 
 func (alloc *Allocator) pause() func() {
@@ -326,27 +348,18 @@ func TestAllocatorFuzz(t *testing.T) {
 		return xs[:ls]
 	}
 
-	// Do a Allocate and check the address
-	// is unique.  Needs a unique container
-	// name.
-	allocate := func(name string) {
+	bumpPending := func() bool {
 		stateLock.Lock()
 		if len(addrs)+numPending >= maxAddresses {
 			stateLock.Unlock()
-			return
+			return false
 		}
 		numPending++
 		stateLock.Unlock()
+		return true
+	}
 
-		allocIndex := rand.Int31n(nodes)
-		alloc := allocs[allocIndex]
-		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
-		addr, err := alloc.Allocate(name, subnet, nil)
-
-		if err != nil {
-			panic(fmt.Sprintf("Could not allocate addr"))
-		}
-
+	noteAllocation := func(allocIndex int32, name string, addr address.Address) {
 		//common.Log.Infof("Allocate: got address %s for name %s", addr, name)
 		addrStr := addr.String()
 
@@ -361,6 +374,26 @@ func TestAllocatorFuzz(t *testing.T) {
 		state[addrStr] = result{name, allocIndex, false}
 		addrs = append(addrs, addrStr)
 		numPending--
+	}
+
+	// Do a Allocate and check the address
+	// is unique.  Needs a unique container
+	// name.
+	allocate := func(name string) {
+		if !bumpPending() {
+			return
+		}
+
+		allocIndex := rand.Int31n(nodes)
+		alloc := allocs[allocIndex]
+		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
+		addr, err := alloc.Allocate(name, subnet, nil)
+
+		if err != nil {
+			panic(fmt.Sprintf("Could not allocate addr"))
+		}
+
+		noteAllocation(allocIndex, name, addr)
 	}
 
 	// Free a random address.
@@ -423,6 +456,21 @@ func TestAllocatorFuzz(t *testing.T) {
 		stateLock.Unlock()
 	}
 
+	// Claim a random address for a unique container name - may not succeed
+	claim := func(name string) {
+		if !bumpPending() {
+			return
+		}
+		allocIndex := rand.Int31n(nodes)
+		addressIndex := rand.Int31n(int32(subnet.Size()))
+		alloc := allocs[allocIndex]
+		addr := address.Add(subnet.Start, address.Offset(addressIndex))
+		err := alloc.Claim(name, addr)
+		if err == nil {
+			noteAllocation(allocIndex, name, addr)
+		}
+	}
+
 	// Run function _f_ _iterations_ times, in _concurrency_
 	// number of goroutines
 	doConcurrentIterations := func(iterations int, f func(int)) {
@@ -462,9 +510,13 @@ func TestAllocatorFuzz(t *testing.T) {
 			// free a random addr
 			free()
 
-		case 0.8 <= r && r < 1.0:
+		case 0.8 <= r && r < 0.95:
 			// ask for an existing name again, check we get same ip
 			allocateAgain()
+
+		case 0.95 <= r && r < 1.0:
+			name := fmt.Sprintf("second%d", iteration)
+			claim(name)
 		}
 	})
 }
