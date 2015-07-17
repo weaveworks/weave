@@ -337,9 +337,9 @@ type SimpleTCPSender struct {
 }
 
 type EncryptedTCPSender struct {
-	SimpleTCPSender
 	sync.RWMutex
-	state *TCPCryptoState
+	sender TCPSender
+	state  *TCPCryptoState
 }
 
 func NewSimpleTCPSender(encoder *gob.Encoder) *SimpleTCPSender {
@@ -350,10 +350,8 @@ func (sender *SimpleTCPSender) Send(msg []byte) error {
 	return sender.encoder.Encode(msg)
 }
 
-func NewEncryptedTCPSender(encoder *gob.Encoder, sessionKey *[32]byte, outbound bool) *EncryptedTCPSender {
-	return &EncryptedTCPSender{
-		SimpleTCPSender: *NewSimpleTCPSender(encoder),
-		state:           NewTCPCryptoState(sessionKey, outbound)}
+func NewEncryptedTCPSender(sender TCPSender, sessionKey *[32]byte, outbound bool) *EncryptedTCPSender {
+	return &EncryptedTCPSender{sender: sender, state: NewTCPCryptoState(sessionKey, outbound)}
 }
 
 func (sender *EncryptedTCPSender) Send(msg []byte) error {
@@ -361,7 +359,7 @@ func (sender *EncryptedTCPSender) Send(msg []byte) error {
 	defer sender.Unlock()
 	encodedMsg := secretbox.Seal(nil, msg, &sender.state.nonce, sender.state.sessionKey)
 	sender.state.advance()
-	return sender.SimpleTCPSender.Send(encodedMsg)
+	return sender.sender.Send(encodedMsg)
 }
 
 type TCPReceiver interface {
@@ -373,8 +371,8 @@ type SimpleTCPReceiver struct {
 }
 
 type EncryptedTCPReceiver struct {
-	SimpleTCPReceiver
-	state *TCPCryptoState
+	receiver TCPReceiver
+	state    *TCPCryptoState
 }
 
 func NewSimpleTCPReceiver(decoder *gob.Decoder) *SimpleTCPReceiver {
@@ -387,14 +385,12 @@ func (receiver *SimpleTCPReceiver) Receive() ([]byte, error) {
 	return msg, err
 }
 
-func NewEncryptedTCPReceiver(decoder *gob.Decoder, sessionKey *[32]byte, outbound bool) *EncryptedTCPReceiver {
-	return &EncryptedTCPReceiver{
-		SimpleTCPReceiver: *NewSimpleTCPReceiver(decoder),
-		state:             NewTCPCryptoState(sessionKey, !outbound)}
+func NewEncryptedTCPReceiver(receiver TCPReceiver, sessionKey *[32]byte, outbound bool) *EncryptedTCPReceiver {
+	return &EncryptedTCPReceiver{receiver: receiver, state: NewTCPCryptoState(sessionKey, !outbound)}
 }
 
 func (receiver *EncryptedTCPReceiver) Receive() ([]byte, error) {
-	msg, err := receiver.SimpleTCPReceiver.Receive()
+	msg, err := receiver.receiver.Receive()
 	if err != nil {
 		return nil, err
 	}

@@ -180,12 +180,13 @@ func (res *ProtocolIntroResults) doIntroV1(params ProtocolIntroParams, pubKey, p
 		return err
 	}
 
+	res.Sender = NewSimpleTCPSender(enc)
+	res.Receiver = NewSimpleTCPReceiver(dec)
+
 	if pubKey == nil {
 		if _, present := res.Features["PublicKey"]; present {
 			return ErrExpectedNoCrypto
 		}
-
-		res.setupNoCrypto(enc, dec)
 	} else {
 		remotePubKeyStr, ok := res.Features["PublicKey"]
 		if !ok {
@@ -197,7 +198,7 @@ func (res *ProtocolIntroResults) doIntroV1(params ProtocolIntroParams, pubKey, p
 			return err
 		}
 
-		res.setupCrypto(params, enc, dec, remotePubKey, privKey)
+		res.setupCrypto(params, remotePubKey, privKey)
 	}
 
 	res.Features = filterV1Features(res.Features)
@@ -265,7 +266,8 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return ErrExpectedCrypto
 		}
 
-		res.setupNoCrypto(gob.NewEncoder(params.Conn), gob.NewDecoder(params.Conn))
+		res.Sender = NewSimpleTCPSender(gob.NewEncoder(params.Conn))
+		res.Receiver = NewSimpleTCPReceiver(gob.NewDecoder(params.Conn))
 
 	case 1:
 		if pubKey == nil {
@@ -277,7 +279,9 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return err
 		}
 
-		res.setupCrypto(params, gob.NewEncoder(params.Conn), gob.NewDecoder(params.Conn), rbuf, privKey)
+		res.Sender = NewSimpleTCPSender(gob.NewEncoder(params.Conn))
+		res.Receiver = NewSimpleTCPReceiver(gob.NewDecoder(params.Conn))
+		res.setupCrypto(params, rbuf, privKey)
 
 	default:
 		return fmt.Errorf("Bad encryption flag %d", rbuf[0])
@@ -314,18 +318,12 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 	return nil
 }
 
-func (res *ProtocolIntroResults) setupNoCrypto(enc *gob.Encoder, dec *gob.Decoder) {
-	res.Sender = NewSimpleTCPSender(enc)
-	res.Receiver = NewSimpleTCPReceiver(dec)
-}
-
-func (res *ProtocolIntroResults) setupCrypto(params ProtocolIntroParams,
-	enc *gob.Encoder, dec *gob.Decoder, remotePubKey []byte, privKey *[32]byte) {
+func (res *ProtocolIntroResults) setupCrypto(params ProtocolIntroParams, remotePubKey []byte, privKey *[32]byte) {
 	var remotePubKeyArr [32]byte
 	copy(remotePubKeyArr[:], remotePubKey)
 	res.SessionKey = FormSessionKey(&remotePubKeyArr, privKey, params.Password)
-	res.Sender = NewEncryptedTCPSender(enc, res.SessionKey, params.Outbound)
-	res.Receiver = NewEncryptedTCPReceiver(dec, res.SessionKey, params.Outbound)
+	res.Sender = NewEncryptedTCPSender(res.Sender, res.SessionKey, params.Outbound)
+	res.Receiver = NewEncryptedTCPReceiver(res.Receiver, res.SessionKey, params.Outbound)
 }
 
 type ProtocolTag byte
