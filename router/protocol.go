@@ -320,8 +320,7 @@ func (res *ProtocolIntroResults) setupNoCrypto(enc *gob.Encoder, dec *gob.Decode
 }
 
 func (res *ProtocolIntroResults) setupCrypto(params ProtocolIntroParams,
-	enc *gob.Encoder, dec *gob.Decoder, remotePubKey []byte,
-	privKey *[32]byte) {
+	enc *gob.Encoder, dec *gob.Decoder, remotePubKey []byte, privKey *[32]byte) {
 	var remotePubKeyArr [32]byte
 	copy(remotePubKeyArr[:], remotePubKey)
 	res.SessionKey = FormSessionKey(&remotePubKeyArr, privKey, params.Password)
