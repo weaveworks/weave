@@ -806,19 +806,6 @@ delete_dns_fqdn() {
     done
 }
 
-# Tell the newly-started weaveDNS about existing weave IPs
-populate_dns() {
-    if ! wait_for_status $CONTAINER_NAME $HTTP_PORT ; then
-        echo "If running, it will not be pre-populated." >&2
-        return 0
-    fi
-    for CONTAINER in $(docker ps -q --no-trunc) ; do
-        if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
-            with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
-        fi
-    done
-}
-
 ######################################################################
 # IP Allocation Management helpers
 ######################################################################
@@ -1102,7 +1089,12 @@ launch_router() {
         # Tell the newly-started weave IP allocator about existing weave IPs
         with_container_addresses ipam_claim weave:expose $(docker ps -q --no-trunc)
     fi
-    populate_dns
+    # Tell the newly-started weaveDNS about existing weave IPs
+    for CONTAINER in $(docker ps -q --no-trunc) ; do
+        if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
+            with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
+        fi
+    done
 }
 
 launch_proxy() {
