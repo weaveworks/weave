@@ -1047,38 +1047,35 @@ launch_router() {
                 [ $# -gt 1 ] || usage
                 WEAVE_PASSWORD="$2"
                 export WEAVE_PASSWORD
-                shift 2
+                shift
                 ;;
             --password=*)
                 WEAVE_PASSWORD="${1#*=}"
                 export WEAVE_PASSWORD
-                shift
                 ;;
             -port|--port)
                 [ $# -gt 1 ] || usage
                 CONTAINER_PORT="$2"
-                shift 2
+                shift
                 ;;
             --port=*)
                 CONTAINER_PORT="${1#*=}"
-                shift
                 ;;
             -iprange|--iprange|--ipalloc-range)
                 [ $# -gt 1 ] || usage
                 IPRANGE="$2"
                 IPRANGE_SPECIFIED=1
-                shift 2
+                shift
                 ;;
             --ipalloc-range=*)
                 IPRANGE="${1#*=}"
                 IPRANGE_SPECIFIED=1
-                shift
                 ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
-                shift
                 ;;
         esac
+        shift
     done
     eval "set -- $ARGS"
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
