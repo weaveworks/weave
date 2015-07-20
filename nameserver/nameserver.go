@@ -130,8 +130,8 @@ func (n *Nameserver) ContainerDied(ident string) {
 		return false
 	})
 	n.Unlock()
-	if n.gossip != nil && len(*entries) > 0 {
-		err := n.gossip.GossipBroadcast(entries)
+	if n.gossip != nil && len(entries) > 0 {
+		err := n.gossip.GossipBroadcast(&entries)
 		if err != nil {
 			n.errorf("Failed to broadcast container '%s' death: %v", ident, err)
 		}
@@ -166,7 +166,7 @@ func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Addr
 	})
 	n.Unlock()
 	if n.gossip != nil {
-		return n.gossip.GossipBroadcast(entries)
+		return n.gossip.GossipBroadcast(&entries)
 	}
 	return nil
 }

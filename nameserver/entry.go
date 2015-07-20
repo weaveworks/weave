@@ -131,7 +131,7 @@ func (es *Entries) merge(incoming Entries) Entries {
 	return newEntries
 }
 
-func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) *Entries {
+func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) Entries {
 	es.checkAndPanic()
 	defer es.checkAndPanic()
 	tombstoned := Entries{}
@@ -143,7 +143,7 @@ func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) *Entr
 			tombstoned = append(tombstoned, e)
 		}
 	}
-	return &tombstoned
+	return tombstoned
 }
 
 func (es *Entries) filter(f func(*Entry) bool) {
