@@ -73,7 +73,7 @@ func (m mapping) Addrs() []address.Address {
 func TestNameservers(t *testing.T) {
 	//common.SetLogLevel("debug")
 
-	lookupTimeout := 20 // ms
+	lookupTimeout := 10 // ms
 	nameservers, grouter := makeNetwork(50)
 	defer stopNetwork(nameservers, grouter)
 	nameserversByName := map[router.PeerName]*Nameserver{}
@@ -173,10 +173,6 @@ func TestNameservers(t *testing.T) {
 	}
 
 	for i := 0; i < 1000; i++ {
-		if i%10 == 0 {
-			grouter.Flush()
-		}
-
 		r := rand.Float32()
 		switch {
 		case r < 0.1:
@@ -194,6 +190,8 @@ func TestNameservers(t *testing.T) {
 		case 0.9 <= r:
 			doReverseLookup()
 		}
+
+		grouter.Flush()
 	}
 }
 
