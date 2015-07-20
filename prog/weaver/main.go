@@ -55,6 +55,7 @@ func main() {
 		peerCount          int
 		apiPath            string
 		peers              []string
+		noDNS              bool
 		dnsDomain          string
 		dnsPort            int
 		dnsTTL             int
@@ -80,6 +81,7 @@ func main() {
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
 	mflag.StringVar(&apiPath, []string{"#api", "-api"}, "unix:///var/run/docker.sock", "Path to Docker API socket")
+	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
 	mflag.IntVar(&dnsPort, []string{"-dns-port"}, nameserver.DefaultPort, "port to listen on for DNS requests")
 	mflag.IntVar(&dnsTTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
@@ -169,21 +171,25 @@ func main() {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}
 
-	ns := nameserver.New(router.Ourself.Peer.Name, router.Peers, dockerCli, dnsDomain)
-	ns.SetGossip(router.NewGossip("nameserver", ns))
-	if err = dockerCli.AddObserver(ns); err != nil {
-		Log.Fatal("Unable to start watcher", err)
+	var (
+		ns        *nameserver.Nameserver
+		dnsserver *nameserver.DNSServer
+	)
+	if !noDNS {
+		ns = nameserver.New(router.Ourself.Peer.Name, router.Peers, dockerCli, dnsDomain)
+		ns.SetGossip(router.NewGossip("nameserver", ns))
+		if err = dockerCli.AddObserver(ns); err != nil {
+			Log.Fatal("Unable to start watcher", err)
+		}
+		ns.Start()
+		defer ns.Stop()
+		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsPort, uint32(dnsTTL), dnsClientTimeout)
+		if err != nil {
+			Log.Fatal("Unable to start dns server: ", err)
+		}
+		dnsserver.ActivateAndServe()
+		defer dnsserver.Stop()
 	}
-	ns.Start()
-	defer ns.Stop()
-
-	dnsserver, err := nameserver.NewDNSServer(ns, dnsDomain, dnsPort,
-		uint32(dnsTTL), dnsClientTimeout)
-	if err != nil {
-		Log.Fatal("Unable to start dns server: ", err)
-	}
-	dnsserver.ActivateAndServe()
-	defer dnsserver.Stop()
 
 	router.Start()
 	if errors := router.ConnectionMaker.InitiateConnections(peers, false); len(errors) > 0 {
@@ -305,7 +311,9 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 		allocator.HandleHTTP(muxRouter, defaultSubnet, docker)
 	}
 
-	ns.HandleHTTP(muxRouter)
+	if ns != nil {
+		ns.HandleHTTP(muxRouter)
+	}
 
 	muxRouter.Methods("GET").Path("/status").Headers("Accept", "application/json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json, _ := router.StatusJSON(version)
@@ -321,8 +329,12 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 			fmt.Fprintln(w, "Allocator default subnet:", defaultSubnet)
 		}
 		fmt.Fprintln(w, "")
-		fmt.Fprintln(w, dnsserver.String())
-		fmt.Fprintln(w, ns.String())
+		if dnsserver == nil {
+			fmt.Fprintln(w, "WeaveDNS is disabled")
+		} else {
+			fmt.Fprintln(w, dnsserver.String())
+			fmt.Fprintln(w, ns.String())
+		}
 	})
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

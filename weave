@@ -1028,6 +1028,7 @@ launch_router() {
     ARGS=""
     IPRANGE=
     IPRANGE_SPECIFIED=
+    DNS_PORT_MAPPING="-p $DOCKER_BRIDGE_IP:53:53/udp -p $DOCKER_BRIDGE_IP:53:53/tcp"
     while [ $# -gt 0 ] ; do
         case "$1" in
             -password|--password)
@@ -1058,6 +1059,10 @@ launch_router() {
                 IPRANGE="${1#*=}"
                 IPRANGE_SPECIFIED=1
                 ;;
+            --no-dns)
+                DNS_PORT_MAPPING=
+                ARGS="$ARGS $1"
+                ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
                 ;;
@@ -1077,8 +1082,7 @@ launch_router() {
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
     ROUTER_CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-        -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp \
-        -p $DOCKER_BRIDGE_IP:53:53/udp -p $DOCKER_BRIDGE_IP:53:53/tcp \
+        -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp $DNS_PORT_MAPPING \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
@@ -1089,12 +1093,14 @@ launch_router() {
         # Tell the newly-started weave IP allocator about existing weave IPs
         with_container_addresses ipam_claim weave:expose $(docker ps -q --no-trunc)
     fi
-    # Tell the newly-started weaveDNS about existing weave IPs
-    for CONTAINER in $(docker ps -q --no-trunc) ; do
-        if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
-            with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
-        fi
-    done
+    if [ -n "$DNS_PORT_MAPPING" ] ; then
+        # Tell the newly-started weaveDNS about existing weave IPs
+        for CONTAINER in $(docker ps -q --no-trunc) ; do
+            if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
+                with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
+            fi
+        done
+    fi
 }
 
 launch_proxy() {
