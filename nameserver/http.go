@@ -1,6 +1,7 @@
 package nameserver
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -82,4 +83,12 @@ func (n *Nameserver) HandleHTTP(router *mux.Router) {
 	router.Methods("DELETE").Path("/name/{container}/{ip}").HandlerFunc(deleteHandler)
 	router.Methods("DELETE").Path("/name/{container}").HandlerFunc(deleteHandler)
 	router.Methods("DELETE").Path("/name").HandlerFunc(deleteHandler)
+
+	router.Methods("GET").Path("/name").Headers("Accept", "application/json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n.RLock()
+		defer n.RUnlock()
+		if err := json.NewEncoder(w).Encode(n.entries); err != nil {
+			badRequest(w, fmt.Errorf("Error marshalling response: %v", err))
+		}
+	})
 }
