@@ -146,6 +146,9 @@ func (n *Nameserver) ContainerDied(ident string) {
 	}
 }
 
+func (n *Nameserver) ContainerDestroyed(ident string) {
+}
+
 func (n *Nameserver) PeerGone(peer *router.Peer) {
 	n.infof("peer gone %s", peer.String())
 	n.Lock()
