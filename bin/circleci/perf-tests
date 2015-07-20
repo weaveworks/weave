@@ -1,0 +1,69 @@
+#!/bin/sh
+
+IN_DIR=$SRCDIR/test/performance
+OUT_DIR=$CIRCLE_ARTIFACTS/
+
+export PERFORMANCE=1
+
+###########################################################################
+
+log()   { echo "$1" >&2 ;            }
+abort() { log "ABORT: $1" ; exit 0 ; }
+fatal() { log "FATAL: $1" ; exit 1 ; }
+
+[ -n "$CIRCLE_NODE_INDEX"  ] || fatal "No CIRCLE_NODE_INDEX defined"
+[ $CIRCLE_NODE_INDEX -eq 0 ] || abort "Not executing in CircleCI node $CIRCLE_NODE_INDEX"
+
+case "$1" in
+	pre)
+		log "Installing dependencies..."
+		sudo pip install plotly
+		sudo pip install requests
+	;;
+
+    start)
+		[ -z "$SRCDIR" ] && abort "No SRCDIR defined"
+
+		cd $SRCDIR/test
+		eval $(./gce.sh hosts)
+		$SRCDIR/test/run_all.sh $SRCDIR/test/*_perf.sh
+    ;;
+
+    stop)
+    ;;
+
+    post)
+		[ -n "$CIRCLE_ARTIFACTS" ] || fatal "no artifacts folder in environment"
+		[ -n "$PLOTLY_USERNAME" ]  || fatal "no PlotLy user name in environment"
+		[ -n "$PLOTLY_API_KEY" ]   || fatal "no PlotLy API key in environment"
+		[ -d $IN_DIR ]             || abort "no performance directory found"
+		[ -d $OUT_DIR ]            || { log "creating $OUT_DIR" ; mkdir -p $OUT_DIR ; }
+
+		log "Processing performance logs in $IN_DIR"
+		for csv_file in $IN_DIR/*.csv ; do
+		    [ -f $csv_file ] || continue
+
+		    name=$(basename $csv_file .csv)
+		    name_wo_ext=$(basename $csv_file)
+
+		    log "Generating graph for $name_wo_ext [branch: $CIRCLE_BRANCH]"
+		    $SRCDIR/bin/circleci/do-perf-graphs.py \
+		        --branch $CIRCLE_BRANCH \
+		        --plot-username $PLOTLY_USERNAME \
+		        --plot-key $PLOTLY_API_KEY \
+		        --plot-name $name \
+		        --num $PERF_GRAPH_HISTORY \
+		        --log debug \
+		        --local-build-num $CIRCLE_BUILD_NUM \
+		        --plot-save-to $OUT_DIR/$name.png \
+		        --pattern $name_wo_ext \
+		        --num $PERF_GRAPH_HISTORY "$csv_file"
+
+		    log "Copying CSV file"
+		    cp $csv_file $OUT_DIR/
+		done
+    ;;
+esac
+
+exit 0
+
