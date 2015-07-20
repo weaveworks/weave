@@ -46,9 +46,9 @@ DOCKER_PORT=2375
 upload_executable() {
     host=$1
     file=$2
-    prefix=${3:-/usr/local/bin/}
-    suffix=$(basename "$file")
-    target="$prefix$suffix"
+    target=${3:-/usr/local/bin/$(basename "$file")}
+    dir=$(dirname "$target")
+    run_on $host "[ -e '$dir' ] || sudo mkdir -p '$dir'"
     [ -z "$DEBUG" ] || greyly echo "Uploading to $host: $file -> $target" >&2
     <"$file" remote $host $SSH $host sh -c "cat | sudo tee $target >/dev/null"
     run_on $host "sudo chmod a+x $target"
