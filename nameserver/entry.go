@@ -131,6 +131,7 @@ func (es *Entries) merge(incoming Entries) Entries {
 	return newEntries
 }
 
+// f returning true means keep the entry.
 func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) Entries {
 	es.checkAndPanic()
 	defer es.checkAndPanic()

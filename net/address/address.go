@@ -90,6 +90,10 @@ func (addr Address) IP4() (r net.IP) {
 	return
 }
 
+func (addr Address) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%q", addr.String())), nil
+}
+
 func (addr Address) String() string {
 	return addr.IP4().String()
 }
