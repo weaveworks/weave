@@ -980,7 +980,7 @@ proxy_args() {
 }
 
 proxy_addr() {
-    if addr=$(docker logs $PROXY_CONTAINER_NAME 2>&1 | head -n3 | grep -oE "proxy listening on .*"); then
+    if addr=$(docker logs $PROXY_CONTAINER_NAME 2>&1 | head -n4 | grep -oE "proxy listening on .*"); then
       echo "${1}${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
     else
       echo  "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
