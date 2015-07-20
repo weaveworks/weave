@@ -176,7 +176,7 @@ func (n *Nameserver) deleteTombstones() {
 	defer n.Unlock()
 	now := time.Now().Unix()
 	n.entries.filter(func(e *Entry) bool {
-		return now-e.Tombstone <= int64(tombstoneTimeout/time.Second)
+		return e.Tombstone == 0 || now-e.Tombstone <= int64(tombstoneTimeout/time.Second)
 	})
 }
 

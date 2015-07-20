@@ -230,6 +230,9 @@ func TestTombstoneDeletion(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
+	nameserver.deleteTombstones()
+	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
+
 	err = nameserver.Delete("hostname", "containerid", "", address.Address(0))
 	require.Nil(t, err)
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
