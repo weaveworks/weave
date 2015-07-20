@@ -143,7 +143,7 @@ func TestAllocatorClaim(t *testing.T) {
 	addr1, _ := address.ParseIP(testAddr1)
 
 	// First claim should trigger "dunno, I'm going to wait"
-	err := alloc.Claim(container3, addr1)
+	err := alloc.Claim(container3, addr1, true)
 	require.NoError(t, err)
 
 	// Do one allocate to ensure paxos is all done
@@ -152,23 +152,23 @@ func TestAllocatorClaim(t *testing.T) {
 	addrx, err := allocs[0].Allocate(container1, subnet, nil)
 
 	// Now try the claim again
-	err = alloc.Claim(container3, addr1)
+	err = alloc.Claim(container3, addr1, true)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
 	addr3, _ := alloc.Allocate(container3, subnet, nil)
 	require.Equal(t, testAddr1, addr3.String(), "address")
 	// one more claim should still work
-	err = alloc.Claim(container3, addr1)
+	err = alloc.Claim(container3, addr1, true)
 	require.NoError(t, err)
 	// claim for a different container should fail
-	err = alloc.Claim(container1, addr1)
+	err = alloc.Claim(container1, addr1, true)
 	require.Error(t, err)
 	// claiming the address allocated on the other peer should fail
-	err = alloc.Claim(container1, addrx)
+	err = alloc.Claim(container1, addrx, true)
 	require.Error(t, err, "claiming address allocated on other peer should fail")
 	// Check an address outside of our universe
 	addr2, _ := address.ParseIP(testAddr2)
-	err = alloc.Claim(container1, addr2)
+	err = alloc.Claim(container1, addr2, true)
 	require.NoError(t, err)
 }
 
@@ -465,7 +465,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		addressIndex := rand.Int31n(int32(subnet.Size()))
 		alloc := allocs[allocIndex]
 		addr := address.Add(subnet.Start, address.Offset(addressIndex))
-		err := alloc.Claim(name, addr)
+		err := alloc.Claim(name, addr, true)
 		if err == nil {
 			noteAllocation(allocIndex, name, addr)
 		}

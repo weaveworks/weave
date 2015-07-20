@@ -12,6 +12,7 @@ type claim struct {
 	resultChan chan<- error
 	ident      string
 	addr       address.Address
+	reclaim    bool
 }
 
 func (c *claim) sendResult(result error) {
@@ -20,6 +21,7 @@ func (c *claim) sendResult(result error) {
 		c.resultChan <- result
 		close(c.resultChan)
 		c.resultChan = nil
+		return
 	}
 	if result != nil {
 		common.Log.Errorln("[allocator] " + result.Error())
@@ -30,7 +32,9 @@ func (c *claim) sendResult(result error) {
 func (c *claim) Try(alloc *Allocator) bool {
 	if !alloc.ring.Contains(c.addr) {
 		// Address not within our universe; assume user knows what they are doing
-		alloc.infof("Ignored address %s claimed by %s - not in our universe", c.addr, c.ident)
+		if c.reclaim {
+			alloc.infof("Ignored address %s claimed by %s - not in our universe", c.addr, c.ident)
+		}
 		c.sendResult(nil)
 		return true
 	}
@@ -40,15 +44,23 @@ func (c *claim) Try(alloc *Allocator) bool {
 		// success
 	case router.UnknownPeerName:
 		// If our ring doesn't know, it must be empty.
-		alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.addr, c.ident)
-		c.sendResult(nil) // don't make the caller wait
+		if c.reclaim {
+			alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.addr, c.ident)
+			c.sendResult(nil) // don't make the caller wait
+		} else {
+			c.sendResult(fmt.Errorf("%s is in the range %s, but the allocator is not initialized yet", c.addr, alloc.universe.AsCIDRString()))
+		}
 		return false
 	default:
 		alloc.debugf("requesting address %s from other peer %s", c.addr, owner)
 		err := alloc.sendSpaceRequest(owner, address.NewRange(c.addr, 1))
-		if err != nil { // can't speak to owner right now; figure it out later
-			alloc.infof("Claim %s for %s: %s; will try later.", c.addr, c.ident, err)
-			c.sendResult(nil)
+		if err != nil { // can't speak to owner right now
+			if c.reclaim { // don't hold up launch; figure it out later
+				alloc.infof("Claim %s for %s: %s; will try later.", c.addr, c.ident, err)
+				c.sendResult(nil)
+			} else { // just tell the user they can't do this.
+				c.DeniedBy(alloc, owner)
+			}
 		}
 		return false
 	}
