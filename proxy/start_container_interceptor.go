@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -10,6 +10,15 @@ import (
 )
 
 type startContainerInterceptor struct{ proxy *Proxy }
+
+func callWeaveAndLog(container *docker.Container, description string, args ...string) error {
+	if _, stderr, err := callWeave(args...); err != nil {
+		return fmt.Errorf("Failed: %s container %s: %s", description, container.ID, string(stderr))
+	} else if len(stderr) > 0 {
+		Log.Warningf("%s container %s: %s", description, container.ID, string(stderr))
+	}
+	return nil
+}
 
 func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 	return nil
@@ -30,11 +39,8 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 	args := []string{"attach"}
 	args = append(args, cidrs...)
 	args = append(args, "--or-die", container.ID)
-	if _, stderr, err := callWeave(args...); err != nil {
-		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
-		return errors.New(string(stderr))
-	} else if len(stderr) > 0 {
-		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
+	if err := callWeaveAndLog(container, "Attaching to weave network", args...); err != nil {
+		return err
 	}
 
 	return i.proxy.client.KillContainer(docker.KillContainerOptions{ID: container.ID, Signal: docker.SIGUSR2})
