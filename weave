@@ -1362,6 +1362,12 @@ case "$COMMAND" in
         done
         show_addrs $ALL_CIDRS
         ;;
+    notify-restart)
+        [ $# -eq 1 ] || usage
+        if CONTAINER=$(container_id $1) 2>/dev/null ; then
+            call_weave POST /ip/restarting/$CONTAINER 2>/dev/null || true
+        fi
+        ;;
     dns-add)
         collect_ip_args "$@"
         shift $IP_COUNT
