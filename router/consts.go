@@ -25,6 +25,7 @@ const (
 	MaxDuration         = time.Duration(math.MaxInt64)
 	MaxMissedHeartbeats = 6
 	HeartbeatTimeout    = MaxMissedHeartbeats * SlowHeartbeat
+	MaxTCPMsgSize       = 10 * 1024 * 1024
 )
 
 var (

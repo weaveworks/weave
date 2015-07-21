@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/andybalholm/go-bit"
@@ -332,28 +333,48 @@ type TCPSender interface {
 	Send([]byte) error
 }
 
-type SimpleTCPSender struct {
+type GobTCPSender struct {
 	encoder *gob.Encoder
 }
 
+type LengthPrefixTCPSender struct {
+	writer io.Writer
+}
+
 type EncryptedTCPSender struct {
-	SimpleTCPSender
 	sync.RWMutex
-	state *TCPCryptoState
+	sender TCPSender
+	state  *TCPCryptoState
 }
 
-func NewSimpleTCPSender(encoder *gob.Encoder) *SimpleTCPSender {
-	return &SimpleTCPSender{encoder: encoder}
+func NewGobTCPSender(encoder *gob.Encoder) *GobTCPSender {
+	return &GobTCPSender{encoder: encoder}
 }
 
-func (sender *SimpleTCPSender) Send(msg []byte) error {
+func (sender *GobTCPSender) Send(msg []byte) error {
 	return sender.encoder.Encode(msg)
 }
 
-func NewEncryptedTCPSender(encoder *gob.Encoder, sessionKey *[32]byte, outbound bool) *EncryptedTCPSender {
-	return &EncryptedTCPSender{
-		SimpleTCPSender: *NewSimpleTCPSender(encoder),
-		state:           NewTCPCryptoState(sessionKey, outbound)}
+func NewLengthPrefixTCPSender(writer io.Writer) *LengthPrefixTCPSender {
+	return &LengthPrefixTCPSender{writer: writer}
+}
+
+func (sender *LengthPrefixTCPSender) Send(msg []byte) error {
+	l := len(msg)
+	if l > MaxTCPMsgSize {
+		return fmt.Errorf("outgoing message exceeds maximum size: %d > %d", l, MaxTCPMsgSize)
+	}
+	// We copy the message so we can send it in a single Write
+	// operation, thus making this thread-safe without locking.
+	prefixedMsg := make([]byte, 4+l)
+	binary.BigEndian.PutUint32(prefixedMsg, uint32(l))
+	copy(prefixedMsg[4:], msg)
+	_, err := sender.writer.Write(prefixedMsg)
+	return err
+}
+
+func NewEncryptedTCPSender(sender TCPSender, sessionKey *[32]byte, outbound bool) *EncryptedTCPSender {
+	return &EncryptedTCPSender{sender: sender, state: NewTCPCryptoState(sessionKey, outbound)}
 }
 
 func (sender *EncryptedTCPSender) Send(msg []byte) error {
@@ -361,40 +382,60 @@ func (sender *EncryptedTCPSender) Send(msg []byte) error {
 	defer sender.Unlock()
 	encodedMsg := secretbox.Seal(nil, msg, &sender.state.nonce, sender.state.sessionKey)
 	sender.state.advance()
-	return sender.SimpleTCPSender.Send(encodedMsg)
+	return sender.sender.Send(encodedMsg)
 }
 
 type TCPReceiver interface {
 	Receive() ([]byte, error)
 }
 
-type SimpleTCPReceiver struct {
+type GobTCPReceiver struct {
 	decoder *gob.Decoder
 }
 
+type LengthPrefixTCPReceiver struct {
+	reader io.Reader
+}
+
 type EncryptedTCPReceiver struct {
-	SimpleTCPReceiver
-	state *TCPCryptoState
+	receiver TCPReceiver
+	state    *TCPCryptoState
 }
 
-func NewSimpleTCPReceiver(decoder *gob.Decoder) *SimpleTCPReceiver {
-	return &SimpleTCPReceiver{decoder: decoder}
+func NewGobTCPReceiver(decoder *gob.Decoder) *GobTCPReceiver {
+	return &GobTCPReceiver{decoder: decoder}
 }
 
-func (receiver *SimpleTCPReceiver) Receive() ([]byte, error) {
+func (receiver *GobTCPReceiver) Receive() ([]byte, error) {
 	var msg []byte
 	err := receiver.decoder.Decode(&msg)
 	return msg, err
 }
 
-func NewEncryptedTCPReceiver(decoder *gob.Decoder, sessionKey *[32]byte, outbound bool) *EncryptedTCPReceiver {
-	return &EncryptedTCPReceiver{
-		SimpleTCPReceiver: *NewSimpleTCPReceiver(decoder),
-		state:             NewTCPCryptoState(sessionKey, !outbound)}
+func NewLengthPrefixTCPReceiver(reader io.Reader) *LengthPrefixTCPReceiver {
+	return &LengthPrefixTCPReceiver{reader: reader}
+}
+
+func (receiver *LengthPrefixTCPReceiver) Receive() ([]byte, error) {
+	lenPrefix := make([]byte, 4)
+	if _, err := io.ReadFull(receiver.reader, lenPrefix); err != nil {
+		return nil, err
+	}
+	l := binary.BigEndian.Uint32(lenPrefix)
+	if l > MaxTCPMsgSize {
+		return nil, fmt.Errorf("incoming message exceeds maximum size: %d > %d", l, MaxTCPMsgSize)
+	}
+	msg := make([]byte, l)
+	_, err := io.ReadFull(receiver.reader, msg)
+	return msg, err
+}
+
+func NewEncryptedTCPReceiver(receiver TCPReceiver, sessionKey *[32]byte, outbound bool) *EncryptedTCPReceiver {
+	return &EncryptedTCPReceiver{receiver: receiver, state: NewTCPCryptoState(sessionKey, !outbound)}
 }
 
 func (receiver *EncryptedTCPReceiver) Receive() ([]byte, error) {
-	msg, err := receiver.SimpleTCPReceiver.Receive()
+	msg, err := receiver.receiver.Receive()
 	if err != nil {
 		return nil, err
 	}

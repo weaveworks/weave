@@ -180,12 +180,13 @@ func (res *ProtocolIntroResults) doIntroV1(params ProtocolIntroParams, pubKey, p
 		return err
 	}
 
+	res.Sender = NewGobTCPSender(enc)
+	res.Receiver = NewGobTCPReceiver(dec)
+
 	if pubKey == nil {
 		if _, present := res.Features["PublicKey"]; present {
 			return ErrExpectedNoCrypto
 		}
-
-		res.setupNoCrypto(enc, dec)
 	} else {
 		remotePubKeyStr, ok := res.Features["PublicKey"]
 		if !ok {
@@ -197,7 +198,7 @@ func (res *ProtocolIntroResults) doIntroV1(params ProtocolIntroParams, pubKey, p
 			return err
 		}
 
-		res.setupCrypto(params, enc, dec, remotePubKey, privKey)
+		res.setupCrypto(params, remotePubKey, privKey)
 	}
 
 	res.Features = filterV1Features(res.Features)
@@ -227,12 +228,11 @@ func filterV1Features(intro map[string]string) map[string]string {
 // - When the connection is encrypted, 32 bytes follow containing the
 // public key.
 //
-// - Then a stream of gobified values.
+// - Then a stream of length-prefixed messages, which are encrypted
+// for an encrypted connection.
 //
-// The gobified values are the messages on the connection (encrypted
-// for an encrypted connection).  The first message contains the
-// encoded features map (so in contrast to V1, it will be encrypted on
-// an encrypted connection).
+// The first message contains the encoded features map (so in contrast
+// to V1, it will be encrypted on an encrypted connection).
 func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, privKey *[32]byte) error {
 	// Public key exchange
 	var wbuf []byte
@@ -265,7 +265,8 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return ErrExpectedCrypto
 		}
 
-		res.setupNoCrypto(gob.NewEncoder(params.Conn), gob.NewDecoder(params.Conn))
+		res.Sender = NewLengthPrefixTCPSender(params.Conn)
+		res.Receiver = NewLengthPrefixTCPReceiver(params.Conn)
 
 	case 1:
 		if pubKey == nil {
@@ -277,7 +278,9 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 			return err
 		}
 
-		res.setupCrypto(params, gob.NewEncoder(params.Conn), gob.NewDecoder(params.Conn), rbuf, privKey)
+		res.Sender = NewLengthPrefixTCPSender(params.Conn)
+		res.Receiver = NewLengthPrefixTCPReceiver(params.Conn)
+		res.setupCrypto(params, rbuf, privKey)
 
 	default:
 		return fmt.Errorf("Bad encryption flag %d", rbuf[0])
@@ -314,18 +317,12 @@ func (res *ProtocolIntroResults) doIntroV2(params ProtocolIntroParams, pubKey, p
 	return nil
 }
 
-func (res *ProtocolIntroResults) setupNoCrypto(enc *gob.Encoder, dec *gob.Decoder) {
-	res.Sender = NewSimpleTCPSender(enc)
-	res.Receiver = NewSimpleTCPReceiver(dec)
-}
-
-func (res *ProtocolIntroResults) setupCrypto(params ProtocolIntroParams,
-	enc *gob.Encoder, dec *gob.Decoder, remotePubKey []byte, privKey *[32]byte) {
+func (res *ProtocolIntroResults) setupCrypto(params ProtocolIntroParams, remotePubKey []byte, privKey *[32]byte) {
 	var remotePubKeyArr [32]byte
 	copy(remotePubKeyArr[:], remotePubKey)
 	res.SessionKey = FormSessionKey(&remotePubKeyArr, privKey, params.Password)
-	res.Sender = NewEncryptedTCPSender(enc, res.SessionKey, params.Outbound)
-	res.Receiver = NewEncryptedTCPReceiver(dec, res.SessionKey, params.Outbound)
+	res.Sender = NewEncryptedTCPSender(res.Sender, res.SessionKey, params.Outbound)
+	res.Receiver = NewEncryptedTCPReceiver(res.Receiver, res.SessionKey, params.Outbound)
 }
 
 type ProtocolTag byte
