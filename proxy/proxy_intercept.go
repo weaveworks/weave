@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strconv"
+	"sync"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -107,25 +108,30 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 		return
 	}
 
-	upDone := make(chan struct{})
-	downDone := make(chan struct{})
-	go copyStream(down, io.MultiReader(remaining, up), upDone)
-	go copyStream(up, downBuf, downDone)
-	<-upDone
-	<-downDone
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go copyStream(down, io.MultiReader(remaining, up), &wg)
+	go copyStream(up, downBuf, &wg)
+	wg.Wait()
 }
 
-func copyStream(dst io.Writer, src io.Reader, done chan struct{}) {
-	defer close(done)
+type closeWriter interface {
+	CloseWrite() error
+}
+
+func copyStream(dst io.WriteCloser, src io.Reader, wg *sync.WaitGroup) {
+	defer wg.Done()
 	if _, err := io.Copy(dst, src); err != nil {
 		Log.Warning(err)
 	}
-	if c, ok := dst.(interface {
-		CloseWrite() error
-	}); ok {
-		if err := c.CloseWrite(); err != nil {
-			Log.Warningf("Error closing connection: %s", err)
-		}
+	var err error
+	if c, ok := dst.(closeWriter); ok {
+		err = c.CloseWrite()
+	} else {
+		err = dst.Close()
+	}
+	if err != nil {
+		Log.Warningf("Error closing connection: %s", err)
 	}
 }
 
