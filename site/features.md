@@ -118,6 +118,25 @@ IP addresses of external services the hosts or containers need to
 connect to. The same IP range must be used everywhere, and the
 individual IP addresses must, of course, be unique.
 
+If you restart a container, it will retain the same IP addresses on
+the weave network:
+
+    host1$ docker run --name a1 -tdi ubuntu
+    f76b09a9fcfee04551dbb8d951d9a83e7e7d55126b02fd9f44f9f8a5f07d7c96
+    host1$ weave ps a1
+    a1 1e:dc:2a:db:ef:ff 10.32.0.3/12
+    host1$ docker restart a1
+    host1$ weave ps a1
+    a1 16:c0:6f:5d:c5:73 10.32.0.3/12
+
+There is also a `weave restart` command, if you are not using the
+weave Docker API proxy:
+
+    host1$ weave restart b1
+
+Note that if Docker restarts a container under a restart policy it
+will not be re-attached to the weave network.
+
 ### <a name="naming-and-discovery"></a>Naming and discovery
 
 Named containers are automatically registered in
