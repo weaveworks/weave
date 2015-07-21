@@ -25,4 +25,7 @@ assert "entrypoint c2" "$(entrypoint $COMMITTED_IMAGE)"
 docker_on $HOST1 run -dit --name c3 $SMALL_IMAGE /bin/sh
 assert_raises "proxy docker_on $HOST1 exec c3 true"
 
+# Check we can't modify weavewait
+assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.2/24' $BASE_IMAGE touch /w/w" 1
+
 end_suite
