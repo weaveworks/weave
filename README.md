@@ -45,7 +45,7 @@ capabilities, so these can continue to be used by containers.
 Ensure you are running Linux (kernel 3.8 or later) and have Docker
 (version 1.3.1 or later) installed. Then install weave with
 
-    sudo curl -L git.io/weave -O /usr/local/bin/weave
+    sudo curl -L git.io/weave -o /usr/local/bin/weave
     sudo chmod a+x /usr/local/bin/weave
 
 CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing weave using cloud-config.
