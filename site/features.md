@@ -64,6 +64,10 @@ or
 [remote API](https://docs.docker.com/reference/api/docker_remote_api/)
 are attached to the weave network before they begin execution.
 
+Containers started in this way that subsequently restart, either by an
+explicit `docker restart` command or by Docker restart policy, are
+re-attached to the weave network by the weave Docker API proxy.
+
 ### <a name="addressing"></a>Address allocation
 
 Containers are automatically allocated an IP address that is unique
@@ -247,6 +251,9 @@ invocation:
     10.2.1.3 10.2.2.3 10.2.3.1
     host1$ weave detach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
     10.2.1.3 10.2.2.3 10.2.3.1
+
+Note that addresses added by dynamic attachment are not re-attached
+if the container restarts.
 
 ### <a name="security"></a>Security
 

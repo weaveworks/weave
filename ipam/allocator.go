@@ -226,6 +226,8 @@ func (alloc *Allocator) ContainerDied(ident string) {
 	}
 }
 
+func (alloc *Allocator) ContainerStarted(ident string) {}
+
 // Delete (Sync) - release all IP addresses for container with given name
 func (alloc *Allocator) Delete(ident string) error {
 	errChan := make(chan error)
