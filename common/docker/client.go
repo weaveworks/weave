@@ -8,6 +8,7 @@ import (
 // An observer for container events
 type ContainerObserver interface {
 	ContainerDied(ident string)
+	ContainerDestroyed(ident string)
 }
 
 type Client struct {
@@ -44,6 +45,8 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 			case "die":
 				id := event.ID
 				ob.ContainerDied(id)
+			case "destroy":
+				ob.ContainerDestroyed(event.ID)
 			}
 		}
 	}()

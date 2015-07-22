@@ -103,6 +103,11 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		fmt.Fprintf(w, "%s/%d", newAddr, defaultSubnet.PrefixLen)
 	})
 
+	router.Methods("POST").Path("/ip/restarting/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ident := mux.Vars(r)["id"]
+		alloc.NotifyRestart(ident)
+	})
+
 	router.Methods("DELETE").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		ident := vars["id"]

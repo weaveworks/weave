@@ -27,6 +27,10 @@ start_container $HOST2 net:$SUBNET_2 --name=c6
 C6=$(container_ip $HOST2 c6)
 assert_raises "exec_on $HOST1 c5 $PING $C6"
 
+# check that restart retains the same IP
+weave_on $HOST2 restart c6
+assert_raises "exec_on $HOST1 c5 $PING $C6"
+
 # check large packets get through. The first attempt typically fails,
 # since the PMTU hasn't been discovered yet. The 2nd attempt should
 # succeed.

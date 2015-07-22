@@ -50,6 +50,7 @@ type Allocator struct {
 	ring             *ring.Ring                   // information on ranges owned by all peers
 	space            space.Space                  // more detail on ranges owned by us
 	owned            map[string][]address.Address // who owns what addresses, indexed by container-ID
+	restarting       map[string]struct{}          // containers restarting, by ID
 	nicknames        map[router.PeerName]string   // so we can map nicknames for rmpeer
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
@@ -63,13 +64,14 @@ type Allocator struct {
 // NewAllocator creates and initialises a new Allocator
 func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint) *Allocator {
 	return &Allocator{
-		ourName:   ourName,
-		universe:  universe,
-		ring:      ring.New(universe.Start, universe.End, ourName),
-		owned:     make(map[string][]address.Address),
-		paxos:     paxos.NewNode(ourName, ourUID, quorum),
-		nicknames: map[router.PeerName]string{ourName: ourNickname},
-		now:       time.Now,
+		ourName:    ourName,
+		universe:   universe,
+		ring:       ring.New(universe.Start, universe.End, ourName),
+		owned:      make(map[string][]address.Address),
+		restarting: make(map[string]struct{}),
+		paxos:      paxos.NewNode(ourName, ourUID, quorum),
+		nicknames:  map[router.PeerName]string{ourName: ourNickname},
+		now:        time.Now,
 	}
 }
 
@@ -222,10 +224,35 @@ func (alloc *Allocator) Claim(ident string, addr address.Address) error {
 	return <-resultChan
 }
 
-// ContainerDied is provided to satisfy the updater interface; does a 'Delete' underneath.  Sync.
+// Note that a container is restarting, so we don't clear down its address. Async.
+func (alloc *Allocator) NotifyRestart(ident string) {
+	alloc.actionChan <- func() {
+		alloc.debugln("Notified of restart for container", ident)
+		alloc.restarting[ident] = struct{}{}
+	}
+}
+
+// ContainerDied is called from the updater interface; does a 'delete' underneath.  Async.
 func (alloc *Allocator) ContainerDied(ident string) {
-	if err := alloc.Delete(ident); err == nil {
-		alloc.debugln("Container", ident, "died; released addresses")
+	alloc.actionChan <- func() {
+		if _, found := alloc.restarting[ident]; found {
+			alloc.debugln("Container", ident, "restarting; retaining address")
+			delete(alloc.restarting, ident)
+			return
+		}
+		if err := alloc.delete(ident); err == nil {
+			alloc.debugln("Container", ident, "died; released addresses")
+		}
+	}
+}
+
+// Called from the updater interface.  Async.
+func (alloc *Allocator) ContainerDestroyed(ident string) {
+	alloc.actionChan <- func() {
+		if _, found := alloc.restarting[ident]; found {
+			delete(alloc.restarting, ident)
+			alloc.delete(ident)
+		}
 	}
 }
 
@@ -233,23 +260,26 @@ func (alloc *Allocator) ContainerDied(ident string) {
 func (alloc *Allocator) Delete(ident string) error {
 	errChan := make(chan error)
 	alloc.actionChan <- func() {
-		addrs, found := alloc.owned[ident]
-		for _, addr := range addrs {
-			alloc.space.Free(addr)
-		}
-		delete(alloc.owned, ident)
-
-		// Also remove any pending ops
-		found = alloc.cancelOpsFor(&alloc.pendingAllocates, ident) || found
-		found = alloc.cancelOpsFor(&alloc.pendingClaims, ident) || found
-
-		if !found {
-			errChan <- fmt.Errorf("Delete: no addresses for %s", ident)
-			return
-		}
-		errChan <- nil
+		errChan <- alloc.delete(ident)
 	}
 	return <-errChan
+}
+
+func (alloc *Allocator) delete(ident string) error {
+	addrs, found := alloc.owned[ident]
+	for _, addr := range addrs {
+		alloc.space.Free(addr)
+	}
+	delete(alloc.owned, ident)
+
+	// Also remove any pending ops
+	found = alloc.cancelOpsFor(&alloc.pendingAllocates, ident) || found
+	found = alloc.cancelOpsFor(&alloc.pendingClaims, ident) || found
+
+	if !found {
+		return fmt.Errorf("Delete: no addresses for %s", ident)
+	}
+	return nil
 }
 
 // Free (Sync) - release single IP address for container
