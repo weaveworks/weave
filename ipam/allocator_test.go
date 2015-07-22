@@ -313,7 +313,7 @@ func TestFakeRouterSimple(t *testing.T) {
 func TestAllocatorFuzz(t *testing.T) {
 	const (
 		firstpass    = 1000
-		secondpass   = 20000
+		secondpass   = 10000
 		nodes        = 10
 		maxAddresses = 1000
 		concurrency  = 30
