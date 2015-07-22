@@ -4,7 +4,7 @@ set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SLOW=${SLOW-}
-GO_TEST_ARGS="-tags netgo -cpu 4 -timeout 2m"
+GO_TEST_ARGS="-tags netgo -cpu 4 -timeout 8m"
 if [ -n "$SLOW" -o "$1" = "-slow" ]; then
     GO_TEST_ARGS="$GO_TEST_ARGS -race -covermode=atomic"
 
