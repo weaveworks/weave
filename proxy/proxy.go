@@ -93,6 +93,15 @@ func NewProxy(c Config) (*Proxy, error) {
 	return p, nil
 }
 
+func (proxy *Proxy) AttachExistingContainers() {
+	containers, _ := proxy.client.ListContainers(docker.ListContainersOptions{})
+	for _, cont := range containers {
+		if strings.HasPrefix(cont.Command, weaveWaitEntrypoint[0]) {
+			proxy.ContainerStarted(cont.ID)
+		}
+	}
+}
+
 func (proxy *Proxy) Dial() (net.Conn, error) {
 	return net.Dial("unix", dockerSock)
 }
@@ -131,7 +140,7 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxy.Intercept(i, w, r)
 }
 
-func (proxy *Proxy) ListenAndServe() {
+func (proxy *Proxy) Listen() []net.Listener {
 	listeners := []net.Listener{}
 	addrs := []string{}
 	for _, addr := range proxy.ListenAddrs {
@@ -146,7 +155,10 @@ func (proxy *Proxy) ListenAndServe() {
 	for _, addr := range addrs {
 		Log.Infoln("proxy listening on", addr)
 	}
+	return listeners
+}
 
+func (proxy *Proxy) Serve(listeners []net.Listener) {
 	errs := make(chan error)
 	for _, listener := range listeners {
 		go func(listener net.Listener) {
