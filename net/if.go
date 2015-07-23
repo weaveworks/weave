@@ -2,30 +2,24 @@ package net
 
 import (
 	"fmt"
-	"math"
 	"net"
-	"time"
+	"syscall"
+
+	"github.com/vishvananda/netlink/nl"
 )
 
-const (
-	sleepTime = 100 * time.Millisecond
-)
-
-// Wait `wait` seconds for an interface to come up. Pass zero to check once
-// and return immediately, or a negative value to wait indefinitely.
-func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
-	if iface, err = findInterface(ifaceName); err == nil || wait == 0 {
-		return
+// Wait for an interface to come up.
+func EnsureInterface(ifaceName string) (*net.Interface, error) {
+	s, err := nl.Subscribe(syscall.NETLINK_ROUTE, syscall.RTNLGRP_LINK)
+	if err != nil {
+		return nil, err
 	}
-	i := int64(math.MaxInt64)
-	if wait > 0 {
-		i = int64(time.Duration(wait) * time.Second / sleepTime)
+	defer s.Close()
+	if iface, err := findInterface(ifaceName); err == nil {
+		return iface, nil
 	}
-	for ; err != nil && i > 0; i-- {
-		time.Sleep(sleepTime)
-		iface, err = findInterface(ifaceName)
-	}
-	return
+	waitForIfUp(s, ifaceName)
+	return findInterface(ifaceName)
 }
 
 func findInterface(ifaceName string) (iface *net.Interface, err error) {
@@ -36,4 +30,32 @@ func findInterface(ifaceName string) (iface *net.Interface, err error) {
 		return iface, fmt.Errorf("Interface %s is not up", ifaceName)
 	}
 	return
+}
+
+func waitForIfUp(s *nl.NetlinkSocket, ifaceName string) error {
+	for {
+		msgs, err := s.Receive()
+		if err != nil {
+			return err
+		}
+		for _, m := range msgs {
+			switch m.Header.Type {
+			case syscall.RTM_NEWLINK: // receive this type for link 'up'
+				ifmsg := nl.DeserializeIfInfomsg(m.Data)
+				attrs, err := syscall.ParseNetlinkRouteAttr(&m)
+				if err != nil {
+					return err
+				}
+				name := ""
+				for _, attr := range attrs {
+					if attr.Attr.Type == syscall.IFA_LABEL {
+						name = string(attr.Value[:len(attr.Value)-1])
+					}
+				}
+				if ifaceName == name && ifmsg.Flags&syscall.IFF_UP != 0 {
+					return nil
+				}
+			}
+		}
+	}
 }

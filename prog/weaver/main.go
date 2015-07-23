@@ -43,7 +43,6 @@ func main() {
 		routerName         string
 		nickName           string
 		password           string
-		wait               int
 		pktdebug           bool
 		logLevel           string
 		prof               string
@@ -71,7 +70,6 @@ func main() {
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
 	mflag.StringVar(&password, []string{"#password", "-password"}, "", "network password")
-	mflag.IntVar(&wait, []string{"#wait", "-wait"}, -1, "number of seconds to wait for interface to come up (0=don't wait, -1=wait forever)")
 	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
 	mflag.BoolVar(&pktdebug, []string{"#pktdebug", "#-pktdebug", "-pkt-debug"}, false, "enable per-packet debug logging")
 	mflag.StringVar(&prof, []string{"#profile", "-profile"}, "", "enable profiling and write profiles to given path")
@@ -118,7 +116,7 @@ func main() {
 	var err error
 
 	if ifaceName != "" {
-		config.Iface, err = weavenet.EnsureInterface(ifaceName, wait)
+		config.Iface, err = weavenet.EnsureInterface(ifaceName)
 		if err != nil {
 			Log.Fatal(err)
 		}

@@ -35,7 +35,7 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		Log.Infof("Leaving container %s alone because %s", container.ID, err)
 	} else if hasWeaveWait {
 		Log.Infof("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
-		cmd := append(weaveWaitEntrypoint, "-s")
+		cmd := weaveWaitEntrypoint
 		options.Cmd = append(cmd, options.Cmd...)
 	}
 

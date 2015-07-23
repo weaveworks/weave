@@ -74,7 +74,8 @@ $(NETCHECK_EXE): prog/netcheck/netcheck.go
 # Sigproxy and weavewait need separate rules as they fail the netgo check in
 # the main build stanza due to not importing net package
 $(SIGPROXY_EXE): prog/sigproxy/main.go
-$(WEAVEWAIT_EXE): prog/weavewait/main.go
+$(WEAVEWAIT_EXE): prog/weavewait/main.go net/*.go
+$(WEAVEHOSTS_EXE): prog/weavehosts/weavehosts.go
 $(COVER_EXE): testing/cover/cover.go
 $(RUNNER_EXE): testing/runner/runner.go
 
