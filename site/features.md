@@ -167,6 +167,11 @@ the weave network:
     host1$ weave ps a1
     a1 16:c0:6f:5d:c5:73 10.32.0.3/12
 
+There is also a `weave restart` command, if you are not using the
+weave Docker API proxy:
+
+    host1$ weave restart b1
+
 (note that the IP address is held for a limited time - currently five seconds)
 
 ### <a name="naming-and-discovery"></a>Naming and discovery

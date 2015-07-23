@@ -27,4 +27,12 @@ start_container $HOST2 net:$SUBNET_2 --name=c6
 C6=$(container_ip $HOST2 c6)
 assert_raises "exec_on $HOST1 c5 $PING $C6"
 
+# check that restart retains the same IP, and reclaims it in IPAM
+weave_on $HOST2 restart c6
+assert_raises "exec_on $HOST1 c5 $PING $C6"
+sleep 6 # past the IPAM timeout
+start_container $HOST2 net:$SUBNET_2 --name=c7
+C7=$(container_ip $HOST2 c7)
+assert_raises "[ $C6 != $C7 ]"
+
 end_suite
