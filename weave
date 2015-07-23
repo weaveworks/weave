@@ -815,7 +815,7 @@ delete_dns_fqdn() {
 ipam_reclaim() {
     for CIDR in $3 ; do
         # NB: CONTAINER_IP is the IP of the weave container; it is set by wait_for_status.
-        http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$1/${CIDR%/*}?reclaim=true
+        http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
     done
 }
 
