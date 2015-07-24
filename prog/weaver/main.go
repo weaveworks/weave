@@ -116,15 +116,11 @@ func main() {
 
 	if ifaceName != "" {
 		iface, err := weavenet.EnsureInterface(ifaceName)
-		if err != nil {
-			Log.Fatal(err)
-		}
+		checkFatal(err)
 
 		// bufsz flag is in MB
 		config.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024)
-		if err != nil {
-			Log.Fatal(err)
-		}
+		checkFatal(err)
 	}
 
 	if routerName == "" {
@@ -135,15 +131,11 @@ func main() {
 	}
 
 	name, err := weave.PeerNameFromUserInput(routerName)
-	if err != nil {
-		Log.Fatal(err)
-	}
+	checkFatal(err)
 
 	if nickName == "" {
 		nickName, err = os.Hostname()
-		if err != nil {
-			Log.Fatal(err)
-		}
+		checkFatal(err)
 	}
 
 	if password == "" {
@@ -285,9 +277,8 @@ func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 
 func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	_, cidr, err := address.ParseCIDR(cidrStr)
-	if err != nil {
-		Log.Fatal(err)
-	}
+	checkFatal(err)
+
 	if cidr.Size() < ipam.MinSubnetSize {
 		Log.Fatalf("Allocation range smaller than minimum size %d: %s", ipam.MinSubnetSize, cidrStr)
 	}
@@ -344,5 +335,11 @@ func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {
 	err = http.Serve(l, nil)
 	if err != nil {
 		Log.Fatal("Unable to create http server", err)
+	}
+}
+
+func checkFatal(e error) {
+	if e != nil {
+		Log.Fatal(e)
 	}
 }
