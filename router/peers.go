@@ -10,7 +10,7 @@ import (
 type Peers struct {
 	sync.RWMutex
 	ourself *LocalPeer
-	table   map[PeerName]*Peer
+	byName  map[PeerName]*Peer
 	onGC    []func(*Peer)
 }
 
@@ -32,7 +32,7 @@ type ConnectionSummary struct {
 }
 
 func NewPeers(ourself *LocalPeer) *Peers {
-	peers := &Peers{ourself: ourself, table: make(map[PeerName]*Peer)}
+	peers := &Peers{ourself: ourself, byName: make(map[PeerName]*Peer)}
 	peers.FetchWithDefault(ourself.Peer)
 	return peers
 }
@@ -54,11 +54,11 @@ func (peers *Peers) invokeOnGCCallbacks(removed []*Peer) {
 func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
 	peers.Lock()
 	defer peers.Unlock()
-	if existingPeer, found := peers.table[peer.Name]; found {
+	if existingPeer, found := peers.byName[peer.Name]; found {
 		existingPeer.localRefCount++
 		return existingPeer
 	}
-	peers.table[peer.Name] = peer
+	peers.byName[peer.Name] = peer
 	peer.localRefCount++
 	return peer
 }
@@ -66,13 +66,13 @@ func (peers *Peers) FetchWithDefault(peer *Peer) *Peer {
 func (peers *Peers) Fetch(name PeerName) *Peer {
 	peers.RLock()
 	defer peers.RUnlock()
-	return peers.table[name]
+	return peers.byName[name]
 }
 
 func (peers *Peers) FetchAndAddRef(name PeerName) *Peer {
 	peers.Lock()
 	defer peers.Unlock()
-	peer := peers.table[name]
+	peer := peers.byName[name]
 	if peer != nil {
 		peer.localRefCount++
 	}
@@ -88,7 +88,7 @@ func (peers *Peers) Dereference(peer *Peer) {
 func (peers *Peers) ForEach(fun func(*Peer)) {
 	peers.RLock()
 	defer peers.RUnlock()
-	for _, peer := range peers.table {
+	for _, peer := range peers.byName {
 		fun(peer)
 	}
 }
@@ -112,7 +112,7 @@ func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error)
 	// have no knowledge of. We can now apply the update. Start by
 	// adding in any new peers into the cache.
 	for name, newPeer := range newPeers {
-		peers.table[name] = newPeer
+		peers.byName[name] = newPeer
 	}
 
 	// Now apply the updates
@@ -139,7 +139,7 @@ func (peers *Peers) Names() PeerNameSet {
 	defer peers.RUnlock()
 
 	names := make(PeerNameSet)
-	for name := range peers.table {
+	for name := range peers.byName {
 		names[name] = void
 	}
 	return names
@@ -151,7 +151,7 @@ func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
 	peers.RLock()
 	defer peers.RUnlock()
 	for name := range names {
-		if peer, found := peers.table[name]; found {
+		if peer, found := peers.byName[name]; found {
 			if peer == peers.ourself.Peer {
 				peers.ourself.Encode(enc)
 			} else {
@@ -175,9 +175,9 @@ func (peers *Peers) garbageCollect() []*Peer {
 	peers.ourself.RLock()
 	_, reached := peers.ourself.Routes(nil, false)
 	peers.ourself.RUnlock()
-	for name, peer := range peers.table {
+	for name, peer := range peers.byName {
 		if _, found := reached[peer.Name]; !found && peer.localRefCount == 0 {
-			delete(peers.table, name)
+			delete(peers.byName, name)
 			removed = append(removed, peer)
 		}
 	}
@@ -202,7 +202,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 		newPeer := NewPeerFromSummary(peerSummary)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connSummaries)
-		existingPeer, found := peers.table[newPeer.Name]
+		existingPeer, found := peers.byName[newPeer.Name]
 		if !found {
 			newPeers[newPeer.Name] = newPeer
 		} else if existingPeer.UID != newPeer.UID {
@@ -217,7 +217,7 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			if _, found := newPeers[remoteName]; found {
 				continue
 			}
-			if _, found := peers.table[remoteName]; found {
+			if _, found := peers.byName[remoteName]; found {
 				continue
 			}
 			// Update refers to a peer which we have no knowledge
@@ -234,8 +234,8 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 	for idx, newPeer := range decodedUpdate {
 		connSummaries := decodedConns[idx]
 		name := newPeer.Name
-		// guaranteed to find peer in the peers.table
-		peer := peers.table[name]
+		// guaranteed to find peer in the peers.byName
+		peer := peers.byName[name]
 		if peer != newPeer &&
 			(peer == peers.ourself.Peer || peer.Version >= newPeer.Version) {
 			// Nobody but us updates us. And if we know more about a
@@ -254,7 +254,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
 		// the router.Peers, so there can be no race here.
 		peer.Version = newPeer.Version
-		peer.connections = makeConnsMap(peer, connSummaries, peers.table)
+		peer.connections = makeConnsMap(peer, connSummaries, peers.byName)
 		newUpdate[name] = void
 	}
 	return newUpdate
@@ -292,11 +292,11 @@ func decodePeer(dec *gob.Decoder) (peerSummary PeerSummary, connSummaries []Conn
 	return
 }
 
-func makeConnsMap(peer *Peer, connSummaries []ConnectionSummary, table map[PeerName]*Peer) map[PeerName]Connection {
+func makeConnsMap(peer *Peer, connSummaries []ConnectionSummary, byName map[PeerName]*Peer) map[PeerName]Connection {
 	conns := make(map[PeerName]Connection)
 	for _, connSummary := range connSummaries {
 		name := PeerNameFromBin(connSummary.NameByte)
-		remotePeer := table[name]
+		remotePeer := byName[name]
 		conn := NewRemoteConnection(peer, remotePeer, connSummary.RemoteTCPAddr, connSummary.Outbound, connSummary.Established)
 		conns[name] = conn
 	}
