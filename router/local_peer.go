@@ -19,7 +19,8 @@ type LocalPeerAction func()
 func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
 	actionChan := make(chan LocalPeerAction, ChannelSize)
 	peer := &LocalPeer{
-		Peer:       NewPeer(name, nickName, randomPeerUID(), 0),
+		Peer: NewPeer(name, nickName, randomPeerUID(), 0,
+			randomPeerShortID()),
 		router:     router,
 		actionChan: actionChan,
 	}
@@ -205,7 +206,13 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
 // helpers
 
 func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
-	peer.router.BroadcastTopologyUpdate(append(peers, peer.Peer))
+	// Some tests run without a router.  This should be fixed so
+	// that the relevant part of Router can be easily run in the
+	// context of a test, but that will involve significant
+	// reworking of tests.
+	if peer.router != nil {
+		peer.router.BroadcastTopologyUpdate(append(peers, peer.Peer))
+	}
 }
 
 func (peer *LocalPeer) checkConnectionLimit() error {
@@ -240,4 +247,11 @@ func (peer *LocalPeer) connectionCount() int {
 	peer.RLock()
 	defer peer.RUnlock()
 	return len(peer.connections)
+}
+
+func (peer *LocalPeer) setShortID(shortID PeerShortID) {
+	peer.Lock()
+	defer peer.Unlock()
+	peer.ShortID = shortID
+	peer.Version++
 }
