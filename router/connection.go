@@ -255,6 +255,7 @@ func (conn *LocalConnection) makeFeatures() map[string]string {
 		"PeerNameFlavour": PeerNameFlavour,
 		"Name":            conn.local.Name.String(),
 		"NickName":        conn.local.NickName,
+		"ShortID":         fmt.Sprint(conn.local.ShortID),
 		"UID":             fmt.Sprint(conn.local.UID),
 		"ConnID":          fmt.Sprint(conn.uid),
 	}
@@ -276,7 +277,7 @@ func (features features) Get(key string) string {
 }
 
 func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
-	if err := features.MustHave([]string{"PeerNameFlavour", "Name", "NickName", "UID", "ConnID"}); err != nil {
+	if err := features.MustHave([]string{"PeerNameFlavour", "Name", "NickName", "ShortID", "UID", "ConnID"}); err != nil {
 		return nil, err
 	}
 
@@ -292,6 +293,12 @@ func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
 
 	nickName := features.Get("NickName")
 
+	shortID, err := strconv.ParseUint(features.Get("ShortID"), 10,
+		PeerShortIDBits)
+	if err != nil {
+		return nil, err
+	}
+
 	uid, err := ParsePeerUID(features.Get("UID"))
 	if err != nil {
 		return nil, err
@@ -303,7 +310,7 @@ func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
 	}
 
 	conn.uid ^= remoteConnID
-	return NewPeer(name, nickName, uid, 0), nil
+	return NewPeer(name, nickName, uid, 0, PeerShortID(shortID)), nil
 }
 
 func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) error {

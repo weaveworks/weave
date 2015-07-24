@@ -15,6 +15,9 @@ type Overlay interface {
 	// The routes have changed, so any cached information should
 	// be discarded.
 	InvalidateRoutes()
+
+	// A mapping of a short id to a peer has changed
+	InvalidateShortIDs()
 }
 
 type ForwarderParams struct {
@@ -88,6 +91,9 @@ func (NullOverlay) MakeForwarder(ForwarderParams) (OverlayForwarder, error) {
 }
 
 func (NullOverlay) InvalidateRoutes() {
+}
+
+func (NullOverlay) InvalidateShortIDs() {
 }
 
 func (NullOverlay) SetListener(OverlayForwarderListener) {

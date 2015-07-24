@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -117,4 +118,259 @@ func TestPeersGarbageCollection(t *testing.T) {
 	// garbage-collection
 	ps1.DeleteTestConnection(p3)
 	checkPeerArray(t, garbageCollect(ps1), p3)
+}
+
+func TestShortIDCollisions(t *testing.T) {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	_, peers := newNode(PeerName(1 << PeerShortIDBits))
+
+	// Make enough peers that short id collisions are
+	// overwhelmingly likely
+	ps := make([]*Peer, 1<<PeerShortIDBits)
+	for i := 0; i < 1<<PeerShortIDBits; i++ {
+		ps[i] = NewPeer(PeerName(i), "", PeerUID(i), 0,
+			PeerShortID(rng.Intn(1<<PeerShortIDBits)))
+	}
+
+	shuffle := func() {
+		for i := range ps {
+			j := rng.Intn(i + 1)
+			ps[i], ps[j] = ps[j], ps[i]
+		}
+	}
+
+	// Fill peers
+	shuffle()
+	var pending PeersPendingNotifications
+	for _, p := range ps {
+		peers.addByShortID(p, &pending)
+	}
+
+	// Check invariants
+	counts := make([]int, 1<<PeerShortIDBits)
+	saw := func(p *Peer) {
+		if p != peers.ourself.Peer {
+			counts[p.UID]++
+		}
+	}
+
+	for shortID, entry := range peers.byShortID {
+		if entry.peer == nil {
+			// no principal peer for this short id, so
+			// others must be empty
+			require.Empty(t, entry.others)
+			continue
+		}
+
+		require.Equal(t, shortID, entry.peer.ShortID)
+		saw(entry.peer)
+
+		for _, p := range entry.others {
+			saw(p)
+			require.Equal(t, shortID, p.ShortID)
+
+			// the principal peer should have the lowest name
+			require.True(t, p.Name > entry.peer.Name)
+		}
+	}
+
+	// Check that every peer was seen
+	for _, n := range counts {
+		require.Equal(t, 1, n)
+	}
+
+	// Delete all the peers
+	shuffle()
+	for _, p := range ps {
+		peers.deleteByShortID(p, &pending)
+	}
+
+	for _, entry := range peers.byShortID {
+		if entry.peer != peers.ourself.Peer {
+			require.Nil(t, entry.peer)
+		}
+
+		require.Empty(t, entry.others)
+	}
+}
+
+// Test the easy case of short id reassignment, when few short ids are taken
+func TestShortIDReassignmentEasy(t *testing.T) {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	_, peers := newNode(PeerName(0))
+
+	for i := 1; i <= 10; i++ {
+		peers.FetchWithDefault(NewPeer(PeerName(i), "", PeerUID(i), 0,
+			PeerShortID(rng.Intn(1<<PeerShortIDBits))))
+	}
+
+	checkShortIDReassignment(t, peers)
+}
+
+// Test the hard case of short id reassignment, when most short ids are taken
+func TestShortIDReassignmentHard(t *testing.T) {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	_, peers := newNode(PeerName(1 << PeerShortIDBits))
+
+	// Take all short ids
+	ps := make([]*Peer, 1<<PeerShortIDBits)
+	var pending PeersPendingNotifications
+	for i := 0; i < 1<<PeerShortIDBits; i++ {
+		ps[i] = NewPeer(PeerName(i), "", PeerUID(i), 0,
+			PeerShortID(i))
+		peers.addByShortID(ps[i], &pending)
+	}
+
+	// As all short ids are taken, an attempted reassigment won't
+	// do anything
+	oldShortID := peers.ourself.ShortID
+	require.False(t, peers.reassignLocalShortID(&pending))
+	require.Equal(t, oldShortID, peers.ourself.ShortID)
+
+	// Free up a few ids
+	for i := 0; i < 10; i++ {
+		x := rng.Intn(len(ps))
+		if ps[x] != nil {
+			peers.deleteByShortID(ps[x], &pending)
+			ps[x] = nil
+		}
+	}
+
+	checkShortIDReassignment(t, peers)
+}
+
+func checkShortIDReassignment(t *testing.T, peers *Peers) {
+	oldShortID := peers.ourself.ShortID
+	peers.reassignLocalShortID(&PeersPendingNotifications{})
+	require.NotEqual(t, oldShortID, peers.ourself.ShortID)
+	require.Equal(t, peers.ourself.Peer, peers.byShortID[peers.ourself.ShortID].peer)
+}
+
+func TestShortIDInvalidation(t *testing.T) {
+	_, peers := newNode(PeerName(1 << PeerShortIDBits))
+
+	// need to use a short id that is not the local peer's
+	shortID := peers.ourself.ShortID + 1
+
+	var pending PeersPendingNotifications
+
+	requireInvalidateShortIDs := func(expect bool) {
+		require.Equal(t, expect, pending.invalidateShortIDs)
+		pending.invalidateShortIDs = false
+	}
+
+	// The use of a fresh short id does not cause invalidation
+	a := NewPeer(PeerName(1), "", PeerUID(1), 0, shortID)
+	peers.addByShortID(a, &pending)
+	requireInvalidateShortIDs(false)
+
+	// An addition which does not change the mapping
+	b := NewPeer(PeerName(2), "", PeerUID(2), 0, shortID)
+	peers.addByShortID(b, &pending)
+	requireInvalidateShortIDs(false)
+
+	// An addition which does change the mapping
+	c := NewPeer(PeerName(0), "", PeerUID(0), 0, shortID)
+	peers.addByShortID(c, &pending)
+	requireInvalidateShortIDs(true)
+
+	// A deletion which does not change the mapping
+	peers.deleteByShortID(b, &pending)
+	requireInvalidateShortIDs(false)
+
+	// A deletion which does change the mapping
+	peers.deleteByShortID(c, &pending)
+	requireInvalidateShortIDs(true)
+
+	// Deleting the last peer with a short id does not cause invalidation
+	peers.deleteByShortID(a, &pending)
+	requireInvalidateShortIDs(false)
+
+	// .. but subsequent reuse of that short id does cause invalidation
+	peers.addByShortID(a, &pending)
+	requireInvalidateShortIDs(true)
+}
+
+func TestShortIDPropagation(t *testing.T) {
+	_, peers1 := newNode(PeerName(1))
+	_, peers2 := newNode(PeerName(2))
+
+	peers1.AddTestConnection(peers2.ourself.Peer)
+	peers1.ApplyUpdate(peers2.EncodePeers(peers2.Names()))
+	peers12 := peers1.Fetch(PeerName(2))
+	old := peers12.PeerSummary
+
+	require.True(t,
+		peers2.reassignLocalShortID(&PeersPendingNotifications{}))
+	peers1.ApplyUpdate(peers2.EncodePeers(peers2.Names()))
+	require.NotEqual(t, old.Version, peers12.Version)
+	require.NotEqual(t, old.ShortID, peers12.ShortID)
+}
+
+func TestShortIDCollision(t *testing.T) {
+	// Create 3 peers
+	_, peers1 := newNode(PeerName(1))
+	_, peers2 := newNode(PeerName(2))
+	_, peers3 := newNode(PeerName(3))
+
+	var pending PeersPendingNotifications
+	peers1.setLocalShortID(1, &pending)
+	peers2.setLocalShortID(2, &pending)
+	peers3.setLocalShortID(3, &pending)
+
+	peers2.AddTestConnection(peers1.ourself.Peer)
+	peers3.AddTestConnection(peers2.ourself.Peer)
+
+	// Propogate from 1 to 2 to 3
+	peers2.ApplyUpdate(peers1.EncodePeers(peers1.Names()))
+	peers3.ApplyUpdate(peers2.EncodePeers(peers2.Names()))
+
+	// Force the short id of peer 1 to collide with peer 2.  Peer
+	// 1 has the lowest name, so it gets to keep the short id
+	peers1.setLocalShortID(2, &pending)
+
+	oldShortID := peers2.ourself.ShortID
+	_, updated, _ := peers2.ApplyUpdate(peers1.EncodePeers(peers1.Names()))
+
+	// peer 2 should have noticed the collision and resolved it
+	require.NotEqual(t, oldShortID, peers2.ourself.ShortID)
+
+	// The Peers do not have a Router, so broadcastPeerUpdate does
+	// nothing in the context of this test.  So we fake what it
+	// would do.
+	updated[PeerName(2)] = void
+
+	// the update from peer 2 should include its short id change
+	peers3.ApplyUpdate(peers2.EncodePeers(updated))
+	require.Equal(t, peers2.ourself.ShortID,
+		peers3.Fetch(PeerName(2)).ShortID)
+}
+
+// Test the case where all short ids are taken, but then some peers go
+// away, so the local peer reassigns
+func TestDeferredShortIDReassignment(t *testing.T) {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	_, us := newNode(PeerName(1 << PeerShortIDBits))
+
+	// Connect us to other peers occupying all short ids
+	others := make([]*Peers, 1<<PeerShortIDBits)
+	var pending PeersPendingNotifications
+	for i := range others {
+		_, others[i] = newNode(PeerName(i))
+		others[i].setLocalShortID(PeerShortID(i), &pending)
+		us.AddTestConnection(others[i].ourself.Peer)
+	}
+
+	// Check that, as expected, the local peer does not own its
+	// short id
+	require.NotEqual(t, us.ourself.Peer,
+		us.byShortID[us.ourself.ShortID].peer)
+
+	// Disconnect one peer, and we should now be able to claim its
+	// short id
+	other := others[rng.Intn(1<<PeerShortIDBits)]
+	us.DeleteTestConnection(other.ourself.Peer)
+	us.GarbageCollect()
+
+	require.Equal(t, us.ourself.Peer, us.byShortID[us.ourself.ShortID].peer)
 }

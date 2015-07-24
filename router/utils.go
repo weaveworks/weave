@@ -3,6 +3,7 @@ package router
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"net"
@@ -62,15 +63,19 @@ func Concat(elems ...[]byte) []byte {
 	return res
 }
 
-func randUint64() (r uint64) {
-	buf := make([]byte, 8)
+func randBytes(n int) []byte {
+	buf := make([]byte, n)
 	_, err := rand.Read(buf)
 	checkFatal(err)
-	for _, v := range buf {
-		r <<= 8
-		r |= uint64(v)
-	}
-	return
+	return buf
+}
+
+func randUint64() (r uint64) {
+	return binary.LittleEndian.Uint64(randBytes(8))
+}
+
+func randUint16() (r uint16) {
+	return binary.LittleEndian.Uint16(randBytes(2))
 }
 
 func GobEncode(items ...interface{}) []byte {

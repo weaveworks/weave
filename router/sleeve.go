@@ -129,6 +129,10 @@ func (*SleeveOverlay) InvalidateRoutes() {
 	// no cached information, so nothing to do
 }
 
+func (*SleeveOverlay) InvalidateShortIDs() {
+	// no cached information, so nothing to do
+}
+
 func (sleeve *SleeveOverlay) lookupForwarder(peer PeerName) *sleeveForwarder {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
