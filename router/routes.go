@@ -200,7 +200,7 @@ func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) unicastRout
 // where <= is the subset relationship on keys of the returned map.
 func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) broadcastRoutes {
 	broadcast := make(broadcastRoutes)
-	for _, peer := range routes.peers.table {
+	for _, peer := range routes.peers.byName {
 		hops := []PeerName{}
 		if found, reached := peer.Routes(routes.ourself.Peer, establishedAndSymmetric); found {
 			routes.ourself.ForEachConnectedPeer(establishedAndSymmetric, reached,
