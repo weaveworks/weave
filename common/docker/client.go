@@ -1,23 +1,13 @@
 package docker
 
 import (
-	"regexp"
-
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 )
 
-// Regexp that matches container IDs
-var containerIDregexp = regexp.MustCompile("^[a-f0-9]+$")
-
-// IsContainerID returns True if the string provided is a valid container id
-func IsContainerID(idStr string) bool {
-	return containerIDregexp.MatchString(idStr)
-}
-
 // An observer for container events
 type ContainerObserver interface {
-	ContainerDied(ident string) error
+	ContainerDied(ident string)
 }
 
 type Client struct {
@@ -62,12 +52,6 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 
 // IsContainerNotRunning returns true if we have checked with Docker that the ID is not running
 func (c *Client) IsContainerNotRunning(idStr string) bool {
-	if !IsContainerID(idStr) {
-		Log.Debugf("[docker] '%s' does not seem to be a container id", idStr)
-		return false
-	}
-
-	// check with Docker whether the container is really running
 	container, err := c.InspectContainer(idStr)
 	if err == nil {
 		return !container.State.Running

@@ -45,9 +45,10 @@ end
 def tweak_docker_daemon(vm)
   vm.provision :shell, :inline => <<SCRIPT
 usermod -a -G docker vagrant
-echo 'DOCKER_OPTS="-H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375"' \
-  >> /etc/default/docker
-service docker restart
+sed -i -e's%-H fd://%-H fd:// -H tcp://0.0.0.0:2375 -s overlay%' /lib/systemd/system/docker.service
+systemctl daemon-reload
+systemctl restart docker
+systemctl enable docker
 SCRIPT
 end
 

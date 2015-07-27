@@ -6,7 +6,7 @@ export GOPATH
 
 WEAVE_SRC=$GOPATH/src/github.com/weaveworks/weave
 
-if [ $# -eq 0 ] ; then
+if [ $# -eq 0 -o "$1" = "tests" ] ; then
     # No arguments.  Expect that the weave repo will be bind-mounted
     # into $GOPATH
     if ! [ -e $WEAVE_SRC ] ; then
@@ -35,7 +35,12 @@ EOF
     echo "weave:x:$uid:$gid::$WEAVE_SRC:/bin/sh" >>/etc/passwd
     echo "weave:*:::::::" >>/etc/shadow
     echo "weave	ALL=(ALL)	NOPASSWD: ALL" >>/etc/sudoers
-    su weave -c "PATH=$PATH make -C $WEAVE_SRC build"
+
+    if [ "$1" = "tests" ] ; then
+        su weave -c "PATH=$PATH make -C $WEAVE_SRC tests"
+    else
+        su weave -c "PATH=$PATH make -C $WEAVE_SRC build"
+    fi
 else
     # There are arguments to pass to git-clone
     mkdir -p ${WEAVE_SRC%/*}

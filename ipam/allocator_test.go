@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/ipam/address"
-	"github.com/weaveworks/weave/router"
+	"github.com/weaveworks/weave/net/address"
+	"github.com/weaveworks/weave/testing/gossip"
 )
 
 const (
@@ -71,7 +72,6 @@ func TestAllocFree(t *testing.T) {
 }
 
 func TestBootstrap(t *testing.T) {
-	common.InitDefaultLogging(false)
 	const (
 		donateSize     = 5
 		donateStart    = "10.0.1.7"
@@ -86,7 +86,7 @@ func TestBootstrap(t *testing.T) {
 	alloc2, _ := makeAllocatorWithMockGossip(t, peerNameString, testStart1+"/22", 2)
 	defer alloc2.Stop()
 
-	alloc1.OnGossipBroadcast(alloc2.Encode())
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
 	alloc1.actionChan <- func() { alloc1.tryPendingOps() }
 
@@ -108,19 +108,19 @@ func TestBootstrap(t *testing.T) {
 
 	// alloc2 receives paxos update and broadcasts its reply
 	ExpectBroadcastMessage(alloc2, nil)
-	alloc2.OnGossipBroadcast(alloc1.Encode())
+	alloc2.OnGossipBroadcast(alloc1.ourName, alloc1.Encode())
 
 	ExpectBroadcastMessage(alloc1, nil)
-	alloc1.OnGossipBroadcast(alloc2.Encode())
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
 	// both nodes will get consensus now so initialize the ring
 	ExpectBroadcastMessage(alloc2, nil)
 	ExpectBroadcastMessage(alloc2, nil)
-	alloc2.OnGossipBroadcast(alloc1.Encode())
+	alloc2.OnGossipBroadcast(alloc1.ourName, alloc1.Encode())
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
-	alloc1.OnGossipBroadcast(alloc2.Encode())
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 	// now alloc1 should have space
 
 	AssertSent(t, done)
@@ -131,23 +131,45 @@ func TestBootstrap(t *testing.T) {
 func TestAllocatorClaim(t *testing.T) {
 	const (
 		container1 = "abcdef"
-		container2 = "baddf00d"
 		container3 = "b01df00d"
-		universe   = "10.0.3.0/30"
-		testAddr1  = "10.0.3.1" // first address allocated should be .1 because .0 is network addr
+		universe   = "10.0.3.0/24"
+		testAddr1  = "10.0.3.2"
+		testAddr2  = "10.0.4.2"
 	)
 
-	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
+	allocs, _, subnet := makeNetworkOfAllocators(2, universe)
+	alloc := allocs[1]
 	defer alloc.Stop()
-
-	alloc.claimRingForTesting()
 	addr1, _ := address.ParseIP(testAddr1)
 
-	err := alloc.Claim(container3, addr1, nil)
+	// First claim should trigger "dunno, I'm going to wait"
+	err := alloc.Claim(container3, addr1)
+	require.NoError(t, err)
+
+	// Do one allocate to ensure paxos is all done
+	alloc.Allocate("unused", subnet, nil)
+	// Do an allocate on the other peer, which we will try to claim later
+	addrx, err := allocs[0].Allocate(container1, subnet, nil)
+
+	// Now try the claim again
+	err = alloc.Claim(container3, addr1)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
 	addr3, _ := alloc.Allocate(container3, subnet, nil)
 	require.Equal(t, testAddr1, addr3.String(), "address")
+	// one more claim should still work
+	err = alloc.Claim(container3, addr1)
+	require.NoError(t, err)
+	// claim for a different container should fail
+	err = alloc.Claim(container1, addr1)
+	require.Error(t, err)
+	// claiming the address allocated on the other peer should fail
+	err = alloc.Claim(container1, addrx)
+	require.Error(t, err, "claiming address allocated on other peer should fail")
+	// Check an address outside of our universe
+	addr2, _ := address.ParseIP(testAddr2)
+	err = alloc.Claim(container1, addr2)
+	require.NoError(t, err)
 }
 
 func (alloc *Allocator) pause() func() {
@@ -163,18 +185,17 @@ func (alloc *Allocator) pause() func() {
 }
 
 func TestCancel(t *testing.T) {
-	common.InitDefaultLogging(false)
 	const (
 		CIDR = "10.0.1.7/26"
 	)
 
-	router := TestGossipRouter{make(map[router.PeerName]chan interface{}), 0.0}
+	router := gossip.NewTestRouter(0.0)
 
 	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
-	alloc1.SetInterfaces(router.connect(alloc1.ourName, alloc1))
+	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 
 	alloc2, _ := makeAllocator("02:00:00:02:00:00", CIDR, 2)
-	alloc2.SetInterfaces(router.connect(alloc2.ourName, alloc2))
+	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc1.claimRingForTesting(alloc1, alloc2)
 	alloc2.claimRingForTesting(alloc1, alloc2)
 
@@ -182,7 +203,7 @@ func TestCancel(t *testing.T) {
 	alloc2.Start()
 
 	// tell peers about each other
-	alloc1.OnGossipBroadcast(alloc2.Encode())
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
 	// Get some IPs, so each allocator has some space
 	res1, _ := alloc1.Allocate("foo", subnet, nil)
@@ -255,18 +276,18 @@ func TestTransfer(t *testing.T) {
 	_, err = alloc3.Allocate("bar", subnet, nil)
 	require.True(t, err == nil, "Failed to get address")
 
-	router.GossipBroadcast(alloc2.Gossip())
-	router.flush()
-	router.GossipBroadcast(alloc3.Gossip())
-	router.flush()
-	router.removePeer(alloc2.ourName)
-	router.removePeer(alloc3.ourName)
+	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
+	router.Flush()
+	alloc2.gossip.GossipBroadcast(alloc3.Gossip())
+	router.Flush()
+	router.RemovePeer(alloc2.ourName)
+	router.RemovePeer(alloc3.ourName)
 	alloc2.Stop()
 	alloc3.Stop()
-	router.flush()
+	router.Flush()
 	require.NoError(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
 	require.NoError(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
-	router.flush()
+	router.Flush()
 
 	require.Equal(t, address.Offset(1022), alloc1.NumFreeAddresses(subnet))
 
@@ -276,7 +297,6 @@ func TestTransfer(t *testing.T) {
 }
 
 func TestFakeRouterSimple(t *testing.T) {
-	common.InitDefaultLogging(false)
 	const (
 		cidr = "10.0.1.7/22"
 	)
@@ -291,10 +311,9 @@ func TestFakeRouterSimple(t *testing.T) {
 }
 
 func TestAllocatorFuzz(t *testing.T) {
-	common.InitDefaultLogging(false)
 	const (
 		firstpass    = 1000
-		secondpass   = 20000
+		secondpass   = 10000
 		nodes        = 10
 		maxAddresses = 1000
 		concurrency  = 30
@@ -329,27 +348,18 @@ func TestAllocatorFuzz(t *testing.T) {
 		return xs[:ls]
 	}
 
-	// Do a Allocate and check the address
-	// is unique.  Needs a unique container
-	// name.
-	allocate := func(name string) {
+	bumpPending := func() bool {
 		stateLock.Lock()
 		if len(addrs)+numPending >= maxAddresses {
 			stateLock.Unlock()
-			return
+			return false
 		}
 		numPending++
 		stateLock.Unlock()
+		return true
+	}
 
-		allocIndex := rand.Int31n(nodes)
-		alloc := allocs[allocIndex]
-		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
-		addr, err := alloc.Allocate(name, subnet, nil)
-
-		if err != nil {
-			panic(fmt.Sprintf("Could not allocate addr"))
-		}
-
+	noteAllocation := func(allocIndex int32, name string, addr address.Address) {
 		//common.Log.Infof("Allocate: got address %s for name %s", addr, name)
 		addrStr := addr.String()
 
@@ -364,6 +374,26 @@ func TestAllocatorFuzz(t *testing.T) {
 		state[addrStr] = result{name, allocIndex, false}
 		addrs = append(addrs, addrStr)
 		numPending--
+	}
+
+	// Do a Allocate and check the address
+	// is unique.  Needs a unique container
+	// name.
+	allocate := func(name string) {
+		if !bumpPending() {
+			return
+		}
+
+		allocIndex := rand.Int31n(nodes)
+		alloc := allocs[allocIndex]
+		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
+		addr, err := alloc.Allocate(name, subnet, nil)
+
+		if err != nil {
+			panic(fmt.Sprintf("Could not allocate addr"))
+		}
+
+		noteAllocation(allocIndex, name, addr)
 	}
 
 	// Free a random address.
@@ -426,6 +456,21 @@ func TestAllocatorFuzz(t *testing.T) {
 		stateLock.Unlock()
 	}
 
+	// Claim a random address for a unique container name - may not succeed
+	claim := func(name string) {
+		if !bumpPending() {
+			return
+		}
+		allocIndex := rand.Int31n(nodes)
+		addressIndex := rand.Int31n(int32(subnet.Size()))
+		alloc := allocs[allocIndex]
+		addr := address.Add(subnet.Start, address.Offset(addressIndex))
+		err := alloc.Claim(name, addr)
+		if err == nil {
+			noteAllocation(allocIndex, name, addr)
+		}
+	}
+
 	// Run function _f_ _iterations_ times, in _concurrency_
 	// number of goroutines
 	doConcurrentIterations := func(iterations int, f func(int)) {
@@ -465,9 +510,13 @@ func TestAllocatorFuzz(t *testing.T) {
 			// free a random addr
 			free()
 
-		case 0.8 <= r && r < 1.0:
+		case 0.8 <= r && r < 0.95:
 			// ask for an existing name again, check we get same ip
 			allocateAgain()
+
+		case 0.95 <= r && r < 1.0:
+			name := fmt.Sprintf("second%d", iteration)
+			claim(name)
 		}
 	})
 }
@@ -479,7 +528,7 @@ func TestGossipSkew(t *testing.T) {
 	alloc2.now = func() time.Time { return time.Now().Add(time.Hour * 2) }
 	defer alloc2.Stop()
 
-	if _, err := alloc1.OnGossipBroadcast(alloc2.Encode()); err == nil {
+	if _, err := alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode()); err == nil {
 		t.Fail()
 	}
 }

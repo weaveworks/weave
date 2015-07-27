@@ -34,7 +34,7 @@ func (peers *Peers) AddTestRemoteConnection(p1, p2 *Peer) {
 
 func (peers *Peers) DeleteTestConnection(p *Peer) {
 	toName := p.Name
-	toPeer, _ := peers.Fetch(toName)
+	toPeer := peers.Fetch(toName)
 	peers.Dereference(toPeer)
 	conn, _ := peers.ourself.ConnectionTo(toName)
 	peers.ourself.deleteConnection(conn)

@@ -36,6 +36,7 @@ prog/weaveproxy/weaveproxy
 prog/sigproxy/sigproxy
 prog/weavewait/weavewait
 prog/netcheck/netcheck
+testing/cover/cover
 tools/bin
 tools/build
 releases
@@ -51,3 +52,5 @@ prog/weaveexec/netcheck
 prog/weaveexec/docker*.tgz
 Vagrantfile.local
 test/tls/*.pem
+test/coverage
+test/coverage.*

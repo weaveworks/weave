@@ -16,7 +16,7 @@ check() {
 
 start_suite "Automatic DNS record removal on container death"
 
-launch_dns_on $HOST1 10.2.254.1/24
+weave_on $HOST1 launch
 start_container_with_dns $HOST1 $C1/24 --name=c1
 
 start_container $HOST1 $C2/24 $DOPTS

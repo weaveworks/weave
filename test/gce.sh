@@ -5,7 +5,7 @@
 # ./gce.sh destroy - tear down the VMs
 # ./gce.sh make_template - make a fresh VM template; update TEMPLATE_NAME first!
 
-set -ex
+set -e
 
 KEY_FILE=/tmp/gce_private_key.json
 SSH_KEY_FILE=$HOME/.ssh/gce_ssh_key
@@ -13,14 +13,14 @@ PROJECT=${PROJECT:-positive-cocoa-90213}
 IMAGE=ubuntu-14-04
 TEMPLATE_NAME="test-template-2"
 ZONE=us-central1-a
-NUM_HOSTS=2
+NUM_HOSTS=3
 SUFFIX=""
 if [ -n "$CIRCLECI" ]; then
 	SUFFIX="-${CIRCLE_BUILD_NUM}-$CIRCLE_NODE_INDEX"
 fi
 
 # Setup authentication
-gcloud auth activate-service-account --key-file $KEY_FILE
+gcloud auth activate-service-account --key-file $KEY_FILE 1>/dev/null
 gcloud config set project $PROJECT
 
 function vm_names {
@@ -120,9 +120,9 @@ function hosts {
 		hosts="$hostname $hosts"
 		args="--add-host=$hostname:$(internal_ip $name) $args"
 	done
-	export SSH=ssh
-	export HOSTS="$hosts"
-	export WEAVE_DOCKER_ARGS="$args"
+	echo export SSH=ssh
+	echo export HOSTS=\"$hosts\"
+	echo export WEAVE_DOCKER_ARGS=\"$args\"
 }
 
 case "$1" in

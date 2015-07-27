@@ -2,6 +2,10 @@ FROM gliderlabs/alpine
 
 MAINTAINER Weaveworks Inc <help@weave.works>
 
+WORKDIR /home/weave
+VOLUME /w
+ENTRYPOINT ["/home/weave/sigproxy", "/home/weave/weave"]
+
 RUN apk add --update \
     curl \
     ethtool \
@@ -9,17 +13,10 @@ RUN apk add --update \
     iproute2 \
     util-linux \
     conntrack-tools \
+    bind-tools \
   && rm -rf /var/cache/apk/*
 
-WORKDIR /home/weave
-
-ADD ./weave /home/weave/
-ADD ./sigproxy /home/weave/
-ADD ./weaveproxy /home/weave/
+ADD ./weave ./sigproxy ./weaveproxy /home/weave/
 ADD ./netcheck /usr/bin/
 ADD ./weavewait /w/w
 ADD ./docker.tgz /
-
-VOLUME /w
-
-ENTRYPOINT ["/home/weave/sigproxy", "/home/weave/weave"]

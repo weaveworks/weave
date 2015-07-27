@@ -28,7 +28,7 @@ assert_zone_records() {
 
     records=$(weave_on $HOST status | grep "^$CID") || true
     # Assert correct number of records exist
-    assert "echo $records | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | wc -l" $#
+    assert "echo $records | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | wc -l | tr -d '[:space:]'" $#
 
     # Assert correct records exist
     for ADDR; do
@@ -73,8 +73,7 @@ start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr argume
 # specific address, i.e. we are assuming that IPAM always returns the
 # lowest available address in the subnet
 
-weave_on $HOST1 launch-router -debug -iprange 10.2.3.0/24
-launch_dns_on $HOST1 10.254.254.254/24
+weave_on $HOST1 launch-router --ipalloc-range 10.2.3.0/24
 
 # Run container with three cidrs
 CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME | cut -b 1-12)

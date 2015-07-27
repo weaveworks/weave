@@ -9,8 +9,10 @@ import (
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
+
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/nameserver"
+	"github.com/weaveworks/weave/router"
 )
 
 const MaxDockerHostname = 64
@@ -23,9 +25,9 @@ type createContainerRequestBody struct {
 	MacAddress string             `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
 }
 
-// Replacement for docker.NoSuchImage, which does not contain the
-// image name, which in turn breaks docker clients post 1.7.0 since
-// they expect the image name to be present in errors.
+// ErrNoSuchImage replaces docker.NoSuchImage, which does not contain the image
+// name, which in turn breaks docker clients post 1.7.0 since they expect the
+// image name to be present in errors.
 type ErrNoSuchImage struct {
 	Name string
 }
@@ -46,19 +48,23 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config); ok {
+	if cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig); err != nil {
+		Log.Infof("Ignoring container due to %s", err)
+	} else {
 		Log.Infof("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
 		if container.HostConfig == nil {
 			container.HostConfig = &docker.HostConfig{}
 		}
-		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy")
+		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy:ro")
 		if container.Config == nil {
 			container.Config = &docker.Config{}
 		}
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
-		if err := i.setWeaveDNS(&container, r.URL.Query().Get("name")); err != nil {
+		containerName := r.URL.Query().Get("name")
+		hostname := i.proxy.hostnameMatchRegexp.ReplaceAllString(containerName, i.proxy.HostnameReplacement)
+		if err := i.setWeaveDNS(&container, hostname); err != nil {
 			return err
 		}
 	}
@@ -92,7 +98,11 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 	}
 
 	if len(container.Entrypoint) == 0 || container.Entrypoint[0] != weaveWaitEntrypoint[0] {
-		container.Entrypoint = append(weaveWaitEntrypoint, container.Entrypoint...)
+		entrypoint := weaveWaitEntrypoint
+		if i.proxy.NoRewriteHosts {
+			entrypoint = append(entrypoint, "-h")
+		}
+		container.Entrypoint = append(entrypoint, container.Entrypoint...)
 	}
 
 	return nil
@@ -133,15 +143,15 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 }
 
 func (i *createContainerInterceptor) getDNSDomain() (domain string, running bool) {
-	domain = nameserver.DefaultLocalDomain
-	dnsContainer, err := i.proxy.client.InspectContainer("weavedns")
+	domain = nameserver.DefaultDomain
+	weaveContainer, err := i.proxy.client.InspectContainer("weave")
 	if err != nil ||
-		dnsContainer.NetworkSettings == nil ||
-		dnsContainer.NetworkSettings.IPAddress == "" {
+		weaveContainer.NetworkSettings == nil ||
+		weaveContainer.NetworkSettings.IPAddress == "" {
 		return
 	}
 
-	url := fmt.Sprintf("http://%s:%d/domain", dnsContainer.NetworkSettings.IPAddress, nameserver.DefaultHTTPPort)
+	url := fmt.Sprintf("http://%s:%d/domain", weaveContainer.NetworkSettings.IPAddress, router.HTTPPort)
 	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return

@@ -41,22 +41,18 @@ var (
 	Log *logrus.Logger
 )
 
-func InitLogging(level logrus.Level) {
-	if Log == nil {
-		Log = &logrus.Logger{
-			Out:       os.Stderr,
-			Formatter: standardTextFormatter,
-			Hooks:     make(logrus.LevelHooks),
-			Level:     level,
-		}
+func init() {
+	Log = &logrus.Logger{
+		Out:       os.Stderr,
+		Formatter: standardTextFormatter,
+		Hooks:     make(logrus.LevelHooks),
 	}
-	Log.Level = level
 }
 
-func InitDefaultLogging(debug bool) {
-	level := logrus.InfoLevel
-	if debug {
-		level = logrus.DebugLevel
+func SetLogLevel(levelname string) {
+	level, err := logrus.ParseLevel(levelname)
+	if err != nil {
+		Log.Fatal(err)
 	}
-	InitLogging(level)
+	Log.Level = level
 }

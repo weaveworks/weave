@@ -8,7 +8,7 @@ layout: default
 Weave automatically assigns containers an IP address that is unique
 across the network, and releases that address when a container
 exits. This happens for all invocations of the `run`, `start`,
-`attach`, `detach`, `expose`, `hide` and `launch-dns` commands, unless
+`attach`, `detach`, `expose`, and `hide` commands, unless
 the user explictly specified an address. Weave can also assign
 addresses in multiple subnets.
 
@@ -26,8 +26,8 @@ in the whole network, weave needs a majority of peers to be present in
 order to avoid formation of isolated groups, which could lead to
 inconsistency, i.e. the same IP address being allocated to two
 different containers. Therefore, you must either supply the list of
-all peers in the network to `weave launch` or add the `-initpeercount`
-flag to specify how many peers there will be.
+all peers in the network to `weave launch` or add the
+`--init-peer-count` flag to specify how many peers there will be.
 
 To illustrate, suppose you have three hosts, accessible to each other
 as `$HOST1`, `$HOST2` and `$HOST3`. You can start weave on those three
@@ -42,13 +42,13 @@ hosts with these three commands:
 Or, if it is not convenient to name all the other hosts at launch
 time, you can give the number of peers like this:
 
-    host1$ weave launch -initpeercount 3
+    host1$ weave launch --init-peer-count 3
 
-    host2$ weave launch -initpeercount 3 $HOST3
+    host2$ weave launch --init-peer-count 3 $HOST3
 
-    host3$ weave launch -initpeercount 3 $HOST2
+    host3$ weave launch --init-peer-count 3 $HOST2
 
-### More on `-initpeercount`
+### More on `--init-peer-count`
 
 TL;DR: it isn't a problem to over-estimate by a bit, but if you supply
 a number that is too small then multiple independent groups may form.
@@ -87,12 +87,20 @@ would be safe wrt weave's startup quorum:
 
 ## <a name="range"></a>Choosing an allocation range
 
-By default, weave will allocate IP addresses in the 10.128.0.0/10
-range. This can be overridden with the `-iprange` option, e.g.
+By default, weave will allocate IP addresses in the 10.32.0.0/12
+range. This can be overridden with the `--ipalloc-range` option, e.g.
 
-    host1$ weave launch -iprange 10.2.0.0/16
+    host1$ weave launch --ipalloc-range 10.2.0.0/16
 
 and must be the same on every host.
+
+> The specified range is for *exclusive* use by the IP allocator. In
+> particular, when starting containers with manually assigned IP
+> addresses, these must be outside the IP allocator's range.  If, in
+> our example, you subsequently executed `docker run -e
+> WEAVE_CIDR=10.2.3.1/24 -ti ubuntu`, the IP allocator might assign
+> the same address to another container, which will break IP routing
+> for the containers sharing an address.
 
 The range parameter is written in
 [CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) -
@@ -107,14 +115,6 @@ according to their needs.  If a group of peers becomes isolated from
 the rest (a partition), they can continue to work with the address
 ranges they had before isolation, and can subsequently be re-connected
 to the rest of the network without any conflicts arising.
-
-Once you have given a range of addresses to the IP allocator, you must
-not use any addresses in that range for anything else.  If, in our
-example, you subsequently executed `docker run -e WEAVE_CIDR=10.2.3.1/24 -ti ubuntu`,
-you run the risk that the IP allocator will assign the same address to
-another container, which will make network traffic delivery
-intermittent or non-existent for the containers that share the same IP
-address.
 
 ## <a name="subnets"></a>Automatic allocation across multiple subnets
 
@@ -135,13 +135,13 @@ for instance:
 When working with multiple subnets in this way, it is usually
 desirable to constrain the default subnet - i.e. the one chosen by the
 allocator when no subnet is supplied - so that it does not overlap
-with others. One can specify that with `-ipsubnet`:
+with others. One can specify that with `--ipalloc-default-subnet`:
 
-    host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.3.0/24
+    host1$ weave launch --ipalloc-range 10.2.0.0/16 --ipalloc-default-subnet 10.2.3.0/24
 
-`-iprange` should cover the entire range that you will ever use for
-allocation, and `-ipsubnet` is the subnet that will be used when you
-don't explicitly specify one.
+`--ipalloc-range` should cover the entire range that you will ever use
+for allocation, and `--ipalloc-default-subnet` is the subnet that will
+be used when you don't explicitly specify one.
 
 When specifying addresses, the default subnet can be denoted
 symbolically with `net:default`.
@@ -151,10 +151,10 @@ symbolically with `net:default`.
 If you want to start containers with a mixture of
 automatically-allocated addresses and manually-chosen addresses, *and
 have the containers communicate with each other*, you can choose a
-`-iprange` that is smaller than `-ipsubnet`, For example, if you
-launch weave with:
+`--ipalloc-range` that is smaller than `--ip-default-subnet`, For
+example, if you launch weave with:
 
-    host1$ weave launch -iprange 10.9.0.0/17 -ipsubnet 10.9.0.0/16
+    host1$ weave launch --ipalloc-range 10.9.0.0/17 --ipalloc-default-subnet 10.9.0.0/16
 
 then you can run all containers in the 10.9.0.0/16 subnet, with
 automatic allocation using the lower half, leaving the upper half free
@@ -213,8 +213,8 @@ The first section covers the router; see the [troubleshooting
 guide](troubleshooting.html#status-report) for full details.
 
 The 'Allocator' section, which is only present if weave has been
-started with the `-iprange` option, summarises the overall position and
-lists which address ranges have been assigned to which peer. Each
-range begins at the address shown and ends just before the next
-address, or wraps around at the end of the subnet. The 'v' number
+started with the `--ipalloc-range` option, summarises the overall
+position and lists which address ranges have been assigned to which
+peer. Each range begins at the address shown and ends just before the
+next address, or wraps around at the end of the subnet. The 'v' number
 denotes how many times that entry has been updated.

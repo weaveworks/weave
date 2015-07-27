@@ -12,7 +12,7 @@ fi
 SOURCED_CONFIG_SH=true
 
 # these ought to match what is in Vagrantfile
-N_MACHINES=${N_MACHINES:-2}
+N_MACHINES=${N_MACHINES:-3}
 IP_PREFIX=${IP_PREFIX:-192.168.48}
 IP_SUFFIX_BASE=${IP_SUFFIX_BASE:-10}
 
@@ -26,6 +26,7 @@ fi
 # these are used by the tests
 HOST1=$(echo $HOSTS | cut -f 1 -d ' ')
 HOST2=$(echo $HOSTS | cut -f 2 -d ' ')
+HOST3=$(echo $HOSTS | cut -f 3 -d ' ')
 
 . "$DIR/assert.sh"
 
@@ -42,16 +43,12 @@ CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 
 DOCKER_PORT=2375
 
-WEAVEDNS_ARGS="--no-cache"
-[ -n "$DEBUG" ] && WEAVEDNS_ARGS="$WEAVEDNS_ARGS --debug"
-
-
 upload_executable() {
     host=$1
     file=$2
-    prefix=${3:-/usr/local/bin/}
-    suffix=$(basename "$file")
-    target="$prefix$suffix"
+    target=${3:-/usr/local/bin/$(basename "$file")}
+    dir=$(dirname "$target")
+    run_on $host "[ -e '$dir' ] || sudo mkdir -p '$dir'"
     [ -z "$DEBUG" ] || greyly echo "Uploading to $host: $file -> $target" >&2
     <"$file" remote $host $SSH $host sh -c "cat | sudo tee $target >/dev/null"
     run_on $host "sudo chmod a+x $target"
@@ -60,16 +57,16 @@ upload_executable() {
 remote() {
     rem=$1
     shift 1
-    "$@" > >(while read line; do echo -e "\e[0;34m$rem>\e[0m $line"; done)
+    "$@" > >(while read line; do echo -e $'\e[0;34m'"$rem>"$'\e[0m'" $line"; done)
 }
 
 colourise() {
-    [ -t 0 ] && echo -ne '\e['$1'm' || true
+    [ -t 0 ] && echo -ne $'\e['$1'm' || true
     shift
     # It's important that we don't do this in a subshell, as some
     # commands we execute need to modify global state
     "$@"
-    [ -t 0 ] && echo -ne '\e[0m' || true
+    [ -t 0 ] && echo -ne $'\e[0m' || true
 }
 
 whitely() {
@@ -113,17 +110,23 @@ weave_on() {
     DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
+stop_router_on() {
+    host=$1
+    shift 1
+    # we don't invoke `weave stop-router` here because that removes
+    # the weave container, which means we a) can't grab coverage
+    # stats, and b) can't inspect the logs when tests fail.
+    docker_on $host stop weave 1>/dev/null 2>&1 || true
+    if [ -n "$COVERAGE" ] ; then
+        collect_coverage $host
+    fi
+}
+
 exec_on() {
     host=$1
     container=$2
     shift 2
     docker -H tcp://$host:$DOCKER_PORT exec $container "$@"
-}
-
-launch_dns_on() {
-    host=$1
-    shift 1
-    weave_on $host launch-dns $@ $WEAVEDNS_ARGS
 }
 
 start_container() {
@@ -154,7 +157,7 @@ assert_dns_record() {
     container=$2
     name=$3
     shift 3
-    exp_ips_regex=$(echo "$@" | sed -r 's/ /\\\|/g')
+    exp_ips_regex=$(echo "$@" | sed -e 's/ /\\\|/g')
 
     [ -z "$DEBUG" ] || greyly echo "Checking whether $name exists at $host:$container"
     assert_raises "exec_on $host $container getent hosts $name | grep -q '$exp_ips_regex'"
@@ -175,9 +178,10 @@ assert_no_dns_record() {
     assert_raises "exec_on $host $container getent hosts $name" 2
 }
 
-# assert_dns_a_record <host> <container> <name> <ip>
+# assert_dns_a_record <host> <container> <name> <ip> [<expected_name>]
 assert_dns_a_record() {
-    assert "exec_on $1 $2 getent hosts $3 | tr -s ' '" "$4 $3"
+    exp_name=${5:-$3}
+    assert "exec_on $1 $2 getent hosts $3 | tr -s ' ' | cut -d ' ' -f 1,2" "$4 $exp_name"
 }
 
 # assert_dns_ptr_record <host> <container> <name> <ip>
@@ -186,7 +190,7 @@ assert_dns_ptr_record() {
 }
 
 start_suite() {
-    for host in $HOST1 $HOST2; do
+    for host in $HOSTS; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
         weave_on $host reset 2>/dev/null
         rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
@@ -196,6 +200,18 @@ start_suite() {
 
 end_suite() {
     whitely assert_end
+    for host in $HOSTS; do
+        stop_router_on $host
+    done
+}
+
+collect_coverage() {
+    host=$1
+    mkdir -p ./coverage
+    rm -f cover.router.prof
+    docker_on $host cp weave:/home/weave/cover.router.prof . 2>/dev/null || return 0
+    # ideally we'd know the name of the test here, and put that in the filename
+    mv cover.router.prof $(mktemp -u ./coverage/integration.XXXXXXXX) || true
 }
 
 WEAVE=$DIR/../weave

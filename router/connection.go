@@ -2,9 +2,9 @@ package router
 
 import (
 	"encoding/binary"
-	"encoding/gob"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -118,6 +118,7 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ud
 		TCPConn:          tcpConn,
 		remoteUDPAddr:    udpAddr,
 		effectivePMTU:    DefaultPMTU,
+		uid:              randUint64(),
 		actionChan:       actionChan,
 		finished:         finished}
 	go conn.run(actionChan, finished, acceptNewPeer)
@@ -232,7 +233,7 @@ func (conn *LocalConnection) ReceivedHeartbeat(remoteUDPAddr *net.UDPAddr, connU
 		if oldRemoteUDPAddr == nil {
 			return conn.sendFastHeartbeats()
 		} else if oldRemoteUDPAddr.String() != remoteUDPAddr.String() {
-			Log.Println("Peer", conn.remote, "moved from", old, "to", remoteUDPAddr)
+			Log.Println("Peer", conn.remote, "moved from", oldRemoteUDPAddr, "to", remoteUDPAddr)
 		}
 		return nil
 	})
@@ -283,12 +284,38 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	defer close(finished)
 
 	conn.TCPConn.SetLinger(0)
-
-	dec, err := conn.handshake(acceptNewPeer)
+	intro, err := ProtocolIntroParams{
+		MinVersion: conn.Router.ProtocolMinVersion,
+		MaxVersion: ProtocolMaxVersion,
+		Features:   conn.makeFeatures(),
+		Conn:       conn.TCPConn,
+		Password:   conn.Router.Password,
+		Outbound:   conn.outbound,
+	}.DoIntro()
 	if err != nil {
 		return
 	}
-	conn.Log("completed handshake; using protocol version", conn.version)
+
+	conn.SessionKey = intro.SessionKey
+	conn.tcpSender = intro.Sender
+	conn.version = intro.Version
+
+	remote, err := conn.parseFeatures(intro.Features)
+	if err != nil {
+		return
+	}
+
+	if err = conn.registerRemote(remote, acceptNewPeer); err != nil {
+		return
+	}
+
+	if conn.SessionKey == nil {
+		conn.Decryptor = NewNonDecryptor()
+	} else {
+		conn.Decryptor = NewNaClDecryptor(conn.SessionKey, conn.outbound)
+	}
+
+	conn.Log("connection ready; using protocol version", conn.version)
 
 	// The ordering of the following is very important. [1]
 
@@ -303,7 +330,8 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	if err = conn.initHeartbeats(); err != nil {
 		return
 	}
-	go conn.receiveTCP(dec)
+
+	go conn.receiveTCP(intro.Receiver)
 	err = conn.actorLoop(actionChan)
 }
 
@@ -352,6 +380,83 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 // prevent that completely, since, for example, forwarder can only be
 // created when we know the remote UDP address, but it helps to try.
 
+func (conn *LocalConnection) makeFeatures() map[string]string {
+	return map[string]string{
+		"PeerNameFlavour": PeerNameFlavour,
+		"Name":            conn.local.Name.String(),
+		"NickName":        conn.local.NickName,
+		"UID":             fmt.Sprint(conn.local.UID),
+		"ConnID":          fmt.Sprint(conn.uid),
+	}
+}
+
+type features map[string]string
+
+func (features features) MustHave(keys []string) error {
+	for _, key := range keys {
+		if _, ok := features[key]; !ok {
+			return fmt.Errorf("Field %s is missing", key)
+		}
+	}
+	return nil
+}
+
+func (features features) Get(key string) string {
+	return features[key]
+}
+
+func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
+	if err := features.MustHave([]string{"PeerNameFlavour", "Name", "NickName", "UID", "ConnID"}); err != nil {
+		return nil, err
+	}
+
+	remotePeerNameFlavour := features.Get("PeerNameFlavour")
+	if remotePeerNameFlavour != PeerNameFlavour {
+		return nil, fmt.Errorf("Peer name flavour mismatch (ours: '%s', theirs: '%s')", PeerNameFlavour, remotePeerNameFlavour)
+	}
+
+	name, err := PeerNameFromString(features.Get("Name"))
+	if err != nil {
+		return nil, err
+	}
+
+	nickName := features.Get("NickName")
+
+	uid, err := ParsePeerUID(features.Get("UID"))
+	if err != nil {
+		return nil, err
+	}
+
+	remoteConnID, err := strconv.ParseUint(features.Get("ConnID"), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	conn.uid ^= remoteConnID
+	return NewPeer(name, nickName, uid, 0), nil
+}
+
+func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) error {
+	if acceptNewPeer {
+		conn.remote = conn.Router.Peers.FetchWithDefault(remote)
+	} else {
+		conn.remote = conn.Router.Peers.FetchAndAddRef(remote.Name)
+		if conn.remote == nil {
+			return fmt.Errorf("Found unknown remote name: %s at %s", remote.Name, conn.remoteTCPAddr)
+		}
+	}
+
+	if conn.remote.UID != remote.UID {
+		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
+	}
+
+	if conn.remote == conn.local {
+		return fmt.Errorf("Cannot connect to ourself")
+	}
+
+	return nil
+}
+
 func (conn *LocalConnection) initHeartbeats() error {
 	conn.heartbeatTCP = time.NewTicker(TCPHeartbeat)
 	conn.heartbeatTimeout = time.NewTimer(HeartbeatTimeout)
@@ -383,7 +488,7 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 
 func (conn *LocalConnection) shutdown(err error) {
 	if conn.remote == nil {
-		Log.Errorf("->[%s] connection shutting down due to error during handshake: %v\n", conn.remoteTCPAddr, err)
+		Log.Errorf("->[%s] connection shutting down due to error during handshake: %v", conn.remoteTCPAddr, err)
 	} else {
 		conn.ErrorLog("connection shutting down due to error:", err)
 	}
@@ -422,23 +527,13 @@ func (conn *LocalConnection) sendProtocolMsg(m ProtocolMsg) error {
 	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
 }
 
-func (conn *LocalConnection) receiveTCP(decoder *gob.Decoder) {
-	usingPassword := conn.SessionKey != nil
-	var receiver TCPReceiver
-	if usingPassword {
-		receiver = NewEncryptedTCPReceiver(conn.SessionKey, conn.outbound)
-	} else {
-		receiver = NewSimpleTCPReceiver()
-	}
+func (conn *LocalConnection) receiveTCP(receiver TCPReceiver) {
 	var err error
 	for {
-		var msg []byte
 		conn.extendReadDeadline()
-		if err = decoder.Decode(&msg); err != nil {
-			break
-		}
-		msg, err = receiver.Decode(msg)
-		if err != nil {
+
+		var msg []byte
+		if msg, err = receiver.Receive(); err != nil {
 			break
 		}
 		if len(msg) < 1 {

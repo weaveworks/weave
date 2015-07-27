@@ -55,7 +55,7 @@ it locally to control a weave network on a remote host.
 
 ## Quick Start Screencast
 
-<a href="http://youtu.be/k6r7yuSr0hE" alt="Click to watch the screencast" target="_blank">
+<a href="https://youtu.be/BF9YJSPQUcY" alt="Click to watch the screencast" target="_blank">
   <img src="/docs/hello-screencast.png" />
 </a>
 
@@ -113,7 +113,7 @@ can talk to each other...
 In the container started on `$HOST1`...
 
     root@a1:/# ping -c 1 -q a2
-    PING a2.weave.local (10.160.0.2) 56(84) bytes of data.
+    PING a2.weave.local (10.40.0.2) 56(84) bytes of data.
     --- a2.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.341/0.341/0.341/0.000 ms
@@ -121,7 +121,7 @@ In the container started on `$HOST1`...
 Similarly, in the container started on `$HOST2`...
 
     root@a2:/# ping -c 1 -q a1
-    PING a1.weave.local (10.128.0.2) 56(84) bytes of data.
+    PING a1.weave.local (10.32.0.2) 56(84) bytes of data.
     --- a1.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.366/0.366/0.366/0.000 ms

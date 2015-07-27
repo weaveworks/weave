@@ -12,6 +12,8 @@ echo "Copying weave images, scripts, and certificates to hosts, and"
 echo "  prefetch test images"
 for HOST in $HOSTS; do
     docker_on $HOST load -i ../weave.tar
+    DANGLING_IMAGES="$(docker_on $HOST images -q -f dangling=true)"
+    [ -n "$DANGLING_IMAGES" ] && docker_on $HOST rmi $DANGLING_IMAGES 1>/dev/null 2>&1 || true
     run_on $HOST mkdir -p bin
     upload_executable $HOST ../bin/docker-ns
     upload_executable $HOST ../weave

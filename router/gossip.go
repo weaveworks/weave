@@ -21,7 +21,7 @@ type Gossiper interface {
 	OnGossipUnicast(sender PeerName, msg []byte) error
 	// merge received data into state and return a representation of
 	// the received data, for further propagation
-	OnGossipBroadcast(update []byte) (GossipData, error)
+	OnGossipBroadcast(sender PeerName, update []byte) (GossipData, error)
 	// return state of everything we know; gets called periodically
 	Gossip() GossipData
 	// merge received data into state and return "everything new I've

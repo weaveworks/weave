@@ -2,6 +2,7 @@ package testing
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"runtime"
 	"testing"
@@ -49,4 +50,18 @@ func RunWithTimeout(t *testing.T, d time.Duration, f func()) {
 		f()
 	}()
 	<-ch
+}
+
+// TrimTestArgs finds the first -- in os.Args and trim all args before that
+func TrimTestArgs() {
+	i, l := 0, len(os.Args)
+	for ; i < l; i++ {
+		if os.Args[i] == "--" {
+			break
+		}
+	}
+	if i == l {
+		panic("Specify weave args after --")
+	}
+	os.Args = append(os.Args[:1], os.Args[i+1:l]...)
 }

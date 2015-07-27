@@ -10,8 +10,8 @@ SUBNET_2=10.2.3.0/24
 
 start_suite "Ping over cross-host weave network (with and without IPAM)"
 
-weave_on $HOST1 launch -iprange $UNIVERSE -ipsubnet $SUBNET_1
-weave_on $HOST2 launch -iprange $UNIVERSE -ipsubnet $SUBNET_1 $HOST1
+weave_on $HOST1 launch --ipalloc-range $UNIVERSE --ipalloc-default-subnet $SUBNET_1
+weave_on $HOST2 launch --ipalloc-range $UNIVERSE --ipalloc-default-subnet $SUBNET_1 $HOST1
 
 start_container $HOST1    $C1/24     --name=c1
 start_container $HOST2 ip:$C2/24     --name=c2
@@ -26,5 +26,11 @@ start_container $HOST1 net:$SUBNET_2 --name=c5
 start_container $HOST2 net:$SUBNET_2 --name=c6
 C6=$(container_ip $HOST2 c6)
 assert_raises "exec_on $HOST1 c5 $PING $C6"
+
+# check large packets get through. The first attempt typically fails,
+# since the PMTU hasn't been discovered yet. The 2nd attempt should
+# succeed.
+exec_on $HOST1 c1 $PING -s 65000 $C2 2>&1 1>/dev/null || true
+assert_raises "exec_on $HOST1 c1 $PING -s 65000 $C2"
 
 end_suite

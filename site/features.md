@@ -71,7 +71,7 @@ across the weave network. You can see which address was allocated with
 [`weave ps`](troubleshooting.html#list-attached-containers):
 
     host1$ weave ps a1
-    a7aee7233393 7a:44:d3:11:10:70 10.128.0.2/10
+    a7aee7233393 7a:44:d3:11:10:70 10.32.0.2/12
 
 Weave detects when a container has exited and releases its
 automatically allocated addresses so they can be re-used.
@@ -142,10 +142,10 @@ To accomplish that, we assign each application a different subnet.
 Let's begin by configuring weave's allocator to manage multiple
 subnets:
 
-    host1$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24
-    host1$ eval $(weave proxy-env)
-    host2$ weave launch -iprange 10.2.0.0/16 -ipsubnet 10.2.1.0/24 $HOST1
-    host2$ eval $(weave proxy-env)
+    host1$ weave launch --ipalloc-range 10.2.0.0/16 --ipalloc-default-subnet 10.2.1.0/24
+    host1$ eval $(weave env)
+    host2$ weave launch --ipalloc-range 10.2.0.0/16 --ipalloc-default-subnet 10.2.1.0/24 $HOST1
+    host2$ eval $(weave env)
 
 This delegates the entire 10.2.0.0/16 subnet to weave, and instructs
 it to allocate from 10.2.1.0/24 within that if no specific subnet is
@@ -251,18 +251,23 @@ invocation:
 ### <a name="security"></a>Security
 
 In order to connect containers across untrusted networks, weave peers
-can be told to encrypt traffic by supplying a `-password` option or
+can be told to encrypt traffic by supplying a `--password` option or
 `WEAVE_PASSWORD` environment variable when launching weave, e.g.
 
-    host1$ weave launch -password wEaVe
+    host1$ weave launch --password wfvAwt7sj
 
 or
 
-    host1$ export WEAVE_PASSWORD=wEaVe
+    host1$ export WEAVE_PASSWORD=wfvAwt7sj
     host1$ weave launch
 
 _NOTE: The command line option takes precedence over the environment
 variable._
+
+> To avoid leaking your password via the kernel process table or your
+> shell history, we recommend you store it in a file and capture it
+> into a shell variable prior to launching weave: `export
+> WEAVE_PASSWORD=$(cat /path/to/password-file)`
 
 The password needs to be reasonably strong to guard against online
 dictionary attacks. We recommend at least 50 bits of entropy. An easy
@@ -291,13 +296,9 @@ returned. So now
     host2$ ping 10.2.1.132
 
 will work, and, more interestingly, we can ping our `a1` application
-container, which is residing on `$HOST1`, after finding its IP
-address:
+container, which is residing on `$HOST1`:
 
-    host1$ weave ps a1
-    a1 1e:88:d7:5b:77:68 10.2.1.2/24
-
-    host2$ ping 10.2.1.2
+    host2$ ping $(weave dns-lookup a1)
 
 Multiple subnet addresses can be exposed or hidden with a single
 invocation:
@@ -332,11 +333,8 @@ explained [above](#host-network-integration), i.e.
 Then we add a NAT rule to route from the outside world to the
 destination container service.
 
-    host1$ weave ps a1
-    a1 1e:88:d7:5b:77:68 10.2.1.2/24
-
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
-           -j DNAT --to-destination 10.2.1.2:4422
+           -j DNAT --to-destination $(weave dns-lookup a1):4422
 
 Here we are assuming that the "outside world" is connecting to `$HOST2`
 via 'eth0'. We want TCP traffic to port 2211 on the external IPs to be
@@ -496,9 +494,9 @@ and the new hosts will be added, when one runs
     host# weave connect --replace $NEW_HOST1 $NEW_HOST2
 
 For complete control over the peer topology, automatic discovery can
-be disabled with the `-nodiscovery` option to `weave launch`. In this
-mode, weave will only connect to the addresses specified at launch
-time and with `weave connect`.
+be disabled with the `--no-discovery` option to `weave launch`. In
+this mode, weave will only connect to the addresses specified at
+launch time and with `weave connect`.
 
 ### <a name="container-mobility"></a>Container mobility
 

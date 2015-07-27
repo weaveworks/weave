@@ -10,9 +10,10 @@ import (
 	"io"
 	"math/rand"
 	"sort"
+	"time"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/ipam/address"
+	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/router"
 )
 
@@ -32,16 +33,14 @@ func (r *Ring) assertInvariants() {
 
 // Errors returned by Merge
 var (
-	ErrNotSorted        = errors.New("Ring not sorted")
-	ErrTokenRepeated    = errors.New("Token appears twice in ring")
-	ErrTokenOutOfRange  = errors.New("Token is out of range")
-	ErrDifferentSubnets = errors.New("IP Allocator with different subnet detected")
-	ErrNewerVersion     = errors.New("Received new version for entry I own!")
-	ErrInvalidEntry     = errors.New("Received invalid state update!")
-	ErrEntryInMyRange   = errors.New("Received new entry in my range!")
-	ErrNoFreeSpace      = errors.New("No free space found!")
-	ErrInvalidTimeout   = errors.New("dt must be greater than 0")
-	ErrNotFound         = errors.New("No entries for peer found")
+	ErrNotSorted       = errors.New("Ring not sorted")
+	ErrTokenRepeated   = errors.New("Token appears twice in ring")
+	ErrTokenOutOfRange = errors.New("Token is out of range")
+	ErrDifferentRange  = errors.New("Received range differs from ours!")
+	ErrNewerVersion    = errors.New("Received new version for entry I own!")
+	ErrInvalidEntry    = errors.New("Received invalid state update!")
+	ErrEntryInMyRange  = errors.New("Received new entry in my range!")
+	ErrNotFound        = errors.New("No entries for peer found")
 )
 
 func (r *Ring) checkInvariants() error {
@@ -89,6 +88,10 @@ func New(start, end address.Address, peer router.PeerName) *Ring {
 	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0)}
 	ring.updateExportedVariables()
 	return ring
+}
+
+func (r *Ring) Range() address.Range {
+	return address.Range{Start: r.Start, End: r.End}
 }
 
 // Returns the distance between two tokens on this ring, dealing
@@ -186,7 +189,7 @@ func (r *Ring) Merge(gossip Ring) error {
 	}
 
 	if r.Start != gossip.Start || r.End != gossip.End {
-		return ErrDifferentSubnets
+		return ErrDifferentRange
 	}
 
 	// Now merge their ring with yours, in a temporary ring.
@@ -217,7 +220,7 @@ func (r *Ring) Merge(gossip Ring) error {
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					common.Log.Debugf("Error merging entries at %s - %v != %v\n", mine.Token, mine, theirs)
+					common.Log.Debugf("Error merging entries at %s - %v != %v", mine.Token, mine, theirs)
 					return ErrInvalidEntry
 				}
 				addToResult(*mine)
@@ -517,4 +520,8 @@ func (r *Ring) PeerNames() map[router.PeerName]struct{} {
 	}
 
 	return res
+}
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
 }

@@ -23,6 +23,17 @@ func (r Range) String() string             { return fmt.Sprintf("[%s-%s)", r.Sta
 func (r Range) Overlaps(or Range) bool     { return !(r.Start >= or.End || r.End <= or.Start) }
 func (r Range) Contains(addr Address) bool { return addr >= r.Start && addr < r.End }
 
+func (r Range) AsCIDRString() string {
+	prefixLen := 32
+	for size := r.Size(); size > 1; size = size / 2 {
+		if size%2 != 0 { // Size not a power of two; cannot be expressed as a CIDR.
+			return r.String()
+		}
+		prefixLen--
+	}
+	return CIDR{Start: r.Start, PrefixLen: prefixLen}.String()
+}
+
 type CIDR struct {
 	Start     Address
 	PrefixLen int
@@ -79,6 +90,10 @@ func (addr Address) IP4() (r net.IP) {
 	return
 }
 
+func (addr Address) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%q", addr.String())), nil
+}
+
 func (addr Address) String() string {
 	return addr.IP4().String()
 }
@@ -97,4 +112,11 @@ func Min(a, b Offset) Offset {
 		return b
 	}
 	return a
+}
+
+func (addr Address) Reverse() Address {
+	return ((addr >> 24) & 0xff) | // move byte 3 to byte 0
+		((addr << 8) & 0xff0000) | // move byte 1 to byte 2
+		((addr >> 8) & 0xff00) | // move byte 2 to byte 1
+		((addr << 24) & 0xff000000) // byte 0 to byte 3
 }

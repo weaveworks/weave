@@ -2,21 +2,25 @@ package main
 
 import (
 	"crypto/sha256"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/davecheney/profile"
+	"github.com/docker/docker/pkg/mflag"
 	"github.com/gorilla/mux"
+
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/ipam"
-	"github.com/weaveworks/weave/ipam/address"
+	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
+	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
 )
 
@@ -32,48 +36,61 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		config       weave.Config
-		justVersion  bool
-		ifaceName    string
-		routerName   string
-		nickName     string
-		password     string
-		wait         int
-		debug        bool
-		pktdebug     bool
-		prof         string
-		bufSzMB      int
-		noDiscovery  bool
-		httpAddr     string
-		iprangeCIDR  string
-		ipsubnetCIDR string
-		peerCount    int
-		apiPath      string
-		peers        []string
+		config             weave.Config
+		justVersion        bool
+		protocolMinVersion int
+		ifaceName          string
+		routerName         string
+		nickName           string
+		password           string
+		wait               int
+		pktdebug           bool
+		logLevel           string
+		prof               string
+		bufSzMB            int
+		noDiscovery        bool
+		httpAddr           string
+		iprangeCIDR        string
+		ipsubnetCIDR       string
+		peerCount          int
+		apiPath            string
+		peers              []string
+		noDNS              bool
+		dnsDomain          string
+		dnsPort            int
+		dnsTTL             int
+		dnsClientTimeout   time.Duration
 	)
 
-	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.IntVar(&config.Port, "port", weave.Port, "router port")
-	flag.StringVar(&ifaceName, "iface", "", "name of interface to capture/inject from (disabled if blank)")
-	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
-	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
-	flag.StringVar(&password, "password", "", "network password")
-	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (0 = don't wait)")
-	flag.BoolVar(&debug, "debug", false, "enable debug logging")
-	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
-	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")
-	flag.IntVar(&config.ConnLimit, "connlimit", 30, "connection limit (0 for unlimited)")
-	flag.BoolVar(&noDiscovery, "nodiscovery", false, "disable peer discovery")
-	flag.IntVar(&bufSzMB, "bufsz", 8, "capture buffer size in MB")
-	flag.StringVar(&httpAddr, "httpaddr", fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
-	flag.StringVar(&iprangeCIDR, "iprange", "", "IP address range reserved for automatic allocation, in CIDR notation")
-	flag.StringVar(&ipsubnetCIDR, "ipsubnet", "", "subnet to allocate within by default, in CIDR notation")
-	flag.IntVar(&peerCount, "initpeercount", 0, "number of peers in network (for IP address allocation)")
-	flag.StringVar(&apiPath, "api", "unix:///var/run/docker.sock", "Path to Docker API socket")
-	flag.Parse()
-	peers = flag.Args()
+	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
+	mflag.IntVar(&config.Port, []string{"#port", "-port"}, weave.Port, "router port")
+	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, weave.ProtocolMinVersion, "minimum weave protocol version")
+	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
+	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
+	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
+	mflag.StringVar(&password, []string{"#password", "-password"}, "", "network password")
+	mflag.IntVar(&wait, []string{"#wait", "-wait"}, -1, "number of seconds to wait for interface to come up (0=don't wait, -1=wait forever)")
+	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
+	mflag.BoolVar(&pktdebug, []string{"#pktdebug", "#-pktdebug", "-pkt-debug"}, false, "enable per-packet debug logging")
+	mflag.StringVar(&prof, []string{"#profile", "-profile"}, "", "enable profiling and write profiles to given path")
+	mflag.IntVar(&config.ConnLimit, []string{"#connlimit", "#-connlimit", "-conn-limit"}, 30, "connection limit (0 for unlimited)")
+	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
+	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
+	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
+	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
+	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
+	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
+	mflag.StringVar(&apiPath, []string{"#api", "-api"}, "unix:///var/run/docker.sock", "Path to Docker API socket")
+	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
+	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
+	mflag.IntVar(&dnsPort, []string{"-dns-port"}, nameserver.DefaultPort, "port to listen on for DNS requests")
+	mflag.IntVar(&dnsTTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
+	mflag.DurationVar(&dnsClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 
-	InitDefaultLogging(debug)
+	mflag.Parse()
+	peers = mflag.Args()
+
+	SetLogLevel(logLevel)
 	if justVersion {
 		fmt.Printf("weave router %s\n", version)
 		os.Exit(0)
@@ -81,6 +98,11 @@ func main() {
 
 	Log.Println("Command line options:", options())
 	Log.Println("Command line peers:", peers)
+
+	if protocolMinVersion < weave.ProtocolMinVersion || protocolMinVersion > weave.ProtocolMaxVersion {
+		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", weave.ProtocolMinVersion, weave.ProtocolMaxVersion)
+	}
+	config.ProtocolMinVersion = byte(protocolMinVersion)
 
 	var err error
 
@@ -93,7 +115,7 @@ func main() {
 
 	if routerName == "" {
 		if config.Iface == nil {
-			Log.Fatal("Either an interface must be specified with -iface or a name with -name")
+			Log.Fatal("Either an interface must be specified with --iface or a name with -name")
 		}
 		routerName = config.Iface.HardwareAddr.String()
 	}
@@ -133,20 +155,40 @@ func main() {
 	router := weave.NewRouter(config, name, nickName)
 	Log.Println("Our name is", router.Ourself)
 
+	dockerCli, err := docker.NewClient(apiPath)
+	if err != nil {
+		Log.Fatal("Unable to start docker client: ", err)
+	}
+
 	var allocator *ipam.Allocator
 	var defaultSubnet address.CIDR
-	var dockerCli *docker.Client
 	if iprangeCIDR != "" {
 		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
-		dockerCli, err = docker.NewClient(apiPath)
-		if err != nil {
-			Log.Fatal("Unable to start docker client: ", err)
-		}
 		if err = dockerCli.AddObserver(allocator); err != nil {
 			Log.Fatal("Unable to start watcher", err)
 		}
 	} else if peerCount > 0 {
-		Log.Fatal("-initpeercount flag specified without -iprange")
+		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
+	}
+
+	var (
+		ns        *nameserver.Nameserver
+		dnsserver *nameserver.DNSServer
+	)
+	if !noDNS {
+		ns = nameserver.New(router.Ourself.Peer.Name, router.Peers, dockerCli, dnsDomain)
+		ns.SetGossip(router.NewGossip("nameserver", ns))
+		if err = dockerCli.AddObserver(ns); err != nil {
+			Log.Fatal("Unable to start watcher", err)
+		}
+		ns.Start()
+		defer ns.Stop()
+		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsPort, uint32(dnsTTL), dnsClientTimeout)
+		if err != nil {
+			Log.Fatal("Unable to start dns server: ", err)
+		}
+		dnsserver.ActivateAndServe()
+		defer dnsserver.Stop()
 	}
 
 	router.Start()
@@ -155,10 +197,10 @@ func main() {
 	}
 
 	// The weave script always waits for a status call to succeed,
-	// so there is no point in doing "weave launch -httpaddr ''".
+	// so there is no point in doing "weave launch --http-addr ''".
 	// This is here to support stand-alone use of weaver.
 	if httpAddr != "" {
-		go handleHTTP(router, httpAddr, allocator, defaultSubnet, dockerCli)
+		go handleHTTP(router, httpAddr, allocator, defaultSubnet, dockerCli, ns, dnsserver)
 	}
 
 	SignalHandlerLoop(router)
@@ -174,14 +216,24 @@ func errorMessages(errors []error) string {
 
 func options() map[string]string {
 	options := make(map[string]string)
-	flag.Visit(func(f *flag.Flag) {
+	mflag.Visit(func(f *mflag.Flag) {
 		value := f.Value.String()
-		if f.Name == "password" {
+		name := canonicalName(f)
+		if name == "password" {
 			value = "<elided>"
 		}
-		options[f.Name] = value
+		options[name] = value
 	})
 	return options
+}
+
+func canonicalName(f *mflag.Flag) string {
+	for _, n := range f.Names {
+		if n[0] != '#' {
+			return strings.TrimLeft(n, "#-")
+		}
+	}
+	return ""
 }
 
 func logFrameFunc(debug bool) weave.LogFrameFunc {
@@ -252,12 +304,22 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	return quorum
 }
 
-func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator, defaultSubnet address.CIDR, docker *docker.Client) {
+func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator, defaultSubnet address.CIDR, docker *docker.Client, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
 	muxRouter := mux.NewRouter()
 
 	if allocator != nil {
 		allocator.HandleHTTP(muxRouter, defaultSubnet, docker)
 	}
+
+	if ns != nil {
+		ns.HandleHTTP(muxRouter)
+	}
+
+	muxRouter.Methods("GET").Path("/status").Headers("Accept", "application/json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json, _ := router.StatusJSON(version)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(json)
+	})
 
 	muxRouter.Methods("GET").Path("/status").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "weave router", version)
@@ -266,11 +328,13 @@ func handleHTTP(router *weave.Router, httpAddr string, allocator *ipam.Allocator
 			fmt.Fprintln(w, allocator.String())
 			fmt.Fprintln(w, "Allocator default subnet:", defaultSubnet)
 		}
-	})
-
-	muxRouter.Methods("GET").Path("/status-json").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json, _ := router.StatusJSON(version)
-		w.Write(json)
+		fmt.Fprintln(w, "")
+		if dnsserver == nil {
+			fmt.Fprintln(w, "WeaveDNS is disabled")
+		} else {
+			fmt.Fprintln(w, dnsserver.String())
+			fmt.Fprintln(w, ns.String())
+		}
 	})
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

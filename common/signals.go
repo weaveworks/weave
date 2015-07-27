@@ -15,22 +15,22 @@ type SignalReceiver interface {
 
 func SignalHandlerLoop(ss ...SignalReceiver) {
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGUSR1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGUSR1, syscall.SIGTERM)
 	buf := make([]byte, 1<<20)
 	for {
 		switch <-sigs {
-		case syscall.SIGINT:
-			Log.Infof("=== received SIGINT ===\n*** exiting\n")
+		case syscall.SIGINT, syscall.SIGTERM:
+			Log.Infof("=== received SIGINT/SIGTERM ===\n*** exiting")
 			for _, subsystem := range ss {
 				subsystem.Stop()
 			}
 			return
 		case syscall.SIGQUIT:
 			stacklen := runtime.Stack(buf, true)
-			Log.Infof("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end\n", buf[:stacklen])
+			Log.Infof("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end", buf[:stacklen])
 		case syscall.SIGUSR1:
 			for _, subsystem := range ss {
-				Log.Infof("=== received SIGUSR1 ===\n*** status...\n%s\n*** end\n", subsystem.Status())
+				Log.Infof("=== received SIGUSR1 ===\n*** status...\n%s\n*** end", subsystem.Status())
 			}
 		}
 	}

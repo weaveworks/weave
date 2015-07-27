@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -26,21 +27,29 @@ var (
 	containerCreateRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
 	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
 	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
+
+	ErrInvalidNetworkMode = errors.New("--net option")
+	ErrWeaveCIDRNone      = errors.New("WEAVE_CIDR=none")
+	ErrNoDefaultIPAM      = errors.New("--no-default-ipam option")
 )
 
 type Config struct {
-	ListenAddrs   []string
-	NoDefaultIPAM bool
-	TLSConfig     TLSConfig
-	Version       string
-	WithDNS       bool
-	WithoutDNS    bool
+	HostnameMatch       string
+	HostnameReplacement string
+	ListenAddrs         []string
+	NoDefaultIPAM       bool
+	NoRewriteHosts      bool
+	TLSConfig           TLSConfig
+	Version             string
+	WithDNS             bool
+	WithoutDNS          bool
 }
 
 type Proxy struct {
 	Config
-	client         *docker.Client
-	dockerBridgeIP string
+	client              *docker.Client
+	dockerBridgeIP      string
+	hostnameMatchRegexp *regexp.Regexp
 }
 
 func NewProxy(c Config) (*Proxy, error) {
@@ -57,11 +66,17 @@ func NewProxy(c Config) (*Proxy, error) {
 	p.client = client
 
 	if !p.WithoutDNS {
-		dockerBridgeIP, err := callWeave("docker-bridge-ip")
+		dockerBridgeIP, stderr, err := callWeave("docker-bridge-ip")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf(string(stderr))
 		}
 		p.dockerBridgeIP = string(dockerBridgeIP)
+	}
+
+	p.hostnameMatchRegexp, err = regexp.Compile(c.HostnameMatch)
+	if err != nil {
+		err := fmt.Errorf("Incorrect hostname match '%s': %s", c.HostnameMatch, err.Error())
+		return nil, err
 	}
 
 	return p, nil
@@ -181,14 +196,22 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 	return listener, fmt.Sprintf("%s://%s", proto, addr), nil
 }
 
-func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config) ([]string, bool) {
+func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, error) {
+	if hostConfig != nil &&
+		hostConfig.NetworkMode != "" &&
+		hostConfig.NetworkMode != "bridge" {
+		return nil, ErrInvalidNetworkMode
+	}
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
 			if e[11:] == "none" {
-				return nil, false
+				return nil, ErrWeaveCIDRNone
 			}
-			return strings.Fields(e[11:]), true
+			return strings.Fields(e[11:]), nil
 		}
 	}
-	return nil, !proxy.NoDefaultIPAM
+	if proxy.NoDefaultIPAM {
+		return nil, ErrNoDefaultIPAM
+	}
+	return nil, nil
 }

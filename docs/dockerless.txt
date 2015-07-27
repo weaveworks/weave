@@ -125,8 +125,8 @@ VM2> nc 192.168.122.2 6783
 If all is well, you should now be able to launch weave on VM1
 then on VM2:
 
-VM1> weaver -iface veth6 -name vm1
-VM2> weaver -iface veth6 -name vm2 192.168.122.2
+VM1> weaver --iface veth6 --name vm1
+VM2> weaver --iface veth6 --name vm2 192.168.122.2
 
 Once the connection is up and running, you should be able to connect
 from VM1/ns2 to VM2/ns2 and vice versa:

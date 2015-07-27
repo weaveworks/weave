@@ -24,8 +24,8 @@ const (
 	PMTUVerifyTimeout   = 10 * time.Millisecond // gets doubled with every attempt
 	MaxDuration         = time.Duration(math.MaxInt64)
 	MaxMissedHeartbeats = 6
-	HeaderTimeout       = 10 * time.Second
 	HeartbeatTimeout    = MaxMissedHeartbeats * SlowHeartbeat
+	MaxTCPMsgSize       = 10 * 1024 * 1024
 )
 
 var (

@@ -30,32 +30,39 @@ start it simultaneously with the router and weaveDNS via `launch`:
 
 or independently via `launch-proxy`:
 
-    host1$ weave launch-router && weave launch-dns && weave launch-proxy
+    host1$ weave launch-router && weave launch-proxy
 
 The first form is more convenient, however you can only pass proxy
 related configuration arguments to `launch-proxy` so if you need to
 modify the default behaviour you will have to use the latter.
 
-By default, the proxy listens on /var/run/weave.sock and port 12375, on
-all network interfaces. This can be adjusted with the `-H` argument, e.g.
+By default, the proxy decides where to listen based on how the
+launching client connects to docker. If the launching client connected
+over a unix socket, the proxy will listen on /var/run/weave.sock. If
+the launching client connected over TCP, the proxy will listen on port
+12375, on all network interfaces. This can be adjusted with the `-H`
+argument, e.g.
 
     host1$ weave launch-proxy -H tcp://127.0.0.1:9999
 
-Multiple -H arguments can be specified. If you are working with a remote
-docker daemon, then any firewalls inbetween need to be configured to permit
-access to the proxy port.
+When launching the proxy via TLS, `-H` and/or [TLS options](#tls) are
+required.
+
+Multiple `-H` arguments can be specified. If you are working with a
+remote docker daemon, then any firewalls inbetween need to be
+configured to permit access to the proxy port.
 
 All docker commands can be run via the proxy, so it is safe to adjust
 your `DOCKER_HOST` to point at the proxy. Weave provides a convenient
 command for this:
 
-    host1$ eval "$(weave proxy-env)"
+    host1$ eval "$(weave env)"
     host1$ docker ps
     ...
 
 Alternatively, the proxy host can be set on a per-command basis with
 
-    host1$ docker $(weave proxy-config) ps
+    host1$ docker $(weave config) ps
 
 The proxy can be stopped independently with
 
@@ -103,7 +110,7 @@ special environment variables or other options*.
 
 To use a specific subnet, we pass a `WEAVE_CIDR` to the container, e.g.
 
-    host1$ docker run -ti -e WEAVE_CIDR=net:10.128.0.0/24 ubuntu
+    host1$ docker run -ti -e WEAVE_CIDR=net:10.32.2.0/24 ubuntu
 
 To start a container without connecting it to the weave network, pass
 `WEAVE_CIDR=none`, e.g.
@@ -130,6 +137,35 @@ automatically if it is running at the point when they are started -
 see the [weaveDNS usage](weavedns.html#usage) section for an in-depth
 explanation of the behaviour and how to control it.
 
+Typically, the proxy will pass on container names as-is to [weaveDNS](weavedns.html)
+for registration. However, there are situations in which the final container
+name is out of the user's control (e.g. when using Docker orchestrators which
+append control/namespacing identifiers to the original container names).
+
+For those situations, the proxy provides two flags: `--hostname-match <regexp>`
+and `--hostname-replacement <replacement>`. When launching a container, its name
+is matched against regular expression `<regexp>`. Then, based on that match,
+`<replacement>` will be used to generate a hostname, which will ultimately be
+handed over to weaveDNS for registration.
+
+For instance, if we launch the proxy using
+`--hostname-match '^aws-[0-9]+-(.*)$'` and `--hostname-replacement 'my-app-$1'`
+
+    host1$ weave launch-router && weave launch-proxy --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
+    host1$ eval "$(weave env)"
+
+then, running a container named `aws-12798186823-foo` will lead to weaveDNS registering
+hostname `my-app-foo` and not `aws-12798186823-foo`.
+
+    host1$ docker run -ti --name=aws-12798186823-foo ubuntu ping my-app-foo
+    PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.
+    64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=1 ttl=64 time=0.027 ms
+    64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=2 ttl=64 time=0.067 ms
+
+Note how regexp substitution groups should be prepended with a dollar sign
+(e.g. `$1`). For further details on the regular expression syntax please see
+[Google's re2 documentation](https://github.com/google/re2/wiki/Syntax).
+
 ## <a name="tls"></a>Securing the docker communication with TLS
 
 If you are
@@ -140,8 +176,8 @@ TLS-related command-line flags as supplied to the docker daemon. For
 example, if you have generated your certificates and keys into the
 docker host's `/tls` directory, we can launch the proxy with:
 
-    host1$ weave launch-proxy --tlsverify --tlscacert=/tls/ca.pem \
-             --tlscert=/tls/server-cert.pem --tlskey=/tls/server-key.pem
+    host1$ weave launch-proxy --tls-verify --tls-cacert=/tls/ca.pem \
+             --tls-cert=/tls/server-cert.pem --tls-key=/tls/server-key.pem
 
 The paths to your certificates and key must be provided as absolute
 paths which exist on the docker host.
@@ -157,8 +193,8 @@ for an example.
 With the proxy running over TLS, we can configure our regular docker
 client to use TLS on a per-invocation basis with
 
-    $ docker --tlsverify --tlscacert=ca.pem --tlscert=cert.pem \
-         --tlskey=key.pem -H=tcp://host1:12375 version
+    $ docker --tls-verify --tls-cacert=ca.pem --tls-cert=cert.pem \
+         --tls-key=key.pem -H=tcp://host1:12375 version
     ...
 
 or,
@@ -167,7 +203,7 @@ with
 
     $ mkdir -pv ~/.docker
     $ cp -v {ca,cert,key}.pem ~/.docker
-    $ eval "$(weave proxy-env)"
+    $ eval "$(weave env)"
     $ export DOCKER_TLS_VERIFY=1
     $ docker version
     ...

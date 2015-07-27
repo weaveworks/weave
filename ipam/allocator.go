@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/ipam/address"
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/router"
 )
 
@@ -19,6 +19,7 @@ import (
 const (
 	msgSpaceRequest = iota
 	msgRingUpdate
+	msgSpaceRequestDenied
 
 	paxosInterval = time.Second * 5
 	MinSubnetSize = 4 // first and last addresses are excluded, so 2 would be too small
@@ -64,7 +65,7 @@ func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname st
 	return &Allocator{
 		ourName:   ourName,
 		universe:  universe,
-		ring:      ring.New(universe.Start, address.Add(universe.Start, universe.Size()), ourName),
+		ring:      ring.New(universe.Start, universe.End, ourName),
 		owned:     make(map[string][]address.Address),
 		paxos:     paxos.NewNode(ourName, ourUID, quorum),
 		nicknames: map[router.PeerName]string{ourName: ourNickname},
@@ -163,6 +164,18 @@ func (alloc *Allocator) tryPendingOps() {
 	}
 }
 
+func (alloc *Allocator) spaceRequestDenied(sender router.PeerName, r address.Range) {
+	for i := 0; i < len(alloc.pendingClaims); {
+		claim := alloc.pendingClaims[i].(*claim)
+		if r.Contains(claim.addr) {
+			claim.DeniedBy(alloc, sender)
+			alloc.pendingClaims = append(alloc.pendingClaims[:i], alloc.pendingClaims[i+1:]...)
+			continue
+		}
+		i++
+	}
+}
+
 func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 	return func() bool {
 		select {
@@ -202,21 +215,18 @@ func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, 
 }
 
 // Claim an address that we think we should own (Sync)
-func (alloc *Allocator) Claim(ident string, addr address.Address, cancelChan <-chan bool) error {
+func (alloc *Allocator) Claim(ident string, addr address.Address) error {
 	resultChan := make(chan error)
-	op := &claim{resultChan: resultChan, ident: ident, addr: addr,
-		hasBeenCancelled: hasBeenCancelled(cancelChan)}
+	op := &claim{resultChan: resultChan, ident: ident, addr: addr}
 	alloc.doOperation(op, &alloc.pendingClaims)
 	return <-resultChan
 }
 
 // ContainerDied is provided to satisfy the updater interface; does a 'Delete' underneath.  Sync.
-func (alloc *Allocator) ContainerDied(ident string) error {
-	err := alloc.Delete(ident)
-	if err == nil {
+func (alloc *Allocator) ContainerDied(ident string) {
+	if err := alloc.Delete(ident); err == nil {
 		alloc.debugln("Container", ident, "died; released addresses")
 	}
-	return err
 }
 
 // Delete (Sync) - release all IP addresses for container with given name
@@ -343,6 +353,11 @@ func (alloc *Allocator) pruneNicknames() {
 	}
 }
 
+func decodeRange(msg []byte) (r address.Range, err error) {
+	decoder := gob.NewDecoder(bytes.NewReader(msg))
+	return r, decoder.Decode(&r)
+}
+
 // OnGossipUnicast (Sync)
 func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) error {
 	alloc.debugln("OnGossipUnicast from", sender, ": ", len(msg), "bytes")
@@ -351,27 +366,30 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 		switch msg[0] {
 		case msgSpaceRequest:
 			// some other peer asked us for space
-			decoder := gob.NewDecoder(bytes.NewReader(msg[1:]))
-			var r address.Range
-			if err := decoder.Decode(&r); err != nil {
-				resultChan <- err
-				return
+			r, err := decodeRange(msg[1:])
+			if err == nil {
+				alloc.donateSpace(r, sender)
 			}
-			alloc.donateSpace(r, sender)
-			resultChan <- nil
+			resultChan <- err
+		case msgSpaceRequestDenied:
+			r, err := decodeRange(msg[1:])
+			if err == nil {
+				alloc.spaceRequestDenied(sender, r)
+			}
+			resultChan <- err
 		case msgRingUpdate:
-			resultChan <- alloc.update(msg[1:])
+			resultChan <- alloc.update(sender, msg[1:])
 		}
 	}
 	return <-resultChan
 }
 
 // OnGossipBroadcast (Sync)
-func (alloc *Allocator) OnGossipBroadcast(msg []byte) (router.GossipData, error) {
-	alloc.debugln("OnGossipBroadcast:", len(msg), "bytes")
+func (alloc *Allocator) OnGossipBroadcast(sender router.PeerName, msg []byte) (router.GossipData, error) {
+	alloc.debugln("OnGossipBroadcast from", sender, ":", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.update(msg)
+		resultChan <- alloc.update(sender, msg)
 	}
 	return alloc.Gossip(), <-resultChan
 }
@@ -420,7 +438,7 @@ func (alloc *Allocator) OnGossip(msg []byte) (router.GossipData, error) {
 	alloc.debugln("Allocator.OnGossip:", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.update(msg)
+		resultChan <- alloc.update(router.UnknownPeerName, msg)
 	}
 	return nil, <-resultChan // for now, we never propagate updates. TBD
 }
@@ -575,13 +593,22 @@ func (alloc *Allocator) propose() {
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
-func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) error {
+func encodeRange(r address.Range) []byte {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	if err := enc.Encode(r); err != nil {
 		panic(err)
 	}
-	msg := router.Concat([]byte{msgSpaceRequest}, buf.Bytes())
+	return buf.Bytes()
+}
+
+func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) error {
+	msg := router.Concat([]byte{msgSpaceRequest}, encodeRange(r))
+	return alloc.gossip.GossipUnicast(dest, msg)
+}
+
+func (alloc *Allocator) sendSpaceRequestDenied(dest router.PeerName, r address.Range) error {
+	msg := router.Concat([]byte{msgSpaceRequestDenied}, encodeRange(r))
 	return alloc.gossip.GossipUnicast(dest, msg)
 }
 
@@ -590,7 +617,7 @@ func (alloc *Allocator) sendRingUpdate(dest router.PeerName) {
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
-func (alloc *Allocator) update(msg []byte) error {
+func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 	reader := bytes.NewReader(msg)
 	decoder := gob.NewDecoder(reader)
 	var data gossipState
@@ -614,6 +641,10 @@ func (alloc *Allocator) update(msg []byte) error {
 	// shouldn't get updates for a empty Ring. But tolerate
 	// them just in case.
 	if data.Ring != nil {
+		if data.Ring.Range() != alloc.universe {
+			return fmt.Errorf("Incompatible IP allocation range %s; ours is %s",
+				data.Ring.Range().AsCIDRString(), alloc.universe.AsCIDRString())
+		}
 		err = alloc.ring.Merge(*data.Ring)
 		if !alloc.ring.Empty() {
 			alloc.pruneNicknames()
@@ -622,16 +653,22 @@ func (alloc *Allocator) update(msg []byte) error {
 		return err
 	}
 
-	if data.Paxos != nil && alloc.ring.Empty() {
-		if alloc.paxos.Update(data.Paxos) {
-			if alloc.paxos.Think() {
-				// If something important changed, broadcast
-				alloc.gossip.GossipBroadcast(alloc.Gossip())
-			}
+	if data.Paxos != nil {
+		if alloc.ring.Empty() {
+			if alloc.paxos.Update(data.Paxos) {
+				if alloc.paxos.Think() {
+					// If something important changed, broadcast
+					alloc.gossip.GossipBroadcast(alloc.Gossip())
+				}
 
-			if ok, cons := alloc.paxos.Consensus(); ok {
-				alloc.createRing(cons.Value)
+				if ok, cons := alloc.paxos.Consensus(); ok {
+					alloc.createRing(cons.Value)
+				}
 			}
+		} else if sender != router.UnknownPeerName {
+			// Sender is trying to initialize a ring, but we have one
+			// already - send it straight back
+			alloc.sendRingUpdate(sender)
 		}
 	}
 
@@ -652,10 +689,14 @@ func (alloc *Allocator) donateSpace(r address.Range, to router.PeerName) {
 		free := alloc.space.NumFreeAddressesInRange(r)
 		common.Assert(free == 0)
 		alloc.debugln("No space to give to peer", to)
+		// separate message maintains backwards-compatibility:
+		// down-level peers will ignore this and still get the ring update.
+		alloc.sendSpaceRequestDenied(to, r)
 		return
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
+	alloc.sendRingUpdate(to)
 }
 
 func (alloc *Allocator) assertInvariants() {

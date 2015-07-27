@@ -60,8 +60,8 @@ func (router *Router) DeleteTestChannelConnection(r *Router) {
 	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
 
-	fromPeer, _ := r.Peers.Fetch(fromName)
-	toPeer, _ := router.Peers.Fetch(toName)
+	fromPeer := r.Peers.Fetch(fromName)
+	toPeer := router.Peers.Fetch(toName)
 
 	r.Peers.Dereference(fromPeer)
 	router.Peers.Dereference(toPeer)
@@ -212,7 +212,7 @@ func (g *testGossiper) OnGossipUnicast(sender PeerName, msg []byte) error {
 	return nil
 }
 
-func (g *testGossiper) OnGossipBroadcast(update []byte) (GossipData, error) {
+func (g *testGossiper) OnGossipBroadcast(_ PeerName, update []byte) (GossipData, error) {
 	g.Lock()
 	defer g.Unlock()
 	for _, v := range update {

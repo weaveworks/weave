@@ -14,27 +14,29 @@ import (
 )
 
 const (
-	macMaxAge      = 10 * time.Minute     // [1]
-	tcpAcceptDelay = 1 * time.Millisecond // [2]
+	macMaxAge        = 10 * time.Minute       // [1]
+	acceptMaxTokens  = 100                    // [2]
+	acceptTokenDelay = 100 * time.Millisecond // [3]
 )
 
 // [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
 // /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 
-// [2] time to wait between accepting tcp connections. This guards
-// against brute-force attacks on the password when encryption is in
-// use. It is also a basic DoS defence.
+// [2] capacity of token bucket for rate limiting accepts
+
+// [3] control rate at which new tokens are added to the bucket
 
 type LogFrameFunc func(string, []byte, *EthernetDecoder)
 
 type Config struct {
-	Port          int
-	Iface         *net.Interface
-	Password      []byte
-	ConnLimit     int
-	PeerDiscovery bool
-	BufSz         int
-	LogFrame      LogFrameFunc
+	Port               int
+	ProtocolMinVersion byte
+	Iface              *net.Interface
+	Password           []byte
+	ConnLimit          int
+	PeerDiscovery      bool
+	BufSz              int
+	LogFrame           LogFrameFunc
 }
 
 type Router struct {
@@ -48,6 +50,7 @@ type Router struct {
 	gossipChannels  GossipChannels
 	TopologyGossip  Gossip
 	UDPListener     *net.UDPConn
+	acceptLimiter   *TokenBucket
 }
 
 type PacketSource interface {
@@ -74,11 +77,13 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 	}
 	router.Ourself = NewLocalPeer(name, nickName, router)
 	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
-	router.Peers = NewPeers(router.Ourself, onPeerGC)
+	router.Peers = NewPeers(router.Ourself)
+	router.Peers.OnGC(onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
 	router.Routes = NewRoutes(router.Ourself, router.Peers)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
+	router.acceptLimiter = NewTokenBucket(acceptMaxTokens, acceptTokenDelay)
 	return router
 }
 
@@ -205,7 +210,7 @@ func (router *Router) listenTCP(localPort int) {
 				continue
 			}
 			router.acceptTCP(tcpConn)
-			time.Sleep(tcpAcceptDelay)
+			router.acceptLimiter.Wait()
 		}
 	}()
 }
@@ -215,7 +220,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	// on router.Port and we wait for them to send us something on UDP to
 	// start.
 	remoteAddrStr := tcpConn.RemoteAddr().String()
-	Log.Printf("->[%s] connection accepted\n", remoteAddrStr)
+	Log.Printf("->[%s] connection accepted", remoteAddrStr)
 	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr, false, false)
 	StartLocalConnection(connRemote, tcpConn, nil, router, true)
 }
@@ -281,12 +286,9 @@ func (router *Router) udpReader(conn *net.UDPConn, po PacketSink) {
 
 func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *EthernetDecoder, sender *net.UDPAddr, po PacketSink) FrameConsumer {
 	return func(srcNameByte, dstNameByte []byte, frame []byte) {
-		srcPeer, found := router.Peers.Fetch(PeerNameFromBin(srcNameByte))
-		if !found {
-			return
-		}
-		dstPeer, found := router.Peers.Fetch(PeerNameFromBin(dstNameByte))
-		if !found {
+		srcPeer := router.Peers.Fetch(PeerNameFromBin(srcNameByte))
+		dstPeer := router.Peers.Fetch(PeerNameFromBin(dstNameByte))
+		if srcPeer == nil || dstPeer == nil {
 			return
 		}
 
@@ -335,7 +337,7 @@ func (router *Router) handleUDPPacketFunc(relayConn *LocalConnection, dec *Ether
 			checkWarn(po.WritePacket(frame))
 		}
 
-		dstPeer, found = router.Macs.Lookup(dstMac)
+		dstPeer, found := router.Macs.Lookup(dstMac)
 		if !found || dstPeer != router.Ourself.Peer {
 			router.LogFrame("Relaying broadcast", frame, dec)
 			router.Ourself.RelayBroadcast(srcPeer, frame, dec)
@@ -387,7 +389,7 @@ func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
 	return fmt.Errorf("unexpected topology gossip unicast: %v", msg)
 }
 
-func (router *Router) OnGossipBroadcast(update []byte) (GossipData, error) {
+func (router *Router) OnGossipBroadcast(_ PeerName, update []byte) (GossipData, error) {
 	origUpdate, _, err := router.applyTopologyUpdate(update)
 	if err != nil || len(origUpdate) == 0 {
 		return nil, err

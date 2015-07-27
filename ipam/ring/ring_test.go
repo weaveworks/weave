@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/ipam/address"
+	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/router"
 )
 
@@ -212,7 +212,7 @@ func TestMergeErrors(t *testing.T) {
 	// Should Merge two rings for different ranges
 	ring2 = New(start, middle, peer2name)
 	ring2.Entries = []*entry{}
-	require.True(t, ring1.Merge(*ring2) == ErrDifferentSubnets, "Expected ErrDifferentSubnets")
+	require.True(t, ring1.Merge(*ring2) == ErrDifferentRange, "Expected ErrDifferentRange")
 
 	// Cannot Merge newer version of entry I own
 	ring2 = New(start, end, peer2name)

@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/ipam/address"
+	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/router"
 )
 
@@ -66,10 +66,6 @@ func (es entries) get(token address.Address) (*entry, bool) {
 	}
 
 	return nil, false
-}
-
-func (es *entries) remove(i int) {
-	*es = (*es)[:i+copy((*es)[i:], (*es)[i+1:])]
 }
 
 // Is token between entries at i and j?

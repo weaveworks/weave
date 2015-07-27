@@ -15,8 +15,7 @@ start_container() {
 
 start_suite "Resolve unqualified names"
 
-weave_on $HOST1 launch-dns 10.2.254.1/24
-weave_on $HOST1 launch-proxy
+weave_on $HOST1 launch
 
 start_container -e WEAVE_CIDR=$C1/24 --name=c1 -h $NAME
 start_container -e WEAVE_CIDR=$C2/24 --name=c2 -h seetwo.$DOMAIN
