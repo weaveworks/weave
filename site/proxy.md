@@ -104,6 +104,12 @@ Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
 `WEAVE_CIDR="10.2.1.1/24 10.2.2.1/24"`.
 
+The docker IP will still be returned by `docker inspect`. If you want
+`docker inspect` to return the weave IP instead, then the proxy must
+be launced with the `--rewrite-inspect` flag.
+
+    host1$ weave launch-router && weave launch-proxy --rewrite-inspect
+
 ## <a name="ipam"></a>Automatic IP address assignment
 
 If [automatic IP address assignment](ipam.html) is enabled in weave,

@@ -24,9 +24,11 @@ const (
 )
 
 var (
-	containerCreateRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
-	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
-	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
+	containerCreateRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
+	containerStartRegexp   = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
+	containerInspectRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/json$")
+	execCreateRegexp       = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
+	execInspectRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/exec/[^/]*/json$")
 
 	ErrWeaveCIDRNone = errors.New("the container was created with the '-e WEAVE_CIDR=none' option")
 	ErrNoDefaultIPAM = errors.New("the container was created without specifying an IP address with '-e WEAVE_CIDR=...' and the proxy was started with the '--no-default-ipalloc' option")
@@ -36,6 +38,7 @@ type Config struct {
 	HostnameMatch       string
 	HostnameReplacement string
 	ListenAddrs         []string
+	RewriteInspect      bool
 	NoDefaultIPAM       bool
 	NoRewriteHosts      bool
 	TLSConfig           TLSConfig
@@ -123,8 +126,12 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		i = &createContainerInterceptor{proxy}
 	case containerStartRegexp.MatchString(path):
 		i = &startContainerInterceptor{proxy}
+	case containerInspectRegexp.MatchString(path):
+		i = &inspectContainerInterceptor{proxy}
 	case execCreateRegexp.MatchString(path):
 		i = &createExecInterceptor{proxy}
+	case execInspectRegexp.MatchString(path):
+		i = &inspectExecInterceptor{proxy}
 	default:
 		i = &nullInterceptor{}
 	}

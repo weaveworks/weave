@@ -29,6 +29,7 @@ func main() {
 	mflagext.ListVar(&c.ListenAddrs, []string{"H"}, nil, "addresses on which to listen")
 	mflag.StringVar(&c.HostnameMatch, []string{"-hostname-match"}, "(.*)", "Regexp pattern to apply on container names (e.g. '^aws-[0-9]+-(.*)$')")
 	mflag.StringVar(&c.HostnameReplacement, []string{"-hostname-replacement"}, "$1", "Expression to generate hostnames based on matches from --hostname-match (e.g. 'my-app-$1')")
+	mflag.BoolVar(&c.RewriteInspect, []string{"-rewrite-inspect"}, false, "Rewrite 'inspect' calls to return the weave network settings (if attached)")
 	mflag.BoolVar(&c.NoDefaultIPAM, []string{"#-no-default-ipam", "-no-default-ipalloc"}, false, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
 	mflag.BoolVar(&c.NoRewriteHosts, []string{"-no-rewrite-hosts"}, false, "do not automatically rewrite /etc/hosts. Use if you need the docker IP to remain in /etc/hosts")
 	mflag.StringVar(&c.TLSConfig.CACert, []string{"#tlscacert", "-tlscacert"}, "", "Trust certs signed only by this CA")

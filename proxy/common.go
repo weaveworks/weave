@@ -3,12 +3,15 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -61,4 +64,33 @@ func inspectContainerInPath(client *docker.Client, path string) (*docker.Contain
 		Log.Warningf("Error inspecting container %s: %v", containerID, err)
 	}
 	return container, err
+}
+
+func weaveContainerIPs(container *docker.Container) (mac string, ips []net.IP, nets []*net.IPNet, err error) {
+	stdout, stderr, err := callWeave("ps", container.ID)
+	if err != nil || len(stderr) > 0 {
+		err = errors.New(string(stderr))
+		return
+	}
+	if len(stdout) <= 0 {
+		return
+	}
+
+	fields := strings.Fields(string(stdout))
+	if len(fields) < 2 {
+		return
+	}
+	mac = fields[1]
+
+	var ip net.IP
+	var ipnet *net.IPNet
+	for _, cidr := range fields[2:] {
+		ip, ipnet, err = net.ParseCIDR(cidr)
+		if err != nil {
+			return
+		}
+		ips = append(ips, ip)
+		nets = append(nets, ipnet)
+	}
+	return
 }
