@@ -45,7 +45,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 		// If our ring doesn't know, it must be empty.
 		if c.noErrorOnUnknown {
 			alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.addr, c.ident)
-			c.sendResult(nil) // don't make the caller wait
+			c.sendResult(nil)
 		} else {
 			c.sendResult(fmt.Errorf("%s is in the range %s, but the allocator is not initialized yet", c.addr, alloc.universe.AsCIDRString()))
 		}
@@ -58,7 +58,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 				alloc.infof("Claim %s for %s: %s; will try later.", c.addr, c.ident, err)
 				c.sendResult(nil)
 			} else { // just tell the user they can't do this.
-				c.DeniedBy(alloc, owner)
+				c.deniedBy(alloc, owner)
 			}
 		}
 		return false
@@ -84,7 +84,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 	return true
 }
 
-func (c *claim) DeniedBy(alloc *Allocator, owner router.PeerName) {
+func (c *claim) deniedBy(alloc *Allocator, owner router.PeerName) {
 	name, found := alloc.nicknames[owner]
 	if found {
 		name = " (" + name + ")"

@@ -168,7 +168,7 @@ func (alloc *Allocator) spaceRequestDenied(sender router.PeerName, r address.Ran
 	for i := 0; i < len(alloc.pendingClaims); {
 		claim := alloc.pendingClaims[i].(*claim)
 		if r.Contains(claim.addr) {
-			claim.DeniedBy(alloc, sender)
+			claim.deniedBy(alloc, sender)
 			alloc.pendingClaims = append(alloc.pendingClaims[:i], alloc.pendingClaims[i+1:]...)
 			continue
 		}
