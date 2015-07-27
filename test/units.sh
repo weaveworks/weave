@@ -32,7 +32,7 @@ for dir in $TESTDIRS; do
 
     GO_TEST_ARGS_RUN="$GO_TEST_ARGS"
     if [ -n "$SLOW" ]; then
-        COVERPKGS=$(go list -f '{{join .Deps "\n"}}' $dir | grep "weaveworks" | paste -s -d,)
+        COVERPKGS=$((go list $dir; go list -f '{{join .Deps "\n"}}' $dir | grep "weaveworks") | paste -s -d,)
         output=$(mktemp $coverdir/unit.XXXXXXXXXX)
         GO_TEST_ARGS_RUN="$GO_TEST_ARGS -coverprofile=$output -coverpkg=$COVERPKGS"
     fi
