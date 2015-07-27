@@ -40,6 +40,7 @@ weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--no-default-ipalloc] [--no-rewrite-hosts]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
+                      [--rewrite-inspect]
 weave connect       [--replace] [<peer> ...]
 weave forget        <peer> ...
 weave run           [--with-dns | --without-dns] [<addr> ...]
