@@ -65,21 +65,29 @@ Say you have docker running on two hosts, accessible to each other as
 `$HOST1` and `$HOST2`, and want to deploy an application consisting of
 two containers, one on each host.
 
-First start weave on $HOST1:
+On $HOST1 we run:
 
     host1$ weave launch && weave launch-dns && weave launch-proxy
-
-this runs the weave router, DNS and Docker API proxy, each in their
-own container. Next we configure our `DOCKER_HOST` environment
-variable to point to the proxy, so that containers launched via the
-docker command line are automatically attached to the weave network:
-
     host1$ eval $(weave proxy-env)
-
-Finally we run our application container; this happens via the proxy
-so it is automatically allocated an IP address and registered in DNS:
-
     host1$ docker run --name a1 -ti ubuntu
+
+> NB: If the first command results in an error like
+> `http:///var/run/docker.sock/v1.19/containers/create: dial unix
+> /var/run/docker.sock: permission denied. Are you trying to connect
+> to a TLS-enabled daemon without TLS?` then you likely need to be
+> 'root' in order to connect to the Docker daemon. If so, run the
+> above and all subsequent commands in a *single* root shell (e.g. one
+> created with `sudo -s`). Do *not* prefix individual commands with
+> `sudo`, since some commands modify environment entries and hence
+> they all need to be executed from the same shell.
+
+The first line runs the weave router, DNS and Docker API proxy, each
+in their own container. The second line sets the `DOCKER_HOST`
+environment variable to point to the proxy, so that containers
+launched via the docker command line are automatically attached to the
+weave network. Finally, we run our application container; this happens
+via the proxy so it is automatically allocated an IP address and
+registered in DNS.
 
 That's it! If our application consists of more than one container on
 this host we simply launch them with `docker run` as appropriate.
