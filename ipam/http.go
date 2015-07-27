@@ -22,10 +22,11 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		vars := mux.Vars(r)
 		ident := vars["id"]
 		ipStr := vars["ip"]
+		noErrorOnUnknown := r.FormValue("noErrorOnUnknown") == "true"
 		if ip, err := address.ParseIP(ipStr); err != nil {
 			badRequest(w, err)
 			return
-		} else if err := alloc.Claim(ident, ip); err != nil {
+		} else if err := alloc.Claim(ident, ip, noErrorOnUnknown); err != nil {
 			badRequest(w, fmt.Errorf("Unable to claim: %s", err))
 			return
 		}
