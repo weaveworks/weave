@@ -108,6 +108,22 @@ check_docker_version() {
     fi
 }
 
+enforce_docker_bridge_addr_assign_type() {
+    if ! ADDR_ASSIGN_TYPE=$(cat /sys/class/net/$DOCKER_BRIDGE/addr_assign_type 2>/dev/null) ; then
+        echo "Could not determine address assignment type of $DOCKER_BRIDGE" >&2
+        return
+    fi
+    # From include/uapi/linux/netdevice.h
+    # #define NET_ADDR_PERM       0   /* address is permanent (default) */
+    # #define NET_ADDR_RANDOM     1   /* address is generated randomly */
+    # #define NET_ADDR_STOLEN     2   /* address is stolen from other device */
+    # #define NET_ADDR_SET        3   /* address is set using dev_set_mac_address() */
+    if [ $ADDR_ASSIGN_TYPE != 3 ] ; then
+        echo "Setting $DOCKER_BRIDGE MAC (mitigate https://github.com/docker/docker/issues/14908)" >&2
+        ip link set dev $DOCKER_BRIDGE address $(random_mac) || true
+    fi
+}
+
 is_cidr() {
     echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
 }
@@ -1013,6 +1029,7 @@ common_launch_args() {
 }
 
 launch_router() {
+    enforce_docker_bridge_addr_assign_type
     create_bridge
     docker_bridge_ip
     # We set the router name to the bridge mac since that is
