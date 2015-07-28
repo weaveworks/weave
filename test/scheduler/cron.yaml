@@ -1,0 +1,4 @@
+cron:
+- description: periodic gc
+  url: /tasks/gc
+  schedule: every 5 minutes

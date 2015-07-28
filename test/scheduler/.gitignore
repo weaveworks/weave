@@ -1,7 +1,1 @@
-*.egg-info
-*.dist-info
-flask
-jinja2
-markupsafe
-werkzeug
-itsdangerous.*
+lib
