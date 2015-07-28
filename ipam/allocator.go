@@ -95,7 +95,6 @@ func (alloc *Allocator) doOperation(op operation, ops *[]operation) {
 			op.Cancel()
 			return
 		}
-		alloc.establishRing()
 		if !op.Try(alloc) {
 			*ops = append(*ops, op)
 		}

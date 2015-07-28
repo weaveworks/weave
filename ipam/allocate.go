@@ -35,6 +35,8 @@ func (g *allocate) Try(alloc *Allocator) bool {
 		return true
 	}
 
+	alloc.establishRing()
+
 	if ok, addr := alloc.space.Allocate(g.r); ok {
 		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.r)
 		alloc.addOwned(g.ident, addr)
