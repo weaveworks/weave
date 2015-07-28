@@ -2,6 +2,7 @@ package gossip
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 
@@ -15,6 +16,10 @@ type unicastMessage struct {
 	buf    []byte
 }
 type broadcastMessage struct {
+	sender router.PeerName
+	data   router.GossipData
+}
+type gossipMessage struct {
 	sender router.PeerName
 	data   router.GossipData
 }
@@ -46,6 +51,25 @@ func (grouter *TestRouter) gossipBroadcast(sender router.PeerName, update router
 		case gossipChan <- broadcastMessage{sender: sender, data: update}:
 		default: // drop the message if we cannot send it
 			common.Log.Errorf("Dropping message")
+		}
+	}
+	return nil
+}
+
+func (grouter *TestRouter) gossip(sender router.PeerName, update router.GossipData) error {
+	count := int(math.Log2(float64(len(grouter.gossipChans))))
+	for dest, gossipChan := range grouter.gossipChans {
+		if dest == sender {
+			continue
+		}
+		select {
+		case gossipChan <- gossipMessage{sender: sender, data: update}:
+		default: // drop the message if we cannot send it
+			common.Log.Errorf("Dropping message")
+		}
+		count--
+		if count <= 0 {
+			break
 		}
 	}
 	return nil
@@ -98,12 +122,18 @@ func (grouter *TestRouter) run(sender router.PeerName, gossiper router.Gossiper,
 					continue
 				}
 				for _, msg := range message.data.Encode() {
-					// TODO: this should call OnGossipBroadcast, and we should implement
-					// 'trickle' gossip correctly in this mock.  But no one depends on this
-					// difference for testing right now, so we abuse the interface here.
+					if _, err := gossiper.OnGossipBroadcast(message.sender, msg); err != nil {
+						panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
+					}
+				}
+			case gossipMessage:
+				if rand.Float32() > (1.0 - grouter.loss) {
+					continue
+				}
+				for _, msg := range message.data.Encode() {
 					diff, err := gossiper.OnGossip(msg)
 					if err != nil {
-						panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
+						panic(fmt.Sprintf("Error doing gossip: %s", err))
 					}
 					if diff == nil {
 						continue
@@ -111,15 +141,16 @@ func (grouter *TestRouter) run(sender router.PeerName, gossiper router.Gossiper,
 					// Sanity check - reconsuming the diff should yield nil
 					for _, diffMsg := range diff.Encode() {
 						if nextDiff, err := gossiper.OnGossip(diffMsg); err != nil {
-							panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
+							panic(fmt.Sprintf("Error doing gossip: %s", err))
 						} else if nextDiff != nil {
 							panic(fmt.Sprintf("Breach of gossip interface: %v != nil", nextDiff))
 						}
 					}
+					grouter.gossip(message.sender, diff)
 				}
 			}
 		case <-gossipTimer:
-			grouter.gossipBroadcast(sender, gossiper.Gossip())
+			grouter.gossip(sender, gossiper.Gossip())
 		}
 	}
 }
