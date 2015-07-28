@@ -33,7 +33,6 @@ WEAVE_EXPORT=weave.tar
 WEAVEEXEC_DOCKER_VERSION=1.3.1
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
-COVERAGE_MODULES=$(shell go list -f '{{join .Deps "\n"}}' ./prog/weaver | grep "weaveworks" | paste -s -d,)
 NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	rm $@; \
 	echo "\nYour go standard library was built without the 'netgo' build tag."; \
@@ -50,8 +49,9 @@ travis: $(EXES)
 update:
 	go get -u -f -v -tags -netgo $(addprefix ./,$(dir $(EXES)))
 
-$(WEAVER_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVER_EXE) $(WEAVEPROXY_EXE): common/*.go common/*/*.go net/*.go
 ifeq ($(COVERAGE),true)
+	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "weaveworks") | paste -s -d,))
 	go get -t -tags netgo ./$(@D)
 	go test -c -o ./$@ -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" \
 		-tags netgo -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
@@ -61,7 +61,7 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEPROXY_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
+$(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	go get -tags netgo ./$(@D)
 	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
 	$(NETGO_CHECK)
