@@ -1,7 +1,14 @@
+import collections
+import json
+import logging
 import operator
+import re
 
 import flask
+from oauth2client.client import GoogleCredentials
+from googleapiclient import discovery
 
+from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 
 app = flask.Flask('scheduler')
@@ -11,6 +18,9 @@ app.debug = True
 # test run times.  Higher alpha discounts historic
 # observations faster.
 alpha = 0.3
+
+PROJECT = 'positive-cocoa-90213'
+ZONE = 'us-central1-a'
 
 class Test(ndb.Model):
   total_run_time = ndb.FloatProperty(default=0.) # Not total, but a EWMA
@@ -64,3 +74,39 @@ def schedule(test_run, shard_count, shard):
   # atomically insert or retrieve existing schedule
   schedule = Schedule.get_or_insert(schedule_id, shards=shards)
   return flask.json.jsonify(tests=schedule.shards[str(shard)])
+
+NAME_RE = re.compile(r'^host(?P<index>\d+)-(?P<build>\d+)-(?P<shard>\d+)$')
+
+@app.route('/tasks/gc')
+def gc():
+  # Get list of running VMs, pick build id out of VM name
+  credentials = GoogleCredentials.get_application_default()
+  compute = discovery.build('compute', 'v1', credentials=credentials)
+  instances = compute.instances().list(project=PROJECT, zone=ZONE).execute()
+  host_by_build = collections.defaultdict(list)
+  for instance in instances['items']:
+    matches = NAME_RE.match(instance['name'])
+    if matches is None:
+      continue
+    host_by_build[int(matches.group('build'))].append(instance['name'])
+  logging.info("Running VMs by build: %r", host_by_build)
+
+  # Get list of builds, filter down to runnning builds
+  result = urlfetch.fetch('https://circleci.com/api/v1/project/weaveworks/weave',
+    headers={'Accept': 'application/json'})
+  assert result.status_code == 200
+  builds = json.loads(result.content)
+  running = {build['build_num'] for build in builds if build['status'] == 'running'}
+  logging.info("Runnings builds: %r", running)
+
+  # Stop VMs for builds that aren't running
+  stopped = []
+  for build, names in host_by_build.iteritems():
+    if build in running:
+      continue
+    for name in names:
+      stopped.append(name)
+      logging.info("Stopping VM %s", name)
+      compute.instances().delete(project=PROJECT, zone=ZONE, instance=name).execute()
+
+  return (flask.json.jsonify(running=list(running), stopped=stopped), 200)

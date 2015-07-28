@@ -7,8 +7,10 @@ threadsafe: true
 handlers:
 - url: .*
   script: main.app
+- url: /tasks/*
+  script: main.app
+  login: admin
 
 libraries:
 - name: webapp2
   version: latest
-
