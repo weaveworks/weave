@@ -38,6 +38,8 @@ func (c *claim) Try(alloc *Allocator) bool {
 		return true
 	}
 
+	alloc.establishRing()
+
 	switch owner := alloc.ring.Owner(c.addr); owner {
 	case alloc.ourName:
 		// success
