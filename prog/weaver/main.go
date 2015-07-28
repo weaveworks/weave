@@ -57,7 +57,7 @@ func main() {
 		peers              []string
 		noDNS              bool
 		dnsDomain          string
-		dnsPort            int
+		dnsListenAddress   string
 		dnsTTL             int
 		dnsClientTimeout   time.Duration
 	)
@@ -83,7 +83,7 @@ func main() {
 	mflag.StringVar(&apiPath, []string{"#api", "-api"}, "unix:///var/run/docker.sock", "Path to Docker API socket")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
-	mflag.IntVar(&dnsPort, []string{"-dns-port"}, nameserver.DefaultPort, "port to listen on for DNS requests")
+	mflag.StringVar(&dnsListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
 	mflag.IntVar(&dnsTTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
 	mflag.DurationVar(&dnsClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 
@@ -183,7 +183,7 @@ func main() {
 		}
 		ns.Start()
 		defer ns.Stop()
-		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsPort, uint32(dnsTTL), dnsClientTimeout)
+		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsListenAddress, uint32(dnsTTL), dnsClientTimeout)
 		if err != nil {
 			Log.Fatal("Unable to start dns server: ", err)
 		}

@@ -20,7 +20,7 @@ func TestTruncation(t *testing.T) {
 	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
 	nameserver := New(peername, nil, nil, "")
-	dnsserver, err := NewDNSServer(nameserver, "weave.local.", 0, 30, 5*time.Second)
+	dnsserver, err := NewDNSServer(nameserver, "weave.local.", "0.0.0.0:0", 30, 5*time.Second)
 	require.Nil(t, err)
 	udpPort := dnsserver.servers[0].PacketConn.LocalAddr().(*net.UDPAddr).Port
 	tcpPort := dnsserver.servers[1].Listener.Addr().(*net.TCPAddr).Port
