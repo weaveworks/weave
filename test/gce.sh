@@ -81,6 +81,12 @@ EOF
 	ssh -t $name sudo docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 }
 
+function copy_hosts {
+	hostname=$1
+	hosts=$2
+	cat $hosts | ssh -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
+}
+
 # Create new set of VMs
 function setup {
 	destroy
@@ -105,9 +111,10 @@ function setup {
 		sudo sh -c "echo \"$(external_ip $json $name) $hostname\" >>/etc/hosts"
 		try_connect $hostname
 
-		# Copy the /etc/hosts we built over
-		cat $hosts | ssh -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
+		copy_hosts $hostname $hosts &
 	done
+
+	wait
 
 	rm $hosts $json
 }
