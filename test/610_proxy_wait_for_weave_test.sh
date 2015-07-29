@@ -28,4 +28,9 @@ assert_raises "proxy docker_on $HOST1 exec c3 true"
 # Check we can't modify weavewait
 assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.2/24' $BASE_IMAGE touch /w/w" 1
 
+# Check only user-specified volumes and /w are mounted
+proxy docker_on $HOST1 create --name c4 -v /tmp/1:/srv1 -v /tmp/2:/srv2 -e 'WEAVE_CIDR=10.2.1.3/24' $BASE_IMAGE $CHECK_ETHWE_UP
+proxy docker_on $HOST1 start -ai c4
+assert "docker_on $HOST1 inspect --format='{{range \$k, \$v := .Volumes}}{{\$k}} {{end}}' c4" "/srv1 /srv2 /w "
+
 end_suite
