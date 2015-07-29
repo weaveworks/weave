@@ -314,9 +314,9 @@ func TestAllocatorFuzz(t *testing.T) {
 	const (
 		firstpass    = 1000
 		secondpass   = 10000
-		nodes        = 10
+		nodes        = 5
 		maxAddresses = 1000
-		concurrency  = 30
+		concurrency  = 5
 		cidr         = "10.0.1.7/22"
 	)
 	allocs, _, subnet := makeNetworkOfAllocators(nodes, cidr)
