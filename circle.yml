@@ -26,7 +26,7 @@ dependencies:
         docker save weaveworks/weave-build >$WEAVE_BUILD;
       fi
   post:
-    - sudo apt-get install bc
+    - sudo apt-get install bc jq
     - pip install requests
     - curl https://sdk.cloud.google.com | bash
     - bin/setup-circleci-secrets "$SECRET_PASSWORD"
