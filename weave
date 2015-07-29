@@ -1087,6 +1087,9 @@ case "$COMMAND" in
         # additional parameters, such as resource limits, to docker
         # when launching the weaveproxy container.
         proxy_args "$@"
+        # Wipe weavewait and recreate so we're sure we're on the right version
+        docker rm -f weavewait >/dev/null 2>&1 || true
+        docker create --name=weavewait "$EXEC_IMAGE" >/dev/null
         PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
             $PROXY_VOLUMES \
             -v /var/run/docker.sock:/var/run/docker.sock \
@@ -1282,6 +1285,7 @@ case "$COMMAND" in
     stop-proxy)
         [ $# -eq 0 ] || usage
         stop $PROXY_CONTAINER_NAME "Proxy"
+        docker rm -f weavewait >/dev/null 2>&1 || true
         ;;
     reset)
         [ $# -eq 0 ] || usage

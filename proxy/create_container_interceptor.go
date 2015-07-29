@@ -53,7 +53,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if container.HostConfig == nil {
 			container.HostConfig = &docker.HostConfig{}
 		}
-		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy:ro")
+		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weavewait:ro")
 		if container.Config == nil {
 			container.Config = &docker.Config{}
 		}
