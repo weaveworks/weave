@@ -199,7 +199,7 @@ PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 COVERAGE_ARGS=""
 if [ -n "$COVERAGE" ] ; then
-    COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.router.prof --"
+    COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.prof --"
 fi
 
 ######################################################################
@@ -433,7 +433,7 @@ ask_version() {
             fi
     fi
     VERSION_COVERAGE_ARGS=""
-    if [ "$1" = "$CONTAINER_NAME" ] ; then
+    if [ "$1" = "$CONTAINER_NAME" ] || [ "$1" == "$PROXY_CONTAINER_NAME"]  ; then
         VERSION_COVERAGE_ARGS="$COVERAGE_ARGS"
     fi
     [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $DOCKERIMAGE $VERSION_COVERAGE_ARGS --version
@@ -1137,7 +1137,7 @@ launch_proxy() {
         -e WEAVE_CIDR=none \
         -e DOCKER_BRIDGE \
         --entrypoint=/home/weave/weaveproxy \
-        $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $PROXY_ARGS)
+        $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
     wait_for_log $PROXY_CONTAINER_NAME "proxy listening"
 }
 
