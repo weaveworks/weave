@@ -37,6 +37,7 @@ prog/sigproxy/sigproxy
 prog/weavewait/weavewait
 prog/netcheck/netcheck
 testing/cover/cover
+testing/runner/runner
 tools/bin
 tools/build
 releases
