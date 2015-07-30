@@ -13,7 +13,7 @@ PROJECT=${PROJECT:-positive-cocoa-90213}
 IMAGE=ubuntu-14-04
 TEMPLATE_NAME="test-template-3"
 ZONE=us-central1-a
-NUM_HOSTS=3
+NUM_HOSTS=5
 SUFFIX=""
 if [ -n "$CIRCLECI" ]; then
 	SUFFIX="-${CIRCLE_BUILD_NUM}-$CIRCLE_NODE_INDEX"
