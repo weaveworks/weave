@@ -31,6 +31,7 @@ sleep 5 # give topology gossip some time to propagate
 
 assert_raises "exec_on $HOST1 c1 $PING $C3"
 
+assert_raises "start_container $HOST1" # triggers IPAM initialisation
 # this stalls if gossip forwarding doesn't work. We wait for slightly
 # longer than the gossip interval (30s) before giving up.
 assert_raises "timeout 40 cat <( start_container $HOST3 )"
