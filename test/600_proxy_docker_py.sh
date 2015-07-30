@@ -17,9 +17,10 @@ docker_py_test() {
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
         joffrey/docker-py)
-    docker cp $C:/home/docker-py/tests/integration_test.py .
+    docker_on $HOST1 cp $C:/home/docker-py/tests/integration_test.py .
     CANDIDATES=$(sed -En 's/^class (Test[[:alpha:]]+).*/\1/p' integration_test.py)
 
+    i=0
     TESTS=
     for test in $CANDIDATES; do
         if [ $(($i % $TOTAL_SHARDS)) -eq $SHARD ]; then
@@ -35,7 +36,7 @@ docker_py_test() {
         -e DOCKER_HOST=tcp://172.17.42.1:12375 \
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        joffrey/docker-py python tests/integration_test.py "$TESTS" ; then
+        joffrey/docker-py python tests/integration_test.py $TESTS ; then
         assert_raises "true"
     else
         assert_raises "false"
