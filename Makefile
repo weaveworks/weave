@@ -15,8 +15,9 @@ SIGPROXY_EXE=prog/sigproxy/sigproxy
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 NETCHECK_EXE=prog/netcheck/netcheck
 COVER_EXE=testing/cover/cover
+RUNNER_EXE=testing/runner/runner
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE) $(COVER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE) $(COVER_EXE) $(RUNNER_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -42,7 +43,7 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	false; \
 }
 
-all: $(WEAVE_EXPORT) $(COVER_EXE)
+all: $(WEAVE_EXPORT) $(COVER_EXE) $(RUNNER_EXE)
 
 travis: $(EXES)
 
@@ -75,8 +76,9 @@ $(NETCHECK_EXE): prog/netcheck/netcheck.go
 $(SIGPROXY_EXE): prog/sigproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/main.go
 $(COVER_EXE): testing/cover/cover.go
+$(RUNNER_EXE): testing/runner/runner.go
 
-$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(COVER_EXE):
+$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(COVER_EXE) $(RUNNER_EXE):
 	go get ./$(@D)
 	go build -o $@ ./$(@D)
 
