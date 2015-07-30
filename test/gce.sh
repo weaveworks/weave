@@ -7,13 +7,13 @@
 
 set -e
 
-KEY_FILE=/tmp/gce_private_key.json
-SSH_KEY_FILE=$HOME/.ssh/gce_ssh_key
-PROJECT=${PROJECT:-positive-cocoa-90213}
-IMAGE=ubuntu-14-04
-TEMPLATE_NAME="test-template-3"
-ZONE=us-central1-a
-NUM_HOSTS=5
+: ${KEY_FILE:=/tmp/gce_private_key.json}
+: ${SSH_KEY_FILE:=$HOME/.ssh/gce_ssh_key}
+: ${PROJECT:=positive-cocoa-90213}
+: ${IMAGE:=ubuntu-14-04}
+: ${TEMPLATE_NAME:=test-template-3}
+: ${ZONE:=us-central1-a}
+: ${NUM_HOSTS:=5}
 SUFFIX=""
 if [ -n "$CIRCLECI" ]; then
 	SUFFIX="-${CIRCLE_BUILD_NUM}-$CIRCLE_NODE_INDEX"
