@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	start = ansi.ColorCode("white+ub")
+	start = ansi.ColorCode("black+ub")
 	fail  = ansi.ColorCode("red+b")
 	succ  = ansi.ColorCode("green+b")
 	reset = ansi.ColorCode("reset")
@@ -45,6 +45,7 @@ type schedule struct {
 }
 
 type result struct {
+	test
 	errored bool
 	hosts   []string
 }
@@ -171,19 +172,28 @@ func getTests(testNames []string) (tests, error) {
 		tests = append(tests, test{name, numHosts})
 		fmt.Printf("Test %s needs %d hosts\n", name, numHosts)
 	}
-	sort.Sort(sort.Reverse(tests))
 	return tests, nil
 }
 
-func parallel(tests tests, hosts []string) bool {
+func summary(tests, failed tests) {
+	if len(failed) > 0 {
+		fmt.Printf("%s>>> Ran %d tests, %d failed%s\n", fail, len(tests), len(failed), reset)
+	} else {
+		fmt.Printf("%s>>> Ran %d tests, all succeeded%s\n", succ, len(tests), reset)
+	}
+}
+
+func parallel(ts tests, hosts []string) bool {
+	testsCopy := ts
+	sort.Sort(sort.Reverse(ts))
 	resultsChan := make(chan result)
 	outstanding := 0
-	errored := false
-	for len(tests) > 0 || outstanding > 0 {
+	failed := tests{}
+	for len(ts) > 0 || outstanding > 0 {
 		// While we have some free hosts, try and schedule
 		// a test on them
 		for len(hosts) > 0 {
-			test, ok := tests.pick(len(hosts))
+			test, ok := ts.pick(len(hosts))
 			if !ok {
 				break
 			}
@@ -192,7 +202,7 @@ func parallel(tests tests, hosts []string) bool {
 
 			go func() {
 				errored := test.run(testHosts)
-				resultsChan <- result{errored, testHosts}
+				resultsChan <- result{test, errored, testHosts}
 			}()
 			outstanding++
 		}
@@ -202,17 +212,23 @@ func parallel(tests tests, hosts []string) bool {
 		result := <-resultsChan
 		hosts = append(hosts, result.hosts...)
 		outstanding--
-		errored = result.errored || errored
+		if result.errored {
+			failed = append(failed, result.test)
+		}
 	}
-	return errored
+	summary(testsCopy, failed)
+	return len(failed) > 0
 }
 
-func sequential(tests tests, hosts []string) bool {
-	errored := false
-	for _, test := range tests {
-		errored = test.run(hosts) || errored
+func sequential(ts tests, hosts []string) bool {
+	failed := tests{}
+	for _, test := range ts {
+		if test.run(hosts) {
+			failed = append(failed, test)
+		}
 	}
-	return errored
+	summary(ts, failed)
+	return len(failed) > 0
 }
 
 func main() {

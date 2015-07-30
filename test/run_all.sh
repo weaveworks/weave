@@ -19,7 +19,7 @@ if [ -n "$CIRCLECI" -a -z "$NO_SCHEDULER" ]; then
 fi
 
 # If running on circle or PARALLEL is not empty, run tests in parallel
-if [ -n "$CIRCLECI" -o -z "$PARALLEL" ]; then
+if [ -n "$CIRCLECI" -o -n "$PARALLEL" ]; then
     RUNNER_ARGS="$RUNNER_ARGS -parallel"
 fi
 
