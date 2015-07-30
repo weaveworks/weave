@@ -29,6 +29,9 @@ coverage.html
 # Emacs backup files
 *~
 
+# Vim backup files
+*.swp
+
 # Project specific
 prog/weaver/weaver
 prog/weavedns/weavedns
