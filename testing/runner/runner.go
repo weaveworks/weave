@@ -31,6 +31,7 @@ var (
 
 	useScheduler = false
 	runParallel  = false
+	verbose      = false
 
 	consoleLock = sync.Mutex{}
 )
@@ -103,8 +104,10 @@ func (t test) run(hosts []string) bool {
 	} else {
 		fmt.Printf("%s>>> Test %s finished with success after %0.1f secs%s\n", succ, t.name, duration, reset)
 	}
-	fmt.Print(out.String())
-	fmt.Println()
+	if err != nil || verbose {
+		fmt.Print(out.String())
+		fmt.Println()
+	}
 	consoleLock.Unlock()
 
 	if err != nil && useScheduler {
@@ -178,6 +181,9 @@ func getTests(testNames []string) (tests, error) {
 func summary(tests, failed tests) {
 	if len(failed) > 0 {
 		fmt.Printf("%s>>> Ran %d tests, %d failed%s\n", fail, len(tests), len(failed), reset)
+		for _, test := range failed {
+			fmt.Printf("%s>>> Fail %s%s\n", fail, test.name, reset)
+		}
 	} else {
 		fmt.Printf("%s>>> Ran %d tests, all succeeded%s\n", succ, len(tests), reset)
 	}
@@ -234,7 +240,12 @@ func sequential(ts tests, hosts []string) bool {
 func main() {
 	mflag.BoolVar(&useScheduler, []string{"scheduler"}, false, "Use scheduler to distribute tests across shards")
 	mflag.BoolVar(&runParallel, []string{"parallel"}, false, "Run tests in parallel on hosts where possible")
+	mflag.BoolVar(&verbose, []string{"v"}, false, "Print output from all tests (Also enabled via DEBUG=1)")
 	mflag.Parse()
+
+	if len(os.Getenv("DEBUG")) > 0 {
+		verbose = true
+	}
 
 	tests, err := getTests(mflag.Args())
 	if err != nil {
