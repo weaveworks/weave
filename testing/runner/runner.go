@@ -178,6 +178,9 @@ func getTests(testNames []string) (tests, error) {
 func summary(tests, failed tests) {
 	if len(failed) > 0 {
 		fmt.Printf("%s>>> Ran %d tests, %d failed%s\n", fail, len(tests), len(failed), reset)
+		for _, test := range failed {
+			fmt.Printf("%s>>> Fail %s%s\n", fail, test.name, reset)
+		}
 	} else {
 		fmt.Printf("%s>>> Ran %d tests, all succeeded%s\n", succ, len(tests), reset)
 	}
