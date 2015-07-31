@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"sync"
 
-	"code.google.com/p/go-bit/bit"
-	"code.google.com/p/go.crypto/nacl/box"
-	"code.google.com/p/go.crypto/nacl/secretbox"
+	"github.com/andybalholm/go-bit"
+	"golang.org/x/crypto/nacl/box"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
 func GenerateKeyPair() (publicKey, privateKey *[32]byte, err error) {

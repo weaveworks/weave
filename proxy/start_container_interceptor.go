@@ -16,6 +16,10 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 }
 
 func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
+	if r.StatusCode < 200 || r.StatusCode >= 300 { // Docker didn't do the start
+		return nil
+	}
+
 	container, err := inspectContainerInPath(i.proxy.client, r.Request.URL.Path)
 	if err != nil {
 		return err
