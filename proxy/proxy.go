@@ -50,6 +50,7 @@ type Proxy struct {
 	client              *docker.Client
 	dockerBridgeIP      string
 	hostnameMatchRegexp *regexp.Regexp
+	weaveWaitVolume     string
 }
 
 func NewProxy(c Config) (*Proxy, error) {
@@ -79,11 +80,34 @@ func NewProxy(c Config) (*Proxy, error) {
 		return nil, err
 	}
 
+	if err = p.findWeaveWaitVolume(); err != nil {
+		return nil, err
+	}
+
 	return p, nil
 }
 
 func (proxy *Proxy) Dial() (net.Conn, error) {
 	return net.Dial("unix", dockerSock)
+}
+
+func (proxy *Proxy) findWeaveWaitVolume() error {
+	container, err := proxy.client.InspectContainer("weaveproxy")
+	if err != nil {
+		return fmt.Errorf("Could not find the weavewait volume: %s", err)
+	}
+
+	if container.Volumes == nil {
+		return fmt.Errorf("Could not find the weavewait volume")
+	}
+
+	volume, ok := container.Volumes["/w"]
+	if !ok {
+		return fmt.Errorf("Could not find the weavewait volume")
+	}
+
+	proxy.weaveWaitVolume = volume
+	return nil
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {

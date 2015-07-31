@@ -55,10 +55,10 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if container.HostConfig == nil {
 			container.HostConfig = &docker.HostConfig{}
 		}
-		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy:ro")
 		if container.Config == nil {
 			container.Config = &docker.Config{}
 		}
+		i.addWeaveWaitVolume(container.HostConfig)
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
@@ -77,6 +77,18 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 	r.ContentLength = int64(len(newBody))
 
 	return nil
+}
+
+func (i *createContainerInterceptor) addWeaveWaitVolume(hostConfig *docker.HostConfig) {
+	var binds []string
+	for _, bind := range hostConfig.Binds {
+		s := strings.Split(bind, ":")
+		if len(s) >= 2 && s[1] == "/w" {
+			continue
+		}
+		binds = append(binds, bind)
+	}
+	hostConfig.Binds = append(binds, fmt.Sprintf("%s:/w:ro", i.proxy.weaveWaitVolume))
 }
 
 func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
