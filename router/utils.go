@@ -7,20 +7,22 @@ import (
 	"fmt"
 	"net"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
+
+var log = common.Log
 
 var void = struct{}{}
 
 func checkFatal(e error) {
 	if e != nil {
-		Log.Fatal(e)
+		log.Fatal(e)
 	}
 }
 
 func checkWarn(e error) {
 	if e != nil {
-		Log.Warnln(e)
+		log.Warnln(e)
 	}
 }
 
