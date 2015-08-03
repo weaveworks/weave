@@ -9,8 +9,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 const (

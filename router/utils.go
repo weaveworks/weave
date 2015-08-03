@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
+
+var Log = common.Log
 
 var void = struct{}{}
 

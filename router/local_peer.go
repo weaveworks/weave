@@ -5,8 +5,6 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 type LocalPeer struct {

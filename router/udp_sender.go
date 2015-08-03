@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	. "github.com/weaveworks/weave/common"
 )
 
 type UDPSender interface {

@@ -5,8 +5,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"sync"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 type GossipChannel struct {

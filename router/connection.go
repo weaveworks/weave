@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 type Connection interface {

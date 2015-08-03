@@ -6,8 +6,6 @@ import (
 	"math/rand"
 	"net"
 	"time"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 const (
