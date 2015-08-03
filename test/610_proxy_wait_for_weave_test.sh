@@ -33,4 +33,9 @@ proxy docker_on $HOST1 create --name c4 -v /tmp/1:/srv1 -v /tmp/2:/srv2 -e 'WEAV
 proxy docker_on $HOST1 start -ai c4
 assert "docker_on $HOST1 inspect --format='{{range \$k, \$v := .Volumes}}{{\$k}} {{end}}' c4" "/srv1 /srv2 /w "
 
+# Check errors are returned (when docker returns an error code)
+assert_raises "docker -H tcp://$HOST1:12375 run -e 'WEAVE_CIDR=10.2.1.3/24' $SMALL_IMAGE foo 2>&1 | grep 'exec: \"foo\": executable file not found in \$PATH'"
+# Check errors still happen when no command is specified
+assert_raises "docker -H tcp://$HOST1:12375 run -e 'WEAVE_CIDR=10.2.1.3/24' $SMALL_IMAGE 2>&1 | grep 'Error response from daemon: No command specified'"
+
 end_suite

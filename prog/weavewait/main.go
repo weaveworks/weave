@@ -7,16 +7,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/weaveworks/weave/net"
+	weavenet "github.com/weaveworks/weave/net"
+	"github.com/weaveworks/weave/proxy"
 )
 
 func main() {
-	if len(os.Args) <= 1 {
-		os.Exit(0)
-	}
 	args := os.Args[1:]
 
-	if args[0] == "-s" {
+	if len(args) > 0 && args[0] == "-s" {
 		args = args[1:]
 	} else {
 		usr2 := make(chan os.Signal)
@@ -24,8 +22,12 @@ func main() {
 		<-usr2
 	}
 
-	_, err := net.EnsureInterface("ethwe", -1)
+	_, err := weavenet.EnsureInterface("ethwe", -1)
 	checkErr(err)
+
+	if len(args) == 0 {
+		checkErr(proxy.ErrNoCommandSpecified)
+	}
 
 	binary, err := exec.LookPath(args[0])
 	checkErr(err)
