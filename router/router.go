@@ -74,7 +74,7 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 	router.Peers = NewPeers(router.Ourself)
 	router.Peers.OnGC(onPeerGC)
 	router.Peers.FetchWithDefault(router.Ourself.Peer)
-	router.Routes = NewRoutes(router.Ourself, router.Peers)
+	router.Routes = NewRoutes(router.Ourself, router.Peers, router.Overlay.InvalidateRoutes)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	router.acceptLimiter = NewTokenBucket(acceptMaxTokens, acceptTokenDelay)

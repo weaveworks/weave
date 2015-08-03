@@ -66,7 +66,7 @@ func (peer *Peer) String() string {
 // NB: This function should generally be invoked while holding a read
 // lock on Peers and LocalPeer.
 func (peer *Peer) Routes(stopAt *Peer, establishedAndSymmetric bool) (bool, map[PeerName]PeerName) {
-	routes := make(map[PeerName]PeerName)
+	routes := make(unicastRoutes)
 	routes[peer.Name] = UnknownPeerName
 	nextWorklist := []*Peer{peer}
 	for len(nextWorklist) > 0 {
