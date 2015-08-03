@@ -6,10 +6,3 @@ func Assert(test bool) {
 		panic("Assertion failure")
 	}
 }
-
-func OnOff(b bool) string {
-	if b {
-		return "on"
-	}
-	return "off"
-}

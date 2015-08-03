@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	. "github.com/weaveworks/weave/common"
 )
 
 type UDPSender interface {
@@ -87,7 +86,7 @@ func (sender *RawUDPSender) Send(msg []byte) error {
 	}
 	defer f.Close()
 	fd := int(f.Fd())
-	Log.Println("EMSGSIZE on send, expecting PMTU update (IP packet was",
+	log.Println("EMSGSIZE on send, expecting PMTU update (IP packet was",
 		len(packet), "bytes, payload was", len(msg), "bytes)")
 	pmtu, err := syscall.GetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU)
 	if err != nil {
