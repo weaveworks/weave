@@ -297,9 +297,9 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 }
 
 func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool) {
-	Log.Printf("->[%s] attempting connection", address)
+	log.Printf("->[%s] attempting connection", address)
 	if err := cm.ourself.CreateConnection(address, acceptNewPeer); err != nil {
-		Log.Errorf("->[%s] error during connection attempt: %v", address, err)
+		log.Errorf("->[%s] error during connection attempt: %v", address, err)
 		cm.ConnectionTerminated(address, err)
 	}
 }

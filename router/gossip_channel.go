@@ -224,5 +224,5 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 }
 
 func (c *GossipChannel) log(args ...interface{}) {
-	Log.Println(append(append([]interface{}{}, "[gossip "+c.name+"]:"), args...)...)
+	log.Println(append(append([]interface{}{}, "[gossip "+c.name+"]:"), args...)...)
 }
