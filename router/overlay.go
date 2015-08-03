@@ -11,6 +11,10 @@ type Overlay interface {
 
 	// Form a packet-forwarding connection.
 	MakeForwarder(ForwarderParams) (OverlayForwarder, error)
+
+	// The routes have changed, so any cached information should
+	// be discarded.
+	InvalidateRoutes()
 }
 
 type ForwarderParams struct {
@@ -79,6 +83,9 @@ func (NullOverlay) StartConsumingPackets(*Peer, *Peers, OverlayConsumer) error {
 
 func (NullOverlay) MakeForwarder(ForwarderParams) (OverlayForwarder, error) {
 	return NullOverlay{}, nil
+}
+
+func (NullOverlay) InvalidateRoutes() {
 }
 
 func (NullOverlay) SetListener(OverlayForwarderListener) {
