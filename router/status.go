@@ -63,14 +63,6 @@ type LocalConnectionStatus struct {
 }
 
 func NewStatus(router *Router) *Status {
-	var ifaceName string
-	if router.Iface != nil {
-		ifaceName = router.Iface.Name
-	}
-	var captureStats map[string]int
-	if router.PacketSource != nil {
-		captureStats = router.PacketSource.Stats()
-	}
 	return &Status{
 		Protocol,
 		ProtocolMinVersion,
@@ -80,8 +72,8 @@ func NewStatus(router *Router) *Status {
 		router.Ourself.Name.String(),
 		router.Ourself.NickName,
 		router.Port,
-		ifaceName,
-		captureStats,
+		router.Bridge.String(),
+		router.Bridge.Stats(),
 		NewMACStatusSlice(router.Macs),
 		NewPeerStatusSlice(router.Peers),
 		NewUnicastRouteStatusSlice(router.Routes),
