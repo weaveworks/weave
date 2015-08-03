@@ -119,7 +119,7 @@ func NewPeerStatusSlice(peers *Peers) []PeerStatus {
 			peer.Name.String(),
 			peer.NickName,
 			peer.UID,
-			peer.version,
+			peer.Version,
 			connections})
 	})
 

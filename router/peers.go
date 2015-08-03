@@ -24,13 +24,6 @@ type NameCollisionError struct {
 
 type PeerNameSet map[PeerName]struct{}
 
-type PeerSummary struct {
-	NameByte []byte
-	NickName string
-	UID      PeerUID
-	Version  uint64
-}
-
 type ConnectionSummary struct {
 	NameByte      []byte
 	RemoteTCPAddr string
@@ -206,13 +199,12 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			err = decErr
 			return
 		}
-		name := PeerNameFromBin(peerSummary.NameByte)
-		newPeer := NewPeer(name, peerSummary.NickName, peerSummary.UID, peerSummary.Version)
+		newPeer := NewPeerFromSummary(peerSummary)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connSummaries)
-		existingPeer, found := peers.table[name]
+		existingPeer, found := peers.table[newPeer.Name]
 		if !found {
-			newPeers[name] = newPeer
+			newPeers[newPeer.Name] = newPeer
 		} else if existingPeer.UID != newPeer.UID {
 			err = NameCollisionError{Name: newPeer.Name}
 			return
@@ -245,7 +237,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// guaranteed to find peer in the peers.table
 		peer := peers.table[name]
 		if peer != newPeer &&
-			(peer == peers.ourself.Peer || peer.version >= newPeer.version) {
+			(peer == peers.ourself.Peer || peer.Version >= newPeer.Version) {
 			// Nobody but us updates us. And if we know more about a
 			// peer than what's in the the update, we ignore the
 			// latter.
@@ -261,7 +253,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		// for an update would be someone else calling
 		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
 		// the router.Peers, so there can be no race here.
-		peer.version = newPeer.version
+		peer.Version = newPeer.Version
 		peer.connections = makeConnsMap(peer, connSummaries, peers.table)
 		newUpdate[name] = peer
 	}
@@ -269,11 +261,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 }
 
 func (peer *Peer) Encode(enc *gob.Encoder) {
-	checkFatal(enc.Encode(PeerSummary{
-		peer.NameByte,
-		peer.NickName,
-		peer.UID,
-		peer.version}))
+	checkFatal(enc.Encode(peer.PeerSummary))
 
 	connSummaries := []ConnectionSummary{}
 	for _, conn := range peer.connections {

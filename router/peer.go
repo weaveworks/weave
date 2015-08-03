@@ -8,34 +8,50 @@ import (
 
 type PeerUID uint64
 
+func randomPeerUID() PeerUID {
+	return PeerUID(randUint64())
+}
+
 func ParsePeerUID(s string) (PeerUID, error) {
 	uid, err := strconv.ParseUint(s, 10, 64)
 	return PeerUID(uid), err
 }
 
+type PeerSummary struct {
+	NameByte []byte
+	NickName string
+	UID      PeerUID
+	Version  uint64
+}
+
 type Peer struct {
-	Name          PeerName
-	NameByte      []byte
-	NickName      string
-	UID           PeerUID
-	version       uint64
+	Name PeerName
+	PeerSummary
 	localRefCount uint64 // maintained by Peers
 	connections   map[PeerName]Connection
 }
 
 type ConnectionSet map[Connection]struct{}
 
-func NewPeer(name PeerName, nickName string, uid PeerUID, version uint64) *Peer {
-	if uid == 0 {
-		uid = PeerUID(randUint64())
-	}
+func NewPeerFromSummary(summary PeerSummary) *Peer {
 	return &Peer{
-		Name:        name,
-		NameByte:    name.Bin(),
-		NickName:    nickName,
-		UID:         uid,
-		version:     version,
-		connections: make(map[PeerName]Connection)}
+		Name:        PeerNameFromBin(summary.NameByte),
+		PeerSummary: summary,
+		connections: make(map[PeerName]Connection),
+	}
+}
+
+func NewPeer(name PeerName, nickName string, uid PeerUID, version uint64) *Peer {
+	return NewPeerFromSummary(PeerSummary{
+		NameByte: name.Bin(),
+		NickName: nickName,
+		UID:      uid,
+		Version:  version,
+	})
+}
+
+func NewPeerFrom(peer *Peer) *Peer {
+	return NewPeerFromSummary(peer.PeerSummary)
 }
 
 func (peer *Peer) String() string {
@@ -43,7 +59,7 @@ func (peer *Peer) String() string {
 }
 
 func (peer *Peer) Info() string {
-	return fmt.Sprint(peer.String(), " (v", peer.version, ") (UID ", peer.UID, ")")
+	return fmt.Sprint(peer.String(), " (v", peer.Version, ") (UID ", peer.UID, ")")
 }
 
 // Calculate the routing table from this peer to all peers reachable
