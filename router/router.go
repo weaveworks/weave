@@ -120,14 +120,21 @@ func (router *Router) UsingPassword() bool {
 func (router *Router) Status() string {
 	var buf bytes.Buffer
 	fmt.Fprintln(&buf, "Our name is", router.Ourself)
-	fmt.Fprintln(&buf, "Encryption", OnOff(router.UsingPassword()))
-	fmt.Fprintln(&buf, "Peer discovery", OnOff(router.PeerDiscovery))
+	fmt.Fprintln(&buf, "Encryption", onOff(router.UsingPassword()))
+	fmt.Fprintln(&buf, "Peer discovery", onOff(router.PeerDiscovery))
 	fmt.Fprintln(&buf, "Sniffing traffic on", router.Iface)
 	fmt.Fprintf(&buf, "MACs:\n%s", router.Macs)
 	fmt.Fprintf(&buf, "Peers:\n%s", router.Peers)
 	fmt.Fprintf(&buf, "Routes:\n%s", router.Routes)
 	fmt.Fprint(&buf, router.ConnectionMaker.Status())
 	return buf.String()
+}
+
+func onOff(b bool) string {
+	if b {
+		return "on"
+	}
+	return "off"
 }
 
 func (router *Router) sniff(pio PacketSourceSink) {
