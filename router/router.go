@@ -20,8 +20,6 @@ const (
 
 // [3] control rate at which new tokens are added to the bucket
 
-type LogFrameFunc func(string, []byte, *EthernetDecoder)
-
 type Config struct {
 	Port               int
 	ProtocolMinVersion byte
@@ -29,9 +27,14 @@ type Config struct {
 	ConnLimit          int
 	PeerDiscovery      bool
 	BufSz              int
-	LogFrame           LogFrameFunc
+	PacketLogging      PacketLogging
 	Bridge             Bridge
 	Overlay            Overlay
+}
+
+type PacketLogging interface {
+	LogPacket(string, PacketKey)
+	LogForwardPacket(string, ForwardPacketKey)
 }
 
 type Router struct {
@@ -97,48 +100,45 @@ func (router *Router) UsingPassword() bool {
 	return router.Password != nil
 }
 
-func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecoder) {
-	router.LogFrame("Sniffed", frameData, dec)
-	decodedLen := len(dec.decoded)
-	if decodedLen == 0 {
-		return
-	}
-	srcMac := dec.Eth.SrcMAC
-	srcPeer, found := router.Macs.Lookup(srcMac)
+func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
+	router.PacketLogging.LogPacket("Captured", key)
+	srcMac := net.HardwareAddr(key.SrcMAC[:])
+	srcPeer := router.Macs.Lookup(srcMac)
+
 	// We need to filter out frames we injected ourselves. For such
 	// frames, the srcMAC will have been recorded as associated with a
 	// different peer.
-	if found && srcPeer != router.Ourself.Peer {
-		return
+	if srcPeer != nil && srcPeer != router.Ourself.Peer {
+		return nil
 	}
+
 	if router.Macs.Enter(srcMac, router.Ourself.Peer) {
 		log.Println("Discovered local MAC", srcMac)
 	}
-	if dec.DropFrame() {
-		return
-	}
-	dstMac := dec.Eth.DstMAC
-	dstPeer, found := router.Macs.Lookup(dstMac)
-	if found && dstPeer == router.Ourself.Peer {
-		return
-	}
-	router.LogFrame("Forwarding", frameData, dec)
 
-	// at this point we are handing over the frame to forwarders, so
-	// we need to make a copy of it in order to prevent the next
-	// capture from overwriting the data
-	frameLen := len(frameData)
-	frameCopy := make([]byte, frameLen, frameLen)
-	copy(frameCopy, frameData)
-
-	// If we don't know which peer corresponds to the dest MAC,
-	// broadcast it.
-	if !found {
-		router.Ourself.Broadcast(frameCopy, dec)
-		return
+	// Discard STP broadcasts
+	if key.DstMAC == [...]byte{0x01, 0x80, 0xC2, 0x00, 0x00, 0x00} {
+		return nil
 	}
 
-	router.Ourself.Forward(dstPeer, frameCopy, dec)
+	dstMac := net.HardwareAddr(key.DstMAC[:])
+	switch dstPeer := router.Macs.Lookup(dstMac); dstPeer {
+	case router.Ourself.Peer:
+		// The packet is destined for a local MAC.  The bridge
+		// won't normally send us such packets, and if it does
+		// it's likely to be broadcasting the packet to all
+		// ports.  So if it happens, just drop the packet to
+		// avoid warnings if we try to forward it.
+		return nil
+	case nil:
+		// If we don't know which peer corresponds to the dest
+		// MAC, broadcast it.
+		router.PacketLogging.LogPacket("Broadcasting", key)
+		return router.Ourself.Broadcast(key)
+	default:
+		router.PacketLogging.LogPacket("Forwarding", key)
+		return router.Ourself.Forward(dstPeer, key)
+	}
 }
 
 func (router *Router) listenTCP(localPort int) {
@@ -170,29 +170,44 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	StartLocalConnection(connRemote, tcpConn, nil, router, true)
 }
 
-func (router *Router) handleForwardedPacket(srcPeer *Peer, dstPeer *Peer,
-	frame []byte, dec *EthernetDecoder) {
-	if dstPeer != router.Ourself.Peer {
+func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
+	if key.DstPeer != router.Ourself.Peer {
 		// it's not for us, we're just relaying it
-		router.LogFrame("Relaying", frame, dec)
-		router.Ourself.Relay(srcPeer, dstPeer, frame, dec)
-		return
+		router.PacketLogging.LogForwardPacket("Relaying", key)
+		return router.Ourself.Relay(key)
 	}
 
-	srcMac := dec.Eth.SrcMAC
-	dstMac := dec.Eth.DstMAC
+	// At this point, it's either unicast to us, or a broadcast
+	// (because the DstPeer on a forwarded broadcast packet is
+	// always set to the peer being forwarded to)
 
-	if router.Macs.Enter(srcMac, srcPeer) {
-		log.Println("Discovered remote MAC", srcMac, "at", srcPeer)
+	srcMac := net.HardwareAddr(key.SrcMAC[:])
+	dstMac := net.HardwareAddr(key.DstMAC[:])
+	if router.Macs.Enter(srcMac, key.SrcPeer) {
+		log.Println("Discovered remote MAC", srcMac, "at", key.SrcPeer)
 	}
 
-	router.LogFrame("Injecting", frame, dec)
-	checkWarn(router.Bridge.InjectPacket(frame))
+	router.PacketLogging.LogForwardPacket("Injecting", key)
+	injectFop := router.Bridge.InjectPacket(key.PacketKey)
+	dstPeer := router.Macs.Lookup(dstMac)
+	if dstPeer == router.Ourself.Peer {
+		return injectFop
+	}
 
-	dstPeer, found := router.Macs.Lookup(dstMac)
-	if !found || dstPeer != router.Ourself.Peer {
-		router.LogFrame("Relaying broadcast", frame, dec)
-		router.Ourself.RelayBroadcast(srcPeer, frame, dec)
+	router.PacketLogging.LogForwardPacket("Relaying broadcast", key)
+	relayFop := router.Ourself.RelayBroadcast(key.SrcPeer, key.PacketKey)
+	switch {
+	case injectFop == nil:
+		return relayFop
+
+	case relayFop == nil:
+		return injectFop
+
+	default:
+		mfop := NewMultiFlowOp(false)
+		mfop.Add(injectFop)
+		mfop.Add(relayFop)
+		return mfop
 	}
 }
 

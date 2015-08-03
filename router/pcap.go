@@ -106,10 +106,14 @@ func (p *Pcap) String() string {
 	return fmt.Sprint(p.iface.Name, " (via pcap)")
 }
 
-func (p *Pcap) InjectPacket(pkt []byte) error {
+func (p *Pcap) InjectPacket(PacketKey) FlowOp {
+	return p
+}
+
+func (p *Pcap) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	return p.writeHandle.WritePacketData(pkt)
+	checkWarn(p.writeHandle.WritePacketData(frame))
 }
 
 func (p *Pcap) sniff(readHandle *pcap.Handle, consumer BridgeConsumer) {
@@ -123,7 +127,21 @@ func (p *Pcap) sniff(readHandle *pcap.Handle, consumer BridgeConsumer) {
 
 		checkFatal(err)
 		dec.DecodeLayers(pkt)
-		consumer(pkt, dec)
+		if len(dec.decoded) == 0 {
+			continue
+		}
+
+		if fop := consumer(dec.PacketKey()); fop != nil {
+			// We are handing over the frame to
+			// forwarders, so we need to make a copy of it
+			// in order to prevent the next capture from
+			// overwriting the data
+			pktLen := len(pkt)
+			pktCopy := make([]byte, pktLen, pktLen)
+			copy(pktCopy, pkt)
+
+			fop.Process(pktCopy, dec, false)
+		}
 	}
 }
 
