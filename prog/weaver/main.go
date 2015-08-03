@@ -166,6 +166,7 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
+	config.Overlay = weave.NewSleeveOverlay(config.Port)
 	config.LogFrame = logFrameFunc(pktdebug)
 	config.PeerDiscovery = !noDiscovery
 
