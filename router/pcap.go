@@ -2,18 +2,42 @@ package router
 
 import (
 	"fmt"
+	"net"
+	"sync"
 
 	"github.com/google/gopacket/pcap"
 )
 
-type PcapIO struct {
-	handle *pcap.Handle
+type Pcap struct {
+	iface *net.Interface
+	bufSz int
+
+	// The libpcap handle for writing packets. It's possible that a
+	// single handle could be used for reading and writing, but
+	// we'd have to examine the performance implications.
+	writeHandle *pcap.Handle
+
+	// pcap handles are single-threaded, so we need to lock around
+	// uses of writeHandle.
+	mutex sync.Mutex
+
+	// The libpcap handle for reading packets
+	readHandle *pcap.Handle
 }
 
-func NewPcapIO(ifName string, bufSz int) (PacketSourceSink, error) {
-	pio, err := newPcapIO(ifName, true, 65535, bufSz)
+func NewPcap(iface *net.Interface, bufSz int) (Bridge, error) {
+	wh, err := newPcapHandle(iface.Name, false, 0, 0)
 	if err != nil {
-		return pio, err
+		return nil, err
+	}
+
+	return &Pcap{iface: iface, bufSz: bufSz, writeHandle: wh}, nil
+}
+
+func (p *Pcap) ConsumePackets(consumer BridgeConsumer) error {
+	rh, err := newPcapHandle(p.iface.Name, true, 65535, p.bufSz)
+	if err != nil {
+		return err
 	}
 
 	// Under Linux, libpcap implements the SetDirection filtering
@@ -21,16 +45,25 @@ func NewPcapIO(ifName string, bufSz int) (PacketSourceSink, error) {
 	// packets inside the kernel.  We do this here rather than in
 	// newPcapIO because libpcap doesn't like this in combination
 	// with a 0 snaplen.
-	err = pio.handle.SetBPFFilter("inbound")
-	return pio, err
+	err = rh.SetBPFFilter("inbound")
+	if err != nil {
+		rh.Close()
+		return err
+	}
+
+	// readHandle is just for the benefit of Stats.
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if p.readHandle != nil {
+		panic("already consuming")
+	}
+
+	p.readHandle = rh
+	go p.sniff(rh, consumer)
+	return nil
 }
 
-func NewPcapO(ifName string) (po PacketSink, err error) {
-	po, err = newPcapIO(ifName, false, 0, 0)
-	return
-}
-
-func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *PcapIO, err error) {
+func newPcapHandle(ifName string, promisc bool, snaplen int, bufSz int) (handle *pcap.Handle, err error) {
 	inactive, err := pcap.NewInactiveHandle(ifName)
 	if err != nil {
 		return
@@ -61,38 +94,54 @@ func newPcapIO(ifName string, promisc bool, snaplen int, bufSz int) (handle *Pca
 	if err = inactive.SetBufferSize(bufSz); err != nil {
 		return
 	}
-	active, err := inactive.Activate()
+	handle, err = inactive.Activate()
 	if err != nil {
 		return
 	}
-	if err = active.SetDirection(pcap.DirectionIn); err != nil {
-		return
-	}
-	return &PcapIO{handle: active}, nil
-}
-
-func (pio *PcapIO) ReadPacket() (data []byte, err error) {
-	for {
-		data, _, err = pio.handle.ZeroCopyReadPacketData()
-		if err == nil || err != pcap.NextErrorTimeoutExpired {
-			break
-		}
-	}
+	err = handle.SetDirection(pcap.DirectionIn)
 	return
 }
 
-func (pio *PcapIO) WritePacket(data []byte) error {
-	return pio.handle.WritePacketData(data)
+func (p *Pcap) String() string {
+	return fmt.Sprint(p.iface.Name, " (via pcap)")
 }
 
-func (pio *PcapIO) Stats() map[string]int {
-	stats, err := pio.handle.Stats()
-	if err != nil {
-		return nil
+func (p *Pcap) InjectPacket(pkt []byte) error {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	return p.writeHandle.WritePacketData(pkt)
+}
+
+func (p *Pcap) sniff(readHandle *pcap.Handle, consumer BridgeConsumer) {
+	dec := NewEthernetDecoder()
+
+	for {
+		pkt, _, err := readHandle.ZeroCopyReadPacketData()
+		if err == pcap.NextErrorTimeoutExpired {
+			continue
+		}
+
+		checkFatal(err)
+		dec.DecodeLayers(pkt)
+		consumer(pkt, dec)
 	}
-	res := make(map[string]int)
-	res["PacketsReceived"] = stats.PacketsReceived
-	res["PacketsDropped"] = stats.PacketsDropped
-	res["PacketsIfDropped"] = stats.PacketsIfDropped
-	return res
+}
+
+func (p *Pcap) Stats() map[string]int {
+	p.mutex.Lock()
+	rh := p.readHandle
+	p.mutex.Unlock()
+
+	if rh != nil {
+		stats, err := rh.Stats()
+		if err == nil {
+			return map[string]int{
+				"PacketsReceived":  stats.PacketsReceived,
+				"PacketsDropped":   stats.PacketsDropped,
+				"PacketsIfDropped": stats.PacketsIfDropped,
+			}
+		}
+	}
+
+	return nil
 }
