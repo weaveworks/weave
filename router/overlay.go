@@ -39,8 +39,7 @@ type ForwarderParams struct {
 
 // When a consumer is called, the decoder will already have been used
 // to decode the frame.
-type OverlayConsumer func(src *Peer, dst *Peer, frame []byte,
-	dec *EthernetDecoder)
+type OverlayConsumer func(ForwardPacketKey) FlowOp
 
 // Crypto settings for a forwarder.
 type OverlayCrypto struct {
@@ -58,11 +57,8 @@ type OverlayForwarder interface {
 	// (e.g. on another thread).
 	SetListener(OverlayForwarderListener)
 
-	// Forward a packet across the connection.  The caller must
-	// supply an EthernetDecoder specific to this thread, which
-	// has already been used to decode the frame.
-	Forward(src *Peer, dest *Peer, frame []byte, dec *EthernetDecoder,
-		broadcast bool)
+	// Forward a packet across the connection.
+	Forward(ForwardPacketKey) FlowOp
 
 	Stop()
 
@@ -88,8 +84,8 @@ func (NullOverlay) MakeForwarder(ForwarderParams) (OverlayForwarder, error) {
 func (NullOverlay) SetListener(OverlayForwarderListener) {
 }
 
-func (NullOverlay) Forward(*Peer, *Peer, []byte, *EthernetDecoder,
-	bool) {
+func (NullOverlay) Forward(ForwardPacketKey) FlowOp {
+	return nil
 }
 
 func (NullOverlay) Stop() {

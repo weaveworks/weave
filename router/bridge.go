@@ -3,7 +3,7 @@ package router
 // Interface to packet handling on the local virtual bridge
 type Bridge interface {
 	// Inject a packet to be delivered locally
-	InjectPacket([]byte) error
+	InjectPacket(PacketKey) FlowOp
 
 	// Start consuming packets from the bridge
 	StartConsumingPackets(BridgeConsumer) error
@@ -12,14 +12,12 @@ type Bridge interface {
 	Stats() map[string]int
 }
 
-// A function that accepts locally captured packets.  The ethernet
-// decoder is specific to this thread, and will already have been used
-// to to decode the packet data.
-type BridgeConsumer func([]byte, *EthernetDecoder)
+// A function that determines how to handle locally captured packets.
+type BridgeConsumer func(PacketKey) FlowOp
 
 type NullBridge struct{}
 
-func (NullBridge) InjectPacket([]byte) error {
+func (NullBridge) InjectPacket(PacketKey) FlowOp {
 	return nil
 }
 

@@ -231,11 +231,23 @@ func (sleeve *SleeveOverlay) handleFrame(sender *net.UDPAddr,
 		return
 	}
 
+	sleeve.sendToConsumer(srcPeer, dstPeer, frame, dec)
+}
+
+func (sleeve *SleeveOverlay) sendToConsumer(srcPeer, dstPeer *Peer,
+	frame []byte, dec *EthernetDecoder) {
 	if sleeve.consumer == nil {
 		return
 	}
 
-	sleeve.consumer(srcPeer, dstPeer, frame, dec)
+	fop := sleeve.consumer(ForwardPacketKey{
+		SrcPeer:   srcPeer,
+		DstPeer:   dstPeer,
+		PacketKey: dec.PacketKey(),
+	})
+	if fop != nil {
+		fop.Send(frame, dec, false)
+	}
 }
 
 type udpSender interface {
@@ -389,8 +401,18 @@ func (fwd *sleeveForwarder) SetListener(listener OverlayForwarderListener) {
 	}
 }
 
-func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
-	dec *EthernetDecoder, broadcast bool) {
+type curriedForward struct {
+	fwd *sleeveForwarder
+	key ForwardPacketKey
+}
+
+func (fwd *sleeveForwarder) Forward(key ForwardPacketKey) FlowOp {
+	return curriedForward{fwd, key}
+}
+
+func (f curriedForward) Send(frame []byte, dec *EthernetDecoder,
+	broadcast bool) {
+	fwd := f.fwd
 	fwd.lock.RLock()
 	haveContact := (fwd.remoteAddr != nil)
 	mtu := fwd.mtu
@@ -403,8 +425,8 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 		return
 	}
 
-	srcName := src.NameByte
-	dstName := dst.NameByte
+	srcName := f.key.SrcPeer.NameByte
+	dstName := f.key.DstPeer.NameByte
 
 	// We could use non-blocking channel sends here, i.e. drop frames
 	// on the floor when the forwarder is busy. This would allow our
@@ -444,7 +466,8 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 
 		// The frag-needed packet does not have DF set, so the
 		// potential recursion here is bounded.
-		fwd.sleeve.consumer(dst, src, fragNeededPacket, dec)
+		fwd.sleeve.sendToConsumer(f.key.DstPeer, f.key.SrcPeer,
+			fragNeededPacket, dec)
 		return
 	}
 
