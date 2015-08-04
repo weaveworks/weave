@@ -24,9 +24,11 @@ const (
 )
 
 var (
-	containerCreateRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
-	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
-	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
+	containerCreateRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
+	containerStartRegexp   = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
+	containerInspectRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/json$")
+	execCreateRegexp       = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
+	execInspectRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/exec/[^/]*/json$")
 
 	ErrInvalidNetworkMode = errors.New("--net option")
 	ErrWeaveCIDRNone      = errors.New("WEAVE_CIDR=none")
@@ -37,6 +39,7 @@ type Config struct {
 	HostnameMatch       string
 	HostnameReplacement string
 	ListenAddrs         []string
+	RewriteInspect      bool
 	NoDefaultIPAM       bool
 	NoRewriteHosts      bool
 	TLSConfig           TLSConfig
@@ -119,8 +122,12 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		i = &createContainerInterceptor{proxy}
 	case containerStartRegexp.MatchString(path):
 		i = &startContainerInterceptor{proxy}
+	case containerInspectRegexp.MatchString(path):
+		i = &inspectContainerInterceptor{proxy}
 	case execCreateRegexp.MatchString(path):
 		i = &createExecInterceptor{proxy}
+	case execInspectRegexp.MatchString(path):
+		i = &inspectExecInterceptor{proxy}
 	default:
 		i = &nullInterceptor{}
 	}

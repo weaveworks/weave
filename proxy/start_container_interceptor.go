@@ -15,7 +15,7 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 	return nil
 }
 
-func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
+func (i *startContainerInterceptor) InterceptResponse(r *http.Response) (err error) {
 	if r.StatusCode < 200 || r.StatusCode >= 300 { // Docker didn't do the start
 		return nil
 	}
@@ -24,6 +24,16 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 	if err != nil {
 		return err
 	}
+
+	defer func() {
+		// If entrypoint is weavewait we need to USR2 it so it starts! Even if
+		// networking has been disabled since creation (as kubernetes does)
+		if err == nil &&
+			len(container.Config.Entrypoint) > 0 &&
+			container.Config.Entrypoint[0] == weaveWaitEntrypoint[0] {
+			err = i.proxy.client.KillContainer(docker.KillContainerOptions{ID: container.ID, Signal: docker.SIGUSR2})
+		}
+	}()
 
 	cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
 	if err != nil {
@@ -41,5 +51,5 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
 	}
 
-	return i.proxy.client.KillContainer(docker.KillContainerOptions{ID: container.ID, Signal: docker.SIGUSR2})
+	return nil
 }
