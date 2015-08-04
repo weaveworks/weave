@@ -75,8 +75,8 @@ of all containers for that hostname across the entire cluster.
 
 WeaveDNS returns IP addresses in a random order to facilitate basic
 load balancing and failure tolerance. Most client side resolvers sort
-the returned addresses based on reachability, sorting local addresses
-to the top of the list (see [RFC 3484](https://www.ietf.org/rfc/rfc3484.txt)).
+the returned addresses based on reachability, placing local addresses
+at the top of the list (see [RFC 3484](https://www.ietf.org/rfc/rfc3484.txt)).
 For example, if there is container with the desired hostname on the local
 machine, the application will receive that container's IP address.
 Otherwise, the application will receive the IP address of a random
