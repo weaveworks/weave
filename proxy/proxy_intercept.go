@@ -2,30 +2,16 @@ package proxy
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"strconv"
 	"sync"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
-)
-
-const (
-	maxLineLength = 4096 // assumed <= bufio.defaultBufSize
-	maxChunkSize  = bufio.MaxScanTokenSize
-)
-
-var (
-	ErrChunkTooLong           = errors.New("chunk too long")
-	ErrInvalidChunkLength     = errors.New("invalid byte in chunk length")
-	ErrLineTooLong            = errors.New("header line too long")
-	ErrMalformedChunkEncoding = errors.New("malformed chunked encoding")
 )
 
 func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Request) {
@@ -153,10 +139,9 @@ func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httpu
 	defer up.Close()
 
 	var err error
-	chunks := bufio.NewScanner(io.MultiReader(remaining, up))
-	chunks.Split(splitChunks)
-	for chunks.Scan() && err == nil {
-		_, err = wf.Write(chunks.Bytes())
+	chunks := NewChunkedReader(io.MultiReader(remaining, up))
+	for chunks.Next() && err == nil {
+		_, err = io.Copy(wf, chunks.Chunk())
 		wf.Flush()
 	}
 	if err == nil {
@@ -165,48 +150,6 @@ func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httpu
 	if err != nil {
 		Log.Errorf("Error forwarding chunked response body: %s", err)
 	}
-}
-
-// a bufio.SplitFunc for http chunks
-func splitChunks(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if atEOF && len(data) == 0 {
-		return 0, nil, nil
-	}
-
-	i := bytes.IndexByte(data, '\n')
-	if i < 0 {
-		return 0, nil, nil
-	}
-	if i > maxLineLength {
-		return 0, nil, ErrLineTooLong
-	}
-
-	chunkSize64, err := strconv.ParseInt(
-		string(bytes.TrimRight(data[:i], " \t\r\n")),
-		16,
-		64,
-	)
-	switch {
-	case err != nil:
-		return 0, nil, ErrInvalidChunkLength
-	case chunkSize64 > maxChunkSize:
-		return 0, nil, ErrChunkTooLong
-	case chunkSize64 == 0:
-		return 0, nil, io.EOF
-	}
-	chunkSize := int(chunkSize64)
-
-	data = data[i+1:]
-
-	if len(data) < chunkSize+2 {
-		return 0, nil, nil
-	}
-
-	if data[chunkSize] != '\r' || data[chunkSize+1] != '\n' {
-		return 0, nil, ErrMalformedChunkEncoding
-	}
-
-	return i + chunkSize + 3, data[:chunkSize], nil
 }
 
 func hijack(w http.ResponseWriter, client *httputil.ClientConn) (down net.Conn, downBuf *bufio.ReadWriter, up net.Conn, remaining io.Reader, err error) {
