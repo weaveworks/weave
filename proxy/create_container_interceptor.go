@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -14,6 +15,10 @@ import (
 )
 
 const MaxDockerHostname = 64
+
+var (
+	ErrNoCommandSpecified = errors.New("No command specified")
+)
 
 type createContainerInterceptor struct{ proxy *Proxy }
 
@@ -103,6 +108,10 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 		if container.Entrypoint == nil {
 			container.Entrypoint = image.Config.Entrypoint
 		}
+	}
+
+	if len(container.Entrypoint) == 0 && len(container.Cmd) == 0 {
+		return ErrNoCommandSpecified
 	}
 
 	if len(container.Entrypoint) == 0 || container.Entrypoint[0] != weaveWaitEntrypoint[0] {
