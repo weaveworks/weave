@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -16,24 +17,24 @@ import (
 	weavenet "github.com/weaveworks/weave/net"
 )
 
-func main() {
-	if len(os.Args) <= 1 {
-		os.Exit(0)
-	}
+var (
+	ErrNoCommandSpecified = errors.New("No command specified")
+)
 
+func main() {
 	var (
 		args         = os.Args[1:]
 		notInExec    = true
 		rewriteHosts = true
 	)
 
-	if args[0] == "-s" {
+	if len(args) > 0 && args[0] == "-s" {
 		notInExec = false
 		rewriteHosts = false
 		args = args[1:]
 	}
 
-	if args[0] == "-h" {
+	if len(args) > 0 && args[0] == "-h" {
 		rewriteHosts = false
 		args = args[1:]
 	}
@@ -46,6 +47,10 @@ func main() {
 
 	iface, err := weavenet.EnsureInterface("ethwe", -1)
 	checkErr(err)
+
+	if len(args) == 0 {
+		checkErr(ErrNoCommandSpecified)
+	}
 
 	if rewriteHosts {
 		updateHosts(iface)
