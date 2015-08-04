@@ -71,8 +71,16 @@ cluster.
 
 When weaveDNS is queried for a name in the `.weave.local` domain, it
 looks up the hostname its in memory database and responds with the IPs
-of all containers for that hostname across the entire cluster, in a
-random order.
+of all containers for that hostname across the entire cluster.
+
+WeaveDNS returns IP addresses in a random order to facilitate basic
+load balancing and failure tolerance. Most client side resolvers sort
+the returned addresses based on reachability, placing local addresses
+at the top of the list (see [RFC 3484](https://www.ietf.org/rfc/rfc3484.txt)).
+For example, if there is container with the desired hostname on the local
+machine, the application will receive that container's IP address.
+Otherwise, the application will receive the IP address of a random
+container with the desired hostname.
 
 When weaveDNS is queried for a name in a domain other than
 `.weave.local`, it queries the host's configured nameserver, which is
