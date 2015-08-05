@@ -25,6 +25,7 @@ start_container $HOST2 --name=c3
 C3=$(container_ip $HOST2 c3)
 assert_raises "[ $C3 != $C1 ]"
 
+sleep 1 # give routers some time to fully establish connectivity
 assert_raises "exec_on $HOST1 c1 $PING $C3"
 
 stop_router_on $HOST1
