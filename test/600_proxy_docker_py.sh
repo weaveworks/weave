@@ -17,8 +17,7 @@ docker_py_test() {
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
         joffrey/docker-py)
-    docker_on $HOST1 cp $C:/home/docker-py/tests/integration_test.py .
-    CANDIDATES=$(sed -En 's/^class (Test[[:alpha:]]+).*/\1/p' integration_test.py)
+    CANDIDATES=$(docker_on $HOST1 cp $C:/home/docker-py/tests/integration_test.py - | sed -En 's/^class (Test[[:alpha:]]+).*/\1/p')
 
     i=0
     TESTS=
