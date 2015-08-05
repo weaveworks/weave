@@ -42,6 +42,7 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	echo "    sudo go install -tags netgo std"; \
 	false; \
 }
+BUILD_FLAGS=-ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo
 
 all: $(WEAVE_EXPORT) $(COVER_EXE) $(RUNNER_EXE)
 
@@ -54,17 +55,16 @@ $(WEAVER_EXE) $(WEAVEPROXY_EXE): common/*.go common/*/*.go net/*.go
 ifeq ($(COVERAGE),true)
 	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "weaveworks") | paste -s -d,))
 	go get -t -tags netgo ./$(@D)
-	go test -c -o ./$@ -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" \
-		-tags netgo -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
+	go test -c -o ./$@ $(BUILD_FLAGS) -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
 else
 	go get -tags netgo ./$(@D)
-	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
+	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 endif
 	$(NETGO_CHECK)
 
 $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	go get -tags netgo ./$(@D)
-	go build -ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo -o $@ ./$(@D)
+	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/main.go
