@@ -35,6 +35,6 @@ weave_on $HOST2 launch-router
 # Introduce host3 to remember the IPAM CRDT when we stop host2
 weave_on $HOST3 launch-router $HOST2
 stop_router_on $HOST2
-weave_on $HOST1 launch-router --log-level=debug $HOST3
+weave_on $HOST1 launch-router $HOST3
 
 end_suite
