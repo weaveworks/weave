@@ -19,7 +19,7 @@ stop_router_on $HOST2
 weave_on $HOST2 launch-router
 weave_on $HOST1 launch-router $HOST2
 
-# Start another container on host2, so if it hasn't relinquished c1's 
+# Start another container on host2, so if it hasn't relinquished c1's
 # address it would give that out as the first available.
 start_container $HOST2 --name=c3
 C3=$(container_ip $HOST2 c3)
