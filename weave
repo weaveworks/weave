@@ -481,7 +481,9 @@ attach() {
         netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
     fi
 
-    arp_update $CONTAINER_IFNAME $1 "netnsenter"
+    for ADDR in "$@" ; do
+        arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
+    done
 }
 
 detach() {
