@@ -212,9 +212,8 @@ Allocator default subnet: 10.2.1.0/24
 The first section covers the router; see the [troubleshooting
 guide](troubleshooting.html#status-report) for full details.
 
-The 'Allocator' section, which is only present if weave has been
-started with the `--ipalloc-range` option, summarises the overall
-position and lists which address ranges have been assigned to which
-peer. Each range begins at the address shown and ends just before the
-next address, or wraps around at the end of the subnet. The 'v' number
-denotes how many times that entry has been updated.
+The 'Allocator' section summarises the overall position and lists
+which address ranges have been assigned to which peer. Each range
+begins at the address shown and ends just before the next address, or
+wraps around at the end of the subnet. The 'v' number denotes how many
+times that entry has been updated.
