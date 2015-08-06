@@ -117,23 +117,30 @@ obtained with `weave status connections`:
 
 ````
 $ weave status connections
-<- 192.168.48.12:39634   ea:2d:b2:e6:e4:f5(host2)         direct     established
-<- 192.168.48.13:49619   ee:38:33:a7:d9:71(host3)         discovered established
--> 192.168.48.14:6783                                     direct     failed(dial tcp4 192.168.48.14:6783: no route to host), retry: 2015-08-05 13:19:00.550203683 +0000 UTC
--> 192.168.48.15:6783                                     direct     failed(dial tcp4 192.168.48.15:6783: no route to host), retry: 2015-08-05 13:19:04.912851748 +0000 UTC
--> 192.168.48.16:6783                                     direct     failed(dial tcp4 192.168.48.16:6783: no route to host), retry: 2015-08-05 13:18:56.609145605 +0000 UTC
+<- 192.168.48.12:33866   7e:21:4a:70:2f:45(host2)         direct     established
+<- 192.168.48.13:60773   7e:ae:cd:d5:23:8d(host3)         direct     established
+-> 192.168.48.14:6783                                     direct     retrying(dial tcp4 192.168.48.14:6783: no route to host)
+-> 192.168.48.15:6783                                     direct     failed(dial tcp4 192.168.48.15:6783: no route to host), retry: 2015-08-06 18:55:38.246910357 +0000 UTC
+-> 192.168.48.16:6783                                     direct     connecting
 ````
 
 The columns are as follows:
 
- * Connection origination direction (-> for outbound, <- for inbound)
+ * Connection origination direction (`->` for outbound, `<-` for
+   inbound)
  * Remote TCP address
  * Remote peer name and nickname (omitted for failed connections)
  * Type - `direct` if specified via `weave launch` or `weave connect`,
    `discovered` if learned via gossip
- * Status - `established` if TCP connection and corresponding UDP path
-   are up, `unestablished` if waiting for confirmation of UDP
-   heartbeat or `failed` if TCP connection could not be made
+ * Status
+    * `connecting` - first connection attempt in progress
+    *  `unestablished` - TCP connection up,  waiting for confirmation
+       of UDP heartbeat
+    * `established` - TCP connection and corresponding UDP path are up
+    * `failed` - TCP connection or UDP heartbeat failed; reason and
+      time of next retry follows
+    * `retrying` - retry of a previously failed connection attempt in
+      progress; reason for previous failure follows
 
 ### <a name="weave-status-peers"></a>List peers
 
