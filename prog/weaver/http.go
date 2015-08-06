@@ -119,7 +119,15 @@ var connectionsTemplate = defTemplate("connectionsTemplate", `\
                                  \
 {{$connectionType := connectionType $directPeers .Address}}\
 {{printf "%-10v" $connectionType}} \
+{{if .Attempting}}\
+{{if .LastError}}\
+retrying({{.LastError}})
+{{else}}\
+connecting
+{{end}}\
+{{else}}\
 failed({{.LastError}}), retry: {{.TryAfter}}
+{{end}}\
 {{end}}\
 `)
 
