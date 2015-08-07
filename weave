@@ -30,6 +30,7 @@ usage() {
 Usage:
 
 weave setup
+weave version
 weave launch        [--password <password>] [--nickname <nickname>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--no-discovery] [--init-peer-count <count>] <peer> ...
@@ -40,8 +41,11 @@ weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--no-default-ipalloc] [--no-rewrite-hosts]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
+weave env
+weave config
 weave connect       [--replace] [<peer> ...]
 weave forget        <peer> ...
+weave status
 weave run           [--with-dns | --without-dns] [<addr> ...]
                       <docker run args> ...
 weave start         [<addr> ...] <container_id>
@@ -53,10 +57,6 @@ weave dns-lookup    <unqualified_name>
 weave expose        [<addr> ...] [-h <fqdn>]
 weave hide          [<addr> ...]
 weave ps            [<container_id> ...]
-weave status
-weave env
-weave config
-weave version
 weave stop
 weave stop-router
 weave stop-proxy
@@ -1256,6 +1256,21 @@ case "$COMMAND" in
             docker pull $img
         done
         ;;
+    version)
+        [ $# -eq 0 ] || usage
+        echo weave script $SCRIPT_VERSION
+        ask_version $CONTAINER_NAME $IMAGE || true
+        if ! EXEC_IMAGE_ID=$(docker inspect --format='{{.Id}}' $EXEC_IMAGE 2>/dev/null) ; then
+            echo "Unable to find $EXEC_IMAGE image." >&2
+        else
+            EXEC_VERSION=$(docker images --no-trunc | grep $EXEC_IMAGE_ID | grep -v latest | tr -s ' ' | cut -d ' ' -f 2 | tr "\n" ' ')
+            if [ -n "$EXEC_VERSION" ] ; then
+                echo "weave exec $EXEC_VERSION"
+            else
+                echo "weave exec (unreleased version)"
+            fi
+        fi
+        ;;
     # intentionally undocumented since it assumes knowledge of weave
     # internals
     create-bridge)
@@ -1310,25 +1325,6 @@ case "$COMMAND" in
             echo "weave proxy is running"
         fi
         [ $res -eq 0 ]
-        ;;
-    ps)
-        [ $# -eq 0 ] && CONTAINERS="weave:expose $(docker ps -q)" || CONTAINERS="$@"
-        with_container_addresses echo_addresses $CONTAINERS
-        ;;
-    version)
-        [ $# -eq 0 ] || usage
-        echo weave script $SCRIPT_VERSION
-        ask_version $CONTAINER_NAME $IMAGE || true
-        if ! EXEC_IMAGE_ID=$(docker inspect --format='{{.Id}}' $EXEC_IMAGE 2>/dev/null) ; then
-            echo "Unable to find $EXEC_IMAGE image." >&2
-        else
-            EXEC_VERSION=$(docker images --no-trunc | grep $EXEC_IMAGE_ID | grep -v latest | tr -s ' ' | cut -d ' ' -f 2 | tr "\n" ' ')
-            if [ -n "$EXEC_VERSION" ] ; then
-                echo "weave exec $EXEC_VERSION"
-            else
-                echo "weave exec (unreleased version)"
-            fi
-        fi
         ;;
     run)
         dns_args "$@"
@@ -1460,6 +1456,10 @@ case "$COMMAND" in
             call_weave DELETE /ip/weave:expose/${CIDR%/*}
         done
         show_addrs $ALL_CIDRS
+        ;;
+    ps)
+        [ $# -eq 0 ] && CONTAINERS="weave:expose $(docker ps -q)" || CONTAINERS="$@"
+        with_container_addresses echo_addresses $CONTAINERS
         ;;
     stop)
         [ $# -eq 0 ] || usage
