@@ -773,7 +773,12 @@ func (fwd *sleeveForwarder) handleHeartbeat(special specialFrame) error {
 		}
 	}
 
-	fwd.heartbeatTimeout.Reset(HeartbeatTimeout)
+	// we can receive a heartbeat before confirmed() has set up
+	// heartbeatTimeout
+	if fwd.heartbeatTimeout != nil {
+		fwd.heartbeatTimeout.Reset(HeartbeatTimeout)
+	}
+
 	return nil
 }
 
