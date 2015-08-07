@@ -6,10 +6,10 @@ NAME=multicidr.weave.local
 
 # assert_container_cidrs <host> <cid> [<cidr> ...]
 assert_container_cidrs() {
-    HOST=$1
-    CID=$2
+    local HOST=$1
+    local CID=$(echo $2 | cut -b 1-12)
     shift 2
-    CIDRS="$@"
+    local CIDRS="$@"
 
     # Assert container has attached CIDRs
     if [ -z "$CIDRS" ] ; then
@@ -19,40 +19,37 @@ assert_container_cidrs() {
     fi
 }
 
-# assert_zone_records <host> <cid> <fqdn> [<ip>|<cidr> ...]
+# assert_zone_records <host> <fqdn> [<ip>|<cidr> ...]
 assert_zone_records() {
-    HOST=$1
-    CID=$2
-    FQDN=$3
-    shift 3
+    local HOST=$1
+    local FQDN=$2
+    shift 2
 
-    records=$(weave_on $HOST status | grep "^$CID") || true
-    # Assert correct number of records exist
-    assert "echo $records | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' | wc -l | tr -d '[:space:]'" $#
-
-    # Assert correct records exist
+    records=$(weave_on $HOST dns-lookup $FQDN; echo "EOF") || true
+    count=$(echo -n "$records" | wc -l)
+    assert "echo $count" $#
     for ADDR; do
-        assert_raises "echo $records | grep '${ADDR%/*}' | grep '$FQDN'"
+        assert_raises "echo $records | grep '${ADDR%/*}'"
     done
 }
 
 # assert_ips_and_dns <host> <cid> <fqdn> [<cidr> ...]
 assert_ips_and_dns() {
-    HOST=$1
-    CID=$2
-    FQDN=$3
+    local HOST=$1
+    local CID=$2
+    local FQDN=$3
     shift 3
 
-    assert_container_cidrs $HOST $CID       "$@"
-    assert_zone_records    $HOST $CID $FQDN "$@"
+    assert_container_cidrs $HOST $CID  "$@"
+    assert_zone_records    $HOST $FQDN "$@"
 }
 
 # assert_bridge_cidrs <host> <dev> <cidr> [<cidr> ...]
 assert_bridge_cidrs() {
-    HOST=$1
-    DEV=$2
+    local HOST=$1
+    local DEV=$2
     shift 2
-    CIDRS="$@"
+    local CIDRS="$@"
 
     BRIDGE_CIDRS=$($SSH $HOST ip addr show dev $DEV | grep -o 'inet .*' | cut -d ' ' -f 2)
     assert "echo $BRIDGE_CIDRS" "$CIDRS"
@@ -76,7 +73,7 @@ start_suite "Weave run/start/attach/detach/expose/hide with multiple cidr argume
 weave_on $HOST1 launch-router --ipalloc-range 10.2.3.0/24
 
 # Run container with three cidrs
-CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME | cut -b 1-12)
+CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.0/24 --name=multicidr -h $NAME)
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Stop the container
