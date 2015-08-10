@@ -135,6 +135,10 @@ func (d *DNSServer) handleLocal(defaultMaxResponseSize int) func(dns.ResponseWri
 		}
 
 		addrs := d.ns.Lookup(hostname)
+		if len(addrs) == 0 {
+			d.errorResponse(req, dns.RcodeNameError, w)
+			return
+		}
 
 		response := dns.Msg{}
 		response.RecursionAvailable = true
@@ -232,10 +236,6 @@ func (d *DNSServer) handleRecursive(client *dns.Client, defaultMaxResponseSize i
 			response, _, err := client.Exchange(reqCopy, fmt.Sprintf("%s:%s", server, d.upstream.Port))
 			if err != nil || response == nil {
 				d.ns.debugf("error trying %s: %v", server, err)
-				continue
-			}
-			if response.Rcode != dns.RcodeSuccess && !response.Authoritative {
-				d.ns.debugf("non-authoritative error trying %s: %v", server, response.Rcode)
 				continue
 			}
 			d.ns.debugf("response: %+v", response)
