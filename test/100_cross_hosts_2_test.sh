@@ -27,10 +27,4 @@ start_container $HOST2 net:$SUBNET_2 --name=c6
 C6=$(container_ip $HOST2 c6)
 assert_raises "exec_on $HOST1 c5 $PING $C6"
 
-# check large packets get through. The first attempt typically fails,
-# since the PMTU hasn't been discovered yet. The 2nd attempt should
-# succeed.
-exec_on $HOST1 c1 $PING -s 65000 $C2 2>&1 1>/dev/null || true
-assert_raises "exec_on $HOST1 c1 $PING -s 65000 $C2"
-
 end_suite
