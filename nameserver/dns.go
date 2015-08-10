@@ -239,7 +239,7 @@ func (d *DNSServer) handleRecursive(client *dns.Client, defaultMaxResponseSize i
 				continue
 			}
 			d.ns.debugf("response: %+v", response)
-			response.SetReply(req)
+			response.Id = req.Id
 			if err := w.WriteMsg(response); err != nil {
 				d.ns.infof("error responding: %v", err)
 			}
