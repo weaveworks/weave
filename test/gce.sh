@@ -139,9 +139,9 @@ function hosts {
 		hosts="$hostname $hosts"
 		args="--add-host=$hostname:$(internal_ip $json $name) $args"
 	done
-	echo export SSH=ssh
-	echo export HOSTS=\"$hosts\"
-	echo export WEAVE_DOCKER_ARGS=\"$args\"
+	echo set -x SSH ssh
+	echo set -x HOSTS \"$hosts\"
+	echo set -x WEAVE_DOCKER_ARGS \"$args\"
 	rm $json
 }
 

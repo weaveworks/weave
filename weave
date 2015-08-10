@@ -1298,7 +1298,7 @@ case "$COMMAND" in
         ;;
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
-        proxy_addr "export DOCKER_HOST="
+        proxy_addr "set -x DOCKER_HOST "
         ;;
     config|proxy-config)
         [ "$COMMAND" = "config" ] || deprecation_warning "$COMMAND" "'weave config'"
