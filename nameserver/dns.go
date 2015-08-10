@@ -38,8 +38,7 @@ type DNSServer struct {
 	udpClient *dns.Client
 }
 
-func NewDNSServer(ns *Nameserver, domain string, address string, ttl uint32,
-	clientTimeout time.Duration) (*DNSServer, error) {
+func NewDNSServer(ns *Nameserver, domain string, address string, ttl uint32, clientTimeout time.Duration) (*DNSServer, error) {
 
 	s := &DNSServer{
 		ns:        ns,
