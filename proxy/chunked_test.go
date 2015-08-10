@@ -100,6 +100,23 @@ func TestInvalidChunkSize(t *testing.T) {
 	assertError(t, r, "invalid byte in chunk length")
 }
 
+func TestChunkSizeLineTooLong(t *testing.T) {
+	var (
+		maxLineLength = 4096
+		chunkSize     string
+	)
+	for i := 0; i < maxLineLength; i++ {
+		chunkSize = chunkSize + "0"
+	}
+	chunkSize = chunkSize + "7"
+
+	r := NewChunkedReader(bytes.NewBufferString(
+		chunkSize + "\r\nhello, \r\n0\r\n",
+	))
+
+	assertError(t, r, "header line too long")
+}
+
 func TestBytesAfterLastChunkAreIgnored(t *testing.T) {
 	r := NewChunkedReader(bytes.NewBufferString(
 		"7\r\nhello, \r\n0\r\nGARBAGEBYTES",

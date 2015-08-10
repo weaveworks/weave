@@ -10,8 +10,6 @@ import (
 	"strconv"
 )
 
-const maxLineLength = 4096 // assumed <= bufio.defaultBufSize
-
 var (
 	ErrLineTooLong        = errors.New("header line too long")
 	ErrInvalidChunkLength = errors.New("invalid byte in chunk length")
@@ -89,22 +87,25 @@ func (cr *ChunkedReader) Err() error {
 	return cr.err
 }
 
-func (cr *ChunkedReader) beginChunk() (n uint64) {
+func (cr *ChunkedReader) beginChunk() uint64 {
+	var (
+		line []byte
+		n    uint64
+	)
 	// chunk-size CRLF
-	var line []byte
 	line, cr.err = readLine(cr.r)
 	if cr.err != nil {
-		return
+		return 0
 	}
 	n, cr.err = strconv.ParseUint(string(line), 16, 64)
 	if cr.err != nil {
 		cr.err = ErrInvalidChunkLength
 	}
-	return
+	return n
 }
 
 // Read a line of bytes (up to \n) from b.
-// Give up if the line exceeds maxLineLength.
+// Give up if the line exceeds the buffer size.
 // The returned bytes are a pointer into storage in
 // the bufio, so they are only valid until the next bufio read.
 func readLine(b *bufio.Reader) (p []byte, err error) {
@@ -117,9 +118,6 @@ func readLine(b *bufio.Reader) (p []byte, err error) {
 			err = ErrLineTooLong
 		}
 		return nil, err
-	}
-	if len(p) >= maxLineLength {
-		return nil, ErrLineTooLong
 	}
 	return bytes.TrimRight(p, " \t\n\r"), nil
 }
