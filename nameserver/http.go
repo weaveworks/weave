@@ -27,7 +27,7 @@ func (n *Nameserver) HandleHTTP(router *mux.Router) {
 			vars      = mux.Vars(r)
 			container = vars["container"]
 			ipStr     = vars["ip"]
-			hostname  = r.FormValue("fqdn")
+			hostname  = dns.Fqdn(r.FormValue("fqdn"))
 			ip, err   = address.ParseIP(ipStr)
 		)
 		if err != nil {
@@ -35,7 +35,7 @@ func (n *Nameserver) HandleHTTP(router *mux.Router) {
 			return
 		}
 
-		if err := n.AddEntry(dns.Fqdn(hostname), container, n.ourName, ip); err != nil {
+		if err := n.AddEntry(hostname, container, n.ourName, ip); err != nil {
 			badRequest(w, fmt.Errorf("Unable to add entry: %v", err))
 			return
 		}
