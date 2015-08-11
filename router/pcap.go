@@ -84,3 +84,15 @@ func (pio *PcapIO) ReadPacket() (data []byte, err error) {
 func (pio *PcapIO) WritePacket(data []byte) error {
 	return pio.handle.WritePacketData(data)
 }
+
+func (pio *PcapIO) Stats() map[string]int {
+	stats, err := pio.handle.Stats()
+	if err != nil {
+		return nil
+	}
+	res := make(map[string]int)
+	res["PacketsReceived"] = stats.PacketsReceived
+	res["PacketsDropped"] = stats.PacketsDropped
+	res["PacketsIfDropped"] = stats.PacketsIfDropped
+	return res
+}

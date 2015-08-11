@@ -14,6 +14,7 @@ type Status struct {
 	NickName           string
 	Port               int
 	Interface          string
+	CaptureStats       map[string]int
 	MACs               []MACStatus
 	Peers              []PeerStatus
 	UnicastRoutes      []UnicastRouteStatus
@@ -66,6 +67,10 @@ func NewStatus(router *Router) *Status {
 	if router.Iface != nil {
 		ifaceName = router.Iface.Name
 	}
+	var captureStats map[string]int
+	if router.PacketSource != nil {
+		captureStats = router.PacketSource.Stats()
+	}
 	return &Status{
 		Protocol,
 		ProtocolMinVersion,
@@ -76,6 +81,7 @@ func NewStatus(router *Router) *Status {
 		router.Ourself.NickName,
 		router.Port,
 		ifaceName,
+		captureStats,
 		NewMACStatusSlice(router.Macs),
 		NewPeerStatusSlice(router.Peers),
 		NewUnicastRouteStatusSlice(router.Routes),
