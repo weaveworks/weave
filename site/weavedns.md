@@ -247,25 +247,25 @@ DNS:
 ````
 ...
 
-WeaveDNS (d6:1b:df:42:af:7d)
-  listening on port 53, for domain weave.local.
-  response ttl 30
-
-1d836dea2c56: foo.weave.local. [10.2.2.1]
+       Service: dns
+        Domain: weave.local.
+           TTL: 1
+       Entries: 9
 
 ...
 ````
 
 The first section covers the router; see the [troubleshooting
-guide](troubleshooting.html#status-report) for more detail.
+guide](troubleshooting.html#weave-status) for more detail.
 
-The second section is pertinent to weaveDNS, and includes:
+The 'Service: dns' section is pertinent to weaveDNS, and includes:
 
-* Port on which the DNS server is listening
 * The local domain suffix which is being served
 * The response ttl
-* The names known to the weaveDNS server. Each entry comprises
-  the container ID, IP address and its fully qualified domain name
+* The total number of entries
+
+You may also use `weave status dns` to obtain a [complete
+dump](troubleshooting.html#weave-status-dns) of all DNS registrations.
 
 Information on the processing of queries, and the general operation of
 weaveDNS, can be obtained from the container logs with

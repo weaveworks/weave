@@ -498,6 +498,11 @@ be disabled with the `--no-discovery` option to `weave launch`. In
 this mode, weave will only connect to the addresses specified at
 launch time and with `weave connect`.
 
+The list of all hosts that a peer has been asked to connect to with
+`weave launch` and `weave connect` can be obtained with
+
+    host# weave status targets
+
 ### <a name="container-mobility"></a>Container mobility
 
 Containers can be moved between hosts without requiring any

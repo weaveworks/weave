@@ -1,8 +1,6 @@
 package router
 
 import (
-	"bytes"
-	"fmt"
 	"math"
 	"sync"
 )
@@ -107,23 +105,6 @@ func (routes *Routes) RandomNeighbours(except PeerName) PeerNameSet {
 		}
 	}
 	return res
-}
-
-func (routes *Routes) String() string {
-	var buf bytes.Buffer
-	routes.RLock()
-	defer routes.RUnlock()
-	fmt.Fprintln(&buf, "unicast:")
-	for name, hop := range routes.unicast {
-		fmt.Fprintf(&buf, "%s -> %s\n", name, hop)
-	}
-	fmt.Fprintln(&buf, "broadcast:")
-	for name, hops := range routes.broadcast {
-		fmt.Fprintf(&buf, "%s -> %v\n", name, hops)
-	}
-	// We don't include the 'all' routes here since they are of
-	// limited utility in troubleshooting
-	return buf.String()
 }
 
 // Request recalculation of the routing table. This is async but can

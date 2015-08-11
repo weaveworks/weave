@@ -115,26 +115,6 @@ func (router *Router) UsingPassword() bool {
 	return router.Password != nil
 }
 
-func (router *Router) Status() string {
-	var buf bytes.Buffer
-	fmt.Fprintln(&buf, "Our name is", router.Ourself)
-	fmt.Fprintln(&buf, "Encryption", onOff(router.UsingPassword()))
-	fmt.Fprintln(&buf, "Peer discovery", onOff(router.PeerDiscovery))
-	fmt.Fprintln(&buf, "Sniffing traffic on", router.Iface)
-	fmt.Fprintf(&buf, "MACs:\n%s", router.Macs)
-	fmt.Fprintf(&buf, "Peers:\n%s", router.Peers)
-	fmt.Fprintf(&buf, "Routes:\n%s", router.Routes)
-	fmt.Fprint(&buf, router.ConnectionMaker.Status())
-	return buf.String()
-}
-
-func onOff(b bool) string {
-	if b {
-		return "on"
-	}
-	return "off"
-}
-
 func (router *Router) sniff(pio PacketSourceSink) {
 	log.Println("Sniffing traffic on", router.Iface)
 

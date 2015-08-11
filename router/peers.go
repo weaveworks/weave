@@ -3,7 +3,6 @@ package router
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"io"
 	"sync"
 )
@@ -168,34 +167,6 @@ func (peers *Peers) GarbageCollect() []*Peer {
 	peers.Unlock()
 	peers.invokeOnGCCallbacks(removed)
 	return removed
-}
-
-func (peers *Peers) String() string {
-	var buf bytes.Buffer
-	printConnection := func(conn Connection) {
-		established := ""
-		if !conn.Established() {
-			established = " (unestablished)"
-		}
-		fmt.Fprintf(&buf, "   -> %s [%v%s]\n", conn.Remote(), conn.RemoteTCPAddr(), established)
-	}
-	peers.ForEach(func(peer *Peer) {
-		if peer == peers.ourself.Peer {
-			fmt.Fprintln(&buf, peers.ourself.Info())
-			for conn := range peers.ourself.Connections() {
-				printConnection(conn)
-			}
-		} else {
-			fmt.Fprintln(&buf, peer.Info())
-			// Modifying peer.connections requires a write lock on
-			// Peers, and since we are holding a read lock (due to the
-			// ForEach), access without locking the peer is safe.
-			for _, conn := range peer.connections {
-				printConnection(conn)
-			}
-		}
-	})
-	return buf.String()
 }
 
 func (peers *Peers) garbageCollect() []*Peer {

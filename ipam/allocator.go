@@ -33,8 +33,6 @@ type operation interface {
 
 	Cancel()
 
-	String() string
-
 	// Does this operation pertain to the given container id?
 	// Used for tidying up pending operations when containers die.
 	ForContainer(ident string) bool
@@ -275,15 +273,6 @@ func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 	return <-errChan
 }
 
-// Sync.
-func (alloc *Allocator) String() string {
-	resultChan := make(chan string)
-	alloc.actionChan <- func() {
-		resultChan <- alloc.string()
-	}
-	return <-resultChan
-}
-
 // Shutdown (Sync)
 func (alloc *Allocator) Shutdown() {
 	alloc.infof("Shutdown")
@@ -492,30 +481,6 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 }
 
 // Helper functions
-
-func (alloc *Allocator) string() string {
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Allocator range %s", alloc.universe)
-
-	if alloc.ring.Empty() {
-		if alloc.paxosTicker != nil {
-			fmt.Fprintf(&buf, " awaiting consensus: %s", alloc.paxos.String())
-		}
-	} else {
-		fmt.Fprint(&buf, "\nOwned Ranges:")
-		alloc.ring.FprintWithNicknames(&buf, alloc.nicknames)
-	}
-	if len(alloc.pendingAllocates)+len(alloc.pendingClaims) > 0 {
-		fmt.Fprintf(&buf, "\nPending requests:")
-		for _, op := range alloc.pendingAllocates {
-			fmt.Fprintf(&buf, "\n  %s", op.String())
-		}
-		for _, op := range alloc.pendingClaims {
-			fmt.Fprintf(&buf, "\n  %s", op.String())
-		}
-	}
-	return buf.String()
-}
 
 // Ensure we are making progress towards an established ring
 func (alloc *Allocator) establishRing() {

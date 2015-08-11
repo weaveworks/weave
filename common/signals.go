@@ -10,7 +10,6 @@ import (
 // A subsystem/server/... that can be stopped or queried about the status with a signal
 type SignalReceiver interface {
 	Stop() error
-	Status() string
 }
 
 func SignalHandlerLoop(ss ...SignalReceiver) {
@@ -28,10 +27,6 @@ func SignalHandlerLoop(ss ...SignalReceiver) {
 		case syscall.SIGQUIT:
 			stacklen := runtime.Stack(buf, true)
 			Log.Infof("=== received SIGQUIT ===\n*** goroutine dump...\n%s\n*** end", buf[:stacklen])
-		case syscall.SIGUSR1:
-			for _, subsystem := range ss {
-				Log.Infof("=== received SIGUSR1 ===\n*** status...\n%s\n*** end", subsystem.Status())
-			}
 		}
 	}
 }

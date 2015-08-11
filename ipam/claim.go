@@ -98,10 +98,6 @@ func (c *claim) Cancel() {
 	c.sendResult(fmt.Errorf("Operation cancelled."))
 }
 
-func (c *claim) String() string {
-	return fmt.Sprintf("Claim %s -> %s", c.ident, c.addr.String())
-}
-
 func (c *claim) ForContainer(ident string) bool {
 	return c.ident == ident
 }

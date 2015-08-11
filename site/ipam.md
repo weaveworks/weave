@@ -48,6 +48,17 @@ time, you can give the number of peers like this:
 
     host3$ weave launch --init-peer-count 3 $HOST2
 
+The consensus mechanism used to determine a majority transitions
+through three states: 'deferred', 'waiting' and 'achieved':
+
+* 'deferred' - no allocation requests or claims have been made yet;
+  consensus is deferred until then
+* 'waiting' - an attempt to achieve consensus is ongoing, triggered by
+  an allocation or claim request; allocations will block. This state
+  persists until a quorum of peers are able to communicate amongst
+  themselves successfully
+* 'achieved' - consensus achieved; allocations proceed normally
+
 ### More on `--init-peer-count`
 
 TL;DR: it isn't a problem to over-estimate by a bit, but if you supply
@@ -199,21 +210,16 @@ reports on the current status of the weave router and IP allocator:
 ````
 ...
 
-Allocator universe 10.2.0.0/16
-Owned Ranges:
-  10.2.1.1 -> 96:e9:e2:2e:2d:bc (host1) (v3)
-  10.2.1.128 -> ea:84:25:9b:31:2e (host2) (v3)
-  10.2.1.192 -> ea:6c:21:09:cf:f0 (host3) (v9)
-Allocator default subnet: 10.2.1.0/24
+       Service: ipam
+     Consensus: waiting(quorum: 2, known: 0)
+         Range: [10.32.0.0-10.48.0.0)
+ DefaultSubnet: 10.32.0.0/12
 
 ...
 ````
 
 The first section covers the router; see the [troubleshooting
-guide](troubleshooting.html#status-report) for full details.
+guide](troubleshooting.html#weave-status) for full details.
 
-The 'Allocator' section summarises the overall position and lists
-which address ranges have been assigned to which peer. Each range
-begins at the address shown and ends just before the next address, or
-wraps around at the end of the subnet. The 'v' number denotes how many
-times that entry has been updated.
+The 'Service: ipam' section displays the consensus state as well as
+the total allocation range and default subnet.

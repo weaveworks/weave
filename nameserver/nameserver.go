@@ -185,23 +185,6 @@ func (n *Nameserver) deleteTombstones() {
 	})
 }
 
-func (n *Nameserver) String() string {
-	n.RLock()
-	defer n.RUnlock()
-	var buf bytes.Buffer
-	for _, entry := range n.entries {
-		if entry.Tombstone > 0 {
-			continue
-		}
-		containerid := entry.ContainerID
-		if len(containerid) > 12 {
-			containerid = containerid[:12]
-		}
-		fmt.Fprintf(&buf, "%s: %s [%s]\n", containerid, entry.Hostname, entry.Addr.String())
-	}
-	return buf.String()
-}
-
 func (n *Nameserver) Gossip() router.GossipData {
 	n.RLock()
 	defer n.RUnlock()
