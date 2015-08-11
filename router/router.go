@@ -47,12 +47,14 @@ type Router struct {
 	gossipLock      sync.RWMutex
 	gossipChannels  GossipChannels
 	TopologyGossip  Gossip
+	PacketSource    PacketSource
 	UDPListener     *net.UDPConn
 	acceptLimiter   *TokenBucket
 }
 
 type PacketSource interface {
 	ReadPacket() ([]byte, error)
+	Stats() map[string]int
 }
 
 type PacketSink interface {
@@ -102,6 +104,7 @@ func (router *Router) Start() {
 	router.UDPListener = router.listenUDP(router.Port, po)
 	router.listenTCP(router.Port)
 	if pio != nil {
+		router.PacketSource = pio
 		router.sniff(pio)
 	}
 }
