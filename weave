@@ -174,7 +174,7 @@ if [ "$1" = "run" ] ; then
     shift $(dns_arg_count "$@")
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
-    CONTAINER=$(docker $DOCKER_CLIENT_ARGS run $DNS_ARGS -d "$@")
+    CONTAINER=$(docker $DOCKER_CLIENT_ARGS run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
     exec_remote attach $CIDR_ARGS --or-die $CONTAINER >/dev/null
     echo $CONTAINER
     exit 0
@@ -1352,7 +1352,7 @@ case "$COMMAND" in
         shift $(dns_arg_count "$@")
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        CONTAINER=$(docker run $DNS_ARGS -d "$@")
+        CONTAINER=$(docker run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
         create_bridge
         ipam_cidrs_or_die $CONTAINER $CIDR_ARGS
         with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
