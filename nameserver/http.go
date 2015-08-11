@@ -8,13 +8,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 
-	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
 )
 
-func badRequest(w http.ResponseWriter, err error) {
+func (n *Nameserver) badRequest(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusBadRequest)
-	common.Log.Warningf("[gossipdns]: %v", err)
+	n.infof("%v", err)
 }
 
 func (n *Nameserver) HandleHTTP(router *mux.Router) {
@@ -27,23 +26,23 @@ func (n *Nameserver) HandleHTTP(router *mux.Router) {
 			vars      = mux.Vars(r)
 			container = vars["container"]
 			ipStr     = vars["ip"]
-			hostname  = r.FormValue("fqdn")
+			hostname  = dns.Fqdn(r.FormValue("fqdn"))
 			ip, err   = address.ParseIP(ipStr)
 		)
 		if err != nil {
-			badRequest(w, err)
+			n.badRequest(w, err)
 			return
 		}
 
-		if err := n.AddEntry(dns.Fqdn(hostname), container, n.ourName, ip); err != nil {
-			badRequest(w, fmt.Errorf("Unable to add entry: %v", err))
+		if err := n.AddEntry(hostname, container, n.ourName, ip); err != nil {
+			n.badRequest(w, fmt.Errorf("Unable to add entry: %v", err))
 			return
 		}
 
 		if r.FormValue("check-alive") == "true" && n.docker.IsContainerNotRunning(container) {
-			common.Log.Infof("[gossipdns] '%s' is not running: removing", container)
+			n.infof("container '%s' is not running: removing", container)
 			if err := n.Delete(hostname, container, ipStr, ip); err != nil {
-				common.Log.Infof("[gossipdns] failed to remove: %v", err)
+				n.infof("failed to remove: %v", err)
 			}
 		}
 
@@ -68,14 +67,14 @@ func (n *Nameserver) HandleHTTP(router *mux.Router) {
 		ipStr, ok := vars["ip"]
 		ip, err := address.ParseIP(ipStr)
 		if ok && err != nil {
-			badRequest(w, err)
+			n.badRequest(w, err)
 			return
 		} else if !ok {
 			ipStr = "*"
 		}
 
 		if err := n.Delete(hostname, container, ipStr, ip); err != nil {
-			badRequest(w, fmt.Errorf("Unable to delete entries: %v", err))
+			n.badRequest(w, fmt.Errorf("Unable to delete entries: %v", err))
 			return
 		}
 		w.WriteHeader(204)
@@ -88,7 +87,7 @@ func (n *Nameserver) HandleHTTP(router *mux.Router) {
 		n.RLock()
 		defer n.RUnlock()
 		if err := json.NewEncoder(w).Encode(n.entries); err != nil {
-			badRequest(w, fmt.Errorf("Error marshalling response: %v", err))
+			n.badRequest(w, fmt.Errorf("Error marshalling response: %v", err))
 		}
 	})
 }

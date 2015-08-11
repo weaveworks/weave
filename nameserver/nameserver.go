@@ -170,6 +170,8 @@ func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Addr
 		if ipStr != "*" && e.Addr != ip {
 			return false
 		}
+
+		n.infof("tombstoning entry %v", e)
 		return true
 	})
 	n.Unlock()
