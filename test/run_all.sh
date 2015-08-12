@@ -36,7 +36,7 @@ echo Running $TESTS
 for t in $TESTS; do
     echo
     greyly echo "---= Running $t =---"
-    (. $t)
+    . $t
 
     # Report test runtime when running on circle, to help scheduler
     if [ -n "$CIRCLECI" ]; then
