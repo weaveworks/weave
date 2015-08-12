@@ -82,7 +82,11 @@ func NewProxy(c Config) (*Proxy, error) {
 		Error.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
-	p.client, err = docker.NewClient(p.DockerAddr)
+	// We pin the protocol version to 1.15 (which corresponds to Docker 1.3.x;
+	// the earliest version supported by weave) in order to insulate ourselves
+	// from breaking changes to the API, as happened in 1.20 (Docker 1.8.0) when
+	// the presentation of volumes changed in inspect.
+	p.client, err = docker.NewVersionedClient(p.DockerAddr, "1.15")
 	if err != nil {
 		return nil, err
 	}
