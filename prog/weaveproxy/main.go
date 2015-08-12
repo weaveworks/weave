@@ -7,36 +7,13 @@ import (
 
 	"github.com/docker/docker/pkg/mflag"
 	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/mflagext"
 	"github.com/weaveworks/weave/proxy"
 )
 
 var (
 	version = "(unreleased version)"
 )
-
-type listOpts struct {
-	value      *[]string
-	hasBeenSet bool
-}
-
-func ListVar(p *[]string, names []string, value []string, usage string) {
-	*p = value
-	mflag.Var(&listOpts{p, false}, names, usage)
-}
-
-func (opts *listOpts) Set(value string) error {
-	if opts.hasBeenSet {
-		(*opts.value) = append((*opts.value), value)
-	} else {
-		(*opts.value) = []string{value}
-		opts.hasBeenSet = true
-	}
-	return nil
-}
-
-func (opts *listOpts) String() string {
-	return fmt.Sprintf("%v", []string(*opts.value))
-}
 
 func main() {
 	var (
@@ -49,7 +26,7 @@ func main() {
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
 	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
-	ListVar(&c.ListenAddrs, []string{"H"}, nil, "addresses on which to listen")
+	mflagext.ListVar(&c.ListenAddrs, []string{"H"}, nil, "addresses on which to listen")
 	mflag.StringVar(&c.HostnameMatch, []string{"-hostname-match"}, "(.*)", "Regexp pattern to apply on container names (e.g. '^aws-[0-9]+-(.*)$')")
 	mflag.StringVar(&c.HostnameReplacement, []string{"-hostname-replacement"}, "$1", "Expression to generate hostnames based on matches from --hostname-match (e.g. 'my-app-$1')")
 	mflag.BoolVar(&c.NoDefaultIPAM, []string{"#-no-default-ipam", "-no-default-ipalloc"}, false, "do not automatically allocate addresses for containers without a WEAVE_CIDR")
