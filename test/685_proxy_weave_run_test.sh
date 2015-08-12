@@ -7,7 +7,6 @@ C1=10.2.1.13
 start_suite "Start containers with 'weave run' via proxy"
 
 weave_on $HOST1 launch
-weave_on $HOST1 launch-proxy
 
 proxy start_container $HOST1 $C1/24 --name=c1
 # check we get exactly one IP back, the one specified
