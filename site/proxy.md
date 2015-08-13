@@ -103,7 +103,7 @@ To start a container without connecting it to the weave network, pass
 If you do not want IPAM to be used by default, the proxy needs to be
 passed the `--no-default-ipam` flag, e.g.
 
-    host1$ docker launch-proxy --no-default-ipam
+    host1$ weave launch-proxy --no-default-ipam
 
 In this configuration, containers with no `WEAVE_CIDR` environment
 variable will not be connected to the weave network. Containers
