@@ -120,6 +120,18 @@ start_container_with_dns() {
     weave_on $host run --with-dns "$@" -t $DNS_IMAGE /bin/sh
 }
 
+proxy_start_container() {
+    host=$1
+    shift 1
+    proxy docker_on $host run "$@" -dt $SMALL_IMAGE /bin/sh
+}
+
+proxy_start_container_with_dns() {
+    host=$1
+    shift 1
+    proxy docker_on $host run "$@" -dt $DNS_IMAGE /bin/sh
+}
+
 rm_containers() {
     host=$1
     shift

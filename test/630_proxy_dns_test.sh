@@ -8,8 +8,8 @@ C1_NAME=c1.weave.local
 C2_NAME=seetwo.weave.local
 
 boot_containers() {
-  proxy docker_on $HOST1 run -e WEAVE_CIDR=$C2/24 -dt --name=c2 -h $C2_NAME $DNS_IMAGE /bin/sh
-  proxy docker_on $HOST1 run -e WEAVE_CIDR=$C1/24 -dt --name=c1             $DNS_IMAGE /bin/sh
+  proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C2/24 -dt --name=c2 -h $C2_NAME
+  proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C1/24 -dt --name=c1
 }
 
 kill_containers() {
