@@ -29,7 +29,7 @@ assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.2/24' $BASE_IMAG
 # Check only user-specified volumes and /w are mounted
 dirs_sans_proxy=$(docker_on $HOST1 run --rm -it $BASE_IMAGE mount | wc -l)
 dirs_with_proxy=$(proxy docker_on $HOST1 run --rm -it -v /tmp/1:/srv1 -v /tmp/2:/srv2 -e 'WEAVE_CIDR=10.2.1.3/24' $BASE_IMAGE mount | wc -l)
-assert "$((dirs_with_proxy-3))" $dirs_sans_proxy
+assert "echo $((dirs_with_proxy-3))" $dirs_sans_proxy
 
 # Check errors are returned (when docker returns an error code)
 assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=10.2.1.3/24' $SMALL_IMAGE foo 2>&1 | grep 'exec: \"foo\": executable file not found in \$PATH'"
