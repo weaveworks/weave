@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. ./perf.sh
 
 [ -n "$PERFORMANCE" ] || exit 0
 

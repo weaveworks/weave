@@ -167,7 +167,9 @@ func getTests(testNames []string) (tests, error) {
 	}
 	tests := tests{}
 	for _, name := range testNames {
-		parts := strings.Split(strings.TrimSuffix(name, "_test.sh"), "_")
+		n := strings.TrimSuffix(name, "_test.sh")
+		n = strings.TrimSuffix(name, "_perf.sh")
+		parts := strings.Split(n, "_")
 		numHosts, err := strconv.Atoi(parts[len(parts)-1])
 		if err != nil {
 			numHosts = 1
