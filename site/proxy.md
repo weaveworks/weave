@@ -120,7 +120,7 @@ To start a container without connecting it to the weave network, pass
 If you do not want an IP to be assigned by default, the proxy needs to
 be passed the `--no-default-ipalloc` flag, e.g.,
 
-    host1$ docker launch-proxy --no-default-ipalloc
+    host1$ weave launch-proxy --no-default-ipalloc
 
 In this configuration, containers with no `WEAVE_CIDR` environment
 variable will not be connected to the weave network. Containers
