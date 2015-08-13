@@ -28,9 +28,8 @@ var (
 	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
 	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
 
-	ErrInvalidNetworkMode = errors.New("--net option")
-	ErrWeaveCIDRNone      = errors.New("WEAVE_CIDR=none")
-	ErrNoDefaultIPAM      = errors.New("--no-default-ipam option")
+	ErrWeaveCIDRNone = errors.New("WEAVE_CIDR=none")
+	ErrNoDefaultIPAM = errors.New("--no-default-ipam option")
 )
 
 type Config struct {
@@ -60,7 +59,12 @@ func NewProxy(c Config) (*Proxy, error) {
 		Log.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
-	client, err := docker.NewClient(dockerSockUnix)
+	// We pin the protocol version to 1.15 (which corresponds to
+	// Docker 1.3.x; the earliest version supported by weave) in order
+	// to insulate ourselves from breaking changes to the API, as
+	// happened in 1.20 (Docker 1.8.0) when the presentation of
+	// volumes changed in `inspect`.
+	client, err := docker.NewVersionedClient(dockerSockUnix, "1.15")
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +227,9 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, error) {
 	if hostConfig != nil &&
 		hostConfig.NetworkMode != "" &&
+		hostConfig.NetworkMode != "default" &&
 		hostConfig.NetworkMode != "bridge" {
-		return nil, ErrInvalidNetworkMode
+		return nil, fmt.Errorf("--net option: %q", hostConfig.NetworkMode)
 	}
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
