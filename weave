@@ -882,7 +882,7 @@ ipam_cidrs_or_die() {
 # TODO: Handle args with spaces
 tls_arg() {
     filename=${3:-$2}
-    PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/$filename.pem"
+    PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/$filename.pem:ro"
     PROXY_ARGS="$PROXY_ARGS --tls$2 /home/weave/tls/$filename.pem"
 }
 
