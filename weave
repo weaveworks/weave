@@ -932,7 +932,7 @@ docker_client_args() {
 # TODO: Handle relative paths for args
 # TODO: Handle args with spaces
 tls_arg() {
-    PROXY_VOLUMES="$PROXY_VOLUMES -v $2:/home/weave/tls/$3.pem"
+    PROXY_VOLUMES="$PROXY_VOLUMES -v $2:/home/weave/tls/$3.pem:ro"
     PROXY_ARGS="$PROXY_ARGS $1 /home/weave/tls/$3.pem"
 }
 
