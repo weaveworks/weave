@@ -12,18 +12,14 @@ NAME2=seetwo.weave.local
 CNAME3=doesnotmatchpattern
 NAME3=doesnotmatchpattern.weave.local
 
-start_container() {
-  proxy docker_on $HOST1 run "$@" -dt $DNS_IMAGE /bin/sh
-}
-
 start_suite "Hostname derivation through container name substitutions"
 
 weave_on $HOST1 launch-router
 weave_on $HOST1 launch-proxy --hostname-match '^[^-]+-(?P<appname>[^-]*)-[^-]+$' --hostname-replacement '$appname'
 
-start_container -e WEAVE_CIDR=$C1/24 --name=$CNAME1
-start_container -e WEAVE_CIDR=$C2/24 --name=$CNAME2
-start_container -e WEAVE_CIDR=$C3/24 --name=$CNAME3
+proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C1/24 --name=$CNAME1
+proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C2/24 --name=$CNAME2
+proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C3/24 --name=$CNAME3
 
 assert_dns_a_record $HOST1 $CNAME1 $NAME2 $C2
 assert_dns_a_record $HOST1 $CNAME2 $NAME3 $C3
