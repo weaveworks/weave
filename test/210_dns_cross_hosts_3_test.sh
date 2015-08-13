@@ -26,10 +26,10 @@ assert_dns_record $HOST1 c1 $NAME2 $C2
 FOO_IPS=
 BAR_IPS=
 for host in $HOSTS; do
-   CID=$(proxy docker_on $host run -dti --name=foo $SMALL_IMAGE /bin/sh)
+   CID=$(proxy_start_container $host --name=foo)
    FOO_IPS="$FOO_IPS $(container_ip $host foo)"
 
-   CID=$(proxy docker_on $host run -dti --name=bar $SMALL_IMAGE /bin/sh)
+   CID=$(proxy_start_container $host --name=bar)
    BAR_IPS="$BAR_IPS $(container_ip $host bar)"
 done
 
