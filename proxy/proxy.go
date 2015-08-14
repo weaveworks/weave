@@ -225,11 +225,12 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 }
 
 func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, error) {
-	if hostConfig != nil &&
-		hostConfig.NetworkMode != "" &&
-		hostConfig.NetworkMode != "default" &&
-		hostConfig.NetworkMode != "bridge" {
-		return nil, fmt.Errorf("--net option: %q", hostConfig.NetworkMode)
+	netMode := ""
+	if hostConfig != nil {
+		netMode = hostConfig.NetworkMode
+	}
+	if netMode == "host" || strings.HasPrefix(netMode, "container:") {
+		return nil, fmt.Errorf("--net option: %q", netMode)
 	}
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
