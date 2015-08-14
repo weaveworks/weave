@@ -13,11 +13,12 @@ WEAVER_EXE=prog/weaver/weaver
 WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
 WEAVEWAIT_EXE=prog/weavewait/weavewait
+WEAVEHOSTS_EXE=prog/weavehosts/weavehosts
 NETCHECK_EXE=prog/netcheck/netcheck
 COVER_EXE=testing/cover/cover
 RUNNER_EXE=testing/runner/runner
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE) $(COVER_EXE) $(RUNNER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEHOSTS_EXE) $(NETCHECK_EXE) $(COVER_EXE) $(RUNNER_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -79,7 +80,7 @@ $(WEAVEHOSTS_EXE): prog/weavehosts/weavehosts.go
 $(COVER_EXE): testing/cover/cover.go
 $(RUNNER_EXE): testing/runner/runner.go
 
-$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(COVER_EXE) $(RUNNER_EXE):
+$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(WEAVEHOSTS_EXE) $(COVER_EXE) $(RUNNER_EXE):
 	go get ./$(@D)
 	go build -o $@ ./$(@D)
 
@@ -87,11 +88,12 @@ $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
-$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE)
+$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEHOSTS_EXE) $(NETCHECK_EXE)
 	cp weave prog/weaveexec/weave
 	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
 	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
 	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
+	cp $(WEAVEHOSTS_EXE) prog/weaveexec/weavehosts
 	cp $(NETCHECK_EXE) prog/weaveexec/netcheck
 	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
 	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec

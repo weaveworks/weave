@@ -17,6 +17,6 @@ RUN apk add --update \
   && rm -rf /var/cache/apk/*
 
 ADD ./weave ./sigproxy ./weaveproxy /home/weave/
-ADD ./netcheck /usr/bin/
+ADD ./netcheck ./weavehosts /usr/bin/
 ADD ./weavewait /w/w
 ADD ./docker.tgz /
