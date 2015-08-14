@@ -20,18 +20,16 @@ proxy_start_container $HOST1 --name=auto
 proxy_start_container $HOST1 --name=none       -e WEAVE_CIDR=none
 proxy_start_container $HOST2 --name=zero       -e WEAVE_CIDR=
 proxy_start_container $HOST2 --name=no-default
+proxy_start_container $HOST1 --name=nodocker   --net=none
 proxy_start_container $HOST1 --name=bridge     --net=bridge
 proxy_start_container $HOST1 --name=host       --net=host
 proxy_start_container $HOST1 --name=other      --net=container:auto
 
-AUTO=$(container_ip $HOST1 auto)
-ZERO=$(container_ip $HOST2 zero)
-BRIDGE=$(container_ip $HOST1 bridge)
-OTHER=$(container_ip $HOST1 other)
-assert_raises "proxy exec_on $HOST1 auto $PING $ZERO"
-assert_raises "proxy exec_on $HOST2 zero $PING $AUTO"
-assert_raises "proxy exec_on $HOST2 zero $PING $BRIDGE"
-assert_raises "proxy exec_on $HOST2 zero $PING $OTHER"
+assert_raises "proxy exec_on $HOST1 auto $PING $(container_ip $HOST2 zero)"
+assert_raises "proxy exec_on $HOST2 zero $PING $(container_ip $HOST1 auto)"
+assert_raises "proxy exec_on $HOST2 zero $PING $(container_ip $HOST1 bridge)"
+assert_raises "proxy exec_on $HOST2 zero $PING $(container_ip $HOST1 other)"
+assert_raises "proxy exec_on $HOST2 zero $PING $(container_ip $HOST1 nodocker)"
 
 assert_no_ethwe $HOST1 none
 assert_no_ethwe $HOST2 no-default
