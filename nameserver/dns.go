@@ -239,6 +239,9 @@ func (d *DNSServer) handleRecursive(client *dns.Client, defaultMaxResponseSize i
 			}
 			d.ns.debugf("response: %+v", response)
 			response.Id = req.Id
+			if response.Len() > getMaxResponseSize(req, defaultMaxResponseSize) {
+				response.Compress = true
+			}
 			if err := w.WriteMsg(response); err != nil {
 				d.ns.infof("error responding: %v", err)
 			}
