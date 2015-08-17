@@ -197,7 +197,11 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 				info = target.lastError.Error()
 			default:
 				state = "failed"
-				info = target.lastError.Error() + ", retry: " + target.tryAfter.String()
+				retry := "never"
+				if !target.tryAfter.IsZero() {
+					retry = target.tryAfter.String()
+				}
+				info = target.lastError.Error() + ", retry: " + retry
 			}
 			slice = append(slice, LocalConnectionStatus{address, true, state, info})
 		}
