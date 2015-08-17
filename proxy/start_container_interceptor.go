@@ -34,7 +34,7 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 
 	cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
 	if err != nil {
-		Log.Infof("Ignoring container %s due to %s", container.ID, err)
+		Log.Infof("Leaving container %s alone because %s", container.ID, err)
 		return nil
 	}
 	Log.Infof("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))

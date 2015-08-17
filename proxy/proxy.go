@@ -28,8 +28,8 @@ var (
 	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
 	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
 
-	ErrWeaveCIDRNone = errors.New("WEAVE_CIDR=none")
-	ErrNoDefaultIPAM = errors.New("--no-default-ipalloc option")
+	ErrWeaveCIDRNone = errors.New("the container was created with the '-e WEAVE_CIDR=none' option")
+	ErrNoDefaultIPAM = errors.New("the container was created without specifying an IP address with '-e WEAVE_CIDR=...' and the proxy was started with the '--no-default-ipalloc' option")
 )
 
 type Config struct {
@@ -230,7 +230,7 @@ func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *dock
 		netMode = hostConfig.NetworkMode
 	}
 	if netMode == "host" || strings.HasPrefix(netMode, "container:") {
-		return nil, fmt.Errorf("--net option: %q", netMode)
+		return nil, fmt.Errorf("the container was created with the '--net=%s'", netMode)
 	}
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
