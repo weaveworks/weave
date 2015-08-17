@@ -29,7 +29,7 @@ var (
 	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
 
 	ErrWeaveCIDRNone = errors.New("WEAVE_CIDR=none")
-	ErrNoDefaultIPAM = errors.New("--no-default-ipam option")
+	ErrNoDefaultIPAM = errors.New("--no-default-ipalloc option")
 )
 
 type Config struct {
