@@ -3,12 +3,14 @@ package nameserver
 import (
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/miekg/dns"
 	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/ipam/address"
 	wt "github.com/weaveworks/weave/testing"
 )
 
@@ -32,11 +34,12 @@ func TestUDPDNSServer(t *testing.T) {
 	setupForTest(t)
 
 	const (
-		successTestName = "test1.weave.local."
-		failTestName    = "fail.weave.local."
-		nonLocalName    = "weave.works."
-		testAddr1       = "10.2.2.1"
-		containerID     = "somecontainer"
+		successTestName    = "test1.weave.local."
+		failTestName       = "fail.weave.local."
+		compressedTestName = "compressed.weave.works."
+		nonLocalName       = "weave.works."
+		testAddr1          = "10.2.2.1"
+		containerID        = "somecontainer"
 	)
 	testCIDR1 := testAddr1 + "/24"
 
@@ -72,6 +75,15 @@ func TestUDPDNSServer(t *testing.T) {
 			m.Answer[0] = &dns.PTR{Hdr: dns.RR_Header{Name: m.Question[0].Name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: 0}, Ptr: "ns1.google.com."}
 		} else if q.Name == testRDNSfail && q.Qtype == dns.TypePTR {
 			m.Rcode = dns.RcodeNameError
+		} else if q.Name == compressedTestName {
+			// Construct a response that is >512 when uncompressed, <512 when compressed
+			header := makeHeader(m, &q, 300)
+			for m.Len() <= minUDPSize {
+				ip := address.Address(rand.Uint32()).IP4()
+				m.Answer = append(m.Answer, &dns.A{Hdr: *header, A: ip})
+			}
+			m.Compress = true
+			wt.AssertTrue(t, m.Len() <= minUDPSize, fmt.Sprintf("length: %d", m.Len()))
 		}
 		w.WriteMsg(m)
 	}
@@ -124,6 +136,9 @@ func TestUDPDNSServer(t *testing.T) {
 	assertExchange(t, nonLocalName, dns.TypeANY, testPort, 5, -1, 0)
 
 	assertExchange(t, testRDNSnonlocal, dns.TypePTR, testPort, 1, -1, 0)
+
+	_, r = assertExchange(t, compressedTestName, dns.TypeA, testPort, -1, -1, 0)
+	wt.AssertTrue(t, r.Len() > minUDPSize, "unexpected message length")
 
 	// Not testing MDNS functionality of server here (yet), since it
 	// needs two servers, each listening on its own address

@@ -395,6 +395,9 @@ func (s *DNSServer) notUsHandler(proto dnsProtocol) dns.HandlerFunc {
 			}
 			Debug.Printf("[dns msgid %d] Given answer by %s for query %s",
 				r.MsgHdr.Id, server, q.Name)
+			if reply.Len() > maxLen {
+				reply.Compress = true
+			}
 			w.WriteMsg(reply)
 			return
 		}
