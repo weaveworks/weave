@@ -19,7 +19,7 @@ func main() {
 		args = os.Args[1:]
 	)
 
-	_, err := weavenet.EnsureInterface("ethwe")
+	_, err := weavenet.EnsureInterfaceAndMcastRoute("ethwe")
 	checkErr(err)
 
 	if len(args) == 0 {

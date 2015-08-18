@@ -15,11 +15,41 @@ func EnsureInterface(ifaceName string) (*net.Interface, error) {
 		return nil, err
 	}
 	defer s.Close()
+	iface, err := ensureInterface(s, ifaceName)
+	if err != nil {
+		return nil, err
+	}
+	return iface, err
+}
+
+func ensureInterface(s *nl.NetlinkSocket, ifaceName string) (*net.Interface, error) {
 	if iface, err := findInterface(ifaceName); err == nil {
 		return iface, nil
 	}
 	waitForIfUp(s, ifaceName)
-	return findInterface(ifaceName)
+	iface, err := findInterface(ifaceName)
+	return iface, err
+}
+
+// Wait for an interface to come up and have a route added to the multicast subnet.
+// This matches the behaviour in 'weave attach', which is the only context in which
+// we expect this to be called.  If you change one, change the other to match.
+func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
+	s, err := nl.Subscribe(syscall.NETLINK_ROUTE, syscall.RTNLGRP_LINK, syscall.RTNLGRP_IPV4_ROUTE)
+	if err != nil {
+		return nil, err
+	}
+	defer s.Close()
+	iface, err := ensureInterface(s, ifaceName)
+	if err != nil {
+		return nil, err
+	}
+	dest := net.IPv4(224, 0, 0, 0)
+	if CheckRouteExists(ifaceName, dest) {
+		return iface, err
+	}
+	waitForRoute(s, ifaceName, dest)
+	return iface, err
 }
 
 func findInterface(ifaceName string) (iface *net.Interface, err error) {
