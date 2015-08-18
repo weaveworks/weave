@@ -3,7 +3,6 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
@@ -42,11 +41,8 @@ var (
 )
 
 func init() {
-	Log = &logrus.Logger{
-		Out:       os.Stderr,
-		Formatter: standardTextFormatter,
-		Hooks:     make(logrus.LevelHooks),
-	}
+	Log = logrus.New()
+	Log.Formatter = standardTextFormatter
 }
 
 func SetLogLevel(levelname string) {
