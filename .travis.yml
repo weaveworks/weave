@@ -15,7 +15,7 @@ install:
   - go clean -i net
   - go install -tags netgo std
   - go get github.com/golang/lint/golint
-  - pip install --user --upgrade gcloud gsutil
+  - pip install --user --upgrade gsutil
   - bin/setup-ci-secrets $encrypted_5ba036e89377_key $encrypted_5ba036e89377_iv
   - make travis
   - go get ./...
