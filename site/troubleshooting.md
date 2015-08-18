@@ -61,6 +61,7 @@ A status summary can be obtained with `weave status`:
 
 ````
 $ weave status
+
        Version: 1.1.0
 
        Service: router
@@ -84,6 +85,7 @@ $ weave status
 
        Service: proxy
        Address: tcp://127.0.0.1:12375
+
 ````
 
 The terms used here are explained further at
