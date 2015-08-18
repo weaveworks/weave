@@ -275,7 +275,7 @@ func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr s
 	if defaultSubnetStr != "" {
 		defaultSubnet = parseAndCheckCIDR(defaultSubnetStr)
 		if !ipRange.Range().Overlaps(defaultSubnet.Range()) {
-			Log.Fatalf("Default subnet %s out of bounds: %s", defaultSubnet, ipRange)
+			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
 		}
 	}
 	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum)
