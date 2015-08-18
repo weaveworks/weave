@@ -1003,9 +1003,10 @@ proxy_args() {
 
 proxy_addr() {
     if addr=$(docker logs $PROXY_CONTAINER_NAME 2>&1 | head -n4 | grep -oE "proxy listening on .*") ; then
-      echo "${1}${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
+      echo "${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
     else
       echo "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
+      return 1
     fi
 }
 
@@ -1304,11 +1305,15 @@ case "$COMMAND" in
         ;;
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
-        proxy_addr "export DOCKER_HOST="
+        if PROXY_ADDR=$(proxy_addr) ; then
+            echo "export DOCKER_HOST=$PROXY_ADDR"
+        fi
         ;;
     config|proxy-config)
         [ "$COMMAND" = "config" ] || deprecation_warning "$COMMAND" "'weave config'"
-        proxy_addr "-H="
+        if PROXY_addr=$(proxy_addr) ; then
+            echo "-H=$PROXY_addr"
+        fi
         ;;
     connect)
         [ $# -gt 0 ] || usage
@@ -1333,10 +1338,10 @@ case "$COMMAND" in
         done
         [ -n "$SUB_STATUS" ] || echo
         call_weave GET $STATUS_URL || res=1
-        if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null ; then
+        if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null && PROXY_ADDR=$(proxy_addr) ; then
             echo
             echo "       Service: proxy"
-            echo "       Address: $(proxy_addr)"
+            echo "       Address: $PROXY_ADDR"
         fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
