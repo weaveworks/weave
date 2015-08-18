@@ -93,6 +93,22 @@ check_docker_version() {
     fi
 }
 
+enforce_docker_bridge_addr_assign_type() {
+    if ! ADDR_ASSIGN_TYPE=$(cat /sys/class/net/$DOCKER_BRIDGE/addr_assign_type 2>/dev/null) ; then
+        echo "Could not determine address assignment type of $DOCKER_BRIDGE" >&2
+        return
+    fi
+    # From include/uapi/linux/netdevice.h
+    # #define NET_ADDR_PERM       0   /* address is permanent (default) */
+    # #define NET_ADDR_RANDOM     1   /* address is generated randomly */
+    # #define NET_ADDR_STOLEN     2   /* address is stolen from other device */
+    # #define NET_ADDR_SET        3   /* address is set using dev_set_mac_address() */
+    if [ $ADDR_ASSIGN_TYPE != 3 ] ; then
+        echo "Setting $DOCKER_BRIDGE MAC (mitigate https://github.com/docker/docker/issues/14908)" >&2
+        ip link set dev $DOCKER_BRIDGE address $(random_mac) || true
+    fi
+}
+
 is_cidr() {
     echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
 }
@@ -142,7 +158,7 @@ if [ "$1" = "run" ] ; then
     shift $(dns_arg_count "$@")
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
-    CONTAINER=$(docker $DOCKER_CLIENT_ARGS run $DNS_ARGS -d "$@")
+    CONTAINER=$(docker $DOCKER_CLIENT_ARGS run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
     exec_remote attach $CIDR_ARGS --or-die $CONTAINER
     echo $CONTAINER
     exit 0
@@ -359,7 +375,7 @@ netnsenter() {
 }
 
 connect_container_to_bridge() {
-    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "$PROCFS/$$/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink $PROCFS/$$/ns/net)" ] ; then
+    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/$$/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/$$/ns/net)" ] ; then
         echo "Container is running in the host network namespace, and therefore cannot be" >&2
         echo "connected to weave. Perhaps the container was started with --net=host." >&2
         return 1
@@ -433,7 +449,9 @@ attach() {
         netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
     fi
 
-    arp_update $CONTAINER_IFNAME $1 "netnsenter"
+    for ADDR in "$@" ; do
+        arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
+    done
 }
 
 detach() {
@@ -664,8 +682,11 @@ dns_args() {
     WITHOUT_DNS=
     while [ $# -gt 0 ] ; do
         case "$1" in
-            --dns-search=*)
-                DNS_SEARCH_SPECIFIED=1
+            --with-dns)
+                WITH_DNS=1
+                ;;
+            --without-dns)
+                WITHOUT_DNS=1
                 ;;
             --name)
                 NAME_ARG="$2"
@@ -677,11 +698,8 @@ dns_args() {
             -h|--hostname|--hostname=*)
                 HOSTNAME_SPECIFIED=1
                 ;;
-            --with-dns)
-                WITH_DNS=1
-                ;;
-            --without-dns)
-                WITHOUT_DNS=1
+            --dns-search|--dns-search=*)
+                DNS_SEARCH_SPECIFIED=1
                 ;;
         esac
         shift
@@ -693,8 +711,13 @@ dns_args() {
     DNS_ARGS="--dns $DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         DOMAIN=$(dns_domain)
-        DNS_ARGS="$DNS_ARGS --hostname=$NAME_ARG.${DOMAIN%.}"
-        HOSTNAME_SPECIFIED=1
+        HOSTNAME="$NAME_ARG.${DOMAIN%.}"
+        if [ ${#HOSTNAME} -gt 64 ] ; then
+            echo "Container name too long to be used as hostname" >&2
+        else
+            DNS_ARGS="$DNS_ARGS --hostname=$HOSTNAME"
+            HOSTNAME_SPECIFIED=1
+        fi
     fi
     if [ -z "$DNS_SEARCH_SPECIFIED" ] ; then
       if [ -z "$HOSTNAME_SPECIFIED" ] ; then
@@ -859,7 +882,7 @@ ipam_cidrs_or_die() {
 # TODO: Handle args with spaces
 tls_arg() {
     filename=${3:-$2}
-    PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/$filename.pem"
+    PROXY_VOLUMES="$PROXY_VOLUMES -v $1:/home/weave/tls/$filename.pem:ro"
     PROXY_ARGS="$PROXY_ARGS --tls$2 /home/weave/tls/$filename.pem"
 }
 
@@ -971,6 +994,7 @@ case "$COMMAND" in
         ;;
     launch)
         check_not_running $CONTAINER_NAME $BASE_IMAGE
+        enforce_docker_bridge_addr_assign_type
         create_bridge
         # We set the router name to the bridge mac since that is
         # stable across re-creations of the containers.
@@ -1017,9 +1041,14 @@ case "$COMMAND" in
         if [ -z "$IPRANGE_SPECIFIED" ] ; then
             IPRANGE="10.128.0.0/10"
             if command_exists netcheck && ! netcheck $IPRANGE ; then
-                echo "Default -iprange $IPRANGE overlaps with existing route." >&2
-                echo "Please pick another range and set it on all hosts." >&2
+                echo "ERROR: Default -iprange $IPRANGE overlaps with existing route on host." >&2
+                echo "You must pick another range and set it on all hosts." >&2
                 exit 1
+            fi
+        else
+            if command_exists netcheck && ! netcheck $IPRANGE ; then
+                echo "WARNING: Specified -iprange $IPRANGE overlaps with existing route on host." >&2
+                echo "Unless this is deliberate, you must pick another range and set it on all hosts." >&2
             fi
         fi
         # Set WEAVE_DOCKER_ARGS in the environment in order to supply
@@ -1071,6 +1100,7 @@ case "$COMMAND" in
             -v /proc:/hostproc \
             -e PROCFS=/hostproc \
             -e WEAVE_CIDR=none \
+            -e DOCKER_BRIDGE \
             --entrypoint=/home/weave/weaveproxy \
             $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $PROXY_ARGS)
         wait_for_log $PROXY_CONTAINER_NAME "proxy listening"
@@ -1130,7 +1160,7 @@ case "$COMMAND" in
         shift $(dns_arg_count "$@")
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        CONTAINER=$(docker run $DNS_ARGS -d "$@")
+        CONTAINER=$(docker run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
         create_bridge
         ipam_cidrs_or_die $CONTAINER $CIDR_ARGS
         with_container_netns_or_die $CONTAINER attach $ALL_CIDRS

@@ -103,9 +103,11 @@ func (zone *ZoneDb) domainLookup(target string, lfun ZoneLookupFunc) (res []Zone
 	for _, answer := range lanswers {
 		r, err := remoteIdent.addIPToName(answer, now)
 		if err != nil {
-			zone.mx.Unlock()
-			Warning.Printf("[zonedb] '%s' insertion for %s failed: %s", answer, target, err)
-			return nil, err
+			if _, ok := err.(DuplicateError); !ok {
+				zone.mx.Unlock()
+				Warning.Printf("[zonedb] '%s' insertion for %s failed: %s", answer, target, err)
+				return nil, err
+			}
 		}
 		uniq.add(r)
 	}

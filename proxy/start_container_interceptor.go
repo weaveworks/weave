@@ -16,14 +16,18 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 }
 
 func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
+	if r.StatusCode < 200 || r.StatusCode >= 300 { // Docker didn't do the start
+		return nil
+	}
+
 	container, err := inspectContainerInPath(i.proxy.client, r.Request.URL.Path)
 	if err != nil {
 		return err
 	}
 
-	cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config)
-	if !ok {
-		Debug.Print("No Weave CIDR, ignoring")
+	cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
+	if err != nil {
+		Info.Printf("Ignoring container %s due to %s", container.ID, err)
 		return nil
 	}
 	Info.Printf("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))

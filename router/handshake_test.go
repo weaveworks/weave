@@ -1,8 +1,9 @@
 package router
 
 import (
-	wt "github.com/weaveworks/weave/testing"
 	"testing"
+
+	wt "github.com/weaveworks/weave/testing"
 )
 
 func TestFieldValidator(t *testing.T) {

@@ -202,10 +202,9 @@ func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, 
 }
 
 // Claim an address that we think we should own (Sync)
-func (alloc *Allocator) Claim(ident string, addr address.Address, cancelChan <-chan bool) error {
+func (alloc *Allocator) Claim(ident string, addr address.Address) error {
 	resultChan := make(chan error)
-	op := &claim{resultChan: resultChan, ident: ident, addr: addr,
-		hasBeenCancelled: hasBeenCancelled(cancelChan)}
+	op := &claim{resultChan: resultChan, ident: ident, addr: addr}
 	alloc.doOperation(op, &alloc.pendingClaims)
 	return <-resultChan
 }
@@ -575,14 +574,14 @@ func (alloc *Allocator) propose() {
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
-func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) {
+func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) error {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	if err := enc.Encode(r); err != nil {
 		panic(err)
 	}
 	msg := router.Concat([]byte{msgSpaceRequest}, buf.Bytes())
-	alloc.gossip.GossipUnicast(dest, msg)
+	return alloc.gossip.GossipUnicast(dest, msg)
 }
 
 func (alloc *Allocator) sendRingUpdate(dest router.PeerName) {

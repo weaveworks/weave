@@ -120,6 +120,18 @@ start_container_with_dns() {
     weave_on $host run --with-dns "$@" -t $DNS_IMAGE /bin/sh
 }
 
+proxy_start_container() {
+    host=$1
+    shift 1
+    proxy docker_on $host run "$@" -dt $SMALL_IMAGE /bin/sh
+}
+
+proxy_start_container_with_dns() {
+    host=$1
+    shift 1
+    proxy docker_on $host run "$@" -dt $DNS_IMAGE /bin/sh
+}
+
 rm_containers() {
     host=$1
     shift
@@ -170,8 +182,8 @@ assert_dns_ptr_record() {
 start_suite() {
     for host in $HOST1 $HOST2; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
-        rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
         weave_on $host reset 2>/dev/null
+        rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
     done
     whitely echo "$@"
 }

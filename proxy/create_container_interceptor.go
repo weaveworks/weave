@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +14,12 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 )
 
+const MaxDockerHostname = 64
+
+var (
+	ErrNoCommandSpecified = errors.New("No command specified")
+)
+
 type createContainerInterceptor struct{ proxy *Proxy }
 
 type createContainerRequestBody struct {
@@ -21,9 +28,9 @@ type createContainerRequestBody struct {
 	MacAddress string             `json:"MacAddress,omitempty" yaml:"MacAddress,omitempty"`
 }
 
-// Replacement for docker.NoSuchImage, which does not contain the
-// image name, which in turn breaks docker clients post 1.7.0 since
-// they expect the image name to be present in errors.
+// ErrNoSuchImage replaces docker.NoSuchImage, which does not contain the image
+// name, which in turn breaks docker clients post 1.7.0 since they expect the
+// image name to be present in errors.
 type ErrNoSuchImage struct {
 	Name string
 }
@@ -44,15 +51,17 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if cidrs, ok := i.proxy.weaveCIDRsFromConfig(container.Config); ok {
+	if cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig); err != nil {
+		Info.Printf("Ignoring container due to %s", err)
+	} else {
 		Info.Printf("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
 		if container.HostConfig == nil {
 			container.HostConfig = &docker.HostConfig{}
 		}
-		container.HostConfig.VolumesFrom = append(container.HostConfig.VolumesFrom, "weaveproxy")
 		if container.Config == nil {
 			container.Config = &docker.Config{}
 		}
+		i.addWeaveWaitVolume(container.HostConfig)
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
@@ -69,6 +78,18 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 	r.ContentLength = int64(len(newBody))
 
 	return nil
+}
+
+func (i *createContainerInterceptor) addWeaveWaitVolume(hostConfig *docker.HostConfig) {
+	var binds []string
+	for _, bind := range hostConfig.Binds {
+		s := strings.Split(bind, ":")
+		if len(s) >= 2 && s[1] == "/w" {
+			continue
+		}
+		binds = append(binds, bind)
+	}
+	hostConfig.Binds = append(binds, fmt.Sprintf("%s:/w:ro", i.proxy.weaveWaitVolume))
 }
 
 func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
@@ -89,7 +110,14 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 		}
 	}
 
-	container.Entrypoint = append(weaveWaitEntrypoint, container.Entrypoint...)
+	if len(container.Entrypoint) == 0 && len(container.Cmd) == 0 {
+		return ErrNoCommandSpecified
+	}
+
+	if len(container.Entrypoint) == 0 || container.Entrypoint[0] != weaveWaitEntrypoint[0] {
+		container.Entrypoint = append(weaveWaitEntrypoint, container.Entrypoint...)
+	}
+
 	return nil
 }
 
@@ -107,9 +135,14 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 
 	name := r.URL.Query().Get("name")
 	if container.Hostname == "" && name != "" {
-		container.Hostname = name
 		// Strip trailing period because it's unusual to see it used on the end of a host name
-		container.Domainname = strings.TrimSuffix(dnsDomain, ".")
+		trimmedDNSDomain := strings.TrimSuffix(dnsDomain, ".")
+		if len(name)+1+len(trimmedDNSDomain) > MaxDockerHostname {
+			Warning.Printf("Container name [%s] too long to be used as hostname", name)
+		} else {
+			container.Hostname = name
+			container.Domainname = trimmedDNSDomain
+		}
 	}
 
 	if len(container.HostConfig.DNSSearch) == 0 {

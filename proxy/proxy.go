@@ -2,6 +2,8 @@ package proxy
 
 import (
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -22,14 +24,18 @@ var (
 	containerCreateRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
 	containerStartRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
 	execCreateRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
+
+	ErrWeaveCIDRNone = errors.New("WEAVE_CIDR=none")
+	ErrNoDefaultIPAM = errors.New("--no-default-ipam option")
 )
 
 type Proxy struct {
 	Config
 
-	dial           func() (net.Conn, error)
-	client         *docker.Client
-	dockerBridgeIP string
+	dial            func() (net.Conn, error)
+	client          *docker.Client
+	dockerBridgeIP  string
+	weaveWaitVolume string
 }
 
 type Config struct {
@@ -75,12 +81,39 @@ func NewProxy(c Config) (*Proxy, error) {
 		Error.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
-	p.client, err = docker.NewClient(p.DockerAddr)
+	// We pin the protocol version to 1.15 (which corresponds to Docker 1.3.x;
+	// the earliest version supported by weave) in order to insulate ourselves
+	// from breaking changes to the API, as happened in 1.20 (Docker 1.8.0) when
+	// the presentation of volumes changed in inspect.
+	p.client, err = docker.NewVersionedClient(p.DockerAddr, "1.15")
 	if err != nil {
 		return nil, err
 	}
 
+	if err = p.findWeaveWaitVolume(); err != nil {
+		return nil, err
+	}
+
 	return p, nil
+}
+
+func (proxy *Proxy) findWeaveWaitVolume() error {
+	container, err := proxy.client.InspectContainer("weaveproxy")
+	if err != nil {
+		return fmt.Errorf("Could not find the weavewait volume: %s", err)
+	}
+
+	if container.Volumes == nil {
+		return fmt.Errorf("Could not find the weavewait volume")
+	}
+
+	volume, ok := container.Volumes["/w"]
+	if !ok {
+		return fmt.Errorf("Could not find the weavewait volume")
+	}
+
+	proxy.weaveWaitVolume = volume
+	return nil
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -115,14 +148,23 @@ func (proxy *Proxy) ListenAndServe() error {
 	return (&http.Server{Handler: proxy}).Serve(listener)
 }
 
-func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config) ([]string, bool) {
+func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, error) {
+	if hostConfig != nil &&
+		hostConfig.NetworkMode != "" &&
+		hostConfig.NetworkMode != "default" &&
+		hostConfig.NetworkMode != "bridge" {
+		return nil, fmt.Errorf("--net option: %q", hostConfig.NetworkMode)
+	}
 	for _, e := range config.Env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
 			if e[11:] == "none" {
-				return nil, false
+				return nil, ErrWeaveCIDRNone
 			}
-			return strings.Fields(e[11:]), true
+			return strings.Fields(e[11:]), nil
 		}
 	}
-	return nil, !proxy.NoDefaultIPAM
+	if proxy.NoDefaultIPAM {
+		return nil, ErrNoDefaultIPAM
+	}
+	return nil, nil
 }

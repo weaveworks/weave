@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	"code.google.com/p/gopacket/layers"
 	"github.com/davecheney/profile"
+	"github.com/google/gopacket/layers"
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
@@ -64,7 +64,7 @@ func main() {
 	flag.StringVar(&routerName, "name", "", "name of router (defaults to MAC of interface)")
 	flag.StringVar(&nickName, "nickname", "", "nickname of peer (defaults to hostname)")
 	flag.StringVar(&password, "password", "", "network password")
-	flag.IntVar(&wait, "wait", 0, "number of seconds to wait for interface to be created and come up (0 = don't wait)")
+	flag.IntVar(&wait, "wait", -1, "number of seconds to wait for interface to come up (0=don't wait, -1=wait forever)")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.BoolVar(&pktdebug, "pktdebug", false, "enable per-packet debug logging")
 	flag.StringVar(&prof, "profile", "", "enable profiling and write profiles to given path")

@@ -6,32 +6,28 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/weaveworks/weave/net"
+	weavenet "github.com/weaveworks/weave/net"
+	"github.com/weaveworks/weave/proxy"
 )
 
 func main() {
-	if len(os.Args) <= 1 {
-		os.Exit(0)
-	}
-
 	args := os.Args[1:]
-	signalWait := 20
-	if args[0] == "-s" {
-		signalWait = 0
-		args = args[1:]
-	}
-	interfaceWait := 20 - signalWait
 
-	usr2 := make(chan os.Signal)
-	signal.Notify(usr2, syscall.SIGUSR2)
-	select {
-	case <-usr2:
-	case <-time.After(time.Duration(signalWait) * time.Second):
+	if len(args) > 0 && args[0] == "-s" {
+		args = args[1:]
+	} else {
+		usr2 := make(chan os.Signal)
+		signal.Notify(usr2, syscall.SIGUSR2)
+		<-usr2
 	}
-	_, err := net.EnsureInterface("ethwe", interfaceWait)
+
+	_, err := weavenet.EnsureInterface("ethwe", -1)
 	checkErr(err)
+
+	if len(args) == 0 {
+		checkErr(proxy.ErrNoCommandSpecified)
+	}
 
 	binary, err := exec.LookPath(args[0])
 	checkErr(err)

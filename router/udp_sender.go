@@ -1,11 +1,12 @@
 package router
 
 import (
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
 	"log"
 	"net"
 	"syscall"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 type UDPSender interface {
