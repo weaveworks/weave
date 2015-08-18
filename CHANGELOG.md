@@ -1,3 +1,15 @@
+## Release 1.0.2
+
+This release fixes a number of bugs, including some security
+vulnerabilities in the Weave Docker API proxy, hangs and failures in
+address allocation, and sporadic failures in name resolution.
+
+More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.0.2).
+
+The release is fully compatible with other 1.0.x versions, so existing
+clusters can be upgraded incrementally.
+
 ## Release 1.0.1
 
 This is a bug fix release, addressing the following issue:
