@@ -11,4 +11,3 @@ layout: default
  * [Troubleshooting](troubleshooting.html)
  * [Building](building.html)
  * [How it works](how-it-works.html)
- * [Contact information](https://github.com/weaveworks/weave#contact-us)
