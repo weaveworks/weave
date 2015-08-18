@@ -1324,21 +1324,21 @@ case "$COMMAND" in
         ;;
     status)
         res=0
-        OMIT_PROXY=
+        SUB_STATUS=
         STATUS_URL="/status"
         while [ $# -gt 0 ] ; do
-            OMIT_PROXY=1
+            SUB_STATUS=1
             STATUS_URL="$STATUS_URL/$1"
             shift
         done
-        echo
+        [ -n "$SUB_STATUS" ] || echo
         call_weave GET $STATUS_URL || res=1
-        if [ -z "$OMIT_PROXY" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null ; then
+        if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null ; then
             echo
             echo "       Service: proxy"
             echo "       Address: $(proxy_addr)"
         fi
-        echo
+        [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
         ;;
     report)
