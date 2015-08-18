@@ -154,7 +154,7 @@ collect_ip_args() {
 }
 
 dns_arg_count() {
-    if [ "$1" = "--with-dns" -o "$1" = "--without-dns" ]; then
+    if [ "$1" = "--with-dns" -o "$1" = "--without-dns" ] ; then
         echo 1
     else
         echo 0
@@ -757,7 +757,7 @@ dns_args() {
 # Print an error to stderr and return with an indicative exit status
 # if the container $1 does not exist or isn't running.
 check_running() {
-    if ! STATUS=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null); then
+    if ! STATUS=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) ; then
         echo  "$1 container is not present. Have you launched it?" >&2
         return 1
     elif [ "$STATUS" != "true" ] ; then
@@ -768,7 +768,7 @@ check_running() {
 
 # Execute $@ only if the weave container is running
 when_weave_running() {
-    if check_running $CONTAINER_NAME 2>/dev/null; then
+    if check_running $CONTAINER_NAME 2>/dev/null ; then
         "$@"
     fi
 }
@@ -984,11 +984,11 @@ proxy_args() {
         shift
     done
 
-    if [ -z "$PROXY_HOST" -a -n "$CLIENT_TLS_ENABLED" -a -z "$PROXY_TLS_ENABLED" ]; then
+    if [ -z "$PROXY_HOST" -a -n "$CLIENT_TLS_ENABLED" -a -z "$PROXY_TLS_ENABLED" ] ; then
       echo "When launching the proxy via TLS, -H and/or TLS options are required." >&2
       exit 1
     fi
-    if [ -z "$PROXY_HOST" ]; then
+    if [ -z "$PROXY_HOST" ] ; then
       case "$DOCKER_CLIENT_HOST" in
         ""|unix://*)
           PROXY_HOST="unix:///var/run/weave.sock"
@@ -1002,7 +1002,7 @@ proxy_args() {
 }
 
 proxy_addr() {
-    if addr=$(docker logs $PROXY_CONTAINER_NAME 2>&1 | head -n4 | grep -oE "proxy listening on .*"); then
+    if addr=$(docker logs $PROXY_CONTAINER_NAME 2>&1 | head -n4 | grep -oE "proxy listening on .*") ; then
       echo "${1}${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
     else
       echo "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
@@ -1312,7 +1312,7 @@ case "$COMMAND" in
         ;;
     connect)
         [ $# -gt 0 ] || usage
-        if [ "$1" == "--replace" ]; then
+        if [ "$1" == "--replace" ] ; then
           replace="-d replace=true"
           shift
         fi
@@ -1384,7 +1384,7 @@ case "$COMMAND" in
     attach)
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        if [ "$1" = "--or-die" ]; then
+        if [ "$1" = "--or-die" ] ; then
           ATTACH_TYPE="_or_die"
           shift
         fi
