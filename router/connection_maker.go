@@ -231,6 +231,9 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 			delete(cm.targets, address)
 			continue
 		}
+		if target.tryAfter.IsZero() {
+			continue
+		}
 		switch duration := target.tryAfter.Sub(now); {
 		case duration <= 0:
 			target.attempting = true
@@ -259,6 +262,11 @@ func (t *Target) tryNow() {
 // The delay at the nth retry is a random value in the range
 // [i-i/2,i+i/2], where i = InitialInterval * 1.5^(n-1).
 func (t *Target) retry() {
+	if t.lastError == ErrConnectToSelf {
+		t.tryAfter = time.Time{}
+		t.tryInterval = MaxInterval
+		return
+	}
 	t.tryAfter = time.Now().Add(t.tryInterval/2 + time.Duration(rand.Int63n(int64(t.tryInterval))))
 	t.tryInterval = t.tryInterval * 3 / 2
 	if t.tryInterval > MaxInterval {

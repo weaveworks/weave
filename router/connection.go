@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -27,6 +28,8 @@ const (
 	TieBreakLost
 	TieBreakTied
 )
+
+var ErrConnectToSelf = errors.New("Cannot connect to ourself")
 
 type RemoteConnection struct {
 	local         *Peer
@@ -437,7 +440,7 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 	}
 
 	if conn.remote == conn.local {
-		return fmt.Errorf("Cannot connect to ourself")
+		return ErrConnectToSelf
 	}
 
 	return nil
