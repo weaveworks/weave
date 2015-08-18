@@ -41,7 +41,7 @@ weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--no-default-ipalloc] [--no-rewrite-hosts]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
-weave env
+weave env           [--restore]
 weave config
 weave connect       [--replace] [<peer> ...]
 weave forget        <peer> ...
@@ -178,12 +178,24 @@ if [ "$1" = "run" ] ; then
     exec_remote attach $CIDR_ARGS --or-die $CONTAINER >/dev/null
     echo $CONTAINER
     exit 0
-elif [ "$1" != "--local" ] ; then
+elif [ "$1" = "env" -a "$2" = "--restore" ] ; then
+    true
+elif [ "$1" = "--local" ] ; then
+    shift
+else
     exec_remote "$@"
     exit $?
 fi
 
-shift 1
+if [ "$1" = "env" -a "$2" = "--restore" ] ; then
+    if [ "${ORIG_DOCKER_HOST-unset}" = "unset" ] ; then
+        echo "Nothing to restore. This is most likely because there was no preceding invocation of 'eval \$(weave env)' in this shell." >&2
+        exit 1
+    else
+        echo "DOCKER_HOST=$ORIG_DOCKER_HOST"
+        exit 0
+    fi
+fi
 
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
@@ -1306,7 +1318,7 @@ case "$COMMAND" in
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
         if PROXY_ADDR=$(proxy_addr) ; then
-            echo "export DOCKER_HOST=$PROXY_ADDR"
+            echo "export DOCKER_HOST=$PROXY_ADDR ORIG_DOCKER_HOST=$DOCKER_CLIENT_HOST"
         fi
         ;;
     config|proxy-config)
