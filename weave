@@ -24,6 +24,7 @@ DOCKER_CLIENT_TLS_VERIFY=${DOCKER_CLIENT_TLS_VERIFY:-$DOCKER_TLS_VERIFY}
 # The regexp here is far from precise, but good enough.
 IP_REGEXP="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 CIDR_REGEXP="$IP_REGEXP/[0-9]{1,2}"
+MIN_DOCKER_VERSION="1.3.1"
 
 usage() {
     cat >&2 <<EOF
@@ -102,12 +103,14 @@ check_docker_version() {
         exit 1
     fi
 
-    # guard against https://github.com/docker/docker/issues/8632
-    if [ "$DOCKER_VERSION" = "1.3.0" ] ; then
-        echo "You are running Docker version $DOCKER_VERSION, which contains a bug that prevents weave from working properly. Please upgrade." >&2
+    FLAG=$(awk 'BEGIN { print ("$DOCKER_VERSION" < "$MIN_DOCKER_VERSION") ? "1" : "0" }')
+    if [ "$FLAG" = "1" ] ; then
+        echo "Weave requires docker version greater that $MIN_DOCKER_VERSION, you are running $DOCKER_VERSION. Please upgrade." >&2
         exit 1
     fi
 }
+
+check_docker_version
 
 enforce_docker_bridge_addr_assign_type() {
     if ! ADDR_ASSIGN_TYPE=$(cat /sys/class/net/$DOCKER_BRIDGE/addr_assign_type 2>/dev/null) ; then
@@ -167,7 +170,6 @@ dns_arg_count() {
 # on our baked-in docker to support those arguments.
 if [ "$1" = "run" ] ; then
     shift 1
-    check_docker_version
     if [ "$1" != "--without-dns" ] ; then
       DNS_ARGS=$(exec_remote dns-args "$@" || true)
     fi
@@ -1194,7 +1196,6 @@ if ! command_exists nsenter ; then
     exit 1
 fi
 
-check_docker_version
 DOCKER_VERSION_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f 1)
 DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
 DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
