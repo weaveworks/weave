@@ -60,6 +60,10 @@ command for this:
     host1$ docker ps
     ...
 
+The prior settings can be restored with
+
+    host1$ eval "$(weave env --restore)"
+
 Alternatively, the proxy host can be set on a per-command basis with
 
     host1$ docker $(weave config) ps
@@ -70,8 +74,9 @@ The proxy can be stopped independently with
 
 or in conjunction with the router and weaveDNS via `stop`.
 
-If you set your `DOCKER_HOST` to point at the proxy, remember to
-revert to the original setting.
+If you set your `DOCKER_HOST` to point at the proxy, you should revert
+to the original settings prior to stopping the proxy.
+
 
 ## <a name="usage"></a>Usage
 

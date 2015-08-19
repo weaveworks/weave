@@ -37,7 +37,13 @@ Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the
 `weave` network bridge on the host.
 
-To stop weave, run
+To stop weave, if you have configured your environment to use the
+Weave Docker API Proxy, e.g. by running `eval $(weave env)` in your
+shell, you must first restore the environment with
+
+    eval $(weave env --restore)
+
+Then run
 
     weave stop
 
