@@ -16,8 +16,15 @@ for i in $(seq $N); do
 done
 weave_on $HOST1 dns-add $IPS $CID -h $NAME
 
-assert_dns_record $HOST1 c0 $NAME $IPS
-
 assert_raises "exec_on $HOST1 c0 dig MX $NAME | grep -q 'status: NXDOMAIN'"
+
+check() {
+    assert "exec_on $HOST1 c0 dig +short $@ $NAME A | grep -v ';;' | wc -l" $N
+}
+
+check
+check +tcp
+check      +bufsize=700
+check +tcp +bufsize=700
 
 end_suite
