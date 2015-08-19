@@ -39,10 +39,11 @@ DOCKER_CLIENT_TLS_VERIFY=${DOCKER_CLIENT_TLS_VERIFY:-$DOCKER_TLS_VERIFY}
 IP_REGEXP="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 CIDR_REGEXP="$IP_REGEXP/[0-9]{1,2}"
 
-usage() {
+usage_no_exit() {
     cat >&2 <<EOF
 Usage:
 
+weave --help | help
 weave setup
 weave version
 weave launch        [--password <password>] [--nickname <nickname>]
@@ -84,6 +85,10 @@ where <peer>     = <ip_address_or_fqdn>[:<port>]
       <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket
       <peer_id>  = <nickname> or weave internal peer ID
 EOF
+}
+
+usage() {
+    usage_no_exit
     exit 1
 }
 
@@ -188,11 +193,31 @@ dns_arg_count() {
 
 check_docker_version
 
-# "run" is a special case because we want to use docker directly,
-# rather than the docker in $EXEC_IMAGE remotely. That's because we
-# are passing arbitrary arguments on to docker run, and we can't rely
-# on our baked-in docker to support those arguments.
-if [ "$1" = "run" ] ; then
+if [ "$1" = "--local" ] ; then
+    shift 1
+    IS_LOCAL=1
+fi
+
+if [ "$1" = "--help" -o "$1" = "help" ] ; then
+    # "--help|help" are special because we always want to process them
+    # at the client end.
+    usage_no_exit
+    exit 0
+elif [ "$1" = "env" -a "$2" = "--restore" ] ; then
+    # "env --restore" is special because we always want to process it
+    # at the client end.
+    if [ "${ORIG_DOCKER_HOST-unset}" = "unset" ] ; then
+        echo "Nothing to restore. This is most likely because there was no preceding invocation of 'eval \$(weave env)' in this shell." >&2
+        exit 1
+    else
+        echo "DOCKER_HOST=$ORIG_DOCKER_HOST"
+        exit 0
+    fi
+elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
+    # non-local "run" is a special case because we want to use docker
+    # directly, rather than the docker in $EXEC_IMAGE remotely. That's
+    # because we are passing arbitrary arguments on to docker run, and
+    # we can't rely on our baked-in docker to support those arguments.
     shift 1
     if [ "$1" != "--without-dns" ] ; then
         DNS_ARGS=$(exec_remote dns-args "$@" || true)
@@ -204,23 +229,11 @@ if [ "$1" = "run" ] ; then
     exec_remote attach $CIDR_ARGS --or-die $CONTAINER >/dev/null
     echo $CONTAINER
     exit 0
-elif [ "$1" = "env" -a "$2" = "--restore" ] ; then
-    true
-elif [ "$1" = "--local" ] ; then
-    shift
-else
-    exec_remote "$@"
-    exit $?
 fi
 
-if [ "$1" = "env" -a "$2" = "--restore" ] ; then
-    if [ "${ORIG_DOCKER_HOST-unset}" = "unset" ] ; then
-        echo "Nothing to restore. This is most likely because there was no preceding invocation of 'eval \$(weave env)' in this shell." >&2
-        exit 1
-    else
-        echo "DOCKER_HOST=$ORIG_DOCKER_HOST"
-        exit 0
-    fi
+if [ -z "$IS_LOCAL" ] ; then
+    exec_remote "$@"
+    exit $?
 fi
 
 BASE_IMAGE=$DOCKERHUB_USER/weave
