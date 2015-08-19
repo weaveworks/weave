@@ -41,7 +41,7 @@ weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--no-default-ipalloc] [--no-rewrite-hosts]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
-weave env
+weave env           [--restore]
 weave config
 weave connect       [--replace] [<peer> ...]
 weave forget        <peer> ...
@@ -178,12 +178,24 @@ if [ "$1" = "run" ] ; then
     exec_remote attach $CIDR_ARGS --or-die $CONTAINER >/dev/null
     echo $CONTAINER
     exit 0
-elif [ "$1" != "--local" ] ; then
+elif [ "$1" = "env" -a "$2" = "--restore" ] ; then
+    true
+elif [ "$1" = "--local" ] ; then
+    shift
+else
     exec_remote "$@"
     exit $?
 fi
 
-shift 1
+if [ "$1" = "env" -a "$2" = "--restore" ] ; then
+    if [ "${ORIG_DOCKER_HOST-unset}" = "unset" ] ; then
+        echo "Nothing to restore. This is most likely because there was no preceding invocation of 'eval \$(weave env)' in this shell." >&2
+        exit 1
+    else
+        echo "DOCKER_HOST=$ORIG_DOCKER_HOST"
+        exit 0
+    fi
+fi
 
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
@@ -1003,9 +1015,16 @@ proxy_args() {
 
 proxy_addr() {
     if addr=$(docker logs $PROXY_CONTAINER_NAME 2>&1 | head -n4 | grep -oE "proxy listening on .*") ; then
-      echo "${1}${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
+      echo "${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
     else
       echo "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
+      return 1
+    fi
+}
+
+warn_if_stopping_proxy_in_env() {
+    if PROXY_ADDR=$(proxy_addr 2>/dev/null) ; then
+        [ "$PROXY_ADDR" != "$DOCKER_CLIENT_HOST" ] || echo "WARNING: It appears that your environment is configured to use the Weave Docker API proxy. Stopping it will break this and subsequent docker invocations. To restore your environment, run '\$(eval weave env --restore)'."
     fi
 }
 
@@ -1304,11 +1323,15 @@ case "$COMMAND" in
         ;;
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
-        proxy_addr "export DOCKER_HOST="
+        if PROXY_ADDR=$(proxy_addr) ; then
+            echo "export DOCKER_HOST=$PROXY_ADDR ORIG_DOCKER_HOST=$DOCKER_CLIENT_HOST"
+        fi
         ;;
     config|proxy-config)
         [ "$COMMAND" = "config" ] || deprecation_warning "$COMMAND" "'weave config'"
-        proxy_addr "-H="
+        if PROXY_addr=$(proxy_addr) ; then
+            echo "-H=$PROXY_addr"
+        fi
         ;;
     connect)
         [ $# -gt 0 ] || usage
@@ -1333,10 +1356,10 @@ case "$COMMAND" in
         done
         [ -n "$SUB_STATUS" ] || echo
         call_weave GET $STATUS_URL || res=1
-        if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null ; then
+        if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null && PROXY_ADDR=$(proxy_addr) ; then
             echo
             echo "       Service: proxy"
-            echo "       Address: $(proxy_addr)"
+            echo "       Address: $PROXY_ADDR"
         fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
@@ -1486,6 +1509,7 @@ case "$COMMAND" in
         ;;
     stop)
         [ $# -eq 0 ] || usage
+        warn_if_stopping_proxy_in_env
         stop $PROXY_CONTAINER_NAME "Proxy"
         stop $CONTAINER_NAME       "Weave"
         conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
@@ -1497,6 +1521,7 @@ case "$COMMAND" in
         ;;
     stop-proxy)
         [ $# -eq 0 ] || usage
+        warn_if_stopping_proxy_in_env
         stop $PROXY_CONTAINER_NAME "Proxy"
         ;;
     reset)
