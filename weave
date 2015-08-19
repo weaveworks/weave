@@ -169,7 +169,7 @@ if [ "$1" = "run" ] ; then
     shift 1
     check_docker_version
     if [ "$1" != "--without-dns" ] ; then
-      DNS_ARGS=$(exec_remote dns-args "$@" || true)
+        DNS_ARGS=$(exec_remote dns-args "$@" || true)
     fi
     shift $(dns_arg_count "$@")
     collect_cidr_args "$@"
