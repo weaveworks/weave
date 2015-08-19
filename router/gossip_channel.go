@@ -112,17 +112,32 @@ func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
 	connections := c.ourself.Connections()
 	c.Lock()
 	defer c.Unlock()
-	// GC - randomly (courtesy of go's map iterator) pick some
-	// existing entries and stop&remove them if the associated
-	// connection is no longer active.  We stop as soon as we
-	// encounter a valid entry; the idea being that when there is
-	// little or no garbage then this executes close to O(1)[1],
-	// whereas when there is lots of garbage we remove it quickly.
-	//
-	// [1] TODO Unfortunately, due to the desire to avoid nested
-	// locks, instead of simply invoking Peer.ConnectionTo(name)
-	// below, we have that Peer.Connections() invocation above. That
-	// is O(n_our_connections) at best.
+	c.gcSenders(connections)
+	for conn := range selectedConnections {
+		c.sendDown(conn, data)
+	}
+}
+
+func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
+	connections := c.ourself.Connections()
+	c.Lock()
+	defer c.Unlock()
+	c.gcSenders(connections)
+	c.sendDown(conn, data)
+}
+
+// GC - randomly (courtesy of go's map iterator) pick some existing
+// senders and stop&remove them if the associated connection is no
+// longer active.  We stop as soon as we encounter a valid entry; the
+// idea being that when there is little or no garbage then this
+// executes close to O(1)[1], whereas when there is lots of garbage we
+// remove it quickly.
+//
+// [1] TODO Unfortunately, due to the desire to avoid nested locks,
+// instead of simply invoking LocalPeer.ConnectionTo(name), we pass in
+// the result of LocalPeer.Connections(). That is O(n_our_connections)
+// at best.
+func (c *GossipChannel) gcSenders(connections ConnectionSet) {
 	for conn, sender := range c.senders {
 		if _, found := connections[conn]; !found {
 			delete(c.senders, conn)
@@ -131,15 +146,6 @@ func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
 			break
 		}
 	}
-	for conn := range selectedConnections {
-		c.sendDown(conn, data)
-	}
-}
-
-func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
-	c.Lock()
-	c.sendDown(conn, data)
-	c.Unlock()
 }
 
 func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
