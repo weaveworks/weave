@@ -11,6 +11,20 @@ else
 fi
 IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
 
+# - Docker versions prior to 1.2.0 cannot parse `--dns-search=.`
+# - Docker versions prior to 1.3.0 fail to include the domain when
+#   setting the hostname, so lookups for non-fq names fail.
+# - Docker version 1.3.0 contains the severe bug
+#   https://github.com/docker/docker/issues/8632
+# - The weavexec image embeds a Docker 1.3.1 client. Misleading
+#   version mismatch errors are produced if the user is running with a
+#   client *and* server with a lower version.
+# - Docker will complain if you run a client against a server older
+#   than that client.
+#
+# We therefore check that the user's Docker *client* is >= 1.3.1
+MIN_DOCKER_VERSION=1.3.1
+
 # These are needed for remote execs, hence we introduce them here
 DOCKERHUB_USER=${DOCKERHUB_USER:-weaveworks}
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
@@ -102,9 +116,20 @@ check_docker_version() {
         exit 1
     fi
 
-    # guard against https://github.com/docker/docker/issues/8632
-    if [ "$DOCKER_VERSION" = "1.3.0" ] ; then
-        echo "You are running Docker version $DOCKER_VERSION, which contains a bug that prevents weave from working properly. Please upgrade." >&2
+    DOCKER_VERSION_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f 1)
+    DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
+    DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
+
+    MIN_DOCKER_VERSION_MAJOR=$(echo "$MIN_DOCKER_VERSION" | cut -d. -f 1)
+    MIN_DOCKER_VERSION_MINOR=$(echo "$MIN_DOCKER_VERSION" | cut -d. -f 2)
+    MIN_DOCKER_VERSION_PATCH=$(echo "$MIN_DOCKER_VERSION" | cut -d. -f 3)
+
+    if [ \( "$DOCKER_VERSION_MAJOR" -lt "$MIN_DOCKER_VERSION_MAJOR" \) -o \
+        \( "$DOCKER_VERSION_MAJOR" -eq "$MIN_DOCKER_VERSION_MAJOR" -a \
+        \( "$DOCKER_VERSION_MINOR" -lt "$MIN_DOCKER_VERSION_MINOR" -o \
+        \( "$DOCKER_VERSION_MINOR" -eq "$MIN_DOCKER_VERSION_MINOR" -a \
+        \( "$DOCKER_VERSION_PATCH" -lt "$MIN_DOCKER_VERSION_PATCH" \) \) \) \) ] ; then
+        echo "ERROR: weave requires Docker version $MIN_DOCKER_VERSION or later; you are running $DOCKER_VERSION" >&2
         exit 1
     fi
 }
@@ -161,13 +186,14 @@ dns_arg_count() {
     fi
 }
 
+check_docker_version
+
 # "run" is a special case because we want to use docker directly,
 # rather than the docker in $EXEC_IMAGE remotely. That's because we
 # are passing arbitrary arguments on to docker run, and we can't rely
 # on our baked-in docker to support those arguments.
 if [ "$1" = "run" ] ; then
     shift 1
-    check_docker_version
     if [ "$1" != "--without-dns" ] ; then
         DNS_ARGS=$(exec_remote dns-args "$@" || true)
     fi
@@ -705,16 +731,6 @@ dns_domain() {
 }
 
 dns_args() {
-    if [ \( "$DOCKER_VERSION_MAJOR" -lt 1 \) -o \
-        \( "$DOCKER_VERSION_MAJOR" -eq 1 -a \
-        "$DOCKER_VERSION_MINOR" -lt 3 \) ] ; then
-        # Versions prior to 1.2.0 cannot parse `--dns-search=.`, and
-        # versions prior to 1.3.0 fail to include the domain when
-        # setting the hostname, so lookups for non-fully-qualified
-        # names fail.
-        echo "ERROR: Need Docker 1.3.0 or later to configure container DNS; you are running $DOCKER_VERSION" >&2
-        exit 1
-    fi
     docker_bridge_ip
     NAME_ARG=""
     HOSTNAME_SPECIFIED=
@@ -1212,11 +1228,6 @@ if ! command_exists nsenter ; then
     echo "ERROR: nsenter utility missing. Please install it." >&2
     exit 1
 fi
-
-check_docker_version
-DOCKER_VERSION_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f 1)
-DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
-DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
 
 deprecation_warning() {
     echo "Warning: ${1%=*} is deprecated; please use $2" >&2
