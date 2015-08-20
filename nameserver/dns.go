@@ -166,8 +166,8 @@ func (h *handler) handleLocal(w dns.ResponseWriter, req *dns.Msg) {
 		ip := addr.IP4()
 		response.Answer[i] = &dns.A{Hdr: header, A: ip}
 	}
-
 	shuffleAnswers(&response.Answer)
+
 	h.truncateResponse(req, &response)
 
 	h.ns.debugf("response: %+v", response)
@@ -255,17 +255,6 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 	h.errorResponse(req, dns.RcodeServerFailure, w)
 }
 
-func shuffleAnswers(answers *[]dns.RR) {
-	if len(*answers) <= 1 {
-		return
-	}
-
-	for i := range *answers {
-		j := rand.Intn(i + 1)
-		(*answers)[i], (*answers)[j] = (*answers)[j], (*answers)[i]
-	}
-}
-
 func (h *handler) truncateResponse(req, response *dns.Msg) {
 	maxSize := h.getMaxResponseSize(req)
 	if len(response.Answer) <= 1 || maxSize <= 0 {
@@ -295,4 +284,15 @@ func (h *handler) getMaxResponseSize(req *dns.Msg) int {
 		return int(opt.UDPSize())
 	}
 	return h.maxResponseSize
+}
+
+func shuffleAnswers(answers *[]dns.RR) {
+	if len(*answers) <= 1 {
+		return
+	}
+
+	for i := range *answers {
+		j := rand.Intn(i + 1)
+		(*answers)[i], (*answers)[j] = (*answers)[j], (*answers)[i]
+	}
 }
