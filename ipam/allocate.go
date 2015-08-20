@@ -26,6 +26,8 @@ func (g *allocate) Try(alloc *Allocator) bool {
 	}
 
 	if addr, found := alloc.lookupOwned(g.ident, g.r); found {
+		// If we had heard that this container died, resurrect it
+		delete(alloc.dead, g.ident) // delete is no-op if key not in map
 		g.resultChan <- allocateResult{addr, nil}
 		return true
 	}

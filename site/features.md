@@ -156,6 +156,19 @@ connect to. The individual IP addresses given to containers must, of
 course, be unique - if you pick an address that the automatic
 allocator has already assigned you will receive a warning.
 
+If you restart a container, it will retain the same IP addresses on
+the weave network:
+
+    host1$ docker run --name a1 -tdi ubuntu
+    f76b09a9fcfee04551dbb8d951d9a83e7e7d55126b02fd9f44f9f8a5f07d7c96
+    host1$ weave ps a1
+    a1 1e:dc:2a:db:ef:ff 10.32.0.3/12
+    host1$ docker restart a1
+    host1$ weave ps a1
+    a1 16:c0:6f:5d:c5:73 10.32.0.3/12
+
+(note that the IP address is held for a limited time - currently five seconds)
+
 ### <a name="naming-and-discovery"></a>Naming and discovery
 
 Named containers are automatically registered in

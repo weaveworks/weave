@@ -21,8 +21,9 @@ const (
 	msgRingUpdate
 	msgSpaceRequestDenied
 
-	tickInterval  = time.Second * 5
-	MinSubnetSize = 4 // first and last addresses are excluded, so 2 would be too small
+	tickInterval         = time.Second * 5
+	MinSubnetSize        = 4 // first and last addresses are excluded, so 2 would be too small
+	containerDiedTimeout = time.Second * 5
 )
 
 // operation represents something which Allocator wants to do, but
@@ -51,6 +52,7 @@ type Allocator struct {
 	nicknames        map[mesh.PeerName]string     // so we can map nicknames for rmpeer
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
+	dead             map[string]time.Time         // containers we heard were dead, and when
 	gossip           mesh.Gossip                  // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosActive      bool
@@ -70,6 +72,7 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 		paxos:       paxos.NewNode(ourName, ourUID, quorum),
 		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
 		isKnownPeer: isKnownPeer,
+		dead:        make(map[string]time.Time),
 		now:         time.Now,
 	}
 }
@@ -223,10 +226,28 @@ func (alloc *Allocator) Claim(ident string, addr address.Address, noErrorOnUnkno
 	return <-resultChan
 }
 
-// ContainerDied is provided to satisfy the updater interface; does a 'Delete' underneath.  Sync.
+// ContainerDied called from the updater interface.  Async.
 func (alloc *Allocator) ContainerDied(ident string) {
-	if err := alloc.Delete(ident); err == nil {
-		alloc.debugln("Container", ident, "died; released addresses")
+	alloc.actionChan <- func() {
+		if _, found := alloc.lookupOwned(ident, alloc.universe); found {
+			alloc.debugln("Container", ident, "died; noting to remove later")
+			alloc.dead[ident] = alloc.now()
+		}
+		// Also remove any pending ops
+		alloc.cancelOpsFor(&alloc.pendingAllocates, ident)
+		alloc.cancelOpsFor(&alloc.pendingClaims, ident)
+	}
+}
+
+func (alloc *Allocator) removeDeadContainers() {
+	cutoff := alloc.now().Add(-containerDiedTimeout)
+	for ident, timeOfDeath := range alloc.dead {
+		if timeOfDeath.Before(cutoff) {
+			if err := alloc.delete(ident); err == nil {
+				alloc.debugln("Removed addresses for container", ident)
+			}
+			delete(alloc.dead, ident)
+		}
 	}
 }
 
@@ -236,23 +257,22 @@ func (alloc *Allocator) ContainerStarted(ident string) {}
 func (alloc *Allocator) Delete(ident string) error {
 	errChan := make(chan error)
 	alloc.actionChan <- func() {
-		addrs, found := alloc.owned[ident]
-		for _, addr := range addrs {
-			alloc.space.Free(addr)
-		}
-		delete(alloc.owned, ident)
-
-		// Also remove any pending ops
-		found = alloc.cancelOpsFor(&alloc.pendingAllocates, ident) || found
-		found = alloc.cancelOpsFor(&alloc.pendingClaims, ident) || found
-
-		if !found {
-			errChan <- fmt.Errorf("Delete: no addresses for %s", ident)
-			return
-		}
-		errChan <- nil
+		errChan <- alloc.delete(ident)
 	}
 	return <-errChan
+}
+
+func (alloc *Allocator) delete(ident string) error {
+	addrs, found := alloc.owned[ident]
+	for _, addr := range addrs {
+		alloc.space.Free(addr)
+	}
+	delete(alloc.owned, ident)
+
+	if !found {
+		return fmt.Errorf("Delete: no addresses for %s", ident)
+	}
+	return nil
 }
 
 // Free (Sync) - release single IP address for container
@@ -514,6 +534,7 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 			if alloc.paxosActive {
 				alloc.propose()
 			}
+			alloc.removeDeadContainers()
 			alloc.tryPendingOps()
 		}
 
