@@ -1360,13 +1360,28 @@ case "$COMMAND" in
         res=0
         SUB_STATUS=
         STATUS_URL="/status"
+        SUB_COMMAND="$@"
         while [ $# -gt 0 ] ; do
             SUB_STATUS=1
             STATUS_URL="$STATUS_URL/$1"
             shift
         done
         [ -n "$SUB_STATUS" ] || echo
-        call_weave GET $STATUS_URL || res=1
+        if status=$(call_weave GET $STATUS_URL) ; then
+            case "$status" in
+                "")
+                    ;;
+                "404 page not found")
+                    echo "Invalid 'weave status' sub-command: $SUB_COMMAND" >&2
+                    usage
+                    ;;
+                *)
+                    echo "$status"
+                    ;;
+            esac
+        else
+            res=1
+        fi
         if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null && PROXY_ADDR=$(proxy_addr) ; then
             echo
             echo "       Service: proxy"
