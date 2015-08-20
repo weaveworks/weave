@@ -162,11 +162,7 @@ func (h *handler) handleLocal(w dns.ResponseWriter, req *dns.Msg) {
 	}
 	shuffleAnswers(&answers)
 
-	response := h.makeResponse(req, answers)
-	h.ns.debugf("response: %+v", response)
-	if err := w.WriteMsg(response); err != nil {
-		h.ns.infof("error responding: %v", err)
-	}
+	h.respond(w, h.makeResponse(req, answers))
 }
 
 func (h *handler) handleReverse(w dns.ResponseWriter, req *dns.Msg) {
@@ -200,11 +196,7 @@ func (h *handler) handleReverse(w dns.ResponseWriter, req *dns.Msg) {
 		Ptr: hostname,
 	}}
 
-	response := h.makeResponse(req, answers)
-	h.ns.debugf("response: %+v", response)
-	if err := w.WriteMsg(response); err != nil {
-		h.ns.infof("error responding: %v", err)
-	}
+	h.respond(w, h.makeResponse(req, answers))
 }
 
 func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
@@ -227,14 +219,11 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 			h.ns.debugf("error trying %s: %v", server, err)
 			continue
 		}
-		h.ns.debugf("response: %+v", response)
 		response.Id = req.Id
 		if response.Len() > h.getMaxResponseSize(req) {
 			response.Compress = true
 		}
-		if err := w.WriteMsg(response); err != nil {
-			h.ns.infof("error responding: %v", err)
-		}
+		h.respond(w, response)
 		return
 	}
 
@@ -272,6 +261,13 @@ func (h *handler) getMaxResponseSize(req *dns.Msg) int {
 		return int(opt.UDPSize())
 	}
 	return h.maxResponseSize
+}
+
+func (h *handler) respond(w dns.ResponseWriter, response *dns.Msg) {
+	h.ns.debugf("response: %+v", response)
+	if err := w.WriteMsg(response); err != nil {
+		h.ns.infof("error responding: %v", err)
+	}
 }
 
 func shuffleAnswers(answers *[]dns.RR) {
