@@ -650,7 +650,7 @@ func TestFuzzRingHard(t *testing.T) {
 		}
 
 		common.Debug.Printf("%s: transferring from peer %s", otherPeername, peername)
-		otherRing.Transfer(peername, peername)
+		otherRing.Transfer(peername, otherPeername)
 
 		// And now tell everyone about the transfer - rmpeer is
 		// not partition safe
