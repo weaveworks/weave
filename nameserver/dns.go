@@ -246,10 +246,10 @@ func (h *handler) makeResponse(req *dns.Msg, answers []dns.RR) *dns.Msg {
 	response.SetReply(req)
 	response.RecursionAvailable = true
 	response.Authoritative = true
+	response.Answer = answers
 
 	maxSize := h.getMaxResponseSize(req)
-	if len(answers) <= 1 || maxSize <= 0 {
-		response.Answer = answers
+	if len(answers) <= 1 || maxSize <= 0 || response.Len() <= maxSize {
 		return response
 	}
 
