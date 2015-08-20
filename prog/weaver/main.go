@@ -87,7 +87,15 @@ func main() {
 	mflag.IntVar(&dnsTTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
 	mflag.DurationVar(&dnsClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 
+	// crude way of detecting that we probably have been started in a
+	// container, with `weave launch` --> suppress misleading paths in
+	// mflags error messages.
+	if os.Args[0] == "/home/weave/weaver" { // matches the Dockerfile ENTRYPOINT
+		os.Args[0] = "weave"
+		mflag.CommandLine.Init("weave", mflag.ExitOnError)
+	}
 	mflag.Parse()
+
 	peers = mflag.Args()
 
 	SetLogLevel(logLevel)
