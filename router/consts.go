@@ -11,7 +11,7 @@ const (
 	Port                = 6783
 	HTTPPort            = Port + 1
 	DefaultPMTU         = 65535
-	MaxUDPPacketSize    = 65536
+	MaxUDPPacketSize    = 65535
 	ChannelSize         = 16
 	FragTestSize        = 60001
 	PMTUDiscoverySize   = 60000
