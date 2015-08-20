@@ -120,10 +120,12 @@ endif
 
 publish: $(PUBLISH)
 
-clean:
+clean-bin:
 	-$(SUDO) docker rmi $(IMAGES)
 	go clean -r ./...
 	rm -f $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT)
+
+clean: clean-bin
 	rm -rf test/tls/*.pem test/coverage.* test/coverage
 
 build:
