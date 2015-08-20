@@ -149,29 +149,22 @@ func (h *handler) handleLocal(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	response := dns.Msg{}
-	response.RecursionAvailable = true
-	response.Authoritative = true
-	response.SetReply(req)
-	response.Answer = make([]dns.RR, len(addrs))
-
 	header := dns.RR_Header{
 		Name:   req.Question[0].Name,
 		Rrtype: dns.TypeA,
 		Class:  dns.ClassINET,
 		Ttl:    h.ttl,
 	}
-
+	answers := make([]dns.RR, len(addrs))
 	for i, addr := range addrs {
 		ip := addr.IP4()
-		response.Answer[i] = &dns.A{Hdr: header, A: ip}
+		answers[i] = &dns.A{Hdr: header, A: ip}
 	}
-	shuffleAnswers(&response.Answer)
+	shuffleAnswers(&answers)
 
-	h.truncateResponse(req, &response)
-
+	response := h.makeResponse(req, answers)
 	h.ns.debugf("response: %+v", response)
-	if err := w.WriteMsg(&response); err != nil {
+	if err := w.WriteMsg(response); err != nil {
 		h.ns.infof("error responding: %v", err)
 	}
 }
@@ -196,27 +189,20 @@ func (h *handler) handleReverse(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	response := dns.Msg{}
-	response.RecursionAvailable = true
-	response.Authoritative = true
-	response.SetReply(req)
-
 	header := dns.RR_Header{
 		Name:   req.Question[0].Name,
 		Rrtype: dns.TypePTR,
 		Class:  dns.ClassINET,
 		Ttl:    h.ttl,
 	}
-
-	response.Answer = []dns.RR{&dns.PTR{
+	answers := []dns.RR{&dns.PTR{
 		Hdr: header,
 		Ptr: hostname,
 	}}
 
-	h.truncateResponse(req, &response)
-
+	response := h.makeResponse(req, answers)
 	h.ns.debugf("response: %+v", response)
-	if err := w.WriteMsg(&response); err != nil {
+	if err := w.WriteMsg(response); err != nil {
 		h.ns.infof("error responding: %v", err)
 	}
 }
@@ -253,6 +239,16 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	h.errorResponse(req, dns.RcodeServerFailure, w)
+}
+
+func (h *handler) makeResponse(req *dns.Msg, answers []dns.RR) *dns.Msg {
+	response := &dns.Msg{}
+	response.SetReply(req)
+	response.RecursionAvailable = true
+	response.Authoritative = true
+	response.Answer = answers
+	h.truncateResponse(req, response)
+	return response
 }
 
 func (h *handler) truncateResponse(req, response *dns.Msg) {
