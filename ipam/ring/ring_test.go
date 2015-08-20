@@ -709,9 +709,6 @@ func TestFuzzRingHard(t *testing.T) {
 				ringsWithEntries = append(ringsWithEntries, ring)
 			}
 		}
-		if len(ringsWithEntries) == 0 { // no rings have entries.
-			return
-		}
 		ring1 := ringsWithEntries[rand.Intn(len(ringsWithEntries))]
 		ring2index, _, ring2 := randomPeer(-1)
 		common.Log.Debugf("%s: 'Gossiping' to %s", ring1.Peer, ring2.Peer)
