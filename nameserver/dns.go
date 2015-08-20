@@ -246,26 +246,24 @@ func (h *handler) makeResponse(req *dns.Msg, answers []dns.RR) *dns.Msg {
 	response.SetReply(req)
 	response.RecursionAvailable = true
 	response.Authoritative = true
-	response.Answer = answers
 
 	maxSize := h.getMaxResponseSize(req)
-	if len(response.Answer) <= 1 || maxSize <= 0 {
-		return response
-	}
-
-	// search for smallest i that is too big
-	i := sort.Search(len(response.Answer), func(i int) bool {
-		// return true if too big
-		response.Answer = answers[:i+1]
-		return response.Len() > maxSize
-	})
-	if i == len(answers) {
+	if len(answers) <= 1 || maxSize <= 0 {
 		response.Answer = answers
 		return response
 	}
 
+	// search for smallest i that is too big
+	i := sort.Search(len(answers), func(i int) bool {
+		// return true if too big
+		response.Answer = answers[:i+1]
+		return response.Len() > maxSize
+	})
+
 	response.Answer = answers[:i]
-	response.Truncated = true
+	if i < len(answers) {
+		response.Truncated = true
+	}
 	return response
 }
 
