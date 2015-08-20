@@ -588,7 +588,7 @@ func TestFuzzRing(t *testing.T) {
 }
 
 func TestFuzzRingHard(t *testing.T) {
-	//common.InitDefaultLogging(true)
+	//common.SetLogLevel("debug")
 	var (
 		numPeers   = 100
 		iterations = 3000
@@ -635,13 +635,8 @@ func TestFuzzRingHard(t *testing.T) {
 			return
 		}
 
+		// Pick one peer to remove, and a different one to transfer to
 		peerIndex, peername, _ := randomPeer(-1)
-		// Remove peer from our state
-		peers = append(peers[:peerIndex], peers[peerIndex+1:]...)
-		rings = append(rings[:peerIndex], rings[peerIndex+1:]...)
-		theRanges = make(map[int][]address.Range)
-
-		// Transfer the space for this peer on another peer, but not this one
 		_, otherPeername, otherRing := randomPeer(peerIndex)
 
 		// We need to be in a ~converged ring to rmpeer
@@ -651,6 +646,11 @@ func TestFuzzRingHard(t *testing.T) {
 
 		common.Debug.Printf("%s: transferring from peer %s", otherPeername, peername)
 		otherRing.Transfer(peername, otherPeername)
+
+		// Remove peer from our state
+		peers = append(peers[:peerIndex], peers[peerIndex+1:]...)
+		rings = append(rings[:peerIndex], rings[peerIndex+1:]...)
+		theRanges = make(map[int][]address.Range)
 
 		// And now tell everyone about the transfer - rmpeer is
 		// not partition safe
