@@ -83,18 +83,17 @@ func TestTruncateResponse(t *testing.T) {
 	}
 
 	for i := 0; i < 10000; i++ {
-		// generate a random msg
-		response := &dns.Msg{}
+		// generate a random answer set
 		numAnswers := 40 + rand.Intn(200)
-		response.Answer = make([]dns.RR, numAnswers)
+		answers := make([]dns.RR, numAnswers)
 		for j := 0; j < numAnswers; j++ {
-			response.Answer[j] = &dns.A{Hdr: header, A: address.Address(j).IP4()}
+			answers[j] = &dns.A{Hdr: header, A: address.Address(j).IP4()}
 		}
 
 		// pick a random max size, truncate response to that, check it
-		maxSize := 512 + rand.Intn(response.Len()-512)
+		maxSize := 512 + rand.Intn(2*512)
 		h := handler{maxResponseSize: maxSize}
-		h.truncateResponse(&dns.Msg{}, response)
+		response := h.makeResponse(&dns.Msg{}, answers)
 		require.True(t, response.Len() <= maxSize)
 	}
 }

@@ -247,18 +247,11 @@ func (h *handler) makeResponse(req *dns.Msg, answers []dns.RR) *dns.Msg {
 	response.RecursionAvailable = true
 	response.Authoritative = true
 	response.Answer = answers
-	h.truncateResponse(req, response)
-	return response
-}
 
-func (h *handler) truncateResponse(req, response *dns.Msg) {
 	maxSize := h.getMaxResponseSize(req)
 	if len(response.Answer) <= 1 || maxSize <= 0 {
-		return
+		return response
 	}
-
-	// take a copy of answers, as we're going to mutate response
-	answers := response.Answer
 
 	// search for smallest i that is too big
 	i := sort.Search(len(response.Answer), func(i int) bool {
@@ -268,11 +261,12 @@ func (h *handler) truncateResponse(req, response *dns.Msg) {
 	})
 	if i == len(answers) {
 		response.Answer = answers
-		return
+		return response
 	}
 
 	response.Answer = answers[:i]
 	response.Truncated = true
+	return response
 }
 
 func (h *handler) getMaxResponseSize(req *dns.Msg) int {
