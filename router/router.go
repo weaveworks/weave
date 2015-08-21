@@ -124,6 +124,11 @@ func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
 	dstMac := net.HardwareAddr(key.DstMAC[:])
 	switch dstPeer := router.Macs.Lookup(dstMac); dstPeer {
 	case router.Ourself.Peer:
+		// The packet is destined for a local MAC.  The bridge
+		// won't normally send us such packets, and if it does
+		// it's likely to be broadcasting the packet to all
+		// ports.  So if it happens, just drop the packet to
+		// avoid warnings if we try to forward it.
 		return nil
 	case nil:
 		// If we don't know which peer corresponds to the dest
