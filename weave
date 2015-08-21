@@ -78,6 +78,10 @@ weave stop-router
 weave stop-proxy
 weave reset
 weave rmpeer        <peer_id>
+weave quarantine-peer <peer_id> <duration>
+weave quarantine-container <container_id> <duration>
+weave unquarantine  <quarantine_id>
+weave quarantines
 
 where <peer>     = <ip_address_or_fqdn>[:<port>]
       <cidr>     = <ip_address>/<routing_prefix_length>
@@ -1580,6 +1584,23 @@ case "$COMMAND" in
         [ $# -eq 1 ] || usage
         PEER=$1
         call_weave DELETE /peer/$PEER
+        ;;
+    quarantine-peer)
+        [ $# -eq 2 ] || usage
+        call_weave POST /quarantine -d "peer=$1&duration=$2"
+        ;;
+    quarantine-container)
+        [ $# -eq 2 ] || usage
+        CONTAINER=$(container_id $1)
+        call_weave POST /quarantine -d "containerid=$CONTAINER&duration=$2"
+        ;;
+    unquarantine)
+        [ $# -eq 1 ] || usage
+        call_weave DELETE /quarantine/$1
+        ;;
+    quarantines)
+        [ $# -eq 0 ] || usage
+        call_weave GET /quarantine
         ;;
     launch-dns)
         echo "The 'launch-dns' command has been removed; DNS is launched as part of 'launch' and 'launch-router'." >&2
