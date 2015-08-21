@@ -208,7 +208,7 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 			continue
 		}
 		response.Id = req.Id
-		if response.Len() > h.getMaxResponseSize(req) {
+		if h.responseTooBig(req, response) {
 			response.Compress = true
 		}
 		h.respond(w, response)
@@ -224,13 +224,12 @@ func (h *handler) makeResponse(req *dns.Msg, answers []dns.RR) *dns.Msg {
 	response.RecursionAvailable = true
 	response.Authoritative = true
 	response.Answer = answers
-
-	maxSize := h.getMaxResponseSize(req)
-	if len(answers) <= 1 || maxSize <= 0 || response.Len() <= maxSize {
+	if !h.responseTooBig(req, response) {
 		return response
 	}
 
 	// search for smallest i that is too big
+	maxSize := h.getMaxResponseSize(req)
 	i := sort.Search(len(answers), func(i int) bool {
 		// return true if too big
 		response.Answer = answers[:i+1]
@@ -250,6 +249,10 @@ func (h *handler) makeErrorResponse(req *dns.Msg, code int) *dns.Msg {
 	response.RecursionAvailable = true
 	response.Rcode = code
 	return response
+}
+
+func (h *handler) responseTooBig(req, response *dns.Msg) bool {
+	return len(response.Answer) > 1 && h.maxResponseSize > 0 && response.Len() > h.getMaxResponseSize(req)
 }
 
 func (h *handler) respond(w dns.ResponseWriter, response *dns.Msg) {
