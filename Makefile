@@ -105,7 +105,7 @@ $(DOCKER_DISTRIB):
 tests: $(COVER_EXE)
 	@test/units.sh
 
-$(PUBLISH): publish_%:
+$(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 	$(SUDO) docker push   $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 	$(SUDO) docker push   $(DOCKERHUB_USER)/$*:latest
