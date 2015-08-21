@@ -74,7 +74,6 @@ func TestTruncation(t *testing.T) {
 }
 
 func TestTruncateResponse(t *testing.T) {
-
 	header := dns.RR_Header{
 		Name:   "host.domain.com",
 		Rrtype: dns.TypePTR,
@@ -93,7 +92,8 @@ func TestTruncateResponse(t *testing.T) {
 
 		// pick a random max size, truncate response to that, check it
 		maxSize := 512 + rand.Intn(response.Len()-512)
-		truncateResponse(response, maxSize)
+		h := handler{maxResponseSize: maxSize}
+		h.truncateResponse(&dns.Msg{}, response)
 		require.True(t, response.Len() <= maxSize)
 	}
 }
