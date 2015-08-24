@@ -96,13 +96,6 @@ publish() {
 
     echo "== Sanity checks"
 
-    if ! which github-release >/dev/null; then
-        echo "Please install git-release:" >&2
-        echo -e "\tgo get github.com/aktau/github-release" >&2
-        echo "and create a git token per https://github.com/aktau/github-release" >&2
-        exit 1
-    fi
-
     if ! [ $(git rev-list -1 $LATEST_TAG) == $(git rev-list -1 latest_release) ]; then
         echo -e "\u2757 The tag latest_release does not point to the same commit as $LATEST_TAG"
         exit 1
@@ -195,6 +188,14 @@ usage() {
     echo -e "\t./bin/release publish"
     echo "-- Publish the artefacts for the latest tag to GitHub and DockerHub"
 }
+
+# Ensure required tooling is installed
+if ! which github-release >/dev/null; then
+    echo "Please install git-release:" >&2
+    echo -e "\tgo get github.com/aktau/github-release" >&2
+    echo "and create a git token per https://github.com/aktau/github-release" >&2
+    exit 1
+fi
 
 case "$1" in
     build)
