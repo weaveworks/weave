@@ -11,14 +11,33 @@ RELEASE_DESCRIPTION=${RELEASE_DESCRIPTION:-"Weaving Containers into Applications
 PWD=`pwd`
 
 setup() {
-    ## Get the new version number from the most recent tag
-    if ! LATEST_TAG=$(git describe --abbrev=0 --match='v*' 2>/dev/null) ; then
-        echo "Could not find an annotated 'v*' version tag." >&2
-        exit 1
-    fi
+    # Ensure we have exactly one annotated tag pointing at HEAD
+    HEAD_TAGS=$(git tag --points-at HEAD)
+    case $(echo $HEAD_TAGS | wc -w) in
+        1)
+            if [ $HEAD_TAGS != "latest_release" ] ; then
+                LATEST_TAG=$HEAD_TAGS
+            else
+                echo "Cannot determine version - latest_release points at HEAD" >&2
+                exit 1
+            fi
+            ;;
+        0)
+            echo "Cannot determine version - no tags point at HEAD" >&2
+            exit 1
+            ;;
+        *)
+            echo "Cannot determine version - multiple tags point at HEAD:" >&2
+            for TAG in $HEAD_TAGS ; do
+                echo -e "\t$TAG" >&2
+            done
+            exit 1
+            ;;
+    esac
+
     LATEST_TAG_SHA=$(git rev-parse $LATEST_TAG)
     LATEST_RELEASE_SHA=$(git rev-parse latest_release)
-    VERSION=${LATEST_TAG#v}
+    VERSION=${LATEST_TAG}
     # NB does not check that this tag is on master
     RELEASE_DIR=./releases/$LATEST_TAG
 }
@@ -39,8 +58,8 @@ build() {
     cd $RELEASE_DIR
 
     ## Check that the top changelog entry is this version
-    if ! latest_changelog=$(grep -o "## Release [0-9].*" -m1 ./CHANGELOG.md) || \
-       ! [ `echo "$latest_changelog" | grep -o '[0-9][^ ]*'` == "$VERSION" ]; then
+    if ! latest_changelog=$(grep -oP '(?<=^## Release ).*' -m1 ./CHANGELOG.md) || \
+       ! [ `echo "$latest_changelog" = "$VERSION"` ]; then
         echo -e "\u2757 Latest changelog entry \"$latest_changelog\" does not match the release version $VERSION" >&2
         exit 1
     fi
@@ -61,7 +80,7 @@ build() {
     fi
 
     ## Run tests with the distributables, including version check
-    v=$(./prog/weaver/weaver --version | grep -o '[0-9].*')
+    v=$(./prog/weaver/weaver --version | grep -oP '(?<=^weave router ).*')
     if ! [ "$v" == "$VERSION" ]; then
         echo "Version of distributable "$v" does not match release version $VERSION" >&2
         exit 1
