@@ -66,4 +66,4 @@ deployment:
     owner: weaveworks
     commands:
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-      - cd $SRCDIR; make publish
+      - make publish
