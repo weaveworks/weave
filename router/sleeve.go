@@ -22,14 +22,14 @@ import (
 const (
 	EthernetOverhead    = 14
 	UDPOverhead         = 28 // 20 bytes for IPv4, 8 bytes for UDP
-	DefaultPMTU         = 65535
+	DefaultMTU          = 65535
 	FragTestSize        = 60001
 	PMTUDiscoverySize   = 60000
 	FastHeartbeat       = 500 * time.Millisecond
 	SlowHeartbeat       = 10 * time.Second
 	FragTestInterval    = 5 * time.Minute
-	PMTUVerifyAttempts  = 8
-	PMTUVerifyTimeout   = 10 * time.Millisecond // doubled with each attempt
+	MTUVerifyAttempts   = 8
+	MTUVerifyTimeout    = 10 * time.Millisecond // doubled with each attempt
 	MaxMissedHeartbeats = 6
 	HeartbeatTimeout    = MaxMissedHeartbeats * SlowHeartbeat
 )
@@ -258,9 +258,9 @@ type sleeveForwarder struct {
 	remoteAddr *net.UDPAddr
 
 	// These fields are accessed and updated independently, so no
-	// locking needed
-	effectivePMTU int
-	stackFrag     bool
+	// locking needed.
+	mtu       int // the mtu for this link on the overlay network
+	stackFrag bool
 
 	// dec is only used from the readUDP goroutine, enc and encDF
 	// are only used in the forwarder goroutine
@@ -281,11 +281,11 @@ type sleeveForwarder struct {
 	fragTestTicker    *time.Ticker
 	ackedHeartbeat    bool
 
-	pmtuTestTimeout  *time.Timer
-	pmtuTestsSent    uint
-	epmtuHighestGood int
-	epmtuLowestBad   int
-	epmtuCandidate   int
+	mtuTestTimeout *time.Timer
+	mtuTestsSent   uint
+	mtuHighestGood int
+	mtuLowestBad   int
+	mtuCandidate   int
 }
 
 type aggregatorFrame struct {
@@ -332,9 +332,9 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		confirmedChan:    confirmedChan,
 		finishedChan:     finishedChan,
 		remoteAddr:       params.RemoteAddr,
-		effectivePMTU:    DefaultPMTU,
+		mtu:              DefaultMTU,
 		crypto:           crypto,
-		maxPayload:       DefaultPMTU - UDPOverhead,
+		maxPayload:       DefaultMTU - UDPOverhead,
 		overheadDF: UDPOverhead + crypto.EncDF.PacketOverhead() +
 			crypto.EncDF.FrameOverhead() + EthernetOverhead,
 		senderDF: newUDPSenderDF(params.LocalIP, sleeve.localPort),
@@ -381,7 +381,7 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 	dec *EthernetDecoder) error {
 	fwd.lock.RLock()
 	haveContact := (fwd.remoteAddr != nil)
-	effectivePMTU := fwd.effectivePMTU
+	mtu := fwd.mtu
 	stackFrag := fwd.stackFrag
 	fwd.lock.RUnlock()
 
@@ -405,8 +405,8 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 	// multiple times. So it's better to drop things at the beginning
 	// of our pipeline.
 	if dec.DF() {
-		if frameTooBig(frame, effectivePMTU) {
-			return FrameTooBigError{EPMTU: effectivePMTU}
+		if frameTooBig(frame, mtu) {
+			return FrameTooBigError{EPMTU: mtu}
 		}
 
 		fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName, frame)
@@ -420,7 +420,7 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 
 	// Don't have trustworthy stack, so we're going to have to
 	// send it DF in any case.
-	if !frameTooBig(frame, effectivePMTU) {
+	if !frameTooBig(frame, mtu) {
 		fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName, frame)
 		return nil
 	}
@@ -428,7 +428,7 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 	// We can't trust the stack to fragment, we have IP, and we
 	// have a frame that's too big for the MTU, so we have to
 	// fragment it ourself.
-	return fragment(dec.Eth, dec.IP, effectivePMTU,
+	return fragment(dec.Eth, dec.IP, mtu,
 		func(segFrame []byte) {
 			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName,
 				segFrame)
@@ -451,14 +451,14 @@ func (ftbe FrameTooBigError) Error() string {
 	return fmt.Sprint("Frame too big error. Effective PMTU is ", ftbe.EPMTU)
 }
 
-func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int,
+func fragment(eth layers.Ethernet, ip layers.IPv4, mtu int,
 	forward func([]byte)) error {
 	// We are not doing any sort of NAT, so we don't need to worry
 	// about checksums of IP payload (eg UDP checksum).
 	headerSize := int(ip.IHL) * 4
 	// &^ is bit clear (AND NOT). So here we're clearing the lowest 3
 	// bits.
-	maxSegmentSize := (pmtu - headerSize) &^ 7
+	maxSegmentSize := (mtu - headerSize) &^ 7
 	opts := gopacket.SerializeOptions{
 		FixLengths:       false,
 		ComputeChecksums: true}
@@ -505,14 +505,14 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, pmtu int,
 	return nil
 }
 
-func frameTooBig(frame []byte, effectivePMTU int) bool {
+func frameTooBig(frame []byte, mtu int) bool {
 	// We capture/forward complete ethernet frames. Therefore the
 	// frame length includes the ethernet header. However, MTUs
 	// operate at the IP layer and thus do not include the ethernet
 	// header. To put it another way, when a sender that was told an
 	// MTU of M sends an IP packet of exactly that length, we will
 	// capture/forward M + EthernetOverhead bytes of data.
-	return len(frame) > effectivePMTU+EthernetOverhead
+	return len(frame) > mtu+EthernetOverhead
 }
 
 func (fwd *sleeveForwarder) ControlMessage(msg []byte) {
@@ -572,8 +572,8 @@ loop:
 		case <-tickerChan(fwd.fragTestTicker):
 			err = fwd.sendFragTest()
 
-		case <-timerChan(fwd.pmtuTestTimeout):
-			err = fwd.handlePMTUTestFailure()
+		case <-timerChan(fwd.mtuTestTimeout):
+			err = fwd.handleMTUTestFailure()
 		}
 	}
 
@@ -586,8 +586,8 @@ loop:
 	if fwd.fragTestTicker != nil {
 		fwd.fragTestTicker.Stop()
 	}
-	if fwd.pmtuTestTimeout != nil {
-		fwd.pmtuTestTimeout.Stop()
+	if fwd.mtuTestTimeout != nil {
+		fwd.mtuTestTimeout.Stop()
 	}
 
 	checkWarn(fwd.senderDF.close())
@@ -631,7 +631,7 @@ func (fwd *sleeveForwarder) aggregateAndSend(frame aggregatorFrame,
 			}
 
 			// Accumulate frames until doing so would
-			// exceed the PMTU.  Even in the non-DF case,
+			// exceed the MTU.  Even in the non-DF case,
 			// it doesn't seem worth adding a frame where
 			// that would lead to fragmentation,
 			// potentially delaying or risking other
@@ -681,14 +681,14 @@ func (fwd *sleeveForwarder) handleSpecialFrame(special specialFrame) error {
 		return fwd.handleFragTest(special.frame)
 
 	default:
-		return fwd.handlePMTUTest(special.frame)
+		return fwd.handleMTUTest(special.frame)
 	}
 }
 
 const (
 	HeartbeatAck = iota
 	FragTestAck
-	PMTUTestAck
+	MTUTestAck
 )
 
 func (fwd *sleeveForwarder) handleControlMsg(msg []byte) error {
@@ -705,8 +705,8 @@ func (fwd *sleeveForwarder) handleControlMsg(msg []byte) error {
 	case FragTestAck:
 		return fwd.handleFragTestAck()
 
-	case PMTUTestAck:
-		return fwd.handlePMTUTestAck(msg)
+	case MTUTestAck:
+		return fwd.handleMTUTestAck(msg)
 
 	default:
 		log.Println(fwd.logPrefix(),
@@ -849,94 +849,94 @@ func (fwd *sleeveForwarder) handleFragTestAck() error {
 
 func (fwd *sleeveForwarder) processSendError(err error) error {
 	if mtbe, ok := err.(msgTooBigError); ok {
-		epmtu := mtbe.PMTU - fwd.overheadDF
-		if fwd.epmtuCandidate != 0 && epmtu >= fwd.epmtuCandidate {
+		mtu := mtbe.underlayPMTU - fwd.overheadDF
+		if fwd.mtuCandidate != 0 && mtu >= fwd.mtuCandidate {
 			return nil
 		}
 
-		fwd.epmtuHighestGood = 8
-		fwd.epmtuLowestBad = epmtu + 1
-		fwd.epmtuCandidate = epmtu
-		fwd.pmtuTestsSent = 0
-		fwd.maxPayload = mtbe.PMTU - UDPOverhead
-		fwd.effectivePMTU = epmtu
-		return fwd.sendPMTUTest()
+		fwd.mtuHighestGood = 8
+		fwd.mtuLowestBad = mtu + 1
+		fwd.mtuCandidate = mtu
+		fwd.mtuTestsSent = 0
+		fwd.maxPayload = mtbe.underlayPMTU - UDPOverhead
+		fwd.mtu = mtu
+		return fwd.sendMTUTest()
 	}
 
 	return err
 }
 
-func (fwd *sleeveForwarder) sendPMTUTest() error {
+func (fwd *sleeveForwarder) sendMTUTest() error {
 	log.Debug(fwd.logPrefix(),
-		"sendPMTUTest: epmtu candidate", fwd.epmtuCandidate)
+		"sendMTUTest: mtu candidate", fwd.mtuCandidate)
 	err := fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF,
-		make([]byte, fwd.epmtuCandidate+EthernetOverhead))
+		make([]byte, fwd.mtuCandidate+EthernetOverhead))
 	if err != nil {
 		return err
 	}
 
-	fwd.pmtuTestTimeout = setTimer(fwd.pmtuTestTimeout,
-		PMTUVerifyTimeout<<fwd.pmtuTestsSent)
-	fwd.pmtuTestsSent++
+	fwd.mtuTestTimeout = setTimer(fwd.mtuTestTimeout,
+		MTUVerifyTimeout<<fwd.mtuTestsSent)
+	fwd.mtuTestsSent++
 	return nil
 }
 
-func (fwd *sleeveForwarder) handlePMTUTest(frame []byte) error {
+func (fwd *sleeveForwarder) handleMTUTest(frame []byte) error {
 	buf := make([]byte, 3)
-	buf[0] = PMTUTestAck
+	buf[0] = MTUTestAck
 	binary.BigEndian.PutUint16(buf[1:], uint16(len(frame)-EthernetOverhead))
 	return fwd.sendControlMsg(buf)
 }
 
-func (fwd *sleeveForwarder) handlePMTUTestAck(msg []byte) error {
+func (fwd *sleeveForwarder) handleMTUTestAck(msg []byte) error {
 	if len(msg) < 3 {
-		log.Println(fwd.logPrefix(), "Received truncated PMTUTestAck")
+		log.Println(fwd.logPrefix(), "Received truncated MTUTestAck")
 		return nil
 	}
 
-	epmtu := int(binary.BigEndian.Uint16(msg[1:]))
+	mtu := int(binary.BigEndian.Uint16(msg[1:]))
 	log.Debug(fwd.logPrefix(),
-		"handlePMTUTestAck: for epmtu candidate", epmtu)
-	if epmtu != fwd.epmtuCandidate {
+		"handleMTUTestAck: for mtu candidate", mtu)
+	if mtu != fwd.mtuCandidate {
 		return nil
 	}
 
-	fwd.epmtuHighestGood = epmtu
-	return fwd.searchEPMTU()
+	fwd.mtuHighestGood = mtu
+	return fwd.searchMTU()
 }
 
-func (fwd *sleeveForwarder) handlePMTUTestFailure() error {
-	if fwd.pmtuTestsSent < PMTUVerifyAttempts {
-		return fwd.sendPMTUTest()
+func (fwd *sleeveForwarder) handleMTUTestFailure() error {
+	if fwd.mtuTestsSent < MTUVerifyAttempts {
+		return fwd.sendMTUTest()
 	}
 
-	log.Debug(fwd.logPrefix(), "handlePMTUTestFailure")
-	fwd.epmtuLowestBad = fwd.epmtuCandidate
-	return fwd.searchEPMTU()
+	log.Debug(fwd.logPrefix(), "handleMTUTestFailure")
+	fwd.mtuLowestBad = fwd.mtuCandidate
+	return fwd.searchMTU()
 }
 
-func (fwd *sleeveForwarder) searchEPMTU() error {
-	log.Debug(fwd.logPrefix(), "searchEPMTU:", fwd.epmtuHighestGood,
-		fwd.epmtuLowestBad)
-	if fwd.epmtuHighestGood+1 >= fwd.epmtuLowestBad {
-		epmtu := fwd.epmtuHighestGood
+func (fwd *sleeveForwarder) searchMTU() error {
+	log.Debug(fwd.logPrefix(), "searchMTU:", fwd.mtuHighestGood,
+		fwd.mtuLowestBad)
+	if fwd.mtuHighestGood+1 >= fwd.mtuLowestBad {
+		mtu := fwd.mtuHighestGood
 		log.Println(fwd.logPrefix(),
-			"Effective PMTU verified at", epmtu)
+			"Effective MTU verified at", mtu)
 
-		if fwd.pmtuTestTimeout != nil {
-			fwd.pmtuTestTimeout.Stop()
-			fwd.pmtuTestTimeout = nil
+		if fwd.mtuTestTimeout != nil {
+			fwd.mtuTestTimeout.Stop()
+			fwd.mtuTestTimeout = nil
 		}
 
-		fwd.epmtuCandidate = 0
-		fwd.maxPayload = epmtu + fwd.overheadDF - UDPOverhead
-		fwd.effectivePMTU = epmtu
+		fwd.mtuCandidate = 0
+		fwd.maxPayload = mtu + fwd.overheadDF - UDPOverhead
+		fwd.mtu = mtu
 		return nil
 	}
 
-	fwd.epmtuCandidate = (fwd.epmtuHighestGood + fwd.epmtuLowestBad) / 2
-	fwd.pmtuTestsSent = 0
-	return fwd.sendPMTUTest()
+	fwd.mtuCandidate = (fwd.mtuHighestGood + fwd.mtuLowestBad) / 2
+	fwd.mtuTestsSent = 0
+	return fwd.sendMTUTest()
 }
 
 type udpSenderDF struct {
@@ -1033,15 +1033,15 @@ func (sender *udpSenderDF) send(msg []byte, raddr *net.UDPAddr) error {
 		return err
 	}
 
-	return msgTooBigError{PMTU: pmtu}
+	return msgTooBigError{underlayPMTU: pmtu}
 }
 
 type msgTooBigError struct {
-	PMTU int // actual pmtu, i.e. what the kernel told us
+	underlayPMTU int // actual pmtu, i.e. what the kernel told us
 }
 
 func (mtbe msgTooBigError) Error() string {
-	return fmt.Sprint("Msg too big error. PMTU is ", mtbe.PMTU)
+	return fmt.Sprint("Msg too big error. PMTU is ", mtbe.underlayPMTU)
 }
 
 func (sender *udpSenderDF) close() error {
