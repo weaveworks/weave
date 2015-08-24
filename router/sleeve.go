@@ -106,16 +106,10 @@ func (sleeve *SleeveOverlay) lookupForwarder(peer PeerName) *sleeveForwarder {
 	return sleeve.forwarders[peer]
 }
 
-func (sleeve *SleeveOverlay) addForwarder(peer PeerName,
-	fwd *sleeveForwarder) error {
+func (sleeve *SleeveOverlay) addForwarder(peer PeerName, fwd *sleeveForwarder) {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
-	if sleeve.forwarders[peer] != nil {
-		return fmt.Errorf("already have a forwarder for %s", peer)
-	}
-
 	sleeve.forwarders[peer] = fwd
-	return nil
 }
 
 func (sleeve *SleeveOverlay) removeForwarder(peer PeerName,
@@ -335,10 +329,6 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		overheadDF: UDPOverhead + crypto.EncDF.PacketOverhead() +
 			crypto.EncDF.FrameOverhead() + EthernetOverhead,
 		senderDF: newUDPSenderDF(params.LocalIP, sleeve.localPort),
-	}
-
-	if err := sleeve.addForwarder(params.RemotePeer.Name, fwd); err != nil {
-		return nil, err
 	}
 
 	go fwd.run(aggChan, aggDFChan, specialChan, confirmedChan,
@@ -721,6 +711,10 @@ func (fwd *sleeveForwarder) confirmed() error {
 		// already confirmed
 		return nil
 	}
+
+	// when the connection is confirmed, this should be the only
+	// forwarder to the peer.
+	fwd.sleeve.addForwarder(fwd.remotePeer.Name, fwd)
 
 	// heartbeatInterval flags that we want to send heartbeats,
 	// even if we don't do sendHeartbeat() yet due to lacking the
