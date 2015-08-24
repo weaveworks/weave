@@ -37,7 +37,7 @@ const (
 type SleeveOverlay struct {
 	localPort int
 
-	// These fields are set in ConsumePackets, and not
+	// These fields are set in StartConsumingPackets, and not
 	// subsequently modified
 	localPeer    *Peer
 	localPeerBin []byte
@@ -53,7 +53,7 @@ func NewSleeveOverlay(localPort int) Overlay {
 	return &SleeveOverlay{localPort: localPort}
 }
 
-func (sleeve *SleeveOverlay) ConsumePackets(localPeer *Peer, peers *Peers,
+func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers,
 	consumer OverlayConsumer) error {
 	localAddr, err := net.ResolveUDPAddr("udp4",
 		fmt.Sprint(":", sleeve.localPort))
@@ -87,7 +87,7 @@ func (sleeve *SleeveOverlay) ConsumePackets(localPeer *Peer, peers *Peers,
 
 	if sleeve.localPeer != nil {
 		conn.Close()
-		return fmt.Errorf("ConsumePackets already called")
+		return fmt.Errorf("StartConsumingPackets already called")
 	}
 
 	sleeve.localPeer = localPeer

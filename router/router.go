@@ -84,7 +84,7 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 func (router *Router) Start() {
 	log.Println("Sniffing traffic on", router.Bridge)
 	checkFatal(router.Bridge.StartConsumingPackets(router.handleCapturedPacket))
-	checkFatal(router.Overlay.ConsumePackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
+	checkFatal(router.Overlay.StartConsumingPackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
 	router.listenTCP(router.Port)
 }
 
