@@ -18,15 +18,16 @@ import (
 const (
 	// Tombstones do not need to survive long periods of peer disconnection, as
 	// we delete entries for disconnected peers.  Therefore they just need to hang
-	// around to account for propagation delay through gossip.  10 minutes sounds
-	// long enough.
+	// around to account for propagation delay through gossip.  We do need them
+	// to hang around longer than the allowed clock skew (defined next).  30mins
+	// tombstone timeout allows for 15mins max clock skew.
 	tombstoneTimeout = time.Minute * 30
-
-	// Used by prog/weaver/main.go and proxy/create_container_interceptor.go
-	DefaultDomain = "weave.local."
 
 	// Maximum age of acceptable gossip messages (to account for clock skew)
 	gossipWindow = int64(tombstoneTimeout/time.Second) / 2
+
+	// Used by prog/weaver/main.go and proxy/create_container_interceptor.go
+	DefaultDomain = "weave.local."
 )
 
 // Nameserver: gossip-based, in memory nameserver.
