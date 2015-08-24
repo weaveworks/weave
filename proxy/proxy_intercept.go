@@ -67,6 +67,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 		if _, err := io.Copy(w, resp.Body); err != nil {
 			Log.Warning(err)
 		}
+		resp.Body.Close()
 	}
 }
 
