@@ -783,17 +783,17 @@ func (fwd *sleeveForwarder) handleHeartbeat(special specialFrame) error {
 }
 
 func (fwd *sleeveForwarder) setRemoteAddr(addr *net.UDPAddr) {
-	// Although we don't need to lock when reading remoteAddr,
-	// because this thread is the only one that modifies
-	// remoteAddr, we do need to lock when writing it, because
-	// memory models.
+	// remoteAddr is only modified here, so we don't need to hold
+	// the lock when reading it from the forwarder goroutine.  But
+	// other threads may read it while holding the read lock, so
+	// when we modify it, we need to hold the write lock.
 	fwd.lock.Lock()
 	fwd.remoteAddr = addr
 	fwd.lock.Unlock()
 }
 
 func (fwd *sleeveForwarder) handleHeartbeatAck() error {
-	// The connection is nowregarded as established
+	// The connection is now regarded as established
 	fwd.notifyEstablished()
 
 	if fwd.heartbeatInterval != SlowHeartbeat {
