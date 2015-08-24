@@ -549,7 +549,13 @@ loop:
 				fwd.crypto.EncDF, fwd.senderDF, fwd.maxPayload)
 
 		case special := <-specialChan:
-			err = fwd.handleSpecialFrame(special)
+			if special.sender == nil {
+				// Control messages are sent on specialChan,
+				// with a nil sender
+				err = fwd.handleControlMsg(special.frame)
+			} else {
+				err = fwd.handleSpecialFrame(special)
+			}
 
 		case _, ok := <-confirmedChan:
 			if !ok {
@@ -665,10 +671,6 @@ func (fwd *sleeveForwarder) sendSpecial(enc Encryptor, sender udpSender,
 }
 
 func (fwd *sleeveForwarder) handleSpecialFrame(special specialFrame) error {
-	if special.sender == nil {
-		return fwd.handleControlMsg(special.frame)
-	}
-
 	// The special frame types are distinguished by length
 	switch len(special.frame) {
 	case EthernetOverhead + 8:
