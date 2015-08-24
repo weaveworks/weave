@@ -133,6 +133,7 @@ func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
 	case nil:
 		// If we don't know which peer corresponds to the dest
 		// MAC, broadcast it.
+		router.PacketLogging.LogPacket("Broadcasting", key)
 		return router.Ourself.Broadcast(key)
 	default:
 		router.PacketLogging.LogPacket("Forwarding", key)
