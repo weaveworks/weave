@@ -552,7 +552,7 @@ loop:
 
 		case _, ok := <-confirmedChan:
 			if !ok {
-				// specialChan is closed to indicate
+				// confirmedChan is closed to indicate
 				// the forwarder is being closed
 				break loop
 			}
