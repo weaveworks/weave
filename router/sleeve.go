@@ -513,7 +513,7 @@ func (fwd *sleeveForwarder) ControlMessage(msg []byte) {
 	}
 }
 
-func (fwd *sleeveForwarder) Close() {
+func (fwd *sleeveForwarder) Stop() {
 	sleeve := fwd.sleeve
 	sleeve.lock.Lock()
 	if sleeve.forwarders[fwd.remotePeer.Name] == fwd {

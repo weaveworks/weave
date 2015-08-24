@@ -357,7 +357,7 @@ func (conn *LocalConnection) shutdown(err error) {
 	stopTicker(conn.heartbeatTCP)
 
 	if conn.forwarder != nil {
-		conn.forwarder.Close()
+		conn.forwarder.Stop()
 	}
 
 	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr, err)

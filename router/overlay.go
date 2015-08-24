@@ -63,7 +63,7 @@ type OverlayForwarder interface {
 	// has already been used to decode the frame.
 	Forward(src *Peer, dest *Peer, frame []byte, dec *EthernetDecoder) error
 
-	Close()
+	Stop()
 
 	// Handle a message from the peer
 	ControlMessage([]byte)
@@ -91,7 +91,7 @@ func (NullOverlay) Forward(*Peer, *Peer, []byte, *EthernetDecoder) error {
 	return nil
 }
 
-func (NullOverlay) Close() {
+func (NullOverlay) Stop() {
 }
 
 func (NullOverlay) ControlMessage([]byte) {
