@@ -59,11 +59,3 @@ teardown:
         parallel: true
     - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; cp coverage.* $CIRCLE_ARTIFACTS):
         parallel: true
-
-deployment:
-  hub:
-    branch: master
-    owner: weaveworks
-    commands:
-      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-      - make publish
