@@ -6,7 +6,7 @@ type Bridge interface {
 	InjectPacket([]byte) error
 
 	// Start consuming packets from the bridge
-	ConsumePackets(BridgeConsumer) error
+	StartConsumingPackets(BridgeConsumer) error
 
 	String() string
 	Stats() map[string]int
@@ -23,7 +23,7 @@ func (NullBridge) InjectPacket([]byte) error {
 	return nil
 }
 
-func (NullBridge) ConsumePackets(BridgeConsumer) error {
+func (NullBridge) StartConsumingPackets(BridgeConsumer) error {
 	return nil
 }
 

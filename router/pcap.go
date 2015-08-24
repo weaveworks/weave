@@ -34,7 +34,7 @@ func NewPcap(iface *net.Interface, bufSz int) (Bridge, error) {
 	return &Pcap{iface: iface, bufSz: bufSz, writeHandle: wh}, nil
 }
 
-func (p *Pcap) ConsumePackets(consumer BridgeConsumer) error {
+func (p *Pcap) StartConsumingPackets(consumer BridgeConsumer) error {
 	rh, err := newPcapHandle(p.iface.Name, true, 65535, p.bufSz)
 	if err != nil {
 		return err
