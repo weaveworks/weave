@@ -118,6 +118,15 @@ func (sleeve *SleeveOverlay) addForwarder(peer PeerName,
 	return nil
 }
 
+func (sleeve *SleeveOverlay) removeForwarder(peer PeerName,
+	fwd *sleeveForwarder) {
+	sleeve.lock.Lock()
+	defer sleeve.lock.Unlock()
+	if sleeve.forwarders[peer] == fwd {
+		delete(sleeve.forwarders, peer)
+	}
+}
+
 func (sleeve *SleeveOverlay) readUDP() {
 	defer sleeve.conn.Close()
 	dec := NewEthernetDecoder()
@@ -514,12 +523,7 @@ func (fwd *sleeveForwarder) ControlMessage(msg []byte) {
 }
 
 func (fwd *sleeveForwarder) Stop() {
-	sleeve := fwd.sleeve
-	sleeve.lock.Lock()
-	if sleeve.forwarders[fwd.remotePeer.Name] == fwd {
-		delete(sleeve.forwarders, fwd.remotePeer.Name)
-	}
-	sleeve.lock.Unlock()
+	fwd.sleeve.removeForwarder(fwd.remotePeer.Name, fwd)
 	fwd.SetListener(nil)
 
 	// Tell the forwarder goroutine to finish.  We don't need to
