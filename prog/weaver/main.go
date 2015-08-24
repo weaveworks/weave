@@ -55,11 +55,13 @@ func main() {
 		peerCount          int
 		apiPath            string
 		peers              []string
-		noDNS              bool
-		dnsDomain          string
-		dnsListenAddress   string
-		dnsTTL             int
-		dnsClientTimeout   time.Duration
+
+		noDNS                     bool
+		dnsDomain                 string
+		dnsListenAddress          string
+		dnsTTL                    int
+		dnsClientTimeout          time.Duration
+		dnsEffectiveListenAddress string
 	)
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
@@ -86,6 +88,7 @@ func main() {
 	mflag.StringVar(&dnsListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
 	mflag.IntVar(&dnsTTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
 	mflag.DurationVar(&dnsClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
+	mflag.StringVar(&dnsEffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -191,7 +194,8 @@ func main() {
 		}
 		ns.Start()
 		defer ns.Stop()
-		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsListenAddress, uint32(dnsTTL), dnsClientTimeout)
+		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsListenAddress,
+			dnsEffectiveListenAddress, uint32(dnsTTL), dnsClientTimeout)
 		if err != nil {
 			Log.Fatal("Unable to start dns server: ", err)
 		}
