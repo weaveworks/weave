@@ -262,11 +262,8 @@ type sleeveForwarder struct {
 	mtu       int // the mtu for this link on the overlay network
 	stackFrag bool
 
-	// dec is only used from the readUDP goroutine, enc and encDF
-	// are only used in the forwarder goroutine
-	crypto OverlayCrypto
-
 	// State only used within the forwarder goroutine
+	crypto     OverlayCrypto
 	senderDF   *udpSenderDF
 	maxPayload int
 
