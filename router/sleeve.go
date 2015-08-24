@@ -809,7 +809,8 @@ func (fwd *sleeveForwarder) handleHeartbeatAck() error {
 		return err
 	}
 
-	// Send a large frame down the DF channel in order to prompt
+	// Send a large frame down the DF channel.  An EMSGSIZE will
+	// result, which is handled in processSendError, prompting
 	// PMTU discovery to start.
 	return fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF,
 		make([]byte, PMTUDiscoverySize))
