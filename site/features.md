@@ -83,7 +83,7 @@ Instead of getting weave to allocate IP addresses automatically, it is
 also possible to specify an address and network explicitly, expressed
 in
 [CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation)
-- let's see how the first example would have looked:
+\- let's see how the first example in the README would have looked:
 
 On $HOST1:
 
