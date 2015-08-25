@@ -131,10 +131,10 @@ func (sleeve *SleeveOverlay) readUDP() {
 		if err == io.EOF {
 			return
 		} else if err != nil {
-			log.Println("ignoring UDP read error", err)
+			log.Print("ignoring UDP read error ", err)
 			continue
 		} else if n < NameSize {
-			log.Println("ignoring too short UDP packet from", sender)
+			log.Print("ignoring too short UDP packet from ", sender)
 			continue
 		}
 
@@ -167,7 +167,7 @@ func (sleeve *SleeveOverlay) readUDP() {
 			// will typically result in missed heartbeats
 			// and the connection getting shut down
 			// because of that.
-			log.Println(fwd.logPrefixFor(sender), err)
+			log.Print(fwd.logPrefixFor(sender), err)
 		}
 	}
 }
@@ -348,7 +348,7 @@ func (fwd *sleeveForwarder) logPrefix() string {
 }
 
 func (fwd *sleeveForwarder) SetListener(listener OverlayForwarderListener) {
-	log.Debug(fwd.logPrefix(), "SetListener", listener)
+	log.Debug(fwd.logPrefix(), "SetListener ", listener)
 
 	fwd.lock.Lock()
 	fwd.listener = listener
@@ -373,7 +373,7 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 	fwd.lock.RUnlock()
 
 	if !haveContact {
-		log.Println(fwd.logPrefix(),
+		log.Print(fwd.logPrefix(),
 			"Cannot forward frame yet - awaiting contact")
 		return nil
 	}
@@ -602,7 +602,7 @@ func (fwd *sleeveForwarder) aggregateAndSend(frame aggregatorFrame,
 	for {
 		// Adding the first frame to an empty buffer
 		if !fits(frame, enc, limit) {
-			log.Println(fwd.logPrefix(), "Dropping too big frame during forwarding: frame len", len(frame.frame), ", limit ", limit)
+			log.Print(fwd.logPrefix(), "Dropping too big frame during forwarding: frame len ", len(frame.frame), ", limit ", limit)
 			return nil
 		}
 
@@ -682,7 +682,7 @@ const (
 
 func (fwd *sleeveForwarder) handleControlMsg(msg []byte) error {
 	if len(msg) == 0 {
-		log.Println(fwd.logPrefix(),
+		log.Print(fwd.logPrefix(),
 			"Received zero-length control message")
 		return nil
 	}
@@ -698,8 +698,8 @@ func (fwd *sleeveForwarder) handleControlMsg(msg []byte) error {
 		return fwd.handleMTUTestAck(msg)
 
 	default:
-		log.Println(fwd.logPrefix(),
-			"Ignoring unknown control message:", msg[0])
+		log.Print(fwd.logPrefix(),
+			"Ignoring unknown control message: ", msg[0])
 		return nil
 	}
 }
@@ -758,8 +758,8 @@ func (fwd *sleeveForwarder) handleHeartbeat(special specialFrame) error {
 			}
 		}
 	} else if !udpAddrsEqual(fwd.remoteAddr, special.sender) {
-		log.Println(fwd.logPrefix(),
-			"Peer UDP address changed to", special.sender)
+		log.Print(fwd.logPrefix(),
+			"Peer UDP address changed to ", special.sender)
 		fwd.setRemoteAddr(special.sender)
 	}
 
@@ -862,7 +862,7 @@ func (fwd *sleeveForwarder) processSendError(err error) error {
 
 func (fwd *sleeveForwarder) sendMTUTest() error {
 	log.Debug(fwd.logPrefix(),
-		"sendMTUTest: mtu candidate", fwd.mtuCandidate)
+		"sendMTUTest: mtu candidate ", fwd.mtuCandidate)
 	err := fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF,
 		make([]byte, fwd.mtuCandidate+EthernetOverhead))
 	if err != nil {
@@ -884,13 +884,13 @@ func (fwd *sleeveForwarder) handleMTUTest(frame []byte) error {
 
 func (fwd *sleeveForwarder) handleMTUTestAck(msg []byte) error {
 	if len(msg) < 3 {
-		log.Println(fwd.logPrefix(), "Received truncated MTUTestAck")
+		log.Print(fwd.logPrefix(), "Received truncated MTUTestAck")
 		return nil
 	}
 
 	mtu := int(binary.BigEndian.Uint16(msg[1:]))
 	log.Debug(fwd.logPrefix(),
-		"handleMTUTestAck: for mtu candidate", mtu)
+		"handleMTUTestAck: for mtu candidate ", mtu)
 	if mtu != fwd.mtuCandidate {
 		return nil
 	}
@@ -910,12 +910,11 @@ func (fwd *sleeveForwarder) handleMTUTestFailure() error {
 }
 
 func (fwd *sleeveForwarder) searchMTU() error {
-	log.Debug(fwd.logPrefix(), "searchMTU:", fwd.mtuHighestGood,
+	log.Debug(fwd.logPrefix(), "searchMTU: ", fwd.mtuHighestGood,
 		fwd.mtuLowestBad)
 	if fwd.mtuHighestGood+1 >= fwd.mtuLowestBad {
 		mtu := fwd.mtuHighestGood
-		log.Println(fwd.logPrefix(),
-			"Effective MTU verified at", mtu)
+		log.Print(fwd.logPrefix(), "Effective MTU verified at ", mtu)
 
 		if fwd.mtuTestTimeout != nil {
 			fwd.mtuTestTimeout.Stop()
@@ -1019,8 +1018,8 @@ func (sender *udpSenderDF) send(msg []byte, raddr *net.UDPAddr) error {
 	}
 	defer f.Close()
 
-	log.Println("EMSGSIZE on send, expecting PMTU update (IP packet was",
-		len(packet), "bytes, payload was", len(msg), "bytes)")
+	log.Print("EMSGSIZE on send, expecting PMTU update (IP packet was ",
+		len(packet), " bytes, payload was ", len(msg), " bytes)")
 	pmtu, err := syscall.GetsockoptInt(int(f.Fd()), syscall.IPPROTO_IP,
 		syscall.IP_MTU)
 	if err != nil {
