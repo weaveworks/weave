@@ -246,7 +246,7 @@ func (sleeve *SleeveOverlay) sendToConsumer(srcPeer, dstPeer *Peer,
 		PacketKey: dec.PacketKey(),
 	})
 	if fop != nil {
-		fop.Send(frame, dec, false)
+		fop.Process(frame, dec, false)
 	}
 }
 
@@ -410,7 +410,7 @@ func (fwd *sleeveForwarder) Forward(key ForwardPacketKey) FlowOp {
 	return curriedForward{fwd, key}
 }
 
-func (f curriedForward) Send(frame []byte, dec *EthernetDecoder,
+func (f curriedForward) Process(frame []byte, dec *EthernetDecoder,
 	broadcast bool) {
 	fwd := f.fwd
 	fwd.lock.RLock()

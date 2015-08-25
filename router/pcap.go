@@ -110,7 +110,7 @@ func (p *Pcap) InjectPacket(PacketKey) FlowOp {
 	return p
 }
 
-func (p *Pcap) Send(frame []byte, dec *EthernetDecoder, broadcast bool) {
+func (p *Pcap) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	checkWarn(p.writeHandle.WritePacketData(frame))
@@ -140,7 +140,7 @@ func (p *Pcap) sniff(readHandle *pcap.Handle, consumer BridgeConsumer) {
 			pktCopy := make([]byte, pktLen, pktLen)
 			copy(pktCopy, pkt)
 
-			fop.Send(pktCopy, dec, false)
+			fop.Process(pktCopy, dec, false)
 		}
 	}
 }

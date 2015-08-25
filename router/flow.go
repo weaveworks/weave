@@ -26,7 +26,7 @@ type FlowOp interface {
 	// thread, which has already been used to decode the frame.
 	// The broadcast parameter is a hint whether the packet is
 	// being broadcast.
-	Send(frame []byte, dec *EthernetDecoder, broadcast bool)
+	Process(frame []byte, dec *EthernetDecoder, broadcast bool)
 }
 
 type MultiFlowOp struct {
@@ -42,9 +42,9 @@ func (mfop *MultiFlowOp) Add(ops ...FlowOp) {
 	mfop.ops = append(mfop.ops, ops...)
 }
 
-func (mfop *MultiFlowOp) Send(frame []byte, dec *EthernetDecoder,
+func (mfop *MultiFlowOp) Process(frame []byte, dec *EthernetDecoder,
 	broadcast bool) {
 	for _, op := range mfop.ops {
-		op.Send(frame, dec, mfop.broadcast)
+		op.Process(frame, dec, mfop.broadcast)
 	}
 }
