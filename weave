@@ -685,6 +685,10 @@ setup_router_iface_bridge() {
         echo "Perhaps you are running the docker daemon with container networking disabled (-b=none)." >&2
         return 1
     fi
+    # No-op if already attached
+    if netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
+        return 0
+    fi
     connect_container_to_bridge $CONTAINER_IFNAME &&
         netnsenter ethtool -K eth0 tx off >/dev/null &&
         netnsenter ip link set $CONTAINER_IFNAME up
@@ -1467,6 +1471,17 @@ launch_router() {
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         ${NETHOST_OPT:+$DNS_ROUTER_OPTS} $NO_DNS_OPT \
         --docker-api "unix:///var/run/docker.sock" "$@")
+}
+
+# Recreate the parameter values that are set when the router is first launched
+fetch_router_args() {
+    IPRANGE=$(docker inspect -f '{{.Args}}' $1 | grep -o -e '-ipalloc-range [^ ]*')
+    # This doesn't get back the right syntax, but it's enough for our purposes
+    DNS_PORT_MAPPING=$(docker inspect -f '{{with index .HostConfig.PortBindings "53/udp"}}{{.}}{{end}}' $1)
+}
+
+attach_router() {
+    ROUTER_CONTAINER=$1
     with_container_netns_or_die $ROUTER_CONTAINER setup_router_iface_$BRIDGE_TYPE
     err_msg=$(death_msg $CONTAINER_NAME)
     container_ip $CONTAINER_NAME "$err_msg" "$err_msg" || return 1
@@ -1643,13 +1658,23 @@ case "$COMMAND" in
         check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
+        attach_router $CONTAINER_NAME
         launch_proxy  $COMMON_ARGS
         ;;
     launch-router)
         deprecation_warnings "$@"
         check_not_running $CONTAINER_NAME $BASE_IMAGE
         launch_router "$@"
+        attach_router $CONTAINER_NAME
         echo $ROUTER_CONTAINER
+        ;;
+    attach-router)
+        deprecation_warnings "$@"
+        check_running $CONTAINER_NAME
+        enforce_docker_bridge_addr_assign_type
+        create_bridge
+        fetch_router_args $CONTAINER_NAME
+        attach_router $CONTAINER_NAME
         ;;
     launch-proxy)
         deprecation_warnings "$@"
