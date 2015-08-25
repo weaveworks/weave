@@ -3,6 +3,9 @@
 
 . ./config.sh
 
+# pin the version to avoid being blind-sided by incompatible changes
+DOCKER_PY=weaveworks/docker-py:pinned
+
 docker_py_test() {
     SHARD=$1
     TOTAL_SHARDS=$2
@@ -10,13 +13,13 @@ docker_py_test() {
     start_suite "Run docker-py test suite against the proxy"
 
     # Get a list of the tests for use to shard
-    docker_on $HOST1 pull joffrey/docker-py >/dev/null
+    docker_on $HOST1 pull $DOCKER_PY >/dev/null
     C=$(docker_on $HOST1 create \
         -e NOT_ON_HOST=true \
         -e DOCKER_HOST=tcp://172.17.42.1:12375 \
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        joffrey/docker-py)
+        $DOCKER_PY)
     CANDIDATES=$(docker_on $HOST1 cp $C:/home/docker-py/tests/integration_test.py - | sed -En 's/^class (Test[[:alpha:]]+).*/\1/p')
 
     i=0
@@ -35,7 +38,7 @@ docker_py_test() {
         -e DOCKER_HOST=tcp://172.17.42.1:12375 \
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        joffrey/docker-py python tests/integration_test.py $TESTS ; then
+        $DOCKER_PY python tests/integration_test.py $TESTS ; then
         assert_raises "true"
     else
         assert_raises "false"
