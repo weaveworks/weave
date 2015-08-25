@@ -390,7 +390,7 @@ func (fwd *sleeveForwarder) SetListener(listener OverlayForwarderListener) {
 }
 
 func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
-	dec *EthernetDecoder) error {
+	dec *EthernetDecoder, broadcast bool) {
 	fwd.lock.RLock()
 	haveContact := (fwd.remoteAddr != nil)
 	mtu := fwd.mtu
@@ -400,7 +400,7 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 	if !haveContact {
 		log.Print(fwd.logPrefix(),
 			"Cannot forward frame yet - awaiting contact")
-		return nil
+		return
 	}
 
 	srcName := src.NameByte
@@ -417,34 +417,57 @@ func (fwd *sleeveForwarder) Forward(src *Peer, dst *Peer, frame []byte,
 	// multiple times. So it's better to drop things at the beginning
 	// of our pipeline.
 	if dec.DF() {
-		if frameTooBig(frame, mtu) {
-			return FrameTooBigError{EPMTU: mtu}
+		if !frameTooBig(frame, mtu) {
+			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName,
+				frame)
+			return
 		}
 
-		fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName, frame)
-		return nil
+		// Why do we need an explicit broadcast hint here,
+		// rather than just checking the frame for a broadcast
+		// destination MAC address?  Because even
+		// non-broadcast frames can be broadcast, if the
+		// destination MAC was not in our MAC cache.
+		if broadcast {
+			log.Print(fwd.logPrefix(), "dropping too big DF broadcast frame (", dec.IP.DstIP, " -> ", dec.IP.SrcIP, "): MTU=", mtu)
+			return
+		}
+
+		// Send an ICMP back to where the frame came from
+		fragNeededPacket, err := dec.makeICMPFragNeeded(mtu)
+		if err != nil {
+			log.Print(fwd.logPrefix(), err)
+			return
+		}
+
+		dec.DecodeLayers(fragNeededPacket)
+
+		// The frag-needed packet does not have DF set, so the
+		// potential recursion here is bounded.
+		fwd.sleeve.consumer(dst, src, fragNeededPacket, dec)
+		return
 	}
 
-	if stackFrag || dec == nil || len(dec.decoded) < 2 {
+	if stackFrag || len(dec.decoded) < 2 {
 		fwd.aggregate(fwd.aggregatorChan, srcName, dstName, frame)
-		return nil
+		return
 	}
 
 	// Don't have trustworthy stack, so we're going to have to
 	// send it DF in any case.
 	if !frameTooBig(frame, mtu) {
 		fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName, frame)
-		return nil
+		return
 	}
 
 	// We can't trust the stack to fragment, we have IP, and we
 	// have a frame that's too big for the MTU, so we have to
 	// fragment it ourself.
-	return fragment(dec.Eth, dec.IP, mtu,
+	checkWarn(fragment(dec.Eth, dec.IP, mtu,
 		func(segFrame []byte) {
 			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName,
 				segFrame)
-		})
+		}))
 }
 
 func (fwd *sleeveForwarder) aggregate(ch chan<- aggregatorFrame, src []byte,
@@ -453,14 +476,6 @@ func (fwd *sleeveForwarder) aggregate(ch chan<- aggregatorFrame, src []byte,
 	case ch <- aggregatorFrame{src, dst, frame}:
 	case <-fwd.finishedChan:
 	}
-}
-
-type FrameTooBigError struct {
-	EPMTU int // effective pmtu, i.e. what we tell packet senders
-}
-
-func (ftbe FrameTooBigError) Error() string {
-	return fmt.Sprint("Frame too big error. Effective PMTU is ", ftbe.EPMTU)
 }
 
 func fragment(eth layers.Ethernet, ip layers.IPv4, mtu int,

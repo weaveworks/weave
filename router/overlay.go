@@ -61,7 +61,8 @@ type OverlayForwarder interface {
 	// Forward a packet across the connection.  The caller must
 	// supply an EthernetDecoder specific to this thread, which
 	// has already been used to decode the frame.
-	Forward(src *Peer, dest *Peer, frame []byte, dec *EthernetDecoder) error
+	Forward(src *Peer, dest *Peer, frame []byte, dec *EthernetDecoder,
+		broadcast bool)
 
 	Stop()
 
@@ -87,8 +88,8 @@ func (NullOverlay) MakeForwarder(ForwarderParams) (OverlayForwarder, error) {
 func (NullOverlay) SetListener(OverlayForwarderListener) {
 }
 
-func (NullOverlay) Forward(*Peer, *Peer, []byte, *EthernetDecoder) error {
-	return nil
+func (NullOverlay) Forward(*Peer, *Peer, []byte, *EthernetDecoder,
+	bool) {
 }
 
 func (NullOverlay) Stop() {

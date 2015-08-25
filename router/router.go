@@ -138,11 +138,7 @@ func (router *Router) handleCapturedPacket(frameData []byte, dec *EthernetDecode
 		return
 	}
 
-	err := router.Ourself.Forward(dstPeer, frameCopy, dec)
-	if ftbe, ok := err.(FrameTooBigError); ok {
-		err = dec.sendICMPFragNeeded(ftbe.EPMTU, router.Bridge.InjectPacket)
-	}
-	checkWarn(err)
+	router.Ourself.Forward(dstPeer, frameCopy, dec)
 }
 
 func (router *Router) listenTCP(localPort int) {
@@ -179,14 +175,7 @@ func (router *Router) handleForwardedPacket(srcPeer *Peer, dstPeer *Peer,
 	if dstPeer != router.Ourself.Peer {
 		// it's not for us, we're just relaying it
 		router.LogFrame("Relaying", frame, dec)
-		err := router.Ourself.Relay(srcPeer, dstPeer, frame, dec)
-		if ftbe, ok := err.(FrameTooBigError); ok {
-			err = dec.sendICMPFragNeeded(ftbe.EPMTU, func(icmpFrame []byte) error {
-				return router.Ourself.Forward(srcPeer, icmpFrame, nil)
-			})
-		}
-
-		checkWarn(err)
+		router.Ourself.Relay(srcPeer, dstPeer, frame, dec)
 		return
 	}
 
