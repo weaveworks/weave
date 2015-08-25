@@ -105,7 +105,8 @@ func NewProxy(c Config) (*Proxy, error) {
 func (proxy *Proxy) AttachExistingContainers() {
 	containers, _ := proxy.client.ListContainers(docker.ListContainersOptions{})
 	for _, cont := range containers {
-		if strings.HasPrefix(cont.Command, weaveWaitEntrypoint[0]) {
+		if strings.HasPrefix(cont.Command, weaveWaitEntrypoint[0]) ||
+			strings.HasPrefix(cont.Command, "/home/weave/weaver") {
 			proxy.ContainerStarted(cont.ID)
 		}
 	}
@@ -257,12 +258,18 @@ func (proxy *Proxy) ContainerStarted(ident string) {
 	// If this was a container we modified the entrypoint for, attach it to the network
 	if containerShouldAttach(container) {
 		proxy.attach(container)
+	} else if containerIsWeaveRouter(container) {
+		proxy.attachRouter(container)
 	}
 	proxy.notifyWaiters(container.ID)
 }
 
 func containerShouldAttach(container *docker.Container) bool {
 	return len(container.Config.Entrypoint) > 0 && container.Config.Entrypoint[0] == weaveWaitEntrypoint[0]
+}
+
+func containerIsWeaveRouter(container *docker.Container) bool {
+	return strings.HasPrefix(container.Config.Image, "weaveworks/weave")
 }
 
 func (proxy *Proxy) createWait(r *http.Request, ident string) {
@@ -326,6 +333,18 @@ func (proxy *Proxy) attach(container *docker.Container) error {
 		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
 	}
 
+	return nil
+}
+
+func (proxy *Proxy) attachRouter(container *docker.Container) error {
+	Log.Infof("Attaching weave router container")
+	args := []string{"attach-router"}
+	if _, stderr, err := callWeave(args...); err != nil {
+		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
+		return errors.New(string(stderr))
+	} else if len(stderr) > 0 {
+		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
+	}
 	return nil
 }
 

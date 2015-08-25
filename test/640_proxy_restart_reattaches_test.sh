@@ -13,11 +13,16 @@ check_attached() {
 
 start_suite "Proxy restart reattaches networking to containers"
 
-weave_on $HOST1 launch
+WEAVE_DOCKER_ARGS=--restart=always WEAVEPROXY_DOCKER_ARGS=--restart=always weave_on $HOST1 launch
 proxy_start_container          $HOST1 -e WEAVE_CIDR=$C2/24 -di --name=c2 --restart=always -h $NAME
 proxy_start_container_with_dns $HOST1 -e WEAVE_CIDR=$C1/24 -di --name=c1 --restart=always
 
 proxy docker_on $HOST1 restart -t=1 c2
+check_attached
+
+# Restart weave router
+docker_on $HOST1 restart weave
+sleep 1
 check_attached
 
 # Kill outside of Docker so Docker will restart it
@@ -28,7 +33,6 @@ check_attached
 # Restart docker itself, using different commands for systemd- and upstart-managed.
 run_on $HOST1 sh -c "command -v systemctl >/dev/null && sudo systemctl restart docker || sudo service docker restart"
 sleep 1
-weave_on $HOST1 launch
 check_attached
 
 end_suite
