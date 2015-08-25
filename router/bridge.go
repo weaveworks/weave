@@ -5,7 +5,8 @@ type Bridge interface {
 	// Inject a packet to be delivered locally
 	InjectPacket(PacketKey) FlowOp
 
-	// Start consuming packets from the bridge
+	// Start consuming packets from the bridge.  Injected packets
+	// should not be included.
 	StartConsumingPackets(BridgeConsumer) error
 
 	String() string
