@@ -167,9 +167,9 @@ container_ip() {
 
 # assert_dns_record <host> <container> <name> [<ip> ...]
 assert_dns_record() {
-    host=$1
-    container=$2
-    name=$3
+    local host=$1
+    local container=$2
+    local name=$3
     shift 3
     exp_ips_regex=$(echo "$@" | sed -e 's/ /\\\|/g')
 
