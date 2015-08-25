@@ -38,8 +38,18 @@ type DNSServer struct {
 	udpClient *dns.Client
 }
 
-func NewDNSServer(ns *Nameserver, domain string, address string, ttl uint32, clientTimeout time.Duration) (*DNSServer, error) {
+func filter(ss []string, s string) []string {
+	for i := 0; i < len(ss); {
+		if ss[i] == s {
+			ss = append(ss[:i], ss[i+1:]...)
+			continue
+		}
+		i++
+	}
+	return ss
+}
 
+func NewDNSServer(ns *Nameserver, domain, address, effectiveAddress string, ttl uint32, clientTimeout time.Duration) (*DNSServer, error) {
 	s := &DNSServer{
 		ns:        ns,
 		domain:    dns.Fqdn(domain),
@@ -51,6 +61,9 @@ func NewDNSServer(ns *Nameserver, domain string, address string, ttl uint32, cli
 	var err error
 	if s.upstream, err = dns.ClientConfigFromFile(etcResolvConf); err != nil {
 		return nil, err
+	}
+	if s.upstream != nil {
+		s.upstream.Servers = filter(s.upstream.Servers, effectiveAddress)
 	}
 
 	err = s.listen(address)
