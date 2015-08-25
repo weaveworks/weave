@@ -19,6 +19,31 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
+// This diagram explains the various arithmetic and variables related
+// to packet offsets and lengths below:
+//
+// +----+-----+--------+--------+----------+--------------------------+
+// | IP | UDP | Sleeve | Sleeve | Overlay  | Overlay Layer 3 Payload  |
+// |    |     | Packet | Frame  | Ethernet |                          |
+// |    |     | Header | Header |          |                          |
+// +----+-----+--------+--------+----------+--------------------------+
+//
+// <------------------------------------ msgTooBigError.underlayPMTU ->
+//
+//            <-------------------------- sleeveForwarder.maxPayload ->
+//
+// <---------->                                             UDPOverhead
+//
+//            <-------->                       Encryptor.PacketOverhead
+//
+//                     <-------->               Encryptor.FrameOverhead
+//
+//                              <---------->           EthernetOverhead
+//
+// <---------------------------------------> sleeveForwarder.overheadDF
+//
+// sleeveForwarder.mtu                     <-------------------------->
+
 const (
 	EthernetOverhead    = 14
 	UDPOverhead         = 28 // 20 bytes for IPv4, 8 bytes for UDP
