@@ -103,17 +103,18 @@ func (router *Router) UsingPassword() bool {
 func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
 	router.PacketLogging.LogPacket("Captured", key)
 	srcMac := net.HardwareAddr(key.SrcMAC[:])
-	srcPeer := router.Macs.Lookup(srcMac)
 
-	// We need to filter out frames we injected ourselves. For such
-	// frames, the srcMAC will have been recorded as associated with a
-	// different peer.
-	if srcPeer != nil && srcPeer != router.Ourself.Peer {
-		return nil
-	}
-
-	if router.Macs.Enter(srcMac, router.Ourself.Peer) {
+	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, router.Ourself.Peer); {
+	case newSrcMac:
 		log.Println("Discovered local MAC", srcMac)
+
+	case conflictPeer != nil:
+		// The MAC cache has an entry for the source MAC
+		// associated with another peer.  This probably means
+		// we are seeing a frame we injected ourself.  That
+		// shouldn't happen, but discard it just in case.
+		log.Errorln("Captured frame from MAC (", srcMac, ") associated with another peer", conflictPeer)
+		return nil
 	}
 
 	// Discard STP broadcasts
@@ -183,7 +184,7 @@ func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
 
 	srcMac := net.HardwareAddr(key.SrcMAC[:])
 	dstMac := net.HardwareAddr(key.DstMAC[:])
-	if router.Macs.Enter(srcMac, key.SrcPeer) {
+	if router.Macs.AddForced(srcMac, key.SrcPeer) {
 		log.Println("Discovered remote MAC", srcMac, "at", key.SrcPeer)
 	}
 
