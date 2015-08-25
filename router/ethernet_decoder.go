@@ -29,7 +29,7 @@ func (dec *EthernetDecoder) DecodeLayers(data []byte) {
 	dec.parser.DecodeLayers(data, &dec.decoded)
 }
 
-func (dec *EthernetDecoder) sendICMPFragNeeded(mtu int, sendFrame func([]byte) error) error {
+func (dec *EthernetDecoder) makeICMPFragNeeded(mtu int) ([]byte, error) {
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths:       true,
@@ -57,11 +57,11 @@ func (dec *EthernetDecoder) sendICMPFragNeeded(mtu int, sendFrame func([]byte) e
 			Seq:      uint16(mtu)},
 		&payload)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU= %v", dec.IP.DstIP, dec.IP.SrcIP, mtu)
-	return sendFrame(buf.Bytes())
+	return buf.Bytes(), nil
 }
 
 var (
