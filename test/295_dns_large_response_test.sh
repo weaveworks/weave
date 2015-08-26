@@ -19,7 +19,7 @@ weave_on $HOST1 dns-add $IPS $CID -h $NAME
 assert_raises "exec_on $HOST1 c0 dig MX $NAME | grep -q 'status: NXDOMAIN'"
 
 check() {
-    assert "exec_on $HOST1 c0 dig +short $@ $NAME A | grep -v ';;' | wc -l" $N
+    assert "exec_on $HOST1 c0 dig +short $* $NAME A | grep -v ';;' | wc -l" $N
 }
 
 check
