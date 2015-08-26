@@ -65,7 +65,7 @@ func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname st
 		universe:  universe,
 		ring:      ring.New(universe.Start, universe.End, ourName),
 		owned:     make(map[string][]address.Address),
-		paxos:     paxos.NewNode(ourName, ourUID, quorum),
+		paxos:     paxos.NewNode(ourName, ourUID, quorum, paxos.KnownPeerNames),
 		nicknames: map[router.PeerName]string{ourName: ourNickname},
 		now:       time.Now,
 	}
@@ -492,7 +492,7 @@ func (alloc *Allocator) establishRing() {
 	if ok, cons := alloc.paxos.Consensus(); ok {
 		// If the quorum was 1, then proposing immediately
 		// leads to consensus
-		alloc.createRing(cons.Value)
+		alloc.createRing(cons.Value.([]router.PeerName))
 	} else {
 		// re-try until we get consensus
 		alloc.paxosTicker = time.NewTicker(paxosInterval)
@@ -626,7 +626,7 @@ func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 				}
 
 				if ok, cons := alloc.paxos.Consensus(); ok {
-					alloc.createRing(cons.Value)
+					alloc.createRing(cons.Value.([]router.PeerName))
 				}
 			}
 		} else if sender != router.UnknownPeerName {
@@ -718,6 +718,10 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 		}
 	}
 	return ""
+}
+
+func init() {
+	gob.Register([]router.PeerName{})
 }
 
 // Logging

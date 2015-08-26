@@ -38,8 +38,8 @@ func (a ProposalID) valid() bool {
 	return a.Round > 0
 }
 
-// For seeding IPAM, the value we want consensus on is a set of peer names
-type Value []router.PeerName
+// Some value that we are trying to achieve consensus on
+type Value interface{}
 
 // An AcceptedValue is a Value plus the proposal which originated that
 // Value.  The origin is not essential, but makes comparing
@@ -67,16 +67,18 @@ func (a NodeClaims) equals(b NodeClaims) bool {
 type GossipState map[NodeID]NodeClaims
 
 type Node struct {
-	id     NodeID
-	quorum uint
-	knows  GossipState
+	id        NodeID
+	quorum    uint
+	knows     GossipState
+	pickValue func(*Node) Value
 }
 
-func NewNode(name router.PeerName, uid router.PeerUID, quorum uint) *Node {
+func NewNode(name router.PeerName, uid router.PeerUID, quorum uint, pickValue func(*Node) Value) *Node {
 	return &Node{
-		id:     NodeID{name, uid},
-		quorum: quorum,
-		knows:  map[NodeID]NodeClaims{},
+		id:        NodeID{name, uid},
+		quorum:    quorum,
+		knows:     map[NodeID]NodeClaims{},
+		pickValue: pickValue,
 	}
 }
 
@@ -189,7 +191,7 @@ func (node *Node) Think() bool {
 
 		if count >= node.quorum {
 			if !accepted.valid() {
-				acceptedVal.Value = node.pickValue()
+				acceptedVal.Value = node.pickValue(node)
 				acceptedVal.Origin = ourClaims.Promise
 			}
 
@@ -222,7 +224,7 @@ func (node *Node) Think() bool {
 // When we get to pick a value, we use the set of peer names we know
 // about.  This is not necessarily all peer names, but it is at least
 // a quorum, and so good enough for seeding the ring.
-func (node *Node) pickValue() Value {
+func KnownPeerNames(node *Node) Value {
 	val := make([]router.PeerName, len(node.knows))
 	i := 0
 	for id := range node.knows {

@@ -98,7 +98,7 @@ func makeRandomModel(params *TestParams, r *rand.Rand, t *testing.T) *Model {
 
 	for i := range m.nodes {
 		m.nodes[i].Node = NewNode(router.PeerName(i/2+1),
-			router.PeerUID(r.Int63()), m.quorum)
+			router.PeerUID(r.Int63()), m.quorum, KnownPeerNames)
 		m.nodes[i].Propose()
 	}
 
@@ -173,7 +173,7 @@ func (m *Model) isolateNode(node *TestNode) {
 // Restart a node
 func (m *Model) restart(node *TestNode) {
 	node.Node = NewNode(router.PeerName(m.nextID),
-		router.PeerUID(m.r.Int63()), m.quorum)
+		router.PeerUID(m.r.Int63()), m.quorum, KnownPeerNames)
 	m.nextID++
 	node.Propose()
 
