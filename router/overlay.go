@@ -57,15 +57,24 @@ type OverlayCrypto struct {
 
 // All of the machinery to forward packets to a particular peer
 type OverlayForwarder interface {
-	// Register a callback for forwarder state changes.
-	// side-effect, calling this confirms that the connection is
-	// really wanted, and so the provider should activate it.
-	// However, Forward might be called before this is called
-	// (e.g. on another thread).
-	SetListener(OverlayForwarderListener)
-
-	// Forward a packet across the connection.
+	// Forward a packet across the connection.  May be called as
+	// soon as the forwarder is created, in particular before
+	// Confirm().
 	Forward(ForwardPacketKey) FlowOp
+
+	// Confirm that the connection is really wanted, and so the
+	// Overlay should begin heartbeats etc. to verify the
+	// operation of the forwarder.
+	Confirm()
+
+	// A channel indicating that the forwarder is established,
+	// i.e. its operation has been confirmed.
+	EstablishedChannel() <-chan struct{}
+
+	// A channel indicating an error from the forwarder.  The
+	// forwarder is not expected to be operational after the first
+	// error, so the channel only needs to buffer a single error.
+	ErrorChannel() <-chan error
 
 	Stop()
 
@@ -73,11 +82,6 @@ type OverlayForwarder interface {
 	// compatibility, and should always be
 	// ProtocolOverlayControlMessage for non-sleeve overlays.
 	ControlMessage(tag ProtocolTag, msg []byte)
-}
-
-type OverlayForwarderListener interface {
-	Established()
-	Error(error)
 }
 
 type NullOverlay struct{}
@@ -96,7 +100,15 @@ func (NullOverlay) InvalidateRoutes() {
 func (NullOverlay) InvalidateShortIDs() {
 }
 
-func (NullOverlay) SetListener(OverlayForwarderListener) {
+func (NullOverlay) Confirm() {
+}
+
+func (NullOverlay) EstablishedChannel() <-chan struct{} {
+	return nil
+}
+
+func (NullOverlay) ErrorChannel() <-chan error {
+	return nil
 }
 
 func (NullOverlay) Forward(ForwardPacketKey) FlowOp {

@@ -115,8 +115,6 @@ func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
 }
 
 func (conn *LocalConnection) Established() bool {
-	conn.RLock()
-	defer conn.RUnlock()
 	return conn.established
 }
 
@@ -214,17 +212,16 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	}
 	conn.Router.ConnectionMaker.ConnectionCreated(conn)
 
-	// SetListener has the side-effect of telling the forwarder
-	// that the connection is confirmed.  This comes after
-	// AddConnection, because only after that completes do we know
-	// the connection is valid: in particular that it is not a
-	// duplicate connection to the same peer. Sending heartbeats
-	// on a duplicate connection can trip up crypto at the other
-	// end, since the associated UDP packets may get decoded by
-	// the other connection. It is also generally wasteful to
-	// engage in any interaction with the remote on a connection
-	// that turns out to be invalid.
-	conn.forwarder.SetListener(ConnectionAsForwarderListener{conn})
+	// Forwarder confirmation comes after AddConnection, because
+	// only after that completes do we know the connection is
+	// valid: in particular that it is not a duplicate connection
+	// to the same peer. Sending heartbeats on a duplicate
+	// connection can trip up crypto at the other end, since the
+	// associated UDP packets may get decoded by the other
+	// connection. It is also generally wasteful to engage in any
+	// interaction with the remote on a connection that turns out
+	// to be invalid.
+	conn.forwarder.Confirm()
 
 	// receiveTCP must follow also AddConnection. In the absence
 	// of any indirect connectivity to the remote peer, the first
@@ -335,12 +332,23 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 }
 
 func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
+	fwdErrorChan := conn.forwarder.ErrorChannel()
+	fwdEstablishedChan := conn.forwarder.EstablishedChannel()
+
 	for err == nil {
 		select {
 		case action := <-actionChan:
 			err = action()
+
 		case <-conn.heartbeatTCP.C:
 			err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
+
+		case <-fwdEstablishedChan:
+			conn.established = true
+			fwdEstablishedChan = nil
+			conn.Router.Ourself.ConnectionEstablished(conn)
+
+		case err = <-fwdErrorChan:
 		}
 	}
 	return
@@ -386,25 +394,6 @@ func (conn *LocalConnection) forwarderCrypto() *OverlayCrypto {
 
 func (conn *LocalConnection) sendOverlayControlMessage(tag ProtocolTag, msg []byte) error {
 	return conn.sendProtocolMsg(ProtocolMsg{tag, msg})
-}
-
-type ConnectionAsForwarderListener struct{ conn *LocalConnection }
-
-func (l ConnectionAsForwarderListener) Established() {
-	l.conn.sendAction(func() error {
-		old := l.conn.established
-		l.conn.Lock()
-		l.conn.established = true
-		l.conn.Unlock()
-		if !old {
-			l.conn.Router.Ourself.ConnectionEstablished(l.conn)
-		}
-		return nil
-	})
-}
-
-func (l ConnectionAsForwarderListener) Error(err error) {
-	l.conn.sendAction(func() error { return err })
 }
 
 // Helpers
