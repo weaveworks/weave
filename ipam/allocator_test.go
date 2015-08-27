@@ -71,6 +71,21 @@ func TestAllocFree(t *testing.T) {
 	require.Equal(t, address.Offset(spaceSize), alloc.NumFreeAddresses(subnet))
 }
 
+func TestAllocateSubnet(t *testing.T) {
+	const (
+		universe = "10.0.0.0/8"
+		name1    = "subnet1"
+		subnet1  = "10.0.0.0/16"
+	)
+
+	alloc, _ := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
+	defer alloc.Stop()
+
+	cidr1, err := alloc.AllocateSubnet(name1, 16, nil)
+	require.NoError(t, err)
+	require.Equal(t, cidr1.String(), subnet1, "subnet")
+}
+
 func TestBootstrap(t *testing.T) {
 	const (
 		donateSize     = 5

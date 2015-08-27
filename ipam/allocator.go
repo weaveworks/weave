@@ -48,14 +48,21 @@ type Allocator struct {
 	ring             *ring.Ring                   // information on ranges owned by all peers
 	space            space.Space                  // more detail on ranges owned by us
 	owned            map[string][]address.Address // who owns what addresses, indexed by container-ID
+	subnets          []subnet                     // all named subnets
 	nicknames        map[router.PeerName]string   // so we can map nicknames for rmpeer
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
 	gossip           router.Gossip                // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosTicker      *time.Ticker
+	spaxos           *paxos.Node
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
 	now              func() time.Time
+}
+
+type subnet struct {
+	name string
+	cidr address.CIDR
 }
 
 // NewAllocator creates and initialises a new Allocator
@@ -271,6 +278,16 @@ func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 		errChan <- fmt.Errorf("Free: address %s not found for %s", addrToFree, ident)
 	}
 	return <-errChan
+}
+
+// (Sync)
+func (alloc *Allocator) AllocateSubnet(name string, size int, cancelChan <-chan bool) (address.CIDR, error) {
+	resultChan := make(chan allocateSubnetResult)
+	op := &allocateSubnet{resultChan: resultChan, name: name, size: size,
+		hasBeenCancelled: hasBeenCancelled(cancelChan)}
+	alloc.doOperation(op, &alloc.pendingAllocates)
+	result := <-resultChan
+	return result.cidr, result.err
 }
 
 // Shutdown (Sync)
