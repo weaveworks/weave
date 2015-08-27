@@ -42,10 +42,6 @@ func (peer *Peer) String() string {
 	return fmt.Sprint(peer.Name, "(", peer.NickName, ")")
 }
 
-func (peer *Peer) Info() string {
-	return fmt.Sprint(peer.String(), " (v", peer.version, ") (UID ", peer.UID, ")")
-}
-
 // Calculate the routing table from this peer to all peers reachable
 // from it, returning a "next hop" map of PeerNameX -> PeerNameY,
 // which says "in order to send a message to X, the peer should send
