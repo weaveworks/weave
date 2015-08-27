@@ -292,9 +292,12 @@ type sleeveForwarder struct {
 	confirmedChan    chan<- struct{}
 	finishedChan     <-chan struct{}
 
+	// listener channels
+	establishedChan chan struct{}
+	errorChan       chan error
+
 	// Explicitly locked state
 	lock       sync.RWMutex
-	listener   OverlayForwarderListener
 	remoteAddr *net.UDPAddr
 
 	// These fields are accessed and updated independently, so no
@@ -375,6 +378,8 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		controlMsgChan:   controlMsgChan,
 		confirmedChan:    confirmedChan,
 		finishedChan:     finishedChan,
+		establishedChan:  make(chan struct{}),
+		errorChan:        make(chan error, 1),
 		remoteAddr:       params.RemoteAddr,
 		mtu:              DefaultMTU,
 		crypto:           crypto,
@@ -400,21 +405,21 @@ func (fwd *sleeveForwarder) logPrefix() string {
 	return fwd.logPrefixFor(remoteAddr)
 }
 
-func (fwd *sleeveForwarder) SetListener(listener OverlayForwarderListener) {
-	log.Debug(fwd.logPrefix(), "SetListener ", listener)
+func (fwd *sleeveForwarder) Confirm() {
+	log.Debug(fwd.logPrefix(), "Confirm")
 
-	fwd.lock.Lock()
-	fwd.listener = listener
-	fwd.lock.Unlock()
-
-	// Setting the listener confirms that the forwarder is really
-	// wanted
-	if listener != nil {
-		select {
-		case fwd.confirmedChan <- struct{}{}:
-		case <-fwd.finishedChan:
-		}
+	select {
+	case fwd.confirmedChan <- struct{}{}:
+	case <-fwd.finishedChan:
 	}
+}
+
+func (fwd *sleeveForwarder) EstablishedChannel() <-chan struct{} {
+	return fwd.establishedChan
+}
+
+func (fwd *sleeveForwarder) ErrorChannel() <-chan error {
+	return fwd.errorChan
 }
 
 type curriedForward struct {
@@ -590,7 +595,6 @@ func (fwd *sleeveForwarder) ControlMessage(tag ProtocolTag, msg []byte) {
 
 func (fwd *sleeveForwarder) Stop() {
 	fwd.sleeve.removeForwarder(fwd.remotePeer.Name, fwd)
-	fwd.SetListener(nil)
 
 	// Tell the forwarder goroutine to finish.  We don't need to
 	// wait for it.
@@ -664,9 +668,9 @@ loop:
 
 	fwd.lock.RLock()
 	defer fwd.lock.RUnlock()
-	if fwd.listener != nil {
-		fwd.listener.Error(err)
-	}
+
+	// this is the only place we send an error to errorChan
+	fwd.errorChan <- err
 }
 
 func (fwd *sleeveForwarder) aggregateAndSend(frame aggregatorFrame,
@@ -857,14 +861,14 @@ func (fwd *sleeveForwarder) setRemoteAddr(addr *net.UDPAddr) {
 func (fwd *sleeveForwarder) handleHeartbeatAck() error {
 	log.Debug(fwd.logPrefix(), "handleHeartbeatAck")
 
-	// The connection is now regarded as established
-	fwd.notifyEstablished()
-
 	if fwd.heartbeatInterval != SlowHeartbeat {
 		fwd.heartbeatInterval = SlowHeartbeat
 		if fwd.heartbeatTimer != nil {
 			fwd.heartbeatTimer.Reset(fwd.heartbeatInterval)
 		}
+
+		// The connection is now regarded as established
+		close(fwd.establishedChan)
 	}
 
 	fwd.fragTestTicker = time.NewTicker(FragTestInterval)
@@ -877,14 +881,6 @@ func (fwd *sleeveForwarder) handleHeartbeatAck() error {
 	// PMTU discovery to start.
 	return fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF,
 		make([]byte, PMTUDiscoverySize))
-}
-
-func (fwd *sleeveForwarder) notifyEstablished() {
-	fwd.lock.RLock()
-	defer fwd.lock.RUnlock()
-	if fwd.listener != nil {
-		fwd.listener.Established()
-	}
 }
 
 func (fwd *sleeveForwarder) sendFragTest() error {
