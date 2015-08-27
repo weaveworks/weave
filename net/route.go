@@ -70,26 +70,46 @@ func matchRoute(ifaceName string, dest net.IP) func(m syscall.NetlinkMessage) (b
 	return func(m syscall.NetlinkMessage) (bool, error) {
 		switch m.Header.Type {
 		case syscall.RTM_NEWROUTE:
-			attrs, err := syscall.ParseNetlinkRouteAttr(&m)
+			route, err := deserializeRoute(m.Data)
 			if err != nil {
 				return true, err
 			}
-			var ip net.IP
-			var link netlink.Link
-			for _, attr := range attrs {
-				switch attr.Attr.Type {
-				case syscall.RTA_DST:
-					ip = attr.Value
-				case syscall.RTA_OIF:
-					native := nl.NativeEndian()
-					index := int(native.Uint32(attr.Value[0:4]))
-					link, _ = netlink.LinkByIndex(index)
-				}
-			}
-			if link.Attrs().Name == ifaceName && ip.Equal(dest) {
+			link, _ := netlink.LinkByIndex(route.LinkIndex)
+			if link.Attrs().Name == ifaceName && route.Dst.IP.Equal(dest) {
 				return true, nil
 			}
 		}
 		return false, nil
 	}
+}
+
+// This code proposed for addition to the vishvananda/netlink library
+// deserializeRoute decodes a binary netlink message into a Route struct
+func deserializeRoute(m []byte) (netlink.Route, error) {
+	route := netlink.Route{}
+	msg := nl.DeserializeRtMsg(m)
+	attrs, err := nl.ParseRouteAttr(m[msg.Len():])
+	if err != nil {
+		return route, err
+	}
+	route.Scope = netlink.Scope(msg.Scope)
+
+	native := nl.NativeEndian()
+	for _, attr := range attrs {
+		switch attr.Attr.Type {
+		case syscall.RTA_GATEWAY:
+			route.Gw = net.IP(attr.Value)
+		case syscall.RTA_PREFSRC:
+			route.Src = net.IP(attr.Value)
+		case syscall.RTA_DST:
+			route.Dst = &net.IPNet{
+				IP:   attr.Value,
+				Mask: net.CIDRMask(int(msg.Dst_len), 8*len(attr.Value)),
+			}
+		case syscall.RTA_OIF:
+			routeIndex := int(native.Uint32(attr.Value[0:4]))
+			route.LinkIndex = routeIndex
+		}
+	}
+	return route, nil
 }
