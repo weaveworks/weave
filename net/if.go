@@ -26,7 +26,7 @@ func ensureInterface(s *nl.NetlinkSocket, ifaceName string) (*net.Interface, err
 	if iface, err := findInterface(ifaceName); err == nil {
 		return iface, nil
 	}
-	waitForIfUp(s, ifaceName)
+	netlinkReceiveUntil(s, matchIfName(ifaceName))
 	iface, err := findInterface(ifaceName)
 	return iface, err
 }
@@ -48,7 +48,7 @@ func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
 	if CheckRouteExists(ifaceName, dest) {
 		return iface, err
 	}
-	waitForRoute(s, ifaceName, dest)
+	netlinkReceiveUntil(s, matchRoute(ifaceName, dest))
 	return iface, err
 }
 
@@ -62,30 +62,39 @@ func findInterface(ifaceName string) (iface *net.Interface, err error) {
 	return
 }
 
-func waitForIfUp(s *nl.NetlinkSocket, ifaceName string) error {
+func netlinkReceiveUntil(s *nl.NetlinkSocket, f func(syscall.NetlinkMessage) (bool, error)) error {
 	for {
 		msgs, err := s.Receive()
 		if err != nil {
 			return err
 		}
 		for _, m := range msgs {
-			switch m.Header.Type {
-			case syscall.RTM_NEWLINK: // receive this type for link 'up'
-				ifmsg := nl.DeserializeIfInfomsg(m.Data)
-				attrs, err := syscall.ParseNetlinkRouteAttr(&m)
-				if err != nil {
-					return err
-				}
-				name := ""
-				for _, attr := range attrs {
-					if attr.Attr.Type == syscall.IFA_LABEL {
-						name = string(attr.Value[:len(attr.Value)-1])
-					}
-				}
-				if ifaceName == name && ifmsg.Flags&syscall.IFF_UP != 0 {
-					return nil
-				}
+			if done, err := f(m); done {
+				return err
 			}
 		}
+	}
+}
+
+func matchIfName(ifaceName string) func(m syscall.NetlinkMessage) (bool, error) {
+	return func(m syscall.NetlinkMessage) (bool, error) {
+		switch m.Header.Type {
+		case syscall.RTM_NEWLINK: // receive this type for link 'up'
+			ifmsg := nl.DeserializeIfInfomsg(m.Data)
+			attrs, err := syscall.ParseNetlinkRouteAttr(&m)
+			if err != nil {
+				return true, err
+			}
+			name := ""
+			for _, attr := range attrs {
+				if attr.Attr.Type == syscall.IFA_LABEL {
+					name = string(attr.Value[:len(attr.Value)-1])
+				}
+			}
+			if ifaceName == name && ifmsg.Flags&syscall.IFF_UP != 0 {
+				return true, nil
+			}
+		}
+		return false, nil
 	}
 }

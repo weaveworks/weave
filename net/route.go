@@ -66,35 +66,30 @@ func CheckRouteExists(ifaceName string, dest net.IP) bool {
 	return found
 }
 
-func waitForRoute(s *nl.NetlinkSocket, ifaceName string, dest net.IP) error {
-	native := nl.NativeEndian()
-	for {
-		msgs, err := s.Receive()
-		if err != nil {
-			return err
-		}
-		for _, m := range msgs {
-			switch m.Header.Type {
-			case syscall.RTM_NEWROUTE:
-				attrs, err := syscall.ParseNetlinkRouteAttr(&m)
-				if err != nil {
-					return err
-				}
-				var ip net.IP
-				var link netlink.Link
-				for _, attr := range attrs {
-					switch attr.Attr.Type {
-					case syscall.RTA_DST:
-						ip = attr.Value
-					case syscall.RTA_OIF:
-						index := int(native.Uint32(attr.Value[0:4]))
-						link, _ = netlink.LinkByIndex(index)
-					}
-				}
-				if link.Attrs().Name == ifaceName && ip.Equal(dest) {
-					return nil
+func matchRoute(ifaceName string, dest net.IP) func(m syscall.NetlinkMessage) (bool, error) {
+	return func(m syscall.NetlinkMessage) (bool, error) {
+		switch m.Header.Type {
+		case syscall.RTM_NEWROUTE:
+			attrs, err := syscall.ParseNetlinkRouteAttr(&m)
+			if err != nil {
+				return true, err
+			}
+			var ip net.IP
+			var link netlink.Link
+			for _, attr := range attrs {
+				switch attr.Attr.Type {
+				case syscall.RTA_DST:
+					ip = attr.Value
+				case syscall.RTA_OIF:
+					native := nl.NativeEndian()
+					index := int(native.Uint32(attr.Value[0:4]))
+					link, _ = netlink.LinkByIndex(index)
 				}
 			}
+			if link.Attrs().Name == ifaceName && ip.Equal(dest) {
+				return true, nil
+			}
 		}
+		return false, nil
 	}
 }
