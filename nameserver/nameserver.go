@@ -121,7 +121,7 @@ func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
 	defer n.RUnlock()
 
 	match, err := n.entries.first(func(e *Entry) bool {
-		return e.Addr == ip
+		return e.Tombstone == 0 && e.Addr == ip
 	})
 	if err != nil {
 		return "", err
