@@ -23,7 +23,7 @@ docker_py_test() {
     TESTS=
     for test in $CANDIDATES; do
         if [ $(($i % $TOTAL_SHARDS)) -eq $SHARD ]; then
-              TESTS="$TESTS $test"
+              TESTS="$TESTS tests/integration_test.py::$test"
         fi
         i=$(($i + 1))
     done
@@ -35,7 +35,7 @@ docker_py_test() {
         -e DOCKER_HOST=tcp://172.17.42.1:12375 \
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        joffrey/docker-py python tests/integration_test.py $TESTS ; then
+        joffrey/docker-py py.test $TESTS ; then
         assert_raises "true"
     else
         assert_raises "false"
