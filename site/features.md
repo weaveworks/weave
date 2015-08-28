@@ -167,12 +167,21 @@ the weave network:
     host1$ weave ps a1
     a1 16:c0:6f:5d:c5:73 10.32.0.3/12
 
-There is also a `weave restart` command, if you are not using the
-weave Docker API proxy:
+It works the same if you stop and immediately restart:
+
+    host1$ docker stop a1
+    host1$ docker start a1
+
+However, additional addresses added with the `weave attach` command
+will not be retained.
+
+There is also a `weave restart` command, which does re-attach all
+current IP addresses:
 
     host1$ weave restart b1
 
-(note that the IP address is held for a limited time - currently five seconds)
+(note that the IP addresses are held for a limited time - currently
+five seconds)
 
 ### <a name="naming-and-discovery"></a>Naming and discovery
 
