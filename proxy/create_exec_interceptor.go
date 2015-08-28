@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -18,6 +19,7 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 	r.Body.Close()
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 
 	options := docker.CreateExecOptions{}
 	if err := json.Unmarshal(body, &options); err != nil {
@@ -29,20 +31,20 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	_, hasWeaveWait := container.Volumes["/w"]
+	if _, hasWeaveWait := container.Volumes["/w"]; !hasWeaveWait {
+		return nil
+	}
+
 	cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
 	if err != nil {
 		Log.Infof("Leaving container %s alone because %s", container.ID, err)
-	} else if hasWeaveWait {
-		Log.Infof("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
-		options.Cmd = append(weaveWaitEntrypoint, options.Cmd...)
+		return nil
 	}
 
-	if err := marshalRequestBody(r, options); err != nil {
-		return err
-	}
+	Log.Infof("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
+	options.Cmd = append(weaveWaitEntrypoint, options.Cmd...)
 
-	return nil
+	return marshalRequestBody(r, options)
 }
 
 func (i *createExecInterceptor) InterceptResponse(r *http.Response) error {

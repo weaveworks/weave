@@ -47,6 +47,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 	r.Body.Close()
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 
 	container := createContainerRequestBody{}
 	if err := json.Unmarshal(body, &container); err != nil {
@@ -72,14 +73,14 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if err := i.setWeaveDNS(&container, hostname); err != nil {
 			return err
 		}
-	}
 
-	newBody, err := json.Marshal(container)
-	if err != nil {
-		return err
+		newBody, err := json.Marshal(container)
+		if err != nil {
+			return err
+		}
+		r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
+		r.ContentLength = int64(len(newBody))
 	}
-	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
-	r.ContentLength = int64(len(newBody))
 
 	return nil
 }
