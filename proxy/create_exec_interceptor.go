@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -18,6 +19,7 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 	r.Body.Close()
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 
 	options := docker.CreateExecOptions{}
 	if err := json.Unmarshal(body, &options); err != nil {
@@ -37,10 +39,10 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		Info.Printf("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
 		cmd := append(weaveWaitEntrypoint, "-s")
 		options.Cmd = append(cmd, options.Cmd...)
-	}
 
-	if err := marshalRequestBody(r, options); err != nil {
-		return err
+		if err := marshalRequestBody(r, options); err != nil {
+			return err
+		}
 	}
 
 	return nil
