@@ -5,6 +5,8 @@
 start_suite "Run docker-py test suite against the proxy"
 
 docker_on $HOST1 pull joffrey/docker-py >/dev/null
+# workaround for https://github.com/docker/docker-py/issues/745
+docker_on $HOST1 pull busybox >/dev/null
 
 weave_on $HOST1 launch-proxy --no-default-ipam
 
@@ -13,7 +15,7 @@ if docker_on $HOST1 run \
     -e DOCKER_HOST=tcp://172.17.42.1:12375 \
     -v /tmp:/tmp \
     -v /var/run/docker.sock:/var/run/docker.sock \
-    joffrey/docker-py python tests/integration_test.py ; then
+    joffrey/docker-py py.test tests/integration_test.py ; then
     assert_raises "true"
 else
     assert_raises "false"
