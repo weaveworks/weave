@@ -1565,6 +1565,7 @@ case "$COMMAND" in
         ;;
     reset)
         [ $# -eq 0 ] || usage
+        warn_if_stopping_proxy_in_env
         call_weave DELETE /peer >/dev/null 2>&1 || true
         for NAME in $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
