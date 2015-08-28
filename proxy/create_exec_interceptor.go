@@ -31,21 +31,21 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	_, hasWeaveWait := container.Volumes["/w"]
+	if _, hasWeaveWait := container.Volumes["/w"]; !hasWeaveWait {
+		return nil
+	}
+
 	cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
 	if err != nil {
 		Info.Printf("Ignoring container %s due to %s", container.ID, err)
-	} else if hasWeaveWait {
-		Info.Printf("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
-		cmd := append(weaveWaitEntrypoint, "-s")
-		options.Cmd = append(cmd, options.Cmd...)
-
-		if err := marshalRequestBody(r, options); err != nil {
-			return err
-		}
+		return nil
 	}
 
-	return nil
+	Info.Printf("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
+	cmd := append(weaveWaitEntrypoint, "-s")
+	options.Cmd = append(cmd, options.Cmd...)
+
+	return marshalRequestBody(r, options)
 }
 
 func (i *createExecInterceptor) InterceptResponse(r *http.Response) error {
