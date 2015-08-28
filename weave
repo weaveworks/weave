@@ -155,6 +155,18 @@ enforce_docker_bridge_addr_assign_type() {
     fi
 }
 
+check_forwarding_rules() {
+    if run_iptables -C FORWARD -j REJECT --reject-with icmp-host-prohibited > /dev/null 2>&1; then
+        cat >&2 <<EOF
+WARNING: existing iptables rule
+
+    '-A FORWARD -j REJECT --reject-with icmp-host-prohibited'
+
+will block name resolution via weaveDNS - please reconfigure your firewall.
+EOF
+    fi
+}
+
 is_cidr() {
     echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
 }
@@ -1080,6 +1092,7 @@ common_launch_args() {
 }
 
 launch_router() {
+    check_forwarding_rules
     enforce_docker_bridge_addr_assign_type
     create_bridge
     docker_bridge_ip
