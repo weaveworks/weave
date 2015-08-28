@@ -35,6 +35,7 @@ coverage.html
 # Project specific
 prog/weaver/weaver
 prog/weavedns/weavedns
+prog/weavehosts/weavehosts
 prog/weaveproxy/weaveproxy
 prog/sigproxy/sigproxy
 prog/weavewait/weavewait
@@ -49,6 +50,7 @@ releases
 .weaveexec.uptodate
 weave.tar
 prog/weaveexec/weave
+prog/weaveexec/weavehosts
 prog/weaveexec/weaveproxy
 prog/weaveexec/weavewait
 prog/weaveexec/sigproxy

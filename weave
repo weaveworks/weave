@@ -540,14 +540,15 @@ attach() {
 
     netnsenter ip link set $CONTAINER_IFNAME up || return 1
 
-    # Route multicast packets across the weave network.
-    if ! netnsenter ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
-        netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
-    fi
-
     for ADDR in "$@" ; do
         arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
     done
+
+    # Route multicast packets across the weave network.
+    # This must come last in 'attach'. If you change this, change weavewait to match.
+    if ! netnsenter ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
+        netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
+    fi
 }
 
 detach() {
@@ -1459,14 +1460,28 @@ case "$COMMAND" in
     attach)
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        if [ "$1" = "--or-die" ] ; then
-          ATTACH_TYPE="_or_die"
-          shift
-        fi
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --or-die)
+                    ATTACH_TYPE="_or_die"
+                    ;;
+                --rewrite-hosts)
+                    REWRITE_HOSTS=1
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+            shift
+        done
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         create_bridge
         ipam_cidrs$ATTACH_TYPE $CONTAINER $CIDR_ARGS
+        if [ -n "$REWRITE_HOSTS" ] && command_exists weavehosts ; then
+            PATH_AND_NAME=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}' $CONTAINER)
+            weavehosts $PATH_AND_NAME $ALL_CIDRS
+        fi
         with_container_netns$ATTACH_TYPE $CONTAINER attach $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
