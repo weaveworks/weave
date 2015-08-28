@@ -134,7 +134,7 @@ func (n *Nameserver) ContainerDied(ident string) {
 	n.Lock()
 	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
 		if e.ContainerID == ident {
-			n.infof("container %s died, tombstoning entry %s", ident, e.String())
+			n.infof("container %s died; tombstoning entry %s", ident, e.String())
 			return true
 		}
 		return false
@@ -142,13 +142,13 @@ func (n *Nameserver) ContainerDied(ident string) {
 	n.Unlock()
 	if len(entries) > 0 {
 		if err := n.broadcastEntries(entries...); err != nil {
-			n.errorf("Failed to broadcast container '%s' death: %v", ident, err)
+			n.errorf("failed to broadcast container %s death: %v", ident, err)
 		}
 	}
 }
 
 func (n *Nameserver) PeerGone(peer *router.Peer) {
-	n.infof("peer gone %s", peer.String())
+	n.infof("peer %s gone", peer.String())
 	n.Lock()
 	defer n.Unlock()
 	n.entries.filter(func(e *Entry) bool {
@@ -158,7 +158,7 @@ func (n *Nameserver) PeerGone(peer *router.Peer) {
 
 func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Address) error {
 	n.Lock()
-	n.infof("tombstoning hostname=%s, containerid=%s, ip=%s", hostname, containerid, ipStr)
+	n.infof("tombstoning hostname=%s, container=%s, ip=%s", hostname, containerid, ipStr)
 	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
 		if hostname != "*" && e.Hostname != hostname {
 			return false
