@@ -9,6 +9,8 @@ docker_py_test() {
 
     start_suite "Run docker-py test suite against the proxy"
 
+    # workaround for https://github.com/docker/docker-py/issues/745
+    docker_on $HOST1 pull busybox >/dev/null
     # Get a list of the tests for use to shard
     docker_on $HOST1 pull joffrey/docker-py >/dev/null
     C=$(docker_on $HOST1 create \
@@ -23,7 +25,7 @@ docker_py_test() {
     TESTS=
     for test in $CANDIDATES; do
         if [ $(($i % $TOTAL_SHARDS)) -eq $SHARD ]; then
-              TESTS="$TESTS $test"
+              TESTS="$TESTS tests/integration_test.py::$test"
         fi
         i=$(($i + 1))
     done
@@ -35,7 +37,7 @@ docker_py_test() {
         -e DOCKER_HOST=tcp://172.17.42.1:12375 \
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        joffrey/docker-py python tests/integration_test.py $TESTS ; then
+        joffrey/docker-py py.test $TESTS ; then
         assert_raises "true"
     else
         assert_raises "false"
