@@ -181,7 +181,7 @@ current IP addresses:
     host1$ weave restart b1
 
 (note that the IP addresses are held for a limited time - currently
-five seconds)
+30 seconds)
 
 ### <a name="naming-and-discovery"></a>Naming and discovery
 

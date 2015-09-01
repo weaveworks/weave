@@ -23,7 +23,7 @@ const (
 
 	tickInterval         = time.Second * 5
 	MinSubnetSize        = 4 // first and last addresses are excluded, so 2 would be too small
-	containerDiedTimeout = time.Second * 5
+	containerDiedTimeout = time.Second * 30
 )
 
 // operation represents something which Allocator wants to do, but
