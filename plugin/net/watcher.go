@@ -55,3 +55,5 @@ func (w *watcher) ContainerDied(id string) {
 	// don't need to do this as WeaveDNS removes names on container died anyway
 	// (note by the time we get this event we can't see the EndpointID)
 }
+
+func (w *watcher) ContainerDestroyed(id string) {}

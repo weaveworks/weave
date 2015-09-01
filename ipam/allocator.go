@@ -239,6 +239,17 @@ func (alloc *Allocator) ContainerDied(ident string) {
 	}
 }
 
+// ContainerDestroyed called from the updater interface.  Async.
+func (alloc *Allocator) ContainerDestroyed(ident string) {
+	alloc.actionChan <- func() {
+		if _, found := alloc.lookupOwned(ident, alloc.universe); found {
+			alloc.debugln("Container", ident, "destroyed; removing addresses")
+			alloc.delete(ident)
+			delete(alloc.dead, ident)
+		}
+	}
+}
+
 func (alloc *Allocator) removeDeadContainers() {
 	cutoff := alloc.now().Add(-containerDiedTimeout)
 	for ident, timeOfDeath := range alloc.dead {
