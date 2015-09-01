@@ -135,6 +135,13 @@ container with a blank `WEAVE_CIDR`, e.g.
 
     host1$ docker run -ti -e WEAVE_CIDR="" ubuntu
 
+When launching weave-enabled containers, the proxy will automatically
+rewrite `/etc/hosts` to replace the docker IP with the container's
+weave IP. If you need the docker IP to remain in `/etc/hosts`, the
+proxy must be launched with the `--no-rewrite-hosts` flag.
+
+    host1$ weave launch-router && weave launch-proxy --no-rewrite-hosts
+
 ## <a name="dns"></a>Automatic discovery
 
 Containers launched via the proxy will use [weaveDNS](weavedns.html)
