@@ -3,7 +3,6 @@ package proxy
 import (
 	"net/http"
 
-	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -18,13 +17,18 @@ func (i *inspectExecInterceptor) InterceptResponse(r *http.Response) error {
 		return nil
 	}
 
-	exec := &docker.ExecInspect{}
+	exec := map[string]interface{}{}
 	if err := unmarshalResponseBody(r, &exec); err != nil {
 		return err
 	}
 
-	if err := updateContainerNetworkSettings(&exec.Container); err != nil {
-		Log.Warningf("Inspecting exec %s failed: %s", exec.ID, err)
+	container, err := lookupObject(exec, "Container")
+	if err != nil {
+		return err
+	}
+
+	if err := updateContainerNetworkSettings(container); err != nil {
+		Log.Warningf("Inspecting exec %s failed: %s", exec["Id"], err)
 	}
 
 	return marshalResponseBody(r, exec)

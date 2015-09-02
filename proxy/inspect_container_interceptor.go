@@ -3,7 +3,6 @@ package proxy
 import (
 	"net/http"
 
-	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -18,26 +17,35 @@ func (i *inspectContainerInterceptor) InterceptResponse(r *http.Response) error 
 		return nil
 	}
 
-	container := &docker.Container{}
-	if err := unmarshalResponseBody(r, container); err != nil {
+	container := map[string]interface{}{}
+	if err := unmarshalResponseBody(r, &container); err != nil {
 		return err
 	}
 
 	if err := updateContainerNetworkSettings(container); err != nil {
-		Log.Warningf("Inspecting container %s failed: %s", container.ID, err)
+		Log.Warningf("Inspecting container %s failed: %s", container["Id"], err)
 	}
 
 	return marshalResponseBody(r, container)
 }
 
-func updateContainerNetworkSettings(container *docker.Container) error {
-	mac, ips, nets, err := weaveContainerIPs(container)
+func updateContainerNetworkSettings(container map[string]interface{}) error {
+	containerID, err := lookupString(container, "Id")
+	if err != nil {
+		return err
+	}
+
+	mac, ips, nets, err := weaveContainerIPs(containerID)
 	if err != nil || len(ips) == 0 {
 		return err
 	}
 
-	container.NetworkSettings.MacAddress = mac
-	container.NetworkSettings.IPAddress = ips[0].String()
-	container.NetworkSettings.IPPrefixLen, _ = nets[0].Mask.Size()
+	networkSettings, err := lookupObject(container, "NetworkSettings")
+	if err != nil {
+		return err
+	}
+	networkSettings["MacAddress"] = mac
+	networkSettings["IPAddress"] = ips[0].String()
+	networkSettings["IPPrefixLen"], _ = nets[0].Mask.Size()
 	return nil
 }

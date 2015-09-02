@@ -105,8 +105,8 @@ func inspectContainerInPath(client *docker.Client, path string) (*docker.Contain
 	return container, err
 }
 
-func weaveContainerIPs(container *docker.Container) (mac string, ips []net.IP, nets []*net.IPNet, err error) {
-	stdout, stderr, err := callWeave("ps", container.ID)
+func weaveContainerIPs(containerID string) (mac string, ips []net.IP, nets []*net.IPNet, err error) {
+	stdout, stderr, err := callWeave("ps", containerID)
 	if err != nil || len(stderr) > 0 {
 		err = errors.New(string(stderr))
 		return
