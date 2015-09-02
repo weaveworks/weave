@@ -208,7 +208,10 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 		}
 
 	case "unix":
-		os.Remove(addr) // remove socket from last invocation
+		// remove socket from last invocation
+		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
+			return nil, "", err
+		}
 		listener, err = net.Listen(proto, addr)
 		if err != nil {
 			return nil, "", err
