@@ -162,9 +162,6 @@ command:
 $ weave dns-remove 10.2.1.27 $C
 ```
 
-When queried about a name with multiple IPs, weaveDNS returns all IPs
-available in a random order.
-
 ## <a name="resolve-weavedns-entries-from-host"></a>Resolve weaveDNS entries from host
 
 You can resolve entries from any host running weaveDNS with `weave
