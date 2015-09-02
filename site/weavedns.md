@@ -161,9 +161,6 @@ The inverse operation can be carried out using the `dns-remove` command:
 $ weave dns-remove 10.2.1.27 $C
 ```
 
-When queried about a name with multiple IPs, weaveDNS returns a random
-result from the set of IPs available.
-
 ## <a name="hot-swapping"></a>Hot-swapping service containers
 
 If you would like to deploy a new version of a service, keep the old
