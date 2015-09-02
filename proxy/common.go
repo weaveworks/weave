@@ -40,6 +40,19 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
+func unmarshalRequestBody(r *http.Request, target interface{}) error {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	if err := r.Body.Close(); err != nil {
+		return err
+	}
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+	return json.Unmarshal(body, &target)
+}
+
 func marshalRequestBody(r *http.Request, body interface{}) error {
 	newBody, err := json.Marshal(body)
 	if err != nil {
@@ -48,6 +61,32 @@ func marshalRequestBody(r *http.Request, body interface{}) error {
 	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
 	return nil
+}
+
+func unmarshalResponseBody(r *http.Response, target interface{}) error {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	if err := r.Body.Close(); err != nil {
+		return err
+	}
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+	return json.Unmarshal(body, &target)
+}
+
+func marshalResponseBody(r *http.Response, body interface{}) error {
+	newBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
+	r.ContentLength = int64(len(newBody))
+	// Stop it being chunked, because that hangs
+	r.TransferEncoding = nil
+	return nil
+
 }
 
 func inspectContainerInPath(client *docker.Client, path string) (*docker.Container, error) {

@@ -1,8 +1,6 @@
 package proxy
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -42,15 +40,8 @@ func (err *ErrNoSuchImage) Error() string {
 }
 
 func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
-	r.Body.Close()
-	r.Body = ioutil.NopCloser(bytes.NewReader(body))
-
 	container := createContainerRequestBody{}
-	if err := json.Unmarshal(body, &container); err != nil {
+	if err := unmarshalRequestBody(r, &container); err != nil {
 		return err
 	}
 
@@ -74,12 +65,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 			return err
 		}
 
-		newBody, err := json.Marshal(container)
-		if err != nil {
-			return err
-		}
-		r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
-		r.ContentLength = int64(len(newBody))
+		return marshalRequestBody(r, container)
 	}
 
 	return nil

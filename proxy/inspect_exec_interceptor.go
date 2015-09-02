@@ -1,9 +1,6 @@
 package proxy
 
 import (
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/fsouza/go-dockerclient"
@@ -21,14 +18,8 @@ func (i *inspectExecInterceptor) InterceptResponse(r *http.Response) error {
 		return nil
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
-	r.Body.Close()
-
 	exec := &docker.ExecInspect{}
-	if err := json.Unmarshal(body, exec); err != nil {
+	if err := unmarshalResponseBody(r, &exec); err != nil {
 		return err
 	}
 
@@ -36,13 +27,5 @@ func (i *inspectExecInterceptor) InterceptResponse(r *http.Response) error {
 		Log.Warningf("Inspecting exec %s failed: %s", exec.ID, err)
 	}
 
-	newBody, err := json.Marshal(exec)
-	if err != nil {
-		return err
-	}
-	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
-	r.ContentLength = int64(len(newBody))
-	r.TransferEncoding = nil // Stop it being chunked, because that hangs
-
-	return nil
+	return marshalResponseBody(r, exec)
 }
