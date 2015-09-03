@@ -20,7 +20,7 @@ weave_on $HOST1 dns-add $C2 c2 -h $NAME2
 assert_dns_record $HOST1 c1 $NAME2 $C2
 
 weave_on $HOST1 dns-add $C1 c1 -h $NAME1
-weave_on $HOST1 dns-add $C1 c1 -h $NAME3
+weave_on $HOST1 dns-add c1 -h $NAME3
 
 assert_dns_a_record $HOST1 c1 $NAME1 $C1
 assert_dns_a_record $HOST1 c1 $NAME3 $C1
@@ -29,5 +29,9 @@ weave_on $HOST1 dns-remove $C1 c1 -h $NAME1
 
 assert_no_dns_record $HOST1 c1 $NAME1
 assert_dns_a_record $HOST1 c1 $NAME3 $C1
+
+weave_on $HOST1 dns-remove c1 -h $NAME3
+
+assert_no_dns_record $HOST1 c1 $NAME3
 
 end_suite
