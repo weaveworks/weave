@@ -159,9 +159,13 @@ symbolically with `net:default`.
 
 ## <a name="manual"></a>Mixing automatic and manual allocation
 
-If you want to start containers with a mixture of
-automatically-allocated addresses and manually-chosen addresses, *and
-have the containers communicate with each other*, you can choose a
+You can start containers with a mixture of automatically-allocated
+addresses and manually-chosen addresses in the same range, but you may
+find that the automatic allocator has already reserved a specific
+address that you wanted.
+
+To reserve a range for manual allocation in the same subnet as the
+automatic allocator, you can specify an
 `--ipalloc-range` that is smaller than `--ip-default-subnet`, For
 example, if you launch weave with:
 
