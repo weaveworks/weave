@@ -17,12 +17,12 @@ func (i *inspectExecInterceptor) InterceptResponse(r *http.Response) error {
 		return nil
 	}
 
-	exec := map[string]interface{}{}
+	exec := jsonObject{}
 	if err := unmarshalResponseBody(r, &exec); err != nil {
 		return err
 	}
 
-	container, err := lookupObject(exec, "Container")
+	container, err := exec.Object("Container")
 	if err != nil {
 		return err
 	}

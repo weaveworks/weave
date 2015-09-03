@@ -4,14 +4,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 )
 
 type createExecInterceptor struct{ proxy *Proxy }
 
 func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
-	options := docker.CreateExecOptions{}
+	options := jsonObject{}
 	if err := unmarshalRequestBody(r, &options); err != nil {
 		return err
 	}
@@ -25,14 +24,19 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return nil
 	}
 
-	cidrs, err := i.proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
+	cidrs, err := i.proxy.weaveCIDRs(container.HostConfig.NetworkMode, container.Config.Env)
 	if err != nil {
 		Log.Infof("Leaving container %s alone because %s", container.ID, err)
 		return nil
 	}
 
+	cmd, err := options.StringArray("Cmd")
+	if err != nil {
+		return err
+	}
+
 	Log.Infof("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
-	options.Cmd = append(weaveWaitEntrypoint, options.Cmd...)
+	options["Cmd"] = append(weaveWaitEntrypoint, cmd...)
 
 	return marshalRequestBody(r, options)
 }
