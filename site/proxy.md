@@ -164,29 +164,43 @@ for registration. However, there are situations in which the final container
 name is out of the user's control (e.g. when using Docker orchestrators which
 append control/namespacing identifiers to the original container names).
 
-For those situations, the proxy provides two flags: `--hostname-match <regexp>`
-and `--hostname-replacement <replacement>`. When launching a container, its name
-is matched against regular expression `<regexp>`. Then, based on that match,
-`<replacement>` will be used to generate a hostname, which will ultimately be
-handed over to weaveDNS for registration.
+For those situations, the proxy provides a few flags: `--hostname-from-label
+<labelkey>`, `--hostname-match <regexp>` and `--hostname-replacement
+<replacement>`. When launching a container, the hostname is initialized to the
+value of the container label with key `<labelkey>`, if `<labelkey>` wasn't
+provided, the container name is used. Additionally, the hostname is matched
+against regular expression `<regexp>`. Then, based on that match,
+`<replacement>` will be used to obtainer the final hostname, which will
+ultimately be handed over to weaveDNS for registration.
 
-For instance, if we launch the proxy using
-`--hostname-match '^aws-[0-9]+-(.*)$'` and `--hostname-replacement 'my-app-$1'`
+For instance, we can launch the proxy using all three flags
 
-    host1$ weave launch-router && weave launch-proxy --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
+    host1$ weave launch-router && weave launch-proxy --hostname-from-label hostname-label --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
     host1$ eval "$(weave env)"
 
-then, running a container named `aws-12798186823-foo` will lead to weaveDNS registering
-hostname `my-app-foo` and not `aws-12798186823-foo`.
+Note how regexp substitution groups should be prepended with a dollar sign
+(e.g. `$1`). For further details on the regular expression syntax please see
+[Google's re2 documentation](https://github.com/google/re2/wiki/Syntax).
+
+
+Then, running a container named `aws-12798186823-foo` without labels will lead
+to weaveDNS registering hostname `my-app-foo` and not `aws-12798186823-foo`.
 
     host1$ docker run -ti --name=aws-12798186823-foo ubuntu ping my-app-foo
     PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=1 ttl=64 time=0.027 ms
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=2 ttl=64 time=0.067 ms
 
-Note how regexp substitution groups should be prepended with a dollar sign
-(e.g. `$1`). For further details on the regular expression syntax please see
-[Google's re2 documentation](https://github.com/google/re2/wiki/Syntax).
+Also, running a container named `foo` with label
+`hostname-label=aws-12798186823-foo` leads to the same hostname registration.
+
+    host1$ docker run -ti --name=foo --label=hostname-label=aws-12798186823-foo ubuntu ping my-app-foo
+    PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.
+    64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=1 ttl=64 time=0.031 ms
+    64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=2 ttl=64 time=0.042 ms
+
+This is because, as we explained above, when providing `--hostname-from-label`
+to the proxy, the specified label has precedence over the container's name.
 
 ## <a name="tls"></a>Securing the docker communication with TLS
 
