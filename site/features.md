@@ -112,11 +112,11 @@ Similarly, in the container on $HOST2...
     round-trip min/avg/max/stddev = 1.034/1.034/1.034/0.000 ms
 
 The IP addresses and netmasks can be anything you like, but make sure
-they don't conflict with any IP ranges in use on the hosts (including
-those delegated to weave's [automatic IP address allocator](ipam.html)) or
+they don't conflict with any IP ranges in use on the hosts or
 IP addresses of external services the hosts or containers need to
-connect to. The same IP range must be used everywhere, and the
-individual IP addresses must, of course, be unique.
+connect to. The individual IP addresses given to containers must, of
+course, be unique - if you pick an address that the automatic
+allocator has already assigned you will receive a warning.
 
 ### <a name="naming-and-discovery"></a>Naming and discovery
 
