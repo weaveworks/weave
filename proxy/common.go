@@ -50,7 +50,9 @@ func unmarshalRequestBody(r *http.Request, target interface{}) error {
 	}
 	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 
-	return json.Unmarshal(body, &target)
+	d := json.NewDecoder(bytes.NewReader(body))
+	d.UseNumber() // don't want large numbers in scientific format
+	return d.Decode(&target)
 }
 
 func marshalRequestBody(r *http.Request, body interface{}) error {
@@ -73,7 +75,9 @@ func unmarshalResponseBody(r *http.Response, target interface{}) error {
 	}
 	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 
-	return json.Unmarshal(body, &target)
+	d := json.NewDecoder(bytes.NewReader(body))
+	d.UseNumber() // don't want large numbers in scientific format
+	return d.Decode(&target)
 }
 
 func marshalResponseBody(r *http.Response, body interface{}) error {
