@@ -3,12 +3,15 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -37,6 +40,19 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
+func unmarshalRequestBody(r *http.Request, target interface{}) error {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	if err := r.Body.Close(); err != nil {
+		return err
+	}
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+	return json.Unmarshal(body, &target)
+}
+
 func marshalRequestBody(r *http.Request, body interface{}) error {
 	newBody, err := json.Marshal(body)
 	if err != nil {
@@ -45,6 +61,32 @@ func marshalRequestBody(r *http.Request, body interface{}) error {
 	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
 	return nil
+}
+
+func unmarshalResponseBody(r *http.Response, target interface{}) error {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	if err := r.Body.Close(); err != nil {
+		return err
+	}
+	r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
+	return json.Unmarshal(body, &target)
+}
+
+func marshalResponseBody(r *http.Response, body interface{}) error {
+	newBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
+	r.ContentLength = int64(len(newBody))
+	// Stop it being chunked, because that hangs
+	r.TransferEncoding = nil
+	return nil
+
 }
 
 func inspectContainerInPath(client *docker.Client, path string) (*docker.Container, error) {
@@ -61,4 +103,33 @@ func inspectContainerInPath(client *docker.Client, path string) (*docker.Contain
 		Log.Warningf("Error inspecting container %s: %v", containerID, err)
 	}
 	return container, err
+}
+
+func weaveContainerIPs(containerID string) (mac string, ips []net.IP, nets []*net.IPNet, err error) {
+	stdout, stderr, err := callWeave("ps", containerID)
+	if err != nil || len(stderr) > 0 {
+		err = errors.New(string(stderr))
+		return
+	}
+	if len(stdout) <= 0 {
+		return
+	}
+
+	fields := strings.Fields(string(stdout))
+	if len(fields) < 2 {
+		return
+	}
+	mac = fields[1]
+
+	var ip net.IP
+	var ipnet *net.IPNet
+	for _, cidr := range fields[2:] {
+		ip, ipnet, err = net.ParseCIDR(cidr)
+		if err != nil {
+			return
+		}
+		ips = append(ips, ip)
+		nets = append(nets, ipnet)
+	}
+	return
 }

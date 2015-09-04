@@ -1,9 +1,6 @@
 package proxy
 
 import (
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -14,15 +11,8 @@ import (
 type createExecInterceptor struct{ proxy *Proxy }
 
 func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
-	r.Body.Close()
-	r.Body = ioutil.NopCloser(bytes.NewReader(body))
-
 	options := docker.CreateExecOptions{}
-	if err := json.Unmarshal(body, &options); err != nil {
+	if err := unmarshalRequestBody(r, &options); err != nil {
 		return err
 	}
 
