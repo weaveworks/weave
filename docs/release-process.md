@@ -8,13 +8,27 @@
 set and export `$GITHUB_TOKEN` with this value
 * Update all dependencies with `make update`
 
+## Release Types
+
+The release script behaves differently depending on the kind of
+release you are doing. There are three types:
+
+* **Mainline** - a release (typically from master) with version tag
+  `vX.Y.Z` where Z is zero (e.g. `v2.1.0`)
+* **Branch** - a bugfix release (typically from a branch) with version tag
+  `vX.Y.Z` where Z is non-zero (e.g `v2.1.1`)
+* **Prerelease** - a release from an arbitrary branch with an arbitrary
+  version tag (e.g. `feature-preview-20150904`)
+
+N.B. the release script _infers the release type from the format of the
+version tag_. Ensure your tag is in the correct format and the desired
+behaviours for that type of release will be obtained from the script.
+
 ## Build Phase
 ### Update CHANGELOG.md
 
 * Checkout the branch from which you wish to release
-* Choose an appropriate version tag, henceforth referred to as `$TAG`.
-  Mainline releases use a version number (e.g. `TAG=v2.0.0`), whereas
-  pre-releases get a descriptive name (e.g. `TAG=feature-preview-20150902`)
+* Choose a version tag (see above) henceforth referred to as `$TAG`.
 * Add a changelog entry for the new tag at the top of `CHANGELOG.md`.
   The first line must be a markdown header of the form `## Release
   $TAG`
@@ -61,17 +75,15 @@ instead!
 
 You're now ready to draft your release notes:
 
-    bin/release draft [--pre-release]
+    bin/release draft
 
 This has the following effects:
 
 * A [release](https://help.github.com/articles/about-releases) is
   created in GitHub for `$TAG`. This release is in the draft state, so
-  it is only visible to contributors
+  it is only visible to contributors; for **Prerelease** builds the
+  pre-release attribute will also be set
 * The `weave` script is uploaded as an attachment to the release
-* If `--pre-release` is specified, the release will have the
-  pre-release attribute set (this affects the way GitHub displays the
-  release and modifies the behaviour of the publish phase)
 
 Navigate to https://github.com/weaveworks/weave/releases, 'Edit' the
 draft and input the release notes. When you are done make sure you
@@ -83,7 +95,7 @@ phase.
 ## Publish Phase
 ### Move/Force Push `latest_release` Tag
 
-This step must only be performed for mainline (non pre-release)
+This step must only be performed for **Mainline** and **Branch**
 releases:
 
     git tag -af -m "Release $TAG" latest_release $TAG
@@ -102,17 +114,19 @@ distributables to DockerHub:
 
     bin/release publish
 
-This has the following effects:
+The effects of this step depend on the inferred release type. The
+following occurs for all types:
 
 * Docker images are tagged `$TAG` and pushed to DockerHub
 * GitHub release moves from draft to published state
 
-Furthermore, if this is a mainline release (detected automatically
-from the GitHub release, you do not need to specify the flag again to
-the publish step)
+Additionally, for **Mainline** and **Branch** types:
+
+* Release named `latest_release` is updated on GitHub
+
+Finally, for **Mainline** releases only:
 
 * Images tagged `latest` are updated on DockerHub
-* Release named `latest_release` is updated on GitHub
 
 
 ## Troubleshooting
