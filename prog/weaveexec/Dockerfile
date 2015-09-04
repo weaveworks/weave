@@ -1,4 +1,4 @@
-FROM gliderlabs/alpine
+FROM alpine
 
 MAINTAINER Weaveworks Inc <help@weave.works>
 LABEL works.weave.role=system
