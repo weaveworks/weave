@@ -67,8 +67,8 @@ weave run           [--with-dns | --without-dns] [<addr> ...]
 weave start         [<addr> ...] <container_id>
 weave attach        [<addr> ...] <container_id>
 weave detach        [<addr> ...] <container_id>
-weave dns-add       <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]
-weave dns-remove    <ip_address> [<ip_address> ...] <container_id> [-h <fqdn>]
+weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>]
+weave dns-remove    [<ip_address> ...] <container_id> [-h <fqdn>]
 weave dns-lookup    <unqualified_name>
 weave expose        [<addr> ...] [-h <fqdn>]
 weave hide          [<addr> ...]
@@ -733,6 +733,12 @@ with_container_addresses() {
 
 echo_addresses() {
     echo $1 $2 $3
+}
+
+echo_ips() {
+    for CIDR in $3; do
+        echo ${3%/*}
+    done
 }
 
 peer_args() {
@@ -1502,9 +1508,12 @@ case "$COMMAND" in
     dns-add)
         collect_ip_args "$@"
         shift $IP_COUNT
-        [ $IP_COUNT -gt 0 -a \( $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) \) ] || usage
+        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
         check_running $CONTAINER_NAME
         CONTAINER=$(container_id $1)
+        if [ $IP_COUNT -eq 0 ] ; then
+            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
+        fi
         if [ $# -eq 1 ] ; then
             with_container_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
         else
@@ -1514,9 +1523,12 @@ case "$COMMAND" in
     dns-remove)
         collect_ip_args "$@"
         shift $IP_COUNT
-        [ $IP_COUNT -gt 0 -a \( $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) \) ] || usage
+        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
         check_running $CONTAINER_NAME
         CONTAINER=$(container_id $1)
+        if [ $IP_COUNT -eq 0 ] ; then
+            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
+        fi
         if [ $# -eq 1 ] ; then
             delete_dns $CONTAINER $IP_ARGS
         else

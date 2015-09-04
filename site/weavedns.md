@@ -148,18 +148,20 @@ If you want to give the container a name in DNS *other* than its
 hostname, you can register it using the `dns-add` command. For example:
 
 ```bash
-$ C=$(docker run -e WEAVE_CIDR=10.2.1.27/24 -ti ubuntu)
-$ weave dns-add 10.2.1.27 $C -h pingme2.weave.local
+$ C=$(docker run -ti ubuntu)
+$ weave dns-add $C -h pingme2.weave.local
 ```
 
 You can also use `dns-add` to add the container's configured hostname
-and domain, simply by omitting `-h <fqdn>`.
+and domain simply by omitting `-h <fqdn>`, or specify additional IP
+addresses to be registered against the container's hostname e.g.
+`weave dns-add 10.2.1.27 $C`.
 
 The inverse operation can be carried out using the `dns-remove`
 command:
 
 ```bash
-$ weave dns-remove 10.2.1.27 $C
+$ weave dns-remove $C
 ```
 
 ## <a name="resolve-weavedns-entries-from-host"></a>Resolve weaveDNS entries from host
