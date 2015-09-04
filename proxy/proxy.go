@@ -24,15 +24,19 @@ const (
 )
 
 var (
-	containerCreateRegexp  = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/create$")
-	containerStartRegexp   = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/(re)?start$")
-	containerInspectRegexp = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/json$")
-	execCreateRegexp       = regexp.MustCompile("^(/v[0-9\\.]*)?/containers/[^/]*/exec$")
-	execInspectRegexp      = regexp.MustCompile("^(/v[0-9\\.]*)?/exec/[^/]*/json$")
+	containerCreateRegexp  = dockerAPIEndpoint("containers/create")
+	containerStartRegexp   = dockerAPIEndpoint("containers/[^/]*/(re)?start")
+	containerInspectRegexp = dockerAPIEndpoint("containers/[^/]*/json")
+	execCreateRegexp       = dockerAPIEndpoint("containers/[^/]*/exec")
+	execInspectRegexp      = dockerAPIEndpoint("exec/[^/]*/json")
 
 	ErrWeaveCIDRNone = errors.New("the container was created with the '-e WEAVE_CIDR=none' option")
 	ErrNoDefaultIPAM = errors.New("the container was created without specifying an IP address with '-e WEAVE_CIDR=...' and the proxy was started with the '--no-default-ipalloc' option")
 )
+
+func dockerAPIEndpoint(endpoint string) *regexp.Regexp {
+	return regexp.MustCompile("^(/v[0-9\\.]*)?/" + endpoint + "$")
+}
 
 type Config struct {
 	HostnameMatch       string
