@@ -11,7 +11,7 @@ layout: default
  * [List DNS entries](#weave-status-dns)
  * [JSON report](#weave-report)
  * [List attached containers](#list-attached-containers)
- * [Snapshot releases](#snapshot-releases)
+ * [Snapshot releases](#snapshots)
 
 Check what version of weave you are running with
 
