@@ -1,3 +1,14 @@
+## Release 1.0.3
+
+This release contains a weaveDNS feature enhancement as well as minor fixes for
+improved stability and robustness.
+
+More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.0.3).
+
+The release is fully compatible with other 1.0.x versions, so existing
+clusters can be upgraded incrementally.
+
 ## Release 1.0.2
 
 This release fixes a number of bugs, including some security
