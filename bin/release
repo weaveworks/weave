@@ -10,6 +10,16 @@ RELEASE_DESCRIPTION=${RELEASE_DESCRIPTION:-"Weaving Containers into Applications
 
 PWD=`pwd`
 
+infer_release_type() {
+    if echo $1 | grep -qE '^v[0-9]+\.[0-9]+\.0+$' ; then
+        echo MAINLINE
+    elif echo $1 | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' ; then
+        echo BRANCH
+    else
+        echo PRERELEASE
+    fi
+}
+
 setup() {
     # Ensure we have exactly one annotated tag pointing at HEAD
     HEAD_TAGS=$(git tag --points-at HEAD)
@@ -34,6 +44,9 @@ setup() {
             exit 1
             ;;
     esac
+
+    RELEASE_TYPE=$(infer_release_type $LATEST_TAG)
+    echo "== Inferred release type $RELEASE_TYPE from tag $LATEST_TAG"
 
     LATEST_TAG_SHA=$(git rev-parse $LATEST_TAG)
     LATEST_TAG_COMMIT_SHA=$(git rev-list -1 $LATEST_TAG)
@@ -95,17 +108,6 @@ build() {
 draft() {
     setup
 
-    TYPE="release"
-    RELEASE_ARGS="--draft"
-    if [ $# -ne 0 ] ; then
-        if [ $# -eq 1 -a "$1" = "--pre-release" ] ; then
-            TYPE="pre-release"
-            RELEASE_ARGS="$RELEASE_ARGS --pre-release"
-        else
-            usage
-        fi
-    fi
-
     cd $PWD/$RELEASE_DIR
 
     echo "== Sanity checks"
@@ -131,7 +133,12 @@ draft() {
 
     echo '** Sanity checks OK for publishing tag' $LATEST_TAG as $DOCKERHUB_USER/weave:$VERSION
 
-    echo "== Creating draft GitHub $TYPE $RELEASE_NAME $VERSION"
+    RELEASE_ARGS="--draft"
+    if [ "$RELEASE_TYPE" = 'PRERELEASE' ] ; then
+        RELEASE_ARGS="$RELEASE_ARGS --pre-release"
+    fi
+
+    echo "== Creating GitHub release $RELEASE_ARGS $RELEASE_NAME $VERSION"
     github-release release $RELEASE_ARGS \
         --user $GITHUB_USER \
         --repo weave \
@@ -154,25 +161,14 @@ publish() {
     setup
     cd $PWD/$RELEASE_DIR
 
-    echo "== Detecting draft type"
-    # Determine whether $LATEST_TAG version in GitHub is marked as pre-release
-    if ! INFO=$(github-release info --user $GITHUB_USER --repo weave --tag $LATEST_TAG) ; then
-        # github-release prints errors to stdout https://github.com/aktau/github-release/issues/32
-        echo $info >&2
-        exit 1
+    UPDATE_LATEST=false
+    if [ "$RELEASE_TYPE" = 'MAINLINE' ] ; then
+        UPDATE_LATEST=true
     fi
 
-    PRERELEASE=
-    TICK=$(echo -e '\u2714')
-    # Pre-releases are signified with a unicode $TICK character ಠ_ಠ
-    if echo "$INFO" | grep -q "prerelease: $TICK" ; then
-        PRERELEASE=1
-    fi
-
-    if [ -n "$PRERELEASE" ] ; then
-        echo "** Pre-release draft detected"
+    if [ "$RELEASE_TYPE" = 'PRERELEASE' ] ; then
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
-        make UPDATE_LATEST=false SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
+        make UPDATE_LATEST=$UPDATE_LATEST SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
         echo "** Docker images tagged and pushed"
 
         echo "== Publishing pre-release on GitHub"
@@ -185,7 +181,6 @@ publish() {
         echo "** Pre-release $RELEASE_NAME $VERSION published at"
         echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
     else
-        echo "** Release draft detected"
         echo "== Sanity checks"
         if ! [ "$LATEST_TAG_COMMIT_SHA" == "$LATEST_RELEASE_COMMIT_SHA" ] ; then
             echo -e "\u2757 The tag latest_release does not point to the same commit as $LATEST_TAG" >&2
@@ -205,7 +200,7 @@ publish() {
         echo '** Sanity checks OK for publishing tag' $LATEST_TAG as $DOCKERHUB_USER/weave:$VERSION
 
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
-        make SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
+        make UPDATE_LATEST=$UPDATE_LATEST SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
         echo "** Docker images tagged and pushed"
 
         echo "== Publishing release on GitHub"
@@ -247,7 +242,7 @@ usage() {
     echo "Usage:"
     echo -e "\t./bin/release build"
     echo "-- Build artefacts for the latest version tag"
-    echo -e "\t./bin/release draft [--pre-release]"
+    echo -e "\t./bin/release draft
     echo "-- Create draft release with artefacts in GitHub"
     echo -e "\t./bin/release publish"
     echo "-- Publish the GitHub release and update DockerHub"
