@@ -1,3 +1,25 @@
+## Release v1.1.0
+
+**Highlights**:
+
+- `weave launch` now launches all weave components, simplifying
+  startup.
+- `weave status` has been completely revamped, with a much improved
+  presentation of the information, and the option to select and output
+  data in JSON.
+- weaveDNS has been rewritten and embedded in the router. The new
+  implementation simplifies configuration, improves performance, and
+  provides fault resilience for services.
+- the weave Docker API proxy now provides an even more seamless user
+  experience, and enables easier integration of weave with other
+  systems such as kubernetes.
+- many usability improvements
+- a few minor bug fixes, including a couple of security
+  vulnerabilities
+
+More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.1.0).
+
 ## Release 1.0.3
 
 This release contains a weaveDNS feature enhancement as well as minor fixes for
