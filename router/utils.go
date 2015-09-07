@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/weaveworks/weave/common"
 )
@@ -26,15 +27,19 @@ func checkWarn(e error) {
 	}
 }
 
+// Look inside an error produced by the net package to get to the
+// syscall.Errno at the root of the problem.
 func PosixError(err error) error {
-	if err == nil {
-		return nil
+	if operr, ok := err.(*net.OpError); ok {
+		err = operr.Err
 	}
-	operr, ok := err.(*net.OpError)
-	if !ok {
-		return nil
+
+	// go1.5 wraps an Errno inside a SyscallError inside an OpError
+	if scerr, ok := err.(*os.SyscallError); ok {
+		err = scerr.Err
 	}
-	return operr.Err
+
+	return err
 }
 
 func (mtbe MsgTooBigError) Error() string {
