@@ -31,6 +31,13 @@ type ConnectionSummary struct {
 	Established   bool
 }
 
+// Pending notifications due to changes to Peers that need to be ent
+// out once the Peers is unlocked.
+type PeersPendingNotifications struct {
+	// Peers that have been GCed
+	removed []*Peer
+}
+
 func NewPeers(ourself *LocalPeer) *Peers {
 	peers := &Peers{ourself: ourself, byName: make(map[PeerName]*Peer)}
 	peers.FetchWithDefault(ourself.Peer)
@@ -40,13 +47,22 @@ func NewPeers(ourself *LocalPeer) *Peers {
 func (peers *Peers) OnGC(callback func(*Peer)) {
 	peers.Lock()
 	defer peers.Unlock()
+
+	// Although the array underlying peers.onGC might be accessed
+	// without holding the lock in unlockAndNotify, we don't
+	// support removing callbacks, so a simple append here is
+	// safe.
 	peers.onGC = append(peers.onGC, callback)
 }
 
-func (peers *Peers) invokeOnGCCallbacks(removed []*Peer) {
-	for _, callback := range peers.onGC {
-		for _, peer := range removed {
-			callback(peer)
+func (peers *Peers) unlockAndNotify(pending *PeersPendingNotifications) {
+	onGC := peers.onGC
+	peers.Unlock()
+	if pending.removed != nil {
+		for _, callback := range onGC {
+			for _, peer := range pending.removed {
+				callback(peer)
+			}
 		}
 	}
 }
@@ -101,10 +117,11 @@ func (peers *Peers) ForEach(fun func(*Peer)) {
 // "improved" update containing just these new/updated elements.
 func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
 	peers.Lock()
+	var pending PeersPendingNotifications
+	defer peers.unlockAndNotify(&pending)
 
 	newPeers, decodedUpdate, decodedConns, err := peers.decodeUpdate(update)
 	if err != nil {
-		peers.Unlock()
 		return nil, nil, err
 	}
 
@@ -117,14 +134,10 @@ func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error)
 
 	// Now apply the updates
 	newUpdate := peers.applyUpdate(decodedUpdate, decodedConns)
-	removed := peers.garbageCollect()
-	for _, peerRemoved := range removed {
+	peers.garbageCollect(&pending)
+	for _, peerRemoved := range pending.removed {
 		delete(newUpdate, peerRemoved.Name)
 	}
-
-	// Don't need to hold peers lock any longer
-	peers.Unlock()
-	peers.invokeOnGCCallbacks(removed)
 
 	updateNames := make(PeerNameSet)
 	for _, peer := range decodedUpdate {
@@ -162,26 +175,24 @@ func (peers *Peers) EncodePeers(names PeerNameSet) []byte {
 	return buf.Bytes()
 }
 
-func (peers *Peers) GarbageCollect() []*Peer {
+func (peers *Peers) GarbageCollect() {
 	peers.Lock()
-	removed := peers.garbageCollect()
-	peers.Unlock()
-	peers.invokeOnGCCallbacks(removed)
-	return removed
+	var pending PeersPendingNotifications
+	defer peers.unlockAndNotify(&pending)
+
+	peers.garbageCollect(&pending)
 }
 
-func (peers *Peers) garbageCollect() []*Peer {
-	removed := []*Peer{}
+func (peers *Peers) garbageCollect(pending *PeersPendingNotifications) {
 	peers.ourself.RLock()
 	_, reached := peers.ourself.Routes(nil, false)
 	peers.ourself.RUnlock()
 	for name, peer := range peers.byName {
 		if _, found := reached[peer.Name]; !found && peer.localRefCount == 0 {
 			delete(peers.byName, name)
-			removed = append(removed, peer)
+			pending.removed = append(pending.removed, peer)
 		}
 	}
-	return removed
 }
 
 func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, decodedUpdate []*Peer, decodedConns [][]ConnectionSummary, err error) {
