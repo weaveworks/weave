@@ -71,6 +71,13 @@ func TestPeersEncoding(t *testing.T) {
 	}
 }
 
+func garbageCollect(peers *Peers) []*Peer {
+	var removed []*Peer
+	peers.OnGC(func(peer *Peer) { removed = append(removed, peer) })
+	peers.GarbageCollect()
+	return removed
+}
+
 func TestPeersGarbageCollection(t *testing.T) {
 	const (
 		peer1NameString = "01:00:00:01:00:00"
@@ -97,17 +104,17 @@ func TestPeersGarbageCollection(t *testing.T) {
 	ps2.AddTestRemoteConnection(p3, p1)
 
 	// Every peer is referenced, so nothing should be dropped
-	require.Empty(t, ps1.GarbageCollect(), "peers removed")
-	require.Empty(t, ps2.GarbageCollect(), "peers removed")
-	require.Empty(t, ps3.GarbageCollect(), "peers removed")
+	require.Empty(t, garbageCollect(ps1), "peers removed")
+	require.Empty(t, garbageCollect(ps2), "peers removed")
+	require.Empty(t, garbageCollect(ps3), "peers removed")
 
 	// Drop the connection from 2 to 3, and 3 isn't garbage-collected
 	// because 1 has a connection to 3
 	ps2.DeleteTestConnection(p3)
-	require.Empty(t, ps2.GarbageCollect(), "peers removed")
+	require.Empty(t, garbageCollect(ps2), "peers removed")
 
 	// Drop the connection from 1 to 3, and 3 will get removed by
 	// garbage-collection
 	ps1.DeleteTestConnection(p3)
-	checkPeerArray(t, ps1.GarbageCollect(), p3)
+	checkPeerArray(t, garbageCollect(ps1), p3)
 }
