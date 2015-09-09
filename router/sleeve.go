@@ -45,18 +45,14 @@ import (
 // sleeveForwarder.mtu                     <-------------------------->
 
 const (
-	EthernetOverhead    = 14
-	UDPOverhead         = 28 // 20 bytes for IPv4, 8 bytes for UDP
-	DefaultMTU          = 65535
-	FragTestSize        = 60001
-	PMTUDiscoverySize   = 60000
-	FastHeartbeat       = 500 * time.Millisecond
-	SlowHeartbeat       = 10 * time.Second
-	FragTestInterval    = 5 * time.Minute
-	MTUVerifyAttempts   = 8
-	MTUVerifyTimeout    = 10 * time.Millisecond // doubled with each attempt
-	MaxMissedHeartbeats = 6
-	HeartbeatTimeout    = MaxMissedHeartbeats * SlowHeartbeat
+	EthernetOverhead  = 14
+	UDPOverhead       = 28 // 20 bytes for IPv4, 8 bytes for UDP
+	DefaultMTU        = 65535
+	FragTestSize      = 60001
+	PMTUDiscoverySize = 60000
+	FragTestInterval  = 5 * time.Minute
+	MTUVerifyAttempts = 8
+	MTUVerifyTimeout  = 10 * time.Millisecond // doubled with each attempt
 )
 
 type SleeveOverlay struct {
