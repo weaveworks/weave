@@ -242,7 +242,7 @@ usage() {
     echo "Usage:"
     echo -e "\t./bin/release build"
     echo "-- Build artefacts for the latest version tag"
-    echo -e "\t./bin/release draft
+    echo -e "\t./bin/release draft"
     echo "-- Create draft release with artefacts in GitHub"
     echo -e "\t./bin/release publish"
     echo "-- Publish the GitHub release and update DockerHub"

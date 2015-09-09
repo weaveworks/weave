@@ -66,23 +66,23 @@ Router:
     simply responds to traffic received from the remote peer via TCP
   5. We register this connection with the local peer
   6a. If we initiated this connection then we now start sending fast
-    heartbeats to the remote peer so that the remote peer can determine what
-    address/port it should use to send UDP back to us. To do this, we
-    spawn off two further threads which are the forwarder
-    loops. These receive frames which are to be sent to the remote
-    peer. One of them sends frames without the DF flag set. To do this
-    it just sends the packets out of the UDP Listener socket. The
-    other needs to send frames with the DF flag set and needs its own
-    socket so that it can do PMTU discovery easily. To do this, it
-    uses a Raw IP socket (IP has no ports, so there's no collision
-    issue with the UDP Listener socket) and so it must add UDP headers
-    itself.
-  6b. If we did not initiate this connection then the UDP Listener
+    heartbeats to the remote peer so that the remote peer can
+    determine what address/port it should use to send UDP back to
+    us. To do this, we spawn off a "forwarder" thread to send
+    heartbeats, monitor incoming heartbeats, and some other auxiliary
+    duties.  It also consumes frames to be encapsulated and send via
+    UDP from two channels, for DF and non-DF cases.  In the non-DF
+    case, it can just send the packets out of the UDP Listener
+    socket. In the DF case, it needs its own socket so that it can do
+    PMTU discovery easily. To do this, it uses a Raw IP socket (IP has
+    no ports, so there's no collision issue with the UDP Listener
+    socket) and so it must add UDP headers itself.
+ 6b. If we did not initiate this connection then the UDP Listener
     should start receiving fast heartbeats from the remote peer. From
     those it should be able to identify the local connection via the
     local peer. It will tell the local connection (communicating to
     the actor thread) about the UDP address of the remote peer. The
-    local connection will then start its forwarder threads as
+    local connection will then start its forwarder thread as
     described in 6a, and start sending fast heartbeats. We send to the
     remote peer via TCP a ConnectionEstablished message. The remote
     peer receives this (on the TCP receiver process), tells the

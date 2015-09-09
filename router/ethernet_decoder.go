@@ -29,7 +29,13 @@ func (dec *EthernetDecoder) DecodeLayers(data []byte) {
 	dec.parser.DecodeLayers(data, &dec.decoded)
 }
 
-func (dec *EthernetDecoder) sendICMPFragNeeded(mtu int, sendFrame func([]byte) error) error {
+func (dec *EthernetDecoder) PacketKey() (key PacketKey) {
+	copy(key.SrcMAC[:], dec.Eth.SrcMAC)
+	copy(key.DstMAC[:], dec.Eth.DstMAC)
+	return
+}
+
+func (dec *EthernetDecoder) makeICMPFragNeeded(mtu int) ([]byte, error) {
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{
 		FixLengths:       true,
@@ -57,22 +63,16 @@ func (dec *EthernetDecoder) sendICMPFragNeeded(mtu int, sendFrame func([]byte) e
 			Seq:      uint16(mtu)},
 		&payload)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU= %v", dec.IP.DstIP, dec.IP.SrcIP, mtu)
-	return sendFrame(buf.Bytes())
+	return buf.Bytes(), nil
 }
 
 var (
-	// see http://en.wikipedia.org/wiki/Multicast_address#Ethernet
-	stpMACPrefix = []byte{0x01, 0x80, 0xC2, 0x00, 0x00}
-	zeroMAC, _   = net.ParseMAC("00:00:00:00:00:00")
+	zeroMAC, _ = net.ParseMAC("00:00:00:00:00:00")
 )
-
-func (dec *EthernetDecoder) DropFrame() bool {
-	return bytes.Equal(stpMACPrefix, dec.Eth.DstMAC[:len(stpMACPrefix)])
-}
 
 func (dec *EthernetDecoder) IsSpecial() bool {
 	return dec.Eth.Length == 0 && dec.Eth.EthernetType == layers.EthernetTypeLLC &&

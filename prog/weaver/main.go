@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"net"
 	"net/http"
@@ -36,31 +35,31 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		config             weave.Config
-		justVersion        bool
-		protocolMinVersion int
-		ifaceName          string
-		routerName         string
-		nickName           string
-		password           string
-		pktdebug           bool
-		logLevel           string
-		prof               string
-		bufSzMB            int
-		noDiscovery        bool
-		httpAddr           string
-		iprangeCIDR        string
-		ipsubnetCIDR       string
-		peerCount          int
-		apiPath            string
-		peers              []string
-
+		config                    weave.Config
+		justVersion               bool
+		protocolMinVersion        int
+		ifaceName                 string
+		routerName                string
+		nickName                  string
+		password                  string
+		pktdebug                  bool
+		logLevel                  string
+		prof                      string
+		bufSzMB                   int
+		noDiscovery               bool
+		httpAddr                  string
+		iprangeCIDR               string
+		ipsubnetCIDR              string
+		peerCount                 int
+		apiPath                   string
+		peers                     []string
 		noDNS                     bool
 		dnsDomain                 string
 		dnsListenAddress          string
 		dnsTTL                    int
 		dnsClientTimeout          time.Duration
 		dnsEffectiveListenAddress string
+		iface                     *net.Interface
 	)
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
@@ -116,18 +115,25 @@ func main() {
 	var err error
 
 	if ifaceName != "" {
-		config.Iface, err = weavenet.EnsureInterface(ifaceName)
+		iface, err := weavenet.EnsureInterface(ifaceName)
+		if err != nil {
+			Log.Fatal(err)
+		}
+
+		// bufsz flag is in MB
+		config.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024)
 		if err != nil {
 			Log.Fatal(err)
 		}
 	}
 
 	if routerName == "" {
-		if config.Iface == nil {
+		if iface == nil {
 			Log.Fatal("Either an interface must be specified with --iface or a name with -name")
 		}
-		routerName = config.Iface.HardwareAddr.String()
+		routerName = iface.HardwareAddr.String()
 	}
+
 	name, err := weave.PeerNameFromUserInput(routerName)
 	if err != nil {
 		Log.Fatal(err)
@@ -157,9 +163,14 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	config.BufSz = bufSzMB * 1024 * 1024
-	config.LogFrame = logFrameFunc(pktdebug)
 	config.PeerDiscovery = !noDiscovery
+	config.Overlay = weave.NewSleeveOverlay(config.Port)
+
+	if pktdebug {
+		config.PacketLogging = packetLogging{}
+	} else {
+		config.PacketLogging = nopPacketLogging{}
+	}
 
 	router := weave.NewRouter(config, name, nickName)
 	Log.Println("Our name is", router.Ourself)
@@ -248,24 +259,22 @@ func canonicalName(f *mflag.Flag) string {
 	return ""
 }
 
-func logFrameFunc(debug bool) weave.LogFrameFunc {
-	if !debug {
-		return func(prefix string, frame []byte, dec *weave.EthernetDecoder) {}
-	}
-	return func(prefix string, frame []byte, dec *weave.EthernetDecoder) {
-		h := fmt.Sprintf("%x", sha256.Sum256(frame))
-		parts := []interface{}{prefix, len(frame), "bytes (", h, ")"}
+type packetLogging struct{}
 
-		if dec != nil {
-			parts = append(parts, dec.Eth.SrcMAC, "->", dec.Eth.DstMAC)
+func (packetLogging) LogPacket(msg string, key weave.PacketKey) {
+	Log.Println(msg, key.SrcMAC, "->", key.DstMAC)
+}
 
-			if dec.DF() {
-				parts = append(parts, "(DF)")
-			}
-		}
+func (packetLogging) LogForwardPacket(msg string, key weave.ForwardPacketKey) {
+	Log.Println(msg, key.SrcPeer, key.SrcMAC, "->", key.DstPeer, key.DstMAC)
+}
 
-		Log.Println(parts...)
-	}
+type nopPacketLogging struct{}
+
+func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
+}
+
+func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
 func parseAndCheckCIDR(cidrStr string) address.CIDR {
