@@ -11,3 +11,4 @@ layout: default
  * [Troubleshooting](troubleshooting.html)
  * [Building](building.html)
  * [How it works](how-it-works.html)
+ * [Latest release](https://github.com/weaveworks/weave/releases/tag/latest_release)
