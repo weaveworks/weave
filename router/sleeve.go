@@ -133,6 +133,10 @@ func (*SleeveOverlay) InvalidateShortIDs() {
 	// no cached information, so nothing to do
 }
 
+func (*SleeveOverlay) AddFeaturesTo(map[string]string) {
+	// No features to be provided, to facilitate compatibility
+}
+
 func (sleeve *SleeveOverlay) lookupForwarder(peer PeerName) *sleeveForwarder {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
@@ -281,7 +285,7 @@ type sleeveForwarder struct {
 	sleeve         *SleeveOverlay
 	remotePeer     *Peer
 	remotePeerBin  []byte
-	sendControlMsg func(ProtocolTag, []byte) error
+	sendControlMsg func(byte, []byte) error
 	connUID        uint64
 
 	// Channels to communicate with the aggregator goroutine
@@ -342,7 +346,7 @@ type specialFrame struct {
 
 // A control message
 type controlMessage struct {
-	tag ProtocolTag
+	tag byte
 	msg []byte
 }
 
@@ -586,7 +590,7 @@ func frameTooBig(frame []byte, mtu int) bool {
 	return len(frame) > mtu+EthernetOverhead
 }
 
-func (fwd *sleeveForwarder) ControlMessage(tag ProtocolTag, msg []byte) {
+func (fwd *sleeveForwarder) ControlMessage(tag byte, msg []byte) {
 	select {
 	case fwd.controlMsgChan <- controlMessage{tag, msg}:
 	case <-fwd.finishedChan:
