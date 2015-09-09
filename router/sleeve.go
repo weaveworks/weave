@@ -399,7 +399,7 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 }
 
 func (fwd *sleeveForwarder) logPrefixFor(sender *net.UDPAddr) string {
-	return fmt.Sprintf("->[%s|%s]: ", sender, fwd.remotePeer)
+	return fmt.Sprintf("sleeve ->[%s|%s]: ", sender, fwd.remotePeer)
 }
 
 func (fwd *sleeveForwarder) logPrefix() string {
