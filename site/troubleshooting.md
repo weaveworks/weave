@@ -224,7 +224,7 @@ available from the `weave status` commands. You can also supply a
 Golang text template to `weave report` in a similar fashion to `docker
 inspect`:
 
-    $ weave report -f '{{{.DNS.Domain}}'
+    $ weave report -f '{{.DNS.Domain}}'
     weave.local.
 
 ### <a name="list-attached-containers"></a>List attached containers
