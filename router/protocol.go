@@ -328,7 +328,7 @@ func (res *ProtocolIntroResults) setupCrypto(params ProtocolIntroParams, remoteP
 type ProtocolTag byte
 
 const (
-	ProtocolHeartbeat ProtocolTag = iota
+	ProtocolHeartbeat = iota
 	ProtocolConnectionEstablished
 	ProtocolFragmentationReceived
 	ProtocolPMTUVerified

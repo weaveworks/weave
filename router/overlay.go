@@ -18,6 +18,9 @@ type Overlay interface {
 
 	// A mapping of a short id to a peer has changed
 	InvalidateShortIDs()
+
+	// Enhance a features map with overlay-related features
+	AddFeaturesTo(map[string]string)
 }
 
 type ForwarderParams struct {
@@ -41,7 +44,10 @@ type ForwarderParams struct {
 
 	// Function to send a control message to the counterpart
 	// forwarder.
-	SendControlMessage func(tag ProtocolTag, msg []byte) error
+	SendControlMessage func(tag byte, msg []byte) error
+
+	// Features passed at connection initiation
+	Features map[string]string
 }
 
 // When a consumer is called, the decoder will already have been used
@@ -81,7 +87,7 @@ type OverlayForwarder interface {
 	// Handle a message from the peer.  'tag' exists for
 	// compatibility, and should always be
 	// ProtocolOverlayControlMessage for non-sleeve overlays.
-	ControlMessage(tag ProtocolTag, msg []byte)
+	ControlMessage(tag byte, msg []byte)
 }
 
 type NullOverlay struct{}
@@ -111,6 +117,9 @@ func (NullOverlay) ErrorChannel() <-chan error {
 	return nil
 }
 
+func (NullOverlay) AddFeaturesTo(map[string]string) {
+}
+
 func (NullOverlay) Forward(ForwardPacketKey) FlowOp {
 	return nil
 }
@@ -118,5 +127,5 @@ func (NullOverlay) Forward(ForwardPacketKey) FlowOp {
 func (NullOverlay) Stop() {
 }
 
-func (NullOverlay) ControlMessage(ProtocolTag, []byte) {
+func (NullOverlay) ControlMessage(byte, []byte) {
 }
