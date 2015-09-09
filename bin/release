@@ -223,7 +223,7 @@ publish() {
             --repo weave \
             --tag latest_release \
             --name "$RELEASE_NAME latest ($VERSION)" \
-            --description "$RELEASE_DESCRIPTION"
+            --description "[Release Notes](https://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG)"
 
         github-release upload \
             --user $GITHUB_USER \
