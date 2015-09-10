@@ -19,7 +19,7 @@ type LocalPeerAction func()
 func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
 	actionChan := make(chan LocalPeerAction, ChannelSize)
 	peer := &LocalPeer{
-		Peer:       NewPeer(name, nickName, 0, 0),
+		Peer:       NewPeer(name, nickName, randomPeerUID(), 0),
 		router:     router,
 		actionChan: actionChan,
 	}
@@ -27,54 +27,54 @@ func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
 	return peer
 }
 
-func (peer *LocalPeer) Forward(dstPeer *Peer, frame []byte, dec *EthernetDecoder) error {
-	return peer.Relay(peer.Peer, dstPeer, frame, dec)
+func (peer *LocalPeer) Forward(dstPeer *Peer, key PacketKey) FlowOp {
+	return peer.Relay(ForwardPacketKey{
+		PacketKey: key,
+		SrcPeer:   peer.Peer,
+		DstPeer:   dstPeer,
+	})
 }
 
-func (peer *LocalPeer) Broadcast(frame []byte, dec *EthernetDecoder) {
-	peer.RelayBroadcast(peer.Peer, frame, dec)
+func (peer *LocalPeer) Broadcast(key PacketKey) FlowOp {
+	return peer.RelayBroadcast(peer.Peer, key)
 }
 
-func (peer *LocalPeer) Relay(srcPeer, dstPeer *Peer, frame []byte, dec *EthernetDecoder) error {
-	relayPeerName, found := peer.router.Routes.Unicast(dstPeer.Name)
+func (peer *LocalPeer) Relay(key ForwardPacketKey) FlowOp {
+	relayPeerName, found := peer.router.Routes.Unicast(key.DstPeer.Name)
 	if !found {
 		// Not necessarily an error as there could be a race with the
 		// dst disappearing whilst the frame is in flight
-		log.Println("Received packet for unknown destination:", dstPeer)
+		log.Println("Received packet for unknown destination:", key.DstPeer)
 		return nil
 	}
+
 	conn, found := peer.ConnectionTo(relayPeerName)
 	if !found {
 		// Again, could just be a race, not necessarily an error
 		log.Println("Unable to find connection to relay peer", relayPeerName)
 		return nil
 	}
-	return conn.(*LocalConnection).Forward(&ForwardedFrame{
-		srcPeer: srcPeer,
-		dstPeer: dstPeer,
-		frame:   frame},
-		dec)
+
+	return conn.(*LocalConnection).Forward(key)
 }
 
-func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, frame []byte, dec *EthernetDecoder) {
+func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
 	nextHops := peer.router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
-		return
+		return nil
 	}
+
+	op := NewMultiFlowOp(true)
+
 	for _, conn := range peer.ConnectionsTo(nextHops) {
-		err := conn.(*LocalConnection).Forward(&ForwardedFrame{
-			srcPeer: srcPeer,
-			dstPeer: conn.Remote(),
-			frame:   frame},
-			dec)
-		if err != nil {
-			if ftbe, ok := err.(FrameTooBigError); ok {
-				log.Warningf("dropping too big DF broadcast frame (%v -> %v): PMTU= %v", dec.IP.DstIP, dec.IP.SrcIP, ftbe.EPMTU)
-			} else {
-				log.Errorln(err)
-			}
-		}
+		op.Add(conn.(*LocalConnection).Forward(ForwardPacketKey{
+			PacketKey: key,
+			SrcPeer:   srcPeer,
+			DstPeer:   conn.Remote(),
+		}))
 	}
+
+	return op
 }
 
 func (peer *LocalPeer) Connections() ConnectionSet {
@@ -265,20 +265,20 @@ func (peer *LocalPeer) addConnection(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	peer.connections[conn.Remote().Name] = conn
-	peer.version++
+	peer.Version++
 }
 
 func (peer *LocalPeer) deleteConnection(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
 	delete(peer.connections, conn.Remote().Name)
-	peer.version++
+	peer.Version++
 }
 
 func (peer *LocalPeer) connectionEstablished(conn Connection) {
 	peer.Lock()
 	defer peer.Unlock()
-	peer.version++
+	peer.Version++
 }
 
 func (peer *LocalPeer) connectionCount() int {

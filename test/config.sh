@@ -34,7 +34,7 @@ HOST3=$(echo $HOSTS | cut -f 3 -d ' ')
 SSH_DIR=${SSH_DIR:-$DIR}
 SSH=${SSH:-ssh -l vagrant -i "$SSH_DIR/insecure_private_key" -o "UserKnownHostsFile=$SSH_DIR/.ssh_known_hosts" -o CheckHostIP=no -o StrictHostKeyChecking=no}
 
-SMALL_IMAGE="gliderlabs/alpine"
+SMALL_IMAGE="alpine"
 DNS_IMAGE="aanand/docker-dnsutils"
 TEST_IMAGES="$SMALL_IMAGE $DNS_IMAGE"
 
