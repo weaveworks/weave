@@ -1074,7 +1074,7 @@ proxy_addr() {
 
 warn_if_stopping_proxy_in_env() {
     if PROXY_ADDR=$(proxy_addr 2>/dev/null) ; then
-        [ "$PROXY_ADDR" != "$DOCKER_CLIENT_HOST" ] || echo "WARNING: It appears that your environment is configured to use the Weave Docker API proxy. Stopping it will break this and subsequent docker invocations. To restore your environment, run '\$(eval weave env --restore)'."
+        [ "$PROXY_ADDR" != "$DOCKER_CLIENT_HOST" ] || echo "WARNING: It appears that your environment is configured to use the Weave Docker API proxy. Stopping it will break this and subsequent docker invocations. To restore your environment, run 'eval \$(weave env --restore)'."
     fi
 }
 
