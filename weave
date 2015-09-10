@@ -995,11 +995,7 @@ tls_arg() {
     PROXY_ARGS="$PROXY_ARGS $1 /home/weave/tls/$3.pem"
 }
 
-proxy_args() {
-    PROXY_VOLUMES=""
-    PROXY_ARGS=""
-    PROXY_TLS_ENABLED=""
-    PROXY_HOST=""
+proxy_parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
           -H)
@@ -1042,10 +1038,20 @@ proxy_args() {
         esac
         shift
     done
+}
+
+proxy_args() {
+    PROXY_VOLUMES=""
+    PROXY_ARGS=""
+    PROXY_TLS_ENABLED=""
+    PROXY_HOST=""
+    proxy_parse_args "$@"
 
     if [ -z "$PROXY_HOST" -a -n "$CLIENT_TLS_ENABLED" -a -z "$PROXY_TLS_ENABLED" ] ; then
-      echo "When launching the proxy via TLS, -H and/or TLS options are required." >&2
-      exit 1
+      if ! proxy_parse_args $(docker_tls_args) ; then
+        echo "When launching the proxy via TLS, -H and/or TLS options are required." >&2
+        exit 1
+      fi
     fi
     if [ -z "$PROXY_HOST" ] ; then
       case "$DOCKER_CLIENT_HOST" in
