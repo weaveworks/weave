@@ -9,7 +9,7 @@ if [ "$SCRIPT_VERSION" = "(unreleased version)" ] ; then
 else
     IMAGE_VERSION=$SCRIPT_VERSION
 fi
-IMAGE_VERSION=${VERSION:-$IMAGE_VERSION}
+IMAGE_VERSION=${WEAVE_VERSION:-$IMAGE_VERSION}
 
 # - Docker versions prior to 1.2.0 cannot parse `--dns-search=.`
 # - Docker versions prior to 1.3.0 fail to include the domain when
@@ -100,7 +100,7 @@ exec_remote() {
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
-        -e VERSION \
+        -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
         -e WEAVE_DOCKER_ARGS \
         -e WEAVEPROXY_DOCKER_ARGS \
