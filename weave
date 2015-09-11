@@ -1209,7 +1209,7 @@ launch_proxy() {
     proxy_args "$@"
     HOSTS_PATH=$(docker run --rm \
       -v /var/run/docker.sock:/var/run/docker.sock \
-      --entrypoint /bin/sh \
+      --entrypoint=/bin/sh \
       $EXEC_IMAGE -c 'docker inspect -f {{.HostsPath}} $(hostname)')
     CONTAINERS_PATH="$(dirname $(dirname "$HOSTS_PATH"))"
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
