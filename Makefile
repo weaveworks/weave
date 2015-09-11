@@ -43,7 +43,7 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	echo "    sudo go install -tags netgo std"; \
 	false; \
 }
-BUILD_FLAGS=-ldflags "-extldflags \"-static\" -linkmode=external -X main.version=$(WEAVE_VERSION)" -tags netgo
+BUILD_FLAGS=-ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo
 
 all: $(WEAVE_EXPORT) $(COVER_EXE) $(RUNNER_EXE)
 
@@ -81,8 +81,8 @@ $(COVER_EXE): testing/cover/cover.go
 $(RUNNER_EXE): testing/runner/runner.go
 
 $(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(WEAVEHOSTS_EXE) $(COVER_EXE) $(RUNNER_EXE):
-	go get -tags netgo ./$(@D)
-	go build $(BUILD_FLAGS) -o $@ ./$(@D)
+	go get ./$(@D)
+	go build -o $@ ./$(@D)
 
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
