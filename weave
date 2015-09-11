@@ -1350,7 +1350,7 @@ case "$COMMAND" in
     launch)
         deprecation_warnings "$@"
         check_not_running $CONTAINER_NAME       $BASE_IMAGE
-        check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
+        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
@@ -1363,7 +1363,7 @@ case "$COMMAND" in
         ;;
     launch-proxy)
         deprecation_warnings "$@"
-        check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
+        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
