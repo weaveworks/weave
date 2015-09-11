@@ -217,6 +217,11 @@ if [ "$1" = "--help" -o "$1" = "help" ] ; then
     # at the client end.
     usage_no_exit
     exit 0
+elif [ "$1" = "version" -a -z "$IS_LOCAL" ] ; then
+    # non-local "version" is special because we want to show the
+    # version of the script executed by the user rather than what is
+    # embedded in weaveexec.
+    echo "weave script $SCRIPT_VERSION"
 elif [ "$1" = "env" -a "$2" = "--restore" ] ; then
     # "env --restore" is special because we always want to process it
     # at the client end.
@@ -498,11 +503,7 @@ ask_version() {
                 echo "Unable to find $2 image." >&2
             fi
     fi
-    VERSION_COVERAGE_ARGS=""
-    if [ "$1" = "$CONTAINER_NAME" ] || [ "$1" == "$PROXY_CONTAINER_NAME"]  ; then
-        VERSION_COVERAGE_ARGS="$COVERAGE_ARGS"
-    fi
-    [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $DOCKERIMAGE $VERSION_COVERAGE_ARGS --version
+    [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
 }
 
 ######################################################################
@@ -1329,18 +1330,8 @@ case "$COMMAND" in
         ;;
     version)
         [ $# -eq 0 ] || usage
-        echo weave script $SCRIPT_VERSION
         ask_version $CONTAINER_NAME $IMAGE || true
-        if ! EXEC_IMAGE_ID=$(docker inspect --format='{{.Id}}' $EXEC_IMAGE 2>/dev/null) ; then
-            echo "Unable to find $EXEC_IMAGE image." >&2
-        else
-            EXEC_VERSION=$(docker images --no-trunc | grep $EXEC_IMAGE_ID | grep -v latest | tr -s ' ' | cut -d ' ' -f 2 | tr "\n" ' ')
-            if [ -n "$EXEC_VERSION" ] ; then
-                echo "weave exec $EXEC_VERSION"
-            else
-                echo "weave exec (unreleased version)"
-            fi
-        fi
+        ask_version $PROXY_CONTAINER_NAME $EXEC_IMAGE --entrypoint=/home/weave/weaveproxy || true
         ;;
     # intentionally undocumented since it assumes knowledge of weave
     # internals
