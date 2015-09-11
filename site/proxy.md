@@ -45,8 +45,9 @@ argument, e.g.
 
     host1$ weave launch-proxy -H tcp://127.0.0.1:9999
 
-When launching the proxy via TLS, `-H` and/or [TLS options](#tls) are
-required.
+If no TLS or listening interfaces are set, TLS will be autoconfigured
+based on the docker daemon's settings, and listening interfaces will
+be autoconfigured based on your docker client's settings.
 
 Multiple `-H` arguments can be specified. If you are working with a
 remote docker daemon, then any firewalls inbetween need to be
@@ -204,13 +205,20 @@ to the proxy, the specified label has precedence over the container's name.
 
 ## <a name="tls"></a>Securing the docker communication with TLS
 
-If you are
-[connecting to the docker daemon with TLS](https://docs.docker.com/articles/https/),
-you will probably want to do the same when connecting to the
-proxy. That is accomplished by launching the proxy with the same
-TLS-related command-line flags as supplied to the docker daemon. For
-example, if you have generated your certificates and keys into the
-docker host's `/tls` directory, we can launch the proxy with:
+If you are [connecting to the docker daemon with
+TLS](https://docs.docker.com/articles/https/), you will probably want
+to do the same when connecting to the proxy. The proxy will
+automatically detect the docker daemon's TLS configuration, and
+attempt to duplicate it. In the standard auto-detection case you will
+be able to launch a TLS-enabled proxy with:
+
+    host1$ weave launch-proxy
+
+You can also manually configure the proxy's TLS. This is accomplished
+by launching the proxy with the same TLS-related command-line flags as
+supplied to the docker daemon. For example, if you have generated your
+certificates and keys into the docker host's `/tls` directory, we can
+launch the proxy with:
 
     host1$ weave launch-proxy --tls-verify --tls-cacert=/tls/ca.pem \
              --tls-cert=/tls/server-cert.pem --tls-key=/tls/server-key.pem
