@@ -240,6 +240,42 @@ func TestCancel(t *testing.T) {
 	}
 }
 
+func TestCancelOnDied(t *testing.T) {
+	const (
+		CIDR       = "10.0.1.7/26"
+		container1 = "abcdef"
+	)
+
+	router := gossip.NewTestRouter(0.0)
+
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
+	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
+
+	alloc1.Start()
+
+	doneChan := make(chan bool)
+	go func() {
+		_, ok := alloc1.Allocate(container1, subnet, nil)
+		doneChan <- ok == nil
+	}()
+
+	// Do another allocation in parallel, to check that is handled correctly
+	go func() {
+		_, ok := alloc1.Allocate(container1, subnet, nil)
+		doneChan <- ok == nil
+	}()
+
+	AssertNothingSent(t, doneChan)
+	time.Sleep(100 * time.Millisecond)
+	AssertNothingSent(t, doneChan)
+
+	alloc1.ContainerDied(container1)
+
+	if <-doneChan || <-doneChan {
+		require.FailNow(t, "Error: got result from Allocate")
+	}
+}
+
 func TestGossipShutdown(t *testing.T) {
 	const (
 		container1 = "abcdef"
