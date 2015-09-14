@@ -43,7 +43,7 @@ func main() {
 	mflag.Parse()
 
 	if justVersion {
-		fmt.Printf("weave proxy %s\n", version)
+		fmt.Printf("weave proxy  %s\n", version)
 		os.Exit(0)
 	}
 
