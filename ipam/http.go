@@ -16,6 +16,43 @@ func badRequest(w http.ResponseWriter, err error) {
 	common.Log.Warningln("[allocator]:", err.Error())
 }
 
+func extractCIDR(w http.ResponseWriter, vars map[string]string) (address.CIDR, bool) {
+	cidrStr := vars["ip"] + "/" + vars["prefixlen"]
+	subnetAddr, cidr, err := address.ParseCIDR(cidrStr)
+	if err != nil {
+		badRequest(w, err)
+		return address.CIDR{}, false
+	}
+	if cidr.Start != subnetAddr {
+		badRequest(w, fmt.Errorf("Invalid subnet %s - bits after network prefix are not all zero", cidrStr))
+		return address.CIDR{}, false
+	}
+	return cidr, true
+}
+
+func doAllocate(alloc *Allocator, dockerCli *docker.Client, w http.ResponseWriter, r *http.Request, vars map[string]string, subnet address.CIDR) {
+	closedChan := w.(http.CloseNotifier).CloseNotify()
+	ident := vars["id"]
+	addr, err := alloc.Allocate(ident, subnet.HostRange(), closedChan)
+	if err != nil {
+		if _, ok := err.(*errorCancelled); ok { // cancellation is not really an error
+			common.Log.Infoln("[allocator]:", err.Error())
+			fmt.Fprint(w, "cancelled")
+			return
+		}
+		badRequest(w, err)
+		return
+	}
+	if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
+		common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, addr)
+		alloc.Free(ident, addr)
+		fmt.Fprint(w, "cancelled")
+		return
+	}
+
+	fmt.Fprintf(w, "%s/%d", addr, subnet.PrefixLen)
+}
+
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
 func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR, dockerCli *docker.Client) {
 	router.Methods("PUT").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,18 +73,14 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 
 	router.Methods("GET").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		cidr := vars["ip"] + "/" + vars["prefixlen"]
-		_, subnet, err := address.ParseCIDR(cidr)
-		if err != nil {
-			badRequest(w, err)
-			return
+		if subnet, ok := extractCIDR(w, vars); ok {
+			addr, err := alloc.Lookup(vars["id"], subnet.HostRange())
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			fmt.Fprintf(w, "%s/%d", addr, subnet.PrefixLen)
 		}
-		addr, err := alloc.Lookup(vars["id"], subnet.HostRange())
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-		fmt.Fprintf(w, "%s/%d", addr, subnet.PrefixLen)
 	})
 
 	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,48 +93,14 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 	})
 
 	router.Methods("POST").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		closedChan := w.(http.CloseNotifier).CloseNotify()
 		vars := mux.Vars(r)
-		ident := vars["id"]
-		cidrStr := vars["ip"] + "/" + vars["prefixlen"]
-		subnetAddr, cidr, err := address.ParseCIDR(cidrStr)
-		if err != nil {
-			badRequest(w, err)
-			return
+		if subnet, ok := extractCIDR(w, vars); ok {
+			doAllocate(alloc, dockerCli, w, r, vars, subnet)
 		}
-		if cidr.Start != subnetAddr {
-			badRequest(w, fmt.Errorf("Invalid subnet %s - bits after network prefix are not all zero", cidrStr))
-			return
-		}
-		addr, err := alloc.Allocate(ident, cidr.HostRange(), closedChan)
-		if err != nil {
-			badRequest(w, fmt.Errorf("Unable to allocate: %s", err))
-			return
-		}
-		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
-			common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, addr)
-			alloc.Free(ident, addr)
-			return
-		}
-
-		fmt.Fprintf(w, "%s/%d", addr, cidr.PrefixLen)
 	})
 
 	router.Methods("POST").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		closedChan := w.(http.CloseNotifier).CloseNotify()
-		ident := mux.Vars(r)["id"]
-		newAddr, err := alloc.Allocate(ident, defaultSubnet.HostRange(), closedChan)
-		if err != nil {
-			badRequest(w, err)
-			return
-		}
-		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
-			common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, newAddr)
-			alloc.Free(ident, newAddr)
-			return
-		}
-
-		fmt.Fprintf(w, "%s/%d", newAddr, defaultSubnet.PrefixLen)
+		doAllocate(alloc, dockerCli, w, r, mux.Vars(r), defaultSubnet)
 	})
 
 	router.Methods("DELETE").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
