@@ -35,12 +35,18 @@ func doAllocate(alloc *Allocator, dockerCli *docker.Client, w http.ResponseWrite
 	ident := vars["id"]
 	addr, err := alloc.Allocate(ident, subnet.HostRange(), closedChan)
 	if err != nil {
+		if _, ok := err.(*errorCancelled); ok { // cancellation is not really an error
+			common.Log.Infoln("[allocator]:", err.Error())
+			fmt.Fprint(w, "cancelled")
+			return
+		}
 		badRequest(w, err)
 		return
 	}
 	if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
 		common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, addr)
 		alloc.Free(ident, addr)
+		fmt.Fprint(w, "cancelled")
 		return
 	}
 

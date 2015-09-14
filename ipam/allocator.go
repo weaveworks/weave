@@ -184,6 +184,15 @@ func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 	}
 }
 
+type errorCancelled struct {
+	kind  string
+	ident string
+}
+
+func (e *errorCancelled) Error() string {
+	return fmt.Sprintf("%s request for %s cancelled", e.kind, e.ident)
+}
+
 // Actor client API
 
 // Allocate (Sync) - get new IP address for container with given name in range
