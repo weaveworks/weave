@@ -33,12 +33,18 @@ func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.Resp
 	closedChan := w.(http.CloseNotifier).CloseNotify()
 	addr, err := alloc.Allocate(ident, subnet.HostRange(), closedChan)
 	if err != nil {
+		if _, ok := err.(*errorCancelled); ok { // cancellation is not really an error
+			common.Log.Infoln("[allocator]:", err.Error())
+			fmt.Fprint(w, "cancelled")
+			return
+		}
 		badRequest(w, err)
 		return
 	}
 	if checkAlive && dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
 		common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, addr)
 		alloc.Free(ident, addr)
+		fmt.Fprint(w, "cancelled")
 		return
 	}
 

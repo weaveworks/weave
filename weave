@@ -919,6 +919,8 @@ ipam_cidrs() {
         if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
             echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
             return 1
+        elif [ "$IPAM_CIDRS" = "cancelled" ] ; then
+            return 0
         fi
         ALL_CIDRS="$IPAM_CIDRS"
     fi
@@ -933,8 +935,9 @@ ipam_cidrs() {
             if [ "$CIDR" = "404 page not found" ] ; then
                 echo "IP address allocation must be enabled to use 'net:'" >&2
                 return 1
-            fi
-            if ! is_cidr "$CIDR" ; then
+            elif [ "$CIDR" = "cancelled" ] ; then
+                return 0
+            elif ! is_cidr "$CIDR" ; then
                 echo "$CIDR" >&2
                 return 1
             fi
@@ -1486,6 +1489,10 @@ case "$COMMAND" in
         CONTAINER=$(container_id $1)
         create_bridge
         ipam_cidrs$ATTACH_TYPE $CONTAINER $CIDR_ARGS
+        if [ "$IPAM_CIDRS" = "cancelled" ] ; then
+            echo "cancelled" >&2
+            exit 0
+        fi
         if [ -n "$REWRITE_HOSTS" ] && command_exists weavehosts ; then
             PATH_AND_NAME=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}' $CONTAINER)
             weavehosts $PATH_AND_NAME $ALL_CIDRS
