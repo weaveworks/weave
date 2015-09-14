@@ -12,7 +12,7 @@ ip_suffix_base = 10
 require '../vagrant-common.rb'
 
 def configure_docker(host, hostname, ip)
-  pkgs = %w(lxc-docker ethtool)
+  pkgs = %w(docker-engine ethtool)
 
   host.vm.box = "ubuntu/ubuntu-15.04-amd64"
   host.vm.box_url = "https://cloud-images.ubuntu.com/vagrant/vivid/current/vivid-server-cloudimg-amd64-vagrant-disk1.box"
@@ -22,8 +22,8 @@ def configure_docker(host, hostname, ip)
 
   host.vm.synced_folder ".", "/vagrant", disabled: true
 
-  host.vm.provision :shell, :inline => "sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9"
-  host.vm.provision :shell, :inline => "echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list"
+  host.vm.provision :shell, :inline => "sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D"
+  host.vm.provision :shell, :inline => "echo deb https://apt.dockerproject.org/repo ubuntu-vivid main > /etc/apt/sources.list.d/docker.list"
 
   install_packages host.vm, pkgs
   tweak_docker_daemon host.vm
