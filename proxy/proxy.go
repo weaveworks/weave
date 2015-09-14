@@ -52,7 +52,7 @@ type wait struct {
 }
 
 type Proxy struct {
-	sync.RWMutex
+	sync.Mutex
 	Config
 	client              *docker.Client
 	dockerBridgeIP      string
