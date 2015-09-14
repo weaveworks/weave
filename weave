@@ -521,31 +521,27 @@ launch() {
 }
 
 attach() {
-    if netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        for ADDR in "$@" ; do
-            # container already has the expected network interface, so assume we set it up already;
-            # just add the IP address.
-            if netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
-                # address was there already
-                continue
-            fi
-            netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
-        done
-
-        return 0
+    if ! netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
+        connect_container_to_bridge || return 1
     fi
 
-    connect_container_to_bridge || return 1
-
+    NEW_ADDRS=
     for ADDR in "$@" ; do
+        if netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
+            # address was there already
+            continue
+        fi
         netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
+        NEW_ADDRS="$NEW_ADDRS $ADDR"
     done
 
     netnsenter ip link set $CONTAINER_IFNAME up || return 1
 
-    for ADDR in "$@" ; do
-        arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
-    done
+    if [ -n "$NEW_ADDRS" ] ; then
+        for ADDR in "$NEW_ADDRS" ; do
+            arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
+        done
+    fi
 
     # Route multicast packets across the weave network.
     # This must come last in 'attach'. If you change this, change weavewait to match.
