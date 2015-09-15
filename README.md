@@ -46,6 +46,11 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
     sudo curl -L git.io/weave -o /usr/local/bin/weave
     sudo chmod a+x /usr/local/bin/weave
 
+For usage on OSX (with Docker Machine) you first need to make sure
+that a VM is running and configured, as shown in [the Docker Machine
+documentation](https://docs.docker.com/installation/mac/#from-your-shell).
+Then you can launch weave directly from the OSX host.
+
 CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing weave using cloud-config.
 
 Weave respects the environment variable `DOCKER_HOST`, so you can run
