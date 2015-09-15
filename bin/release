@@ -52,7 +52,11 @@ setup() {
     LATEST_TAG_COMMIT_SHA=$(git rev-list -1 $LATEST_TAG)
     LATEST_RELEASE_SHA=$(git rev-parse latest_release)
     LATEST_RELEASE_COMMIT_SHA=$(git rev-list -1 latest_release)
-    VERSION=${LATEST_TAG}
+    if [ "$RELEASE_TYPE" != 'PRERELEASE' ] ; then
+        VERSION=${LATEST_TAG#v}
+    else
+        VERSION=${LATEST_TAG}
+    fi
     # NB does not check that this tag is on master
     RELEASE_DIR=./releases/$LATEST_TAG
 }
