@@ -256,8 +256,8 @@ usage() {
 # Ensure required tooling is installed
 if ! which github-release >/dev/null; then
     echo "Please install git-release:" >&2
-    echo -e "\tgo get github.com/aktau/github-release" >&2
-    echo "and create a git token per https://github.com/aktau/github-release" >&2
+    echo -e "\tgo get github.com/weaveworks/github-release" >&2
+    echo "and create a git token per https://github.com/weaveworks/github-release" >&2
     exit 1
 fi
 
