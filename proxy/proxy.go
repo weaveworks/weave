@@ -9,10 +9,12 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
+	weavedocker "github.com/weaveworks/weave/common/docker"
 )
 
 const (
@@ -52,16 +54,23 @@ type Config struct {
 	WithoutDNS          bool
 }
 
+type wait struct {
+	ident string
+	ch    chan struct{}
+}
+
 type Proxy struct {
+	sync.Mutex
 	Config
 	client              *docker.Client
 	dockerBridgeIP      string
 	hostnameMatchRegexp *regexp.Regexp
 	weaveWaitVolume     string
+	waiters             map[*http.Request]*wait
 }
 
 func NewProxy(c Config) (*Proxy, error) {
-	p := &Proxy{Config: c}
+	p := &Proxy{Config: c, waiters: make(map[*http.Request]*wait)}
 
 	if err := p.TLSConfig.loadCerts(); err != nil {
 		Log.Fatalf("Could not configure tls for proxy: %s", err)
@@ -72,11 +81,11 @@ func NewProxy(c Config) (*Proxy, error) {
 	// to insulate ourselves from breaking changes to the API, as
 	// happened in 1.20 (Docker 1.8.0) when the presentation of
 	// volumes changed in `inspect`.
-	client, err := docker.NewVersionedClient(dockerSockUnix, "1.15")
+	client, err := weavedocker.NewVersionedClient(dockerSockUnix, "1.15")
 	if err != nil {
 		return nil, err
 	}
-	p.client = client
+	p.client = client.Client
 
 	if !p.WithoutDNS {
 		dockerBridgeIP, stderr, err := callWeave("docker-bridge-ip")
@@ -96,7 +105,18 @@ func NewProxy(c Config) (*Proxy, error) {
 		return nil, err
 	}
 
+	client.AddObserver(p)
+
 	return p, nil
+}
+
+func (proxy *Proxy) AttachExistingContainers() {
+	containers, _ := proxy.client.ListContainers(docker.ListContainersOptions{})
+	for _, cont := range containers {
+		if strings.HasPrefix(cont.Command, weaveWaitEntrypoint[0]) {
+			proxy.ContainerStarted(cont.ID)
+		}
+	}
 }
 
 func (proxy *Proxy) Dial() (net.Conn, error) {
@@ -143,7 +163,7 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxy.Intercept(i, w, r)
 }
 
-func (proxy *Proxy) ListenAndServe() {
+func (proxy *Proxy) Listen() []net.Listener {
 	listeners := []net.Listener{}
 	addrs := []string{}
 	for _, addr := range proxy.ListenAddrs {
@@ -158,7 +178,10 @@ func (proxy *Proxy) ListenAndServe() {
 	for _, addr := range addrs {
 		Log.Infoln("proxy listening on", addr)
 	}
+	return listeners
+}
 
+func (proxy *Proxy) Serve(listeners []net.Listener) {
 	errs := make(chan error)
 	for _, listener := range listeners {
 		go func(listener net.Listener) {
@@ -237,6 +260,88 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 	}
 
 	return listener, fmt.Sprintf("%s://%s", proto, addr), nil
+}
+
+// weavedocker.ContainerObserver interface
+func (proxy *Proxy) ContainerStarted(ident string) {
+	container, err := proxy.client.InspectContainer(ident)
+	if err != nil {
+		Log.Warningf("Error inspecting container %s: %v", ident, err)
+		return
+	}
+	// If this was a container we modified the entrypoint for, attach it to the network
+	if containerShouldAttach(container) {
+		proxy.attach(container)
+	}
+	proxy.notifyWaiters(container.ID)
+}
+
+func containerShouldAttach(container *docker.Container) bool {
+	return len(container.Config.Entrypoint) > 0 && container.Config.Entrypoint[0] == weaveWaitEntrypoint[0]
+}
+
+func (proxy *Proxy) createWait(r *http.Request, ident string) {
+	proxy.Lock()
+	ch := make(chan struct{})
+	proxy.waiters[r] = &wait{ident: ident, ch: ch}
+	proxy.Unlock()
+}
+
+func (proxy *Proxy) removeWait(r *http.Request) {
+	proxy.Lock()
+	delete(proxy.waiters, r)
+	proxy.Unlock()
+}
+
+func (proxy *Proxy) notifyWaiters(ident string) {
+	proxy.Lock()
+	for _, wait := range proxy.waiters {
+		if ident == wait.ident && wait.ch != nil {
+			close(wait.ch)
+			wait.ch = nil
+		}
+	}
+	proxy.Unlock()
+}
+
+func (proxy *Proxy) waitForStart(r *http.Request) {
+	var ch chan struct{}
+	proxy.Lock()
+	wait, found := proxy.waiters[r]
+	if found {
+		ch = wait.ch
+	}
+	proxy.Unlock()
+	if found {
+		Log.Debugf("Wait for start of container %s", wait.ident)
+		<-ch
+	}
+}
+
+func (proxy *Proxy) ContainerDied(ident string) {
+}
+
+func (proxy *Proxy) attach(container *docker.Container) error {
+	cidrs, err := proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
+	if err != nil {
+		Log.Infof("Leaving container %s alone because %s", container.ID, err)
+		return nil
+	}
+	Log.Infof("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
+	args := []string{"attach"}
+	args = append(args, cidrs...)
+	if !proxy.NoRewriteHosts {
+		args = append(args, "--rewrite-hosts")
+	}
+	args = append(args, "--or-die", container.ID)
+	if _, stderr, err := callWeave(args...); err != nil {
+		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
+		return errors.New(string(stderr))
+	} else if len(stderr) > 0 {
+		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
+	}
+
+	return nil
 }
 
 func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, error) {

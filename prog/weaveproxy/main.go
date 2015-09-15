@@ -61,6 +61,8 @@ func main() {
 		Log.Fatalf("Could not start proxy: %s", err)
 	}
 
-	go p.ListenAndServe()
+	listeners := p.Listen()
+	p.AttachExistingContainers()
+	go p.Serve(listeners)
 	SignalHandlerLoop()
 }

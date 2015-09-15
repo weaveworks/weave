@@ -7,6 +7,7 @@ import (
 
 // An observer for container events
 type ContainerObserver interface {
+	ContainerStarted(ident string)
 	ContainerDied(ident string)
 }
 
@@ -22,12 +23,26 @@ func NewClient(apiPath string) (*Client, error) {
 	}
 	client := &Client{dc}
 
-	env, err := client.Version()
+	return client, client.checkWorking(apiPath)
+}
+
+func NewVersionedClient(apiPath string, apiVersionString string) (*Client, error) {
+	dc, err := docker.NewVersionedClient(apiPath, apiVersionString)
 	if err != nil {
 		return nil, err
 	}
+	client := &Client{dc}
+
+	return client, client.checkWorking(apiPath)
+}
+
+func (c *Client) checkWorking(apiPath string) error {
+	env, err := c.Version()
+	if err != nil {
+		return err
+	}
 	Log.Infof("[docker] Using Docker API on %s: %v", apiPath, env)
-	return client, nil
+	return nil
 }
 
 // AddObserver adds an observer for docker events
@@ -41,6 +56,9 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 	go func() {
 		for event := range events {
 			switch event.Status {
+			case "start":
+				id := event.ID
+				ob.ContainerStarted(id)
 			case "die":
 				id := event.ID
 				ob.ContainerDied(id)
