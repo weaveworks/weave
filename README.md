@@ -48,8 +48,20 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
 
 CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing weave using cloud-config.
 
+For usage on OSX (e.g. with Docker Machine and/or Boot2Docker) we
+first need to make sure that the VM is running and configured before
+launching weave. For example, for a VM named "weave-1" on
+docker-machine:
+
+    osx$ docker-machine create -d virtualbox weave-1
+    osx$ docker-machine start weave-1
+    osx$ eval "$(docker-machine env weave-1)"
+
+Then we can launch weave directly from the osx host.
+
 Weave respects the environment variable `DOCKER_HOST`, so you can run
 it locally to control a weave network on a remote host.
+
 
 ## Quick Start Screencast
 
