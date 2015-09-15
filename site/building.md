@@ -37,10 +37,7 @@ Some prerequisites are needed to build weave:
 
 * Install Docker if you haven't already, by following the instructions
   [on the Docker
-  site](https://docs.docker.com/installation/ubuntulinux/).  Note that
-  we recommend using the Docker-maintained `lxc-docker` package, rather
-  than the `docker.io` package which contains a very old version.  Then
-  install the other prerequisites for building with:
+  site](https://docs.docker.com/installation/ubuntulinux/).
 * Building weave requires Go 1.4.2, and the `golang` package in Ubuntu
   14.04 LTS is too old.  So you may need to [install the tarball from
   golang.org](http://golang.org/doc/install).
