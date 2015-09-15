@@ -126,11 +126,13 @@ func (alloc *Allocator) cancelOps(ops *[]operation) {
 // if we found any.
 func (alloc *Allocator) cancelOpsFor(ops *[]operation, ident string) bool {
 	var found bool
-	for i, op := range *ops {
-		if op.ForContainer(ident) {
+	for i := 0; i < len(*ops); {
+		if op := (*ops)[i]; op.ForContainer(ident) {
 			found = true
 			op.Cancel()
 			*ops = append((*ops)[:i], (*ops)[i+1:]...)
+		} else {
+			i++
 		}
 	}
 	return found
