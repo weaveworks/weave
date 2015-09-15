@@ -131,9 +131,9 @@ func (alloc *Allocator) cancelOpsFor(ops *[]operation, ident string) bool {
 			found = true
 			op.Cancel()
 			*ops = append((*ops)[:i], (*ops)[i+1:]...)
-			continue
+		} else {
+			i++
 		}
-		i++
 	}
 	return found
 }
