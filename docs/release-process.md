@@ -31,7 +31,7 @@ behaviours for that type of release will be obtained from the script.
 * Choose a version tag (see above) henceforth referred to as `$TAG`.
 * Add a changelog entry for the new tag at the top of `CHANGELOG.md`.
   The first line must be a markdown header of the form `## Release
-  $TAG`
+  $TAG` for **Prerelease** builds, `## Release ${TAG#v}` otherwise.
 
 Commit the changelog update:
 

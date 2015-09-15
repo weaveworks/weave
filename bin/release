@@ -52,7 +52,11 @@ setup() {
     LATEST_TAG_COMMIT_SHA=$(git rev-list -1 $LATEST_TAG)
     LATEST_RELEASE_SHA=$(git rev-parse latest_release)
     LATEST_RELEASE_COMMIT_SHA=$(git rev-list -1 latest_release)
-    VERSION=${LATEST_TAG}
+    if [ "$RELEASE_TYPE" != 'PRERELEASE' ] ; then
+        VERSION=${LATEST_TAG#v}
+    else
+        VERSION=${LATEST_TAG}
+    fi
     # NB does not check that this tag is on master
     RELEASE_DIR=./releases/$LATEST_TAG
 }
@@ -252,8 +256,8 @@ usage() {
 # Ensure required tooling is installed
 if ! which github-release >/dev/null; then
     echo "Please install git-release:" >&2
-    echo -e "\tgo get github.com/aktau/github-release" >&2
-    echo "and create a git token per https://github.com/aktau/github-release" >&2
+    echo -e "\tgo get github.com/weaveworks/github-release" >&2
+    echo "and create a git token per https://github.com/weaveworks/github-release" >&2
     exit 1
 fi
 
