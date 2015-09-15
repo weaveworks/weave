@@ -1381,6 +1381,8 @@ launch_proxy() {
         -e PROCFS=/hostproc \
         -e WEAVE_CIDR=none \
         -e DOCKER_BRIDGE \
+        -e WEAVE_DEBUG \
+        -e COVERAGE \
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
     wait_for_status $PROXY_CONTAINER_NAME http_call_unix $PROXY_CONTAINER_NAME status.sock

@@ -436,13 +436,15 @@ func (proxy *Proxy) getDNSDomain() (domain string) {
 	}
 
 	weaveContainer, err := proxy.client.InspectContainer("weave")
-	if err != nil ||
-		weaveContainer.NetworkSettings == nil ||
-		weaveContainer.NetworkSettings.IPAddress == "" {
-		return
+	var weaveIP string
+	if err == nil && weaveContainer.NetworkSettings != nil {
+		weaveIP = weaveContainer.NetworkSettings.IPAddress
+	}
+	if weaveIP == "" {
+		weaveIP = "127.0.0.1"
 	}
 
-	url := fmt.Sprintf("http://%s:%d/domain", weaveContainer.NetworkSettings.IPAddress, router.HTTPPort)
+	url := fmt.Sprintf("http://%s:%d/domain", weaveIP, router.HTTPPort)
 	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return
