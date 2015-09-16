@@ -43,7 +43,7 @@ func main() {
 		for i := 0; i < len(args); i++ {
 			arg := string(args[i])
 			switch {
-			case arg == "-d":
+			case arg == "-d" || arg == "daemon":
 				isDaemon = true
 				break
 			case arg == "--tls", arg == "--tlsverify":
