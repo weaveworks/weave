@@ -48,6 +48,11 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
 
 CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing weave using cloud-config.
 
+Amazon ECS users see
+[here](https://github.com/weaveworks/guides/blob/master/aws-ecs/LATESTAMIs.md)
+for the latest Weave AMIs and
+[here](http://weave.works/guides/service-discovery-with-weave-aws-ecs.html) to get started with Weave on ECS.
+
 Weave respects the environment variable `DOCKER_HOST`, so you can run
 it locally to control a weave network on a remote host.
 
