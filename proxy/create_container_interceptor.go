@@ -2,16 +2,11 @@ package proxy
 
 import (
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
-
 	. "github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/nameserver"
-	"github.com/weaveworks/weave/router"
 )
 
 const MaxDockerHostname = 64
@@ -55,7 +50,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		if container.Config == nil {
 			container.Config = &docker.Config{}
 		}
-		i.addWeaveWaitVolume(container.HostConfig)
+		i.proxy.addWeaveWaitVolume(container.HostConfig)
 		if err := i.setWeaveWaitEntrypoint(container.Config); err != nil {
 			return err
 		}
@@ -66,26 +61,17 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 			}
 		}
 		hostname = i.proxy.hostnameMatchRegexp.ReplaceAllString(hostname, i.proxy.HostnameReplacement)
-		if err := i.setWeaveDNS(&container, hostname); err != nil {
-			return err
+		if dnsDomain, withDNS := i.proxy.getDNSDomain(); withDNS {
+			i.setHostname(&container, hostname, dnsDomain)
+			if err := i.proxy.setWeaveDNS(container.HostConfig, container.Hostname, dnsDomain); err != nil {
+				return err
+			}
 		}
 
 		return marshalRequestBody(r, container)
 	}
 
 	return nil
-}
-
-func (i *createContainerInterceptor) addWeaveWaitVolume(hostConfig *docker.HostConfig) {
-	var binds []string
-	for _, bind := range hostConfig.Binds {
-		s := strings.Split(bind, ":")
-		if len(s) >= 2 && s[1] == "/w" {
-			continue
-		}
-		binds = append(binds, bind)
-	}
-	hostConfig.Binds = append(binds, fmt.Sprintf("%s:/w:ro", i.proxy.weaveWaitVolume))
 }
 
 func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Config) error {
@@ -117,18 +103,7 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container *docker.Co
 	return nil
 }
 
-func (i *createContainerInterceptor) setWeaveDNS(container *createContainerRequestBody, name string) error {
-	if i.proxy.WithoutDNS {
-		return nil
-	}
-
-	dnsDomain, dnsRunning := i.getDNSDomain()
-	if !(dnsRunning || i.proxy.WithDNS) {
-		return nil
-	}
-
-	container.HostConfig.DNS = append(container.HostConfig.DNS, i.proxy.dockerBridgeIP)
-
+func (i *createContainerInterceptor) setHostname(container *createContainerRequestBody, name, dnsDomain string) {
 	if container.Hostname == "" && name != "" {
 		// Strip trailing period because it's unusual to see it used on the end of a host name
 		trimmedDNSDomain := strings.TrimSuffix(dnsDomain, ".")
@@ -140,39 +115,7 @@ func (i *createContainerInterceptor) setWeaveDNS(container *createContainerReque
 		}
 	}
 
-	if len(container.HostConfig.DNSSearch) == 0 {
-		if container.Hostname == "" {
-			container.HostConfig.DNSSearch = []string{dnsDomain}
-		} else {
-			container.HostConfig.DNSSearch = []string{"."}
-		}
-	}
-
-	return nil
-}
-
-func (i *createContainerInterceptor) getDNSDomain() (domain string, running bool) {
-	domain = nameserver.DefaultDomain
-	weaveContainer, err := i.proxy.client.InspectContainer("weave")
-	if err != nil ||
-		weaveContainer.NetworkSettings == nil ||
-		weaveContainer.NetworkSettings.IPAddress == "" {
-		return
-	}
-
-	url := fmt.Sprintf("http://%s:%d/domain", weaveContainer.NetworkSettings.IPAddress, router.HTTPPort)
-	resp, err := http.Get(url)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		return
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-
-	return string(b), true
+	return
 }
 
 func (i *createContainerInterceptor) InterceptResponse(r *http.Response) error {

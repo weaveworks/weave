@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -15,6 +16,8 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
+	"github.com/weaveworks/weave/nameserver"
+	"github.com/weaveworks/weave/router"
 )
 
 const (
@@ -364,4 +367,55 @@ func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *dock
 		return nil, ErrNoDefaultIPAM
 	}
 	return nil, nil
+}
+
+func (proxy *Proxy) addWeaveWaitVolume(hostConfig *docker.HostConfig) {
+	var binds []string
+	for _, bind := range hostConfig.Binds {
+		s := strings.Split(bind, ":")
+		if len(s) >= 2 && s[1] == "/w" {
+			continue
+		}
+		binds = append(binds, bind)
+	}
+	hostConfig.Binds = append(binds, fmt.Sprintf("%s:/w:ro", proxy.weaveWaitVolume))
+}
+
+func (proxy *Proxy) setWeaveDNS(hostConfig *docker.HostConfig, hostname, dnsDomain string) error {
+	hostConfig.DNS = append(hostConfig.DNS, proxy.dockerBridgeIP)
+
+	if len(hostConfig.DNSSearch) == 0 {
+		if hostname == "" {
+			hostConfig.DNSSearch = []string{dnsDomain}
+		} else {
+			hostConfig.DNSSearch = []string{"."}
+		}
+	}
+
+	return nil
+}
+
+func (proxy *Proxy) getDNSDomain() (domain string, running bool) {
+	domain = nameserver.DefaultDomain
+	running = proxy.WithDNS
+	weaveContainer, err := proxy.client.InspectContainer("weave")
+	if err != nil ||
+		weaveContainer.NetworkSettings == nil ||
+		weaveContainer.NetworkSettings.IPAddress == "" {
+		return
+	}
+
+	url := fmt.Sprintf("http://%s:%d/domain", weaveContainer.NetworkSettings.IPAddress, router.HTTPPort)
+	resp, err := http.Get(url)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	return string(b), true
 }

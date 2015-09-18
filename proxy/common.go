@@ -50,6 +50,10 @@ func unmarshalRequestBody(r *http.Request, target interface{}) error {
 	}
 	r.Body = ioutil.NopCloser(bytes.NewReader(body))
 
+	if len(body) == 0 {
+		return nil
+	}
+
 	d := json.NewDecoder(bytes.NewReader(body))
 	d.UseNumber() // don't want large numbers in scientific format
 	return d.Decode(&target)
@@ -62,6 +66,7 @@ func marshalRequestBody(r *http.Request, body interface{}) error {
 	}
 	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
+	r.Header.Set("Content-Type", "application/json")
 	return nil
 }
 
