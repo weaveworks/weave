@@ -83,8 +83,8 @@ $(RUNNER_EXE): testing/runner/runner.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
 
 $(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(WEAVEHOSTS_EXE) $(COVER_EXE) $(RUNNER_EXE) $(DOCKERTLSARGS_EXE):
-	go get ./$(@D)
-	go build -o $@ ./$(@D)
+	go get -tags netgo ./$(@D)
+	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
