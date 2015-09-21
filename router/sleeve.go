@@ -277,13 +277,14 @@ type sleeveForwarder struct {
 	sleeve         *SleeveOverlay
 	remotePeer     *Peer
 	remotePeerBin  []byte
-	sendControlMsg func([]byte) error
+	sendControlMsg func(ProtocolTag, []byte) error
 	connUID        uint64
 
 	// Channels to communicate with the aggregator goroutine
 	aggregatorChan   chan<- aggregatorFrame
 	aggregatorDFChan chan<- aggregatorFrame
 	specialChan      chan<- specialFrame
+	controlMsgChan   chan<- controlMessage
 	confirmedChan    chan<- struct{}
 	finishedChan     <-chan struct{}
 
@@ -326,11 +327,16 @@ type aggregatorFrame struct {
 	frame []byte
 }
 
-// A "special" message over UDP, or a control message.  The sender is
-// nil for control messages.
+// A "special" frame over UDP
 type specialFrame struct {
 	sender *net.UDPAddr
 	frame  []byte
+}
+
+// A control message
+type controlMessage struct {
+	tag ProtocolTag
+	msg []byte
 }
 
 func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
@@ -349,6 +355,7 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 	aggChan := make(chan aggregatorFrame, ChannelSize)
 	aggDFChan := make(chan aggregatorFrame, ChannelSize)
 	specialChan := make(chan specialFrame, 1)
+	controlMsgChan := make(chan controlMessage, 1)
 	confirmedChan := make(chan struct{})
 	finishedChan := make(chan struct{})
 
@@ -361,6 +368,7 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		aggregatorChan:   aggChan,
 		aggregatorDFChan: aggDFChan,
 		specialChan:      specialChan,
+		controlMsgChan:   controlMsgChan,
 		confirmedChan:    confirmedChan,
 		finishedChan:     finishedChan,
 		remoteAddr:       params.RemoteAddr,
@@ -372,8 +380,8 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		senderDF: newUDPSenderDF(params.LocalIP, sleeve.localPort),
 	}
 
-	go fwd.run(aggChan, aggDFChan, specialChan, confirmedChan,
-		finishedChan)
+	go fwd.run(aggChan, aggDFChan, specialChan, controlMsgChan,
+		confirmedChan, finishedChan)
 	return fwd, nil
 }
 
@@ -569,9 +577,9 @@ func frameTooBig(frame []byte, mtu int) bool {
 	return len(frame) > mtu+EthernetOverhead
 }
 
-func (fwd *sleeveForwarder) ControlMessage(msg []byte) {
+func (fwd *sleeveForwarder) ControlMessage(tag ProtocolTag, msg []byte) {
 	select {
-	case fwd.specialChan <- specialFrame{nil, msg}:
+	case fwd.controlMsgChan <- controlMessage{tag, msg}:
 	case <-fwd.finishedChan:
 	}
 }
@@ -588,6 +596,7 @@ func (fwd *sleeveForwarder) Stop() {
 func (fwd *sleeveForwarder) run(aggChan <-chan aggregatorFrame,
 	aggDFChan <-chan aggregatorFrame,
 	specialChan <-chan specialFrame,
+	controlMsgChan <-chan controlMessage,
 	confirmedChan <-chan struct{},
 	finishedChan chan<- struct{}) {
 	defer close(finishedChan)
@@ -605,14 +614,11 @@ loop:
 			err = fwd.aggregateAndSend(frame, aggDFChan,
 				fwd.crypto.EncDF, fwd.senderDF, fwd.maxPayload)
 
-		case special := <-specialChan:
-			if special.sender == nil {
-				// Control messages are sent on specialChan,
-				// with a nil sender
-				err = fwd.handleControlMsg(special.frame)
-			} else {
-				err = fwd.handleSpecialFrame(special)
-			}
+		case sf := <-specialChan:
+			err = fwd.handleSpecialFrame(sf)
+
+		case cm := <-controlMsgChan:
+			err = fwd.handleControlMessage(cm)
 
 		case _, ok := <-confirmedChan:
 			if !ok {
@@ -741,32 +747,20 @@ func (fwd *sleeveForwarder) handleSpecialFrame(special specialFrame) error {
 	}
 }
 
-const (
-	HeartbeatAck = iota
-	FragTestAck
-	MTUTestAck
-)
-
-func (fwd *sleeveForwarder) handleControlMsg(msg []byte) error {
-	if len(msg) == 0 {
-		log.Print(fwd.logPrefix(),
-			"Received zero-length control message")
-		return nil
-	}
-
-	switch msg[0] {
-	case HeartbeatAck:
+func (fwd *sleeveForwarder) handleControlMessage(cm controlMessage) error {
+	switch cm.tag {
+	case ProtocolConnectionEstablished:
 		return fwd.handleHeartbeatAck()
 
-	case FragTestAck:
+	case ProtocolFragmentationReceived:
 		return fwd.handleFragTestAck()
 
-	case MTUTestAck:
-		return fwd.handleMTUTestAck(msg)
+	case ProtocolPMTUVerified:
+		return fwd.handleMTUTestAck(cm.msg)
 
 	default:
 		log.Print(fwd.logPrefix(),
-			"Ignoring unknown control message: ", msg[0])
+			"Ignoring unknown control message tag: ", cm.tag)
 		return nil
 	}
 }
@@ -832,7 +826,7 @@ func (fwd *sleeveForwarder) handleHeartbeat(special specialFrame) error {
 
 	if !fwd.ackedHeartbeat {
 		fwd.ackedHeartbeat = true
-		if err := fwd.sendControlMsg([]byte{HeartbeatAck}); err != nil {
+		if err := fwd.sendControlMsg(ProtocolConnectionEstablished, nil); err != nil {
 			return err
 		}
 	}
@@ -857,6 +851,8 @@ func (fwd *sleeveForwarder) setRemoteAddr(addr *net.UDPAddr) {
 }
 
 func (fwd *sleeveForwarder) handleHeartbeatAck() error {
+	log.Debug(fwd.logPrefix(), "handleHeartbeatAck")
+
 	// The connection is now regarded as established
 	fwd.notifyEstablished()
 
@@ -899,7 +895,7 @@ func (fwd *sleeveForwarder) handleFragTest(frame []byte) error {
 		return nil
 	}
 
-	return fwd.sendControlMsg([]byte{FragTestAck})
+	return fwd.sendControlMsg(ProtocolFragmentationReceived, nil)
 }
 
 func (fwd *sleeveForwarder) handleFragTestAck() error {
@@ -943,19 +939,18 @@ func (fwd *sleeveForwarder) sendMTUTest() error {
 }
 
 func (fwd *sleeveForwarder) handleMTUTest(frame []byte) error {
-	buf := make([]byte, 3)
-	buf[0] = MTUTestAck
-	binary.BigEndian.PutUint16(buf[1:], uint16(len(frame)-EthernetOverhead))
-	return fwd.sendControlMsg(buf)
+	buf := make([]byte, 2)
+	binary.BigEndian.PutUint16(buf, uint16(len(frame)-EthernetOverhead))
+	return fwd.sendControlMsg(ProtocolPMTUVerified, buf)
 }
 
 func (fwd *sleeveForwarder) handleMTUTestAck(msg []byte) error {
-	if len(msg) < 3 {
+	if len(msg) < 2 {
 		log.Print(fwd.logPrefix(), "Received truncated MTUTestAck")
 		return nil
 	}
 
-	mtu := int(binary.BigEndian.Uint16(msg[1:]))
+	mtu := int(binary.BigEndian.Uint16(msg))
 	log.Debug(fwd.logPrefix(),
 		"handleMTUTestAck: for mtu candidate ", mtu)
 	if mtu != fwd.mtuCandidate {

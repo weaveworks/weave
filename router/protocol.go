@@ -329,10 +329,13 @@ type ProtocolTag byte
 
 const (
 	ProtocolHeartbeat ProtocolTag = iota
-	ProtocolOverlayControlMsg
+	ProtocolConnectionEstablished
+	ProtocolFragmentationReceived
+	ProtocolPMTUVerified
 	ProtocolGossip
 	ProtocolGossipUnicast
 	ProtocolGossipBroadcast
+	ProtocolOverlayControlMsg
 )
 
 type ProtocolMsg struct {
