@@ -915,6 +915,9 @@ ipam_cidrs() {
         if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
             echo "No IP address supplied and IP address allocation is disabled" >&2
             return 1
+        elif ! is_cidr "$IPAM_CIDRS" ; then
+            echo "$IPAM_CIDRS" >&2
+            return 1
         fi
         ALL_CIDRS="$IPAM_CIDRS"
     fi
@@ -929,8 +932,7 @@ ipam_cidrs() {
             if [ "$CIDR" = "404 page not found" ] ; then
                 echo "IP address allocation must be enabled to use 'net:'" >&2
                 return 1
-            fi
-            if ! is_cidr "$CIDR" ; then
+            elif ! is_cidr "$CIDR" ; then
                 echo "$CIDR" >&2
                 return 1
             fi
