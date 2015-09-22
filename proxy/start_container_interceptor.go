@@ -14,11 +14,11 @@ type startContainerRequestBody struct {
 
 func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 	container, err := inspectContainerInPath(i.proxy.client, r.URL.Path)
-	if err != nil || !containerShouldAttach(container) {
+	if err != nil {
 		return err
 	}
 
-	if r.Header.Get("Content-Type") != "application/json" {
+	if !containerShouldAttach(container) || r.Header.Get("Content-Type") != "application/json" {
 		i.proxy.createWait(r, container.ID)
 		return nil
 	}
@@ -35,8 +35,11 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 		}
 	}
 
+	if err := marshalRequestBody(r, hostConfig); err != nil {
+		return err
+	}
 	i.proxy.createWait(r, container.ID)
-	return marshalRequestBody(r, hostConfig)
+	return nil
 }
 
 func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {

@@ -99,6 +99,16 @@ docker_on() {
     docker -H tcp://$host:$DOCKER_PORT "$@"
 }
 
+docker_api_on() {
+    host=$1
+    method=$2
+    url=$3
+    data=$4
+    shift 4
+    [ -z "$DEBUG" ] || greyly echo "Docker (API) on $host:$DOCKER_PORT: $method $url" >&2
+    echo -n "$data" | curl -s -X "$method" -H Content-Type:application/json "http://$host:$DOCKER_PORT/v1.15$url" -d @-
+}
+
 proxy() {
     DOCKER_PORT=12375 "$@"
 }

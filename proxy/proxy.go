@@ -396,6 +396,10 @@ func (proxy *Proxy) setWeaveDNS(hostConfig *docker.HostConfig, hostname, dnsDoma
 }
 
 func (proxy *Proxy) getDNSDomain() (domain string, running bool) {
+	if proxy.WithoutDNS {
+		return "", false
+	}
+
 	domain = nameserver.DefaultDomain
 	running = proxy.WithDNS
 	weaveContainer, err := proxy.client.InspectContainer("weave")
