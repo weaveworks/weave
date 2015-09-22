@@ -95,7 +95,7 @@ func (c *claim) deniedBy(alloc *Allocator, owner router.PeerName) {
 }
 
 func (c *claim) Cancel() {
-	c.sendResult(fmt.Errorf("Operation cancelled."))
+	c.sendResult(&errorCancelled{"Claim", c.ident})
 }
 
 func (c *claim) ForContainer(ident string) bool {
