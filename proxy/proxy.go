@@ -312,7 +312,7 @@ func (proxy *Proxy) waitForStart(r *http.Request) {
 		ch = wait.ch
 	}
 	proxy.Unlock()
-	if found {
+	if ch != nil {
 		Log.Debugf("Wait for start of container %s", wait.ident)
 		<-ch
 	}
