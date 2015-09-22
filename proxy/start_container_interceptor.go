@@ -29,7 +29,7 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 	}
 
 	i.proxy.addWeaveWaitVolume(hostConfig)
-	if dnsDomain, withDNS := i.proxy.getDNSDomain(); withDNS {
+	if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
 		if err := i.proxy.setWeaveDNS(hostConfig, container.Config.Hostname, dnsDomain); err != nil {
 			return err
 		}

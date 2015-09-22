@@ -61,7 +61,7 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 			}
 		}
 		hostname = i.proxy.hostnameMatchRegexp.ReplaceAllString(hostname, i.proxy.HostnameReplacement)
-		if dnsDomain, withDNS := i.proxy.getDNSDomain(); withDNS {
+		if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
 			i.setHostname(&container, hostname, dnsDomain)
 			if err := i.proxy.setWeaveDNS(container.HostConfig, container.Hostname, dnsDomain); err != nil {
 				return err
