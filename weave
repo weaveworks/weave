@@ -910,24 +910,14 @@ ipam_cidrs() {
     shift 1
     ALL_CIDRS=""
     IPAM_CIDRs=""
-    if [ $# -eq 0 ] ; then
-        # If no addresses passed in, get one in the default subnet
-        IPAM_CIDRS=$(call_weave POST /ip/$CONTAINER_ID$CHECK_ALIVE) || return 1
-        if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
-            echo "No IP address supplied and IP address allocation is disabled" >&2
-            return 1
-        elif ! is_cidr "$IPAM_CIDRS" ; then
-            echo "$IPAM_CIDRS" >&2
-            return 1
-        fi
-        ALL_CIDRS="$IPAM_CIDRS"
-    fi
-    while [ $# -gt 0 ] ; do
-        if [ "${1%:*}" = "net" ] ; then
-            if [ "$1" = "net:default" ] ; then
+    # If no addresses passed in, get one in the default subnet
+    [ $# -gt 0 ] || set -- net:default
+    for arg in "$@" ; do
+        if [ "${arg%:*}" = "net" ] ; then
+            if [ "$arg" = "net:default" ] ; then
                 IPAM_URL=/ip/$CONTAINER_ID
             else
-                IPAM_URL=/ip/$CONTAINER_ID/"${1#net:}"
+                IPAM_URL=/ip/$CONTAINER_ID/"${arg#net:}"
             fi
             CIDR=$(call_weave POST $IPAM_URL$CHECK_ALIVE) || return 1
             if [ "$CIDR" = "404 page not found" ] ; then
@@ -941,13 +931,12 @@ ipam_cidrs() {
             ALL_CIDRS="$ALL_CIDRS $CIDR"
         else
             # This is a plain IP address; warn if it clashes but carry on
-            command_exists netcheck && netcheck --ignore-iface=$BRIDGE $1 || true
+            command_exists netcheck && netcheck --ignore-iface=$BRIDGE $arg || true
             if container_ip $CONTAINER_NAME 2>/dev/null ; then
-                http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$CONTAINER_ID/${1%/*} >&2
+                http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
             fi
-            ALL_CIDRS="$ALL_CIDRS $1"
+            ALL_CIDRS="$ALL_CIDRS $arg"
         fi
-        shift 1
     done
 }
 
