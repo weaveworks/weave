@@ -9,8 +9,6 @@ docker_py_test() {
 
     start_suite "Run docker-py test suite against the proxy"
 
-    # workaround for https://github.com/docker/docker-py/issues/745
-    docker_on $HOST1 pull busybox >/dev/null
     # Get a list of the tests for use to shard
     docker_on $HOST1 pull joffrey/docker-py >/dev/null
     CANDIDATES=$(docker_on $HOST1 run \
