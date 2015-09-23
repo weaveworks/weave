@@ -148,7 +148,6 @@ func (router *Router) listenTCP(localPort int) {
 	ln, err := net.ListenTCP("tcp4", localAddr)
 	checkFatal(err)
 	go func() {
-		defer ln.Close()
 		for {
 			tcpConn, err := ln.AcceptTCP()
 			if err != nil {
