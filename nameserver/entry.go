@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/weaveworks/weave/net/address"
@@ -23,8 +24,26 @@ type Entry struct {
 }
 
 type Entries []Entry
+type CaseSensitive Entries
+type CaseInsensitive Entries
+type SortableEntries interface {
+	sort.Interface
+	Get(i int) Entry
+}
 
-func (e1 *Entry) equal(e2 *Entry) bool {
+// Gossip messages are sorted in a case sensitive order...
+func (es CaseSensitive) Len() int           { return len(es) }
+func (es CaseSensitive) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
+func (es CaseSensitive) Get(i int) Entry    { return es[i] }
+func (es CaseSensitive) Less(i, j int) bool { return es[i].less(&es[j]) }
+
+// ... but we store entries in a case insensitive order.
+func (es CaseInsensitive) Len() int           { return len(es) }
+func (es CaseInsensitive) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
+func (es CaseInsensitive) Get(i int) Entry    { return es[i] }
+func (es CaseInsensitive) Less(i, j int) bool { return es[i].insensitiveLess(&es[j]) }
+
+func (e1 Entry) equal(e2 Entry) bool {
 	return e1.ContainerID == e2.ContainerID &&
 		e1.Origin == e2.Origin &&
 		e1.Addr == e2.Addr &&
@@ -36,6 +55,24 @@ func (e1 *Entry) less(e2 *Entry) bool {
 	switch {
 	case e1.Hostname != e2.Hostname:
 		return e1.Hostname < e2.Hostname
+
+	case e1.Origin != e2.Origin:
+		return e1.Origin < e2.Origin
+
+	case e1.ContainerID != e2.ContainerID:
+		return e1.ContainerID < e2.ContainerID
+
+	default:
+		return e1.Addr < e2.Addr
+	}
+}
+
+func (e1 *Entry) insensitiveLess(e2 *Entry) bool {
+	// Entries are kept sorted by Hostname, Origin, ContainerID then address
+	e1Hostname, e2Hostname := strings.ToLower(e1.Hostname), strings.ToLower(e2.Hostname)
+	switch {
+	case e1Hostname != e2Hostname:
+		return e1Hostname < e2Hostname
 
 	case e1.Origin != e2.Origin:
 		return e1.Origin < e2.Origin
@@ -63,37 +100,37 @@ func (e1 *Entry) String() string {
 	return fmt.Sprintf("%s -> %s", e1.Hostname, e1.Addr.String())
 }
 
-func (es Entries) Len() int           { return len(es) }
-func (es Entries) Swap(i, j int)      { panic("Swap") }
-func (es Entries) Less(i, j int) bool { return es[i].less(&es[j]) }
-
-func (es Entries) check() error {
+func check(es SortableEntries) error {
 	if !sort.IsSorted(es) {
 		return fmt.Errorf("Not sorted!")
 	}
-	for i := 1; i < len(es); i++ {
-		if es[i].equal(&es[i-1]) {
-			return fmt.Errorf("Duplicate entry: %d:%v and %d:%v", i-1, es[i-1], i, es[i])
+	for i := 1; i < es.Len(); i++ {
+		if es.Get(i).equal(es.Get(i - 1)) {
+			return fmt.Errorf("Duplicate entry: %d:%v and %d:%v", i-1, es.Get(i-1), i, es.Get(i))
 		}
 	}
 	return nil
 }
 
-func (es *Entries) checkAndPanic() {
-	if err := es.check(); err != nil {
+func checkAndPanic(es SortableEntries) {
+	if err := check(es); err != nil {
 		panic(err)
 	}
 }
 
+func (es *Entries) checkAndPanic() *Entries {
+	checkAndPanic(CaseInsensitive(*es))
+	return es
+}
+
 func (es *Entries) add(hostname, containerid string, origin router.PeerName, addr address.Address) Entry {
-	es.checkAndPanic()
-	defer es.checkAndPanic()
+	defer es.checkAndPanic().checkAndPanic()
 
 	entry := Entry{Hostname: hostname, Origin: origin, ContainerID: containerid, Addr: addr}
 	i := sort.Search(len(*es), func(i int) bool {
-		return !(*es)[i].less(&entry)
+		return !(*es)[i].insensitiveLess(&entry)
 	})
-	if i < len(*es) && (*es)[i].equal(&entry) {
+	if i < len(*es) && (*es)[i].equal(entry) {
 		if (*es)[i].Tombstone > 0 {
 			(*es)[i].Tombstone = 0
 			(*es)[i].Version++
@@ -107,16 +144,16 @@ func (es *Entries) add(hostname, containerid string, origin router.PeerName, add
 }
 
 func (es *Entries) merge(incoming Entries) Entries {
-	es.checkAndPanic()
-	defer es.checkAndPanic()
+	defer es.checkAndPanic().checkAndPanic()
+
 	newEntries := Entries{}
 	i := 0
 
 	for _, entry := range incoming {
-		for i < len(*es) && (*es)[i].less(&entry) {
+		for i < len(*es) && (*es)[i].insensitiveLess(&entry) {
 			i++
 		}
-		if i < len(*es) && (*es)[i].equal(&entry) {
+		if i < len(*es) && (*es)[i].equal(entry) {
 			if (*es)[i].merge(&entry) {
 				newEntries = append(newEntries, entry)
 			}
@@ -133,8 +170,8 @@ func (es *Entries) merge(incoming Entries) Entries {
 
 // f returning true means keep the entry.
 func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) Entries {
-	es.checkAndPanic()
-	defer es.checkAndPanic()
+	defer es.checkAndPanic().checkAndPanic()
+
 	tombstoned := Entries{}
 	for i, e := range *es {
 		if f(&e) && e.Origin == ourname {
@@ -148,8 +185,8 @@ func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) Entri
 }
 
 func (es *Entries) filter(f func(*Entry) bool) {
-	es.checkAndPanic()
-	defer es.checkAndPanic()
+	defer es.checkAndPanic().checkAndPanic()
+
 	i := 0
 	for _, e := range *es {
 		if !f(&e) {
@@ -163,15 +200,17 @@ func (es *Entries) filter(f func(*Entry) bool) {
 
 func (es Entries) lookup(hostname string) Entries {
 	es.checkAndPanic()
+
+	lowerHostname := strings.ToLower(hostname)
 	i := sort.Search(len(es), func(i int) bool {
-		return es[i].Hostname >= hostname
+		return strings.ToLower(es[i].Hostname) >= lowerHostname
 	})
-	if i >= len(es) || es[i].Hostname != hostname {
+	if i >= len(es) || strings.ToLower(es[i].Hostname) != lowerHostname {
 		return Entries{}
 	}
 
 	j := sort.Search(len(es)-i, func(j int) bool {
-		return es[i+j].Hostname > hostname
+		return strings.ToLower(es[i+j].Hostname) > lowerHostname
 	})
 
 	return es[i : i+j]
@@ -179,6 +218,7 @@ func (es Entries) lookup(hostname string) Entries {
 
 func (es *Entries) first(f func(*Entry) bool) (*Entry, error) {
 	es.checkAndPanic()
+
 	for _, e := range *es {
 		if f(&e) {
 			return &e, nil
@@ -193,6 +233,8 @@ type GossipData struct {
 }
 
 func (g *GossipData) Merge(o router.GossipData) {
+	checkAndPanic(CaseSensitive(g.Entries))
+	defer func() { checkAndPanic(CaseSensitive(g.Entries)) }()
 	other := o.(*GossipData)
 	g.Entries.merge(other.Entries)
 	if g.Timestamp < other.Timestamp {
@@ -201,6 +243,7 @@ func (g *GossipData) Merge(o router.GossipData) {
 }
 
 func (g *GossipData) Encode() [][]byte {
+	checkAndPanic(CaseSensitive(g.Entries))
 	buf := &bytes.Buffer{}
 	if err := gob.NewEncoder(buf).Encode(g); err != nil {
 		panic(err)
