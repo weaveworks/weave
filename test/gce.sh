@@ -11,7 +11,7 @@ set -e
 : ${SSH_KEY_FILE:=$HOME/.ssh/gce_ssh_key}
 : ${PROJECT:=positive-cocoa-90213}
 : ${IMAGE:=ubuntu-14-04}
-: ${TEMPLATE_NAME:=test-template-3}
+: ${TEMPLATE_NAME:=test-template-4}
 : ${ZONE:=us-central1-a}
 : ${NUM_HOSTS:=5}
 SUFFIX=""
@@ -68,10 +68,10 @@ function try_connect {
 function install_docker_on {
 	name=$1
 	ssh -t $name sudo bash -x -s <<EOF
-apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9;
-echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list;
+curl -sSL https://get.docker.com/gpg | sudo apt-key add -
+curl -sSL https://get.docker.com/ | sh
 apt-get update -qq;
-apt-get install -q -y --force-yes --no-install-recommends lxc-docker ethtool;
+apt-get install -q -y --force-yes --no-install-recommends ethtool;
 usermod -a -G docker vagrant;
 echo 'DOCKER_OPTS="-H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375"' >> /etc/default/docker;
 service docker restart
