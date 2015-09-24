@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/docker/machine/utils"
+	"github.com/docker/machine/libmachine/cert"
 )
 
 const (
@@ -28,7 +28,7 @@ func main() {
 			log.Fatalf("The CA key already exists.  Please remove it or specify a different key/cert.")
 		}
 
-		if err := utils.GenerateCACertificate(caCertPath, caKeyPath, org, bits); err != nil {
+		if err := cert.GenerateCACertificate(caCertPath, caKeyPath, org, bits); err != nil {
 			log.Printf("Error generating CA certificate: %s", err)
 		}
 	}
@@ -41,7 +41,7 @@ func main() {
 			log.Fatalf("The client key already exists.  Please remove it or specify a different key/cert.")
 		}
 
-		err = utils.GenerateCert(
+		err = cert.GenerateCert(
 			[]string{""},
 			clientCertPath,
 			clientKeyPath,
@@ -64,7 +64,7 @@ func main() {
 
 		if _, err := os.Stat(serverCertPath); os.IsNotExist(err) {
 			log.Printf("Creating server certificate: %s", serverCertPath)
-			err = utils.GenerateCert(
+			err = cert.GenerateCert(
 				[]string{ip},
 				serverCertPath,
 				serverKeyPath,
