@@ -337,8 +337,9 @@ configure_arp_cache() {
               echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit"
 }
 
-# Send out an unsolicated ARP response to update ARP cache entries
-# across the weave network.  We do this in addition to
+# Send out an ARP announcement
+# (https://tools.ietf.org/html/rfc5227#page-15) to update ARP cache
+# entries across the weave network.  We do this in addition to
 # configure_arp_cache because a) with those ARP cache settings it
 # still takes a few seconds to correct a stale ARP mapping, and b)
 # there is a kernel bug that means that the base_reachable_time
