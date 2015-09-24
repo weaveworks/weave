@@ -45,7 +45,7 @@ func (grouter *TestRouter) Stop() {
 	}
 }
 
-func (grouter *TestRouter) gossipBroadcast(sender router.PeerName, update router.GossipData) error {
+func (grouter *TestRouter) GossipBroadcast(sender router.PeerName, update router.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
 		case gossipChan <- broadcastMessage{sender: sender, data: update}:
@@ -174,5 +174,5 @@ func (client TestRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []
 }
 
 func (client TestRouterClient) GossipBroadcast(update router.GossipData) error {
-	return client.router.gossipBroadcast(client.sender, update)
+	return client.router.GossipBroadcast(client.sender, update)
 }

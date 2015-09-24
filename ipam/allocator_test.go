@@ -564,3 +564,35 @@ func TestGossipSkew(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestBao(t *testing.T) {
+	common.SetLogLevel("debug")
+	const (
+		container1 = "abcdef"
+		container3 = "b01df00d"
+		universe   = "10.0.3.0/24"
+	)
+
+	allocs, _, subnet := makeNetworkOfAllocators(2, universe)
+	alloc1, alloc2 := allocs[0], allocs[1]
+	defer alloc1.Stop()
+	defer alloc2.Stop()
+
+	_, err := alloc1.Allocate("c1", subnet, nil)
+	require.NoError(t, err)
+	_, err = alloc2.Allocate("c2", subnet, nil)
+	require.NoError(t, err)
+
+	allocs, _, _ = makeNetworkOfAllocators(1, universe)
+	alloc3 := allocs[0]
+	defer alloc3.Stop()
+
+	_, err = alloc3.Allocate("c3", subnet, nil)
+	require.NoError(t, err)
+	_, err = alloc3.Allocate("c4", subnet, nil)
+	require.NoError(t, err)
+	_, err = alloc3.Allocate("c5", subnet, nil)
+	require.NoError(t, err)
+
+	alloc1.OnGossipBroadcast(alloc3.ourName, alloc3.encode())
+}

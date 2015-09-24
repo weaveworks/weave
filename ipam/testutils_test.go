@@ -201,7 +201,7 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestR
 
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
-		alloc, subnet = makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", i),
+		alloc, subnet = makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", rand.Int31n(99)),
 			cidr, uint(size/2+1))
 		alloc.SetInterfaces(gossipRouter.Connect(alloc.ourName, alloc))
 		alloc.Start()
