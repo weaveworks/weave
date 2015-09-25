@@ -44,6 +44,9 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	echo "    sudo go install -tags netgo std"; \
 	false; \
 }
+ENSURE_TOOLS=@if [ ! -d .tools ]; then \
+	git clone https://github.com/weaveworks/tools.git .tools/;\
+fi
 BUILD_FLAGS=-ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo
 
 all: $(WEAVE_EXPORT) $(COVER_EXE) $(RUNNER_EXE)
@@ -109,7 +112,8 @@ $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
 tests: $(COVER_EXE)
-	@test/units.sh
+	$(ENSURE_TOOLS)
+	.tools/test
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
