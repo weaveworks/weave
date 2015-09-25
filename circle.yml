@@ -12,18 +12,19 @@ machine:
     SRCDIR: /home/ubuntu/src/github.com/weaveworks/weave
     PATH: $PATH:$HOME/.local/bin:$HOME/google-cloud-sdk/bin/
     CLOUDSDK_CORE_DISABLE_PROMPTS: 1
-    WEAVE_BUILD: $HOME/docker/weave-build.tar
+    WEAVE_TEST: $HOME/docker/weave-test.tar
 
 dependencies:
   cache_directories:
     - "~/docker"
   override:
-    - if [[ -e "$WEAVE_BUILD" ]]; then
-        docker load -i $WEAVE_BUILD;
+    - if [[ -e "$WEAVE_TEST" ]]; then
+        docker load -i $WEAVE_TEST;
       else
         docker build -t weaveworks/weave-build build;
-        mkdir -p $(dirname "$WEAVE_BUILD");
-        docker save weaveworks/weave-build >$WEAVE_BUILD;
+        docker build -t weaveworks/weave-test test/image;
+        mkdir -p $(dirname "$WEAVE_TEST");
+        docker save weaveworks/weave-test >$WEAVE_TEST;
       fi
   post:
     - sudo apt-get update
@@ -36,7 +37,7 @@ dependencies:
 
 test:
   override:
-    - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go -e COVERDIR=test/coverage -e SLOW=true -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX weaveworks/weave-build tests:
+    - docker run -v /home/ubuntu:/home/go -e COVERDIR=test/coverage -e SLOW=true -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX weaveworks/weave-test:
         parallel: true
     - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go -e COVERAGE=true weaveworks/weave-build:
         parallel: true
