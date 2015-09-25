@@ -69,6 +69,7 @@ type Proxy struct {
 	dockerBridgeIP      string
 	hostnameMatchRegexp *regexp.Regexp
 	weaveWaitVolume     string
+	normalisedAddrs     []string
 	waiters             map[*http.Request]*wait
 }
 
@@ -168,17 +169,17 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (proxy *Proxy) Listen() []net.Listener {
 	listeners := []net.Listener{}
-	addrs := []string{}
+	proxy.normalisedAddrs = []string{}
 	for _, addr := range proxy.ListenAddrs {
 		listener, normalisedAddr, err := proxy.listen(addr)
 		if err != nil {
 			Log.Fatalf("Cannot listen on %s: %s", addr, err)
 		}
 		listeners = append(listeners, listener)
-		addrs = append(addrs, normalisedAddr)
+		proxy.normalisedAddrs = append(proxy.normalisedAddrs, normalisedAddr)
 	}
 
-	for _, addr := range addrs {
+	for _, addr := range proxy.normalisedAddrs {
 		Log.Infoln("proxy listening on", addr)
 	}
 	return listeners
@@ -196,6 +197,23 @@ func (proxy *Proxy) Serve(listeners []net.Listener) {
 		if err != nil {
 			Log.Fatalf("Serve failed: %s", err)
 		}
+	}
+}
+
+func (proxy *Proxy) ListenAndServeStatus(socket string) {
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		Log.Fatalf("ListenAndServeStatus failed: %s", err)
+	}
+	handler := http.HandlerFunc(proxy.StatusHTTP)
+	if err := (&http.Server{Handler: handler}).Serve(listener); err != nil {
+		Log.Fatalf("ListenAndServeStatus failed: %s", err)
+	}
+}
+
+func (proxy *Proxy) StatusHTTP(w http.ResponseWriter, r *http.Request) {
+	for _, addr := range proxy.normalisedAddrs {
+		fmt.Fprintln(w, addr)
 	}
 }
 

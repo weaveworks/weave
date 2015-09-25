@@ -662,6 +662,17 @@ http_call() {
     curl --connect-timeout 3 -s -S -X $http_verb "$@" http://$addr$url
 }
 
+http_call_unix() {
+    container="$1"
+    socket="$2"
+    http_verb="$3"
+    url="$4"
+    shift 4
+    output=$(docker exec $container curl -s -S -X $http_verb --unix-socket $socket "$@" http:$url)
+    [ -n "$output" ] || return 1
+    echo $output
+}
+
 call_weave() {
     container_ip $CONTAINER_NAME \
         "$CONTAINER_NAME container is not present. Have you launched it?" \
@@ -692,17 +703,19 @@ wait_for_status() {
     done
 }
 
-# Wait until container $1 outputs a line containing $2 in its log
-wait_for_log() {
-    fifo=/tmp/tmpfifo.$$
-    mkfifo $fifo || exit 1
-    docker logs -f $1 >$fifo 2>&1 &
-    res=0
-    grep -q "$2" $fifo || res=1
-    kill $! 2>/dev/null || true
-    rm $fifo
-    [ $res -eq 1 ] && echo "$(death_msg $1)" >&2
-    return $res
+# Wait until container $1 is alive enough to respond to "GET /status"
+# http request is to unix socket "status.sock", we assume the container
+# has curl >= 7.40
+wait_for_status_unix() {
+    err_msg=$(death_msg $1)
+    while true ; do
+        http_call_unix $1 status.sock GET /status >/dev/null 2>&1 && return 0
+        if ! container_id $1 >/dev/null 2>&1 ; then
+            echo "$err_msg" >&2
+            return 1
+        fi
+        fractional_sleep 3.1
+    done
 }
 
 # Call $1 for all containers, passing container ID, all MACs and all IPs
@@ -1051,8 +1064,8 @@ proxy_args() {
 }
 
 proxy_addr() {
-    if addr=$(docker logs $PROXY_CONTAINER_NAME 2>&1 | head -n4 | grep -oE "proxy listening on .*") ; then
-      echo "${addr##* }" | sed "s/0.0.0.0/$PROXY_HOST/g"
+    if addr=$(http_call_unix $PROXY_CONTAINER_NAME status.sock GET /status 2>&1) ; then
+      echo "$addr" | head -n1 | sed "s/0.0.0.0/$PROXY_HOST/g"
     else
       echo "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
       return 1
@@ -1209,7 +1222,7 @@ launch_proxy() {
         -e DOCKER_BRIDGE \
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
-    wait_for_log $PROXY_CONTAINER_NAME "proxy listening"
+    wait_for_status_unix $PROXY_CONTAINER_NAME
 }
 
 ##########################################################################################
