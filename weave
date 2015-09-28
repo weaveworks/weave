@@ -668,7 +668,9 @@ http_call_unix() {
     http_verb="$3"
     url="$4"
     shift 4
+    # NB: requires curl >= 7.40
     output=$(docker exec $container curl -s -S -X $http_verb --unix-socket $socket "$@" http:$url)
+    # in some docker versions, `docker exec` does not fail when the executed command fails
     [ -n "$output" ] || return 1
     echo $output
 }
@@ -689,32 +691,17 @@ death_msg() {
 }
 
 # Wait until container $1 is alive enough to respond to "GET /status"
-# http request on its docker-assigned IP
+# http request
 wait_for_status() {
-    err_msg=$(death_msg $1)
-    container_ip $1 "$err_msg" "$err_msg" || return 1
+    container="$1"
+    shift
     while true ; do
-        http_call $CONTAINER_IP:$HTTP_PORT GET /status >/dev/null 2>&1 && return 0
-        if ! container_id $1 >/dev/null 2>&1 ; then
-            echo "$err_msg" >&2
+        "$@" GET /status >/dev/null 2>&1 && return 0
+        if ! container_id $container >/dev/null 2>&1 ; then
+            echo $(death_msg $container) >&2
             return 1
         fi
         fractional_sleep 0.1
-    done
-}
-
-# Wait until container $1 is alive enough to respond to "GET /status"
-# http request is to unix socket "status.sock", we assume the container
-# has curl >= 7.40
-wait_for_status_unix() {
-    err_msg=$(death_msg $1)
-    while true ; do
-        http_call_unix $1 status.sock GET /status >/dev/null 2>&1 && return 0
-        if ! container_id $1 >/dev/null 2>&1 ; then
-            echo "$err_msg" >&2
-            return 1
-        fi
-        fractional_sleep 3.1
     done
 }
 
@@ -1186,7 +1173,9 @@ launch_router() {
         -e WEAVE_CIDR=none \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS --iface $CONTAINER_IFNAME --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" --ipalloc-range "$IPRANGE" --dns-effective-listen-address "$DOCKER_BRIDGE_IP" "$@")
     with_container_netns_or_die $ROUTER_CONTAINER launch
-    wait_for_status $CONTAINER_NAME
+    err_msg=$(death_msg $CONTAINER_NAME)
+    container_ip $CONTAINER_NAME "$err_msg" "$err_msg" || return 1
+    wait_for_status $CONTAINER_NAME http_call $CONTAINER_IP:$HTTP_PORT
     if [ -n "$IPRANGE" ] ; then
         # Tell the newly-started weave IP allocator about existing weave IPs
         with_container_addresses ipam_reclaim weave:expose $(docker ps -q --no-trunc)
@@ -1222,7 +1211,7 @@ launch_proxy() {
         -e DOCKER_BRIDGE \
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
-    wait_for_status_unix $PROXY_CONTAINER_NAME
+    wait_for_status $PROXY_CONTAINER_NAME http_call_unix $PROXY_CONTAINER_NAME status.sock
 }
 
 ##########################################################################################
