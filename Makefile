@@ -1,7 +1,7 @@
 PUBLISH=publish_weave publish_weaveexec
 
 .DEFAULT: all
-.PHONY: all update tests publish $(PUBLISH) clean clean-bin prerequisites build travis run-smoketests
+.PHONY: all update tests lint publish $(PUBLISH) clean clean-bin prerequisites build travis run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
@@ -44,9 +44,6 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	echo "    sudo go install -tags netgo std"; \
 	false; \
 }
-ENSURE_TOOLS=@if [ ! -d .tools ]; then \
-	git clone https://github.com/weaveworks/tools.git .tools/;\
-fi
 BUILD_FLAGS=-ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo
 
 all: $(WEAVE_EXPORT) $(COVER_EXE) $(RUNNER_EXE)
@@ -111,13 +108,14 @@ $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
-tests: $(COVER_EXE)
-	$(ENSURE_TOOLS)
-	.tools/test
+tests: $(COVER_EXE) tools/.git
+	tools/test
 
-lint:
-	$(ENSURE_TOOLS)
-	.tools/lint -nocomment -notestpackage .
+lint: tools/.git
+	tools/lint -nocomment -notestpackage .
+
+tools/.git:
+	git submodule update --init
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
