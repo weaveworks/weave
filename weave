@@ -96,7 +96,7 @@ usage() {
 
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host \
-        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/run:/var/run \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
@@ -1041,7 +1041,7 @@ proxy_args() {
     if [ -z "$PROXY_HOST" ] ; then
       case "$DOCKER_CLIENT_HOST" in
         ""|unix://*)
-          PROXY_HOST="unix:///var/run/weave.sock"
+          PROXY_HOST="unix:///var/run/weave/weave.sock"
           ;;
         *)
           PROXY_HOST="tcp://0.0.0.0:12375"
@@ -1203,7 +1203,8 @@ launch_proxy() {
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
         -v "$CONTAINERS_PATH":"$CONTAINERS_PATH" \
-        -v /var/run:/var/run \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e WEAVE_CIDR=none \
@@ -1211,6 +1212,8 @@ launch_proxy() {
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
     wait_for_log $PROXY_CONTAINER_NAME "proxy listening"
+    # backward compatibility
+    ln -sf -T /var/run/weave/weave.sock /var/run/weave.sock
 }
 
 ##########################################################################################
