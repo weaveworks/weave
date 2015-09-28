@@ -654,31 +654,23 @@ container_ip() {
     esac
 }
 
-http_call_ip() {
-    ip="$1"
-    port="$2"
-    http_verb="$3"
-    url="$4"
-    shift 4
-    curl --connect-timeout 3 -s -S -X $http_verb "$@" http://$ip:$port$url
-}
-
-# Call url $4 with http verb $3 on container $1 at port $2
 http_call() {
-    HTTP_CALL_CONTAINER=$1
-    container_ip $HTTP_CALL_CONTAINER \
-        "$HTTP_CALL_CONTAINER container is not present. Have you launched it?" \
-        "$HTTP_CALL_CONTAINER container is not running." \
-        || return 1
-    shift 1
-    if ! http_call_ip $CONTAINER_IP "$@" ; then
-        echo "Call to $HTTP_CALL_CONTAINER failed." >&2
-        return 1
-    fi
+    addr="$1"
+    http_verb="$2"
+    url="$3"
+    shift 3
+    curl --connect-timeout 3 -s -S -X $http_verb "$@" http://$addr$url
 }
 
 call_weave() {
-    http_call $CONTAINER_NAME $HTTP_PORT "$@"
+    container_ip $CONTAINER_NAME \
+        "$CONTAINER_NAME container is not present. Have you launched it?" \
+        "$CONTAINER_NAME container is not running." \
+        || return 1
+    if ! http_call $CONTAINER_IP:$HTTP_PORT "$@" ; then
+        echo "Call to $CONTAINER_NAME failed." >&2
+        return 1
+    fi
 }
 
 death_msg() {
@@ -686,12 +678,12 @@ death_msg() {
 }
 
 # Wait until container $1 is alive enough to respond to "GET /status"
-# http request on its docker-assigned IP, port $2
+# http request on its docker-assigned IP
 wait_for_status() {
     err_msg=$(death_msg $1)
     container_ip $1 "$err_msg" "$err_msg" || return 1
     while true ; do
-        http_call_ip $CONTAINER_IP $2 GET /status >/dev/null 2>&1 && return 0
+        http_call $CONTAINER_IP:$HTTP_PORT GET /status >/dev/null 2>&1 && return 0
         if ! container_id $1 >/dev/null 2>&1 ; then
             echo "$err_msg" >&2
             return 1
@@ -894,7 +886,7 @@ delete_dns_fqdn() {
 ipam_reclaim() {
     for CIDR in $3 ; do
         # NB: CONTAINER_IP is the IP of the weave container; it is set by wait_for_status.
-        http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
+        http_call $CONTAINER_IP:$HTTP_PORT PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
     done
 }
 
@@ -934,7 +926,7 @@ ipam_cidrs() {
             # This is a plain IP address; warn if it clashes but carry on
             command_exists netcheck && netcheck --ignore-iface=$BRIDGE $arg || true
             if container_ip $CONTAINER_NAME 2>/dev/null ; then
-                http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
+                http_call $CONTAINER_IP:$HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
@@ -1181,7 +1173,7 @@ launch_router() {
         -e WEAVE_CIDR=none \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS --iface $CONTAINER_IFNAME --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" --ipalloc-range "$IPRANGE" --dns-effective-listen-address "$DOCKER_BRIDGE_IP" "$@")
     with_container_netns_or_die $ROUTER_CONTAINER launch
-    wait_for_status $CONTAINER_NAME $HTTP_PORT
+    wait_for_status $CONTAINER_NAME
     if [ -n "$IPRANGE" ] ; then
         # Tell the newly-started weave IP allocator about existing weave IPs
         with_container_addresses ipam_reclaim weave:expose $(docker ps -q --no-trunc)
