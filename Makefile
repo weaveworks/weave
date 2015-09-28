@@ -1,7 +1,7 @@
 PUBLISH=publish_weave publish_weaveexec
 
 .DEFAULT: all
-.PHONY: all update tests publish $(PUBLISH) clean prerequisites build travis run-smoketests
+.PHONY: all update tests publish $(PUBLISH) clean clean-bin prerequisites build travis run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
