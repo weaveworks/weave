@@ -21,7 +21,6 @@ install:
   - go get ./...
 
 script:
-  - bin/lint .
   - make tests
 
 after_success:

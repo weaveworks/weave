@@ -115,6 +115,10 @@ tests: $(COVER_EXE)
 	$(ENSURE_TOOLS)
 	.tools/test
 
+lint:
+	$(ENSURE_TOOLS)
+	.tools/lint -nocomment -notestpackage .
+
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 	$(SUDO) docker push   $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
