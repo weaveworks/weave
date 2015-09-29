@@ -48,6 +48,10 @@ test:
     - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
         parallel: true
         timeout: 300
+    - cd $SRCDIR; make clean-bin:
+        parallel: true
+    - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go weaveworks/weave-build:
+        parallel: true
   post:
     - cd $SRCDIR/test; ./gce.sh destroy:
         parallel: true
@@ -60,3 +64,11 @@ teardown:
         parallel: true
     - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; cp coverage.* $CIRCLE_ARTIFACTS):
         parallel: true
+
+deployment:
+  hub:
+    branch: master
+    owner: weaveworks
+    commands:
+      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - make publish
