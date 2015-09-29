@@ -674,7 +674,7 @@ call_weave() {
 }
 
 death_msg() {
-    echo "The $1 container has died. Consult the logs with 'docker logs $1' for further details."
+    echo "The $1 container has died. Consult the container logs for further details."
 }
 
 # Wait until container $1 is alive enough to respond to "GET /status"
