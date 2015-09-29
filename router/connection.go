@@ -319,6 +319,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	if err = conn.initHeartbeats(); err != nil {
 		return
 	}
+	conn.Router.ConnectionMaker.ConnectionCreated(conn)
 
 	go conn.receiveTCP(intro.Receiver)
 	err = conn.actorLoop(actionChan)
@@ -503,7 +504,7 @@ func (conn *LocalConnection) shutdown(err error) {
 	// try to send any more
 	conn.stopForwarders()
 
-	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr, err)
+	conn.Router.ConnectionMaker.ConnectionTerminated(conn, err)
 }
 
 // Helpers
