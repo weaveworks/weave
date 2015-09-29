@@ -77,7 +77,7 @@ $ weave status
  PeerDiscovery: enabled
        Targets: [192.168.48.14 192.168.48.15]
    Connections: 5 (1 established, 1 pending, 1 retrying, 1 failed, 1 connecting)
-         Peers: 3 (with 5 established, 1 pending connections betweeen them)
+         Peers: 3 (with 5 established, 1 pending connections)
 
        Service: ipam
      Consensus: achieved
@@ -125,9 +125,9 @@ router and other peers, and a break down of that figure by connection
 state. Further details are available with
 [`weave status connections`](#weave-status-connections).
 
-'Peers' shows the total number of peers in the network, and the number of
-connections between them. Further details are available with
-[`weave status peers`](#weave-status-peers).
+'Peers' shows the total number of peers in the network, and the total
+number of connections peers have to other peers. Further details are
+available with [`weave status peers`](#weave-status-peers).
 
 There are further sections for the [IP address
 allocator](ipam.html#troubleshooting),

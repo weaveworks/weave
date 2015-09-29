@@ -89,7 +89,7 @@ var statusTemplate = defTemplate("status", `\
  PeerDiscovery: {{printState .Router.PeerDiscovery}}
        Targets: {{len .Router.Targets}}
    Connections: {{len .Router.Connections}}{{with printConnectionCounts .Router.Connections}} ({{.}}){{end}}
-         Peers: {{len .Router.Peers}}{{with printPeerConnectionCounts .Router.Peers}} (with {{.}} connections between them){{end}}
+         Peers: {{len .Router.Peers}}{{with printPeerConnectionCounts .Router.Peers}} (with {{.}} connections){{end}}
 {{if .IPAM}}\
 
        Service: ipam
