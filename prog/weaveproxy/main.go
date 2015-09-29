@@ -64,5 +64,6 @@ func main() {
 	listeners := p.Listen()
 	p.AttachExistingContainers()
 	go p.Serve(listeners)
+	go p.ListenAndServeStatus("/home/weave/status.sock")
 	SignalHandlerLoop()
 }
