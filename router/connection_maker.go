@@ -212,7 +212,7 @@ func (cm *ConnectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarg
 			} else if ip, _, err := net.SplitHostPort(address); err == nil {
 				// There is no point connecting to the (likely
 				// ephemeral) remote port of an inbound connection
-				// that some peer has. Let's try to connect to on the
+				// that some peer has. Let's try to connect on the
 				// weave port instead.
 				addTarget(fmt.Sprintf("%s:%d", ip, cm.port))
 			}
