@@ -212,6 +212,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	if err = conn.Router.Ourself.AddConnection(conn); err != nil {
 		return
 	}
+	conn.Router.ConnectionMaker.ConnectionCreated(conn)
 
 	// SetListener has the side-effect of telling the forwarder
 	// that the connection is confirmed.  This comes after
@@ -360,7 +361,7 @@ func (conn *LocalConnection) shutdown(err error) {
 		conn.forwarder.Stop()
 	}
 
-	conn.Router.ConnectionMaker.ConnectionTerminated(conn.remoteTCPAddr, err)
+	conn.Router.ConnectionMaker.ConnectionTerminated(conn, err)
 }
 
 func (conn *LocalConnection) forwarderCrypto() *OverlayCrypto {
