@@ -99,7 +99,11 @@ func (cm *ConnectionMaker) ConnectionAborted(address string, err error) {
 
 func (cm *ConnectionMaker) ConnectionCreated(conn Connection) {
 	cm.actionChan <- func() bool {
-		cm.connections[conn.RemoteTCPAddr()] = conn
+		address := conn.RemoteTCPAddr()
+		cm.connections[address] = conn
+		if conn.Outbound() {
+			delete(cm.targets, address)
+		}
 		return false
 	}
 }
@@ -189,7 +193,6 @@ func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}) {
 		ourInboundIPs     = make(map[string]struct{})
 	)
 	for address, conn := range cm.connections {
-		delete(cm.targets, address)
 		ourConnectedPeers[conn.Remote().Name] = void
 		if conn.Outbound() {
 			continue
