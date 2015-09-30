@@ -179,12 +179,12 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 	resultChan := make(chan []LocalConnectionStatus, 0)
 	cm.actionChan <- func() bool {
 		var slice []LocalConnectionStatus
-		for conn := range cm.ourself.Connections() {
+		for address, conn := range cm.connections {
 			state := "pending"
 			if conn.Established() {
 				state = "established"
 			}
-			slice = append(slice, LocalConnectionStatus{conn.RemoteTCPAddr(), conn.Outbound(), state, conn.Remote().String()})
+			slice = append(slice, LocalConnectionStatus{address, conn.Outbound(), state, conn.Remote().String()})
 		}
 		for address, target := range cm.targets {
 			var state, info string
