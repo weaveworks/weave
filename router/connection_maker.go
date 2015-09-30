@@ -20,7 +20,7 @@ type ConnectionMaker struct {
 	port        int
 	discovery   bool
 	targets     map[string]*Target
-	connections map[string]Connection
+	connections map[Connection]struct{}
 	directPeers peerAddrs
 	actionChan  chan<- ConnectionMakerAction
 }
@@ -44,7 +44,7 @@ func NewConnectionMaker(ourself *LocalPeer, peers *Peers, port int, discovery bo
 		discovery:   discovery,
 		directPeers: peerAddrs{},
 		targets:     make(map[string]*Target),
-		connections: make(map[string]Connection),
+		connections: make(map[Connection]struct{}),
 		actionChan:  actionChan}
 	go cm.queryLoop(actionChan)
 	return cm
@@ -99,10 +99,9 @@ func (cm *ConnectionMaker) ConnectionAborted(address string, err error) {
 
 func (cm *ConnectionMaker) ConnectionCreated(conn Connection) {
 	cm.actionChan <- func() bool {
-		address := conn.RemoteTCPAddr()
-		cm.connections[address] = conn
+		cm.connections[conn] = void
 		if conn.Outbound() {
-			delete(cm.targets, address)
+			delete(cm.targets, conn.RemoteTCPAddr())
 		}
 		return false
 	}
@@ -110,10 +109,9 @@ func (cm *ConnectionMaker) ConnectionCreated(conn Connection) {
 
 func (cm *ConnectionMaker) ConnectionTerminated(conn Connection, err error) {
 	cm.actionChan <- func() bool {
-		address := conn.RemoteTCPAddr()
-		delete(cm.connections, address)
+		delete(cm.connections, conn)
 		if conn.Outbound() {
-			cm.retry(address, err)
+			cm.retry(conn.RemoteTCPAddr(), err)
 		}
 		return true
 	}
@@ -143,10 +141,10 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 		validTarget  = make(map[string]struct{})
 		directTarget = make(map[string]struct{})
 	)
-	ourConnectedPeers, ourInboundIPs := cm.ourConnections()
+	ourConnectedPeers, ourConnectedTargets, ourInboundIPs := cm.ourConnections()
 
 	addTarget := func(address string) {
-		if _, connected := cm.connections[address]; connected {
+		if _, connected := ourConnectedTargets[address]; connected {
 			return
 		}
 		validTarget[address] = void
@@ -187,13 +185,16 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	return cm.connectToTargets(validTarget, directTarget)
 }
 
-func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}) {
+func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}, map[string]struct{}) {
 	var (
-		ourConnectedPeers = make(PeerNameSet)
-		ourInboundIPs     = make(map[string]struct{})
+		ourConnectedPeers   = make(PeerNameSet)
+		ourConnectedTargets = make(map[string]struct{})
+		ourInboundIPs       = make(map[string]struct{})
 	)
-	for address, conn := range cm.connections {
+	for conn := range cm.connections {
+		address := conn.RemoteTCPAddr()
 		ourConnectedPeers[conn.Remote().Name] = void
+		ourConnectedTargets[address] = void
 		if conn.Outbound() {
 			continue
 		}
@@ -201,7 +202,7 @@ func (cm *ConnectionMaker) ourConnections() (PeerNameSet, map[string]struct{}) {
 			ourInboundIPs[ip] = void
 		}
 	}
-	return ourConnectedPeers, ourInboundIPs
+	return ourConnectedPeers, ourConnectedTargets, ourInboundIPs
 }
 
 func (cm *ConnectionMaker) addPeerTargets(ourConnectedPeers PeerNameSet, addTarget func(string)) {
