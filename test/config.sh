@@ -106,7 +106,7 @@ docker_api_on() {
     data=$4
     shift 4
     [ -z "$DEBUG" ] || greyly echo "Docker (API) on $host:$DOCKER_PORT: $method $url" >&2
-    echo -n "$data" | curl -s -X "$method" -H Content-Type:application/json "http://$host:$DOCKER_PORT/v1.15$url" -d @-
+    echo -n "$data" | curl -s -f -X "$method" -H Content-Type:application/json "http://$host:$DOCKER_PORT/v1.15$url" -d @-
 }
 
 proxy() {

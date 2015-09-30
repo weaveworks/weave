@@ -24,7 +24,7 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 	}
 
 	hostConfig := &docker.HostConfig{}
-	if err := unmarshalRequestBody(r, &hostConfig); err != nil {
+	if err := unmarshalRequestBody(r, hostConfig); err != nil {
 		return err
 	}
 
