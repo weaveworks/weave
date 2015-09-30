@@ -38,6 +38,9 @@ docker_py_test() {
         assert_raises "true"
     else
         assert_raises "false"
+        echo "\n-----[begin docker logs]-----" 2>&1
+        run_on $HOST1 "/bin/sh -c 'sudo grep docker /var/log/syslog | tail -n 20'" 2>&1
+        echo "-----[end docker logs]-----" 2>&1
     fi
 
     end_suite
