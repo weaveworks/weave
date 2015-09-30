@@ -126,7 +126,7 @@ publish: $(PUBLISH)
 
 clean-bin:
 	-$(SUDO) docker rmi $(IMAGES)
-	go clean -r ./...
+	go clean -r $(addprefix ./,$(dir $(EXES)))
 	rm -f $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT)
 
 clean: clean-bin
