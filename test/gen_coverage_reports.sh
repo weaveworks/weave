@@ -9,7 +9,7 @@ if [ -n "$CIRCLECI" ]; then
     done
 fi
 
-$DIR/../testing/cover/cover
+go get github.com/weaveworks/build-tools/cover
 cover ./coverage/* >profile.cov
 go tool cover -html=profile.cov -o coverage.html
 go tool cover -func=profile.cov -o coverage.txt

@@ -1,7 +1,7 @@
 PUBLISH=publish_weave publish_weaveexec
 
 .DEFAULT: all
-.PHONY: all update tests publish $(PUBLISH) clean clean-bin prerequisites build travis run-smoketests
+.PHONY: all update tests lint publish $(PUBLISH) clean clean-bin prerequisites build travis run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo
@@ -16,10 +16,9 @@ WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEHOSTS_EXE=prog/weavehosts/weavehosts
 NETCHECK_EXE=prog/netcheck/netcheck
 DOCKERTLSARGS_EXE=prog/docker_tls_args/docker_tls_args
-COVER_EXE=testing/cover/cover
 RUNNER_EXE=testing/runner/runner
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEHOSTS_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(COVER_EXE) $(RUNNER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEHOSTS_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(RUNNER_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -46,7 +45,7 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 }
 BUILD_FLAGS=-ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo
 
-all: $(WEAVE_EXPORT) $(COVER_EXE) $(RUNNER_EXE)
+all: $(WEAVE_EXPORT) $(RUNNER_EXE)
 
 travis: $(EXES)
 
@@ -78,11 +77,10 @@ $(NETCHECK_EXE): prog/netcheck/netcheck.go
 $(SIGPROXY_EXE): prog/sigproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/main.go net/*.go
 $(WEAVEHOSTS_EXE): prog/weavehosts/weavehosts.go
-$(COVER_EXE): testing/cover/cover.go
 $(RUNNER_EXE): testing/runner/runner.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
 
-$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(WEAVEHOSTS_EXE) $(COVER_EXE) $(RUNNER_EXE) $(DOCKERTLSARGS_EXE):
+$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(WEAVEHOSTS_EXE) $(RUNNER_EXE) $(DOCKERTLSARGS_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
@@ -108,8 +106,14 @@ $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
-tests: $(COVER_EXE)
-	@test/units.sh
+tests: tools/.git
+	tools/test
+
+lint: tools/.git
+	tools/lint -nocomment -notestpackage .
+
+tools/.git:
+	git submodule update --init
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
@@ -122,7 +126,7 @@ publish: $(PUBLISH)
 
 clean-bin:
 	-$(SUDO) docker rmi $(IMAGES)
-	go clean -r ./...
+	go clean -r $(addprefix ./,$(dir $(EXES)))
 	rm -f $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT)
 
 clean: clean-bin

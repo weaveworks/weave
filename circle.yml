@@ -37,6 +37,8 @@ dependencies:
 
 test:
   override:
+    - cd $SRCDIR; make lint:
+        parallel: true
     - docker run -v /home/ubuntu:/home/go -e COVERDIR=test/coverage -e SLOW=true -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX weaveworks/weave-test:
         parallel: true
     - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go -e COVERAGE=true weaveworks/weave-build:

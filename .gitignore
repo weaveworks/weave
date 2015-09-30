@@ -43,8 +43,6 @@ prog/netcheck/netcheck
 prog/docker_tls_args/docker_tls_args
 testing/cover/cover
 testing/runner/runner
-tools/bin
-tools/build
 releases
 .weaver.uptodate
 .weavedns.uptodate
