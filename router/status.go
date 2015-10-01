@@ -162,16 +162,10 @@ func NewBroadcastRouteStatusSlice(routes *Routes) []BroadcastRouteStatus {
 }
 
 func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus {
-	// We need to Refresh first in order to clear out any 'attempting'
-	// connections from cm.targets that have been established since
-	// the last run of cm.checkStateAndAttemptConnections. These
-	// entries are harmless but do represent stale state that we do
-	// not want to report.
-	cm.Refresh()
 	resultChan := make(chan []LocalConnectionStatus, 0)
 	cm.actionChan <- func() bool {
 		var slice []LocalConnectionStatus
-		for conn := range cm.ourself.Connections() {
+		for conn := range cm.connections {
 			state := "pending"
 			if conn.Established() {
 				state = "established"
