@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -198,6 +199,7 @@ func (n *Nameserver) Gossip() router.GossipData {
 		Timestamp: now(),
 	}
 	copy(gossip.Entries, n.entries)
+	sort.Sort(CaseSensitive(gossip.Entries))
 	return gossip
 }
 
@@ -215,9 +217,7 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 		return nil, nil, fmt.Errorf("clock skew of %d detected", delta)
 	}
 
-	if err := gossip.Entries.check(); err != nil {
-		return nil, nil, err
-	}
+	sort.Sort(CaseInsensitive(gossip.Entries))
 
 	n.Lock()
 	defer n.Unlock()
