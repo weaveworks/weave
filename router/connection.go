@@ -376,8 +376,8 @@ func (conn *LocalConnection) forwarderCrypto() *OverlayCrypto {
 	}
 }
 
-func (conn *LocalConnection) sendOverlayControlMessage(msg []byte) error {
-	return conn.sendProtocolMsg(ProtocolMsg{ProtocolOverlayControlMsg, msg})
+func (conn *LocalConnection) sendOverlayControlMessage(tag ProtocolTag, msg []byte) error {
+	return conn.sendProtocolMsg(ProtocolMsg{tag, msg})
 }
 
 type ConnectionAsForwarderListener struct{ conn *LocalConnection }
@@ -432,8 +432,8 @@ func (conn *LocalConnection) receiveTCP(receiver TCPReceiver) {
 func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) error {
 	switch tag {
 	case ProtocolHeartbeat:
-	case ProtocolOverlayControlMsg:
-		conn.forwarder.ControlMessage(payload)
+	case ProtocolConnectionEstablished, ProtocolFragmentationReceived, ProtocolPMTUVerified, ProtocolOverlayControlMsg:
+		conn.forwarder.ControlMessage(tag, payload)
 	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:
 		return conn.Router.handleGossip(tag, payload)
 	default:

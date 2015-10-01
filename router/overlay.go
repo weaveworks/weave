@@ -38,7 +38,7 @@ type ForwarderParams struct {
 
 	// Function to send a control message to the counterpart
 	// forwarder.
-	SendControlMessage func([]byte) error
+	SendControlMessage func(tag ProtocolTag, msg []byte) error
 }
 
 // When a consumer is called, the decoder will already have been used
@@ -66,8 +66,10 @@ type OverlayForwarder interface {
 
 	Stop()
 
-	// Handle a message from the peer
-	ControlMessage([]byte)
+	// Handle a message from the peer.  'tag' exists for
+	// compatibility, and should always be
+	// ProtocolOverlayControlMessage for non-sleeve overlays.
+	ControlMessage(tag ProtocolTag, msg []byte)
 }
 
 type OverlayForwarderListener interface {
@@ -98,5 +100,5 @@ func (NullOverlay) Forward(ForwardPacketKey) FlowOp {
 func (NullOverlay) Stop() {
 }
 
-func (NullOverlay) ControlMessage([]byte) {
+func (NullOverlay) ControlMessage(ProtocolTag, []byte) {
 }
