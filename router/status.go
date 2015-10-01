@@ -175,6 +175,8 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 		for address, target := range cm.targets {
 			var state, info string
 			switch {
+			case target.connected:
+				continue
 			case target.lastError == nil:
 				state = "connecting"
 				info = ""

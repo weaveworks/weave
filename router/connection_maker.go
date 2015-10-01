@@ -10,6 +10,7 @@ import (
 const (
 	InitialInterval = 2 * time.Second
 	MaxInterval     = 6 * time.Minute
+	ResetAfter      = 1 * time.Minute
 )
 
 type peerAddrs map[string]*net.TCPAddr
@@ -28,6 +29,7 @@ type ConnectionMaker struct {
 // Information about an address where we may find a peer
 type Target struct {
 	attempting  bool          // are we currently attempting to connect there?
+	connected   bool          // are we currently connected to there?
 	lastError   error         // reason for disconnection last time
 	tryAfter    time.Time     // next time to try this address
 	tryInterval time.Duration // retry delay on next failure
@@ -92,7 +94,10 @@ func (cm *ConnectionMaker) ForgetConnections(peers []string) {
 
 func (cm *ConnectionMaker) ConnectionAborted(address string, err error) {
 	cm.actionChan <- func() bool {
-		cm.retry(address, err)
+		target := cm.targets[address]
+		target.attempting = false
+		target.lastError = err
+		target.retry()
 		return true
 	}
 }
@@ -101,7 +106,9 @@ func (cm *ConnectionMaker) ConnectionCreated(conn Connection) {
 	cm.actionChan <- func() bool {
 		cm.connections[conn] = void
 		if conn.Outbound() {
-			delete(cm.targets, conn.RemoteTCPAddr())
+			target := cm.targets[conn.RemoteTCPAddr()]
+			target.attempting = false
+			target.connected = true
 		}
 		return false
 	}
@@ -111,7 +118,18 @@ func (cm *ConnectionMaker) ConnectionTerminated(conn Connection, err error) {
 	cm.actionChan <- func() bool {
 		delete(cm.connections, conn)
 		if conn.Outbound() {
-			cm.retry(conn.RemoteTCPAddr(), err)
+			target := cm.targets[conn.RemoteTCPAddr()]
+			target.attempting = false
+			target.connected = false
+			target.lastError = err
+			switch {
+			case err == ErrConnectToSelf:
+				target.tryNever()
+			case time.Now().After(target.tryAfter.Add(ResetAfter)):
+				target.tryNow()
+			default:
+				target.retry()
+			}
 		}
 		return true
 	}
@@ -238,7 +256,7 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if target.attempting {
+		if target.attempting || target.connected {
 			continue
 		}
 		if _, valid := validTarget[address]; !valid {
@@ -268,12 +286,9 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	}
 }
 
-func (cm *ConnectionMaker) retry(address string, err error) {
-	if target, found := cm.targets[address]; found {
-		target.attempting = false
-		target.lastError = err
-		target.retry()
-	}
+func (t *Target) tryNever() {
+	t.tryAfter = time.Time{}
+	t.tryInterval = MaxInterval
 }
 
 func (t *Target) tryNow() {
@@ -284,11 +299,6 @@ func (t *Target) tryNow() {
 // The delay at the nth retry is a random value in the range
 // [i-i/2,i+i/2], where i = InitialInterval * 1.5^(n-1).
 func (t *Target) retry() {
-	if t.lastError == ErrConnectToSelf {
-		t.tryAfter = time.Time{}
-		t.tryInterval = MaxInterval
-		return
-	}
 	t.tryAfter = time.Now().Add(t.tryInterval/2 + time.Duration(rand.Int63n(int64(t.tryInterval))))
 	t.tryInterval = t.tryInterval * 3 / 2
 	if t.tryInterval > MaxInterval {
