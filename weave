@@ -96,7 +96,7 @@ usage() {
 
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host \
-        -v /var/run:/var/run \
+        -v /var/run/docker.sock:/var/run/docker.sock \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
@@ -1213,8 +1213,6 @@ launch_proxy() {
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
     wait_for_status $PROXY_CONTAINER_NAME http_call_unix $PROXY_CONTAINER_NAME status.sock
-    # backward compatibility
-    ln -sf -T /var/run/weave/weave.sock /var/run/weave.sock
 }
 
 ##########################################################################################
