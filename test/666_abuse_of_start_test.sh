@@ -18,4 +18,8 @@ proxy docker_on $HOST1 create --name=c3 -v /tmp:/hosttmp $SMALL_IMAGE $CHECK_ETH
 proxy docker_api_on $HOST1 POST /containers/c3/start '{"Binds":[],"Dns":null,"DnsSearch":null,"ExtraHosts":null,"VolumesFrom":null,"Devices":null,"NetworkMode":""}'
 assert "docker_on $HOST1 inspect -f '{{.State.Running}} {{.State.ExitCode}} {{.HostConfig.Dns}}' c3" "false 0 [$docker_bridge_ip]"
 
+# Start c4 with an 'null' HostConfig
+proxy docker_on $HOST1 create --name=c4 $SMALL_IMAGE echo foo
+assert_raises "proxy docker_api_on $HOST1 POST /containers/c4/start 'null'"
+
 end_suite
