@@ -10,7 +10,7 @@ start_suite "DNS lookup case (in)sensitivity"
 
 weave_on $HOST1 launch
 
-start_container_with_dns $HOST1        --name=test
+start_container_with_dns $HOST1 --name=test
 
 start_container $HOST1 $C1/24 --name=seeone
 assert_dns_record $HOST1 test seeone.weave.local $C1
