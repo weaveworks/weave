@@ -50,7 +50,7 @@ all: $(WEAVE_EXPORT) $(RUNNER_EXE)
 travis: $(EXES)
 
 update:
-	go get -u -f -v -tags -netgo $(addprefix ./,$(dir $(EXES)))
+	go get -u -f -v -tags netgo $(addprefix ./,$(dir $(EXES)))
 
 $(WEAVER_EXE) $(WEAVEPROXY_EXE): common/*.go common/*/*.go net/*.go
 ifeq ($(COVERAGE),true)
