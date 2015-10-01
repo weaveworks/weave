@@ -38,7 +38,7 @@ modify the default behaviour you will have to use the latter.
 
 By default, the proxy decides where to listen based on how the
 launching client connects to docker. If the launching client connected
-over a unix socket, the proxy will listen on /var/run/weave.sock. If
+over a unix socket, the proxy will listen on /var/run/weave/weave.sock. If
 the launching client connected over TCP, the proxy will listen on port
 12375, on all network interfaces. This can be adjusted with the `-H`
 argument, e.g.
