@@ -26,10 +26,17 @@ type ConnectionMaker struct {
 	actionChan  chan<- ConnectionMakerAction
 }
 
+type TargetState int
+
+const (
+	TargetWaiting    TargetState = iota // we are waiting to connect there
+	TargetAttempting                    // we are attempting to connect there
+	TargetConnected                     // we are connected to there
+)
+
 // Information about an address where we may find a peer
 type Target struct {
-	attempting  bool          // are we currently attempting to connect there?
-	connected   bool          // are we currently connected to there?
+	state       TargetState
 	lastError   error         // reason for disconnection last time
 	tryAfter    time.Time     // next time to try this address
 	tryInterval time.Duration // retry delay on next failure
@@ -95,7 +102,7 @@ func (cm *ConnectionMaker) ForgetConnections(peers []string) {
 func (cm *ConnectionMaker) ConnectionAborted(address string, err error) {
 	cm.actionChan <- func() bool {
 		target := cm.targets[address]
-		target.attempting = false
+		target.state = TargetWaiting
 		target.lastError = err
 		target.retry()
 		return true
@@ -107,8 +114,7 @@ func (cm *ConnectionMaker) ConnectionCreated(conn Connection) {
 		cm.connections[conn] = void
 		if conn.Outbound() {
 			target := cm.targets[conn.RemoteTCPAddr()]
-			target.attempting = false
-			target.connected = true
+			target.state = TargetConnected
 		}
 		return false
 	}
@@ -119,8 +125,7 @@ func (cm *ConnectionMaker) ConnectionTerminated(conn Connection, err error) {
 		delete(cm.connections, conn)
 		if conn.Outbound() {
 			target := cm.targets[conn.RemoteTCPAddr()]
-			target.attempting = false
-			target.connected = false
+			target.state = TargetWaiting
 			target.lastError = err
 			switch {
 			case err == ErrConnectToSelf:
@@ -169,7 +174,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 		if _, found := cm.targets[address]; found {
 			return
 		}
-		target := &Target{}
+		target := &Target{state: TargetWaiting}
 		target.tryNow()
 		cm.targets[address] = target
 	}
@@ -256,7 +261,7 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 	now := time.Now() // make sure we catch items just added
 	after := MaxDuration
 	for address, target := range cm.targets {
-		if target.attempting || target.connected {
+		if target.state != TargetWaiting {
 			continue
 		}
 		if _, valid := validTarget[address]; !valid {
@@ -268,7 +273,7 @@ func (cm *ConnectionMaker) connectToTargets(validTarget map[string]struct{}, dir
 		}
 		switch duration := target.tryAfter.Sub(now); {
 		case duration <= 0:
-			target.attempting = true
+			target.state = TargetAttempting
 			_, isCmdLineTarget := directTarget[address]
 			go cm.attemptConnection(address, isCmdLineTarget)
 		case duration < after:
