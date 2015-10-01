@@ -34,6 +34,8 @@ dependencies:
     - bin/setup-circleci-secrets "$SECRET_PASSWORD"
     - mkdir -p $(dirname $SRCDIR)
     - cp -r $(pwd)/ $SRCDIR
+    - cd $SRCDIR/test; ./gce.sh make_template:
+        parallel: false
 
 test:
   override:
