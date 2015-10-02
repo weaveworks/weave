@@ -19,9 +19,10 @@ import (
 
 // Ring represents the ring itself
 type Ring struct {
-	Start, End address.Address // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
-	Peer       router.PeerName // name of peer owning this ring instance
-	Entries    entries         // list of entries sorted by token
+	Start, End address.Address   // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
+	Peer       router.PeerName   // name of peer owning this ring instance
+	Entries    entries           // list of entries sorted by token
+	Seeds      []router.PeerName // peers with which the ring was seeded
 }
 
 func (r *Ring) assertInvariants() {
@@ -36,6 +37,7 @@ var (
 	ErrNotSorted       = errors.New("Ring not sorted")
 	ErrTokenRepeated   = errors.New("Token appears twice in ring")
 	ErrTokenOutOfRange = errors.New("Token is out of range")
+	ErrDifferentSeeds  = errors.New("Received ring was seeded differently from ours!")
 	ErrDifferentRange  = errors.New("Received range differs from ours!")
 	ErrNewerVersion    = errors.New("Received new version for entry I own!")
 	ErrInvalidEntry    = errors.New("Received invalid state update!")
@@ -188,6 +190,17 @@ func (r *Ring) Merge(gossip Ring) error {
 		return err
 	}
 
+	if len(gossip.Seeds) > 0 && len(r.Seeds) > 0 {
+		if len(gossip.Seeds) != len(r.Seeds) {
+			return ErrDifferentSeeds
+		}
+		for i, seed := range gossip.Seeds {
+			if seed != r.Seeds[i] {
+				return ErrDifferentSeeds
+			}
+		}
+	}
+
 	if r.Start != gossip.Start || r.End != gossip.End {
 		return ErrDifferentRange
 	}
@@ -254,6 +267,9 @@ func (r *Ring) Merge(gossip Ring) error {
 		previousOwner = nil
 	}
 
+	if len(r.Seeds) == 0 {
+		r.Seeds = gossip.Seeds
+	}
 	r.Entries = result
 	return nil
 }
@@ -330,6 +346,8 @@ func (r *Ring) ClaimForPeers(peers []router.PeerName) {
 	}
 
 	common.Assert(pos == r.End)
+
+	r.Seeds = peers
 }
 
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[router.PeerName]string) {
