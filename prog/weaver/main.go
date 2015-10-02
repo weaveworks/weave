@@ -51,7 +51,7 @@ func main() {
 		iprangeCIDR               string
 		ipsubnetCIDR              string
 		peerCount                 int
-		apiPath                   string
+		dockerAPI                 string
 		peers                     []string
 		noDNS                     bool
 		dnsDomain                 string
@@ -79,7 +79,7 @@ func main() {
 	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
-	mflag.StringVar(&apiPath, []string{"#api", "-api"}, "unix:///var/run/docker.sock", "path to Docker API socket; set to '' to disable")
+	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, "", "Docker API endpoint, e.g. unix:///var/run/docker.sock")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
 	mflag.StringVar(&dnsListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
@@ -176,8 +176,8 @@ func main() {
 	Log.Println("Our name is", router.Ourself)
 
 	var dockerCli *docker.Client
-	if apiPath != "" {
-		dc, err := docker.NewClient(apiPath)
+	if dockerAPI != "" {
+		dc, err := docker.NewClient(dockerAPI)
 		if err != nil {
 			Log.Fatal("Unable to start docker client: ", err)
 		}
