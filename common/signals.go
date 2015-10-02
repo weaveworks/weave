@@ -14,7 +14,7 @@ type SignalReceiver interface {
 
 func SignalHandlerLoop(ss ...SignalReceiver) {
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGUSR1, syscall.SIGTERM)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	buf := make([]byte, 1<<20)
 	for {
 		switch <-sigs {
