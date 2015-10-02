@@ -23,7 +23,7 @@ func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
 
 	for i := 0; i < size; i++ {
 		name, _ := router.PeerNameFromString(fmt.Sprintf("%02d:00:00:02:00:00", i))
-		nameserver := New(name, nil, nil, "")
+		nameserver := New(name, nil, "")
 		nameserver.SetGossip(gossipRouter.Connect(nameserver.ourName, nameserver))
 		nameserver.Start()
 		nameservers[i] = nameserver
@@ -205,7 +205,7 @@ func testNameservers(t *testing.T) {
 func TestContainerAndPeerDeath(t *testing.T) {
 	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
-	nameserver := New(peername, nil, nil, "")
+	nameserver := New(peername, nil, "")
 
 	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Nil(t, err)
@@ -229,7 +229,7 @@ func TestTombstoneDeletion(t *testing.T) {
 
 	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
-	nameserver := New(peername, nil, nil, "")
+	nameserver := New(peername, nil, "")
 
 	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Nil(t, err)
