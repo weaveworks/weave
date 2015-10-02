@@ -82,7 +82,7 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string, replace bool) []e
 			cm.directPeers[peer] = addr
 			// curtail any existing reconnect interval
 			if target, found := cm.targets[addr.String()]; found {
-				target.tryNow()
+				target.nextTryNow()
 			}
 		}
 		return true
@@ -104,7 +104,7 @@ func (cm *ConnectionMaker) ConnectionAborted(address string, err error) {
 		target := cm.targets[address]
 		target.state = TargetWaiting
 		target.lastError = err
-		target.retry()
+		target.nextTryLater()
 		return true
 	}
 }
@@ -129,11 +129,11 @@ func (cm *ConnectionMaker) ConnectionTerminated(conn Connection, err error) {
 			target.lastError = err
 			switch {
 			case err == ErrConnectToSelf:
-				target.tryNever()
+				target.nextTryNever()
 			case time.Now().After(target.tryAfter.Add(ResetAfter)):
-				target.tryNow()
+				target.nextTryNow()
 			default:
-				target.retry()
+				target.nextTryLater()
 			}
 		}
 		return true
@@ -175,7 +175,7 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 			return
 		}
 		target := &Target{state: TargetWaiting}
-		target.tryNow()
+		target.nextTryNow()
 		cm.targets[address] = target
 	}
 
@@ -291,19 +291,19 @@ func (cm *ConnectionMaker) attemptConnection(address string, acceptNewPeer bool)
 	}
 }
 
-func (t *Target) tryNever() {
+func (t *Target) nextTryNever() {
 	t.tryAfter = time.Time{}
 	t.tryInterval = MaxInterval
 }
 
-func (t *Target) tryNow() {
+func (t *Target) nextTryNow() {
 	t.tryAfter = time.Now()
 	t.tryInterval = InitialInterval
 }
 
 // The delay at the nth retry is a random value in the range
 // [i-i/2,i+i/2], where i = InitialInterval * 1.5^(n-1).
-func (t *Target) retry() {
+func (t *Target) nextTryLater() {
 	t.tryAfter = time.Now().Add(t.tryInterval/2 + time.Duration(rand.Int63n(int64(t.tryInterval))))
 	t.tryInterval = t.tryInterval * 3 / 2
 	if t.tryInterval > MaxInterval {
