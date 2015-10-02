@@ -173,23 +173,28 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 			slice = append(slice, LocalConnectionStatus{conn.RemoteTCPAddr(), conn.Outbound(), state, conn.Remote().String()})
 		}
 		for address, target := range cm.targets {
-			var state, info string
-			switch {
-			case target.lastError == nil:
-				state = "connecting"
-				info = ""
-			case target.attempting:
-				state = "retrying"
-				info = target.lastError.Error()
-			default:
-				state = "failed"
-				retry := "never"
-				if !target.tryAfter.IsZero() {
-					retry = target.tryAfter.String()
-				}
-				info = target.lastError.Error() + ", retry: " + retry
+			add := func(state, info string) {
+				slice = append(slice, LocalConnectionStatus{address, true, state, info})
 			}
-			slice = append(slice, LocalConnectionStatus{address, true, state, info})
+			switch target.state {
+			case TargetWaiting:
+				until := "never"
+				if !target.tryAfter.IsZero() {
+					until = target.tryAfter.String()
+				}
+				if target.lastError == nil { // shouldn't happen
+					add("waiting", "until: "+until)
+				} else {
+					add("failed", target.lastError.Error()+", retry: "+until)
+				}
+			case TargetAttempting:
+				if target.lastError == nil {
+					add("connecting", "")
+				} else {
+					add("retrying", target.lastError.Error())
+				}
+			case TargetConnected:
+			}
 		}
 		resultChan <- slice
 		return false
