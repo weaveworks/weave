@@ -538,11 +538,9 @@ attach() {
 
     netnsenter ip link set $CONTAINER_IFNAME up || return 1
 
-    if [ -n "$NEW_ADDRS" ] ; then
-        for ADDR in "$NEW_ADDRS" ; do
-            arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
-        done
-    fi
+    for ADDR in $NEW_ADDRS ; do
+        arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
+    done
 
     # Route multicast packets across the weave network.
     # This must come last in 'attach'. If you change this, change weavewait to match.
