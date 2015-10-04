@@ -1605,7 +1605,7 @@ case "$COMMAND" in
         conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         destroy_bridge
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do
-            ip link del $LOCAL_IFNAME >/dev/null 2>&1 || true
+            ip link del ${LOCAL_IFNAME%@*} >/dev/null 2>&1 || true
         done
         ;;
     rmpeer)
