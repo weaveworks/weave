@@ -1,3 +1,14 @@
+## Release 1.1.1
+
+This release contains a number of bug fixes and minor
+enhancements. More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.1.1).
+
+The release is fully compatible with 1.1.0 versions, so existing
+clusters can be upgraded incrementally. When upgrading from 1.0.x,
+note the compatibility information in the
+[Installation & Upgrading instructions for Weave 1.1.0](https://github.com/weaveworks/weave/releases/tag/v1.1.0).
+
 ## Release v1.1.0
 
 **Highlights**:
