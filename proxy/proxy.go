@@ -356,6 +356,12 @@ func (proxy *Proxy) attach(container *docker.Container) error {
 	args = append(args, cidrs...)
 	if !proxy.NoRewriteHosts {
 		args = append(args, "--rewrite-hosts")
+
+		if container.HostConfig != nil {
+			for _, eh := range container.HostConfig.ExtraHosts {
+				args = append(args, fmt.Sprintf("--add-host=%s", eh))
+			}
+		}
 	}
 	args = append(args, "--or-die", container.ID)
 	if _, stderr, err := callWeave(args...); err != nil {
