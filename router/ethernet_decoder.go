@@ -60,7 +60,7 @@ func (dec *EthernetDecoder) sendICMPFragNeeded(mtu int, sendFrame func([]byte) e
 		return err
 	}
 
-	log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU= %v", dec.IP.DstIP, dec.IP.SrcIP, mtu)
+	log.Printf("Sending ICMP 3,4 (%v -> %v): PMTU=%v", dec.IP.DstIP, dec.IP.SrcIP, mtu)
 	return sendFrame(buf.Bytes())
 }
 

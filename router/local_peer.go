@@ -69,7 +69,7 @@ func (peer *LocalPeer) RelayBroadcast(srcPeer *Peer, frame []byte, dec *Ethernet
 			dec)
 		if err != nil {
 			if ftbe, ok := err.(FrameTooBigError); ok {
-				log.Warningf("dropping too big DF broadcast frame (%v -> %v): PMTU= %v", dec.IP.DstIP, dec.IP.SrcIP, ftbe.EPMTU)
+				log.Warningf("dropping too big DF broadcast frame (%v -> %v): PMTU=%v", dec.IP.SrcIP, dec.IP.DstIP, ftbe.EPMTU)
 			} else {
 				log.Errorln(err)
 			}
