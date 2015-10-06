@@ -618,16 +618,20 @@ func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 	// shouldn't get updates for a empty Ring. But tolerate
 	// them just in case.
 	if data.Ring != nil {
-		if data.Ring.Range() != alloc.universe {
-			return fmt.Errorf("Incompatible IP allocation range %s; ours is %s",
-				data.Ring.Range().AsCIDRString(), alloc.universe.AsCIDRString())
+		switch err = alloc.ring.Merge(*data.Ring); err {
+		case ring.ErrDifferentSeeds:
+			return fmt.Errorf("IP allocation was seeded by different peers (received: %v, ours: %v)",
+				data.Ring.Seeds, alloc.ring.Seeds)
+		case ring.ErrDifferentRange:
+			return fmt.Errorf("Incompatible IP allocation ranges (received: %s, ours: %s)",
+				data.Ring.Range().AsCIDRString(), alloc.ring.Range().AsCIDRString())
+		default:
+			if err == nil && !alloc.ring.Empty() {
+				alloc.pruneNicknames()
+				alloc.ringUpdated()
+			}
+			return err
 		}
-		err = alloc.ring.Merge(*data.Ring)
-		if !alloc.ring.Empty() {
-			alloc.pruneNicknames()
-			alloc.ringUpdated()
-		}
-		return err
 	}
 
 	if data.Paxos != nil {
