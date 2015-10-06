@@ -126,11 +126,13 @@ func (alloc *Allocator) cancelOps(ops *[]operation) {
 // if we found any.
 func (alloc *Allocator) cancelOpsFor(ops *[]operation, ident string) bool {
 	var found bool
-	for i, op := range *ops {
-		if op.ForContainer(ident) {
+	for i := 0; i < len(*ops); {
+		if op := (*ops)[i]; op.ForContainer(ident) {
 			found = true
 			op.Cancel()
 			*ops = append((*ops)[:i], (*ops)[i+1:]...)
+		} else {
+			i++
 		}
 	}
 	return found
@@ -182,6 +184,15 @@ func hasBeenCancelled(cancelChan <-chan bool) func() bool {
 			return false
 		}
 	}
+}
+
+type errorCancelled struct {
+	kind  string
+	ident string
+}
+
+func (e *errorCancelled) Error() string {
+	return fmt.Sprintf("%s request for %s cancelled", e.kind, e.ident)
 }
 
 // Actor client API

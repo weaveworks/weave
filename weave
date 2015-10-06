@@ -96,7 +96,7 @@ usage() {
 
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host \
-        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/run:/var/run \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
@@ -332,8 +332,9 @@ configure_arp_cache() {
               echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit"
 }
 
-# Send out an unsolicated ARP response to update ARP cache entries
-# across the weave network.  We do this in addition to
+# Send out an ARP announcement
+# (https://tools.ietf.org/html/rfc5227#page-15) to update ARP cache
+# entries across the weave network.  We do this in addition to
 # configure_arp_cache because a) with those ARP cache settings it
 # still takes a few seconds to correct a stale ARP mapping, and b)
 # there is a kernel bug that means that the base_reachable_time
@@ -520,29 +521,23 @@ launch() {
 }
 
 attach() {
-    if netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        for ADDR in "$@" ; do
-            # container already has the expected network interface, so assume we set it up already;
-            # just add the IP address.
-            if netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
-                # address was there already
-                continue
-            fi
-            netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
-        done
-
-        return 0
+    if ! netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
+        connect_container_to_bridge || return 1
     fi
 
-    connect_container_to_bridge || return 1
-
+    NEW_ADDRS=
     for ADDR in "$@" ; do
+        if netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
+            # address was there already
+            continue
+        fi
         netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
+        NEW_ADDRS="$NEW_ADDRS $ADDR"
     done
 
     netnsenter ip link set $CONTAINER_IFNAME up || return 1
 
-    for ADDR in "$@" ; do
+    for ADDR in $NEW_ADDRS ; do
         arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
     done
 
@@ -913,28 +908,20 @@ ipam_cidrs() {
     shift 1
     ALL_CIDRS=""
     IPAM_CIDRs=""
-    if [ $# -eq 0 ] ; then
-        # If no addresses passed in, get one in the default subnet
-        IPAM_CIDRS=$(call_weave POST /ip/$CONTAINER_ID$CHECK_ALIVE) || return 1
-        if [ "$IPAM_CIDRS" = "404 page not found" ] ; then
-            echo "No IP address supplied (use the -iprange option on 'weave launch' to enable IP address allocation)" >&2
-            return 1
-        fi
-        ALL_CIDRS="$IPAM_CIDRS"
-    fi
-    while [ $# -gt 0 ] ; do
-        if [ "${1%:*}" = "net" ] ; then
-            if [ "$1" = "net:default" ] ; then
+    # If no addresses passed in, get one in the default subnet
+    [ $# -gt 0 ] || set -- net:default
+    for arg in "$@" ; do
+        if [ "${arg%:*}" = "net" ] ; then
+            if [ "$arg" = "net:default" ] ; then
                 IPAM_URL=/ip/$CONTAINER_ID
             else
-                IPAM_URL=/ip/$CONTAINER_ID/"${1#net:}"
+                IPAM_URL=/ip/$CONTAINER_ID/"${arg#net:}"
             fi
             CIDR=$(call_weave POST $IPAM_URL$CHECK_ALIVE) || return 1
             if [ "$CIDR" = "404 page not found" ] ; then
                 echo "IP address allocation must be enabled to use 'net:'" >&2
                 return 1
-            fi
-            if ! is_cidr "$CIDR" ; then
+            elif ! is_cidr "$CIDR" ; then
                 echo "$CIDR" >&2
                 return 1
             fi
@@ -942,13 +929,12 @@ ipam_cidrs() {
             ALL_CIDRS="$ALL_CIDRS $CIDR"
         else
             # This is a plain IP address; warn if it clashes but carry on
-            command_exists netcheck && netcheck --ignore-iface=$BRIDGE $1 || true
+            command_exists netcheck && netcheck --ignore-iface=$BRIDGE $arg || true
             if container_ip $CONTAINER_NAME 2>/dev/null ; then
-                http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$CONTAINER_ID/${1%/*} >&2
+                http_call_ip $CONTAINER_IP $HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
             fi
-            ALL_CIDRS="$ALL_CIDRS $1"
+            ALL_CIDRS="$ALL_CIDRS $arg"
         fi
-        shift 1
     done
 }
 
@@ -1053,7 +1039,7 @@ proxy_args() {
     if [ -z "$PROXY_HOST" ] ; then
       case "$DOCKER_CLIENT_HOST" in
         ""|unix://*)
-          PROXY_HOST="unix:///var/run/weave.sock"
+          PROXY_HOST="unix:///var/run/weave/weave.sock"
           ;;
         *)
           PROXY_HOST="tcp://0.0.0.0:12375"
@@ -1074,7 +1060,7 @@ proxy_addr() {
 
 warn_if_stopping_proxy_in_env() {
     if PROXY_ADDR=$(proxy_addr 2>/dev/null) ; then
-        [ "$PROXY_ADDR" != "$DOCKER_CLIENT_HOST" ] || echo "WARNING: It appears that your environment is configured to use the Weave Docker API proxy. Stopping it will break this and subsequent docker invocations. To restore your environment, run '\$(eval weave env --restore)'."
+        [ "$PROXY_ADDR" != "$DOCKER_CLIENT_HOST" ] || echo "WARNING: It appears that your environment is configured to use the Weave Docker API proxy. Stopping it will break this and subsequent docker invocations. To restore your environment, run 'eval \$(weave env --restore)'."
     fi
 }
 
@@ -1215,7 +1201,8 @@ launch_proxy() {
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
         -v "$CONTAINERS_PATH":"$CONTAINERS_PATH" \
-        -v /var/run:/var/run \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e WEAVE_CIDR=none \
@@ -1223,6 +1210,8 @@ launch_proxy() {
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
     wait_for_log $PROXY_CONTAINER_NAME "proxy listening"
+    # backward compatibility
+    ln -sf -T /var/run/weave/weave.sock /var/run/weave.sock
 }
 
 ##########################################################################################
@@ -1350,7 +1339,7 @@ case "$COMMAND" in
     launch)
         deprecation_warnings "$@"
         check_not_running $CONTAINER_NAME       $BASE_IMAGE
-        check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
+        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
@@ -1363,7 +1352,7 @@ case "$COMMAND" in
         ;;
     launch-proxy)
         deprecation_warnings "$@"
-        check_not_running $PROXY_CONTAINER_NAME $EXEC_IMAGE
+        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
@@ -1616,7 +1605,7 @@ case "$COMMAND" in
         conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         destroy_bridge
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do
-            ip link del $LOCAL_IFNAME >/dev/null 2>&1 || true
+            ip link del ${LOCAL_IFNAME%@*} >/dev/null 2>&1 || true
         done
         ;;
     rmpeer)

@@ -229,13 +229,45 @@ func TestCancel(t *testing.T) {
 		doneChan <- ok == nil
 	}()
 
-	AssertNothingSent(t, doneChan)
 	time.Sleep(100 * time.Millisecond)
 	AssertNothingSent(t, doneChan)
 
 	cancelChan <- true
 	unpause()
 	if <-doneChan {
+		require.FailNow(t, "Error: got result from Allocate")
+	}
+}
+
+func TestCancelOnDied(t *testing.T) {
+	const (
+		CIDR       = "10.0.1.7/26"
+		container1 = "abcdef"
+	)
+
+	router := gossip.NewTestRouter(0.0)
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
+	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
+	alloc1.Start()
+
+	doneChan := make(chan bool)
+	f := func() {
+		_, ok := alloc1.Allocate(container1, subnet, nil)
+		doneChan <- ok == nil
+	}
+
+	// Attempt two allocations in parallel, to check that this is handled correctly
+	go f()
+	go f()
+
+	// Nothing should happen, because we declared the quorum as 2
+	time.Sleep(100 * time.Millisecond)
+	AssertNothingSent(t, doneChan)
+
+	alloc1.ContainerDied(container1)
+
+	// Check that the two allocations both exit with an error
+	if <-doneChan || <-doneChan {
 		require.FailNow(t, "Error: got result from Allocate")
 	}
 }

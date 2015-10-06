@@ -28,8 +28,8 @@ assert_raises "DOCKER_CLIENT_ARGS='--tls' weave_on $HOST1 launch-proxy" 1
 assert_raises "DOCKER_CERT_PATH='./tls' DOCKER_TLS_VERIFY=1 weave_on $HOST1 launch-proxy" 1
 
 # Booting it with a specific -H overrides defaults
-weave_on $HOST1 launch-proxy -H unix:///var/run/weave2.sock
-assert_raises "run_on $HOST1 sudo docker -H unix:///var/run/weave2.sock ps"
+weave_on $HOST1 launch-proxy -H tcp://0.0.0.0:12345
+assert_raises "run_on $HOST1 sudo docker -H tcp://$HOST1:12345 ps"
 assert_raises "proxy docker_on $HOST1 ps" 1
 weave_on $HOST1 stop-proxy
 
