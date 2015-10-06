@@ -354,6 +354,18 @@ func (alloc *Allocator) pruneNicknames() {
 	}
 }
 
+func (alloc *Allocator) annotatePeernames(names []router.PeerName) []string {
+	var res []string
+	for _, name := range names {
+		if nickname, found := alloc.nicknames[name]; found {
+			res = append(res, fmt.Sprint(name, "(", nickname, ")"))
+		} else {
+			res = append(res, name.String())
+		}
+	}
+	return res
+}
+
 func decodeRange(msg []byte) (r address.Range, err error) {
 	decoder := gob.NewDecoder(bytes.NewReader(msg))
 	return r, decoder.Decode(&r)
@@ -621,7 +633,7 @@ func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 		switch err = alloc.ring.Merge(*data.Ring); err {
 		case ring.ErrDifferentSeeds:
 			return fmt.Errorf("IP allocation was seeded by different peers (received: %v, ours: %v)",
-				data.Ring.Seeds, alloc.ring.Seeds)
+				alloc.annotatePeernames(data.Ring.Seeds), alloc.annotatePeernames(alloc.ring.Seeds))
 		case ring.ErrDifferentRange:
 			return fmt.Errorf("Incompatible IP allocation ranges (received: %s, ours: %s)",
 				data.Ring.Range().AsCIDRString(), alloc.ring.Range().AsCIDRString())
