@@ -544,8 +544,14 @@ attach() {
 
     # Route multicast packets across the weave network.
     # This must come last in 'attach'. If you change this, change weavewait to match.
+    #
+    # The MTU lock prevents PMTU discovery for multicast
+    # destinations. Without that, the kernel sets the DF flag on
+    # multicast packets. Since RFC1122 prohibits sending of ICMP
+    # errors for packets with multicast destinations, that causes
+    # packets larger than the PMTU to be dropped silently.
     if ! netnsenter ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
-        netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME
+        netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME mtu lock $MTU
     fi
 }
 
