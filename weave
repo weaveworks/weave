@@ -888,20 +888,33 @@ ipam_reclaim() {
     done
 }
 
-# Call IPAM as necessary to allocate addresses
-# $1 is the full container id and following args are previously parsed CIDR_ARGS.
-# Returns ALL_CIDRS and IPAM_CIDRS
+# Call IPAM as necessary to lookup or allocate addresses
+#
+# $1 is one of 'lookup', 'allocate' or 'allocate_no_check_alive', $2
+# is the full container id. The remaining args are previously parsed
+# CIDR_ARGS.
+#
+# Populates ALL_CIDRS and IPAM_CIDRS
 ipam_cidrs() {
-    CHECK_ALIVE="?check-alive=true"
-    if [ "$1" = "--no-check-alive" ] ; then
-        CHECK_ALIVE=
-        shift 1
-    fi
-    CONTAINER_ID="$1"
-    shift 1
+    case $1 in
+        lookup)
+            METHOD=GET
+            CHECK_ALIVE=
+            ;;
+        allocate)
+            METHOD=POST
+            CHECK_ALIVE="?check-alive=true"
+            ;;
+        allocate_no_check_alive)
+            METHOD=POST
+            CHECK_ALIVE=
+            ;;
+    esac
+    CONTAINER_ID="$2"
+    shift 2
     ALL_CIDRS=""
     IPAM_CIDRs=""
-    # If no addresses passed in, get one in the default subnet
+    # If no addresses passed in, select the default subnet
     [ $# -gt 0 ] || set -- net:default
     for arg in "$@" ; do
         if [ "${arg%:*}" = "net" ] ; then
@@ -910,21 +923,26 @@ ipam_cidrs() {
             else
                 IPAM_URL=/ip/$CONTAINER_ID/"${arg#net:}"
             fi
-            CIDR=$(call_weave POST $IPAM_URL$CHECK_ALIVE) || return 1
+            CIDR=$(call_weave $METHOD $IPAM_URL$CHECK_ALIVE) || return 1
             if [ "$CIDR" = "404 page not found" ] ; then
-                echo "IP address allocation must be enabled to use 'net:'" >&2
-                return 1
+                if [ "$METHOD" = "POST" ] ; then
+                    echo "IP address allocation must be enabled to use 'net:'" >&2
+                    return 1
+                fi
             elif ! is_cidr "$CIDR" ; then
                 echo "$CIDR" >&2
                 return 1
+            else
+                IPAM_CIDRS="$IPAM_CIDRS $CIDR"
+                ALL_CIDRS="$ALL_CIDRS $CIDR"
             fi
-            IPAM_CIDRS="$IPAM_CIDRS $CIDR"
-            ALL_CIDRS="$ALL_CIDRS $CIDR"
         else
-            # This is a plain IP address; warn if it clashes but carry on
-            command_exists netcheck && netcheck --ignore-iface=$BRIDGE $arg || true
-            if container_ip $CONTAINER_NAME 2>/dev/null ; then
-                http_call $CONTAINER_IP:$HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
+            if [ "$METHOD" = "POST" ] ; then
+                # Assignment of a plain IP address; warn if it clashes but carry on
+                command_exists netcheck && netcheck --ignore-iface=$BRIDGE $arg || true
+                if container_ip $CONTAINER_NAME 2>/dev/null ; then
+                    http_call $CONTAINER_IP:$HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
+                fi
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
@@ -933,7 +951,7 @@ ipam_cidrs() {
 
 ipam_cidrs_or_die() {
     if ! ipam_cidrs "$@" ; then
-        docker kill $1 >/dev/null 2>&1 || true
+        docker kill $2 >/dev/null 2>&1 || true
         exit 1
     fi
 }
@@ -1418,7 +1436,7 @@ case "$COMMAND" in
         shift $CIDR_ARG_COUNT
         CONTAINER=$(docker run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
         create_bridge
-        ipam_cidrs_or_die $CONTAINER $CIDR_ARGS
+        ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
         with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $CONTAINER
@@ -1438,7 +1456,7 @@ case "$COMMAND" in
         RES=$(docker start $1)
         CONTAINER=$(container_id $1)
         create_bridge
-        ipam_cidrs_or_die $CONTAINER $CIDR_ARGS
+        ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
         with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
@@ -1463,7 +1481,7 @@ case "$COMMAND" in
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         create_bridge
-        ipam_cidrs$ATTACH_TYPE $CONTAINER $CIDR_ARGS
+        ipam_cidrs$ATTACH_TYPE allocate $CONTAINER $CIDR_ARGS
         if [ -n "$REWRITE_HOSTS" ] && command_exists weavehosts ; then
             PATH_AND_NAME=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}' $CONTAINER)
             weavehosts $PATH_AND_NAME $ALL_CIDRS
@@ -1477,7 +1495,7 @@ case "$COMMAND" in
         shift $CIDR_ARG_COUNT
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
-        ipam_cidrs $CONTAINER $CIDR_ARGS
+        ipam_cidrs lookup $CONTAINER $CIDR_ARGS
         with_container_netns $CONTAINER detach $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER delete_dns_fqdn $ALL_CIDRS
         for CIDR in $IPAM_CIDRS ; do
@@ -1523,7 +1541,7 @@ case "$COMMAND" in
     expose)
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        ipam_cidrs --no-check-alive weave:expose $CIDR_ARGS
+        ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
         if [ $# -eq 0 ] ; then
             FQDN=""
         else
@@ -1547,7 +1565,7 @@ case "$COMMAND" in
     hide)
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        ipam_cidrs --no-check-alive weave:expose $CIDR_ARGS
+        ipam_cidrs lookup weave:expose $CIDR_ARGS
         create_bridge --without-ethtool
         for CIDR in $ALL_CIDRS ; do
             if ip addr show dev $BRIDGE | grep -qF $CIDR ; then
