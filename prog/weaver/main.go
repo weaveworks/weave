@@ -51,7 +51,7 @@ func main() {
 		iprangeCIDR               string
 		ipsubnetCIDR              string
 		peerCount                 int
-		apiPath                   string
+		dockerAPI                 string
 		peers                     []string
 		noDNS                     bool
 		dnsDomain                 string
@@ -79,7 +79,7 @@ func main() {
 	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
-	mflag.StringVar(&apiPath, []string{"#api", "-api"}, "unix:///var/run/docker.sock", "Path to Docker API socket")
+	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, "", "Docker API endpoint, e.g. unix:///var/run/docker.sock")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
 	mflag.StringVar(&dnsListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
@@ -175,18 +175,26 @@ func main() {
 	router := weave.NewRouter(config, name, nickName)
 	Log.Println("Our name is", router.Ourself)
 
-	dockerCli, err := docker.NewClient(apiPath)
-	if err != nil {
-		Log.Fatal("Unable to start docker client: ", err)
+	var dockerCli *docker.Client
+	if dockerAPI != "" {
+		dc, err := docker.NewClient(dockerAPI)
+		if err != nil {
+			Log.Fatal("Unable to start docker client: ", err)
+		}
+		dockerCli = dc
 	}
-
+	observeContainers := func(o docker.ContainerObserver) {
+		if dockerCli != nil {
+			if err = dockerCli.AddObserver(o); err != nil {
+				Log.Fatal("Unable to start watcher", err)
+			}
+		}
+	}
 	var allocator *ipam.Allocator
 	var defaultSubnet address.CIDR
 	if iprangeCIDR != "" {
 		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
-		if err = dockerCli.AddObserver(allocator); err != nil {
-			Log.Fatal("Unable to start watcher", err)
-		}
+		observeContainers(allocator)
 	} else if peerCount > 0 {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}
@@ -196,11 +204,9 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		ns = nameserver.New(router.Ourself.Peer.Name, router.Peers, dockerCli, dnsDomain)
+		ns = nameserver.New(router.Ourself.Peer.Name, router.Peers, dnsDomain)
 		ns.SetGossip(router.NewGossip("nameserver", ns))
-		if err = dockerCli.AddObserver(ns); err != nil {
-			Log.Fatal("Unable to start watcher", err)
-		}
+		observeContainers(ns)
 		ns.Start()
 		defer ns.Stop()
 		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsListenAddress,
@@ -226,7 +232,7 @@ func main() {
 			allocator.HandleHTTP(muxRouter, defaultSubnet, dockerCli)
 		}
 		if ns != nil {
-			ns.HandleHTTP(muxRouter)
+			ns.HandleHTTP(muxRouter, dockerCli)
 		}
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)

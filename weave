@@ -1187,7 +1187,7 @@ launch_router() {
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
-        $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS --iface $CONTAINER_IFNAME --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" --ipalloc-range "$IPRANGE" --dns-effective-listen-address "$DOCKER_BRIDGE_IP" "$@")
+        $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS --iface $CONTAINER_IFNAME --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" --ipalloc-range "$IPRANGE" --dns-effective-listen-address "$DOCKER_BRIDGE_IP" --docker-api "unix:///var/run/docker.sock" "$@")
     with_container_netns_or_die $ROUTER_CONTAINER launch
     err_msg=$(death_msg $CONTAINER_NAME)
     container_ip $CONTAINER_NAME "$err_msg" "$err_msg" || return 1

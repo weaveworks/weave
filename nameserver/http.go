@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
 
+	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -16,7 +17,7 @@ func (n *Nameserver) badRequest(w http.ResponseWriter, err error) {
 	n.infof("%v", err)
 }
 
-func (n *Nameserver) HandleHTTP(router *mux.Router) {
+func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 	router.Methods("GET").Path("/domain").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, n.domain)
 	})
@@ -39,7 +40,7 @@ func (n *Nameserver) HandleHTTP(router *mux.Router) {
 			return
 		}
 
-		if r.FormValue("check-alive") == "true" && n.docker.IsContainerNotRunning(container) {
+		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(container) {
 			n.infof("container '%s' is not running: removing", container)
 			if err := n.Delete(hostname, container, ipStr, ip); err != nil {
 				n.infof("failed to remove: %v", err)

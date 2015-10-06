@@ -11,7 +11,6 @@ import (
 	"github.com/miekg/dns"
 
 	. "github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/router"
 )
@@ -41,18 +40,16 @@ type Nameserver struct {
 	ourName router.PeerName
 	domain  string
 	gossip  router.Gossip
-	docker  *docker.Client
 	entries Entries
 	peers   *router.Peers
 	quit    chan struct{}
 }
 
-func New(ourName router.PeerName, peers *router.Peers, docker *docker.Client, domain string) *Nameserver {
+func New(ourName router.PeerName, peers *router.Peers, domain string) *Nameserver {
 	ns := &Nameserver{
 		ourName: ourName,
 		domain:  dns.Fqdn(domain),
 		peers:   peers,
-		docker:  docker,
 		quit:    make(chan struct{}),
 	}
 	if peers != nil {
