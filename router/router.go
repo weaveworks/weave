@@ -135,10 +135,13 @@ func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
 		// If we don't know which peer corresponds to the dest
 		// MAC, broadcast it.
 		router.PacketLogging.LogPacket("Broadcasting", key)
-		return router.Ourself.Broadcast(key)
+		return router.relayBroadcast(router.Ourself.Peer, key)
 	default:
 		router.PacketLogging.LogPacket("Forwarding", key)
-		return router.Ourself.Forward(dstPeer, key)
+		return router.relay(ForwardPacketKey{
+			PacketKey: key,
+			SrcPeer:   router.Ourself.Peer,
+			DstPeer:   dstPeer})
 	}
 }
 
@@ -175,7 +178,7 @@ func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
 	if key.DstPeer != router.Ourself.Peer {
 		// it's not for us, we're just relaying it
 		router.PacketLogging.LogForwardPacket("Relaying", key)
-		return router.Ourself.Relay(key)
+		return router.relay(key)
 	}
 
 	// At this point, it's either unicast to us, or a broadcast
@@ -196,7 +199,7 @@ func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
 	}
 
 	router.PacketLogging.LogForwardPacket("Relaying broadcast", key)
-	relayFop := router.Ourself.RelayBroadcast(key.SrcPeer, key.PacketKey)
+	relayFop := router.relayBroadcast(key.SrcPeer, key.PacketKey)
 	switch {
 	case injectFop == nil:
 		return relayFop
@@ -210,6 +213,45 @@ func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
 		mfop.Add(relayFop)
 		return mfop
 	}
+}
+
+// Routing
+
+func (router *Router) relay(key ForwardPacketKey) FlowOp {
+	relayPeerName, found := router.Routes.Unicast(key.DstPeer.Name)
+	if !found {
+		// Not necessarily an error as there could be a race with the
+		// dst disappearing whilst the frame is in flight
+		log.Println("Received packet for unknown destination:", key.DstPeer)
+		return nil
+	}
+
+	conn, found := router.Ourself.ConnectionTo(relayPeerName)
+	if !found {
+		// Again, could just be a race, not necessarily an error
+		log.Println("Unable to find connection to relay peer", relayPeerName)
+		return nil
+	}
+
+	return conn.(*LocalConnection).Forward(key)
+}
+
+func (router *Router) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
+	nextHops := router.Routes.Broadcast(srcPeer.Name)
+	if len(nextHops) == 0 {
+		return nil
+	}
+
+	op := NewMultiFlowOp(true)
+
+	for _, conn := range router.Ourself.ConnectionsTo(nextHops) {
+		op.Add(conn.(*LocalConnection).Forward(ForwardPacketKey{
+			PacketKey: key,
+			SrcPeer:   srcPeer,
+			DstPeer:   conn.Remote()}))
+	}
+
+	return op
 }
 
 // Gossiper methods - the Router is the topology Gossiper
