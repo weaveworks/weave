@@ -23,7 +23,7 @@ normally place it in `/etc/systemd/system/weave.service`.
     [Service]
     EnvironmentFile=-/etc/sysconfig/weave
     ExecStartPre=/usr/local/bin/weave launch $PEERS
-    ExecStart=/usr/bin/docker attach -f weave
+    ExecStart=/usr/bin/docker attach weave
     ExecStop=/usr/local/bin/weave stop
     [Install]
     WantedBy=multi-user.target
