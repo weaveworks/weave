@@ -88,6 +88,9 @@ type OverlayForwarder interface {
 	// compatibility, and should always be
 	// ProtocolOverlayControlMessage for non-sleeve overlays.
 	ControlMessage(tag byte, msg []byte)
+
+	// User facing overlay name
+	DisplayName() string
 }
 
 type NullOverlay struct{}
@@ -128,4 +131,8 @@ func (NullOverlay) Stop() {
 }
 
 func (NullOverlay) ControlMessage(byte, []byte) {
+}
+
+func (NullOverlay) DisplayName() string {
+	return "null"
 }

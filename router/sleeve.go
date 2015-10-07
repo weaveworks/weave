@@ -593,6 +593,10 @@ func (fwd *sleeveForwarder) ControlMessage(tag byte, msg []byte) {
 	}
 }
 
+func (fwd *sleeveForwarder) DisplayName() string {
+	return "sleeve"
+}
+
 func (fwd *sleeveForwarder) Stop() {
 	fwd.sleeve.removeForwarder(fwd.remotePeer.Name, fwd)
 

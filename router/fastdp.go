@@ -662,6 +662,10 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 	}
 }
 
+func (fwd *fastDatapathForwarder) DisplayName() string {
+	return "fastdp"
+}
+
 func (fwd *fastDatapathForwarder) handleHeartbeatAck() {
 	log.Debug(fwd.logPrefix(), "handleHeartbeatAck")
 
