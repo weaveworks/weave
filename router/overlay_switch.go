@@ -393,3 +393,15 @@ func (fwd *overlaySwitchForwarder) ControlMessage(tag byte, msg []byte) {
 		subFwd.ControlMessage(msg[1], msg[2:])
 	}
 }
+
+func (fwd *overlaySwitchForwarder) OverlayType() string {
+	fwd.lock.Lock()
+	best := fwd.best
+	fwd.lock.Unlock()
+
+	if best == nil {
+		return "none"
+	}
+
+	return best.OverlayType()
+}

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -170,7 +171,9 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 			if conn.Established() {
 				state = "established"
 			}
-			slice = append(slice, LocalConnectionStatus{conn.RemoteTCPAddr(), conn.Outbound(), state, conn.Remote().String()})
+			lc, _ := conn.(*LocalConnection)
+			info := fmt.Sprintf("%-6v %v", lc.forwarder.OverlayType(), conn.Remote())
+			slice = append(slice, LocalConnectionStatus{conn.RemoteTCPAddr(), conn.Outbound(), state, info})
 		}
 		for address, target := range cm.targets {
 			add := func(state, info string) {
