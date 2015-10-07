@@ -175,17 +175,6 @@ func (alloc *Allocator) spaceRequestDenied(sender router.PeerName, r address.Ran
 	}
 }
 
-func hasBeenCancelled(cancelChan <-chan bool) func() bool {
-	return func() bool {
-		select {
-		case <-cancelChan:
-			return true
-		default:
-			return false
-		}
-	}
-}
-
 type errorCancelled struct {
 	kind  string
 	ident string
@@ -199,10 +188,9 @@ func (e *errorCancelled) Error() string {
 
 // Allocate (Sync) - get new IP address for container with given name in range
 // if there isn't any space in that range we block indefinitely
-func (alloc *Allocator) Allocate(ident string, r address.Range, cancelChan <-chan bool) (address.Address, error) {
+func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled func() bool) (address.Address, error) {
 	resultChan := make(chan allocateResult)
-	op := &allocate{resultChan: resultChan, ident: ident, r: r,
-		hasBeenCancelled: hasBeenCancelled(cancelChan)}
+	op := &allocate{resultChan: resultChan, ident: ident, r: r, hasBeenCancelled: hasBeenCancelled}
 	alloc.doOperation(op, &alloc.pendingAllocates)
 	result := <-resultChan
 	return result.addr, result.err

@@ -20,6 +20,8 @@ const (
 	testStart3 = "10.0.3.0"
 )
 
+func returnFalse() bool { return false }
+
 func TestAllocFree(t *testing.T) {
 	const (
 		container1 = "abcdef"
@@ -39,31 +41,31 @@ func TestAllocFree(t *testing.T) {
 	_, cidr2, _ := address.ParseCIDR(subnet2)
 
 	alloc.claimRingForTesting()
-	addr1, err := alloc.Allocate(container1, cidr1.HostRange(), nil)
+	addr1, err := alloc.Allocate(container1, cidr1.HostRange(), returnFalse)
 	require.NoError(t, err)
 	require.Equal(t, testAddr1, addr1.String(), "address")
 
-	addr2, err := alloc.Allocate(container1, cidr2.HostRange(), nil)
+	addr2, err := alloc.Allocate(container1, cidr2.HostRange(), returnFalse)
 	require.NoError(t, err)
 	require.Equal(t, testAddr2, addr2.String(), "address")
 
 	// Ask for another address for a different container and check it's different
-	addr1b, _ := alloc.Allocate(container2, cidr1.HostRange(), nil)
+	addr1b, _ := alloc.Allocate(container2, cidr1.HostRange(), returnFalse)
 	if addr1b.String() == testAddr1 {
 		t.Fatalf("Expected different address but got %s", addr1b.String())
 	}
 
 	// Ask for the first container again and we should get the same addresses again
-	addr1a, _ := alloc.Allocate(container1, cidr1.HostRange(), nil)
+	addr1a, _ := alloc.Allocate(container1, cidr1.HostRange(), returnFalse)
 	require.Equal(t, testAddr1, addr1a.String(), "address")
-	addr2a, _ := alloc.Allocate(container1, cidr2.HostRange(), nil)
+	addr2a, _ := alloc.Allocate(container1, cidr2.HostRange(), returnFalse)
 	require.Equal(t, testAddr2, addr2a.String(), "address")
 
 	// Now delete the first container, and we should get its addresses back
 	require.NoError(t, alloc.Delete(container1))
-	addr3, _ := alloc.Allocate(container3, cidr1.HostRange(), nil)
+	addr3, _ := alloc.Allocate(container3, cidr1.HostRange(), returnFalse)
 	require.Equal(t, testAddr1, addr3.String(), "address")
-	addr4, _ := alloc.Allocate(container3, cidr2.HostRange(), nil)
+	addr4, _ := alloc.Allocate(container3, cidr2.HostRange(), returnFalse)
 	require.Equal(t, testAddr2, addr4.String(), "address")
 
 	alloc.ContainerDied(container2)
@@ -93,7 +95,7 @@ func TestBootstrap(t *testing.T) {
 	ExpectBroadcastMessage(alloc1, nil) // alloc1 will try to form consensus
 	done := make(chan bool)
 	go func() {
-		alloc1.Allocate("somecontainer", subnet, nil)
+		alloc1.Allocate("somecontainer", subnet, returnFalse)
 		done <- true
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -147,15 +149,15 @@ func TestAllocatorClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	// Do one allocate to ensure paxos is all done
-	alloc.Allocate("unused", subnet, nil)
+	alloc.Allocate("unused", subnet, returnFalse)
 	// Do an allocate on the other peer, which we will try to claim later
-	addrx, err := allocs[0].Allocate(container1, subnet, nil)
+	addrx, err := allocs[0].Allocate(container1, subnet, returnFalse)
 
 	// Now try the claim again
 	err = alloc.Claim(container3, addr1, true)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
-	addr3, _ := alloc.Allocate(container3, subnet, nil)
+	addr3, _ := alloc.Allocate(container3, subnet, returnFalse)
 	require.Equal(t, testAddr1, addr3.String(), "address")
 	// one more claim should still work
 	err = alloc.Claim(container3, addr1, true)
@@ -206,9 +208,9 @@ func TestCancel(t *testing.T) {
 	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
 	// Get some IPs, so each allocator has some space
-	res1, _ := alloc1.Allocate("foo", subnet, nil)
+	res1, _ := alloc1.Allocate("foo", subnet, returnFalse)
 	common.Log.Debugf("res1 = %s", res1.String())
-	res2, _ := alloc2.Allocate("bar", subnet, nil)
+	res2, _ := alloc2.Allocate("bar", subnet, returnFalse)
 	common.Log.Debugf("res2 = %s", res2.String())
 	if res1 == res2 {
 		require.FailNow(t, "Error: got same ips!")
@@ -220,12 +222,20 @@ func TestCancel(t *testing.T) {
 
 	// Use up all the IPs that alloc1 owns, so the allocation after this will prompt a request to alloc2
 	for i := 0; alloc1.NumFreeAddresses(subnet) > 0; i++ {
-		alloc1.Allocate(fmt.Sprintf("tmp%d", i), subnet, nil)
+		alloc1.Allocate(fmt.Sprintf("tmp%d", i), subnet, returnFalse)
 	}
 	cancelChan := make(chan bool, 1)
 	doneChan := make(chan bool)
 	go func() {
-		_, ok := alloc1.Allocate("baz", subnet, cancelChan)
+		_, ok := alloc1.Allocate("baz", subnet,
+			func() bool {
+				select {
+				case <-cancelChan:
+					return true
+				default:
+					return false
+				}
+			})
 		doneChan <- ok == nil
 	}()
 
@@ -252,7 +262,7 @@ func TestCancelOnDied(t *testing.T) {
 
 	doneChan := make(chan bool)
 	f := func() {
-		_, ok := alloc1.Allocate(container1, subnet, nil)
+		_, ok := alloc1.Allocate(container1, subnet, returnFalse)
 		doneChan <- ok == nil
 	}
 
@@ -283,11 +293,11 @@ func TestGossipShutdown(t *testing.T) {
 	defer alloc.Stop()
 
 	alloc.claimRingForTesting()
-	alloc.Allocate(container1, subnet, nil)
+	alloc.Allocate(container1, subnet, returnFalse)
 
 	alloc.Shutdown()
 
-	_, err := alloc.Allocate(container2, subnet, nil) // trying to allocate after shutdown should fail
+	_, err := alloc.Allocate(container2, subnet, returnFalse) // trying to allocate after shutdown should fail
 	require.False(t, err == nil, "no address")
 
 	CheckAllExpectedMessagesSent(alloc)
@@ -302,10 +312,10 @@ func TestTransfer(t *testing.T) {
 	alloc2 := allocs[1]
 	alloc3 := allocs[2] // This will be 'master' and get the first range
 
-	_, err := alloc2.Allocate("foo", subnet, nil)
+	_, err := alloc2.Allocate("foo", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 
-	_, err = alloc3.Allocate("bar", subnet, nil)
+	_, err = alloc3.Allocate("bar", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 
 	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
@@ -323,7 +333,7 @@ func TestTransfer(t *testing.T) {
 
 	require.Equal(t, address.Offset(1022), alloc1.NumFreeAddresses(subnet))
 
-	_, err = alloc1.Allocate("foo", subnet, nil)
+	_, err = alloc1.Allocate("foo", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 	alloc1.Stop()
 }
@@ -338,7 +348,7 @@ func TestFakeRouterSimple(t *testing.T) {
 	alloc1 := allocs[0]
 	//alloc2 := allocs[1]
 
-	_, err := alloc1.Allocate("foo", subnet, nil)
+	_, err := alloc1.Allocate("foo", subnet, returnFalse)
 	require.NoError(t, err, "Failed to get address")
 }
 
@@ -419,7 +429,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		allocIndex := rand.Int31n(nodes)
 		alloc := allocs[allocIndex]
 		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
-		addr, err := alloc.Allocate(name, subnet, nil)
+		addr, err := alloc.Allocate(name, subnet, returnFalse)
 
 		if err != nil {
 			panic(fmt.Sprintf("Could not allocate addr"))
@@ -476,7 +486,7 @@ func TestAllocatorFuzz(t *testing.T) {
 
 		//common.Log.Infof("Asking for %s (%s) on allocator %d again", res.name, addr, res.alloc)
 
-		newAddr, _ := alloc.Allocate(res.name, subnet, nil)
+		newAddr, _ := alloc.Allocate(res.name, subnet, returnFalse)
 		oldAddr, _ := address.ParseIP(addr)
 		if newAddr != oldAddr {
 			panic(fmt.Sprintf("Got different address for repeat request for %s: %s != %s", res.name, newAddr, oldAddr))
