@@ -21,6 +21,9 @@ type Overlay interface {
 
 	// Enhance a features map with overlay-related features
 	AddFeaturesTo(map[string]string)
+
+	// Obtain diagnostic information specific to the overlay
+	Diagnostics() interface{}
 }
 
 type ForwarderParams struct {
@@ -135,4 +138,8 @@ func (NullOverlay) ControlMessage(byte, []byte) {
 
 func (NullOverlay) OverlayType() string {
 	return "null"
+}
+
+func (NullOverlay) Diagnostics() interface{} {
+	return nil
 }

@@ -22,6 +22,7 @@ type Status struct {
 	BroadcastRoutes    []BroadcastRouteStatus
 	Connections        []LocalConnectionStatus
 	Targets            []string
+	OverlayDiagnostics interface{}
 }
 
 type MACStatus struct {
@@ -80,7 +81,8 @@ func NewStatus(router *Router) *Status {
 		NewUnicastRouteStatusSlice(router.Routes),
 		NewBroadcastRouteStatusSlice(router.Routes),
 		NewLocalConnectionStatusSlice(router.ConnectionMaker),
-		NewTargetSlice(router.ConnectionMaker)}
+		NewTargetSlice(router.ConnectionMaker),
+		router.Overlay.Diagnostics()}
 }
 
 func NewMACStatusSlice(cache *MacCache) []MACStatus {
