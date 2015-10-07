@@ -161,7 +161,12 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.Router, all
 	}
 	muxRouter.Methods("GET").Path("/report").Headers("Accept", "application/json").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			json, _ := json.MarshalIndent(status(), "", "    ")
+			json, err := json.MarshalIndent(status(), "", "    ")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				Log.Error("Error during report marshalling: ", err)
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(json)
 		})
