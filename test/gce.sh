@@ -11,7 +11,7 @@ set -e
 : ${SSH_KEY_FILE:=$HOME/.ssh/gce_ssh_key}
 : ${PROJECT:=positive-cocoa-90213}
 : ${IMAGE:=ubuntu-14-04}
-: ${TEMPLATE_NAME:=test-template-4}
+: ${TEMPLATE_NAME:=test-template-6}
 : ${ZONE:=us-central1-a}
 : ${NUM_HOSTS:=5}
 SUFFIX=""
@@ -90,6 +90,7 @@ function copy_hosts {
 # Create new set of VMs
 function setup {
 	destroy
+
 	names="$(vm_names)"
 	gcloud compute instances create $names --image $TEMPLATE_NAME --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
@@ -159,5 +160,8 @@ destroy)
 	;;
 
 make_template)
-	make_template
+	# see if template exists
+	if ! gcloud compute images list | grep $PROJECT | grep $TEMPLATE_NAME; then
+		make_template
+	fi
 esac
