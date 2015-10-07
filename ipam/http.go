@@ -31,7 +31,17 @@ func parseCIDR(w http.ResponseWriter, cidrStr string) (address.CIDR, bool) {
 
 func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.ResponseWriter, ident string, checkAlive bool, subnet address.CIDR) {
 	closedChan := w.(http.CloseNotifier).CloseNotify()
-	addr, err := alloc.Allocate(ident, subnet.HostRange(), closedChan)
+	addr, err := alloc.Allocate(ident, subnet.HostRange(),
+		func() bool {
+			select {
+			case <-closedChan:
+				return true
+			default:
+				res := checkAlive && dockerCli != nil && dockerCli.IsContainerNotRunning(ident)
+				checkAlive = false // we check only once; if the container dies later we learn about that through events
+				return res
+			}
+		})
 	if err != nil {
 		if _, ok := err.(*errorCancelled); ok { // cancellation is not really an error
 			common.Log.Infoln("[allocator]:", err.Error())
@@ -39,12 +49,6 @@ func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.Resp
 			return
 		}
 		badRequest(w, err)
-		return
-	}
-	if checkAlive && dockerCli != nil && dockerCli.IsContainerNotRunning(ident) {
-		common.Log.Infof("[allocator] '%s' is not running: freeing %s", ident, addr)
-		alloc.Free(ident, addr)
-		fmt.Fprint(w, "cancelled")
 		return
 	}
 
