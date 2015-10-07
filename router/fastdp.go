@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -319,6 +320,77 @@ func (fastdp fastDatapathOverlay) InvalidateShortIDs() {
 func (fastDatapathOverlay) AddFeaturesTo(features map[string]string) {
 	// Nothing needed.  Fast datapath support is indicated through
 	// OverlaySwitch.
+}
+
+type FlowStatus odp.FlowInfo
+
+func (flowStatus *FlowStatus) MarshalJSON() ([]byte, error) {
+	type jsonFlowStatus struct {
+		FlowKeys []string
+		Actions  []string
+		Packets  uint64
+		Bytes    uint64
+		Used     uint64
+	}
+
+	flowKeys := make([]string, 0, len(flowStatus.FlowKeys))
+	for _, flowKey := range flowStatus.FlowKeys {
+		if !flowKey.Ignored() {
+			flowKeys = append(flowKeys, fmt.Sprint(flowKey))
+		}
+	}
+
+	actions := make([]string, 0, len(flowStatus.Actions))
+	for _, action := range flowStatus.Actions {
+		actions = append(actions, fmt.Sprint(action))
+	}
+
+	return json.Marshal(&jsonFlowStatus{flowKeys, actions,
+		flowStatus.Packets, flowStatus.Bytes, flowStatus.Used})
+}
+
+type VportStatus odp.Vport
+
+func (vport *VportStatus) MarshalJSON() ([]byte, error) {
+	type jsonVportStatus struct {
+		ID       odp.VportID
+		Name     string
+		TypeName string
+	}
+
+	return json.Marshal(&jsonVportStatus{vport.ID, vport.Spec.Name(),
+		vport.Spec.TypeName()})
+}
+
+func (fastdp fastDatapathOverlay) Diagnostics() interface{} {
+	lock := fastdp.startLock()
+	defer lock.unlock()
+
+	vports, err := fastdp.dp.EnumerateVports()
+	if err != nil {
+		log.Warn(err)
+	}
+	vportStatuses := make([]VportStatus, 0, len(vports))
+	for _, vport := range vports {
+		vportStatuses = append(vportStatuses, VportStatus(vport))
+	}
+
+	flows, err := fastdp.dp.EnumerateFlows()
+	if err != nil {
+		log.Warn(err)
+	}
+	flowStatuses := make([]FlowStatus, 0, len(flows))
+	for _, flow := range flows {
+		flowStatuses = append(flowStatuses, FlowStatus(flow))
+	}
+
+	return struct {
+		Vports []VportStatus
+		Flows  []FlowStatus
+	}{
+		vportStatuses,
+		flowStatuses,
+	}
 }
 
 func (fastdp fastDatapathOverlay) StartConsumingPackets(localPeer *Peer,
