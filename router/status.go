@@ -36,6 +36,7 @@ type PeerStatus struct {
 	Name        string
 	NickName    string
 	UID         PeerUID
+	ShortID     PeerShortID
 	Version     uint64
 	Connections []ConnectionStatus
 }
@@ -122,6 +123,7 @@ func NewPeerStatusSlice(peers *Peers) []PeerStatus {
 			peer.Name.String(),
 			peer.NickName,
 			peer.UID,
+			peer.ShortID,
 			peer.Version,
 			connections})
 	})
