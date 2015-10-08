@@ -849,10 +849,15 @@ with_container_fqdn() {
 # Register FQDN in $2 as names for addresses $3.. under full container ID $1
 put_dns_fqdn() {
     CHECK_ALIVE="-d check-alive=true"
-    if [ "$1" = "--no-check-alive" ] ; then
-        CHECK_ALIVE=
-        shift 1
-    fi
+    put_dns_fqdn_helper "$@"
+}
+
+put_dns_fqdn_no_check_alive() {
+    CHECK_ALIVE=
+    put_dns_fqdn_helper "$@"
+}
+
+put_dns_fqdn_helper() {
     CONTAINER_ID="$1"
     FQDN="$2"
     shift 2
@@ -895,11 +900,12 @@ collect_dns_add_remove_args() {
         shift 2
     fi
     [ $# -eq 0 -a \( -n "$C" -o \( $IP_COUNT -gt 0 -a -n "$FQDN" \) \) ] || usage
-    [ -n "$C" ] || C=$CONTAINER_NAME
     check_running $CONTAINER_NAME
-    CONTAINER=$(container_id $C)
-    if [ $IP_COUNT -eq 0 ] ; then
-        IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
+    if [ -n "$C" ] ; then
+        CONTAINER=$(container_id $C)
+        if [ $IP_COUNT -eq 0 ] ; then
+            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
+        fi
     fi
 }
 
@@ -1533,14 +1539,20 @@ case "$COMMAND" in
         ;;
     dns-add)
         collect_dns_add_remove_args "$@"
+        FN=put_dns_fqdn
+        if [ -z "$CONTAINER" ] ; then
+            FN=put_dns_fqdn_no_check_alive
+            CONTAINER=weave:extern
+        fi
         if [ -n "$FQDN" ] ; then
-            put_dns_fqdn $CONTAINER $FQDN $IP_ARGS
+            $FN $CONTAINER $FQDN $IP_ARGS
         else
-            with_container_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
+            with_container_fqdn $CONTAINER $FN $IP_ARGS
         fi
         ;;
     dns-remove)
         collect_dns_add_remove_args "$@"
+        [ -n "$CONTAINER" ] || CONTAINER=weave:extern
         if [ -n "$FQDN" ] ; then
             delete_dns_fqdn $CONTAINER $FQDN $IP_ARGS
         else
@@ -1570,7 +1582,7 @@ case "$COMMAND" in
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
                 if [ -n "$FQDN" ] ; then
-                    when_weave_running put_dns_fqdn --no-check-alive weave:expose $FQDN $CIDR
+                    when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
                 fi
             fi
         done
