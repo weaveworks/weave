@@ -164,6 +164,18 @@ command:
 $ weave dns-remove $C
 ```
 
+By omitting the container name it is possible to add/remove DNS
+records that associate names in the weaveDNS domain with IP addresses
+that do not belong to containers, e.g. non-weave addresses of external
+services:
+
+```bash
+$ weave dns-add 192.128.16.45 -h db.weave.local
+```
+
+Note that such records get removed when stopping the weave peer on
+which they were added.
+
 ## <a name="resolve-weavedns-entries-from-host"></a>Resolve weaveDNS entries from host
 
 You can resolve entries from any host running weaveDNS with `weave
