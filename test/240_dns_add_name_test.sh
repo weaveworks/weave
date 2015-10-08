@@ -4,6 +4,7 @@
 
 C1=10.2.0.78
 C2=10.2.0.34
+C3=10.2.0.12
 NAME1=seeone.weave.local
 NAME2=seetwo.weave.local
 NAME3=seethree.weave.local
@@ -33,5 +34,11 @@ assert_dns_a_record $HOST1 c1 $NAME3 $C1
 weave_on $HOST1 dns-remove c1 -h $NAME3
 
 assert_no_dns_record $HOST1 c1 $NAME3
+
+weave_on $HOST1 dns-add $C3 -h $NAME1
+assert_dns_record $HOST1 c1 $NAME1 $C3
+
+weave_on $HOST1 dns-remove $C3 -h $NAME1
+assert_no_dns_record $HOST1 c1 $NAME1
 
 end_suite

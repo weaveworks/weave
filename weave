@@ -69,8 +69,10 @@ weave run           [--with-dns | --without-dns] [<addr> ...]
 weave start         [<addr> ...] <container_id>
 weave attach        [<addr> ...] <container_id>
 weave detach        [<addr> ...] <container_id>
-weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>]
-weave dns-remove    [<ip_address> ...] <container_id> [-h <fqdn>]
+weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>] |
+                    <ip_address> ... -h <fqdn>
+weave dns-remove    [<ip_address> ...] <container_id> [-h <fqdn>] |
+                    <ip_address> ... -h <fqdn>
 weave dns-lookup    <unqualified_name>
 weave expose        [<addr> ...] [-h <fqdn>]
 weave hide          [<addr> ...]
@@ -881,6 +883,26 @@ delete_dns_fqdn() {
     done
 }
 
+collect_dns_add_remove_args() {
+    collect_ip_args "$@"
+    shift $IP_COUNT
+    if [ $# -gt 0 -a "$1" != "-h" ] ; then
+        C="$1"
+        shift
+    fi
+    if [ $# -eq 2 -a "$1" = "-h" ] ; then
+        FQDN="$2"
+        shift 2
+    fi
+    [ $# -eq 0 -a \( -n "$C" -o \( $IP_COUNT -gt 0 -a -n "$FQDN" \) \) ] || usage
+    [ -n "$C" ] || C=$CONTAINER_NAME
+    check_running $CONTAINER_NAME
+    CONTAINER=$(container_id $C)
+    if [ $IP_COUNT -eq 0 ] ; then
+        IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
+    fi
+}
+
 ######################################################################
 # IP Allocation Management helpers
 ######################################################################
@@ -1510,33 +1532,19 @@ case "$COMMAND" in
         show_addrs $ALL_CIDRS
         ;;
     dns-add)
-        collect_ip_args "$@"
-        shift $IP_COUNT
-        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
-        check_running $CONTAINER_NAME
-        CONTAINER=$(container_id $1)
-        if [ $IP_COUNT -eq 0 ] ; then
-            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
-        fi
-        if [ $# -eq 1 ] ; then
-            with_container_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
+        collect_dns_add_remove_args "$@"
+        if [ -n "$FQDN" ] ; then
+            put_dns_fqdn $CONTAINER $FQDN $IP_ARGS
         else
-            put_dns_fqdn $CONTAINER "$3" $IP_ARGS
+            with_container_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
         fi
         ;;
     dns-remove)
-        collect_ip_args "$@"
-        shift $IP_COUNT
-        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
-        check_running $CONTAINER_NAME
-        CONTAINER=$(container_id $1)
-        if [ $IP_COUNT -eq 0 ] ; then
-            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
-        fi
-        if [ $# -eq 1 ] ; then
-            delete_dns $CONTAINER $IP_ARGS
+        collect_dns_add_remove_args "$@"
+        if [ -n "$FQDN" ] ; then
+            delete_dns_fqdn $CONTAINER $FQDN $IP_ARGS
         else
-            delete_dns_fqdn $CONTAINER "$3" $IP_ARGS
+            delete_dns $CONTAINER $IP_ARGS
         fi
         ;;
     dns-lookup)
