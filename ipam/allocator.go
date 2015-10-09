@@ -342,6 +342,18 @@ func (alloc *Allocator) pruneNicknames() {
 	}
 }
 
+func (alloc *Allocator) annotatePeernames(names []router.PeerName) []string {
+	var res []string
+	for _, name := range names {
+		if nickname, found := alloc.nicknames[name]; found {
+			res = append(res, fmt.Sprint(name, "(", nickname, ")"))
+		} else {
+			res = append(res, name.String())
+		}
+	}
+	return res
+}
+
 func decodeRange(msg []byte) (r address.Range, err error) {
 	decoder := gob.NewDecoder(bytes.NewReader(msg))
 	return r, decoder.Decode(&r)
@@ -606,16 +618,20 @@ func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 	// shouldn't get updates for a empty Ring. But tolerate
 	// them just in case.
 	if data.Ring != nil {
-		if data.Ring.Range() != alloc.universe {
-			return fmt.Errorf("Incompatible IP allocation range %s; ours is %s",
-				data.Ring.Range().AsCIDRString(), alloc.universe.AsCIDRString())
+		switch err = alloc.ring.Merge(*data.Ring); err {
+		case ring.ErrDifferentSeeds:
+			return fmt.Errorf("IP allocation was seeded by different peers (received: %v, ours: %v)",
+				alloc.annotatePeernames(data.Ring.Seeds), alloc.annotatePeernames(alloc.ring.Seeds))
+		case ring.ErrDifferentRange:
+			return fmt.Errorf("Incompatible IP allocation ranges (received: %s, ours: %s)",
+				data.Ring.Range().AsCIDRString(), alloc.ring.Range().AsCIDRString())
+		default:
+			if err == nil && !alloc.ring.Empty() {
+				alloc.pruneNicknames()
+				alloc.ringUpdated()
+			}
+			return err
 		}
-		err = alloc.ring.Merge(*data.Ring)
-		if !alloc.ring.Empty() {
-			alloc.pruneNicknames()
-			alloc.ringUpdated()
-		}
-		return err
 	}
 
 	if data.Paxos != nil {
