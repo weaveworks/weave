@@ -201,6 +201,9 @@ func (proxy *Proxy) Serve(listeners []net.Listener) {
 }
 
 func (proxy *Proxy) ListenAndServeStatus(socket string) {
+	if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
+		Log.Fatalf("Error removing existing status socket: %s", err)
+	}
 	listener, err := net.Listen("unix", socket)
 	if err != nil {
 		Log.Fatalf("ListenAndServeStatus failed: %s", err)
