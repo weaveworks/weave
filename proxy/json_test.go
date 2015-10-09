@@ -36,49 +36,43 @@ func TestLookupObject(t *testing.T) {
 	for _, test := range tests {
 		gotResult, gotErr := test.root.Object(test.key)
 		msg := fmt.Sprintf("%q.Object(%q) => %q, %q", test.root, test.key, gotResult, gotErr)
-		assert.Equal(t, gotResult, test.result, msg)
-		assert.Equal(t, gotErr, test.err, msg)
+		assert.Equal(t, test.result, gotResult, msg)
+		assert.Equal(t, test.err, gotErr, msg)
 	}
 }
 
 func TestLookupString(t *testing.T) {
 	tests := []struct {
 		root   jsonObject
-		path   []string
+		key    string
 		result string
 		err    error
 	}{
 		{
 			jsonObject{},
-			[]string{"a", "b"},
+			"a",
 			"",
 			nil,
 		},
 		{
 			jsonObject{"nonString": int(1)},
-			[]string{"nonString"},
+			"nonString",
 			"",
 			&UnmarshalWrongTypeError{Field: "nonString", Expected: "string", Got: 1},
 		},
-		{
-			jsonObject{"nonObject": int(1)},
-			[]string{"nonObject", "b"},
-			"",
-			&UnmarshalWrongTypeError{Field: "nonObject", Expected: "object", Got: 1},
-		},
 	}
 	for _, test := range tests {
-		gotResult, gotErr := test.root.String(test.path[0], test.path[1:]...)
-		msg := fmt.Sprintf("%q.String(%q) => %q, %q", test.root, test.path, gotResult, gotErr)
-		assert.Equal(t, gotResult, test.result, msg)
-		assert.Equal(t, gotErr, test.err, msg)
+		gotResult, gotErr := test.root.String(test.key)
+		msg := fmt.Sprintf("%q.String(%q) => %q, %q", test.root, test.key, gotResult, gotErr)
+		assert.Equal(t, test.result, gotResult, msg)
+		assert.Equal(t, test.err, gotErr, msg)
 	}
 }
 
 func TestLookupStringArray(t *testing.T) {
 	tests := []struct {
 		root   jsonObject
-		path   string
+		key    string
 		result []string
 		err    error
 	}{
@@ -101,16 +95,22 @@ func TestLookupStringArray(t *testing.T) {
 			nil,
 		},
 		{
-			jsonObject{"string": "foo"},
-			"string",
+			jsonObject{"a": "foo"},
+			"a",
+			[]string{"foo"},
 			nil,
-			&UnmarshalWrongTypeError{Field: "string", Expected: "array of strings", Got: "foo"},
+		},
+		{
+			jsonObject{"int": 5},
+			"int",
+			nil,
+			&UnmarshalWrongTypeError{Field: "int", Expected: "string or array of strings", Got: 5},
 		},
 	}
 	for _, test := range tests {
-		gotResult, gotErr := test.root.StringArray(test.path)
-		msg := fmt.Sprintf("%q.String(%q) => %q, %q", test.root, test.path, gotResult, gotErr)
-		assert.Equal(t, gotResult, test.result, msg)
-		assert.Equal(t, gotErr, test.err, msg)
+		gotResult, gotErr := test.root.StringArray(test.key)
+		msg := fmt.Sprintf("%q.String(%q) => %q, %q", test.root, test.key, gotResult, gotErr)
+		assert.Equal(t, test.result, gotResult, msg)
+		assert.Equal(t, test.err, gotErr, msg)
 	}
 }

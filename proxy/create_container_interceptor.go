@@ -82,17 +82,7 @@ func (i *createContainerInterceptor) setWeaveWaitEntrypoint(container jsonObject
 	var entrypoint []string
 	entrypoint, err := container.StringArray("Entrypoint")
 	if err != nil {
-		err, ok := err.(*UnmarshalWrongTypeError)
-		if !ok {
-			return err
-		}
-
-		got, ok := err.Got.(string)
-		if !ok {
-			return err
-		}
-
-		entrypoint = []string{got}
+		return err
 	}
 
 	cmd, err := container.StringArray("Cmd")
@@ -146,7 +136,6 @@ func (i *createContainerInterceptor) setHostname(container jsonObject, name, dns
 		if len(name)+1+len(trimmedDNSDomain) > MaxDockerHostname {
 			Log.Warningf("Container name [%s] too long to be used as hostname", name)
 		} else {
-			hostname = name
 			container["Hostname"] = name
 			container["Domainname"] = trimmedDNSDomain
 		}
@@ -169,7 +158,11 @@ func (i *createContainerInterceptor) containerHostname(r *http.Request, containe
 }
 
 func (i *createContainerInterceptor) hostnameFromLabel(hostname string, container jsonObject) (string, error) {
-	label, err := container.String("Labels", i.proxy.Config.HostnameFromLabel)
+	labels, err := container.Object("Labels")
+	if err != nil {
+		return "", err
+	}
+	label, err := labels.String(i.proxy.Config.HostnameFromLabel)
 	if err != nil {
 		return "", err
 	}
