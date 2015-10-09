@@ -1669,7 +1669,6 @@ case "$COMMAND" in
         echo $ROUTER_CONTAINER
         ;;
     attach-router)
-        deprecation_warnings "$@"
         check_running $CONTAINER_NAME
         enforce_docker_bridge_addr_assign_type
         create_bridge
