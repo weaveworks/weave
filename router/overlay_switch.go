@@ -13,8 +13,9 @@ import (
 // uses the best one that seems to be working.
 
 type OverlaySwitch struct {
-	overlays     map[string]Overlay
-	overlayNames []string
+	overlays      map[string]Overlay
+	overlayNames  []string
+	compatOverlay Overlay
 }
 
 func NewOverlaySwitch() *OverlaySwitch {
@@ -29,6 +30,10 @@ func (osw *OverlaySwitch) Add(name string, overlay Overlay) {
 
 	osw.overlays[name] = overlay
 	osw.overlayNames = append(osw.overlayNames, name)
+}
+
+func (osw *OverlaySwitch) SetCompatOverlay(overlay Overlay) {
+	osw.compatOverlay = overlay
 }
 
 func (osw *OverlaySwitch) AddFeaturesTo(features map[string]string) {
@@ -159,6 +164,10 @@ type subForwarderEvent struct {
 
 func (osw *OverlaySwitch) MakeForwarder(
 	params ForwarderParams) (OverlayForwarder, error) {
+	if _, present := params.Features["Overlays"]; !present && osw.compatOverlay != nil {
+		return osw.compatOverlay.MakeForwarder(params)
+	}
+
 	overlays, err := osw.commonOverlays(params)
 	if err != nil {
 		return nil, err
