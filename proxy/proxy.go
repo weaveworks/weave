@@ -346,7 +346,7 @@ func (proxy *Proxy) ContainerDied(ident string) {
 }
 
 func (proxy *Proxy) attach(container *docker.Container) error {
-	cidrs, err := proxy.weaveCIDRsFromConfig(container.Config, container.HostConfig)
+	cidrs, err := proxy.weaveCIDRs(container.HostConfig.NetworkMode, container.Config.Env)
 	if err != nil {
 		Log.Infof("Leaving container %s alone because %s", container.ID, err)
 		return nil
@@ -368,15 +368,11 @@ func (proxy *Proxy) attach(container *docker.Container) error {
 	return nil
 }
 
-func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *docker.HostConfig) ([]string, error) {
-	netMode := ""
-	if hostConfig != nil {
-		netMode = hostConfig.NetworkMode
+func (proxy *Proxy) weaveCIDRs(networkMode string, env []string) ([]string, error) {
+	if networkMode == "host" || strings.HasPrefix(networkMode, "container:") {
+		return nil, fmt.Errorf("the container was created with the '--net=%s'", networkMode)
 	}
-	if netMode == "host" || strings.HasPrefix(netMode, "container:") {
-		return nil, fmt.Errorf("the container was created with the '--net=%s'", netMode)
-	}
-	for _, e := range config.Env {
+	for _, e := range env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
 			if e[11:] == "none" {
 				return nil, ErrWeaveCIDRNone
@@ -390,26 +386,40 @@ func (proxy *Proxy) weaveCIDRsFromConfig(config *docker.Config, hostConfig *dock
 	return nil, nil
 }
 
-func (proxy *Proxy) addWeaveWaitVolume(hostConfig *docker.HostConfig) {
+func (proxy *Proxy) addWeaveWaitVolume(hostConfig jsonObject) error {
+	configBinds, err := hostConfig.StringArray("Binds")
+	if err != nil {
+		return err
+	}
+
 	var binds []string
-	for _, bind := range hostConfig.Binds {
+	for _, bind := range configBinds {
 		s := strings.Split(bind, ":")
 		if len(s) >= 2 && s[1] == "/w" {
 			continue
 		}
 		binds = append(binds, bind)
 	}
-	hostConfig.Binds = append(binds, fmt.Sprintf("%s:/w:ro", proxy.weaveWaitVolume))
+	hostConfig["Binds"] = append(binds, fmt.Sprintf("%s:/w:ro", proxy.weaveWaitVolume))
+	return nil
 }
 
-func (proxy *Proxy) setWeaveDNS(hostConfig *docker.HostConfig, hostname, dnsDomain string) error {
-	hostConfig.DNS = append(hostConfig.DNS, proxy.dockerBridgeIP)
+func (proxy *Proxy) setWeaveDNS(hostConfig jsonObject, hostname, dnsDomain string) error {
+	dns, err := hostConfig.StringArray("Dns")
+	if err != nil {
+		return err
+	}
+	hostConfig["Dns"] = append(dns, proxy.dockerBridgeIP)
 
-	if len(hostConfig.DNSSearch) == 0 {
+	dnsSearch, err := hostConfig.StringArray("DnsSearch")
+	if err != nil {
+		return err
+	}
+	if len(dnsSearch) == 0 {
 		if hostname == "" {
-			hostConfig.DNSSearch = []string{dnsDomain}
+			hostConfig["DnsSearch"] = []string{dnsDomain}
 		} else {
-			hostConfig.DNSSearch = []string{"."}
+			hostConfig["DnsSearch"] = []string{"."}
 		}
 	}
 

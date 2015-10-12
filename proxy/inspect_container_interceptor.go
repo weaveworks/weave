@@ -17,7 +17,7 @@ func (i *inspectContainerInterceptor) InterceptResponse(r *http.Response) error 
 		return nil
 	}
 
-	container := map[string]interface{}{}
+	container := jsonObject{}
 	if err := unmarshalResponseBody(r, &container); err != nil {
 		return err
 	}
@@ -29,8 +29,8 @@ func (i *inspectContainerInterceptor) InterceptResponse(r *http.Response) error 
 	return marshalResponseBody(r, container)
 }
 
-func updateContainerNetworkSettings(container map[string]interface{}) error {
-	containerID, err := lookupString(container, "Id")
+func updateContainerNetworkSettings(container jsonObject) error {
+	containerID, err := container.String("Id")
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func updateContainerNetworkSettings(container map[string]interface{}) error {
 		return err
 	}
 
-	networkSettings, err := lookupObject(container, "NetworkSettings")
+	networkSettings, err := container.Object("NetworkSettings")
 	if err != nil {
 		return err
 	}
