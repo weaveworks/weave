@@ -54,7 +54,7 @@ update:
 
 $(WEAVER_EXE) $(WEAVEPROXY_EXE): common/*.go common/*/*.go net/*.go
 ifeq ($(COVERAGE),true)
-	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "weaveworks") | paste -s -d,))
+	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "^github.com/weaveworks/weave/") | paste -s -d,))
 	go get -t -tags netgo ./$(@D)
 	go test -c -o ./$@ $(BUILD_FLAGS) -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
 else
