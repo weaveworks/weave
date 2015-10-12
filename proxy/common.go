@@ -90,7 +90,6 @@ func marshalResponseBody(r *http.Response, body interface{}) error {
 	// Stop it being chunked, because that hangs
 	r.TransferEncoding = nil
 	return nil
-
 }
 
 func inspectContainerInPath(client *docker.Client, path string) (*docker.Container, error) {
