@@ -108,14 +108,11 @@ $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
 
-tests: tools/.git
+tests:
 	tools/test
 
-lint: tools/.git
+lint:
 	tools/lint -nocomment -notestpackage .
-
-tools/.git:
-	git submodule update --init
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
