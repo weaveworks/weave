@@ -70,7 +70,7 @@ func checkEqualConns(t *testing.T, ourName PeerName, got, wanted map[PeerName]Co
 // Get all the peers from a Peers in a slice
 func (peers *Peers) allPeers() []*Peer {
 	var res []*Peer
-	for _, peer := range peers.table {
+	for _, peer := range peers.byName {
 		res = append(res, peer)
 	}
 	return res

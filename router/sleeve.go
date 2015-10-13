@@ -45,18 +45,14 @@ import (
 // sleeveForwarder.mtu                     <-------------------------->
 
 const (
-	EthernetOverhead    = 14
-	UDPOverhead         = 28 // 20 bytes for IPv4, 8 bytes for UDP
-	DefaultMTU          = 65535
-	FragTestSize        = 60001
-	PMTUDiscoverySize   = 60000
-	FastHeartbeat       = 500 * time.Millisecond
-	SlowHeartbeat       = 10 * time.Second
-	FragTestInterval    = 5 * time.Minute
-	MTUVerifyAttempts   = 8
-	MTUVerifyTimeout    = 10 * time.Millisecond // doubled with each attempt
-	MaxMissedHeartbeats = 6
-	HeartbeatTimeout    = MaxMissedHeartbeats * SlowHeartbeat
+	EthernetOverhead  = 14
+	UDPOverhead       = 28 // 20 bytes for IPv4, 8 bytes for UDP
+	DefaultMTU        = 65535
+	FragTestSize      = 60001
+	PMTUDiscoverySize = 60000
+	FragTestInterval  = 5 * time.Minute
+	MTUVerifyAttempts = 8
+	MTUVerifyTimeout  = 10 * time.Millisecond // doubled with each attempt
 )
 
 type SleeveOverlay struct {
@@ -127,6 +123,14 @@ func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers
 
 func (*SleeveOverlay) InvalidateRoutes() {
 	// no cached information, so nothing to do
+}
+
+func (*SleeveOverlay) InvalidateShortIDs() {
+	// no cached information, so nothing to do
+}
+
+func (*SleeveOverlay) AddFeaturesTo(map[string]string) {
+	// No features to be provided, to facilitate compatibility
 }
 
 func (sleeve *SleeveOverlay) lookupForwarder(peer PeerName) *sleeveForwarder {
@@ -277,7 +281,7 @@ type sleeveForwarder struct {
 	sleeve         *SleeveOverlay
 	remotePeer     *Peer
 	remotePeerBin  []byte
-	sendControlMsg func(ProtocolTag, []byte) error
+	sendControlMsg func(byte, []byte) error
 	connUID        uint64
 
 	// Channels to communicate with the aggregator goroutine
@@ -288,9 +292,12 @@ type sleeveForwarder struct {
 	confirmedChan    chan<- struct{}
 	finishedChan     <-chan struct{}
 
+	// listener channels
+	establishedChan chan struct{}
+	errorChan       chan error
+
 	// Explicitly locked state
 	lock       sync.RWMutex
-	listener   OverlayForwarderListener
 	remoteAddr *net.UDPAddr
 
 	// These fields are accessed and updated independently, so no
@@ -335,7 +342,7 @@ type specialFrame struct {
 
 // A control message
 type controlMessage struct {
-	tag ProtocolTag
+	tag byte
 	msg []byte
 }
 
@@ -371,6 +378,8 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		controlMsgChan:   controlMsgChan,
 		confirmedChan:    confirmedChan,
 		finishedChan:     finishedChan,
+		establishedChan:  make(chan struct{}),
+		errorChan:        make(chan error, 1),
 		remoteAddr:       params.RemoteAddr,
 		mtu:              DefaultMTU,
 		crypto:           crypto,
@@ -386,7 +395,7 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 }
 
 func (fwd *sleeveForwarder) logPrefixFor(sender *net.UDPAddr) string {
-	return fmt.Sprintf("->[%s|%s]: ", sender, fwd.remotePeer)
+	return fmt.Sprintf("sleeve ->[%s|%s]: ", sender, fwd.remotePeer)
 }
 
 func (fwd *sleeveForwarder) logPrefix() string {
@@ -396,21 +405,21 @@ func (fwd *sleeveForwarder) logPrefix() string {
 	return fwd.logPrefixFor(remoteAddr)
 }
 
-func (fwd *sleeveForwarder) SetListener(listener OverlayForwarderListener) {
-	log.Debug(fwd.logPrefix(), "SetListener ", listener)
+func (fwd *sleeveForwarder) Confirm() {
+	log.Debug(fwd.logPrefix(), "Confirm")
 
-	fwd.lock.Lock()
-	fwd.listener = listener
-	fwd.lock.Unlock()
-
-	// Setting the listener confirms that the forwarder is really
-	// wanted
-	if listener != nil {
-		select {
-		case fwd.confirmedChan <- struct{}{}:
-		case <-fwd.finishedChan:
-		}
+	select {
+	case fwd.confirmedChan <- struct{}{}:
+	case <-fwd.finishedChan:
 	}
+}
+
+func (fwd *sleeveForwarder) EstablishedChannel() <-chan struct{} {
+	return fwd.establishedChan
+}
+
+func (fwd *sleeveForwarder) ErrorChannel() <-chan error {
+	return fwd.errorChan
 }
 
 type curriedForward struct {
@@ -577,7 +586,7 @@ func frameTooBig(frame []byte, mtu int) bool {
 	return len(frame) > mtu+EthernetOverhead
 }
 
-func (fwd *sleeveForwarder) ControlMessage(tag ProtocolTag, msg []byte) {
+func (fwd *sleeveForwarder) ControlMessage(tag byte, msg []byte) {
 	select {
 	case fwd.controlMsgChan <- controlMessage{tag, msg}:
 	case <-fwd.finishedChan:
@@ -586,7 +595,6 @@ func (fwd *sleeveForwarder) ControlMessage(tag ProtocolTag, msg []byte) {
 
 func (fwd *sleeveForwarder) Stop() {
 	fwd.sleeve.removeForwarder(fwd.remotePeer.Name, fwd)
-	fwd.SetListener(nil)
 
 	// Tell the forwarder goroutine to finish.  We don't need to
 	// wait for it.
@@ -660,9 +668,9 @@ loop:
 
 	fwd.lock.RLock()
 	defer fwd.lock.RUnlock()
-	if fwd.listener != nil {
-		fwd.listener.Error(err)
-	}
+
+	// this is the only place we send an error to errorChan
+	fwd.errorChan <- err
 }
 
 func (fwd *sleeveForwarder) aggregateAndSend(frame aggregatorFrame,
@@ -853,14 +861,14 @@ func (fwd *sleeveForwarder) setRemoteAddr(addr *net.UDPAddr) {
 func (fwd *sleeveForwarder) handleHeartbeatAck() error {
 	log.Debug(fwd.logPrefix(), "handleHeartbeatAck")
 
-	// The connection is now regarded as established
-	fwd.notifyEstablished()
-
 	if fwd.heartbeatInterval != SlowHeartbeat {
 		fwd.heartbeatInterval = SlowHeartbeat
 		if fwd.heartbeatTimer != nil {
 			fwd.heartbeatTimer.Reset(fwd.heartbeatInterval)
 		}
+
+		// The connection is now regarded as established
+		close(fwd.establishedChan)
 	}
 
 	fwd.fragTestTicker = time.NewTicker(FragTestInterval)
@@ -873,14 +881,6 @@ func (fwd *sleeveForwarder) handleHeartbeatAck() error {
 	// PMTU discovery to start.
 	return fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF,
 		make([]byte, PMTUDiscoverySize))
-}
-
-func (fwd *sleeveForwarder) notifyEstablished() {
-	fwd.lock.RLock()
-	defer fwd.lock.RUnlock()
-	if fwd.listener != nil {
-		fwd.listener.Established()
-	}
 }
 
 func (fwd *sleeveForwarder) sendFragTest() error {

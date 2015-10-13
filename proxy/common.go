@@ -24,15 +24,28 @@ var (
 
 func callWeave(args ...string) ([]byte, []byte, error) {
 	args = append([]string{"--local"}, args...)
-	Log.Debug("Calling weave", args)
 	cmd := exec.Command("./weave", args...)
 	cmd.Env = []string{
 		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"PROCFS=/hostproc",
 	}
-	if bridge := os.Getenv("DOCKER_BRIDGE"); bridge != "" {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("DOCKER_BRIDGE=%s", bridge))
+
+	propagateEnv := func(key string) {
+		if val := os.Getenv(key); val != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, val))
+		}
 	}
+
+	propagateEnv("DOCKER_BRIDGE")
+
+	// Propogage WEAVE_DEBUG, to make debugging easier.
+	propagateEnv("WEAVE_DEBUG")
+
+	// This prevents the code coverage contortions in our
+	// integration test suite breaking things.
+	propagateEnv("COVERAGE")
+
+	Log.Debug("Calling weave args: ", args, "env: ", cmd.Env)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

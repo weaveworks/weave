@@ -15,6 +15,12 @@ type Overlay interface {
 	// The routes have changed, so any cached information should
 	// be discarded.
 	InvalidateRoutes()
+
+	// A mapping of a short id to a peer has changed
+	InvalidateShortIDs()
+
+	// Enhance a features map with overlay-related features
+	AddFeaturesTo(map[string]string)
 }
 
 type ForwarderParams struct {
@@ -38,7 +44,10 @@ type ForwarderParams struct {
 
 	// Function to send a control message to the counterpart
 	// forwarder.
-	SendControlMessage func(tag ProtocolTag, msg []byte) error
+	SendControlMessage func(tag byte, msg []byte) error
+
+	// Features passed at connection initiation
+	Features map[string]string
 }
 
 // When a consumer is called, the decoder will already have been used
@@ -54,27 +63,31 @@ type OverlayCrypto struct {
 
 // All of the machinery to forward packets to a particular peer
 type OverlayForwarder interface {
-	// Register a callback for forwarder state changes.
-	// side-effect, calling this confirms that the connection is
-	// really wanted, and so the provider should activate it.
-	// However, Forward might be called before this is called
-	// (e.g. on another thread).
-	SetListener(OverlayForwarderListener)
-
-	// Forward a packet across the connection.
+	// Forward a packet across the connection.  May be called as
+	// soon as the forwarder is created, in particular before
+	// Confirm().
 	Forward(ForwardPacketKey) FlowOp
+
+	// Confirm that the connection is really wanted, and so the
+	// Overlay should begin heartbeats etc. to verify the
+	// operation of the forwarder.
+	Confirm()
+
+	// A channel indicating that the forwarder is established,
+	// i.e. its operation has been confirmed.
+	EstablishedChannel() <-chan struct{}
+
+	// A channel indicating an error from the forwarder.  The
+	// forwarder is not expected to be operational after the first
+	// error, so the channel only needs to buffer a single error.
+	ErrorChannel() <-chan error
 
 	Stop()
 
 	// Handle a message from the peer.  'tag' exists for
 	// compatibility, and should always be
 	// ProtocolOverlayControlMessage for non-sleeve overlays.
-	ControlMessage(tag ProtocolTag, msg []byte)
-}
-
-type OverlayForwarderListener interface {
-	Established()
-	Error(error)
+	ControlMessage(tag byte, msg []byte)
 }
 
 type NullOverlay struct{}
@@ -90,7 +103,21 @@ func (NullOverlay) MakeForwarder(ForwarderParams) (OverlayForwarder, error) {
 func (NullOverlay) InvalidateRoutes() {
 }
 
-func (NullOverlay) SetListener(OverlayForwarderListener) {
+func (NullOverlay) InvalidateShortIDs() {
+}
+
+func (NullOverlay) Confirm() {
+}
+
+func (NullOverlay) EstablishedChannel() <-chan struct{} {
+	return nil
+}
+
+func (NullOverlay) ErrorChannel() <-chan error {
+	return nil
+}
+
+func (NullOverlay) AddFeaturesTo(map[string]string) {
 }
 
 func (NullOverlay) Forward(ForwardPacketKey) FlowOp {
@@ -100,5 +127,5 @@ func (NullOverlay) Forward(ForwardPacketKey) FlowOp {
 func (NullOverlay) Stop() {
 }
 
-func (NullOverlay) ControlMessage(ProtocolTag, []byte) {
+func (NullOverlay) ControlMessage(byte, []byte) {
 }

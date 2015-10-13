@@ -65,21 +65,13 @@ func (routes *Routes) UnicastAll(name PeerName) (PeerName, bool) {
 func (routes *Routes) Broadcast(name PeerName) []PeerName {
 	routes.RLock()
 	defer routes.RUnlock()
-	hops, found := routes.broadcast[name]
-	if !found {
-		return []PeerName{}
-	}
-	return hops
+	return routes.broadcast[name]
 }
 
 func (routes *Routes) BroadcastAll(name PeerName) []PeerName {
 	routes.RLock()
 	defer routes.RUnlock()
-	hops, found := routes.broadcastAll[name]
-	if !found {
-		return []PeerName{}
-	}
-	return hops
+	return routes.broadcastAll[name]
 }
 
 // Choose min(log2(n_peers), n_neighbouring_peers) neighbours, with a
@@ -208,7 +200,7 @@ func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) unicastRout
 // where <= is the subset relationship on keys of the returned map.
 func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) broadcastRoutes {
 	broadcast := make(broadcastRoutes)
-	for _, peer := range routes.peers.table {
+	for _, peer := range routes.peers.byName {
 		hops := []PeerName{}
 		if found, reached := peer.Routes(routes.ourself.Peer, establishedAndSymmetric); found {
 			routes.ourself.ForEachConnectedPeer(establishedAndSymmetric, reached,

@@ -115,8 +115,6 @@ func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
 }
 
 func (conn *LocalConnection) Established() bool {
-	conn.RLock()
-	defer conn.RUnlock()
 	return conn.established
 }
 
@@ -201,6 +199,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 		ConnUID:            conn.uid,
 		Crypto:             conn.forwarderCrypto(),
 		SendControlMessage: conn.sendOverlayControlMessage,
+		Features:           intro.Features,
 	}
 	if conn.forwarder, err = conn.Router.Overlay.MakeForwarder(params); err != nil {
 		return
@@ -214,17 +213,16 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	}
 	conn.Router.ConnectionMaker.ConnectionCreated(conn)
 
-	// SetListener has the side-effect of telling the forwarder
-	// that the connection is confirmed.  This comes after
-	// AddConnection, because only after that completes do we know
-	// the connection is valid: in particular that it is not a
-	// duplicate connection to the same peer. Sending heartbeats
-	// on a duplicate connection can trip up crypto at the other
-	// end, since the associated UDP packets may get decoded by
-	// the other connection. It is also generally wasteful to
-	// engage in any interaction with the remote on a connection
-	// that turns out to be invalid.
-	conn.forwarder.SetListener(ConnectionAsForwarderListener{conn})
+	// Forwarder confirmation comes after AddConnection, because
+	// only after that completes do we know the connection is
+	// valid: in particular that it is not a duplicate connection
+	// to the same peer. Sending heartbeats on a duplicate
+	// connection can trip up crypto at the other end, since the
+	// associated UDP packets may get decoded by the other
+	// connection. It is also generally wasteful to engage in any
+	// interaction with the remote on a connection that turns out
+	// to be invalid.
+	conn.forwarder.Confirm()
 
 	// receiveTCP must follow also AddConnection. In the absence
 	// of any indirect connectivity to the remote peer, the first
@@ -251,13 +249,16 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 }
 
 func (conn *LocalConnection) makeFeatures() map[string]string {
-	return map[string]string{
+	features := map[string]string{
 		"PeerNameFlavour": PeerNameFlavour,
 		"Name":            conn.local.Name.String(),
 		"NickName":        conn.local.NickName,
+		"ShortID":         fmt.Sprint(conn.local.ShortID),
 		"UID":             fmt.Sprint(conn.local.UID),
 		"ConnID":          fmt.Sprint(conn.uid),
 	}
+	conn.Router.Overlay.AddFeaturesTo(features)
+	return features
 }
 
 type features map[string]string
@@ -276,7 +277,7 @@ func (features features) Get(key string) string {
 }
 
 func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
-	if err := features.MustHave([]string{"PeerNameFlavour", "Name", "NickName", "UID", "ConnID"}); err != nil {
+	if err := features.MustHave([]string{"PeerNameFlavour", "Name", "NickName", "ShortID", "UID", "ConnID"}); err != nil {
 		return nil, err
 	}
 
@@ -292,6 +293,12 @@ func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
 
 	nickName := features.Get("NickName")
 
+	shortID, err := strconv.ParseUint(features.Get("ShortID"), 10,
+		PeerShortIDBits)
+	if err != nil {
+		return nil, err
+	}
+
 	uid, err := ParsePeerUID(features.Get("UID"))
 	if err != nil {
 		return nil, err
@@ -303,7 +310,7 @@ func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
 	}
 
 	conn.uid ^= remoteConnID
-	return NewPeer(name, nickName, uid, 0), nil
+	return NewPeer(name, nickName, uid, 0, PeerShortID(shortID)), nil
 }
 
 func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) error {
@@ -328,12 +335,23 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 }
 
 func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
+	fwdErrorChan := conn.forwarder.ErrorChannel()
+	fwdEstablishedChan := conn.forwarder.EstablishedChannel()
+
 	for err == nil {
 		select {
 		case action := <-actionChan:
 			err = action()
+
 		case <-conn.heartbeatTCP.C:
 			err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
+
+		case <-fwdEstablishedChan:
+			conn.established = true
+			fwdEstablishedChan = nil
+			conn.Router.Ourself.ConnectionEstablished(conn)
+
+		case err = <-fwdErrorChan:
 		}
 	}
 	return
@@ -377,27 +395,8 @@ func (conn *LocalConnection) forwarderCrypto() *OverlayCrypto {
 	}
 }
 
-func (conn *LocalConnection) sendOverlayControlMessage(tag ProtocolTag, msg []byte) error {
-	return conn.sendProtocolMsg(ProtocolMsg{tag, msg})
-}
-
-type ConnectionAsForwarderListener struct{ conn *LocalConnection }
-
-func (l ConnectionAsForwarderListener) Established() {
-	l.conn.sendAction(func() error {
-		old := l.conn.established
-		l.conn.Lock()
-		l.conn.established = true
-		l.conn.Unlock()
-		if !old {
-			l.conn.Router.Ourself.ConnectionEstablished(l.conn)
-		}
-		return nil
-	})
-}
-
-func (l ConnectionAsForwarderListener) Error(err error) {
-	l.conn.sendAction(func() error { return err })
+func (conn *LocalConnection) sendOverlayControlMessage(tag byte, msg []byte) error {
+	return conn.sendProtocolMsg(ProtocolMsg{ProtocolTag(tag), msg})
 }
 
 // Helpers
@@ -434,7 +433,7 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 	switch tag {
 	case ProtocolHeartbeat:
 	case ProtocolConnectionEstablished, ProtocolFragmentationReceived, ProtocolPMTUVerified, ProtocolOverlayControlMsg:
-		conn.forwarder.ControlMessage(tag, payload)
+		conn.forwarder.ControlMessage(byte(tag), payload)
 	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:
 		return conn.Router.handleGossip(tag, payload)
 	default:

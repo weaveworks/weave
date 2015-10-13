@@ -62,18 +62,18 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 		router.Overlay = NullOverlay{}
 	}
 
-	onMacExpiry := func(mac net.HardwareAddr, peer *Peer) {
-		log.Println("Expired MAC", mac, "at", peer)
-	}
-	onPeerGC := func(peer *Peer) {
+	router.Ourself = NewLocalPeer(name, nickName, router)
+	router.Macs = NewMacCache(macMaxAge,
+		func(mac net.HardwareAddr, peer *Peer) {
+			log.Println("Expired MAC", mac, "at", peer)
+		})
+	router.Peers = NewPeers(router.Ourself)
+	router.Peers.OnGC(func(peer *Peer) {
 		router.Macs.Delete(peer)
 		log.Println("Removed unreachable peer", peer)
-	}
-	router.Ourself = NewLocalPeer(name, nickName, router)
-	router.Macs = NewMacCache(macMaxAge, onMacExpiry)
-	router.Peers = NewPeers(router.Ourself)
-	router.Peers.OnGC(onPeerGC)
-	router.Peers.FetchWithDefault(router.Ourself.Peer)
+	})
+	router.Peers.OnInvalidateShortIDs(router.Overlay.InvalidateShortIDs)
+
 	router.Routes = NewRoutes(router.Ourself, router.Peers, router.Overlay.InvalidateRoutes)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
@@ -261,12 +261,16 @@ type TopologyGossipData struct {
 	update PeerNameSet
 }
 
-func NewTopologyGossipData(peers *Peers, update ...*Peer) *TopologyGossipData {
+func (router *Router) BroadcastTopologyUpdate(update []*Peer) {
 	names := make(PeerNameSet)
 	for _, p := range update {
 		names[p.Name] = void
 	}
-	return &TopologyGossipData{peers: peers, update: names}
+
+	router.TopologyGossip.GossipBroadcast(&TopologyGossipData{
+		peers:  router.Peers,
+		update: names,
+	})
 }
 
 func (d *TopologyGossipData) Merge(other GossipData) {
