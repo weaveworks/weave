@@ -76,7 +76,7 @@ type Proxy struct {
 func NewProxy(c Config) (*Proxy, error) {
 	p := &Proxy{Config: c, waiters: make(map[*http.Request]*wait)}
 
-	if err := p.TLSConfig.loadCerts(); err != nil {
+	if err := p.TLSConfig.LoadCerts(); err != nil {
 		Log.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
@@ -262,7 +262,7 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		if proxy.TLSConfig.enabled() {
+		if proxy.TLSConfig.IsEnabled() {
 			listener = tls.NewListener(listener, proxy.TLSConfig.Config)
 		}
 

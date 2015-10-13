@@ -17,15 +17,17 @@ type TLSConfig struct {
 	*tls.Config
 }
 
-func (c *TLSConfig) enabled() bool {
+// IsEnabled returns true if TLS is enable, according to the config.
+func (c *TLSConfig) IsEnabled() bool {
 	if c == nil {
 		return false
 	}
 	return c.Enabled || c.Verify
 }
 
-func (c *TLSConfig) loadCerts() error {
-	if !c.enabled() {
+// LoadCerts loads the certificates into c.Config, if TLS is enabled.
+func (c *TLSConfig) LoadCerts() error {
+	if !c.IsEnabled() {
 		return nil
 	}
 
