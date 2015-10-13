@@ -21,6 +21,9 @@ type Overlay interface {
 
 	// Enhance a features map with overlay-related features
 	AddFeaturesTo(map[string]string)
+
+	// Obtain diagnostic information specific to the overlay
+	Diagnostics() interface{}
 }
 
 type ForwarderParams struct {
@@ -88,6 +91,9 @@ type OverlayForwarder interface {
 	// compatibility, and should always be
 	// ProtocolOverlayControlMessage for non-sleeve overlays.
 	ControlMessage(tag byte, msg []byte)
+
+	// Type of overlay this forwarder belongs to
+	OverlayType() string
 }
 
 type NullOverlay struct{}
@@ -128,4 +134,12 @@ func (NullOverlay) Stop() {
 }
 
 func (NullOverlay) ControlMessage(byte, []byte) {
+}
+
+func (NullOverlay) OverlayType() string {
+	return "null"
+}
+
+func (NullOverlay) Diagnostics() interface{} {
+	return nil
 }

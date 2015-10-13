@@ -35,6 +35,14 @@ func (osw *OverlaySwitch) AddFeaturesTo(features map[string]string) {
 	features["Overlays"] = strings.Join(osw.overlayNames, " ")
 }
 
+func (osw *OverlaySwitch) Diagnostics() interface{} {
+	diagnostics := make(map[string]interface{})
+	for name, overlay := range osw.overlays {
+		diagnostics[name] = overlay.Diagnostics()
+	}
+	return diagnostics
+}
+
 func (osw *OverlaySwitch) InvalidateRoutes() {
 	for _, overlay := range osw.overlays {
 		overlay.InvalidateRoutes()
@@ -392,4 +400,16 @@ func (fwd *overlaySwitchForwarder) ControlMessage(tag byte, msg []byte) {
 	if subFwd != nil {
 		subFwd.ControlMessage(msg[1], msg[2:])
 	}
+}
+
+func (fwd *overlaySwitchForwarder) OverlayType() string {
+	fwd.lock.Lock()
+	best := fwd.best
+	fwd.lock.Unlock()
+
+	if best == nil {
+		return "none"
+	}
+
+	return best.OverlayType()
 }
