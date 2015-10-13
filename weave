@@ -1377,8 +1377,8 @@ case "$COMMAND" in
         ;;
     config|proxy-config)
         [ "$COMMAND" = "config" ] || deprecation_warning "$COMMAND" "'weave config'"
-        if PROXY_addr=$(proxy_addr) ; then
-            echo "-H=$PROXY_addr"
+        if PROXY_ADDR=$(proxy_addr) ; then
+            echo "-H=$PROXY_ADDR"
         fi
         ;;
     connect)
