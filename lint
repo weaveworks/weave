@@ -1,0 +1,157 @@
+#!/bin/bash
+# This scipt lints go files for common errors.
+#
+# Its runs gofmt and go vet, and optionally golint and
+# gocyclo, if they are installed.
+#
+# With no arguments, it lints the current files staged
+# for git commit.  Or you can pass it explicit filenames
+# (or directories) and it will lint them.
+#
+# To use this script automatically, run:
+#   ln -s ../../bin/lint .git/hooks/pre-commit
+
+set -e
+
+IGNORE_LINT_COMMENT=
+IGNORE_TEST_PACKAGES=
+while true; do
+	case "$1" in
+		-nocomment)
+		IGNORE_LINT_COMMENT=1
+		shift 1
+		;;
+		-notestpackage)
+		IGNORE_TEST_PACKAGES=1
+		shift 1
+		;;
+		*)
+		break
+	esac
+done
+
+
+function spell_check {
+	filename="$1"
+	local lint_result=0
+
+	if grep -iH --color=always psueod "${filename}"; then
+		echo "${filename}: spelling mistake"
+		lint_result=1
+	fi
+
+	return $lint_result
+}
+
+function test_mismatch {
+	filename="$1"
+	package=$(grep '^package ' $filename | awk '{print $2}')
+	local lint_result=0
+
+	if [[ $package == "main" ]]; then
+		continue # in package main, all bets are off
+	fi
+
+	if [[ $filename == *"_internal_test.go" ]]; then
+		if [[ $package == *"_test" ]]; then
+			lint_result=1
+			echo "${filename}: should not be part of a _test package"
+		fi
+	else
+		if [[ ! $package == *"_test" ]]; then
+			lint_result=1
+			echo "${filename}: should be part of a _test package"
+		fi
+	fi
+
+	return $lint_result
+}
+
+function lint_go {
+	filename="$1"
+	local lint_result=0
+
+	if [ -n "$(gofmt -s -l "${filename}")" ]; then
+		lint_result=1
+		echo "${filename}: run gofmt -s -w ${filename}!"
+	fi
+
+	go tool vet "${filename}" || lint_result=$?
+
+	# golint is completely optional.  If you don't like it
+	# don't have it installed.
+	if type golint >/dev/null 2>&1; then
+		# golint doesn't set an exit code it seems
+		if [ -z "$IGNORE_LINT_COMMENT"  ]; then
+			lintoutput=$(golint "${filename}")
+		else
+			lintoutput=$(golint "${filename}" | grep -vE 'comment|dot imports')
+		fi
+		if [ -n "$lintoutput" ]; then
+			lint_result=1
+			echo "$lintoutput"
+		fi
+	fi
+
+	# gocyclo is completely optional.  If you don't like it
+	# don't have it installed.  Also never blocks a commit,
+	# it just warns.
+	if type gocyclo >/dev/null 2>&1; then
+		gocyclo -over 25 "${filename}" | while read line; do
+			echo "${filename}": higher than 25 cyclomatic complexity - "${line}"
+		done
+	fi
+
+	return $lint_result
+}
+
+function lint {
+	filename="$1"
+	ext="${filename##*\.}"
+	local lint_result=0
+
+	# Don't lint deleted files
+	if [ ! -f "$filename" ]; then
+		return
+	fi
+
+	# Don't lint this script or static.go
+	case "$(basename "${filename}")" in
+	lint) return;;
+	static.go) return;;
+	coverage.html) return;;
+	esac
+
+	case "$ext" in
+		go) lint_go "${filename}" || lint_result=1
+		;;
+	esac
+
+	if [ -z "$IGNORE_TEST_PACKAGES" ]; then
+		if [[ "$filename" == *"_test.go" ]]; then
+			test_mismatch "${filename}" || lint_result=1
+		fi
+	fi
+
+	spell_check "${filename}" || lint_result=1
+
+	return $lint_result
+}
+
+function lint_files {
+	local lint_result=0
+	while read filename; do
+		lint "${filename}" || lint_result=1
+	done
+	exit $lint_result
+}
+
+function list_files {
+	if [ $# -gt 0 ]; then
+		find "$@" -type f | grep -vE '^\./\.git/'
+	else
+		git diff --cached --name-only
+	fi
+}
+
+list_files "$@" | lint_files

@@ -1,0 +1,22 @@
+machine:
+  services:
+    - docker
+  environment:
+    GOPATH: /home/ubuntu
+    SRCDIR: /home/ubuntu/src/github.com/weaveworks/tools
+    PATH: $PATH:$HOME/bin
+
+dependencies:
+  post:
+    - go clean -i net
+    - go install -tags netgo std
+    - mkdir -p $(dirname $SRCDIR)
+    - cp -r $(pwd)/ $SRCDIR
+    - go get github.com/golang/lint/golint github.com/fzipp/gocyclo github.com/kisielk/errcheck
+
+test:
+  override:
+    - cd $SRCDIR; ./lint .
+    - cd $SRCDIR/cover; make
+    - cd $SRCDIR/socks; make
+
