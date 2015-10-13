@@ -114,6 +114,10 @@ func (peers *Peers) unlockAndNotify(pending *PeersPendingNotifications) {
 }
 
 func (peers *Peers) addByShortID(peer *Peer, pending *PeersPendingNotifications) {
+	if !peer.HasShortID {
+		return
+	}
+
 	entry, ok := peers.byShortID[peer.ShortID]
 	if !ok {
 		entry = ShortIDPeers{peer: peer}
@@ -146,6 +150,10 @@ func (peers *Peers) addByShortID(peer *Peer, pending *PeersPendingNotifications)
 }
 
 func (peers *Peers) deleteByShortID(peer *Peer, pending *PeersPendingNotifications) {
+	if !peer.HasShortID {
+		return
+	}
+
 	entry := peers.byShortID[peer.ShortID]
 	var otherIndex int
 
