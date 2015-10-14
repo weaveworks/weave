@@ -1200,13 +1200,19 @@ proxy_args() {
     fi
 }
 
-proxy_addr() {
-    if addr=$(http_call_unix $PROXY_CONTAINER_NAME status.sock GET /status 2>&1) ; then
-      echo "$addr" | head -n1 | sed "s/0.0.0.0/$PROXY_HOST/g"
+proxy_addrs() {
+    if addr="$(http_call_unix $PROXY_CONTAINER_NAME status.sock GET /status 2>&1)" ; then
+      echo "$addr" | sed "s/0.0.0.0/$PROXY_HOST/g"
+
     else
       echo "$PROXY_CONTAINER_NAME container is not present. Have you launched it?" >&2
       return 1
     fi
+}
+
+proxy_addr() {
+    addr=$(proxy_addrs) || return 1
+    echo "$addr" | cut -d ' ' -f1
 }
 
 warn_if_stopping_proxy_in_env() {
@@ -1570,10 +1576,10 @@ case "$COMMAND" in
         else
             res=1
         fi
-        if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null && PROXY_ADDR=$(proxy_addr) ; then
+        if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null && PROXY_ADDRS=$(proxy_addrs) ; then
             echo
             echo "       Service: proxy"
-            echo "       Address: $PROXY_ADDR"
+            echo "       Address: $PROXY_ADDRS"
         fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
