@@ -2,15 +2,9 @@ package proxy
 
 import (
 	"net/http"
-
-	"github.com/fsouza/go-dockerclient"
 )
 
 type startContainerInterceptor struct{ proxy *Proxy }
-
-type startContainerRequestBody struct {
-	HostConfig *docker.HostConfig `json:"HostConfig,omitempty" yaml:"HostConfig,omitempty"`
-}
 
 func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 	container, err := inspectContainerInPath(i.proxy.client, r.URL.Path)
@@ -18,25 +12,22 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	if !containerShouldAttach(container) || r.Header.Get("Content-Type") != "application/json" {
-		i.proxy.createWait(r, container.ID)
-		return nil
-	}
-
-	hostConfig := map[string]interface{}{}
-	if err := unmarshalRequestBody(r, &hostConfig); err != nil {
-		return err
-	}
-
-	i.proxy.addWeaveWaitVolume(hostConfig)
-	if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
-		if err := i.proxy.setWeaveDNS(hostConfig, container.Config.Hostname, dnsDomain); err != nil {
+	if containerShouldAttach(container) && r.Header.Get("Content-Type") == "application/json" {
+		hostConfig := map[string]interface{}{}
+		if err := unmarshalRequestBody(r, &hostConfig); err != nil {
 			return err
 		}
-	}
 
-	if err := marshalRequestBody(r, hostConfig); err != nil {
-		return err
+		i.proxy.addWeaveWaitVolume(hostConfig)
+		if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
+			if err := i.proxy.setWeaveDNS(hostConfig, container.Config.Hostname, dnsDomain); err != nil {
+				return err
+			}
+		}
+
+		if err := marshalRequestBody(r, hostConfig); err != nil {
+			return err
+		}
 	}
 	i.proxy.createWait(r, container.ID)
 	return nil
