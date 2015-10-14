@@ -406,8 +406,25 @@ create_bridge() {
         # whether it is a bridge instead.
         if [ -d /sys/class/net/$BRIDGE/bridge ] ; then
             BRIDGE_TYPE=bridge
+
+            if [ -n "$LAUNCHING_ROUTER" -a -z "$WEAVE_NO_FASTDP" ] ; then
+                cat <<EOF >&1
+WEAVE_NO_FASTDP is not set, but there is already a bridge present of
+the wrong type for fast datapath.  Please do 'weave reset' to remove
+the bridge first.
+EOF
+                return 1
+            fi
         else
             BRIDGE_TYPE=fastdp
+
+            if [ -n "$WEAVE_NO_FASTDP" ] ; then
+                cat <<EOF >&1
+WEAVE_NO_FASTDP is set, but there is already a weave fast datapath
+bridge present.  Please do 'weave reset' to remove the bridge first.
+EOF
+                return 1
+            fi
         fi
 
         # WEAVE_MTU may have been specified when the bridge was
@@ -1238,6 +1255,7 @@ common_launch_args() {
 }
 
 launch_router() {
+    LAUNCHING_ROUTER=1
     check_forwarding_rules
     enforce_docker_bridge_addr_assign_type
     create_bridge
