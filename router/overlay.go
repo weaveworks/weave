@@ -68,7 +68,8 @@ type OverlayCrypto struct {
 type OverlayForwarder interface {
 	// Forward a packet across the connection.  May be called as
 	// soon as the forwarder is created, in particular before
-	// Confirm().
+	// Confirm().  The return value nil means the key could not be
+	// handled by this forwarder.
 	Forward(ForwardPacketKey) FlowOp
 
 	// Confirm that the connection is really wanted, and so the

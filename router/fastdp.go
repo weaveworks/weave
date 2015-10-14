@@ -754,6 +754,10 @@ func (fwd *fastDatapathForwarder) handleHeartbeatAck() {
 }
 
 func (fwd *fastDatapathForwarder) Forward(key ForwardPacketKey) FlowOp {
+	if !key.SrcPeer.HasShortID || !key.DstPeer.HasShortID {
+		return nil
+	}
+
 	fwd.lock.RLock()
 	defer fwd.lock.RUnlock()
 
