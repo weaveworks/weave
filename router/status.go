@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -21,6 +22,7 @@ type Status struct {
 	BroadcastRoutes    []BroadcastRouteStatus
 	Connections        []LocalConnectionStatus
 	Targets            []string
+	OverlayDiagnostics interface{}
 }
 
 type MACStatus struct {
@@ -34,6 +36,7 @@ type PeerStatus struct {
 	Name        string
 	NickName    string
 	UID         PeerUID
+	ShortID     PeerShortID
 	Version     uint64
 	Connections []ConnectionStatus
 }
@@ -79,7 +82,8 @@ func NewStatus(router *Router) *Status {
 		NewUnicastRouteStatusSlice(router.Routes),
 		NewBroadcastRouteStatusSlice(router.Routes),
 		NewLocalConnectionStatusSlice(router.ConnectionMaker),
-		NewTargetSlice(router.ConnectionMaker)}
+		NewTargetSlice(router.ConnectionMaker),
+		router.Overlay.Diagnostics()}
 }
 
 func NewMACStatusSlice(cache *MacCache) []MACStatus {
@@ -119,6 +123,7 @@ func NewPeerStatusSlice(peers *Peers) []PeerStatus {
 			peer.Name.String(),
 			peer.NickName,
 			peer.UID,
+			peer.ShortID,
 			peer.Version,
 			connections})
 	})
@@ -170,7 +175,9 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 			if conn.Established() {
 				state = "established"
 			}
-			slice = append(slice, LocalConnectionStatus{conn.RemoteTCPAddr(), conn.Outbound(), state, conn.Remote().String()})
+			lc, _ := conn.(*LocalConnection)
+			info := fmt.Sprintf("%-6v %v", lc.forwarder.DisplayName(), conn.Remote())
+			slice = append(slice, LocalConnectionStatus{conn.RemoteTCPAddr(), conn.Outbound(), state, info})
 		}
 		for address, target := range cm.targets {
 			add := func(state, info string) {

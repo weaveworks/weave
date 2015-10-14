@@ -133,6 +133,10 @@ func (*SleeveOverlay) AddFeaturesTo(map[string]string) {
 	// No features to be provided, to facilitate compatibility
 }
 
+func (*SleeveOverlay) Diagnostics() interface{} {
+	return nil
+}
+
 func (sleeve *SleeveOverlay) lookupForwarder(peer PeerName) *sleeveForwarder {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
@@ -591,6 +595,10 @@ func (fwd *sleeveForwarder) ControlMessage(tag byte, msg []byte) {
 	case fwd.controlMsgChan <- controlMessage{tag, msg}:
 	case <-fwd.finishedChan:
 	}
+}
+
+func (fwd *sleeveForwarder) DisplayName() string {
+	return "sleeve"
 }
 
 func (fwd *sleeveForwarder) Stop() {
