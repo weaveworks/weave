@@ -20,8 +20,9 @@ proxy docker_api_on $HOST1 POST /containers/c3/start '{"Binds":[],"Dns":null,"Dn
 docker_on $HOST1 attach c3 >/dev/null 2>&1 || true # Wait for container to exit
 assert "docker_on $HOST1 inspect -f '{{.State.Running}} {{.State.ExitCode}} {{.HostConfig.Dns}}' c3" "false 0 [$docker_bridge_ip]"
 
-# Start c4 with an 'null' HostConfig
-proxy docker_on $HOST1 create --name=c4 $SMALL_IMAGE echo foo
+# Start c4 with an 'null' HostConfig and check this doesn't remove previous parameters
+proxy docker_on $HOST1 create --name=c4 --memory-swap -1 $SMALL_IMAGE echo foo
 assert_raises "proxy docker_api_on $HOST1 POST /containers/c4/start 'null'"
+assert "docker_on $HOST1 inspect -f '{{.HostConfig.MemorySwap}}' c4" "-1"
 
 end_suite
