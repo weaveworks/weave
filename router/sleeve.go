@@ -427,12 +427,13 @@ func (fwd *sleeveForwarder) ErrorChannel() <-chan error {
 }
 
 type curriedForward struct {
+	NonDiscardingFlowOp
 	fwd *sleeveForwarder
 	key ForwardPacketKey
 }
 
 func (fwd *sleeveForwarder) Forward(key ForwardPacketKey) FlowOp {
-	return curriedForward{fwd, key}
+	return curriedForward{fwd: fwd, key: key}
 }
 
 func (f curriedForward) Process(frame []byte, dec *EthernetDecoder,

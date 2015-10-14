@@ -127,7 +127,7 @@ func (NullOverlay) AddFeaturesTo(map[string]string) {
 }
 
 func (NullOverlay) Forward(ForwardPacketKey) FlowOp {
-	return nil
+	return DiscardingFlowOp{}
 }
 
 func (NullOverlay) Stop() {

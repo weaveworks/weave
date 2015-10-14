@@ -443,8 +443,10 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 		pk := flowKeysToPacketKey(fks)
 		var zeroMAC MAC
 		if pk.SrcMAC == zeroMAC && pk.DstMAC == zeroMAC {
-			return vxlanSpecialPacketFlowOp{fastdp, srcPeer,
-				&net.UDPAddr{
+			return vxlanSpecialPacketFlowOp{
+				fastdp:  fastdp,
+				srcPeer: srcPeer,
+				sender: &net.UDPAddr{
 					IP:   net.IP(tunKey.Ipv4Src[:]),
 					Port: udpPort,
 				},
@@ -477,6 +479,7 @@ func (fastdp *FastDatapath) extractPeers(tunnelID [8]byte) (*Peer, *Peer) {
 }
 
 type vxlanSpecialPacketFlowOp struct {
+	NonDiscardingFlowOp
 	fastdp  *FastDatapath
 	srcPeer *Peer
 	sender  *net.UDPAddr
@@ -765,7 +768,7 @@ func (fwd *fastDatapathForwarder) Forward(key ForwardPacketKey) FlowOp {
 	remoteIP, err := ipv4Bytes(fwd.remoteAddr.IP)
 	if err != nil {
 		log.Error(err)
-		return nil
+		return DiscardingFlowOp{}
 	}
 
 	var sta odp.SetTunnelAction
@@ -1134,6 +1137,7 @@ func (fastdp *FastDatapath) takeDecoder(lock *fastDatapathLock) *EthernetDecoder
 }
 
 type odpActionsFlowOp struct {
+	NonDiscardingFlowOp
 	fastdp  *FastDatapath
 	actions []odp.Action
 }
@@ -1157,22 +1161,15 @@ func (fop odpActionsFlowOp) Process(frame []byte, dec *EthernetDecoder,
 	checkWarn(fastdp.dp.Execute(frame, nil, fop.actions))
 }
 
-type nopFlowOp struct{}
-
-func (nopFlowOp) Process([]byte, *EthernetDecoder, bool) {
-	// A nopFlowOp just provides a hint about flow creation, it
-	// doesn't send anything
-}
-
 // A vetoFlowCreationFlowOp flags that no flow should be created
 type vetoFlowCreationFlowOp struct {
-	nopFlowOp
+	DiscardingFlowOp
 }
 
 // A odpFlowKeyFlowOp adds a FlowKey to the resulting flow
 type odpFlowKeyFlowOp struct {
+	DiscardingFlowOp
 	key odp.FlowKey
-	nopFlowOp
 }
 
 func odpFlowKey(key odp.FlowKey) FlowOp {

@@ -114,12 +114,12 @@ func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
 		// we are seeing a frame we injected ourself.  That
 		// shouldn't happen, but discard it just in case.
 		log.Errorln("Captured frame from MAC (", srcMac, ") associated with another peer", conflictPeer)
-		return nil
+		return DiscardingFlowOp{}
 	}
 
 	// Discard STP broadcasts
 	if key.DstMAC == [...]byte{0x01, 0x80, 0xC2, 0x00, 0x00, 0x00} {
-		return nil
+		return DiscardingFlowOp{}
 	}
 
 	dstMac := net.HardwareAddr(key.DstMAC[:])
@@ -130,7 +130,7 @@ func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
 		// it's likely to be broadcasting the packet to all
 		// ports.  So if it happens, just drop the packet to
 		// avoid warnings if we try to forward it.
-		return nil
+		return DiscardingFlowOp{}
 	case nil:
 		// If we don't know which peer corresponds to the dest
 		// MAC, broadcast it.
@@ -223,14 +223,14 @@ func (router *Router) relay(key ForwardPacketKey) FlowOp {
 		// Not necessarily an error as there could be a race with the
 		// dst disappearing whilst the frame is in flight
 		log.Println("Received packet for unknown destination:", key.DstPeer)
-		return nil
+		return DiscardingFlowOp{}
 	}
 
 	conn, found := router.Ourself.ConnectionTo(relayPeerName)
 	if !found {
 		// Again, could just be a race, not necessarily an error
 		log.Println("Unable to find connection to relay peer", relayPeerName)
-		return nil
+		return DiscardingFlowOp{}
 	}
 
 	return conn.(*LocalConnection).Forward(key)
@@ -239,7 +239,7 @@ func (router *Router) relay(key ForwardPacketKey) FlowOp {
 func (router *Router) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
 	nextHops := router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
-		return nil
+		return DiscardingFlowOp{}
 	}
 
 	op := NewMultiFlowOp(true)
