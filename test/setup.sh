@@ -6,7 +6,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 . ./config.sh
 
-(cd ./tls && go get ./... && go run generate_certs.go $HOSTS)
+(cd ./tls && go get -tags netgo ./... && go run generate_certs.go $HOSTS)
 
 echo "Copying weave images, scripts, and certificates to hosts, and"
 echo "  prefetch test images"
