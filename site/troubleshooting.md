@@ -141,8 +141,8 @@ obtained with `weave status connections`:
 
 ````
 $ weave status connections
-<- 192.168.48.12:33866   established 7e:21:4a:70:2f:45(host2)
-<- 192.168.48.13:60773   pending     7e:ae:cd:d5:23:8d(host3)
+<- 192.168.48.12:33866   established fastdp 7e:21:4a:70:2f:45(host2)
+<- 192.168.48.13:60773   pending     fastdp 7e:ae:cd:d5:23:8d(host3)
 -> 192.168.48.14:6783    retrying    dial tcp4 192.168.48.14:6783: no route to host
 -> 192.168.48.15:6783    failed      dial tcp4 192.168.48.15:6783: no route to host, retry: 2015-08-06 18:55:38.246910357 +0000 UTC
 -> 192.168.48.16:6783    connecting
@@ -158,11 +158,12 @@ The columns are as follows:
     * `failed` - TCP connection or UDP heartbeat failed
     * `retrying` - retry of a previously failed connection attempt in
       progress; reason for previous failure follows
-    * `pending` - TCP connection up, waiting for confirmation of
-       UDP heartbeat
+    * `pending` - TCP connection up, waiting for confirmation of UDP
+      heartbeat
     * `established` - TCP connection and corresponding UDP path are up
- * Info - the remote peer name and nickname for (un)established
-   connections, the failure reason for failed and retrying connection
+ * Info - the failure reason for failed and retrying connections, or
+   the data transport method, remote peer name and nickname for
+   pending and established connections
 
 ### <a name="weave-status-peers"></a>List peers
 
