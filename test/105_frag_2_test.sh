@@ -25,7 +25,7 @@ sleep 35 # give weave time to discover the PMTU
 # Check large packets get through. The first attempt typically fails,
 # since the sending container hasn't discovered the PMTU yet. The 2nd
 # attempt should succeed.
-exec_on $HOST2 c2 $PING -s 10000 $C1 2>&1 1>/dev/null || true
+exec_on $HOST2 c2 $PING -s 10000 $C1 1>/dev/null 2>&1 || true
 assert_raises "exec_on $HOST2 c2 $PING -s 10000 $C1"
 
 run_on $HOST2 "sudo iptables -D $drop_large_udp_packets"
