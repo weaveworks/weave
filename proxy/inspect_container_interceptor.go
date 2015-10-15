@@ -13,7 +13,7 @@ func (i *inspectContainerInterceptor) InterceptRequest(r *http.Request) error {
 }
 
 func (i *inspectContainerInterceptor) InterceptResponse(r *http.Response) error {
-	if !i.proxy.RewriteInspect {
+	if !i.proxy.RewriteInspect || r.StatusCode != 200 {
 		return nil
 	}
 
