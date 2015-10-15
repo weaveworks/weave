@@ -29,9 +29,11 @@ docker_py_test() {
 
     weave_on $HOST1 launch-proxy --no-default-ipalloc
 
+    DOCKER_BRIDGE_IP=$(weave_on $HOST1 docker-bridge-ip)
+
     if docker_on $HOST1 run \
         -e NOT_ON_HOST=true \
-        -e DOCKER_HOST=tcp://172.17.42.1:12375 \
+        -e DOCKER_HOST=tcp://$DOCKER_BRIDGE_IP:12375 \
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
         joffrey/docker-py py.test $TESTS ; then
