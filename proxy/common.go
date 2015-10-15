@@ -58,6 +58,7 @@ func unmarshalRequestBody(r *http.Request, target interface{}) error {
 	if err != nil {
 		return err
 	}
+	Log.Debugf("->requestBody: %s", body)
 	if err := r.Body.Close(); err != nil {
 		return err
 	}
@@ -73,6 +74,7 @@ func marshalRequestBody(r *http.Request, body interface{}) error {
 	if err != nil {
 		return err
 	}
+	Log.Debugf("<-requestBody: %s", newBody)
 	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
 	return nil
@@ -83,6 +85,7 @@ func unmarshalResponseBody(r *http.Response, target interface{}) error {
 	if err != nil {
 		return err
 	}
+	Log.Debugf("->responseBody: %s", body)
 	if err := r.Body.Close(); err != nil {
 		return err
 	}
@@ -98,6 +101,7 @@ func marshalResponseBody(r *http.Response, body interface{}) error {
 	if err != nil {
 		return err
 	}
+	Log.Debugf("<-responseBody: %s", newBody)
 	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
 	// Stop it being chunked, because that hangs
