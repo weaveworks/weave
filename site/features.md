@@ -9,6 +9,7 @@ Weave has a few more features beyond those illustrated by the [basic
 example](https://github.com/weaveworks/weave#example):
 
  * [Virtual ethernet switch](#virtual-ethernet-switch)
+ * [Fast data path](#fast-data-path)
  * [Seamless Docker integration](#docker)
  * [Address allocation](#addressing)
  * [Naming and discovery](#naming-and-discovery)
@@ -54,6 +55,25 @@ and troubleshoot our container network. To put it another way, we can
 now re-use the same tools and techniques when deploying applications
 as containers as we would have done when deploying them 'on metal' in
 our data centre.
+
+### <a name="fast-data-path"></a>Fast data path
+
+Weave automatically chooses the fastest available method to transport
+data between peers. The most performant of these ('fastdp') offers
+near-native throughput and latency but does not support encryption;
+consequently supplying a password will cause the router to fall back
+to a slower mode ('sleeve') that does.
+
+Even when encryption is not in use, certain adverse network conditions
+will cause this fallback to occur dynamically; in these circumstances,
+weave will upgrade the connection back to the fastdp transport without
+user intervention once they abate. You can see which method is in use
+by examining the output of `weave status connections`.
+
+You can also administratively disable fastdp with the
+`WEAVE_NO_FASTDP` environment variable:
+
+    $ WEAVE_NO_FASTDP=true weave launch
 
 ### <a name="docker"></a>Seamless Docker integration
 
@@ -282,7 +302,10 @@ way to generate a random password which satsifies this requirement is
 
     < /dev/urandom tr -dc A-Za-z0-9 | head -c9 ; echo
 
-The same password must be specified for all weave peers.
+The same password must be specified for all weave peers. Note that
+supplying a password will [cause weave to fall back to a slower
+method](#fast-data-path) for transporting data between
+peers.
 
 ### <a name="host-network-integration"></a>Host network integration
 
@@ -449,11 +472,13 @@ Weave can network containers hosted in different cloud providers /
 data centres. So, for example, one could run an application consisting
 of containers on GCE, EC2 and in local data centres.
 
-To enable this, the network must be configured to permit TCP and UDP
-connections to the weave port of the docker hosts. The weave port
-defaults to 6783. This can be overriden by setting `WEAVE_PORT`, but
-it is highly recommended that all peers in a weave network are given
-the same port setting.
+To enable this, the network must be configured to permit connections
+to weave's control and data ports on the docker hosts. The control
+port defaults to TCP 6783, and the data ports to UDP 6783/6784. You
+can override these defaults by setting `WEAVE_PORT` (this is a base
+value - setting `WEAVE_PORT=9000` will result in weave using TCP 9000
+for control and UDP 9000/9001 for data). Note that it is highly
+recommended that all peers be given the same setting.
 
 ### <a name="multi-hop-routing"></a>Multi-hop routing
 
