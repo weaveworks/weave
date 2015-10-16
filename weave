@@ -64,8 +64,8 @@ weave connect       [--replace] [<peer> ...]
 weave forget        <peer> ...
 weave status        [targets | connections | peers | dns]
 weave report        [-f <format>]
-weave run           [--with-dns | --without-dns] [<addr> ...]
-                      <docker run args> ...
+weave run           [--with-dns | --without-dns] [--no-rewrite-hosts]
+                      [<addr> ...] <docker run args> ...
 weave start         [<addr> ...] <container_id>
 weave attach        [<addr> ...] <container_id>
 weave detach        [<addr> ...] <container_id>
@@ -207,6 +207,26 @@ dns_arg_count() {
     fi
 }
 
+extra_hosts_args() {
+    DNS_EXTRA_HOSTS=
+    DNS_EXTRA_HOSTS_ARGS=
+    while [ $# -gt 0 ] ; do
+        case "$1" in
+            --add-host)
+                DNS_EXTRA_HOSTS="$2 $DNS_EXTRA_HOSTS"
+                DNS_EXTRA_HOSTS_ARGS="--add-host=$2 $DNS_EXTRA_HOSTS_ARGS"
+                shift
+                ;;
+            --add-host=*)
+                DNS_EXTRA_HOSTS="${1#*=} $DNS_EXTRA_HOSTS"
+                DNS_EXTRA_HOSTS_ARGS="--add-host=${1#*=} $DNS_EXTRA_HOSTS_ARGS"
+                ;;
+        esac
+        shift
+    done
+}
+
+
 check_docker_version
 
 if [ "$1" = "--local" ] ; then
@@ -244,10 +264,16 @@ elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
         DNS_ARGS=$(exec_remote dns-args "$@" || true)
     fi
     shift $(dns_arg_count "$@")
+    if [ "$1" = "--no-rewrite-hosts" ] ; then
+        shift
+    else
+        extra_hosts_args "$@"
+        DNS_EXTRA_HOSTS_ARGS="--rewrite-hosts $DNS_EXTRA_HOSTS_ARGS"
+    fi
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
     CONTAINER=$(docker $DOCKER_CLIENT_ARGS run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
-    exec_remote attach $CIDR_ARGS --or-die $CONTAINER >/dev/null
+    exec_remote attach $CIDR_ARGS --or-die $DNS_EXTRA_HOSTS_ARGS $CONTAINER >/dev/null
     echo $CONTAINER
     exit 0
 fi
@@ -955,6 +981,50 @@ dns_args() {
     fi
 }
 
+etc_hosts_contents() {
+    NAME=$1
+    shift
+    echo "# created by Weave - BEGIN"
+    echo "# container hostname"
+    for CIDR in $ALL_CIDRS ; do
+        echo "${CIDR%/*}    $NAME"
+    done
+    echo
+    echo "# static names added with --add-host"
+    for EXTRA_HOST in "$@" ; do
+        echo "${EXTRA_HOST#*:}     ${EXTRA_HOST%:*}"
+    done
+
+    cat <<-EOF
+
+# default localhost entries
+127.0.0.1       localhost
+::1             ip6-localhost ip6-loopback
+fe00::0         ip6-localnet
+ff00::0         ip6-mcastprefix
+ff02::1         ip6-allnodes
+ff02::2         ip6-allrouters
+EOF
+
+    echo "# created by Weave - END"
+}
+
+rewrite_etc_hosts() {
+    HOSTS_PATH_AND_NAME=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}' $CONTAINER)
+    HOSTS=${HOSTS_PATH_AND_NAME% *}
+    NAME=${HOSTS_PATH_AND_NAME#* }
+    CONTAINERS_PATH=$(dirname $HOSTS)
+    MNT=/container
+    MNT_HOSTS=$MNT/$(basename $HOSTS)
+    CONTENTS="$(etc_hosts_contents $NAME $@)"
+    # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
+    # leaving it with valid contents...
+    docker run --rm \
+        -v $CONTAINERS_PATH:$MNT \
+        --entrypoint=sh \
+        $EXEC_IMAGE -c "echo '$CONTENTS' > $MNT_HOSTS && rm -f $MNT_HOSTS && echo '$CONTENTS' > $MNT_HOSTS"
+}
+
 # Print an error to stderr and return with an indicative exit status
 # if the container $1 does not exist or isn't running.
 check_running() {
@@ -1613,11 +1683,20 @@ case "$COMMAND" in
     run)
         dns_args "$@"
         shift $(dns_arg_count "$@")
+        REWRITE_HOSTS=1
+        if [ "$1" = "--no-rewrite-hosts" ] ; then
+            REWRITE_HOSTS=
+            shift
+        fi
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         CONTAINER=$(docker run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
         create_bridge
         ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
+        if [ -n "$REWRITE_HOSTS" ] ; then
+            extra_hosts_args "$@"
+            rewrite_etc_hosts $DNS_EXTRA_HOSTS
+        fi
         with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $CONTAINER
@@ -1643,6 +1722,8 @@ case "$COMMAND" in
         echo $RES
         ;;
     attach)
+        DNS_EXTRA_HOSTS=
+        REWRITE_HOSTS=
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
         while [ $# -gt 0 ]; do
@@ -1652,6 +1733,13 @@ case "$COMMAND" in
                     ;;
                 --rewrite-hosts)
                     REWRITE_HOSTS=1
+                    ;;
+                --add-host)
+                    DNS_EXTRA_HOSTS="$2 $DNS_EXTRA_HOSTS"
+                    shift
+                    ;;
+                --add-host=*)
+                    DNS_EXTRA_HOSTS="${1#*=} $DNS_EXTRA_HOSTS"
                     ;;
                 *)
                     break
@@ -1663,10 +1751,7 @@ case "$COMMAND" in
         CONTAINER=$(container_id $1)
         create_bridge
         ipam_cidrs$ATTACH_TYPE allocate $CONTAINER $CIDR_ARGS
-        if [ -n "$REWRITE_HOSTS" ] && command_exists weavehosts ; then
-            PATH_AND_NAME=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}' $CONTAINER)
-            weavehosts $PATH_AND_NAME $ALL_CIDRS
-        fi
+        [ -n "$REWRITE_HOSTS" ] && rewrite_etc_hosts $DNS_EXTRA_HOSTS
         with_container_netns$ATTACH_TYPE $CONTAINER attach $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS

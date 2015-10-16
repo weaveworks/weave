@@ -5,16 +5,16 @@
 IP=10.2.0.34
 TARGET=seetwo.weave.local
 TARGET_IP=10.2.0.78
+STATIC=static.name
+STATIC_IP=10.9.9.9
 
-assert_no_resolution() {
-    container=$(weave_on $HOST1 run "$@" $IP/24 -t $DNS_IMAGE /bin/sh)
-    assert_no_dns_record $HOST1 $container $TARGET
-    rm_containers $HOST1 $container
-}
+check_dns() {
+    chk=$1
+    shift
 
-assert_resolution() {
-    container=$(weave_on $HOST1 run "$@" $IP/24 -t $DNS_IMAGE /bin/sh)
-    assert_dns_record $HOST1 $container $TARGET $TARGET_IP
+    container=$(weave_on $HOST1 run $@ $IP/24 -t --add-host=$STATIC:$STATIC_IP $DNS_IMAGE /bin/sh)
+    $chk $HOST1 $container $TARGET
+    assert_dns_record $HOST1 $container $STATIC $STATIC_IP
     rm_containers $HOST1 $container
 }
 
@@ -24,10 +24,9 @@ start_suite "With or without DNS test"
 weave_on $HOST1 launch-router
 
 start_container $HOST1 $TARGET_IP/24 --name c2 -h $TARGET
-DNS_IP=$(weave_on $HOST1 docker-bridge-ip)
 
-assert_no_resolution --without-dns
-assert_resolution
-assert_resolution --with-dns
+check_dns assert_no_dns_record --without-dns
+check_dns assert_dns_record
+check_dns assert_dns_record --with-dns
 
 end_suite

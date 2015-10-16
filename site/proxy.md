@@ -146,10 +146,27 @@ container with a blank `WEAVE_CIDR`, e.g.
 
     host1$ docker run -ti -e WEAVE_CIDR="" ubuntu
 
-When launching weave-enabled containers, the proxy will automatically
-rewrite `/etc/hosts` to replace the docker IP with the container's
-weave IP. If you need the docker IP to remain in `/etc/hosts`, the
-proxy must be launched with the `--no-rewrite-hosts` flag.
+## <a name="etchosts"></a>Name resolution via `/etc/hosts`
+
+When starting weave-enabled containers, the proxy will automatically
+replace the container's `/etc/hosts` file, and disable Docker's control
+over it. The new file contains an entry for the container's hostname
+and weave IP address, as well as additional entries that have been
+specified with `--add-host` parameters. This ensures that
+
+- name resolution of the container's hostname, e.g. via `hostname -i`,
+returns the weave IP address. This is required for many cluster-aware
+applications to work.
+- unqualified names get resolved via DNS, i.e. typically via weaveDNS
+to weave IP addresses. This is required so that in a typical setup
+one can simply "ping <container-name>", i.e. without having to
+specify a `.weave.local` suffix.
+
+In case you prefer to keep `/etc/hosts` under Docker's control (for
+example, because you need the hostname to resolve to the Docker-assigned
+IP instead of the weave IP, or you require name resolution for
+Docker-managed networks), the proxy must be launched with the
+`--no-rewrite-hosts` flag.
 
     host1$ weave launch-router && weave launch-proxy --no-rewrite-hosts
 
@@ -270,6 +287,13 @@ this example with an automatically allocated IP. If you wish you can
 specify addresses manually instead:
 
     $ weave run 10.2.1.1/24 -ti ubuntu
+
+`weave run` will rewrite `/etc/hosts` in the same way
+[the proxy does](#etchosts). In case you prefer to keep
+the original file, you must specify `--no-rewrite-hosts` when running
+the container:
+
+    $ weave run --no-rewrite-hosts 10.2.1.1/24 -ti ubuntu
 
 There are some limitations to starting containers with `weave run`:
 
