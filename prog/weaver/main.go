@@ -272,6 +272,11 @@ func main() {
 		if err != nil {
 			Log.Fatal("Unable to start dns server: ", err)
 		}
+		listenAddr := dnsListenAddress
+		if dnsEffectiveListenAddress != "" {
+			listenAddr = dnsEffectiveListenAddress
+		}
+		Log.Println("Listening for DNS queries on", listenAddr)
 		dnsserver.ActivateAndServe()
 		defer dnsserver.Stop()
 	}
@@ -295,6 +300,7 @@ func main() {
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
 		http.Handle("/", muxRouter)
+		Log.Println("Listening for HTTP control messages on", httpAddr)
 		go listenAndServeHTTP(httpAddr, muxRouter)
 	}
 
