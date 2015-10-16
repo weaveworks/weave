@@ -170,7 +170,8 @@ func main() {
 		// than capture via ODP misses, even when using an
 		// ODP-based bridge.  So when using weave encyption,
 		// it's preferable to use -iface.
-		iface, err := weavenet.EnsureInterface(ifaceName)
+		var err error
+		iface, err = weavenet.EnsureInterface(ifaceName)
 		checkFatal(err)
 
 		// bufsz flag is in MB
