@@ -671,6 +671,8 @@ router_opts_bridge () {
 setup_router_iface_fastdp() {
     if [ -n "$WEAVE_PASSWORD" ] ; then
         # See router_opts_fastdp
+        # In case there is a lingering weave2 netdev
+        ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
         connect_container_to_bridge $ROUTER_HOSTNETNS_IFNAME &&
             ip link set $ROUTER_HOSTNETNS_IFNAME up
     fi
@@ -1455,6 +1457,14 @@ launch_router() {
     fi
 }
 
+stop_router() {
+    stop $CONTAINER_NAME "Weave"
+    conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
+    # remove the weave2 netdev in a fastdp context
+    [ -d /sys/class/net/$BRIDGE -a ! -d /sys/class/net/$BRIDGE/bridge ] \
+        && ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
+}
+
 launch_proxy() {
     # Set WEAVEPROXY_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
@@ -1480,6 +1490,11 @@ launch_proxy() {
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
     wait_for_status $PROXY_CONTAINER_NAME http_call_unix $PROXY_CONTAINER_NAME status.sock
+}
+
+stop_proxy() {
+    warn_if_stopping_proxy_in_env
+    stop $PROXY_CONTAINER_NAME "Proxy"
 }
 
 ##########################################################################################
@@ -1852,20 +1867,16 @@ case "$COMMAND" in
         ;;
     stop)
         [ $# -eq 0 ] || usage
-        warn_if_stopping_proxy_in_env
-        stop $PROXY_CONTAINER_NAME "Proxy"
-        stop $CONTAINER_NAME       "Weave"
-        conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
+        stop_proxy
+        stop_router
         ;;
     stop-router)
         [ $# -eq 0 ] || usage
-        stop $CONTAINER_NAME "Weave"
-        conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
+        stop_router
         ;;
     stop-proxy)
         [ $# -eq 0 ] || usage
-        warn_if_stopping_proxy_in_env
-        stop $PROXY_CONTAINER_NAME "Proxy"
+        stop_proxy
         ;;
     reset)
         [ $# -eq 0 ] || usage
