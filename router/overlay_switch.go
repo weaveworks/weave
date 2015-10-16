@@ -424,7 +424,7 @@ func (fwd *overlaySwitchForwarder) DisplayName() string {
 	var best OverlayForwarder
 
 	fwd.lock.Lock()
-	if fwd.best > 0 {
+	if fwd.best >= 0 {
 		best = fwd.forwarders[fwd.best].fwd
 	}
 	fwd.lock.Unlock()
