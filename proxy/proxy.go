@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
@@ -27,6 +28,9 @@ const (
 
 	weaveSock     = "/var/run/weave/weave.sock"
 	weaveSockUnix = "unix://" + weaveSock
+
+	initialInterval = 2 * time.Second
+	maxInterval     = 1 * time.Minute
 )
 
 var (
@@ -77,10 +81,56 @@ type Proxy struct {
 	weaveWaitNomcastVolume string
 	normalisedAddrs        []string
 	waiters                map[*http.Request]*wait
+	attachJobs             map[string]*attachJob
+	quit                   chan struct{}
+}
+
+type attachJob struct {
+	id          string
+	tryInterval time.Duration // retry delay on next failure
+	timer       *time.Timer
+}
+
+func (proxy *Proxy) attachWithRetry(id string) {
+	proxy.Lock()
+	defer proxy.Unlock()
+	if j, ok := proxy.attachJobs[id]; ok {
+		j.timer.Reset(time.Duration(0))
+		return
+	}
+
+	j := &attachJob{id: id, tryInterval: initialInterval}
+	j.timer = time.AfterFunc(time.Duration(0), func() {
+		if err := proxy.attach(id, false); err != nil {
+			// The delay at the nth retry is a random value in the range
+			// [i-i/2,i+i/2], where i = initialInterval * 1.5^(n-1).
+			j.timer.Reset(j.tryInterval)
+			j.tryInterval = j.tryInterval * 3 / 2
+			if j.tryInterval > maxInterval {
+				j.tryInterval = maxInterval
+			}
+			return
+		}
+		proxy.notifyWaiters(id, nil)
+	})
+	proxy.attachJobs[id] = j
+}
+
+func (proxy *Proxy) attachAndKillOnFailure(id string) {
+	proxy.notifyWaiters(id, proxy.attach(id, true))
+}
+
+func (j attachJob) Stop() {
+	j.timer.Stop()
 }
 
 func NewProxy(c Config) (*Proxy, error) {
-	p := &Proxy{Config: c, waiters: make(map[*http.Request]*wait)}
+	p := &Proxy{
+		Config:     c,
+		waiters:    make(map[*http.Request]*wait),
+		attachJobs: make(map[string]*attachJob),
+		quit:       make(chan struct{}),
+	}
 
 	if err := p.TLSConfig.LoadCerts(); err != nil {
 		Log.Fatalf("Could not configure tls for proxy: %s", err)
@@ -125,16 +175,7 @@ func NewProxy(c Config) (*Proxy, error) {
 func (proxy *Proxy) AttachExistingContainers() {
 	containers, _ := proxy.client.ListContainers(docker.ListContainersOptions{})
 	for _, c := range containers {
-		container, err := proxy.client.InspectContainer(c.ID)
-		if err != nil {
-			if _, ok := err.(*docker.NoSuchContainer); !ok {
-				Log.Warningf("unable to attach existing container %s since inspecting it failed: %v", c.ID, err)
-			}
-			continue
-		}
-		if containerShouldAttach(container) && (container.State.Running || container.State.Paused) {
-			proxy.attach(container, false)
-		}
+		proxy.attachWithRetry(c.ID)
 	}
 }
 
@@ -344,18 +385,7 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 
 // weavedocker.ContainerObserver interface
 func (proxy *Proxy) ContainerStarted(ident string) {
-	container, err := proxy.client.InspectContainer(ident)
-	if err == nil {
-		if containerShouldAttach(container) {
-			err = proxy.attach(container, true)
-		} else if containerIsWeaveRouter(container) {
-			err = proxy.attachRouter(container)
-		}
-	}
-	if _, ok := err.(*docker.NoSuchContainer); err != nil && !ok {
-		Log.Warningf("unable to attach new container %s since inspecting it failed: %v", ident, err)
-	}
-	proxy.notifyWaiters(ident, err)
+	proxy.attachAndKillOnFailure(ident)
 }
 
 func containerShouldAttach(container *docker.Container) bool {
@@ -381,6 +411,10 @@ func (proxy *Proxy) removeWait(r *http.Request) {
 
 func (proxy *Proxy) notifyWaiters(ident string, err error) {
 	proxy.Lock()
+	if j, ok := proxy.attachJobs[ident]; ok {
+		j.Stop()
+		delete(proxy.attachJobs, ident)
+	}
 	for _, wait := range proxy.waiters {
 		if ident == wait.ident && !wait.done {
 			wait.ch <- err
@@ -427,10 +461,26 @@ func (proxy *Proxy) waitForStartByIdent(ident string) error {
 func (proxy *Proxy) ContainerDied(ident string) {
 }
 
-func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
+// Check if this container needs to be attached, and return nil on success or not needed.
+func (proxy *Proxy) attach(containerID string, orDie bool) error {
+	container, err := proxy.client.InspectContainer(containerID)
+	if err != nil {
+		if _, ok := err.(*docker.NoSuchContainer); !ok {
+			Log.Warningf("unable to attach existing container %s since inspecting it failed: %v", containerID, err)
+		}
+		return nil
+	}
+	if containerIsWeaveRouter(container) {
+		Log.Infof("Attaching weave router container: %s", container.ID)
+		return callWeaveAttach(container, []string{"attach-router"})
+	}
+	if !containerShouldAttach(container) || !(container.State.Running || container.State.Paused) {
+		return nil
+	}
+
 	cidrs, err := proxy.weaveCIDRs(container.HostConfig.NetworkMode, container.Config.Env)
 	if err != nil {
-		Log.Infof("Leaving container %s alone because %s", container.ID, err)
+		Log.Infof("Leaving container %s alone because %s", containerID, err)
 		return nil
 	}
 	Log.Infof("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
@@ -452,19 +502,10 @@ func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
 		args = append(args, "--or-die")
 	}
 	args = append(args, container.ID)
-	if _, stderr, err := callWeave(args...); err != nil {
-		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
-		return errors.New(string(stderr))
-	} else if len(stderr) > 0 {
-		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
-	}
-
-	return nil
+	return callWeaveAttach(container, args)
 }
 
-func (proxy *Proxy) attachRouter(container *docker.Container) error {
-	Log.Infof("Attaching weave router container: %s", container.ID)
-	args := []string{"attach-router"}
+func callWeaveAttach(container *docker.Container, args []string) error {
 	if _, stderr, err := callWeave(args...); err != nil {
 		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
 		return errors.New(string(stderr))
@@ -638,4 +679,13 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		err = errors.New(buf.String())
 	}
 	return
+}
+
+func (proxy *Proxy) Stop() {
+	close(proxy.quit)
+	proxy.Lock()
+	defer proxy.Unlock()
+	for _, j := range proxy.attachJobs {
+		j.Stop()
+	}
 }
