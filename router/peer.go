@@ -30,11 +30,12 @@ func randomPeerShortID() PeerShortID {
 }
 
 type PeerSummary struct {
-	NameByte []byte
-	NickName string
-	UID      PeerUID
-	Version  uint64
-	ShortID  PeerShortID
+	NameByte   []byte
+	NickName   string
+	UID        PeerUID
+	Version    uint64
+	ShortID    PeerShortID
+	HasShortID bool
 }
 
 type Peer struct {
@@ -56,11 +57,12 @@ func NewPeerFromSummary(summary PeerSummary) *Peer {
 
 func NewPeer(name PeerName, nickName string, uid PeerUID, version uint64, shortID PeerShortID) *Peer {
 	return NewPeerFromSummary(PeerSummary{
-		NameByte: name.Bin(),
-		NickName: nickName,
-		UID:      uid,
-		Version:  version,
-		ShortID:  shortID,
+		NameByte:   name.Bin(),
+		NickName:   nickName,
+		UID:        uid,
+		Version:    version,
+		ShortID:    shortID,
+		HasShortID: true,
 	})
 }
 

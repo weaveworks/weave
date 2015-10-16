@@ -13,8 +13,9 @@ import (
 // uses the best one that seems to be working.
 
 type OverlaySwitch struct {
-	overlays     map[string]Overlay
-	overlayNames []string
+	overlays      map[string]Overlay
+	overlayNames  []string
+	compatOverlay Overlay
 }
 
 func NewOverlaySwitch() *OverlaySwitch {
@@ -29,6 +30,10 @@ func (osw *OverlaySwitch) Add(name string, overlay Overlay) {
 
 	osw.overlays[name] = overlay
 	osw.overlayNames = append(osw.overlayNames, name)
+}
+
+func (osw *OverlaySwitch) SetCompatOverlay(overlay Overlay) {
+	osw.compatOverlay = overlay
 }
 
 func (osw *OverlaySwitch) AddFeaturesTo(features map[string]string) {
@@ -119,8 +124,8 @@ type overlaySwitchForwarder struct {
 
 	lock sync.Mutex
 
-	// the forwarder to send on
-	best OverlayForwarder
+	// the index of the forwarder to send on
+	best int
 
 	// the subsidiary forwarders
 	forwarders []subForwarder
@@ -159,6 +164,10 @@ type subForwarderEvent struct {
 
 func (osw *OverlaySwitch) MakeForwarder(
 	params ForwarderParams) (OverlayForwarder, error) {
+	if _, present := params.Features["Overlays"]; !present && osw.compatOverlay != nil {
+		return osw.compatOverlay.MakeForwarder(params)
+	}
+
 	overlays, err := osw.commonOverlays(params)
 	if err != nil {
 		return nil, err
@@ -174,6 +183,7 @@ func (osw *OverlaySwitch) MakeForwarder(
 	fwd := &overlaySwitchForwarder{
 		remotePeer: params.RemotePeer,
 
+		best:       -1,
 		forwarders: make([]subForwarder, len(overlays)),
 		stopChan:   stopChan,
 
@@ -276,9 +286,6 @@ func (fwd *overlaySwitchForwarder) established(index int) {
 
 	fwd.forwarders[index].established = true
 
-	// less preferred forwarders are no longer needed
-	fwd.stopFrom(index + 1)
-
 	if !fwd.alreadyEstablished {
 		fwd.alreadyEstablished = true
 		close(fwd.establishedChan)
@@ -314,7 +321,8 @@ func (fwd *overlaySwitchForwarder) stopFrom(index int) {
 func (fwd *overlaySwitchForwarder) chooseBest() {
 	// the most preferred established forwarder is the best
 	// otherwise, the most preferred working forwarder is the best
-	var bestEstablished, bestWorking *subForwarder
+	bestEstablished := -1
+	bestWorking := -1
 
 	for i := range fwd.forwarders {
 		subFwd := &fwd.forwarders[i]
@@ -322,18 +330,18 @@ func (fwd *overlaySwitchForwarder) chooseBest() {
 			continue
 		}
 
-		if bestWorking == nil {
-			bestWorking = subFwd
+		if bestWorking < 0 {
+			bestWorking = i
 		}
 
-		if bestEstablished == nil && subFwd.established {
-			bestEstablished = subFwd
+		if bestEstablished < 0 && subFwd.established {
+			bestEstablished = i
 		}
 	}
 
 	best := bestEstablished
-	if best == nil {
-		if bestWorking == nil {
+	if best < 0 {
+		if bestWorking < 0 {
 			select {
 			case fwd.errorChan <- fmt.Errorf("no working forwarders to %s", fwd.remotePeer):
 			default:
@@ -345,9 +353,10 @@ func (fwd *overlaySwitchForwarder) chooseBest() {
 		best = bestWorking
 	}
 
-	if fwd.best != best.fwd {
-		fwd.best = best.fwd
-		log.Info(fwd.logPrefix(), "using ", best.overlayName)
+	if fwd.best != best {
+		fwd.best = best
+		log.Info(fwd.logPrefix(),
+			"using ", fwd.forwarders[best].overlayName)
 	}
 }
 
@@ -369,14 +378,23 @@ func (fwd *overlaySwitchForwarder) Confirm() {
 
 func (fwd *overlaySwitchForwarder) Forward(pk ForwardPacketKey) FlowOp {
 	fwd.lock.Lock()
-	best := fwd.best
-	fwd.lock.Unlock()
 
-	if best == nil {
-		return nil
+	if fwd.best >= 0 {
+		for i := fwd.best; i < len(fwd.forwarders); i++ {
+			best := fwd.forwarders[i].fwd
+			if best != nil {
+				fwd.lock.Unlock()
+				if op := best.Forward(pk); op != nil {
+					return op
+				}
+				fwd.lock.Lock()
+			}
+		}
 	}
 
-	return best.Forward(pk)
+	fwd.lock.Unlock()
+
+	return DiscardingFlowOp{}
 }
 
 func (fwd *overlaySwitchForwarder) EstablishedChannel() <-chan struct{} {
@@ -403,13 +421,17 @@ func (fwd *overlaySwitchForwarder) ControlMessage(tag byte, msg []byte) {
 }
 
 func (fwd *overlaySwitchForwarder) DisplayName() string {
+	var best OverlayForwarder
+
 	fwd.lock.Lock()
-	best := fwd.best
+	if fwd.best > 0 {
+		best = fwd.forwarders[fwd.best].fwd
+	}
 	fwd.lock.Unlock()
 
-	if best == nil {
-		return "none"
+	if best != nil {
+		return best.DisplayName()
 	}
 
-	return best.DisplayName()
+	return "none"
 }

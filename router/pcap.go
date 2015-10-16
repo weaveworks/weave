@@ -9,6 +9,8 @@ import (
 )
 
 type Pcap struct {
+	NonDiscardingFlowOp
+
 	iface *net.Interface
 	bufSz int
 
@@ -131,7 +133,7 @@ func (p *Pcap) sniff(readHandle *pcap.Handle, consumer BridgeConsumer) {
 			continue
 		}
 
-		if fop := consumer(dec.PacketKey()); fop != nil {
+		if fop := consumer(dec.PacketKey()); !fop.Discards() {
 			// We are handing over the frame to
 			// forwarders, so we need to make a copy of it
 			// in order to prevent the next capture from

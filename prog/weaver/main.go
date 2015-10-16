@@ -197,7 +197,9 @@ func main() {
 	if fastDPOverlay != nil {
 		overlays.Add("fastdp", fastDPOverlay)
 	}
-	overlays.Add("sleeve", weave.NewSleeveOverlay(config.Port))
+	sleeve := weave.NewSleeveOverlay(config.Port)
+	overlays.Add("sleeve", sleeve)
+	overlays.SetCompatOverlay(sleeve)
 	config.Overlay = overlays
 
 	if routerName == "" {

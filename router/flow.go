@@ -27,6 +27,24 @@ type FlowOp interface {
 	// The broadcast parameter is a hint whether the packet is
 	// being broadcast.
 	Process(frame []byte, dec *EthernetDecoder, broadcast bool)
+
+	// Does the FlowOp discard the packet?
+	Discards() bool
+}
+
+type DiscardingFlowOp struct{}
+
+func (DiscardingFlowOp) Process([]byte, *EthernetDecoder, bool) {
+}
+
+func (DiscardingFlowOp) Discards() bool {
+	return true
+}
+
+type NonDiscardingFlowOp struct{}
+
+func (NonDiscardingFlowOp) Discards() bool {
+	return false
 }
 
 type MultiFlowOp struct {
@@ -36,16 +54,14 @@ type MultiFlowOp struct {
 
 func NewMultiFlowOp(broadcast bool, ops ...FlowOp) *MultiFlowOp {
 	mfop := &MultiFlowOp{broadcast: broadcast}
-	mfop.Add(ops...)
+	for _, op := range ops {
+		mfop.Add(op)
+	}
 	return mfop
 }
 
-func (mfop *MultiFlowOp) Add(ops ...FlowOp) {
-	for _, op := range ops {
-		if op != nil {
-			mfop.ops = append(mfop.ops, op)
-		}
-	}
+func (mfop *MultiFlowOp) Add(op FlowOp) {
+	mfop.ops = append(mfop.ops, op)
 }
 
 func (mfop *MultiFlowOp) Process(frame []byte, dec *EthernetDecoder,
@@ -53,6 +69,16 @@ func (mfop *MultiFlowOp) Process(frame []byte, dec *EthernetDecoder,
 	for _, op := range mfop.ops {
 		op.Process(frame, dec, mfop.broadcast)
 	}
+}
+
+func (mfop *MultiFlowOp) Discards() bool {
+	for _, op := range mfop.ops {
+		if !op.Discards() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func FlattenFlowOp(fop FlowOp) []FlowOp {
