@@ -1471,18 +1471,18 @@ launch_router() {
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         ${NETHOST_OPT:+$DNS_ROUTER_OPTS} $NO_DNS_OPT \
         --docker-api "unix:///var/run/docker.sock" "$@")
+    attach_router
 }
 
 # Recreate the parameter values that are set when the router is first launched
 fetch_router_args() {
-    IPRANGE=$(docker inspect -f '{{.Args}}' $1 | grep -o -e '-ipalloc-range [^ ]*')
+    IPRANGE=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME | grep -o -e '-ipalloc-range [^ ]*')
     # This doesn't get back the right syntax, but it's enough for our purposes
-    DNS_PORT_MAPPING=$(docker inspect -f '{{with index .HostConfig.PortBindings "53/udp"}}{{.}}{{end}}' $1)
+    DNS_PORT_MAPPING=$(docker inspect -f '{{with index .HostConfig.PortBindings "53/udp"}}{{.}}{{end}}' $CONTAINER_NAME)
 }
 
 attach_router() {
-    ROUTER_CONTAINER=$1
-    with_container_netns_or_die $ROUTER_CONTAINER setup_router_iface_$BRIDGE_TYPE
+    with_container_netns_or_die $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
     err_msg=$(death_msg $CONTAINER_NAME)
     container_ip $CONTAINER_NAME "$err_msg" "$err_msg" || return 1
     wait_for_status $CONTAINER_NAME http_call $CONTAINER_IP:$HTTP_PORT
@@ -1658,22 +1658,20 @@ case "$COMMAND" in
         check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
-        attach_router $CONTAINER_NAME
         launch_proxy  $COMMON_ARGS
         ;;
     launch-router)
         deprecation_warnings "$@"
         check_not_running $CONTAINER_NAME $BASE_IMAGE
         launch_router "$@"
-        attach_router $CONTAINER_NAME
         echo $ROUTER_CONTAINER
         ;;
     attach-router)
         check_running $CONTAINER_NAME
         enforce_docker_bridge_addr_assign_type
         create_bridge
-        fetch_router_args $CONTAINER_NAME
-        attach_router $CONTAINER_NAME
+        fetch_router_args
+        attach_router
         ;;
     launch-proxy)
         deprecation_warnings "$@"
