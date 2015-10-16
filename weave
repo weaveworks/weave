@@ -645,6 +645,8 @@ router_opts_bridge () {
 setup_router_iface_fastdp() {
     if [ -n "$WEAVE_PASSWORD" ] ; then
         # See router_opts_fastdp
+        # In case there is a lingering weave2 netdev
+        ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
         connect_container_to_bridge $ROUTER_HOSTNETNS_IFNAME &&
             ip link set $ROUTER_HOSTNETNS_IFNAME up
     fi
@@ -1388,6 +1390,9 @@ launch_router() {
 stop_router() {
     stop $CONTAINER_NAME "Weave"
     conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
+    # remove the weave2 netdev in a fastdp context
+    [ -d /sys/class/net/$BRIDGE -a ! -d /sys/class/net/$BRIDGE/bridge ] \
+        && ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
 }
 
 launch_proxy() {
