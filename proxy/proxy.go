@@ -116,10 +116,16 @@ func NewProxy(c Config) (*Proxy, error) {
 
 func (proxy *Proxy) AttachExistingContainers() {
 	containers, _ := proxy.client.ListContainers(docker.ListContainersOptions{})
-	for _, cont := range containers {
-		if strings.HasPrefix(cont.Command, weaveWaitEntrypoint[0]) {
-			proxy.ContainerStarted(cont.ID)
+	for _, apiContainer := range containers {
+		container, err := proxy.client.InspectContainer(apiContainer.ID)
+		if err != nil {
+			Log.Warningf("Error inspecting container %s: %v", apiContainer.ID, err)
+			continue
 		}
+		if containerShouldAttach(container) {
+			proxy.attach(container, false)
+		}
+		proxy.notifyWaiters(container.ID)
 	}
 }
 
@@ -295,7 +301,7 @@ func (proxy *Proxy) ContainerStarted(ident string) {
 	}
 	// If this was a container we modified the entrypoint for, attach it to the network
 	if containerShouldAttach(container) {
-		proxy.attach(container)
+		proxy.attach(container, true)
 	}
 	proxy.notifyWaiters(container.ID)
 }
@@ -345,7 +351,7 @@ func (proxy *Proxy) waitForStart(r *http.Request) {
 func (proxy *Proxy) ContainerDied(ident string) {
 }
 
-func (proxy *Proxy) attach(container *docker.Container) error {
+func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
 	cidrs, err := proxy.weaveCIDRs(container.HostConfig.NetworkMode, container.Config.Env)
 	if err != nil {
 		Log.Infof("Leaving container %s alone because %s", container.ID, err)
@@ -357,7 +363,10 @@ func (proxy *Proxy) attach(container *docker.Container) error {
 	if !proxy.NoRewriteHosts {
 		args = append(args, "--rewrite-hosts")
 	}
-	args = append(args, "--or-die", container.ID)
+	if orDie {
+		args = append(args, "--or-die")
+	}
+	args = append(args, container.ID)
 	if _, stderr, err := callWeave(args...); err != nil {
 		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
 		return errors.New(string(stderr))
