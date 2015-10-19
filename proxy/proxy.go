@@ -393,7 +393,7 @@ func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
 }
 
 func (proxy *Proxy) attachRouter(container *docker.Container) error {
-	Log.Infof("Attaching weave router container:", container.ID)
+	Log.Infof("Attaching weave router container: %s", container.ID)
 	args := []string{"attach-router"}
 	if _, stderr, err := callWeave(args...); err != nil {
 		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
