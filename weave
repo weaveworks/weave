@@ -1471,6 +1471,7 @@ launch_router() {
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         ${NETHOST_OPT:+$DNS_ROUTER_OPTS} $NO_DNS_OPT \
         --docker-api "unix:///var/run/docker.sock" "$@")
+    with_container_netns_or_die $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
     attach_router
 }
 
@@ -1482,7 +1483,6 @@ fetch_router_args() {
 }
 
 attach_router() {
-    with_container_netns_or_die $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
     err_msg=$(death_msg $CONTAINER_NAME)
     container_ip $CONTAINER_NAME "$err_msg" "$err_msg" || return 1
     wait_for_status $CONTAINER_NAME http_call $CONTAINER_IP:$HTTP_PORT
@@ -1671,6 +1671,7 @@ case "$COMMAND" in
         enforce_docker_bridge_addr_assign_type
         create_bridge
         fetch_router_args
+        with_container_netns $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
         attach_router
         ;;
     launch-proxy)
