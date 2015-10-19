@@ -69,8 +69,10 @@ weave run           [--with-dns | --without-dns] [--no-rewrite-hosts]
 weave start         [<addr> ...] <container_id>
 weave attach        [<addr> ...] <container_id>
 weave detach        [<addr> ...] <container_id>
-weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>]
-weave dns-remove    [<ip_address> ...] <container_id> [-h <fqdn>]
+weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>] |
+                    <ip_address> ... -h <fqdn>
+weave dns-remove    [<ip_address> ...] <container_id> [-h <fqdn>] |
+                    <ip_address> ... -h <fqdn>
 weave dns-lookup    <unqualified_name>
 weave expose        [<addr> ...] [-h <fqdn>]
 weave hide          [<addr> ...]
@@ -1064,10 +1066,15 @@ with_container_fqdn() {
 # Register FQDN in $2 as names for addresses $3.. under full container ID $1
 put_dns_fqdn() {
     CHECK_ALIVE="-d check-alive=true"
-    if [ "$1" = "--no-check-alive" ] ; then
-        CHECK_ALIVE=
-        shift 1
-    fi
+    put_dns_fqdn_helper "$@"
+}
+
+put_dns_fqdn_no_check_alive() {
+    CHECK_ALIVE=
+    put_dns_fqdn_helper "$@"
+}
+
+put_dns_fqdn_helper() {
     CONTAINER_ID="$1"
     FQDN="$2"
     shift 2
@@ -1096,6 +1103,27 @@ delete_dns_fqdn() {
     for ADDR in "$@" ; do
         call_weave DELETE /name/$CONTAINER_ID/${ADDR%/*}?fqdn=$FQDN || true
     done
+}
+
+collect_dns_add_remove_args() {
+    collect_ip_args "$@"
+    shift $IP_COUNT
+    if [ $# -gt 0 -a "$1" != "-h" ] ; then
+        C="$1"
+        shift
+    fi
+    if [ $# -eq 2 -a "$1" = "-h" ] ; then
+        FQDN="$2"
+        shift 2
+    fi
+    [ $# -eq 0 -a \( -n "$C" -o \( $IP_COUNT -gt 0 -a -n "$FQDN" \) \) ] || usage
+    check_running $CONTAINER_NAME
+    if [ -n "$C" ] ; then
+        CONTAINER=$(container_id $C)
+        if [ $IP_COUNT -eq 0 ] ; then
+            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
+        fi
+    fi
 }
 
 ######################################################################
@@ -1785,33 +1813,25 @@ case "$COMMAND" in
         show_addrs $ALL_CIDRS
         ;;
     dns-add)
-        collect_ip_args "$@"
-        shift $IP_COUNT
-        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
-        check_running $CONTAINER_NAME
-        CONTAINER=$(container_id $1)
-        if [ $IP_COUNT -eq 0 ] ; then
-            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
+        collect_dns_add_remove_args "$@"
+        FN=put_dns_fqdn
+        if [ -z "$CONTAINER" ] ; then
+            FN=put_dns_fqdn_no_check_alive
+            CONTAINER=weave:extern
         fi
-        if [ $# -eq 1 ] ; then
-            with_container_fqdn $CONTAINER put_dns_fqdn $IP_ARGS
+        if [ -n "$FQDN" ] ; then
+            $FN $CONTAINER $FQDN $IP_ARGS
         else
-            put_dns_fqdn $CONTAINER "$3" $IP_ARGS
+            with_container_fqdn $CONTAINER $FN $IP_ARGS
         fi
         ;;
     dns-remove)
-        collect_ip_args "$@"
-        shift $IP_COUNT
-        [ $# -eq 1 -o \( $# -eq 3 -a "$2" = "-h" \) ] || usage
-        check_running $CONTAINER_NAME
-        CONTAINER=$(container_id $1)
-        if [ $IP_COUNT -eq 0 ] ; then
-            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
-        fi
-        if [ $# -eq 1 ] ; then
-            delete_dns $CONTAINER $IP_ARGS
+        collect_dns_add_remove_args "$@"
+        [ -n "$CONTAINER" ] || CONTAINER=weave:extern
+        if [ -n "$FQDN" ] ; then
+            delete_dns_fqdn $CONTAINER $FQDN $IP_ARGS
         else
-            delete_dns_fqdn $CONTAINER "$3" $IP_ARGS
+            delete_dns $CONTAINER $IP_ARGS
         fi
         ;;
     dns-lookup)
@@ -1837,7 +1857,7 @@ case "$COMMAND" in
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
                 if [ -n "$FQDN" ] ; then
-                    when_weave_running put_dns_fqdn --no-check-alive weave:expose $FQDN $CIDR
+                    when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
                 fi
             fi
         done
