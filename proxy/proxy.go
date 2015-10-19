@@ -116,9 +116,16 @@ func NewProxy(c Config) (*Proxy, error) {
 
 func (proxy *Proxy) AttachExistingContainers() {
 	containers, _ := proxy.client.ListContainers(docker.ListContainersOptions{})
-	for _, cont := range containers {
-		if strings.HasPrefix(cont.Command, weaveWaitEntrypoint[0]) {
-			proxy.ContainerStarted(cont.ID)
+	for _, c := range containers {
+		container, err := proxy.client.InspectContainer(c.ID)
+		if err != nil {
+			if _, ok := err.(*docker.NoSuchContainer); !ok {
+				Log.Warningf("unable to attach existing container %s since inspecting it failed: %v", c.ID, err)
+			}
+			continue
+		}
+		if containerShouldAttach(container) && (container.State.Running || container.State.Paused) {
+			proxy.attach(container, false)
 		}
 	}
 }
@@ -290,12 +297,14 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 func (proxy *Proxy) ContainerStarted(ident string) {
 	container, err := proxy.client.InspectContainer(ident)
 	if err != nil {
-		Log.Warningf("Error inspecting container %s: %v", ident, err)
+		if _, ok := err.(*docker.NoSuchContainer); !ok {
+			Log.Warningf("unable to attach new container %s since inspecting it failed: %v", ident, err)
+		}
 		return
 	}
 	// If this was a container we modified the entrypoint for, attach it to the network
 	if containerShouldAttach(container) {
-		proxy.attach(container)
+		proxy.attach(container, true)
 	}
 	proxy.notifyWaiters(container.ID)
 }
@@ -345,7 +354,7 @@ func (proxy *Proxy) waitForStart(r *http.Request) {
 func (proxy *Proxy) ContainerDied(ident string) {
 }
 
-func (proxy *Proxy) attach(container *docker.Container) error {
+func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
 	cidrs, err := proxy.weaveCIDRs(container.HostConfig.NetworkMode, container.Config.Env)
 	if err != nil {
 		Log.Infof("Leaving container %s alone because %s", container.ID, err)
@@ -363,7 +372,10 @@ func (proxy *Proxy) attach(container *docker.Container) error {
 			}
 		}
 	}
-	args = append(args, "--or-die", container.ID)
+	if orDie {
+		args = append(args, "--or-die")
+	}
+	args = append(args, container.ID)
 	if _, stderr, err := callWeave(args...); err != nil {
 		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
 		return errors.New(string(stderr))
