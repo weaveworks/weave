@@ -38,4 +38,10 @@ proxy docker_on $HOST1 create --name=c6 $SMALL_IMAGE $CHECK_ETHWE_UP
 proxy docker_api_on $HOST1 POST /containers/c6/start '{"NetworkMode": "container:c2", "HostConfig": {"NetworkMode": "container:c1"}}'
 check_hostconfig c6 container:c1
 
+# Start c7 with an empty HostConfig and check this removes previous parameters, but still attaches to weave
+proxy docker_on $HOST1 create --name=c7 --memory-swap -1 $SMALL_IMAGE $CHECK_ETHWE_UP
+proxy docker_api_on $HOST1 POST /containers/c7/start '{"HostConfig":{}}'
+assert "docker_on $HOST1 inspect -f '{{.HostConfig.MemorySwap}}' c7" "0"
+check_hostconfig c7 default
+
 end_suite
