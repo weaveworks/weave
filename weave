@@ -1477,8 +1477,8 @@ launch_router() {
 # Recreate the parameter values that are set when the router is first launched
 fetch_router_args() {
     CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME)
-    IPRANGE=$(echo $CONTAINER_ARGS | grep -o -e '-ipalloc-range [^ ]*')
-    NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns')
+    IPRANGE=$(echo $CONTAINER_ARGS | grep -o -e '-ipalloc-range [^ ]*') || true
+    NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
 }
 
 attach_router() {
