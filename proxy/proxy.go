@@ -116,16 +116,17 @@ func NewProxy(c Config) (*Proxy, error) {
 
 func (proxy *Proxy) AttachExistingContainers() {
 	containers, _ := proxy.client.ListContainers(docker.ListContainersOptions{})
-	for _, apiContainer := range containers {
-		container, err := proxy.client.InspectContainer(apiContainer.ID)
+	for _, c := range containers {
+		container, err := proxy.client.InspectContainer(c.ID)
 		if err != nil {
-			Log.Warningf("Error inspecting container %s: %v", apiContainer.ID, err)
+			if _, ok := err.(*docker.NoSuchContainer); !ok {
+				Log.Warningf("unable to attach existing container %s since inspecting it failed: %v", c.ID, err)
+			}
 			continue
 		}
-		if containerShouldAttach(container) {
+		if containerShouldAttach(container) && (container.State.Running || container.State.Paused) {
 			proxy.attach(container, false)
 		}
-		proxy.notifyWaiters(container.ID)
 	}
 }
 
@@ -296,7 +297,9 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 func (proxy *Proxy) ContainerStarted(ident string) {
 	container, err := proxy.client.InspectContainer(ident)
 	if err != nil {
-		Log.Warningf("Error inspecting container %s: %v", ident, err)
+		if _, ok := err.(*docker.NoSuchContainer); !ok {
+			Log.Warningf("unable to attach new container %s since inspecting it failed: %v", ident, err)
+		}
 		return
 	}
 	// If this was a container we modified the entrypoint for, attach it to the network
