@@ -673,8 +673,10 @@ router_opts_bridge() {
 setup_router_iface_fastdp() {
     if [ -n "$WEAVE_PASSWORD" ] ; then
         # See router_opts_fastdp
-        # In case there is a lingering weave2 netdev
-        ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
+        # No-op if already attached
+        if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
+            return 0
+        fi
         connect_container_to_bridge $ROUTER_HOSTNETNS_IFNAME &&
             ip link set $ROUTER_HOSTNETNS_IFNAME up
     fi
@@ -1453,6 +1455,8 @@ launch_router() {
 
     if [ "$BRIDGE_TYPE" = fastdp ] ; then
         NETHOST_OPT="--net=host"
+        # In case there is a lingering weave2 netdev
+        ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
     fi
 
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
@@ -1480,6 +1484,7 @@ fetch_router_args() {
     CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME)
     IPRANGE=$(echo $CONTAINER_ARGS | grep -o -e '-ipalloc-range [^ ]*') || true
     NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
+    WEAVE_PASSWORD=$(docker inspect -f '{{.Config.Env}}' $CONTAINER_NAME | sed -n -e 's/.*WEAVE_PASSWORD=\([^] ]*\).*/\1/p')
 }
 
 attach_router() {
