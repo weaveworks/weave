@@ -473,7 +473,7 @@ EOF
     configure_arp_cache $BRIDGE
 }
 
-init_bridge_fastdp () {
+init_bridge_fastdp() {
     # GCE has the lowest underlay network MTU we're likely to encounter on
     # a local network, at 1460 bytes.  To get the overlay MTU from that we
     # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
@@ -485,7 +485,7 @@ init_bridge_fastdp () {
     ip link set dev $BRIDGE mtu $MTU
 }
 
-init_bridge_bridge () {
+init_bridge_bridge() {
     MTU=${WEAVE_MTU:-65535}
 
     ip link add name $BRIDGE type bridge
@@ -504,11 +504,11 @@ init_bridge_bridge () {
     ip link del dev v${CONTAINER_IFNAME}du
 }
 
-ethtool_tx_off_fastdp () {
+ethtool_tx_off_fastdp() {
     true
 }
 
-ethtool_tx_off_bridge () {
+ethtool_tx_off_bridge() {
     ethtool -K $1 tx off >/dev/null
 }
 
@@ -621,11 +621,11 @@ connect_container_to_bridge() {
     fi
 }
 
-add_iface_fastdp () {
+add_iface_fastdp() {
     docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --datapath=$BRIDGE --add-datapath-iface=$1
 }
 
-add_iface_bridge () {
+add_iface_bridge() {
     ip link set $1 master $BRIDGE
 }
 
@@ -638,7 +638,7 @@ ask_version() {
     [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
 }
 
-router_opts_fastdp () {
+router_opts_fastdp() {
     if [ -z "$WEAVE_PASSWORD" ] ; then
         echo "--datapath $BRIDGE"
     else
@@ -662,7 +662,7 @@ router_opts_fastdp () {
     fi
 }
 
-router_opts_bridge () {
+router_opts_bridge() {
     echo "--iface $CONTAINER_IFNAME"
 }
 
