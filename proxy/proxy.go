@@ -59,7 +59,8 @@ type Config struct {
 
 type wait struct {
 	ident string
-	ch    chan struct{}
+	ch    chan error
+	done  bool
 }
 
 type Proxy struct {
@@ -304,11 +305,11 @@ func (proxy *Proxy) ContainerStarted(ident string) {
 	}
 	// If this was a container we modified the entrypoint for, attach it to the network
 	if containerShouldAttach(container) {
-		proxy.attach(container, true)
+		err = proxy.attach(container, true)
 	} else if containerIsWeaveRouter(container) {
-		proxy.attachRouter(container)
+		err = proxy.attachRouter(container)
 	}
-	proxy.notifyWaiters(container.ID)
+	proxy.notifyWaiters(container.ID, err)
 }
 
 func containerShouldAttach(container *docker.Container) bool {
@@ -321,8 +322,7 @@ func containerIsWeaveRouter(container *docker.Container) bool {
 
 func (proxy *Proxy) createWait(r *http.Request, ident string) {
 	proxy.Lock()
-	ch := make(chan struct{})
-	proxy.waiters[r] = &wait{ident: ident, ch: ch}
+	proxy.waiters[r] = &wait{ident: ident, ch: make(chan error, 1)}
 	proxy.Unlock()
 }
 
@@ -332,19 +332,20 @@ func (proxy *Proxy) removeWait(r *http.Request) {
 	proxy.Unlock()
 }
 
-func (proxy *Proxy) notifyWaiters(ident string) {
+func (proxy *Proxy) notifyWaiters(ident string, err error) {
 	proxy.Lock()
 	for _, wait := range proxy.waiters {
-		if ident == wait.ident && wait.ch != nil {
+		if ident == wait.ident && !wait.done {
+			wait.ch <- err
 			close(wait.ch)
-			wait.ch = nil
+			wait.done = true
 		}
 	}
 	proxy.Unlock()
 }
 
-func (proxy *Proxy) waitForStart(r *http.Request) {
-	var ch chan struct{}
+func (proxy *Proxy) waitForStart(r *http.Request) error {
+	var ch chan error
 	proxy.Lock()
 	wait, found := proxy.waiters[r]
 	if found {
@@ -353,8 +354,9 @@ func (proxy *Proxy) waitForStart(r *http.Request) {
 	proxy.Unlock()
 	if ch != nil {
 		Log.Debugf("Wait for start of container %s", wait.ident)
-		<-ch
+		return <-ch
 	}
+	return nil
 }
 
 func (proxy *Proxy) ContainerDied(ident string) {

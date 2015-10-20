@@ -53,6 +53,5 @@ func (i *startContainerInterceptor) InterceptResponse(r *http.Response) error {
 	if r.StatusCode < 200 || r.StatusCode >= 300 { // Docker didn't do the start
 		return nil
 	}
-	i.proxy.waitForStart(r.Request)
-	return nil
+	return i.proxy.waitForStart(r.Request)
 }
