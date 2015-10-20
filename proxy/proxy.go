@@ -297,19 +297,17 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 // weavedocker.ContainerObserver interface
 func (proxy *Proxy) ContainerStarted(ident string) {
 	container, err := proxy.client.InspectContainer(ident)
-	if err != nil {
-		if _, ok := err.(*docker.NoSuchContainer); !ok {
-			Log.Warningf("unable to attach new container %s since inspecting it failed: %v", ident, err)
+	if err == nil {
+		if containerShouldAttach(container) {
+			err = proxy.attach(container, true)
+		} else if containerIsWeaveRouter(container) {
+			err = proxy.attachRouter(container)
 		}
-		return
 	}
-	// If this was a container we modified the entrypoint for, attach it to the network
-	if containerShouldAttach(container) {
-		err = proxy.attach(container, true)
-	} else if containerIsWeaveRouter(container) {
-		err = proxy.attachRouter(container)
+	if _, ok := err.(*docker.NoSuchContainer); err != nil && !ok {
+		Log.Warningf("unable to attach new container %s since inspecting it failed: %v", ident, err)
 	}
-	proxy.notifyWaiters(container.ID, err)
+	proxy.notifyWaiters(ident, err)
 }
 
 func containerShouldAttach(container *docker.Container) bool {
