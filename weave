@@ -1657,6 +1657,16 @@ case "$COMMAND" in
     # intentionally undocumented since it assumes knowledge of weave
     # internals
     create-bridge)
+        # This subcommand may be run without the docker daemon, but
+        # fastdp needs to run the router container to setup the ODP
+        # bridge, hence:
+        if [ -z "$WEAVE_NO_FASTDP" ] ; then
+            cat 1>&2 <<EOF
+'weave create-bridge' is not compatible with fast data path.  Please set
+the WEAVE_NO_FASTDP environment variable.
+EOF
+            exit 1
+        fi
         create_bridge --without-ethtool
         ;;
     launch)
