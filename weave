@@ -986,12 +986,16 @@ dns_args() {
 }
 
 etc_hosts_contents() {
-    NAME=$1
+    FQDN=$1
     shift
+    NAME=${FQDN%%.*}
+    HOSTNAMES="$NAME"
+    [ "$NAME" = "$FQDN" -o "$NAME." = "$FQDN" ] || HOSTNAMES="$FQDN $HOSTNAMES"
+
     echo "# created by Weave - BEGIN"
     echo "# container hostname"
     for CIDR in $ALL_CIDRS ; do
-        echo "${CIDR%/*}    $NAME"
+        echo "${CIDR%/*}    $HOSTNAMES"
     done
     echo
     echo "# static names added with --add-host"
@@ -1014,13 +1018,13 @@ EOF
 }
 
 rewrite_etc_hosts() {
-    HOSTS_PATH_AND_NAME=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}' $CONTAINER)
-    HOSTS=${HOSTS_PATH_AND_NAME% *}
-    NAME=${HOSTS_PATH_AND_NAME#* }
+    HOSTS_PATH_AND_FQDN=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}.{{.Config.Domainname}}' $CONTAINER)
+    HOSTS=${HOSTS_PATH_AND_FQDN% *}
+    FQDN=${HOSTS_PATH_AND_FQDN#* }
     CONTAINERS_PATH=$(dirname $HOSTS)
     MNT=/container
     MNT_HOSTS=$MNT/$(basename $HOSTS)
-    CONTENTS="$(etc_hosts_contents $NAME $@)"
+    CONTENTS="$(etc_hosts_contents $FQDN $@)"
     # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
     # leaving it with valid contents...
     docker run --rm \
@@ -1052,15 +1056,13 @@ when_weave_running() {
 # the container as the first argument, the FQDN as the second argument
 # and $3.. as additional arguments
 with_container_fqdn() {
-    CONTAINER="$1"
+    CONT="$1"
     COMMAND="$2"
     shift 2
 
-    CONTAINER_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}' $CONTAINER 2>/dev/null) || return 0
-
-    if echo "$CONTAINER_FQDN" | grep -Eq '[^.]+\..+' ; then
-        $COMMAND "$CONTAINER" "$CONTAINER_FQDN" "$@"
-    fi
+    CONT_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}' $CONT 2>/dev/null) || return 0
+    CONT_NAME=${CONT_FQDN%%.*}
+    [ "$CONT_NAME" = "$CONT_FQDN" -o "$CONT_NAME." = "$CONT_FQDN" ] || $COMMAND "$CONT" "$CONT_FQDN" "$@"
 }
 
 # Register FQDN in $2 as names for addresses $3.. under full container ID $1
