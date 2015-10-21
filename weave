@@ -294,7 +294,7 @@ CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 BRIDGE=weave
 CONTAINER_IFNAME=ethwe
 # ROUTER_HOSTNETNS_IFNAME is only used for fastdp with encryption
-ROUTER_HOSTNETNS_IFNAME=weave2
+ROUTER_HOSTNETNS_IFNAME=veth-weave
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 PROXY_PORT=12375
@@ -1457,7 +1457,7 @@ launch_router() {
 
     if [ "$BRIDGE_TYPE" = fastdp ] ; then
         NETHOST_OPT="--net=host"
-        # In case there is a lingering weave2 netdev
+        # In case there is a lingering veth-weave netdev
         ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
     fi
 
@@ -1510,7 +1510,7 @@ attach_router() {
 stop_router() {
     stop $CONTAINER_NAME "Weave"
     conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
-    # remove the weave2 netdev in a fastdp context
+    # remove the veth-weave netdev in a fastdp context
     [ -d /sys/class/net/$BRIDGE -a ! -d /sys/class/net/$BRIDGE/bridge ] \
         && ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
 }
