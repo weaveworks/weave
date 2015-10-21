@@ -68,9 +68,8 @@ func (cache *MacCache) Add(mac net.HardwareAddr, peer *Peer) (bool, *Peer) {
 	return cache.add(mac, peer, false)
 }
 
-func (cache *MacCache) AddForced(mac net.HardwareAddr, peer *Peer) bool {
-	newMac, _ := cache.add(mac, peer, true)
-	return newMac
+func (cache *MacCache) AddForced(mac net.HardwareAddr, peer *Peer) (bool, *Peer) {
+	return cache.add(mac, peer, true)
 }
 
 func (cache *MacCache) Lookup(mac net.HardwareAddr) *Peer {

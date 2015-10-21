@@ -113,7 +113,7 @@ func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
 		// associated with another peer.  This probably means
 		// we are seeing a frame we injected ourself.  That
 		// shouldn't happen, but discard it just in case.
-		log.Errorln("Captured frame from MAC (", srcMac, ") associated with another peer", conflictPeer)
+		log.Error("Captured frame from MAC (", srcMac, ") associated with another peer ", conflictPeer)
 		return DiscardingFlowOp{}
 	}
 
@@ -187,8 +187,17 @@ func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
 
 	srcMac := net.HardwareAddr(key.SrcMAC[:])
 	dstMac := net.HardwareAddr(key.DstMAC[:])
-	if router.Macs.AddForced(srcMac, key.SrcPeer) {
-		log.Println("Discovered remote MAC", srcMac, "at", key.SrcPeer)
+
+	switch newSrcMac, conflictPeer := router.Macs.AddForced(srcMac, key.SrcPeer); {
+	case newSrcMac:
+		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer)
+
+	case conflictPeer != nil:
+		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer, " (was at ", conflictPeer, ")")
+
+		// We need to clear out any flows destined to the MAC
+		// that forward to the old peer.
+		router.Overlay.InvalidateRoutes()
 	}
 
 	router.PacketLogging.LogForwardPacket("Injecting", key)
