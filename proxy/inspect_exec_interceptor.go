@@ -27,7 +27,7 @@ func (i *inspectExecInterceptor) InterceptResponse(r *http.Response) error {
 		return err
 	}
 
-	if err := updateContainerNetworkSettings(container); err != nil {
+	if err := updateContainerNetworkSettings(container, i.proxy); err != nil {
 		Log.Warningf("Inspecting exec %s failed: %s", exec["Id"], err)
 	}
 

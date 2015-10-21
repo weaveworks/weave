@@ -358,6 +358,23 @@ func (proxy *Proxy) waitForStart(r *http.Request) error {
 	return nil
 }
 
+// If some other operation is waiting for a container to start, join in the wait
+func (proxy *Proxy) waitForStartByIdent(ident string) {
+	var ch chan struct{}
+	proxy.Lock()
+	for _, wait := range proxy.waiters {
+		if ident == wait.ident {
+			ch = wait.ch
+			break
+		}
+	}
+	proxy.Unlock()
+	if ch != nil {
+		Log.Debugf("Wait for start of container %s", ident)
+		<-ch
+	}
+}
+
 func (proxy *Proxy) ContainerDied(ident string) {
 }
 
