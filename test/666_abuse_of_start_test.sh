@@ -10,7 +10,7 @@ proxy_start_container $HOST1 --name=c1
 
 check_hostconfig() {
     docker_on $HOST1 attach c2 >/dev/null 2>&1 || true # Wait for container to exit
-    assert "docker_on $HOST1 inspect -f '{{.HostConfig.NetworkMode}} {{.State.Running}} {{.State.ExitCode}} {{.HostConfig.Dns}}' $1" "$2 false 0 [$docker_bridge_ip]"
+    assert "docker_on $HOST1 inspect -f '{{.HostConfig.Dns}} {{.HostConfig.NetworkMode}} {{.State.Running}} {{.State.ExitCode}}' $1" "[$docker_bridge_ip] $2 false 0"
 }
 
 # Start c2 with a sneaky HostConfig
