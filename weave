@@ -635,7 +635,7 @@ ask_version() {
                 echo "Unable to find $2 image." >&2
             fi
     fi
-    [ -n "$DOCKERIMAGE" ] && docker run --rm -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
+    [ -n "$DOCKERIMAGE" ] && docker run --rm --net=none -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
 }
 
 router_opts_fastdp() {
@@ -1033,7 +1033,7 @@ rewrite_etc_hosts() {
     CONTENTS="$(etc_hosts_contents $FQDN $@)"
     # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
     # leaving it with valid contents...
-    docker run --rm \
+    docker run --rm --net=none \
         -v $CONTAINERS_PATH:$MNT \
         --entrypoint=sh \
         $EXEC_IMAGE -c "echo '$CONTENTS' > $MNT_HOSTS && rm -f $MNT_HOSTS && echo '$CONTENTS' > $MNT_HOSTS"
@@ -1521,7 +1521,7 @@ launch_proxy() {
     # when launching the weaveproxy container.
     docker_client_args $DOCKER_CLIENT_ARGS
     proxy_args "$@"
-    HOSTS_PATH=$(docker run --rm \
+    HOSTS_PATH=$(docker run --rm --net=none \
       -v /var/run/docker.sock:/var/run/docker.sock \
       --entrypoint=/bin/sh \
       $EXEC_IMAGE -c 'docker inspect -f {{.HostsPath}} $(hostname)')
