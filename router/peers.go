@@ -327,8 +327,6 @@ func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error)
 		return nil, nil, err
 	}
 
-	ourVersion := peers.ourself.Version
-
 	// By this point, we know the update doesn't refer to any peers we
 	// have no knowledge of. We can now apply the update. Start by
 	// adding in any new peers.
@@ -347,13 +345,6 @@ func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error)
 	updateNames := make(PeerNameSet)
 	for _, peer := range decodedUpdate {
 		updateNames[peer.Name] = void
-	}
-
-	if peers.ourself.Version != ourVersion {
-		// Our short id changed, i.e. due to a short ID
-		// change.  So we need to include ourself in the
-		// update
-		newUpdate[peers.ourself.Name] = void
 	}
 
 	return updateNames, newUpdate, nil
