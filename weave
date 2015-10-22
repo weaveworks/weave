@@ -1033,7 +1033,7 @@ rewrite_etc_hosts() {
     CONTENTS="$(etc_hosts_contents $FQDN $@)"
     # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
     # leaving it with valid contents...
-    docker run --rm --net=none \
+    docker run --rm --net=none --privileged \
         -v $CONTAINERS_PATH:$MNT \
         --entrypoint=sh \
         $EXEC_IMAGE -c "echo '$CONTENTS' > $MNT_HOSTS && rm -f $MNT_HOSTS && echo '$CONTENTS' > $MNT_HOSTS"
