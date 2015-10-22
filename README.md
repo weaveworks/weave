@@ -46,6 +46,11 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
     sudo curl -L git.io/weave -o /usr/local/bin/weave
     sudo chmod a+x /usr/local/bin/weave
 
+For usage on OSX (with Docker Machine) you first need to make sure
+that a VM is running and configured, as shown in [the Docker Machine
+documentation](https://docs.docker.com/installation/mac/#from-your-shell).
+Then you can launch weave directly from the OSX host.
+
 CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing weave using cloud-config.
 
 Amazon ECS users see
@@ -102,9 +107,8 @@ The only difference, apart from the name of the application container,
 is that we tell our weave that it should peer with the weave on
 `$HOST1` (specified as the IP address or hostname, and optional
 `:port`, by which `$HOST2` can reach it). NB: if there is a firewall
-between `$HOST1` and `$HOST2`, you must open the weave port (6783 by
-default; this can be overriden by setting `WEAVE_PORT`) for TCP and
-UDP.
+between `$HOST1` and `$HOST2`, you must permit traffic to the weave
+control port (TCP 6783) and data ports (UDP 6783/6784).
 
 Note that we could instead have told the weave on `$HOST1` to connect to
 `$HOST2`, or told both about each other. Order does not matter here;
