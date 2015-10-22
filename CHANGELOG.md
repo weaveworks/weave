@@ -1,3 +1,24 @@
+## Release 1.2.0
+
+**Highlights**
+
+This release introduces the 
+[Fast Data Path](http://docs.weave.works/weave/master/head/features.html#fast-data-path),
+which allows Weave networks to operate at near wire-level speeds. This
+new feature is enabled by default.
+
+Other highlights:
+
+- auto-configuration of TLS for the Weave Docker API proxy, making it
+  easier to run Weave on Macs and in conjunction with tools like
+  Docker Swarm
+- support for restart policies on application containers and weave
+  infrastructure containers
+- better compatibility with recent and future Docker versions
+
+More details in the 
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.2.0).
+
 ## Release 1.1.2
 
 This release contains a small number of bug fixes. More details in the
