@@ -1927,8 +1927,8 @@ EOF
         ;;
     stop)
         [ $# -eq 0 ] || usage
-        stop_proxy
         stop_router
+        stop_proxy
         ;;
     stop-router)
         [ $# -eq 0 ] || usage
