@@ -1479,6 +1479,11 @@ launch_router() {
         --docker-api "unix:///var/run/docker.sock" "$@")
     with_container_netns_or_die $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
     attach_router
+
+    # let DNS traffic to weaveDNS, since otherwise it might get blocked by the likes of UFW
+    [ -n "$DNS_PORT_MAPPING" ] && \
+        add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p udp --dport 53  -j ACCEPT && \
+        add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p tcp --dport 53  -j ACCEPT
 }
 
 # Recreate the parameter values that are set when the router is first launched
@@ -1513,6 +1518,9 @@ stop_router() {
     # remove the veth-weave netdev in a fastdp context
     [ -d /sys/class/net/$BRIDGE -a ! -d /sys/class/net/$BRIDGE/bridge ] \
         && ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
+
+    delete_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p udp --dport 53  -j ACCEPT
+    delete_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p tcp --dport 53  -j ACCEPT
 }
 
 launch_proxy() {
