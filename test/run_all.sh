@@ -23,4 +23,4 @@ if [ -n "$CIRCLECI" -o -n "$PARALLEL" ]; then
     RUNNER_ARGS="$RUNNER_ARGS -parallel"
 fi
 
-HOSTS="$HOSTS" "${DIR}/../testing/runner/runner" $RUNNER_ARGS $TESTS
+HOSTS="$HOSTS" "${DIR}/../tools/runner/runner" $RUNNER_ARGS $TESTS
