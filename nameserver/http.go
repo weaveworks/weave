@@ -35,6 +35,11 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 			return
 		}
 
+		if !dns.IsSubDomain(n.domain, hostname) {
+			n.infof("Ignoring registration %s %s %s (not a subdomain of %s)", hostname, ipStr, container, n.domain)
+			return
+		}
+
 		if err := n.AddEntry(hostname, container, n.ourName, ip); err != nil {
 			n.badRequest(w, fmt.Errorf("Unable to add entry: %v", err))
 			return
