@@ -57,13 +57,13 @@ All docker commands can be run via the proxy, so it is safe to adjust
 your `DOCKER_HOST` to point at the proxy. Weave provides a convenient
 command for this:
 
-    host1$ eval "$(weave env)"
+    host1$ eval $(weave env)
     host1$ docker ps
     ...
 
 The prior settings can be restored with
 
-    host1$ eval "$(weave env --restore)"
+    host1$ eval $(weave env --restore)
 
 Alternatively, the proxy host can be set on a per-command basis with
 
@@ -194,7 +194,7 @@ ultimately be handed over to weaveDNS for registration.
 For instance, we can launch the proxy using all three flags
 
     host1$ weave launch-router && weave launch-proxy --hostname-from-label hostname-label --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
-    host1$ eval "$(weave env)"
+    host1$ eval $(weave env)
 
 Note how regexp substitution groups should be prepended with a dollar sign
 (e.g. `$1`). For further details on the regular expression syntax please see
@@ -264,7 +264,7 @@ with
 
     $ mkdir -pv ~/.docker
     $ cp -v {ca,cert,key}.pem ~/.docker
-    $ eval "$(weave env)"
+    $ eval $(weave env)
     $ export DOCKER_TLS_VERIFY=1
     $ docker version
     ...
