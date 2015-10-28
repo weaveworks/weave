@@ -315,7 +315,8 @@ func containerShouldAttach(container *docker.Container) bool {
 }
 
 func containerIsWeaveRouter(container *docker.Container) bool {
-	return len(container.Config.Entrypoint) > 0 && container.Config.Entrypoint[0] == weaveEntrypoint
+	return container.Name == weaveContainerName &&
+		len(container.Config.Entrypoint) > 0 && container.Config.Entrypoint[0] == weaveEntrypoint
 }
 
 func (proxy *Proxy) createWait(r *http.Request, ident string) {
