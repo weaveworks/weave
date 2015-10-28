@@ -48,7 +48,7 @@ func TestMerge(t *testing.T) {
 		Entry{Hostname: "F"},
 	}
 
-	diff := e1.merge(e2)
+	diff := e1.merge(e2, insensitiveLess)
 	expectedDiff := Entries{
 		Entry{Hostname: "B"},
 		Entry{Hostname: "E"},
@@ -65,17 +65,17 @@ func TestMerge(t *testing.T) {
 	}
 	require.Equal(t, expected, e1)
 
-	diff = e1.merge(e1)
+	diff = e1.merge(e1, insensitiveLess)
 	require.Equal(t, Entries{}, diff)
 }
 
 func TestOldMerge(t *testing.T) {
 	e1 := Entries{Entry{Hostname: "A", Version: 0}}
-	diff := e1.merge(Entries{Entry{Hostname: "A", Version: 1}})
+	diff := e1.merge(Entries{Entry{Hostname: "A", Version: 1}}, insensitiveLess)
 	require.Equal(t, Entries{Entry{Hostname: "A", Version: 1}}, diff)
 	require.Equal(t, Entries{Entry{Hostname: "A", Version: 1}}, e1)
 
-	diff = e1.merge(Entries{Entry{Hostname: "A", Version: 0}})
+	diff = e1.merge(Entries{Entry{Hostname: "A", Version: 0}}, insensitiveLess)
 	require.Equal(t, Entries{}, diff)
 	require.Equal(t, Entries{Entry{Hostname: "A", Version: 1}}, e1)
 }

@@ -35,13 +35,13 @@ type SortableEntries interface {
 func (es CaseSensitive) Len() int           { return len(es) }
 func (es CaseSensitive) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
 func (es CaseSensitive) Get(i int) Entry    { return es[i] }
-func (es CaseSensitive) Less(i, j int) bool { return es[i].less(&es[j]) }
+func (es CaseSensitive) Less(i, j int) bool { return sensitiveLess(&es[i], &es[j]) }
 
 // ... but we store entries in a case insensitive order.
 func (es CaseInsensitive) Len() int           { return len(es) }
 func (es CaseInsensitive) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
 func (es CaseInsensitive) Get(i int) Entry    { return es[i] }
-func (es CaseInsensitive) Less(i, j int) bool { return es[i].insensitiveLess(&es[j]) }
+func (es CaseInsensitive) Less(i, j int) bool { return insensitiveLess(&es[i], &es[j]) }
 
 func (e1 Entry) equal(e2 Entry) bool {
 	return e1.ContainerID == e2.ContainerID &&
@@ -50,7 +50,7 @@ func (e1 Entry) equal(e2 Entry) bool {
 		e1.Hostname == e2.Hostname
 }
 
-func (e1 *Entry) less(e2 *Entry) bool {
+func sensitiveLess(e1, e2 *Entry) bool {
 	// Entries are kept sorted by Hostname, Origin, ContainerID then address
 	switch {
 	case e1.Hostname != e2.Hostname:
@@ -67,7 +67,7 @@ func (e1 *Entry) less(e2 *Entry) bool {
 	}
 }
 
-func (e1 *Entry) insensitiveLess(e2 *Entry) bool {
+func insensitiveLess(e1, e2 *Entry) bool {
 	// Entries are kept sorted by Hostname, Origin, ContainerID then address
 	e1Hostname, e2Hostname := strings.ToLower(e1.Hostname), strings.ToLower(e2.Hostname)
 	switch {
@@ -128,7 +128,7 @@ func (es *Entries) add(hostname, containerid string, origin router.PeerName, add
 
 	entry := Entry{Hostname: hostname, Origin: origin, ContainerID: containerid, Addr: addr}
 	i := sort.Search(len(*es), func(i int) bool {
-		return !(*es)[i].insensitiveLess(&entry)
+		return !insensitiveLess(&(*es)[i], &entry)
 	})
 	if i < len(*es) && (*es)[i].equal(entry) {
 		if (*es)[i].Tombstone > 0 {
@@ -143,14 +143,15 @@ func (es *Entries) add(hostname, containerid string, origin router.PeerName, add
 	return (*es)[i]
 }
 
-func (es *Entries) merge(incoming Entries) Entries {
-	defer es.checkAndPanic().checkAndPanic()
+func (es *Entries) merge(incoming Entries, comp func(e1, e2 *Entry) bool) Entries {
+	// TODO(twilkie) figure out how to apply the comp function to the aseert.
+	// defer es.checkAndPanic().checkAndPanic()
 
 	newEntries := Entries{}
 	i := 0
 
 	for _, entry := range incoming {
-		for i < len(*es) && (*es)[i].insensitiveLess(&entry) {
+		for i < len(*es) && comp(&(*es)[i], &entry) {
 			i++
 		}
 		if i < len(*es) && (*es)[i].equal(entry) {
@@ -236,7 +237,7 @@ func (g *GossipData) Merge(o router.GossipData) {
 	checkAndPanic(CaseSensitive(g.Entries))
 	defer func() { checkAndPanic(CaseSensitive(g.Entries)) }()
 	other := o.(*GossipData)
-	g.Entries.merge(other.Entries)
+	g.Entries.merge(other.Entries, sensitiveLess)
 	if g.Timestamp < other.Timestamp {
 		g.Timestamp = other.Timestamp
 	}
