@@ -225,8 +225,12 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 		})
 	}
 
-	newEntries := n.entries.merge(gossip.Entries)
+	newEntries := n.entries.merge(gossip.Entries, insensitiveLess)
+
+	// We need to return data CASE SENSITIVE, as it may be broadcast on
+	sort.Sort(CaseSensitive(gossip.Entries))
 	if len(newEntries) > 0 {
+		sort.Sort(CaseSensitive(newEntries))
 		return &GossipData{Entries: newEntries, Timestamp: now()}, &gossip, nil
 	}
 	return nil, &gossip, nil
