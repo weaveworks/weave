@@ -18,7 +18,7 @@ import (
 func startServer(t *testing.T, upstream *dns.ClientConfig) (*DNSServer, *Nameserver, int, int) {
 	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
-	nameserver := New(peername, nil, "")
+	nameserver := New(peername, "", func(router.PeerName) bool { return true })
 	dnsserver, err := NewDNSServer(nameserver, "weave.local.", "0.0.0.0:0", "", 30, 5*time.Second)
 	require.Nil(t, err)
 	udpPort := dnsserver.servers[0].PacketConn.LocalAddr().(*net.UDPAddr).Port

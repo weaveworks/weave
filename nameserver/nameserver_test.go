@@ -17,13 +17,17 @@ import (
 	"github.com/weaveworks/weave/testing/gossip"
 )
 
+func makeNameserver(name router.PeerName) *Nameserver {
+	return New(name, "", func(router.PeerName) bool { return true })
+}
+
 func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
 	gossipRouter := gossip.NewTestRouter(0.0)
 	nameservers := make([]*Nameserver, size)
 
 	for i := 0; i < size; i++ {
 		name, _ := router.PeerNameFromString(fmt.Sprintf("%02d:00:00:02:00:00", i))
-		nameserver := New(name, nil, "")
+		nameserver := makeNameserver(name)
 		nameserver.SetGossip(gossipRouter.Connect(nameserver.ourName, nameserver))
 		nameserver.Start()
 		nameservers[i] = nameserver
@@ -205,7 +209,7 @@ func testNameservers(t *testing.T) {
 func TestContainerAndPeerDeath(t *testing.T) {
 	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
-	nameserver := New(peername, nil, "")
+	nameserver := makeNameserver(peername)
 
 	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Nil(t, err)
@@ -218,7 +222,7 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
-	nameserver.PeerGone(&router.Peer{Name: peername})
+	nameserver.PeerGone(peername)
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
 }
 
@@ -229,7 +233,7 @@ func TestTombstoneDeletion(t *testing.T) {
 
 	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
-	nameserver := New(peername, nil, "")
+	nameserver := makeNameserver(peername)
 
 	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Nil(t, err)

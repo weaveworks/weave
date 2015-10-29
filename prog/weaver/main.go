@@ -264,7 +264,11 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		ns = nameserver.New(router.Ourself.Peer.Name, router.Peers, dnsDomain)
+		isKnownPeer := func(name weave.PeerName) bool {
+			return router.Peers.Fetch(name) != nil
+		}
+		ns = nameserver.New(router.Ourself.Peer.Name, dnsDomain, isKnownPeer)
+		router.Peers.OnGC(func(peer *weave.Peer) { ns.PeerGone(peer.Name) })
 		ns.SetGossip(router.NewGossip("nameserver", ns))
 		observeContainers(ns)
 		ns.Start()

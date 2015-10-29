@@ -37,25 +37,21 @@ const (
 // - Update is O(n) for now
 type Nameserver struct {
 	sync.RWMutex
-	ourName router.PeerName
-	domain  string
-	gossip  router.Gossip
-	entries Entries
-	peers   *router.Peers
-	quit    chan struct{}
+	ourName     router.PeerName
+	domain      string
+	gossip      router.Gossip
+	entries     Entries
+	isKnownPeer func(router.PeerName) bool
+	quit        chan struct{}
 }
 
-func New(ourName router.PeerName, peers *router.Peers, domain string) *Nameserver {
-	ns := &Nameserver{
-		ourName: ourName,
-		domain:  dns.Fqdn(domain),
-		peers:   peers,
-		quit:    make(chan struct{}),
+func New(ourName router.PeerName, domain string, isKnownPeer func(router.PeerName) bool) *Nameserver {
+	return &Nameserver{
+		ourName:     ourName,
+		domain:      dns.Fqdn(domain),
+		isKnownPeer: isKnownPeer,
+		quit:        make(chan struct{}),
 	}
-	if peers != nil {
-		peers.OnGC(ns.PeerGone)
-	}
-	return ns
 }
 
 func (n *Nameserver) SetGossip(gossip router.Gossip) {
@@ -147,12 +143,12 @@ func (n *Nameserver) ContainerDied(ident string) {
 	}
 }
 
-func (n *Nameserver) PeerGone(peer *router.Peer) {
+func (n *Nameserver) PeerGone(peer router.PeerName) {
 	n.infof("peer %s gone", peer.String())
 	n.Lock()
 	defer n.Unlock()
 	n.entries.filter(func(e *Entry) bool {
-		return e.Origin != peer.Name
+		return e.Origin != peer
 	})
 }
 
@@ -219,11 +215,9 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 	n.Lock()
 	defer n.Unlock()
 
-	if n.peers != nil {
-		gossip.Entries.filter(func(e *Entry) bool {
-			return n.peers.Fetch(e.Origin) != nil
-		})
-	}
+	gossip.Entries.filter(func(e *Entry) bool {
+		return n.isKnownPeer(e.Origin)
+	})
 
 	newEntries := n.entries.merge(gossip.Entries)
 	if len(newEntries) > 0 {
