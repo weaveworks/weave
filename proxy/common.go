@@ -155,3 +155,25 @@ func weaveContainerIPs(containerID string) (mac string, ips []net.IP, nets []*ne
 	}
 	return
 }
+
+func addVolume(hostConfig jsonObject, source, target, mode string) error {
+	configBinds, err := hostConfig.StringArray("Binds")
+	if err != nil {
+		return err
+	}
+
+	var binds []string
+	for _, bind := range configBinds {
+		s := strings.Split(bind, ":")
+		if len(s) >= 2 && s[1] == target {
+			continue
+		}
+		binds = append(binds, bind)
+	}
+	bind := source + ":" + target
+	if mode != "" {
+		bind += ":" + mode
+	}
+	hostConfig["Binds"] = append(binds, bind)
+	return nil
+}

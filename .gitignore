@@ -39,6 +39,7 @@ prog/weavehosts/weavehosts
 prog/weaveproxy/weaveproxy
 prog/sigproxy/sigproxy
 prog/weavewait/weavewait
+prog/weavewait/weavewait_noop
 prog/netcheck/netcheck
 prog/docker_tls_args/docker_tls_args
 testing/cover/cover
@@ -52,6 +53,7 @@ prog/weaveexec/weave
 prog/weaveexec/weavehosts
 prog/weaveexec/weaveproxy
 prog/weaveexec/weavewait
+prog/weaveexec/weavewait_noop
 prog/weaveexec/sigproxy
 prog/weaveexec/netcheck
 prog/weaveexec/docker_tls_args
