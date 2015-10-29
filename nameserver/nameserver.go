@@ -196,7 +196,6 @@ func (n *Nameserver) Gossip() router.GossipData {
 		Timestamp: now(),
 	}
 	copy(gossip.Entries, n.entries)
-	sort.Sort(CaseSensitive(gossip.Entries))
 	return gossip
 }
 
