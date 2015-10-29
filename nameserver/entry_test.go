@@ -130,3 +130,31 @@ func TestLookup(t *testing.T) {
 	}
 	require.Equal(t, have, want)
 }
+
+func TestGossipDataMerge(t *testing.T) {
+	g1 := GossipData{Entries: Entries{
+		Entry{Hostname: "A"},
+		Entry{Hostname: "c"},
+		Entry{Hostname: "D"},
+		Entry{Hostname: "f"},
+	}}
+
+	g2 := GossipData{Entries: Entries{
+		Entry{Hostname: "B"},
+		Entry{Hostname: "E"},
+		Entry{Hostname: "f"},
+	}}
+
+	g1.Merge(&g2)
+
+	expected := GossipData{Entries: Entries{
+		Entry{Hostname: "A"},
+		Entry{Hostname: "B"},
+		Entry{Hostname: "c"},
+		Entry{Hostname: "D"},
+		Entry{Hostname: "E"},
+		Entry{Hostname: "f"},
+	}}
+
+	require.Equal(t, expected, g1)
+}
