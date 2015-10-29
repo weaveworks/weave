@@ -31,7 +31,7 @@ sleep 1
 check_attached
 
 # Restart docker itself, using different commands for systemd- and upstart-managed.
-run_on $HOST1 sh -c "command -v systemctl >/dev/null && sudo systemctl restart docker || sudo service docker restart"
+run_on $HOST1 sh -c "systemctl=\$(command -v systemctl) && sudo \$systemctl restart docker || sudo service docker restart"
 sleep 10
 check_attached
 
