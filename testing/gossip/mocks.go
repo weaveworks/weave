@@ -97,7 +97,7 @@ type TestRouterClient struct {
 }
 
 func (grouter *TestRouter) run(sender router.PeerName, gossiper router.Gossiper, gossipChan chan interface{}) {
-	gossipTimer := time.Tick(10 * time.Second)
+	gossipTimer := time.Tick(2 * time.Second)
 	for {
 		select {
 		case gossip := <-gossipChan:

@@ -1,10 +1,7 @@
 package nameserver
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -192,7 +189,6 @@ func (n *Nameserver) Gossip() router.GossipData {
 		Timestamp: now(),
 	}
 	copy(gossip.Entries, n.entries)
-	sort.Sort(CaseSensitive(gossip.Entries))
 	return gossip
 }
 
@@ -202,15 +198,12 @@ func (n *Nameserver) OnGossipUnicast(sender router.PeerName, msg []byte) error {
 
 func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.GossipData, error) {
 	var gossip GossipData
-	if err := gob.NewDecoder(bytes.NewReader(msg)).Decode(&gossip); err != nil {
+	if err := gossip.Decode(msg); err != nil {
 		return nil, nil, err
 	}
-
 	if delta := gossip.Timestamp - now(); delta > gossipWindow || delta < -gossipWindow {
 		return nil, nil, fmt.Errorf("clock skew of %d detected", delta)
 	}
-
-	sort.Sort(CaseInsensitive(gossip.Entries))
 
 	n.Lock()
 	defer n.Unlock()

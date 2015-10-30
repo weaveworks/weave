@@ -87,6 +87,10 @@ func testNameservers(t *testing.T) {
 	lookupTimeout := 10 // ms
 	nameservers, grouter := makeNetwork(50)
 	defer stopNetwork(nameservers, grouter)
+	// This subset will sometimes lose touch with some of the others
+	badNameservers := nameservers[45:]
+	// This subset will remain well-connected, and we will deal mainly with them
+	nameservers = nameservers[:45]
 	nameserversByName := map[router.PeerName]*Nameserver{}
 	for _, n := range nameservers {
 		nameserversByName[n.ourName] = n
@@ -110,7 +114,13 @@ func testNameservers(t *testing.T) {
 	addMapping := func() {
 		nameserver := nameservers[rand.Intn(len(nameservers))]
 		addr := address.Address(rand.Int31())
-		hostname := fmt.Sprintf("hostname%d", rand.Int63())
+		// Create a hostname which has some upper and lowercase letters,
+		// and a unique number so we don't have to check if we allocated it already
+		randomBits := rand.Int63()
+		firstLetter := 'H' + (randomBits&1)*32
+		secondLetter := 'O' + (randomBits&2)*16
+		randomBits = randomBits >> 2
+		hostname := fmt.Sprintf("%c%cstname%d", firstLetter, secondLetter, randomBits)
 		mapping := mapping{hostname, []pair{{nameserver.ourName, addr}}}
 		mappings = append(mappings, mapping)
 
@@ -131,6 +141,12 @@ func testNameservers(t *testing.T) {
 
 		require.Nil(t, nameserver.AddEntry(mapping.hostname, "", nameserver.ourName, addr))
 		check(nameserver, mapping)
+	}
+
+	loseConnection := func() {
+		nameserver1 := badNameservers[rand.Intn(len(badNameservers))]
+		nameserver2 := nameservers[rand.Intn(len(nameservers))]
+		nameserver1.PeerGone(&router.Peer{Name: nameserver2.ourName})
 	}
 
 	deleteMapping := func() {
@@ -195,7 +211,10 @@ func testNameservers(t *testing.T) {
 		case 0.2 <= r && r < 0.3:
 			deleteMapping()
 
-		case 0.3 <= r && r < 0.9:
+		case 0.3 <= r && r < 0.35:
+			loseConnection()
+
+		case 0.35 <= r && r < 0.9:
 			doLookup()
 
 		case 0.9 <= r:

@@ -145,6 +145,7 @@ func (es *Entries) add(hostname, containerid string, origin router.PeerName, add
 
 func (es *Entries) merge(incoming Entries) Entries {
 	defer es.checkAndPanic().checkAndPanic()
+	incoming.checkAndPanic()
 
 	newEntries := Entries{}
 	i := 0
@@ -233,8 +234,6 @@ type GossipData struct {
 }
 
 func (g *GossipData) Merge(o router.GossipData) {
-	checkAndPanic(CaseSensitive(g.Entries))
-	defer func() { checkAndPanic(CaseSensitive(g.Entries)) }()
 	other := o.(*GossipData)
 	g.Entries.merge(other.Entries)
 	if g.Timestamp < other.Timestamp {
@@ -242,10 +241,22 @@ func (g *GossipData) Merge(o router.GossipData) {
 	}
 }
 
+func (g *GossipData) Decode(msg []byte) error {
+	if err := gob.NewDecoder(bytes.NewReader(msg)).Decode(g); err != nil {
+		return err
+	}
+
+	sort.Sort(CaseInsensitive(g.Entries))
+	return nil
+}
+
 func (g *GossipData) Encode() [][]byte {
-	checkAndPanic(CaseSensitive(g.Entries))
+	// Make a copy so we can sort: all outgoing data is sent in case-sensitive order
+	g2 := GossipData{Timestamp: g.Timestamp, Entries: make(Entries, len(g.Entries))}
+	copy(g2.Entries, g.Entries)
+	sort.Sort(CaseSensitive(g2.Entries))
 	buf := &bytes.Buffer{}
-	if err := gob.NewEncoder(buf).Encode(g); err != nil {
+	if err := gob.NewEncoder(buf).Encode(g2); err != nil {
 		panic(err)
 	}
 	return [][]byte{buf.Bytes()}
