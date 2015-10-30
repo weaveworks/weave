@@ -145,6 +145,7 @@ func (es *Entries) add(hostname, containerid string, origin router.PeerName, add
 
 func (es *Entries) merge(incoming Entries) Entries {
 	defer es.checkAndPanic().checkAndPanic()
+	incoming.checkAndPanic()
 
 	newEntries := Entries{}
 	i := 0
@@ -233,8 +234,6 @@ type GossipData struct {
 }
 
 func (g *GossipData) Merge(o router.GossipData) {
-	checkAndPanic(CaseInsensitive(g.Entries))
-	defer func() { checkAndPanic(CaseInsensitive(g.Entries)) }()
 	other := o.(*GossipData)
 	g.Entries.merge(other.Entries)
 	if g.Timestamp < other.Timestamp {
