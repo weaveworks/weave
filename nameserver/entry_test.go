@@ -9,6 +9,14 @@ import (
 	"github.com/weaveworks/weave/router"
 )
 
+func makeEntries(values string) Entries {
+	entries := make(Entries, len(values))
+	for i, c := range values {
+		entries[i] = Entry{Hostname: string(c)}
+	}
+	return entries
+}
+
 func TestAdd(t *testing.T) {
 	oldNow := now
 	defer func() { now = oldNow }()
@@ -35,35 +43,13 @@ func TestAdd(t *testing.T) {
 }
 
 func TestMerge(t *testing.T) {
-	e1 := Entries{
-		Entry{Hostname: "A"},
-		Entry{Hostname: "C"},
-		Entry{Hostname: "D"},
-		Entry{Hostname: "F"},
-	}
-
-	e2 := Entries{
-		Entry{Hostname: "B"},
-		Entry{Hostname: "E"},
-		Entry{Hostname: "F"},
-	}
+	e1 := makeEntries("ACDF")
+	e2 := makeEntries("BEF")
 
 	diff := e1.merge(e2)
-	expectedDiff := Entries{
-		Entry{Hostname: "B"},
-		Entry{Hostname: "E"},
-	}
-	require.Equal(t, expectedDiff, diff)
 
-	expected := Entries{
-		Entry{Hostname: "A"},
-		Entry{Hostname: "B"},
-		Entry{Hostname: "C"},
-		Entry{Hostname: "D"},
-		Entry{Hostname: "E"},
-		Entry{Hostname: "F"},
-	}
-	require.Equal(t, expected, e1)
+	require.Equal(t, makeEntries("BE"), diff)
+	require.Equal(t, makeEntries("ABCDEF"), e1)
 
 	diff = e1.merge(e1)
 	require.Equal(t, Entries{}, diff)
@@ -85,10 +71,7 @@ func TestTombstone(t *testing.T) {
 	defer func() { now = oldNow }()
 	now = func() int64 { return 1234 }
 
-	es := Entries{
-		Entry{Hostname: "A"},
-		Entry{Hostname: "B"},
-	}
+	es := makeEntries("AB")
 
 	es.tombstone(router.UnknownPeerName, func(e *Entry) bool {
 		return e.Hostname == "B"
@@ -101,18 +84,12 @@ func TestTombstone(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	es := Entries{
-		Entry{Hostname: "A"},
-		Entry{Hostname: "B"},
-	}
+	es := makeEntries("AB")
 
 	es.filter(func(e *Entry) bool {
 		return e.Hostname != "A"
 	})
-	expected := Entries{
-		Entry{Hostname: "B"},
-	}
-	require.Equal(t, expected, es)
+	require.Equal(t, makeEntries("B"), es)
 }
 
 func TestLookup(t *testing.T) {
@@ -132,29 +109,10 @@ func TestLookup(t *testing.T) {
 }
 
 func TestGossipDataMerge(t *testing.T) {
-	g1 := GossipData{Entries: Entries{
-		Entry{Hostname: "A"},
-		Entry{Hostname: "c"},
-		Entry{Hostname: "D"},
-		Entry{Hostname: "f"},
-	}}
-
-	g2 := GossipData{Entries: Entries{
-		Entry{Hostname: "B"},
-		Entry{Hostname: "E"},
-		Entry{Hostname: "f"},
-	}}
+	g1 := GossipData{Entries: makeEntries("AcDf")}
+	g2 := GossipData{Entries: makeEntries("BEf")}
 
 	g1.Merge(&g2)
 
-	expected := GossipData{Entries: Entries{
-		Entry{Hostname: "A"},
-		Entry{Hostname: "B"},
-		Entry{Hostname: "c"},
-		Entry{Hostname: "D"},
-		Entry{Hostname: "E"},
-		Entry{Hostname: "f"},
-	}}
-
-	require.Equal(t, expected, g1)
+	require.Equal(t, GossipData{Entries: makeEntries("ABcDEf")}, g1)
 }
