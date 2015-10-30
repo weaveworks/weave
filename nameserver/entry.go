@@ -241,6 +241,15 @@ func (g *GossipData) Merge(o router.GossipData) {
 	}
 }
 
+func (g *GossipData) Decode(msg []byte) error {
+	if err := gob.NewDecoder(bytes.NewReader(msg)).Decode(g); err != nil {
+		return err
+	}
+
+	sort.Sort(CaseInsensitive(g.Entries))
+	return nil
+}
+
 func (g *GossipData) Encode() [][]byte {
 	// Make a copy so we can sort: all outgoing data is sent in case-sensitive order
 	g2 := GossipData{Timestamp: g.Timestamp, Entries: make(Entries, len(g.Entries))}
