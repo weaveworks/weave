@@ -60,6 +60,6 @@ export DEBIAN_FRONTEND=noninteractive
 /etc/init.d/puppet stop
 apt-get -qq remove puppet chef
 apt-get -qq autoremove
-killall -9 chef-client
+killall -9 chef-client 2>/dev/null || true
 SCRIPT
 end
