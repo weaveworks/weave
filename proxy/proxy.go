@@ -358,6 +358,24 @@ func (proxy *Proxy) waitForStart(r *http.Request) error {
 	return nil
 }
 
+// If some other operation is waiting for a container to start, join in the wait
+func (proxy *Proxy) waitForStartByIdent(ident string) error {
+	var ch chan error
+	proxy.Lock()
+	for _, wait := range proxy.waiters {
+		if ident == wait.ident && !wait.done {
+			ch = wait.ch
+			break
+		}
+	}
+	proxy.Unlock()
+	if ch != nil {
+		Log.Debugf("Wait for start of container %s", ident)
+		return <-ch
+	}
+	return nil
+}
+
 func (proxy *Proxy) ContainerDied(ident string) {
 }
 
@@ -494,4 +512,28 @@ func (proxy *Proxy) getDNSDomain() (domain string) {
 	}
 
 	return string(b)
+}
+
+func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
+	containerID, err := container.String("Id")
+	if err != nil {
+		return err
+	}
+
+	if err := proxy.waitForStartByIdent(containerID); err != nil {
+		return err
+	}
+	mac, ips, nets, err := weaveContainerIPs(containerID)
+	if err != nil || len(ips) == 0 {
+		return err
+	}
+
+	networkSettings, err := container.Object("NetworkSettings")
+	if err != nil {
+		return err
+	}
+	networkSettings["MacAddress"] = mac
+	networkSettings["IPAddress"] = ips[0].String()
+	networkSettings["IPPrefixLen"], _ = nets[0].Mask.Size()
+	return nil
 }
