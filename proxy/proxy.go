@@ -512,3 +512,25 @@ func (proxy *Proxy) getDNSDomain() (domain string) {
 
 	return string(b)
 }
+
+func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
+	containerID, err := container.String("Id")
+	if err != nil {
+		return err
+	}
+
+	proxy.waitForStartByIdent(containerID)
+	mac, ips, nets, err := weaveContainerIPs(containerID)
+	if err != nil || len(ips) == 0 {
+		return err
+	}
+
+	networkSettings, err := container.Object("NetworkSettings")
+	if err != nil {
+		return err
+	}
+	networkSettings["MacAddress"] = mac
+	networkSettings["IPAddress"] = ips[0].String()
+	networkSettings["IPPrefixLen"], _ = nets[0].Mask.Size()
+	return nil
+}
