@@ -1,0 +1,63 @@
+#!/bin/bash
+# Rebuild a cached docker image if the input files have changed.
+# Usage: ./rebuild-image <image name> <image dir> <image files...>
+
+set -eux
+
+IMAGENAME=$1
+SAVEDNAME=$(echo $IMAGENAME | sed "s/[\/\-]/\./g")
+IMAGEDIR=$2
+shift 2
+
+INPUTFILES=$@
+CACHEDIR=$HOME/docker/
+
+# Rebuild the image
+rebuild() {
+    mkdir -p $CACHEDIR
+    rm $CACHEDIR/$SAVEDNAME* || true
+    docker build -t $IMAGENAME $IMAGEDIR
+	docker save $IMAGENAME:latest > $CACHEDIR/$SAVEDNAME-$CIRCLE_SHA1
+}
+
+# Get the revision the cached image was build at
+cached_image_rev() {
+	find $CACHEDIR -name "$SAVEDNAME-*" -type f | sed 's/[^\-]*\-//'
+}
+
+# Have there been any revision beween $1 and $2
+has_changes() {
+	local rev1=$1
+	local rev2=$2
+	local changes=$(git log --oneline $rev1..$rev2 -- $INPUTFILES | wc -l)
+	[ "$changes" -gt 0 ]
+}
+
+commit_timestamp() {
+	local rev=$1
+	git show -s --format=%ct $rev
+}
+
+cached_revision=$(cached_image_rev)
+if [ -z "$cached_revision" ]; then
+	echo ">>> No cached image found; rebuilding"
+	rebuild
+	exit 0
+fi
+
+echo ">>> Found cached image rev $cached_revision"
+if has_changes $cached_revision $CIRCLE_SHA1 ; then
+	echo ">>> Found changes, rebuilding"
+	rebuild
+	exit 0
+fi
+
+if [ "$(commit_timestamp $cached_revision)" -lt "$(( $(date +%s) - 86400 ))" ]; then
+	echo ">>> Image is more the 24hrs old; rebuilding"
+	rebuild
+	exit 0
+fi
+
+# we didn't rebuild; import cached version
+echo ">>> No changes found, importing cached image"
+docker load -i $CACHEDIR/$SAVEDNAME-$cached_revision
