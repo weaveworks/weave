@@ -56,10 +56,11 @@ type Allocator struct {
 	paxosTicker      *time.Ticker
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
 	now              func() time.Time
+	namesFunc        func() map[router.PeerName]struct{}
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint) *Allocator {
+func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint, names func() map[router.PeerName]struct{}) *Allocator {
 	return &Allocator{
 		ourName:   ourName,
 		universe:  universe,
@@ -68,6 +69,7 @@ func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname st
 		paxos:     paxos.NewNode(ourName, ourUID, quorum),
 		nicknames: map[router.PeerName]string{ourName: ourNickname},
 		now:       time.Now,
+		namesFunc: names,
 	}
 }
 
@@ -282,7 +284,17 @@ func (alloc *Allocator) Shutdown() {
 		alloc.shuttingDown = true
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
-		if heir := alloc.ring.PickPeerForTransfer(); heir != router.UnknownPeerName {
+		heir := alloc.ring.PickPeerForTransfer()
+		if heir == router.UnknownPeerName && alloc.namesFunc != nil {
+			// No peers in the ring; pick one via the function we were given at init
+			for peerName := range alloc.namesFunc() {
+				if peerName != alloc.ourName {
+					heir = peerName
+					break
+				}
+			}
+		}
+		if heir != router.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
