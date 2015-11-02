@@ -13,7 +13,6 @@ import (
 	"github.com/davecheney/profile"
 	"github.com/docker/docker/pkg/mflag"
 	"github.com/gorilla/mux"
-	"github.com/weaveworks/go-odp/odp"
 
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
@@ -119,8 +118,12 @@ func main() {
 		os.Exit(0)
 
 	case createDatapath:
-		err := weave.CreateDatapath(datapathName)
-		if odp.IsKernelLacksODPError(err) {
+		err, odp_supported := weave.CreateDatapath(datapathName)
+		if !odp_supported {
+			if err != nil {
+				Log.Error(err)
+			}
+
 			// When the kernel lacks ODP support, exit
 			// with a special status to distinguish it for
 			// the weave script.
