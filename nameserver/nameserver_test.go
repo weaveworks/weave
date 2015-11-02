@@ -260,14 +260,14 @@ func TestTombstoneDeletion(t *testing.T) {
 	err = nameserver.Delete("hostname", "containerid", "", address.Address(0))
 	require.Nil(t, err)
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
-	require.Equal(t, Entries{{
+	require.Equal(t, l(Entries{Entry{
 		ContainerID: "containerid",
 		Origin:      peername,
 		Addr:        address.Address(0),
 		Hostname:    "hostname",
 		Version:     1,
 		Tombstone:   1234,
-	}}, nameserver.entries)
+	}}), nameserver.entries)
 
 	now = func() int64 { return 1234 + int64(tombstoneTimeout/time.Second) + 1 }
 	nameserver.deleteTombstones()

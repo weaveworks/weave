@@ -18,7 +18,8 @@ type Entry struct {
 	ContainerID string
 	Origin      router.PeerName
 	Addr        address.Address
-	Hostname    string
+	Hostname    string // as supplied
+	lHostname   string // lowercased (not exported, so not encoded by gob)
 	Version     int
 	Tombstone   int64 // timestamp of when it was deleted
 }
@@ -69,7 +70,7 @@ func (e1 *Entry) less(e2 *Entry) bool {
 
 func (e1 *Entry) insensitiveLess(e2 *Entry) bool {
 	// Entries are kept sorted by Hostname, Origin, ContainerID then address
-	e1Hostname, e2Hostname := strings.ToLower(e1.Hostname), strings.ToLower(e2.Hostname)
+	e1Hostname, e2Hostname := e1.lHostname, e2.lHostname
 	switch {
 	case e1Hostname != e2Hostname:
 		return e1Hostname < e2Hostname
@@ -100,6 +101,10 @@ func (e1 *Entry) String() string {
 	return fmt.Sprintf("%s -> %s", e1.Hostname, e1.Addr.String())
 }
 
+func (e1 *Entry) addLowercase() {
+	e1.lHostname = strings.ToLower(e1.Hostname)
+}
+
 func check(es SortableEntries) error {
 	if !sort.IsSorted(es) {
 		return fmt.Errorf("Not sorted!")
@@ -126,7 +131,8 @@ func (es *Entries) checkAndPanic() *Entries {
 func (es *Entries) add(hostname, containerid string, origin router.PeerName, addr address.Address) Entry {
 	defer es.checkAndPanic().checkAndPanic()
 
-	entry := Entry{Hostname: hostname, Origin: origin, ContainerID: containerid, Addr: addr}
+	entry := Entry{Hostname: hostname, lHostname: strings.ToLower(hostname),
+		Origin: origin, ContainerID: containerid, Addr: addr}
 	i := sort.Search(len(*es), func(i int) bool {
 		return !(*es)[i].insensitiveLess(&entry)
 	})
@@ -204,14 +210,14 @@ func (es Entries) lookup(hostname string) Entries {
 
 	lowerHostname := strings.ToLower(hostname)
 	i := sort.Search(len(es), func(i int) bool {
-		return strings.ToLower(es[i].Hostname) >= lowerHostname
+		return es[i].lHostname >= lowerHostname
 	})
-	if i >= len(es) || strings.ToLower(es[i].Hostname) != lowerHostname {
+	if i >= len(es) || es[i].lHostname != lowerHostname {
 		return Entries{}
 	}
 
 	j := sort.Search(len(es)-i, func(j int) bool {
-		return strings.ToLower(es[i+j].Hostname) > lowerHostname
+		return es[i+j].lHostname > lowerHostname
 	})
 
 	return es[i : i+j]
@@ -226,6 +232,12 @@ func (es Entries) first(f func(*Entry) bool) (*Entry, error) {
 		}
 	}
 	return nil, fmt.Errorf("Not found")
+}
+
+func (es Entries) addLowercase() {
+	for i := range es {
+		es[i].addLowercase()
+	}
 }
 
 type GossipData struct {
@@ -246,6 +258,7 @@ func (g *GossipData) Decode(msg []byte) error {
 		return err
 	}
 
+	g.Entries.addLowercase() // lowercase strings not sent on the wire
 	sort.Sort(CaseInsensitive(g.Entries))
 	return nil
 }
