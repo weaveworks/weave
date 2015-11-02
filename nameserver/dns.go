@@ -216,7 +216,7 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 		reqCopy := req.Copy()
 		reqCopy.Id = dns.Id()
 		response, _, err := h.client.Exchange(reqCopy, fmt.Sprintf("%s:%s", server, h.upstream.Port))
-		if err != nil || response == nil {
+		if (err != nil && err != dns.ErrTruncated) || response == nil {
 			h.ns.debugf("error trying %s: %v", server, err)
 			continue
 		}
