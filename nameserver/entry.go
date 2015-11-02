@@ -216,10 +216,10 @@ func (es Entries) lookup(hostname string) Entries {
 	return es[i : i+j]
 }
 
-func (es *Entries) first(f func(*Entry) bool) (*Entry, error) {
+func (es Entries) first(f func(*Entry) bool) (*Entry, error) {
 	es.checkAndPanic()
 
-	for _, e := range *es {
+	for _, e := range es {
 		if f(&e) {
 			return &e, nil
 		}
