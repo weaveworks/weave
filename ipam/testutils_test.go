@@ -135,7 +135,7 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 	}
 
 	alloc := NewAllocator(peername, router.PeerUID(rand.Int63()),
-		"nick-"+name, cidr.Range(), quorum)
+		"nick-"+name, cidr.Range(), quorum, nil)
 
 	return alloc, cidr.HostRange()
 }
