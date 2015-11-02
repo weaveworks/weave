@@ -42,17 +42,17 @@ func TestTruncation(t *testing.T) {
 		nameserver.AddEntry("foo.weave.local.", "", router.UnknownPeerName, i)
 	}
 
-	doRequest := func(client *dns.Client, request *dns.Msg, port int) *dns.Msg {
+	doRequest := func(client *dns.Client, request *dns.Msg, port int, expectedErr error) *dns.Msg {
 		request.SetQuestion("foo.weave.local.", dns.TypeA)
 		response, _, err := client.Exchange(request, fmt.Sprintf("127.0.0.1:%d", port))
-		require.Nil(t, err)
+		require.Equal(t, expectedErr, err)
 		return response
 	}
 
 	// do a udp query, ensure we get a truncated response
 	{
 		udpClient := dns.Client{Net: "udp", UDPSize: minUDPSize}
-		response := doRequest(&udpClient, &dns.Msg{}, udpPort)
+		response := doRequest(&udpClient, &dns.Msg{}, udpPort, dns.ErrTruncated)
 		require.True(t, response.MsgHdr.Truncated)
 		require.True(t, len(response.Answer) < 100)
 	}
@@ -62,7 +62,7 @@ func TestTruncation(t *testing.T) {
 		udpClient := dns.Client{Net: "udp", UDPSize: 65535}
 		request := &dns.Msg{}
 		request.SetEdns0(65535, false)
-		response := doRequest(&udpClient, request, udpPort)
+		response := doRequest(&udpClient, request, udpPort, nil)
 		require.False(t, response.MsgHdr.Truncated)
 		require.Equal(t, len(response.Answer), 100)
 	}
@@ -70,7 +70,7 @@ func TestTruncation(t *testing.T) {
 	// do a tcp query, ensure we don't get a truncated response
 	{
 		tcpClient := dns.Client{Net: "tcp"}
-		response := doRequest(&tcpClient, &dns.Msg{}, tcpPort)
+		response := doRequest(&tcpClient, &dns.Msg{}, tcpPort, nil)
 		require.False(t, response.MsgHdr.Truncated)
 		require.Equal(t, len(response.Answer), 100)
 	}
