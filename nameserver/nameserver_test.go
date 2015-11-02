@@ -72,7 +72,7 @@ func (m mapping) Addrs() []address.Address {
 }
 
 func TestNameservers(t *testing.T) {
-	wt.RunWithTimeout(t, time.Minute, func() {
+	wt.RunWithTimeout(t, 2*time.Minute, func() {
 		testNameservers(t)
 	})
 }
@@ -81,12 +81,12 @@ func testNameservers(t *testing.T) {
 	//common.SetLogLevel("debug")
 
 	lookupTimeout := 10 // ms
-	nameservers, grouter := makeNetwork(50)
+	nameservers, grouter := makeNetwork(30)
 	defer stopNetwork(nameservers, grouter)
 	// This subset will sometimes lose touch with some of the others
-	badNameservers := nameservers[45:]
+	badNameservers := nameservers[25:]
 	// This subset will remain well-connected, and we will deal mainly with them
-	nameservers = nameservers[:45]
+	nameservers = nameservers[:25]
 	nameserversByName := map[router.PeerName]*Nameserver{}
 	for _, n := range nameservers {
 		nameserversByName[n.ourName] = n
@@ -195,7 +195,7 @@ func testNameservers(t *testing.T) {
 		require.Equal(t, mapping.hostname, hostname)
 	}
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 800; i++ {
 		r := rand.Float32()
 		switch {
 		case r < 0.1:
