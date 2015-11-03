@@ -21,6 +21,13 @@ start_container_with_dns $HOST1 $C1/24 --name=c1 $STATICS_ARGS
 
 assert_dns_record $HOST1 c1 $NAME $C2
 
+# Check that 'weave expose -h' names are added to DNS
+weave_on $HOST1 expose
+EXPOSE=$(weave_on $HOST1 expose -h testexpose1.weave.local)
+weave_on $HOST1 expose -h testexpose2.weave.local
+assert_dns_record $HOST1 c1 testexpose1.weave.local $EXPOSE
+assert_dns_record $HOST1 c1 testexpose2.weave.local
+
 # check we respect the --add-host arguments
 for C in c1 c2 ; do
     assert_dns_a_record $HOST1 $C $STATIC1_NAME $STATIC1

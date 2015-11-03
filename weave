@@ -1896,9 +1896,9 @@ EOF
                 arp_update $BRIDGE $CIDR
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-                if [ -n "$FQDN" ] ; then
-                    when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
-                fi
+            fi
+            if [ -n "$FQDN" ] ; then
+                when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
             fi
         done
         show_addrs $ALL_CIDRS
