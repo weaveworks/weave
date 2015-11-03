@@ -56,20 +56,20 @@ type Allocator struct {
 	paxosTicker      *time.Ticker
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
 	now              func() time.Time
-	namesFunc        func() map[router.PeerName]struct{}
+	peerValidFunc    func(router.PeerName) bool
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint, names func() map[router.PeerName]struct{}) *Allocator {
+func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint, validPeer func(name router.PeerName) bool) *Allocator {
 	return &Allocator{
-		ourName:   ourName,
-		universe:  universe,
-		ring:      ring.New(universe.Start, universe.End, ourName),
-		owned:     make(map[string][]address.Address),
-		paxos:     paxos.NewNode(ourName, ourUID, quorum),
-		nicknames: map[router.PeerName]string{ourName: ourNickname},
-		now:       time.Now,
-		namesFunc: names,
+		ourName:       ourName,
+		universe:      universe,
+		ring:          ring.New(universe.Start, universe.End, ourName),
+		owned:         make(map[string][]address.Address),
+		paxos:         paxos.NewNode(ourName, ourUID, quorum),
+		nicknames:     map[router.PeerName]string{ourName: ourNickname},
+		now:           time.Now,
+		peerValidFunc: validPeer,
 	}
 }
 
@@ -276,6 +276,33 @@ func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 	return <-errChan
 }
 
+func (alloc *Allocator) pickPeerFromNicknames(isValid func(router.PeerName) bool) router.PeerName {
+	for name := range alloc.nicknames {
+		if name != alloc.ourName && isValid(name) {
+			return name
+		}
+	}
+	return router.UnknownPeerName
+}
+
+func (alloc *Allocator) pickPeerForTransfer() router.PeerName {
+	// first try alive peers that actively participate in IPAM (i.e. have entries)
+	if heir := alloc.ring.PickPeerForTransfer(alloc.peerValidFunc); heir != router.UnknownPeerName {
+		return heir
+	}
+	// next try alive peers that have IPAM enabled but have no entries
+	if heir := alloc.pickPeerFromNicknames(alloc.peerValidFunc); heir != router.UnknownPeerName {
+		return heir
+	}
+	// next try disappeared peers that still have entries
+	t := func(router.PeerName) bool { return true }
+	if heir := alloc.ring.PickPeerForTransfer(t); heir != router.UnknownPeerName {
+		return heir
+	}
+	// finally, disappeared peers that that passively participated in IPAM
+	return alloc.pickPeerFromNicknames(t)
+}
+
 // Shutdown (Sync)
 func (alloc *Allocator) Shutdown() {
 	alloc.infof("Shutdown")
@@ -284,16 +311,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.shuttingDown = true
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
-		heir := alloc.ring.PickPeerForTransfer()
-		if heir == router.UnknownPeerName && alloc.namesFunc != nil {
-			// No peers in the ring; pick one via the function we were given at init
-			for peerName := range alloc.namesFunc() {
-				if peerName != alloc.ourName {
-					heir = peerName
-					break
-				}
-			}
-		}
+		heir := alloc.pickPeerForTransfer()
 		if heir != router.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()
@@ -322,7 +340,6 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) error {
 			return
 		}
 
-		delete(alloc.nicknames, peername)
 		newRanges, err := alloc.ring.Transfer(peername, alloc.ourName)
 		alloc.space.AddRanges(newRanges)
 		resultChan <- err
@@ -344,11 +361,11 @@ func (alloc *Allocator) lookupPeername(name string) (router.PeerName, error) {
 	return router.PeerNameFromString(name)
 }
 
-// Restrict the peers in "nicknames" to those in the ring and our own
+// Restrict the peers in "nicknames" to those in the ring plus peers known to the router
 func (alloc *Allocator) pruneNicknames() {
 	ringPeers := alloc.ring.PeerNames()
 	for name := range alloc.nicknames {
-		if _, ok := ringPeers[name]; !ok && name != alloc.ourName {
+		if _, ok := ringPeers[name]; !ok && !alloc.peerValidFunc(name) {
 			delete(alloc.nicknames, name)
 		}
 	}

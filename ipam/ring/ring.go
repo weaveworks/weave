@@ -470,9 +470,9 @@ func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []router.Pee
 	return result
 }
 
-func (r *Ring) PickPeerForTransfer() router.PeerName {
+func (r *Ring) PickPeerForTransfer(isValid func(router.PeerName) bool) router.PeerName {
 	for _, entry := range r.Entries {
-		if entry.Peer != r.Peer {
+		if entry.Peer != r.Peer && isValid(entry.Peer) {
 			return entry.Peer
 		}
 	}

@@ -368,8 +368,8 @@ func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr s
 			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
 		}
 	}
-	namesFunc := func() map[weave.PeerName]struct{} { return router.Peers.Names() }
-	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum, namesFunc)
+	isValidFunc := func(name weave.PeerName) bool { return router.Peers.Fetch(name) != nil }
+	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum, isValidFunc)
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
