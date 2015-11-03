@@ -15,9 +15,9 @@ SIGPROXY_EXE=prog/sigproxy/sigproxy
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 NETCHECK_EXE=prog/netcheck/netcheck
 DOCKERTLSARGS_EXE=prog/docker_tls_args/docker_tls_args
-RUNNER_EXE=testing/runner/runner
+RUNNER_EXE=tools/runner/runner
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(RUNNER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -77,10 +77,9 @@ $(NETCHECK_EXE): prog/netcheck/netcheck.go
 # the main build stanza due to not importing net package
 $(SIGPROXY_EXE): prog/sigproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/main.go net/*.go
-$(RUNNER_EXE): testing/runner/runner.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
 
-$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(RUNNER_EXE) $(DOCKERTLSARGS_EXE):
+$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
@@ -113,6 +112,9 @@ lint: tools/.git
 
 tools/.git:
 	git submodule update --init
+
+$(RUNNER_EXE):
+	make -C tools/runner
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
