@@ -6,8 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
-
-	weavenet "github.com/weaveworks/weave/net"
 )
 
 var (
@@ -19,8 +17,7 @@ func main() {
 		args = os.Args[1:]
 	)
 
-	_, err := weavenet.EnsureInterfaceAndMcastRoute("ethwe")
-	checkErr(err)
+	checkErr(checkNetwork())
 
 	if len(args) == 0 {
 		checkErr(ErrNoCommandSpecified)

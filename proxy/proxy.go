@@ -70,6 +70,7 @@ type Proxy struct {
 	dockerBridgeIP      string
 	hostnameMatchRegexp *regexp.Regexp
 	weaveWaitVolume     string
+	weaveWaitNoopVolume string
 	normalisedAddrs     []string
 	waiters             map[*http.Request]*wait
 }
@@ -106,7 +107,7 @@ func NewProxy(c Config) (*Proxy, error) {
 		return nil, err
 	}
 
-	if err = p.findWeaveWaitVolume(); err != nil {
+	if err = p.findWeaveWaitVolumes(); err != nil {
 		return nil, err
 	}
 
@@ -135,23 +136,31 @@ func (proxy *Proxy) Dial() (net.Conn, error) {
 	return net.Dial("unix", dockerSock)
 }
 
-func (proxy *Proxy) findWeaveWaitVolume() error {
+func (proxy *Proxy) findWeaveWaitVolumes() error {
+	var err error
+	if proxy.weaveWaitVolume, err = proxy.findVolume("/w"); err != nil {
+		return err
+	}
+	proxy.weaveWaitNoopVolume, err = proxy.findVolume("/w-noop")
+	return err
+}
+
+func (proxy *Proxy) findVolume(v string) (string, error) {
 	container, err := proxy.client.InspectContainer("weaveproxy")
 	if err != nil {
-		return fmt.Errorf("Could not find the weavewait volume: %s", err)
+		return "", fmt.Errorf("Could not find the weavewait volume: %s", err)
 	}
 
 	if container.Volumes == nil {
-		return fmt.Errorf("Could not find the weavewait volume")
+		return "", fmt.Errorf("Could not find the weavewait volume")
 	}
 
-	volume, ok := container.Volumes["/w"]
+	volume, ok := container.Volumes[v]
 	if !ok {
-		return fmt.Errorf("Could not find the weavewait volume")
+		return "", fmt.Errorf("Could not find the weavewait volume")
 	}
 
-	proxy.weaveWaitVolume = volume
-	return nil
+	return volume, nil
 }
 
 func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -425,7 +434,7 @@ func (proxy *Proxy) attachRouter(container *docker.Container) error {
 
 func (proxy *Proxy) weaveCIDRs(networkMode string, env []string) ([]string, error) {
 	if networkMode == "host" || strings.HasPrefix(networkMode, "container:") {
-		return nil, fmt.Errorf("the container was created with the '--net=%s'", networkMode)
+		return nil, fmt.Errorf("the container has '--net=%s'", networkMode)
 	}
 	for _, e := range env {
 		if strings.HasPrefix(e, "WEAVE_CIDR=") {
@@ -439,24 +448,6 @@ func (proxy *Proxy) weaveCIDRs(networkMode string, env []string) ([]string, erro
 		return nil, ErrNoDefaultIPAM
 	}
 	return nil, nil
-}
-
-func (proxy *Proxy) addWeaveWaitVolume(hostConfig jsonObject) error {
-	configBinds, err := hostConfig.StringArray("Binds")
-	if err != nil {
-		return err
-	}
-
-	var binds []string
-	for _, bind := range configBinds {
-		s := strings.Split(bind, ":")
-		if len(s) >= 2 && s[1] == "/w" {
-			continue
-		}
-		binds = append(binds, bind)
-	}
-	hostConfig["Binds"] = append(binds, fmt.Sprintf("%s:/w:ro", proxy.weaveWaitVolume))
-	return nil
 }
 
 func (proxy *Proxy) setWeaveDNS(hostConfig jsonObject, hostname, dnsDomain string) error {
