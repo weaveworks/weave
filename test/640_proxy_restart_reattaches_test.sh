@@ -7,7 +7,7 @@ C2=10.2.0.34
 NAME=seetwo.weave.local
 
 check_attached() {
-    assert_raises "proxy exec_on $HOST1 c2 $CHECK_ETHWE_UP"
+    assert_raises "exec_on $HOST1 c2 $CHECK_ETHWE_UP"
     assert_dns_record $HOST1 c1 $NAME $C2
 }
 
@@ -51,6 +51,6 @@ check_attached
 proxy_start_container $HOST1 -di --name=c3 --restart=always # Use ipam, so it won't be attachable w/o weave
 weave_on $HOST1 stop
 weave_on $HOST1 launch-proxy
-assert_raises "proxy exec_on $HOST1 c3 $CHECK_ETHWE_UP"
+assert_raises "exec_on $HOST1 c3 $CHECK_ETHWE_UP"
 
 end_suite
