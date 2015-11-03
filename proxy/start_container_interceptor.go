@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"net/http"
+	"strings"
 )
 
 type startContainerInterceptor struct{ proxy *Proxy }
@@ -31,10 +32,22 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 			hostConfig = params
 		}
 		if hostConfig != nil {
-			i.proxy.addWeaveWaitVolume(hostConfig)
-			if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
-				if err := i.proxy.setWeaveDNS(hostConfig, container.Config.Hostname, dnsDomain); err != nil {
+			networkMode, err := jsonObject(hostConfig).String("NetworkMode")
+			if err != nil {
+				return err
+			}
+			if strings.HasPrefix(networkMode, "container:") || networkMode == "host" {
+				if err := addVolume(hostConfig, i.proxy.weaveWaitNoopVolume, "/w", "ro"); err != nil {
 					return err
+				}
+			} else {
+				if err := addVolume(hostConfig, i.proxy.weaveWaitVolume, "/w", "ro"); err != nil {
+					return err
+				}
+				if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
+					if err := i.proxy.setWeaveDNS(hostConfig, container.Config.Hostname, dnsDomain); err != nil {
+						return err
+					}
 				}
 			}
 
