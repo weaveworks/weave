@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"testing"
 
 	weavetest "github.com/weaveworks/weave/testing"
@@ -8,5 +9,7 @@ import (
 
 func TestMain(t *testing.T) {
 	weavetest.TrimTestArgs()
-	main()
+	if len(os.Args) > 1 {
+		main()
+	}
 }

@@ -61,7 +61,8 @@ func TrimTestArgs() {
 		}
 	}
 	if i == l {
-		panic("Specify weave args after --")
+		fmt.Println("Specify weave args after --")
+		i--
 	}
 	os.Args = append(os.Args[:1], os.Args[i+1:l]...)
 }
