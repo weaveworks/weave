@@ -55,8 +55,8 @@ type Allocator struct {
 	paxos            *paxos.Node
 	paxosTicker      *time.Ticker
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
-	now              func() time.Time
 	isKnownPeer      func(router.PeerName) bool
+	now              func() time.Time
 }
 
 // NewAllocator creates and initialises a new Allocator
@@ -68,8 +68,8 @@ func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname st
 		owned:       make(map[string][]address.Address),
 		paxos:       paxos.NewNode(ourName, ourUID, quorum),
 		nicknames:   map[router.PeerName]string{ourName: ourNickname},
-		now:         time.Now,
 		isKnownPeer: isKnownPeer,
+		now:         time.Now,
 	}
 }
 
@@ -311,8 +311,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.shuttingDown = true
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
-		heir := alloc.pickPeerForTransfer()
-		if heir != router.UnknownPeerName {
+		if heir := alloc.pickPeerForTransfer(); heir != router.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
