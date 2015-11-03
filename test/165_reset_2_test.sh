@@ -2,7 +2,7 @@
 
 . ./config.sh
 
-start_suite "Claiming addresses"
+start_suite "Rolling restart with reset"
 
 weave_on $HOST1 launch-router
 weave_on $HOST2 launch-router $HOST1
