@@ -253,10 +253,13 @@ func main() {
 			}
 		}
 	}
+	isKnownPeer := func(name weave.PeerName) bool {
+		return router.Peers.Fetch(name) != nil
+	}
 	var allocator *ipam.Allocator
 	var defaultSubnet address.CIDR
 	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
+		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), isKnownPeer)
 		observeContainers(allocator)
 	} else if peerCount > 0 {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
@@ -267,9 +270,6 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		isKnownPeer := func(name weave.PeerName) bool {
-			return router.Peers.Fetch(name) != nil
-		}
 		ns = nameserver.New(router.Ourself.Peer.Name, dnsDomain, isKnownPeer)
 		router.Peers.OnGC(func(peer *weave.Peer) { ns.PeerGone(peer.Name) })
 		ns.SetGossip(router.NewGossip("nameserver", ns))
@@ -366,7 +366,7 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	return cidr
 }
 
-func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr string, quorum uint) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr string, quorum uint, isKnownPeer func(weave.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange := parseAndCheckCIDR(ipRangeStr)
 	defaultSubnet := ipRange
 	if defaultSubnetStr != "" {
@@ -375,7 +375,6 @@ func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr s
 			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
 		}
 	}
-	isKnownPeer := func(name weave.PeerName) bool { return router.Peers.Fetch(name) != nil }
 	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum, isKnownPeer)
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
