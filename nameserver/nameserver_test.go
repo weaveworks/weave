@@ -146,7 +146,7 @@ func testNameservers(t *testing.T) {
 	loseConnection := func() {
 		nameserver1 := badNameservers[rand.Intn(len(badNameservers))]
 		nameserver2 := nameservers[rand.Intn(len(nameservers))]
-		nameserver1.PeerGone(&router.Peer{Name: nameserver2.ourName})
+		nameserver1.PeerGone(nameserver2.ourName)
 	}
 
 	deleteMapping := func() {
