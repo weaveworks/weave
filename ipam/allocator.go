@@ -55,19 +55,21 @@ type Allocator struct {
 	paxos            *paxos.Node
 	paxosTicker      *time.Ticker
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
+	isKnownPeer      func(router.PeerName) bool
 	now              func() time.Time
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint) *Allocator {
+func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name router.PeerName) bool) *Allocator {
 	return &Allocator{
-		ourName:   ourName,
-		universe:  universe,
-		ring:      ring.New(universe.Start, universe.End, ourName),
-		owned:     make(map[string][]address.Address),
-		paxos:     paxos.NewNode(ourName, ourUID, quorum),
-		nicknames: map[router.PeerName]string{ourName: ourNickname},
-		now:       time.Now,
+		ourName:     ourName,
+		universe:    universe,
+		ring:        ring.New(universe.Start, universe.End, ourName),
+		owned:       make(map[string][]address.Address),
+		paxos:       paxos.NewNode(ourName, ourUID, quorum),
+		nicknames:   map[router.PeerName]string{ourName: ourNickname},
+		isKnownPeer: isKnownPeer,
+		now:         time.Now,
 	}
 }
 
@@ -274,6 +276,33 @@ func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 	return <-errChan
 }
 
+func (alloc *Allocator) pickPeerFromNicknames(isValid func(router.PeerName) bool) router.PeerName {
+	for name := range alloc.nicknames {
+		if name != alloc.ourName && isValid(name) {
+			return name
+		}
+	}
+	return router.UnknownPeerName
+}
+
+func (alloc *Allocator) pickPeerForTransfer() router.PeerName {
+	// first try alive peers that actively participate in IPAM (i.e. have entries)
+	if heir := alloc.ring.PickPeerForTransfer(alloc.isKnownPeer); heir != router.UnknownPeerName {
+		return heir
+	}
+	// next try alive peers that have IPAM enabled but have no entries
+	if heir := alloc.pickPeerFromNicknames(alloc.isKnownPeer); heir != router.UnknownPeerName {
+		return heir
+	}
+	// next try disappeared peers that still have entries
+	t := func(router.PeerName) bool { return true }
+	if heir := alloc.ring.PickPeerForTransfer(t); heir != router.UnknownPeerName {
+		return heir
+	}
+	// finally, disappeared peers that that passively participated in IPAM
+	return alloc.pickPeerFromNicknames(t)
+}
+
 // Shutdown (Sync)
 func (alloc *Allocator) Shutdown() {
 	alloc.infof("Shutdown")
@@ -282,7 +311,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.shuttingDown = true
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
-		if heir := alloc.ring.PickPeerForTransfer(); heir != router.UnknownPeerName {
+		if heir := alloc.pickPeerForTransfer(); heir != router.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
@@ -310,7 +339,6 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) error {
 			return
 		}
 
-		delete(alloc.nicknames, peername)
 		newRanges, err := alloc.ring.Transfer(peername, alloc.ourName)
 		alloc.space.AddRanges(newRanges)
 		resultChan <- err
@@ -332,11 +360,11 @@ func (alloc *Allocator) lookupPeername(name string) (router.PeerName, error) {
 	return router.PeerNameFromString(name)
 }
 
-// Restrict the peers in "nicknames" to those in the ring and our own
+// Restrict the peers in "nicknames" to those in the ring plus peers known to the router
 func (alloc *Allocator) pruneNicknames() {
 	ringPeers := alloc.ring.PeerNames()
 	for name := range alloc.nicknames {
-		if _, ok := ringPeers[name]; !ok && name != alloc.ourName {
+		if _, ok := ringPeers[name]; !ok && !alloc.isKnownPeer(name) {
 			delete(alloc.nicknames, name)
 		}
 	}
