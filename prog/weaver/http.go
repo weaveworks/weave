@@ -3,15 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+	"text/template"
+
 	"github.com/gorilla/mux"
+
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
-	"net/http"
-	"strings"
-	"text/template"
 )
 
 var rootTemplate = template.New("root").Funcs(map[string]interface{}{
