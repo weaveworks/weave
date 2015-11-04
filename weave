@@ -1481,7 +1481,7 @@ launch_router() {
         $(router_opts_$BRIDGE_TYPE) \
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
-        ${NETHOST_OPT:+$DNS_ROUTER_OPTS} $NO_DNS_OPT \
+        ${NETHOST_OPT:+$DNS_ROUTER_OPTS --http-addr 127.0.0.1:$HTTP_PORT} $NO_DNS_OPT \
         --docker-api "unix:///var/run/docker.sock" "$@")
     with_container_netns_or_die $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
     attach_router
