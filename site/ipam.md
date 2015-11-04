@@ -105,14 +105,6 @@ range. This can be overridden with the `--ipalloc-range` option, e.g.
 
 and must be the same on every host.
 
-> The specified range is for *exclusive* use by the IP allocator. In
-> particular, when starting containers with manually assigned IP
-> addresses, these must be outside the IP allocator's range.  If, in
-> our example, you subsequently executed `docker run -e
-> WEAVE_CIDR=10.2.3.1/24 -ti ubuntu`, the IP allocator might assign
-> the same address to another container, which will break IP routing
-> for the containers sharing an address.
-
 The range parameter is written in
 [CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) -
 in this example "/16" means the first 16 bits of the address form the
@@ -227,3 +219,7 @@ guide](troubleshooting.html#weave-status) for full details.
 
 The 'Service: ipam' section displays the consensus state as well as
 the total allocation range and default subnet.
+
+Note that the 'Range' is written using interval notation - '[' means
+the start of the range is included and ')' means the end of the range
+is not included.
