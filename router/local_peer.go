@@ -19,8 +19,7 @@ type LocalPeerAction func()
 func NewLocalPeer(name PeerName, nickName string, router *Router) *LocalPeer {
 	actionChan := make(chan LocalPeerAction, ChannelSize)
 	peer := &LocalPeer{
-		Peer: NewPeer(name, nickName, randomPeerUID(), 0,
-			randomPeerShortID()),
+		Peer:       NewPeer(name, nickName, randomPeerUID(), 0, randomPeerShortID()),
 		router:     router,
 		actionChan: actionChan,
 	}
