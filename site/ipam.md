@@ -109,9 +109,7 @@ The range parameter is written in
 [CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) -
 in this example "/16" means the first 16 bits of the address form the
 network address and the allocator is to allocate container addresses
-that all start 10.2. The ".0" and ".-1" addresses in a subnet are not
-used, as required by
-[RFC 1122](https://tools.ietf.org/html/rfc1122#page-29).
+that all start 10.2.
 
 Weave shares the IP address range across all peers, dynamically
 according to their needs.  If a group of peers becomes isolated from
@@ -121,11 +119,16 @@ to the rest of the network without any conflicts arising.
 
 ## <a name="subnets"></a>Automatic allocation across multiple subnets
 
-When
-[running containers on different subnets](features.html#application-isolation),
-you may wish to request the allocation of an address from a particular
-subnet. This is done by specifying the subnet with `net:<subnet>`, in
-CIDR notation, e.g.
+IP subnets are used to define or restrict routing. By default, weave
+puts all containers in a subnet that spans the entire allocation
+range, so every weave-attached container can talk to every other
+weave-attached container.
+
+If you want some [isolation](features.html#application-isolation), you
+can choose to run containers on different subnets.  To request the
+allocation of an address from a particular subnet, set the
+`WEAVE_CIDR` environment variable to `net:<subnet>` when creating the
+container, e.g.
 
     host1$ docker run -e WEAVE_CIDR=net:10.2.7.0/24 -ti ubuntu
 
@@ -134,6 +137,9 @@ manually-assigned addresses (outside the automatic allocation range),
 for instance:
 
     host1$ docker run -e WEAVE_CIDR="net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24" -ti ubuntu
+
+(Note the ".0" and ".-1" addresses in a subnet are not used, as required by
+[RFC 1122](https://tools.ietf.org/html/rfc1122#page-29)).
 
 When working with multiple subnets in this way, it is usually
 desirable to constrain the default subnet - i.e. the one chosen by the
