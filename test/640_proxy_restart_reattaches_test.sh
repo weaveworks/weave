@@ -7,8 +7,20 @@ C2=10.2.0.34
 NAME=seetwo.weave.local
 
 check_attached() {
-    assert_raises "proxy exec_on $HOST1 c2 $CHECK_ETHWE_UP"
+    assert_raises "exec_on $HOST1 c2 $CHECK_ETHWE_UP"
     assert_dns_record $HOST1 c1 $NAME $C2
+}
+
+wait_for_proxy() {
+    for i in $(seq 1 120); do
+        echo "Waiting for proxy to start"
+        if proxy docker_on $1 info > /dev/null 2>&1 ; then
+            return
+        fi
+        sleep 1
+    done
+    echo "Timed out waiting for proxy to start" >&2
+    exit 1
 }
 
 start_suite "Proxy restart reattaches networking to containers"
@@ -32,13 +44,13 @@ check_attached
 
 # Restart docker itself, using different commands for systemd- and upstart-managed.
 run_on $HOST1 sh -c "command -v systemctl >/dev/null && sudo systemctl restart docker || sudo service docker restart"
-sleep 10
+wait_for_proxy $HOST1
 check_attached
 
 # Restarting proxy shouldn't kill unattachable containers
 proxy_start_container $HOST1 -di --name=c3 --restart=always # Use ipam, so it won't be attachable w/o weave
 weave_on $HOST1 stop
 weave_on $HOST1 launch-proxy
-assert_raises "proxy exec_on $HOST1 c3 $CHECK_ETHWE_UP"
+assert_raises "exec_on $HOST1 c3 $CHECK_ETHWE_UP"
 
 end_suite
