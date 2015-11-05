@@ -219,7 +219,7 @@ NB: By default docker permits communication between containers on the
 same host, via their docker-assigned IP addresses. For complete
 isolation between application containers, that feature needs to be
 disabled by
-[setting `--icc=false`](https://docs.docker.com/articles/networking/#between-containers)
+[setting `--icc=false`](https://docs.docker.com/engine/userguide/networking/default_network/container-communication/#communication-between-containers)
 in the docker daemon configuration. Furthermore, containers should be
 prevented from capturing and injecting raw network packets - this can
 be accomplished by starting them with the `--cap-drop net_raw` option.
@@ -306,6 +306,14 @@ The same password must be specified for all weave peers. Note that
 supplying a password will [cause weave to fall back to a slower
 method](#fast-data-path) for transporting data between
 peers.
+
+Be aware that:
+
+* Containers will be able to access the router REST API if you have
+  disabled fast datapath. You can prevent this by setting
+  [`--icc=false`](https://docs.docker.com/engine/userguide/networking/default_network/container-communication/#communication-between-containers)
+* Containers are able to access the router control and data plane
+  ports, but you can mitigate this by enabling encryption
 
 ### <a name="host-network-integration"></a>Host network integration
 
