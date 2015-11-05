@@ -453,10 +453,6 @@ func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(TCPHeartbeat * 2))
 }
 
-func (conn *LocalConnection) Forward(key ForwardPacketKey) FlowOp {
-	return conn.forwarder.Forward(key)
-}
-
 func tickerChan(ticker *time.Ticker) <-chan time.Time {
 	if ticker != nil {
 		return ticker.C

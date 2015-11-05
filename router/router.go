@@ -242,7 +242,7 @@ func (router *Router) relay(key ForwardPacketKey) FlowOp {
 		return DiscardingFlowOp{}
 	}
 
-	return conn.(*LocalConnection).Forward(key)
+	return conn.(*LocalConnection).forwarder.Forward(key)
 }
 
 func (router *Router) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
@@ -254,7 +254,7 @@ func (router *Router) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
 	op := NewMultiFlowOp(true)
 
 	for _, conn := range router.Ourself.ConnectionsTo(nextHops) {
-		op.Add(conn.(*LocalConnection).Forward(ForwardPacketKey{
+		op.Add(conn.(*LocalConnection).forwarder.Forward(ForwardPacketKey{
 			PacketKey: key,
 			SrcPeer:   srcPeer,
 			DstPeer:   conn.Remote()}))
