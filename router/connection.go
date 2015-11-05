@@ -40,17 +40,16 @@ type RemoteConnection struct {
 type LocalConnection struct {
 	sync.RWMutex
 	RemoteConnection
-	TCPConn       *net.TCPConn
-	version       byte
-	tcpSender     TCPSender
-	remoteUDPAddr *net.UDPAddr
-	SessionKey    *[32]byte
-	heartbeatTCP  *time.Ticker
-	Router        *Router
-	uid           uint64
-	actionChan    chan<- ConnectionAction
-	finished      <-chan struct{} // closed to signal that actorLoop has finished
-	forwarder     OverlayForwarder
+	TCPConn      *net.TCPConn
+	version      byte
+	tcpSender    TCPSender
+	SessionKey   *[32]byte
+	heartbeatTCP *time.Ticker
+	Router       *Router
+	uid          uint64
+	actionChan   chan<- ConnectionAction
+	finished     <-chan struct{} // closed to signal that actorLoop has finished
+	forwarder    OverlayForwarder
 }
 
 type ConnectionAction func() error
@@ -83,7 +82,7 @@ func (conn *RemoteConnection) ErrorLog(args ...interface{}) {
 
 // Does not return anything. If the connection is successful, it will
 // end up in the local peer's connections map.
-func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router, acceptNewPeer bool) {
+func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, router *Router, acceptNewPeer bool) {
 	if connRemote.local != router.Ourself.Peer {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
@@ -94,7 +93,6 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ud
 		RemoteConnection: *connRemote,
 		Router:           router,
 		TCPConn:          tcpConn,
-		remoteUDPAddr:    udpAddr,
 		uid:              randUint64(),
 		actionChan:       actionChan,
 		finished:         finished}
@@ -192,10 +190,16 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.Log("connection ready; using protocol version", conn.version)
 
+	var remoteAddr *net.UDPAddr
+	if conn.outbound {
+		tcpAddr := conn.TCPConn.RemoteAddr().(*net.TCPAddr)
+		remoteAddr = &net.UDPAddr{IP: tcpAddr.IP, Port: tcpAddr.Port, Zone: tcpAddr.Zone}
+	}
+
 	params := ForwarderParams{
 		RemotePeer:         conn.remote,
 		LocalIP:            conn.TCPConn.LocalAddr().(*net.TCPAddr).IP,
-		RemoteAddr:         conn.remoteUDPAddr,
+		RemoteAddr:         remoteAddr,
 		ConnUID:            conn.uid,
 		Crypto:             conn.forwarderCrypto(),
 		SendControlMessage: conn.sendOverlayControlMessage,
