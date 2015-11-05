@@ -248,8 +248,7 @@ func (fastdp fastDatapathBridge) InjectPacket(key PacketKey) FlowOp {
 
 // Ethernet bridge implementation
 
-func (fastdp *FastDatapath) bridge(ingress bridgePortID,
-	key PacketKey, lock *fastDatapathLock) FlowOp {
+func (fastdp *FastDatapath) bridge(ingress bridgePortID, key PacketKey, lock *fastDatapathLock) FlowOp {
 	lock.relock()
 	if fastdp.sendToMAC[key.SrcMAC] == nil {
 		// Learn the source MAC
@@ -393,8 +392,7 @@ func (fastdp fastDatapathOverlay) Diagnostics() interface{} {
 	}
 }
 
-func (fastdp fastDatapathOverlay) StartConsumingPackets(localPeer *Peer,
-	peers *Peers, consumer OverlayConsumer) error {
+func (fastdp fastDatapathOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers, consumer OverlayConsumer) error {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 
@@ -485,8 +483,7 @@ type vxlanSpecialPacketFlowOp struct {
 	sender  *net.UDPAddr
 }
 
-func (op vxlanSpecialPacketFlowOp) Process(frame []byte, dec *EthernetDecoder,
-	broadcast bool) {
+func (op vxlanSpecialPacketFlowOp) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {
 	op.fastdp.lock.Lock()
 	fwd := op.fastdp.forwarders[op.srcPeer.Name]
 	op.fastdp.lock.Unlock()
@@ -518,8 +515,7 @@ type fastDatapathForwarder struct {
 	errorChan       chan error
 }
 
-func (fastdp fastDatapathOverlay) MakeForwarder(
-	params ForwarderParams) (OverlayForwarder, error) {
+func (fastdp fastDatapathOverlay) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
 	if params.Crypto != nil {
 		// No encryption suport in fastdp.  The weaver main.go
 		// is responsible for ensuring this doesn't happen.
@@ -681,8 +677,7 @@ const (
 	FastDatapathHeartbeatAck = iota
 )
 
-func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte,
-	sender *net.UDPAddr) {
+func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender *net.UDPAddr) {
 	fwd.lock.Lock()
 	defer fwd.lock.Unlock()
 
@@ -809,8 +804,7 @@ func (fwd *fastDatapathForwarder) Stop() {
 	}
 }
 
-func (fastdp *FastDatapath) addForwarder(peer PeerName,
-	fwd *fastDatapathForwarder) {
+func (fastdp *FastDatapath) addForwarder(peer PeerName, fwd *fastDatapathForwarder) {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 
@@ -819,8 +813,7 @@ func (fastdp *FastDatapath) addForwarder(peer PeerName,
 	fastdp.forwarders[peer] = fwd
 }
 
-func (fastdp *FastDatapath) removeForwarder(peer PeerName,
-	fwd *fastDatapathForwarder) {
+func (fastdp *FastDatapath) removeForwarder(peer PeerName, fwd *fastDatapathForwarder) {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 	if fastdp.forwarders[peer] == fwd {
@@ -922,8 +915,7 @@ func (fastdp *FastDatapath) expireFlows() {
 // maintain its MAC->peer table.  We do this by querying the router
 // without an actual packet being involved.  Maybe it's
 // worth devising a more unified approach in the future.
-func (fastdp *FastDatapath) touchFlow(fks odp.FlowKeys,
-	lock *fastDatapathLock) {
+func (fastdp *FastDatapath) touchFlow(fks odp.FlowKeys, lock *fastDatapathLock) {
 	// All the flows we create should have an ingress key, but we
 	// check here just in case we encounter one from somewhere
 	// else.
@@ -1044,8 +1036,7 @@ func flowKeysToPacketKey(fks odp.FlowKeys) PacketKey {
 
 // The sendToPort map is read-only, so this method does the copy in
 // order to add an entry.
-func (fastdp *FastDatapath) addSendToPort(portID bridgePortID,
-	sender bridgeSender) {
+func (fastdp *FastDatapath) addSendToPort(portID bridgePortID, sender bridgeSender) {
 	sendToPort := map[bridgePortID]bridgeSender{portID: sender}
 	for id, sender := range fastdp.sendToPort {
 		sendToPort[id] = sender
@@ -1064,8 +1055,7 @@ func (fastdp *FastDatapath) deleteSendToPort(portID bridgePortID) {
 }
 
 // Send a packet, creating a corresponding ODP flow rule if possible
-func (fastdp *FastDatapath) send(fops FlowOp, frame []byte,
-	lock *fastDatapathLock) {
+func (fastdp *FastDatapath) send(fops FlowOp, frame []byte, lock *fastDatapathLock) {
 	// Gather the actions from actionFlowOps, execute any others
 	var dec *EthernetDecoder
 	flow := odp.NewFlowSpec()
@@ -1157,8 +1147,7 @@ func (fop odpActionsFlowOp) updateFlowSpec(flow *odp.FlowSpec) {
 	flow.AddActions(fop.actions)
 }
 
-func (fop odpActionsFlowOp) Process(frame []byte, dec *EthernetDecoder,
-	broadcast bool) {
+func (fop odpActionsFlowOp) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {
 	fastdp := fop.fastdp
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()

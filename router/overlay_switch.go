@@ -60,8 +60,7 @@ func (osw *OverlaySwitch) InvalidateShortIDs() {
 	}
 }
 
-func (osw *OverlaySwitch) StartConsumingPackets(localPeer *Peer, peers *Peers,
-	consumer OverlayConsumer) error {
+func (osw *OverlaySwitch) StartConsumingPackets(localPeer *Peer, peers *Peers, consumer OverlayConsumer) error {
 	for _, overlay := range osw.overlays {
 		if err := overlay.StartConsumingPackets(localPeer, peers,
 			consumer); err != nil {
@@ -162,8 +161,7 @@ type subForwarderEvent struct {
 	err error
 }
 
-func (osw *OverlaySwitch) MakeForwarder(
-	params ForwarderParams) (OverlayForwarder, error) {
+func (osw *OverlaySwitch) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
 	if _, present := params.Features["Overlays"]; !present && osw.compatOverlay != nil {
 		return osw.compatOverlay.MakeForwarder(params)
 	}
@@ -224,8 +222,7 @@ func (osw *OverlaySwitch) MakeForwarder(
 	return fwd, nil
 }
 
-func monitorForwarder(index int, eventsChan chan<- subForwarderEvent,
-	stopChan <-chan struct{}, fwd OverlayForwarder) {
+func monitorForwarder(index int, eventsChan chan<- subForwarderEvent, stopChan <-chan struct{}, fwd OverlayForwarder) {
 	establishedChan := fwd.EstablishedChannel()
 loop:
 	for {
@@ -257,8 +254,7 @@ loop:
 	fwd.Stop()
 }
 
-func (fwd *overlaySwitchForwarder) run(eventsChan <-chan subForwarderEvent,
-	stopChan <-chan struct{}) {
+func (fwd *overlaySwitchForwarder) run(eventsChan <-chan subForwarderEvent, stopChan <-chan struct{}) {
 loop:
 	for {
 		select {
