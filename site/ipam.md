@@ -214,7 +214,7 @@ reports on the current status of the weave router and IP allocator:
 
        Service: ipam
      Consensus: waiting(quorum: 2, known: 0)
-         Range: [10.32.0.0-10.48.0.0)
+         Range: 10.32.0.0-10.47.255.255
  DefaultSubnet: 10.32.0.0/12
 
 ...
@@ -225,7 +225,3 @@ guide](troubleshooting.html#weave-status) for full details.
 
 The 'Service: ipam' section displays the consensus state as well as
 the total allocation range and default subnet.
-
-Note that the 'Range' is written using interval notation - '[' means
-the start of the range is included and ')' means the end of the range
-is not included.
