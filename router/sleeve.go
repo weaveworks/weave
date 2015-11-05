@@ -365,6 +365,11 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 	confirmedChan := make(chan struct{})
 	finishedChan := make(chan struct{})
 
+	var remoteAddr *net.UDPAddr
+	if params.Outbound {
+		remoteAddr = makeUDPAddr(params.RemoteAddr)
+	}
+
 	fwd := &sleeveForwarder{
 		sleeve:           sleeve,
 		remotePeer:       params.RemotePeer,
@@ -379,13 +384,13 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		finishedChan:     finishedChan,
 		establishedChan:  make(chan struct{}),
 		errorChan:        make(chan error, 1),
-		remoteAddr:       params.RemoteAddr,
+		remoteAddr:       remoteAddr,
 		mtu:              DefaultMTU,
 		crypto:           crypto,
 		maxPayload:       DefaultMTU - UDPOverhead,
 		overheadDF: UDPOverhead + crypto.EncDF.PacketOverhead() +
 			crypto.EncDF.FrameOverhead() + EthernetOverhead,
-		senderDF: newUDPSenderDF(params.LocalIP, sleeve.localPort),
+		senderDF: newUDPSenderDF(params.LocalAddr.IP, sleeve.localPort),
 	}
 
 	go fwd.run(aggChan, aggDFChan, specialChan, controlMsgChan,

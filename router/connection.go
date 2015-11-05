@@ -190,16 +190,11 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.Log("connection ready; using protocol version", conn.version)
 
-	var remoteAddr *net.UDPAddr
-	if conn.outbound {
-		tcpAddr := conn.TCPConn.RemoteAddr().(*net.TCPAddr)
-		remoteAddr = &net.UDPAddr{IP: tcpAddr.IP, Port: tcpAddr.Port, Zone: tcpAddr.Zone}
-	}
-
 	params := ForwarderParams{
 		RemotePeer:         conn.remote,
-		LocalIP:            conn.TCPConn.LocalAddr().(*net.TCPAddr).IP,
-		RemoteAddr:         remoteAddr,
+		LocalAddr:          conn.TCPConn.LocalAddr().(*net.TCPAddr),
+		RemoteAddr:         conn.TCPConn.RemoteAddr().(*net.TCPAddr),
+		Outbound:           conn.outbound,
 		ConnUID:            conn.uid,
 		Crypto:             conn.forwarderCrypto(),
 		SendControlMessage: conn.sendOverlayControlMessage,

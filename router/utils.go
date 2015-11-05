@@ -104,6 +104,10 @@ func intmac(key uint64) (r net.HardwareAddr) {
 	return
 }
 
+func makeUDPAddr(addr *net.TCPAddr) *net.UDPAddr {
+	return &net.UDPAddr{IP: addr.IP, Port: addr.Port, Zone: addr.Zone}
+}
+
 type ListOfPeers []*Peer
 
 func (lop ListOfPeers) Len() int {

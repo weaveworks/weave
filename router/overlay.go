@@ -29,15 +29,19 @@ type Overlay interface {
 type ForwarderParams struct {
 	RemotePeer *Peer
 
-	// The local IP address to use for sending.  Derived from the
-	// local address of the corresponding TCP socket, so may
-	// differ for different forwarders.
-	LocalIP net.IP
+	// The local address of the corresponding TCP connection. Used to
+	// derive the local IP address for sending. May differ for
+	// different forwarders.
+	LocalAddr *net.TCPAddr
 
-	// The remote address to send to.  nil if unknown, i.e. an
-	// incoming connection, in which case the Overlay needs to
-	// discover it (e.g. from incoming datagrams).
-	RemoteAddr *net.UDPAddr
+	// The remote address of the corresponding TCP connection. Used to
+	// determine the address to send to, but only if the TCP
+	// connection is outbound. Otherwise the Overlay needs to discover
+	// it (e.g. from incoming datagrams).
+	RemoteAddr *net.TCPAddr
+
+	// Is the corresponding TCP connection outbound?
+	Outbound bool
 
 	// Unique identifier for this connection
 	ConnUID uint64
