@@ -142,7 +142,7 @@ function hosts {
 	done
 	echo export SSH=ssh
 	echo export HOSTS=\"$hosts\"
-	echo export WEAVE_DOCKER_ARGS=\"$args\"
+	echo export ADD_HOST_ARGS=\"$args\"
 	rm $json
 }
 
