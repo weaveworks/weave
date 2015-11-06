@@ -61,13 +61,6 @@ type ForwarderParams struct {
 // to decode the frame.
 type OverlayConsumer func(ForwardPacketKey) FlowOp
 
-// Crypto settings for a forwarder.
-type OverlayCrypto struct {
-	Dec   Decryptor
-	Enc   Encryptor
-	EncDF Encryptor
-}
-
 // All of the machinery to forward packets to a particular peer
 type OverlayForwarder interface {
 	// Forward a packet across the connection.  May be called as

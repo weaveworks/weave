@@ -273,6 +273,12 @@ func (sleeve *SleeveOverlay) send(msg []byte, raddr *net.UDPAddr) error {
 	return err
 }
 
+type sleeveCrypto struct {
+	Dec   Decryptor
+	Enc   Encryptor
+	EncDF Encryptor
+}
+
 type sleeveForwarder struct {
 	// Immutable
 	sleeve         *SleeveOverlay
@@ -303,7 +309,7 @@ type sleeveForwarder struct {
 	stackFrag bool
 
 	// State only used within the forwarder goroutine
-	crypto     OverlayCrypto
+	crypto     sleeveCrypto
 	senderDF   *udpSenderDF
 	maxPayload int
 
@@ -345,15 +351,15 @@ type controlMessage struct {
 
 func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
 	name := sleeve.localPeer.NameByte
-	var crypto OverlayCrypto
+	var crypto sleeveCrypto
 	if params.SessionKey != nil {
-		crypto = OverlayCrypto{
+		crypto = sleeveCrypto{
 			Dec:   NewNaClDecryptor(params.SessionKey, params.Outbound),
 			Enc:   NewNaClEncryptor(name, params.SessionKey, params.Outbound, false),
 			EncDF: NewNaClEncryptor(name, params.SessionKey, params.Outbound, true),
 		}
 	} else {
-		crypto = OverlayCrypto{
+		crypto = sleeveCrypto{
 			Dec:   NewNonDecryptor(),
 			Enc:   NewNonEncryptor(name),
 			EncDF: NewNonEncryptor(name),
