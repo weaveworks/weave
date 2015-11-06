@@ -49,7 +49,7 @@ type LocalConnection struct {
 	uid          uint64
 	actionChan   chan<- ConnectionAction
 	finished     <-chan struct{} // closed to signal that actorLoop has finished
-	forwarder    OverlayForwarder
+	OverlayConn  OverlayConnection
 }
 
 type ConnectionAction func() error
@@ -190,7 +190,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.Log("connection ready; using protocol version", conn.version)
 
-	params := ForwarderParams{
+	params := OverlayConnectionParams{
 		RemotePeer:         conn.remote,
 		LocalAddr:          conn.TCPConn.LocalAddr().(*net.TCPAddr),
 		RemoteAddr:         conn.TCPConn.RemoteAddr().(*net.TCPAddr),
@@ -200,28 +200,27 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 		SendControlMessage: conn.sendOverlayControlMessage,
 		Features:           intro.Features,
 	}
-	if conn.forwarder, err = conn.Router.Overlay.MakeForwarder(params); err != nil {
+	if conn.OverlayConn, err = conn.Router.Overlay.PrepareConnection(params); err != nil {
 		return
 	}
 
 	// As soon as we do AddConnection, the new connection becomes
 	// visible to the packet routing logic.  So AddConnection must
-	// come after MakeForwarder
+	// come after PrepareConnection
 	if err = conn.Router.Ourself.AddConnection(conn); err != nil {
 		return
 	}
 	conn.Router.ConnectionMaker.ConnectionCreated(conn)
 
-	// Forwarder confirmation comes after AddConnection, because
-	// only after that completes do we know the connection is
-	// valid: in particular that it is not a duplicate connection
-	// to the same peer. Sending heartbeats on a duplicate
-	// connection can trip up crypto at the other end, since the
-	// associated UDP packets may get decoded by the other
-	// connection. It is also generally wasteful to engage in any
-	// interaction with the remote on a connection that turns out
-	// to be invalid.
-	conn.forwarder.Confirm()
+	// OverlayConnection confirmation comes after AddConnection,
+	// because only after that completes do we know the connection is
+	// valid: in particular that it is not a duplicate connection to
+	// the same peer. Overlay communication on a duplicate connection
+	// can cause problems such as tripping up overlay crypto at the
+	// other end due to data being decoded by the other connection. It
+	// is also generally wasteful to engage in any interaction with
+	// the remote on a connection that turns out to be invalid.
+	conn.OverlayConn.Confirm()
 
 	// receiveTCP must follow also AddConnection. In the absence
 	// of any indirect connectivity to the remote peer, the first
@@ -341,8 +340,8 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 }
 
 func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
-	fwdErrorChan := conn.forwarder.ErrorChannel()
-	fwdEstablishedChan := conn.forwarder.EstablishedChannel()
+	fwdErrorChan := conn.OverlayConn.ErrorChannel()
+	fwdEstablishedChan := conn.OverlayConn.EstablishedChannel()
 
 	for err == nil {
 		select {
@@ -383,8 +382,8 @@ func (conn *LocalConnection) shutdown(err error) {
 		conn.heartbeatTCP.Stop()
 	}
 
-	if conn.forwarder != nil {
-		conn.forwarder.Stop()
+	if conn.OverlayConn != nil {
+		conn.OverlayConn.Stop()
 	}
 
 	conn.Router.ConnectionMaker.ConnectionTerminated(conn, err)
@@ -428,7 +427,7 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 	switch tag {
 	case ProtocolHeartbeat:
 	case ProtocolConnectionEstablished, ProtocolFragmentationReceived, ProtocolPMTUVerified, ProtocolOverlayControlMsg:
-		conn.forwarder.ControlMessage(byte(tag), payload)
+		conn.OverlayConn.ControlMessage(byte(tag), payload)
 	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:
 		return conn.Router.handleGossip(tag, payload)
 	default:

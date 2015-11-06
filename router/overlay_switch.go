@@ -76,7 +76,7 @@ type namedOverlay struct {
 
 // Find the common set of overlays supported by both sides, with the
 // ordering being the same on both sides too.
-func (osw *OverlaySwitch) commonOverlays(params ForwarderParams) ([]namedOverlay, error) {
+func (osw *OverlaySwitch) commonOverlays(params OverlayConnectionParams) ([]namedOverlay, error) {
 	var peerOverlays []string
 	if overlaysFeature, present := params.Features["Overlays"]; present {
 		peerOverlays = strings.Split(overlaysFeature, " ")
@@ -160,9 +160,9 @@ type subForwarderEvent struct {
 	err error
 }
 
-func (osw *OverlaySwitch) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
+func (osw *OverlaySwitch) PrepareConnection(params OverlayConnectionParams) (OverlayConnection, error) {
 	if _, present := params.Features["Overlays"]; !present && osw.compatOverlay != nil {
-		return osw.compatOverlay.MakeForwarder(params)
+		return osw.compatOverlay.PrepareConnection(params)
 	}
 
 	overlays, err := osw.commonOverlays(params)
@@ -200,11 +200,12 @@ func (osw *OverlaySwitch) MakeForwarder(params ForwarderParams) (OverlayForwarde
 			return origSendControlMessage(ProtocolOverlayControlMsg, xmsg)
 		}
 
-		subFwd, err := overlay.MakeForwarder(params)
+		subConn, err := overlay.PrepareConnection(params)
 		if err != nil {
 			fwd.stopFrom(0)
 			return nil, err
 		}
+		subFwd := subConn.(OverlayForwarder)
 
 		subStopChan := make(chan struct{})
 		go monitorForwarder(i, eventsChan, subStopChan, subFwd)

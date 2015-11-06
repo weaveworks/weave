@@ -349,7 +349,7 @@ type controlMessage struct {
 	msg []byte
 }
 
-func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
+func (sleeve *SleeveOverlay) PrepareConnection(params OverlayConnectionParams) (OverlayConnection, error) {
 	name := sleeve.localPeer.NameByte
 	var crypto sleeveCrypto
 	if params.SessionKey != nil {

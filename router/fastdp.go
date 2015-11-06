@@ -506,7 +506,7 @@ type fastDatapathForwarder struct {
 	errorChan       chan error
 }
 
-func (fastdp fastDatapathOverlay) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
+func (fastdp fastDatapathOverlay) PrepareConnection(params OverlayConnectionParams) (OverlayConnection, error) {
 	if params.SessionKey != nil {
 		// No encryption suport in fastdp.  The weaver main.go
 		// is responsible for ensuring this doesn't happen.

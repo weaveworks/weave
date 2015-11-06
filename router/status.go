@@ -176,7 +176,7 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 				state = "established"
 			}
 			lc, _ := conn.(*LocalConnection)
-			info := fmt.Sprintf("%-6v %v", lc.forwarder.DisplayName(), conn.Remote())
+			info := fmt.Sprintf("%-6v %v", lc.OverlayConn.DisplayName(), conn.Remote())
 			slice = append(slice, LocalConnectionStatus{conn.RemoteTCPAddr(), conn.Outbound(), state, info})
 		}
 		for address, target := range cm.targets {

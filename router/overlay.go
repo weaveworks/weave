@@ -9,8 +9,9 @@ type Overlay interface {
 	// Start consuming forwarded packets.
 	StartConsumingPackets(*Peer, *Peers, OverlayConsumer) error
 
-	// Form a packet-forwarding connection.
-	MakeForwarder(ForwarderParams) (OverlayForwarder, error)
+	// Prepare on overlay connection. The connection should remain
+	// passive until it has been Confirm()ed.
+	PrepareConnection(OverlayConnectionParams) (OverlayConnection, error)
 
 	// The routes have changed, so any cached information should
 	// be discarded.
@@ -26,12 +27,12 @@ type Overlay interface {
 	Diagnostics() interface{}
 }
 
-type ForwarderParams struct {
+type OverlayConnectionParams struct {
 	RemotePeer *Peer
 
 	// The local address of the corresponding TCP connection. Used to
 	// derive the local IP address for sending. May differ for
-	// different forwarders.
+	// different overlay connections.
 	LocalAddr *net.TCPAddr
 
 	// The remote address of the corresponding TCP connection. Used to
@@ -50,7 +51,7 @@ type ForwarderParams struct {
 	SessionKey *[32]byte
 
 	// Function to send a control message to the counterpart
-	// forwarder.
+	// overlay connection.
 	SendControlMessage func(tag byte, msg []byte) error
 
 	// Features passed at connection initiation
@@ -61,26 +62,22 @@ type ForwarderParams struct {
 // to decode the frame.
 type OverlayConsumer func(ForwardPacketKey) FlowOp
 
-// All of the machinery to forward packets to a particular peer
-type OverlayForwarder interface {
-	// Forward a packet across the connection.  May be called as
-	// soon as the forwarder is created, in particular before
-	// Confirm().  The return value nil means the key could not be
-	// handled by this forwarder.
-	Forward(ForwardPacketKey) FlowOp
-
+// All of the machinery to manage overlay connectivity to a particular
+// peer
+type OverlayConnection interface {
 	// Confirm that the connection is really wanted, and so the
-	// Overlay should begin heartbeats etc. to verify the
-	// operation of the forwarder.
+	// Overlay should begin heartbeats etc. to verify the operation of
+	// the overlay connection.
 	Confirm()
 
-	// A channel indicating that the forwarder is established,
-	// i.e. its operation has been confirmed.
+	// A channel indicating that the overlay connection is
+	// established, i.e. its operation has been confirmed.
 	EstablishedChannel() <-chan struct{}
 
-	// A channel indicating an error from the forwarder.  The
-	// forwarder is not expected to be operational after the first
-	// error, so the channel only needs to buffer a single error.
+	// A channel indicating an error from the overlay connection.  The
+	// overlay connection is not expected to be operational after the
+	// first error, so the channel only needs to buffer a single
+	// error.
 	ErrorChannel() <-chan error
 
 	Stop()
@@ -94,13 +91,23 @@ type OverlayForwarder interface {
 	DisplayName() string
 }
 
+// All of the machinery to forward packets to a particular peer
+type OverlayForwarder interface {
+	OverlayConnection
+	// Forward a packet across the connection.  May be called as soon
+	// as the overlay connection is created, in particular before
+	// Confirm().  The return value nil means the key could not be
+	// handled by this forwarder.
+	Forward(ForwardPacketKey) FlowOp
+}
+
 type NullOverlay struct{}
 
 func (NullOverlay) StartConsumingPackets(*Peer, *Peers, OverlayConsumer) error {
 	return nil
 }
 
-func (NullOverlay) MakeForwarder(ForwarderParams) (OverlayForwarder, error) {
+func (NullOverlay) PrepareConnection(OverlayConnectionParams) (OverlayConnection, error) {
 	return NullOverlay{}, nil
 }
 
