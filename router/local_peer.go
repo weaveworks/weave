@@ -62,21 +62,16 @@ func (peer *LocalPeer) CreateConnection(peerAddr string, acceptNewPeer bool) err
 	if err := peer.checkConnectionLimit(); err != nil {
 		return err
 	}
-	tcpAddr, tcpErr := net.ResolveTCPAddr("tcp4", peerAddr)
-	udpAddr, udpErr := net.ResolveUDPAddr("udp4", peerAddr)
-	if tcpErr != nil || udpErr != nil {
-		// they really should have the same value, but just in case...
-		if tcpErr == nil {
-			return udpErr
-		}
-		return tcpErr
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", peerAddr)
+	if err != nil {
+		return err
 	}
 	tcpConn, err := net.DialTCP("tcp4", nil, tcpAddr)
 	if err != nil {
 		return err
 	}
 	connRemote := NewRemoteConnection(peer.Peer, nil, tcpConn.RemoteAddr().String(), true, false)
-	StartLocalConnection(connRemote, tcpConn, udpAddr, peer.router, acceptNewPeer)
+	StartLocalConnection(connRemote, tcpConn, peer.router, acceptNewPeer)
 	return nil
 }
 

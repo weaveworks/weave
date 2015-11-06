@@ -523,15 +523,16 @@ func (fastdp fastDatapathOverlay) MakeForwarder(params ForwarderParams) (Overlay
 	}
 
 	vxlanVportID := fastdp.mainVxlanVportID
-	remoteAddr := params.RemoteAddr
-	if remoteAddr != nil {
+	var remoteAddr *net.UDPAddr
+
+	if params.Outbound {
+		remoteAddr = makeUDPAddr(params.RemoteAddr)
 		// The provided address contains the main weave port
 		// number to connect to.  We need to derive the vxlan
 		// port number from that.
-		vxlanRemoteAddr := *params.RemoteAddr
+		vxlanRemoteAddr := *remoteAddr
 		vxlanRemoteAddr.Port++
 		remoteAddr = &vxlanRemoteAddr
-
 		var err error
 		vxlanVportID, err = fastdp.getVxlanVportID(remoteAddr.Port)
 		if err != nil {
@@ -539,7 +540,7 @@ func (fastdp fastDatapathOverlay) MakeForwarder(params ForwarderParams) (Overlay
 		}
 	}
 
-	localIP, err := ipv4Bytes(params.LocalIP)
+	localIP, err := ipv4Bytes(params.LocalAddr.IP)
 	if err != nil {
 		return nil, err
 	}

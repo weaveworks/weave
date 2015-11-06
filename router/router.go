@@ -171,7 +171,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	remoteAddrStr := tcpConn.RemoteAddr().String()
 	log.Printf("->[%s] connection accepted", remoteAddrStr)
 	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr, false, false)
-	StartLocalConnection(connRemote, tcpConn, nil, router, true)
+	StartLocalConnection(connRemote, tcpConn, router, true)
 }
 
 func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
