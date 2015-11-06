@@ -196,7 +196,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 		RemoteAddr:         conn.TCPConn.RemoteAddr().(*net.TCPAddr),
 		Outbound:           conn.outbound,
 		ConnUID:            conn.uid,
-		Crypto:             conn.forwarderCrypto(),
+		SessionKey:         conn.SessionKey,
 		SendControlMessage: conn.sendOverlayControlMessage,
 		Features:           intro.Features,
 	}
@@ -388,19 +388,6 @@ func (conn *LocalConnection) shutdown(err error) {
 	}
 
 	conn.Router.ConnectionMaker.ConnectionTerminated(conn, err)
-}
-
-func (conn *LocalConnection) forwarderCrypto() *OverlayCrypto {
-	if !conn.Router.UsingPassword() {
-		return nil
-	}
-
-	name := conn.local.NameByte
-	return &OverlayCrypto{
-		Dec:   NewNaClDecryptor(conn.SessionKey, conn.outbound),
-		Enc:   NewNaClEncryptor(name, conn.SessionKey, conn.outbound, false),
-		EncDF: NewNaClEncryptor(name, conn.SessionKey, conn.outbound, true),
-	}
 }
 
 func (conn *LocalConnection) sendOverlayControlMessage(tag byte, msg []byte) error {

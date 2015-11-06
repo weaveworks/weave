@@ -46,8 +46,8 @@ type ForwarderParams struct {
 	// Unique identifier for this connection
 	ConnUID uint64
 
-	// Crypto bits.  Nil if not encrypting
-	Crypto *OverlayCrypto
+	// Session key, if connection is encrypted; nil otherwise
+	SessionKey *[32]byte
 
 	// Function to send a control message to the counterpart
 	// forwarder.

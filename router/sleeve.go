@@ -344,11 +344,15 @@ type controlMessage struct {
 }
 
 func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
+	name := sleeve.localPeer.NameByte
 	var crypto OverlayCrypto
-	if params.Crypto != nil {
-		crypto = *params.Crypto
+	if params.SessionKey != nil {
+		crypto = OverlayCrypto{
+			Dec:   NewNaClDecryptor(params.SessionKey, params.Outbound),
+			Enc:   NewNaClEncryptor(name, params.SessionKey, params.Outbound, false),
+			EncDF: NewNaClEncryptor(name, params.SessionKey, params.Outbound, true),
+		}
 	} else {
-		name := sleeve.localPeer.NameByte
 		crypto = OverlayCrypto{
 			Dec:   NewNonDecryptor(),
 			Enc:   NewNonEncryptor(name),
