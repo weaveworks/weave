@@ -72,6 +72,5 @@ start_container          $HOST2 --name=c4 -h $NAME4
 start_container_with_dns $HOST1 --name=c3
 C4=$(container_ip $HOST2 c4)
 assert_dns_record $HOST1 c3 $NAME4 $C4
-assert_raises "exec_on $HOST1 c3 getent hosts 8.8.8.8 | grep google"
 
 end_suite
