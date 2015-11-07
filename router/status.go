@@ -14,15 +14,19 @@ type Status struct {
 	Name               string
 	NickName           string
 	Port               int
-	Interface          string
-	CaptureStats       map[string]int
-	MACs               []MACStatus
 	Peers              []PeerStatus
 	UnicastRoutes      []UnicastRouteStatus
 	BroadcastRoutes    []BroadcastRouteStatus
 	Connections        []LocalConnectionStatus
 	Targets            []string
 	OverlayDiagnostics interface{}
+}
+
+type NetworkRouterStatus struct {
+	*Status
+	Interface    string
+	CaptureStats map[string]int
+	MACs         []MACStatus
 }
 
 type MACStatus struct {
@@ -65,7 +69,7 @@ type LocalConnectionStatus struct {
 	Info     string
 }
 
-func NewStatus(router *NetworkRouter) *Status {
+func NewStatus(router *Router) *Status {
 	return &Status{
 		Protocol,
 		ProtocolMinVersion,
@@ -75,15 +79,20 @@ func NewStatus(router *NetworkRouter) *Status {
 		router.Ourself.Name.String(),
 		router.Ourself.NickName,
 		router.Port,
-		router.Bridge.String(),
-		router.Bridge.Stats(),
-		NewMACStatusSlice(router.Macs),
 		NewPeerStatusSlice(router.Peers),
 		NewUnicastRouteStatusSlice(router.Routes),
 		NewBroadcastRouteStatusSlice(router.Routes),
 		NewLocalConnectionStatusSlice(router.ConnectionMaker),
 		NewTargetSlice(router.ConnectionMaker),
 		router.Overlay.Diagnostics()}
+}
+
+func NewNetworkRouterStatus(router *NetworkRouter) *NetworkRouterStatus {
+	return &NetworkRouterStatus{
+		NewStatus(router.Router),
+		router.Bridge.String(),
+		router.Bridge.Stats(),
+		NewMACStatusSlice(router.Macs)}
 }
 
 func NewMACStatusSlice(cache *MacCache) []MACStatus {

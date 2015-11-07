@@ -146,16 +146,16 @@ var dnsEntriesTemplate = defTemplate("dnsEntries", `\
 
 type WeaveStatus struct {
 	Version string
-	Router  *weave.Status      `json:"Router,omitempty"`
-	IPAM    *ipam.Status       `json:"IPAM,omitempty"`
-	DNS     *nameserver.Status `json:"DNS,omitempty"`
+	Router  *weave.NetworkRouterStatus `json:"Router,omitempty"`
+	IPAM    *ipam.Status               `json:"IPAM,omitempty"`
+	DNS     *nameserver.Status         `json:"DNS,omitempty"`
 }
 
 func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
 	status := func() WeaveStatus {
 		return WeaveStatus{
 			version,
-			weave.NewStatus(router),
+			weave.NewNetworkRouterStatus(router),
 			ipam.NewStatus(allocator, defaultSubnet),
 			nameserver.NewStatus(ns, dnsserver)}
 	}
