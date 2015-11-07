@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -10,6 +11,18 @@ import (
 )
 
 const (
+	Port                = 6783
+	HTTPPort            = Port + 1
+	MaxUDPPacketSize    = 65535
+	ChannelSize         = 16
+	TCPHeartbeat        = 30 * time.Second
+	GossipInterval      = 30 * time.Second
+	MaxDuration         = time.Duration(math.MaxInt64)
+	FastHeartbeat       = 500 * time.Millisecond
+	SlowHeartbeat       = 10 * time.Second
+	MaxMissedHeartbeats = 6
+	HeartbeatTimeout    = MaxMissedHeartbeats * SlowHeartbeat
+
 	macMaxAge        = 10 * time.Minute       // [1]
 	acceptMaxTokens  = 100                    // [2]
 	acceptTokenDelay = 100 * time.Millisecond // [3]

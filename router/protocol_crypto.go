@@ -13,6 +13,8 @@ import (
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
+const MaxTCPMsgSize = 10 * 1024 * 1024
+
 func GenerateKeyPair() (publicKey, privateKey *[32]byte, err error) {
 	return box.GenerateKey(rand.Reader)
 }
