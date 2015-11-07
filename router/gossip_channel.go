@@ -239,3 +239,12 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 func (c *GossipChannel) log(args ...interface{}) {
 	log.Println(append(append([]interface{}{}, "[gossip "+c.name+"]:"), args...)...)
 }
+
+func GobEncode(items ...interface{}) []byte {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	for _, i := range items {
+		checkFatal(enc.Encode(i))
+	}
+	return buf.Bytes()
+}

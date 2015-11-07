@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"syscall"
 	"time"
@@ -1132,4 +1133,23 @@ func tickerChan(ticker *time.Ticker) <-chan time.Time {
 		return ticker.C
 	}
 	return nil
+}
+
+func makeUDPAddr(addr *net.TCPAddr) *net.UDPAddr {
+	return &net.UDPAddr{IP: addr.IP, Port: addr.Port, Zone: addr.Zone}
+}
+
+// Look inside an error produced by the net package to get to the
+// syscall.Errno at the root of the problem.
+func PosixError(err error) error {
+	if operr, ok := err.(*net.OpError); ok {
+		err = operr.Err
+	}
+
+	// go1.5 wraps an Errno inside a SyscallError inside an OpError
+	if scerr, ok := err.(*os.SyscallError); ok {
+		err = scerr.Err
+	}
+
+	return err
 }

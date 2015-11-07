@@ -414,7 +414,7 @@ func (conn *LocalConnection) sendSimpleProtocolMsg(tag ProtocolTag) error {
 }
 
 func (conn *LocalConnection) sendProtocolMsg(m ProtocolMsg) error {
-	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
+	return conn.tcpSender.Send(append([]byte{byte(m.tag)}, m.msg...))
 }
 
 func (conn *LocalConnection) receiveTCP(receiver TCPReceiver) {

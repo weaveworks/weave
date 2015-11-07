@@ -180,6 +180,10 @@ type PacketDecodingError struct {
 	Desc string
 }
 
+func (pde PacketDecodingError) Error() string {
+	return fmt.Sprint("Failed to decode packet: ", pde.Desc)
+}
+
 func NewNonDecryptor() *NonDecryptor {
 	return &NonDecryptor{}
 }

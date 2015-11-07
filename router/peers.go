@@ -3,10 +3,13 @@ package router
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"io"
 	"math/rand"
 	"sync"
 )
+
+var void = struct{}{}
 
 type Peers struct {
 	sync.RWMutex
@@ -33,8 +36,16 @@ type UnknownPeerError struct {
 	Name PeerName
 }
 
+func (upe UnknownPeerError) Error() string {
+	return fmt.Sprint("Reference to unknown peer ", upe.Name)
+}
+
 type NameCollisionError struct {
 	Name PeerName
+}
+
+func (nce NameCollisionError) Error() string {
+	return fmt.Sprint("Multiple peers found with same name: ", nce.Name)
 }
 
 type PeerNameSet map[PeerName]struct{}

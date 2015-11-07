@@ -112,3 +112,20 @@ func (cache *MacCache) expire() {
 	}
 	cache.setExpiryTimer()
 }
+
+func macint(mac net.HardwareAddr) (r uint64) {
+	for _, b := range mac {
+		r <<= 8
+		r |= uint64(b)
+	}
+	return
+}
+
+func intmac(key uint64) (r net.HardwareAddr) {
+	r = make([]byte, 6)
+	for i := 5; i >= 0; i-- {
+		r[i] = byte(key)
+		key >>= 8
+	}
+	return
+}

@@ -608,17 +608,17 @@ func encodeRange(r address.Range) []byte {
 }
 
 func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) error {
-	msg := router.Concat([]byte{msgSpaceRequest}, encodeRange(r))
+	msg := append([]byte{msgSpaceRequest}, encodeRange(r)...)
 	return alloc.gossip.GossipUnicast(dest, msg)
 }
 
 func (alloc *Allocator) sendSpaceRequestDenied(dest router.PeerName, r address.Range) error {
-	msg := router.Concat([]byte{msgSpaceRequestDenied}, encodeRange(r))
+	msg := append([]byte{msgSpaceRequestDenied}, encodeRange(r)...)
 	return alloc.gossip.GossipUnicast(dest, msg)
 }
 
 func (alloc *Allocator) sendRingUpdate(dest router.PeerName) {
-	msg := router.Concat([]byte{msgRingUpdate}, alloc.encode())
+	msg := append([]byte{msgRingUpdate}, alloc.encode()...)
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 

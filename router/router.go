@@ -5,6 +5,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/weaveworks/weave/common"
 )
 
 const (
@@ -19,6 +21,12 @@ const (
 // [2] capacity of token bucket for rate limiting accepts
 
 // [3] control rate at which new tokens are added to the bucket
+
+var (
+	log        = common.Log
+	checkFatal = common.CheckFatal
+	checkWarn  = common.CheckWarn
+)
 
 type Config struct {
 	Port               int
