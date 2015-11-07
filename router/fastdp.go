@@ -366,18 +366,14 @@ func (fastdp fastDatapathOverlay) Diagnostics() interface{} {
 	defer lock.unlock()
 
 	vports, err := fastdp.dp.EnumerateVports()
-	if err != nil {
-		log.Warn(err)
-	}
+	checkWarn(err)
 	vportStatuses := make([]VportStatus, 0, len(vports))
 	for _, vport := range vports {
 		vportStatuses = append(vportStatuses, VportStatus(vport))
 	}
 
 	flows, err := fastdp.dp.EnumerateFlows()
-	if err != nil {
-		log.Warn(err)
-	}
+	checkWarn(err)
 	flowStatuses := make([]FlowStatus, 0, len(flows))
 	for _, flow := range flows {
 		flowStatuses = append(flowStatuses, FlowStatus(flow))
@@ -893,9 +889,7 @@ func (fastdp *FastDatapath) expireFlows() {
 	defer lock.unlock()
 
 	flows, err := fastdp.dp.EnumerateFlows()
-	if err != nil {
-		log.Warn(err)
-	}
+	checkWarn(err)
 
 	for _, flow := range flows {
 		if flow.Used == 0 {
