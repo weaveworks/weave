@@ -259,8 +259,7 @@ func (fastdp *FastDatapath) bridge(ingress bridgePortID, key PacketKey, lock *fa
 	// If we know about the destination MAC, deliver it to the
 	// associated port.
 	if sender := fastdp.sendToMAC[key.DstMAC]; sender != nil {
-		return NewMultiFlowOp(false, odpEthernetFlowKey(key),
-			sender(key, lock))
+		return NewMultiFlowOp(false, odpEthernetFlowKey(key), sender(key, lock))
 	}
 
 	// Otherwise, it might be a real broadcast, or it might
@@ -344,8 +343,7 @@ func (flowStatus *FlowStatus) MarshalJSON() ([]byte, error) {
 		actions = append(actions, fmt.Sprint(action))
 	}
 
-	return json.Marshal(&jsonFlowStatus{flowKeys, actions,
-		flowStatus.Packets, flowStatus.Bytes, flowStatus.Used})
+	return json.Marshal(&jsonFlowStatus{flowKeys, actions, flowStatus.Packets, flowStatus.Bytes, flowStatus.Used})
 }
 
 type VportStatus odp.Vport
@@ -357,8 +355,7 @@ func (vport *VportStatus) MarshalJSON() ([]byte, error) {
 		TypeName string
 	}
 
-	return json.Marshal(&jsonVportStatus{vport.ID, vport.Spec.Name(),
-		vport.Spec.TypeName()})
+	return json.Marshal(&jsonVportStatus{vport.ID, vport.Spec.Name(), vport.Spec.TypeName()})
 }
 
 func (fastdp fastDatapathOverlay) Diagnostics() interface{} {
@@ -411,8 +408,7 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 	}
 
 	vxlanVportID, err := fastdp.dp.CreateVport(
-		odp.NewVxlanVportSpec(fmt.Sprintf("vxlan-%d", udpPort),
-			uint16(udpPort)))
+		odp.NewVxlanVportSpec(fmt.Sprintf("vxlan-%d", udpPort), uint16(udpPort)))
 	if err != nil {
 		return 0, err
 	}
@@ -458,8 +454,7 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 		tunnelFlowKey.SetIpv4Src(tunKey.Ipv4Src)
 		tunnelFlowKey.SetIpv4Dst(tunKey.Ipv4Dst)
 
-		return NewMultiFlowOp(false, odpFlowKey(tunnelFlowKey),
-			consumer(key))
+		return NewMultiFlowOp(false, odpFlowKey(tunnelFlowKey), consumer(key))
 	}
 
 	return vxlanVportID, nil
@@ -698,8 +693,7 @@ func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender 
 			fwd.heartbeatTimer.Reset(0)
 		}
 	} else if !udpAddrsEqual(fwd.remoteAddr, sender) {
-		log.Info(fwd.logPrefix(),
-			"Peer IP address changed to ", sender)
+		log.Info(fwd.logPrefix(), "Peer IP address changed to ", sender)
 		fwd.remoteAddr = sender
 	}
 
@@ -724,8 +718,7 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 		fwd.handleHeartbeatAck()
 
 	default:
-		log.Info(fwd.logPrefix(),
-			"Ignoring unknown control message: ", tag)
+		log.Info(fwd.logPrefix(), "Ignoring unknown control message: ", tag)
 	}
 }
 
@@ -950,8 +943,7 @@ func (fastdp *FastDatapath) Miss(packet []byte, fks odp.FlowKeys) error {
 	// delivery to a local netdev based on the dest MAC),
 	// including the ingress in every flow makes things simpler
 	// in touchFlow.
-	mfop := NewMultiFlowOp(false, handler(fks, &lock),
-		odpFlowKey(odp.NewInPortFlowKey(ingress)))
+	mfop := NewMultiFlowOp(false, handler(fks, &lock), odpFlowKey(odp.NewInPortFlowKey(ingress)))
 	fastdp.send(mfop, packet, &lock)
 	return nil
 }
@@ -1019,8 +1011,7 @@ func (fastdp *FastDatapath) makeBridgeVport(vport odp.Vport) {
 
 	// Packets coming from the netdev are processed by the bridge
 	fastdp.missHandlers[vportID] = func(flowKeys odp.FlowKeys, lock *fastDatapathLock) FlowOp {
-		return fastdp.bridge(bridgePortID{vport: vportID},
-			flowKeysToPacketKey(flowKeys), lock)
+		return fastdp.bridge(bridgePortID{vport: vportID}, flowKeysToPacketKey(flowKeys), lock)
 	}
 }
 

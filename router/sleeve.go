@@ -75,8 +75,7 @@ func NewSleeveOverlay(localPort int) Overlay {
 }
 
 func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers, consumer OverlayConsumer) error {
-	localAddr, err := net.ResolveUDPAddr("udp4",
-		fmt.Sprint(":", sleeve.localPort))
+	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", sleeve.localPort))
 	if err != nil {
 		return err
 	}
@@ -96,8 +95,7 @@ func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers
 
 	// This makes sure all packets we send out do not have DF set
 	// on them.
-	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP,
-		syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DONT)
+	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DONT)
 	if err != nil {
 		return err
 	}
@@ -184,8 +182,7 @@ func (sleeve *SleeveOverlay) readUDP() {
 
 		err = fwd.crypto.Dec.IterateFrames(packet,
 			func(src []byte, dst []byte, frame []byte) {
-				sleeve.handleFrame(sender, fwd,
-					src, dst, frame, dec)
+				sleeve.handleFrame(sender, fwd, src, dst, frame, dec)
 			})
 		if err != nil {
 			// Errors during UDP packet decoding /
@@ -393,8 +390,7 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		senderDF: newUDPSenderDF(params.LocalAddr.IP, sleeve.localPort),
 	}
 
-	go fwd.run(aggChan, aggDFChan, specialChan, controlMsgChan,
-		confirmedChan, finishedChan)
+	go fwd.run(aggChan, aggDFChan, specialChan, controlMsgChan, confirmedChan, finishedChan)
 	return fwd, nil
 }
 
@@ -445,8 +441,7 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder, broadcast bo
 	fwd.lock.RUnlock()
 
 	if !haveContact {
-		log.Print(fwd.logPrefix(),
-			"Cannot forward frame yet - awaiting contact")
+		log.Print(fwd.logPrefix(), "Cannot forward frame yet - awaiting contact")
 		return
 	}
 
@@ -465,8 +460,7 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder, broadcast bo
 	// of our pipeline.
 	if dec.DF() {
 		if !frameTooBig(frame, mtu) {
-			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName,
-				frame)
+			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName, frame)
 			return
 		}
 
@@ -491,8 +485,7 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder, broadcast bo
 
 		// The frag-needed packet does not have DF set, so the
 		// potential recursion here is bounded.
-		fwd.sleeve.sendToConsumer(f.key.DstPeer, f.key.SrcPeer,
-			fragNeededPacket, dec)
+		fwd.sleeve.sendToConsumer(f.key.DstPeer, f.key.SrcPeer, fragNeededPacket, dec)
 		return
 	}
 
@@ -513,8 +506,7 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder, broadcast bo
 	// fragment it ourself.
 	checkWarn(fragment(dec.Eth, dec.IP, mtu,
 		func(segFrame []byte) {
-			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName,
-				segFrame)
+			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName, segFrame)
 		}))
 }
 
@@ -567,8 +559,7 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, mtu int, forward func([]byte)
 		ip.FragOffset = uint16((offset + offsetBase) >> 3)
 		buf := gopacket.NewSerializeBuffer()
 		segPayload := gopacket.Payload(segmentPayload)
-		err := gopacket.SerializeLayers(buf, opts, &eth, &ip,
-			&segPayload)
+		err := gopacket.SerializeLayers(buf, opts, &eth, &ip, &segPayload)
 		if err != nil {
 			return err
 		}
@@ -620,13 +611,10 @@ loop:
 	for err == nil {
 		select {
 		case frame := <-aggChan:
-			err = fwd.aggregateAndSend(frame, aggChan,
-				fwd.crypto.Enc, fwd.sleeve,
-				MaxUDPPacketSize-UDPOverhead)
+			err = fwd.aggregateAndSend(frame, aggChan, fwd.crypto.Enc, fwd.sleeve, MaxUDPPacketSize-UDPOverhead)
 
 		case frame := <-aggDFChan:
-			err = fwd.aggregateAndSend(frame, aggDFChan,
-				fwd.crypto.EncDF, fwd.senderDF, fwd.maxPayload)
+			err = fwd.aggregateAndSend(frame, aggDFChan, fwd.crypto.EncDF, fwd.senderDF, fwd.maxPayload)
 
 		case sf := <-specialChan:
 			err = fwd.handleSpecialFrame(sf)
@@ -770,8 +758,7 @@ func (fwd *sleeveForwarder) handleControlMessage(cm controlMessage) error {
 		return fwd.handleMTUTestAck(cm.msg)
 
 	default:
-		log.Print(fwd.logPrefix(),
-			"Ignoring unknown control message tag: ", cm.tag)
+		log.Print(fwd.logPrefix(), "Ignoring unknown control message tag: ", cm.tag)
 		return nil
 	}
 }
@@ -830,8 +817,7 @@ func (fwd *sleeveForwarder) handleHeartbeat(special specialFrame) error {
 			}
 		}
 	} else if !udpAddrsEqual(fwd.remoteAddr, special.sender) {
-		log.Print(fwd.logPrefix(),
-			"Peer UDP address changed to ", special.sender)
+		log.Print(fwd.logPrefix(), "Peer UDP address changed to ", special.sender)
 		fwd.setRemoteAddr(special.sender)
 	}
 
