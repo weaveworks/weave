@@ -1126,3 +1126,10 @@ func timerChan(timer *time.Timer) <-chan time.Time {
 	}
 	return nil
 }
+
+func tickerChan(ticker *time.Ticker) <-chan time.Time {
+	if ticker != nil {
+		return ticker.C
+	}
+	return nil
+}

@@ -379,7 +379,9 @@ func (conn *LocalConnection) shutdown(err error) {
 		conn.Router.Ourself.DeleteConnection(conn)
 	}
 
-	stopTicker(conn.heartbeatTCP)
+	if conn.heartbeatTCP != nil {
+		conn.heartbeatTCP.Stop()
+	}
 
 	if conn.forwarder != nil {
 		conn.forwarder.Stop()
@@ -450,17 +452,4 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 
 func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(TCPHeartbeat * 2))
-}
-
-func tickerChan(ticker *time.Ticker) <-chan time.Time {
-	if ticker != nil {
-		return ticker.C
-	}
-	return nil
-}
-
-func stopTicker(ticker *time.Ticker) {
-	if ticker != nil {
-		ticker.Stop()
-	}
 }
