@@ -12,7 +12,6 @@ import (
 
 const (
 	Port                = 6783
-	HTTPPort            = Port + 1
 	MaxUDPPacketSize    = 65535
 	ChannelSize         = 16
 	TCPHeartbeat        = 30 * time.Second
