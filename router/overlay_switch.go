@@ -62,8 +62,7 @@ func (osw *OverlaySwitch) InvalidateShortIDs() {
 
 func (osw *OverlaySwitch) StartConsumingPackets(localPeer *Peer, peers *Peers, consumer OverlayConsumer) error {
 	for _, overlay := range osw.overlays {
-		if err := overlay.StartConsumingPackets(localPeer, peers,
-			consumer); err != nil {
+		if err := overlay.StartConsumingPackets(localPeer, peers, consumer); err != nil {
 			return err
 		}
 	}
@@ -198,8 +197,7 @@ func (osw *OverlaySwitch) MakeForwarder(params ForwarderParams) (OverlayForwarde
 			xmsg[0] = byte(index)
 			xmsg[1] = tag
 			copy(xmsg[2:], msg)
-			return origSendControlMessage(ProtocolOverlayControlMsg,
-				xmsg)
+			return origSendControlMessage(ProtocolOverlayControlMsg, xmsg)
 		}
 
 		subFwd, err := overlay.MakeForwarder(params)
@@ -351,8 +349,7 @@ func (fwd *overlaySwitchForwarder) chooseBest() {
 
 	if fwd.best != best {
 		fwd.best = best
-		log.Info(fwd.logPrefix(),
-			"using ", fwd.forwarders[best].overlayName)
+		log.Info(fwd.logPrefix(), "using ", fwd.forwarders[best].overlayName)
 	}
 }
 
