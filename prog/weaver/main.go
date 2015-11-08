@@ -42,6 +42,7 @@ func main() {
 		addDatapathInterface string
 
 		config                    weave.Config
+		networkConfig             weave.NetworkConfig
 		protocolMinVersion        int
 		ifaceName                 string
 		routerName                string
@@ -163,7 +164,7 @@ func main() {
 		})
 
 		checkFatal(err)
-		config.Bridge = fastdp.Bridge()
+		networkConfig.Bridge = fastdp.Bridge()
 		fastDPOverlay = fastdp.Overlay()
 	}
 
@@ -178,7 +179,7 @@ func main() {
 		checkFatal(err)
 
 		// bufsz flag is in MB
-		config.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024)
+		networkConfig.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024)
 		checkFatal(err)
 	}
 
@@ -229,12 +230,12 @@ func main() {
 	config.PeerDiscovery = !noDiscovery
 
 	if pktdebug {
-		config.PacketLogging = packetLogging{}
+		networkConfig.PacketLogging = packetLogging{}
 	} else {
-		config.PacketLogging = nopPacketLogging{}
+		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	router := weave.NewRouter(config, name, nickName, overlays)
+	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlays)
 	Log.Println("Our name is", router.Ourself)
 
 	var dockerCli *docker.Client
@@ -258,7 +259,7 @@ func main() {
 	var allocator *ipam.Allocator
 	var defaultSubnet address.CIDR
 	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), isKnownPeer)
+		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), isKnownPeer)
 		observeContainers(allocator)
 	} else if peerCount > 0 {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")

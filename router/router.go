@@ -46,9 +46,12 @@ type Config struct {
 	Password           []byte
 	ConnLimit          int
 	PeerDiscovery      bool
-	BufSz              int
-	PacketLogging      PacketLogging
-	Bridge             Bridge
+}
+
+type NetworkConfig struct {
+	BufSz         int
+	PacketLogging PacketLogging
+	Bridge        Bridge
 }
 
 type PacketLogging interface {
@@ -60,7 +63,6 @@ type Router struct {
 	Config
 	Overlay         Overlay
 	Ourself         *LocalPeer
-	Macs            *MacCache
 	Peers           *Peers
 	Routes          *Routes
 	ConnectionMaker *ConnectionMaker
@@ -70,31 +72,20 @@ type Router struct {
 	acceptLimiter   *TokenBucket
 }
 
-func NewRouter(config Config, name PeerName, nickName string, overlay NetworkOverlay) *Router {
+func NewRouter(config Config, name PeerName, nickName string, overlay Overlay) *Router {
 	router := &Router{Config: config, gossipChannels: make(GossipChannels)}
 
-	if router.Bridge == nil {
-		router.Bridge = NullBridge{}
-	}
-
 	if overlay == nil {
-		overlay = NullNetworkOverlay{}
+		overlay = NullOverlay{}
 	}
 
 	router.Overlay = overlay
 	router.Ourself = NewLocalPeer(name, nickName, router)
-	router.Macs = NewMacCache(macMaxAge,
-		func(mac net.HardwareAddr, peer *Peer) {
-			log.Println("Expired MAC", mac, "at", peer)
-		})
 	router.Peers = NewPeers(router.Ourself)
 	router.Peers.OnGC(func(peer *Peer) {
-		router.Macs.Delete(peer)
 		log.Println("Removed unreachable peer", peer)
 	})
-	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes = NewRoutes(router.Ourself, router.Peers)
-	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	router.acceptLimiter = NewTokenBucket(acceptMaxTokens, acceptTokenDelay)
@@ -102,14 +93,45 @@ func NewRouter(config Config, name PeerName, nickName string, overlay NetworkOve
 	return router
 }
 
-// Start listening for TCP connections, locally captured packets, and
-// forwarded packets.  This is separate from NewRouter so
-// that gossipers can register before we start forming connections.
+type NetworkRouter struct {
+	*Router
+	NetworkConfig
+	Macs *MacCache
+}
+
+func NewNetworkRouter(config Config, networkConfig NetworkConfig, name PeerName, nickName string, overlay NetworkOverlay) *NetworkRouter {
+	if overlay == nil {
+		overlay = NullNetworkOverlay{}
+	}
+	if networkConfig.Bridge == nil {
+		networkConfig.Bridge = NullBridge{}
+	}
+
+	router := &NetworkRouter{Router: NewRouter(config, name, nickName, overlay), NetworkConfig: networkConfig}
+	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
+	router.Routes.OnChange(overlay.InvalidateRoutes)
+	router.Macs = NewMacCache(macMaxAge,
+		func(mac net.HardwareAddr, peer *Peer) {
+			log.Println("Expired MAC", mac, "at", peer)
+		})
+	router.Peers.OnGC(func(peer *Peer) { router.Macs.Delete(peer) })
+	return router
+}
+
+// Start listening for TCP connections. This is separate from
+// NewRouter so that gossipers can register before we start forming
+// connections.
 func (router *Router) Start() {
+	router.listenTCP(router.Port)
+}
+
+// Start listening for TCP connections, locally captured packets, and
+// forwarded packets.
+func (router *NetworkRouter) Start() {
 	log.Println("Sniffing traffic on", router.Bridge)
 	checkFatal(router.Bridge.StartConsumingPackets(router.handleCapturedPacket))
 	checkFatal(router.Overlay.(NetworkOverlay).StartConsumingPackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
-	router.listenTCP(router.Port)
+	router.Router.Start()
 }
 
 func (router *Router) Stop() error {
@@ -121,7 +143,7 @@ func (router *Router) UsingPassword() bool {
 	return router.Password != nil
 }
 
-func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
+func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 	router.PacketLogging.LogPacket("Captured", key)
 	srcMac := net.HardwareAddr(key.SrcMAC[:])
 
@@ -195,7 +217,7 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	StartLocalConnection(connRemote, tcpConn, router, true)
 }
 
-func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
+func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp {
 	if key.DstPeer != router.Ourself.Peer {
 		// it's not for us, we're just relaying it
 		router.PacketLogging.LogForwardPacket("Relaying", key)
@@ -247,7 +269,7 @@ func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
 
 // Routing
 
-func (router *Router) relay(key ForwardPacketKey) FlowOp {
+func (router *NetworkRouter) relay(key ForwardPacketKey) FlowOp {
 	relayPeerName, found := router.Routes.Unicast(key.DstPeer.Name)
 	if !found {
 		// Not necessarily an error as there could be a race with the
@@ -266,7 +288,7 @@ func (router *Router) relay(key ForwardPacketKey) FlowOp {
 	return conn.(*LocalConnection).OverlayConn.(OverlayForwarder).Forward(key)
 }
 
-func (router *Router) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
+func (router *NetworkRouter) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
 	nextHops := router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
 		return DiscardingFlowOp{}

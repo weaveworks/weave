@@ -65,7 +65,7 @@ type LocalConnectionStatus struct {
 	Info     string
 }
 
-func NewStatus(router *Router) *Status {
+func NewStatus(router *NetworkRouter) *Status {
 	return &Status{
 		Protocol,
 		ProtocolMinVersion,
