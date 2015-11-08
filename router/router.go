@@ -78,7 +78,7 @@ func NewRouter(config Config, name PeerName, nickName string, overlay NetworkOve
 	}
 
 	if overlay == nil {
-		overlay = NullOverlay{}
+		overlay = NullNetworkOverlay{}
 	}
 
 	router.Overlay = overlay

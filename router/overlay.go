@@ -107,20 +107,16 @@ type OverlayForwarder interface {
 
 type NullOverlay struct{}
 
-func (NullOverlay) StartConsumingPackets(*Peer, *Peers, OverlayConsumer) error {
-	return nil
+func (NullOverlay) AddFeaturesTo(map[string]string) {
 }
 
 func (NullOverlay) PrepareConnection(OverlayConnectionParams) (OverlayConnection, error) {
 	return NullOverlay{}, nil
 }
 
-func (NullOverlay) InvalidateRoutes() {
+func (NullOverlay) Diagnostics() interface{} {
+	return nil
 }
-
-func (NullOverlay) InvalidateShortIDs() {
-}
-
 func (NullOverlay) Confirm() {
 }
 
@@ -130,13 +126,6 @@ func (NullOverlay) EstablishedChannel() <-chan struct{} {
 
 func (NullOverlay) ErrorChannel() <-chan error {
 	return nil
-}
-
-func (NullOverlay) AddFeaturesTo(map[string]string) {
-}
-
-func (NullOverlay) Forward(ForwardPacketKey) FlowOp {
-	return DiscardingFlowOp{}
 }
 
 func (NullOverlay) Stop() {
@@ -149,6 +138,18 @@ func (NullOverlay) DisplayName() string {
 	return "null"
 }
 
-func (NullOverlay) Diagnostics() interface{} {
+type NullNetworkOverlay struct{ NullOverlay }
+
+func (NullNetworkOverlay) InvalidateRoutes() {
+}
+
+func (NullNetworkOverlay) InvalidateShortIDs() {
+}
+
+func (NullNetworkOverlay) StartConsumingPackets(*Peer, *Peers, OverlayConsumer) error {
 	return nil
+}
+
+func (NullNetworkOverlay) Forward(ForwardPacketKey) FlowOp {
+	return DiscardingFlowOp{}
 }
