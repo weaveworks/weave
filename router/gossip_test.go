@@ -20,7 +20,7 @@ type mockChannelConnection struct {
 
 func NewTestRouter(name string) *Router {
 	peerName, _ := PeerNameFromString(name)
-	router := NewRouter(Config{}, peerName, "nick")
+	router := NewRouter(Config{}, peerName, "nick", nil)
 	router.Start()
 	return router
 }

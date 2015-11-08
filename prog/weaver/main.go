@@ -203,7 +203,6 @@ func main() {
 	sleeve := weave.NewSleeveOverlay(config.Port)
 	overlays.Add("sleeve", sleeve)
 	overlays.SetCompatOverlay(sleeve)
-	config.Overlay = overlays
 
 	if routerName == "" {
 		if iface == nil {
@@ -235,7 +234,7 @@ func main() {
 		config.PacketLogging = nopPacketLogging{}
 	}
 
-	router := weave.NewRouter(config, name, nickName)
+	router := weave.NewRouter(config, name, nickName, overlays)
 	Log.Println("Our name is", router.Ourself)
 
 	var dockerCli *docker.Client

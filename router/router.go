@@ -49,7 +49,6 @@ type Config struct {
 	BufSz              int
 	PacketLogging      PacketLogging
 	Bridge             Bridge
-	Overlay            Overlay
 }
 
 type PacketLogging interface {
@@ -59,6 +58,7 @@ type PacketLogging interface {
 
 type Router struct {
 	Config
+	Overlay         Overlay
 	Ourself         *LocalPeer
 	Macs            *MacCache
 	Peers           *Peers
@@ -71,17 +71,18 @@ type Router struct {
 	acceptLimiter   *TokenBucket
 }
 
-func NewRouter(config Config, name PeerName, nickName string) *Router {
+func NewRouter(config Config, name PeerName, nickName string, overlay Overlay) *Router {
 	router := &Router{Config: config, gossipChannels: make(GossipChannels)}
 
 	if router.Bridge == nil {
 		router.Bridge = NullBridge{}
 	}
 
-	if router.Overlay == nil {
-		router.Overlay = NullOverlay{}
+	if overlay == nil {
+		overlay = NullOverlay{}
 	}
 
+	router.Overlay = overlay
 	router.Ourself = NewLocalPeer(name, nickName, router)
 	router.Macs = NewMacCache(macMaxAge,
 		func(mac net.HardwareAddr, peer *Peer) {
@@ -92,11 +93,9 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 		router.Macs.Delete(peer)
 		log.Println("Removed unreachable peer", peer)
 	})
-	router.Peers.OnInvalidateShortIDs(router.Overlay.InvalidateShortIDs)
-
+	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes = NewRoutes(router.Ourself, router.Peers)
-	router.Routes.OnChange(router.Overlay.InvalidateRoutes)
-
+	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	router.acceptLimiter = NewTokenBucket(acceptMaxTokens, acceptTokenDelay)
