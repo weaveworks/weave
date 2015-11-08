@@ -297,7 +297,7 @@ type fastDatapathOverlay struct {
 	*FastDatapath
 }
 
-func (fastdp *FastDatapath) Overlay() Overlay {
+func (fastdp *FastDatapath) Overlay() NetworkOverlay {
 	return fastDatapathOverlay{fastdp}
 }
 

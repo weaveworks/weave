@@ -150,7 +150,7 @@ func main() {
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
-	var fastDPOverlay weave.Overlay
+	var fastDPOverlay weave.NetworkOverlay
 	if datapathName != "" {
 		// A datapath name implies that "Bridge" and "Overlay"
 		// packet handling use fast datapath, although other

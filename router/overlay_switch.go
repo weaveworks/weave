@@ -13,16 +13,16 @@ import (
 // uses the best one that seems to be working.
 
 type OverlaySwitch struct {
-	overlays      map[string]Overlay
+	overlays      map[string]NetworkOverlay
 	overlayNames  []string
-	compatOverlay Overlay
+	compatOverlay NetworkOverlay
 }
 
 func NewOverlaySwitch() *OverlaySwitch {
-	return &OverlaySwitch{overlays: make(map[string]Overlay)}
+	return &OverlaySwitch{overlays: make(map[string]NetworkOverlay)}
 }
 
-func (osw *OverlaySwitch) Add(name string, overlay Overlay) {
+func (osw *OverlaySwitch) Add(name string, overlay NetworkOverlay) {
 	// check for repeated names
 	if _, present := osw.overlays[name]; present {
 		log.Fatal("OverlaySwitch: repeated overlay name")
@@ -32,7 +32,7 @@ func (osw *OverlaySwitch) Add(name string, overlay Overlay) {
 	osw.overlayNames = append(osw.overlayNames, name)
 }
 
-func (osw *OverlaySwitch) SetCompatOverlay(overlay Overlay) {
+func (osw *OverlaySwitch) SetCompatOverlay(overlay NetworkOverlay) {
 	osw.compatOverlay = overlay
 }
 
@@ -70,7 +70,7 @@ func (osw *OverlaySwitch) StartConsumingPackets(localPeer *Peer, peers *Peers, c
 }
 
 type namedOverlay struct {
-	Overlay
+	NetworkOverlay
 	name string
 }
 
@@ -82,7 +82,7 @@ func (osw *OverlaySwitch) commonOverlays(params OverlayConnectionParams) ([]name
 		peerOverlays = strings.Split(overlaysFeature, " ")
 	}
 
-	common := make(map[string]Overlay)
+	common := make(map[string]NetworkOverlay)
 	for _, name := range peerOverlays {
 		if overlay := osw.overlays[name]; overlay != nil {
 			common[name] = overlay

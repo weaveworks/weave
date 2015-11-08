@@ -4,14 +4,21 @@ import (
 	"net"
 )
 
-// Interface to overlay network packet handling
 type Overlay interface {
-	// Start consuming forwarded packets.
-	StartConsumingPackets(*Peer, *Peers, OverlayConsumer) error
+	// Enhance a features map with overlay-related features
+	AddFeaturesTo(map[string]string)
 
 	// Prepare on overlay connection. The connection should remain
 	// passive until it has been Confirm()ed.
 	PrepareConnection(OverlayConnectionParams) (OverlayConnection, error)
+
+	// Obtain diagnostic information specific to the overlay
+	Diagnostics() interface{}
+}
+
+// Interface to overlay network packet handling
+type NetworkOverlay interface {
+	Overlay
 
 	// The routes have changed, so any cached information should
 	// be discarded.
@@ -20,11 +27,8 @@ type Overlay interface {
 	// A mapping of a short id to a peer has changed
 	InvalidateShortIDs()
 
-	// Enhance a features map with overlay-related features
-	AddFeaturesTo(map[string]string)
-
-	// Obtain diagnostic information specific to the overlay
-	Diagnostics() interface{}
+	// Start consuming forwarded packets.
+	StartConsumingPackets(*Peer, *Peers, OverlayConsumer) error
 }
 
 type OverlayConnectionParams struct {

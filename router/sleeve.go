@@ -71,7 +71,7 @@ type SleeveOverlay struct {
 	forwarders map[PeerName]*sleeveForwarder
 }
 
-func NewSleeveOverlay(localPort int) Overlay {
+func NewSleeveOverlay(localPort int) NetworkOverlay {
 	return &SleeveOverlay{localPort: localPort}
 }
 

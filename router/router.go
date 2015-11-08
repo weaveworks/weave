@@ -70,7 +70,7 @@ type Router struct {
 	acceptLimiter   *TokenBucket
 }
 
-func NewRouter(config Config, name PeerName, nickName string, overlay Overlay) *Router {
+func NewRouter(config Config, name PeerName, nickName string, overlay NetworkOverlay) *Router {
 	router := &Router{Config: config, gossipChannels: make(GossipChannels)}
 
 	if router.Bridge == nil {
@@ -108,7 +108,7 @@ func NewRouter(config Config, name PeerName, nickName string, overlay Overlay) *
 func (router *Router) Start() {
 	log.Println("Sniffing traffic on", router.Bridge)
 	checkFatal(router.Bridge.StartConsumingPackets(router.handleCapturedPacket))
-	checkFatal(router.Overlay.StartConsumingPackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
+	checkFatal(router.Overlay.(NetworkOverlay).StartConsumingPackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
 	router.listenTCP(router.Port)
 }
 
@@ -218,7 +218,7 @@ func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
 
 		// We need to clear out any flows destined to the MAC
 		// that forward to the old peer.
-		router.Overlay.InvalidateRoutes()
+		router.Overlay.(NetworkOverlay).InvalidateRoutes()
 	}
 
 	router.PacketLogging.LogForwardPacket("Injecting", key)
