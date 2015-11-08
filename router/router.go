@@ -67,7 +67,6 @@ type Router struct {
 	gossipLock      sync.RWMutex
 	gossipChannels  GossipChannels
 	TopologyGossip  Gossip
-	UDPListener     *net.UDPConn
 	acceptLimiter   *TokenBucket
 }
 
