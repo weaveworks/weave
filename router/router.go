@@ -94,10 +94,13 @@ func NewRouter(config Config, name PeerName, nickName string) *Router {
 	})
 	router.Peers.OnInvalidateShortIDs(router.Overlay.InvalidateShortIDs)
 
-	router.Routes = NewRoutes(router.Ourself, router.Peers, router.Overlay.InvalidateRoutes)
+	router.Routes = NewRoutes(router.Ourself, router.Peers)
+	router.Routes.OnChange(router.Overlay.InvalidateRoutes)
+
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	router.acceptLimiter = NewTokenBucket(acceptMaxTokens, acceptTokenDelay)
+
 	return router
 }
 

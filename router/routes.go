@@ -12,7 +12,7 @@ type Routes struct {
 	sync.RWMutex
 	ourself      *LocalPeer
 	peers        *Peers
-	onChange     func()
+	onChange     []func()
 	unicast      unicastRoutes
 	unicastAll   unicastRoutes // [1]
 	broadcast    broadcastRoutes
@@ -23,13 +23,12 @@ type Routes struct {
 	// symmetric ones
 }
 
-func NewRoutes(ourself *LocalPeer, peers *Peers, onChange func()) *Routes {
+func NewRoutes(ourself *LocalPeer, peers *Peers) *Routes {
 	recalculate := make(chan *struct{}, 1)
 	wait := make(chan chan struct{})
 	routes := &Routes{
 		ourself:      ourself,
 		peers:        peers,
-		onChange:     onChange,
 		unicast:      make(unicastRoutes),
 		unicastAll:   make(unicastRoutes),
 		broadcast:    make(broadcastRoutes),
@@ -42,6 +41,12 @@ func NewRoutes(ourself *LocalPeer, peers *Peers, onChange func()) *Routes {
 	routes.broadcastAll[ourself.Name] = []PeerName{}
 	go routes.run(recalculate, wait)
 	return routes
+}
+
+func (routes *Routes) OnChange(callback func()) {
+	routes.Lock()
+	defer routes.Unlock()
+	routes.onChange = append(routes.onChange, callback)
 }
 
 func (routes *Routes) PeerNames() PeerNameSet {
@@ -159,10 +164,13 @@ func (routes *Routes) calculate() {
 	routes.unicastAll = unicastAll
 	routes.broadcast = broadcast
 	routes.broadcastAll = broadcastAll
+	onChange := routes.onChange
 	routes.Unlock()
 
 	if !unicast.equals(oldUnicast) || !broadcast.equals(oldBroadcast) {
-		routes.onChange()
+		for _, callback := range onChange {
+			callback()
+		}
 	}
 }
 
