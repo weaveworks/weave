@@ -34,6 +34,7 @@ const (
 // - Update is O(n) for now
 type Nameserver struct {
 	sync.RWMutex
+	*Observers
 	ourName     router.PeerName
 	domain      string
 	gossip      router.Gossip
@@ -43,12 +44,14 @@ type Nameserver struct {
 }
 
 func New(ourName router.PeerName, domain string, isKnownPeer func(router.PeerName) bool) *Nameserver {
-	return &Nameserver{
+	ns := &Nameserver{
 		ourName:     ourName,
 		domain:      dns.Fqdn(domain),
 		isKnownPeer: isKnownPeer,
 		quit:        make(chan struct{}),
 	}
+	ns.Observers = NewObservers(ns)
+	return ns
 }
 
 func (n *Nameserver) SetGossip(gossip router.Gossip) {
@@ -88,6 +91,7 @@ func (n *Nameserver) AddEntry(hostname, containerid string, origin router.PeerNa
 	n.Lock()
 	entry := n.entries.add(hostname, containerid, origin, addr)
 	n.Unlock()
+	n.Notify()
 	return n.broadcastEntries(entry)
 }
 
@@ -133,6 +137,7 @@ func (n *Nameserver) ContainerDied(ident string) {
 		return false
 	})
 	n.Unlock()
+	n.Notify()
 	if len(entries) > 0 {
 		if err := n.broadcastEntries(entries...); err != nil {
 			n.errorf("failed to broadcast container %s death: %v", ident, err)
@@ -143,6 +148,7 @@ func (n *Nameserver) ContainerDied(ident string) {
 func (n *Nameserver) PeerGone(peer router.PeerName) {
 	n.infof("peer %s gone", peer.String())
 	n.Lock()
+	defer n.Notify()
 	defer n.Unlock()
 	n.entries.filter(func(e *Entry) bool {
 		return e.Origin != peer
@@ -169,11 +175,13 @@ func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Addr
 		return true
 	})
 	n.Unlock()
+	n.Notify()
 	return n.broadcastEntries(entries...)
 }
 
 func (n *Nameserver) deleteTombstones() {
 	n.Lock()
+	defer n.Notify()
 	defer n.Unlock()
 	now := time.Now().Unix()
 	n.entries.filter(func(e *Entry) bool {
@@ -206,6 +214,7 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 	}
 
 	n.Lock()
+	defer n.Notify()
 	defer n.Unlock()
 
 	gossip.Entries.filter(func(e *Entry) bool {
