@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveworks/weave/router"
+	"github.com/weaveworks/weave/mesh"
 )
 
 type TestNode struct {
@@ -97,8 +97,8 @@ func makeRandomModel(params *TestParams, r *rand.Rand, t *testing.T) *Model {
 	}
 
 	for i := range m.nodes {
-		m.nodes[i].Node = NewNode(router.PeerName(i/2+1),
-			router.PeerUID(r.Int63()), m.quorum)
+		m.nodes[i].Node = NewNode(mesh.PeerName(i/2+1),
+			mesh.PeerUID(r.Int63()), m.quorum)
 		m.nodes[i].Propose()
 	}
 
@@ -172,8 +172,8 @@ func (m *Model) isolateNode(node *TestNode) {
 
 // Restart a node
 func (m *Model) restart(node *TestNode) {
-	node.Node = NewNode(router.PeerName(m.nextID),
-		router.PeerUID(m.r.Int63()), m.quorum)
+	node.Node = NewNode(mesh.PeerName(m.nextID),
+		mesh.PeerUID(m.r.Int63()), m.quorum)
 	m.nextID++
 	node.Propose()
 

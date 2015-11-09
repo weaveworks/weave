@@ -70,7 +70,7 @@ $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
-$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
+$(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
 $(NETCHECK_EXE): prog/netcheck/netcheck.go
 

@@ -1,7 +1,7 @@
 package paxos
 
 import (
-	"github.com/weaveworks/weave/router"
+	"github.com/weaveworks/weave/mesh"
 )
 
 // The node identifier.  The use of the UID here is important: Paxos
@@ -9,8 +9,8 @@ import (
 // node does not restart and lose its Paxos state but claim to have
 // the same ID.
 type NodeID struct {
-	Name router.PeerName
-	UID  router.PeerUID
+	Name mesh.PeerName
+	UID  mesh.PeerUID
 }
 
 // note all fields exported in structs so we can Gob them
@@ -39,7 +39,7 @@ func (a ProposalID) valid() bool {
 }
 
 // For seeding IPAM, the value we want consensus on is a set of peer names
-type Value []router.PeerName
+type Value []mesh.PeerName
 
 // An AcceptedValue is a Value plus the proposal which originated that
 // Value.  The origin is not essential, but makes comparing
@@ -72,7 +72,7 @@ type Node struct {
 	knows  GossipState
 }
 
-func NewNode(name router.PeerName, uid router.PeerUID, quorum uint) *Node {
+func NewNode(name mesh.PeerName, uid mesh.PeerUID, quorum uint) *Node {
 	return &Node{
 		id:     NodeID{name, uid},
 		quorum: quorum,
@@ -223,7 +223,7 @@ func (node *Node) Think() bool {
 // about.  This is not necessarily all peer names, but it is at least
 // a quorum, and so good enough for seeding the ring.
 func (node *Node) pickValue() Value {
-	val := make([]router.PeerName, len(node.knows))
+	val := make([]mesh.PeerName, len(node.knows))
 	i := 0
 	for id := range node.knows {
 		val[i] = id.Name

@@ -1,19 +1,32 @@
 package router
 
 import (
+	"math"
 	"net"
 	"time"
+
+	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/mesh"
 )
 
 const (
+	ChannelSize         = 16
 	MaxUDPPacketSize    = 65535
 	FastHeartbeat       = 500 * time.Millisecond
 	SlowHeartbeat       = 10 * time.Second
 	MaxMissedHeartbeats = 6
 	HeartbeatTimeout    = MaxMissedHeartbeats * SlowHeartbeat
+	MaxDuration         = time.Duration(math.MaxInt64)
+	NameSize            = mesh.NameSize
 	// should be greater than typical ARP cache expiries, i.e. > 3/2 *
 	// /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
 	macMaxAge = 10 * time.Minute
+)
+
+var (
+	log        = common.Log
+	checkFatal = common.CheckFatal
+	checkWarn  = common.CheckWarn
 )
 
 type NetworkConfig struct {
@@ -28,12 +41,12 @@ type PacketLogging interface {
 }
 
 type NetworkRouter struct {
-	*Router
+	*mesh.Router
 	NetworkConfig
 	Macs *MacCache
 }
 
-func NewNetworkRouter(config Config, networkConfig NetworkConfig, name PeerName, nickName string, overlay NetworkOverlay) *NetworkRouter {
+func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh.PeerName, nickName string, overlay NetworkOverlay) *NetworkRouter {
 	if overlay == nil {
 		overlay = NullNetworkOverlay{}
 	}
@@ -41,14 +54,14 @@ func NewNetworkRouter(config Config, networkConfig NetworkConfig, name PeerName,
 		networkConfig.Bridge = NullBridge{}
 	}
 
-	router := &NetworkRouter{Router: NewRouter(config, name, nickName, overlay), NetworkConfig: networkConfig}
+	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay), NetworkConfig: networkConfig}
 	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.Macs = NewMacCache(macMaxAge,
-		func(mac net.HardwareAddr, peer *Peer) {
+		func(mac net.HardwareAddr, peer *mesh.Peer) {
 			log.Println("Expired MAC", mac, "at", peer)
 		})
-	router.Peers.OnGC(func(peer *Peer) { router.Macs.Delete(peer) })
+	router.Peers.OnGC(func(peer *mesh.Peer) { router.Macs.Delete(peer) })
 	return router
 }
 
@@ -174,10 +187,10 @@ func (router *NetworkRouter) relay(key ForwardPacketKey) FlowOp {
 		return DiscardingFlowOp{}
 	}
 
-	return conn.(*LocalConnection).OverlayConn.(OverlayForwarder).Forward(key)
+	return conn.(*mesh.LocalConnection).OverlayConn.(OverlayForwarder).Forward(key)
 }
 
-func (router *NetworkRouter) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
+func (router *NetworkRouter) relayBroadcast(srcPeer *mesh.Peer, key PacketKey) FlowOp {
 	nextHops := router.Routes.Broadcast(srcPeer.Name)
 	if len(nextHops) == 0 {
 		return DiscardingFlowOp{}
@@ -186,7 +199,7 @@ func (router *NetworkRouter) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp
 	op := NewMultiFlowOp(true)
 
 	for _, conn := range router.Ourself.ConnectionsTo(nextHops) {
-		op.Add(conn.(*LocalConnection).OverlayConn.(OverlayForwarder).Forward(ForwardPacketKey{
+		op.Add(conn.(*mesh.LocalConnection).OverlayConn.(OverlayForwarder).Forward(ForwardPacketKey{
 			PacketKey: key,
 			SrcPeer:   srcPeer,
 			DstPeer:   conn.Remote()}))

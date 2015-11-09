@@ -4,14 +4,14 @@ import (
 	"sort"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 // Entry represents entries around the ring
 type entry struct {
 	Token   address.Address // The start of this range
-	Peer    router.PeerName // Who owns this range
+	Peer    mesh.PeerName   // Who owns this range
 	Version uint32          // Version of this range
 	Free    address.Offset  // Number of free IPs in this range
 }
@@ -21,7 +21,7 @@ func (e *entry) Equal(e2 *entry) bool {
 		e.Version == e2.Version
 }
 
-func (e *entry) update(peername router.PeerName, free address.Offset) {
+func (e *entry) update(peername mesh.PeerName, free address.Offset) {
 	e.Peer = peername
 	e.Version++
 	e.Free = free

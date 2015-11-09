@@ -2,12 +2,13 @@ package router
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/weaveworks/weave/common"
-	"net/http"
 )
 
-func (router *Router) HandleHTTP(muxRouter *mux.Router) {
+func (router *NetworkRouter) HandleHTTP(muxRouter *mux.Router) {
 
 	muxRouter.Methods("POST").Path("/connect").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {

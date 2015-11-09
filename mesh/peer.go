@@ -1,4 +1,4 @@
-package router
+package mesh
 
 import (
 	"crypto/rand"

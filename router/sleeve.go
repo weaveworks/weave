@@ -18,6 +18,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+
+	"github.com/weaveworks/weave/mesh"
 )
 
 // This diagram explains the various arithmetic and variables related
@@ -61,21 +63,21 @@ type SleeveOverlay struct {
 
 	// These fields are set in StartConsumingPackets, and not
 	// subsequently modified
-	localPeer    *Peer
+	localPeer    *mesh.Peer
 	localPeerBin []byte
 	consumer     OverlayConsumer
-	peers        *Peers
+	peers        *mesh.Peers
 	conn         *net.UDPConn
 
 	lock       sync.Mutex
-	forwarders map[PeerName]*sleeveForwarder
+	forwarders map[mesh.PeerName]*sleeveForwarder
 }
 
 func NewSleeveOverlay(localPort int) NetworkOverlay {
 	return &SleeveOverlay{localPort: localPort}
 }
 
-func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers, consumer OverlayConsumer) error {
+func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *mesh.Peer, peers *mesh.Peers, consumer OverlayConsumer) error {
 	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", sleeve.localPort))
 	if err != nil {
 		return err
@@ -114,7 +116,7 @@ func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers
 	sleeve.consumer = consumer
 	sleeve.peers = peers
 	sleeve.conn = conn
-	sleeve.forwarders = make(map[PeerName]*sleeveForwarder)
+	sleeve.forwarders = make(map[mesh.PeerName]*sleeveForwarder)
 	go sleeve.readUDP()
 	return nil
 }
@@ -135,19 +137,19 @@ func (*SleeveOverlay) Diagnostics() interface{} {
 	return nil
 }
 
-func (sleeve *SleeveOverlay) lookupForwarder(peer PeerName) *sleeveForwarder {
+func (sleeve *SleeveOverlay) lookupForwarder(peer mesh.PeerName) *sleeveForwarder {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
 	return sleeve.forwarders[peer]
 }
 
-func (sleeve *SleeveOverlay) addForwarder(peer PeerName, fwd *sleeveForwarder) {
+func (sleeve *SleeveOverlay) addForwarder(peer mesh.PeerName, fwd *sleeveForwarder) {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
 	sleeve.forwarders[peer] = fwd
 }
 
-func (sleeve *SleeveOverlay) removeForwarder(peer PeerName, fwd *sleeveForwarder) {
+func (sleeve *SleeveOverlay) removeForwarder(peer mesh.PeerName, fwd *sleeveForwarder) {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
 	if sleeve.forwarders[peer] == fwd {
@@ -172,7 +174,7 @@ func (sleeve *SleeveOverlay) readUDP() {
 			continue
 		}
 
-		fwdName := PeerNameFromBin(buf[:NameSize])
+		fwdName := mesh.PeerNameFromBin(buf[:NameSize])
 		fwd := sleeve.lookupForwarder(fwdName)
 		if fwd == nil {
 			continue
@@ -212,8 +214,8 @@ func (sleeve *SleeveOverlay) handleFrame(sender *net.UDPAddr, fwd *sleeveForward
 		return
 	}
 
-	srcPeer := sleeve.peers.Fetch(PeerNameFromBin(src))
-	dstPeer := sleeve.peers.Fetch(PeerNameFromBin(dst))
+	srcPeer := sleeve.peers.Fetch(mesh.PeerNameFromBin(src))
+	dstPeer := sleeve.peers.Fetch(mesh.PeerNameFromBin(dst))
 	if srcPeer == nil || dstPeer == nil {
 		return
 	}
@@ -240,7 +242,7 @@ func (sleeve *SleeveOverlay) handleFrame(sender *net.UDPAddr, fwd *sleeveForward
 	sleeve.sendToConsumer(srcPeer, dstPeer, frame, dec)
 }
 
-func (sleeve *SleeveOverlay) sendToConsumer(srcPeer, dstPeer *Peer, frame []byte, dec *EthernetDecoder) {
+func (sleeve *SleeveOverlay) sendToConsumer(srcPeer, dstPeer *mesh.Peer, frame []byte, dec *EthernetDecoder) {
 	if sleeve.consumer == nil {
 		return
 	}
@@ -282,7 +284,7 @@ type sleeveCrypto struct {
 type sleeveForwarder struct {
 	// Immutable
 	sleeve         *SleeveOverlay
-	remotePeer     *Peer
+	remotePeer     *mesh.Peer
 	remotePeerBin  []byte
 	sendControlMsg func(byte, []byte) error
 	connUID        uint64
@@ -349,7 +351,7 @@ type controlMessage struct {
 	msg []byte
 }
 
-func (sleeve *SleeveOverlay) PrepareConnection(params OverlayConnectionParams) (OverlayConnection, error) {
+func (sleeve *SleeveOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
 	name := sleeve.localPeer.NameByte
 	var crypto sleeveCrypto
 	if params.SessionKey != nil {
@@ -759,13 +761,13 @@ func (fwd *sleeveForwarder) handleSpecialFrame(special specialFrame) error {
 
 func (fwd *sleeveForwarder) handleControlMessage(cm controlMessage) error {
 	switch cm.tag {
-	case ProtocolConnectionEstablished:
+	case mesh.ProtocolConnectionEstablished:
 		return fwd.handleHeartbeatAck()
 
-	case ProtocolFragmentationReceived:
+	case mesh.ProtocolFragmentationReceived:
 		return fwd.handleFragTestAck()
 
-	case ProtocolPMTUVerified:
+	case mesh.ProtocolPMTUVerified:
 		return fwd.handleMTUTestAck(cm.msg)
 
 	default:
@@ -834,7 +836,7 @@ func (fwd *sleeveForwarder) handleHeartbeat(special specialFrame) error {
 
 	if !fwd.ackedHeartbeat {
 		fwd.ackedHeartbeat = true
-		if err := fwd.sendControlMsg(ProtocolConnectionEstablished, nil); err != nil {
+		if err := fwd.sendControlMsg(mesh.ProtocolConnectionEstablished, nil); err != nil {
 			return err
 		}
 	}
@@ -895,7 +897,7 @@ func (fwd *sleeveForwarder) handleFragTest(frame []byte) error {
 		return nil
 	}
 
-	return fwd.sendControlMsg(ProtocolFragmentationReceived, nil)
+	return fwd.sendControlMsg(mesh.ProtocolFragmentationReceived, nil)
 }
 
 func (fwd *sleeveForwarder) handleFragTestAck() error {
@@ -941,7 +943,7 @@ func (fwd *sleeveForwarder) sendMTUTest() error {
 func (fwd *sleeveForwarder) handleMTUTest(frame []byte) error {
 	buf := make([]byte, 2)
 	binary.BigEndian.PutUint16(buf, uint16(len(frame)-EthernetOverhead))
-	return fwd.sendControlMsg(ProtocolPMTUVerified, buf)
+	return fwd.sendControlMsg(mesh.ProtocolPMTUVerified, buf)
 }
 
 func (fwd *sleeveForwarder) handleMTUTestAck(msg []byte) error {

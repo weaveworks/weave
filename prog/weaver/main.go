@@ -17,6 +17,7 @@ import (
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/ipam"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
@@ -41,7 +42,7 @@ func main() {
 		deleteDatapath       bool
 		addDatapathInterface string
 
-		config                    weave.Config
+		config                    mesh.Config
 		networkConfig             weave.NetworkConfig
 		protocolMinVersion        int
 		ifaceName                 string
@@ -74,8 +75,8 @@ func main() {
 	mflag.BoolVar(&deleteDatapath, []string{"-delete-datapath"}, false, "delete ODP datapath and exit")
 	mflag.StringVar(&addDatapathInterface, []string{"-add-datapath-iface"}, "", "add a network interface to the ODP datapath and exit")
 
-	mflag.IntVar(&config.Port, []string{"#port", "-port"}, weave.Port, "router port")
-	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, weave.ProtocolMinVersion, "minimum weave protocol version")
+	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
+	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
@@ -146,8 +147,8 @@ func main() {
 	Log.Println("Command line options:", options())
 	Log.Println("Command line peers:", peers)
 
-	if protocolMinVersion < weave.ProtocolMinVersion || protocolMinVersion > weave.ProtocolMaxVersion {
-		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", weave.ProtocolMinVersion, weave.ProtocolMaxVersion)
+	if protocolMinVersion < mesh.ProtocolMinVersion || protocolMinVersion > mesh.ProtocolMaxVersion {
+		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", mesh.ProtocolMinVersion, mesh.ProtocolMaxVersion)
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
@@ -212,7 +213,7 @@ func main() {
 		routerName = iface.HardwareAddr.String()
 	}
 
-	name, err := weave.PeerNameFromUserInput(routerName)
+	name, err := mesh.PeerNameFromUserInput(routerName)
 	checkFatal(err)
 
 	if nickName == "" {
@@ -253,7 +254,7 @@ func main() {
 			}
 		}
 	}
-	isKnownPeer := func(name weave.PeerName) bool {
+	isKnownPeer := func(name mesh.PeerName) bool {
 		return router.Peers.Fetch(name) != nil
 	}
 	var allocator *ipam.Allocator
@@ -271,7 +272,7 @@ func main() {
 	)
 	if !noDNS {
 		ns = nameserver.New(router.Ourself.Peer.Name, dnsDomain, isKnownPeer)
-		router.Peers.OnGC(func(peer *weave.Peer) { ns.PeerGone(peer.Name) })
+		router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
 		ns.SetGossip(router.NewGossip("nameserver", ns))
 		observeContainers(ns)
 		ns.Start()
@@ -366,7 +367,7 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	return cidr
 }
 
-func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr string, quorum uint, isKnownPeer func(weave.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr string, quorum uint, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange := parseAndCheckCIDR(ipRangeStr)
 	defaultSubnet := ipRange
 	if defaultSubnetStr != "" {
