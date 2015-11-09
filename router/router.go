@@ -11,28 +11,19 @@ import (
 )
 
 const (
-	Port                = 6783
-	MaxUDPPacketSize    = 65535
-	ChannelSize         = 16
-	TCPHeartbeat        = 30 * time.Second
-	GossipInterval      = 30 * time.Second
-	MaxDuration         = time.Duration(math.MaxInt64)
-	FastHeartbeat       = 500 * time.Millisecond
-	SlowHeartbeat       = 10 * time.Second
-	MaxMissedHeartbeats = 6
-	HeartbeatTimeout    = MaxMissedHeartbeats * SlowHeartbeat
+	Port           = 6783
+	ChannelSize    = 16
+	TCPHeartbeat   = 30 * time.Second
+	GossipInterval = 30 * time.Second
+	MaxDuration    = time.Duration(math.MaxInt64)
 
-	macMaxAge        = 10 * time.Minute       // [1]
-	acceptMaxTokens  = 100                    // [2]
-	acceptTokenDelay = 100 * time.Millisecond // [3]
+	acceptMaxTokens  = 100                    // [1]
+	acceptTokenDelay = 100 * time.Millisecond // [2]
 )
 
-// [1] should be greater than typical ARP cache expiries, i.e. > 3/2 *
-// /proc/sys/net/ipv4_neigh/*/base_reachable_time_ms on Linux
+// [1] capacity of token bucket for rate limiting accepts
 
-// [2] capacity of token bucket for rate limiting accepts
-
-// [3] control rate at which new tokens are added to the bucket
+// [2] control rate at which new tokens are added to the bucket
 
 var (
 	log        = common.Log
@@ -46,21 +37,12 @@ type Config struct {
 	Password           []byte
 	ConnLimit          int
 	PeerDiscovery      bool
-	BufSz              int
-	PacketLogging      PacketLogging
-	Bridge             Bridge
-}
-
-type PacketLogging interface {
-	LogPacket(string, PacketKey)
-	LogForwardPacket(string, ForwardPacketKey)
 }
 
 type Router struct {
 	Config
 	Overlay         Overlay
 	Ourself         *LocalPeer
-	Macs            *MacCache
 	Peers           *Peers
 	Routes          *Routes
 	ConnectionMaker *ConnectionMaker
@@ -73,28 +55,17 @@ type Router struct {
 func NewRouter(config Config, name PeerName, nickName string, overlay Overlay) *Router {
 	router := &Router{Config: config, gossipChannels: make(GossipChannels)}
 
-	if router.Bridge == nil {
-		router.Bridge = NullBridge{}
-	}
-
 	if overlay == nil {
 		overlay = NullOverlay{}
 	}
 
 	router.Overlay = overlay
 	router.Ourself = NewLocalPeer(name, nickName, router)
-	router.Macs = NewMacCache(macMaxAge,
-		func(mac net.HardwareAddr, peer *Peer) {
-			log.Println("Expired MAC", mac, "at", peer)
-		})
 	router.Peers = NewPeers(router.Ourself)
 	router.Peers.OnGC(func(peer *Peer) {
-		router.Macs.Delete(peer)
 		log.Println("Removed unreachable peer", peer)
 	})
-	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes = NewRoutes(router.Ourself, router.Peers)
-	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.ConnectionMaker = NewConnectionMaker(router.Ourself, router.Peers, router.Port, router.PeerDiscovery)
 	router.TopologyGossip = router.NewGossip("topology", router)
 	router.acceptLimiter = NewTokenBucket(acceptMaxTokens, acceptTokenDelay)
@@ -102,13 +73,10 @@ func NewRouter(config Config, name PeerName, nickName string, overlay Overlay) *
 	return router
 }
 
-// Start listening for TCP connections, locally captured packets, and
-// forwarded packets.  This is separate from NewRouter so
-// that gossipers can register before we start forming connections.
+// Start listening for TCP connections. This is separate from
+// NewRouter so that gossipers can register before we start forming
+// connections.
 func (router *Router) Start() {
-	log.Println("Sniffing traffic on", router.Bridge)
-	checkFatal(router.Bridge.StartConsumingPackets(router.handleCapturedPacket))
-	checkFatal(router.Overlay.StartConsumingPackets(router.Ourself.Peer, router.Peers, router.handleForwardedPacket))
 	router.listenTCP(router.Port)
 }
 
@@ -119,51 +87,6 @@ func (router *Router) Stop() error {
 
 func (router *Router) UsingPassword() bool {
 	return router.Password != nil
-}
-
-func (router *Router) handleCapturedPacket(key PacketKey) FlowOp {
-	router.PacketLogging.LogPacket("Captured", key)
-	srcMac := net.HardwareAddr(key.SrcMAC[:])
-
-	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, router.Ourself.Peer); {
-	case newSrcMac:
-		log.Println("Discovered local MAC", srcMac)
-
-	case conflictPeer != nil:
-		// The MAC cache has an entry for the source MAC
-		// associated with another peer.  This probably means
-		// we are seeing a frame we injected ourself.  That
-		// shouldn't happen, but discard it just in case.
-		log.Error("Captured frame from MAC (", srcMac, ") associated with another peer ", conflictPeer)
-		return DiscardingFlowOp{}
-	}
-
-	// Discard STP broadcasts
-	if key.DstMAC == [...]byte{0x01, 0x80, 0xC2, 0x00, 0x00, 0x00} {
-		return DiscardingFlowOp{}
-	}
-
-	dstMac := net.HardwareAddr(key.DstMAC[:])
-	switch dstPeer := router.Macs.Lookup(dstMac); dstPeer {
-	case router.Ourself.Peer:
-		// The packet is destined for a local MAC.  The bridge
-		// won't normally send us such packets, and if it does
-		// it's likely to be broadcasting the packet to all
-		// ports.  So if it happens, just drop the packet to
-		// avoid warnings if we try to forward it.
-		return DiscardingFlowOp{}
-	case nil:
-		// If we don't know which peer corresponds to the dest
-		// MAC, broadcast it.
-		router.PacketLogging.LogPacket("Broadcasting", key)
-		return router.relayBroadcast(router.Ourself.Peer, key)
-	default:
-		router.PacketLogging.LogPacket("Forwarding", key)
-		return router.relay(ForwardPacketKey{
-			PacketKey: key,
-			SrcPeer:   router.Ourself.Peer,
-			DstPeer:   dstPeer})
-	}
 }
 
 func (router *Router) listenTCP(localPort int) {
@@ -193,95 +116,6 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 	log.Printf("->[%s] connection accepted", remoteAddrStr)
 	connRemote := NewRemoteConnection(router.Ourself.Peer, nil, remoteAddrStr, false, false)
 	StartLocalConnection(connRemote, tcpConn, router, true)
-}
-
-func (router *Router) handleForwardedPacket(key ForwardPacketKey) FlowOp {
-	if key.DstPeer != router.Ourself.Peer {
-		// it's not for us, we're just relaying it
-		router.PacketLogging.LogForwardPacket("Relaying", key)
-		return router.relay(key)
-	}
-
-	// At this point, it's either unicast to us, or a broadcast
-	// (because the DstPeer on a forwarded broadcast packet is
-	// always set to the peer being forwarded to)
-
-	srcMac := net.HardwareAddr(key.SrcMAC[:])
-	dstMac := net.HardwareAddr(key.DstMAC[:])
-
-	switch newSrcMac, conflictPeer := router.Macs.AddForced(srcMac, key.SrcPeer); {
-	case newSrcMac:
-		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer)
-
-	case conflictPeer != nil:
-		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer, " (was at ", conflictPeer, ")")
-
-		// We need to clear out any flows destined to the MAC
-		// that forward to the old peer.
-		router.Overlay.InvalidateRoutes()
-	}
-
-	router.PacketLogging.LogForwardPacket("Injecting", key)
-	injectFop := router.Bridge.InjectPacket(key.PacketKey)
-	dstPeer := router.Macs.Lookup(dstMac)
-	if dstPeer == router.Ourself.Peer {
-		return injectFop
-	}
-
-	router.PacketLogging.LogForwardPacket("Relaying broadcast", key)
-	relayFop := router.relayBroadcast(key.SrcPeer, key.PacketKey)
-	switch {
-	case injectFop == nil:
-		return relayFop
-
-	case relayFop == nil:
-		return injectFop
-
-	default:
-		mfop := NewMultiFlowOp(false)
-		mfop.Add(injectFop)
-		mfop.Add(relayFop)
-		return mfop
-	}
-}
-
-// Routing
-
-func (router *Router) relay(key ForwardPacketKey) FlowOp {
-	relayPeerName, found := router.Routes.Unicast(key.DstPeer.Name)
-	if !found {
-		// Not necessarily an error as there could be a race with the
-		// dst disappearing whilst the frame is in flight
-		log.Println("Received packet for unknown destination:", key.DstPeer)
-		return DiscardingFlowOp{}
-	}
-
-	conn, found := router.Ourself.ConnectionTo(relayPeerName)
-	if !found {
-		// Again, could just be a race, not necessarily an error
-		log.Println("Unable to find connection to relay peer", relayPeerName)
-		return DiscardingFlowOp{}
-	}
-
-	return conn.(*LocalConnection).forwarder.Forward(key)
-}
-
-func (router *Router) relayBroadcast(srcPeer *Peer, key PacketKey) FlowOp {
-	nextHops := router.Routes.Broadcast(srcPeer.Name)
-	if len(nextHops) == 0 {
-		return DiscardingFlowOp{}
-	}
-
-	op := NewMultiFlowOp(true)
-
-	for _, conn := range router.Ourself.ConnectionsTo(nextHops) {
-		op.Add(conn.(*LocalConnection).forwarder.Forward(ForwardPacketKey{
-			PacketKey: key,
-			SrcPeer:   srcPeer,
-			DstPeer:   conn.Remote()}))
-	}
-
-	return op
 }
 
 // Gossiper methods - the Router is the topology Gossiper
