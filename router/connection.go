@@ -329,10 +329,6 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 		}
 	}
 
-	if conn.remote.UID != remote.UID {
-		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
-	}
-
 	if conn.remote == conn.local {
 		return ErrConnectToSelf
 	}
