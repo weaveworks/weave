@@ -27,13 +27,10 @@ dependencies:
         docker save weaveworks/weave-test >$WEAVE_TEST;
       fi
   post:
-    - sudo apt-get update
-    - sudo apt-get install bc jq
-    - pip install requests
+    - sudo apt-get update && sudo apt-get install bc jq && pip install requests
     - curl https://sdk.cloud.google.com | bash
     - bin/setup-circleci-secrets "$SECRET_PASSWORD"
-    - mkdir -p $(dirname $SRCDIR)
-    - cp -r $(pwd)/ $SRCDIR
+    - mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR
     - cd $SRCDIR/test; ./gce.sh make_template:
         parallel: false
 
@@ -43,13 +40,11 @@ test:
         parallel: true
     - docker run -v /home/ubuntu:/home/go -e COVERDIR=test/coverage -e SLOW=true -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX weaveworks/weave-test:
         parallel: true
-    - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go -e COVERAGE=true weaveworks/weave-build:
+    - docker run -v /var/run/docker.sock:/run/docker.sock -v /home/ubuntu:/home/go weaveworks/weave-build:
         parallel: true
-    - cd $SRCDIR/test; ./gce.sh setup:
+    - cd $SRCDIR/test; ./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh:
         parallel: true
-    - cd $SRCDIR/test; eval $(./gce.sh hosts); ./setup.sh:
-        parallel: true
-    - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
+    - cd $SRCDIR/test; eval $(./gce.sh hosts); ./run_all.sh:
         parallel: true
         timeout: 300
     - cd $SRCDIR; make clean-bin:

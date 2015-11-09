@@ -48,7 +48,7 @@ releases
 .weaver.uptodate
 .weavedns.uptodate
 .weaveexec.uptodate
-weave.tar
+weave.tar.gz
 prog/weaveexec/weave
 prog/weaveexec/weavehosts
 prog/weaveexec/weaveproxy

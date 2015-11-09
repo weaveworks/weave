@@ -30,7 +30,7 @@ WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 
 IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE)
 
-WEAVE_EXPORT=weave.tar
+WEAVE_EXPORT=weave.tar.gz
 
 WEAVEEXEC_DOCKER_VERSION=1.3.1
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
@@ -105,7 +105,7 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPR
 	touch $@
 
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
-	$(SUDO) docker save $(addsuffix :latest,$(IMAGES)) > $@
+	$(SUDO) docker save $(addsuffix :latest,$(IMAGES)) | gzip > $@
 
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
