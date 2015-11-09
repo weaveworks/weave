@@ -13,7 +13,7 @@ echo "  prefetch test images"
 
 setup_host() {
     HOST=$1
-    docker_on $HOST load -i ../weave.tar
+    docker_on $HOST load -i ../weave.tar.gz
     DANGLING_IMAGES="$(docker_on $HOST images -q -f dangling=true)"
     [ -n "$DANGLING_IMAGES" ] && docker_on $HOST rmi $DANGLING_IMAGES 1>/dev/null 2>&1 || true
     run_on $HOST mkdir -p bin
