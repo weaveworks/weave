@@ -249,3 +249,13 @@ func (peer *LocalPeer) setShortID(shortID PeerShortID) {
 	peer.ShortID = shortID
 	peer.Version++
 }
+
+func (peer *LocalPeer) setVersionBeyond(version uint64) bool {
+	peer.Lock()
+	defer peer.Unlock()
+	if version >= peer.Version {
+		peer.Version = version + 1
+		return true
+	}
+	return false
+}
