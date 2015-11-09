@@ -36,7 +36,13 @@ type OverlayConnectionParams struct {
 	// Unique identifier for this connection
 	ConnUID uint64
 
-	// Session key, if connection is encrypted; nil otherwise
+	// Session key, if connection is encrypted; nil otherwise.
+	//
+	// NB: overlay connections must take care not to use nonces which
+	// may collide with those of the main connection. These nonces are
+	// 192 bits, with the top most bit unspecified, the next bit set
+	// to 1, followed by 126 zero bits, and a message sequence number
+	// in the lowest 64 bits.
 	SessionKey *[32]byte
 
 	// Function to send a control message to the counterpart
