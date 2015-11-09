@@ -56,6 +56,10 @@ const (
 	FragTestInterval  = 5 * time.Minute
 	MTUVerifyAttempts = 8
 	MTUVerifyTimeout  = 10 * time.Millisecond // doubled with each attempt
+
+	ProtocolConnectionEstablished = mesh.ProtocolReserved1
+	ProtocolFragmentationReceived = mesh.ProtocolReserved2
+	ProtocolPMTUVerified          = mesh.ProtocolReserved3
 )
 
 type SleeveOverlay struct {
@@ -761,13 +765,13 @@ func (fwd *sleeveForwarder) handleSpecialFrame(special specialFrame) error {
 
 func (fwd *sleeveForwarder) handleControlMessage(cm controlMessage) error {
 	switch cm.tag {
-	case mesh.ProtocolConnectionEstablished:
+	case ProtocolConnectionEstablished:
 		return fwd.handleHeartbeatAck()
 
-	case mesh.ProtocolFragmentationReceived:
+	case ProtocolFragmentationReceived:
 		return fwd.handleFragTestAck()
 
-	case mesh.ProtocolPMTUVerified:
+	case ProtocolPMTUVerified:
 		return fwd.handleMTUTestAck(cm.msg)
 
 	default:
@@ -836,7 +840,7 @@ func (fwd *sleeveForwarder) handleHeartbeat(special specialFrame) error {
 
 	if !fwd.ackedHeartbeat {
 		fwd.ackedHeartbeat = true
-		if err := fwd.sendControlMsg(mesh.ProtocolConnectionEstablished, nil); err != nil {
+		if err := fwd.sendControlMsg(ProtocolConnectionEstablished, nil); err != nil {
 			return err
 		}
 	}
@@ -897,7 +901,7 @@ func (fwd *sleeveForwarder) handleFragTest(frame []byte) error {
 		return nil
 	}
 
-	return fwd.sendControlMsg(mesh.ProtocolFragmentationReceived, nil)
+	return fwd.sendControlMsg(ProtocolFragmentationReceived, nil)
 }
 
 func (fwd *sleeveForwarder) handleFragTestAck() error {
@@ -943,7 +947,7 @@ func (fwd *sleeveForwarder) sendMTUTest() error {
 func (fwd *sleeveForwarder) handleMTUTest(frame []byte) error {
 	buf := make([]byte, 2)
 	binary.BigEndian.PutUint16(buf, uint16(len(frame)-EthernetOverhead))
-	return fwd.sendControlMsg(mesh.ProtocolPMTUVerified, buf)
+	return fwd.sendControlMsg(ProtocolPMTUVerified, buf)
 }
 
 func (fwd *sleeveForwarder) handleMTUTestAck(msg []byte) error {

@@ -422,7 +422,7 @@ func (conn *LocalConnection) receiveTCP(receiver TCPReceiver) {
 func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) error {
 	switch tag {
 	case ProtocolHeartbeat:
-	case ProtocolConnectionEstablished, ProtocolFragmentationReceived, ProtocolPMTUVerified, ProtocolOverlayControlMsg:
+	case ProtocolReserved1, ProtocolReserved2, ProtocolReserved3, ProtocolOverlayControlMsg:
 		conn.OverlayConn.ControlMessage(byte(tag), payload)
 	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:
 		return conn.Router.handleGossip(tag, payload)
