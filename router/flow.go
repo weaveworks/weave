@@ -1,6 +1,10 @@
 package router
 
-import "net"
+import (
+	"net"
+
+	"github.com/weaveworks/weave/mesh"
+)
 
 // Just enough flow machinery for the weave router
 
@@ -16,8 +20,8 @@ type PacketKey struct {
 }
 
 type ForwardPacketKey struct {
-	SrcPeer *Peer
-	DstPeer *Peer
+	SrcPeer *mesh.Peer
+	DstPeer *mesh.Peer
 	PacketKey
 }
 

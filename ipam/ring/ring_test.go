@@ -9,14 +9,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 var (
-	peer1name, _ = router.PeerNameFromString("01:00:00:00:02:00")
-	peer2name, _ = router.PeerNameFromString("02:00:00:00:02:00")
-	peer3name, _ = router.PeerNameFromString("03:00:00:00:02:00")
+	peer1name, _ = mesh.PeerNameFromString("01:00:00:00:02:00")
+	peer2name, _ = mesh.PeerNameFromString("02:00:00:00:02:00")
+	peer3name, _ = mesh.PeerNameFromString("03:00:00:00:02:00")
 
 	start, end    = ParseIP("10.0.0.0"), ParseIP("10.0.0.255")
 	dot10, dot245 = ParseIP("10.0.0.10"), ParseIP("10.0.0.245")
@@ -351,7 +351,7 @@ func TestGossip(t *testing.T) {
 	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
 }
 
-func assertPeersWithSpace(t *testing.T, ring *Ring, start, end address.Address, expected int) []router.PeerName {
+func assertPeersWithSpace(t *testing.T, ring *Ring, start, end address.Address, expected int) []mesh.PeerName {
 	peers := ring.ChoosePeersToAskForSpace(start, end)
 	require.Equal(t, expected, len(peers))
 	return peers
@@ -375,7 +375,7 @@ func TestFindFree(t *testing.T) {
 	ring1.assertInvariants()
 
 	// We should return others
-	var peers []router.PeerName
+	var peers []mesh.PeerName
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 1}}
 	peers = assertPeersWithSpace(t, ring1, start, end, 1)
@@ -493,7 +493,7 @@ func TestOwner(t *testing.T) {
 	require.True(t, ring1.Contains(start), "start should be in ring")
 	require.False(t, ring1.Contains(end), "end should not be in ring")
 
-	require.Equal(t, router.UnknownPeerName, ring1.Owner(start))
+	require.Equal(t, mesh.UnknownPeerName, ring1.Owner(start))
 
 	ring1.ClaimItAll()
 	ring1.GrantRangeToHost(middle, end, peer2name)
@@ -517,9 +517,9 @@ func TestFuzzRing(t *testing.T) {
 		iterations = 1000
 	)
 
-	peers := make([]router.PeerName, numPeers)
+	peers := make([]mesh.PeerName, numPeers)
 	for i := 0; i < numPeers; i++ {
-		peer, _ := router.PeerNameFromString(fmt.Sprintf("%02d:00:00:00:02:00", i))
+		peer, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:00:00:00:02:00", i))
 		peers[i] = peer
 	}
 
@@ -601,13 +601,13 @@ func TestFuzzRingHard(t *testing.T) {
 	var (
 		numPeers   = 100
 		iterations = 3000
-		peers      []router.PeerName
+		peers      []mesh.PeerName
 		rings      []*Ring
 		nextPeerID = 0
 	)
 
 	addPeer := func() {
-		peer, _ := router.PeerNameFromString(fmt.Sprintf("%02d:%02d:00:00:00:00", nextPeerID/10, nextPeerID%10))
+		peer, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:%02d:00:00:00:00", nextPeerID/10, nextPeerID%10))
 		common.Log.Debugf("%s: Adding peer", peer)
 		nextPeerID++
 		peers = append(peers, peer)
@@ -620,7 +620,7 @@ func TestFuzzRingHard(t *testing.T) {
 
 	rings[0].ClaimItAll()
 
-	randomPeer := func(exclude int) (int, router.PeerName, *Ring) {
+	randomPeer := func(exclude int) (int, mesh.PeerName, *Ring) {
 		var peerIndex int
 		if exclude >= 0 {
 			peerIndex = rand.Intn(len(peers) - 1)
@@ -729,7 +729,7 @@ func TestFuzzRingHard(t *testing.T) {
 }
 
 func (r *Ring) ClaimItAll() {
-	r.ClaimForPeers([]router.PeerName{r.Peer})
+	r.ClaimForPeers([]mesh.PeerName{r.Peer})
 }
 
 func (es entries) String() string {

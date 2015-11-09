@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/weaveworks/weave/mesh"
 )
 
 // OverlaySwitch selects which overlay to use, from a set of
@@ -60,7 +62,7 @@ func (osw *OverlaySwitch) InvalidateShortIDs() {
 	}
 }
 
-func (osw *OverlaySwitch) StartConsumingPackets(localPeer *Peer, peers *Peers, consumer OverlayConsumer) error {
+func (osw *OverlaySwitch) StartConsumingPackets(localPeer *mesh.Peer, peers *mesh.Peers, consumer OverlayConsumer) error {
 	for _, overlay := range osw.overlays {
 		if err := overlay.StartConsumingPackets(localPeer, peers, consumer); err != nil {
 			return err
@@ -76,7 +78,7 @@ type namedOverlay struct {
 
 // Find the common set of overlays supported by both sides, with the
 // ordering being the same on both sides too.
-func (osw *OverlaySwitch) commonOverlays(params OverlayConnectionParams) ([]namedOverlay, error) {
+func (osw *OverlaySwitch) commonOverlays(params mesh.OverlayConnectionParams) ([]namedOverlay, error) {
 	var peerOverlays []string
 	if overlaysFeature, present := params.Features["Overlays"]; present {
 		peerOverlays = strings.Split(overlaysFeature, " ")
@@ -118,7 +120,7 @@ func (osw *OverlaySwitch) commonOverlays(params OverlayConnectionParams) ([]name
 }
 
 type overlaySwitchForwarder struct {
-	remotePeer *Peer
+	remotePeer *mesh.Peer
 
 	lock sync.Mutex
 
@@ -160,7 +162,7 @@ type subForwarderEvent struct {
 	err error
 }
 
-func (osw *OverlaySwitch) PrepareConnection(params OverlayConnectionParams) (OverlayConnection, error) {
+func (osw *OverlaySwitch) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
 	if _, present := params.Features["Overlays"]; !present && osw.compatOverlay != nil {
 		return osw.compatOverlay.PrepareConnection(params)
 	}
@@ -197,7 +199,7 @@ func (osw *OverlaySwitch) PrepareConnection(params OverlayConnectionParams) (Ove
 			xmsg[0] = byte(index)
 			xmsg[1] = tag
 			copy(xmsg[2:], msg)
-			return origSendControlMessage(ProtocolOverlayControlMsg, xmsg)
+			return origSendControlMessage(mesh.ProtocolOverlayControlMsg, xmsg)
 		}
 
 		subConn, err := overlay.PrepareConnection(params)

@@ -15,7 +15,7 @@
 // name. In particular it doesn't actually have to be the MAC of, say,
 // the network interface the peer is sniffing on.
 
-package router
+package mesh
 
 import (
 	"net"
@@ -55,4 +55,21 @@ func (name PeerName) Bin() []byte {
 
 func (name PeerName) String() string {
 	return intmac(uint64(name)).String()
+}
+
+func macint(mac net.HardwareAddr) (r uint64) {
+	for _, b := range mac {
+		r <<= 8
+		r |= uint64(b)
+	}
+	return
+}
+
+func intmac(key uint64) (r net.HardwareAddr) {
+	r = make([]byte, 6)
+	for i := 5; i >= 0; i-- {
+		r[i] = byte(key)
+		key >>= 8
+	}
+	return
 }

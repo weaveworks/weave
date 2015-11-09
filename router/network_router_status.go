@@ -2,10 +2,12 @@ package router
 
 import (
 	"time"
+
+	"github.com/weaveworks/weave/mesh"
 )
 
 type NetworkRouterStatus struct {
-	*Status
+	*mesh.Status
 	Interface    string
 	CaptureStats map[string]int
 	MACs         []MACStatus
@@ -20,7 +22,7 @@ type MACStatus struct {
 
 func NewNetworkRouterStatus(router *NetworkRouter) *NetworkRouterStatus {
 	return &NetworkRouterStatus{
-		NewStatus(router.Router),
+		mesh.NewStatus(router.Router),
 		router.Bridge.String(),
 		router.Bridge.Stats(),
 		NewMACStatusSlice(router.Macs)}

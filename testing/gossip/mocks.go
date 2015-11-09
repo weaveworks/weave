@@ -7,21 +7,21 @@ import (
 	"time"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/router"
+	"github.com/weaveworks/weave/mesh"
 )
 
 // Router to convey gossip from one gossiper to another, for testing
 type unicastMessage struct {
-	sender router.PeerName
+	sender mesh.PeerName
 	buf    []byte
 }
 type broadcastMessage struct {
-	sender router.PeerName
-	data   router.GossipData
+	sender mesh.PeerName
+	data   mesh.GossipData
 }
 type gossipMessage struct {
-	sender router.PeerName
-	data   router.GossipData
+	sender mesh.PeerName
+	data   mesh.GossipData
 }
 type exitMessage struct {
 	exitChan chan struct{}
@@ -31,12 +31,12 @@ type flushMessage struct {
 }
 
 type TestRouter struct {
-	gossipChans map[router.PeerName]chan interface{}
+	gossipChans map[mesh.PeerName]chan interface{}
 	loss        float32 // 0.0 means no loss
 }
 
 func NewTestRouter(loss float32) *TestRouter {
-	return &TestRouter{make(map[router.PeerName]chan interface{}, 100), loss}
+	return &TestRouter{make(map[mesh.PeerName]chan interface{}, 100), loss}
 }
 
 func (grouter *TestRouter) Stop() {
@@ -45,7 +45,7 @@ func (grouter *TestRouter) Stop() {
 	}
 }
 
-func (grouter *TestRouter) gossipBroadcast(sender router.PeerName, update router.GossipData) error {
+func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update mesh.GossipData) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
 		case gossipChan <- broadcastMessage{sender: sender, data: update}:
@@ -56,7 +56,7 @@ func (grouter *TestRouter) gossipBroadcast(sender router.PeerName, update router
 	return nil
 }
 
-func (grouter *TestRouter) gossip(sender router.PeerName, update router.GossipData) error {
+func (grouter *TestRouter) gossip(sender mesh.PeerName, update mesh.GossipData) error {
 	count := int(math.Log2(float64(len(grouter.gossipChans))))
 	for dest, gossipChan := range grouter.gossipChans {
 		if dest == sender {
@@ -83,7 +83,7 @@ func (grouter *TestRouter) Flush() {
 	}
 }
 
-func (grouter *TestRouter) RemovePeer(peer router.PeerName) {
+func (grouter *TestRouter) RemovePeer(peer mesh.PeerName) {
 	gossipChan := grouter.gossipChans[peer]
 	resultChan := make(chan struct{})
 	gossipChan <- exitMessage{exitChan: resultChan}
@@ -93,10 +93,10 @@ func (grouter *TestRouter) RemovePeer(peer router.PeerName) {
 
 type TestRouterClient struct {
 	router *TestRouter
-	sender router.PeerName
+	sender mesh.PeerName
 }
 
-func (grouter *TestRouter) run(sender router.PeerName, gossiper router.Gossiper, gossipChan chan interface{}) {
+func (grouter *TestRouter) run(sender mesh.PeerName, gossiper mesh.Gossiper, gossipChan chan interface{}) {
 	gossipTimer := time.Tick(2 * time.Second)
 	for {
 		select {
@@ -155,7 +155,7 @@ func (grouter *TestRouter) run(sender router.PeerName, gossiper router.Gossiper,
 	}
 }
 
-func (grouter *TestRouter) Connect(sender router.PeerName, gossiper router.Gossiper) router.Gossip {
+func (grouter *TestRouter) Connect(sender mesh.PeerName, gossiper mesh.Gossiper) mesh.Gossip {
 	gossipChan := make(chan interface{}, 100)
 
 	go grouter.run(sender, gossiper, gossipChan)
@@ -164,7 +164,7 @@ func (grouter *TestRouter) Connect(sender router.PeerName, gossiper router.Gossi
 	return TestRouterClient{grouter, sender}
 }
 
-func (client TestRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
+func (client TestRouterClient) GossipUnicast(dstPeerName mesh.PeerName, buf []byte) error {
 	select {
 	case client.router.gossipChans[dstPeerName] <- unicastMessage{sender: client.sender, buf: buf}:
 	default: // drop the message if we cannot send it
@@ -173,6 +173,6 @@ func (client TestRouterClient) GossipUnicast(dstPeerName router.PeerName, buf []
 	return nil
 }
 
-func (client TestRouterClient) GossipBroadcast(update router.GossipData) error {
+func (client TestRouterClient) GossipBroadcast(update mesh.GossipData) error {
 	return client.router.gossipBroadcast(client.sender, update)
 }

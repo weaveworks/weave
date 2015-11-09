@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveworks/go-odp/odp"
+	"github.com/weaveworks/weave/mesh"
 )
 
 // The virtual bridge accepts packets from ODP vports and the router
@@ -40,8 +41,8 @@ type FastDatapath struct {
 	dp               odp.DatapathHandle
 	deleteFlowsCount uint64
 	missHandlers     map[odp.VportID]missHandler
-	localPeer        *Peer
-	peers            *Peers
+	localPeer        *mesh.Peer
+	peers            *mesh.Peers
 	overlayConsumer  OverlayConsumer
 
 	// Bridge state: How to send to the given bridge port
@@ -62,7 +63,7 @@ type FastDatapath struct {
 	dec *EthernetDecoder
 
 	// forwarders by remote peer
-	forwarders map[PeerName]*fastDatapathForwarder
+	forwarders map[mesh.PeerName]*fastDatapathForwarder
 }
 
 type FastDatapathConfig struct {
@@ -105,7 +106,7 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 		sendToMAC:     make(map[MAC]bridgeSender),
 		seenMACs:      make(map[MAC]struct{}),
 		vxlanVportIDs: make(map[int]odp.VportID),
-		forwarders:    make(map[PeerName]*fastDatapathForwarder),
+		forwarders:    make(map[mesh.PeerName]*fastDatapathForwarder),
 	}
 
 	if err := fastdp.deleteVxlanVports(); err != nil {
@@ -385,7 +386,7 @@ func (fastdp fastDatapathOverlay) Diagnostics() interface{} {
 	}
 }
 
-func (fastdp fastDatapathOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers, consumer OverlayConsumer) error {
+func (fastdp fastDatapathOverlay) StartConsumingPackets(localPeer *mesh.Peer, peers *mesh.Peers, consumer OverlayConsumer) error {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 
@@ -460,17 +461,17 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 	return vxlanVportID, nil
 }
 
-func (fastdp *FastDatapath) extractPeers(tunnelID [8]byte) (*Peer, *Peer) {
+func (fastdp *FastDatapath) extractPeers(tunnelID [8]byte) (*mesh.Peer, *mesh.Peer) {
 	vni := binary.BigEndian.Uint64(tunnelID[:])
-	srcPeer := fastdp.peers.FetchByShortID(PeerShortID(vni & 0xfff))
-	dstPeer := fastdp.peers.FetchByShortID(PeerShortID((vni >> 12) & 0xfff))
+	srcPeer := fastdp.peers.FetchByShortID(mesh.PeerShortID(vni & 0xfff))
+	dstPeer := fastdp.peers.FetchByShortID(mesh.PeerShortID((vni >> 12) & 0xfff))
 	return srcPeer, dstPeer
 }
 
 type vxlanSpecialPacketFlowOp struct {
 	NonDiscardingFlowOp
 	fastdp  *FastDatapath
-	srcPeer *Peer
+	srcPeer *mesh.Peer
 	sender  *net.UDPAddr
 }
 
@@ -486,7 +487,7 @@ func (op vxlanSpecialPacketFlowOp) Process(frame []byte, dec *EthernetDecoder, b
 
 type fastDatapathForwarder struct {
 	fastdp         *FastDatapath
-	remotePeer     *Peer
+	remotePeer     *mesh.Peer
 	localIP        [4]byte
 	sendControlMsg func(byte, []byte) error
 	connUID        uint64
@@ -506,7 +507,7 @@ type fastDatapathForwarder struct {
 	errorChan       chan error
 }
 
-func (fastdp fastDatapathOverlay) PrepareConnection(params OverlayConnectionParams) (OverlayConnection, error) {
+func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
 	if params.SessionKey != nil {
 		// No encryption suport in fastdp.  The weaver main.go
 		// is responsible for ensuring this doesn't happen.
@@ -794,7 +795,7 @@ func (fwd *fastDatapathForwarder) Stop() {
 	}
 }
 
-func (fastdp *FastDatapath) addForwarder(peer PeerName, fwd *fastDatapathForwarder) {
+func (fastdp *FastDatapath) addForwarder(peer mesh.PeerName, fwd *fastDatapathForwarder) {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 
@@ -803,7 +804,7 @@ func (fastdp *FastDatapath) addForwarder(peer PeerName, fwd *fastDatapathForward
 	fastdp.forwarders[peer] = fwd
 }
 
-func (fastdp *FastDatapath) removeForwarder(peer PeerName, fwd *fastDatapathForwarder) {
+func (fastdp *FastDatapath) removeForwarder(peer mesh.PeerName, fwd *fastDatapathForwarder) {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 	if fastdp.forwarders[peer] == fwd {

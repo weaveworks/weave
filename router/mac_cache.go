@@ -4,11 +4,13 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/weaveworks/weave/mesh"
 )
 
 type MacCacheEntry struct {
 	lastSeen time.Time
-	peer     *Peer
+	peer     *mesh.Peer
 }
 
 type MacCache struct {
@@ -16,10 +18,10 @@ type MacCache struct {
 	table       map[uint64]*MacCacheEntry
 	maxAge      time.Duration
 	expiryTimer *time.Timer
-	onExpiry    func(net.HardwareAddr, *Peer)
+	onExpiry    func(net.HardwareAddr, *mesh.Peer)
 }
 
-func NewMacCache(maxAge time.Duration, onExpiry func(net.HardwareAddr, *Peer)) *MacCache {
+func NewMacCache(maxAge time.Duration, onExpiry func(net.HardwareAddr, *mesh.Peer)) *MacCache {
 	cache := &MacCache{
 		table:    make(map[uint64]*MacCacheEntry),
 		maxAge:   maxAge,
@@ -28,7 +30,7 @@ func NewMacCache(maxAge time.Duration, onExpiry func(net.HardwareAddr, *Peer)) *
 	return cache
 }
 
-func (cache *MacCache) add(mac net.HardwareAddr, peer *Peer, force bool) (bool, *Peer) {
+func (cache *MacCache) add(mac net.HardwareAddr, peer *mesh.Peer, force bool) (bool, *mesh.Peer) {
 	key := macint(mac)
 	now := time.Now()
 
@@ -64,15 +66,15 @@ func (cache *MacCache) add(mac net.HardwareAddr, peer *Peer, force bool) (bool, 
 	return false, nil
 }
 
-func (cache *MacCache) Add(mac net.HardwareAddr, peer *Peer) (bool, *Peer) {
+func (cache *MacCache) Add(mac net.HardwareAddr, peer *mesh.Peer) (bool, *mesh.Peer) {
 	return cache.add(mac, peer, false)
 }
 
-func (cache *MacCache) AddForced(mac net.HardwareAddr, peer *Peer) (bool, *Peer) {
+func (cache *MacCache) AddForced(mac net.HardwareAddr, peer *mesh.Peer) (bool, *mesh.Peer) {
 	return cache.add(mac, peer, true)
 }
 
-func (cache *MacCache) Lookup(mac net.HardwareAddr) *Peer {
+func (cache *MacCache) Lookup(mac net.HardwareAddr) *mesh.Peer {
 	key := macint(mac)
 	cache.RLock()
 	defer cache.RUnlock()
@@ -83,7 +85,7 @@ func (cache *MacCache) Lookup(mac net.HardwareAddr) *Peer {
 	return entry.peer
 }
 
-func (cache *MacCache) Delete(peer *Peer) bool {
+func (cache *MacCache) Delete(peer *mesh.Peer) bool {
 	found := false
 	cache.Lock()
 	defer cache.Unlock()

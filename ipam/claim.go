@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 type claim struct {
@@ -43,7 +43,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 	switch owner := alloc.ring.Owner(c.addr); owner {
 	case alloc.ourName:
 		// success
-	case router.UnknownPeerName:
+	case mesh.UnknownPeerName:
 		// If our ring doesn't know, it must be empty.
 		if c.noErrorOnUnknown {
 			alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.addr, c.ident)
@@ -86,7 +86,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 	return true
 }
 
-func (c *claim) deniedBy(alloc *Allocator, owner router.PeerName) {
+func (c *claim) deniedBy(alloc *Allocator, owner mesh.PeerName) {
 	name, found := alloc.nicknames[owner]
 	if found {
 		name = " (" + name + ")"

@@ -6,6 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
@@ -24,14 +25,14 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 		}
 		return count
 	},
-	"printConnectionCounts": func(conns []weave.LocalConnectionStatus) string {
+	"printConnectionCounts": func(conns []mesh.LocalConnectionStatus) string {
 		counts := make(map[string]int)
 		for _, conn := range conns {
 			counts[conn.State]++
 		}
 		return printCounts(counts, []string{"established", "pending", "retrying", "failed", "connecting"})
 	},
-	"printPeerConnectionCounts": func(peers []weave.PeerStatus) string {
+	"printPeerConnectionCounts": func(peers []mesh.PeerStatus) string {
 		counts := make(map[string]int)
 		for _, peer := range peers {
 			for _, conn := range peer.Connections {
