@@ -16,6 +16,7 @@ import (
 
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
+	"github.com/weaveworks/weave/common/odp"
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/nameserver"
@@ -120,7 +121,7 @@ func main() {
 		os.Exit(0)
 
 	case createDatapath:
-		err, odp_supported := weave.CreateDatapath(datapathName)
+		err, odp_supported := odp.CreateDatapath(datapathName)
 		if !odp_supported {
 			if err != nil {
 				Log.Error(err)
@@ -136,11 +137,11 @@ func main() {
 		os.Exit(0)
 
 	case deleteDatapath:
-		checkFatal(weave.DeleteDatapath(datapathName))
+		checkFatal(odp.DeleteDatapath(datapathName))
 		os.Exit(0)
 
 	case addDatapathInterface != "":
-		checkFatal(weave.AddDatapathInterface(datapathName, addDatapathInterface))
+		checkFatal(odp.AddDatapathInterface(datapathName, addDatapathInterface))
 		os.Exit(0)
 	}
 
