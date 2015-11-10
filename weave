@@ -58,6 +58,7 @@ weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
                       [--rewrite-inspect]
+weave launch-plugin
 weave env           [--restore]
 weave config
 weave connect       [--replace] [<peer> ...]
@@ -80,6 +81,7 @@ weave ps            [<container_id> ...]
 weave stop
 weave stop-router
 weave stop-proxy
+weave stop-plugin
 weave reset
 weave rmpeer        <peer_id>
 
@@ -290,6 +292,7 @@ IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 
 BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
 PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
+PLUGIN_CONTAINER_NAME=weaveplugin
 
 PROCFS=${PROCFS:-/proc}
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
@@ -1558,6 +1561,18 @@ stop_proxy() {
     stop $PROXY_CONTAINER_NAME "Proxy"
 }
 
+launch_plugin() {
+    PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
+        --net=host \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /run/docker/plugins:/run/docker/plugins \
+        $PLUGIN_IMAGE "$@")
+}
+
+stop_plugin() {
+    stop $PLUGIN_CONTAINER_NAME "Plugin"
+}
+
 ##########################################################################################
 
 [ $(id -u) = 0 ] || {
@@ -1707,6 +1722,11 @@ EOF
         check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         launch_proxy "$@"
         echo $PROXY_CONTAINER
+        ;;
+    launch-plugin)
+        check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
+        launch_plugin "$@"
+        echo $PLUGIN_CONTAINER
         ;;
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
@@ -1948,6 +1968,10 @@ EOF
     stop-proxy)
         [ $# -eq 0 ] || usage
         stop_proxy
+        ;;
+    stop-plugin)
+        [ $# -eq 0 ] || usage
+        stop_plugin
         ;;
     reset)
         [ $# -eq 0 ] || usage
