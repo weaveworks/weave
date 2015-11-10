@@ -1783,6 +1783,11 @@ EOF
             echo "       Service: proxy"
             echo "       Address: $PROXY_ADDRS"
         fi
+        if [ -z "$SUB_STATUS" ] && check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
+            echo
+            echo "       Service: plugin"
+            echo "    DriverName: weave"
+        fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
         ;;
