@@ -288,6 +288,9 @@ fi
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 
+BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
+PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
+
 PROCFS=${PROCFS:-/proc}
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
@@ -1653,7 +1656,7 @@ shift 1
 
 case "$COMMAND" in
     setup)
-        for img in $IMAGE $EXEC_IMAGE ; do
+        for img in $IMAGE $EXEC_IMAGE $PLUGIN_IMAGE ; do
             docker pull $img
         done
         ;;
