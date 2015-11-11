@@ -1527,14 +1527,8 @@ launch_proxy() {
     # when launching the weaveproxy container.
     docker_client_args $DOCKER_CLIENT_ARGS
     proxy_args "$@"
-    HOSTS_PATH=$(docker run --rm --net=none \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      --entrypoint=/bin/sh \
-      $EXEC_IMAGE -c 'docker inspect -f {{.HostsPath}} $(hostname)')
-    CONTAINERS_PATH="$(dirname $(dirname "$HOSTS_PATH"))"
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
-        -v "$CONTAINERS_PATH":"$CONTAINERS_PATH" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
