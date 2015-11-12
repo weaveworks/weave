@@ -674,7 +674,10 @@ func (fwd *fastDatapathForwarder) sendHeartbeat() {
 		DstPeer:   fwd.remotePeer,
 	}
 	fwd.lock.RUnlock()
-	fwd.Forward(pk).Process(buf, dec, false)
+
+	if fop := fwd.Forward(pk); fop != nil {
+		fop.Process(buf, dec, false)
+	}
 }
 
 const (
