@@ -1563,6 +1563,7 @@ stop_proxy() {
 
 launch_plugin() {
     PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
+        --restart=always \
         --net=host \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /run/docker/plugins:/run/docker/plugins \
