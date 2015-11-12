@@ -5,28 +5,33 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/vishvananda/netlink/nl"
+	"github.com/vishvananda/netlink"
 )
 
 // Wait for an interface to come up.
 func EnsureInterface(ifaceName string) (*net.Interface, error) {
-	s, err := nl.Subscribe(syscall.NETLINK_ROUTE, syscall.RTNLGRP_LINK)
-	if err != nil {
-		return nil, err
-	}
-	defer s.Close()
-	iface, err := ensureInterface(s, ifaceName)
+	iface, err := ensureInterface(ifaceName)
 	if err != nil {
 		return nil, err
 	}
 	return iface, err
 }
 
-func ensureInterface(s *nl.NetlinkSocket, ifaceName string) (*net.Interface, error) {
+func ensureInterface(ifaceName string) (*net.Interface, error) {
 	if iface, err := findInterface(ifaceName); err == nil {
 		return iface, nil
 	}
-	netlinkReceiveUntil(s, matchIfName(ifaceName))
+	ch := make(chan netlink.LinkUpdate)
+	done := make(chan struct{})
+	defer close(done)
+	if err := netlink.LinkSubscribe(ch, done); err != nil {
+		return nil, err
+	}
+	for update := range ch {
+		if ifaceName == update.Link.Attrs().Name && update.IfInfomsg.Flags&syscall.IFF_UP != 0 {
+			break
+		}
+	}
 	iface, err := findInterface(ifaceName)
 	return iface, err
 }
@@ -35,12 +40,7 @@ func ensureInterface(s *nl.NetlinkSocket, ifaceName string) (*net.Interface, err
 // This matches the behaviour in 'weave attach', which is the only context in which
 // we expect this to be called.  If you change one, change the other to match.
 func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
-	s, err := nl.Subscribe(syscall.NETLINK_ROUTE, syscall.RTNLGRP_LINK, syscall.RTNLGRP_IPV4_ROUTE)
-	if err != nil {
-		return nil, err
-	}
-	defer s.Close()
-	iface, err := ensureInterface(s, ifaceName)
+	iface, err := ensureInterface(ifaceName)
 	if err != nil {
 		return nil, err
 	}
@@ -48,8 +48,19 @@ func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
 	if CheckRouteExists(ifaceName, dest) {
 		return iface, err
 	}
-	netlinkReceiveUntil(s, matchRoute(ifaceName, dest))
-	return iface, err
+	ch := make(chan netlink.RouteUpdate)
+	done := make(chan struct{})
+	defer close(done)
+	if err := netlink.RouteSubscribe(ch, done); err != nil {
+		return nil, err
+	}
+	for update := range ch {
+		link, _ := netlink.LinkByIndex(update.Route.LinkIndex)
+		if link.Attrs().Name == ifaceName && update.Route.Dst.IP.Equal(dest) {
+			break
+		}
+	}
+	return iface, nil
 }
 
 func findInterface(ifaceName string) (iface *net.Interface, err error) {
@@ -60,41 +71,4 @@ func findInterface(ifaceName string) (iface *net.Interface, err error) {
 		return iface, fmt.Errorf("Interface %s is not up", ifaceName)
 	}
 	return
-}
-
-func netlinkReceiveUntil(s *nl.NetlinkSocket, f func(syscall.NetlinkMessage) (bool, error)) error {
-	for {
-		msgs, err := s.Receive()
-		if err != nil {
-			return err
-		}
-		for _, m := range msgs {
-			if done, err := f(m); done {
-				return err
-			}
-		}
-	}
-}
-
-func matchIfName(ifaceName string) func(m syscall.NetlinkMessage) (bool, error) {
-	return func(m syscall.NetlinkMessage) (bool, error) {
-		switch m.Header.Type {
-		case syscall.RTM_NEWLINK: // receive this type for link 'up'
-			ifmsg := nl.DeserializeIfInfomsg(m.Data)
-			attrs, err := syscall.ParseNetlinkRouteAttr(&m)
-			if err != nil {
-				return true, err
-			}
-			name := ""
-			for _, attr := range attrs {
-				if attr.Attr.Type == syscall.IFA_LABEL {
-					name = string(attr.Value[:len(attr.Value)-1])
-				}
-			}
-			if ifaceName == name && ifmsg.Flags&syscall.IFF_UP != 0 {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
 }
