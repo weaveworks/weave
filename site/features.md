@@ -11,6 +11,7 @@ example](https://github.com/weaveworks/weave#example):
  * [Virtual ethernet switch](#virtual-ethernet-switch)
  * [Fast data path](#fast-data-path)
  * [Seamless Docker integration](#docker)
+ * [Docker network plugin](#plugin)
  * [Address allocation](#addressing)
  * [Naming and discovery](#naming-and-discovery)
  * [Application isolation](#application-isolation)
@@ -87,6 +88,24 @@ are attached to the weave network before they begin execution.
 Containers started in this way that subsequently restart, either by an
 explicit `docker restart` command or by Docker restart policy, are
 re-attached to the weave network by the weave Docker API proxy.
+
+### <a name="plugin"></a>Docker network plugin
+
+Alternatively, you can use weave as a Docker plugin. First you must
+configure the Docker daemon to use a cluster store as documented
+[here](https://docs.docker.com/engine/userguide/networking/dockernetworks/#an-overlay-network);
+you can then launch weave and create a network:
+
+    $ weave launch
+    $ weave launch-plugin
+    $ docker network create --driver=weave weave
+
+and then start a container:
+
+    $ docker run --net=weave -ti ubuntu
+
+For more details see the
+[plugin README](https://github.com/weaveworks/docker-plugin).
 
 ### <a name="addressing"></a>Address allocation
 
