@@ -119,7 +119,7 @@ lint: tools/.git
 tools/.git:
 	git submodule update --init
 
-$(RUNNER_EXE):
+$(RUNNER_EXE): tools/.git
 	make -C tools/runner
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
