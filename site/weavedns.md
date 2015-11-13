@@ -260,6 +260,7 @@ DNS:
 
        Service: dns
         Domain: weave.local.
+      Upstream: 8.8.8.8, 8.8.4.4
            TTL: 1
        Entries: 9
 
@@ -272,6 +273,7 @@ guide](troubleshooting.html#weave-status) for more detail.
 The 'Service: dns' section is pertinent to weaveDNS, and includes:
 
 * The local domain suffix which is being served
+* The list of upstream servers used for resolving names not in the local domain
 * The response ttl
 * The total number of entries
 
