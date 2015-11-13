@@ -13,14 +13,14 @@ docker_py_test() {
     docker_on $HOST1 pull joffrey/docker-py >/dev/null
     CANDIDATES=$(docker_on $HOST1 run \
       joffrey/docker-py \
-      py.test --collect-only tests/integration_test.py \
-      | sed -En "s/\s*<UnitTestCase '([[:alpha:]]+)'>/\1/p")
+      py.test --collect-only tests/integration/ \
+      | sed -En "s/\s*<Module '([[:print:]]+)'>/\1/p")
 
     i=0
     TESTS=
     for test in $CANDIDATES; do
         if [ $(($i % $TOTAL_SHARDS)) -eq $SHARD ]; then
-              TESTS="$TESTS tests/integration_test.py::$test"
+              TESTS="$TESTS $test"
         fi
         i=$(($i + 1))
     done
