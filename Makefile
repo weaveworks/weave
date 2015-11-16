@@ -103,7 +103,7 @@ $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
-	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
 $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
@@ -116,7 +116,7 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER
 	cp $(NETCHECK_EXE) prog/weaveexec/netcheck
 	cp $(DOCKERTLSARGS_EXE) prog/weaveexec/docker_tls_args
 	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
-	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
 $(DOCKERPLUGIN_UPTODATE): prog/plugin/Dockerfile $(DOCKERPLUGIN_EXE)
@@ -124,7 +124,7 @@ $(DOCKERPLUGIN_UPTODATE): prog/plugin/Dockerfile $(DOCKERPLUGIN_EXE)
 	touch $@
 
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
-	$(SUDO) docker save $(addsuffix :latest,$(IMAGES)) | gzip > $@
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker save $(addsuffix :latest,$(IMAGES)) | gzip > $@
 
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
@@ -142,16 +142,16 @@ $(RUNNER_EXE): tools/.git
 	make -C tools/runner
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
-	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
-	$(SUDO) docker push   $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push   $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 ifneq ($(UPDATE_LATEST),false)
-	$(SUDO) docker push   $(DOCKERHUB_USER)/$*:latest
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push   $(DOCKERHUB_USER)/$*:latest
 endif
 
 publish: $(PUBLISH)
 
 clean-bin:
-	-$(SUDO) docker rmi $(IMAGES)
+	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
 	go clean -r $(addprefix ./,$(dir $(EXES)))
 	rm -f $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT)
 
