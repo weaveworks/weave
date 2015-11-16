@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	version = "(unreleased version)"
+	version           = "(unreleased version)"
+	defaultDockerHost = "unix:///var/run/docker.sock"
 )
 
 func main() {
@@ -60,6 +61,11 @@ func main() {
 
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
+
+	c.DockerHost = defaultDockerHost
+	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
+		c.DockerHost = dockerHost
+	}
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {

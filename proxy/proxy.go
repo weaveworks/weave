@@ -25,8 +25,6 @@ const (
 	defaultCaFile   = "ca.pem"
 	defaultKeyFile  = "key.pem"
 	defaultCertFile = "cert.pem"
-	dockerSock      = "/var/run/docker.sock"
-	dockerSockUnix  = "unix://" + dockerSock
 
 	weaveSock     = "/var/run/weave/weave.sock"
 	weaveSockUnix = "unix://" + weaveSock
@@ -61,6 +59,7 @@ type Config struct {
 	WithDNS             bool
 	WithoutDNS          bool
 	NoMulticastRoute    bool
+	DockerHost          string
 }
 
 type wait struct {
@@ -94,7 +93,7 @@ func NewProxy(c Config) (*Proxy, error) {
 	// to insulate ourselves from breaking changes to the API, as
 	// happened in 1.20 (Docker 1.8.0) when the presentation of
 	// volumes changed in `inspect`.
-	client, err := weavedocker.NewVersionedClient(dockerSockUnix, "1.18")
+	client, err := weavedocker.NewVersionedClient(c.DockerHost, "1.18")
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +139,16 @@ func (proxy *Proxy) AttachExistingContainers() {
 }
 
 func (proxy *Proxy) Dial() (net.Conn, error) {
-	return net.Dial("unix", dockerSock)
+	proto := "tcp"
+	addr := proxy.Config.DockerHost
+	switch {
+	case strings.HasPrefix(addr, "unix://"):
+		proto = "unix"
+		addr = strings.TrimPrefix(addr, "unix://")
+	case strings.HasPrefix(addr, "tcp://"):
+		addr = strings.TrimPrefix(addr, "tcp://")
+	}
+	return net.Dial(proto, addr)
 }
 
 func (proxy *Proxy) findWeaveWaitVolumes() error {
@@ -321,8 +329,10 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		if err = copyOwnerAndPermissions(dockerSock, addr); err != nil {
-			return nil, "", err
+		if strings.HasPrefix(proxy.Config.DockerHost, "unix://") {
+			if err = copyOwnerAndPermissions(strings.TrimPrefix(proxy.Config.DockerHost, "unix://"), addr); err != nil {
+				return nil, "", err
+			}
 		}
 
 	default:
