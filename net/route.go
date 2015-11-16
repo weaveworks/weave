@@ -3,10 +3,8 @@ package net
 import (
 	"fmt"
 	"net"
-	"syscall"
 
 	"github.com/vishvananda/netlink"
-	"github.com/vishvananda/netlink/nl"
 )
 
 // A network is considered free if it does not overlap any existing
@@ -64,52 +62,4 @@ func CheckRouteExists(ifaceName string, dest net.IP) bool {
 		return nil
 	})
 	return found
-}
-
-func matchRoute(ifaceName string, dest net.IP) func(m syscall.NetlinkMessage) (bool, error) {
-	return func(m syscall.NetlinkMessage) (bool, error) {
-		switch m.Header.Type {
-		case syscall.RTM_NEWROUTE:
-			route, err := deserializeRoute(m.Data)
-			if err != nil {
-				return true, err
-			}
-			link, _ := netlink.LinkByIndex(route.LinkIndex)
-			if link.Attrs().Name == ifaceName && route.Dst.IP.Equal(dest) {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
-}
-
-// This code proposed for addition to the vishvananda/netlink library
-// deserializeRoute decodes a binary netlink message into a Route struct
-func deserializeRoute(m []byte) (netlink.Route, error) {
-	route := netlink.Route{}
-	msg := nl.DeserializeRtMsg(m)
-	attrs, err := nl.ParseRouteAttr(m[msg.Len():])
-	if err != nil {
-		return route, err
-	}
-	route.Scope = netlink.Scope(msg.Scope)
-
-	native := nl.NativeEndian()
-	for _, attr := range attrs {
-		switch attr.Attr.Type {
-		case syscall.RTA_GATEWAY:
-			route.Gw = net.IP(attr.Value)
-		case syscall.RTA_PREFSRC:
-			route.Src = net.IP(attr.Value)
-		case syscall.RTA_DST:
-			route.Dst = &net.IPNet{
-				IP:   attr.Value,
-				Mask: net.CIDRMask(int(msg.Dst_len), 8*len(attr.Value)),
-			}
-		case syscall.RTA_OIF:
-			routeIndex := int(native.Uint32(attr.Value[0:4]))
-			route.LinkIndex = routeIndex
-		}
-	}
-	return route, nil
 }
