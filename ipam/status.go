@@ -2,13 +2,23 @@ package ipam
 
 import (
 	"github.com/weaveworks/weave/ipam/paxos"
+	"github.com/weaveworks/weave/ipam/ring"
+	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 
 type Status struct {
 	Paxos            *paxos.Status
 	Range            string
+	RangeNumIPs      int
 	DefaultSubnet    string
+	Ring             *ring.Ring                   // information on ranges owned by all peers
+	Space            space.Space                  // more detail on ranges owned by us
+	Owned            map[string][]address.Address // addresses by container-ID
+	OurName          mesh.PeerName
+	Nicknames        map[mesh.PeerName]string `json:"-"`
+	IsKnownPeer      func(mesh.PeerName) bool `json:"-"`
 	Entries          []EntryStatus
 	PendingClaims    []ClaimStatus
 	PendingAllocates []string
@@ -40,7 +50,14 @@ func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
 		resultChan <- &Status{
 			paxosStatus,
 			allocator.universe.String(),
+			int(allocator.universe.Size()),
 			defaultSubnet.String(),
+			allocator.ring,
+			allocator.space,
+			allocator.owned,
+			allocator.ourName,
+			allocator.nicknames,
+			allocator.isKnownPeer,
 			newEntryStatusSlice(allocator),
 			newClaimStatusSlice(allocator),
 			newAllocateIdentSlice(allocator)}

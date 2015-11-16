@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+	"text/template"
+
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam"
@@ -10,9 +15,6 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
-	"net/http"
-	"strings"
-	"text/template"
 )
 
 var rootTemplate = template.New("root").Funcs(map[string]interface{}{
@@ -30,6 +32,76 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			return "none"
 		}
 		return strings.Join(servers, ", ")
+	},
+	"printIPAMRanges": func(status ipam.Status) string {
+		var buffer bytes.Buffer
+
+		type NicknameStats struct {
+			Ranges    []address.Range
+			Addresses []address.Address
+			Reachable bool
+		}
+
+		nicknameStats := make(map[string]*NicknameStats)
+		getNickName := func(peer mesh.PeerName) string {
+			name, found := status.Nicknames[peer]
+			if !found {
+				return fmt.Sprintf("%s", peer)
+			}
+			return name
+		}
+		getOrCreateNicknameStats := func(peer mesh.PeerName) *NicknameStats {
+			peerName := getNickName(peer)
+			stats, found := nicknameStats[peerName]
+			if !found {
+				stats = &NicknameStats{
+					Ranges:    []address.Range{},
+					Addresses: []address.Address{},
+					Reachable: status.IsKnownPeer(peer),
+				}
+				nicknameStats[peerName] = stats
+			}
+			return stats
+		}
+
+		for _, entry := range status.Ring.Entries {
+			stats := getOrCreateNicknameStats(entry.Peer)
+			stats.Addresses = append(stats.Addresses, entry.Token)
+		}
+
+		for peer, ranges := range status.Ring.OwnedRangesByPeer() {
+			stats := getOrCreateNicknameStats(peer)
+			stats.Ranges = append(stats.Ranges, ranges...)
+		}
+
+		appendAddresses := func(displayName string, reachable bool, addresses []address.Address, ranges []address.Range) {
+			reachableStr := ""
+			if !reachable {
+				reachableStr = "- unreachable!"
+			}
+			ipsInRange := 0
+			for _, chunk := range ranges {
+				ipsInRange += int(chunk.Size())
+			}
+			percentageRanges := float32(ipsInRange) * 100.0 / float32(status.RangeNumIPs)
+
+			fmt.Fprintf(&buffer, "%20s: %8d IPs (%04.1f%% of universe, in %3d ranges) - used: %8d IPs %s\n",
+				displayName, ipsInRange, percentageRanges, len(ranges), len(addresses), reachableStr)
+		}
+
+		// print the local addresses
+		ourNickname := getNickName(status.OurName)
+		ourStats := nicknameStats[ourNickname]
+		appendAddresses("(local)", true, ourStats.Addresses, ourStats.Ranges)
+
+		// and then the rest
+		for nickname, stats := range nicknameStats {
+			if nickname != ourNickname {
+				appendAddresses(nickname, stats.Reachable, stats.Addresses, stats.Ranges)
+			}
+		}
+
+		return buffer.String()
 	},
 	"printConnectionCounts": func(conns []mesh.LocalConnectionStatus) string {
 		counts := make(map[string]int)
@@ -152,6 +224,25 @@ var dnsEntriesTemplate = defTemplate("dnsEntries", `\
 {{end}}\
 `)
 
+var ipamTemplate = defTemplate("ipamTemplate", `\
+      Universe: {{.IPAM.Range}} ({{.IPAM.RangeNumIPs}} IPs)
+ DefaultSubnet: {{.IPAM.DefaultSubnet}}
+{{if .IPAM.Owned}}\
+    Containers:
+{{range $id, $addresses := .IPAM.Owned}}\
+                {{printf "%-12s" $id}}: {{$addresses}}
+{{end}}\
+{{end}}\
+    Ownerships:
+{{printIPAMRanges .IPAM}}
+{{if .IPAM.PendingClaims}}\
+        Claims:
+{{range .IPAM.PendingClaims}}
+                {{printf "%-15v" .Ident}} {{.Address}}
+{{end}}\
+{{end}}\
+`)
+
 type WeaveStatus struct {
 	Version string
 	Router  *weave.NetworkRouterStatus `json:"Router,omitempty"`
@@ -207,5 +298,6 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 	defHandler("/status/connections", connectionsTemplate)
 	defHandler("/status/peers", peersTemplate)
 	defHandler("/status/dns", dnsEntriesTemplate)
+	defHandler("/status/ipam", ipamTemplate)
 
 }

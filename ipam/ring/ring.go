@@ -316,6 +316,26 @@ func (r *Ring) OwnedRanges() (result []address.Range) {
 	return r.splitRangesOverZero(result)
 }
 
+func (r *Ring) OwnedRangesByPeer() map[mesh.PeerName][]address.Range {
+	r.assertInvariants()
+
+	result := make(map[mesh.PeerName][]address.Range)
+	for i, entry := range r.Entries {
+		nextEntry := r.Entries.entry(i + 1)
+		resultPeer, found := result[entry.Peer]
+		r := address.Range{Start: entry.Token, End: nextEntry.Token}
+		if !found {
+			result[entry.Peer] = []address.Range{r}
+		} else {
+			result[entry.Peer] = append(resultPeer, r)
+		}
+	}
+	for peer, resultPeer := range result {
+		result[peer] = r.splitRangesOverZero(resultPeer)
+	}
+	return result
+}
+
 // ClaimForPeers claims the entire ring for the array of peers passed
 // in.  Only works for empty rings.
 func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
