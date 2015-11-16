@@ -134,7 +134,7 @@ func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 // do not need locks for reading, and only need write locks for fields
 // read by other processes.
 
-// Async
+// Non-blocking.
 func (conn *LocalConnection) Shutdown(err error) {
 	// err should always be a real error, even if only io.EOF
 	if err == nil {
