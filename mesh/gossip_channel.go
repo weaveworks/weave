@@ -97,6 +97,73 @@ func (c *GossipChannel) deliver(srcName PeerName, _ []byte, dec *gob.Decoder) er
 	return nil
 }
 
+func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, msg []byte) error {
+	return c.relayUnicast(dstPeerName, GobEncode(c.name, c.ourself.Name, dstPeerName, msg))
+}
+
+func (c *GossipChannel) GossipBroadcast(update GossipData) error {
+	return c.relayBroadcast(c.ourself.Name, update)
+}
+
+func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
+	if relayPeerName, found := c.routes.UnicastAll(dstPeerName); !found {
+		err = fmt.Errorf("unknown relay destination: %s", dstPeerName)
+	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
+		err = fmt.Errorf("unable to find connection to relay peer %s", relayPeerName)
+	} else {
+		conn.(ProtocolSender).SendProtocolMsg(ProtocolMsg{ProtocolGossipUnicast, buf})
+	}
+	return err
+}
+
+func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
+	names := c.routes.PeerNames() // do this outside the lock so they don't nest
+	c.Lock()
+	defer c.Unlock()
+	// GC - randomly (courtesy of go's map iterator) pick some
+	// existing broadcasters and stop&remove them if their source peer
+	// is unknown. We stop as soon as we encounter a valid entry; the
+	// idea being that when there is little or no garbage then this
+	// executes close to O(1)[1], whereas when there is lots of
+	// garbage we remove it quickly.
+	//
+	// [1] TODO Unfortunately, due to the desire to avoid nested
+	// locks, instead of simply invoking Peers.Fetch(name) below, we
+	// have that Peers.Names() invocation above. That is O(n_peers) at
+	// best.
+	for name, broadcaster := range c.broadcasters {
+		if _, found := names[name]; !found {
+			delete(c.broadcasters, name)
+			broadcaster.Stop()
+		} else {
+			break
+		}
+	}
+	broadcaster, found := c.broadcasters[srcName]
+	if !found {
+		broadcaster = NewGossipSender(func(pending GossipData) { c.sendBroadcast(srcName, pending) })
+		c.broadcasters[srcName] = broadcaster
+	}
+	broadcaster.Send(update)
+	return nil
+}
+
+func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
+	c.routes.EnsureRecalculated()
+	nextHops := c.routes.BroadcastAll(srcName)
+	if len(nextHops) == 0 {
+		return
+	}
+	connections := c.ourself.ConnectionsTo(nextHops)
+	for _, msg := range update.Encode() {
+		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
+		// FIXME a single blocked connection can stall us
+		for _, conn := range connections {
+			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+		}
+	}
+}
+
 func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
 	// do this outside the lock below so we avoid lock nesting
 	c.routes.EnsureRecalculated()
@@ -167,73 +234,6 @@ func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
 		c.senders[conn] = sender
 	}
 	sender.Send(data)
-}
-
-func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, msg []byte) error {
-	return c.relayUnicast(dstPeerName, GobEncode(c.name, c.ourself.Name, dstPeerName, msg))
-}
-
-func (c *GossipChannel) GossipBroadcast(update GossipData) error {
-	return c.relayBroadcast(c.ourself.Name, update)
-}
-
-func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
-	if relayPeerName, found := c.routes.UnicastAll(dstPeerName); !found {
-		err = fmt.Errorf("unknown relay destination: %s", dstPeerName)
-	} else if conn, found := c.ourself.ConnectionTo(relayPeerName); !found {
-		err = fmt.Errorf("unable to find connection to relay peer %s", relayPeerName)
-	} else {
-		conn.(ProtocolSender).SendProtocolMsg(ProtocolMsg{ProtocolGossipUnicast, buf})
-	}
-	return err
-}
-
-func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
-	names := c.routes.PeerNames() // do this outside the lock so they don't nest
-	c.Lock()
-	defer c.Unlock()
-	// GC - randomly (courtesy of go's map iterator) pick some
-	// existing broadcasters and stop&remove them if their source peer
-	// is unknown. We stop as soon as we encounter a valid entry; the
-	// idea being that when there is little or no garbage then this
-	// executes close to O(1)[1], whereas when there is lots of
-	// garbage we remove it quickly.
-	//
-	// [1] TODO Unfortunately, due to the desire to avoid nested
-	// locks, instead of simply invoking Peers.Fetch(name) below, we
-	// have that Peers.Names() invocation above. That is O(n_peers) at
-	// best.
-	for name, broadcaster := range c.broadcasters {
-		if _, found := names[name]; !found {
-			delete(c.broadcasters, name)
-			broadcaster.Stop()
-		} else {
-			break
-		}
-	}
-	broadcaster, found := c.broadcasters[srcName]
-	if !found {
-		broadcaster = NewGossipSender(func(pending GossipData) { c.sendBroadcast(srcName, pending) })
-		c.broadcasters[srcName] = broadcaster
-	}
-	broadcaster.Send(update)
-	return nil
-}
-
-func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
-	c.routes.EnsureRecalculated()
-	nextHops := c.routes.BroadcastAll(srcName)
-	if len(nextHops) == 0 {
-		return
-	}
-	connections := c.ourself.ConnectionsTo(nextHops)
-	for _, msg := range update.Encode() {
-		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
-		// FIXME a single blocked connection can stall us
-		for _, conn := range connections {
-			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
-		}
-	}
 }
 
 func (c *GossipChannel) log(args ...interface{}) {
