@@ -1278,6 +1278,9 @@ proxy_parse_args() {
             PROXY_HOST="${1#*=}"
             PROXY_ARGS="$PROXY_ARGS $1"
             ;;
+          -no-detect-tls|--no-detect-tls)
+            PROXY_TLS_DETECTION_DISABLED=1
+            ;;
           -tls|--tls|-tlsverify|--tlsverify)
             PROXY_TLS_ENABLED=1
             PROXY_ARGS="$PROXY_ARGS $1"
@@ -1315,12 +1318,13 @@ proxy_args() {
     PROXY_VOLUMES=""
     PROXY_ARGS=""
     PROXY_TLS_ENABLED=""
+    PROXY_TLS_DETECTION_DISABLED=""
     PROXY_HOST=""
     proxy_parse_args "$@"
 
-    if [ -z "$PROXY_HOST" -a -n "$CLIENT_TLS_ENABLED" -a -z "$PROXY_TLS_ENABLED" ] ; then
-      if ! proxy_parse_args $(docker_tls_args) ; then
-        echo "When launching the proxy via TLS, -H and/or TLS options are required." >&2
+    if [ -z "$PROXY_TLS_ENABLED" ] ; then
+      if [ -z "$PROXY_TLS_DETECTION_DISABLED" ] && ! proxy_parse_args $(docker_tls_args) ; then
+        echo "Unable to auto-detect TLS configuration, --no-detect-tls or TLS options are required." >&2
         exit 1
       fi
     fi
