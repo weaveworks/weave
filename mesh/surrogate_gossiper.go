@@ -12,8 +12,12 @@ func (d *SurrogateGossipData) Encode() [][]byte {
 	return d.messages
 }
 
-func (d *SurrogateGossipData) Merge(other GossipData) {
-	d.messages = append(d.messages, other.(*SurrogateGossipData).messages...)
+func (d *SurrogateGossipData) Merge(other GossipData) GossipData {
+	o := other.(*SurrogateGossipData)
+	messages := make([][]byte, 0, len(d.messages)+len(o.messages))
+	messages = append(messages, d.messages...)
+	messages = append(messages, o.messages...)
+	return &SurrogateGossipData{messages: messages}
 }
 
 // SurrogateGossiper ignores unicasts and relays broadcasts and gossips.

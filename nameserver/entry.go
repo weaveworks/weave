@@ -245,12 +245,18 @@ type GossipData struct {
 	Entries
 }
 
-func (g *GossipData) Merge(o mesh.GossipData) {
+func (g *GossipData) Merge(o mesh.GossipData) mesh.GossipData {
 	other := o.(*GossipData)
-	g.Entries.merge(other.Entries)
-	if g.Timestamp < other.Timestamp {
-		g.Timestamp = other.Timestamp
+	gossip := &GossipData{
+		Entries:   make(Entries, len(g.Entries)),
+		Timestamp: g.Timestamp,
 	}
+	copy(gossip.Entries, g.Entries)
+	gossip.Entries.merge(other.Entries)
+	if gossip.Timestamp < other.Timestamp {
+		gossip.Timestamp = other.Timestamp
+	}
+	return gossip
 }
 
 func (g *GossipData) Decode(msg []byte) error {

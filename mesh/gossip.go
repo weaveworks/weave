@@ -6,7 +6,7 @@ import (
 
 type GossipData interface {
 	Encode() [][]byte
-	Merge(GossipData)
+	Merge(GossipData) GossipData
 }
 
 type Gossip interface {
@@ -79,8 +79,7 @@ func (sender *GossipSender) Send(data GossipData) {
 	// NB: this must not be invoked concurrently
 	select {
 	case pending := <-sender.cell:
-		pending.Merge(data)
-		sender.cell <- pending
+		sender.cell <- pending.Merge(data)
 	default:
 		sender.cell <- data
 	}
