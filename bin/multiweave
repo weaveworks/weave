@@ -29,6 +29,7 @@ random_mac() {
 case "$1" in
     launch)
         shift 1
+        echo $(date -R) launching
         for i in $(seq $START $FINISH); do
             WEAVE_CONTAINER_NAME=weave$i WEAVE_PORT=$((5000+i)) $weavedir/weave launch-router --iface '' --name $(random_mac) --nickname weave$i --port $PORT --no-dns "$@"
         done
@@ -36,6 +37,7 @@ case "$1" in
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$((START-1)))
             PREV="${status#true }"
         fi
+        echo $(date -R) connecting
         for i in $(seq $START $FINISH); do
             if [ -n "$PREV" ] ; then
                 echo connecting weave$i to $PREV
@@ -44,6 +46,7 @@ case "$1" in
             status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' weave$i)
             PREV="${status#true }"
         done
+        echo $(date -R) done
         ;;
     stop)
         for i in $(seq $START $FINISH); do
