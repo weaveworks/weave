@@ -1266,17 +1266,36 @@ tls_arg() {
     PROXY_ARGS="$PROXY_ARGS $1 /home/weave/tls/$3.pem"
 }
 
+# TODO: Handle relative paths for args
+# TODO: Handle args with spaces
+host_arg() {
+  PROXY_HOST="$1"
+  if [ "$PROXY_HOST" != "${PROXY_HOST#unix://}" ]; then
+    host=$(dirname ${PROXY_HOST#unix://})
+    if [ "$host" = "${host#/}" ]; then
+      echo "When launching the proxy, unix sockets must be specified as an absolute path." >&2
+      exit 1
+    fi
+    if [ "$host" = "/var/run" ]; then
+      echo "WARNING: Proxying sockets whose immediate parent directory is /var/run is unreliable." >&2
+      echo "To work around this, put the unix socket in a subdirectory of /var/run, and symlink it into place." >&2
+    fi
+    PROXY_VOLUMES="$PROXY_VOLUMES -v $host:/host$host"
+    PROXY_ARGS="$PROXY_ARGS -H unix:///host$host/$(basename ${PROXY_HOST#unix://})"
+  else
+    PROXY_ARGS="$PROXY_ARGS -H $1"
+  fi
+}
+
 proxy_parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
           -H)
-            PROXY_HOST="$2"
-            PROXY_ARGS="$PROXY_ARGS $1 $2"
+            host_arg "$2"
             shift
             ;;
           -H=*)
-            PROXY_HOST="${1#*=}"
-            PROXY_ARGS="$PROXY_ARGS $1"
+            host_arg "${1#*=}"
             ;;
           -no-detect-tls|--no-detect-tls)
             PROXY_TLS_DETECTION_DISABLED=1
@@ -1337,7 +1356,7 @@ proxy_args() {
           PROXY_HOST="tcp://0.0.0.0:12375"
           ;;
       esac
-      PROXY_ARGS="$PROXY_ARGS -H $PROXY_HOST"
+      host_arg "$PROXY_HOST"
     fi
 }
 
