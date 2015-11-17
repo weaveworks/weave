@@ -116,11 +116,6 @@ func (conn *LocalConnection) Established() bool {
 	return conn.established
 }
 
-// Send directly, not via the Actor.  If it goes via the Actor we can
-// get a deadlock where LocalConnection is blocked talking to
-// LocalPeer and LocalPeer is blocked trying send a ProtocolMsg via
-// LocalConnection, and the channels are full in both directions so
-// nothing can proceed.
 func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 	if err := conn.sendProtocolMsg(m); err != nil {
 		conn.Shutdown(err)
