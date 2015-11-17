@@ -86,11 +86,10 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ro
 	if connRemote.local != router.Ourself.Peer {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
-	// NB, we're taking a copy of connRemote here.
 	actionChan := make(chan ConnectionAction, ChannelSize)
 	finished := make(chan struct{})
 	conn := &LocalConnection{
-		RemoteConnection: *connRemote,
+		RemoteConnection: *connRemote, // NB, we're taking a copy of connRemote here.
 		Router:           router,
 		TCPConn:          tcpConn,
 		uid:              randUint64(),
