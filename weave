@@ -1277,12 +1277,11 @@ host_arg() {
       exit 1
     fi
     if [ "$host" = "/var/run" ]; then
-      echo "WARNING: When launching the proxy, unix sockets directly in /var/run can lead to a bug with net namespace cleanup." >&2
+      echo "WARNING: Proxying sockets whose immediate parent directory is /var/run is unreliable." >&2
       echo "To work around this, put the unix socket in a subdirectory of /var/run, and symlink it into place." >&2
-      echo "For more info, see https://github.com/weaveworks/weave/issues/1455" >&2
     fi
     PROXY_VOLUMES="$PROXY_VOLUMES -v $host:/host$host"
-    PROXY_ARGS="$PROXY_ARGS -H /host$host/$(basename ${PROXY_HOST#unix://})"
+    PROXY_ARGS="$PROXY_ARGS -H unix:///host$host/$(basename ${PROXY_HOST#unix://})"
   else
     PROXY_ARGS="$PROXY_ARGS -H $1"
   fi
