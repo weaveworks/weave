@@ -11,19 +11,13 @@ else
 fi
 IMAGE_VERSION=${WEAVE_VERSION:-$IMAGE_VERSION}
 
-# - Docker versions prior to 1.2.0 cannot parse `--dns-search=.`
-# - Docker versions prior to 1.3.0 fail to include the domain when
-#   setting the hostname, so lookups for non-fq names fail.
-# - Docker version 1.3.0 contains the severe bug
-#   https://github.com/docker/docker/issues/8632
-# - The weavexec image embeds a Docker 1.3.1 client. Misleading
-#   version mismatch errors are produced if the user is running with a
-#   client *and* server with a lower version.
+# - Docker versions prior to 1.6 cannot pull images from DockerHub
+# - The weavexec image uses an embedded Docker 1.6 client.
 # - Docker will complain if you run a client against a server older
 #   than that client.
 #
-# We therefore check that the user's Docker *client* is >= 1.3.1
-MIN_DOCKER_VERSION=1.3.1
+# We therefore check that the user's Docker *client* is >= 1.6
+MIN_DOCKER_VERSION=1.6.0
 
 # These are needed for remote execs, hence we introduce them here
 DOCKERHUB_USER=${DOCKERHUB_USER:-weaveworks}
