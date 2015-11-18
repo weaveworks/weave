@@ -1,4 +1,4 @@
-package router
+package mesh
 
 type SurrogateGossipData struct {
 	messages [][]byte

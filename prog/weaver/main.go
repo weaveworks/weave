@@ -16,7 +16,9 @@ import (
 
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
+	"github.com/weaveworks/weave/common/odp"
 	"github.com/weaveworks/weave/ipam"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
@@ -41,7 +43,8 @@ func main() {
 		deleteDatapath       bool
 		addDatapathInterface string
 
-		config                    weave.Config
+		config                    mesh.Config
+		networkConfig             weave.NetworkConfig
 		protocolMinVersion        int
 		ifaceName                 string
 		routerName                string
@@ -73,8 +76,8 @@ func main() {
 	mflag.BoolVar(&deleteDatapath, []string{"-delete-datapath"}, false, "delete ODP datapath and exit")
 	mflag.StringVar(&addDatapathInterface, []string{"-add-datapath-iface"}, "", "add a network interface to the ODP datapath and exit")
 
-	mflag.IntVar(&config.Port, []string{"#port", "-port"}, weave.Port, "router port")
-	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, weave.ProtocolMinVersion, "minimum weave protocol version")
+	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
+	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
@@ -85,7 +88,7 @@ func main() {
 	mflag.IntVar(&config.ConnLimit, []string{"#connlimit", "#-connlimit", "-conn-limit"}, 30, "connection limit (0 for unlimited)")
 	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
-	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, fmt.Sprintf(":%d", weave.HTTPPort), "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
+	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
@@ -118,7 +121,7 @@ func main() {
 		os.Exit(0)
 
 	case createDatapath:
-		err, odp_supported := weave.CreateDatapath(datapathName)
+		err, odp_supported := odp.CreateDatapath(datapathName)
 		if !odp_supported {
 			if err != nil {
 				Log.Error(err)
@@ -134,23 +137,23 @@ func main() {
 		os.Exit(0)
 
 	case deleteDatapath:
-		checkFatal(weave.DeleteDatapath(datapathName))
+		checkFatal(odp.DeleteDatapath(datapathName))
 		os.Exit(0)
 
 	case addDatapathInterface != "":
-		checkFatal(weave.AddDatapathInterface(datapathName, addDatapathInterface))
+		checkFatal(odp.AddDatapathInterface(datapathName, addDatapathInterface))
 		os.Exit(0)
 	}
 
 	Log.Println("Command line options:", options())
 	Log.Println("Command line peers:", peers)
 
-	if protocolMinVersion < weave.ProtocolMinVersion || protocolMinVersion > weave.ProtocolMaxVersion {
-		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", weave.ProtocolMinVersion, weave.ProtocolMaxVersion)
+	if protocolMinVersion < mesh.ProtocolMinVersion || protocolMinVersion > mesh.ProtocolMaxVersion {
+		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", mesh.ProtocolMinVersion, mesh.ProtocolMaxVersion)
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
-	var fastDPOverlay weave.Overlay
+	var fastDPOverlay weave.NetworkOverlay
 	if datapathName != "" {
 		// A datapath name implies that "Bridge" and "Overlay"
 		// packet handling use fast datapath, although other
@@ -163,7 +166,7 @@ func main() {
 		})
 
 		checkFatal(err)
-		config.Bridge = fastdp.Bridge()
+		networkConfig.Bridge = fastdp.Bridge()
 		fastDPOverlay = fastdp.Overlay()
 	}
 
@@ -178,7 +181,7 @@ func main() {
 		checkFatal(err)
 
 		// bufsz flag is in MB
-		config.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024)
+		networkConfig.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024)
 		checkFatal(err)
 	}
 
@@ -203,7 +206,6 @@ func main() {
 	sleeve := weave.NewSleeveOverlay(config.Port)
 	overlays.Add("sleeve", sleeve)
 	overlays.SetCompatOverlay(sleeve)
-	config.Overlay = overlays
 
 	if routerName == "" {
 		if iface == nil {
@@ -212,7 +214,7 @@ func main() {
 		routerName = iface.HardwareAddr.String()
 	}
 
-	name, err := weave.PeerNameFromUserInput(routerName)
+	name, err := mesh.PeerNameFromUserInput(routerName)
 	checkFatal(err)
 
 	if nickName == "" {
@@ -230,12 +232,12 @@ func main() {
 	config.PeerDiscovery = !noDiscovery
 
 	if pktdebug {
-		config.PacketLogging = packetLogging{}
+		networkConfig.PacketLogging = packetLogging{}
 	} else {
-		config.PacketLogging = nopPacketLogging{}
+		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	router := weave.NewRouter(config, name, nickName)
+	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlays)
 	Log.Println("Our name is", router.Ourself)
 
 	var dockerCli *docker.Client
@@ -253,10 +255,13 @@ func main() {
 			}
 		}
 	}
+	isKnownPeer := func(name mesh.PeerName) bool {
+		return router.Peers.Fetch(name) != nil
+	}
 	var allocator *ipam.Allocator
 	var defaultSubnet address.CIDR
 	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers))
+		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), isKnownPeer)
 		observeContainers(allocator)
 	} else if peerCount > 0 {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
@@ -267,7 +272,8 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		ns = nameserver.New(router.Ourself.Peer.Name, router.Peers, dnsDomain)
+		ns = nameserver.New(router.Ourself.Peer.Name, dnsDomain, isKnownPeer)
+		router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
 		ns.SetGossip(router.NewGossip("nameserver", ns))
 		observeContainers(ns)
 		ns.Start()
@@ -362,7 +368,7 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	return cidr
 }
 
-func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr string, quorum uint) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr string, quorum uint, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange := parseAndCheckCIDR(ipRangeStr)
 	defaultSubnet := ipRange
 	if defaultSubnetStr != "" {
@@ -371,7 +377,6 @@ func createAllocator(router *weave.Router, ipRangeStr string, defaultSubnetStr s
 			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
 		}
 	}
-	isKnownPeer := func(name weave.PeerName) bool { return router.Peers.Fetch(name) != nil }
 	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum, isKnownPeer)
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))

@@ -1,3 +1,20 @@
+## Release 1.3.0
+
+**Highlights**
+
+This release includes a Docker Plugin, so you have the option to use
+Weave Net that way. More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.3.0).
+
+## Release 1.2.1
+
+This release contains a number of bug fixes and minor
+enhancements. More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.2.1).
+
+The release is fully compatible with 1.2.0 versions, so existing
+clusters can be upgraded incrementally.
+
 ## Release 1.2.0
 
 **Highlights**

@@ -11,12 +11,15 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+
+	"github.com/weaveworks/weave/mesh"
 )
 
 // This diagram explains the various arithmetic and variables related
@@ -53,6 +56,10 @@ const (
 	FragTestInterval  = 5 * time.Minute
 	MTUVerifyAttempts = 8
 	MTUVerifyTimeout  = 10 * time.Millisecond // doubled with each attempt
+
+	ProtocolConnectionEstablished = mesh.ProtocolReserved1
+	ProtocolFragmentationReceived = mesh.ProtocolReserved2
+	ProtocolPMTUVerified          = mesh.ProtocolReserved3
 )
 
 type SleeveOverlay struct {
@@ -60,24 +67,22 @@ type SleeveOverlay struct {
 
 	// These fields are set in StartConsumingPackets, and not
 	// subsequently modified
-	localPeer    *Peer
+	localPeer    *mesh.Peer
 	localPeerBin []byte
 	consumer     OverlayConsumer
-	peers        *Peers
+	peers        *mesh.Peers
 	conn         *net.UDPConn
 
 	lock       sync.Mutex
-	forwarders map[PeerName]*sleeveForwarder
+	forwarders map[mesh.PeerName]*sleeveForwarder
 }
 
-func NewSleeveOverlay(localPort int) Overlay {
+func NewSleeveOverlay(localPort int) NetworkOverlay {
 	return &SleeveOverlay{localPort: localPort}
 }
 
-func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers,
-	consumer OverlayConsumer) error {
-	localAddr, err := net.ResolveUDPAddr("udp4",
-		fmt.Sprint(":", sleeve.localPort))
+func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *mesh.Peer, peers *mesh.Peers, consumer OverlayConsumer) error {
+	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", sleeve.localPort))
 	if err != nil {
 		return err
 	}
@@ -97,8 +102,7 @@ func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers
 
 	// This makes sure all packets we send out do not have DF set
 	// on them.
-	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP,
-		syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DONT)
+	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DONT)
 	if err != nil {
 		return err
 	}
@@ -116,7 +120,7 @@ func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *Peer, peers *Peers
 	sleeve.consumer = consumer
 	sleeve.peers = peers
 	sleeve.conn = conn
-	sleeve.forwarders = make(map[PeerName]*sleeveForwarder)
+	sleeve.forwarders = make(map[mesh.PeerName]*sleeveForwarder)
 	go sleeve.readUDP()
 	return nil
 }
@@ -137,20 +141,19 @@ func (*SleeveOverlay) Diagnostics() interface{} {
 	return nil
 }
 
-func (sleeve *SleeveOverlay) lookupForwarder(peer PeerName) *sleeveForwarder {
+func (sleeve *SleeveOverlay) lookupForwarder(peer mesh.PeerName) *sleeveForwarder {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
 	return sleeve.forwarders[peer]
 }
 
-func (sleeve *SleeveOverlay) addForwarder(peer PeerName, fwd *sleeveForwarder) {
+func (sleeve *SleeveOverlay) addForwarder(peer mesh.PeerName, fwd *sleeveForwarder) {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
 	sleeve.forwarders[peer] = fwd
 }
 
-func (sleeve *SleeveOverlay) removeForwarder(peer PeerName,
-	fwd *sleeveForwarder) {
+func (sleeve *SleeveOverlay) removeForwarder(peer mesh.PeerName, fwd *sleeveForwarder) {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()
 	if sleeve.forwarders[peer] == fwd {
@@ -175,7 +178,7 @@ func (sleeve *SleeveOverlay) readUDP() {
 			continue
 		}
 
-		fwdName := PeerNameFromBin(buf[:NameSize])
+		fwdName := mesh.PeerNameFromBin(buf[:NameSize])
 		fwd := sleeve.lookupForwarder(fwdName)
 		if fwd == nil {
 			continue
@@ -186,8 +189,7 @@ func (sleeve *SleeveOverlay) readUDP() {
 
 		err = fwd.crypto.Dec.IterateFrames(packet,
 			func(src []byte, dst []byte, frame []byte) {
-				sleeve.handleFrame(sender, fwd,
-					src, dst, frame, dec)
+				sleeve.handleFrame(sender, fwd, src, dst, frame, dec)
 			})
 		if err != nil {
 			// Errors during UDP packet decoding /
@@ -209,17 +211,15 @@ func (sleeve *SleeveOverlay) readUDP() {
 	}
 }
 
-func (sleeve *SleeveOverlay) handleFrame(sender *net.UDPAddr,
-	fwd *sleeveForwarder, src []byte, dst []byte, frame []byte,
-	dec *EthernetDecoder) {
+func (sleeve *SleeveOverlay) handleFrame(sender *net.UDPAddr, fwd *sleeveForwarder, src []byte, dst []byte, frame []byte, dec *EthernetDecoder) {
 	dec.DecodeLayers(frame)
 	decodedLen := len(dec.decoded)
 	if decodedLen == 0 {
 		return
 	}
 
-	srcPeer := sleeve.peers.Fetch(PeerNameFromBin(src))
-	dstPeer := sleeve.peers.Fetch(PeerNameFromBin(dst))
+	srcPeer := sleeve.peers.Fetch(mesh.PeerNameFromBin(src))
+	dstPeer := sleeve.peers.Fetch(mesh.PeerNameFromBin(dst))
 	if srcPeer == nil || dstPeer == nil {
 		return
 	}
@@ -246,8 +246,7 @@ func (sleeve *SleeveOverlay) handleFrame(sender *net.UDPAddr,
 	sleeve.sendToConsumer(srcPeer, dstPeer, frame, dec)
 }
 
-func (sleeve *SleeveOverlay) sendToConsumer(srcPeer, dstPeer *Peer,
-	frame []byte, dec *EthernetDecoder) {
+func (sleeve *SleeveOverlay) sendToConsumer(srcPeer, dstPeer *mesh.Peer, frame []byte, dec *EthernetDecoder) {
 	if sleeve.consumer == nil {
 		return
 	}
@@ -280,10 +279,16 @@ func (sleeve *SleeveOverlay) send(msg []byte, raddr *net.UDPAddr) error {
 	return err
 }
 
+type sleeveCrypto struct {
+	Dec   Decryptor
+	Enc   Encryptor
+	EncDF Encryptor
+}
+
 type sleeveForwarder struct {
 	// Immutable
 	sleeve         *SleeveOverlay
-	remotePeer     *Peer
+	remotePeer     *mesh.Peer
 	remotePeerBin  []byte
 	sendControlMsg func(byte, []byte) error
 	connUID        uint64
@@ -310,7 +315,7 @@ type sleeveForwarder struct {
 	stackFrag bool
 
 	// State only used within the forwarder goroutine
-	crypto     OverlayCrypto
+	crypto     sleeveCrypto
 	senderDF   *udpSenderDF
 	maxPayload int
 
@@ -350,13 +355,17 @@ type controlMessage struct {
 	msg []byte
 }
 
-func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwarder, error) {
-	var crypto OverlayCrypto
-	if params.Crypto != nil {
-		crypto = *params.Crypto
+func (sleeve *SleeveOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
+	name := sleeve.localPeer.NameByte
+	var crypto sleeveCrypto
+	if params.SessionKey != nil {
+		crypto = sleeveCrypto{
+			Dec:   NewNaClDecryptor(params.SessionKey, params.Outbound),
+			Enc:   NewNaClEncryptor(name, params.SessionKey, params.Outbound, false),
+			EncDF: NewNaClEncryptor(name, params.SessionKey, params.Outbound, true),
+		}
 	} else {
-		name := sleeve.localPeer.NameByte
-		crypto = OverlayCrypto{
+		crypto = sleeveCrypto{
 			Dec:   NewNonDecryptor(),
 			Enc:   NewNonEncryptor(name),
 			EncDF: NewNonEncryptor(name),
@@ -369,6 +378,11 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 	controlMsgChan := make(chan controlMessage, 1)
 	confirmedChan := make(chan struct{})
 	finishedChan := make(chan struct{})
+
+	var remoteAddr *net.UDPAddr
+	if params.Outbound {
+		remoteAddr = makeUDPAddr(params.RemoteAddr)
+	}
 
 	fwd := &sleeveForwarder{
 		sleeve:           sleeve,
@@ -384,17 +398,16 @@ func (sleeve *SleeveOverlay) MakeForwarder(params ForwarderParams) (OverlayForwa
 		finishedChan:     finishedChan,
 		establishedChan:  make(chan struct{}),
 		errorChan:        make(chan error, 1),
-		remoteAddr:       params.RemoteAddr,
+		remoteAddr:       remoteAddr,
 		mtu:              DefaultMTU,
 		crypto:           crypto,
 		maxPayload:       DefaultMTU - UDPOverhead,
 		overheadDF: UDPOverhead + crypto.EncDF.PacketOverhead() +
 			crypto.EncDF.FrameOverhead() + EthernetOverhead,
-		senderDF: newUDPSenderDF(params.LocalIP, sleeve.localPort),
+		senderDF: newUDPSenderDF(params.LocalAddr.IP, sleeve.localPort),
 	}
 
-	go fwd.run(aggChan, aggDFChan, specialChan, controlMsgChan,
-		confirmedChan, finishedChan)
+	go fwd.run(aggChan, aggDFChan, specialChan, controlMsgChan, confirmedChan, finishedChan)
 	return fwd, nil
 }
 
@@ -436,8 +449,7 @@ func (fwd *sleeveForwarder) Forward(key ForwardPacketKey) FlowOp {
 	return curriedForward{fwd: fwd, key: key}
 }
 
-func (f curriedForward) Process(frame []byte, dec *EthernetDecoder,
-	broadcast bool) {
+func (f curriedForward) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {
 	fwd := f.fwd
 	fwd.lock.RLock()
 	haveContact := (fwd.remoteAddr != nil)
@@ -446,8 +458,7 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder,
 	fwd.lock.RUnlock()
 
 	if !haveContact {
-		log.Print(fwd.logPrefix(),
-			"Cannot forward frame yet - awaiting contact")
+		log.Print(fwd.logPrefix(), "Cannot forward frame yet - awaiting contact")
 		return
 	}
 
@@ -466,8 +477,7 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder,
 	// of our pipeline.
 	if dec.DF() {
 		if !frameTooBig(frame, mtu) {
-			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName,
-				frame)
+			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName, frame)
 			return
 		}
 
@@ -492,8 +502,7 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder,
 
 		// The frag-needed packet does not have DF set, so the
 		// potential recursion here is bounded.
-		fwd.sleeve.sendToConsumer(f.key.DstPeer, f.key.SrcPeer,
-			fragNeededPacket, dec)
+		fwd.sleeve.sendToConsumer(f.key.DstPeer, f.key.SrcPeer, fragNeededPacket, dec)
 		return
 	}
 
@@ -514,21 +523,18 @@ func (f curriedForward) Process(frame []byte, dec *EthernetDecoder,
 	// fragment it ourself.
 	checkWarn(fragment(dec.Eth, dec.IP, mtu,
 		func(segFrame []byte) {
-			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName,
-				segFrame)
+			fwd.aggregate(fwd.aggregatorDFChan, srcName, dstName, segFrame)
 		}))
 }
 
-func (fwd *sleeveForwarder) aggregate(ch chan<- aggregatorFrame, src []byte,
-	dst []byte, frame []byte) {
+func (fwd *sleeveForwarder) aggregate(ch chan<- aggregatorFrame, src []byte, dst []byte, frame []byte) {
 	select {
 	case ch <- aggregatorFrame{src, dst, frame}:
 	case <-fwd.finishedChan:
 	}
 }
 
-func fragment(eth layers.Ethernet, ip layers.IPv4, mtu int,
-	forward func([]byte)) error {
+func fragment(eth layers.Ethernet, ip layers.IPv4, mtu int, forward func([]byte)) error {
 	// We are not doing any sort of NAT, so we don't need to worry
 	// about checksums of IP payload (eg UDP checksum).
 	headerSize := int(ip.IHL) * 4
@@ -570,8 +576,7 @@ func fragment(eth layers.Ethernet, ip layers.IPv4, mtu int,
 		ip.FragOffset = uint16((offset + offsetBase) >> 3)
 		buf := gopacket.NewSerializeBuffer()
 		segPayload := gopacket.Payload(segmentPayload)
-		err := gopacket.SerializeLayers(buf, opts, &eth, &ip,
-			&segPayload)
+		err := gopacket.SerializeLayers(buf, opts, &eth, &ip, &segPayload)
 		if err != nil {
 			return err
 		}
@@ -623,13 +628,10 @@ loop:
 	for err == nil {
 		select {
 		case frame := <-aggChan:
-			err = fwd.aggregateAndSend(frame, aggChan,
-				fwd.crypto.Enc, fwd.sleeve,
-				MaxUDPPacketSize-UDPOverhead)
+			err = fwd.aggregateAndSend(frame, aggChan, fwd.crypto.Enc, fwd.sleeve, MaxUDPPacketSize-UDPOverhead)
 
 		case frame := <-aggDFChan:
-			err = fwd.aggregateAndSend(frame, aggDFChan,
-				fwd.crypto.EncDF, fwd.senderDF, fwd.maxPayload)
+			err = fwd.aggregateAndSend(frame, aggDFChan, fwd.crypto.EncDF, fwd.senderDF, fwd.maxPayload)
 
 		case sf := <-specialChan:
 			err = fwd.handleSpecialFrame(sf)
@@ -683,8 +685,7 @@ loop:
 }
 
 func (fwd *sleeveForwarder) aggregateAndSend(frame aggregatorFrame,
-	aggChan <-chan aggregatorFrame, enc Encryptor, sender udpSender,
-	limit int) error {
+	aggChan <-chan aggregatorFrame, enc Encryptor, sender udpSender, limit int) error {
 	// Give up after processing N frames, to avoid starving the
 	// other activities of the forwarder goroutine.
 	i := 0
@@ -734,8 +735,7 @@ func fits(frame aggregatorFrame, enc Encryptor, limit int) bool {
 	return enc.TotalLen()+enc.FrameOverhead()+len(frame.frame) <= limit
 }
 
-func (fwd *sleeveForwarder) flushEncryptor(enc Encryptor,
-	sender udpSender) error {
+func (fwd *sleeveForwarder) flushEncryptor(enc Encryptor, sender udpSender) error {
 	msg, err := enc.Bytes()
 	if err != nil {
 		return err
@@ -744,8 +744,7 @@ func (fwd *sleeveForwarder) flushEncryptor(enc Encryptor,
 	return fwd.processSendError(sender.send(msg, fwd.remoteAddr))
 }
 
-func (fwd *sleeveForwarder) sendSpecial(enc Encryptor, sender udpSender,
-	data []byte) error {
+func (fwd *sleeveForwarder) sendSpecial(enc Encryptor, sender udpSender, data []byte) error {
 	enc.AppendFrame(fwd.sleeve.localPeerBin, fwd.remotePeerBin, data)
 	return fwd.flushEncryptor(enc, sender)
 }
@@ -776,8 +775,7 @@ func (fwd *sleeveForwarder) handleControlMessage(cm controlMessage) error {
 		return fwd.handleMTUTestAck(cm.msg)
 
 	default:
-		log.Print(fwd.logPrefix(),
-			"Ignoring unknown control message tag: ", cm.tag)
+		log.Print(fwd.logPrefix(), "Ignoring unknown control message tag: ", cm.tag)
 		return nil
 	}
 }
@@ -836,8 +834,7 @@ func (fwd *sleeveForwarder) handleHeartbeat(special specialFrame) error {
 			}
 		}
 	} else if !udpAddrsEqual(fwd.remoteAddr, special.sender) {
-		log.Print(fwd.logPrefix(),
-			"Peer UDP address changed to ", special.sender)
+		log.Print(fwd.logPrefix(), "Peer UDP address changed to ", special.sender)
 		fwd.setRemoteAddr(special.sender)
 	}
 
@@ -1145,4 +1142,30 @@ func timerChan(timer *time.Timer) <-chan time.Time {
 		return timer.C
 	}
 	return nil
+}
+
+func tickerChan(ticker *time.Ticker) <-chan time.Time {
+	if ticker != nil {
+		return ticker.C
+	}
+	return nil
+}
+
+func makeUDPAddr(addr *net.TCPAddr) *net.UDPAddr {
+	return &net.UDPAddr{IP: addr.IP, Port: addr.Port, Zone: addr.Zone}
+}
+
+// Look inside an error produced by the net package to get to the
+// syscall.Errno at the root of the problem.
+func PosixError(err error) error {
+	if operr, ok := err.(*net.OpError); ok {
+		err = operr.Err
+	}
+
+	// go1.5 wraps an Errno inside a SyscallError inside an OpError
+	if scerr, ok := err.(*os.SyscallError); ok {
+		err = scerr.Err
+	}
+
+	return err
 }

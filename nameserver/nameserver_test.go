@@ -11,19 +11,23 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 	wt "github.com/weaveworks/weave/testing"
 	"github.com/weaveworks/weave/testing/gossip"
 )
+
+func makeNameserver(name mesh.PeerName) *Nameserver {
+	return New(name, "", func(mesh.PeerName) bool { return true })
+}
 
 func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
 	gossipRouter := gossip.NewTestRouter(0.0)
 	nameservers := make([]*Nameserver, size)
 
 	for i := 0; i < size; i++ {
-		name, _ := router.PeerNameFromString(fmt.Sprintf("%02d:00:00:02:00:00", i))
-		nameserver := New(name, nil, "")
+		name, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:00:00:02:00:00", i))
+		nameserver := makeNameserver(name)
 		nameserver.SetGossip(gossipRouter.Connect(nameserver.ourName, nameserver))
 		nameserver.Start()
 		nameservers[i] = nameserver
@@ -40,7 +44,7 @@ func stopNetwork(nameservers []*Nameserver, grouter *gossip.TestRouter) {
 }
 
 type pair struct {
-	origin router.PeerName
+	origin mesh.PeerName
 	addr   address.Address
 }
 
@@ -87,7 +91,7 @@ func testNameservers(t *testing.T) {
 	badNameservers := nameservers[25:]
 	// This subset will remain well-connected, and we will deal mainly with them
 	nameservers = nameservers[:25]
-	nameserversByName := map[router.PeerName]*Nameserver{}
+	nameserversByName := map[mesh.PeerName]*Nameserver{}
 	for _, n := range nameservers {
 		nameserversByName[n.ourName] = n
 	}
@@ -142,7 +146,7 @@ func testNameservers(t *testing.T) {
 	loseConnection := func() {
 		nameserver1 := badNameservers[rand.Intn(len(badNameservers))]
 		nameserver2 := nameservers[rand.Intn(len(nameservers))]
-		nameserver1.PeerGone(&router.Peer{Name: nameserver2.ourName})
+		nameserver1.PeerGone(nameserver2.ourName)
 	}
 
 	deleteMapping := func() {
@@ -222,9 +226,9 @@ func testNameservers(t *testing.T) {
 }
 
 func TestContainerAndPeerDeath(t *testing.T) {
-	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
+	peername, err := mesh.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
-	nameserver := New(peername, nil, "")
+	nameserver := makeNameserver(peername)
 
 	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Nil(t, err)
@@ -237,7 +241,7 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
-	nameserver.PeerGone(&router.Peer{Name: peername})
+	nameserver.PeerGone(peername)
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
 }
 
@@ -246,9 +250,9 @@ func TestTombstoneDeletion(t *testing.T) {
 	defer func() { now = oldNow }()
 	now = func() int64 { return 1234 }
 
-	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
+	peername, err := mesh.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
-	nameserver := New(peername, nil, "")
+	nameserver := makeNameserver(peername)
 
 	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Nil(t, err)

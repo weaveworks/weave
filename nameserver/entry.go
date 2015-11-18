@@ -8,15 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 var now = func() int64 { return time.Now().Unix() }
 
 type Entry struct {
 	ContainerID string
-	Origin      router.PeerName
+	Origin      mesh.PeerName
 	Addr        address.Address
 	Hostname    string // as supplied
 	lHostname   string // lowercased (not exported, so not encoded by gob)
@@ -128,7 +128,7 @@ func (es *Entries) checkAndPanic() *Entries {
 	return es
 }
 
-func (es *Entries) add(hostname, containerid string, origin router.PeerName, addr address.Address) Entry {
+func (es *Entries) add(hostname, containerid string, origin mesh.PeerName, addr address.Address) Entry {
 	defer es.checkAndPanic().checkAndPanic()
 
 	entry := Entry{Hostname: hostname, lHostname: strings.ToLower(hostname),
@@ -176,7 +176,7 @@ func (es *Entries) merge(incoming Entries) Entries {
 }
 
 // f returning true means keep the entry.
-func (es *Entries) tombstone(ourname router.PeerName, f func(*Entry) bool) Entries {
+func (es *Entries) tombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries {
 	defer es.checkAndPanic().checkAndPanic()
 
 	tombstoned := Entries{}
@@ -245,7 +245,7 @@ type GossipData struct {
 	Entries
 }
 
-func (g *GossipData) Merge(o router.GossipData) {
+func (g *GossipData) Merge(o mesh.GossipData) {
 	other := o.(*GossipData)
 	g.Entries.merge(other.Entries)
 	if g.Timestamp < other.Timestamp {

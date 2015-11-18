@@ -1,4 +1,4 @@
-package router
+package mesh
 
 import (
 	"fmt"
@@ -40,17 +40,16 @@ type RemoteConnection struct {
 type LocalConnection struct {
 	sync.RWMutex
 	RemoteConnection
-	TCPConn       *net.TCPConn
-	version       byte
-	tcpSender     TCPSender
-	remoteUDPAddr *net.UDPAddr
-	SessionKey    *[32]byte
-	heartbeatTCP  *time.Ticker
-	Router        *Router
-	uid           uint64
-	actionChan    chan<- ConnectionAction
-	finished      <-chan struct{} // closed to signal that actorLoop has finished
-	forwarder     OverlayForwarder
+	TCPConn      *net.TCPConn
+	version      byte
+	tcpSender    TCPSender
+	SessionKey   *[32]byte
+	heartbeatTCP *time.Ticker
+	Router       *Router
+	uid          uint64
+	actionChan   chan<- ConnectionAction
+	finished     <-chan struct{} // closed to signal that actorLoop has finished
+	OverlayConn  OverlayConnection
 }
 
 type ConnectionAction func() error
@@ -83,7 +82,7 @@ func (conn *RemoteConnection) ErrorLog(args ...interface{}) {
 
 // Does not return anything. If the connection is successful, it will
 // end up in the local peer's connections map.
-func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, udpAddr *net.UDPAddr, router *Router, acceptNewPeer bool) {
+func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, router *Router, acceptNewPeer bool) {
 	if connRemote.local != router.Ourself.Peer {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
@@ -94,7 +93,6 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ud
 		RemoteConnection: *connRemote,
 		Router:           router,
 		TCPConn:          tcpConn,
-		remoteUDPAddr:    udpAddr,
 		uid:              randUint64(),
 		actionChan:       actionChan,
 		finished:         finished}
@@ -192,37 +190,37 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.Log("connection ready; using protocol version", conn.version)
 
-	params := ForwarderParams{
+	params := OverlayConnectionParams{
 		RemotePeer:         conn.remote,
-		LocalIP:            conn.TCPConn.LocalAddr().(*net.TCPAddr).IP,
-		RemoteAddr:         conn.remoteUDPAddr,
+		LocalAddr:          conn.TCPConn.LocalAddr().(*net.TCPAddr),
+		RemoteAddr:         conn.TCPConn.RemoteAddr().(*net.TCPAddr),
+		Outbound:           conn.outbound,
 		ConnUID:            conn.uid,
-		Crypto:             conn.forwarderCrypto(),
+		SessionKey:         conn.SessionKey,
 		SendControlMessage: conn.sendOverlayControlMessage,
 		Features:           intro.Features,
 	}
-	if conn.forwarder, err = conn.Router.Overlay.MakeForwarder(params); err != nil {
+	if conn.OverlayConn, err = conn.Router.Overlay.PrepareConnection(params); err != nil {
 		return
 	}
 
 	// As soon as we do AddConnection, the new connection becomes
 	// visible to the packet routing logic.  So AddConnection must
-	// come after MakeForwarder
+	// come after PrepareConnection
 	if err = conn.Router.Ourself.AddConnection(conn); err != nil {
 		return
 	}
 	conn.Router.ConnectionMaker.ConnectionCreated(conn)
 
-	// Forwarder confirmation comes after AddConnection, because
-	// only after that completes do we know the connection is
-	// valid: in particular that it is not a duplicate connection
-	// to the same peer. Sending heartbeats on a duplicate
-	// connection can trip up crypto at the other end, since the
-	// associated UDP packets may get decoded by the other
-	// connection. It is also generally wasteful to engage in any
-	// interaction with the remote on a connection that turns out
-	// to be invalid.
-	conn.forwarder.Confirm()
+	// OverlayConnection confirmation comes after AddConnection,
+	// because only after that completes do we know the connection is
+	// valid: in particular that it is not a duplicate connection to
+	// the same peer. Overlay communication on a duplicate connection
+	// can cause problems such as tripping up overlay crypto at the
+	// other end due to data being decoded by the other connection. It
+	// is also generally wasteful to engage in any interaction with
+	// the remote on a connection that turns out to be invalid.
+	conn.OverlayConn.Confirm()
 
 	// receiveTCP must follow also AddConnection. In the absence
 	// of any indirect connectivity to the remote peer, the first
@@ -330,10 +328,6 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 		}
 	}
 
-	if conn.remote.UID != remote.UID {
-		return fmt.Errorf("Connection appears to be with different version of a peer we already know of")
-	}
-
 	if conn.remote == conn.local {
 		return ErrConnectToSelf
 	}
@@ -342,8 +336,8 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 }
 
 func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
-	fwdErrorChan := conn.forwarder.ErrorChannel()
-	fwdEstablishedChan := conn.forwarder.EstablishedChannel()
+	fwdErrorChan := conn.OverlayConn.ErrorChannel()
+	fwdEstablishedChan := conn.OverlayConn.EstablishedChannel()
 
 	for err == nil {
 		select {
@@ -380,26 +374,15 @@ func (conn *LocalConnection) shutdown(err error) {
 		conn.Router.Ourself.DeleteConnection(conn)
 	}
 
-	stopTicker(conn.heartbeatTCP)
+	if conn.heartbeatTCP != nil {
+		conn.heartbeatTCP.Stop()
+	}
 
-	if conn.forwarder != nil {
-		conn.forwarder.Stop()
+	if conn.OverlayConn != nil {
+		conn.OverlayConn.Stop()
 	}
 
 	conn.Router.ConnectionMaker.ConnectionTerminated(conn, err)
-}
-
-func (conn *LocalConnection) forwarderCrypto() *OverlayCrypto {
-	if !conn.Router.UsingPassword() {
-		return nil
-	}
-
-	name := conn.local.NameByte
-	return &OverlayCrypto{
-		Dec:   NewNaClDecryptor(conn.SessionKey, conn.outbound),
-		Enc:   NewNaClEncryptor(name, conn.SessionKey, conn.outbound, false),
-		EncDF: NewNaClEncryptor(name, conn.SessionKey, conn.outbound, true),
-	}
 }
 
 func (conn *LocalConnection) sendOverlayControlMessage(tag byte, msg []byte) error {
@@ -413,7 +396,7 @@ func (conn *LocalConnection) sendSimpleProtocolMsg(tag ProtocolTag) error {
 }
 
 func (conn *LocalConnection) sendProtocolMsg(m ProtocolMsg) error {
-	return conn.tcpSender.Send(Concat([]byte{byte(m.tag)}, m.msg))
+	return conn.tcpSender.Send(append([]byte{byte(m.tag)}, m.msg...))
 }
 
 func (conn *LocalConnection) receiveTCP(receiver TCPReceiver) {
@@ -439,8 +422,8 @@ func (conn *LocalConnection) receiveTCP(receiver TCPReceiver) {
 func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) error {
 	switch tag {
 	case ProtocolHeartbeat:
-	case ProtocolConnectionEstablished, ProtocolFragmentationReceived, ProtocolPMTUVerified, ProtocolOverlayControlMsg:
-		conn.forwarder.ControlMessage(byte(tag), payload)
+	case ProtocolReserved1, ProtocolReserved2, ProtocolReserved3, ProtocolOverlayControlMsg:
+		conn.OverlayConn.ControlMessage(byte(tag), payload)
 	case ProtocolGossipUnicast, ProtocolGossipBroadcast, ProtocolGossip:
 		return conn.Router.handleGossip(tag, payload)
 	default:
@@ -451,21 +434,4 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 
 func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(TCPHeartbeat * 2))
-}
-
-func (conn *LocalConnection) Forward(key ForwardPacketKey) FlowOp {
-	return conn.forwarder.Forward(key)
-}
-
-func tickerChan(ticker *time.Ticker) <-chan time.Time {
-	if ticker != nil {
-		return ticker.C
-	}
-	return nil
-}
-
-func stopTicker(ticker *time.Ticker) {
-	if ticker != nil {
-		ticker.Stop()
-	}
 }

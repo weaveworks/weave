@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/weaveworks/weave/mesh"
 )
 
 // OverlaySwitch selects which overlay to use, from a set of
@@ -13,16 +15,16 @@ import (
 // uses the best one that seems to be working.
 
 type OverlaySwitch struct {
-	overlays      map[string]Overlay
+	overlays      map[string]NetworkOverlay
 	overlayNames  []string
-	compatOverlay Overlay
+	compatOverlay NetworkOverlay
 }
 
 func NewOverlaySwitch() *OverlaySwitch {
-	return &OverlaySwitch{overlays: make(map[string]Overlay)}
+	return &OverlaySwitch{overlays: make(map[string]NetworkOverlay)}
 }
 
-func (osw *OverlaySwitch) Add(name string, overlay Overlay) {
+func (osw *OverlaySwitch) Add(name string, overlay NetworkOverlay) {
 	// check for repeated names
 	if _, present := osw.overlays[name]; present {
 		log.Fatal("OverlaySwitch: repeated overlay name")
@@ -32,7 +34,7 @@ func (osw *OverlaySwitch) Add(name string, overlay Overlay) {
 	osw.overlayNames = append(osw.overlayNames, name)
 }
 
-func (osw *OverlaySwitch) SetCompatOverlay(overlay Overlay) {
+func (osw *OverlaySwitch) SetCompatOverlay(overlay NetworkOverlay) {
 	osw.compatOverlay = overlay
 }
 
@@ -60,11 +62,9 @@ func (osw *OverlaySwitch) InvalidateShortIDs() {
 	}
 }
 
-func (osw *OverlaySwitch) StartConsumingPackets(localPeer *Peer, peers *Peers,
-	consumer OverlayConsumer) error {
+func (osw *OverlaySwitch) StartConsumingPackets(localPeer *mesh.Peer, peers *mesh.Peers, consumer OverlayConsumer) error {
 	for _, overlay := range osw.overlays {
-		if err := overlay.StartConsumingPackets(localPeer, peers,
-			consumer); err != nil {
+		if err := overlay.StartConsumingPackets(localPeer, peers, consumer); err != nil {
 			return err
 		}
 	}
@@ -72,19 +72,19 @@ func (osw *OverlaySwitch) StartConsumingPackets(localPeer *Peer, peers *Peers,
 }
 
 type namedOverlay struct {
-	Overlay
+	NetworkOverlay
 	name string
 }
 
 // Find the common set of overlays supported by both sides, with the
 // ordering being the same on both sides too.
-func (osw *OverlaySwitch) commonOverlays(params ForwarderParams) ([]namedOverlay, error) {
+func (osw *OverlaySwitch) commonOverlays(params mesh.OverlayConnectionParams) ([]namedOverlay, error) {
 	var peerOverlays []string
 	if overlaysFeature, present := params.Features["Overlays"]; present {
 		peerOverlays = strings.Split(overlaysFeature, " ")
 	}
 
-	common := make(map[string]Overlay)
+	common := make(map[string]NetworkOverlay)
 	for _, name := range peerOverlays {
 		if overlay := osw.overlays[name]; overlay != nil {
 			common[name] = overlay
@@ -120,7 +120,7 @@ func (osw *OverlaySwitch) commonOverlays(params ForwarderParams) ([]namedOverlay
 }
 
 type overlaySwitchForwarder struct {
-	remotePeer *Peer
+	remotePeer *mesh.Peer
 
 	lock sync.Mutex
 
@@ -162,10 +162,9 @@ type subForwarderEvent struct {
 	err error
 }
 
-func (osw *OverlaySwitch) MakeForwarder(
-	params ForwarderParams) (OverlayForwarder, error) {
+func (osw *OverlaySwitch) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
 	if _, present := params.Features["Overlays"]; !present && osw.compatOverlay != nil {
-		return osw.compatOverlay.MakeForwarder(params)
+		return osw.compatOverlay.PrepareConnection(params)
 	}
 
 	overlays, err := osw.commonOverlays(params)
@@ -200,15 +199,15 @@ func (osw *OverlaySwitch) MakeForwarder(
 			xmsg[0] = byte(index)
 			xmsg[1] = tag
 			copy(xmsg[2:], msg)
-			return origSendControlMessage(ProtocolOverlayControlMsg,
-				xmsg)
+			return origSendControlMessage(mesh.ProtocolOverlayControlMsg, xmsg)
 		}
 
-		subFwd, err := overlay.MakeForwarder(params)
+		subConn, err := overlay.PrepareConnection(params)
 		if err != nil {
 			fwd.stopFrom(0)
 			return nil, err
 		}
+		subFwd := subConn.(OverlayForwarder)
 
 		subStopChan := make(chan struct{})
 		go monitorForwarder(i, eventsChan, subStopChan, subFwd)
@@ -224,8 +223,7 @@ func (osw *OverlaySwitch) MakeForwarder(
 	return fwd, nil
 }
 
-func monitorForwarder(index int, eventsChan chan<- subForwarderEvent,
-	stopChan <-chan struct{}, fwd OverlayForwarder) {
+func monitorForwarder(index int, eventsChan chan<- subForwarderEvent, stopChan <-chan struct{}, fwd OverlayForwarder) {
 	establishedChan := fwd.EstablishedChannel()
 loop:
 	for {
@@ -257,8 +255,7 @@ loop:
 	fwd.Stop()
 }
 
-func (fwd *overlaySwitchForwarder) run(eventsChan <-chan subForwarderEvent,
-	stopChan <-chan struct{}) {
+func (fwd *overlaySwitchForwarder) run(eventsChan <-chan subForwarderEvent, stopChan <-chan struct{}) {
 loop:
 	for {
 		select {
@@ -355,8 +352,7 @@ func (fwd *overlaySwitchForwarder) chooseBest() {
 
 	if fwd.best != best {
 		fwd.best = best
-		log.Info(fwd.logPrefix(),
-			"using ", fwd.forwarders[best].overlayName)
+		log.Info(fwd.logPrefix(), "using ", fwd.forwarders[best].overlayName)
 	}
 }
 

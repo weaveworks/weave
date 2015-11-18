@@ -1,12 +1,15 @@
-package router
+package mesh
 
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"io"
 	"math/rand"
 	"sync"
 )
+
+var void = struct{}{}
 
 type Peers struct {
 	sync.RWMutex
@@ -33,8 +36,8 @@ type UnknownPeerError struct {
 	Name PeerName
 }
 
-type NameCollisionError struct {
-	Name PeerName
+func (upe UnknownPeerError) Error() string {
+	return fmt.Sprint("Reference to unknown peer ", upe.Name)
 }
 
 type PeerNameSet map[PeerName]struct{}
@@ -57,6 +60,9 @@ type PeersPendingNotifications struct {
 
 	// The local short ID needs reassigning due to a collision
 	reassignLocalShortID bool
+
+	// The local peer was modified
+	localPeerModified bool
 }
 
 func NewPeers(ourself *LocalPeer) *Peers {
@@ -89,7 +95,8 @@ func (peers *Peers) OnInvalidateShortIDs(callback func()) {
 }
 
 func (peers *Peers) unlockAndNotify(pending *PeersPendingNotifications) {
-	broadcastLocalPeer := pending.reassignLocalShortID && peers.reassignLocalShortID(pending)
+	broadcastLocalPeer := (pending.reassignLocalShortID && peers.reassignLocalShortID(pending)) ||
+		pending.localPeerModified
 	onGC := peers.onGC
 	onInvalidateShortIDs := peers.onInvalidateShortIDs
 	peers.Unlock()
@@ -425,12 +432,8 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 		newPeer := NewPeerFromSummary(peerSummary)
 		decodedUpdate = append(decodedUpdate, newPeer)
 		decodedConns = append(decodedConns, connSummaries)
-		existingPeer, found := peers.byName[newPeer.Name]
-		if !found {
+		if _, found := peers.byName[newPeer.Name]; !found {
 			newPeers[newPeer.Name] = newPeer
-		} else if existingPeer.UID != newPeer.UID {
-			err = NameCollisionError{Name: newPeer.Name}
-			return
 		}
 	}
 
@@ -458,36 +461,36 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 		connSummaries := decodedConns[idx]
 		name := newPeer.Name
 		// guaranteed to find peer in the peers.byName
-		peer := peers.byName[name]
-		if peer != newPeer &&
-			(peer == peers.ourself.Peer || peer.Version >= newPeer.Version) {
-			// Nobody but us updates us. And if we know more about a
-			// peer than what's in the the update, we ignore the
-			// latter.
-			continue
+		switch peer := peers.byName[name]; peer {
+		case peers.ourself.Peer:
+			if newPeer.UID != peer.UID {
+				// The update contains information about an old
+				// incarnation of ourselves. We increase our version
+				// number beyond that which we received, so our
+				// information supersedes the old one when it is
+				// received by other peers.
+				pending.localPeerModified = peers.ourself.setVersionBeyond(newPeer.Version)
+			}
+		case newPeer:
+			peer.connections = makeConnsMap(peer, connSummaries, peers.byName)
+			newUpdate[name] = void
+		default: // existing peer
+			if newPeer.Version < peer.Version ||
+				(newPeer.Version == peer.Version && newPeer.UID <= peer.UID) {
+				continue
+			}
+			peer.Version = newPeer.Version
+			peer.UID = newPeer.UID
+			peer.connections = makeConnsMap(peer, connSummaries, peers.byName)
+
+			if newPeer.ShortID != peer.ShortID {
+				peers.deleteByShortID(peer, pending)
+				peer.ShortID = newPeer.ShortID
+				peers.addByShortID(peer, pending)
+			}
+			newUpdate[name] = void
 		}
-		// If we're here, either it was a new peer, or the update has
-		// more info about the peer than we do. Either case, we need
-		// to set version and conns and include the updated peer in
-		// the outgoing update.
-
-		// Can peer have been updated by anyone else in the mean time?
-		// No - we know that peer is not ourself, so the only prospect
-		// for an update would be someone else calling
-		// router.Peers.ApplyUpdate. But ApplyUpdate takes the Lock on
-		// the router.Peers, so there can be no race here.
-		peer.Version = newPeer.Version
-		peer.connections = makeConnsMap(peer, connSummaries, peers.byName)
-
-		if newPeer.ShortID != peer.ShortID {
-			peers.deleteByShortID(peer, pending)
-			peer.ShortID = newPeer.ShortID
-			peers.addByShortID(peer, pending)
-		}
-
-		newUpdate[name] = void
 	}
-
 	return newUpdate
 }
 

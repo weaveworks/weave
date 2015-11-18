@@ -58,6 +58,7 @@ weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
                       [--rewrite-inspect]
+weave launch-plugin
 weave env           [--restore]
 weave config
 weave connect       [--replace] [<peer> ...]
@@ -80,6 +81,7 @@ weave ps            [<container_id> ...]
 weave stop
 weave stop-router
 weave stop-proxy
+weave stop-plugin
 weave reset
 weave rmpeer        <peer_id>
 
@@ -287,6 +289,10 @@ fi
 
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
+
+BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
+PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
+PLUGIN_CONTAINER_NAME=weaveplugin
 
 PROCFS=${PROCFS:-/proc}
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
@@ -703,7 +709,7 @@ setup_router_iface_bridge() {
 }
 
 attach() {
-    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/$$/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/$$/ns/net)" ] ; then
+    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/self/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/self/ns/net)" ] ; then
         echo "Container is running in the host network namespace, and therefore cannot be" >&2
         echo "connected to weave. Perhaps the container was started with --net=host." >&2
         return 1
@@ -1463,6 +1469,7 @@ launch_router() {
 
     if [ "$BRIDGE_TYPE" = fastdp ] ; then
         NETHOST_OPT="--net=host"
+        HTTP_IP=127.0.0.1
         # In case there is a lingering veth-weave netdev
         ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
     fi
@@ -1482,6 +1489,7 @@ launch_router() {
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         ${NETHOST_OPT:+$DNS_ROUTER_OPTS} $NO_DNS_OPT \
+        --http-addr $HTTP_IP:$HTTP_PORT \
         --docker-api "unix:///var/run/docker.sock" "$@")
     with_container_netns_or_die $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
     attach_router
@@ -1527,14 +1535,8 @@ launch_proxy() {
     # when launching the weaveproxy container.
     docker_client_args $DOCKER_CLIENT_ARGS
     proxy_args "$@"
-    HOSTS_PATH=$(docker run --rm --net=none \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      --entrypoint=/bin/sh \
-      $EXEC_IMAGE -c 'docker inspect -f {{.HostsPath}} $(hostname)')
-    CONTAINERS_PATH="$(dirname $(dirname "$HOSTS_PATH"))"
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
-        -v "$CONTAINERS_PATH":"$CONTAINERS_PATH" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
@@ -1551,6 +1553,19 @@ launch_proxy() {
 stop_proxy() {
     warn_if_stopping_proxy_in_env
     stop $PROXY_CONTAINER_NAME "Proxy"
+}
+
+launch_plugin() {
+    PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
+        --restart=always \
+        --net=host \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /run/docker/plugins:/run/docker/plugins \
+        $PLUGIN_IMAGE "$@")
+}
+
+stop_plugin() {
+    stop $PLUGIN_CONTAINER_NAME "Plugin"
 }
 
 ##########################################################################################
@@ -1651,7 +1666,7 @@ shift 1
 
 case "$COMMAND" in
     setup)
-        for img in $IMAGE $EXEC_IMAGE ; do
+        for img in $IMAGE $EXEC_IMAGE $PLUGIN_IMAGE ; do
             docker pull $img
         done
         ;;
@@ -1702,6 +1717,11 @@ EOF
         check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         launch_proxy "$@"
         echo $PROXY_CONTAINER
+        ;;
+    launch-plugin)
+        check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
+        launch_plugin "$@"
+        echo $PLUGIN_CONTAINER
         ;;
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
@@ -1757,6 +1777,11 @@ EOF
             echo
             echo "       Service: proxy"
             echo "       Address: $PROXY_ADDRS"
+        fi
+        if [ -z "$SUB_STATUS" ] && check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
+            echo
+            echo "       Service: plugin"
+            echo "    DriverName: weave"
         fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]
@@ -1943,6 +1968,10 @@ EOF
     stop-proxy)
         [ $# -eq 0 ] || usage
         stop_proxy
+        ;;
+    stop-plugin)
+        [ $# -eq 0 ] || usage
+        stop_plugin
         ;;
     reset)
         [ $# -eq 0 ] || usage

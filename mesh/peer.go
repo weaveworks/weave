@@ -1,10 +1,27 @@
-package router
+package mesh
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"sort"
 	"strconv"
 )
+
+func randBytes(n int) []byte {
+	buf := make([]byte, n)
+	_, err := rand.Read(buf)
+	checkFatal(err)
+	return buf
+}
+
+func randUint64() (r uint64) {
+	return binary.LittleEndian.Uint64(randBytes(8))
+}
+
+func randUint16() (r uint16) {
+	return binary.LittleEndian.Uint16(randBytes(2))
+}
 
 type PeerUID uint64
 
@@ -43,6 +60,18 @@ type Peer struct {
 	PeerSummary
 	localRefCount uint64 // maintained by Peers
 	connections   map[PeerName]Connection
+}
+
+type ListOfPeers []*Peer
+
+func (lop ListOfPeers) Len() int {
+	return len(lop)
+}
+func (lop ListOfPeers) Swap(i, j int) {
+	lop[i], lop[j] = lop[j], lop[i]
+}
+func (lop ListOfPeers) Less(i, j int) bool {
+	return lop[i].Name < lop[j].Name
 }
 
 type ConnectionSet map[Connection]struct{}

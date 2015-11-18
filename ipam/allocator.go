@@ -11,8 +11,8 @@ import (
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 // Kinds of message we can unicast to other peers
@@ -43,31 +43,31 @@ type operation interface {
 // are used around data structures.
 type Allocator struct {
 	actionChan       chan<- func()
-	ourName          router.PeerName
+	ourName          mesh.PeerName
 	universe         address.Range                // superset of all ranges
 	ring             *ring.Ring                   // information on ranges owned by all peers
 	space            space.Space                  // more detail on ranges owned by us
 	owned            map[string][]address.Address // who owns what addresses, indexed by container-ID
-	nicknames        map[router.PeerName]string   // so we can map nicknames for rmpeer
+	nicknames        map[mesh.PeerName]string     // so we can map nicknames for rmpeer
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
-	gossip           router.Gossip                // our link to the outside world for sending messages
+	gossip           mesh.Gossip                  // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosTicker      *time.Ticker
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
-	isKnownPeer      func(router.PeerName) bool
+	isKnownPeer      func(mesh.PeerName) bool
 	now              func() time.Time
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name router.PeerName) bool) *Allocator {
+func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
 	return &Allocator{
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
 		owned:       make(map[string][]address.Address),
 		paxos:       paxos.NewNode(ourName, ourUID, quorum),
-		nicknames:   map[router.PeerName]string{ourName: ourNickname},
+		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
 		isKnownPeer: isKnownPeer,
 		now:         time.Now,
 	}
@@ -75,7 +75,7 @@ func NewAllocator(ourName router.PeerName, ourUID router.PeerUID, ourNickname st
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
-	actionChan := make(chan func(), router.ChannelSize)
+	actionChan := make(chan func(), mesh.ChannelSize)
 	alloc.actionChan = actionChan
 	go alloc.actorLoop(actionChan)
 }
@@ -165,7 +165,7 @@ func (alloc *Allocator) tryPendingOps() {
 	}
 }
 
-func (alloc *Allocator) spaceRequestDenied(sender router.PeerName, r address.Range) {
+func (alloc *Allocator) spaceRequestDenied(sender mesh.PeerName, r address.Range) {
 	for i := 0; i < len(alloc.pendingClaims); {
 		claim := alloc.pendingClaims[i].(*claim)
 		if r.Contains(claim.addr) {
@@ -276,27 +276,27 @@ func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 	return <-errChan
 }
 
-func (alloc *Allocator) pickPeerFromNicknames(isValid func(router.PeerName) bool) router.PeerName {
+func (alloc *Allocator) pickPeerFromNicknames(isValid func(mesh.PeerName) bool) mesh.PeerName {
 	for name := range alloc.nicknames {
 		if name != alloc.ourName && isValid(name) {
 			return name
 		}
 	}
-	return router.UnknownPeerName
+	return mesh.UnknownPeerName
 }
 
-func (alloc *Allocator) pickPeerForTransfer() router.PeerName {
+func (alloc *Allocator) pickPeerForTransfer() mesh.PeerName {
 	// first try alive peers that actively participate in IPAM (i.e. have entries)
-	if heir := alloc.ring.PickPeerForTransfer(alloc.isKnownPeer); heir != router.UnknownPeerName {
+	if heir := alloc.ring.PickPeerForTransfer(alloc.isKnownPeer); heir != mesh.UnknownPeerName {
 		return heir
 	}
 	// next try alive peers that have IPAM enabled but have no entries
-	if heir := alloc.pickPeerFromNicknames(alloc.isKnownPeer); heir != router.UnknownPeerName {
+	if heir := alloc.pickPeerFromNicknames(alloc.isKnownPeer); heir != mesh.UnknownPeerName {
 		return heir
 	}
 	// next try disappeared peers that still have entries
-	t := func(router.PeerName) bool { return true }
-	if heir := alloc.ring.PickPeerForTransfer(t); heir != router.UnknownPeerName {
+	t := func(mesh.PeerName) bool { return true }
+	if heir := alloc.ring.PickPeerForTransfer(t); heir != mesh.UnknownPeerName {
 		return heir
 	}
 	// finally, disappeared peers that that passively participated in IPAM
@@ -311,7 +311,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.shuttingDown = true
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
-		if heir := alloc.pickPeerForTransfer(); heir != router.UnknownPeerName {
+		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
@@ -350,14 +350,14 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) error {
 // call into the router for this because we are interested in peers
 // that have gone away but are still in the ring, which is why we
 // maintain our own nicknames map.
-func (alloc *Allocator) lookupPeername(name string) (router.PeerName, error) {
+func (alloc *Allocator) lookupPeername(name string) (mesh.PeerName, error) {
 	for peername, nickname := range alloc.nicknames {
 		if nickname == name {
 			return peername, nil
 		}
 	}
 
-	return router.PeerNameFromString(name)
+	return mesh.PeerNameFromString(name)
 }
 
 // Restrict the peers in "nicknames" to those in the ring plus peers known to the router
@@ -370,7 +370,7 @@ func (alloc *Allocator) pruneNicknames() {
 	}
 }
 
-func (alloc *Allocator) annotatePeernames(names []router.PeerName) []string {
+func (alloc *Allocator) annotatePeernames(names []mesh.PeerName) []string {
 	var res []string
 	for _, name := range names {
 		if nickname, found := alloc.nicknames[name]; found {
@@ -388,7 +388,7 @@ func decodeRange(msg []byte) (r address.Range, err error) {
 }
 
 // OnGossipUnicast (Sync)
-func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) error {
+func (alloc *Allocator) OnGossipUnicast(sender mesh.PeerName, msg []byte) error {
 	alloc.debugln("OnGossipUnicast from", sender, ": ", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
@@ -414,7 +414,7 @@ func (alloc *Allocator) OnGossipUnicast(sender router.PeerName, msg []byte) erro
 }
 
 // OnGossipBroadcast (Sync)
-func (alloc *Allocator) OnGossipBroadcast(sender router.PeerName, msg []byte) (router.GossipData, error) {
+func (alloc *Allocator) OnGossipBroadcast(sender mesh.PeerName, msg []byte) (mesh.GossipData, error) {
 	alloc.debugln("OnGossipBroadcast from", sender, ":", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
@@ -427,7 +427,7 @@ type gossipState struct {
 	// We send a timstamp along with the information to be
 	// gossipped in order to detect skewed clocks
 	Now       int64
-	Nicknames map[router.PeerName]string
+	Nicknames map[mesh.PeerName]string
 
 	Paxos paxos.GossipState
 	Ring  *ring.Ring
@@ -463,11 +463,11 @@ func (alloc *Allocator) Encode() []byte {
 }
 
 // OnGossip (Sync)
-func (alloc *Allocator) OnGossip(msg []byte) (router.GossipData, error) {
+func (alloc *Allocator) OnGossip(msg []byte) (mesh.GossipData, error) {
 	alloc.debugln("Allocator.OnGossip:", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.update(router.UnknownPeerName, msg)
+		resultChan <- alloc.update(mesh.UnknownPeerName, msg)
 	}
 	return nil, <-resultChan // for now, we never propagate updates. TBD
 }
@@ -478,7 +478,7 @@ type ipamGossipData struct {
 	alloc *Allocator
 }
 
-func (d *ipamGossipData) Merge(other router.GossipData) {
+func (d *ipamGossipData) Merge(other mesh.GossipData) {
 	// no-op
 }
 
@@ -488,12 +488,12 @@ func (d *ipamGossipData) Encode() [][]byte {
 
 // Gossip returns a GossipData implementation, which in this case always
 // returns the latest ring state (and does nothing on merge)
-func (alloc *Allocator) Gossip() router.GossipData {
+func (alloc *Allocator) Gossip() mesh.GossipData {
 	return &ipamGossipData{alloc}
 }
 
 // SetInterfaces gives the allocator two interfaces for talking to the outside world
-func (alloc *Allocator) SetInterfaces(gossip router.Gossip) {
+func (alloc *Allocator) SetInterfaces(gossip mesh.Gossip) {
 	alloc.gossip = gossip
 }
 
@@ -540,7 +540,7 @@ func (alloc *Allocator) establishRing() {
 	}
 }
 
-func (alloc *Allocator) createRing(peers []router.PeerName) {
+func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
 	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
@@ -563,7 +563,7 @@ func (alloc *Allocator) ringUpdated() {
 }
 
 // For compatibility with sort.Interface
-type peerNames []router.PeerName
+type peerNames []mesh.PeerName
 
 func (a peerNames) Len() int           { return len(a) }
 func (a peerNames) Less(i, j int) bool { return a[i] < a[j] }
@@ -572,7 +572,7 @@ func (a peerNames) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 // When we get a consensus from Paxos, the peer names are not in a
 // defined order and may contain duplicates.  This function sorts them
 // and de-dupes.
-func normalizeConsensus(consensus []router.PeerName) []router.PeerName {
+func normalizeConsensus(consensus []mesh.PeerName) []mesh.PeerName {
 	if len(consensus) == 0 {
 		return nil
 	}
@@ -607,22 +607,22 @@ func encodeRange(r address.Range) []byte {
 	return buf.Bytes()
 }
 
-func (alloc *Allocator) sendSpaceRequest(dest router.PeerName, r address.Range) error {
-	msg := router.Concat([]byte{msgSpaceRequest}, encodeRange(r))
+func (alloc *Allocator) sendSpaceRequest(dest mesh.PeerName, r address.Range) error {
+	msg := append([]byte{msgSpaceRequest}, encodeRange(r)...)
 	return alloc.gossip.GossipUnicast(dest, msg)
 }
 
-func (alloc *Allocator) sendSpaceRequestDenied(dest router.PeerName, r address.Range) error {
-	msg := router.Concat([]byte{msgSpaceRequestDenied}, encodeRange(r))
+func (alloc *Allocator) sendSpaceRequestDenied(dest mesh.PeerName, r address.Range) error {
+	msg := append([]byte{msgSpaceRequestDenied}, encodeRange(r)...)
 	return alloc.gossip.GossipUnicast(dest, msg)
 }
 
-func (alloc *Allocator) sendRingUpdate(dest router.PeerName) {
-	msg := router.Concat([]byte{msgRingUpdate}, alloc.encode())
+func (alloc *Allocator) sendRingUpdate(dest mesh.PeerName) {
+	msg := append([]byte{msgRingUpdate}, alloc.encode()...)
 	alloc.gossip.GossipUnicast(dest, msg)
 }
 
-func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
+func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	reader := bytes.NewReader(msg)
 	decoder := gob.NewDecoder(reader)
 	var data gossipState
@@ -674,7 +674,7 @@ func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 					alloc.createRing(cons.Value)
 				}
 			}
-		} else if sender != router.UnknownPeerName {
+		} else if sender != mesh.UnknownPeerName {
 			// Sender is trying to initialize a ring, but we have one
 			// already - send it straight back
 			alloc.sendRingUpdate(sender)
@@ -684,7 +684,7 @@ func (alloc *Allocator) update(sender router.PeerName, msg []byte) error {
 	return nil
 }
 
-func (alloc *Allocator) donateSpace(r address.Range, to router.PeerName) {
+func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	// No matter what we do, we'll send a unicast gossip
 	// of our ring back to tha chap who asked for space.
 	// This serves to both tell him of any space we might

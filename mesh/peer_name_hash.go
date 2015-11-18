@@ -3,7 +3,7 @@
 // Let peer names be sha256 hashes...of anything (as long as it's
 // unique).
 
-package router
+package mesh
 
 import (
 	"crypto/sha256"

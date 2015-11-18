@@ -11,14 +11,14 @@ import (
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/require"
 
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 func startServer(t *testing.T, upstream *dns.ClientConfig) (*DNSServer, *Nameserver, int, int) {
-	peername, err := router.PeerNameFromString("00:00:00:02:00:00")
+	peername, err := mesh.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
-	nameserver := New(peername, nil, "")
+	nameserver := New(peername, "", func(mesh.PeerName) bool { return true })
 	dnsserver, err := NewDNSServer(nameserver, "weave.local.", "0.0.0.0:0", "", 30, 5*time.Second)
 	require.Nil(t, err)
 	udpPort := dnsserver.servers[0].PacketConn.LocalAddr().(*net.UDPAddr).Port
@@ -39,7 +39,7 @@ func TestTruncation(t *testing.T) {
 	addrs := []address.Address{}
 	for i := address.Address(0); i < 100; i++ {
 		addrs = append(addrs, i)
-		nameserver.AddEntry("foo.weave.local.", "", router.UnknownPeerName, i)
+		nameserver.AddEntry("foo.weave.local.", "", mesh.UnknownPeerName, i)
 	}
 
 	doRequest := func(client *dns.Client, request *dns.Msg, port int, expectedErr error) *dns.Msg {

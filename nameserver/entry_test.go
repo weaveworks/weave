@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 func l(es Entries) Entries {
@@ -28,21 +28,21 @@ func TestAdd(t *testing.T) {
 	now = func() int64 { return 1234 }
 
 	entries := Entries{}
-	entries.add("A", "", router.UnknownPeerName, address.Address(0))
+	entries.add("A", "", mesh.UnknownPeerName, address.Address(0))
 	expected := l(Entries{
-		Entry{Hostname: "A", Origin: router.UnknownPeerName, Addr: address.Address(0)},
+		Entry{Hostname: "A", Origin: mesh.UnknownPeerName, Addr: address.Address(0)},
 	})
 	require.Equal(t, entries, expected)
 
-	entries.tombstone(router.UnknownPeerName, func(e *Entry) bool { return e.Hostname == "A" })
+	entries.tombstone(mesh.UnknownPeerName, func(e *Entry) bool { return e.Hostname == "A" })
 	expected = l(Entries{
-		Entry{Hostname: "A", Origin: router.UnknownPeerName, Addr: address.Address(0), Version: 1, Tombstone: 1234},
+		Entry{Hostname: "A", Origin: mesh.UnknownPeerName, Addr: address.Address(0), Version: 1, Tombstone: 1234},
 	})
 	require.Equal(t, entries, expected)
 
-	entries.add("A", "", router.UnknownPeerName, address.Address(0))
+	entries.add("A", "", mesh.UnknownPeerName, address.Address(0))
 	expected = l(Entries{
-		Entry{Hostname: "A", Origin: router.UnknownPeerName, Addr: address.Address(0), Version: 2},
+		Entry{Hostname: "A", Origin: mesh.UnknownPeerName, Addr: address.Address(0), Version: 2},
 	})
 	require.Equal(t, entries, expected)
 }
@@ -78,7 +78,7 @@ func TestTombstone(t *testing.T) {
 
 	es := makeEntries("AB")
 
-	es.tombstone(router.UnknownPeerName, func(e *Entry) bool {
+	es.tombstone(mesh.UnknownPeerName, func(e *Entry) bool {
 		return e.Hostname == "B"
 	})
 	expected := l(Entries{

@@ -8,8 +8,8 @@ import (
 	"github.com/miekg/dns"
 
 	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 const (
@@ -34,28 +34,24 @@ const (
 // - Update is O(n) for now
 type Nameserver struct {
 	sync.RWMutex
-	ourName router.PeerName
-	domain  string
-	gossip  router.Gossip
-	entries Entries
-	peers   *router.Peers
-	quit    chan struct{}
+	ourName     mesh.PeerName
+	domain      string
+	gossip      mesh.Gossip
+	entries     Entries
+	isKnownPeer func(mesh.PeerName) bool
+	quit        chan struct{}
 }
 
-func New(ourName router.PeerName, peers *router.Peers, domain string) *Nameserver {
-	ns := &Nameserver{
-		ourName: ourName,
-		domain:  dns.Fqdn(domain),
-		peers:   peers,
-		quit:    make(chan struct{}),
+func New(ourName mesh.PeerName, domain string, isKnownPeer func(mesh.PeerName) bool) *Nameserver {
+	return &Nameserver{
+		ourName:     ourName,
+		domain:      dns.Fqdn(domain),
+		isKnownPeer: isKnownPeer,
+		quit:        make(chan struct{}),
 	}
-	if peers != nil {
-		peers.OnGC(ns.PeerGone)
-	}
-	return ns
 }
 
-func (n *Nameserver) SetGossip(gossip router.Gossip) {
+func (n *Nameserver) SetGossip(gossip mesh.Gossip) {
 	n.gossip = gossip
 }
 
@@ -87,7 +83,7 @@ func (n *Nameserver) broadcastEntries(es ...Entry) error {
 	return nil
 }
 
-func (n *Nameserver) AddEntry(hostname, containerid string, origin router.PeerName, addr address.Address) error {
+func (n *Nameserver) AddEntry(hostname, containerid string, origin mesh.PeerName, addr address.Address) error {
 	n.infof("adding entry %s -> %s", hostname, addr.String())
 	n.Lock()
 	entry := n.entries.add(hostname, containerid, origin, addr)
@@ -144,12 +140,12 @@ func (n *Nameserver) ContainerDied(ident string) {
 	}
 }
 
-func (n *Nameserver) PeerGone(peer *router.Peer) {
+func (n *Nameserver) PeerGone(peer mesh.PeerName) {
 	n.infof("peer %s gone", peer.String())
 	n.Lock()
 	defer n.Unlock()
 	n.entries.filter(func(e *Entry) bool {
-		return e.Origin != peer.Name
+		return e.Origin != peer
 	})
 }
 
@@ -185,7 +181,7 @@ func (n *Nameserver) deleteTombstones() {
 	})
 }
 
-func (n *Nameserver) Gossip() router.GossipData {
+func (n *Nameserver) Gossip() mesh.GossipData {
 	n.RLock()
 	defer n.RUnlock()
 	gossip := &GossipData{
@@ -196,11 +192,11 @@ func (n *Nameserver) Gossip() router.GossipData {
 	return gossip
 }
 
-func (n *Nameserver) OnGossipUnicast(sender router.PeerName, msg []byte) error {
+func (n *Nameserver) OnGossipUnicast(sender mesh.PeerName, msg []byte) error {
 	return nil
 }
 
-func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.GossipData, error) {
+func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData, error) {
 	var gossip GossipData
 	if err := gossip.Decode(msg); err != nil {
 		return nil, nil, err
@@ -212,11 +208,9 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 	n.Lock()
 	defer n.Unlock()
 
-	if n.peers != nil {
-		gossip.Entries.filter(func(e *Entry) bool {
-			return n.peers.Fetch(e.Origin) != nil
-		})
-	}
+	gossip.Entries.filter(func(e *Entry) bool {
+		return n.isKnownPeer(e.Origin)
+	})
 
 	newEntries := n.entries.merge(gossip.Entries)
 	if len(newEntries) > 0 {
@@ -227,14 +221,14 @@ func (n *Nameserver) receiveGossip(msg []byte) (router.GossipData, router.Gossip
 
 // merge received data into state and return "everything new I've
 // just learnt", or nil if nothing in the received data was new
-func (n *Nameserver) OnGossip(msg []byte) (router.GossipData, error) {
+func (n *Nameserver) OnGossip(msg []byte) (mesh.GossipData, error) {
 	newEntries, _, err := n.receiveGossip(msg)
 	return newEntries, err
 }
 
 // merge received data into state and return a representation of
 // the received data, for further propagation
-func (n *Nameserver) OnGossipBroadcast(_ router.PeerName, msg []byte) (router.GossipData, error) {
+func (n *Nameserver) OnGossipBroadcast(_ mesh.PeerName, msg []byte) (mesh.GossipData, error) {
 	_, entries, err := n.receiveGossip(msg)
 	return entries, err
 }

@@ -3,7 +3,7 @@
 // It supplies some mock implementations to other unit tests, and is
 // named "...test.go" so it is only compiled under `go test`.
 
-package router
+package mesh
 
 import (
 	"fmt"

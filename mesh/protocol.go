@@ -1,4 +1,4 @@
-package router
+package mesh
 
 import (
 	"bytes"
@@ -329,9 +329,9 @@ type ProtocolTag byte
 
 const (
 	ProtocolHeartbeat = iota
-	ProtocolConnectionEstablished
-	ProtocolFragmentationReceived
-	ProtocolPMTUVerified
+	ProtocolReserved1 // legacy overlay control messages
+	ProtocolReserved2 //
+	ProtocolReserved3 //
 	ProtocolGossip
 	ProtocolGossipUnicast
 	ProtocolGossipBroadcast

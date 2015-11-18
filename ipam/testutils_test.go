@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 	"github.com/weaveworks/weave/testing/gossip"
 )
 
 type mockMessage struct {
-	dst     router.PeerName
+	dst     mesh.PeerName
 	msgType byte
 	buf     []byte
 }
@@ -48,13 +48,13 @@ func (m *mockGossipComms) String() string {
 // that the contents of messages are never re-ordered.  Which, for instance,
 // requires they are not based off iterating through a map.
 
-func (m *mockGossipComms) GossipBroadcast(update router.GossipData) error {
+func (m *mockGossipComms) GossipBroadcast(update mesh.GossipData) error {
 	m.Lock()
 	defer m.Unlock()
 	buf := []byte{}
 	if len(m.messages) == 0 {
 		require.FailNow(m, fmt.Sprintf("%s: Gossip broadcast message unexpected: \n%x", m.name, buf))
-	} else if msg := m.messages[0]; msg.dst != router.UnknownPeerName {
+	} else if msg := m.messages[0]; msg.dst != mesh.UnknownPeerName {
 		require.FailNow(m, fmt.Sprintf("%s: Expected Gossip message to %s but got broadcast", m.name, msg.dst))
 	} else if msg.buf != nil && !equalByteBuffer(msg.buf, buf) {
 		require.FailNow(m, fmt.Sprintf("%s: Gossip message not sent as expected: \nwant: %x\ngot : %x", m.name, msg.buf, buf))
@@ -77,12 +77,12 @@ func equalByteBuffer(a, b []byte) bool {
 	return true
 }
 
-func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte) error {
+func (m *mockGossipComms) GossipUnicast(dstPeerName mesh.PeerName, buf []byte) error {
 	m.Lock()
 	defer m.Unlock()
 	if len(m.messages) == 0 {
 		require.FailNow(m, fmt.Sprintf("%s: Gossip message to %s unexpected: \n%s", m.name, dstPeerName, buf))
-	} else if msg := m.messages[0]; msg.dst == router.UnknownPeerName {
+	} else if msg := m.messages[0]; msg.dst == mesh.UnknownPeerName {
 		require.FailNow(m, fmt.Sprintf("%s: Expected Gossip broadcast message but got dest %s", m.name, dstPeerName))
 	} else if msg.dst != dstPeerName {
 		require.FailNow(m, fmt.Sprintf("%s: Expected Gossip message to %s but got dest %s", m.name, msg.dst, dstPeerName))
@@ -99,7 +99,7 @@ func (m *mockGossipComms) GossipUnicast(dstPeerName router.PeerName, buf []byte)
 
 func ExpectMessage(alloc *Allocator, dst string, msgType byte, buf []byte) {
 	m := alloc.gossip.(*mockGossipComms)
-	dstPeerName, _ := router.PeerNameFromString(dst)
+	dstPeerName, _ := mesh.PeerNameFromString(dst)
 	m.Lock()
 	m.messages = append(m.messages, mockMessage{dstPeerName, msgType, buf})
 	m.Unlock()
@@ -108,7 +108,7 @@ func ExpectMessage(alloc *Allocator, dst string, msgType byte, buf []byte) {
 func ExpectBroadcastMessage(alloc *Allocator, buf []byte) {
 	m := alloc.gossip.(*mockGossipComms)
 	m.Lock()
-	m.messages = append(m.messages, mockMessage{router.UnknownPeerName, 0, buf})
+	m.messages = append(m.messages, mockMessage{mesh.UnknownPeerName, 0, buf})
 	m.Unlock()
 }
 
@@ -124,7 +124,7 @@ func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 }
 
 func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.Range) {
-	peername, err := router.PeerNameFromString(name)
+	peername, err := mesh.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
 	}
@@ -134,8 +134,8 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 		panic(err)
 	}
 
-	alloc := NewAllocator(peername, router.PeerUID(rand.Int63()),
-		"nick-"+name, cidr.Range(), quorum, func(router.PeerName) bool { return true })
+	alloc := NewAllocator(peername, mesh.PeerUID(rand.Int63()),
+		"nick-"+name, cidr.Range(), quorum, func(mesh.PeerName) bool { return true })
 
 	return alloc, cidr.HostRange()
 }
@@ -149,7 +149,7 @@ func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string,
 }
 
 func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
-	peers := []router.PeerName{alloc.ourName}
+	peers := []mesh.PeerName{alloc.ourName}
 	for _, alloc2 := range allocs {
 		peers = append(peers, alloc2.ourName)
 	}

@@ -16,9 +16,9 @@ WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 NETCHECK_EXE=prog/netcheck/netcheck
 DOCKERTLSARGS_EXE=prog/docker_tls_args/docker_tls_args
-RUNNER_EXE=testing/runner/runner
+RUNNER_EXE=tools/runner/runner
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(RUNNER_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -30,7 +30,7 @@ WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 
 IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE)
 
-WEAVE_EXPORT=weave.tar
+WEAVE_EXPORT=weave.tar.gz
 
 WEAVEEXEC_DOCKER_VERSION=1.3.1
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
@@ -70,7 +70,7 @@ $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
-$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
+$(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
 $(NETCHECK_EXE): prog/netcheck/netcheck.go
 
@@ -78,10 +78,9 @@ $(NETCHECK_EXE): prog/netcheck/netcheck.go
 # the main build stanza due to not importing net package
 $(SIGPROXY_EXE): prog/sigproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
-$(RUNNER_EXE): testing/runner/runner.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
 
-$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(RUNNER_EXE) $(DOCKERTLSARGS_EXE):
+$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
@@ -106,7 +105,7 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPR
 	touch $@
 
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
-	$(SUDO) docker save $(addsuffix :latest,$(IMAGES)) > $@
+	$(SUDO) docker save $(addsuffix :latest,$(IMAGES)) | gzip > $@
 
 $(DOCKER_DISTRIB):
 	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
@@ -119,6 +118,9 @@ lint: tools/.git
 
 tools/.git:
 	git submodule update --init
+
+$(RUNNER_EXE): tools/.git
+	make -C tools/runner
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) docker tag -f $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)

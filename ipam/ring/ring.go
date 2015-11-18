@@ -13,16 +13,16 @@ import (
 	"time"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	"github.com/weaveworks/weave/router"
 )
 
 // Ring represents the ring itself
 type Ring struct {
-	Start, End address.Address   // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
-	Peer       router.PeerName   // name of peer owning this ring instance
-	Entries    entries           // list of entries sorted by token
-	Seeds      []router.PeerName // peers with which the ring was seeded
+	Start, End address.Address // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
+	Peer       mesh.PeerName   // name of peer owning this ring instance
+	Entries    entries         // list of entries sorted by token
+	Seeds      []mesh.PeerName // peers with which the ring was seeded
 }
 
 func (r *Ring) assertInvariants() {
@@ -84,7 +84,7 @@ func (r *Ring) checkInvariants() error {
 }
 
 // New creates an empty ring belonging to peer.
-func New(start, end address.Address, peer router.PeerName) *Ring {
+func New(start, end address.Address, peer mesh.PeerName) *Ring {
 	common.Assert(start < end)
 
 	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0)}
@@ -111,7 +111,7 @@ func (r *Ring) distance(start, end address.Address) address.Offset {
 // Preconditions:
 // - start < end
 // - [start, end) must be owned by the calling peer
-func (r *Ring) GrantRangeToHost(start, end address.Address, peer router.PeerName) {
+func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) {
 	//fmt.Printf("%s GrantRangeToHost [%v,%v) -> %s\n", r.Peer, start, end, peer)
 
 	r.assertInvariants()
@@ -210,7 +210,7 @@ func (r *Ring) Merge(gossip Ring) error {
 	addToResult := func(e entry) { result = append(result, &e) }
 
 	var mine, theirs *entry
-	var previousOwner *router.PeerName
+	var previousOwner *mesh.PeerName
 	// i is index into r.Entries; j is index into gossip.Entries
 	var i, j int
 	for i < len(r.Entries) && j < len(gossip.Entries) {
@@ -318,7 +318,7 @@ func (r *Ring) OwnedRanges() (result []address.Range) {
 
 // ClaimForPeers claims the entire ring for the array of peers passed
 // in.  Only works for empty rings.
-func (r *Ring) ClaimForPeers(peers []router.PeerName) {
+func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	common.Assert(r.Empty())
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
@@ -350,7 +350,7 @@ func (r *Ring) ClaimForPeers(peers []router.PeerName) {
 	r.Seeds = peers
 }
 
-func (r *Ring) FprintWithNicknames(w io.Writer, m map[router.PeerName]string) {
+func (r *Ring) FprintWithNicknames(w io.Writer, m map[mesh.PeerName]string) {
 	for _, entry := range r.Entries {
 		nickname, found := m[entry.Peer]
 		if found {
@@ -365,7 +365,7 @@ func (r *Ring) FprintWithNicknames(w io.Writer, m map[router.PeerName]string) {
 func (r *Ring) String() string {
 	var buffer bytes.Buffer
 	fmt.Fprintf(&buffer, "Ring [%s, %s)", r.Start, r.End)
-	r.FprintWithNicknames(&buffer, make(map[router.PeerName]string))
+	r.FprintWithNicknames(&buffer, make(map[mesh.PeerName]string))
 	return buffer.String()
 }
 
@@ -415,7 +415,7 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
 
 type weightedPeer struct {
 	weight   float64
-	peername router.PeerName
+	peername mesh.PeerName
 }
 type weightedPeers []weightedPeer
 
@@ -426,10 +426,10 @@ func (ws weightedPeers) Swap(i, j int)      { ws[i], ws[j] = ws[j], ws[i] }
 
 // ChoosePeersToAskForSpace returns all peers we can ask for space in
 // the range [start, end), in weighted-random order.  Assumes start<end.
-func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []router.PeerName {
+func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []mesh.PeerName {
 	var (
 		sum               address.Offset
-		totalSpacePerPeer = make(map[router.PeerName]address.Offset) // Compute total free space per peer
+		totalSpacePerPeer = make(map[mesh.PeerName]address.Offset) // Compute total free space per peer
 	)
 
 	// iterate through tokens
@@ -463,25 +463,25 @@ func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []router.Pee
 		ws = append(ws, weightedPeer{weight: float64(space) * rand.Float64(), peername: peername})
 	}
 	sort.Sort(ws)
-	result := make([]router.PeerName, len(ws))
+	result := make([]mesh.PeerName, len(ws))
 	for i, wp := range ws {
 		result[i] = wp.peername
 	}
 	return result
 }
 
-func (r *Ring) PickPeerForTransfer(isValid func(router.PeerName) bool) router.PeerName {
+func (r *Ring) PickPeerForTransfer(isValid func(mesh.PeerName) bool) mesh.PeerName {
 	for _, entry := range r.Entries {
 		if entry.Peer != r.Peer && isValid(entry.Peer) {
 			return entry.Peer
 		}
 	}
-	return router.UnknownPeerName
+	return mesh.UnknownPeerName
 }
 
 // Transfer will mark all entries associated with 'from' peer as owned by 'to' peer
 // and return ranges indicating the new space we picked up
-func (r *Ring) Transfer(from, to router.PeerName) ([]address.Range, error) {
+func (r *Ring) Transfer(from, to mesh.PeerName) ([]address.Range, error) {
 	r.assertInvariants()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
@@ -511,13 +511,13 @@ func (r *Ring) Contains(addr address.Address) bool {
 }
 
 // Owner returns the peername which owns the range containing addr
-func (r *Ring) Owner(token address.Address) router.PeerName {
+func (r *Ring) Owner(token address.Address) mesh.PeerName {
 	common.Assert(r.Start <= token && token < r.End)
 
 	r.assertInvariants()
 	// There can be no owners on an empty ring
 	if r.Empty() {
-		return router.UnknownPeerName
+		return mesh.UnknownPeerName
 	}
 
 	// Look for the right-most entry, less than or equal to token
@@ -530,8 +530,8 @@ func (r *Ring) Owner(token address.Address) router.PeerName {
 }
 
 // Get the set of PeerNames mentioned in the ring
-func (r *Ring) PeerNames() map[router.PeerName]struct{} {
-	res := make(map[router.PeerName]struct{})
+func (r *Ring) PeerNames() map[mesh.PeerName]struct{} {
+	res := make(map[mesh.PeerName]struct{})
 
 	for _, entry := range r.Entries {
 		res[entry.Peer] = struct{}{}

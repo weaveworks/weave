@@ -17,7 +17,6 @@ import (
 	. "github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/nameserver"
-	"github.com/weaveworks/weave/router"
 )
 
 const (
@@ -490,7 +489,7 @@ func (proxy *Proxy) getDNSDomain() (domain string) {
 		weaveIP = "127.0.0.1"
 	}
 
-	url := fmt.Sprintf("http://%s:%d/domain", weaveIP, router.HTTPPort)
+	url := fmt.Sprintf("http://%s:6784/domain", weaveIP)
 	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return
