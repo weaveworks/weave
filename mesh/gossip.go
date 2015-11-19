@@ -141,7 +141,7 @@ func (router *Router) SendAllGossip() {
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for channel := range router.gossipChannelSet() {
 		if gossip := channel.gossiper.Gossip(); gossip != nil {
-			channel.SendDown(conn, channel.gossiper.Gossip())
+			channel.SendDown(conn, gossip)
 		}
 	}
 }
