@@ -127,17 +127,19 @@ func (router *Router) BroadcastTopologyUpdate(update []*Peer) {
 	for _, p := range update {
 		names[p.Name] = void
 	}
-
-	router.TopologyGossip.GossipBroadcast(&TopologyGossipData{
-		peers:  router.Peers,
-		update: names,
-	})
+	router.TopologyGossip.GossipBroadcast(
+		&TopologyGossipData{peers: router.Peers, update: names})
 }
 
-func (d *TopologyGossipData) Merge(other GossipData) {
-	for name := range other.(*TopologyGossipData).update {
-		d.update[name] = void
+func (d *TopologyGossipData) Merge(other GossipData) GossipData {
+	names := make(PeerNameSet)
+	for name := range d.update {
+		names[name] = void
 	}
+	for name := range other.(*TopologyGossipData).update {
+		names[name] = void
+	}
+	return &TopologyGossipData{peers: d.peers, update: names}
 }
 
 func (d *TopologyGossipData) Encode() [][]byte {
