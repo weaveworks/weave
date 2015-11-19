@@ -74,13 +74,13 @@ func (n *Nameserver) Stop() {
 }
 
 func (n *Nameserver) broadcastEntries(es ...Entry) error {
-	if n.gossip != nil {
-		return n.gossip.GossipBroadcast(&GossipData{
-			Entries:   Entries(es),
-			Timestamp: now(),
-		})
+	if n.gossip == nil || len(es) == 0 {
+		return nil
 	}
-	return nil
+	return n.gossip.GossipBroadcast(&GossipData{
+		Entries:   Entries(es),
+		Timestamp: now(),
+	})
 }
 
 func (n *Nameserver) AddEntry(hostname, containerid string, origin mesh.PeerName, addr address.Address) error {
@@ -133,10 +133,8 @@ func (n *Nameserver) ContainerDied(ident string) {
 		return false
 	})
 	n.Unlock()
-	if len(entries) > 0 {
-		if err := n.broadcastEntries(entries...); err != nil {
-			n.errorf("failed to broadcast container %s death: %v", ident, err)
-		}
+	if err := n.broadcastEntries(entries...); err != nil {
+		n.errorf("failed to broadcast container %s death: %v", ident, err)
 	}
 }
 
