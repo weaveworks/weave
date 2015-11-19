@@ -25,6 +25,12 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 		}
 		return count
 	},
+	"upstreamServers": func(servers []string) string {
+		if len(servers) == 0 {
+			return "none"
+		}
+		return strings.Join(servers, ", ")
+	},
 	"printConnectionCounts": func(conns []mesh.LocalConnectionStatus) string {
 		counts := make(map[string]int)
 		for _, conn := range conns {
@@ -108,6 +114,7 @@ var statusTemplate = defTemplate("status", `\
 
        Service: dns
         Domain: {{.DNS.Domain}}
+      Upstream: {{upstreamServers .DNS.Upstream}}
            TTL: {{.DNS.TTL}}
        Entries: {{countDNSEntries .DNS.Entries}}
 {{end}}\
