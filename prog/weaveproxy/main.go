@@ -35,7 +35,7 @@ func main() {
 	mflag.BoolVar(&c.NoRewriteHosts, []string{"-no-rewrite-hosts"}, false, "do not automatically rewrite /etc/hosts. Use if you need the docker IP to remain in /etc/hosts")
 	mflag.StringVar(&c.TLSConfig.CACert, []string{"#tlscacert", "-tlscacert"}, "", "Trust certs signed only by this CA")
 	mflag.StringVar(&c.TLSConfig.Cert, []string{"#tlscert", "-tlscert"}, "", "Path to TLS certificate file")
-	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tls-verify")
+	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tlsverify")
 	mflag.StringVar(&c.TLSConfig.Key, []string{"#tlskey", "-tlskey"}, "", "Path to TLS key file")
 	mflag.BoolVar(&c.TLSConfig.Verify, []string{"#tlsverify", "-tlsverify"}, false, "Use TLS and verify the remote")
 	mflag.BoolVar(&c.WithDNS, []string{"-with-dns", "w"}, false, "instruct created containers to always use weaveDNS as their nameserver")
