@@ -97,15 +97,19 @@ usage() {
 }
 
 docker_sock() {
+  if [ -z "$DOCKER_HOST" ]; then
+    echo "/var/run/docker.sock"
+    return
+  fi
   if echo "$DOCKER_HOST" | grep -q "^unix://" >/dev/null; then
     echo "${DOCKER_HOST#unix://}"
-  else
-    echo "/var/run/docker.sock"
   fi
 }
 
 docker_sock_volume_mount() {
-  echo "-v $(docker_sock):$(docker_sock) -e DOCKER_HOST=unix://$(docker_sock)"
+  if [ -n "$(docker_sock)" ]; then
+    echo "-v $(docker_sock):$(docker_sock)"
+  fi
 }
 
 exec_remote() {
@@ -125,6 +129,7 @@ exec_remote() {
         -e WEAVE_NO_FASTDP \
         -e WEAVE_NO_BRIDGED_FASTDP \
         -e WEAVE_NO_PLUGIN \
+        -e DOCKER_HOST \
         -e DOCKER_BRIDGE \
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
         -e DOCKER_CLIENT_ARGS \
@@ -1624,6 +1629,7 @@ launch_router() {
         $(docker_sock_volume_mount) \
         -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp \
         ${NETHOST_OPT:-$DNS_PORT_MAPPING} \
+        -e DOCKER_HOST \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
@@ -1633,7 +1639,7 @@ launch_router() {
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         ${NETHOST_OPT:+$DNS_ROUTER_OPTS} $NO_DNS_OPT \
         --http-addr $HTTP_IP:$HTTP_PORT \
-        --docker-api "unix://$(docker_sock)" "$@")
+        "$@")
     with_container_netns_or_die $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
     attach_router
 }
@@ -1683,6 +1689,7 @@ launch_proxy() {
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e WEAVE_CIDR=none \
+        -e DOCKER_HOST \
         -e DOCKER_BRIDGE \
         -e WEAVE_DEBUG \
         -e COVERAGE \
@@ -1703,6 +1710,7 @@ launch_plugin() {
         --net=host \
         $(docker_sock_volume_mount) \
         -v /run/docker/plugins:/run/docker/plugins \
+        -e DOCKER_HOST \
         $PLUGIN_IMAGE "$@")
 }
 

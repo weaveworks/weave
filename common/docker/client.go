@@ -2,6 +2,8 @@ package docker
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/fsouza/go-dockerclient"
 
 	. "github.com/weaveworks/weave/common"
@@ -19,6 +21,9 @@ type Client struct {
 
 // NewClient creates a new Docker client and checks we can talk to Docker
 func NewClient(apiPath string) (*Client, error) {
+	if apiPath != "" && !strings.Contains(apiPath, "://") {
+		apiPath = "tcp://" + apiPath
+	}
 	dc, err := docker.NewClient(apiPath)
 	if err != nil {
 		return nil, err
@@ -29,6 +34,9 @@ func NewClient(apiPath string) (*Client, error) {
 }
 
 func NewVersionedClient(apiPath string, apiVersionString string) (*Client, error) {
+	if !strings.Contains(apiPath, "://") {
+		apiPath = "tcp://" + apiPath
+	}
 	dc, err := docker.NewVersionedClient(apiPath, apiVersionString)
 	if err != nil {
 		return nil, err
