@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -283,15 +284,16 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 		}
 
 	case "unix":
+		localAddr := filepath.Join("/host", addr)
 		// remove socket from last invocation
-		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(localAddr); err != nil && !os.IsNotExist(err) {
 			return nil, "", err
 		}
-		listener, err = net.Listen(proto, addr)
+		listener, err = net.Listen(proto, localAddr)
 		if err != nil {
 			return nil, "", err
 		}
-		if err = copyOwnerAndPermissions(dockerSock, addr); err != nil {
+		if err = copyOwnerAndPermissions(dockerSock, localAddr); err != nil {
 			return nil, "", err
 		}
 
