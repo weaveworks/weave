@@ -11,7 +11,7 @@ You only need to build weave if you want to work on the weave codebase
 Apart from the `weave` shell script, weave is delivered as a set of
 container images.  There is no distribution-specific packaging, so in
 principle it shouldn't matter which Linux distribution you build
-under.  But naturally, Docker is a prerequisite (version 1.3.1 or
+under.  But naturally, Docker is a prerequisite (version 1.6.0 or
 later).  And it is difficult to build under Fedora because [Fedora
 does not include static
 libraries](http://fedoraproject.org/wiki/Packaging:Guidelines#Packaging_Static_Libraries).

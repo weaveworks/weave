@@ -32,7 +32,7 @@ IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE)
 
 WEAVE_EXPORT=weave.tar.gz
 
-WEAVEEXEC_DOCKER_VERSION=1.3.1
+WEAVEEXEC_DOCKER_VERSION=1.6.2
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
