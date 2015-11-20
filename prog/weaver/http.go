@@ -46,7 +46,7 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 		getNickName := func(peer mesh.PeerName) string {
 			name, found := status.Nicknames[peer]
 			if !found {
-				return fmt.Sprintf("%s", peer)
+				return peer.String()
 			}
 			return name
 		}
@@ -54,11 +54,7 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			peerName := getNickName(peer)
 			stats, found := nicknameStats[peerName]
 			if !found {
-				stats = &NicknameStats{
-					Ranges:    []address.Range{},
-					Addresses: []address.Address{},
-					Reachable: status.IsKnownPeer(peer),
-				}
+				stats = &NicknameStats{Reachable: status.IsKnownPeer(peer)}
 				nicknameStats[peerName] = stats
 			}
 			return stats
@@ -85,8 +81,8 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			}
 			percentageRanges := float32(ipsInRange) * 100.0 / float32(status.RangeNumIPs)
 
-			fmt.Fprintf(&buffer, "%20s: %8d IPs (%04.1f%% of universe, in %3d ranges) - used: %8d IPs %s\n",
-				displayName, ipsInRange, percentageRanges, len(ranges), len(addresses), reachableStr)
+			fmt.Fprintf(&buffer, "%20s: %8d IPs (%04.1f%% of total) - used: %d %s\n",
+				displayName, ipsInRange, percentageRanges, len(addresses), reachableStr)
 		}
 
 		// print the local addresses
@@ -224,24 +220,7 @@ var dnsEntriesTemplate = defTemplate("dnsEntries", `\
 {{end}}\
 `)
 
-var ipamTemplate = defTemplate("ipamTemplate", `\
-      Universe: {{.IPAM.Range}} ({{.IPAM.RangeNumIPs}} IPs)
- DefaultSubnet: {{.IPAM.DefaultSubnet}}
-{{if .IPAM.Owned}}\
-    Containers:
-{{range $id, $addresses := .IPAM.Owned}}\
-                {{printf "%-12s" $id}}: {{$addresses}}
-{{end}}\
-{{end}}\
-    Ownerships:
-{{printIPAMRanges .IPAM}}
-{{if .IPAM.PendingClaims}}\
-        Claims:
-{{range .IPAM.PendingClaims}}
-                {{printf "%-15v" .Ident}} {{.Address}}
-{{end}}\
-{{end}}\
-`)
+var ipamTemplate = defTemplate("ipamTemplate", `{{printIPAMRanges .IPAM}}`)
 
 type WeaveStatus struct {
 	Version string
