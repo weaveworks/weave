@@ -81,12 +81,12 @@ func NewProxy(c Config) (*Proxy, error) {
 		Log.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
-	// We pin the protocol version to 1.15 (which corresponds to
-	// Docker 1.3.x; the earliest version supported by weave) in order
+	// We pin the protocol version to 1.18 (which corresponds to
+	// Docker 1.6.x; the earliest version supported by weave) in order
 	// to insulate ourselves from breaking changes to the API, as
 	// happened in 1.20 (Docker 1.8.0) when the presentation of
 	// volumes changed in `inspect`.
-	client, err := weavedocker.NewVersionedClient(dockerSockUnix, "1.15")
+	client, err := weavedocker.NewVersionedClient(dockerSockUnix, "1.18")
 	if err != nil {
 		return nil, err
 	}
