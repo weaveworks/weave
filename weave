@@ -1275,17 +1275,30 @@ tls_arg() {
     PROXY_ARGS="$PROXY_ARGS $1 /home/weave/tls/$3.pem"
 }
 
+# TODO: Handle relative paths for args
+# TODO: Handle args with spaces
+host_arg() {
+  PROXY_HOST="$1"
+  if [ "$PROXY_HOST" != "${PROXY_HOST#unix://}" ]; then
+    host=$(dirname ${PROXY_HOST#unix://})
+    if [ "$host" = "${host#/}" ]; then
+      echo "When launching the proxy, unix sockets must be specified as an absolute path." >&2
+      exit 1
+    fi
+    PROXY_VOLUMES="$PROXY_VOLUMES -v /var/run/weave:/var/run/weave"
+  fi
+  PROXY_ARGS="$PROXY_ARGS -H $1"
+}
+
 proxy_parse_args() {
     while [ $# -gt 0 ]; do
         case "$1" in
           -H)
-            PROXY_HOST="$2"
-            PROXY_ARGS="$PROXY_ARGS $1 $2"
+            host_arg "$2"
             shift
             ;;
           -H=*)
-            PROXY_HOST="${1#*=}"
-            PROXY_ARGS="$PROXY_ARGS $1"
+            host_arg "${1#*=}"
             ;;
           -no-detect-tls|--no-detect-tls)
             PROXY_TLS_DETECTION_DISABLED=1
@@ -1346,7 +1359,7 @@ proxy_args() {
           PROXY_HOST="tcp://0.0.0.0:12375"
           ;;
       esac
-      PROXY_ARGS="$PROXY_ARGS -H $PROXY_HOST"
+      host_arg "$PROXY_HOST"
     fi
 }
 
@@ -1559,6 +1572,7 @@ launch_proxy() {
         -e DOCKER_BRIDGE \
         -e WEAVE_DEBUG \
         -e COVERAGE \
+        -e EXEC_IMAGE=$EXEC_IMAGE \
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
     wait_for_status $PROXY_CONTAINER_NAME http_call_unix $PROXY_CONTAINER_NAME status.sock

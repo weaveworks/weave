@@ -96,7 +96,7 @@ $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
-$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
+$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
 	cp weave prog/weaveexec/weave
 	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
 	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy

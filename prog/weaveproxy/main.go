@@ -19,7 +19,7 @@ func main() {
 	var (
 		justVersion bool
 		logLevel    = "info"
-		c           = proxy.Config{ListenAddrs: []string{}}
+		c           = proxy.Config{Image: "weaveworks/weaveexec"}
 	)
 
 	c.Version = version
@@ -52,6 +52,10 @@ func main() {
 	}
 
 	SetLogLevel(logLevel)
+
+	if image := os.Getenv("EXEC_IMAGE"); image != "" {
+		c.Image = image
+	}
 
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
