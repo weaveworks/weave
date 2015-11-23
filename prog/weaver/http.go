@@ -38,31 +38,21 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 
 		type stats struct {
 			Ranges    []address.Range
-			Addresses []address.Address
 			Reachable bool
 		}
 
 		peerStats := make(map[mesh.PeerName]*stats)
-		getOrCreateStats := func(peer mesh.PeerName) *stats {
+
+		for peer, ranges := range status.Ring.OwnedRangesByPeer() {
 			s, found := peerStats[peer]
 			if !found {
 				s = &stats{Reachable: status.IsKnownPeer(peer)}
 				peerStats[peer] = s
 			}
-			return s
+			s.Ranges = append(s.Ranges, ranges...)
 		}
 
-		for _, entry := range status.Ring.Entries {
-			stats := getOrCreateStats(entry.Peer)
-			stats.Addresses = append(stats.Addresses, entry.Token)
-		}
-
-		for peer, ranges := range status.Ring.OwnedRangesByPeer() {
-			stats := getOrCreateStats(peer)
-			stats.Ranges = append(stats.Ranges, ranges...)
-		}
-
-		appendAddresses := func(peer mesh.PeerName, nickName string, reachable bool, addresses []address.Address, ranges []address.Range) {
+		appendOwned := func(peer mesh.PeerName, nickName string, reachable bool, ranges []address.Range) {
 			reachableStr := ""
 			if !reachable {
 				reachableStr = "- unreachable!"
@@ -74,13 +64,13 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			percentageRanges := float32(ipsInRange) * 100.0 / float32(status.RangeNumIPs)
 
 			displayName := peer.String() + "(" + nickName + ")"
-			fmt.Fprintf(&buffer, "%20s: %8d IPs (%04.1f%% of total) - used: %d %s\n",
-				displayName, ipsInRange, percentageRanges, len(addresses), reachableStr)
+			fmt.Fprintf(&buffer, "%20s: %8d IPs (%04.1f%% of total) %s\n",
+				displayName, ipsInRange, percentageRanges, reachableStr)
 		}
 
 		// print the local addresses
 		if ourStats := peerStats[status.OurName]; ourStats != nil {
-			appendAddresses(status.OurName, "local", true, ourStats.Addresses, ourStats.Ranges)
+			appendOwned(status.OurName, "local", true, ourStats.Ranges)
 		}
 
 		// and then the rest
@@ -90,7 +80,7 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 				if !found {
 					nickname = peer.String()
 				}
-				appendAddresses(peer, nickname, stats.Reachable, stats.Addresses, stats.Ranges)
+				appendOwned(peer, nickname, stats.Reachable, stats.Ranges)
 			}
 		}
 
