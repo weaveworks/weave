@@ -86,6 +86,20 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 
 		return buffer.String()
 	},
+	"printIPAMWarning": func(status ipam.Status) string {
+		ipsReachable := 0
+		for peer, ranges := range status.Ring.OwnedRangesByPeer() {
+			if status.IsKnownPeer(peer) {
+				for _, chunk := range ranges {
+					ipsReachable += int(chunk.Size())
+				}
+			}
+		}
+		if ipsReachable == 0 {
+			return "- all IPs owned by unreachable peers!"
+		}
+		return ""
+	},
 	"printConnectionCounts": func(conns []mesh.LocalConnectionStatus) string {
 		counts := make(map[string]int)
 		for _, conn := range conns {
@@ -156,7 +170,7 @@ var statusTemplate = defTemplate("status", `\
 
        Service: ipam
 {{if .IPAM.Entries}}\
-     Consensus: achieved
+     Consensus: achieved {{printIPAMWarning .IPAM}}
 {{else if .IPAM.Paxos}}\
      Consensus: waiting (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
 {{else}}\
