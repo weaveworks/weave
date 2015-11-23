@@ -36,41 +36,33 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 	"printIPAMRanges": func(status ipam.Status) string {
 		var buffer bytes.Buffer
 
-		type NicknameStats struct {
+		type stats struct {
 			Ranges    []address.Range
 			Addresses []address.Address
 			Reachable bool
 		}
 
-		nicknameStats := make(map[string]*NicknameStats)
-		getNickName := func(peer mesh.PeerName) string {
-			name, found := status.Nicknames[peer]
+		peerStats := make(map[mesh.PeerName]*stats)
+		getOrCreateStats := func(peer mesh.PeerName) *stats {
+			s, found := peerStats[peer]
 			if !found {
-				return peer.String()
+				s = &stats{Reachable: status.IsKnownPeer(peer)}
+				peerStats[peer] = s
 			}
-			return name
-		}
-		getOrCreateNicknameStats := func(peer mesh.PeerName) *NicknameStats {
-			peerName := getNickName(peer)
-			stats, found := nicknameStats[peerName]
-			if !found {
-				stats = &NicknameStats{Reachable: status.IsKnownPeer(peer)}
-				nicknameStats[peerName] = stats
-			}
-			return stats
+			return s
 		}
 
 		for _, entry := range status.Ring.Entries {
-			stats := getOrCreateNicknameStats(entry.Peer)
+			stats := getOrCreateStats(entry.Peer)
 			stats.Addresses = append(stats.Addresses, entry.Token)
 		}
 
 		for peer, ranges := range status.Ring.OwnedRangesByPeer() {
-			stats := getOrCreateNicknameStats(peer)
+			stats := getOrCreateStats(peer)
 			stats.Ranges = append(stats.Ranges, ranges...)
 		}
 
-		appendAddresses := func(displayName string, reachable bool, addresses []address.Address, ranges []address.Range) {
+		appendAddresses := func(peer mesh.PeerName, nickName string, reachable bool, addresses []address.Address, ranges []address.Range) {
 			reachableStr := ""
 			if !reachable {
 				reachableStr = "- unreachable!"
@@ -81,19 +73,24 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			}
 			percentageRanges := float32(ipsInRange) * 100.0 / float32(status.RangeNumIPs)
 
+			displayName := peer.String() + "(" + nickName + ")"
 			fmt.Fprintf(&buffer, "%20s: %8d IPs (%04.1f%% of total) - used: %d %s\n",
 				displayName, ipsInRange, percentageRanges, len(addresses), reachableStr)
 		}
 
 		// print the local addresses
-		ourNickname := getNickName(status.OurName)
-		ourStats := nicknameStats[ourNickname]
-		appendAddresses("(local)", true, ourStats.Addresses, ourStats.Ranges)
+		if ourStats := peerStats[status.OurName]; ourStats != nil {
+			appendAddresses(status.OurName, "local", true, ourStats.Addresses, ourStats.Ranges)
+		}
 
 		// and then the rest
-		for nickname, stats := range nicknameStats {
-			if nickname != ourNickname {
-				appendAddresses(nickname, stats.Reachable, stats.Addresses, stats.Ranges)
+		for peer, stats := range peerStats {
+			if peer != status.OurName {
+				nickname, found := status.Nicknames[peer]
+				if !found {
+					nickname = peer.String()
+				}
+				appendAddresses(peer, nickname, stats.Reachable, stats.Addresses, stats.Ranges)
 			}
 		}
 
