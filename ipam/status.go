@@ -2,9 +2,6 @@ package ipam
 
 import (
 	"github.com/weaveworks/weave/ipam/paxos"
-	"github.com/weaveworks/weave/ipam/ring"
-	"github.com/weaveworks/weave/ipam/space"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -13,21 +10,18 @@ type Status struct {
 	Range            string
 	RangeNumIPs      int
 	DefaultSubnet    string
-	Ring             *ring.Ring                   // information on ranges owned by all peers
-	Space            space.Space                  // more detail on ranges owned by us
-	Owned            map[string][]address.Address // addresses by container-ID
-	OurName          mesh.PeerName
-	Nicknames        map[mesh.PeerName]string `json:"-"`
-	IsKnownPeer      func(mesh.PeerName) bool `json:"-"`
 	Entries          []EntryStatus
 	PendingClaims    []ClaimStatus
 	PendingAllocates []string
 }
 
 type EntryStatus struct {
-	Token   string
-	Peer    string
-	Version uint32
+	Token       string
+	Size        uint32
+	Peer        string
+	Nickname    string
+	IsKnownPeer bool
+	Version     uint32
 }
 
 type ClaimStatus struct {
@@ -52,12 +46,6 @@ func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
 			allocator.universe.String(),
 			int(allocator.universe.Size()),
 			defaultSubnet.String(),
-			allocator.ring,
-			allocator.space,
-			allocator.owned,
-			allocator.ourName,
-			allocator.nicknames,
-			allocator.isKnownPeer,
 			newEntryStatusSlice(allocator),
 			newClaimStatusSlice(allocator),
 			newAllocateIdentSlice(allocator)}
@@ -73,8 +61,15 @@ func newEntryStatusSlice(allocator *Allocator) []EntryStatus {
 		return slice
 	}
 
-	for _, entry := range allocator.ring.Entries {
-		slice = append(slice, EntryStatus{entry.Token.String(), entry.Peer.String(), entry.Version})
+	for _, r := range allocator.ring.AllRangeInfo() {
+		slice = append(slice, EntryStatus{
+			Token:       r.Start.String(),
+			Size:        uint32(r.Size()),
+			Peer:        r.Peer.String(),
+			Nickname:    allocator.nicknames[r.Peer],
+			IsKnownPeer: allocator.isKnownPeer(r.Peer),
+			Version:     r.Version,
+		})
 	}
 
 	return slice
