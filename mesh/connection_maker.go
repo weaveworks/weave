@@ -81,7 +81,7 @@ func (cm *ConnectionMaker) InitiateConnections(peers []string, replace bool) []e
 		for peer, addr := range addrs {
 			cm.directPeers[peer] = addr
 			// curtail any existing reconnect interval
-			if target, found := cm.targets[addr.String()]; found {
+			if target, found := cm.targets[cm.completeAddr(*addr)]; found {
 				target.nextTryNow()
 			}
 		}
@@ -159,6 +159,13 @@ func (cm *ConnectionMaker) queryLoop(actionChan <-chan ConnectionMakerAction) {
 	}
 }
 
+func (cm *ConnectionMaker) completeAddr(addr net.TCPAddr) string {
+	if addr.Port == 0 {
+		addr.Port = cm.port
+	}
+	return addr.String()
+}
+
 func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 	var (
 		validTarget  = make(map[string]struct{})
@@ -181,18 +188,16 @@ func (cm *ConnectionMaker) checkStateAndAttemptConnections() time.Duration {
 
 	// Add direct targets that are not connected
 	for _, addr := range cm.directPeers {
-		completeAddr := *addr
 		attempt := true
-		if completeAddr.Port == 0 {
-			completeAddr.Port = cm.port
+		if addr.Port == 0 {
 			// If a peer was specified w/o a port, then we do not
 			// attempt to connect to it if we have any inbound
 			// connections from that IP.
-			if _, connected := ourInboundIPs[completeAddr.IP.String()]; connected {
+			if _, connected := ourInboundIPs[addr.IP.String()]; connected {
 				attempt = false
 			}
 		}
-		address := completeAddr.String()
+		address := cm.completeAddr(*addr)
 		directTarget[address] = void
 		if attempt {
 			addTarget(address)
