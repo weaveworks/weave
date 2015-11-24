@@ -60,14 +60,14 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			}
 			percentageRanges := float32(ips) * 100.0 / float32(status.RangeNumIPs)
 
-			displayName := name + " (" + nickName + ")"
-			fmt.Fprintf(&buffer, "%30s: %8d IPs (%04.1f%% of total) %s\n",
+			displayName := name + " (" + nickName + "):"
+			fmt.Fprintf(&buffer, "%-32s %8d IPs (%04.1f%% of total) %s\n",
 				displayName, ips, percentageRanges, reachableStr)
 		}
 
 		// print the local info first
 		if ourStats := peerStats[router.Name]; ourStats != nil {
-			printOwned(router.Name, "local", true, ourStats.ips)
+			printOwned(router.Name, ourStats.nickname, true, ourStats.ips)
 		}
 
 		// and then the rest
@@ -158,14 +158,16 @@ var statusTemplate = defTemplate("status", `\
        Service: ipam
 {{if .IPAM.Entries}}\
 {{if allIPAMOwnersUnreachable .IPAM}}\
-        Halted: all IPs owned by unreachable peers
+        Status: all IP ranges owned by unreachable peers - use 'rmpeer' if they are dead
+{{else if len .IPAM.PendingAllocates}}\
+        Status: waiting for IP range grant from peers
 {{else}}\
-     Consensus: achieved
+        Status: ready
 {{end}}\
 {{else if .IPAM.Paxos}}\
-     Consensus: waiting (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
+        Status: awaiting consensus (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
 {{else}}\
-     Consensus: deferred
+        Status: idle
 {{end}}\
          Range: {{.IPAM.Range}}
  DefaultSubnet: {{.IPAM.DefaultSubnet}}
