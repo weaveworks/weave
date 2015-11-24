@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"fmt"
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/net/address"
 )
@@ -88,7 +89,7 @@ func newAllocateIdentSlice(allocator *Allocator) []string {
 	var slice []string
 	for _, op := range allocator.pendingAllocates {
 		allocate := op.(*allocate)
-		slice = append(slice, allocate.ident)
+		slice = append(slice, fmt.Sprintf("%s %s", allocate.ident, allocate.r.String()))
 	}
 	return slice
 }
