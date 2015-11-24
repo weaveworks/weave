@@ -324,8 +324,6 @@ type RangeInfo struct {
 }
 
 func (r *Ring) AllRangeInfo() (result []RangeInfo) {
-	r.assertInvariants()
-
 	for i, entry := range r.Entries {
 		nextEntry := r.Entries.entry(i + 1)
 		ranges := []address.Range{{Start: entry.Token, End: nextEntry.Token}}
