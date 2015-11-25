@@ -122,15 +122,6 @@ type TopologyGossipData struct {
 	update PeerNameSet
 }
 
-func (router *Router) BroadcastTopologyUpdate(update []*Peer) {
-	names := make(PeerNameSet)
-	for _, p := range update {
-		names[p.Name] = void
-	}
-	router.TopologyGossip.GossipBroadcast(
-		&TopologyGossipData{peers: router.Peers, update: names})
-}
-
 func (d *TopologyGossipData) Merge(other GossipData) GossipData {
 	names := make(PeerNameSet)
 	for name := range d.update {
@@ -144,6 +135,15 @@ func (d *TopologyGossipData) Merge(other GossipData) GossipData {
 
 func (d *TopologyGossipData) Encode() [][]byte {
 	return [][]byte{d.peers.EncodePeers(d.update)}
+}
+
+func (router *Router) BroadcastTopologyUpdate(update []*Peer) {
+	names := make(PeerNameSet)
+	for _, p := range update {
+		names[p.Name] = void
+	}
+	router.TopologyGossip.GossipBroadcast(
+		&TopologyGossipData{peers: router.Peers, update: names})
 }
 
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {

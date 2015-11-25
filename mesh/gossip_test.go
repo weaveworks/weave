@@ -238,10 +238,10 @@ func (g *testGossiper) OnGossip(update []byte) (GossipData, error) {
 			g.state[v] = void
 		}
 	}
-	if len(delta) > 0 {
-		return NewSurrogateGossipData(delta), nil
+	if len(delta) == 0 {
+		return nil, nil
 	}
-	return nil, nil
+	return NewSurrogateGossipData(delta), nil
 }
 
 func (g *testGossiper) checkHas(t *testing.T, vs ...byte) {
