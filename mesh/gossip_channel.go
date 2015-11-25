@@ -167,20 +167,18 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
 	// do this outside the lock below so we avoid lock nesting
 	c.routes.EnsureRecalculated()
-	selectedConnections := make(ConnectionSet)
-	for name := range c.routes.RandomNeighbours(srcName) {
-		if conn, found := c.ourself.ConnectionTo(name); found {
-			selectedConnections[conn] = void
-		}
+	destinations := c.routes.RandomNeighbours(srcName)
+	if len(destinations) == 0 {
+		return
 	}
-	c.sendDown(selectedConnections, data)
+	c.sendDown(c.ourself.ConnectionsTo(destinations), data)
 }
 
 func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
-	c.sendDown(ConnectionSet{conn: void}, data)
+	c.sendDown([]Connection{conn}, data)
 }
 
-func (c *GossipChannel) sendDown(selectedConnections ConnectionSet, data GossipData) {
+func (c *GossipChannel) sendDown(selectedConnections []Connection, data GossipData) {
 	if len(selectedConnections) == 0 {
 		return
 	}
@@ -207,7 +205,7 @@ func (c *GossipChannel) sendDown(selectedConnections ConnectionSet, data GossipD
 		}
 	}
 	// start senders, if necessary, and send.
-	for conn := range selectedConnections {
+	for _, conn := range selectedConnections {
 		sender, found := c.senders[conn]
 		if !found {
 			sender = c.makeSender(conn)

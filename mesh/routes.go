@@ -92,19 +92,23 @@ func (routes *Routes) BroadcastAll(name PeerName) []PeerName {
 // returns a higher proportion of neighbours than elsewhere. In
 // extremis, on peers with fewer than log2(n_peers) neighbours, all
 // neighbours are returned.
-func (routes *Routes) RandomNeighbours(except PeerName) PeerNameSet {
-	res := make(PeerNameSet)
+func (routes *Routes) RandomNeighbours(except PeerName) []PeerName {
+	destinations := make(PeerNameSet)
 	routes.RLock()
 	defer routes.RUnlock()
 	count := int(math.Log2(float64(len(routes.unicastAll))))
 	// depends on go's random map iteration
 	for _, dst := range routes.unicastAll {
 		if dst != UnknownPeerName && dst != except {
-			res[dst] = void
-			if len(res) >= count {
+			destinations[dst] = void
+			if len(destinations) >= count {
 				break
 			}
 		}
+	}
+	res := make([]PeerName, 0, len(destinations))
+	for dst := range destinations {
+		res = append(res, dst)
 	}
 	return res
 }
