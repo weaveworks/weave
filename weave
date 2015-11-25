@@ -453,7 +453,7 @@ create_bridge() {
             fi
         fi
 
-        init_bridge_$BRIDGE_TYPE
+        init_$BRIDGE_TYPE
 
         # Drop traffic from Docker bridge to Weave; it can break
         # subnet isolation
@@ -510,7 +510,7 @@ EOF
     configure_arp_cache $BRIDGE
 }
 
-init_bridge_fastdp() {
+init_fastdp() {
     # GCE has the lowest underlay network MTU we're likely to encounter on
     # a local network, at 1460 bytes.  To get the overlay MTU from that we
     # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
@@ -522,7 +522,7 @@ init_bridge_fastdp() {
     ip link set dev $DATAPATH mtu $MTU
 }
 
-init_bridge_bridge() {
+init_bridge() {
     # Observe any MTU that is already set
     if [ -z "$MTU" ] ; then
         MTU=${WEAVE_MTU:-65535}
@@ -544,9 +544,9 @@ init_bridge_bridge() {
     ip link del dev v${CONTAINER_IFNAME}du
 }
 
-init_bridge_bridged_fastdp() {
+init_bridged_fastdp() {
     # Initialise the datapath as normal. NB sets MTU for use below
-    init_bridge_fastdp
+    init_fastdp
 
     # Create linking veth pair. We do this before initialising the bridge
     # so that `ip link show` displays the datapath, linking veths and
@@ -556,7 +556,7 @@ init_bridge_bridged_fastdp() {
     ip link add name $BRIDGE_IFNAME mtu $MTU type veth peer name $DATAPATH_IFNAME mtu $MTU || return 1
 
     # Initialise the bridge using fast datapath MTU
-    init_bridge_bridge
+    init_bridge
 
     # Link intermediary bridge and datapath
     if ! ip link set $DATAPATH_IFNAME up ||
