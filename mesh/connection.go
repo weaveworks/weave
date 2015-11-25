@@ -48,6 +48,7 @@ type LocalConnection struct {
 	Router       *Router
 	uid          uint64
 	actionChan   chan<- ConnectionAction
+	errorChan    chan<- error
 	finished     <-chan struct{} // closed to signal that actorLoop has finished
 	OverlayConn  OverlayConnection
 }
@@ -87,6 +88,7 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ro
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
 	actionChan := make(chan ConnectionAction, ChannelSize)
+	errorChan := make(chan error, 1)
 	finished := make(chan struct{})
 	conn := &LocalConnection{
 		RemoteConnection: *connRemote, // NB, we're taking a copy of connRemote here.
@@ -94,8 +96,9 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ro
 		TCPConn:          tcpConn,
 		uid:              randUint64(),
 		actionChan:       actionChan,
+		errorChan:        errorChan,
 		finished:         finished}
-	go conn.run(actionChan, finished, acceptNewPeer)
+	go conn.run(actionChan, errorChan, finished, acceptNewPeer)
 }
 
 func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
@@ -135,8 +138,10 @@ func (conn *LocalConnection) Shutdown(err error) {
 		panic("nil error")
 	}
 
-	// Run on its own goroutine in case the channel is backed up
-	go func() { conn.sendAction(func() error { return err }) }()
+	select {
+	case conn.errorChan <- err:
+	default:
+	}
 }
 
 // Send an actor request to the actorLoop, but don't block if
@@ -151,7 +156,7 @@ func (conn *LocalConnection) sendAction(action ConnectionAction) {
 
 // ACTOR server
 
-func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished chan<- struct{}, acceptNewPeer bool) {
+func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, errorChan <-chan error, finished chan<- struct{}, acceptNewPeer bool) {
 	var err error // important to use this var and not create another one with 'err :='
 	defer func() { conn.shutdown(err) }()
 	defer close(finished)
@@ -237,7 +242,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	// running AddConnection in a separate goroutine, at least not
 	// without some synchronisation. Which in turn requires the
 	// launching of the receiveTCP goroutine to precede actorLoop.
-	err = conn.actorLoop(actionChan)
+	err = conn.actorLoop(actionChan, errorChan)
 }
 
 func (conn *LocalConnection) makeFeatures() map[string]string {
@@ -329,7 +334,7 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 	return nil
 }
 
-func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
+func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction, errorChan <-chan error) (err error) {
 	fwdErrorChan := conn.OverlayConn.ErrorChannel()
 	fwdEstablishedChan := conn.OverlayConn.EstablishedChannel()
 
@@ -337,6 +342,8 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 		select {
 		case action := <-actionChan:
 			err = action()
+
+		case err = <-errorChan:
 
 		case <-conn.heartbeatTCP.C:
 			err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
