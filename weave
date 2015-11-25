@@ -1781,6 +1781,9 @@ EOF
         fi
         create_bridge --without-ethtool
         ;;
+    bridge-type)
+        detect_bridge_type && echo $BRIDGE_TYPE
+        ;;
     launch)
         deprecation_warnings "$@"
         check_not_running $CONTAINER_NAME       $BASE_IMAGE
