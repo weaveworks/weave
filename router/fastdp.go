@@ -218,6 +218,9 @@ func (fastdp fastDatapathBridge) String() string {
 }
 
 func (fastdp fastDatapathBridge) Stats() map[string]int {
+	lock := fastdp.startLock()
+	defer lock.unlock()
+
 	return map[string]int{
 		"FlowMisses": int(fastdp.missCount),
 	}
