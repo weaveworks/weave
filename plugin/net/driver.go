@@ -23,14 +23,16 @@ const (
 type driver struct {
 	version    string
 	nameserver string
+	scope      string
 	sync.RWMutex
 	endpoints map[string]struct{}
 }
 
-func New(client *docker.Client, version string, nameserver string) (skel.Driver, error) {
+func New(client *docker.Client, version string, nameserver string, scope string) (skel.Driver, error) {
 	driver := &driver{
 		nameserver: nameserver,
 		version:    version,
+		scope:      scope,
 		endpoints:  make(map[string]struct{}),
 	}
 
@@ -48,11 +50,10 @@ func errorf(format string, a ...interface{}) error {
 
 // === protocol handlers
 
-var caps = &api.GetCapabilityResponse{
-	Scope: "global",
-}
-
 func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
+	var caps = &api.GetCapabilityResponse{
+		Scope: driver.scope,
+	}
 	Log.Debugf("Get capabilities: responded with %+v", caps)
 	return caps, nil
 }

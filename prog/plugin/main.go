@@ -23,12 +23,14 @@ func main() {
 		address     string
 		nameserver  string
 		logLevel    string
+		scope       string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	flag.StringVar(&address, "socket", "/run/docker/plugins/weave.sock", "socket on which to listen")
 	flag.StringVar(&nameserver, "nameserver", "", "nameserver to provide to containers")
+	flag.StringVar(&scope, "scope", "global", "plugin scope (local or global)")
 
 	flag.Parse()
 
@@ -46,7 +48,7 @@ func main() {
 		Log.Fatalf("unable to connect to docker: %s", err)
 	}
 
-	d, err := netplugin.New(dockerClient, version, nameserver)
+	d, err := netplugin.New(dockerClient, version, nameserver, scope)
 	if err != nil {
 		Log.Fatalf("unable to create driver: %s", err)
 	}
