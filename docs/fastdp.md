@@ -55,6 +55,8 @@ To avoid triggering this fallback in typical deployments, the datapath
 interface is statically configured with an MTU of 1410 bytes allowing
 it to work with most underlay network provider MTUs, including GCE at
 1460 bytes (the fifty byte difference accomodates the vxlan overhead).
+This value can be overriden by setting `WEAVE_MTU` at launch if
+necessary.
 
 # Virtual Ports
 
