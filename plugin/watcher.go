@@ -14,19 +14,15 @@ const (
 )
 
 type watcher struct {
-	dockerer
-	weave *weaveapi.Client
+	client *docker.Client
+	weave  *weaveapi.Client
 }
 
 type Watcher interface {
 }
 
 func NewWatcher(client *docker.Client) (Watcher, error) {
-	w := &watcher{
-		dockerer: dockerer{
-			client: client,
-		},
-	}
+	w := &watcher{client: client}
 	err := client.AddObserver(w)
 	if err != nil {
 		return nil, err
