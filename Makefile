@@ -16,19 +16,22 @@ WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 NETCHECK_EXE=prog/netcheck/netcheck
 DOCKERTLSARGS_EXE=prog/docker_tls_args/docker_tls_args
+DOCKERPLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
+DOCKERPLUGIN_UPTODATE=.dockerplugin.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(DOCKERPLUGIN_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
+DOCKERPLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(DOCKERPLUGIN_IMAGE)
 
 WEAVE_EXPORT=weave.tar.gz
 
@@ -74,13 +77,14 @@ $(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
 $(NETCHECK_EXE): prog/netcheck/netcheck.go
 
-# Sigproxy and weavewait need separate rules as they fail the netgo check in
+# These next programs need separate rules as they fail the netgo check in
 # the main build stanza due to not importing net package
 $(SIGPROXY_EXE): prog/sigproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
+$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/*.go plugin/skel/*.go
 
-$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE):
+$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
@@ -102,6 +106,10 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile $(DOCKER_DISTRIB) weave $(SIGPR
 	cp $(DOCKERTLSARGS_EXE) prog/weaveexec/docker_tls_args
 	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
 	$(SUDO) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
+	touch $@
+
+$(DOCKERPLUGIN_UPTODATE): prog/plugin/Dockerfile $(DOCKERPLUGIN_EXE)
+	$(SUDO) docker build -t $(DOCKERPLUGIN_IMAGE) prog/plugin
 	touch $@
 
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
