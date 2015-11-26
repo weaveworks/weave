@@ -80,3 +80,16 @@ func (c *Client) IsContainerNotRunning(idStr string) bool {
 	Log.Errorf("[docker] Could not check container status: %s", err)
 	return false
 }
+
+func (c *Client) GetContainerBridgeIP(nameOrID string) (string, error) {
+	Log.Debugf("Getting IP for container %s", nameOrID)
+	info, err := c.InspectContainer(nameOrID)
+	if err != nil {
+		return "", err
+	}
+	return info.NetworkSettings.IPAddress, nil
+}
+
+func (c *Client) InspectContainer(nameOrId string) (*docker.Container, error) {
+	return c.Client.InspectContainer(nameOrId)
+}

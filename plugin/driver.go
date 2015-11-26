@@ -7,10 +7,10 @@ import (
 	"github.com/docker/libnetwork/types"
 
 	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/common/odp"
 	"github.com/weaveworks/weave/plugin/skel"
 
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/vishvananda/netlink"
 )
 

@@ -8,7 +8,7 @@ import (
 )
 
 func (d *dockerer) registerWithDNS(ID string, fqdn string, ip string) error {
-	dnsip, err := d.getContainerBridgeIP(WeaveDNSContainer)
+	dnsip, err := d.client.GetContainerBridgeIP(WeaveContainer)
 	if err != nil {
 		return fmt.Errorf("nameserver not available: %s", err)
 	}
@@ -33,7 +33,7 @@ func (d *dockerer) registerWithDNS(ID string, fqdn string, ip string) error {
 }
 
 func (d *dockerer) deregisterWithDNS(ID string, ip string) error {
-	dnsip, err := d.getContainerBridgeIP(WeaveDNSContainer)
+	dnsip, err := d.client.GetContainerBridgeIP(WeaveContainer)
 	if err != nil {
 		return fmt.Errorf("nameserver not available: %s", err)
 	}
