@@ -70,7 +70,7 @@ func main() {
 		Log.Debugf("Caught signal %s; shutting down", sig)
 	case err := <-endChan:
 		if err != nil {
-			Log.Errorf("Error from listener: ", err)
+			Log.Errorf("Error from listener: %s", err)
 			listener.Close()
 			os.Exit(1)
 		}
