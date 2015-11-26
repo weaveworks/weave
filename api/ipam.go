@@ -3,12 +3,9 @@ package api
 import (
 	"fmt"
 	"net"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 func (client *Client) ipamOp(ID string, op string) (*net.IPNet, error) {
-	Log.Debugf("IPAM operation %s for %s", op, ID)
 	ip, err := httpVerb(op, fmt.Sprintf("%s/ip/%s", client.baseUrl, ID), nil)
 	if err != nil {
 		return nil, err

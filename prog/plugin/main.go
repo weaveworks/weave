@@ -62,7 +62,7 @@ func main() {
 
 	endChan := make(chan error, 1)
 	go func() {
-		endChan <- skel.Listen(listener, d)
+		endChan <- skel.Listen(listener, d, nil)
 	}()
 
 	select {

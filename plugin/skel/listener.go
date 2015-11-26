@@ -9,10 +9,13 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/docker/libnetwork/drivers/remote/api"
+	"github.com/docker/libnetwork/ipamapi"
+	iapi "github.com/docker/libnetwork/ipams/remote/api"
 )
 
 const (
-	MethodReceiver = "NetworkDriver"
+	networkReceiver = "NetworkDriver"
+	ipamReceiver    = ipamapi.PluginEndpointType
 )
 
 type Driver interface {
@@ -30,30 +33,50 @@ type Driver interface {
 
 type listener struct {
 	d Driver
+	i ipamapi.Ipam
 }
 
-func Listen(socket net.Listener, driver Driver) error {
+func Listen(socket net.Listener, driver Driver, ipamDriver ipamapi.Ipam) error {
 	router := mux.NewRouter()
 	router.NotFoundHandler = http.HandlerFunc(notFound)
 
-	router.Methods("POST").Path("/Plugin.Activate").HandlerFunc(handshake)
+	listener := &listener{driver, ipamDriver}
 
-	handleMethod := func(method string, h http.HandlerFunc) {
-		router.Methods("POST").Path(fmt.Sprintf("/%s.%s", MethodReceiver, method)).HandlerFunc(h)
+	router.Methods("POST").Path("/Plugin.Activate").HandlerFunc(listener.handshake)
+
+	handleMethod := func(receiver, method string, h http.HandlerFunc) {
+		router.Methods("POST").Path(fmt.Sprintf("/%s.%s", receiver, method)).HandlerFunc(h)
 	}
 
-	listener := &listener{driver}
+	handleMethod(networkReceiver, "GetCapabilities", listener.getCapabilities)
 
-	handleMethod("GetCapabilities", listener.getCapabilities)
-	handleMethod("CreateNetwork", listener.createNetwork)
-	handleMethod("DeleteNetwork", listener.deleteNetwork)
-	handleMethod("CreateEndpoint", listener.createEndpoint)
-	handleMethod("DeleteEndpoint", listener.deleteEndpoint)
-	handleMethod("EndpointOperInfo", listener.infoEndpoint)
-	handleMethod("Join", listener.joinEndpoint)
-	handleMethod("Leave", listener.leaveEndpoint)
+	if driver != nil {
+		handleMethod(networkReceiver, "CreateNetwork", listener.createNetwork)
+		handleMethod(networkReceiver, "DeleteNetwork", listener.deleteNetwork)
+		handleMethod(networkReceiver, "CreateEndpoint", listener.createEndpoint)
+		handleMethod(networkReceiver, "DeleteEndpoint", listener.deleteEndpoint)
+		handleMethod(networkReceiver, "EndpointOperInfo", listener.infoEndpoint)
+		handleMethod(networkReceiver, "Join", listener.joinEndpoint)
+		handleMethod(networkReceiver, "Leave", listener.leaveEndpoint)
+	}
+
+	if ipamDriver != nil {
+		handleMethod(ipamReceiver, "GetDefaultAddressSpaces", listener.getDefaultAddressSpaces)
+		handleMethod(ipamReceiver, "RequestPool", listener.requestPool)
+		handleMethod(ipamReceiver, "ReleasePool", listener.releasePool)
+		handleMethod(ipamReceiver, "RequestAddress", listener.requestAddress)
+		handleMethod(ipamReceiver, "ReleaseAddress", listener.releaseAddress)
+	}
 
 	return http.Serve(socket, router)
+}
+
+func decode(w http.ResponseWriter, r *http.Request, v interface{}) error {
+	err := json.NewDecoder(r.Body).Decode(v)
+	if err != nil {
+		sendError(w, "Unable to decode JSON payload: "+err.Error(), http.StatusBadRequest)
+	}
+	return err
 }
 
 // === protocol handlers
@@ -62,10 +85,15 @@ type handshakeResp struct {
 	Implements []string
 }
 
-func handshake(w http.ResponseWriter, r *http.Request) {
-	err := json.NewEncoder(w).Encode(&handshakeResp{
-		[]string{"NetworkDriver"},
-	})
+func (listener *listener) handshake(w http.ResponseWriter, r *http.Request) {
+	var resp handshakeResp
+	if listener.d != nil {
+		resp.Implements = append(resp.Implements, "NetworkDriver")
+	}
+	if listener.i != nil {
+		resp.Implements = append(resp.Implements, "IpamDriver")
+	}
+	err := json.NewEncoder(w).Encode(&resp)
 	if err != nil {
 		sendError(w, "encode error", http.StatusInternalServerError)
 		return
@@ -160,6 +188,70 @@ func (listener *listener) discoverDelete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	emptyOrErrorResponse(w, listener.d.DiscoverDelete(&disco))
+}
+
+// ===
+
+func (listener *listener) getDefaultAddressSpaces(w http.ResponseWriter, r *http.Request) {
+	local, global, err := listener.i.GetDefaultAddressSpaces()
+	response := &iapi.GetAddressSpacesResponse{
+		LocalDefaultAddressSpace:  local,
+		GlobalDefaultAddressSpace: global,
+	}
+	objectOrErrorResponse(w, response, err)
+}
+
+func (listener *listener) requestPool(w http.ResponseWriter, r *http.Request) {
+	var rq iapi.RequestPoolRequest
+	if err := decode(w, r, &rq); err != nil {
+		return
+	}
+	poolID, pool, data, err := listener.i.RequestPool(rq.AddressSpace, rq.Pool, rq.SubPool, rq.Options, rq.V6)
+	if err != nil {
+		errorResponse(w, err.Error())
+		return
+	}
+	response := &iapi.RequestPoolResponse{
+		PoolID: poolID,
+		Pool:   pool.String(),
+		Data:   data,
+	}
+	objectResponse(w, response)
+}
+
+func (listener *listener) releasePool(w http.ResponseWriter, r *http.Request) {
+	var rq iapi.ReleasePoolRequest
+	if err := decode(w, r, &rq); err != nil {
+		return
+	}
+	err := listener.i.ReleasePool(rq.PoolID)
+	emptyOrErrorResponse(w, err)
+}
+
+func (listener *listener) requestAddress(w http.ResponseWriter, r *http.Request) {
+	var rq iapi.RequestAddressRequest
+	if err := decode(w, r, &rq); err != nil {
+		return
+	}
+	address, data, err := listener.i.RequestAddress(rq.PoolID, net.ParseIP(rq.Address), rq.Options)
+	if err != nil {
+		errorResponse(w, err.Error())
+		return
+	}
+	response := &iapi.RequestAddressResponse{
+		Address: address.String(),
+		Data:    data,
+	}
+	objectResponse(w, response)
+}
+
+func (listener *listener) releaseAddress(w http.ResponseWriter, r *http.Request) {
+	var rq iapi.ReleaseAddressRequest
+	if err := decode(w, r, &rq); err != nil {
+		return
+	}
+	err := listener.i.ReleaseAddress(rq.PoolID, net.ParseIP(rq.Address))
+	emptyOrErrorResponse(w, err)
 }
 
 // ===
