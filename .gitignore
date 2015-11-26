@@ -42,12 +42,14 @@ prog/weavewait/weavewait
 prog/weavewait/weavewait_noop
 prog/netcheck/netcheck
 prog/docker_tls_args/docker_tls_args
+prog/plugin/plugin
 testing/cover/cover
 testing/runner/runner
 releases
 .weaver.uptodate
 .weavedns.uptodate
 .weaveexec.uptodate
+.dockerplugin.uptodate
 weave.tar.gz
 prog/weaveexec/weave
 prog/weaveexec/weavehosts
