@@ -83,7 +83,7 @@ $(NETCHECK_EXE): prog/netcheck/netcheck.go
 $(SIGPROXY_EXE): prog/sigproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
-$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/net/*.go plugin/skel/*.go api/*.go common/docker/*.go
+$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/net/*.go plugin/ipam/*.go plugin/skel/*.go api/*.go common/docker/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 
 $(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE):
