@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	. "github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/plugin"
+	"github.com/weaveworks/weave/plugin/net"
 	"github.com/weaveworks/weave/plugin/skel"
 )
 
