@@ -33,7 +33,7 @@ func NewWatcher(client *docker.Client) (Watcher, error) {
 
 func (w *watcher) haveWeaveClient() bool {
 	if w.weave == nil {
-		dnsip, err := w.client.GetContainerBridgeIP(WeaveContainer)
+		dnsip, err := w.client.GetContainerIP(WeaveContainer)
 		if err != nil {
 			Log.Warningf("nameserver not available: %s", err)
 			return false
