@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"fmt"
-	"strings"
 
 	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
@@ -16,13 +15,14 @@ const (
 type watcher struct {
 	client *docker.Client
 	weave  *weaveapi.Client
+	driver *driver
 }
 
 type Watcher interface {
 }
 
-func NewWatcher(client *docker.Client) (Watcher, error) {
-	w := &watcher{client: client}
+func NewWatcher(client *docker.Client, driver *driver) (Watcher, error) {
+	w := &watcher{client: client, driver: driver}
 	err := client.AddObserver(w)
 	if err != nil {
 		return nil, err
@@ -50,34 +50,21 @@ func (w *watcher) ContainerStarted(id string) {
 		Log.Warningf("error inspecting container: %s", err)
 		return
 	}
-	// FIXME: check that it's on our network; but, the docker client lib doesn't know about .NetworkID
-	if isSubdomain(info.Config.Domainname, WeaveDomain) && w.haveWeaveClient() {
-		// one of ours
-		ip := info.NetworkSettings.IPAddress
-		fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
-		if err := w.weave.RegisterWithDNS(id, fqdn, ip); err != nil {
-			Log.Warningf("unable to register with weaveDNS: %s", err)
+	if !w.haveWeaveClient() {
+		return
+	}
+	// check that it's on our network, via the endpointID
+	for _, net := range info.NetworkSettings.Networks {
+		if w.driver.HasEndpoint(net.EndpointID) {
+			fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
+			if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
+				Log.Warningf("unable to register with weaveDNS: %s", err)
+			}
 		}
 	}
 }
 
 func (w *watcher) ContainerDied(id string) {
-	Log.Debugf("Container died %s", id)
-	info, err := w.client.InspectContainer(id)
-	if err != nil {
-		Log.Warningf("error inspecting container: %s", err)
-		return
-	}
-	if isSubdomain(info.Config.Domainname, WeaveDomain) && w.haveWeaveClient() {
-		ip := info.NetworkSettings.IPAddress
-		if err := w.weave.DeregisterWithDNS(id, ip); err != nil {
-			Log.Warningf("unable to deregister with weaveDNS: %s", err)
-		}
-	}
-}
-
-// Cheap and cheerful way to check x is, or is a subdomain, of
-// y. Neither are expected to start with a '.'.
-func isSubdomain(x string, y string) bool {
-	return x == y || strings.HasSuffix(x, "."+y)
+	// don't need to do this as WeaveDNS removes names on container died anyway
+	// (note by the time we get this event we can't see the EndpointID)
 }
