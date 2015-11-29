@@ -476,16 +476,20 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 			newUpdate[name] = void
 		default: // existing peer
 			if newPeer.Version < peer.Version ||
-				(newPeer.Version == peer.Version && newPeer.UID <= peer.UID) {
+				(newPeer.Version == peer.Version &&
+					(newPeer.UID < peer.UID ||
+						(newPeer.UID == peer.UID &&
+							(!newPeer.HasShortID || peer.HasShortID)))) {
 				continue
 			}
 			peer.Version = newPeer.Version
 			peer.UID = newPeer.UID
 			peer.connections = makeConnsMap(peer, connSummaries, peers.byName)
 
-			if newPeer.ShortID != peer.ShortID {
+			if newPeer.ShortID != peer.ShortID || newPeer.HasShortID != peer.HasShortID {
 				peers.deleteByShortID(peer, pending)
 				peer.ShortID = newPeer.ShortID
+				peer.HasShortID = newPeer.HasShortID
 				peers.addByShortID(peer, pending)
 			}
 			newUpdate[name] = void
