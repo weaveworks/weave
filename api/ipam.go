@@ -30,6 +30,15 @@ func (client *Client) ReleaseIP(ID string) error {
 	return err
 }
 
+func (client *Client) DefaultSubnet() (*net.IPNet, error) {
+	cidr, err := httpVerb("GET", fmt.Sprintf("%s/ipinfo/defaultsubnet", client.baseUrl), nil)
+	if err != nil {
+		return nil, err
+	}
+	_, ipnet, err := net.ParseCIDR(cidr)
+	return ipnet, err
+}
+
 func parseIP(body string) (*net.IPNet, error) {
 	ip, ipnet, err := net.ParseCIDR(string(body))
 	if err != nil {

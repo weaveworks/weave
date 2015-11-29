@@ -43,8 +43,13 @@ func (i *ipam) GetDefaultAddressSpaces() (string, string, error) {
 
 func (i *ipam) RequestPool(addressSpace, pool, subPool string, options map[string]string, v6 bool) (string, *net.IPNet, map[string]string, error) {
 	Log.Debugln("RequestPool", addressSpace, pool, subPool, options)
-	_, cidr, _ := net.ParseCIDR("10.32.0.0/12")
-	return "weavepool", cidr, nil, nil
+	if err := i.configureWeaveClient(); err == nil {
+		cidr, err := i.weave.DefaultSubnet()
+		Log.Debugln("RequestPool returning ", cidr, err)
+		return "weavepool", cidr, nil, err
+	} else {
+		return "", nil, nil, err
+	}
 }
 
 func (i *ipam) ReleasePool(poolID string) error {
