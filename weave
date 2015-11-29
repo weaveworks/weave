@@ -111,6 +111,7 @@ exec_remote() {
         -e WEAVE_MTU \
         -e WEAVE_NO_FASTDP \
         -e WEAVE_NO_BRIDGED_FASTDP \
+        -e WEAVE_NO_PLUGIN \
         -e DOCKER_BRIDGE \
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
         -e DOCKER_CLIENT_ARGS \
@@ -149,6 +150,22 @@ check_docker_version() {
     if version_lt $DOCKER_VERSION $MIN_DOCKER_VERSION ; then
         echo "ERROR: weave requires Docker version $MIN_DOCKER_VERSION or later; you are running $DOCKER_VERSION" >&2
         exit 1
+    fi
+}
+
+check_docker_server_api_version() {
+    # Cope with various versions of `docker version` output format
+    if ! DOCKER_API_VERSION=$(docker version -f '{{.Server.APIVersion}}' 2> /dev/null ) ; then
+        if ! DOCKER_API_VERSION=$(docker version -f '{{.Server.ApiVersion}}' 2> /dev/null ) ; then
+            if ! DOCKER_API_VERSION=$(docker version | sed -n -e 's|^Server API version: *\([0-9][0-9]*\.[0-9][0-9]\).*|\1|p') ; then
+                echo "ERROR: Unable to determine docker version" >&2
+                exit 1
+            fi
+        fi
+    fi
+
+    if version_lt ${DOCKER_API_VERSION}.0 ${1}.0 ; then
+        return 1
     fi
 }
 
@@ -1812,6 +1829,10 @@ EOF
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
+        if [ -z $WEAVE_NO_PLUGIN ] && check_docker_server_api_version 1.21 ; then
+            check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
+            launch_plugin $COMMON_ARGS --create-default-network
+        fi
         ;;
     launch-router)
         deprecation_warnings "$@"
@@ -2088,6 +2109,7 @@ EOF
         ;;
     stop)
         [ $# -eq 0 ] || usage
+        stop_plugin
         stop_router
         stop_proxy
         ;;
@@ -2107,7 +2129,7 @@ EOF
         [ $# -eq 0 ] || usage
         warn_if_stopping_proxy_in_env
         call_weave DELETE /peer >/dev/null 2>&1 || true
-        for NAME in $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
+        for NAME in $PLUGIN_CONTAINER_NAME $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true
         done
