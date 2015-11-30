@@ -1548,6 +1548,7 @@ launch_proxy() {
     # when launching the weaveproxy container.
     docker_client_args $DOCKER_CLIENT_ARGS
     proxy_args "$@"
+    mkdir -p /var/run/weave
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
         -v /var/run/docker.sock:/var/run/docker.sock \
