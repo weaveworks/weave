@@ -108,6 +108,7 @@ exec_remote() {
         -e WEAVE_CONTAINER_NAME \
         -e WEAVE_MTU \
         -e WEAVE_NO_FASTDP \
+        -e WEAVE_NO_BRIDGED_FASTDP \
         -e DOCKER_BRIDGE \
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
         -e DOCKER_CLIENT_TLS_VERIFY="$DOCKER_CLIENT_TLS_VERIFY" \
@@ -293,6 +294,10 @@ PROCFS=${PROCFS:-/proc}
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 BRIDGE=weave
+# This value is overridden when the datapath is used unbridged
+DATAPATH=datapath
+BRIDGE_IFNAME=link-${BRIDGE}
+DATAPATH_IFNAME=${DATAPATH}-link
 CONTAINER_IFNAME=ethwe
 # ROUTER_HOSTNETNS_IFNAME is only used for fastdp with encryption
 ROUTER_HOSTNETNS_IFNAME=veth-weave
@@ -397,22 +402,58 @@ random_mac() {
 # weave and docker specific helpers
 ######################################################################
 
-create_bridge() {
+# Detect the current bridge/datapath state. When invoked, the values of
+# $BRIDGE and $DATAPATH are expected to be distinct. $BRIDGE_TYPE and
+# $DATAPATH are set correctly on success; failure indicates that the
+# bridge/datapath devices have yet to be configured. If netdevs do exist
+# but are in an inconsistent state the script aborts with an error.
+detect_bridge_type() {
     BRIDGE_TYPE=
-
-    if [ ! -d /sys/class/net/$BRIDGE ] ; then
-        if [ -n "$WEAVE_NO_FASTDP" ] ; then
-            BRIDGE_TYPE=bridge
-        elif docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --create-datapath --datapath=$BRIDGE ; then
-            BRIDGE_TYPE=fastdp
-        elif [ $? = 17 ] ; then
-            # Exit status of 17 means the kernel doesn't have ODP
+    if [ -d /sys/class/net/$DATAPATH ] ; then
+        # Unfortunately there's no simple way to positively check whether
+        # $DATAPATH is an ODP netdev so we have to make sure it isn't
+        # a bridge instead (and that $BRIDGE is).
+        if [ ! -d /sys/class/net/$DATAPATH/bridge -a -d /sys/class/net/$BRIDGE/bridge ] ; then
+            BRIDGE_TYPE=bridged_fastdp
+        else
+            echo "Inconsistent bridge state detected. Please do 'weave reset' and try again" >&2
+            exit 1
+        fi
+    elif [ -d /sys/class/net/$BRIDGE ] ; then
+        if [ -d /sys/class/net/$BRIDGE/bridge ] ; then
             BRIDGE_TYPE=bridge
         else
-            return 1
+            BRIDGE_TYPE=fastdp
+            # The datapath is the bridge when there is no intermediary
+            DATAPATH="$BRIDGE"
+        fi
+    else
+        # No bridge/datapath devices configured
+        return 1
+    fi
+}
+
+create_bridge() {
+    if ! detect_bridge_type ; then
+        BRIDGE_TYPE=bridge
+        if [ -z "$WEAVE_NO_FASTDP" ] ; then
+            BRIDGE_TYPE=bridged_fastdp
+            if [ -n "$WEAVE_NO_BRIDGED_FASTDP" ] ; then
+                BRIDGE_TYPE=fastdp
+                # The datapath is the bridge when there is no intermediary
+                DATAPATH="$BRIDGE"
+            fi
+            if docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --create-datapath --datapath=$DATAPATH ; then
+                : # ODP datapath created successfully
+            elif [ $? = 17 ] ; then
+                # Exit status of 17 means the kernel doesn't have ODP
+                BRIDGE_TYPE=bridge
+            else
+                return 1
+            fi
         fi
 
-        init_bridge_$BRIDGE_TYPE
+        init_$BRIDGE_TYPE
 
         # Drop traffic from Docker bridge to Weave; it can break
         # subnet isolation
@@ -440,14 +481,8 @@ create_bridge() {
         run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
         add_iptables_rule nat POSTROUTING -j WEAVE
     else
-        # Detect whether fast datapath is in use on
-        # $BRIDGE. Unfortunately there's no simple way to positively
-        # check whether $BRIDGE is a ODP netdev, so we have to check
-        # whether it is a bridge instead.
-        if [ -d /sys/class/net/$BRIDGE/bridge ] ; then
-            BRIDGE_TYPE=bridge
-
-            if [ -n "$LAUNCHING_ROUTER" -a -z "$WEAVE_NO_FASTDP" ] ; then
+        if [ -n "$LAUNCHING_ROUTER" ] ; then
+            if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] ; then
                 cat <<EOF >&1
 WEAVE_NO_FASTDP is not set, but there is already a bridge present of
 the wrong type for fast datapath.  Please do 'weave reset' to remove
@@ -455,10 +490,7 @@ the bridge first.
 EOF
                 return 1
             fi
-        else
-            BRIDGE_TYPE=fastdp
-
-            if [ -n "$WEAVE_NO_FASTDP" ] ; then
+            if [ "$BRIDGE_TYPE" != bridge -a -n "$WEAVE_NO_FASTDP" ] ; then
                 cat <<EOF >&1
 WEAVE_NO_FASTDP is set, but there is already a weave fast datapath
 bridge present.  Please do 'weave reset' to remove the bridge first.
@@ -485,7 +517,7 @@ EOF
     configure_arp_cache $BRIDGE
 }
 
-init_bridge_fastdp() {
+init_fastdp() {
     # GCE has the lowest underlay network MTU we're likely to encounter on
     # a local network, at 1460 bytes.  To get the overlay MTU from that we
     # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
@@ -494,11 +526,14 @@ init_bridge_fastdp() {
     MTU=${WEAVE_MTU:-1410}
 
     # create_bridge already created the datapath netdev
-    ip link set dev $BRIDGE mtu $MTU
+    ip link set dev $DATAPATH mtu $MTU
 }
 
-init_bridge_bridge() {
-    MTU=${WEAVE_MTU:-65535}
+init_bridge() {
+    # Observe any MTU that is already set
+    if [ -z "$MTU" ] ; then
+        MTU=${WEAVE_MTU:-65535}
+    fi
 
     ip link add name $BRIDGE type bridge
 
@@ -516,6 +551,36 @@ init_bridge_bridge() {
     ip link del dev v${CONTAINER_IFNAME}du
 }
 
+init_bridged_fastdp() {
+    # Initialise the datapath as normal. NB sets MTU for use below
+    init_fastdp
+
+    # Create linking veth pair. We do this before initialising the bridge
+    # so that `ip link show` displays the datapath, linking veths and
+    # the bridge in natural order
+    ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
+    ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
+    ip link add name $BRIDGE_IFNAME mtu $MTU type veth peer name $DATAPATH_IFNAME mtu $MTU || return 1
+
+    # Initialise the bridge using fast datapath MTU
+    init_bridge
+
+    # Link intermediary bridge and datapath
+    if ! ip link set $DATAPATH_IFNAME up ||
+       ! ip link set $BRIDGE_IFNAME up ||
+       ! add_iface_fastdp $DATAPATH_IFNAME || ! ip link set $BRIDGE_IFNAME master $BRIDGE ; then
+        # Failed to link bridge and datapath - clean up
+        ip link del $BRIDGE >/dev/null 2>&1 || true
+        ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
+        ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
+        docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --delete-datapath --datapath=$DATAPATH >/dev/null 2>&1 || true
+        return 1
+    fi
+
+    # Finally, bring the datapath up
+    ip link set dev $DATAPATH up
+}
+
 ethtool_tx_off_fastdp() {
     true
 }
@@ -524,14 +589,28 @@ ethtool_tx_off_bridge() {
     ethtool -K $1 tx off >/dev/null
 }
 
+ethtool_tx_off_bridged_fastdp() {
+    true
+}
+
 destroy_bridge() {
-    if [ -d /sys/class/net/$BRIDGE ] ; then
-        if [ -d /sys/class/net/$BRIDGE/bridge ] ; then
-            ip link del dev $BRIDGE
-        else
-            docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --delete-datapath --datapath=$BRIDGE
+    # It's important that detect_bridge_type has not been called so
+    # we have distinct values for $BRIDGE and $DATAPATH. Make best efforts
+    # to remove netdevs of any type with those names so `weave reset` can
+    # recover from inconsistent states.
+    for NETDEV in $BRIDGE $DATAPATH ; do
+        if [ -d /sys/class/net/$NETDEV ] ; then
+            if [ -d /sys/class/net/$NETDEV/bridge ] ; then
+                ip link del $NETDEV
+            else
+                docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --delete-datapath --datapath=$NETDEV
+            fi
         fi
-    fi
+    done
+
+    # Remove any lingering bridged fastdp veth
+    ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
+    ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
 
     if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
         run_iptables -t filter -D FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP 2>/dev/null || true
@@ -643,11 +722,15 @@ connect_container_to_bridge() {
 }
 
 add_iface_fastdp() {
-    docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --datapath=$BRIDGE --add-datapath-iface=$1
+    docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --datapath=$DATAPATH --add-datapath-iface=$1
 }
 
 add_iface_bridge() {
     ip link set $1 master $BRIDGE
+}
+
+add_iface_bridged_fastdp() {
+    add_iface_bridge "$@"
 }
 
 ask_version() {
@@ -661,7 +744,7 @@ ask_version() {
 
 router_opts_fastdp() {
     if [ -z "$WEAVE_PASSWORD" ] ; then
-        echo "--datapath $BRIDGE"
+        echo "--datapath $DATAPATH"
     else
         # When using encryption, we still do bridging on the ODP
         # datapath, because you can 'weave launch' without encryption
@@ -679,12 +762,16 @@ router_opts_fastdp() {
         # Having a netdev in the host netns called "ethwe" might
         # surprise people, so it is called $ROUTER_HOSTNETNS_IFNAME
         # instead.
-        echo "--datapath $BRIDGE --iface $ROUTER_HOSTNETNS_IFNAME"
+        echo "--datapath $DATAPATH --iface $ROUTER_HOSTNETNS_IFNAME"
     fi
 }
 
 router_opts_bridge() {
     echo "--iface $CONTAINER_IFNAME"
+}
+
+router_opts_bridged_fastdp() {
+    router_opts_fastdp "$@"
 }
 
 ######################################################################
@@ -715,6 +802,10 @@ setup_router_iface_bridge() {
     connect_container_to_bridge $CONTAINER_IFNAME &&
         netnsenter ethtool -K eth0 tx off >/dev/null &&
         netnsenter ip link set $CONTAINER_IFNAME up
+}
+
+setup_router_iface_bridged_fastdp() {
+    setup_router_iface_fastdp "$@"
 }
 
 attach() {
@@ -1480,7 +1571,7 @@ launch_router() {
         fi
     fi
 
-    if [ "$BRIDGE_TYPE" = fastdp ] ; then
+    if [ "$BRIDGE_TYPE" != bridge ] ; then
         NETHOST_OPT="--net=host"
         HTTP_IP=127.0.0.1
         # In case there is a lingering veth-weave netdev
@@ -1537,9 +1628,10 @@ attach_router() {
 stop_router() {
     stop $CONTAINER_NAME "Weave"
     conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
-    # remove the veth-weave netdev in a fastdp context
-    [ -d /sys/class/net/$BRIDGE -a ! -d /sys/class/net/$BRIDGE/bridge ] \
-        && ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
+    # Remove the veth-weave netdev in a fastdp context
+    if detect_bridge_type && [ "$BRIDGE_TYPE" != bridge ] ; then
+        ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
+    fi
 }
 
 launch_proxy() {
@@ -1703,6 +1795,9 @@ EOF
             exit 1
         fi
         create_bridge --without-ethtool
+        ;;
+    bridge-type)
+        detect_bridge_type && echo $BRIDGE_TYPE
         ;;
     launch)
         deprecation_warnings "$@"
