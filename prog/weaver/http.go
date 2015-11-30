@@ -60,8 +60,8 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			}
 			percentageRanges := float32(ips) * 100.0 / float32(status.RangeNumIPs)
 
-			displayName := name + " (" + nickName + "):"
-			fmt.Fprintf(&buffer, "%-32s %8d IPs (%04.1f%% of total) %s\n",
+			displayName := name + "(" + nickName + ")"
+			fmt.Fprintf(&buffer, "%-37v %8d IPs (%04.1f%% of total) %s\n",
 				displayName, ips, percentageRanges, reachableStr)
 		}
 
@@ -198,7 +198,7 @@ var peersTemplate = defTemplate("peers", `\
 {{.Name}}({{.NickName}})
 {{range .Connections}}\
    {{if .Outbound}}->{{else}}<-{{end}} {{printf "%-21v" .Address}} \
-{{$nameNickName := printf "%v(%v)" .Name .NickName}}{{printf "%-32v" $nameNickName}} \
+{{$nameNickName := printf "%v(%v)" .Name .NickName}}{{printf "%-37v" $nameNickName}} \
 {{if .Established}}established{{else}}pending{{end}}
 {{end}}\
 {{end}}\
