@@ -3,7 +3,6 @@ package mesh
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"io"
 	"math/rand"
 	"sync"
@@ -30,14 +29,6 @@ type ShortIDPeers struct {
 
 	// In case of a collision, this holds the other peers.
 	others []*Peer
-}
-
-type UnknownPeerError struct {
-	Name PeerName
-}
-
-func (upe UnknownPeerError) Error() string {
-	return fmt.Sprint("Reference to unknown peer ", upe.Name)
 }
 
 type PeerNameSet map[PeerName]struct{}
@@ -334,9 +325,7 @@ func (peers *Peers) ApplyUpdate(update []byte) (PeerNameSet, PeerNameSet, error)
 		return nil, nil, err
 	}
 
-	// By this point, we know the update doesn't refer to any peers we
-	// have no knowledge of. We can now apply the update. Start by
-	// adding in any new peers.
+	// Add new peers
 	for name, newPeer := range newPeers {
 		peers.byName[name] = newPeer
 		peers.addByShortID(newPeer, &pending)
@@ -446,10 +435,8 @@ func (peers *Peers) decodeUpdate(update []byte) (newPeers map[PeerName]*Peer, de
 			if _, found := peers.byName[remoteName]; found {
 				continue
 			}
-			// Update refers to a peer which we have no knowledge
-			// of. Thus we can't apply the update. Abort.
-			err = UnknownPeerError{remoteName}
-			return
+			// Update refers to a peer which we have no knowledge of.
+			newPeers[remoteName] = NewPeerPlaceholder(remoteName)
 		}
 	}
 	return
@@ -484,6 +471,7 @@ func (peers *Peers) applyUpdate(decodedUpdate []*Peer, decodedConns [][]Connecti
 			}
 			peer.Version = newPeer.Version
 			peer.UID = newPeer.UID
+			peer.NickName = newPeer.NickName
 			peer.connections = makeConnsMap(peer, connSummaries, peers.byName)
 
 			if newPeer.ShortID != peer.ShortID || newPeer.HasShortID != peer.HasShortID {

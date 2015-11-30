@@ -26,7 +26,12 @@ func randUint16() (r uint16) {
 type PeerUID uint64
 
 func randomPeerUID() PeerUID {
-	return PeerUID(randUint64())
+	for {
+		uid := randUint64()
+		if uid != 0 { // uid 0 is reserved for peer placeholder
+			return PeerUID(uid)
+		}
+	}
 }
 
 func ParsePeerUID(s string) (PeerUID, error) {
@@ -93,6 +98,10 @@ func NewPeer(name PeerName, nickName string, uid PeerUID, version uint64, shortI
 		ShortID:    shortID,
 		HasShortID: true,
 	})
+}
+
+func NewPeerPlaceholder(name PeerName) *Peer {
+	return NewPeerFromSummary(PeerSummary{NameByte: name.Bin()})
 }
 
 func NewPeerFrom(peer *Peer) *Peer {

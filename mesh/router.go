@@ -172,14 +172,6 @@ func (router *Router) OnGossip(update []byte) (GossipData, error) {
 
 func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
 	origUpdate, newUpdate, err := router.Peers.ApplyUpdate(update)
-	if _, ok := err.(UnknownPeerError); err != nil && ok {
-		// That update contained a reference to a peer which wasn't
-		// itself included in the update, and we didn't know about
-		// already. We ignore this; eventually we should receive an
-		// update containing a complete topology.
-		log.Println("Topology gossip:", err)
-		return nil, nil, nil
-	}
 	if err != nil {
 		return nil, nil, err
 	}
