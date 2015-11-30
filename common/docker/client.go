@@ -30,7 +30,7 @@ func NewClient(apiPath string) (*Client, error) {
 	}
 	client := &Client{dc}
 
-	return client, client.checkWorking(apiPath)
+	return client, client.checkWorking()
 }
 
 func NewVersionedClient(apiPath string, apiVersionString string) (*Client, error) {
@@ -43,15 +43,25 @@ func NewVersionedClient(apiPath string, apiVersionString string) (*Client, error
 	}
 	client := &Client{dc}
 
-	return client, client.checkWorking(apiPath)
+	return client, client.checkWorking()
 }
 
-func (c *Client) checkWorking(apiPath string) error {
+func NewVersionedClientFromEnv(apiVersionString string) (*Client, error) {
+	dc, err := docker.NewVersionedClientFromEnv(apiVersionString)
+	if err != nil {
+		return nil, err
+	}
+	client := &Client{dc}
+
+	return client, client.checkWorking()
+}
+
+func (c *Client) checkWorking() error {
 	env, err := c.Version()
 	if err != nil {
 		return err
 	}
-	Log.Infof("[docker] Using Docker API on %s: %v", apiPath, env)
+	Log.Infof("[docker] Using Docker API on %s: %v", c.Endpoint(), env)
 	return nil
 }
 
