@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+	"text/template"
+
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam"
@@ -10,9 +15,6 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
-	"net/http"
-	"strings"
-	"text/template"
 )
 
 var rootTemplate = template.New("root").Funcs(map[string]interface{}{
@@ -30,6 +32,60 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			return "none"
 		}
 		return strings.Join(servers, ", ")
+	},
+	"printIPAMRanges": func(router weave.NetworkRouterStatus, status ipam.Status) string {
+		var buffer bytes.Buffer
+
+		type stats struct {
+			ips       uint32
+			nickname  string
+			reachable bool
+		}
+
+		peerStats := make(map[string]*stats)
+
+		for _, entry := range status.Entries {
+			s, found := peerStats[entry.Peer]
+			if !found {
+				s = &stats{nickname: entry.Nickname, reachable: entry.IsKnownPeer}
+				peerStats[entry.Peer] = s
+			}
+			s.ips += entry.Size
+		}
+
+		printOwned := func(name string, nickName string, reachable bool, ips uint32) {
+			reachableStr := ""
+			if !reachable {
+				reachableStr = "- unreachable!"
+			}
+			percentageRanges := float32(ips) * 100.0 / float32(status.RangeNumIPs)
+
+			displayName := name + "(" + nickName + ")"
+			fmt.Fprintf(&buffer, "%-37v %8d IPs (%04.1f%% of total) %s\n",
+				displayName, ips, percentageRanges, reachableStr)
+		}
+
+		// print the local info first
+		if ourStats := peerStats[router.Name]; ourStats != nil {
+			printOwned(router.Name, ourStats.nickname, true, ourStats.ips)
+		}
+
+		// and then the rest
+		for peer, stats := range peerStats {
+			if peer != router.Name {
+				printOwned(peer, stats.nickname, stats.reachable, stats.ips)
+			}
+		}
+
+		return buffer.String()
+	},
+	"allIPAMOwnersUnreachable": func(status ipam.Status) bool {
+		for _, entry := range status.Entries {
+			if entry.Size > 0 && entry.IsKnownPeer {
+				return false
+			}
+		}
+		return true
 	},
 	"printConnectionCounts": func(conns []mesh.LocalConnectionStatus) string {
 		counts := make(map[string]int)
@@ -101,11 +157,17 @@ var statusTemplate = defTemplate("status", `\
 
        Service: ipam
 {{if .IPAM.Entries}}\
-     Consensus: achieved
-{{else if .IPAM.Paxos}}\
-     Consensus: waiting (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
+{{if allIPAMOwnersUnreachable .IPAM}}\
+        Status: all IP ranges owned by unreachable peers - use 'rmpeer' if they are dead
+{{else if len .IPAM.PendingAllocates}}\
+        Status: waiting for IP range grant from peers
 {{else}}\
-     Consensus: deferred
+        Status: ready
+{{end}}\
+{{else if .IPAM.Paxos}}\
+        Status: awaiting consensus (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
+{{else}}\
+        Status: idle
 {{end}}\
          Range: {{.IPAM.Range}}
  DefaultSubnet: {{.IPAM.DefaultSubnet}}
@@ -136,7 +198,7 @@ var peersTemplate = defTemplate("peers", `\
 {{.Name}}({{.NickName}})
 {{range .Connections}}\
    {{if .Outbound}}->{{else}}<-{{end}} {{printf "%-21v" .Address}} \
-{{$nameNickName := printf "%v(%v)" .Name .NickName}}{{printf "%-32v" $nameNickName}} \
+{{$nameNickName := printf "%v(%v)" .Name .NickName}}{{printf "%-37v" $nameNickName}} \
 {{if .Established}}established{{else}}pending{{end}}
 {{end}}\
 {{end}}\
@@ -151,6 +213,8 @@ var dnsEntriesTemplate = defTemplate("dnsEntries", `\
 {{end}}\
 {{end}}\
 `)
+
+var ipamTemplate = defTemplate("ipamTemplate", `{{printIPAMRanges .Router .IPAM}}`)
 
 type WeaveStatus struct {
 	Version string
@@ -207,5 +271,6 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 	defHandler("/status/connections", connectionsTemplate)
 	defHandler("/status/peers", peersTemplate)
 	defHandler("/status/dns", dnsEntriesTemplate)
+	defHandler("/status/ipam", ipamTemplate)
 
 }

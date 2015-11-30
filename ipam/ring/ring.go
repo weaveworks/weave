@@ -316,6 +316,25 @@ func (r *Ring) OwnedRanges() (result []address.Range) {
 	return r.splitRangesOverZero(result)
 }
 
+// For printing status
+type RangeInfo struct {
+	Peer mesh.PeerName
+	address.Range
+	Version uint32
+}
+
+func (r *Ring) AllRangeInfo() (result []RangeInfo) {
+	for i, entry := range r.Entries {
+		nextEntry := r.Entries.entry(i + 1)
+		ranges := []address.Range{{Start: entry.Token, End: nextEntry.Token}}
+		ranges = r.splitRangesOverZero(ranges)
+		for _, r := range ranges {
+			result = append(result, RangeInfo{entry.Peer, r, entry.Version})
+		}
+	}
+	return
+}
+
 // ClaimForPeers claims the entire ring for the array of peers passed
 // in.  Only works for empty rings.
 func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
