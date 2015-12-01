@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"errors"
 	"github.com/fsouza/go-dockerclient"
+
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -100,9 +102,8 @@ func (c *Client) GetContainerIP(nameOrID string) (string, error) {
 	} else if info.HostConfig.NetworkMode == "host" {
 		return "127.0.0.1", nil
 	}
+	if info.NetworkSettings.IPAddress == "" {
+		return "", errors.New("No IP address found for container " + nameOrID)
+	}
 	return info.NetworkSettings.IPAddress, nil
-}
-
-func (c *Client) InspectContainer(nameOrId string) (*docker.Container, error) {
-	return c.Client.InspectContainer(nameOrId)
 }
