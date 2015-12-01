@@ -11,7 +11,7 @@ set -e
 : ${SSH_KEY_FILE:=$HOME/.ssh/gce_ssh_key}
 : ${PROJECT:=positive-cocoa-90213}
 : ${IMAGE:=ubuntu-14-04}
-: ${TEMPLATE_NAME:=test-template-8}
+: ${TEMPLATE_NAME:=test-template-9}
 : ${ZONE:=us-central1-a}
 : ${NUM_HOSTS:=5}
 SUFFIX=""
@@ -73,7 +73,7 @@ curl -sSL https://get.docker.com/ | sh
 apt-get update -qq;
 apt-get install -q -y --force-yes --no-install-recommends ethtool;
 usermod -a -G docker vagrant;
-echo 'DOCKER_OPTS="-H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375 -s overlay"' >> /etc/default/docker;
+echo 'DOCKER_OPTS="-H unix:///var/run/docker.sock -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay"' >> /etc/default/docker;
 service docker restart
 EOF
 	# It seems we need a short delay for docker to start up, so I put this in
