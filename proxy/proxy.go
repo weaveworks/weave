@@ -194,7 +194,7 @@ func (proxy *Proxy) Listen() []net.Listener {
 	proxy.normalisedAddrs = []string{}
 	unixAddrs := []string{}
 	for _, addr := range proxy.ListenAddrs {
-		if strings.HasPrefix(addr, "unix://") {
+		if strings.HasPrefix(addr, "unix://") || strings.HasPrefix(addr, "/") {
 			unixAddrs = append(unixAddrs, addr)
 			continue
 		}
