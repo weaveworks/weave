@@ -568,7 +568,7 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		proxy.normalisedAddrs = append(proxy.normalisedAddrs, addr)
 	}
 	if len(froms) == 0 {
-		return nil
+		return
 	}
 
 	env := []string{
@@ -589,7 +589,7 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		HostConfig: &docker.HostConfig{Binds: binds},
 	})
 	if err != nil {
-		return err
+		return
 	}
 
 	defer func() {
@@ -599,8 +599,9 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		}
 	}()
 
-	if err := proxy.client.StartContainer(container.ID, nil); err != nil {
-		return err
+	err = proxy.client.StartContainer(container.ID, nil)
+	if err != nil {
+		return
 	}
 
 	var buf bytes.Buffer
@@ -611,15 +612,16 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		Stderr:      true,
 	})
 	if err != nil {
-		return err
+		return
 	}
 
-	rc, err := proxy.client.WaitContainer(container.ID)
+	var rc int
+	rc, err = proxy.client.WaitContainer(container.ID)
 	if err != nil {
-		return err
+		return
 	}
 	if rc != 0 {
-		return errors.New(buf.String())
+		err = errors.New(buf.String())
 	}
-	return nil
+	return
 }
