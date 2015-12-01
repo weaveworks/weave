@@ -157,7 +157,7 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) error {
 	}
 
 	peer.router.Routes.Recalculate()
-	peer.broadcastPeerUpdate(conn.Remote())
+	peer.broadcastPeerUpdate()
 
 	return nil
 }
@@ -199,13 +199,13 @@ func (peer *LocalPeer) handleDeleteConnection(conn Connection) {
 
 // helpers
 
-func (peer *LocalPeer) broadcastPeerUpdate(peers ...*Peer) {
+func (peer *LocalPeer) broadcastPeerUpdate() {
 	// Some tests run without a router.  This should be fixed so
 	// that the relevant part of Router can be easily run in the
 	// context of a test, but that will involve significant
 	// reworking of tests.
 	if peer.router != nil {
-		peer.router.BroadcastTopologyUpdate(append(peers, peer.Peer))
+		peer.router.BroadcastTopologyUpdate([]*Peer{peer.Peer})
 	}
 }
 
