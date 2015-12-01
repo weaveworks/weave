@@ -575,8 +575,8 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	}
 
-	if val := os.Getenv("DEBUG"); val != "" {
-		env = append(env, fmt.Sprintf("%s=%s", "DEBUG", val))
+	if val := os.Getenv("WEAVE_DEBUG"); val != "" {
+		env = append(env, fmt.Sprintf("%s=%s", "WEAVE_DEBUG", val))
 	}
 
 	container, err = proxy.client.CreateContainer(docker.CreateContainerOptions{

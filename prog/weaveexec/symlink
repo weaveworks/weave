@@ -4,7 +4,7 @@
 
 set -e
 
-[ -z "$DEBUG" ] || set -x
+[ -z "$WEAVE_DEBUG" ] || set -x
 
 target="$1"
 user="$(stat -c '%u:%g' "$target")"
