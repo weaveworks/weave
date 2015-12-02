@@ -55,7 +55,8 @@ func main() {
 
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 
-	dockerClient, err := docker.NewClient("unix:///var/run/docker.sock")
+	// API 1.21 is the first version that supports docker network commands
+	dockerClient, err := docker.NewVersionedClient("unix:///var/run/docker.sock", "1.21")
 	if err != nil {
 		Log.Fatalf("unable to connect to docker: %s", err)
 	}
