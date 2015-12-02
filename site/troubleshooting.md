@@ -93,6 +93,9 @@ $ weave status
         Service: proxy
         Address: tcp://127.0.0.1:12375
 
+       Service: plugin
+    DriverName: weave
+
 ````
 
 The terms used here are explained further at

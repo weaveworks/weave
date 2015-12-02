@@ -57,6 +57,7 @@ weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
 weave launch-plugin
 weave env           [--restore]
 weave config
+weave dns-args
 weave connect       [--replace] [<peer> ...]
 weave forget        <peer> ...
 weave status        [targets | connections | peers | dns]
