@@ -1325,7 +1325,7 @@ proxy_args() {
           PROXY_HOST="unix:///var/run/weave/weave.sock"
           ;;
         *)
-          PROXY_HOST="tcp://0.0.0.0:12375"
+          PROXY_HOST="tcp://0.0.0.0:$PROXY_PORT"
           ;;
       esac
       PROXY_ARGS="$PROXY_ARGS -H $PROXY_HOST"
