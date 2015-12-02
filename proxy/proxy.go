@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -25,6 +27,9 @@ const (
 	defaultCertFile = "cert.pem"
 	dockerSock      = "/var/run/docker.sock"
 	dockerSockUnix  = "unix://" + dockerSock
+
+	weaveSock     = "/var/run/weave/weave.sock"
+	weaveSockUnix = "unix://" + weaveSock
 )
 
 var (
@@ -46,6 +51,7 @@ type Config struct {
 	HostnameFromLabel   string
 	HostnameMatch       string
 	HostnameReplacement string
+	Image               string
 	ListenAddrs         []string
 	RewriteInspect      bool
 	NoDefaultIPAM       bool
@@ -186,13 +192,32 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (proxy *Proxy) Listen() []net.Listener {
 	listeners := []net.Listener{}
 	proxy.normalisedAddrs = []string{}
+	unixAddrs := []string{}
 	for _, addr := range proxy.ListenAddrs {
+		if strings.HasPrefix(addr, "unix://") || strings.HasPrefix(addr, "/") {
+			unixAddrs = append(unixAddrs, addr)
+			continue
+		}
 		listener, normalisedAddr, err := proxy.listen(addr)
 		if err != nil {
 			Log.Fatalf("Cannot listen on %s: %s", addr, err)
 		}
 		listeners = append(listeners, listener)
 		proxy.normalisedAddrs = append(proxy.normalisedAddrs, normalisedAddr)
+	}
+
+	if len(unixAddrs) > 0 {
+		listener, _, err := proxy.listen(weaveSockUnix)
+		if err != nil {
+			Log.Fatalf("Cannot listen on %s: %s", weaveSockUnix, err)
+		}
+		listeners = append(listeners, listener)
+
+		if err := proxy.symlink(unixAddrs); err != nil {
+			Log.Fatalf("Cannot listen on unix sockets: %s", err)
+		}
+
+		proxy.normalisedAddrs = append(proxy.normalisedAddrs, weaveSockUnix)
 	}
 
 	for _, addr := range proxy.normalisedAddrs {
@@ -526,4 +551,77 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 	networkSettings["IPAddress"] = ips[0].String()
 	networkSettings["IPPrefixLen"], _ = nets[0].Mask.Size()
 	return nil
+}
+
+func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
+	var container *docker.Container
+	binds := []string{"/var/run/weave:/var/run/weave"}
+	froms := []string{}
+	for _, addr := range unixAddrs {
+		if addr == weaveSockUnix {
+			continue
+		}
+		from := strings.TrimPrefix(addr, "unix://")
+		dir := filepath.Dir(from)
+		binds = append(binds, dir+":"+filepath.Join("/host", dir))
+		froms = append(froms, filepath.Join("/host", from))
+		proxy.normalisedAddrs = append(proxy.normalisedAddrs, addr)
+	}
+	if len(froms) == 0 {
+		return
+	}
+
+	env := []string{
+		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	}
+
+	if val := os.Getenv("WEAVE_DEBUG"); val != "" {
+		env = append(env, fmt.Sprintf("%s=%s", "WEAVE_DEBUG", val))
+	}
+
+	container, err = proxy.client.CreateContainer(docker.CreateContainerOptions{
+		Config: &docker.Config{
+			Image:      proxy.Image,
+			Entrypoint: []string{"/home/weave/symlink", weaveSock},
+			Cmd:        froms,
+			Env:        env,
+		},
+		HostConfig: &docker.HostConfig{Binds: binds},
+	})
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		err2 := proxy.client.RemoveContainer(docker.RemoveContainerOptions{ID: container.ID})
+		if err == nil {
+			err = err2
+		}
+	}()
+
+	err = proxy.client.StartContainer(container.ID, nil)
+	if err != nil {
+		return
+	}
+
+	var buf bytes.Buffer
+	err = proxy.client.AttachToContainer(docker.AttachToContainerOptions{
+		Container:   container.ID,
+		ErrorStream: &buf,
+		Logs:        true,
+		Stderr:      true,
+	})
+	if err != nil {
+		return
+	}
+
+	var rc int
+	rc, err = proxy.client.WaitContainer(container.ID)
+	if err != nil {
+		return
+	}
+	if rc != 0 {
+		err = errors.New(buf.String())
+	}
+	return
 }

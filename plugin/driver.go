@@ -2,15 +2,16 @@ package plugin
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/docker/libnetwork/drivers/remote/api"
 	"github.com/docker/libnetwork/types"
 
 	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/common/odp"
 	"github.com/weaveworks/weave/plugin/skel"
 
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/vishvananda/netlink"
 )
 
@@ -22,6 +23,8 @@ const (
 type driver struct {
 	version    string
 	nameserver string
+	sync.RWMutex
+	endpoints map[string]struct{}
 }
 
 func New(version string, nameserver string) (skel.Driver, error) {
@@ -30,15 +33,17 @@ func New(version string, nameserver string) (skel.Driver, error) {
 		return nil, errorf("could not connect to docker: %s", err)
 	}
 
-	_, err = NewWatcher(client)
+	driver := &driver{
+		nameserver: nameserver,
+		version:    version,
+		endpoints:  make(map[string]struct{}),
+	}
+
+	_, err = NewWatcher(client, driver)
 	if err != nil {
 		return nil, err
 	}
-
-	return &driver{
-		nameserver: nameserver,
-		version:    version,
-	}, nil
+	return driver, nil
 }
 
 func errorf(format string, a ...interface{}) error {
@@ -76,16 +81,29 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 	if create.Interface == nil {
 		return nil, fmt.Errorf("Not supported: creating an interface from within CreateEndpoint")
 	}
+	driver.Lock()
+	driver.endpoints[endID] = struct{}{}
+	driver.Unlock()
 	resp := &api.CreateEndpointResponse{}
 
 	Log.Infof("Create endpoint %s %+v", endID, resp)
 	return resp, nil
 }
 
-func (driver *driver) DeleteEndpoint(delete *api.DeleteEndpointRequest) error {
-	Log.Debugf("Delete endpoint request: %+v", delete)
-	Log.Infof("Delete endpoint %s", delete.EndpointID)
+func (driver *driver) DeleteEndpoint(deleteReq *api.DeleteEndpointRequest) error {
+	Log.Debugf("Delete endpoint request: %+v", deleteReq)
+	Log.Infof("Delete endpoint %s", deleteReq.EndpointID)
+	driver.Lock()
+	delete(driver.endpoints, deleteReq.EndpointID)
+	driver.Unlock()
 	return nil
+}
+
+func (driver *driver) HasEndpoint(endpointID string) bool {
+	driver.Lock()
+	_, found := driver.endpoints[endpointID]
+	driver.Unlock()
+	return found
 }
 
 func (driver *driver) EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointInfoResponse, error) {

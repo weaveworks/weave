@@ -1,7 +1,9 @@
 package docker
 
 import (
+	"errors"
 	"github.com/fsouza/go-dockerclient"
+
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -79,4 +81,29 @@ func (c *Client) IsContainerNotRunning(idStr string) bool {
 	}
 	Log.Errorf("[docker] Could not check container status: %s", err)
 	return false
+}
+
+// This is intended to find an IP address that we can reach the container on;
+// if it is on the Docker bridge network then that address; if on the host network
+// then localhost
+func (c *Client) GetContainerIP(nameOrID string) (string, error) {
+	Log.Debugf("Getting IP for container %s", nameOrID)
+	info, err := c.InspectContainer(nameOrID)
+	if err != nil {
+		return "", err
+	}
+	if info.NetworkSettings.Networks != nil {
+		Log.Debugln("Networks: ", info.NetworkSettings.Networks)
+		if bridgeNetwork, ok := info.NetworkSettings.Networks["bridge"]; ok {
+			return bridgeNetwork.IPAddress, nil
+		} else if _, ok := info.NetworkSettings.Networks["host"]; ok {
+			return "127.0.0.1", nil
+		}
+	} else if info.HostConfig.NetworkMode == "host" {
+		return "127.0.0.1", nil
+	}
+	if info.NetworkSettings.IPAddress == "" {
+		return "", errors.New("No IP address found for container " + nameOrID)
+	}
+	return info.NetworkSettings.IPAddress, nil
 }
