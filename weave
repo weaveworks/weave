@@ -1284,7 +1284,7 @@ ipam_cidrs() {
     CONTAINER_ID="$2"
     shift 2
     ALL_CIDRS=""
-    IPAM_CIDRs=""
+    IPAM_CIDRS=""
     # If no addresses passed in, select the default subnet
     [ $# -gt 0 ] || set -- net:default
     for arg in "$@" ; do
