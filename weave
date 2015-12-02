@@ -1611,14 +1611,14 @@ deprecation_warnings() {
         case "$1" in
             -password|-password=*)
                 deprecation_warning $1 "--password"
-                [ "$1" == "-password" ] && shift
+                [ "$1" = "-password" ] && shift
                 ;;
             --password)
                 shift
                 ;;
             -nickname|-nickname=*)
                 deprecation_warning $1 "--nickname"
-                [ "$1" == "-nickname" ] && shift
+                [ "$1" = "-nickname" ] && shift
                 ;;
             --nickname)
                 shift
@@ -1628,21 +1628,21 @@ deprecation_warnings() {
                 ;;
             -iprange|--iprange|-iprange=*|--iprange=*)
                 deprecation_warning $1 "--ipalloc-range"
-                [ ${1#--} == "iprange" ] && shift
+                [ ${1#--} = "iprange" ] && shift
                 ;;
             --ipalloc-range)
                 shift
                 ;;
             -ipsubnet|--ipsubnet|-ipsubnet=*|--ipsubnet=*)
                 deprecation_warning $1 "--ipalloc-default-subnet"
-                [ ${1#--} == "ipsubnet" ] && shift
+                [ ${1#--} = "ipsubnet" ] && shift
                 ;;
             --ipalloc-default-subnet)
                 shift
                 ;;
             -initpeercount|--initpeercount|-initpeercount=*|--initpeercount=*)
                 deprecation_warning $1 "--init-peer-count"
-                [ ${1#--} == "initpeercount" ] && shift
+                [ ${1#--} = "initpeercount" ] && shift
                 ;;
             --init-peer-count)
                 shift
@@ -1732,7 +1732,7 @@ EOF
         ;;
     connect)
         [ $# -gt 0 ] || usage
-        if [ "$1" == "--replace" ] ; then
+        if [ "$1" = "--replace" ] ; then
           replace="-d replace=true"
           shift
         fi
