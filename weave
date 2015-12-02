@@ -27,7 +27,6 @@ EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
 PROXY_HOST=${PROXY_HOST:-$(echo "${DOCKER_HOST#tcp://}" | cut -s -d: -f1)}
 PROXY_HOST=${PROXY_HOST:-127.0.0.1}
 DOCKER_CLIENT_HOST=${DOCKER_CLIENT_HOST:-$DOCKER_HOST}
-DOCKER_CLIENT_TLS_VERIFY=${DOCKER_CLIENT_TLS_VERIFY:-$DOCKER_TLS_VERIFY}
 
 # Define some regular expressions for matching addresses.
 # The regexp here is far from precise, but good enough.
@@ -111,7 +110,6 @@ exec_remote() {
         -e WEAVE_NO_BRIDGED_FASTDP \
         -e DOCKER_BRIDGE \
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
-        -e DOCKER_CLIENT_TLS_VERIFY="$DOCKER_CLIENT_TLS_VERIFY" \
         -e DOCKER_CLIENT_ARGS \
         -e PROXY_HOST="$PROXY_HOST" \
         -e WEAVE_CIDR=none \
@@ -1340,8 +1338,6 @@ show_addrs() {
 ######################################################################
 
 docker_client_args() {
-    CLIENT_TLS_ENABLED=""
-    [ -z "$DOCKER_CLIENT_TLS_VERIFY" ] || CLIENT_TLS_ENABLED=1
     while [ $# -gt 0 ]; do
         case "$1" in
           -H|--host)
@@ -1350,9 +1346,6 @@ docker_client_args() {
             ;;
           -H=*|--host=*)
             DOCKER_CLIENT_HOST="${1#*=}"
-            ;;
-          -tls|--tls|-tlsverify|--tlsverify)
-            CLIENT_TLS_ENABLED=1
             ;;
         esac
         shift
