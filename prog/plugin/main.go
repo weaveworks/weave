@@ -22,12 +22,13 @@ var version = "(unreleased version)"
 
 func main() {
 	var (
-		justVersion     bool
-		address         string
-		nameserver      string
-		meshAddress     string
-		logLevel        string
-		meshNetworkName string
+		justVersion      bool
+		address          string
+		nameserver       string
+		meshAddress      string
+		logLevel         string
+		meshNetworkName  string
+		noMulticastRoute bool
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -36,6 +37,7 @@ func main() {
 	flag.StringVar(&nameserver, "nameserver", "", "nameserver to provide to containers")
 	flag.StringVar(&meshAddress, "meshsocket", "/run/docker/plugins/weavemesh.sock", "socket on which to listen in mesh mode")
 	flag.StringVar(&meshNetworkName, "mesh-network-name", "weave", "network name to create in mesh mode")
+	flag.BoolVar(&noMulticastRoute, "no-multicast-route", false, "do not add a multicast route to network endpoints")
 
 	flag.Parse()
 
@@ -57,14 +59,14 @@ func main() {
 	var globalListener, meshListener net.Listener
 	endChan := make(chan error, 1)
 	if address != "" {
-		globalListener, err := listenAndServe(dockerClient, address, nameserver, endChan, "global", false)
+		globalListener, err := listenAndServe(dockerClient, address, nameserver, noMulticastRoute, endChan, "global", false)
 		if err != nil {
 			Log.Fatalf("unable to create driver: %s", err)
 		}
 		defer globalListener.Close()
 	}
 	if meshAddress != "" {
-		meshListener, err := listenAndServe(dockerClient, meshAddress, nameserver, endChan, "local", true)
+		meshListener, err := listenAndServe(dockerClient, meshAddress, nameserver, noMulticastRoute, endChan, "local", true)
 		if err != nil {
 			Log.Fatalf("unable to create driver: %s", err)
 		}
@@ -94,8 +96,8 @@ func main() {
 	}
 }
 
-func listenAndServe(dockerClient *docker.Client, address, nameserver string, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
-	d, err := netplugin.New(dockerClient, version, nameserver, scope)
+func listenAndServe(dockerClient *docker.Client, address, nameserver string, noMulticastRoute bool, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
+	d, err := netplugin.New(dockerClient, version, nameserver, scope, noMulticastRoute)
 	if err != nil {
 		return nil, err
 	}

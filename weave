@@ -54,7 +54,7 @@ weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
                       [--rewrite-inspect]
-weave launch-plugin
+weave launch-plugin [--no-multicast-route]
 weave env           [--restore]
 weave config
 weave dns-args
