@@ -48,6 +48,7 @@ weave launch-router [--password <password>] [--nickname <nickname>]
                       [--no-discovery] [--init-peer-count <count>] <peer> ...
 weave launch-proxy  [-H <endpoint>] [--with-dns | --without-dns]
                       [--no-default-ipalloc] [--no-rewrite-hosts]
+                      [--no-multicast-route]
                       [--hostname-from-label <labelkey>]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
