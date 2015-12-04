@@ -40,17 +40,19 @@ type RemoteConnection struct {
 type LocalConnection struct {
 	sync.RWMutex
 	RemoteConnection
-	TCPConn      *net.TCPConn
-	version      byte
-	tcpSender    TCPSender
-	SessionKey   *[32]byte
-	heartbeatTCP *time.Ticker
-	Router       *Router
-	uid          uint64
-	actionChan   chan<- ConnectionAction
-	errorChan    chan<- error
-	finished     <-chan struct{} // closed to signal that actorLoop has finished
-	OverlayConn  OverlayConnection
+	TCPConn         *net.TCPConn
+	TrustRemote     bool // is remote on a trusted subnet?
+	TrustedByRemote bool // does remote trust us?
+	version         byte
+	tcpSender       TCPSender
+	SessionKey      *[32]byte
+	heartbeatTCP    *time.Ticker
+	Router          *Router
+	uid             uint64
+	actionChan      chan<- ConnectionAction
+	errorChan       chan<- error
+	finished        <-chan struct{} // closed to signal that actorLoop has finished
+	OverlayConn     OverlayConnection
 }
 
 type ConnectionAction func() error
@@ -94,6 +96,7 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ro
 		RemoteConnection: *connRemote, // NB, we're taking a copy of connRemote here.
 		Router:           router,
 		TCPConn:          tcpConn,
+		TrustRemote:      false,
 		uid:              randUint64(),
 		actionChan:       actionChan,
 		errorChan:        errorChan,
@@ -189,13 +192,19 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, errorChan <
 
 	conn.Log("connection ready; using protocol version", conn.version)
 
+	// only use negotiated session key for untrusted connections
+	var sessionKey *[32]byte
+	if conn.Untrusted() {
+		sessionKey = conn.SessionKey
+	}
+
 	params := OverlayConnectionParams{
 		RemotePeer:         conn.remote,
 		LocalAddr:          conn.TCPConn.LocalAddr().(*net.TCPAddr),
 		RemoteAddr:         conn.TCPConn.RemoteAddr().(*net.TCPAddr),
 		Outbound:           conn.outbound,
 		ConnUID:            conn.uid,
-		SessionKey:         conn.SessionKey,
+		SessionKey:         sessionKey,
 		SendControlMessage: conn.sendOverlayControlMessage,
 		Features:           intro.Features,
 	}
@@ -253,6 +262,7 @@ func (conn *LocalConnection) makeFeatures() map[string]string {
 		"ShortID":         fmt.Sprint(conn.local.ShortID),
 		"UID":             fmt.Sprint(conn.local.UID),
 		"ConnID":          fmt.Sprint(conn.uid),
+		"Trusted":         fmt.Sprint(conn.TrustRemote),
 	}
 	conn.Router.Overlay.AddFeaturesTo(features)
 	return features
@@ -299,6 +309,15 @@ func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
 			return nil, err
 		}
 	}
+
+	var trusted bool
+	if trustedStr, present := features["Trusted"]; present {
+		trusted, err = strconv.ParseBool(trustedStr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	conn.TrustedByRemote = trusted
 
 	uid, err := ParsePeerUID(features.Get("UID"))
 	if err != nil {
@@ -434,4 +453,8 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 
 func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(TCPHeartbeat * 2))
+}
+
+func (conn *LocalConnection) Untrusted() bool {
+	return !conn.TrustRemote || !conn.TrustedByRemote
 }
