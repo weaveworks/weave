@@ -1037,7 +1037,7 @@ rewrite_etc_hosts() {
     CONTAINERS_PATH=$(dirname $HOSTS)
     MNT=/container
     MNT_HOSTS=$MNT/$(basename $HOSTS)
-    CONTENTS="$(etc_hosts_contents $FQDN $@)"
+    CONTENTS="$(etc_hosts_contents $FQDN "$@")"
     # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
     # leaving it with valid contents...
     docker run --rm --net=none --privileged \
