@@ -96,7 +96,7 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ro
 		RemoteConnection: *connRemote, // NB, we're taking a copy of connRemote here.
 		Router:           router,
 		TCPConn:          tcpConn,
-		TrustRemote:      false,
+		TrustRemote:      router.Trusts(connRemote),
 		uid:              randUint64(),
 		actionChan:       actionChan,
 		errorChan:        errorChan,
