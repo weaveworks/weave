@@ -6,7 +6,7 @@ import (
 )
 
 func (client *Client) ipamOp(ID string, op string) (*net.IPNet, error) {
-	ip, err := httpVerb(op, fmt.Sprintf("%s/ip/%s", client.baseUrl, ID), nil)
+	ip, err := client.httpVerb(op, fmt.Sprintf("/ip/%s", ID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (client *Client) ReleaseIP(ID string) error {
 }
 
 func (client *Client) DefaultSubnet() (*net.IPNet, error) {
-	cidr, err := httpVerb("GET", fmt.Sprintf("%s/ipinfo/defaultsubnet", client.baseUrl), nil)
+	cidr, err := client.httpVerb("GET", fmt.Sprintf("/ipinfo/defaultsubnet"), nil)
 	if err != nil {
 		return nil, err
 	}

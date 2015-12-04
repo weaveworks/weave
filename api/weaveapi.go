@@ -20,7 +20,8 @@ type Client struct {
 	baseUrl string
 }
 
-func httpVerb(verb string, url string, values url.Values) (string, error) {
+func (client *Client) httpVerb(verb string, url string, values url.Values) (string, error) {
+	url = client.baseUrl + url
 	Log.Debugf("weave %s to %s with %v", verb, url, values)
 	var body io.Reader
 	if values != nil {
@@ -54,6 +55,6 @@ func NewClient(addr string) *Client {
 }
 
 func (client *Client) Connect(remote string) error {
-	_, err := httpVerb("POST", client.baseUrl+"/connect", url.Values{"peer": {remote}})
+	_, err := client.httpVerb("POST", "/connect", url.Values{"peer": {remote}})
 	return err
 }
