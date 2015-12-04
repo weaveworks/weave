@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/docker/libnetwork/ipamapi"
+	"github.com/docker/libnetwork/netlabel"
 	"github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
@@ -32,7 +33,10 @@ func (i *ipam) RequestPool(addressSpace, pool, subPool string, options map[strin
 	Log.Debugln("RequestPool", addressSpace, pool, subPool, options)
 	cidr, err := i.weave.DefaultSubnet()
 	Log.Debugln("RequestPool returning ", cidr, err)
-	return "weavepool", cidr, nil, err
+	// Pass back a fake "gateway address"; we don't actually use it,
+	// so just give the network address.
+	data := map[string]string{netlabel.Gateway: cidr.String()}
+	return "weavepool", cidr, data, err
 }
 
 func (i *ipam) ReleasePool(poolID string) error {
