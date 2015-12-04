@@ -1,7 +1,6 @@
 package ipamplugin
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/docker/libnetwork/ipamapi"
@@ -20,20 +19,8 @@ type ipam struct {
 }
 
 func NewIpam(client *docker.Client, version string) (ipamapi.Ipam, error) {
-	return &ipam{client: client}, nil
-}
-
-func (i *ipam) configureWeaveClient() error {
-	if i.weave != nil {
-		return nil
-	}
-	ip, err := i.client.GetContainerIP(WeaveContainer)
-	if err != nil {
-		Log.Warningf("weave ipam not available: %s", err)
-		return fmt.Errorf("weave ipam not available: %s", err)
-	}
-	i.weave = api.NewClient(ip)
-	return nil
+	resolver := func() (string, error) { return client.GetContainerIP(WeaveContainer) }
+	return &ipam{client: client, weave: api.NewClientWithResolver(resolver)}, nil
 }
 
 func (i *ipam) GetDefaultAddressSpaces() (string, string, error) {
@@ -43,13 +30,9 @@ func (i *ipam) GetDefaultAddressSpaces() (string, string, error) {
 
 func (i *ipam) RequestPool(addressSpace, pool, subPool string, options map[string]string, v6 bool) (string, *net.IPNet, map[string]string, error) {
 	Log.Debugln("RequestPool", addressSpace, pool, subPool, options)
-	if err := i.configureWeaveClient(); err == nil {
-		cidr, err := i.weave.DefaultSubnet()
-		Log.Debugln("RequestPool returning ", cidr, err)
-		return "weavepool", cidr, nil, err
-	} else {
-		return "", nil, nil, err
-	}
+	cidr, err := i.weave.DefaultSubnet()
+	Log.Debugln("RequestPool returning ", cidr, err)
+	return "weavepool", cidr, nil, err
 }
 
 func (i *ipam) ReleasePool(poolID string) error {
@@ -60,20 +43,12 @@ func (i *ipam) ReleasePool(poolID string) error {
 func (i *ipam) RequestAddress(poolID string, address net.IP, options map[string]string) (*net.IPNet, map[string]string, error) {
 	Log.Debugln("RequestAddress", poolID, address, options)
 	// Pass magic string to weave IPAM, which then stores the address under its own string
-	if err := i.configureWeaveClient(); err == nil {
-		ip, err := i.weave.AllocateIP("_")
-		Log.Debugln("allocateIP returned", ip, err)
-		return ip, nil, err
-	} else {
-		return nil, nil, err
-	}
+	ip, err := i.weave.AllocateIP("_")
+	Log.Debugln("allocateIP returned", ip, err)
+	return ip, nil, err
 }
 
 func (i *ipam) ReleaseAddress(poolID string, address net.IP) error {
 	Log.Debugln("ReleaseAddress", poolID, address)
-	if err := i.configureWeaveClient(); err == nil {
-		return i.weave.ReleaseIP(address.String())
-	} else {
-		return err
-	}
+	return i.weave.ReleaseIP(address.String())
 }
