@@ -27,11 +27,11 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 		}
 		return count
 	},
-	"upstreamServers": func(servers []string) string {
-		if len(servers) == 0 {
+	"printList": func(list []string) string {
+		if len(list) == 0 {
 			return "none"
 		}
-		return strings.Join(servers, ", ")
+		return strings.Join(list, ", ")
 	},
 	"printIPAMRanges": func(router weave.NetworkRouterStatus, status ipam.Status) string {
 		var buffer bytes.Buffer
@@ -153,6 +153,7 @@ var statusTemplate = defTemplate("status", `\
        Targets: {{len .Router.Targets}}
    Connections: {{len .Router.Connections}}{{with printConnectionCounts .Router.Connections}} ({{.}}){{end}}
          Peers: {{len .Router.Peers}}{{with printPeerConnectionCounts .Router.Peers}} (with {{.}} connections){{end}}
+TrustedSubnets: {{printList .Router.TrustedSubnets}}
 {{if .IPAM}}\
 
        Service: ipam
@@ -176,7 +177,7 @@ var statusTemplate = defTemplate("status", `\
 
        Service: dns
         Domain: {{.DNS.Domain}}
-      Upstream: {{upstreamServers .DNS.Upstream}}
+      Upstream: {{printList .DNS.Upstream}}
            TTL: {{.DNS.TTL}}
        Entries: {{countDNSEntries .DNS.Entries}}
 {{end}}\
