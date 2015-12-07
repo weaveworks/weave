@@ -138,48 +138,48 @@ func defTemplate(name string, text string) *template.Template {
 }
 
 var statusTemplate = defTemplate("status", `\
-       Version: {{.Version}}
+        Version: {{.Version}}
 
-       Service: router
-      Protocol: {{.Router.Protocol}} \
+        Service: router
+       Protocol: {{.Router.Protocol}} \
 {{if eq .Router.ProtocolMinVersion .Router.ProtocolMaxVersion}}\
 {{.Router.ProtocolMaxVersion}}\
 {{else}}\
 {{.Router.ProtocolMinVersion}}..{{.Router.ProtocolMaxVersion}}\
 {{end}}
-          Name: {{.Router.Name}}({{.Router.NickName}})
-    Encryption: {{printState .Router.Encryption}}
- PeerDiscovery: {{printState .Router.PeerDiscovery}}
-       Targets: {{len .Router.Targets}}
-   Connections: {{len .Router.Connections}}{{with printConnectionCounts .Router.Connections}} ({{.}}){{end}}
-         Peers: {{len .Router.Peers}}{{with printPeerConnectionCounts .Router.Peers}} (with {{.}} connections){{end}}
-TrustedSubnets: {{printList .Router.TrustedSubnets}}
+           Name: {{.Router.Name}}({{.Router.NickName}})
+     Encryption: {{printState .Router.Encryption}}
+  PeerDiscovery: {{printState .Router.PeerDiscovery}}
+        Targets: {{len .Router.Targets}}
+    Connections: {{len .Router.Connections}}{{with printConnectionCounts .Router.Connections}} ({{.}}){{end}}
+          Peers: {{len .Router.Peers}}{{with printPeerConnectionCounts .Router.Peers}} (with {{.}} connections){{end}}
+ TrustedSubnets: {{printList .Router.TrustedSubnets}}
 {{if .IPAM}}\
 
-       Service: ipam
+        Service: ipam
 {{if .IPAM.Entries}}\
 {{if allIPAMOwnersUnreachable .IPAM}}\
-        Status: all IP ranges owned by unreachable peers - use 'rmpeer' if they are dead
+         Status: all IP ranges owned by unreachable peers - use 'rmpeer' if they are dead
 {{else if len .IPAM.PendingAllocates}}\
-        Status: waiting for IP range grant from peers
+         Status: waiting for IP range grant from peers
 {{else}}\
-        Status: ready
+         Status: ready
 {{end}}\
 {{else if .IPAM.Paxos}}\
-        Status: awaiting consensus (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
+         Status: awaiting consensus (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
 {{else}}\
-        Status: idle
+         Status: idle
 {{end}}\
-         Range: {{.IPAM.Range}}
- DefaultSubnet: {{.IPAM.DefaultSubnet}}
+          Range: {{.IPAM.Range}}
+  DefaultSubnet: {{.IPAM.DefaultSubnet}}
 {{end}}\
 {{if .DNS}}\
 
-       Service: dns
-        Domain: {{.DNS.Domain}}
-      Upstream: {{printList .DNS.Upstream}}
-           TTL: {{.DNS.TTL}}
-       Entries: {{countDNSEntries .DNS.Entries}}
+        Service: dns
+         Domain: {{.DNS.Domain}}
+       Upstream: {{printList .DNS.Upstream}}
+            TTL: {{.DNS.TTL}}
+        Entries: {{countDNSEntries .DNS.Entries}}
 {{end}}\
 `)
 
