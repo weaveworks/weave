@@ -11,7 +11,7 @@ import (
 // TODO test gossip unicast; atm we only test topology gossip and
 // surrogates, neither of which employ unicast.
 
-type mockChannelConnection struct {
+type mockGossipConnection struct {
 	RemoteConnection
 	router *Router
 	dest   *Router
@@ -25,19 +25,19 @@ func NewTestRouter(name string) *Router {
 	return router
 }
 
-func (conn *mockChannelConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
+func (conn *mockGossipConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
 	<-conn.start
 	if err := conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg); err != nil {
 		panic(err)
 	}
 }
 
-func (conn *mockChannelConnection) Connect() {
+func (conn *mockGossipConnection) Connect() {
 	conn.router.Ourself.handleAddConnection(conn)
 	conn.router.Ourself.handleConnectionEstablished(conn)
 }
 
-func (conn *mockChannelConnection) Start() {
+func (conn *mockGossipConnection) Start() {
 	close(conn.start)
 }
 
@@ -52,26 +52,26 @@ func sendPendingGossip(routers ...*Router) {
 }
 
 func AddTestGossipConnection(r1, r2 *Router) {
-	c1 := r1.NewTestChannelConnection(r2)
-	c2 := r2.NewTestChannelConnection(r1)
+	c1 := r1.NewTestGossipConnection(r2)
+	c2 := r2.NewTestGossipConnection(r1)
 	c1.Connect()
 	c2.Start()
 	c2.Connect()
 	c1.Start()
 }
 
-func (router *Router) NewTestChannelConnection(r *Router) *mockChannelConnection {
+func (router *Router) NewTestGossipConnection(r *Router) *mockGossipConnection {
 	fromPeer := NewPeerFrom(router.Ourself.Peer)
 	toPeer := NewPeerFrom(r.Ourself.Peer)
 
 	r.Peers.FetchWithDefault(fromPeer)             // Has side-effect of incrementing refcount
 	toPeer = router.Peers.FetchWithDefault(toPeer) //
 
-	return &mockChannelConnection{
+	return &mockGossipConnection{
 		RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, router, r, make(chan struct{})}
 }
 
-func (router *Router) DeleteTestChannelConnection(r *Router) {
+func (router *Router) DeleteTestGossipConnection(r *Router) {
 	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
 
@@ -136,14 +136,14 @@ func TestGossipTopology(t *testing.T) {
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1, r2))
 
 	// Drop the connection from 2 to 3
-	r2.DeleteTestChannelConnection(r3)
+	r2.DeleteTestGossipConnection(r3)
 	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
 	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
 
 	// Drop the connection from 1 to 3
-	r1.DeleteTestChannelConnection(r3)
+	r1.DeleteTestGossipConnection(r3)
 	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
