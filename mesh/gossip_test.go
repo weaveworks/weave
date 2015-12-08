@@ -69,9 +69,8 @@ func (router *Router) DeleteTestChannelConnection(r *Router) {
 
 func TestGossipTopology(t *testing.T) {
 	wt.RunWithTimeout(t, 5*time.Second, func() {
-		//implTestGossipTopology(t)
+		implTestGossipTopology(t)
 	})
-	implTestGossipTopology(t)
 }
 
 // Create a Peer representing the receiver router, with connections to
