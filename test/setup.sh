@@ -6,7 +6,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 . ./config.sh
 
-(cd ./tls && go get -tags netgo ./... && go run generate_certs.go $HOSTS)
+(cd ./tls && ./tls $HOSTS)
 
 echo "Copying weave images, scripts, and certificates to hosts, and"
 echo "  prefetch test images"
@@ -19,7 +19,7 @@ setup_host() {
     run_on $HOST mkdir -p bin
     upload_executable $HOST ../bin/docker-ns
     upload_executable $HOST ../weave
-    rsync -az -e "$SSH" ./tls/ $HOST:~/tls
+    rsync -az -e "$SSH" --exclude=tls ./tls/ $HOST:~/tls
     for IMG in $TEST_IMAGES ; do
         docker_on $HOST inspect --format=" " $IMG >/dev/null 2>&1 || docker_on $HOST pull $IMG
     done
