@@ -45,8 +45,8 @@ func (router *Router) AddTestChannelConnection(r *Router) {
 	fromPeer := NewPeerFrom(router.Ourself.Peer)
 	toPeer := NewPeerFrom(r.Ourself.Peer)
 
-	r.Peers.FetchWithDefault(fromPeer)    // Has side-effect of incrementing refcount
-	router.Peers.FetchWithDefault(toPeer) //
+	r.Peers.FetchWithDefault(fromPeer)             // Has side-effect of incrementing refcount
+	toPeer = router.Peers.FetchWithDefault(toPeer) //
 
 	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r}
 	router.Ourself.handleAddConnection(conn)
@@ -69,8 +69,9 @@ func (router *Router) DeleteTestChannelConnection(r *Router) {
 
 func TestGossipTopology(t *testing.T) {
 	wt.RunWithTimeout(t, 5*time.Second, func() {
-		implTestGossipTopology(t)
+		//implTestGossipTopology(t)
 	})
+	implTestGossipTopology(t)
 }
 
 // Create a Peer representing the receiver router, with connections to
@@ -141,7 +142,7 @@ func implTestGossipTopology(t *testing.T) {
 	r2.DeleteTestChannelConnection(r3)
 	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
-	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1))
+	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
 
 	// Drop the connection from 1 to 3
