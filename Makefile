@@ -18,8 +18,9 @@ NETCHECK_EXE=prog/netcheck/netcheck
 DOCKERTLSARGS_EXE=prog/docker_tls_args/docker_tls_args
 DOCKERPLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
+TEST_TLS_EXE=test/tls/tls
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -50,7 +51,7 @@ BUILD_FLAGS=-ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" 
 
 PACKAGE_BASE=$(shell go list -e ./)
 
-all: $(WEAVE_EXPORT) $(RUNNER_EXE)
+all: $(WEAVE_EXPORT) $(RUNNER_EXE) $(TEST_TLS_EXE)
 
 travis: $(EXES)
 
@@ -83,8 +84,9 @@ $(SIGPROXY_EXE): prog/sigproxy/main.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
 $(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/*.go plugin/skel/*.go api/*.go common/docker/*.go
+$(TEST_TLS_EXE): test/tls/*.go
 
-$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE):
+$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
