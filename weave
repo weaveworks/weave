@@ -783,10 +783,10 @@ check_not_running() {
             exit 1
             ;;
         "false $2")
-            docker rm $1 >/dev/null
+            docker rm -v $1 >/dev/null
             ;;
         "false $2:"*)
-            docker rm $1 >/dev/null
+            docker rm -v $1 >/dev/null
             ;;
         true*)
             echo "Found another running container named '$1'. Aborting." >&2
@@ -803,7 +803,7 @@ stop() {
     if ! docker stop $1 >/dev/null 2>&1 ; then
         echo "$2 is not running." >&2
     fi
-    docker rm -f $1 >/dev/null 2>&1 || true
+    docker rm -v -f $1 >/dev/null 2>&1 || true
 }
 
 # Given a container name or short ID in $1, ensure the specified
@@ -1532,6 +1532,8 @@ launch_proxy() {
     proxy_args "$@"
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
+        -v /w \
+        -v /w-noop \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
@@ -1974,7 +1976,7 @@ EOF
         call_weave DELETE /peer >/dev/null 2>&1 || true
         for NAME in $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
-            docker rm -f $NAME >/dev/null 2>&1 || true
+            docker rm -v -f $NAME >/dev/null 2>&1 || true
         done
         conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         destroy_bridge
