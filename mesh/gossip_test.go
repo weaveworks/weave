@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 // TODO test gossip unicast; atm we only test topology gossip and
@@ -67,12 +65,6 @@ func (router *Router) DeleteTestChannelConnection(r *Router) {
 	router.Ourself.handleDeleteConnection(conn)
 }
 
-func TestGossipTopology(t *testing.T) {
-	wt.RunWithTimeout(t, 5*time.Second, func() {
-		implTestGossipTopology(t)
-	})
-}
-
 // Create a Peer representing the receiver router, with connections to
 // the routers supplied as arguments, carrying across all UID and
 // version information.
@@ -95,7 +87,7 @@ func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
 	router.Peers.RUnlock()
 }
 
-func implTestGossipTopology(t *testing.T) {
+func TestGossipTopology(t *testing.T) {
 	// Create some peers that will talk to each other
 	r1 := NewTestRouter("01:00:00:01:00:00")
 	r2 := NewTestRouter("02:00:00:02:00:00")
