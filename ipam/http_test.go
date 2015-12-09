@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
-	wt "github.com/weaveworks/weave/testing"
 )
 
 func HTTPPost(t *testing.T, url string) string {
@@ -145,12 +144,6 @@ func TestBadHttp(t *testing.T) {
 }
 
 func TestHTTPCancel(t *testing.T) {
-	wt.RunWithTimeout(t, 2*time.Second, func() {
-		impTestHTTPCancel(t)
-	})
-}
-
-func impTestHTTPCancel(t *testing.T) {
 	var (
 		containerID = "deadbeef"
 		testCIDR1   = "10.0.3.0/29"
