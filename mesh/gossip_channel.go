@@ -165,7 +165,6 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 }
 
 func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
-	// do this outside the lock below so we avoid lock nesting
 	c.routes.EnsureRecalculated()
 	destinations := c.routes.RandomNeighbours(srcName)
 	if len(destinations) == 0 {
