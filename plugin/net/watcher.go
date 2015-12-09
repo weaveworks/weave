@@ -22,7 +22,9 @@ type Watcher interface {
 }
 
 func NewWatcher(client *docker.Client, driver *driver) (Watcher, error) {
-	w := &watcher{client: client, driver: driver}
+	resolver := func() (string, error) { return client.GetContainerIP(WeaveContainer) }
+	w := &watcher{client: client, driver: driver,
+		weave: weaveapi.NewClientWithResolver(resolver)}
 	err := client.AddObserver(w)
 	if err != nil {
 		return nil, err
@@ -31,26 +33,11 @@ func NewWatcher(client *docker.Client, driver *driver) (Watcher, error) {
 	return w, nil
 }
 
-func (w *watcher) haveWeaveClient() bool {
-	if w.weave == nil {
-		dnsip, err := w.client.GetContainerIP(WeaveContainer)
-		if err != nil {
-			Log.Warningf("nameserver not available: %s", err)
-			return false
-		}
-		w.weave = weaveapi.NewClient(dnsip)
-	}
-	return true
-}
-
 func (w *watcher) ContainerStarted(id string) {
 	Log.Debugf("Container started %s", id)
 	info, err := w.client.InspectContainer(id)
 	if err != nil {
 		Log.Warningf("error inspecting container: %s", err)
-		return
-	}
-	if !w.haveWeaveClient() {
 		return
 	}
 	// check that it's on our network, via the endpointID

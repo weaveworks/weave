@@ -3,13 +3,10 @@ package api
 import (
 	"fmt"
 	"net"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 func (client *Client) ipamOp(ID string, op string) (*net.IPNet, error) {
-	Log.Debugf("IPAM operation %s for %s", op, ID)
-	ip, err := httpVerb(op, fmt.Sprintf("%s/ip/%s", client.baseUrl, ID), nil)
+	ip, err := client.httpVerb(op, fmt.Sprintf("/ip/%s", ID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -31,6 +28,15 @@ func (client *Client) LookupIP(ID string) (*net.IPNet, error) {
 func (client *Client) ReleaseIP(ID string) error {
 	_, err := client.ipamOp(ID, "DELETE")
 	return err
+}
+
+func (client *Client) DefaultSubnet() (*net.IPNet, error) {
+	cidr, err := client.httpVerb("GET", fmt.Sprintf("/ipinfo/defaultsubnet"), nil)
+	if err != nil {
+		return nil, err
+	}
+	_, ipnet, err := net.ParseCIDR(cidr)
+	return ipnet, err
 }
 
 func parseIP(body string) (*net.IPNet, error) {

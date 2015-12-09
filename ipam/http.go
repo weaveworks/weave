@@ -57,6 +57,10 @@ func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.Resp
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
 func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR, dockerCli *docker.Client) {
+	router.Methods("GET").Path("/ipinfo/defaultsubnet").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "%s", defaultSubnet)
+	})
+
 	router.Methods("PUT").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		ident := vars["id"]

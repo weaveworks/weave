@@ -27,19 +27,14 @@ type driver struct {
 	endpoints map[string]struct{}
 }
 
-func New(version string, nameserver string) (skel.Driver, error) {
-	client, err := docker.NewClient("unix:///var/run/docker.sock")
-	if err != nil {
-		return nil, errorf("could not connect to docker: %s", err)
-	}
-
+func New(client *docker.Client, version string, nameserver string) (skel.Driver, error) {
 	driver := &driver{
 		nameserver: nameserver,
 		version:    version,
 		endpoints:  make(map[string]struct{}),
 	}
 
-	_, err = NewWatcher(client, driver)
+	_, err := NewWatcher(client, driver)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,9 @@ import (
 	"syscall"
 
 	. "github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/plugin"
+	"github.com/weaveworks/weave/common/docker"
+	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
+	netplugin "github.com/weaveworks/weave/plugin/net"
 	"github.com/weaveworks/weave/plugin/skel"
 )
 
@@ -39,8 +41,17 @@ func main() {
 
 	Log.Println("Weave plugin", version, "Command line options:", os.Args)
 
-	var d skel.Driver
-	d, err := plugin.New(version, nameserver)
+	dockerClient, err := docker.NewClient("unix:///var/run/docker.sock")
+	if err != nil {
+		Log.Fatalf("unable to connect to docker: %s", err)
+	}
+
+	d, err := netplugin.New(dockerClient, version, nameserver)
+	if err != nil {
+		Log.Fatalf("unable to create driver: %s", err)
+	}
+
+	i, err := ipamplugin.NewIpam(dockerClient, version)
 	if err != nil {
 		Log.Fatalf("unable to create driver: %s", err)
 	}
@@ -62,7 +73,7 @@ func main() {
 
 	endChan := make(chan error, 1)
 	go func() {
-		endChan <- skel.Listen(listener, d)
+		endChan <- skel.Listen(listener, d, i)
 	}()
 
 	select {
