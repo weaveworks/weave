@@ -107,12 +107,19 @@ func checkTopology(t *testing.T, router *Router, wantedPeers ...*Peer) {
 	router.Peers.RUnlock()
 }
 
+func flushAndCheckTopology(t *testing.T, routers []*Router, wantedPeers ...*Peer) {
+	sendPendingGossip(routers...)
+	for _, r := range routers {
+		checkTopology(t, r, wantedPeers...)
+	}
+}
+
 func TestGossipTopology(t *testing.T) {
 	// Create some peers that will talk to each other
 	r1 := NewTestRouter("01:00:00:01:00:00")
 	r2 := NewTestRouter("02:00:00:02:00:00")
 	r3 := NewTestRouter("03:00:00:03:00:00")
-
+	routers := []*Router{r1, r2, r3}
 	// Check state when they have no connections
 	checkTopology(t, r1, r1.tp())
 	checkTopology(t, r2, r2.tp())
@@ -124,23 +131,14 @@ func TestGossipTopology(t *testing.T) {
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
 
 	AddTestGossipConnection(r2, r3)
-	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
-	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
-	checkTopology(t, r3, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
+	flushAndCheckTopology(t, routers, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
 
 	AddTestGossipConnection(r3, r1)
-	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1, r2))
-	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1, r2))
-	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1, r2))
+	flushAndCheckTopology(t, routers, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1, r2))
 
 	// Drop the connection from 2 to 3
 	r2.DeleteTestGossipConnection(r3)
-	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
-	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
-	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
+	flushAndCheckTopology(t, routers, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
 
 	// Drop the connection from 1 to 3
 	r1.DeleteTestGossipConnection(r3)
@@ -161,12 +159,10 @@ func TestGossipSurrogate(t *testing.T) {
 	r1 := NewTestRouter("01:00:00:01:00:00")
 	r2 := NewTestRouter("02:00:00:02:00:00")
 	r3 := NewTestRouter("03:00:00:03:00:00")
+	routers := []*Router{r1, r2, r3}
 	AddTestGossipConnection(r1, r2)
 	AddTestGossipConnection(r3, r2)
-	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
-	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
-	checkTopology(t, r3, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
+	flushAndCheckTopology(t, routers, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
 
 	// create a gossiper at either end, but not the middle
 	g1 := newTestGossiper()
