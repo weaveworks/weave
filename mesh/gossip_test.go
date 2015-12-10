@@ -13,7 +13,9 @@ import (
 
 type mockChannelConnection struct {
 	RemoteConnection
-	dest *Router
+	router *Router
+	dest   *Router
+	start  chan struct{}
 }
 
 func NewTestRouter(name string) *Router {
@@ -24,9 +26,19 @@ func NewTestRouter(name string) *Router {
 }
 
 func (conn *mockChannelConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
+	<-conn.start
 	if err := conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg); err != nil {
 		panic(err)
 	}
+}
+
+func (conn *mockChannelConnection) Connect() {
+	conn.router.Ourself.handleAddConnection(conn)
+	conn.router.Ourself.handleConnectionEstablished(conn)
+}
+
+func (conn *mockChannelConnection) Start() {
+	close(conn.start)
 }
 
 func sendPendingGossip(routers ...*Router) {
@@ -39,16 +51,24 @@ func sendPendingGossip(routers ...*Router) {
 	}
 }
 
-func (router *Router) AddTestChannelConnection(r *Router) {
+func AddTestGossipConnection(r1, r2 *Router) {
+	c1 := r1.NewTestChannelConnection(r2)
+	c2 := r2.NewTestChannelConnection(r1)
+	c1.Connect()
+	c2.Start()
+	c2.Connect()
+	c1.Start()
+}
+
+func (router *Router) NewTestChannelConnection(r *Router) *mockChannelConnection {
 	fromPeer := NewPeerFrom(router.Ourself.Peer)
 	toPeer := NewPeerFrom(r.Ourself.Peer)
 
 	r.Peers.FetchWithDefault(fromPeer)             // Has side-effect of incrementing refcount
 	toPeer = router.Peers.FetchWithDefault(toPeer) //
 
-	conn := &mockChannelConnection{RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r}
-	router.Ourself.handleAddConnection(conn)
-	router.Ourself.handleConnectionEstablished(conn)
+	return &mockChannelConnection{
+		RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, router, r, make(chan struct{})}
 }
 
 func (router *Router) DeleteTestChannelConnection(r *Router) {
@@ -98,56 +118,42 @@ func TestGossipTopology(t *testing.T) {
 	checkTopology(t, r2, r2.tp())
 
 	// Now try adding some connections
-	r1.AddTestChannelConnection(r2)
-	sendPendingGossip(r1, r2)
-	checkTopology(t, r1, r1.tp(r2), r2.tp())
-	checkTopology(t, r2, r1.tp(r2), r2.tp())
-	r2.AddTestChannelConnection(r1)
+	AddTestGossipConnection(r1, r2)
 	sendPendingGossip(r1, r2)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
 
-	// Currently, the connection from 2 to 3 is one-way only
-	r2.AddTestChannelConnection(r3)
+	AddTestGossipConnection(r2, r3)
 	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp())
-	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp())
-	// When r2 gossiped to r3, 1 was unreachable from r3 so it got removed from the
-	// list of peers, but remains referenced in the connection from 1 to 3.
-	checkTopology(t, r3, r2.tp(r1, r3), r3.tp())
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
+	checkTopology(t, r3, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
 
-	// Add a connection from 3 to 1 and now r1 is reachable.
-	r3.AddTestChannelConnection(r1)
+	AddTestGossipConnection(r3, r1)
 	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r1))
-	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r1))
-	checkTopology(t, r3, r1.tp(), r2.tp(r1, r3), r3.tp(r1))
-
-	r1.AddTestChannelConnection(r3)
-	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
-	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
-	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1))
+	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1, r2))
+	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1, r2))
+	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1, r3), r3.tp(r1, r2))
 
 	// Drop the connection from 2 to 3
 	r2.DeleteTestChannelConnection(r3)
 	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
-	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
-	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
+	checkTopology(t, r1, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
+	checkTopology(t, r2, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
+	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
 
 	// Drop the connection from 1 to 3
 	r1.DeleteTestChannelConnection(r3)
 	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
-	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
 	// r3 still thinks r1 has a connection to it
-	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1))
+	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
 
 	// On a timer, r3 will gossip to r1
 	r3.SendAllGossip()
 	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
 }
 
 func TestGossipSurrogate(t *testing.T) {
@@ -155,10 +161,8 @@ func TestGossipSurrogate(t *testing.T) {
 	r1 := NewTestRouter("01:00:00:01:00:00")
 	r2 := NewTestRouter("02:00:00:02:00:00")
 	r3 := NewTestRouter("03:00:00:03:00:00")
-	r1.AddTestChannelConnection(r2)
-	r2.AddTestChannelConnection(r1)
-	r3.AddTestChannelConnection(r2)
-	r2.AddTestChannelConnection(r3)
+	AddTestGossipConnection(r1, r2)
+	AddTestGossipConnection(r3, r2)
 	sendPendingGossip(r1, r2, r3)
 	checkTopology(t, r1, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
 	checkTopology(t, r2, r1.tp(r2), r2.tp(r1, r3), r3.tp(r2))
