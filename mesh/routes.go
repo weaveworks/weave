@@ -71,36 +71,16 @@ func (routes *Routes) UnicastAll(name PeerName) (PeerName, bool) {
 }
 
 func (routes *Routes) Broadcast(name PeerName) []PeerName {
-	routes.RLock()
-	hops, found := routes.broadcast[name]
-	routes.RUnlock()
-	if found {
-		return hops
-	}
-	res := make(chan []PeerName)
-	routes.action <- func() {
-		routes.RLock()
-		hops, found := routes.broadcast[name]
-		routes.RUnlock()
-		if found {
-			res <- hops
-		}
-		routes.peers.RLock()
-		routes.ourself.RLock()
-		hops = routes.calculateBroadcast(name, true)
-		routes.ourself.RUnlock()
-		routes.peers.RUnlock()
-		res <- hops
-		routes.Lock()
-		routes.broadcast[name] = hops
-		routes.Unlock()
-	}
-	return <-res
+	return routes.lookupOrCalculate(name, &routes.broadcast, true)
 }
 
 func (routes *Routes) BroadcastAll(name PeerName) []PeerName {
+	return routes.lookupOrCalculate(name, &routes.broadcastAll, false)
+}
+
+func (routes *Routes) lookupOrCalculate(name PeerName, broadcast *broadcastRoutes, establishedAndSymmetric bool) []PeerName {
 	routes.RLock()
-	hops, found := routes.broadcastAll[name]
+	hops, found := (*broadcast)[name]
 	routes.RUnlock()
 	if found {
 		return hops
@@ -108,19 +88,19 @@ func (routes *Routes) BroadcastAll(name PeerName) []PeerName {
 	res := make(chan []PeerName)
 	routes.action <- func() {
 		routes.RLock()
-		hops, found := routes.broadcastAll[name]
+		hops, found := (*broadcast)[name]
 		routes.RUnlock()
 		if found {
 			res <- hops
 		}
 		routes.peers.RLock()
 		routes.ourself.RLock()
-		hops = routes.calculateBroadcast(name, false)
+		hops = routes.calculateBroadcast(name, establishedAndSymmetric)
 		routes.ourself.RUnlock()
 		routes.peers.RUnlock()
 		res <- hops
 		routes.Lock()
-		routes.broadcastAll[name] = hops
+		(*broadcast)[name] = hops
 		routes.Unlock()
 	}
 	return <-res
