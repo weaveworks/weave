@@ -11,6 +11,11 @@ Before you can use this plugin, you must [install weave](https://github.com/weav
     $ weave launch-plugin
     $ docker network create --driver=weave weave
 
+When you start subsequent weave peers you have to tell them about other peers, e.g.
+
+    $ weave launch <host1> <host2>
+    $ weave launch-plugin
+
 ## Starting a container:
 
     $ docker run --net=weave -ti ubuntu
