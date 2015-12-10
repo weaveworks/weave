@@ -19,6 +19,7 @@ type Routes struct {
 	broadcastAll broadcastRoutes // [1]
 	recalculate  chan<- *struct{}
 	wait         chan<- chan struct{}
+	action       chan<- func()
 	// [1] based on *all* connections, not just established &
 	// symmetric ones
 }
@@ -26,6 +27,7 @@ type Routes struct {
 func NewRoutes(ourself *LocalPeer, peers *Peers) *Routes {
 	recalculate := make(chan *struct{}, 1)
 	wait := make(chan chan struct{})
+	action := make(chan func())
 	routes := &Routes{
 		ourself:      ourself,
 		peers:        peers,
@@ -34,12 +36,13 @@ func NewRoutes(ourself *LocalPeer, peers *Peers) *Routes {
 		broadcast:    make(broadcastRoutes),
 		broadcastAll: make(broadcastRoutes),
 		recalculate:  recalculate,
-		wait:         wait}
+		wait:         wait,
+		action:       action}
 	routes.unicast[ourself.Name] = UnknownPeerName
 	routes.unicastAll[ourself.Name] = UnknownPeerName
 	routes.broadcast[ourself.Name] = []PeerName{}
 	routes.broadcastAll[ourself.Name] = []PeerName{}
-	go routes.run(recalculate, wait)
+	go routes.run(recalculate, wait, action)
 	return routes
 }
 
@@ -69,14 +72,58 @@ func (routes *Routes) UnicastAll(name PeerName) (PeerName, bool) {
 
 func (routes *Routes) Broadcast(name PeerName) []PeerName {
 	routes.RLock()
-	defer routes.RUnlock()
-	return routes.broadcast[name]
+	hops, found := routes.broadcast[name]
+	routes.RUnlock()
+	if found {
+		return hops
+	}
+	res := make(chan []PeerName)
+	routes.action <- func() {
+		routes.RLock()
+		hops, found := routes.broadcast[name]
+		routes.RUnlock()
+		if found {
+			res <- hops
+		}
+		routes.peers.RLock()
+		routes.ourself.RLock()
+		hops = routes.calculateBroadcast(name, true)
+		routes.ourself.RUnlock()
+		routes.peers.RUnlock()
+		res <- hops
+		routes.Lock()
+		routes.broadcast[name] = hops
+		routes.Unlock()
+	}
+	return <-res
 }
 
 func (routes *Routes) BroadcastAll(name PeerName) []PeerName {
 	routes.RLock()
-	defer routes.RUnlock()
-	return routes.broadcastAll[name]
+	hops, found := routes.broadcastAll[name]
+	routes.RUnlock()
+	if found {
+		return hops
+	}
+	res := make(chan []PeerName)
+	routes.action <- func() {
+		routes.RLock()
+		hops, found := routes.broadcastAll[name]
+		routes.RUnlock()
+		if found {
+			res <- hops
+		}
+		routes.peers.RLock()
+		routes.ourself.RLock()
+		hops = routes.calculateBroadcast(name, false)
+		routes.ourself.RUnlock()
+		routes.peers.RUnlock()
+		res <- hops
+		routes.Lock()
+		routes.broadcastAll[name] = hops
+		routes.Unlock()
+	}
+	return <-res
 }
 
 // Choose min(log2(n_peers), n_neighbouring_peers) neighbours, with a
@@ -123,6 +170,7 @@ func (routes *Routes) Recalculate() {
 	select {
 	case routes.recalculate <- nil:
 	default:
+		log.Println("route recalculation coalesced")
 	}
 }
 
@@ -133,7 +181,7 @@ func (routes *Routes) EnsureRecalculated() {
 	<-done
 }
 
-func (routes *Routes) run(recalculate <-chan *struct{}, wait <-chan chan struct{}) {
+func (routes *Routes) run(recalculate <-chan *struct{}, wait <-chan chan struct{}, action <-chan func()) {
 	for {
 		select {
 		case <-recalculate:
@@ -145,6 +193,8 @@ func (routes *Routes) run(recalculate <-chan *struct{}, wait <-chan chan struct{
 			default:
 			}
 			close(done)
+		case f := <-action:
+			f()
 		}
 	}
 }
@@ -153,13 +203,13 @@ func (routes *Routes) calculate() {
 	routes.peers.RLock()
 	routes.ourself.RLock()
 	var (
-		oldUnicast   = routes.unicast
-		oldBroadcast = routes.broadcast
 		unicast      = routes.calculateUnicast(true)
 		unicastAll   = routes.calculateUnicast(false)
-		broadcast    = routes.calculateBroadcast(true)
-		broadcastAll = routes.calculateBroadcast(false)
+		broadcast    = make(broadcastRoutes)
+		broadcastAll = make(broadcastRoutes)
 	)
+	broadcast[routes.ourself.Name] = routes.calculateBroadcast(routes.ourself.Name, true)
+	broadcastAll[routes.ourself.Name] = routes.calculateBroadcast(routes.ourself.Name, false)
 	routes.ourself.RUnlock()
 	routes.peers.RUnlock()
 
@@ -171,10 +221,8 @@ func (routes *Routes) calculate() {
 	onChange := routes.onChange
 	routes.Unlock()
 
-	if !unicast.equals(oldUnicast) || !broadcast.equals(oldBroadcast) {
-		for _, callback := range onChange {
-			callback()
-		}
+	for _, callback := range onChange {
+		callback()
 	}
 }
 
@@ -192,7 +240,7 @@ func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) unicastRout
 	return unicast
 }
 
-// Calculate all the routes for the question: if we receive a
+// Calculate the route to answer the question: if we receive a
 // broadcast originally from Peer X, which peers should we pass the
 // frames on to?
 //
@@ -210,67 +258,15 @@ func (routes *Routes) calculateUnicast(establishedAndSymmetric bool) unicastRout
 //     Y =/= Z /\ X.Routes(Y) <= X.Routes(Z) =>
 //     X.Routes(Y) u [P | Y.HasSymmetricConnectionTo(P)] <= X.Routes(Z)
 // where <= is the subset relationship on keys of the returned map.
-func (routes *Routes) calculateBroadcast(establishedAndSymmetric bool) broadcastRoutes {
-	broadcast := make(broadcastRoutes)
-	for _, peer := range routes.peers.byName {
-		hops := []PeerName{}
-		if found, reached := peer.Routes(routes.ourself.Peer, establishedAndSymmetric); found {
-			routes.ourself.ForEachConnectedPeer(establishedAndSymmetric, reached,
-				func(remotePeer *Peer) { hops = append(hops, remotePeer.Name) })
-		}
-		broadcast[peer.Name] = hops
+func (routes *Routes) calculateBroadcast(name PeerName, establishedAndSymmetric bool) []PeerName {
+	hops := []PeerName{}
+	peer, found := routes.peers.byName[name]
+	if !found {
+		return hops
 	}
-	return broadcast
-}
-
-func (a unicastRoutes) equals(b unicastRoutes) bool {
-	for key, aval := range a {
-		if bval, ok := b[key]; !ok || bval != aval {
-			return false
-		}
+	if found, reached := peer.Routes(routes.ourself.Peer, establishedAndSymmetric); found {
+		routes.ourself.ForEachConnectedPeer(establishedAndSymmetric, reached,
+			func(remotePeer *Peer) { hops = append(hops, remotePeer.Name) })
 	}
-
-	for key := range b {
-		if _, ok := a[key]; !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (a broadcastRoutes) equals(b broadcastRoutes) bool {
-	set := make(map[PeerName]struct{})
-
-	for key, aval := range a {
-		bval, ok := b[key]
-		if !ok {
-			return false
-		}
-
-		for _, peer := range aval {
-			set[peer] = struct{}{}
-		}
-
-		for _, peer := range bval {
-			if _, ok := set[peer]; !ok {
-				return false
-			}
-
-			delete(set, peer)
-		}
-
-		if len(set) != 0 {
-			return false
-		}
-
-	}
-
-	for key := range b {
-		if _, ok := a[key]; !ok {
-			return false
-		}
-	}
-
-	return true
+	return hops
 }
