@@ -20,26 +20,22 @@ import (
 
 var version = "(unreleased version)"
 
-const (
-	meshNetworkName = "weave"
-)
-
 func main() {
 	var (
-		justVersion   bool
-		address       string
-		nameserver    string
-		meshAddress   string
-		logLevel      string
-		createDefault bool
+		justVersion     bool
+		address         string
+		nameserver      string
+		meshAddress     string
+		logLevel        string
+		meshNetworkName string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	flag.StringVar(&address, "socket", "/run/docker/plugins/weave.sock", "socket on which to listen")
 	flag.StringVar(&nameserver, "nameserver", "", "nameserver to provide to containers")
-	flag.StringVar(&meshAddress, "meshsocket", "", "socket on which to listen for mesh mode")
-	flag.BoolVar(&createDefault, "create-default-network", false, "create default network")
+	flag.StringVar(&meshAddress, "meshsocket", "/run/docker/plugins/weavemesh.sock", "socket on which to listen in mesh mode")
+	flag.StringVar(&meshNetworkName, "mesh-network-name", "weave", "network name to create in mesh mode")
 
 	flag.Parse()
 
@@ -48,9 +44,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	if createDefault && meshAddress == "" {
-		meshAddress = "/run/docker/plugins/weavemesh.sock"
-	}
 	SetLogLevel(logLevel)
 
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
@@ -78,8 +71,8 @@ func main() {
 		defer meshListener.Close()
 	}
 
-	if createDefault {
-		createNetwork(dockerClient, meshAddress)
+	if meshNetworkName != "" {
+		createNetwork(dockerClient, meshNetworkName, meshAddress)
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -133,16 +126,16 @@ func listenAndServe(dockerClient *docker.Client, address, nameserver string, end
 	return listener, nil
 }
 
-func createNetwork(dockerClient *docker.Client, address string) {
-	if _, err := dockerClient.Client.NetworkInfo(meshNetworkName); err == nil {
-		Log.Printf("Docker network '%s' already exists", meshNetworkName)
+func createNetwork(dockerClient *docker.Client, networkName, address string) {
+	if _, err := dockerClient.Client.NetworkInfo(networkName); err == nil {
+		Log.Printf("Docker network '%s' already exists", networkName)
 	} else if _, ok := err.(*go_docker.NoSuchNetwork); ok {
 		driverName := strings.TrimSuffix(address, ".sock")
 		if i := strings.LastIndex(driverName, "/"); i >= 0 {
 			driverName = driverName[i+1:]
 		}
 		options := go_docker.CreateNetworkOptions{
-			Name:           meshNetworkName,
+			Name:           networkName,
 			CheckDuplicate: true,
 			Driver:         driverName,
 			IPAM:           go_docker.IPAMOptions{Driver: driverName},

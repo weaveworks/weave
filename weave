@@ -1832,7 +1832,7 @@ EOF
         launch_proxy  $COMMON_ARGS
         if [ -z $WEAVE_NO_PLUGIN ] && check_docker_server_api_version 1.21 ; then
             check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
-            launch_plugin $COMMON_ARGS --create-default-network
+            launch_plugin $COMMON_ARGS
         fi
         ;;
     launch-router)
