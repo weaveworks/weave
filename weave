@@ -120,25 +120,33 @@ exec_remote() {
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
+# Given $1 and $2 as semantic version numbers like 3.1.2, return [ $1 < $2 ]
+version_lt() {
+    VERSION_MAJOR=${1%.*.*}
+    REST=${1%.*} VERSION_MINOR=${REST#*.}
+    VERSION_PATCH=${1#*.*.}
+
+    MIN_VERSION_MAJOR=${2%.*.*}
+    REST=${2%.*} MIN_VERSION_MINOR=${REST#*.}
+    MIN_VERSION_PATCH=${2#*.*.}
+
+    if [ \( "$VERSION_MAJOR" -lt "$MIN_VERSION_MAJOR" \) -o \
+        \( "$VERSION_MAJOR" -eq "$MIN_VERSION_MAJOR" -a \
+        \( "$VERSION_MINOR" -lt "$MIN_VERSION_MINOR" -o \
+        \( "$VERSION_MINOR" -eq "$MIN_VERSION_MINOR" -a \
+        \( "$VERSION_PATCH" -lt "$MIN_VERSION_PATCH" \) \) \) \) ] ; then
+        return 0
+    fi
+    return 1
+}
+
 check_docker_version() {
     if ! DOCKER_VERSION=$(docker -v | sed -n -e 's|^Docker version \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*|\1|p') || [ -z "$DOCKER_VERSION" ] ; then
         echo "ERROR: Unable to parse docker version" >&2
         exit 1
     fi
 
-    DOCKER_VERSION_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f 1)
-    DOCKER_VERSION_MINOR=$(echo "$DOCKER_VERSION" | cut -d. -f 2)
-    DOCKER_VERSION_PATCH=$(echo "$DOCKER_VERSION" | cut -d. -f 3)
-
-    MIN_DOCKER_VERSION_MAJOR=$(echo "$MIN_DOCKER_VERSION" | cut -d. -f 1)
-    MIN_DOCKER_VERSION_MINOR=$(echo "$MIN_DOCKER_VERSION" | cut -d. -f 2)
-    MIN_DOCKER_VERSION_PATCH=$(echo "$MIN_DOCKER_VERSION" | cut -d. -f 3)
-
-    if [ \( "$DOCKER_VERSION_MAJOR" -lt "$MIN_DOCKER_VERSION_MAJOR" \) -o \
-        \( "$DOCKER_VERSION_MAJOR" -eq "$MIN_DOCKER_VERSION_MAJOR" -a \
-        \( "$DOCKER_VERSION_MINOR" -lt "$MIN_DOCKER_VERSION_MINOR" -o \
-        \( "$DOCKER_VERSION_MINOR" -eq "$MIN_DOCKER_VERSION_MINOR" -a \
-        \( "$DOCKER_VERSION_PATCH" -lt "$MIN_DOCKER_VERSION_PATCH" \) \) \) \) ] ; then
+    if version_lt $DOCKER_VERSION $MIN_DOCKER_VERSION ; then
         echo "ERROR: weave requires Docker version $MIN_DOCKER_VERSION or later; you are running $DOCKER_VERSION" >&2
         exit 1
     fi
