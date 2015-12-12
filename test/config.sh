@@ -151,7 +151,7 @@ start_container() {
 start_container_with_dns() {
     host=$1
     shift 1
-    weave_on $host run --with-dns "$@" -t $DNS_IMAGE /bin/sh
+    weave_on $host run "$@" -t $DNS_IMAGE /bin/sh
 }
 
 start_container_local_plugin() {

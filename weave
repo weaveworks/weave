@@ -62,8 +62,7 @@ weave connect       [--replace] [<peer> ...]
 weave forget        <peer> ...
 weave status        [targets | connections | peers | dns]
 weave report        [-f <format>]
-weave run           [--with-dns | --without-dns]
-                    [--no-rewrite-hosts] [--no-multicast-route]
+weave run           [--without-dns] [--no-rewrite-hosts] [--no-multicast-route]
                       [<addr> ...] <docker run args> ...
 weave start         [<addr> ...] <container_id>
 weave attach        [<addr> ...] <container_id>
@@ -1094,12 +1093,11 @@ dns_args() {
     NAME_ARG=""
     HOSTNAME_SPECIFIED=
     DNS_SEARCH_SPECIFIED=
-    WITH_DNS=
     WITHOUT_DNS=
     while [ $# -gt 0 ] ; do
         case "$1" in
             --with-dns)
-                WITH_DNS=1
+                echo "Warning: $1 is deprecated; it is on by default" >&2
                 ;;
             --without-dns)
                 WITHOUT_DNS=1
