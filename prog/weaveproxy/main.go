@@ -38,17 +38,12 @@ func main() {
 	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tlsverify")
 	mflag.StringVar(&c.TLSConfig.Key, []string{"#tlskey", "-tlskey"}, "", "Path to TLS key file")
 	mflag.BoolVar(&c.TLSConfig.Verify, []string{"#tlsverify", "-tlsverify"}, false, "Use TLS and verify the remote")
-	mflag.BoolVar(&c.WithDNS, []string{"-with-dns", "w"}, false, "instruct created containers to always use weaveDNS as their nameserver")
 	mflag.BoolVar(&c.WithoutDNS, []string{"-without-dns"}, false, "instruct created containers to never use weaveDNS as their nameserver")
 	mflag.Parse()
 
 	if justVersion {
 		fmt.Printf("weave proxy  %s\n", version)
 		os.Exit(0)
-	}
-
-	if c.WithDNS && c.WithoutDNS {
-		Log.Fatalf("Cannot use both '--with-dns' and '--without-dns' flags")
 	}
 
 	SetLogLevel(logLevel)
