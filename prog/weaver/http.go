@@ -245,7 +245,13 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 
 	muxRouter.Methods("GET").Path("/report").Queries("format", "{format}").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			formatTemplate, err := template.New("format").Parse(mux.Vars(r)["format"])
+			funcs := template.FuncMap{
+				"json": func(v interface{}) string {
+					a, _ := json.Marshal(v)
+					return string(a)
+				},
+			}
+			formatTemplate, err := template.New("format").Funcs(funcs).Parse(mux.Vars(r)["format"])
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
