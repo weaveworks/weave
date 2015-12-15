@@ -232,6 +232,12 @@ inspect`:
     $ weave report -f {% raw %}'{{.DNS.Domain}}'{% endraw %}
     weave.local.
 
+Weave adds a template function, `json`, which can be applied to get
+results in JSON format.
+
+    $ weave report -f {% raw %}'{{json .DNS}}'{% endraw %}
+    {% raw %}{"Domain":"weave.local.","Upstream":["8.8.8.8","8.8.4.4"],"Address":"172.17.0.1:53","TTL":1,"Entries":null}{% endraw %}
+
 ### <a name="list-attached-containers"></a>List attached containers
 
     weave ps
