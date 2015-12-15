@@ -54,6 +54,8 @@ func main() {
 	dockerClient, err := docker.NewVersionedClientFromEnv("1.21")
 	if err != nil {
 		Log.Fatalf("unable to connect to docker: %s", err)
+	} else {
+		Log.Info(dockerClient.Info())
 	}
 
 	var globalListener, meshListener net.Listener

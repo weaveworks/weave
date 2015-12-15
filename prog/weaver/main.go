@@ -255,6 +255,8 @@ func main() {
 		dc, err := docker.NewClient(dockerAPI)
 		if err != nil {
 			Log.Fatal("Unable to start docker client: ", err)
+		} else {
+			Log.Info(dc.Info())
 		}
 		dockerCli = dc
 	}

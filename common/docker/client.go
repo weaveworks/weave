@@ -2,9 +2,10 @@ package docker
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 
 	. "github.com/weaveworks/weave/common"
 )
@@ -57,12 +58,16 @@ func NewVersionedClientFromEnv(apiVersionString string) (*Client, error) {
 }
 
 func (c *Client) checkWorking() error {
-	env, err := c.Version()
-	if err != nil {
-		return err
+	_, err := c.Version()
+	return err
+}
+
+func (c *Client) Info() string {
+	if env, err := c.Version(); err != nil {
+		return fmt.Sprintf("Docker API error: %s", err)
+	} else {
+		return fmt.Sprintf("Docker API on %s: %v", c.Endpoint(), env)
 	}
-	Log.Infof("[docker] Using Docker API on %s: %v", c.Endpoint(), env)
-	return nil
 }
 
 // AddObserver adds an observer for docker events
