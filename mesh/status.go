@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"fmt"
+	"net"
 )
 
 type Status struct {
@@ -19,6 +20,7 @@ type Status struct {
 	Connections        []LocalConnectionStatus
 	Targets            []string
 	OverlayDiagnostics interface{}
+	TrustedSubnets     []string
 }
 
 type PeerStatus struct {
@@ -69,7 +71,8 @@ func NewStatus(router *Router) *Status {
 		NewBroadcastRouteStatusSlice(router.Routes),
 		NewLocalConnectionStatusSlice(router.ConnectionMaker),
 		NewTargetSlice(router.ConnectionMaker),
-		router.Overlay.Diagnostics()}
+		router.Overlay.Diagnostics(),
+		NewTrustedSubnetsSlice(router.TrustedSubnets)}
 }
 
 func NewPeerStatusSlice(peers *Peers) []PeerStatus {
@@ -147,6 +150,13 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 			}
 			lc, _ := conn.(*LocalConnection)
 			info := fmt.Sprintf("%-6v %v", lc.OverlayConn.DisplayName(), conn.Remote())
+			if lc.Router.UsingPassword() {
+				if lc.Untrusted() {
+					info = fmt.Sprintf("%-11v %v", "encrypted", info)
+				} else {
+					info = fmt.Sprintf("%-11v %v", "unencrypted", info)
+				}
+			}
 			slice = append(slice, LocalConnectionStatus{conn.RemoteTCPAddr(), conn.Outbound(), state, info})
 		}
 		for address, target := range cm.targets {
@@ -190,4 +200,12 @@ func NewTargetSlice(cm *ConnectionMaker) []string {
 		return false
 	}
 	return <-resultChan
+}
+
+func NewTrustedSubnetsSlice(trustedSubnets []*net.IPNet) []string {
+	trustedSubnetStrs := []string{}
+	for _, trustedSubnet := range trustedSubnets {
+		trustedSubnetStrs = append(trustedSubnetStrs, trustedSubnet.String())
+	}
+	return trustedSubnetStrs
 }

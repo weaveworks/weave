@@ -42,7 +42,8 @@ weave setup
 weave version
 weave launch        [--password <password>] [--nickname <nickname>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                      [--no-discovery] [--init-peer-count <count>] <peer> ...
+                      [--no-discovery] [--init-peer-count <count>]
+                      [--trusted-subnets <cidr>,...] <peer> ...
 weave launch-router [--password <password>] [--nickname <nickname>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--no-discovery] [--init-peer-count <count>] <peer> ...
@@ -321,8 +322,6 @@ DATAPATH=datapath
 BRIDGE_IFNAME=link-${BRIDGE}
 DATAPATH_IFNAME=${DATAPATH}-link
 CONTAINER_IFNAME=ethwe
-# ROUTER_HOSTNETNS_IFNAME is only used for fastdp with encryption
-ROUTER_HOSTNETNS_IFNAME=veth-weave
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
 PROXY_PORT=12375
@@ -765,27 +764,7 @@ ask_version() {
 }
 
 router_opts_fastdp() {
-    if [ -z "$WEAVE_PASSWORD" ] ; then
-        echo "--datapath $DATAPATH"
-    else
-        # When using encryption, we still do bridging on the ODP
-        # datapath, because you can 'weave launch' without encryption
-        # and then later restart the router with encryption, or vice
-        # versa.  Encryption disables the use of the fastdp Overlay,
-        # but the router could still use the fastdp Bridge to receive
-        # packets.  However, pcap has better performance when sniffing
-        # every packet.  So we pass --iface to use the pcap Bridge.
-        #
-        # Why don't we simply pass "--iface $BRIDGE".  We could,
-        # except for the fact that NetworkManager likes to down the
-        # odp $BRIDGE netdev (at least under ubuntu), and you can only
-        # use pcap on an interface that is up.  We avoid that by use
-        # pcap via a veth pair (NetworkManager leaves them alone).
-        # Having a netdev in the host netns called "ethwe" might
-        # surprise people, so it is called $ROUTER_HOSTNETNS_IFNAME
-        # instead.
-        echo "--datapath $DATAPATH --iface $ROUTER_HOSTNETNS_IFNAME"
-    fi
+    echo "--datapath $DATAPATH"
 }
 
 router_opts_bridge() {
@@ -801,15 +780,7 @@ router_opts_bridged_fastdp() {
 ######################################################################
 
 setup_router_iface_fastdp() {
-    if [ -n "$WEAVE_PASSWORD" ] ; then
-        # See router_opts_fastdp
-        # No-op if already attached
-        if ip link show $LOCAL_IFNAME >/dev/null 2>&1 ; then
-            return 0
-        fi
-        connect_container_to_bridge $ROUTER_HOSTNETNS_IFNAME &&
-            ip link set $ROUTER_HOSTNETNS_IFNAME up
-    fi
+    true
 }
 
 setup_router_iface_bridge() {
@@ -1606,8 +1577,6 @@ launch_router() {
     if [ "$BRIDGE_TYPE" != bridge ] ; then
         NETHOST_OPT="--net=host"
         HTTP_IP=127.0.0.1
-        # In case there is a lingering veth-weave netdev
-        ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
     fi
 
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
@@ -1660,10 +1629,6 @@ attach_router() {
 stop_router() {
     stop $CONTAINER_NAME "Weave"
     conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
-    # Remove the veth-weave netdev in a fastdp context
-    if detect_bridge_type && [ "$BRIDGE_TYPE" != bridge ] ; then
-        ip link del $ROUTER_HOSTNETNS_IFNAME >/dev/null 2>&1 || true
-    fi
 }
 
 launch_proxy() {
@@ -1917,13 +1882,13 @@ EOF
         fi
         if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null && PROXY_ADDRS=$(proxy_addrs) ; then
             echo
-            echo "       Service: proxy"
-            echo "       Address: $PROXY_ADDRS"
+            echo "        Service: proxy"
+            echo "        Address: $PROXY_ADDRS"
         fi
         if [ -z "$SUB_STATUS" ] && check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
             echo
-            echo "       Service: plugin"
-            echo "    DriverName: weave"
+            echo "        Service: plugin"
+            echo "     DriverName: weave"
         fi
         [ -n "$SUB_STATUS" ] || echo
         [ $res -eq 0 ]

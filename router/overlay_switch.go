@@ -204,8 +204,16 @@ func (osw *OverlaySwitch) PrepareConnection(params mesh.OverlayConnectionParams)
 
 		subConn, err := overlay.PrepareConnection(params)
 		if err != nil {
-			fwd.stopFrom(0)
-			return nil, err
+			log.Infof("Unable to use %s for connection to %s(%s): %s",
+				overlay.name,
+				params.RemotePeer.Name,
+				params.RemotePeer.NickName,
+				err)
+			// failed to start subforwarder - record overlay name and continue
+			fwd.forwarders[i] = subForwarder{
+				overlayName: overlay.name,
+			}
+			continue
 		}
 		subFwd := subConn.(OverlayForwarder)
 

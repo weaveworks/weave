@@ -37,6 +37,7 @@ type Config struct {
 	Password           []byte
 	ConnLimit          int
 	PeerDiscovery      bool
+	TrustedSubnets     []*net.IPNet
 }
 
 type Router struct {
@@ -180,4 +181,18 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 		router.Routes.Recalculate()
 	}
 	return origUpdate, newUpdate, nil
+}
+
+func (router *Router) Trusts(remote *RemoteConnection) bool {
+	if tcpAddr, err := net.ResolveTCPAddr("tcp4", remote.remoteTCPAddr); err == nil {
+		for _, trustedSubnet := range router.TrustedSubnets {
+			if trustedSubnet.Contains(tcpAddr.IP) {
+				return true
+			}
+		}
+	} else {
+		// Should not happen as remoteTCPAddr was obtained from TCPConn
+		log.Errorf("Unable to parse remote TCP addr: %s", err)
+	}
+	return false
 }

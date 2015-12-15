@@ -68,29 +68,30 @@ A status summary can be obtained with `weave status`:
 ````
 $ weave status
 
-       Version: 1.1.0
+        Version: 1.1.0
 
-       Service: router
-      Protocol: weave 1..2
-          Name: 4a:0f:f6:ec:1c:93(host1)
-    Encryption: disabled
- PeerDiscovery: enabled
-       Targets: [192.168.48.14 192.168.48.15]
-   Connections: 5 (1 established, 1 pending, 1 retrying, 1 failed, 1 connecting)
-         Peers: 3 (with 5 established, 1 pending connections)
+        Service: router
+       Protocol: weave 1..2
+           Name: 4a:0f:f6:ec:1c:93(host1)
+     Encryption: disabled
+  PeerDiscovery: enabled
+        Targets: [192.168.48.14 192.168.48.15]
+    Connections: 5 (1 established, 1 pending, 1 retrying, 1 failed, 1 connecting)
+          Peers: 3 (with 5 established, 1 pending connections)
+ TrustedSubnets: none
 
-       Service: ipam
-     Consensus: achieved
-         Range: 10.32.0.0-10.47.255.255
- DefaultSubnet: 10.32.0.0/12
+        Service: ipam
+      Consensus: achieved
+          Range: 10.32.0.0-10.47.255.255
+  DefaultSubnet: 10.32.0.0/12
 
-       Service: dns
-        Domain: weave.local.
-           TTL: 1
-       Entries: 9
+        Service: dns
+         Domain: weave.local.
+            TTL: 1
+        Entries: 9
 
-       Service: proxy
-       Address: tcp://127.0.0.1:12375
+        Service: proxy
+        Address: tcp://127.0.0.1:12375
 
 ````
 
@@ -129,6 +130,9 @@ state. Further details are available with
 number of connections peers have to other peers. Further details are
 available with [`weave status peers`](#weave-status-peers).
 
+'TrustedSubnets' shows subnets which the router trusts as specified by
+the `--trusted-subnets` option to `weave launch`.
+
 There are further sections for the [IP address
 allocator](ipam.html#troubleshooting),
 [weaveDNS](weavedns.html#troubleshooting), and [Weave Docker API
@@ -141,8 +145,8 @@ obtained with `weave status connections`:
 
 ````
 $ weave status connections
-<- 192.168.48.12:33866   established fastdp 7e:21:4a:70:2f:45(host2)
-<- 192.168.48.13:60773   pending     fastdp 7e:ae:cd:d5:23:8d(host3)
+<- 192.168.48.12:33866   established unencrypted fastdp 7e:21:4a:70:2f:45(host2)
+<- 192.168.48.13:60773   pending     encrypted   fastdp 7e:ae:cd:d5:23:8d(host3)
 -> 192.168.48.14:6783    retrying    dial tcp4 192.168.48.14:6783: no route to host
 -> 192.168.48.15:6783    failed      dial tcp4 192.168.48.15:6783: no route to host, retry: 2015-08-06 18:55:38.246910357 +0000 UTC
 -> 192.168.48.16:6783    connecting
@@ -162,8 +166,8 @@ The columns are as follows:
       heartbeat
     * `established` - TCP connection and corresponding UDP path are up
  * Info - the failure reason for failed and retrying connections, or
-   the data transport method, remote peer name and nickname for
-   pending and established connections
+   the encryption mode, data transport method, remote peer name and
+   nickname for pending and established connections
 
 ### <a name="weave-status-peers"></a>List peers
 

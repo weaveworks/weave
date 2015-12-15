@@ -63,7 +63,9 @@ Weave automatically chooses the fastest available method to transport
 data between peers. The most performant of these ('fastdp') offers
 near-native throughput and latency but does not support encryption;
 consequently supplying a password will cause the router to fall back
-to a slower mode ('sleeve') that does.
+to a slower mode ('sleeve') that does, for connections that traverse
+untrusted networks (see the [security](#security) section for more
+details).
 
 Even when encryption is not in use, certain adverse network conditions
 will cause this fallback to occur dynamically; in these circumstances,
@@ -321,10 +323,16 @@ way to generate a random password which satsifies this requirement is
 
     < /dev/urandom tr -dc A-Za-z0-9 | head -c9 ; echo
 
-The same password must be specified for all weave peers. Note that
-supplying a password will [cause weave to fall back to a slower
-method](#fast-data-path) for transporting data between
-peers.
+The same password must be specified for all weave peers; by default
+both control and data plane traffic will then use authenticated
+encryption. If some of your peers are colocated in a trusted network
+(for example within the boundary of your own datacentre) you can use
+the `--trusted-subnets` argument to `weave launch` to selectively
+disable data plane encryption as an optimisation. Both peers must
+consider the other to be in a trusted subnet for this to take place -
+if they do not, weave will [fall back to a slower
+method](#fast-data-path) for transporting data between peers as fast
+datapath does not support encryption.
 
 Be aware that:
 

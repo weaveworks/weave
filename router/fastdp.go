@@ -515,9 +515,8 @@ type fastDatapathForwarder struct {
 
 func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
 	if params.SessionKey != nil {
-		// No encryption suport in fastdp.  The weaver main.go
-		// is responsible for ensuring this doesn't happen.
-		log.Fatal("Attempt to use FastDatapath with encryption")
+		// No encryption support in fastdp
+		return nil, fmt.Errorf("encryption not supported")
 	}
 
 	vxlanVportID := fastdp.mainVxlanVportID
