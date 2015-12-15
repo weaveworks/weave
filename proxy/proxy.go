@@ -60,6 +60,7 @@ type Config struct {
 	Version             string
 	WithDNS             bool
 	WithoutDNS          bool
+	NoMulticastRoute    bool
 }
 
 type wait struct {
@@ -71,13 +72,14 @@ type wait struct {
 type Proxy struct {
 	sync.Mutex
 	Config
-	client              *docker.Client
-	dockerBridgeIP      string
-	hostnameMatchRegexp *regexp.Regexp
-	weaveWaitVolume     string
-	weaveWaitNoopVolume string
-	normalisedAddrs     []string
-	waiters             map[*http.Request]*wait
+	client                 *docker.Client
+	dockerBridgeIP         string
+	hostnameMatchRegexp    *regexp.Regexp
+	weaveWaitVolume        string
+	weaveWaitNoopVolume    string
+	weaveWaitNomcastVolume string
+	normalisedAddrs        []string
+	waiters                map[*http.Request]*wait
 }
 
 func NewProxy(c Config) (*Proxy, error) {
@@ -146,7 +148,10 @@ func (proxy *Proxy) findWeaveWaitVolumes() error {
 	if proxy.weaveWaitVolume, err = proxy.findVolume("/w"); err != nil {
 		return err
 	}
-	proxy.weaveWaitNoopVolume, err = proxy.findVolume("/w-noop")
+	if proxy.weaveWaitNoopVolume, err = proxy.findVolume("/w-noop"); err != nil {
+		return err
+	}
+	proxy.weaveWaitNomcastVolume, err = proxy.findVolume("/w-nomcast")
 	return err
 }
 
@@ -429,6 +434,9 @@ func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
 				args = append(args, fmt.Sprintf("--add-host=%s", eh))
 			}
 		}
+	}
+	if proxy.NoMulticastRoute {
+		args = append(args, "--no-multicast-route")
 	}
 	if orDie {
 		args = append(args, "--or-die")

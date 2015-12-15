@@ -14,13 +14,14 @@ WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
+WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
 NETCHECK_EXE=prog/netcheck/netcheck
 DOCKERTLSARGS_EXE=prog/docker_tls_args/docker_tls_args
 DOCKERPLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -81,29 +82,37 @@ $(NETCHECK_EXE): prog/netcheck/netcheck.go
 # These next programs need separate rules as they fail the netgo check in
 # the main build stanza due to not importing net package
 $(SIGPROXY_EXE): prog/sigproxy/main.go
-$(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
 $(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/net/*.go plugin/ipam/*.go plugin/skel/*.go api/*.go common/docker/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 
-$(WEAVEWAIT_EXE) $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE):
+$(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
+$(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
+	go get -tags netgo ./$(@D)
+	go build $(BUILD_FLAGS) -tags "iface mcast" -o $@ ./$(@D)
+
+$(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
+	go get -tags netgo ./$(@D)
+	go build $(BUILD_FLAGS) -tags iface -o $@ ./$(@D)
+
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 	go get -tags netgo ./$(@D)
-	go build $(BUILD_FLAGS) -tags noop -o $@ ./$(@D)
+	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) docker build -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
-$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
+$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
 	cp weave prog/weaveexec/weave
 	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
 	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
 	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
+	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
 	cp $(NETCHECK_EXE) prog/weaveexec/netcheck
 	cp $(DOCKERTLSARGS_EXE) prog/weaveexec/docker_tls_args
 	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz

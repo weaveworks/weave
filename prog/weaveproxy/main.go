@@ -40,6 +40,7 @@ func main() {
 	mflag.BoolVar(&c.TLSConfig.Verify, []string{"#tlsverify", "-tlsverify"}, false, "Use TLS and verify the remote")
 	mflag.BoolVar(&c.WithDNS, []string{"-with-dns", "w"}, false, "instruct created containers to always use weaveDNS as their nameserver")
 	mflag.BoolVar(&c.WithoutDNS, []string{"-without-dns"}, false, "instruct created containers to never use weaveDNS as their nameserver")
+	mflag.BoolVar(&c.NoMulticastRoute, []string{"-no-multicast-route"}, false, "do not add a multicast route via the weave interface when attaching containers")
 	mflag.Parse()
 
 	if justVersion {
