@@ -21,19 +21,21 @@ const (
 )
 
 type driver struct {
-	version    string
-	nameserver string
-	scope      string
+	version          string
+	nameserver       string
+	scope            string
+	noMulticastRoute bool
 	sync.RWMutex
 	endpoints map[string]struct{}
 }
 
-func New(client *docker.Client, version string, nameserver string, scope string) (skel.Driver, error) {
+func New(client *docker.Client, version string, nameserver string, scope string, noMulticastRoute bool) (skel.Driver, error) {
 	driver := &driver{
-		nameserver: nameserver,
-		version:    version,
-		scope:      scope,
-		endpoints:  make(map[string]struct{}),
+		nameserver:       nameserver,
+		noMulticastRoute: noMulticastRoute,
+		version:          version,
+		scope:            scope,
+		endpoints:        make(map[string]struct{}),
 	}
 
 	_, err := NewWatcher(client, driver)
@@ -161,6 +163,13 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 			NextHop:     "",
 		}
 		response.StaticRoutes = []api.StaticRoute{routeToDNS}
+	}
+	if !driver.noMulticastRoute {
+		multicastRoute := api.StaticRoute{
+			Destination: "224.0.0.0/4",
+			RouteType:   types.CONNECTED,
+		}
+		response.StaticRoutes = append(response.StaticRoutes, multicastRoute)
 	}
 	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
 	return response, nil

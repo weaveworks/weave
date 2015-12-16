@@ -68,6 +68,8 @@ The plugin command-line arguments are:
    how much information to emit for debugging.
  * `--mesh-network-name=<name>`: set it to blank to disable creation
    of a default network, or a name of your own choice.
+ * `--no-multicast-route`: stop weave adding a static IP route for
+   multicast traffic on its interface
 
 ## Restarting
 
