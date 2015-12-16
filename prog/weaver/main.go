@@ -70,7 +70,13 @@ func main() {
 		iface                     *net.Interface
 		datapathName              string
 		trustedSubnetStr          string
+
+		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
+
+	if val := os.Getenv("DOCKER_HOST"); val != "" {
+		defaultDockerHost = val
+	}
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
 	mflag.BoolVar(&createDatapath, []string{"-create-datapath"}, false, "create ODP datapath and exit")
@@ -93,7 +99,7 @@ func main() {
 	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
-	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, "", "Docker API endpoint, e.g. unix:///var/run/docker.sock")
+	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
 	mflag.StringVar(&dnsListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
