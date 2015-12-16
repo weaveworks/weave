@@ -61,11 +61,9 @@ func AddTestGossipConnection(r1, r2 *Router) {
 }
 
 func (router *Router) NewTestGossipConnection(r *Router) *mockGossipConnection {
-	fromPeer := NewPeerFrom(router.Ourself.Peer)
-	toPeer := NewPeerFrom(r.Ourself.Peer)
-
-	r.Peers.FetchWithDefault(fromPeer)             // Has side-effect of incrementing refcount
-	toPeer = router.Peers.FetchWithDefault(toPeer) //
+	to := r.Ourself.Peer
+	toPeer := NewPeer(to.Name, to.NickName, to.UID, 0, to.ShortID)
+	toPeer = router.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
 
 	return &mockGossipConnection{
 		RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, router, r, make(chan struct{})}
