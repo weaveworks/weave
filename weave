@@ -345,8 +345,8 @@ CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 BRIDGE=weave
 # This value is overridden when the datapath is used unbridged
 DATAPATH=datapath
-BRIDGE_IFNAME=link-${BRIDGE}
-DATAPATH_IFNAME=${DATAPATH}-link
+BRIDGE_IFNAME=vethwe-bridge
+DATAPATH_IFNAME=vethwe-datapath
 CONTAINER_IFNAME=ethwe
 PORT=${WEAVE_PORT:-6783}
 HTTP_PORT=6784
