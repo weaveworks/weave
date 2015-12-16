@@ -11,12 +11,15 @@ start_suite "--no-multicast-route operation"
 # Ensure containers run either way have no multicast route
 weave_on $HOST1 launch-router
 weave_on $HOST1 launch-proxy --no-multicast-route
+weave_on $HOST1 launch-plugin --no-multicast-route
 
 start_container $HOST1 --no-multicast-route --name c1
 proxy_start_container $HOST1 --name c2
+start_container_local_plugin $HOST1 --name=c3
 
 assert "show_multicast_route_on $HOST1 c1"
 assert "show_multicast_route_on $HOST1 c2"
+assert "show_multicast_route_on $HOST1 c3"
 
 # Ensure current proxy options are obeyed on container start
 docker_on $HOST1 stop c2
