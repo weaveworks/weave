@@ -13,9 +13,8 @@ import (
 
 type mockGossipConnection struct {
 	RemoteConnection
-	router *Router
-	dest   *Router
-	start  chan struct{}
+	dest  *Router
+	start chan struct{}
 }
 
 func NewTestRouter(name string) *Router {
@@ -30,11 +29,6 @@ func (conn *mockGossipConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
 	if err := conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg); err != nil {
 		panic(err)
 	}
-}
-
-func (conn *mockGossipConnection) Connect() {
-	conn.router.Ourself.handleAddConnection(conn)
-	conn.router.Ourself.handleConnectionEstablished(conn)
 }
 
 func (conn *mockGossipConnection) Start() {
@@ -54,34 +48,26 @@ func sendPendingGossip(routers ...*Router) {
 func AddTestGossipConnection(r1, r2 *Router) {
 	c1 := r1.NewTestGossipConnection(r2)
 	c2 := r2.NewTestGossipConnection(r1)
-	c1.Connect()
-	c2.Start()
-	c2.Connect()
 	c1.Start()
+	c2.Start()
 }
 
 func (router *Router) NewTestGossipConnection(r *Router) *mockGossipConnection {
-	fromPeer := NewPeerFrom(router.Ourself.Peer)
-	toPeer := NewPeerFrom(r.Ourself.Peer)
+	to := r.Ourself.Peer
+	toPeer := NewPeer(to.Name, to.NickName, to.UID, 0, to.ShortID)
+	toPeer = router.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
 
-	r.Peers.FetchWithDefault(fromPeer)             // Has side-effect of incrementing refcount
-	toPeer = router.Peers.FetchWithDefault(toPeer) //
-
-	return &mockGossipConnection{
-		RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, router, r, make(chan struct{})}
+	conn := &mockGossipConnection{
+		RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r, make(chan struct{})}
+	router.Ourself.handleAddConnection(conn)
+	router.Ourself.handleConnectionEstablished(conn)
+	return conn
 }
 
 func (router *Router) DeleteTestGossipConnection(r *Router) {
-	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
-
-	fromPeer := r.Peers.Fetch(fromName)
-	toPeer := router.Peers.Fetch(toName)
-
-	r.Peers.Dereference(fromPeer)
-	router.Peers.Dereference(toPeer)
-
 	conn, _ := router.Ourself.ConnectionTo(toName)
+	router.Peers.Dereference(conn.Remote())
 	router.Ourself.handleDeleteConnection(conn)
 }
 
@@ -143,15 +129,10 @@ func TestGossipTopology(t *testing.T) {
 	// Drop the connection from 1 to 3
 	r1.DeleteTestGossipConnection(r3)
 	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
-	checkTopology(t, r2, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
 	// r3 still thinks r1 has a connection to it
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
-
-	// On a timer, r3 will gossip to r1
-	r3.SendAllGossip()
-	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
 }
 
 func TestGossipSurrogate(t *testing.T) {
