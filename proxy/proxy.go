@@ -18,7 +18,6 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
-	"github.com/weaveworks/weave/nameserver"
 )
 
 const (
@@ -56,7 +55,6 @@ type Config struct {
 	NoRewriteHosts      bool
 	TLSConfig           TLSConfig
 	Version             string
-	WithDNS             bool
 	WithoutDNS          bool
 	NoMulticastRoute    bool
 	DockerHost          string
@@ -517,10 +515,6 @@ func (proxy *Proxy) setWeaveDNS(hostConfig jsonObject, hostname, dnsDomain strin
 func (proxy *Proxy) getDNSDomain() (domain string) {
 	if proxy.WithoutDNS {
 		return ""
-	}
-
-	if proxy.WithDNS {
-		domain = nameserver.DefaultDomain
 	}
 
 	weaveContainer, err := proxy.client.InspectContainer("weave")
