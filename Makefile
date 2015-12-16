@@ -92,11 +92,11 @@ $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE):
 
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 	go get -tags netgo ./$(@D)
-	go build $(BUILD_FLAGS) -tags "iface mcast" -o $@ ./$(@D)
+	go build $(BUILD_FLAGS) -tags "netgo iface mcast" -o $@ ./$(@D)
 
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
 	go get -tags netgo ./$(@D)
-	go build $(BUILD_FLAGS) -tags iface -o $@ ./$(@D)
+	go build $(BUILD_FLAGS) -tags "netgo iface" -o $@ ./$(@D)
 
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 	go get -tags netgo ./$(@D)
