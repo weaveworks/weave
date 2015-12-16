@@ -65,16 +65,9 @@ func (router *Router) NewTestGossipConnection(r *Router) *mockGossipConnection {
 }
 
 func (router *Router) DeleteTestGossipConnection(r *Router) {
-	fromName := router.Ourself.Peer.Name
 	toName := r.Ourself.Peer.Name
-
-	fromPeer := r.Peers.Fetch(fromName)
-	toPeer := router.Peers.Fetch(toName)
-
-	r.Peers.Dereference(fromPeer)
-	router.Peers.Dereference(toPeer)
-
 	conn, _ := router.Ourself.ConnectionTo(toName)
+	router.Peers.Dereference(conn.Remote())
 	router.Ourself.handleDeleteConnection(conn)
 }
 
@@ -136,15 +129,10 @@ func TestGossipTopology(t *testing.T) {
 	// Drop the connection from 1 to 3
 	r1.DeleteTestGossipConnection(r3)
 	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
-	checkTopology(t, r2, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
+	checkTopology(t, r1, r1.tp(r2), r2.tp(r1))
+	checkTopology(t, r2, r1.tp(r2), r2.tp(r1))
 	// r3 still thinks r1 has a connection to it
 	checkTopology(t, r3, r1.tp(r2, r3), r2.tp(r1), r3.tp(r1, r2))
-
-	// On a timer, r3 will gossip to r1
-	r3.SendAllGossip()
-	sendPendingGossip(r1, r2, r3)
-	checkTopology(t, r1, r1.tp(r2), r2.tp(r1), r3.tp(r1, r2))
 }
 
 func TestGossipSurrogate(t *testing.T) {
