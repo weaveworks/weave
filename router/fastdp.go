@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/weaveworks/go-odp/odp"
@@ -110,6 +111,10 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 		forwarders:    make(map[mesh.PeerName]*fastDatapathForwarder),
 	}
 
+	// This delete happens asynchronously in the kernel, meaning that
+	// we can sometimes fail to recreate the vxlan vport with EADDRINUSE -
+	// consequently we retry a small number of times in
+	// getVxlanVportIDHarder() to compensate.
 	if err := fastdp.deleteVxlanVports(); err != nil {
 		return nil, err
 	}
@@ -126,7 +131,7 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 	// numbers to be independent, but working out how to specify
 	// them on the connecting side.  So we can wait to find out if
 	// anyone wants that.
-	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportID(config.Port + 1)
+	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportIDHarder(config.Port+1, 5, time.Millisecond*10)
 	if err != nil {
 		return nil, err
 	}
@@ -404,6 +409,20 @@ func (fastdp fastDatapathOverlay) StartConsumingPackets(localPeer *mesh.Peer, pe
 	fastdp.peers = peers
 	fastdp.overlayConsumer = consumer
 	return nil
+}
+
+func (fastdp *FastDatapath) getVxlanVportIDHarder(udpPort int, retries int, duration time.Duration) (odp.VportID, error) {
+	var vxlanVportID odp.VportID
+	var err error
+	for try := 0; try < retries; try++ {
+		vxlanVportID, err = fastdp.getVxlanVportID(udpPort)
+		if err == nil || err != odp.NetlinkError(syscall.EADDRINUSE) {
+			return vxlanVportID, err
+		}
+		log.Warning("Address already in use creating vxlan vport ", udpPort, " - retrying")
+		time.Sleep(duration)
+	}
+	return 0, err
 }
 
 func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
