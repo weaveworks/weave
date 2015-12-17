@@ -12,6 +12,12 @@ The Weave Net plugin runs automatically when you `weave launch`.  You
 must still tell the weave peers to connect to one another, either via
 `weave launch` or `weave connect`.
 
+Note that the plugin container (`weaveplugin`) is run with
+`--restart=always`, so that it is there after a restart or reboot. If
+you remove this container (e.g. using `weave reset`) before removing
+all endpoints created using `--net=weave`, Docker can
+[hang](https://github.com/docker/libnetwork/issues/813).
+
 ## Starting a container:
 
     $ docker run --net=weave -ti ubuntu

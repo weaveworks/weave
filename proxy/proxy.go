@@ -94,6 +94,8 @@ func NewProxy(c Config) (*Proxy, error) {
 	client, err := weavedocker.NewVersionedClient(c.DockerHost, "1.18")
 	if err != nil {
 		return nil, err
+	} else {
+		Log.Info(client.Info())
 	}
 	p.client = client.Client
 

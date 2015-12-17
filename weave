@@ -1712,7 +1712,14 @@ launch_plugin() {
         $PLUGIN_IMAGE "$@")
 }
 
+remove_plugin_network() {
+    docker run --rm --net=host \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        $PLUGIN_IMAGE --remove-network
+}
+
 stop_plugin() {
+    remove_plugin_network
     stop $PLUGIN_CONTAINER_NAME "Plugin"
 }
 
@@ -2146,6 +2153,7 @@ EOF
         ;;
     reset)
         [ $# -eq 0 ] || usage
+        remove_plugin_network || echo "WARNING: docker may hang in this state; re-launch weave and remove attached containers before shutting down" >&2
         warn_if_stopping_proxy_in_env
         call_weave DELETE /peer >/dev/null 2>&1 || true
         for NAME in $PLUGIN_CONTAINER_NAME $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do

@@ -29,6 +29,7 @@ func main() {
 		logLevel         string
 		meshNetworkName  string
 		noMulticastRoute bool
+		removeNetwork    bool
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
@@ -38,6 +39,7 @@ func main() {
 	flag.StringVar(&meshAddress, "meshsocket", "/run/docker/plugins/weavemesh.sock", "socket on which to listen in mesh mode")
 	flag.StringVar(&meshNetworkName, "mesh-network-name", "weave", "network name to create in mesh mode")
 	flag.BoolVar(&noMulticastRoute, "no-multicast-route", false, "do not add a multicast route to network endpoints")
+	flag.BoolVar(&removeNetwork, "remove-network", false, "remove mesh network and exit")
 
 	flag.Parse()
 
@@ -48,13 +50,24 @@ func main() {
 
 	SetLogLevel(logLevel)
 
-	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
-
 	// API 1.21 is the first version that supports docker network commands
 	dockerClient, err := docker.NewVersionedClientFromEnv("1.21")
 	if err != nil {
 		Log.Fatalf("unable to connect to docker: %s", err)
 	}
+
+	if removeNetwork {
+		if _, err = dockerClient.Client.NetworkInfo(meshNetworkName); err == nil {
+			err = dockerClient.Client.RemoveNetwork(meshNetworkName)
+			if err != nil {
+				Log.Fatalf("unable to remove network: %s", err)
+			}
+		}
+		os.Exit(0)
+	}
+
+	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
+	Log.Info(dockerClient.Info())
 
 	var globalListener, meshListener net.Listener
 	endChan := make(chan error, 1)
