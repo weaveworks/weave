@@ -1,3 +1,13 @@
+## Release 1.4.0
+
+**Highlights**
+
+* The Docker Network plugin can now operate without a cluster store, so it is now run by default.
+* You can now use the fast datapath over trusted links and Weave encryption over untrusted links, in the same network.
+
+Plus many bug fixes and minor enhancements. More details below and in
+the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.4.0).
+
 ## Release 1.3.1
 
 **Highlights**
