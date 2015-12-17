@@ -55,9 +55,8 @@ root@ubuntu:/# ping pingme
 > the hostname is not in the weaveDNS domain the container will *not*
 > be registered, but will still use weaveDNS for resolution.
 
-It is also possible to force or forbid an application container's use
-of weaveDNS with the `--with-dns` and `--without-dns` options to
-`weave run` and `weave launch-proxy`.
+To disable application containers' use of weaveDNS, add the
+`--without-dns` option to `weave run` or `weave launch-proxy`.
 
 ## <a name="how-it-works"></a>How it works
 
@@ -100,7 +99,7 @@ In the event that weaveDNS is launched in this way, it's important that
 other calls to `weave` also specify the bridge device:
 
 ```bash
-$ sudo DOCKER_BRIDGE=someother weave run --with-dns ...
+$ sudo DOCKER_BRIDGE=someother weave run ...
 ```
 
 ## <a name="load-balancing"></a>Load balancing
