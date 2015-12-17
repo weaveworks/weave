@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -16,15 +18,15 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
-	"github.com/weaveworks/weave/nameserver"
 )
 
 const (
 	defaultCaFile   = "ca.pem"
 	defaultKeyFile  = "key.pem"
 	defaultCertFile = "cert.pem"
-	dockerSock      = "/var/run/docker.sock"
-	dockerSockUnix  = "unix://" + dockerSock
+
+	weaveSock     = "/var/run/weave/weave.sock"
+	weaveSockUnix = "unix://" + weaveSock
 )
 
 var (
@@ -46,14 +48,16 @@ type Config struct {
 	HostnameFromLabel   string
 	HostnameMatch       string
 	HostnameReplacement string
+	Image               string
 	ListenAddrs         []string
 	RewriteInspect      bool
 	NoDefaultIPAM       bool
 	NoRewriteHosts      bool
 	TLSConfig           TLSConfig
 	Version             string
-	WithDNS             bool
 	WithoutDNS          bool
+	NoMulticastRoute    bool
+	DockerHost          string
 }
 
 type wait struct {
@@ -65,13 +69,14 @@ type wait struct {
 type Proxy struct {
 	sync.Mutex
 	Config
-	client              *docker.Client
-	dockerBridgeIP      string
-	hostnameMatchRegexp *regexp.Regexp
-	weaveWaitVolume     string
-	weaveWaitNoopVolume string
-	normalisedAddrs     []string
-	waiters             map[*http.Request]*wait
+	client                 *docker.Client
+	dockerBridgeIP         string
+	hostnameMatchRegexp    *regexp.Regexp
+	weaveWaitVolume        string
+	weaveWaitNoopVolume    string
+	weaveWaitNomcastVolume string
+	normalisedAddrs        []string
+	waiters                map[*http.Request]*wait
 }
 
 func NewProxy(c Config) (*Proxy, error) {
@@ -81,14 +86,16 @@ func NewProxy(c Config) (*Proxy, error) {
 		Log.Fatalf("Could not configure tls for proxy: %s", err)
 	}
 
-	// We pin the protocol version to 1.15 (which corresponds to
-	// Docker 1.3.x; the earliest version supported by weave) in order
+	// We pin the protocol version to 1.18 (which corresponds to
+	// Docker 1.6.x; the earliest version supported by weave) in order
 	// to insulate ourselves from breaking changes to the API, as
 	// happened in 1.20 (Docker 1.8.0) when the presentation of
 	// volumes changed in `inspect`.
-	client, err := weavedocker.NewVersionedClient(dockerSockUnix, "1.15")
+	client, err := weavedocker.NewVersionedClient(c.DockerHost, "1.18")
 	if err != nil {
 		return nil, err
+	} else {
+		Log.Info(client.Info())
 	}
 	p.client = client.Client
 
@@ -132,7 +139,16 @@ func (proxy *Proxy) AttachExistingContainers() {
 }
 
 func (proxy *Proxy) Dial() (net.Conn, error) {
-	return net.Dial("unix", dockerSock)
+	proto := "tcp"
+	addr := proxy.Config.DockerHost
+	switch {
+	case strings.HasPrefix(addr, "unix://"):
+		proto = "unix"
+		addr = strings.TrimPrefix(addr, "unix://")
+	case strings.HasPrefix(addr, "tcp://"):
+		addr = strings.TrimPrefix(addr, "tcp://")
+	}
+	return net.Dial(proto, addr)
 }
 
 func (proxy *Proxy) findWeaveWaitVolumes() error {
@@ -140,7 +156,10 @@ func (proxy *Proxy) findWeaveWaitVolumes() error {
 	if proxy.weaveWaitVolume, err = proxy.findVolume("/w"); err != nil {
 		return err
 	}
-	proxy.weaveWaitNoopVolume, err = proxy.findVolume("/w-noop")
+	if proxy.weaveWaitNoopVolume, err = proxy.findVolume("/w-noop"); err != nil {
+		return err
+	}
+	proxy.weaveWaitNomcastVolume, err = proxy.findVolume("/w-nomcast")
 	return err
 }
 
@@ -186,13 +205,32 @@ func (proxy *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (proxy *Proxy) Listen() []net.Listener {
 	listeners := []net.Listener{}
 	proxy.normalisedAddrs = []string{}
+	unixAddrs := []string{}
 	for _, addr := range proxy.ListenAddrs {
+		if strings.HasPrefix(addr, "unix://") || strings.HasPrefix(addr, "/") {
+			unixAddrs = append(unixAddrs, addr)
+			continue
+		}
 		listener, normalisedAddr, err := proxy.listen(addr)
 		if err != nil {
 			Log.Fatalf("Cannot listen on %s: %s", addr, err)
 		}
 		listeners = append(listeners, listener)
 		proxy.normalisedAddrs = append(proxy.normalisedAddrs, normalisedAddr)
+	}
+
+	if len(unixAddrs) > 0 {
+		listener, _, err := proxy.listen(weaveSockUnix)
+		if err != nil {
+			Log.Fatalf("Cannot listen on %s: %s", weaveSockUnix, err)
+		}
+		listeners = append(listeners, listener)
+
+		if err := proxy.symlink(unixAddrs); err != nil {
+			Log.Fatalf("Cannot listen on unix sockets: %s", err)
+		}
+
+		proxy.normalisedAddrs = append(proxy.normalisedAddrs, weaveSockUnix)
 	}
 
 	for _, addr := range proxy.normalisedAddrs {
@@ -291,8 +329,10 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		if err = copyOwnerAndPermissions(dockerSock, addr); err != nil {
-			return nil, "", err
+		if strings.HasPrefix(proxy.Config.DockerHost, "unix://") {
+			if err = copyOwnerAndPermissions(strings.TrimPrefix(proxy.Config.DockerHost, "unix://"), addr); err != nil {
+				return nil, "", err
+			}
 		}
 
 	default:
@@ -405,6 +445,9 @@ func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
 			}
 		}
 	}
+	if proxy.NoMulticastRoute {
+		args = append(args, "--no-multicast-route")
+	}
 	if orDie {
 		args = append(args, "--or-die")
 	}
@@ -476,10 +519,6 @@ func (proxy *Proxy) getDNSDomain() (domain string) {
 		return ""
 	}
 
-	if proxy.WithDNS {
-		domain = nameserver.DefaultDomain
-	}
-
 	weaveContainer, err := proxy.client.InspectContainer("weave")
 	var weaveIP string
 	if err == nil && weaveContainer.NetworkSettings != nil {
@@ -526,4 +565,77 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 	networkSettings["IPAddress"] = ips[0].String()
 	networkSettings["IPPrefixLen"], _ = nets[0].Mask.Size()
 	return nil
+}
+
+func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
+	var container *docker.Container
+	binds := []string{"/var/run/weave:/var/run/weave"}
+	froms := []string{}
+	for _, addr := range unixAddrs {
+		if addr == weaveSockUnix {
+			continue
+		}
+		from := strings.TrimPrefix(addr, "unix://")
+		dir := filepath.Dir(from)
+		binds = append(binds, dir+":"+filepath.Join("/host", dir))
+		froms = append(froms, filepath.Join("/host", from))
+		proxy.normalisedAddrs = append(proxy.normalisedAddrs, addr)
+	}
+	if len(froms) == 0 {
+		return
+	}
+
+	env := []string{
+		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	}
+
+	if val := os.Getenv("WEAVE_DEBUG"); val != "" {
+		env = append(env, fmt.Sprintf("%s=%s", "WEAVE_DEBUG", val))
+	}
+
+	container, err = proxy.client.CreateContainer(docker.CreateContainerOptions{
+		Config: &docker.Config{
+			Image:      proxy.Image,
+			Entrypoint: []string{"/home/weave/symlink", weaveSock},
+			Cmd:        froms,
+			Env:        env,
+		},
+		HostConfig: &docker.HostConfig{Binds: binds},
+	})
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		err2 := proxy.client.RemoveContainer(docker.RemoveContainerOptions{ID: container.ID})
+		if err == nil {
+			err = err2
+		}
+	}()
+
+	err = proxy.client.StartContainer(container.ID, nil)
+	if err != nil {
+		return
+	}
+
+	var buf bytes.Buffer
+	err = proxy.client.AttachToContainer(docker.AttachToContainerOptions{
+		Container:   container.ID,
+		ErrorStream: &buf,
+		Logs:        true,
+		Stderr:      true,
+	})
+	if err != nil {
+		return
+	}
+
+	var rc int
+	rc, err = proxy.client.WaitContainer(container.ID)
+	if err != nil {
+		return
+	}
+	if rc != 0 {
+		err = errors.New(buf.String())
+	}
+	return
 }

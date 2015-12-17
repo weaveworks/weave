@@ -151,7 +151,14 @@ start_container() {
 start_container_with_dns() {
     host=$1
     shift 1
-    weave_on $host run --with-dns "$@" -t $DNS_IMAGE /bin/sh
+    weave_on $host run "$@" -t $DNS_IMAGE /bin/sh
+}
+
+start_container_local_plugin() {
+    host=$1
+    shift 1
+    # using ssh rather than docker -H because CircleCI docker client is older
+    $SSH $host docker run "$@" -dt --net=weave $SMALL_IMAGE /bin/sh
 }
 
 proxy_start_container() {
@@ -217,8 +224,12 @@ assert_dns_ptr_record() {
 start_suite() {
     for host in $HOSTS; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
+        PLUGIN_ID=$(docker_on $host ps -aq --filter=name=weaveplugin)
+        PLUGIN_FILTER="cat"
+        [ -n "$PLUGIN_ID" ] && PLUGIN_FILTER="grep -v $PLUGIN_ID"
+        rm_containers $host $(docker_on $host ps -aq 2>/dev/null | $PLUGIN_FILTER)
+        run_on $host "docker network ls | grep -q ' weave ' && docker network rm weave" || true
         weave_on $host reset 2>/dev/null
-        rm_containers $host $(docker_on $host ps -aq 2>/dev/null)
     done
     whitely echo "$@"
 }

@@ -53,8 +53,14 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 		Log.Infof("Leaving container alone because %s", err)
 	} else {
 		Log.Infof("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
-		if err := addVolume(hostConfig, i.proxy.weaveWaitVolume, "/w", "ro"); err != nil {
-			return err
+		if i.proxy.NoMulticastRoute {
+			if err := addVolume(hostConfig, i.proxy.weaveWaitNomcastVolume, "/w", "ro"); err != nil {
+				return err
+			}
+		} else {
+			if err := addVolume(hostConfig, i.proxy.weaveWaitVolume, "/w", "ro"); err != nil {
+				return err
+			}
 		}
 		if err := i.setWeaveWaitEntrypoint(container); err != nil {
 			return err

@@ -27,6 +27,5 @@ start_container $HOST1 $TARGET_IP/24 --name c2 -h $TARGET
 
 check_dns assert_no_dns_record --without-dns
 check_dns assert_dns_record
-check_dns assert_dns_record --with-dns
 
 end_suite

@@ -478,8 +478,8 @@ type ipamGossipData struct {
 	alloc *Allocator
 }
 
-func (d *ipamGossipData) Merge(other mesh.GossipData) {
-	// no-op
+func (d *ipamGossipData) Merge(other mesh.GossipData) mesh.GossipData {
+	return d // no-op
 }
 
 func (d *ipamGossipData) Encode() [][]byte {

@@ -1,3 +1,30 @@
+## Release 1.4.0
+
+**Highlights**
+
+* The Docker Network plugin can now operate without a cluster store, so it is now run by default.
+* You can now use the fast datapath over trusted links and Weave encryption over untrusted links, in the same network.
+
+Plus many bug fixes and minor enhancements. More details below and in
+the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.4.0).
+
+## Release 1.3.1
+
+**Highlights**
+
+* The minimum Docker version has been increased to 1.6 due to the
+  [upcoming deprecation of Dockerhub access](https://blog.docker.com/2015/10/docker-hub-deprecation-1-5/)
+  for old clients. From December 7th onwards previous versions of the
+  `weave` script will fail to pull down images from the hub; if you
+  are unable to upgrade to 1.3.1 immediately you can work around this
+  by running `weave --local setup` in conjunction with a compatible
+  Docker client installation
+* Docker networking plugin now works with older kernels and allows you
+  to configure the MTU
+
+More details in the
+[change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.3.1).
+
 ## Release 1.3.0
 
 **Highlights**

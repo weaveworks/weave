@@ -12,14 +12,15 @@ import (
 )
 
 var (
-	version = "(unreleased version)"
+	version           = "(unreleased version)"
+	defaultDockerHost = "unix:///var/run/docker.sock"
 )
 
 func main() {
 	var (
 		justVersion bool
 		logLevel    = "info"
-		c           = proxy.Config{ListenAddrs: []string{}}
+		c           = proxy.Config{Image: "weaveworks/weaveexec"}
 	)
 
 	c.Version = version
@@ -35,11 +36,11 @@ func main() {
 	mflag.BoolVar(&c.NoRewriteHosts, []string{"-no-rewrite-hosts"}, false, "do not automatically rewrite /etc/hosts. Use if you need the docker IP to remain in /etc/hosts")
 	mflag.StringVar(&c.TLSConfig.CACert, []string{"#tlscacert", "-tlscacert"}, "", "Trust certs signed only by this CA")
 	mflag.StringVar(&c.TLSConfig.Cert, []string{"#tlscert", "-tlscert"}, "", "Path to TLS certificate file")
-	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tls-verify")
+	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tlsverify")
 	mflag.StringVar(&c.TLSConfig.Key, []string{"#tlskey", "-tlskey"}, "", "Path to TLS key file")
 	mflag.BoolVar(&c.TLSConfig.Verify, []string{"#tlsverify", "-tlsverify"}, false, "Use TLS and verify the remote")
-	mflag.BoolVar(&c.WithDNS, []string{"-with-dns", "w"}, false, "instruct created containers to always use weaveDNS as their nameserver")
 	mflag.BoolVar(&c.WithoutDNS, []string{"-without-dns"}, false, "instruct created containers to never use weaveDNS as their nameserver")
+	mflag.BoolVar(&c.NoMulticastRoute, []string{"-no-multicast-route"}, false, "do not add a multicast route via the weave interface when attaching containers")
 	mflag.Parse()
 
 	if justVersion {
@@ -47,14 +48,19 @@ func main() {
 		os.Exit(0)
 	}
 
-	if c.WithDNS && c.WithoutDNS {
-		Log.Fatalf("Cannot use both '--with-dns' and '--without-dns' flags")
-	}
-
 	SetLogLevel(logLevel)
+
+	if image := os.Getenv("EXEC_IMAGE"); image != "" {
+		c.Image = image
+	}
 
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
+
+	c.DockerHost = defaultDockerHost
+	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
+		c.DockerHost = dockerHost
+	}
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {

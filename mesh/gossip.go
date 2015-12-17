@@ -6,7 +6,7 @@ import (
 
 type GossipData interface {
 	Encode() [][]byte
-	Merge(GossipData)
+	Merge(GossipData) GossipData
 }
 
 type Gossip interface {
@@ -79,8 +79,7 @@ func (sender *GossipSender) Send(data GossipData) {
 	// NB: this must not be invoked concurrently
 	select {
 	case pending := <-sender.cell:
-		pending.Merge(data)
-		sender.cell <- pending
+		sender.cell <- pending.Merge(data)
 	default:
 		sender.cell <- data
 	}
@@ -142,7 +141,7 @@ func (router *Router) SendAllGossip() {
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for channel := range router.gossipChannelSet() {
 		if gossip := channel.gossiper.Gossip(); gossip != nil {
-			channel.SendDown(conn, channel.gossiper.Gossip())
+			channel.SendDown(conn, gossip)
 		}
 	}
 }

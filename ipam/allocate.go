@@ -38,6 +38,11 @@ func (g *allocate) Try(alloc *Allocator) bool {
 	alloc.establishRing()
 
 	if ok, addr := alloc.space.Allocate(g.r); ok {
+		// If caller hasn't supplied a unique ID, file it under the IP address
+		// which lets the caller then release the address using DELETE /ip/address
+		if g.ident == "_" {
+			g.ident = addr.String()
+		}
 		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.r)
 		alloc.addOwned(g.ident, addr)
 		g.resultChan <- allocateResult{addr, nil}

@@ -231,11 +231,11 @@ be able to launch a TLS-enabled proxy with:
 
     host1$ weave launch-proxy
 
-You can also manually configure the proxy's TLS. This is accomplished
-by launching the proxy with the same TLS-related command-line flags as
-supplied to the docker daemon. For example, if you have generated your
-certificates and keys into the docker host's `/tls` directory, we can
-launch the proxy with:
+To disable auto-detection of TLS configuration, you can either pass
+the `--no-detect-tls` flag, or manually configure the proxy's TLS with
+the same TLS-related command-line flags as supplied to the docker
+daemon. For example, if you have generated your certificates and keys
+into the docker host's `/tls` directory, we can launch the proxy with:
 
     host1$ weave launch-proxy --tlsverify --tlscacert=/tls/ca.pem \
              --tlscert=/tls/server-cert.pem --tlskey=/tls/server-key.pem

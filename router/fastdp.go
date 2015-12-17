@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/weaveworks/go-odp/odp"
@@ -40,6 +41,7 @@ type FastDatapath struct {
 	dpif             *odp.Dpif
 	dp               odp.DatapathHandle
 	deleteFlowsCount uint64
+	missCount        uint64
 	missHandlers     map[odp.VportID]missHandler
 	localPeer        *mesh.Peer
 	peers            *mesh.Peers
@@ -109,6 +111,10 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 		forwarders:    make(map[mesh.PeerName]*fastDatapathForwarder),
 	}
 
+	// This delete happens asynchronously in the kernel, meaning that
+	// we can sometimes fail to recreate the vxlan vport with EADDRINUSE -
+	// consequently we retry a small number of times in
+	// getVxlanVportIDHarder() to compensate.
 	if err := fastdp.deleteVxlanVports(); err != nil {
 		return nil, err
 	}
@@ -125,7 +131,7 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 	// numbers to be independent, but working out how to specify
 	// them on the connecting side.  So we can wait to find out if
 	// anyone wants that.
-	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportID(config.Port + 1)
+	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportIDHarder(config.Port+1, 5, time.Millisecond*10)
 	if err != nil {
 		return nil, err
 	}
@@ -216,8 +222,13 @@ func (fastdp fastDatapathBridge) String() string {
 	return fmt.Sprint(fastdp.dpname, " (via ODP)")
 }
 
-func (fastDatapathBridge) Stats() map[string]int {
-	return nil
+func (fastdp fastDatapathBridge) Stats() map[string]int {
+	lock := fastdp.startLock()
+	defer lock.unlock()
+
+	return map[string]int{
+		"FlowMisses": int(fastdp.missCount),
+	}
 }
 
 var routerBridgePortID = bridgePortID{router: true}
@@ -400,6 +411,20 @@ func (fastdp fastDatapathOverlay) StartConsumingPackets(localPeer *mesh.Peer, pe
 	return nil
 }
 
+func (fastdp *FastDatapath) getVxlanVportIDHarder(udpPort int, retries int, duration time.Duration) (odp.VportID, error) {
+	var vxlanVportID odp.VportID
+	var err error
+	for try := 0; try < retries; try++ {
+		vxlanVportID, err = fastdp.getVxlanVportID(udpPort)
+		if err == nil || err != odp.NetlinkError(syscall.EADDRINUSE) {
+			return vxlanVportID, err
+		}
+		log.Warning("Address already in use creating vxlan vport ", udpPort, " - retrying")
+		time.Sleep(duration)
+	}
+	return 0, err
+}
+
 func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
@@ -509,9 +534,8 @@ type fastDatapathForwarder struct {
 
 func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
 	if params.SessionKey != nil {
-		// No encryption suport in fastdp.  The weaver main.go
-		// is responsible for ensuring this doesn't happen.
-		log.Fatal("Attempt to use FastDatapath with encryption")
+		// No encryption support in fastdp
+		return nil, fmt.Errorf("encryption not supported")
 	}
 
 	vxlanVportID := fastdp.mainVxlanVportID
@@ -936,6 +960,8 @@ func (fastdp *FastDatapath) Miss(packet []byte, fks odp.FlowKeys) error {
 
 	lock := fastdp.startLock()
 	defer lock.unlock()
+
+	fastdp.missCount++
 
 	handler := fastdp.getMissHandler(ingress)
 	if handler == nil {

@@ -97,78 +97,6 @@ func (c *GossipChannel) deliver(srcName PeerName, _ []byte, dec *gob.Decoder) er
 	return nil
 }
 
-func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
-	// do this outside the lock below so we avoid lock nesting
-	c.routes.EnsureRecalculated()
-	selectedConnections := make(ConnectionSet)
-	for name := range c.routes.RandomNeighbours(srcName) {
-		if conn, found := c.ourself.ConnectionTo(name); found {
-			selectedConnections[conn] = void
-		}
-	}
-	if len(selectedConnections) == 0 {
-		return
-	}
-	connections := c.ourself.Connections()
-	c.Lock()
-	defer c.Unlock()
-	c.gcSenders(connections)
-	for conn := range selectedConnections {
-		c.sendDown(conn, data)
-	}
-}
-
-func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
-	connections := c.ourself.Connections()
-	c.Lock()
-	defer c.Unlock()
-	c.gcSenders(connections)
-	c.sendDown(conn, data)
-}
-
-// GC - randomly (courtesy of go's map iterator) pick some existing
-// senders and stop&remove them if the associated connection is no
-// longer active.  We stop as soon as we encounter a valid entry; the
-// idea being that when there is little or no garbage then this
-// executes close to O(1)[1], whereas when there is lots of garbage we
-// remove it quickly.
-//
-// [1] TODO Unfortunately, due to the desire to avoid nested locks,
-// instead of simply invoking LocalPeer.ConnectionTo(name), we pass in
-// the result of LocalPeer.Connections(). That is O(n_our_connections)
-// at best.
-func (c *GossipChannel) gcSenders(connections ConnectionSet) {
-	for conn, sender := range c.senders {
-		if _, found := connections[conn]; !found {
-			delete(c.senders, conn)
-			sender.Stop()
-		} else {
-			break
-		}
-	}
-}
-
-// We have seen a couple of failures which suggest a >128GB slice was encountered.
-// 100MB should be enough for anyone.
-const maxFeasibleMessageLen = 100 * 1024 * 1024
-
-func (c *GossipChannel) sendDown(conn Connection, data GossipData) {
-	sender, found := c.senders[conn]
-	if !found {
-		sender = NewGossipSender(func(pending GossipData) {
-			for _, msg := range pending.Encode() {
-				if len(msg) > maxFeasibleMessageLen {
-					panic(fmt.Sprintf("Gossip message too large: len=%d bytes; on channel '%s' from %+v", len(msg), c.name, pending))
-				}
-				protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, msg)}
-				conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
-			}
-		})
-		c.senders[conn] = sender
-	}
-	sender.Send(data)
-}
-
 func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, msg []byte) error {
 	return c.relayUnicast(dstPeerName, GobEncode(c.name, c.ourself.Name, dstPeerName, msg))
 }
@@ -234,6 +162,72 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 		}
 	}
+}
+
+func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
+	c.routes.EnsureRecalculated()
+	destinations := c.routes.RandomNeighbours(srcName)
+	if len(destinations) == 0 {
+		return
+	}
+	c.sendDown(c.ourself.ConnectionsTo(destinations), data)
+}
+
+func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
+	c.sendDown([]Connection{conn}, data)
+}
+
+func (c *GossipChannel) sendDown(selectedConnections []Connection, data GossipData) {
+	if len(selectedConnections) == 0 {
+		return
+	}
+	connections := c.ourself.Connections()
+	c.Lock()
+	defer c.Unlock()
+	// GC - randomly (courtesy of go's map iterator) pick some
+	// existing senders and stop&remove them if the associated
+	// connection is no longer active.  We stop as soon as we
+	// encounter a valid entry; the idea being that when there is
+	// little or no garbage then this executes close to O(1)[1],
+	// whereas when there is lots of garbage we remove it quickly.
+	//
+	// [1] TODO Unfortunately, due to the desire to avoid nested
+	// locks, instead of simply invoking LocalPeer.ConnectionTo(name),
+	// we operate on LocalPeer.Connections(). That is
+	// O(n_our_connections) at best.
+	for conn, sender := range c.senders {
+		if _, found := connections[conn]; !found {
+			delete(c.senders, conn)
+			sender.Stop()
+		} else {
+			break
+		}
+	}
+	// start senders, if necessary, and send.
+	for _, conn := range selectedConnections {
+		sender, found := c.senders[conn]
+		if !found {
+			sender = c.makeSender(conn)
+			c.senders[conn] = sender
+		}
+		sender.Send(data)
+	}
+}
+
+// We have seen a couple of failures which suggest a >128GB slice was encountered.
+// 100MB should be enough for anyone.
+const maxFeasibleMessageLen = 100 * 1024 * 1024
+
+func (c *GossipChannel) makeSender(conn Connection) *GossipSender {
+	return NewGossipSender(func(pending GossipData) {
+		for _, msg := range pending.Encode() {
+			if len(msg) > maxFeasibleMessageLen {
+				panic(fmt.Sprintf("Gossip message too large: len=%d bytes; on channel '%s' from %+v", len(msg), c.name, pending))
+			}
+			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, msg)}
+			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+		}
+	})
 }
 
 func (c *GossipChannel) log(args ...interface{}) {

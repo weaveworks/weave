@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
+	"text/template"
+
 	"github.com/gorilla/mux"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam"
@@ -10,9 +15,6 @@ import (
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
-	"net/http"
-	"strings"
-	"text/template"
 )
 
 var rootTemplate = template.New("root").Funcs(map[string]interface{}{
@@ -24,6 +26,66 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			}
 		}
 		return count
+	},
+	"printList": func(list []string) string {
+		if len(list) == 0 {
+			return "none"
+		}
+		return strings.Join(list, ", ")
+	},
+	"printIPAMRanges": func(router weave.NetworkRouterStatus, status ipam.Status) string {
+		var buffer bytes.Buffer
+
+		type stats struct {
+			ips       uint32
+			nickname  string
+			reachable bool
+		}
+
+		peerStats := make(map[string]*stats)
+
+		for _, entry := range status.Entries {
+			s, found := peerStats[entry.Peer]
+			if !found {
+				s = &stats{nickname: entry.Nickname, reachable: entry.IsKnownPeer}
+				peerStats[entry.Peer] = s
+			}
+			s.ips += entry.Size
+		}
+
+		printOwned := func(name string, nickName string, reachable bool, ips uint32) {
+			reachableStr := ""
+			if !reachable {
+				reachableStr = "- unreachable!"
+			}
+			percentageRanges := float32(ips) * 100.0 / float32(status.RangeNumIPs)
+
+			displayName := name + "(" + nickName + ")"
+			fmt.Fprintf(&buffer, "%-37v %8d IPs (%04.1f%% of total) %s\n",
+				displayName, ips, percentageRanges, reachableStr)
+		}
+
+		// print the local info first
+		if ourStats := peerStats[router.Name]; ourStats != nil {
+			printOwned(router.Name, ourStats.nickname, true, ourStats.ips)
+		}
+
+		// and then the rest
+		for peer, stats := range peerStats {
+			if peer != router.Name {
+				printOwned(peer, stats.nickname, stats.reachable, stats.ips)
+			}
+		}
+
+		return buffer.String()
+	},
+	"allIPAMOwnersUnreachable": func(status ipam.Status) bool {
+		for _, entry := range status.Entries {
+			if entry.Size > 0 && entry.IsKnownPeer {
+				return false
+			}
+		}
+		return true
 	},
 	"printConnectionCounts": func(conns []mesh.LocalConnectionStatus) string {
 		counts := make(map[string]int)
@@ -76,40 +138,48 @@ func defTemplate(name string, text string) *template.Template {
 }
 
 var statusTemplate = defTemplate("status", `\
-       Version: {{.Version}}
+        Version: {{.Version}}
 
-       Service: router
-      Protocol: {{.Router.Protocol}} \
+        Service: router
+       Protocol: {{.Router.Protocol}} \
 {{if eq .Router.ProtocolMinVersion .Router.ProtocolMaxVersion}}\
 {{.Router.ProtocolMaxVersion}}\
 {{else}}\
 {{.Router.ProtocolMinVersion}}..{{.Router.ProtocolMaxVersion}}\
 {{end}}
-          Name: {{.Router.Name}}({{.Router.NickName}})
-    Encryption: {{printState .Router.Encryption}}
- PeerDiscovery: {{printState .Router.PeerDiscovery}}
-       Targets: {{len .Router.Targets}}
-   Connections: {{len .Router.Connections}}{{with printConnectionCounts .Router.Connections}} ({{.}}){{end}}
-         Peers: {{len .Router.Peers}}{{with printPeerConnectionCounts .Router.Peers}} (with {{.}} connections){{end}}
+           Name: {{.Router.Name}}({{.Router.NickName}})
+     Encryption: {{printState .Router.Encryption}}
+  PeerDiscovery: {{printState .Router.PeerDiscovery}}
+        Targets: {{len .Router.Targets}}
+    Connections: {{len .Router.Connections}}{{with printConnectionCounts .Router.Connections}} ({{.}}){{end}}
+          Peers: {{len .Router.Peers}}{{with printPeerConnectionCounts .Router.Peers}} (with {{.}} connections){{end}}
+ TrustedSubnets: {{printList .Router.TrustedSubnets}}
 {{if .IPAM}}\
 
-       Service: ipam
+        Service: ipam
 {{if .IPAM.Entries}}\
-     Consensus: achieved
-{{else if .IPAM.Paxos}}\
-     Consensus: waiting (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
+{{if allIPAMOwnersUnreachable .IPAM}}\
+         Status: all IP ranges owned by unreachable peers - use 'rmpeer' if they are dead
+{{else if len .IPAM.PendingAllocates}}\
+         Status: waiting for IP range grant from peers
 {{else}}\
-     Consensus: deferred
+         Status: ready
 {{end}}\
-         Range: {{.IPAM.Range}}
- DefaultSubnet: {{.IPAM.DefaultSubnet}}
+{{else if .IPAM.Paxos}}\
+         Status: awaiting consensus (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
+{{else}}\
+         Status: idle
+{{end}}\
+          Range: {{.IPAM.Range}}
+  DefaultSubnet: {{.IPAM.DefaultSubnet}}
 {{end}}\
 {{if .DNS}}\
 
-       Service: dns
-        Domain: {{.DNS.Domain}}
-           TTL: {{.DNS.TTL}}
-       Entries: {{countDNSEntries .DNS.Entries}}
+        Service: dns
+         Domain: {{.DNS.Domain}}
+       Upstream: {{printList .DNS.Upstream}}
+            TTL: {{.DNS.TTL}}
+        Entries: {{countDNSEntries .DNS.Entries}}
 {{end}}\
 `)
 
@@ -129,7 +199,7 @@ var peersTemplate = defTemplate("peers", `\
 {{.Name}}({{.NickName}})
 {{range .Connections}}\
    {{if .Outbound}}->{{else}}<-{{end}} {{printf "%-21v" .Address}} \
-{{$nameNickName := printf "%v(%v)" .Name .NickName}}{{printf "%-32v" $nameNickName}} \
+{{$nameNickName := printf "%v(%v)" .Name .NickName}}{{printf "%-37v" $nameNickName}} \
 {{if .Established}}established{{else}}pending{{end}}
 {{end}}\
 {{end}}\
@@ -144,6 +214,8 @@ var dnsEntriesTemplate = defTemplate("dnsEntries", `\
 {{end}}\
 {{end}}\
 `)
+
+var ipamTemplate = defTemplate("ipamTemplate", `{{printIPAMRanges .Router .IPAM}}`)
 
 type WeaveStatus struct {
 	Version string
@@ -174,7 +246,13 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 
 	muxRouter.Methods("GET").Path("/report").Queries("format", "{format}").HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			formatTemplate, err := template.New("format").Parse(mux.Vars(r)["format"])
+			funcs := template.FuncMap{
+				"json": func(v interface{}) string {
+					a, _ := json.Marshal(v)
+					return string(a)
+				},
+			}
+			formatTemplate, err := template.New("format").Funcs(funcs).Parse(mux.Vars(r)["format"])
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -200,5 +278,6 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 	defHandler("/status/connections", connectionsTemplate)
 	defHandler("/status/peers", peersTemplate)
 	defHandler("/status/dns", dnsEntriesTemplate)
+	defHandler("/status/ipam", ipamTemplate)
 
 }

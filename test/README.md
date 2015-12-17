@@ -2,7 +2,7 @@ This directory contains integration tests for weave.
 
 ## Requirements
 
-You need two VMs with docker >=1.3.1 installed and listening on TCP
+You need two VMs with docker >=1.6.0 installed and listening on TCP
 port 2375 (see below). You also need to be able to ssh to these VMs,
 preferably without having to input anything.
 

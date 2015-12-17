@@ -40,16 +40,19 @@ type RemoteConnection struct {
 type LocalConnection struct {
 	sync.RWMutex
 	RemoteConnection
-	TCPConn      *net.TCPConn
-	version      byte
-	tcpSender    TCPSender
-	SessionKey   *[32]byte
-	heartbeatTCP *time.Ticker
-	Router       *Router
-	uid          uint64
-	actionChan   chan<- ConnectionAction
-	finished     <-chan struct{} // closed to signal that actorLoop has finished
-	OverlayConn  OverlayConnection
+	TCPConn         *net.TCPConn
+	TrustRemote     bool // is remote on a trusted subnet?
+	TrustedByRemote bool // does remote trust us?
+	version         byte
+	tcpSender       TCPSender
+	SessionKey      *[32]byte
+	heartbeatTCP    *time.Ticker
+	Router          *Router
+	uid             uint64
+	actionChan      chan<- ConnectionAction
+	errorChan       chan<- error
+	finished        <-chan struct{} // closed to signal that actorLoop has finished
+	OverlayConn     OverlayConnection
 }
 
 type ConnectionAction func() error
@@ -86,17 +89,19 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ro
 	if connRemote.local != router.Ourself.Peer {
 		log.Fatal("Attempt to create local connection from a peer which is not ourself")
 	}
-	// NB, we're taking a copy of connRemote here.
 	actionChan := make(chan ConnectionAction, ChannelSize)
+	errorChan := make(chan error, 1)
 	finished := make(chan struct{})
 	conn := &LocalConnection{
-		RemoteConnection: *connRemote,
+		RemoteConnection: *connRemote, // NB, we're taking a copy of connRemote here.
 		Router:           router,
 		TCPConn:          tcpConn,
+		TrustRemote:      router.Trusts(connRemote),
 		uid:              randUint64(),
 		actionChan:       actionChan,
+		errorChan:        errorChan,
 		finished:         finished}
-	go conn.run(actionChan, finished, acceptNewPeer)
+	go conn.run(actionChan, errorChan, finished, acceptNewPeer)
 }
 
 func (conn *LocalConnection) BreakTie(dupConn Connection) ConnectionTieBreak {
@@ -116,11 +121,6 @@ func (conn *LocalConnection) Established() bool {
 	return conn.established
 }
 
-// Send directly, not via the Actor.  If it goes via the Actor we can
-// get a deadlock where LocalConnection is blocked talking to
-// LocalPeer and LocalPeer is blocked trying send a ProtocolMsg via
-// LocalConnection, and the channels are full in both directions so
-// nothing can proceed.
 func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 	if err := conn.sendProtocolMsg(m); err != nil {
 		conn.Shutdown(err)
@@ -134,15 +134,17 @@ func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
 // do not need locks for reading, and only need write locks for fields
 // read by other processes.
 
-// Async
+// Non-blocking.
 func (conn *LocalConnection) Shutdown(err error) {
 	// err should always be a real error, even if only io.EOF
 	if err == nil {
 		panic("nil error")
 	}
 
-	// Run on its own goroutine in case the channel is backed up
-	go func() { conn.sendAction(func() error { return err }) }()
+	select {
+	case conn.errorChan <- err:
+	default:
+	}
 }
 
 // Send an actor request to the actorLoop, but don't block if
@@ -157,7 +159,7 @@ func (conn *LocalConnection) sendAction(action ConnectionAction) {
 
 // ACTOR server
 
-func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished chan<- struct{}, acceptNewPeer bool) {
+func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, errorChan <-chan error, finished chan<- struct{}, acceptNewPeer bool) {
 	var err error // important to use this var and not create another one with 'err :='
 	defer func() { conn.shutdown(err) }()
 	defer close(finished)
@@ -190,13 +192,19 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 
 	conn.Log("connection ready; using protocol version", conn.version)
 
+	// only use negotiated session key for untrusted connections
+	var sessionKey *[32]byte
+	if conn.Untrusted() {
+		sessionKey = conn.SessionKey
+	}
+
 	params := OverlayConnectionParams{
 		RemotePeer:         conn.remote,
 		LocalAddr:          conn.TCPConn.LocalAddr().(*net.TCPAddr),
 		RemoteAddr:         conn.TCPConn.RemoteAddr().(*net.TCPAddr),
 		Outbound:           conn.outbound,
 		ConnUID:            conn.uid,
-		SessionKey:         conn.SessionKey,
+		SessionKey:         sessionKey,
 		SendControlMessage: conn.sendOverlayControlMessage,
 		Features:           intro.Features,
 	}
@@ -243,7 +251,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, finished ch
 	// running AddConnection in a separate goroutine, at least not
 	// without some synchronisation. Which in turn requires the
 	// launching of the receiveTCP goroutine to precede actorLoop.
-	err = conn.actorLoop(actionChan)
+	err = conn.actorLoop(actionChan, errorChan)
 }
 
 func (conn *LocalConnection) makeFeatures() map[string]string {
@@ -254,6 +262,7 @@ func (conn *LocalConnection) makeFeatures() map[string]string {
 		"ShortID":         fmt.Sprint(conn.local.ShortID),
 		"UID":             fmt.Sprint(conn.local.UID),
 		"ConnID":          fmt.Sprint(conn.uid),
+		"Trusted":         fmt.Sprint(conn.TrustRemote),
 	}
 	conn.Router.Overlay.AddFeaturesTo(features)
 	return features
@@ -295,12 +304,20 @@ func (conn *LocalConnection) parseFeatures(features features) (*Peer, error) {
 	var hasShortID bool
 	if shortIDStr, present := features["ShortID"]; present {
 		hasShortID = true
-		shortID, err = strconv.ParseUint(shortIDStr, 10,
-			PeerShortIDBits)
+		shortID, err = strconv.ParseUint(shortIDStr, 10, PeerShortIDBits)
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	var trusted bool
+	if trustedStr, present := features["Trusted"]; present {
+		trusted, err = strconv.ParseBool(trustedStr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	conn.TrustedByRemote = trusted
 
 	uid, err := ParsePeerUID(features.Get("UID"))
 	if err != nil {
@@ -335,7 +352,7 @@ func (conn *LocalConnection) registerRemote(remote *Peer, acceptNewPeer bool) er
 	return nil
 }
 
-func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err error) {
+func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction, errorChan <-chan error) (err error) {
 	fwdErrorChan := conn.OverlayConn.ErrorChannel()
 	fwdEstablishedChan := conn.OverlayConn.EstablishedChannel()
 
@@ -343,6 +360,8 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction) (err 
 		select {
 		case action := <-actionChan:
 			err = action()
+
+		case err = <-errorChan:
 
 		case <-conn.heartbeatTCP.C:
 			err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
@@ -434,4 +453,8 @@ func (conn *LocalConnection) handleProtocolMsg(tag ProtocolTag, payload []byte) 
 
 func (conn *LocalConnection) extendReadDeadline() {
 	conn.TCPConn.SetReadDeadline(time.Now().Add(TCPHeartbeat * 2))
+}
+
+func (conn *LocalConnection) Untrusted() bool {
+	return !conn.TrustRemote || !conn.TrustedByRemote
 }

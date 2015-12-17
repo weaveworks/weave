@@ -13,7 +13,6 @@ import (
 
 	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
-	wt "github.com/weaveworks/weave/testing"
 	"github.com/weaveworks/weave/testing/gossip"
 )
 
@@ -76,12 +75,6 @@ func (m mapping) Addrs() []address.Address {
 }
 
 func TestNameservers(t *testing.T) {
-	wt.RunWithTimeout(t, 2*time.Minute, func() {
-		testNameservers(t)
-	})
-}
-
-func testNameservers(t *testing.T) {
 	//common.SetLogLevel("debug")
 
 	lookupTimeout := 10 // ms

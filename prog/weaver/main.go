@@ -69,7 +69,14 @@ func main() {
 		dnsEffectiveListenAddress string
 		iface                     *net.Interface
 		datapathName              string
+		trustedSubnetStr          string
+
+		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
+
+	if val := os.Getenv("DOCKER_HOST"); val != "" {
+		defaultDockerHost = val
+	}
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
 	mflag.BoolVar(&createDatapath, []string{"-create-datapath"}, false, "create ODP datapath and exit")
@@ -92,7 +99,7 @@ func main() {
 	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
-	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, "", "Docker API endpoint, e.g. unix:///var/run/docker.sock")
+	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
 	mflag.StringVar(&dnsListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
@@ -100,6 +107,8 @@ func main() {
 	mflag.DurationVar(&dnsClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 	mflag.StringVar(&dnsEffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
+
+	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "Command separated list of trusted subnets in CIDR notation")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -193,10 +202,7 @@ func main() {
 		Log.Println("Communication between peers is unencrypted.")
 	} else {
 		config.Password = []byte(password)
-		Log.Println("Communication between peers is encrypted.")
-
-		// fastdp doesn't support encryption
-		fastDPOverlay = nil
+		Log.Println("Communication between peers via untrusted networks is encrypted.")
 	}
 
 	overlays := weave.NewOverlaySwitch()
@@ -237,6 +243,10 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
+	if config.TrustedSubnets, err = parseTrustedSubnets(trustedSubnetStr); err != nil {
+		Log.Fatal("Unable to parse trusted subnets: ", err)
+	}
+
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlays)
 	Log.Println("Our name is", router.Ourself)
 
@@ -245,6 +255,8 @@ func main() {
 		dc, err := docker.NewClient(dockerAPI)
 		if err != nil {
 			Log.Fatal("Unable to start docker client: ", err)
+		} else {
+			Log.Info(dc.Info())
 		}
 		dockerCli = dc
 	}
@@ -403,6 +415,24 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	quorum := clusterSize/2 + 1
 	Log.Println("Assuming quorum size of", quorum)
 	return quorum
+}
+
+func parseTrustedSubnets(trustedSubnetStr string) ([]*net.IPNet, error) {
+	trustedSubnets := []*net.IPNet{}
+
+	if trustedSubnetStr == "" {
+		return trustedSubnets, nil
+	}
+
+	for _, subnetStr := range strings.Split(trustedSubnetStr, ",") {
+		_, subnet, err := net.ParseCIDR(subnetStr)
+		if err != nil {
+			return nil, err
+		}
+		trustedSubnets = append(trustedSubnets, subnet)
+	}
+
+	return trustedSubnets, nil
 }
 
 func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {

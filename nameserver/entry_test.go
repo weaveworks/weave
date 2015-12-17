@@ -117,7 +117,7 @@ func TestGossipDataMerge(t *testing.T) {
 	g1 := GossipData{Entries: makeEntries("AcDf")}
 	g2 := GossipData{Entries: makeEntries("BEf")}
 
-	g1.Merge(&g2)
+	g3 := g1.Merge(&g2).(*GossipData)
 
-	require.Equal(t, GossipData{Entries: makeEntries("ABcDEf")}, g1)
+	require.Equal(t, GossipData{Entries: makeEntries("ABcDEf")}, *g3)
 }

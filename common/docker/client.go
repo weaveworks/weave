@@ -1,7 +1,12 @@
 package docker
 
 import (
-	"github.com/fsouza/go-dockerclient"
+	"errors"
+	"fmt"
+	"strings"
+
+	docker "github.com/fsouza/go-dockerclient"
+
 	. "github.com/weaveworks/weave/common"
 )
 
@@ -17,32 +22,52 @@ type Client struct {
 
 // NewClient creates a new Docker client and checks we can talk to Docker
 func NewClient(apiPath string) (*Client, error) {
+	if apiPath != "" && !strings.Contains(apiPath, "://") {
+		apiPath = "tcp://" + apiPath
+	}
 	dc, err := docker.NewClient(apiPath)
 	if err != nil {
 		return nil, err
 	}
 	client := &Client{dc}
 
-	return client, client.checkWorking(apiPath)
+	return client, client.checkWorking()
 }
 
 func NewVersionedClient(apiPath string, apiVersionString string) (*Client, error) {
+	if !strings.Contains(apiPath, "://") {
+		apiPath = "tcp://" + apiPath
+	}
 	dc, err := docker.NewVersionedClient(apiPath, apiVersionString)
 	if err != nil {
 		return nil, err
 	}
 	client := &Client{dc}
 
-	return client, client.checkWorking(apiPath)
+	return client, client.checkWorking()
 }
 
-func (c *Client) checkWorking(apiPath string) error {
-	env, err := c.Version()
+func NewVersionedClientFromEnv(apiVersionString string) (*Client, error) {
+	dc, err := docker.NewVersionedClientFromEnv(apiVersionString)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	Log.Infof("[docker] Using Docker API on %s: %v", apiPath, env)
-	return nil
+	client := &Client{dc}
+
+	return client, client.checkWorking()
+}
+
+func (c *Client) checkWorking() error {
+	_, err := c.Version()
+	return err
+}
+
+func (c *Client) Info() string {
+	if env, err := c.Version(); err != nil {
+		return fmt.Sprintf("Docker API error: %s", err)
+	} else {
+		return fmt.Sprintf("Docker API on %s: %v", c.Endpoint(), env)
+	}
 }
 
 // AddObserver adds an observer for docker events
@@ -79,4 +104,29 @@ func (c *Client) IsContainerNotRunning(idStr string) bool {
 	}
 	Log.Errorf("[docker] Could not check container status: %s", err)
 	return false
+}
+
+// This is intended to find an IP address that we can reach the container on;
+// if it is on the Docker bridge network then that address; if on the host network
+// then localhost
+func (c *Client) GetContainerIP(nameOrID string) (string, error) {
+	Log.Debugf("Getting IP for container %s", nameOrID)
+	info, err := c.InspectContainer(nameOrID)
+	if err != nil {
+		return "", err
+	}
+	if info.NetworkSettings.Networks != nil {
+		Log.Debugln("Networks: ", info.NetworkSettings.Networks)
+		if bridgeNetwork, ok := info.NetworkSettings.Networks["bridge"]; ok {
+			return bridgeNetwork.IPAddress, nil
+		} else if _, ok := info.NetworkSettings.Networks["host"]; ok {
+			return "127.0.0.1", nil
+		}
+	} else if info.HostConfig.NetworkMode == "host" {
+		return "127.0.0.1", nil
+	}
+	if info.NetworkSettings.IPAddress == "" {
+		return "", errors.New("No IP address found for container " + nameOrID)
+	}
+	return info.NetworkSettings.IPAddress, nil
 }

@@ -41,8 +41,14 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 					return err
 				}
 			} else {
-				if err := addVolume(hostConfig, i.proxy.weaveWaitVolume, "/w", "ro"); err != nil {
-					return err
+				if i.proxy.NoMulticastRoute {
+					if err := addVolume(hostConfig, i.proxy.weaveWaitNomcastVolume, "/w", "ro"); err != nil {
+						return err
+					}
+				} else {
+					if err := addVolume(hostConfig, i.proxy.weaveWaitVolume, "/w", "ro"); err != nil {
+						return err
+					}
 				}
 				if dnsDomain := i.proxy.getDNSDomain(); dnsDomain != "" {
 					if err := i.proxy.setWeaveDNS(hostConfig, container.Config.Hostname, dnsDomain); err != nil {

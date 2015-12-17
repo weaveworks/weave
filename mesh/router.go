@@ -37,6 +37,7 @@ type Config struct {
 	Password           []byte
 	ConnLimit          int
 	PeerDiscovery      bool
+	TrustedSubnets     []*net.IPNet
 }
 
 type Router struct {
@@ -122,26 +123,28 @@ type TopologyGossipData struct {
 	update PeerNameSet
 }
 
+func (d *TopologyGossipData) Merge(other GossipData) GossipData {
+	names := make(PeerNameSet)
+	for name := range d.update {
+		names[name] = void
+	}
+	for name := range other.(*TopologyGossipData).update {
+		names[name] = void
+	}
+	return &TopologyGossipData{peers: d.peers, update: names}
+}
+
+func (d *TopologyGossipData) Encode() [][]byte {
+	return [][]byte{d.peers.EncodePeers(d.update)}
+}
+
 func (router *Router) BroadcastTopologyUpdate(update []*Peer) {
 	names := make(PeerNameSet)
 	for _, p := range update {
 		names[p.Name] = void
 	}
-
-	router.TopologyGossip.GossipBroadcast(&TopologyGossipData{
-		peers:  router.Peers,
-		update: names,
-	})
-}
-
-func (d *TopologyGossipData) Merge(other GossipData) {
-	for name := range other.(*TopologyGossipData).update {
-		d.update[name] = void
-	}
-}
-
-func (d *TopologyGossipData) Encode() [][]byte {
-	return [][]byte{d.peers.EncodePeers(d.update)}
+	router.TopologyGossip.GossipBroadcast(
+		&TopologyGossipData{peers: router.Peers, update: names})
 }
 
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
@@ -170,14 +173,6 @@ func (router *Router) OnGossip(update []byte) (GossipData, error) {
 
 func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
 	origUpdate, newUpdate, err := router.Peers.ApplyUpdate(update)
-	if _, ok := err.(UnknownPeerError); err != nil && ok {
-		// That update contained a reference to a peer which wasn't
-		// itself included in the update, and we didn't know about
-		// already. We ignore this; eventually we should receive an
-		// update containing a complete topology.
-		log.Println("Topology gossip:", err)
-		return nil, nil, nil
-	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -186,4 +181,18 @@ func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameS
 		router.Routes.Recalculate()
 	}
 	return origUpdate, newUpdate, nil
+}
+
+func (router *Router) Trusts(remote *RemoteConnection) bool {
+	if tcpAddr, err := net.ResolveTCPAddr("tcp4", remote.remoteTCPAddr); err == nil {
+		for _, trustedSubnet := range router.TrustedSubnets {
+			if trustedSubnet.Contains(tcpAddr.IP) {
+				return true
+			}
+		}
+	} else {
+		// Should not happen as remoteTCPAddr was obtained from TCPConn
+		log.Errorf("Unable to parse remote TCP addr: %s", err)
+	}
+	return false
 }
