@@ -11,6 +11,7 @@ layout: default
  * [List DNS entries](#weave-status-dns)
  * [JSON report](#weave-report)
  * [List attached containers](#list-attached-containers)
+ * [Reboots](#reboots)
  * [Snapshot releases](#snapshots)
 
 Check what version of weave you are running with
@@ -267,20 +268,21 @@ You can also supply a list of container IDs/names to `weave ps`, like this:
     able ce:15:34:a9:b5:6d 10.2.5.1/24
     baker 7a:61:a2:49:4b:91 10.2.8.3/24
 
-### Reboots
+### <a name="reboots"></a>Reboots
 
 When a host reboots, docker's default behaviour is to restart any
-containers that were running. Since weave relies on special network
-configuration outside of the containers, the weave network will not
-function in this state.
+containers that were running. The Weave proxy re-attaches any
+containers it sees at start-up; however this process is not entirely
+reliable; we have at least [one issue][issue1556] in Weave and [one in
+docker][docker18574] that cause trouble.
 
-To remedy this, stop and re-launch the weave container, and re-attach
-the application containers with `weave attach`.
-
-For a more permanent solution,
-[disable Docker's auto-restart feature](https://docs.docker.com/articles/host_integration/)
+For a more dependable solution,
+[disable Docker's auto-restart feature][docker-host-integration]
 and create appropriate startup scripts to launch weave and run
 application containers from your favourite process manager.
+
+Note that if you use the Weave Docker plugin, it must always start
+with Docker, as described in [its documentation](plugin.html).
 
 ### <a name="snapshots"></a>Snapshot Releases
 
@@ -294,3 +296,7 @@ latest snapshot release with
 
 Snapshot releases report the script version as "(unreleased version)",
 and the container image versions as git hashes.
+
+[issue1556]: https://github.com/weaveworks/weave/issues/1556
+[docker18574]: https://github.com/docker/docker/issues/18574
+[docker-host-integration]: https://docs.docker.com/articles/host_integration/
