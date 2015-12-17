@@ -18,6 +18,14 @@ func (client *Client) AllocateIP(ID string) (*net.IPNet, error) {
 	return client.ipamOp(ID, "POST")
 }
 
+func (client *Client) AllocateIPInRange(ID string, ipRange *net.IPNet) (*net.IPNet, error) {
+	ip, err := client.httpVerb("POST", fmt.Sprintf("/ip/%s/%s", ID, ipRange.String()), nil)
+	if err != nil {
+		return nil, err
+	}
+	return parseIP(ip)
+}
+
 // returns an IP for the ID given, or nil if one has not been
 // allocated
 func (client *Client) LookupIP(ID string) (*net.IPNet, error) {
