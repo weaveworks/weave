@@ -3,6 +3,8 @@ title: Using Weave Net via Docker Networking
 layout: default
 ---
 
+# Weave Plugin
+
 New in Docker version 1.9 is a plugin mechanism to add different
 network providers.
 
@@ -18,11 +20,11 @@ you remove this container (e.g. using `weave reset`) before removing
 all endpoints created using `--net=weave`, Docker can
 [hang](https://github.com/docker/libnetwork/issues/813).
 
-## Starting a container:
+## Starting a container
 
     $ docker run --net=weave -ti ubuntu
 
-## Using WeaveDNS for Service Discovery:
+## Using WeaveDNS for Service Discovery
 
 You need to pass the additional arguments `--dns` and `-dns-search`,
 for which we provide a helper in the weave script:
@@ -46,6 +48,11 @@ store](#cluster-store) (like Docker's overlay driver) and one named
 * Supports only a single network (we create one named `weave` for you automatically)
 * Uses Weave's partition tolerant IPAM
 
+If you do create additional networks using the `weavemesh` driver,
+containers attached to them will be able to communicate with
+containers attached to `weave`; there is no isolation between those
+networks.
+
 ### `weave` driver
 
 * This runs in what Docker call "global scope"; requires a cluster store
@@ -56,7 +63,7 @@ There's no specific documentation from Docker on using a cluster
 store, but the first part of [Getting Started with Docker Multi-host Networking][docker-net]
 should point the way.
 
-Note that in the case of multiple docker networks, all containers are
+Note that in the case of multiple networks using the `weave` driver, all containers are
 on the same virtual network but Docker allocates their addresses on
 different subnets so they cannot talk to each other directly.
 
