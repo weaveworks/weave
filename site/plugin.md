@@ -3,6 +3,8 @@ title: Using Weave Net via Docker Networking
 layout: default
 ---
 
+# Weave Plugin
+
 New in Docker version 1.9 is a plugin mechanism to add different
 network providers.
 
@@ -18,11 +20,11 @@ you remove this container (e.g. using `weave reset`) before removing
 all endpoints created using `--net=weave`, Docker can
 [hang](https://github.com/docker/libnetwork/issues/813).
 
-## Starting a container:
+## Starting a container
 
     $ docker run --net=weave -ti ubuntu
 
-## Using WeaveDNS for Service Discovery:
+## Using WeaveDNS for Service Discovery
 
 You need to pass the additional arguments `--dns` and `-dns-search`,
 for which we provide a helper in the weave script:
