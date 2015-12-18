@@ -1604,14 +1604,14 @@ launch_router() {
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
         IPRANGE="10.32.0.0/12"
         if command_exists netcheck && ! netcheck --ignore-iface=$BRIDGE $IPRANGE ; then
-                echo "ERROR: Default --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
-                echo "You must pick another range and set it on all hosts." >&2
+            echo "ERROR: Default --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
+            echo "You must pick another range and set it on all hosts." >&2
             exit 1
-            fi
-        else
-            if [ -n "$IPRANGE" ] && command_exists netcheck && ! netcheck --ignore-iface=$BRIDGE $IPRANGE ; then
-                echo "WARNING: Specified --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
-                echo "Unless this is deliberate, you must pick another range and set it on all hosts." >&2
+        fi
+    else
+        if [ -n "$IPRANGE" ] && command_exists netcheck && ! netcheck --ignore-iface=$BRIDGE $IPRANGE ; then
+            echo "WARNING: Specified --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
+            echo "Unless this is deliberate, you must pick another range and set it on all hosts." >&2
         fi
     fi
 
