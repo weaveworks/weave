@@ -61,7 +61,7 @@ func (c *GossipChannel) deliverUnicast(srcName PeerName, origPayload []byte, dec
 	return nil
 }
 
-func (c *GossipChannel) deliverBroadcast(srcName PeerName, _ []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliverBroadcast(srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
 		return err
@@ -70,7 +70,7 @@ func (c *GossipChannel) deliverBroadcast(srcName PeerName, _ []byte, dec *gob.De
 	if err != nil {
 		return err
 	}
-	if err := c.relayBroadcast(srcName, payload); err != nil {
+	if err := c.relayBroadcast(srcName, origPayload); err != nil {
 		c.log(err)
 	}
 	return nil
@@ -94,7 +94,7 @@ func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, msg []byte) error {
 }
 
 func (c *GossipChannel) GossipBroadcast(update []byte) error {
-	return c.relayBroadcast(c.ourself.Name, update)
+	return c.relayBroadcast(c.ourself.Name, GobEncode(c.name, c.ourself.Name, update))
 }
 
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
@@ -108,13 +108,13 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err erro
 	return err
 }
 
-func (c *GossipChannel) relayBroadcast(srcName PeerName, update []byte) error {
+func (c *GossipChannel) relayBroadcast(srcName PeerName, buf []byte) error {
 	c.routes.EnsureRecalculated()
 	destinations := c.routes.BroadcastAll(srcName)
 	if len(destinations) == 0 {
 		return nil
 	}
-	msg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, update)}
+	msg := ProtocolMsg{ProtocolGossipBroadcast, buf}
 	for _, conn := range c.ourself.ConnectionsTo(destinations) {
 		conn.(ProtocolSender).GossipSender(c.name, c.gossip).SendGossip(msg)
 	}
