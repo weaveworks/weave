@@ -299,7 +299,7 @@ func (alloc *Allocator) pickPeerForTransfer() mesh.PeerName {
 	if heir := alloc.ring.PickPeerForTransfer(t); heir != mesh.UnknownPeerName {
 		return heir
 	}
-	// finally, disappeared peers that that passively participated in IPAM
+	// finally, disappeared peers that passively participated in IPAM
 	return alloc.pickPeerFromNicknames(t)
 }
 
