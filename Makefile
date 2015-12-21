@@ -40,15 +40,14 @@ WEAVE_EXPORT=weave.tar.gz
 WEAVEEXEC_DOCKER_VERSION=1.6.2
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
-NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
-	rm $@; \
-	echo "\nYour go standard library was built without the 'netgo' build tag."; \
+NETGO_CHECK=go install $(NETGO_FLAGS) std || { \
+	echo "\nYour Go standard library needs to be built with the 'netgo' build tag."; \
 	echo "To fix that, run"; \
-	echo "    sudo go clean -i net"; \
-	echo "    sudo go install -tags netgo std"; \
+	echo "    sudo go install $(NETGO_FLAGS) std"; \
 	false; \
 }
-BUILD_FLAGS=-ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" -tags netgo
+NETGO_FLAGS=-tags netgo -installsuffix netgo
+BUILD_FLAGS=-ldflags "-extldflags \"-static\" -X main.version $(WEAVE_VERSION)" $(NETGO_FLAGS)
 
 PACKAGE_BASE=$(shell go list -e ./)
 
@@ -57,23 +56,23 @@ all: $(WEAVE_EXPORT) $(RUNNER_EXE) $(TEST_TLS_EXE)
 travis: $(EXES)
 
 update:
-	go get -u -f -v -tags netgo $(addprefix ./,$(dir $(EXES)))
+	go get -u -f -v $(NETGO_FLAGS) $(addprefix ./,$(dir $(EXES)))
 
 $(WEAVER_EXE) $(WEAVEPROXY_EXE): common/*.go common/*/*.go net/*.go
+	$(NETGO_CHECK)
 ifeq ($(COVERAGE),true)
 	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "^$(PACKAGE_BASE)/") | paste -s -d,))
-	go get -t -tags netgo ./$(@D)
+	go get -t $(NETGO_FLAGS) ./$(@D)
 	go test -c -o ./$@ $(BUILD_FLAGS) -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
 else
-	go get -tags netgo ./$(@D)
+	go get $(NETGO_FLAGS) ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 endif
-	$(NETGO_CHECK)
 
 $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
-	go get -tags netgo ./$(@D)
-	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
+	go get $(NETGO_FLAGS) ./$(@D)
+	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 $(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
@@ -87,19 +86,19 @@ $(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/net/*.go plugin/ipam/*.go plugin/sk
 $(TEST_TLS_EXE): test/tls/*.go
 
 $(SIGPROXY_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE):
-	go get -tags netgo ./$(@D)
+	go get $(NETGO_FLAGS) ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
-	go get -tags netgo ./$(@D)
+	go get $(NETGO_FLAGS) ./$(@D)
 	go build $(BUILD_FLAGS) -tags "netgo iface mcast" -o $@ ./$(@D)
 
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
-	go get -tags netgo ./$(@D)
+	go get $(NETGO_FLAGS) ./$(@D)
 	go build $(BUILD_FLAGS) -tags "netgo iface" -o $@ ./$(@D)
 
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
-	go get -tags netgo ./$(@D)
+	go get $(NETGO_FLAGS) ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
@@ -159,8 +158,7 @@ clean: clean-bin
 	rm -rf test/tls/*.pem test/coverage.* test/coverage
 
 build:
-	$(SUDO) go clean -i net
-	$(SUDO) go install -tags netgo std
+	$(SUDO) go install $(NETGO_FLAGS) std
 	$(MAKE)
 
 run-smoketests: all
