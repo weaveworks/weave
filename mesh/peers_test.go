@@ -330,7 +330,7 @@ func TestShortIDCollision(t *testing.T) {
 	peers1.setLocalShortID(2, &pending)
 
 	oldShortID := peers2.ourself.ShortID
-	_, updated, _ := peers2.ApplyUpdate(peers1.EncodePeers(peers1.Names()))
+	updated, _ := peers2.ApplyUpdate(peers1.EncodePeers(peers1.Names()))
 
 	// peer 2 should have noticed the collision and resolved it
 	require.NotEqual(t, oldShortID, peers2.ourself.ShortID)

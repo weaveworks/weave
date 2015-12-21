@@ -345,4 +345,10 @@ type ProtocolMsg struct {
 
 type ProtocolSender interface {
 	SendProtocolMsg(m ProtocolMsg) error
+	GossipSender(channelName string, gossip func() *ProtocolMsg) ProtocolGossipSender
+}
+
+type ProtocolGossipSender interface {
+	SendGossip(m ProtocolMsg)
+	SendAllGossip()
 }

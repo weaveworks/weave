@@ -77,10 +77,7 @@ func (n *Nameserver) broadcastEntries(es ...Entry) error {
 	if n.gossip == nil || len(es) == 0 {
 		return nil
 	}
-	return n.gossip.GossipBroadcast(&GossipData{
-		Entries:   Entries(es),
-		Timestamp: now(),
-	})
+	return n.gossip.GossipBroadcast((&GossipData{Timestamp: now(), Entries: es}).Encode())
 }
 
 func (n *Nameserver) AddEntry(hostname, containerid string, origin mesh.PeerName, addr address.Address) error {
@@ -179,28 +176,32 @@ func (n *Nameserver) deleteTombstones() {
 	})
 }
 
-func (n *Nameserver) Gossip() mesh.GossipData {
+func (n *Nameserver) Gossip() []byte {
 	n.RLock()
 	defer n.RUnlock()
-	gossip := &GossipData{
-		Entries:   make(Entries, len(n.entries)),
-		Timestamp: now(),
-	}
-	copy(gossip.Entries, n.entries)
-	return gossip
+	return (&GossipData{Timestamp: now(), Entries: n.entries}).Encode()
 }
 
 func (n *Nameserver) OnGossipUnicast(sender mesh.PeerName, msg []byte) error {
 	return nil
 }
 
-func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData, error) {
+// merge received data into state and return a representation of
+// the received data, for further propagation
+func (n *Nameserver) OnGossipBroadcast(_ mesh.PeerName, msg []byte) error {
+	_, err := n.OnGossip(msg)
+	return err
+}
+
+// merge received data into state and return "everything new I've
+// just learnt", or nil if nothing in the received data was new
+func (n *Nameserver) OnGossip(msg []byte) ([]byte, error) {
 	var gossip GossipData
 	if err := gossip.Decode(msg); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if delta := gossip.Timestamp - now(); delta > gossipWindow || delta < -gossipWindow {
-		return nil, nil, fmt.Errorf("clock skew of %d detected", delta)
+		return nil, fmt.Errorf("clock skew of %d detected", delta)
 	}
 
 	n.Lock()
@@ -211,24 +212,10 @@ func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData
 	})
 
 	newEntries := n.entries.merge(gossip.Entries)
-	if len(newEntries) > 0 {
-		return &GossipData{Entries: newEntries, Timestamp: now()}, &gossip, nil
+	if len(newEntries) == 0 {
+		return nil, nil
 	}
-	return nil, &gossip, nil
-}
-
-// merge received data into state and return "everything new I've
-// just learnt", or nil if nothing in the received data was new
-func (n *Nameserver) OnGossip(msg []byte) (mesh.GossipData, error) {
-	newEntries, _, err := n.receiveGossip(msg)
-	return newEntries, err
-}
-
-// merge received data into state and return a representation of
-// the received data, for further propagation
-func (n *Nameserver) OnGossipBroadcast(_ mesh.PeerName, msg []byte) (mesh.GossipData, error) {
-	_, entries, err := n.receiveGossip(msg)
-	return entries, err
+	return (&GossipData{Timestamp: now(), Entries: newEntries}).Encode(), nil
 }
 
 func (n *Nameserver) infof(fmt string, args ...interface{}) {
