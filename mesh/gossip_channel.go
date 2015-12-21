@@ -57,19 +57,17 @@ func (c *GossipChannel) deliverUnicast(srcName PeerName, origPayload []byte, dec
 	if err := dec.Decode(&destName); err != nil {
 		return err
 	}
-	if c.ourself.Name != destName {
-		if err := c.relayUnicast(destName, origPayload); err != nil {
-			// just log errors from relayUnicast; a problem between us and destination
-			// is not enough reason to break the connection from the source
-			c.log(err)
+	if c.ourself.Name == destName {
+		var payload []byte
+		if err := dec.Decode(&payload); err != nil {
+			return err
 		}
-		return nil
+		return c.gossiper.OnGossipUnicast(srcName, payload)
 	}
-	var payload []byte
-	if err := dec.Decode(&payload); err != nil {
-		return err
+	if err := c.relayUnicast(destName, origPayload); err != nil {
+		c.log(err)
 	}
-	return c.gossiper.OnGossipUnicast(srcName, payload)
+	return nil
 }
 
 func (c *GossipChannel) deliverBroadcast(srcName PeerName, _ []byte, dec *gob.Decoder) error {
@@ -81,7 +79,10 @@ func (c *GossipChannel) deliverBroadcast(srcName PeerName, _ []byte, dec *gob.De
 	if err != nil || data == nil {
 		return err
 	}
-	return c.relayBroadcast(srcName, data)
+	if err := c.relayBroadcast(srcName, data); err != nil {
+		c.log(err)
+	}
+	return nil
 }
 
 func (c *GossipChannel) deliver(srcName PeerName, _ []byte, dec *gob.Decoder) error {
@@ -89,11 +90,11 @@ func (c *GossipChannel) deliver(srcName PeerName, _ []byte, dec *gob.Decoder) er
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	if data, err := c.gossiper.OnGossip(payload); err != nil {
+	data, err := c.gossiper.OnGossip(payload)
+	if err != nil || data == nil {
 		return err
-	} else if data != nil {
-		c.Send(srcName, data)
 	}
+	c.Send(srcName, data)
 	return nil
 }
 
