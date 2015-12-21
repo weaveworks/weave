@@ -94,7 +94,7 @@ func (c *GossipChannel) deliver(srcName PeerName, _ []byte, dec *gob.Decoder) er
 	if err != nil || update == nil {
 		return err
 	}
-	c.Send(srcName, update)
+	c.relay(srcName, update)
 	return nil
 }
 
@@ -165,9 +165,18 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 	}
 }
 
-func (c *GossipChannel) Send(srcName PeerName, data GossipData) {
+func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
 	c.routes.EnsureRecalculated()
 	destinations := c.routes.RandomNeighbours(srcName)
+	if len(destinations) == 0 {
+		return
+	}
+	c.sendDown(c.ourself.ConnectionsTo(destinations), data)
+}
+
+func (c *GossipChannel) Send(data GossipData) {
+	c.routes.EnsureRecalculated()
+	destinations := c.routes.RandomNeighbours(c.ourself.Name)
 	if len(destinations) == 0 {
 		return
 	}

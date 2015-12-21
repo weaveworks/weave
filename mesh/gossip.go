@@ -133,7 +133,7 @@ func (router *Router) gossipChannelSet() map[*GossipChannel]struct{} {
 func (router *Router) SendAllGossip() {
 	for channel := range router.gossipChannelSet() {
 		if gossip := channel.gossiper.Gossip(); gossip != nil {
-			channel.Send(router.Ourself.Name, gossip)
+			channel.Send(gossip)
 		}
 	}
 }
