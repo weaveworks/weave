@@ -42,51 +42,47 @@ type GossipSender struct {
 func NewGossipSender(send func(GossipData)) *GossipSender {
 	cell := make(chan GossipData, 1)
 	flushch := make(chan chan bool)
-	sender := &GossipSender{
-		send:    send,
-		cell:    cell,
-		flushch: flushch,
-	}
-	go sender.run()
-	return sender
+	s := &GossipSender{send: send, cell: cell, flushch: flushch}
+	go s.run()
+	return s
 }
 
-func (sender *GossipSender) run() {
+func (s *GossipSender) run() {
 	for {
 		select {
-		case pending := <-sender.cell:
+		case pending := <-s.cell:
 			if pending == nil { // receive zero value when chan is closed
 				return
 			}
-			sender.send(pending)
-			sender.sent = true
-		case ch := <-sender.flushch:
+			s.send(pending)
+			s.sent = true
+		case ch := <-s.flushch:
 			// send anything pending, then reply back whether we sent
 			// anything since previous flush
 			select {
-			case pending := <-sender.cell:
-				sender.send(pending)
-				sender.sent = true
+			case pending := <-s.cell:
+				s.send(pending)
+				s.sent = true
 			default:
 			}
-			ch <- sender.sent
-			sender.sent = false
+			ch <- s.sent
+			s.sent = false
 		}
 	}
 }
 
-func (sender *GossipSender) Send(data GossipData) {
+func (s *GossipSender) Send(data GossipData) {
 	// NB: this must not be invoked concurrently
 	select {
-	case pending := <-sender.cell:
-		sender.cell <- pending.Merge(data)
+	case pending := <-s.cell:
+		s.cell <- pending.Merge(data)
 	default:
-		sender.cell <- data
+		s.cell <- data
 	}
 }
 
-func (sender *GossipSender) Stop() {
-	close(sender.cell)
+func (s *GossipSender) Stop() {
+	close(s.cell)
 }
 
 type GossipChannels map[string]*GossipChannel
@@ -163,8 +159,8 @@ func (router *Router) sendPendingGossip() bool {
 	return sentSomething
 }
 
-func (sender *GossipSender) flush() bool {
+func (s *GossipSender) flush() bool {
 	ch := make(chan bool)
-	sender.flushch <- ch
+	s.flushch <- ch
 	return <-ch
 }
