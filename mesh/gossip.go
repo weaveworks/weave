@@ -32,11 +32,9 @@ type Gossiper interface {
 // Accumulates GossipData that needs to be sent to one destination,
 // and sends it when possible.
 type GossipSender struct {
-	send func(GossipData)
-	cell chan GossipData
-	// for testing
-	sent    bool
-	flushch chan chan bool
+	send    func(GossipData)
+	cell    chan GossipData
+	flushch chan chan bool // for testing
 }
 
 func NewGossipSender(send func(GossipData)) *GossipSender {
@@ -48,6 +46,7 @@ func NewGossipSender(send func(GossipData)) *GossipSender {
 }
 
 func (s *GossipSender) run() {
+	sent := false
 	for {
 		select {
 		case pending := <-s.cell:
@@ -55,18 +54,18 @@ func (s *GossipSender) run() {
 				return
 			}
 			s.send(pending)
-			s.sent = true
-		case ch := <-s.flushch:
+			sent = true
+		case ch := <-s.flushch: // for testing
 			// send anything pending, then reply back whether we sent
 			// anything since previous flush
 			select {
 			case pending := <-s.cell:
 				s.send(pending)
-				s.sent = true
+				sent = true
 			default:
 			}
-			ch <- s.sent
-			s.sent = false
+			ch <- sent
+			sent = false
 		}
 	}
 }
