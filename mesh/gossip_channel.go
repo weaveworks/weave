@@ -90,11 +90,11 @@ func (c *GossipChannel) deliver(srcName PeerName, _ []byte, dec *gob.Decoder) er
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	data, err := c.gossiper.OnGossip(payload)
-	if err != nil || data == nil {
+	update, err := c.gossiper.OnGossip(payload)
+	if err != nil || update == nil {
 		return err
 	}
-	c.Send(srcName, data)
+	c.Send(srcName, update)
 	return nil
 }
 
