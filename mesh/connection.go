@@ -121,10 +121,12 @@ func (conn *LocalConnection) Established() bool {
 	return conn.established
 }
 
-func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) {
+func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) error {
 	if err := conn.sendProtocolMsg(m); err != nil {
 		conn.Shutdown(err)
+		return err
 	}
+	return nil
 }
 
 // ACTOR methods

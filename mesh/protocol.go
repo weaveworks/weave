@@ -344,5 +344,5 @@ type ProtocolMsg struct {
 }
 
 type ProtocolSender interface {
-	SendProtocolMsg(m ProtocolMsg)
+	SendProtocolMsg(m ProtocolMsg) error
 }

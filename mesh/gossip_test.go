@@ -24,11 +24,9 @@ func NewTestRouter(name string) *Router {
 	return router
 }
 
-func (conn *mockGossipConnection) SendProtocolMsg(protocolMsg ProtocolMsg) {
+func (conn *mockGossipConnection) SendProtocolMsg(protocolMsg ProtocolMsg) error {
 	<-conn.start
-	if err := conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg); err != nil {
-		panic(err)
-	}
+	return conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg)
 }
 
 func (conn *mockGossipConnection) Start() {
