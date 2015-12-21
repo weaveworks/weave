@@ -94,11 +94,21 @@ func (driver *driver) DeleteNetwork(delreq *api.DeleteNetworkRequest) error {
 
 func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.CreateEndpointResponse, error) {
 	driver.logReq("CreateEndpoint", create, create.EndpointID)
+	common.Log.Debugf("interface %+v", create.Interface)
 
 	if create.Interface == nil {
 		return nil, driver.error("CreateEndpoint", "Not supported: creating an interface from within CreateEndpoint")
 	}
-	resp := &api.CreateEndpointResponse{}
+
+	// create veths. note we assume endpoint IDs are unique in the first 5 chars
+	name, peerName := vethPair(create.EndpointID)
+	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, false, nil); err != nil {
+		return nil, driver.error("JoinEndpoint", "%s", err)
+	}
+
+	// Send back the MAC address
+	link, _ := netlink.LinkByName(peerName)
+	resp := &api.CreateEndpointResponse{Interface: &api.EndpointInterface{MacAddress: link.Attrs().HardwareAddr.String()}}
 
 	driver.logRes("CreateEndpoint", resp)
 	return resp, nil
@@ -106,6 +116,11 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 
 func (driver *driver) DeleteEndpoint(deleteReq *api.DeleteEndpointRequest) error {
 	driver.logReq("DeleteEndpoint", deleteReq, deleteReq.EndpointID)
+	name, _ := vethPair(deleteReq.EndpointID)
+	veth := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: name}}
+	if err := netlink.LinkDel(veth); err != nil {
+		driver.warn("LeaveEndpoint", "unable to delete veth: %s", err)
+	}
 	return nil
 }
 
@@ -122,11 +137,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 		return nil, driver.error("JoinEndpoint", "unable to find network info: %s", err)
 	}
 
-	name, peerName := vethPair(j.EndpointID)
-	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, false, nil); err != nil {
-		return nil, driver.error("JoinEndpoint", "%s", err)
-	}
-
+	_, peerName := vethPair(j.EndpointID)
 	response := &api.JoinResponse{
 		InterfaceName: &api.InterfaceName{
 			SrcName:   peerName,
@@ -186,12 +197,6 @@ func (driver *driver) setupNetworkInfo(id string, isOurs bool, options map[strin
 
 func (driver *driver) LeaveEndpoint(leave *api.LeaveRequest) error {
 	driver.logReq("LeaveEndpoint", leave, fmt.Sprintf("%s:%s", leave.NetworkID, leave.EndpointID))
-
-	name, _ := vethPair(leave.EndpointID)
-	veth := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: name}}
-	if err := netlink.LinkDel(veth); err != nil {
-		driver.warn("LeaveEndpoint", "unable to delete veth: %s", err)
-	}
 	return nil
 }
 
