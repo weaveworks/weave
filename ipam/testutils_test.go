@@ -48,7 +48,7 @@ func (m *mockGossipComms) String() string {
 // that the contents of messages are never re-ordered.  Which, for instance,
 // requires they are not based off iterating through a map.
 
-func (m *mockGossipComms) GossipBroadcast(update mesh.GossipData) error {
+func (m *mockGossipComms) GossipBroadcast(update []byte) error {
 	m.Lock()
 	defer m.Unlock()
 	buf := []byte{}

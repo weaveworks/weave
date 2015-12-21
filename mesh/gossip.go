@@ -2,67 +2,75 @@ package mesh
 
 import (
 	"fmt"
+	"sync"
 )
-
-type GossipData interface {
-	Encode() [][]byte
-	Merge(GossipData) GossipData
-}
 
 type Gossip interface {
 	// specific message from one peer to another
 	// intermediate peers relay it using unicast topology.
 	GossipUnicast(dstPeerName PeerName, msg []byte) error
 	// send gossip to every peer, relayed using broadcast topology.
-	GossipBroadcast(update GossipData) error
+	GossipBroadcast(update []byte) error
 }
 
 type Gossiper interface {
 	OnGossipUnicast(sender PeerName, msg []byte) error
-	// merge received data into state and return a representation of
-	// the received data, for further propagation
-	OnGossipBroadcast(sender PeerName, update []byte) (GossipData, error)
+	// merge received data into state
+	OnGossipBroadcast(sender PeerName, update []byte) error
 	// return state of everything we know; gets called periodically
-	Gossip() GossipData
+	Gossip() []byte
 	// merge received data into state and return "everything new I've
 	// just learnt", or nil if nothing in the received data was new
-	OnGossip(update []byte) (GossipData, error)
+	OnGossip(update []byte) ([]byte, error)
 }
 
-// Accumulates GossipData that needs to be sent to one destination,
-// and sends it when possible.
 type GossipSender struct {
-	send    func(GossipData)
-	cell    chan GossipData
-	flushch chan chan bool // for testing
+	sync.Mutex
+	sender   ProtocolSender
+	gossip   func() *ProtocolMsg
+	more     chan<- struct{}
+	buf      []ProtocolMsg
+	bufSz    int // size of all messages in buf
+	bufSzMax int
+	sendAll  bool
+	flushch  chan chan bool // for testing
 }
 
-func NewGossipSender(send func(GossipData)) *GossipSender {
-	cell := make(chan GossipData, 1)
+// Scaling factor for calculating the maximum buffer size from the
+// size of the last complete gossip.
+const bufSzMaxScale = 1
+
+func NewGossipSender(sender ProtocolSender, stop <-chan struct{}, gossip func() *ProtocolMsg) *GossipSender {
+	more := make(chan struct{}, 1)
 	flushch := make(chan chan bool)
-	s := &GossipSender{send: send, cell: cell, flushch: flushch}
-	go s.run()
+	s := &GossipSender{sender: sender, gossip: gossip, more: more, flushch: flushch}
+	go s.run(stop, more)
 	return s
 }
 
-func (s *GossipSender) run() {
+func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}) {
 	sent := false
 	for {
 		select {
-		case pending := <-s.cell:
-			if pending == nil { // receive zero value when chan is closed
+		case <-stop:
+			return
+		case <-more:
+			sentSomething, err := s.send()
+			if err != nil {
 				return
 			}
-			s.send(pending)
-			sent = true
+			sent = sentSomething || sent
 		case ch := <-s.flushch: // for testing
 			// send anything pending, then reply back whether we sent
 			// anything since previous flush
-			select {
-			case pending := <-s.cell:
-				s.send(pending)
-				sent = true
-			default:
+			for empty := false; !empty; {
+				select {
+				case <-more:
+					sentSomething, _ := s.send()
+					sent = sentSomething || sent
+				default:
+					empty = true
+				}
 			}
 			ch <- sent
 			sent = false
@@ -70,18 +78,113 @@ func (s *GossipSender) run() {
 	}
 }
 
-func (s *GossipSender) Send(data GossipData) {
-	// NB: this must not be invoked concurrently
-	select {
-	case pending := <-s.cell:
-		s.cell <- pending.Merge(data)
-	default:
-		s.cell <- data
+func (s *GossipSender) send() (bool, error) {
+	sent := false
+	for {
+		msg := s.dequeue()
+		if msg == nil {
+			return sent, nil
+		}
+		if err := s.sender.SendProtocolMsg(*msg); err != nil {
+			return sent, err
+		}
+		sent = true
 	}
 }
 
-func (s *GossipSender) Stop() {
-	close(s.cell)
+func (s *GossipSender) SendGossip(msg ProtocolMsg) {
+	s.Lock()
+	defer s.Unlock()
+	if s.sendAll {
+		return
+	}
+	if s.bufSzMax == 0 || s.bufSz+len(msg.msg) <= s.bufSzMax {
+		s.buf = append(s.buf, msg)
+		s.bufSz += len(msg.msg)
+		if len(s.buf) == 1 {
+			s.prod()
+		}
+		return
+	}
+	s.clear()
+	s.prod()
+}
+
+func (s *GossipSender) SendAllGossip() {
+	s.Lock()
+	defer s.Unlock()
+	if s.sendAll {
+		return
+	}
+	s.clear()
+	s.prod()
+}
+
+func (s *GossipSender) clear() {
+	s.buf = nil
+	s.bufSz = 0
+	s.sendAll = true
+}
+
+func (s *GossipSender) prod() {
+	select {
+	case s.more <- void:
+	default:
+	}
+}
+
+func (s *GossipSender) dequeue() *ProtocolMsg {
+	s.Lock()
+	defer s.Unlock()
+	if len(s.buf) > 0 { // NB: s.sendAll -> s.buf == nil
+		msg := s.buf[0]
+		s.buf = s.buf[1:]
+		s.bufSz -= len(msg.msg)
+		return &msg
+	}
+	if !s.sendAll {
+		return nil
+	}
+
+	// allow more enqueuing
+	s.sendAll = false
+
+	// We don't know what obtaining gossip entails, so in order to
+	// avoid deadlocks, we must not hold any locks while doing so.
+	s.Unlock()
+	msg := s.gossip()
+	s.Lock()
+	if msg == nil {
+		s.bufSzMax = 0
+	} else {
+		s.bufSzMax = bufSzMaxScale * len(msg.msg)
+		if s.bufSz > s.bufSzMax {
+			s.clear()
+		}
+	}
+	return msg
+}
+
+type GossipSenders struct {
+	sync.Mutex
+	sender  ProtocolSender
+	stop    <-chan struct{}
+	senders map[string]ProtocolGossipSender
+}
+
+func NewGossipSenders(sender ProtocolSender, stop <-chan struct{}) *GossipSenders {
+	return &GossipSenders{sender: sender, stop: stop, senders: make(map[string]ProtocolGossipSender)}
+}
+
+func (gs *GossipSenders) Sender(channelName string, gossip func() *ProtocolMsg) ProtocolGossipSender {
+	gs.Lock()
+	defer gs.Unlock()
+	s, found := gs.senders[channelName]
+	if !found {
+		s = NewGossipSender(gs.sender, gs.stop, gossip)
+		gs.senders[channelName] = s
+	}
+	return s
 }
 
 type GossipChannels map[string]*GossipChannel
@@ -127,17 +230,13 @@ func (router *Router) gossipChannelSet() map[*GossipChannel]struct{} {
 
 func (router *Router) SendAllGossip() {
 	for channel := range router.gossipChannelSet() {
-		if gossip := channel.gossiper.Gossip(); gossip != nil {
-			channel.Send(gossip)
-		}
+		channel.Send()
 	}
 }
 
 func (router *Router) SendAllGossipDown(conn Connection) {
 	for channel := range router.gossipChannelSet() {
-		if gossip := channel.gossiper.Gossip(); gossip != nil {
-			channel.SendDown(conn, gossip)
-		}
+		channel.SendDown(conn)
 	}
 }
 
@@ -146,14 +245,10 @@ func (router *Router) SendAllGossipDown(conn Connection) {
 func (router *Router) sendPendingGossip() bool {
 	sentSomething := false
 	for channel := range router.gossipChannelSet() {
-		channel.Lock()
-		for _, sender := range channel.senders {
-			sentSomething = sender.flush() || sentSomething
+		for conn := range router.Ourself.Connections() {
+			sender := conn.(ProtocolSender).GossipSender(channel.name, channel.gossip)
+			sentSomething = sender.(*GossipSender).flush() || sentSomething
 		}
-		for _, sender := range channel.broadcasters {
-			sentSomething = sender.flush() || sentSomething
-		}
-		channel.Unlock()
 	}
 	return sentSomething
 }

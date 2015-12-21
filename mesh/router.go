@@ -118,69 +118,45 @@ func (router *Router) acceptTCP(tcpConn *net.TCPConn) {
 
 // Gossiper methods - the Router is the topology Gossiper
 
-type TopologyGossipData struct {
-	peers  *Peers
-	update PeerNameSet
-}
-
-func (d *TopologyGossipData) Merge(other GossipData) GossipData {
-	names := make(PeerNameSet)
-	for name := range d.update {
-		names[name] = void
-	}
-	for name := range other.(*TopologyGossipData).update {
-		names[name] = void
-	}
-	return &TopologyGossipData{peers: d.peers, update: names}
-}
-
-func (d *TopologyGossipData) Encode() [][]byte {
-	return [][]byte{d.peers.EncodePeers(d.update)}
-}
-
 func (router *Router) BroadcastTopologyUpdate(update []*Peer) {
 	names := make(PeerNameSet)
 	for _, p := range update {
 		names[p.Name] = void
 	}
-	router.TopologyGossip.GossipBroadcast(
-		&TopologyGossipData{peers: router.Peers, update: names})
+	router.TopologyGossip.GossipBroadcast(router.Peers.EncodePeers(names))
 }
 
 func (router *Router) OnGossipUnicast(sender PeerName, msg []byte) error {
 	return fmt.Errorf("unexpected topology gossip unicast: %v", msg)
 }
 
-func (router *Router) OnGossipBroadcast(_ PeerName, update []byte) (GossipData, error) {
-	origUpdate, _, err := router.applyTopologyUpdate(update)
-	if err != nil || len(origUpdate) == 0 {
-		return nil, err
-	}
-	return &TopologyGossipData{peers: router.Peers, update: origUpdate}, nil
+func (router *Router) OnGossipBroadcast(_ PeerName, update []byte) error {
+	_, err := router.applyTopologyUpdate(update)
+	return err
 }
 
-func (router *Router) Gossip() GossipData {
-	return &TopologyGossipData{peers: router.Peers, update: router.Peers.Names()}
+func (router *Router) Gossip() []byte {
+	return router.Peers.EncodePeers(router.Peers.Names())
 }
 
-func (router *Router) OnGossip(update []byte) (GossipData, error) {
-	_, newUpdate, err := router.applyTopologyUpdate(update)
+func (router *Router) OnGossip(update []byte) ([]byte, error) {
+	newUpdate, err := router.applyTopologyUpdate(update)
 	if err != nil || len(newUpdate) == 0 {
 		return nil, err
 	}
-	return &TopologyGossipData{peers: router.Peers, update: newUpdate}, nil
+	return router.Peers.EncodePeers(newUpdate), nil
 }
 
-func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, PeerNameSet, error) {
-	origUpdate, newUpdate, err := router.Peers.ApplyUpdate(update)
+func (router *Router) applyTopologyUpdate(update []byte) (PeerNameSet, error) {
+	newUpdate, err := router.Peers.ApplyUpdate(update)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if len(newUpdate) > 0 {
 		router.ConnectionMaker.Refresh()
 		router.Routes.Recalculate()
 	}
-	return origUpdate, newUpdate, nil
+	return newUpdate, nil
 }
 
 func (router *Router) Trusts(remote *RemoteConnection) bool {

@@ -314,7 +314,7 @@ func (alloc *Allocator) Shutdown() {
 		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()
-			alloc.gossip.GossipBroadcast(alloc.Gossip())
+			alloc.gossip.GossipBroadcast(alloc.encode())
 			time.Sleep(100 * time.Millisecond)
 		}
 		doneChan <- struct{}{}
@@ -414,13 +414,13 @@ func (alloc *Allocator) OnGossipUnicast(sender mesh.PeerName, msg []byte) error 
 }
 
 // OnGossipBroadcast (Sync)
-func (alloc *Allocator) OnGossipBroadcast(sender mesh.PeerName, msg []byte) (mesh.GossipData, error) {
+func (alloc *Allocator) OnGossipBroadcast(sender mesh.PeerName, msg []byte) error {
 	alloc.debugln("OnGossipBroadcast from", sender, ":", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
 		resultChan <- alloc.update(sender, msg)
 	}
-	return alloc.Gossip(), <-resultChan
+	return <-resultChan
 }
 
 type gossipState struct {
@@ -453,17 +453,8 @@ func (alloc *Allocator) encode() []byte {
 	return buf.Bytes()
 }
 
-// Encode (Sync)
-func (alloc *Allocator) Encode() []byte {
-	resultChan := make(chan []byte)
-	alloc.actionChan <- func() {
-		resultChan <- alloc.encode()
-	}
-	return <-resultChan
-}
-
 // OnGossip (Sync)
-func (alloc *Allocator) OnGossip(msg []byte) (mesh.GossipData, error) {
+func (alloc *Allocator) OnGossip(msg []byte) ([]byte, error) {
 	alloc.debugln("Allocator.OnGossip:", len(msg), "bytes")
 	resultChan := make(chan error)
 	alloc.actionChan <- func() {
@@ -472,24 +463,12 @@ func (alloc *Allocator) OnGossip(msg []byte) (mesh.GossipData, error) {
 	return nil, <-resultChan // for now, we never propagate updates. TBD
 }
 
-// GossipData implementation is trivial - we always gossip the latest
-// data we have at time of sending
-type ipamGossipData struct {
-	alloc *Allocator
-}
-
-func (d *ipamGossipData) Merge(other mesh.GossipData) mesh.GossipData {
-	return d // no-op
-}
-
-func (d *ipamGossipData) Encode() [][]byte {
-	return [][]byte{d.alloc.Encode()}
-}
-
-// Gossip returns a GossipData implementation, which in this case always
-// returns the latest ring state (and does nothing on merge)
-func (alloc *Allocator) Gossip() mesh.GossipData {
-	return &ipamGossipData{alloc}
+func (alloc *Allocator) Gossip() []byte {
+	resultChan := make(chan []byte)
+	alloc.actionChan <- func() {
+		resultChan <- alloc.encode()
+	}
+	return <-resultChan
 }
 
 // SetInterfaces gives the allocator two interfaces for talking to the outside world
@@ -543,7 +522,7 @@ func (alloc *Allocator) establishRing() {
 func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
 	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
-	alloc.gossip.GossipBroadcast(alloc.Gossip())
+	alloc.gossip.GossipBroadcast(alloc.encode())
 	alloc.ringUpdated()
 }
 
@@ -595,7 +574,7 @@ func normalizeConsensus(consensus []mesh.PeerName) []mesh.PeerName {
 func (alloc *Allocator) propose() {
 	alloc.debugf("Paxos proposing")
 	alloc.paxos.Propose()
-	alloc.gossip.GossipBroadcast(alloc.Gossip())
+	alloc.gossip.GossipBroadcast(alloc.encode())
 }
 
 func encodeRange(r address.Range) []byte {
@@ -667,7 +646,7 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 			if alloc.paxos.Update(data.Paxos) {
 				if alloc.paxos.Think() {
 					// If something important changed, broadcast
-					alloc.gossip.GossipBroadcast(alloc.Gossip())
+					alloc.gossip.GossipBroadcast(alloc.encode())
 				}
 
 				if ok, cons := alloc.paxos.Consensus(); ok {

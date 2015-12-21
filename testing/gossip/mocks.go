@@ -17,11 +17,11 @@ type unicastMessage struct {
 }
 type broadcastMessage struct {
 	sender mesh.PeerName
-	data   mesh.GossipData
+	data   []byte
 }
 type gossipMessage struct {
 	sender mesh.PeerName
-	data   mesh.GossipData
+	data   []byte
 }
 type exitMessage struct {
 	exitChan chan struct{}
@@ -45,7 +45,7 @@ func (grouter *TestRouter) Stop() {
 	}
 }
 
-func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update mesh.GossipData) error {
+func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update []byte) error {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
 		case gossipChan <- broadcastMessage{sender: sender, data: update}:
@@ -56,7 +56,7 @@ func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update mesh.Gos
 	return nil
 }
 
-func (grouter *TestRouter) gossip(sender mesh.PeerName, update mesh.GossipData) error {
+func (grouter *TestRouter) gossip(sender mesh.PeerName, update []byte) error {
 	count := int(math.Log2(float64(len(grouter.gossipChans))))
 	for dest, gossipChan := range grouter.gossipChans {
 		if dest == sender {
@@ -121,33 +121,27 @@ func (grouter *TestRouter) run(sender mesh.PeerName, gossiper mesh.Gossiper, gos
 				if rand.Float32() > (1.0 - grouter.loss) {
 					continue
 				}
-				for _, msg := range message.data.Encode() {
-					if _, err := gossiper.OnGossipBroadcast(message.sender, msg); err != nil {
-						panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
-					}
+				if err := gossiper.OnGossipBroadcast(message.sender, message.data); err != nil {
+					panic(fmt.Sprintf("Error doing gossip broadcast: %s", err))
 				}
 			case gossipMessage:
 				if rand.Float32() > (1.0 - grouter.loss) {
 					continue
 				}
-				for _, msg := range message.data.Encode() {
-					diff, err := gossiper.OnGossip(msg)
-					if err != nil {
-						panic(fmt.Sprintf("Error doing gossip: %s", err))
-					}
-					if diff == nil {
-						continue
-					}
-					// Sanity check - reconsuming the diff should yield nil
-					for _, diffMsg := range diff.Encode() {
-						if nextDiff, err := gossiper.OnGossip(diffMsg); err != nil {
-							panic(fmt.Sprintf("Error doing gossip: %s", err))
-						} else if nextDiff != nil {
-							panic(fmt.Sprintf("Breach of gossip interface: %v != nil", nextDiff))
-						}
-					}
-					grouter.gossip(message.sender, diff)
+				diff, err := gossiper.OnGossip(message.data)
+				if err != nil {
+					panic(fmt.Sprintf("Error doing gossip: %s", err))
 				}
+				if diff == nil {
+					continue
+				}
+				// Sanity check - reconsuming the diff should yield nil
+				if nextDiff, err := gossiper.OnGossip(diff); err != nil {
+					panic(fmt.Sprintf("Error doing gossip: %s", err))
+				} else if nextDiff != nil {
+					panic(fmt.Sprintf("Breach of gossip interface: %v != nil", nextDiff))
+				}
+				grouter.gossip(message.sender, diff)
 			}
 		case <-gossipTimer:
 			grouter.gossip(sender, gossiper.Gossip())
@@ -173,6 +167,6 @@ func (client TestRouterClient) GossipUnicast(dstPeerName mesh.PeerName, buf []by
 	return nil
 }
 
-func (client TestRouterClient) GossipBroadcast(update mesh.GossipData) error {
+func (client TestRouterClient) GossipBroadcast(update []byte) error {
 	return client.router.gossipBroadcast(client.sender, update)
 }

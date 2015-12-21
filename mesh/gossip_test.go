@@ -13,8 +13,9 @@ import (
 
 type mockGossipConnection struct {
 	RemoteConnection
-	dest  *Router
-	start chan struct{}
+	dest          *Router
+	start         chan struct{}
+	gossipSenders *GossipSenders
 }
 
 func NewTestRouter(name string) *Router {
@@ -27,6 +28,10 @@ func NewTestRouter(name string) *Router {
 func (conn *mockGossipConnection) SendProtocolMsg(protocolMsg ProtocolMsg) error {
 	<-conn.start
 	return conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg)
+}
+
+func (conn *mockGossipConnection) GossipSender(channelName string, gossip func() *ProtocolMsg) ProtocolGossipSender {
+	return conn.gossipSenders.Sender(channelName, gossip)
 }
 
 func (conn *mockGossipConnection) Start() {
@@ -56,7 +61,10 @@ func (router *Router) NewTestGossipConnection(r *Router) *mockGossipConnection {
 	toPeer = router.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
 
 	conn := &mockGossipConnection{
-		RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r, make(chan struct{})}
+		RemoteConnection: RemoteConnection{router.Ourself.Peer, toPeer, "", false, true},
+		dest:             r,
+		start:            make(chan struct{})}
+	conn.gossipSenders = NewGossipSenders(conn, make(chan struct{}))
 	router.Ourself.handleAddConnection(conn)
 	router.Ourself.handleConnectionEstablished(conn)
 	return conn
@@ -178,26 +186,26 @@ func (g *testGossiper) OnGossipUnicast(sender PeerName, msg []byte) error {
 	return nil
 }
 
-func (g *testGossiper) OnGossipBroadcast(_ PeerName, update []byte) (GossipData, error) {
+func (g *testGossiper) OnGossipBroadcast(_ PeerName, update []byte) error {
 	g.Lock()
 	defer g.Unlock()
 	for _, v := range update {
 		g.state[v] = void
 	}
-	return NewSurrogateGossipData(update), nil
+	return nil
 }
 
-func (g *testGossiper) Gossip() GossipData {
+func (g *testGossiper) Gossip() []byte {
 	g.RLock()
 	defer g.RUnlock()
 	state := make([]byte, len(g.state))
 	for v := range g.state {
 		state = append(state, v)
 	}
-	return NewSurrogateGossipData(state)
+	return state
 }
 
-func (g *testGossiper) OnGossip(update []byte) (GossipData, error) {
+func (g *testGossiper) OnGossip(update []byte) ([]byte, error) {
 	g.Lock()
 	defer g.Unlock()
 	var delta []byte
@@ -210,7 +218,7 @@ func (g *testGossiper) OnGossip(update []byte) (GossipData, error) {
 	if len(delta) == 0 {
 		return nil, nil
 	}
-	return NewSurrogateGossipData(delta), nil
+	return delta, nil
 }
 
 func (g *testGossiper) checkHas(t *testing.T, vs ...byte) {
@@ -224,5 +232,5 @@ func (g *testGossiper) checkHas(t *testing.T, vs ...byte) {
 }
 
 func broadcast(s Gossip, v byte) {
-	s.GossipBroadcast(NewSurrogateGossipData([]byte{v}))
+	s.GossipBroadcast([]byte{v})
 }

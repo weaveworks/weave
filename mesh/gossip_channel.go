@@ -4,30 +4,21 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"sync"
 )
 
 type GossipChannel struct {
-	sync.Mutex
-	name         string
-	ourself      *LocalPeer
-	routes       *Routes
-	gossiper     Gossiper
-	senders      connectionSenders
-	broadcasters peerSenders
+	name     string
+	ourself  *LocalPeer
+	routes   *Routes
+	gossiper Gossiper
 }
-
-type connectionSenders map[Connection]*GossipSender
-type peerSenders map[PeerName]*GossipSender
 
 func NewGossipChannel(channelName string, ourself *LocalPeer, routes *Routes, g Gossiper) *GossipChannel {
 	return &GossipChannel{
-		name:         channelName,
-		ourself:      ourself,
-		routes:       routes,
-		gossiper:     g,
-		senders:      make(connectionSenders),
-		broadcasters: make(peerSenders)}
+		name:     channelName,
+		ourself:  ourself,
+		routes:   routes,
+		gossiper: g}
 }
 
 func (router *Router) handleGossip(tag ProtocolTag, payload []byte) error {
@@ -70,16 +61,16 @@ func (c *GossipChannel) deliverUnicast(srcName PeerName, origPayload []byte, dec
 	return nil
 }
 
-func (c *GossipChannel) deliverBroadcast(srcName PeerName, _ []byte, dec *gob.Decoder) error {
+func (c *GossipChannel) deliverBroadcast(srcName PeerName, origPayload []byte, dec *gob.Decoder) error {
 	var payload []byte
 	if err := dec.Decode(&payload); err != nil {
 		return err
 	}
-	data, err := c.gossiper.OnGossipBroadcast(srcName, payload)
-	if err != nil || data == nil {
+	err := c.gossiper.OnGossipBroadcast(srcName, payload)
+	if err != nil {
 		return err
 	}
-	if err := c.relayBroadcast(srcName, data); err != nil {
+	if err := c.relayBroadcast(srcName, origPayload); err != nil {
 		c.log(err)
 	}
 	return nil
@@ -102,8 +93,8 @@ func (c *GossipChannel) GossipUnicast(dstPeerName PeerName, msg []byte) error {
 	return c.relayUnicast(dstPeerName, GobEncode(c.name, c.ourself.Name, dstPeerName, msg))
 }
 
-func (c *GossipChannel) GossipBroadcast(update GossipData) error {
-	return c.relayBroadcast(c.ourself.Name, update)
+func (c *GossipChannel) GossipBroadcast(update []byte) error {
+	return c.relayBroadcast(c.ourself.Name, GobEncode(c.name, c.ourself.Name, update))
 }
 
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
@@ -117,127 +108,51 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err erro
 	return err
 }
 
-func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
-	names := c.routes.PeerNames() // do this outside the lock so they don't nest
-	c.Lock()
-	defer c.Unlock()
-	// GC - randomly (courtesy of go's map iterator) pick some
-	// existing broadcasters and stop&remove them if their source peer
-	// is unknown. We stop as soon as we encounter a valid entry; the
-	// idea being that when there is little or no garbage then this
-	// executes close to O(1)[1], whereas when there is lots of
-	// garbage we remove it quickly.
-	//
-	// [1] TODO Unfortunately, due to the desire to avoid nested
-	// locks, instead of simply invoking Peers.Fetch(name) below, we
-	// have that Peers.Names() invocation above. That is O(n_peers) at
-	// best.
-	for name, broadcaster := range c.broadcasters {
-		if _, found := names[name]; !found {
-			delete(c.broadcasters, name)
-			broadcaster.Stop()
-		} else {
-			break
-		}
+func (c *GossipChannel) relayBroadcast(srcName PeerName, buf []byte) error {
+	c.routes.EnsureRecalculated()
+	destinations := c.routes.BroadcastAll(srcName)
+	if len(destinations) == 0 {
+		return nil
 	}
-	broadcaster, found := c.broadcasters[srcName]
-	if !found {
-		broadcaster = NewGossipSender(func(pending GossipData) { c.sendBroadcast(srcName, pending) })
-		c.broadcasters[srcName] = broadcaster
+	msg := ProtocolMsg{ProtocolGossipBroadcast, buf}
+	for _, conn := range c.ourself.ConnectionsTo(destinations) {
+		conn.(ProtocolSender).GossipSender(c.name, c.gossip).SendGossip(msg)
 	}
-	broadcaster.Send(update)
 	return nil
 }
 
-func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
-	c.routes.EnsureRecalculated()
-	nextHops := c.routes.BroadcastAll(srcName)
-	if len(nextHops) == 0 {
-		return
-	}
-	connections := c.ourself.ConnectionsTo(nextHops)
-	for _, msg := range update.Encode() {
-		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
-		// FIXME a single blocked connection can stall us
-		for _, conn := range connections {
-			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
-		}
-	}
-}
-
-func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
+func (c *GossipChannel) relay(srcName PeerName, update []byte) {
 	c.routes.EnsureRecalculated()
 	destinations := c.routes.RandomNeighbours(srcName)
 	if len(destinations) == 0 {
 		return
 	}
-	c.sendDown(c.ourself.ConnectionsTo(destinations), data)
+	msg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, update)}
+	for _, conn := range c.ourself.ConnectionsTo(destinations) {
+		conn.(ProtocolSender).GossipSender(c.name, c.gossip).SendGossip(msg)
+	}
 }
 
-func (c *GossipChannel) Send(data GossipData) {
+func (c *GossipChannel) Send() {
 	c.routes.EnsureRecalculated()
 	destinations := c.routes.RandomNeighbours(c.ourself.Name)
 	if len(destinations) == 0 {
 		return
 	}
-	c.sendDown(c.ourself.ConnectionsTo(destinations), data)
-}
-
-func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
-	c.sendDown([]Connection{conn}, data)
-}
-
-func (c *GossipChannel) sendDown(selectedConnections []Connection, data GossipData) {
-	if len(selectedConnections) == 0 {
-		return
-	}
-	connections := c.ourself.Connections()
-	c.Lock()
-	defer c.Unlock()
-	// GC - randomly (courtesy of go's map iterator) pick some
-	// existing senders and stop&remove them if the associated
-	// connection is no longer active.  We stop as soon as we
-	// encounter a valid entry; the idea being that when there is
-	// little or no garbage then this executes close to O(1)[1],
-	// whereas when there is lots of garbage we remove it quickly.
-	//
-	// [1] TODO Unfortunately, due to the desire to avoid nested
-	// locks, instead of simply invoking LocalPeer.ConnectionTo(name),
-	// we operate on LocalPeer.Connections(). That is
-	// O(n_our_connections) at best.
-	for conn, sender := range c.senders {
-		if _, found := connections[conn]; !found {
-			delete(c.senders, conn)
-			sender.Stop()
-		} else {
-			break
-		}
-	}
-	// start senders, if necessary, and send.
-	for _, conn := range selectedConnections {
-		sender, found := c.senders[conn]
-		if !found {
-			sender = c.makeSender(conn)
-			c.senders[conn] = sender
-		}
-		sender.Send(data)
+	for _, conn := range c.ourself.ConnectionsTo(destinations) {
+		c.SendDown(conn)
 	}
 }
 
-// We have seen a couple of failures which suggest a >128GB slice was encountered.
-// 100MB should be enough for anyone.
-const maxFeasibleMessageLen = 100 * 1024 * 1024
+func (c *GossipChannel) SendDown(conn Connection) {
+	conn.(ProtocolSender).GossipSender(c.name, c.gossip).SendAllGossip()
+}
 
-func (c *GossipChannel) makeSender(conn Connection) *GossipSender {
-	return NewGossipSender(func(pending GossipData) {
-		for _, msg := range pending.Encode() {
-			if len(msg) > maxFeasibleMessageLen {
-				panic(fmt.Sprintf("Gossip message too large: len=%d bytes; on channel '%s' from %+v", len(msg), c.name, pending))
-			}
-			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, msg)}
-			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
-		}
-	})
+func (c *GossipChannel) gossip() *ProtocolMsg {
+	if gossip := c.gossiper.Gossip(); gossip != nil {
+		return &ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, gossip)}
+	}
+	return nil
 }
 
 func (c *GossipChannel) log(args ...interface{}) {

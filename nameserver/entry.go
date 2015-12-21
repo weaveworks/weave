@@ -245,16 +245,6 @@ type GossipData struct {
 	Entries
 }
 
-func (g *GossipData) Merge(o mesh.GossipData) mesh.GossipData {
-	other := o.(*GossipData)
-	gossip := g.copy()
-	gossip.Entries.merge(other.Entries)
-	if gossip.Timestamp < other.Timestamp {
-		gossip.Timestamp = other.Timestamp
-	}
-	return gossip
-}
-
 func (g *GossipData) Decode(msg []byte) error {
 	if err := gob.NewDecoder(bytes.NewReader(msg)).Decode(g); err != nil {
 		return err
@@ -265,18 +255,14 @@ func (g *GossipData) Decode(msg []byte) error {
 	return nil
 }
 
-func (g *GossipData) Encode() [][]byte {
-	g2 := g.copy()
+func (g *GossipData) Encode() []byte {
+	// Make a copy so we can sort: all outgoing data is sent in case-sensitive order
+	g2 := GossipData{Timestamp: g.Timestamp, Entries: make(Entries, len(g.Entries))}
+	copy(g2.Entries, g.Entries)
 	sort.Sort(CaseSensitive(g2.Entries))
 	buf := &bytes.Buffer{}
 	if err := gob.NewEncoder(buf).Encode(g2); err != nil {
 		panic(err)
 	}
-	return [][]byte{buf.Bytes()}
-}
-
-func (g *GossipData) copy() *GossipData {
-	g2 := &GossipData{Timestamp: g.Timestamp, Entries: make(Entries, len(g.Entries))}
-	copy(g2.Entries, g.Entries)
-	return g2
+	return buf.Bytes()
 }
