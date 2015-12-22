@@ -908,12 +908,9 @@ container_weave_addrs() {
 
 # Check that a container for component $1 named $2 with image $3 is not running
 check_not_running() {
-    case $(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) in
+    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
+    case ${RUN_STATUS%:*} in
         "true restarting $3")
-            echo "$2 is restarting; you can stop it with 'weave stop-$1'." >&2
-            exit 1
-            ;;
-        "true restarting $3:"*)
             echo "$2 is restarting; you can stop it with 'weave stop-$1'." >&2
             exit 1
             ;;
@@ -921,14 +918,7 @@ check_not_running() {
             echo "$2 is already running." >&2
             exit 1
             ;;
-        "true "*" $3:"*)
-            echo "$2 is already running." >&2
-            exit 1
-            ;;
         "false "*" $3")
-            docker rm $2 >/dev/null
-            ;;
-        "false "*" $3:"*)
             docker rm $2 >/dev/null
             ;;
         true*)
