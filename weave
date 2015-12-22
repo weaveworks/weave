@@ -95,20 +95,13 @@ usage() {
     exit 1
 }
 
-docker_sock() {
-  if [ -z "$DOCKER_HOST" ]; then
-    echo "/var/run/docker.sock"
-    return
-  fi
-  if echo "$DOCKER_HOST" | grep -q "^unix://" >/dev/null; then
-    echo "${DOCKER_HOST#unix://}"
-  fi
-}
-
 docker_sock_volume_mount() {
-  if [ -n "$(docker_sock)" ]; then
-    echo "-v $(docker_sock):$(docker_sock)"
+  if [ -z "$DOCKER_HOST" ]; then
+      DOCKER_SOCK="/var/run/docker.sock"
+  elif echo "$DOCKER_HOST" | grep -q "^unix://" >/dev/null; then
+      DOCKER_SOCK="${DOCKER_HOST#unix://}"
   fi
+  [ -z "$DOCKER_SOCK" ] || echo "-v $DOCKER_SOCK:$DOCKER_SOCK"
 }
 
 exec_remote() {
