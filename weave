@@ -915,7 +915,7 @@ check_not_running() {
             exit 1
             ;;
         "true "*" $3")
-            echo "$2 is already running." >&2
+            echo "$2 is already running; you can stop it with 'weave stop-$1'." >&2
             exit 1
             ;;
         "false "*" $3")
