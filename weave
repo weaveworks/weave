@@ -1803,6 +1803,9 @@ deprecation_warnings() {
             -no-default-ipam|--no-default-ipam)
                 deprecation_warning $1 "--no-default-ipalloc"
                 ;;
+            --with-dns)
+                echo "Warning: $1 has been removed; DNS is on by default" >&2
+                ;;
         esac
         shift
     done
