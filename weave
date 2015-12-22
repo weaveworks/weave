@@ -1811,7 +1811,7 @@ deprecation_warnings() {
                 deprecation_warning $1 "--no-default-ipalloc"
                 ;;
             --with-dns)
-                echo "Warning: $1 is deprecated; it is on by default" >&2
+                echo "Warning: $1 has been removed; DNS is on by default" >&2
                 ;;
         esac
         shift
