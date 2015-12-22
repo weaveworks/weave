@@ -1850,15 +1850,13 @@ EOF
         ;;
     launch)
         deprecation_warnings "$@"
-        check_not_running $CONTAINER_NAME       $BASE_IMAGE
-        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
+        check_not_running $CONTAINER_NAME        $BASE_IMAGE
+        check_not_running $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
+        check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
-        if [ -z $WEAVE_NO_PLUGIN ] && check_docker_server_api_version 1.21 ; then
-            check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
-            launch_plugin $COMMON_ARGS
-        fi
+        [ -z $WEAVE_NO_PLUGIN ] && check_docker_server_api_version 1.21 && launch_plugin $COMMON_ARGS
         ;;
     launch-router)
         deprecation_warnings "$@"
