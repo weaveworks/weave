@@ -1822,6 +1822,7 @@ case "$COMMAND" in
         [ $# -eq 0 ] || usage
         ask_version $CONTAINER_NAME $IMAGE || true
         ask_version $PROXY_CONTAINER_NAME $EXEC_IMAGE --entrypoint=/home/weave/weaveproxy || true
+        ask_version $PLUGIN_CONTAINER_NAME $PLUGIN_IMAGE || true
         ;;
     # intentionally undocumented since it assumes knowledge of weave
     # internals
