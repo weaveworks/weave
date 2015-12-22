@@ -1,3 +1,17 @@
+## Release 1.4.1
+
+This is a bug-fix release to cover a few issues that came up since the
+release of 1.4.0.
+
+* Weave would fail to launch when `$DOCKER_HOST` was set to a TCP socket secured with TLS #1820/#1822
+* Weave would fail to stop when run against Docker pre-1.9 #1815/#1817
+* Issue a warning instead of failing on `--with-dns` option to proxy, which was removed #1810/#1812
+* Make `weave version` show the plugin version #1797/#1813
+* Make `weave launch` show when the a container is restarting #1778/#1814
+* Make `weave launch` fail if the plugin is running, for consistency with router and proxy. #1818/#1819
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.4.1).
+
 ## Release 1.4.0
 
 **Highlights**

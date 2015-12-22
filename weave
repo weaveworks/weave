@@ -95,18 +95,19 @@ usage() {
     exit 1
 }
 
-docker_sock_volume_mount() {
-  if [ -z "$DOCKER_HOST" ]; then
-      DOCKER_SOCK="/var/run/docker.sock"
-  elif echo "$DOCKER_HOST" | grep -q "^unix://" >/dev/null; then
-      DOCKER_SOCK="${DOCKER_HOST#unix://}"
-  fi
-  [ -z "$DOCKER_SOCK" ] || echo "-v $DOCKER_SOCK:$DOCKER_SOCK"
+docker_sock_options() {
+    # Pass through DOCKER_HOST if it is a Unix socket;
+    # a TCP socket may be secured by TLS, in which case we can't use it
+    if echo "$DOCKER_HOST" | grep -q "^unix://" >/dev/null; then
+        echo "-v ${DOCKER_HOST#unix://}:${DOCKER_HOST#unix://} -e DOCKER_HOST"
+    else
+        echo "-v /var/run/docker.sock:/var/run/docker.sock"
+    fi
 }
 
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host \
-        $(docker_sock_volume_mount) \
+        $(docker_sock_options) \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
@@ -121,7 +122,6 @@ exec_remote() {
         -e WEAVE_NO_FASTDP \
         -e WEAVE_NO_BRIDGED_FASTDP \
         -e WEAVE_NO_PLUGIN \
-        -e DOCKER_HOST \
         -e DOCKER_BRIDGE \
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
         -e DOCKER_CLIENT_ARGS \
@@ -1615,10 +1615,9 @@ launch_router() {
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
     ROUTER_CONTAINER=$(docker run --privileged -d --name=$CONTAINER_NAME \
-        $(docker_sock_volume_mount) \
+        $(docker_sock_options) \
         -p $PORT:$CONTAINER_PORT/tcp -p $PORT:$CONTAINER_PORT/udp \
         ${NETHOST_OPT:-$DNS_PORT_MAPPING} \
-        -e DOCKER_HOST \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
@@ -1673,12 +1672,11 @@ launch_proxy() {
     mkdir -p /var/run/weave
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
-        $(docker_sock_volume_mount) \
+        $(docker_sock_options) \
         -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e WEAVE_CIDR=none \
-        -e DOCKER_HOST \
         -e DOCKER_BRIDGE \
         -e WEAVE_DEBUG \
         -e COVERAGE \
@@ -1697,9 +1695,8 @@ launch_plugin() {
     PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
         --restart=always \
         --net=host \
-        $(docker_sock_volume_mount) \
+        $(docker_sock_options) \
         -v /run/docker/plugins:/run/docker/plugins \
-        -e DOCKER_HOST \
         $PLUGIN_IMAGE "$@")
 }
 
