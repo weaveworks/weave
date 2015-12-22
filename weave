@@ -913,21 +913,19 @@ container_weave_addrs() {
 # functions for interacting with containers
 ######################################################################
 
-# Check that a container named $1 with image $2 is not running
+# Check that a container named $1 with image $2 for component $3 is not running
 check_not_running() {
-    case $(docker inspect --format='{{.State.Running}} {{.Config.Image}}' $1 2>/dev/null) in
-        "true $2")
+    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $1 2>/dev/null) || true
+    case ${RUN_STATUS%:*} in
+        "true restarting $2")
+            echo "$1 is restarting; you can stop it with 'weave stop-$3'" >&2
+            exit 1
+            ;;
+        "true "*" $2")
             echo "$1 is already running." >&2
             exit 1
             ;;
-        "true $2:"*)
-            echo "$1 is already running." >&2
-            exit 1
-            ;;
-        "false $2")
-            docker rm $1 >/dev/null
-            ;;
-        "false $2:"*)
+        "false "*" $2")
             docker rm $1 >/dev/null
             ;;
         true*)
@@ -1850,19 +1848,19 @@ EOF
         ;;
     launch)
         deprecation_warnings "$@"
-        check_not_running $CONTAINER_NAME       $BASE_IMAGE
-        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
+        check_not_running $CONTAINER_NAME       $BASE_IMAGE      router
+        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE proxy
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
         if [ -z $WEAVE_NO_PLUGIN ] && check_docker_server_api_version 1.21 ; then
-            check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
+            check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE plugin
             launch_plugin $COMMON_ARGS
         fi
         ;;
     launch-router)
         deprecation_warnings "$@"
-        check_not_running $CONTAINER_NAME $BASE_IMAGE
+        check_not_running $CONTAINER_NAME $BASE_IMAGE router
         launch_router "$@"
         echo $ROUTER_CONTAINER
         ;;
@@ -1876,12 +1874,12 @@ EOF
         ;;
     launch-proxy)
         deprecation_warnings "$@"
-        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
+        check_not_running $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE proxy
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
     launch-plugin)
-        check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
+        check_not_running $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE plugin
         launch_plugin "$@"
         echo $PLUGIN_CONTAINER
         ;;
