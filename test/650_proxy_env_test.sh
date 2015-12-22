@@ -30,7 +30,7 @@ check
 
 # Check we can use weave env/config with unix -Hs specified
 weave_on $HOST1 stop
-run_on $HOST1 "COVERAGE=$COVERAGE weave launch-proxy -H unix:///var/run/weave/weave.sock"
+weave_on $HOST1 launch-proxy -H unix:///var/run/weave/weave.sock
 assert_raises "run_on $HOST1 'eval \$(weave env) ; docker $CMD'"
 assert_raises "run_on $HOST1 'docker \$(weave config) $CMD'"
 
