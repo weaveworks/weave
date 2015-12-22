@@ -21,6 +21,7 @@ func main() {
 		justVersion bool
 		logLevel    = "info"
 		c           = proxy.Config{Image: "weaveworks/weaveexec"}
+		withDNS     bool
 	)
 
 	c.Version = version
@@ -39,6 +40,7 @@ func main() {
 	mflag.BoolVar(&c.TLSConfig.Enabled, []string{"#tls", "-tls"}, false, "Use TLS; implied by --tlsverify")
 	mflag.StringVar(&c.TLSConfig.Key, []string{"#tlskey", "-tlskey"}, "", "Path to TLS key file")
 	mflag.BoolVar(&c.TLSConfig.Verify, []string{"#tlsverify", "-tlsverify"}, false, "Use TLS and verify the remote")
+	mflag.BoolVar(&withDNS, []string{"#-with-dns", "#w"}, false, "option removed")
 	mflag.BoolVar(&c.WithoutDNS, []string{"-without-dns"}, false, "instruct created containers to never use weaveDNS as their nameserver")
 	mflag.BoolVar(&c.NoMulticastRoute, []string{"-no-multicast-route"}, false, "do not add a multicast route via the weave interface when attaching containers")
 	mflag.Parse()
@@ -56,6 +58,10 @@ func main() {
 
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
+
+	if withDNS {
+		Log.Warning("--with-dns option has been removed; DNS is on by default")
+	}
 
 	c.DockerHost = defaultDockerHost
 	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
