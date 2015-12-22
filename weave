@@ -1713,9 +1713,11 @@ launch_plugin() {
 }
 
 remove_plugin_network() {
-    docker run --rm --net=host \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        $PLUGIN_IMAGE --remove-network
+    if [ -z $WEAVE_NO_PLUGIN ] && check_docker_server_api_version 1.21 ; then
+        docker run --rm --net=host \
+               -v /var/run/docker.sock:/var/run/docker.sock \
+               $PLUGIN_IMAGE --remove-network
+    fi
 }
 
 stop_plugin() {
