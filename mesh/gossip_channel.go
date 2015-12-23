@@ -128,7 +128,6 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err erro
 func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
 	names := c.routes.PeerNames() // do this outside the lock so they don't nest
 	c.Lock()
-	defer c.Unlock()
 	// GC - randomly (courtesy of go's map iterator) pick some
 	// existing broadcasters and stop&remove them if their source peer
 	// is unknown. We stop as soon as we encounter a valid entry; the
@@ -153,6 +152,7 @@ func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) erro
 		broadcaster = NewGossipSender(func(pending GossipData) { c.sendBroadcast(srcName, pending) })
 		c.broadcasters[srcName] = broadcaster
 	}
+	c.Unlock()
 	broadcaster.Send(update)
 	return nil
 }
@@ -189,7 +189,6 @@ func (c *GossipChannel) sendDown(conns []Connection, data GossipData) {
 	}
 	ourConnections := c.ourself.Connections()
 	c.Lock()
-	defer c.Unlock()
 	// GC - randomly (courtesy of go's map iterator) pick some
 	// existing senders and stop&remove them if the associated
 	// connection is no longer active.  We stop as soon as we
@@ -209,13 +208,19 @@ func (c *GossipChannel) sendDown(conns []Connection, data GossipData) {
 			break
 		}
 	}
-	// start senders, if necessary, and send.
-	for _, conn := range conns {
+	// start senders, if necessary
+	senders := make([]*GossipSender, len(conns), len(conns))
+	for i, conn := range conns {
 		sender, found := c.senders[conn]
 		if !found {
 			sender = c.makeSender(conn)
 			c.senders[conn] = sender
 		}
+		senders[i] = sender
+	}
+	c.Unlock()
+	// send
+	for _, sender := range senders {
 		sender.Send(data)
 	}
 }
