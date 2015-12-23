@@ -151,11 +151,10 @@ func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) erro
 
 func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 	c.routes.EnsureRecalculated()
-	nextHops := c.routes.BroadcastAll(srcName)
-	if len(nextHops) == 0 {
+	connections := c.ourself.ConnectionsTo(c.routes.BroadcastAll(srcName))
+	if len(connections) == 0 {
 		return
 	}
-	connections := c.ourself.ConnectionsTo(nextHops)
 	for _, msg := range update.Encode() {
 		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
 		// FIXME a single blocked connection can stall us
@@ -167,20 +166,12 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 
 func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
 	c.routes.EnsureRecalculated()
-	destinations := c.routes.RandomNeighbours(srcName)
-	if len(destinations) == 0 {
-		return
-	}
-	c.sendDown(c.ourself.ConnectionsTo(destinations), data)
+	c.sendDown(c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName)), data)
 }
 
 func (c *GossipChannel) Send(data GossipData) {
 	c.routes.EnsureRecalculated()
-	destinations := c.routes.RandomNeighbours(c.ourself.Name)
-	if len(destinations) == 0 {
-		return
-	}
-	c.sendDown(c.ourself.ConnectionsTo(destinations), data)
+	c.sendDown(c.ourself.ConnectionsTo(c.routes.RandomNeighbours(c.ourself.Name)), data)
 }
 
 func (c *GossipChannel) SendDown(conn Connection, data GossipData) {

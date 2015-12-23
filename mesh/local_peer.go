@@ -45,6 +45,9 @@ func (peer *LocalPeer) ConnectionTo(name PeerName) (Connection, bool) {
 }
 
 func (peer *LocalPeer) ConnectionsTo(names []PeerName) []Connection {
+	if len(names) == 0 {
+		return nil
+	}
 	conns := make([]Connection, 0, len(names))
 	peer.RLock()
 	defer peer.RUnlock()
