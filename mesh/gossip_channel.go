@@ -224,16 +224,9 @@ func (c *GossipChannel) sendDown(selectedConnections []Connection, data GossipDa
 	}
 }
 
-// We have seen a couple of failures which suggest a >128GB slice was encountered.
-// 100MB should be enough for anyone.
-const maxFeasibleMessageLen = 100 * 1024 * 1024
-
 func (c *GossipChannel) makeSender(conn Connection) *GossipSender {
 	return NewGossipSender(func(pending GossipData) {
 		for _, msg := range pending.Encode() {
-			if len(msg) > maxFeasibleMessageLen {
-				panic(fmt.Sprintf("Gossip message too large: len=%d bytes; on channel '%s' from %+v", len(msg), c.name, pending))
-			}
 			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, msg)}
 			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
 		}
