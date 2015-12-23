@@ -178,11 +178,11 @@ func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
 	c.sendDown([]Connection{conn}, data)
 }
 
-func (c *GossipChannel) sendDown(selectedConnections []Connection, data GossipData) {
-	if len(selectedConnections) == 0 {
+func (c *GossipChannel) sendDown(conns []Connection, data GossipData) {
+	if len(conns) == 0 {
 		return
 	}
-	connections := c.ourself.Connections()
+	ourConnections := c.ourself.Connections()
 	c.Lock()
 	defer c.Unlock()
 	// GC - randomly (courtesy of go's map iterator) pick some
@@ -197,7 +197,7 @@ func (c *GossipChannel) sendDown(selectedConnections []Connection, data GossipDa
 	// we operate on LocalPeer.Connections(). That is
 	// O(n_our_connections) at best.
 	for conn, sender := range c.senders {
-		if _, found := connections[conn]; !found {
+		if _, found := ourConnections[conn]; !found {
 			delete(c.senders, conn)
 			sender.Stop()
 		} else {
@@ -205,7 +205,7 @@ func (c *GossipChannel) sendDown(selectedConnections []Connection, data GossipDa
 		}
 	}
 	// start senders, if necessary, and send.
-	for _, conn := range selectedConnections {
+	for _, conn := range conns {
 		sender, found := c.senders[conn]
 		if !found {
 			sender = c.makeSender(conn)
