@@ -2,6 +2,7 @@ package mesh
 
 import (
 	"fmt"
+	"sync"
 )
 
 type GossipData interface {
@@ -32,35 +33,38 @@ type Gossiper interface {
 // Accumulates GossipData that needs to be sent to one destination,
 // and sends it when possible.
 type GossipSender struct {
+	sync.Mutex
 	send  func(GossipData)
-	cell  chan GossipData
+	cell  GossipData
+	stop  chan<- struct{}
+	more  chan<- struct{}
 	flush chan<- chan<- bool // for testing
 }
 
 func NewGossipSender(send func(GossipData)) *GossipSender {
-	cell := make(chan GossipData, 1)
+	stop := make(chan struct{})
+	more := make(chan struct{}, 1)
 	flush := make(chan chan<- bool)
-	s := &GossipSender{send: send, cell: cell, flush: flush}
-	go s.run(flush)
+	s := &GossipSender{send: send, stop: stop, more: more, flush: flush}
+	go s.run(stop, more, flush)
 	return s
 }
 
-func (s *GossipSender) run(flush <-chan chan<- bool) {
+func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}, flush <-chan chan<- bool) {
 	sent := false
 	for {
 		select {
-		case pending := <-s.cell:
-			if pending == nil { // receive zero value when chan is closed
-				return
-			}
-			s.send(pending)
+		case <-stop:
+			return
+		case <-more:
+			s.deliver()
 			sent = true
 		case ch := <-flush: // for testing
 			// send anything pending, then reply back whether we sent
 			// anything since previous flush
 			select {
-			case pending := <-s.cell:
-				s.send(pending)
+			case <-more:
+				s.deliver()
 				sent = true
 			default:
 			}
@@ -70,13 +74,25 @@ func (s *GossipSender) run(flush <-chan chan<- bool) {
 	}
 }
 
+func (s *GossipSender) deliver() {
+	s.Lock()
+	data := s.cell
+	s.cell = nil
+	s.Unlock()
+	s.send(data)
+}
+
 func (s *GossipSender) Send(data GossipData) {
-	// NB: this must not be invoked concurrently
-	select {
-	case pending := <-s.cell:
-		s.cell <- pending.Merge(data)
-	default:
-		s.cell <- data
+	s.Lock()
+	defer s.Unlock()
+	if s.cell == nil {
+		s.cell = data
+		select {
+		case s.more <- void:
+		default:
+		}
+	} else {
+		s.cell = s.cell.Merge(data)
 	}
 }
 
@@ -88,7 +104,7 @@ func (s *GossipSender) Flush() bool {
 }
 
 func (s *GossipSender) Stop() {
-	close(s.cell)
+	close(s.stop)
 }
 
 type GossipChannels map[string]*GossipChannel
