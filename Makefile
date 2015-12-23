@@ -1,4 +1,4 @@
-PUBLISH=publish_weave publish_weaveexec
+PUBLISH=publish_weave publish_weaveexec publish_plugin
 
 .DEFAULT: all
 .PHONY: all update tests lint publish $(PUBLISH) clean clean-bin prerequisites build travis run-smoketests
