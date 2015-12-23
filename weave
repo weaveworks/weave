@@ -1880,7 +1880,8 @@ EOF
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
         if PROXY_ADDR=$(proxy_addr) ; then
-            echo "export DOCKER_HOST=$PROXY_ADDR ORIG_DOCKER_HOST=$DOCKER_CLIENT_HOST"
+            [ "$PROXY_ADDR" = "$DOCKER_CLIENT_HOST" ] || RESTORE="ORIG_DOCKER_HOST=$DOCKER_CLIENT_HOST"
+            echo "export DOCKER_HOST=$PROXY_ADDR $RESTORE"
         fi
         ;;
     config|proxy-config)
