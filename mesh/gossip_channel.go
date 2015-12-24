@@ -155,11 +155,17 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 	if len(connections) == 0 {
 		return
 	}
-	for _, msg := range update.Encode() {
-		protocolMsg := ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
-		// FIXME a single blocked connection can stall us
-		for _, conn := range connections {
-			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+	msgs := update.Encode()
+	protocolMsgs := make([]ProtocolMsg, len(msgs), len(msgs))
+	for i, msg := range msgs {
+		protocolMsgs[i] = ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
+	}
+	// FIXME a single blocked connection can stall us
+	for _, conn := range connections {
+		for _, protocolMsg := range protocolMsgs {
+			if conn.(ProtocolSender).SendProtocolMsg(protocolMsg) != nil {
+				break
+			}
 		}
 	}
 }
@@ -219,7 +225,9 @@ func (c *GossipChannel) makeSender(conn Connection) *GossipSender {
 	return NewGossipSender(func(pending GossipData) {
 		for _, msg := range pending.Encode() {
 			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, msg)}
-			conn.(ProtocolSender).SendProtocolMsg(protocolMsg)
+			if conn.(ProtocolSender).SendProtocolMsg(protocolMsg) != nil {
+				break
+			}
 		}
 	})
 }
