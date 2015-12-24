@@ -67,13 +67,21 @@ func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}, flush <-c
 		case <-stop:
 			return
 		case <-more:
-			sent = s.deliver(stop) || sent
+			sentSomething, err := s.deliver(stop)
+			if err != nil {
+				return
+			}
+			sent = sent || sentSomething
 		case ch := <-flush: // for testing
 			// send anything pending, then reply back whether we sent
 			// anything since previous flush
 			select {
 			case <-more:
-				sent = s.deliver(stop) || sent
+				sentSomething, err := s.deliver(stop)
+				if err != nil {
+					return
+				}
+				sent = sent || sentSomething
 			default:
 			}
 			ch <- sent
@@ -82,7 +90,7 @@ func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}, flush <-c
 	}
 }
 
-func (s *GossipSender) deliver(stop <-chan struct{}) bool {
+func (s *GossipSender) deliver(stop <-chan struct{}) (bool, error) {
 	sent := false
 	// We must not hold our lock when sending, since that would block
 	// the callers of Send[Gossip] while we are stuck waiting for
@@ -91,16 +99,16 @@ func (s *GossipSender) deliver(stop <-chan struct{}) bool {
 	for {
 		select {
 		case <-stop:
-			return sent
+			return sent, nil
 		default:
 		}
 		data, makeProtocolMsg := s.pick()
 		if data == nil {
-			return sent
+			return sent, nil
 		}
 		for _, msg := range data.Encode() {
-			if s.sender.SendProtocolMsg(makeProtocolMsg(msg)) != nil {
-				break
+			if err := s.sender.SendProtocolMsg(makeProtocolMsg(msg)); err != nil {
+				return sent, err
 			}
 		}
 		sent = true
