@@ -67,13 +67,13 @@ func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}, flush <-c
 		case <-stop:
 			return
 		case <-more:
-			sent = s.deliver() || sent
+			sent = s.deliver(stop) || sent
 		case ch := <-flush: // for testing
 			// send anything pending, then reply back whether we sent
 			// anything since previous flush
 			select {
 			case <-more:
-				sent = s.deliver() || sent
+				sent = s.deliver(stop) || sent
 			default:
 			}
 			ch <- sent
@@ -82,13 +82,18 @@ func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}, flush <-c
 	}
 }
 
-func (s *GossipSender) deliver() bool {
+func (s *GossipSender) deliver(stop <-chan struct{}) bool {
 	sent := false
 	// We must not hold our lock when sending, since that would block
 	// the callers of Send[Gossip] while we are stuck waiting for
 	// network congestion to clear. So we pick and send one piece of
 	// data at a time, only holding the lock during the picking.
 	for {
+		select {
+		case <-stop:
+			return sent
+		default:
+		}
 		data, makeProtocolMsg := s.pick()
 		if data == nil {
 			return sent
