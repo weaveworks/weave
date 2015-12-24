@@ -92,6 +92,7 @@ func (routes *Routes) lookupOrCalculate(name PeerName, broadcast *broadcastRoute
 		routes.RUnlock()
 		if found {
 			res <- hops
+			return
 		}
 		routes.peers.RLock()
 		routes.ourself.RLock()
