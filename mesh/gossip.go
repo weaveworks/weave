@@ -34,18 +34,28 @@ type Gossiper interface {
 // and sends it when possible.
 type GossipSender struct {
 	sync.Mutex
-	send  func(GossipData)
-	cell  GossipData
-	stop  chan<- struct{}
-	more  chan<- struct{}
-	flush chan<- chan<- bool // for testing
+	makeMsg          func(msg []byte) ProtocolMsg
+	makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg
+	sender           ProtocolSender
+	gossip           GossipData
+	broadcasts       map[PeerName]GossipData
+	stop             chan<- struct{}
+	more             chan<- struct{}
+	flush            chan<- chan<- bool // for testing
 }
 
-func NewGossipSender(send func(GossipData)) *GossipSender {
+func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg, sender ProtocolSender) *GossipSender {
 	stop := make(chan struct{})
 	more := make(chan struct{}, 1)
 	flush := make(chan chan<- bool)
-	s := &GossipSender{send: send, stop: stop, more: more, flush: flush}
+	s := &GossipSender{
+		makeMsg:          makeMsg,
+		makeBroadcastMsg: makeBroadcastMsg,
+		sender:           sender,
+		broadcasts:       make(map[PeerName]GossipData),
+		stop:             stop,
+		more:             more,
+		flush:            flush}
 	go s.run(stop, more, flush)
 	return s
 }
@@ -57,15 +67,13 @@ func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}, flush <-c
 		case <-stop:
 			return
 		case <-more:
-			s.deliver()
-			sent = true
+			sent = s.deliver() || sent
 		case ch := <-flush: // for testing
 			// send anything pending, then reply back whether we sent
 			// anything since previous flush
 			select {
 			case <-more:
-				s.deliver()
-				sent = true
+				sent = s.deliver() || sent
 			default:
 			}
 			ch <- sent
@@ -74,25 +82,78 @@ func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}, flush <-c
 	}
 }
 
-func (s *GossipSender) deliver() {
+func (s *GossipSender) deliver() bool {
+	sent := false
+	// We must not hold our lock when sending, since that would block
+	// the callers of Send[Gossip] while we are stuck waiting for
+	// network congestion to clear. So we pick and send one piece of
+	// data at a time, only holding the lock during the picking.
+	for {
+		data, makeProtocolMsg := s.pick()
+		if data == nil {
+			return sent
+		}
+		for _, msg := range data.Encode() {
+			if s.sender.SendProtocolMsg(makeProtocolMsg(msg)) != nil {
+				break
+			}
+		}
+		sent = true
+	}
+}
+
+func (s *GossipSender) pick() (data GossipData, makeProtocolMsg func(msg []byte) ProtocolMsg) {
 	s.Lock()
-	data := s.cell
-	s.cell = nil
-	s.Unlock()
-	s.send(data)
+	defer s.Unlock()
+	switch {
+	case s.gossip != nil: // usually more important than broadcasts
+		data = s.gossip
+		makeProtocolMsg = s.makeMsg
+		s.gossip = nil
+	case len(s.broadcasts) > 0:
+		for srcName, d := range s.broadcasts {
+			data = d
+			makeProtocolMsg = func(msg []byte) ProtocolMsg { return s.makeBroadcastMsg(srcName, msg) }
+			delete(s.broadcasts, srcName)
+			break
+		}
+	}
+	return
 }
 
 func (s *GossipSender) Send(data GossipData) {
 	s.Lock()
 	defer s.Unlock()
-	if s.cell == nil {
-		s.cell = data
-		select {
-		case s.more <- void:
-		default:
-		}
+	if s.empty() {
+		defer s.prod()
+	}
+	if s.gossip == nil {
+		s.gossip = data
 	} else {
-		s.cell = s.cell.Merge(data)
+		s.gossip = s.gossip.Merge(data)
+	}
+}
+
+func (s *GossipSender) Broadcast(srcName PeerName, data GossipData) {
+	s.Lock()
+	defer s.Unlock()
+	if s.empty() {
+		defer s.prod()
+	}
+	d, found := s.broadcasts[srcName]
+	if !found {
+		s.broadcasts[srcName] = data
+	} else {
+		s.broadcasts[srcName] = d.Merge(data)
+	}
+}
+
+func (s *GossipSender) empty() bool { return s.gossip == nil && len(s.broadcasts) == 0 }
+
+func (s *GossipSender) prod() {
+	select {
+	case s.more <- void:
+	default:
 	}
 }
 
@@ -171,9 +232,6 @@ func (router *Router) sendPendingGossip() bool {
 	for channel := range router.gossipChannelSet() {
 		channel.Lock()
 		for _, sender := range channel.senders {
-			sentSomething = sender.Flush() || sentSomething
-		}
-		for _, sender := range channel.broadcasters {
 			sentSomething = sender.Flush() || sentSomething
 		}
 		channel.Unlock()
