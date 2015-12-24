@@ -9,25 +9,23 @@ import (
 
 type GossipChannel struct {
 	sync.Mutex
-	name         string
-	ourself      *LocalPeer
-	routes       *Routes
-	gossiper     Gossiper
-	senders      connectionSenders
-	broadcasters peerSenders
+	name     string
+	ourself  *LocalPeer
+	routes   *Routes
+	gossiper Gossiper
+	senders  connectionSenders
 }
 
 type connectionSenders map[Connection]*GossipSender
-type peerSenders map[PeerName]*GossipSender
 
 func NewGossipChannel(channelName string, ourself *LocalPeer, routes *Routes, g Gossiper) *GossipChannel {
 	return &GossipChannel{
-		name:         channelName,
-		ourself:      ourself,
-		routes:       routes,
-		gossiper:     g,
-		senders:      make(connectionSenders),
-		broadcasters: make(peerSenders)}
+		name:     channelName,
+		ourself:  ourself,
+		routes:   routes,
+		gossiper: g,
+		senders:  make(connectionSenders),
+	}
 }
 
 func (router *Router) handleGossip(tag ProtocolTag, payload []byte) error {
@@ -128,56 +126,11 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err erro
 }
 
 func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
-	names := c.routes.PeerNames() // do this outside the lock so they don't nest
-	c.Lock()
-	// GC - randomly (courtesy of go's map iterator) pick some
-	// existing broadcasters and stop&remove them if their source peer
-	// is unknown. We stop as soon as we encounter a valid entry; the
-	// idea being that when there is little or no garbage then this
-	// executes close to O(1)[1], whereas when there is lots of
-	// garbage we remove it quickly.
-	//
-	// [1] TODO Unfortunately, due to the desire to avoid nested
-	// locks, instead of simply invoking Peers.Fetch(name) below, we
-	// have that Peers.Names() invocation above. That is O(n_peers) at
-	// best.
-	for name, broadcaster := range c.broadcasters {
-		if _, found := names[name]; !found {
-			delete(c.broadcasters, name)
-			broadcaster.Stop()
-		} else {
-			break
-		}
-	}
-	broadcaster, found := c.broadcasters[srcName]
-	if !found {
-		broadcaster = NewGossipSender(func(pending GossipData) { c.sendBroadcast(srcName, pending) })
-		c.broadcasters[srcName] = broadcaster
-	}
-	c.Unlock()
-	broadcaster.Send(update)
-	return nil
-}
-
-func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 	c.routes.EnsureRecalculated()
-	connections := c.ourself.ConnectionsTo(c.routes.BroadcastAll(srcName))
-	if len(connections) == 0 {
-		return
+	for _, sender := range c.sendersFor(c.ourself.ConnectionsTo(c.routes.BroadcastAll(srcName))) {
+		sender.Broadcast(srcName, update)
 	}
-	msgs := update.Encode()
-	protocolMsgs := make([]ProtocolMsg, len(msgs), len(msgs))
-	for i, msg := range msgs {
-		protocolMsgs[i] = ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
-	}
-	// FIXME a single blocked connection can stall us
-	for _, conn := range connections {
-		for _, protocolMsg := range protocolMsgs {
-			if conn.(ProtocolSender).SendProtocolMsg(protocolMsg) != nil {
-				break
-			}
-		}
-	}
+	return nil
 }
 
 func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
@@ -218,7 +171,7 @@ func (c *GossipChannel) sendersFor(conns []Connection) []*GossipSender {
 	for i, conn := range conns {
 		sender, found := c.senders[conn]
 		if !found {
-			sender = c.makeSender(conn)
+			sender = NewGossipSender(c.makeMsg, c.makeBroadcastMsg, conn.(ProtocolSender))
 			c.senders[conn] = sender
 		}
 		senders[i] = sender
@@ -226,15 +179,12 @@ func (c *GossipChannel) sendersFor(conns []Connection) []*GossipSender {
 	return senders
 }
 
-func (c *GossipChannel) makeSender(conn Connection) *GossipSender {
-	return NewGossipSender(func(pending GossipData) {
-		for _, msg := range pending.Encode() {
-			protocolMsg := ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, msg)}
-			if conn.(ProtocolSender).SendProtocolMsg(protocolMsg) != nil {
-				break
-			}
-		}
-	})
+func (c *GossipChannel) makeMsg(msg []byte) ProtocolMsg {
+	return ProtocolMsg{ProtocolGossip, GobEncode(c.name, c.ourself.Name, msg)}
+}
+
+func (c *GossipChannel) makeBroadcastMsg(srcName PeerName, msg []byte) ProtocolMsg {
+	return ProtocolMsg{ProtocolGossipBroadcast, GobEncode(c.name, srcName, msg)}
 }
 
 func (c *GossipChannel) log(args ...interface{}) {
