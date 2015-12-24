@@ -151,7 +151,6 @@ func (routes *Routes) Recalculate() {
 	select {
 	case routes.recalculate <- nil:
 	default:
-		log.Println("route recalculation coalesced")
 	}
 }
 
