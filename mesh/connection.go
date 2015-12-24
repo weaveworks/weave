@@ -360,20 +360,21 @@ func (conn *LocalConnection) actorLoop(actionChan <-chan ConnectionAction, error
 
 	for err == nil {
 		select {
-		case action := <-actionChan:
-			err = action()
-
 		case err = <-errorChan:
-
-		case <-conn.heartbeatTCP.C:
-			err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
-
-		case <-fwdEstablishedChan:
-			conn.established = true
-			fwdEstablishedChan = nil
-			conn.Router.Ourself.ConnectionEstablished(conn)
-
 		case err = <-fwdErrorChan:
+		default:
+			select {
+			case action := <-actionChan:
+				err = action()
+			case <-conn.heartbeatTCP.C:
+				err = conn.sendSimpleProtocolMsg(ProtocolHeartbeat)
+			case <-fwdEstablishedChan:
+				conn.established = true
+				fwdEstablishedChan = nil
+				conn.Router.Ourself.ConnectionEstablished(conn)
+			case err = <-errorChan:
+			case err = <-fwdErrorChan:
+			}
 		}
 	}
 	return
