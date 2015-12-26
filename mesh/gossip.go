@@ -43,7 +43,7 @@ type GossipSender struct {
 	flush            chan<- chan<- bool // for testing
 }
 
-func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg, sender ProtocolSender, stop <-chan struct{}) *GossipSender {
+func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg, sender ProtocolSender, start <-chan struct{}, stop <-chan struct{}) *GossipSender {
 	more := make(chan struct{}, 1)
 	flush := make(chan chan<- bool)
 	s := &GossipSender{
@@ -53,11 +53,16 @@ func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func
 		broadcasts:       make(map[PeerName]GossipData),
 		more:             more,
 		flush:            flush}
-	go s.run(stop, more, flush)
+	go s.run(start, stop, more, flush)
 	return s
 }
 
-func (s *GossipSender) run(stop <-chan struct{}, more <-chan struct{}, flush <-chan chan<- bool) {
+func (s *GossipSender) run(start <-chan struct{}, stop <-chan struct{}, more <-chan struct{}, flush <-chan chan<- bool) {
+	select {
+	case <-stop:
+		return
+	case <-start:
+	}
 	sent := false
 	for {
 		select {
@@ -177,23 +182,28 @@ func (s *GossipSender) Flush() bool {
 type GossipSenders struct {
 	sync.Mutex
 	sender  ProtocolSender
+	start   chan struct{}
 	stop    <-chan struct{}
 	senders map[string]*GossipSender
 }
 
 func NewGossipSenders(sender ProtocolSender, stop <-chan struct{}) *GossipSenders {
-	return &GossipSenders{sender: sender, stop: stop, senders: make(map[string]*GossipSender)}
+	return &GossipSenders{sender: sender, start: make(chan struct{}), stop: stop, senders: make(map[string]*GossipSender)}
 }
 
-func (gs *GossipSenders) Sender(channelName string, makeGossipSender func(sender ProtocolSender, stop <-chan struct{}) *GossipSender) *GossipSender {
+func (gs *GossipSenders) Sender(channelName string, makeGossipSender func(sender ProtocolSender, start <-chan struct{}, stop <-chan struct{}) *GossipSender) *GossipSender {
 	gs.Lock()
 	defer gs.Unlock()
 	s, found := gs.senders[channelName]
 	if !found {
-		s = makeGossipSender(gs.sender, gs.stop)
+		s = makeGossipSender(gs.sender, gs.start, gs.stop)
 		gs.senders[channelName] = s
 	}
 	return s
+}
+
+func (gs *GossipSenders) Start() {
+	close(gs.start)
 }
 
 // for testing
