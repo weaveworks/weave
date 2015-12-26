@@ -137,7 +137,7 @@ func (c *GossipChannel) senderFor(conn Connection) *GossipSender {
 }
 
 func (c *GossipChannel) makeGossipSender(sender ProtocolSender, start <-chan struct{}, stop <-chan struct{}) *GossipSender {
-	return NewGossipSender(c.makeMsg, c.makeBroadcastMsg, sender, start, stop)
+	return NewGossipSender(c.makeMsg, c.makeBroadcastMsg, sender, c.ourself.Name, start, stop)
 }
 
 func (c *GossipChannel) makeMsg(msg []byte) ProtocolMsg {

@@ -37,19 +37,22 @@ type GossipSender struct {
 	makeMsg          func(msg []byte) ProtocolMsg
 	makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg
 	sender           ProtocolSender
+	ourName          PeerName
 	gossip           GossipData
+	broadcast        GossipData // broadcast from ourself
 	broadcasts       map[PeerName]GossipData
 	more             chan<- struct{}
 	flush            chan<- chan<- bool // for testing
 }
 
-func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg, sender ProtocolSender, start <-chan struct{}, stop <-chan struct{}) *GossipSender {
+func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg, sender ProtocolSender, ourName PeerName, start <-chan struct{}, stop <-chan struct{}) *GossipSender {
 	more := make(chan struct{}, 1)
 	flush := make(chan chan<- bool)
 	s := &GossipSender{
 		makeMsg:          makeMsg,
 		makeBroadcastMsg: makeBroadcastMsg,
 		sender:           sender,
+		ourName:          ourName,
 		broadcasts:       make(map[PeerName]GossipData),
 		more:             more,
 		flush:            flush}
@@ -121,7 +124,11 @@ func (s *GossipSender) pick() (data GossipData, makeProtocolMsg func(msg []byte)
 	s.Lock()
 	defer s.Unlock()
 	switch {
-	case s.gossip != nil: // usually more important than broadcasts
+	case s.broadcast != nil: // our own broadcasts are most important
+		data = s.broadcast
+		makeProtocolMsg = func(msg []byte) ProtocolMsg { return s.makeBroadcastMsg(s.ourName, msg) }
+		s.broadcast = nil
+	case s.gossip != nil: // usually more important than other's broadcasts
 		data = s.gossip
 		makeProtocolMsg = s.makeMsg
 		s.gossip = nil
@@ -155,6 +162,14 @@ func (s *GossipSender) Broadcast(srcName PeerName, data GossipData) {
 	if s.empty() {
 		defer s.prod()
 	}
+	if srcName == s.ourName {
+		if s.broadcast == nil {
+			s.broadcast = data
+		} else {
+			s.broadcast = s.broadcast.Merge(data)
+		}
+		return
+	}
 	d, found := s.broadcasts[srcName]
 	if !found {
 		s.broadcasts[srcName] = data
@@ -163,7 +178,9 @@ func (s *GossipSender) Broadcast(srcName PeerName, data GossipData) {
 	}
 }
 
-func (s *GossipSender) empty() bool { return s.gossip == nil && len(s.broadcasts) == 0 }
+func (s *GossipSender) empty() bool {
+	return s.gossip == nil && s.broadcast == nil && len(s.broadcasts) == 0
+}
 
 func (s *GossipSender) prod() {
 	select {
