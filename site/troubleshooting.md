@@ -275,18 +275,19 @@ re-connect.
 
 ## <a name="reboots"></a>Reboots
 
-When a host reboots, docker's default behaviour is to restart any
-containers that were running. Since weave relies on special network
-configuration outside of the containers, the weave network will not
-function in this state.
+The router and proxy containers do not have Docker restart policies
+set, because the process of getting everything re-started and
+re-connected via restart policies is not entirely reliable. Until that
+changes, we recommend you create appropriate startup scripts to launch
+weave and run application containers from
+[your favourite process manager](systemd.html).
 
-To remedy this, stop and re-launch the weave container, and re-attach
-the application containers with `weave attach`.
+If you are shutting down or restarting a host deliberately, run `weave
+reset` to clear everything down.
 
-For a more permanent solution,
-[disable Docker's auto-restart feature](https://docs.docker.com/articles/host_integration/)
-and create appropriate startup scripts to launch weave and run
-application containers from your favourite process manager.
+The Weave Docker plugin does restart automatically because it must
+always start with Docker, as described in
+[its documentation](plugin.html).
 
 ## <a name="snapshots"></a>Snapshot releases
 
