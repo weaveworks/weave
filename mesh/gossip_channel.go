@@ -103,9 +103,7 @@ func (c *GossipChannel) Send(data GossipData) {
 }
 
 func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
-	for _, sender := range c.sendersFor([]Connection{conn}) {
-		sender.Send(data)
-	}
+	c.senderFor(conn).Send(data)
 }
 
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
@@ -121,25 +119,21 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err erro
 
 func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
 	c.routes.EnsureRecalculated()
-	for _, sender := range c.sendersFor(c.ourself.ConnectionsTo(c.routes.BroadcastAll(srcName))) {
-		sender.Broadcast(srcName, update)
+	for _, conn := range c.ourself.ConnectionsTo(c.routes.BroadcastAll(srcName)) {
+		c.senderFor(conn).Broadcast(srcName, update)
 	}
 	return nil
 }
 
 func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
 	c.routes.EnsureRecalculated()
-	for _, sender := range c.sendersFor(c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName))) {
-		sender.Send(data)
+	for _, conn := range c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName)) {
+		c.senderFor(conn).Send(data)
 	}
 }
 
-func (c *GossipChannel) sendersFor(conns []Connection) []*GossipSender {
-	senders := make([]*GossipSender, len(conns), len(conns))
-	for i, conn := range conns {
-		senders[i] = conn.(GossipConnection).GossipSenders().Sender(c.name, c.makeGossipSender)
-	}
-	return senders
+func (c *GossipChannel) senderFor(conn Connection) *GossipSender {
+	return conn.(GossipConnection).GossipSenders().Sender(c.name, c.makeGossipSender)
 }
 
 func (c *GossipChannel) makeGossipSender(sender ProtocolSender, stop <-chan struct{}) *GossipSender {
