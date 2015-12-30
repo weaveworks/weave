@@ -106,6 +106,14 @@ func (c *GossipChannel) GossipBroadcast(update GossipData) error {
 	return c.relayBroadcast(c.ourself.Name, update)
 }
 
+func (c *GossipChannel) Send(data GossipData) {
+	c.relay(c.ourself.Name, data)
+}
+
+func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
+	c.sendDown([]Connection{conn}, data)
+}
+
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
 	if relayPeerName, found := c.routes.UnicastAll(dstPeerName); !found {
 		err = fmt.Errorf("unknown relay destination: %s", dstPeerName)
@@ -173,15 +181,6 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
 	c.routes.EnsureRecalculated()
 	c.sendDown(c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName)), data)
-}
-
-func (c *GossipChannel) Send(data GossipData) {
-	c.routes.EnsureRecalculated()
-	c.sendDown(c.ourself.ConnectionsTo(c.routes.RandomNeighbours(c.ourself.Name)), data)
-}
-
-func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
-	c.sendDown([]Connection{conn}, data)
 }
 
 func (c *GossipChannel) sendDown(conns []Connection, data GossipData) {
