@@ -1277,6 +1277,10 @@ collect_dns_add_remove_args() {
 # IP Allocation Management helpers
 ######################################################################
 
+check_overlap() {
+    ! command_exists netcheck || netcheck --ignore-iface=$BRIDGE $1
+}
+
 # Claim addresses for a container in IPAM.  Expects to be called from
 # with_container_addresses.
 ipam_reclaim() {
@@ -1337,7 +1341,7 @@ ipam_cidrs() {
         else
             if [ "$METHOD" = "POST" ] ; then
                 # Assignment of a plain IP address; warn if it clashes but carry on
-                command_exists netcheck && netcheck --ignore-iface=$BRIDGE $arg || true
+                check_overlap $arg || true
                 if container_ip $CONTAINER_NAME 2>/dev/null ; then
                     http_call $CONTAINER_IP:$HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
                 fi
@@ -1594,13 +1598,13 @@ launch_router() {
     eval "set -- $ARGS"
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
         IPRANGE="10.32.0.0/12"
-        if command_exists netcheck && ! netcheck --ignore-iface=$BRIDGE $IPRANGE ; then
+        if ! check_overlap $IPRANGE ; then
             echo "ERROR: Default --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
             echo "You must pick another range and set it on all hosts." >&2
             exit 1
         fi
     else
-        if [ -n "$IPRANGE" ] && command_exists netcheck && ! netcheck --ignore-iface=$BRIDGE $IPRANGE ; then
+        if [ -n "$IPRANGE" ] && ! check_overlap $IPRANGE ; then
             echo "WARNING: Specified --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
             echo "Unless this is deliberate, you must pick another range and set it on all hosts." >&2
         fi
