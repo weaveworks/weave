@@ -149,14 +149,14 @@ to each other.
 
 ## Contact Us
 
-Found a bug, want to suggest a feature, or have a question?  You can
-[File an issue](https://github.com/weaveworks/weave/issues).  And
-there is a [Weave Users Google
-Group](https://groups.google.com/a/weave.works/forum/#!forum/weave-users),
-which you can post to by email at weave-users@weave.works.  Or you can
-contact Weaveworks directly at help@weave.works. When reporting a
-bug, please include which version of weave you are running, as shown
-by `weave version`.
+Found a bug, want to suggest a feature, or have a question?  Please
+[file an issue](https://github.com/weaveworks/weave/issues), or post
+to the
+[Weave Users Google Group](https://groups.google.com/a/weave.works/forum/#!forum/weave-users),
+which you can email at weave-users@weave.works.  Or you can contact
+Weaveworks directly at help@weave.works. When reporting a bug, please
+include which version of weave you are running, as shown by `weave
+version`.
 
 Follow on Twitter:
 [@weaveworks](https://twitter.com/weaveworks).
