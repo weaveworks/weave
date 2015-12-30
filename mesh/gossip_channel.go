@@ -111,7 +111,9 @@ func (c *GossipChannel) Send(data GossipData) {
 }
 
 func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
-	c.sendDown([]Connection{conn}, data)
+	for _, sender := range c.sendersFor([]Connection{conn}) {
+		sender.Send(data)
+	}
 }
 
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
@@ -180,11 +182,7 @@ func (c *GossipChannel) sendBroadcast(srcName PeerName, update GossipData) {
 
 func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
 	c.routes.EnsureRecalculated()
-	c.sendDown(c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName)), data)
-}
-
-func (c *GossipChannel) sendDown(conns []Connection, data GossipData) {
-	for _, sender := range c.sendersFor(conns) {
+	for _, sender := range c.sendersFor(c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName))) {
 		sender.Send(data)
 	}
 }
