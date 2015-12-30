@@ -5,13 +5,18 @@ layout: default
 
 # Troubleshooting Weave
 
- * [Overall status](#weave-status)
- * [List connections](#weave-status-connections)
- * [List peers](#weave-status-peers)
- * [List DNS entries](#weave-status-dns)
- * [JSON report](#weave-report)
- * [List attached containers](#list-attached-containers)
+ * [Basic diagnostics](#diagnostics)
+ * [Status reporting](#weave-status)
+   - [List connections](#weave-status-connections)
+   - [List peers](#weave-status-peers)
+   - [List DNS entries](#weave-status-dns)
+   - [JSON report](#weave-report)
+   - [List attached containers](#list-attached-containers)
+ * [Stopping weave](#stop)
+ * [Reboots](#reboots)
  * [Snapshot releases](#snapshots)
+
+## <a name="diagnostics"></a>Basic diagnostics
 
 Check what version of weave you are running with
 
@@ -37,31 +42,7 @@ Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the
 `weave` network bridge on the host.
 
-To stop weave, if you have configured your environment to use the
-Weave Docker API Proxy, e.g. by running `eval $(weave env)` in your
-shell, you must first restore the environment with
-
-    eval $(weave env --restore)
-
-Then run
-
-    weave stop
-
-Note that this leaves the local application container network intact;
-containers on the local host can continue to communicate, whereas
-communication with containers on different hosts, as well as service
-export/import, is disrupted but resumes when weave is relaunched.
-
-To stop weave and completely remove all traces of the weave network on
-the local host, run
-
-    weave reset
-
-Any running application containers will permanently lose connectivity
-with the weave network and have to be restarted in order to
-re-connect.
-
-### <a name="weave-status"></a>Overall status
+## <a name="weave-status"></a>Status reporting
 
 A status summary can be obtained with `weave status`:
 
@@ -267,7 +248,32 @@ You can also supply a list of container IDs/names to `weave ps`, like this:
     able ce:15:34:a9:b5:6d 10.2.5.1/24
     baker 7a:61:a2:49:4b:91 10.2.8.3/24
 
-### Reboots
+## <a name="stop"></a>Stopping weave
+To stop weave, if you have configured your environment to use the
+Weave Docker API Proxy, e.g. by running `eval $(weave env)` in your
+shell, you must first restore the environment with
+
+    eval $(weave env --restore)
+
+Then run
+
+    weave stop
+
+Note that this leaves the local application container network intact;
+containers on the local host can continue to communicate, whereas
+communication with containers on different hosts, as well as service
+export/import, is disrupted but resumes when weave is relaunched.
+
+To stop weave and completely remove all traces of the weave network on
+the local host, run
+
+    weave reset
+
+Any running application containers will permanently lose connectivity
+with the weave network and have to be restarted in order to
+re-connect.
+
+## <a name="reboots"></a>Reboots
 
 When a host reboots, docker's default behaviour is to restart any
 containers that were running. Since weave relies on special network
@@ -282,7 +288,7 @@ For a more permanent solution,
 and create appropriate startup scripts to launch weave and run
 application containers from your favourite process manager.
 
-### <a name="snapshots"></a>Snapshot Releases
+## <a name="snapshots"></a>Snapshot releases
 
 We sometimes publish snapshot releases, to provide previews of new
 features, assist in validation of bug fixes, etc. One can install the
