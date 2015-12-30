@@ -46,17 +46,11 @@ Ensure you are running Linux (kernel 3.8 or later) and have Docker
     sudo curl -L git.io/weave -o /usr/local/bin/weave
     sudo chmod a+x /usr/local/bin/weave
 
-For usage on OSX (with Docker Machine) you first need to make sure
-that a VM is running and configured, as shown in [the Docker Machine
-documentation](https://docs.docker.com/installation/mac/#from-your-shell).
+For usage on OSX (with Docker Machine) you first need to
+[make sure that a VM is running and configured](https://docs.docker.com/installation/mac/#from-your-shell).
 Then you can launch weave directly from the OSX host.
 
-CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing weave using cloud-config.
-
-Amazon ECS users see
-[here](https://github.com/weaveworks/guides/blob/master/aws-ecs/LATESTAMIs.md)
-for the latest Weave AMIs and
-[here](http://weave.works/guides/service-discovery-with-weave-aws-ecs.html) to get started with Weave on ECS.
+For installing weave on other platforms, follow the [integration guides](http://weave.works/product/integrations/).
 
 Weave respects the environment variable `DOCKER_HOST`, so you can run
 it locally to control a weave network on a remote host.
