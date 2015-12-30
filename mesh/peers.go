@@ -395,7 +395,7 @@ func (peers *Peers) garbageCollect(pending *PeersPendingNotifications) {
 		}
 	}
 
-	if peers.byShortID[peers.ourself.ShortID].peer != peers.ourself.Peer {
+	if len(pending.removed) > 0 && peers.byShortID[peers.ourself.ShortID].peer != peers.ourself.Peer {
 		// The local peer doesn't own its short id.  Garbage
 		// collection might have freed some up, so try to
 		// reassign.
