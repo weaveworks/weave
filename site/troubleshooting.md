@@ -275,21 +275,19 @@ re-connect.
 
 ## <a name="reboots"></a>Reboots
 
-We do not set a restart policy on the Weave router or proxy, because
-the process of getting everything re-started and re-connected is not
-entirely reliable; we have at least [one issue][issue1556] in Weave
-and [one in docker][docker18574] that cause trouble.
-
-Instead, we recommend you create appropriate startup scripts to launch
-weave and run application containers from [your favourite process
-manager](systemd.html).
+The router and proxy containers do not have Docker restart policies
+set, because the process of getting everything re-started and
+re-connected via restart policies is not entirely reliable. Until that
+changes, we recommend you create appropriate startup scripts to launch
+weave and run application containers from
+[your favourite process manager](systemd.html).
 
 If you are shutting down or restarting a host deliberately, run `weave
 reset` to clear everything down.
 
-The Weave Docker plugin does restart automatically, because it must
-always start with Docker as described in [its
-documentation](plugin.html).
+The Weave Docker plugin does restart automatically because it must
+always start with Docker, as described in
+[its documentation](plugin.html).
 
 ## <a name="snapshots"></a>Snapshot releases
 
@@ -303,6 +301,3 @@ latest snapshot release with
 
 Snapshot releases report the script version as "(unreleased version)",
 and the container image versions as git hashes.
-
-[issue1556]: https://github.com/weaveworks/weave/issues/1556
-[docker18574]: https://github.com/docker/docker/issues/18574
