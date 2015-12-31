@@ -173,7 +173,7 @@ check_docker_server_api_version() {
     # Cope with various versions of `docker version` output format
     if ! DOCKER_API_VERSION=$(docker version -f '{{.Server.APIVersion}}' 2> /dev/null ) ; then
         if ! DOCKER_API_VERSION=$(docker version -f '{{.Server.ApiVersion}}' 2> /dev/null ) ; then
-            if ! DOCKER_API_VERSION=$(docker version | sed -n -e 's|^Server API version: *\([0-9][0-9]*\.[0-9][0-9]\).*|\1|p') ; then
+            if ! DOCKER_API_VERSION=$(docker version | sed -n -e 's|^Server API version: *\([0-9][0-9]*\.[0-9][0-9]\).*|\1|p') || [ -z "$DOCKER_API_VERSION" ] ; then
                 echo "ERROR: Unable to determine docker version" >&2
                 exit 1
             fi
