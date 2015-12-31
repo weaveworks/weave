@@ -40,13 +40,11 @@ Usage:
 weave --help | help
 weave setup
 weave version
-weave launch        [--password <password>] [--nickname <nickname>]
+weave launch        <same arguments as 'weave launch-router'>
+weave launch-router [--password <password>] [--nickname <nickname>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--no-discovery] [--init-peer-count <count>]
                       [--trusted-subnets <cidr>,...] <peer> ...
-weave launch-router [--password <password>] [--nickname <nickname>]
-                      [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                      [--no-discovery] [--init-peer-count <count>] <peer> ...
 weave launch-proxy  [-H <endpoint>] [--without-dns]
                       [--no-default-ipalloc] [--no-rewrite-hosts]
                       [--no-multicast-route]
