@@ -464,6 +464,10 @@ random_mac() {
 # weave and docker specific helpers
 ######################################################################
 
+fastdp_op() {
+    docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --$1 --datapath=$2
+}
+
 # Detect the current bridge/datapath state. When invoked, the values of
 # $BRIDGE and $DATAPATH are expected to be distinct. $BRIDGE_TYPE and
 # $DATAPATH are set correctly on success; failure indicates that the
@@ -505,7 +509,7 @@ create_bridge() {
                 # The datapath is the bridge when there is no intermediary
                 DATAPATH="$BRIDGE"
             fi
-            if docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --create-datapath --datapath=$DATAPATH ; then
+            if fastdp_op create-datapath $DATAPATH ; then
                 : # ODP datapath created successfully
             elif [ $? = 17 ] ; then
                 # Exit status of 17 means the kernel doesn't have ODP
@@ -635,7 +639,7 @@ init_bridged_fastdp() {
         ip link del $BRIDGE >/dev/null 2>&1 || true
         ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
         ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
-        docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --delete-datapath --datapath=$DATAPATH >/dev/null 2>&1 || true
+        fastdp_op delete-datapath $DATAPATH >/dev/null 2>&1 || true
         return 1
     fi
 
@@ -665,7 +669,7 @@ destroy_bridge() {
             if [ -d /sys/class/net/$NETDEV/bridge ] ; then
                 ip link del $NETDEV
             else
-                docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --delete-datapath --datapath=$NETDEV
+                fastdp_op delete-datapath $NETDEV
             fi
         fi
     done
@@ -784,7 +788,7 @@ connect_container_to_bridge() {
 }
 
 add_iface_fastdp() {
-    docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --datapath=$DATAPATH --add-datapath-iface=$1
+    fastdp_op add-datapath-iface=$1 $DATAPATH
 }
 
 add_iface_bridge() {
