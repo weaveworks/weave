@@ -4,11 +4,8 @@ set -e
 [ -n "$WEAVE_DEBUG" ] && set -x
 
 SCRIPT_VERSION="(unreleased version)"
-if [ "$SCRIPT_VERSION" = "(unreleased version)" ] ; then
-    IMAGE_VERSION=latest
-else
-    IMAGE_VERSION=$SCRIPT_VERSION
-fi
+IMAGE_VERSION=latest
+[ "$SCRIPT_VERSION" = "(unreleased version)" ] || IMAGE_VERSION=$SCRIPT_VERSION
 IMAGE_VERSION=${WEAVE_VERSION:-$IMAGE_VERSION}
 
 # - Docker versions prior to 1.6 cannot pull images from DockerHub
@@ -271,10 +268,7 @@ extra_hosts_args() {
 
 check_docker_version
 
-if [ "$1" = "--local" ] ; then
-    shift 1
-    IS_LOCAL=1
-fi
+[ "$1" = "--local" ] && shift 1 && IS_LOCAL=1
 
 if [ "$1" = "--help" -o "$1" = "help" ] ; then
     # "--help|help" are special because we always want to process them
@@ -303,9 +297,7 @@ elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
     # we can't rely on our baked-in docker to support those arguments.
     shift 1
 
-    if [ "$1" != "--without-dns" ] ; then
-        DNS_ARGS=$(exec_remote dns-args "$@" || true)
-    fi
+    [ "$1" = "--without-dns" ] || DNS_ARGS=$(exec_remote dns-args "$@" || true)
     shift $(dns_arg_count "$@")
 
     REWRITE_HOSTS=1
@@ -325,14 +317,8 @@ elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
         shift
     done
 
-    if [ -n "$REWRITE_HOSTS" ] ; then
-        extra_hosts_args "$@"
-        DNS_EXTRA_HOSTS_ARGS="--rewrite-hosts $DNS_EXTRA_HOSTS_ARGS"
-    fi
-
-    if [ -n "$NO_MULTICAST_ROUTE" ] ; then
-        ATTACH_ARGS="--no-multicast-route"
-    fi
+    [ -n "$REWRITE_HOSTS" ] && extra_hosts_args "$@" && DNS_EXTRA_HOSTS_ARGS="--rewrite-hosts $DNS_EXTRA_HOSTS_ARGS"
+    [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
 
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
@@ -368,9 +354,7 @@ HTTP_PORT=6784
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 COVERAGE_ARGS=""
-if [ -n "$COVERAGE" ] ; then
-    COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.prof --"
-fi
+[ -n "$COVERAGE" ] && COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.prof --"
 
 ######################################################################
 # general helpers; independent of docker and weave
@@ -400,9 +384,7 @@ fractional_sleep() {
 run_iptables() {
     # -w is recent addition to iptables
     if [ -z "$CHECKED_IPTABLES_W" ] ; then
-        if iptables -S -w >/dev/null 2>&1 ; then
-            IPTABLES_W=-w
-        fi
+        iptables -S -w >/dev/null 2>&1 && IPTABLES_W=-w
         CHECKED_IPTABLES_W=1
     fi
 
@@ -447,9 +429,7 @@ configure_arp_cache() {
 arp_update() {
     # It's not the end of the world if this doesn't run - we configure
     # ARP caches so that stale entries will be noticed quickly.
-    if command_exists arping ; then
-        $3 arping -U -q -I $1 -c 1 ${2%/*}
-    fi
+    ! command_exists arping || $3 arping -U -q -I $1 -c 1 ${2%/*}
 }
 
 # Generate a random MAC value
@@ -572,9 +552,7 @@ EOF
         MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
     fi
 
-    if [ "$1" != "--without-ethtool" ] ; then
-        ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
-    fi
+    [ "$1" = "--without-ethtool" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
 
     ip link set dev $BRIDGE up
 
@@ -597,9 +575,7 @@ init_fastdp() {
 
 init_bridge() {
     # Observe any MTU that is already set
-    if [ -z "$MTU" ] ; then
-        MTU=${WEAVE_MTU:-65535}
-    fi
+    [ -n "$MTU" ] || MTU=${WEAVE_MTU:-65535}
 
     ip link add name $BRIDGE type bridge
 
@@ -834,9 +810,8 @@ setup_router_iface_bridge() {
         return 1
     fi
     # No-op if already attached
-    if netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        return 0
-    fi
+    netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 && return 0
+
     connect_container_to_bridge $CONTAINER_IFNAME &&
         netnsenter ethtool -K eth0 tx off >/dev/null &&
         netnsenter ip link set $CONTAINER_IFNAME up
@@ -943,9 +918,7 @@ check_not_running() {
 }
 
 stop() {
-    if ! docker stop $1 >/dev/null 2>&1 ; then
-        echo "$2 is not running." >&2
-    fi
+    docker stop $1 >/dev/null 2>&1 || echo "$2 is not running." >&2
     docker rm -f $1 >/dev/null 2>&1 || true
 }
 
@@ -1202,9 +1175,7 @@ check_running() {
 
 # Execute $@ only if the weave container is running
 when_weave_running() {
-    if check_running $CONTAINER_NAME 2>/dev/null ; then
-        "$@"
-    fi
+    ! check_running $CONTAINER_NAME 2>/dev/null || "$@"
 }
 
 # Iff the container in $1 has an FQDN, invoke $2 as a command passing
@@ -1265,21 +1236,13 @@ delete_dns_fqdn() {
 collect_dns_add_remove_args() {
     collect_ip_args "$@"
     shift $IP_COUNT
-    if [ $# -gt 0 -a "$1" != "-h" ] ; then
-        C="$1"
-        shift
-    fi
-    if [ $# -eq 2 -a "$1" = "-h" ] ; then
-        FQDN="$2"
-        shift 2
-    fi
+    [ $# -gt 0 -a "$1" != "-h" ] &&    C="$1" && shift 1
+    [ $# -eq 2 -a "$1"  = "-h" ] && FQDN="$2" && shift 2
     [ $# -eq 0 -a \( -n "$C" -o \( $IP_COUNT -gt 0 -a -n "$FQDN" \) \) ] || usage
     check_running $CONTAINER_NAME
     if [ -n "$C" ] ; then
         CONTAINER=$(container_id $C)
-        if [ $IP_COUNT -eq 0 ] ; then
-            IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
-        fi
+        [ $IP_COUNT -gt 0 ] || IP_ARGS=$(with_container_addresses echo_ips $CONTAINER)
     fi
 }
 
@@ -1622,10 +1585,7 @@ launch_router() {
         fi
     fi
 
-    if [ "$BRIDGE_TYPE" != bridge ] ; then
-        NETHOST_OPT="--net=host"
-        HTTP_IP=127.0.0.1
-    fi
+    [ "$BRIDGE_TYPE" != bridge ] && NETHOST_OPT="--net=host" && HTTP_IP=127.0.0.1
 
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
@@ -1904,16 +1864,11 @@ EOF
         ;;
     config|proxy-config)
         [ "$COMMAND" = "config" ] || deprecation_warning "$COMMAND" "'weave config'"
-        if PROXY_ADDR=$(proxy_addr) ; then
-            echo "-H=$PROXY_ADDR"
-        fi
+        PROXY_ADDR=$(proxy_addr) && echo "-H=$PROXY_ADDR"
         ;;
     connect)
         [ $# -gt 0 ] || usage
-        if [ "$1" = "--replace" ] ; then
-          replace="-d replace=true"
-          shift
-        fi
+        [ "$1" = "--replace" ] && replace="-d replace=true" && shift
         call_weave POST /connect $replace -d $(peer_args "$@")
         ;;
     forget)
@@ -1991,10 +1946,7 @@ EOF
         CONTAINER=$(docker run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
         create_bridge
         ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
-        if [ -n "$REWRITE_HOSTS" ] ; then
-            extra_hosts_args "$@"
-            rewrite_etc_hosts $DNS_EXTRA_HOSTS
-        fi
+        [ -n "$REWRITE_HOSTS" ] && extra_hosts_args "$@" && rewrite_etc_hosts $DNS_EXTRA_HOSTS
         with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $CONTAINER
@@ -2074,10 +2026,7 @@ EOF
     dns-add)
         collect_dns_add_remove_args "$@"
         FN=put_dns_fqdn
-        if [ -z "$CONTAINER" ] ; then
-            FN=put_dns_fqdn_no_check_alive
-            CONTAINER=weave:extern
-        fi
+        [ -z "$CONTAINER" ] && CONTAINER=weave:extern && FN=put_dns_fqdn_no_check_alive
         if [ -n "$FQDN" ] ; then
             $FN $CONTAINER $FQDN $IP_ARGS
         else
@@ -2086,7 +2035,7 @@ EOF
         ;;
     dns-remove)
         collect_dns_add_remove_args "$@"
-        [ -n "$CONTAINER" ] || CONTAINER=weave:extern
+        [ -z "$CONTAINER" ] && CONTAINER=weave:extern
         if [ -n "$FQDN" ] ; then
             delete_dns_fqdn $CONTAINER $FQDN $IP_ARGS
         else
@@ -2116,9 +2065,7 @@ EOF
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
             fi
-            if [ -n "$FQDN" ] ; then
-                when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
-            fi
+            [ -n "$FQDN" ] && when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
         done
         show_addrs $ALL_CIDRS
         ;;
