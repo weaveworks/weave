@@ -38,53 +38,61 @@ usage_no_exit() {
 Usage:
 
 weave --help | help
-weave setup
-weave version
+      setup
+      version
+
 weave launch        <same arguments as 'weave launch-router'>
-weave launch-router [--password <password>] [--nickname <nickname>]
+      launch-router [--password <password>] [--nickname <nickname>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                      [--no-discovery] [--init-peer-count <count>]
+                      [--init-peer-count <count>] [--no-discovery]
                       [--trusted-subnets <cidr>,...] <peer> ...
-weave launch-proxy  [-H <endpoint>] [--without-dns]
-                      [--no-default-ipalloc] [--no-rewrite-hosts]
-                      [--no-multicast-route]
+      launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
+                      [--no-rewrite-hosts] [--no-default-ipalloc]
                       [--hostname-from-label <labelkey>]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
                       [--rewrite-inspect]
-weave launch-plugin [--no-multicast-route]
+      launch-plugin [--no-multicast-route]
+
 weave env           [--restore]
-weave config
-weave dns-args
+      config
+      dns-args
+
 weave connect       [--replace] [<peer> ...]
-weave forget        <peer> ...
-weave status        [targets | connections | peers | dns]
-weave report        [-f <format>]
+      forget        <peer> ...
+
 weave run           [--without-dns] [--no-rewrite-hosts] [--no-multicast-route]
                       [<addr> ...] <docker run args> ...
-weave start         [<addr> ...] <container_id>
-weave attach        [<addr> ...] <container_id>
-weave detach        [<addr> ...] <container_id>
+      start         [<addr> ...] <container_id>
+      attach        [<addr> ...] <container_id>
+      detach        [<addr> ...] <container_id>
+
+weave expose        [<addr> ...] [-h <fqdn>]
+      hide          [<addr> ...]
+
 weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>] |
                     <ip_address> ... -h <fqdn>
-weave dns-remove    [<ip_address> ...] <container_id> [-h <fqdn>] |
+      dns-remove    [<ip_address> ...] <container_id> [-h <fqdn>] |
                     <ip_address> ... -h <fqdn>
-weave dns-lookup    <unqualified_name>
-weave expose        [<addr> ...] [-h <fqdn>]
-weave hide          [<addr> ...]
-weave ps            [<container_id> ...]
+      dns-lookup    <unqualified_name>
+
+weave status        [targets | connections | peers | dns]
+      report        [-f <format>]
+      ps            [<container_id> ...]
+
 weave stop
-weave stop-router
-weave stop-proxy
-weave stop-plugin
+      stop-router
+      stop-proxy
+      stop-plugin
+
 weave reset
-weave rmpeer        <peer_id>
+      rmpeer        <nickname> | <weave internal peer ID>
+
 
 where <peer>     = <ip_address_or_fqdn>[:<port>]
       <cidr>     = <ip_address>/<routing_prefix_length>
       <addr>     = [ip:]<cidr> | net:<cidr> | net:default
       <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket
-      <peer_id>  = <nickname> or weave internal peer ID
 EOF
 }
 
