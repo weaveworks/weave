@@ -1455,15 +1455,13 @@ proxy_args() {
     PROXY_HOST=""
     proxy_parse_args "$@"
 
-    if [ -z "$PROXY_TLS_ENABLED" ] ; then
-      if [ -z "$PROXY_TLS_DETECTION_DISABLED" ] ; then
-          if ! DOCKER_TLS_ARGS=$(docker_tls_args) ; then
-              echo "Unable to auto-detect proxy TLS configuration; you must launch the proxy with" >&2
-              echo "'weave launch-proxy' and supply '--no-detect-tls' or TLS options." >&2
-              exit 1
-          fi
-          proxy_parse_args "$DOCKER_TLS_ARGS"
-      fi
+    if [ -z "$PROXY_TLS_ENABLED" -a -z "$PROXY_TLS_DETECTION_DISABLED" ] ; then
+        if ! DOCKER_TLS_ARGS=$(docker_tls_args) ; then
+            echo "Unable to auto-detect proxy TLS configuration; you must launch the proxy with" >&2
+            echo "'weave launch-proxy' and supply '--no-detect-tls' or TLS options." >&2
+            exit 1
+        fi
+        proxy_parse_args "$DOCKER_TLS_ARGS"
     fi
     if [ -z "$PROXY_HOST" ] ; then
       case "$DOCKER_CLIENT_HOST" in
