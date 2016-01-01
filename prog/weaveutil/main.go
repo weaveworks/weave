@@ -4,17 +4,14 @@ package main
 import (
 	"fmt"
 	"os"
-
-	weavenet "github.com/weaveworks/weave/net"
 )
-
-var f = weavenet.EnsureInterface // placeholder to force inclusion of 'net'
 
 var commands map[string]func([]string) error
 
 func init() {
 	commands = map[string]func([]string) error{
-		"help": help,
+		"help":     help,
+		"netcheck": netcheck,
 	}
 }
 

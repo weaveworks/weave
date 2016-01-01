@@ -1251,7 +1251,7 @@ collect_dns_add_remove_args() {
 ######################################################################
 
 check_overlap() {
-    ! command_exists netcheck || netcheck --ignore-iface=$BRIDGE $1
+    ! command_exists weaveutil || weaveutil netcheck $1 $BRIDGE
 }
 
 # Claim addresses for a container in IPAM.  Expects to be called from
