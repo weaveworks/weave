@@ -1,6 +1,5 @@
 // docker_tls_args: find the docker daemon's tls args
-// This reimplements pgrep, because pgrep will only look in /proc, but not in
-// $PROCFS.
+// This reimplements pgrep, because pgrep will only look in /proc.
 package main
 
 import (
@@ -14,9 +13,9 @@ import (
 )
 
 func main() {
-	procRoot := os.Getenv("PROCFS")
-	if procRoot == "" {
-		procRoot = "/proc"
+	procRoot := "/proc"
+	if len(os.Args) > 1 {
+		procRoot = os.Args[1]
 	}
 
 	dirEntries, err := ioutil.ReadDir(procRoot)
