@@ -41,6 +41,7 @@ prog/sigproxy/sigproxy
 prog/weavewait/weavewait
 prog/weavewait/weavewait_noop
 prog/weavewait/weavewait_nomcast
+prog/weaveutil/weaveutil
 prog/netcheck/netcheck
 prog/docker_tls_args/docker_tls_args
 prog/plugin/plugin
@@ -59,6 +60,7 @@ prog/weaveexec/weavewait
 prog/weaveexec/weavewait_noop
 prog/weaveexec/weavewait_nomcast
 prog/weaveexec/sigproxy
+prog/weaveexec/weaveutil
 prog/weaveexec/netcheck
 prog/weaveexec/docker_tls_args
 prog/weaveexec/docker*.tgz

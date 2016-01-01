@@ -15,13 +15,14 @@ SIGPROXY_EXE=prog/sigproxy/sigproxy
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
+WEAVEUTIL_EXE=prog/weaveutil/weaveutil
 NETCHECK_EXE=prog/netcheck/netcheck
 DOCKERTLSARGS_EXE=prog/docker_tls_args/docker_tls_args
 DOCKERPLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE)
 
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -70,13 +71,14 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVEUTIL_EXE) $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
 $(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
+$(WEAVEUTIL_EXE): prog/weaveutil/*.go
 $(NETCHECK_EXE): prog/netcheck/*.go
 
 # These next programs need separate rules as they fail the netgo check in
@@ -106,13 +108,14 @@ $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
-$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
+$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(NETCHECK_EXE) $(DOCKERTLSARGS_EXE)
 	cp weave prog/weaveexec/weave
 	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
 	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
 	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
 	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
+	cp $(WEAVEUTIL_EXE) prog/weaveexec/weaveutil
 	cp $(NETCHECK_EXE) prog/weaveexec/netcheck
 	cp $(DOCKERTLSARGS_EXE) prog/weaveexec/docker_tls_args
 	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
