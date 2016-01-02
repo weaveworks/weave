@@ -16,10 +16,8 @@ func CreateDatapath(dpname string) (supported bool, err error) {
 		if odp.IsKernelLacksODPError(err) {
 			return false, nil
 		}
-
 		return true, err
 	}
-
 	defer dpif.Close()
 
 	dp, err := dpif.CreateDatapath(dpname)
@@ -33,25 +31,23 @@ func CreateDatapath(dpname string) (supported bool, err error) {
 	if err != nil {
 		return true, err
 	}
+	defer udpconn.Close()
 
 	// we leave the UDP socket open, so creating a vxlan vport on
 	// the same port number should fail.  But that's fine: It's
 	// still sufficient to probe for support.
 	portno := uint16(udpconn.LocalAddr().(*net.UDPAddr).Port)
-	vpid, err := dp.CreateVport(odp.NewVxlanVportSpec(
-		fmt.Sprintf("vxlan-%d", portno), portno))
+	vpid, err := dp.CreateVport(odp.NewVxlanVportSpec(fmt.Sprintf("vxlan-%d", portno), portno))
 	if nlerr, ok := err.(odp.NetlinkError); ok {
 		if syscall.Errno(nlerr) == syscall.EAFNOSUPPORT {
 			dp.Delete()
 			return false, fmt.Errorf("kernel does not have Open vSwitch VXLAN support")
 		}
 	}
-
 	if err == nil {
 		dp.DeleteVport(vpid)
 	}
 
-	udpconn.Close()
 	return true, nil
 }
 
@@ -60,7 +56,6 @@ func DeleteDatapath(dpname string) error {
 	if err != nil {
 		return err
 	}
-
 	defer dpif.Close()
 
 	dp, err := dpif.LookupDatapath(dpname)
@@ -68,7 +63,6 @@ func DeleteDatapath(dpname string) error {
 		if odp.IsNoSuchDatapathError(err) {
 			return nil
 		}
-
 		return err
 	}
 
@@ -80,7 +74,6 @@ func AddDatapathInterface(dpname string, ifname string) error {
 	if err != nil {
 		return err
 	}
-
 	defer dpif.Close()
 
 	dp, err := dpif.LookupDatapath(dpname)
