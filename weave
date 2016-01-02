@@ -445,7 +445,11 @@ random_mac() {
 ######################################################################
 
 fastdp_op() {
-    docker run --rm --privileged --net=host $IMAGE $COVERAGE_ARGS --$1 --datapath=$2
+    if command_exists weaveutil ; then
+        weaveutil "$@"
+    else
+        docker run --rm --privileged --net=host --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
+    fi
 }
 
 # Detect the current bridge/datapath state. When invoked, the values of
@@ -764,7 +768,7 @@ connect_container_to_bridge() {
 }
 
 add_iface_fastdp() {
-    fastdp_op add-datapath-iface=$1 $DATAPATH
+    fastdp_op add-datapath-interface $DATAPATH $1
 }
 
 add_iface_bridge() {
