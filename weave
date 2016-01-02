@@ -444,11 +444,12 @@ random_mac() {
 # weave and docker specific helpers
 ######################################################################
 
-fastdp_op() {
+util_op() {
     if command_exists weaveutil ; then
         weaveutil "$@"
     else
-        docker run --rm --privileged --net=host --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
+        docker run --rm --privileged --net=host -v /proc:/hostproc -e PROCFS=/hostproc \
+            --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
     fi
 }
 
@@ -493,7 +494,7 @@ create_bridge() {
                 # The datapath is the bridge when there is no intermediary
                 DATAPATH="$BRIDGE"
             fi
-            if fastdp_op create-datapath $DATAPATH ; then
+            if util_op create-datapath $DATAPATH ; then
                 : # ODP datapath created successfully
             elif [ $? = 17 ] ; then
                 # Exit status of 17 means the kernel doesn't have ODP
@@ -619,7 +620,7 @@ init_bridged_fastdp() {
         ip link del $BRIDGE >/dev/null 2>&1 || true
         ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
         ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
-        fastdp_op delete-datapath $DATAPATH >/dev/null 2>&1 || true
+        util_op delete-datapath $DATAPATH >/dev/null 2>&1 || true
         return 1
     fi
 
@@ -649,7 +650,7 @@ destroy_bridge() {
             if [ -d /sys/class/net/$NETDEV/bridge ] ; then
                 ip link del $NETDEV
             else
-                fastdp_op delete-datapath $NETDEV
+                util_op delete-datapath $NETDEV
             fi
         fi
     done
@@ -768,7 +769,7 @@ connect_container_to_bridge() {
 }
 
 add_iface_fastdp() {
-    fastdp_op add-datapath-interface $DATAPATH $1
+    util_op add-datapath-interface $DATAPATH $1
 }
 
 add_iface_bridge() {
@@ -1255,7 +1256,7 @@ collect_dns_add_remove_args() {
 ######################################################################
 
 check_overlap() {
-    ! command_exists weaveutil || weaveutil netcheck $1 $BRIDGE
+    util_op netcheck $1 $BRIDGE
 }
 
 # Claim addresses for a container in IPAM.  Expects to be called from
@@ -1438,8 +1439,8 @@ proxy_args() {
     PROXY_HOST=""
     proxy_parse_args "$@"
 
-    if [ -z "$PROXY_TLS_ENABLED" -a -z "$PROXY_TLS_DETECTION_DISABLED" ] && command_exists weaveutil ; then
-        if ! DOCKER_TLS_ARGS=$(weaveutil docker-tls-args) ; then
+    if [ -z "$PROXY_TLS_ENABLED" -a -z "$PROXY_TLS_DETECTION_DISABLED" ] ; then
+        if ! DOCKER_TLS_ARGS=$(util_op docker-tls-args) ; then
             echo "Unable to auto-detect proxy TLS configuration; you must launch the proxy with" >&2
             echo "'weave launch-proxy' and supply '--no-detect-tls' or TLS options." >&2
             exit 1
