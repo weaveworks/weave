@@ -130,8 +130,8 @@ func main() {
 		os.Exit(0)
 
 	case createDatapath:
-		err, odp_supported := odp.CreateDatapath(datapathName)
-		if !odp_supported {
+		odpSupported, err := odp.CreateDatapath(datapathName)
+		if !odpSupported {
 			if err != nil {
 				Log.Error(err)
 			}

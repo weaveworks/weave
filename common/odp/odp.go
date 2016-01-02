@@ -10,28 +10,28 @@ import (
 
 // ODP admin functionality
 
-func CreateDatapath(dpname string) (err error, supported bool) {
+func CreateDatapath(dpname string) (supported bool, err error) {
 	dpif, err := odp.NewDpif()
 	if err != nil {
 		if odp.IsKernelLacksODPError(err) {
-			return nil, false
+			return false, nil
 		}
 
-		return err, true
+		return true, err
 	}
 
 	defer dpif.Close()
 
 	dp, err := dpif.CreateDatapath(dpname)
 	if err != nil && !odp.IsDatapathNameAlreadyExistsError(err) {
-		return err, true
+		return true, err
 	}
 
 	// Pick an ephemeral port number to use in probing for vxlan
 	// support.
 	udpconn, err := net.ListenUDP("udp4", nil)
 	if err != nil {
-		return err, true
+		return true, err
 	}
 
 	// we leave the UDP socket open, so creating a vxlan vport on
@@ -43,7 +43,7 @@ func CreateDatapath(dpname string) (err error, supported bool) {
 	if nlerr, ok := err.(odp.NetlinkError); ok {
 		if syscall.Errno(nlerr) == syscall.EAFNOSUPPORT {
 			dp.Delete()
-			return fmt.Errorf("kernel does not have Open vSwitch VXLAN support"), false
+			return false, fmt.Errorf("kernel does not have Open vSwitch VXLAN support")
 		}
 	}
 
@@ -52,7 +52,7 @@ func CreateDatapath(dpname string) (err error, supported bool) {
 	}
 
 	udpconn.Close()
-	return nil, true
+	return true, nil
 }
 
 func DeleteDatapath(dpname string) error {

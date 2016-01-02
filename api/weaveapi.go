@@ -13,24 +13,24 @@ import (
 )
 
 const (
-	WeaveHttpPort = 6784
+	WeaveHTTPPort = 6784
 )
 
 type Client struct {
-	baseUrl string
+	baseURL string
 	resolve func() (string, error)
 }
 
 func (client *Client) httpVerb(verb string, url string, values url.Values) (string, error) {
-	baseUrl := client.baseUrl
+	baseURL := client.baseURL
 	if client.resolve != nil {
 		addr, err := client.resolve()
 		if err != nil {
 			return "", err
 		}
-		baseUrl = fmt.Sprintf("http://%s:%d", addr, WeaveHttpPort)
+		baseURL = fmt.Sprintf("http://%s:%d", addr, WeaveHTTPPort)
 	}
-	url = baseUrl + url
+	url = baseURL + url
 	Log.Debugf("weave %s to %s with %v", verb, url, values)
 	var body io.Reader
 	if values != nil {
@@ -43,24 +43,23 @@ func (client *Client) httpVerb(verb string, url string, values url.Values) (stri
 	if values != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-	if resp, err := http.DefaultClient.Do(req); err != nil {
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
 		return "", err
-	} else {
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return "", err
-		}
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
-			return string(body), nil
-		} else {
-			return "", errors.New(resp.Status + ": " + string(body))
-		}
 	}
+	defer resp.Body.Close()
+	rbody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+		return string(rbody), nil
+	}
+	return "", errors.New(resp.Status + ": " + string(rbody))
 }
 
 func NewClient(addr string) *Client {
-	return &Client{baseUrl: fmt.Sprintf("http://%s:%d", addr, WeaveHttpPort)}
+	return &Client{baseURL: fmt.Sprintf("http://%s:%d", addr, WeaveHTTPPort)}
 }
 
 func NewClientWithResolver(resolver func() (string, error)) *Client {

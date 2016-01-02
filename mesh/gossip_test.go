@@ -11,7 +11,7 @@ import (
 // TODO test gossip unicast; atm we only test topology gossip and
 // surrogates, neither of which employ unicast.
 
-type mockGossipConnection struct {
+type MockGossipConnection struct {
 	RemoteConnection
 	dest  *Router
 	start chan struct{}
@@ -24,12 +24,12 @@ func NewTestRouter(name string) *Router {
 	return router
 }
 
-func (conn *mockGossipConnection) SendProtocolMsg(protocolMsg ProtocolMsg) error {
+func (conn *MockGossipConnection) SendProtocolMsg(protocolMsg ProtocolMsg) error {
 	<-conn.start
 	return conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg)
 }
 
-func (conn *mockGossipConnection) Start() {
+func (conn *MockGossipConnection) Start() {
 	close(conn.start)
 }
 
@@ -50,12 +50,12 @@ func AddTestGossipConnection(r1, r2 *Router) {
 	c2.Start()
 }
 
-func (router *Router) NewTestGossipConnection(r *Router) *mockGossipConnection {
+func (router *Router) NewTestGossipConnection(r *Router) *MockGossipConnection {
 	to := r.Ourself.Peer
 	toPeer := NewPeer(to.Name, to.NickName, to.UID, 0, to.ShortID)
 	toPeer = router.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
 
-	conn := &mockGossipConnection{
+	conn := &MockGossipConnection{
 		RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r, make(chan struct{})}
 	router.Ourself.handleAddConnection(conn)
 	router.Ourself.handleConnectionEstablished(conn)
