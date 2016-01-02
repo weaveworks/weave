@@ -169,11 +169,7 @@ func main() {
 		// options can override that below.  Even if both
 		// things are overridden, we might need bridging on
 		// the datapath.
-		fastdp, err := weave.NewFastDatapath(weave.FastDatapathConfig{
-			DatapathName: datapathName,
-			Port:         config.Port,
-		})
-
+		fastdp, err := weave.NewFastDatapath(datapathName, config.Port)
 		checkFatal(err)
 		networkConfig.Bridge = fastdp.Bridge()
 		overlays.Add("fastdp", fastdp.Overlay())

@@ -68,14 +68,7 @@ type FastDatapath struct {
 	forwarders map[mesh.PeerName]*fastDatapathForwarder
 }
 
-type FastDatapathConfig struct {
-	DatapathName        string
-	Port                int
-	ExpireFlowsInterval time.Duration
-	ExpireMACsInterval  time.Duration
-}
-
-func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
+func NewFastDatapath(dpName string, port int) (*FastDatapath, error) {
 	dpif, err := odp.NewDpif()
 	if err != nil {
 		return nil, err
@@ -88,18 +81,18 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 		}
 	}()
 
-	dp, err := dpif.LookupDatapath(config.DatapathName)
+	dp, err := dpif.LookupDatapath(dpName)
 	if err != nil {
 		return nil, err
 	}
 
-	iface, err := net.InterfaceByName(config.DatapathName)
+	iface, err := net.InterfaceByName(dpName)
 	if err != nil {
 		return nil, err
 	}
 
 	fastdp := &FastDatapath{
-		dpname:        config.DatapathName,
+		dpname:        dpName,
 		mtu:           iface.MTU,
 		dpif:          dpif,
 		dp:            dp,
@@ -131,7 +124,7 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 	// numbers to be independent, but working out how to specify
 	// them on the connecting side.  So we can wait to find out if
 	// anyone wants that.
-	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportIDHarder(config.Port+1, 5, time.Millisecond*10)
+	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportIDHarder(port+1, 5, time.Millisecond*10)
 	if err != nil {
 		return nil, err
 	}
