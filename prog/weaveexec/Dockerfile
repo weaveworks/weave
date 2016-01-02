@@ -20,7 +20,7 @@ RUN apk add --update \
   && rm -rf /var/cache/apk/*
 
 ADD ./weave ./sigproxy ./weaveproxy ./symlink /home/weave/
-ADD ./weaveutil ./docker_tls_args /usr/bin/
+ADD ./weaveutil /usr/bin/
 ADD ./weavewait /w/w
 ADD ./weavewait_noop /w-noop/w
 ADD ./weavewait_nomcast /w-nomcast/w

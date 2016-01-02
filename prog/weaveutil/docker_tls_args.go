@@ -13,14 +13,18 @@ import (
 	"strings"
 )
 
-func main() {
+func dockerTLSArgs(args []string) error {
+	if len(args) > 0 {
+		cmdUsage("docker-tls-args", "")
+	}
 	procRoot := os.Getenv("PROCFS")
 	if procRoot == "" {
 		procRoot = "/proc"
 	}
-
 	dirEntries, err := ioutil.ReadDir(procRoot)
-	checkErr(err)
+	if err != nil {
+		return err
+	}
 
 	for _, dirEntry := range dirEntries {
 		dirName := dirEntry.Name()
@@ -63,15 +67,8 @@ func main() {
 		}
 
 		fmt.Println(strings.Join(tlsArgs, " "))
-		os.Exit(0)
+		return nil
 	}
 
-	os.Exit(1)
-}
-
-func checkErr(err error) {
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	return fmt.Errorf("cannot locate running docker daemon")
 }

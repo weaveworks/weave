@@ -10,8 +10,9 @@ var commands map[string]func([]string) error
 
 func init() {
 	commands = map[string]func([]string) error{
-		"help":     help,
-		"netcheck": netcheck,
+		"help":            help,
+		"netcheck":        netcheck,
+		"docker-tls-args": dockerTLSArgs,
 	}
 }
 
