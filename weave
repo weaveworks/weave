@@ -1440,7 +1440,7 @@ proxy_args() {
             echo "'weave launch-proxy' and supply '--no-detect-tls' or TLS options." >&2
             exit 1
         fi
-        proxy_parse_args "$DOCKER_TLS_ARGS"
+        proxy_parse_args $DOCKER_TLS_ARGS
     fi
     if [ -z "$PROXY_HOST" ] ; then
       case "$DOCKER_CLIENT_HOST" in
