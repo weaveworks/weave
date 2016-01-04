@@ -1701,7 +1701,7 @@ launch_plugin() {
 }
 
 plugin_disabled() {
-    [ -n $WEAVE_NO_PLUGIN ] || ! check_docker_server_api_version 1.21
+    [ -n "$WEAVE_NO_PLUGIN" ] || ! check_docker_server_api_version 1.21
 }
 
 remove_plugin_network() {
