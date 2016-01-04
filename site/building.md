@@ -21,7 +21,11 @@ You can also build in a container under any system that supports
 Docker.  And you can run Ubuntu in a VM and build there.  These
 options are described below.
 
-## Building directly on Ubuntu
+ * [Building directly on Ubuntu](#ubuntu)
+ * [Building in a Docker container](#docker)
+ * [Building using Vagrant](#vagrant)
+
+## <a name="ubuntu"></a>Building directly on Ubuntu
 
 The weave git repository should be cloned into
 `$GOPATH/src/github.com/weaveworks/weave`, in accordance with [the go
@@ -56,7 +60,7 @@ This will build the weave components and package them into three
 Docker images (`weaveworks/weave`, `weaveworks/weaveexec`, and
 `weaveworks/plugin`).  These are then exported as `weave.tar.gz`.
 
-## Building in a Docker container
+## <a name="docker"></a>Building in a Docker container
 
 As a preliminary step, we create a container image based on Ubuntu
 that has all the prerequisites.  This avoids the need to download and
@@ -106,7 +110,7 @@ $ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock -v <host gopath>:
 This will leave the intermediate build artifacts on the host, so that
 you can modify the weave source code and rebuild quickly.
 
-## Building using Vagrant
+## <a name="vagrant"></a>Building using Vagrant
 
 If you aren't running Linux, or otherwise don't want to run the docker
 daemon outside a VM, you can use
