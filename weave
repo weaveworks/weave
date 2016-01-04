@@ -1676,8 +1676,8 @@ launch_plugin() {
         $PLUGIN_IMAGE "$@")
 }
 
-plugin_enabled() {
-    [ -z $WEAVE_NO_PLUGIN ] && check_docker_server_api_version 1.21
+plugin_disabled() {
+    [ -n "$WEAVE_NO_PLUGIN" ] || ! check_docker_server_api_version 1.21
 }
 
 remove_plugin_network() {
@@ -1828,7 +1828,7 @@ EOF
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
-        plugin_enabled && launch_plugin $COMMON_ARGS
+        plugin_disabled || launch_plugin $COMMON_ARGS
         ;;
     launch-router)
         deprecation_warnings "$@"
@@ -2093,7 +2093,7 @@ EOF
         ;;
     stop)
         [ $# -eq 0 ] || usage
-        plugin_enabled && stop_plugin
+        plugin_disabled || stop_plugin
         stop_router
         stop_proxy
         ;;
@@ -2111,9 +2111,8 @@ EOF
         ;;
     reset)
         [ $# -eq 0 ] || usage
-        if plugin_enabled ; then
-            remove_plugin_network || echo "WARNING: docker may hang in this state; re-launch weave and remove attached containers before shutting down" >&2
-        fi
+        plugin_disabled || remove_plugin_network || \
+            echo "WARNING: docker may hang in this state; re-launch weave and remove attached containers before shutting down" >&2
         warn_if_stopping_proxy_in_env
         call_weave DELETE /peer >/dev/null 2>&1 || true
         for NAME in $PLUGIN_CONTAINER_NAME $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
