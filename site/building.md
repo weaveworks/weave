@@ -53,8 +53,8 @@ $ make
 ```
 
 This will build the weave components and package them into three
-Docker images (`weaveworks/weave`, `weaveworks/weavedns`, and
-`weaveworks/weaveexec`).  These are then exported as `weave.tar.gz`.
+Docker images (`weaveworks/weave`, `weaveworks/weaveexec`, and
+`weaveworks/plugin`).  These are then exported as `weave.tar.gz`.
 
 ## Building in a Docker container
 
