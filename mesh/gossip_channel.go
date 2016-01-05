@@ -4,19 +4,14 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"sync"
 )
 
 type GossipChannel struct {
-	sync.Mutex
 	name     string
 	ourself  *LocalPeer
 	routes   *Routes
 	gossiper Gossiper
-	senders  connectionSenders
 }
-
-type connectionSenders map[Connection]*GossipSender
 
 func NewGossipChannel(channelName string, ourself *LocalPeer, routes *Routes, g Gossiper) *GossipChannel {
 	return &GossipChannel{
@@ -24,7 +19,6 @@ func NewGossipChannel(channelName string, ourself *LocalPeer, routes *Routes, g 
 		ourself:  ourself,
 		routes:   routes,
 		gossiper: g,
-		senders:  make(connectionSenders),
 	}
 }
 
@@ -141,42 +135,15 @@ func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
 }
 
 func (c *GossipChannel) sendersFor(conns []Connection) []*GossipSender {
-	if len(conns) == 0 {
-		return nil
-	}
-	ourConnections := c.ourself.Connections()
-	c.Lock()
-	defer c.Unlock()
-	// GC - randomly (courtesy of go's map iterator) pick some
-	// existing senders and stop&remove them if the associated
-	// connection is no longer active.  We stop as soon as we
-	// encounter a valid entry; the idea being that when there is
-	// little or no garbage then this executes close to O(1)[1],
-	// whereas when there is lots of garbage we remove it quickly.
-	//
-	// [1] TODO Unfortunately, due to the desire to avoid nested
-	// locks, instead of simply invoking LocalPeer.ConnectionTo(name),
-	// we operate on LocalPeer.Connections(). That is
-	// O(n_our_connections) at best.
-	for conn, sender := range c.senders {
-		if _, found := ourConnections[conn]; !found {
-			delete(c.senders, conn)
-			sender.Stop()
-		} else {
-			break
-		}
-	}
-	// start senders, if necessary
 	senders := make([]*GossipSender, len(conns), len(conns))
 	for i, conn := range conns {
-		sender, found := c.senders[conn]
-		if !found {
-			sender = NewGossipSender(c.makeMsg, c.makeBroadcastMsg, conn.(ProtocolSender))
-			c.senders[conn] = sender
-		}
-		senders[i] = sender
+		senders[i] = conn.(GossipConnection).GossipSenders().Sender(c.name, c.makeGossipSender)
 	}
 	return senders
+}
+
+func (c *GossipChannel) makeGossipSender(sender ProtocolSender, stop <-chan struct{}) *GossipSender {
+	return NewGossipSender(c.makeMsg, c.makeBroadcastMsg, sender, stop)
 }
 
 func (c *GossipChannel) makeMsg(msg []byte) ProtocolMsg {

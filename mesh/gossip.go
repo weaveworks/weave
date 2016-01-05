@@ -39,13 +39,11 @@ type GossipSender struct {
 	sender           ProtocolSender
 	gossip           GossipData
 	broadcasts       map[PeerName]GossipData
-	stop             chan<- struct{}
 	more             chan<- struct{}
 	flush            chan<- chan<- bool // for testing
 }
 
-func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg, sender ProtocolSender) *GossipSender {
-	stop := make(chan struct{})
+func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func(srcName PeerName, msg []byte) ProtocolMsg, sender ProtocolSender, stop <-chan struct{}) *GossipSender {
 	more := make(chan struct{}, 1)
 	flush := make(chan chan<- bool)
 	s := &GossipSender{
@@ -53,7 +51,6 @@ func NewGossipSender(makeMsg func(msg []byte) ProtocolMsg, makeBroadcastMsg func
 		makeBroadcastMsg: makeBroadcastMsg,
 		sender:           sender,
 		broadcasts:       make(map[PeerName]GossipData),
-		stop:             stop,
 		more:             more,
 		flush:            flush}
 	go s.run(stop, more, flush)
@@ -177,8 +174,37 @@ func (s *GossipSender) Flush() bool {
 	return <-ch
 }
 
-func (s *GossipSender) Stop() {
-	close(s.stop)
+type GossipSenders struct {
+	sync.Mutex
+	sender  ProtocolSender
+	stop    <-chan struct{}
+	senders map[string]*GossipSender
+}
+
+func NewGossipSenders(sender ProtocolSender, stop <-chan struct{}) *GossipSenders {
+	return &GossipSenders{sender: sender, stop: stop, senders: make(map[string]*GossipSender)}
+}
+
+func (gs *GossipSenders) Sender(channelName string, makeGossipSender func(sender ProtocolSender, stop <-chan struct{}) *GossipSender) *GossipSender {
+	gs.Lock()
+	defer gs.Unlock()
+	s, found := gs.senders[channelName]
+	if !found {
+		s = makeGossipSender(gs.sender, gs.stop)
+		gs.senders[channelName] = s
+	}
+	return s
+}
+
+// for testing
+func (gs *GossipSenders) Flush() bool {
+	sent := false
+	gs.Lock()
+	defer gs.Unlock()
+	for _, sender := range gs.senders {
+		sent = sender.Flush() || sent
+	}
+	return sent
 }
 
 type GossipChannels map[string]*GossipChannel
@@ -242,12 +268,8 @@ func (router *Router) SendAllGossipDown(conn Connection) {
 
 func (router *Router) sendPendingGossip() bool {
 	sentSomething := false
-	for channel := range router.gossipChannelSet() {
-		channel.Lock()
-		for _, sender := range channel.senders {
-			sentSomething = sender.Flush() || sentSomething
-		}
-		channel.Unlock()
+	for conn := range router.Ourself.Connections() {
+		sentSomething = conn.(GossipConnection).GossipSenders().Flush() || sentSomething
 	}
 	return sentSomething
 }
