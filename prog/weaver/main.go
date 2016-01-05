@@ -130,8 +130,8 @@ func main() {
 		os.Exit(0)
 
 	case createDatapath:
-		err, odp_supported := odp.CreateDatapath(datapathName)
-		if !odp_supported {
+		odpSupported, err := odp.CreateDatapath(datapathName)
+		if !odpSupported {
 			if err != nil {
 				Log.Error(err)
 			}
@@ -162,22 +162,21 @@ func main() {
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
-	var fastDPOverlay weave.NetworkOverlay
+	overlays := weave.NewOverlaySwitch()
 	if datapathName != "" {
 		// A datapath name implies that "Bridge" and "Overlay"
 		// packet handling use fast datapath, although other
 		// options can override that below.  Even if both
 		// things are overridden, we might need bridging on
 		// the datapath.
-		fastdp, err := weave.NewFastDatapath(weave.FastDatapathConfig{
-			DatapathName: datapathName,
-			Port:         config.Port,
-		})
-
+		fastdp, err := weave.NewFastDatapath(datapathName, config.Port)
 		checkFatal(err)
 		networkConfig.Bridge = fastdp.Bridge()
-		fastDPOverlay = fastdp.Overlay()
+		overlays.Add("fastdp", fastdp.Overlay())
 	}
+	sleeve := weave.NewSleeveOverlay(config.Port)
+	overlays.Add("sleeve", sleeve)
+	overlays.SetCompatOverlay(sleeve)
 
 	if ifaceName != "" {
 		// -iface can coexist with -datapath, because
@@ -204,14 +203,6 @@ func main() {
 		config.Password = []byte(password)
 		Log.Println("Communication between peers via untrusted networks is encrypted.")
 	}
-
-	overlays := weave.NewOverlaySwitch()
-	if fastDPOverlay != nil {
-		overlays.Add("fastdp", fastDPOverlay)
-	}
-	sleeve := weave.NewSleeveOverlay(config.Port)
-	overlays.Add("sleeve", sleeve)
-	overlays.SetCompatOverlay(sleeve)
 
 	if routerName == "" {
 		if iface == nil {

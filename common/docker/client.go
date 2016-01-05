@@ -63,11 +63,11 @@ func (c *Client) checkWorking() error {
 }
 
 func (c *Client) Info() string {
-	if env, err := c.Version(); err != nil {
+	env, err := c.Version()
+	if err != nil {
 		return fmt.Sprintf("Docker API error: %s", err)
-	} else {
-		return fmt.Sprintf("Docker API on %s: %v", c.Endpoint(), env)
 	}
+	return fmt.Sprintf("Docker API on %s: %v", c.Endpoint(), env)
 }
 
 // AddObserver adds an observer for docker events

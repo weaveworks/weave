@@ -76,12 +76,12 @@ $(NETCHECK_EXE): common/*.go common/*/*.go net/*.go
 	$(NETGO_CHECK)
 
 $(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
-$(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/main.go
-$(NETCHECK_EXE): prog/netcheck/netcheck.go
+$(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
+$(NETCHECK_EXE): prog/netcheck/*.go
 
 # These next programs need separate rules as they fail the netgo check in
 # the main build stanza due to not importing net package
-$(SIGPROXY_EXE): prog/sigproxy/main.go
+$(SIGPROXY_EXE): prog/sigproxy/*.go
 $(DOCKERTLSARGS_EXE): prog/docker_tls_args/*.go
 $(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/net/*.go plugin/ipam/*.go plugin/skel/*.go api/*.go common/docker/*.go
 $(TEST_TLS_EXE): test/tls/*.go

@@ -10,49 +10,45 @@ import (
 
 // ODP admin functionality
 
-func CreateDatapath(dpname string) (err error, supported bool) {
+func CreateDatapath(dpname string) (supported bool, err error) {
 	dpif, err := odp.NewDpif()
 	if err != nil {
 		if odp.IsKernelLacksODPError(err) {
-			return nil, false
+			return false, nil
 		}
-
-		return err, true
+		return true, err
 	}
-
 	defer dpif.Close()
 
 	dp, err := dpif.CreateDatapath(dpname)
 	if err != nil && !odp.IsDatapathNameAlreadyExistsError(err) {
-		return err, true
+		return true, err
 	}
 
 	// Pick an ephemeral port number to use in probing for vxlan
 	// support.
 	udpconn, err := net.ListenUDP("udp4", nil)
 	if err != nil {
-		return err, true
+		return true, err
 	}
+	defer udpconn.Close()
 
 	// we leave the UDP socket open, so creating a vxlan vport on
 	// the same port number should fail.  But that's fine: It's
 	// still sufficient to probe for support.
 	portno := uint16(udpconn.LocalAddr().(*net.UDPAddr).Port)
-	vpid, err := dp.CreateVport(odp.NewVxlanVportSpec(
-		fmt.Sprintf("vxlan-%d", portno), portno))
+	vpid, err := dp.CreateVport(odp.NewVxlanVportSpec(fmt.Sprintf("vxlan-%d", portno), portno))
 	if nlerr, ok := err.(odp.NetlinkError); ok {
 		if syscall.Errno(nlerr) == syscall.EAFNOSUPPORT {
 			dp.Delete()
-			return fmt.Errorf("kernel does not have Open vSwitch VXLAN support"), false
+			return false, fmt.Errorf("kernel does not have Open vSwitch VXLAN support")
 		}
 	}
-
 	if err == nil {
 		dp.DeleteVport(vpid)
 	}
 
-	udpconn.Close()
-	return nil, true
+	return true, nil
 }
 
 func DeleteDatapath(dpname string) error {
@@ -60,7 +56,6 @@ func DeleteDatapath(dpname string) error {
 	if err != nil {
 		return err
 	}
-
 	defer dpif.Close()
 
 	dp, err := dpif.LookupDatapath(dpname)
@@ -68,7 +63,6 @@ func DeleteDatapath(dpname string) error {
 		if odp.IsNoSuchDatapathError(err) {
 			return nil
 		}
-
 		return err
 	}
 
@@ -80,7 +74,6 @@ func AddDatapathInterface(dpname string, ifname string) error {
 	if err != nil {
 		return err
 	}
-
 	defer dpif.Close()
 
 	dp, err := dpif.LookupDatapath(dpname)
