@@ -4,19 +4,14 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"sync"
 )
 
 type GossipChannel struct {
-	sync.Mutex
 	name     string
 	ourself  *LocalPeer
 	routes   *Routes
 	gossiper Gossiper
-	senders  connectionSenders
 }
-
-type connectionSenders map[Connection]*GossipSender
 
 func NewGossipChannel(channelName string, ourself *LocalPeer, routes *Routes, g Gossiper) *GossipChannel {
 	return &GossipChannel{
@@ -24,7 +19,6 @@ func NewGossipChannel(channelName string, ourself *LocalPeer, routes *Routes, g 
 		ourself:  ourself,
 		routes:   routes,
 		gossiper: g,
-		senders:  make(connectionSenders),
 	}
 }
 
@@ -109,9 +103,7 @@ func (c *GossipChannel) Send(data GossipData) {
 }
 
 func (c *GossipChannel) SendDown(conn Connection, data GossipData) {
-	for _, sender := range c.sendersFor([]Connection{conn}) {
-		sender.Send(data)
-	}
+	c.senderFor(conn).Send(data)
 }
 
 func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err error) {
@@ -127,56 +119,25 @@ func (c *GossipChannel) relayUnicast(dstPeerName PeerName, buf []byte) (err erro
 
 func (c *GossipChannel) relayBroadcast(srcName PeerName, update GossipData) error {
 	c.routes.EnsureRecalculated()
-	for _, sender := range c.sendersFor(c.ourself.ConnectionsTo(c.routes.BroadcastAll(srcName))) {
-		sender.Broadcast(srcName, update)
+	for _, conn := range c.ourself.ConnectionsTo(c.routes.BroadcastAll(srcName)) {
+		c.senderFor(conn).Broadcast(srcName, update)
 	}
 	return nil
 }
 
 func (c *GossipChannel) relay(srcName PeerName, data GossipData) {
 	c.routes.EnsureRecalculated()
-	for _, sender := range c.sendersFor(c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName))) {
-		sender.Send(data)
+	for _, conn := range c.ourself.ConnectionsTo(c.routes.RandomNeighbours(srcName)) {
+		c.senderFor(conn).Send(data)
 	}
 }
 
-func (c *GossipChannel) sendersFor(conns []Connection) []*GossipSender {
-	if len(conns) == 0 {
-		return nil
-	}
-	ourConnections := c.ourself.Connections()
-	c.Lock()
-	defer c.Unlock()
-	// GC - randomly (courtesy of go's map iterator) pick some
-	// existing senders and stop&remove them if the associated
-	// connection is no longer active.  We stop as soon as we
-	// encounter a valid entry; the idea being that when there is
-	// little or no garbage then this executes close to O(1)[1],
-	// whereas when there is lots of garbage we remove it quickly.
-	//
-	// [1] TODO Unfortunately, due to the desire to avoid nested
-	// locks, instead of simply invoking LocalPeer.ConnectionTo(name),
-	// we operate on LocalPeer.Connections(). That is
-	// O(n_our_connections) at best.
-	for conn, sender := range c.senders {
-		if _, found := ourConnections[conn]; !found {
-			delete(c.senders, conn)
-			sender.Stop()
-		} else {
-			break
-		}
-	}
-	// start senders, if necessary
-	senders := make([]*GossipSender, len(conns), len(conns))
-	for i, conn := range conns {
-		sender, found := c.senders[conn]
-		if !found {
-			sender = NewGossipSender(c.makeMsg, c.makeBroadcastMsg, conn.(ProtocolSender))
-			c.senders[conn] = sender
-		}
-		senders[i] = sender
-	}
-	return senders
+func (c *GossipChannel) senderFor(conn Connection) *GossipSender {
+	return conn.(GossipConnection).GossipSenders().Sender(c.name, c.makeGossipSender)
+}
+
+func (c *GossipChannel) makeGossipSender(sender ProtocolSender, stop <-chan struct{}) *GossipSender {
+	return NewGossipSender(c.makeMsg, c.makeBroadcastMsg, sender, stop)
 }
 
 func (c *GossipChannel) makeMsg(msg []byte) ProtocolMsg {

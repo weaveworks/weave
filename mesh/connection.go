@@ -53,6 +53,11 @@ type LocalConnection struct {
 	errorChan       chan<- error
 	finished        <-chan struct{} // closed to signal that actorLoop has finished
 	OverlayConn     OverlayConnection
+	gossipSenders   *GossipSenders
+}
+
+type GossipConnection interface {
+	GossipSenders() *GossipSenders
 }
 
 type ConnectionAction func() error
@@ -101,6 +106,7 @@ func StartLocalConnection(connRemote *RemoteConnection, tcpConn *net.TCPConn, ro
 		actionChan:       actionChan,
 		errorChan:        errorChan,
 		finished:         finished}
+	conn.gossipSenders = NewGossipSenders(conn, finished)
 	go conn.run(actionChan, errorChan, finished, acceptNewPeer)
 }
 
@@ -127,6 +133,10 @@ func (conn *LocalConnection) SendProtocolMsg(m ProtocolMsg) error {
 		return err
 	}
 	return nil
+}
+
+func (conn *LocalConnection) GossipSenders() *GossipSenders {
+	return conn.gossipSenders
 }
 
 // ACTOR methods
