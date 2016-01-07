@@ -25,6 +25,7 @@ _testmain.go
 *.prof
 profile.cov
 coverage.html
+.pkg
 
 # Emacs backup files
 *~
