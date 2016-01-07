@@ -33,6 +33,7 @@ dependencies:
     - mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR
     - cd $SRCDIR/test; ./gce.sh make_template:
         parallel: false
+    - go get github.com/FiloSottile/gvt; cd $SRCDIR; gvt rebuild
 
 test:
   override:

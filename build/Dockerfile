@@ -1,24 +1,6 @@
-FROM ubuntu
-
-RUN apt-get -y update && apt-get -y install --no-install-recommends ca-certificates apt-transport-https
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9
-RUN echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list
-RUN apt-get -y update && apt-get -y install --no-install-recommends build-essential git lxc-docker-1.6.2 mercurial libpcap-dev curl make pkg-config gcc bison flex python-requests
-
-# When doing a build in a container, "apt-get update" happens twice,
-# which can be a very significant overhead for incremental builds.
-# And it's unnecessary, because if any of the prerequisites do change,
-# the right thing to do is to rebuild the container image.  Rather
-# than suppressing the "apt-get update" commands explicitly, we clear
-# out sources.list so that 'apt-get update' doesn't do anything.
-RUN echo >/etc/apt/sources.list
-
-ENV GO_VERSION 1.4.2
-RUN curl -sSL https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xz
-ENV PATH /usr/local/go/bin:$PATH
-
-# So that sudo does not trample on PATH
-RUN sed -ie '/secure_path/d' /etc/sudoers
-
+FROM golang:1.5.2
+ENV GO15VENDOREXPERIMENT 1
+RUN apt-get update && apt-get install -y libpcap-dev python-requests time
+RUN go clean -i net && go install -tags netgo std
 COPY build.sh /
 ENTRYPOINT ["sh", "/build.sh"]
