@@ -124,7 +124,6 @@ exec_remote() {
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
         -e DOCKER_CLIENT_ARGS \
         -e PROXY_HOST="$PROXY_HOST" \
-        -e WEAVE_CIDR=none \
         -e COVERAGE \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
@@ -1676,7 +1675,6 @@ launch_proxy() {
         -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
-        -e WEAVE_CIDR=none \
         -e DOCKER_BRIDGE \
         -e WEAVE_DEBUG \
         -e COVERAGE \
