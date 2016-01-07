@@ -129,7 +129,6 @@ exec_remote() {
         -e DOCKER_CLIENT_HOST="$DOCKER_CLIENT_HOST" \
         -e DOCKER_CLIENT_ARGS \
         -e PROXY_HOST="$PROXY_HOST" \
-        -e WEAVE_CIDR=none \
         -e COVERAGE \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
@@ -1155,7 +1154,7 @@ rewrite_etc_hosts() {
     CONTENTS="$(etc_hosts_contents $FQDN "$@")"
     # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
     # leaving it with valid contents...
-    docker run --rm --net=none --privileged \
+    docker run --rm --net=none -e WEAVE_CIDR=none --privileged \
         -v $CONTAINERS_PATH:$MNT \
         --entrypoint=sh \
         $EXEC_IMAGE -c "echo '$CONTENTS' > $MNT_HOSTS && rm -f $MNT_HOSTS && echo '$CONTENTS' > $MNT_HOSTS"
@@ -1652,7 +1651,6 @@ launch_proxy() {
         -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
-        -e WEAVE_CIDR=none \
         -e DOCKER_BRIDGE \
         -e WEAVE_DEBUG \
         -e COVERAGE \
