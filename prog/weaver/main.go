@@ -16,7 +16,6 @@ import (
 
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
-	"github.com/weaveworks/weave/common/odp"
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/nameserver"
@@ -37,12 +36,7 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		// flags that cause immediate exit
-		justVersion          bool
-		createDatapath       bool
-		deleteDatapath       bool
-		addDatapathInterface string
-
+		justVersion               bool
 		config                    mesh.Config
 		networkConfig             weave.NetworkConfig
 		protocolMinVersion        int
@@ -79,10 +73,6 @@ func main() {
 	}
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
-	mflag.BoolVar(&createDatapath, []string{"-create-datapath"}, false, "create ODP datapath and exit")
-	mflag.BoolVar(&deleteDatapath, []string{"-delete-datapath"}, false, "delete ODP datapath and exit")
-	mflag.StringVar(&addDatapathInterface, []string{"-add-datapath-iface"}, "", "add a network interface to the ODP datapath and exit")
-
 	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
@@ -124,33 +114,8 @@ func main() {
 
 	SetLogLevel(logLevel)
 
-	switch {
-	case justVersion:
+	if justVersion {
 		fmt.Printf("weave router %s\n", version)
-		os.Exit(0)
-
-	case createDatapath:
-		odpSupported, err := odp.CreateDatapath(datapathName)
-		if !odpSupported {
-			if err != nil {
-				Log.Error(err)
-			}
-
-			// When the kernel lacks ODP support, exit
-			// with a special status to distinguish it for
-			// the weave script.
-			os.Exit(17)
-		}
-
-		checkFatal(err)
-		os.Exit(0)
-
-	case deleteDatapath:
-		checkFatal(odp.DeleteDatapath(datapathName))
-		os.Exit(0)
-
-	case addDatapathInterface != "":
-		checkFatal(odp.AddDatapathInterface(datapathName, addDatapathInterface))
 		os.Exit(0)
 	}
 
