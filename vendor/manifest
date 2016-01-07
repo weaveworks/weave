@@ -1,0 +1,232 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/Sirupsen/logrus",
+			"repository": "https://github.com/Sirupsen/logrus",
+			"revision": "446d1c146faa8ed3f4218f056fcd165f6bcfda81",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/andybalholm/go-bit",
+			"repository": "https://github.com/andybalholm/go-bit",
+			"revision": "34813fe0e46a87398d88d0315e0f22615592b242",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/davecheney/profile",
+			"repository": "https://github.com/davecheney/profile",
+			"revision": "c29d1a1565bca9fbeed5eed0e5d52ba78469a16b",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/docker/docker/pkg/homedir",
+			"repository": "https://github.com/docker/docker",
+			"revision": "374a9596b22819ddcb1a981ea05a8ba3f4d4f0ed",
+			"branch": "master",
+			"path": "/pkg/homedir"
+		},
+		{
+			"importpath": "github.com/docker/docker/pkg/mflag",
+			"repository": "https://github.com/docker/docker",
+			"revision": "374a9596b22819ddcb1a981ea05a8ba3f4d4f0ed",
+			"branch": "master",
+			"path": "/pkg/mflag"
+		},
+		{
+			"importpath": "github.com/docker/libnetwork/driverapi",
+			"repository": "https://github.com/docker/libnetwork",
+			"revision": "c88b755c4f8a2eff9bf6b97937d89e9e116b8f54",
+			"branch": "master",
+			"path": "/driverapi"
+		},
+		{
+			"importpath": "github.com/docker/libnetwork/drivers/remote/api",
+			"repository": "https://github.com/docker/libnetwork",
+			"revision": "c88b755c4f8a2eff9bf6b97937d89e9e116b8f54",
+			"branch": "master",
+			"path": "/drivers/remote/api"
+		},
+		{
+			"importpath": "github.com/docker/libnetwork/ipamapi",
+			"repository": "https://github.com/docker/libnetwork",
+			"revision": "c88b755c4f8a2eff9bf6b97937d89e9e116b8f54",
+			"branch": "master",
+			"path": "/ipamapi"
+		},
+		{
+			"importpath": "github.com/docker/libnetwork/ipams/remote/api",
+			"repository": "https://github.com/docker/libnetwork",
+			"revision": "c88b755c4f8a2eff9bf6b97937d89e9e116b8f54",
+			"branch": "master",
+			"path": "/ipams/remote/api"
+		},
+		{
+			"importpath": "github.com/docker/libnetwork/netlabel",
+			"repository": "https://github.com/docker/libnetwork",
+			"revision": "c88b755c4f8a2eff9bf6b97937d89e9e116b8f54",
+			"branch": "master",
+			"path": "/netlabel"
+		},
+		{
+			"importpath": "github.com/docker/libnetwork/types",
+			"repository": "https://github.com/docker/libnetwork",
+			"revision": "c88b755c4f8a2eff9bf6b97937d89e9e116b8f54",
+			"branch": "master",
+			"path": "/types"
+		},
+		{
+			"importpath": "github.com/docker/machine/libmachine/auth",
+			"repository": "https://github.com/docker/machine",
+			"revision": "dd67c30838e39744a8b1b8ac6d99c38df797824e",
+			"branch": "master",
+			"path": "/libmachine/auth"
+		},
+		{
+			"importpath": "github.com/docker/machine/libmachine/cert",
+			"repository": "https://github.com/docker/machine",
+			"revision": "dd67c30838e39744a8b1b8ac6d99c38df797824e",
+			"branch": "master",
+			"path": "/libmachine/cert"
+		},
+		{
+			"importpath": "github.com/docker/machine/libmachine/log",
+			"repository": "https://github.com/docker/machine",
+			"revision": "dd67c30838e39744a8b1b8ac6d99c38df797824e",
+			"branch": "master",
+			"path": "/libmachine/log"
+		},
+		{
+			"importpath": "github.com/docker/machine/libmachine/mcnutils",
+			"repository": "https://github.com/docker/machine",
+			"revision": "dd67c30838e39744a8b1b8ac6d99c38df797824e",
+			"branch": "master",
+			"path": "/libmachine/mcnutils"
+		},
+		{
+			"importpath": "github.com/fsouza/go-dockerclient",
+			"repository": "https://github.com/fsouza/go-dockerclient",
+			"revision": "175e1df973274f04e9b459a62cffc49808f1a649",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/google/gopacket",
+			"repository": "https://github.com/google/gopacket",
+			"revision": "fcd0c1de5ee74764536d744176006fef28f240fd",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/google/gopacket/layers",
+			"repository": "https://github.com/google/gopacket",
+			"revision": "fcd0c1de5ee74764536d744176006fef28f240fd",
+			"branch": "master",
+			"path": "/layers"
+		},
+		{
+			"importpath": "github.com/google/gopacket/pcap",
+			"repository": "https://github.com/google/gopacket",
+			"revision": "fcd0c1de5ee74764536d744176006fef28f240fd",
+			"branch": "master",
+			"path": "/pcap"
+		},
+		{
+			"importpath": "github.com/gorilla/context",
+			"repository": "https://github.com/gorilla/context",
+			"revision": "1c83b3eabd45b6d76072b66b746c20815fb2872d",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/gorilla/mux",
+			"repository": "https://github.com/gorilla/mux",
+			"revision": "26a6070f849969ba72b72256e9f14cf519751690",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/miekg/dns",
+			"repository": "https://github.com/miekg/dns",
+			"revision": "1756430e42a7b2ecded216a9fdd37d002c116df5",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/opencontainers/runc/libcontainer/user",
+			"repository": "https://github.com/opencontainers/runc",
+			"revision": "f03b7f83177b9b5876bb5ebf92a9407a7fe02e6d",
+			"branch": "master",
+			"path": "/libcontainer/user"
+		},
+		{
+			"importpath": "github.com/vishvananda/netlink",
+			"repository": "https://github.com/vishvananda/netlink",
+			"revision": "bfd70f556483c008636b920dda142fdaa0d59ef9",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/vishvananda/netlink/nl",
+			"repository": "https://github.com/vishvananda/netlink",
+			"revision": "bfd70f556483c008636b920dda142fdaa0d59ef9",
+			"branch": "master",
+			"path": "/nl"
+		},
+		{
+			"importpath": "github.com/weaveworks/go-odp/odp",
+			"repository": "https://github.com/weaveworks/go-odp",
+			"revision": "f8c8c40c18898d7c4f6be33978d68f5d2810f373",
+			"branch": "master",
+			"path": "/odp"
+		},
+		{
+			"importpath": "golang.org/x/crypto/curve25519",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "f23ba3a5ee43012fcb4b92e1a2a405a92554f4f2",
+			"branch": "master",
+			"path": "/curve25519"
+		},
+		{
+			"importpath": "golang.org/x/crypto/nacl/box",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "f23ba3a5ee43012fcb4b92e1a2a405a92554f4f2",
+			"branch": "master",
+			"path": "/nacl/box"
+		},
+		{
+			"importpath": "golang.org/x/crypto/nacl/secretbox",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "f23ba3a5ee43012fcb4b92e1a2a405a92554f4f2",
+			"branch": "master",
+			"path": "/nacl/secretbox"
+		},
+		{
+			"importpath": "golang.org/x/crypto/poly1305",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "f23ba3a5ee43012fcb4b92e1a2a405a92554f4f2",
+			"branch": "master",
+			"path": "/poly1305"
+		},
+		{
+			"importpath": "golang.org/x/crypto/salsa20/salsa",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "f23ba3a5ee43012fcb4b92e1a2a405a92554f4f2",
+			"branch": "master",
+			"path": "/salsa20/salsa"
+		},
+		{
+			"importpath": "golang.org/x/sys/unix",
+			"repository": "https://go.googlesource.com/sys",
+			"revision": "833a04a10549a95dc34458c195cbad61bbb6cb4d",
+			"branch": "master",
+			"path": "/unix"
+		},
+		{
+			"importpath": "gopkg.in/airbrake/gobrake.v2",
+			"repository": "https://gopkg.in/airbrake/gobrake.v2",
+			"revision": "c9d51adc624b5cc4c1bf8de730a09af4878ffe2d",
+			"branch": "master"
+		},
+		{
+			"importpath": "gopkg.in/gemnasium/logrus-airbrake-hook.v2",
+			"repository": "https://gopkg.in/gemnasium/logrus-airbrake-hook.v2",
+			"revision": "31e6fd4bd5a98d8ee7673d24bc54ec73c31810dd",
+			"branch": "master"
+		}
+	]
+}
