@@ -34,9 +34,12 @@ function vm_names {
 # Delete all vms in this account
 function destroy {
 	names="$(vm_names)"
+	if [ $(gcloud compute instances list --zone $ZONE -q $names | wc -l) -le 1 ] ; then
+		return 0
+	fi
 	for i in {0..10}; do
 		# gcloud instances delete can sometimes hang.
-		case  $(set +e; timeout 60s /bin/bash -c "gcloud compute instances delete --zone $ZONE -q $names  >/dev/null 2>&1 || true"; echo $?) in
+		case  $(set +e; timeout 60s /bin/bash -c "gcloud compute instances delete --zone $ZONE -q $names  >/dev/null 2>&1"; echo $?) in
 			0)
 				return 0
 				;;
