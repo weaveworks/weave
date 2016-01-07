@@ -13,8 +13,9 @@ import (
 
 type MockGossipConnection struct {
 	RemoteConnection
-	dest  *Router
-	start chan struct{}
+	dest          *Router
+	gossipSenders *GossipSenders
+	start         chan struct{}
 }
 
 func NewTestRouter(name string) *Router {
@@ -27,6 +28,10 @@ func NewTestRouter(name string) *Router {
 func (conn *MockGossipConnection) SendProtocolMsg(protocolMsg ProtocolMsg) error {
 	<-conn.start
 	return conn.dest.handleGossip(protocolMsg.tag, protocolMsg.msg)
+}
+
+func (conn *MockGossipConnection) GossipSenders() *GossipSenders {
+	return conn.gossipSenders
 }
 
 func (conn *MockGossipConnection) Start() {
@@ -56,7 +61,11 @@ func (router *Router) NewTestGossipConnection(r *Router) *MockGossipConnection {
 	toPeer = router.Peers.FetchWithDefault(toPeer) // Has side-effect of incrementing refcount
 
 	conn := &MockGossipConnection{
-		RemoteConnection{router.Ourself.Peer, toPeer, "", false, true}, r, make(chan struct{})}
+		RemoteConnection: RemoteConnection{router.Ourself.Peer, toPeer, "", false, true},
+		dest:             r,
+		start:            make(chan struct{}),
+	}
+	conn.gossipSenders = NewGossipSenders(conn, make(chan struct{}))
 	router.Ourself.handleAddConnection(conn)
 	router.Ourself.handleConnectionEstablished(conn)
 	return conn
