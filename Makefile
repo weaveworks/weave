@@ -58,12 +58,12 @@ travis: $(EXES)
 update:
 	go get -u -f -v -tags netgo $(addprefix ./,$(dir $(EXES)))
 
-$(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
 $(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
-$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/net/*.go plugin/ipam/*.go plugin/skel/*.go api/*.go common/docker/*.go
+$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/docker/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
@@ -85,21 +85,21 @@ $(WEAVEUTIL_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
-# These next programs need separate rules as they fail the netgo check in
-# the main build stanza due to not importing net package
-
-$(SIGPROXY_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE):
-	go get -tags netgo ./$(@D)
-	go build $(BUILD_FLAGS) -o $@ ./$(@D)
-
 $(WEAVEWAIT_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -tags "netgo iface mcast" -o $@ ./$(@D)
+	$(NETGO_CHECK)
 
 $(WEAVEWAIT_NOMCAST_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -tags "netgo iface" -o $@ ./$(@D)
+	$(NETGO_CHECK)
 
+# These programs need a separat rule as they fail the netgo check in
+# the main build stanza due to not importing net package
+$(SIGPROXY_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE):
+	go get -tags netgo ./$(@D)
+	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVER_IMAGE) prog/weaver
