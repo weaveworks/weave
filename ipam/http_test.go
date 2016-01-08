@@ -149,29 +149,25 @@ func TestHTTPCancel(t *testing.T) {
 		testCIDR1   = "10.0.3.0/29"
 	)
 
-	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
+	// Say quorum=2, so the allocate won't go ahead
+	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 2)
 	defer alloc.Stop()
-	alloc.claimRingForTesting()
+	ExpectBroadcastMessage(alloc, nil) // trying to form consensus
 	_, cidr, _ := address.ParseCIDR(testCIDR1)
 	port := listenHTTP(alloc, cidr)
 
-	// Stop the alloc so nothing actually works
-	unpause := alloc.pause()
-
 	// Ask the http server for a new address
-	done := make(chan *http.Response)
 	req, _ := http.NewRequest("POST", allocURL(port, testCIDR1, containerID), nil)
+	// On another goroutine, wait for a bit then cancel the request
 	go func() {
-		res, _ := http.DefaultClient.Do(req)
-		done <- res
+		time.Sleep(100 * time.Millisecond)
+		common.Log.Debug("Cancelling allocate")
+		http.DefaultTransport.(*http.Transport).CancelRequest(req)
 	}()
 
-	time.Sleep(100 * time.Millisecond)
-	fmt.Println("Cancelling allocate")
-	http.DefaultTransport.(*http.Transport).CancelRequest(req)
-	unpause()
-	res := <-done
+	res, _ := http.DefaultClient.Do(req)
 	if res != nil {
-		require.FailNow(t, "Error: Allocate returned non-nil")
+		body, _ := ioutil.ReadAll(res.Body)
+		require.FailNow(t, "Error: Allocate returned non-nil", string(body))
 	}
 }
