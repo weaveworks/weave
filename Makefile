@@ -58,7 +58,18 @@ travis: $(EXES)
 update:
 	go get -u -f -v -tags netgo $(addprefix ./,$(dir $(EXES)))
 
-$(WEAVER_EXE) $(WEAVEPROXY_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
+$(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
+$(WEAVEUTIL_EXE): prog/weaveutil/*.go
+$(SIGPROXY_EXE): prog/sigproxy/*.go
+$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/net/*.go plugin/ipam/*.go plugin/skel/*.go api/*.go common/docker/*.go
+$(TEST_TLS_EXE): test/tls/*.go
+$(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
+$(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
+$(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
+
+$(WEAVER_EXE) $(WEAVEPROXY_EXE):
 ifeq ($(COVERAGE),true)
 	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "^$(PACKAGE_BASE)/") | paste -s -d,))
 	go get -t -tags netgo ./$(@D)
@@ -69,34 +80,27 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go
+$(WEAVEUTIL_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
-$(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
-$(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
-$(WEAVEUTIL_EXE): prog/weaveutil/*.go
-
 # These next programs need separate rules as they fail the netgo check in
 # the main build stanza due to not importing net package
-$(SIGPROXY_EXE): prog/sigproxy/*.go
-$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/net/*.go plugin/ipam/*.go plugin/skel/*.go api/*.go common/docker/*.go
-$(TEST_TLS_EXE): test/tls/*.go
 
 $(SIGPROXY_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
-$(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
+$(WEAVEWAIT_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -tags "netgo iface mcast" -o $@ ./$(@D)
 
-$(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
+$(WEAVEWAIT_NOMCAST_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -tags "netgo iface" -o $@ ./$(@D)
 
-$(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
+$(WEAVEWAIT_NOOP_EXE):
 	go get -tags netgo ./$(@D)
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
