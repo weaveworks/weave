@@ -46,10 +46,7 @@ prog/plugin/plugin
 testing/cover/cover
 testing/runner/runner
 releases
-.weaver.uptodate
-.weavedns.uptodate
-.weaveexec.uptodate
-.dockerplugin.uptodate
+.*.uptodate
 weave.tar.gz
 prog/weaveexec/weave
 prog/weaveexec/weavehosts
