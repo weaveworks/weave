@@ -95,7 +95,7 @@ $(WEAVEWAIT_NOMCAST_EXE):
 	go build $(BUILD_FLAGS) -tags "netgo iface" -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
-# These programs need a separat rule as they fail the netgo check in
+# These programs need a separate rule as they fail the netgo check in
 # the main build stanza due to not importing net package
 $(SIGPROXY_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE):
 	go get -tags netgo ./$(@D)
