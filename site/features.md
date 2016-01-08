@@ -50,6 +50,8 @@ TCP/IP, e.g. a netcat UDP service would be run with
 
     root@a2:/# echo 'Hello, world.' | nc -u a1 5533
 
+Broadcast and multicast protocols also work over Weave Net.
+
 We can deploy the entire arsenal of standard network tools and
 applications, developed over decades, to configure, secure, monitor,
 and troubleshoot our container network. To put it another way, we can

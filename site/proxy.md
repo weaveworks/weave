@@ -115,6 +115,10 @@ will only include one of them.
 
     host1$ weave launch-router && weave launch-proxy --rewrite-inspect
 
+By default, multicast traffic will be routed over the weave network.
+To turn this off, e.g. because you want to configure your own multicast
+route, add the `--no-multicast-route` flag to `weave launch-proxy`.
+
 ## <a name="ipam"></a>Automatic IP address assignment
 
 If [automatic IP address assignment](ipam.html) is enabled in weave,
