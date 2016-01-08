@@ -84,6 +84,10 @@ The plugin command-line arguments are:
  * `--no-multicast-route`: stop weave adding a static IP route for
    multicast traffic on its interface
 
+By default, multicast traffic will be routed over the weave network.
+To turn this off, e.g. because you want to configure your own multicast
+route, add the `--no-multicast-route` flag to `weave launch-plugin`.
+
 ## Restarting
 
 We start the plugin with a restart policy, because Docker attempts to
