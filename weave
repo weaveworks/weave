@@ -432,12 +432,18 @@ arp_update() {
     ! command_exists arping || $3 arping -U -q -I $1 -c 1 ${2%/*}
 }
 
-# Generate a random MAC value
-random_mac() {
+# Generate a MAC value from a stdin containing six space separated
+# 2-digit hexadecimal numbers.
+mac_from_hex() {
     # In the first byte of the MAC, the 'multicast' bit should be
     # clear and 'locally administered' bit should be set.  All other
     # bits should be random.
-    od -txC -An -N6 /dev/urandom | ( read a b c d e f && printf "%02x:$b:$c:$d:$e:$f" $((0x$a & ~1 | 2)) )
+    read a b c d e f && printf "%02x:$b:$c:$d:$e:$f" $((0x$a & ~1 | 2))
+}
+
+# Generate a random MAC value
+random_mac() {
+    od -txC -An -N6 /dev/urandom | mac_from_hex
 }
 
 ######################################################################
@@ -585,10 +591,22 @@ init_bridge() {
 
     ip link add name $BRIDGE type bridge
 
-    # Set a random MAC address on the bridge.  Current Linux
-    # kernels already do this when creating a bridge, but there
-    # are rumours it was not always so.
-    ip link set dev $BRIDGE address $(random_mac)
+    # Derive the bridge MAC from the system (aka bios) UUID, if
+    # present. Elsewhere we in turn derive the peer name from that,
+    # which we want to be stable across reboots but otherwise
+    # unique. The system UUID fits that bill, unlike, say,
+    # /etc/machine-id, which is often identical on VMs created from
+    # cloned filesystems. If we cannot determine the system UUID we
+    # just generate a random MAC.
+    if SYSTEM_UUID=$(cat /sys/class/dmi/id/product_uuid 2>/dev/null) ; then
+        # We salt the input just as a precaution to avoid clashes with
+        # other applications who might have had the bright idea of
+        # generating MACs in the same way.
+        MAC=$(echo "9oBJ0Jmip-$SYSTEM_UUID" | sha256sum | sed 's/\(..\)/\1 /g' | cut -c1-17 | mac_from_hex)
+    else
+        MAC=$(random_mac)
+    fi
+    ip link set dev $BRIDGE address $MAC
 
     # Attempting to set the bridge MTU to a high value directly
     # fails. Bridges take the lowest MTU of their interfaces. So
@@ -1514,12 +1532,9 @@ launch_router() {
     enforce_docker_bridge_addr_assign_type
     create_bridge
     docker_bridge_ip
-    # We set the router name to the bridge mac since that is
-    # stable across re-creations of the containers.
-    #
-    # TODO use the mac of one of the physical host interfaces
-    # (eth0, wlan0, etc) so the name becomes stable across host
-    # restarts.
+    # We set the router name to the bridge MAC, which in turn is
+    # derived from the system UUID (if available), and thus stable
+    # across reboots.
     PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
     # backward compatibility...
     if is_cidr "$1" ; then
