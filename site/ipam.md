@@ -176,20 +176,26 @@ for manual allocation.
 
 ## <a name="stop"></a>Stopping and removing peers
 
-You may wish to `weave stop` and re-launch to change some config or to
-upgrade to a new version; provided the underlying protocol hasn't
-changed it will pick up where it left off and learn from peers in the
-network which address ranges it was previously using. If, however, you
-run `weave reset` this will remove the peer from the network so
-if Weave is run again on that node it will start from scratch.
+You may wish to `weave stop` and re-launch to change a peer's
+configuration or upgrade it to a new version. Provided the underlying
+protocol hasn't changed the peer will pick up where it left off and
+learn from other peers in the network which address ranges it was
+previously using.
 
-For failed peers, the `weave rmpeer` command can be used to
-permanently remove the ranges allocated to said peer.  This will allow
-other peers to allocate IPs in the ranges previously owner by the rm'd
-peer, and as such should be used with extreme caution - if the rm'd
-peer had transferred some range of IP addresses to another peer but
-this is not known to the whole network, or if it later rejoins
-the Weave network, the same IP address may be allocated twice.
+The same normally happens when a peer is restarted any other way,
+e.g. as result of a reboot, provided the
+[system-uuid](http://linux.die.net/man/8/dmidecode) didn't change.
+
+If you want to remove a peer from the network, run `weave reset`. This
+removes the ranges allocated to the peer, thus allowing other peers to
+allocate IPs in them.
+
+For a failed peer, the `weave rmpeer` command can be run on any other
+peer to achieve the same result. The command should be used with
+extreme caution - if the rm'd peer had transferred some range of IP
+addresses to another peer but this is not known to the whole network,
+or if it actually had not failed and later rejoins the network, the
+same IP address may be allocated twice.
 
 Assuming we had started the three peers in the example earlier, and
 host3 has caught fire, we can go to one of the other hosts and run:
