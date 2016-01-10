@@ -285,6 +285,25 @@ type sleeveCrypto struct {
 	EncDF Encryptor
 }
 
+func newSleeveCrypto(name []byte, sessionKey *[32]byte, outbound bool) sleeveCrypto {
+	if sessionKey == nil {
+		return sleeveCrypto{
+			Dec:   NewNonDecryptor(),
+			Enc:   NewNonEncryptor(name),
+			EncDF: NewNonEncryptor(name),
+		}
+	}
+	return sleeveCrypto{
+		Dec:   NewNaClDecryptor(sessionKey, outbound),
+		Enc:   NewNaClEncryptor(name, sessionKey, outbound, false),
+		EncDF: NewNaClEncryptor(name, sessionKey, outbound, true),
+	}
+}
+
+func (crypto sleeveCrypto) Overhead() int {
+	return UDPOverhead + crypto.EncDF.PacketOverhead() + crypto.EncDF.FrameOverhead() + EthernetOverhead
+}
+
 type sleeveForwarder struct {
 	// Immutable
 	sleeve         *SleeveOverlay
@@ -356,22 +375,6 @@ type controlMessage struct {
 }
 
 func (sleeve *SleeveOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
-	name := sleeve.localPeer.NameByte
-	var crypto sleeveCrypto
-	if params.SessionKey != nil {
-		crypto = sleeveCrypto{
-			Dec:   NewNaClDecryptor(params.SessionKey, params.Outbound),
-			Enc:   NewNaClEncryptor(name, params.SessionKey, params.Outbound, false),
-			EncDF: NewNaClEncryptor(name, params.SessionKey, params.Outbound, true),
-		}
-	} else {
-		crypto = sleeveCrypto{
-			Dec:   NewNonDecryptor(),
-			Enc:   NewNonEncryptor(name),
-			EncDF: NewNonEncryptor(name),
-		}
-	}
-
 	aggChan := make(chan aggregatorFrame, ChannelSize)
 	aggDFChan := make(chan aggregatorFrame, ChannelSize)
 	specialChan := make(chan specialFrame, 1)
@@ -383,6 +386,8 @@ func (sleeve *SleeveOverlay) PrepareConnection(params mesh.OverlayConnectionPara
 	if params.Outbound {
 		remoteAddr = makeUDPAddr(params.RemoteAddr)
 	}
+
+	crypto := newSleeveCrypto(sleeve.localPeer.NameByte, params.SessionKey, params.Outbound)
 
 	fwd := &sleeveForwarder{
 		sleeve:           sleeve,
@@ -402,9 +407,8 @@ func (sleeve *SleeveOverlay) PrepareConnection(params mesh.OverlayConnectionPara
 		mtu:              DefaultMTU,
 		crypto:           crypto,
 		maxPayload:       DefaultMTU - UDPOverhead,
-		overheadDF: UDPOverhead + crypto.EncDF.PacketOverhead() +
-			crypto.EncDF.FrameOverhead() + EthernetOverhead,
-		senderDF: newUDPSenderDF(params.LocalAddr.IP, sleeve.localPort),
+		overheadDF:       crypto.Overhead(),
+		senderDF:         newUDPSenderDF(params.LocalAddr.IP, sleeve.localPort),
 	}
 
 	go fwd.run(aggChan, aggDFChan, specialChan, controlMsgChan, confirmedChan, finishedChan)
