@@ -1200,10 +1200,13 @@ rewrite_etc_hosts() {
 # Print an error to stderr and return with an indicative exit status
 # if the container $1 does not exist or isn't running.
 check_running() {
-    if ! STATUS=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) ; then
+    if ! STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Restarting}}' $1 2>/dev/null) ; then
         echo  "$1 container is not present. Have you launched it?" >&2
         return 1
-    elif [ "$STATUS" != "true" ] ; then
+    elif [ "$STATUS" == "true true" ] ; then
+        echo "$1 container is restarting." >&2
+        return 2
+    elif [ "$STATUS" != "true false" ] ; then
         echo "$1 container is not running." >&2
         return 2
     fi
