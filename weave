@@ -931,13 +931,13 @@ stop() {
 # it's not running or doesn't exist, print an error to stderr and
 # return with an indicative non-zero exit code.
 container_id() {
-    if ! status=$(docker inspect --format='{{.State.Running}} {{.Id}}' $1 2>/dev/null) ; then
+    if ! status=$(docker inspect --format='{{.State.Status}} {{.Id}}' $1 2>/dev/null) ; then
         echo "Error: No such container: $1" >&2
         return 1
     fi
     case "$status" in
-        true*)
-            echo "${status#true }"
+        running*)
+            echo "${status#running }"
             ;;
         *)
             echo "$1 container is not running." >&2
@@ -947,17 +947,17 @@ container_id() {
 }
 
 container_ip() {
-    if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null) ; then
+    if ! status=$(docker inspect --format='{{.State.Status}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null) ; then
         echo "$2" >&2
         return 1
     fi
     case "$status" in
-        "true ")
+        "running ")
             #echo "$1 container has no IP address; is Docker networking enabled?" >&2
             CONTAINER_IP=127.0.0.1
             ;;
-        true*)
-            CONTAINER_IP="${status#true }"
+        running*)
+            CONTAINER_IP="${status#running }"
             ;;
         *)
             echo "$3" >&2
@@ -1168,10 +1168,10 @@ rewrite_etc_hosts() {
 # Print an error to stderr and return with an indicative exit status
 # if the container $1 does not exist or isn't running.
 check_running() {
-    if ! STATUS=$(docker inspect --format='{{.State.Running}}' $1 2>/dev/null) ; then
+    if ! STATUS=$(docker inspect --format='{{.State.Status}}' $1 2>/dev/null) ; then
         echo  "$1 container is not present. Have you launched it?" >&2
         return 1
-    elif [ "$STATUS" != "true" ] ; then
+    elif [ "$STATUS" != "running" ] ; then
         echo "$1 container is not running." >&2
         return 2
     fi
@@ -1856,6 +1856,8 @@ EOF
     launch-plugin)
         check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
         launch_plugin "$@"
+        fractional_sleep 0.1
+        check_running $PLUGIN_CONTAINER_NAME 2>/dev/null || death_msg $PLUGIN_CONTAINER_NAME && exit 1
         echo $PLUGIN_CONTAINER
         ;;
     env|proxy-env)
