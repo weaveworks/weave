@@ -64,8 +64,8 @@ chances of overlap. But it could be that you or your hosting provider
 are using some of these private addresses in the same range, which would
 cause a clash.
 
-Here's an example that came up recently: on `weave launch`, the
-following error message appeared:
+Here's an example: on `weave launch`, the following error message
+can appear:
 
 ````
 Network 10.32.0.0/12 overlaps with existing route 10.0.0.0/8 on host.
