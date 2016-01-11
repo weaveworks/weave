@@ -115,7 +115,7 @@ Weave detects when a container has exited and releases its
 automatically allocated addresses so they can be re-used.
 
 See the [Automatic IP Address Management](ipam.html) documentation for
-further details.
+further details. We also have a page on [the basics of IP addressing](ip-addresses.html)
 
 Instead of getting weave to allocate IP addresses automatically, it is
 also possible to specify an address and network explicitly, expressed
