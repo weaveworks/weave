@@ -53,7 +53,7 @@ PACKAGE_BASE=$(shell go list -e ./)
 
 all: $(WEAVE_EXPORT) $(RUNNER_EXE) $(TEST_TLS_EXE)
 
-travis: $(EXES)
+exes: $(EXES)
 
 update:
 	go get -u -f -v -tags netgo $(addprefix ./,$(dir $(EXES)))
