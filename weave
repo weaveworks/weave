@@ -1875,6 +1875,8 @@ EOF
     launch-plugin)
         check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
         launch_plugin "$@"
+        fractional_sleep 0.1
+        check_running $PLUGIN_CONTAINER_NAME 2>/dev/null || death_msg $PLUGIN_CONTAINER_NAME && exit 1
         echo $PLUGIN_CONTAINER
         ;;
     env|proxy-env)
