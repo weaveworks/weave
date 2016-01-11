@@ -139,10 +139,6 @@ func main() {
 		networkConfig.Bridge = fastdp.Bridge()
 		overlays.Add("fastdp", fastdp.Overlay())
 	}
-	sleeve := weave.NewSleeveOverlay(config.Port)
-	overlays.Add("sleeve", sleeve)
-	overlays.SetCompatOverlay(sleeve)
-
 	if ifaceName != "" {
 		// -iface can coexist with -datapath, because
 		// pcap-based packet capture is a bit more efficient
@@ -152,16 +148,16 @@ func main() {
 		var err error
 		iface, err = weavenet.EnsureInterface(ifaceName)
 		checkFatal(err)
-
-		// bufsz flag is in MB
-		networkConfig.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024)
+		networkConfig.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
 		checkFatal(err)
 	}
+	sleeve := weave.NewSleeveOverlay(config.Port)
+	overlays.Add("sleeve", sleeve)
+	overlays.SetCompatOverlay(sleeve)
 
 	if password == "" {
 		password = os.Getenv("WEAVE_PASSWORD")
 	}
-
 	if password == "" {
 		Log.Println("Communication between peers is unencrypted.")
 	} else {
