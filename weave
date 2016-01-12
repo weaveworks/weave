@@ -904,6 +904,7 @@ container_weave_addrs() {
 ######################################################################
 
 # Check that a container for component $1 named $2 with image $3 is not running
+# or is a plugin running with identical arguments to $4...
 check_not_running() {
     RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
     case ${RUN_STATUS%:*} in
@@ -912,8 +913,18 @@ check_not_running() {
             exit 1
             ;;
         "true "*" $3")
-            echo "$2 is already running; you can stop it with 'weave stop-$1'." >&2
-            exit 1
+            if [ "$1" = "plugin" ] ; then
+                ARGS=$(docker inspect --format='{{.Args}}' $2)
+                shift 3
+                if [ "$ARGS" != "[$@]" ] ; then
+                    echo "$PLUGIN_CONTAINER_NAME is already running with arguments $ARGS; you can stop it with 'weave stop-plugin'." >&2
+                    exit 1
+                fi
+                PLUGIN_CONTAINER=$(container_id $PLUGIN_CONTAINER_NAME)
+            else
+                echo "$2 is already running; you can stop it with 'weave stop-$1'." >&2
+                exit 1
+            fi
             ;;
         "false "*" $3")
             docker rm $2 >/dev/null
@@ -1846,11 +1857,11 @@ EOF
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
         check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
-        check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
         COMMON_ARGS=$(common_launch_args "$@")
+        check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE $COMMON_ARGS
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
-        plugin_disabled || launch_plugin $COMMON_ARGS
+        plugin_disabled || [ -n "$PLUGIN_CONTAINER" ] || launch_plugin $COMMON_ARGS
         ;;
     launch-router)
         deprecation_warnings "$@"
@@ -1873,8 +1884,8 @@ EOF
         echo $PROXY_CONTAINER
         ;;
     launch-plugin)
-        check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
-        launch_plugin "$@"
+        check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE "$@"
+        [ -n "$PLUGIN_CONTAINER" ] || launch_plugin "$@"
         echo $PLUGIN_CONTAINER
         ;;
     env|proxy-env)
