@@ -909,22 +909,22 @@ check_not_running() {
     case ${RUN_STATUS%:*} in
         "true restarting $3")
             echo "$2 is restarting; you can stop it with 'weave stop-$1'." >&2
-            exit 1
+            return 3
             ;;
         "true "*" $3")
             echo "$2 is already running; you can stop it with 'weave stop-$1'." >&2
-            exit 1
+            return 1
             ;;
         "false "*" $3")
             docker rm $2 >/dev/null
             ;;
         true*)
             echo "Found another running container named '$2'. Aborting." >&2
-            exit 1
+            return 2
             ;;
         false*)
             echo "Found another container named '$2'. Aborting." >&2
-            exit 1
+            return 2
             ;;
     esac
 }
@@ -1851,8 +1851,11 @@ EOF
         launch_proxy  $COMMON_ARGS
         # Allow an existing plugin to keep running, because we run it with restart=always
         if ! plugin_disabled ; then
-            check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE 
-            launch_plugin $COMMON_ARGS
+            if check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE ; then
+                launch_plugin $COMMON_ARGS
+            else
+                [ $? -lt 2 ] || exit 1
+            fi
         fi
         ;;
     launch-router)
