@@ -1701,11 +1701,15 @@ stop_proxy() {
 }
 
 launch_plugin() {
+    # Set WEAVEPLUGIN_DOCKER_ARGS in the environment in order to supply
+    # additional parameters, such as resource limits, to docker
+    # when launching the weaveplugin container.
     PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
         --restart=always \
         --net=host \
         $(docker_sock_options) \
         -v /run/docker/plugins:/run/docker/plugins \
+        $WEAVEPLUGIN_DOCKER_ARGS \
         $PLUGIN_IMAGE "$@")
 }
 
