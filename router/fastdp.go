@@ -90,9 +90,9 @@ func NewFastDatapath(dpName string, port int) (*FastDatapath, error) {
 
 	fastdp := &FastDatapath{
 		dpname:        dpName,
-		mtu:           iface.MTU,
 		dpif:          dpif,
 		dp:            dp,
+		mtu:           iface.MTU,
 		missHandlers:  make(map[odp.VportID]missHandler),
 		sendToPort:    nil,
 		sendToMAC:     make(map[MAC]bridgeSender),
