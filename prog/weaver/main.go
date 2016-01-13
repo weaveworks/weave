@@ -65,7 +65,6 @@ func main() {
 		peers              []string
 		noDNS              bool
 		dnsConfig          dnsConfig
-		iface              *net.Interface
 		datapathName       string
 		trustedSubnetStr   string
 
@@ -131,25 +130,23 @@ func main() {
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
-	overlays := weave.NewOverlaySwitch()
-	switch {
-	case datapathName != "" && ifaceName != "":
-		Log.Fatal("At most one of --datapath and --iface must be specified.")
-	case datapathName != "":
-		fastdp, err := weave.NewFastDatapath(datapathName, config.Port)
-		checkFatal(err)
-		networkConfig.Bridge = fastdp.Bridge()
-		overlays.Add("fastdp", fastdp.Overlay())
-	case ifaceName != "":
-		var err error
-		iface, err = weavenet.EnsureInterface(ifaceName)
-		checkFatal(err)
-		networkConfig.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
+	overlay, bridge := createOverlay(datapathName, ifaceName, config.Port, bufSzMB)
+	networkConfig.Bridge = bridge
+
+	if routerName == "" {
+		iface := bridge.Interface()
+		if iface == nil {
+			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
+		}
+		routerName = iface.HardwareAddr.String()
+	}
+	name, err := mesh.PeerNameFromUserInput(routerName)
+	checkFatal(err)
+
+	if nickName == "" {
+		nickName, err = os.Hostname()
 		checkFatal(err)
 	}
-	sleeve := weave.NewSleeveOverlay(config.Port)
-	overlays.Add("sleeve", sleeve)
-	overlays.SetCompatOverlay(sleeve)
 
 	if password == "" {
 		password = os.Getenv("WEAVE_PASSWORD")
@@ -159,21 +156,6 @@ func main() {
 	} else {
 		config.Password = []byte(password)
 		Log.Println("Communication between peers via untrusted networks is encrypted.")
-	}
-
-	if routerName == "" {
-		if iface == nil {
-			Log.Fatal("Either an interface must be specified with --iface or a name with -name")
-		}
-		routerName = iface.HardwareAddr.String()
-	}
-
-	name, err := mesh.PeerNameFromUserInput(routerName)
-	checkFatal(err)
-
-	if nickName == "" {
-		nickName, err = os.Hostname()
-		checkFatal(err)
 	}
 
 	if prof != "" {
@@ -195,7 +177,7 @@ func main() {
 		Log.Fatal("Unable to parse trusted subnets: ", err)
 	}
 
-	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlays)
+	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay)
 	Log.Println("Our name is", router.Ourself)
 
 	var dockerCli *docker.Client
@@ -307,6 +289,31 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 }
 
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
+}
+
+func createOverlay(datapathName string, ifaceName string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+	overlay := weave.NewOverlaySwitch()
+	var bridge weave.Bridge
+	switch {
+	case datapathName != "" && ifaceName != "":
+		Log.Fatal("At most one of --datapath and --iface must be specified.")
+	case datapathName != "":
+		fastdp, err := weave.NewFastDatapath(datapathName, port)
+		checkFatal(err)
+		bridge = fastdp.Bridge()
+		overlay.Add("fastdp", fastdp.Overlay())
+	case ifaceName != "":
+		iface, err := weavenet.EnsureInterface(ifaceName)
+		checkFatal(err)
+		bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
+		checkFatal(err)
+	default:
+		bridge = weave.NullBridge{}
+	}
+	sleeve := weave.NewSleeveOverlay(port)
+	overlay.Add("sleeve", sleeve)
+	overlay.SetCompatOverlay(sleeve)
+	return overlay, bridge
 }
 
 func parseAndCheckCIDR(cidrStr string) address.CIDR {
