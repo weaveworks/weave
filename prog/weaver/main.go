@@ -128,23 +128,15 @@ func main() {
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
 	overlays := weave.NewOverlaySwitch()
-	if datapathName != "" {
-		// A datapath name implies that "Bridge" and "Overlay"
-		// packet handling use fast datapath, although other
-		// options can override that below.  Even if both
-		// things are overridden, we might need bridging on
-		// the datapath.
+	switch {
+	case datapathName != "" && ifaceName != "":
+		Log.Fatal("At most one of --datapath and --iface must be specified.")
+	case datapathName != "":
 		fastdp, err := weave.NewFastDatapath(datapathName, config.Port)
 		checkFatal(err)
 		networkConfig.Bridge = fastdp.Bridge()
 		overlays.Add("fastdp", fastdp.Overlay())
-	}
-	if ifaceName != "" {
-		// -iface can coexist with -datapath, because
-		// pcap-based packet capture is a bit more efficient
-		// than capture via ODP misses, even when using an
-		// ODP-based bridge.  So when using weave encyption,
-		// it's preferable to use -iface.
+	case ifaceName != "":
 		var err error
 		iface, err = weavenet.EnsureInterface(ifaceName)
 		checkFatal(err)

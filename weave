@@ -1622,7 +1622,6 @@ fetch_router_args() {
     CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME)
     IPRANGE=$(echo $CONTAINER_ARGS | grep -o -e '-ipalloc-range [^ ]*') || true
     NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
-    WEAVE_PASSWORD=$(docker inspect -f '{{.Config.Env}}' $CONTAINER_NAME | sed -n -e 's/.*WEAVE_PASSWORD=\([^] ]*\).*/\1/p')
 }
 
 attach_router() {
