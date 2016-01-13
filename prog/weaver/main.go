@@ -133,6 +133,21 @@ func main() {
 	overlay, bridge := createOverlay(datapathName, ifaceName, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
+	if routerName == "" {
+		iface := bridge.Interface()
+		if iface == nil {
+			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
+		}
+		routerName = iface.HardwareAddr.String()
+	}
+	name, err := mesh.PeerNameFromUserInput(routerName)
+	checkFatal(err)
+
+	if nickName == "" {
+		nickName, err = os.Hostname()
+		checkFatal(err)
+	}
+
 	if password == "" {
 		password = os.Getenv("WEAVE_PASSWORD")
 	}
@@ -141,22 +156,6 @@ func main() {
 	} else {
 		config.Password = []byte(password)
 		Log.Println("Communication between peers via untrusted networks is encrypted.")
-	}
-
-	if routerName == "" {
-		iface := networkConfig.Bridge.Interface()
-		if iface == nil {
-			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
-		}
-		routerName = iface.HardwareAddr.String()
-	}
-
-	name, err := mesh.PeerNameFromUserInput(routerName)
-	checkFatal(err)
-
-	if nickName == "" {
-		nickName, err = os.Hostname()
-		checkFatal(err)
 	}
 
 	if prof != "" {
