@@ -26,6 +26,14 @@ import (
 
 var version = "(unreleased version)"
 
+type dnsConfig struct {
+	Domain                 string
+	ListenAddress          string
+	TTL                    int
+	ClientTimeout          time.Duration
+	EffectiveListenAddress string
+}
+
 func main() {
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
@@ -36,34 +44,30 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		justVersion               bool
-		config                    mesh.Config
-		networkConfig             weave.NetworkConfig
-		protocolMinVersion        int
-		ifaceName                 string
-		routerName                string
-		nickName                  string
-		password                  string
-		pktdebug                  bool
-		logLevel                  string
-		prof                      string
-		bufSzMB                   int
-		noDiscovery               bool
-		httpAddr                  string
-		iprangeCIDR               string
-		ipsubnetCIDR              string
-		peerCount                 int
-		dockerAPI                 string
-		peers                     []string
-		noDNS                     bool
-		dnsDomain                 string
-		dnsListenAddress          string
-		dnsTTL                    int
-		dnsClientTimeout          time.Duration
-		dnsEffectiveListenAddress string
-		iface                     *net.Interface
-		datapathName              string
-		trustedSubnetStr          string
+		justVersion        bool
+		config             mesh.Config
+		networkConfig      weave.NetworkConfig
+		protocolMinVersion int
+		ifaceName          string
+		routerName         string
+		nickName           string
+		password           string
+		pktdebug           bool
+		logLevel           string
+		prof               string
+		bufSzMB            int
+		noDiscovery        bool
+		httpAddr           string
+		iprangeCIDR        string
+		ipsubnetCIDR       string
+		peerCount          int
+		dockerAPI          string
+		peers              []string
+		noDNS              bool
+		dnsConfig          dnsConfig
+		iface              *net.Interface
+		datapathName       string
+		trustedSubnetStr   string
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -91,11 +95,11 @@ func main() {
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
 	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
-	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
-	mflag.StringVar(&dnsListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
-	mflag.IntVar(&dnsTTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
-	mflag.DurationVar(&dnsClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
-	mflag.StringVar(&dnsEffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
+	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
+	mflag.StringVar(&dnsConfig.ListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
+	mflag.IntVar(&dnsConfig.TTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
+	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
+	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
 
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "Command separated list of trusted subnets in CIDR notation")
@@ -231,22 +235,10 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		ns = nameserver.New(router.Ourself.Peer.Name, dnsDomain, isKnownPeer)
-		router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
-		ns.SetGossip(router.NewGossip("nameserver", ns))
+		ns, dnsserver = createDNSServer(dnsConfig, router.Router, isKnownPeer)
 		observeContainers(ns)
 		ns.Start()
 		defer ns.Stop()
-		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsListenAddress,
-			dnsEffectiveListenAddress, uint32(dnsTTL), dnsClientTimeout)
-		if err != nil {
-			Log.Fatal("Unable to start dns server: ", err)
-		}
-		listenAddr := dnsListenAddress
-		if dnsEffectiveListenAddress != "" {
-			listenAddr = dnsEffectiveListenAddress
-		}
-		Log.Println("Listening for DNS queries on", listenAddr)
 		dnsserver.ActivateAndServe()
 		defer dnsserver.Stop()
 	}
@@ -342,6 +334,23 @@ func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr st
 	allocator.Start()
 
 	return allocator, defaultSubnet
+}
+
+func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mesh.PeerName) bool) (*nameserver.Nameserver, *nameserver.DNSServer) {
+	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, isKnownPeer)
+	router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
+	ns.SetGossip(router.NewGossip("nameserver", ns))
+	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,
+		config.EffectiveListenAddress, uint32(config.TTL), config.ClientTimeout)
+	if err != nil {
+		Log.Fatal("Unable to start dns server: ", err)
+	}
+	listenAddr := config.ListenAddress
+	if config.EffectiveListenAddress != "" {
+		listenAddr = config.EffectiveListenAddress
+	}
+	Log.Println("Listening for DNS queries on", listenAddr)
+	return ns, dnsserver
 }
 
 // Pick a quorum size heuristically based on the number of peer
