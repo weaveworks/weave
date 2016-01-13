@@ -63,7 +63,7 @@ exes: $(EXES)
 
 $(EXES): $(BUILD_UPTODATE)
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
-$(WEAVER_EXE): router/*.go mesh/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
+$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go nameserver/*.go prog/weaver/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
