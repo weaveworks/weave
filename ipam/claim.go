@@ -40,6 +40,9 @@ func (c *claim) Try(alloc *Allocator) bool {
 
 	alloc.establishRing()
 
+	// If we had heard that this container died, resurrect it
+	delete(alloc.dead, c.ident) // (delete is no-op if key not in map)
+
 	switch owner := alloc.ring.Owner(c.addr); owner {
 	case alloc.ourName:
 		// success
@@ -78,6 +81,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 		}
 	case c.ident:
 		// same identifier is claiming same address; that's OK
+		alloc.debugln("Re-Claimed", c.addr, "for", c.ident)
 		c.sendResult(nil)
 	default:
 		// Addr already owned by container on this machine
