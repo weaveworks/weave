@@ -28,18 +28,11 @@ type bridgeSender func(key PacketKey, lock *fastDatapathLock) FlowOp
 type missHandler func(fks odp.FlowKeys, lock *fastDatapathLock) FlowOp
 
 type FastDatapath struct {
-	dpname string
-
-	// The mtu from the datapath netdev (which should match the
-	// mtus on all the veths hooked up to the datapath).  We
-	// validate that we are able to support that mtu.
-	mtu int
-
-	// The lock guards the FastDatapath state, and also
-	// synchronizes use of the dpif
-	lock             sync.Mutex
+	dpname           string
+	lock             sync.Mutex // guards state and synchronises use of dpif
 	dpif             *odp.Dpif
 	dp               odp.DatapathHandle
+	mtu              int // [1]
 	deleteFlowsCount uint64
 	missCount        uint64
 	missHandlers     map[odp.VportID]missHandler
@@ -66,6 +59,10 @@ type FastDatapath struct {
 
 	// forwarders by remote peer
 	forwarders map[mesh.PeerName]*fastDatapathForwarder
+
+	// [1] The mtu from the datapath netdev (which should match the
+	// mtus on all the veths hooked up to the datapath).  We validate
+	// that we are able to support that mtu.
 }
 
 func NewFastDatapath(dpName string, port int) (*FastDatapath, error) {
