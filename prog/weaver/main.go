@@ -141,15 +141,7 @@ func main() {
 		checkFatal(err)
 	}
 
-	if password == "" {
-		password = os.Getenv("WEAVE_PASSWORD")
-	}
-	if password == "" {
-		Log.Println("Communication between peers is unencrypted.")
-	} else {
-		config.Password = []byte(password)
-		Log.Println("Communication between peers via untrusted networks is encrypted.")
-	}
+	config.Password = determinePassword(password)
 
 	if prof != "" {
 		p := *profile.CPUProfile
@@ -369,6 +361,18 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	quorum := clusterSize/2 + 1
 	Log.Println("Assuming quorum size of", quorum)
 	return quorum
+}
+
+func determinePassword(password string) []byte {
+	if password == "" {
+		password = os.Getenv("WEAVE_PASSWORD")
+	}
+	if password == "" {
+		Log.Println("Communication between peers is unencrypted.")
+		return nil
+	}
+	Log.Println("Communication between peers via untrusted networks is encrypted.")
+	return []byte(password)
 }
 
 func peerName(routerName string, iface *net.Interface) mesh.PeerName {
