@@ -1853,6 +1853,7 @@ EOF
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
         check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
+        # Don't check the plugin here, since we start it with `--restart=always`
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
