@@ -65,7 +65,6 @@ func main() {
 		peers              []string
 		noDNS              bool
 		dnsConfig          dnsConfig
-		iface              *net.Interface
 		datapathName       string
 		trustedSubnetStr   string
 
@@ -141,11 +140,12 @@ func main() {
 		networkConfig.Bridge = fastdp.Bridge()
 		overlays.Add("fastdp", fastdp.Overlay())
 	case ifaceName != "":
-		var err error
-		iface, err = weavenet.EnsureInterface(ifaceName)
+		iface, err := weavenet.EnsureInterface(ifaceName)
 		checkFatal(err)
 		networkConfig.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
 		checkFatal(err)
+	default:
+		networkConfig.Bridge = weave.NullBridge{}
 	}
 	sleeve := weave.NewSleeveOverlay(config.Port)
 	overlays.Add("sleeve", sleeve)
@@ -162,8 +162,9 @@ func main() {
 	}
 
 	if routerName == "" {
+		iface := networkConfig.Bridge.Interface()
 		if iface == nil {
-			Log.Fatal("Either an interface must be specified with --iface or a name with -name")
+			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
 		}
 		routerName = iface.HardwareAddr.String()
 	}
