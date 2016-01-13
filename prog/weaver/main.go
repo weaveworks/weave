@@ -214,8 +214,11 @@ func main() {
 	isKnownPeer := func(name mesh.PeerName) bool {
 		return router.Peers.Fetch(name) != nil
 	}
-	var allocator *ipam.Allocator
-	var defaultSubnet address.CIDR
+
+	var (
+		allocator     *ipam.Allocator
+		defaultSubnet address.CIDR
+	)
 	if iprangeCIDR != "" {
 		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), isKnownPeer)
 		observeContainers(allocator)
