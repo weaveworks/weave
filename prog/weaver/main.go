@@ -130,26 +130,8 @@ func main() {
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
-	overlays := weave.NewOverlaySwitch()
-	switch {
-	case datapathName != "" && ifaceName != "":
-		Log.Fatal("At most one of --datapath and --iface must be specified.")
-	case datapathName != "":
-		fastdp, err := weave.NewFastDatapath(datapathName, config.Port)
-		checkFatal(err)
-		networkConfig.Bridge = fastdp.Bridge()
-		overlays.Add("fastdp", fastdp.Overlay())
-	case ifaceName != "":
-		iface, err := weavenet.EnsureInterface(ifaceName)
-		checkFatal(err)
-		networkConfig.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
-		checkFatal(err)
-	default:
-		networkConfig.Bridge = weave.NullBridge{}
-	}
-	sleeve := weave.NewSleeveOverlay(config.Port)
-	overlays.Add("sleeve", sleeve)
-	overlays.SetCompatOverlay(sleeve)
+	overlays, bridge := createOverlay(datapathName, ifaceName, config.Port, bufSzMB)
+	networkConfig.Bridge = bridge
 
 	if password == "" {
 		password = os.Getenv("WEAVE_PASSWORD")
@@ -308,6 +290,31 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 }
 
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
+}
+
+func createOverlay(datapathName string, ifaceName string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+	overlays := weave.NewOverlaySwitch()
+	var bridge weave.Bridge
+	switch {
+	case datapathName != "" && ifaceName != "":
+		Log.Fatal("At most one of --datapath and --iface must be specified.")
+	case datapathName != "":
+		fastdp, err := weave.NewFastDatapath(datapathName, port)
+		checkFatal(err)
+		bridge = fastdp.Bridge()
+		overlays.Add("fastdp", fastdp.Overlay())
+	case ifaceName != "":
+		iface, err := weavenet.EnsureInterface(ifaceName)
+		checkFatal(err)
+		bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
+		checkFatal(err)
+	default:
+		bridge = weave.NullBridge{}
+	}
+	sleeve := weave.NewSleeveOverlay(port)
+	overlays.Add("sleeve", sleeve)
+	overlays.SetCompatOverlay(sleeve)
+	return overlays, bridge
 }
 
 func parseAndCheckCIDR(cidrStr string) address.CIDR {
