@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/weaveworks/go-odp/odp"
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 // The virtual bridge accepts packets from ODP vports and the router

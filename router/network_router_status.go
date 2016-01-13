@@ -3,7 +3,7 @@ package router
 import (
 	"time"
 
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 type NetworkRouterStatus struct {

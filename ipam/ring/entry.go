@@ -3,8 +3,9 @@ package ring
 import (
 	"sort"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 
