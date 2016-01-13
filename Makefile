@@ -78,7 +78,7 @@ lint: $(BUILD_UPTODATE) tools/.git
 ifeq ($(BUILD_IN_CONTAINER),true)
 
 $(EXES) tests lint:
-	git submodule update
+	git submodule update --init
 	@mkdir -p $(shell pwd)/.pkg
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
 	    -v $(shell pwd):/go/src/github.com/weaveworks/weave \
