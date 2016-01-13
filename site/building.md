@@ -12,20 +12,14 @@ Apart from the `weave` shell script, weave is delivered as a set of
 container images.  There is no distribution-specific packaging, so in
 principle it shouldn't matter which Linux distribution you build
 under.  But naturally, Docker is a prerequisite (version 1.6.0 or
-later).  And it is difficult to build under Fedora because [Fedora
-does not include static
-libraries](http://fedoraproject.org/wiki/Packaging:Guidelines#Packaging_Static_Libraries).
-So we recommend building under Ubuntu.
+later).
 
-You can also build in a container under any system that supports
-Docker.  And you can run Ubuntu in a VM and build there.  These
-options are described below.
+The only way to build is by using the the build container; the
+Makefile is setup to make this transparent.  This method is
+documented below, and can be run directly on your machine or using
+a Vagrant VM.
 
- * [Building directly on Ubuntu](#ubuntu)
- * [Building in a Docker container](#docker)
- * [Building using Vagrant](#vagrant)
-
-## <a name="ubuntu"></a>Building directly on Ubuntu
+## <a name="ubuntu"></a>Building directly on your machine
 
 The weave git repository should be cloned into
 `$GOPATH/src/github.com/weaveworks/weave`, in accordance with [the go
@@ -37,18 +31,8 @@ $ git clone https://$WEAVE $GOPATH/src/$WEAVE
 $ cd $GOPATH/src/$WEAVE
 ```
 
-Some prerequisites are needed to build weave:
-
-* Install Docker if you haven't already, by following the instructions
-  [on the Docker
-  site](https://docs.docker.com/installation/ubuntulinux/).
-* Building weave requires Go 1.4.2, and the `golang` package in Ubuntu
-  14.04 LTS is too old.  So you may need to [install the tarball from
-  golang.org](http://golang.org/doc/install).
-* A few other packages are also needed:
-```bash
-$ sudo apt-get install build-essential git mercurial libpcap-dev
-```
+Next install Docker if you haven't already, by following the instructions
+[on the Docker site](https://docs.docker.com/installation/ubuntulinux/).
 
 Then to actually build, simply do:
 
@@ -56,59 +40,16 @@ Then to actually build, simply do:
 $ make
 ```
 
-This will build the weave components and package them into three
-Docker images (`weaveworks/weave`, `weaveworks/weaveexec`, and
-`weaveworks/plugin`).  These are then exported as `weave.tar.gz`.
+On a fresh repository, the Makefile will do the following:
+- assemble the build container
+- download specific versions of all the dependencies
+- build the weave components in the build container
+- package them into three Docker images (`weaveworks/weave`,
+`weaveworks/weaveexec`, and `weaveworks/plugin`)
+- Exported these images as `weave.tar.gz`
 
-## <a name="docker"></a>Building in a Docker container
-
-As a preliminary step, we create a container image based on Ubuntu
-that has all the prerequisites.  This avoids the need to download and
-install them for each build.  In the `weave` directory, do:
-
-```bash
-$ sudo docker build -t weaveworks/weave-build build
-```
-
-Next we run a container based on that image. That container requires
-access to the Docker daemon on the host, via
-`/var/run/docker.sock`. If you are building under a Fedora or RHEL
-Docker host (or another distribution that uses SELinux), and you have
-SELinux set to enforcing mode, it will block attempts to access
-`/var/run/docker.sock` inside the container.  See
-[dpw/selinux-dockersock](https://github.com/dpw/selinux-dockersock)
-for a way to work around this problem.
-
-To perform a build, run:
-
-```bash
-$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock weaveworks/weave-build https://github.com/weaveworks/weave.git
-```
-
-This will clone the weave git repository, then do the build.
-
-When the build completes, the resulting images are stored in docker on
-the host, as when building directly under Ubuntu.
-
-The container arguments are passed to `git clone`, so for example, you
-can build from a forked repository and a specific branch with:
-
-```bash
-$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock weaveworks/weave-build -b <branch name> <repo URI>
-```
-
-Alternatively, you might want to build from a weave source tree
-already present on the host.  You can do this by using the `-v` option
-to bind the bind your go workspace containing the weave repository to
-`/home/go` inside the container.  No container arguments should be
-passed in this case:
-
-```bash
-$ sudo docker run -v /var/run/docker.sock:/var/run/docker.sock -v <host gopath>:/home/go weaveworks/weave-build
-```
-
-This will leave the intermediate build artifacts on the host, so that
-you can modify the weave source code and rebuild quickly.
+The first two steps may take a while - don't worry, they are
+are cached and should not need to be redone very often.
 
 ## <a name="vagrant"></a>Building using Vagrant
 
