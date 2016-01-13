@@ -1689,7 +1689,14 @@ stop_proxy() {
     stop $PROXY_CONTAINER_NAME "Proxy"
 }
 
-launch_plugin() {
+launch_plugin_if_not_running() {
+    retval=0
+    check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE || retval=$?
+    # If an existing plugin is running (we start it with restart=always), return its ID
+    [ $retval = 1 ] && PLUGIN_CONTAINER=$(container_id $PLUGIN_CONTAINER_NAME) && return 0
+    # Any other kind of error code from check_not_running is a failure.
+    [ $retval -gt 0 ] && return $retval
+
     PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
         --restart=always \
         --net=host \
@@ -1849,14 +1856,7 @@ EOF
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
-        # Allow an existing plugin to keep running, because we run it with restart=always
-        if ! plugin_disabled ; then
-            if check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE ; then
-                launch_plugin $COMMON_ARGS
-            else
-                [ $? -lt 2 ] || exit 1
-            fi
-        fi
+        plugin_disabled || launch_plugin_if_not_running $COMMON_ARGS
         ;;
     launch-router)
         deprecation_warnings "$@"
@@ -1879,8 +1879,7 @@ EOF
         echo $PROXY_CONTAINER
         ;;
     launch-plugin)
-        check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
-        launch_plugin "$@"
+        launch_plugin_if_not_running "$@"
         echo $PLUGIN_CONTAINER
         ;;
     env|proxy-env)
