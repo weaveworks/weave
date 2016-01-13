@@ -204,6 +204,10 @@ func (fastdp *FastDatapath) Bridge() Bridge {
 	return fastDatapathBridge{fastdp}
 }
 
+func (fastdp fastDatapathBridge) Interface() *net.Interface {
+	return fastdp.iface
+}
+
 func (fastdp fastDatapathBridge) String() string {
 	return fmt.Sprint(fastdp.dpname, " (via ODP)")
 }
