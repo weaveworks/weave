@@ -125,10 +125,23 @@ func main() {
 	Log.Println("Command line options:", options())
 	Log.Println("Command line peers:", peers)
 
+	if prof != "" {
+		p := *profile.CPUProfile
+		p.ProfilePath = prof
+		p.NoShutdownHook = true
+		defer profile.Start(&p).Stop()
+	}
+
 	if protocolMinVersion < mesh.ProtocolMinVersion || protocolMinVersion > mesh.ProtocolMaxVersion {
 		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", mesh.ProtocolMinVersion, mesh.ProtocolMaxVersion)
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
+
+	if pktdebug {
+		networkConfig.PacketLogging = packetLogging{}
+	} else {
+		networkConfig.PacketLogging = nopPacketLogging{}
+	}
 
 	overlay, bridge := createOverlay(datapathName, ifaceName, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
@@ -142,23 +155,8 @@ func main() {
 	}
 
 	config.Password = determinePassword(password)
-
-	if prof != "" {
-		p := *profile.CPUProfile
-		p.ProfilePath = prof
-		p.NoShutdownHook = true
-		defer profile.Start(&p).Stop()
-	}
-
-	config.PeerDiscovery = !noDiscovery
-
-	if pktdebug {
-		networkConfig.PacketLogging = packetLogging{}
-	} else {
-		networkConfig.PacketLogging = nopPacketLogging{}
-	}
-
 	config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
+	config.PeerDiscovery = !noDiscovery
 
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay)
 	Log.Println("Our name is", router.Ourself)
