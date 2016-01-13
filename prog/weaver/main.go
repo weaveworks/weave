@@ -133,17 +133,10 @@ func main() {
 	overlay, bridge := createOverlay(datapathName, ifaceName, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
-	if routerName == "" {
-		iface := bridge.Interface()
-		if iface == nil {
-			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
-		}
-		routerName = iface.HardwareAddr.String()
-	}
-	name, err := mesh.PeerNameFromUserInput(routerName)
-	checkFatal(err)
+	name := peerName(routerName, bridge.Interface())
 
 	if nickName == "" {
+		var err error
 		nickName, err = os.Hostname()
 		checkFatal(err)
 	}
@@ -173,9 +166,7 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	if config.TrustedSubnets, err = parseTrustedSubnets(trustedSubnetStr); err != nil {
-		Log.Fatal("Unable to parse trusted subnets: ", err)
-	}
+	config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
 
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay)
 	Log.Println("Our name is", router.Ourself)
@@ -192,7 +183,7 @@ func main() {
 	}
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
-			if err = dockerCli.AddObserver(o); err != nil {
+			if err := dockerCli.AddObserver(o); err != nil {
 				Log.Fatal("Unable to start watcher", err)
 			}
 		}
@@ -380,22 +371,33 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	return quorum
 }
 
-func parseTrustedSubnets(trustedSubnetStr string) ([]*net.IPNet, error) {
-	trustedSubnets := []*net.IPNet{}
+func peerName(routerName string, iface *net.Interface) mesh.PeerName {
+	if routerName == "" {
+		if iface == nil {
+			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
+		}
+		routerName = iface.HardwareAddr.String()
+	}
+	name, err := mesh.PeerNameFromUserInput(routerName)
+	checkFatal(err)
+	return name
+}
 
+func parseTrustedSubnets(trustedSubnetStr string) []*net.IPNet {
+	trustedSubnets := []*net.IPNet{}
 	if trustedSubnetStr == "" {
-		return trustedSubnets, nil
+		return trustedSubnets
 	}
 
 	for _, subnetStr := range strings.Split(trustedSubnetStr, ",") {
 		_, subnet, err := net.ParseCIDR(subnetStr)
 		if err != nil {
-			return nil, err
+			Log.Fatal("Unable to parse trusted subnets: ", err)
 		}
 		trustedSubnets = append(trustedSubnets, subnet)
 	}
 
-	return trustedSubnets, nil
+	return trustedSubnets
 }
 
 func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {
