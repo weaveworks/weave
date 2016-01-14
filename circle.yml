@@ -14,6 +14,8 @@ machine:
     CLOUDSDK_CORE_DISABLE_PROMPTS: 1
 
 dependencies:
+  cache_directories:
+    - "~/docker"
   post:
     - "sudo apt-get update && sudo apt-get install bc jq"
     - curl https://sdk.cloud.google.com | bash
@@ -37,10 +39,6 @@ test:
     - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
         parallel: true
         timeout: 300
-    - cd $SRCDIR; make clean-bin:
-        parallel: true
-    - cd $SRCDIR; make RM=:
-        parallel: true
   post:
     - cd $SRCDIR/test; ./gce.sh destroy:
         parallel: true
@@ -60,4 +58,5 @@ deployment:
     owner: weaveworks
     commands:
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+      - cd $SRCDIR; make clean-bin
       - cd $SRCDIR; make publish
