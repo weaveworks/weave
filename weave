@@ -1683,12 +1683,15 @@ launch_plugin_if_not_running() {
     # Any other kind of error code from check_not_running is a failure.
     [ $retval -gt 0 ] && return $retval
 
-    PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
+    if ! PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
         --restart=always \
         --net=host \
         $(docker_sock_options) \
         -v /run/docker/plugins:/run/docker/plugins \
-        $PLUGIN_IMAGE "$@")
+        $PLUGIN_IMAGE "$@") ; then
+        return 1
+    fi
+    util_op create-plugin-network weave weavemesh
 }
 
 plugin_disabled() {

@@ -7,6 +7,36 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
+func createPluginNetwork(args []string) error {
+	if len(args) != 2 {
+		cmdUsage("create-plugin-network", "<network-name> <driver-name>")
+	}
+	networkName := args[0]
+	driverName := args[1]
+	d, err := newDockerClient()
+	if err != nil {
+		return err
+	}
+	_, err = d.NetworkInfo(networkName)
+	if err == nil {
+		return nil
+	}
+	if _, ok := err.(*docker.NoSuchNetwork); !ok {
+		return nil // TODO is this right?
+	}
+	_, err = d.CreateNetwork(
+		docker.CreateNetworkOptions{
+			Name:           networkName,
+			CheckDuplicate: true,
+			Driver:         driverName,
+			IPAM:           docker.IPAMOptions{Driver: driverName},
+		})
+	if err != nil {
+		return fmt.Errorf("unable to create network: %s", err)
+	}
+	return nil
+}
+
 func removePluginNetwork(args []string) error {
 	if len(args) != 1 {
 		cmdUsage("remove-plugin-network", "<network-name>")
