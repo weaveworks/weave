@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/docker/libnetwork/ipamapi"
 	go_docker "github.com/fsouza/go-dockerclient"
@@ -90,22 +88,12 @@ func main() {
 		createNetwork(dockerClient, meshNetworkName, meshAddress)
 	}
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
-
-	select {
-	case sig := <-sigChan:
-		Log.Debugf("Caught signal %s; shutting down", sig)
-		if err := dockerClient.Client.RemoveNetwork(meshNetworkName); err != nil {
-			Log.Fatal(err)
-		}
-	case err := <-endChan:
-		if err != nil {
-			Log.Errorf("Error from listener: %s", err)
-			globalListener.Close()
-			meshListener.Close()
-			os.Exit(1)
-		}
+	err = <-endChan
+	if err != nil {
+		Log.Errorf("Error from listener: %s", err)
+		globalListener.Close()
+		meshListener.Close()
+		os.Exit(1)
 	}
 }
 
