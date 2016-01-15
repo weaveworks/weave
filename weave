@@ -448,7 +448,8 @@ util_op() {
     if command_exists weaveutil ; then
         weaveutil "$@"
     else
-        docker run --rm --privileged --net=host -v /proc:/hostproc -e PROCFS=/hostproc \
+        docker run --rm --privileged --net=host $(docker_sock_options) \
+            -v /proc:/hostproc -e PROCFS=/hostproc \
             --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
     fi
 }
@@ -1682,26 +1683,23 @@ launch_plugin_if_not_running() {
     # Any other kind of error code from check_not_running is a failure.
     [ $retval -gt 0 ] && return $retval
 
-    PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
+    if ! PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
         --restart=always \
         --net=host \
         $(docker_sock_options) \
         -v /run/docker/plugins:/run/docker/plugins \
-        $PLUGIN_IMAGE "$@")
+        $PLUGIN_IMAGE "$@") ; then
+        return 1
+    fi
+    util_op create-plugin-network weave weavemesh
 }
 
 plugin_disabled() {
     [ -n "$WEAVE_NO_PLUGIN" ] || ! check_docker_server_api_version 1.21
 }
 
-remove_plugin_network() {
-    docker run --rm --net=host \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        $PLUGIN_IMAGE --remove-network
-}
-
 stop_plugin() {
-    remove_plugin_network
+    util_op remove-plugin-network weave
     stop $PLUGIN_CONTAINER_NAME "Plugin"
 }
 
@@ -2137,7 +2135,7 @@ EOF
         ;;
     reset)
         [ $# -eq 0 ] || usage
-        plugin_disabled || remove_plugin_network || \
+        plugin_disabled || util_op remove-plugin-network weave || \
             echo "WARNING: docker may hang in this state; re-launch weave and remove attached containers before shutting down" >&2
         warn_if_stopping_proxy_in_env
         call_weave DELETE /peer >/dev/null 2>&1 || true
