@@ -16,6 +16,7 @@ func init() {
 		"create-datapath":        createDatapath,
 		"delete-datapath":        deleteDatapath,
 		"add-datapath-interface": addDatapathInterface,
+		"remove-plugin-network":  removePluginNetwork,
 	}
 }
 
