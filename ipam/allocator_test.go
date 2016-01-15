@@ -69,8 +69,18 @@ func TestAllocFree(t *testing.T) {
 	require.Equal(t, testAddr2, addr4.String(), "address")
 
 	alloc.ContainerDied(container2)
+
+	// Resurrect
+	addr1c, err := alloc.Allocate(container2, cidr1.HostRange(), returnFalse)
+	require.NoError(t, err)
+	require.Equal(t, addr1b, addr1c, "address")
+
 	alloc.ContainerDied(container3)
-	require.Equal(t, address.Offset(spaceSize), alloc.NumFreeAddresses(subnet))
+	alloc.Encode() // sync up
+	// Move the clock forward and clear out the dead container
+	alloc.actionChan <- func() { alloc.now = func() time.Time { return time.Now().Add(containerDiedTimeout * 2) } }
+	alloc.actionChan <- func() { alloc.removeDeadContainers() }
+	require.Equal(t, address.Offset(spaceSize-1), alloc.NumFreeAddresses(subnet))
 }
 
 func TestBootstrap(t *testing.T) {

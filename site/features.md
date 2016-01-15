@@ -50,6 +50,8 @@ TCP/IP, e.g. a netcat UDP service would be run with
 
     root@a2:/# echo 'Hello, world.' | nc -u a1 5533
 
+Broadcast and multicast protocols also work over Weave Net.
+
 We can deploy the entire arsenal of standard network tools and
 applications, developed over decades, to configure, secure, monitor,
 and troubleshoot our container network. To put it another way, we can
@@ -113,7 +115,8 @@ Weave detects when a container has exited and releases its
 automatically allocated addresses so they can be re-used.
 
 See the [Automatic IP Address Management](ipam.html) documentation for
-further details.
+further details. We also have an explanation of
+[the basics of IP addressing](ip-addresses.html)
 
 Instead of getting weave to allocate IP addresses automatically, it is
 also possible to specify an address and network explicitly, expressed
@@ -153,6 +156,33 @@ IP addresses of external services the hosts or containers need to
 connect to. The individual IP addresses given to containers must, of
 course, be unique - if you pick an address that the automatic
 allocator has already assigned you will receive a warning.
+
+If you restart a container, it will retain the same IP addresses on
+the weave network:
+
+    host1$ docker run --name a1 -tdi ubuntu
+    f76b09a9fcfee04551dbb8d951d9a83e7e7d55126b02fd9f44f9f8a5f07d7c96
+    host1$ weave ps a1
+    a1 1e:dc:2a:db:ef:ff 10.32.0.3/12
+    host1$ docker restart a1
+    host1$ weave ps a1
+    a1 16:c0:6f:5d:c5:73 10.32.0.3/12
+
+It works the same if you stop and immediately restart:
+
+    host1$ docker stop a1
+    host1$ docker start a1
+
+However, additional addresses added with the `weave attach` command
+will not be retained.
+
+There is also a `weave restart` command, which does re-attach all
+current IP addresses:
+
+    host1$ weave restart b1
+
+(note that the IP addresses are held for a limited time - currently
+30 seconds)
 
 ### <a name="naming-and-discovery"></a>Naming and discovery
 

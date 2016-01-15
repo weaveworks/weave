@@ -136,10 +136,8 @@ func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp 
 	switch newSrcMac, conflictPeer := router.Macs.AddForced(srcMac, key.SrcPeer); {
 	case newSrcMac:
 		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer)
-
 	case conflictPeer != nil:
 		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer, " (was at ", conflictPeer, ")")
-
 		// We need to clear out any flows destined to the MAC
 		// that forward to the old peer.
 		router.Overlay.(NetworkOverlay).InvalidateRoutes()
@@ -157,10 +155,8 @@ func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp 
 	switch {
 	case injectFop == nil:
 		return relayFop
-
 	case relayFop == nil:
 		return injectFop
-
 	default:
 		mfop := NewMultiFlowOp(false)
 		mfop.Add(injectFop)

@@ -18,14 +18,15 @@ func EnsureInterface(ifaceName string) (*net.Interface, error) {
 }
 
 func ensureInterface(ifaceName string) (*net.Interface, error) {
-	if iface, err := findInterface(ifaceName); err == nil {
-		return iface, nil
-	}
 	ch := make(chan netlink.LinkUpdate)
 	done := make(chan struct{})
 	defer close(done)
 	if err := netlink.LinkSubscribe(ch, done); err != nil {
 		return nil, err
+	}
+	// check for currently-existing interface after subscribing, to avoid race
+	if iface, err := findInterface(ifaceName); err == nil {
+		return iface, nil
 	}
 	for update := range ch {
 		if ifaceName == update.Link.Attrs().Name && update.IfInfomsg.Flags&syscall.IFF_UP != 0 {
@@ -44,15 +45,16 @@ func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	dest := net.IPv4(224, 0, 0, 0)
-	if CheckRouteExists(ifaceName, dest) {
-		return iface, err
-	}
 	ch := make(chan netlink.RouteUpdate)
 	done := make(chan struct{})
 	defer close(done)
 	if err := netlink.RouteSubscribe(ch, done); err != nil {
 		return nil, err
+	}
+	dest := net.IPv4(224, 0, 0, 0)
+	// check for currently-existing route after subscribing, to avoid race
+	if CheckRouteExists(ifaceName, dest) {
+		return iface, err
 	}
 	for update := range ch {
 		link, _ := netlink.LinkByIndex(update.Route.LinkIndex)

@@ -1,3 +1,25 @@
+## Release 1.4.2
+
+Bug-fixes and minor improvements.
+
+* A race condition in weavewait that would occasionally hang
+  containers at startup #1882/#1884
+* Having the plugin auto-restart prevents successful `weave launch` on
+  reboot #1869
+* Work round weave router failure on CoreOS 4.3 caused by kernel bug
+  #1854
+* `weave launch` would exit with error code on docker <1.9 #1851
+* Running `eval $(weave env)` multiple times would break `eval $(weave
+  env --restore)` #1824/#1825
+* Don't complain in `weave stop` about "Plugin is not running" when
+  plugin is not enabled #1840/#1841
+* `weave --local launch` would fail if utility program
+  `docker_tls_args` could not be found #1844
+* Improved error reporting when TLS arg detection fails #1843
+* Improve error reporting when docker isn't running #1845
+* Add `--trusted-subnets` usage to `weave` script #1842
+* weave run can hang under rare combinations of options #1858
+
 ## Release 1.4.1
 
 This is a bug-fix release to cover a few issues that came up since the

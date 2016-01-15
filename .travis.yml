@@ -1,28 +1,12 @@
-language: go
+language: python
 sudo: false
-go:
-  - 1.4
 
 env:
   - PATH="${PATH}:${HOME}/.local/bin"
 
-addons:
-  apt:
-    packages:
-    - libpcap-dev
-
 install:
-  - go clean -i net
-  - go install -tags netgo std
-  - go get github.com/golang/lint/golint
-  - pip install --user --upgrade gsutil
+  - pip install --upgrade gsutil
   - bin/setup-ci-secrets $encrypted_5ba036e89377_key $encrypted_5ba036e89377_iv
-  - make travis
-  - go get ./...
 
 script:
-  - make tests
-
-after_success:
-  - go get github.com/mattn/goveralls
-  - test "${TRAVIS_PULL_REQUEST}" = "false" && site/build-and-publish.sh
+  - 'test "${TRAVIS_PULL_REQUEST}" = "false" && site/build-and-publish.sh || true'

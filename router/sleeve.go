@@ -285,6 +285,25 @@ type sleeveCrypto struct {
 	EncDF Encryptor
 }
 
+func newSleeveCrypto(name []byte, sessionKey *[32]byte, outbound bool) sleeveCrypto {
+	if sessionKey == nil {
+		return sleeveCrypto{
+			Dec:   NewNonDecryptor(),
+			Enc:   NewNonEncryptor(name),
+			EncDF: NewNonEncryptor(name),
+		}
+	}
+	return sleeveCrypto{
+		Dec:   NewNaClDecryptor(sessionKey, outbound),
+		Enc:   NewNaClEncryptor(name, sessionKey, outbound, false),
+		EncDF: NewNaClEncryptor(name, sessionKey, outbound, true),
+	}
+}
+
+func (crypto sleeveCrypto) Overhead() int {
+	return UDPOverhead + crypto.EncDF.PacketOverhead() + crypto.EncDF.FrameOverhead() + EthernetOverhead
+}
+
 type sleeveForwarder struct {
 	// Immutable
 	sleeve         *SleeveOverlay
@@ -356,22 +375,6 @@ type controlMessage struct {
 }
 
 func (sleeve *SleeveOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
-	name := sleeve.localPeer.NameByte
-	var crypto sleeveCrypto
-	if params.SessionKey != nil {
-		crypto = sleeveCrypto{
-			Dec:   NewNaClDecryptor(params.SessionKey, params.Outbound),
-			Enc:   NewNaClEncryptor(name, params.SessionKey, params.Outbound, false),
-			EncDF: NewNaClEncryptor(name, params.SessionKey, params.Outbound, true),
-		}
-	} else {
-		crypto = sleeveCrypto{
-			Dec:   NewNonDecryptor(),
-			Enc:   NewNonEncryptor(name),
-			EncDF: NewNonEncryptor(name),
-		}
-	}
-
 	aggChan := make(chan aggregatorFrame, ChannelSize)
 	aggDFChan := make(chan aggregatorFrame, ChannelSize)
 	specialChan := make(chan specialFrame, 1)
@@ -383,6 +386,8 @@ func (sleeve *SleeveOverlay) PrepareConnection(params mesh.OverlayConnectionPara
 	if params.Outbound {
 		remoteAddr = makeUDPAddr(params.RemoteAddr)
 	}
+
+	crypto := newSleeveCrypto(sleeve.localPeer.NameByte, params.SessionKey, params.Outbound)
 
 	fwd := &sleeveForwarder{
 		sleeve:           sleeve,
@@ -402,9 +407,8 @@ func (sleeve *SleeveOverlay) PrepareConnection(params mesh.OverlayConnectionPara
 		mtu:              DefaultMTU,
 		crypto:           crypto,
 		maxPayload:       DefaultMTU - UDPOverhead,
-		overheadDF: UDPOverhead + crypto.EncDF.PacketOverhead() +
-			crypto.EncDF.FrameOverhead() + EthernetOverhead,
-		senderDF: newUDPSenderDF(params.LocalAddr.IP, sleeve.localPort),
+		overheadDF:       crypto.Overhead(),
+		senderDF:         newUDPSenderDF(params.LocalAddr.IP, sleeve.localPort),
 	}
 
 	go fwd.run(aggChan, aggDFChan, specialChan, controlMsgChan, confirmedChan, finishedChan)
@@ -424,7 +428,6 @@ func (fwd *sleeveForwarder) logPrefix() string {
 
 func (fwd *sleeveForwarder) Confirm() {
 	log.Debug(fwd.logPrefix(), "Confirm")
-
 	select {
 	case fwd.confirmedChan <- struct{}{}:
 	case <-fwd.finishedChan:
@@ -684,8 +687,7 @@ loop:
 	fwd.errorChan <- err
 }
 
-func (fwd *sleeveForwarder) aggregateAndSend(frame aggregatorFrame,
-	aggChan <-chan aggregatorFrame, enc Encryptor, sender udpSender, limit int) error {
+func (fwd *sleeveForwarder) aggregateAndSend(frame aggregatorFrame, aggChan <-chan aggregatorFrame, enc Encryptor, sender udpSender, limit int) error {
 	// Give up after processing N frames, to avoid starving the
 	// other activities of the forwarder goroutine.
 	i := 0
@@ -885,15 +887,13 @@ func (fwd *sleeveForwarder) handleHeartbeatAck() error {
 	// Send a large frame down the DF channel.  An EMSGSIZE will
 	// result, which is handled in processSendError, prompting
 	// PMTU discovery to start.
-	return fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF,
-		make([]byte, PMTUDiscoverySize))
+	return fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF, make([]byte, PMTUDiscoverySize))
 }
 
 func (fwd *sleeveForwarder) sendFragTest() error {
 	log.Debug(fwd.logPrefix(), "sendFragTest")
 	fwd.stackFrag = false
-	return fwd.sendSpecial(fwd.crypto.Enc, fwd.sleeve,
-		make([]byte, FragTestSize))
+	return fwd.sendSpecial(fwd.crypto.Enc, fwd.sleeve, make([]byte, FragTestSize))
 }
 
 func (fwd *sleeveForwarder) handleFragTest(frame []byte) error {
@@ -930,16 +930,14 @@ func (fwd *sleeveForwarder) processSendError(err error) error {
 }
 
 func (fwd *sleeveForwarder) sendMTUTest() error {
-	log.Debug(fwd.logPrefix(),
-		"sendMTUTest: mtu candidate ", fwd.mtuCandidate)
-	err := fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF,
-		make([]byte, fwd.mtuCandidate+EthernetOverhead))
+	log.Debug(fwd.logPrefix(), "sendMTUTest: mtu candidate ", fwd.mtuCandidate)
+
+	err := fwd.sendSpecial(fwd.crypto.EncDF, fwd.senderDF, make([]byte, fwd.mtuCandidate+EthernetOverhead))
 	if err != nil {
 		return err
 	}
 
-	fwd.mtuTestTimeout = setTimer(fwd.mtuTestTimeout,
-		MTUVerifyTimeout<<fwd.mtuTestsSent)
+	fwd.mtuTestTimeout = setTimer(fwd.mtuTestTimeout, MTUVerifyTimeout<<fwd.mtuTestsSent)
 	fwd.mtuTestsSent++
 	return nil
 }
@@ -957,8 +955,7 @@ func (fwd *sleeveForwarder) handleMTUTestAck(msg []byte) error {
 	}
 
 	mtu := int(binary.BigEndian.Uint16(msg))
-	log.Debug(fwd.logPrefix(),
-		"handleMTUTestAck: for mtu candidate ", mtu)
+	log.Debug(fwd.logPrefix(), "handleMTUTestAck: for mtu candidate ", mtu)
 	if mtu != fwd.mtuCandidate {
 		return nil
 	}
@@ -978,8 +975,8 @@ func (fwd *sleeveForwarder) handleMTUTestFailure() error {
 }
 
 func (fwd *sleeveForwarder) searchMTU() error {
-	log.Debug(fwd.logPrefix(), "searchMTU: ", fwd.mtuHighestGood,
-		fwd.mtuLowestBad)
+	log.Debug(fwd.logPrefix(), "searchMTU: ", fwd.mtuHighestGood, fwd.mtuLowestBad)
+
 	if fwd.mtuHighestGood+1 >= fwd.mtuLowestBad {
 		mtu := fwd.mtuHighestGood
 		log.Print(fwd.logPrefix(), "Effective MTU verified at ", mtu)
@@ -1047,8 +1044,7 @@ func (sender *udpSenderDF) dial() error {
 	defer f.Close()
 
 	// This makes sure all packets we send out have DF set on them.
-	err = syscall.SetsockoptInt(int(f.Fd()), syscall.IPPROTO_IP,
-		syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DO)
+	err = syscall.SetsockoptInt(int(f.Fd()), syscall.IPPROTO_IP, syscall.IP_MTU_DISCOVER, syscall.IP_PMTUDISC_DO)
 	if err != nil {
 		return err
 	}
@@ -1068,8 +1064,7 @@ func (sender *udpSenderDF) send(msg []byte, raddr *net.UDPAddr) error {
 
 	sender.udpHeader.DstPort = layers.UDPPort(raddr.Port)
 	payload := gopacket.Payload(msg)
-	err := gopacket.SerializeLayers(sender.ipBuf, sender.opts,
-		sender.udpHeader, &payload)
+	err := gopacket.SerializeLayers(sender.ipBuf, sender.opts, sender.udpHeader, &payload)
 	if err != nil {
 		return err
 	}
@@ -1086,10 +1081,8 @@ func (sender *udpSenderDF) send(msg []byte, raddr *net.UDPAddr) error {
 	}
 	defer f.Close()
 
-	log.Print("EMSGSIZE on send, expecting PMTU update (IP packet was ",
-		len(packet), " bytes, payload was ", len(msg), " bytes)")
-	pmtu, err := syscall.GetsockoptInt(int(f.Fd()), syscall.IPPROTO_IP,
-		syscall.IP_MTU)
+	log.Print("EMSGSIZE on send, expecting PMTU update (IP packet was ", len(packet), " bytes, payload was ", len(msg), " bytes)")
+	pmtu, err := syscall.GetsockoptInt(int(f.Fd()), syscall.IPPROTO_IP, syscall.IP_MTU)
 	if err != nil {
 		return err
 	}

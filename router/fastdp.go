@@ -28,18 +28,11 @@ type bridgeSender func(key PacketKey, lock *fastDatapathLock) FlowOp
 type missHandler func(fks odp.FlowKeys, lock *fastDatapathLock) FlowOp
 
 type FastDatapath struct {
-	dpname string
-
-	// The mtu from the datapath netdev (which should match the
-	// mtus on all the veths hooked up to the datapath).  We
-	// validate that we are able to support that mtu.
-	mtu int
-
-	// The lock guards the FastDatapath state, and also
-	// synchronizes use of the dpif
-	lock             sync.Mutex
+	dpname           string
+	lock             sync.Mutex // guards state and synchronises use of dpif
 	dpif             *odp.Dpif
 	dp               odp.DatapathHandle
+	iface            *net.Interface
 	deleteFlowsCount uint64
 	missCount        uint64
 	missHandlers     map[odp.VportID]missHandler
@@ -93,9 +86,9 @@ func NewFastDatapath(dpName string, port int) (*FastDatapath, error) {
 
 	fastdp := &FastDatapath{
 		dpname:        dpName,
-		mtu:           iface.MTU,
 		dpif:          dpif,
 		dp:            dp,
+		iface:         iface,
 		missHandlers:  make(map[odp.VportID]missHandler),
 		sendToPort:    nil,
 		sendToMAC:     make(map[MAC]bridgeSender),
@@ -209,6 +202,10 @@ type fastDatapathBridge struct {
 
 func (fastdp *FastDatapath) Bridge() Bridge {
 	return fastDatapathBridge{fastdp}
+}
+
+func (fastdp fastDatapathBridge) Interface() *net.Interface {
+	return fastdp.iface
 }
 
 func (fastdp fastDatapathBridge) String() string {
@@ -668,7 +665,7 @@ func (fwd *fastDatapathForwarder) sendHeartbeat() {
 
 	// the heartbeat payload consists of the 64-bit connection uid
 	// followed by the 16-bit packet size.
-	buf := make([]byte, EthernetOverhead+fwd.fastdp.mtu)
+	buf := make([]byte, EthernetOverhead+fwd.fastdp.iface.MTU)
 	binary.BigEndian.PutUint64(buf[EthernetOverhead:], fwd.connUID)
 	binary.BigEndian.PutUint16(buf[EthernetOverhead+8:], uint16(len(buf)))
 
