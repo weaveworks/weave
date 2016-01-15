@@ -230,6 +230,7 @@ func (conn *LocalConnection) run(actionChan <-chan ConnectionAction, errorChan <
 	if err = conn.Router.Ourself.AddConnection(conn); err != nil {
 		return
 	}
+	conn.gossipSenders.Start()
 	conn.Router.ConnectionMaker.ConnectionCreated(conn)
 
 	// OverlayConnection confirmation comes after AddConnection,

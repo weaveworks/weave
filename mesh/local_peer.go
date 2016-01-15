@@ -160,7 +160,7 @@ func (peer *LocalPeer) handleAddConnection(conn Connection) error {
 	}
 
 	peer.router.Routes.Recalculate()
-	peer.broadcastPeerUpdate(conn.Remote())
+	peer.broadcastPeerUpdate()
 
 	return nil
 }
