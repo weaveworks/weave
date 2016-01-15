@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 // OverlaySwitch selects which overlay to use, from a set of

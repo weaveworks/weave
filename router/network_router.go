@@ -5,8 +5,9 @@ import (
 	"net"
 	"time"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/mesh"
 )
 
 const (

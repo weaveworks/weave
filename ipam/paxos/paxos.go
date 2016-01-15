@@ -1,7 +1,7 @@
 package paxos
 
 import (
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 // The node identifier.  The use of the UID here is important: Paxos

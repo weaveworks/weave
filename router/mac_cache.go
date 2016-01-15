@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 type MacCacheEntry struct {

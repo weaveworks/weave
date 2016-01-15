@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/testing/gossip"
 )

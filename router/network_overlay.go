@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 // Interface to overlay network packet handling

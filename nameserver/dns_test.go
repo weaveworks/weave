@@ -11,7 +11,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/require"
 
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 

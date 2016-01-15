@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 type TestNode struct {

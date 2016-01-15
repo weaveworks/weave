@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/weaveworks/mesh"
 
 	. "github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 

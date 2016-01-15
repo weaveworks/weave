@@ -49,3 +49,6 @@
 [submodule "vendor/github.com/docker/machine"]
 	path = vendor/github.com/docker/machine
 	url = https://github.com/docker/machine.git
+[submodule "vendor/github.com/weaveworks/mesh"]
+	path = vendor/github.com/weaveworks/mesh
+	url = https://github.com/weaveworks/mesh

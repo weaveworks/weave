@@ -6,8 +6,9 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/mesh"
 )
 
 // Router to convey gossip from one gossiper to another, for testing
