@@ -17,13 +17,6 @@ func createPluginNetwork(args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.NetworkInfo(networkName)
-	if err == nil {
-		return nil
-	}
-	if _, ok := err.(*docker.NoSuchNetwork); !ok {
-		return nil // TODO is this right?
-	}
 	_, err = d.CreateNetwork(
 		docker.CreateNetworkOptions{
 			Name:           networkName,
@@ -31,8 +24,14 @@ func createPluginNetwork(args []string) error {
 			Driver:         driverName,
 			IPAM:           docker.IPAMOptions{Driver: driverName},
 		})
-	if err != nil {
-		return fmt.Errorf("unable to create network: %s", err)
+	if err != docker.ErrNetworkAlreadyExists && err != nil {
+		// Despite appearances to the contrary, CreateNetwork does
+		// sometimes(always?) *not* return ErrNetworkAlreadyExists
+		// when the network already exists. Hence we need to check for
+		// this explicitly.
+		if _, err2 := d.NetworkInfo(networkName); err2 != nil {
+			return fmt.Errorf("unable to create network: %s", err)
+		}
 	}
 	return nil
 }
@@ -46,13 +45,8 @@ func removePluginNetwork(args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.NetworkInfo(networkName)
-	if err != nil {
-		// network probably doesn't exist; TODO check this better
-		return nil
-	}
 	err = d.RemoveNetwork(networkName)
-	if err != nil {
+	if _, ok := err.(*docker.NoSuchNetwork); !ok && err != nil {
 		return fmt.Errorf("unable to remove network: %s", err)
 	}
 	return nil
