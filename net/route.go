@@ -54,14 +54,3 @@ func forEachRoute(ignoreIfaceNames map[string]struct{}, check func(name string, 
 	}
 	return nil
 }
-
-func CheckRouteExists(ifaceName string, dest net.IP) bool {
-	found := false
-	forEachRoute(map[string]struct{}{}, func(name string, route netlink.Route) error {
-		if name == ifaceName && route.Dst.IP.Equal(dest) {
-			found = true
-		}
-		return nil
-	})
-	return found
-}
