@@ -57,8 +57,7 @@ func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
 		return iface, err
 	}
 	for update := range ch {
-		link, _ := netlink.LinkByIndex(update.Route.LinkIndex)
-		if link.Attrs().Name == ifaceName && update.Route.Dst.IP.Equal(dest) {
+		if update.Route.LinkIndex == iface.Index && update.Route.Dst.IP.Equal(dest) {
 			break
 		}
 	}

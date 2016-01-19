@@ -41,12 +41,14 @@ func forEachRoute(ignoreIfaceNames map[string]struct{}, check func(name string, 
 	}
 	for _, route := range routes {
 		link, err := netlink.LinkByIndex(route.LinkIndex)
-		if err == nil {
-			if _, found := ignoreIfaceNames[link.Attrs().Name]; found {
-				continue
-			}
+		if err != nil {
+			continue
 		}
-		if err := check(link.Attrs().Name, route); err != nil {
+		ifaceName := link.Attrs().Name
+		if _, found := ignoreIfaceNames[ifaceName]; found {
+			continue
+		}
+		if err := check(ifaceName, route); err != nil {
 			return err
 		}
 	}
