@@ -33,6 +33,9 @@ func (i *ipam) RequestPool(addressSpace, pool, subPool string, options map[strin
 	Log.Debugln("RequestPool", addressSpace, pool, subPool, options)
 	cidr, err := i.weave.DefaultSubnet()
 	Log.Debugln("RequestPool returning ", cidr, err)
+	if err != nil {
+		return "", nil, nil, err
+	}
 	// Pass back a fake "gateway address"; we don't actually use it,
 	// so just give the network address.
 	data := map[string]string{netlabel.Gateway: cidr.String()}
