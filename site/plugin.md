@@ -33,31 +33,47 @@ The Weave plugin actually provides *two* network drivers to Docker
 one named `weave` that can only work with one (like Docker's overlay
 driver).
 
+Docker supports creating multiple networks via the plugin, although
+Weave Net provides only one network underneath. So long as the IP
+addresses for each network are on different subnets, containers on one
+network will not be able to communicate with those on a different network.
+
 ### `weavemesh` driver
 
 * Weave handles all co-ordination between hosts (referred to by Docker as a "local scope" driver)
-* Supports only a single network (we create one named `weave` for you automatically)
 * Uses Weave's partition tolerant IPAM
+* User must pick different subnets if creating multiple networks.
 
-If you do create additional networks using the `weavemesh` driver,
-containers attached to them will be able to communicate with
-containers attached to `weave`; there is no isolation between those
-networks.
+We create a network named `weave` for you automatically, using the
+[default subnet](ipam.html#subnets) set for the `weave` router.
+
+To create additional networks using the `weavemesh` driver, pick a
+different subnet and run this command on all hosts:
+
+    $ docker network create --driver=weavemesh --ipam-driver=weavemesh --subnet=<subnet> <network-name>
+
+The subnets you pick must be within the range covered by Weave's [IP
+Address Management](ipam.html#range)
 
 ### `weave` driver
 
 * This runs in what Docker call "global scope"; requires a cluster store
-* Supports multiple networks (these must be created with `docker network create --driver weave ...`)
 * Used with Docker's cluster store based IPAM
+* Docker can coordinate choosing different subnets for multiple networks.
+
+To create a network using this driver, once you have your cluster store set up:
+
+    $ docker network create --driver=weave <network-name>
+
+### <a name="cluster-store"></a>Cluster store
+
+This is the term used by Docker for a distributed key-value store such
+as Consul, Etcd or ZooKeeper.
 
 There's no specific documentation from Docker on using a cluster
 store, but the first part of
 [Getting Started with Docker Multi-host Networking](https://github.com/docker/docker/blob/master/docs/userguide/networking/get-started-overlay.md)
 should point the way.
-
-Note that in the case of multiple networks using the `weave` driver, all containers are
-on the same virtual network but Docker allocates their addresses on
-different subnets so they cannot talk to each other directly.
 
 ## Plugin command-line arguments
 
