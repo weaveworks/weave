@@ -80,7 +80,7 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 		return nil, fmt.Errorf("Not supported: creating an interface from within CreateEndpoint")
 	}
 	// create veths. note we assume endpoint IDs are unique in the first 5 chars
-	local := vethPair(endID[:5])
+	local := vethPair(endID)
 	if err := netlink.LinkAdd(local); err != nil {
 		return nil, errorf("could not create veth pair: %s", err)
 	}
@@ -103,7 +103,7 @@ func (driver *driver) DeleteEndpoint(deleteReq *api.DeleteEndpointRequest) error
 	driver.Lock()
 	delete(driver.endpoints, deleteReq.EndpointID)
 	driver.Unlock()
-	local := vethPair(deleteReq.EndpointID[:5])
+	local := vethPair(deleteReq.EndpointID)
 	if err := netlink.LinkDel(local); err != nil {
 		Log.Warningf("unable to delete veth: %s", err)
 	}
@@ -131,7 +131,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 		return nil, errorf(`bridge "%s" not present; did you launch weave?`, WeaveBridge)
 	}
 
-	local := vethPair(endID[:5])
+	local := vethPair(endID)
 	if err = netlink.LinkSetMTU(local, maybeBridge.Attrs().MTU); err != nil {
 		return nil, errorf(`unable to set mtu: %s`, err)
 	}
@@ -204,7 +204,8 @@ func (driver *driver) DiscoverDelete(disco *api.DiscoveryNotification) error {
 
 // ===
 
-func vethPair(suffix string) *netlink.Veth {
+func vethPair(endpointID string) *netlink.Veth {
+	suffix := endpointID[:5]
 	return &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{Name: "vethwl" + suffix},
 		PeerName:  "vethwg" + suffix,
