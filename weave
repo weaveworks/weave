@@ -1715,8 +1715,12 @@ remove_plugin_network() {
         $PLUGIN_IMAGE --remove-network
 }
 
+warn_plugin_active() {
+    echo "WARNING: docker may hang in this state; re-launch weave and remove attached containers before shutting down" >&2
+}
+
 stop_plugin() {
-    remove_plugin_network
+    remove_plugin_network || warn_plugin_active
     stop $PLUGIN_CONTAINER_NAME "Plugin"
 }
 
@@ -2152,8 +2156,7 @@ EOF
         ;;
     reset)
         [ $# -eq 0 ] || usage
-        plugin_disabled || remove_plugin_network || \
-            echo "WARNING: docker may hang in this state; re-launch weave and remove attached containers before shutting down" >&2
+        plugin_disabled || remove_plugin_network || warn_plugin_active
         warn_if_stopping_proxy_in_env
         call_weave DELETE /peer >/dev/null 2>&1 || true
         for NAME in $PLUGIN_CONTAINER_NAME $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
