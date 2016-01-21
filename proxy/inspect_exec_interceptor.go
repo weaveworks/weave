@@ -22,6 +22,10 @@ func (i *inspectExecInterceptor) InterceptResponse(r *http.Response) error {
 		return err
 	}
 
+	if _, ok := exec["Container"]; !ok {
+		return nil
+	}
+
 	container, err := exec.Object("Container")
 	if err != nil {
 		return err
