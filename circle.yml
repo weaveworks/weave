@@ -32,7 +32,9 @@ test:
         parallel: true
     - cd $SRCDIR; COVERDIR=test/coverage make RM= tests:
         parallel: true
-    - cd $SRCDIR; make COVERAGE=true RM=:
+    - cd $SRCDIR; make COVERAGE=true RM= all:
+        parallel: true
+    - cd $SRCDIR; make testrunner:
         parallel: true
     - cd $SRCDIR/test; ./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh:
         parallel: true

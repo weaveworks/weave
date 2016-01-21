@@ -1,7 +1,7 @@
 PUBLISH=publish_weave publish_weaveexec publish_plugin
 
 .DEFAULT: all
-.PHONY: all exes update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
+.PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=sudo -E
@@ -57,9 +57,9 @@ BUILD_FLAGS=-i -ldflags "-extldflags \"-static\" -X main.version=$(WEAVE_VERSION
 
 PACKAGE_BASE=$(shell go list -e ./)
 
-all: $(WEAVE_EXPORT) $(RUNNER_EXE) $(TEST_TLS_EXE)
+all: $(WEAVE_EXPORT)
 exes: $(EXES)
-
+testrunner: $(RUNNER_EXE) $(TEST_TLS_EXE)
 
 $(EXES): $(BUILD_UPTODATE)
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
@@ -180,5 +180,5 @@ build:
 	$(SUDO) go install -tags netgo std
 	$(MAKE)
 
-run-smoketests: all
+run-smoketests: all testrunner
 	cd test && ./setup.sh && ./run_all.sh
