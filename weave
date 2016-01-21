@@ -833,8 +833,12 @@ setup_router_iface_bridged_fastdp() {
     setup_router_iface_fastdp "$@"
 }
 
+container_in_host_ns() {
+    [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/self/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/self/ns/net)" ]
+}
+
 attach() {
-    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/self/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/self/ns/net)" ] ; then
+    if container_in_host_ns ; then
         echo "Container is running in the host network namespace, and therefore cannot be" >&2
         echo "connected to weave. Perhaps the container was started with --net=host." >&2
         return 1
