@@ -79,7 +79,7 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 	if create.Interface == nil {
 		return nil, fmt.Errorf("Not supported: creating an interface from within CreateEndpoint")
 	}
-	// create veths. note we assume endpoint IDs are unique in the first 5 chars
+	// create veths. note we assume endpoint IDs are unique in the first 8 chars
 	local := vethPair(endID)
 	if err := netlink.LinkAdd(local); err != nil {
 		return nil, errorf("could not create veth pair: %s", err)
@@ -205,7 +205,7 @@ func (driver *driver) DiscoverDelete(disco *api.DiscoveryNotification) error {
 // ===
 
 func vethPair(endpointID string) *netlink.Veth {
-	suffix := endpointID[:5]
+	suffix := endpointID[:8]
 	return &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{Name: "vethwl" + suffix},
 		PeerName:  "vethwg" + suffix,
