@@ -85,8 +85,17 @@ route, add the `--no-multicast-route` flag to `weave launch-plugin`.
 We start the plugin with a policy of `--restart=always`, so that it is
 there after a restart or reboot. If you remove this container
 (e.g. using `weave reset`) before removing all endpoints created using
-`--net=weave`, Docker can
-[hang](https://github.com/docker/libnetwork/issues/813).
+`--net=weave`, Docker may hang for a long time when it subsequently
+tries to talk to the plugin.
+
+Unfortunately, [Docker 1.9 may also try to talk to the plugin before it has even started it](https://github.com/docker/libnetwork/issues/813).
+If using `systemd`, we advise that you modify the Docker unit to
+remove the timeout on startup, to give Docker enough time to abandon
+its attempts.
+
+E.g. in the file `/lib/systemd/system/docker.service`, add under `[Service]`:
+
+    TimeoutStartSec=0
 
 [readme]: https://github.com/weaveworks/weave/blob/master/README.md#installation
 [service-discovery]: weavedns.html
