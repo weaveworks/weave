@@ -8,6 +8,7 @@ import (
 	"github.com/docker/libnetwork/drivers/remote/api"
 	"github.com/docker/libnetwork/netlabel"
 	"github.com/docker/libnetwork/types"
+	"golang.org/x/sys/unix"
 
 	"github.com/vishvananda/netlink"
 	weaveapi "github.com/weaveworks/weave/api"
@@ -100,7 +101,7 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 		return nil, driver.error("CreateEndpoint", "Not supported: creating an interface from within CreateEndpoint")
 	}
 
-	// create veths. note we assume endpoint IDs are unique in the first 5 chars
+	// create veths. note we assume endpoint IDs are unique in the first 9 chars
 	name, peerName := vethPair(create.EndpointID)
 	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, false, nil); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
@@ -119,7 +120,13 @@ func (driver *driver) DeleteEndpoint(deleteReq *api.DeleteEndpointRequest) error
 	name, _ := vethPair(deleteReq.EndpointID)
 	veth := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: name}}
 	if err := netlink.LinkDel(veth); err != nil {
-		driver.warn("LeaveEndpoint", "unable to delete veth: %s", err)
+		// Try again using the name construction from earlier plugin version,
+		// in case user has upgraded with endpoints still extant
+		veth.Name = "vethwl" + deleteReq.EndpointID[:5]
+		if err2 := netlink.LinkDel(veth); err2 != nil {
+			// Note we report the first error
+			driver.warn("LeaveEndpoint", "unable to delete veth %q: %s", name, err)
+		}
 	}
 	return nil
 }
@@ -211,7 +218,8 @@ func (driver *driver) DiscoverDelete(disco *api.DiscoveryNotification) error {
 }
 
 func vethPair(id string) (string, string) {
-	return "vethwl" + id[:5], "vethwg" + id[:5]
+	// IFNAMSIZ is buffer length; subtract 6 for "vethwl" and 1 for terminating nul
+	return "vethwl" + id[:unix.IFNAMSIZ-7], "vethwg" + id[:unix.IFNAMSIZ-7]
 }
 
 // logging
