@@ -14,8 +14,7 @@ require '../vagrant-common.rb'
 def configure_docker(host, hostname, ip)
   pkgs = %w(docker-engine ethtool)
 
-  host.vm.box = "ubuntu/ubuntu-15.10-amd64"
-  host.vm.box_url = "https://cloud-images.ubuntu.com/vagrant/wily/current/wily-server-cloudimg-amd64-vagrant-disk1.box"
+  host.vm.box = "ubuntu/wily64"
 
   host.vm.provision :shell, :inline => "hostnamectl set-hostname "+hostname
   host.vm.network "private_network", ip: ip
