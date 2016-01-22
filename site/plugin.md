@@ -5,7 +5,7 @@ layout: default
 
 # Weave Plugin
 
-Docker version 1.9 and later have a plugin mechanism for adding
+Docker versions 1.9 and later have a plugin mechanism for adding
 different network providers. Weave installs itself as a network plugin
 when you start it with `weave launch`. To create a network that spans
 multiple docker hosts, the weave peers must be connected in the usual
