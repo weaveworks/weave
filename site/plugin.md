@@ -61,19 +61,15 @@ Address Management](ipam.html#range)
 * Used with Docker's cluster store based IPAM
 * Docker can coordinate choosing different subnets for multiple networks.
 
-To create a network using this driver, once you have your cluster store set up:
-
-    $ docker network create --driver=weave <network-name>
-
-### <a name="cluster-store"></a>Cluster store
-
-This is the term used by Docker for a distributed key-value store such
-as Consul, Etcd or ZooKeeper.
-
 There's no specific documentation from Docker on using a cluster
 store, but the first part of
 [Getting Started with Docker Multi-host Networking](https://github.com/docker/docker/blob/master/docs/userguide/networking/get-started-overlay.md)
 should point the way.
+
+To create a network using this driver, once you have your cluster store set up:
+
+    $ docker network create --driver=weave <network-name>
+
 
 ## Plugin command-line arguments
 
