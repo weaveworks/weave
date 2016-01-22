@@ -209,7 +209,7 @@ func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled
 func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
 	resultChan := make(chan allocateResult)
 	alloc.actionChan <- func() {
-		if addr, found := alloc.lookupOwned(ident, r); found {
+		if addr, found := alloc.ownedInRange(ident, r); found {
 			resultChan <- allocateResult{addr: addr}
 			return
 		}
@@ -230,7 +230,7 @@ func (alloc *Allocator) Claim(ident string, addr address.Address, noErrorOnUnkno
 // ContainerDied called from the updater interface.  Async.
 func (alloc *Allocator) ContainerDied(ident string) {
 	alloc.actionChan <- func() {
-		if _, found := alloc.lookupOwned(ident, alloc.universe); found {
+		if alloc.hasOwned(ident) {
 			alloc.debugln("Container", ident, "died; noting to remove later")
 			alloc.dead[ident] = alloc.now()
 		}
@@ -243,7 +243,7 @@ func (alloc *Allocator) ContainerDied(ident string) {
 // ContainerDestroyed called from the updater interface.  Async.
 func (alloc *Allocator) ContainerDestroyed(ident string) {
 	alloc.actionChan <- func() {
-		if _, found := alloc.lookupOwned(ident, alloc.universe); found {
+		if alloc.hasOwned(ident) {
 			alloc.debugln("Container", ident, "destroyed; removing addresses")
 			alloc.delete(ident)
 			delete(alloc.dead, ident)
@@ -275,13 +275,12 @@ func (alloc *Allocator) Delete(ident string) error {
 }
 
 func (alloc *Allocator) delete(ident string) error {
-	addrs, found := alloc.owned[ident]
+	addrs := alloc.removeAllOwned(ident)
 	for _, addr := range addrs {
 		alloc.space.Free(addr)
 	}
-	delete(alloc.owned, ident)
 
-	if !found {
+	if len(addrs) == 0 {
 		return fmt.Errorf("Delete: no addresses for %s", ident)
 	}
 	return nil
@@ -291,19 +290,11 @@ func (alloc *Allocator) delete(ident string) error {
 func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 	errChan := make(chan error)
 	alloc.actionChan <- func() {
-		addrs := alloc.owned[ident]
-		for i, ownedAddr := range addrs {
-			if ownedAddr == addrToFree {
-				alloc.debugln("Freed", addrToFree, "for", ident)
-				if len(addrs) == 1 {
-					delete(alloc.owned, ident)
-				} else {
-					alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
-				}
-				alloc.space.Free(addrToFree)
-				errChan <- nil
-				return
-			}
+		if alloc.removeOwned(ident, addrToFree) {
+			alloc.debugln("Freed", addrToFree, "for", ident)
+			alloc.space.Free(addrToFree)
+			errChan <- nil
+			return
 		}
 
 		errChan <- fmt.Errorf("Free: address %s not found for %s", addrToFree, ident)
@@ -767,12 +758,42 @@ func (alloc *Allocator) reportFreeSpace() {
 
 // Owned addresses
 
+func (alloc *Allocator) allOwned(ident string) []address.Address {
+	return alloc.owned[ident]
+}
+
+func (alloc *Allocator) hasOwned(ident string) bool {
+	_, b := alloc.owned[ident]
+	return b
+}
+
 // NB: addr must not be owned by ident already
 func (alloc *Allocator) addOwned(ident string, addr address.Address) {
 	alloc.owned[ident] = append(alloc.owned[ident], addr)
 }
 
-func (alloc *Allocator) lookupOwned(ident string, r address.Range) (address.Address, bool) {
+func (alloc *Allocator) removeAllOwned(ident string) []address.Address {
+	a := alloc.owned[ident]
+	delete(alloc.owned, ident)
+	return a
+}
+
+func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bool {
+	addrs, _ := alloc.owned[ident]
+	for i, ownedAddr := range addrs {
+		if ownedAddr == addrToFree {
+			if len(addrs) == 1 {
+				delete(alloc.owned, ident)
+			} else {
+				alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (alloc *Allocator) ownedInRange(ident string, r address.Range) (address.Address, bool) {
 	for _, addr := range alloc.owned[ident] {
 		if r.Contains(addr) {
 			return addr, true
