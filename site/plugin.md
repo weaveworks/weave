@@ -5,36 +5,33 @@ layout: default
 
 # Weave Plugin
 
-New in Docker version 1.9 is a plugin mechanism to add different
-network providers.
+Docker version 1.9 and later have a plugin mechanism for adding
+different network providers. Weave installs itself as a network plugin
+when you start it with `weave launch`. To create a network that spans
+multiple docker hosts, the weave peers must be connected in the usual
+way, i.e. by specifying other hosts in `weave launch` or
+[`weave connect`](features.html#dynamic-topologies).
 
-To install, download the `weave` script as per the [readme][].
-
-The Weave Net plugin runs automatically when you `weave launch`.  You
-must still tell the weave peers to connect to one another, either via
-`weave launch` or `weave connect`.
-
-## Starting a container
+Subsequently you can start containers with, e.g.
 
     $ docker run --net=weave -ti ubuntu
 
-## Using WeaveDNS for Service Discovery
+on any of the hosts, and they can all communicate with each other.
 
-You need to pass the additional arguments `--dns` and `-dns-search`,
-for which we provide a helper in the weave script:
+In order to use Weave's [Service Discovery](weavedns.html), you
+need to pass the additional arguments `--dns` and `-dns-search`, for
+which we provide a helper in the weave script:
 
     $ docker run --net=weave -h foo.weave.local $(weave dns-args) -tdi ubuntu
     $ docker run --net=weave -h bar.weave.local $(weave dns-args) -ti ubuntu
     # ping foo
 
-For more details see the [Weave Service Discovery documentation][service-discovery].
-
 ## Under the hood
 
-The Weave Net plugin actually provides *two* network drivers to Docker
-- one named `weavemesh` that can operate without a [cluster
-store](#cluster-store) (like Docker's overlay driver) and one named
-`weave` that can only work with one.
+The Weave plugin actually provides *two* network drivers to Docker
+- one named `weavemesh` that can operate without a cluster store and
+one named `weave` that can only work with one (like Docker's overlay
+driver).
 
 ### `weavemesh` driver
 
@@ -54,7 +51,8 @@ networks.
 * Used with Docker's cluster store based IPAM
 
 There's no specific documentation from Docker on using a cluster
-store, but the first part of [Getting Started with Docker Multi-host Networking][docker-net]
+store, but the first part of
+[Getting Started with Docker Multi-host Networking](https://github.com/docker/docker/blob/master/docs/userguide/networking/get-started-overlay.md)
 should point the way.
 
 Note that in the case of multiple networks using the `weave` driver, all containers are
@@ -98,7 +96,3 @@ its attempts.
 E.g. in the file `/lib/systemd/system/docker.service`, add under `[Service]`:
 
     TimeoutStartSec=0
-
-[readme]: https://github.com/weaveworks/weave/blob/master/README.md#installation
-[service-discovery]: weavedns.html
-[docker-net]: https://github.com/docker/docker/blob/master/docs/userguide/networking/get-started-overlay.md
