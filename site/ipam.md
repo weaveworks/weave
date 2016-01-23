@@ -184,7 +184,14 @@ previously using.
 
 The same normally happens when a peer is restarted any other way,
 e.g. as result of a reboot, provided the
-[system-uuid](http://linux.die.net/man/8/dmidecode) didn't change.
+[system-uuid](http://linux.die.net/man/8/dmidecode) didn't change,
+from which weave derives the peer name. In circumstances where the
+system-uuid is not stable, the weave peer name can be specified on
+`weave launch` with the `--name` option in form of MAC address, e.g.
+
+    host1$ weave launch --name d2:e1:4d:cc:92:15
+
+_NOTE: Do not do this unless absolutely necessary._
 
 If you want to remove a peer from the network, run `weave reset`. This
 removes the ranges allocated to the peer, thus allowing other peers to
