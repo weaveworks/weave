@@ -714,7 +714,7 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 
 func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	// No matter what we do, we'll send a unicast gossip
-	// of our ring back to tha chap who asked for space.
+	// of our ring back to the chap who asked for space.
 	// This serves to both tell him of any space we might
 	// have given him, or tell him where he might find some
 	// more.
@@ -733,7 +733,6 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
-	alloc.sendRingUpdate(to)
 }
 
 func (alloc *Allocator) assertInvariants() {
