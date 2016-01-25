@@ -73,27 +73,18 @@ func (driver *driver) DeleteNetwork(delete *api.DeleteNetworkRequest) error {
 }
 
 func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.CreateEndpointResponse, error) {
-	Log.Debugf("Create endpoint request %+v interface %+v", create, create.Interface)
+	Log.Debugf("Create endpoint request %+v", create)
 	endID := create.EndpointID
 
 	if create.Interface == nil {
 		return nil, fmt.Errorf("Not supported: creating an interface from within CreateEndpoint")
 	}
-	// create veths. note we assume endpoint IDs are unique in the first 8 chars
-	local := vethPair(endID)
-	if err := netlink.LinkAdd(local); err != nil {
-		return nil, errorf("could not create veth pair: %s", err)
-	}
 	driver.Lock()
 	driver.endpoints[endID] = struct{}{}
 	driver.Unlock()
-
-	// Send back the MAC address
-	link, _ := netlink.LinkByName(local.PeerName)
-	resp := &api.CreateEndpointResponse{Interface: &api.EndpointInterface{MacAddress: link.Attrs().HardwareAddr.String()}}
+	resp := &api.CreateEndpointResponse{}
 
 	Log.Infof("Create endpoint %s %+v", endID, resp)
-	Log.Infof("Veth info %+v", local)
 	return resp, nil
 }
 
@@ -103,10 +94,6 @@ func (driver *driver) DeleteEndpoint(deleteReq *api.DeleteEndpointRequest) error
 	driver.Lock()
 	delete(driver.endpoints, deleteReq.EndpointID)
 	driver.Unlock()
-	local := vethPair(deleteReq.EndpointID)
-	if err := netlink.LinkDel(local); err != nil {
-		Log.Warningf("unable to delete veth: %s", err)
-	}
 	return nil
 }
 
@@ -131,9 +118,11 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 		return nil, errorf(`bridge "%s" not present; did you launch weave?`, WeaveBridge)
 	}
 
-	local := vethPair(endID)
-	if err = netlink.LinkSetMTU(local, maybeBridge.Attrs().MTU); err != nil {
-		return nil, errorf(`unable to set mtu: %s`, err)
+	// create and attach local name to the bridge
+	local := vethPair(endID[:5])
+	local.Attrs().MTU = maybeBridge.Attrs().MTU
+	if err := netlink.LinkAdd(local); err != nil {
+		return nil, errorf("could not create veth pair: %s", err)
 	}
 
 	switch maybeBridge.(type) {
@@ -188,6 +177,11 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 
 func (driver *driver) LeaveEndpoint(leave *api.LeaveRequest) error {
 	Log.Debugf("Leave request: %+v", leave)
+
+	local := vethPair(leave.EndpointID[:5])
+	if err := netlink.LinkDel(local); err != nil {
+		Log.Warningf("unable to delete veth on leave: %s", err)
+	}
 	Log.Infof("Leave %s:%s", leave.NetworkID, leave.EndpointID)
 	return nil
 }
@@ -204,8 +198,7 @@ func (driver *driver) DiscoverDelete(disco *api.DiscoveryNotification) error {
 
 // ===
 
-func vethPair(endpointID string) *netlink.Veth {
-	suffix := endpointID[:8]
+func vethPair(suffix string) *netlink.Veth {
 	return &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{Name: "vethwl" + suffix},
 		PeerName:  "vethwg" + suffix,
