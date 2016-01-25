@@ -192,6 +192,9 @@ func main() {
 	if iprangeCIDR != "" {
 		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), dbPrefix, isKnownPeer)
 		observeContainers(allocator)
+		ids, err := dockerCli.AllContainerIDs()
+		checkFatal(err)
+		allocator.AllContainerIDs(ids)
 	} else if peerCount > 0 {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}

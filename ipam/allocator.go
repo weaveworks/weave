@@ -328,6 +328,17 @@ func (alloc *Allocator) ContainerStarted(ident string) {
 	}
 }
 
+func (alloc *Allocator) AllContainerIDs(idsOrig []string) {
+	alloc.actionChan <- func() {
+		ids := make([]string, len(idsOrig))
+		copy(ids, idsOrig)
+		sort.Strings(ids)
+		alloc.syncOwned(func(ident string) bool {
+			return sort.SearchStrings(ids, ident) < len(ids)
+		})
+	}
+}
+
 // Delete (Sync) - release all IP addresses for container with given name
 func (alloc *Allocator) Delete(ident string) error {
 	errChan := make(chan error)
@@ -857,6 +868,31 @@ func (alloc *Allocator) loadPersistedRing() {
 /* 'owned' data; inside that is a bucket per ID (container), and
 /* inside that is a tree-map of all addresses.
 */
+
+// For each ID in the 'owned' map, remove the entry if checkExists() returns false
+func (alloc *Allocator) syncOwned(checkExists func(string) bool) {
+	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
+		var idents []string
+		b := tx.Bucket(ownedBucket)
+		// We aren't allowed to make changes during ForEach, so get a list of
+		// all identifiers first, then delete the non-existent ones
+		err := b.ForEach(func(name, _ []byte) error {
+			idents = append(idents, string(name))
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		for _, ident := range idents {
+			if !checkExists(ident) {
+				if err := b.DeleteBucket([]byte(ident)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}))
+}
 
 func (alloc *Allocator) hasOwned(ident string) (found bool) {
 	alloc.checkErr(alloc.db.View(func(tx *bolt.Tx) error {
