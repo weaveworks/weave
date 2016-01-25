@@ -273,6 +273,16 @@ func (alloc *Allocator) ContainerStarted(ident string) {
 	}
 }
 
+func (alloc *Allocator) AllContainerIDs(ids []string) {
+	alloc.actionChan <- func() {
+		idmap := make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idmap[id] = struct{}{}
+		}
+		alloc.syncOwned(idmap)
+	}
+}
+
 // Delete (Sync) - release all IP addresses for container with given name
 func (alloc *Allocator) Delete(ident string) error {
 	errChan := make(chan error)
@@ -875,6 +885,23 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 		}
 	}
 	return ""
+}
+
+// For each ID in the 'owned' map, remove the entry if it isn't in the map
+func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
+	changed := false
+	for ident, addrs := range alloc.owned {
+		if _, found := ids[ident]; !found {
+			for _, addr := range addrs {
+				alloc.space.Free(addr)
+			}
+			delete(alloc.owned, ident)
+			changed = true
+		}
+	}
+	if changed {
+		alloc.persistOwned()
+	}
 }
 
 // Logging
