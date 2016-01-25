@@ -917,7 +917,7 @@ func (fwd *sleeveForwarder) processSendError(err error) error {
 			return nil
 		}
 
-		fwd.mtuHighestGood = 8
+		fwd.mtuHighestGood = 552
 		fwd.mtuLowestBad = mtu + 1
 		fwd.mtuCandidate = mtu
 		fwd.mtuTestsSent = 0
