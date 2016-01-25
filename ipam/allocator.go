@@ -30,6 +30,7 @@ const (
 )
 
 var (
+	ringBucket = []byte("ring")
 )
 
 // operation represents something which Allocator wants to do, but
@@ -97,13 +98,15 @@ func openDB(dbPrefix string) (*bolt.DB, error) {
 	}
 	// Create all the buckets we are going to need
 	err = db.Update(func(tx *bolt.Tx) error {
-		return nil
+		_, err := tx.CreateBucketIfNotExists(ringBucket)
+		return err
 	})
 	return db, err
 }
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
+	alloc.loadPersistedRing()
 	actionChan := make(chan func(), mesh.ChannelSize)
 	alloc.actionChan = actionChan
 	alloc.ticker = time.NewTicker(tickInterval)
@@ -608,6 +611,7 @@ func (alloc *Allocator) ringUpdated() {
 		alloc.paxos = nil
 	}
 
+	alloc.persistRing()
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 	alloc.tryPendingOps()
 }
@@ -755,6 +759,7 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
+	alloc.persistRing()
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -785,6 +790,36 @@ func (alloc *Allocator) reportFreeSpace() {
 		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}
 	alloc.ring.ReportFree(freespace)
+}
+
+// Persisting the Ring
+
+func (alloc *Allocator) persistRing() {
+	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ringBucket)
+		buf := new(bytes.Buffer)
+		enc := gob.NewEncoder(buf)
+		if err := enc.Encode(alloc.ring); err != nil {
+			panic(err)
+		}
+		return b.Put(ringBucket, buf.Bytes())
+	}))
+}
+
+func (alloc *Allocator) loadPersistedRing() {
+	alloc.checkErr(alloc.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ringBucket)
+		v := b.Get(ringBucket)
+		if v == nil {
+			return nil
+		}
+		reader := bytes.NewReader(v)
+		decoder := gob.NewDecoder(reader)
+		return decoder.Decode(&alloc.ring)
+	}))
+	if alloc.ring != nil {
+		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+	}
 }
 
 // Owned addresses
