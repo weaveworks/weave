@@ -51,7 +51,6 @@ func main() {
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 	Log.Info(dockerClient.Info())
 
-	var globalListener, meshListener net.Listener
 	endChan := make(chan error, 1)
 	if address != "" {
 		globalListener, err := listenAndServe(dockerClient, address, nameserver, noMulticastRoute, endChan, "global", false)
@@ -71,8 +70,6 @@ func main() {
 	err = <-endChan
 	if err != nil {
 		Log.Errorf("Error from listener: %s", err)
-		globalListener.Close()
-		meshListener.Close()
 		os.Exit(1)
 	}
 }

@@ -447,10 +447,7 @@ func (ws weightedPeers) Swap(i, j int)      { ws[i], ws[j] = ws[j], ws[i] }
 // ChoosePeersToAskForSpace returns all peers we can ask for space in
 // the range [start, end), in weighted-random order.  Assumes start<end.
 func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []mesh.PeerName {
-	var (
-		sum               address.Offset
-		totalSpacePerPeer = make(map[mesh.PeerName]address.Offset) // Compute total free space per peer
-	)
+	totalSpacePerPeer := make(map[mesh.PeerName]address.Offset)
 
 	// iterate through tokens
 	for i, entry := range r.Entries {
@@ -472,7 +469,6 @@ func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []mesh.PeerN
 		}
 
 		totalSpacePerPeer[entry.Peer] += entry.Free
-		sum += entry.Free
 	}
 
 	// Compute weighted random numbers, then sort.
