@@ -894,17 +894,25 @@ func (alloc *Allocator) syncOwned(checkExists func(string) bool) {
 	}))
 }
 
-func (alloc *Allocator) hasOwned(ident string) (found bool) {
-	alloc.checkErr(alloc.db.View(func(tx *bolt.Tx) error {
+func (alloc *Allocator) withBucket(ident string, f func(b, v *bolt.Bucket) error) error {
+	return alloc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(ownedBucket)
 		v := b.Bucket([]byte(ident))
-		found = (v != nil)
+		if v == nil {
+			return nil
+		}
+		return f(b, v)
+	})
+}
+
+func (alloc *Allocator) hasOwned(ident string) (found bool) {
+	alloc.checkErr(alloc.withBucket(ident, func(_, _ *bolt.Bucket) error {
+		found = true
 		return nil
 	}))
 	return
 }
 
-// NB: addr must not be owned by ident already
 func (alloc *Allocator) addOwned(ident string, addr address.Address) {
 	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(ownedBucket)
@@ -918,12 +926,7 @@ func (alloc *Allocator) addOwned(ident string, addr address.Address) {
 
 func (alloc *Allocator) removeAllOwned(ident string) []address.Address {
 	var a []address.Address
-	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(ownedBucket)
-		v := b.Bucket([]byte(ident))
-		if v == nil {
-			return nil
-		}
+	alloc.checkErr(alloc.withBucket(ident, func(b, v *bolt.Bucket) error {
 		v.ForEach(func(k, _ []byte) error {
 			a = append(a, address.FromIP4(k))
 			return nil
@@ -945,12 +948,7 @@ func empty(b *bolt.Bucket) bool {
 }
 
 func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) (found bool) {
-	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(ownedBucket)
-		v := b.Bucket([]byte(ident))
-		if v == nil {
-			return nil
-		}
+	alloc.checkErr(alloc.withBucket(ident, func(b, v *bolt.Bucket) error {
 		err := v.Delete(addrToFree.IP4())
 		if err == nil {
 			found = true
@@ -968,12 +966,7 @@ func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) (f
 }
 
 func (alloc *Allocator) ownedInRange(ident string, r address.Range) (a address.Address, found bool) {
-	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(ownedBucket)
-		v := b.Bucket([]byte(ident))
-		if v == nil {
-			return nil
-		}
+	alloc.checkErr(alloc.withBucket(ident, func(b, v *bolt.Bucket) error {
 		return v.ForEach(func(k, _ []byte) error {
 			addr := address.FromIP4(k)
 			if r.Contains(addr) {
@@ -987,20 +980,25 @@ func (alloc *Allocator) ownedInRange(ident string, r address.Range) (a address.A
 	return
 }
 
-func (alloc *Allocator) findOwner(addr address.Address) (owner string) {
-	alloc.checkErr(alloc.db.View(func(tx *bolt.Tx) error {
+func (alloc *Allocator) forEachOwned(f func([]byte, address.Address) error) error {
+	return alloc.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(ownedBucket)
 		return b.ForEach(func(name, _ []byte) error {
 			v := b.Bucket(name)
 			return v.ForEach(func(k, _ []byte) error {
-				candidate := address.FromIP4(k)
-				if candidate == addr {
-					owner = string(name)
-					return errBreakLoop
-				}
-				return nil
+				return f(name, address.FromIP4(k))
 			})
 		})
+	})
+}
+
+func (alloc *Allocator) findOwner(addr address.Address) (owner string) {
+	alloc.checkErr(alloc.forEachOwned(func(name []byte, candidate address.Address) error {
+		if candidate == addr {
+			owner = string(name)
+			return errBreakLoop
+		}
+		return nil
 	}))
 	return owner
 }
