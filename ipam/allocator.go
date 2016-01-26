@@ -859,6 +859,9 @@ func (alloc *Allocator) loadPersistedRing() {
 	}))
 	if alloc.ring != nil {
 		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+		alloc.checkErr(alloc.forEachOwned(func(_ []byte, addr address.Address) error {
+			return alloc.space.Claim(addr)
+		}))
 	}
 }
 
