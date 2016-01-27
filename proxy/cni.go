@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	cniScript     = "./cni.sh"
 	cniNetwork    = "cni.network"
 	cniConfPath   = "/etc/cni/net.d"
 	cniPluginPath = []string{"/etc/cni/plugins"}
