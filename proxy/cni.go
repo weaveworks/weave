@@ -1,17 +1,7 @@
 package proxy
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"os"
-	"os/exec"
-	"regexp"
-	"strings"
 
 	"github.com/appc/cni/libcni"
 	"github.com/fsouza/go-dockerclient"
@@ -27,31 +17,31 @@ var (
 )
 
 func useCNI(container *docker.Container) bool {
-	_, ok := container.Labels[cniNetwork]
+	_, ok := container.Config.Labels[cniNetwork]
 	return ok
 }
 
-func (proxy *Proxy) attachCNI(container *docker.Container, orDie bool) {
-	network := container.Labels[cniNetwork]
+func (proxy *Proxy) attachCNI(container *docker.Container, orDie bool) error {
+	network := container.Config.Labels[cniNetwork]
 
 	// read the json config to find the plugin exe
 	conf, err := libcni.LoadConf(cniConfPath, network)
 	if err != nil {
-		Log.Warningf("Attaching container %s using CNI plugin failed: %s", container.ID, string(stderr))
-		return errors.New(string(stderr))
+		Log.Warningf("Attaching container %s using CNI plugin failed: %s", container.ID, err)
+		return err
 	}
 
 	// tell plugin to attach container
-	c := RuntimeConf.CNIConfig{Path: cniPluginPath}
-	_, err := c.AddNetwork(conf, libcni.RuntimeConf{
+	c := libcni.CNIConfig{Path: cniPluginPath}
+	r := &libcni.RuntimeConf{
 		ContainerID: container.ID,
-		NetNS:       fmt.Printf("/proc/net/%s/ns", container.Status.PID),
+		NetNS:       fmt.Sprintf("/proc/net/%s/ns", container.State.Pid),
 		IfName:      cniIfName,
-	})
+	}
 
-	if err != nil {
-		Log.Warningf("Attaching container %s using CNI plugin failed: %s", container.ID, string(stderr))
-		return errors.New(string(stderr))
+	if _, err := c.AddNetwork(conf, r); err != nil  {
+		Log.Warningf("Attaching container %s using CNI plugin failed: %s", container.ID, err)
+		return err
 	}
 	return nil
 }
