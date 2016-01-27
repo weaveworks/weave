@@ -478,6 +478,10 @@ func (proxy *Proxy) attach(containerID string, orDie bool) error {
 		return nil
 	}
 
+	if useCNI(container) {
+		return proxy.attachCNI(container, orDie)
+	}
+
 	cidrs, err := proxy.weaveCIDRs(container.HostConfig.NetworkMode, container.Config.Env)
 	if err != nil {
 		Log.Infof("Leaving container %s alone because %s", containerID, err)
