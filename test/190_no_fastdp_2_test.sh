@@ -7,8 +7,8 @@ C2=10.2.1.47
 
 start_suite "WEAVE_NO_FASTDP operation"
 
-WEAVE_NO_FASTDP=1 WEAVE_DOCKER_ARGS=$ADD_HOST_ARGS weave_on $HOST1 launch
-WEAVE_NO_FASTDP=1 WEAVE_DOCKER_ARGS=$ADD_HOST_ARGS weave_on $HOST2 launch $HOST1
+WEAVE_NO_FASTDP=1 weave_on $HOST1 launch
+WEAVE_NO_FASTDP=1 weave_on $HOST2 launch $HOST1
 
 start_container $HOST1 $C1/24 --name=c1
 start_container $HOST2 $C2/24 --name=c2
