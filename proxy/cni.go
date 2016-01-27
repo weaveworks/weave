@@ -20,7 +20,7 @@ func useCNI(container *docker.Container) bool {
 	return ok
 }
 
-func (proxy *Proxy) attachCNI(container *docker.Container, orDie bool) error {
+func (proxy *Proxy) attachCNI(container *docker.Container, orDie bool) (err error) {
 	network := container.Config.Labels[cniNetwork]
 
 	// read the json config to find the plugin exe
@@ -38,7 +38,7 @@ func (proxy *Proxy) attachCNI(container *docker.Container, orDie bool) error {
 		IfName:      cniIfName,
 	}
 
-	if _, err := c.AddNetwork(conf, r); err != nil  {
+	if _, err := c.AddNetwork(conf, r); err != nil {
 		Log.Warningf("Attaching container %s using CNI plugin failed: %s", container.ID, err)
 		return err
 	}
