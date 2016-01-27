@@ -265,6 +265,7 @@ func sendError(w http.ResponseWriter, msg string, code int) {
 }
 
 func errorResponse(w http.ResponseWriter, fmtString string, item ...interface{}) {
+	w.WriteHeader(http.StatusInternalServerError)
 	json.NewEncoder(w).Encode(map[string]string{
 		"Err": fmt.Sprintf(fmtString, item...),
 	})
