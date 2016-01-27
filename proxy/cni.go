@@ -12,7 +12,7 @@ var (
 	cniScript     = "./cni.sh"
 	cniNetwork    = "cni.network"
 	cniConfPath   = "/etc/cni/net.d"
-	cniPluginPath = []string{"/home/weave", "/usr/bin", "/"}
+	cniPluginPath = []string{"/etc/cni/plugins"}
 	cniIfName     = "ethwe" // /w/w is waiting for an interface of this name
 )
 
@@ -35,7 +35,7 @@ func (proxy *Proxy) attachCNI(container *docker.Container, orDie bool) error {
 	c := libcni.CNIConfig{Path: cniPluginPath}
 	r := &libcni.RuntimeConf{
 		ContainerID: container.ID,
-		NetNS:       fmt.Sprintf("/proc/net/%s/ns", container.State.Pid),
+		NetNS:       fmt.Sprintf("/hostproc/%d/ns/net", container.State.Pid),
 		IfName:      cniIfName,
 	}
 
