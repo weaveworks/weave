@@ -73,22 +73,22 @@ func (n *Nameserver) Stop() {
 	n.quit <- struct{}{}
 }
 
-func (n *Nameserver) broadcastEntries(es ...Entry) error {
+func (n *Nameserver) broadcastEntries(es ...Entry) {
 	if n.gossip == nil || len(es) == 0 {
-		return nil
+		return
 	}
-	return n.gossip.GossipBroadcast(&GossipData{
+	n.gossip.GossipBroadcast(&GossipData{
 		Entries:   Entries(es),
 		Timestamp: now(),
 	})
 }
 
-func (n *Nameserver) AddEntry(hostname, containerid string, origin mesh.PeerName, addr address.Address) error {
+func (n *Nameserver) AddEntry(hostname, containerid string, origin mesh.PeerName, addr address.Address) {
 	n.infof("adding entry %s -> %s", hostname, addr.String())
 	n.Lock()
 	entry := n.entries.add(hostname, containerid, origin, addr)
 	n.Unlock()
-	return n.broadcastEntries(entry)
+	n.broadcastEntries(entry)
 }
 
 func (n *Nameserver) Lookup(hostname string) []address.Address {
@@ -134,9 +134,7 @@ func (n *Nameserver) ContainerDied(ident string) {
 		return false
 	})
 	n.Unlock()
-	if err := n.broadcastEntries(entries...); err != nil {
-		n.errorf("failed to broadcast container %s death: %v", ident, err)
-	}
+	n.broadcastEntries(entries...)
 }
 
 func (n *Nameserver) PeerGone(peer mesh.PeerName) {
@@ -148,7 +146,7 @@ func (n *Nameserver) PeerGone(peer mesh.PeerName) {
 	})
 }
 
-func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Address) error {
+func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Address) {
 	n.Lock()
 	n.infof("tombstoning hostname=%s, container=%s, ip=%s", hostname, containerid, ipStr)
 	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
@@ -168,7 +166,7 @@ func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Addr
 		return true
 	})
 	n.Unlock()
-	return n.broadcastEntries(entries...)
+	n.broadcastEntries(entries...)
 }
 
 func (n *Nameserver) deleteTombstones() {
