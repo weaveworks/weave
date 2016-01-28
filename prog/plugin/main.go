@@ -93,17 +93,23 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 
+	cleanup := func() {
+		globalListener.Close()
+		meshListener.Close()
+		_ = os.Remove(address)
+		_ = os.Remove(meshAddress)
+	}
 	select {
 	case sig := <-sigChan:
 		Log.Debugf("Caught signal %s; shutting down", sig)
 		if err := dockerClient.Client.RemoveNetwork(meshNetworkName); err != nil {
 			Log.Fatal(err)
 		}
+		cleanup()
 	case err := <-endChan:
+		cleanup()
 		if err != nil {
 			Log.Errorf("Error from listener: %s", err)
-			globalListener.Close()
-			meshListener.Close()
 			os.Exit(1)
 		}
 	}
