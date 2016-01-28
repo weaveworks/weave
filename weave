@@ -1671,7 +1671,10 @@ launch_proxy() {
     docker_client_args $DOCKER_CLIENT_ARGS
     proxy_args "$@"
     mkdir -p /var/run/weave
-    docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME $EXEC_IMAGE >/dev/null 2>&1 || true
+    # Create a data-only container to mount the weavewait files from
+    if ! docker inspect -f ' ' $VOLUMES_CONTAINER_NAME > /dev/null 2>&1 ; then
+       docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
+    fi
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
         --volumes-from $VOLUMES_CONTAINER_NAME \
