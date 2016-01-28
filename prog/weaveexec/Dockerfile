@@ -4,9 +4,6 @@ MAINTAINER Weaveworks Inc <help@weave.works>
 LABEL works.weave.role=system
 
 WORKDIR /home/weave
-VOLUME /w
-VOLUME /w-noop
-VOLUME /w-nomcast
 ENTRYPOINT ["/home/weave/sigproxy", "/home/weave/weave"]
 
 RUN apk add --update \
