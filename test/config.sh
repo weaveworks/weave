@@ -176,7 +176,7 @@ proxy_start_container_with_dns() {
 rm_containers() {
     host=$1
     shift
-    [ $# -eq 0 ] || docker_on $host rm -f "$@" >/dev/null
+    [ $# -eq 0 ] || docker_on $host rm -f -v "$@" >/dev/null
 }
 
 container_ip() {
