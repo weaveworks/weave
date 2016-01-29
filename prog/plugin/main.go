@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/docker/libnetwork/ipamapi"
 	. "github.com/weaveworks/weave/common"
@@ -49,26 +51,40 @@ func main() {
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 	Log.Info(dockerClient.Info())
 
+	err = run(dockerClient, address, meshAddress, noMulticastRoute)
+	if err != nil {
+		Log.Fatal(err)
+	}
+}
+
+func run(dockerClient *docker.Client, address, meshAddress string, noMulticastRoute bool) error {
 	endChan := make(chan error, 1)
 	if address != "" {
 		globalListener, err := listenAndServe(dockerClient, address, noMulticastRoute, endChan, "global", false)
 		if err != nil {
-			Log.Fatalf("unable to create driver: %s", err)
+			return err
 		}
+		defer os.Remove(address)
 		defer globalListener.Close()
 	}
 	if meshAddress != "" {
 		meshListener, err := listenAndServe(dockerClient, meshAddress, noMulticastRoute, endChan, "local", true)
 		if err != nil {
-			Log.Fatalf("unable to create driver: %s", err)
+			return err
 		}
+		defer os.Remove(meshAddress)
 		defer meshListener.Close()
 	}
 
-	err = <-endChan
-	if err != nil {
-		Log.Errorf("Error from listener: %s", err)
-		os.Exit(1)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
+
+	select {
+	case sig := <-sigChan:
+		Log.Debugf("Caught signal %s; shutting down", sig)
+		return nil
+	case err := <-endChan:
+		return err
 	}
 }
 
