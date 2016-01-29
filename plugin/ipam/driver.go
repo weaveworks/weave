@@ -78,14 +78,21 @@ func (i *ipam) RequestAddress(poolID string, address net.IP, options map[string]
 	if _, subnet, err = net.ParseCIDR(parts[1]); err != nil {
 		return
 	}
-	if _, iprange, err = net.ParseCIDR(parts[2]); err != nil {
-		return
+	if address != nil { // try to claim specific address requested
+		if err = i.weave.ClaimIP("_", address); err != nil {
+			return
+		}
+		ip = &net.IPNet{IP: address, Mask: subnet.Mask}
+	} else {
+		if _, iprange, err = net.ParseCIDR(parts[2]); err != nil {
+			return
+		}
+		// We are lying slightly to IPAM here: the range is not a subnet
+		if ip, err = i.weave.AllocateIPInSubnet("_", iprange); err != nil {
+			return
+		}
+		ip.Mask = subnet.Mask // fix up the subnet we lied about
 	}
-	// We are lying slightly to IPAM here: the range is not a subnet
-	if ip, err = i.weave.AllocateIPInSubnet("_", iprange); err != nil {
-		return
-	}
-	ip.Mask = subnet.Mask // fix up the subnet we lied about
 	return
 }
 

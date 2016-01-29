@@ -32,6 +32,12 @@ func (client *Client) LookupIP(ID string) (*net.IPNet, error) {
 	return client.ipamOp(ID, "GET")
 }
 
+// Claim a specific IP on behalf of the ID
+func (client *Client) ClaimIP(ID string, addr net.IP) error {
+	_, err := client.httpVerb("PUT", fmt.Sprintf("/ip/%s/%s", ID, addr), nil)
+	return err
+}
+
 // release an IP which is no longer needed
 func (client *Client) ReleaseIP(ID string) error {
 	_, err := client.ipamOp(ID, "DELETE")
