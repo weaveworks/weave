@@ -1724,6 +1724,7 @@ launch_plugin_if_not_running() {
         $PLUGIN_IMAGE "$@") ; then
         return 1
     fi
+    wait_for_status $PLUGIN_CONTAINER_NAME http_call_unix $PLUGIN_CONTAINER_NAME status.sock
     util_op create-plugin-network weave weavemesh
 }
 

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -77,6 +78,11 @@ func run(dockerClient *docker.Client, address, meshAddress string, noMulticastRo
 		defer meshListener.Close()
 	}
 
+	statusListener, err := weavenet.ListenUnixSocket("/home/weave/status.sock")
+	if err != nil {
+		return err
+	}
+	go serveStatus(statusListener)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 
@@ -113,4 +119,13 @@ func listenAndServe(dockerClient *docker.Client, address string, noMulticastRout
 	}()
 
 	return listener, nil
+}
+
+func serveStatus(listener net.Listener) {
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "ok")
+	})}
+	if err := server.Serve(listener); err != nil {
+		Log.Fatalf("ListenAndServeStatus failed: %s", err)
+	}
 }
