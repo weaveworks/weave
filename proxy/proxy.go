@@ -19,6 +19,7 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	. "github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 const (
@@ -296,10 +297,7 @@ func (proxy *Proxy) Serve(listeners []net.Listener) {
 }
 
 func (proxy *Proxy) ListenAndServeStatus(socket string) {
-	if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
-		Log.Fatalf("Error removing existing status socket: %s", err)
-	}
-	listener, err := net.Listen("unix", socket)
+	listener, err := weavenet.ListenUnixSocket(socket)
 	if err != nil {
 		Log.Fatalf("ListenAndServeStatus failed: %s", err)
 	}

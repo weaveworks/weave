@@ -11,6 +11,7 @@ import (
 	"github.com/docker/libnetwork/ipamapi"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
+	weavenet "github.com/weaveworks/weave/net"
 	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
 	netplugin "github.com/weaveworks/weave/plugin/net"
 	"github.com/weaveworks/weave/plugin/skel"
@@ -101,13 +102,7 @@ func listenAndServe(dockerClient *docker.Client, address string, noMulticastRout
 		}
 	}
 
-	var listener net.Listener
-
-	// remove sockets from last invocation
-	if err := os.Remove(address); err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-	listener, err = net.Listen("unix", address)
+	listener, err := weavenet.ListenUnixSocket(address)
 	if err != nil {
 		return nil, err
 	}
