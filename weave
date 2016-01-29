@@ -845,8 +845,12 @@ setup_router_iface_bridged_fastdp() {
     setup_router_iface_fastdp "$@"
 }
 
+container_in_host_ns() {
+    [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/self/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/self/ns/net)" ]
+}
+
 attach() {
-    if [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/self/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/self/ns/net)" ] ; then
+    if container_in_host_ns ; then
         echo "Container is running in the host network namespace, and therefore cannot be" >&2
         echo "connected to weave. Perhaps the container was started with --net=host." >&2
         return 1
@@ -907,8 +911,8 @@ detach() {
     netnsenter ip link del $CONTAINER_IFNAME type veth
 }
 
-container_weave_addrs() {
-    netnsenter ip addr show dev $CONTAINER_IFNAME
+container_ip_addr_show() {
+    ! container_in_host_ns && netnsenter ip addr show
 }
 
 ######################################################################
@@ -1037,6 +1041,17 @@ wait_for_status() {
     done
 }
 
+# Parse the output of `ip addr show`, outputing weave addresses of kind $1
+addrs_from_ip_addr_show() {
+    while read first second rest ; do
+        if [ "$first" != "${first%:}" ] ; then
+            iname="${second%:}"
+        elif [ "$first" = "$1" -a \( "$iname" = "weave" -o "$iname" != "${iname#ethwe}" \) ] ; then
+            echo $second
+        fi
+    done
+}
+
 # Call $1 for all containers, passing container ID, all MACs and all IPs
 with_container_addresses() {
     COMMAND=$1
@@ -1045,12 +1060,14 @@ with_container_addresses() {
         if [ "$CONTAINER_ID" = "weave:expose" ] ; then
             ADDRS_CMD="ip addr show dev $BRIDGE"
         else
-            ADDRS_CMD="with_container_netns $CONTAINER_ID container_weave_addrs"
+            ADDRS_CMD="with_container_netns $CONTAINER_ID container_ip_addr_show"
         fi
         if CONTAINER_ADDRS=$($ADDRS_CMD 2>/dev/null) ; then
-            CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | grep -o 'link/ether .*' | cut -d ' ' -f 2)
-            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | grep -o 'inet .*'       | cut -d ' ' -f 2)
-            $COMMAND "$CONTAINER_ID" "$CONTAINER_MAC" "$CONTAINER_IPS"
+            CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | addrs_from_ip_addr_show 'link/ether')
+            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | addrs_from_ip_addr_show 'inet')
+            if [ -n "$CONTAINER_MAC$CONTAINER_IPS" ] ; then
+                $COMMAND "$CONTAINER_ID" "$CONTAINER_MAC" "$CONTAINER_IPS"
+            fi
         fi
     done
 }
@@ -1651,7 +1668,7 @@ attach_router() {
     if [ -z "$NO_DNS_OPT" ] ; then
         # Tell the newly-started weaveDNS about existing weave IPs
         for CONTAINER in $(docker ps -q --no-trunc) ; do
-            if CONTAINER_IPS=$(with_container_netns $CONTAINER container_weave_addrs 2>&1 | sed -n -e 's/inet \([^/]*\)\/\(.*\)/\1/p') ; then
+            if CONTAINER_IPS=$(with_container_netns $CONTAINER container_ip_addr_show 2>/dev/null | addrs_from_ip_addr_show 'inet') && [ -n "$CONTAINER_IPS" ] ; then
                 with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
             fi
         done
