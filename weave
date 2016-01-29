@@ -812,10 +812,10 @@ router_opts_bridged_fastdp() {
 }
 
 ask_version() {
-    if ! DOCKERIMAGE=$(docker inspect --format='{{.Image}}' $1 2>/dev/null) ; then
-            if ! DOCKERIMAGE=$(docker inspect --format='{{.Id}}' $2 2>/dev/null) ; then
-                echo "Unable to find $2 image." >&2
-            fi
+    if check_running $1 2>/dev/null ; then
+        DOCKERIMAGE=$(docker inspect --format='{{.Image}}' $1 )
+    elif ! DOCKERIMAGE=$(docker inspect --format='{{.Id}}' $2 2>/dev/null) ; then
+        echo "Unable to find $2 image." >&2
     fi
     [ -n "$DOCKERIMAGE" ] && docker run --rm --net=none -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
 }
