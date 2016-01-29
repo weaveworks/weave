@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -100,6 +101,7 @@ func run(dockerClient *docker.Client, address, meshAddress, meshNetworkName, nam
 		}
 	}
 
+	go listenAndServeStatus("/home/weave/status.sock")
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 
@@ -167,4 +169,20 @@ func createNetwork(dockerClient *docker.Client, networkName, address string) err
 		}
 	}
 	return nil
+}
+
+func listenAndServeStatus(socket string) {
+	if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
+		Log.Fatalf("Error removing existing status socket: %s", err)
+	}
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		Log.Fatalf("ListenAndServeStatus failed: %s", err)
+	}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "ok")
+	})
+	if err := (&http.Server{Handler: handler}).Serve(listener); err != nil {
+		Log.Fatalf("ListenAndServeStatus failed: %s", err)
+	}
 }

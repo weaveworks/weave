@@ -1722,6 +1722,7 @@ launch_plugin_if_not_running() {
         $(docker_sock_options) \
         -v /run/docker/plugins:/run/docker/plugins \
         $PLUGIN_IMAGE "$@")
+    wait_for_status $PLUGIN_CONTAINER_NAME http_call_unix $PLUGIN_CONTAINER_NAME status.sock
 }
 
 plugin_disabled() {
