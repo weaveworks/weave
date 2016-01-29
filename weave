@@ -344,7 +344,7 @@ IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
 PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
 PLUGIN_CONTAINER_NAME=weaveplugin
-VOLUMES_CONTAINER_NAME=weavevolumes
+VOLUMES_CONTAINER_NAME=weavevolumes-$IMAGE_VERSION
 
 PROCFS=${PROCFS:-/proc}
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
@@ -1672,7 +1672,8 @@ launch_proxy() {
     mkdir -p /var/run/weave
     # Create a data-only container to mount the weavewait files from
     if ! docker inspect -f ' ' $VOLUMES_CONTAINER_NAME > /dev/null 2>&1 ; then
-       docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
+       docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
+           --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
     PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
         $PROXY_VOLUMES \
@@ -2169,7 +2170,8 @@ EOF
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true
         done
-        docker rm -v $VOLUMES_CONTAINER_NAME >/dev/null 2>&1 || true
+        VOLUME_CONTAINERS=$(docker ps -qa --filter label=weavevolumes)
+        [ -n "$VOLUME_CONTAINERS" ] && docker rm -v $VOLUME_CONTAINERS  >/dev/null 2>&1 || true
         conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
         destroy_bridge
         for LOCAL_IFNAME in $(ip link show | grep v${CONTAINER_IFNAME}pl | cut -d ' ' -f 2 | tr -d ':') ; do
