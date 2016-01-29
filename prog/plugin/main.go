@@ -20,7 +20,6 @@ func main() {
 	var (
 		justVersion      bool
 		address          string
-		nameserver       string
 		meshAddress      string
 		logLevel         string
 		noMulticastRoute bool
@@ -29,7 +28,6 @@ func main() {
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	flag.StringVar(&address, "socket", "/run/docker/plugins/weave.sock", "socket on which to listen")
-	flag.StringVar(&nameserver, "nameserver", "", "nameserver to provide to containers")
 	flag.StringVar(&meshAddress, "meshsocket", "/run/docker/plugins/weavemesh.sock", "socket on which to listen in mesh mode")
 	flag.BoolVar(&noMulticastRoute, "no-multicast-route", false, "do not add a multicast route to network endpoints")
 
@@ -53,14 +51,14 @@ func main() {
 
 	endChan := make(chan error, 1)
 	if address != "" {
-		globalListener, err := listenAndServe(dockerClient, address, nameserver, noMulticastRoute, endChan, "global", false)
+		globalListener, err := listenAndServe(dockerClient, address, noMulticastRoute, endChan, "global", false)
 		if err != nil {
 			Log.Fatalf("unable to create driver: %s", err)
 		}
 		defer globalListener.Close()
 	}
 	if meshAddress != "" {
-		meshListener, err := listenAndServe(dockerClient, meshAddress, nameserver, noMulticastRoute, endChan, "local", true)
+		meshListener, err := listenAndServe(dockerClient, meshAddress, noMulticastRoute, endChan, "local", true)
 		if err != nil {
 			Log.Fatalf("unable to create driver: %s", err)
 		}
@@ -74,8 +72,8 @@ func main() {
 	}
 }
 
-func listenAndServe(dockerClient *docker.Client, address, nameserver string, noMulticastRoute bool, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
-	d, err := netplugin.New(dockerClient, version, nameserver, scope, noMulticastRoute)
+func listenAndServe(dockerClient *docker.Client, address string, noMulticastRoute bool, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
+	d, err := netplugin.New(dockerClient, version, scope, noMulticastRoute)
 	if err != nil {
 		return nil, err
 	}
