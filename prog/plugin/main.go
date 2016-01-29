@@ -69,49 +69,49 @@ func main() {
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 	Log.Info(dockerClient.Info())
 
-	var globalListener, meshListener net.Listener
+	err = run(dockerClient, address, meshAddress, meshNetworkName, nameserver, noMulticastRoute)
+	if err != nil {
+		Log.Fatal(err)
+	}
+}
+
+func run(dockerClient *docker.Client, address, meshAddress, meshNetworkName, nameserver string, noMulticastRoute bool) error {
 	endChan := make(chan error, 1)
 	if address != "" {
 		globalListener, err := listenAndServe(dockerClient, address, nameserver, noMulticastRoute, endChan, "global", false)
 		if err != nil {
-			Log.Fatalf("unable to create driver: %s", err)
+			return err
 		}
+		defer os.Remove(address)
 		defer globalListener.Close()
 	}
 	if meshAddress != "" {
 		meshListener, err := listenAndServe(dockerClient, meshAddress, nameserver, noMulticastRoute, endChan, "local", true)
 		if err != nil {
-			Log.Fatalf("unable to create driver: %s", err)
+			return err
 		}
+		defer os.Remove(meshAddress)
 		defer meshListener.Close()
 	}
 
 	if meshNetworkName != "" {
-		createNetwork(dockerClient, meshNetworkName, meshAddress)
+		if err := createNetwork(dockerClient, meshNetworkName, meshAddress); err != nil {
+			return err
+		}
 	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 
-	cleanup := func() {
-		globalListener.Close()
-		meshListener.Close()
-		_ = os.Remove(address)
-		_ = os.Remove(meshAddress)
-	}
 	select {
 	case sig := <-sigChan:
 		Log.Debugf("Caught signal %s; shutting down", sig)
-		if err := dockerClient.Client.RemoveNetwork(meshNetworkName); err != nil {
-			Log.Fatal(err)
+		if meshNetworkName != "" {
+			return dockerClient.Client.RemoveNetwork(meshNetworkName)
 		}
-		cleanup()
+		return nil
 	case err := <-endChan:
-		cleanup()
-		if err != nil {
-			Log.Errorf("Error from listener: %s", err)
-			os.Exit(1)
-		}
+		return err
 	}
 }
 
@@ -147,7 +147,7 @@ func listenAndServe(dockerClient *docker.Client, address, nameserver string, noM
 	return listener, nil
 }
 
-func createNetwork(dockerClient *docker.Client, networkName, address string) {
+func createNetwork(dockerClient *docker.Client, networkName, address string) error {
 	if _, err := dockerClient.Client.NetworkInfo(networkName); err == nil {
 		Log.Printf("Docker network '%s' already exists", networkName)
 	} else if _, ok := err.(*go_docker.NoSuchNetwork); ok {
@@ -163,7 +163,8 @@ func createNetwork(dockerClient *docker.Client, networkName, address string) {
 		}
 		_, err := dockerClient.Client.CreateNetwork(options)
 		if err != nil {
-			Log.Fatalf("Error creating network: %s", err)
+			return fmt.Errorf("Error creating network: %s", err)
 		}
 	}
+	return nil
 }
