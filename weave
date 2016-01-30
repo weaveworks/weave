@@ -1296,7 +1296,7 @@ collect_dns_add_remove_args() {
 # with_container_addresses.
 ipam_reclaim() {
     for CIDR in $3 ; do
-        # NB: CONTAINER_IP is the IP of the weave container; it is set by wait_for_status.
+        # NB: CONTAINER_IP is the IP of the weave container.
         http_call $CONTAINER_IP:$HTTP_PORT PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
     done
 }
