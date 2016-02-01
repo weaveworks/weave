@@ -3,7 +3,9 @@ package ipam
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -134,8 +136,18 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 		panic(err)
 	}
 
-	alloc := NewAllocator(peername, mesh.PeerUID(rand.Int63()),
-		"nick-"+name, cidr.Range(), quorum, func(mesh.PeerName) bool { return true })
+	err = os.Remove("/tmp/" + name + "ipam.db")
+	if err != nil {
+		if e := err.(*os.PathError); e.Err != syscall.ENOENT {
+			panic(e.Err)
+		}
+	}
+
+	alloc, err := NewAllocator(peername, mesh.PeerUID(rand.Int63()),
+		"nick-"+name, cidr.Range(), quorum, "/tmp/"+name, func(mesh.PeerName) bool { return true })
+	if err != nil {
+		panic(err)
+	}
 
 	return alloc, cidr.HostRange()
 }

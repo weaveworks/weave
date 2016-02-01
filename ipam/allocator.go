@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
@@ -27,6 +29,9 @@ const (
 	containerDiedTimeout = time.Second * 30
 )
 
+var (
+)
+
 // operation represents something which Allocator wants to do, but
 // which may need to wait until some other message arrives.
 type operation interface {
@@ -45,6 +50,7 @@ type operation interface {
 // are used around data structures.
 type Allocator struct {
 	actionChan       chan<- func()
+	db               *bolt.DB
 	ourName          mesh.PeerName
 	universe         address.Range                // superset of all ranges
 	ring             *ring.Ring                   // information on ranges owned by all peers
@@ -64,8 +70,13 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
+func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, dbPrefix string, isKnownPeer func(name mesh.PeerName) bool) (*Allocator, error) {
+	db, err := openDB(dbPrefix)
+	if err != nil {
+		return nil, err
+	}
 	return &Allocator{
+		db:          db,
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
@@ -75,7 +86,20 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 		isKnownPeer: isKnownPeer,
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
+	}, nil
+}
+
+func openDB(dbPrefix string) (*bolt.DB, error) {
+	dbPathname := dbPrefix + "ipam.db"
+	db, err := bolt.Open(dbPathname, 0660, nil)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to open %s: %s", dbPathname, err)
 	}
+	// Create all the buckets we are going to need
+	err = db.Update(func(tx *bolt.Tx) error {
+		return nil
+	})
+	return db, err
 }
 
 // Start runs the allocator goroutine
@@ -90,6 +114,9 @@ func (alloc *Allocator) Start() {
 // calls after this is processed will hang. Async.
 func (alloc *Allocator) Stop() {
 	alloc.ticker.Stop()
+	alloc.actionChan <- func() {
+		alloc.checkErr(alloc.db.Close())
+	}
 	alloc.actionChan <- nil
 }
 
@@ -346,6 +373,7 @@ func (alloc *Allocator) Shutdown() {
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 			time.Sleep(100 * time.Millisecond)
 		}
+		alloc.checkErr(alloc.db.Close())
 		doneChan <- struct{}{}
 	}
 	<-doneChan
@@ -826,4 +854,10 @@ func (alloc *Allocator) debugln(args ...interface{}) {
 }
 func (alloc *Allocator) debugf(fmt string, args ...interface{}) {
 	common.Log.Debugf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+}
+
+func (alloc *Allocator) checkErr(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
