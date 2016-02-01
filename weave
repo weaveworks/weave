@@ -776,11 +776,11 @@ connect_container_to_bridge() {
     # veth pair in the 'up' or 'down' state.  Furthermore, moving one
     # end into a netns normally sets them to 'down'.  But, moving an
     # end into the default netns is a null operation, so they stay up,
-    # which leads to errors later on.  So to get a consistent result,
-    # we have to be explicit in setting them 'up' or 'down' as
-    # necessary.
+    # which leads to errors in 'set name' since that requires the
+    # interface to be down. So to get a consistent result, we set the
+    # interface 'down' to begin with.
     if ! netnsenter ip link set $GUEST_IFNAME down ||
-       ! netnsenter ip link set $GUEST_IFNAME name $1 up ||
+       ! netnsenter ip link set $GUEST_IFNAME name $1 ||
        ! ip link set $LOCAL_IFNAME up ||
        ! add_iface_$BRIDGE_TYPE $LOCAL_IFNAME ||
        ! configure_arp_cache $1 "netnsenter" ; then

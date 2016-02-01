@@ -6,15 +6,26 @@ entrypoint() {
   docker_on $HOST1 inspect --format="{{.Config.Entrypoint}}" "$@"
 }
 
+check_iface_ready() {
+    assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=$1' $BASE_IMAGE $CHECK_ETHWE_UP"
+    assert_raises "proxy docker_on $HOST1 run -e 'WEAVE_CIDR=$1' $BASE_IMAGE ip -4 -o addr show ethwe | grep -q '$1'"
+}
+
 start_suite "Proxy waits for weave to be ready before running container commands"
-weave_on $HOST1 launch-proxy
+
 BASE_IMAGE=busybox
 # Ensure the base image does not exist, so that it will be pulled
 ! docker_on $HOST1 inspect --format=" " $BASE_IMAGE >/dev/null 2>&1 || docker_on $HOST1 rmi $BASE_IMAGE
 
-assert_raises "proxy docker_on $HOST1 run --name c1 -e 'WEAVE_CIDR=10.2.1.1/24' $BASE_IMAGE $CHECK_ETHWE_UP"
+# check that interface is ready, with and without --no-multicast-route
+weave_on $HOST1 launch-proxy --no-multicast-route
+check_iface_ready 10.2.1.1/24
+weave_on $HOST1 stop-proxy
+weave_on $HOST1 launch-proxy
+check_iface_ready 10.2.1.1/24
 
 # Check committed containers only have one weavewait prepended
+proxy_start_container $HOST1 --name c1 -e 'WEAVE_CIDR=10.2.1.1/24'
 COMMITTED_IMAGE=$(proxy docker_on $HOST1 commit c1)
 assert_raises "proxy docker_on $HOST1 run --name c2 $COMMITTED_IMAGE"
 assert "entrypoint c2" "$(entrypoint $COMMITTED_IMAGE)"
