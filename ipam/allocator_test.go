@@ -68,6 +68,13 @@ func TestAllocFree(t *testing.T) {
 	addr4, _ := alloc.Allocate(container3, cidr2.HostRange(), returnFalse)
 	require.Equal(t, testAddr2, addr4.String(), "address")
 
+	// Check that the one we deleted isn't still lurking
+	addr1d, _ := alloc.Allocate(container1, cidr1.HostRange(), returnFalse)
+	if addr1d.String() == testAddr1 {
+		t.Fatalf("Expected different address but got %s", addr1d.String())
+	}
+	require.NoError(t, alloc.Delete(container1))
+
 	alloc.ContainerDied(container2)
 
 	// Resurrect
