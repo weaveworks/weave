@@ -25,15 +25,15 @@ func (g *allocate) Try(alloc *Allocator) bool {
 		return true
 	}
 
-	if addr, found := alloc.ownedInRange(g.ident, g.r); found {
+	if addrs := alloc.ownedInRange(g.ident, g.r); len(addrs) > 0 {
 		// If we had heard that this container died, resurrect it
 		delete(alloc.dead, g.ident) // delete is no-op if key not in map
-		g.resultChan <- allocateResult{addr, nil}
+		g.resultChan <- allocateResult{addrs[0], nil}
 		return true
 	}
 
 	if !alloc.universe.Overlaps(g.r) {
-		g.resultChan <- allocateResult{0, fmt.Errorf("range %s out of bounds: %s", g.r, alloc.universe)}
+		g.resultChan <- allocateResult{err: fmt.Errorf("range %s out of bounds: %s", g.r, alloc.universe)}
 		return true
 	}
 
@@ -66,7 +66,7 @@ func (g *allocate) Try(alloc *Allocator) bool {
 }
 
 func (g *allocate) Cancel() {
-	g.resultChan <- allocateResult{0, &errorCancelled{"Allocate", g.ident}}
+	g.resultChan <- allocateResult{err: &errorCancelled{"Allocate", g.ident}}
 }
 
 func (g *allocate) ForContainer(ident string) bool {
