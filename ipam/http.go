@@ -29,6 +29,15 @@ func parseCIDR(w http.ResponseWriter, cidrStr string) (address.CIDR, bool) {
 	return cidr, true
 }
 
+func writeAddresses(w http.ResponseWriter, addrs []address.Address, subnet address.CIDR) {
+	for i, addr := range addrs {
+		fmt.Fprintf(w, "%s/%d", addr, subnet.PrefixLen)
+		if i < len(addrs)-1 {
+			w.Write([]byte{' '})
+		}
+	}
+}
+
 func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.ResponseWriter, ident string, checkAlive bool, subnet address.CIDR) {
 	closedChan := w.(http.CloseNotifier).CloseNotify()
 	addr, err := alloc.Allocate(ident, subnet.HostRange(),
@@ -80,22 +89,22 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 	router.Methods("GET").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		if subnet, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"]); ok {
-			addr, err := alloc.Lookup(vars["id"], subnet.HostRange())
+			addrs, err := alloc.Lookup(vars["id"], subnet.HostRange())
 			if err != nil {
 				http.NotFound(w, r)
 				return
 			}
-			fmt.Fprintf(w, "%s/%d", addr, subnet.PrefixLen)
+			writeAddresses(w, addrs, subnet)
 		}
 	})
 
 	router.Methods("GET").Path("/ip/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		addr, err := alloc.Lookup(mux.Vars(r)["id"], defaultSubnet.HostRange())
+		addrs, err := alloc.Lookup(mux.Vars(r)["id"], defaultSubnet.HostRange())
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprintf(w, "%s/%d", addr, defaultSubnet.PrefixLen)
+		writeAddresses(w, addrs, defaultSubnet)
 	})
 
 	router.Methods("POST").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

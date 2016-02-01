@@ -1343,7 +1343,7 @@ ipam_cidrs() {
                     echo "IP address allocation must be enabled to use 'net:'" >&2
                     return 1
                 fi
-            elif ! is_cidr "$CIDR" ; then
+            elif [ -n "$CIDR" ] && ! is_cidr "$CIDR" ; then
                 echo "$CIDR" >&2
                 return 1
             else
