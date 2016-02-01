@@ -30,6 +30,8 @@ const (
 )
 
 var (
+	topBucket  = []byte("top")
+	nameIdent  = []byte("peername")
 	ringBucket = []byte("ring")
 )
 
@@ -72,7 +74,7 @@ type Allocator struct {
 
 // NewAllocator creates and initialises a new Allocator
 func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, dbPrefix string, isKnownPeer func(name mesh.PeerName) bool) (*Allocator, error) {
-	db, err := openDB(dbPrefix)
+	db, err := openDB(ourName, dbPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -90,14 +92,29 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 	}, nil
 }
 
-func openDB(dbPrefix string) (*bolt.DB, error) {
+func openDB(ourName mesh.PeerName, dbPrefix string) (*bolt.DB, error) {
 	dbPathname := dbPrefix + "ipam.db"
 	db, err := bolt.Open(dbPathname, 0660, nil)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to open %s: %s", dbPathname, err)
 	}
-	// Create all the buckets we are going to need
 	err = db.Update(func(tx *bolt.Tx) error {
+		nameVal := []byte(ourName.String())
+		// top-level bucket has peerName
+		if top := tx.Bucket(topBucket); top == nil {
+			top, err := tx.CreateBucket(topBucket)
+			if err != nil {
+				return err
+			}
+			top.Put(nameIdent, nameVal)
+		} else {
+			if checkPeerName := top.Get(nameIdent); !bytes.Equal(checkPeerName, nameVal) {
+				common.Log.Infof("[allocator] Deleting persisted data for peername %s", checkPeerName)
+				tx.DeleteBucket(ringBucket)
+				top.Put(nameIdent, nameVal)
+			}
+		}
+		// Create all the buckets we are going to need
 		_, err := tx.CreateBucketIfNotExists(ringBucket)
 		return err
 	})
