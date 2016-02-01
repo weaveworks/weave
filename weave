@@ -914,10 +914,6 @@ detach() {
     netnsenter ip link del $CONTAINER_IFNAME type veth
 }
 
-container_ip_addr_show() {
-    ! container_in_host_ns && netnsenter ip addr show
-}
-
 ######################################################################
 # functions for interacting with containers
 ######################################################################
@@ -1043,34 +1039,13 @@ wait_for_status() {
     done
 }
 
-# Parse the output of `ip addr show`, outputing weave addresses of kind $1
-addrs_from_ip_addr_show() {
-    while read first second rest ; do
-        if [ "$first" != "${first%:}" ] ; then
-            iname="${second%:}"
-        elif [ "$first" = "$1" -a \( "$iname" = "weave" -o "$iname" != "${iname#ethwe}" \) ] ; then
-            echo $second
-        fi
-    done
-}
-
 # Call $1 for all containers, passing container ID, all MACs and all IPs
 with_container_addresses() {
     COMMAND=$1
     shift 1
-    for CONTAINER_ID in "$@" ; do
-        if [ "$CONTAINER_ID" = "weave:expose" ] ; then
-            ADDRS_CMD="ip addr show dev $BRIDGE"
-        else
-            ADDRS_CMD="with_container_netns $CONTAINER_ID container_ip_addr_show"
-        fi
-        if CONTAINER_ADDRS=$($ADDRS_CMD 2>/dev/null) ; then
-            CONTAINER_MAC=$(echo "$CONTAINER_ADDRS" | addrs_from_ip_addr_show 'link/ether')
-            CONTAINER_IPS=$(echo "$CONTAINER_ADDRS" | addrs_from_ip_addr_show 'inet')
-            if [ -n "$CONTAINER_MAC$CONTAINER_IPS" ] ; then
-                $COMMAND "$CONTAINER_ID" "$CONTAINER_MAC" "$CONTAINER_IPS"
-            fi
-        fi
+
+    util_op container-addrs $PROCFS $BRIDGE "$@" | while read CONTAINER_ID CONTAINER_MAC CONTAINER_IPS; do
+        $COMMAND "$CONTAINER_ID" "$CONTAINER_MAC" "$CONTAINER_IPS"
     done
 }
 

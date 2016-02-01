@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -43,6 +44,25 @@ func (j jsonObject) String(key string) (string, error) {
 	}
 
 	return result, nil
+}
+
+func (j jsonObject) Int(key string) (int, error) {
+	iface, ok := j[key]
+	if !ok || iface == nil {
+		return 0, nil
+	}
+
+	result, ok := iface.(json.Number)
+	if !ok {
+		return 0, &UnmarshalWrongTypeError{key, "json.Number", iface}
+	}
+
+	i64, err := result.Int64()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(i64), nil
 }
 
 func (j jsonObject) StringArray(key string) ([]string, error) {

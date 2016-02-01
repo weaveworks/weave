@@ -62,6 +62,7 @@ type Config struct {
 	WithoutDNS          bool
 	NoMulticastRoute    bool
 	DockerHost          string
+	ProcPath            string
 }
 
 type wait struct {
@@ -590,11 +591,21 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 		return err
 	}
 
+	state, err := container.Object("State")
+	if err != nil {
+		return err
+	}
+
+	pid, err := state.Int("Pid")
+	if err != nil {
+		return err
+	}
+
 	if err := proxy.waitForStartByIdent(containerID); err != nil {
 		return err
 	}
-	mac, ips, nets, err := weaveContainerIPs(containerID)
-	if err != nil || len(ips) == 0 {
+	netDevs, err := GetWeaveNetDevs(proxy.ProcPath, pid)
+	if err != nil || len(netDevs) == 0 || len(netDevs[0].CIDRs) == 0 {
 		return err
 	}
 
@@ -602,9 +613,9 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 	if err != nil {
 		return err
 	}
-	networkSettings["MacAddress"] = mac
-	networkSettings["IPAddress"] = ips[0].String()
-	networkSettings["IPPrefixLen"], _ = nets[0].Mask.Size()
+	networkSettings["MacAddress"] = netDevs[0].MAC.String()
+	networkSettings["IPAddress"] = netDevs[0].CIDRs[0].IP.String()
+	networkSettings["IPPrefixLen"], _ = netDevs[0].CIDRs[0].Mask.Size()
 	return nil
 }
 
