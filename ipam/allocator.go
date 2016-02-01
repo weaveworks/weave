@@ -265,14 +265,18 @@ func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled
 }
 
 // Lookup (Sync) - get existing IP address for container with given name in range
-func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
-	resultChan := make(chan allocateResult)
+func (alloc *Allocator) Lookup(ident string, r address.Range) ([]address.Address, error) {
+	type lookupResult struct {
+		addr []address.Address
+		err  error
+	}
+	resultChan := make(chan lookupResult)
 	alloc.actionChan <- func() {
-		if addr, found := alloc.ownedInRange(ident, r); found {
-			resultChan <- allocateResult{addr: addr}
+		if addr := alloc.ownedInRange(ident, r); len(addr) > 0 {
+			resultChan <- lookupResult{addr: addr}
 			return
 		}
-		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
+		resultChan <- lookupResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
 	}
 	result := <-resultChan
 	return result.addr, result.err
@@ -968,19 +972,18 @@ func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) (f
 	return
 }
 
-func (alloc *Allocator) ownedInRange(ident string, r address.Range) (a address.Address, found bool) {
+func (alloc *Allocator) ownedInRange(ident string, r address.Range) []address.Address {
+	var a []address.Address
 	alloc.checkErr(alloc.withBucket(ident, func(b, v *bolt.Bucket) error {
 		return v.ForEach(func(k, _ []byte) error {
 			addr := address.FromIP4(k)
 			if r.Contains(addr) {
-				a = addr
-				found = true
-				return errBreakLoop
+				a = append(a, addr)
 			}
 			return nil
 		})
 	}))
-	return
+	return a
 }
 
 func (alloc *Allocator) forEachOwned(f func([]byte, address.Address) error) error {

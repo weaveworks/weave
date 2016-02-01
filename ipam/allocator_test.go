@@ -49,6 +49,10 @@ func TestAllocFree(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, testAddr2, addr2.String(), "address")
 
+	addrs, err := alloc.Lookup(container1, subnet)
+	require.NoError(t, err)
+	require.Equal(t, []address.Address{addr1, addr2}, addrs)
+
 	// Ask for another address for a different container and check it's different
 	addr1b, _ := alloc.Allocate(container2, cidr1.HostRange(), returnFalse)
 	if addr1b.String() == testAddr1 {
