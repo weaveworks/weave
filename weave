@@ -1668,7 +1668,7 @@ attach_router() {
     if [ -z "$NO_DNS_OPT" ] ; then
         # Tell the newly-started weaveDNS about existing weave IPs
         for CONTAINER in $(docker ps -q --no-trunc) ; do
-            if CONTAINER_IPS=$(with_container_netns $CONTAINER container_ip_addr_show 2>/dev/null | addrs_from_ip_addr_show 'inet') && [ -n "$CONTAINER_IPS" ] ; then
+            if CONTAINER_IPS=$(with_container_addresses echo_ips $CONTAINER) && [ -n "$CONTAINER_IPS" ] ; then
                 with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
             fi
         done
