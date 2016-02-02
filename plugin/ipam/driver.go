@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/libnetwork/ipamapi"
 	"github.com/docker/libnetwork/netlabel"
+	godocker "github.com/fsouza/go-dockerclient"
 	"github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
@@ -22,7 +23,13 @@ type ipam struct {
 }
 
 func NewIpam(client *docker.Client, version string) (ipamapi.Ipam, error) {
-	resolver := func() (string, error) { return client.GetContainerIP(WeaveContainer) }
+	resolver := func() (string, error) {
+		addr, err := client.GetContainerIP(WeaveContainer)
+		if _, ok := err.(*godocker.NoSuchContainer); ok {
+			return "", fmt.Errorf("%s container is not present. Have you launched it?", WeaveContainer)
+		}
+		return addr, err
+	}
 	return &ipam{client: client, weave: api.NewClientWithResolver(resolver)}, nil
 }
 
