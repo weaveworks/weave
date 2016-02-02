@@ -276,12 +276,11 @@ func (alloc *Allocator) Delete(ident string) error {
 
 func (alloc *Allocator) delete(ident string) error {
 	addrs := alloc.removeAllOwned(ident)
-	for _, addr := range addrs {
-		alloc.space.Free(addr)
-	}
-
 	if len(addrs) == 0 {
 		return fmt.Errorf("Delete: no addresses for %s", ident)
+	}
+	for _, addr := range addrs {
+		alloc.space.Free(addr)
 	}
 	return nil
 }
