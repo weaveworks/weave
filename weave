@@ -121,6 +121,7 @@ exec_remote() {
         -e WEAVEPROXY_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
+        -e WEAVE_HTTP_ADDR \
         -e WEAVE_CONTAINER_NAME \
         -e WEAVE_MTU \
         -e WEAVE_NO_FASTDP \
@@ -352,8 +353,7 @@ DATAPATH_IFNAME=vethwe-datapath
 PCAP_IFNAME=vethwe-pcap
 CONTAINER_IFNAME=ethwe
 PORT=${WEAVE_PORT:-6783}
-HTTP_HOST=127.0.0.1
-HTTP_PORT=6784
+HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 COVERAGE_ARGS=""
@@ -989,7 +989,7 @@ http_call_unix() {
 
 call_weave() {
     check_running $CONTAINER_NAME || return 1
-    if ! http_call $HTTP_HOST:$HTTP_PORT "$@" ; then
+    if ! http_call $HTTP_ADDR "$@" ; then
         echo "Call to $CONTAINER_NAME failed." >&2
         return 1
     fi
@@ -1276,7 +1276,7 @@ check_overlap() {
 # with_container_addresses.
 ipam_reclaim() {
     for CIDR in $3 ; do
-        http_call $HTTP_HOST:$HTTP_PORT PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
+        http_call $HTTP_ADDR PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
     done
 }
 
@@ -1332,7 +1332,7 @@ ipam_cidrs() {
             if [ "$METHOD" = "POST" ] ; then
                 # Assignment of a plain IP address; warn if it clashes but carry on
                 check_overlap $arg || true
-                when_weave_running http_call $HTTP_HOST:$HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
+                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/${arg%/*} >&2
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
@@ -1605,7 +1605,7 @@ launch_router() {
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
-        --http-addr $HTTP_HOST:$HTTP_PORT \
+        --http-addr $HTTP_ADDR \
         "$@")
     setup_router_iface_$BRIDGE_TYPE
     attach_router
@@ -1619,7 +1619,7 @@ fetch_router_args() {
 }
 
 attach_router() {
-    wait_for_status $CONTAINER_NAME http_call $HTTP_HOST:$HTTP_PORT
+    wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     if [ -n "$IPRANGE" ] ; then
         # Tell the newly-started weave IP allocator about existing weave IPs
         with_container_addresses ipam_reclaim weave:expose $(docker ps -q --no-trunc)
