@@ -760,7 +760,7 @@ netnsenter() {
     nsenter --net=$PROCFS/$CONTAINER_PID/ns/net "$@"
 }
 
-# connect_container_to_bridge <container inteface name>
+# connect_container_to_bridge <container interface name>
 connect_container_to_bridge() {
     ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU || return 1
 
