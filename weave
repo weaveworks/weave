@@ -705,10 +705,11 @@ docker_bridge_ip() {
 
 # the following borrows from https://github.com/jpetazzo/pipework
 
-# Set $CONTAINER_PID to the PID of container $1, $LOCAL_IFNAME and
-# $GUEST_IFNAME to suitable names for two ends of a veth pair, specific
-# to the container, and execute args $2 $3 ... as a command. If an error
-# is caused by container dying, swallow output from error.
+# Set $CONTAINER_NETNS to the network namespace of container $1,
+# $LOCAL_IFNAME and $GUEST_IFNAME to suitable names for two ends of a
+# veth pair, specific to the container, and execute args $2 $3 ... as
+# a command. If an error is caused by container dying, swallow output
+# from error.
 with_container_netns() {
     CONTAINER="$1"
     CONTAINER_PID=$(docker inspect --format='{{.State.Pid}}' $CONTAINER)
@@ -723,6 +724,7 @@ with_container_netns() {
         exit 1
     fi
 
+    CONTAINER_NETNS=$PROCFS/$CONTAINER_PID/ns/net
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
     IP_TMPOUT=/tmp/weave_ip_out_$$
@@ -755,9 +757,9 @@ with_container_netns_or_die() {
     fi
 }
 
-# Execute arguments as a command within the network namespace of $CONTAINER_PID
+# Execute arguments as a command within the $CONTAINER_NETNS network namespace
 netnsenter() {
-    nsenter --net=$PROCFS/$CONTAINER_PID/ns/net "$@"
+    nsenter --net=$CONTAINER_NETNS "$@"
 }
 
 # connect_container_to_bridge <container interface name>
@@ -765,7 +767,7 @@ connect_container_to_bridge() {
     ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU || return 1
 
     if ! ethtool_tx_off_$BRIDGE_TYPE $GUEST_IFNAME ||
-        ! ip link set $GUEST_IFNAME netns $PROCFS/$CONTAINER_PID/ns/net ; then
+        ! ip link set $GUEST_IFNAME netns $CONTAINER_NETNS ; then
         # failed before we assigned the veth to the container's
         # namespace
         ip link del $LOCAL_IFNAME type veth || true
@@ -847,7 +849,7 @@ setup_router_iface_bridged_fastdp() {
 }
 
 container_in_host_ns() {
-    [ -h "$PROCFS/$CONTAINER_PID/ns/net" -a -h "/proc/self/ns/net" -a "$(readlink $PROCFS/$CONTAINER_PID/ns/net)" = "$(readlink /proc/self/ns/net)" ]
+    [ -h "$CONTAINER_NETNS" -a -h "/proc/self/ns/net" -a "$(readlink $CONTAINER_NETNS)" = "$(readlink /proc/self/ns/net)" ]
 }
 
 attach() {
