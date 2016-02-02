@@ -1,3 +1,28 @@
+## Release 1.4.3
+
+Preparing for Docker 1.10, plus some bug-fixes.
+
+* Avoid hang in Docker v1.10 on `docker volume ls` after `weave stop`,
+  `weave stop-plugin` or `weave reset` #1934/#1936
+* Fix "unexpected EOF" from Docker 1.10 on `docker exec` with Weave
+  proxy `--rewrite-inspect` enabled #1911/#1917
+* Avoid losing DNS entries and potentially double-allocating IP
+  Addresses allocated via plugin, on router restart; also extend
+  `weave ps` to show IP addresses allocated via plugin #1745/#1921
+* Stop creating lots of copies of `weavewait` program in Docker
+  volumes #1757/#1935
+* Prevent container starting prematurely when proxy in
+`--no-multicast-route` mode #1942/#1943
+* Log error message from plugin rather than crashing when weave not
+  running #1906/#1918
+* Warn, don't error, if unable to remove plugin network in 'weave
+  stop', to avoid breaking the usual upgrade or config change process
+  #1900/#1919
+* Don't crash if network conditions suggest only very small packets
+  will get through #1905/#1926
+* Cope with unexpected errors during route traversal when starting
+  container via proxy #1909/#1910/#1932
+
 ## Release 1.4.2
 
 Bug-fixes and minor improvements.
