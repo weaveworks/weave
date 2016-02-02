@@ -506,6 +506,29 @@ func TestOwner(t *testing.T) {
 
 }
 
+func makePeerName(i int) mesh.PeerName {
+	if i >= 10000 {
+		panic("makePeerName: invalid value")
+	}
+	peer, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:%02d:00:00:00:ff", i/100, i%100))
+	return peer
+}
+
+func TestClaimForPeers(t *testing.T) {
+	const numPeers = 12
+	// Different end to usual so we get a number of addresses that a)
+	// is smaller than the max number of peers, and b) is divisible by
+	// some number of peers. This maximises coverage of edge cases.
+	end := dot10
+	peers := make([]mesh.PeerName, numPeers)
+	// Test for a range of peer counts
+	for i := 0; i < numPeers; i++ {
+		peers[i] = makePeerName(i)
+		ring := New(start, end, peers[0])
+		ring.ClaimForPeers(peers[:i+1])
+	}
+}
+
 type addressSlice []address.Address
 
 func (s addressSlice) Len() int           { return len(s) }
@@ -520,8 +543,7 @@ func TestFuzzRing(t *testing.T) {
 
 	peers := make([]mesh.PeerName, numPeers)
 	for i := 0; i < numPeers; i++ {
-		peer, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:00:00:00:02:00", i))
-		peers[i] = peer
+		peers[i] = makePeerName(i)
 	}
 
 	// Make a valid, random ring
@@ -608,7 +630,7 @@ func TestFuzzRingHard(t *testing.T) {
 	)
 
 	addPeer := func() {
-		peer, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:%02d:00:00:00:00", nextPeerID/10, nextPeerID%10))
+		peer := makePeerName(nextPeerID)
 		common.Log.Debugf("%s: Adding peer", peer)
 		nextPeerID++
 		peers = append(peers, peer)
