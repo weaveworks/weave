@@ -1699,6 +1699,8 @@ launch_proxy() {
         --volumes-from $VOLUMES_CONTAINER_NAME \
         $(docker_sock_options) \
         -v /var/run/weave:/var/run/weave \
+        -v /etc/cni/net.d:/etc/cni/net.d \
+        -v /etc/cni/plugins:/etc/cni/plugins \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e DOCKER_BRIDGE \

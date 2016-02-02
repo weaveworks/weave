@@ -52,3 +52,6 @@
 [submodule "vendor/github.com/weaveworks/mesh"]
 	path = vendor/github.com/weaveworks/mesh
 	url = https://github.com/weaveworks/mesh
+[submodule "vendor/github.com/appc/cni"]
+	path = vendor/github.com/appc/cni
+	url = https://github.com/appc/cni
