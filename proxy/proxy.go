@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
 )
@@ -555,7 +555,7 @@ func (proxy *Proxy) setWeaveDNS(hostConfig jsonObject, hostname, dnsDomain strin
 	return nil
 }
 
-func (proxy *Proxy) getDNSDomain() (domain string) {
+func (proxy *Proxy) getDNSDomain() string {
 	if proxy.WithoutDNS {
 		return ""
 	}
@@ -569,19 +569,9 @@ func (proxy *Proxy) getDNSDomain() (domain string) {
 		weaveIP = "127.0.0.1"
 	}
 
-	url := fmt.Sprintf("http://%s:6784/domain", weaveIP)
-	resp, err := http.Get(url)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		return
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-
-	return string(b)
+	weave := weaveapi.NewClient(weaveIP)
+	domain, _ := weave.DNSDomain()
+	return domain
 }
 
 func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
