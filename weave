@@ -966,26 +966,6 @@ container_id() {
     esac
 }
 
-container_ip() {
-    if ! status=$(docker inspect --format='{{.State.Running}} {{.NetworkSettings.IPAddress}}' $1 2>/dev/null) ; then
-        echo "$2" >&2
-        return 1
-    fi
-    case "$status" in
-        "true ")
-            #echo "$1 container has no IP address; is Docker networking enabled?" >&2
-            CONTAINER_IP=127.0.0.1
-            ;;
-        true*)
-            CONTAINER_IP="${status#true }"
-            ;;
-        *)
-            echo "$3" >&2
-            return 1
-            ;;
-    esac
-}
-
 http_call() {
     addr="$1"
     http_verb="$2"
@@ -1008,11 +988,8 @@ http_call_unix() {
 }
 
 call_weave() {
-    container_ip $CONTAINER_NAME \
-        "$CONTAINER_NAME container is not present. Have you launched it?" \
-        "$CONTAINER_NAME container is not running." \
-        || return 1
-    if ! http_call $CONTAINER_IP:$HTTP_PORT "$@" ; then
+    check_running $CONTAINER_NAME || return 1
+    if ! http_call $HTTP_HOST:$HTTP_PORT "$@" ; then
         echo "Call to $CONTAINER_NAME failed." >&2
         return 1
     fi
@@ -1299,8 +1276,7 @@ check_overlap() {
 # with_container_addresses.
 ipam_reclaim() {
     for CIDR in $3 ; do
-        # NB: CONTAINER_IP is the IP of the weave container.
-        http_call $CONTAINER_IP:$HTTP_PORT PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
+        http_call $HTTP_HOST:$HTTP_PORT PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
     done
 }
 
@@ -1356,9 +1332,7 @@ ipam_cidrs() {
             if [ "$METHOD" = "POST" ] ; then
                 # Assignment of a plain IP address; warn if it clashes but carry on
                 check_overlap $arg || true
-                if container_ip $CONTAINER_NAME 2>/dev/null ; then
-                    http_call $CONTAINER_IP:$HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
-                fi
+                when_weave_running http_call $HTTP_HOST:$HTTP_PORT PUT /ip/$CONTAINER_ID/${arg%/*} >&2
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
@@ -1645,9 +1619,7 @@ fetch_router_args() {
 }
 
 attach_router() {
-    err_msg=$(death_msg $CONTAINER_NAME)
-    container_ip $CONTAINER_NAME "$err_msg" "$err_msg" || return 1
-    wait_for_status $CONTAINER_NAME http_call $CONTAINER_IP:$HTTP_PORT
+    wait_for_status $CONTAINER_NAME http_call $HTTP_HOST:$HTTP_PORT
     if [ -n "$IPRANGE" ] ; then
         # Tell the newly-started weave IP allocator about existing weave IPs
         with_container_addresses ipam_reclaim weave:expose $(docker ps -q --no-trunc)
