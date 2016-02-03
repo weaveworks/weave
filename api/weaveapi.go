@@ -19,19 +19,10 @@ const (
 
 type Client struct {
 	baseURL string
-	resolve func() (string, error)
 }
 
 func (client *Client) httpVerb(verb string, url string, values url.Values) (string, error) {
-	baseURL := client.baseURL
-	if client.resolve != nil {
-		addr, err := client.resolve()
-		if err != nil {
-			return "", err
-		}
-		baseURL = fmt.Sprintf("http://%s:%d", addr, WeaveHTTPPort)
-	}
-	url = baseURL + url
+	url = client.baseURL + url
 	Log.Debugf("weave %s to %s with %v", verb, url, values)
 	var body io.Reader
 	if values != nil {
@@ -79,10 +70,6 @@ func NewClient(addr string) *Client {
 		return &Client{baseURL: fmt.Sprintf("http://%s", addr)}
 	}
 	return &Client{baseURL: fmt.Sprintf("http://%s:%s", host, port)}
-}
-
-func NewClientWithResolver(resolver func() (string, error)) *Client {
-	return &Client{resolve: resolver}
 }
 
 func (client *Client) Connect(remote string) error {
