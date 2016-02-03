@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	WeaveHTTPHost = "127.0.0.1"
 	WeaveHTTPPort = 6784
 )
 
@@ -59,7 +60,25 @@ func (client *Client) httpVerb(verb string, url string, values url.Values) (stri
 }
 
 func NewClient(addr string) *Client {
-	return &Client{baseURL: fmt.Sprintf("http://%s:%d", addr, WeaveHTTPPort)}
+	host := WeaveHTTPHost
+	port := fmt.Sprintf("%d", WeaveHTTPPort)
+	switch parts := strings.Split(addr, ":"); len(parts) {
+	case 0:
+	case 1:
+		if parts[0] != "" {
+			host = parts[0]
+		}
+	case 2:
+		if parts[0] != "" {
+			host = parts[0]
+		}
+		if parts[1] != "" {
+			port = parts[1]
+		}
+	default:
+		return &Client{baseURL: fmt.Sprintf("http://%s", addr)}
+	}
+	return &Client{baseURL: fmt.Sprintf("http://%s:%s", host, port)}
 }
 
 func NewClientWithResolver(resolver func() (string, error)) *Client {

@@ -559,17 +559,7 @@ func (proxy *Proxy) getDNSDomain() string {
 	if proxy.WithoutDNS {
 		return ""
 	}
-
-	weaveContainer, err := proxy.client.InspectContainer("weave")
-	var weaveIP string
-	if err == nil && weaveContainer.NetworkSettings != nil {
-		weaveIP = weaveContainer.NetworkSettings.IPAddress
-	}
-	if weaveIP == "" {
-		weaveIP = "127.0.0.1"
-	}
-
-	weave := weaveapi.NewClient(weaveIP)
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"))
 	domain, _ := weave.DNSDomain()
 	return domain
 }
