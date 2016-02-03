@@ -1686,6 +1686,7 @@ launch_plugin_if_not_running() {
         --net=host \
         $(docker_sock_options) \
         -v /run/docker/plugins:/run/docker/plugins \
+        -e WEAVE_HTTP_ADDR \
         $PLUGIN_IMAGE "$@") ; then
         return 1
     fi

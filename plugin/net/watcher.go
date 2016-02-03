@@ -21,16 +21,9 @@ type watcher struct {
 type Watcher interface {
 }
 
-func NewWatcher(client *docker.Client, driver *driver) (Watcher, error) {
-	resolver := func() (string, error) { return client.GetContainerIP(WeaveContainer) }
-	w := &watcher{client: client, driver: driver,
-		weave: weaveapi.NewClientWithResolver(resolver)}
-	err := client.AddObserver(w)
-	if err != nil {
-		return nil, err
-	}
-
-	return w, nil
+func NewWatcher(client *docker.Client, weave *weaveapi.Client, driver *driver) (Watcher, error) {
+	w := &watcher{client: client, weave: weave, driver: driver}
+	return w, client.AddObserver(w)
 }
 
 func (w *watcher) ContainerStarted(id string) {
