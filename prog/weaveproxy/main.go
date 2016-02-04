@@ -14,6 +14,7 @@ import (
 var (
 	version           = "(unreleased version)"
 	defaultDockerHost = "unix:///var/run/docker.sock"
+	defaultProcPath   = "/proc"
 )
 
 func main() {
@@ -66,6 +67,11 @@ func main() {
 	c.DockerHost = defaultDockerHost
 	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
 		c.DockerHost = dockerHost
+	}
+
+	c.ProcPath = defaultProcPath
+	if procPath := os.Getenv("PROCFS"); procPath != "" {
+		c.ProcPath = procPath
 	}
 
 	p, err := proxy.NewProxy(c)

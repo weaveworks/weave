@@ -52,3 +52,6 @@
 [submodule "vendor/github.com/weaveworks/mesh"]
 	path = vendor/github.com/weaveworks/mesh
 	url = https://github.com/weaveworks/mesh
+[submodule "vendor/github.com/vishvananda/netns"]
+	path = vendor/github.com/vishvananda/netns
+	url = https://github.com/vishvananda/netns.git
