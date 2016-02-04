@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,7 @@ import (
 	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
+	weavenet "github.com/weaveworks/weave/net"
 	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
 	netplugin "github.com/weaveworks/weave/plugin/net"
 	"github.com/weaveworks/weave/plugin/skel"
@@ -79,6 +81,11 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 		defer meshListener.Close()
 	}
 
+	statusListener, err := weavenet.ListenUnixSocket("/home/weave/status.sock")
+	if err != nil {
+		return err
+	}
+	go serveStatus(statusListener)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 
@@ -102,13 +109,7 @@ func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address
 		i = ipamplugin.NewIpam(weave)
 	}
 
-	var listener net.Listener
-
-	// remove sockets from last invocation
-	if err := os.Remove(address); err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-	listener, err = net.Listen("unix", address)
+	listener, err := weavenet.ListenUnixSocket(address)
 	if err != nil {
 		return nil, err
 	}
@@ -119,4 +120,13 @@ func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address
 	}()
 
 	return listener, nil
+}
+
+func serveStatus(listener net.Listener) {
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "ok")
+	})}
+	if err := server.Serve(listener); err != nil {
+		Log.Fatalf("ListenAndServeStatus failed: %s", err)
+	}
 }
