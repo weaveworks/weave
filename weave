@@ -492,6 +492,12 @@ detect_bridge_type() {
         # No bridge/datapath devices configured
         return 1
     fi
+
+    # WEAVE_MTU may have been specified when the bridge was
+    # created (perhaps implicitly with WEAVE_NO_FASTDP).  So take
+    # the MTU from the bridge unless it is explicitly specified
+    # for this invocation.
+    MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
 }
 
 create_bridge() {
@@ -559,12 +565,6 @@ EOF
                 return 1
             fi
         fi
-
-        # WEAVE_MTU may have been specified when the bridge was
-        # created (perhaps implicitly with WEAVE_NO_FASTDP).  So take
-        # the MTU from the bridge unless it is explicitly specified
-        # for this invocation.
-        MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
     fi
 
     [ "$1" = "--without-ethtool" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
@@ -795,6 +795,23 @@ add_iface_bridge() {
 
 add_iface_bridged_fastdp() {
     add_iface_bridge "$@"
+}
+
+attach_bridge() {
+    bridge="$1"
+    LOCAL_IFNAME=v${CONTAINER_IFNAME}bl$bridge
+    GUEST_IFNAME=v${CONTAINER_IFNAME}bg$bridge
+
+    ip link show $GUEST_IFNAME >/dev/null 2>&1 && return 0
+    if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ||
+       ! ip link set $LOCAL_IFNAME up ||
+       ! add_iface_$BRIDGE_TYPE $LOCAL_IFNAME ||
+       ! ip link set $GUEST_IFNAME up
+       ! ip link set $GUEST_IFNAME master $bridge ; then
+        ip link del $GUEST_IFNAME >/dev/null 2>&1 || true
+        ip link del $LOCAL_IFNAME >/dev/null 2>&1 || true
+        return 1
+    fi
 }
 
 router_opts_fastdp() {
@@ -1795,17 +1812,33 @@ case "$COMMAND" in
     # intentionally undocumented since it assumes knowledge of weave
     # internals
     create-bridge)
+        cat 1>&2 <<EOF
+WARNING: 'weave create-bridge' is deprecated. Instead use 'weave attach-bridge'
+to link the docker and weave bridges after both docker and weave have been
+started. Note that, unlike 'weave create-bridge', 'weave attach-bridge' is
+compatible with fast data path.
+EOF
         # This subcommand may be run without the docker daemon, but
         # fastdp needs to run the router container to setup the ODP
         # bridge, hence:
         if [ -z "$WEAVE_NO_FASTDP" ] ; then
             cat 1>&2 <<EOF
-'weave create-bridge' is not compatible with fast data path.  Please set
-the WEAVE_NO_FASTDP environment variable.
+
+ERROR: 'weave create-bridge' is not compatible with fast data path. If you
+really want to do this please set the WEAVE_NO_FASTDP environment variable.
 EOF
             exit 1
         fi
         create_bridge --without-ethtool
+        ;;
+    attach-bridge)
+        if detect_bridge_type ; then
+            attach_bridge ${1:-$DOCKER_BRIDGE}
+            run_iptables -t nat -I POSTROUTING -o $BRIDGE -j ACCEPT
+        else
+            echo "Weave bridge not found. Please run 'weave launch' and try again" >&2
+            exit 1
+        fi
         ;;
     bridge-type)
         detect_bridge_type && echo $BRIDGE_TYPE
