@@ -2016,7 +2016,7 @@ EOF
         [ $# -ge 1 ] || usage
         create_bridge
         ALL_CIDRS=$(with_container_addresses echo_cidrs $1)
-        RES=$(docker restart "$1")
+        RES=$(docker restart $1)
         CONTAINER=$(container_id $1)
         for CIDR in $ALL_CIDRS ; do
             call_weave PUT /ip/$CONTAINER/${CIDR%/*}
