@@ -76,6 +76,7 @@ func main() {
 	}
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
+	mflag.StringVar(&config.Host, []string{"-host"}, "", "router host")
 	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
@@ -143,7 +144,7 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	overlay, bridge := createOverlay(datapathName, ifaceName, config.Port, bufSzMB)
+	overlay, bridge := createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
 	name := peerName(routerName, bridge.Interface())
@@ -272,7 +273,7 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(datapathName string, ifaceName string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(datapathName string, ifaceName string, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
 	switch {
@@ -291,7 +292,7 @@ func createOverlay(datapathName string, ifaceName string, port int, bufSzMB int)
 	default:
 		bridge = weave.NullBridge{}
 	}
-	sleeve := weave.NewSleeveOverlay(port)
+	sleeve := weave.NewSleeveOverlay(host, port)
 	overlay.Add("sleeve", sleeve)
 	overlay.SetCompatOverlay(sleeve)
 	return overlay, bridge

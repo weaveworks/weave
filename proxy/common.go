@@ -48,6 +48,9 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 	// integration test suite breaking things.
 	propagateEnv("COVERAGE")
 
+	// In case the router control endpoint address is non-standard.
+	propagateEnv("WEAVE_HTTP_ADDR")
+
 	Log.Debug("Calling weave args: ", args, "env: ", cmd.Env)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

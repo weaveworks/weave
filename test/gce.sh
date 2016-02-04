@@ -135,17 +135,14 @@ function make_template {
 
 function hosts {
 	hosts=
-	args=
 	json=$(mktemp json.XXXXXXXXXX)
 	gcloud compute instances list --format=json >$json
 	for name in $(vm_names); do
 		hostname="$name.$ZONE.$PROJECT"
 		hosts="$hostname $hosts"
-		args="--add-host=$hostname:$(internal_ip $json $name) $args"
 	done
 	echo export SSH=\"ssh -l vagrant\"
 	echo export HOSTS=\"$hosts\"
-	echo export ADD_HOST_ARGS=\"$args\"
 	rm $json
 }
 

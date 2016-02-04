@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/docker/libnetwork/ipamapi"
+	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
@@ -48,19 +49,21 @@ func main() {
 		Log.Fatalf("unable to connect to docker: %s", err)
 	}
 
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"))
+
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 	Log.Info(dockerClient.Info())
 
-	err = run(dockerClient, address, meshAddress, noMulticastRoute)
+	err = run(dockerClient, weave, address, meshAddress, noMulticastRoute)
 	if err != nil {
 		Log.Fatal(err)
 	}
 }
 
-func run(dockerClient *docker.Client, address, meshAddress string, noMulticastRoute bool) error {
+func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string, noMulticastRoute bool) error {
 	endChan := make(chan error, 1)
 	if address != "" {
-		globalListener, err := listenAndServe(dockerClient, address, noMulticastRoute, endChan, "global", false)
+		globalListener, err := listenAndServe(dockerClient, weave, address, noMulticastRoute, endChan, "global", false)
 		if err != nil {
 			return err
 		}
@@ -68,7 +71,7 @@ func run(dockerClient *docker.Client, address, meshAddress string, noMulticastRo
 		defer globalListener.Close()
 	}
 	if meshAddress != "" {
-		meshListener, err := listenAndServe(dockerClient, meshAddress, noMulticastRoute, endChan, "local", true)
+		meshListener, err := listenAndServe(dockerClient, weave, meshAddress, noMulticastRoute, endChan, "local", true)
 		if err != nil {
 			return err
 		}
@@ -88,17 +91,15 @@ func run(dockerClient *docker.Client, address, meshAddress string, noMulticastRo
 	}
 }
 
-func listenAndServe(dockerClient *docker.Client, address string, noMulticastRoute bool, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
-	d, err := netplugin.New(dockerClient, version, scope, noMulticastRoute)
+func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, noMulticastRoute bool, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
+	d, err := netplugin.New(dockerClient, weave, scope, noMulticastRoute)
 	if err != nil {
 		return nil, err
 	}
 
 	var i ipamapi.Ipam
 	if withIpam {
-		if i, err = ipamplugin.NewIpam(dockerClient, version); err != nil {
-			return nil, err
-		}
+		i = ipamplugin.NewIpam(weave)
 	}
 
 	var listener net.Listener

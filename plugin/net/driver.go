@@ -7,6 +7,7 @@ import (
 	"github.com/docker/libnetwork/drivers/remote/api"
 	"github.com/docker/libnetwork/types"
 
+	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/common/odp"
@@ -21,22 +22,20 @@ const (
 )
 
 type driver struct {
-	version          string
 	scope            string
 	noMulticastRoute bool
 	sync.RWMutex
 	endpoints map[string]struct{}
 }
 
-func New(client *docker.Client, version string, scope string, noMulticastRoute bool) (skel.Driver, error) {
+func New(client *docker.Client, weave *weaveapi.Client, scope string, noMulticastRoute bool) (skel.Driver, error) {
 	driver := &driver{
 		noMulticastRoute: noMulticastRoute,
-		version:          version,
 		scope:            scope,
 		endpoints:        make(map[string]struct{}),
 	}
 
-	_, err := NewWatcher(client, driver)
+	_, err := NewWatcher(client, weave, driver)
 	if err != nil {
 		return nil, err
 	}

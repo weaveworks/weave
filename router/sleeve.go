@@ -62,6 +62,7 @@ const (
 )
 
 type SleeveOverlay struct {
+	host      string
 	localPort int
 
 	// These fields are set in StartConsumingPackets, and not
@@ -76,12 +77,12 @@ type SleeveOverlay struct {
 	forwarders map[mesh.PeerName]*sleeveForwarder
 }
 
-func NewSleeveOverlay(localPort int) NetworkOverlay {
-	return &SleeveOverlay{localPort: localPort}
+func NewSleeveOverlay(host string, localPort int) NetworkOverlay {
+	return &SleeveOverlay{host: host, localPort: localPort}
 }
 
 func (sleeve *SleeveOverlay) StartConsumingPackets(localPeer *mesh.Peer, peers *mesh.Peers, consumer OverlayConsumer) error {
-	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(":", sleeve.localPort))
+	localAddr, err := net.ResolveUDPAddr("udp4", fmt.Sprint(sleeve.host, ":", sleeve.localPort))
 	if err != nil {
 		return err
 	}
