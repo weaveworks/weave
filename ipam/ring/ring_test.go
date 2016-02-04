@@ -60,13 +60,19 @@ func TestInsert(t *testing.T) {
 
 	ring.Entries.entry(0).Free = 0
 	ring.Entries.insert(entry{Token: dot245, Peer: peer1name})
-	ring2 := New(start, end, peer1name)
-	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Free: 0}, {Token: dot245, Peer: peer1name}}
-	require.Equal(t, ring2, ring)
+	check := []RangeInfo{
+		{Peer: peer1name, Range: address.Range{Start: start, End: dot245}},
+		{Peer: peer1name, Range: address.Range{Start: dot245, End: end}},
+	}
+	require.Equal(t, check, ring.AllRangeInfo())
 
 	ring.Entries.insert(entry{Token: dot10, Peer: peer1name})
-	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Free: 0}, {Token: dot10, Peer: peer1name}, {Token: dot245, Peer: peer1name}}
-	require.Equal(t, ring2, ring)
+	check2 := []RangeInfo{
+		{Peer: peer1name, Range: address.Range{Start: start, End: dot10}},
+		{Peer: peer1name, Range: address.Range{Start: dot10, End: dot245}},
+		{Peer: peer1name, Range: address.Range{Start: dot245, End: end}},
+	}
+	require.Equal(t, check2, ring.AllRangeInfo())
 }
 
 func TestBetween(t *testing.T) {
