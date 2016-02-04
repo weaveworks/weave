@@ -61,6 +61,7 @@ type Config struct {
 	Version             string
 	WithoutDNS          bool
 	NoMulticastRoute    bool
+	DockerBridge        string
 	DockerHost          string
 	ProcPath            string
 }
@@ -151,11 +152,14 @@ func NewProxy(c Config) (*Proxy, error) {
 	p.client = client.Client
 
 	if !p.WithoutDNS {
-		dockerBridgeIP, stderr, err := callWeave("docker-bridge-ip")
+		netDevs, err := GetBridgeNetDev(c.ProcPath, c.DockerBridge)
 		if err != nil {
-			return nil, fmt.Errorf(string(stderr))
+			return nil, err
 		}
-		p.dockerBridgeIP = string(dockerBridgeIP)
+		if len(netDevs) != 1 || len(netDevs[0].CIDRs) != 1 {
+			return nil, fmt.Errorf("Could not obtain address of %s", c.DockerBridge)
+		}
+		p.dockerBridgeIP = netDevs[0].CIDRs[0].IP.String()
 	}
 
 	p.hostnameMatchRegexp, err = regexp.Compile(c.HostnameMatch)

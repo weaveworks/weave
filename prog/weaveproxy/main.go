@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	version           = "(unreleased version)"
-	defaultDockerHost = "unix:///var/run/docker.sock"
-	defaultProcPath   = "/proc"
+	version             = "(unreleased version)"
+	defaultDockerHost   = "unix:///var/run/docker.sock"
+	defaultProcPath     = "/proc"
+	defaultDockerBridge = "docker0"
 )
 
 func main() {
@@ -62,6 +63,11 @@ func main() {
 
 	if withDNS {
 		Log.Warning("--with-dns option has been removed; DNS is on by default")
+	}
+
+	c.DockerBridge = defaultDockerBridge
+	if dockerBridge := os.Getenv("DOCKER_BRIDGE"); dockerBridge != "" {
+		c.DockerBridge = dockerBridge
 	}
 
 	c.DockerHost = defaultDockerHost
