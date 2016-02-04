@@ -356,12 +356,7 @@ func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 			}
 		}
 
-		if e, found := r.Entries.get(pos); found {
-			e.update(peer, share)
-		} else {
-			r.Entries.insert(entry{Token: pos, Peer: peer, Free: share})
-		}
-
+		r.Entries.insert(entry{Token: pos, Peer: peer, Free: share})
 		pos += address.Address(share)
 	}
 
