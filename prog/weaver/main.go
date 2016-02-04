@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/weaveworks/mesh"
 
+	"github.com/weaveworks/go-checkpoint"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
@@ -33,6 +34,32 @@ type dnsConfig struct {
 	TTL                    int
 	ClientTimeout          time.Duration
 	EffectiveListenAddress string
+}
+
+const (
+	signatureFile      = "/etc/weave/signature"
+	versionCheckPeriod = 6 * time.Hour
+)
+
+func check() {
+	handleResponse := func(r *checkpoint.CheckResponse, err error) {
+		if err != nil {
+			Log.Printf("Error checking version: %v", err)
+		} else if r.Outdated {
+			Log.Printf("Weave version %s is available; please update at %s",
+				r.CurrentVersion, r.CurrentDownloadURL)
+		}
+	}
+
+	// Start background version checking
+	params := checkpoint.CheckParams{
+		Product:       "weave-net",
+		Version:       version,
+		SignatureFile: signatureFile,
+	}
+	resp, err := checkpoint.Check(&params)
+	handleResponse(resp, err)
+	checkpoint.CheckInterval(&params, versionCheckPeriod, handleResponse)
 }
 
 func main() {
@@ -128,6 +155,8 @@ func main() {
 
 	Log.Println("Command line options:", options())
 	Log.Println("Command line peers:", peers)
+
+	go check()
 
 	if prof != "" {
 		p := *profile.CPUProfile

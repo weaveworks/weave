@@ -132,6 +132,7 @@ exec_remote() {
         -e DOCKER_CLIENT_ARGS \
         -e PROXY_HOST="$PROXY_HOST" \
         -e COVERAGE \
+        -e CHECKPOINT_DISABLE \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
@@ -1594,6 +1595,8 @@ launch_router() {
         $(docker_sock_options) \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
+        -e CHECKPOINT_DISABLE \
+        -v /etc/weave:/etc/weave \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
         --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" \
         $(router_opts_$BRIDGE_TYPE) \
