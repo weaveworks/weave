@@ -263,7 +263,11 @@ func (alloc *Allocator) removeDeadContainers() {
 	}
 }
 
-func (alloc *Allocator) ContainerStarted(ident string) {}
+func (alloc *Allocator) ContainerStarted(ident string) {
+	alloc.actionChan <- func() {
+		delete(alloc.dead, ident) // delete is no-op if key not in map
+	}
+}
 
 // Delete (Sync) - release all IP addresses for container with given name
 func (alloc *Allocator) Delete(ident string) error {
