@@ -225,17 +225,18 @@ func TestMergeErrors(t *testing.T) {
 	ring2 = New(start, end, peer2name)
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Version: 1}}
-	require.True(t, ring1.Merge(*ring2) == ErrNewerVersion, "Expected ErrNewerVersion")
+	fmt.Println(ring1.Merge(*ring2))
+	require.Error(t, ring1.Merge(*ring2), "Expected error")
 
 	// Cannot Merge two entries with same version but different hosts
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: start, Peer: peer2name}}
-	require.True(t, ring1.Merge(*ring2) == ErrInvalidEntry, "Expected ErrInvalidEntry")
+	require.Error(t, ring1.Merge(*ring2), "Expected error")
 
 	// Cannot Merge an entry into a range I own
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: middle, Peer: peer2name}}
-	require.True(t, ring1.Merge(*ring2) == ErrEntryInMyRange, "Expected ErrEntryInMyRange")
+	require.Error(t, ring1.Merge(*ring2), "Expected error")
 }
 
 func TestMergeMore(t *testing.T) {
