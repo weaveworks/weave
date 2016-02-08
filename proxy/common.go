@@ -36,7 +36,6 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 		}
 	}
 
-	propagateEnv("DOCKER_BRIDGE")
 	propagateEnv("DOCKER_HOST")
 
 	// Propagate WEAVE_DEBUG, to make debugging easier.
