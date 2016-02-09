@@ -939,28 +939,49 @@ detach() {
 # functions for interacting with containers
 ######################################################################
 
-# Check that a container for component $1 named $2 with image $3 is not running
-check_not_running() {
-    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
+args_match() {
+    dummy_container=$(docker create $CONTAINER_ARGS)
+    dummy_args="$(docker inspect -f '{{.Args}}' $dummy_container)"
+    docker rm $dummy_container >/dev/null
+    [ "$(docker inspect -f '{{.Args}}' $1)" = "$dummy_args" ]
+}
+
+# Check if a container for component $1 named $2 with image $3 is running, and start it if necessary
+start_if_necessary() {
+    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}} {{.Id}}' $2 2>/dev/null) || true
+    CONTAINER_ID=${RUN_STATUS##* }
     case ${RUN_STATUS%:*} in
         "true restarting $3")
             echo "$2 is restarting; you can stop it with 'weave stop-$1'." >&2
             return 3
             ;;
         "true "*" $3")
-            echo "$2 is already running; you can stop it with 'weave stop-$1'." >&2
-            return 1
+            if args_match $CONTAINER_ID ; then
+                ALREADY_RUNNING_ID=$CONTAINER_ID
+                echo $CONTAINER_ID
+            else
+                echo "$2 is already running with different arguments; you can stop it with 'weave stop-$1'." >&2
+                return 1
+            fi
             ;;
         "false "*" $3")
-            docker rm $2 >/dev/null
+            if args_match $CONTAINER_ID ; then
+                docker start $CONTAINER_ID
+            else
+                docker rm $2 >/dev/null
+                docker run -d --name=$2 $CONTAINER_ARGS
+            fi
             ;;
         true*)
             echo "Found another running container named '$2'. Aborting." >&2
             return 2
             ;;
         false*)
-            echo "Found another container named '$2'. Aborting." >&2
-            return 2
+            docker rm $2 >/dev/null
+            docker run -d --name=$2 $CONTAINER_ARGS
+            ;;
+        "")
+            docker run -d --name=$2 $CONTAINER_ARGS
             ;;
     esac
 }
@@ -1593,7 +1614,7 @@ launch_router() {
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
-    ROUTER_CONTAINER=$(docker run --privileged --net=host -d --name=$CONTAINER_NAME \
+    CONTAINER_ARGS=$(echo --privileged --net=host \
         $(docker_sock_options) \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
@@ -1605,6 +1626,8 @@ launch_router() {
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
         --http-addr $HTTP_ADDR \
         "$@")
+    ROUTER_CONTAINER=$(start_if_necessary router $CONTAINER_NAME $BASE_IMAGE)
+    [ -n "$ALREADY_RUNNING_ID" ] && return 0
     setup_router_iface_$BRIDGE_TYPE
     attach_router
 }
@@ -1649,7 +1672,7 @@ launch_proxy() {
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
-    PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
+    CONTAINER_ARGS=$(echo --privileged --net=host \
         $PROXY_VOLUMES \
         --volumes-from $VOLUMES_CONTAINER_NAME \
         $(docker_sock_options) \
@@ -1663,6 +1686,7 @@ launch_proxy() {
         -e EXEC_IMAGE=$EXEC_IMAGE \
         --entrypoint=/home/weave/weaveproxy \
         $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
+    PROXY_CONTAINER=$(start_if_necessary proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE)
     wait_for_status $PROXY_CONTAINER_NAME http_call_unix $PROXY_CONTAINER_NAME status.sock
 }
 
@@ -1672,20 +1696,15 @@ stop_proxy() {
 }
 
 launch_plugin_if_not_running() {
-    retval=0
-    check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE || retval=$?
-    # If an existing plugin is running (we start it with restart=always), return its ID
-    [ $retval = 1 ] && PLUGIN_CONTAINER=$(container_id $PLUGIN_CONTAINER_NAME) && return 0
-    # Any other kind of error code from check_not_running is a failure.
-    [ $retval -gt 0 ] && return $retval
-
-    if ! PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
+    CONTAINER_ARGS=$(echo --privileged \
         --restart=always \
         --net=host \
         $(docker_sock_options) \
         -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_HTTP_ADDR \
-        $PLUGIN_IMAGE "$@") ; then
+        $PLUGIN_IMAGE "$@")
+
+    if ! PLUGIN_CONTAINER=$(start_if_necessary plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE) ; then
         return 1
     fi
     wait_for_status $PLUGIN_CONTAINER_NAME http_call_unix $PLUGIN_CONTAINER_NAME status.sock
@@ -1852,9 +1871,6 @@ EOF
         ;;
     launch)
         deprecation_warnings "$@"
-        check_not_running router $CONTAINER_NAME        $BASE_IMAGE
-        check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
-        # Don't check the plugin here, since we start it with `--restart=always`
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
@@ -1862,7 +1878,6 @@ EOF
         ;;
     launch-router)
         deprecation_warnings "$@"
-        check_not_running router $CONTAINER_NAME $BASE_IMAGE
         launch_router "$@"
         echo $ROUTER_CONTAINER
         ;;
@@ -1876,7 +1891,6 @@ EOF
         ;;
     launch-proxy)
         deprecation_warnings "$@"
-        check_not_running proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
