@@ -7,19 +7,19 @@ import (
 )
 
 func containerAddrs(args []string) error {
-	if len(args) < 2 {
-		cmdUsage("container-addrs", "<procPath> <bridgeName> [containerID ...]")
+	if len(args) < 1 {
+		cmdUsage("container-addrs", "<bridgeName> [containerID ...]")
 	}
+	bridgeName := args[0]
 
-	procPath := args[0]
-	bridgeName := args[1]
+	procPath := procDir()
 
 	c, err := docker.NewVersionedClientFromEnv("1.18")
 	if err != nil {
 		return err
 	}
 
-	for _, containerID := range args[2:] {
+	for _, containerID := range args[1:] {
 		netDevs, err := getNetDevs(procPath, bridgeName, c, containerID)
 		if err != nil {
 			if _, ok := err.(*docker.NoSuchContainer); ok {

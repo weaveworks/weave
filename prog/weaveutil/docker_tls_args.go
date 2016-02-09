@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,10 +16,7 @@ func dockerTLSArgs(args []string) error {
 	if len(args) > 0 {
 		cmdUsage("docker-tls-args", "")
 	}
-	procRoot := os.Getenv("PROCFS")
-	if procRoot == "" {
-		procRoot = "/proc"
-	}
+	procRoot := procDir()
 	dirEntries, err := ioutil.ReadDir(procRoot)
 	if err != nil {
 		return err
