@@ -403,6 +403,15 @@ add_iptables_rule() {
     fi
 }
 
+# Insert a rule in iptables, if it doesn't exist already
+insert_iptables_rule() {
+    IPTABLES_TABLE="$1"
+    shift 1
+    if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1 ; then
+        run_iptables -t $IPTABLES_TABLE -I "$@" >/dev/null
+    fi
+}
+
 # Delete a rule from iptables, if it exist
 delete_iptables_rule() {
     IPTABLES_TABLE="$1"
@@ -677,10 +686,10 @@ destroy_bridge() {
         fi
     done
 
-    # Remove any lingering bridged fastdp and pcap veths
-    ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
-    ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
-    ip link del $PCAP_IFNAME >/dev/null 2>&1 || true
+    # Remove any lingering bridged fastdp, pcap and attach-bridge veths
+    for VETH in $(ip -o link show | grep -o v${CONTAINER_IFNAME}[^:]*) ; do
+        ip link del $VETH >/dev/null 2>&1 || true
+    done
 
     if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
         run_iptables -t filter -D FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP 2>/dev/null || true
@@ -698,6 +707,7 @@ destroy_bridge() {
     run_iptables -t filter -D FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT 2>/dev/null || true
     run_iptables -t nat -F WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
+    run_iptables -t nat -D POSTROUTING -o $BRIDGE -j ACCEPT >/dev/null 2>&1 || true
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
 }
 
@@ -1831,7 +1841,7 @@ EOF
     attach-bridge)
         if detect_bridge_type ; then
             attach_bridge ${1:-$DOCKER_BRIDGE}
-            run_iptables -t nat -I POSTROUTING -o $BRIDGE -j ACCEPT
+            insert_iptables_rule nat POSTROUTING -o $BRIDGE -j ACCEPT
         else
             echo "Weave bridge not found. Please run 'weave launch' and try again" >&2
             exit 1
