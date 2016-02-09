@@ -53,7 +53,7 @@ func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
 	}
 	dest := net.IPv4(224, 0, 0, 0)
 	check := func(route netlink.Route) bool {
-		return route.LinkIndex == iface.Index && route.Dst != nil && route.Dst.IP.Equal(dest)
+		return route.Dst != nil && route.Dst.IP.Equal(dest)
 	}
 	// check for currently-existing route after subscribing, to avoid race
 	routes, err := netlink.RouteList(nil, netlink.FAMILY_V4)
