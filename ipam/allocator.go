@@ -30,9 +30,11 @@ const (
 )
 
 var (
-	topBucket  = []byte("top")
-	nameIdent  = []byte("peername")
-	ringBucket = []byte("ring")
+	versionIdent       = []byte("version")
+	persistenceVersion = []byte{1, 0} // major.minor
+	topBucket          = []byte("top")
+	nameIdent          = []byte("peername")
+	ringBucket         = []byte("ring")
 )
 
 // operation represents something which Allocator wants to do, but
@@ -100,14 +102,20 @@ func openDB(ourName mesh.PeerName, dbPrefix string) (*bolt.DB, error) {
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
 		nameVal := []byte(ourName.String())
-		// top-level bucket has peerName
+		// top-level bucket has peerName and persistence version
 		if top := tx.Bucket(topBucket); top == nil {
 			top, err := tx.CreateBucket(topBucket)
 			if err != nil {
 				return err
 			}
 			top.Put(nameIdent, nameVal)
+			top.Put(versionIdent, persistenceVersion)
 		} else {
+			if checkVersion := top.Get(versionIdent); checkVersion != nil {
+				if checkVersion[0] != persistenceVersion[0] {
+					common.Log.Fatalf("[allocator] Cannot use persistence file %s - version %x", dbPathname, checkVersion)
+				}
+			}
 			if checkPeerName := top.Get(nameIdent); !bytes.Equal(checkPeerName, nameVal) {
 				common.Log.Infof("[allocator] Deleting persisted data for peername %s", checkPeerName)
 				tx.DeleteBucket(ringBucket)
