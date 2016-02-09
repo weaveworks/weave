@@ -1034,7 +1034,7 @@ with_container_addresses() {
     COMMAND=$1
     shift 1
 
-    util_op container-addrs $PROCFS $BRIDGE "$@" | while read CONTAINER_ID CONTAINER_MAC CONTAINER_IPS; do
+    util_op container-addrs $BRIDGE "$@" | while read CONTAINER_ID CONTAINER_MAC CONTAINER_IPS; do
         $COMMAND "$CONTAINER_ID" "$CONTAINER_MAC" "$CONTAINER_IPS"
     done
 }

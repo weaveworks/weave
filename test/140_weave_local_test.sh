@@ -21,4 +21,6 @@ assert_raises "exec_on $HOST1 c1 $CHECK_ETHWE_UP"
 weave_local_on $HOST1 run             -ti --name=c2 $SMALL_IMAGE /bin/sh
 assert_raises "exec_on $HOST1 c2 $CHECK_ETHWE_UP"
 
+assert "weave_local_on $HOST1 ps | wc -l" 3
+
 end_suite
