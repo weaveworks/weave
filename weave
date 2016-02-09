@@ -1179,7 +1179,7 @@ check_running() {
     if ! STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Restarting}}' $1 2>/dev/null) ; then
         echo  "$1 container is not present. Have you launched it?" >&2
         return 1
-    elif [ "$STATUS" == "true true" ] ; then
+    elif [ "$STATUS" = "true true" ] ; then
         echo "$1 container is restarting." >&2
         return 2
     elif [ "$STATUS" != "true false" ] ; then
