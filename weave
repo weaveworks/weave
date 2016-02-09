@@ -677,10 +677,10 @@ destroy_bridge() {
         fi
     done
 
-    # Remove any lingering bridged fastdp and pcap veths
-    ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
-    ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
-    ip link del $PCAP_IFNAME >/dev/null 2>&1 || true
+    # Remove any lingering bridged fastdp, pcap and attach-bridge veths
+    for VETH in $(ip -o link show | grep -o v${CONTAINER_IFNAME}[^:]*) ; do
+        ip link del $VETH >/dev/null 2>&1 || true
+    done
 
     if [ "$DOCKER_BRIDGE" != "$BRIDGE" ] ; then
         run_iptables -t filter -D FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP 2>/dev/null || true
