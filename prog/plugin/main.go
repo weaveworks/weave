@@ -106,9 +106,6 @@ func run(dockerClient *docker.Client, address, meshAddress, meshNetworkName, nam
 	select {
 	case sig := <-sigChan:
 		Log.Debugf("Caught signal %s; shutting down", sig)
-		if meshNetworkName != "" {
-			return dockerClient.Client.RemoveNetwork(meshNetworkName)
-		}
 		return nil
 	case err := <-endChan:
 		return err
