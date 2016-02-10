@@ -8,6 +8,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/vishvananda/netlink"
+
+	"github.com/weaveworks/weave/common/odp"
 )
 
 type BridgeType int
@@ -143,4 +145,134 @@ func FindBridgeIP(bridgeName string, subnet *net.IPNet) (net.IP, error) {
 	}
 	// No subnet, or none in the required subnet; just return the first one
 	return netdev.CIDRs[0].IP, nil
+}
+
+type BridgeConfig struct {
+	DBPrefix         string
+	HostRoot         string
+	DockerBridgeName string
+	WeaveBridgeName  string
+	DatapathName     string
+	NoFastdp         bool
+	NoBridgedFastdp  bool
+	MTU              int
+	Mac              string
+}
+
+func CreateBridge(config *BridgeConfig) (BridgeType, error) {
+	bridgeType := DetectBridgeType(config.WeaveBridgeName, config.DatapathName)
+
+	if bridgeType == None {
+		bridgeType = Bridge
+		if !config.NoFastdp {
+			bridgeType = BridgedFastdp
+			if config.NoBridgedFastdp {
+				bridgeType = Fastdp
+				config.DatapathName = config.WeaveBridgeName
+			}
+			odpSupported, err := odp.CreateDatapath(config.DatapathName)
+			if err != nil {
+				return None, err
+			}
+			if !odpSupported {
+				bridgeType = Bridge
+			}
+		}
+
+		var err error
+		switch bridgeType {
+		case Bridge:
+			err = initBridge(config)
+		case Fastdp:
+			err = initFastdp(config)
+		case BridgedFastdp:
+			err = initBridgedFastdp(config)
+		default:
+			err = fmt.Errorf("Cannot initialise bridge type %v", bridgeType)
+		}
+		if err != nil {
+			return None, err
+		}
+
+		configureIPTables(config)
+	}
+
+	if bridgeType == Bridge {
+		if err := EthtoolTXOff(config.WeaveBridgeName); err != nil {
+			return bridgeType, err
+		}
+	}
+
+	if err := linkSetUpByName(config.WeaveBridgeName); err != nil {
+		return bridgeType, err
+	}
+
+	if err := ConfigureARPCache(config.WeaveBridgeName); err != nil {
+		return bridgeType, err
+	}
+
+	return bridgeType, nil
+}
+
+func initBridge(config *BridgeConfig) error {
+	mac, err := net.ParseMAC(config.Mac)
+	if err != nil {
+		return err
+	}
+
+	linkAttrs := netlink.NewLinkAttrs()
+	linkAttrs.Name = config.WeaveBridgeName
+	linkAttrs.HardwareAddr = mac
+	linkAttrs.MTU = config.MTU // TODO this probably doesn't work - see weave script
+	if err = netlink.LinkAdd(&netlink.Bridge{LinkAttrs: linkAttrs}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func initFastdp(config *BridgeConfig) error {
+	datapath, err := netlink.LinkByName(config.DatapathName)
+	if err != nil {
+		return err
+	}
+	return netlink.LinkSetMTU(datapath, config.MTU)
+}
+
+func initBridgedFastdp(config *BridgeConfig) error {
+	if err := initFastdp(config); err != nil {
+		return err
+	}
+	if err := initBridge(config); err != nil {
+		return err
+	}
+	if _, err := CreateAndAttachVeth("vethwe-bridge", "vethwe-datapath", config.WeaveBridgeName, config.MTU, true, func(veth netlink.Link) error {
+		if err := netlink.LinkSetUp(veth); err != nil {
+			return err
+		}
+		if err := odp.AddDatapathInterface(config.DatapathName, veth.Attrs().Name); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if err := linkSetUpByName(config.DatapathName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func configureIPTables(config *BridgeConfig) error {
+	return fmt.Errorf("Not implemented")
+}
+
+func linkSetUpByName(linkName string) error {
+	link, err := netlink.LinkByName(linkName)
+	if err != nil {
+		return err
+	}
+	return netlink.LinkSetUp(link)
 }
