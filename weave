@@ -585,6 +585,24 @@ EOF
     configure_arp_cache $BRIDGE
 }
 
+# create veth with ends $1-$2, and then invoke $3..., removing the
+# veth on failure. No-op of veth already exists.
+create_veth() {
+    VETHL=$1
+    VETHR=$2
+    shift 2
+
+    ip link show $VETHL >/dev/null 2>&1 && ip link show $VETHR >/dev/null 2>&1 && return 0
+
+    ip link add name $VETHL mtu $MTU type veth peer name $VETHR mtu $MTU
+
+    if ! ip link set $VETHL up || ! ip link set $VETHR up || ! "$@" ; then
+        ip link del $VETHL >/dev/null 2>&1 || true
+        ip link del $VETHR >/dev/null 2>&1 || true
+        return 1
+    fi
+}
+
 init_fastdp() {
     # GCE has the lowest underlay network MTU we're likely to encounter on
     # a local network, at 1460 bytes.  To get the overlay MTU from that we
@@ -633,30 +651,19 @@ init_bridged_fastdp() {
     # Initialise the datapath as normal. NB sets MTU for use below
     init_fastdp
 
-    # Create linking veth pair. We do this before initialising the bridge
-    # so that `ip link show` displays the datapath, linking veths and
-    # the bridge in natural order
-    ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
-    ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
-    ip link add name $BRIDGE_IFNAME mtu $MTU type veth peer name $DATAPATH_IFNAME mtu $MTU || return 1
-
     # Initialise the bridge using fast datapath MTU
     init_bridge
 
-    # Link intermediary bridge and datapath
-    if ! ip link set $DATAPATH_IFNAME up ||
-       ! ip link set $BRIDGE_IFNAME up ||
-       ! add_iface_fastdp $DATAPATH_IFNAME || ! ip link set $BRIDGE_IFNAME master $BRIDGE ; then
-        # Failed to link bridge and datapath - clean up
-        ip link del $BRIDGE >/dev/null 2>&1 || true
-        ip link del $DATAPATH_IFNAME >/dev/null 2>&1 || true
-        ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
-        util_op delete-datapath $DATAPATH >/dev/null 2>&1 || true
-        return 1
-    fi
+    # Create linking veth pair
+    create_veth $BRIDGE_IFNAME $DATAPATH_IFNAME configure_veth_bridged_fastdp
 
     # Finally, bring the datapath up
     ip link set dev $DATAPATH up
+}
+
+configure_veth_bridged_fastdp() {
+    add_iface_fastdp $DATAPATH_IFNAME
+    add_iface_bridge $BRIDGE_IFNAME
 }
 
 ethtool_tx_off_fastdp() {
@@ -812,16 +819,12 @@ attach_bridge() {
     LOCAL_IFNAME=v${CONTAINER_IFNAME}bl$bridge
     GUEST_IFNAME=v${CONTAINER_IFNAME}bg$bridge
 
-    ip link show $GUEST_IFNAME >/dev/null 2>&1 && return 0
-    if ! ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU ||
-       ! ip link set $LOCAL_IFNAME up ||
-       ! add_iface_$BRIDGE_TYPE $LOCAL_IFNAME ||
-       ! ip link set $GUEST_IFNAME up
-       ! ip link set $GUEST_IFNAME master $bridge ; then
-        ip link del $GUEST_IFNAME >/dev/null 2>&1 || true
-        ip link del $LOCAL_IFNAME >/dev/null 2>&1 || true
-        return 1
-    fi
+    create_veth $LOCAL_IFNAME $GUEST_IFNAME configure_veth_attached_bridge
+}
+
+configure_veth_attached_bridge() {
+    add_iface_$BRIDGE_TYPE $LOCAL_IFNAME
+    ip link set $GUEST_IFNAME master $bridge
 }
 
 router_opts_fastdp() {
@@ -854,15 +857,7 @@ setup_router_iface_fastdp() {
 }
 
 setup_router_iface_bridge() {
-    ip link show $PCAP_IFNAME >/dev/null 2>&1 && return 0
-    if ! ip link add name $BRIDGE_IFNAME mtu $MTU type veth peer name $PCAP_IFNAME mtu $MTU ||
-       ! ip link set $BRIDGE_IFNAME up ||
-       ! add_iface_bridge $BRIDGE_IFNAME ||
-       ! ip link set $PCAP_IFNAME up ; then
-        ip link del $PCAP_IFNAME >/dev/null 2>&1 || true
-        ip link del $BRIDGE_IFNAME >/dev/null 2>&1 || true
-        return 1
-    fi
+    create_veth $BRIDGE_IFNAME $PCAP_IFNAME add_iface_bridge $BRIDGE_IFNAME
 }
 
 setup_router_iface_bridged_fastdp() {
