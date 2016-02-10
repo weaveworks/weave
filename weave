@@ -937,10 +937,10 @@ detach() {
 ######################################################################
 
 args_match() {
-    prev_args="$(docker inspect -f '{{.Args}}' $1)"
+    prev_args="$(docker inspect -f '{{.Args}} {{.Config.Env}}' $1)"
     shift
     dummy_container=$(docker create "$@" 2>/dev/null) || return 1
-    dummy_args="$(docker inspect -f '{{.Args}}' $dummy_container)"
+    dummy_args="$(docker inspect -f '{{.Args}} {{.Config.Env}}' $dummy_container)"
     docker rm $dummy_container >/dev/null
     [ "$prev_args"  = "$dummy_args" ]
 }
