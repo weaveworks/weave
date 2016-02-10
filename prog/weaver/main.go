@@ -52,6 +52,7 @@ func main() {
 		routerName         string
 		nickName           string
 		password           string
+		passwordHash       string
 		pktdebug           bool
 		logLevel           string
 		prof               string
@@ -83,6 +84,7 @@ func main() {
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
 	mflag.StringVar(&password, []string{"#password", "-password"}, "", "network password")
+	mflag.StringVar(&passwordHash, []string{"-password-hash"}, "", "hash of network password")
 	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
 	mflag.BoolVar(&pktdebug, []string{"#pktdebug", "#-pktdebug", "-pkt-debug"}, false, "enable per-packet debug logging")
 	mflag.StringVar(&prof, []string{"#profile", "-profile"}, "", "enable profiling and write profiles to given path")
