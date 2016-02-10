@@ -952,23 +952,19 @@ start_if_necessary() {
     name=$2
     image=$3
     shift 3
-    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}} {{.Id}}' $name 2>/dev/null) || true
+    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.Config.Image}} {{.Id}}' $name 2>/dev/null) || true
     CONTAINER_ID=${RUN_STATUS##* }
     case ${RUN_STATUS%:*} in
-        "true restarting $image")
-            echo "$name is restarting; you can stop it with 'weave stop-$component'." >&2
-            return 3
-            ;;
-        "true "*" $image")
+        "true $image")
             if args_match $CONTAINER_ID "$@" ; then
-                ALREADY_RUNNING_ID=$CONTAINER_ID
+                ALREADY_RUNNING_CONTAINER=$CONTAINER_ID
                 echo $CONTAINER_ID
             else
                 echo "$name is already running with different arguments; you can stop it with 'weave stop-$component'." >&2
                 return 1
             fi
             ;;
-        "false "*" $image")
+        "false $image")
             if args_match $CONTAINER_ID "$@" ; then
                 docker start $CONTAINER_ID
             else
@@ -1205,6 +1201,7 @@ check_running() {
         echo  "$1 container is not present. Have you launched it?" >&2
         return 1
     elif [ "$STATUS" = "true true" ] ; then
+        [ -n "$ALREADY_RUNNING_CONTAINER" ] && return 0
         echo "$1 container is restarting." >&2
         return 2
     elif [ "$STATUS" != "true false" ] ; then
@@ -1630,9 +1627,9 @@ launch_router() {
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
         --http-addr $HTTP_ADDR \
         "$@"
-    [ -n "$ALREADY_RUNNING_ID" ] && return 0
     setup_router_iface_$BRIDGE_TYPE
-    attach_router
+    wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
+    [ -n "$ALREADY_RUNNING_CONTAINER" ] || attach_router
 }
 
 # Recreate the parameter values that are set when the router is first launched
@@ -1643,7 +1640,6 @@ fetch_router_args() {
 }
 
 attach_router() {
-    wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     if [ -n "$IPRANGE" ] ; then
         # Tell the newly-started weave IP allocator about existing weave IPs
         with_container_addresses ipam_reclaim weave:expose $(docker ps -q --no-trunc)
@@ -1883,6 +1879,7 @@ EOF
         create_bridge
         fetch_router_args
         with_container_netns $CONTAINER_NAME setup_router_iface_$BRIDGE_TYPE
+        wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
         attach_router
         ;;
     launch-proxy)
