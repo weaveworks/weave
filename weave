@@ -952,10 +952,12 @@ start_if_necessary() {
     name=$2
     image=$3
     shift 3
-    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.Config.Image}} {{.Id}}' $name 2>/dev/null) || true
+    image_base=${image%:*}
+    IMAGE_ID=$(docker inspect --format='{{.Id}}' $image)
+    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.Image}} {{.Config.Image}} {{.Id}}' $name 2>/dev/null) || true
     CONTAINER_ID=${RUN_STATUS##* }
     case ${RUN_STATUS%:*} in
-        "true $image")
+        "true $IMAGE_ID "*)
             if args_match $CONTAINER_ID "$@" ; then
                 ALREADY_RUNNING_CONTAINER=$CONTAINER_ID
                 echo $CONTAINER_ID
@@ -964,13 +966,17 @@ start_if_necessary() {
                 return 1
             fi
             ;;
-        "false $image")
+        "false $IMAGE_ID "*)
             if args_match $CONTAINER_ID "$@" ; then
                 docker start $CONTAINER_ID
             else
                 docker rm $name >/dev/null
                 docker run -d --name=$name "$@"
             fi
+            ;;
+        true*$image_base)
+            echo "Found another version of $name running. Aborting." >&2
+            return 2
             ;;
         true*)
             echo "Found another running container named '$name'. Aborting." >&2
@@ -1615,7 +1621,7 @@ launch_router() {
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
-    start_if_necessary router $CONTAINER_NAME $BASE_IMAGE \
+    start_if_necessary router $CONTAINER_NAME $IMAGE \
         --privileged --net=host $(docker_sock_options) \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
@@ -1671,7 +1677,7 @@ launch_proxy() {
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
-    start_if_necessary proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE \
+    start_if_necessary proxy $PROXY_CONTAINER_NAME $EXEC_IMAGE \
         --privileged --net=host $(docker_sock_options) \
         $PROXY_VOLUMES \
         --volumes-from $VOLUMES_CONTAINER_NAME \
@@ -1694,7 +1700,7 @@ stop_proxy() {
 }
 
 launch_plugin_if_not_running() {
-    start_if_necessary plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE \
+    start_if_necessary plugin $PLUGIN_CONTAINER_NAME $PLUGIN_IMAGE \
         --privileged --net=host $(docker_sock_options) \
         --restart=always \
         -v /run/docker/plugins:/run/docker/plugins \
