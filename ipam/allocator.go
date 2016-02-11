@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
@@ -27,6 +29,15 @@ const (
 	containerDiedTimeout = time.Second * 30
 )
 
+var (
+	versionIdent       = []byte("version")
+	persistenceVersion = []byte{1, 0} // major.minor
+	topBucket          = []byte("top")
+	nameIdent          = []byte("peername")
+	ringBucket         = []byte("ring")
+	ownedBucket        = []byte("owned")
+)
+
 // operation represents something which Allocator wants to do, but
 // which may need to wait until some other message arrives.
 type operation interface {
@@ -45,16 +56,16 @@ type operation interface {
 // are used around data structures.
 type Allocator struct {
 	actionChan       chan<- func()
+	db               *bolt.DB
 	ourName          mesh.PeerName
-	universe         address.Range                // superset of all ranges
-	ring             *ring.Ring                   // information on ranges owned by all peers
-	space            space.Space                  // more detail on ranges owned by us
-	owned            map[string][]address.Address // who owns what addresses, indexed by container-ID
-	nicknames        map[mesh.PeerName]string     // so we can map nicknames for rmpeer
-	pendingAllocates []operation                  // held until we get some free space
-	pendingClaims    []operation                  // held until we know who owns the space
-	dead             map[string]time.Time         // containers we heard were dead, and when
-	gossip           mesh.Gossip                  // our link to the outside world for sending messages
+	universe         address.Range            // superset of all ranges
+	ring             *ring.Ring               // information on ranges owned by all peers
+	space            space.Space              // more detail on ranges owned by us
+	nicknames        map[mesh.PeerName]string // so we can map nicknames for rmpeer
+	pendingAllocates []operation              // held until we get some free space
+	pendingClaims    []operation              // held until we know who owns the space
+	dead             map[string]time.Time     // containers we heard were dead, and when
+	gossip           mesh.Gossip              // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosActive      bool
 	ticker           *time.Ticker
@@ -64,22 +75,67 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
+func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, dbPrefix string, isKnownPeer func(name mesh.PeerName) bool) (*Allocator, error) {
+	db, err := openDB(ourName, dbPrefix)
+	if err != nil {
+		return nil, err
+	}
 	return &Allocator{
+		db:          db,
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
-		owned:       make(map[string][]address.Address),
 		paxos:       paxos.NewNode(ourName, ourUID, quorum),
 		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
 		isKnownPeer: isKnownPeer,
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
+	}, nil
+}
+
+func openDB(ourName mesh.PeerName, dbPrefix string) (*bolt.DB, error) {
+	dbPathname := dbPrefix + "ipam.db"
+	db, err := bolt.Open(dbPathname, 0660, nil)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to open %s: %s", dbPathname, err)
 	}
+	err = db.Update(func(tx *bolt.Tx) error {
+		nameVal := []byte(ourName.String())
+		// top-level bucket has peerName and persistence version
+		if top := tx.Bucket(topBucket); top == nil {
+			top, err := tx.CreateBucket(topBucket)
+			if err != nil {
+				return err
+			}
+			top.Put(nameIdent, nameVal)
+			top.Put(versionIdent, persistenceVersion)
+		} else {
+			if checkVersion := top.Get(versionIdent); checkVersion != nil {
+				if checkVersion[0] != persistenceVersion[0] {
+					common.Log.Fatalf("[allocator] Cannot use persistence file %s - version %x", dbPathname, checkVersion)
+				}
+			}
+			if checkPeerName := top.Get(nameIdent); !bytes.Equal(checkPeerName, nameVal) {
+				common.Log.Infof("[allocator] Deleting persisted data for peername %s", checkPeerName)
+				tx.DeleteBucket(ringBucket)
+				tx.DeleteBucket(ownedBucket)
+				top.Put(nameIdent, nameVal)
+			}
+		}
+		// Create all the buckets we are going to need
+		_, err := tx.CreateBucketIfNotExists(ringBucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists(ownedBucket)
+		return err
+	})
+	return db, err
 }
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
+	alloc.loadPersistedRing()
 	actionChan := make(chan func(), mesh.ChannelSize)
 	alloc.actionChan = actionChan
 	alloc.ticker = time.NewTicker(tickInterval)
@@ -90,6 +146,9 @@ func (alloc *Allocator) Start() {
 // calls after this is processed will hang. Async.
 func (alloc *Allocator) Stop() {
 	alloc.ticker.Stop()
+	alloc.actionChan <- func() {
+		alloc.checkErr(alloc.db.Close())
+	}
 	alloc.actionChan <- nil
 }
 
@@ -206,14 +265,18 @@ func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled
 }
 
 // Lookup (Sync) - get existing IP address for container with given name in range
-func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
-	resultChan := make(chan allocateResult)
+func (alloc *Allocator) Lookup(ident string, r address.Range) ([]address.Address, error) {
+	type lookupResult struct {
+		addr []address.Address
+		err  error
+	}
+	resultChan := make(chan lookupResult)
 	alloc.actionChan <- func() {
-		if addr, found := alloc.ownedInRange(ident, r); found {
-			resultChan <- allocateResult{addr: addr}
+		if addr := alloc.ownedInRange(ident, r); len(addr) > 0 {
+			resultChan <- lookupResult{addr: addr}
 			return
 		}
-		resultChan <- allocateResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
+		resultChan <- lookupResult{err: fmt.Errorf("lookup: no address found for %s in range %s", ident, r)}
 	}
 	result := <-resultChan
 	return result.addr, result.err
@@ -266,6 +329,17 @@ func (alloc *Allocator) removeDeadContainers() {
 func (alloc *Allocator) ContainerStarted(ident string) {
 	alloc.actionChan <- func() {
 		delete(alloc.dead, ident) // delete is no-op if key not in map
+	}
+}
+
+func (alloc *Allocator) AllContainerIDs(idsOrig []string) {
+	alloc.actionChan <- func() {
+		ids := make([]string, len(idsOrig))
+		copy(ids, idsOrig)
+		sort.Strings(ids)
+		alloc.syncOwned(func(ident string) bool {
+			return sort.SearchStrings(ids, ident) < len(ids)
+		})
 	}
 }
 
@@ -346,6 +420,7 @@ func (alloc *Allocator) Shutdown() {
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 			time.Sleep(100 * time.Millisecond)
 		}
+		alloc.checkErr(alloc.db.Close())
 		doneChan <- struct{}{}
 	}
 	<-doneChan
@@ -580,6 +655,7 @@ func (alloc *Allocator) ringUpdated() {
 		alloc.paxos = nil
 	}
 
+	alloc.persistRing()
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 	alloc.tryPendingOps()
 }
@@ -727,6 +803,7 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
+	alloc.persistRing()
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -759,61 +836,177 @@ func (alloc *Allocator) reportFreeSpace() {
 	alloc.ring.ReportFree(freespace)
 }
 
+// Persisting the Ring
+
+func (alloc *Allocator) persistRing() {
+	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ringBucket)
+		buf := new(bytes.Buffer)
+		enc := gob.NewEncoder(buf)
+		if err := enc.Encode(alloc.ring); err != nil {
+			panic(err)
+		}
+		return b.Put(ringBucket, buf.Bytes())
+	}))
+}
+
+func (alloc *Allocator) loadPersistedRing() {
+	alloc.checkErr(alloc.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ringBucket)
+		v := b.Get(ringBucket)
+		if v == nil {
+			return nil
+		}
+		reader := bytes.NewReader(v)
+		decoder := gob.NewDecoder(reader)
+		return decoder.Decode(&alloc.ring)
+	}))
+	if alloc.ring != nil {
+		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+		alloc.checkErr(alloc.forEachOwned(func(_ []byte, addr address.Address) error {
+			return alloc.space.Claim(addr)
+		}))
+	}
+}
+
 // Owned addresses
 
-func (alloc *Allocator) allOwned(ident string) []address.Address {
-	return alloc.owned[ident]
+/* The structure inside BoltDB is: one top-level bucket for all
+/* 'owned' data; inside that is a bucket per ID (container), and
+/* inside that is a tree-map of all addresses.
+*/
+
+// For each ID in the 'owned' map, remove the entry if checkExists() returns false
+func (alloc *Allocator) syncOwned(checkExists func(string) bool) {
+	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
+		var idents []string
+		b := tx.Bucket(ownedBucket)
+		// We aren't allowed to make changes during ForEach, so get a list of
+		// all identifiers first, then delete the non-existent ones
+		err := b.ForEach(func(name, _ []byte) error {
+			idents = append(idents, string(name))
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		for _, ident := range idents {
+			if !checkExists(ident) {
+				if err := b.DeleteBucket([]byte(ident)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}))
 }
 
-func (alloc *Allocator) hasOwned(ident string) bool {
-	_, b := alloc.owned[ident]
-	return b
+func (alloc *Allocator) withBucket(ident string, f func(b, v *bolt.Bucket) error) error {
+	return alloc.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ownedBucket)
+		v := b.Bucket([]byte(ident))
+		if v == nil {
+			return nil
+		}
+		return f(b, v)
+	})
 }
 
-// NB: addr must not be owned by ident already
+func (alloc *Allocator) hasOwned(ident string) (found bool) {
+	alloc.checkErr(alloc.withBucket(ident, func(_, _ *bolt.Bucket) error {
+		found = true
+		return nil
+	}))
+	return
+}
+
 func (alloc *Allocator) addOwned(ident string, addr address.Address) {
-	alloc.owned[ident] = append(alloc.owned[ident], addr)
+	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ownedBucket)
+		v, err := b.CreateBucketIfNotExists([]byte(ident))
+		if err != nil {
+			return err
+		}
+		return v.Put(addr.IP4(), []byte{})
+	}))
 }
 
 func (alloc *Allocator) removeAllOwned(ident string) []address.Address {
-	a := alloc.owned[ident]
-	delete(alloc.owned, ident)
+	var a []address.Address
+	alloc.checkErr(alloc.withBucket(ident, func(b, v *bolt.Bucket) error {
+		v.ForEach(func(k, _ []byte) error {
+			a = append(a, address.FromIP4(k))
+			return nil
+		})
+		return b.DeleteBucket([]byte(ident))
+	}))
 	return a
 }
 
-func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bool {
-	addrs, _ := alloc.owned[ident]
-	for i, ownedAddr := range addrs {
-		if ownedAddr == addrToFree {
-			if len(addrs) == 1 {
-				delete(alloc.owned, ident)
-			} else {
-				alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
-			}
-			return true
-		}
-	}
-	return false
+var (
+	errBreakLoop = fmt.Errorf("break out of Bolt loop") // not really an error
+)
+
+// helper function to detect if a Bucket is empty or not
+func empty(b *bolt.Bucket) bool {
+	return b.ForEach(func(_, _ []byte) error {
+		return errBreakLoop
+	}) == errBreakLoop
 }
 
-func (alloc *Allocator) ownedInRange(ident string, r address.Range) (address.Address, bool) {
-	for _, addr := range alloc.owned[ident] {
-		if r.Contains(addr) {
-			return addr, true
+func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) (found bool) {
+	alloc.checkErr(alloc.withBucket(ident, func(b, v *bolt.Bucket) error {
+		err := v.Delete(addrToFree.IP4())
+		if err == nil {
+			found = true
+			if empty(v) {
+				if err := b.DeleteBucket([]byte(ident)); err != nil {
+					return err
+				}
+			}
+		} else if err == bolt.ErrBucketNotFound {
+			return nil
 		}
-	}
-	return 0, false
+		return err
+	}))
+	return
 }
 
-func (alloc *Allocator) findOwner(addr address.Address) string {
-	for ident, addrs := range alloc.owned {
-		for _, candidate := range addrs {
-			if candidate == addr {
-				return ident
+func (alloc *Allocator) ownedInRange(ident string, r address.Range) []address.Address {
+	var a []address.Address
+	alloc.checkErr(alloc.withBucket(ident, func(b, v *bolt.Bucket) error {
+		return v.ForEach(func(k, _ []byte) error {
+			addr := address.FromIP4(k)
+			if r.Contains(addr) {
+				a = append(a, addr)
 			}
+			return nil
+		})
+	}))
+	return a
+}
+
+func (alloc *Allocator) forEachOwned(f func([]byte, address.Address) error) error {
+	return alloc.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ownedBucket)
+		return b.ForEach(func(name, _ []byte) error {
+			v := b.Bucket(name)
+			return v.ForEach(func(k, _ []byte) error {
+				return f(name, address.FromIP4(k))
+			})
+		})
+	})
+}
+
+func (alloc *Allocator) findOwner(addr address.Address) (owner string) {
+	alloc.checkErr(alloc.forEachOwned(func(name []byte, candidate address.Address) error {
+		if candidate == addr {
+			owner = string(name)
+			return errBreakLoop
 		}
-	}
-	return ""
+		return nil
+	}))
+	return owner
 }
 
 // Logging
@@ -826,4 +1019,10 @@ func (alloc *Allocator) debugln(args ...interface{}) {
 }
 func (alloc *Allocator) debugf(fmt string, args ...interface{}) {
 	common.Log.Debugf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+}
+
+func (alloc *Allocator) checkErr(err error) {
+	if err != nil && err != errBreakLoop {
+		panic(err)
+	}
 }
