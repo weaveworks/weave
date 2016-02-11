@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/boltdb/bolt"
+
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
@@ -27,6 +29,14 @@ const (
 	containerDiedTimeout = time.Second * 30
 )
 
+var (
+	versionIdent       = []byte("version")
+	persistenceVersion = []byte{1, 0} // major.minor
+	topBucket          = []byte("top")
+	nameIdent          = []byte("peername")
+	ringBucket         = []byte("ring")
+)
+
 // operation represents something which Allocator wants to do, but
 // which may need to wait until some other message arrives.
 type operation interface {
@@ -45,6 +55,7 @@ type operation interface {
 // are used around data structures.
 type Allocator struct {
 	actionChan       chan<- func()
+	db               *bolt.DB
 	ourName          mesh.PeerName
 	universe         address.Range                // superset of all ranges
 	ring             *ring.Ring                   // information on ranges owned by all peers
@@ -64,8 +75,13 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
+func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, dbPrefix string, isKnownPeer func(name mesh.PeerName) bool) (*Allocator, error) {
+	db, err := openDB(ourName, dbPrefix)
+	if err != nil {
+		return nil, err
+	}
 	return &Allocator{
+		db:          db,
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
@@ -75,11 +91,47 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 		isKnownPeer: isKnownPeer,
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
+	}, nil
+}
+
+func openDB(ourName mesh.PeerName, dbPrefix string) (*bolt.DB, error) {
+	dbPathname := dbPrefix + "ipam.db"
+	db, err := bolt.Open(dbPathname, 0660, nil)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to open %s: %s", dbPathname, err)
 	}
+	err = db.Update(func(tx *bolt.Tx) error {
+		nameVal := []byte(ourName.String())
+		// top-level bucket has peerName and persistence version
+		if top := tx.Bucket(topBucket); top == nil {
+			top, err := tx.CreateBucket(topBucket)
+			if err != nil {
+				return err
+			}
+			top.Put(nameIdent, nameVal)
+			top.Put(versionIdent, persistenceVersion)
+		} else {
+			if checkVersion := top.Get(versionIdent); checkVersion != nil {
+				if checkVersion[0] != persistenceVersion[0] {
+					common.Log.Fatalf("[allocator] Cannot use persistence file %s - version %x", dbPathname, checkVersion)
+				}
+			}
+			if checkPeerName := top.Get(nameIdent); !bytes.Equal(checkPeerName, nameVal) {
+				common.Log.Infof("[allocator] Deleting persisted data for peername %s", checkPeerName)
+				tx.DeleteBucket(ringBucket)
+				top.Put(nameIdent, nameVal)
+			}
+		}
+		// Create all the buckets we are going to need
+		_, err := tx.CreateBucketIfNotExists(ringBucket)
+		return err
+	})
+	return db, err
 }
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
+	alloc.loadPersistedRing()
 	actionChan := make(chan func(), mesh.ChannelSize)
 	alloc.actionChan = actionChan
 	alloc.ticker = time.NewTicker(tickInterval)
@@ -90,6 +142,9 @@ func (alloc *Allocator) Start() {
 // calls after this is processed will hang. Async.
 func (alloc *Allocator) Stop() {
 	alloc.ticker.Stop()
+	alloc.actionChan <- func() {
+		alloc.checkErr(alloc.db.Close())
+	}
 	alloc.actionChan <- nil
 }
 
@@ -346,6 +401,7 @@ func (alloc *Allocator) Shutdown() {
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 			time.Sleep(100 * time.Millisecond)
 		}
+		alloc.checkErr(alloc.db.Close())
 		doneChan <- struct{}{}
 	}
 	<-doneChan
@@ -580,6 +636,7 @@ func (alloc *Allocator) ringUpdated() {
 		alloc.paxos = nil
 	}
 
+	alloc.persistRing()
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 	alloc.tryPendingOps()
 }
@@ -727,6 +784,7 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
+	alloc.persistRing()
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -757,6 +815,36 @@ func (alloc *Allocator) reportFreeSpace() {
 		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}
 	alloc.ring.ReportFree(freespace)
+}
+
+// Persisting the Ring
+
+func (alloc *Allocator) persistRing() {
+	alloc.checkErr(alloc.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ringBucket)
+		buf := new(bytes.Buffer)
+		enc := gob.NewEncoder(buf)
+		if err := enc.Encode(alloc.ring); err != nil {
+			panic(err)
+		}
+		return b.Put(ringBucket, buf.Bytes())
+	}))
+}
+
+func (alloc *Allocator) loadPersistedRing() {
+	alloc.checkErr(alloc.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(ringBucket)
+		v := b.Get(ringBucket)
+		if v == nil {
+			return nil
+		}
+		reader := bytes.NewReader(v)
+		decoder := gob.NewDecoder(reader)
+		return decoder.Decode(&alloc.ring)
+	}))
+	if alloc.ring != nil {
+		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+	}
 }
 
 // Owned addresses
@@ -826,4 +914,10 @@ func (alloc *Allocator) debugln(args ...interface{}) {
 }
 func (alloc *Allocator) debugf(fmt string, args ...interface{}) {
 	common.Log.Debugf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+}
+
+func (alloc *Allocator) checkErr(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
