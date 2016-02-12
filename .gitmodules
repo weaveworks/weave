@@ -55,3 +55,6 @@
 [submodule "vendor/github.com/vishvananda/netns"]
 	path = vendor/github.com/vishvananda/netns
 	url = https://github.com/vishvananda/netns.git
+[submodule "vendor/github.com/boltdb/bolt"]
+	path = vendor/github.com/boltdb/bolt
+	url = https://github.com/boltdb/bolt
