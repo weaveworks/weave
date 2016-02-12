@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/weaveworks/weave.svg?branch=master)](https://travis-ci.org/weaveworks/weave) [![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield&circle-token=4933c7dabb3d0383e62117565cb9d16df7b1a811)](https://circleci.com/gh/weaveworks/weave) [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
 
-# About Weaveworks
+#About Weaveworks
 
 [Weaveworks](http://weave.works) is the company that develops Weave -
 the most productive way for developers to connect, observe and control
@@ -11,7 +11,7 @@ started tutorials, visit our [website](http://weave.works) and
 [documentation](http://docs.weave.works) or continue to read about
 some of the more technical aspects of Weave in this readme.
 
-# Weave
+#Weave
 
 Weave creates a virtual network that connects Docker containers
 deployed across multiple hosts and enables their automatic discovery.
@@ -38,7 +38,7 @@ multiple containers, running anywhere.
 Weave works alongside Docker's existing (single host) networking
 capabilities, so these can continue to be used by containers.
 
-## Installation
+##Installation
 
 Ensure you are running Linux (kernel 3.8 or later) and have Docker
 (version 1.6.0 or later) installed. Then install weave with
