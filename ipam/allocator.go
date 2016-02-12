@@ -774,18 +774,18 @@ const (
 func (alloc *Allocator) persistRing() {
 	// It would be better if these two Save operations happened in the same transaction
 	if err := alloc.db.Save(nameIdent, alloc.ourName); err != nil {
-		common.Log.Errorf("Error persisting ring data: %s", err)
+		alloc.fatalf("Error persisting ring data: %s", err)
 		return
 	}
 	if err := alloc.db.Save(ringIdent, alloc.ring); err != nil {
-		common.Log.Errorf("Error persisting ring data: %s", err)
+		alloc.fatalf("Error persisting ring data: %s", err)
 	}
 }
 
 func (alloc *Allocator) loadPersistedRing() {
 	var checkPeerName mesh.PeerName
 	if err := alloc.db.Load(nameIdent, &checkPeerName); err != nil {
-		common.Log.Errorf("Error loading persisted peer name: %s", err)
+		alloc.fatalf("Error loading persisted peer name: %s", err)
 		return
 	}
 	if checkPeerName != alloc.ourName {
@@ -794,7 +794,7 @@ func (alloc *Allocator) loadPersistedRing() {
 		return
 	}
 	if err := alloc.db.Load(ringIdent, &alloc.ring); err != nil {
-		common.Log.Errorf("Error loading persisted ring data: %s", err)
+		alloc.fatalf("Error loading persisted ring data: %s", err)
 	}
 	if alloc.ring != nil {
 		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
@@ -860,6 +860,9 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 
 // Logging
 
+func (alloc *Allocator) fatalf(fmt string, args ...interface{}) {
+	common.Log.Fatalf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+}
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
 	common.Log.Infof("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
