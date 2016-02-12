@@ -83,6 +83,7 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
+	alloc.loadPersistedRing()
 	actionChan := make(chan func(), mesh.ChannelSize)
 	alloc.actionChan = actionChan
 	alloc.ticker = time.NewTicker(tickInterval)
@@ -583,6 +584,7 @@ func (alloc *Allocator) ringUpdated() {
 		alloc.paxos = nil
 	}
 
+	alloc.persistRing()
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 	alloc.tryPendingOps()
 }
@@ -730,6 +732,7 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
+	alloc.persistRing()
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -760,6 +763,26 @@ func (alloc *Allocator) reportFreeSpace() {
 		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}
 	alloc.ring.ReportFree(freespace)
+}
+
+// Persisting the Ring
+const (
+	ringIdent = "ring"
+)
+
+func (alloc *Allocator) persistRing() {
+	if err := alloc.db.Save(ringIdent, alloc.ring); err != nil {
+		common.Log.Errorf("Error persisting ring data: %s", err)
+	}
+}
+
+func (alloc *Allocator) loadPersistedRing() {
+	if err := alloc.db.Load(ringIdent, &alloc.ring); err != nil {
+		common.Log.Errorf("Error loading persisted ring data: %s", err)
+	}
+	if alloc.ring != nil {
+		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+	}
 }
 
 // Owned addresses
