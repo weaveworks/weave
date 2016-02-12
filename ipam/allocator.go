@@ -10,6 +10,7 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
@@ -54,6 +55,7 @@ type Allocator struct {
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
 	dead             map[string]time.Time         // containers we heard were dead, and when
+	db               db.DB                        // persistence
 	gossip           mesh.Gossip                  // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosActive      bool
@@ -64,12 +66,13 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
+func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, db db.DB, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
 	return &Allocator{
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
 		owned:       make(map[string][]address.Address),
+		db:          db,
 		paxos:       paxos.NewNode(ourName, ourUID, quorum),
 		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
 		isKnownPeer: isKnownPeer,
