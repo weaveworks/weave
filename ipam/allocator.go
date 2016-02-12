@@ -768,15 +768,31 @@ func (alloc *Allocator) reportFreeSpace() {
 // Persisting the Ring
 const (
 	ringIdent = "ring"
+	nameIdent = "peername"
 )
 
 func (alloc *Allocator) persistRing() {
+	// It would be better if these two Save operations happened in the same transaction
+	if err := alloc.db.Save(nameIdent, alloc.ourName); err != nil {
+		common.Log.Errorf("Error persisting ring data: %s", err)
+		return
+	}
 	if err := alloc.db.Save(ringIdent, alloc.ring); err != nil {
 		common.Log.Errorf("Error persisting ring data: %s", err)
 	}
 }
 
 func (alloc *Allocator) loadPersistedRing() {
+	var checkPeerName mesh.PeerName
+	if err := alloc.db.Load(nameIdent, &checkPeerName); err != nil {
+		common.Log.Errorf("Error loading persisted peer name: %s", err)
+		return
+	}
+	if checkPeerName != alloc.ourName {
+		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
+		alloc.persistRing()
+		return
+	}
 	if err := alloc.db.Load(ringIdent, &alloc.ring); err != nil {
 		common.Log.Errorf("Error loading persisted ring data: %s", err)
 	}
