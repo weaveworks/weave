@@ -8,6 +8,7 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/db"
 )
 
 const (
@@ -45,9 +46,10 @@ type NetworkRouter struct {
 	*mesh.Router
 	NetworkConfig
 	Macs *MacCache
+	db   db.DB
 }
 
-func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh.PeerName, nickName string, overlay NetworkOverlay) *NetworkRouter {
+func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh.PeerName, nickName string, overlay NetworkOverlay, db db.DB) *NetworkRouter {
 	if overlay == nil {
 		overlay = NullNetworkOverlay{}
 	}
@@ -55,7 +57,7 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh
 		networkConfig.Bridge = NullBridge{}
 	}
 
-	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay), NetworkConfig: networkConfig}
+	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay), NetworkConfig: networkConfig, db: db}
 	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.Macs = NewMacCache(macMaxAge,
@@ -203,4 +205,23 @@ func (router *NetworkRouter) relayBroadcast(srcPeer *mesh.Peer, key PacketKey) F
 	}
 
 	return op
+}
+
+// Persisting the set of peers we are supposed to connect to
+const peersIdent = "directPeers"
+
+func (router *NetworkRouter) persistPeers() {
+	if err := router.db.Save(peersIdent, router.ConnectionMaker.Targets()); err != nil {
+		log.Errorf("Error persisting peers: %s", err)
+		return
+	}
+}
+
+func (router *NetworkRouter) SetInitialPeers(peers []string) []error {
+	// Load is a no-op if persistence entry has never been saved
+	if err := router.db.Load(peersIdent, &peers); err != nil {
+		return []error{err}
+	}
+	log.Println("Initiating connections to peers:", peers)
+	return router.ConnectionMaker.InitiateConnections(peers, false)
 }

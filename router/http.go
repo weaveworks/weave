@@ -17,6 +17,7 @@ func (router *NetworkRouter) HandleHTTP(muxRouter *mux.Router) {
 		if errors := router.ConnectionMaker.InitiateConnections(r.Form["peer"], r.FormValue("replace") == "true"); len(errors) > 0 {
 			http.Error(w, common.ErrorMessages(errors), http.StatusBadRequest)
 		}
+		router.persistPeers()
 	})
 
 	muxRouter.Methods("POST").Path("/forget").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +25,7 @@ func (router *NetworkRouter) HandleHTTP(muxRouter *mux.Router) {
 			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
 		}
 		router.ConnectionMaker.ForgetConnections(r.Form["peer"])
+		router.persistPeers()
 	})
 
 }
