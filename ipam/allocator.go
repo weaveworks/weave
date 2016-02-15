@@ -10,6 +10,7 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
@@ -54,6 +55,7 @@ type Allocator struct {
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
 	dead             map[string]time.Time         // containers we heard were dead, and when
+	db               db.DB                        // persistence
 	gossip           mesh.Gossip                  // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosActive      bool
@@ -64,12 +66,13 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
+func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, db db.DB, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
 	return &Allocator{
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
 		owned:       make(map[string][]address.Address),
+		db:          db,
 		paxos:       paxos.NewNode(ourName, ourUID, quorum),
 		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
 		isKnownPeer: isKnownPeer,
@@ -80,6 +83,7 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
+	alloc.loadPersistedRing()
 	actionChan := make(chan func(), mesh.ChannelSize)
 	alloc.actionChan = actionChan
 	alloc.ticker = time.NewTicker(tickInterval)
@@ -580,6 +584,7 @@ func (alloc *Allocator) ringUpdated() {
 		alloc.paxos = nil
 	}
 
+	alloc.persistRing()
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 	alloc.tryPendingOps()
 }
@@ -727,6 +732,7 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
+	alloc.persistRing()
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -757,6 +763,42 @@ func (alloc *Allocator) reportFreeSpace() {
 		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}
 	alloc.ring.ReportFree(freespace)
+}
+
+// Persisting the Ring
+const (
+	ringIdent = "ring"
+	nameIdent = "peername"
+)
+
+func (alloc *Allocator) persistRing() {
+	// It would be better if these two Save operations happened in the same transaction
+	if err := alloc.db.Save(nameIdent, alloc.ourName); err != nil {
+		alloc.fatalf("Error persisting ring data: %s", err)
+		return
+	}
+	if err := alloc.db.Save(ringIdent, alloc.ring); err != nil {
+		alloc.fatalf("Error persisting ring data: %s", err)
+	}
+}
+
+func (alloc *Allocator) loadPersistedRing() {
+	var checkPeerName mesh.PeerName
+	if err := alloc.db.Load(nameIdent, &checkPeerName); err != nil {
+		alloc.fatalf("Error loading persisted peer name: %s", err)
+		return
+	}
+	if checkPeerName != alloc.ourName {
+		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
+		alloc.persistRing()
+		return
+	}
+	if err := alloc.db.Load(ringIdent, &alloc.ring); err != nil {
+		alloc.fatalf("Error loading persisted ring data: %s", err)
+	}
+	if alloc.ring != nil {
+		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+	}
 }
 
 // Owned addresses
@@ -818,6 +860,9 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 
 // Logging
 
+func (alloc *Allocator) fatalf(fmt string, args ...interface{}) {
+	common.Log.Fatalf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+}
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
 	common.Log.Infof("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
