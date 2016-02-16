@@ -84,8 +84,8 @@ func (n *Nameserver) broadcastEntries(es ...Entry) {
 }
 
 func (n *Nameserver) AddEntry(hostname, containerid string, origin mesh.PeerName, addr address.Address) {
-	n.infof("adding entry %s -> %s", hostname, addr.String())
 	n.Lock()
+	n.infof("adding entry for %s: %s -> %s", containerid, hostname, addr.String())
 	entry := n.entries.add(hostname, containerid, origin, addr)
 	n.Unlock()
 	n.broadcastEntries(entry)
