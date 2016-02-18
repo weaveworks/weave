@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/docker/libnetwork/discoverapi"
 	"github.com/docker/libnetwork/ipamapi"
 	"github.com/docker/libnetwork/netlabel"
 	"github.com/weaveworks/weave/api"
@@ -96,4 +97,14 @@ func (i *ipam) RequestAddress(poolID string, address net.IP, options map[string]
 func (i *ipam) ReleaseAddress(poolID string, address net.IP) error {
 	Log.Debugln("ReleaseAddress", poolID, address)
 	return i.weave.ReleaseIP(address.String())
+}
+
+// Functions required by ipamapi "contract" but not actually used.
+
+func (i *ipam) DiscoverNew(discoverapi.DiscoveryType, interface{}) error {
+	return nil
+}
+
+func (i *ipam) DiscoverDelete(discoverapi.DiscoveryType, interface{}) error {
+	return nil
 }
