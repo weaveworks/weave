@@ -27,7 +27,6 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 	cmd := exec.Command("./weave", args...)
 	cmd.Env = []string{
 		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		"PROCFS=/hostproc",
 	}
 
 	propagateEnv := func(key string) {
