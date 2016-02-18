@@ -1,5 +1,5 @@
 ---
-title:Viewing Connections Using Fastdp vs. Sleeve
+title:Viewing Connection Mode Fastdp or Sleeve
 layout: default
 ---
 

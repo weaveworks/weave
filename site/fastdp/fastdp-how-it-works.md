@@ -12,7 +12,7 @@ Weave's Fast datapath uses the Linux kernel's [Open vSwitch datapath module](htt
 
 ![Weave Net Encapsulation](/images/weave-net-fdp1-1024x454.png)
 
-Because Weave Net issues instructions directly to the kernel, the number of packet data and context switches is decreased. In addition to this, `fast datapath` also reduces CPU overhead and latency. The packet goes straight from your application to the kernel, where the Virtual Extensible Lan (VXLAN) header is added (the NIC does this if it offers VXLAN acceleration). VXLAN is an IETF standard UDP-based tunneling protocol that enable you to use common networking tools like [Wireshark](https://www.wireshark.org/) to inspect the tunneled packets.
+Because Weave Net issues instructions directly to the kernel, the amount of packet data and also the context switches are decreased. In addition to this, `fast datapath` reduces CPU overhead and latency. The packet goes straight from your application to the kernel, where the Virtual Extensible Lan (VXLAN) header is added (the NIC does this if it offers VXLAN acceleration). VXLAN is an IETF standard UDP-based tunneling protocol that enable you to use common networking tools like [Wireshark](https://www.wireshark.org/) to inspect the tunneled packets.
 
 ![Weave Net Encapsulation](/images/weave-frame-encapsulation-178x300.png)
 
