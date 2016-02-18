@@ -694,7 +694,7 @@ destroy_bridge() {
     done
 
     # Remove any lingering bridged fastdp, pcap and attach-bridge veths
-    for VETH in $(ip -o link show | grep -o v${CONTAINER_IFNAME}[^:]*) ; do
+    for VETH in $(ip -o link show | grep -o v${CONTAINER_IFNAME}[^:@]*) ; do
         ip link del $VETH >/dev/null 2>&1 || true
     done
 
