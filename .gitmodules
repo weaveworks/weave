@@ -58,3 +58,24 @@
 [submodule "vendor/github.com/boltdb/bolt"]
 	path = vendor/github.com/boltdb/bolt
 	url = https://github.com/boltdb/bolt
+[submodule "vendor/github.com/docker/go-plugins-helpers"]
+	path = vendor/github.com/docker/go-plugins-helpers
+	url = https://github.com/docker/go-plugins-helpers
+[submodule "vendor/github.com/coreos/go-systemd"]
+	path = vendor/github.com/coreos/go-systemd
+	url = https://github.com/coreos/go-systemd
+[submodule "vendor/github.com/docker/go-connections"]
+	path = vendor/github.com/docker/go-connections
+	url = https://github.com/docker/go-connections
+[submodule "vendor/golang.org/x/net"]
+	path = vendor/golang.org/x/net
+	url = https://go.googlesource.com/net
+[submodule "vendor/github.com/armon/go-socks5"]
+	path = vendor/github.com/armon/go-socks5
+	url = https://github.com/armon/go-socks5
+[submodule "vendor/golang.org/x/tools"]
+	path = vendor/golang.org/x/tools
+	url = https://go.googlesource.com/tools
+[submodule "vendor/github.com/mgutz/ansi"]
+	path = vendor/github.com/mgutz/ansi
+	url = https://github.com/mgutz/ansi
