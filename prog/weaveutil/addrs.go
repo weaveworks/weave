@@ -12,15 +12,13 @@ func containerAddrs(args []string) error {
 	}
 	bridgeName := args[0]
 
-	procPath := procDir()
-
 	c, err := docker.NewVersionedClientFromEnv("1.18")
 	if err != nil {
 		return err
 	}
 
 	for _, containerID := range args[1:] {
-		netDevs, err := getNetDevs(procPath, bridgeName, c, containerID)
+		netDevs, err := getNetDevs(bridgeName, c, containerID)
 		if err != nil {
 			if _, ok := err.(*docker.NoSuchContainer); ok {
 				continue
@@ -41,9 +39,9 @@ func containerAddrs(args []string) error {
 	return nil
 }
 
-func getNetDevs(procPath, bridgeName string, c *docker.Client, containerID string) ([]common.NetDev, error) {
+func getNetDevs(bridgeName string, c *docker.Client, containerID string) ([]common.NetDev, error) {
 	if containerID == "weave:expose" {
-		return common.GetBridgeNetDev(procPath, bridgeName)
+		return common.GetBridgeNetDev(bridgeName)
 	}
 
 	container, err := c.InspectContainer(containerID)
@@ -51,5 +49,5 @@ func getNetDevs(procPath, bridgeName string, c *docker.Client, containerID strin
 		return nil, err
 	}
 
-	return common.GetWeaveNetDevs(procPath, container.State.Pid)
+	return common.GetWeaveNetDevs(container.State.Pid)
 }

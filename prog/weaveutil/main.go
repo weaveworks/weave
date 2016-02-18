@@ -60,11 +60,3 @@ func cmdUsage(cmd string, usage string) {
 	fmt.Fprintf(os.Stderr, "usage: weaveutil %s %s\n", cmd, usage)
 	os.Exit(1)
 }
-
-func procDir() string {
-	procDir := os.Getenv("PROCFS")
-	if procDir == "" {
-		procDir = "/proc"
-	}
-	return procDir
-}

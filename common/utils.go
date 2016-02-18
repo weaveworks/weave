@@ -49,10 +49,10 @@ type NetDev struct {
 }
 
 // Search the network namespace of a process for interfaces matching a predicate
-func FindNetDevs(procPath string, processID int, match func(string) bool) ([]NetDev, error) {
+func FindNetDevs(processID int, match func(string) bool) ([]NetDev, error) {
 	var netDevs []NetDev
 
-	ns, err := netns.GetFromPath(fmt.Sprintf("%s/%d/ns/net", procPath, processID))
+	ns, err := netns.GetFromPath(fmt.Sprintf("/proc/%d/ns/net", processID))
 	if err != nil {
 		return nil, err
 	}
@@ -84,15 +84,15 @@ func FindNetDevs(procPath string, processID int, match func(string) bool) ([]Net
 }
 
 // Lookup the weave interface of a container
-func GetWeaveNetDevs(procPath string, processID int) ([]NetDev, error) {
-	return FindNetDevs(procPath, processID, func(name string) bool {
+func GetWeaveNetDevs(processID int) ([]NetDev, error) {
+	return FindNetDevs(processID, func(name string) bool {
 		return strings.HasPrefix(name, "ethwe")
 	})
 }
 
 // Get the weave bridge interface
-func GetBridgeNetDev(procPath, bridgeName string) ([]NetDev, error) {
-	return FindNetDevs(procPath, 1, func(name string) bool {
+func GetBridgeNetDev(bridgeName string) ([]NetDev, error) {
+	return FindNetDevs(1, func(name string) bool {
 		return name == bridgeName
 	})
 }
