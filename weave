@@ -486,7 +486,7 @@ detect_bridge_type() {
         if [ ! -d /sys/class/net/$DATAPATH/bridge -a -d /sys/class/net/$BRIDGE/bridge ] ; then
             BRIDGE_TYPE=bridged_fastdp
         else
-            echo "Inconsistent bridge state detected. Please do 'weave reset' and try again" >&2
+            echo "Inconsistent bridge state detected. Please do 'weave reset' and try again." >&2
             exit 1
         fi
     elif [ -d /sys/class/net/$BRIDGE ] ; then
