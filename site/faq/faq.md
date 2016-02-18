@@ -7,37 +7,40 @@ layout: default
 
 ##Q:How do I obtain the IP of a specific container when I'm using Weave?
 
-To see which address was allocated to a container on a Weave network, run: `weave ps`.  For more information about addressing see (Address Allocation)[/site/features].
+Use `weave ps` to see which address was allocated to a container on a Weave network.  
+
+See [Address Allocation](/site/features/address-allocation-feature.md).
 
 
 ##Q: How do I expose one of my containers to the outside world?
 
-How to expose a container to the outside world is described in [Exporting Services](/site/exporting-services).
+Exposing a container to the outside world is described in [Exporting Services](/site/features/exporting-services.md).
 
 
-##Q: How do I manually change the IP of a container?
-
-My dockerized app checks the request of a remote IP, and I need to include a specific address on a list.  I could just use all of the IP addresses that Weave generates, but that's clearly not very efficient. 
-
-You can manually change the IP of a container using [Classless Inter-Domain Routing or CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing). For more information, refer to [How to Manually Change an IP Address](/site/manual-ip-address.md). 
+##Q: My dockerized app needs to check the request of a remote IP. Can I manually change the IP of a container?
 
 
-##Q:How do I connect my existing 'legacy' network with a Weave container network?
+You can manually change the IP of a container using [Classless Inter-Domain Routing or CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing). 
 
-For example, let's say you have a Weave network that runs on hosts A, B, C. And you have another host, let's call it P, where neither Weave nor Docker are running.  You want to connect from a process running on host P to a specific container running on your other network, Host B. 
+For more information, refer to [How to Manually Change an IP Address](/site/ipam/manual-ip-address.md). 
 
-Since the Weave Network is completely separate from any network that P is connected to, you cannot connect the container using the container's IP address.
 
-Instead you will have to expose a port on the container on host B. You can read about how to expose a port: [http://docs.weave.works/weave/latest_release/features.html#service-export](XXXX-link to service export in Features doc)
+##Q:Can I connect my existing 'legacy' network with a Weave container network?
 
->>Note: If host P is able to route to B, then this approach is the best solution.
+Yes you can. 
+
+Let's say you have a Weave network that runs on hosts A, B, C. and an additional host, that we'll call P, where neither Weave nor Docker are running.  You want to connect from a process running on host P to a specific container running on host B on the Weave network. 
+
+Since the Weave network is completely separate from any network that P is connected to, you cannot connect the container using the container's IP address. Instead you will have to expose a port on the container on host B. 
+
+You can read about how to expose a port in [Service Exporting](/site/features/service-management.md)
 
 
 ##Q: Why am I seeing the same IP address assigned to two different containers on different hosts?
 
 Under normal circumstances, this should not happen, but it can occur if  `weave forget` and `weave rmpeer` was run on more than one host. 
 
-You cannot call `weave rmpeer` on more than one host. The address space, which was owned by the stale peer cannot be left dangling, and so, is reassigned. In this instance, the address is reassigned to the peer on which `weave rmpeer` was run. Therefore, if you run `weave forget` and then `weave rmpeer` on more than one host at a time, the result is duplicate IPs on more than one host.
+You cannot call `weave rmpeer` on more than one host. The address space, which was owned by the stale peer cannot be left dangling, and as a result it gets reassigned. In this instance, the address is reassigned to the peer on which `weave rmpeer` was run. Therefore, if you run `weave forget` and then `weave rmpeer` on more than one host at a time, it results in duplicate IPs on more than one host.
 
 Once the peers detect the inconsistency, they log the error and drop the connection that supplied the inconsistent data. The rest of the peers will carry on with their view of the world, but the network will not function correctly.
 
@@ -55,9 +58,9 @@ This will provide enough time for Weave to re-establish its peer connections acr
 
 All virtualization techniques have some overhead, and unless your system is completely bottlenecked on the network you won't notice this during normal operation. 
 
-Weave Net also automatically uses the fastest data path between two hosts. When Weave Net can't use the fast data path between two hosts, it falls back to the slower packet forwarding approach. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast data path within the data centers, but not for the more constrained network link between them.
+Weave Net also automatically uses the fastest data path between two hosts. When Weave Net can't use the fast data path between two hosts, it falls back to the slower packet forwarding approach. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast datapath within the data centers, but not for the more constrained network link between them.
 
-For more information about fast datapath see [How Fast Data Path Works](/site/fastdp-how-it-works.md)
+For more information about fast datapath see [How Fast Data Path Works](/site/fastdp/fastdp-how-it-works.md)
 
 
 ##Q:How can I tell if Weave is using fastdp or not?
@@ -71,8 +74,8 @@ For more information on this command, see [Viewing Connection Mode Fastdp or Sle
 
 Encryption does not work with fast datapath. If you enable encryption using the `--password` option to launch weave (or you use the `WEAVE_PASSWORD` environment variable), fast data path will by default be disabled. 
 
-See [Using Fast Datapath](/site/using-fastdp.md) for more information
+See [Using Fast Datapath](/site/fastdp/using-fastdp.md) for more information
 
-##Q: Can I have multiple isolated subnets and still enable individuals containers to communicate with one another?
+##Q: Can I have multiple isolated subnets and still enable individual containers to communicate with one another?
 
-Yes, of course!  Weave allows you to run isolated subnets and then open communications between individual containers from those isolated subnets. You can find information on how to do this in [Application Isolation](/site/application-isolation.md)
+Yes, of course!  Weave allows you to run isolated subnets and then open communications between individual containers from those isolated subnets. You can find information on how to do this in [Application Isolation](/site/features/application-isolation.md)

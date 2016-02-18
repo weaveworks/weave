@@ -4,13 +4,12 @@ layout: default
 ---
 
 
-##Using Fast Datapath
 
 The most important thing to know about fast datapath is that you don't need to configure anything before using this feature. If you are using Weave Net 1.2 or greater, fast datapath (`fastdp`) is automatically enabled.
 
 When Weave Net can't use the fast data path between two hosts, it falls back to the slower packet forwarding approach. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast data path within the data centers, but not for the more constrained network link between them. 
 
-See [How Fastdp Works](/site/fastdp-how-it-works.md) for a more indepth discussion of this feature. 
+See [How Fastdp Works](/site/fastdp/fastdp-how-it-works.md) for a more indepth discussion of this feature. 
 
 ###Disabling Fast Datapath
 
