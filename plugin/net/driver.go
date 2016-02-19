@@ -17,8 +17,7 @@ import (
 )
 
 const (
-	WeaveContainer = "weave"
-	WeaveBridge    = "weave"
+	WeaveBridge = "weave"
 )
 
 type driver struct {

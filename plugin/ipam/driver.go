@@ -12,10 +12,6 @@ import (
 	. "github.com/weaveworks/weave/common"
 )
 
-const (
-	WeaveContainer = "weave"
-)
-
 type ipam struct {
 	weave *api.Client
 }
