@@ -45,24 +45,24 @@ type operation interface {
 // necessary plumbing.  Runs as a single-threaded Actor, so no locks
 // are used around data structures.
 type Allocator struct {
-	actionChan       chan<- func()
-	ourName          mesh.PeerName
-	universe         address.Range                // superset of all ranges
-	ring             *ring.Ring                   // information on ranges owned by all peers
-	space            space.Space                  // more detail on ranges owned by us
-	owned            map[string][]address.Address // who owns what addresses, indexed by container-ID
-	nicknames        map[mesh.PeerName]string     // so we can map nicknames for rmpeer
-	pendingAllocates []operation                  // held until we get some free space
-	pendingClaims    []operation                  // held until we know who owns the space
-	dead             map[string]time.Time         // containers we heard were dead, and when
-	db               db.DB                        // persistence
-	gossip           mesh.Gossip                  // our link to the outside world for sending messages
-	paxos            *paxos.Node
-	paxosActive      bool
-	ticker           *time.Ticker
-	shuttingDown     bool // to avoid doing any requests while trying to shut down
-	isKnownPeer      func(mesh.PeerName) bool
-	now              func() time.Time
+	actionChan        chan<- func()
+	ourName           mesh.PeerName
+	universe          address.Range                // superset of all ranges
+	ring              *ring.Ring                   // information on ranges owned by all peers
+	space             space.Space                  // more detail on ranges owned by us
+	owned             map[string][]address.Address // who owns what addresses, indexed by container-ID
+	nicknames         map[mesh.PeerName]string     // so we can map nicknames for rmpeer
+	pendingAllocates  []operation                  // held until we get some free space
+	pendingClaims     []operation                  // held until we know who owns the space
+	dead              map[string]time.Time         // containers we heard were dead, and when
+	db                db.DB                        // persistence
+	gossip            mesh.Gossip                  // our link to the outside world for sending messages
+	participant       paxos.Participant
+	awaitingConsensus bool
+	ticker            *time.Ticker
+	shuttingDown      bool // to avoid doing any requests while trying to shut down
+	isKnownPeer       func(mesh.PeerName) bool
+	now               func() time.Time
 }
 
 // NewAllocator creates and initialises a new Allocator
@@ -73,7 +73,7 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 		ring:        ring.New(universe.Start, universe.End, ourName),
 		owned:       make(map[string][]address.Address),
 		db:          db,
-		paxos:       paxos.NewNode(ourName, ourUID, quorum),
+		participant: paxos.NewParticipant(ourName, ourUID, quorum),
 		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
 		isKnownPeer: isKnownPeer,
 		dead:        make(map[string]time.Time),
@@ -473,8 +473,11 @@ func (alloc *Allocator) encode() []byte {
 	}
 
 	// We're only interested in Paxos until we have a Ring.
+	// Non-electing participants (e.g. observers) return
+	// a nil gossip state in order to provoke a unicast ring
+	// update from electing peers who have reached consensus.
 	if alloc.ring.Empty() {
-		data.Paxos = alloc.paxos.GossipState()
+		data.Paxos = alloc.participant.GossipState()
 	} else {
 		data.Ring = alloc.ring
 	}
@@ -541,7 +544,7 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 			}
 			action()
 		case <-alloc.ticker.C:
-			if alloc.paxosActive {
+			if alloc.awaitingConsensus {
 				alloc.propose()
 			}
 			alloc.removeDeadContainers()
@@ -557,13 +560,13 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 
 // Ensure we are making progress towards an established ring
 func (alloc *Allocator) establishRing() {
-	if !alloc.ring.Empty() || alloc.paxosActive {
+	if !alloc.ring.Empty() || alloc.awaitingConsensus {
 		return
 	}
 
-	alloc.paxosActive = true
+	alloc.awaitingConsensus = true
 	alloc.propose()
-	if ok, cons := alloc.paxos.Consensus(); ok {
+	if ok, cons := alloc.participant.Consensus(); ok {
 		// If the quorum was 1, then proposing immediately
 		// leads to consensus
 		alloc.createRing(cons.Value)
@@ -579,9 +582,9 @@ func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 
 func (alloc *Allocator) ringUpdated() {
 	// When we have a ring, we don't need paxos any more
-	if alloc.paxosActive {
-		alloc.paxosActive = false
-		alloc.paxos = nil
+	if alloc.awaitingConsensus {
+		alloc.awaitingConsensus = false
+		alloc.participant = nil
 	}
 
 	alloc.persistRing()
@@ -621,7 +624,7 @@ func normalizeConsensus(consensus []mesh.PeerName) []mesh.PeerName {
 
 func (alloc *Allocator) propose() {
 	alloc.debugf("Paxos proposing")
-	alloc.paxos.Propose()
+	alloc.participant.Propose()
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
@@ -669,11 +672,16 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 		alloc.nicknames[peer] = nickname
 	}
 
-	// only one of Ring and Paxos should be present.  And we
-	// shouldn't get updates for a empty Ring. But tolerate
-	// them just in case.
-	if data.Ring != nil {
+	switch {
+	// If someone sent us a ring, merge it into ours. Note this will move us
+	// out of the awaiting-consensus state if we didn't have a ring already.
+	case data.Ring != nil:
 		switch err = alloc.ring.Merge(*data.Ring); err {
+		case nil:
+			if !alloc.ring.Empty() {
+				alloc.pruneNicknames()
+				alloc.ringUpdated()
+			}
 		case ring.ErrDifferentSeeds:
 			return fmt.Errorf("IP allocation was seeded by different peers (received: %v, ours: %v)",
 				alloc.annotatePeernames(data.Ring.Seeds), alloc.annotatePeernames(alloc.ring.Seeds))
@@ -681,30 +689,41 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 			return fmt.Errorf("Incompatible IP allocation ranges (received: %s, ours: %s)",
 				data.Ring.Range().AsCIDRString(), alloc.ring.Range().AsCIDRString())
 		default:
-			if err == nil && !alloc.ring.Empty() {
-				alloc.pruneNicknames()
-				alloc.ringUpdated()
-			}
 			return err
 		}
-	}
 
-	if data.Paxos != nil {
-		if alloc.ring.Empty() {
-			if alloc.paxos.Update(data.Paxos) {
-				if alloc.paxos.Think() {
-					// If something important changed, broadcast
-					alloc.gossip.GossipBroadcast(alloc.Gossip())
-				}
+	// If we reach this point we know the sender is either an elector
+	// broadcasting a paxos proposal to form a ring or a non-elector
+	// broadcasting a ring request. If we have a ring already we can just send
+	// it back regardless.
+	case !alloc.ring.Empty() && sender != mesh.UnknownPeerName:
+		alloc.sendRingUpdate(sender)
 
-				if ok, cons := alloc.paxos.Consensus(); ok {
-					alloc.createRing(cons.Value)
-				}
+	// Otherwise, we need to react according to whether or not we received a
+	// paxos proposal.
+	case data.Paxos != nil:
+		// Process the proposal (this is a no-op if we're an observer)
+		if alloc.participant.Update(data.Paxos) {
+			if alloc.participant.Think() {
+				// If something important changed, broadcast
+				alloc.gossip.GossipBroadcast(alloc.Gossip())
 			}
-		} else if sender != mesh.UnknownPeerName {
-			// Sender is trying to initialize a ring, but we have one
-			// already - send it straight back
-			alloc.sendRingUpdate(sender)
+
+			if ok, cons := alloc.participant.Consensus(); ok {
+				alloc.createRing(cons.Value)
+			}
+		}
+
+	// No paxos proposal present, so sender is a non-elector. We don't have a
+	// ring to send, so attempt to establish one on their behalf. NB we only do
+	// this:
+	//
+	// * On an explicit broadcast request triggered by a remote allocation attempt
+	//   (if we did so on periodic gossip we would force consensus unnecessarily)
+	// * If we are an elector (to avoid a broadcast storm of ring request messages)
+	default:
+		if _, ok := alloc.participant.(*paxos.Node); ok && sender != mesh.UnknownPeerName {
+			alloc.establishRing()
 		}
 	}
 

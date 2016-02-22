@@ -94,7 +94,7 @@ func main() {
 	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
-	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
+	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, -1, "number of peers in network (for IP address allocation)")
 	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
@@ -197,7 +197,7 @@ func main() {
 	if iprangeCIDR != "" {
 		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), db, isKnownPeer)
 		observeContainers(allocator)
-	} else if peerCount > 0 {
+	} else if peerCount > -1 {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}
 
@@ -352,6 +352,10 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 // Pick a quorum size heuristically based on the number of peer
 // addresses passed.
 func determineQuorum(initPeerCountFlag int, peers []string) uint {
+	if initPeerCountFlag == 0 {
+		return uint(0)
+	}
+
 	if initPeerCountFlag > 0 {
 		return uint(initPeerCountFlag/2 + 1)
 	}
