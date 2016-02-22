@@ -87,7 +87,12 @@ launched via the Docker
 [command-line interface](https://docs.docker.com/reference/commandline/cli/)
 or
 [remote API](https://docs.docker.com/reference/api/docker_remote_api/)
-are attached to the weave network before they begin execution.
+are attached to the weave network before they begin execution. To use
+the proxy, run
+
+    $ eval $(weave env)
+
+and then start containers as usual.
 
 Containers started in this way that subsequently restart, either by an
 explicit `docker restart` command or by Docker restart policy, are
@@ -99,6 +104,9 @@ Alternatively, you can use weave as a Docker plugin.  A Docker network
 named `weave` is created by `weave launch`, which you can use like this:
 
     $ docker run --net=weave -ti ubuntu
+
+> NB: The plugin is an *alternative* to the proxy, hence one should
+> *not* run `eval $(weave env)` beforehand.
 
 For more details see the [plugin documentation](plugin.html).
 
