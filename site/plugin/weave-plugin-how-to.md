@@ -30,8 +30,10 @@ The Weave Docker Networking plugin is fast and easy to use and best of all doesn
 
 Just launch the Weave Net router onto each host and then make a peer connection with the other hosts:
 
+~~~bash
 host1$ weave launch host2
 host2$ weave launch host1
+~~~
 
 then you can run your containers using the Docker command-line:
 
@@ -41,7 +43,7 @@ root@1458e848cd90:/# hostname -i
 10.32.0.2
 ~~~
 
-~~~
+~~~bash
 host2$ docker run --net=weave -ti ubuntu
 root@8cc4b5dc5722:/# ping 10.32.0.2
 
@@ -58,10 +60,11 @@ We start the plugin with a policy of `--restart=always`, so that it is there aft
 
 Unfortunately, [Docker 1.9 may also try to commmuncate with the plugin before it has even started it](https://github.com/docker/libnetwork/issues/813).
 
->>**Note:** If using `systemd`, it's advised that you modify the Docker unit to remove the timeout on startup. This gives Docker enough time to abandon its attempts. E.g. in the file `/lib/systemd/system/docker.service`, add it under `[Service]`:
+If using `systemd`, it's advised that you modify the Docker unit to remove the timeout on startup. This gives Docker enough time to abandon its attempts. For example, in the file `/lib/systemd/system/docker.service`, add the following under `[Service]`: 
 
+~~~bash
     TimeoutStartSec=0
-
+~~~
 
 ###Bypassing the Central Cluster Store When Building Docker Apps
 
