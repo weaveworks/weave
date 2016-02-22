@@ -18,13 +18,33 @@ Subsequently you can start containers with, e.g.
 
 on any of the hosts, and they can all communicate with each other.
 
+> NB: It is inadvisable to attach containers to the weave network
+> using both the Weave Docker Networking Plugin and
+> [Weave Docker API Proxy](proxy.html) simultaneously. Such containers
+> will end up with two weave network interfaces and two IP addresses,
+> which is rarely desirable. To ensure the proxy is not being used, *do
+> not run `eval $(weave env)`, or `docker $(weave config) ...`*.
+
 In order to use Weave's [Service Discovery](weavedns.html), you
 need to pass the additional arguments `--dns` and `-dns-search`, for
 which we provide a helper in the weave script:
 
     $ docker run --net=weave -h foo.weave.local $(weave dns-args) -tdi ubuntu
-    $ docker run --net=weave -h bar.weave.local $(weave dns-args) -ti ubuntu
-    # ping foo
+
+Here is a complete example of using the plugin for connectivity
+between two containers running on different hosts:
+
+    host1$ weave launch
+    host1$ docker run --net=weave -h foo.weave.local $(weave dns-args) -tdi ubuntu
+    
+    host2$ weave launch $HOST1
+    host2$ docker run --net=weave $(weave dns-args) -ti ubuntu
+    root@cb73d1a8aece:/# ping -c1 -q foo
+    PING foo (10.32.0.1) 56(84) bytes of data.
+    
+    --- foo ping statistics ---
+    1 packets transmitted, 1 received, 0% packet loss, time 0ms
+    rtt min/avg/max/mdev = 1.341/1.341/1.341/0.000 ms
 
 ## Under the hood
 
