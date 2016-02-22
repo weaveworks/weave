@@ -2,10 +2,10 @@ language: python
 sudo: false
 
 env:
-  - PATH="${PATH}:${HOME}/.local/bin"
+  - PATH="${PATH}:${HOME}/gsutil"
 
 install:
-  - pip install --upgrade gsutil
+  - curl --silent --location https://storage.googleapis.com/pub/gsutil.tar.gz | tar x -C $HOME
   - bin/setup-ci-secrets $encrypted_5ba036e89377_key $encrypted_5ba036e89377_iv
 
 script:
