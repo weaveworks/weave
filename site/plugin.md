@@ -18,12 +18,12 @@ Subsequently you can start containers with, e.g.
 
 on any of the hosts, and they can all communicate with each other.
 
-> NB: It is inadvisable to attach containers to the weave network
+> WARNING: It is inadvisable to attach containers to the weave network
 > using both the Weave Docker Networking Plugin and
 > [Weave Docker API Proxy](proxy.html) simultaneously. Such containers
 > will end up with two weave network interfaces and two IP addresses,
-> which is rarely desirable. To ensure the proxy is not being used, *do
-> not run `eval $(weave env)`, or `docker $(weave config) ...`*.
+> which is rarely desirable. To ensure the proxy is not being used,
+> *do not run `eval $(weave env)`, or `docker $(weave config) ...`*.
 
 In order to use Weave's [Service Discovery](weavedns.html), you
 need to pass the additional arguments `--dns` and `-dns-search`, for
