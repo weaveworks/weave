@@ -2,11 +2,12 @@ language: python
 sudo: false
 
 env:
-  - PATH="${PATH}:${HOME}/.local/bin"
+  - PATH="${PATH}:${HOME}/gsutil"
 
 install:
-  - pip install --upgrade gsutil
+  - pip install pyopenssl
+  - curl --silent --location https://storage.googleapis.com/pub/gsutil.tar.gz | tar xz -C $HOME
   - bin/setup-ci-secrets $encrypted_5ba036e89377_key $encrypted_5ba036e89377_iv
 
 script:
-  - 'test "${TRAVIS_PULL_REQUEST}" = "false" && site/build-and-publish.sh || true'
+  - 'test "${TRAVIS_PULL_REQUEST}" = "true" || site/build-and-publish.sh'
