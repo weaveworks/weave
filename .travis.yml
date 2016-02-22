@@ -9,4 +9,4 @@ install:
   - bin/setup-ci-secrets $encrypted_5ba036e89377_key $encrypted_5ba036e89377_iv
 
 script:
-  - 'test "${TRAVIS_PULL_REQUEST}" = "false" && site/build-and-publish.sh || true'
+  - 'test "${TRAVIS_PULL_REQUEST}" = "true" || site/build-and-publish.sh'
