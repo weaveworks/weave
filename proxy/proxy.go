@@ -132,7 +132,8 @@ func (proxy *Proxy) AttachExistingContainers() {
 			}
 			continue
 		}
-		if containerShouldAttach(container) && container.State.Running && !container.State.Restarting {
+		// The 'Running' check is purely an optimisation.
+		if containerShouldAttach(container) && container.State.Running {
 			proxy.attach(container, false)
 		}
 	}
