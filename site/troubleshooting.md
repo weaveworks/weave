@@ -124,6 +124,13 @@ Proxy](proxy.html#troubleshooting).
 
 ### <a name="weave-status-connections"></a>List connections
 
+Connections between weave peers carry control traffic over TCP and
+data traffic over UDP. For a connection to be fully established, the
+TCP connection and UDP data path must be able to transmit information
+in both directions. Weave routers check this regularly with
+heartbeats. Failed connections are automatically retried, with an
+exponential back-off.
+
 Detailed information on the local weave router's connections can be
 obtained with `weave status connections`:
 
