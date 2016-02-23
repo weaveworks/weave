@@ -558,7 +558,9 @@ create_bridge() {
         add_iptables_rule nat POSTROUTING -j WEAVE
     else
         if [ -n "$LAUNCHING_ROUTER" ] ; then
-            if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] ; then
+            if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] &&
+                util_op create-datapath $DATAPATH 2>/dev/null &&
+                util_op delete-datapath $DATAPATH 2>/dev/null ; then
                 cat <<EOF >&1
 WEAVE_NO_FASTDP is not set, but there is already a bridge present of
 the wrong type for fast datapath.  Please do 'weave reset' to remove
