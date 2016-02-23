@@ -119,10 +119,6 @@ func (proxy *Proxy) attachWithRetry(id string) {
 	proxy.attachJobs[id] = j
 }
 
-func (proxy *Proxy) attachAndKillOnFailure(id string) {
-	proxy.notifyWaiters(id, proxy.attach(id, true))
-}
-
 func (j attachJob) Stop() {
 	j.timer.Stop()
 }
@@ -388,7 +384,7 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 
 // weavedocker.ContainerObserver interface
 func (proxy *Proxy) ContainerStarted(ident string) {
-	proxy.attachAndKillOnFailure(ident)
+	proxy.notifyWaiters(ident, proxy.attach(ident, true))
 }
 
 func containerShouldAttach(container *docker.Container) bool {
