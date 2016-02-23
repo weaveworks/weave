@@ -97,7 +97,7 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 func (c *Client) IsContainerNotRunning(idStr string) bool {
 	container, err := c.InspectContainer(idStr)
 	if err == nil {
-		return !container.State.Running
+		return !container.State.Running || container.State.Restarting
 	}
 	if _, notThere := err.(*docker.NoSuchContainer); notThere {
 		return true

@@ -132,7 +132,7 @@ func (proxy *Proxy) AttachExistingContainers() {
 			}
 			continue
 		}
-		if containerShouldAttach(container) && (container.State.Running || container.State.Paused) {
+		if containerShouldAttach(container) && container.State.Running && !container.State.Restarting {
 			proxy.attach(container, false)
 		}
 	}
