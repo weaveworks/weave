@@ -474,7 +474,7 @@ func (proxy *Proxy) attach(containerID string, orDie bool) error {
 		Log.Infof("Attaching weave router container: %s", container.ID)
 		return callWeaveAttach(container, []string{"attach-router"})
 	}
-	if !containerShouldAttach(container) || !(container.State.Running || container.State.Paused) {
+	if !containerShouldAttach(container) || !container.State.Running {
 		return nil
 	}
 
