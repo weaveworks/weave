@@ -54,6 +54,7 @@ type Allocator struct {
 	nicknames        map[mesh.PeerName]string     // so we can map nicknames for rmpeer
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
+	pendingConsenses []operation                  // held until consensus achieved
 	dead             map[string]time.Time         // containers we heard were dead, and when
 	db               db.DB                        // persistence
 	gossip           mesh.Gossip                  // our link to the outside world for sending messages
@@ -151,29 +152,34 @@ func (alloc *Allocator) cancelOpsFor(ops *[]operation, ident string) bool {
 	return found
 }
 
-// Try all pending operations
-func (alloc *Allocator) tryPendingOps() {
-	// The slightly different semantics requires us to operate on 'claims' and
-	// 'allocates' separately:
-	// Claims must be tried before Allocates
-	for i := 0; i < len(alloc.pendingClaims); {
-		op := alloc.pendingClaims[i]
+// Try operations in a queue
+func (alloc *Allocator) tryOps(ops *[]operation, bailOnFail bool) {
+	for i := 0; i < len(*ops); {
+		op := (*ops)[i]
 		if !op.Try(alloc) {
+			if bailOnFail {
+				break
+			}
 			i++
 			continue
 		}
-		alloc.pendingClaims = append(alloc.pendingClaims[:i], alloc.pendingClaims[i+1:]...)
+		*ops = append((*ops)[:i], (*ops)[i+1:]...)
 	}
+}
+
+// Try all pending operations
+func (alloc *Allocator) tryPendingOps() {
+	// Unblock pending consenses first
+	alloc.tryOps(&alloc.pendingConsenses, false)
+
+	// The slightly different semantics requires us to operate on 'claims' and
+	// 'allocates' separately:
+	// Claims must be tried before Allocates
+	alloc.tryOps(&alloc.pendingClaims, false)
 
 	// When the first Allocate fails, bail - no need to
 	// send too many begs for space.
-	for i := 0; i < len(alloc.pendingAllocates); {
-		op := alloc.pendingAllocates[i]
-		if !op.Try(alloc) {
-			break
-		}
-		alloc.pendingAllocates = append(alloc.pendingAllocates[:i], alloc.pendingAllocates[i+1:]...)
-	}
+	alloc.tryOps(&alloc.pendingAllocates, true)
 }
 
 func (alloc *Allocator) spaceRequestDenied(sender mesh.PeerName, r address.Range) {
@@ -198,6 +204,14 @@ func (e *errorCancelled) Error() string {
 }
 
 // Actor client API
+
+// Consense (Sync) - wait for consensus
+func (alloc *Allocator) Consense() {
+	resultChan := make(chan struct{})
+	op := &consense{resultChan: resultChan}
+	alloc.doOperation(op, &alloc.pendingConsenses)
+	<-resultChan
+}
 
 // Allocate (Sync) - get new IP address for container with given name in range
 // if there isn't any space in that range we block indefinitely
@@ -344,6 +358,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.shuttingDown = true
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
+		alloc.cancelOps(&alloc.pendingConsenses)
 		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()

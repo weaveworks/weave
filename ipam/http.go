@@ -77,6 +77,10 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		w.WriteHeader(204)
 	})
 
+	router.Methods("GET").Path("/consensus").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		alloc.Consense()
+	})
+
 	router.Methods("GET").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		if subnet, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"]); ok {
