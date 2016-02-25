@@ -8,7 +8,7 @@ import (
 	"github.com/docker/libnetwork/types"
 
 	weaveapi "github.com/weaveworks/weave/api"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/common/odp"
 	"github.com/weaveworks/weave/plugin/skel"
@@ -42,7 +42,7 @@ func New(client *docker.Client, weave *weaveapi.Client, scope string, noMulticas
 }
 
 func errorf(format string, a ...interface{}) error {
-	Log.Errorf(format, a...)
+	common.Log.Errorf(format, a...)
 	return fmt.Errorf(format, a...)
 }
 
@@ -52,24 +52,24 @@ func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
 	var caps = &api.GetCapabilityResponse{
 		Scope: driver.scope,
 	}
-	Log.Debugf("Get capabilities: responded with %+v", caps)
+	common.Log.Debugf("Get capabilities: responded with %+v", caps)
 	return caps, nil
 }
 
 func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
-	Log.Debugf("Create network request %+v", create)
-	Log.Infof("Create network %s", create.NetworkID)
+	common.Log.Debugf("Create network request %+v", create)
+	common.Log.Infof("Create network %s", create.NetworkID)
 	return nil
 }
 
 func (driver *driver) DeleteNetwork(delete *api.DeleteNetworkRequest) error {
-	Log.Debugf("Delete network request: %+v", delete)
-	Log.Infof("Destroy network %s", delete.NetworkID)
+	common.Log.Debugf("Delete network request: %+v", delete)
+	common.Log.Infof("Destroy network %s", delete.NetworkID)
 	return nil
 }
 
 func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.CreateEndpointResponse, error) {
-	Log.Debugf("Create endpoint request %+v", create)
+	common.Log.Debugf("Create endpoint request %+v", create)
 	endID := create.EndpointID
 
 	if create.Interface == nil {
@@ -80,13 +80,13 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 	driver.Unlock()
 	resp := &api.CreateEndpointResponse{}
 
-	Log.Infof("Create endpoint %s %+v", endID, resp)
+	common.Log.Infof("Create endpoint %s %+v", endID, resp)
 	return resp, nil
 }
 
 func (driver *driver) DeleteEndpoint(deleteReq *api.DeleteEndpointRequest) error {
-	Log.Debugf("Delete endpoint request: %+v", deleteReq)
-	Log.Infof("Delete endpoint %s", deleteReq.EndpointID)
+	common.Log.Debugf("Delete endpoint request: %+v", deleteReq)
+	common.Log.Infof("Delete endpoint %s", deleteReq.EndpointID)
 	driver.Lock()
 	delete(driver.endpoints, deleteReq.EndpointID)
 	driver.Unlock()
@@ -101,8 +101,8 @@ func (driver *driver) HasEndpoint(endpointID string) bool {
 }
 
 func (driver *driver) EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointInfoResponse, error) {
-	Log.Debugf("Endpoint info request: %+v", req)
-	Log.Infof("Endpoint info %s", req.EndpointID)
+	common.Log.Debugf("Endpoint info request: %+v", req)
+	common.Log.Infof("Endpoint info %s", req.EndpointID)
 	return &api.EndpointInfoResponse{Value: map[string]interface{}{}}, nil
 }
 
@@ -128,16 +128,16 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 		}
 	case *netlink.GenericLink:
 		if maybeBridge.Type() != "openvswitch" {
-			Log.Errorf("device %s is %+v", WeaveBridge, maybeBridge)
+			common.Log.Errorf("device %s is %+v", WeaveBridge, maybeBridge)
 			return nil, errorf(`device "%s" is of type "%s"`, WeaveBridge, maybeBridge.Type())
 		}
 		odp.AddDatapathInterface(WeaveBridge, local.Name)
 	case *netlink.Device:
-		Log.Warnf("kernel does not report what kind of device %s is, just %+v", WeaveBridge, maybeBridge)
+		common.Log.Warnf("kernel does not report what kind of device %s is, just %+v", WeaveBridge, maybeBridge)
 		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
 		odp.AddDatapathInterface(WeaveBridge, local.Name)
 	default:
-		Log.Errorf("device %s is %+v", WeaveBridge, maybeBridge)
+		common.Log.Errorf("device %s is %+v", WeaveBridge, maybeBridge)
 		return nil, errorf(`device "%s" not a bridge`, WeaveBridge)
 	}
 	if err := netlink.LinkSetUp(local); err != nil {
@@ -159,28 +159,28 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 		}
 		response.StaticRoutes = append(response.StaticRoutes, multicastRoute)
 	}
-	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
+	common.Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
 	return response, nil
 }
 
 func (driver *driver) LeaveEndpoint(leave *api.LeaveRequest) error {
-	Log.Debugf("Leave request: %+v", leave)
+	common.Log.Debugf("Leave request: %+v", leave)
 
 	local := vethPair(leave.EndpointID[:5])
 	if err := netlink.LinkDel(local); err != nil {
-		Log.Warningf("unable to delete veth on leave: %s", err)
+		common.Log.Warningf("unable to delete veth on leave: %s", err)
 	}
-	Log.Infof("Leave %s:%s", leave.NetworkID, leave.EndpointID)
+	common.Log.Infof("Leave %s:%s", leave.NetworkID, leave.EndpointID)
 	return nil
 }
 
 func (driver *driver) DiscoverNew(disco *api.DiscoveryNotification) error {
-	Log.Debugf("Dicovery new notification: %+v", disco)
+	common.Log.Debugf("Dicovery new notification: %+v", disco)
 	return nil
 }
 
 func (driver *driver) DiscoverDelete(disco *api.DiscoveryNotification) error {
-	Log.Debugf("Dicovery delete notification: %+v", disco)
+	common.Log.Debugf("Dicovery delete notification: %+v", disco)
 	return nil
 }
 

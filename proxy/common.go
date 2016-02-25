@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 var (
@@ -47,7 +47,7 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 	// In case the router control endpoint address is non-standard.
 	propagateEnv("WEAVE_HTTP_ADDR")
 
-	Log.Debug("Calling weave args: ", args, "env: ", cmd.Env)
+	common.Log.Debug("Calling weave args: ", args, "env: ", cmd.Env)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -60,7 +60,7 @@ func unmarshalRequestBody(r *http.Request, target interface{}) error {
 	if err != nil {
 		return err
 	}
-	Log.Debugf("->requestBody: %s", body)
+	common.Log.Debugf("->requestBody: %s", body)
 	if err := r.Body.Close(); err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func marshalRequestBody(r *http.Request, body interface{}) error {
 	if err != nil {
 		return err
 	}
-	Log.Debugf("<-requestBody: %s", newBody)
+	common.Log.Debugf("<-requestBody: %s", newBody)
 	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
 	return nil
@@ -87,7 +87,7 @@ func unmarshalResponseBody(r *http.Response, target interface{}) error {
 	if err != nil {
 		return err
 	}
-	Log.Debugf("->responseBody: %s", body)
+	common.Log.Debugf("->responseBody: %s", body)
 	if err := r.Body.Close(); err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func marshalResponseBody(r *http.Response, body interface{}) error {
 	if err != nil {
 		return err
 	}
-	Log.Debugf("<-responseBody: %s", newBody)
+	common.Log.Debugf("<-responseBody: %s", newBody)
 	r.Body = ioutil.NopCloser(bytes.NewReader(newBody))
 	r.ContentLength = int64(len(newBody))
 	// Stop it being chunked, because that hangs
@@ -115,14 +115,14 @@ func inspectContainerInPath(client *docker.Client, path string) (*docker.Contain
 	subs := containerIDRegexp.FindStringSubmatch(path)
 	if subs == nil {
 		err := fmt.Errorf("No container id found in request with path %s", path)
-		Log.Warningln(err)
+		common.Log.Warningln(err)
 		return nil, err
 	}
 	containerID := subs[2]
 
 	container, err := client.InspectContainer(containerID)
 	if err != nil {
-		Log.Warningf("Error inspecting container %s: %v", containerID, err)
+		common.Log.Warningf("Error inspecting container %s: %v", containerID, err)
 	}
 	return container, err
 }

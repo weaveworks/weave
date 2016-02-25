@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/weaveworks/mesh"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
@@ -238,7 +238,7 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 			json, err := json.MarshalIndent(status(), "", "    ")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
-				Log.Error("Error during report marshalling: ", err)
+				common.Log.Error("Error during report marshalling: ", err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -260,7 +260,7 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 			}
 			if err := formatTemplate.Execute(w, status()); err != nil {
 				http.Error(w, "error during template execution", http.StatusInternalServerError)
-				Log.Error(err)
+				common.Log.Error(err)
 			}
 		})
 
@@ -269,7 +269,7 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 			func(w http.ResponseWriter, r *http.Request) {
 				if err := template.Execute(w, status()); err != nil {
 					http.Error(w, "error during template execution", http.StatusInternalServerError)
-					Log.Error(err)
+					common.Log.Error(err)
 				}
 			})
 	}

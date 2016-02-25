@@ -3,7 +3,7 @@ package proxy
 import (
 	"net/http"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 type inspectContainerInterceptor struct{ proxy *Proxy }
@@ -23,7 +23,7 @@ func (i *inspectContainerInterceptor) InterceptResponse(r *http.Response) error 
 	}
 
 	if err := i.proxy.updateContainerNetworkSettings(container); err != nil {
-		Log.Warningf("Inspecting container %s failed: %s", container["Id"], err)
+		common.Log.Warningf("Inspecting container %s failed: %s", container["Id"], err)
 	}
 
 	return marshalResponseBody(r, container)
