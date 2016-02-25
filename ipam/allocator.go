@@ -47,6 +47,7 @@ type operation interface {
 type Allocator struct {
 	actionChan       chan<- func()
 	ourName          mesh.PeerName
+	seed             []mesh.PeerName              // optional user supplied ring seed
 	universe         address.Range                // superset of all ranges
 	ring             *ring.Ring                   // information on ranges owned by all peers
 	space            space.Space                  // more detail on ranges owned by us
@@ -66,9 +67,10 @@ type Allocator struct {
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, db db.DB, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
+func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, seed []mesh.PeerName, universe address.Range, quorum uint, db db.DB, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
 	return &Allocator{
 		ourName:     ourName,
+		seed:        seed,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
 		owned:       make(map[string][]address.Address),
@@ -784,21 +786,35 @@ func (alloc *Allocator) persistRing() {
 
 func (alloc *Allocator) loadPersistedRing() {
 	var checkPeerName mesh.PeerName
-	if err := alloc.db.Load(nameIdent, &checkPeerName); err != nil {
+	nameFound, err := alloc.db.Load(nameIdent, &checkPeerName)
+	if err != nil {
 		alloc.fatalf("Error loading persisted peer name: %s", err)
 		return
 	}
-	if checkPeerName != alloc.ourName {
-		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
-		alloc.persistRing()
-		return
-	}
-	if err := alloc.db.Load(ringIdent, &alloc.ring); err != nil {
+	ringFound, err := alloc.db.Load(ringIdent, &alloc.ring)
+	if err != nil {
 		alloc.fatalf("Error loading persisted ring data: %s", err)
 	}
-	if alloc.ring != nil {
-		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+
+	if nameFound && ringFound {
+		if checkPeerName == alloc.ourName {
+			if len(alloc.seed) != 0 {
+				alloc.infof("Found persisted ring data, ignoring supplied IPAM seed")
+			}
+			alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+			return
+		}
+		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
+		alloc.persistRing()
 	}
+
+	if len(alloc.seed) != 0 {
+		alloc.infof("Initialising with supplied IPAM seed")
+		alloc.createRing(alloc.seed)
+	} else {
+		alloc.infof("Initialising via deferred consensus")
+	}
+
 }
 
 // Owned addresses
