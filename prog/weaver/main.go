@@ -15,7 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/weaveworks/mesh"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam"
@@ -119,15 +119,15 @@ func main() {
 
 	peers = mflag.Args()
 
-	SetLogLevel(logLevel)
+	common.SetLogLevel(logLevel)
 
 	if justVersion {
 		fmt.Printf("weave router %s\n", version)
 		os.Exit(0)
 	}
 
-	Log.Println("Command line options:", options())
-	Log.Println("Command line peers:", peers)
+	common.Log.Println("Command line options:", options())
+	common.Log.Println("Command line peers:", peers)
 
 	if prof != "" {
 		p := *profile.CPUProfile
@@ -137,7 +137,7 @@ func main() {
 	}
 
 	if protocolMinVersion < mesh.ProtocolMinVersion || protocolMinVersion > mesh.ProtocolMaxVersion {
-		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", mesh.ProtocolMinVersion, mesh.ProtocolMaxVersion)
+		common.Log.Fatalf("--min-protocol-version must be in range [%d,%d]", mesh.ProtocolMinVersion, mesh.ProtocolMaxVersion)
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
@@ -167,22 +167,22 @@ func main() {
 	defer db.Close()
 
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay)
-	Log.Println("Our name is", router.Ourself)
+	common.Log.Println("Our name is", router.Ourself)
 
 	var dockerCli *docker.Client
 	if dockerAPI != "" {
 		dc, err := docker.NewClient(dockerAPI)
 		if err != nil {
-			Log.Fatal("Unable to start docker client: ", err)
+			common.Log.Fatal("Unable to start docker client: ", err)
 		} else {
-			Log.Info(dc.Info())
+			common.Log.Info(dc.Info())
 		}
 		dockerCli = dc
 	}
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
 			if err := dockerCli.AddObserver(o); err != nil {
-				Log.Fatal("Unable to start watcher", err)
+				common.Log.Fatal("Unable to start watcher", err)
 			}
 		}
 	}
@@ -198,7 +198,7 @@ func main() {
 		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), db, isKnownPeer)
 		observeContainers(allocator)
 	} else if peerCount > 0 {
-		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
+		common.Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}
 
 	var (
@@ -216,7 +216,7 @@ func main() {
 
 	router.Start()
 	if errors := router.ConnectionMaker.InitiateConnections(peers, false); len(errors) > 0 {
-		Log.Fatal(ErrorMessages(errors))
+		common.Log.Fatal(common.ErrorMessages(errors))
 	}
 
 	// The weave script always waits for a status call to succeed,
@@ -233,11 +233,11 @@ func main() {
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
 		http.Handle("/", muxRouter)
-		Log.Println("Listening for HTTP control messages on", httpAddr)
+		common.Log.Println("Listening for HTTP control messages on", httpAddr)
 		go listenAndServeHTTP(httpAddr, muxRouter)
 	}
 
-	SignalHandlerLoop(router)
+	common.SignalHandlerLoop(router)
 }
 
 func options() map[string]string {
@@ -265,11 +265,11 @@ func canonicalName(f *mflag.Flag) string {
 type packetLogging struct{}
 
 func (packetLogging) LogPacket(msg string, key weave.PacketKey) {
-	Log.Println(msg, key.SrcMAC, "->", key.DstMAC)
+	common.Log.Println(msg, key.SrcMAC, "->", key.DstMAC)
 }
 
 func (packetLogging) LogForwardPacket(msg string, key weave.ForwardPacketKey) {
-	Log.Println(msg, key.SrcPeer, key.SrcMAC, "->", key.DstPeer, key.DstMAC)
+	common.Log.Println(msg, key.SrcPeer, key.SrcMAC, "->", key.DstPeer, key.DstMAC)
 }
 
 type nopPacketLogging struct{}
@@ -285,7 +285,7 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	var bridge weave.Bridge
 	switch {
 	case datapathName != "" && ifaceName != "":
-		Log.Fatal("At most one of --datapath and --iface must be specified.")
+		common.Log.Fatal("At most one of --datapath and --iface must be specified.")
 	case datapathName != "":
 		fastdp, err := weave.NewFastDatapath(datapathName, port)
 		checkFatal(err)
@@ -310,7 +310,7 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	checkFatal(err)
 
 	if cidr.Size() < ipam.MinSubnetSize {
-		Log.Fatalf("Allocation range smaller than minimum size %d: %s", ipam.MinSubnetSize, cidrStr)
+		common.Log.Fatalf("Allocation range smaller than minimum size %d: %s", ipam.MinSubnetSize, cidrStr)
 	}
 	return cidr
 }
@@ -321,7 +321,7 @@ func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr st
 	if defaultSubnetStr != "" {
 		defaultSubnet = parseAndCheckCIDR(defaultSubnetStr)
 		if !ipRange.Range().Overlaps(defaultSubnet.Range()) {
-			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
+			common.Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
 		}
 	}
 	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum, db, isKnownPeer)
@@ -339,13 +339,13 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,
 		config.EffectiveListenAddress, uint32(config.TTL), config.ClientTimeout)
 	if err != nil {
-		Log.Fatal("Unable to start dns server: ", err)
+		common.Log.Fatal("Unable to start dns server: ", err)
 	}
 	listenAddr := config.ListenAddress
 	if config.EffectiveListenAddress != "" {
 		listenAddr = config.EffectiveListenAddress
 	}
-	Log.Println("Listening for DNS queries on", listenAddr)
+	common.Log.Println("Listening for DNS queries on", listenAddr)
 	return ns, dnsserver
 }
 
@@ -365,7 +365,7 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	// specify it explicitly if that becomes a problem.
 	clusterSize := uint(len(peers) + 1)
 	quorum := clusterSize/2 + 1
-	Log.Println("Assuming quorum size of", quorum)
+	common.Log.Println("Assuming quorum size of", quorum)
 	return quorum
 }
 
@@ -374,17 +374,17 @@ func determinePassword(password string) []byte {
 		password = os.Getenv("WEAVE_PASSWORD")
 	}
 	if password == "" {
-		Log.Println("Communication between peers is unencrypted.")
+		common.Log.Println("Communication between peers is unencrypted.")
 		return nil
 	}
-	Log.Println("Communication between peers via untrusted networks is encrypted.")
+	common.Log.Println("Communication between peers via untrusted networks is encrypted.")
 	return []byte(password)
 }
 
 func peerName(routerName string, iface *net.Interface) mesh.PeerName {
 	if routerName == "" {
 		if iface == nil {
-			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
+			common.Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
 		}
 		routerName = iface.HardwareAddr.String()
 	}
@@ -402,7 +402,7 @@ func parseTrustedSubnets(trustedSubnetStr string) []*net.IPNet {
 	for _, subnetStr := range strings.Split(trustedSubnetStr, ",") {
 		_, subnet, err := net.ParseCIDR(subnetStr)
 		if err != nil {
-			Log.Fatal("Unable to parse trusted subnets: ", err)
+			common.Log.Fatal("Unable to parse trusted subnets: ", err)
 		}
 		trustedSubnets = append(trustedSubnets, subnet)
 	}
@@ -418,16 +418,16 @@ func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {
 	}
 	l, err := net.Listen(protocol, httpAddr)
 	if err != nil {
-		Log.Fatal("Unable to create http listener socket: ", err)
+		common.Log.Fatal("Unable to create http listener socket: ", err)
 	}
 	err = http.Serve(l, nil)
 	if err != nil {
-		Log.Fatal("Unable to create http server", err)
+		common.Log.Fatal("Unable to create http server", err)
 	}
 }
 
 func checkFatal(e error) {
 	if e != nil {
-		Log.Fatal(e)
+		common.Log.Fatal(e)
 	}
 }

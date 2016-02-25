@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 const MaxDockerHostname = 64
@@ -50,9 +50,9 @@ func (i *createContainerInterceptor) InterceptRequest(r *http.Request) error {
 	}
 
 	if cidrs, err := i.proxy.weaveCIDRs(networkMode, env); err != nil {
-		Log.Infof("Leaving container alone because %s", err)
+		common.Log.Infof("Leaving container alone because %s", err)
 	} else {
-		Log.Infof("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
+		common.Log.Infof("Creating container with WEAVE_CIDR \"%s\"", strings.Join(cidrs, " "))
 		if i.proxy.NoMulticastRoute {
 			if err := addVolume(hostConfig, i.proxy.weaveWaitNomcastVolume, "/w", "ro"); err != nil {
 				return err
@@ -140,7 +140,7 @@ func (i *createContainerInterceptor) setHostname(container jsonObject, name, dns
 		// Strip trailing period because it's unusual to see it used on the end of a host name
 		trimmedDNSDomain := strings.TrimSuffix(dnsDomain, ".")
 		if len(name)+1+len(trimmedDNSDomain) > MaxDockerHostname {
-			Log.Warningf("Container name [%s] too long to be used as hostname", name)
+			common.Log.Warningf("Container name [%s] too long to be used as hostname", name)
 		} else {
 			container["Hostname"] = name
 			container["Domainname"] = trimmedDNSDomain

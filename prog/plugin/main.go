@@ -11,7 +11,7 @@ import (
 
 	"github.com/docker/libnetwork/ipamapi"
 	weaveapi "github.com/weaveworks/weave/api"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	weavenet "github.com/weaveworks/weave/net"
 	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
@@ -43,22 +43,22 @@ func main() {
 		os.Exit(0)
 	}
 
-	SetLogLevel(logLevel)
+	common.SetLogLevel(logLevel)
 
 	// API 1.21 is the first version that supports docker network commands
 	dockerClient, err := docker.NewVersionedClientFromEnv("1.21")
 	if err != nil {
-		Log.Fatalf("unable to connect to docker: %s", err)
+		common.Log.Fatalf("unable to connect to docker: %s", err)
 	}
 
 	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"))
 
-	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
-	Log.Info(dockerClient.Info())
+	common.Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
+	common.Log.Info(dockerClient.Info())
 
 	err = run(dockerClient, weave, address, meshAddress, noMulticastRoute)
 	if err != nil {
-		Log.Fatal(err)
+		common.Log.Fatal(err)
 	}
 }
 
@@ -91,7 +91,7 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 
 	select {
 	case sig := <-sigChan:
-		Log.Debugf("Caught signal %s; shutting down", sig)
+		common.Log.Debugf("Caught signal %s; shutting down", sig)
 		return nil
 	case err := <-endChan:
 		return err
@@ -113,7 +113,7 @@ func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address
 	if err != nil {
 		return nil, err
 	}
-	Log.Printf("Listening on %s for %s scope", address, scope)
+	common.Log.Printf("Listening on %s for %s scope", address, scope)
 
 	go func() {
 		endChan <- skel.Listen(listener, d, i)
@@ -127,6 +127,6 @@ func serveStatus(listener net.Listener) {
 		fmt.Fprintln(w, "ok")
 	})}
 	if err := server.Serve(listener); err != nil {
-		Log.Fatalf("ListenAndServeStatus failed: %s", err)
+		common.Log.Fatalf("ListenAndServeStatus failed: %s", err)
 	}
 }

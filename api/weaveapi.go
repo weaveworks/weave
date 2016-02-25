@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 const (
@@ -23,7 +23,7 @@ type Client struct {
 
 func (client *Client) httpVerb(verb string, url string, values url.Values) (string, error) {
 	url = client.baseURL + url
-	Log.Debugf("weave %s to %s with %v", verb, url, values)
+	common.Log.Debugf("weave %s to %s with %v", verb, url, values)
 	var body io.Reader
 	if values != nil {
 		body = strings.NewReader(values.Encode())
