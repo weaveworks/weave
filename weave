@@ -1592,7 +1592,6 @@ launch_router() {
     ROUTER_CONTAINER=$(docker run --name=$CONTAINER_NAME \
         -d --privileged --net=host $(docker_sock_options) \
         -e WEAVE_PASSWORD \
-        -e WEAVE_CIDR=none \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
         --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" \
         $(router_opts_$BRIDGE_TYPE) \
