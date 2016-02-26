@@ -55,11 +55,14 @@ For installing weave on other platforms, follow the [integration guides](http://
 Weave respects the environment variable `DOCKER_HOST`, so you can run
 it locally to control a weave network on a remote host.
 
-Weave will periodically check with our servers to see if a new version is available. To disable this, run:
+Weave will periodically check with our servers to see if a new version is available.
+New versions are announced in the log. To disable this, run:
 
 ```
 CHECKPOINT_DISABLE=true weave launch
 ```
+
+For more information, [read this](https://github.com/weaveworks/go-checkpoint).
 
 ## Quick Start Screencast
 
