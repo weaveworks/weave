@@ -61,9 +61,6 @@
 [submodule "vendor/github.com/weaveworks/go-checkpoint"]
 	path = vendor/github.com/weaveworks/go-checkpoint
 	url = https://github.com/weaveworks/go-checkpoint
-[submodule "vendor/github.com/certifi/gocertifi"]
-	path = vendor/github.com/certifi/gocertifi
-	url = https://github.com/certifi/gocertifi
 [submodule "vendor/github.com/hashicorp/go-cleanhttp"]
 	path = vendor/github.com/hashicorp/go-cleanhttp
 	url = http://github.com/hashicorp/go-cleanhttp
