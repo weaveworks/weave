@@ -110,8 +110,7 @@ docker_sock_options() {
 }
 
 exec_remote() {
-    docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host \
-        $(docker_sock_options) \
+    docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host $(docker_sock_options) \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
@@ -1590,8 +1589,8 @@ launch_router() {
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
-    ROUTER_CONTAINER=$(docker run --privileged --net=host -d --name=$CONTAINER_NAME \
-        $(docker_sock_options) \
+    ROUTER_CONTAINER=$(docker run --name=$CONTAINER_NAME \
+        -d --privileged --net=host $(docker_sock_options) \
         -e WEAVE_PASSWORD \
         -e WEAVE_CIDR=none \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
@@ -1646,10 +1645,10 @@ launch_proxy() {
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
-    PROXY_CONTAINER=$(docker run --privileged -d --name=$PROXY_CONTAINER_NAME --net=host \
+    PROXY_CONTAINER=$(docker run --name=$PROXY_CONTAINER_NAME \
+        -d --privileged --net=host $(docker_sock_options) \
         $PROXY_VOLUMES \
         --volumes-from $VOLUMES_CONTAINER_NAME \
-        $(docker_sock_options) \
         -v /var/run/weave:/var/run/weave \
         -v /proc:/hostproc \
         -e PROCFS=/hostproc \
@@ -1676,10 +1675,9 @@ launch_plugin_if_not_running() {
     # Any other kind of error code from check_not_running is a failure.
     [ $retval -gt 0 ] && return $retval
 
-    if ! PLUGIN_CONTAINER=$(docker run --privileged -d --name=$PLUGIN_CONTAINER_NAME \
+    if ! PLUGIN_CONTAINER=$(docker run --name=$PLUGIN_CONTAINER_NAME \
+        -d --privileged --net=host $(docker_sock_options) \
         --restart=always \
-        --net=host \
-        $(docker_sock_options) \
         -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_HTTP_ADDR \
         $PLUGIN_IMAGE "$@") ; then
