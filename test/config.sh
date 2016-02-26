@@ -118,7 +118,7 @@ weave_on() {
     host=$1
     shift 1
     [ -z "$DEBUG" ] || greyly echo "Weave on $host:$DOCKER_PORT: $@" >&2
-    DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
+    CHECKPOINT_DISABLE=true DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
 stop_router_on() {

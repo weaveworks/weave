@@ -3,4 +3,5 @@ MAINTAINER Weaveworks Inc <help@weave.works>
 LABEL works.weave.role=system
 WORKDIR /home/weave
 ADD ./weaver /home/weave/
+COPY ca-certificates.crt /etc/ssl/certs/
 ENTRYPOINT ["/home/weave/weaver"]

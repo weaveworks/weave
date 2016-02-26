@@ -1594,7 +1594,6 @@ launch_router() {
         -d --privileged --net=host $(docker_sock_options) \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
-        -v /etc/weave:/etc/weave \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
         --port $CONTAINER_PORT --name "$PEERNAME" --nickname "$(hostname)" \
         $(router_opts_$BRIDGE_TYPE) \
