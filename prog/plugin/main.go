@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/docker/libnetwork/ipamapi"
+	ipamapi "github.com/docker/go-plugins-helpers/ipam"
 	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"

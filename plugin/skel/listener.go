@@ -8,14 +8,12 @@ import (
 
 	"github.com/gorilla/mux"
 
+	ipamapi "github.com/docker/go-plugins-helpers/ipam"
 	"github.com/docker/libnetwork/drivers/remote/api"
-	"github.com/docker/libnetwork/ipamapi"
-	iapi "github.com/docker/libnetwork/ipams/remote/api"
 )
 
 const (
 	networkReceiver = "NetworkDriver"
-	ipamReceiver    = ipamapi.PluginEndpointType
 )
 
 type Driver interface {
@@ -61,11 +59,10 @@ func Listen(socket net.Listener, driver Driver, ipamDriver ipamapi.Ipam) error {
 	}
 
 	if ipamDriver != nil {
-		handleMethod(ipamReceiver, "GetDefaultAddressSpaces", listener.getDefaultAddressSpaces)
-		handleMethod(ipamReceiver, "RequestPool", listener.requestPool)
-		handleMethod(ipamReceiver, "ReleasePool", listener.releasePool)
-		handleMethod(ipamReceiver, "RequestAddress", listener.requestAddress)
-		handleMethod(ipamReceiver, "ReleaseAddress", listener.releaseAddress)
+		// FIXME looks like plugins-helpers does not allow a single
+		// mux to serve multiple APIs. This is problematic, since ATM
+		// we only have one socket.
+		ipamapi.NewHandler(ipamDriver).Serve(socket)
 	}
 
 	return http.Serve(socket, router)
@@ -188,70 +185,6 @@ func (listener *listener) discoverDelete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	emptyOrErrorResponse(w, listener.d.DiscoverDelete(&disco))
-}
-
-// ===
-
-func (listener *listener) getDefaultAddressSpaces(w http.ResponseWriter, r *http.Request) {
-	local, global, err := listener.i.GetDefaultAddressSpaces()
-	response := &iapi.GetAddressSpacesResponse{
-		LocalDefaultAddressSpace:  local,
-		GlobalDefaultAddressSpace: global,
-	}
-	objectOrErrorResponse(w, response, err)
-}
-
-func (listener *listener) requestPool(w http.ResponseWriter, r *http.Request) {
-	var rq iapi.RequestPoolRequest
-	if err := decode(w, r, &rq); err != nil {
-		return
-	}
-	poolID, pool, data, err := listener.i.RequestPool(rq.AddressSpace, rq.Pool, rq.SubPool, rq.Options, rq.V6)
-	if err != nil {
-		errorResponse(w, err.Error())
-		return
-	}
-	response := &iapi.RequestPoolResponse{
-		PoolID: poolID,
-		Pool:   pool.String(),
-		Data:   data,
-	}
-	objectResponse(w, response)
-}
-
-func (listener *listener) releasePool(w http.ResponseWriter, r *http.Request) {
-	var rq iapi.ReleasePoolRequest
-	if err := decode(w, r, &rq); err != nil {
-		return
-	}
-	err := listener.i.ReleasePool(rq.PoolID)
-	emptyOrErrorResponse(w, err)
-}
-
-func (listener *listener) requestAddress(w http.ResponseWriter, r *http.Request) {
-	var rq iapi.RequestAddressRequest
-	if err := decode(w, r, &rq); err != nil {
-		return
-	}
-	address, data, err := listener.i.RequestAddress(rq.PoolID, net.ParseIP(rq.Address), rq.Options)
-	if err != nil {
-		errorResponse(w, err.Error())
-		return
-	}
-	response := &iapi.RequestAddressResponse{
-		Address: address.String(),
-		Data:    data,
-	}
-	objectResponse(w, response)
-}
-
-func (listener *listener) releaseAddress(w http.ResponseWriter, r *http.Request) {
-	var rq iapi.ReleaseAddressRequest
-	if err := decode(w, r, &rq); err != nil {
-		return
-	}
-	err := listener.i.ReleaseAddress(rq.PoolID, net.ParseIP(rq.Address))
-	emptyOrErrorResponse(w, err)
 }
 
 // ===
