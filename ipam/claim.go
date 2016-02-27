@@ -34,7 +34,8 @@ func (c *claim) sendResult(result error) {
 func (c *claim) Try(alloc *Allocator) bool {
 	if !alloc.ring.Contains(c.addr) {
 		// Address not within our universe; assume user knows what they are doing
-		alloc.infof("Ignored address %s claimed by %s - not in our universe", c.addr, c.ident)
+		alloc.infof("Address %s claimed by %s - not in our range", c.addr, c.ident)
+		alloc.addOwned(c.ident, c.addr)
 		c.sendResult(nil)
 		return true
 	}
