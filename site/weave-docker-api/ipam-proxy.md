@@ -39,4 +39,4 @@ container with a blank `WEAVE_CIDR`, for example:
 **See Also**
 
  * [Address Allocation with IP Address Management (IPAM)](/site/ipam/overview-init-ipam.md)
- * [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manually-ip-address.md)    
+ * [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md)    

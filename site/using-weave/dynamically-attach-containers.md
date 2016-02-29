@@ -52,4 +52,4 @@ Finally, multiple addresses can be attached or detached using a single command:
 
 **See Also**
 
- * [Adding and Removing Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamicall.md)
+ * [Adding and Removing Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md)

@@ -77,10 +77,10 @@ If required, a container can also be attached to multiple subnets when it is sta
 >>Note: By default docker permits communication between containers on the same host, via their docker-assigned IP addresses. For complete
 isolation between application containers, that feature needs to be disabled by [setting `--icc=false`](https://docs.docker.com/engine/userguide/networking/default_network/container-communication/#communication-between-containers) in the docker daemon configuration. 
 
-**See also,** 
+**See Also** 
 
- * Managing Services in Weave: Exporting, Importing, Binding and Routing(/site/using-weave/service-management.md)
- * Exposing Services to the Outside World(/site/using-weave/service-export.md)
+ * [Managing Services in Weave: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
+ * [Exposing Services to the Outside World] (/site/using-weave/service-export.md)
  
  
  

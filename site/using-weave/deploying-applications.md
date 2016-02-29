@@ -31,7 +31,7 @@ Where,
  `http:///var/run/Docker.sock/v1.19/containers/create: dial unix
  /var/run/Docker.sock: permission denied. Are you trying to connect to a TLS-enabled daemon without TLS?` then you likely need to be 'root' in order to connect to the Docker daemon. If so, run the above and all subsequent commands in a *single* root shell (e.g. one created with `sudo -s`). Do *not* prefix individual commands with `sudo`, since some commands modify environment entries and hence they all need to be executed from the same shell.
 
->>**Important!** if you are running the Weave Docker Network Plugin do not run `eval $(weave env)`. See [Using the Weave Net Docker Network Plugin](/site/weave-plugin-how-to.md) for more information.
+>>**Important!** if you are running the Weave Docker Network Plugin do not run `eval $(weave env)`. See [Using the Weave Net Docker Network Plugin](/site/pluing/weave-plugin-how-to.md) for more information.
 
 Weave must be launched once per host. The relevant container images will be pulled down from Docker Hub on demand during `weave launch`. 
 
@@ -65,7 +65,7 @@ For example:
     `host2$:weave launch` <ip address> <ip address> 
 ~~~
 
-Peers can also be dynamically added. See [Adding Hosts Dynamically](http://docs.weave.works/weave/latest_release/features.html#dynamic-topologies) for more information.
+Peers can also be dynamically added. See [Adding Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md) for more information.
 
 
 ###<a name="testing"></a>Testing Container Communications

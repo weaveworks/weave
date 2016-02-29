@@ -60,7 +60,7 @@ through three states: 'deferred', 'waiting' and 'achieved':
   themselves successfully
 * 'achieved' - consensus achieved; allocations proceed normally
 
-####<a name="range"></a> `--init-peer-count` and How Quorum is Achieved
+####<a name="quorum"></a> `--init-peer-count` and How Quorum is Achieved
 
 Normally it isn't a problem to over-estimate `--init-peer-count`, but if you supply
 a number that is too small, then multiple independent groups may form.
@@ -127,6 +127,6 @@ to the rest of the network without any conflicts arising.
  **See Also**
 
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
- * [Plugin Command-line Arguments](/site/ipam/plug-in-command-line.md)
+ * [Plugin Command-line Arguments](/site/plugin/plug-in-command-line.md)
  
     

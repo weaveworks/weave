@@ -20,7 +20,7 @@ You can specify IP addresses manually instead:
     $ weave run 10.2.1.1/24 -ti ubuntu
 
 `weave run` rewrites `/etc/hosts` in the same way
-[the proxy does](/site/weave-docker-api/name-resolution.md). If you need to keep
+[the proxy does](/site/weave-docker-api/name-resolution-proxy.md). If you need to keep
 the original file, specify `--no-rewrite-hosts` when running
 the container:
 

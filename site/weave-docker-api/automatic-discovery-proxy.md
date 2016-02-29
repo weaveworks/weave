@@ -3,9 +3,9 @@ title: Using Automatic Discovery With the Weave Proxy
 layout: default
 ---
 
-Containers launched via the proxy use [weavedns](/site/weave-dns/overview-using-weavedns.md)
+Containers launched via the proxy use [weavedns](/site/weavedns/overview-using-weavedns.md)
 automatically if it is running when they are started -
-see the [weavedns usage](/site/weave-dns/overview-using-weavedns.md#usage) section for an in-depth
+see the [weavedns usage](/site/weavedns/overview-using-weavedns.md#usage) section for an in depth
 explanation of the behaviour and how to control it.
 
 Typically, the proxy passes on container names as-is to weavedns

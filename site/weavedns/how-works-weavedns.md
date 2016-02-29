@@ -50,10 +50,10 @@ other calls to `weave` also specify the bridge device:
 
 ```bash
 $ sudo DOCKER_BRIDGE=someother weave run ...
-
+```
 
 **See Also**
 
  * [Using Weavedns](/site/weavedns/overview-using-weavedns.md)
- * [Load Balancing with weavedns](/site/weavedns/load-balance-weavedns.md)
- * [Managing Domain Entries](/site/weavedns/managing-entries-weavedns.md)
+ * [Load Balancing with weavedns](/site/weavedns/load-balance-fault-weavedns.md)
+ * [Managing Domain Entries](/site/weavedns/managing-domains-weavedns.md)
