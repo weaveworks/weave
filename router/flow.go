@@ -2,6 +2,8 @@ package router
 
 import (
 	"net"
+	"bytes"
+	"fmt"
 
 	"github.com/weaveworks/mesh"
 )
@@ -34,9 +36,14 @@ type FlowOp interface {
 
 	// Does the FlowOp discard the packet?
 	Discards() bool
+	String() string
 }
 
 type DiscardingFlowOp struct{}
+
+func (d DiscardingFlowOp) String() string {
+	return "DiscardingFlowOp"
+}
 
 func (DiscardingFlowOp) Process([]byte, *EthernetDecoder, bool) {
 }
@@ -46,6 +53,10 @@ func (DiscardingFlowOp) Discards() bool {
 }
 
 type NonDiscardingFlowOp struct{}
+
+func (n NonDiscardingFlowOp) String() string {
+	return "DiscardingFlowOp"
+}
 
 func (NonDiscardingFlowOp) Discards() bool {
 	return false
@@ -62,6 +73,16 @@ func NewMultiFlowOp(broadcast bool, ops ...FlowOp) *MultiFlowOp {
 		mfop.Add(op)
 	}
 	return mfop
+}
+
+func (mfop *MultiFlowOp) String() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "MultiFlowOp: %t [", mfop.broadcast)
+	for _, op := range mfop.ops {
+		fmt.Fprintf(&buf, "%s, ", op)
+	}
+	fmt.Fprintf(&buf, "]")
+	return buf.String()
 }
 
 func (mfop *MultiFlowOp) Add(op FlowOp) {

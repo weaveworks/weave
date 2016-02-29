@@ -448,6 +448,10 @@ type curriedForward struct {
 	key ForwardPacketKey
 }
 
+func (c curriedForward) String() string {
+	return fmt.Sprintf("curriedForward: %s key %s", c.fwd, c.key)
+}
+
 func (fwd *sleeveForwarder) Forward(key ForwardPacketKey) FlowOp {
 	return curriedForward{fwd: fwd, key: key}
 }

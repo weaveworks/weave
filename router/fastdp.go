@@ -251,6 +251,8 @@ func (fastdp fastDatapathBridge) InjectPacket(key PacketKey) FlowOp {
 // Ethernet bridge implementation
 
 func (fastdp *FastDatapath) bridge(ingress bridgePortID, key PacketKey, lock *fastDatapathLock) FlowOp {
+	log.Debug("bridge: ", ingress, key)
+
 	lock.relock()
 	if fastdp.sendToMAC[key.SrcMAC] == nil {
 		// Learn the source MAC
@@ -261,6 +263,7 @@ func (fastdp *FastDatapath) bridge(ingress bridgePortID, key PacketKey, lock *fa
 	// If we know about the destination MAC, deliver it to the
 	// associated port.
 	if sender := fastdp.sendToMAC[key.DstMAC]; sender != nil {
+		log.Debug("bridge: known MAC ", key.DstMAC)
 		return NewMultiFlowOp(false, odpEthernetFlowKey(key), sender(key, lock))
 	}
 
@@ -274,8 +277,10 @@ func (fastdp *FastDatapath) bridge(ingress bridgePortID, key PacketKey, lock *fa
 		// If we did, we'd need to delete the flows every time
 		// we learned a new MAC address, or have a more
 		// complicated selective invalidation scheme.
+		log.Debug("bridge: veto flow creation ", key.DstMAC)
 		mfop.Add(vetoFlowCreationFlowOp{})
 	} else {
+		log.Debug("bridge: broadcast ", key)
 		// A real broadcast
 		mfop.Add(odpEthernetFlowKey(key))
 	}
@@ -441,6 +446,7 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 		}
 
 		srcPeer, dstPeer := fastdp.extractPeers(tunKey.TunnelId)
+		log.Debug("vxlan missHandler: ", consumer, srcPeer, dstPeer)
 		if srcPeer == nil || dstPeer == nil {
 			return vetoFlowCreationFlowOp{}
 		}
@@ -488,6 +494,10 @@ type vxlanSpecialPacketFlowOp struct {
 	fastdp  *FastDatapath
 	srcPeer *mesh.Peer
 	sender  *net.UDPAddr
+}
+
+func (v vxlanSpecialPacketFlowOp) String() string {
+	return fmt.Sprintf("vxlanSpecialPacketFlowOp: src %s sender %s", v.srcPeer, v.sender)
 }
 
 func (op vxlanSpecialPacketFlowOp) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {
@@ -964,14 +974,17 @@ func (fastdp *FastDatapath) Miss(packet []byte, fks odp.FlowKeys) error {
 	// including the ingress in every flow makes things simpler
 	// in touchFlow.
 	mfop := NewMultiFlowOp(false, handler(fks, &lock), odpFlowKey(odp.NewInPortFlowKey(ingress)))
+	log.Debug("Creating new flow: ", mfop)
 	fastdp.send(mfop, packet, &lock)
 	return nil
 }
 
 func (fastdp *FastDatapath) getMissHandler(ingress odp.VportID) missHandler {
 	handler := fastdp.missHandlers[ingress]
+	log.Debug("getMissHandler: ", ingress, handler)
 	if handler == nil {
 		vport, err := fastdp.dp.LookupVport(ingress)
+		log.Debug("getMissHandler: vport ", vport, err)
 		if err != nil {
 			log.Error(err)
 			return nil
@@ -1013,6 +1026,7 @@ func (fastdp *FastDatapath) makeBridgeVport(vport odp.Vport) {
 	// bridge ports (we set up the miss handler for them in
 	// getVxlanVportID).
 	typ := vport.Spec.TypeName()
+	log.Debug("makeBridgeVport: ", vport, typ)
 	if typ != "netdev" && typ != "internal" {
 		return
 	}
@@ -1068,6 +1082,7 @@ func (fastdp *FastDatapath) send(fops FlowOp, frame []byte, lock *fastDatapathLo
 	createFlow := true
 
 	for _, xfop := range FlattenFlowOp(fops) {
+		log.Debug("fastdp.send: ", xfop)
 		switch fop := xfop.(type) {
 		case interface {
 			updateFlowSpec(*odp.FlowSpec)
@@ -1142,6 +1157,10 @@ type odpActionsFlowOp struct {
 	actions []odp.Action
 }
 
+func (o odpActionsFlowOp) String() string {
+	return fmt.Sprintf("odpActionsFlowOp: %s", o.actions)
+}
+
 func (fastdp *FastDatapath) odpActions(actions ...odp.Action) FlowOp {
 	return odpActionsFlowOp{
 		fastdp:  fastdp,
@@ -1165,10 +1184,18 @@ type vetoFlowCreationFlowOp struct {
 	DiscardingFlowOp
 }
 
+func (v vetoFlowCreationFlowOp) String() string {
+	return "vetoFlowCreationFlowOp"
+}
+
 // A odpFlowKeyFlowOp adds a FlowKey to the resulting flow
 type odpFlowKeyFlowOp struct {
 	DiscardingFlowOp
 	key odp.FlowKey
+}
+
+func (o odpFlowKeyFlowOp) String() string {
+	return fmt.Sprintf("odpFlowKeyFlowOp: %s", o.key)
 }
 
 func odpFlowKey(key odp.FlowKey) FlowOp {
