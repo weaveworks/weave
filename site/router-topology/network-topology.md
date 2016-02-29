@@ -13,13 +13,13 @@ This section contains the following topics:
 
 ###<a name="topology"></a>Communicating Topology Among Peers
 
-The topology information captures which peers are connected to which
-other peers. Weave peers communicate their knowledge of the topology
+Topology messages capture which peers are connected to other peers. 
+Weave peers communicate their knowledge of the topology
 (and changes to it) to others, so that all peers learn about the
 entire topology. 
 
-Communication between peers occurs over TCP links using 
-a) spanning-tree based broadcast mechanism, and b) a
+Communication between peers occurs over TCP links using: 
+a) a spanning-tree based broadcast mechanism, and b) a
 neighour gossip mechanism.
 
 Topology messages are sent by a peer in the following instances:
