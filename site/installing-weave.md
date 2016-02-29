@@ -20,7 +20,7 @@ After the VM is configured with Docker Machine, Weave can be launched directly f
 Weave respects the environment variable `DOCKER_HOST`, so that you can run
 and control a Weave Network locally on a remote host. See [Using The Weave Docker API Proxy](/site/weave-docker-api/using-proxy.md)
 
-With Weave downloaded onto your VMs or hosts, you are ready to launch a Weave network and deploy apps onto it. See [Deploying Applications to Weave](/site/using-weave/deploying-application.md#launching)
+With Weave downloaded onto your VMs or hosts, you are ready to launch a Weave network and deploy apps onto it. See [Deploying Applications to Weave](/site/using-weave/deploying-applications.md#launching)
 
 CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing Weave using cloud-config.
 
@@ -41,6 +41,6 @@ for the latest Weave AMIs and
  * [Using Weave Net](/site/using-weave/intro-example.md)
  * [Getting Started Guides](http://www.weave.works/guides/)
  * [Features](/site/features.md)
- * [Troubleshooting](XXXX)
+ * [Troubleshooting](/site/troubleshooting.md)
  * [Building](XXXX)
- * [How it works](XXXX)
+ 

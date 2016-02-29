@@ -9,7 +9,7 @@ layout: default
 
 Use `weave ps` to see which address was allocated to a container on a Weave network.  
 
-See [Address Allocation](/site/features/address-allocation-feature.md).
+See [Address Allocation](/site/features/address-allocation.md).
 
 
 ###Q: How do I expose one of my containers to the outside world?
@@ -22,7 +22,7 @@ Exposing a container to the outside world is described in [Exposing Services to 
 
 You can manually change the IP of a container using [Classless Inter-Domain Routing or CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing). 
 
-For more information, refer to [Manually Specifying the IP Address of a Container](/site/using-weave/manually-ip-address.md). 
+For more information, refer to [Manually Specifying the IP Address of a Container](/site/using-weave/manual-ip-address.md). 
 
 
 ###Q:Can I connect my existing 'legacy' network with a Weave container network?
@@ -33,7 +33,7 @@ Let's say you have a Weave network that runs on hosts A, B, C. and an additional
 
 Since the Weave network is completely separate from any network that P is connected to, you cannot connect the container using the container's IP address. Instead you will have to expose a port on the container on host B. 
 
-You can read about how to expose a port in [Service Exporting](/site/features/service-management.md)
+You can read about how to expose a port in [Service Exporting](/site/using-weave/service-export.md)
 
 
 ###Q: Why am I seeing the same IP address assigned to two different containers on different hosts?
@@ -78,4 +78,4 @@ See [Using Fast Datapath](/site/fastdp/using-fastdp.md) for more information
 
 ###Q: Can I have multiple isolated subnets and still enable individual containers to communicate with one another?
 
-Yes, of course!  Weave allows you to run isolated subnets and then open communications between individual containers from those isolated subnets. You can find information on how to do this in [Application Isolation](/site/features/application-isolation.md)
+Yes, of course!  Weave allows you to run isolated subnets and then open communications between individual containers from those isolated subnets. You can find information on how to do this in [Application Isolation](/site/using-weave/application-isolation.md)

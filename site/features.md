@@ -44,7 +44,7 @@ Broadcast and Multicast protocols can also be implemented
 over Weave Net.
 
 To start using Weave Net, see [Installing Weave Net](/site/install/installing-weave.md)
-and [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md)
+and [Deploying Applications to Weave Net](/site/deploying-applications.md)
 
 ###<a name="fast-data-path"></a>Fast Datapath
 
@@ -57,7 +57,7 @@ password at `weave launch` the router falls back to a slower
 `sleeve` mode that does support encryption. 
 
 For connections that traverse untrusted networks, 
-see [Securing Containers Across Untrusted Networks](/site/encryption/security-untrusted-networks.md) for more details.
+see [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) for more details.
 
 See [Using Fast Datapath](/site/fastdp/using-fastdp.md) and 
 [How Fast Datapath Works](/site/fastdp/fastdp-how-it-works.md). 
@@ -93,7 +93,7 @@ when there are network connectivity problems.
 >*Note:* The plugin is an *alternative* to the proxy, and therefor you do
 *not* need to run `eval $(weave env)` beforehand.
 
-See [Using the Weave Docker Network Plugin](/site//weave-docker-plugin/weave-plugin-how-to.md) for more details.
+See [Using the Weave Docker Network Plugin](/site/plugin/weave-plugin-how-to.md) for more details.
 
 
 ###<a name="addressing"></a>Address Allocation (IPAM)
@@ -180,7 +180,7 @@ running alongside Weave.
 Weave implements encryption and security using [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
 
 For information on how to secure your Docker containers, 
-see [Securing Containers Across Untrusted Networks](/site/encryption/security-untrusted-networks.md) 
+see [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) 
 and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption/crypto-overview.md) and [How Weave Implements Encryption](/site/encryption/emphemeral-key.md)
 
 
