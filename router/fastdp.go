@@ -765,10 +765,10 @@ func (fwd *fastDatapathForwarder) Forward(key ForwardPacketKey) FlowOp {
 	defer fwd.lock.RUnlock()
 
 	if fwd.remoteAddr == nil {
-		// Returning nil would discard the packet, but also
-		// result in a flow rule, which we would have to
-		// invalidate when we learn the remote IP.  So for
-		// now, just prevent flows.
+		// Returning a DiscardingFlowOp would discard the
+		// packet, but also result in a flow rule, which we
+		// would have to invalidate when we learn the remote
+		// IP.  So for now, just prevent flows.
 		return vetoFlowCreationFlowOp{}
 	}
 
@@ -1076,6 +1076,10 @@ func (fastdp *FastDatapath) send(fops FlowOp, frame []byte, lock *fastDatapathLo
 		case vetoFlowCreationFlowOp:
 			createFlow = false
 		default:
+			if xfop.Discards() {
+				continue
+			}
+
 			// A foreign FlowOp (e.g. a sleeve forwarding
 			// FlowOp), so send the packet through the
 			// FlowOp interface, decoding the packet

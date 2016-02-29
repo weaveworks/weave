@@ -84,15 +84,12 @@ func (mfop *MultiFlowOp) Discards() bool {
 	return true
 }
 
+// Flatten out a FlowOp to eliminate any MultiFlowOps
 func FlattenFlowOp(fop FlowOp) []FlowOp {
 	return collectFlowOps(nil, fop)
 }
 
 func collectFlowOps(into []FlowOp, fop FlowOp) []FlowOp {
-	if fop == nil {
-		return into
-	}
-
 	if mfop, ok := fop.(*MultiFlowOp); ok {
 		for _, op := range mfop.ops {
 			into = collectFlowOps(into, op)
