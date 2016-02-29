@@ -26,3 +26,8 @@ route, add the `--no-multicast-route` flag to `weave launch-plugin`.
 
 
 >>Note: When using the Docker Plugin, there is no need to run eval $(weave env) to enable the Proxy. Because Weave is running as a plugin within Docker, the Weave Docker API Proxy, at present, cannot detect between networks.  
+
+**See Also**
+
+ * [Using the Weave Net Docker Network Plugin](/site/plugin/weave-plugin-how-to.md)
+ * [How the Weave Network Plugin Works](/site/plugin/plugin-how-it-works.md)

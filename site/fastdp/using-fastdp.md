@@ -1,8 +1,7 @@
 ---
-title: Using Fast Datapath
+title: Using Fast Datapath With Weave
 layout: default
 ---
-
 
 
 The most important thing to know about fast datapath is that you don't need to configure anything before using this feature. If you are using Weave Net 1.2 or greater, fast datapath (`fastdp`) is automatically enabled.
@@ -24,3 +23,9 @@ $ WEAVE_NO_FASTDP=true weave launch
 Encryption does not work with fast datapath. If you enable encryption using the `--password` option to launch weave (or you use the `WEAVE_PASSWORD` environment variable), fast data path will by default be disabled. 
 
 When encryption is not in use there may be other conditions in which the fastdp will revert back to `sleeve mode`. Once these conditions pass, weave will revert back to using fastdp. To view which mode Weave is using, run `weave status connections`.
+
+**See Also**
+
+ * [Deploying Applications to Weave](/site/using-weave/deploying-applications.md)
+ * [How Fastdp Works](/site/fastdp/fastdp-how-it-works.md)
+ * [Viewing Connection Mode Fastdp or Sleeve](/site/fastdp/viewing-connections.md)

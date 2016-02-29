@@ -27,3 +27,8 @@ store, but the first part of
 >>**Note:** In the case of multiple networks using the `weave` driver, all containers are on the same virtual network but Docker allocates their addresses on different subnets so they cannot talk to each other directly.
 
 
+**See Also**
+
+ * [Using the Weave Net Docker Network Plugin](/site/plugin/weave-plugin-how-to.md)
+ * [Plugin Command-line Arguments](/site/plugin/plug-in-command-line.md)
+ 
