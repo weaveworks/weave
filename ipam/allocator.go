@@ -151,29 +151,23 @@ func (alloc *Allocator) cancelOpsFor(ops *[]operation, ident string) bool {
 	return found
 }
 
-// Try all pending operations
-func (alloc *Allocator) tryPendingOps() {
-	// The slightly different semantics requires us to operate on 'claims' and
-	// 'allocates' separately:
-	// Claims must be tried before Allocates
-	for i := 0; i < len(alloc.pendingClaims); {
-		op := alloc.pendingClaims[i]
+// Try all operations in a queue
+func (alloc *Allocator) tryOps(ops *[]operation) {
+	for i := 0; i < len(*ops); {
+		op := (*ops)[i]
 		if !op.Try(alloc) {
 			i++
 			continue
 		}
-		alloc.pendingClaims = append(alloc.pendingClaims[:i], alloc.pendingClaims[i+1:]...)
+		*ops = append((*ops)[:i], (*ops)[i+1:]...)
 	}
+}
 
-	// When the first Allocate fails, bail - no need to
-	// send too many begs for space.
-	for i := 0; i < len(alloc.pendingAllocates); {
-		op := alloc.pendingAllocates[i]
-		if !op.Try(alloc) {
-			break
-		}
-		alloc.pendingAllocates = append(alloc.pendingAllocates[:i], alloc.pendingAllocates[i+1:]...)
-	}
+// Try all pending operations
+func (alloc *Allocator) tryPendingOps() {
+	// Process existing claims before servicing new allocations
+	alloc.tryOps(&alloc.pendingClaims)
+	alloc.tryOps(&alloc.pendingAllocates)
 }
 
 func (alloc *Allocator) spaceRequestDenied(sender mesh.PeerName, r address.Range) {
