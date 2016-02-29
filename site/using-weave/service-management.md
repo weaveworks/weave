@@ -7,8 +7,8 @@ This section contains the following topics:
 
  * [Exporting Services](#exporting)
  * [Importing Services](#importing)
- * [Binding Services](#routing)
- * [Routing Services](#start-netcat)
+ * [Binding Services](#binding)
+ * [Routing Services](#routing)
  * [Dynamically Changing Service Locations](#change-location)
 
 
@@ -71,7 +71,7 @@ You can now connect to it from the application container running on `$HOST2` usi
 
 Note that you should be able to run this command from any application container.
 
-###Binding Services
+###<a name="binding"></a>Binding Services
 
 Importing a service provides a degree of indirection that allows late and dynamic binding, similar to what can be achieved with a proxy. 
 

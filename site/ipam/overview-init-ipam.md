@@ -113,16 +113,14 @@ The range parameter is written in
 [CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing) -
 in this example "/16" means the first 16 bits of the address form the
 network address and the allocator is to allocate container addresses
-that all start 10.2. We have [a page with more information on IP
-addresses and routes](ip-addresses.html).
+that all start 10.2. See [IP
+addresses and routes](/site/using-weave/service-management.md#routing) for more information.
 
 Weave shares the IP address range across all peers, dynamically
 according to their needs.  If a group of peers becomes isolated from
 the rest (a partition), they can continue to work with the address
 ranges they had before isolation, and can subsequently be re-connected
 to the rest of the network without any conflicts arising.
- 
- 
     
  **See Also**
 

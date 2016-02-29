@@ -22,7 +22,7 @@ reports on the current status of the weave router and IP allocator:
 ````
 
 The first section covers the router; see the [troubleshooting
-guide](site/troubleshooting.md#weave-status) for full details.
+guide](/site/troubleshooting.md#weave-status) for full details.
 
 The 'Service: ipam' section displays the consensus state as well as
 the total allocation range and default subnet.
