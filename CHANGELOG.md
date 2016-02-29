@@ -1,3 +1,23 @@
+## Release 1.4.5
+
+Higher performance for multicast and broadcast traffic when using
+Weave's Fast Datapath
+
+* The flow rule to deliver broadcast and multicast packets in-kernel
+  was not created correctly, hence every such packet caused a
+  context-switch to the software router #2003/#2008
+
+Other fixes:
+
+* Remove DNS entries for containers that are being restarted by Docker
+  but are not live yet #1977/#1989
+* Don't let one failing allocation attempt prevent others from
+  succeeding; they could be in different subnets which are more
+  available #1996/#2001
+* Don't complain on second router launch on kernels that lack support
+  for Fast Datapath #1929/#1983
+* Fix build broken by change in libnetwork IPAM API #1984/#1985
+
 ## Release 1.4.4
 
 Fixing a rather serious issue that slipped through our preparations
