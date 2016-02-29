@@ -18,7 +18,6 @@ hosts.
 * [Adding and removing extra DNS entries](#add-remove)
 * [Resolve weaveDNS entries from host](#resolve-weavedns-entries-from-host)
 * [Hot-swapping service containers](#hot-swapping)
-* [Retaining DNS entries when containers stop](#retain-stopped)
 * [Configuring a custom TTL](#ttl)
 * [Configuring the domain search path](#domain-search-path)
 * [Using a different local domain](#local-domain)
