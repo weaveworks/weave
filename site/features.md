@@ -43,8 +43,8 @@ a container network.
 Broadcast and Multicast protocols can also be implemented 
 over Weave Net.
 
-To start using Weave Net, see [Installing Weave Net](/site/install/installing-weave.md)
-and [Deploying Applications to Weave Net](/site/deploying-applications.md)
+To start using Weave Net, see [Installing Weave Net](/site/installing-weave.md)
+and [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md)
 
 ###<a name="fast-data-path"></a>Fast Datapath
 
@@ -181,7 +181,7 @@ Weave implements encryption and security using [Daniel J. Bernstein's NaCl libra
 
 For information on how to secure your Docker containers, 
 see [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) 
-and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption/crypto-overview.md) and [How Weave Implements Encryption](/site/encryption/emphemeral-key.md)
+and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption/crypto-overview.md) and [How Weave Implements Encryption](/site/encryption/ephemeral-key.md)
 
 
 ###<a name="host-network-integration"></a>Host Network Integration
@@ -219,7 +219,7 @@ even when there is only partial connectivity between the hosts. Weave
 routes traffic between containers as long as there is at least one *path* 
 of connected hosts between them.
 
-See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/multi-cloud-hop-dynamic-topologies.md)
+See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/multi-cloud-multi-hop.md)
 
 
 ###<a name="dynamic-topologies"></a>Dynamic Topologies
@@ -232,7 +232,7 @@ Weave routes traffic between containers as long as
 there is at least one *path* of connected hosts 
 between them.
 
-See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/multi-cloud-hop-dynamic-topologies.md)
+See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/finding-adding-hosts-dynamically.md)
 
 
 ###<a name="container-mobility"></a>Container Mobility
