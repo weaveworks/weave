@@ -209,7 +209,7 @@ of containers that run on [Google Compute Engine](https://cloud.google.com/compu
 (GCE), [Amazon Elastic Compute Cloud](https://aws.amazon.com/ec2/) 
 (EC2) and in a local data centre all at the same time.
 
-See [Enabling Multi-Cloud networking and Mutihop Routing](/site/using-weave/multi-cloud-hop-dynamic-topologies.md)
+See [Enabling Multi-Cloud networking and Muti-hop Routing](/site/using-weave/multi-cloud-multi-hop.md)
 
 
 ###<a name="multi-hop-routing"></a>Multi-Hop Routing
