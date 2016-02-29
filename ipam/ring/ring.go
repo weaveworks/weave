@@ -12,8 +12,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -39,11 +40,18 @@ var (
 	ErrTokenOutOfRange = errors.New("Token is out of range")
 	ErrDifferentSeeds  = errors.New("Received ring was seeded differently from ours!")
 	ErrDifferentRange  = errors.New("Received range differs from ours!")
-	ErrNewerVersion    = errors.New("Received new version for entry I own!")
-	ErrInvalidEntry    = errors.New("Received invalid state update!")
-	ErrEntryInMyRange  = errors.New("Received new entry in my range!")
 	ErrNotFound        = errors.New("No entries for peer found")
 )
+
+func errInconsistentEntry(mine, theirs *entry) error {
+	return fmt.Errorf("Inconsistent entries for %s: owned by %s but incoming message says %s", mine.Token, mine.Peer, theirs.Peer)
+}
+func errEntryInMyRange(theirs *entry) error {
+	return fmt.Errorf("Peer %s says it owns the IP range from %s, which I think I own", theirs.Peer, theirs.Token)
+}
+func errNewerVersion(mine, theirs *entry) error {
+	return fmt.Errorf("Received update for IP range I own at %s v%d: incoming message says owner %s v%d", mine.Token, mine.Version, theirs.Peer, theirs.Version)
+}
 
 func (r *Ring) checkInvariants() error {
 	if !sort.IsSorted(r.Entries) {
@@ -223,7 +231,7 @@ func (r *Ring) Merge(gossip Ring) error {
 		case mine.Token > theirs.Token:
 			// insert, checking that a range owned by us hasn't been split
 			if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-				return ErrEntryInMyRange
+				return errEntryInMyRange(theirs)
 			}
 			addToResult(*theirs)
 			previousOwner = nil
@@ -233,14 +241,13 @@ func (r *Ring) Merge(gossip Ring) error {
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					common.Log.Debugf("Error merging entries at %s - %v != %v", mine.Token, mine, theirs)
-					return ErrInvalidEntry
+					return errInconsistentEntry(mine, theirs)
 				}
 				addToResult(*mine)
 				previousOwner = &mine.Peer
 			case mine.Version < theirs.Version:
 				if mine.Peer == r.Peer { // We shouldn't receive updates to our own tokens
-					return ErrNewerVersion
+					return errNewerVersion(mine, theirs)
 				}
 				addToResult(*theirs)
 				previousOwner = nil
@@ -261,7 +268,7 @@ func (r *Ring) Merge(gossip Ring) error {
 	for ; j < len(gossip.Entries); j++ {
 		theirs = gossip.Entries[j]
 		if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-			return ErrEntryInMyRange
+			return errEntryInMyRange(theirs)
 		}
 		addToResult(*theirs)
 		previousOwner = nil
@@ -355,12 +362,7 @@ func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 			}
 		}
 
-		if e, found := r.Entries.get(pos); found {
-			e.update(peer, share)
-		} else {
-			r.Entries.insert(entry{Token: pos, Peer: peer, Free: share})
-		}
-
+		r.Entries.insert(entry{Token: pos, Peer: peer, Free: share})
 		pos += address.Address(share)
 	}
 
@@ -446,10 +448,7 @@ func (ws weightedPeers) Swap(i, j int)      { ws[i], ws[j] = ws[j], ws[i] }
 // ChoosePeersToAskForSpace returns all peers we can ask for space in
 // the range [start, end), in weighted-random order.  Assumes start<end.
 func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []mesh.PeerName {
-	var (
-		sum               address.Offset
-		totalSpacePerPeer = make(map[mesh.PeerName]address.Offset) // Compute total free space per peer
-	)
+	totalSpacePerPeer := make(map[mesh.PeerName]address.Offset)
 
 	// iterate through tokens
 	for i, entry := range r.Entries {
@@ -471,7 +470,6 @@ func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []mesh.PeerN
 		}
 
 		totalSpacePerPeer[entry.Peer] += entry.Free
-		sum += entry.Free
 	}
 
 	// Compute weighted random numbers, then sort.

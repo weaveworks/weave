@@ -36,7 +36,7 @@ func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
 	}
 
 	var paxosStatus *paxos.Status
-	if allocator.paxosTicker != nil {
+	if allocator.paxosActive {
 		paxosStatus = paxos.NewStatus(allocator.paxos)
 	}
 

@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/net/address"
 )
 

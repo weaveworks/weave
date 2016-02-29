@@ -3,8 +3,9 @@ package ipam
 import (
 	"fmt"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -40,6 +41,9 @@ func (c *claim) Try(alloc *Allocator) bool {
 
 	alloc.establishRing()
 
+	// If we had heard that this container died, resurrect it
+	delete(alloc.dead, c.ident) // (delete is no-op if key not in map)
+
 	switch owner := alloc.ring.Owner(c.addr); owner {
 	case alloc.ourName:
 		// success
@@ -71,6 +75,9 @@ func (c *claim) Try(alloc *Allocator) bool {
 	case "":
 		if err := alloc.space.Claim(c.addr); err == nil {
 			alloc.debugln("Claimed", c.addr, "for", c.ident)
+			if c.ident == "_" { // Special "I don't have a unique ID" identifier
+				c.ident = c.addr.String()
+			}
 			alloc.addOwned(c.ident, c.addr)
 			c.sendResult(nil)
 		} else {
@@ -78,7 +85,11 @@ func (c *claim) Try(alloc *Allocator) bool {
 		}
 	case c.ident:
 		// same identifier is claiming same address; that's OK
+		alloc.debugln("Re-Claimed", c.addr, "for", c.ident)
 		c.sendResult(nil)
+	case c.addr.String():
+		// Address already allocated via "_" name
+		c.sendResult(fmt.Errorf("address %s already in use", c.addr))
 	default:
 		// Addr already owned by container on this machine
 		c.sendResult(fmt.Errorf("address %s is already owned by %s", c.addr.String(), existingIdent))

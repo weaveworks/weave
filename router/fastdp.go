@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/weaveworks/go-odp/odp"
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 // The virtual bridge accepts packets from ODP vports and the router
@@ -28,18 +28,11 @@ type bridgeSender func(key PacketKey, lock *fastDatapathLock) FlowOp
 type missHandler func(fks odp.FlowKeys, lock *fastDatapathLock) FlowOp
 
 type FastDatapath struct {
-	dpname string
-
-	// The mtu from the datapath netdev (which should match the
-	// mtus on all the veths hooked up to the datapath).  We
-	// validate that we are able to support that mtu.
-	mtu int
-
-	// The lock guards the FastDatapath state, and also
-	// synchronizes use of the dpif
-	lock             sync.Mutex
+	dpname           string
+	lock             sync.Mutex // guards state and synchronises use of dpif
 	dpif             *odp.Dpif
 	dp               odp.DatapathHandle
+	iface            *net.Interface
 	deleteFlowsCount uint64
 	missCount        uint64
 	missHandlers     map[odp.VportID]missHandler
@@ -68,14 +61,7 @@ type FastDatapath struct {
 	forwarders map[mesh.PeerName]*fastDatapathForwarder
 }
 
-type FastDatapathConfig struct {
-	DatapathName        string
-	Port                int
-	ExpireFlowsInterval time.Duration
-	ExpireMACsInterval  time.Duration
-}
-
-func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
+func NewFastDatapath(dpName string, port int) (*FastDatapath, error) {
 	dpif, err := odp.NewDpif()
 	if err != nil {
 		return nil, err
@@ -88,21 +74,21 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 		}
 	}()
 
-	dp, err := dpif.LookupDatapath(config.DatapathName)
+	dp, err := dpif.LookupDatapath(dpName)
 	if err != nil {
 		return nil, err
 	}
 
-	iface, err := net.InterfaceByName(config.DatapathName)
+	iface, err := net.InterfaceByName(dpName)
 	if err != nil {
 		return nil, err
 	}
 
 	fastdp := &FastDatapath{
-		dpname:        config.DatapathName,
-		mtu:           iface.MTU,
+		dpname:        dpName,
 		dpif:          dpif,
 		dp:            dp,
+		iface:         iface,
 		missHandlers:  make(map[odp.VportID]missHandler),
 		sendToPort:    nil,
 		sendToMAC:     make(map[MAC]bridgeSender),
@@ -131,7 +117,7 @@ func NewFastDatapath(config FastDatapathConfig) (*FastDatapath, error) {
 	// numbers to be independent, but working out how to specify
 	// them on the connecting side.  So we can wait to find out if
 	// anyone wants that.
-	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportIDHarder(config.Port+1, 5, time.Millisecond*10)
+	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportIDHarder(port+1, 5, time.Millisecond*10)
 	if err != nil {
 		return nil, err
 	}
@@ -216,6 +202,10 @@ type fastDatapathBridge struct {
 
 func (fastdp *FastDatapath) Bridge() Bridge {
 	return fastDatapathBridge{fastdp}
+}
+
+func (fastdp fastDatapathBridge) Interface() *net.Interface {
+	return fastdp.iface
 }
 
 func (fastdp fastDatapathBridge) String() string {
@@ -675,7 +665,7 @@ func (fwd *fastDatapathForwarder) sendHeartbeat() {
 
 	// the heartbeat payload consists of the 64-bit connection uid
 	// followed by the 16-bit packet size.
-	buf := make([]byte, EthernetOverhead+fwd.fastdp.mtu)
+	buf := make([]byte, EthernetOverhead+fwd.fastdp.iface.MTU)
 	binary.BigEndian.PutUint64(buf[EthernetOverhead:], fwd.connUID)
 	binary.BigEndian.PutUint16(buf[EthernetOverhead+8:], uint16(len(buf)))
 

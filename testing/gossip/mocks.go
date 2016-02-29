@@ -6,8 +6,9 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/mesh"
 )
 
 // Router to convey gossip from one gossiper to another, for testing
@@ -45,7 +46,7 @@ func (grouter *TestRouter) Stop() {
 	}
 }
 
-func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update mesh.GossipData) error {
+func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update mesh.GossipData) {
 	for _, gossipChan := range grouter.gossipChans {
 		select {
 		case gossipChan <- broadcastMessage{sender: sender, data: update}:
@@ -53,7 +54,6 @@ func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update mesh.Gos
 			common.Log.Errorf("Dropping message")
 		}
 	}
-	return nil
 }
 
 func (grouter *TestRouter) gossip(sender mesh.PeerName, update mesh.GossipData) error {
@@ -173,6 +173,6 @@ func (client TestRouterClient) GossipUnicast(dstPeerName mesh.PeerName, buf []by
 	return nil
 }
 
-func (client TestRouterClient) GossipBroadcast(update mesh.GossipData) error {
-	return client.router.gossipBroadcast(client.sender, update)
+func (client TestRouterClient) GossipBroadcast(update mesh.GossipData) {
+	client.router.gossipBroadcast(client.sender, update)
 }

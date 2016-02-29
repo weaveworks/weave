@@ -34,8 +34,8 @@ assert_raises "proxy docker_on $HOST1 ps"
 weave_on $HOST1 stop-proxy
 
 # Booting it over tls errors
-assert_raises "DOCKER_CLIENT_ARGS='--tls' weave_on $HOST1 launch-proxy" 1
-assert_raises "DOCKER_CERT_PATH='./tls' DOCKER_TLS_VERIFY=1 weave_on $HOST1 launch-proxy" 1
+assert_raises "! DOCKER_CLIENT_ARGS='--tls' weave_on $HOST1 launch-proxy"
+assert_raises "! DOCKER_CERT_PATH='./tls' DOCKER_TLS_VERIFY=1 weave_on $HOST1 launch-proxy"
 
 # Booting it with a specific -H overrides defaults
 weave_on $HOST1 launch-proxy -H tcp://0.0.0.0:12345

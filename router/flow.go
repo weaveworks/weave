@@ -3,7 +3,7 @@ package router
 import (
 	"net"
 
-	"github.com/weaveworks/weave/mesh"
+	"github.com/weaveworks/mesh"
 )
 
 // Just enough flow machinery for the weave router

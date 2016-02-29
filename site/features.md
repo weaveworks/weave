@@ -4,7 +4,7 @@ layout: default
 ---
 
 The following is a comprehensive list and overview of all the features available in Weave 
-Net.  Weave Net features:
+Net:
 
  * [Virtual Ethernet Switch](#virtual-ethernet-switch)
  * [Fast Data Path](#fast-data-path)
@@ -66,7 +66,7 @@ See [Using Fast Datapath](/site/fastdp/using-fastdp.md) and
 
 Weave includes a [Docker API Proxy](/site/weave-docker-api/set-up-proxy.md), which can be 
 used to launch containers and attach them to the Weave network 
-using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/] or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/). 
+using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/). 
 
 To use the proxy run: 
 
@@ -261,6 +261,4 @@ simply stop it (with `weave stop`) and restart it. Application
 containers do *not* have to be restarted in that event, and 
 if the Weave container is restarted quickly enough, 
 may not experience a temporary connectivity failure.
-
-
 

@@ -14,6 +14,7 @@ import (
 type ContainerObserver interface {
 	ContainerStarted(ident string)
 	ContainerDied(ident string)
+	ContainerDestroyed(ident string)
 }
 
 type Client struct {
@@ -63,11 +64,11 @@ func (c *Client) checkWorking() error {
 }
 
 func (c *Client) Info() string {
-	if env, err := c.Version(); err != nil {
+	env, err := c.Version()
+	if err != nil {
 		return fmt.Sprintf("Docker API error: %s", err)
-	} else {
-		return fmt.Sprintf("Docker API on %s: %v", c.Endpoint(), env)
 	}
+	return fmt.Sprintf("Docker API on %s: %v", c.Endpoint(), env)
 }
 
 // AddObserver adds an observer for docker events
@@ -82,11 +83,11 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 		for event := range events {
 			switch event.Status {
 			case "start":
-				id := event.ID
-				ob.ContainerStarted(id)
+				ob.ContainerStarted(event.ID)
 			case "die":
-				id := event.ID
-				ob.ContainerDied(id)
+				ob.ContainerDied(event.ID)
+			case "destroy":
+				ob.ContainerDestroyed(event.ID)
 			}
 		}
 	}()
@@ -97,7 +98,7 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 func (c *Client) IsContainerNotRunning(idStr string) bool {
 	container, err := c.InspectContainer(idStr)
 	if err == nil {
-		return !container.State.Running
+		return !container.State.Running || container.State.Restarting
 	}
 	if _, notThere := err.(*docker.NoSuchContainer); notThere {
 		return true

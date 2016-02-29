@@ -5,6 +5,10 @@ import (
 	"net/url"
 )
 
+func (client *Client) DNSDomain() (string, error) {
+	return client.httpVerb("GET", "/domain", nil)
+}
+
 func (client *Client) RegisterWithDNS(ID string, fqdn string, ip string) error {
 	data := url.Values{}
 	data.Add("fqdn", fqdn)

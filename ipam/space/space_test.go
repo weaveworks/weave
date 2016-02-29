@@ -155,7 +155,7 @@ func TestSpaceFree(t *testing.T) {
 	// Check we are full
 	ok, _ := space.Allocate(entireRange)
 	require.True(t, !ok, "Should have failed to get address")
-	r, ok = space.Donate(entireRange)
+	r, _ = space.Donate(entireRange)
 	require.True(t, r.Size() == 0, "Wrong space")
 
 	// Free in the middle

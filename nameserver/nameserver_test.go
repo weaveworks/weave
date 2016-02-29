@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/testing/gossip"
 )
@@ -117,7 +117,7 @@ func TestNameservers(t *testing.T) {
 		mapping := mapping{hostname, []pair{{nameserver.ourName, addr}}}
 		mappings = append(mappings, mapping)
 
-		require.Nil(t, nameserver.AddEntry(hostname, "", nameserver.ourName, addr))
+		nameserver.AddEntry(hostname, "", nameserver.ourName, addr)
 		check(nameserver, mapping)
 	}
 
@@ -132,7 +132,7 @@ func TestNameservers(t *testing.T) {
 		mapping.addrs = append(mapping.addrs, pair{nameserver.ourName, addr})
 		mappings[i] = mapping
 
-		require.Nil(t, nameserver.AddEntry(mapping.hostname, "", nameserver.ourName, addr))
+		nameserver.AddEntry(mapping.hostname, "", nameserver.ourName, addr)
 		check(nameserver, mapping)
 	}
 
@@ -157,7 +157,7 @@ func TestNameservers(t *testing.T) {
 		mappings[i] = mapping
 		nameserver := nameserversByName[pair.origin]
 
-		require.Nil(t, nameserver.Delete(mapping.hostname, "*", pair.addr.String(), pair.addr))
+		nameserver.Delete(mapping.hostname, "*", pair.addr.String(), pair.addr)
 		check(nameserver, mapping)
 	}
 
@@ -223,15 +223,13 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	require.Nil(t, err)
 	nameserver := makeNameserver(peername)
 
-	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
-	require.Nil(t, err)
+	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
 	nameserver.ContainerDied("containerid")
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
 
-	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
-	require.Nil(t, err)
+	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
 	nameserver.PeerGone(peername)
@@ -247,15 +245,13 @@ func TestTombstoneDeletion(t *testing.T) {
 	require.Nil(t, err)
 	nameserver := makeNameserver(peername)
 
-	err = nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
-	require.Nil(t, err)
+	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
 	nameserver.deleteTombstones()
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
-	err = nameserver.Delete("hostname", "containerid", "", address.Address(0))
-	require.Nil(t, err)
+	nameserver.Delete("hostname", "containerid", "", address.Address(0))
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
 	require.Equal(t, l(Entries{Entry{
 		ContainerID: "containerid",

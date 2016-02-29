@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/testing/gossip"
 )
@@ -48,7 +49,7 @@ func (m *mockGossipComms) String() string {
 // that the contents of messages are never re-ordered.  Which, for instance,
 // requires they are not based off iterating through a map.
 
-func (m *mockGossipComms) GossipBroadcast(update mesh.GossipData) error {
+func (m *mockGossipComms) GossipBroadcast(update mesh.GossipData) {
 	m.Lock()
 	defer m.Unlock()
 	buf := []byte{}
@@ -62,7 +63,6 @@ func (m *mockGossipComms) GossipBroadcast(update mesh.GossipData) error {
 		// Swallow this message
 		m.messages = m.messages[1:]
 	}
-	return nil
 }
 
 func equalByteBuffer(a, b []byte) bool {
@@ -123,6 +123,11 @@ func CheckAllExpectedMessagesSent(allocs ...*Allocator) {
 	}
 }
 
+type mockDB struct{}
+
+func (d *mockDB) Load(_ string, _ interface{}) error { return nil }
+func (d *mockDB) Save(_ string, _ interface{}) error { return nil }
+
 func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.Range) {
 	peername, err := mesh.PeerNameFromString(name)
 	if err != nil {
@@ -135,7 +140,7 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 	}
 
 	alloc := NewAllocator(peername, mesh.PeerUID(rand.Int63()),
-		"nick-"+name, cidr.Range(), quorum, func(mesh.PeerName) bool { return true })
+		"nick-"+name, cidr.Range(), quorum, new(mockDB), func(mesh.PeerName) bool { return true })
 
 	return alloc, cidr.HostRange()
 }

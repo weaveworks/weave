@@ -7,6 +7,7 @@ import (
 	"github.com/docker/libnetwork/drivers/remote/api"
 	"github.com/docker/libnetwork/types"
 
+	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/common/odp"
@@ -16,29 +17,24 @@ import (
 )
 
 const (
-	WeaveContainer = "weave"
-	WeaveBridge    = "weave"
+	WeaveBridge = "weave"
 )
 
 type driver struct {
-	version          string
-	nameserver       string
 	scope            string
 	noMulticastRoute bool
 	sync.RWMutex
 	endpoints map[string]struct{}
 }
 
-func New(client *docker.Client, version string, nameserver string, scope string, noMulticastRoute bool) (skel.Driver, error) {
+func New(client *docker.Client, weave *weaveapi.Client, scope string, noMulticastRoute bool) (skel.Driver, error) {
 	driver := &driver{
-		nameserver:       nameserver,
 		noMulticastRoute: noMulticastRoute,
-		version:          version,
 		scope:            scope,
 		endpoints:        make(map[string]struct{}),
 	}
 
-	_, err := NewWatcher(client, driver)
+	_, err := NewWatcher(client, weave, driver)
 	if err != nil {
 		return nil, err
 	}
@@ -155,14 +151,6 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 
 	response := &api.JoinResponse{
 		InterfaceName: ifname,
-	}
-	if driver.nameserver != "" {
-		routeToDNS := api.StaticRoute{
-			Destination: driver.nameserver + "/32",
-			RouteType:   types.CONNECTED,
-			NextHop:     "",
-		}
-		response.StaticRoutes = []api.StaticRoute{routeToDNS}
 	}
 	if !driver.noMulticastRoute {
 		multicastRoute := api.StaticRoute{

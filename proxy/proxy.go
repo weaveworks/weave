@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -14,10 +13,13 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 const (
@@ -27,6 +29,9 @@ const (
 
 	weaveSock     = "/var/run/weave/weave.sock"
 	weaveSockUnix = "unix://" + weaveSock
+
+	initialInterval = 2 * time.Second
+	maxInterval     = 1 * time.Minute
 )
 
 var (
@@ -57,7 +62,9 @@ type Config struct {
 	Version             string
 	WithoutDNS          bool
 	NoMulticastRoute    bool
+	DockerBridge        string
 	DockerHost          string
+	ProcPath            string
 }
 
 type wait struct {
@@ -77,10 +84,52 @@ type Proxy struct {
 	weaveWaitNomcastVolume string
 	normalisedAddrs        []string
 	waiters                map[*http.Request]*wait
+	attachJobs             map[string]*attachJob
+	quit                   chan struct{}
+}
+
+type attachJob struct {
+	id          string
+	tryInterval time.Duration // retry delay on next failure
+	timer       *time.Timer
+}
+
+func (proxy *Proxy) attachWithRetry(id string) {
+	proxy.Lock()
+	defer proxy.Unlock()
+	if j, ok := proxy.attachJobs[id]; ok {
+		j.timer.Reset(time.Duration(0))
+		return
+	}
+
+	j := &attachJob{id: id, tryInterval: initialInterval}
+	j.timer = time.AfterFunc(time.Duration(0), func() {
+		if err := proxy.attach(id, false); err != nil {
+			// The delay at the nth retry is a random value in the range
+			// [i-i/2,i+i/2], where i = initialInterval * 1.5^(n-1).
+			j.timer.Reset(j.tryInterval)
+			j.tryInterval = j.tryInterval * 3 / 2
+			if j.tryInterval > maxInterval {
+				j.tryInterval = maxInterval
+			}
+			return
+		}
+		proxy.notifyWaiters(id, nil)
+	})
+	proxy.attachJobs[id] = j
+}
+
+func (j attachJob) Stop() {
+	j.timer.Stop()
 }
 
 func NewProxy(c Config) (*Proxy, error) {
-	p := &Proxy{Config: c, waiters: make(map[*http.Request]*wait)}
+	p := &Proxy{
+		Config:     c,
+		waiters:    make(map[*http.Request]*wait),
+		attachJobs: make(map[string]*attachJob),
+		quit:       make(chan struct{}),
+	}
 
 	if err := p.TLSConfig.LoadCerts(); err != nil {
 		Log.Fatalf("Could not configure tls for proxy: %s", err)
@@ -94,17 +143,20 @@ func NewProxy(c Config) (*Proxy, error) {
 	client, err := weavedocker.NewVersionedClient(c.DockerHost, "1.18")
 	if err != nil {
 		return nil, err
-	} else {
-		Log.Info(client.Info())
 	}
+	Log.Info(client.Info())
+
 	p.client = client.Client
 
 	if !p.WithoutDNS {
-		dockerBridgeIP, stderr, err := callWeave("docker-bridge-ip")
+		netDevs, err := GetBridgeNetDev(c.ProcPath, c.DockerBridge)
 		if err != nil {
-			return nil, fmt.Errorf(string(stderr))
+			return nil, err
 		}
-		p.dockerBridgeIP = string(dockerBridgeIP)
+		if len(netDevs) != 1 || len(netDevs[0].CIDRs) != 1 {
+			return nil, fmt.Errorf("Could not obtain address of %s", c.DockerBridge)
+		}
+		p.dockerBridgeIP = netDevs[0].CIDRs[0].IP.String()
 	}
 
 	p.hostnameMatchRegexp, err = regexp.Compile(c.HostnameMatch)
@@ -125,16 +177,7 @@ func NewProxy(c Config) (*Proxy, error) {
 func (proxy *Proxy) AttachExistingContainers() {
 	containers, _ := proxy.client.ListContainers(docker.ListContainersOptions{})
 	for _, c := range containers {
-		container, err := proxy.client.InspectContainer(c.ID)
-		if err != nil {
-			if _, ok := err.(*docker.NoSuchContainer); !ok {
-				Log.Warningf("unable to attach existing container %s since inspecting it failed: %v", c.ID, err)
-			}
-			continue
-		}
-		if containerShouldAttach(container) && (container.State.Running || container.State.Paused) {
-			proxy.attach(container, false)
-		}
+		proxy.attachWithRetry(c.ID)
 	}
 }
 
@@ -255,10 +298,7 @@ func (proxy *Proxy) Serve(listeners []net.Listener) {
 }
 
 func (proxy *Proxy) ListenAndServeStatus(socket string) {
-	if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
-		Log.Fatalf("Error removing existing status socket: %s", err)
-	}
-	listener, err := net.Listen("unix", socket)
+	listener, err := weavenet.ListenUnixSocket(socket)
 	if err != nil {
 		Log.Fatalf("ListenAndServeStatus failed: %s", err)
 	}
@@ -344,18 +384,7 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 
 // weavedocker.ContainerObserver interface
 func (proxy *Proxy) ContainerStarted(ident string) {
-	container, err := proxy.client.InspectContainer(ident)
-	if err == nil {
-		if containerShouldAttach(container) {
-			err = proxy.attach(container, true)
-		} else if containerIsWeaveRouter(container) {
-			err = proxy.attachRouter(container)
-		}
-	}
-	if _, ok := err.(*docker.NoSuchContainer); err != nil && !ok {
-		Log.Warningf("unable to attach new container %s since inspecting it failed: %v", ident, err)
-	}
-	proxy.notifyWaiters(ident, err)
+	proxy.notifyWaiters(ident, proxy.attach(ident, true))
 }
 
 func containerShouldAttach(container *docker.Container) bool {
@@ -381,6 +410,10 @@ func (proxy *Proxy) removeWait(r *http.Request) {
 
 func (proxy *Proxy) notifyWaiters(ident string, err error) {
 	proxy.Lock()
+	if j, ok := proxy.attachJobs[ident]; ok {
+		j.Stop()
+		delete(proxy.attachJobs, ident)
+	}
 	for _, wait := range proxy.waiters {
 		if ident == wait.ident && !wait.done {
 			wait.ch <- err
@@ -424,13 +457,30 @@ func (proxy *Proxy) waitForStartByIdent(ident string) error {
 	return nil
 }
 
-func (proxy *Proxy) ContainerDied(ident string) {
-}
+func (proxy *Proxy) ContainerDied(ident string)      {}
+func (proxy *Proxy) ContainerDestroyed(ident string) {}
 
-func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
+// Check if this container needs to be attached, if so then attach it,
+// and return nil on success or not needed.
+func (proxy *Proxy) attach(containerID string, orDie bool) error {
+	container, err := proxy.client.InspectContainer(containerID)
+	if err != nil {
+		if _, ok := err.(*docker.NoSuchContainer); !ok {
+			Log.Warningf("unable to attach existing container %s since inspecting it failed: %v", containerID, err)
+		}
+		return nil
+	}
+	if containerIsWeaveRouter(container) {
+		Log.Infof("Attaching weave router container: %s", container.ID)
+		return callWeaveAttach(container, []string{"attach-router"})
+	}
+	if !containerShouldAttach(container) || !container.State.Running {
+		return nil
+	}
+
 	cidrs, err := proxy.weaveCIDRs(container.HostConfig.NetworkMode, container.Config.Env)
 	if err != nil {
-		Log.Infof("Leaving container %s alone because %s", container.ID, err)
+		Log.Infof("Leaving container %s alone because %s", containerID, err)
 		return nil
 	}
 	Log.Infof("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
@@ -452,19 +502,10 @@ func (proxy *Proxy) attach(container *docker.Container, orDie bool) error {
 		args = append(args, "--or-die")
 	}
 	args = append(args, container.ID)
-	if _, stderr, err := callWeave(args...); err != nil {
-		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
-		return errors.New(string(stderr))
-	} else if len(stderr) > 0 {
-		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
-	}
-
-	return nil
+	return callWeaveAttach(container, args)
 }
 
-func (proxy *Proxy) attachRouter(container *docker.Container) error {
-	Log.Infof("Attaching weave router container: %s", container.ID)
-	args := []string{"attach-router"}
+func callWeaveAttach(container *docker.Container, args []string) error {
 	if _, stderr, err := callWeave(args...); err != nil {
 		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
 		return errors.New(string(stderr))
@@ -514,33 +555,13 @@ func (proxy *Proxy) setWeaveDNS(hostConfig jsonObject, hostname, dnsDomain strin
 	return nil
 }
 
-func (proxy *Proxy) getDNSDomain() (domain string) {
+func (proxy *Proxy) getDNSDomain() string {
 	if proxy.WithoutDNS {
 		return ""
 	}
-
-	weaveContainer, err := proxy.client.InspectContainer("weave")
-	var weaveIP string
-	if err == nil && weaveContainer.NetworkSettings != nil {
-		weaveIP = weaveContainer.NetworkSettings.IPAddress
-	}
-	if weaveIP == "" {
-		weaveIP = "127.0.0.1"
-	}
-
-	url := fmt.Sprintf("http://%s:6784/domain", weaveIP)
-	resp, err := http.Get(url)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		return
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-
-	return string(b)
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"))
+	domain, _ := weave.DNSDomain()
+	return domain
 }
 
 func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
@@ -549,11 +570,21 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 		return err
 	}
 
+	state, err := container.Object("State")
+	if err != nil {
+		return err
+	}
+
+	pid, err := state.Int("Pid")
+	if err != nil {
+		return err
+	}
+
 	if err := proxy.waitForStartByIdent(containerID); err != nil {
 		return err
 	}
-	mac, ips, nets, err := weaveContainerIPs(containerID)
-	if err != nil || len(ips) == 0 {
+	netDevs, err := GetWeaveNetDevs(proxy.ProcPath, pid)
+	if err != nil || len(netDevs) == 0 || len(netDevs[0].CIDRs) == 0 {
 		return err
 	}
 
@@ -561,9 +592,9 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 	if err != nil {
 		return err
 	}
-	networkSettings["MacAddress"] = mac
-	networkSettings["IPAddress"] = ips[0].String()
-	networkSettings["IPPrefixLen"], _ = nets[0].Mask.Size()
+	networkSettings["MacAddress"] = netDevs[0].MAC.String()
+	networkSettings["IPAddress"] = netDevs[0].CIDRs[0].IP.String()
+	networkSettings["IPPrefixLen"], _ = netDevs[0].CIDRs[0].Mask.Size()
 	return nil
 }
 
@@ -638,4 +669,13 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		err = errors.New(buf.String())
 	}
 	return
+}
+
+func (proxy *Proxy) Stop() {
+	close(proxy.quit)
+	proxy.Lock()
+	defer proxy.Unlock()
+	for _, j := range proxy.attachJobs {
+		j.Stop()
+	}
 }

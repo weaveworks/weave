@@ -13,24 +13,16 @@ import (
 )
 
 const (
-	WeaveHttpPort = 6784
+	WeaveHTTPHost = "127.0.0.1"
+	WeaveHTTPPort = 6784
 )
 
 type Client struct {
-	baseUrl string
-	resolve func() (string, error)
+	baseURL string
 }
 
 func (client *Client) httpVerb(verb string, url string, values url.Values) (string, error) {
-	baseUrl := client.baseUrl
-	if client.resolve != nil {
-		addr, err := client.resolve()
-		if err != nil {
-			return "", err
-		}
-		baseUrl = fmt.Sprintf("http://%s:%d", addr, WeaveHttpPort)
-	}
-	url = baseUrl + url
+	url = client.baseURL + url
 	Log.Debugf("weave %s to %s with %v", verb, url, values)
 	var body io.Reader
 	if values != nil {
@@ -43,28 +35,41 @@ func (client *Client) httpVerb(verb string, url string, values url.Values) (stri
 	if values != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-	if resp, err := http.DefaultClient.Do(req); err != nil {
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
 		return "", err
-	} else {
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return "", err
-		}
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
-			return string(body), nil
-		} else {
-			return "", errors.New(resp.Status + ": " + string(body))
-		}
 	}
+	defer resp.Body.Close()
+	rbody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+		return string(rbody), nil
+	}
+	return "", errors.New(resp.Status + ": " + string(rbody))
 }
 
 func NewClient(addr string) *Client {
-	return &Client{baseUrl: fmt.Sprintf("http://%s:%d", addr, WeaveHttpPort)}
-}
-
-func NewClientWithResolver(resolver func() (string, error)) *Client {
-	return &Client{resolve: resolver}
+	host := WeaveHTTPHost
+	port := fmt.Sprintf("%d", WeaveHTTPPort)
+	switch parts := strings.Split(addr, ":"); len(parts) {
+	case 0:
+	case 1:
+		if parts[0] != "" {
+			host = parts[0]
+		}
+	case 2:
+		if parts[0] != "" {
+			host = parts[0]
+		}
+		if parts[1] != "" {
+			port = parts[1]
+		}
+	default:
+		return &Client{baseURL: fmt.Sprintf("http://%s", addr)}
+	}
+	return &Client{baseURL: fmt.Sprintf("http://%s:%s", host, port)}
 }
 
 func (client *Client) Connect(remote string) error {

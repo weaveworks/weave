@@ -7,6 +7,7 @@
   github-release](https://help.github.com/articles/creating-an-access-token-for-command-line-use/);
 set and export `$GITHUB_TOKEN` with this value
 * Update all dependencies with `make update`
+* Ensure you are still on the right branch, since Go may switch to `master` as part of `make update`
 
 ## Release Types
 
@@ -63,9 +64,10 @@ This has the following effects:
 ## Draft Phase
 ### Push Version Tag Upstream
 
-First you must push your version tag upstream, so that an associated
-GitHub release may be created:
+First you must push your branch and version tag upstream, so that an
+associated GitHub release may be created:
 
+    git push git@github.com:weaveworks/weave
     git push git@github.com:weaveworks/weave $TAG
 
 N.B. if you're testing the release process, push to your fork
@@ -128,6 +130,12 @@ Finally, for **Mainline** releases only:
 
 * Images tagged `latest` are updated on DockerHub
 
+### Finish up
+
+* If not on master, merge branch into master and push to GitHub.
+* Merge the branch you are on into `latest_doc_release_updates` and push to GitHub.
+* Close the [milestone](https://github.com/weaveworks/weave/milestones) in GitHub and create the next milestone
+* Update the `#weavenetwork` topic heading on freenode (requires 'chanops' permission)
 
 ## Troubleshooting
 

@@ -7,11 +7,13 @@ import (
 	"sort"
 	"time"
 
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -21,8 +23,9 @@ const (
 	msgRingUpdate
 	msgSpaceRequestDenied
 
-	paxosInterval = time.Second * 5
-	MinSubnetSize = 4 // first and last addresses are excluded, so 2 would be too small
+	tickInterval         = time.Second * 5
+	MinSubnetSize        = 4 // first and last addresses are excluded, so 2 would be too small
+	containerDiedTimeout = time.Second * 30
 )
 
 // operation represents something which Allocator wants to do, but
@@ -51,38 +54,46 @@ type Allocator struct {
 	nicknames        map[mesh.PeerName]string     // so we can map nicknames for rmpeer
 	pendingAllocates []operation                  // held until we get some free space
 	pendingClaims    []operation                  // held until we know who owns the space
+	dead             map[string]time.Time         // containers we heard were dead, and when
+	db               db.DB                        // persistence
 	gossip           mesh.Gossip                  // our link to the outside world for sending messages
 	paxos            *paxos.Node
-	paxosTicker      *time.Ticker
+	paxosActive      bool
+	ticker           *time.Ticker
 	shuttingDown     bool // to avoid doing any requests while trying to shut down
 	isKnownPeer      func(mesh.PeerName) bool
 	now              func() time.Time
 }
 
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
+func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, db db.DB, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
 	return &Allocator{
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
 		owned:       make(map[string][]address.Address),
+		db:          db,
 		paxos:       paxos.NewNode(ourName, ourUID, quorum),
 		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
 		isKnownPeer: isKnownPeer,
+		dead:        make(map[string]time.Time),
 		now:         time.Now,
 	}
 }
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
+	alloc.loadPersistedRing()
 	actionChan := make(chan func(), mesh.ChannelSize)
 	alloc.actionChan = actionChan
+	alloc.ticker = time.NewTicker(tickInterval)
 	go alloc.actorLoop(actionChan)
 }
 
 // Stop makes the actor routine exit, for test purposes ONLY because any
 // calls after this is processed will hang. Async.
 func (alloc *Allocator) Stop() {
+	alloc.ticker.Stop()
 	alloc.actionChan <- nil
 }
 
@@ -202,7 +213,7 @@ func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled
 func (alloc *Allocator) Lookup(ident string, r address.Range) (address.Address, error) {
 	resultChan := make(chan allocateResult)
 	alloc.actionChan <- func() {
-		if addr, found := alloc.lookupOwned(ident, r); found {
+		if addr, found := alloc.ownedInRange(ident, r); found {
 			resultChan <- allocateResult{addr: addr}
 			return
 		}
@@ -220,55 +231,77 @@ func (alloc *Allocator) Claim(ident string, addr address.Address, noErrorOnUnkno
 	return <-resultChan
 }
 
-// ContainerDied is provided to satisfy the updater interface; does a 'Delete' underneath.  Sync.
+// ContainerDied called from the updater interface.  Async.
 func (alloc *Allocator) ContainerDied(ident string) {
-	if err := alloc.Delete(ident); err == nil {
-		alloc.debugln("Container", ident, "died; released addresses")
+	alloc.actionChan <- func() {
+		if alloc.hasOwned(ident) {
+			alloc.debugln("Container", ident, "died; noting to remove later")
+			alloc.dead[ident] = alloc.now()
+		}
+		// Also remove any pending ops
+		alloc.cancelOpsFor(&alloc.pendingAllocates, ident)
+		alloc.cancelOpsFor(&alloc.pendingClaims, ident)
 	}
 }
 
-func (alloc *Allocator) ContainerStarted(ident string) {}
+// ContainerDestroyed called from the updater interface.  Async.
+func (alloc *Allocator) ContainerDestroyed(ident string) {
+	alloc.actionChan <- func() {
+		if alloc.hasOwned(ident) {
+			alloc.debugln("Container", ident, "destroyed; removing addresses")
+			alloc.delete(ident)
+			delete(alloc.dead, ident)
+		}
+	}
+}
+
+func (alloc *Allocator) removeDeadContainers() {
+	cutoff := alloc.now().Add(-containerDiedTimeout)
+	for ident, timeOfDeath := range alloc.dead {
+		if timeOfDeath.Before(cutoff) {
+			if err := alloc.delete(ident); err == nil {
+				alloc.debugln("Removed addresses for container", ident)
+			}
+			delete(alloc.dead, ident)
+		}
+	}
+}
+
+func (alloc *Allocator) ContainerStarted(ident string) {
+	alloc.actionChan <- func() {
+		delete(alloc.dead, ident) // delete is no-op if key not in map
+	}
+}
 
 // Delete (Sync) - release all IP addresses for container with given name
 func (alloc *Allocator) Delete(ident string) error {
 	errChan := make(chan error)
 	alloc.actionChan <- func() {
-		addrs, found := alloc.owned[ident]
-		for _, addr := range addrs {
-			alloc.space.Free(addr)
-		}
-		delete(alloc.owned, ident)
-
-		// Also remove any pending ops
-		found = alloc.cancelOpsFor(&alloc.pendingAllocates, ident) || found
-		found = alloc.cancelOpsFor(&alloc.pendingClaims, ident) || found
-
-		if !found {
-			errChan <- fmt.Errorf("Delete: no addresses for %s", ident)
-			return
-		}
-		errChan <- nil
+		errChan <- alloc.delete(ident)
 	}
 	return <-errChan
+}
+
+func (alloc *Allocator) delete(ident string) error {
+	addrs := alloc.removeAllOwned(ident)
+	if len(addrs) == 0 {
+		return fmt.Errorf("Delete: no addresses for %s", ident)
+	}
+	for _, addr := range addrs {
+		alloc.space.Free(addr)
+	}
+	return nil
 }
 
 // Free (Sync) - release single IP address for container
 func (alloc *Allocator) Free(ident string, addrToFree address.Address) error {
 	errChan := make(chan error)
 	alloc.actionChan <- func() {
-		addrs := alloc.owned[ident]
-		for i, ownedAddr := range addrs {
-			if ownedAddr == addrToFree {
-				alloc.debugln("Freed", addrToFree, "for", ident)
-				if len(addrs) == 1 {
-					delete(alloc.owned, ident)
-				} else {
-					alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
-				}
-				alloc.space.Free(addrToFree)
-				errChan <- nil
-				return
-			}
+		if alloc.removeOwned(ident, addrToFree) {
+			alloc.debugln("Freed", addrToFree, "for", ident)
+			alloc.space.Free(addrToFree)
+			errChan <- nil
+			return
 		}
 
 		errChan <- fmt.Errorf("Free: address %s not found for %s", addrToFree, ident)
@@ -299,7 +332,7 @@ func (alloc *Allocator) pickPeerForTransfer() mesh.PeerName {
 	if heir := alloc.ring.PickPeerForTransfer(t); heir != mesh.UnknownPeerName {
 		return heir
 	}
-	// finally, disappeared peers that that passively participated in IPAM
+	// finally, disappeared peers that passively participated in IPAM
 	return alloc.pickPeerFromNicknames(t)
 }
 
@@ -501,19 +534,18 @@ func (alloc *Allocator) SetInterfaces(gossip mesh.Gossip) {
 
 func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 	for {
-		var tickChan <-chan time.Time
-		if alloc.paxosTicker != nil {
-			tickChan = alloc.paxosTicker.C
-		}
-
 		select {
 		case action := <-actionChan:
 			if action == nil {
 				return
 			}
 			action()
-		case <-tickChan:
-			alloc.propose()
+		case <-alloc.ticker.C:
+			if alloc.paxosActive {
+				alloc.propose()
+			}
+			alloc.removeDeadContainers()
+			alloc.tryPendingOps()
 		}
 
 		alloc.assertInvariants()
@@ -525,18 +557,16 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
 
 // Ensure we are making progress towards an established ring
 func (alloc *Allocator) establishRing() {
-	if !alloc.ring.Empty() || alloc.paxosTicker != nil {
+	if !alloc.ring.Empty() || alloc.paxosActive {
 		return
 	}
 
+	alloc.paxosActive = true
 	alloc.propose()
 	if ok, cons := alloc.paxos.Consensus(); ok {
 		// If the quorum was 1, then proposing immediately
 		// leads to consensus
 		alloc.createRing(cons.Value)
-	} else {
-		// re-try until we get consensus
-		alloc.paxosTicker = time.NewTicker(paxosInterval)
 	}
 }
 
@@ -549,15 +579,12 @@ func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 
 func (alloc *Allocator) ringUpdated() {
 	// When we have a ring, we don't need paxos any more
-	if alloc.paxos != nil {
+	if alloc.paxosActive {
+		alloc.paxosActive = false
 		alloc.paxos = nil
-
-		if alloc.paxosTicker != nil {
-			alloc.paxosTicker.Stop()
-			alloc.paxosTicker = nil
-		}
 	}
 
+	alloc.persistRing()
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 	alloc.tryPendingOps()
 }
@@ -686,7 +713,7 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 
 func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	// No matter what we do, we'll send a unicast gossip
-	// of our ring back to tha chap who asked for space.
+	// of our ring back to the chap who asked for space.
 	// This serves to both tell him of any space we might
 	// have given him, or tell him where he might find some
 	// more.
@@ -705,7 +732,7 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
-	alloc.sendRingUpdate(to)
+	alloc.persistRing()
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -738,14 +765,80 @@ func (alloc *Allocator) reportFreeSpace() {
 	alloc.ring.ReportFree(freespace)
 }
 
+// Persisting the Ring
+const (
+	ringIdent = "ring"
+	nameIdent = "peername"
+)
+
+func (alloc *Allocator) persistRing() {
+	// It would be better if these two Save operations happened in the same transaction
+	if err := alloc.db.Save(nameIdent, alloc.ourName); err != nil {
+		alloc.fatalf("Error persisting ring data: %s", err)
+		return
+	}
+	if err := alloc.db.Save(ringIdent, alloc.ring); err != nil {
+		alloc.fatalf("Error persisting ring data: %s", err)
+	}
+}
+
+func (alloc *Allocator) loadPersistedRing() {
+	var checkPeerName mesh.PeerName
+	if err := alloc.db.Load(nameIdent, &checkPeerName); err != nil {
+		alloc.fatalf("Error loading persisted peer name: %s", err)
+		return
+	}
+	if checkPeerName != alloc.ourName {
+		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
+		alloc.persistRing()
+		return
+	}
+	if err := alloc.db.Load(ringIdent, &alloc.ring); err != nil {
+		alloc.fatalf("Error loading persisted ring data: %s", err)
+	}
+	if alloc.ring != nil {
+		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+	}
+}
+
 // Owned addresses
+
+func (alloc *Allocator) allOwned(ident string) []address.Address {
+	return alloc.owned[ident]
+}
+
+func (alloc *Allocator) hasOwned(ident string) bool {
+	_, b := alloc.owned[ident]
+	return b
+}
 
 // NB: addr must not be owned by ident already
 func (alloc *Allocator) addOwned(ident string, addr address.Address) {
 	alloc.owned[ident] = append(alloc.owned[ident], addr)
 }
 
-func (alloc *Allocator) lookupOwned(ident string, r address.Range) (address.Address, bool) {
+func (alloc *Allocator) removeAllOwned(ident string) []address.Address {
+	a := alloc.owned[ident]
+	delete(alloc.owned, ident)
+	return a
+}
+
+func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bool {
+	addrs, _ := alloc.owned[ident]
+	for i, ownedAddr := range addrs {
+		if ownedAddr == addrToFree {
+			if len(addrs) == 1 {
+				delete(alloc.owned, ident)
+			} else {
+				alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (alloc *Allocator) ownedInRange(ident string, r address.Range) (address.Address, bool) {
 	for _, addr := range alloc.owned[ident] {
 		if r.Contains(addr) {
 			return addr, true
@@ -767,6 +860,9 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 
 // Logging
 
+func (alloc *Allocator) fatalf(fmt string, args ...interface{}) {
+	common.Log.Fatalf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+}
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
 	common.Log.Infof("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }

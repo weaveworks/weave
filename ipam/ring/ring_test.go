@@ -8,8 +8,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/weaveworks/mesh"
+
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -59,13 +60,19 @@ func TestInsert(t *testing.T) {
 
 	ring.Entries.entry(0).Free = 0
 	ring.Entries.insert(entry{Token: dot245, Peer: peer1name})
-	ring2 := New(start, end, peer1name)
-	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Free: 0}, {Token: dot245, Peer: peer1name}}
-	require.Equal(t, ring2, ring)
+	check := []RangeInfo{
+		{Peer: peer1name, Range: address.Range{Start: start, End: dot245}},
+		{Peer: peer1name, Range: address.Range{Start: dot245, End: end}},
+	}
+	require.Equal(t, check, ring.AllRangeInfo())
 
 	ring.Entries.insert(entry{Token: dot10, Peer: peer1name})
-	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Free: 0}, {Token: dot10, Peer: peer1name}, {Token: dot245, Peer: peer1name}}
-	require.Equal(t, ring2, ring)
+	check2 := []RangeInfo{
+		{Peer: peer1name, Range: address.Range{Start: start, End: dot10}},
+		{Peer: peer1name, Range: address.Range{Start: dot10, End: dot245}},
+		{Peer: peer1name, Range: address.Range{Start: dot245, End: end}},
+	}
+	require.Equal(t, check2, ring.AllRangeInfo())
 }
 
 func TestBetween(t *testing.T) {
@@ -218,17 +225,18 @@ func TestMergeErrors(t *testing.T) {
 	ring2 = New(start, end, peer2name)
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Version: 1}}
-	require.True(t, ring1.Merge(*ring2) == ErrNewerVersion, "Expected ErrNewerVersion")
+	fmt.Println(ring1.Merge(*ring2))
+	require.Error(t, ring1.Merge(*ring2), "Expected error")
 
 	// Cannot Merge two entries with same version but different hosts
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: start, Peer: peer2name}}
-	require.True(t, ring1.Merge(*ring2) == ErrInvalidEntry, "Expected ErrInvalidEntry")
+	require.Error(t, ring1.Merge(*ring2), "Expected error")
 
 	// Cannot Merge an entry into a range I own
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: middle, Peer: peer2name}}
-	require.True(t, ring1.Merge(*ring2) == ErrEntryInMyRange, "Expected ErrEntryInMyRange")
+	require.Error(t, ring1.Merge(*ring2), "Expected error")
 }
 
 func TestMergeMore(t *testing.T) {
@@ -505,6 +513,29 @@ func TestOwner(t *testing.T) {
 
 }
 
+func makePeerName(i int) mesh.PeerName {
+	if i >= 10000 {
+		panic("makePeerName: invalid value")
+	}
+	peer, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:%02d:00:00:00:ff", i/100, i%100))
+	return peer
+}
+
+func TestClaimForPeers(t *testing.T) {
+	const numPeers = 12
+	// Different end to usual so we get a number of addresses that a)
+	// is smaller than the max number of peers, and b) is divisible by
+	// some number of peers. This maximises coverage of edge cases.
+	end := dot10
+	peers := make([]mesh.PeerName, numPeers)
+	// Test for a range of peer counts
+	for i := 0; i < numPeers; i++ {
+		peers[i] = makePeerName(i)
+		ring := New(start, end, peers[0])
+		ring.ClaimForPeers(peers[:i+1])
+	}
+}
+
 type addressSlice []address.Address
 
 func (s addressSlice) Len() int           { return len(s) }
@@ -519,8 +550,7 @@ func TestFuzzRing(t *testing.T) {
 
 	peers := make([]mesh.PeerName, numPeers)
 	for i := 0; i < numPeers; i++ {
-		peer, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:00:00:00:02:00", i))
-		peers[i] = peer
+		peers[i] = makePeerName(i)
 	}
 
 	// Make a valid, random ring
@@ -607,7 +637,7 @@ func TestFuzzRingHard(t *testing.T) {
 	)
 
 	addPeer := func() {
-		peer, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:%02d:00:00:00:00", nextPeerID/10, nextPeerID%10))
+		peer := makePeerName(nextPeerID)
 		common.Log.Debugf("%s: Adding peer", peer)
 		nextPeerID++
 		peers = append(peers, peer)

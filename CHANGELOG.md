@@ -1,3 +1,16 @@
+## Release 1.4.4
+
+Fixing a rather serious issue that slipped through our preparations
+for Docker 1.10:
+
+* Restarting Docker or rebooting your machine while the Weave Net
+  plugin is running causes Docker 1.10.0 to fail to start #1959/#1963
+
+Also one other small fix:
+
+* Avoid a hang when trying to use plugin and proxy at the same time
+  #1956/#1961
+
 ## Release 1.4.3
 
 Preparing for Docker 1.10, plus some bug-fixes.

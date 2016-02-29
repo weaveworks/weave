@@ -13,12 +13,13 @@ import (
 	"github.com/davecheney/profile"
 	"github.com/docker/docker/pkg/mflag"
 	"github.com/gorilla/mux"
+	"github.com/weaveworks/mesh"
 
+	"github.com/weaveworks/go-checkpoint"
 	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
-	"github.com/weaveworks/weave/common/odp"
+	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam"
-	"github.com/weaveworks/weave/mesh"
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
@@ -26,6 +27,39 @@ import (
 )
 
 var version = "(unreleased version)"
+
+type dnsConfig struct {
+	Domain                 string
+	ListenAddress          string
+	TTL                    int
+	ClientTimeout          time.Duration
+	EffectiveListenAddress string
+}
+
+const (
+	versionCheckPeriod = 6 * time.Hour
+)
+
+func check() {
+	handleResponse := func(r *checkpoint.CheckResponse, err error) {
+		if err != nil {
+			Log.Printf("Error checking version: %v", err)
+		} else if r.Outdated {
+			Log.Printf("Weave version %s is available; please update at %s",
+				r.CurrentVersion, r.CurrentDownloadURL)
+		}
+	}
+
+	// Start background version checking
+	params := checkpoint.CheckParams{
+		Product:       "weave-net",
+		Version:       version,
+		SignatureFile: "",
+	}
+	resp, err := checkpoint.Check(&params)
+	handleResponse(resp, err)
+	checkpoint.CheckInterval(&params, versionCheckPeriod, handleResponse)
+}
 
 func main() {
 	procs := runtime.NumCPU()
@@ -37,39 +71,30 @@ func main() {
 	runtime.GOMAXPROCS(procs)
 
 	var (
-		// flags that cause immediate exit
-		justVersion          bool
-		createDatapath       bool
-		deleteDatapath       bool
-		addDatapathInterface string
-
-		config                    mesh.Config
-		networkConfig             weave.NetworkConfig
-		protocolMinVersion        int
-		ifaceName                 string
-		routerName                string
-		nickName                  string
-		password                  string
-		pktdebug                  bool
-		logLevel                  string
-		prof                      string
-		bufSzMB                   int
-		noDiscovery               bool
-		httpAddr                  string
-		iprangeCIDR               string
-		ipsubnetCIDR              string
-		peerCount                 int
-		dockerAPI                 string
-		peers                     []string
-		noDNS                     bool
-		dnsDomain                 string
-		dnsListenAddress          string
-		dnsTTL                    int
-		dnsClientTimeout          time.Duration
-		dnsEffectiveListenAddress string
-		iface                     *net.Interface
-		datapathName              string
-		trustedSubnetStr          string
+		justVersion        bool
+		config             mesh.Config
+		networkConfig      weave.NetworkConfig
+		protocolMinVersion int
+		ifaceName          string
+		routerName         string
+		nickName           string
+		password           string
+		pktdebug           bool
+		logLevel           string
+		prof               string
+		bufSzMB            int
+		noDiscovery        bool
+		httpAddr           string
+		iprangeCIDR        string
+		ipsubnetCIDR       string
+		peerCount          int
+		dockerAPI          string
+		peers              []string
+		noDNS              bool
+		dnsConfig          dnsConfig
+		datapathName       string
+		trustedSubnetStr   string
+		dbPrefix           string
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -79,10 +104,7 @@ func main() {
 	}
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
-	mflag.BoolVar(&createDatapath, []string{"-create-datapath"}, false, "create ODP datapath and exit")
-	mflag.BoolVar(&deleteDatapath, []string{"-delete-datapath"}, false, "delete ODP datapath and exit")
-	mflag.StringVar(&addDatapathInterface, []string{"-add-datapath-iface"}, "", "add a network interface to the ODP datapath and exit")
-
+	mflag.StringVar(&config.Host, []string{"-host"}, "", "router host")
 	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
@@ -101,14 +123,15 @@ func main() {
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
 	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
-	mflag.StringVar(&dnsDomain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
-	mflag.StringVar(&dnsListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
-	mflag.IntVar(&dnsTTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
-	mflag.DurationVar(&dnsClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
-	mflag.StringVar(&dnsEffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
+	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
+	mflag.StringVar(&dnsConfig.ListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
+	mflag.IntVar(&dnsConfig.TTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
+	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
+	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
+	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "weave", "pathname/prefix of filename to store data")
 
-	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "Command separated list of trusted subnets in CIDR notation")
+	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "Comma-separated list of trusted subnets in CIDR notation")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -124,109 +147,15 @@ func main() {
 
 	SetLogLevel(logLevel)
 
-	switch {
-	case justVersion:
+	if justVersion {
 		fmt.Printf("weave router %s\n", version)
-		os.Exit(0)
-
-	case createDatapath:
-		err, odp_supported := odp.CreateDatapath(datapathName)
-		if !odp_supported {
-			if err != nil {
-				Log.Error(err)
-			}
-
-			// When the kernel lacks ODP support, exit
-			// with a special status to distinguish it for
-			// the weave script.
-			os.Exit(17)
-		}
-
-		checkFatal(err)
-		os.Exit(0)
-
-	case deleteDatapath:
-		checkFatal(odp.DeleteDatapath(datapathName))
-		os.Exit(0)
-
-	case addDatapathInterface != "":
-		checkFatal(odp.AddDatapathInterface(datapathName, addDatapathInterface))
 		os.Exit(0)
 	}
 
 	Log.Println("Command line options:", options())
 	Log.Println("Command line peers:", peers)
 
-	if protocolMinVersion < mesh.ProtocolMinVersion || protocolMinVersion > mesh.ProtocolMaxVersion {
-		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", mesh.ProtocolMinVersion, mesh.ProtocolMaxVersion)
-	}
-	config.ProtocolMinVersion = byte(protocolMinVersion)
-
-	var fastDPOverlay weave.NetworkOverlay
-	if datapathName != "" {
-		// A datapath name implies that "Bridge" and "Overlay"
-		// packet handling use fast datapath, although other
-		// options can override that below.  Even if both
-		// things are overridden, we might need bridging on
-		// the datapath.
-		fastdp, err := weave.NewFastDatapath(weave.FastDatapathConfig{
-			DatapathName: datapathName,
-			Port:         config.Port,
-		})
-
-		checkFatal(err)
-		networkConfig.Bridge = fastdp.Bridge()
-		fastDPOverlay = fastdp.Overlay()
-	}
-
-	if ifaceName != "" {
-		// -iface can coexist with -datapath, because
-		// pcap-based packet capture is a bit more efficient
-		// than capture via ODP misses, even when using an
-		// ODP-based bridge.  So when using weave encyption,
-		// it's preferable to use -iface.
-		var err error
-		iface, err = weavenet.EnsureInterface(ifaceName)
-		checkFatal(err)
-
-		// bufsz flag is in MB
-		networkConfig.Bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024)
-		checkFatal(err)
-	}
-
-	if password == "" {
-		password = os.Getenv("WEAVE_PASSWORD")
-	}
-
-	if password == "" {
-		Log.Println("Communication between peers is unencrypted.")
-	} else {
-		config.Password = []byte(password)
-		Log.Println("Communication between peers via untrusted networks is encrypted.")
-	}
-
-	overlays := weave.NewOverlaySwitch()
-	if fastDPOverlay != nil {
-		overlays.Add("fastdp", fastDPOverlay)
-	}
-	sleeve := weave.NewSleeveOverlay(config.Port)
-	overlays.Add("sleeve", sleeve)
-	overlays.SetCompatOverlay(sleeve)
-
-	if routerName == "" {
-		if iface == nil {
-			Log.Fatal("Either an interface must be specified with --iface or a name with -name")
-		}
-		routerName = iface.HardwareAddr.String()
-	}
-
-	name, err := mesh.PeerNameFromUserInput(routerName)
-	checkFatal(err)
-
-	if nickName == "" {
-		nickName, err = os.Hostname()
-		checkFatal(err)
-	}
+	go check()
 
 	if prof != "" {
 		p := *profile.CPUProfile
@@ -235,7 +164,10 @@ func main() {
 		defer profile.Start(&p).Stop()
 	}
 
-	config.PeerDiscovery = !noDiscovery
+	if protocolMinVersion < mesh.ProtocolMinVersion || protocolMinVersion > mesh.ProtocolMaxVersion {
+		Log.Fatalf("--min-protocol-version must be in range [%d,%d]", mesh.ProtocolMinVersion, mesh.ProtocolMaxVersion)
+	}
+	config.ProtocolMinVersion = byte(protocolMinVersion)
 
 	if pktdebug {
 		networkConfig.PacketLogging = packetLogging{}
@@ -243,11 +175,26 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	if config.TrustedSubnets, err = parseTrustedSubnets(trustedSubnetStr); err != nil {
-		Log.Fatal("Unable to parse trusted subnets: ", err)
+	overlay, bridge := createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB)
+	networkConfig.Bridge = bridge
+
+	name := peerName(routerName, bridge.Interface())
+
+	if nickName == "" {
+		var err error
+		nickName, err = os.Hostname()
+		checkFatal(err)
 	}
 
-	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlays)
+	config.Password = determinePassword(password)
+	config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
+	config.PeerDiscovery = !noDiscovery
+
+	db, err := db.NewBoltDB(dbPrefix + "data.db")
+	checkFatal(err)
+	defer db.Close()
+
+	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay)
 	Log.Println("Our name is", router.Ourself)
 
 	var dockerCli *docker.Client
@@ -262,7 +209,7 @@ func main() {
 	}
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
-			if err = dockerCli.AddObserver(o); err != nil {
+			if err := dockerCli.AddObserver(o); err != nil {
 				Log.Fatal("Unable to start watcher", err)
 			}
 		}
@@ -270,10 +217,13 @@ func main() {
 	isKnownPeer := func(name mesh.PeerName) bool {
 		return router.Peers.Fetch(name) != nil
 	}
-	var allocator *ipam.Allocator
-	var defaultSubnet address.CIDR
+
+	var (
+		allocator     *ipam.Allocator
+		defaultSubnet address.CIDR
+	)
 	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), isKnownPeer)
+		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), db, isKnownPeer)
 		observeContainers(allocator)
 	} else if peerCount > 0 {
 		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
@@ -284,22 +234,10 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		ns = nameserver.New(router.Ourself.Peer.Name, dnsDomain, isKnownPeer)
-		router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
-		ns.SetGossip(router.NewGossip("nameserver", ns))
+		ns, dnsserver = createDNSServer(dnsConfig, router.Router, isKnownPeer)
 		observeContainers(ns)
 		ns.Start()
 		defer ns.Stop()
-		dnsserver, err = nameserver.NewDNSServer(ns, dnsDomain, dnsListenAddress,
-			dnsEffectiveListenAddress, uint32(dnsTTL), dnsClientTimeout)
-		if err != nil {
-			Log.Fatal("Unable to start dns server: ", err)
-		}
-		listenAddr := dnsListenAddress
-		if dnsEffectiveListenAddress != "" {
-			listenAddr = dnsEffectiveListenAddress
-		}
-		Log.Println("Listening for DNS queries on", listenAddr)
 		dnsserver.ActivateAndServe()
 		defer dnsserver.Stop()
 	}
@@ -370,6 +308,31 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
+func createOverlay(datapathName string, ifaceName string, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+	overlay := weave.NewOverlaySwitch()
+	var bridge weave.Bridge
+	switch {
+	case datapathName != "" && ifaceName != "":
+		Log.Fatal("At most one of --datapath and --iface must be specified.")
+	case datapathName != "":
+		fastdp, err := weave.NewFastDatapath(datapathName, port)
+		checkFatal(err)
+		bridge = fastdp.Bridge()
+		overlay.Add("fastdp", fastdp.Overlay())
+	case ifaceName != "":
+		iface, err := weavenet.EnsureInterface(ifaceName)
+		checkFatal(err)
+		bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
+		checkFatal(err)
+	default:
+		bridge = weave.NullBridge{}
+	}
+	sleeve := weave.NewSleeveOverlay(host, port)
+	overlay.Add("sleeve", sleeve)
+	overlay.SetCompatOverlay(sleeve)
+	return overlay, bridge
+}
+
 func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	_, cidr, err := address.ParseCIDR(cidrStr)
 	checkFatal(err)
@@ -380,7 +343,7 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	return cidr
 }
 
-func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr string, quorum uint, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr string, quorum uint, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange := parseAndCheckCIDR(ipRangeStr)
 	defaultSubnet := ipRange
 	if defaultSubnetStr != "" {
@@ -389,12 +352,29 @@ func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr st
 			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
 		}
 	}
-	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum, isKnownPeer)
+	allocator := ipam.NewAllocator(router.Ourself.Peer.Name, router.Ourself.Peer.UID, router.Ourself.Peer.NickName, ipRange.Range(), quorum, db, isKnownPeer)
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
 
 	return allocator, defaultSubnet
+}
+
+func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mesh.PeerName) bool) (*nameserver.Nameserver, *nameserver.DNSServer) {
+	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, isKnownPeer)
+	router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
+	ns.SetGossip(router.NewGossip("nameserver", ns))
+	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,
+		config.EffectiveListenAddress, uint32(config.TTL), config.ClientTimeout)
+	if err != nil {
+		Log.Fatal("Unable to start dns server: ", err)
+	}
+	listenAddr := config.ListenAddress
+	if config.EffectiveListenAddress != "" {
+		listenAddr = config.EffectiveListenAddress
+	}
+	Log.Println("Listening for DNS queries on", listenAddr)
+	return ns, dnsserver
 }
 
 // Pick a quorum size heuristically based on the number of peer
@@ -417,22 +397,45 @@ func determineQuorum(initPeerCountFlag int, peers []string) uint {
 	return quorum
 }
 
-func parseTrustedSubnets(trustedSubnetStr string) ([]*net.IPNet, error) {
-	trustedSubnets := []*net.IPNet{}
+func determinePassword(password string) []byte {
+	if password == "" {
+		password = os.Getenv("WEAVE_PASSWORD")
+	}
+	if password == "" {
+		Log.Println("Communication between peers is unencrypted.")
+		return nil
+	}
+	Log.Println("Communication between peers via untrusted networks is encrypted.")
+	return []byte(password)
+}
 
+func peerName(routerName string, iface *net.Interface) mesh.PeerName {
+	if routerName == "" {
+		if iface == nil {
+			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
+		}
+		routerName = iface.HardwareAddr.String()
+	}
+	name, err := mesh.PeerNameFromUserInput(routerName)
+	checkFatal(err)
+	return name
+}
+
+func parseTrustedSubnets(trustedSubnetStr string) []*net.IPNet {
+	trustedSubnets := []*net.IPNet{}
 	if trustedSubnetStr == "" {
-		return trustedSubnets, nil
+		return trustedSubnets
 	}
 
 	for _, subnetStr := range strings.Split(trustedSubnetStr, ",") {
 		_, subnet, err := net.ParseCIDR(subnetStr)
 		if err != nil {
-			return nil, err
+			Log.Fatal("Unable to parse trusted subnets: ", err)
 		}
 		trustedSubnets = append(trustedSubnets, subnet)
 	}
 
-	return trustedSubnets, nil
+	return trustedSubnets
 }
 
 func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {

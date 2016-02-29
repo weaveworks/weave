@@ -12,15 +12,21 @@ import (
 )
 
 var (
-	version           = "(unreleased version)"
-	defaultDockerHost = "unix:///var/run/docker.sock"
+	version = "(unreleased version)"
 )
+
+func getenv(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultVal
+}
 
 func main() {
 	var (
 		justVersion bool
 		logLevel    = "info"
-		c           = proxy.Config{Image: "weaveworks/weaveexec"}
+		c           proxy.Config
 		withDNS     bool
 	)
 
@@ -52,10 +58,6 @@ func main() {
 
 	SetLogLevel(logLevel)
 
-	if image := os.Getenv("EXEC_IMAGE"); image != "" {
-		c.Image = image
-	}
-
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
 
@@ -63,15 +65,16 @@ func main() {
 		Log.Warning("--with-dns option has been removed; DNS is on by default")
 	}
 
-	c.DockerHost = defaultDockerHost
-	if dockerHost := os.Getenv("DOCKER_HOST"); dockerHost != "" {
-		c.DockerHost = dockerHost
-	}
+	c.Image = getenv("EXEC_IMAGE", "weaveworks/weaveexec")
+	c.DockerBridge = getenv("DOCKER_BRIDGE", "docker0")
+	c.DockerHost = getenv("DOCKER_HOST", "unix:///var/run/docker.sock")
+	c.ProcPath = getenv("PROCFS", "/proc")
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {
 		Log.Fatalf("Could not start proxy: %s", err)
 	}
+	defer p.Stop()
 
 	listeners := p.Listen()
 	p.AttachExistingContainers()

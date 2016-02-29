@@ -3,10 +3,8 @@ package proxy
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -38,15 +36,17 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 		}
 	}
 
-	propagateEnv("DOCKER_BRIDGE")
 	propagateEnv("DOCKER_HOST")
 
-	// Propogage WEAVE_DEBUG, to make debugging easier.
+	// Propagate WEAVE_DEBUG, to make debugging easier.
 	propagateEnv("WEAVE_DEBUG")
 
 	// This prevents the code coverage contortions in our
 	// integration test suite breaking things.
 	propagateEnv("COVERAGE")
+
+	// In case the router control endpoint address is non-standard.
+	propagateEnv("WEAVE_HTTP_ADDR")
 
 	Log.Debug("Calling weave args: ", args, "env: ", cmd.Env)
 	var stdout, stderr bytes.Buffer
@@ -126,35 +126,6 @@ func inspectContainerInPath(client *docker.Client, path string) (*docker.Contain
 		Log.Warningf("Error inspecting container %s: %v", containerID, err)
 	}
 	return container, err
-}
-
-func weaveContainerIPs(containerID string) (mac string, ips []net.IP, nets []*net.IPNet, err error) {
-	stdout, stderr, err := callWeave("ps", containerID)
-	if err != nil || len(stderr) > 0 {
-		err = errors.New(string(stderr))
-		return
-	}
-	if len(stdout) <= 0 {
-		return
-	}
-
-	fields := strings.Fields(string(stdout))
-	if len(fields) < 2 {
-		return
-	}
-	mac = fields[1]
-
-	var ip net.IP
-	var ipnet *net.IPNet
-	for _, cidr := range fields[2:] {
-		ip, ipnet, err = net.ParseCIDR(cidr)
-		if err != nil {
-			return
-		}
-		ips = append(ips, ip)
-		nets = append(nets, ipnet)
-	}
-	return
 }
 
 func addVolume(hostConfig jsonObject, source, target, mode string) error {

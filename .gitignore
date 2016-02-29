@@ -25,6 +25,7 @@ _testmain.go
 *.prof
 profile.cov
 coverage.html
+.pkg
 
 # Emacs backup files
 *~
@@ -41,16 +42,12 @@ prog/sigproxy/sigproxy
 prog/weavewait/weavewait
 prog/weavewait/weavewait_noop
 prog/weavewait/weavewait_nomcast
-prog/netcheck/netcheck
-prog/docker_tls_args/docker_tls_args
+prog/weaveutil/weaveutil
 prog/plugin/plugin
 testing/cover/cover
 testing/runner/runner
 releases
-.weaver.uptodate
-.weavedns.uptodate
-.weaveexec.uptodate
-.dockerplugin.uptodate
+.*.uptodate
 weave.tar.gz
 prog/weaveexec/weave
 prog/weaveexec/weavehosts
@@ -59,8 +56,7 @@ prog/weaveexec/weavewait
 prog/weaveexec/weavewait_noop
 prog/weaveexec/weavewait_nomcast
 prog/weaveexec/sigproxy
-prog/weaveexec/netcheck
-prog/weaveexec/docker_tls_args
+prog/weaveexec/weaveutil
 prog/weaveexec/docker*.tgz
 Vagrantfile.local
 test/tls/tls
