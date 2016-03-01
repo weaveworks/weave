@@ -41,11 +41,11 @@ func TestAllocFree(t *testing.T) {
 	_, cidr2, _ := address.ParseCIDR(subnet2)
 
 	alloc.claimRingForTesting()
-	addr1, err := alloc.Allocate(container1, cidr1.HostRange(), returnFalse)
+	addr1, err := alloc.Allocate(container1, cidr1, returnFalse)
 	require.NoError(t, err)
 	require.Equal(t, testAddr1, addr1.String(), "address")
 
-	addr2, err := alloc.Allocate(container1, cidr2.HostRange(), returnFalse)
+	addr2, err := alloc.Allocate(container1, cidr2, returnFalse)
 	require.NoError(t, err)
 	require.Equal(t, testAddr2, addr2.String(), "address")
 
@@ -54,28 +54,28 @@ func TestAllocFree(t *testing.T) {
 	require.Equal(t, []address.Address{addr1, addr2}, addrs)
 
 	// Ask for another address for a different container and check it's different
-	addr1b, _ := alloc.Allocate(container2, cidr1.HostRange(), returnFalse)
+	addr1b, _ := alloc.Allocate(container2, cidr1, returnFalse)
 	if addr1b.String() == testAddr1 {
 		t.Fatalf("Expected different address but got %s", addr1b.String())
 	}
 
 	// Ask for the first container again and we should get the same addresses again
-	addr1a, _ := alloc.Allocate(container1, cidr1.HostRange(), returnFalse)
+	addr1a, _ := alloc.Allocate(container1, cidr1, returnFalse)
 	require.Equal(t, testAddr1, addr1a.String(), "address")
-	addr2a, _ := alloc.Allocate(container1, cidr2.HostRange(), returnFalse)
+	addr2a, _ := alloc.Allocate(container1, cidr2, returnFalse)
 	require.Equal(t, testAddr2, addr2a.String(), "address")
 
 	// Now delete the first container, and we should get its addresses back
 	require.NoError(t, alloc.Delete(container1))
-	addr3, _ := alloc.Allocate(container3, cidr1.HostRange(), returnFalse)
+	addr3, _ := alloc.Allocate(container3, cidr1, returnFalse)
 	require.Equal(t, testAddr1, addr3.String(), "address")
-	addr4, _ := alloc.Allocate(container3, cidr2.HostRange(), returnFalse)
+	addr4, _ := alloc.Allocate(container3, cidr2, returnFalse)
 	require.Equal(t, testAddr2, addr4.String(), "address")
 
 	alloc.ContainerDied(container2)
 
 	// Resurrect
-	addr1c, err := alloc.Allocate(container2, cidr1.HostRange(), returnFalse)
+	addr1c, err := alloc.Allocate(container2, cidr1, returnFalse)
 	require.NoError(t, err)
 	require.Equal(t, addr1b, addr1c, "address")
 

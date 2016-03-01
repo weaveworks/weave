@@ -40,7 +40,7 @@ func writeAddresses(w http.ResponseWriter, cidrs []address.CIDR) {
 
 func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.ResponseWriter, ident string, checkAlive bool, subnet address.CIDR) {
 	closedChan := w.(http.CloseNotifier).CloseNotify()
-	addr, err := alloc.Allocate(ident, subnet.HostRange(),
+	addr, err := alloc.Allocate(ident, subnet,
 		func() bool {
 			select {
 			case <-closedChan:

@@ -195,7 +195,7 @@ func (e *errorCancelled) Error() string {
 
 // Allocate (Sync) - get new IP address for container with given name in range
 // if there isn't any space in that range we block indefinitely
-func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled func() bool) (address.Address, error) {
+func (alloc *Allocator) Allocate(ident string, r address.CIDR, hasBeenCancelled func() bool) (address.Address, error) {
 	resultChan := make(chan allocateResult)
 	op := &allocate{resultChan: resultChan, ident: ident, r: r, hasBeenCancelled: hasBeenCancelled}
 	alloc.doOperation(op, &alloc.pendingAllocates)
