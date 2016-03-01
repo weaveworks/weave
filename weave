@@ -1298,7 +1298,7 @@ check_overlap() {
 # with_container_addresses.
 ipam_reclaim() {
     for CIDR in $3 ; do
-        http_call $HTTP_ADDR PUT /ip/$1/${CIDR%/*}?noErrorOnUnknown=true
+        http_call $HTTP_ADDR PUT /ip/$1/$CIDR?noErrorOnUnknown=true
     done
 }
 
@@ -1354,7 +1354,7 @@ ipam_cidrs() {
             if [ "$METHOD" = "POST" ] ; then
                 # Assignment of a plain IP address; warn if it clashes but carry on
                 check_overlap $arg || true
-                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/${arg%/*} >&2
+                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg >&2
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
@@ -2064,7 +2064,7 @@ EOF
         RES=$(docker restart $1)
         CONTAINER=$(container_id $1)
         for CIDR in $ALL_CIDRS ; do
-            call_weave PUT /ip/$CONTAINER/${CIDR%/*}
+            call_weave PUT /ip/$CONTAINER/$CIDR
         done
         with_container_netns_or_die $1 attach $ALL_CIDRS
         when_weave_running with_container_fqdn $1 put_dns_fqdn $ALL_CIDRS

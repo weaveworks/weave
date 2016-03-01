@@ -28,7 +28,7 @@ func (g *allocate) Try(alloc *Allocator) bool {
 	if addrs := alloc.ownedInRange(g.ident, g.r); len(addrs) > 0 {
 		// If we had heard that this container died, resurrect it
 		delete(alloc.dead, g.ident) // delete is no-op if key not in map
-		g.resultChan <- allocateResult{addrs[0], nil}
+		g.resultChan <- allocateResult{addrs[0].Addr, nil}
 		return true
 	}
 
@@ -46,7 +46,7 @@ func (g *allocate) Try(alloc *Allocator) bool {
 			g.ident = addr.String()
 		}
 		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.r)
-		alloc.addOwned(g.ident, addr)
+		alloc.addOwned(g.ident, address.MakeCIDR(g.r, addr))
 		g.resultChan <- allocateResult{addr, nil}
 		return true
 	}

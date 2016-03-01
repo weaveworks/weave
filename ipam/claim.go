@@ -12,7 +12,7 @@ import (
 type claim struct {
 	resultChan       chan<- error
 	ident            string
-	addr             address.Address
+	cidr             address.CIDR
 	noErrorOnUnknown bool
 }
 
@@ -32,10 +32,10 @@ func (c *claim) sendResult(result error) {
 
 // Try returns true for success (or failure), false if we need to try again later
 func (c *claim) Try(alloc *Allocator) bool {
-	if !alloc.ring.Contains(c.addr) {
+	if !alloc.ring.Contains(c.cidr.Addr) {
 		// Address not within our universe; assume user knows what they are doing
-		alloc.infof("Address %s claimed by %s - not in our range", c.addr, c.ident)
-		alloc.addOwned(c.ident, c.addr)
+		alloc.infof("Address %s claimed by %s - not in our range", c.cidr, c.ident)
+		alloc.addOwned(c.ident, c.cidr)
 		c.sendResult(nil)
 		return true
 	}
@@ -45,24 +45,24 @@ func (c *claim) Try(alloc *Allocator) bool {
 	// If we had heard that this container died, resurrect it
 	delete(alloc.dead, c.ident) // (delete is no-op if key not in map)
 
-	switch owner := alloc.ring.Owner(c.addr); owner {
+	switch owner := alloc.ring.Owner(c.cidr.Addr); owner {
 	case alloc.ourName:
 		// success
 	case mesh.UnknownPeerName:
 		// If our ring doesn't know, it must be empty.
 		if c.noErrorOnUnknown {
-			alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.addr, c.ident)
+			alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.cidr, c.ident)
 			c.sendResult(nil)
 		} else {
-			c.sendResult(fmt.Errorf("%s is in the range %s, but the allocator is not initialized yet", c.addr, alloc.universe.AsCIDRString()))
+			c.sendResult(fmt.Errorf("%s is in the range %s, but the allocator is not initialized yet", c.cidr, alloc.universe.AsCIDRString()))
 		}
 		return false
 	default:
-		alloc.debugf("requesting address %s from other peer %s", c.addr, owner)
-		err := alloc.sendSpaceRequest(owner, address.NewRange(c.addr, 1))
+		alloc.debugf("requesting address %s from other peer %s", c.cidr, owner)
+		err := alloc.sendSpaceRequest(owner, address.NewRange(c.cidr.Addr, 1))
 		if err != nil { // can't speak to owner right now
 			if c.noErrorOnUnknown {
-				alloc.infof("Claim %s for %s: %s; will try later.", c.addr, c.ident, err)
+				alloc.infof("Claim %s for %s: %s; will try later.", c.cidr, c.ident, err)
 				c.sendResult(nil)
 			} else { // just tell the user they can't do this.
 				c.deniedBy(alloc, owner)
@@ -72,28 +72,28 @@ func (c *claim) Try(alloc *Allocator) bool {
 	}
 
 	// We are the owner, check we haven't given it to another container
-	switch existingIdent := alloc.findOwner(c.addr); existingIdent {
+	switch existingIdent := alloc.findOwner(c.cidr.Addr); existingIdent {
 	case "":
-		if err := alloc.space.Claim(c.addr); err == nil {
-			alloc.debugln("Claimed", c.addr, "for", c.ident)
+		if err := alloc.space.Claim(c.cidr.Addr); err == nil {
+			alloc.debugln("Claimed", c.cidr, "for", c.ident)
 			if c.ident == "_" { // Special "I don't have a unique ID" identifier
-				c.ident = c.addr.String()
+				c.ident = c.cidr.String()
 			}
-			alloc.addOwned(c.ident, c.addr)
+			alloc.addOwned(c.ident, c.cidr)
 			c.sendResult(nil)
 		} else {
 			c.sendResult(err)
 		}
 	case c.ident:
 		// same identifier is claiming same address; that's OK
-		alloc.debugln("Re-Claimed", c.addr, "for", c.ident)
+		alloc.debugln("Re-Claimed", c.cidr, "for", c.ident)
 		c.sendResult(nil)
-	case c.addr.String():
+	case c.cidr.String():
 		// Address already allocated via "_" name
-		c.sendResult(fmt.Errorf("address %s already in use", c.addr))
+		c.sendResult(fmt.Errorf("address %s already in use", c.cidr))
 	default:
 		// Addr already owned by container on this machine
-		c.sendResult(fmt.Errorf("address %s is already owned by %s", c.addr.String(), existingIdent))
+		c.sendResult(fmt.Errorf("address %s is already owned by %s", c.cidr.String(), existingIdent))
 	}
 	return true
 }
@@ -103,7 +103,7 @@ func (c *claim) deniedBy(alloc *Allocator, owner mesh.PeerName) {
 	if found {
 		name = " (" + name + ")"
 	}
-	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.addr.String(), owner, name))
+	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.cidr.String(), owner, name))
 }
 
 func (c *claim) Cancel() {

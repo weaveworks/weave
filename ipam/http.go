@@ -16,23 +16,23 @@ func badRequest(w http.ResponseWriter, err error) {
 	common.Log.Warningln("[allocator]:", err.Error())
 }
 
-func parseCIDR(w http.ResponseWriter, cidrStr string) (address.CIDR, bool) {
+func parseCIDR(w http.ResponseWriter, cidrStr string, net bool) (address.CIDR, bool) {
 	subnetAddr, cidr, err := address.ParseCIDR(cidrStr)
 	if err != nil {
 		badRequest(w, err)
 		return address.CIDR{}, false
 	}
-	if cidr.Start != subnetAddr {
+	if net && cidr.Addr != subnetAddr {
 		badRequest(w, fmt.Errorf("Invalid subnet %s - bits after network prefix are not all zero", cidrStr))
 		return address.CIDR{}, false
 	}
 	return cidr, true
 }
 
-func writeAddresses(w http.ResponseWriter, addrs []address.Address, subnet address.CIDR) {
-	for i, addr := range addrs {
-		fmt.Fprintf(w, "%s/%d", addr, subnet.PrefixLen)
-		if i < len(addrs)-1 {
+func writeAddresses(w http.ResponseWriter, cidrs []address.CIDR) {
+	for i, cidr := range cidrs {
+		fmt.Fprint(w, cidr)
+		if i < len(cidrs)-1 {
 			w.Write([]byte{' '})
 		}
 	}
@@ -70,31 +70,27 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		fmt.Fprintf(w, "%s", defaultSubnet)
 	})
 
-	router.Methods("PUT").Path("/ip/{id}/{ip}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	router.Methods("PUT").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		ident := vars["id"]
-		ipStr := vars["ip"]
-		noErrorOnUnknown := r.FormValue("noErrorOnUnknown") == "true"
-		if ip, err := address.ParseIP(ipStr); err != nil {
-			badRequest(w, err)
-			return
-		} else if err := alloc.Claim(ident, ip, noErrorOnUnknown); err != nil {
-			badRequest(w, fmt.Errorf("Unable to claim: %s", err))
-			return
+		if cidr, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"], false); ok {
+			noErrorOnUnknown := r.FormValue("noErrorOnUnknown") == "true"
+			if err := alloc.Claim(vars["id"], cidr, noErrorOnUnknown); err != nil {
+				badRequest(w, fmt.Errorf("Unable to claim: %s", err))
+				return
+			}
+			w.WriteHeader(204)
 		}
-
-		w.WriteHeader(204)
 	})
 
 	router.Methods("GET").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		if subnet, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"]); ok {
-			addrs, err := alloc.Lookup(vars["id"], subnet.HostRange())
+		if subnet, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"], true); ok {
+			cidrs, err := alloc.Lookup(vars["id"], subnet.HostRange())
 			if err != nil {
 				http.NotFound(w, r)
 				return
 			}
-			writeAddresses(w, addrs, subnet)
+			writeAddresses(w, cidrs)
 		}
 	})
 
@@ -104,12 +100,12 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 			http.NotFound(w, r)
 			return
 		}
-		writeAddresses(w, addrs, defaultSubnet)
+		writeAddresses(w, addrs)
 	})
 
 	router.Methods("POST").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		if subnet, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"]); ok {
+		if subnet, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"], true); ok {
 			alloc.handleHTTPAllocate(dockerCli, w, vars["id"], r.FormValue("check-alive") == "true", subnet)
 		}
 	})

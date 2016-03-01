@@ -26,8 +26,8 @@ type EntryStatus struct {
 }
 
 type ClaimStatus struct {
-	Ident   string
-	Address address.Address
+	Ident string
+	CIDR  address.CIDR
 }
 
 func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
@@ -80,7 +80,7 @@ func newClaimStatusSlice(allocator *Allocator) []ClaimStatus {
 	var slice []ClaimStatus
 	for _, op := range allocator.pendingClaims {
 		claim := op.(*claim)
-		slice = append(slice, ClaimStatus{claim.ident, claim.addr})
+		slice = append(slice, ClaimStatus{claim.ident, claim.cidr})
 	}
 	return slice
 }

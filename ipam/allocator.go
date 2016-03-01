@@ -47,16 +47,16 @@ type operation interface {
 type Allocator struct {
 	actionChan       chan<- func()
 	ourName          mesh.PeerName
-	universe         address.Range                // superset of all ranges
-	ring             *ring.Ring                   // information on ranges owned by all peers
-	space            space.Space                  // more detail on ranges owned by us
-	owned            map[string][]address.Address // who owns what addresses, indexed by container-ID
-	nicknames        map[mesh.PeerName]string     // so we can map nicknames for rmpeer
-	pendingAllocates []operation                  // held until we get some free space
-	pendingClaims    []operation                  // held until we know who owns the space
-	dead             map[string]time.Time         // containers we heard were dead, and when
-	db               db.DB                        // persistence
-	gossip           mesh.Gossip                  // our link to the outside world for sending messages
+	universe         address.Range             // superset of all ranges
+	ring             *ring.Ring                // information on ranges owned by all peers
+	space            space.Space               // more detail on ranges owned by us
+	owned            map[string][]address.CIDR // who owns what addresses, indexed by container-ID
+	nicknames        map[mesh.PeerName]string  // so we can map nicknames for rmpeer
+	pendingAllocates []operation               // held until we get some free space
+	pendingClaims    []operation               // held until we know who owns the space
+	dead             map[string]time.Time      // containers we heard were dead, and when
+	db               db.DB                     // persistence
+	gossip           mesh.Gossip               // our link to the outside world for sending messages
 	paxos            *paxos.Node
 	paxosActive      bool
 	ticker           *time.Ticker
@@ -71,7 +71,7 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 		ourName:     ourName,
 		universe:    universe,
 		ring:        ring.New(universe.Start, universe.End, ourName),
-		owned:       make(map[string][]address.Address),
+		owned:       make(map[string][]address.CIDR),
 		db:          db,
 		paxos:       paxos.NewNode(ourName, ourUID, quorum),
 		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
@@ -173,7 +173,7 @@ func (alloc *Allocator) tryPendingOps() {
 func (alloc *Allocator) spaceRequestDenied(sender mesh.PeerName, r address.Range) {
 	for i := 0; i < len(alloc.pendingClaims); {
 		claim := alloc.pendingClaims[i].(*claim)
-		if r.Contains(claim.addr) {
+		if r.Contains(claim.cidr.Addr) {
 			claim.deniedBy(alloc, sender)
 			alloc.pendingClaims = append(alloc.pendingClaims[:i], alloc.pendingClaims[i+1:]...)
 			continue
@@ -204,8 +204,8 @@ func (alloc *Allocator) Allocate(ident string, r address.Range, hasBeenCancelled
 }
 
 // Lookup (Sync) - get existing IP addresses for container with given name in range
-func (alloc *Allocator) Lookup(ident string, r address.Range) ([]address.Address, error) {
-	resultChan := make(chan []address.Address)
+func (alloc *Allocator) Lookup(ident string, r address.Range) ([]address.CIDR, error) {
+	resultChan := make(chan []address.CIDR)
 	alloc.actionChan <- func() {
 		resultChan <- alloc.ownedInRange(ident, r)
 	}
@@ -213,9 +213,9 @@ func (alloc *Allocator) Lookup(ident string, r address.Range) ([]address.Address
 }
 
 // Claim an address that we think we should own (Sync)
-func (alloc *Allocator) Claim(ident string, addr address.Address, noErrorOnUnknown bool) error {
+func (alloc *Allocator) Claim(ident string, cidr address.CIDR, noErrorOnUnknown bool) error {
 	resultChan := make(chan error)
-	op := &claim{resultChan: resultChan, ident: ident, addr: addr, noErrorOnUnknown: noErrorOnUnknown}
+	op := &claim{resultChan: resultChan, ident: ident, cidr: cidr, noErrorOnUnknown: noErrorOnUnknown}
 	alloc.doOperation(op, &alloc.pendingClaims)
 	return <-resultChan
 }
@@ -282,12 +282,12 @@ func (alloc *Allocator) Delete(ident string) error {
 }
 
 func (alloc *Allocator) delete(ident string) error {
-	addrs := alloc.removeAllOwned(ident)
-	if len(addrs) == 0 {
+	cidrs := alloc.removeAllOwned(ident)
+	if len(cidrs) == 0 {
 		return fmt.Errorf("Delete: no addresses for %s", ident)
 	}
-	for _, addr := range addrs {
-		alloc.space.Free(addr)
+	for _, cidr := range cidrs {
+		alloc.space.Free(cidr.Addr)
 	}
 	return nil
 }
@@ -803,9 +803,9 @@ func (alloc *Allocator) loadPersistedData() {
 	if err := alloc.db.Load(ownedIdent, &alloc.owned); err != nil {
 		alloc.fatalf("Error loading persisted address data: %s", err)
 	}
-	for _, addrs := range alloc.owned {
-		for _, addr := range addrs {
-			alloc.space.Claim(addr)
+	for _, cidrs := range alloc.owned {
+		for _, cidr := range cidrs {
+			alloc.space.Claim(cidr.Addr)
 		}
 	}
 }
@@ -818,22 +818,18 @@ func (alloc *Allocator) persistOwned() {
 
 // Owned addresses
 
-func (alloc *Allocator) allOwned(ident string) []address.Address {
-	return alloc.owned[ident]
-}
-
 func (alloc *Allocator) hasOwned(ident string) bool {
 	_, b := alloc.owned[ident]
 	return b
 }
 
 // NB: addr must not be owned by ident already
-func (alloc *Allocator) addOwned(ident string, addr address.Address) {
-	alloc.owned[ident] = append(alloc.owned[ident], addr)
+func (alloc *Allocator) addOwned(ident string, cidr address.CIDR) {
+	alloc.owned[ident] = append(alloc.owned[ident], cidr)
 	alloc.persistOwned()
 }
 
-func (alloc *Allocator) removeAllOwned(ident string) []address.Address {
+func (alloc *Allocator) removeAllOwned(ident string) []address.CIDR {
 	a := alloc.owned[ident]
 	delete(alloc.owned, ident)
 	alloc.persistOwned()
@@ -841,13 +837,13 @@ func (alloc *Allocator) removeAllOwned(ident string) []address.Address {
 }
 
 func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bool {
-	addrs, _ := alloc.owned[ident]
-	for i, ownedAddr := range addrs {
-		if ownedAddr == addrToFree {
-			if len(addrs) == 1 {
+	cidrs, _ := alloc.owned[ident]
+	for i, ownedCidr := range cidrs {
+		if ownedCidr.Addr == addrToFree {
+			if len(cidrs) == 1 {
 				delete(alloc.owned, ident)
 			} else {
-				alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
+				alloc.owned[ident] = append(cidrs[:i], cidrs[i+1:]...)
 			}
 			alloc.persistOwned()
 			return true
@@ -856,20 +852,20 @@ func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bo
 	return false
 }
 
-func (alloc *Allocator) ownedInRange(ident string, r address.Range) []address.Address {
-	var a []address.Address
-	for _, addr := range alloc.owned[ident] {
-		if r.Contains(addr) {
-			a = append(a, addr)
+func (alloc *Allocator) ownedInRange(ident string, r address.Range) []address.CIDR {
+	var c []address.CIDR
+	for _, cidr := range alloc.owned[ident] {
+		if r.Contains(cidr.Addr) {
+			c = append(c, cidr)
 		}
 	}
-	return a
+	return c
 }
 
 func (alloc *Allocator) findOwner(addr address.Address) string {
-	for ident, addrs := range alloc.owned {
-		for _, candidate := range addrs {
-			if candidate == addr {
+	for ident, cidrs := range alloc.owned {
+		for _, candidate := range cidrs {
+			if candidate.Addr == addr {
 				return ident
 			}
 		}
@@ -880,10 +876,10 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 // For each ID in the 'owned' map, remove the entry if it isn't in the map
 func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
 	changed := false
-	for ident, addrs := range alloc.owned {
+	for ident, cidrs := range alloc.owned {
 		if _, found := ids[ident]; !found {
-			for _, addr := range addrs {
-				alloc.space.Free(addr)
+			for _, cidr := range cidrs {
+				alloc.space.Free(cidr.Addr)
 			}
 			delete(alloc.owned, ident)
 			changed = true
