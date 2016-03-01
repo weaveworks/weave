@@ -64,7 +64,6 @@ type Config struct {
 	NoMulticastRoute    bool
 	DockerBridge        string
 	DockerHost          string
-	ProcPath            string
 }
 
 type wait struct {
@@ -149,7 +148,7 @@ func NewProxy(c Config) (*Proxy, error) {
 	p.client = client.Client
 
 	if !p.WithoutDNS {
-		netDevs, err := GetBridgeNetDev(c.ProcPath, c.DockerBridge)
+		netDevs, err := GetBridgeNetDev(c.DockerBridge)
 		if err != nil {
 			return nil, err
 		}
@@ -583,7 +582,7 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 	if err := proxy.waitForStartByIdent(containerID); err != nil {
 		return err
 	}
-	netDevs, err := GetWeaveNetDevs(proxy.ProcPath, pid)
+	netDevs, err := GetWeaveNetDevs(pid)
 	if err != nil || len(netDevs) == 0 || len(netDevs[0].CIDRs) == 0 {
 		return err
 	}

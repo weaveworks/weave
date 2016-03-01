@@ -68,7 +68,6 @@ func main() {
 	c.Image = getenv("EXEC_IMAGE", "weaveworks/weaveexec")
 	c.DockerBridge = getenv("DOCKER_BRIDGE", "docker0")
 	c.DockerHost = getenv("DOCKER_HOST", "unix:///var/run/docker.sock")
-	c.ProcPath = getenv("PROCFS", "/proc")
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {

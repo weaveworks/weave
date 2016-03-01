@@ -110,9 +110,7 @@ docker_sock_options() {
 }
 
 exec_remote() {
-    docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host $(docker_sock_options) \
-        -v /proc:/hostproc \
-        -e PROCFS=/hostproc \
+    docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host --pid=host $(docker_sock_options) \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
         -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
@@ -342,7 +340,6 @@ PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
 PLUGIN_CONTAINER_NAME=weaveplugin
 VOLUMES_CONTAINER_NAME=weavevolumes-$IMAGE_VERSION
 
-PROCFS=${PROCFS:-/proc}
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 BRIDGE=weave
@@ -466,8 +463,7 @@ util_op() {
     if command_exists weaveutil ; then
         weaveutil "$@"
     else
-        docker run --rm --privileged --net=host $(docker_sock_options) \
-            -v /proc:/hostproc -e PROCFS=/hostproc \
+        docker run --rm --privileged --net=host --pid=host $(docker_sock_options) \
             --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
     fi
 }
@@ -746,7 +742,7 @@ with_container_netns() {
         exit 1
     fi
 
-    CONTAINER_NETNS=$PROCFS/$CONTAINER_PID/ns/net
+    CONTAINER_NETNS=/proc/$CONTAINER_PID/ns/net
     LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
     GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
     IP_TMPOUT=/tmp/weave_ip_out_$$
@@ -758,7 +754,7 @@ with_container_netns() {
     shift 1
     if ! "$@" >$IP_TMPOUT 2>$IP_TMPERR ; then
         STATUS=1
-        if [ ! -d $PROCFS/$CONTAINER_PID ] ; then
+        if [ ! -d /proc/$CONTAINER_PID ] ; then
             echo "Container $CONTAINER died" >&2
         else
             echo "Failure during network configuration for container $CONTAINER:" >&2
@@ -1678,12 +1674,10 @@ launch_proxy() {
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
     start_if_necessary proxy $PROXY_CONTAINER_NAME $EXEC_IMAGE \
-        --privileged --net=host $(docker_sock_options) \
+        --privileged --net=host --pid=host $(docker_sock_options) \
         $PROXY_VOLUMES \
         --volumes-from $VOLUMES_CONTAINER_NAME \
         -v /var/run/weave:/var/run/weave \
-        -v /proc:/hostproc \
-        -e PROCFS=/hostproc \
         -e DOCKER_BRIDGE \
         -e WEAVE_DEBUG \
         -e COVERAGE \
