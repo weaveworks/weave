@@ -5,7 +5,7 @@ require './vagrant-common.rb'
 vm_ip = "172.16.0.3" # arbitrary private IP
 
 pkgs = %w(
-  docker-engine
+  docker-engine=1.10.2-0~wily
   aufs-tools
   build-essential
   ethtool
