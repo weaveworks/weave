@@ -3,46 +3,17 @@
 set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SSH_DIR=${SSH_DIR:-DIR}
+WEAVE=$DIR/../weave
+DOCKER_NS=$DIR/../bin/docker-ns
 
-# Protect against being sourced multiple times to prevent
-# overwriting assert.sh global state
-if ! [ -z "$SOURCED_CONFIG_SH" ]; then
-    return
-fi
-SOURCED_CONFIG_SH=true
+. "../tools/integration/config.sh"
 
-# these ought to match what is in Vagrantfile
-N_MACHINES=${N_MACHINES:-3}
-IP_PREFIX=${IP_PREFIX:-192.168.48}
-IP_SUFFIX_BASE=${IP_SUFFIX_BASE:-10}
-
-if [ -z "$HOSTS" ] ; then
-    for i in $(seq 1 $N_MACHINES); do
-        IP="${IP_PREFIX}.$((${IP_SUFFIX_BASE}+$i))"
-        HOSTS="$HOSTS $IP"
-    done
-fi
-
-# these are used by the tests
-HOST1=$(echo $HOSTS | cut -f 1 -d ' ')
-HOST2=$(echo $HOSTS | cut -f 2 -d ' ')
-HOST3=$(echo $HOSTS | cut -f 3 -d ' ')
-
-. "$DIR/assert.sh"
-
-
-SSH_DIR=${SSH_DIR:-$DIR}
-SSH=${SSH:-ssh -l vagrant -i "$SSH_DIR/insecure_private_key" -o "UserKnownHostsFile=$SSH_DIR/.ssh_known_hosts" -o CheckHostIP=no -o StrictHostKeyChecking=no}
-
-SMALL_IMAGE="alpine"
 DNS_IMAGE="aanand/docker-dnsutils"
-TEST_IMAGES="$SMALL_IMAGE $DNS_IMAGE"
+TEST_IMAGES="$TEST_IMAGES $DNS_IMAGE"
 
-PING="ping -nq -W 1 -c 1"
 CHECK_ETHWE_UP="grep ^1$ /sys/class/net/ethwe/carrier"
 CHECK_ETHWE_MISSING="test ! -d /sys/class/net/ethwe"
-
-DOCKER_PORT=2375
 
 upload_executable() {
     host=$1
@@ -53,51 +24,6 @@ upload_executable() {
     [ -z "$DEBUG" ] || greyly echo "Uploading to $host: $file -> $target" >&2
     <"$file" remote $host $SSH $host sh -c "cat | sudo tee $target >/dev/null"
     run_on $host "sudo chmod a+x $target"
-}
-
-remote() {
-    rem=$1
-    shift 1
-    "$@" > >(while read line; do echo -e $'\e[0;34m'"$rem>"$'\e[0m'" $line"; done)
-}
-
-colourise() {
-    [ -t 0 ] && echo -ne $'\e['$1'm' || true
-    shift
-    # It's important that we don't do this in a subshell, as some
-    # commands we execute need to modify global state
-    "$@"
-    [ -t 0 ] && echo -ne $'\e[0m' || true
-}
-
-whitely() {
-    colourise '1;37' "$@"
-}
-
-greyly () {
-    colourise '0;37' "$@"
-}
-
-redly() {
-    colourise '1;31' "$@"
-}
-
-greenly() {
-    colourise '1;32' "$@"
-}
-
-run_on() {
-    host=$1
-    shift 1
-    [ -z "$DEBUG" ] || greyly echo "Running on $host: $@" >&2
-    remote $host $SSH $host "$@"
-}
-
-docker_on() {
-    host=$1
-    shift 1
-    [ -z "$DEBUG" ] || greyly echo "Docker on $host:$DOCKER_PORT: $@" >&2
-    docker -H tcp://$host:$DOCKER_PORT "$@"
 }
 
 docker_api_on() {
@@ -114,13 +40,6 @@ proxy() {
     DOCKER_PORT=12375 "$@"
 }
 
-weave_on() {
-    host=$1
-    shift 1
-    [ -z "$DEBUG" ] || greyly echo "Weave on $host:$DOCKER_PORT: $@" >&2
-    CHECKPOINT_DISABLE=true DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
-}
-
 stop_router_on() {
     host=$1
     shift 1
@@ -133,13 +52,6 @@ stop_router_on() {
         collect_coverage $host weave
         collect_coverage $host weaveproxy
     fi
-}
-
-exec_on() {
-    host=$1
-    container=$2
-    shift 2
-    docker -H tcp://$host:$DOCKER_PORT exec $container "$@"
 }
 
 start_container() {
@@ -171,12 +83,6 @@ proxy_start_container_with_dns() {
     host=$1
     shift 1
     proxy docker_on $host run "$@" -dt $DNS_IMAGE /bin/sh
-}
-
-rm_containers() {
-    host=$1
-    shift
-    [ $# -eq 0 ] || docker_on $host rm -f -v "$@" >/dev/null
 }
 
 container_ip() {
@@ -221,18 +127,6 @@ assert_dns_ptr_record() {
     assert "exec_on $1 $2 getent hosts $4 | tr -s ' '" "$4 $3"
 }
 
-start_suite() {
-    for host in $HOSTS; do
-        [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
-        PLUGIN_ID=$(docker_on $host ps -aq --filter=name=weaveplugin)
-        PLUGIN_FILTER="cat"
-        [ -n "$PLUGIN_ID" ] && PLUGIN_FILTER="grep -v $PLUGIN_ID"
-        rm_containers $host $(docker_on $host ps -aq 2>/dev/null | $PLUGIN_FILTER)
-        weave_on $host reset 2>/dev/null
-    done
-    whitely echo "$@"
-}
-
 end_suite() {
     whitely assert_end
     for host in $HOSTS; do
@@ -249,6 +143,3 @@ collect_coverage() {
     # ideally we'd know the name of the test here, and put that in the filename
     mv cover.prof $(mktemp -u ./coverage/integration.XXXXXXXX) || true
 }
-
-WEAVE=$DIR/../weave
-DOCKER_NS=$DIR/../bin/docker-ns
