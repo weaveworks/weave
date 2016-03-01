@@ -33,6 +33,7 @@ Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
 `WEAVE_CIDR="10.2.1.1/24 10.2.2.1/24"`.
 
+
 ###Returning Weave Network Settings Instead of Docker Network Settings
 
 The Docker NetworkSettings (including IP address, MacAddress, and

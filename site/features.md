@@ -65,18 +65,20 @@ See [Using Fast Datapath](/site/fastdp/using-fastdp.md) and
 ###<a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
 
 Weave includes a [Docker API Proxy](/site/weave-docker-api/set-up-proxy.md), which can be 
-used to launch containers and attach them to the Weave network 
-using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/). 
+used to launch containers to the Weave network using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/). 
 
 To use the proxy run: 
 
     host1$ eval $(weave env)
+    
+ 
+With the proxy enabled, you can start and manage containers using standard Docker commands. 
 
 Containers started in this way that subsequently restart, either
 by an explicit `docker restart` command or by Docker restart 
-policy, are re-attached to the Weave network using the `Weave Docker API Proxy`.
+policy, are re-attached to the Weave network by the `Weave Docker API Proxy` 
 
-See [Running Docker Commands with the Weave Docker API](/site/weave-docker-api/using-proxy.md)
+See [Using the Weave Docker API](/site/weave-docker-api/using-proxy.md)
 
 
 ###<a name="plugin"></a>Weave Network Docker Plugin
@@ -86,37 +88,34 @@ named `weave` is created by `weave launch`, which is used as follows:
 
     $ docker run --net=weave -ti ubuntu 
 
-Weave’s Docker Network plugin doesn't require an external 
-cluster store. You can also start and stop containers even 
+Using the Weave plugin enables you to take advantage of [Docker's network functionality]( https://docs.docker.com/engine/extend/plugins_network/)
+
+Also, Weave’s Docker Network plugin doesn't require an external cluster store and you can start and stop containers even 
 when there are network connectivity problems.
 
->*Note:* The plugin is an *alternative* to the proxy, and therefor you do
+
+
+>*Note:* The plugin is an *alternative* to the proxy, and therefore you do
 *not* need to run `eval $(weave env)` beforehand.
 
 See [Using the Weave Docker Network Plugin](/site/plugin/weave-plugin-how-to.md) for more details.
 
 
-###<a name="addressing"></a>Address Allocation (IPAM)
+###<a name="addressing"></a>IP Address Allocation (IPAM)
  
-Containers are automatically allocated a unique IP address 
-across the weave network. Addresses allocated by Weave can 
-be viewed by running `weave ps`.
+Containers are automatically allocated a unique IP address. To view the addresses allocated by Weave run, `weave ps`.
 
-Instead of allowing Weave to automatically allocate 
-addresses, an IP address and a network can be explicitly 
-specified using [CIDR notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation). 
-See [How to Manually Specify IP Addresses and Subnets(/site/using-weave/manual-ip-address.md)
+Instead of allowing Weave to automatically allocate addresses, an IP address and a network can be explicitly 
+specified. See [How to Manually Specify IP Addresses and Subnets(/site/using-weave/manual-ip-address.md) for instructions. 
 
-For a discussion on how Weave uses IPAM, see 
-[Automatic IP Address Management](/site/ipam/overview-init-ipam.md) and also 
-[the basics of IP addressing](/site/ip-addresses/configuring-weave.md) 
-for an explanation of addressing and private networks. 
+For a discussion on how Weave uses IPAM, see [Automatic IP Address Management](/site/ipam/overview-init-ipam.md). And also review the 
+[the basics of IP addressing](/site/ip-addresses/ip-addresses.md) for an explanation of addressing and private networks. 
 
 
 ###<a name="naming-and-discovery"></a>Naming and Discovery
  
 Named containers are automatically registered in [weavedns](/site/weavedns/overview-using-weavedns.md), 
-and are discoverable using standard, simple name lookups:
+and are discoverable by using standard, simple name lookups:
 
 
     host1$ docker run -dti --name=service ubuntu
@@ -124,7 +123,7 @@ and are discoverable using standard, simple name lookups:
     root@7b21498fb103:/# ping service
 
 
-`weavedns` also supports [load balancing](/site/weavedns/load-balance-weavedns.md), [fault resilience](/site/weavedns/fault-weavedns.md) and [hot swapping](/site/weavedns/managing-entries-weavedns.md). 
+`weavedns` also supports [load balancing](/site/weavedns/load-balance-fault-weavedns.md), [fault resilience](/site/weavedns/load-balance-fault-weavedns.md) and [hot swapping](/site/weavedns/managing-entries-weavedns.md). 
 
 See [Naming and discovery with Weavedns](/site/weavedns/how-works-weavedns.md).
  
@@ -250,12 +249,11 @@ See [Managing Services in Weave: Exporting, Importing, Binding and Routing](/sit
 Weave peers continually exchange topology information, and 
 monitor and (re)establish network connections to other peers. 
 So if hosts or networks fail, Weave can "route around" the problem. 
-This includes network partitions; containers on either side 
+This includes network partitions, where containers on either side 
 of a partition can continue to communicate, with full connectivity 
 being restored when the partition heals.
 
-The Weave container is very lightweight - just over 8MB image 
-size and a few 10s of MBs of runtime memory - and disposable. 
+The Weave Router container is very lightweight, fast and and disposable. 
 For example, should Weave ever run into difficulty, one can 
 simply stop it (with `weave stop`) and restart it. Application 
 containers do *not* have to be restarted in that event, and 

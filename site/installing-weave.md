@@ -42,5 +42,6 @@ for the latest Weave AMIs and
  * [Getting Started Guides](http://www.weave.works/guides/)
  * [Features](/site/features.md)
  * [Troubleshooting](/site/troubleshooting.md)
- * [Building](XXXX)
+ * [Building](/site/building.md)
+ * [Using Weave with Systemd](/site/systemd.md)
  
