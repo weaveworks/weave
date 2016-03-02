@@ -17,12 +17,12 @@ func badRequest(w http.ResponseWriter, err error) {
 }
 
 func parseCIDR(w http.ResponseWriter, cidrStr string, net bool) (address.CIDR, bool) {
-	subnetAddr, cidr, err := address.ParseCIDR(cidrStr)
+	cidr, err := address.ParseCIDR(cidrStr)
 	if err != nil {
 		badRequest(w, err)
 		return address.CIDR{}, false
 	}
-	if net && cidr.Addr != subnetAddr {
+	if net && !cidr.IsSubnet() {
 		badRequest(w, fmt.Errorf("Invalid subnet %s - bits after network prefix are not all zero", cidrStr))
 		return address.CIDR{}, false
 	}
