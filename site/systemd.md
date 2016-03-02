@@ -3,17 +3,16 @@ title: Using Weave with Systemd
 layout: default
 ---
 
-# Using Weave with Systemd
 
-Having installed `weave` as per [readme][], you might wish to configure the
-init daemon to start it on boot. Most recent Linux distribution releases are
-shipping with [systemd][]. The information below should provide you with some
-initial guidance on getting a weave service configured on systemd-based OS.
+Having installed `weave` as per [Installing Weave](/site/installing-weave.md), you might find it convenient to configure the
+init daemon to start Weave on boot. Most recent Linux distribution releases are
+shipping with [systemd](http://www.freedesktop.org/wiki/Software/systemd/). The information below should provide you with some
+initial guidance on getting a Weave service configured on a systemd-based OS.
 
 ## Weave Service Unit and Configuration
 
-A regular service unit definition for weave is shown below and you should
-normally place it in `/etc/systemd/system/weave.service`.
+A regular service unit definition for Weave is shown below. This file is
+normally placed in `/etc/systemd/system/weave.service`.
 
     [Unit]
     Description=Weave Network
@@ -29,25 +28,22 @@ normally place it in `/etc/systemd/system/weave.service`.
     WantedBy=multi-user.target
 
 
-To specify the addresses or names of other weave hosts to join the network
-you can create the `/etc/sysconfig/weave` environment file which would be of
-the following format:
+To specify the addresses or names of other Weave hosts to join the network, 
+create the `/etc/sysconfig/weave` environment file using the following format:
 
     PEERS="HOST1 HOST2 .. HOSTn"
 
-You can also use the [connect][] command to add participating hosts dynamically.
+You can also use the [`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md) command to add participating hosts dynamically.
 
-Additionally, if you want to enable [encryption][] you can specify a
-password with e.g. `WEAVE_PASSWORD="wfvAwt7sj"` in the
-`/etc/sysconfig/weave` environment file, and it will get picked up by
-weave on launch. Recommendations for choosing a suitably strong
-password can be found [here](features.html#security).
+Additionally, if you want to enable [encryption](/site/using-weave/security-untrusted-networks.md) you can specify a
+password with e.g. `WEAVE_PASSWORD="wfvAwt7sj"` in the `/etc/sysconfig/weave` environment file, and it will get picked up by
+Weave on launch. Recommendations for choosing a suitably strong password can be found [here](/site/using-weave/security-untrusted-networks.md).
 
-You now should be able to launch weave with
+You can now launch Weave using
 
     sudo systemctl start weave
 
-To ensure weave launches after reboot, you need run
+To ensure Weave launches after reboot, run:
 
     sudo systemctl enable weave
 
@@ -56,18 +52,20 @@ by your distribution of Linux.
 
 ## SELinux Tweaks
 
-If your OS has SELinux enabled and you wish to run weave as a systemd unit,
-then you should follow the instructions below. These instructions apply to
+If your OS has SELinux enabled and you want to run Weave as a systemd unit,
+then follow the instructions below. These instructions apply to
 CentOS and RHEL as of 7.0. On Fedora 21, there is no need to do this.
 
-Once you have installed `weave` in `/usr/local/bin`, set its execution
+Once `weave` is installed in `/usr/local/bin`, set its execution
 context with the commands shown below. You will need to have the
 `policycoreutils-python` package installed.
 
     sudo semanage fcontext -a -t unconfined_exec_t -f f /usr/local/bin/weave
     sudo restorecon /usr/local/bin/weave
 
-[readme]: https://github.com/weaveworks/weave/blob/master/README.md#installation
-[connect]: features.html#dynamic-topologies
-[systemd]: http://www.freedesktop.org/wiki/Software/systemd/
-[encryption]: features.html#security
+**See Also**
+
+ * [Using Weave Net](/site/using-weave/intro-example.md)
+ * [Getting Started Guides](http://www.weave.works/guides/)
+ * [Features](/site/features.md)
+ * [Troubleshooting](/site/troubleshooting.md)
