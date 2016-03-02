@@ -80,7 +80,7 @@ func TestHttp(t *testing.T) {
 	)
 
 	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", universe, 1)
-	_, cidr, _ := address.ParseCIDR(universe)
+	cidr, _ := address.ParseCIDR(universe)
 	port := listenHTTP(alloc, cidr)
 	alloc.claimRingForTesting()
 
@@ -122,7 +122,7 @@ func TestBadHttp(t *testing.T) {
 
 	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 1)
 	defer alloc.Stop()
-	_, cidr, _ := address.ParseCIDR(testCIDR1)
+	cidr, _ := address.ParseCIDR(testCIDR1)
 	port := listenHTTP(alloc, cidr)
 
 	alloc.claimRingForTesting()
@@ -153,7 +153,7 @@ func TestHTTPCancel(t *testing.T) {
 	alloc, _ := makeAllocatorWithMockGossip(t, "08:00:27:01:c3:9a", testCIDR1, 2)
 	defer alloc.Stop()
 	ExpectBroadcastMessage(alloc, nil) // trying to form consensus
-	_, cidr, _ := address.ParseCIDR(testCIDR1)
+	cidr, _ := address.ParseCIDR(testCIDR1)
 	port := listenHTTP(alloc, cidr)
 
 	// Ask the http server for a new address

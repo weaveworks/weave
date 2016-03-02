@@ -37,8 +37,8 @@ func TestAllocFree(t *testing.T) {
 
 	alloc, subnet := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", universe, 1)
 	defer alloc.Stop()
-	_, cidr1, _ := address.ParseCIDR(subnet1)
-	_, cidr2, _ := address.ParseCIDR(subnet2)
+	cidr1, _ := address.ParseCIDR(subnet1)
+	cidr2, _ := address.ParseCIDR(subnet2)
 
 	alloc.claimRingForTesting()
 	addr1, err := alloc.Allocate(container1, cidr1, returnFalse)
@@ -49,9 +49,9 @@ func TestAllocFree(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, testAddr2, addr2.String(), "address")
 
-	addrs, err := alloc.Lookup(container1, subnet)
+	addrs, err := alloc.Lookup(container1, subnet.Range())
 	require.NoError(t, err)
-	require.Equal(t, []address.Address{addr1, addr2}, addrs)
+	require.Equal(t, []address.CIDR{address.MakeCIDR(cidr1, addr1), address.MakeCIDR(cidr2, addr2)}, addrs)
 
 	// Ask for another address for a different container and check it's different
 	addr1b, _ := alloc.Allocate(container2, cidr1, returnFalse)
@@ -84,7 +84,7 @@ func TestAllocFree(t *testing.T) {
 	// Move the clock forward and clear out the dead container
 	alloc.actionChan <- func() { alloc.now = func() time.Time { return time.Now().Add(containerDiedTimeout * 2) } }
 	alloc.actionChan <- func() { alloc.removeDeadContainers() }
-	require.Equal(t, address.Offset(spaceSize-1), alloc.NumFreeAddresses(subnet))
+	require.Equal(t, address.Offset(spaceSize+1), alloc.NumFreeAddresses(subnet.Range()))
 }
 
 func TestBootstrap(t *testing.T) {
@@ -149,14 +149,14 @@ func TestAllocatorClaim(t *testing.T) {
 		container1 = "abcdef"
 		container3 = "b01df00d"
 		universe   = "10.0.3.0/24"
-		testAddr1  = "10.0.3.2"
-		testAddr2  = "10.0.4.2"
+		testAddr1  = "10.0.3.2/24"
+		testAddr2  = "10.0.4.2/24"
 	)
 
 	allocs, _, subnet := makeNetworkOfAllocators(2, universe)
 	alloc := allocs[1]
 	defer alloc.Stop()
-	addr1, _ := address.ParseIP(testAddr1)
+	addr1, _ := address.ParseCIDR(testAddr1)
 
 	// First claim should trigger "dunno, I'm going to wait"
 	err := alloc.Claim(container3, addr1, true)
@@ -172,7 +172,7 @@ func TestAllocatorClaim(t *testing.T) {
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
 	addr3, _ := alloc.Allocate(container3, subnet, returnFalse)
-	require.Equal(t, testAddr1, addr3.String(), "address")
+	require.Equal(t, testAddr1, address.MakeCIDR(subnet, addr3).String(), "address")
 	// one more claim should still work
 	err = alloc.Claim(container3, addr1, true)
 	require.NoError(t, err)
@@ -180,10 +180,10 @@ func TestAllocatorClaim(t *testing.T) {
 	err = alloc.Claim(container1, addr1, true)
 	require.Error(t, err)
 	// claiming the address allocated on the other peer should fail
-	err = alloc.Claim(container1, addrx, true)
+	err = alloc.Claim(container1, address.MakeCIDR(subnet, addrx), true)
 	require.Error(t, err, "claiming address allocated on other peer should fail")
 	// Check an address outside of our universe
-	addr2, _ := address.ParseIP(testAddr2)
+	addr2, _ := address.ParseCIDR(testAddr2)
 	err = alloc.Claim(container1, addr2, true)
 	require.NoError(t, err)
 }
@@ -235,7 +235,7 @@ func TestCancel(t *testing.T) {
 	unpause := alloc2.pause()
 
 	// Use up all the IPs that alloc1 owns, so the allocation after this will prompt a request to alloc2
-	for i := 0; alloc1.NumFreeAddresses(subnet) > 0; i++ {
+	for i := 0; alloc1.NumFreeAddresses(subnet.HostRange()) > 0; i++ {
 		alloc1.Allocate(fmt.Sprintf("tmp%d", i), subnet, returnFalse)
 	}
 	cancelChan := make(chan bool, 1)
@@ -345,7 +345,7 @@ func TestTransfer(t *testing.T) {
 	require.NoError(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
 	router.Flush()
 
-	require.Equal(t, address.Offset(1022), alloc1.NumFreeAddresses(subnet))
+	require.Equal(t, address.Offset(1024), alloc1.NumFreeAddresses(subnet.Range()))
 
 	_, err = alloc1.Allocate("foo", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
@@ -520,8 +520,8 @@ func TestAllocatorFuzz(t *testing.T) {
 		allocIndex := rand.Int31n(nodes)
 		addressIndex := rand.Int31n(int32(subnet.Size()))
 		alloc := allocs[allocIndex]
-		addr := address.Add(subnet.Start, address.Offset(addressIndex))
-		err := alloc.Claim(name, addr, true)
+		addr := address.Add(subnet.Addr, address.Offset(addressIndex))
+		err := alloc.Claim(name, address.MakeCIDR(subnet, addr), true)
 		if err == nil {
 			noteAllocation(allocIndex, name, addr)
 		}
