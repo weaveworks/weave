@@ -156,7 +156,7 @@ The columns are as follows:
    the encryption mode, data transport method, remote peer name and
    nickname for pending and established connections
 
-### <a name="weave-status-peers"></a>List peers
+### <a name="weave-status-peers"></a>List Peers
 
 Detailed information on peers can be obtained with `weave status
 peers`:
@@ -206,7 +206,7 @@ The columns are as follows:
  * Registering entity identifier (typically a container ID)
  * Name of peer from which the registration originates
 
-### <a name="weave-report"></a>JSON report
+### <a name="weave-report"></a>JSON Report
 
     $ weave report
 
@@ -225,7 +225,7 @@ results in JSON format.
     $ weave report -f {% raw %}'{{json .DNS}}'{% endraw %}
     {% raw %}{"Domain":"weave.local.","Upstream":["8.8.8.8","8.8.4.4"],"Address":"172.17.0.1:53","TTL":1,"Entries":null}{% endraw %}
 
-### <a name="list-attached-containers"></a>List attached containers
+### <a name="list-attached-containers"></a>List Attached Containers
 
     weave ps
 
@@ -251,7 +251,7 @@ You can also supply a list of container IDs/names to `weave ps`, like this:
     able ce:15:34:a9:b5:6d 10.2.5.1/24
     baker 7a:61:a2:49:4b:91 10.2.8.3/24
 
-## <a name="stop"></a>Stopping weave
+## <a name="stop"></a>Stopping Weave
 
 To stop Weave, if you have configured your environment to use the
 Weave Docker API Proxy, e.g. by running `eval $(weave env)` in your
@@ -293,7 +293,7 @@ The Weave Docker plugin does restart automatically because it must
 always start with Docker, as described in
 [its documentation](/site/weave-docker-api/using-proxy.md).
 
-## <a name="snapshots"></a>Snapshot releases
+## <a name="snapshots"></a>Snapshot Releases
 
 Snapshot releases are published at times to provide previews of new
 features, assist in the validation of bug fixes, etc. One can install the
