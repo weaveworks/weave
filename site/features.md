@@ -31,6 +31,8 @@ see [Using Weave Net](/site/using-weave/intro-example.md)
 
 ###<a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
+Weave Net creates a virtual network that connects Docker containers
+deployed across multiple hosts.
 To application containers, the network established by Weave 
 resembles a giant Ethernet switch, where all containers are 
 connected and can easily access services from one another. 
@@ -50,14 +52,11 @@ and [Deploying Applications to Weave Net](/site/using-weave/deploying-applicatio
 
 Weave automatically chooses the fastest available method to 
 transport data between peers. The best performing of these 
-(the 'fastdp') offers near-native throughput and latency. 
+(the 'fast datapath') offers near-native throughput and latency.
 
-Fastdp does not support encryption. If you supply a 
-password at `weave launch` the router falls back to a slower 
-`sleeve` mode that does support encryption. 
-
-For connections that traverse untrusted networks, 
-see [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) for more details.
+Fast datapath does not support encryption. For full details on configuring
+Weave when you have connections that traverse untrusted networks,
+see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) for more details.
 
 See [Using Fast Datapath](/site/fastdp/using-fastdp.md) and 
 [How Fast Datapath Works](/site/fastdp/fastdp-how-it-works.md). 
@@ -83,7 +82,7 @@ See [Using the Weave Docker API](/site/weave-docker-api/using-proxy.md)
 
 ###<a name="plugin"></a>Weave Network Docker Plugin
 
-Weave can also be used as a Docker plugin.  A Docker network 
+Weave can also be used as a [Docker plugin](https://docs.docker.com/engine/extend/plugins_network/).  A Docker network 
 named `weave` is created by `weave launch`, which is used as follows:
 
     $ docker run --net=weave -ti ubuntu 
@@ -101,7 +100,7 @@ when there are network connectivity problems.
 See [Using the Weave Docker Network Plugin](/site/plugin/weave-plugin-how-to.md) for more details.
 
 
-###<a name="addressing"></a>IP Address Allocation (IPAM)
+###<a name="addressing"></a>IP Address Management (IPAM)
  
 Containers are automatically allocated a unique IP address. To view the addresses allocated by Weave run, `weave ps`.
 
@@ -178,8 +177,8 @@ running alongside Weave.
 
 Weave implements encryption and security using [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
 
-For information on how to secure your Docker containers, 
-see [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) 
+For information on how to secure your Docker network connections,
+see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)
 and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption/crypto-overview.md) and [How Weave Implements Encryption](/site/encryption/ephemeral-key.md)
 
 
@@ -223,21 +222,15 @@ See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/mu
 
 ###<a name="dynamic-topologies"></a>Dynamic Topologies
 
-A network of containers across more than two hosts can be 
-established even when there is only partial connectivity 
-between the hosts. 
-
-Weave routes traffic between containers as long as 
-there is at least one *path* of connected hosts 
-between them.
-
-See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/finding-adding-hosts-dynamically.md)
+Hosts can be added to or removed from a Weave network without stopping
+or reconfiguring the remaining hosts. See [Adding and Removing Hosts
+Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md)
 
 
 ###<a name="container-mobility"></a>Container Mobility
 
 Containers can be moved between hosts without requiring any 
-re-configuration or, in many cases, restarts of other containers. 
+reconfiguration or, in many cases, restarts of other containers. 
 All that is required is for the migrated container to be started 
 with the same IP address as it was given originally.
 

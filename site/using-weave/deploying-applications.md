@@ -42,7 +42,7 @@ If you are deploying an application that consists of more than one container to 
 
 ###<a name="peer-connections"></a>Creating Peer Connections Between Hosts
 
-To launch Weave on an additional host and create a peer connections by running the following:  
+To launch Weave on an additional host and create a peer connection, run the following:
 
     host2$ weave launch $HOST1
     host2$ eval $(weave env)

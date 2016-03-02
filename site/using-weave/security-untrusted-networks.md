@@ -1,5 +1,5 @@
 ---
-title: Securing Containers Across Untrusted Networks
+title: Securing Connections Across Untrusted Networks
 layout: default
 ---
 
@@ -27,6 +27,10 @@ To guard against dictionary attacks, the password needs to be reasonably strong 
     < /dev/urandom tr -dc A-Za-z0-9 | head -c9 ; echo
 
 The same password must be specified for all Weave peers, by default both control and data plane traffic will then use authenticated encryption. 
+
+Fast datapath does not support encryption. If you supply a
+password at `weave launch` the router falls back to a slower
+`sleeve` mode that does support encryption.
 
 If some of your peers are co-located in a trusted network (for example within the boundary of your own datacenter) you can use the `--trusted-subnets` argument to `weave launch` to selectively disable data plane encryption as an optimization. 
 
