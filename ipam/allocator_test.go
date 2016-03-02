@@ -588,3 +588,37 @@ func TestGossipSkew(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestSpaceRequest(t *testing.T) {
+	const (
+		container1 = "cont-1"
+		container2 = "cont-2"
+		universe   = "10.32.0.0/12"
+	)
+	allocs, gossipRouter, subnet := makeNetworkOfAllocators(1, universe)
+	alloc1 := allocs[0]
+	defer alloc1.Stop()
+
+	addr, err := alloc1.Allocate(container1, subnet, returnFalse)
+	require.Nil(t, err, "")
+	// free it again so the donation splits the range neatly
+	err = alloc1.Free(container1, addr)
+	require.Nil(t, err, "")
+	require.Equal(t, cidrRanges(universe), alloc1.ring.OwnedRanges(), "")
+
+	// Start a new peer
+	alloc2, _ := makeAllocator("02:00:00:02:00:00", universe, 2)
+	alloc2.SetInterfaces(gossipRouter.Connect(alloc2.ourName, alloc2))
+	alloc2.Start()
+	defer alloc2.Stop()
+	alloc2.Allocate(container2, subnet, returnFalse)
+
+	// Test whether the universe has been split into two equal halves (GH #2009)
+	require.Equal(t, cidrRanges("10.32.0.0/13"), alloc1.ring.OwnedRanges(), "")
+	require.Equal(t, cidrRanges("10.40.0.0/13"), alloc2.ring.OwnedRanges(), "")
+}
+
+func cidrRanges(s string) []address.Range {
+	c, _ := address.ParseCIDR(s)
+	return []address.Range{c.Range()}
+}
