@@ -17,7 +17,7 @@ set -u
 : ${SEC_GROUP_NAME:="weavenet-ci"}
 : ${SUFFIX:=""}
 : ${AWSCLI:="aws"}
-: ${SSH:="ssh -o StrictHostKeyChecking=no -o CheckHostIp=no
+: ${SSHZ:="ssh -o StrictHostKeyChecking=no -o CheckHostIp=no
              -o UserKnownHostsFile=/dev/null -l ubuntu -i $SSH_KEY_FILE"}
 
 # Creates and runs a set of VMs.
@@ -198,7 +198,7 @@ function hosts {
 		hostname="$name"
 		hosts="$hostname $hosts"
 	done
-	echo export SSH=\"$SSH\"
+	echo export SSH=\"$SSHZ\"
 	echo export HOSTS=\"$hosts\"
 	rm $json
 }
@@ -206,7 +206,7 @@ function hosts {
 function try_connect {
     echo "trying"
 	for i in {0..10}; do
-		$SSH -t $1 true && return
+		$SSHZ -t $1 true && return
 		sleep 2
 	done
     echo "connected"
@@ -215,7 +215,7 @@ function try_connect {
 function copy_hosts {
 	hostname=$1
 	hosts=$2
-	cat $hosts | $SSH -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
+	cat $hosts | $SSHZ -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
 }
 
 function install_docker_on {
@@ -223,7 +223,7 @@ function install_docker_on {
     # TODO(mp) *maybe* use `vagrant` user instead of default `ubuntu`.
 
 	name=$1
-	$SSH -t $name sudo bash -x -s <<EOF
+	$SSHZ -t $name sudo bash -x -s <<EOF
 curl -sSL https://get.docker.com/gpg | sudo apt-key add -
 curl -sSL https://get.docker.com/ | sh
 apt-get update -qq;
@@ -234,7 +234,7 @@ service docker restart
 EOF
 	# It seems we need a short delay for docker to start up, so I put this in
 	# a separate ssh connection.  This installs nsenter.
-	$SSH -t $name sudo docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+	$SSHZ -t $name sudo docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 }
 
 # Main
