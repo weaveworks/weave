@@ -1,5 +1,5 @@
 ---
-title: Managing Services in Weave - Exporting, Importing, Binding and Routing
+title: Managing Services in Weave Net - Exporting, Importing, Binding and Routing
 layout: default
 ---
 
@@ -48,7 +48,7 @@ Weave hosts, regardless of where the actual application containers are located.
 Using the netcat service example described in 
 [Deploying Applications](/site/using-weave/deploying-applications.md), and expanding upon it, you now decide to add a third containerized netcat service. This additional netcat service runs on `$HOST3`, and listens on port 2211, but it is not on the Weave network. 
 
-An additional caveat is that `$HOST3` can only be reached from `$HOST1`, which is not accessible via `$HOST2`. Nonetheless, you still need to make the `$HOST3` service available to an application that is running in a container on `$HOST2`.
+An additional caveat is that `$HOST3` can only be reached from `$HOST1`, which is not accessible via `$HOST2`. Nonetheless, you still need to make a `$HOST3` service available to an application that is running in a container on `$HOST2`.
 
 To satisfy this scenario, first expose the [application network to the host](/site/using-weave/host-network-integration.md) by running the following on `$HOST1`: 
 
@@ -83,16 +83,16 @@ You can point application containers to another service location by changing the
 
 You can combine the service export and service import features to establish connectivity between applications and services residing on disjointed networks, even if those networks are separated by firewalls and have overlapping IP ranges. 
 
-Each network imports its services into Weave, while at the same time, exports from Weave any services that are required by its applications. In this scenario, there are no application containers (although, there could be). Weave is acting as an address translation and routing facility, and uses the Weave container network as an intermediary.
+Each network imports its services into Weave Net, while at the same time, exports from Weave Net any services that are required by its applications. In this scenario, there are no application containers (although, there could be). Weave Net is acting as an address translation and routing facility, and uses the Weave container network as an intermediary.
 
-Expanding on the [netcat example](/site/using-weave/deploying-applications.md), you can also import an additional netcat service running on `$HOST3` into Weave via `$HOST1`. 
+Expanding on the [netcat example](/site/using-weave/deploying-applications.md), you can also import an additional netcat service running on `$HOST3` into Weave Net via `$HOST1`. 
 
 Begin importing the service onto `$HOST2` by first exposing the application network:
 
     host2$ weave expose
     10.2.1.3
 
-Then add a NAT rule which routes traffic from the `$HOST2` network (i.e. anything which can connect to `$HOST2`) to the service endpoint on the Weave network:
+Then add a NAT rule which routes traffic from the `$HOST2` network (for example, anything that can connect to `$HOST2`) to the service endpoint on the Weave network:
 
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
            -j DNAT --to-destination 10.2.1.3:3322

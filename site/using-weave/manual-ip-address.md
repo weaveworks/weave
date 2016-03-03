@@ -8,11 +8,11 @@ Containers are automatically allocated an IP address that is unique across the W
     host1$ weave ps a1
     a7aee7233393 7a:44:d3:11:10:70 10.32.0.2/12
 
-Weave detects when a container has exited and releases its allocated addresses so they can be re-used by the network.
+Weave Net detects when a container has exited and releases its allocated addresses so they can be re-used by the network.
 
 See the [Automatic IP Address Management](/site/ipam/overview-init-ipam.md) and also an explanation of [the basics of IP addressing](/site/ip-addresses/ip-addresses.md) for further details.
 
-Instead of allowing Weave to allocate IP addresses automatically (using IPAM), there may be instances where you need to control a particular container or a cluster by setting an IP address for it.  
+Instead of allowing Weave Net to allocate IP addresses automatically (using IPAM), there may be instances where you need to control a particular container or a cluster by setting an IP address for it.  
 
 You can specify an IP address and a network explicitly, using Classless Inter-Domain Routing or [CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing).
 

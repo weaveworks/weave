@@ -4,7 +4,7 @@ layout: default
 ---
 
 
-To connect containers across untrusted networks, Weave peers can be instructed to encrypt traffic by supplying a `--password` option or by using the `WEAVE_PASSWORD` environment variable during `weave launch`. 
+To connect containers across untrusted networks, Weave Net peers can be instructed to encrypt traffic by supplying a `--password` option or by using the `WEAVE_PASSWORD` environment variable during `weave launch`. 
 
 For example:
 
@@ -26,7 +26,7 @@ To guard against dictionary attacks, the password needs to be reasonably strong 
 
     < /dev/urandom tr -dc A-Za-z0-9 | head -c9 ; echo
 
-The same password must be specified for all Weave peers, by default both control and data plane traffic will then use authenticated encryption. 
+The same password must be specified for all Weave Net peers, by default both control and data plane traffic will then use authenticated encryption. 
 
 Fast datapath does not support encryption. If you supply a
 password at `weave launch` the router falls back to a slower
@@ -34,7 +34,7 @@ password at `weave launch` the router falls back to a slower
 
 If some of your peers are co-located in a trusted network (for example within the boundary of your own datacenter) you can use the `--trusted-subnets` argument to `weave launch` to selectively disable data plane encryption as an optimization. 
 
-Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave [falls back to a slower method]( /site/fastdp/using-fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
+>>**Note:** Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave Net [falls back to a slower method]( /site/fastdp/using-fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
 
 Be aware that:
 
@@ -45,4 +45,5 @@ Be aware that:
 
 **See Also**
 
- * [Using Encryption With Weave](/site/encryption/crypto-overview.md)
+ * [Using Encryption With Weave Net](/site/encryption/crypto-overview.md)
+ * [Using Fast Datapath](/site/using-weave/using-fastdap.md)

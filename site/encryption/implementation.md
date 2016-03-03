@@ -1,5 +1,5 @@
 ---
-title: How Weave Implements Encryption
+title: How Weave Net Implements Encryption
 layout: default
 ---
 
@@ -27,7 +27,7 @@ When a peer has received a public key from the remote peer, it uses
 this to form the ephemeral session key for this connection. The public
 key from the remote peer is combined with the private key for the
 local peer in the usual [Diffie-Hellman way](https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange), 
-resulting in both peersarriving at the same shared key. To this is appended the supplied
+resulting in both peers arriving at the same shared key. To this is appended the supplied
 password, and the result is hashed through SHA256, to form the final
 ephemeral session key. 
 
@@ -53,7 +53,7 @@ between two peers.
 Generating fresh keys for every connection
 provides forward secrecy at the cost of placing a demand on the Linux
 CSPRNG (accessed by `GenerateKey` via `/dev/urandom`) proportional to
-the number of inbound connection attempts. Weave has accept throttling
+the number of inbound connection attempts. Weave Net has accept throttling
 to mitigate against denial of service attacks that seek to deplete the
 CSPRNG entropy pool, however even at the lower bound of ten requests
 per second, there may not be enough entropy gathered on a headless
@@ -71,7 +71,7 @@ entirely safe for use as key material.
 
 By way of comparison, this is exactly how OpenSSL works - it reads 256
 bits of entropy at startup, and uses that to seed an internal CSPRNG,
-which is used to generate keys. While Weave could have taken
+which is used to generate keys. While Weave Net could have taken
 the same approach and built a custom CSPRNG to work around the
 potential `/dev/random` blocking issue, the decision was made to rely
 on the [heavily scrutinised](http://eprint.iacr.org/2012/251.pdf) Linux random number
@@ -80,7 +80,7 @@ here](http://cr.yp.to/highspeed/coolnacl-20120725.pdf) (page 10,
 'Centralizing randomness'). 
 
 >>**Note:**The aforementioned notwithstanding, if
-Weave's demand on `/dev/urandom` is causing you problems with blocking
+Weave Net's demand on `/dev/urandom` is causing you problems with blocking
 `/dev/random` reads, please get in touch with us - we'd love to hear
 about your use case.
 

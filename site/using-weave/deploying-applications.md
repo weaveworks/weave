@@ -13,7 +13,7 @@ This section contains the following topics:
 
 ###<a name="launching"></a>Launching Weave Net
 
-Before launching Weave and deploying your apps, ensure that Docker is [installed]( https://docs.docker.com/engine/installation/) on both hosts. 
+Before launching Weave Net and deploying your apps, ensure that Docker is [installed]( https://docs.docker.com/engine/installation/) on both hosts. 
 
 On `$HOST1` run:
 
@@ -23,8 +23,8 @@ On `$HOST1` run:
 
 Where, 
 
- * The first line runs Weave. 
- * The second line configures the Weave environment, so that containers launched via the Docker command line are automatically attached to the Weave network, and, 
+ * The first line runs Weave Net. 
+ * The second line configures the Weave Net environment, so that containers launched via the Docker command line are automatically attached to the Weave network, and, 
  * The third line runs the application container using [Docker commands]( https://docs.Docker.com/engine/reference/commandline/daemon/). 
 
 >>**Note:** If the first command results in an error like
@@ -33,7 +33,7 @@ Where,
 
 >>**Important!** if you are running the Weave Docker Network Plugin do not run `eval $(weave env)`. See [Using the Weave Net Docker Network Plugin](/site/pluing/weave-plugin-how-to.md) for more information.
 
-Weave must be launched once per host. The relevant container images will be pulled down from Docker Hub on demand during `weave launch`. 
+Weave Net must be launched once per host. The relevant container images will be pulled down from Docker Hub on demand during `weave launch`. 
 
 You can also preload the images by running `weave setup`. Preloaded images are useful for automated deployments, and ensure there are no delays during later operations.
 
@@ -42,19 +42,19 @@ If you are deploying an application that consists of more than one container to 
 
 ###<a name="peer-connections"></a>Creating Peer Connections Between Hosts
 
-To launch Weave on an additional host and create a peer connection, run the following:
+To launch Weave Net on an additional host and create a peer connection, run the following:
 
     host2$ weave launch $HOST1
     host2$ eval $(weave env)
     host2$ docker run --name a2 -ti ubuntu
 
-As noted above, the same steps are repeated for `$HOST2`. The only difference, besides the application container’s name, is that `$HOST2` is told to peer with Weave on `$HOST1` during launch. 
+As noted above, the same steps are repeated for `$HOST2`. The only difference, besides the application container’s name, is that `$HOST2` is told to peer with Weave Net on `$HOST1` during launch. 
 
 You can also peer with other hosts by specifying the IP address, and a `:port` by which `$HOST2` can reach `$HOST1`. 
 
 >>**Note:** If there is a firewall between `$HOST1` and `$HOST2`,  you must permit traffic to flow through TCP 6783 and UDP 6783/6798, which are Weave’s control nd data ports.
 
-There are a number of different ways that you can specify peers on a Weave network. You can launch Weave on `$HOST1` and then peer with `$HOST2`, or you can launch on `$HOST2` and peer with `$HOST1` or you can tell both hosts about each other at launch. The order in which peers are specified is not important. Weave automatically (re)connects to peers when they become available. 
+There are a number of different ways that you can specify peers on a Weave network. You can launch Weave Net on `$HOST1` and then peer with `$HOST2`, or you can launch on `$HOST2` and peer with `$HOST1` or you can tell both hosts about each other at launch. The order in which peers are specified is not important. Weave Net automatically (re)connects to peers when they become available. 
 
 ####Specifying Multiple Peers at Launch
 
@@ -102,7 +102,7 @@ and then connected to from the another container on `$HOST2` using:
     root@a2:/# echo 'Hello, world.' | nc a1 4422
 ~~~
 
-Weave supports *any* protocol, and it doesn't have to be over TCP/IP. For example, a netcat UDP service can also be run by using the following:
+Weave Net supports *any* protocol, and it doesn't have to be over TCP/IP. For example, a netcat UDP service can also be run by using the following:
 
 ~~~bash
     root@a1:/# nc -lu -p 5533
@@ -113,5 +113,5 @@ Weave supports *any* protocol, and it doesn't have to be over TCP/IP. For exampl
 **See Also** 
 
  * [Installing Weave Net](/site/installing-weave.md)
- * [Using Fastdp With Weave](/site/fastdp/using-fastdp.md)
+ * [Using Fastdp With Weave Net](/site/fastdp/using-fastdp.md)
  * [Using the Weave Net Docker Network Plugin](/site/plugin/weave-plugin-how-to.md)

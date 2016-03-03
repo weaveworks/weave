@@ -15,12 +15,12 @@ Install Weave Net by running the following:
 If you are on OSX and are using Docker Machine) you need to make sure
 that a VM is running and configured before getting Weave Net. Setting up a VM is shown in [the Docker Machine
 documentation](https://docs.docker.com/installation/mac/#from-your-shell).
-After the VM is configured with Docker Machine, Weave can be launched directly from the OSX host.
+After the VM is configured with Docker Machine, Weave Net can be launched directly from the OSX host.
 
-Weave respects the environment variable `DOCKER_HOST`, so that you can run
+Weave Net respects the environment variable `DOCKER_HOST`, so that you can run
 and control a Weave Network locally on a remote host. See [Using The Weave Docker API Proxy](/site/weave-docker-api/using-proxy.md)
 
-With Weave downloaded onto your VMs or hosts, you are ready to launch a Weave network and deploy apps onto it. See [Deploying Applications to Weave](/site/using-weave/deploying-applications.md#launching)
+With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weave network and deploy apps onto it. See [Deploying Applications to Weave](/site/using-weave/deploying-applications.md#launching)
 
 CoreOS users see [here](https://github.com/fintanr/weave-gs/blob/master/coreos-simple/user-data) for an example of installing Weave using cloud-config.
 

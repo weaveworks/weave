@@ -7,11 +7,11 @@ A single Weave network can host multiple, isolated applications where each appli
 to communicate with each other, but not with the containers of other applications.
 
 To isolate applications, you can make use of `isolation-through-subnets` technique.
- This common strategy is an example of how with Weave many of your `on metal` 
- techniques can still be used to deploy applications to a container network.
+This common strategy is an example of how with Weave Net many of your `on metal` 
+techniques can still be used to deploy applications to a container network.
  
 To begin isolating an application (or parts of an application),  
-configure Weave's IP allocator to manage multiple subnets. 
+configure Weave Net's IP allocator to manage multiple subnets. 
 
 Using [the netcat example](/site/using-weave/deploying-applications.md), configure multiple subsets:
 
@@ -22,7 +22,7 @@ Using [the netcat example](/site/using-weave/deploying-applications.md), configu
     host2$ eval $(weave env)
 ~~~
 
-This delegates the entire 10.2.0.0/16 subnet to Weave, and instructs
+This delegates the entire 10.2.0.0/16 subnet to Weave Net, and instructs
 it to allocate from 10.2.1.0/24 within that, if a specific subnet is not
 specified. 
 
@@ -79,7 +79,7 @@ isolation between application containers, that feature needs to be disabled by [
 
 **See Also** 
 
- * [Managing Services in Weave: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
+ * [Managing Services in Weave Net: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
  * [Exposing Services to the Outside World] (/site/using-weave/service-export.md)
  
  

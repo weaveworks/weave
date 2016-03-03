@@ -1,5 +1,5 @@
 ---
-title: How Weave Inteprets Network Topology
+title: How Weave Net Inteprets Network Topology
 layout: default
 ---
 
@@ -144,7 +144,7 @@ which time the topology should have updated.
 
 **See Also**
 
- * [Weave Router Encapsulation](/site/router-topology/router-encapsulation.md)
+ * [Weave Net Router Encapsulation](/site/router-topology/router-encapsulation.md)
  
  
  

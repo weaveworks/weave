@@ -20,19 +20,19 @@ $ WEAVE_NO_FASTDP=true weave launch
 
 ###Fast Datapath and Encryption
 
-Encryption does not work with fast datapath. If you enable encryption using the `--password` option to launch weave (or you use the `WEAVE_PASSWORD` environment variable), fast data path will by default be disabled. 
+Encryption does not work with fast datapath. If you enable encryption using the `--password` option to launch weave (or you use the `WEAVE_PASSWORD` environment variable), fast datapath will by default be disabled. 
 
-When encryption is not in use there may be other conditions in which the fastdp will revert back to `sleeve mode`. Once these conditions pass, weave will revert back to using fastdp. To view which mode Weave is using, run `weave status connections`.
+When encryption is not in use there may be other conditions in which the fast datapath reverts to `sleeve mode`. Once these conditions pass, Weave Net reverts back to using fastdp. To view which mode Weave Net is using, run `weave status connections`.
 
 ###Viewing Connection Mode Fastdp or Sleeve
 
-Weave automatically uses the fastest datapath for every connection unless it encounters a situation that prevents it from working. To ensure that Weave can use the fast data path:
+Weave Net automatically uses the fastest datapath for every connection unless it encounters a situation that prevents it from working. To ensure that Weave Net can use the fast datapath:
 
  * Avoid Network Address Translation (NAT) devices
  * Open UDP port 6784 (This is the port used by the Weave routers)
  * Ensure that `WEAVE_MTU` fits with the `MTU` of the intermediate network (see below)
 
-The use of fast datapath is an automated connection-by-connection decision made by Weave, and because of this, you may end up with a mixture of connection tunnel types. If fast data path cannot be used for a connection, Weave falls back to the "user space" packet path. 
+The use of fast datapath is an automated connection-by-connection decision made by Weave Net, and because of this, you may end up with a mixture of connection tunnel types. If fast datapath cannot be used for a connection, Weave Net falls back to the "user space" packet path. 
 
 Once a Weave network is set up, you can query the connections using the `weave status connections` command:
 
@@ -41,7 +41,7 @@ $ weave status connections
 <-192.168.122.25:43889  established fastdp a6:66:4f:a5:8a:11(ubuntu1204)
 ~~~
 
-Where fastdp indicates that fast data path is being used on a connection. If fastdp is not shown, the field displays `sleeve` indicating Weave Net's fall-back encapsulation method:
+Where fastdp indicates that fast datapath is being used on a connection. If fastdp is not shown, the field displays `sleeve` indicating Weave Net's fall-back encapsulation method:
 
 ~~~bash
 $ weave status connections

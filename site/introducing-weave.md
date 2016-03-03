@@ -4,11 +4,7 @@ layout: default
 ---
 
 
-##What is Weave Net?
-
-Weave creates a virtual network that connects Docker containers deployed across multiple hosts and enables their automatic discovery. With Weave Net, portable microservices-based applications consisting of multiple containers can run anywhere: on one host, multiple hosts or even across cloud providers and data centers. 
-Applications use the network just as if the containers were all plugged into the same network switch, without having to configure port mappings, or ambassador links. 
-
+Weave Net creates a virtual network that connects Docker containers deployed across multiple hosts and enables their automatic discovery. With Weave Net, portable microservices-based applications consisting of multiple containers can run anywhere: on one host, multiple hosts or even across cloud providers and data centers. Applications use the network just as if the containers were all plugged into the same network switch, without having to configure port mappings, or ambassador links. 
 
 Services provided by application containers on the weave network can be exposed to the outside world, regardless of where they are running. Similarly, existing internal systems can be opened to accept connections from application containers irrespective of their location.
 
@@ -17,13 +13,13 @@ Services provided by application containers on the weave network can be exposed 
 
 ###Hassle Free Configuration
 
-Weave simplifies setting up a container network. Because containers on a Weave network use standard port numbers, (for example MySQL’s default is port 3306), managing microservices is straightforward. Every container can find the IP of any other container using a simple DNS query on the container's name, and it can also communicate directly without NAT, without using port mappings or complicated ambassador linking.  And best of all deploying a Weave container network requires zero changes to your application’s code. 
+Weave Net simplifies setting up a container network. Because containers on a Weave network use standard port numbers, (for example MySQL’s default is port 3306), managing microservices is straightforward. Every container can find the IP of any other container using a simple DNS query on the container's name, and it can also communicate directly without NAT, without using port mappings or complicated ambassador linking.  And best of all deploying a Weave container network requires zero changes to your application’s code. 
 
 ![Weave Net Encapsulation](/images/weave-net-overview.png)
 
 ###Service Discovery
 
-Weave implements service discovery by providing a fast "micro DNS" server at each node. You simply name containers and everything 'just works', including load balancing across multiple containers with the same name.  
+Weave Net implements service discovery by providing a fast "micro DNS" server at each node. You simply name containers and everything 'just works', including load balancing across multiple containers with the same name.  
 
 ###No External Cluster Store Required
 
@@ -34,7 +30,7 @@ For information about the Weave Docker Plugin, see “Using the Weave Network Do
 
 ###Operates in Partially Connected Networks
 
-Weave can forward traffic between nodes, and it works even if the mesh network is only partially connected.  This means that you can have a mix of legacy systems and containerized apps and still use Weave Net to keep everything in communication. 
+Weave Net can forward traffic between nodes, and it works even if the mesh network is only partially connected.  This means that you can have a mix of legacy systems and containerized apps and still use Weave Net to keep everything in communication. 
 
 ###Weave Net is Fast
 

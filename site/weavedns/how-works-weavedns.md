@@ -9,8 +9,8 @@ containers on that host. It learns about hostnames for local containers
 from the proxy and from the `weave run` command.  
 
 If a hostname is in the `.weave.local` domain, then weavedns records the association of that
-name with the container's Weave IP address(es) in its in-memory
-database, and then broadcasts the association to other Weave peers in the
+name with the container's Weave Net IP address(es) in its in-memory
+database, and then broadcasts the association to other Weave Net peers in the
 cluster.
 
 When weavedns is queried for a name in the `.weave.local` domain, it

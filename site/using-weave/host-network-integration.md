@@ -1,5 +1,5 @@
 ---
-title: Integrating a Host Network with Weave
+title: Integrating a Host Network with Weave Net
 layout: default
 ---
 
@@ -12,7 +12,7 @@ On `$HOST2` run:
     host2$ weave expose
     10.2.1.132
 
-This command grants the host access to all of the application containers in the default subnet. An IP address is allocated by Weave especially for that purpose, and is returned after running `weave expose`. 
+This command grants the host access to all of the application containers in the default subnet. An IP address is allocated by Weave Net especially for that purpose, and is returned after running `weave expose`. 
 
 Now you are able to ping the host:
 
@@ -25,7 +25,7 @@ And you can also ping the `a1` netcat application container residing on `$HOST1`
 
 ###Exposing Multiple Subnets
 
-Multiple subnet addresses can be exposed or hidden with a single command:
+Multiple subnet addresses can be exposed or hidden using a single command:
 
     host2$ weave expose net:default net:10.2.2.0/24
     10.2.1.132 10.2.2.130

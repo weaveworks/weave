@@ -1,10 +1,10 @@
 ---
-title: Weave Router Encapsulation
+title: Weave Net Router Encapsulation
 layout: default
 ---
 
 
-When the Weave router forwards packets, the encapsulation looks
+When the Weave Net router forwards packets, the encapsulation looks
 something like this:
 
     +-----------------------------------+
@@ -61,4 +61,4 @@ MAC discovery.
 
 **See Also**
 
- * [How Weave Inteprets Network Topology](/site/router-topology/network-topology.md)
+ * [How Weave Net Inteprets Network Topology](/site/router-topology/network-topology.md)

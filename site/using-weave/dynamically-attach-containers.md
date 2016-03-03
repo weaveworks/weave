@@ -4,7 +4,7 @@ layout: default
 ---
 
 
-When containers may not know the network to which they will be attached, Weave enables you to dynamically attach and detach containers to and from a given network, even when a container is already running. 
+When containers may not know the network to which they will be attached, Weave Net enables you to dynamically attach and detach containers to and from a given network, even when a container is already running. 
 
 To illustrate these scenarios, imagine a netcat service running in a container on $host1 and you need to attach it to another subnet. To attach the netcat service container to a given subnet run: 
 
@@ -15,7 +15,7 @@ To illustrate these scenarios, imagine a netcat service running in a container o
 Where, 
 
  *  `C=$(Docker run -e WEAVE_CIDR=none -dti ubuntu)` is a variable for the subnet on which to attach
- *  `weave attach` – the Weave command to attach to the specified subnet, which takes the variable for the subnet
+ *  `weave attach` – the Weave Net command to attach to the specified subnet, which takes the variable for the subnet
  *  `10.2.1.3` - the allocated IP address output by `weave attach` and in this case, represents the default subnet
 
 >>Note If you are using the Weave Docker API proxy, it will have modified `DOCKER_HOST` to point to the proxy and therefore you will have to pass `-e WEAVE_CIDR=none` to start a container that _doesn't_ get automatically attached to the weave network for the purposes of this example.

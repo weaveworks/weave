@@ -4,7 +4,7 @@ layout: default
 ---
 
 
-IP subnets are used to define or restrict routing. By default, Weave
+IP subnets are used to define or restrict routing. By default, Weave Net
 puts all containers into a subnet that spans the entire allocation
 range, so that every Weave-attached container can communicate with every other
 Weave-attached container.

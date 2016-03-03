@@ -4,17 +4,17 @@ layout: default
 ---
 
 
-When containers are created via the Weave proxy, their entrypoint is 
+When containers are created via the Weave Net proxy, their entrypoint is 
 modified to wait for the Weave network interface to become
 available. 
 
-When they are started via the Weave proxy, containers are 
+When they are started via the Weave Net proxy, containers are 
 [automatically assigned IP addresses](/site/ipam/overview-init-ipam.md) and connected to the
 Weave network.  
 
-###Creating and Starting Containers with the Weave Proxy
+###Creating and Starting Containers with the Weave Net Proxy
 
-To create and start a container via the Weave proxy run:
+To create and start a container via the Weave Net proxy run:
 
     host1$ docker run -ti ubuntu
 
@@ -41,8 +41,8 @@ IPPrefixLen), are still returned when `docker inspect` is run. If you want
 `docker inspect` to return the Weave NetworkSettings instead, then the
 proxy must be launched using the `--rewrite-inspect` flag. 
 
-This command substitutes the Weave Network settings when the container has a
-Weave IP. If a container has more than one Weave IP, then the inspect call
+This command substitutes the Weave network settings when the container has a
+Weave Net IP. If a container has more than one Weave Net IP, then the inspect call
 only includes one of them.
 
     host1$ weave launch-router && weave launch-proxy --rewrite-inspect
@@ -51,7 +51,7 @@ only includes one of them.
 ###Multicast Traffic and Launching the Weave Proxy
 
 By default, multicast traffic is routed over the Weave network.
-To turn this off, e.g. because you want to configure your own multicast
+To turn this off, for example, because you want to configure your own multicast
 route, add the `--no-multicast-route` flag to `weave launch-proxy`.
 
 
