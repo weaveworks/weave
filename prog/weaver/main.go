@@ -91,6 +91,7 @@ func main() {
 		ipsubnetCIDR       string
 		peerCount          int
 		observer           bool
+		ipamSeedStr        string
 		dockerAPI          string
 		peers              []string
 		noDNS              bool
@@ -125,6 +126,7 @@ func main() {
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
 	mflag.BoolVar(&observer, []string{"-observer"}, false, "do not participate in paxos, observe only")
+	mflag.StringVar(&ipamSeedStr, []string{"-ipam-seed"}, "", "Comma-separated list of peer names amongst which address space is shared initially")
 	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
@@ -229,11 +231,11 @@ func main() {
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
 	)
-	if observer && peerCount > 0 {
-		Log.Fatal("At most one of --observer and --init-peer-count must be specified.")
+	if observer && peerCount > 0 || peerCount > 0 && len(ipamSeedStr) > 0 || len(ipamSeedStr) > 0 && observer {
+		Log.Fatal("At most one of --observer, --ipam-seed or --init-peer-count may be specified.")
 	}
 	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(observer, peerCount, peers), db, isKnownPeer)
+		allocator, defaultSubnet = createAllocator(router.Router, ipamSeedStr, iprangeCIDR, ipsubnetCIDR, determineQuorum(observer, peerCount, peers), db, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
@@ -359,7 +361,8 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	return cidr
 }
 
-func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr string, quorum uint, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *mesh.Router, ipamSeedStr, ipRangeStr string, defaultSubnetStr string, quorum uint, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+	seed := parseIPAMSeed(ipamSeedStr)
 	ipRange := parseAndCheckCIDR(ipRangeStr)
 	defaultSubnet := ipRange
 	if defaultSubnetStr != "" {
@@ -373,6 +376,7 @@ func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr st
 		OurName:     router.Ourself.Peer.Name,
 		OurUID:      router.Ourself.Peer.UID,
 		OurNickname: router.Ourself.Peer.NickName,
+		Seed:        seed,
 		Universe:    ipRange.Range(),
 		Quorum:      quorum,
 		Db:          db,
@@ -467,6 +471,23 @@ func parseTrustedSubnets(trustedSubnetStr string) []*net.IPNet {
 	}
 
 	return trustedSubnets
+}
+
+func parseIPAMSeed(ipamSeed string) []mesh.PeerName {
+	peerNames := []mesh.PeerName{}
+	if ipamSeed == "" {
+		return peerNames
+	}
+
+	for _, peerNameStr := range strings.Split(ipamSeed, ",") {
+		peerName, err := mesh.PeerNameFromUserInput(peerNameStr)
+		if err != nil {
+			Log.Fatal("Unable to parse IPAM seed: ", err)
+		}
+		peerNames = append(peerNames, peerName)
+	}
+
+	return peerNames
 }
 
 func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {
