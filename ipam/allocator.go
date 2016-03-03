@@ -83,7 +83,7 @@ func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
-	alloc.loadPersistedRing()
+	alloc.loadPersistedData()
 	actionChan := make(chan func(), mesh.ChannelSize)
 	alloc.actionChan = actionChan
 	alloc.ticker = time.NewTicker(tickInterval)
@@ -264,6 +264,16 @@ func (alloc *Allocator) removeDeadContainers() {
 func (alloc *Allocator) ContainerStarted(ident string) {
 	alloc.actionChan <- func() {
 		delete(alloc.dead, ident) // delete is no-op if key not in map
+	}
+}
+
+func (alloc *Allocator) AllContainerIDs(ids []string) {
+	alloc.actionChan <- func() {
+		idmap := make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idmap[id] = struct{}{}
+		}
+		alloc.syncOwned(idmap)
 	}
 }
 
@@ -759,10 +769,11 @@ func (alloc *Allocator) reportFreeSpace() {
 	alloc.ring.ReportFree(freespace)
 }
 
-// Persisting the Ring
+// Persistent data
 const (
-	ringIdent = "ring"
-	nameIdent = "peername"
+	ringIdent  = "ring"
+	nameIdent  = "peername"
+	ownedIdent = "ownedAddresses"
 )
 
 func (alloc *Allocator) persistRing() {
@@ -776,8 +787,8 @@ func (alloc *Allocator) persistRing() {
 	}
 }
 
-func (alloc *Allocator) loadPersistedRing() {
-	var checkPeerName mesh.PeerName
+func (alloc *Allocator) loadPersistedData() {
+	checkPeerName := alloc.ourName
 	if err := alloc.db.Load(nameIdent, &checkPeerName); err != nil {
 		alloc.fatalf("Error loading persisted peer name: %s", err)
 		return
@@ -785,6 +796,7 @@ func (alloc *Allocator) loadPersistedRing() {
 	if checkPeerName != alloc.ourName {
 		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
 		alloc.persistRing()
+		alloc.persistOwned()
 		return
 	}
 	if err := alloc.db.Load(ringIdent, &alloc.ring); err != nil {
@@ -792,6 +804,20 @@ func (alloc *Allocator) loadPersistedRing() {
 	}
 	if alloc.ring != nil {
 		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+	}
+	if err := alloc.db.Load(ownedIdent, &alloc.owned); err != nil {
+		alloc.fatalf("Error loading persisted address data: %s", err)
+	}
+	for _, addrs := range alloc.owned {
+		for _, addr := range addrs {
+			alloc.space.Claim(addr)
+		}
+	}
+}
+
+func (alloc *Allocator) persistOwned() {
+	if err := alloc.db.Save(ownedIdent, alloc.owned); err != nil {
+		alloc.fatalf("Error persisting address data: %s", err)
 	}
 }
 
@@ -809,11 +835,13 @@ func (alloc *Allocator) hasOwned(ident string) bool {
 // NB: addr must not be owned by ident already
 func (alloc *Allocator) addOwned(ident string, addr address.Address) {
 	alloc.owned[ident] = append(alloc.owned[ident], addr)
+	alloc.persistOwned()
 }
 
 func (alloc *Allocator) removeAllOwned(ident string) []address.Address {
 	a := alloc.owned[ident]
 	delete(alloc.owned, ident)
+	alloc.persistOwned()
 	return a
 }
 
@@ -826,6 +854,7 @@ func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bo
 			} else {
 				alloc.owned[ident] = append(addrs[:i], addrs[i+1:]...)
 			}
+			alloc.persistOwned()
 			return true
 		}
 	}
@@ -850,6 +879,23 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 		}
 	}
 	return ""
+}
+
+// For each ID in the 'owned' map, remove the entry if it isn't in the map
+func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
+	changed := false
+	for ident, addrs := range alloc.owned {
+		if _, found := ids[ident]; !found {
+			for _, addr := range addrs {
+				alloc.space.Free(addr)
+			}
+			delete(alloc.owned, ident)
+			changed = true
+		}
+	}
+	if changed {
+		alloc.persistOwned()
+	}
 }
 
 // Logging

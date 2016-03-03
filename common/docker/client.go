@@ -94,6 +94,18 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 	return nil
 }
 
+func (c *Client) AllContainerIDs() ([]string, error) {
+	all, err := c.ListContainers(docker.ListContainersOptions{All: true})
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, c := range all {
+		ids = append(ids, c.ID)
+	}
+	return ids, nil
+}
+
 // IsContainerNotRunning returns true if we have checked with Docker that the ID is not running
 func (c *Client) IsContainerNotRunning(idStr string) bool {
 	container, err := c.InspectContainer(idStr)
