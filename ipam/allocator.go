@@ -54,6 +54,7 @@ type Allocator struct {
 	nicknames         map[mesh.PeerName]string  // so we can map nicknames for rmpeer
 	pendingAllocates  []operation               // held until we get some free space
 	pendingClaims     []operation               // held until we know who owns the space
+	pendingConsenses  []operation               // held until consensus achieved
 	dead              map[string]time.Time      // containers we heard were dead, and when
 	db                db.DB                     // persistence
 	gossip            mesh.Gossip               // our link to the outside world for sending messages
@@ -165,6 +166,8 @@ func (alloc *Allocator) tryOps(ops *[]operation) {
 
 // Try all pending operations
 func (alloc *Allocator) tryPendingOps() {
+	// Unblock pending consenses first
+	alloc.tryOps(&alloc.pendingConsenses)
 	// Process existing claims before servicing new allocations
 	alloc.tryOps(&alloc.pendingClaims)
 	alloc.tryOps(&alloc.pendingAllocates)
@@ -192,6 +195,14 @@ func (e *errorCancelled) Error() string {
 }
 
 // Actor client API
+
+// Consense (Sync) - wait for consensus
+func (alloc *Allocator) Consense() {
+	resultChan := make(chan struct{})
+	op := &consense{resultChan: resultChan}
+	alloc.doOperation(op, &alloc.pendingConsenses)
+	<-resultChan
+}
 
 // Allocate (Sync) - get new IP address for container with given name in range
 // if there isn't any space in that range we block indefinitely
@@ -343,6 +354,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.shuttingDown = true
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
+		alloc.cancelOps(&alloc.pendingConsenses)
 		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()
