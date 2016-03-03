@@ -340,9 +340,12 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 }
 
 func parseAndCheckCIDR(cidrStr string) address.CIDR {
-	_, cidr, err := address.ParseCIDR(cidrStr)
+	cidr, err := address.ParseCIDR(cidrStr)
 	checkFatal(err)
 
+	if !cidr.IsSubnet() {
+		Log.Fatalf("Invalid allocation range %s - bits after network prefix are not all zero", cidrStr)
+	}
 	if cidr.Size() < ipam.MinSubnetSize {
 		Log.Fatalf("Allocation range smaller than minimum size %d: %s", ipam.MinSubnetSize, cidrStr)
 	}

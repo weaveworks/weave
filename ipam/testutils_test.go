@@ -128,13 +128,13 @@ type mockDB struct{}
 func (d *mockDB) Load(_ string, _ interface{}) error { return nil }
 func (d *mockDB) Save(_ string, _ interface{}) error { return nil }
 
-func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.Range) {
+func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.CIDR) {
 	peername, err := mesh.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
 	}
 
-	_, cidr, err := address.ParseCIDR(cidrStr)
+	cidr, err := address.ParseCIDR(cidrStr)
 	if err != nil {
 		panic(err)
 	}
@@ -142,10 +142,10 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 	alloc := NewAllocator(peername, mesh.PeerUID(rand.Int63()),
 		"nick-"+name, cidr.Range(), quorum, new(mockDB), func(mesh.PeerName) bool { return true })
 
-	return alloc, cidr.HostRange()
+	return alloc, cidr
 }
 
-func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.Range) {
+func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.CIDR) {
 	alloc, subnet := makeAllocator(name, universeCIDR, quorum)
 	gossip := &mockGossipComms{T: t, name: name}
 	alloc.SetInterfaces(gossip)
@@ -199,10 +199,10 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 	}
 }
 
-func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestRouter, address.Range) {
+func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
 	gossipRouter := gossip.NewTestRouter(0.0)
 	allocs := make([]*Allocator, size)
-	var subnet address.Range
+	var subnet address.CIDR
 
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
