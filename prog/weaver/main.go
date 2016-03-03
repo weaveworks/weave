@@ -88,6 +88,7 @@ func main() {
 		iprangeCIDR        string
 		ipsubnetCIDR       string
 		peerCount          int
+		observer           bool
 		dockerAPI          string
 		peers              []string
 		noDNS              bool
@@ -121,6 +122,7 @@ func main() {
 	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
+	mflag.BoolVar(&observer, []string{"-observer"}, false, "do not participate in paxos, observe only")
 	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
@@ -225,8 +227,11 @@ func main() {
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
 	)
+	if observer && peerCount > 0 {
+		Log.Fatal("At most one of --observer and --init-peer-count must be specified.")
+	}
 	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(peerCount, peers), db, isKnownPeer)
+		allocator, defaultSubnet = createAllocator(router.Router, iprangeCIDR, ipsubnetCIDR, determineQuorum(observer, peerCount, peers), db, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
@@ -388,7 +393,11 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 
 // Pick a quorum size heuristically based on the number of peer
 // addresses passed.
-func determineQuorum(initPeerCountFlag int, peers []string) uint {
+func determineQuorum(observer bool, initPeerCountFlag int, peers []string) uint {
+	if observer {
+		return uint(0)
+	}
+
 	if initPeerCountFlag > 0 {
 		return uint(initPeerCountFlag/2 + 1)
 	}
