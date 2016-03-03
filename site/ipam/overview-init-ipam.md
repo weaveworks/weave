@@ -15,6 +15,7 @@ The following automatic IP address managment topics are discussed:
 
  * [Initializing Peers on a Weave Network](#initialization)
  * [`--init-peer-count` and How Quorum is Achieved](#quorum)
+ * [Forcing Consensus](#forcing-consensus)
  * [Choosing an Allocation Range](#range)
 
  
@@ -110,6 +111,19 @@ is safe with respect to Weave's startup quorum:
     ...time passes...
     ...host1 is rebooted...
     host1$ weave launch $HOST2 $HOST3
+
+### <a name="forcing-consensus"></a>Forcing Consensus
+
+Under certain circumstances (for example when adding new nodes to an
+existing cluster) it is desirable to ensure that a node has
+successfully joined and received a copy of the IPAM data structure
+shared amongst the peers. An administrative command is provided for
+this purpose:
+
+    host1$ weave consense
+
+This operation will block until the node on which it is run has joined
+successfully.
 
 ### <a name="range"></a>Choosing an Allocation Range
 
