@@ -5,46 +5,46 @@ layout: default
 
 # Troubleshooting Weave
 
- * [Basic diagnostics](#diagnostics)
- * [Status reporting](#weave-status)
+ * [Basic Diagnostics](#diagnostics)
+ * [Status Reporting](#weave-status)
    - [List connections](#weave-status-connections)
    - [List peers](#weave-status-peers)
    - [List DNS entries](#weave-status-dns)
    - [JSON report](#weave-report)
    - [List attached containers](#list-attached-containers)
- * [Stopping weave](#stop)
+ * [Stopping Weave](#stop)
  * [Reboots](#reboots)
- * [Snapshot releases](#snapshots)
+ * [Snapshot Releases](#snapshots)
 
-## <a name="diagnostics"></a>Basic diagnostics
+## <a name="diagnostics"></a>Basic Diagnostics
 
-Check what version of weave you are running with
+Check the version of Weave you are running using:
 
     weave version
 
 If it is not the latest version, as shown in the list of
 [releases](https://github.com/weaveworks/weave/releases), then it is
-highly recommended that you upgrade by following the
+recommended you upgrade using the
 [installation instructions](https://github.com/weaveworks/weave#installation).
 
-Check the weave container logs with
+To check the Weave container logs:
 
     docker logs weave
 
 A reasonable amount of information, and all errors, get logged there.
 
-The log verbosity can be increased by supplying the
-`--log-level=debug` option when launching weave. To log information on
-a per-packet basis use `--pktdebug` - be warned, this can produce a
+The log verbosity may be increased by using the
+`--log-level=debug` option during `weave launch`. To log information on
+a per-packet basis use `--pktdebug` - but be warned, as this can produce a
 lot of output.
 
 Another useful debugging technique is to attach standard packet
 capture and analysis tools, such as tcpdump and wireshark, to the
 `weave` network bridge on the host.
 
-## <a name="weave-status"></a>Status reporting
+## <a name="weave-status"></a>Status Reporting
 
-A status summary can be obtained with `weave status`:
+A status summary can be obtained using `weave status`:
 
 ````
 $ weave status
@@ -80,59 +80,55 @@ $ weave status
 ````
 
 The terms used here are explained further at
-[how it works](how-it-works.html).
+[How Weave Net Works](/site/router-topology/overview.md).
 
-The 'Version' line shows the weave version.
+  * **Version** - shows the Weave version.
 
-The 'Protocol' line indicates the weave router's inter-peer
+  * **Protocol**- indicates the Weave Router inter-peer
 communication protocol name and supported versions (min..max).
 
-The 'Name' line identifies the local weave router as a peer in the
-weave network. The nickname shown in parentheses defaults to the name
-of the host on which the weave container was launched; if desired it
-can be overriden by supplying the `--nickname` argument to `weave
+ * **Name** - identifies the local Weave Router as a peer on the
+Weave network. The nickname shown in parentheses defaults to the name
+of the host on which the Weave container was launched. It
+can be overriden by using the `--nickname` argument at `weave
 launch`.
 
-The 'Encryption' line indicates whether
-[encryption](features.html#security) is in use for communication
+ * **Encryption** - indicates whether
+[encryption](/site/encryption/crypto-overview) is in use for communication
 between peers.
 
-The 'PeerDiscovery' line indicates whether
-[automatic peer discovery](features.html#dynamic-topologies) is
+ * **PeerDiscovery** - indicates whether
+[automatic peer discovery](/site/ipam/allocation-multi-ipam.md) is
 enabled (which is the default).
 
-'Targets' is the number of hosts that the local weave router has been
-asked to connect to in `weave launch` and `weave connect`. The
-complete list can be obtained with `weave status targets`.
+ * **Targets** - are the number of hosts that the local Weave Router has been
+asked to connect to at `weave launch` and `weave connect`. The
+complete list can be obtained using `weave status targets`.
 
-'Connections' shows the total number connections between the local weave
-router and other peers, and a break down of that figure by connection
+ * **Connections** - show the total number connections between the local Weave
+Router and other peers, and a break down of that figure by connection
 state. Further details are available with
 [`weave status connections`](#weave-status-connections).
 
-'Peers' shows the total number of peers in the network, and the total
+ * **Peers** - show the total number of peers in the network, and the total
 number of connections peers have to other peers. Further details are
 available with [`weave status peers`](#weave-status-peers).
 
-'TrustedSubnets' shows subnets which the router trusts as specified by
-the `--trusted-subnets` option to `weave launch`.
+ * **TrustedSubnets** - show subnets which the router trusts as specified by the `--trusted-subnets` option at `weave launch`.
 
-There are further sections for the [IP address
-allocator](ipam.html#troubleshooting),
-[weaveDNS](weavedns.html#troubleshooting), and [Weave Docker API
-Proxy](proxy.html#troubleshooting).
 
-### <a name="weave-status-connections"></a>List connections
 
-Connections between weave peers carry control traffic over TCP and
+### <a name="weave-status-connections"></a>List Connections
+
+Connections between Weave peers carry control traffic over TCP and
 data traffic over UDP. For a connection to be fully established, the
-TCP connection and UDP data path must be able to transmit information
+TCP connection and UDP datapath must be able to transmit information
 in both directions. Weave routers check this regularly with
 heartbeats. Failed connections are automatically retried, with an
 exponential back-off.
 
-Detailed information on the local weave router's connections can be
-obtained with `weave status connections`:
+Detailed information on the local Weave router's connections can be
+obtained using `weave status connections`:
 
 ````
 $ weave status connections
@@ -160,7 +156,7 @@ The columns are as follows:
    the encryption mode, data transport method, remote peer name and
    nickname for pending and established connections
 
-### <a name="weave-status-peers"></a>List peers
+### <a name="weave-status-peers"></a>List Peers
 
 Detailed information on peers can be obtained with `weave status
 peers`:
@@ -185,7 +181,7 @@ address and port number of the connection.  In the above example,
 `host3` has connected to `host1` at `192.168.48.11:6783`; `host1` sees
 the `host3` end of the same connection as `192.168.48.13:49619`.
 
-### <a name="weave-status-dns"></a>List DNS entries
+### <a name="weave-status-dns"></a>List DNS Entries
 
 Detailed information on DNS registrations can be obtained with `weave
 status dns`:
@@ -210,7 +206,7 @@ The columns are as follows:
  * Registering entity identifier (typically a container ID)
  * Name of peer from which the registration originates
 
-### <a name="weave-report"></a>JSON report
+### <a name="weave-report"></a>JSON Report
 
     $ weave report
 
@@ -229,12 +225,12 @@ results in JSON format.
     $ weave report -f {% raw %}'{{json .DNS}}'{% endraw %}
     {% raw %}{"Domain":"weave.local.","Upstream":["8.8.8.8","8.8.4.4"],"Address":"172.17.0.1:53","TTL":1,"Entries":null}{% endraw %}
 
-### <a name="list-attached-containers"></a>List attached containers
+### <a name="list-attached-containers"></a>List Attached Containers
 
     weave ps
 
-Produces a list of all the containers running on this host that are
-connected to the weave network, like this:
+Produces a list of all containers running on this host that are
+connected to the Weave network, like this:
 
     weave:expose 7a:c4:8b:a1:e6:ad 10.2.5.2/24
     b07565b06c53 ae:e3:07:9c:8c:d4
@@ -245,8 +241,8 @@ connected to the weave network, like this:
 On each line are the container ID, its MAC address, then the list of
 IP address/routing prefix length ([CIDR
 notation](http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing))
-assigned on the weave network. The special container name `weave:expose`
-displays the weave bridge MAC and any IP addresses added to it via the
+assigned on the Weave network. The special container name `weave:expose`
+displays the Weave bridge MAC and any IP addresses added to it via the
 `weave expose` command.
 
 You can also supply a list of container IDs/names to `weave ps`, like this:
@@ -255,29 +251,30 @@ You can also supply a list of container IDs/names to `weave ps`, like this:
     able ce:15:34:a9:b5:6d 10.2.5.1/24
     baker 7a:61:a2:49:4b:91 10.2.8.3/24
 
-## <a name="stop"></a>Stopping weave
-To stop weave, if you have configured your environment to use the
+## <a name="stop"></a>Stopping Weave
+
+To stop Weave, if you have configured your environment to use the
 Weave Docker API Proxy, e.g. by running `eval $(weave env)` in your
 shell, you must first restore the environment with
 
     eval $(weave env --restore)
 
-Then run
+Then run:
 
     weave stop
 
-Note that this leaves the local application container network intact;
-containers on the local host can continue to communicate, whereas
+Note that this leaves the local application container network intact.
+Containers on the local host can continue to communicate, whereas
 communication with containers on different hosts, as well as service
-export/import, is disrupted but resumes when weave is relaunched.
+export/import, is disrupted but resumes once Weave is relaunched.
 
-To stop weave and completely remove all traces of the weave network on
+To stop Weave and to completely remove all traces of the Weave network on
 the local host, run
 
     weave reset
 
-Any running application containers will permanently lose connectivity
-with the weave network and have to be restarted in order to
+Any running application containers permanently lose connectivity
+with the Weave network and will have to be restarted in order to
 re-connect.
 
 ## <a name="reboots"></a>Reboots
@@ -286,21 +283,21 @@ The router and proxy containers do not have Docker restart policies
 set, because the process of getting everything re-started and
 re-connected via restart policies is not entirely reliable. Until that
 changes, we recommend you create appropriate startup scripts to launch
-weave and run application containers from
-[your favourite process manager](systemd.html).
+Weave and run application containers from
+[your favourite process manager](/site/systemd.md).
 
 If you are shutting down or restarting a host deliberately, run `weave
 reset` to clear everything down.
 
 The Weave Docker plugin does restart automatically because it must
 always start with Docker, as described in
-[its documentation](plugin.html).
+[its documentation](/site/weave-docker-api/using-proxy.md).
 
-## <a name="snapshots"></a>Snapshot releases
+## <a name="snapshots"></a>Snapshot Releases
 
-We sometimes publish snapshot releases, to provide previews of new
-features, assist in validation of bug fixes, etc. One can install the
-latest snapshot release with
+Snapshot releases are published at times to provide previews of new
+features, assist in the validation of bug fixes, etc. One can install the
+latest snapshot release using:
 
     sudo curl -L git.io/weave-snapshot -o /usr/local/bin/weave
     sudo chmod a+x /usr/local/bin/weave
@@ -308,3 +305,11 @@ latest snapshot release with
 
 Snapshot releases report the script version as "(unreleased version)",
 and the container image versions as git hashes.
+
+
+
+**See Also**
+
+ * [Troubleshooting Weave](/site/troublehooting.md)
+ * [Troubleshooting IPAM](/site/ipam/troubleshooting.md)
+ * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)
