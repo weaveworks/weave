@@ -33,6 +33,9 @@ coverage.html
 # Vim backup files
 *.swp
 
+# Ctags
+tags
+
 # Project specific
 prog/weaver/weaver
 prog/weavedns/weavedns

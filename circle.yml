@@ -36,14 +36,22 @@ test:
         parallel: true
     - cd $SRCDIR; make testrunner:
         parallel: true
-    - cd $SRCDIR/test; ./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh:
-        parallel: true
-    - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
-        parallel: true
+    #- cd $SRCDIR/test; ./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh:
+    #    parallel: true
+    #- cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
+    #    parallel: true
+    #    timeout: 300
+    - cd $SRCDIR/test; ./aws.sh setup && eval $(./aws.sh hosts) && ./setup.sh:
+        parallel: false
+    - cd $SRCDIR/test; eval $(./aws.sh hosts); export COVERAGE=true; ./run_all.sh:
+        parallel: false
         timeout: 300
+
   post:
-    - cd $SRCDIR/test; ./gce.sh destroy:
-        parallel: true
+    #- cd $SRCDIR/test; ./gce.sh destroy:
+    #    parallel: true
+    - cd $SRCDIR/test; ./aws.sh destroy:
+        parallel: false
 
 teardown:
   pre:
