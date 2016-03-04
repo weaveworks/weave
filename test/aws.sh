@@ -83,7 +83,7 @@ function make_template {
 
     # Create an instance
     json=$(mktemp json.XXXXXXXXXX)
-    run_instances 1 > $json
+    run_instances 1 "$SRC_IMAGE_ID" > $json
 
     # Install docker and friends
     instance_id=$(jq -r -e ".Instances[0].InstanceId" $json)
