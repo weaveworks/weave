@@ -25,6 +25,8 @@ dependencies:
     - "cd $SRCDIR; git submodule update --init"
     - cd $SRCDIR/test; ./gce.sh make_template:
         parallel: false
+    - cd $SRCDIR/test; ./aws.sh make_template:
+        parallel: false
     - "cd $SRCDIR/build; ../tools/rebuild-image weaveworks/weavebuild . Dockerfile build.sh && touch $SRCDIR/.build.uptodate"
 
 test:
