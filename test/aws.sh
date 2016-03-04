@@ -40,6 +40,7 @@ function setup {
     # Start instances
     image_id=$(ami_id)
     json=$(mktemp json.XXXXXXXXXX)
+    echo "Creating $NUM_HOSTS instances of $image_id image"
     run_instances $NUM_HOSTS $image_id > $json
 
     # Assign a name to each instance and
@@ -83,6 +84,7 @@ function make_template {
 
     # Create an instance
     json=$(mktemp json.XXXXXXXXXX)
+    echo "Creating instances of $SRC_IMAGE_ID image"
     run_instances 1 "$SRC_IMAGE_ID" > $json
 
     # Install docker and friends
@@ -130,12 +132,11 @@ function run_instances {
     image_id="$2"
 
     # Create keypair
-    create_key_pair
+    create_key_pair > /dev/null
 
     # Check whether a necessary security group exists
-    ensure_sec_group
+    ensure_sec_group > /dev/null
 
-    echo "Creating $count instances of $image_id image"
     $AWSCLI ec2 run-instances                   \
         --image-id "$image_id"                  \
         --key-name "$KEY_NAME"                  \
