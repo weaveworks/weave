@@ -4,6 +4,8 @@
 
 # * Create IAM user. TODO(mp) write about policies and friends.
 
+# TODO(mp) when listing instances, take $SUFFIX into consideration!
+
 set -e
 #set -x
 
@@ -19,11 +21,11 @@ set -e
 : ${KEY_NAME:="weavenet_ci"}
 : ${SSH_KEY_FILE:="$HOME/.ssh/$KEY_NAME"}
 
-: ${NUM_HOSTS:=2}
+: ${NUM_HOSTS:=5}
 : ${AWSCLI:="aws"}
 : ${SSHCMD:="ssh -o StrictHostKeyChecking=no -o CheckHostIp=no
              -o UserKnownHostsFile=/dev/null -l ubuntu -i $SSH_KEY_FILE"}
-# TODO(mp) take into consideration $SUFFIX (perhaps filter in list_instances)
+
 SUFFIX=""
 if [ -n "$CIRCLECI" ]; then
 	SUFFIX="-${CIRCLE_BUILD_NUM}-$CIRCLE_NODE_INDEX"
@@ -35,22 +37,10 @@ function setup {
     # Destroy previous machines (if any)
     destroy
 
-    # Create keypair
-    create_key_pair
-
-    # Check whether a necessary security group exists
-    ensure_sec_group
-
     # Start instances
     image_id=$(ami_id)
     json=$(mktemp json.XXXXXXXXXX)
-    $AWSCLI ec2 run-instances                   \
-        --image-id "$image_id"                  \
-        --key-name "$KEY_NAME"                  \
-        --placement "AvailabilityZone=$ZONE"    \
-        --instance-type "$INSTANCE_TYPE"        \
-        --security-groups "$SEC_GROUP_NAME"     \
-        --count "$NUM_HOSTS" > $json
+    run_instances $NUM_HOSTS $image_id > $json
 
     # Assign a name to each instance and
     # disable src/dst checks (required by awsvpc)
@@ -74,7 +64,6 @@ function setup {
     for vm in $names; do
 		echo "$(internal_ip $json $vm) $vm" >> $hosts
     done
-    # TODO(mp) add wait_for_external_ip instead of sleeping
     for vm in $names; do
 		sudo sed -i "/$vm/d" /etc/hosts
 		sudo sh -c "echo \"$(external_ip $json $vm) $vm\" >>/etc/hosts"
@@ -87,40 +76,14 @@ function setup {
     rm $json $hosts
 }
 
-function run_instances {
-    COUNT="$1"
-    $AWSCLI ec2 run-instances                   \
-        --image-id "$SRC_IMAGE_ID"                  \
-        --key-name "$KEY_NAME"                  \
-        --placement "AvailabilityZone=$ZONE"    \
-        --instance-type "$INSTANCE_TYPE"        \
-        --security-groups "$SEC_GROUP_NAME"     \
-        --count $COUNT
-}
-
 # Creates AMI.
 function make_template {
     # Check if image exists
     [[ $(ami_id) == "null" ]] || exit 0
 
     # Create an instance
-
-    # TODO(mp) move it to run_instances function
-    # Create keypair
-    create_key_pair
-
-    # Check whether a necessary security group exists
-    ensure_sec_group
-
     json=$(mktemp json.XXXXXXXXXX)
     run_instances 1 > $json
-    #$AWSCLI ec2 run-instances                   \
-    #    --image-id "$IMAGE_ID"                  \
-    #    --key-name "$KEY_NAME"                  \
-    #    --placement "AvailabilityZone=$ZONE"    \
-    #    --instance-type "$INSTANCE_TYPE"        \
-    #    --security-groups "$SEC_GROUP_NAME"     \
-    #    --count 1 > $json
 
     # Install docker and friends
     instance_id=$(jq -r -e ".Instances[0].InstanceId" $json)
@@ -132,6 +95,7 @@ function make_template {
     install_docker_on "$public_ip"
 
     # Create an image
+    echo "Creating $IMAGE_NAME image from $instance_id instance"
     $AWSCLI ec2 create-image            \
         --instance-id "$instance_id"    \
         --name "$IMAGE_NAME"
@@ -152,6 +116,7 @@ function destroy {
         instances="$i $instances"
     done
 
+    echo "Terminating $instances instances"
     [[ ! -z "$instances" ]] &&
         $AWSCLI ec2 terminate-instances --instance-ids $instances > /dev/null
 
@@ -159,6 +124,26 @@ function destroy {
 }
 
 # Helpers
+
+function run_instances {
+    count="$1"
+    image_id="$2"
+
+    # Create keypair
+    create_key_pair
+
+    # Check whether a necessary security group exists
+    ensure_sec_group
+
+    echo "Creating $count instances of $image_id image"
+    $AWSCLI ec2 run-instances                   \
+        --image-id "$image_id"                  \
+        --key-name "$KEY_NAME"                  \
+        --placement "AvailabilityZone=$ZONE"    \
+        --instance-type "$INSTANCE_TYPE"        \
+        --security-groups "$SEC_GROUP_NAME"     \
+        --count $count
+}
 
 function list_instances {
     $AWSCLI ec2 describe-instances                                      \
@@ -185,21 +170,26 @@ function ami_state {
 # Function blocks until image becomes ready (i.e. state != pending).
 function wait_for_ami {
     image_id="$1"
-    echo "waiting for image"
+
+    echo "Waiting for $image_id image"
     for i in {0..20}; do
         state=$(ami_state "$image_id")
         [[ "$state" != "pending" ]] && return
 		sleep 60
 	done
-    echo "done"
+    echo "Done waiting"
 }
 
 function wait_for_hosts {
     json="$1"
+
+    echo "Waiting for hosts"
     for vm in $(vm_names); do
+        echo "Waiting for $vm"
         # TODO(mp) maybe parallelize
         wait_for_external_ip $json "$vm"
     done
+    echo "Done waiting"
 }
 
 function wait_for_external_ip {
@@ -245,7 +235,6 @@ function create_key_pair {
 
     if ! RET=$(_create); then
         if echo "$RET" | grep -q "InvalidKeyPair\.Duplicate"; then
-            echo "Deleting key pair"
             delete_key_pair
             RET=$(_create)
         else
@@ -254,11 +243,15 @@ function create_key_pair {
         fi
     fi
 
+    echo "Created $KEY_FILE keypair"
+    echo "Writing $KEY_FILE into $SSH_KEY_FILE"
+
     echo "$RET" | jq -r .KeyMaterial > $SSH_KEY_FILE
     chmod 400 $SSH_KEY_FILE
 }
 
 function delete_key_pair {
+    echo "Deleting $KEY_NAME keypair"
     $AWSCLI ec2 delete-key-pair --key-name $KEY_NAME
     rm -f "$SSH_KEY_FILE" || true
 }
@@ -271,6 +264,7 @@ function ensure_sec_group {
 }
 
 function create_sec_group {
+    echo "Creating $SEC_GROUP_NAME security group"
     $AWSCLI ec2 create-security-group               \
         --group-name "$SEC_GROUP_NAME"              \
         --description "Weave CircleCI" > /dev/null
@@ -306,17 +300,18 @@ function hosts {
 }
 
 function try_connect {
-    echo "trying"
+    echo "Trying to connect to $1"
 	for i in {0..10}; do
 		$SSHCMD -t $1 true && return
 		sleep 2
 	done
-    echo "connected"
+    echo "Connected to $1"
 }
 
 function copy_hosts {
 	hostname=$1
 	hosts=$2
+
 	cat $hosts | $SSHCMD -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
 }
 
