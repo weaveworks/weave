@@ -21,7 +21,7 @@ set -e
 : ${KEY_NAME:="weavenet_ci"}
 : ${SSH_KEY_FILE:="$HOME/.ssh/$KEY_NAME"}
 
-: ${NUM_HOSTS:=2}
+: ${NUM_HOSTS:=5}
 : ${AWSCLI:="aws"}
 : ${SSHCMD:="ssh -o StrictHostKeyChecking=no -o CheckHostIp=no
              -o UserKnownHostsFile=/dev/null -l ubuntu -i $SSH_KEY_FILE"}
