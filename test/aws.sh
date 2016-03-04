@@ -5,23 +5,32 @@
 # * Create IAM user. TODO(mp) write about policies and friends.
 
 set -e
-set -u
 #set -x
 
-: ${IMAGE_ID:="ami-fce3c696"} # Ubuntu 14.04 LTS (HVM) at us-east-1
 : ${ZONE:="us-east-1a"}
+
+: ${SRC_IMAGE_ID:="ami-fce3c696"} # Ubuntu 14.04 LTS (HVM) at us-east-1
+: ${IMAGE_NAME:="weavenet_ci"}
+
 : ${INSTANCE_TYPE:="t2.micro"}
+: ${INSTANCE_TAG:="weavenet_ci"}
+: ${SEC_GROUP_NAME:="weavenet-ci"}
+
 : ${KEY_NAME:="weavenet_ci"}
 : ${SSH_KEY_FILE:="$HOME/.ssh/$KEY_NAME"}
-: ${NUM_HOSTS:=5}
-: ${SEC_GROUP_NAME:="weavenet-ci"}
-: ${SUFFIX:=""}
+
+: ${NUM_HOSTS:=2}
 : ${AWSCLI:="aws"}
-: ${SSHZ:="ssh -o StrictHostKeyChecking=no -o CheckHostIp=no
+: ${SSHCMD:="ssh -o StrictHostKeyChecking=no -o CheckHostIp=no
              -o UserKnownHostsFile=/dev/null -l ubuntu -i $SSH_KEY_FILE"}
+# TODO(mp) take into consideration $SUFFIX (perhaps filter in list_instances)
+SUFFIX=""
+if [ -n "$CIRCLECI" ]; then
+	SUFFIX="-${CIRCLE_BUILD_NUM}-$CIRCLE_NODE_INDEX"
+fi
 
 # Creates and runs a set of VMs.
-# Each VM is named after "host${ID}${SUFFIX}".
+# Each VM is named after "host${ID}${SUFFIX}" and is tagged with $INSTANCE_TAG.
 function setup {
     # Destroy previous machines (if any)
     destroy
@@ -33,23 +42,24 @@ function setup {
     ensure_sec_group
 
     # Start instances
+    image_id=$(ami_id)
+    json=$(mktemp json.XXXXXXXXXX)
     $AWSCLI ec2 run-instances                   \
-        --image-id "$IMAGE_ID"                  \
+        --image-id "$image_id"                  \
         --key-name "$KEY_NAME"                  \
         --placement "AvailabilityZone=$ZONE"    \
         --instance-type "$INSTANCE_TYPE"        \
         --security-groups "$SEC_GROUP_NAME"     \
-        --count "$NUM_HOSTS"
+        --count "$NUM_HOSTS" > $json
 
     # Assign a name to each instance and
     # disable src/dst checks (required by awsvpc)
-    json=$(mktemp json.XXXXXXXXXX)
-    list_instances > $json
     i=1
-    for vm in `jq -r ".Reservations[].Instances[].InstanceId" $json`; do
+    for vm in `jq -r -e ".Instances[].InstanceId" $json`; do
         $AWSCLI ec2 create-tags                             \
             --resources "$vm"                               \
-            --tags "Key=Name,Value=\"$(vm_name $i)\""
+            --tags "Key=Name,Value=\"$(vm_name $i)\""       \
+                   "Key=$INSTANCE_TAG,Value=\"true\""
         $AWSCLI ec2 modify-instance-attribute               \
             --instance-id "$vm"                             \
             --no-source-dest-check
@@ -58,17 +68,18 @@ function setup {
 
     # Populate /etc/hosts of local host and of each instance
 	hosts=$(mktemp hosts.XXXXXXXXXX)
-    list_instances > $json
+    # wait_for_hosts will populate $json as well
+    wait_for_hosts $json
     names=$(vm_names)
     for vm in $names; do
 		echo "$(internal_ip $json $vm) $vm" >> $hosts
     done
+    # TODO(mp) add wait_for_external_ip instead of sleeping
     for vm in $names; do
 		sudo sed -i "/$vm/d" /etc/hosts
 		sudo sh -c "echo \"$(external_ip $json $vm) $vm\" >>/etc/hosts"
 		try_connect $vm
 		copy_hosts $vm $hosts &
-	    install_docker_on $vm &
     done
 
 	wait
@@ -76,9 +87,59 @@ function setup {
     rm $json $hosts
 }
 
+function run_instances {
+    COUNT="$1"
+    $AWSCLI ec2 run-instances                   \
+        --image-id "$SRC_IMAGE_ID"                  \
+        --key-name "$KEY_NAME"                  \
+        --placement "AvailabilityZone=$ZONE"    \
+        --instance-type "$INSTANCE_TYPE"        \
+        --security-groups "$SEC_GROUP_NAME"     \
+        --count $COUNT
+}
+
 # Creates AMI.
 function make_template {
-    echo "NYI"
+    # Check if image exists
+    [[ $(ami_id) == "null" ]] || exit 0
+
+    # Create an instance
+
+    # TODO(mp) move it to run_instances function
+    # Create keypair
+    create_key_pair
+
+    # Check whether a necessary security group exists
+    ensure_sec_group
+
+    json=$(mktemp json.XXXXXXXXXX)
+    run_instances 1 > $json
+    #$AWSCLI ec2 run-instances                   \
+    #    --image-id "$IMAGE_ID"                  \
+    #    --key-name "$KEY_NAME"                  \
+    #    --placement "AvailabilityZone=$ZONE"    \
+    #    --instance-type "$INSTANCE_TYPE"        \
+    #    --security-groups "$SEC_GROUP_NAME"     \
+    #    --count 1 > $json
+
+    # Install docker and friends
+    instance_id=$(jq -r -e ".Instances[0].InstanceId" $json)
+    trap '$AWSCLI ec2 terminate-instances --instance-ids $instance_id > /dev/null' EXIT
+    list_instances_by_id "$instance_id" > $json
+    f=".Reservations[].Instances[].NetworkInterfaces[0].Association.PublicIp"
+    public_ip=$(jq -r -e "$f" $json)
+	try_connect "$public_ip"
+    install_docker_on "$public_ip"
+
+    # Create an image
+    $AWSCLI ec2 create-image            \
+        --instance-id "$instance_id"    \
+        --name "$IMAGE_NAME"
+    image_id=$(ami_id)
+    wait_for_ami $image_id
+
+    # Delete artifacts
+    rm $json
 }
 
 # Destroy VMs and remove keys.
@@ -87,7 +148,7 @@ function destroy {
     json=$(mktemp json.XXXXXXXXXX)
     list_instances >> $json
     instances=""
-    for i in `jq -r ".Reservations[].Instances[].InstanceId" $json`; do
+    for i in `jq -r -e ".Reservations[].Instances[].InstanceId" $json`; do
         instances="$i $instances"
     done
 
@@ -101,14 +162,55 @@ function destroy {
 
 function list_instances {
     $AWSCLI ec2 describe-instances                                      \
-        --filters "Name=image-id,Values=$IMAGE_ID"                      \
-                  "Name=instance-state-name,Values=pending,running"
+        --filters "Name=instance-state-name,Values=pending,running"     \
+                  "Name=tag:$INSTANCE_TAG,Values=true"
 }
 
-function get_instance_id_by_name {
-    jq -r ".Reservations[].Instances[]
-          | select (.Tags[].Value == \"$2\")
-          | .InstanceId" $1
+function list_instances_by_id {
+    ids="$1"
+    $AWSCLI ec2 describe-instances --instance-ids $1
+}
+
+function ami_id {
+    $AWSCLI ec2 describe-images --filter "Name=name,Values=$IMAGE_NAME" |
+        jq -r ".Images[0].ImageId"
+}
+
+function ami_state {
+    image_id="$1"
+    $AWSCLI ec2 describe-images --image-ids "$image_id" |
+        jq -r -e ".Images[0].State"
+}
+
+# Function blocks until image becomes ready (i.e. state != pending).
+function wait_for_ami {
+    image_id="$1"
+    echo "waiting for image"
+    for i in {0..20}; do
+        state=$(ami_state "$image_id")
+        [[ "$state" != "pending" ]] && return
+		sleep 60
+	done
+    echo "done"
+}
+
+function wait_for_hosts {
+    json="$1"
+    for vm in $(vm_names); do
+        # TODO(mp) maybe parallelize
+        wait_for_external_ip $json "$vm"
+    done
+}
+
+function wait_for_external_ip {
+    json="$1"
+    vm="$2"
+    for i in {0..10}; do
+        list_instances > $json
+        ip=$(external_ip $json $vm)
+        [[ ! -z "$ip" ]] && return
+        sleep 2
+    done
 }
 
 function vm_names {
@@ -126,14 +228,14 @@ function vm_name {
 
 function internal_ip {
     jq -r ".Reservations[].Instances[]
-          | select (.Tags[0].Key == \"Name\" and .Tags[0].Value == \"$2\")
-          | .NetworkInterfaces[0].PrivateIpAddress" $1
+              | select (.Tags[].Value == \"$2\")
+              | .NetworkInterfaces[0].PrivateIpAddress" $1
 }
 
 function external_ip {
     jq -r ".Reservations[].Instances[]
-          | select (.Tags[0].Key == \"Name\" and .Tags[0].Value == \"$2\")
-          | .NetworkInterfaces[0].Association.PublicIp" $1
+              | select (.Tags[].Value == \"$2\")
+              | .NetworkInterfaces[0].Association.PublicIp" $1
 }
 
 function create_key_pair {
@@ -198,7 +300,7 @@ function hosts {
 		hostname="$name"
 		hosts="$hostname $hosts"
 	done
-	echo export SSH=\"$SSHZ\"
+	echo export SSH=\"$SSHCMD\"
 	echo export HOSTS=\"$hosts\"
 	rm $json
 }
@@ -206,7 +308,7 @@ function hosts {
 function try_connect {
     echo "trying"
 	for i in {0..10}; do
-		$SSHZ -t $1 true && return
+		$SSHCMD -t $1 true && return
 		sleep 2
 	done
     echo "connected"
@@ -215,7 +317,7 @@ function try_connect {
 function copy_hosts {
 	hostname=$1
 	hosts=$2
-	cat $hosts | $SSHZ -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
+	cat $hosts | $SSHCMD -t "$hostname" "sudo -- sh -c \"cat >>/etc/hosts\""
 }
 
 function install_docker_on {
@@ -223,7 +325,7 @@ function install_docker_on {
     # TODO(mp) *maybe* use `vagrant` user instead of default `ubuntu`.
 
 	name=$1
-	$SSHZ -t $name sudo bash -x -s <<EOF
+	$SSHCMD -t $name sudo bash -x -s <<EOF
 curl -sSL https://get.docker.com/gpg | sudo apt-key add -
 curl -sSL https://get.docker.com/ | sh
 apt-get update -qq;
@@ -234,7 +336,7 @@ service docker restart
 EOF
 	# It seems we need a short delay for docker to start up, so I put this in
 	# a separate ssh connection.  This installs nsenter.
-	$SSHZ -t $name sudo docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+	$SSHCMD -t $name sudo docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 }
 
 # Main
