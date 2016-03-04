@@ -1,10 +1,10 @@
 #!/bin/bash
 
+# TODO(mp) docs
+
 # Before the script can be executed, the following must be done:
 
 # * Create IAM user. TODO(mp) write about policies and friends.
-
-# TODO(mp) when listing instances, take $SUFFIX into consideration!
 
 set -e
 #set -x
@@ -21,7 +21,7 @@ set -e
 : ${KEY_NAME:="weavenet_ci"}
 : ${SSH_KEY_FILE:="$HOME/.ssh/$KEY_NAME"}
 
-: ${NUM_HOSTS:=5}
+: ${NUM_HOSTS:=2}
 : ${AWSCLI:="aws"}
 : ${SSHCMD:="ssh -o StrictHostKeyChecking=no -o CheckHostIp=no
              -o UserKnownHostsFile=/dev/null -l ubuntu -i $SSH_KEY_FILE"}
@@ -149,7 +149,8 @@ function run_instances {
 function list_instances {
     $AWSCLI ec2 describe-instances                                      \
         --filters "Name=instance-state-name,Values=pending,running"     \
-                  "Name=tag:$INSTANCE_TAG,Values=true"
+                  "Name=tag:$INSTANCE_TAG,Values=true"                  \
+                  "Name=tag:Name,Values=$(vm_names| sed 's/ $//' | sed 's/ /,/g')"
 }
 
 function list_instances_by_id {
@@ -181,6 +182,7 @@ function wait_for_ami {
     echo "Done waiting"
 }
 
+# Function blocks until external ip becomes available.
 function wait_for_hosts {
     json="$1"
 
@@ -280,6 +282,10 @@ function create_sec_group {
     $AWSCLI ec2 authorize-security-group-ingress    \
         --group-name "$SEC_GROUP_NAME"              \
         --protocol tcp --port 2375                  \
+        --cidr "0.0.0.0/0"
+    $AWSCLI ec2 authorize-security-group-ingress    \
+        --group-name "$SEC_GROUP_NAME"              \
+        --protocol tcp --port 12375                  \
         --cidr "0.0.0.0/0"
 }
 
