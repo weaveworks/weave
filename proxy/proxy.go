@@ -558,7 +558,7 @@ func (proxy *Proxy) getDNSDomain() string {
 	if proxy.WithoutDNS {
 		return ""
 	}
-	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"))
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
 	domain, _ := weave.DNSDomain()
 	return domain
 }

@@ -51,7 +51,7 @@ func main() {
 		Log.Fatalf("unable to connect to docker: %s", err)
 	}
 
-	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"))
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
 
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 	Log.Info(dockerClient.Info())
