@@ -38,8 +38,8 @@ func (client *Client) ClaimIP(ID string, addr net.IP) error {
 	return err
 }
 
-// release an IP which is no longer needed
-func (client *Client) ReleaseIP(ID string) error {
+// release all IPs owned by an ID
+func (client *Client) ReleaseIPsFor(ID string) error {
 	_, err := client.ipamOp(ID, "DELETE")
 	return err
 }
