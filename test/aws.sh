@@ -1,13 +1,16 @@
 #!/bin/bash
 
-# TODO(mp) docs
-
-# Before the script can be executed, the following must be done:
-
-# * Create IAM user. TODO(mp) write about policies and friends.
+# The script is used to setup AWS EC2 machines for running integration tests.
+#
+# Before running the script, make sure that:
+# * An user within IAM is created (attached policies: "AmazonEC2FullAccess").
+# * AWS credentials of the user are set in CircleCI.
+#
+# Each machine is scheduled to terminate after 30mins (via `shutdown -h`). It
+# is needed because, at the time of writing, CircleCI does not support
+# a graceful teardown in a case of build cancelation.
 
 set -e
-#set -x
 
 : ${ZONE:="us-east-1a"}
 
@@ -17,6 +20,7 @@ set -e
 : ${INSTANCE_TYPE:="t2.micro"}
 : ${INSTANCE_TAG:="weavenet_ci"}
 : ${SEC_GROUP_NAME:="weavenet-ci"}
+: ${TERMINATE_AFTER_MIN:=30}
 
 : ${KEY_NAME:="weavenet_ci"}
 : ${SSH_KEY_FILE:="$HOME/.ssh/$KEY_NAME"}
@@ -33,6 +37,7 @@ fi
 
 # Creates and runs a set of VMs.
 # Each VM is named after "host${ID}${SUFFIX}" and is tagged with $INSTANCE_TAG.
+# NOTE: each VM will be automatically terminated after $TERMINATE_AFTER_MIN minutes.
 function setup {
     # Destroy previous machines (if any)
     destroy
@@ -54,6 +59,9 @@ function setup {
         $AWSCLI ec2 modify-instance-attribute               \
             --instance-id "$vm"                             \
             --no-source-dest-check
+        $AWSCLI ec2 modify-instance-attribute               \
+            --instance-id "$vm"                             \
+            --instance-initiated-shutdown-behavior terminate
         ((i++))
     done
 
@@ -69,6 +77,7 @@ function setup {
 		sudo sed -i "/$vm/d" /etc/hosts
 		sudo sh -c "echo \"$(external_ip $json $vm) $vm\" >>/etc/hosts"
 		try_connect $vm
+	    $SSHCMD $vm "nohup sudo shutdown -h +$TERMINATE_AFTER_MIN > /dev/null 2>&1 &"
 		copy_hosts $vm $hosts &
     done
 
@@ -325,7 +334,6 @@ function copy_hosts {
 
 function install_docker_on {
     # TODO(mp) bring back `-s overlay` opt to DOCKER_OPTS.
-    # TODO(mp) *maybe* use `vagrant` user instead of default `ubuntu`.
 
 	name=$1
 	$SSHCMD -t $name sudo bash -x -s <<EOF
