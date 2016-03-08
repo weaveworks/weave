@@ -1627,6 +1627,7 @@ launch_router() {
     # when launching the weave container.
     start_if_necessary router $CONTAINER_NAME $IMAGE \
         $(docker_run_options) \
+        --restart=always \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
@@ -1683,6 +1684,7 @@ launch_proxy() {
     fi
     start_if_necessary proxy $PROXY_CONTAINER_NAME $EXEC_IMAGE \
         $(docker_run_options) \
+        --restart=always \
         --pid=host \
         $PROXY_VOLUMES \
         --volumes-from $VOLUMES_CONTAINER_NAME \
