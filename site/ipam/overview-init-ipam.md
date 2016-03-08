@@ -60,7 +60,7 @@ through three states: 'deferred', 'waiting' and 'achieved':
   themselves successfully
 * 'achieved' - consensus achieved; allocations proceed normally
 
-Finally, you some peers can be launched as election observers using the
+Finally, some peers can be launched as election observers using the
 `--observer` option:
 
     host4$ weave launch --observer $HOST3

@@ -48,7 +48,7 @@ Weave hosts, regardless of where the actual application containers are located.
 Using the netcat service example described in 
 [Deploying Applications](/site/using-weave/deploying-applications.md), and expanding upon it, you now decide to add a third containerized netcat service. This additional netcat service runs on `$HOST3`, and listens on port 2211, but it is not on the Weave network. 
 
-An additional caveat is that `$HOST3` can only be reached from `$HOST1`, which is not accessible via `$HOST2`. Nonetheless, you still need to make a `$HOST3` service available to an application that is running in a container on `$HOST2`.
+An additional caveat is that `$HOST3` can only be reached from `$HOST1`, which is not accessible via `$HOST2`. Nonetheless, you still need to make the `$HOST3` service available to an application that is running in a container on `$HOST2`.
 
 To satisfy this scenario, first expose the [application network to the host](/site/using-weave/host-network-integration.md) by running the following on `$HOST1`: 
 

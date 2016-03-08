@@ -14,8 +14,8 @@ if Weave Net is run again on that node it will start from scratch.
 
 For failed peers, the `weave rmpeer` command can be used to
 permanently remove the ranges allocated to said peer.  This allows
-other peers to allocate IPs in the ranges previously owned by the removed peer
-peer, and as such should be used with extreme caution - if the removed
+other peers to allocate IPs in the ranges previously owned by the removed peer, 
+and as such should be used with extreme caution - if the removed
 peer had transferred some range of IP addresses to another peer but
 this is not known to the whole network, or if it later rejoins
 the Weave network, the same IP address may be allocated twice.
