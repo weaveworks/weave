@@ -64,3 +64,6 @@
 [submodule "vendor/github.com/hashicorp/go-cleanhttp"]
 	path = vendor/github.com/hashicorp/go-cleanhttp
 	url = http://github.com/hashicorp/go-cleanhttp
+[submodule "vendor/github.com/appc/cni"]
+	path = vendor/github.com/appc/cni
+	url = https://github.com/appc/cni

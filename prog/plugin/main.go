@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	cni "github.com/appc/cni/pkg/skel"
 	"github.com/docker/libnetwork/ipamapi"
 	weaveapi "github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
@@ -45,13 +46,19 @@ func main() {
 
 	SetLogLevel(logLevel)
 
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
+
+	if os.Args[0] == "weave-ipam" {
+		i := ipamplugin.NewIpam(weave)
+		cni.PluginMain(i.CmdAdd, i.CmdDel)
+		os.Exit(0)
+	}
+
 	// API 1.21 is the first version that supports docker network commands
 	dockerClient, err := docker.NewVersionedClientFromEnv("1.21")
 	if err != nil {
 		Log.Fatalf("unable to connect to docker: %s", err)
 	}
-
-	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
 
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 	Log.Info(dockerClient.Info())
