@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	cni "github.com/appc/cni/pkg/skel"
@@ -48,9 +49,14 @@ func main() {
 
 	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
 
-	if os.Args[0] == "weave-ipam" {
+	switch {
+	case strings.HasSuffix(os.Args[0], "weave-ipam"):
 		i := ipamplugin.NewIpam(weave)
 		cni.PluginMain(i.CmdAdd, i.CmdDel)
+		os.Exit(0)
+	case strings.HasSuffix(os.Args[0], "weave"):
+		n := netplugin.NewCNIPlugin(weave)
+		cni.PluginMain(n.CmdAdd, n.CmdDel)
 		os.Exit(0)
 	}
 
