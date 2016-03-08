@@ -5,13 +5,13 @@ layout: default
 
 Services running in containers on a Weave network can be made
 accessible to the outside world (and, more generally, to other networks)
-from any Weave host, irrespective of where the service containers are
+from any Weave Net host, irrespective of where the service containers are
 located.
 
 Returning to the netcat example service, described in [Deploying Applications]( /site/using-weave/deploying-applications.md), 
 you can expose the netcat service running on `HOST1` and make it accessible to the outside world via `$HOST2`. 
 
-First, expose the application network to `$HOST2`, as explained in [Integrating a Host Network with a Weave](/site/using-weave/host-network-integration.md):
+First, expose the application network to `$HOST2`, as explained in [Integrating a Host Network with a Weave Net](/site/using-weave/host-network-integration.md):
 
     host2$ weave expose
     10.2.1.132
@@ -36,4 +36,4 @@ Similar NAT rules to the above can be used to expose services not just to the ou
 **See Also**
 
  * [Using Weave Net](/site/using-weave/intro-example.md)
- * [Managing Services in Weave: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
+ * [Managing Services in Weave Net: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)

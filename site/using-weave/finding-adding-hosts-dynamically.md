@@ -5,24 +5,24 @@ layout: default
 
 
 To add a host to an existing Weave network, simply launch 
-Weave on the host, and then supply the address of at least 
-one host. Weave automatically discovers any other hosts in 
-the network and  establishes connections with them if it 
+Weave Net on the host, and then supply the address of at least 
+one host. Weave Net automatically discovers any other hosts in 
+the network and establishes connections with them if it 
 can (in order to avoid unnecessary multi-hop routing).
 
-In some situations all existing Weave hosts may be 
+In some situations all existing Weave Net hosts may be 
 unreachable from the new host due to firewalls, etc. 
 However, it is still possible to add the new host, 
 provided that inverse connections, for example, 
 from existing hosts to the new hosts, are available. 
 
-To accomplish this, launch Weave onto the new host 
+To accomplish this, launch Weave Net onto the new host 
 without supplying any additional addresses.  And then, from one 
 of the existing hosts run:
 
     host# weave connect $NEW_HOST
 
-Other hosts in the Weave network will automatically attempt
+Other hosts on the Weave network will automatically attempt
 to establish connections to the new host as well. 
 
 Alternatively, you can also instruct a peer to forget a 
@@ -45,7 +45,7 @@ For complete control over the peer topology, automatic
 discovery can be disabled using the `--no-discovery` 
 option with `weave launch`. 
 
-If discovery if disabled, Weave only connects to the 
+If discovery if disabled, Weave Net only connects to the 
 addresses specified at launch time and with `weave connect`.
 
 A list of all hosts that a peer has been asked to connect 

@@ -1,5 +1,5 @@
 ---
-title: Using Automatic Discovery With the Weave Proxy
+title: Using Automatic Discovery With the Weave Net Proxy
 layout: default
 ---
 
@@ -35,8 +35,7 @@ For example, you can launch the proxy using all three flags, as follows:
 (for example, `$1`). For further details on the regular expression syntax see
 [Google's re2 documentation](https://github.com/google/re2/wiki/Syntax).
 
-After launching the Weave proxy with these flags, running a container named `aws-12798186823-foo` without labels results in
-weavedns registering the hostname `my-app-foo` and not `aws-12798186823-foo`.
+After launching the Weave Net proxy with these flags, running a container named `aws-12798186823-foo` without labels results in weavedns registering the hostname `my-app-foo` and not `aws-12798186823-foo`.
 
     host1$ docker run -ti --name=aws-12798186823-foo ubuntu ping my-app-foo
     PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.

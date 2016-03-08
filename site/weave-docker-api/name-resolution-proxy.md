@@ -4,19 +4,19 @@ layout: default
 ---
 
 
-When starting Weave-enabled containers, the proxy automatically
+When starting Weave Net enabled containers, the proxy automatically
 replaces the container's `/etc/hosts` file, and disables Docker's control
 over it. The new file contains an entry for the container's hostname
-and Weave IP address, as well as additional entries that have been
+and Weave Net IP address, as well as additional entries that have been
 specified using the `--add-host` parameters. 
 
 This ensures that:
 
 - name resolution of the container's hostname, for example, via `hostname -i`,
-returns the Weave IP address. This is required for many cluster-aware
+returns the Weave Net IP address. This is required for many cluster-aware
 applications to work.
 - unqualified names get resolved via DNS, for example typically via weavedns
-to Weave IP addresses. This is required so that in a typical setup
+to Weave Net IP addresses. This is required so that in a typical setup
 one can simply "ping <container-name>", i.e. without having to
 specify a `.weave.local` suffix.
 

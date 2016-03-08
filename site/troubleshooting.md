@@ -1,9 +1,8 @@
 ---
-title: Troubleshooting Weave
+title: Troubleshooting Weave Net
 layout: default
 ---
 
-# Troubleshooting Weave
 
  * [Basic Diagnostics](#diagnostics)
  * [Status Reporting](#weave-status)
@@ -18,7 +17,7 @@ layout: default
 
 ## <a name="diagnostics"></a>Basic Diagnostics
 
-Check the version of Weave you are running using:
+Check the version of Weave Net you are running using:
 
     weave version
 
@@ -27,7 +26,7 @@ If it is not the latest version, as shown in the list of
 recommended you upgrade using the
 [installation instructions](https://github.com/weaveworks/weave#installation).
 
-To check the Weave container logs:
+To check the Weave Net container logs:
 
     docker logs weave
 
@@ -82,7 +81,7 @@ $ weave status
 The terms used here are explained further at
 [How Weave Net Works](/site/router-topology/overview.md).
 
-  * **Version** - shows the Weave version.
+  * **Version** - shows the Weave Net version.
 
   * **Protocol**- indicates the Weave Router inter-peer
 communication protocol name and supported versions (min..max).
@@ -120,14 +119,14 @@ available with [`weave status peers`](#weave-status-peers).
 
 ### <a name="weave-status-connections"></a>List Connections
 
-Connections between Weave peers carry control traffic over TCP and
+Connections between Weave Net peers carry control traffic over TCP and
 data traffic over UDP. For a connection to be fully established, the
 TCP connection and UDP datapath must be able to transmit information
-in both directions. Weave routers check this regularly with
+in both directions. Weave Net routers check this regularly with
 heartbeats. Failed connections are automatically retried, with an
 exponential back-off.
 
-Detailed information on the local Weave router's connections can be
+Detailed information on the local Weave Net router's connections can be
 obtained using `weave status connections`:
 
 ````
@@ -219,7 +218,7 @@ inspect`:
     $ weave report -f {% raw %}'{{.DNS.Domain}}'{% endraw %}
     weave.local.
 
-Weave adds a template function, `json`, which can be applied to get
+Weave Net adds a template function, `json`, which can be applied to get
 results in JSON format.
 
     $ weave report -f {% raw %}'{{json .DNS}}'{% endraw %}
@@ -251,11 +250,11 @@ You can also supply a list of container IDs/names to `weave ps`, like this:
     able ce:15:34:a9:b5:6d 10.2.5.1/24
     baker 7a:61:a2:49:4b:91 10.2.8.3/24
 
-## <a name="stop"></a>Stopping Weave
+## <a name="stop"></a>Stopping Weave Net
 
-To stop Weave, if you have configured your environment to use the
+To stop Weave Net, if you have configured your environment to use the
 Weave Docker API Proxy, e.g. by running `eval $(weave env)` in your
-shell, you must first restore the environment with
+shell, you must first restore the environment using:
 
     eval $(weave env --restore)
 
@@ -268,8 +267,8 @@ Containers on the local host can continue to communicate, whereas
 communication with containers on different hosts, as well as service
 export/import, is disrupted but resumes once Weave is relaunched.
 
-To stop Weave and to completely remove all traces of the Weave network on
-the local host, run
+To stop Weave Net and to completely remove all traces of the Weave network on
+the local host, run:
 
     weave reset
 
@@ -289,7 +288,7 @@ Weave and run application containers from
 If you are shutting down or restarting a host deliberately, run `weave
 reset` to clear everything down.
 
-The Weave Docker plugin does restart automatically because it must
+The Weave Net Docker plugin does restart automatically because it must
 always start with Docker, as described in
 [its documentation](/site/weave-docker-api/using-proxy.md).
 

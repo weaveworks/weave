@@ -1,16 +1,16 @@
 ---
-title: How the Weave Docker Network Plugin Works
+title: How the Weave Net Docker Network Plugin Works
 layout: default
 ---
 
 
-The Weave plugin actually provides *two* network drivers to Docker - one named `weavemesh` that can operate without a cluster store and another one named `weave` that can only work with one (like Docker's overlay driver).
+The Weave Net plugin actually provides *two* network drivers to Docker - one named `weavemesh` that can operate without a cluster store and another one named `weave` that can only work with one (like Docker's overlay driver).
 
 ### `weavemesh` driver
 
-* Weave handles all co-ordination between hosts (referred to by Docker as a "local scope" driver)
+* Weave Net handles all co-ordination between hosts (referred to by Docker as a "local scope" driver)
 * Supports a single network only. A network named `weave` is automatically created for you.
-* Uses Weave's partition tolerant IPAM
+* Uses Weave Net's partition tolerant IPAM
 
 If you do create additional networks using the `weavemesh` driver, containers attached to them will be able to communicate with containers attached to `weave`. There is no isolation between those networks.
 

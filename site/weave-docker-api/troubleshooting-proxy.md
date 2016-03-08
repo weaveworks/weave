@@ -7,7 +7,7 @@ The command
 
     weave status
 
-reports on the current status of various weave components, including
+reports on the current status of various Weave Net components, including
 the proxy, if it is running:
 
 ````

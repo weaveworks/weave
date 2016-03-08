@@ -12,7 +12,7 @@ The command:
 
     weave status
 
-reports on the current status of various Weave components, including
+reports on the current status of various Weave Net components, including
 DNS:
 
 ````

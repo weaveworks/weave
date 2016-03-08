@@ -1,5 +1,5 @@
 ---
-title: Setting Up The Weave Docker API Proxy
+title: Setting Up The Weave Net Docker API Proxy
 layout: default
 ---
 
@@ -11,7 +11,7 @@ or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/),
 instead of `weave run`.
 
  
-###Setting Up The Weave Docker API Proxy
+###Setting Up The Weave Net Docker API Proxy
 
 The proxy sits between the Docker client (command line or API) and the
 Docker daemon, and intercepts the communication between the two. You can
@@ -44,7 +44,7 @@ remote docker daemon, then any firewalls inbetween need to be
 configured to permit access to the proxy port.
 
 All docker commands can be run via the proxy, so it is safe to adjust
-your `DOCKER_HOST` to point at the proxy. Weave provides a convenient
+your `DOCKER_HOST` to point at the proxy. Weave Net provides a convenient
 command for this:
 
     host1$ eval $(weave env)

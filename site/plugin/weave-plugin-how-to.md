@@ -5,16 +5,16 @@ layout: default
 
 
 Docker versions 1.9 and later have a plugin mechanism for adding
-different network providers. Weave installs itself as a network plugin
+different network providers. Weave Net installs itself as a network plugin
 when you start it with `weave launch`. The Weave Docker Networking plugin is fast and easy to use and 
 best of all doesn't require an external cluster store in order to use it.  
 
-To create a network which can span multiple Docker hosts, the Weave peers must be connected to each other, by specifying the other hosts during `weave launch` or via
+To create a network which can span multiple Docker hosts, Weave Net peers must be connected to each other, by specifying the other hosts during `weave launch` or via
 [`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md).
 
 See [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md#peer-connections) for a discussion on peer connections. 
 
-After you've launched Weave and peered your hosts,  you can start containers using the following, for example:
+After you've launched Weave Net and peered your hosts,  you can start containers using the following, for example:
 
     $ docker run --net=weave -ti ubuntu
 
@@ -22,7 +22,7 @@ on any of the hosts, and they can all communicate with each other.
 
 >>**Warning!** It is inadvisable to attach containers to the Weave network using the Weave Docker Networking Plugin and Weave Docker API Proxy simultaneously. Such containers will end up with two Weave network interfaces and two IP addresses, which is rarely desirable. To ensure that the proxy is not being used, do not run eval $(weave env), or docker $(weave config).
 
-In order to use Weave's [Service Discovery](/site/weavedns/overview-using-weavedns.md) you
+In order to use Weave Net's [Service Discovery](/site/weavedns/overview-using-weavedns.md) you
 must pass the additional arguments `--dns` and `-dns-search`, for
 which a helper is provided in the Weave script:
 
@@ -32,7 +32,7 @@ which a helper is provided in the Weave script:
 
 
 
-###Launching Weave and Running Containers Using the Plugin
+###Launching Weave Net and Running Containers Using the Plugin
 
 Just launch the Weave Net router onto each host and make a peer connection with the other hosts:
 

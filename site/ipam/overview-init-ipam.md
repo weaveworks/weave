@@ -4,11 +4,11 @@ layout: default
 ---
 
 
-Weave automatically assigns containers a unique IP address
+Weave Net automatically assigns containers a unique IP address
 across the network, and also releases that address when the container
 exits. Unless you explicitly specify an address, this occurs for all 
 invocations of the `run`, `start`,
-`attach`, `detach`, `expose`, and `hide` commands. Weave can also assign
+`attach`, `detach`, `expose`, and `hide` commands. Weave Net can also assign
 addresses in multiple subnets.
 
 The following automatic IP address managment topics are discussed: 
@@ -23,8 +23,8 @@ The following automatic IP address managment topics are discussed:
 ### <a name="initialization"></a>Initializing Peers on a Weave Network
 
 Just once, when the first automatic IP address allocation is requested
-in the whole network, Weave needs a majority of peers to be present in
-order to avoid formation of isolated groups, which could lead to
+in the whole network, Weave Net needs a majority of peers to be present in
+order to avoid formation of isolated groups, which can lead to
 inconsistency, for example, the same IP address being allocated to two
 different containers. 
 
@@ -32,7 +32,7 @@ Therefore, you must either supply the list of all peers in the network at `weave
 `--init-peer-count` flag to specify how many peers there will be.
 
 To illustrate, suppose you have three hosts, accessible to each other
-as `$HOST1`, `$HOST2` and `$HOST3`. You can start weave on those three
+as `$HOST1`, `$HOST2` and `$HOST3`. You can start Weave Net on those three
 hosts using these three commands:
 
     host1$ weave launch $HOST2 $HOST3
@@ -61,7 +61,7 @@ through three states: 'deferred', 'waiting' and 'achieved':
   themselves successfully
 * 'achieved' - consensus achieved; allocations proceed normally
 
-Finally, you may launch some peers as election observers using the
+Finally, some peers can be launched as election observers using the
 `--observer` option:
 
     host4$ weave launch --observer $HOST3
@@ -77,7 +77,7 @@ initial peer counts accordingly.
 Normally it isn't a problem to over-estimate `--init-peer-count`, but if you supply
 a number that is too small, then multiple independent groups may form.
 
-Weave uses the estimate of the number of peers at initialization to
+Weave Net uses the estimate of the number of peers at initialization to
 compute a majority or quorum number - specifically floor(n/2) + 1. 
 
 If the actual number of peers is less than half the number stated, then
@@ -101,7 +101,7 @@ that was correct when they first started, then they could form an
 independent set again.
 
 To illustrate this last point, the following sequence of operations
-is safe with respect to Weave's startup quorum:
+is safe with respect to Weave Net's startup quorum:
 
     host1$ weave launch
     ...time passes...
@@ -127,8 +127,8 @@ successfully.
 
 ### <a name="range"></a>Choosing an Allocation Range
 
-By default, Weave allocates IP addresses in the 10.32.0.0/12
-range. This can be overridden with the `--ipalloc-range` option, e.g.
+By default, Weave Net allocates IP addresses in the 10.32.0.0/12
+range. This can be overridden with the `--ipalloc-range` option:
 
     host1$ weave launch --ipalloc-range 10.2.0.0/16
 

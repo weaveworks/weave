@@ -14,7 +14,7 @@ To do this, you need to configure Weave's IP allocator to manage multiple subnet
     host2$ eval $(weave env)
 ~~~
 
-This delegates the entire 10.2.0.0/16 subnet to Weave, and instructs it to allocate from 10.2.1.0/24 within that if no specific subnet is specified. 
+This delegates the entire 10.2.0.0/16 subnet to Weave Net, and instructs it to allocate from 10.2.1.0/24 within that if no specific subnet is specified. 
 
 Now you can launch two containers onto the default subnet:
 
