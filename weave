@@ -111,8 +111,14 @@ docker_sock_options() {
     fi
 }
 
+docker_run_options() {
+    echo --privileged --net=host $(docker_sock_options)
+}
+
 exec_remote() {
-    docker $DOCKER_CLIENT_ARGS run --rm --privileged --net=host --pid=host $(docker_sock_options) \
+    docker $DOCKER_CLIENT_ARGS run --rm \
+        $(docker_run_options) \
+        --pid=host \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
         -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
@@ -1620,7 +1626,7 @@ launch_router() {
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
     start_if_necessary router $CONTAINER_NAME $IMAGE \
-        --privileged --net=host $(docker_sock_options) \
+        $(docker_run_options) \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
@@ -1676,7 +1682,8 @@ launch_proxy() {
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
     start_if_necessary proxy $PROXY_CONTAINER_NAME $EXEC_IMAGE \
-        --privileged --net=host --pid=host $(docker_sock_options) \
+        $(docker_run_options) \
+        --pid=host \
         $PROXY_VOLUMES \
         --volumes-from $VOLUMES_CONTAINER_NAME \
         -v /var/run/weave:/var/run/weave \
@@ -1697,7 +1704,7 @@ stop_proxy() {
 
 launch_plugin_if_not_running() {
     start_if_necessary plugin $PLUGIN_CONTAINER_NAME $PLUGIN_IMAGE \
-        --privileged --net=host $(docker_sock_options) \
+        $(docker_run_options) \
         --restart=always \
         -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_HTTP_ADDR \
