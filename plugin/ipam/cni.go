@@ -10,10 +10,18 @@ import (
 )
 
 func (i *Ipam) CmdAdd(args *skel.CmdArgs) error {
+	result, err := i.Allocate(args)
+	if err != nil {
+		return err
+	}
+	return result.Print()
+}
+
+func (i *Ipam) Allocate(args *skel.CmdArgs) (*types.Result, error) {
 	// extract the things we care about
 	conf, err := loadIPAMConf(args.StdinData)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if conf == nil {
 		conf = &ipamConf{}
@@ -27,25 +35,29 @@ func (i *Ipam) CmdAdd(args *skel.CmdArgs) error {
 		var subnet *net.IPNet
 		subnet, err = types.ParseCIDR(conf.Subnet)
 		if err != nil {
-			return fmt.Errorf("subnet given in config, but not parseable: %s", err)
+			return nil, fmt.Errorf("subnet given in config, but not parseable: %s", err)
 		}
 		ipnet, err = i.weave.AllocateIPInSubnet(containerID, subnet)
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
-	result := types.Result{
+	result := &types.Result{
 		IP4: &types.IPConfig{
 			IP:      *ipnet,
 			Gateway: conf.Gateway,
 			Routes:  conf.Routes,
 		},
 	}
-	return result.Print()
+	return result, nil
 }
 
 func (i *Ipam) CmdDel(args *skel.CmdArgs) error {
+	return i.Release(args)
+}
+
+func (i *Ipam) Release(args *skel.CmdArgs) error {
 	return i.weave.ReleaseIPsFor(args.ContainerID)
 }
 
