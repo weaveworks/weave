@@ -957,7 +957,7 @@ start_if_necessary() {
     image=$3
     shift 3
     image_base=${image%:*}
-    IMAGE_ID=$(docker inspect --format='{{.Id}}' $image)
+    IMAGE_ID=$(docker inspect --format='{{.Id}}' $image 2>/dev/null) || true
     RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.Image}} {{.Config.Image}} {{.Id}}' $name 2>/dev/null) || true
     CONTAINER_ID=${RUN_STATUS##* }
     case ${RUN_STATUS%:*} in
