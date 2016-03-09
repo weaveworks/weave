@@ -458,6 +458,14 @@ mac_from_hex() {
     read a b c d e f && printf "%02x:$b:$c:$d:$e:$f" $((0x$a & ~1 | 2))
 }
 
+mac_from_file() {
+    UUID=$(cat $1 2>/dev/null) || return 1
+    # We salt the input just as a precaution to avoid clashes with
+    # other applications who might have had the bright idea of
+    # generating MACs in the same way.
+    echo "9oBJ0Jmip-$UUID" | sha256sum | sed 's/\(..\)/\1 /g' | cut -c1-17 | mac_from_hex
+}
+
 # Generate a random MAC value
 random_mac() {
     od -txC -An -N6 /dev/urandom | mac_from_hex
@@ -627,21 +635,17 @@ init_bridge() {
 
     ip link add name $BRIDGE type bridge
 
-    # Derive the bridge MAC from the system (aka bios) UUID, if
-    # present. Elsewhere we in turn derive the peer name from that,
-    # which we want to be stable across reboots but otherwise
-    # unique. The system UUID fits that bill, unlike, say,
-    # /etc/machine-id, which is often identical on VMs created from
-    # cloned filesystems. If we cannot determine the system UUID we
-    # just generate a random MAC.
-    if SYSTEM_UUID=$(cat /sys/class/dmi/id/product_uuid 2>/dev/null) ; then
-        # We salt the input just as a precaution to avoid clashes with
-        # other applications who might have had the bright idea of
-        # generating MACs in the same way.
-        MAC=$(echo "9oBJ0Jmip-$SYSTEM_UUID" | sha256sum | sed 's/\(..\)/\1 /g' | cut -c1-17 | mac_from_hex)
-    else
+    # Derive the bridge MAC from the system (aka bios) UUID, or,
+    # failing that, the hypervisor UUID. Elsewhere we in turn derive
+    # the peer name from that, which we want to be stable across
+    # reboots but otherwise unique. The system/hypervisor UUID fits
+    # that bill, unlike, say, /etc/machine-id, which is often
+    # identical on VMs created from cloned filesystems. If we cannot
+    # determine the system/hypervisor UUID we just generate a random MAC.
+    MAC=$(mac_from_file /sys/class/dmi/id/product_uuid) || \
+        MAC=$(mac_from_file /sys/hypervisor/uuid) || \
         MAC=$(random_mac)
-    fi
+
     ip link set dev $BRIDGE address $MAC
 
     # Attempting to set the bridge MTU to a high value directly
