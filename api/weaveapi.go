@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 const (
@@ -19,11 +17,12 @@ const (
 
 type Client struct {
 	baseURL string
+	log     Logger
 }
 
 func (client *Client) httpVerb(verb string, url string, values url.Values) (string, error) {
 	url = client.baseURL + url
-	Log.Debugf("weave %s to %s with %v", verb, url, values)
+	client.log.Debugf("weave %s to %s with %v", verb, url, values)
 	var body io.Reader
 	if values != nil {
 		body = strings.NewReader(values.Encode())
@@ -50,7 +49,7 @@ func (client *Client) httpVerb(verb string, url string, values url.Values) (stri
 	return "", errors.New(resp.Status + ": " + string(rbody))
 }
 
-func NewClient(addr string) *Client {
+func NewClient(addr string, log Logger) *Client {
 	host := WeaveHTTPHost
 	port := fmt.Sprintf("%d", WeaveHTTPPort)
 	switch parts := strings.Split(addr, ":"); len(parts) {
@@ -67,12 +66,17 @@ func NewClient(addr string) *Client {
 			port = parts[1]
 		}
 	default:
-		return &Client{baseURL: fmt.Sprintf("http://%s", addr)}
+		return &Client{baseURL: fmt.Sprintf("http://%s", addr), log: log}
 	}
-	return &Client{baseURL: fmt.Sprintf("http://%s:%s", host, port)}
+	return &Client{baseURL: fmt.Sprintf("http://%s:%s", host, port), log: log}
 }
 
 func (client *Client) Connect(remote string) error {
 	_, err := client.httpVerb("POST", "/connect", url.Values{"peer": {remote}})
 	return err
+}
+
+type Logger interface {
+	Infof(string, ...interface{})
+	Debugf(string, ...interface{})
 }
