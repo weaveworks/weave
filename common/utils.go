@@ -39,7 +39,7 @@ func WithNetNS(ns netns.NsHandle, work func() error) error {
 		}
 	}
 
-	return nil
+	return err
 }
 
 type NetDev struct {
