@@ -40,7 +40,7 @@ func (client *Client) ClaimIP(ID string, cidr *net.IPNet) error {
 
 // release all IPs owned by an ID
 func (client *Client) ReleaseIPsFor(ID string) error {
-	_, err := client.ipamOp(ID, "DELETE")
+	_, err := client.httpVerb("DELETE", fmt.Sprintf("/ip/%s", ID), nil)
 	return err
 }
 
