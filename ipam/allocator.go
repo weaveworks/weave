@@ -469,7 +469,7 @@ func (alloc *Allocator) OnGossipBroadcast(sender mesh.PeerName, msg []byte) (mes
 
 type gossipState struct {
 	// We send a timstamp along with the information to be
-	// gossipped in order to detect skewed clocks
+	// gossipped for backwards-compatibility (previously to detect skewed clocks)
 	Now       int64
 	Nicknames map[mesh.PeerName]string
 
@@ -671,11 +671,6 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 
 	if err := decoder.Decode(&data); err != nil {
 		return err
-	}
-
-	deltat := time.Unix(data.Now, 0).Sub(alloc.now())
-	if deltat > time.Hour || -deltat > time.Hour {
-		return fmt.Errorf("clock skew of %v detected, ignoring update", deltat)
 	}
 
 	// Merge nicknames

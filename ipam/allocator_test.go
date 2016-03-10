@@ -577,18 +577,6 @@ func TestAllocatorFuzz(t *testing.T) {
 	})
 }
 
-func TestGossipSkew(t *testing.T) {
-	alloc1, _ := makeAllocatorWithMockGossip(t, "01:00:00:01:00:00", "10.0.1.0/22", 2)
-	defer alloc1.Stop()
-	alloc2, _ := makeAllocatorWithMockGossip(t, "02:00:00:02:00:00", "10.0.1.0/22", 2)
-	alloc2.now = func() time.Time { return time.Now().Add(time.Hour * 2) }
-	defer alloc2.Stop()
-
-	if _, err := alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode()); err == nil {
-		t.Fail()
-	}
-}
-
 func TestSpaceRequest(t *testing.T) {
 	const (
 		container1 = "cont-1"
