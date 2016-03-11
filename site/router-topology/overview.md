@@ -43,7 +43,7 @@ changing topology. For example, in this network, peer 1 is connected
 directly to 2 and 3, but if 1 needs to send a packet to 4 or 5 it must
 first send it to peer 3:
 
-![A Partially Connected Weave Network](images/top-diag1.png "Partially connected Weave Network")
+![A Partially Connected Weave Network](/site/images/top-diag1.png "Partially connected Weave Network")
 
 **See Also**
 
