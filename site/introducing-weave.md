@@ -36,7 +36,7 @@ Weave Net can forward traffic between nodes, and it works even if the mesh netwo
 
 Weave Net automatically chooses the fastest path between two hosts, offering near native throughput and latency, all without your intervention.  
 
-See [How Fast Datapath Works](site/fastdp/using-fastdp.md) for more information.
+See [How Fast Datapath Works](/site/fastdp/using-fastdp.md) for more information.
 
 ###Network Operations Friendly
 
