@@ -10,6 +10,7 @@ Net:
  * [Fast Data Path](#fast-data-path)
  * [Seamless Docker Integration](#docker)
  * [Docker Network Plugin](#plugin)
+ * [CNI Plugin](#cniplugin)
  * [Address Allocation (IPAM)](#addressing)
  * [Naming and Discovery](#naming-and-discovery)
  * [Application Isolation](#application-isolation)
@@ -98,6 +99,13 @@ when there are network connectivity problems.
 *not* need to run `eval $(weave env)` beforehand.
 
 See [Using the Weave Docker Network Plugin](/site/plugin/weave-plugin-how-to.md) for more details.
+
+
+###<a name="cniplugin"></a>Weave Network CNI Plugin
+
+Weave can be used as a plugin to systems that support the [Container Network Interface](https://github.com/appc/cni), such as Kubernetes.
+
+See [Using the Weave CNI Plugin](/site/plugin/cni-plugin-how-to.md) for more details.
 
 
 ###<a name="addressing"></a>IP Address Management (IPAM)
