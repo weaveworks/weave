@@ -48,7 +48,7 @@ type NetDev struct {
 }
 
 // Search the network namespace of a process for interfaces matching a predicate
-func FindNetDevs(processID int, match func(string) bool) ([]NetDev, error) {
+func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, error) {
 	var netDevs []NetDev
 
 	ns, err := netns.GetFromPid(processID)
@@ -58,40 +58,57 @@ func FindNetDevs(processID int, match func(string) bool) ([]NetDev, error) {
 	defer ns.Close()
 
 	err = WithNetNS(ns, func() error {
-		links, err := netlink.LinkList()
-		if err != nil {
-			return err
-		}
-		for _, link := range links {
-			if match(link.Attrs().Name) {
-				addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+		return forEachLink(func(link netlink.Link) error {
+			if match(link) {
+				netDev, err := linkToNetDev(link)
 				if err != nil {
 					return err
 				}
-
-				netDev := NetDev{MAC: link.Attrs().HardwareAddr}
-				for _, addr := range addrs {
-					netDev.CIDRs = append(netDev.CIDRs, addr.IPNet)
-				}
-				netDevs = append(netDevs, netDev)
+				netDevs = append(netDevs, *netDev)
 			}
-		}
-		return nil
+			return nil
+		})
 	})
 
 	return netDevs, err
 }
 
+func forEachLink(f func(netlink.Link) error) error {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return err
+	}
+	for _, link := range links {
+		if err := f(link); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func linkToNetDev(link netlink.Link) (*NetDev, error) {
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, err
+	}
+
+	netDev := &NetDev{MAC: link.Attrs().HardwareAddr}
+	for _, addr := range addrs {
+		netDev.CIDRs = append(netDev.CIDRs, addr.IPNet)
+	}
+	return netDev, nil
+}
+
 // Lookup the weave interface of a container
 func GetWeaveNetDevs(processID int) ([]NetDev, error) {
-	return FindNetDevs(processID, func(name string) bool {
-		return strings.HasPrefix(name, "ethwe")
+	return FindNetDevs(processID, func(link netlink.Link) bool {
+		return strings.HasPrefix(link.Attrs().Name, "ethwe")
 	})
 }
 
 // Get the weave bridge interface
 func GetBridgeNetDev(bridgeName string) ([]NetDev, error) {
-	return FindNetDevs(1, func(name string) bool {
-		return name == bridgeName
+	return FindNetDevs(1, func(link netlink.Link) bool {
+		return link.Attrs().Name == bridgeName
 	})
 }
