@@ -66,17 +66,27 @@ type Allocator struct {
 	now               func() time.Time
 }
 
+type Config struct {
+	OurName     mesh.PeerName
+	OurUID      mesh.PeerUID
+	OurNickname string
+	Universe    address.Range
+	Quorum      uint
+	Db          db.DB
+	IsKnownPeer func(name mesh.PeerName) bool
+}
+
 // NewAllocator creates and initialises a new Allocator
-func NewAllocator(ourName mesh.PeerName, ourUID mesh.PeerUID, ourNickname string, universe address.Range, quorum uint, db db.DB, isKnownPeer func(name mesh.PeerName) bool) *Allocator {
+func NewAllocator(config Config) *Allocator {
 	return &Allocator{
-		ourName:     ourName,
-		universe:    universe,
-		ring:        ring.New(universe.Start, universe.End, ourName),
+		ourName:     config.OurName,
+		universe:    config.Universe,
+		ring:        ring.New(config.Universe.Start, config.Universe.End, config.OurName),
 		owned:       make(map[string][]address.CIDR),
-		db:          db,
-		paxos:       paxos.NewParticipant(ourName, ourUID, quorum),
-		nicknames:   map[mesh.PeerName]string{ourName: ourNickname},
-		isKnownPeer: isKnownPeer,
+		db:          config.Db,
+		paxos:       paxos.NewParticipant(config.OurName, config.OurUID, config.Quorum),
+		nicknames:   map[mesh.PeerName]string{config.OurName: config.OurNickname},
+		isKnownPeer: config.IsKnownPeer,
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
 	}

@@ -139,8 +139,10 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 		panic(err)
 	}
 
-	alloc := NewAllocator(peername, mesh.PeerUID(rand.Int63()),
-		"nick-"+name, cidr.Range(), quorum, new(mockDB), func(mesh.PeerName) bool { return true })
+	config := Config{peername, mesh.PeerUID(rand.Int63()),
+		"nick-" + name, cidr.Range(), quorum, new(mockDB), func(mesh.PeerName) bool { return true }}
+
+	alloc := NewAllocator(config)
 
 	return alloc, cidr
 }
