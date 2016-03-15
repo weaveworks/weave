@@ -26,6 +26,7 @@ var version = "(unreleased version)"
 func main() {
 	var (
 		justVersion      bool
+		cniNet, cniIpam  bool
 		address          string
 		meshAddress      string
 		logLevel         string
@@ -33,6 +34,8 @@ func main() {
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
+	flag.BoolVar(&cniNet, "cni-net", false, "act as a CNI network plugin")
+	flag.BoolVar(&cniIpam, "cni-ipam", false, "act as a CNI IPAM plugin")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	flag.StringVar(&address, "socket", "/run/docker/plugins/weave.sock", "socket on which to listen")
 	flag.StringVar(&meshAddress, "meshsocket", "/run/docker/plugins/weavemesh.sock", "socket on which to listen in mesh mode")
@@ -50,11 +53,11 @@ func main() {
 	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
 
 	switch {
-	case strings.HasSuffix(os.Args[0], "weave-ipam"):
+	case cniIpam || strings.HasSuffix(os.Args[0], "weave-ipam"):
 		i := ipamplugin.NewIpam(weave)
 		cni.PluginMain(i.CmdAdd, i.CmdDel)
 		os.Exit(0)
-	case strings.HasSuffix(os.Args[0], "weave"):
+	case cniNet || strings.HasSuffix(os.Args[0], "weave-net"):
 		n := netplugin.NewCNIPlugin(weave)
 		cni.PluginMain(n.CmdAdd, n.CmdDel)
 		os.Exit(0)
