@@ -135,6 +135,9 @@ func setupGuestIP4(origName, name string, ipnet net.IPNet, gw net.IP, routes []t
 	if err = netlink.LinkSetUp(guest); err != nil {
 		return err
 	}
+	if err = common.ConfigureARPCache(name); err != nil {
+		return err
+	}
 	if routes == nil { // If config says nothing about routes, add a default one
 		if !ipnet.Contains(gw) {
 			// The bridge IP is not on the same subnet; add a specific route to it
