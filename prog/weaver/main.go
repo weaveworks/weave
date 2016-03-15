@@ -368,11 +368,14 @@ func createAllocator(router *mesh.Router, ipRangeStr string, defaultSubnetStr st
 	}
 
 	config := ipam.Config{
-		router.Ourself.Peer.Name,
-		router.Ourself.Peer.UID,
-		router.Ourself.Peer.NickName,
-		ipRange.Range(),
-		quorum, db, isKnownPeer}
+		OurName:     router.Ourself.Peer.Name,
+		OurUID:      router.Ourself.Peer.UID,
+		OurNickname: router.Ourself.Peer.NickName,
+		Universe:    ipRange.Range(),
+		Quorum:      quorum,
+		Db:          db,
+		IsKnownPeer: isKnownPeer,
+	}
 
 	allocator := ipam.NewAllocator(config)
 
