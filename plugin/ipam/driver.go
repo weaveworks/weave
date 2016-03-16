@@ -73,10 +73,10 @@ func (i *ipam) RequestAddress(poolID string, address net.IP, options map[string]
 		return
 	}
 	if address != nil { // try to claim specific address requested
-		if err = i.weave.ClaimIP("_", address); err != nil {
+		ip = &net.IPNet{IP: address, Mask: subnet.Mask}
+		if err = i.weave.ClaimIP("_", ip); err != nil {
 			return
 		}
-		ip = &net.IPNet{IP: address, Mask: subnet.Mask}
 	} else {
 		if _, iprange, err = net.ParseCIDR(parts[2]); err != nil {
 			return

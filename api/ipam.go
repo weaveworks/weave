@@ -33,8 +33,8 @@ func (client *Client) LookupIP(ID string) (*net.IPNet, error) {
 }
 
 // Claim a specific IP on behalf of the ID
-func (client *Client) ClaimIP(ID string, addr net.IP) error {
-	_, err := client.httpVerb("PUT", fmt.Sprintf("/ip/%s/%s", ID, addr), nil)
+func (client *Client) ClaimIP(ID string, cidr *net.IPNet) error {
+	_, err := client.httpVerb("PUT", fmt.Sprintf("/ip/%s/%s", ID, cidr), nil)
 	return err
 }
 
