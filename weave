@@ -902,7 +902,7 @@ attach() {
     netnsenter ip link set $CONTAINER_IFNAME up || return 1
 
     for ADDR in $NEW_ADDRS ; do
-        arp_update $CONTAINER_IFNAME $ADDR "netnsenter"
+        arp_update $CONTAINER_IFNAME $ADDR "netnsenter" || true
     done
 
     # Route multicast packets across the weave network.
@@ -2123,7 +2123,7 @@ EOF
         for CIDR in $ALL_CIDRS ; do
             if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr add dev $BRIDGE $CIDR
-                arp_update $BRIDGE $CIDR
+                arp_update $BRIDGE $CIDR || true
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
             fi
