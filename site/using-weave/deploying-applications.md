@@ -13,7 +13,7 @@ This section contains the following topics:
 
 ###<a name="launching"></a>Launching Weave Net
 
-Before launching Weave Net and deploying your apps, ensure that Docker is [installed]( https://docs.docker.com/engine/installation/) on both hosts. 
+Before launching Weave Net and deploying your apps, ensure that Docker is [installed](https://docs.docker.com/engine/installation/) on both hosts. 
 
 On `$HOST1` run:
 
@@ -25,7 +25,7 @@ Where,
 
  * The first line runs Weave Net. 
  * The second line configures the Weave Net environment, so that containers launched via the Docker command line are automatically attached to the Weave network, and, 
- * The third line runs the application container using [Docker commands]( https://docs.Docker.com/engine/reference/commandline/daemon/). 
+ * The third line runs the application container using [Docker commands](https://docs.Docker.com/engine/reference/commandline/daemon/). 
 
 >>**Note:** If the first command results in an error like
  `http:///var/run/Docker.sock/v1.19/containers/create: dial unix

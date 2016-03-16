@@ -87,7 +87,7 @@ named `weave` is created by `weave launch`, which is used as follows:
 
     $ docker run --net=weave -ti ubuntu 
 
-Using the Weave plugin enables you to take advantage of [Docker's network functionality]( https://docs.docker.com/engine/extend/plugins_network/)
+Using the Weave plugin enables you to take advantage of [Docker's network functionality](https://docs.docker.com/engine/extend/plugins_network/)
 
 Also, Weave’s Docker Network plugin doesn't require an external cluster store and you can start and stop containers even 
 when there are network connectivity problems.
