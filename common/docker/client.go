@@ -4,10 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
 
 	. "github.com/weaveworks/weave/common"
+)
+
+const (
+	InitialInterval = 1 * time.Second
+	MaxInterval     = 60 * time.Second
 )
 
 // An observer for container events
@@ -72,21 +78,33 @@ func (c *Client) Info() string {
 
 // AddObserver adds an observer for docker events
 func (c *Client) AddObserver(ob ContainerObserver) error {
-	events := make(chan *docker.APIEvents)
-	if err := c.AddEventListener(events); err != nil {
-		Log.Errorf("[docker] Unable to add listener to Docker API: %s", err)
-		return err
-	}
-
 	go func() {
-		for event := range events {
-			switch event.Status {
-			case "start":
-				id := event.ID
-				ob.ContainerStarted(id)
-			case "die":
-				id := event.ID
-				ob.ContainerDied(id)
+		retryInterval := InitialInterval
+		for {
+			events := make(chan *docker.APIEvents)
+			if err := c.AddEventListener(events); err != nil {
+				Log.Errorf("[docker] Unable to add listener to Docker API: %s - retrying in %ds", err, retryInterval/time.Second)
+			} else {
+				start := time.Now()
+				for event := range events {
+					switch event.Status {
+					case "start":
+						id := event.ID
+						ob.ContainerStarted(id)
+					case "die":
+						id := event.ID
+						ob.ContainerDied(id)
+					}
+				}
+				if time.Since(start) > retryInterval {
+					retryInterval = InitialInterval
+				}
+				Log.Errorf("[docker] Event listener channel closed - retrying subscription in %ds", retryInterval/time.Second)
+			}
+			time.Sleep(retryInterval)
+			retryInterval = retryInterval * 3 / 2
+			if retryInterval > MaxInterval {
+				retryInterval = MaxInterval
 			}
 		}
 	}()
