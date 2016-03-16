@@ -85,6 +85,7 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 			if err := c.AddEventListener(events); err != nil {
 				Log.Errorf("[docker] Unable to add listener to Docker API: %s - retrying in %ds", err, retryInterval/time.Second)
 			} else {
+				start := time.Now()
 				for event := range events {
 					switch event.Status {
 					case "start":
@@ -94,6 +95,9 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 						id := event.ID
 						ob.ContainerDied(id)
 					}
+				}
+				if time.Since(start) > retryInterval {
+					retryInterval = InitialInterval
 				}
 				Log.Errorf("[docker] Event listener channel closed - retrying subscription in %ds", retryInterval/time.Second)
 			}
