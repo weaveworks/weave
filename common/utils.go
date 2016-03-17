@@ -117,7 +117,13 @@ func GetWeaveNetDevs(processID int) ([]NetDev, error) {
 	indexes := make(map[int]struct{})
 	err = forEachLink(func(link netlink.Link) error {
 		if link.Attrs().MasterIndex == weaveBridge.Attrs().Index {
-			indexes[link.Attrs().Index] = struct{}{}
+			peerIndex := link.Attrs().ParentIndex
+			if peerIndex == 0 {
+				// perhaps running on an older kernel where ParentIndex doesn't work.
+				// as fall-back, assume the indexes are consecutive
+				peerIndex = link.Attrs().Index - 1
+			}
+			indexes[peerIndex] = struct{}{}
 		}
 		return nil
 	})
@@ -125,9 +131,8 @@ func GetWeaveNetDevs(processID int) ([]NetDev, error) {
 		return nil, err
 	}
 	return FindNetDevs(processID, func(link netlink.Link) bool {
-		// For checking, rely on index number of veth end inside namespace being -1 of end outside
 		_, isveth := link.(*netlink.Veth)
-		_, found := indexes[link.Attrs().Index+1]
+		_, found := indexes[link.Attrs().Index]
 		return isveth && found
 	})
 }
