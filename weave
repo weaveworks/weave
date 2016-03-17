@@ -608,7 +608,7 @@ create_veth() {
 
     ip link show $VETHL >/dev/null 2>&1 && ip link show $VETHR >/dev/null 2>&1 && return 0
 
-    ip link add name $VETHL mtu $MTU type veth peer name $VETHR mtu $MTU
+    ip link add name $VETHL mtu $MTU type veth peer name $VETHR mtu $MTU || return 1
 
     if ! ip link set $VETHL up || ! ip link set $VETHR up || ! "$@" ; then
         ip link del $VETHL >/dev/null 2>&1 || true
@@ -672,8 +672,8 @@ init_bridged_fastdp() {
 }
 
 configure_veth_bridged_fastdp() {
-    add_iface_fastdp $DATAPATH_IFNAME
-    add_iface_bridge $BRIDGE_IFNAME
+    add_iface_fastdp $DATAPATH_IFNAME || return 1
+    add_iface_bridge $BRIDGE_IFNAME || return 1
 }
 
 ethtool_tx_off_fastdp() {
@@ -742,7 +742,7 @@ docker_bridge_ip() {
 # from error.
 with_container_netns() {
     CONTAINER="$1"
-    CONTAINER_PID=$(docker inspect --format='{{.State.Pid}}' $CONTAINER)
+    CONTAINER_PID=$(docker inspect --format='{{.State.Pid}}' $CONTAINER) || return 1
 
     if [ "$CONTAINER_PID" = 0 ] ; then
         echo "Container $CONTAINER not running." >&2
@@ -833,7 +833,7 @@ attach_bridge() {
 }
 
 configure_veth_attached_bridge() {
-    add_iface_$BRIDGE_TYPE $LOCAL_IFNAME
+    add_iface_$BRIDGE_TYPE $LOCAL_IFNAME || return 1
     ip link set $GUEST_IFNAME master $bridge
 }
 
@@ -945,10 +945,10 @@ detach() {
 ######################################################################
 
 args_match() {
-    prev_args="$(docker inspect -f '{{.Args}} {{.Config.Env}}' $1)"
+    prev_args="$(docker inspect -f '{{.Args}} {{.Config.Env}}' $1)" || return 1
     shift
     dummy_container=$(docker create "$@" 2>/dev/null) || return 1
-    dummy_args="$(docker inspect -f '{{.Args}} {{.Config.Env}}' $dummy_container)"
+    dummy_args="$(docker inspect -f '{{.Args}} {{.Config.Env}}' $dummy_container)" || return 1
     docker rm $dummy_container >/dev/null
     [ "$prev_args"  = "$dummy_args" ]
 }
@@ -1030,7 +1030,7 @@ http_call_unix() {
     url="$4"
     shift 4
     # NB: requires curl >= 7.40
-    output=$(docker exec $container curl -s -S -X $http_verb --unix-socket $socket "$@" http:$url)
+    output=$(docker exec $container curl -s -S -X $http_verb --unix-socket $socket "$@" http:$url) || return 1
     # in some docker versions, `docker exec` does not fail when the executed command fails
     [ -n "$output" ] || return 1
     echo $output
@@ -1366,7 +1366,7 @@ ipam_cidrs() {
             if [ "$METHOD" = "POST" ] ; then
                 # Assignment of a plain IP address; warn if it clashes but carry on
                 check_overlap $arg || true
-                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg >&2
+                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg >&2 || return 1
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
