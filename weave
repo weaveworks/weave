@@ -729,7 +729,7 @@ destroy_bridge() {
 }
 
 docker_bridge_ip() {
-    DOCKER_BRIDGE_IP=$(ip -4 addr show dev $DOCKER_BRIDGE | grep -m1 -o 'inet [.0-9]*')
+    DOCKER_BRIDGE_IP=$(ip -4 addr show dev $DOCKER_BRIDGE | grep -m1 -o 'inet [.0-9]*') || return 1
     DOCKER_BRIDGE_IP=${DOCKER_BRIDGE_IP#inet }
 }
 
@@ -1193,7 +1193,7 @@ EOF
 }
 
 rewrite_etc_hosts() {
-    HOSTS_PATH_AND_FQDN=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}.{{.Config.Domainname}}' $CONTAINER)
+    HOSTS_PATH_AND_FQDN=$(docker inspect -f '{{.HostsPath}} {{.Config.Hostname}}.{{.Config.Domainname}}' $CONTAINER) || return 1
     HOSTS=${HOSTS_PATH_AND_FQDN% *}
     FQDN=${HOSTS_PATH_AND_FQDN#* }
     CONTAINERS_PATH=$(dirname $HOSTS)
@@ -1649,7 +1649,7 @@ launch_router() {
 
 # Recreate the parameter values that are set when the router is first launched
 fetch_router_args() {
-    CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME)
+    CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME) || return 1
     IPRANGE=$(echo $CONTAINER_ARGS | grep -o -e '-ipalloc-range [^ ]*') || true
     NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
 }
