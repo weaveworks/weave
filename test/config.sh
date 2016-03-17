@@ -183,6 +183,10 @@ container_ip() {
     weave_on $1 ps $2 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
 }
 
+container_pid() {
+    docker_on $1 inspect -f '{{.State.Pid}}' $2
+}
+
 # assert_dns_record <host> <container> <name> [<ip> ...]
 assert_dns_record() {
     local host=$1
