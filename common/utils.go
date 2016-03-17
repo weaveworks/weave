@@ -109,19 +109,13 @@ func GetWeaveNetDevs(processID int) ([]NetDev, error) {
 		return nil, nil
 	}
 
-	var weaveBridge netlink.Link
-	forEachLink(func(link netlink.Link) error {
-		if link.Attrs().Name == "weave" {
-			weaveBridge = link
-		}
-		return nil
-	})
-	if weaveBridge == nil {
-		return nil, fmt.Errorf("Cannot find weave bridge")
+	weaveBridge, err := netlink.LinkByName("weave")
+	if err != nil {
+		return nil, fmt.Errorf("Cannot find weave bridge: %s", err)
 	}
 	// Scan devices in root namespace to find those attached to weave bridge
 	indexes := make(map[int]struct{})
-	err := forEachLink(func(link netlink.Link) error {
+	err = forEachLink(func(link netlink.Link) error {
 		if link.Attrs().MasterIndex == weaveBridge.Attrs().Index {
 			indexes[link.Attrs().Index] = struct{}{}
 		}

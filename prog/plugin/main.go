@@ -26,7 +26,8 @@ var version = "(unreleased version)"
 func main() {
 	var (
 		justVersion      bool
-		cniNet, cniIpam  bool
+		cniNet           bool
+		cniIpam          bool
 		address          string
 		meshAddress      string
 		logLevel         string
