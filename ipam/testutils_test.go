@@ -144,7 +144,8 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 		OurUID:      mesh.PeerUID(rand.Int63()),
 		OurNickname: "nick-" + name,
 		Universe:    cidr.Range(),
-		Quorum:      quorum,
+		IsObserver:  quorum == 0,
+		Quorum:      func() uint { return quorum },
 		Db:          new(mockDB),
 		IsKnownPeer: func(mesh.PeerName) bool { return true },
 	}), cidr

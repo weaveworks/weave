@@ -80,6 +80,10 @@ func NewNode(name mesh.PeerName, uid mesh.PeerUID, quorum uint) *Node {
 	}
 }
 
+func (node *Node) SetQuorum(quorum uint) {
+	node.quorum = quorum
+}
+
 func (node *Node) GossipState() GossipState {
 	return node.knows
 }

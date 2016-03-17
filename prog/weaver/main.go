@@ -255,7 +255,7 @@ func main() {
 		defaultSubnet address.CIDR
 	)
 	if ipamConfig.Enabled() {
-		allocator, defaultSubnet = createAllocator(router.Router, ipamConfig, len(peers), db, isKnownPeer)
+		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
@@ -379,7 +379,7 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	return cidr
 }
 
-func createAllocator(router *mesh.Router, config ipamConfig, peerCount int, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange := parseAndCheckCIDR(config.IPRangeCIDR)
 	seed := parseIPAMSeed(config.Seed)
 	defaultSubnet := ipRange
@@ -396,7 +396,8 @@ func createAllocator(router *mesh.Router, config ipamConfig, peerCount int, db d
 		OurNickname: router.Ourself.Peer.NickName,
 		Seed:        seed,
 		Universe:    ipRange.Range(),
-		Quorum:      determineQuorum(config.Observer, config.PeerCount, peerCount),
+		IsObserver:  config.Observer,
+		Quorum:      func() uint { return determineQuorum(config.PeerCount, router) },
 		Db:          db,
 		IsKnownPeer: isKnownPeer,
 	}
@@ -426,16 +427,13 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 	return ns, dnsserver
 }
 
-// Pick a quorum size heuristically based on the number of peer
-// addresses passed.
-func determineQuorum(observer bool, initPeerCountFlag int, peerCount int) uint {
-	if observer {
-		return uint(0)
-	}
-
+// Pick a quorum size based on the number of peer addresses.
+func determineQuorum(initPeerCountFlag int, router *weave.NetworkRouter) uint {
 	if initPeerCountFlag > 0 {
 		return uint(initPeerCountFlag/2 + 1)
 	}
+
+	peers := router.ConnectionMaker.Targets()
 
 	// Guess a suitable quorum size based on the list of peer
 	// addresses.  The peer list might or might not contain an
@@ -444,7 +442,7 @@ func determineQuorum(observer bool, initPeerCountFlag int, peerCount int) uint {
 	// that resolve to the same peer, in which case the quorum
 	// might be larger than it needs to be.  But the user can
 	// specify it explicitly if that becomes a problem.
-	clusterSize := uint(peerCount + 1)
+	clusterSize := uint(len(peers) + 1)
 	quorum := clusterSize/2 + 1
 	Log.Println("Assuming quorum size of", quorum)
 	return quorum
