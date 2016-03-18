@@ -13,7 +13,7 @@ import (
 
 const (
 	InitialInterval = 1 * time.Second
-	MaxInterval     = 60 * time.Second
+	MaxInterval     = 20 * time.Second
 )
 
 // An observer for container events
