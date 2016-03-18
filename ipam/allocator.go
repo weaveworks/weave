@@ -934,14 +934,20 @@ func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
 // Logging
 
 func (alloc *Allocator) fatalf(fmt string, args ...interface{}) {
-	common.Log.Fatalf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+	alloc.logf(common.Log.Fatalf, fmt, args...)
+}
+func (alloc *Allocator) warnf(fmt string, args ...interface{}) {
+	alloc.logf(common.Log.Warnf, fmt, args...)
 }
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
-	common.Log.Infof("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+	alloc.logf(common.Log.Infof, fmt, args...)
+}
+func (alloc *Allocator) debugf(fmt string, args ...interface{}) {
+	alloc.logf(common.Log.Debugf, fmt, args...)
+}
+func (alloc *Allocator) logf(f func(string, ...interface{}), fmt string, args ...interface{}) {
+	f("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
 func (alloc *Allocator) debugln(args ...interface{}) {
 	common.Log.Debugln(append([]interface{}{fmt.Sprintf("[allocator %s]:", alloc.ourName)}, args...)...)
-}
-func (alloc *Allocator) debugf(fmt string, args ...interface{}) {
-	common.Log.Debugf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
