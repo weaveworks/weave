@@ -12,7 +12,7 @@ manager built by Google.
 ###Installing the Weave Net CNI plugin
 
 The Weave Net CNI plugin is installed when you run `weave setup`, if
-it your machine has the directories normally used to host CNI plugins.
+your machine has the directories normally used to host CNI plugins.
 To create those directories, run (as root):
 
     mkdir -p /opt/cni/bin
@@ -30,7 +30,7 @@ To create a network which can span multiple hosts, the Weave peers must be conne
 See [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md#peer-connections) for a discussion on peer connections. 
 
 As well as launching Weave Net, you have to run an extra command to
-configure the Weave bridge:
+perform some additional configuration of the Weave bridge:
 
     weave launch <peer hosts>
     weave expose
