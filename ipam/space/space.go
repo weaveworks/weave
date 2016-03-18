@@ -31,8 +31,8 @@ func (s *Space) Add(start address.Address, size address.Offset) {
 
 // Clear removes all spaces from this space set.  Used during node shutdown.
 func (s *Space) Clear() {
-	s.free = s.free[:0]
 	s.ours = s.ours[:0]
+	s.free = s.free[:0]
 }
 
 // Walk down the free list calling f() on the in-range portions, until
