@@ -1069,7 +1069,8 @@ with_container_addresses() {
     COMMAND=$1
     shift 1
 
-    util_op container-addrs $BRIDGE "$@" | while read CONTAINER_ID CONTAINER_MAC CONTAINER_IPS; do
+    CONTAINER_ADDRS=$(util_op container-addrs $BRIDGE "$@") || return 1
+    echo "$CONTAINER_ADDRS" |  while read CONTAINER_ID CONTAINER_MAC CONTAINER_IPS; do
         $COMMAND "$CONTAINER_ID" "$CONTAINER_MAC" "$CONTAINER_IPS"
     done
 }

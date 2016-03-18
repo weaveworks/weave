@@ -49,5 +49,9 @@ func getNetDevs(bridgeName string, c *docker.Client, containerID string) ([]comm
 		return nil, err
 	}
 
+	if container.State.Pid == 0 {
+		return nil, nil
+	}
+
 	return common.GetWeaveNetDevs(container.State.Pid)
 }

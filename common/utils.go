@@ -4,6 +4,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	"net"
+	"os"
 	"runtime"
 	"strings"
 )
@@ -53,6 +54,9 @@ func FindNetDevs(processID int, match func(string) bool) ([]NetDev, error) {
 
 	ns, err := netns.GetFromPid(processID)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer ns.Close()
