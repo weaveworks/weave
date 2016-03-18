@@ -61,16 +61,16 @@ through three states: 'deferred', 'waiting' and 'achieved':
   themselves successfully
 * 'achieved' - consensus achieved; allocations proceed normally
 
-Finally, some peers can be launched as election observers using the
-`--observer` option:
+Finally, some (but never all) peers can be launched as consensus
+observers rather than participants by specifying the `--observer`
+option:
 
     host4$ weave launch --observer $HOST3
 
-You do not need to specify an initial count to such peers, as they do
-not participate in the election - they await its outcome. This can be
-useful to add ephemeral peers to an existing fixed cluster (for example
-in response to a scale-out event) without worrying about adjusting
-initial peer counts accordingly.
+You do not need to specify an initial peer count to such peers. This
+can be useful to add ephemeral peers to an existing fixed cluster (for
+example in response to a scale-out event) without worrying about
+adjusting initial peer counts accordingly.
 
 ####<a name="quorum"></a> `--init-peer-count` and How Quorum is Achieved
 
