@@ -116,9 +116,8 @@ is safe with respect to Weave Net's startup quorum:
 
 Under certain circumstances (for example when adding new nodes to an
 existing cluster) it is desirable to ensure that a node has
-successfully joined and received a copy of the IPAM data structure
-shared amongst the peers. An administrative command is provided for
-this purpose:
+successfully joined and is ready to allocate IP addresses. An
+administrative command is provided for this purpose:
 
     host1$ weave consense
 
