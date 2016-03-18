@@ -139,12 +139,15 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 		panic(err)
 	}
 
-	config := Config{peername, mesh.PeerUID(rand.Int63()),
-		"nick-" + name, cidr.Range(), quorum, new(mockDB), func(mesh.PeerName) bool { return true }}
-
-	alloc := NewAllocator(config)
-
-	return alloc, cidr
+	return NewAllocator(Config{
+		OurName:     peername,
+		OurUID:      mesh.PeerUID(rand.Int63()),
+		OurNickname: "nick-" + name,
+		Universe:    cidr.Range(),
+		Quorum:      quorum,
+		Db:          new(mockDB),
+		IsKnownPeer: func(mesh.PeerName) bool { return true },
+	}), cidr
 }
 
 func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.CIDR) {
