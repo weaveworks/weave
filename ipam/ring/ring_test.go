@@ -374,7 +374,7 @@ func TestFindFree(t *testing.T) {
 	assertPeersWithSpace(t, ring1, start, end, 0)
 
 	// We shouldn't return outselves
-	ring1.ReportFree(map[address.Address]address.Offset{start: 10})
+	ring1.ReportFree(map[address.Address]address.Count{start: 10})
 	assertPeersWithSpace(t, ring1, start, end, 0)
 
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 1},
@@ -409,7 +409,7 @@ func TestReportFree(t *testing.T) {
 	ring1.GrantRangeToHost(middle, end, peer2name)
 	require.NoError(t, ring2.Merge(*ring1))
 
-	freespace := make(map[address.Address]address.Offset)
+	freespace := make(map[address.Address]address.Count)
 	for _, r := range ring2.OwnedRanges() {
 		freespace[r.Start] = 0
 	}

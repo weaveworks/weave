@@ -15,6 +15,7 @@ type entry struct {
 	Peer    mesh.PeerName   // Who owns this range
 	Version uint32          // Version of this range
 	Free    address.Offset  // Number of free IPs in this range
+	// Note: Free should perhaps be an address.Count, but we can't change the wire protocol
 }
 
 func (e *entry) Equal(e2 *entry) bool {

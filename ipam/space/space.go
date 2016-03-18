@@ -88,8 +88,8 @@ func (s *Space) Claim(addr address.Address) error {
 	return nil
 }
 
-func (s *Space) NumFreeAddressesInRange(r address.Range) address.Offset {
-	res := address.Offset(0)
+func (s *Space) NumFreeAddressesInRange(r address.Range) address.Count {
+	res := address.Count(0)
 	s.walkFree(r, func(chunk address.Range) bool {
 		res += chunk.Size()
 		return false
@@ -111,7 +111,7 @@ func (s *Space) Free(addr address.Address) error {
 }
 
 func (s *Space) biggestFreeRange(r address.Range) (biggest address.Range) {
-	biggestSize := address.Offset(0)
+	biggestSize := address.Count(0)
 	s.walkFree(r, func(chunk address.Range) bool {
 		if size := chunk.Size(); size >= biggestSize {
 			biggest = chunk
@@ -131,7 +131,7 @@ func (s *Space) Donate(r address.Range) (address.Range, bool) {
 
 	// Donate half of that biggest free range. Note size/2 rounds down, so
 	// the resulting donation size rounds up, and in particular can't be empty.
-	biggest.Start = address.Add(biggest.Start, biggest.Size()/2)
+	biggest.Start = address.Add(biggest.Start, address.Offset(biggest.Size()/2))
 
 	s.ours = subtract(s.ours, biggest.Start, biggest.End)
 	s.free = subtract(s.free, biggest.Start, biggest.End)

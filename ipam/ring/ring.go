@@ -393,7 +393,7 @@ func (r *Ring) String() string {
 // ReportFree is used by the allocator to tell the ring how many free
 // ips are in a given range, so that ChoosePeersToAskForSpace can make
 // more intelligent decisions.
-func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
+func (r *Ring) ReportFree(freespace map[address.Address]address.Count) {
 	r.assertInvariants()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
@@ -423,13 +423,13 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Offset) {
 		// Check we're not reporting more space than the range
 		entry, next := entries.entry(i), entries.entry(i+1)
 		maxSize := r.distance(entry.Token, next.Token)
-		common.Assert(free <= maxSize)
+		common.Assert(free <= address.Count(maxSize))
 
-		if entries[i].Free == free {
+		if address.Count(entries[i].Free) == free {
 			return
 		}
 
-		entries[i].Free = free
+		entries[i].Free = address.Offset(free)
 		entries[i].Version++
 	}
 }
