@@ -103,8 +103,14 @@ func linkToNetDev(link netlink.Link) (*NetDev, error) {
 // Lookup the weave interface of a container
 func GetWeaveNetDevs(processID int) ([]NetDev, error) {
 	// Bail out if this container is running in the root namespace
-	nsToplevel, _ := netns.GetFromPid(1)
-	nsContainr, _ := netns.GetFromPid(processID)
+	nsToplevel, err := netns.GetFromPid(1)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open root namespace: %s", err)
+	}
+	nsContainr, err := netns.GetFromPid(processID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open process %d namespace: %s", processID, err)
+	}
 	if nsToplevel.Equal(nsContainr) {
 		return nil, nil
 	}
