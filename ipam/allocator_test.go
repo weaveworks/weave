@@ -597,7 +597,7 @@ func TestSpaceRequest(t *testing.T) {
 	// free it again so the donation splits the range neatly
 	err = alloc1.Free(container1, addr)
 	require.Nil(t, err, "")
-	require.Equal(t, cidrRanges(universe), alloc1.ring.OwnedRanges(), "")
+	require.Equal(t, cidrRanges(universe), alloc1.OwnedRanges(), "")
 
 	// Start a new peer
 	alloc2, _ := makeAllocator("02:00:00:02:00:00", universe, 2)
@@ -607,8 +607,8 @@ func TestSpaceRequest(t *testing.T) {
 	alloc2.Allocate(container2, subnet, returnFalse)
 
 	// Test whether the universe has been split into two equal halves (GH #2009)
-	require.Equal(t, cidrRanges("10.32.0.0/13"), alloc1.ring.OwnedRanges(), "")
-	require.Equal(t, cidrRanges("10.40.0.0/13"), alloc2.ring.OwnedRanges(), "")
+	require.Equal(t, cidrRanges("10.32.0.0/13"), alloc1.OwnedRanges(), "")
+	require.Equal(t, cidrRanges("10.40.0.0/13"), alloc2.OwnedRanges(), "")
 }
 
 func cidrRanges(s string) []address.Range {
