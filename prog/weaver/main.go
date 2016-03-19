@@ -433,7 +433,7 @@ func determineQuorum(initPeerCountFlag int, router *weave.NetworkRouter) uint {
 		return uint(initPeerCountFlag/2 + 1)
 	}
 
-	peers := router.ConnectionMaker.Targets()
+	peers := router.ConnectionMaker.Targets(true)
 
 	// Guess a suitable quorum size based on the list of peer
 	// addresses.  The peer list might or might not contain an
