@@ -17,4 +17,7 @@ assert "container_ip $HOST1 c2" "10.40.0.2" # assuming linear allocation strateg
 assert_raises "exec_on $HOST1 c1 $PING c2"
 assert_raises "exec_on $HOST1 c2 $PING c1"
 
+$SSH $HOST1 docker rm -f c1 c2
+$SSH $HOST1 docker network rm testsubnet
+
 end_suite
