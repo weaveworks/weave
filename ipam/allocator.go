@@ -403,9 +403,9 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 			return
 		}
 
-		before := alloc.space.NumFreeAddressesInRange(alloc.universe)
+		before := alloc.space.NumFreeAddresses()
 		alloc.space.AddRanges(newRanges)
-		after := alloc.space.NumFreeAddressesInRange(alloc.universe)
+		after := alloc.space.NumFreeAddresses()
 
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
 
