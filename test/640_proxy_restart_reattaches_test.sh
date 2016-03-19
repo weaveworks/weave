@@ -33,7 +33,7 @@ run_many() {
 
 start_suite "Proxy restart reattaches networking to containers"
 
-WEAVE_DOCKER_ARGS=--restart=always WEAVEPROXY_DOCKER_ARGS=--restart=always weave_on $HOST1 launch
+weave_on $HOST1 launch
 proxy_start_container          $HOST1 -di --name=c2 --restart=always -h $NAME
 proxy_start_container_with_dns $HOST1 -di --name=c1 --restart=always
 C2=$(container_ip $HOST1 c2)

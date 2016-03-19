@@ -25,8 +25,8 @@ start_suite "Containers get same IP address on restart"
 # Remove any persisted data from previous runs
 run_on $HOST1 "sudo rm -f /tmp/test163-*"
 
-WEAVE_DOCKER_ARGS="-v /tmp:/db --restart=always" weave_on $HOST1 launch-router --db-prefix=/db/test163-
-WEAVEPROXY_DOCKER_ARGS=--restart=always weave_on $HOST1 launch-proxy
+WEAVE_DOCKER_ARGS="-v /tmp:/db" weave_on $HOST1 launch-router --db-prefix=/db/test163-
+weave_on $HOST1 launch-proxy
 
 # Use up first address with throwaway container
 start_container $HOST1 --name=c1
