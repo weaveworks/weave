@@ -175,6 +175,14 @@ func (alloc *Allocator) NumFreeAddresses(r address.Range) address.Count {
 	return <-resultChan
 }
 
+func (alloc *Allocator) OwnedRanges() (result []address.Range) {
+	resultChan := make(chan []address.Range)
+	alloc.actionChan <- func() {
+		resultChan <- alloc.ring.OwnedRanges()
+	}
+	return <-resultChan
+}
+
 // Check whether or not something was sent on a channel
 func AssertSent(t *testing.T, ch <-chan bool) {
 	timeout := time.After(10 * time.Second)
