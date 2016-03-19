@@ -498,28 +498,22 @@ func (r *Ring) PickPeerForTransfer(isValid func(mesh.PeerName) bool) mesh.PeerNa
 
 // Transfer will mark all entries associated with 'from' peer as owned by 'to' peer
 // and return ranges indicating the new space we picked up
-func (r *Ring) Transfer(from, to mesh.PeerName) ([]address.Range, error) {
+func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 	r.assertInvariants()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
 	var newRanges []address.Range
-	found := false
 
 	for i, entry := range r.Entries {
 		if entry.Peer == from {
-			found = true
 			entry.Peer = to
 			entry.Version++
 			newRanges = append(newRanges, address.Range{Start: entry.Token, End: r.Entries.entry(i + 1).Token})
 		}
 	}
 
-	if !found {
-		return nil, ErrNotFound
-	}
-
-	return r.splitRangesOverZero(newRanges), nil
+	return r.splitRangesOverZero(newRanges)
 }
 
 // Contains returns true if addr is in this ring

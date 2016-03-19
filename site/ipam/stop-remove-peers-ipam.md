@@ -24,6 +24,7 @@ Assume you had started the three peers in the example earlier, and
 then host3 caught fire, you can go to one of the other hosts and run:
 
     host1$ weave rmpeer host3
+    524288 IPs taken over from host3
 
 Weave Net takes all the IP address ranges owned by host3 and transfers
 them to be owned by host1. The name "host3" is resolved via the

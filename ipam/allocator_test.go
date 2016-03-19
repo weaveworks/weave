@@ -336,13 +336,18 @@ func TestTransfer(t *testing.T) {
 	router.Flush()
 	alloc2.gossip.GossipBroadcast(alloc3.Gossip())
 	router.Flush()
+
+	free2 := alloc2.NumFreeAddresses(subnet.Range())
+	free3 := alloc3.NumFreeAddresses(subnet.Range())
+
 	router.RemovePeer(alloc2.ourName)
 	router.RemovePeer(alloc3.ourName)
 	alloc2.Stop()
 	alloc3.Stop()
 	router.Flush()
-	require.NoError(t, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
-	require.NoError(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
+
+	require.Equal(t, free2+1, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
+	require.Equal(t, free3+1, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
 	router.Flush()
 
 	require.Equal(t, address.Count(1024), alloc1.NumFreeAddresses(subnet.Range()))
