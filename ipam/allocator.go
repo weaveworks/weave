@@ -376,29 +376,40 @@ func (alloc *Allocator) Shutdown() {
 	<-doneChan
 }
 
-// AdminTakeoverRanges (Sync) - take over the ranges owned by a given peer.
+// AdminTakeoverRanges (Sync) - take over the ranges owned by a given
+// peer, and return how much space was transferred in the process.
 // Only done on adminstrator command.
-func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) error {
-	resultChan := make(chan error)
+func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.Count {
+	resultChan := make(chan address.Count)
 	alloc.actionChan <- func() {
 		peername, err := alloc.lookupPeername(peerNameOrNickname)
 		if err != nil {
-			resultChan <- fmt.Errorf("Cannot find peer '%s'", peerNameOrNickname)
+			alloc.warnf("attempt to take over range from unknown peer '%s'", peerNameOrNickname)
+			resultChan <- address.Count(0)
 			return
 		}
 
 		alloc.debugln("AdminTakeoverRanges:", peername)
 		if peername == alloc.ourName {
-			resultChan <- fmt.Errorf("Cannot take over ranges from yourself!")
+			alloc.warnf("attempt to take over range from ourself")
+			resultChan <- address.Count(0)
 			return
 		}
 
-		newRanges, err := alloc.ring.Transfer(peername, alloc.ourName)
-		if err == nil && len(newRanges) > 0 {
-			alloc.space.AddRanges(newRanges)
-			alloc.gossip.GossipBroadcast(alloc.Gossip())
+		newRanges := alloc.ring.Transfer(peername, alloc.ourName)
+
+		if len(newRanges) == 0 {
+			resultChan <- address.Count(0)
+			return
 		}
-		resultChan <- err
+
+		before := alloc.space.NumFreeAddresses()
+		alloc.space.AddRanges(newRanges)
+		after := alloc.space.NumFreeAddresses()
+
+		alloc.gossip.GossipBroadcast(alloc.Gossip())
+
+		resultChan <- after - before
 	}
 	return <-resultChan
 }
@@ -934,14 +945,20 @@ func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
 // Logging
 
 func (alloc *Allocator) fatalf(fmt string, args ...interface{}) {
-	common.Log.Fatalf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+	alloc.logf(common.Log.Fatalf, fmt, args...)
+}
+func (alloc *Allocator) warnf(fmt string, args ...interface{}) {
+	alloc.logf(common.Log.Warnf, fmt, args...)
 }
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
-	common.Log.Infof("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
+	alloc.logf(common.Log.Infof, fmt, args...)
+}
+func (alloc *Allocator) debugf(fmt string, args ...interface{}) {
+	alloc.logf(common.Log.Debugf, fmt, args...)
+}
+func (alloc *Allocator) logf(f func(string, ...interface{}), fmt string, args ...interface{}) {
+	f("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
 func (alloc *Allocator) debugln(args ...interface{}) {
 	common.Log.Debugln(append([]interface{}{fmt.Sprintf("[allocator %s]:", alloc.ourName)}, args...)...)
-}
-func (alloc *Allocator) debugf(fmt string, args ...interface{}) {
-	common.Log.Debugf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }

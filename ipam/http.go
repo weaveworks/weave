@@ -151,11 +151,7 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 
 	router.Methods("DELETE").Path("/peer/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ident := mux.Vars(r)["id"]
-		if err := alloc.AdminTakeoverRanges(ident); err != nil {
-			badRequest(w, err)
-			return
-		}
-
-		w.WriteHeader(204)
+		transferred := alloc.AdminTakeoverRanges(ident)
+		fmt.Fprintf(w, "%d IPs taken over from %s\n", transferred, ident)
 	})
 }
