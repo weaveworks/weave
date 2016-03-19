@@ -394,7 +394,10 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) error {
 		}
 
 		newRanges, err := alloc.ring.Transfer(peername, alloc.ourName)
-		alloc.space.AddRanges(newRanges)
+		if err == nil && len(newRanges) > 0 {
+			alloc.space.AddRanges(newRanges)
+			alloc.gossip.GossipBroadcast(alloc.Gossip())
+		}
 		resultChan <- err
 	}
 	return <-resultChan
