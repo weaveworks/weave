@@ -84,7 +84,7 @@ func TestAllocFree(t *testing.T) {
 	// Move the clock forward and clear out the dead container
 	alloc.actionChan <- func() { alloc.now = func() time.Time { return time.Now().Add(containerDiedTimeout * 2) } }
 	alloc.actionChan <- func() { alloc.removeDeadContainers() }
-	require.Equal(t, address.Offset(spaceSize+1), alloc.NumFreeAddresses(subnet.Range()))
+	require.Equal(t, address.Count(spaceSize+1), alloc.NumFreeAddresses(subnet.Range()))
 }
 
 func TestBootstrap(t *testing.T) {
@@ -345,7 +345,7 @@ func TestTransfer(t *testing.T) {
 	require.NoError(t, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
 	router.Flush()
 
-	require.Equal(t, address.Offset(1024), alloc1.NumFreeAddresses(subnet.Range()))
+	require.Equal(t, address.Count(1024), alloc1.NumFreeAddresses(subnet.Range()))
 
 	_, err = alloc1.Allocate("foo", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")

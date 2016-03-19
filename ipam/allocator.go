@@ -795,7 +795,7 @@ func (alloc *Allocator) reportFreeSpace() {
 		return
 	}
 
-	freespace := make(map[address.Address]address.Offset)
+	freespace := make(map[address.Address]address.Count)
 	for _, r := range ranges {
 		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}

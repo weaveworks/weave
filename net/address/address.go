@@ -10,6 +10,7 @@ import (
 // Using 32-bit integer to represent IPv4 address
 type Address uint32
 type Offset uint32
+type Count uint32
 
 type Range struct {
 	Start, End Address // [Start, End); Start <= End
@@ -18,7 +19,7 @@ type Range struct {
 func NewRange(start Address, size Offset) Range {
 	return Range{Start: start, End: Add(start, size)}
 }
-func (r Range) Size() Offset               { return Subtract(r.End, r.Start) }
+func (r Range) Size() Count                { return Length(r.End, r.Start) }
 func (r Range) String() string             { return fmt.Sprintf("%s-%s", r.Start, r.End-1) }
 func (r Range) Overlaps(or Range) bool     { return !(r.Start >= or.End || r.End <= or.Start) }
 func (r Range) Contains(addr Address) bool { return addr >= r.Start && addr < r.End }
@@ -114,6 +115,11 @@ func Add(addr Address, i Offset) Address {
 func Subtract(a, b Address) Offset {
 	common.Assert(a >= b)
 	return Offset(a - b)
+}
+
+func Length(a, b Address) Count {
+	common.Assert(a >= b)
+	return Count(a - b)
 }
 
 func Min(a, b Offset) Offset {

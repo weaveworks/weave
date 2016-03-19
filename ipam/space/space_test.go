@@ -21,10 +21,10 @@ func ip(s string) address.Address {
 
 // Helper function to avoid 'NumFreeAddressesInRange(start, end)'
 // dozens of times in tests
-func (s *Space) NumFreeAddresses() address.Offset {
-	res := address.Offset(0)
+func (s *Space) NumFreeAddresses() address.Count {
+	res := address.Count(0)
 	for i := 0; i < len(s.free); i += 2 {
-		res += address.Subtract(s.free[i+1], s.free[i])
+		res += address.Length(s.free[i+1], s.free[i])
 	}
 	return res
 }
@@ -61,19 +61,19 @@ func TestLowlevel(t *testing.T) {
 	require.Equal(t, []address.Address{}, a)
 
 	s := New()
-	require.Equal(t, address.Offset(0), s.NumFreeAddresses())
+	require.Equal(t, address.Count(0), s.NumFreeAddresses())
 	ok, got := s.Allocate(address.NewRange(0, 1000))
 	require.False(t, ok, "allocate in empty space should fail")
 
 	s.Add(100, 100)
-	require.Equal(t, address.Offset(100), s.NumFreeAddresses())
+	require.Equal(t, address.Count(100), s.NumFreeAddresses())
 	ok, got = s.Allocate(address.NewRange(0, 1000))
 	require.True(t, ok && got == 100, "allocate")
-	require.Equal(t, address.Offset(99), s.NumFreeAddresses())
+	require.Equal(t, address.Count(99), s.NumFreeAddresses())
 	require.NoError(t, s.Claim(150))
-	require.Equal(t, address.Offset(98), s.NumFreeAddresses())
+	require.Equal(t, address.Count(98), s.NumFreeAddresses())
 	require.NoError(t, s.Free(100))
-	require.Equal(t, address.Offset(99), s.NumFreeAddresses())
+	require.Equal(t, address.Count(99), s.NumFreeAddresses())
 	wt.AssertErrorInterface(t, (*error)(nil), s.Free(0), "free not allocated")
 	wt.AssertErrorInterface(t, (*error)(nil), s.Free(100), "double free")
 
@@ -107,19 +107,19 @@ func TestSpaceAllocate(t *testing.T) {
 	)
 
 	space1 := makeSpace(start, size)
-	require.Equal(t, address.Offset(20), space1.NumFreeAddresses())
+	require.Equal(t, address.Count(20), space1.NumFreeAddresses())
 	space1.assertInvariants()
 
 	_, addr1 := space1.Allocate(address.NewRange(start, size))
 	require.Equal(t, testAddr1, addr1.String(), "address")
-	require.Equal(t, address.Offset(19), space1.NumFreeAddresses())
+	require.Equal(t, address.Count(19), space1.NumFreeAddresses())
 	space1.assertInvariants()
 
 	_, addr2 := space1.Allocate(address.NewRange(start, size))
 	require.False(t, addr2.String() == testAddr1, "address")
-	require.Equal(t, address.Offset(18), space1.NumFreeAddresses())
-	require.Equal(t, address.Offset(13), space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddrx)}))
-	require.Equal(t, address.Offset(18), space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddry)}))
+	require.Equal(t, address.Count(18), space1.NumFreeAddresses())
+	require.Equal(t, address.Count(13), space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddrx)}))
+	require.Equal(t, address.Count(18), space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddry)}))
 	space1.assertInvariants()
 
 	space1.Free(addr2)
@@ -172,7 +172,7 @@ func TestSpaceFree(t *testing.T) {
 	require.NoError(t, space.Free(ip("10.0.3.22")))
 	require.NoError(t, space.Free(ip("10.0.3.21")))
 
-	require.Equal(t, address.Offset(4), space.NumFreeAddresses())
+	require.Equal(t, address.Count(4), space.NumFreeAddresses())
 
 	// Now get the biggest free space; should be 3.21
 	r = space.biggestFreeRange(entireRange)
@@ -183,7 +183,7 @@ func TestSpaceFree(t *testing.T) {
 	require.NoError(t, space.Free(ip("10.0.3.11")))
 	require.NoError(t, space.Free(ip("10.0.3.10")))
 
-	require.Equal(t, address.Offset(7), space.NumFreeAddresses())
+	require.Equal(t, address.Count(7), space.NumFreeAddresses())
 
 	// Now get the biggest free space; should be 3.21
 	r = space.biggestFreeRange(entireRange)
@@ -210,8 +210,8 @@ func TestDonateSimple(t *testing.T) {
 	numGivenUp := r.Size()
 	require.True(t, ok, "Donate result")
 	require.Equal(t, "10.0.1.24", r.Start.String(), "Invalid start")
-	require.Equal(t, address.Offset(size/2), numGivenUp)
-	require.Equal(t, address.Offset(size/2), ps1.NumFreeAddresses())
+	require.Equal(t, address.Count(size/2), numGivenUp)
+	require.Equal(t, address.Count(size/2), ps1.NumFreeAddresses())
 
 	// Now check we can give the rest up.
 	count := 0 // count to avoid infinite loop
@@ -222,8 +222,8 @@ func TestDonateSimple(t *testing.T) {
 		}
 		numGivenUp += r.Size()
 	}
-	require.Equal(t, address.Offset(0), ps1.NumFreeAddresses())
-	require.Equal(t, address.Offset(size), numGivenUp)
+	require.Equal(t, address.Count(0), ps1.NumFreeAddresses())
+	require.Equal(t, address.Count(size), numGivenUp)
 }
 
 func TestDonateHard(t *testing.T) {
@@ -240,7 +240,7 @@ func TestDonateHard(t *testing.T) {
 		require.True(t, ok, "Failed to get IP!")
 	}
 
-	require.Equal(t, address.Offset(0), spaceset.NumFreeAddresses())
+	require.Equal(t, address.Count(0), spaceset.NumFreeAddresses())
 
 	// Now free all but the last address
 	// this will force us to split the free list
@@ -252,8 +252,8 @@ func TestDonateHard(t *testing.T) {
 	newRange, ok := spaceset.Donate(address.NewRange(start, size))
 	require.True(t, ok, "GiveUpSpace result")
 	require.Equal(t, ip("10.0.1.23"), newRange.Start)
-	require.Equal(t, address.Offset(24), newRange.Size())
-	require.Equal(t, address.Offset(23), spaceset.NumFreeAddresses())
+	require.Equal(t, address.Count(24), newRange.Size())
+	require.Equal(t, address.Count(23), spaceset.NumFreeAddresses())
 
 	//Space set should now have 2 spaces
 	expected := New()

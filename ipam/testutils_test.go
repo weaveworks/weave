@@ -167,8 +167,8 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 	alloc.space.AddRanges(alloc.ring.OwnedRanges())
 }
 
-func (alloc *Allocator) NumFreeAddresses(r address.Range) address.Offset {
-	resultChan := make(chan address.Offset)
+func (alloc *Allocator) NumFreeAddresses(r address.Range) address.Count {
+	resultChan := make(chan address.Count)
 	alloc.actionChan <- func() {
 		resultChan <- alloc.space.NumFreeAddressesInRange(r)
 	}
