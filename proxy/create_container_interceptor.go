@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/weaveworks/weave/common"
 )
 
 const MaxDockerHostname = 64

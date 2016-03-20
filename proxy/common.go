@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 var (
@@ -20,6 +20,8 @@ var (
 	weaveWaitEntrypoint = []string{"/w/w"}
 	weaveEntrypoint     = "/home/weave/weaver"
 	weaveContainerName  = "/weave"
+
+	Log = common.Log
 )
 
 func callWeave(args ...string) ([]byte, []byte, error) {

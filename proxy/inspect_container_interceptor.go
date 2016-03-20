@@ -2,8 +2,6 @@ package proxy
 
 import (
 	"net/http"
-
-	. "github.com/weaveworks/weave/common"
 )
 
 type inspectContainerInterceptor struct{ proxy *Proxy }
