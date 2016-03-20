@@ -16,7 +16,7 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/go-checkpoint"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam"
@@ -27,6 +27,8 @@ import (
 )
 
 var version = "(unreleased version)"
+
+var Log = common.Log
 
 type dnsConfig struct {
 	Domain                 string
@@ -147,7 +149,7 @@ func main() {
 
 	peers = mflag.Args()
 
-	SetLogLevel(logLevel)
+	common.SetLogLevel(logLevel)
 
 	if justVersion {
 		fmt.Printf("weave router %s\n", version)
@@ -255,7 +257,7 @@ func main() {
 
 	router.Start()
 	if errors := router.InitiateConnections(peers, false); len(errors) > 0 {
-		Log.Fatal(ErrorMessages(errors))
+		Log.Fatal(common.ErrorMessages(errors))
 	}
 
 	// The weave script always waits for a status call to succeed,
@@ -276,7 +278,7 @@ func main() {
 		go listenAndServeHTTP(httpAddr, muxRouter)
 	}
 
-	SignalHandlerLoop(router)
+	common.SignalHandlerLoop(router)
 }
 
 func options() map[string]string {

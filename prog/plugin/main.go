@@ -11,7 +11,7 @@ import (
 
 	"github.com/docker/libnetwork/ipamapi"
 	weaveapi "github.com/weaveworks/weave/api"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	weavenet "github.com/weaveworks/weave/net"
 	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
@@ -20,6 +20,8 @@ import (
 )
 
 var version = "(unreleased version)"
+
+var Log = common.Log
 
 func main() {
 	var (
@@ -43,7 +45,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	SetLogLevel(logLevel)
+	common.SetLogLevel(logLevel)
 
 	// API 1.21 is the first version that supports docker network commands
 	dockerClient, err := docker.NewVersionedClientFromEnv("1.21")

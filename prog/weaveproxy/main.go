@@ -6,14 +6,14 @@ import (
 	"strings"
 
 	"github.com/docker/docker/pkg/mflag"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/mflagext"
 	"github.com/weaveworks/weave/proxy"
 )
 
-var (
-	version = "(unreleased version)"
-)
+var version = "(unreleased version)"
+
+var Log = common.Log
 
 func getenv(key, defaultVal string) string {
 	if v := os.Getenv(key); v != "" {
@@ -56,7 +56,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	SetLogLevel(logLevel)
+	common.SetLogLevel(logLevel)
 
 	Log.Infoln("weave proxy", version)
 	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
@@ -79,5 +79,5 @@ func main() {
 	p.AttachExistingContainers()
 	go p.Serve(listeners)
 	go p.ListenAndServeStatus("/home/weave/status.sock")
-	SignalHandlerLoop()
+	common.SignalHandlerLoop()
 }

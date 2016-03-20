@@ -11,7 +11,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/weaveworks/mesh"
 
-	. "github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
