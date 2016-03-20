@@ -8,7 +8,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/weaveworks/mesh"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -230,12 +230,17 @@ func (n *Nameserver) OnGossipBroadcast(_ mesh.PeerName, msg []byte) (mesh.Gossip
 	return entries, err
 }
 
+// Logging
+
 func (n *Nameserver) infof(fmt string, args ...interface{}) {
-	Log.Infof("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
+	n.logf(common.Log.Infof, fmt, args...)
 }
 func (n *Nameserver) debugf(fmt string, args ...interface{}) {
-	Log.Debugf("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
+	n.logf(common.Log.Debugf, fmt, args...)
 }
 func (n *Nameserver) errorf(fmt string, args ...interface{}) {
-	Log.Errorf("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
+	n.logf(common.Log.Errorf, fmt, args...)
+}
+func (n *Nameserver) logf(f func(string, ...interface{}), fmt string, args ...interface{}) {
+	f("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
 }
