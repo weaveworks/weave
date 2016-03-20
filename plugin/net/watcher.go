@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	weaveapi "github.com/weaveworks/weave/api"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 )
 
@@ -27,10 +27,10 @@ func NewWatcher(client *docker.Client, weave *weaveapi.Client, driver *driver) (
 }
 
 func (w *watcher) ContainerStarted(id string) {
-	Log.Debugf("Container started %s", id)
+	common.Log.Debugf("Container started %s", id)
 	info, err := w.client.InspectContainer(id)
 	if err != nil {
-		Log.Warningf("error inspecting container: %s", err)
+		common.Log.Warningf("error inspecting container: %s", err)
 		return
 	}
 	// check that it's on our network, via the endpointID
@@ -38,7 +38,7 @@ func (w *watcher) ContainerStarted(id string) {
 		if w.driver.HasEndpoint(net.EndpointID) {
 			fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
 			if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
-				Log.Warningf("unable to register with weaveDNS: %s", err)
+				common.Log.Warningf("unable to register with weaveDNS: %s", err)
 			}
 		}
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/docker/docker/pkg/mflag"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/mflagext"
 	"github.com/weaveworks/weave/proxy"
 )
@@ -56,13 +56,13 @@ func main() {
 		os.Exit(0)
 	}
 
-	SetLogLevel(logLevel)
+	common.SetLogLevel(logLevel)
 
-	Log.Infoln("weave proxy", version)
-	Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
+	common.Log.Infoln("weave proxy", version)
+	common.Log.Infoln("Command line arguments:", strings.Join(os.Args[1:], " "))
 
 	if withDNS {
-		Log.Warning("--with-dns option has been removed; DNS is on by default")
+		common.Log.Warning("--with-dns option has been removed; DNS is on by default")
 	}
 
 	c.Image = getenv("EXEC_IMAGE", "weaveworks/weaveexec")
@@ -71,7 +71,7 @@ func main() {
 
 	p, err := proxy.NewProxy(c)
 	if err != nil {
-		Log.Fatalf("Could not start proxy: %s", err)
+		common.Log.Fatalf("Could not start proxy: %s", err)
 	}
 	defer p.Stop()
 
@@ -79,5 +79,5 @@ func main() {
 	p.AttachExistingContainers()
 	go p.Serve(listeners)
 	go p.ListenAndServeStatus("/home/weave/status.sock")
-	SignalHandlerLoop()
+	common.SignalHandlerLoop()
 }

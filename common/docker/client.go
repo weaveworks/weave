@@ -8,7 +8,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 const (
@@ -84,7 +84,7 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 		for {
 			events := make(chan *docker.APIEvents)
 			if err := c.AddEventListener(events); err != nil {
-				Log.Errorf("[docker] Unable to add listener to Docker API: %s - retrying in %ds", err, retryInterval/time.Second)
+				common.Log.Errorf("[docker] Unable to add listener to Docker API: %s - retrying in %ds", err, retryInterval/time.Second)
 			} else {
 				start := time.Now()
 				for event := range events {
@@ -100,7 +100,7 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 				if time.Since(start) > retryInterval {
 					retryInterval = InitialInterval
 				}
-				Log.Errorf("[docker] Event listener channel closed - retrying subscription in %ds", retryInterval/time.Second)
+				common.Log.Errorf("[docker] Event listener channel closed - retrying subscription in %ds", retryInterval/time.Second)
 			}
 			time.Sleep(retryInterval)
 			retryInterval = retryInterval * 3 / 2
@@ -133,7 +133,7 @@ func (c *Client) IsContainerNotRunning(idStr string) bool {
 	if _, notThere := err.(*docker.NoSuchContainer); notThere {
 		return true
 	}
-	Log.Errorf("[docker] Could not check container status: %s", err)
+	common.Log.Errorf("[docker] Could not check container status: %s", err)
 	return false
 }
 
@@ -141,13 +141,13 @@ func (c *Client) IsContainerNotRunning(idStr string) bool {
 // if it is on the Docker bridge network then that address; if on the host network
 // then localhost
 func (c *Client) GetContainerIP(nameOrID string) (string, error) {
-	Log.Debugf("Getting IP for container %s", nameOrID)
+	common.Log.Debugf("Getting IP for container %s", nameOrID)
 	info, err := c.InspectContainer(nameOrID)
 	if err != nil {
 		return "", err
 	}
 	if info.NetworkSettings.Networks != nil {
-		Log.Debugln("Networks: ", info.NetworkSettings.Networks)
+		common.Log.Debugln("Networks: ", info.NetworkSettings.Networks)
 		if bridgeNetwork, ok := info.NetworkSettings.Networks["bridge"]; ok {
 			return bridgeNetwork.IPAddress, nil
 		} else if _, ok := info.NetworkSettings.Networks["host"]; ok {

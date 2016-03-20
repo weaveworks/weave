@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/fsouza/go-dockerclient"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Request) {
@@ -23,7 +23,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusNotFound)
 		default:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			Log.Warning("Error intercepting request: ", err)
+			common.Log.Warning("Error intercepting request: ", err)
 		}
 		return
 	}
@@ -31,7 +31,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 	conn, err := proxy.Dial()
 	if err != nil {
 		http.Error(w, "Could not connect to target", http.StatusInternalServerError)
-		Log.Warning(err)
+		common.Log.Warning(err)
 		return
 	}
 	client := httputil.NewClientConn(conn, nil)
@@ -40,13 +40,13 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 	resp, err := client.Do(r)
 	if err != nil && err != httputil.ErrPersistEOF {
 		http.Error(w, fmt.Sprintf("Could not make request to target: %v", err), http.StatusInternalServerError)
-		Log.Warning("Error forwarding request: ", err)
+		common.Log.Warning("Error forwarding request: ", err)
 		return
 	}
 	err = i.InterceptResponse(resp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		Log.Warning("Error intercepting response: ", err)
+		common.Log.Warning("Error intercepting response: ", err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 			hdr.Add(k, v)
 		}
 	}
-	Log.Debugf("Response from target: %s %v", resp.Status, w.Header())
+	common.Log.Debugf("Response from target: %s %v", resp.Status, w.Header())
 
 	if resp.Header.Get("Content-Type") == "application/vnd.docker.raw-stream" {
 		doRawStream(w, resp, client)
@@ -65,7 +65,7 @@ func (proxy *Proxy) Intercept(i interceptor, w http.ResponseWriter, r *http.Requ
 	} else {
 		w.WriteHeader(resp.StatusCode)
 		if _, err := io.Copy(w, resp.Body); err != nil {
-			Log.Warning(err)
+			common.Log.Warning(err)
 		}
 	}
 }
@@ -80,17 +80,17 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 	defer up.Close()
 
 	if _, err := down.Write([]byte("HTTP/1.1 200 OK\n")); err != nil {
-		Log.Warning(err)
+		common.Log.Warning(err)
 		return
 	}
 
 	if err := resp.Header.Write(down); err != nil {
-		Log.Warning(err)
+		common.Log.Warning(err)
 		return
 	}
 
 	if _, err := down.Write([]byte("\n")); err != nil {
-		Log.Warning(err)
+		common.Log.Warning(err)
 		return
 	}
 
@@ -108,7 +108,7 @@ type closeWriter interface {
 func copyStream(dst io.WriteCloser, src io.Reader, wg *sync.WaitGroup) {
 	defer wg.Done()
 	if _, err := io.Copy(dst, src); err != nil {
-		Log.Warning(err)
+		common.Log.Warning(err)
 	}
 	var err error
 	if c, ok := dst.(closeWriter); ok {
@@ -117,7 +117,7 @@ func copyStream(dst io.WriteCloser, src io.Reader, wg *sync.WaitGroup) {
 		err = dst.Close()
 	}
 	if err != nil {
-		Log.Warningf("Error closing connection: %s", err)
+		common.Log.Warningf("Error closing connection: %s", err)
 	}
 }
 
@@ -148,7 +148,7 @@ func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httpu
 		err = chunks.Err()
 	}
 	if err != nil {
-		Log.Errorf("Error forwarding chunked response body: %s", err)
+		common.Log.Errorf("Error forwarding chunked response body: %s", err)
 	}
 }
 

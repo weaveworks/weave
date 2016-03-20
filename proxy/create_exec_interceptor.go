@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 type createExecInterceptor struct{ proxy *Proxy }
@@ -26,7 +26,7 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 
 	cidrs, err := i.proxy.weaveCIDRs(container.HostConfig.NetworkMode, container.Config.Env)
 	if err != nil {
-		Log.Infof("Leaving container %s alone because %s", container.ID, err)
+		common.Log.Infof("Leaving container %s alone because %s", container.ID, err)
 		return nil
 	}
 
@@ -35,7 +35,7 @@ func (i *createExecInterceptor) InterceptRequest(r *http.Request) error {
 		return err
 	}
 
-	Log.Infof("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
+	common.Log.Infof("Exec in container %s with WEAVE_CIDR \"%s\"", container.ID, strings.Join(cidrs, " "))
 	options["Cmd"] = append(weaveWaitEntrypoint, cmd...)
 
 	return marshalRequestBody(r, options)

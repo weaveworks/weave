@@ -9,7 +9,7 @@ import (
 	"github.com/docker/libnetwork/ipamapi"
 	"github.com/docker/libnetwork/netlabel"
 	"github.com/weaveworks/weave/api"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 )
 
 type ipam struct {
@@ -21,13 +21,13 @@ func NewIpam(weave *api.Client) ipamapi.Ipam {
 }
 
 func (i *ipam) GetDefaultAddressSpaces() (string, string, error) {
-	Log.Debugln("GetDefaultAddressSpaces")
+	common.Log.Debugln("GetDefaultAddressSpaces")
 	return "weavelocal", "weaveglobal", nil
 }
 
 func (i *ipam) RequestPool(addressSpace, pool, subPool string, options map[string]string, v6 bool) (poolname string, subnet *net.IPNet, data map[string]string, err error) {
-	Log.Debugln("RequestPool", addressSpace, pool, subPool, options)
-	defer func() { Log.Debugln("RequestPool returning", poolname, subnet, data, err) }()
+	common.Log.Debugln("RequestPool", addressSpace, pool, subPool, options)
+	defer func() { common.Log.Debugln("RequestPool returning", poolname, subnet, data, err) }()
 	if pool == "" {
 		subnet, err = i.weave.DefaultSubnet()
 	} else {
@@ -51,13 +51,13 @@ func (i *ipam) RequestPool(addressSpace, pool, subPool string, options map[strin
 }
 
 func (i *ipam) ReleasePool(poolID string) error {
-	Log.Debugln("ReleasePool", poolID)
+	common.Log.Debugln("ReleasePool", poolID)
 	return nil
 }
 
 func (i *ipam) RequestAddress(poolID string, address net.IP, options map[string]string) (ip *net.IPNet, _ map[string]string, err error) {
-	Log.Debugln("RequestAddress", poolID, address, options)
-	defer func() { Log.Debugln("allocateIP returned", ip, err) }()
+	common.Log.Debugln("RequestAddress", poolID, address, options)
+	defer func() { common.Log.Debugln("allocateIP returned", ip, err) }()
 	// If we pass magic string "_" to weave IPAM it stores the address under its own string
 	if poolID == "weavepool" { // old-style
 		ip, err = i.weave.AllocateIP("_")
@@ -91,7 +91,7 @@ func (i *ipam) RequestAddress(poolID string, address net.IP, options map[string]
 }
 
 func (i *ipam) ReleaseAddress(poolID string, address net.IP) error {
-	Log.Debugln("ReleaseAddress", poolID, address)
+	common.Log.Debugln("ReleaseAddress", poolID, address)
 	return i.weave.ReleaseIPsFor(address.String())
 }
 
