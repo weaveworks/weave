@@ -6,19 +6,20 @@ layout: default
 
 You may wish to `weave stop` and re-launch to change some config or to
 upgrade to a new version. Provided that the underlying protocol hasn't
-changed, Weave Net picks up where it left off and learns from peers in the
-network which address ranges it was previously using. 
+changed, Weave Net picks up where it left off and learns from peers in
+the network which address ranges it was previously using.
 
-If, however, you run `weave reset` this removes the peer from the network so
-if Weave Net is run again on that node it will start from scratch.
+If, however, you run `weave reset` this removes the peer from the
+network so if Weave Net is run again on that node it will start from
+scratch.
 
-For failed peers, the `weave rmpeer` command can be used to
+For failed peers, the `weave rmpeer` command can be invoked to
 permanently remove the ranges allocated to said peer.  This allows
-other peers to allocate IPs in the ranges previously owned by the removed peer, 
-and as such should be used with extreme caution - if the removed
-peer had transferred some range of IP addresses to another peer but
-this is not known to the whole network, or if it later rejoins
-the Weave network, the same IP address may be allocated twice.
+other peers to allocate IPs in the ranges previously owned by the
+removed peer, and as such should be used with extreme caution - if the
+removed peer had transferred some range of IP addresses to another
+peer but this is not known to the whole network, or if it later
+rejoins the Weave network, the same IP address may be allocated twice.
 
 Assume you had started the three peers in the example earlier, and
 then host3 caught fire, you can go to one of the other hosts and run:
@@ -37,4 +38,3 @@ status`.
  * [Address Allocation with IP Address Management (IPAM)](/site/ipam/overview-init-ipam.md)
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
  * [Isolating Applications on a Weave Network](/site/using-weave/isolating-applications.md)
- 
