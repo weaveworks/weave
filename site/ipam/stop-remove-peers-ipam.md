@@ -14,12 +14,13 @@ network so if Weave Net is run again on that node it will start from
 scratch.
 
 For failed peers, the `weave rmpeer` command can be invoked to
-permanently remove the ranges allocated to said peer.  This allows
+permanently remove the ranges allocated to said peers.  This allows
 other peers to allocate IPs in the ranges previously owned by the
-removed peer, and as such should be used with extreme caution - if the
-removed peer had transferred some range of IP addresses to another
-peer but this is not known to the whole network, or if it later
-rejoins the Weave network, the same IP address may be allocated twice.
+removed peers, and as such should be used with extreme caution: if the
+removed peers had transferred some range of IP addresses to other
+peers but this is not known to the whole network, or if some of them
+later rejoin the Weave network, the same IP address may be allocated
+twice.
 
 Assume you had started the three peers in the example earlier, and
 then host3 caught fire, you can go to one of the other hosts and run:

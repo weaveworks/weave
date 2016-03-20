@@ -86,13 +86,14 @@ weave stop
       stop-plugin
 
 weave reset
-      rmpeer        <nickname> | <weave internal peer ID>
+      rmpeer        <peer_id> ...
 
 
 where <peer>     = <ip_address_or_fqdn>[:<port>]
       <cidr>     = <ip_address>/<routing_prefix_length>
       <addr>     = [ip:]<cidr> | net:<cidr> | net:default
       <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket
+      <peer_id>  = <nickname> | <weave internal peer ID>
 EOF
 }
 
@@ -2190,9 +2191,12 @@ EOF
         done
         ;;
     rmpeer)
-        [ $# -eq 1 ] || usage
-        PEER=$1
-        call_weave DELETE /peer/$PEER
+        [ $# -gt 0 ] || usage
+        res=0
+        for PEER in "$@" ; do
+            call_weave DELETE /peer/$PEER || res=1
+        done
+        [ $res -eq 0 ]
         ;;
     launch-dns)
         echo "The 'launch-dns' command has been removed; DNS is launched as part of 'launch' and 'launch-router'." >&2
