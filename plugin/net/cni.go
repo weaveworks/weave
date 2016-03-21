@@ -35,7 +35,7 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 		BrName: "weave",
 	}
 	if err := json.Unmarshal(bytes, n); err != nil {
-		return nil, errorf("failed to load netconf: %v", err)
+		return nil, fmt.Errorf("failed to load netconf: %v", err)
 	}
 	return n, nil
 }
@@ -47,10 +47,10 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 
 	if conf.IsGW {
-		return errorf("Gateway functionality not supported")
+		return fmt.Errorf("Gateway functionality not supported")
 	}
 	if conf.IPMasq {
-		return errorf("IP Masquerading functionality not supported")
+		return fmt.Errorf("IP Masquerading functionality not supported")
 	}
 
 	ns, err := netns.GetFromPath(args.Netns)
@@ -83,11 +83,11 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		return cleanup(err)
 	}
 	if err = netlink.LinkSetNsFd(guest, int(ns)); err != nil {
-		return cleanup(errorf("failed to move veth to container netns: %s", err))
+		return cleanup(fmt.Errorf("failed to move veth to container netns: %s", err))
 	}
 
 	if err := netlink.LinkSetUp(local); err != nil {
-		return cleanup(errorf("unable to bring veth up: %s", err))
+		return cleanup(fmt.Errorf("unable to bring veth up: %s", err))
 	}
 
 	var result *types.Result
@@ -98,10 +98,10 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		result, err = ipam.ExecAdd(conf.IPAM.Type, args.StdinData)
 	}
 	if err != nil {
-		return cleanup(errorf("unable to allocate IP address: %s", err))
+		return cleanup(fmt.Errorf("unable to allocate IP address: %s", err))
 	}
 	if result.IP4 == nil {
-		return cleanup(errorf("IPAM plugin failed to allocate IP address"))
+		return cleanup(fmt.Errorf("IPAM plugin failed to allocate IP address"))
 	}
 
 	// If config says nothing about routes or gateway, default one will be via the bridge
@@ -117,7 +117,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		return setupGuestIP4(local.PeerName, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
 	})
 	if err != nil {
-		return cleanup(errorf("error setting up interface: %s", err))
+		return cleanup(fmt.Errorf("error setting up interface: %s", err))
 	}
 
 	result.DNS = conf.DNS
@@ -216,7 +216,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return netlink.LinkDel(link)
 	})
 	if err != nil {
-		return errorf("error removing interface: %s", err)
+		return fmt.Errorf("error removing interface: %s", err)
 	}
 
 	// Default IPAM is Weave's own
@@ -226,7 +226,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		err = ipam.ExecDel(conf.IPAM.Type, args.StdinData)
 	}
 	if err != nil {
-		return errorf("unable to release IP address: %s", err)
+		return fmt.Errorf("unable to release IP address: %s", err)
 	}
 	return nil
 }
