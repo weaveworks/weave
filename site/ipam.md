@@ -49,15 +49,15 @@ time, you can give the number of peers like this:
     host3$ weave launch --init-peer-count 3 $HOST2
 
 The consensus mechanism used to determine a majority transitions
-through three states: 'deferred', 'waiting' and 'achieved':
+through three states: 'idle', 'awaiting consensus' and 'ready':
 
-* 'deferred' - no allocation requests or claims have been made yet;
+* 'idle' - no allocation requests or claims have been made yet;
   consensus is deferred until then
-* 'waiting' - an attempt to achieve consensus is ongoing, triggered by
-  an allocation or claim request; allocations will block. This state
-  persists until a quorum of peers are able to communicate amongst
-  themselves successfully
-* 'achieved' - consensus achieved; allocations proceed normally
+* 'awaiting consensus' - an attempt to achieve consensus is ongoing,
+  triggered by an allocation or claim request; allocations will block.
+  This state persists until a quorum of peers are able to communicate
+  amongst themselves successfully
+* 'ready' - consensus achieved; allocations proceed normally
 
 ### More on `--init-peer-count`
 
@@ -214,7 +214,7 @@ reports on the current status of the weave router and IP allocator:
 ...
 
        Service: ipam
-     Consensus: waiting(quorum: 2, known: 0)
+        Status: awaiting consensus (quorum: 2, known: 0)
          Range: 10.32.0.0-10.47.255.255
  DefaultSubnet: 10.32.0.0/12
 
