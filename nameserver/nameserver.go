@@ -204,11 +204,14 @@ func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData
 	}
 
 	n.Lock()
-	defer n.Unlock()
-
+	isKnownPeer := n.isKnownPeer
+	n.Unlock() // Don't hold the lock over call out to code elsewhere
 	gossip.Entries.filter(func(e *Entry) bool {
-		return n.isKnownPeer(e.Origin)
+		return isKnownPeer(e.Origin)
 	})
+
+	n.Lock()
+	defer n.Unlock()
 
 	newEntries := n.entries.merge(gossip.Entries)
 	if len(newEntries) > 0 {
