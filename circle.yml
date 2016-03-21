@@ -44,11 +44,11 @@ test:
   post:
     - cd $SRCDIR/test; ./gce.sh destroy:
         parallel: true
+    - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh):
+        parallel: true
 
 teardown:
   pre:
-    - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh):
-        parallel: true
     - test "$CIRCLE_NODE_INDEX" != "0" || (go get github.com/mattn/goveralls && goveralls -repotoken $COVERALLS_REPO_TOKEN -coverprofile=$SRCDIR/test/profile.cov -service=circleci || true):
         parallel: true
     - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; cp coverage.* $CIRCLE_ARTIFACTS):
