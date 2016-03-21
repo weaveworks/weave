@@ -6,26 +6,25 @@ import (
 	"strings"
 
 	"github.com/docker/libnetwork/discoverapi"
-	"github.com/docker/libnetwork/ipamapi"
 	"github.com/docker/libnetwork/netlabel"
 	"github.com/weaveworks/weave/api"
 	. "github.com/weaveworks/weave/common"
 )
 
-type ipam struct {
+type Ipam struct {
 	weave *api.Client
 }
 
-func NewIpam(weave *api.Client) ipamapi.Ipam {
-	return &ipam{weave: weave}
+func NewIpam(weave *api.Client) *Ipam {
+	return &Ipam{weave: weave}
 }
 
-func (i *ipam) GetDefaultAddressSpaces() (string, string, error) {
+func (i *Ipam) GetDefaultAddressSpaces() (string, string, error) {
 	Log.Debugln("GetDefaultAddressSpaces")
 	return "weavelocal", "weaveglobal", nil
 }
 
-func (i *ipam) RequestPool(addressSpace, pool, subPool string, options map[string]string, v6 bool) (poolname string, subnet *net.IPNet, data map[string]string, err error) {
+func (i *Ipam) RequestPool(addressSpace, pool, subPool string, options map[string]string, v6 bool) (poolname string, subnet *net.IPNet, data map[string]string, err error) {
 	Log.Debugln("RequestPool", addressSpace, pool, subPool, options)
 	defer func() { Log.Debugln("RequestPool returning", poolname, subnet, data, err) }()
 	if pool == "" {
@@ -50,12 +49,12 @@ func (i *ipam) RequestPool(addressSpace, pool, subPool string, options map[strin
 	return
 }
 
-func (i *ipam) ReleasePool(poolID string) error {
+func (i *Ipam) ReleasePool(poolID string) error {
 	Log.Debugln("ReleasePool", poolID)
 	return nil
 }
 
-func (i *ipam) RequestAddress(poolID string, address net.IP, options map[string]string) (ip *net.IPNet, _ map[string]string, err error) {
+func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]string) (ip *net.IPNet, _ map[string]string, err error) {
 	Log.Debugln("RequestAddress", poolID, address, options)
 	defer func() { Log.Debugln("allocateIP returned", ip, err) }()
 	// If we pass magic string "_" to weave IPAM it stores the address under its own string
@@ -90,17 +89,17 @@ func (i *ipam) RequestAddress(poolID string, address net.IP, options map[string]
 	return
 }
 
-func (i *ipam) ReleaseAddress(poolID string, address net.IP) error {
+func (i *Ipam) ReleaseAddress(poolID string, address net.IP) error {
 	Log.Debugln("ReleaseAddress", poolID, address)
 	return i.weave.ReleaseIPsFor(address.String())
 }
 
 // Functions required by ipamapi "contract" but not actually used.
 
-func (i *ipam) DiscoverNew(discoverapi.DiscoveryType, interface{}) error {
+func (i *Ipam) DiscoverNew(discoverapi.DiscoveryType, interface{}) error {
 	return nil
 }
 
-func (i *ipam) DiscoverDelete(discoverapi.DiscoveryType, interface{}) error {
+func (i *Ipam) DiscoverDelete(discoverapi.DiscoveryType, interface{}) error {
 	return nil
 }

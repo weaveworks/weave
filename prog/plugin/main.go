@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	cni "github.com/appc/cni/pkg/skel"
 	"github.com/docker/libnetwork/ipamapi"
 	weaveapi "github.com/weaveworks/weave/api"
 	"github.com/weaveworks/weave/common"
@@ -26,6 +28,8 @@ var Log = common.Log
 func main() {
 	var (
 		justVersion      bool
+		cniNet           bool
+		cniIpam          bool
 		address          string
 		meshAddress      string
 		logLevel         string
@@ -33,6 +37,8 @@ func main() {
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
+	flag.BoolVar(&cniNet, "cni-net", false, "act as a CNI network plugin")
+	flag.BoolVar(&cniIpam, "cni-ipam", false, "act as a CNI IPAM plugin")
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	flag.StringVar(&address, "socket", "/run/docker/plugins/weave.sock", "socket on which to listen")
 	flag.StringVar(&meshAddress, "meshsocket", "/run/docker/plugins/weavemesh.sock", "socket on which to listen in mesh mode")
@@ -47,13 +53,24 @@ func main() {
 
 	common.SetLogLevel(logLevel)
 
+	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
+
+	switch {
+	case cniIpam || strings.HasSuffix(os.Args[0], "weave-ipam"):
+		i := ipamplugin.NewIpam(weave)
+		cni.PluginMain(i.CmdAdd, i.CmdDel)
+		os.Exit(0)
+	case cniNet || strings.HasSuffix(os.Args[0], "weave-net"):
+		n := netplugin.NewCNIPlugin(weave)
+		cni.PluginMain(n.CmdAdd, n.CmdDel)
+		os.Exit(0)
+	}
+
 	// API 1.21 is the first version that supports docker network commands
 	dockerClient, err := docker.NewVersionedClientFromEnv("1.21")
 	if err != nil {
 		Log.Fatalf("unable to connect to docker: %s", err)
 	}
-
-	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
 
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 	Log.Info(dockerClient.Info())

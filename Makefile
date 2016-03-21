@@ -67,7 +67,7 @@ $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/we
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
-$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/docker/*.go
+$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
