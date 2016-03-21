@@ -26,7 +26,7 @@ func (i *Ipam) GetDefaultAddressSpaces() (string, string, error) {
 
 func (i *Ipam) RequestPool(addressSpace, pool, subPool string, options map[string]string, v6 bool) (poolname string, subnet *net.IPNet, data map[string]string, err error) {
 	i.logReq("RequestPool", addressSpace, pool, subPool, options)
-	defer func() { i.logRes("RequestPool", poolname, subnet, data, err) }()
+	defer func() { i.logRes("RequestPool", err, poolname, subnet, data) }()
 	if pool == "" {
 		subnet, err = i.weave.DefaultSubnet()
 	} else {
@@ -56,7 +56,7 @@ func (i *Ipam) ReleasePool(poolID string) error {
 
 func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]string) (ip *net.IPNet, _ map[string]string, err error) {
 	i.logReq("RequestAddress", poolID, address, options)
-	defer func() { i.logRes("RequestAddress", ip, err) }()
+	defer func() { i.logRes("RequestAddress", err, ip) }()
 	// If we pass magic string "_" to weave IPAM it stores the address under its own string
 	if poolID == "weavepool" { // old-style
 		ip, err = i.weave.AllocateIP("_")
@@ -107,9 +107,13 @@ func (i *Ipam) DiscoverDelete(discoverapi.DiscoveryType, interface{}) error {
 // logging
 
 func (i *Ipam) logReq(fun string, args ...interface{}) {
-	common.Log.Debugln(append([]interface{}{fmt.Sprintf("[ipam] %s", fun)}, args...)...)
+	common.Log.Infoln(append([]interface{}{fmt.Sprintf("[ipam] %s", fun)}, args...)...)
 }
 
-func (i *Ipam) logRes(fun string, args ...interface{}) {
-	common.Log.Debugln(append([]interface{}{fmt.Sprintf("[ipam] %s result", fun)}, args...)...)
+func (i *Ipam) logRes(fun string, err error, args ...interface{}) {
+	if err == nil {
+		common.Log.Debugln(append([]interface{}{fmt.Sprintf("[ipam] %s result", fun)}, args...)...)
+		return
+	}
+	common.Log.Errorf("[ipam] %s: %s", fun, err)
 }
