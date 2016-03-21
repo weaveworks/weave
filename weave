@@ -40,7 +40,7 @@ weave --help | help
 
 weave launch        <same arguments as 'weave launch-router'>
       launch-router [--password <pass>] [--name <mac>] [--nickname <nickname>]
-                      [--ipam-seed <mac>,...]
+                      [--ipam-seed <mac>,...] [--observer]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--init-peer-count <count>] [--no-discovery]
                       [--trusted-subnets <cidr>,...] <peer> ...
