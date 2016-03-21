@@ -22,6 +22,36 @@ The following automatic IP address managment topics are discussed:
 
 ### <a name="initialization"></a>Initializing Peers on a Weave Network
 
+There are two options for initialising IPAM - with a statically
+configured seed or automatically via one-off consensus. The two
+options have different tradeoffs, so pick the one that suits your
+deployment best.
+
+#### <a name="seed"></a>Via Seed
+
+Configuration via seed requires you to provide a list of peer names
+(via the `--ipam-seed` parameter) amongst which the address space will
+be shared initially - this means that you will also have to specify
+peer names explicitly on launch:
+
+    host1$ weave launch --name ::1 --ipam-seed ::1,::2,::3
+    host2$ weave launch --name ::2 --ipam-seed ::1,::2,::3
+    host3$ weave launch --name ::3 --ipam-seed ::1,::2,::3
+
+In this configuration each peer knows in advance how the address space
+has been divided up, and will be able to perform allocations from the
+outset even under conditions of partition - no consensus is required.
+
+#### <a name="consensus"></a>Via One-off Consensus
+
+Alternatively, you can let weave determine the seed automatically via
+a consensus algorithm; since you don't need to provide it with a list
+of peer names anymore you can also let weave generate those randomly
+for you too. However, in order for weave to form a single consensus
+reliably you must now instead tell each peer how many peers there are
+in total either by listing them as target peers or via the
+`--init-peer-count` parameter.
+
 Just once, when the first automatic IP address allocation is requested
 in the whole network, Weave Net needs a majority of peers to be present in
 order to avoid formation of isolated groups, which can lead to

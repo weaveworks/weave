@@ -47,6 +47,7 @@ type operation interface {
 type Allocator struct {
 	actionChan        chan<- func()
 	ourName           mesh.PeerName
+	seed              []mesh.PeerName           // optional user supplied ring seed
 	universe          address.Range             // superset of all ranges
 	ring              *ring.Ring                // information on ranges owned by all peers
 	space             space.Space               // more detail on ranges owned by us
@@ -70,6 +71,7 @@ type Config struct {
 	OurName     mesh.PeerName
 	OurUID      mesh.PeerUID
 	OurNickname string
+	Seed        []mesh.PeerName
 	Universe    address.Range
 	Quorum      uint
 	Db          db.DB
@@ -80,6 +82,7 @@ type Config struct {
 func NewAllocator(config Config) *Allocator {
 	return &Allocator{
 		ourName:     config.OurName,
+		seed:        config.Seed,
 		universe:    config.Universe,
 		ring:        ring.New(config.Universe.Start, config.Universe.End, config.OurName),
 		owned:       make(map[string][]address.CIDR),
@@ -835,31 +838,49 @@ func (alloc *Allocator) persistRing() {
 }
 
 func (alloc *Allocator) loadPersistedData() {
-	checkPeerName := alloc.ourName
-	if err := alloc.db.Load(nameIdent, &checkPeerName); err != nil {
+	var checkPeerName mesh.PeerName
+	nameFound, err := alloc.db.Load(nameIdent, &checkPeerName)
+	if err != nil {
 		alloc.fatalf("Error loading persisted peer name: %s", err)
-		return
 	}
-	if checkPeerName != alloc.ourName {
+	ringFound, err := alloc.db.Load(ringIdent, &alloc.ring)
+	if err != nil {
+		alloc.fatalf("Error loading persisted IPAM data: %s", err)
+	}
+	ownedFound, err := alloc.db.Load(ownedIdent, &alloc.owned)
+	if err != nil {
+		alloc.fatalf("Error loading persisted address data: %s", err)
+	}
+
+	if nameFound {
+		if checkPeerName == alloc.ourName {
+			if ringFound {
+				if len(alloc.seed) != 0 {
+					alloc.infof("Found persisted IPAM data, ignoring supplied IPAM seed")
+				}
+				alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+			}
+			if ownedFound {
+				for _, cidrs := range alloc.owned {
+					for _, cidr := range cidrs {
+						alloc.space.Claim(cidr.Addr)
+					}
+				}
+			}
+			return
+		}
 		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
 		alloc.persistRing()
 		alloc.persistOwned()
-		return
 	}
-	if err := alloc.db.Load(ringIdent, &alloc.ring); err != nil {
-		alloc.fatalf("Error loading persisted ring data: %s", err)
+
+	if len(alloc.seed) != 0 {
+		alloc.infof("Initialising with supplied IPAM seed")
+		alloc.createRing(alloc.seed)
+	} else {
+		alloc.infof("Initialising via deferred consensus")
 	}
-	if alloc.ring != nil {
-		alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
-	}
-	if err := alloc.db.Load(ownedIdent, &alloc.owned); err != nil {
-		alloc.fatalf("Error loading persisted address data: %s", err)
-	}
-	for _, cidrs := range alloc.owned {
-		for _, cidr := range cidrs {
-			alloc.space.Claim(cidr.Addr)
-		}
-	}
+
 }
 
 func (alloc *Allocator) persistOwned() {

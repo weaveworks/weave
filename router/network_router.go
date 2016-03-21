@@ -230,7 +230,7 @@ func (router *NetworkRouter) ForgetConnections(peers []string) {
 
 func (router *NetworkRouter) InitialPeers(peers []string) ([]string, error) {
 	var storedPeers []string
-	if err := router.db.Load(peersIdent, &storedPeers); err != nil {
+	if _, err := router.db.Load(peersIdent, &storedPeers); err != nil {
 		return nil, err
 	}
 

@@ -9,7 +9,7 @@ import (
 )
 
 type DB interface {
-	Load(string, interface{}) error
+	Load(string, interface{}) (bool, error)
 	Save(string, interface{}) error
 }
 
@@ -50,11 +50,13 @@ func NewBoltDB(dbPathname string) (*BoltDB, error) {
 	return &BoltDB{db: db}, err
 }
 
-func (d *BoltDB) Load(ident string, data interface{}) error {
-	return d.db.View(func(tx *bolt.Tx) error {
+func (d *BoltDB) Load(ident string, data interface{}) (bool, error) {
+	found := true
+	err := d.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(topBucket)
 		v := b.Get([]byte(ident))
 		if v == nil {
+			found = false
 			return nil
 		}
 		reader := bytes.NewReader(v)
@@ -62,6 +64,7 @@ func (d *BoltDB) Load(ident string, data interface{}) error {
 		err := decoder.Decode(data)
 		return err
 	})
+	return found, err
 }
 
 func (d *BoltDB) Save(ident string, data interface{}) error {
