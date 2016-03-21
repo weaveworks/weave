@@ -61,7 +61,7 @@ $ weave status
  TrustedSubnets: none
 
         Service: ipam
-      Consensus: achieved
+         Status: ready
           Range: 10.32.0.0-10.47.255.255
   DefaultSubnet: 10.32.0.0/12
 
