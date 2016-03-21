@@ -76,10 +76,13 @@ func (c ipamConfig) Enabled() bool {
 		hasPeerCount = c.PeerCount > 0
 		hasSeed      = len(c.Seed) > 0
 		hasRange     = c.IPRangeCIDR != ""
+		hasSubnet    = c.IPSubnetCIDR != ""
 	)
 	switch {
-	case !(c.Observer || hasPeerCount || hasSeed || hasRange):
+	case !(c.Observer || hasPeerCount || hasSeed || hasRange || hasSubnet):
 		return false
+	case !hasRange && hasSubnet:
+		Log.Fatal("--ipalloc-default-subnet specified without --ipalloc-range.")
 	case !hasRange:
 		Log.Fatal("--observer, --ipam-seed or --init-peer-count specified without --ipalloc-range.")
 	case c.Observer && hasPeerCount || hasPeerCount && hasSeed || hasSeed && c.Observer:
