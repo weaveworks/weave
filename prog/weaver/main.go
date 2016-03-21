@@ -125,7 +125,7 @@ func main() {
 	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
-	mflag.BoolVar(&observer, []string{"-observer"}, false, "do not participate in paxos, observe only")
+	mflag.BoolVar(&observer, []string{"-observer"}, false, "initialise IP address allocation by observing other peers")
 	mflag.StringVar(&ipamSeedStr, []string{"-ipam-seed"}, "", "comma-separated list of peer names amongst which address space is shared initially")
 	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
