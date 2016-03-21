@@ -30,6 +30,14 @@ var version = "(unreleased version)"
 
 var Log = common.Log
 
+type ipamConfig struct {
+	IPRangeCIDR  string
+	IPSubnetCIDR string
+	PeerCount    int
+	Observer     bool
+	Seed         string
+}
+
 type dnsConfig struct {
 	Domain                 string
 	ListenAddress          string
@@ -63,6 +71,26 @@ func check() {
 	checkpoint.CheckInterval(&params, versionCheckPeriod, handleResponse)
 }
 
+func (c ipamConfig) Enabled() bool {
+	var (
+		hasPeerCount = c.PeerCount > 0
+		hasSeed      = len(c.Seed) > 0
+		hasRange     = c.IPRangeCIDR != ""
+		hasSubnet    = c.IPSubnetCIDR != ""
+	)
+	switch {
+	case !(c.Observer || hasPeerCount || hasSeed || hasRange || hasSubnet):
+		return false
+	case !hasRange && hasSubnet:
+		Log.Fatal("--ipalloc-default-subnet specified without --ipalloc-range.")
+	case !hasRange:
+		Log.Fatal("--observer, --ipam-seed or --init-peer-count specified without --ipalloc-range.")
+	case c.Observer && hasPeerCount || hasPeerCount && hasSeed || hasSeed && c.Observer:
+		Log.Fatal("At most one of --observer, --ipam-seed or --init-peer-count may be specified.")
+	}
+	return true
+}
+
 func main() {
 	procs := runtime.NumCPU()
 	// packet sniffing can block an OS thread, so we need one thread
@@ -87,11 +115,7 @@ func main() {
 		bufSzMB            int
 		noDiscovery        bool
 		httpAddr           string
-		iprangeCIDR        string
-		ipsubnetCIDR       string
-		peerCount          int
-		observer           bool
-		ipamSeedStr        string
+		ipamConfig         ipamConfig
 		dockerAPI          string
 		peers              []string
 		noDNS              bool
@@ -122,11 +146,11 @@ func main() {
 	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
 	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
-	mflag.StringVar(&iprangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
-	mflag.StringVar(&ipsubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
-	mflag.IntVar(&peerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
-	mflag.BoolVar(&observer, []string{"-observer"}, false, "initialise IP address allocation by observing other peers")
-	mflag.StringVar(&ipamSeedStr, []string{"-ipam-seed"}, "", "comma-separated list of peer names amongst which address space is shared initially")
+	mflag.StringVar(&ipamConfig.IPRangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
+	mflag.StringVar(&ipamConfig.IPSubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
+	mflag.IntVar(&ipamConfig.PeerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
+	mflag.BoolVar(&ipamConfig.Observer, []string{"-observer"}, false, "initialise IP address allocation by observing other peers")
+	mflag.StringVar(&ipamConfig.Seed, []string{"-ipam-seed"}, "", "comma-separated list of peer names amongst which address space is shared initially")
 	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
@@ -230,17 +254,12 @@ func main() {
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
 	)
-	if observer && peerCount > 0 || peerCount > 0 && len(ipamSeedStr) > 0 || len(ipamSeedStr) > 0 && observer {
-		Log.Fatal("At most one of --observer, --ipam-seed or --init-peer-count may be specified.")
-	}
-	if iprangeCIDR != "" {
-		allocator, defaultSubnet = createAllocator(router.Router, ipamSeedStr, iprangeCIDR, ipsubnetCIDR, determineQuorum(observer, peerCount, peers), db, isKnownPeer)
+	if ipamConfig.Enabled() {
+		allocator, defaultSubnet = createAllocator(router.Router, ipamConfig, len(peers), db, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
 		allocator.AllContainerIDs(ids)
-	} else if peerCount > 0 {
-		Log.Fatal("--init-peer-count flag specified without --ipalloc-range")
 	}
 
 	var (
@@ -360,29 +379,29 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 	return cidr
 }
 
-func createAllocator(router *mesh.Router, ipamSeedStr, ipRangeStr string, defaultSubnetStr string, quorum uint, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
-	seed := parseIPAMSeed(ipamSeedStr)
-	ipRange := parseAndCheckCIDR(ipRangeStr)
+func createAllocator(router *mesh.Router, config ipamConfig, peerCount int, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+	ipRange := parseAndCheckCIDR(config.IPRangeCIDR)
+	seed := parseIPAMSeed(config.Seed)
 	defaultSubnet := ipRange
-	if defaultSubnetStr != "" {
-		defaultSubnet = parseAndCheckCIDR(defaultSubnetStr)
+	if config.IPSubnetCIDR != "" {
+		defaultSubnet = parseAndCheckCIDR(config.IPSubnetCIDR)
 		if !ipRange.Range().Overlaps(defaultSubnet.Range()) {
 			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
 		}
 	}
 
-	config := ipam.Config{
+	c := ipam.Config{
 		OurName:     router.Ourself.Peer.Name,
 		OurUID:      router.Ourself.Peer.UID,
 		OurNickname: router.Ourself.Peer.NickName,
 		Seed:        seed,
 		Universe:    ipRange.Range(),
-		Quorum:      quorum,
+		Quorum:      determineQuorum(config.Observer, config.PeerCount, peerCount),
 		Db:          db,
 		IsKnownPeer: isKnownPeer,
 	}
 
-	allocator := ipam.NewAllocator(config)
+	allocator := ipam.NewAllocator(c)
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
@@ -409,7 +428,7 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 
 // Pick a quorum size heuristically based on the number of peer
 // addresses passed.
-func determineQuorum(observer bool, initPeerCountFlag int, peers []string) uint {
+func determineQuorum(observer bool, initPeerCountFlag int, peerCount int) uint {
 	if observer {
 		return uint(0)
 	}
@@ -425,7 +444,7 @@ func determineQuorum(observer bool, initPeerCountFlag int, peers []string) uint 
 	// that resolve to the same peer, in which case the quorum
 	// might be larger than it needs to be.  But the user can
 	// specify it explicitly if that becomes a problem.
-	clusterSize := uint(len(peers) + 1)
+	clusterSize := uint(peerCount + 1)
 	quorum := clusterSize/2 + 1
 	Log.Println("Assuming quorum size of", quorum)
 	return quorum
