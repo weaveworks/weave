@@ -93,6 +93,9 @@ func (e1 *Entry) merge(e2 *Entry) bool {
 		e1.Version = e2.Version
 		e1.Tombstone = e2.Tombstone
 		return true
+	} else if e2.Version == e1.Version && e2.Tombstone > e1.Tombstone {
+		e1.Tombstone = e2.Tombstone
+		return true
 	}
 	return false
 }
