@@ -181,6 +181,7 @@ func NewLocalConnectionStatusSlice(cm *ConnectionMaker) []LocalConnectionStatus 
 					add("retrying", target.lastError.Error())
 				}
 			case TargetConnected:
+			case TargetSuspended:
 			}
 		}
 		resultChan <- slice
