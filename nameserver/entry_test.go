@@ -86,6 +86,21 @@ func TestTombstone(t *testing.T) {
 		Entry{Hostname: "B", Version: 1, Tombstone: 1234},
 	})
 	require.Equal(t, expected, es)
+
+	// Now try a merge including two entries which differ only in tombstone
+	e2 := make(Entries, len(es))
+	copy(e2, es)
+	e2[1].Tombstone = 5555
+
+	diff := es.merge(e2)
+
+	expected2 := l(Entries{
+		Entry{Hostname: "A"},
+		Entry{Hostname: "B", Version: 1, Tombstone: 5555},
+	})
+	require.Equal(t, expected2, es)
+	expectedDiff := l(Entries{Entry{Hostname: "B", Version: 1, Tombstone: 5555}})
+	require.Equal(t, expectedDiff, diff)
 }
 
 func TestDelete(t *testing.T) {
