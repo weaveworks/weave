@@ -108,9 +108,9 @@ func (e1 *Entry) addLowercase() {
 	e1.lHostname = strings.ToLower(e1.Hostname)
 }
 
-func (e *Entry) tombstone() {
-	e.Version++
-	e.Tombstone = now()
+func (e1 *Entry) tombstone() {
+	e1.Version++
+	e1.Tombstone = now()
 }
 
 func check(es SortableEntries) error {
@@ -219,9 +219,8 @@ func (es Entries) findEqual(e *Entry) (*Entry, bool) {
 	})
 	if i < len(es) && es[i].equal(*e) {
 		return &es[i], true
-	} else {
-		return nil, false
 	}
+	return nil, false
 }
 
 func (es Entries) lookup(hostname string) Entries {
