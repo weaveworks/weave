@@ -93,6 +93,9 @@ func (e1 *Entry) merge(e2 *Entry) bool {
 		e1.Version = e2.Version
 		e1.Tombstone = e2.Tombstone
 		return true
+	} else if e2.Version == e1.Version && e2.Tombstone > e1.Tombstone {
+		e1.Tombstone = e2.Tombstone
+		return true
 	}
 	return false
 }
@@ -103,6 +106,11 @@ func (e1 *Entry) String() string {
 
 func (e1 *Entry) addLowercase() {
 	e1.lHostname = strings.ToLower(e1.Hostname)
+}
+
+func (e *Entry) tombstone() {
+	e.Version++
+	e.Tombstone = now()
 }
 
 func check(es SortableEntries) error {
@@ -182,8 +190,7 @@ func (es *Entries) tombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries
 	tombstoned := Entries{}
 	for i, e := range *es {
 		if f(&e) && e.Origin == ourname {
-			e.Version++
-			e.Tombstone = now()
+			e.tombstone()
 			(*es)[i] = e
 			tombstoned = append(tombstoned, e)
 		}
@@ -191,6 +198,7 @@ func (es *Entries) tombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries
 	return tombstoned
 }
 
+// note f() may only modify entries such that they remain in order defined by less()
 func (es *Entries) filter(f func(*Entry) bool) {
 	defer es.checkAndPanic().checkAndPanic()
 
@@ -203,6 +211,17 @@ func (es *Entries) filter(f func(*Entry) bool) {
 		i++
 	}
 	*es = (*es)[:i]
+}
+
+func (es Entries) findEqual(e *Entry) (*Entry, bool) {
+	i := sort.Search(len(es), func(i int) bool {
+		return !es[i].insensitiveLess(e)
+	})
+	if i < len(es) && es[i].equal(*e) {
+		return &es[i], true
+	} else {
+		return nil, false
+	}
 }
 
 func (es Entries) lookup(hostname string) Entries {
