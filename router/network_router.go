@@ -211,7 +211,7 @@ func (router *NetworkRouter) relayBroadcast(srcPeer *mesh.Peer, key PacketKey) F
 const peersIdent = "directPeers"
 
 func (router *NetworkRouter) persistPeers() {
-	if err := router.db.Save(peersIdent, router.ConnectionMaker.Targets()); err != nil {
+	if err := router.db.Save(peersIdent, router.ConnectionMaker.Targets(false)); err != nil {
 		log.Errorf("Error persisting peers: %s", err)
 		return
 	}
