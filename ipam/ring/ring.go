@@ -46,33 +46,37 @@ var (
 )
 
 func (r *Ring) checkInvariants() error {
-	if !sort.IsSorted(r.Entries) {
+	return r.checkEntries(r.Entries)
+}
+
+func (r *Ring) checkEntries(entries entries) error {
+	if !sort.IsSorted(entries) {
 		return ErrNotSorted
 	}
 
 	// Check no token appears twice
 	// We know it's sorted...
-	for i := 1; i < len(r.Entries); i++ {
-		if r.Entries[i-1].Token == r.Entries[i].Token {
+	for i := 1; i < len(entries); i++ {
+		if entries[i-1].Token == entries[i].Token {
 			return ErrTokenRepeated
 		}
 	}
 
-	if len(r.Entries) == 0 {
+	if len(entries) == 0 {
 		return nil
 	}
 
 	// Check tokens are in range
-	if r.Entries.entry(0).Token < r.Start {
+	if entries.entry(0).Token < r.Start {
 		return ErrTokenOutOfRange
 	}
-	if r.Entries.entry(-1).Token >= r.End {
+	if entries.entry(-1).Token >= r.End {
 		return ErrTokenOutOfRange
 	}
 
 	// Check all the freespaces are in range
-	for i, entry := range r.Entries {
-		next := r.Entries.entry(i + 1)
+	for i, entry := range entries {
+		next := entries.entry(i + 1)
 		distance := r.distance(entry.Token, next.Token)
 
 		if entry.Free > distance {
@@ -181,7 +185,6 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 // Merge the given ring into this ring and return any new ranges added
 func (r *Ring) Merge(gossip Ring) error {
 	r.assertInvariants()
-	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
 	// Don't panic when checking the gossiped in ring.
@@ -265,6 +268,10 @@ func (r *Ring) Merge(gossip Ring) error {
 		}
 		addToResult(*theirs)
 		previousOwner = nil
+	}
+
+	if err := r.checkEntries(result); err != nil {
+		return fmt.Errorf("Merge of incoming data causes: %s", err)
 	}
 
 	if len(r.Seeds) == 0 {
