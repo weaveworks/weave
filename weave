@@ -151,6 +151,7 @@ exec_remote() {
         -e WEAVE_DEBUG \
         -e WEAVE_DOCKER_ARGS \
         -e WEAVEPROXY_DOCKER_ARGS \
+        -e WEAVEPLUGIN_DOCKER_ARGS \
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
         -e WEAVE_HTTP_ADDR \
@@ -1742,6 +1743,7 @@ launch_plugin_if_not_running() {
         --restart=always \
         -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_HTTP_ADDR \
+        $WEAVEPLUGIN_DOCKER_ARGS \
         $PLUGIN_IMAGE "$@"
     wait_for_status $PLUGIN_CONTAINER_NAME http_call_unix $PLUGIN_CONTAINER_NAME status.sock
     util_op create-plugin-network weave weavemesh
