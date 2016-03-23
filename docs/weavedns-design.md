@@ -9,7 +9,7 @@ The model is that each host has a service that is notified of
 hostnames and weave addresses for containers on the host.  Like IPAM,
 this service is embedded within the router.  It binds to
 the host bridge to answer DNS queries from local containers; for
-anything it can't answer, it uses the infomation in the host's
+anything it can't answer, it uses the information in the host's
 /etc/resolv.conf to query an 'fallback' server.
 
 The service is comprised of a DNS server, which answers all DNS queries
@@ -33,7 +33,7 @@ are re-broadcast around the cluster.
 The DNS server also listens to the Docker event stream, and removes
 entries for containers when they die.  Entries removed in this way are
 tombstoned, and the tombstone lazily broadcast around the cluster.
-After a short timeout the tombstones are independantly removed from
+After a short timeout the tombstones are independently removed from
 each host.
 
 

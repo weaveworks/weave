@@ -6,19 +6,19 @@ layout: default
 
 Weave Net automatically assigns containers a unique IP address
 across the network, and also releases that address when the container
-exits. Unless you explicitly specify an address, this occurs for all 
+exits. Unless you explicitly specify an address, this occurs for all
 invocations of the `run`, `start`,
 `attach`, `detach`, `expose`, and `hide` commands. Weave Net can also assign
 addresses in multiple subnets.
 
-The following automatic IP address managment topics are discussed: 
+The following automatic IP address management topics are discussed:
 
  * [Initializing Peers on a Weave Network](#initialization)
  * [`--init-peer-count` and How Quorum is Achieved](#quorum)
  * [Forcing Consensus](#forcing-consensus)
  * [Choosing an Allocation Range](#range)
 
- 
+
 
 ### <a name="initialization"></a>Initializing Peers on a Weave Network
 
@@ -56,7 +56,7 @@ Just once, when the first automatic IP address allocation is requested
 in the whole network, Weave Net needs a majority of peers to be present in
 order to avoid formation of isolated groups, which can lead to
 inconsistency, for example, the same IP address being allocated to two
-different containers. 
+different containers.
 
 Therefore, you must either supply the list of all peers in the network at `weave launch` or add the
 `--init-peer-count` flag to specify how many peers there will be.
@@ -108,10 +108,10 @@ Normally it isn't a problem to over-estimate `--init-peer-count`, but if you sup
 a number that is too small, then multiple independent groups may form.
 
 Weave Net uses the estimate of the number of peers at initialization to
-compute a majority or quorum number - specifically floor(n/2) + 1. 
+compute a majority or quorum number - specifically floor(n/2) + 1.
 
 If the actual number of peers is less than half the number stated, then
-they keep waiting for someone else to join in order to reach a quorum. 
+they keep waiting for someone else to join in order to reach a quorum.
 
 But if the actual number is more than twice the quorum
 number, then you may end up with two sets of peers with each reaching a quorum and
@@ -123,7 +123,7 @@ definitely possible.
 The quorum number is only used once at start-up (specifically, the
 first time someone tries to allocate or claim an IP address). Once
 a set of peers is initialized, you can add more and they will join on
-to the data structure used by the existing set.  
+to the data structure used by the existing set.
 
 The one issue to watch is if the earlier peers are restarted, you must restart
 them using the current number of peers. If they use the smaller number
@@ -175,10 +175,10 @@ according to their needs.  If a group of peers becomes isolated from
 the rest (a partition), they can continue to work with the address
 ranges they had before isolation, and can subsequently be re-connected
 to the rest of the network without any conflicts arising.
-    
+
  **See Also**
 
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
  * [Plugin Command-line Arguments](/site/plugin/plug-in-command-line.md)
- 
-    
+
+

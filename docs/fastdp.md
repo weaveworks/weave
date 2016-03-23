@@ -24,7 +24,7 @@ The router relies on having access to the source and destination peer
 when deciding how to forward packets. When the Sleeve overlay is in
 use this information is conveyed directly within the encapsulation by
 including the names of the peers in question, a solution not
-accomodated directly by the vxlan wire format. Fortunately vxlan does
+accommodated directly by the vxlan wire format. Fortunately vxlan does
 have a twenty four bit segment ID field in the header we can use to
 encode this data - the challenge is to identify peers uniquely with a
 twelve bit identifier instead of the seventeen bytes used by Sleeve.
@@ -54,8 +54,8 @@ with low path MTUs.
 To avoid triggering this fallback in typical deployments, the datapath
 interface is statically configured with an MTU of 1410 bytes allowing
 it to work with most underlay network provider MTUs, including GCE at
-1460 bytes (the fifty byte difference accomodates the vxlan overhead).
-This value can be overriden by setting `WEAVE_MTU` at launch if
+1460 bytes (the fifty byte difference accommodates the vxlan overhead).
+This value can be overridden by setting `WEAVE_MTU` at launch if
 necessary.
 
 # Virtual Ports

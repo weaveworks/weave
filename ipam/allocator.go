@@ -381,7 +381,7 @@ func (alloc *Allocator) Shutdown() {
 
 // AdminTakeoverRanges (Sync) - take over the ranges owned by a given
 // peer, and return how much space was transferred in the process.
-// Only done on adminstrator command.
+// Only done on administrator command.
 func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.Count {
 	resultChan := make(chan address.Count)
 	alloc.actionChan <- func() {
