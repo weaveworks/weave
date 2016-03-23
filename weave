@@ -1400,7 +1400,8 @@ ipam_cidrs() {
             if [ "$METHOD" = "POST" ] ; then
                 # Assignment of a plain IP address; warn if it clashes but carry on
                 check_overlap $arg || true
-                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg || return 1
+                # Abort on failure, but not 4 (=404), which means IPAM is disabled
+                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg || [ $? -eq 4 ] || return 1
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
