@@ -51,8 +51,7 @@ run_on $HOST1 sudo kill -KILL $(docker_on $HOST1 inspect --format='{{.State.Pid}
 sleep 1
 check_attached
 
-# Restart docker itself, using different commands for systemd- and upstart-managed.
-run_on $HOST1 sudo sh -c "command -v systemctl >/dev/null && systemctl restart docker || service docker restart"
+run_on $HOST1 "sudo service docker restart"
 wait_for_proxy $HOST1
 sleep 5 # allow for re-tries of attach
 # Re-fetch the IP since it is not retained on docker restart
