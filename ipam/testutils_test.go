@@ -10,6 +10,7 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/stretchr/testify/require"
+	"github.com/weaveworks/weave/ipam/monitor"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/testing/gossip"
 )
@@ -128,7 +129,8 @@ type mockDB struct{}
 func (d *mockDB) Load(_ string, _ interface{}) (bool, error) { return false, nil }
 func (d *mockDB) Save(_ string, _ interface{}) error         { return nil }
 
-func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.CIDR) {
+func makeAllocator(name string, cidrStr string, quorum uint, isCIDRAligned bool,
+	mon monitor.Monitor) (*Allocator, address.CIDR) {
 	peername, err := mesh.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
@@ -140,19 +142,30 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 	}
 
 	return NewAllocator(Config{
-		OurName:     peername,
-		OurUID:      mesh.PeerUID(rand.Int63()),
-		OurNickname: "nick-" + name,
-		Universe:    cidr,
-		IsObserver:  quorum == 0,
-		Quorum:      func() uint { return quorum },
-		Db:          new(mockDB),
-		IsKnownPeer: func(mesh.PeerName) bool { return true },
+		OurName:       peername,
+		OurUID:        mesh.PeerUID(rand.Int63()),
+		OurNickname:   "nick-" + name,
+		Universe:      cidr,
+		IsObserver:    quorum == 0,
+		Quorum:        func() uint { return quorum },
+		Db:            new(mockDB),
+		IsKnownPeer:   func(mesh.PeerName) bool { return true },
+		IsCIDRAligned: isCIDRAligned,
+		Monitor:       mon,
 	}), cidr
 }
 
-func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.CIDR) {
-	alloc, subnet := makeAllocator(name, universeCIDR, quorum)
+func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string,
+	quorum uint) (*Allocator, address.CIDR) {
+
+	return makeAllocatorWithMockGossipAndMonitor(t, name, universeCIDR, quorum,
+		false, monitor.NewNullMonitor())
+}
+
+func makeAllocatorWithMockGossipAndMonitor(t *testing.T, name string, universeCIDR string, quorum uint,
+	isCIDRAligned bool, mon monitor.Monitor) (*Allocator, address.CIDR) {
+
+	alloc, subnet := makeAllocator(name, universeCIDR, quorum, isCIDRAligned, mon)
 	gossip := &mockGossipComms{T: t, name: name}
 	alloc.SetInterfaces(gossip)
 	alloc.Start()
@@ -164,7 +177,7 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 	for _, alloc2 := range allocs {
 		peers = append(peers, alloc2.ourName)
 	}
-	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
+	alloc.ring.ClaimForPeers(normalizeConsensus(peers), false)
 	alloc.space.AddRanges(alloc.ring.OwnedRanges())
 }
 
@@ -214,6 +227,12 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 }
 
 func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
+	return makeNetworkOfAllocatorsWithMonitor(size, cidr, false, monitor.NewNullMonitor())
+}
+
+func makeNetworkOfAllocatorsWithMonitor(size int, cidr string, isCIDRAligned bool,
+	mon monitor.Monitor) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
+
 	gossipRouter := gossip.NewTestRouter(0.0)
 	allocs := make([]*Allocator, size)
 	var subnet address.CIDR
@@ -221,7 +240,7 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestR
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
 		alloc, subnet = makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", i),
-			cidr, uint(size/2+1))
+			cidr, uint(size/2+1), isCIDRAligned, mon)
 		alloc.SetInterfaces(gossipRouter.Connect(alloc.ourName, alloc))
 		alloc.Start()
 		allocs[i] = alloc

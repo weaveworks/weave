@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/db"
+	"github.com/weaveworks/weave/ipam/monitor"
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
@@ -73,18 +74,22 @@ type Allocator struct {
 	isKnownPeer       func(mesh.PeerName) bool
 	quorum            func() uint
 	now               func() time.Time
+	isCIDRAligned     bool            // should donate only CIDR aligned ranges
+	monitor           monitor.Monitor // monitor tracks changes in address ranges owned by us
 }
 
 type Config struct {
-	OurName     mesh.PeerName
-	OurUID      mesh.PeerUID
-	OurNickname string
-	Seed        []mesh.PeerName
-	Universe    address.CIDR
-	IsObserver  bool
-	Quorum      func() uint
-	Db          db.DB
-	IsKnownPeer func(name mesh.PeerName) bool
+	OurName       mesh.PeerName
+	OurUID        mesh.PeerUID
+	OurNickname   string
+	Seed          []mesh.PeerName
+	Universe      address.CIDR
+	IsObserver    bool
+	Quorum        func() uint
+	Db            db.DB
+	IsKnownPeer   func(name mesh.PeerName) bool
+	IsCIDRAligned bool
+	Monitor       monitor.Monitor
 }
 
 // NewAllocator creates and initialises a new Allocator
@@ -98,18 +103,20 @@ func NewAllocator(config Config) *Allocator {
 	}
 
 	return &Allocator{
-		ourName:     config.OurName,
-		seed:        config.Seed,
-		universe:    config.Universe,
-		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName),
-		owned:       make(map[string]ownedData),
-		db:          config.Db,
-		paxos:       participant,
-		nicknames:   map[mesh.PeerName]string{config.OurName: config.OurNickname},
-		isKnownPeer: config.IsKnownPeer,
-		quorum:      config.Quorum,
-		dead:        make(map[string]time.Time),
-		now:         time.Now,
+		ourName:       config.OurName,
+		seed:          config.Seed,
+		universe:      config.Universe,
+		ring:          ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName),
+		owned:         make(map[string]ownedData),
+		db:            config.Db,
+		paxos:         participant,
+		nicknames:     map[mesh.PeerName]string{config.OurName: config.OurNickname},
+		isKnownPeer:   config.IsKnownPeer,
+		quorum:        config.Quorum,
+		dead:          make(map[string]time.Time),
+		now:           time.Now,
+		isCIDRAligned: config.IsCIDRAligned,
+		monitor:       config.Monitor,
 	}
 }
 
@@ -430,6 +437,10 @@ func (alloc *Allocator) Shutdown() {
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
 		alloc.cancelOps(&alloc.pendingPrimes)
+		err := alloc.monitor.HandleUpdate(alloc.ring.OwnedAndMergedRanges(), nil)
+		if err != nil {
+			alloc.errorf("HandleUpdate failed: %s", err)
+		}
 		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.persistRing()
@@ -461,6 +472,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 			return
 		}
 
+		oldRanges := alloc.ring.OwnedAndMergedRanges()
 		newRanges := alloc.ring.Transfer(peername, alloc.ourName)
 
 		if len(newRanges) == 0 {
@@ -471,6 +483,12 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 		before := alloc.space.NumFreeAddresses()
 		alloc.ringUpdated()
 		after := alloc.space.NumFreeAddresses()
+
+		// TODO(mp): Return error over resultChan
+		err = alloc.monitor.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+		if err != nil {
+			alloc.errorf("HandleUpdate: %s", err)
+		}
 
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
 
@@ -696,7 +714,12 @@ func (alloc *Allocator) establishRing() {
 
 func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
-	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
+	alloc.ring.ClaimForPeers(normalizeConsensus(peers), alloc.isCIDRAligned)
+	// We assume that the peer has not possessed any address ranges before
+	err := alloc.monitor.HandleUpdate(nil, alloc.ring.OwnedAndMergedRanges())
+	if err != nil {
+		alloc.errorf("HandleUpdate failed: %s", err)
+	}
 	alloc.ringUpdated()
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
@@ -787,15 +810,21 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 		alloc.nicknames[peer] = nickname
 	}
 
+	var oldRanges []address.Range
 	switch {
 	// If someone sent us a ring, merge it into ours. Note this will move us
 	// out of the awaiting-consensus state if we didn't have a ring already.
 	case data.Ring != nil:
+		oldRanges = alloc.ring.OwnedAndMergedRanges()
 		updated, err := alloc.ring.Merge(*data.Ring)
 		switch err {
 		case nil:
 			if updated {
 				alloc.pruneNicknames()
+				err := alloc.monitor.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+				if err != nil {
+					return err
+				}
 				alloc.ringUpdated()
 			}
 		case ring.ErrDifferentSeeds:
@@ -867,8 +896,13 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 		return
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
+	oldRanges := alloc.ring.OwnedAndMergedRanges()
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
 	alloc.persistRing()
+	err := alloc.monitor.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+	if err != nil {
+		alloc.errorf("HandleUpdate failed: %s", err)
+	}
 }
 
 func (alloc *Allocator) assertInvariants() {
@@ -1067,6 +1101,9 @@ func (alloc *Allocator) fatalf(fmt string, args ...interface{}) {
 }
 func (alloc *Allocator) warnf(fmt string, args ...interface{}) {
 	alloc.logf(common.Log.Warnf, fmt, args...)
+}
+func (alloc *Allocator) errorf(fmt string, args ...interface{}) {
+	common.Log.Errorf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
 	alloc.logf(common.Log.Infof, fmt, args...)

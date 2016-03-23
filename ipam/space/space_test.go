@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/weaveworks/weave/net/address"
 	wt "github.com/weaveworks/weave/testing"
 )

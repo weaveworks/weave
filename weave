@@ -181,6 +181,7 @@ exec_remote() {
         -e PROXY_HOST="$PROXY_HOST" \
         -e COVERAGE \
         -e CHECKPOINT_DISABLE \
+        -e AWSVPC   \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
@@ -660,17 +661,25 @@ expose_ip() {
         if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
             ip addr add dev $BRIDGE $CIDR
             arp_update $BRIDGE $CIDR || true
+            # Remove a default route installed by the kernel, because awsvpc
+            # has installed it as well
+            if [ -n "$AWSVPC" ]; then
+                RCIDR=$(ip route list exact $CIDR proto kernel | head -n1 | cut -d' ' -f1)
+                [ -n "$RCIDR" ] && ip route del dev $BRIDGE proto kernel $RCIDR
+            fi
         fi
         [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
     done
 }
 
 expose_nat() {
-    for CIDR in $ALL_CIDRS ; do
-        add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
-        add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
-        add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-    done
+    if [ -z "$AWSVPC" ]; then
+        for CIDR in $ALL_CIDRS ; do
+            add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
+            add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
+            add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
+        done
+    fi
 }
 
 # create veth with ends $1-$2, and then invoke $3..., removing the
@@ -721,6 +730,7 @@ init_bridge() {
         MAC=$(random_mac)
 
     ip link set dev $BRIDGE address $MAC
+
 
     # Attempting to set the bridge MTU to a high value directly
     # fails. Bridges take the lowest MTU of their interfaces. So
@@ -872,7 +882,9 @@ setup_router_iface_fastdp() {
 }
 
 setup_router_iface_bridge() {
-    create_veth $BRIDGE_IFNAME $PCAP_IFNAME add_iface_bridge $BRIDGE_IFNAME
+    if [ -z "$AWSVPC" ]; then
+        create_veth $BRIDGE_IFNAME $PCAP_IFNAME add_iface_bridge $BRIDGE_IFNAME
+    fi
 }
 
 setup_router_iface_bridged_fastdp() {
@@ -884,9 +896,35 @@ container_in_host_ns() {
 }
 
 attach() {
+    if [[ -n "$AWSVPC" && $(echo "$@" | wc -w) -gt 1 ]]; then
+        echo "AWSVPC is enabled, therefore only one address can be attached to" >&2
+        echo " the container" >&2
+        return 1
+    fi
+
     ATTACH_ARGS=""
     [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
     util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
+}
+
+detach() {
+    netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 || return 0
+
+    for ADDR in "$@" ; do
+        if ! netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
+            # address is not there, leave the device alone
+            continue
+        fi
+        netnsenter ip addr del $ADDR dev $CONTAINER_IFNAME || return 1
+    done
+
+    if [ -n "$(netnsenter ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
+        # other addresses are left, leave the device alone
+        return 0
+    fi
+
+    # Deleting the interface will delete the multicast route we set up
+    netnsenter ip link del $CONTAINER_IFNAME type veth
 }
 
 ######################################################################
@@ -1501,17 +1539,13 @@ launch_router() {
     LAUNCHING_ROUTER=1
     check_forwarding_rules
     enforce_docker_bridge_addr_assign_type
-    create_bridge
-    docker_bridge_ip
-    # We set the router name to the bridge MAC, which in turn is
-    # derived from the system UUID (if available), and thus stable
-    # across reboots.
-    PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
+
     # backward compatibility...
     if is_cidr "$1" ; then
         echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
         shift 1
     fi
+
     CONTAINER_PORT=$PORT
     ARGS=
     IPRANGE=
@@ -1557,6 +1591,10 @@ launch_router() {
                 ;;
             --no-restart)
                 RESTART_POLICY=
+            --awsvpc)
+                WEAVE_NO_FASTDP=1
+                AWSVPC_ARGS="--awsvpc"
+                AWSVPC=1
                 ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
@@ -1565,6 +1603,14 @@ launch_router() {
         shift
     done
     eval "set -- $ARGS"
+
+    create_bridge
+    docker_bridge_ip
+    # We set the router name to the bridge MAC, which in turn is
+    # derived from the system UUID (if available), and thus stable
+    # across reboots.
+    PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
+
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
         IPRANGE="10.32.0.0/12"
         if ! check_overlap $IPRANGE ; then
@@ -1601,11 +1647,13 @@ launch_router() {
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
+        $AWSVPC_ARGS \
         --http-addr $HTTP_ADDR \
         "$@")
     setup_router_iface_$BRIDGE_TYPE
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     populate_router
+    [ -z "$AWSVPC" ] || expose
 }
 
 # Recreate the parameter values that are set when the router is first launched

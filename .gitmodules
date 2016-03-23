@@ -73,3 +73,6 @@
 [submodule "vendor/github.com/j-keck/arping"]
 	path = vendor/github.com/j-keck/arping
 	url = https://github.com/j-keck/arping
+[submodule "vendor/github.com/aws/aws-sdk-go"]
+	path = vendor/github.com/aws/aws-sdk-go
+	url = https://github.com/aws/aws-sdk-go

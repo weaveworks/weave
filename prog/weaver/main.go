@@ -22,6 +22,7 @@ import (
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam"
+	"github.com/weaveworks/weave/ipam/monitor"
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
@@ -170,6 +171,7 @@ func main() {
 		datapathName       string
 		trustedSubnetStr   string
 		dbPrefix           string
+		useAWSVPC          bool
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -208,6 +210,7 @@ func main() {
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
+	mflag.BoolVar(&useAWSVPC, []string{"#awsvpc", "-awsvpc"}, false, "use AWS VPC for routing")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -250,7 +253,8 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	overlay, bridge := createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB)
+	overlay, bridge := createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB,
+		useAWSVPC)
 	networkConfig.Bridge = bridge
 
 	name := peerName(routerName, bridge.Interface())
@@ -302,7 +306,8 @@ func main() {
 		defaultSubnet address.CIDR
 	)
 	if ipamConfig.Enabled() {
-		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, isKnownPeer)
+		allocator, defaultSubnet = createAllocator(router, ipamConfig, db,
+			isKnownPeer, useAWSVPC)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
@@ -388,7 +393,13 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(datapathName string, ifaceName string, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(datapathName string, ifaceName string, host string, port int, bufSzMB int,
+	useAWSVPC bool) (weave.NetworkOverlay, weave.Bridge) {
+
+	if useAWSVPC {
+		return weave.NullNetworkOverlay{}, weave.NullBridge{}
+	}
+
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
 	switch {
@@ -415,7 +426,15 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	return overlay, bridge
 }
 
-func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB,
+	isKnownPeer func(mesh.PeerName) bool, useAWSVPC bool) (*ipam.Allocator, address.CIDR) {
+
+	var (
+		mon           = monitor.Monitor(monitor.NewNullMonitor())
+		err           error
+		isCIDRAligned bool
+	)
+
 	ipRange, err := ipam.ParseCIDRSubnet(config.IPRangeCIDR)
 	checkFatal(err)
 	defaultSubnet := ipRange
@@ -427,16 +446,27 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 		}
 	}
 
+	if useAWSVPC {
+		Log.Infoln("Using AWS VPC monitor")
+		mon, err = monitor.NewAWSVPCMonitor()
+		if err != nil {
+			Log.Fatalf("Cannot start NewAwsVPCMonitor due to %s", err)
+		}
+		isCIDRAligned = true
+	}
+
 	c := ipam.Config{
-		OurName:     router.Ourself.Peer.Name,
-		OurUID:      router.Ourself.Peer.UID,
-		OurNickname: router.Ourself.Peer.NickName,
-		Seed:        config.SeedPeerNames,
-		Universe:    ipRange,
-		IsObserver:  config.Observer,
-		Quorum:      func() uint { return determineQuorum(config.PeerCount, router) },
-		Db:          db,
-		IsKnownPeer: isKnownPeer,
+		OurName:       router.Ourself.Peer.Name,
+		OurUID:        router.Ourself.Peer.UID,
+		OurNickname:   router.Ourself.Peer.NickName,
+		Seed:          config.SeedPeerNames,
+		Universe:      ipRange,
+		IsObserver:    config.Observer,
+		Quorum:        func() uint { return determineQuorum(config.PeerCount, router) },
+		Db:            db,
+		IsKnownPeer:   isKnownPeer,
+		IsCIDRAligned: isCIDRAligned,
+		Monitor:       mon,
 	}
 
 	allocator := ipam.NewAllocator(c)

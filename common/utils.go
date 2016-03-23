@@ -19,6 +19,13 @@ func Assert(test bool) {
 	}
 }
 
+// AssertWithMsg panics with the given msg if test is false
+func AssertWithMsg(test bool, msg string) {
+	if !test {
+		panic(msg)
+	}
+}
+
 func ErrorMessages(errors []error) string {
 	var result []string
 	for _, err := range errors {

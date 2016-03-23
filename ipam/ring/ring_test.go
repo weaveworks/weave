@@ -545,8 +545,27 @@ func TestClaimForPeers(t *testing.T) {
 	// Test for a range of peer counts
 	for i := 0; i < numPeers; i++ {
 		ring := New(start, end, peers[0])
-		ring.ClaimForPeers(peers[:i+1])
+		ring.ClaimForPeers(peers[:i+1], false)
 	}
+}
+
+func TestClaimForPeersCIDRAligned(t *testing.T) {
+	peers := makePeers(3)
+	ring := New(start, end+1, peers[0])
+	ring.ClaimForPeers(peers, true)
+	expectedRanges := []address.Range{
+		address.NewRange(start, 128),                     // 10.0.0.0/25
+		address.NewRange(address.Add(start, 128), 64),    // 10.0.0.128/26
+		address.NewRange(address.Add(start, 128+64), 64), // 10.0.0.192/26
+	}
+	for i, entry := range ring.Entries {
+		r := address.NewRange(entry.Token, entry.Free)
+		require.Equal(t, expectedRanges[i], r, "")
+	}
+
+	// Test whether allocation panics due to too small ring
+	ring = New(start, start+1, peers[0])
+	require.Panics(t, func() { ring.ClaimForPeers(peers, true) }, "")
 }
 
 type addressSlice []address.Address
@@ -772,7 +791,7 @@ func TestFuzzRingHard(t *testing.T) {
 }
 
 func (r *Ring) ClaimItAll() {
-	r.ClaimForPeers([]mesh.PeerName{r.Peer})
+	r.ClaimForPeers([]mesh.PeerName{r.Peer}, false)
 }
 
 func (es entries) String() string {
@@ -786,4 +805,58 @@ func (es entries) String() string {
 	}
 	fmt.Fprintf(&buffer, "]")
 	return buffer.String()
+}
+
+func TestOwnedCIDRRanges(t *testing.T) {
+	ring := New(start, end+1, peer1name) // 10.0.0.0/24
+	entries := []entry{
+		{ip("10.0.0.128"), peer2name, 0, 128 + 16},
+		{ip("10.0.0.16"), peer1name, 0, 1},
+		{ip("10.0.0.17"), peer2name, 0, 47},
+		{ip("10.0.0.64"), peer1name, 0, 63},
+		{ip("10.0.0.127"), peer1name, 0, 1},
+	}
+	// peer1: [10.0.0.16-10.0.0.16 10.0.0.64-10.0.0.127]
+	// peer2: [10.0.0.128-10.0.0.15 10.0.0.17-10.0.0.63]
+	for _, e := range entries {
+		ring.Entries.insert(e)
+	}
+
+	cidrs := ring.OwnedCIDRRanges(
+		address.Range{Start: start, End: end + 1})
+	require.Len(t, cidrs, 2, "")
+	require.Equal(t, "10.0.0.16/32", cidrs[0].String(), "")
+	require.Equal(t, "10.0.0.64/26", cidrs[1].String(), "")
+
+	cidrs = ring.OwnedCIDRRanges(
+		address.Range{Start: ip("10.0.0.16"), End: ip("10.0.0.66")})
+	require.Len(t, cidrs, 2, "")
+	require.Equal(t, "10.0.0.16/32", cidrs[0].String(), "")
+	require.Equal(t, "10.0.0.64/31", cidrs[1].String(), "")
+}
+
+// TODO(mp) Move the helpers bellow to testing_utils or so to DRY.
+
+func ip(s string) address.Address {
+	addr, _ := address.ParseIP(s)
+	return addr
+}
+
+func TestOwnedAndMergedRanges(t *testing.T) {
+	ring1 := New(start, end, peer1name)
+
+	ring1.Entries.insert(
+		entry{Token: start, Peer: peer1name, Free: address.Subtract(dot10, start)})
+	ring1.Entries.insert(
+		entry{Token: dot10, Peer: peer1name, Free: address.Subtract(dot245, dot10)})
+	ring1.Entries.insert(
+		entry{Token: dot245, Peer: peer2name, Free: address.Subtract(dot250, dot245)})
+	ring1.Entries.insert(
+		entry{Token: dot250, Peer: peer1name, Free: address.Subtract(end, dot250)})
+
+	require.Equal(t,
+		[]address.Range{
+			{Start: start, End: dot245},
+			{Start: dot250, End: end},
+		}, ring1.OwnedAndMergedRanges())
 }
