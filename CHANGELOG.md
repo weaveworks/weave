@@ -1,3 +1,19 @@
+## Release 1.4.6
+
+Fixes some issues encountered by our users.
+
+* Restarting a peer could leave stale entries in WeaveDNS
+  #1867/#2023/#2081
+* Weave proxy occasionally failing to attach any new containers
+  #2016/#2049
+
+Other fixes:
+
+* Resolved a crash when a restarting peer re-connected to a peer that
+  had not received the latest IPAM data #2083/#2092
+* Make IP address space available immediately after a dead peer is
+  removed #2068
+
 ## Release 1.4.5
 
 Higher performance for multicast and broadcast traffic when using
