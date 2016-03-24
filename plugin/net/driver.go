@@ -109,7 +109,7 @@ func (driver *driver) EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointI
 func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error) {
 	local, err := createAndAttach(j.EndpointID, WeaveBridge, 0)
 	if err != nil {
-		return nil, err
+		return nil, errorf("%s", err)
 	}
 
 	if err := netlink.LinkSetUp(local); err != nil {
@@ -139,7 +139,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
 	maybeBridge, err := netlink.LinkByName(bridgeName)
 	if err != nil {
-		return nil, errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
+		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
 	}
 
 	local := vethPair(id[:5])
@@ -149,29 +149,28 @@ func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
 		local.Attrs().MTU = mtu
 	}
 	if err := netlink.LinkAdd(local); err != nil {
-		return nil, errorf(`could not create veth pair %s-%s: %s`, local.Name, local.PeerName, err)
+		return nil, fmt.Errorf(`could not create veth pair %s-%s: %s`, local.Name, local.PeerName, err)
 	}
 
 	switch maybeBridge.(type) {
 	case *netlink.Bridge:
 		if err := netlink.LinkSetMasterByIndex(local, maybeBridge.Attrs().Index); err != nil {
-			return nil, errorf(`unable to set master of %s: %s`, local.Name, err)
+			return nil, fmt.Errorf(`unable to set master of %s: %s`, local.Name, err)
 		}
 	case *netlink.GenericLink:
 		if maybeBridge.Type() != "openvswitch" {
-			return nil, errorf(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
+			return nil, fmt.Errorf(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
 		}
 		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return nil, errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
+			return nil, fmt.Errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
 		}
 	case *netlink.Device:
-		Log.Warnf("kernel does not report what kind of device %s is, just %+v", bridgeName, maybeBridge)
 		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
 		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return nil, errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
+			return nil, fmt.Errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
 		}
 	default:
-		return nil, errorf(`device "%s" is not a bridge`, bridgeName)
+		return nil, fmt.Errorf(`device "%s" is not a bridge`, bridgeName)
 	}
 	return local, nil
 }
