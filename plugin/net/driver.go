@@ -113,7 +113,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	}
 
 	if err := netlink.LinkSetUp(local); err != nil {
-		return nil, errorf(`unable to bring up veth %s-%s: %s`, local.Name, local.PeerName, err)
+		return nil, errorf("unable to bring up veth %s-%s: %s", local.Name, local.PeerName, err)
 	}
 
 	ifname := &api.InterfaceName{
@@ -149,7 +149,7 @@ func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
 		local.Attrs().MTU = mtu
 	}
 	if err := netlink.LinkAdd(local); err != nil {
-		return nil, errorf("could not create veth pair %s-%s: %s", local.Name, local.PeerName, err)
+		return nil, errorf(`could not create veth pair %s-%s: %s`, local.Name, local.PeerName, err)
 	}
 
 	switch maybeBridge.(type) {
