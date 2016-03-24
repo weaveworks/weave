@@ -161,11 +161,15 @@ func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
 		if maybeBridge.Type() != "openvswitch" {
 			return nil, errorf(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
 		}
-		odp.AddDatapathInterface(bridgeName, local.Name)
+		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
+			return nil, errorf(`failed to attach "%s" to device "%s": %s`, local.Name, bridgeName, err)
+		}
 	case *netlink.Device:
 		Log.Warnf("kernel does not report what kind of device %s is, just %+v", bridgeName, maybeBridge)
 		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
-		odp.AddDatapathInterface(bridgeName, local.Name)
+		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
+			return nil, errorf(`failed to attach "%s" to device "%s": %s`, local.Name, bridgeName, err)
+		}
 	default:
 		return nil, errorf(`device "%s" not a bridge`, bridgeName)
 	}
