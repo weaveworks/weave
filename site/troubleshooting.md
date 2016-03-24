@@ -89,7 +89,7 @@ communication protocol name and supported versions (min..max).
  * **Name** - identifies the local Weave Router as a peer on the
 Weave network. The nickname shown in parentheses defaults to the name
 of the host on which the Weave container was launched. It
-can be overriden by using the `--nickname` argument at `weave
+can be overridden by using the `--nickname` argument at `weave
 launch`.
 
  * **Encryption** - indicates whether

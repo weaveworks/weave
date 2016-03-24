@@ -10,7 +10,7 @@ network when they are started using the ordinary Docker
 or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/),
 instead of `weave run`.
 
- 
+
 ###Setting Up The Weave Net Docker API Proxy
 
 The proxy sits between the Docker client (command line or API) and the
@@ -23,7 +23,7 @@ or independently via `launch-proxy`:
 
     host1$ weave launch-router && weave launch-proxy
 
-The first form is more convenient. But only `launch-proxy` can be passed configuration arguments. 
+The first form is more convenient. But only `launch-proxy` can be passed configuration arguments.
 Therefor if you need to modify the default behaviour of the proxy, you must use `launch-proxy`.
 
 By default, the proxy decides where to listen based on how the
@@ -36,11 +36,11 @@ argument, for example:
     host1$ weave launch-proxy -H tcp://127.0.0.1:9999
 
 If no TLS or listening interfaces are set, TLS is autoconfigured
-based on the Docker daemon's settings, and the listening interfaces are 
+based on the Docker daemon's settings, and the listening interfaces are
 autoconfigured based on your Docker client's settings.
 
 Multiple `-H` arguments can be specified. If you are working with a
-remote docker daemon, then any firewalls inbetween need to be
+remote docker daemon, then any firewalls in between need to be
 configured to permit access to the proxy port.
 
 All docker commands can be run via the proxy, so it is safe to adjust

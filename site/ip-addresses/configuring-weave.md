@@ -20,10 +20,10 @@ appears:
 As the message indicates, the default range that Weave Net would like to use is
 `10.32.0.0/12` - a 12-bit prefix, where all addresses start with the bit
 pattern 000010100010, or in decimal everything from 10.32.0.0 through
-10.47.255.255. 
+10.47.255.255.
 
 However, your host is using a route for `10.0.0.0/8`,
-which overlaps, since the first 8 bits are the same. In this case, if you used the default network 
+which overlaps, since the first 8 bits are the same. In this case, if you used the default network
 for an address like `10.32.5.6` the kernel would never be sure if this meant the
 Weave Net network of `10.32.0.0/12` or the hosting network of
 `10.0.0.0/8`.
@@ -32,7 +32,7 @@ If you are sure the addresses you want are not in use, then
 explicitly setting the range with `--ipalloc-range` in the
 command-line arguments to `weave launch` on all hosts forces Weave
 Net to use that range, even though it overlaps. Otherwise, you can
-pick a different range, preferrably another subset of the [Private
+pick a different range, preferably another subset of the [Private
 Networks](https://en.wikipedia.org/wiki/Private_network).  For example
 172.30.0.0/16.
 
