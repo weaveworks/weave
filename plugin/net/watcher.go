@@ -27,10 +27,10 @@ func NewWatcher(client *docker.Client, weave *weaveapi.Client, driver *driver) (
 }
 
 func (w *watcher) ContainerStarted(id string) {
-	Log.Debugf("Container started %s", id)
+	Log.Debugf("Container %s started", id)
 	info, err := w.client.InspectContainer(id)
 	if err != nil {
-		Log.Warningf("error inspecting container: %s", err)
+		Log.Warningf("error inspecting container %s: %s", id, err)
 		return
 	}
 	// check that it's on our network, via the endpointID
@@ -38,7 +38,7 @@ func (w *watcher) ContainerStarted(id string) {
 		if w.driver.HasEndpoint(net.EndpointID) {
 			fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
 			if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
-				Log.Warningf("unable to register with weaveDNS: %s", err)
+				Log.Warningf("unable to register %s with weaveDNS: %s", id, err)
 			}
 		}
 	}

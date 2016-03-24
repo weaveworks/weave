@@ -113,7 +113,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	}
 
 	if err := netlink.LinkSetUp(local); err != nil {
-		return nil, errorf(`unable to bring veth up: %s`, err)
+		return nil, errorf(`unable to bring up veth: %s`, err)
 	}
 
 	ifname := &api.InterfaceName{
@@ -171,7 +171,7 @@ func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
 			return nil, errorf(`failed to attach "%s" to device "%s": %s`, local.Name, bridgeName, err)
 		}
 	default:
-		return nil, errorf(`device "%s" not a bridge`, bridgeName)
+		return nil, errorf(`device "%s" is not a bridge`, bridgeName)
 	}
 	return local, nil
 }
