@@ -113,7 +113,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	}
 
 	if err := netlink.LinkSetUp(local); err != nil {
-		return nil, errorf(`unable to bring up veth: %s`, err)
+		return nil, errorf(`unable to bring up veth %s-%s: %s`, local.Name, local.PeerName, err)
 	}
 
 	ifname := &api.InterfaceName{
@@ -149,26 +149,26 @@ func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
 		local.Attrs().MTU = mtu
 	}
 	if err := netlink.LinkAdd(local); err != nil {
-		return nil, errorf("could not create veth pair: %s", err)
+		return nil, errorf("could not create veth pair %s-%s: %s", local.Name, local.PeerName, err)
 	}
 
 	switch maybeBridge.(type) {
 	case *netlink.Bridge:
 		if err := netlink.LinkSetMasterByIndex(local, maybeBridge.Attrs().Index); err != nil {
-			return nil, errorf(`unable to set master: %s`, err)
+			return nil, errorf(`unable to set master of %s: %s`, local.Name, err)
 		}
 	case *netlink.GenericLink:
 		if maybeBridge.Type() != "openvswitch" {
 			return nil, errorf(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
 		}
 		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return nil, errorf(`failed to attach "%s" to device "%s": %s`, local.Name, bridgeName, err)
+			return nil, errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
 		}
 	case *netlink.Device:
 		Log.Warnf("kernel does not report what kind of device %s is, just %+v", bridgeName, maybeBridge)
 		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
 		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return nil, errorf(`failed to attach "%s" to device "%s": %s`, local.Name, bridgeName, err)
+			return nil, errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
 		}
 	default:
 		return nil, errorf(`device "%s" is not a bridge`, bridgeName)
@@ -188,12 +188,12 @@ func (driver *driver) LeaveEndpoint(leave *api.LeaveRequest) error {
 }
 
 func (driver *driver) DiscoverNew(disco *api.DiscoveryNotification) error {
-	Log.Debugf("Dicovery new notification: %+v", disco)
+	Log.Debugf("Discovery new notification: %+v", disco)
 	return nil
 }
 
 func (driver *driver) DiscoverDelete(disco *api.DiscoveryNotification) error {
-	Log.Debugf("Dicovery delete notification: %+v", disco)
+	Log.Debugf("Discovery delete notification: %+v", disco)
 	return nil
 }
 
