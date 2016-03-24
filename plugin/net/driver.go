@@ -135,11 +135,15 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 			Log.Errorf("device %s is %+v", WeaveBridge, maybeBridge)
 			return nil, errorf(`device "%s" is of type "%s"`, WeaveBridge, maybeBridge.Type())
 		}
-		odp.AddDatapathInterface(WeaveBridge, local.Name)
+		if err := odp.AddDatapathInterface(WeaveBridge, local.Name); err != nil {
+			return nil, errorf(`failed to attach "%s" to device "%s": %s`, local.Name, WeaveBridge, err)
+		}
 	case *netlink.Device:
 		Log.Warnf("kernel does not report what kind of device %s is, just %+v", WeaveBridge, maybeBridge)
 		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
-		odp.AddDatapathInterface(WeaveBridge, local.Name)
+		if err := odp.AddDatapathInterface(WeaveBridge, local.Name); err != nil {
+			return nil, errorf(`failed to attach "%s" to device "%s": %s`, local.Name, WeaveBridge, err)
+		}
 	default:
 		Log.Errorf("device %s is %+v", WeaveBridge, maybeBridge)
 		return nil, errorf(`device "%s" not a bridge`, WeaveBridge)
