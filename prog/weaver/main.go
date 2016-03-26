@@ -47,10 +47,10 @@ type dnsConfig struct {
 }
 
 const (
-	versionCheckPeriod = 6 * time.Hour
+	updateCheckPeriod = 6 * time.Hour
 )
 
-func check() {
+func checkForUpdates() {
 	handleResponse := func(r *checkpoint.CheckResponse, err error) {
 		if err != nil {
 			Log.Printf("Error checking version: %v", err)
@@ -68,7 +68,7 @@ func check() {
 	}
 	resp, err := checkpoint.Check(&params)
 	handleResponse(resp, err)
-	checkpoint.CheckInterval(&params, versionCheckPeriod, handleResponse)
+	checkpoint.CheckInterval(&params, updateCheckPeriod, handleResponse)
 }
 
 func (c ipamConfig) Enabled() bool {
@@ -183,7 +183,7 @@ func main() {
 
 	Log.Println("Command line options:", options())
 
-	go check()
+	go checkForUpdates()
 
 	if prof != "" {
 		p := *profile.CPUProfile
