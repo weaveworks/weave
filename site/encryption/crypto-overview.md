@@ -4,13 +4,15 @@ layout: default
 ---
 
 
+Weave Net peers
+[communicate with each other over both TCP and UDP](/site/router-topology/overview.md). This
+communication
+[can be encrypted](/site/using-weave/security-untrusted-networks.md).
 
-Weave Net can be configured to encrypt both the data passing over the TCP
-connections and the payloads of UDP packets sent between peers. This
-is accomplished using the [NaCl](http://nacl.cr.yp.to/) crypto
-libraries, employing Curve25519, XSalsa20 and Poly1305 to encrypt and
-authenticate messages. Weave Net protects against injection and replay
-attacks for traffic forwarded between peers.
+Encryption is accomplished using the [NaCl](http://nacl.cr.yp.to/)
+crypto libraries, employing Curve25519, XSalsa20 and Poly1305 to
+encrypt and authenticate messages. Weave Net protects against
+injection and replay attacks for traffic forwarded between peers.
 
 NaCl was selected because of its good reputation both in terms of
 selection and implementation of ciphers, but equally importantly, its
