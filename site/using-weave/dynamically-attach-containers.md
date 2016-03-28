@@ -14,7 +14,7 @@ To illustrate these scenarios, imagine a netcat service running in a container o
 
 Where, 
 
- *  `C=$(Docker run -e WEAVE_CIDR=none -dti ubuntu)` is a variable for the subnet on which to attach
+ *  `C=$(docker run -e WEAVE_CIDR=none -dti ubuntu)` is a variable for the subnet on which to attach
  *  `weave attach` – the Weave Net command to attach to the specified subnet, which takes the variable for the subnet
  *  `10.2.1.3` - the allocated IP address output by `weave attach` and in this case, represents the default subnet
 

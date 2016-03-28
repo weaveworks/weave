@@ -21,14 +21,14 @@ For example, in the example, $HOST1 and $HOST2, in CIDR notation you could run y
 On `$HOST1`:
 
 ~~~bash
-host1$ Docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
+host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
 root@7ca0f6ecf59f:/#
 ~~~
 
 And $HOST2:
 
 ~~~bash
-host2$ Docker run -e WEAVE_CIDR=10.2.1.2/24 -ti ubuntu
+host2$ docker run -e WEAVE_CIDR=10.2.1.2/24 -ti ubuntu
 root@04c4831fafd3:/#
 ~~~
 
