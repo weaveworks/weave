@@ -16,7 +16,8 @@ Instead of allowing Weave Net to allocate IP addresses automatically (using IPAM
 
 You can specify an IP address and a network explicitly, using Classless Inter-Domain Routing or [CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing).
 
-For example, in the example, $HOST1 and $HOST2, in CIDR notation you could run your containers as follows:
+For example, we can launch a couple of containers on $HOST1 and
+$HOST2, respectively, with specified IP addresses, as follows...
 
 On `$HOST1`:
 
@@ -32,7 +33,7 @@ host2$ docker run -e WEAVE_CIDR=10.2.1.2/24 -ti ubuntu
 root@04c4831fafd3:/#
 ~~~
 
-Then test that the container on $HOST2 can be reached:
+Then test that the container on $HOST2 can be reached from the container on $HOST1:
 
 ~~~bash
 root@7ca0f6ecf59f:/# ping -c 1 -q 10.2.1.2
@@ -42,7 +43,7 @@ PING 10.2.1.2 (10.2.1.2): 48 data bytes
 round-trip min/avg/max/stddev = 1.048/1.048/1.048/0.000 ms
 ~~~
 
-And do the same in the container on $HOST1:
+And in the other direction...
 
 ~~~bash
 root@04c4831fafd3:/# ping -c 1 -q 10.2.1.1
