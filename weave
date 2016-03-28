@@ -1076,13 +1076,13 @@ echo_ips() {
 }
 
 peer_args() {
-  res=''
-  sep=''
-  for p in "$@" ; do
-    res="$res${sep}peer=$p"
-    sep="&"
-  done
-  echo "$res"
+    res=''
+    sep=''
+    for p in "$@" ; do
+        res="$res${sep}peer=$p"
+        sep="&"
+    done
+    echo "$res"
 }
 
 ######################################################################
@@ -1091,9 +1091,9 @@ peer_args() {
 
 # Memoized function to query the weaveDNS server for our dns domain.
 dns_domain() {
-  DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null || true)}
-  DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
-  echo $DNS_DOMAIN
+    DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null || true)}
+    DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
+    echo $DNS_DOMAIN
 }
 
 dns_args() {
