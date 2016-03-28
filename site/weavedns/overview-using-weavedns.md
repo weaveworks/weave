@@ -38,11 +38,10 @@ the hostname is not in the weavedns domain, the container is *not*
 registered, but it will still use weavedns for resolution.
 
 To disable an application container's use of weavedns, add the
-`--without-dns` option to `weave run` or `weave launch-proxy`.
-
+`--without-dns` option to `weave run` or `weave launch-proxy`. To
+disable weaveDNS itself, launch weave with the `--no-dns` option.
 
 **See Also**
 
  * [How Weave Finds Containers](/site/weave-docker-api/how-works-weavedns.md)
  * [Load Balancing and Fault Resilience with weavedns](/site/weave-docker-api/load-balance-fault-weavedns.md)
- 
