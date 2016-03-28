@@ -1,11 +1,11 @@
 ---
-title: Building Weave
+title: Building Weave Net
 layout: default
 ---
 
-# Building Weave
+# Building Weave Net
 
-You only need to build weave if you want to work on the weave codebase
+You only need to build Weave Net if you want to work on the Weave Net codebase
 (or you just enjoy building software).
 
 Apart from the `weave` shell script, weave is delivered as a set of
@@ -53,7 +53,7 @@ are cached and should not need to be redone very often.
 
 ## <a name="vagrant"></a>Building using Vagrant
 
-If you aren't running Linux, or otherwise don't want to run the docker
+If you aren't running Linux, or otherwise don't want to run the Docker
 daemon outside a VM, you can use
 [Vagrant](https://www.vagrantup.com/downloads.html) to run a
 development environment. You'll probably need to install
@@ -96,7 +96,7 @@ vm$ cd src/github.com/weaveworks/weave
 vm$ make
 ```
 
-The docker daemon is also running in this VM, so you can then do
+The Docker daemon is also running in this VM, so you can then do
 
 ```bash
 vm$ sudo ./weave launch

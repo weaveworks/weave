@@ -17,14 +17,18 @@ The proxy sits between the Docker client (command line or API) and the
 Docker daemon, and intercepts the communication between the two. You can
 start it simultaneously with the router and weavedns via `launch`:
 
+~~~bash
     host1$ weave launch
+~~~
 
 or independently via `launch-proxy`:
 
+~~~bash
     host1$ weave launch-router && weave launch-proxy
+~~~
 
 The first form is more convenient. But only `launch-proxy` can be passed configuration arguments.
-Therefor if you need to modify the default behaviour of the proxy, you must use `launch-proxy`.
+Therefore if you need to modify the default behaviour of the proxy, you must use `launch-proxy`.
 
 By default, the proxy decides where to listen based on how the
 launching client connects to Docker. If the launching client connected
@@ -33,11 +37,13 @@ the launching client connects over TCP, the proxy listens on port
 12375, on all network interfaces. This can be adjusted using the `-H`
 argument, for example:
 
+~~~bash
     host1$ weave launch-proxy -H tcp://127.0.0.1:9999
+~~~
 
-If no TLS or listening interfaces are set, TLS is autoconfigured
+If no TLS or listening interfaces are set, TLS is auto-configured
 based on the Docker daemon's settings, and the listening interfaces are
-autoconfigured based on your Docker client's settings.
+auto-configured based on your Docker client's settings.
 
 Multiple `-H` arguments can be specified. If you are working with a
 remote docker daemon, then any firewalls in between need to be
@@ -47,23 +53,30 @@ All docker commands can be run via the proxy, so it is safe to adjust
 your `DOCKER_HOST` to point at the proxy. Weave Net provides a convenient
 command for this:
 
+~~~bash
     host1$ eval $(weave env)
     host1$ docker ps
-    ...
+~~~
 
 The prior settings can be restored with
 
+~~~bash
     host1$ eval $(weave env --restore)
+~~~
 
 Alternatively, the proxy host can be set on a per-command basis with
 
+~~~bash
     host1$ docker $(weave config) ps
+~~~
 
 The proxy can be stopped independently with
 
+~~~bash
     host1$ weave stop-proxy
+~~~
 
-or in conjunction with the router and weaveDNS via `stop`.
+or in conjunction with the router and weavedns via `stop`.
 
 If you set your `DOCKER_HOST` to point at the proxy, you should revert
 to the original settings prior to stopping the proxy.

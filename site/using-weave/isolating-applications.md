@@ -66,9 +66,9 @@ Where,
 
  *`net:default` is used to request the allocation of an address from the default subnet in addition to one from an explicitly specified range.
 
->>Note: By default Docker permits communication between containers on the same host, via their Docker-assigned IP addresses. For complete isolation between application containers, that feature _must_ to be disabled by [setting `--icc=false`](https://docs.Docker.com/engine/userguide/networking/default_network/container-communication/#communication-between-containers) in the Docker daemon configuration. 
+>Note: By default Docker permits communication between containers on the same host, via their Docker-assigned IP addresses. For complete isolation between application containers, that feature _must_ to be disabled by [setting `--icc=false`](https://docs.Docker.com/engine/userguide/networking/default_network/container-communication/#communication-between-containers) in the Docker daemon configuration. 
 
->>**Important:!** Containers must not be allowed to capture and inject raw network packets. This can be prevented by starting the containers with the `--cap-drop net_raw` option.
+>**Important:!** Containers must not be allowed to capture and inject raw network packets. This can be prevented by starting the containers with the `--cap-drop net_raw` option.
 
 **See Also**
 

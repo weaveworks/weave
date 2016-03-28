@@ -1,5 +1,5 @@
 ---
-title: How Weave Net Inteprets Network Topology
+title: How Weave Net Interprets Network Topology
 layout: default
 ---
 
@@ -20,7 +20,7 @@ entire topology.
 
 Communication between peers occurs over TCP links using: 
 a) a spanning-tree based broadcast mechanism, and b) a
-neighour gossip mechanism.
+neighbor gossip mechanism.
 
 Topology messages are sent by a peer in the following instances:
 
@@ -34,7 +34,7 @@ Topology messages are sent by a peer in the following instances:
 - when a connection has been torn down; an update containing just
   information about the local peer is broadcast,
 - periodically, on a timer, the entire topology is "gossiped" to a
-  subset of neighbours, based on a topology-sensitive random
+  subset of neighbors, based on a topology-sensitive random
   distribution. This is done in case some of the aforementioned
   broadcasts do not reach all peers, due to rapid changes in the
   topology causing broadcast routing tables to become outdated.
@@ -130,7 +130,7 @@ knowledge of that second peer.
 ####<a name="out-of-date-topology"></a>What Happens When The Topology is Out of Date?
 
 The propagation of topology changes to all peers is not instantaneous.
-Therefor, it is very possible for a node elsewhere in the network to have an
+Therefore, it is very possible for a node elsewhere in the network to have an
 out-of-date view.
 
 If the destination peer for a packet is still reachable, then

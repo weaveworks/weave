@@ -5,8 +5,10 @@ layout: default
 
 Containers are automatically allocated an IP address that is unique across the Weave network. You can see which address was allocated by running, [`weave ps`](/site/troubleshooting.md#weave-status):
 
+~~~bash
     host1$ weave ps a1
     a7aee7233393 7a:44:d3:11:10:70 10.32.0.2/12
+~~~
 
 Weave Net detects when a container has exited and releases its allocated addresses so they can be re-used by the network.
 

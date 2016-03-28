@@ -21,23 +21,28 @@ Turning back to the [netcat example](/site/using-weave/deploying-applications.md
 
 To do this, expose the application network to `$HOST2`, as explained in [Host Network Integration](/site/using-weave/host-network-integration.md) by running:
 
+~~~bash
     host2$ weave expose
     10.2.1.132
+~~~
 
 Then add a NAT rule to route from the outside world to the destination container service.
 
+~~~bash
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
            -j DNAT --to-destination $(weave dns-lookup a1):4422
+~~~
 
 Here it is assumed that the "outside world" is connecting to `$HOST2` via 'eth0'. The TCP traffic to port 2211 on the external IPs will be routed to the 'nc' service, running in the a1 container and listening on port 4422.
 With the above in place, you are ready to connect to the 'nc' service from anywhere using:
 
+~~~bash
     echo 'Hello, world.' | nc $HOST2 2211
+~~~
 
->>**Note:** Due to the way routing is handled in the Linux kernel, this won't work when run *on* `$HOST2`.
+>**Note:** Due to the way routing is handled in the Linux kernel, this won't work when run *on* `$HOST2`.
 
 Similar NAT rules to the above can used to expose services not just to the outside world but also other, internal, networks.
-
 
 
 ###<a name="importing"></a>Importing Services
@@ -51,22 +56,30 @@ An additional caveat is that `$HOST3` can only be reached from `$HOST1`, which i
 
 To satisfy this scenario, first [expose the application network to the host](/site/using-weave/host-network-integration.md) by running the following on `$HOST1`: 
 
+~~~bash
     host1$ weave expose -h host1.weave.local
     10.2.1.3
+~~~
 
 Then add a NAT rule, which routes from the above IP to the destination service.
 
+~~~bash
     host1$ iptables -t nat -A PREROUTING -p tcp -d 10.2.1.3 --dport 3322 \
            -j DNAT --to-destination $HOST3:2211
+~~~
 
 This allows any application container to reach the service by connecting to 10.2.1.3:3322. So if `$HOST3` is running a 
 netcat service on port 2211:
 
+~~~bash
     host3$ nc -lk -p 2211
+~~~
 
 You can now connect to it from the application container running on `$HOST2` using:
 
+~~~bash
     root@a2:/# echo 'Hello, world.' | nc host1 3322
+~~~
 
 Note that you should be able to run this command from any application container.
 
@@ -88,18 +101,23 @@ Expanding on the [netcat example](/site/using-weave/deploying-applications.md), 
 
 Begin importing the service onto `$HOST2` by first exposing the application network:
 
+~~~bash
     host2$ weave expose
     10.2.1.3
+~~~
 
 Then add a NAT rule which routes traffic from the `$HOST2` network (for example, anything that can connect to `$HOST2`) to the service endpoint on the Weave network:
 
+~~~bash
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 4433 \
            -j DNAT --to-destination 10.2.1.3:3322
+~~~
 
 Now any host on the same network as `$HOST2` is able to access the service:
 
+~~~bash
     echo 'Hello, world.' | nc $HOST2 4433
-
+~~~
 
 ###<a name="change-location"></a>Dynamically Changing Service Locations
 

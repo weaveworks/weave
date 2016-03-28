@@ -8,12 +8,16 @@ To connect containers across untrusted networks, Weave Net peers can be instruct
 
 For example:
 
+~~~bash
     host1$ weave launch --password wfvAwt7sj
+~~~
 
 or
 
+~~~bash
     host1$ export WEAVE_PASSWORD=wfvAwt7sj
     host1$ weave launch
+~~~
 
 >NOTE: The command line option takes precedence over the environment variable._
 
@@ -24,7 +28,9 @@ or
 
 To guard against dictionary attacks, the password needs to be reasonably strong with at least 50 bits of entropy is recommended. An easy way to generate a random password that satisfies this requirement is:
 
+~~~bash
     < /dev/urandom tr -dc A-Za-z0-9 | head -c9 ; echo
+~~~
 
 The same password must be specified for all Weave Net peers, by default both control and data plane traffic will then use authenticated encryption. 
 
@@ -32,9 +38,9 @@ Fast datapath does not support encryption. If you supply a
 password at `weave launch` the router falls back to a slower
 `sleeve` mode that does support encryption.
 
-If some of your peers are co-located in a trusted network (for example within the boundary of your own datacenter) you can use the `--trusted-subnets` argument to `weave launch` to selectively disable data plane encryption as an optimization. 
+If some of your peers are co-located in a trusted network (for example within the boundary of your own data center) you can use the `--trusted-subnets` argument to `weave launch` to selectively disable data plane encryption as an optimization. 
 
->>**Note:** Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave Net [falls back to a slower method](/site/fastdp/using-fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
+>**Note:** Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave Net [falls back to a slower method](/site/fastdp/using-fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
 
 Be aware that:
 

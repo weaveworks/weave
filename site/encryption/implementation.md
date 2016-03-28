@@ -42,7 +42,7 @@ and the use of SHA256 reduces this back to 256 bits, to form the final
 ephemeral session key. This late combination with the password
 eliminates any "Man In The Middle" attacks: sniffing the public key
 exchange between the two peers and faking their responses will not
-grant an attacker knowledge of the password, and therefor, an attacker would
+grant an attacker knowledge of the password, and therefore, an attacker would
 not be able to form valid ephemeral session keys.
 
 The same ephemeral session key is used for both TCP and UDP traffic
@@ -74,12 +74,12 @@ bits of entropy at startup, and uses that to seed an internal CSPRNG,
 which is used to generate keys. While Weave Net could have taken
 the same approach and built a custom CSPRNG to work around the
 potential `/dev/random` blocking issue, the decision was made to rely
-on the [heavily scrutinised](http://eprint.iacr.org/2012/251.pdf) Linux random number
+on the [heavily scrutinized](http://eprint.iacr.org/2012/251.pdf) Linux random number
 generator as [advised
 here](http://cr.yp.to/highspeed/coolnacl-20120725.pdf) (page 10,
 'Centralizing randomness'). 
 
->>**Note:**The aforementioned notwithstanding, if
+>**Note:**The aforementioned notwithstanding, if
 Weave Net's demand on `/dev/urandom` is causing you problems with blocking
 `/dev/random` reads, please get in touch with us - we'd love to hear
 about your use case.

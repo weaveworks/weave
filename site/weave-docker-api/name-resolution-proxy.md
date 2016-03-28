@@ -26,7 +26,9 @@ IP instead of the Weave IP, or you require name resolution for
 Docker-managed networks), the proxy must be launched using the
 `--no-rewrite-hosts` flag.
 
+~~~bash
     host1$ weave launch-router && weave launch-proxy --no-rewrite-hosts
+~~~
     
 **See Also**
 

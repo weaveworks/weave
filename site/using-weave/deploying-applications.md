@@ -27,11 +27,12 @@ Where,
  * The second line configures the Weave Net environment, so that containers launched via the Docker command line are automatically attached to the Weave network, and, 
  * The third line runs the application container using [Docker commands](https://docs.Docker.com/engine/reference/commandline/daemon/). 
 
->>**Note:** If the first command results in an error like
+>**Note:** If the first command results in an error like
  `http:///var/run/Docker.sock/v1.19/containers/create: dial unix
  /var/run/Docker.sock: permission denied. Are you trying to connect to a TLS-enabled daemon without TLS?` then you likely need to be 'root' in order to connect to the Docker daemon. If so, run the above and all subsequent commands in a *single* root shell (e.g. one created with `sudo -s`). Do *not* prefix individual commands with `sudo`, since some commands modify environment entries and hence they all need to be executed from the same shell.
+ 
 
->>**Important!** if you are running the Weave Docker Network Plugin do not run `eval $(weave env)`. See [Using the Weave Net Docker Network Plugin](/site/pluing/weave-plugin-how-to.md) for more information.
+>**Important!** if you are running the Weave Docker Network Plugin do not run `eval $(weave env)`. See [Using the Weave Net Docker Network Plugin](/site/pluing/weave-plugin-how-to.md) for more information.
 
 Weave Net must be launched once per host. The relevant container images will be pulled down from Docker Hub on demand during `weave launch`. 
 
@@ -52,7 +53,7 @@ As noted above, the same steps are repeated for `$HOST2`. The only difference, b
 
 You can also peer with other hosts by specifying the IP address, and a `:port` by which `$HOST2` can reach `$HOST1`. 
 
->>**Note:** If there is a firewall between `$HOST1` and `$HOST2`,  you must permit traffic to flow through TCP 6783 and UDP 6783/6798, which are Weave’s control nd data ports.
+>**Note:** If there is a firewall between `$HOST1` and `$HOST2`,  you must permit traffic to flow through TCP 6783 and UDP 6783/6798, which are Weave’s control and data ports.
 
 There are a number of different ways that you can specify peers on a Weave network. You can launch Weave Net on `$HOST1` and then peer with `$HOST2`, or you can launch on `$HOST2` and peer with `$HOST1` or you can tell both hosts about each other at launch. The order in which peers are specified is not important. Weave Net automatically (re)connects to peers when they become available. 
 
@@ -61,6 +62,7 @@ There are a number of different ways that you can specify peers on a Weave netwo
 To specify multiple peers, supply a list of addresses to which you want to connect, all separated by spaces. 
 
 For example: 
+
 ~~~bash
     `host2$:weave launch` <ip address> <ip address> 
 ~~~
@@ -74,19 +76,24 @@ With two containers running on separate hosts, test that both containers are abl
 
 From the container started on `$HOST1`...
 
+
+~~~bash
     root@a1:/# ping -c 1 -q a2
     PING a2.weave.local (10.40.0.2) 56(84) bytes of data.
     --- a2.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.341/0.341/0.341/0.000 ms
+~~~
 
 Similarly, in the container started on `$HOST2`...
 
+~~~bash
     root@a2:/# ping -c 1 -q a1
     PING a1.weave.local (10.32.0.2) 56(84) bytes of data.
     --- a1.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.366/0.366/0.366/0.000 ms
+~~~
 
 ###<a name="start-netcat"></a>Starting the Netcat Service
 
