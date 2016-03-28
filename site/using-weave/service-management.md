@@ -17,7 +17,7 @@ This section contains the following topics:
 
 Services running in containers on a Weave network can be made accessible to the outside world (and, more generally, to other networks) from any Weave host, regardless of where the service containers are located.
 
-Turning back to the netcat example, your netcat service, which is running in a container on `$HOST1`, needs to be accessible to the outside world via `$HOST2`.
+Turning back to the [netcat example](/site/using-weave/deploying-applications.md), say you want the netcat service, which is running in a container on `$HOST1`, to be accessible to the outside world via `$HOST2`.
 
 To do this, expose the application network to `$HOST2`, as explained in [Host Network Integration](/site/using-weave/host-network-integration.md) by running:
 
@@ -74,7 +74,7 @@ Note that you should be able to run this command from any application container.
 
 Importing a service provides a degree of indirection that allows late and dynamic binding, similar to what can be achieved with a proxy. 
 
-Referring back to the netcat services example that is running on three hosts (as explained in Importing Services above), the application containers are completely unaware that the service they are accessing at `10.2.1.3:3322` actually resides on `$HOST3:2211`. 
+Referring back to the [netcat services example that is running on three hosts](#importing), the application containers are completely unaware that the service they are accessing at `10.2.1.3:3322` actually resides on `$HOST3:2211`. 
 
 You can point application containers to another service location by changing the above NAT rule, without altering the applications.
 

@@ -9,8 +9,10 @@ It is permissible to register multiple containers with the same name:
 weavedns returns all addresses, in a random order, for each request.
 This provides a basic load balancing capability.
 
-Returning to the earlier example, let us start an additional `pingme`
-container, this time on the 2nd host, and then run some ping tests...
+Expanding the
+[overview example](/site/weavedns/overview-using-weavedns.md), let us
+start an additional `pingme` container on a 2nd host, and then run
+some ping tests...
 
 ```bash
 host2$ weave launch $HOST1

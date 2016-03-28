@@ -22,8 +22,9 @@ peers but this is not known to the whole network, or if some of them
 later rejoin the Weave network, the same IP address may be allocated
 twice.
 
-Assume you had started the three peers in the example earlier, and
-then host3 caught fire, you can go to one of the other hosts and run:
+Assume you had started the three peers in the
+[overview example](/site/ipam/overview-init-ipam.md), and then host3
+caught fire, you can go to one of the other hosts and run:
 
     host1$ weave rmpeer host3
     524288 IPs taken over from host3
