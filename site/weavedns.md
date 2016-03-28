@@ -55,7 +55,8 @@ root@ubuntu:/# ping pingme
 > be registered, but will still use weaveDNS for resolution.
 
 To disable application containers' use of weaveDNS, add the
-`--without-dns` option to `weave run` or `weave launch-proxy`.
+`--without-dns` option to `weave run` or `weave launch-proxy`. To
+disable weaveDNS itself, launch weave with the `--no-dns` option.
 
 ## <a name="how-it-works"></a>How it works
 
