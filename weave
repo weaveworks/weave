@@ -1098,7 +1098,7 @@ dns_domain() {
 }
 
 dns_args() {
-    docker_bridge_ip
+    DOMAIN=$(dns_domain) || return 0
     NAME_ARG=""
     HOSTNAME_SPECIFIED=
     DNS_SEARCH_SPECIFIED=
@@ -1128,7 +1128,7 @@ dns_args() {
         shift
     done
     [ -n "$WITHOUT_DNS" ] && return 0
-    DOMAIN=$(dns_domain) || return 0
+    docker_bridge_ip
     DNS_ARGS="--dns $DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         HOSTNAME="$NAME_ARG.${DOMAIN%.}"
