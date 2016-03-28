@@ -112,7 +112,7 @@ Returning to our earlier example, let us start an additional `pingme`
 container, this time on the 2nd host, and then run some ping tests...
 
 ```bash
-host2$ weave launch
+host2$ weave launch $HOST1
 host2$ eval $(weave env)
 host2$ docker run -dti --name=pingme ubuntu
 
