@@ -10,7 +10,6 @@ This section describes some details of Weave Net's built-in
  * [Key Generation](#csprng)
  * [Encypting and Decrypting TCP Messages](#tcp)
  * [Encypting and Decrypting UDP Messages](#udp)
- * [Further Reading](#plugin)
 
 
 
