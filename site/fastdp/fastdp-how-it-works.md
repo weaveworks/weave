@@ -17,9 +17,9 @@ Because Weave Net issues instructions directly to the kernel, context switches a
 
 ![Weave Net Encapsulation](/site/images/weave-frame-encapsulation-178x300.png)
 
-Prior to version 1.2, Weave Net used a custom encapsulation format. Fast data path uses VXLAN, and like Weave Net's custom encapsulation format, VXLAN is UDP-based, and therefore needs no special configuration with network infrastructure. 
+Prior to version 1.2, Weave Net used a custom encapsulation format. Fast datapath uses VXLAN, and like Weave Net's custom encapsulation format, VXLAN is UDP-based, and therefore needs no special configuration with network infrastructure. 
 
->>**Note:** The required open vSwitch datapath (ODP) and VXLAN features are present in Linux kernel versions 3.12 and greater. If your kernel was built without the necessary modules Weave Net will fall back to the "user mode" packet path.
+>**Note:** The required open vSwitch datapath (ODP) and VXLAN features are present in Linux kernel versions 3.12 and greater. If your kernel was built without the necessary modules Weave Net will fall back to the "user mode" packet path.
 
 
 **See Also**

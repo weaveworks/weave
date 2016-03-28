@@ -32,7 +32,7 @@ root@ubuntu:/# ping pingme
 ...
 ```
 
->> **Note** If both hostname and container name are specified at
+> **Note** If both hostname and container name are specified at
 the same time, the hostname takes precedence. In this circumstance, if
 the hostname is not in the weavedns domain, the container is *not*
 registered, but it will still use weavedns for resolution.

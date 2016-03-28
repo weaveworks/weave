@@ -16,20 +16,23 @@ See [Deploying Applications to Weave Net](/site/using-weave/deploying-applicatio
 
 After you've launched Weave Net and peered your hosts,  you can start containers using the following, for example:
 
+~~~bash
     $ docker run --net=weave -ti ubuntu
+~~~
 
 on any of the hosts, and they can all communicate with each other.
 
->>**Warning!** It is inadvisable to attach containers to the Weave network using the Weave Docker Networking Plugin and Weave Docker API Proxy simultaneously. Such containers will end up with two Weave network interfaces and two IP addresses, which is rarely desirable. To ensure that the proxy is not being used, do not run eval $(weave env), or docker $(weave config).
+>**Warning!** It is inadvisable to attach containers to the Weave network using the Weave Docker Networking Plugin and Weave Docker API Proxy simultaneously. Such containers will end up with two Weave network interfaces and two IP addresses, which is rarely desirable. To ensure that the proxy is not being used, do not run eval $(weave env), or docker $(weave config).
 
 In order to use Weave Net's [Service Discovery](/site/weavedns/overview-using-weavedns.md) you
 must pass the additional arguments `--dns` and `-dns-search`, for
 which a helper is provided in the Weave script:
 
+~~~bash
     $ docker run --net=weave -h foo.weave.local $(weave dns-args) -tdi ubuntu
     $ docker run --net=weave -h bar.weave.local $(weave dns-args) -ti ubuntu
     # ping foo
-
+~~~
 
 
 ###Launching Weave Net and Running Containers Using the Plugin
@@ -63,7 +66,7 @@ PING 10.32.0.2 (10.32.0.2) 56(84) bytes of data.
 
 The plugin is started with a policy of `--restart=always`, so that it is always there after a restart or reboot. If you remove this container (for example, when using `weave reset`) before removing all endpoints created using `--net=weave`, Docker may hang for a long time when it subsequently tries to re-establish communications to the plugin.
 
-Unfortunately, [Docker 1.9 may also try to commmuncate with the plugin before it has even started it](https://github.com/docker/libnetwork/issues/813).
+Unfortunately, [Docker 1.9 may also try to communicate with the plugin before it has even started it](https://github.com/docker/libnetwork/issues/813).
 
 If you are using `systemd`, it is advised that you modify the Docker unit to remove the timeout on startup. This gives Docker enough time to abandon its attempts. For example, in the file `/lib/systemd/system/docker.service`, add the following under `[Service]`: 
 

@@ -16,18 +16,24 @@ Weave network.
 
 To create and start a container via the Weave Net proxy run:
 
+~~~bash
     host1$ docker run -ti ubuntu
+~~~
 
 or, equivalently run:
 
+~~~bash
     host1$ docker create -ti ubuntu
     5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
     host1$ docker start 5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
+~~~
 
 Specific IP addresses and networks can be supplied in the `WEAVE_CIDR`
 environment variable, for example:
 
+~~~bash
     host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
+~~~
 
 Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in
@@ -45,8 +51,9 @@ This command substitutes the Weave network settings when the container has a
 Weave Net IP. If a container has more than one Weave Net IP, then the inspect call
 only includes one of them.
 
+~~~bash
     host1$ weave launch-router && weave launch-proxy --rewrite-inspect
-
+~~~
 
 ###Multicast Traffic and Launching the Weave Proxy
 

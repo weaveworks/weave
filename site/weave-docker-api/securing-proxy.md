@@ -11,7 +11,9 @@ attempts to duplicate it.
 
 In the standard auto-detection case you can launch a TLS-enabled proxy as follows:
 
+~~~bash
     host1$ weave launch-proxy
+~~~
 
 To disable auto-detection of TLS configuration, you can either pass
 the `--no-detect-tls` flag, or you can manually configure the proxy's TLS using
@@ -21,8 +23,10 @@ daemon.
 For example, if you generated your certificates and keys
 into the Docker host's `/tls` directory, launch the proxy using:
 
+~~~bash
     host1$ weave launch-proxy --tlsverify --tlscacert=/tls/ca.pem \
              --tlscert=/tls/server-cert.pem --tlskey=/tls/server-key.pem
+~~~
 
 The paths to your certificates and key must be provided as absolute
 paths as they exist on the Docker host.
@@ -37,18 +41,20 @@ for an example.
 With the proxy running over TLS, you can configure the Docker
 client to use TLS on a per-invocation basis by running:
 
+~~~bash
     $ docker --tlsverify --tlscacert=ca.pem --tlscert=cert.pem \
          --tlskey=key.pem -H=tcp://host1:12375 version
-    ...
+~~~
 
 or, [by default](https://docs.docker.com/articles/https/#secure-by-default), using:
 
+~~~bash
     $ mkdir -pv ~/.docker
     $ cp -v {ca,cert,key}.pem ~/.docker
     $ eval $(weave env)
     $ export DOCKER_TLS_VERIFY=1
     $ docker version
-    ...
+~~~
 
 This is exactly the same configuration used when connecting to the
 Docker daemon directly, except that the specified port is the Weave

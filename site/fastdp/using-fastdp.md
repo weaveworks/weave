@@ -8,7 +8,7 @@ The most important thing to know about fast datapath is that you don't need to c
 
 When Weave Net can't use the fast data path between two hosts, it falls back to the slower packet forwarding approach. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast data path within the data centers, but not for the more constrained network link between them. 
 
-See [How Fastdp Works](/site/fastdp/fastdp-how-it-works.md) for a more indepth discussion of this feature. 
+See [How Fastdp Works](/site/fastdp/fastdp-how-it-works.md) for a more in-depth discussion of this feature. 
 
 ###Disabling Fast Datapath
 

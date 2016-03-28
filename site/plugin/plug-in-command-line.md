@@ -8,8 +8,10 @@ layout: default
 If you need to give additional arguments to the plugin independently, don't
 use `weave launch`, but instead run:
 
+~~~bash
     $ weave launch-router [other peers]
     $ weave launch-plugin [plugin arguments]
+~~~
 
 The plugin command-line arguments are:
 
@@ -25,7 +27,7 @@ To turn this off, e.g. you want to configure your own multicast
 route, add the `--no-multicast-route` flag to `weave launch-plugin`.
 
 
->>Note: When using the Docker Plugin, there is no need to run eval $(weave env) to enable the Proxy. Because Weave is running as a plugin within Docker, the Weave Docker API Proxy, at present, cannot detect between networks.  
+>Note: When using the Docker Plugin, there is no need to run eval $(weave env) to enable the Proxy. Because Weave is running as a plugin within Docker, the Weave Docker API Proxy, at present, cannot detect between networks.  
 
 **See Also**
 

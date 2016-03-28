@@ -8,9 +8,11 @@ When containers may not know the network to which they will be attached, Weave N
 
 To illustrate...
 
+~~~bash
     host1$ C=$(docker run -e WEAVE_CIDR=none -dti ubuntu)
     host1$ weave attach $C
     10.2.1.3
+~~~
 
 where,
 
@@ -24,31 +26,39 @@ where,
 
 A container can be detached from a subnet, by using the `weave detach` command:
 
+~~~bash
     host1$ weave detach $C
     10.2.1.3
+~~~
 
 You can also detach a container from one network and then attach it to a different one:
 
+~~~bash
     host1$ weave detach net:default $C
     10.2.1.3
     host1$ weave attach net:10.2.2.0/24 $C
     10.2.2.3
+~~~
 
 or, attach a container to multiple application networks, effectively sharing the same container between applications:
 
+~~~bash
     host1$ weave attach net:default
     10.2.1.3
     host1$ weave attach net:10.2.2.0/24
     10.2.2.3
+~~~
 
 Finally, multiple addresses can be attached or detached using a single command:
 
+~~~bash
     host1$ weave attach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
     10.2.1.3 10.2.2.3 10.2.3.1
     host1$ weave detach net:default net:10.2.2.0/24 net:10.2.3.0/24 $C
     10.2.1.3 10.2.2.3 10.2.3.1
+~~~
 
->>**Important!** Any addresses that were dynamically attached will not be re-attached if the container restarts.
+>**Important!** Any addresses that were dynamically attached will not be re-attached if the container restarts.
 
 **See Also**
 

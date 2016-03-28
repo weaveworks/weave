@@ -22,7 +22,7 @@ The following automatic IP address management topics are discussed:
 
 ### <a name="initialization"></a>Initializing Peers on a Weave Network
 
-There are two options for initialising IPAM - with a statically
+There are two options for initializing IPAM - with a statically
 configured seed or automatically via one-off consensus. The two
 options have different tradeoffs, so pick the one that suits your
 deployment best.
@@ -44,12 +44,14 @@ outset even under conditions of partition - no consensus is required.
 
 #### <a name="consensus"></a>Via One-off Consensus
 
-Alternatively, you can let weave determine the seed automatically via
-a consensus algorithm; since you don't need to provide it with a list
-of peer names anymore you can also let weave generate those randomly
-for you too. However, in order for weave to form a single consensus
+Alternatively, you can let Weave Net determine the seed automatically via
+a consensus algorithm. Since you don't need to provide it with a list
+of peer names anymore, you can let Weave Net generate those randomly
+for you as well. 
+
+However, in order for Weave Net to form a single consensus
 reliably you must now instead tell each peer how many peers there are
-in total either by listing them as target peers or via the
+in total either by listing them as target peers or using the
 `--init-peer-count` parameter.
 
 Just once, when the first automatic IP address allocation is requested
@@ -65,20 +67,20 @@ To illustrate, suppose you have three hosts, accessible to each other
 as `$HOST1`, `$HOST2` and `$HOST3`. You can start Weave Net on those three
 hosts using these three commands:
 
-    host1$ weave launch $HOST2 $HOST3
-
-    host2$ weave launch $HOST1 $HOST3
-
-    host3$ weave launch $HOST1 $HOST2
+~~~bash
+   host1$ weave launch $HOST2 $HOST3
+   host2$ weave launch $HOST1 $HOST3
+   host3$ weave launch $HOST1 $HOST2
+~~~
 
 Or, if it is not convenient to name all the other hosts at launch
 time, you can pass the number of peers like this:
 
+~~~bash
     host1$ weave launch --init-peer-count 3
-
     host2$ weave launch --init-peer-count 3 $HOST3
-
     host3$ weave launch --init-peer-count 3 $HOST2
+~~~
 
 The consensus mechanism used to determine a majority, transitions
 through three states: 'deferred', 'waiting' and 'achieved':
@@ -95,7 +97,9 @@ Finally, some (but never all) peers can be launched as consensus
 observers rather than participants by specifying the `--observer`
 option:
 
+~~~bash
     host4$ weave launch --observer $HOST3
+~~~
 
 You do not need to specify an initial peer count to such peers. This
 can be useful to add ephemeral peers to an existing fixed cluster (for
@@ -133,6 +137,7 @@ independent set again.
 To illustrate this last point, the following sequence of operations
 is safe with respect to Weave Net's startup quorum:
 
+~~~bash
     host1$ weave launch
     ...time passes...
     host2$ weave launch $HOST1
@@ -141,6 +146,7 @@ is safe with respect to Weave Net's startup quorum:
     ...time passes...
     ...host1 is rebooted...
     host1$ weave launch $HOST2 $HOST3
+~~~
 
 ### <a name="forcing-consensus"></a>Forcing Consensus
 

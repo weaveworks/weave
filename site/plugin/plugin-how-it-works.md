@@ -24,7 +24,7 @@ There's no specific documentation from Docker on using a cluster
 store, but the first part of
 [Getting Started with Docker Multi-host Networking](https://github.com/docker/docker/blob/master/docs/userguide/networking/get-started-overlay.md) is a good place to start.
 
->>**Note:** In the case of multiple networks using the `weave` driver, all containers are on the same virtual network but Docker allocates their addresses on different subnets so they cannot talk to each other directly.
+>**Note:** In the case of multiple networks using the `weave` driver, all containers are on the same virtual network but Docker allocates their addresses on different subnets so they cannot talk to each other directly.
 
 
 **See Also**

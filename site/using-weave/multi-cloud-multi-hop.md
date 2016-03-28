@@ -16,7 +16,7 @@ the `WEAVE_PORT` setting. For example, if WEAVE_PORT is
 set to `9000`, then Weave uses TCP 9000 for its control 
 port and UDP 9000/9001 for its data port. 
 
->>**Important!** It is recommended that all peers be given 
+>**Important!** It is recommended that all peers be given 
 the same setting.
 
 

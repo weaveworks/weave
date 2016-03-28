@@ -53,8 +53,10 @@ which they were added.
 You can resolve entries from any host running weaveDNS with `weave
 dns-lookup`:
 
+~~~bash
     host1$ weave dns-lookup pingme
     10.40.0.1
+~~~
 
 ### <a name="hot-swapping"></a>Hot-swapping service containers
 

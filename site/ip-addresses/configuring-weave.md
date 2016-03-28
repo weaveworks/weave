@@ -5,7 +5,7 @@ layout: default
 
 The default configurations for both Weave Net and Docker use [Private
 Networks](https://en.wikipedia.org/wiki/Private_network), whose
-addresses are never found on the public internet, and subsequently reduces the
+addresses are never found on the public Internet, and subsequently reduces the
 chance of IP overlap. However, it could be that you or your hosting provider
 are using some of these private addresses in the same range, which will
 cause a clash.
@@ -13,9 +13,11 @@ cause a clash.
 If after `weave launch`, the following error message
 appears:
 
+~~~bash
     Network 10.32.0.0/12 overlaps with existing route 10.0.0.0/8 on host.
     ERROR: Default --ipalloc-range 10.32.0.0/12 overlaps with existing route on host.
     You must pick another range and set it on all hosts.
+~~~
 
 As the message indicates, the default range that Weave Net would like to use is
 `10.32.0.0/12` - a 12-bit prefix, where all addresses start with the bit
