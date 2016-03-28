@@ -45,8 +45,7 @@ Similar NAT rules to the above can used to expose services not just to the outsi
 Applications running in containers on a Weave network can be given access to services, which are only reachable from certain 
 Weave hosts, regardless of where the actual application containers are located.
 
-Using the netcat service example described in 
-[Deploying Applications](/site/using-weave/deploying-applications.md), and expanding upon it, you now decide to add a third containerized netcat service. This additional netcat service runs on `$HOST3`, and listens on port 2211, but it is not on the Weave network. 
+Expanding on the [netcat service example](/site/using-weave/deploying-applications.md), you now decide to add a third, non-containerized, netcat service. This additional netcat service runs on `$HOST3`, and listens on port 2211, but it is not on the Weave network. 
 
 An additional caveat is that `$HOST3` can only be reached from `$HOST1`, which is not accessible via `$HOST2`. Nonetheless, you still need to make the `$HOST3` service available to an application that is running in a container on `$HOST2`.
 
