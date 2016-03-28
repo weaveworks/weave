@@ -1092,6 +1092,7 @@ peer_args() {
 # Memoized function to query the weaveDNS server for our dns domain.
 dns_domain() {
     DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null || true)}
+    [ "$DNS_DOMAIN" = "404 page not found" ] && return 1
     DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
     echo $DNS_DOMAIN
 }
@@ -1127,9 +1128,9 @@ dns_args() {
         shift
     done
     [ -n "$WITHOUT_DNS" ] && return 0
+    DOMAIN=$(dns_domain) || return 0
     DNS_ARGS="--dns $DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
-        DOMAIN=$(dns_domain)
         HOSTNAME="$NAME_ARG.${DOMAIN%.}"
         if [ ${#HOSTNAME} -gt 64 ] ; then
             echo "Container name too long to be used as hostname" >&2
@@ -1140,7 +1141,7 @@ dns_args() {
     fi
     if [ -z "$DNS_SEARCH_SPECIFIED" ] ; then
       if [ -z "$HOSTNAME_SPECIFIED" ] ; then
-        DNS_ARGS="$DNS_ARGS --dns-search=$(dns_domain)"
+        DNS_ARGS="$DNS_ARGS --dns-search=$DOMAIN"
       else
         DNS_ARGS="$DNS_ARGS --dns-search=."
       fi
