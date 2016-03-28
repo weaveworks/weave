@@ -71,7 +71,6 @@ To use the proxy run:
 
     host1$ eval $(weave env)
     
- 
 With the proxy enabled, you can start and manage containers using standard Docker commands. 
 
 Containers started in this way that subsequently restart, either
@@ -110,10 +109,10 @@ See [Using the Weave CNI Plugin](/site/plugin/cni-plugin-how-to.md) for more det
 
 ###<a name="addressing"></a>IP Address Management (IPAM)
  
-Containers are automatically allocated a unique IP address. To view the addresses allocated by Weave run, `weave ps`.
+Containers are automatically allocated a unique IP address. To view the addresses allocated by Weave, run `weave ps`.
 
 Instead of allowing Weave to automatically allocate addresses, an IP address and a network can be explicitly 
-specified. See [How to Manually Specify IP Addresses and Subnets(/site/using-weave/manual-ip-address.md) for instructions. 
+specified. See [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md) for instructions. 
 
 For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Management](/site/ipam/overview-init-ipam.md). And also review the 
 [the basics of IP addressing](/site/ip-addresses/ip-addresses.md) for an explanation of addressing and private networks. 
@@ -124,11 +123,9 @@ For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Managemen
 Named containers are automatically registered in [weavedns](/site/weavedns/overview-using-weavedns.md), 
 and are discoverable by using standard, simple name lookups:
 
-
     host1$ docker run -dti --name=service ubuntu
     host1$ docker run -ti ubuntu
     root@7b21498fb103:/# ping service
-
 
 `weavedns` also supports [load balancing](/site/weavedns/load-balance-fault-weavedns.md), [fault resilience](/site/weavedns/load-balance-fault-weavedns.md) and [hot swapping](/site/weavedns/managing-entries-weavedns.md). 
 
@@ -187,7 +184,7 @@ Weave Net implements encryption and security using [Daniel J. Bernstein's NaCl l
 
 For information on how to secure your Docker network connections,
 see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)
-and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption/crypto-overview.md) and [How Weave Implements Encryption](/site/encryption/ephemeral-key.md)
+and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption/crypto-overview.md) and [How Weave Implements Encryption](/site/encryption/implementation.md)
 
 
 ###<a name="host-network-integration"></a>Host Network Integration
