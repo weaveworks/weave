@@ -3,7 +3,8 @@ title: How Weave Net Implements Encryption
 layout: default
 ---
 
-This section discusses the following topics:
+This section describes some details of Weave Net's built-in
+[encryption](/site/encryption/crypto-overview.md):
 
  * [Establishing the Ephemeral Session Key](#ephemeral-key)
  * [Key Generation](#csprng)
