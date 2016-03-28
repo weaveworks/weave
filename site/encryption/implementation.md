@@ -3,7 +3,7 @@ title: How Weave Net Implements Encryption
 layout: default
 ---
 
-This section discusses the folloiwng topics: 
+This section discusses the following topics:
 
  * [Establishing the Ephemeral Session Key](#ephemeral-key)
  * [Key Generation](#csprng)
