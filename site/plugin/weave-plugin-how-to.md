@@ -16,9 +16,7 @@ See [Deploying Applications to Weave Net](/site/using-weave/deploying-applicatio
 
 After you've launched Weave Net and peered your hosts,  you can start containers using the following, for example:
 
-~~~bash
     $ docker run --net=weave -ti ubuntu
-~~~
 
 on any of the hosts, and they can all communicate with each other.
 
@@ -28,38 +26,30 @@ In order to use Weave Net's [Service Discovery](/site/weavedns/overview-using-we
 must pass the additional arguments `--dns` and `-dns-search`, for
 which a helper is provided in the Weave script:
 
-~~~bash
     $ docker run --net=weave -h foo.weave.local $(weave dns-args) -tdi ubuntu
     $ docker run --net=weave -h bar.weave.local $(weave dns-args) -ti ubuntu
     # ping foo
-~~~
 
 
 ###Launching Weave Net and Running Containers Using the Plugin
 
 Just launch the Weave Net router onto each host and make a peer connection with the other hosts:
 
-~~~bash
-host1$ weave launch host2
-host2$ weave launch host1
-~~~
+    host1$ weave launch host2
+    host2$ weave launch host1
 
 then run your containers using the Docker command-line:
 
-~~~bash
-host1$ docker run --net=weave -ti ubuntu
-root@1458e848cd90:/# hostname -i
-10.32.0.2
-~~~
+    host1$ docker run --net=weave -ti ubuntu
+    root@1458e848cd90:/# hostname -i
+    10.32.0.2
 
-~~~bash
-host2$ docker run --net=weave -ti ubuntu
-root@8cc4b5dc5722:/# ping 10.32.0.2
+    host2$ docker run --net=weave -ti ubuntu
+    root@8cc4b5dc5722:/# ping 10.32.0.2
 
-PING 10.32.0.2 (10.32.0.2) 56(84) bytes of data.
-64 bytes from 10.32.0.2: icmp_seq=1 ttl=64 time=0.116 ms
-64 bytes from 10.32.0.2: icmp_seq=2 ttl=64 time=0.052 ms
-~~~
+    PING 10.32.0.2 (10.32.0.2) 56(84) bytes of data.
+    64 bytes from 10.32.0.2: icmp_seq=1 ttl=64 time=0.116 ms
+    64 bytes from 10.32.0.2: icmp_seq=2 ttl=64 time=0.052 ms
 
 
 ### Restarting the Plugin
@@ -70,9 +60,7 @@ Unfortunately, [Docker 1.9 may also try to communicate with the plugin before it
 
 If you are using `systemd`, it is advised that you modify the Docker unit to remove the timeout on startup. This gives Docker enough time to abandon its attempts. For example, in the file `/lib/systemd/system/docker.service`, add the following under `[Service]`: 
 
-~~~bash
     TimeoutStartSec=0
-~~~
 
 ###Bypassing the Central Cluster Store When Building Docker Apps
 

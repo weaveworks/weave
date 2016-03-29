@@ -13,11 +13,9 @@ cause a clash.
 If after `weave launch`, the following error message
 appears:
 
-~~~bash
     Network 10.32.0.0/12 overlaps with existing route 10.0.0.0/8 on host.
     ERROR: Default --ipalloc-range 10.32.0.0/12 overlaps with existing route on host.
     You must pick another range and set it on all hosts.
-~~~
 
 As the message indicates, the default range that Weave Net would like to use is
 `10.32.0.0/12` - a 12-bit prefix, where all addresses start with the bit

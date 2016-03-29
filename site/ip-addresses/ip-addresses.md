@@ -42,12 +42,10 @@ Several websites offer calculators to decode this kind of address, see: [IP Addr
 The following is an example route table for a container that is attached to a Weave
 network:
 
-~~~bash
     # ip route show
     default via 172.17.42.1 dev eth0 
     10.2.2.0/24 dev ethwe  proto kernel  scope link  src 10.2.2.1 
     172.17.0.0/16 dev eth0  proto kernel  scope link  src 172.17.0.170 
-~~~
 
 It has two interfaces: one that Docker gave it called `eth0`, and one
 that weave gave it called `ethwe`. They are on networks

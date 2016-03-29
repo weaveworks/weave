@@ -17,15 +17,11 @@ The proxy sits between the Docker client (command line or API) and the
 Docker daemon, and intercepts the communication between the two. You can
 start it simultaneously with the router and weavedns via `launch`:
 
-~~~bash
     host1$ weave launch
-~~~
 
 or independently via `launch-proxy`:
 
-~~~bash
     host1$ weave launch-router && weave launch-proxy
-~~~
 
 The first form is more convenient. But only `launch-proxy` can be passed configuration arguments.
 Therefore if you need to modify the default behaviour of the proxy, you must use `launch-proxy`.
@@ -37,9 +33,7 @@ the launching client connects over TCP, the proxy listens on port
 12375, on all network interfaces. This can be adjusted using the `-H`
 argument, for example:
 
-~~~bash
     host1$ weave launch-proxy -H tcp://127.0.0.1:9999
-~~~
 
 If no TLS or listening interfaces are set, TLS is auto-configured
 based on the Docker daemon's settings, and the listening interfaces are
@@ -53,28 +47,20 @@ All docker commands can be run via the proxy, so it is safe to adjust
 your `DOCKER_HOST` to point at the proxy. Weave Net provides a convenient
 command for this:
 
-~~~bash
     host1$ eval $(weave env)
     host1$ docker ps
-~~~
 
 The prior settings can be restored with
 
-~~~bash
     host1$ eval $(weave env --restore)
-~~~
 
 Alternatively, the proxy host can be set on a per-command basis with
 
-~~~bash
     host1$ docker $(weave config) ps
-~~~
 
 The proxy can be stopped independently with
 
-~~~bash
     host1$ weave stop-proxy
-~~~
 
 or in conjunction with the router and weavedns via `stop`.
 

@@ -14,9 +14,7 @@ See [How Fastdp Works](/site/fastdp/fastdp-how-it-works.md) for a more in-depth 
 
 You can disable fastdp by enabling the `WEAVE_NO_FASTDP` environment variable at `weave launch`:
 
-~~~bash
-$ WEAVE_NO_FASTDP=true weave launch
-~~~
+    $ WEAVE_NO_FASTDP=true weave launch
 
 ###Fast Datapath and Encryption
 
@@ -36,17 +34,13 @@ The use of fast datapath is an automated connection-by-connection decision made 
 
 Once a Weave network is set up, you can query the connections using the `weave status connections` command:
 
-~~~bash
-$ weave status connections
-<-192.168.122.25:43889  established fastdp a6:66:4f:a5:8a:11(ubuntu1204)
-~~~
+    $ weave status connections
+    <-192.168.122.25:43889  established fastdp a6:66:4f:a5:8a:11(ubuntu1204)
 
 Where fastdp indicates that fast datapath is being used on a connection. If fastdp is not shown, the field displays `sleeve` indicating Weave Net's fall-back encapsulation method:
 
-~~~bash
-$ weave status connections
-<- 192.168.122.25:54782  established sleeve 8a:50:4c:23:11:ae(ubuntu1204)
-~~~
+    $ weave status connections
+    <- 192.168.122.25:54782  established sleeve 8a:50:4c:23:11:ae(ubuntu1204)
 
 **See Also**
 

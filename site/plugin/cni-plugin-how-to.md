@@ -16,16 +16,12 @@ your machine has the directories normally used to host CNI plugins.
 
 To create those directories, run (as root):
 
-~~~bash
     mkdir -p /opt/cni/bin
     mkdir -p /etc/cni/net.d
-~~~
 
 Then run:
 
-~~~bash
     weave setup
-~~~
 
 ###Launching Weave Net
 
@@ -37,10 +33,8 @@ See [Deploying Applications to Weave Net](/site/using-weave/deploying-applicatio
 As well as launching Weave Net, you have to run an extra command to
 perform some additional configuration of the Weave bridge:
 
-~~~bash
     weave launch <peer hosts>
     weave expose
-~~~
 
 ###Configuring Kubernetes to use the CNI Plugin
 
@@ -48,9 +42,7 @@ After you've launched Weave and peered your hosts, you can configure
 Kubernetes to use Weave, by adding the following options to the
 `kubelet` command:
 
-~~~bash
     --network-plugin=cni --network-plugin-dir=/etc/cni/net.d
-~~~
 
 See the [`kubelet` documentation](http://kubernetes.io/v1.1/docs/admin/kubelet.html)
 for more details.
@@ -68,11 +60,9 @@ for details on the format and contents of this file.
 
 By default, the Weave CNI plugin adds a default route out via the Weave bridge, so your containers can access resources on the internet.  If you do not want this, add a section to the config file that specifies no routes:
 
-~~~bash
     "ipam": {
         "routes": [ ]
     }
-~~~
 
 The following other fields in the spec are supported:
 
