@@ -80,6 +80,10 @@ func NewNode(name mesh.PeerName, uid mesh.PeerUID, quorum uint) *Node {
 	}
 }
 
+func (node *Node) SetQuorum(quorum uint) {
+	node.quorum = quorum
+}
+
 func (node *Node) GossipState() GossipState {
 	return node.knows
 }
@@ -124,6 +128,9 @@ func max(a uint, b uint) uint {
 // simply a matter of gossipping a new proposal that supersedes all
 // others.
 func (node *Node) Propose() {
+	if node.quorum == 0 {
+		panic("Paxos node.Propose() called with no quorum set")
+	}
 	// Find the highest round number around
 	round := uint(0)
 

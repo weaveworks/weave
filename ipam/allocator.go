@@ -64,6 +64,7 @@ type Allocator struct {
 	ticker            *time.Ticker
 	shuttingDown      bool // to avoid doing any requests while trying to shut down
 	isKnownPeer       func(mesh.PeerName) bool
+	quorum            func() uint
 	now               func() time.Time
 }
 
@@ -73,13 +74,20 @@ type Config struct {
 	OurNickname string
 	Seed        []mesh.PeerName
 	Universe    address.Range
-	Quorum      uint
+	IsObserver  bool
+	Quorum      func() uint
 	Db          db.DB
 	IsKnownPeer func(name mesh.PeerName) bool
 }
 
 // NewAllocator creates and initialises a new Allocator
 func NewAllocator(config Config) *Allocator {
+	var participant paxos.Participant
+	if config.IsObserver {
+		participant = paxos.NewObserver()
+	} else {
+		participant = paxos.NewNode(config.OurName, config.OurUID, 1)
+	}
 	return &Allocator{
 		ourName:     config.OurName,
 		seed:        config.Seed,
@@ -87,9 +95,10 @@ func NewAllocator(config Config) *Allocator {
 		ring:        ring.New(config.Universe.Start, config.Universe.End, config.OurName),
 		owned:       make(map[string][]address.CIDR),
 		db:          config.Db,
-		paxos:       paxos.NewParticipant(config.OurName, config.OurUID, config.Quorum),
+		paxos:       participant,
 		nicknames:   map[mesh.PeerName]string{config.OurName: config.OurNickname},
 		isKnownPeer: config.IsKnownPeer,
+		quorum:      config.Quorum,
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
 	}
@@ -603,6 +612,7 @@ func (alloc *Allocator) establishRing() {
 	}
 
 	alloc.awaitingConsensus = true
+	alloc.paxos.SetQuorum(alloc.quorum())
 	alloc.propose()
 	if ok, cons := alloc.paxos.Consensus(); ok {
 		// If the quorum was 1, then proposing immediately

@@ -19,11 +19,11 @@ check "DefaultSubnet" "{{.IPAM.DefaultSubnet}}"                $UNIVERSE
 check "Domain"        "{{.DNS.Domain}}"                        "weave.local."
 
 assert_raises "weave_on $HOST1 status peers | grep nicknamington"
-weave_on $HOST1 connect 10.2.2.1
-assert "weave_on $HOST1 status targets" "10.2.2.1"
-assert "weave_on $HOST1 status connections | tr -s ' ' | cut -d ' ' -f 2" "10.2.2.1:6783"
 start_container $HOST1 --name test
 assert "weave_on $HOST1 status dns         | tr -s ' ' | cut -d ' ' -f 1" "test"
 assert_raises "weave_on $HOST1 report | grep nicknamington"
+weave_on $HOST1 connect 10.2.2.1
+assert "weave_on $HOST1 status targets" "10.2.2.1"
+assert "weave_on $HOST1 status connections | tr -s ' ' | cut -d ' ' -f 2" "10.2.2.1:6783"
 
 end_suite
