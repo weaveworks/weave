@@ -39,4 +39,4 @@ status`.
 
  * [Address Allocation with IP Address Management (IPAM)](/site/ipam/overview-init-ipam.md)
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
- * [Isolating Applications on a Weave Network](/site/using-weave/isolating-applications.md)
+ * [Isolating Applications on a Weave Network](/site/using-weave/application-isolation.md)
