@@ -9,44 +9,34 @@ For example, returning to the [netcat example](/site/using-weave/deploying-appli
 
 On `$HOST2` run:
 
-~~~bash
     host2$ weave expose
     10.2.1.132
-~~~
 
 This command grants the host access to all of the application containers in the default subnet. An IP address is allocated by Weave Net especially for that purpose, and is returned after running `weave expose`. 
 
 Now you are able to ping the host:
 
-~~~bash
     host2$ ping 10.2.1.132
-~~~
 
 And you can also ping the `a1` netcat application container residing on `$HOST1`:
 
-~~~bash
     host2$ ping $(weave dns-lookup a1)
-~~~
 
 ###Exposing Multiple Subnets
 
 Multiple subnet addresses can be exposed or hidden using a single command:
 
-~~~bash
     host2$ weave expose net:default net:10.2.2.0/24
     10.2.1.132 10.2.2.130
     host2$ weave hide   net:default net:10.2.2.0/24
     10.2.1.132 10.2.2.130
-~~~
 
 ###Adding Exposed Addresses to weavedns
 
 Exposed addresses can also be added to `weavedns` by supplying fully qualified domain names:
 
-~~~bash
     host2$ weave expose -h exposed.weave.local
     10.2.1.132
-~~~
 
 
 **See Also**

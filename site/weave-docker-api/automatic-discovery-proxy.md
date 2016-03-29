@@ -28,10 +28,8 @@ Additionally, the hostname is matched against a regular expression `<regexp>` an
 
 For example, you can launch the proxy using all three flags, as follows:
 
-~~~bash
     host1$ weave launch-router && weave launch-proxy --hostname-from-label hostname-label --hostname-match '^aws-[0-9]+-(.*)$' --hostname-replacement 'my-app-$1'
     host1$ eval $(weave env)
-~~~
 
 >**Note:** regexp substitution groups must be pre-pended with a dollar sign
 (for example, `$1`). For further details on the regular expression syntax see
@@ -39,22 +37,18 @@ For example, you can launch the proxy using all three flags, as follows:
 
 After launching the Weave Net proxy with these flags, running a container named `aws-12798186823-foo` without labels results in weavedns registering the hostname `my-app-foo` and not `aws-12798186823-foo`.
 
-~~~bash
     host1$ docker run -ti --name=aws-12798186823-foo ubuntu ping my-app-foo
     PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=1 ttl=64 time=0.027 ms
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=2 ttl=64 time=0.067 ms
-~~~
 
 Also, running a container named `foo` with the label
 `hostname-label=aws-12798186823-foo` leads to the same hostname registration.
 
-~~~bash
     host1$ docker run -ti --name=foo --label=hostname-label=aws-12798186823-foo ubuntu ping my-app-foo
     PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=1 ttl=64 time=0.031 ms
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=2 ttl=64 time=0.042 ms
-~~~
 
 This is because, as explained above, if providing `--hostname-from-label`
 to the proxy, the specified label takes precedence over the container's name.

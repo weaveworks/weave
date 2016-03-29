@@ -8,10 +8,8 @@ layout: default
 If you need to give additional arguments to the plugin independently, don't
 use `weave launch`, but instead run:
 
-~~~bash
     $ weave launch-router [other peers]
     $ weave launch-plugin [plugin arguments]
-~~~
 
 The plugin command-line arguments are:
 

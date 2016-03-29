@@ -10,20 +10,20 @@ layout: default
 
 The command:
 
-~~~bash
     weave status
-~~~
 
 reports on the current status of various Weave Net components, including
 DNS:
 
-~~~bash
+````
+...
        Service: dns
         Domain: weave.local.
       Upstream: 8.8.8.8, 8.8.4.4
            TTL: 1
        Entries: 9
-~~~
+...
+````
 
 The first section covers the router; see the [troubleshooting
 guide](/site/troubleshooting.md#weave-status) for more details.
@@ -41,9 +41,7 @@ dump](/site/troubleshooting.md#weave-status-dns) of all DNS registrations.
 Information on the processing of queries, and the general operation of
 weaveDNS, can be obtained from the container logs with
 
-~~~bash
     docker logs weave
-~~~
 
 ### <a name="limitations"></a>Present Limitations
 

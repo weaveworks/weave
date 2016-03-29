@@ -63,9 +63,7 @@ To specify multiple peers, supply a list of addresses to which you want to conne
 
 For example: 
 
-~~~bash
-    `host2$:weave launch` <ip address> <ip address> 
-~~~
+    host2$ weave launch <ip address> <ip address> 
 
 Peers can also be dynamically added. See [Adding Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md) for more information.
 
@@ -77,44 +75,34 @@ With two containers running on separate hosts, test that both containers are abl
 From the container started on `$HOST1`...
 
 
-~~~bash
     root@a1:/# ping -c 1 -q a2
     PING a2.weave.local (10.40.0.2) 56(84) bytes of data.
     --- a2.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.341/0.341/0.341/0.000 ms
-~~~
 
 Similarly, in the container started on `$HOST2`...
 
-~~~bash
     root@a2:/# ping -c 1 -q a1
     PING a1.weave.local (10.32.0.2) 56(84) bytes of data.
     --- a1.weave.local ping statistics ---
     1 packets transmitted, 1 received, 0% packet loss, time 0ms
     rtt min/avg/max/mdev = 0.366/0.366/0.366/0.000 ms
-~~~
 
 ###<a name="start-netcat"></a>Starting the Netcat Service
 
 The `netcat` service can be started using the following commands:  
 
-~~~bash
     root@a1:/# nc -lk -p 4422
-~~~
 
 and then connected to from the another container on `$HOST2` using:
 
-~~~bash
     root@a2:/# echo 'Hello, world.' | nc a1 4422
-~~~
 
 Weave Net supports *any* protocol, and it doesn't have to be over TCP/IP. For example, a netcat UDP service can also be run by using the following:
 
-~~~bash
     root@a1:/# nc -lu -p 5533
     root@a2:/# echo 'Hello, world.' | nc -u a1 5533
-~~~
 
 
 **See Also** 

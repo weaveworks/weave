@@ -67,20 +67,16 @@ To illustrate, suppose you have three hosts, accessible to each other
 as `$HOST1`, `$HOST2` and `$HOST3`. You can start Weave Net on those three
 hosts using these three commands:
 
-~~~bash
-   host1$ weave launch $HOST2 $HOST3
-   host2$ weave launch $HOST1 $HOST3
-   host3$ weave launch $HOST1 $HOST2
-~~~
+    host1$ weave launch $HOST2 $HOST3
+    host2$ weave launch $HOST1 $HOST3
+    host3$ weave launch $HOST1 $HOST2
 
 Or, if it is not convenient to name all the other hosts at launch
 time, you can pass the number of peers like this:
 
-~~~bash
     host1$ weave launch --init-peer-count 3
     host2$ weave launch --init-peer-count 3 $HOST3
     host3$ weave launch --init-peer-count 3 $HOST2
-~~~
 
 The consensus mechanism used to determine a majority, transitions
 through three states: 'deferred', 'waiting' and 'achieved':
@@ -97,9 +93,7 @@ Finally, some (but never all) peers can be launched as consensus
 observers rather than participants by specifying the `--observer`
 option:
 
-~~~bash
     host4$ weave launch --observer $HOST3
-~~~
 
 You do not need to specify an initial peer count to such peers. This
 can be useful to add ephemeral peers to an existing fixed cluster (for
@@ -137,7 +131,6 @@ independent set again.
 To illustrate this last point, the following sequence of operations
 is safe with respect to Weave Net's startup quorum:
 
-~~~bash
     host1$ weave launch
     ...time passes...
     host2$ weave launch $HOST1
@@ -146,7 +139,6 @@ is safe with respect to Weave Net's startup quorum:
     ...time passes...
     ...host1 is rebooted...
     host1$ weave launch $HOST2 $HOST3
-~~~
 
 ### <a name="forcing-consensus"></a>Forcing Consensus
 

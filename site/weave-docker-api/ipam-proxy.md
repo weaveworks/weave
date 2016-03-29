@@ -8,31 +8,23 @@ If [automatic IP address allocation](/site/ipam/overview-init-ipam.md) is enable
 then containers started via the proxy are automatically assigned an IP address, *without having to specify any
 special environment variables or any other options*.
 
-~~~bash
     host1$ docker run -ti ubuntu
-~~~
 
 To use a specific subnet, you can pass a `WEAVE_CIDR` to the container, for example:
 
-~~~bash
     host1$ docker run -ti -e WEAVE_CIDR=net:10.32.2.0/24 ubuntu
-~~
 
 To start a container without connecting it to the Weave network, pass
 `WEAVE_CIDR=none`, for example:
 
-~~~bash
     host1$ docker run -ti -e WEAVE_CIDR=none ubuntu
-~~~
 
 ###Disabling Automatic IP Address Allocation
 
 If you do not want an IP to be assigned by default, the proxy needs to
 be passed the `--no-default-ipalloc` flag, for example:
 
-~~~bash
     host1$ weave launch-proxy --no-default-ipalloc
-~~~
 
 In this configuration, containers using no `WEAVE_CIDR` environment
 variable are not connected to the Weave network. 
@@ -41,9 +33,7 @@ Containers started with a `WEAVE_CIDR` environment variable are handled as befor
 To automatically assign an address in this mode, start the
 container with a blank `WEAVE_CIDR`, for example:
 
-~~~bash
     host1$ docker run -ti -e WEAVE_CIDR="" ubuntu
-~~~
     
 **See Also**
 

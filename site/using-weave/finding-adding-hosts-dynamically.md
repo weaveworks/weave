@@ -20,9 +20,7 @@ To accomplish this, launch Weave Net onto the new host
 without supplying any additional addresses.  And then, from one 
 of the existing hosts run:
 
-~~~bash
     host# weave connect $NEW_HOST
-~~~
 
 Other hosts on the Weave network will automatically attempt
 to establish connections to the new host as well. 
@@ -31,9 +29,7 @@ Alternatively, you can also instruct a peer to forget a
 particular host specified to it via `weave launch` or 
 `weave connect` by running:
 
-~~~bash
     host# weave forget $DECOMMISSIONED_HOST
-~~~
 
 This prevents the peer from trying to reconnect to that host 
 once connectivity to it is lost, and therefore can be used 
@@ -43,9 +39,7 @@ from the network.
 Hosts may also be bulk-replaced. All existing hosts 
 will be forgotten, and the new hosts will be added:
 
-~~~bash
     host# weave connect --replace $NEW_HOST1 $NEW_HOST2
-~~~
 
 For complete control over the peer topology, automatic 
 discovery can be disabled using the `--no-discovery` 
@@ -58,9 +52,7 @@ A list of all hosts that a peer has been asked to connect
 to with `weave launch` and `weave connect` 
 can be obtained using:
 
-~~~bash
     host# weave status targets
-~~~
 
 **See Also** 
 
