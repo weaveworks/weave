@@ -18,11 +18,13 @@ reports on the current status of various Weave Net components, including
 DNS:
 
 ~~~bash
+...
        Service: dns
         Domain: weave.local.
       Upstream: 8.8.8.8, 8.8.4.4
            TTL: 1
        Entries: 9
+...
 ~~~
 
 The first section covers the router; see the [troubleshooting
