@@ -58,9 +58,9 @@ If required, a container can also be attached to multiple subnets when it is sta
 
 `net:default` is used to request the allocation of an address from the default subnet in addition to one from an explicitly specified range.
 
->>**Important:** Containers must be prevented from capturing and injecting raw network packets - this can be accomplished by starting them with the `--cap-drop net_raw` option.
+>**Important:** Containers must be prevented from capturing and injecting raw network packets - this can be accomplished by starting them with the `--cap-drop net_raw` option.
 
->>Note: By default docker permits communication between containers on the same host, via their docker-assigned IP addresses. For complete
+>Note: By default docker permits communication between containers on the same host, via their docker-assigned IP addresses. For complete
 isolation between application containers, that feature needs to be disabled by [setting `--icc=false`](https://docs.docker.com/engine/userguide/networking/default_network/container-communication/#communication-between-containers) in the docker daemon configuration. 
 
 **See Also** 

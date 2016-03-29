@@ -18,7 +18,7 @@ where,
  *  `weave attach` – the Weave Net command to attach to the specified container
  *  `10.2.1.3` - the allocated IP address output by `weave attach`, in this case in the default subnet
 
->>Note If you are using the Weave Docker API proxy, it will have modified `DOCKER_HOST` to point to the proxy and therefore you will have to pass `-e WEAVE_CIDR=none` to start a container that _doesn't_ get automatically attached to the weave network for the purposes of this example.
+>Note If you are using the Weave Docker API proxy, it will have modified `DOCKER_HOST` to point to the proxy and therefore you will have to pass `-e WEAVE_CIDR=none` to start a container that _doesn't_ get automatically attached to the weave network for the purposes of this example.
 
 ###Dynamically Detaching Containers
 

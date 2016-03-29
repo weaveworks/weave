@@ -23,7 +23,7 @@ for instance:
 
     host1$ docker run -e WEAVE_CIDR="net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24" -ti ubuntu
 
->>**Note:** The ".0" and ".-1" addresses in a subnet are not used, as required by
+>**Note:** The ".0" and ".-1" addresses in a subnet are not used, as required by
 [RFC 1122](https://tools.ietf.org/html/rfc1122#page-29)).
 
 When working with multiple subnets in this way, it is usually
