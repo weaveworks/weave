@@ -7,13 +7,12 @@ import (
 	"github.com/docker/libnetwork/drivers/remote/api"
 	"github.com/docker/libnetwork/types"
 
+	"github.com/vishvananda/netlink"
 	weaveapi "github.com/weaveworks/weave/api"
-	. "github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/common/odp"
 	"github.com/weaveworks/weave/plugin/skel"
-
-	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -41,52 +40,45 @@ func New(client *docker.Client, weave *weaveapi.Client, scope string, noMulticas
 	return driver, nil
 }
 
-func errorf(format string, a ...interface{}) error {
-	Log.Errorf(format, a...)
-	return fmt.Errorf(format, a...)
-}
-
 // === protocol handlers
 
 func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
+	driver.logReq("GetCapabilities", nil, "")
 	var caps = &api.GetCapabilityResponse{
 		Scope: driver.scope,
 	}
-	Log.Debugf("Get capabilities: responded with %+v", caps)
+	driver.logRes("GetCapabilities", caps)
 	return caps, nil
 }
 
 func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
-	Log.Debugf("Create network request %+v", create)
-	Log.Infof("Create network %s", create.NetworkID)
+	driver.logReq("CreateNetwork", create, create.NetworkID)
 	return nil
 }
 
 func (driver *driver) DeleteNetwork(delete *api.DeleteNetworkRequest) error {
-	Log.Debugf("Delete network request: %+v", delete)
-	Log.Infof("Destroy network %s", delete.NetworkID)
+	driver.logReq("DeleteNetwork", delete, delete.NetworkID)
 	return nil
 }
 
 func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.CreateEndpointResponse, error) {
-	Log.Debugf("Create endpoint request %+v", create)
+	driver.logReq("CreateEndpoint", create, create.EndpointID)
 	endID := create.EndpointID
 
 	if create.Interface == nil {
-		return nil, fmt.Errorf("Not supported: creating an interface from within CreateEndpoint")
+		return nil, driver.error("CreateEndpoint", "Not supported: creating an interface from within CreateEndpoint")
 	}
 	driver.Lock()
 	driver.endpoints[endID] = struct{}{}
 	driver.Unlock()
 	resp := &api.CreateEndpointResponse{}
 
-	Log.Infof("Create endpoint %s %+v", endID, resp)
+	driver.logRes("CreateEndpoint", resp)
 	return resp, nil
 }
 
 func (driver *driver) DeleteEndpoint(deleteReq *api.DeleteEndpointRequest) error {
-	Log.Debugf("Delete endpoint request: %+v", deleteReq)
-	Log.Infof("Delete endpoint %s", deleteReq.EndpointID)
+	driver.logReq("DeleteEndpoint", deleteReq, deleteReq.EndpointID)
 	driver.Lock()
 	delete(driver.endpoints, deleteReq.EndpointID)
 	driver.Unlock()
@@ -101,19 +93,20 @@ func (driver *driver) HasEndpoint(endpointID string) bool {
 }
 
 func (driver *driver) EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointInfoResponse, error) {
-	Log.Debugf("Endpoint info request: %+v", req)
-	Log.Infof("Endpoint info %s", req.EndpointID)
+	driver.logReq("EndpointInfo", req, req.EndpointID)
 	return &api.EndpointInfoResponse{Value: map[string]interface{}{}}, nil
 }
 
 func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error) {
+	driver.logReq("JoinEndpoint", j, fmt.Sprintf("%s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey))
+
 	local, err := createAndAttach(j.EndpointID, WeaveBridge, 0)
 	if err != nil {
-		return nil, err
+		return nil, driver.error("JoinEndpoint", "%s", err)
 	}
 
 	if err := netlink.LinkSetUp(local); err != nil {
-		return nil, errorf("unable to bring up veth %s-%s: %s", local.Name, local.PeerName, err)
+		return nil, driver.error("JoinEndpoint", "unable to bring up veth %s-%s: %s", local.Name, local.PeerName, err)
 	}
 
 	ifname := &api.InterfaceName{
@@ -131,7 +124,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 		}
 		response.StaticRoutes = append(response.StaticRoutes, multicastRoute)
 	}
-	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
+	driver.logRes("JoinEndpoint", response)
 	return response, nil
 }
 
@@ -139,7 +132,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
 	maybeBridge, err := netlink.LinkByName(bridgeName)
 	if err != nil {
-		return nil, errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
+		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
 	}
 
 	local := vethPair(id[:5])
@@ -149,51 +142,49 @@ func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
 		local.Attrs().MTU = mtu
 	}
 	if err := netlink.LinkAdd(local); err != nil {
-		return nil, errorf(`could not create veth pair %s-%s: %s`, local.Name, local.PeerName, err)
+		return nil, fmt.Errorf(`could not create veth pair %s-%s: %s`, local.Name, local.PeerName, err)
 	}
 
 	switch maybeBridge.(type) {
 	case *netlink.Bridge:
 		if err := netlink.LinkSetMasterByIndex(local, maybeBridge.Attrs().Index); err != nil {
-			return nil, errorf(`unable to set master of %s: %s`, local.Name, err)
+			return nil, fmt.Errorf(`unable to set master of %s: %s`, local.Name, err)
 		}
 	case *netlink.GenericLink:
 		if maybeBridge.Type() != "openvswitch" {
-			return nil, errorf(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
+			return nil, fmt.Errorf(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
 		}
 		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return nil, errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
+			return nil, fmt.Errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
 		}
 	case *netlink.Device:
-		Log.Warnf("kernel does not report what kind of device %s is, just %+v", bridgeName, maybeBridge)
 		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
 		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return nil, errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
+			return nil, fmt.Errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
 		}
 	default:
-		return nil, errorf(`device "%s" is not a bridge`, bridgeName)
+		return nil, fmt.Errorf(`device "%s" is not a bridge`, bridgeName)
 	}
 	return local, nil
 }
 
 func (driver *driver) LeaveEndpoint(leave *api.LeaveRequest) error {
-	Log.Debugf("Leave request: %+v", leave)
+	driver.logReq("LeaveEndpoint", leave, fmt.Sprintf("%s:%s", leave.NetworkID, leave.EndpointID))
 
 	local := vethPair(leave.EndpointID[:5])
 	if err := netlink.LinkDel(local); err != nil {
-		Log.Warningf("unable to delete veth on leave: %s", err)
+		driver.warn("LeaveEndpoint", "unable to delete veth: %s", err)
 	}
-	Log.Infof("Leave %s:%s", leave.NetworkID, leave.EndpointID)
 	return nil
 }
 
 func (driver *driver) DiscoverNew(disco *api.DiscoveryNotification) error {
-	Log.Debugf("Discovery new notification: %+v", disco)
+	driver.logReq("DiscoverNew", disco, "")
 	return nil
 }
 
 func (driver *driver) DiscoverDelete(disco *api.DiscoveryNotification) error {
-	Log.Debugf("Discovery delete notification: %+v", disco)
+	driver.logReq("DiscoverDelete", disco, "")
 	return nil
 }
 
@@ -204,4 +195,32 @@ func vethPair(suffix string) *netlink.Veth {
 		LinkAttrs: netlink.LinkAttrs{Name: "vethwl" + suffix},
 		PeerName:  "vethwg" + suffix,
 	}
+}
+
+// logging
+
+func (driver *driver) logReq(fun string, req interface{}, short string) {
+	driver.log(common.Log.Debugf, " %+v", fun, req)
+	common.Log.Infof("[net] %s %s", fun, short)
+}
+
+func (driver *driver) logRes(fun string, res interface{}) {
+	driver.log(common.Log.Debugf, " %+v", fun, res)
+}
+
+func (driver *driver) warn(fun string, format string, a ...interface{}) {
+	driver.log(common.Log.Warnf, ": "+format, fun, a...)
+}
+
+func (driver *driver) debug(fun string, format string, a ...interface{}) {
+	driver.log(common.Log.Debugf, ": "+format, fun, a...)
+}
+
+func (driver *driver) error(fun string, format string, a ...interface{}) error {
+	driver.log(common.Log.Errorf, ": "+format, fun, a...)
+	return fmt.Errorf(format, a...)
+}
+
+func (driver *driver) log(f func(string, ...interface{}), format string, fun string, a ...interface{}) {
+	f("[net] %s"+format, append([]interface{}{fun}, a...)...)
 }
