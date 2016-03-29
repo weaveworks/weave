@@ -9,7 +9,7 @@ puts all containers into a subnet that spans the entire allocation
 range, so that every Weave-attached container can communicate with every other
 Weave-attached container.
 
-If you want some [isolation](/site/using-weave/isolating-applications.md), you
+If you want some [isolation](/site/using-weave/application-isolation.md), you
 can choose to run containers on different subnets.  To request the
 allocation of an address from a particular subnet, set the
 `WEAVE_CIDR` environment variable to `net:<subnet>` when creating the
