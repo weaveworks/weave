@@ -1089,15 +1089,12 @@ peer_args() {
 # weaveDNS helpers
 ######################################################################
 
-# Memoized function to query the weaveDNS server for our dns domain.
-dns_domain() {
-    DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null || true)}
-    DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
-    echo $DNS_DOMAIN
-}
-
 dns_args() {
-    docker_bridge_ip
+    # NB: this is memoized
+    DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null || true)}
+    [ "$DNS_DOMAIN" = "404 page not found" ] && return 0
+    DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
+
     NAME_ARG=""
     HOSTNAME_SPECIFIED=
     DNS_SEARCH_SPECIFIED=
@@ -1127,10 +1124,11 @@ dns_args() {
         shift
     done
     [ -n "$WITHOUT_DNS" ] && return 0
+
+    docker_bridge_ip
     DNS_ARGS="--dns $DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
-        DOMAIN=$(dns_domain)
-        HOSTNAME="$NAME_ARG.${DOMAIN%.}"
+        HOSTNAME="$NAME_ARG.${DNS_DOMAIN%.}"
         if [ ${#HOSTNAME} -gt 64 ] ; then
             echo "Container name too long to be used as hostname" >&2
         else
@@ -1140,7 +1138,7 @@ dns_args() {
     fi
     if [ -z "$DNS_SEARCH_SPECIFIED" ] ; then
       if [ -z "$HOSTNAME_SPECIFIED" ] ; then
-        DNS_ARGS="$DNS_ARGS --dns-search=$(dns_domain)"
+        DNS_ARGS="$DNS_ARGS --dns-search=$DNS_DOMAIN"
       else
         DNS_ARGS="$DNS_ARGS --dns-search=."
       fi
