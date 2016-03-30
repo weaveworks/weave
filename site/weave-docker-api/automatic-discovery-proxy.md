@@ -3,12 +3,12 @@ title: Using Automatic Discovery With the Weave Net Proxy
 layout: default
 ---
 
-Containers launched via the proxy use [weavedns](/site/weavedns/overview-using-weavedns.md)
+Containers launched via the proxy use [weaveDNS](/site/weavedns/overview-using-weavedns.md)
 automatically if it is running when they are started -
-see the [weavedns usage](/site/weavedns/overview-using-weavedns.md#usage) section for an in depth
+see the [weaveDNS usage](/site/weavedns/overview-using-weavedns.md#usage) section for an in depth
 explanation of the behaviour and how to control it.
 
-Typically, the proxy passes on container names as-is to weavedns
+Typically, the proxy passes on container names as-is to weaveDNS
 for registration. However, there are situations in which the final container
 name may be out of your control (for example, if you are using Docker orchestrators which
 append control/namespacing identifiers to the original container names).
@@ -35,7 +35,7 @@ For example, you can launch the proxy using all three flags, as follows:
 (for example, `$1`). For further details on the regular expression syntax see
 [Google's re2 documentation](https://github.com/google/re2/wiki/Syntax).
 
-After launching the Weave Net proxy with these flags, running a container named `aws-12798186823-foo` without labels results in weavedns registering the hostname `my-app-foo` and not `aws-12798186823-foo`.
+After launching the Weave Net proxy with these flags, running a container named `aws-12798186823-foo` without labels results in weaveDNS registering the hostname `my-app-foo` and not `aws-12798186823-foo`.
 
     host1$ docker run -ti --name=aws-12798186823-foo ubuntu ping my-app-foo
     PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.

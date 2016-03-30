@@ -1,12 +1,12 @@
 ---
-title: Load Balancing and Fault Resilience with weavedns
+title: Load Balancing and Fault Resilience with weaveDNS
 layout: default
 ---
 
 
 
 It is permissible to register multiple containers with the same name:
-weavedns returns all addresses, in a random order, for each request.
+weaveDNS returns all addresses, in a random order, for each request.
 This provides a basic load balancing capability.
 
 Expanding the

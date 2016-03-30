@@ -15,7 +15,7 @@ instead of `weave run`.
 
 The proxy sits between the Docker client (command line or API) and the
 Docker daemon, and intercepts the communication between the two. You can
-start it simultaneously with the router and weavedns via `launch`:
+start it simultaneously with the router and weaveDNS via `launch`:
 
     host1$ weave launch
 
@@ -62,7 +62,7 @@ The proxy can be stopped independently with
 
     host1$ weave stop-proxy
 
-or in conjunction with the router and weavedns via `stop`.
+or in conjunction with the router and weaveDNS via `stop`.
 
 If you set your `DOCKER_HOST` to point at the proxy, you should revert
 to the original settings prior to stopping the proxy.
