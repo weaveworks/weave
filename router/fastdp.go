@@ -29,9 +29,9 @@ type missHandler func(fks odp.FlowKeys, lock *fastDatapathLock) FlowOp
 
 type FastDatapath struct {
 	lock             sync.Mutex // guards state and synchronises use of dpif
+	iface            *net.Interface
 	dpif             *odp.Dpif
 	dp               odp.DatapathHandle
-	iface            *net.Interface
 	deleteFlowsCount uint64
 	missCount        uint64
 	missHandlers     map[odp.VportID]missHandler
@@ -79,9 +79,9 @@ func NewFastDatapath(iface *net.Interface, port int) (*FastDatapath, error) {
 	}
 
 	fastdp := &FastDatapath{
+		iface:         iface,
 		dpif:          dpif,
 		dp:            dp,
-		iface:         iface,
 		missHandlers:  make(map[odp.VportID]missHandler),
 		sendToPort:    nil,
 		sendToMAC:     make(map[MAC]bridgeSender),
