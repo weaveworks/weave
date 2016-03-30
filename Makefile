@@ -88,7 +88,7 @@ $(EXES) tests lint:
 
 else
 
-$(WEAVER_EXE) $(WEAVEPROXY_EXE):
+$(WEAVER_EXE) $(WEAVEPROXY_EXE) $(PLUGIN_EXE):
 ifeq ($(COVERAGE),true)
 	go build -v $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "^$(PACKAGE_BASE)/") | grep -v "^$(PACKAGE_BASE)/vendor/" | paste -s -d,))
@@ -112,7 +112,7 @@ $(WEAVEWAIT_NOMCAST_EXE):
 
 # These programs need a separate rule as they fail the netgo check in
 # the main build stanza due to not importing net package
-$(SIGPROXY_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE):
+$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 tests:
