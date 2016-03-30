@@ -20,25 +20,25 @@ WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
 WEAVEUTIL_EXE=prog/weaveutil/weaveutil
-DOCKERPLUGIN_EXE=prog/plugin/plugin
+PLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE)
 
 BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
-DOCKERPLUGIN_UPTODATE=.dockerplugin.uptodate
+PLUGIN_UPTODATE=.plugin.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(DOCKERPLUGIN_UPTODATE) $(BUILD_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(BUILD_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
-DOCKERPLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin
+PLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin
 BUILD_IMAGE=$(DOCKERHUB_USER)/weavebuild
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(DOCKERPLUGIN_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE)
 
 WEAVE_EXPORT=weave.tar.gz
 
@@ -67,7 +67,7 @@ $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/we
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
-$(DOCKERPLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go
+$(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
@@ -112,7 +112,7 @@ $(WEAVEWAIT_NOMCAST_EXE):
 
 # These programs need a separate rule as they fail the netgo check in
 # the main build stanza due to not importing net package
-$(SIGPROXY_EXE) $(DOCKERPLUGIN_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE):
+$(SIGPROXY_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 tests:
@@ -143,8 +143,8 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
-$(DOCKERPLUGIN_UPTODATE): prog/plugin/Dockerfile $(DOCKERPLUGIN_EXE) $(WEAVEEXEC_UPTODATE)
-	$(SUDO) docker build -t $(DOCKERPLUGIN_IMAGE) prog/plugin
+$(PLUGIN_UPTODATE): prog/plugin/Dockerfile $(PLUGIN_EXE) $(WEAVEEXEC_UPTODATE)
+	$(SUDO) docker build -t $(PLUGIN_IMAGE) prog/plugin
 	touch $@
 
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
