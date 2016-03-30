@@ -61,7 +61,7 @@ type FastDatapath struct {
 	forwarders map[mesh.PeerName]*fastDatapathForwarder
 }
 
-func NewFastDatapath(dpName string, port int) (*FastDatapath, error) {
+func NewFastDatapath(iface *net.Interface, port int) (*FastDatapath, error) {
 	dpif, err := odp.NewDpif()
 	if err != nil {
 		return nil, err
@@ -74,18 +74,13 @@ func NewFastDatapath(dpName string, port int) (*FastDatapath, error) {
 		}
 	}()
 
-	dp, err := dpif.LookupDatapath(dpName)
-	if err != nil {
-		return nil, err
-	}
-
-	iface, err := net.InterfaceByName(dpName)
+	dp, err := dpif.LookupDatapath(iface.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	fastdp := &FastDatapath{
-		dpname:        dpName,
+		dpname:        iface.Name,
 		dpif:          dpif,
 		dp:            dp,
 		iface:         iface,

@@ -348,9 +348,9 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	case datapathName != "" && ifaceName != "":
 		Log.Fatal("At most one of --datapath and --iface must be specified.")
 	case datapathName != "":
-		_, err := weavenet.EnsureInterface(datapathName)
+		iface, err := weavenet.EnsureInterface(datapathName)
 		checkFatal(err)
-		fastdp, err := weave.NewFastDatapath(datapathName, port)
+		fastdp, err := weave.NewFastDatapath(iface, port)
 		checkFatal(err)
 		bridge = fastdp.Bridge()
 		overlay.Add("fastdp", fastdp.Overlay())
