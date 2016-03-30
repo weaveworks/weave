@@ -7,7 +7,7 @@ layout: default
 The following topics are discussed: 
 
 * [Adding and removing extra DNS entries](#add-remove)
-* [Resolving Weavedns entries from the Host](#resolve-weavedns-entries-from-host)
+* [Resolving WeaveDNS entries from the Host](#resolve-weavedns-entries-from-host)
 * [Hot-swapping Service Containers](#hot-swapping)
 * [Retaining DNS Entries When Containers Stop](#retain-stopped)
 * [Configuring a Custom TTL](#ttl)
@@ -48,7 +48,7 @@ $ weave dns-add 192.128.16.45 -h db.weave.local
 Note that such records get removed when stopping the weave peer on
 which they were added.
 
-### <a name="resolve-weavedns-entries-from-host"></a>Resolving Weavedns Entries From the Host
+### <a name="resolve-weavedns-entries-from-host"></a>Resolving WeaveDNS Entries From the Host
 
 You can resolve entries from any host running weaveDNS with `weave
 dns-lookup`:
@@ -83,5 +83,5 @@ weaveDNS instance will receive.
 **See Also**
 
  * [How Weave Finds Containers](/site/weave-docker-api/how-works-weavedns.md)
- * [Load Balancing and Fault Resilience with weavedns](/site/weave-docker-api/load-balance-fault-weavedns.md)
+ * [Load Balancing and Fault Resilience with WeaveDNS](/site/weave-docker-api/load-balance-fault-weavedns.md)
  * [Managing Domains](/site/weavedns/managing-domains-weavedns.md)

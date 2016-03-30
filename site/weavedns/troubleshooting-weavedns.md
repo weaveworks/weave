@@ -28,7 +28,7 @@ DNS:
 The first section covers the router; see the [troubleshooting
 guide](/site/troubleshooting.md#weave-status) for more details.
 
-The 'Service: dns' section is pertinent to weavedns, and includes:
+The 'Service: dns' section is pertinent to weaveDNS, and includes:
 
 * The local domain suffix which is being served
 * The list of upstream servers used for resolving names not in the local domain

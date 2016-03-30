@@ -31,9 +31,9 @@ Multiple subnet addresses can be exposed or hidden using a single command:
     host2$ weave hide   net:default net:10.2.2.0/24
     10.2.1.132 10.2.2.130
 
-###Adding Exposed Addresses to weavedns
+###Adding Exposed Addresses to weaveDNS
 
-Exposed addresses can also be added to `weavedns` by supplying fully qualified domain names:
+Exposed addresses can also be added to weaveDNS by supplying fully qualified domain names:
 
     host2$ weave expose -h exposed.weave.local
     10.2.1.132
