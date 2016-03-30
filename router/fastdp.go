@@ -28,7 +28,6 @@ type bridgeSender func(key PacketKey, lock *fastDatapathLock) FlowOp
 type missHandler func(fks odp.FlowKeys, lock *fastDatapathLock) FlowOp
 
 type FastDatapath struct {
-	dpname           string
 	lock             sync.Mutex // guards state and synchronises use of dpif
 	dpif             *odp.Dpif
 	dp               odp.DatapathHandle
@@ -80,7 +79,6 @@ func NewFastDatapath(iface *net.Interface, port int) (*FastDatapath, error) {
 	}
 
 	fastdp := &FastDatapath{
-		dpname:        iface.Name,
 		dpif:          dpif,
 		dp:            dp,
 		iface:         iface,
@@ -204,7 +202,7 @@ func (fastdp fastDatapathBridge) Interface() *net.Interface {
 }
 
 func (fastdp fastDatapathBridge) String() string {
-	return fmt.Sprint(fastdp.dpname, " (via ODP)")
+	return fmt.Sprint(fastdp.iface.Name, " (via ODP)")
 }
 
 func (fastdp fastDatapathBridge) Stats() map[string]int {
