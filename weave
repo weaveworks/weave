@@ -1741,8 +1741,8 @@ launch_plugin_if_not_running() {
         --restart=always \
         -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_HTTP_ADDR \
-        $WEAVEPLUGIN_DOCKER_ARGS \
-        $PLUGIN_IMAGE "$@"
+        $WEAVEPLUGIN_DOCKER_ARGS $PLUGIN_IMAGE \
+        "$@"
     wait_for_status $PLUGIN_CONTAINER_NAME http_call_unix $PLUGIN_CONTAINER_NAME status.sock
     util_op create-plugin-network weave weavemesh
 }
