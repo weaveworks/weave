@@ -1,6 +1,6 @@
 ---
 title: Deploying Applications To Weave Net
-layout: default
+menu_order: 10
 ---
 
 This section contains the following topics: 

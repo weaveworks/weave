@@ -1,6 +1,6 @@
 ---
 title: Managing Domain Entries
-layout: default
+menu_order: 40
 ---
 
 

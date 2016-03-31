@@ -1,6 +1,6 @@
 ---
 title: Starting, Stopping and Removing Peers
-layout: default
+menu_order: 20
 ---
 
 

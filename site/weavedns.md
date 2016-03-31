@@ -1,6 +1,6 @@
 ---
 title: Using WeaveDNS
-layout: default
+menu_order: 120
 ---
 
 

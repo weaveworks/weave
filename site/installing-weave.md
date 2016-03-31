@@ -1,6 +1,6 @@
 ---
 title: Installing Weave Net
-layout: default
+menu_order: 30
 ---
 
 

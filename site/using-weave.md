@@ -1,6 +1,6 @@
 ---
 title: Using Weave Net - Example
-layout: default
+menu_order: 40
 ---
 
 Weave Net provides a simple to deploy networking solution for containerized apps. The example described and built upon throughout this `Using Weave Net` section describes how to manage a Weave container network using a sample application which consists of two simple `netcat` services deployed to containers on two separate hosts, and sometimes extended across three hosts.  

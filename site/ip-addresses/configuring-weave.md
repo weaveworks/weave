@@ -1,6 +1,6 @@
 ---
 title: Configuring Weave to Explicitly Use an IP Range
-layout: default
+menu_order: 10
 ---
 
 The default configurations for both Weave Net and Docker use [Private

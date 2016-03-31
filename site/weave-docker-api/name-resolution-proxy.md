@@ -1,6 +1,6 @@
 ---
 title: Name resolution via `/etc/hosts`
-layout: default
+menu_order: 40
 ---
 
 

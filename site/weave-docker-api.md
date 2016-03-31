@@ -1,6 +1,6 @@
 ---
 title: Setting Up The Weave Net Docker API Proxy
-layout: default
+menu_order: 60
 ---
 
 

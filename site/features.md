@@ -1,6 +1,6 @@
 ---
 title: Weave Features
-layout: default
+menu_order: 20
 ---
 
 The following is a comprehensive list and overview of all the features available in Weave 

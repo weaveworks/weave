@@ -1,6 +1,6 @@
 ---
 title: Securing the Docker Communications With TLS
-layout: default
+menu_order: 20
 ---
 
 If you are [connecting to the docker daemon with

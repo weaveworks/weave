@@ -1,6 +1,6 @@
 ---
 title: Using The Weave Docker API Proxy
-layout: default
+menu_order: 10
 ---
 
 

@@ -1,6 +1,6 @@
 ---
 title: Exposing Services to the Outside World
-layout: default
+menu_order: 70
 ---
 
 Services running in containers on a Weave network can be made

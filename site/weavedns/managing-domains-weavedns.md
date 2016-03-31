@@ -1,6 +1,6 @@
 ---
 title: Managing Domains
-layout: default
+menu_order: 30
 ---
 
 The following topics are discussed:
