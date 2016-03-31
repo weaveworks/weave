@@ -5,10 +5,11 @@ layout: default
 
 
 
-The Weave DNS server answers name queries on a Weave network and provides a simple way for containers to find each other. Just give
-the containers hostnames and then tell other containers to connect to those names.
-Unlike Docker 'links', this requires no code changes and it works across
-hosts.
+WeaveDNS is a DNS server that answers name queries on a Weave network
+and provides a simple way for containers to find each other. Just give
+the containers hostnames and then tell other containers to connect to
+those names.  Unlike Docker 'links', this requires no code changes and
+it works across hosts.
 
 WeaveDNS is deployed as an embedded service within the Weave router.
 The service is automatically started when the router is launched:

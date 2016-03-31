@@ -73,4 +73,4 @@ The following other fields in the spec are supported:
 ###Caveats
 
 - The Weave Net router container must be running for CNI to allocate addresses
-- The CNI plugin does not add entries to Weave DNS.
+- The CNI plugin does not add entries to weaveDNS.
