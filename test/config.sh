@@ -127,12 +127,10 @@ stop_router_on() {
     # we don't invoke `weave stop-router` here because that removes
     # the weave container, which means we a) can't grab coverage
     # stats, and b) can't inspect the logs when tests fail.
-    docker_on $host stop weave 1>/dev/null 2>&1 || true
-    docker_on $host stop weaveproxy 1>/dev/null 2>&1 || true
-    if [ -n "$COVERAGE" ] ; then
-        collect_coverage $host weave
-        collect_coverage $host weaveproxy
-    fi
+    for C in weaveplugin weaveproxy weave ; do
+        docker_on $host stop $C 1>/dev/null 2>&1 || true
+        [ -n "$COVERAGE" ] && collect_coverage $host $C
+    done
 }
 
 exec_on() {
