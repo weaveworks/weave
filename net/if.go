@@ -19,9 +19,10 @@ func EnsureInterface(ifaceName string) (*net.Interface, error) {
 
 func ensureInterface(ifaceName string) (*net.Interface, error) {
 	ch := make(chan netlink.LinkUpdate)
-	done := make(chan struct{})
-	defer close(done)
-	if err := netlink.LinkSubscribe(ch, done); err != nil {
+	// NB: We do not supply (and eventually close) a 'done' channel
+	// here since that can cause incorrect file descriptor
+	// re-usage. See https://github.com/weaveworks/weave/issues/2120
+	if err := netlink.LinkSubscribe(ch, nil); err != nil {
 		return nil, err
 	}
 	// check for currently-existing interface after subscribing, to avoid race
@@ -46,9 +47,7 @@ func EnsureInterfaceAndMcastRoute(ifaceName string) (*net.Interface, error) {
 		return nil, err
 	}
 	ch := make(chan netlink.RouteUpdate)
-	done := make(chan struct{})
-	defer close(done)
-	if err := netlink.RouteSubscribe(ch, done); err != nil {
+	if err := netlink.RouteSubscribe(ch, nil); err != nil {
 		return nil, err
 	}
 	dest := net.IPv4(224, 0, 0, 0)
