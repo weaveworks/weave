@@ -62,6 +62,6 @@ for manual allocation.
 
 **See Also**
 
- * [Address Allocation with IP Address Management (IPAM)](/site/ipam/overview-init-ipam.md)
+ * [Address Allocation with IP Address Management (IPAM)](/site/ipam.md)
  * [Isolating Applications on a Weave Network](/site/using-weave/application-isolation.md)
  * [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md)

@@ -9,7 +9,7 @@ modified to wait for the Weave network interface to become
 available. 
 
 When they are started via the Weave Net proxy, containers are 
-[automatically assigned IP addresses](/site/ipam/overview-init-ipam.md) and connected to the
+[automatically assigned IP addresses](/site/ipam.md) and connected to the
 Weave network.  
 
 ###Creating and Starting Containers with the Weave Net Proxy
@@ -56,6 +56,6 @@ route, add the `--no-multicast-route` flag to `weave launch-proxy`.
 
 **See Also**
 
- * [Setting Up The Weave Docker API Proxy](/site/weave-docker-api/set-up-proxy.md)
+ * [Setting Up The Weave Docker API Proxy](/site/weave-docker-api.md)
  * [Securing Docker Communications With TLS](securing-proxy.md)
  * [Launching Containers With Weave Run (without the Proxy)](/site/weave-docker-api/launching-without-proxy.md)

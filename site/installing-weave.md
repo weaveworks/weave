@@ -38,7 +38,7 @@ for the latest Weave AMIs and
 
 **See Also** 
 
- * [Using Weave Net](/site/using-weave/intro-example.md)
+ * [Using Weave Net](/site/using-weave.md)
  * [Getting Started Guides](http://www.weave.works/guides/)
  * [Features](/site/features.md)
  * [Troubleshooting](/site/troubleshooting.md)

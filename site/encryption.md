@@ -5,7 +5,7 @@ menu_order: 90
 
 
 Weave Net peers
-[communicate with each other over both TCP and UDP](/site/router-topology/overview.md). This
+[communicate with each other over both TCP and UDP](/site/router-topology.md). This
 communication
 [can be encrypted](/site/using-weave/security-untrusted-networks.md).
 

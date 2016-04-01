@@ -25,6 +25,6 @@ Prior to version 1.2, Weave Net used a custom encapsulation format. Fast datapat
 **See Also**
 
  * [Deploying Applications to Weave](/site/using-weave/deploying-applications.md)
- * [Using Fast Datapath](/site/fastdp/using-fastdp.md)
+ * [Using Fast Datapath](/site/fastdp.md)
 
 

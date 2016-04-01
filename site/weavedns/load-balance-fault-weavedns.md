@@ -10,7 +10,7 @@ weaveDNS returns all addresses, in a random order, for each request.
 This provides a basic load balancing capability.
 
 Expanding the
-[overview example](/site/weavedns/overview-using-weavedns.md), let us
+[overview example](/site/weavedns.md), let us
 start an additional `pingme` container on a 2nd host, and then run
 some ping tests...
 
@@ -47,6 +47,6 @@ container that is still alive.
 
 **See Also**
 
- * [How Weave Finds Containers](/site/weave-docker-api/how-works-weavedns.md)
+ * [How Weave Finds Containers](/site/weave-docker-api.md)
  * [Managing Domains](/site/weavedns/managing-domains-weavedns.md)
  * [Managing Domain Entries](/site/weavedns/managing-entries-weavedns.md)

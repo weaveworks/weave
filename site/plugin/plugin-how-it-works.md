@@ -29,6 +29,6 @@ store, but the first part of
 
 **See Also**
 
- * [Using the Weave Net Docker Network Plugin](/site/plugin/weave-plugin-how-to.md)
+ * [Using the Weave Net Docker Network Plugin](/site/plugin.md)
  * [Plugin Command-line Arguments](/site/plugin/plug-in-command-line.md)
  

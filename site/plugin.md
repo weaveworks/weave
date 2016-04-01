@@ -22,7 +22,7 @@ on any of the hosts, and they can all communicate with each other.
 
 >**Warning!** It is inadvisable to attach containers to the Weave network using the Weave Docker Networking Plugin and Weave Docker API Proxy simultaneously. Such containers will end up with two Weave network interfaces and two IP addresses, which is rarely desirable. To ensure that the proxy is not being used, do not run eval $(weave env), or docker $(weave config).
 
-In order to use Weave Net's [Service Discovery](/site/weavedns/overview-using-weavedns.md) you
+In order to use Weave Net's [Service Discovery](/site/weavedns.md) you
 must pass the additional arguments `--dns` and `-dns-search`, for
 which a helper is provided in the Weave script:
 

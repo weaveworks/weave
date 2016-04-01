@@ -54,6 +54,6 @@ $ sudo DOCKER_BRIDGE=someother weave run ...
 
 **See Also**
 
- * [Using WeaveDNS](/site/weavedns/overview-using-weavedns.md)
+ * [Using WeaveDNS](/site/weavedns.md)
  * [Load Balancing with weaveDNS](/site/weavedns/load-balance-fault-weavedns.md)
  * [Managing Domain Entries](/site/weavedns/managing-domains-weavedns.md)

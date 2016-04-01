@@ -82,6 +82,6 @@ weaveDNS instance will receive.
 
 **See Also**
 
- * [How Weave Finds Containers](/site/weave-docker-api/how-works-weavedns.md)
+ * [How Weave Finds Containers](/site/weave-docker-api.md)
  * [Load Balancing and Fault Resilience with WeaveDNS](/site/weave-docker-api/load-balance-fault-weavedns.md)
  * [Managing Domains](/site/weavedns/managing-domains-weavedns.md)

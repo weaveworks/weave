@@ -29,5 +29,5 @@ route, add the `--no-multicast-route` flag to `weave launch-plugin`.
 
 **See Also**
 
- * [Using the Weave Net Docker Network Plugin](/site/plugin/weave-plugin-how-to.md)
+ * [Using the Weave Net Docker Network Plugin](/site/plugin.md)
  * [How the Weave Network Plugin Works](/site/plugin/plugin-how-it-works.md)

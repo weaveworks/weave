@@ -36,7 +36,7 @@ Weave Net can forward traffic between nodes, and it works even if the mesh netwo
 
 Weave Net automatically chooses the fastest path between two hosts, offering near native throughput and latency, all without your intervention.  
 
-See [How Fast Datapath Works](/site/fastdp/using-fastdp.md) for more information.
+See [How Fast Datapath Works](/site/fastdp.md) for more information.
 
 ###Network Operations Friendly
 
@@ -59,7 +59,7 @@ With Weave Net, deploy your peer-to-peer file sharing applications and voice ove
 Weave Net is a good choice if you want one tool for everything.  For example: In addition to Docker plugins, you can also use Weave as a Kubernetes plugin.  You can also use Weave with Amazon ECS or with Mesos and Marathon.  
 Refer to our Getting Started and Integration Guides for more information.
 
-For a complete list and description of Weave Net’s current feature set see, [Weave Net Features](/site/features/features.md)
+For a complete list and description of Weave Net’s current feature set see, [Weave Net Features](/site/features.md)
 
 
 
