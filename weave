@@ -1050,16 +1050,18 @@ http_call() {
     shift 3
     CURL_TMPOUT=/tmp/weave_curl_out_$$
     HTTP_CODE=$(curl -o $CURL_TMPOUT -w '%{http_code}' --connect-timeout 3 -s -S -X $http_verb "$@" http://$addr$url) || return $?
-    if [ "$HTTP_CODE" = "404" ] ; then # Swallow the message for 404
-        retval=4
-    # anything else not beginning with a 2 is an error: send the message to stderr
-    elif [ "$HTTP_CODE" = "${HTTP_CODE#2}" ] ; then
-        [ -f $CURL_TMPOUT ] && cat $CURL_TMPOUT >&2
-        retval=1
-    else
-        [ -f $CURL_TMPOUT ] && cat $CURL_TMPOUT
-        retval=0
-    fi
+    case "$HTTP_CODE" in
+        2??) # 2xx -> not an error; output response on stdout
+            [ -f $CURL_TMPOUT ] && cat $CURL_TMPOUT
+            retval=0
+            ;;
+        404) # treat as error but swallow response
+            retval=4
+            ;;
+        *) # anything else is an error; output response on stderr
+            [ -f $CURL_TMPOUT ] && cat $CURL_TMPOUT >&2
+            retval=1
+    esac
     rm -f $CURL_TMPOUT
     return $retval
 }
