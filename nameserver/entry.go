@@ -109,9 +109,13 @@ func (e1 *Entry) addLowercase() {
 	e1.lHostname = strings.ToLower(e1.Hostname)
 }
 
-func (e1 *Entry) tombstone() {
-	e1.Version++
+func (e1 *Entry) tombstone() bool {
+	if e1.Tombstone > 0 {
+		return false
+	}
 	e1.Tombstone = now()
+	e1.Version++
+	return true
 }
 
 func check(es SortableEntries) error {
@@ -190,8 +194,7 @@ func (es *Entries) tombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries
 
 	tombstoned := Entries{}
 	for i, e := range *es {
-		if f(&e) && e.Origin == ourname {
-			e.tombstone()
+		if f(&e) && e.Origin == ourname && e.tombstone() {
 			(*es)[i] = e
 			tombstoned = append(tombstoned, e)
 		}
