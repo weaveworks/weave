@@ -1080,8 +1080,14 @@ http_call_unix() {
 }
 
 call_weave() {
-    check_running $CONTAINER_NAME || return 1
-    http_call $HTTP_ADDR "$@"
+    TMPERR=/tmp/call_weave_err_$$
+    retval=0
+    http_call $HTTP_ADDR "$@" 2>$TMPERR || retval=$?
+    if [ $retval -ne 0 ] ; then
+        check_running $CONTAINER_NAME && cat $TMPERR >&2
+    fi
+    rm -f $TMPERR
+    return $retval
 }
 
 death_msg() {
