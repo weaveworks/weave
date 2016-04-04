@@ -57,7 +57,7 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh
 		networkConfig.Bridge = NullBridge{}
 	}
 
-	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay), NetworkConfig: networkConfig, db: db}
+	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay, common.LogLogger()), NetworkConfig: networkConfig, db: db}
 	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.Macs = NewMacCache(macMaxAge,
