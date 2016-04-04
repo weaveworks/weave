@@ -1350,7 +1350,7 @@ check_overlap() {
 # with_container_addresses.
 ipam_reclaim() {
     for CIDR in $3 ; do
-        http_call $HTTP_ADDR PUT /ip/$1/$CIDR?noErrorOnUnknown=true
+        http_call $HTTP_ADDR PUT /ip/$1/$CIDR?noErrorOnUnknown=true || true
     done
 }
 
