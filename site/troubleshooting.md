@@ -306,6 +306,5 @@ and the container image versions as git hashes.
 
 **See Also**
 
- * [Troubleshooting Weave](/site/troublehooting.md)
  * [Troubleshooting IPAM](/site/ipam/troubleshooting.md)
  * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)
