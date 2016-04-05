@@ -65,19 +65,19 @@ See [Using Fast Datapath](/site/fastdp/using-fastdp.md) and
 ###<a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
 
 Weave Net includes a [Docker API Proxy](/site/weave-docker-api/set-up-proxy.md), which can be 
-used to launch containers to the Weave network using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/). 
+used to start containers using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/), and attach them to the Weave network before they begin execution.
 
-To use the proxy run: 
+To use the proxy run
 
     host1$ eval $(weave env)
     
-With the proxy enabled, you can start and manage containers using standard Docker commands. 
+and then start and manage containers with standard Docker commands. 
 
 Containers started in this way that subsequently restart, either
 by an explicit `docker restart` command or by Docker restart 
-policy, are re-attached to the Weave network by the `Weave Docker API Proxy` 
+policy, are re-attached to the Weave network by the `Weave Docker API Proxy`.
 
-See [Using the Weave Docker API](/site/weave-docker-api/using-proxy.md)
+See [Using the Weave Docker API Proxy](/site/weave-docker-api/using-proxy.md)
 
 
 ###<a name="plugin"></a>Weave Network Docker Plugin
