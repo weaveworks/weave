@@ -57,14 +57,15 @@ For installing Weave Net on other platforms, follow the [integration guides](htt
 Weave Net respects the environment variable `DOCKER_HOST`, so you can run
 it locally to control a weave network on a remote host.
 
-Weave Net will periodically check with our servers to see if a new version is available.
-New versions are announced in the log. To disable this, run:
+Weave Net
+[periodically contacts Weaveworks servers for available versions](https://github.com/weaveworks/go-checkpoint)
+and announces new versions in the log. To disable this check, run:
 
 ```
-CHECKPOINT_DISABLE=true weave launch
+export CHECKPOINT_DISABLE=true
 ```
 
-For more information, [read this](https://github.com/weaveworks/go-checkpoint).
+before launching Weave Net.
 
 ## Quick Start Screencast
 
