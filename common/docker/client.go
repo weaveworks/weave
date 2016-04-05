@@ -26,6 +26,13 @@ type Client struct {
 	*docker.Client
 }
 
+type syncPair struct {
+	stop chan struct{}
+	done chan struct{}
+}
+
+type pendingStarts map[string]*syncPair
+
 // NewClient creates a new Docker client and checks we can talk to Docker
 func NewClient(apiPath string) (*Client, error) {
 	if apiPath != "" && !strings.Contains(apiPath, "://") {
@@ -79,6 +86,7 @@ func (c *Client) Info() string {
 // AddObserver adds an observer for docker events
 func (c *Client) AddObserver(ob ContainerObserver) error {
 	go func() {
+		pending := make(pendingStarts)
 		retryInterval := InitialInterval
 		for {
 			events := make(chan *docker.APIEvents)
@@ -89,11 +97,11 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 				for event := range events {
 					switch event.Status {
 					case "start":
-						id := event.ID
-						ob.ContainerStarted(id)
+						pending.finish(event.ID)
+						pending.start(event.ID, c, ob)
 					case "die":
-						id := event.ID
-						ob.ContainerDied(id)
+						pending.finish(event.ID)
+						ob.ContainerDied(event.ID)
 					}
 				}
 				if time.Since(start) > retryInterval {
@@ -109,6 +117,39 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 		}
 	}()
 	return nil
+}
+
+// Docker sends a 'start' event before it has attempted to start the
+// container.  Delay notifying the observer until the container has a
+// pid, or we are told to stop when a 'die' event arrives.
+//
+// Note we always deliver the event, even if the container seems to
+// have gone away.
+func (pending pendingStarts) start(id string, c *Client, ob ContainerObserver) {
+	sync := syncPair{make(chan struct{}), make(chan struct{})}
+	pending[id] = &sync
+	go func() {
+		defer close(sync.done)
+		defer ob.ContainerStarted(id)
+		for {
+			if container, err := c.InspectContainer(id); err != nil || container.State.Pid != 0 {
+				return
+			}
+			select {
+			case <-sync.stop:
+				return
+			case <-time.After(200 * time.Millisecond):
+			}
+		}
+	}()
+}
+
+func (pending pendingStarts) finish(id string) {
+	if sync, found := pending[id]; found {
+		close(sync.stop)
+		<-sync.done
+		delete(pending, id)
+	}
 }
 
 // IsContainerNotRunning returns true if we have checked with Docker that the ID is not running
