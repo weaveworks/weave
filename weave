@@ -1048,7 +1048,22 @@ http_call() {
     http_verb="$2"
     url="$3"
     shift 3
-    curl --connect-timeout 3 -s -S -X $http_verb "$@" http://$addr$url
+    CURL_TMPOUT=/tmp/weave_curl_out_$$
+    HTTP_CODE=$(curl -o $CURL_TMPOUT -w '%{http_code}' --connect-timeout 3 -s -S -X $http_verb "$@" http://$addr$url) || return $?
+    case "$HTTP_CODE" in
+        2??) # 2xx -> not an error; output response on stdout
+            [ -f $CURL_TMPOUT ] && cat $CURL_TMPOUT
+            retval=0
+            ;;
+        404) # treat as error but swallow response
+            retval=4
+            ;;
+        *) # anything else is an error; output response on stderr
+            [ -f $CURL_TMPOUT ] && cat $CURL_TMPOUT >&2
+            retval=1
+    esac
+    rm -f $CURL_TMPOUT
+    return $retval
 }
 
 http_call_unix() {
@@ -1065,11 +1080,14 @@ http_call_unix() {
 }
 
 call_weave() {
-    check_running $CONTAINER_NAME || return 1
-    if ! http_call $HTTP_ADDR "$@" ; then
-        echo "Call to $CONTAINER_NAME failed." >&2
-        return 1
+    TMPERR=/tmp/call_weave_err_$$
+    retval=0
+    http_call $HTTP_ADDR "$@" 2>$TMPERR || retval=$?
+    if [ $retval -ne 0 ] ; then
+        check_running $CONTAINER_NAME && cat $TMPERR >&2
     fi
+    rm -f $TMPERR
+    return $retval
 }
 
 death_msg() {
@@ -1132,9 +1150,10 @@ peer_args() {
 ######################################################################
 
 dns_args() {
+    retval=0
     # NB: this is memoized
-    DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null || true)}
-    [ "$DNS_DOMAIN" = "404 page not found" ] && return 0
+    DNS_DOMAIN=${DNS_DOMAIN:-$(call_weave GET /domain 2>/dev/null)} || retval=$?
+    [ "$retval" -eq 4 ] && return 0
     DNS_DOMAIN=${DNS_DOMAIN:-weave.local.}
 
     NAME_ARG=""
@@ -1337,7 +1356,7 @@ check_overlap() {
 # with_container_addresses.
 ipam_reclaim() {
     for CIDR in $3 ; do
-        http_call $HTTP_ADDR PUT /ip/$1/$CIDR?noErrorOnUnknown=true
+        http_call $HTTP_ADDR PUT /ip/$1/$CIDR?noErrorOnUnknown=true || true
     done
 }
 
@@ -1376,24 +1395,21 @@ ipam_cidrs() {
             else
                 IPAM_URL=/ip/$CONTAINER_ID/"${arg#net:}"
             fi
-            CIDR=$(call_weave $METHOD $IPAM_URL$CHECK_ALIVE) || return 1
-            if [ "$CIDR" = "404 page not found" ] ; then
-                if [ "$METHOD" = "POST" ] ; then
-                    echo "IP address allocation must be enabled to use 'net:'" >&2
-                    return 1
-                fi
-            elif [ -n "$CIDR" ] && ! is_cidr "$CIDR" ; then
-                echo "$CIDR" >&2
+            retval=0
+            CIDR=$(call_weave $METHOD $IPAM_URL$CHECK_ALIVE) || retval=$?
+            if [ $retval -eq 4 -a "$METHOD" = "POST" ] ; then
+                echo "IP address allocation must be enabled to use 'net:'" >&2
                 return 1
-            else
-                IPAM_CIDRS="$IPAM_CIDRS $CIDR"
-                ALL_CIDRS="$ALL_CIDRS $CIDR"
             fi
+            [ $retval -gt 0 ] && return $retval
+            IPAM_CIDRS="$IPAM_CIDRS $CIDR"
+            ALL_CIDRS="$ALL_CIDRS $CIDR"
         else
             if [ "$METHOD" = "POST" ] ; then
                 # Assignment of a plain IP address; warn if it clashes but carry on
                 check_overlap $arg || true
-                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg >&2 || return 1
+                # Abort on failure, but not 4 (=404), which means IPAM is disabled
+                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg || [ $? -eq 4 ] || return 1
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
@@ -1970,20 +1986,10 @@ EOF
             shift
         done
         [ -n "$SUB_STATUS" ] || echo
-        if status=$(call_weave GET $STATUS_URL) ; then
-            case "$status" in
-                "")
-                    ;;
-                "404 page not found")
-                    echo "Invalid 'weave status' sub-command: $SUB_COMMAND" >&2
-                    usage
-                    ;;
-                *)
-                    echo "$status"
-                    ;;
-            esac
-        else
-            res=1
+        call_weave GET $STATUS_URL || res=$?
+        if [ $res -eq 4 ] ; then
+            echo "Invalid 'weave status' sub-command: $SUB_COMMAND" >&2
+            usage
         fi
         if [ -z "$SUB_STATUS" ] && check_running $PROXY_CONTAINER_NAME 2>/dev/null && PROXY_ADDRS=$(proxy_addrs) ; then
             echo
