@@ -22,8 +22,8 @@ C1=$(container_ip $HOST1 c1)
 start_container $HOST2 --name=c2
 assert_raises "exec_on $HOST2 c2 $PING $C1"
 
-stop_router_on $HOST1
-stop_router_on $HOST2
+stop_weave_on $HOST1
+stop_weave_on $HOST2
 
 # Start just HOST2; if nothing persisted it would form its own ring
 launch_router_with_db $HOST2
