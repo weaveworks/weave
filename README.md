@@ -62,7 +62,7 @@ Weave Net
 and announces new versions in the log. To disable this check, run:
 
 ```
-export CHECKPOINT_DISABLE=true
+export CHECKPOINT_DISABLE=1
 ```
 
 before launching Weave Net.
