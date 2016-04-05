@@ -121,16 +121,14 @@ weave_on() {
     CHECKPOINT_DISABLE=true DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
-stop_router_on() {
+stop_weave_on() {
     host=$1
-    shift 1
-    # we don't invoke `weave stop-router` here because that removes
-    # the weave container, which means we a) can't grab coverage
-    # stats, and b) can't inspect the logs when tests fail.
-    for C in weaveplugin weaveproxy weave ; do
-        docker_on $host stop $C 1>/dev/null 2>&1 || true
-        [ -n "$COVERAGE" ] && collect_coverage $host $C
-    done
+    weave_on $host stop || true
+    if [ -n "$COVERAGE" ]; then
+        for C in weaveplugin weaveproxy weave ; do
+            collect_coverage $host $C
+        done
+    fi
 }
 
 exec_on() {
@@ -238,7 +236,7 @@ start_suite() {
 end_suite() {
     whitely assert_end
     for host in $HOSTS; do
-        stop_router_on $host
+        stop_weave_on $host
     done
 }
 
