@@ -275,19 +275,18 @@ re-connect.
 
 ## <a name="reboots"></a>Reboots
 
-because the process of getting everything re-started and
-re-connected via restart policies is not entirely reliable, the router and 
-proxy containers do not have Docker restart policies
-set. Until that changes, we recommend that you create appropriate startup scripts to launch
-Weave Net and run application containers from
-[your favourite process manager](/site/systemd.md).
+All the containers started by `weave launch` are configured with the
+Docker restart policy `--restart=always`, so they will come back again
+on reboot.
 
-If you are shutting down or restarting a host deliberately, run `weave
-reset` to clear everything down.
-
-The Weave Net Docker plugin does restart automatically because it must
-always start with Docker, as described in
-[its documentation](/site/weave-docker-api/using-proxy.md).
+Note that the
+[Weave Net Docker API Proxy](/site/weave-docker-api/set-up-proxy.md)
+is responsible for reconfiguring the Weave router and re-attaching
+application containers to the Weave network at startup, so if you
+choose not to run it you must make arrangements for this
+reconfiguration to take place. In this scenario, set up your favourite
+process manager to run `weave launch-router` every time the machine
+reboots.
 
 ## <a name="snapshots"></a>Snapshot Releases
 
