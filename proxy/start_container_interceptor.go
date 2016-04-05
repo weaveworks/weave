@@ -15,7 +15,7 @@ func (i *startContainerInterceptor) InterceptRequest(r *http.Request) error {
 
 	// If the client has sent some JSON which might be a HostConfig, add our
 	// parameters back into it, otherwise Docker will consider them overwritten
-	if containerShouldAttach(container) && r.Header.Get("Content-Type") == "application/json" {
+	if containerShouldAttach(container) && r.Header.Get("Content-Type") == "application/json" && r.ContentLength > 0 {
 		params := map[string]interface{}{}
 		if err := unmarshalRequestBody(r, &params); err != nil {
 			return err
