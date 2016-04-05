@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/weaveworks/mesh"
 
+	"github.com/weaveworks/go-checkpoint"
 	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/nameserver"
 	"github.com/weaveworks/weave/net/address"
@@ -138,7 +140,7 @@ func defTemplate(name string, text string) *template.Template {
 }
 
 var statusTemplate = defTemplate("status", `\
-        Version: {{.Version}}
+        Version: {{.Version}} ({{.VersionCheck}})
 
         Service: router
        Protocol: {{.Router.Protocol}} \
@@ -221,17 +223,51 @@ var dnsEntriesTemplate = defTemplate("dnsEntries", `\
 
 var ipamTemplate = defTemplate("ipamTemplate", `{{printIPAMRanges .Router .IPAM}}`)
 
+type VersionCheck struct {
+	Enabled     bool
+	NewVersion  string
+	NextCheckAt time.Time
+}
+
+func versionCheck() *VersionCheck {
+	v := &VersionCheck{}
+	if checkpoint.IsCheckDisabled() {
+		return v
+	}
+
+	v.Enabled = true
+	v.NewVersion = newVersion.Load().(string)
+	v.NextCheckAt = checker.NextCheckAt()
+
+	return v
+}
+
+func (v *VersionCheck) String() string {
+	switch {
+	case !v.Enabled:
+		return "version check update disabled"
+	case v.NewVersion != "":
+		return fmt.Sprintf("version %s available - please upgrade!",
+			v.NewVersion)
+	default:
+		return fmt.Sprintf("up to date; next check at %s",
+			v.NextCheckAt.Format("2006/01/02 15:04:05"))
+	}
+}
+
 type WeaveStatus struct {
-	Version string
-	Router  *weave.NetworkRouterStatus `json:"Router,omitempty"`
-	IPAM    *ipam.Status               `json:"IPAM,omitempty"`
-	DNS     *nameserver.Status         `json:"DNS,omitempty"`
+	Version      string
+	VersionCheck *VersionCheck              `json:"VersionCheck,omitempty"`
+	Router       *weave.NetworkRouterStatus `json:"Router,omitempty"`
+	IPAM         *ipam.Status               `json:"IPAM,omitempty"`
+	DNS          *nameserver.Status         `json:"DNS,omitempty"`
 }
 
 func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
 	status := func() WeaveStatus {
 		return WeaveStatus{
 			version,
+			versionCheck(),
 			weave.NewNetworkRouterStatus(router),
 			ipam.NewStatus(allocator, defaultSubnet),
 			nameserver.NewStatus(ns, dnsserver)}
@@ -283,5 +319,4 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 	defHandler("/status/peers", peersTemplate)
 	defHandler("/status/dns", dnsEntriesTemplate)
 	defHandler("/status/ipam", ipamTemplate)
-
 }

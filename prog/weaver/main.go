@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/davecheney/profile"
@@ -27,6 +28,8 @@ import (
 )
 
 var version = "(unreleased version)"
+var checker *checkpoint.Checker
+var newVersion atomic.Value
 
 var Log = common.Log
 
@@ -51,10 +54,15 @@ const (
 )
 
 func checkForUpdates() {
+	newVersion.Store("")
+
 	handleResponse := func(r *checkpoint.CheckResponse, err error) {
 		if err != nil {
 			Log.Printf("Error checking version: %v", err)
-		} else if r.Outdated {
+			return
+		}
+		if r.Outdated {
+			newVersion.Store(r.CurrentVersion)
 			Log.Printf("Weave version %s is available; please update at %s",
 				r.CurrentVersion, r.CurrentDownloadURL)
 		}
@@ -66,9 +74,7 @@ func checkForUpdates() {
 		Version:       version,
 		SignatureFile: "",
 	}
-	resp, err := checkpoint.Check(&params)
-	handleResponse(resp, err)
-	checkpoint.CheckInterval(&params, updateCheckPeriod, handleResponse)
+	checker = checkpoint.CheckInterval(&params, updateCheckPeriod, handleResponse)
 }
 
 func (c ipamConfig) Enabled() bool {
@@ -183,7 +189,7 @@ func main() {
 
 	Log.Println("Command line options:", options())
 
-	go checkForUpdates()
+	checkForUpdates()
 
 	if prof != "" {
 		p := *profile.CPUProfile

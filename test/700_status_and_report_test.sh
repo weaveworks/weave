@@ -26,4 +26,19 @@ weave_on $HOST1 connect 10.2.2.1
 assert "weave_on $HOST1 status targets" "10.2.2.1"
 assert "weave_on $HOST1 status connections | tr -s ' ' | cut -d ' ' -f 2" "10.2.2.1:6783"
 
+assert "weave_on $HOST1 report -f '{{.VersionCheck.Enabled}}'" "false"
+assert_raises "weave_on $HOST1 status | grep 'version check update disabled'"
+
+weave_on $HOST1 reset
+
+CHECKPOINT_DISABLE="" weave_on $HOST1 launch
+assert "weave_on $HOST1 report -f '{{.VersionCheck.Enabled}}'" "true"
+
+NEW_VSN=$(weave_on $HOST1 report  -f "{{.VersionCheck.NewVersion}}")
+if [ -z "$NEW_VSN" ]; then
+    assert_raises "weave_on $HOST1 status | grep 'up to date; next check at '"
+else
+    assert_raises "weave_on $HOST1 status | grep \"version $NEW_VSN available - please upgrade!\""
+fi
+
 end_suite

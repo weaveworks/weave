@@ -44,6 +44,8 @@ CHECK_ETHWE_MISSING="test ! -d /sys/class/net/ethwe"
 
 DOCKER_PORT=2375
 
+CHECKPOINT_DISABLE=true
+
 upload_executable() {
     host=$1
     file=$2
@@ -118,7 +120,7 @@ weave_on() {
     host=$1
     shift 1
     [ -z "$DEBUG" ] || greyly echo "Weave on $host:$DOCKER_PORT: $@" >&2
-    CHECKPOINT_DISABLE=true DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
+    CHECKPOINT_DISABLE="$CHECKPOINT_DISABLE" DOCKER_HOST=tcp://$host:$DOCKER_PORT $WEAVE "$@"
 }
 
 stop_weave_on() {
