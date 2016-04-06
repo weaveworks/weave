@@ -887,8 +887,10 @@ func (alloc *Allocator) loadPersistedData() {
 	if len(alloc.seed) != 0 {
 		alloc.infof("Initialising with supplied IPAM seed")
 		alloc.createRing(alloc.seed)
-	} else {
+	} else if alloc.paxos.IsElector() {
 		alloc.infof("Initialising via deferred consensus")
+	} else {
+		alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
 	}
 
 }

@@ -262,10 +262,11 @@ func (node *Node) IsElector() bool {
 }
 
 type Status struct {
+	Elector    bool
 	KnownNodes int
 	Quorum     uint
 }
 
 func NewStatus(node *Node) *Status {
-	return &Status{len(node.knows), node.quorum}
+	return &Status{true, len(node.knows), node.quorum}
 }
