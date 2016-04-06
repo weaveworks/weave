@@ -767,7 +767,7 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	//   (if we did so on periodic gossip we would force consensus unnecessarily)
 	// * If we are an elector (to avoid a broadcast storm of ring request messages)
 	default:
-		if _, ok := alloc.paxos.(*paxos.Node); ok && sender != mesh.UnknownPeerName {
+		if alloc.paxos.IsElector() && sender != mesh.UnknownPeerName {
 			alloc.establishRing()
 		}
 	}

@@ -257,14 +257,15 @@ func (node *Node) Consensus() (bool, AcceptedValue) {
 	return false, AcceptedValue{}
 }
 
+func (node *Node) IsElector() bool {
+	return true
+}
+
 type Status struct {
 	KnownNodes int
 	Quorum     uint
 }
 
 func NewStatus(node *Node) *Status {
-	if node == nil {
-		return nil
-	}
 	return &Status{len(node.knows), node.quorum}
 }

@@ -7,6 +7,7 @@ type Participant interface {
 	Propose()
 	Think() bool
 	Consensus() (bool, AcceptedValue)
+	IsElector() bool
 }
 
 type Observer struct {
@@ -36,4 +37,8 @@ func (observer *Observer) Think() bool {
 
 func (observer *Observer) Consensus() (bool, AcceptedValue) {
 	return false, AcceptedValue{}
+}
+
+func (observer *Observer) IsElector() bool {
+	return false
 }
