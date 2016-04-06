@@ -21,6 +21,7 @@ MIN_DOCKER_VERSION=1.6.0
 DOCKERHUB_USER=${DOCKERHUB_USER:-weaveworks}
 BASE_EXEC_IMAGE=$DOCKERHUB_USER/weaveexec
 EXEC_IMAGE=$BASE_EXEC_IMAGE:$IMAGE_VERSION
+WEAVEDB_IMAGE=$DOCKERHUB_USER/weavedb
 PROXY_HOST=${PROXY_HOST:-$(echo "${DOCKER_HOST#tcp://}" | cut -s -d: -f1)}
 PROXY_HOST=${PROXY_HOST:-127.0.0.1}
 DOCKER_CLIENT_HOST=${DOCKER_CLIENT_HOST:-$DOCKER_HOST}
@@ -384,7 +385,10 @@ IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
 PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
 PLUGIN_CONTAINER_NAME=weaveplugin
+# Note VOLUMES_CONTAINER which is for weavewait should change when you upgrade Weave
 VOLUMES_CONTAINER_NAME=weavevolumes-$IMAGE_VERSION
+# DB files should remain when you upgrade, so version number not included in name
+DB_CONTAINER_NAME=weavedb
 
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
@@ -1679,12 +1683,19 @@ launch_router() {
         fi
     fi
 
+    # Create a data-only container for persistence data
+    if ! docker inspect -f ' ' $DB_CONTAINER_NAME > /dev/null 2>&1 ; then
+       docker create -v /weavedb --name=$DB_CONTAINER_NAME \
+           --label=weavevolumes $WEAVEDB_IMAGE >/dev/null
+    fi
+
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
     start_if_necessary router $CONTAINER_NAME $IMAGE \
         $(docker_run_options) \
         --restart=always \
+        --volumes-from $DB_CONTAINER_NAME \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
