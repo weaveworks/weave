@@ -123,7 +123,7 @@ weave_on() {
 
 stop_weave_on() {
     host=$1
-    weave_on $host stop || true
+    weave_on $host stop 1>/dev/null 2>&1 || true
     if [ -n "$COVERAGE" ]; then
         for C in weaveplugin weaveproxy weave ; do
             collect_coverage $host $C
