@@ -22,10 +22,11 @@ docker_on $HOST1 rm -f c1
 
 weave_on $HOST1 launch-router --no-discovery $HOST3
 
-# Now re-enable gossip
+# Now re-enable gossip from host2 to host3
 run_on $HOST3 "sudo iptables -D INPUT -s $HOST2 -j DROP"
 
-# Currently failing due to Mesh #28
-# assert_no_dns_record $HOST3 c3 c1.weave.local
+sleep 1
+
+assert_no_dns_record $HOST3 c3 c1.weave.local
 
 end_suite
