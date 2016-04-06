@@ -300,14 +300,14 @@ func (m *Model) validate() {
 	for i := range m.nodes {
 		ok, val := m.nodes[i].Consensus()
 		if !ok {
-			//m.dump()
+			m.dump()
 			m.t.Fatal("Node doesn't know about consensus")
 		}
 
 		firstConsensus := m.nodes[i].firstConsensus
 		if firstConsensus.Origin.valid() &&
 			firstConsensus.Origin != val.Origin {
-			//m.dump()
+			m.dump()
 			m.t.Fatal("Consensus mismatch")
 		}
 
