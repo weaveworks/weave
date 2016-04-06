@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
@@ -63,4 +64,24 @@ func CheckWarn(e error) {
 	if e != nil {
 		Log.Warnln(e)
 	}
+}
+
+// Adaptor type to go from Logrus to something expecting a standard library log.Logger
+type logLogger struct {
+	logger *logrus.Logger
+}
+
+// io.Writer interface
+func (l logLogger) Write(p []byte) (n int, err error) {
+	ln := len(p)
+	// Strip a trailing newline, because logrus formatter adds one
+	if ln > 0 && p[ln-1] == '\n' {
+		p = p[:ln-1]
+	}
+	l.logger.Info(string(p))
+	return ln, nil
+}
+
+func LogLogger() *log.Logger {
+	return log.New(logLogger{Log}, "", 0)
 }
