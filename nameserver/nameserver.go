@@ -208,8 +208,8 @@ func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData
 		return n.isKnownPeer(e.Origin)
 	})
 
+	var overriddenEntries []Entry
 	n.Lock()
-	defer n.Unlock()
 
 	// Check entries claiming to originate from us against our current data
 	gossip.Entries.filter(func(e *Entry) bool {
@@ -221,15 +221,24 @@ func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData
 					nextVersion := e.Version + 1
 					*e = *ourEntry
 					e.Version = nextVersion
+					overriddenEntries = append(overriddenEntries, *e)
 				}
 			} else { // We have no entry matching the one that came in with us as Origin
-				e.tombstone()
+				if e.tombstone() {
+					overriddenEntries = append(overriddenEntries, *e)
+				}
 			}
 		}
 		return true
 	})
 
 	newEntries := n.entries.merge(gossip.Entries)
+	n.Unlock() // unlock before attempting to broadcast
+
+	// Note that all overriddenEntries have been merged into our entries, either
+	// because we forced the version higher or because they were missing before.
+	n.broadcastEntries(overriddenEntries...)
+
 	if len(newEntries) > 0 {
 		return &GossipData{Entries: newEntries, Timestamp: now()}, &gossip, nil
 	}
