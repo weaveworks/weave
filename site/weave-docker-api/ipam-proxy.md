@@ -4,7 +4,7 @@ layout: default
 ---
 
 
-If [automatic IP address allocation](/site/ipam/overview-init-ipam.md) is enabled in Weave Net (by default IPAM is enabled),
+If [automatic IP address allocation](/site/ipam.md) is enabled in Weave Net (by default IPAM is enabled),
 then containers started via the proxy are automatically assigned an IP address, *without having to specify any
 special environment variables or any other options*.
 
@@ -37,5 +37,5 @@ container with a blank `WEAVE_CIDR`, for example:
     
 **See Also**
 
- * [Address Allocation with IP Address Management (IPAM)](/site/ipam/overview-init-ipam.md)
+ * [Address Allocation with IP Address Management (IPAM)](/site/ipam.md)
  * [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md)    

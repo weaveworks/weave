@@ -1,6 +1,6 @@
 ---
 title: Configuring Weave to Explicitly Use an IP Range
-layout: default
+menu_order: 10
 ---
 
 The default configurations for both Weave Net and Docker use [Private
@@ -39,4 +39,4 @@ Networks](https://en.wikipedia.org/wiki/Private_network).  For example
 
 **See Also**
 
- * [IP Addresses, Routes and Networks](/site/ip-addresses/ip-addresses.md)
+ * [IP Addresses, Routes and Networks](/site/ip-addresses.md)

@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting
-layout: default
+menu_order: 60
 ---
 
 The command

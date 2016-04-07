@@ -1,6 +1,6 @@
 ---
 title: Launching Containers With Weave Run (without the Proxy)
-layout: default
+menu_order: 50
 ---
 
 
@@ -41,6 +41,6 @@ containers using `docker start` and attaches them to the Weave network.
 
 **See Also**
 
- * [Setting Up The Weave Docker API Proxy](/site/weave-docker-api/set-up-proxy.md)
+ * [Setting Up The Weave Docker API Proxy](/site/weave-docker-api.md)
  * [Securing Docker Communications With TLS](/site/weave-docker-api/securing-proxy.md)
  * [Name Resolution via `/etc/hosts`](/site/weave-docker-api/name-resolution-proxy.md)

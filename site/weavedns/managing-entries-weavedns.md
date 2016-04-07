@@ -1,6 +1,6 @@
 ---
 title: Managing Domain Entries
-layout: default
+menu_order: 40
 ---
 
 
@@ -82,6 +82,6 @@ weaveDNS instance will receive.
 
 **See Also**
 
- * [How Weave Finds Containers](/site/weave-docker-api/how-works-weavedns.md)
- * [Load Balancing and Fault Resilience with WeaveDNS](/site/weave-docker-api/load-balance-fault-weavedns.md)
+ * [How Weave Finds Containers](/site/weave-docker-api.md)
+ * [Load Balancing and Fault Resilience with WeaveDNS](/site/weavedns/load-balance-fault-weavedns.md)
  * [Managing Domains](/site/weavedns/managing-domains-weavedns.md)

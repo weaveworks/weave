@@ -1,6 +1,6 @@
 ---
 title: Integrating a Host Network with Weave Net
-layout: default
+menu_order: 60
 ---
 
 Weave application networks can be integrated with an external host network, establishing connectivity between the host and with application containers running anywhere.

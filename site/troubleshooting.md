@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting Weave Net
-layout: default
+menu_order: 150
 ---
 
 
@@ -78,7 +78,7 @@ $ weave status
 ````
 
 The terms used here are explained further at
-[How Weave Net Works](/site/router-topology/overview.md).
+[How Weave Net Works](/site/router-topology.md).
 
   * **Version** - shows the Weave Net version.
 
@@ -92,7 +92,7 @@ can be overridden by using the `--nickname` argument at `weave
 launch`.
 
  * **Encryption** - indicates whether
-[encryption](/site/encryption/crypto-overview.md) is in use for communication
+[encryption](/site/encryption.md) is in use for communication
 between peers.
 
  * **PeerDiscovery** - indicates whether
@@ -305,5 +305,5 @@ and the container image versions as git hashes.
 
 **See Also**
 
- * [Troubleshooting IPAM](/site/ipam/troubleshooting.md)
+ * [Troubleshooting IPAM](/site/ipam/troubleshooting-ipam.md)
  * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)

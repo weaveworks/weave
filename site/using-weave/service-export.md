@@ -1,6 +1,6 @@
 ---
 title: Exposing Services to the Outside World
-layout: default
+menu_order: 70
 ---
 
 Services running in containers on a Weave network can be made
@@ -35,5 +35,5 @@ Similar NAT rules to the above can be used to expose services not just to the ou
 
 **See Also**
 
- * [Using Weave Net](/site/using-weave/intro-example.md)
+ * [Using Weave Net](/site/using-weave.md)
  * [Managing Services in Weave Net: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)

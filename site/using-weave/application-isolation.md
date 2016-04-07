@@ -1,6 +1,6 @@
 ---
 title: Isolating Applications on a Weave Network
-layout: default
+menu_order: 30
 ---
 
 A single Weave network can host multiple, isolated applications where each application's containers are able 

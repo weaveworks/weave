@@ -1,6 +1,6 @@
 ---
 title: Introducing Weave Net
-layout: default
+menu_order: 10
 ---
 
 
@@ -15,7 +15,7 @@ Services provided by application containers on the weave network can be exposed 
 
 Weave Net simplifies setting up a container network. Because containers on a Weave network use standard port numbers, (for example MySQL’s default is port 3306), managing microservices is straightforward. Every container can find the IP of any other container using a simple DNS query on the container's name, and it can also communicate directly without NAT, without using port mappings or complicated ambassador linking.  And best of all deploying a Weave container network requires zero changes to your application’s code. 
 
-![Weave Net Encapsulation](/site/images/weave-net-overview.png)
+![Weave Net Encapsulation](weave-net-overview.png)
 
 ###Service Discovery
 
@@ -36,7 +36,7 @@ Weave Net can forward traffic between nodes, and it works even if the mesh netwo
 
 Weave Net automatically chooses the fastest path between two hosts, offering near native throughput and latency, all without your intervention.  
 
-See [How Fast Datapath Works](/site/fastdp/using-fastdp.md) for more information.
+See [How Fast Datapath Works](/site/fastdp.md) for more information.
 
 ###Network Operations Friendly
 
@@ -59,7 +59,7 @@ With Weave Net, deploy your peer-to-peer file sharing applications and voice ove
 Weave Net is a good choice if you want one tool for everything.  For example: In addition to Docker plugins, you can also use Weave as a Kubernetes plugin.  You can also use Weave with Amazon ECS or with Mesos and Marathon.  
 Refer to our Getting Started and Integration Guides for more information.
 
-For a complete list and description of Weave Net’s current feature set see, [Weave Net Features](/site/features/features.md)
+For a complete list and description of Weave Net’s current feature set see, [Weave Net Features](/site/features.md)
 
 
 

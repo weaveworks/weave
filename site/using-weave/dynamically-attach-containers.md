@@ -1,6 +1,6 @@
 ---
 title: Dynamically Attaching and Detaching Applications
-layout: default
+menu_order: 40
 ---
 
 

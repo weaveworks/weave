@@ -1,6 +1,6 @@
 ---
 title: How Weave Net Interprets Network Topology
-layout: default
+menu_order: 20
 ---
 
 This section contains the following topics: 

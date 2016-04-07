@@ -1,6 +1,6 @@
 ---
 title: Weave Features
-layout: default
+menu_order: 20
 ---
 
 The following is a comprehensive list and overview of all the features available in Weave 
@@ -28,7 +28,7 @@ Net:
  * [Fault Tolerance](#fault-tolerance) 
 
 For step-by-step instructions on how to use Weave Net, 
-see [Using Weave Net](/site/using-weave/intro-example.md)
+see [Using Weave Net](/site/using-weave.md)
 
 ###<a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
@@ -59,12 +59,12 @@ Fast datapath does not support encryption. For full details on configuring
 Weave when you have connections that traverse untrusted networks,
 see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) for more details.
 
-See [Using Fast Datapath](/site/fastdp/using-fastdp.md) and 
+See [Using Fast Datapath](/site/fastdp.md) and 
 [How Fast Datapath Works](/site/fastdp/fastdp-how-it-works.md). 
 
 ###<a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
 
-Weave Net includes a [Docker API Proxy](/site/weave-docker-api/set-up-proxy.md), which can be 
+Weave Net includes a [Docker API Proxy](/site/weave-docker-api.md), which can be 
 used to start containers using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/), and attach them to the Weave network before they begin execution.
 
 To use the proxy run
@@ -97,7 +97,7 @@ when there are network connectivity problems.
 >*Note:* The plugin is an *alternative* to the proxy, and therefore you do
 *not* need to run `eval $(weave env)` beforehand.
 
-See [Using the Weave Docker Network Plugin](/site/plugin/weave-plugin-how-to.md) for more details.
+See [Using the Weave Docker Network Plugin](/site/plugin.md) for more details.
 
 
 ###<a name="cniplugin"></a>Weave Network CNI Plugin
@@ -114,13 +114,13 @@ Containers are automatically allocated a unique IP address. To view the addresse
 Instead of allowing Weave to automatically allocate addresses, an IP address and a network can be explicitly 
 specified. See [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md) for instructions. 
 
-For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Management](/site/ipam/overview-init-ipam.md). And also review the 
-[the basics of IP addressing](/site/ip-addresses/ip-addresses.md) for an explanation of addressing and private networks. 
+For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Management](/site/ipam.md). And also review the 
+[the basics of IP addressing](/site/ip-addresses.md) for an explanation of addressing and private networks. 
 
 
 ###<a name="naming-and-discovery"></a>Naming and Discovery
  
-Named containers are automatically registered in [weaveDNS](/site/weavedns/overview-using-weavedns.md), 
+Named containers are automatically registered in [weaveDNS](/site/weavedns.md), 
 and are discoverable by using standard, simple name lookups:
 
     host1$ docker run -dti --name=service ubuntu
@@ -184,7 +184,7 @@ Weave Net implements encryption and security using [Daniel J. Bernstein's NaCl l
 
 For information on how to secure your Docker network connections,
 see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)
-and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption/crypto-overview.md) and [How Weave Implements Encryption](/site/encryption/implementation.md)
+and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption.md) and [How Weave Implements Encryption](/site/encryption/implementation.md)
 
 
 ###<a name="host-network-integration"></a>Host Network Integration

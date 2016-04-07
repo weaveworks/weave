@@ -1,6 +1,6 @@
 ---
 title: Starting, Stopping and Removing Peers
-layout: default
+menu_order: 20
 ---
 
 
@@ -23,7 +23,7 @@ later rejoin the Weave network, the same IP address may be allocated
 twice.
 
 Assume you had started the three peers in the
-[overview example](/site/ipam/overview-init-ipam.md), and then host3
+[overview example](/site/ipam.md), and then host3
 caught fire, you can go to one of the other hosts and run:
 
     host1$ weave rmpeer host3
@@ -37,6 +37,6 @@ status`.
 
 **See Also**
 
- * [Address Allocation with IP Address Management (IPAM)](/site/ipam/overview-init-ipam.md)
+ * [Address Allocation with IP Address Management (IPAM)](/site/ipam.md)
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
  * [Isolating Applications on a Weave Network](/site/using-weave/application-isolation.md)

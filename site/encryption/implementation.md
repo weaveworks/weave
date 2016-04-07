@@ -4,7 +4,7 @@ layout: default
 ---
 
 This section describes some details of Weave Net's built-in
-[encryption](/site/encryption/crypto-overview.md):
+[encryption](/site/encryption.md):
 
  * [Establishing the Ephemeral Session Key](#ephemeral-key)
  * [Key Generation](#csprng)

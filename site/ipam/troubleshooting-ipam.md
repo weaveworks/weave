@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting the IP Allocator
-layout: default
+menu_order: 30
 ---
 
 

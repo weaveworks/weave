@@ -1,6 +1,6 @@
 ---
 title: Securing Connections Across Untrusted Networks
-layout: default
+menu_order: 80
 ---
 
 
@@ -34,7 +34,7 @@ password at `weave launch` the router falls back to a slower
 
 If some of your peers are co-located in a trusted network (for example within the boundary of your own data center) you can use the `--trusted-subnets` argument to `weave launch` to selectively disable data plane encryption as an optimization. 
 
->**Note:** Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave Net [falls back to a slower method](/site/fastdp/using-fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
+>**Note:** Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave Net [falls back to a slower method](/site/fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
 
 Be aware that:
 
@@ -45,5 +45,5 @@ Be aware that:
 
 **See Also**
 
- * [Using Encryption With Weave Net](/site/encryption/crypto-overview.md)
- * [Using Fast Datapath](/site/using-weave/using-fastdap.md)
+ * [Using Encryption With Weave Net](/site/encryption.md)
+ * [Using Fast Datapath](/site/using-weave.md)

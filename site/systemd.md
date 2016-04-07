@@ -1,6 +1,6 @@
 ---
 title: Using Weave with Systemd
-layout: default
+menu_order: 130
 ---
 
 
@@ -63,7 +63,7 @@ context with the commands shown below. You will need to have the
 
 **See Also**
 
- * [Using Weave Net](/site/using-weave/intro-example.md)
+ * [Using Weave Net](/site/using-weave.md)
  * [Getting Started Guides](http://www.weave.works/guides/)
  * [Features](/site/features.md)
  * [Troubleshooting](/site/troubleshooting.md)
