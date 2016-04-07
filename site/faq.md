@@ -87,7 +87,7 @@ Yes, of course!  Weave allows you to run isolated networks and still allow open 
 
 **See Also**
 
- * [Troubleshooting Weave](/site/troublehooting.md.md)
+ * [Troubleshooting Weave](/site/troublehooting.md)
  * [Troubleshooting IPAM](/site/ipam.md)
  * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)
  
