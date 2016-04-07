@@ -45,4 +45,4 @@ disable weaveDNS itself, launch weave with the `--no-dns` option.
 **See Also**
 
  * [How Weave Finds Containers](/site/weave-docker-api.md)
- * [Load Balancing and Fault Resilience with WeaveDNS](/site/weave-docker-api/load-balance-fault-weavedns.md)
+ * [Load Balancing and Fault Resilience with WeaveDNS](/site/weavedns/load-balance-fault-weavedns.md)

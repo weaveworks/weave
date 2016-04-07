@@ -32,7 +32,7 @@ Where,
  /var/run/Docker.sock: permission denied. Are you trying to connect to a TLS-enabled daemon without TLS?` then you likely need to be 'root' in order to connect to the Docker daemon. If so, run the above and all subsequent commands in a *single* root shell (e.g. one created with `sudo -s`). Do *not* prefix individual commands with `sudo`, since some commands modify environment entries and hence they all need to be executed from the same shell.
  
 
->**Important!** if you are running the Weave Docker Network Plugin do not run `eval $(weave env)`. See [Using the Weave Net Docker Network Plugin](/site/pluing.md) for more information.
+>**Important!** if you are running the Weave Docker Network Plugin do not run `eval $(weave env)`. See [Using the Weave Net Docker Network Plugin](/site/plugin.md) for more information.
 
 Weave Net must be launched once per host. The relevant container images will be pulled down from Docker Hub on demand during `weave launch`. 
 
