@@ -37,8 +37,12 @@ func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
 
 	var paxosStatus *paxos.Status
 	if allocator.awaitingConsensus && allocator.paxos != nil {
-		if node, ok := allocator.paxos.(*paxos.Node); ok {
-			paxosStatus = paxos.NewStatus(node)
+		if allocator.paxos.IsElector() {
+			if node, ok := allocator.paxos.(*paxos.Node); ok {
+				paxosStatus = paxos.NewStatus(node)
+			}
+		} else {
+			paxosStatus = &paxos.Status{Elector: false}
 		}
 	}
 

@@ -767,7 +767,7 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	//   (if we did so on periodic gossip we would force consensus unnecessarily)
 	// * If we are an elector (to avoid a broadcast storm of ring request messages)
 	default:
-		if _, ok := alloc.paxos.(*paxos.Node); ok && sender != mesh.UnknownPeerName {
+		if alloc.paxos.IsElector() && sender != mesh.UnknownPeerName {
 			alloc.establishRing()
 		}
 	}
@@ -887,8 +887,10 @@ func (alloc *Allocator) loadPersistedData() {
 	if len(alloc.seed) != 0 {
 		alloc.infof("Initialising with supplied IPAM seed")
 		alloc.createRing(alloc.seed)
-	} else {
+	} else if alloc.paxos.IsElector() {
 		alloc.infof("Initialising via deferred consensus")
+	} else {
+		alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
 	}
 
 }
