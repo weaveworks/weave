@@ -124,7 +124,7 @@ cni_volume_options() {
 create_cni_script() {
     cat >"$1" <<EOF
 #!/bin/sh
-docker run --rm --privileged --net=host --pid=host -i \\
+docker run --rm $(docker_run_options) --pid=host -i \\
  -e CNI_VERSION -e CNI_COMMAND -e CNI_CONTAINERID -e CNI_NETNS \\
  -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH $(cni_volume_options setup) \\
  $PLUGIN_IMAGE "$2"
