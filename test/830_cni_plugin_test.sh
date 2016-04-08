@@ -16,12 +16,7 @@ cni_connect() {
     docker_on $1 run --rm --privileged --net=host --pid=host -i \
         -e CNI_VERSION=1 -e CNI_COMMAND=ADD -e CNI_CONTAINERID=c1 \
         -e CNI_NETNS=/proc/$pid/ns/net -e CNI_IFNAME=eth0 -e CNI_PATH=/opt/cni/bin \
-        weaveworks/plugin:latest $(coverage_args) --cni-net <<EOF
-{
-    "name": "weave",
-    "type": "weave-net"
-}
-EOF
+        weaveworks/plugin:latest $(coverage_args) --cni-net
 }
 
 weave_on $HOST1 launch
@@ -30,8 +25,22 @@ weave_on $HOST1 expose
 C1=$(docker_on $HOST1 run --net=none --name=c1 -dt $SMALL_IMAGE /bin/sh)
 C2=$(docker_on $HOST1 run --net=none --name=c2 -dt $SMALL_IMAGE /bin/sh)
 
-cni_connect $HOST1 c1 >/dev/null
-cni_connect $HOST1 c2 >/dev/null
+cni_connect $HOST1 c1 >/dev/null <<EOF
+{
+    "name": "weave",
+    "type": "weave-net"
+}
+EOF
+cni_connect $HOST1 c2 >/dev/null <<EOF
+{
+    "name": "weave",
+    "type": "weave-net"
+    "ipam": {
+        "type": "weave-ipam",
+        "routes": [ { "dst": "10.32.0.0/12" } ]
+    }
+}
+EOF
 
 C1IP=$(container_ip $HOST1 c1)
 C2IP=$(container_ip $HOST1 c2)
