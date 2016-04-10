@@ -46,6 +46,7 @@ type operation interface {
 // are used around data structures.
 type Allocator struct {
 	actionChan        chan<- func()
+	stopChan          chan<- struct{}
 	ourName           mesh.PeerName
 	seed              []mesh.PeerName           // optional user supplied ring seed
 	universe          address.Range             // superset of all ranges
@@ -108,16 +109,20 @@ func NewAllocator(config Config) *Allocator {
 func (alloc *Allocator) Start() {
 	alloc.loadPersistedData()
 	actionChan := make(chan func(), mesh.ChannelSize)
+	stopChan := make(chan struct{})
 	alloc.actionChan = actionChan
+	alloc.stopChan = stopChan
 	alloc.ticker = time.NewTicker(tickInterval)
-	go alloc.actorLoop(actionChan)
+	go alloc.actorLoop(actionChan, stopChan)
 }
 
 // Stop makes the actor routine exit, for test purposes ONLY because any
 // calls after this is processed will hang. Async.
 func (alloc *Allocator) Stop() {
-	alloc.ticker.Stop()
-	alloc.actionChan <- nil
+	select {
+	case alloc.stopChan <- struct{}{}:
+	default:
+	}
 }
 
 // Operation life cycle
@@ -582,14 +587,14 @@ func (alloc *Allocator) SetInterfaces(gossip mesh.Gossip) {
 
 // ACTOR server
 
-func (alloc *Allocator) actorLoop(actionChan <-chan func()) {
+func (alloc *Allocator) actorLoop(actionChan <-chan func(), stopChan <-chan struct{}) {
+	defer alloc.ticker.Stop()
 	for {
 		select {
 		case action := <-actionChan:
-			if action == nil {
-				return
-			}
 			action()
+		case <-stopChan:
+			return
 		case <-alloc.ticker.C:
 			if alloc.awaitingConsensus {
 				alloc.propose()
