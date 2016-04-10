@@ -232,7 +232,10 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestR
 	return allocs, gossipRouter, subnet
 }
 
-func stopNetworkOfAllocators(allocs []*Allocator) {
+func stopNetworkOfAllocators(allocs []*Allocator, gossipRouter *gossip.TestRouter) {
+	// NB: We must stop the router first since ipam gossip makes
+	// synchronous calls into the allocator.
+	gossipRouter.Stop()
 	for _, alloc := range allocs {
 		alloc.Stop()
 	}
