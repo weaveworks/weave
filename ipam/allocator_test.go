@@ -164,9 +164,9 @@ func TestAllocatorClaim(t *testing.T) {
 		testAddr2  = "10.0.4.2/24"
 	)
 
-	allocs, _, subnet := makeNetworkOfAllocators(2, universe)
+	allocs, router, subnet := makeNetworkOfAllocators(2, universe)
+	defer stopNetworkOfAllocators(allocs, router)
 	alloc := allocs[1]
-	defer alloc.Stop()
 	addr1, _ := address.ParseCIDR(testAddr1)
 
 	// First claim should trigger "dunno, I'm going to wait"
@@ -333,6 +333,7 @@ func TestTransfer(t *testing.T) {
 		cidr = "10.0.1.7/22"
 	)
 	allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
+	defer stopNetworkOfAllocators(allocs, router)
 	alloc1 := allocs[0]
 	alloc2 := allocs[1]
 	alloc3 := allocs[2] // This will be 'master' and get the first range
@@ -372,8 +373,8 @@ func TestFakeRouterSimple(t *testing.T) {
 	const (
 		cidr = "10.0.1.7/22"
 	)
-	allocs, _, subnet := makeNetworkOfAllocators(2, cidr)
-	defer stopNetworkOfAllocators(allocs)
+	allocs, router, subnet := makeNetworkOfAllocators(2, cidr)
+	defer stopNetworkOfAllocators(allocs, router)
 
 	alloc1 := allocs[0]
 	//alloc2 := allocs[1]
@@ -391,8 +392,8 @@ func TestAllocatorFuzz(t *testing.T) {
 		concurrency  = 5
 		cidr         = "10.0.1.7/22"
 	)
-	allocs, _, subnet := makeNetworkOfAllocators(nodes, cidr)
-	defer stopNetworkOfAllocators(allocs)
+	allocs, router, subnet := makeNetworkOfAllocators(nodes, cidr)
+	defer stopNetworkOfAllocators(allocs, router)
 
 	// Test state
 	// For each IP issued we store the allocator
@@ -599,9 +600,9 @@ func TestSpaceRequest(t *testing.T) {
 		container2 = "cont-2"
 		universe   = "10.32.0.0/12"
 	)
-	allocs, gossipRouter, subnet := makeNetworkOfAllocators(1, universe)
+	allocs, router, subnet := makeNetworkOfAllocators(1, universe)
+	defer stopNetworkOfAllocators(allocs, router)
 	alloc1 := allocs[0]
-	defer alloc1.Stop()
 
 	addr, err := alloc1.Allocate(container1, subnet, returnFalse)
 	require.Nil(t, err, "")
@@ -612,7 +613,7 @@ func TestSpaceRequest(t *testing.T) {
 
 	// Start a new peer
 	alloc2, _ := makeAllocator("02:00:00:02:00:00", universe, 2)
-	alloc2.SetInterfaces(gossipRouter.Connect(alloc2.ourName, alloc2))
+	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc2.Start()
 	defer alloc2.Stop()
 	alloc2.Allocate(container2, subnet, returnFalse)
