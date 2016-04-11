@@ -1150,7 +1150,7 @@ etc_hosts_contents() {
     shift
     NAME=${FQDN%%.*}
     HOSTNAMES="$NAME"
-    [ "$NAME" = "$FQDN" -o "$NAME." = "$FQDN" ] || HOSTNAMES="$FQDN $HOSTNAMES"
+    [ "$NAME" = "$FQDN" -o "$NAME." = "$FQDN" ] || HOSTNAMES="${FQDN%.} $HOSTNAMES"
 
     echo "# created by Weave - BEGIN"
     echo "# container hostname"
