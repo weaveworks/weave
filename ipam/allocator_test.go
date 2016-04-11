@@ -117,6 +117,7 @@ func TestBootstrap(t *testing.T) {
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
+	// Check that tryPendingOps doesn't cause anything to happen here
 	alloc1.actionChan <- func() { alloc1.tryPendingOps() }
 	AssertNothingSent(t, done)
 
@@ -129,14 +130,24 @@ func TestBootstrap(t *testing.T) {
 	ExpectBroadcastMessage(alloc1, nil)
 	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 
-	// both nodes will get consensus now so initialize the ring
+	CheckAllExpectedMessagesSent(alloc1, alloc2)
+
+	// at this point, both nodes have seen each other, but don't have a valid proposal
+	// so there is another exchange of messages
 	ExpectBroadcastMessage(alloc2, nil)
-	ExpectBroadcastMessage(alloc2, nil)
+	alloc2.OnGossipBroadcast(alloc1.ourName, alloc1.Encode())
+
+	// we have consensus now so alloc1 will initialize the ring
+	ExpectBroadcastMessage(alloc1, nil)
+	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
+
+	CheckAllExpectedMessagesSent(alloc1, alloc2)
+
+	// alloc2 receives the ring and does not reply
 	alloc2.OnGossipBroadcast(alloc1.ourName, alloc1.Encode())
 
 	CheckAllExpectedMessagesSent(alloc1, alloc2)
 
-	alloc1.OnGossipBroadcast(alloc2.ourName, alloc2.Encode())
 	// now alloc1 should have space
 
 	AssertSent(t, done)
