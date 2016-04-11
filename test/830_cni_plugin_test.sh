@@ -4,34 +4,37 @@
 
 start_suite "Test CNI plugin"
 
-coverage_args() {
-    # no coverage reporting for now; but when the plugin binary has
-    # been built for coverage reporting we need to prevent it from
-    # complaining about the non-coverage args.
-    [ -n "$COVERAGE" ] && echo "--"
-}
-
 cni_connect() {
     pid=$(container_pid $1 $2)
-    docker_on $1 run --rm --privileged --net=host --pid=host -i \
-        -e CNI_VERSION=1 -e CNI_COMMAND=ADD -e CNI_CONTAINERID=c1 \
-        -e CNI_NETNS=/proc/$pid/ns/net -e CNI_IFNAME=eth0 -e CNI_PATH=/opt/cni/bin \
-        weaveworks/plugin:latest $(coverage_args) --cni-net <<EOF
-{
-    "name": "weave",
-    "type": "weave-net"
-}
-EOF
+    run_on $1 CNI_VERSION=1 CNI_COMMAND=ADD CNI_CONTAINERID=c1 CNI_IFNAME=eth0 \
+    CNI_NETNS=/proc/$pid/ns/net CNI_PATH=/opt/cni/bin /opt/cni/bin/weave-net 
 }
 
+run_on $HOST1 sudo mkdir -p /opt/cni/bin
+# setup-cni is a subset of 'weave setup', without doing any 'docker pull's
+weave_on $HOST1 setup-cni
 weave_on $HOST1 launch
 weave_on $HOST1 expose
 
 C1=$(docker_on $HOST1 run --net=none --name=c1 -dt $SMALL_IMAGE /bin/sh)
 C2=$(docker_on $HOST1 run --net=none --name=c2 -dt $SMALL_IMAGE /bin/sh)
 
-cni_connect $HOST1 c1 >/dev/null
-cni_connect $HOST1 c2 >/dev/null
+cni_connect $HOST1 c1 <<EOF
+{
+    "name": "weave",
+    "type": "weave-net"
+}
+EOF
+cni_connect $HOST1 c2 <<EOF
+{
+    "name": "weave",
+    "type": "weave-net",
+    "ipam": {
+        "type": "weave-ipam",
+        "routes": [ { "dst": "10.32.0.0/12" } ]
+    }
+}
+EOF
 
 C1IP=$(container_ip $HOST1 c1)
 C2IP=$(container_ip $HOST1 c2)
