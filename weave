@@ -118,7 +118,7 @@ docker_run_options() {
 }
 
 cni_volume_options() {
-    [ "$1" = "setup" ] && echo -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni
+    [ "$1" = "setup" -o "$1" = "setup-cni" ] && echo -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni
 }
 
 create_cni_script() {
@@ -127,7 +127,7 @@ create_cni_script() {
 docker run --rm $(docker_run_options) --pid=host -i \\
  -e CNI_VERSION -e CNI_COMMAND -e CNI_CONTAINERID -e CNI_NETNS \\
  -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH $(cni_volume_options setup) \\
- $PLUGIN_IMAGE "$2"
+ $PLUGIN_IMAGE $COVERAGE_ARGS $2
 EOF
     chmod a+x "$1"
 }
@@ -139,6 +139,16 @@ create_cni_config() {
     "type": "weave-net"
 }
 EOF
+}
+
+setup_cni() {
+    if [ -d /opt/cni/bin ] ; then
+        create_cni_script /opt/cni/bin/weave-net  --cni-net
+        create_cni_script /opt/cni/bin/weave-ipam --cni-ipam
+    fi
+    if [ -d /etc/cni/net.d -a ! -f /etc/cni/net.d/10-weave.conf ] ; then
+        create_cni_config /etc/cni/net.d/10-weave.conf
+    fi
 }
 
 exec_remote() {
@@ -1880,13 +1890,10 @@ case "$COMMAND" in
         for img in $IMAGE $EXEC_IMAGE $PLUGIN_IMAGE ; do
             docker pull $img
         done
-        if [ -d /opt/cni/bin ] ; then
-            create_cni_script /opt/cni/bin/weave-net  --cni-net
-            create_cni_script /opt/cni/bin/weave-ipam --cni-ipam
-        fi
-        if [ -d /etc/cni/net.d -a ! -f /etc/cni/net.d/10-weave.conf ] ; then
-            create_cni_config /etc/cni/net.d/10-weave.conf
-        fi
+        setup_cni
+        ;;
+    setup-cni)
+        setup_cni
         ;;
     version)
         [ $# -eq 0 ] || usage
