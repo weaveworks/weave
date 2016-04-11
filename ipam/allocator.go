@@ -86,7 +86,7 @@ func NewAllocator(config Config) *Allocator {
 	if config.IsObserver {
 		participant = paxos.NewObserver()
 	} else {
-		participant = paxos.NewNode(config.OurName, config.OurUID, 1)
+		participant = paxos.NewNode(config.OurName, config.OurUID, 0)
 	}
 	return &Allocator{
 		ourName:     config.OurName,
