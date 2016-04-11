@@ -241,6 +241,9 @@ func (node *Node) pickValue() Value {
 
 // Has a consensus been reached, based on the known claims of other nodes?
 func (node *Node) Consensus() (bool, AcceptedValue) {
+	if node.quorum == 0 {
+		return false, AcceptedValue{}
+	}
 	counts := map[ProposalID]uint{}
 
 	for _, claims := range node.knows {
