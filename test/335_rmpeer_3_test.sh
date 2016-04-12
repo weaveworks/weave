@@ -9,9 +9,9 @@ weave_on $HOST1 launch
 PEER1=$(weave_on $HOST1 report -f '{{.Router.Name}}')
 start_container $HOST1
 weave_on $HOST2 launch $HOST1
-weave_on $HOST2 consense
+weave_on $HOST2 prime
 weave_on $HOST3 launch $HOST1
-weave_on $HOST3 consense
+weave_on $HOST3 prime
 
 # nuke 1st peer
 docker_on $HOST1 kill weave

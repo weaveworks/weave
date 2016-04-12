@@ -82,8 +82,8 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		}
 	})
 
-	router.Methods("GET").Path("/consensus").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		alloc.Consense()
+	router.Methods("GET").Path("/ring").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		alloc.Prime()
 	})
 
 	router.Methods("GET").Path("/ip/{id}/{ip}/{prefixlen}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

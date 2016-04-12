@@ -52,7 +52,7 @@ weave launch        <same arguments as 'weave launch-router'>
                       [--rewrite-inspect]
       launch-plugin [--no-multicast-route]
 
-weave consense
+weave prime
 
 weave env           [--restore]
       config
@@ -2252,8 +2252,8 @@ EOF
         echo "The 'stop-dns command has been removed; DNS is stopped as part of 'stop' and 'stop-router'." >&2
         exit 0
         ;;
-    consense)
-        call_weave GET /consensus
+    prime)
+        call_weave GET /ring
         ;;
     *)
         echo "Unknown weave command '$COMMAND'" >&2

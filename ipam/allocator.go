@@ -56,7 +56,7 @@ type Allocator struct {
 	nicknames         map[mesh.PeerName]string  // so we can map nicknames for rmpeer
 	pendingAllocates  []operation               // held until we get some free space
 	pendingClaims     []operation               // held until we know who owns the space
-	pendingConsenses  []operation               // held until consensus achieved
+	pendingPrimes     []operation               // held while our ring is empty
 	dead              map[string]time.Time      // containers we heard were dead, and when
 	db                db.DB                     // persistence
 	gossip            mesh.Gossip               // our link to the outside world for sending messages
@@ -193,8 +193,8 @@ func (alloc *Allocator) tryOps(ops *[]operation) {
 
 // Try all pending operations
 func (alloc *Allocator) tryPendingOps() {
-	// Unblock pending consenses first
-	alloc.tryOps(&alloc.pendingConsenses)
+	// Unblock pending primes first
+	alloc.tryOps(&alloc.pendingPrimes)
 	// Process existing claims before servicing new allocations
 	alloc.tryOps(&alloc.pendingClaims)
 	alloc.tryOps(&alloc.pendingAllocates)
@@ -223,11 +223,11 @@ func (e *errorCancelled) Error() string {
 
 // Actor client API
 
-// Consense (Sync) - wait for consensus
-func (alloc *Allocator) Consense() {
+// Prime (Sync) - wait for consensus
+func (alloc *Allocator) Prime() {
 	resultChan := make(chan struct{})
-	op := &consense{resultChan: resultChan}
-	alloc.doOperation(op, &alloc.pendingConsenses)
+	op := &prime{resultChan: resultChan}
+	alloc.doOperation(op, &alloc.pendingPrimes)
 	<-resultChan
 }
 
@@ -381,7 +381,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.shuttingDown = true
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
-		alloc.cancelOps(&alloc.pendingConsenses)
+		alloc.cancelOps(&alloc.pendingPrimes)
 		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.space.Clear()

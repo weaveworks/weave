@@ -147,7 +147,7 @@ existing cluster) it is desirable to ensure that a node has
 successfully joined and is ready to allocate IP addresses. An
 administrative command is provided for this purpose:
 
-    host1$ weave consense
+    host1$ weave prime
 
 This operation will block until the node on which it is run has joined
 successfully.
