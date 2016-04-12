@@ -11,7 +11,7 @@ check() {
 
 start_suite "'detach' and 'hide' do not require IP allocation"
 
-weave_on $HOST1 launch --ipalloc-range $UNIVERSE --init-peer-count=2
+weave_on $HOST1 launch --ipalloc-range $UNIVERSE --ipalloc-init consensus=2
 
 start_container $HOST1 10.2.1.1/24 --name=c1
 check detach           10.2.1.1/24 c1
