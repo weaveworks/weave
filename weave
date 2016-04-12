@@ -42,7 +42,7 @@ weave launch        <same arguments as 'weave launch-router'>
       launch-router [--password <pass>] [--name <mac>] [--nickname <nickname>]
                       [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                      [--init-peer-count <count>] [--no-discovery] [--no-dns]
+                      [--no-discovery] [--no-dns]
                       [--trusted-subnets <cidr>,...] <peer> ...
       launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
                       [--no-rewrite-hosts] [--no-default-ipalloc]
@@ -1865,10 +1865,12 @@ deprecation_warnings() {
                 shift
                 ;;
             -initpeercount|--initpeercount|-initpeercount=*|--initpeercount=*)
-                deprecation_warning $1 "--init-peer-count"
+                deprecation_warning $1 "--ipalloc-init"
                 [ ${1#--} = "initpeercount" ] && shift
                 ;;
-            --init-peer-count)
+            --init-peer-count|--init-peer-count=*)
+                deprecation_warning $1 "--ipalloc-init"
+                [ ${1#--} = "init-peer-count" ] && shift
                 shift
                 ;;
             -no-default-ipam|--no-default-ipam)
