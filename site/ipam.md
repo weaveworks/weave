@@ -14,7 +14,7 @@ addresses in multiple subnets.
 The following automatic IP address management topics are discussed:
 
  * [Initializing Peers on a Weave Network](#initialization)
- * [`--init-peer-count` and How Quorum is Achieved](#quorum)
+ * [`--ipalloc-init:consensus` and How Quorum is Achieved](#quorum)
  * [Forcing Consensus](#forcing-consensus)
  * [Choosing an Allocation Range](#range)
 
@@ -22,21 +22,20 @@ The following automatic IP address management topics are discussed:
 
 ### <a name="initialization"></a>Initializing Peers on a Weave Network
 
-There are two options for initializing IPAM - with a statically
-configured seed or automatically via one-off consensus. The two
-options have different tradeoffs, so pick the one that suits your
-deployment best.
+Three initialization strategies are available: seed, consensus and
+observer. These options have different tradeoffs, so pick the one that
+suits your deployment best.
 
 #### <a name="seed"></a>Via Seed
 
 Configuration via seed requires you to provide a list of peer names
-(via the `--ipam-seed` parameter) amongst which the address space will
-be shared initially - this means that you will also have to specify
-peer names explicitly on launch:
+(via the `--ipalloc-init seed=` parameter) amongst which the address
+space will be shared initially - this means that you will also have to
+specify peer names explicitly on launch:
 
-    host1$ weave launch --name ::1 --ipam-seed ::1,::2,::3
-    host2$ weave launch --name ::2 --ipam-seed ::1,::2,::3
-    host3$ weave launch --name ::3 --ipam-seed ::1,::2,::3
+    host1$ weave launch --name ::1 --ipalloc-init seed=::1,::2,::3
+    host2$ weave launch --name ::2 --ipalloc-init seed=::1,::2,::3
+    host3$ weave launch --name ::3 --ipalloc-init seed=::1,::2,::3
 
 In this configuration each peer knows in advance how the address space
 has been divided up, and will be able to perform allocations from the
@@ -52,7 +51,7 @@ for you as well.
 However, in order for Weave Net to form a single consensus
 reliably you must now instead tell each peer how many peers there are
 in total either by listing them as target peers or using the
-`--init-peer-count` parameter.
+`--ipalloc-init consensus=` parameter.
 
 Just once, when the first automatic IP address allocation is requested
 in the whole network, Weave Net needs a majority of peers to be present in
@@ -61,7 +60,7 @@ inconsistency, for example, the same IP address being allocated to two
 different containers.
 
 Therefore, you must either supply the list of all peers in the network at `weave launch` or add the
-`--init-peer-count` flag to specify how many peers there will be.
+`--ipalloc-init consensus=` flag to specify how many peers there will be.
 
 To illustrate, suppose you have three hosts, accessible to each other
 as `$HOST1`, `$HOST2` and `$HOST3`. You can start Weave Net on those three
@@ -74,11 +73,11 @@ hosts using these three commands:
 Or, if it is not convenient to name all the other hosts at launch
 time, you can pass the number of peers like this:
 
-    host1$ weave launch --init-peer-count 3
-    host2$ weave launch --init-peer-count 3 $HOST3
-    host3$ weave launch --init-peer-count 3 $HOST2
+    host1$ weave launch --ipalloc-init consensus=3
+    host2$ weave launch --ipalloc-init consensus=3 $HOST3
+    host3$ weave launch --ipalloc-init consensus=3 $HOST2
 
-The consensus mechanism used to determine a majority, transitions
+The consensus mechanism used to determine a majority transitions
 through three states: 'deferred', 'waiting' and 'achieved':
 
 * 'deferred' - no allocation requests or claims have been made yet;
@@ -89,21 +88,23 @@ through three states: 'deferred', 'waiting' and 'achieved':
   themselves successfully
 * 'achieved' - consensus achieved; allocations proceed normally
 
-Finally, some (but never all) peers can be launched as consensus
-observers rather than participants by specifying the `--observer`
-option:
+#### <a name="observer"></a>Via Observation
 
-    host4$ weave launch --observer $HOST3
+Finally, some (but never all) peers can be launched as observers
+by specifying the `--ipalloc-init observer` option:
 
-You do not need to specify an initial peer count to such peers. This
-can be useful to add ephemeral peers to an existing fixed cluster (for
-example in response to a scale-out event) without worrying about
+    host4$ weave launch --ipalloc-init observer $HOST3
+
+You do not need to specify an initial peer count or seed to such
+peers. This can be useful to add peers to an existing fixed cluster
+(for example in response to a scale-out event) without worrying about
 adjusting initial peer counts accordingly.
 
-####<a name="quorum"></a> `--init-peer-count` and How Quorum is Achieved
+####<a name="quorum"></a> `--ipalloc-init consensus=` and How Quorum is Achieved
 
-Normally it isn't a problem to over-estimate `--init-peer-count`, but if you supply
-a number that is too small, then multiple independent groups may form.
+Normally it isn't a problem to over-estimate the value supplied to
+`--ipalloc-init consensus=`, but if you supply a number that is too
+small, then multiple independent groups may form.
 
 Weave Net uses the estimate of the number of peers at initialization to
 compute a majority or quorum number - specifically floor(n/2) + 1.
