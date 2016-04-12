@@ -45,7 +45,12 @@ end
 def tweak_docker_daemon(vm)
   vm.provision :shell, :inline => <<SCRIPT
 usermod -a -G docker vagrant
-sed -i -e's%-H fd://%-H fd:// -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay%' /lib/systemd/system/docker.service
+mkdir -p /etc/systemd/system/docker.service.d
+cat >/etc/systemd/system/docker.service.d/override.conf  <<EOF
+[Service]
+ExecStart=
+ExecStart=/usr/bin/docker daemon -H fd:// -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay
+EOF
 systemctl daemon-reload
 systemctl restart docker
 systemctl enable docker
