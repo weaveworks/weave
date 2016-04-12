@@ -40,7 +40,7 @@ weave --help | help
 
 weave launch        <same arguments as 'weave launch-router'>
       launch-router [--password <pass>] [--name <mac>] [--nickname <nickname>]
-                      [--ipam-seed <mac>,...] [--observer]
+                      [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--init-peer-count <count>] [--no-discovery] [--no-dns]
                       [--trusted-subnets <cidr>,...] <peer> ...
@@ -95,6 +95,7 @@ where <peer>     = <ip_address_or_fqdn>[:<port>]
       <addr>     = [ip:]<cidr> | net:<cidr> | net:default
       <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket
       <peer_id>  = <nickname> | <weave internal peer ID>
+      <mode>     = consensus[=<count>] | seed=<mac>,... | observer
 EOF
 }
 
