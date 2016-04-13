@@ -24,17 +24,16 @@ encrypted, which carry encapsulated network packets. These
 Weave Net creates a network bridge on the host. Each container is
 connected to that bridge via a veth pair, the container side of which
 is given an IP address and netmask supplied either by the user or
-by Weave Net's IP address allocator. Also connected to the bridge is the
-Weave Net router container.
+by Weave Net's IP address allocator.
 
-A Weave Net router captures Ethernet packets from its bridge-connected
-interface in promiscuous mode, using 'pcap'. This typically excludes
-traffic between local containers, and between the host and local
-containers, all of which is routed straight over the bridge by the
-kernel. Captured packets are forwarded over UDP to weave router peers
-running on other hosts. On receipt of such a packet, a router injects
-the packet on its bridge interface using 'pcap' and/or forwards the
-packet to peers.
+Weave Net routes packets between containers on different hosts via two
+methods: a [fast data path](/site/fastdp.md) method, which operates
+entirely in kernel space, and a fallback `sleeve` method, in which
+packets destined for non-local containers are captured by the kernel
+and processed by the Weave Net router in user space, forwarded over
+UDP to weave router peers running on other hosts, and there injected
+back into the kernel which in turn passes them to local destination
+containers.
 
 Weave Net routers learn which peer host a particular MAC address resides
 on. They combine this knowledge with topology information in order to
