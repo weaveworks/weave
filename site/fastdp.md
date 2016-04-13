@@ -6,7 +6,7 @@ menu_order: 70
 
 The most important thing to know about fast datapath is that you don't need to configure anything before using this feature. If you are using Weave Net 1.2 or greater, fast datapath (`fastdp`) is automatically enabled.
 
-When Weave Net can't use the fast data path between two hosts, it falls back to the slower packet forwarding approach. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast data path within the data centers, but not for the more constrained network link between them. 
+When Weave Net cannot use the fast data path between two hosts, it falls back to a slower packet forwarding approach called `sleeve`. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast data path within the data centers, but not for the more constrained network link between them. 
 
 See [How Fastdp Works](/site/fastdp/fastdp-how-it-works.md) for a more in-depth discussion of this feature. 
 
@@ -30,7 +30,7 @@ Weave Net automatically uses the fastest datapath for every connection unless it
  * Open UDP port 6784 (This is the port used by the Weave routers)
  * Ensure that `WEAVE_MTU` fits with the `MTU` of the intermediate network (see below)
 
-The use of fast datapath is an automated connection-by-connection decision made by Weave Net, and because of this, you may end up with a mixture of connection tunnel types. If fast datapath cannot be used for a connection, Weave Net falls back to the "user space" packet path. 
+The use of fast datapath is an automated connection-by-connection decision made by Weave Net, and because of this, you may end up with a mixture of connection tunnel types. If fast datapath cannot be used for a connection, Weave Net falls back to the `sleeve` "user space" packet path.
 
 Once a Weave network is set up, you can query the connections using the `weave status connections` command:
 
