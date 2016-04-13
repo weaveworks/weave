@@ -1722,6 +1722,20 @@ populate_router() {
     fi
 }
 
+expose() {
+    FQDN=$1
+    shift
+    for CIDR in "$@" ; do
+        if ! ip addr show dev $BRIDGE | grep -qF $1 ; then
+            ip addr add dev $BRIDGE $1
+            arp_update $BRIDGE $1 || true
+            add_iptables_rule nat WEAVE -d $1 ! -s $1 -j MASQUERADE
+            add_iptables_rule nat WEAVE -s $1 ! -d $1 -j MASQUERADE
+        fi
+        [ -n "$FQDN" ] && when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
+    done
+}
+
 stop_router() {
     stop $CONTAINER_NAME "Weave"
     conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
@@ -2168,15 +2182,7 @@ EOF
             FQDN="$2"
         fi
         create_bridge --without-ethtool
-        for CIDR in $ALL_CIDRS ; do
-            if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
-                ip addr add dev $BRIDGE $CIDR
-                arp_update $BRIDGE $CIDR || true
-                add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
-                add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-            fi
-            [ -n "$FQDN" ] && when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
-        done
+        expose "$FQDN" $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
     hide)
