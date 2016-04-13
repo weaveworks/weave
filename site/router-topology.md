@@ -48,5 +48,5 @@ first send it to peer 3:
 
 **See Also**
 
- * [Weave Router Encapsulation](/site/router-topology/router-encapsulation.md)
+ * [Weave Router Sleeve Encapsulation](/site/router-topology/router-encapsulation.md)
  * [How Weave Inteprets Network Topology](/site/router-topology/network-topology.md)

@@ -1,11 +1,11 @@
 ---
-title: Weave Net Router Encapsulation
+title: Weave Net Router Sleeve Encapsulation
 menu_order: 10
 ---
 
-
-When the Weave Net router forwards packets, the encapsulation looks
-something like this:
+When the Weave Net router forwards packets to peers in `sleeve` mode
+(rather than via the [fast data path](/site/fastdp.md)), the
+encapsulation looks something like this:
 
     +-----------------------------------+
     | Name of sending peer              |
