@@ -48,7 +48,7 @@ A status summary can be obtained using `weave status`:
 ````
 $ weave status
 
-        Version: 1.1.0
+        Version: 1.1.0 (up to date; next check at 2016/04/06 12:30:00)
 
         Service: router
        Protocol: weave 1..2
@@ -80,7 +80,9 @@ $ weave status
 The terms used here are explained further at
 [How Weave Net Works](/site/router-topology.md).
 
-  * **Version** - shows the Weave Net version.
+  * **Version** - shows the Weave Net version. If checkpoint is enabled (i.e.
+`CHECKPOINT_DISABLE` is not set), information about existence of a new version
+will be shown.
 
   * **Protocol**- indicates the Weave Router inter-peer
 communication protocol name and supported versions (min..max).
