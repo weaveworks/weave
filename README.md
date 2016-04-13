@@ -58,8 +58,10 @@ Weave Net respects the environment variable `DOCKER_HOST`, so you can run
 it locally to control a weave network on a remote host.
 
 Weave Net
-[periodically contacts Weaveworks servers for available versions](https://github.com/weaveworks/go-checkpoint)
-and announces new versions in the log. To disable this check, run:
+[periodically contacts Weaveworks servers for available versions](https://github.com/weaveworks/go-checkpoint).
+New versions are announced in the log and in
+[the status summary](http://docs.weave.works/weave/latest_release/troubleshooting.html#weave-status).
+To disable this check, run:
 
 ```
 export CHECKPOINT_DISABLE=1

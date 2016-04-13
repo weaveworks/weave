@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/weaveworks/mesh"
@@ -32,22 +33,34 @@ type flushMessage struct {
 }
 
 type TestRouter struct {
+	sync.Mutex
 	gossipChans map[mesh.PeerName]chan interface{}
 	loss        float32 // 0.0 means no loss
 }
 
 func NewTestRouter(loss float32) *TestRouter {
-	return &TestRouter{make(map[mesh.PeerName]chan interface{}, 100), loss}
+	return &TestRouter{gossipChans: make(map[mesh.PeerName]chan interface{}, 100), loss: loss}
+}
+
+// Copy so we can access outside of a lock
+func (grouter *TestRouter) copyGossipChans() map[mesh.PeerName]chan interface{} {
+	ret := make(map[mesh.PeerName]chan interface{})
+	grouter.Lock()
+	defer grouter.Unlock()
+	for p, c := range grouter.gossipChans {
+		ret[p] = c
+	}
+	return ret
 }
 
 func (grouter *TestRouter) Stop() {
-	for peer := range grouter.gossipChans {
+	for peer := range grouter.copyGossipChans() {
 		grouter.RemovePeer(peer)
 	}
 }
 
 func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update mesh.GossipData) {
-	for _, gossipChan := range grouter.gossipChans {
+	for _, gossipChan := range grouter.copyGossipChans() {
 		select {
 		case gossipChan <- broadcastMessage{sender: sender, data: update}:
 		default: // drop the message if we cannot send it
@@ -57,8 +70,9 @@ func (grouter *TestRouter) gossipBroadcast(sender mesh.PeerName, update mesh.Gos
 }
 
 func (grouter *TestRouter) gossip(sender mesh.PeerName, update mesh.GossipData) error {
-	count := int(math.Log2(float64(len(grouter.gossipChans))))
-	for dest, gossipChan := range grouter.gossipChans {
+	gossipChans := grouter.copyGossipChans()
+	count := int(math.Log2(float64(len(gossipChans))))
+	for dest, gossipChan := range gossipChans {
 		if dest == sender {
 			continue
 		}
@@ -76,7 +90,7 @@ func (grouter *TestRouter) gossip(sender mesh.PeerName, update mesh.GossipData) 
 }
 
 func (grouter *TestRouter) Flush() {
-	for _, gossipChan := range grouter.gossipChans {
+	for _, gossipChan := range grouter.copyGossipChans() {
 		flushChan := make(chan struct{})
 		gossipChan <- flushMessage{flushChan: flushChan}
 		<-flushChan
@@ -84,11 +98,15 @@ func (grouter *TestRouter) Flush() {
 }
 
 func (grouter *TestRouter) RemovePeer(peer mesh.PeerName) {
+	grouter.Lock()
 	gossipChan := grouter.gossipChans[peer]
+	grouter.Unlock()
 	resultChan := make(chan struct{})
 	gossipChan <- exitMessage{exitChan: resultChan}
 	<-resultChan
+	grouter.Lock()
 	delete(grouter.gossipChans, peer)
+	grouter.Unlock()
 }
 
 type TestRouterClient struct {
@@ -160,13 +178,18 @@ func (grouter *TestRouter) Connect(sender mesh.PeerName, gossiper mesh.Gossiper)
 
 	go grouter.run(sender, gossiper, gossipChan)
 
+	grouter.Lock()
 	grouter.gossipChans[sender] = gossipChan
+	grouter.Unlock()
 	return TestRouterClient{grouter, sender}
 }
 
 func (client TestRouterClient) GossipUnicast(dstPeerName mesh.PeerName, buf []byte) error {
+	client.router.Lock()
+	gossipChan := client.router.gossipChans[dstPeerName]
+	client.router.Unlock()
 	select {
-	case client.router.gossipChans[dstPeerName] <- unicastMessage{sender: client.sender, buf: buf}:
+	case gossipChan <- unicastMessage{sender: client.sender, buf: buf}:
 	default: // drop the message if we cannot send it
 		common.Log.Errorf("Dropping message")
 	}
