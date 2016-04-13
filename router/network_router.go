@@ -228,29 +228,26 @@ func (router *NetworkRouter) ForgetConnections(peers []string) {
 	router.persistPeers()
 }
 
+// Load the peers stored from last time, and union with the set passed in
 func (router *NetworkRouter) InitialPeers(peers []string) ([]string, error) {
 	var storedPeers []string
 	if _, err := router.db.Load(peersIdent, &storedPeers); err != nil {
 		return nil, err
 	}
 
-	if storedPeers != nil && !equal(peers, storedPeers) {
-		log.Println("Overriding initial peer list with stored list:", storedPeers)
-		peers = storedPeers
-	} else {
-		log.Println("Initial set of peers:", peers)
+	for _, peer := range storedPeers {
+		if !contains(peers, peer) {
+			peers = append(peers, peer)
+		}
 	}
 	return peers, nil
 }
 
-func equal(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, v := range a {
-		if v != b[i] {
-			return false
+func contains(a []string, s string) bool {
+	for _, v := range a {
+		if s == v {
+			return true
 		}
 	}
-	return true
+	return false
 }
