@@ -2129,6 +2129,7 @@ EOF
             if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
                 ip addr add dev $BRIDGE $CIDR
                 arp_update $BRIDGE $CIDR
+                add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
                 add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
                 add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
             fi
