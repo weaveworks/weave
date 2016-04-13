@@ -42,4 +42,9 @@ stop_weave_on $HOST1
 launch_router_with_db $HOST1 $HOST2
 assert_raises "exec_on $HOST2 c2 $PING $C1"
 
+# Check we can replace the stored list
+stop_weave_on $HOST1
+launch_router_with_db $HOST1 --replace
+assert_raises "exec_on $HOST2 c2 sh -c '! $PING $C1'"
+
 end_suite

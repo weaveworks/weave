@@ -129,6 +129,7 @@ func main() {
 		datapathName       string
 		trustedSubnetStr   string
 		dbPrefix           string
+		peerListReplaces   bool
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -167,6 +168,7 @@ func main() {
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "weave", "pathname/prefix of filename to store data")
+	mflag.BoolVar(&peerListReplaces, []string{"-replace"}, false, "peer list replaces any stored list")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -231,8 +233,10 @@ func main() {
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
 	Log.Println("Our name is", router.Ourself)
 
-	if peers, err = router.InitialPeers(peers); err != nil {
-		Log.Fatal("Unable to get initial peer set: ", err)
+	if !peerListReplaces {
+		if peers, err = router.InitialPeers(peers); err != nil {
+			Log.Fatal("Unable to get initial peer set: ", err)
+		}
 	}
 	Log.Println("Initial set of peers:", peers)
 

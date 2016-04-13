@@ -43,7 +43,7 @@ weave launch        <same arguments as 'weave launch-router'>
                       [--ipam-seed <mac>,...] [--observer]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--init-peer-count <count>] [--no-discovery] [--no-dns]
-                      [--trusted-subnets <cidr>,...] <peer> ...
+                      [--trusted-subnets <cidr>,...] [--replace] <peer> ...
       launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
                       [--no-rewrite-hosts] [--no-default-ipalloc]
                       [--hostname-from-label <labelkey>]
