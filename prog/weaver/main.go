@@ -234,6 +234,7 @@ func main() {
 	if peers, err = router.InitialPeers(peers); err != nil {
 		Log.Fatal("Unable to get initial peer set: ", err)
 	}
+	Log.Println("Initial set of peers:", peers)
 
 	var dockerCli *docker.Client
 	if dockerAPI != "" {

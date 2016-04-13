@@ -35,4 +35,11 @@ assert_raises "[ $C3 != $C1 ]"
 launch_router_with_db $HOST1
 assert_raises "exec_on $HOST2 c2 $PING $C1"
 
+# See if persistence overrides the command-line
+weave_on $HOST1 forget $HOST2
+weave_on $HOST2 forget $HOST1
+stop_weave_on $HOST1
+launch_router_with_db $HOST1 $HOST2
+assert_raises "exec_on $HOST2 c2 $PING $C1"
+
 end_suite
