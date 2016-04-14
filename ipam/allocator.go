@@ -239,9 +239,15 @@ func (alloc *Allocator) Prime() {
 
 // Allocate (Sync) - get new IP address for container with given name in range
 // if there isn't any space in that range we block indefinitely
-func (alloc *Allocator) Allocate(ident string, r address.CIDR, hasBeenCancelled func() bool) (address.Address, error) {
+func (alloc *Allocator) Allocate(ident string, r address.CIDR, isContainer bool, hasBeenCancelled func() bool) (address.Address, error) {
 	resultChan := make(chan allocateResult)
-	op := &allocate{resultChan: resultChan, ident: ident, r: r, hasBeenCancelled: hasBeenCancelled}
+	op := &allocate{
+		resultChan:       resultChan,
+		ident:            ident,
+		r:                r,
+		isContainer:      isContainer,
+		hasBeenCancelled: hasBeenCancelled,
+	}
 	alloc.doOperation(op, &alloc.pendingAllocates)
 	result := <-resultChan
 	return result.addr, result.err
@@ -920,8 +926,9 @@ func (alloc *Allocator) hasOwned(ident string) bool {
 }
 
 // NB: addr must not be owned by ident already
-func (alloc *Allocator) addOwned(ident string, cidr address.CIDR) {
+func (alloc *Allocator) addOwned(ident string, cidr address.CIDR, isContainer bool) {
 	d := alloc.owned[ident]
+	d.IsContainer = isContainer
 	d.Cidrs = append(d.Cidrs, cidr)
 	alloc.owned[ident] = d
 	alloc.persistOwned()
