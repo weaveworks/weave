@@ -41,17 +41,17 @@ weave --help | help
 
 weave launch        <same arguments as 'weave launch-router'>
       launch-router [--password <pass>] [--name <mac>] [--nickname <nickname>]
-                      [--ipalloc-init <mode>]
+                      [--no-restart] [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--no-discovery] [--no-dns]
                       [--trusted-subnets <cidr>,...] <peer> ...
       launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
-                      [--no-rewrite-hosts] [--no-default-ipalloc]
+                      [--no-rewrite-hosts] [--no-default-ipalloc] [--no-restart]
                       [--hostname-from-label <labelkey>]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
                       [--rewrite-inspect]
-      launch-plugin [--no-multicast-route]
+      launch-plugin [--no-restart] [--no-multicast-route]
 
 weave prime
 
@@ -380,6 +380,8 @@ if [ -z "$IS_LOCAL" ] ; then
     exit $?
 fi
 
+# Default restart policy for router/proxy/plugin
+RESTART_POLICY="--restart=always"
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 
@@ -987,11 +989,18 @@ detach() {
 # functions for interacting with containers
 ######################################################################
 
+pertinent_match_args() {
+    docker inspect -f '{{.Args}}
+        {{.Config.Env}}
+        {{.HostConfig.RestartPolicy.Name}}
+        {{.HostConfig.RestartPolicy.MaximumRetryCount}}' $1
+}
+
 args_match() {
-    prev_args="$(docker inspect -f '{{.Args}} {{.Config.Env}}' $1)" || return 1
+    prev_args="$(pertinent_match_args $1)" || return 1
     shift
     dummy_container=$(docker create "$@" 2>/dev/null) || return 1
-    dummy_args="$(docker inspect -f '{{.Args}} {{.Config.Env}}' $dummy_container)" || return 1
+    dummy_args="$(pertinent_match_args $dummy_container)" || return 1
     docker rm $dummy_container >/dev/null
     [ "$prev_args"  = "$dummy_args" ]
 }
@@ -1525,6 +1534,9 @@ proxy_parse_args() {
           --tlskey=*)
             tls_arg "${1%%=*}" "${1#*=}" key
             ;;
+          --no-restart)
+            RESTART_POLICY=
+            ;;
           *)
             PROXY_ARGS="$PROXY_ARGS $1"
             ;;
@@ -1591,6 +1603,9 @@ common_launch_args() {
     args=""
     while [ $# -gt 0 ] ; do
         case "$1" in
+            --no-restart)
+                args="$args $1"
+                ;;
             --log-level)
                 [ $# -gt 1 ] || usage
                 args="$args $1 $2"
@@ -1663,6 +1678,9 @@ launch_router() {
                 NO_DNS_OPT="--no-dns"
                 ARGS="$ARGS $1"
                 ;;
+            --no-restart)
+                RESTART_POLICY=
+                ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
                 ;;
@@ -1695,7 +1713,7 @@ launch_router() {
     # when launching the weave container.
     start_if_necessary router $CONTAINER_NAME $IMAGE \
         $(docker_run_options) \
-        --restart=always \
+        $RESTART_POLICY \
         --volumes-from $DB_CONTAINER_NAME \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
@@ -1753,7 +1771,7 @@ launch_proxy() {
     fi
     start_if_necessary proxy $PROXY_CONTAINER_NAME $EXEC_IMAGE \
         $(docker_run_options) \
-        --restart=always \
+        $RESTART_POLICY \
         --pid=host \
         $PROXY_VOLUMES \
         --volumes-from $VOLUMES_CONTAINER_NAME \
@@ -1774,9 +1792,20 @@ stop_proxy() {
 }
 
 launch_plugin_if_not_running() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --no-restart)
+                RESTART_POLICY=
+                ;;
+            *)
+                break
+                ;;
+        esac
+        shift
+    done
     start_if_necessary plugin $PLUGIN_CONTAINER_NAME $PLUGIN_IMAGE \
         $(docker_run_options) \
-        --restart=always \
+        $RESTART_POLICY \
         -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_HTTP_ADDR \
         $WEAVEPLUGIN_DOCKER_ARGS $PLUGIN_IMAGE $COVERAGE_ARGS \
