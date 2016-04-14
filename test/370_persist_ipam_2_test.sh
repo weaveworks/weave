@@ -7,12 +7,8 @@ start_suite "Checking persistence of IPAM"
 launch_router_with_db() {
     host=$1
     shift
-    WEAVE_DOCKER_ARGS="-v /tmp:/db" weave_on $host launch-router --db-prefix=/db/test162- "$@"
+    weave_on $host launch-router "$@"
 }
-
-# Remove any persisted data from previous runs
-run_on $HOST1 "sudo rm -f /tmp/test162-*"
-run_on $HOST2 "sudo rm -f /tmp/test162-*"
 
 launch_router_with_db $HOST1 $HOST2
 launch_router_with_db $HOST2 $HOST1
