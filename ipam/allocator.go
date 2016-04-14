@@ -971,6 +971,7 @@ func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
 			for _, cidr := range cidrs {
 				alloc.space.Free(cidr.Addr)
 			}
+			alloc.debugf("Deleting old entry %s: %v", ident, cidrs)
 			delete(alloc.owned, ident)
 			changed = true
 		}
