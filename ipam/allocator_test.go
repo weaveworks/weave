@@ -170,7 +170,7 @@ func TestAllocatorClaim(t *testing.T) {
 	addr1, _ := address.ParseCIDR(testAddr1)
 
 	// First claim should trigger "dunno, I'm going to wait"
-	err := alloc.Claim(container3, addr1, true)
+	err := alloc.Claim(container3, addr1, true, true)
 	require.NoError(t, err)
 
 	alloc.Prime()
@@ -178,23 +178,23 @@ func TestAllocatorClaim(t *testing.T) {
 	addrx, err := allocs[0].Allocate(container1, subnet, true, returnFalse)
 
 	// Now try the claim again
-	err = alloc.Claim(container3, addr1, true)
+	err = alloc.Claim(container3, addr1, true, true)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
 	addr3, _ := alloc.Allocate(container3, subnet, true, returnFalse)
 	require.Equal(t, testAddr1, address.MakeCIDR(subnet, addr3).String(), "address")
 	// one more claim should still work
-	err = alloc.Claim(container3, addr1, true)
+	err = alloc.Claim(container3, addr1, true, true)
 	require.NoError(t, err)
 	// claim for a different container should fail
-	err = alloc.Claim(container1, addr1, true)
+	err = alloc.Claim(container1, addr1, true, true)
 	require.Error(t, err)
 	// claiming the address allocated on the other peer should fail
-	err = alloc.Claim(container1, address.MakeCIDR(subnet, addrx), true)
+	err = alloc.Claim(container1, address.MakeCIDR(subnet, addrx), true, true)
 	require.Error(t, err, "claiming address allocated on other peer should fail")
 	// Check an address outside of our universe
 	addr2, _ := address.ParseCIDR(testAddr2)
-	err = alloc.Claim(container1, addr2, true)
+	err = alloc.Claim(container1, addr2, true, true)
 	require.NoError(t, err)
 }
 
@@ -530,7 +530,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		addressIndex := rand.Int31n(int32(subnet.Size()))
 		alloc := allocs[allocIndex]
 		addr := address.Add(subnet.Addr, address.Offset(addressIndex))
-		err := alloc.Claim(name, address.MakeCIDR(subnet, addr), true)
+		err := alloc.Claim(name, address.MakeCIDR(subnet, addr), true, true)
 		if err == nil {
 			noteAllocation(allocIndex, name, addr)
 		}

@@ -74,7 +74,8 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		vars := mux.Vars(r)
 		if cidr, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"], false); ok {
 			noErrorOnUnknown := r.FormValue("noErrorOnUnknown") == "true"
-			if err := alloc.Claim(vars["id"], cidr, noErrorOnUnknown); err != nil {
+			checkAlive := r.FormValue("check-alive") == "true"
+			if err := alloc.Claim(vars["id"], cidr, checkAlive, noErrorOnUnknown); err != nil {
 				badRequest(w, fmt.Errorf("Unable to claim: %s", err))
 				return
 			}
