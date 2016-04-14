@@ -41,6 +41,12 @@ type operation interface {
 	ForContainer(ident string) bool
 }
 
+// This type is persisted hence all fields exported
+type ownedData struct {
+	IsContainer bool
+	Cidrs       []address.CIDR
+}
+
 // Allocator brings together Ring and space.Set, and does the
 // necessary plumbing.  Runs as a single-threaded Actor, so no locks
 // are used around data structures.
@@ -48,18 +54,18 @@ type Allocator struct {
 	actionChan        chan<- func()
 	stopChan          chan<- struct{}
 	ourName           mesh.PeerName
-	seed              []mesh.PeerName           // optional user supplied ring seed
-	universe          address.Range             // superset of all ranges
-	ring              *ring.Ring                // information on ranges owned by all peers
-	space             space.Space               // more detail on ranges owned by us
-	owned             map[string][]address.CIDR // who owns what addresses, indexed by container-ID
-	nicknames         map[mesh.PeerName]string  // so we can map nicknames for rmpeer
-	pendingAllocates  []operation               // held until we get some free space
-	pendingClaims     []operation               // held until we know who owns the space
-	pendingPrimes     []operation               // held while our ring is empty
-	dead              map[string]time.Time      // containers we heard were dead, and when
-	db                db.DB                     // persistence
-	gossip            mesh.Gossip               // our link to the outside world for sending messages
+	seed              []mesh.PeerName          // optional user supplied ring seed
+	universe          address.Range            // superset of all ranges
+	ring              *ring.Ring               // information on ranges owned by all peers
+	space             space.Space              // more detail on ranges owned by us
+	owned             map[string]ownedData     // who owns what addresses, indexed by container-ID
+	nicknames         map[mesh.PeerName]string // so we can map nicknames for rmpeer
+	pendingAllocates  []operation              // held until we get some free space
+	pendingClaims     []operation              // held until we know who owns the space
+	pendingPrimes     []operation              // held while our ring is empty
+	dead              map[string]time.Time     // containers we heard were dead, and when
+	db                db.DB                    // persistence
+	gossip            mesh.Gossip              // our link to the outside world for sending messages
 	paxos             paxos.Participant
 	awaitingConsensus bool
 	ticker            *time.Ticker
@@ -94,7 +100,7 @@ func NewAllocator(config Config) *Allocator {
 		seed:        config.Seed,
 		universe:    config.Universe,
 		ring:        ring.New(config.Universe.Start, config.Universe.End, config.OurName),
-		owned:       make(map[string][]address.CIDR),
+		owned:       make(map[string]ownedData),
 		db:          config.Db,
 		paxos:       participant,
 		nicknames:   map[mesh.PeerName]string{config.OurName: config.OurNickname},
@@ -876,8 +882,8 @@ func (alloc *Allocator) loadPersistedData() {
 				alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 			}
 			if ownedFound {
-				for _, cidrs := range alloc.owned {
-					for _, cidr := range cidrs {
+				for _, d := range alloc.owned {
+					for _, cidr := range d.Cidrs {
 						alloc.space.Claim(cidr.Addr)
 					}
 				}
@@ -915,7 +921,9 @@ func (alloc *Allocator) hasOwned(ident string) bool {
 
 // NB: addr must not be owned by ident already
 func (alloc *Allocator) addOwned(ident string, cidr address.CIDR) {
-	alloc.owned[ident] = append(alloc.owned[ident], cidr)
+	d := alloc.owned[ident]
+	d.Cidrs = append(d.Cidrs, cidr)
+	alloc.owned[ident] = d
 	alloc.persistOwned()
 }
 
@@ -923,17 +931,18 @@ func (alloc *Allocator) removeAllOwned(ident string) []address.CIDR {
 	a := alloc.owned[ident]
 	delete(alloc.owned, ident)
 	alloc.persistOwned()
-	return a
+	return a.Cidrs
 }
 
 func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bool {
-	cidrs, _ := alloc.owned[ident]
-	for i, ownedCidr := range cidrs {
+	d := alloc.owned[ident]
+	for i, ownedCidr := range d.Cidrs {
 		if ownedCidr.Addr == addrToFree {
-			if len(cidrs) == 1 {
+			if len(d.Cidrs) == 1 {
 				delete(alloc.owned, ident)
 			} else {
-				alloc.owned[ident] = append(cidrs[:i], cidrs[i+1:]...)
+				d.Cidrs = append(d.Cidrs[:i], d.Cidrs[i+1:]...)
+				alloc.owned[ident] = d
 			}
 			alloc.persistOwned()
 			return true
@@ -944,7 +953,7 @@ func (alloc *Allocator) removeOwned(ident string, addrToFree address.Address) bo
 
 func (alloc *Allocator) ownedInRange(ident string, r address.Range) []address.CIDR {
 	var c []address.CIDR
-	for _, cidr := range alloc.owned[ident] {
+	for _, cidr := range alloc.owned[ident].Cidrs {
 		if r.Contains(cidr.Addr) {
 			c = append(c, cidr)
 		}
@@ -953,8 +962,8 @@ func (alloc *Allocator) ownedInRange(ident string, r address.Range) []address.CI
 }
 
 func (alloc *Allocator) findOwner(addr address.Address) string {
-	for ident, cidrs := range alloc.owned {
-		for _, candidate := range cidrs {
+	for ident, d := range alloc.owned {
+		for _, candidate := range d.Cidrs {
 			if candidate.Addr == addr {
 				return ident
 			}
@@ -966,12 +975,15 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 // For each ID in the 'owned' map, remove the entry if it isn't in the map
 func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
 	changed := false
-	for ident, cidrs := range alloc.owned {
+	for ident, d := range alloc.owned {
+		if !d.IsContainer {
+			continue
+		}
 		if _, found := ids[ident]; !found {
-			for _, cidr := range cidrs {
+			for _, cidr := range d.Cidrs {
 				alloc.space.Free(cidr.Addr)
 			}
-			alloc.debugf("Deleting old entry %s: %v", ident, cidrs)
+			alloc.debugf("Deleting old entry %s: %v", ident, d.Cidrs)
 			delete(alloc.owned, ident)
 			changed = true
 		}
