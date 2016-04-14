@@ -41,9 +41,9 @@ weave --help | help
 
 weave launch        <same arguments as 'weave launch-router'>
       launch-router [--password <pass>] [--name <mac>] [--nickname <nickname>]
-                      [--ipam-seed <mac>,...] [--observer]
+                      [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                      [--init-peer-count <count>] [--no-discovery] [--no-dns]
+                      [--no-discovery] [--no-dns]
                       [--trusted-subnets <cidr>,...] <peer> ...
       launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
                       [--no-rewrite-hosts] [--no-default-ipalloc]
@@ -53,7 +53,7 @@ weave launch        <same arguments as 'weave launch-router'>
                       [--rewrite-inspect]
       launch-plugin [--no-multicast-route]
 
-weave consense
+weave prime
 
 weave env           [--restore]
       config
@@ -96,6 +96,7 @@ where <peer>     = <ip_address_or_fqdn>[:<port>]
       <addr>     = [ip:]<cidr> | net:<cidr> | net:default
       <endpoint> = [tcp://][<ip_address>]:<port> | [unix://]/path/to/socket
       <peer_id>  = <nickname> | <weave internal peer ID>
+      <mode>     = consensus[=<count>] | seed=<mac>,... | observer
 EOF
 }
 
@@ -1875,10 +1876,12 @@ deprecation_warnings() {
                 shift
                 ;;
             -initpeercount|--initpeercount|-initpeercount=*|--initpeercount=*)
-                deprecation_warning $1 "--init-peer-count"
+                deprecation_warning $1 "--ipalloc-init"
                 [ ${1#--} = "initpeercount" ] && shift
                 ;;
-            --init-peer-count)
+            --init-peer-count|--init-peer-count=*)
+                deprecation_warning $1 "--ipalloc-init"
+                [ ${1#--} = "init-peer-count" ] && shift
                 shift
                 ;;
             -no-default-ipam|--no-default-ipam)
@@ -2263,8 +2266,8 @@ EOF
         echo "The 'stop-dns command has been removed; DNS is stopped as part of 'stop' and 'stop-router'." >&2
         exit 0
         ;;
-    consense)
-        call_weave GET /consensus
+    prime)
+        call_weave GET /ring
         ;;
     *)
         echo "Unknown weave command '$COMMAND'" >&2

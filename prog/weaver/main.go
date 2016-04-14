@@ -7,6 +7,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -34,11 +35,12 @@ var newVersion atomic.Value
 var Log = common.Log
 
 type ipamConfig struct {
-	IPRangeCIDR  string
-	IPSubnetCIDR string
-	PeerCount    int
-	Observer     bool
-	Seed         string
+	IPRangeCIDR   string
+	IPSubnetCIDR  string
+	PeerCount     int
+	Mode          string
+	Observer      bool
+	SeedPeerNames []mesh.PeerName
 }
 
 type dnsConfig struct {
@@ -77,24 +79,62 @@ func checkForUpdates() {
 	checker = checkpoint.CheckInterval(&params, updateCheckPeriod, handleResponse)
 }
 
-func (c ipamConfig) Enabled() bool {
+func (c *ipamConfig) Enabled() bool {
 	var (
 		hasPeerCount = c.PeerCount > 0
-		hasSeed      = len(c.Seed) > 0
+		hasMode      = len(c.Mode) > 0
 		hasRange     = c.IPRangeCIDR != ""
 		hasSubnet    = c.IPSubnetCIDR != ""
 	)
 	switch {
-	case !(c.Observer || hasPeerCount || hasSeed || hasRange || hasSubnet):
+	case !(hasPeerCount || hasMode || hasRange || hasSubnet):
 		return false
 	case !hasRange && hasSubnet:
 		Log.Fatal("--ipalloc-default-subnet specified without --ipalloc-range.")
 	case !hasRange:
-		Log.Fatal("--observer, --ipam-seed or --init-peer-count specified without --ipalloc-range.")
-	case c.Observer && hasPeerCount || hasPeerCount && hasSeed || hasSeed && c.Observer:
-		Log.Fatal("At most one of --observer, --ipam-seed or --init-peer-count may be specified.")
+		Log.Fatal("--ipalloc-init or --init-peer-count specified without --ipalloc-range.")
+	case hasMode && hasPeerCount:
+		Log.Fatal("At most one of --ipalloc-init or --init-peer-count may be specified.")
+	}
+	if hasMode {
+		if err := c.parseMode(); err != nil {
+			Log.Fatalf("Unable to parse --ipalloc-init: %s", err)
+		}
 	}
 	return true
+}
+
+func (c *ipamConfig) parseMode() error {
+	modeAndParam := strings.SplitN(c.Mode, "=", 2)
+
+	switch modeAndParam[0] {
+	case "consensus":
+		if len(modeAndParam) == 2 {
+			peerCount, err := strconv.Atoi(modeAndParam[1])
+			if err != nil {
+				return fmt.Errorf("bad consensus parameter: %s", err)
+			}
+			c.PeerCount = peerCount
+		}
+	case "seed":
+		if len(modeAndParam) != 2 {
+			return fmt.Errorf("seed mode requires peer name list")
+		}
+		seedPeerNames, err := parsePeerNames(modeAndParam[1])
+		if err != nil {
+			return fmt.Errorf("bad seed parameter: %s", err)
+		}
+		c.SeedPeerNames = seedPeerNames
+	case "observer":
+		if len(modeAndParam) != 1 {
+			return fmt.Errorf("observer mode takes no parameter")
+		}
+		c.Observer = true
+	default:
+		return fmt.Errorf("unknown mode: %s", modeAndParam[0])
+	}
+
+	return nil
 }
 
 func main() {
@@ -152,11 +192,10 @@ func main() {
 	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
 	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
+	mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
 	mflag.StringVar(&ipamConfig.IPRangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipamConfig.IPSubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
 	mflag.IntVar(&ipamConfig.PeerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
-	mflag.BoolVar(&ipamConfig.Observer, []string{"-observer"}, false, "initialise IP address allocation by observing other peers")
-	mflag.StringVar(&ipamConfig.Seed, []string{"-ipam-seed"}, "", "comma-separated list of peer names amongst which address space is shared initially")
 	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
 	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
@@ -389,7 +428,6 @@ func parseAndCheckCIDR(cidrStr string) address.CIDR {
 
 func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange := parseAndCheckCIDR(config.IPRangeCIDR)
-	seed := parseIPAMSeed(config.Seed)
 	defaultSubnet := ipRange
 	if config.IPSubnetCIDR != "" {
 		defaultSubnet = parseAndCheckCIDR(config.IPSubnetCIDR)
@@ -402,7 +440,7 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 		OurName:     router.Ourself.Peer.Name,
 		OurUID:      router.Ourself.Peer.UID,
 		OurNickname: router.Ourself.Peer.NickName,
-		Seed:        seed,
+		Seed:        config.SeedPeerNames,
 		Universe:    ipRange.Range(),
 		IsObserver:  config.Observer,
 		Quorum:      func() uint { return determineQuorum(config.PeerCount, router) },
@@ -497,21 +535,21 @@ func parseTrustedSubnets(trustedSubnetStr string) []*net.IPNet {
 	return trustedSubnets
 }
 
-func parseIPAMSeed(ipamSeed string) []mesh.PeerName {
+func parsePeerNames(s string) ([]mesh.PeerName, error) {
 	peerNames := []mesh.PeerName{}
-	if ipamSeed == "" {
-		return peerNames
+	if s == "" {
+		return peerNames, nil
 	}
 
-	for _, peerNameStr := range strings.Split(ipamSeed, ",") {
+	for _, peerNameStr := range strings.Split(s, ",") {
 		peerName, err := mesh.PeerNameFromUserInput(peerNameStr)
 		if err != nil {
-			Log.Fatal("Unable to parse IPAM seed: ", err)
+			return nil, fmt.Errorf("error parsing peer names: %s", err)
 		}
 		peerNames = append(peerNames, peerName)
 	}
 
-	return peerNames
+	return peerNames, nil
 }
 
 func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {

@@ -1,10 +1,10 @@
 package ipam
 
-type consense struct {
+type prime struct {
 	resultChan chan<- struct{}
 }
 
-func (c *consense) Try(alloc *Allocator) bool {
+func (c *prime) Try(alloc *Allocator) bool {
 	if !alloc.ring.Empty() {
 		close(c.resultChan)
 		return true
@@ -15,10 +15,10 @@ func (c *consense) Try(alloc *Allocator) bool {
 	return false
 }
 
-func (c *consense) Cancel() {
+func (c *prime) Cancel() {
 	close(c.resultChan)
 }
 
-func (c *consense) ForContainer(ident string) bool {
+func (c *prime) ForContainer(ident string) bool {
 	return false
 }

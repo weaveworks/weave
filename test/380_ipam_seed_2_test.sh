@@ -5,8 +5,8 @@
 start_suite "Specify initial IPAM seed"
 
 # Launch two disconnected routers
-weave_on $HOST1 launch --name ::1 --ipam-seed ::1,::2
-weave_on $HOST2 launch --name ::2 --ipam-seed ::1,::2
+weave_on $HOST1 launch --name ::1 --ipalloc-init seed=::1,::2
+weave_on $HOST2 launch --name ::2 --ipalloc-init seed=::1,::2
 
 # Ensure allocations can proceed
 assert_raises "timeout 10 cat <( start_container $HOST1 --name c1)"
