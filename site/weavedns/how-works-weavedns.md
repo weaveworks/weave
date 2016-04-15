@@ -41,14 +41,14 @@ is assumed to be `docker0`.  Some configurations may use a different
 Docker bridge device. To supply a different bridge device, use the
 environment variable `DOCKER_BRIDGE`, e.g.,
 
-```bash
+```
 $ sudo DOCKER_BRIDGE=someother weave launch
 ```
 
 In the event that weaveDNS is launched in this way, it's important that
 other calls to `weave` also specify the bridge device:
 
-```bash
+```
 $ sudo DOCKER_BRIDGE=someother weave run ...
 ```
 
