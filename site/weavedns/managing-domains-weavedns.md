@@ -23,7 +23,7 @@ hostnames across all sub-domains plus some external domains, you need
 *also* to supply the `weave.local` domain to retain the above
 behaviour.
 
-```bash
+```
 docker run -ti \
   --dns-search=zone1.weave.local --dns-search=zone2.weave.local \
   --dns-search=corp1.com --dns-search=corp2.com \
@@ -37,7 +37,7 @@ Weave network. In general users do not need to change this domain, but
 you can force weaveDNS to use a different domain by launching it with
 the `--dns-domain` argument. For example,
 
-```bash
+```
 $ weave launch --dns-domain="mycompany.local."
 ```
 
@@ -46,6 +46,6 @@ link-local as per [RFC6762](https://tools.ietf.org/html/rfc6762),
 (though this is not strictly necessary).
 
 
- * [How Weave Finds Containers](/site/weave-docker-api.md)
+ * [How Weave Finds Containers](/site/how-works-weavedns.md.md)
  * [Load Balancing and Fault Resilience with WeaveDNS](/site/weavedns/load-balance-fault-weavedns.md)
  * [Managing Domain Entries](/site/weavedns/managing-entries-weavedns.md)
