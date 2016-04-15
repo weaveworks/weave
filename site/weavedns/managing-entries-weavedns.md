@@ -19,7 +19,7 @@ The following topics are discussed:
 If you want to give the container a name in DNS *other* than its
 hostname, you can register it using the `dns-add` command. For example:
 
-```bash
+```
 $ C=$(docker run -ti ubuntu)
 $ weave dns-add $C -h pingme2.weave.local
 ```
@@ -32,7 +32,7 @@ addresses to be registered against the container's hostname e.g.
 The inverse operation can be carried out using the `dns-remove`
 command:
 
-```bash
+```
 $ weave dns-remove $C
 ```
 
@@ -40,8 +40,7 @@ By omitting the container name it is possible to add/remove DNS
 records that associate names in the weaveDNS domain with IP addresses
 that do not belong to containers, e.g. non-weave addresses of external
 services:
-
-```bash
+```
 $ weave dns-add 192.128.16.45 -h db.weave.local
 ```
 
@@ -71,7 +70,7 @@ By default, weaveDNS specifies a TTL of 30 seconds in responses to DNS
 requests.  However, you can force a different TTL value by launching
 weave with the `--dns-ttl` argument:
 
-```bash
+```
 $ weave launch --dns-ttl=10
 ```
 
@@ -82,6 +81,6 @@ weaveDNS instance will receive.
 
 **See Also**
 
- * [How Weave Finds Containers](/site/weave-docker-api.md)
+ * [How Weave Finds Containers](/site/how-works-weavedns.md)
  * [Load Balancing and Fault Resilience with WeaveDNS](/site/weavedns/load-balance-fault-weavedns.md)
  * [Managing Domains](/site/weavedns/managing-domains-weavedns.md)
