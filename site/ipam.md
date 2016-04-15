@@ -15,7 +15,7 @@ The following automatic IP address management topics are discussed:
 
  * [Initializing Peers on a Weave Network](#initialization)
  * [`--ipalloc-init:consensus` and How Quorum is Achieved](#quorum)
- * [Forcing Consensus](#forcing-consensus)
+ * [Priming a Peer](#priming-a-peer)
  * [Choosing an Allocation Range](#range)
 
 
@@ -141,16 +141,16 @@ is safe with respect to Weave Net's startup quorum:
     ...host1 is rebooted...
     host1$ weave launch $HOST2 $HOST3
 
-### <a name="forcing-consensus"></a>Forcing Consensus
+### <a name="priming-a-peer"></a>Priming a Peer
 
-Under certain circumstances (for example when adding new nodes to an
-existing cluster) it is desirable to ensure that a node has
+Under certain circumstances (for example when adding new peers to an
+existing network) it is desirable to ensure that a peer has
 successfully joined and is ready to allocate IP addresses. An
 administrative command is provided for this purpose:
 
     host1$ weave prime
 
-This operation will block until the node on which it is run has joined
+This operation will block until the peer on which it is run has joined
 successfully.
 
 ### <a name="range"></a>Choosing an Allocation Range
