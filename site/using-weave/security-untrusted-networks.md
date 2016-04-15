@@ -15,7 +15,7 @@ or
     host1$ export WEAVE_PASSWORD=wfvAwt7sj
     host1$ weave launch
 
->NOTE: The command line option takes precedence over the environment variable._
+>**NOTE**: The command line option takes precedence over the environment variable._
 
 > To avoid leaking your password via the kernel process table or your
 > shell history, we recommend you store it in a file and capture it
@@ -39,11 +39,11 @@ If some of your peers are co-located in a trusted network (for example within th
 Be aware that:
 
  * Containers will be able to access the router REST API if fast datapath is disabled. You can prevent this by setting:
- [`icc=false`](https://docs.docker.com/engine/userguide/networking/default_network/container-communication/#communication-between-containers)
+ [`icc=false`](https://docs.docker.com/engine/userguide/networking/default_network/container-communication/#communication-between-containers).
  * Containers are able to access the router control and data plane
   ports, but this can be mitigated by enabling encryption.
 
 **See Also**
 
  * [Using Encryption With Weave Net](/site/encryption.md)
- * [Using Fast Datapath](/site/using-weave.md)
+ * [Using Fast Datapath](/site/fastdp.md)
