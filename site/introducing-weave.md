@@ -26,7 +26,7 @@ Weave Net implements service discovery by providing a fast "micro DNS" server at
 All other Docker networking plugins, including Docker's own "Overlay" driver, require that you set up Docker with a cluster store – a central database like Consul or Zookeeper – before you can even use them. Besides being difficult to set up, maintain and manage, every Docker host must also be in constant contact with the cluster store: if you lose the connection, even temporarily, then you cannot start or stop any containers.
 
 Weave Net is bundled with a Docker Network plugin that doesn't require an external cluster store. You can get started right away and you can start and stop containers even when there are network connectivity problems.  
-For information about the Weave Docker Plugin, see [How The Weave Network Plugin Works.](/site/plugin/plugin-how-it-works.md)
+For information about the Weave Docker Plugin, see [How The Weave Network Plugin Works](/site/plugin/plugin-how-it-works.md).
 
 ###Operates in Partially Connected Networks
 
@@ -36,7 +36,7 @@ Weave Net can forward traffic between nodes, and it works even if the mesh netwo
 
 Weave Net automatically chooses the fastest path between two hosts, offering near native throughput and latency, all without your intervention.  
 
-See [How Fast Datapath Works.](/site/fastdp.md) for more information.
+See [How Fast Datapath Works](/site/fastdp.md) for more information.
 
 ###Network Operations Friendly
 
@@ -59,7 +59,7 @@ With Weave Net, deploy your peer-to-peer file sharing applications and voice ove
 Weave Net is a good choice if you want one tool for everything.  For example: In addition to Docker plugins, you can also use Weave as a Kubernetes plugin.  You can also use Weave with Amazon ECS or with Mesos and Marathon.  
 Refer to our Getting Started and Integration Guides for more information.
 
-For a complete list and description of Weave Net’s current feature set see, [Weave Net Features.](/site/features.md)
+For a complete list and description of Weave Net’s current feature set see, [Weave Net Features](/site/features.md).
 
 
 
