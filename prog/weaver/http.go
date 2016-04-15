@@ -171,7 +171,7 @@ var statusTemplate = defTemplate("status", `\
 {{if .IPAM.Paxos.Elector}}\
          Status: awaiting consensus (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
 {{else}}\
-         Status: awaiting consensus (observer)
+         Status: priming
 {{end}}\
 {{else}}\
          Status: idle
