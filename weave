@@ -1698,6 +1698,8 @@ launch_router() {
     setup_router_iface_$BRIDGE_TYPE
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     [ -n "$ALREADY_RUNNING_CONTAINER" ] || populate_router
+    ipam_cidrs lookup weave:expose
+    expose "" $ALL_CIDRS
 }
 
 # Recreate the parameter values that are set when the router is first launched
@@ -1968,6 +1970,8 @@ EOF
         setup_router_iface_$BRIDGE_TYPE
         wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
         populate_router
+        ipam_cidrs lookup weave:expose
+        expose "" $ALL_CIDRS
         ;;
     launch-proxy)
         deprecation_warnings "$@"
