@@ -32,8 +32,8 @@ the total allocation range and default subnet. Columns are as follows:
       ongoing, triggered by an allocation or claim request;
       allocations will block.  This state persists until a quorum of
       peers are able to communicate amongst themselves successfully.
-      The Status may also show '(observer)' instead of the quorum size,
-      if this peer has been started with the `--observer` option.
+    * 'priming' - peer is an observer and is waiting to receive IPAM
+      data from seeding or consensus elsewhere in the network
     * 'ready' - consensus achieved; allocations proceed normally
     * 'waiting for IP range grant from peers' - peer has exhausted its
       agreed portion of the range and is waiting to be granted some
