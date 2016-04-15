@@ -27,7 +27,7 @@ Net:
  * [Container Mobility](#container-mobility)
  * [Fault Tolerance](#fault-tolerance) 
 
-For step-by-step instructions on how to use Weave Net, see [Using Weave Net.](/site/using-weave.md)
+For step-by-step instructions on how to use Weave Net, see [Using Weave Net](/site/using-weave.md).
 
 ###<a name="virtual-ethernet-switch"></a>Virtual Ethernet Switch
 
@@ -46,7 +46,7 @@ Broadcast and Multicast protocols can also be implemented
 over Weave Net.
 
 To start using Weave Net, see [Installing Weave Net](/site/installing-weave.md) 
-and [Deploying Applications to Weave Net.](/site/using-weave/deploying-applications.md)
+and [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md).
 
 ###<a name="fast-data-path"></a>Fast Datapath
 
@@ -76,7 +76,7 @@ Containers started in this way that subsequently restart, either
 by an explicit `docker restart` command or by Docker restart 
 policy, are re-attached to the Weave network by the `Weave Docker API Proxy`.
 
-See [Using the Weave Docker API Proxy.](/site/weave-docker-api/using-proxy.md)
+See [Using the Weave Docker API Proxy](/site/weave-docker-api/using-proxy.md).
 
 
 ###<a name="plugin"></a>Weave Network Docker Plugin
@@ -86,7 +86,7 @@ named `weave` is created by `weave launch`, which is used as follows:
 
     $ docker run --net=weave -ti ubuntu 
 
-Using the Weave plugin enables you to take advantage of [Docker's network functionality.](https://docs.docker.com/engine/extend/plugins_network/)
+Using the Weave plugin enables you to take advantage of [Docker's network functionality](https://docs.docker.com/engine/extend/plugins_network/).
 
 Also, Weave’s Docker Network plugin doesn't require an external cluster store and you can start and stop containers even 
 when there are network connectivity problems.
@@ -181,7 +181,7 @@ running alongside Weave.
 
 Weave Net implements encryption and security using [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
 
-For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption.md) and [How Weave Implements Encryption.](/site/encryption/implementation.md)
+For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption.md) and [How Weave Implements Encryption](/site/encryption/implementation.md).
 
 
 ###<a name="host-network-integration"></a>Host Network Integration
@@ -189,7 +189,7 @@ For information on how to secure your Docker network connections, see [Securing 
 Weave Net application networks can be integrated with a host's network, and establish connectivity between the host and 
 application containers anywhere.
 
-See [Integrating a Host Network with Weave.](/site/using-weave/host-network-integration.md)
+See [Integrating a Host Network with Weave](/site/using-weave/host-network-integration.md).
 
 ###<a name="services"></a>Managing Services: Exporting, Importing, Binding and Routing
  
@@ -208,7 +208,7 @@ of containers that run on [Google Compute Engine](https://cloud.google.com/compu
 (GCE), [Amazon Elastic Compute Cloud](https://aws.amazon.com/ec2/) 
 (EC2) and in a local data centre all at the same time.
 
-See [Enabling Multi-Cloud networking and Muti-hop Routing.](/site/using-weave/multi-cloud-multi-hop.md)
+See [Enabling Multi-Cloud networking and Muti-hop Routing](/site/using-weave/multi-cloud-multi-hop.md).
 
 
 ###<a name="multi-hop-routing"></a>Multi-Hop Routing
@@ -218,7 +218,7 @@ even when there is only partial connectivity between the hosts. Weave Net
 routes traffic between containers as long as there is at least one *path* 
 of connected hosts between them.
 
-See [Enabling Multi-Cloud networking and Multi-hop Routing.](/site/using-weave/multi-cloud-multi-hop.md)
+See [Enabling Multi-Cloud networking and Multi-hop Routing](/site/using-weave/multi-cloud-multi-hop.md).
 
 
 ###<a name="dynamic-topologies"></a>Dynamic Topologies
