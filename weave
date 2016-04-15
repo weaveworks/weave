@@ -384,6 +384,7 @@ fi
 RESTART_POLICY="--restart=always"
 BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
+CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 
 BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
 PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
@@ -391,10 +392,9 @@ PLUGIN_CONTAINER_NAME=weaveplugin
 # Note VOLUMES_CONTAINER which is for weavewait should change when you upgrade Weave
 VOLUMES_CONTAINER_NAME=weavevolumes-$IMAGE_VERSION
 # DB files should remain when you upgrade, so version number not included in name
-DB_CONTAINER_NAME=weavedb
+DB_CONTAINER_NAME=${CONTAINER_NAME}db
 
 DOCKER_BRIDGE=${DOCKER_BRIDGE:-docker0}
-CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 BRIDGE=weave
 # This value is overridden when the datapath is used unbridged
 DATAPATH=datapath
