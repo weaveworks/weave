@@ -9,12 +9,10 @@ It is permissible to register multiple containers with the same name:
 weaveDNS returns all addresses, in a random order, for each request.
 This provides a basic load balancing capability.
 
-Expanding the
-[overview example](/site/weavedns.md), let us
-start an additional `pingme` container on a 2nd host, and then run
-some ping tests...
+Expanding the [overview example](/site/weavedns.md), let us start an additional `pingme` container on a second host, and then run
+some ping tests.
 
-```bash
+```
 host2$ weave launch $HOST1
 host2$ eval $(weave env)
 host2$ docker run -dti --name=pingme ubuntu
@@ -36,7 +34,7 @@ PING pingme.weave.local (10.32.0.2) 56(84) bytes of data.
 Notice how the ping reaches different addresses.
 
 
-## <a name="fault-resilience"></a>Fault resilience
+## <a name="fault-resilience"></a>Fault Resilience
 
 WeaveDNS removes the addresses of any container that dies. This offers
 a simple way to implement redundancy. E.g. if in our example we stop
@@ -47,6 +45,6 @@ container that is still alive.
 
 **See Also**
 
- * [How Weave Finds Containers](/site/weave-docker-api.md)
+ * [How Weave Finds Containers](/site/how-works-weavedns.md)
  * [Managing Domains](/site/weavedns/managing-domains-weavedns.md)
  * [Managing Domain Entries](/site/weavedns/managing-entries-weavedns.md)
