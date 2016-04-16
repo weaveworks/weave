@@ -334,39 +334,39 @@ func TestTransfer(t *testing.T) {
 	)
 	allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
 	defer stopNetworkOfAllocators(allocs, router)
-	alloc1 := allocs[0]
-	alloc2 := allocs[1]
-	alloc3 := allocs[2] // This will be 'master' and get the first range
+	alloc0 := allocs[0]
+	alloc1 := allocs[1]
+	alloc2 := allocs[2] // This will be 'master' and get the first range
 
-	_, err := alloc2.Allocate("foo", subnet, returnFalse)
+	_, err := alloc1.Allocate("foo", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 
-	_, err = alloc3.Allocate("bar", subnet, returnFalse)
+	_, err = alloc2.Allocate("bar", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 
-	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
+	alloc1.gossip.GossipBroadcast(alloc1.Gossip())
 	router.Flush()
-	alloc2.gossip.GossipBroadcast(alloc3.Gossip())
+	alloc1.gossip.GossipBroadcast(alloc2.Gossip())
 	router.Flush()
 
+	free1 := alloc1.NumFreeAddresses(subnet.Range())
 	free2 := alloc2.NumFreeAddresses(subnet.Range())
-	free3 := alloc3.NumFreeAddresses(subnet.Range())
 
+	router.RemovePeer(alloc1.ourName)
 	router.RemovePeer(alloc2.ourName)
-	router.RemovePeer(alloc3.ourName)
-	alloc2.Stop()
-	alloc3.Stop()
-	router.Flush()
-
-	require.Equal(t, free2+1, alloc1.AdminTakeoverRanges(alloc2.ourName.String()))
-	require.Equal(t, free3+1, alloc1.AdminTakeoverRanges(alloc3.ourName.String()))
-	router.Flush()
-
-	require.Equal(t, address.Count(1024), alloc1.NumFreeAddresses(subnet.Range()))
-
-	_, err = alloc1.Allocate("foo", subnet, returnFalse)
-	require.True(t, err == nil, "Failed to get address")
 	alloc1.Stop()
+	alloc2.Stop()
+	router.Flush()
+
+	require.Equal(t, free1+1, alloc0.AdminTakeoverRanges(alloc1.ourName.String()))
+	require.Equal(t, free2+1, alloc0.AdminTakeoverRanges(alloc2.ourName.String()))
+	router.Flush()
+
+	require.Equal(t, address.Count(1024), alloc0.NumFreeAddresses(subnet.Range()))
+
+	_, err = alloc0.Allocate("foo", subnet, returnFalse)
+	require.True(t, err == nil, "Failed to get address")
+	alloc0.Stop()
 }
 
 func TestFakeRouterSimple(t *testing.T) {
