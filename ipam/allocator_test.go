@@ -318,10 +318,12 @@ func TestTransfer(t *testing.T) {
 	_, err = alloc3.Allocate("bar", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 
+	// simulation of periodic gossip
 	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
 	router.Flush()
-	alloc2.gossip.GossipBroadcast(alloc3.Gossip())
+	alloc1.gossip.GossipBroadcast(alloc1.Gossip())
 	router.Flush()
+
 	router.RemovePeer(alloc2.ourName)
 	router.RemovePeer(alloc3.ourName)
 	alloc2.Stop()
