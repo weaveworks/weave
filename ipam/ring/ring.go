@@ -238,10 +238,8 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 // entries belonging to ourPeer. Returns the merged entries and an
 // indication whether the merge resulted in any changes, i.e. the
 // result differs from the original.
-func (es entries) merge(other entries, ourPeer mesh.PeerName) (entries, bool, error) {
-	var result entries
+func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, updated bool, err error) {
 	addToResult := func(e entry) { result = append(result, &e) }
-	var updated bool
 
 	var mine, theirs *entry
 	var previousOwner *mesh.PeerName
@@ -257,7 +255,8 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (entries, bool, er
 		case mine.Token > theirs.Token:
 			// insert, checking that a range owned by us hasn't been split
 			if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
-				return result, false, errEntryInMyRange(theirs)
+				err = errEntryInMyRange(theirs)
+				return
 			}
 			addToResult(*theirs)
 			updated = true
@@ -268,13 +267,15 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (entries, bool, er
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					return result, false, errInconsistentEntry(mine, theirs)
+					err = errInconsistentEntry(mine, theirs)
+					return
 				}
 				addToResult(*mine)
 				previousOwner = &mine.Peer
 			case mine.Version < theirs.Version:
 				if mine.Peer == ourPeer { // We shouldn't receive updates to our own tokens
-					return result, false, errNewerVersion(mine, theirs)
+					err = errNewerVersion(mine, theirs)
+					return
 				}
 				addToResult(*theirs)
 				updated = true
@@ -296,14 +297,15 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (entries, bool, er
 	for ; j < len(other); j++ {
 		theirs = other[j]
 		if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
-			return result, false, errEntryInMyRange(theirs)
+			err = errEntryInMyRange(theirs)
+			return
 		}
 		addToResult(*theirs)
 		updated = true
 		previousOwner = nil
 	}
 
-	return result, updated, nil
+	return
 }
 
 // Empty returns true if the ring has no entries
