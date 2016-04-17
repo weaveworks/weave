@@ -217,69 +217,10 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 		return false, ErrDifferentRange
 	}
 
-	// Now merge their ring with yours, in a temporary ring.
-	var result entries
-	addToResult := func(e entry) { result = append(result, &e) }
-	var updated bool
+	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer)
 
-	var mine, theirs *entry
-	var previousOwner *mesh.PeerName
-	// i is index into r.Entries; j is index into gossip.Entries
-	var i, j int
-	for i < len(r.Entries) && j < len(gossip.Entries) {
-		mine, theirs = r.Entries[i], gossip.Entries[j]
-		switch {
-		case mine.Token < theirs.Token:
-			addToResult(*mine)
-			previousOwner = &mine.Peer
-			i++
-		case mine.Token > theirs.Token:
-			// insert, checking that a range owned by us hasn't been split
-			if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-				return false, errEntryInMyRange(theirs)
-			}
-			addToResult(*theirs)
-			updated = true
-			previousOwner = nil
-			j++
-		case mine.Token == theirs.Token:
-			// merge
-			switch {
-			case mine.Version >= theirs.Version:
-				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					return false, errInconsistentEntry(mine, theirs)
-				}
-				addToResult(*mine)
-				previousOwner = &mine.Peer
-			case mine.Version < theirs.Version:
-				if mine.Peer == r.Peer { // We shouldn't receive updates to our own tokens
-					return false, errNewerVersion(mine, theirs)
-				}
-				addToResult(*theirs)
-				updated = true
-				previousOwner = nil
-			}
-			i++
-			j++
-		}
-	}
-
-	// At this point, either i is at the end of r or j is at the end
-	// of gossip, so copy over the remaining entries.
-
-	for ; i < len(r.Entries); i++ {
-		mine = r.Entries[i]
-		addToResult(*mine)
-	}
-
-	for ; j < len(gossip.Entries); j++ {
-		theirs = gossip.Entries[j]
-		if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-			return false, errEntryInMyRange(theirs)
-		}
-		addToResult(*theirs)
-		updated = true
-		previousOwner = nil
+	if err != nil {
+		return false, err
 	}
 
 	if err := r.checkEntries(result); err != nil {
@@ -291,6 +232,78 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 	}
 	r.Entries = result
 	return updated, nil
+}
+
+// Merge other entries into ours, and complain when that stomps on
+// entries belonging to ourPeer. Returns the merged entries and an
+// indication whether the merge resulted in any changes, i.e. the
+// result differs from the original.
+func (es entries) merge(other entries, ourPeer mesh.PeerName) (entries, bool, error) {
+	var result entries
+	addToResult := func(e entry) { result = append(result, &e) }
+	var updated bool
+
+	var mine, theirs *entry
+	var previousOwner *mesh.PeerName
+	// i is index into es; j is index into other
+	var i, j int
+	for i < len(es) && j < len(other) {
+		mine, theirs = es[i], other[j]
+		switch {
+		case mine.Token < theirs.Token:
+			addToResult(*mine)
+			previousOwner = &mine.Peer
+			i++
+		case mine.Token > theirs.Token:
+			// insert, checking that a range owned by us hasn't been split
+			if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
+				return result, false, errEntryInMyRange(theirs)
+			}
+			addToResult(*theirs)
+			updated = true
+			previousOwner = nil
+			j++
+		case mine.Token == theirs.Token:
+			// merge
+			switch {
+			case mine.Version >= theirs.Version:
+				if mine.Version == theirs.Version && !mine.Equal(theirs) {
+					return result, false, errInconsistentEntry(mine, theirs)
+				}
+				addToResult(*mine)
+				previousOwner = &mine.Peer
+			case mine.Version < theirs.Version:
+				if mine.Peer == ourPeer { // We shouldn't receive updates to our own tokens
+					return result, false, errNewerVersion(mine, theirs)
+				}
+				addToResult(*theirs)
+				updated = true
+				previousOwner = nil
+			}
+			i++
+			j++
+		}
+	}
+
+	// At this point, either i is at the end of es or j is at the end
+	// of other, so copy over the remaining entries.
+
+	for ; i < len(es); i++ {
+		mine = es[i]
+		addToResult(*mine)
+	}
+
+	for ; j < len(other); j++ {
+		theirs = other[j]
+		if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
+			return result, false, errEntryInMyRange(theirs)
+		}
+		addToResult(*theirs)
+		updated = true
+		previousOwner = nil
+	}
+
+	return result, updated, nil
 }
 
 // Empty returns true if the ring has no entries
