@@ -239,10 +239,15 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 // indication whether the merge resulted in any changes, i.e. the
 // result differs from the original.
 func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, updated bool, err error) {
-	addToResult := func(e entry) { result = append(result, &e) }
-
 	var mine, theirs *entry
 	var previousOwner *mesh.PeerName
+	addToResult := func(e entry) { result = append(result, &e) }
+	addTheirs := func(e entry) {
+		addToResult(e)
+		updated = true
+		previousOwner = nil
+	}
+
 	// i is index into es; j is index into other
 	var i, j int
 	for i < len(es) && j < len(other) {
@@ -258,9 +263,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, u
 				err = errEntryInMyRange(theirs)
 				return
 			}
-			addToResult(*theirs)
-			updated = true
-			previousOwner = nil
+			addTheirs(*theirs)
 			j++
 		case mine.Token == theirs.Token:
 			// merge
@@ -277,9 +280,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, u
 					err = errNewerVersion(mine, theirs)
 					return
 				}
-				addToResult(*theirs)
-				updated = true
-				previousOwner = nil
+				addTheirs(*theirs)
 			}
 			i++
 			j++
@@ -300,9 +301,7 @@ func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, u
 			err = errEntryInMyRange(theirs)
 			return
 		}
-		addToResult(*theirs)
-		updated = true
-		previousOwner = nil
+		addTheirs(*theirs)
 	}
 
 	return
