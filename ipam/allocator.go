@@ -709,7 +709,6 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	reader := bytes.NewReader(msg)
 	decoder := gob.NewDecoder(reader)
 	var data gossipState
-	var err error
 
 	if err := decoder.Decode(&data); err != nil {
 		return err
@@ -724,9 +723,10 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	// If someone sent us a ring, merge it into ours. Note this will move us
 	// out of the awaiting-consensus state if we didn't have a ring already.
 	case data.Ring != nil:
-		switch err = alloc.ring.Merge(*data.Ring); err {
+		updated, err := alloc.ring.Merge(*data.Ring)
+		switch err {
 		case nil:
-			if !alloc.ring.Empty() {
+			if updated {
 				alloc.pruneNicknames()
 				alloc.ringUpdated()
 			}

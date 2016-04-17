@@ -190,35 +190,37 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 	r.Entries.insert(entry{Token: end, Peer: r.Peer, Free: endFree})
 }
 
-// Merge the given ring into this ring and return any new ranges added
-func (r *Ring) Merge(gossip Ring) error {
+// Merge the given ring into this ring and indicate whether this ring
+// got updated as a result.
+func (r *Ring) Merge(gossip Ring) (bool, error) {
 	r.assertInvariants()
 	defer r.updateExportedVariables()
 
 	// Don't panic when checking the gossiped in ring.
 	// In this case just return any error found.
 	if err := gossip.checkInvariants(); err != nil {
-		return err
+		return false, err
 	}
 
 	if len(gossip.Seeds) > 0 && len(r.Seeds) > 0 {
 		if len(gossip.Seeds) != len(r.Seeds) {
-			return ErrDifferentSeeds
+			return false, ErrDifferentSeeds
 		}
 		for i, seed := range gossip.Seeds {
 			if seed != r.Seeds[i] {
-				return ErrDifferentSeeds
+				return false, ErrDifferentSeeds
 			}
 		}
 	}
 
 	if r.Start != gossip.Start || r.End != gossip.End {
-		return ErrDifferentRange
+		return false, ErrDifferentRange
 	}
 
 	// Now merge their ring with yours, in a temporary ring.
 	var result entries
 	addToResult := func(e entry) { result = append(result, &e) }
+	var updated bool
 
 	var mine, theirs *entry
 	var previousOwner *mesh.PeerName
@@ -234,9 +236,10 @@ func (r *Ring) Merge(gossip Ring) error {
 		case mine.Token > theirs.Token:
 			// insert, checking that a range owned by us hasn't been split
 			if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-				return errEntryInMyRange(theirs)
+				return false, errEntryInMyRange(theirs)
 			}
 			addToResult(*theirs)
+			updated = true
 			previousOwner = nil
 			j++
 		case mine.Token == theirs.Token:
@@ -244,15 +247,16 @@ func (r *Ring) Merge(gossip Ring) error {
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					return errInconsistentEntry(mine, theirs)
+					return false, errInconsistentEntry(mine, theirs)
 				}
 				addToResult(*mine)
 				previousOwner = &mine.Peer
 			case mine.Version < theirs.Version:
 				if mine.Peer == r.Peer { // We shouldn't receive updates to our own tokens
-					return errNewerVersion(mine, theirs)
+					return false, errNewerVersion(mine, theirs)
 				}
 				addToResult(*theirs)
+				updated = true
 				previousOwner = nil
 			}
 			i++
@@ -271,21 +275,22 @@ func (r *Ring) Merge(gossip Ring) error {
 	for ; j < len(gossip.Entries); j++ {
 		theirs = gossip.Entries[j]
 		if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-			return errEntryInMyRange(theirs)
+			return false, errEntryInMyRange(theirs)
 		}
 		addToResult(*theirs)
+		updated = true
 		previousOwner = nil
 	}
 
 	if err := r.checkEntries(result); err != nil {
-		return fmt.Errorf("Merge of incoming data causes: %s", err)
+		return false, fmt.Errorf("Merge of incoming data causes: %s", err)
 	}
 
 	if len(r.Seeds) == 0 {
 		r.Seeds = gossip.Seeds
 	}
 	r.Entries = result
-	return nil
+	return updated, nil
 }
 
 // Empty returns true if the ring has no entries

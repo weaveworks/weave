@@ -325,6 +325,21 @@ func TestGossipShutdown(t *testing.T) {
 	CheckAllExpectedMessagesSent(alloc)
 }
 
+func TestNoFrag(t *testing.T) {
+	const cidr = "10.0.1.7/22"
+	resultChan := make(chan int)
+	for i := 0; i < 100; i++ {
+		allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
+		allocs[1].Allocate("foo", subnet, returnFalse)
+		allocs[2].Allocate("bar", subnet, returnFalse)
+		allocs[2].actionChan <- func() {
+			resultChan <- len(allocs[2].ring.Entries)
+		}
+		require.True(t, <-resultChan < 5, "excessive ring fragmentation")
+		stopNetworkOfAllocators(allocs, router)
+	}
+}
+
 func TestTransfer(t *testing.T) {
 	const cidr = "10.0.1.7/22"
 	allocs, router, subnet := makeNetworkOfAllocators(3, cidr)

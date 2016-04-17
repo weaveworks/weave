@@ -30,6 +30,11 @@ func ParseIP(s string) address.Address {
 	return addr
 }
 
+func merge(r1, r2 *Ring) error {
+	_, err := r1.Merge(*r2)
+	return err
+}
+
 func TestInvariants(t *testing.T) {
 	ring := New(start, end, peer1name)
 
@@ -158,7 +163,7 @@ func TestGrantSplit(t *testing.T) {
 
 	// Claim everything for peer1
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 255}}
-	ring2.Merge(*ring1)
+	merge(ring2, ring1)
 	require.Equal(t, ring2.Entries, ring1.Entries)
 
 	// Now grant a split range to peer2
@@ -188,7 +193,7 @@ func TestMergeSimple(t *testing.T) {
 	// Claim everything for peer1
 	ring1.ClaimItAll()
 	ring1.GrantRangeToHost(middle, end, peer2name)
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 
 	require.Equal(t, entries{{Token: start, Peer: peer1name, Free: 128, Version: 1},
 		{Token: middle, Peer: peer2name, Free: 127}}, ring1.Entries)
@@ -200,8 +205,8 @@ func TestMergeSimple(t *testing.T) {
 	ring1.GrantRangeToHost(start, middle, peer2name)
 	ring2.GrantRangeToHost(middle, end, peer1name)
 
-	require.NoError(t, ring2.Merge(*ring1))
-	require.NoError(t, ring1.Merge(*ring2))
+	require.NoError(t, merge(ring2, ring1))
+	require.NoError(t, merge(ring1, ring2))
 
 	require.Equal(t, entries{{Token: start, Peer: peer2name, Free: 128, Version: 2},
 		{Token: middle, Peer: peer1name, Free: 127, Version: 1}}, ring1.Entries)
@@ -214,29 +219,29 @@ func TestMergeErrors(t *testing.T) {
 	ring1 := New(start, end, peer1name)
 	ring2 := New(start, end, peer2name)
 	ring2.Entries = []*entry{{Token: middle, Peer: peer2name}, {Token: start, Peer: peer2name}}
-	require.True(t, ring1.Merge(*ring2) == ErrNotSorted, "Expected ErrNotSorted")
+	require.True(t, merge(ring1, ring2) == ErrNotSorted, "Expected ErrNotSorted")
 
 	// Should Merge two rings for different ranges
 	ring2 = New(start, middle, peer2name)
 	ring2.Entries = []*entry{}
-	require.True(t, ring1.Merge(*ring2) == ErrDifferentRange, "Expected ErrDifferentRange")
+	require.True(t, merge(ring1, ring2) == ErrDifferentRange, "Expected ErrDifferentRange")
 
 	// Cannot Merge newer version of entry I own
 	ring2 = New(start, end, peer2name)
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: start, Peer: peer1name, Version: 1}}
-	fmt.Println(ring1.Merge(*ring2))
-	require.Error(t, ring1.Merge(*ring2), "Expected error")
+	fmt.Println(merge(ring1, ring2))
+	require.Error(t, merge(ring1, ring2), "Expected error")
 
 	// Cannot Merge two entries with same version but different hosts
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: start, Peer: peer2name}}
-	require.Error(t, ring1.Merge(*ring2), "Expected error")
+	require.Error(t, merge(ring1, ring2), "Expected error")
 
 	// Cannot Merge an entry into a range I own
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name}}
 	ring2.Entries = []*entry{{Token: middle, Peer: peer2name}}
-	require.Error(t, ring1.Merge(*ring2), "Expected error")
+	require.Error(t, merge(ring1, ring2), "Expected error")
 }
 
 func TestMergeMore(t *testing.T) {
@@ -256,7 +261,7 @@ func TestMergeMore(t *testing.T) {
 	assertRing(ring2, []*entry{})
 
 	// Check the Merge sends it to the other ring
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 255}})
 	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
 
@@ -265,7 +270,7 @@ func TestMergeMore(t *testing.T) {
 	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}})
 	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
 
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}})
 	assertRing(ring2, []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}})
 
@@ -276,14 +281,14 @@ func TestMergeMore(t *testing.T) {
 	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}})
 
 	// And Merge back
-	require.NoError(t, ring1.Merge(*ring2))
+	require.NoError(t, merge(ring1, ring2))
 	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
 		{Token: middle, Peer: peer1name, Free: 127}})
 	assertRing(ring2, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
 		{Token: middle, Peer: peer1name, Free: 127}})
 
 	// This should be a no-op
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
 		{Token: middle, Peer: peer1name, Free: 127}})
 	assertRing(ring2, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
@@ -296,7 +301,7 @@ func TestMergeSplit(t *testing.T) {
 
 	// Claim everything for peer2
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 255}}
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 	require.Equal(t, ring2.Entries, ring1.Entries)
 
 	// Now grant a split range to peer1
@@ -305,7 +310,7 @@ func TestMergeSplit(t *testing.T) {
 		{Token: dot10, Peer: peer1name, Free: 235},
 		{Token: dot245, Peer: peer2name, Free: 10}}, ring2.Entries)
 
-	require.NoError(t, ring1.Merge(*ring2))
+	require.NoError(t, merge(ring1, ring2))
 	require.Equal(t, entries{{Token: start, Peer: peer2name, Free: 10, Version: 1},
 		{Token: dot10, Peer: peer1name, Free: 235},
 		{Token: dot245, Peer: peer2name, Free: 10}}, ring1.Entries)
@@ -319,7 +324,7 @@ func TestMergeSplit2(t *testing.T) {
 
 	// Claim everything for peer2
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 250}, {Token: dot250, Peer: peer2name, Free: 5}}
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 	require.Equal(t, ring2.Entries, ring1.Entries)
 
 	// Now grant a split range to peer1
@@ -328,7 +333,7 @@ func TestMergeSplit2(t *testing.T) {
 		{Token: dot10, Peer: peer1name, Free: 235},
 		{Token: dot245, Peer: peer2name, Free: 5}, {Token: dot250, Peer: peer2name, Free: 5}}, ring2.Entries)
 
-	require.NoError(t, ring1.Merge(*ring2))
+	require.NoError(t, merge(ring1, ring2))
 	require.Equal(t, entries{{Token: start, Peer: peer2name, Free: 10, Version: 1},
 		{Token: dot10, Peer: peer1name, Free: 235},
 		{Token: dot245, Peer: peer2name, Free: 5}, {Token: dot250, Peer: peer2name, Free: 5}}, ring1.Entries)
@@ -354,7 +359,7 @@ func TestGossip(t *testing.T) {
 	assertRing(ring2, []*entry{})
 
 	// Check the Merge sends it to the other ring
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 255}})
 	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
 }
@@ -407,7 +412,7 @@ func TestReportFree(t *testing.T) {
 
 	ring1.ClaimItAll()
 	ring1.GrantRangeToHost(middle, end, peer2name)
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 
 	freespace := make(map[address.Address]address.Count)
 	for _, r := range ring2.OwnedRanges() {
@@ -431,7 +436,7 @@ func TestEmptyGossip(t *testing.T) {
 
 	ring1.ClaimItAll()
 	// This used to panic, and it shouldn't
-	require.NoError(t, ring1.Merge(*ring2))
+	require.NoError(t, merge(ring1, ring2))
 }
 
 func TestMergeOldMessage(t *testing.T) {
@@ -439,10 +444,10 @@ func TestMergeOldMessage(t *testing.T) {
 	ring2 := New(start, end, peer2name)
 
 	ring1.ClaimItAll()
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 
 	ring1.GrantRangeToHost(middle, end, peer1name)
-	require.NoError(t, ring1.Merge(*ring2))
+	require.NoError(t, merge(ring1, ring2))
 }
 
 func TestSplitRangeAtBeginning(t *testing.T) {
@@ -450,10 +455,10 @@ func TestSplitRangeAtBeginning(t *testing.T) {
 	ring2 := New(start, end, peer2name)
 
 	ring1.ClaimItAll()
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 
 	ring1.GrantRangeToHost(start, middle, peer2name)
-	require.NoError(t, ring2.Merge(*ring1))
+	require.NoError(t, merge(ring2, ring1))
 }
 
 func TestOwnedRange(t *testing.T) {
@@ -466,7 +471,7 @@ func TestOwnedRange(t *testing.T) {
 	require.Equal(t, []address.Range{{Start: start, End: middle}}, ring1.OwnedRanges())
 
 	ring2 := New(start, end, peer2name)
-	ring2.Merge(*ring1)
+	merge(ring2, ring1)
 	require.Equal(t, []address.Range{{Start: middle, End: end}}, ring2.OwnedRanges())
 
 	ring2.Entries = []*entry{{Token: middle, Peer: peer2name}}
@@ -586,7 +591,7 @@ func TestFuzzRing(t *testing.T) {
 
 		// Merge them - this might fail, we don't care
 		// We just want to make sure it doesn't panic
-		ring1.Merge(*ring2)
+		merge(ring1, ring2)
 
 		// Check whats left still passes assertions
 		ring1.assertInvariants()
@@ -619,7 +624,7 @@ func TestFuzzRing(t *testing.T) {
 
 		// Merge them - this might fail, we don't care
 		// We just want to make sure it doesn't panic
-		ring1.Merge(*ring2)
+		merge(ring1, ring2)
 
 		// Check whats left still passes assertions
 		ring1.assertInvariants()
@@ -680,7 +685,7 @@ func TestFuzzRingHard(t *testing.T) {
 
 		// We need to be in a ~converged ring to rmpeer
 		for _, ring := range rings {
-			require.NoError(t, otherRing.Merge(*ring))
+			require.NoError(t, merge(otherRing, ring))
 		}
 
 		common.Log.Debugf("%s: transferring from peer %s", otherPeername, peername)
@@ -694,7 +699,7 @@ func TestFuzzRingHard(t *testing.T) {
 		// And now tell everyone about the transfer - rmpeer is
 		// not partition safe
 		for i, ring := range rings {
-			require.NoError(t, ring.Merge(*otherRing))
+			require.NoError(t, merge(ring, otherRing))
 			theRanges[i] = ring.OwnedRanges()
 		}
 	}
@@ -723,7 +728,7 @@ func TestFuzzRingHard(t *testing.T) {
 			// Now 'gossip' this to a random host (note, note could be same host as above)
 			otherIndex, _, otherRing := randomPeer(-1)
 			common.Log.Debugf("%s: 'Gossiping' to %s", ring.Peer, otherRing.Peer)
-			require.NoError(t, otherRing.Merge(*ring))
+			require.NoError(t, merge(otherRing, ring))
 
 			theRanges[indexWithRanges] = ring.OwnedRanges()
 			theRanges[otherIndex] = otherRing.OwnedRanges()
@@ -742,7 +747,7 @@ func TestFuzzRingHard(t *testing.T) {
 		ring1 := ringsWithEntries[rand.Intn(len(ringsWithEntries))]
 		ring2index, _, ring2 := randomPeer(-1)
 		common.Log.Debugf("%s: 'Gossiping' to %s", ring1.Peer, ring2.Peer)
-		require.NoError(t, ring2.Merge(*ring1))
+		require.NoError(t, merge(ring2, ring1))
 		theRanges[ring2index] = ring2.OwnedRanges()
 	}
 
