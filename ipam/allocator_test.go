@@ -212,16 +212,13 @@ func (alloc *Allocator) pause() func() {
 }
 
 func TestCancel(t *testing.T) {
-	const (
-		CIDR = "10.0.1.7/26"
-	)
-
+	const cidr = "10.0.1.7/26"
 	router := gossip.NewTestRouter(0.0)
 
-	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2)
 	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 
-	alloc2, _ := makeAllocator("02:00:00:02:00:00", CIDR, 2)
+	alloc2, _ := makeAllocator("02:00:00:02:00:00", cidr, 2)
 	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc1.claimRingForTesting(alloc1, alloc2)
 	alloc2.claimRingForTesting(alloc1, alloc2)
@@ -276,12 +273,12 @@ func TestCancel(t *testing.T) {
 
 func TestCancelOnDied(t *testing.T) {
 	const (
-		CIDR       = "10.0.1.7/26"
+		cidr       = "10.0.1.7/26"
 		container1 = "abcdef"
 	)
 
 	router := gossip.NewTestRouter(0.0)
-	alloc1, subnet := makeAllocator("01:00:00:02:00:00", CIDR, 2)
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2)
 	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 	alloc1.Start()
 
@@ -329,9 +326,7 @@ func TestGossipShutdown(t *testing.T) {
 }
 
 func TestTransfer(t *testing.T) {
-	const (
-		cidr = "10.0.1.7/22"
-	)
+	const cidr = "10.0.1.7/22"
 	allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
 	defer stopNetworkOfAllocators(allocs, router)
 	alloc0 := allocs[0]
@@ -370,9 +365,7 @@ func TestTransfer(t *testing.T) {
 }
 
 func TestFakeRouterSimple(t *testing.T) {
-	const (
-		cidr = "10.0.1.7/22"
-	)
+	const cidr = "10.0.1.7/22"
 	allocs, router, subnet := makeNetworkOfAllocators(2, cidr)
 	defer stopNetworkOfAllocators(allocs, router)
 
