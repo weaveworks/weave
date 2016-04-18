@@ -39,7 +39,7 @@ func TestTruncation(t *testing.T) {
 	addrs := []address.Address{}
 	for i := address.Address(0); i < 100; i++ {
 		addrs = append(addrs, i)
-		nameserver.AddEntry("foo.weave.local.", "", mesh.UnknownPeerName, i, false)
+		nameserver.AddEntry("foo.weave.local.", "", mesh.UnknownPeerName, i)
 	}
 
 	doRequest := func(client *dns.Client, request *dns.Msg, port int, expectedErr error) *dns.Msg {

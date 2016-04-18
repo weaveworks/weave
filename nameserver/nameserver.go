@@ -105,7 +105,7 @@ func (n *Nameserver) restoreFromDB() {
 	}
 
 	// At this point, gossip is not set, thus we add entries to be broadcasted
-	// once gossip interface has been set.
+	// once the gossip interface has been set.
 	n.pendingBroadcast = entries
 
 	n.debugf("restore: finished.")
@@ -146,9 +146,10 @@ func (n *Nameserver) broadcastEntries(es ...Entry) {
 	})
 }
 
-// TODO(mp) document restoreStopped
+// TODO(mp) optimization: add restoreStopped flag which would indicate whether
+// we need to restore stopped entries
 func (n *Nameserver) AddEntry(hostname, containerid string,
-	origin mesh.PeerName, addr address.Address, restoreStopped bool) {
+	origin mesh.PeerName, addr address.Address) {
 
 	var entries Entries
 	var found bool
@@ -156,18 +157,15 @@ func (n *Nameserver) AddEntry(hostname, containerid string,
 	n.Lock()
 
 	// Check for the stopped entries first
-	// TODO(mp) move the following into the restoreStopped iterator
-	if restoreStopped {
-		for i, e := range n.entries {
-			if e.Origin == origin && e.ContainerID == containerid && e.stopped {
-				if !found && e.Addr == addr {
-					found = true
-				}
-				n.entries[i].stopped = false
-				n.entries[i].Tombstone = 0
-				n.entries[i].Version++
-				entries = append(entries, n.entries[i])
+	for i, e := range n.entries {
+		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
+			if !found && e.Addr == addr {
+				found = true
 			}
+			n.entries[i].stopped = false
+			n.entries[i].Tombstone = 0
+			n.entries[i].Version++
+			entries = append(entries, n.entries[i])
 		}
 	}
 
