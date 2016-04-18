@@ -31,7 +31,7 @@ for the latest Weave AMIs and [here](http://weave.works/guides/service-discovery
 ###Quick Start Screencast
 
 <a href="https://youtu.be/kihQCCT1ykE" alt="Click to watch the screencast" target="_blank">
-  <img src="/docs/hello-screencast.png" />
+  <img src="hello-screencast.png" />
 </a>
 
 **See Also** 
