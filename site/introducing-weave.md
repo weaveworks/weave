@@ -4,7 +4,7 @@ menu_order: 10
 ---
 
 
-Weave Net creates a virtual network that connects Docker containers deployed across multiple hosts and enables their automatic discovery. With Weave Net, portable microservices-based applications consisting of multiple containers can run anywhere: on one host, multiple hosts or even across cloud providers and data centers. Applications use the network just as if the containers were all plugged into the same network switch, without having to configure port mappings, or ambassador links. 
+Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery. With Weave Net, portable microservices-based applications consisting of multiple containers can run anywhere: on one host, multiple hosts or even across cloud providers and data centers. Applications use the network just as if the containers were all plugged into the same network switch, without having to configure port mappings, ambassadors or links.
 
 Services provided by application containers on the weave network can be exposed to the outside world, regardless of where they are running. Similarly, existing internal systems can be opened to accept connections from application containers irrespective of their location.
 
@@ -52,9 +52,9 @@ Multicast addressing and routing is fully supported in Weave Net. Data can be se
 
 ###NAT Traversal
 
-With Weave Net, deploy your peer-to-peer file sharing applications and voice over IP and take advantage of built-in NAT traversal. With Weave your app is portable, containerized and with its standardized approach to networking it gives you one less thing to worry about. 
+With Weave Net, deploy your applications - whether peer-to-peer file sharing, voice over IP or anything else - and take advantage of built-in NAT traversal. With Weave your app is portable, containerized and with its standardized approach to networking it gives you one less thing to worry about.
 
-###Run with Anything: Kubernetes, Mesos, Amazon ECS
+###Run with Anything: Kubernetes, Mesos, Amazon ECS, ...
 
 Weave Net is a good choice if you want one tool for everything.  For example: In addition to Docker plugins, you can also use Weave as a Kubernetes plugin.  You can also use Weave with Amazon ECS or with Mesos and Marathon.  
 Refer to our Getting Started and Integration Guides for more information.
