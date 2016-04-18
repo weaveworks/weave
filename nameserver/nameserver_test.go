@@ -17,7 +17,7 @@ import (
 )
 
 func makeNameserver(name mesh.PeerName) *Nameserver {
-	return New(name, "", func(mesh.PeerName) bool { return true })
+	return New(name, "", NewMockDB(), func(mesh.PeerName) bool { return true })
 }
 
 func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
@@ -117,7 +117,7 @@ func TestNameservers(t *testing.T) {
 		mapping := mapping{hostname, []pair{{nameserver.ourName, addr}}}
 		mappings = append(mappings, mapping)
 
-		nameserver.AddEntry(hostname, "", nameserver.ourName, addr)
+		nameserver.AddEntry(hostname, "", nameserver.ourName, addr, false)
 		check(nameserver, mapping)
 	}
 
@@ -132,7 +132,7 @@ func TestNameservers(t *testing.T) {
 		mapping.addrs = append(mapping.addrs, pair{nameserver.ourName, addr})
 		mappings[i] = mapping
 
-		nameserver.AddEntry(mapping.hostname, "", nameserver.ourName, addr)
+		nameserver.AddEntry(mapping.hostname, "", nameserver.ourName, addr, false)
 		check(nameserver, mapping)
 	}
 
@@ -223,13 +223,13 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	require.Nil(t, err)
 	nameserver := makeNameserver(peername)
 
-	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
+	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0), false)
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
 	nameserver.ContainerDied("containerid")
 	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
 
-	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
+	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0), false)
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
 	nameserver.PeerGone(peername)
@@ -245,7 +245,7 @@ func TestTombstoneDeletion(t *testing.T) {
 	require.Nil(t, err)
 	nameserver := makeNameserver(peername)
 
-	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
+	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0), false)
 	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
 
 	nameserver.deleteTombstones()
@@ -265,4 +265,98 @@ func TestTombstoneDeletion(t *testing.T) {
 	now = func() int64 { return 1234 + int64(tombstoneTimeout/time.Second) + 1 }
 	nameserver.deleteTombstones()
 	require.Equal(t, Entries{}, nameserver.entries)
+}
+
+// TestRestoration tests restoration of local entries.
+func TestRestoration(t *testing.T) {
+	const (
+		container1 = "c1"
+		container2 = "c2"
+		container3 = "c3"
+
+		hostname1 = "hostname1"
+		hostname2 = "hostname2"
+
+		addr1 = address.Address(1)
+		addr2 = address.Address(2)
+		addr3 = address.Address(3)
+	)
+
+	oldNow := now
+	defer func() { now = oldNow }()
+	now = func() int64 { return 1234 }
+
+	name, _ := mesh.PeerNameFromString("00:00:00:02:00:00")
+	nameserver := makeNameserver(name)
+
+	nameserver.AddEntry(hostname1, container1, name, addr1, false)
+	nameserver.AddEntry(hostname2, container2, name, addr2, false)
+	nameserver.AddEntry(hostname2, container3, name, addr3, false)
+	nameserver.Delete(hostname2, container2, "", addr2)
+
+	// "Restart" nameserver by creating a new instance with the reused db instance
+	now = func() int64 { return 4321 }
+	nameserver = New(name, "", nameserver.db, func(mesh.PeerName) bool { return true })
+
+	require.Equal(t,
+		Entries{
+			Entry{
+				ContainerID: container1,
+				Origin:      name,
+				Addr:        addr1,
+				Hostname:    hostname1,
+				lHostname:   hostname1,
+				Version:     1,
+				Tombstone:   4321,
+				stopped:     true,
+			},
+			Entry{
+				ContainerID: container2,
+				Origin:      name,
+				Addr:        addr2,
+				Hostname:    hostname2,
+				lHostname:   hostname2,
+				Version:     1,
+				Tombstone:   1234,
+				stopped:     false,
+			},
+			Entry{
+				ContainerID: container3,
+				Origin:      name,
+				Addr:        addr3,
+				Hostname:    hostname2,
+				lHostname:   hostname2,
+				Version:     1,
+				Tombstone:   4321,
+				stopped:     true,
+			},
+		}, nameserver.entries, "")
+}
+
+// Database mock
+
+type MockDB struct {
+	data map[string]Entries
+}
+
+func NewMockDB() *MockDB {
+	return &MockDB{data: make(map[string]Entries)}
+}
+
+func (m *MockDB) Load(key string, val interface{}) (bool, error) {
+	if entries, ok := m.data[key]; ok {
+		ret := make(Entries, len(entries))
+		copy(ret, entries)
+		valPtr := val.(*Entries)
+		*valPtr = ret
+		return true, nil
+	}
+	return false, nil
+}
+
+func (m *MockDB) Save(key string, val interface{}) error {
+	entries := val.(Entries)
+	m.data[key] = make(Entries, len(entries))
+	copy(m.data[key], entries)
+	return nil
 }

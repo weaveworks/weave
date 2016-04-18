@@ -262,7 +262,7 @@ func (alloc *Allocator) Claim(ident string, cidr address.CIDR, noErrorOnUnknown 
 func (alloc *Allocator) ContainerDied(ident string) {
 	alloc.actionChan <- func() {
 		if alloc.hasOwned(ident) {
-			alloc.debugln("Container", ident, "died; noting to remove later")
+			alloc.debugln("Container", ident, "died; nothing to remove later")
 			alloc.dead[ident] = alloc.now()
 		}
 		// Also remove any pending ops
@@ -509,7 +509,7 @@ func (alloc *Allocator) OnGossipBroadcast(sender mesh.PeerName, msg []byte) (mes
 }
 
 type gossipState struct {
-	// We send a timstamp along with the information to be
+	// We send a timestamp along with the information to be
 	// gossipped for backwards-compatibility (previously to detect skewed clocks)
 	Now       int64
 	Nicknames map[mesh.PeerName]string

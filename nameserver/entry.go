@@ -23,6 +23,7 @@ type Entry struct {
 	lHostname   string // lowercased (not exported, so not encoded by gob)
 	Version     int
 	Tombstone   int64 // timestamp of when it was deleted
+	stopped     bool  // denotes whether the container has been stopped
 }
 
 type Entries []Entry
@@ -149,6 +150,7 @@ func (es *Entries) add(hostname, containerid string, origin mesh.PeerName, addr 
 	i := sort.Search(len(*es), func(i int) bool {
 		return !(*es)[i].insensitiveLess(&entry)
 	})
+	// TODO(mp) think about updating the "stopped" field here
 	if i < len(*es) && (*es)[i].equal(entry) {
 		if (*es)[i].Tombstone > 0 {
 			(*es)[i].Tombstone = 0
@@ -200,6 +202,23 @@ func (es *Entries) tombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries
 		}
 	}
 	return tombstoned
+}
+
+// TODO(mp) docs
+func (es *Entries) untombstone(containerid string, ourname mesh.PeerName) Entries {
+	defer es.checkAndPanic().checkAndPanic()
+
+	untombstoned := Entries{}
+	for i, e := range *es {
+		if e.Origin == ourname && e.ContainerID == containerid && e.Tombstone > 0 {
+			// TODO(mp) DRY
+			(*es)[i].Tombstone = 0
+			(*es)[i].Version++
+			untombstoned = append(untombstoned, e)
+		}
+	}
+
+	return untombstoned
 }
 
 // note f() may only modify entries such that they remain in order defined by less()

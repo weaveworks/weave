@@ -273,7 +273,7 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		ns, dnsserver = createDNSServer(dnsConfig, router.Router, isKnownPeer)
+		ns, dnsserver = createDNSServer(dnsConfig, router.Router, db, isKnownPeer)
 		observeContainers(ns)
 		ns.Start()
 		defer ns.Stop()
@@ -418,8 +418,10 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 	return allocator, defaultSubnet
 }
 
-func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mesh.PeerName) bool) (*nameserver.Nameserver, *nameserver.DNSServer) {
-	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, isKnownPeer)
+func createDNSServer(config dnsConfig, router *mesh.Router, db db.DB,
+	isKnownPeer func(mesh.PeerName) bool) (*nameserver.Nameserver, *nameserver.DNSServer) {
+
+	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, db, isKnownPeer)
 	router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
 	ns.SetGossip(router.NewGossip("nameserver", ns))
 	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,

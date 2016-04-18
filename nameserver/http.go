@@ -40,7 +40,8 @@ func (n *Nameserver) HandleHTTP(router *mux.Router, dockerCli *docker.Client) {
 			return
 		}
 
-		n.AddEntry(hostname, container, n.ourName, ip)
+		// TODO(mp) add flag for re-registration
+		n.AddEntry(hostname, container, n.ourName, ip, false)
 
 		if r.FormValue("check-alive") == "true" && dockerCli != nil && dockerCli.IsContainerNotRunning(container) {
 			n.infof("container '%s' is not running: removing", container)
