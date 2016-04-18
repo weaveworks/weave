@@ -319,9 +319,9 @@ func TestTransfer(t *testing.T) {
 	require.True(t, err == nil, "Failed to get address")
 
 	// simulation of periodic gossip
-	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
+	alloc3.gossip.GossipBroadcast(alloc3.Gossip())
 	router.Flush()
-	alloc1.gossip.GossipBroadcast(alloc1.Gossip())
+	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
 	router.Flush()
 
 	router.RemovePeer(alloc2.ourName)
