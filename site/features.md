@@ -43,7 +43,7 @@ Broadcast and Multicast protocols can also be used
 over Weave Net.
 
 To start using Weave Net, see [Installing Weave Net](/site/installing-weave.md) 
-and [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md).
+and [Using Weave Net](/site/using-weave.md).
 
 ###<a name="fast-data-path"></a>Fast Datapath
 

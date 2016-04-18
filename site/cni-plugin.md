@@ -29,7 +29,7 @@ Then run:
 To create a network which can span multiple hosts, the Weave peers must be connected to each other, by specifying the other hosts during `weave launch` or via
 [`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md).
 
-See [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md#peer-connections) for a discussion on peer connections. 
+See [Using Weave Net](/site/using-weave.md#peer-connections) for a discussion on peer connections. 
 
 As well as launching Weave Net, you have to run an extra command to
 perform some additional configuration of the Weave bridge:

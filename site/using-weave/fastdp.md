@@ -44,6 +44,6 @@ Where fastdp indicates that fast datapath is being used on a connection. If fast
 
 **See Also**
 
- * [Deploying Applications to Weave](/site/using-weave/deploying-applications.md)
+ * [Using Weave Net](/site/using-weave.md)
  * [How Fastdp Works](/site/how-it-works/fastdp-how-it-works.md)
  
