@@ -458,6 +458,29 @@ func TestRestoreBroadcast(t *testing.T) {
 	grouter.Flush()
 }
 
+// TestStopContainer tests whether all entries has been restored after container
+// restart.
+func TestStopContainer(t *testing.T) {
+	oldNow := now
+	defer func() { now = oldNow }()
+	now = func() int64 { return 1234 }
+
+	name, _ := mesh.PeerNameFromString("00:00:00:02:00:00")
+	nameserver := makeNameserver(name)
+
+	nameserver.AddEntry(hostname1, container1, name, addr1)
+	nameserver.AddEntry(hostname2, container1, name, addr2)
+	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String(), "")
+	require.Equal(t, addrs{addr2}.String(), addrs(nameserver.Lookup(hostname2)).String(), "")
+
+	nameserver.ContainerDied(container1)
+	require.Equal(t, "", addrs(nameserver.Lookup(hostname1)).String(), "")
+	require.Equal(t, "", addrs(nameserver.Lookup(hostname2)).String(), "")
+	nameserver.AddEntry(hostname2, container1, name, addr2)
+	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String(), "")
+	require.Equal(t, addrs{addr2}.String(), addrs(nameserver.Lookup(hostname2)).String(), "")
+}
+
 // Database mock
 
 type MockDB struct {

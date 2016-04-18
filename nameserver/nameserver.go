@@ -216,6 +216,8 @@ func (n *Nameserver) ContainerDied(ident string) {
 	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
 		if e.ContainerID == ident {
 			n.infof("container %s died; tombstoning entry %s", ident, e.String())
+			// We want to restore all entries if container comes back
+			e.stopped = true
 			return true
 		}
 		return false
