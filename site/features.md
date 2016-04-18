@@ -58,8 +58,8 @@ Fast datapath does not support encryption. For full details on configuring
 Weave when you have connections that traverse untrusted networks,
 see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) for more details.
 
-See [Using Fast Datapath](/site/fastdp.md) and 
-[How Fast Datapath Works](/site/fastdp/fastdp-how-it-works.md). 
+See [Using Fast Datapath](/using-weave/fastdp.md) and
+[How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
 
 ###<a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
 

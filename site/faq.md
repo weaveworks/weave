@@ -62,14 +62,14 @@ All virtualization techniques have some overhead, and Weave's overhead is typica
 
 Weave Net also automatically uses the fastest datapath between two hosts. When Weave Net can't use the fast datapath between two hosts, it falls back to the slower packet forwarding approach. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast datapath within the data centers, but not for the more constrained network link between them.
 
-For more information about fast datapath see [How Fast Datapath Works](/site/fastdp/fastdp-how-it-works.md)
+For more information about fast datapath see [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md)
 
 
 **Q:How can I tell if Weave is using fast datapath (fastdp) or not?**
 
 To view whether Weave is using fastdp or not, you can run, `weave status connections`
 
-For more information on this command, see [Using Fast Datapath](/site/fastdp.md)
+For more information on this command, see [Using Fast Datapath](/using-weave/fastdp.md)
 
 
 **Q: Does encryption work with fastdp?**
@@ -78,7 +78,7 @@ Encryption does not work with fast datapath. If you enable encryption using the 
 
 You can however have a mixture of fast datapath connections over trusted links, as well as, encrypted connections over untrusted links.
 
-See [Using Fast Datapath](/site/fastdp.md) for more information
+See [Using Fast Datapath](/using-weave/fastdp.md) for more information
 
 **Q: Can I create multiple networks where containers can communicate on one network, but are isolated from containers on other networks?**
 

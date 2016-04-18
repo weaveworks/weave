@@ -4,7 +4,7 @@ menu_order: 10
 ---
 
 When the Weave Net router forwards packets to peers in `sleeve` mode
-(rather than via the [fast data path](/site/fastdp.md)), the
+(rather than via the [fast data path](/using-weave/fastdp.md)), the
 encapsulation looks something like this:
 
     +-----------------------------------+
