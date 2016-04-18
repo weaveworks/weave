@@ -61,4 +61,4 @@ MAC discovery.
 
 **See Also**
 
- * [How Weave Net Inteprets Network Topology](/site/router-topology/network-topology.md)
+ * [How Weave Net Inteprets Network Topology](/site/how-it-works/network-topology.md)

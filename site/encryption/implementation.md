@@ -145,7 +145,7 @@ follows:
     | Frame N: Captured payload         |  |
     +-----------------------------------+ -+
 
-This is very similar to the [non-crypto encapsulation](/site/router-topology/router-encapsulation.md).
+This is very similar to the [non-crypto encapsulation](/site/how-it-works/router-encapsulation.md).
 
 All of the frames on a connection are encrypted with the same
 ephemeral session key, and a nonce constructed from a message sequence

@@ -78,7 +78,7 @@ $ weave status
 ```
 
 The terms used here are explained further at
-[How Weave Net Works](/site/router-topology.md).
+[How Weave Net Works](/site/how-it-works.md).
 
   * **Version** - shows the Weave Net version. If checkpoint is enabled (i.e.
 `CHECKPOINT_DISABLE` is not set), information about existence of a new version
