@@ -39,13 +39,14 @@ const (
 // - Update is O(n) for now
 type Nameserver struct {
 	sync.RWMutex
-	ourName     mesh.PeerName
-	domain      string
-	gossip      mesh.Gossip
-	entries     Entries
-	isKnownPeer func(mesh.PeerName) bool
-	quit        chan struct{}
-	db          db.DB
+	ourName          mesh.PeerName
+	domain           string
+	gossip           mesh.Gossip
+	entries          Entries
+	isKnownPeer      func(mesh.PeerName) bool
+	quit             chan struct{}
+	db               db.DB
+	pendingBroadcast Entries
 }
 
 func New(ourName mesh.PeerName, domain string, db db.DB,
@@ -66,6 +67,8 @@ func New(ourName mesh.PeerName, domain string, db db.DB,
 // Restores local entries from the database.
 // NB: called only during the initialization, thus the lock is not taken.
 func (n *Nameserver) restoreFromDB() {
+	var entries Entries
+
 	n.debugf("restore: starting...")
 	ok, err := n.db.Load(nameserverIdent, &n.entries)
 
@@ -78,10 +81,14 @@ func (n *Nameserver) restoreFromDB() {
 		return
 	}
 
-	// Set .stopped to true for all non-tombstoned local entries to distinguish
+	// Set .stopped for all non-tombstoned local entries to distinguish
 	// between tombstoned entries and the ones which were not tombstoned
 	// before termination of nameserver.
-	// TODO(mp) handle weave:extern
+
+	// TODO(mp) handle special case for weave:extern
+	// TODO(mp) use the output of `docker ps` to restore immediately entries of
+	// running containers.
+
 	now := now()
 	for i, e := range n.entries {
 		if e.Tombstone == 0 {
@@ -93,19 +100,22 @@ func (n *Nameserver) restoreFromDB() {
 			// 2) the ones which haven't removed the entry will get a newer version
 			//    after we will reinsert the entry.
 			n.entries[i].Version++
+			entries = append(entries, n.entries[i])
 		}
 	}
 
-	// TODO(mp) think about broadcasting here. It seems that it might be not
-	// necessary, because the other peers might have removed the entries due
-	// to termination of the peer. However, if termination message has not reached
-	// any peer, then the peers might contain the list of obsolete entries.
+	// At this point, gossip is not set, thus we add entries to be broadcasted
+	// once gossip interface has been set.
+	n.pendingBroadcast = entries
 
 	n.debugf("restore: finished.")
 }
 
+// NB: Can be called only before n.Start()
 func (n *Nameserver) SetGossip(gossip mesh.Gossip) {
 	n.gossip = gossip
+	n.broadcastEntries(n.pendingBroadcast...)
+	n.pendingBroadcast = nil
 }
 
 func (n *Nameserver) Start() {
@@ -261,8 +271,7 @@ func (n *Nameserver) deleteTombstones() {
 }
 
 // snapshot stores the local entries (Origin == n.ourName) to the database.
-// NB: we assume that a caller has taken the nameserver lock either for reading
-//     or for writing.
+// NB: we assume that a caller has taken the nameserver' read or write lock.
 func (n *Nameserver) snapshot() {
 	// TODO(mp) optimize: store a single entry per key-val pair.
 	if err := n.db.Save(nameserverIdent, n.entries); err != nil {

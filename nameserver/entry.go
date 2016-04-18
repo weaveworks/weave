@@ -209,23 +209,6 @@ func (es *Entries) tombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries
 	return tombstoned
 }
 
-// TODO(mp) docs
-func (es *Entries) untombstone(containerid string, ourname mesh.PeerName) Entries {
-	defer es.checkAndPanic().checkAndPanic()
-
-	untombstoned := Entries{}
-	for i, e := range *es {
-		if e.Origin == ourname && e.ContainerID == containerid && e.Tombstone > 0 {
-			// TODO(mp) DRY
-			(*es)[i].Tombstone = 0
-			(*es)[i].Version++
-			untombstoned = append(untombstoned, e)
-		}
-	}
-
-	return untombstoned
-}
-
 // note f() may only modify entries such that they remain in order defined by less()
 func (es *Entries) filter(f func(*Entry) bool) {
 	defer es.checkAndPanic().checkAndPanic()
