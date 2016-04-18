@@ -1380,6 +1380,12 @@ check_overlap() {
 # with_container_addresses.
 ipam_reclaim() {
     for CIDR in $3 ; do
+        http_call $HTTP_ADDR PUT "/ip/$1/$CIDR?noErrorOnUnknown=true&?check-alive=true" || true
+    done
+}
+
+ipam_reclaim_no_check_alive() {
+    for CIDR in $3 ; do
         http_call $HTTP_ADDR PUT /ip/$1/$CIDR?noErrorOnUnknown=true || true
     done
 }
@@ -1433,7 +1439,7 @@ ipam_cidrs() {
                 # Assignment of a plain IP address; warn if it clashes but carry on
                 check_overlap $arg || true
                 # Abort on failure, but not 4 (=404), which means IPAM is disabled
-                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg || [ $? -eq 4 ] || return 1
+                when_weave_running http_call $HTTP_ADDR PUT /ip/$CONTAINER_ID/$arg$CHECK_ALIVE || [ $? -eq 4 ] || return 1
             fi
             ALL_CIDRS="$ALL_CIDRS $arg"
         fi
@@ -1740,7 +1746,8 @@ fetch_router_args() {
 populate_router() {
     if [ -n "$IPRANGE" ] ; then
         # Tell the newly-started weave IP allocator about existing weave IPs
-        with_container_addresses ipam_reclaim weave:expose $(docker ps -q --no-trunc)
+        with_container_addresses ipam_reclaim_no_check_alive weave:expose
+        with_container_addresses ipam_reclaim $(docker ps -q --no-trunc)
     fi
     if [ -z "$NO_DNS_OPT" ] ; then
         # Tell the newly-started weaveDNS about existing weave IPs
@@ -2170,7 +2177,7 @@ EOF
         RES=$(docker restart $1)
         CONTAINER=$(container_id $1)
         for CIDR in $ALL_CIDRS ; do
-            call_weave PUT /ip/$CONTAINER/$CIDR
+            call_weave PUT /ip/$CONTAINER/$CIDR?check-alive=true
         done
         with_container_netns_or_die $1 attach $ALL_CIDRS
         when_weave_running with_container_fqdn $1 put_dns_fqdn $ALL_CIDRS

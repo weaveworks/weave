@@ -15,6 +15,7 @@ type allocate struct {
 	resultChan       chan<- allocateResult
 	ident            string
 	r                address.CIDR // Subnet we are trying to allocate within
+	isContainer      bool
 	hasBeenCancelled func() bool
 }
 
@@ -46,7 +47,7 @@ func (g *allocate) Try(alloc *Allocator) bool {
 			g.ident = addr.String()
 		}
 		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.r)
-		alloc.addOwned(g.ident, address.MakeCIDR(g.r, addr))
+		alloc.addOwned(g.ident, address.MakeCIDR(g.r, addr), g.isContainer)
 		g.resultChan <- allocateResult{addr, nil}
 		return true
 	}

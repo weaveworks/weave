@@ -13,6 +13,7 @@ type claim struct {
 	resultChan       chan<- error
 	ident            string
 	cidr             address.CIDR
+	isContainer      bool
 	noErrorOnUnknown bool
 }
 
@@ -35,7 +36,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 	if !alloc.ring.Contains(c.cidr.Addr) {
 		// Address not within our universe; assume user knows what they are doing
 		alloc.infof("Address %s claimed by %s - not in our range", c.cidr, c.ident)
-		alloc.addOwned(c.ident, c.cidr)
+		alloc.addOwned(c.ident, c.cidr, c.isContainer)
 		c.sendResult(nil)
 		return true
 	}
@@ -79,7 +80,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 			if c.ident == "_" { // Special "I don't have a unique ID" identifier
 				c.ident = c.cidr.String()
 			}
-			alloc.addOwned(c.ident, c.cidr)
+			alloc.addOwned(c.ident, c.cidr, c.isContainer)
 			c.sendResult(nil)
 		} else {
 			c.sendResult(err)

@@ -40,7 +40,7 @@ func writeAddresses(w http.ResponseWriter, cidrs []address.CIDR) {
 
 func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.ResponseWriter, ident string, checkAlive bool, subnet address.CIDR) {
 	closedChan := w.(http.CloseNotifier).CloseNotify()
-	addr, err := alloc.Allocate(ident, subnet,
+	addr, err := alloc.Allocate(ident, subnet, checkAlive,
 		func() bool {
 			select {
 			case <-closedChan:
@@ -74,7 +74,8 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		vars := mux.Vars(r)
 		if cidr, ok := parseCIDR(w, vars["ip"]+"/"+vars["prefixlen"], false); ok {
 			noErrorOnUnknown := r.FormValue("noErrorOnUnknown") == "true"
-			if err := alloc.Claim(vars["id"], cidr, noErrorOnUnknown); err != nil {
+			checkAlive := r.FormValue("check-alive") == "true"
+			if err := alloc.Claim(vars["id"], cidr, checkAlive, noErrorOnUnknown); err != nil {
 				badRequest(w, fmt.Errorf("Unable to claim: %s", err))
 				return
 			}
