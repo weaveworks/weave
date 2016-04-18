@@ -25,7 +25,7 @@ The weave git repository should be cloned into
 `$GOPATH/src/github.com/weaveworks/weave`, in accordance with [the go
 workspace conventions](https://golang.org/doc/code.html#Workspaces):
 
-```bash
+```
 $ WEAVE=github.com/weaveworks/weave
 $ git clone https://$WEAVE $GOPATH/src/$WEAVE
 $ cd $GOPATH/src/$WEAVE
@@ -36,7 +36,7 @@ Next install Docker if you haven't already, by following the instructions
 
 Then to actually build, simply do:
 
-```bash
+```
 $ make
 ```
 
@@ -62,7 +62,7 @@ Vagrant to run VMs in.
 
 First, check out the code:
 
-```bash
+```
 $ git clone https://github.com/weaveworks/weave
 $ cd weave
 ```
@@ -78,7 +78,7 @@ The `Vagrantfile` in the top directory constructs a VM that has
 
 Once you are in the working directory you can issue
 
-```bash
+```
 $ vagrant up
 ```
 
@@ -90,7 +90,7 @@ use git and so on in the regular filesystem.
 To build and run the code, you need to use the VM. To log in and build
 the weave image, do
 
-```bash
+```
 $ vagrant ssh
 vm$ cd src/github.com/weaveworks/weave
 vm$ make
@@ -98,7 +98,7 @@ vm$ make
 
 The Docker daemon is also running in this VM, so you can then do
 
-```bash
+```
 vm$ sudo ./weave launch
 vm$ sudo docker ps
 ```
@@ -108,7 +108,7 @@ and so on.
 If you are looking to just do a build and not run anything on this VM,
 you can do so with
 
-```bash
+```
 $ vagrant ssh -c 'make -C src/github.com/weaveworks/weave'
 ```
 
@@ -116,7 +116,7 @@ you should then find a `weave.tar.gz` container snapshot tarball in the
 top-level directory. You can use that snapshot with `docker load`
 against a different host, e.g.
 
-```bash
+```
 $ export DOCKER_HOST=tcp://<HOST:PORT>
 $ docker load < weave.tar.gz
 ```

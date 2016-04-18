@@ -14,7 +14,7 @@ it works across hosts.
 WeaveDNS is deployed as an embedded service within the Weave router.
 The service is automatically started when the router is launched:
 
-```bash
+```
 host1$ weave launch
 host1$ eval $(weave env)
 ```
@@ -26,7 +26,7 @@ running when they are started. They use it for name
 resolution, and will register themselves if they either have a
 hostname in the weaveDNS domain (`weave.local` by default) or are given an explicit container name:
 
-```bash
+```
 host1$ docker run -dti --name=pingme ubuntu
 host1$ docker run -ti  --hostname=ubuntu.weave.local ubuntu
 root@ubuntu:/# ping pingme
