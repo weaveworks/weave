@@ -15,7 +15,7 @@ The command:
 reports on the current status of various Weave Net components, including
 DNS:
 
-````
+```
 ...
        Service: dns
         Domain: weave.local.
@@ -23,7 +23,7 @@ DNS:
            TTL: 1
        Entries: 9
 ...
-````
+```
 
 The first section covers the router; see the [troubleshooting
 guide](/site/troubleshooting.md#weave-status) for more details.
