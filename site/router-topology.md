@@ -1,7 +1,7 @@
 ---
-title: How Weave Net Works
+title: Understanding how Weave Net Works
 layout: default
-menu_order: 100
+menu_order: 90
 ---
 
 

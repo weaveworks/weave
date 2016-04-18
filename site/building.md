@@ -1,6 +1,6 @@
 ---
 title: Building Weave Net
-menu_order: 160
+menu_order: 120
 ---
 
 # Building Weave Net

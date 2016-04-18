@@ -1,6 +1,6 @@
 ---
-title: Setting Up The Weave Net Docker API Proxy
-menu_order: 60
+title: Integrating Docker via the API Proxy
+menu_order: 50
 ---
 
 

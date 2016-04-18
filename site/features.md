@@ -1,5 +1,5 @@
 ---
-title: Weave Features
+title: Feature Overview
 menu_order: 20
 ---
 

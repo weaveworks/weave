@@ -1,6 +1,6 @@
 ---
-title: Weave Net FAQ
-menu_order: 140
+title: FAQ
+menu_order: 100
 ---
 
 

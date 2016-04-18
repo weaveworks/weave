@@ -1,6 +1,6 @@
 ---
-title: Using WeaveDNS
-menu_order: 120
+title: Discovering Containers with WeaveDNS
+menu_order: 80
 ---
 
 

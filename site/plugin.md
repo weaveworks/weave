@@ -1,6 +1,6 @@
 ---
-title: Using the Weave Net Docker Network Plugin
-menu_order: 80
+title: Integrating Docker via the Network Plugin
+menu_order: 60
 ---
 
 

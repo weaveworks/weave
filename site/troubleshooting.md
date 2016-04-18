@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting Weave Net
-menu_order: 150
+menu_order: 110
 ---
 
 

@@ -1,5 +1,5 @@
 ---
-title: Using Weave Net - Example
+title: Using Weave Net
 menu_order: 40
 ---
 
