@@ -215,13 +215,13 @@ available from the `weave status` commands. You can also supply a
 Golang text template to `weave report` in a similar fashion to `docker
 inspect`:
 
-    $ weave report -f {% raw %}'{{.DNS.Domain}}'{% endraw %} weave.local.
+    $ weave report -f '{{.DNS.Domain}}' weave.local.
 
 Weave Net adds a template function, `json`, which can be applied to get
 results in JSON format.
 
-    $ weave report -f {% raw %}'{{json .DNS}}'{% endraw %}
-    {% raw %}{"Domain":"weave.local.","Upstream":["8.8.8.8","8.8.4.4"],"Address":"172.17.0.1:53","TTL":1,"Entries":null}{% endraw %}
+    $ weave report -f '{{json .DNS}}'
+    {"Domain":"weave.local.","Upstream":["8.8.8.8","8.8.4.4"],"Address":"172.17.0.1:53","TTL":1,"Entries":null}
 
 ### <a name="list-attached-containers"></a>Listing Attached Containers
 
