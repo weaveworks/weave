@@ -310,7 +310,7 @@ func TestTransfer(t *testing.T) {
 	allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
 	alloc1 := allocs[0]
 	alloc2 := allocs[1]
-	alloc3 := allocs[2] // This will be 'master' and get the first range
+	alloc3 := allocs[2]
 
 	_, err := alloc2.Allocate("foo", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
