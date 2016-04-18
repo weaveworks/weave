@@ -45,5 +45,5 @@ Be aware that:
 
 **See Also**
 
- * [Using Encryption With Weave Net](/site/encryption.md)
+ * [Weave Encryption](/how-it-works/encryption.md)
  * [Using Fast Datapath](/using-weave/fastdp.md)

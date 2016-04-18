@@ -1,6 +1,6 @@
 ---
 title: Encryption and Weave Net
-menu_order: 95
+menu_order: 60
 ---
 
 
@@ -34,5 +34,5 @@ deployed.
 
 **See Also**
 
- * [How Weave Implements Encryption](/site/encryption/implementation.md)
+ * [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md)
  * [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)

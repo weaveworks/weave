@@ -181,7 +181,7 @@ running alongside Weave.
 
 Weave Net implements encryption and security using [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
 
-For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption.md) and [How Weave Implements Encryption](/site/encryption/implementation.md).
+For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/how-it-works/encryption.md) and [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md).
 
 
 ###<a name="host-network-integration"></a>Host Network Integration

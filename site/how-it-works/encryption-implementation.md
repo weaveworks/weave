@@ -1,10 +1,11 @@
 ---
 title: How Weave Net Implements Encryption
 layout: default
+menu_order: 70
 ---
 
 This section describes some details of Weave Net's built-in
-[encryption](/site/encryption.md):
+[encryption](/how-it-works/encryption.md):
 
  * [Establishing the Ephemeral Session Key](#ephemeral-key)
  * [Key Generation](#csprng)
