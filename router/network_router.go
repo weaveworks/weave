@@ -211,10 +211,11 @@ func (router *NetworkRouter) relayBroadcast(srcPeer *mesh.Peer, key PacketKey) F
 const peersIdent = "directPeers"
 
 func (router *NetworkRouter) persistPeers() {
-	if err := router.db.Save(peersIdent, router.ConnectionMaker.Targets(false)); err != nil {
+	// Persistence disabled pending rationalisation of the expected behaviour
+	/*if err := router.db.Save(peersIdent, router.ConnectionMaker.Targets(false)); err != nil {
 		log.Errorf("Error persisting peers: %s", err)
 		return
-	}
+	}*/
 }
 
 func (router *NetworkRouter) InitiateConnections(peers []string, replace bool) []error {
@@ -230,9 +231,10 @@ func (router *NetworkRouter) ForgetConnections(peers []string) {
 
 func (router *NetworkRouter) InitialPeers(peers []string) ([]string, error) {
 	var storedPeers []string
-	if _, err := router.db.Load(peersIdent, &storedPeers); err != nil {
+	// Persistence disabled pending rationalisation of the expected behaviour
+	/*if _, err := router.db.Load(peersIdent, &storedPeers); err != nil {
 		return nil, err
-	}
+	}*/
 
 	if storedPeers != nil && !equal(peers, storedPeers) {
 		log.Println("Overriding initial peer list with stored list:", storedPeers)

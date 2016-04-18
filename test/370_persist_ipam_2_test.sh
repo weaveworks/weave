@@ -28,7 +28,10 @@ C3=$(container_ip $HOST2 c3)
 assert_raises "[ $C3 != $C1 ]"
 
 # Restart HOST1 and see if it remembers to connect to HOST2
-launch_router_with_db $HOST1
-assert_raises "exec_on $HOST2 c2 $PING $C1"
+#
+# disabled pending rationalisation of the expected behaviour
+#
+# launch_router_with_db $HOST1
+# assert_raises "exec_on $HOST2 c2 $PING $C1"
 
 end_suite
