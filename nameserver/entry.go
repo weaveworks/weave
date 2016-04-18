@@ -23,7 +23,12 @@ type Entry struct {
 	lHostname   string // lowercased (not exported, so not encoded by gob)
 	Version     int
 	Tombstone   int64 // timestamp of when it was deleted
-	stopped     bool  // denotes whether the container has been stopped
+	// Denotes whether the container might be stopped. The field is set to true
+	// (in conjunction with Tombstone) when restoring entries from a DB. During that
+	// time it is not known whether container is running. The stopped entries are
+	// set to "normal" upon AddEntry call with ContainerID set to stopped entries'
+	// ContainerID.
+	stopped bool
 }
 
 type Entries []Entry

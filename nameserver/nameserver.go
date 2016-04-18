@@ -98,7 +98,8 @@ func (n *Nameserver) restoreFromDB() {
 
 	// TODO(mp) think about broadcasting here. It seems that it might be not
 	// necessary, because the other peers might have removed the entries due
-	// to termination of the peer.
+	// to termination of the peer. However, if termination message has not reached
+	// any peer, then the peers might contain the list of obsolete entries.
 
 	n.debugf("restore: finished.")
 }
@@ -135,26 +136,34 @@ func (n *Nameserver) broadcastEntries(es ...Entry) {
 	})
 }
 
-// TODO(mp) document reregister flag
+// TODO(mp) document restoreStopped
 func (n *Nameserver) AddEntry(hostname, containerid string,
-	origin mesh.PeerName, addr address.Address, reRegister bool) {
+	origin mesh.PeerName, addr address.Address, restoreStopped bool) {
 
 	var entries Entries
+	var found bool
+
 	n.Lock()
 
-	// check for stopped entries
-
-	// TODO(mp) optimize with "reRegister" flag
-	for i, e := range n.entries {
-		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
-			n.entries[i].stopped = false
-			n.entries[i].Tombstone = 0
-			n.entries[i].Version++
-			entries = append(entries, e)
+	// Check for the stopped entries first
+	// TODO(mp) move the following into the restoreStopped iterator
+	if restoreStopped {
+		for i, e := range n.entries {
+			if e.Origin == origin && e.ContainerID == containerid && e.stopped {
+				if !found && e.Addr == addr {
+					found = true
+				}
+				n.entries[i].stopped = false
+				n.entries[i].Tombstone = 0
+				n.entries[i].Version++
+				entries = append(entries, n.entries[i])
+			}
 		}
 	}
 
-	entries = append(entries, n.entries.add(hostname, containerid, origin, addr))
+	if !found {
+		entries = append(entries, n.entries.add(hostname, containerid, origin, addr))
+	}
 
 	n.snapshot()
 	n.Unlock()

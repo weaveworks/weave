@@ -267,19 +267,17 @@ func TestTombstoneDeletion(t *testing.T) {
 	require.Equal(t, Entries{}, nameserver.entries)
 }
 
-// TestRestoration tests restoration of local entries.
+// TestRestoration tests the restoration of local entries procedure.
 func TestRestoration(t *testing.T) {
 	const (
 		container1 = "c1"
 		container2 = "c2"
 		container3 = "c3"
-
-		hostname1 = "hostname1"
-		hostname2 = "hostname2"
-
-		addr1 = address.Address(1)
-		addr2 = address.Address(2)
-		addr3 = address.Address(3)
+		hostname1  = "hostname1"
+		hostname2  = "hostname2"
+		addr1      = address.Address(1)
+		addr2      = address.Address(2)
+		addr3      = address.Address(3)
 	)
 
 	oldNow := now
@@ -298,6 +296,7 @@ func TestRestoration(t *testing.T) {
 	now = func() int64 { return 4321 }
 	nameserver = New(name, "", nameserver.db, func(mesh.PeerName) bool { return true })
 
+	nameserver.RLock()
 	require.Equal(t,
 		Entries{
 			Entry{
@@ -331,6 +330,98 @@ func TestRestoration(t *testing.T) {
 				stopped:     true,
 			},
 		}, nameserver.entries, "")
+	nameserver.RUnlock()
+}
+
+// TestAddEntryWithRestore tests whether stopped entries have been restored and
+// broadcasted to the peers.
+func TestAddEntryWithRestore(t *testing.T) {
+	const (
+		container1 = "c1"
+		container2 = "c2"
+		container3 = "c3"
+		hostname1  = "hostname1"
+		hostname2  = "hostname2"
+		hostname3  = "hostname3"
+		hostname4  = "hostname4"
+		addr1      = address.Address(1)
+		addr2      = address.Address(2)
+		addr3      = address.Address(3)
+		addr4      = address.Address(4)
+	)
+
+	oldNow := now
+	defer func() { now = oldNow }()
+	now = func() int64 { return 1234 }
+
+	nameservers, grouter := makeNetwork(2)
+	defer stopNetwork(nameservers, grouter)
+	ns1, ns2 := nameservers[0], nameservers[1]
+
+	ns1.AddEntry(hostname1, container1, ns1.ourName, addr1, false)
+	ns1.AddEntry(hostname2, container2, ns1.ourName, addr2, false)
+	ns1.Delete(hostname2, container2, "", addr2)
+
+	// Restart ns1 and preserve its db instance for marking the first entry as stopped
+	time.Sleep(1 * time.Millisecond)
+	ns1.Stop()
+	grouter.RemovePeer(ns1.ourName)
+	// TODO(mp) possible race: 1) PeerGone 2) OnGossipBroadcast
+	ns2.PeerGone(ns1.ourName)
+	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true })
+	ns1 = nameservers[0]
+	ns1.SetGossip(grouter.Connect(ns1.ourName, ns1))
+	ns1.Start()
+	// At this point, the c1 entry is set to stopped
+
+	// Because restoreStopped is not set, the c1 entry won't be set back to "normal"
+	ns1.AddEntry(hostname3, container3, ns1.ourName, addr3, false)
+	ns1.RLock()
+	require.Equal(t,
+		Entry{
+			ContainerID: container1,
+			Origin:      ns1.ourName,
+			Addr:        addr1,
+			Hostname:    hostname1,
+			lHostname:   hostname1,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     true,
+		}, ns1.entries[0], "")
+	ns1.RUnlock()
+
+	time.Sleep(1 * time.Millisecond)
+	// ns2 should store only the c3 entry
+	ns2.RLock()
+	require.Len(t, ns2.entries, 1, "")
+	require.Equal(t, container3, ns2.entries[0].ContainerID, "")
+	ns2.RUnlock()
+
+	ns1.AddEntry(hostname4, container1, ns1.ourName, addr4, true)
+	// c1 (hostname1 -> addr1) should be restored and propagated to ns2
+	time.Sleep(1 * time.Millisecond)
+
+	ns2.RLock()
+	require.Len(t, ns2.entries, 3, "")
+	require.Equal(t,
+		Entry{
+			ContainerID: container1,
+			Origin:      ns1.ourName,
+			Addr:        addr1,
+			Hostname:    hostname1,
+			lHostname:   hostname1,
+			Version:     2,
+			Tombstone:   0,
+			stopped:     false,
+		}, ns2.entries[0], "")
+	ns2.RUnlock()
+
+	//fmt.Println("NS1>", ns1.entries)
+	//// TODO(mp) once we got obsolete entry for c2, so make sure that we broadcast
+	//// tombstoned entries during the restoration procedure. Add tests for that
+	//fmt.Println("NS2>", ns2.entries)
+
+	grouter.Flush()
 }
 
 // Database mock
