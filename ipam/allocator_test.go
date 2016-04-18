@@ -331,7 +331,7 @@ func TestTransfer(t *testing.T) {
 	defer stopNetworkOfAllocators(allocs, router)
 	alloc0 := allocs[0]
 	alloc1 := allocs[1]
-	alloc2 := allocs[2] // This will be 'master' and get the first range
+	alloc2 := allocs[2]
 
 	_, err := alloc1.Allocate("foo", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
@@ -339,9 +339,10 @@ func TestTransfer(t *testing.T) {
 	_, err = alloc2.Allocate("bar", subnet, returnFalse)
 	require.True(t, err == nil, "Failed to get address")
 
+	// simulation of periodic gossip
 	alloc1.gossip.GossipBroadcast(alloc1.Gossip())
 	router.Flush()
-	alloc1.gossip.GossipBroadcast(alloc2.Gossip())
+	alloc0.gossip.GossipBroadcast(alloc0.Gossip())
 	router.Flush()
 
 	free1 := alloc1.NumFreeAddresses(subnet.Range())
