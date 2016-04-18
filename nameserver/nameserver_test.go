@@ -360,7 +360,7 @@ func TestAddEntryWithRestore(t *testing.T) {
 	ns1.Delete(hostname2, container2, "", addr2)
 
 	// Restart ns1 and preserve its db instance for marking the first entry as stopped
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	ns1.Stop()
 	grouter.RemovePeer(ns1.ourName)
 	// TODO(mp) possible race: 1) PeerGone 2) OnGossipBroadcast
@@ -395,7 +395,7 @@ func TestAddEntryWithRestore(t *testing.T) {
 	require.Equal(t, int64(1234), entries[0].Tombstone, "")
 
 	ns1.AddEntry(hostname3, container1, ns1.ourName, addr3)
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// c1 (hostname1 -> addr1) should be restored and propagated to ns2
 	entries = ns2.copyEntries()
@@ -429,7 +429,7 @@ func TestRestoreBroadcast(t *testing.T) {
 	ns1.AddEntry(hostname1, container1, ns1.ourName, addr1)
 
 	// ns2 has received message containing the entry for container1
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	require.Equal(t, addrs{addr1}.String(), addrs(ns2.Lookup(hostname1)).String(), "")
 
 	// Restart ns1
@@ -441,7 +441,7 @@ func TestRestoreBroadcast(t *testing.T) {
 	ns1.Start()
 
 	// n2 should have received broadcast message indicating that the entry is tombstoned
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	entries := ns2.copyEntries()
 	require.Equal(t, Entries{
 		Entry{
