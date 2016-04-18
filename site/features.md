@@ -103,7 +103,7 @@ See [Using the Weave Docker Network Plugin](/site/plugin.md) for more details.
 
 Weave can be used as a plugin to systems that support the [Container Network Interface](https://github.com/appc/cni), such as Kubernetes.
 
-See [Using the Weave CNI Plugin](/site/plugin/cni-plugin-how-to.md) for more details.
+See [Using the Weave CNI Plugin](/site/cni-plugin.md) for more details.
 
 
 ###<a name="addressing"></a>IP Address Management (IPAM)
