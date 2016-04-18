@@ -114,7 +114,7 @@ Instead of allowing Weave to automatically allocate addresses, an IP address and
 specified. See [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md) for instructions. 
 
 For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Management](/site/ipam.md). And also review the 
-[the basics of IP addressing](/site/ip-addresses.md) for an explanation of addressing and private networks. 
+[the basics of IP addressing](/how-it-works/ip-addresses.md) for an explanation of addressing and private networks. 
 
 
 ###<a name="naming-and-discovery"></a>Naming and Discovery
