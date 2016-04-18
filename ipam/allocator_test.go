@@ -339,9 +339,9 @@ func TestTransfer(t *testing.T) {
 	require.True(t, err == nil, "Failed to get address")
 
 	// simulation of periodic gossip
-	alloc1.gossip.GossipBroadcast(alloc1.Gossip())
+	alloc2.gossip.GossipBroadcast(alloc2.Gossip())
 	router.Flush()
-	alloc0.gossip.GossipBroadcast(alloc0.Gossip())
+	alloc1.gossip.GossipBroadcast(alloc1.Gossip())
 	router.Flush()
 
 	free1 := alloc1.NumFreeAddresses(subnet.Range())
