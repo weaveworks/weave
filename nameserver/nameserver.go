@@ -273,8 +273,15 @@ func (n *Nameserver) deleteTombstones() {
 // snapshot stores the local entries (Origin == n.ourName) to the database.
 // NB: we assume that a caller has taken the nameserver' read or write lock.
 func (n *Nameserver) snapshot() {
+	entries := n.entries.copyAndFilter(
+		func(e *Entry) bool {
+			if e.Origin == n.ourName {
+				return true
+			}
+			return false
+		})
 	// TODO(mp) optimize: store a single entry per key-val pair.
-	if err := n.db.Save(nameserverIdent, n.entries); err != nil {
+	if err := n.db.Save(nameserverIdent, entries); err != nil {
 		n.errorf("saving to DB failed to due: %s", err)
 	}
 }

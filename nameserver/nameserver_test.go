@@ -20,6 +20,7 @@ const (
 	container1 = "c1"
 	container2 = "c2"
 	container3 = "c3"
+	container4 = "c4"
 	hostname1  = "hostname1"
 	hostname2  = "hostname2"
 	hostname3  = "hostname3"
@@ -302,6 +303,8 @@ func TestRestoration(t *testing.T) {
 	nameserver.AddEntry(hostname1, container1, name, addr1)
 	nameserver.AddEntry(hostname2, container2, name, addr2)
 	nameserver.AddEntry(hostname2, container3, name, addr3)
+	otherPeerName, _ := mesh.PeerNameFromString("01:00:00:02:00:00")
+	nameserver.AddEntry(hostname4, container4, otherPeerName, addr4)
 	nameserver.Delete(hostname2, container2, "", addr2)
 
 	// "Restart" nameserver by creating a new instance with the reused db instance

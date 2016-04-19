@@ -224,6 +224,16 @@ func (es *Entries) filter(f func(*Entry) bool) {
 	*es = (*es)[:i]
 }
 
+// copyAndFilter makes a copy of receiver entries and filters them.
+func (es Entries) copyAndFilter(f func(*Entry) bool) Entries {
+	entries := make(Entries, len(es))
+
+	copy(entries, es)
+	(&entries).filter(f)
+
+	return entries
+}
+
 func (es Entries) findEqual(e *Entry) (*Entry, bool) {
 	i := sort.Search(len(es), func(i int) bool {
 		return !es[i].insensitiveLess(e)
