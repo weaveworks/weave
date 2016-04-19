@@ -1,6 +1,6 @@
 ---
-title: Address Allocation with IP Address Management (IPAM)
-menu_order: 110
+title: Allocating IP Addresses
+menu_order: 70
 ---
 
 

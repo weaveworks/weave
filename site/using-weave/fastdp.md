@@ -1,6 +1,6 @@
 ---
 title: Using Fast Datapath
-menu_order: 70
+menu_order: 96
 ---
 
 
@@ -8,7 +8,7 @@ The most important thing to know about fast datapath is that you don't need to c
 
 When Weave Net cannot use the fast data path between two hosts, it falls back to a slower packet forwarding approach called `sleeve`. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast data path within the data centers, but not for the more constrained network link between them. 
 
-See [How Fastdp Works](/site/fastdp/fastdp-how-it-works.md) for a more in-depth discussion of this feature. 
+See [How Fastdp Works](/site/how-it-works/fastdp-how-it-works.md) for a more in-depth discussion of this feature. 
 
 ###Disabling Fast Datapath
 
@@ -45,5 +45,5 @@ Where fastdp indicates that fast datapath is being used on a connection. If fast
 **See Also**
 
  * [Deploying Applications to Weave](/site/using-weave/deploying-applications.md)
- * [How Fastdp Works](/site/fastdp/fastdp-how-it-works.md)
+ * [How Fastdp Works](/site/how-it-works/fastdp-how-it-works.md)
  

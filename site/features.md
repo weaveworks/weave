@@ -1,5 +1,5 @@
 ---
-title: Weave Features
+title: Feature Overview
 menu_order: 20
 ---
 
@@ -58,8 +58,8 @@ Fast datapath does not support encryption. For full details on configuring
 Weave when you have connections that traverse untrusted networks,
 see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) for more details.
 
-See [Using Fast Datapath](/site/fastdp.md) and 
-[How Fast Datapath Works](/site/fastdp/fastdp-how-it-works.md). 
+See [Using Fast Datapath](/using-weave/fastdp.md) and
+[How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
 
 ###<a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
 
@@ -103,7 +103,7 @@ See [Using the Weave Docker Network Plugin](/site/plugin.md) for more details.
 
 Weave can be used as a plugin to systems that support the [Container Network Interface](https://github.com/appc/cni), such as Kubernetes.
 
-See [Using the Weave CNI Plugin](/site/plugin/cni-plugin-how-to.md) for more details.
+See [Using the Weave CNI Plugin](/site/cni-plugin.md) for more details.
 
 
 ###<a name="addressing"></a>IP Address Management (IPAM)
@@ -114,7 +114,7 @@ Instead of allowing Weave to automatically allocate addresses, an IP address and
 specified. See [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md) for instructions. 
 
 For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Management](/site/ipam.md). And also review the 
-[the basics of IP addressing](/site/ip-addresses.md) for an explanation of addressing and private networks. 
+[the basics of IP addressing](/how-it-works/ip-addresses.md) for an explanation of addressing and private networks. 
 
 
 ###<a name="naming-and-discovery"></a>Naming and Discovery
@@ -181,7 +181,7 @@ running alongside Weave.
 
 Weave Net implements encryption and security using [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
 
-For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Using Encryption with Weave](/site/encryption.md) and [How Weave Implements Encryption](/site/encryption/implementation.md).
+For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/how-it-works/encryption.md) and [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md).
 
 
 ###<a name="host-network-integration"></a>Host Network Integration

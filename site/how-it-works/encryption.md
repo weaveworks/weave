@@ -1,11 +1,11 @@
 ---
 title: Encryption and Weave Net
-menu_order: 90
+menu_order: 60
 ---
 
 
 Weave Net peers
-[communicate with each other over both TCP and UDP](/site/router-topology.md). This
+[communicate with each other over both TCP and UDP](/site/how-it-works.md). This
 communication
 [can be encrypted](/site/using-weave/security-untrusted-networks.md).
 
@@ -34,5 +34,5 @@ deployed.
 
 **See Also**
 
- * [How Weave Implements Encryption](/site/encryption/implementation.md)
+ * [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md)
  * [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)

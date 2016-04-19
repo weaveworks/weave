@@ -1,6 +1,7 @@
 ---
-title: Using the Weave Net CNI Plugin
+title: Integrating Kubernetes via the CNI Plugin
 layout: default
+menu_order: 65
 ---
 
 CNI, the [_Container Network Interface_](https://github.com/appc/cni#cni---the-container-network-interface),

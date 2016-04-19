@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting Weave Net
-menu_order: 150
+menu_order: 110
 ---
 
 
@@ -45,7 +45,7 @@ capture and analysis tools, such as tcpdump and wireshark, to the
 
 A status summary can be obtained using `weave status`:
 
-````
+```
 $ weave status
 
         Version: 1.1.0 (up to date; next check at 2016/04/06 12:30:00)
@@ -75,10 +75,10 @@ $ weave status
 
        Service: plugin
     DriverName: weave
-````
+```
 
 The terms used here are explained further at
-[How Weave Net Works](/site/router-topology.md).
+[How Weave Net Works](/site/how-it-works.md).
 
   * **Version** - shows the Weave Net version. If checkpoint is enabled (i.e.
 `CHECKPOINT_DISABLE` is not set), information about existence of a new version
@@ -94,7 +94,7 @@ can be overridden by using the `--nickname` argument at `weave
 launch`.
 
  * **Encryption** - indicates whether
-[encryption](/site/encryption.md) is in use for communication
+[encryption](/how-it-works/encryption.md) is in use for communication
 between peers.
 
  * **PeerDiscovery** - indicates whether
@@ -129,14 +129,14 @@ exponential back-off.
 
 To view detailed information on the local Weave Net router's type `weave status connections`:
 
-````
+```
 $ weave status connections
 <- 192.168.48.12:33866   established unencrypted fastdp 7e:21:4a:70:2f:45(host2)
 <- 192.168.48.13:60773   pending     encrypted   fastdp 7e:ae:cd:d5:23:8d(host3)
 -> 192.168.48.14:6783    retrying    dial tcp4 192.168.48.14:6783: no route to host
 -> 192.168.48.15:6783    failed      dial tcp4 192.168.48.15:6783: no route to host, retry: 2015-08-06 18:55:38.246910357 +0000 UTC
 -> 192.168.48.16:6783    connecting
-````
+```
 
 The columns are as follows:
 
@@ -160,7 +160,7 @@ The columns are as follows:
 Detailed information on peers can be obtained with `weave status
 peers`:
 
-````
+```
 $ weave status peers
 ce:31:e0:06:45:1a(host1)
    <- 192.168.48.12:39634   ea:2d:b2:e6:e4:f5(host2)         established
@@ -171,7 +171,7 @@ ea:2d:b2:e6:e4:f5(host2)
 ee:38:33:a7:d9:71(host3)
    -> 192.168.48.12:6783    ea:2d:b2:e6:e4:f5(host2)         established
    -> 192.168.48.11:6783    ce:31:e0:06:45:1a(host1)         established
-````
+```
 
 This lists all peers known to this router, including itself.  Each
 peer is shown with its name and nickname, then each line thereafter
@@ -185,7 +185,7 @@ the `host3` end of the same connection as `192.168.48.13:49619`.
 Detailed information on DNS registrations can be obtained with `weave
 status dns`:
 
-````
+```
 $ weave status dns
 one          10.32.0.1       eebd81120ee4 4a:0f:f6:ec:1c:93
 one          10.43.255.255   4fcec78d2a9b 66:c4:47:c6:65:bf
@@ -196,7 +196,7 @@ three        10.40.0.2       8a9c2e2ef00f ba:98:d0:37:4f:1c
 two          10.32.0.2       83689b8f34e0 4a:0f:f6:ec:1c:93
 two          10.44.0.0       7edc306cb668 66:c4:47:c6:65:bf
 two          10.40.0.1       68a5e9c2641b ba:98:d0:37:4f:1c
-````
+```
 
 The columns are as follows:
 

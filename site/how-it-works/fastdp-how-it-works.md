@@ -1,6 +1,6 @@
 ---
 title: How Fast Datapath Works
-menu_order: 10
+menu_order: 30
 ---
 
 
@@ -25,6 +25,6 @@ Prior to version 1.2, Weave Net used a custom encapsulation format. Fast datapat
 **See Also**
 
  * [Deploying Applications to Weave](/site/using-weave/deploying-applications.md)
- * [Using Fast Datapath](/site/fastdp.md)
+ * [Using Fast Datapath](/using-weave/fastdp.md)
 
 

@@ -144,7 +144,7 @@ which time the topology should have updated.
 
 **See Also**
 
- * [Weave Net Router Encapsulation](/site/router-topology/router-encapsulation.md)
+ * [Weave Net Router Encapsulation](/site/how-it-works/router-encapsulation.md)
  
  
  

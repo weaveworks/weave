@@ -1,7 +1,7 @@
 ---
-title: How Weave Net Works
+title: Understanding how Weave Net Works
 layout: default
-menu_order: 100
+menu_order: 90
 ---
 
 
@@ -27,7 +27,7 @@ is given an IP address and netmask supplied either by the user or
 by Weave Net's IP address allocator.
 
 Weave Net routes packets between containers on different hosts via two
-methods: a [fast data path](/site/fastdp.md) method, which operates
+methods: a [fast data path](/using-weave/fastdp.md) method, which operates
 entirely in kernel space, and a fallback `sleeve` method, in which
 packets destined for non-local containers are captured by the kernel
 and processed by the Weave Net router in user space, forwarded over
@@ -47,5 +47,5 @@ first send it to peer 3:
 
 **See Also**
 
- * [Weave Router Sleeve Encapsulation](/site/router-topology/router-encapsulation.md)
- * [How Weave Inteprets Network Topology](/site/router-topology/network-topology.md)
+ * [Weave Router Sleeve Encapsulation](/site/how-it-works/router-encapsulation.md)
+ * [How Weave Inteprets Network Topology](/site/how-it-works/network-topology.md)

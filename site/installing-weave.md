@@ -41,5 +41,5 @@ for the latest Weave AMIs and [here](http://weave.works/guides/service-discovery
  * [Features](/site/features.md)
  * [Troubleshooting](/site/troubleshooting.md)
  * [Building](/site/building.md)
- * [Using Weave with Systemd](/site/systemd.md)
+ * [Using Weave with Systemd](/site/installing-weave/systemd.md)
  
