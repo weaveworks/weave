@@ -54,11 +54,11 @@ then run your containers using the Docker command-line:
 
 ### Restarting the Plugin
 
-The plugin is started with a policy of `--restart=always`, so that it is always there after a restart or reboot. If you remove this container (for example, when using `weave reset`) before removing all endpoints created using `--net=weave`, Docker may hang for a long time when it subsequently tries to re-establish communications to the plugin.
+The plugin, like all Weave Net components, is started with a policy of `--restart=always`, so that it is always there after a restart or reboot. If you remove this container (for example, when using `weave reset`) before removing all endpoints created using `--net=weave`, Docker may hang for a long time when it subsequently tries to re-establish communications to the plugin.
 
 Unfortunately, [Docker 1.9 may also try to communicate with the plugin before it has even started it](https://github.com/docker/libnetwork/issues/813).
 
-If you are using `systemd`, it is advised that you modify the Docker unit to remove the timeout on startup. This gives Docker enough time to abandon its attempts. For example, in the file `/lib/systemd/system/docker.service`, add the following under `[Service]`: 
+If you are using `systemd` with Docker 1.9, it is advised that you modify the Docker unit to remove the timeout on startup. This gives Docker enough time to abandon its attempts. For example, in the file `/lib/systemd/system/docker.service`, add the following under `[Service]`:
 
     TimeoutStartSec=0
 
