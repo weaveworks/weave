@@ -69,7 +69,7 @@ For more information about fast datapath see [How Fast Datapath Works](/site/how
 
 To view whether Weave is using fastdp or not, you can run, `weave status connections`
 
-For more information on this command, see [Using Fast Datapath](/using-weave/fastdp.md)
+For more information on this command, see [Using Fast Datapath](/site/using-weave/fastdp.md)
 
 
 **Q: Does encryption work with fastdp?**
@@ -78,7 +78,7 @@ Encryption does not work with fast datapath. If you enable encryption using the 
 
 You can however have a mixture of fast datapath connections over trusted links, as well as, encrypted connections over untrusted links.
 
-See [Using Fast Datapath](/using-weave/fastdp.md) for more information
+See [Using Fast Datapath](/site/using-weave/fastdp.md) for more information
 
 **Q: Can I create multiple networks where containers can communicate on one network, but are isolated from containers on other networks?**
 

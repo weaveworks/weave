@@ -25,6 +25,6 @@ Prior to version 1.2, Weave Net used a custom encapsulation format. Fast datapat
 **See Also**
 
  * [Using Weave Net](/site/using-weave.md)
- * [Using Fast Datapath](/using-weave/fastdp.md)
+ * [Using Fast Datapath](/site/using-weave/fastdp.md)
 
 
