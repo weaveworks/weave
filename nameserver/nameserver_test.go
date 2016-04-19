@@ -1,6 +1,8 @@
 package nameserver
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -291,8 +293,8 @@ func TestTombstoneDeletion(t *testing.T) {
 	require.Equal(t, Entries{}, nameserver.entries)
 }
 
-// TestRestoration tests the restoration of local entries procedure.
-func TestRestoration(t *testing.T) {
+// TestRestore tests the restoration of local entries procedure.
+func TestRestore(t *testing.T) {
 	oldNow := now
 	defer func() { now = oldNow }()
 	now = func() int64 { return 1234 }
@@ -487,27 +489,29 @@ func TestStopContainer(t *testing.T) {
 // Database mock
 
 type MockDB struct {
-	data map[string]Entries
+	data map[string][]byte
 }
 
 func NewMockDB() *MockDB {
-	return &MockDB{data: make(map[string]Entries)}
+	return &MockDB{data: make(map[string][]byte)}
 }
 
 func (m *MockDB) Load(key string, val interface{}) (bool, error) {
-	if entries, ok := m.data[key]; ok {
-		ret := make(Entries, len(entries))
-		copy(ret, entries)
-		valPtr := val.(*Entries)
-		*valPtr = ret
-		return true, nil
+	if ret, ok := m.data[key]; ok {
+		reader := bytes.NewReader(ret)
+		dec := gob.NewDecoder(reader)
+		err := dec.Decode(val)
+		return true, err
 	}
 	return false, nil
 }
 
 func (m *MockDB) Save(key string, val interface{}) error {
-	entries := val.(Entries)
-	m.data[key] = make(Entries, len(entries))
-	copy(m.data[key], entries)
+	buf := bytes.NewBuffer(nil)
+	enc := gob.NewEncoder(buf)
+	if err := enc.Encode(val); err != nil {
+		return err
+	}
+	m.data[key] = buf.Bytes()
 	return nil
 }

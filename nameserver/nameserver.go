@@ -91,6 +91,8 @@ func (n *Nameserver) restoreFromDB() {
 
 	now := now()
 	for i, e := range n.entries {
+		// TODO(mp) check maybe it is possible to restore private fields :-/
+		n.entries[i].addLowercase()
 		if e.Tombstone == 0 {
 			n.entries[i].stopped = true
 			n.entries[i].Tombstone = now
