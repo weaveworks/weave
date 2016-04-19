@@ -38,8 +38,8 @@ check_attached c2
 
 docker_on $HOST1 rm -f c1
 
-# Restart docker daemon, using different commands for systemd- and upstart-managed.
-run_on $HOST1 sh -c "command -v systemctl >/dev/null && sudo systemctl restart docker || sudo service docker restart"
+# Restart docker daemon
+restart_docker $HOST1
 wait_for_proxy $HOST1
 sleep 3 # allow for re-tries of attach
 check_attached c2
