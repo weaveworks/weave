@@ -413,7 +413,7 @@ func TestAddEntryWithRestore(t *testing.T) {
 			Version:     2,
 			Tombstone:   0,
 			stopped:     false,
-		}, entries[0], "")
+		}, entries[1], "")
 
 	grouter.Flush()
 }
