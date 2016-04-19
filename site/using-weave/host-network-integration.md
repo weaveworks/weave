@@ -5,7 +5,7 @@ menu_order: 60
 
 Weave application networks can be integrated with an external host network, establishing connectivity between the host and with application containers running anywhere.
 
-For example, returning to the [netcat example](/site/using-weave/deploying-applications.md), you’ve now decided that you need to have the application containers that are running on `$HOST2` accessible by other hosts and containers. 
+For example, returning to the [netcat example](/site/using-weave.md), you’ve now decided that you need to have the application containers that are running on `$HOST2` accessible by other hosts and containers. 
 
 On `$HOST2` run:
 
@@ -41,5 +41,5 @@ Exposed addresses can also be added to weaveDNS by supplying fully qualified dom
 
 **See Also**
 
- * [Deploying Applications To Weave Net](/site/using-weave/deploying-applications.md)
+ * [Using Weave Net](/site/using-weave.md)
  * [Managing Services in Weave: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)

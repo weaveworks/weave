@@ -3,9 +3,6 @@ title: Feature Overview
 menu_order: 20
 ---
 
-The following is a comprehensive list and overview of all the features available in Weave 
-Net:
-
  * [Virtual Ethernet Switch](#virtual-ethernet-switch)
  * [Fast Data Path](#fast-data-path)
  * [Seamless Docker Integration](#docker)
@@ -42,11 +39,11 @@ tools and applications, developed over decades, can still
 be used to configure, secure, monitor, and troubleshoot 
 a container network. 
 
-Broadcast and Multicast protocols can also be implemented 
+Broadcast and Multicast protocols can also be used
 over Weave Net.
 
 To start using Weave Net, see [Installing Weave Net](/site/installing-weave.md) 
-and [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md).
+and [Using Weave Net](/site/using-weave.md).
 
 ###<a name="fast-data-path"></a>Fast Datapath
 
@@ -58,7 +55,7 @@ Fast datapath does not support encryption. For full details on configuring
 Weave when you have connections that traverse untrusted networks,
 see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) for more details.
 
-See [Using Fast Datapath](/using-weave/fastdp.md) and
+See [Using Fast Datapath](/site/using-weave/fastdp.md) and
 [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
 
 ###<a name="docker"></a>Seamless Docker Integration (Weave Docker API Proxy)
@@ -66,7 +63,7 @@ See [Using Fast Datapath](/using-weave/fastdp.md) and
 Weave Net includes a [Docker API Proxy](/site/weave-docker-api.md), which can be 
 used to start containers using the Docker [command-line interface](https://docs.docker.com/reference/commandline/cli/) or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/), and attach them to the Weave network before they begin execution.
 
-To use the proxy run:
+To use the proxy, run:
 
     host1$ eval $(weave env)
     
@@ -138,8 +135,8 @@ to communicate with each other but not with the containers
 of other applications.
 
 To isolate applications, Weave Net can make use of the 
-`isolation-through-subnets` technique. This common strategy
- is an example of how with Weave many of your `on metal` 
+_isolation-through-subnets_ technique. This common strategy
+ is an example of how with Weave many "on metal"
  techniques can be used to deploy your applications to 
  containers.
 
@@ -179,7 +176,7 @@ mechanism which you can use in conjunction with or as an
 alternative to any other security technologies you have 
 running alongside Weave. 
 
-Weave Net implements encryption and security using [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
+Weave Net implements encryption and security using the Go version of [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
 
 For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/how-it-works/encryption.md) and [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md).
 

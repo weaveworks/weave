@@ -175,6 +175,18 @@ the rest (a partition), they can continue to work with the address
 ranges they had before isolation, and can subsequently be re-connected
 to the rest of the network without any conflicts arising.
 
+### <a name="persistence"></a>Data persistence
+
+Key IPAM data is saved to disk, so that it is immediately available
+when the peer restarts:
+
+* The division of the IP allocation range amongst peers
+* Allocation of addresses to containers on the local peer
+
+A [data volume
+container](https://docs.docker.com/engine/userguide/containers/dockervolumes/#creating-and-mounting-a-data-volume-container)
+named `weavedb` is used to store this data.
+
  **See Also**
 
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)

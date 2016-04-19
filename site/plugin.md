@@ -12,7 +12,7 @@ best of all doesn't require an external cluster store in order to use it.
 To create a network which can span multiple Docker hosts, Weave Net peers must be connected to each other, by specifying the other hosts during `weave launch` or via
 [`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md).
 
-See [Deploying Applications to Weave Net](/site/using-weave/deploying-applications.md#peer-connections) for a discussion on peer connections. 
+See [Using Weave Net](/site/using-weave.md#peer-connections) for a discussion on peer connections. 
 
 After you've launched Weave Net and peered your hosts,  you can start containers using the following, for example:
 
@@ -54,11 +54,11 @@ then run your containers using the Docker command-line:
 
 ### Restarting the Plugin
 
-The plugin is started with a policy of `--restart=always`, so that it is always there after a restart or reboot. If you remove this container (for example, when using `weave reset`) before removing all endpoints created using `--net=weave`, Docker may hang for a long time when it subsequently tries to re-establish communications to the plugin.
+The plugin, like all Weave Net components, is started with a policy of `--restart=always`, so that it is always there after a restart or reboot. If you remove this container (for example, when using `weave reset`) before removing all endpoints created using `--net=weave`, Docker may hang for a long time when it subsequently tries to re-establish communications to the plugin.
 
 Unfortunately, [Docker 1.9 may also try to communicate with the plugin before it has even started it](https://github.com/docker/libnetwork/issues/813).
 
-If you are using `systemd`, it is advised that you modify the Docker unit to remove the timeout on startup. This gives Docker enough time to abandon its attempts. For example, in the file `/lib/systemd/system/docker.service`, add the following under `[Service]`: 
+If you are using `systemd` with Docker 1.9, it is advised that you modify the Docker unit to remove the timeout on startup. This gives Docker enough time to abandon its attempts. For example, in the file `/lib/systemd/system/docker.service`, add the following under `[Service]`:
 
     TimeoutStartSec=0
 
