@@ -1,3 +1,17 @@
+## Release 1.5.0
+
+## Highlights
+
+- A new [Container Network Interface](https://github.com/appc/cni#cni---the-container-network-interface) plugin.
+- This release is much more robust against unscheduled restarts,
+  because it persists key data to disk.
+- New configuration options that are useful when you create or
+  auto-scale larger networks.
+- Weave now periodically checks for updates (can be disabled)
+
+Plus many bug fixes and minor enhancements. More details below and in
+the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.5.0).
+
 ## Release 1.4.6
 
 Fixes some issues encountered by our users.
