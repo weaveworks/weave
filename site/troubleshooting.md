@@ -279,7 +279,9 @@ re-connect.
 
 All the containers started by `weave launch` are configured with the
 Docker restart policy `--restart=always`, so they will come back again
-on reboot.
+on reboot. This can be disabled via:
+
+    weave launch --no-restart
 
 Note that the
 [Weave Net Docker API Proxy](/site/weave-docker-api/set-up-proxy.md)
