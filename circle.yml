@@ -40,7 +40,7 @@ test:
         parallel: true
     - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
         parallel: true
-        timeout: 500
+        timeout: 1200
   post:
     - cd $SRCDIR/test; ./gce.sh destroy:
         parallel: true
