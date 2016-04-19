@@ -25,9 +25,9 @@ type Entry struct {
 	Tombstone   int64 // timestamp of when it was deleted
 	// Denotes whether the container might be stopped. The field is set to true
 	// (in conjunction with Tombstone) when restoring entries from a DB. During that
-	// time it is not known whether container is running. The stopped entries are
-	// set to "normal" upon AddEntry call with ContainerID set to stopped entries'
-	// ContainerID.
+	// time it is not known whether the container is running. The stopped entries are
+	// restored for the given container by AddEntry with ContainerID equal to ID of the
+	// container.
 	stopped bool
 }
 
@@ -224,12 +224,13 @@ func (es *Entries) filter(f func(*Entry) bool) {
 	*es = (*es)[:i]
 }
 
-// copyAndFilter makes a copy of receiver entries and filters them.
+// copyAndFilter makes a copy of receiver entries and does filtering before
+// returning them.
 func (es Entries) copyAndFilter(f func(*Entry) bool) Entries {
 	entries := make(Entries, len(es))
 
 	copy(entries, es)
-	(&entries).filter(f)
+	entries.filter(f)
 
 	return entries
 }

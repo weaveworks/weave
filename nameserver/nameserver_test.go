@@ -358,9 +358,9 @@ func TestAddEntryWithRestore(t *testing.T) {
 	defer stopNetwork(nameservers, grouter)
 	ns1, ns2 := nameservers[0], nameservers[1]
 
-	ns1.AddEntry(hostname1, container1, ns1.ourName, addr1)
-	ns1.AddEntry(hostname2, container2, ns1.ourName, addr2)
-	ns1.Delete(hostname2, container2, "", addr2)
+	ns1.AddEntry(hostname2, container1, ns1.ourName, addr1)
+	ns1.AddEntry(hostname3, container2, ns1.ourName, addr2)
+	ns1.Delete(hostname3, container2, "", addr2)
 
 	// Restart ns1 and preserve its db instance for marking the first entry as stopped
 	time.Sleep(200 * time.Millisecond)
@@ -383,8 +383,8 @@ func TestAddEntryWithRestore(t *testing.T) {
 			ContainerID: container1,
 			Origin:      ns1.ourName,
 			Addr:        addr1,
-			Hostname:    hostname1,
-			lHostname:   hostname1,
+			Hostname:    hostname2,
+			lHostname:   hostname2,
 			Version:     1,
 			Tombstone:   1234,
 			stopped:     true,
@@ -397,7 +397,7 @@ func TestAddEntryWithRestore(t *testing.T) {
 	require.Equal(t, container1, entries[0].ContainerID, "")
 	require.Equal(t, int64(1234), entries[0].Tombstone, "")
 
-	ns1.AddEntry(hostname3, container1, ns1.ourName, addr3)
+	ns1.AddEntry(hostname1, container1, ns1.ourName, addr3)
 	time.Sleep(200 * time.Millisecond)
 
 	// c1 (hostname1 -> addr1) should be restored and propagated to ns2
@@ -408,8 +408,8 @@ func TestAddEntryWithRestore(t *testing.T) {
 			ContainerID: container1,
 			Origin:      ns1.ourName,
 			Addr:        addr1,
-			Hostname:    hostname1,
-			lHostname:   hostname1,
+			Hostname:    hostname2,
+			lHostname:   hostname2,
 			Version:     2,
 			Tombstone:   0,
 			stopped:     false,
