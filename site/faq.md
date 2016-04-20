@@ -85,6 +85,12 @@ See [Using Fast Datapath](/site/using-weave/fastdp.md) for more information
 Yes, of course!  Weave allows you to run isolated networks and still allow open communications between individual containers from those isolated networks. You can find information on how to do this in [Application Isolation](/site/using-weave/application-isolation.md)
 
 
+**Q: Which ports does Weave Net use (e.g. if I am configuring a firewall) ?**
+
+You must permit traffic to flow through TCP 6783 and UDP 6783/6784,
+which are Weave’s control and data ports.
+
+
 **See Also**
 
  * [Troubleshooting Weave](/site/troublehooting.md)

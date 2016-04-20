@@ -55,7 +55,7 @@ As noted above, the same steps are repeated for `$HOST2`. The only difference, b
 
 You can also peer with other hosts by specifying the IP address, and a `:port` by which `$HOST2` can reach `$HOST1`. 
 
->**Note:** If there is a firewall between `$HOST1` and `$HOST2`,  you must permit traffic to flow through TCP 6783 and UDP 6783/6798, which are Weave’s control and data ports.
+>**Note:** If there is a firewall between `$HOST1` and `$HOST2`,  you must permit traffic to flow through TCP 6783 and UDP 6783/6784, which are Weave’s control and data ports.
 
 There are a number of different ways that you can specify peers on a Weave network. You can launch Weave Net on `$HOST1` and then peer with `$HOST2`, or you can launch on `$HOST2` and peer with `$HOST1` or you can tell both hosts about each other at launch. The order in which peers are specified is not important. Weave Net automatically (re)connects to peers when they become available. 
 
