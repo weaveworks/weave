@@ -72,14 +72,14 @@ func (c *claim) Try(alloc *Allocator) bool {
 		return false
 	}
 
+	if c.ident == "_" { // Special "I don't have a unique ID" identifier
+		c.ident = c.cidr.Addr.String()
+	}
 	// We are the owner, check we haven't given it to another container
 	switch existingIdent := alloc.findOwner(c.cidr.Addr); existingIdent {
 	case "":
 		if err := alloc.space.Claim(c.cidr.Addr); err == nil {
 			alloc.debugln("Claimed", c.cidr, "for", c.ident)
-			if c.ident == "_" { // Special "I don't have a unique ID" identifier
-				c.ident = c.cidr.String()
-			}
 			alloc.addOwned(c.ident, c.cidr, c.isContainer)
 			c.sendResult(nil)
 		} else {
@@ -89,7 +89,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 		// same identifier is claiming same address; that's OK
 		alloc.debugln("Re-Claimed", c.cidr, "for", c.ident)
 		c.sendResult(nil)
-	case c.cidr.String():
+	case c.cidr.Addr.String():
 		// Address already allocated via "_" name
 		c.sendResult(fmt.Errorf("address %s already in use", c.cidr))
 	default:
