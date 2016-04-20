@@ -1937,7 +1937,7 @@ shift 1
 
 case "$COMMAND" in
     setup)
-        for img in $IMAGE $EXEC_IMAGE $PLUGIN_IMAGE ; do
+        for img in $IMAGE $EXEC_IMAGE $PLUGIN_IMAGE $WEAVEDB_IMAGE ; do
             docker pull $img
         done
         setup_cni
