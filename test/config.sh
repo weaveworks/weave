@@ -186,7 +186,7 @@ container_pid() {
 }
 
 restart_docker() {
-    CMD="command -v systemctl >/dev/null && sudo systemctl restart docker || sudo service docker restart"
+    CMD="command -v systemctl 2>/dev/null && sudo systemctl restart docker || sudo service docker restart"
     run_on $1 sh -c "$CMD"
 }
 

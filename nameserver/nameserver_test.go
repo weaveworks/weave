@@ -100,6 +100,36 @@ func (n *Nameserver) copyEntries() Entries {
 	return entries
 }
 
+// Database mock
+
+type MockDB struct {
+	data map[string][]byte
+}
+
+func NewMockDB() *MockDB {
+	return &MockDB{data: make(map[string][]byte)}
+}
+
+func (m *MockDB) Load(key string, val interface{}) (bool, error) {
+	if ret, ok := m.data[key]; ok {
+		reader := bytes.NewReader(ret)
+		dec := gob.NewDecoder(reader)
+		err := dec.Decode(val)
+		return true, err
+	}
+	return false, nil
+}
+
+func (m *MockDB) Save(key string, val interface{}) error {
+	buf := bytes.NewBuffer(nil)
+	enc := gob.NewEncoder(buf)
+	if err := enc.Encode(val); err != nil {
+		return err
+	}
+	m.data[key] = buf.Bytes()
+	return nil
+}
+
 func TestNameservers(t *testing.T) {
 	//common.SetLogLevel("debug")
 
@@ -249,17 +279,17 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	require.Nil(t, err)
 	nameserver := makeNameserver(peername)
 
-	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
-	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
+	nameserver.AddEntry(hostname1, container1, peername, addr1)
+	require.Equal(t, []address.Address{addr1}, nameserver.Lookup(hostname1))
 
-	nameserver.ContainerDied("containerid")
-	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
+	nameserver.ContainerDied(container1)
+	require.Equal(t, []address.Address{}, nameserver.Lookup(hostname1))
 
-	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
-	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
+	nameserver.AddEntry(hostname1, container1, peername, addr1)
+	require.Equal(t, []address.Address{addr1}, nameserver.Lookup(hostname1))
 
 	nameserver.PeerGone(peername)
-	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
+	require.Equal(t, []address.Address{}, nameserver.Lookup(hostname1))
 }
 
 func TestTombstoneDeletion(t *testing.T) {
@@ -271,19 +301,19 @@ func TestTombstoneDeletion(t *testing.T) {
 	require.Nil(t, err)
 	nameserver := makeNameserver(peername)
 
-	nameserver.AddEntry("hostname", "containerid", peername, address.Address(0))
-	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
+	nameserver.AddEntry(hostname1, container1, peername, addr1)
+	require.Equal(t, []address.Address{addr1}, nameserver.Lookup(hostname1))
 
 	nameserver.deleteTombstones()
-	require.Equal(t, []address.Address{0}, nameserver.Lookup("hostname"))
+	require.Equal(t, []address.Address{addr1}, nameserver.Lookup(hostname1))
 
-	nameserver.Delete("hostname", "containerid", "", address.Address(0))
-	require.Equal(t, []address.Address{}, nameserver.Lookup("hostname"))
+	nameserver.Delete(hostname1, container1, "", addr1)
+	require.Equal(t, []address.Address{}, nameserver.Lookup(hostname1))
 	require.Equal(t, l(Entries{Entry{
-		ContainerID: "containerid",
+		ContainerID: container1,
 		Origin:      peername,
-		Addr:        address.Address(0),
-		Hostname:    "hostname",
+		Addr:        addr1,
+		Hostname:    hostname1,
 		Version:     1,
 		Tombstone:   1234,
 	}}), nameserver.entries)
@@ -315,13 +345,12 @@ func TestRestore(t *testing.T) {
 
 	entries := nameserver.copyEntries()
 	require.Equal(t,
-		Entries{
+		l(Entries{
 			Entry{
 				ContainerID: container1,
 				Origin:      name,
 				Addr:        addr1,
 				Hostname:    hostname1,
-				lHostname:   hostname1,
 				Version:     1,
 				Tombstone:   4321,
 				stopped:     true,
@@ -331,7 +360,6 @@ func TestRestore(t *testing.T) {
 				Origin:      name,
 				Addr:        addr2,
 				Hostname:    hostname2,
-				lHostname:   hostname2,
 				Version:     1,
 				Tombstone:   1234,
 				stopped:     false,
@@ -341,16 +369,15 @@ func TestRestore(t *testing.T) {
 				Origin:      name,
 				Addr:        addr3,
 				Hostname:    hostname2,
-				lHostname:   hostname2,
 				Version:     1,
 				Tombstone:   4321,
 				stopped:     true,
 			},
-		}, entries, "")
+		}), entries)
 }
 
 // TestAddEntryWithRestore tests whether stopped entries have been restored and
-// broadcasted to the peers.
+// broadcasted to the connected peers.
 func TestAddEntryWithRestore(t *testing.T) {
 	oldNow := now
 	defer func() { now = oldNow }()
@@ -364,14 +391,10 @@ func TestAddEntryWithRestore(t *testing.T) {
 	ns1.AddEntry(hostname3, container2, ns1.ourName, addr2)
 	ns1.Delete(hostname3, container2, "", addr2)
 
-	// Restart ns1 and preserve its db instance for marking the first entry as stopped
+	// Restart ns1 and preserve its db instance
 	time.Sleep(200 * time.Millisecond)
 	ns1.Stop()
 	grouter.RemovePeer(ns1.ourName)
-	// TODO(mp) possible race: 1) PeerGone 2) OnGossipBroadcast
-	// TODO(mp) test 'found=true'
-	// TODO(mp) test netsplit for br messages
-
 	ns2.PeerGone(ns1.ourName)
 	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true })
 	ns1 = nameservers[0]
@@ -381,32 +404,31 @@ func TestAddEntryWithRestore(t *testing.T) {
 	// At this point, the c1 entry is set to stopped
 	entries := ns1.copyEntries()
 	require.Equal(t,
-		Entry{
+		l(Entries{Entry{
 			ContainerID: container1,
 			Origin:      ns1.ourName,
 			Addr:        addr1,
 			Hostname:    hostname2,
-			lHostname:   hostname2,
 			Version:     1,
 			Tombstone:   1234,
 			stopped:     true,
-		}, entries[0], "")
+		}}), Entries{entries[0]})
 
 	// ns2 should store the tombstoned c1 entry (c2 has been wiped by PeerGone)
 	time.Sleep(200 * time.Millisecond)
 	entries = ns2.copyEntries()
-	require.Len(t, entries, 1, "")
-	require.Equal(t, container1, entries[0].ContainerID, "")
-	require.Equal(t, int64(1234), entries[0].Tombstone, "")
+	require.Len(t, entries, 1)
+	require.Equal(t, container1, entries[0].ContainerID)
+	require.Equal(t, int64(1234), entries[0].Tombstone)
 
 	ns1.AddEntry(hostname1, container1, ns1.ourName, addr3)
 	time.Sleep(200 * time.Millisecond)
 
 	// c1 (hostname1 -> addr1) should be restored and propagated to ns2
 	entries = ns2.copyEntries()
-	require.Len(t, entries, 2, "")
+	require.Len(t, entries, 2)
 	require.Equal(t,
-		Entry{
+		l(Entries{Entry{
 			ContainerID: container1,
 			Origin:      ns1.ourName,
 			Addr:        addr1,
@@ -415,13 +437,13 @@ func TestAddEntryWithRestore(t *testing.T) {
 			Version:     2,
 			Tombstone:   0,
 			stopped:     false,
-		}, entries[1], "")
+		}}), Entries{entries[1]})
 
 	grouter.Flush()
 }
 
-// TestRestoreBroadcast tests whether a broadcast message is gossiped about
-// stopped entries during the restore step.
+// TestRestoreBroadcast tests whether a broadcast message emitted during
+// the restoration is sent to other peers.
 func TestRestoreBroadcast(t *testing.T) {
 	oldNow := now
 	defer func() { now = oldNow }()
@@ -433,9 +455,9 @@ func TestRestoreBroadcast(t *testing.T) {
 
 	ns1.AddEntry(hostname1, container1, ns1.ourName, addr1)
 
-	// ns2 has received message containing the entry for container1
+	// ns2 has received a message containing the entry of container1
 	time.Sleep(200 * time.Millisecond)
-	require.Equal(t, addrs{addr1}.String(), addrs(ns2.Lookup(hostname1)).String(), "")
+	require.Equal(t, addrs{addr1}.String(), addrs(ns2.Lookup(hostname1)).String())
 
 	// Restart ns1
 	ns1.Stop()
@@ -448,17 +470,16 @@ func TestRestoreBroadcast(t *testing.T) {
 	// n2 should have received broadcast message indicating that the entry is tombstoned
 	time.Sleep(200 * time.Millisecond)
 	entries := ns2.copyEntries()
-	require.Equal(t, Entries{
+	require.Equal(t, l(Entries{
 		Entry{
 			ContainerID: container1,
 			Origin:      ns1.ourName,
 			Addr:        addr1,
 			Hostname:    hostname1,
-			lHostname:   hostname1,
 			Version:     1,
 			Tombstone:   1234,
 			stopped:     false,
-		}}, entries, "")
+		}}), entries)
 
 	grouter.Flush()
 }
@@ -474,44 +495,16 @@ func TestStopContainer(t *testing.T) {
 	nameserver := makeNameserver(name)
 
 	nameserver.AddEntry(hostname1, container1, name, addr1)
-	nameserver.AddEntry(hostname2, container1, name, addr2)
-	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String(), "")
-	require.Equal(t, addrs{addr2}.String(), addrs(nameserver.Lookup(hostname2)).String(), "")
+	nameserver.AddEntry(hostname2, container1, name, addr1)
+	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String())
+	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname2)).String())
 
 	nameserver.ContainerDied(container1)
-	require.Equal(t, "", addrs(nameserver.Lookup(hostname1)).String(), "")
-	require.Equal(t, "", addrs(nameserver.Lookup(hostname2)).String(), "")
-	nameserver.AddEntry(hostname2, container1, name, addr2)
-	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String(), "")
-	require.Equal(t, addrs{addr2}.String(), addrs(nameserver.Lookup(hostname2)).String(), "")
-}
+	require.Equal(t, "", addrs(nameserver.Lookup(hostname1)).String())
+	require.Equal(t, "", addrs(nameserver.Lookup(hostname2)).String())
 
-// Database mock
-
-type MockDB struct {
-	data map[string][]byte
-}
-
-func NewMockDB() *MockDB {
-	return &MockDB{data: make(map[string][]byte)}
-}
-
-func (m *MockDB) Load(key string, val interface{}) (bool, error) {
-	if ret, ok := m.data[key]; ok {
-		reader := bytes.NewReader(ret)
-		dec := gob.NewDecoder(reader)
-		err := dec.Decode(val)
-		return true, err
-	}
-	return false, nil
-}
-
-func (m *MockDB) Save(key string, val interface{}) error {
-	buf := bytes.NewBuffer(nil)
-	enc := gob.NewEncoder(buf)
-	if err := enc.Encode(val); err != nil {
-		return err
-	}
-	m.data[key] = buf.Bytes()
-	return nil
+	// AddEntry should restore both entries
+	nameserver.AddEntry(hostname2, container1, name, addr1)
+	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String())
+	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname2)).String())
 }

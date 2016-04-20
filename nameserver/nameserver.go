@@ -81,33 +81,33 @@ func (n *Nameserver) restoreFromDB() {
 		return
 	}
 
-	// Set .stopped for all non-tombstoned local entries to distinguish
-	// between tombstoned entries and the ones which were not tombstoned
-	// before termination of nameserver.
-
 	// TODO(mp) handle special case for weave:extern
-	// TODO(mp) use the output of `docker ps` to restore immediately entries of
-	// running containers.
+	// TODO(mp) optimization: use the output of `docker ps` to restore
+	//			immediately entries of running containers.
 
 	now := now()
 	for i, e := range n.entries {
-		// TODO(mp) check maybe it is possible to restore private fields :-/
+		if e.Origin != n.ourName {
+			panic(fmt.Sprintf(
+				"restore: peer %s DB should not have contained entries of %s peer",
+				n.ourName, e.Origin))
+		}
+		// .lHostname gets lost, because gob encoder which is used by the DB
+		// does not serialize private fields, so we need to do it manually :/
 		n.entries[i].addLowercase()
 		if e.Tombstone == 0 {
+			n.debugf("restore: restoring %s...", e)
+			// Set .stopped for all non-tombstoned local entries to distinguish
+			// between tombstoned entries and the ones which were not tombstoned
+			// before termination of nameserver.
 			n.entries[i].stopped = true
 			n.entries[i].Tombstone = now
-			// TODO(mp) incrementing the version number is probably not needed
-			// here, because:
-			// 1) the other peers might have removed the entry (due to PeerGone).
-			// 2) the ones which haven't removed the entry will get a newer version
-			//    after we will reinsert the entry.
 			n.entries[i].Version++
 			entries = append(entries, n.entries[i])
 		}
 	}
 
-	// At this point, gossip is not set, thus we add entries to be broadcasted
-	// once the gossip interface has been set.
+	// Will gossip once we set the gossiper
 	n.pendingBroadcast = entries
 
 	n.debugf("restore: finished.")
@@ -148,8 +148,8 @@ func (n *Nameserver) broadcastEntries(es ...Entry) {
 	})
 }
 
-// TODO(mp) optimization: add restoreStopped flag which would indicate whether
-// we need to restore stopped entries
+// TODO(mp) optimization: pass restoreStopped flag to indicate whether
+//			we need to restore stopped entries.
 func (n *Nameserver) AddEntry(hostname, containerid string,
 	origin mesh.PeerName, addr address.Address) {
 
@@ -158,7 +158,7 @@ func (n *Nameserver) AddEntry(hostname, containerid string,
 
 	n.Lock()
 
-	// Check for the stopped entries first
+	// Restore the stopped entries first
 	for i, e := range n.entries {
 		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
 			if !found && e.Addr == addr {
@@ -275,7 +275,7 @@ func (n *Nameserver) deleteTombstones() {
 // snapshot stores the local entries (Origin == n.ourName) to the database.
 // NB: we assume that a caller has taken the nameserver' read or write lock.
 func (n *Nameserver) snapshot() {
-	entries := n.entries.copyAndFilter(
+	entries := n.entries.filterCopy(
 		func(e *Entry) bool {
 			if e.Origin == n.ourName {
 				return true

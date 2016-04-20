@@ -23,11 +23,8 @@ type Entry struct {
 	lHostname   string // lowercased (not exported, so not encoded by gob)
 	Version     int
 	Tombstone   int64 // timestamp of when it was deleted
-	// Denotes whether the container might be stopped. The field is set to true
-	// (in conjunction with Tombstone) when restoring entries from a DB. During that
-	// time it is not known whether the container is running. The stopped entries are
-	// restored for the given container by AddEntry with ContainerID equal to ID of the
-	// container.
+	// (stopped==true && Tombstone > 0) denotes that container might be stopped;
+	// its entries will be restored by the AddEntry function call.
 	stopped bool
 }
 
@@ -224,9 +221,9 @@ func (es *Entries) filter(f func(*Entry) bool) {
 	*es = (*es)[:i]
 }
 
-// copyAndFilter makes a copy of receiver entries and does filtering before
-// returning them.
-func (es Entries) copyAndFilter(f func(*Entry) bool) Entries {
+// filterCopy makes a copy of the receiver entries and filters the copy before
+// returning it.
+func (es Entries) filterCopy(f func(*Entry) bool) Entries {
 	entries := make(Entries, len(es))
 
 	copy(entries, es)

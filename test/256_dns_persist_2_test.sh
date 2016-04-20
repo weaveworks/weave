@@ -50,7 +50,7 @@ assert_dns_a_record $HOST2 c3 $NAME1 $C2
 # Restart Docker on $HOST1; DNS entries of c2 should be restored
 restart_docker $HOST1
 
-sleep 3
+sleep 5
 assert_dns_a_record $HOST2 c3 $NAME $C2
 assert_dns_a_record $HOST2 c3 $NAME1 $C2
 
