@@ -81,7 +81,6 @@ func (n *Nameserver) restoreFromDB() {
 		return
 	}
 
-	// TODO(mp) handle special case for weave:extern
 	// TODO(mp) optimization: use the output of `docker ps` to restore
 	//			immediately entries of running containers.
 
@@ -93,16 +92,25 @@ func (n *Nameserver) restoreFromDB() {
 				n.ourName, e.Origin))
 		}
 		// .lHostname gets lost, because gob encoder which is used by the DB
-		// does not serialize private fields, so we need to do it manually :/
+		// does not serialize private fields, so we need to set this field manually :/
 		n.entries[i].addLowercase()
 		if e.Tombstone == 0 {
+			// Special case: restore "weave:extern"
+			// TODO(mp) personally, I don't like the idea, that "weave:extern" is exposed to
+			//			nameserver. IMO, it should not know about this hack. One way to get
+			//			rid of it, is to introduce /restore_all/container_id API which
+			//			would be called from the weave script.
 			n.debugf("restore: restoring %s...", e)
-			// Set .stopped for all non-tombstoned local entries to distinguish
-			// between tombstoned entries and the ones which were not tombstoned
-			// before termination of nameserver.
-			n.entries[i].stopped = true
-			n.entries[i].Tombstone = now
-			n.entries[i].Version++
+			if e.ContainerID == "weave:extern" {
+				n.entries[i].Tombstone = 0
+			} else {
+				// Set .stopped for all non-tombstoned local entries to distinguish
+				// between tombstoned entries and the ones which were not tombstoned
+				// before termination of nameserver.
+				n.entries[i].stopped = true
+				n.entries[i].Tombstone = now
+				n.entries[i].Version++
+			}
 			entries = append(entries, n.entries[i])
 		}
 	}
