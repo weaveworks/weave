@@ -40,7 +40,6 @@ var (
 	ErrTokenOutOfRange = errors.New("Token is out of range")
 	ErrDifferentSeeds  = errors.New("Received ring was seeded differently from ours!")
 	ErrDifferentRange  = errors.New("Received range differs from ours!")
-	ErrNotFound        = errors.New("No entries for peer found")
 )
 
 func errInconsistentEntry(mine, theirs *entry) error {
