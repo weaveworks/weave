@@ -6,14 +6,14 @@ wait_for_container() {
     host="$1"
     container="$2"
     for i in $(seq 1 120); do
-        echo "Waiting for $2 to start"
+        echo "Waiting for container $2 to start"
         state=$(docker_on $host inspect -f "{{.State.Status}}" $container 2>/dev/null)
         if [ "$state" == "running" ]; then
             return
         fi
         sleep 1
     done
-    echo "Timed out waiting for $2 to start" >&2
+    echo "Timed out waiting for container $2 to start" >&2
     exit 1
 }
 
@@ -52,11 +52,11 @@ assert_no_dns_record $HOST2 c3 $NAME
 assert_no_dns_record $HOST2 c3 $NAME1
 assert_no_dns_record $HOST2 c3 $NAME2
 
-# Start weave on $HOST1; it should restore DNS entries.
+# Start weave on $HOST1, it should restore its local DNS entries.
 weave_on $HOST1 launch
 
-sleep 1
-# $NAME and $NAME1 should be restored
+sleep 3
+# $NAME and $NAME1 should be restored.
 assert_dns_a_record $HOST2 c3 $NAME $C2
 assert_dns_a_record $HOST2 c3 $NAME1 $C2
 assert_dns_a_record $HOST2 c3 $NAME2 $IP
@@ -71,12 +71,15 @@ assert_dns_a_record $HOST2 c3 $NAME $C2
 assert_dns_a_record $HOST2 c3 $NAME1 $C2
 assert_dns_a_record $HOST2 c3 $NAME2 $IP
 
-# Restart Docker on $HOST1; DNS entries of c2 should be restored
+# Restart Docker on $HOST1, DNS entries of c2 should be restored.
 restart_docker $HOST1
 
 wait_for_container $HOST1 weave
 wait_for_container $HOST1 c2
-sleep 10 # TODO(mp) fix it
+# TODO(mp) the following sleep time is way too long and might differ on
+#          different machines. Add a better mechanism for detecting when entries get
+#          re-populated.
+sleep 10
 
 assert_dns_a_record $HOST2 c3 $NAME $C2
 assert_dns_a_record $HOST2 c3 $NAME1 $C2

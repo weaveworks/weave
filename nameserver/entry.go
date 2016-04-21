@@ -152,7 +152,6 @@ func (es *Entries) add(hostname, containerid string, origin mesh.PeerName, addr 
 	i := sort.Search(len(*es), func(i int) bool {
 		return !(*es)[i].insensitiveLess(&entry)
 	})
-	// TODO(mp) think about updating the "stopped" field here
 	if i < len(*es) && (*es)[i].equal(entry) {
 		if (*es)[i].Tombstone > 0 {
 			(*es)[i].Tombstone = 0

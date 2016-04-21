@@ -29,6 +29,9 @@ const (
 
 	// Used as a key for stored nameserver entries in the database
 	nameserverIdent = "nameserver"
+
+	// Used as an identifier for entries which do not belong to the Weave network
+	externContainerID = "weave:extern"
 )
 
 // Nameserver: gossip-based, in memory nameserver.
@@ -81,6 +84,10 @@ func (n *Nameserver) restoreFromDB() {
 		return
 	}
 
+	// lHostname gets lost, because the gob encoder which is used internally by the DB
+	// wrapper does not serialize private fields, so we need to set this field manually
+	n.entries.addLowercase()
+
 	// TODO(mp) optimization: use the output of `docker ps` to restore
 	//			immediately entries of running containers.
 
@@ -91,19 +98,15 @@ func (n *Nameserver) restoreFromDB() {
 				"restore: peer %s DB should not have contained entries of %s peer",
 				n.ourName, e.Origin))
 		}
-		// .lHostname gets lost, because gob encoder which is used by the DB
-		// does not serialize private fields, so we need to set this field manually :/
-		n.entries[i].addLowercase()
 		if e.Tombstone == 0 {
-			// Special case: restore "weave:extern"
-			// TODO(mp) personally, I don't like the idea, that "weave:extern" is exposed to
-			//			nameserver. IMO, it should not know about this hack. One way to get
-			//			rid of it, is to introduce /restore_all/container_id API which
+			n.debugf("restore: restoring %v...", e)
+			// We should not tombstone entries for "weave:extern", because there
+			// might be no subsequent AddEntry call for external IPs
+			// TODO(mp) personally, I don't like the idea, that nameserver is aware of"weave:extern"
+			//			IMO, it should not know about this workaround. One way to get
+			//			rid of it, is to introduce e.g. /restore/$CONTAINER_ID API which
 			//			would be called from the weave script.
-			n.debugf("restore: restoring %s...", e)
-			if e.ContainerID == "weave:extern" {
-				n.entries[i].Tombstone = 0
-			} else {
+			if e.ContainerID != externContainerID {
 				// Set .stopped for all non-tombstoned local entries to distinguish
 				// between tombstoned entries and the ones which were not tombstoned
 				// before termination of nameserver.
@@ -167,15 +170,17 @@ func (n *Nameserver) AddEntry(hostname, containerid string,
 	n.Lock()
 
 	// Restore the stopped entries first
-	for i, e := range n.entries {
-		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
-			if !found && e.Addr == addr {
-				found = true
+	if containerid != externContainerID {
+		for i, e := range n.entries {
+			if e.Origin == origin && e.ContainerID == containerid && e.stopped {
+				if !found && e.Addr == addr {
+					found = true
+				}
+				n.entries[i].stopped = false
+				n.entries[i].Tombstone = 0
+				n.entries[i].Version++
+				entries = append(entries, n.entries[i])
 			}
-			n.entries[i].stopped = false
-			n.entries[i].Tombstone = 0
-			n.entries[i].Version++
-			entries = append(entries, n.entries[i])
 		}
 	}
 
