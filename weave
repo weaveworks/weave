@@ -2179,8 +2179,8 @@ EOF
         for CIDR in $ALL_CIDRS ; do
             call_weave PUT /ip/$CONTAINER/$CIDR?check-alive=true
         done
-        with_container_netns_or_die $1 attach $ALL_CIDRS
-        when_weave_running with_container_fqdn $1 put_dns_fqdn $ALL_CIDRS
+        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
         ;;
     dns-add)
