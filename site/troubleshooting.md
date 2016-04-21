@@ -80,11 +80,11 @@ $ weave status
 The terms used here are explained further at
 [How Weave Net Works](/site/how-it-works.md).
 
-  * **Version** - shows the Weave Net version. If checkpoint is enabled (i.e.
+ * **Version** - shows the Weave Net version. If checkpoint is enabled (i.e.
 `CHECKPOINT_DISABLE` is not set), information about existence of a new version
 will be shown.
 
-  * **Protocol**- indicates the Weave Router inter-peer
+ * **Protocol**- indicates the Weave Router inter-peer
 communication protocol name and supported versions (min..max).
 
  * **Name** - identifies the local Weave Router as a peer on the
