@@ -293,7 +293,7 @@ func main() {
 		}
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
-		http.Handle("/", muxRouter)
+		http.Handle("/", common.LoggingHTTPHandler(muxRouter))
 		Log.Println("Listening for HTTP control messages on", httpAddr)
 		go listenAndServeHTTP(httpAddr, muxRouter)
 	}
