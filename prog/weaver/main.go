@@ -452,6 +452,7 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
+	router.Peers.OnGC(func(peer *mesh.Peer) { allocator.PeerGone(peer.Name) })
 
 	return allocator, defaultSubnet
 }
