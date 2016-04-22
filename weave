@@ -1211,7 +1211,7 @@ dns_args() {
     [ -n "$WITHOUT_DNS" ] && return 0
 
     docker_bridge_ip
-    DNS_ARGS="--dns $DOCKER_BRIDGE_IP"
+    DNS_ARGS="--dns=$DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         HOSTNAME="$NAME_ARG.${DNS_DOMAIN%.}"
         if [ ${#HOSTNAME} -gt 64 ] ; then
