@@ -90,11 +90,13 @@ type Config struct {
 // NewAllocator creates and initialises a new Allocator
 func NewAllocator(config Config) *Allocator {
 	var participant paxos.Participant
+
 	if config.IsObserver {
 		participant = paxos.NewObserver()
 	} else {
 		participant = paxos.NewNode(config.OurName, config.OurUID, 0)
 	}
+
 	return &Allocator{
 		ourName:     config.OurName,
 		seed:        config.Seed,
@@ -483,6 +485,22 @@ func (alloc *Allocator) annotatePeernames(names []mesh.PeerName) []string {
 		}
 	}
 	return res
+}
+
+// PeerGone removes nicknames of peers which are no longer mentioned
+// in the ring. Async.
+//
+// NB: the function is invoked by the gossip library routines and should be
+//     registered manually.
+func (alloc *Allocator) PeerGone(peerName mesh.PeerName) {
+	alloc.debugln("PeerGone: peer %s", peerName)
+
+	alloc.actionChan <- func() {
+		ringPeers := alloc.ring.PeerNames()
+		if _, ok := ringPeers[peerName]; !ok {
+			delete(alloc.nicknames, peerName)
+		}
+	}
 }
 
 func decodeRange(msg []byte) (r address.Range, err error) {
