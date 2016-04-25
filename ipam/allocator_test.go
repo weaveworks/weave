@@ -329,8 +329,8 @@ func TestNoFrag(t *testing.T) {
 	resultChan := make(chan int)
 	for i := 0; i < 100; i++ {
 		allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
-		allocs[1].Allocate("foo", subnet, returnFalse)
-		allocs[2].Allocate("bar", subnet, returnFalse)
+		allocs[1].Allocate("foo", subnet, true, returnFalse)
+		allocs[2].Allocate("bar", subnet, true, returnFalse)
 		allocs[2].actionChan <- func() {
 			resultChan <- len(allocs[2].ring.Entries)
 		}
