@@ -189,42 +189,68 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 	r.Entries.insert(entry{Token: end, Peer: r.Peer, Free: endFree})
 }
 
-// Merge the given ring into this ring and return any new ranges added
-func (r *Ring) Merge(gossip Ring) error {
+// Merge the given ring into this ring and indicate whether this ring
+// got updated as a result.
+func (r *Ring) Merge(gossip Ring) (bool, error) {
 	r.assertInvariants()
 	defer r.updateExportedVariables()
 
 	// Don't panic when checking the gossiped in ring.
 	// In this case just return any error found.
 	if err := gossip.checkInvariants(); err != nil {
-		return err
+		return false, err
 	}
 
 	if len(gossip.Seeds) > 0 && len(r.Seeds) > 0 {
 		if len(gossip.Seeds) != len(r.Seeds) {
-			return ErrDifferentSeeds
+			return false, ErrDifferentSeeds
 		}
 		for i, seed := range gossip.Seeds {
 			if seed != r.Seeds[i] {
-				return ErrDifferentSeeds
+				return false, ErrDifferentSeeds
 			}
 		}
 	}
 
 	if r.Start != gossip.Start || r.End != gossip.End {
-		return ErrDifferentRange
+		return false, ErrDifferentRange
 	}
 
-	// Now merge their ring with yours, in a temporary ring.
-	var result entries
-	addToResult := func(e entry) { result = append(result, &e) }
+	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer)
 
+	if err != nil {
+		return false, err
+	}
+
+	if err := r.checkEntries(result); err != nil {
+		return false, fmt.Errorf("Merge of incoming data causes: %s", err)
+	}
+
+	if len(r.Seeds) == 0 {
+		r.Seeds = gossip.Seeds
+	}
+	r.Entries = result
+	return updated, nil
+}
+
+// Merge other entries into ours, and complain when that stomps on
+// entries belonging to ourPeer. Returns the merged entries and an
+// indication whether the merge resulted in any changes, i.e. the
+// result differs from the original.
+func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, updated bool, err error) {
 	var mine, theirs *entry
 	var previousOwner *mesh.PeerName
-	// i is index into r.Entries; j is index into gossip.Entries
+	addToResult := func(e entry) { result = append(result, &e) }
+	addTheirs := func(e entry) {
+		addToResult(e)
+		updated = true
+		previousOwner = nil
+	}
+
+	// i is index into es; j is index into other
 	var i, j int
-	for i < len(r.Entries) && j < len(gossip.Entries) {
-		mine, theirs = r.Entries[i], gossip.Entries[j]
+	for i < len(es) && j < len(other) {
+		mine, theirs = es[i], other[j]
 		switch {
 		case mine.Token < theirs.Token:
 			addToResult(*mine)
@@ -232,59 +258,52 @@ func (r *Ring) Merge(gossip Ring) error {
 			i++
 		case mine.Token > theirs.Token:
 			// insert, checking that a range owned by us hasn't been split
-			if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-				return errEntryInMyRange(theirs)
+			if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
+				err = errEntryInMyRange(theirs)
+				return
 			}
-			addToResult(*theirs)
-			previousOwner = nil
+			addTheirs(*theirs)
 			j++
 		case mine.Token == theirs.Token:
 			// merge
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					return errInconsistentEntry(mine, theirs)
+					err = errInconsistentEntry(mine, theirs)
+					return
 				}
 				addToResult(*mine)
 				previousOwner = &mine.Peer
 			case mine.Version < theirs.Version:
-				if mine.Peer == r.Peer { // We shouldn't receive updates to our own tokens
-					return errNewerVersion(mine, theirs)
+				if mine.Peer == ourPeer { // We shouldn't receive updates to our own tokens
+					err = errNewerVersion(mine, theirs)
+					return
 				}
-				addToResult(*theirs)
-				previousOwner = nil
+				addTheirs(*theirs)
 			}
 			i++
 			j++
 		}
 	}
 
-	// At this point, either i is at the end of r or j is at the end
-	// of gossip, so copy over the remaining entries.
+	// At this point, either i is at the end of es or j is at the end
+	// of other, so copy over the remaining entries.
 
-	for ; i < len(r.Entries); i++ {
-		mine = r.Entries[i]
+	for ; i < len(es); i++ {
+		mine = es[i]
 		addToResult(*mine)
 	}
 
-	for ; j < len(gossip.Entries); j++ {
-		theirs = gossip.Entries[j]
-		if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-			return errEntryInMyRange(theirs)
+	for ; j < len(other); j++ {
+		theirs = other[j]
+		if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
+			err = errEntryInMyRange(theirs)
+			return
 		}
-		addToResult(*theirs)
-		previousOwner = nil
+		addTheirs(*theirs)
 	}
 
-	if err := r.checkEntries(result); err != nil {
-		return fmt.Errorf("Merge of incoming data causes: %s", err)
-	}
-
-	if len(r.Seeds) == 0 {
-		r.Seeds = gossip.Seeds
-	}
-	r.Entries = result
-	return nil
+	return
 }
 
 // Empty returns true if the ring has no entries
