@@ -84,8 +84,7 @@ func (n *Nameserver) restoreFromDB() {
 		return
 	}
 
-	// lHostname gets lost, because the gob encoder which is used internally by the DB
-	// wrapper does not serialize private fields, so we need to set this field manually
+	// lHostname gets lost during serialization, so we need to set this field manually
 	n.entries.addLowercase()
 
 	// TODO(mp) optimization: use the output of `docker ps` to restore
@@ -297,7 +296,7 @@ func (n *Nameserver) snapshot() {
 		})
 	// TODO(mp) optimize: store a single entry per key-val pair.
 	if err := n.db.Save(nameserverIdent, entries); err != nil {
-		n.errorf("saving to DB failed to due: %s", err)
+		n.errorf("saving to DB failed due to: %s", err)
 	}
 }
 

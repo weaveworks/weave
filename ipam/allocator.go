@@ -262,7 +262,7 @@ func (alloc *Allocator) Claim(ident string, cidr address.CIDR, noErrorOnUnknown 
 func (alloc *Allocator) ContainerDied(ident string) {
 	alloc.actionChan <- func() {
 		if alloc.hasOwned(ident) {
-			alloc.debugln("Container", ident, "died; nothing to remove later")
+			alloc.debugln("Container", ident, "died; noting to remove later")
 			alloc.dead[ident] = alloc.now()
 		}
 		// Also remove any pending ops
