@@ -499,12 +499,13 @@ func TestStopContainer(t *testing.T) {
 	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String())
 	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname2)).String())
 
+	nameserver.Delete(hostname1, container1, "", addr1)
 	nameserver.ContainerDied(container1)
 	require.Equal(t, "", addrs(nameserver.Lookup(hostname1)).String())
 	require.Equal(t, "", addrs(nameserver.Lookup(hostname2)).String())
 
-	// AddEntry should restore both entries
+	// AddEntry should restore the non-tombstoned entry
 	nameserver.AddEntry(hostname2, container1, name, addr1)
-	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String())
+	require.Equal(t, "", addrs(nameserver.Lookup(hostname1)).String())
 	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname2)).String())
 }
