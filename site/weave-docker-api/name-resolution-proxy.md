@@ -17,7 +17,7 @@ returns the Weave Net IP address. This is required for many cluster-aware
 applications to work.
 - unqualified names get resolved via DNS, for example typically via weaveDNS
 to Weave Net IP addresses. This is required so that in a typical setup
-one can simply "ping <container-name>", i.e. without having to
+one can simply "ping `<container-name>`", i.e. without having to
 specify a `.weave.local` suffix.
 
 If you prefer to keep `/etc/hosts` under Docker's control (for

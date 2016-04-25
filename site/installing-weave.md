@@ -24,8 +24,8 @@ With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weav
 
 ###Quick Start Screencast
 
-<a href="https://youtu.be/kihQCCT1ykE" alt="Click to watch the screencast" target="_blank">
-  <img src="hello-screencast.png" />
+<a href="https://youtu.be/kihQCCT1ykE" target="_blank">
+  <img src="hello-screencast.png" alt="Click to watch the screencast" />
 </a>
 
 ###Guides for specific platforms

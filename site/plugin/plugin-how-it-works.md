@@ -1,6 +1,6 @@
 ---
 title: How the Weave Net Docker Network Plugin Works
-layout: default
+menu_order: 20
 ---
 
 
