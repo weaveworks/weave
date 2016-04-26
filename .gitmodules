@@ -4,9 +4,6 @@
 [submodule "vendor/github.com/vishvananda/netlink"]
 	path = vendor/github.com/vishvananda/netlink
 	url = https://github.com/vishvananda/netlink.git
-[submodule "vendor/github.com/davecheney/profile"]
-	path = vendor/github.com/davecheney/profile
-	url = https://github.com/davecheney/profile.git
 [submodule "vendor/github.com/gorilla/mux"]
 	path = vendor/github.com/gorilla/mux
 	url = https://github.com/gorilla/mux.git
@@ -70,3 +67,6 @@
 [submodule "vendor/github.com/coreos/go-iptables"]
 	path = vendor/github.com/coreos/go-iptables
 	url = https://github.com/coreos/go-iptables
+[submodule "vendor/github.com/pkg/profile"]
+	path = vendor/github.com/pkg/profile
+	url = https://github.com/pkg/profile

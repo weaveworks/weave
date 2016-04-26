@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecheney/profile"
 	"github.com/docker/docker/pkg/mflag"
 	"github.com/gorilla/mux"
+	"github.com/pkg/profile"
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/go-checkpoint"
@@ -231,10 +231,7 @@ func main() {
 	checkForUpdates()
 
 	if prof != "" {
-		p := *profile.CPUProfile
-		p.ProfilePath = prof
-		p.NoShutdownHook = true
-		defer profile.Start(&p).Stop()
+		defer profile.Start(profile.CPUProfile, profile.ProfilePath(prof), profile.NoShutdownHook).Stop()
 	}
 
 	if protocolMinVersion < mesh.ProtocolMinVersion || protocolMinVersion > mesh.ProtocolMaxVersion {
