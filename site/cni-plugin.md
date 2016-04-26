@@ -1,6 +1,5 @@
 ---
 title: Integrating Kubernetes via the CNI Plugin
-layout: default
 menu_order: 65
 ---
 

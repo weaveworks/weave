@@ -1,6 +1,5 @@
 ---
 title: How Weave Net Implements Encryption
-layout: default
 menu_order: 70
 ---
 

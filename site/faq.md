@@ -33,7 +33,7 @@ For example, you have a Weave network that runs on hosts A, B, C. and you have a
 
 The simplest way to accomplish this would be to run Weave on the host and then run, `weave expose` to expose the network to any running containers.  See [Integrating a Network Host](/site/using-weave/host-network-integration.md) If this is not possible, you could also  expose a port on the container on host B and then connect to it. 
 
-You can read about exposing ports in [Service Exporting](/site/using-weave/service-export.md)
+You can read about exposing ports in [Service Exporting](/site/using-weave/service-export.md).
 
 
 **Q: Why am I seeing the same IP address assigned to two different containers on different hosts?**
@@ -46,7 +46,7 @@ Once the peers detect the inconsistency, they log the error and drop the connect
 
 Some peers may be able to communicate their claim to the others before they run `rmpeer` (i.e. it's a race), so what you can expect is a few cliques of peers that are still talking to each other, but repeatedly dropping attempted connections with peers in other cliques.
 
-For more information on see [Address Allocation with IP Address Management (IPAM)](/site/ipam.md) and also, [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md)
+For more information on see [Allocating IP Addresses](/site/ipam.md) and also, [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md).
 
 
 **Q: What is the best practice for resetting a node that goes out of service?**
@@ -62,14 +62,14 @@ All virtualization techniques have some overhead, and Weave's overhead is typica
 
 Weave Net also automatically uses the fastest datapath between two hosts. When Weave Net can't use the fast datapath between two hosts, it falls back to the slower packet forwarding approach. Selecting the fastest forwarding approach is automatic, and is determined on a connection-by-connection basis. For example, a Weave network spanning two data centers might use fast datapath within the data centers, but not for the more constrained network link between them.
 
-For more information about fast datapath see [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md)
+For more information about fast datapath see [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
 
 
 **Q:How can I tell if Weave is using fast datapath (fastdp) or not?**
 
 To view whether Weave is using fastdp or not, you can run, `weave status connections`
 
-For more information on this command, see [Using Fast Datapath](/site/using-weave/fastdp.md)
+For more information on this command, see [Using Fast Datapath](/site/using-weave/fastdp.md).
 
 
 **Q: Does encryption work with fastdp?**
@@ -78,11 +78,11 @@ Encryption does not work with fast datapath. If you enable encryption using the 
 
 You can however have a mixture of fast datapath connections over trusted links, as well as, encrypted connections over untrusted links.
 
-See [Using Fast Datapath](/site/using-weave/fastdp.md) for more information
+See [Using Fast Datapath](/site/using-weave/fastdp.md) for more information.
 
 **Q: Can I create multiple networks where containers can communicate on one network, but are isolated from containers on other networks?**
 
-Yes, of course!  Weave allows you to run isolated networks and still allow open communications between individual containers from those isolated networks. You can find information on how to do this in [Application Isolation](/site/using-weave/application-isolation.md)
+Yes, of course!  Weave allows you to run isolated networks and still allow open communications between individual containers from those isolated networks. You can find information on how to do this in [Application Isolation](/site/using-weave/application-isolation.md).
 
 
 **Q: Which ports does Weave Net use (e.g. if I am configuring a firewall) ?**
