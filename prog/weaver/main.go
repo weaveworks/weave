@@ -304,7 +304,7 @@ func main() {
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
-		allocator.AllContainerIDs(ids)
+		allocator.PruneOwned(ids)
 	}
 
 	var (

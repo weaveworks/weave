@@ -320,13 +320,13 @@ func (alloc *Allocator) ContainerStarted(ident string) {
 	}
 }
 
-func (alloc *Allocator) AllContainerIDs(ids []string) {
+func (alloc *Allocator) PruneOwned(ids []string) {
 	alloc.actionChan <- func() {
 		idmap := make(map[string]struct{}, len(ids))
 		for _, id := range ids {
 			idmap[id] = struct{}{}
 		}
-		alloc.syncOwned(idmap)
+		alloc.pruneOwned(idmap)
 	}
 }
 
@@ -1004,7 +1004,7 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 }
 
 // For each ID in the 'owned' map, remove the entry if it isn't in the map
-func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
+func (alloc *Allocator) pruneOwned(ids map[string]struct{}) {
 	changed := false
 	for ident, d := range alloc.owned {
 		if !d.IsContainer {
