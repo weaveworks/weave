@@ -18,4 +18,7 @@ start_container_local_plugin $HOST2 --name=c2 --hostname=$C2_NAME --dns=$DNS_IP
 assert_raises "exec_on $HOST1 c1 $PING $C2_NAME"
 assert_raises "exec_on $HOST2 c2 $PING $C1_NAME"
 
+docker_on $HOST1 rm -f c1
+docker_on $HOST2 rm -f c2
+
 end_suite

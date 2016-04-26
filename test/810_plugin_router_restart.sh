@@ -21,4 +21,6 @@ assert "weave_on $HOST1 dns-lookup $C1_NAME" "$c1ip"
 start_container $HOST1 --name=c2
 assert_raises "container_ip $HOST1 c2 | grep -v $c1ip"
 
+docker_on $HOST1 rm -f c1 c2
+
 end_suite

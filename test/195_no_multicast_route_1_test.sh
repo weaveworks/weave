@@ -30,4 +30,6 @@ proxy docker_on $HOST1 start c2
 
 assert "show_multicast_route_on $HOST1 c2" "224.0.0.0/4 dev ethwe "
 
+docker_on $HOST1 rm -f c3
+
 end_suite

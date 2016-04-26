@@ -226,9 +226,7 @@ assert_dns_ptr_record() {
 start_suite() {
     for host in $HOSTS; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
-        PLUGIN_ID=$(docker_on $host ps -aq --filter=name=weaveplugin)
-        PLUGIN_FILTER="cat"
-        [ -n "$PLUGIN_ID" ] && PLUGIN_FILTER="grep -v $PLUGIN_ID"
+        PLUGIN_FILTER=$(docker_on $host inspect -f 'grep -v {{.Id}}' weaveplugin 2>/dev/null) || PLUGIN_FILTER=cat
         rm_containers $host $(docker_on $host ps -aq 2>/dev/null | $PLUGIN_FILTER)
         weave_on $host reset 2>/dev/null
     done
