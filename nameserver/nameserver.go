@@ -87,8 +87,15 @@ func New(ourName mesh.PeerName, domain string, db db.DB,
 func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 	// TODO(mp) HACK HACK HACK! "weave:extern" should be appended to nonStopped :-(((
 
+	var dbEntries []dbEntry
+
 	n.debugf("restore: starting...")
-	ok, err := n.db.Load(nameserverIdent, &n.entries)
+	ok, err := n.db.Load(nameserverIdent, &dbEntries)
+	for _, e := range dbEntries {
+		tmp := e.Entry
+		tmp.stopped = e.Stopped
+		n.entries = append(n.entries, tmp)
+	}
 
 	//n.debugf("restore: sleeping...")
 	//time.Sleep(60 * time.Second)
@@ -347,17 +354,36 @@ func (n *Nameserver) RestoreStopped(containerid string) {
 	// TODO(mp) used to restore weave:extern (maybe not needed).
 }
 
+type dbEntry struct {
+	Entry
+	Stopped bool
+}
+
 // snapshot stores the local entries (Origin == n.ourName) to the database.
 // NB: we assume that a caller has taken the nameserver' lock for reading or writing.
 func (n *Nameserver) snapshot() {
-	entries := n.entries.filterCopy(
-		func(e *Entry) bool {
-			if e.Origin == n.ourName {
-				return true
-			}
-			return false
-		})
-	if err := n.db.Save(nameserverIdent, entries); err != nil {
+	//dbEntries := make(dbEntry, len(
+	var dbEntries []dbEntry
+
+	for _, e := range n.entries {
+		if e.Origin == n.ourName {
+			dbEntries = append(dbEntries, dbEntry{e, e.stopped})
+		}
+	}
+
+	//entries := n.entries.filterCopy(
+	//	func(e *Entry) bool {
+	//		if e.Origin == n.ourName {
+	//			return true
+	//		}
+	//		return false
+	//	})
+
+	//for _, e := range entries {
+	//	dbEntries
+
+	//}
+	if err := n.db.Save(nameserverIdent, dbEntries); err != nil {
 		n.errorf("saving to DB failed due to: %s", err)
 	}
 }
