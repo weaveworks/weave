@@ -29,9 +29,6 @@ const (
 
 	// Used as a key for stored nameserver entries in the database
 	nameserverIdent = "nameserver"
-
-	// Used as an identifier for entries which do not belong to the Weave network
-	externContainerID = "weave:extern"
 )
 
 // Nameserver: gossip-based, in memory nameserver.
@@ -52,8 +49,16 @@ type Nameserver struct {
 	pendingBroadcast Entries
 }
 
+type containerIDSet map[string]struct{}
+
+func (s containerIDSet) Exist(containerID string) bool {
+	_, ok := s[containerID]
+	return ok
+}
+
 func New(ourName mesh.PeerName, domain string, db db.DB,
-	isKnownPeer func(mesh.PeerName) bool) *Nameserver {
+	isKnownPeer func(mesh.PeerName) bool,
+	nonStopped, stopped containerIDSet) *Nameserver {
 
 	n := &Nameserver{
 		ourName:     ourName,
@@ -62,18 +67,22 @@ func New(ourName mesh.PeerName, domain string, db db.DB,
 		isKnownPeer: isKnownPeer,
 		quit:        make(chan struct{}),
 	}
-	n.restoreFromDB()
+	n.restoreFromDB(nonStopped, stopped)
 
 	return n
 }
 
 // Restores local entries from the database.
 // NB: called only during the initialization, thus the lock is not taken.
-func (n *Nameserver) restoreFromDB() {
-	var entries Entries
+func (n *Nameserver) restoreFromDB(nonStopped, stopped containerIDSet) {
+	// TODO(mp) HACK HACK HACK! "weave:extern" should be appended to nonStopped :-(((
 
 	n.debugf("restore: starting...")
 	ok, err := n.db.Load(nameserverIdent, &n.entries)
+
+	//n.debugf("restore: sleeping...")
+	//time.Sleep(60 * time.Second)
+	//n.debugf("restore: sleeping done.")
 
 	switch {
 	case err != nil:
@@ -84,11 +93,19 @@ func (n *Nameserver) restoreFromDB() {
 		return
 	}
 
-	// lHostname gets lost during serialization, so we need to set this field manually
-	n.entries.addLowercase()
+	// The IDEA:
+	// * During restoration, .stopped is set only for containers which are not running;
+	//   for others, we just restore entries aka restore entries from
+	// * ContainerDied: we set .stopped
+	// * ContainerDestroyed: we remove all container entries
+	// * AddEntry: restore stopped entries (weave:extern non-tombstoned will be stopped, which we restore later)
+	// * (maybe) Move restoration from AddEntry to ContainerStarted
+	// * Possible race: AllContainers <- gap (start new container) -> restoreFromDB (maybe not, if we do not allow to
+	// start while being in process of the initialization)
 
-	// TODO(mp) optimization: use the output of `docker ps` to restore
-	//			immediately entries of running containers.
+	// Restoration:
+	// - .stopped = true, for !('running', 'paused', 'restarting')
+	// - remove = does not exist in `docker ps`
 
 	now := now()
 	for i, e := range n.entries {
@@ -97,28 +114,41 @@ func (n *Nameserver) restoreFromDB() {
 				"restore: peer %s DB should not have contained entries of %s peer",
 				n.ourName, e.Origin))
 		}
-		if e.Tombstone == 0 {
+
+		switch {
+		case nonStopped.Exist(e.ContainerID):
 			n.debugf("restore: restoring %v...", e)
-			// We should not tombstone entries for "weave:extern", because there
-			// might be no subsequent AddEntry call for external IPs
-			// TODO(mp) personally, I don't like the idea, that nameserver is aware of"weave:extern"
-			//			IMO, it should not know about this workaround. One way to get
-			//			rid of it, is to introduce e.g. /restore/$CONTAINER_ID API which
-			//			would be called from the weave script.
-			if e.ContainerID != externContainerID {
-				// Set .stopped for all non-tombstoned local entries to distinguish
-				// between tombstoned entries and the ones which were not tombstoned
-				// before termination of nameserver.
-				n.entries[i].stopped = true
-				n.entries[i].Tombstone = now
-				n.entries[i].Version++
-			}
-			entries = append(entries, n.entries[i])
+			e.stopped = false
+			e.Tombstone = 0
+			e.Version++ // TODO(mp) maybeIncVersion
+			n.entries[i] = e
+		case stopped.Exist(e.ContainerID) && e.Tombstone == 0:
+			n.debugf("restore: stopping %v...", e)
+			e.stopped = true
+			e.Tombstone = now
+			e.Version++
+			n.entries[i] = e
+		case e.Tombstone == 0:
+			n.debugf("restore: tombstoning %v...", e)
+			e.Tombstone = now
+			e.stopped = false
+			e.Version++
+			n.entries[i] = e
+		default:
+			n.debugf("restore: keeping %v...", e)
 		}
 	}
 
+	// TODO(mp) do we want to broadcast stopped entries? yes, we do.
+	// TODO(mp) move restoration to Start
+
+	// lHostname gets lost during serialization, so we need to set this field manually
+	n.entries.addLowercase()
+	n.snapshot()
+
 	// Will gossip once we set the gossiper
-	n.pendingBroadcast = entries
+	n.pendingBroadcast = make(Entries, len(n.entries))
+	copy(n.pendingBroadcast, n.entries)
 
 	n.debugf("restore: finished.")
 }
@@ -169,17 +199,16 @@ func (n *Nameserver) AddEntry(hostname, containerid string,
 	n.Lock()
 
 	// Restore the stopped entries first
-	if containerid != externContainerID {
-		for i, e := range n.entries {
-			if e.Origin == origin && e.ContainerID == containerid && e.stopped {
-				if !found && e.Addr == addr {
-					found = true
-				}
-				n.entries[i].stopped = false
-				n.entries[i].Tombstone = 0
-				n.entries[i].Version++
-				entries = append(entries, n.entries[i])
+	for i, e := range n.entries {
+		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
+			if !found && e.Addr == addr {
+				found = true
 			}
+			e.stopped = false
+			e.Tombstone = 0
+			e.Version++
+			n.entries[i] = e
+			entries = append(entries, e)
 		}
 	}
 
@@ -222,8 +251,23 @@ func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
 	return match.Hostname, nil
 }
 
-func (n *Nameserver) ContainerStarted(ident string)   {}
-func (n *Nameserver) ContainerDestroyed(ident string) {}
+func (n *Nameserver) ContainerStarted(ident string) {
+	// TODO(mp) maybe move code from AddEntry here
+}
+func (n *Nameserver) ContainerDestroyed(ident string) {
+	n.Lock()
+	for i, e := range n.entries {
+		if e.Origin == n.ourName && e.ContainerID == ident {
+			if e.Tombstone == 0 {
+				panic("wtf")
+			}
+			n.entries[i].stopped = false
+			// TODO(mp) what's about version++ ?
+		}
+	}
+	n.snapshot()
+	n.Unlock()
+}
 
 func (n *Nameserver) ContainerDied(ident string) {
 	n.Lock()
@@ -279,13 +323,21 @@ func (n *Nameserver) deleteTombstones() {
 	defer n.Unlock()
 	now := time.Now().Unix()
 	n.entries.filter(func(e *Entry) bool {
-		return e.Tombstone == 0 || now-e.Tombstone <= int64(tombstoneTimeout/time.Second)
+		return e.Tombstone == 0 || e.stopped || now-e.Tombstone <= int64(tombstoneTimeout/time.Second)
 	})
 	n.snapshot()
 }
 
+// RestoreStopped restores all stopped entries of the given container.
+func (n *Nameserver) RestoreStopped(containerid string) {
+	n.Lock()
+	defer n.Unlock()
+
+	// TODO(mp) used to restore weave:extern (maybe not needed).
+}
+
 // snapshot stores the local entries (Origin == n.ourName) to the database.
-// NB: we assume that a caller has taken the nameserver' read or write lock.
+// NB: we assume that a caller has taken the nameserver' lock for reading or writing.
 func (n *Nameserver) snapshot() {
 	entries := n.entries.filterCopy(
 		func(e *Entry) bool {
@@ -294,7 +346,6 @@ func (n *Nameserver) snapshot() {
 			}
 			return false
 		})
-	// TODO(mp) optimize: store a single entry per key-val pair.
 	if err := n.db.Save(nameserverIdent, entries); err != nil {
 		n.errorf("saving to DB failed due to: %s", err)
 	}

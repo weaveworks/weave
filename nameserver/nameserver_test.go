@@ -23,10 +23,12 @@ const (
 	container2 = "c2"
 	container3 = "c3"
 	container4 = "c4"
+	container5 = "c5"
 	hostname1  = "hostname1"
 	hostname2  = "hostname2"
 	hostname3  = "hostname3"
 	hostname4  = "hostname4"
+	hostname5  = "hostname5"
 	addr1      = address.Address(1)
 	addr2      = address.Address(2)
 	addr3      = address.Address(3)
@@ -34,7 +36,14 @@ const (
 )
 
 func makeNameserver(name mesh.PeerName) *Nameserver {
-	return New(name, "", NewMockDB(), func(mesh.PeerName) bool { return true })
+	return makeNameserverWithRestore(name, make(containerIDSet), make(containerIDSet))
+}
+
+func makeNameserverWithRestore(name mesh.PeerName,
+	nonStopped, stopped containerIDSet) *Nameserver {
+
+	return New(name, "", NewMockDB(), func(mesh.PeerName) bool { return true },
+		nonStopped, stopped)
 }
 
 func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
@@ -324,6 +333,7 @@ func TestTombstoneDeletion(t *testing.T) {
 }
 
 // TestRestore tests the restoration of local entries procedure.
+// TODO(mp) merge with TestRestoreBroadcast
 func TestRestore(t *testing.T) {
 	oldNow := now
 	defer func() { now = oldNow }()
@@ -341,7 +351,15 @@ func TestRestore(t *testing.T) {
 
 	// "Restart" nameserver by creating a new instance with the reused db instance
 	now = func() int64 { return 4321 }
-	nameserver = New(name, "", nameserver.db, func(mesh.PeerName) bool { return true })
+	nonStopped := containerIDSet{
+		container1: struct{}{},
+	}
+	stopped := containerIDSet{
+		container3: struct{}{},
+		container2: struct{}{},
+	}
+	nameserver = New(name, "", nameserver.db, func(mesh.PeerName) bool { return true },
+		nonStopped, stopped)
 
 	entries := nameserver.copyEntries()
 	require.Equal(t,
@@ -352,8 +370,8 @@ func TestRestore(t *testing.T) {
 				Addr:        addr1,
 				Hostname:    hostname1,
 				Version:     1,
-				Tombstone:   4321,
-				stopped:     true,
+				Tombstone:   0,
+				stopped:     false,
 			},
 			Entry{
 				ContainerID: container2,
@@ -396,15 +414,18 @@ func TestAddEntryWithRestore(t *testing.T) {
 	ns1.Stop()
 	grouter.RemovePeer(ns1.ourName)
 	ns2.PeerGone(ns1.ourName)
-	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true })
+	nonStopped := containerIDSet{}
+	stopped := containerIDSet{container1: struct{}{}}
+	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true },
+		nonStopped, stopped)
 	ns1 = nameservers[0]
 	ns1.SetGossip(grouter.Connect(ns1.ourName, ns1))
 	ns1.Start()
 
 	// At this point, the c1 entry is set to stopped
 	entries := ns1.copyEntries()
-	require.Equal(t,
-		l(Entries{Entry{
+	require.Equal(t, l(Entries{
+		Entry{
 			ContainerID: container1,
 			Origin:      ns1.ourName,
 			Addr:        addr1,
@@ -412,32 +433,73 @@ func TestAddEntryWithRestore(t *testing.T) {
 			Version:     1,
 			Tombstone:   1234,
 			stopped:     true,
-		}}), Entries{entries[0]})
+		},
+		Entry{
+			ContainerID: container2,
+			Origin:      ns1.ourName,
+			Addr:        addr2,
+			Hostname:    hostname3,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     false,
+		}}), entries)
 
-	// ns2 should store the tombstoned c1 entry (c2 has been wiped by PeerGone)
 	time.Sleep(200 * time.Millisecond)
 	entries = ns2.copyEntries()
-	require.Len(t, entries, 1)
-	require.Equal(t, container1, entries[0].ContainerID)
-	require.Equal(t, int64(1234), entries[0].Tombstone)
+	require.Equal(t, l(Entries{
+		Entry{
+			ContainerID: container1,
+			Origin:      ns1.ourName,
+			Addr:        addr1,
+			Hostname:    hostname2,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container2,
+			Origin:      ns1.ourName,
+			Addr:        addr2,
+			Hostname:    hostname3,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     false,
+		}}), entries)
 
 	ns1.AddEntry(hostname1, container1, ns1.ourName, addr3)
 	time.Sleep(200 * time.Millisecond)
 
 	// c1 (hostname1 -> addr1) should be restored and propagated to ns2
 	entries = ns2.copyEntries()
-	require.Len(t, entries, 2)
-	require.Equal(t,
-		l(Entries{Entry{
+	require.Len(t, entries, 3)
+	require.Equal(t, l(Entries{
+		Entry{
+			ContainerID: container1,
+			Origin:      ns1.ourName,
+			Addr:        addr3,
+			Hostname:    hostname1,
+			Version:     0,
+			Tombstone:   0,
+			stopped:     false,
+		},
+		Entry{
 			ContainerID: container1,
 			Origin:      ns1.ourName,
 			Addr:        addr1,
 			Hostname:    hostname2,
-			lHostname:   hostname2,
 			Version:     2,
 			Tombstone:   0,
 			stopped:     false,
-		}}), Entries{entries[1]})
+		},
+		Entry{
+			ContainerID: container2,
+			Origin:      ns1.ourName,
+			Addr:        addr2,
+			Hostname:    hostname3,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     false,
+		}}), entries)
 
 	grouter.Flush()
 }
@@ -454,15 +516,21 @@ func TestRestoreBroadcast(t *testing.T) {
 	ns1, ns2 := nameservers[0], nameservers[1]
 
 	ns1.AddEntry(hostname1, container1, ns1.ourName, addr1)
+	ns1.AddEntry(hostname2, container2, ns1.ourName, addr2)
 
 	// ns2 has received a message containing the entry of container1
 	time.Sleep(200 * time.Millisecond)
 	require.Equal(t, addrs{addr1}.String(), addrs(ns2.Lookup(hostname1)).String())
+	require.Equal(t, addrs{addr2}.String(), addrs(ns2.Lookup(hostname2)).String())
 
 	// Restart ns1
 	ns1.Stop()
 	grouter.RemovePeer(ns1.ourName)
-	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true })
+	nonStopped := containerIDSet{
+		container1: struct{}{},
+	}
+	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true },
+		nonStopped, make(containerIDSet))
 	ns1 = nameservers[0]
 	ns1.SetGossip(grouter.Connect(ns1.ourName, ns1))
 	ns1.Start()
@@ -476,6 +544,15 @@ func TestRestoreBroadcast(t *testing.T) {
 			Origin:      ns1.ourName,
 			Addr:        addr1,
 			Hostname:    hostname1,
+			Version:     1,
+			Tombstone:   0,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container2,
+			Origin:      ns1.ourName,
+			Addr:        addr2,
+			Hostname:    hostname2,
 			Version:     1,
 			Tombstone:   1234,
 			stopped:     false,
@@ -508,4 +585,6 @@ func TestStopContainer(t *testing.T) {
 	nameserver.AddEntry(hostname2, container1, name, addr1)
 	require.Equal(t, "", addrs(nameserver.Lookup(hostname1)).String())
 	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname2)).String())
+
+	// TODO(mp) test ContainerDestroyed
 }

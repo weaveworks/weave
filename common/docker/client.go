@@ -96,6 +96,7 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 			} else {
 				start := time.Now()
 				for event := range events {
+					fmt.Println(">>> event", event.Status, event)
 					switch event.Status {
 					case "start":
 						pending.finish(event.ID)
@@ -164,6 +165,42 @@ func (c *Client) AllContainerIDs() ([]string, error) {
 	var ids []string
 	for _, c := range all {
 		ids = append(ids, c.ID)
+	}
+	return ids, nil
+}
+
+// NonStoppedContainerIDs returns ID of containers which are in one of the
+// following state:
+// * "running"
+// * "paused"
+// * "restarting"
+func (c *Client) NonStoppedContainerIDs() (map[string]struct{}, error) {
+	return c.containerIDs("running", "paused", "restarting")
+}
+
+// StoppedContainerIDs returns ID of containers which are in one of the following
+// state:
+// * "exited"
+// * "created"
+func (c *Client) StoppedContainerIDs() (map[string]struct{}, error) {
+	return c.containerIDs("exited", "created")
+}
+
+func (c *Client) containerIDs(states ...string) (map[string]struct{}, error) {
+	opts := docker.ListContainersOptions{
+		All: true,
+		Filters: map[string][]string{
+			"status": states,
+		},
+	}
+	all, err := c.ListContainers(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make(map[string]struct{})
+	for _, c := range all {
+		ids[c.ID] = struct{}{}
 	}
 	return ids, nil
 }
