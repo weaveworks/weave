@@ -1,6 +1,6 @@
 ---
 title: Managing Services in Weave Net - Exporting, Importing, Binding and Routing
-menu_order: 90
+menu_order: 70
 ---
 
 This section contains the following topics: 

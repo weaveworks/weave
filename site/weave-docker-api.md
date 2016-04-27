@@ -71,7 +71,7 @@ to the original settings prior to stopping the proxy.
 **See Also**
 
  * [Using The Weave Docker API Proxy](/site/weave-docker-api/using-proxy.md)
- * [Securing Docker Communications With TLS](securing-proxy.md)
+ * [Securing Docker Communications With TLS](/site/weave-docker-api/securing-proxy.md)
  * [Launching Containers With Weave Run (without the Proxy)](/site/weave-docker-api/launching-without-proxy.md)
 
 

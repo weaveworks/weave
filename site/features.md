@@ -111,7 +111,7 @@ Instead of allowing Weave to automatically allocate addresses, an IP address and
 specified. See [How to Manually Specify IP Addresses and Subnets](/site/using-weave/manual-ip-address.md) for instructions. 
 
 For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Management](/site/ipam.md). And also review the 
-[the basics of IP addressing](/how-it-works/ip-addresses.md) for an explanation of addressing and private networks. 
+[the basics of IP addressing](/site/how-it-works/ip-addresses.md) for an explanation of addressing and private networks. 
 
 
 ###<a name="naming-and-discovery"></a>Naming and Discovery
@@ -178,7 +178,7 @@ running alongside Weave.
 
 Weave Net implements encryption and security using the Go version of [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
 
-For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/how-it-works/encryption.md) and [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md).
+For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/site/how-it-works/encryption.md) and [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md).
 
 
 ###<a name="host-network-integration"></a>Host Network Integration
