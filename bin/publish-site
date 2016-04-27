@@ -36,4 +36,4 @@ esac
 
 echo ">>> Publishing $PRODUCT $VERSION site to $1"
 
-wordepress --dry-run --url "$1" --user "$2" --password "$3" --product "$PRODUCT" --version "$VERSION" publish site
+wordepress --url "$1" --user "$2" --password "$3" --product "$PRODUCT" --version "$VERSION" publish site
