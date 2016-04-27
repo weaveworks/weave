@@ -17,7 +17,7 @@ See [Troubleshooting Weave - List attached containers](/site/troubleshooting.md#
 Exposing a container to the outside world is described in [Exposing Services to the Outside](/site/using-weave/service-export.md).
 
 
-**Q: My dockerized app needs to check the request of a an application that uses a static IP. Is it possible to manually change the IP of a container?**
+**Q: My dockerized app needs to check the request of an application that uses a static IP. Is it possible to manually change the IP of a container?**
 
 
 You can manually change the IP of a container using [Classless Inter-Domain Routing or CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing). 
