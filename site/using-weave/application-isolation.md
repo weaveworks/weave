@@ -67,4 +67,3 @@ isolation between application containers, that feature needs to be disabled by [
 
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
  * [Managing Services in Weave Net: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
- * [Exposing Services to the Outside World] (/site/using-weave/service-export.md)
