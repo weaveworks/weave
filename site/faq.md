@@ -93,7 +93,7 @@ which are Weave’s control and data ports.
 
 **See Also**
 
- * [Troubleshooting Weave](/site/troublehooting.md)
+ * [Troubleshooting Weave](/site/troubleshooting.md)
  * [Troubleshooting IPAM](/site/ipam.md)
  * [Troubleshooting the Proxy](/site/weave-docker-api/using-proxy.md)
  
