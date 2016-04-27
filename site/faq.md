@@ -22,7 +22,7 @@ For more information, refer to [Manually Specifying the IP Address of a Containe
 
 **Q: How do I expose one of my containers to the outside world?**
 
-Exposing a container to the outside world is described in [Exposing Services to the Outside](/site/using-weave/service-export.md).
+Exposing a container to the outside world is described in [Exporting Services](/site/using-weave/service-management.md#exporting).
 
 
 **Q: Can I connect my existing 'legacy' network with a Weave container network?**
@@ -33,7 +33,7 @@ For example, you have a Weave network that runs on hosts A, B, C. and you have a
 
 The simplest way to accomplish this would be to run Weave on the host and then run, `weave expose` to expose the network to any running containers.  See [Integrating a Network Host](/site/using-weave/host-network-integration.md) If this is not possible, you could also  expose a port on the container on host B and then connect to it. 
 
-You can read about exposing ports in [Service Exporting](/site/using-weave/service-export.md).
+You can read about exposing ports in [Exporting Services](/site/using-weave/service-management.md#exporting).
 
 
 **Q: Why am I seeing the same IP address assigned to two different containers on different hosts?**
