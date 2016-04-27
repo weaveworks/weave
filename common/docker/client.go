@@ -96,7 +96,6 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 			} else {
 				start := time.Now()
 				for event := range events {
-					fmt.Println(">>> event", event.Status, event)
 					switch event.Status {
 					case "start":
 						pending.finish(event.ID)
@@ -158,50 +157,46 @@ func (pending pendingStarts) finish(id string) {
 }
 
 func (c *Client) AllContainerIDs() ([]string, error) {
-	all, err := c.ListContainers(docker.ListContainersOptions{All: true})
-	if err != nil {
-		return nil, err
-	}
-	var ids []string
-	for _, c := range all {
-		ids = append(ids, c.ID)
-	}
-	return ids, nil
+	return c.containerIDs()
 }
 
-// NonStoppedContainerIDs returns ID of containers which are in one of the
-// following state:
+// NonStoppedContainerIDs returns ID of containers which are in one of
+// the following states:
 // * "running"
 // * "paused"
 // * "restarting"
-func (c *Client) NonStoppedContainerIDs() (map[string]struct{}, error) {
+func (c *Client) NonStoppedContainerIDs() ([]string, error) {
 	return c.containerIDs("running", "paused", "restarting")
 }
 
-// StoppedContainerIDs returns ID of containers which are in one of the following
-// state:
+// StoppedContainerIDs returns ID of containers which are in one of
+// the following states:
 // * "exited"
 // * "created"
-func (c *Client) StoppedContainerIDs() (map[string]struct{}, error) {
+func (c *Client) StoppedContainerIDs() ([]string, error) {
 	return c.containerIDs("exited", "created")
 }
 
-func (c *Client) containerIDs(states ...string) (map[string]struct{}, error) {
+func (c *Client) containerIDs(states ...string) ([]string, error) {
+	var ids []string
+
 	opts := docker.ListContainersOptions{
 		All: true,
-		Filters: map[string][]string{
-			"status": states,
-		},
 	}
+	if len(states) > 0 {
+		opts.Filters = map[string][]string{
+			"status": states,
+		}
+	}
+
 	all, err := c.ListContainers(opts)
 	if err != nil {
 		return nil, err
 	}
-
-	ids := make(map[string]struct{})
 	for _, c := range all {
-		ids[c.ID] = struct{}{}
+		ids = append(ids, c.ID)
 	}
+
 	return ids, nil
 }
 

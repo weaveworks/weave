@@ -49,16 +49,26 @@ type Nameserver struct {
 	pendingBroadcast Entries
 }
 
-type containerIDSet map[string]struct{}
+// TODO comments
 
-func (s containerIDSet) Exist(containerID string) bool {
+type ContainerIDSet map[string]struct{}
+
+func NewContainerIDSet(ids ...string) ContainerIDSet {
+	s := ContainerIDSet{}
+	for _, id := range ids {
+		s[id] = struct{}{}
+	}
+
+	return s
+}
+
+func (s ContainerIDSet) Exist(containerID string) bool {
 	_, ok := s[containerID]
 	return ok
 }
 
 func New(ourName mesh.PeerName, domain string, db db.DB,
-	isKnownPeer func(mesh.PeerName) bool,
-	nonStopped, stopped containerIDSet) *Nameserver {
+	isKnownPeer func(mesh.PeerName) bool, nonStopped, stopped ContainerIDSet) *Nameserver {
 
 	n := &Nameserver{
 		ourName:     ourName,
@@ -74,7 +84,7 @@ func New(ourName mesh.PeerName, domain string, db db.DB,
 
 // Restores local entries from the database.
 // NB: called only during the initialization, thus the lock is not taken.
-func (n *Nameserver) restoreFromDB(nonStopped, stopped containerIDSet) {
+func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 	// TODO(mp) HACK HACK HACK! "weave:extern" should be appended to nonStopped :-(((
 
 	n.debugf("restore: starting...")
@@ -93,6 +103,7 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped containerIDSet) {
 		return
 	}
 
+	// <braindump>
 	// The IDEA:
 	// * During restoration, .stopped is set only for containers which are not running;
 	//   for others, we just restore entries aka restore entries from
@@ -106,6 +117,7 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped containerIDSet) {
 	// Restoration:
 	// - .stopped = true, for !('running', 'paused', 'restarting')
 	// - remove = does not exist in `docker ps`
+	// </braindump>
 
 	now := now()
 	for i, e := range n.entries {
@@ -116,7 +128,7 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped containerIDSet) {
 		}
 
 		switch {
-		case nonStopped.Exist(e.ContainerID):
+		case nonStopped.Exist(e.ContainerID): // TODO(mp) BUG BUG: should check for .stopped
 			n.debugf("restore: restoring %v...", e)
 			e.stopped = false
 			e.Tombstone = 0
@@ -188,8 +200,6 @@ func (n *Nameserver) broadcastEntries(es ...Entry) {
 	})
 }
 
-// TODO(mp) optimization: pass restoreStopped flag to indicate whether
-//			we need to restore stopped entries.
 func (n *Nameserver) AddEntry(hostname, containerid string,
 	origin mesh.PeerName, addr address.Address) {
 
@@ -256,17 +266,18 @@ func (n *Nameserver) ContainerStarted(ident string) {
 }
 func (n *Nameserver) ContainerDestroyed(ident string) {
 	n.Lock()
-	for i, e := range n.entries {
-		if e.Origin == n.ourName && e.ContainerID == ident {
-			if e.Tombstone == 0 {
-				panic("wtf")
-			}
-			n.entries[i].stopped = false
-			// TODO(mp) what's about version++ ?
+	entries := n.entries.forceTombstone(n.ourName, func(e *Entry) bool {
+		if e.ContainerID == ident {
+			n.infof("container %s destroyed; tombstoning entry %s", ident, e.String())
+			// Unset the flag that the entry could be GC later on
+			e.stopped = false
+			return true
 		}
-	}
+		return false
+	})
 	n.snapshot()
 	n.Unlock()
+	n.broadcastEntries(entries...)
 }
 
 func (n *Nameserver) ContainerDied(ident string) {
@@ -274,7 +285,7 @@ func (n *Nameserver) ContainerDied(ident string) {
 	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
 		if e.ContainerID == ident {
 			n.infof("container %s died; tombstoning entry %s", ident, e.String())
-			// We want to restore all entries if container comes back
+			// We might want to restore the entry if container comes back
 			e.stopped = true
 			return true
 		}

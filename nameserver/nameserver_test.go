@@ -36,11 +36,11 @@ const (
 )
 
 func makeNameserver(name mesh.PeerName) *Nameserver {
-	return makeNameserverWithRestore(name, make(containerIDSet), make(containerIDSet))
+	return makeNameserverWithRestore(name, NewContainerIDSet(), NewContainerIDSet())
 }
 
 func makeNameserverWithRestore(name mesh.PeerName,
-	nonStopped, stopped containerIDSet) *Nameserver {
+	nonStopped, stopped ContainerIDSet) *Nameserver {
 
 	return New(name, "", NewMockDB(), func(mesh.PeerName) bool { return true },
 		nonStopped, stopped)
@@ -349,15 +349,12 @@ func TestRestore(t *testing.T) {
 	nameserver.AddEntry(hostname4, container4, otherPeerName, addr4)
 	nameserver.Delete(hostname2, container2, "", addr2)
 
+	// TODO(mp) add a test for a case when c1 is tombstoned, but not stopped
+
 	// "Restart" nameserver by creating a new instance with the reused db instance
 	now = func() int64 { return 4321 }
-	nonStopped := containerIDSet{
-		container1: struct{}{},
-	}
-	stopped := containerIDSet{
-		container3: struct{}{},
-		container2: struct{}{},
-	}
+	nonStopped := NewContainerIDSet(container1)
+	stopped := NewContainerIDSet(container2, container3)
 	nameserver = New(name, "", nameserver.db, func(mesh.PeerName) bool { return true },
 		nonStopped, stopped)
 
@@ -414,8 +411,8 @@ func TestAddEntryWithRestore(t *testing.T) {
 	ns1.Stop()
 	grouter.RemovePeer(ns1.ourName)
 	ns2.PeerGone(ns1.ourName)
-	nonStopped := containerIDSet{}
-	stopped := containerIDSet{container1: struct{}{}}
+	nonStopped := NewContainerIDSet()
+	stopped := NewContainerIDSet(container1)
 	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true },
 		nonStopped, stopped)
 	ns1 = nameservers[0]
@@ -526,11 +523,10 @@ func TestRestoreBroadcast(t *testing.T) {
 	// Restart ns1
 	ns1.Stop()
 	grouter.RemovePeer(ns1.ourName)
-	nonStopped := containerIDSet{
-		container1: struct{}{},
-	}
+	nonStopped := NewContainerIDSet(container1)
+	stopped := NewContainerIDSet()
 	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true },
-		nonStopped, make(containerIDSet))
+		nonStopped, stopped)
 	ns1 = nameservers[0]
 	ns1.SetGossip(grouter.Connect(ns1.ourName, ns1))
 	ns1.Start()
@@ -561,8 +557,10 @@ func TestRestoreBroadcast(t *testing.T) {
 	grouter.Flush()
 }
 
-// TestStopContainer tests whether all entries has been restored after container
-// restart.
+// TestStopContainer tests whether:
+// * AddEntry restores entries.
+// * ContainerDied sets stop flag.
+// * ContainerDestroyed unsets the flag.
 func TestStopContainer(t *testing.T) {
 	oldNow := now
 	defer func() { now = oldNow }()
@@ -573,18 +571,128 @@ func TestStopContainer(t *testing.T) {
 
 	nameserver.AddEntry(hostname1, container1, name, addr1)
 	nameserver.AddEntry(hostname2, container1, name, addr1)
-	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname1)).String())
-	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname2)).String())
+	nameserver.AddEntry(hostname3, container3, name, addr3)
+	require.Equal(t, l(Entries{
+		Entry{
+			ContainerID: container1,
+			Origin:      nameserver.ourName,
+			Addr:        addr1,
+			Hostname:    hostname1,
+			Version:     0,
+			Tombstone:   0,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container1,
+			Origin:      nameserver.ourName,
+			Addr:        addr1,
+			Hostname:    hostname2,
+			Version:     0,
+			Tombstone:   0,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container3,
+			Origin:      nameserver.ourName,
+			Addr:        addr3,
+			Hostname:    hostname3,
+			Version:     0,
+			Tombstone:   0,
+			stopped:     false,
+		}}), nameserver.copyEntries())
 
 	nameserver.Delete(hostname1, container1, "", addr1)
 	nameserver.ContainerDied(container1)
-	require.Equal(t, "", addrs(nameserver.Lookup(hostname1)).String())
-	require.Equal(t, "", addrs(nameserver.Lookup(hostname2)).String())
+	require.Equal(t, l(Entries{
+		Entry{
+			ContainerID: container1,
+			Origin:      nameserver.ourName,
+			Addr:        addr1,
+			Hostname:    hostname1,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container1,
+			Origin:      nameserver.ourName,
+			Addr:        addr1,
+			Hostname:    hostname2,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     true,
+		},
+		Entry{
+			ContainerID: container3,
+			Origin:      nameserver.ourName,
+			Addr:        addr3,
+			Hostname:    hostname3,
+			Version:     0,
+			Tombstone:   0,
+			stopped:     false,
+		}}), nameserver.copyEntries())
 
 	// AddEntry should restore the non-tombstoned entry
+	now = func() int64 { return 1235 }
 	nameserver.AddEntry(hostname2, container1, name, addr1)
-	require.Equal(t, "", addrs(nameserver.Lookup(hostname1)).String())
-	require.Equal(t, addrs{addr1}.String(), addrs(nameserver.Lookup(hostname2)).String())
+	require.Equal(t, l(Entries{
+		Entry{
+			ContainerID: container1,
+			Origin:      nameserver.ourName,
+			Addr:        addr1,
+			Hostname:    hostname1,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container1,
+			Origin:      nameserver.ourName,
+			Addr:        addr1,
+			Hostname:    hostname2,
+			Version:     2,
+			Tombstone:   0,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container3,
+			Origin:      nameserver.ourName,
+			Addr:        addr3,
+			Hostname:    hostname3,
+			Version:     0,
+			Tombstone:   0,
+			stopped:     false,
+		}}), nameserver.copyEntries())
 
-	// TODO(mp) test ContainerDestroyed
+	now = func() int64 { return 1236 }
+	// All container1 entries should be tombstoned
+	nameserver.ContainerDestroyed(container1)
+	require.Equal(t, l(Entries{
+		Entry{
+			ContainerID: container1,
+			Origin:      nameserver.ourName,
+			Addr:        addr1,
+			Hostname:    hostname1,
+			Version:     1,
+			Tombstone:   1234,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container1,
+			Origin:      nameserver.ourName,
+			Addr:        addr1,
+			Hostname:    hostname2,
+			Version:     3,
+			Tombstone:   1236,
+			stopped:     false,
+		},
+		Entry{
+			ContainerID: container3,
+			Origin:      nameserver.ourName,
+			Addr:        addr3,
+			Hostname:    hostname3,
+			Version:     0,
+			Tombstone:   0,
+			stopped:     false,
+		}}), nameserver.copyEntries())
 }

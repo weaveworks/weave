@@ -192,15 +192,29 @@ func (es *Entries) merge(incoming Entries) Entries {
 	return newEntries
 }
 
-// f returning true means keep the entry.
 func (es *Entries) tombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries {
+	return es.doTombstone(ourname, f, false)
+}
+
+func (es *Entries) forceTombstone(ourname mesh.PeerName, f func(*Entry) bool) Entries {
+	return es.doTombstone(ourname, f, true)
+}
+
+// f returning true means keep the entry.
+// forceUpdate denotes that changes made by f should be stored regardless the outcome of
+// e.tombstone().
+func (es *Entries) doTombstone(ourname mesh.PeerName, f func(*Entry) bool, forceUpdate bool) Entries {
 	defer es.checkAndPanic().checkAndPanic()
 
 	tombstoned := Entries{}
 	for i, e := range *es {
-		if f(&e) && e.Origin == ourname && e.tombstone() {
-			(*es)[i] = e
-			tombstoned = append(tombstoned, e)
+		if f(&e) && e.Origin == ourname {
+			if e.tombstone() {
+				tombstoned = append(tombstoned, e)
+				(*es)[i] = e
+			} else if forceUpdate {
+				(*es)[i] = e
+			}
 		}
 	}
 	return tombstoned
