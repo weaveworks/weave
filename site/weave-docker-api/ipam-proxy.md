@@ -1,6 +1,6 @@
 ---
 title: Automatic IP Allocation and the Weave Proxy
-layout: default
+menu_order: 25
 ---
 
 
