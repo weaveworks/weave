@@ -1,5 +1,5 @@
 ---
-title: Configuring Weave to Explicitly Use an IP Range
+title: Allocating IPs in a Specific Range
 menu_order: 15
 ---
 

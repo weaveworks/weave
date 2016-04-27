@@ -186,7 +186,7 @@ For information on how to secure your Docker network connections, see [Securing 
 Weave Net application networks can be integrated with a host's network, and establish connectivity between the host and 
 application containers anywhere.
 
-See [Integrating a Host Network with Weave](/site/using-weave/host-network-integration.md).
+See [Integrating with the Host Network](/site/using-weave/host-network-integration.md).
 
 ###<a name="services"></a>Managing Services: Exporting, Importing, Binding and Routing
  
@@ -195,7 +195,7 @@ See [Integrating a Host Network with Weave](/site/using-weave/host-network-integ
  * **Binding Services** - A container can be bound to a particular IP and port without having to change your application code, while at the same time will maintain its original endpoint. 
  * **Routing Services** - By combining the importing and exporting features, you can connect to disjointed networks, even when separated by firewalls and where there may be overlapping IP addresses.  
 
-See [Managing Services in Weave: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md) for instructions on how to manage services on a Weave container network. 
+See [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md) for instructions on how to manage services on a Weave container network. 
 
 ###<a name="multi-cloud-networking"></a>Multi-Cloud Networking
 
@@ -232,7 +232,7 @@ reconfiguration or, in many cases, restarts of other containers.
 All that is required is for the migrated container to be started 
 with the same IP address as it was given originally.
 
-See [Managing Services in Weave: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md), in particular, Routing Services for more information on container mobility. 
+See [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md), in particular, Routing Services for more information on container mobility. 
 
 
 ###<a name="fault-tolerance"></a>Fault Tolerance
