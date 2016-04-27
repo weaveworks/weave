@@ -13,31 +13,35 @@ This section contains the following topics:
 
 
 
-###<a name="exporting"></a> Exporting Services
+###<a name="exporting"></a>Exporting Services
 
-Services running in containers on a Weave network can be made accessible to the outside world (and, more generally, to other networks) from any Weave host, regardless of where the service containers are located.
+Services running in containers on a Weave network can be made
+accessible to the outside world (and, more generally, to other networks)
+from any Weave Net host, irrespective of where the service containers are
+located.
 
-Turning back to the [netcat example](/site/using-weave.md), say you want the netcat service, which is running in a container on `$HOST1`, to be accessible to the outside world via `$HOST2`.
+Returning to the [netcat example service](/site/using-weave.md), 
+you can expose the netcat service running on `HOST1` and make it accessible to the outside world via `$HOST2`. 
 
-To do this, expose the application network to `$HOST2`, as explained in [Host Network Integration](/site/using-weave/host-network-integration.md) by running:
+First, expose the application network to `$HOST2`, as explained in [Integrating a Host Network with a Weave Net](/site/using-weave/host-network-integration.md):
 
     host2$ weave expose
     10.2.1.132
 
-Then add a NAT rule to route from the outside world to the destination container service.
+Then add a NAT rule that routes the traffic from the outside world to the destination container service.
 
     host2$ iptables -t nat -A PREROUTING -p tcp -i eth0 --dport 2211 \
            -j DNAT --to-destination $(weave dns-lookup a1):4422
 
-Here it is assumed that the "outside world" is connecting to `$HOST2` via 'eth0'. The TCP traffic to port 2211 on the external IPs will be routed to the 'nc' service, running in the a1 container and listening on port 4422.
-With the above in place, you are ready to connect to the 'nc' service from anywhere using:
+In this example, it is assumed that the "outside world" is connecting to `$HOST2` via 'eth0'. The TCP traffic to port 2211 on the external IPs will be routed to the 'nc' service running on port 4422 in the container a1.
 
-    $ echo 'Hello, world.' | nc $HOST2 2211
+With the above in place, you can connect to the 'nc' service from anywhere using:
+
+    echo 'Hello, world.' | nc $HOST2 2211
 
 >**Note:** Due to the way routing is handled in the Linux kernel, this won't work when run *on* `$HOST2`.
 
-Similar NAT rules to the above can used to expose services not just to the outside world but also other, internal, networks.
-
+Similar NAT rules to the above can be used to expose services not just to the outside world but also to other, internal, networks.
 
 ###<a name="importing"></a>Importing Services
 
