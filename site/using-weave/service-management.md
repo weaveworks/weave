@@ -13,7 +13,7 @@ This section contains the following topics:
 
 
 
-###<a name="exporting"></a> Exporting Services
+###<a name="exporting"></a>Exporting Services
 
 Services running in containers on a Weave network can be made
 accessible to the outside world (and, more generally, to other networks)
