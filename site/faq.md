@@ -5,7 +5,7 @@ menu_order: 100
 
 
 
-**Q:How do I obtain the IP of a specific container when I'm using Weave?**
+**Q: How do I obtain the IP of a specific container when I'm using Weave?**
 
 You can use `weave ps <container>` to see the allocated address of a container on a Weave network.  
 
@@ -25,7 +25,7 @@ You can manually change the IP of a container using [Classless Inter-Domain Rout
 For more information, refer to [Manually Specifying the IP Address of a Container](/site/using-weave/manual-ip-address.md). 
 
 
-**Q:Can I connect my existing 'legacy' network with a Weave container network?**
+**Q: Can I connect my existing 'legacy' network with a Weave container network?**
 
 Yes you can. 
 
@@ -65,7 +65,7 @@ Weave Net also automatically uses the fastest datapath between two hosts. When W
 For more information about fast datapath see [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
 
 
-**Q:How can I tell if Weave is using fast datapath (fastdp) or not?**
+**Q: How can I tell if Weave is using fast datapath (fastdp) or not?**
 
 To view whether Weave is using fastdp or not, you can run, `weave status connections`
 
