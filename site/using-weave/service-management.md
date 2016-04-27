@@ -1,5 +1,5 @@
 ---
-title: Managing Services in Weave Net - Exporting, Importing, Binding and Routing
+title: Managing Services - Exporting, Importing, Binding and Routing
 menu_order: 70
 ---
 
@@ -23,7 +23,7 @@ located.
 Returning to the [netcat example service](/site/using-weave.md), 
 you can expose the netcat service running on `HOST1` and make it accessible to the outside world via `$HOST2`. 
 
-First, expose the application network to `$HOST2`, as explained in [Integrating a Host Network with a Weave Net](/site/using-weave/host-network-integration.md):
+First, expose the application network to `$HOST2`, as explained in [Integrating with the Host Network](/site/using-weave/host-network-integration.md):
 
     host2$ weave expose
     10.2.1.132

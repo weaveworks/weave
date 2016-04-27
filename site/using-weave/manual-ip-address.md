@@ -51,7 +51,7 @@ Individual IP addresses given to containers must, of course, be unique. If you p
 
 **See Also**
 
- * [Managing Services: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
- * [Configuring Weave to Explicitly Use an IP Range](/site/using-weave/configuring-weave.md) 
+ * [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
+ * [Allocating IPs in a Specific Range](/site/using-weave/configuring-weave.md) 
  * [Automatic IP Address Management](/site/ipam.md)   
 

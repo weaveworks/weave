@@ -1,5 +1,5 @@
 ---
-title: Integrating a Host Network with Weave Net
+title: Integrating with the Host Network
 menu_order: 60
 ---
 
@@ -42,4 +42,4 @@ Exposed addresses can also be added to weaveDNS by supplying fully qualified dom
 **See Also**
 
  * [Using Weave Net](/site/using-weave.md)
- * [Managing Services in Weave: Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
+ * [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
