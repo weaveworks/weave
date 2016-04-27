@@ -12,17 +12,17 @@ You can use `weave ps <container>` to see the allocated address of a container o
 See [Troubleshooting Weave - List attached containers](/site/troubleshooting.md#list-attached-containers).
 
 
-**Q: How do I expose one of my containers to the outside world?**
-
-Exposing a container to the outside world is described in [Exposing Services to the Outside](/site/using-weave/service-export.md).
-
-
 **Q: My dockerized app needs to check the request of an application that uses a static IP. Is it possible to manually change the IP of a container?**
 
 
 You can manually change the IP of a container using [Classless Inter-Domain Routing or CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing). 
 
 For more information, refer to [Manually Specifying the IP Address of a Container](/site/using-weave/manual-ip-address.md). 
+
+
+**Q: How do I expose one of my containers to the outside world?**
+
+Exposing a container to the outside world is described in [Exposing Services to the Outside](/site/using-weave/service-export.md).
 
 
 **Q: Can I connect my existing 'legacy' network with a Weave container network?**
