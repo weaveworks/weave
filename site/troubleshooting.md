@@ -284,7 +284,7 @@ on reboot. This can be disabled via:
     weave launch --no-restart
 
 Note that the
-[Weave Net Docker API Proxy](/site/weave-docker-api/set-up-proxy.md)
+[Weave Net Docker API Proxy](/site/weave-docker-api.md)
 is responsible for reconfiguring the Weave router and re-attaching
 application containers to the Weave network at startup, so if you
 choose not to run it you must make arrangements for this
