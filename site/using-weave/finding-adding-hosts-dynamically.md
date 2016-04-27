@@ -1,6 +1,6 @@
 ---
 title: Adding and Removing Hosts Dynamically
-menu_order: 50
+menu_order: 90
 ---
 
 
