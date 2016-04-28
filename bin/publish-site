@@ -21,6 +21,7 @@ fi
 case "$BRANCH" in
     issues/*)
         VERSION="${BRANCH#issues/}"
+        TAGS="$VERSION"
         ;;
     *)
         if echo "$BRANCH" | grep -qE '^[0-9]+\.[0-9]+' ; then
@@ -28,12 +29,18 @@ case "$BRANCH" in
             if ! VERSION=$(echo "$DESCRIBE" | grep -oP '(?<=^v)[0-9]+\.[0-9]+\.[0-9]+') ; then
                 fatal "Could not infer latest $BRANCH version from $DESCRIBE"
             fi
+            TAGS="$VERSION latest"
         else
             VERSION="$BRANCH"
+            TAGS="$VERSION"
         fi
         ;;
 esac
 
-echo ">>> Publishing $PRODUCT $VERSION site to $1"
-
-wordepress --url "$1" --user "$2" --password "$3" --product "$PRODUCT" --version "$VERSION" publish site
+for TAG in $TAGS ; do
+    echo ">>> Publishing $PRODUCT $VERSION to $1/docs/$PRODUCT/$TAG"
+    wordepress \
+        --url "$1" --user "$2" --password "$3" \
+        --product "$PRODUCT" --version "$VERSION" --tag "$TAG" \
+        publish site
+done
