@@ -49,6 +49,12 @@ type Nameserver struct {
 	pendingBroadcast Entries
 }
 
+// dbEntry is used when storing each entry to DB.
+type dbEntry struct {
+	Entry
+	Stopped bool
+}
+
 // TODO comments
 
 type ContainerIDSet map[string]struct{}
@@ -87,26 +93,13 @@ func New(ourName mesh.PeerName, domain string, db db.DB,
 func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 	// TODO(mp) HACK HACK HACK! "weave:extern" should be appended to nonStopped :-(((
 
-	var dbEntries []dbEntry
-
 	n.debugf("restore: starting...")
-	ok, err := n.db.Load(nameserverIdent, &dbEntries)
-	for _, e := range dbEntries {
-		tmp := e.Entry
-		tmp.stopped = e.Stopped
-		n.entries = append(n.entries, tmp)
-	}
 
 	//n.debugf("restore: sleeping...")
 	//time.Sleep(60 * time.Second)
 	//n.debugf("restore: sleeping done.")
 
-	switch {
-	case err != nil:
-		n.errorf("restore: cannot retrieve entries due to: %s", err)
-		return
-	case !ok:
-		n.infof("restore: cannot find any entry in DB")
+	if ok := n.loadEntries(); !ok {
 		return
 	}
 
@@ -135,19 +128,22 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 		}
 
 		switch {
-		case nonStopped.Exist(e.ContainerID): // TODO(mp) BUG BUG: should check for .stopped
+		case nonStopped.Exist(e.ContainerID) && (e.stopped || e.Tombstone == 0):
+			// Restore non-deleted entries of running containers
 			n.debugf("restore: restoring %v...", e)
 			e.stopped = false
 			e.Tombstone = 0
-			e.Version++ // TODO(mp) maybeIncVersion
+			e.Version++
 			n.entries[i] = e
 		case stopped.Exist(e.ContainerID) && e.Tombstone == 0:
+			// Flag entry as stopped, because container is stopped (but not destroyed)
 			n.debugf("restore: stopping %v...", e)
 			e.stopped = true
 			e.Tombstone = now
 			e.Version++
 			n.entries[i] = e
 		case e.Tombstone == 0:
+			// Container has been destroyed, tombstone the entry
 			n.debugf("restore: tombstoning %v...", e)
 			e.Tombstone = now
 			e.stopped = false
@@ -157,9 +153,6 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 			n.debugf("restore: keeping %v...", e)
 		}
 	}
-
-	// TODO(mp) do we want to broadcast stopped entries? yes, we do.
-	// TODO(mp) move restoration to Start
 
 	// lHostname gets lost during serialization, so we need to set this field manually
 	n.entries.addLowercase()
@@ -346,23 +339,12 @@ func (n *Nameserver) deleteTombstones() {
 	n.snapshot()
 }
 
-// RestoreStopped restores all stopped entries of the given container.
-func (n *Nameserver) RestoreStopped(containerid string) {
-	n.Lock()
-	defer n.Unlock()
-
-	// TODO(mp) used to restore weave:extern (maybe not needed).
-}
-
-type dbEntry struct {
-	Entry
-	Stopped bool
-}
-
 // snapshot stores the local entries (Origin == n.ourName) to the database.
+// Each entry is wrapped by the dbEntry struct because the entry.stopped field is private
+// and is lost during the serialization performed by the db.
+//
 // NB: we assume that a caller has taken the nameserver' lock for reading or writing.
 func (n *Nameserver) snapshot() {
-	//dbEntries := make(dbEntry, len(
 	var dbEntries []dbEntry
 
 	for _, e := range n.entries {
@@ -371,21 +353,32 @@ func (n *Nameserver) snapshot() {
 		}
 	}
 
-	//entries := n.entries.filterCopy(
-	//	func(e *Entry) bool {
-	//		if e.Origin == n.ourName {
-	//			return true
-	//		}
-	//		return false
-	//	})
-
-	//for _, e := range entries {
-	//	dbEntries
-
-	//}
 	if err := n.db.Save(nameserverIdent, dbEntries); err != nil {
 		n.errorf("saving to DB failed due to: %s", err)
 	}
+}
+
+// loadEntries loads and unwraps entries from DB.
+func (n *Nameserver) loadEntries() bool {
+	var dbEntries []dbEntry
+
+	ok, err := n.db.Load(nameserverIdent, &dbEntries)
+	switch {
+	case err != nil:
+		n.errorf("restore: cannot retrieve entries due to: %s", err)
+		return false
+	case !ok:
+		n.infof("restore: cannot find any entry in DB")
+		return false
+	}
+
+	for _, e := range dbEntries {
+		entry := e.Entry
+		entry.stopped = e.Stopped
+		n.entries = append(n.entries, entry)
+	}
+
+	return true
 }
 
 func (n *Nameserver) Gossip() mesh.GossipData {
