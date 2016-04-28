@@ -2,6 +2,13 @@
 
 . ./config.sh
 
+delete_persistence() {
+    for host in "$@" ; do
+        docker_on $host rm -v weavedb >/dev/null
+        docker_on $host rm weave >/dev/null
+    done
+}
+
 start_suite "Claiming addresses"
 
 weave_on $HOST1 launch-router
@@ -14,6 +21,9 @@ assert_raises "exec_on $HOST2 c2 $PING $C1"
 
 stop_weave_on $HOST1
 stop_weave_on $HOST2
+
+# Delete persistence data so they form a blank ring
+delete_persistence $HOST1 $HOST2
 
 # Start hosts in reverse order so c1's address has to be claimed from host2
 weave_on $HOST2 launch-router
@@ -31,11 +41,14 @@ assert_raises "exec_on $HOST1 c1 $PING $C3"
 stop_weave_on $HOST1
 stop_weave_on $HOST2
 
+delete_persistence $HOST1 $HOST2
+
 # Now make host1 attempt to claim from host2, when host2 is stopped
 # the point being to check whether host1 will hang trying to talk to host2
 weave_on $HOST2 launch-router
 # Introduce host3 to remember the IPAM CRDT when we stop host2
 weave_on $HOST3 launch-router $HOST2
+weave_on $HOST3 prime
 stop_weave_on $HOST2
 weave_on $HOST1 launch-router $HOST3
 
