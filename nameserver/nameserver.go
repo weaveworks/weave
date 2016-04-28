@@ -113,11 +113,22 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 	// * (maybe) Move restoration from AddEntry to ContainerStarted
 	// * Possible race: AllContainers <- gap (start new container) -> restoreFromDB (maybe not, if we do not allow to
 	// start while being in process of the initialization)
-
-	// Restoration:
-	// - .stopped = true, for !('running', 'paused', 'restarting')
-	// - remove = does not exist in `docker ps`
 	// </braindump>
+
+	// ------------------+-------------------+-------------------+---------------+------------
+	// Container NonStopped | Container Stopped |  Entry Tombstoned | Entry Stopped | Action
+	// ---------------------+-------------------+-------------------+---------------+------------
+	//           1          |        0          |        1          |       1       | Restore
+	//           1          |        0          |        1          |       0       | noop
+	//           1          |        0          |        0          |       0       | noop
+	//           0          |        1          |        1          |       1       | noop
+	//           0          |        1          |        1          |       0       | noop
+	//           0          |        1          |        0          |       0       | Stop
+	//           0          |        0          |        1          |       1       | Tombstone
+	//           0          |        0          |        1          |       0       | noop
+	//           0          |        0          |        0          |       0       | Tombstone
+	// ---------------------+-------------------+-------------------+---------------+------------
+	// * (Container NonStopped) OR (Container Stopped) == 0 => Container has been removed.
 
 	now := now()
 	for i, e := range n.entries {
@@ -128,30 +139,29 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 		}
 
 		switch {
-		case nonStopped.Exist(e.ContainerID) && (e.stopped || e.Tombstone == 0):
-			// Restore non-deleted entries of running containers
+		case nonStopped.Exist(e.ContainerID) && e.stopped:
 			n.debugf("restore: restoring %v...", e)
 			e.stopped = false
 			e.Tombstone = 0
 			e.Version++
-			n.entries[i] = e
 		case stopped.Exist(e.ContainerID) && e.Tombstone == 0:
-			// Flag entry as stopped, because container is stopped (but not destroyed)
 			n.debugf("restore: stopping %v...", e)
 			e.stopped = true
 			e.Tombstone = now
 			e.Version++
-			n.entries[i] = e
-		case e.Tombstone == 0:
-			// Container has been destroyed, tombstone the entry
-			n.debugf("restore: tombstoning %v...", e)
-			e.Tombstone = now
+		case !nonStopped.Exist(e.ContainerID) && !stopped.Exist(e.ContainerID) && e.stopped:
+			n.debugf("restore: removing %v...", e)
 			e.stopped = false
 			e.Version++
-			n.entries[i] = e
+		case !nonStopped.Exist(e.ContainerID) && !stopped.Exist(e.ContainerID) && e.Tombstone == 0:
+			n.debugf("restore: tombstoning %v...", e)
+			e.stopped = false
+			e.Tombstone = now
+			e.Version++
 		default:
-			n.debugf("restore: keeping %v...", e)
+			n.debugf("restore: restoring %v...", e)
 		}
+		n.entries[i] = e
 	}
 
 	// lHostname gets lost during serialization, so we need to set this field manually
