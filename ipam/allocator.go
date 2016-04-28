@@ -402,6 +402,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.cancelOps(&alloc.pendingPrimes)
 		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
+			alloc.persistRing()
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 			time.Sleep(100 * time.Millisecond)
@@ -439,7 +440,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 		}
 
 		before := alloc.space.NumFreeAddresses()
-		alloc.space.AddRanges(newRanges)
+		alloc.ringUpdated()
 		after := alloc.space.NumFreeAddresses()
 
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
