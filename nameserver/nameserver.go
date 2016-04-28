@@ -13,6 +13,8 @@ import (
 	"github.com/weaveworks/weave/net/address"
 )
 
+// TODO(mp) double-check merging
+
 const (
 	// Tombstones do not need to survive long periods of peer disconnection, as
 	// we delete entries for disconnected peers.  Therefore they just need to hang
@@ -55,26 +57,24 @@ type dbEntry struct {
 	Stopped bool
 }
 
-// TODO comments
+type set map[string]struct{}
 
-type ContainerIDSet map[string]struct{}
-
-func NewContainerIDSet(ids ...string) ContainerIDSet {
-	s := ContainerIDSet{}
-	for _, id := range ids {
-		s[id] = struct{}{}
+func newSet(items []string) set {
+	s := set{}
+	for _, i := range items {
+		s[i] = struct{}{}
 	}
-
 	return s
 }
 
-func (s ContainerIDSet) Exist(containerID string) bool {
-	_, ok := s[containerID]
+func (s set) exist(item string) bool {
+	_, ok := s[item]
 	return ok
 }
 
+// TODO(mp) comment
 func New(ourName mesh.PeerName, domain string, db db.DB,
-	isKnownPeer func(mesh.PeerName) bool, nonStopped, stopped ContainerIDSet) *Nameserver {
+	isKnownPeer func(mesh.PeerName) bool, nonStopped, stopped []string) *Nameserver {
 
 	n := &Nameserver{
 		ourName:     ourName,
@@ -90,11 +90,10 @@ func New(ourName mesh.PeerName, domain string, db db.DB,
 
 // Restores local entries from the database.
 // NB: called only during the initialization, thus the lock is not taken.
-func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
-	// TODO(mp) HACK HACK HACK! "weave:extern" should be appended to nonStopped :-(((
-
+func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	n.debugf("restore: starting...")
 
+	// TODO(mp) check race
 	//n.debugf("restore: sleeping...")
 	//time.Sleep(60 * time.Second)
 	//n.debugf("restore: sleeping done.")
@@ -102,6 +101,10 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 	if ok := n.loadEntries(); !ok {
 		return
 	}
+
+	// TODO(mp) maybe just replace with sort.Search...
+	nonStoppedSet := newSet(nonStopped)
+	stoppedSet := newSet(stopped)
 
 	// <braindump>
 	// The IDEA:
@@ -139,21 +142,21 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped ContainerIDSet) {
 		}
 
 		switch {
-		case nonStopped.Exist(e.ContainerID) && e.stopped:
+		case nonStoppedSet.exist(e.ContainerID) && e.stopped:
 			n.debugf("restore: restoring %v...", e)
 			e.stopped = false
 			e.Tombstone = 0
 			e.Version++
-		case stopped.Exist(e.ContainerID) && e.Tombstone == 0:
+		case stoppedSet.exist(e.ContainerID) && e.Tombstone == 0:
 			n.debugf("restore: stopping %v...", e)
 			e.stopped = true
 			e.Tombstone = now
 			e.Version++
-		case !nonStopped.Exist(e.ContainerID) && !stopped.Exist(e.ContainerID) && e.stopped:
+		case !nonStoppedSet.exist(e.ContainerID) && !stoppedSet.exist(e.ContainerID) && e.stopped:
 			n.debugf("restore: removing %v...", e)
 			e.stopped = false
 			e.Version++
-		case !nonStopped.Exist(e.ContainerID) && !stopped.Exist(e.ContainerID) && e.Tombstone == 0:
+		case !nonStoppedSet.exist(e.ContainerID) && !stoppedSet.exist(e.ContainerID) && e.Tombstone == 0:
 			n.debugf("restore: tombstoning %v...", e)
 			e.stopped = false
 			e.Tombstone = now

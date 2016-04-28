@@ -273,23 +273,26 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		var s, n []string
+		var (
+			nonStoppedContainerIDs []string
+			stoppedContainerIDs    []string
+		)
 		if dockerCli != nil {
-			s, err = dockerCli.StoppedContainerIDs()
-			if err != nil {
-				Log.Fatalf("StoppedContainerIDs failed due to: %s", err)
-			}
-			n, err = dockerCli.NonStoppedContainerIDs()
+			nonStoppedContainerIDs, err = dockerCli.NonStoppedContainerIDs()
 			if err != nil {
 				Log.Fatalf("NonStoppedContainerIDs failed due to: %s", err)
 			}
+			stoppedContainerIDs, err = dockerCli.StoppedContainerIDs()
+			if err != nil {
+				Log.Fatalf("StoppedContainerIDs failed due to: %s", err)
+			}
 		}
-		n = append(n, "weave:extern")
-		nonStopped := nameserver.NewContainerIDSet(n...)
-		stopped := nameserver.NewContainerIDSet(s...)
+		// To restore external DNS entries we should pretend that "weave:extern"
+		// container exists and it is running.
+		nonStoppedContainerIDs = append(nonStoppedContainerIDs, "weave:extern")
 
 		ns, dnsserver = createDNSServer(dnsConfig, router.Router, db, isKnownPeer,
-			nonStopped, stopped)
+			nonStoppedContainerIDs, stoppedContainerIDs)
 		observeContainers(ns)
 		ns.Start()
 		defer ns.Stop()
@@ -436,7 +439,7 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 
 func createDNSServer(config dnsConfig, router *mesh.Router, db db.DB,
 	isKnownPeer func(mesh.PeerName) bool,
-	nonStopped, stopped nameserver.ContainerIDSet) (*nameserver.Nameserver, *nameserver.DNSServer) {
+	nonStopped, stopped []string) (*nameserver.Nameserver, *nameserver.DNSServer) {
 
 	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, db, isKnownPeer,
 		nonStopped, stopped)
