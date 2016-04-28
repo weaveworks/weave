@@ -4,7 +4,7 @@ menu_order: 70
 ---
 
 This section describes some details of Weave Net's built-in
-[encryption](/how-it-works/encryption.md):
+[encryption](/site/how-it-works/encryption.md):
 
  * [Establishing the Ephemeral Session Key](#ephemeral-key)
  * [Key Generation](#csprng)
