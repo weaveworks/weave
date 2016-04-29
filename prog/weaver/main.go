@@ -281,6 +281,8 @@ func main() {
 		ns, dnsserver = createDNSServer(dnsConfig, router.Router, db, isKnownPeer)
 		observeContainers(ns)
 
+		// TODO(mp) Think of possible race condition: container gets started
+		//			after the following dockerCli calls.
 		if dockerCli != nil {
 			nonStoppedContainerIDs, err = dockerCli.NonStoppedContainerIDs()
 			if err != nil {
