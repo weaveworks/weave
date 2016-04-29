@@ -164,17 +164,17 @@ func (c *Client) AllContainerIDs() ([]string, error) {
 // the following states:
 // * "running"
 // * "paused"
-// * "restarting"
 func (c *Client) NonStoppedContainerIDs() ([]string, error) {
-	return c.containerIDs("running", "paused", "restarting")
+	return c.containerIDs("running", "paused")
 }
 
 // StoppedContainerIDs returns ID of containers which are in one of
 // the following states:
 // * "exited"
 // * "created"
+// * "restarting"
 func (c *Client) StoppedContainerIDs() ([]string, error) {
-	return c.containerIDs("exited", "created")
+	return c.containerIDs("exited", "created", "restarting")
 }
 
 func (c *Client) containerIDs(states ...string) ([]string, error) {
