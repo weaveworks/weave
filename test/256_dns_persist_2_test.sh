@@ -17,6 +17,20 @@ wait_for_container() {
     exit 1
 }
 
+wait_for_dns_a_record() {
+    exp_name=${5:-$3}
+    for i in $(seq 1 30); do
+        echo "Waiting for $4 $exp_name"
+        actual=$(exec_on $1 $2 getent hosts $3 | tr -s ' ' | cut -d ' ' -f 1,2)
+        if [ "$actual" == "$4 $exp_name" ]; then
+            return
+        fi
+        sleep 1
+    done
+    echo "Timed out waiting for $4 $exp_name" >& 2
+    exit 1
+}
+
 C1=10.2.0.78
 C2=10.2.0.34
 IP=192.168.32.25
@@ -73,15 +87,10 @@ assert_dns_a_record $HOST2 c3 $NAME2 $IP
 
 # Restart Docker on $HOST1, DNS entries of c2 should be restored.
 restart_docker $HOST1
-
 wait_for_container $HOST1 weave
 wait_for_container $HOST1 c2
-# TODO(mp) the following sleep time is way too long and might differ on
-#          different machines. Add a better mechanism for detecting when entries get
-#          re-populated.
-sleep 10
 
-assert_dns_a_record $HOST2 c3 $NAME $C2
+wait_for_dns_a_record $HOST2 c3 $NAME $C2
 assert_dns_a_record $HOST2 c3 $NAME1 $C2
 assert_dns_a_record $HOST2 c3 $NAME2 $IP
 
