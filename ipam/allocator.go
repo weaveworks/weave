@@ -632,11 +632,13 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func(), stopChan <-chan stru
 		case <-stopChan:
 			return
 		case <-alloc.ticker.C:
+			// Retry things in case messages got lost between here and recipients
 			if alloc.awaitingConsensus {
 				alloc.propose()
+			} else {
+				alloc.tryPendingOps()
 			}
 			alloc.removeDeadContainers()
-			alloc.tryPendingOps()
 		}
 
 		alloc.assertInvariants()
