@@ -354,19 +354,19 @@ func TestRestore(t *testing.T) {
 	defer grouter.Flush()
 	ns1, ns2 := nameservers[0], nameservers[1]
 
-	// Container NonStopped | Entry Stopped
+	// Container NonStopped && Entry Stopped
 	ns1.AddEntry(hostname1, container1, ns1.ourName, addr1)
 	ns1.ContainerDied(container1)
 	nonStopped = append(nonStopped, container1)
-	// Container Stopped | Entry OK
+	// Container Stopped && Entry OK
 	ns1.AddEntry(hostname2, container2, ns1.ourName, addr2)
 	stopped = append(stopped, container2)
-	// Container Removed | Entry Stopped
+	// Container Removed && Entry Stopped
 	ns1.AddEntry(hostname3, container3, ns1.ourName, addr3)
 	ns1.ContainerDied(container3)
-	// Container Removed | Entry OK
+	// Container Removed && Entry OK
 	ns1.AddEntry(hostname4, container4, ns1.ourName, addr4)
-	// Container NonStopped | Entry OK
+	// Container NonStopped && Entry OK
 	ns1.AddEntry(hostname5, container5, ns1.ourName, addr5)
 	nonStopped = append(nonStopped, container5)
 	ns2.AddEntry(hostname6, container6, ns2.ourName, addr6)
@@ -404,7 +404,7 @@ func TestRestore(t *testing.T) {
 			Origin:      ns1.ourName,
 			Addr:        addr3,
 			Hostname:    hostname3,
-			Version:     2,
+			Version:     1,
 			Tombstone:   1000,
 			stopped:     false,
 		},
@@ -444,7 +444,7 @@ func TestRestore(t *testing.T) {
 	require.Equal(t, expected, ns2.copyEntries())
 }
 
-// TestEntryLifecycle tests "stopping" and removal of entry which happens due to
+// TestEntryLifecycle tests "stopping" and removal of entries, which happens due to
 // container state changes.
 func TestEntryLifecycle(t *testing.T) {
 	oldNow := now
@@ -525,7 +525,6 @@ func TestEntryLifecycle(t *testing.T) {
 	// Should tombstone entries of container1
 	ns1.ContainerDied(container1)
 	ns1.ContainerDestroyed(container1)
-	// TODO(mp) maybe increase version?
 	expected[0].Version = 3
 	expected[0].Tombstone = 1000
 	expected[0].stopped = false
@@ -536,5 +535,4 @@ func TestEntryLifecycle(t *testing.T) {
 	require.Equal(t, expected, ns1.copyEntries())
 	expected.unsetStopped()
 	require.Equal(t, expected, ns2.copyEntries())
-
 }

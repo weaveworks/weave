@@ -13,8 +13,6 @@ import (
 	"github.com/weaveworks/weave/net/address"
 )
 
-// TODO(mp) double-check merging
-
 const (
 	// Tombstones do not need to survive long periods of peer disconnection, as
 	// we delete entries for disconnected peers.  Therefore they just need to hang
@@ -57,6 +55,7 @@ type dbEntry struct {
 	Stopped bool
 }
 
+// Set of strings
 type set map[string]struct{}
 
 func newSet(items []string) set {
@@ -72,9 +71,9 @@ func (s set) exist(item string) bool {
 	return ok
 }
 
-// TODO(mp) comment
 func New(ourName mesh.PeerName, domain string, db db.DB,
-	isKnownPeer func(mesh.PeerName) bool, nonStopped, stopped []string) *Nameserver {
+	isKnownPeer func(mesh.PeerName) bool,
+	nonStoppedContainerIDs, stoppedContainerIDs []string) *Nameserver {
 
 	n := &Nameserver{
 		ourName:     ourName,
@@ -83,7 +82,7 @@ func New(ourName mesh.PeerName, domain string, db db.DB,
 		isKnownPeer: isKnownPeer,
 		quit:        make(chan struct{}),
 	}
-	n.restoreFromDB(nonStopped, stopped)
+	n.restoreFromDB(nonStoppedContainerIDs, stoppedContainerIDs)
 
 	return n
 }
@@ -93,7 +92,8 @@ func New(ourName mesh.PeerName, domain string, db db.DB,
 func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	n.debugf("restore: starting...")
 
-	// TODO(mp) check race
+	// TODO(mp) check if such a race is possible:
+	//          get ({non,}Stopped), container started, restoreFromDB
 	//n.debugf("restore: sleeping...")
 	//time.Sleep(60 * time.Second)
 	//n.debugf("restore: sleeping done.")
@@ -102,23 +102,13 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 		return
 	}
 
-	// TODO(mp) maybe just replace with sort.Search...
+	// TODO(mp) maybe just replace with sort.Search.
 	nonStoppedSet := newSet(nonStopped)
 	stoppedSet := newSet(stopped)
 
-	// <braindump>
-	// The IDEA:
-	// * During restoration, .stopped is set only for containers which are not running;
-	//   for others, we just restore entries aka restore entries from
-	// * ContainerDied: we set .stopped
-	// * ContainerDestroyed: we remove all container entries
-	// * AddEntry: restore stopped entries (weave:extern non-tombstoned will be stopped, which we restore later)
-	// * (maybe) Move restoration from AddEntry to ContainerStarted
-	// * Possible race: AllContainers <- gap (start new container) -> restoreFromDB (maybe not, if we do not allow to
-	// start while being in process of the initialization)
-	// </braindump>
-
-	// ------------------+-------------------+-------------------+---------------+------------
+	// We iterate over all restored entries and decide whether an entry should be restored,
+	// tombstoned or flagged as stopped. The decision is based on the following conditions:
+	// ---------------------+-------------------+-------------------+---------------+------------
 	// Container NonStopped | Container Stopped |  Entry Tombstoned | Entry Stopped | Action
 	// ---------------------+-------------------+-------------------+---------------+------------
 	//           1          |        0          |        1          |       1       | Restore
@@ -133,7 +123,6 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	// ---------------------+-------------------+-------------------+---------------+------------
 	// * (Container NonStopped) OR (Container Stopped) == 0 => Container has been removed.
 
-	now := now()
 	for i, e := range n.entries {
 		if e.Origin != n.ourName {
 			panic(fmt.Sprintf(
@@ -150,16 +139,15 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 		case stoppedSet.exist(e.ContainerID) && e.Tombstone == 0:
 			n.debugf("restore: stopping %v...", e)
 			e.stopped = true
-			e.Tombstone = now
+			e.Tombstone = now()
 			e.Version++
 		case !nonStoppedSet.exist(e.ContainerID) && !stoppedSet.exist(e.ContainerID) && e.stopped:
 			n.debugf("restore: removing %v...", e)
 			e.stopped = false
-			e.Version++
 		case !nonStoppedSet.exist(e.ContainerID) && !stoppedSet.exist(e.ContainerID) && e.Tombstone == 0:
 			n.debugf("restore: tombstoning %v...", e)
 			e.stopped = false
-			e.Tombstone = now
+			e.Tombstone = now()
 			e.Version++
 		default:
 			n.debugf("restore: restoring %v...", e)
@@ -275,14 +263,18 @@ func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
 }
 
 func (n *Nameserver) ContainerStarted(ident string) {
-	// TODO(mp) maybe move code from AddEntry here
+	// TODO(mp) maybe handle restoration of entries here
 }
+
 func (n *Nameserver) ContainerDestroyed(ident string) {
 	n.Lock()
 	entries := n.entries.forceTombstone(n.ourName, func(e *Entry) bool {
 		if e.ContainerID == ident {
 			n.infof("container %s destroyed; tombstoning entry %s", ident, e.String())
-			// Unset the flag that the entry could be GC later on
+			// Unset the flag that the entry could be removed later on;
+			// Because the flag isn't exposed to other non-local peers, we don't
+			// need bump the version number if the entry has been previously
+			// tombstoned.
 			e.stopped = false
 			return true
 		}
@@ -298,7 +290,7 @@ func (n *Nameserver) ContainerDied(ident string) {
 	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
 		if e.ContainerID == ident {
 			n.infof("container %s died; tombstoning entry %s", ident, e.String())
-			// We might want to restore the entry if container comes back
+			// We might want to restore the entry if the container comes back
 			e.stopped = true
 			return true
 		}
@@ -353,7 +345,7 @@ func (n *Nameserver) deleteTombstones() {
 }
 
 // snapshot stores the local entries (Origin == n.ourName) to the database.
-// Each entry is wrapped by the dbEntry struct because the entry.stopped field is private
+// Each entry is wrapped into the dbEntry struct because the entry.stopped field is private
 // and is lost during the serialization performed by the db.
 //
 // NB: we assume that a caller has taken the nameserver' lock for reading or writing.

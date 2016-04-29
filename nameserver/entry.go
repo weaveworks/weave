@@ -23,9 +23,9 @@ type Entry struct {
 	lHostname   string // lowercased (not exported, so not encoded by gob)
 	Version     int
 	Tombstone   int64 // timestamp of when it was deleted
-	// Denotes that container is stopped;
-	// its entries will be restored by the AddEntry function call.
-	// TODO(mp) think of ContainerStarted
+	// Denotes that the container is stopped; such entry is removed only
+	// when the container is destroyed or container does not exist after a restart of
+	// nameserver.
 	stopped bool
 }
 
