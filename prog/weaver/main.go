@@ -337,7 +337,7 @@ func main() {
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
 		http.Handle("/", muxRouter)
 		Log.Println("Listening for HTTP control messages on", httpAddr)
-		go listenAndServeHTTP(httpAddr, muxRouter)
+		go listenAndServeHTTP(httpAddr)
 	}
 
 	common.SignalHandlerLoop(router)
@@ -550,7 +550,7 @@ func parsePeerNames(s string) ([]mesh.PeerName, error) {
 	return peerNames, nil
 }
 
-func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {
+func listenAndServeHTTP(httpAddr string) {
 	protocol := "tcp"
 	if strings.HasPrefix(httpAddr, "/") {
 		os.Remove(httpAddr) // in case it's there from last time
