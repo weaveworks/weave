@@ -118,7 +118,7 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	nonStoppedSet := newSet(nonStopped)
 	stoppedSet := newSet(stopped)
 
-	// We iterate over all restored entries and decide whether an entry should be restored,
+	// We iterate over all retrieved entries and decide whether an entry should be restored,
 	// tombstoned or flagged as stopped. The decision is based on the following conditions:
 	// ---------------------+-------------------+-------------------+---------------+------------
 	// Container NonStopped | Container Stopped |  Entry Tombstoned | Entry Stopped | Action
@@ -262,9 +262,9 @@ func (n *Nameserver) ContainerDestroyed(ident string) {
 	entries := n.entries.forceTombstone(n.ourName, func(e *Entry) bool {
 		if e.ContainerID == ident {
 			n.infof("container %s destroyed; tombstoning entry %s", ident, e.String())
-			// Unset the flag that the entry could be removed later on;
-			// Because the flag isn't exposed to other non-local peers, we don't
-			// need bump the version number if the entry has been previously
+			// Unset the flag to allow the entry be removed later on;
+			// Because the flag isn't exposed to other peers, we don't
+			// need to bump the version number if the entry has been previously
 			// tombstoned.
 			e.stopped = false
 			return true
@@ -359,7 +359,7 @@ func (n *Nameserver) loadEntries() bool {
 	var dbEntries []dbEntry
 
 	// (Redundant) sanity check.
-	// Shouldn't happen, because DNS server is started after restoreFromDB.
+	// Shouldn't happen, because the DNS server is started after restoreFromDB.
 	if len(n.entries) != 0 {
 		n.fatalf("restore: entries list is not empty")
 		return false
