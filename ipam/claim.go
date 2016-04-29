@@ -66,6 +66,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 				alloc.infof("Claim %s for %s: %s; will try later.", c.cidr, c.ident, err)
 				c.sendResult(nil)
 			} else { // just tell the user they can't do this.
+				alloc.errorf("unable to request address %s from %s: %s", c.cidr, owner, err)
 				c.deniedBy(alloc, owner)
 			}
 		}
