@@ -650,8 +650,8 @@ func (alloc *Allocator) establishRing() {
 func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
 	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
-	alloc.gossip.GossipBroadcast(alloc.Gossip())
 	alloc.ringUpdated()
+	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
 func (alloc *Allocator) ringUpdated() {
