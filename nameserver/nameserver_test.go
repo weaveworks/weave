@@ -40,12 +40,7 @@ const (
 )
 
 func makeNameserver(name mesh.PeerName) *Nameserver {
-	return makeNameserverWithRestore(name, nil, nil)
-}
-
-func makeNameserverWithRestore(name mesh.PeerName, nonStopped, stopped []string) *Nameserver {
-	return New(name, "", NewMockDB(), func(mesh.PeerName) bool { return true },
-		nonStopped, stopped)
+	return New(name, "", NewMockDB(), func(mesh.PeerName) bool { return true })
 }
 
 func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
@@ -56,7 +51,7 @@ func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
 		name, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:00:00:02:00:00", i))
 		nameserver := makeNameserver(name)
 		nameserver.SetGossip(gossipRouter.Connect(nameserver.ourName, nameserver))
-		nameserver.Start()
+		nameserver.Start(nil, nil)
 		nameservers[i] = nameserver
 	}
 
@@ -374,11 +369,10 @@ func TestRestore(t *testing.T) {
 	// Restart ns1
 	ns1.Stop()
 	grouter.RemovePeer(ns1.ourName)
-	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true },
-		nonStopped, stopped)
+	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true })
 	ns1 = nameservers[0]
 	ns1.SetGossip(grouter.Connect(ns1.ourName, ns1))
-	ns1.Start()
+	ns1.Start(nonStopped, stopped)
 
 	expected := l(Entries{
 		Entry{

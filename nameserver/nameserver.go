@@ -39,14 +39,13 @@ const (
 // - Update is O(n) for now
 type Nameserver struct {
 	sync.RWMutex
-	ourName          mesh.PeerName
-	domain           string
-	gossip           mesh.Gossip
-	entries          Entries
-	isKnownPeer      func(mesh.PeerName) bool
-	quit             chan struct{}
-	db               db.DB
-	pendingBroadcast Entries
+	ourName     mesh.PeerName
+	domain      string
+	gossip      mesh.Gossip
+	entries     Entries
+	isKnownPeer func(mesh.PeerName) bool
+	quit        chan struct{}
+	db          db.DB
 }
 
 // dbEntry is used when storing each entry to DB.
@@ -72,31 +71,44 @@ func (s set) exist(item string) bool {
 }
 
 func New(ourName mesh.PeerName, domain string, db db.DB,
-	isKnownPeer func(mesh.PeerName) bool,
-	nonStoppedContainerIDs, stoppedContainerIDs []string) *Nameserver {
+	isKnownPeer func(mesh.PeerName) bool) *Nameserver {
 
-	n := &Nameserver{
+	return &Nameserver{
 		ourName:     ourName,
 		domain:      dns.Fqdn(domain),
 		db:          db,
 		isKnownPeer: isKnownPeer,
 		quit:        make(chan struct{}),
 	}
-	n.restoreFromDB(nonStoppedContainerIDs, stoppedContainerIDs)
+}
 
-	return n
+// NB: Can be called only before n.Start()
+func (n *Nameserver) SetGossip(gossip mesh.Gossip) {
+	n.gossip = gossip
+}
+
+func (n *Nameserver) Start(nonStoppedContainerIDs, stoppedContainerIDs []string) {
+	n.Lock()
+	n.restoreFromDB(nonStoppedContainerIDs, stoppedContainerIDs)
+	n.Unlock()
+
+	go func() {
+		ticker := time.Tick(tombstoneTimeout)
+		for {
+			select {
+			case <-n.quit:
+				return
+			case <-ticker:
+				n.deleteTombstones()
+			}
+		}
+	}()
 }
 
 // Restores local entries from the database.
 // NB: called only during the initialization, thus the lock is not taken.
 func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	n.debugf("restore: starting...")
-
-	// TODO(mp) check if such a race is possible:
-	//          get ({non,}Stopped), container started, restoreFromDB
-	//n.debugf("restore: sleeping...")
-	//time.Sleep(60 * time.Second)
-	//n.debugf("restore: sleeping done.")
 
 	if ok := n.loadEntries(); !ok {
 		return
@@ -142,7 +154,7 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 			e.Tombstone = now()
 			e.Version++
 		case !nonStoppedSet.exist(e.ContainerID) && !stoppedSet.exist(e.ContainerID) && e.stopped:
-			n.debugf("restore: removing %v...", e)
+			n.debugf("restore: removing the stopped flag %v...", e)
 			e.stopped = false
 		case !nonStoppedSet.exist(e.ContainerID) && !stoppedSet.exist(e.ContainerID) && e.Tombstone == 0:
 			n.debugf("restore: tombstoning %v...", e)
@@ -150,7 +162,7 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 			e.Tombstone = now()
 			e.Version++
 		default:
-			n.debugf("restore: restoring %v...", e)
+			n.debugf("restore: keeping %v...", e)
 		}
 		n.entries[i] = e
 	}
@@ -159,32 +171,11 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	n.entries.addLowercase()
 	n.snapshot()
 
-	// Will gossip once we set the gossiper
-	n.pendingBroadcast = make(Entries, len(n.entries))
-	copy(n.pendingBroadcast, n.entries)
+	entries := make(Entries, len(n.entries))
+	copy(entries, n.entries)
+	n.broadcastEntries(entries...)
 
 	n.debugf("restore: finished.")
-}
-
-// NB: Can be called only before n.Start()
-func (n *Nameserver) SetGossip(gossip mesh.Gossip) {
-	n.gossip = gossip
-	n.broadcastEntries(n.pendingBroadcast...)
-	n.pendingBroadcast = nil
-}
-
-func (n *Nameserver) Start() {
-	go func() {
-		ticker := time.Tick(tombstoneTimeout)
-		for {
-			select {
-			case <-n.quit:
-				return
-			case <-ticker:
-				n.deleteTombstones()
-			}
-		}
-	}()
 }
 
 func (n *Nameserver) Stop() {
@@ -367,6 +358,13 @@ func (n *Nameserver) snapshot() {
 func (n *Nameserver) loadEntries() bool {
 	var dbEntries []dbEntry
 
+	// (Redundant) sanity check.
+	// Shouldn't happen, because DNS server is started after restoreFromDB.
+	if len(n.entries) != 0 {
+		n.fatalf("restore: entries list is not empty")
+		return false
+	}
+
 	ok, err := n.db.Load(nameserverIdent, &dbEntries)
 	switch {
 	case err != nil:
@@ -478,6 +476,9 @@ func (n *Nameserver) debugf(fmt string, args ...interface{}) {
 }
 func (n *Nameserver) errorf(fmt string, args ...interface{}) {
 	n.logf(common.Log.Errorf, fmt, args...)
+}
+func (n *Nameserver) fatalf(fmt string, args ...interface{}) {
+	n.logf(common.Log.Fatalf, fmt, args...)
 }
 func (n *Nameserver) logf(f func(string, ...interface{}), fmt string, args ...interface{}) {
 	f("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)
