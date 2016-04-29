@@ -15,8 +15,8 @@ The plugin command-line arguments are:
 
  * `--log-level=debug|info|warning|error` --tells the plugin
    how much information to emit for debugging.
- * `--mesh-network-name=<name>` -- set `<name>` to blank to disable creation
-   of a default network, or include a name of your own choice.
+ * `--no-restart` -- remove the default policy of `--restart=always`, if
+   you want to control start-up of the plugin yourself
  * `--no-multicast-route` -- stops weave from adding a static IP route for
    multicast traffic onto its interface
 
