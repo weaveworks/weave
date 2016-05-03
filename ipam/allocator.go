@@ -896,11 +896,13 @@ func (alloc *Allocator) loadPersistedData() {
 	if err != nil {
 		alloc.fatalf("Error loading persisted peer name: %s", err)
 	}
-	ringFound, err := alloc.db.Load(ringIdent, &alloc.ring)
+	var persistedRing *ring.Ring
+	ringFound, err := alloc.db.Load(ringIdent, &persistedRing)
 	if err != nil {
 		alloc.fatalf("Error loading persisted IPAM data: %s", err)
 	}
-	ownedFound, err := alloc.db.Load(ownedIdent, &alloc.owned)
+	var persistedOwned map[string]ownedData
+	ownedFound, err := alloc.db.Load(ownedIdent, &persistedOwned)
 	if err != nil {
 		alloc.fatalf("Error loading persisted address data: %s", err)
 	}
@@ -911,9 +913,11 @@ func (alloc *Allocator) loadPersistedData() {
 				if len(alloc.seed) != 0 {
 					alloc.infof("Found persisted IPAM data, ignoring supplied IPAM seed")
 				}
+				alloc.ring = persistedRing
 				alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 			}
 			if ownedFound {
+				alloc.owned = persistedOwned
 				for _, d := range alloc.owned {
 					for _, cidr := range d.Cidrs {
 						alloc.space.Claim(cidr.Addr)
