@@ -160,21 +160,10 @@ func (c *Client) AllContainerIDs() ([]string, error) {
 	return c.containerIDs()
 }
 
-// NonStoppedContainerIDs returns ID of containers which are in one of
-// the following states:
-// * "running"
-// * "paused"
-func (c *Client) NonStoppedContainerIDs() ([]string, error) {
-	return c.containerIDs("running", "paused")
-}
-
-// StoppedContainerIDs returns ID of containers which are in one of
-// the following states:
-// * "exited"
-// * "created"
-// * "restarting"
-func (c *Client) StoppedContainerIDs() ([]string, error) {
-	return c.containerIDs("exited", "created", "restarting")
+// ExistingContainerIDs returns a list of container IDs which either are running or
+// might be started.
+func (c *Client) ExistingContainerIDs() ([]string, error) {
+	return c.containerIDs("running", "paused", "exited", "created", "restarting")
 }
 
 func (c *Client) containerIDs(states ...string) ([]string, error) {

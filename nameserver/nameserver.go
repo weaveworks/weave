@@ -89,9 +89,9 @@ func (n *Nameserver) SetGossip(gossip mesh.Gossip) {
 	n.gossip = gossip
 }
 
-func (n *Nameserver) Start(nonStoppedContainerIDs, stoppedContainerIDs []string) {
+func (n *Nameserver) Start(existingContainerIDs []string) {
 	n.Lock()
-	n.restoreFromDB(nonStoppedContainerIDs, stoppedContainerIDs)
+	n.restoreFromDB(existingContainerIDs)
 	n.replayEvents()
 	n.ready = true
 	n.Unlock()
@@ -111,7 +111,7 @@ func (n *Nameserver) Start(nonStoppedContainerIDs, stoppedContainerIDs []string)
 
 // Restores local entries from the database.
 // NB: called only during the initialization, thus the lock is not taken.
-func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
+func (n *Nameserver) restoreFromDB(existingContainerIDs []string) {
 	n.debugf("restore: starting...")
 	defer n.debugf("restore: finished.")
 
@@ -120,56 +120,25 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	}
 
 	// TODO(mp) maybe just replace with sort.Search.
-	nonStoppedSet := newSet(nonStopped)
-	stoppedSet := newSet(stopped)
+	ids := newSet(existingContainerIDs)
 
-	// We iterate over all retrieved entries and decide whether an entry should be restored,
-	// tombstoned or flagged as stopped. The decision is based on the following conditions:
-	// ---------------------+-------------------+-------------------+---------------+------------
-	// Container NonStopped | Container Stopped |  Entry Tombstoned | Entry Stopped | Action
-	// ---------------------+-------------------+-------------------+---------------+------------
-	//           1          |        0          |        1          |       1       | Restore
-	//           1          |        0          |        1          |       0       | noop
-	//           1          |        0          |        0          |       0       | noop
-	//           0          |        1          |        1          |       1       | noop
-	//           0          |        1          |        1          |       0       | noop
-	//           0          |        1          |        0          |       0       | Stop
-	//           0          |        0          |        1          |       1       | Tombstone
-	//           0          |        0          |        1          |       0       | noop
-	//           0          |        0          |        0          |       0       | Tombstone
-	// ---------------------+-------------------+-------------------+---------------+------------
-	// * (Container NonStopped) OR (Container Stopped) == 0 => Container has been removed.
-
+	// Tombstone all entries and flag entries of existing containers as stopped
 	for i, e := range n.entries {
 		if e.Origin != n.ourName {
 			panic(fmt.Sprintf(
 				"restore: peer %s DB should not have contained entries of %s peer",
 				n.ourName, e.Origin))
 		}
-
-		switch {
-		case nonStoppedSet.exist(e.ContainerID) && e.stopped:
-			n.debugf("restore: restoring %v...", e)
-			e.stopped = false
-			e.Tombstone = 0
-			e.Version++
-		case stoppedSet.exist(e.ContainerID) && e.Tombstone == 0:
-			n.debugf("restore: stopping %v...", e)
-			e.stopped = true
-			e.Tombstone = now()
-			e.Version++
-		case !nonStoppedSet.exist(e.ContainerID) && !stoppedSet.exist(e.ContainerID) && e.stopped:
-			n.debugf("restore: removing the stopped flag %v...", e)
-			e.stopped = false
-		case !nonStoppedSet.exist(e.ContainerID) && !stoppedSet.exist(e.ContainerID) && e.Tombstone == 0:
+		if e.Tombstone == 0 {
 			n.debugf("restore: tombstoning %v...", e)
-			e.stopped = false
 			e.Tombstone = now()
 			e.Version++
-		default:
-			n.debugf("restore: keeping %v...", e)
+			if ids.exist(e.ContainerID) {
+				n.debugf("restore: stopping %v...", e)
+				e.stopped = true
+			}
+			n.entries[i] = e
 		}
-		n.entries[i] = e
 	}
 
 	// lHostname gets lost during serialization, so we need to set this field manually
@@ -206,7 +175,7 @@ func (n *Nameserver) AddEntry(hostname, containerid string,
 	// Restore the stopped entries first
 	for i, e := range n.entries {
 		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
-			if !found && e.Addr == addr {
+			if e.Addr == addr {
 				found = true
 			}
 			e.stopped = false
@@ -223,6 +192,26 @@ func (n *Nameserver) AddEntry(hostname, containerid string,
 
 	n.snapshot()
 	n.Unlock()
+	n.broadcastEntries(entries...)
+}
+
+// TODO(mp) DRY
+func (n *Nameserver) RestoreEntries(containerid string) {
+	var entries Entries
+
+	n.Lock()
+	for i, e := range n.entries {
+		if e.Origin == n.ourName && e.ContainerID == containerid && e.stopped {
+			e.stopped = false
+			e.Tombstone = 0
+			e.Version++
+			n.entries[i] = e
+			entries = append(entries, e)
+		}
+	}
+	n.snapshot()
+	n.Unlock()
+
 	n.broadcastEntries(entries...)
 }
 

@@ -273,29 +273,23 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		var (
-			nonStoppedContainerIDs []string
-			stoppedContainerIDs    []string
-		)
+		var existingContainerIDs []string
 
 		ns, dnsserver = createDNSServer(dnsConfig, router.Router, db, isKnownPeer)
 		observeContainers(ns)
 
 		if dockerCli != nil {
-			nonStoppedContainerIDs, err = dockerCli.NonStoppedContainerIDs()
+			existingContainerIDs, err = dockerCli.ExistingContainerIDs()
 			if err != nil {
-				Log.Fatalf("NonStoppedContainerIDs failed due to: %s", err)
-			}
-			stoppedContainerIDs, err = dockerCli.StoppedContainerIDs()
-			if err != nil {
-				Log.Fatalf("StoppedContainerIDs failed due to: %s", err)
+				Log.Fatalf("ExistingContainerIDs failed due to: %s", err)
 			}
 		}
 
 		// To restore external DNS entries we should pretend that "weave:extern"
-		// container exists and it is running.
-		nonStoppedContainerIDs = append(nonStoppedContainerIDs, "weave:extern")
-		ns.Start(nonStoppedContainerIDs, stoppedContainerIDs)
+		// container exists.
+		existingContainerIDs = append(existingContainerIDs, "weave:extern")
+		ns.Start(existingContainerIDs)
+		ns.RestoreEntries("weave:extern")
 		defer ns.Stop()
 
 		dnsserver.ActivateAndServe()

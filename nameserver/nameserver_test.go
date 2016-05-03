@@ -51,7 +51,7 @@ func makeNetwork(size int) ([]*Nameserver, *gossip.TestRouter) {
 		name, _ := mesh.PeerNameFromString(fmt.Sprintf("%02d:00:00:02:00:00", i))
 		nameserver := makeNameserver(name)
 		nameserver.SetGossip(gossipRouter.Connect(nameserver.ourName, nameserver))
-		nameserver.Start(nil, nil)
+		nameserver.Start(nil)
 		nameservers[i] = nameserver
 	}
 
@@ -290,7 +290,7 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	peername, err := mesh.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
 	nameserver := makeNameserver(peername)
-	nameserver.Start(nil, nil)
+	nameserver.Start(nil)
 
 	nameserver.AddEntry(hostname1, container1, peername, addr1)
 	require.Equal(t, []address.Address{addr1}, nameserver.Lookup(hostname1))
@@ -336,10 +336,10 @@ func TestTombstoneDeletion(t *testing.T) {
 	require.Equal(t, Entries{}, nameserver.entries)
 }
 
-// TestRestore tests whether entries have been restored after the nameserver restart.
+// TestRestore tests whether entries have been restored after the nameserver restart
+// and after manually calling RestoreEntries.
 func TestRestore(t *testing.T) {
-	var nonStopped []string
-	var stopped []string
+	var existingIDs []string
 
 	oldNow := now
 	defer func() { now = oldNow }()
@@ -350,22 +350,21 @@ func TestRestore(t *testing.T) {
 	defer grouter.Flush()
 	ns1, ns2 := nameservers[0], nameservers[1]
 
-	// Container NonStopped && Entry Stopped
+	// Create entries
 	ns1.AddEntry(hostname1, container1, ns1.ourName, addr1)
 	ns1.ContainerDied(container1)
-	nonStopped = append(nonStopped, container1)
-	// Container Stopped && Entry OK
+	existingIDs = append(existingIDs, container1)
+
 	ns1.AddEntry(hostname2, container2, ns1.ourName, addr2)
-	stopped = append(stopped, container2)
-	// Container Removed && Entry Stopped
+	existingIDs = append(existingIDs, container2)
+
 	ns1.AddEntry(hostname3, container3, ns1.ourName, addr3)
 	ns1.ContainerDied(container3)
-	// Container Removed && Entry OK
+
 	ns1.AddEntry(hostname4, container4, ns1.ourName, addr4)
-	// Container NonStopped && Entry OK
-	ns1.AddEntry(hostname5, container5, ns1.ourName, addr5)
-	nonStopped = append(nonStopped, container5)
-	ns2.AddEntry(hostname6, container6, ns2.ourName, addr6)
+	ns1.ContainerDestroyed(container4)
+
+	ns2.AddEntry(hostname5, container5, ns2.ourName, addr5)
 
 	// Restart ns1
 	ns1.Stop()
@@ -373,7 +372,10 @@ func TestRestore(t *testing.T) {
 	nameservers[0] = New(ns1.ourName, "", ns1.db, func(mesh.PeerName) bool { return true })
 	ns1 = nameservers[0]
 	ns1.SetGossip(grouter.Connect(ns1.ourName, ns1))
-	ns1.Start(nonStopped, stopped)
+	ns1.Start(existingIDs)
+
+	// Restore container3 entries
+	ns1.RestoreEntries(container3)
 
 	expected := l(Entries{
 		Entry{
@@ -381,9 +383,9 @@ func TestRestore(t *testing.T) {
 			Origin:      ns1.ourName,
 			Addr:        addr1,
 			Hostname:    hostname1,
-			Version:     2,
-			Tombstone:   0,
-			stopped:     false,
+			Version:     1,
+			Tombstone:   1000,
+			stopped:     true,
 		},
 		Entry{
 			ContainerID: container2,
@@ -399,8 +401,8 @@ func TestRestore(t *testing.T) {
 			Origin:      ns1.ourName,
 			Addr:        addr3,
 			Hostname:    hostname3,
-			Version:     1,
-			Tombstone:   1000,
+			Version:     2,
+			Tombstone:   0,
 			stopped:     false,
 		},
 		Entry{
@@ -414,18 +416,9 @@ func TestRestore(t *testing.T) {
 		},
 		Entry{
 			ContainerID: container5,
-			Origin:      ns1.ourName,
+			Origin:      ns2.ourName,
 			Addr:        addr5,
 			Hostname:    hostname5,
-			Version:     0,
-			Tombstone:   0,
-			stopped:     false,
-		},
-		Entry{
-			ContainerID: container6,
-			Origin:      ns2.ourName,
-			Addr:        addr6,
-			Hostname:    hostname6,
 			Version:     0,
 			Tombstone:   0,
 			stopped:     false,
@@ -434,7 +427,7 @@ func TestRestore(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 	// TODO(mp) Check why ns2 entries are not broadcasted to ns1
-	require.Equal(t, expected[:5], ns1.copyEntries()[:5])
+	require.Equal(t, expected[:4], ns1.copyEntries()[:4])
 	expected.unsetStopped()
 	require.Equal(t, expected, ns2.copyEntries())
 }
