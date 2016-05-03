@@ -134,7 +134,7 @@ func (d *DNSServer) createMux(client *dns.Client, defaultMaxResponseSize int) *d
 
 func (h *handler) handleLocal(w dns.ResponseWriter, req *dns.Msg) {
 	h.ns.debugf("local request: %+v", *req)
-	if len(req.Question) != 1 || req.Question[0].Qtype != dns.TypeA {
+	if len(req.Question) != 1 {
 		h.nameError(w, req)
 		return
 	}
@@ -147,6 +147,12 @@ func (h *handler) handleLocal(w dns.ResponseWriter, req *dns.Msg) {
 	addrs := h.ns.Lookup(hostname)
 	if len(addrs) == 0 {
 		h.nameError(w, req)
+		return
+	}
+	// Per RFC4074, if we have an A but another type was requested,
+	// return 'no error' with empty answer section
+	if req.Question[0].Qtype != dns.TypeA {
+		h.respond(w, h.makeResponse(req, nil))
 		return
 	}
 
@@ -204,7 +210,7 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 	h.ns.debugf("recursive request: %+v", *req)
 
 	// Resolve unqualified names locally
-	if len(req.Question) == 1 && req.Question[0].Qtype == dns.TypeA {
+	if len(req.Question) == 1 {
 		hostname := dns.Fqdn(req.Question[0].Name)
 		if strings.Count(hostname, ".") == 1 {
 			h.handleLocal(w, req)
