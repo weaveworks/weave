@@ -115,7 +115,20 @@ func NewAllocator(config Config) *Allocator {
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
-	alloc.loadPersistedData()
+	if alloc.loadPersistedData() {
+		if len(alloc.seed) != 0 {
+			alloc.infof("Found persisted IPAM data, ignoring supplied IPAM seed")
+		}
+	} else {
+		if len(alloc.seed) != 0 {
+			alloc.infof("Initialising with supplied IPAM seed")
+			alloc.createRing(alloc.seed)
+		} else if alloc.paxos.IsElector() {
+			alloc.infof("Initialising via deferred consensus")
+		} else {
+			alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
+		}
+	}
 	actionChan := make(chan func(), mesh.ChannelSize)
 	stopChan := make(chan struct{})
 	alloc.actionChan = actionChan
@@ -890,52 +903,57 @@ func (alloc *Allocator) persistRing() {
 	}
 }
 
-func (alloc *Allocator) loadPersistedData() {
+// Returns true if persisted data is to be used, otherwise false
+func (alloc *Allocator) loadPersistedData() bool {
 	var checkPeerName mesh.PeerName
 	nameFound, err := alloc.db.Load(nameIdent, &checkPeerName)
 	if err != nil {
 		alloc.fatalf("Error loading persisted peer name: %s", err)
 	}
-	ringFound, err := alloc.db.Load(ringIdent, &alloc.ring)
+	var persistedRing *ring.Ring
+	ringFound, err := alloc.db.Load(ringIdent, &persistedRing)
 	if err != nil {
 		alloc.fatalf("Error loading persisted IPAM data: %s", err)
 	}
-	ownedFound, err := alloc.db.Load(ownedIdent, &alloc.owned)
+	var persistedOwned map[string]ownedData
+	ownedFound, err := alloc.db.Load(ownedIdent, &persistedOwned)
 	if err != nil {
 		alloc.fatalf("Error loading persisted address data: %s", err)
 	}
 
-	if nameFound {
-		if checkPeerName == alloc.ourName {
-			if ringFound {
-				if len(alloc.seed) != 0 {
-					alloc.infof("Found persisted IPAM data, ignoring supplied IPAM seed")
-				}
-				alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
-			}
-			if ownedFound {
-				for _, d := range alloc.owned {
-					for _, cidr := range d.Cidrs {
-						alloc.space.Claim(cidr.Addr)
-					}
-				}
-			}
-			return
-		}
-		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
+	overwritePersisted := func(fmt string, args ...interface{}) {
+		alloc.infof(fmt, args...)
 		alloc.persistRing()
 		alloc.persistOwned()
 	}
 
-	if len(alloc.seed) != 0 {
-		alloc.infof("Initialising with supplied IPAM seed")
-		alloc.createRing(alloc.seed)
-	} else if alloc.paxos.IsElector() {
-		alloc.infof("Initialising via deferred consensus")
-	} else {
-		alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
+	if !nameFound || !ringFound {
+		overwritePersisted("No valid persisted data")
+		return false
 	}
 
+	if checkPeerName != alloc.ourName {
+		overwritePersisted("Deleting persisted data for peername %s", checkPeerName)
+		return false
+	}
+
+	if persistedRing.Range() != alloc.universe {
+		overwritePersisted("Deleting persisted data for IPAM range %s; our range is %s", persistedRing.Range(), alloc.universe)
+		return false
+	}
+
+	alloc.ring = persistedRing
+	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+
+	if ownedFound {
+		alloc.owned = persistedOwned
+		for _, d := range alloc.owned {
+			for _, cidr := range d.Cidrs {
+				alloc.space.Claim(cidr.Addr)
+			}
+		}
+	}
+	return true
 }
 
 func (alloc *Allocator) persistOwned() {
