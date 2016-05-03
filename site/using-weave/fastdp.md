@@ -42,6 +42,23 @@ Where fastdp indicates that fast datapath is being used on a connection. If fast
     $ weave status connections
     <- 192.168.122.25:54782  established sleeve 8a:50:4c:23:11:ae(ubuntu1204)
 
+###Packet size (MTU)
+
+The Maximum Transmission Unit, or MTU, is the technical term for the
+limit on how big a single packet can be on the network. Weave Net
+defaults to 1410 bytes, but you can set a smaller size if your
+underlying network has a tighter limit, or set a larger size for
+better performance.
+
+The underlying network must be able to deliver packets of the size
+specified plus overheads of around 50 bytes.  This requirement applies
+to every path between peers.
+
+To specify a different MTU, before launching Weave Net set the
+environment variable `WEAVE_MTU`.  For example:
+
+    $ WEAVE_MTU=1350 weave launch host2 host3
+
 **See Also**
 
  * [Using Weave Net](/site/using-weave.md)
