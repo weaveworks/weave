@@ -937,6 +937,11 @@ func (alloc *Allocator) loadPersistedData() bool {
 		return false
 	}
 
+	if persistedRing.Range() != alloc.universe {
+		overwritePersisted("Deleting persisted data for IPAM range %s; our range is %s", persistedRing.Range(), alloc.universe)
+		return false
+	}
+
 	alloc.ring = persistedRing
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 
