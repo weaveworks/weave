@@ -113,19 +113,19 @@ func NewAllocator(config Config) *Allocator {
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
-	if alloc.loadPersistedData() {
-		if len(alloc.seed) != 0 {
-			alloc.infof("Found persisted IPAM data, ignoring supplied IPAM seed")
-		}
-	} else {
-		if len(alloc.seed) != 0 {
-			alloc.infof("Initialising with supplied IPAM seed")
-			alloc.createRing(alloc.seed)
-		} else if alloc.paxos.IsElector() {
-			alloc.infof("Initialising via deferred consensus")
-		} else {
-			alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
-		}
+	loadedPersistedData := alloc.loadPersistedData()
+	switch {
+	case loadedPersistedData && len(alloc.seed) != 0:
+		alloc.infof("Found persisted IPAM data, ignoring supplied IPAM seed")
+	case loadedPersistedData:
+		alloc.infof("Initialising with persisted data")
+	case len(alloc.seed) != 0:
+		alloc.infof("Initialising with supplied IPAM seed")
+		alloc.createRing(alloc.seed)
+	case alloc.paxos.IsElector():
+		alloc.infof("Initialising via deferred consensus")
+	default:
+		alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
 	}
 	actionChan := make(chan func(), mesh.ChannelSize)
 	stopChan := make(chan struct{})
