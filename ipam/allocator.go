@@ -113,7 +113,20 @@ func NewAllocator(config Config) *Allocator {
 
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
-	alloc.loadPersistedData()
+	if alloc.loadPersistedData() {
+		if len(alloc.seed) != 0 {
+			alloc.infof("Found persisted IPAM data, ignoring supplied IPAM seed")
+		}
+	} else {
+		if len(alloc.seed) != 0 {
+			alloc.infof("Initialising with supplied IPAM seed")
+			alloc.createRing(alloc.seed)
+		} else if alloc.paxos.IsElector() {
+			alloc.infof("Initialising via deferred consensus")
+		} else {
+			alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
+		}
+	}
 	actionChan := make(chan func(), mesh.ChannelSize)
 	stopChan := make(chan struct{})
 	alloc.actionChan = actionChan
@@ -870,7 +883,8 @@ func (alloc *Allocator) persistRing() {
 	}
 }
 
-func (alloc *Allocator) loadPersistedData() {
+// Returns true if persisted data is to be used, otherwise false
+func (alloc *Allocator) loadPersistedData() bool {
 	var checkPeerName mesh.PeerName
 	nameFound, err := alloc.db.Load(nameIdent, &checkPeerName)
 	if err != nil {
@@ -890,9 +904,6 @@ func (alloc *Allocator) loadPersistedData() {
 	if nameFound {
 		if checkPeerName == alloc.ourName {
 			if ringFound {
-				if len(alloc.seed) != 0 {
-					alloc.infof("Found persisted IPAM data, ignoring supplied IPAM seed")
-				}
 				alloc.ring = persistedRing
 				alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 			}
@@ -904,22 +915,14 @@ func (alloc *Allocator) loadPersistedData() {
 					}
 				}
 			}
-			return
+			return true
 		}
 		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
 		alloc.persistRing()
 		alloc.persistOwned()
 	}
 
-	if len(alloc.seed) != 0 {
-		alloc.infof("Initialising with supplied IPAM seed")
-		alloc.createRing(alloc.seed)
-	} else if alloc.paxos.IsElector() {
-		alloc.infof("Initialising via deferred consensus")
-	} else {
-		alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
-	}
-
+	return false
 }
 
 func (alloc *Allocator) persistOwned() {
