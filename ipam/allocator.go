@@ -921,28 +921,34 @@ func (alloc *Allocator) loadPersistedData() bool {
 		alloc.fatalf("Error loading persisted address data: %s", err)
 	}
 
-	if nameFound {
-		if checkPeerName == alloc.ourName {
-			if ringFound {
-				alloc.ring = persistedRing
-				alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
-			}
-			if ownedFound {
-				alloc.owned = persistedOwned
-				for _, d := range alloc.owned {
-					for _, cidr := range d.Cidrs {
-						alloc.space.Claim(cidr.Addr)
-					}
-				}
-			}
-			return true
-		}
-		alloc.infof("Deleting persisted data for peername %s", checkPeerName)
+	overwritePersisted := func(fmt string, args ...interface{}) {
+		alloc.infof(fmt, args...)
 		alloc.persistRing()
 		alloc.persistOwned()
 	}
 
-	return false
+	if !nameFound || !ringFound {
+		overwritePersisted("No valid persisted data")
+		return false
+	}
+
+	if checkPeerName != alloc.ourName {
+		overwritePersisted("Deleting persisted data for peername %s", checkPeerName)
+		return false
+	}
+
+	alloc.ring = persistedRing
+	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
+
+	if ownedFound {
+		alloc.owned = persistedOwned
+		for _, d := range alloc.owned {
+			for _, cidr := range d.Cidrs {
+				alloc.space.Claim(cidr.Addr)
+			}
+		}
+	}
+	return true
 }
 
 func (alloc *Allocator) persistOwned() {
