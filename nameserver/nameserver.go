@@ -39,13 +39,15 @@ const (
 // - Update is O(n) for now
 type Nameserver struct {
 	sync.RWMutex
-	ourName     mesh.PeerName
-	domain      string
-	gossip      mesh.Gossip
-	entries     Entries
-	isKnownPeer func(mesh.PeerName) bool
-	quit        chan struct{}
-	db          db.DB
+	ourName       mesh.PeerName
+	domain        string
+	gossip        mesh.Gossip
+	entries       Entries
+	isKnownPeer   func(mesh.PeerName) bool
+	quit          chan struct{}
+	db            db.DB
+	ready         bool
+	pendingEvents []event
 }
 
 // dbEntry is used when storing each entry to DB.
@@ -90,6 +92,8 @@ func (n *Nameserver) SetGossip(gossip mesh.Gossip) {
 func (n *Nameserver) Start(nonStoppedContainerIDs, stoppedContainerIDs []string) {
 	n.Lock()
 	n.restoreFromDB(nonStoppedContainerIDs, stoppedContainerIDs)
+	n.replayEvents()
+	n.ready = true
 	n.Unlock()
 
 	go func() {
@@ -109,6 +113,7 @@ func (n *Nameserver) Start(nonStoppedContainerIDs, stoppedContainerIDs []string)
 // NB: called only during the initialization, thus the lock is not taken.
 func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	n.debugf("restore: starting...")
+	defer n.debugf("restore: finished.")
 
 	if ok := n.loadEntries(); !ok {
 		return
@@ -174,8 +179,6 @@ func (n *Nameserver) restoreFromDB(nonStopped, stopped []string) {
 	entries := make(Entries, len(n.entries))
 	copy(entries, n.entries)
 	n.broadcastEntries(entries...)
-
-	n.debugf("restore: finished.")
 }
 
 func (n *Nameserver) Stop() {
@@ -253,45 +256,6 @@ func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
 	return match.Hostname, nil
 }
 
-func (n *Nameserver) ContainerStarted(ident string) {
-	// TODO(mp) maybe handle restoration of entries here
-}
-
-func (n *Nameserver) ContainerDestroyed(ident string) {
-	n.Lock()
-	entries := n.entries.forceTombstone(n.ourName, func(e *Entry) bool {
-		if e.ContainerID == ident {
-			n.infof("container %s destroyed; tombstoning entry %s", ident, e.String())
-			// Unset the flag to allow the entry be removed later on;
-			// Because the flag isn't exposed to other peers, we don't
-			// need to bump the version number if the entry has been previously
-			// tombstoned.
-			e.stopped = false
-			return true
-		}
-		return false
-	})
-	n.snapshot()
-	n.Unlock()
-	n.broadcastEntries(entries...)
-}
-
-func (n *Nameserver) ContainerDied(ident string) {
-	n.Lock()
-	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
-		if e.ContainerID == ident {
-			n.infof("container %s died; tombstoning entry %s", ident, e.String())
-			// We might want to restore the entry if the container comes back
-			e.stopped = true
-			return true
-		}
-		return false
-	})
-	n.snapshot()
-	n.Unlock()
-	n.broadcastEntries(entries...)
-}
-
 func (n *Nameserver) PeerGone(peer mesh.PeerName) {
 	n.infof("peer %s gone", peer.String())
 	n.Lock()
@@ -358,7 +322,7 @@ func (n *Nameserver) snapshot() {
 func (n *Nameserver) loadEntries() bool {
 	var dbEntries []dbEntry
 
-	// (Redundant) sanity check.
+	// Sanity check.
 	// Shouldn't happen, because the DNS server is started after restoreFromDB.
 	if len(n.entries) != 0 {
 		n.fatalf("restore: entries list is not empty")

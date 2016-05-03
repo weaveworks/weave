@@ -281,8 +281,6 @@ func main() {
 		ns, dnsserver = createDNSServer(dnsConfig, router.Router, db, isKnownPeer)
 		observeContainers(ns)
 
-		// TODO(mp) Think of possible race condition: container gets started
-		//			after the following dockerCli calls.
 		if dockerCli != nil {
 			nonStoppedContainerIDs, err = dockerCli.NonStoppedContainerIDs()
 			if err != nil {
@@ -293,6 +291,7 @@ func main() {
 				Log.Fatalf("StoppedContainerIDs failed due to: %s", err)
 			}
 		}
+
 		// To restore external DNS entries we should pretend that "weave:extern"
 		// container exists and it is running.
 		nonStoppedContainerIDs = append(nonStoppedContainerIDs, "weave:extern")

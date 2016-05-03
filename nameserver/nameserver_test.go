@@ -290,6 +290,7 @@ func TestContainerAndPeerDeath(t *testing.T) {
 	peername, err := mesh.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
 	nameserver := makeNameserver(peername)
+	nameserver.Start(nil, nil)
 
 	nameserver.AddEntry(hostname1, container1, peername, addr1)
 	require.Equal(t, []address.Address{addr1}, nameserver.Lookup(hostname1))
