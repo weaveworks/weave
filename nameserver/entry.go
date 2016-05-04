@@ -23,8 +23,8 @@ type Entry struct {
 	lHostname   string // lowercased (not exported, so not encoded by gob)
 	Version     int
 	Tombstone   int64 // timestamp of when it was deleted
-	// Denotes that the container is stopped; the flag prevents a tombstoned entry
-	// from being deleted.
+	// Denotes that the container is stopped and may restart;
+	// the flag prevents a tombstoned entry from being deleted.
 	stopped bool
 }
 
@@ -119,6 +119,12 @@ func (e1 *Entry) tombstone() bool {
 	e1.Tombstone = now()
 	e1.Version++
 	return true
+}
+
+func (e1 *Entry) resetStopped() {
+	e1.stopped = false
+	e1.Tombstone = 0
+	e1.Version++
 }
 
 func check(es SortableEntries) error {

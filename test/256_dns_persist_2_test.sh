@@ -38,6 +38,22 @@ NAME=seetwo.weave.local
 NAME1=seetwoextra.weave.local
 NAME2=extern.weave.local
 
+assert_dns_a_records_exist() {
+    host="$1"
+    container="$2"
+    assert_dns_a_record $host $container $NAME $C2
+    assert_dns_a_record $host $container $NAME1 $C2
+    assert_dns_a_record $host $container $NAME2 $IP
+}
+
+assert_no_dns_records_exist() {
+    host="$1"
+    container="$2"
+    assert_no_dns_record $host $container $NAME
+    assert_no_dns_record $host $container $NAME1
+    assert_no_dns_record $host $container $NAME2
+}
+
 start_suite "Check persisted DNS records"
 
 weave_on $HOST1 launch
@@ -50,40 +66,28 @@ start_container_with_dns $HOST2 --name=c3
 weave_on $HOST1 dns-add c2 -h $NAME1
 weave_on $HOST1 dns-add $IP -h $NAME2
 
-assert_dns_a_record $HOST1 c1 $NAME $C2
-assert_dns_a_record $HOST1 c1 $NAME1 $C2
-assert_dns_a_record $HOST1 c1 $NAME2 $IP
-assert_dns_a_record $HOST2 c3 $NAME $C2
-assert_dns_a_record $HOST2 c3 $NAME1 $C2
-assert_dns_a_record $HOST2 c3 $NAME2 $IP
+assert_dns_a_records_exist $HOST1 c1
+assert_dns_a_records_exist $HOST2 c3
 
 # Stop weave on $HOST1, so that c1 and c2 DNS entries get tombstoned.
 weave_on $HOST1 stop
 
 sleep 1
 # $NAME and $NAME1 should be gone because of the termination.
-assert_no_dns_record $HOST2 c3 $NAME
-assert_no_dns_record $HOST2 c3 $NAME1
-assert_no_dns_record $HOST2 c3 $NAME2
+assert_no_dns_records_exist $HOST2 c3
 
 # Start weave on $HOST1, it should restore its local DNS entries.
 weave_on $HOST1 launch
 
 sleep 3
 # $NAME and $NAME1 should be restored.
-assert_dns_a_record $HOST2 c3 $NAME $C2
-assert_dns_a_record $HOST2 c3 $NAME1 $C2
-assert_dns_a_record $HOST2 c3 $NAME2 $IP
+assert_dns_a_records_exist $HOST2 c3
 
 run_on $HOST1 "eval \$(weave env) ; docker restart c2"
 
 sleep 1
-assert_dns_a_record $HOST1 c1 $NAME $C2
-assert_dns_a_record $HOST1 c1 $NAME1 $C2
-assert_dns_a_record $HOST1 c1 $NAME2 $IP
-assert_dns_a_record $HOST2 c3 $NAME $C2
-assert_dns_a_record $HOST2 c3 $NAME1 $C2
-assert_dns_a_record $HOST2 c3 $NAME2 $IP
+assert_dns_a_records_exist $HOST1 c1
+assert_dns_a_records_exist $HOST2 c3
 
 # Restart Docker on $HOST1, DNS entries of c2 should be restored.
 restart_docker $HOST1
@@ -91,7 +95,6 @@ wait_for_container $HOST1 weave
 wait_for_container $HOST1 c2
 
 wait_for_dns_a_record $HOST2 c3 $NAME $C2
-assert_dns_a_record $HOST2 c3 $NAME1 $C2
-assert_dns_a_record $HOST2 c3 $NAME2 $IP
+assert_dns_a_records_exist $HOST2 c3
 
 end_suite

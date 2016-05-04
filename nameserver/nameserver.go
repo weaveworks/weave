@@ -179,23 +179,8 @@ func (n *Nameserver) broadcastEntries(es ...Entry) {
 func (n *Nameserver) AddEntry(hostname, containerid string,
 	origin mesh.PeerName, addr address.Address) {
 
-	var entries Entries
-	var found bool
-
 	n.Lock()
-	// Restore the stopped entries first
-	for i, e := range n.entries {
-		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
-			if e.Addr == addr {
-				found = true
-			}
-			e.stopped = false
-			e.Tombstone = 0
-			e.Version++
-			n.entries[i] = e
-			entries = append(entries, e)
-		}
-	}
+	entries, found := n.restoreEntries(containerid, origin, addr)
 	if !found {
 		entries = append(entries, n.entries.add(hostname, containerid, origin, addr))
 	}
@@ -205,21 +190,30 @@ func (n *Nameserver) AddEntry(hostname, containerid string,
 }
 
 func (n *Nameserver) RestoreEntries(containerid string) {
-	var entries Entries
-
 	n.Lock()
-	for i, e := range n.entries {
-		if e.Origin == n.ourName && e.ContainerID == containerid && e.stopped {
-			e.stopped = false
-			e.Tombstone = 0
-			e.Version++
-			n.entries[i] = e
-			entries = append(entries, e)
-		}
-	}
+	entries, _ := n.restoreEntries(containerid, n.ourName, address.Address(0))
 	n.snapshot()
 	n.Unlock()
 	n.broadcastEntries(entries...)
+}
+
+func (n *Nameserver) restoreEntries(containerid string, origin mesh.PeerName,
+	addr address.Address) (Entries, bool) {
+
+	var entries Entries
+	var found bool
+
+	for i, e := range n.entries {
+		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
+			if e.Addr == addr {
+				found = true
+			}
+			n.entries[i].resetStopped()
+			entries = append(entries, n.entries[i])
+		}
+	}
+
+	return entries, found
 }
 
 func (n *Nameserver) Lookup(hostname string) []address.Address {
@@ -392,12 +386,7 @@ func (n *Nameserver) snapshot() {
 func (n *Nameserver) loadEntries() bool {
 	var dbEntries []dbEntry
 
-	// Sanity check.
-	// Shouldn't happen, because the DNS server is started after restoreFromDB.
-	if len(n.entries) != 0 {
-		n.fatalf("restore: entries list is not empty")
-		return false
-	}
+	common.Assert(len(n.entries) == 0 && !n.ready)
 
 	ok, err := n.db.Load(nameserverIdent, &dbEntries)
 	switch {
