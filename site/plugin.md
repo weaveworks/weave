@@ -3,6 +3,10 @@ title: Integrating Docker via the Network Plugin
 menu_order: 60
 ---
 
+ * [Launching Weave Net and Running Containers Using the Plugin](#launching)
+ * [Restarting the Plugin](#restarting)
+ * [Bypassing the Central Cluster Store When Building Docker Apps](#cluster-store)
+ * [Using other plugin command-line arguments](#plugin-args)
 
 Docker versions 1.9 and later have a plugin mechanism for adding
 different network providers. Weave Net installs itself as a network plugin
@@ -31,7 +35,7 @@ which a helper is provided in the Weave script:
     # ping foo
 
 
-###Launching Weave Net and Running Containers Using the Plugin
+###<a name="launching"></a>Launching Weave Net and Running Containers Using the Plugin
 
 Just launch the Weave Net router onto each host and make a peer connection with the other hosts:
 
@@ -52,7 +56,7 @@ then run your containers using the Docker command-line:
     64 bytes from 10.32.0.2: icmp_seq=2 ttl=64 time=0.052 ms
 
 
-### Restarting the Plugin
+###<a name="restarting"></a>Restarting the Plugin
 
 The plugin, like all Weave Net components, is started with a policy of `--restart=always`, so that it is always there after a restart or reboot. If you remove this container (for example, when using `weave reset`) before removing all endpoints created using `--net=weave`, Docker may hang for a long time when it subsequently tries to re-establish communications to the plugin.
 
@@ -62,7 +66,7 @@ If you are using `systemd` with Docker 1.9, it is advised that you modify the Do
 
     TimeoutStartSec=0
 
-###Bypassing the Central Cluster Store When Building Docker Apps
+###<a name="cluster-store"></a>Bypassing the Central Cluster Store When Building Docker Apps
 
 To run a Docker cluster without a central database, you need to ensure the following:
 
@@ -72,6 +76,32 @@ To run a Docker cluster without a central database, you need to ensure the follo
 
 All cross-host coordination is handled by Weave Net's "mesh" communication, using gossipDNS and eventual consistency to avoid the need for constant communication and dependency on a central cluster store.
 
+
+###<a name="plugin-args"></a>Using other plugin command-line arguments
+
+If you need to give additional arguments to the plugin independently, don't
+use `weave launch`, but instead run:
+
+    $ weave launch-router [other peers]
+    $ weave launch-plugin [plugin arguments]
+
+The plugin command-line arguments are:
+
+ * `--log-level=debug|info|warning|error` --tells the plugin
+   how much information to emit for debugging.
+ * `--no-restart` -- remove the default policy of `--restart=always`, if
+   you want to control start-up of the plugin yourself
+ * `--no-multicast-route` -- stops weave from adding a static IP route for
+   multicast traffic onto its interface
+
+By default, multicast traffic is routed over the weave network.
+To turn this off, e.g. you want to configure your own multicast
+route, add the `--no-multicast-route` flag to `weave launch-plugin`.
+
+
+>Note: When using the Docker Plugin, there is no need to run `eval
+ $(weave env)` to enable the Proxy. If you do, you may end up with two
+ weave network interfaces and two IP addresses for each container.
 
 **See Also**
 
