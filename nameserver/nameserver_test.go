@@ -24,19 +24,16 @@ const (
 	container3 = "c3"
 	container4 = "c4"
 	container5 = "c5"
-	container6 = "c6"
 	hostname1  = "hostname1"
 	hostname2  = "hostname2"
 	hostname3  = "hostname3"
 	hostname4  = "hostname4"
 	hostname5  = "hostname5"
-	hostname6  = "hostname6"
 	addr1      = address.Address(1)
 	addr2      = address.Address(2)
 	addr3      = address.Address(3)
 	addr4      = address.Address(4)
 	addr5      = address.Address(5)
-	addr6      = address.Address(6)
 )
 
 func makeNameserver(name mesh.PeerName) *Nameserver {

@@ -161,7 +161,7 @@ func (c *Client) AllContainerIDs() ([]string, error) {
 }
 
 // ExistingContainerIDs returns a list of container IDs which either are running or
-// might be started.
+// might be started in the future.
 func (c *Client) ExistingContainerIDs() ([]string, error) {
 	return c.containerIDs("running", "paused", "exited", "created", "restarting")
 }
