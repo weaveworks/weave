@@ -52,15 +52,16 @@ better performance.
 
 The underlying network must be able to deliver packets of the size
 specified plus overheads of around 50 bytes.  This requirement applies
-to every path between peers.
+to _every path_ between peers.
 
 To specify a different MTU, before launching Weave Net set the
-environment variable `WEAVE_MTU`.  For example:
+environment variable `WEAVE_MTU`.  For example, for a typical "jumbo
+frame" configuration:
 
-    $ WEAVE_MTU=1350 weave launch host2 host3
+    $ WEAVE_MTU=8950 weave launch host2 host3
 
 **See Also**
 
  * [Using Weave Net](/site/using-weave.md)
  * [How Fastdp Works](/site/how-it-works/fastdp-how-it-works.md)
- 
+ * [Performance measurements](/blog/weave-docker-networking-performance-fast-data-path/)
