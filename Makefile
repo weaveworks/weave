@@ -4,7 +4,7 @@ PUBLISH=publish_weave publish_weaveexec publish_plugin
 .PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
-SUDO=sudo -E
+SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 BUILD_IN_CONTAINER=true
 RM=--rm
 RUN_FLAGS=-ti
