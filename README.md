@@ -5,34 +5,22 @@
 # About Weaveworks
 
 [Weaveworks](https://www.weave.works) is the company that delivers the most productive way for developers to connect, observe and control
-Docker containers. The first product developed by Weaveworks, with nearly 5 million downloads to date, is Weave Net, enabling users to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions. Other products from Weaveworks include [Weave Scope](https://www.weave.works/products/weave-scope/), a powerful container monitoring tool that automatically maps Docker containers and their interactions, and [Weave Flux](https://www.weave.works/products/weave-flux/), a microservice router that automates the access of containers as services.
+Docker containers. The first product developed by Weaveworks, with nearly 5 million downloads to date, is Weave Net, enabling users to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions. 
 
-# Weave Net Documentation
+Other products from Weaveworks include [Weave Scope](https://www.weave.works/products/weave-scope/), a powerful container monitoring tool that automatically maps Docker containers and their interactions, and [Weave Flux](https://www.weave.works/products/weave-flux/), a microservice router that automates the access of containers as services.
 
-To learn more about our products, visit the [Weaveworks website](https://www.weave.works) and for indepth information on Weave Net, see the
-[Weave Net User's Guide](https://www.weave.works/docs/net/latest/introducing-weave/).
+##Weave Net
 
-## Find out more
+Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery. With Weave Net, portable microservices-based applications consisting of multiple containers can run anywhere: on one host, multiple hosts or even across cloud providers and data centers. Applications use the network just as if the containers were all plugged into the same network switch, without having to configure port mappings, ambassadors or links.
 
- * [Product Documentation](https://www.weave.works/docs/)
- * [Getting Started Guides](https://www.weave.works/guides/)
- 
+Services provided by application containers on the Weave network can be exposed to the outside world, regardless of where they are running. Similarly, existing internal systems can be opened to accept connections from application containers irrespective of their location.
 
-## Contact Us
+##Installing
 
-Found a bug, want to suggest a feature, or have a question?  Please
-[file an issue](https://github.com/weaveworks/weave/issues), or post
-to the
-[Weave Users Google Group](https://groups.google.com/a/weave.works/forum/#!forum/weave-users),
-which you can email at weave-users@weave.works. When reporting a bug, please
-include which version of Weave Net you are running, as shown by `weave
-version`.
+See [Installing Weave Net](https://www.weave.works/docs/net/latest/installing-weave/) for setup instructions. 
 
-Follow us on Twitter:
-[@weaveworks](https://twitter.com/weaveworks).
+###Find Out More
 
-Check out our blog for the latest product and ecosystem news:
-[Weaveworks Blog](https://www.weave.works/blog/).
+* [Weaveworks Products](https://www.weave.works/products/weave-net/) 
+* [Getting Started Guides](https://www.weave.works/guides/)
 
-IRC:
-[#weavenetwork](https://botbot.me/freenode/weavenetwork/)
