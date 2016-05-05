@@ -15,8 +15,6 @@ Weave Net creates a virtual network that connects Docker containers across multi
 
 Services provided by application containers on the Weave network can be exposed to the outside world, regardless of where they are running. Similarly, existing internal systems can be opened to accept connections from application containers irrespective of their location.
 
-##Installing
-
 See [Installing Weave Net](https://www.weave.works/docs/net/latest/installing-weave/) for setup instructions. 
 
 ###Find Out More
