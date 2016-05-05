@@ -9,6 +9,6 @@ to integrate Weave Net with [Kubernetes](http://kubernetes.io/).
 The Docker plugin runs automatically when you `weave launch`, provided your
 Docker daemon is version 1.9 or newer.
 
-More detail on the Docker plugin [here](https://github.com/weaveworks/weave/blob/master/site/plugin.md).
+More detail on the Docker plugin [here](https://www.weave.works/docs/net/latest/plugin/).
 
-More detail on the CNI plugin [here](https://github.com/weaveworks/weave/blob/master/site/cni-plugin.md).
+More detail on the CNI plugin [here](https://www.weave.works/docs/net/latest/cni-plugin/).
