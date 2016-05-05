@@ -19,4 +19,12 @@ weave_on $HOST2 connect $HOST1
 assert_raises "exec_on $HOST1 c1 $PING c2"
 assert_raises "exec_on $HOST2 c2 $PING c1"
 
+# Now restart one router with a different peername
+docker_on $HOST2 rm -f c2 >/dev/null
+weave_on $HOST2 forget $HOST1
+weave_on $HOST2 stop
+weave_on $HOST2 launch --name ::3
+# Check that this host has not retained the previous IPAM data
+assert "weave_on $HOST2 status ipam" ""
+
 end_suite
