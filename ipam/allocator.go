@@ -415,6 +415,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.cancelOps(&alloc.pendingPrimes)
 		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
+			alloc.persistRing()
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 			time.Sleep(100 * time.Millisecond)
@@ -452,7 +453,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 		}
 
 		before := alloc.space.NumFreeAddresses()
-		alloc.space.AddRanges(newRanges)
+		alloc.ringUpdated()
 		after := alloc.space.NumFreeAddresses()
 
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
@@ -627,11 +628,13 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func(), stopChan <-chan stru
 		case <-stopChan:
 			return
 		case <-alloc.ticker.C:
+			// Retry things in case messages got lost between here and recipients
 			if alloc.awaitingConsensus {
 				alloc.propose()
+			} else {
+				alloc.tryPendingOps()
 			}
 			alloc.removeDeadContainers()
-			alloc.tryPendingOps()
 		}
 
 		alloc.assertInvariants()
@@ -660,8 +663,8 @@ func (alloc *Allocator) establishRing() {
 func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
 	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
-	alloc.gossip.GossipBroadcast(alloc.Gossip())
 	alloc.ringUpdated()
+	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
 
 func (alloc *Allocator) ringUpdated() {

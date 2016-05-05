@@ -176,6 +176,7 @@ func TestAllocatorClaim(t *testing.T) {
 	alloc.Prime()
 	// Do an allocate on the other peer, which we will try to claim later
 	addrx, err := allocs[0].Allocate(container1, subnet, true, returnFalse)
+	router.Flush()
 
 	// Now try the claim again
 	err = alloc.Claim(container3, addr1, true, true)
