@@ -2,6 +2,8 @@
 
 . ./config.sh
 
+UNIVERSE=10.32.0.0/12
+
 delete_persistence() {
     for host in "$@" ; do
         docker_on $host rm -v weavedb >/dev/null
@@ -51,5 +53,23 @@ weave_on $HOST3 launch-router $HOST2
 weave_on $HOST3 prime
 stop_weave_on $HOST2
 weave_on $HOST1 launch-router $HOST3
+
+stop_weave_on $HOST1
+stop_weave_on $HOST2
+stop_weave_on $HOST3
+delete_persistence $HOST1 $HOST2 $HOST3
+
+weave_on $HOST1 launch --ipalloc-range $UNIVERSE $HOST2
+# Start another container on host1. The starting should block, because host1 is
+# not able to establish the ring due to host2 being offline.
+CMD="proxy_start_container $HOST1 --name c4 -e WEAVE_CIDR=10.32.0.4/12"
+assert_raises "timeout 5 cat <( $CMD )" 124
+# However, allocation for an external subnet should not block.
+assert_raises "proxy_start_container $HOST1 -e WEAVE_CIDR=10.48.0.1/12"
+
+# Launch host2, so that host1 can establish the ring.
+weave_on $HOST2 launch --ipalloc-range $UNIVERSE $HOST1
+weave_on $HOST1 prime
+assert_raises "[ $(container_ip $HOST1 c4) == 10.32.0.4 ]"
 
 end_suite

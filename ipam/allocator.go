@@ -276,7 +276,7 @@ func (alloc *Allocator) Lookup(ident string, r address.Range) ([]address.CIDR, e
 }
 
 // Claim an address that we think we should own (Sync)
-func (alloc *Allocator) Claim(ident string, cidr address.CIDR, isContainer, noErrorOnUnknown bool) error {
+func (alloc *Allocator) Claim(ident string, cidr address.CIDR, isContainer, noErrorOnUnknown bool, hasBeenCancelled func() bool) error {
 	resultChan := make(chan error)
 	op := &claim{
 		resultChan:       resultChan,
@@ -284,6 +284,7 @@ func (alloc *Allocator) Claim(ident string, cidr address.CIDR, isContainer, noEr
 		cidr:             cidr,
 		isContainer:      isContainer,
 		noErrorOnUnknown: noErrorOnUnknown,
+		hasBeenCancelled: hasBeenCancelled,
 	}
 	alloc.doOperation(op, &alloc.pendingClaims)
 	return <-resultChan
