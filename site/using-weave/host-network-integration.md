@@ -38,8 +38,25 @@ Exposed addresses can also be added to weaveDNS by supplying fully qualified dom
     host2$ weave expose -h exposed.weave.local
     10.2.1.132
 
+###<a name="routing"></a>Routing from Another Host
+
+After running `weave expose`, you can use Linux routing to provide
+access to the Weave network from hosts that are not running Weave Net:
+
+    ip route add <network-cidr> via <exposing-host>
+
+Where,
+ * `<network-cidr>` is an IP address range in use on Weave Net,
+for example,  `10.2.0.0/16` or `10.32.0.0/12` and,
+ * `<exposing-host>` is the address of the machine on which you ran `weave expose`.
+
+>**Note:** You must ensure that the [IP subnet used by Weave
+Net](/site/ipam.md#range) does not clash with anything on those other
+hosts.
+
 
 **See Also**
 
  * [Using Weave Net](/site/using-weave.md)
+ * [General information on IP Addresses, Routes and Networks](/site/how-it-works/ip-addresses.md)
  * [Managing Services - Exporting, Importing, Binding and Routing](/site/using-weave/service-management.md)
