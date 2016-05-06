@@ -1143,23 +1143,23 @@ with_container_addresses() {
     shift 1
 
     CONTAINER_ADDRS=$(util_op container-addrs $BRIDGE "$@") || return 1
-    echo "$CONTAINER_ADDRS" |  while read CONTAINER_ID CONTAINER_MAC CONTAINER_IPS; do
-        $COMMAND "$CONTAINER_ID" "$CONTAINER_MAC" "$CONTAINER_IPS"
+    echo "$CONTAINER_ADDRS" |  while read CONTAINER_ID CONTAINER_IFACE CONTAINER_MAC CONTAINER_IPS; do
+        $COMMAND "$CONTAINER_ID" "$CONTAINER_IFACE" "$CONTAINER_MAC" "$CONTAINER_IPS"
     done
 }
 
 echo_addresses() {
-    echo $1 $2 $3
+    echo $1 $3 $4
 }
 
 echo_ips() {
-    for CIDR in $3; do
+    for CIDR in $4; do
         echo ${CIDR%/*}
     done
 }
 
 echo_cidrs() {
-    echo $3
+    echo $4
 }
 
 peer_args() {
@@ -1382,13 +1382,13 @@ check_overlap() {
 # Claim addresses for a container in IPAM.  Expects to be called from
 # with_container_addresses.
 ipam_reclaim() {
-    for CIDR in $3 ; do
+    for CIDR in $4 ; do
         http_call $HTTP_ADDR PUT "/ip/$1/$CIDR?noErrorOnUnknown=true&?check-alive=true" || true
     done
 }
 
 ipam_reclaim_no_check_alive() {
-    for CIDR in $3 ; do
+    for CIDR in $4 ; do
         http_call $HTTP_ADDR PUT /ip/$1/$CIDR?noErrorOnUnknown=true || true
     done
 }

@@ -45,6 +45,7 @@ func WithNetNS(ns netns.NsHandle, work func() error) error {
 }
 
 type NetDev struct {
+	Name  string
 	MAC   net.HardwareAddr
 	CIDRs []*net.IPNet
 }
@@ -97,7 +98,7 @@ func linkToNetDev(link netlink.Link) (*NetDev, error) {
 		return nil, err
 	}
 
-	netDev := &NetDev{MAC: link.Attrs().HardwareAddr}
+	netDev := &NetDev{Name: link.Attrs().Name, MAC: link.Attrs().HardwareAddr}
 	for _, addr := range addrs {
 		netDev.CIDRs = append(netDev.CIDRs, addr.IPNet)
 	}
