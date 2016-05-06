@@ -46,6 +46,7 @@ access to the Weave network from hosts that are not running Weave Net:
     ip route add <network-cidr> via <exposing-host>
 
 Where,
+
  * `<network-cidr>` is an IP address range in use on Weave Net,
 for example,  `10.2.0.0/16` or `10.32.0.0/12` and,
  * `<exposing-host>` is the address of the machine on which you ran `weave expose`.
