@@ -53,6 +53,13 @@ By default, multicast traffic is routed over the Weave network.
 To turn this off, for example, because you want to configure your own multicast
 route, add the `--no-multicast-route` flag to `weave launch-proxy`.
 
+###Other Weave Proxy options
+
+ * `--without-dns` -- stop telling containers to use [WeaveDNS](/site/weavedns.md)
+ * `--log-level=debug|info|warning|error` -- controls how much
+   information to emit for debugging
+ * `--no-restart` -- remove the default policy of `--restart=always`, if
+   you want to control start-up of the proxy yourself
 
 **See Also**
 
