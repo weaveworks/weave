@@ -438,18 +438,20 @@ func (proxy *Proxy) waitForStart(r *http.Request) error {
 	return nil
 }
 
-// If some other operation is waiting for a container to start, join in the wait
-func (proxy *Proxy) waitForStartByIdent(ident string) error {
-	var ch chan error
+func (proxy *Proxy) waitChan(ident string) chan error {
 	proxy.Lock()
+	defer proxy.Unlock()
 	for _, wait := range proxy.waiters {
 		if ident == wait.ident && !wait.done {
-			ch = wait.ch
-			break
+			return wait.ch
 		}
 	}
-	proxy.Unlock()
-	if ch != nil {
+	return nil
+}
+
+// If some other operation is waiting for a container to start, join in the wait
+func (proxy *Proxy) waitForStartByIdent(ident string) error {
+	if ch := proxy.waitChan(ident); ch != nil {
 		Log.Debugf("Wait for start of container %s", ident)
 		return <-ch
 	}
