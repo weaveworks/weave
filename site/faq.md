@@ -31,9 +31,9 @@ Yes you can.
 
 For example, you have a Weave network that runs on hosts A, B, C. and you have an additional host, that we'll call P, where neither Weave nor Docker are running.  However, you need to connect from a process running on host P to a specific container running on host B on the Weave network.  Since the Weave network is completely separate from any network that P is connected to, you cannot connect the container using the container's IP address. 
 
-The simplest way to accomplish this would be to run Weave on the host and then run, `weave expose` to expose the network to any running containers.  See [Integrating a Network Host](/site/using-weave/host-network-integration.md) If this is not possible, you could also  expose a port on the container on host B and then connect to it. 
+A simple way to accomplish this would be to run Weave on the host and then run, `weave expose` to expose the network to any running containers. Or you set up a route from P to one of A, B or C. See [Integrating a Network Host](/site/using-weave/host-network-integration.md).
 
-You can read about exposing ports in [Exporting Services](/site/using-weave/service-management.md#exporting).
+Yet another option is to expose a port from the container on host B and then connect to it. You can read about exposing ports in [Exporting Services](/site/using-weave/service-management.md#exporting).
 
 
 **Q: Why am I seeing the same IP address assigned to two different containers on different hosts?**
