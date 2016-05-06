@@ -1154,7 +1154,7 @@ echo_addresses() {
 
 echo_ips() {
     for CIDR in $3; do
-        echo ${3%/*}
+        echo ${CIDR%/*}
     done
 }
 
