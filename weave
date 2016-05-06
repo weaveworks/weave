@@ -1382,8 +1382,13 @@ check_overlap() {
 # Claim addresses for a container in IPAM.  Expects to be called from
 # with_container_addresses.
 ipam_reclaim() {
+    CONTAINER_ID="$1"
+    # The weave IP addresses of containers attached by the plugin are
+    # recorded specially in IPAM, since the container id is not know
+    # at the time.
+    [ "$2" = "$CONTAINER_IFNAME" ] || CONTAINER_ID="_"
     for CIDR in $4 ; do
-        http_call $HTTP_ADDR PUT "/ip/$1/$CIDR?noErrorOnUnknown=true&?check-alive=true" || true
+        http_call $HTTP_ADDR PUT "/ip/$CONTAINER_ID/$CIDR?noErrorOnUnknown=true&?check-alive=true" || true
     done
 }
 
