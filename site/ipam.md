@@ -28,10 +28,22 @@ suits your deployment best.
 
 #### <a name="seed"></a>Via Seed
 
-Configuration via seed requires you to provide a list of peer names
+Configuration via seed requires you to provide a list of _peer names_
 (via the `--ipalloc-init seed=` parameter) amongst which the address
-space will be shared initially - this means that you will also have to
-specify peer names explicitly on launch:
+space will be shared initially. Normally weave derives a unique peer
+name automatically at launch, but since you need to know them ahead of
+time in this case you will need to name each peer explicitly via the
+`--name` parameter.
+
+> Peers in the weave network are identified by a 48-bit value
+> formatted like an ethernet MAC address (e.g. 01:23:45:67:89:ab) -
+> you can either specify the name fully, or substitute a single run of
+> zero-octets using the `::` notation, similar to
+> [IPv6 address representation](https://en.wikipedia.org/wiki/IPv6_address#Recommended_representation_as_text):
+>
+> * `00:00:00:00:00:01` can be written `::1`
+> * `01:00:00:00:00:00` can be written `1::`
+> * `01:00:00:00:00:01` can be written `1::1`
 
     host1$ weave launch --name ::1 --ipalloc-init seed=::1,::2,::3
     host2$ weave launch --name ::2 --ipalloc-init seed=::1,::2,::3
@@ -43,10 +55,10 @@ outset even under conditions of partition - no consensus is required.
 
 #### <a name="consensus"></a>Via One-off Consensus
 
-Alternatively, you can let Weave Net determine the seed automatically via
-a consensus algorithm. Since you don't need to provide it with a list
-of peer names anymore, you can let Weave Net generate those randomly
-for you as well. 
+Alternatively, you can let Weave Net determine the seed automatically
+via a consensus algorithm. Since you don't need to provide it with a
+list of peer names anymore, you can let Weave Net derive those
+automatically for you as well.
 
 However, in order for Weave Net to form a single consensus
 reliably you must now instead tell each peer how many peers there are
@@ -191,5 +203,3 @@ named `weavedb` is used to store this data.
 
  * [Automatic Allocation Across Multiple Subnets](/site/ipam/allocation-multi-ipam.md)
  * [Plugin Command-line Arguments](/site/plugin/plug-in-command-line.md)
-
-
