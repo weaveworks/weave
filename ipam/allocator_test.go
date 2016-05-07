@@ -22,6 +22,14 @@ const (
 
 func returnFalse() bool { return false }
 
+func (alloc *Allocator) SimplyAllocate(ident string, cidr address.CIDR) (address.Address, error) {
+	return alloc.Allocate(ident, cidr, true, returnFalse)
+}
+
+func (alloc *Allocator) SimplyClaim(ident string, cidr address.CIDR) error {
+	return alloc.Claim(ident, cidr, true, true)
+}
+
 func TestAllocFree(t *testing.T) {
 	const (
 		container1 = "abcdef"
@@ -41,11 +49,11 @@ func TestAllocFree(t *testing.T) {
 	cidr2, _ := address.ParseCIDR(subnet2)
 
 	alloc.claimRingForTesting()
-	addr1, err := alloc.Allocate(container1, cidr1, true, returnFalse)
+	addr1, err := alloc.SimplyAllocate(container1, cidr1)
 	require.NoError(t, err)
 	require.Equal(t, testAddr1, addr1.String(), "address")
 
-	addr2, err := alloc.Allocate(container1, cidr2, true, returnFalse)
+	addr2, err := alloc.SimplyAllocate(container1, cidr2)
 	require.NoError(t, err)
 	require.Equal(t, testAddr2, addr2.String(), "address")
 
@@ -54,28 +62,28 @@ func TestAllocFree(t *testing.T) {
 	require.Equal(t, []address.CIDR{address.MakeCIDR(cidr1, addr1), address.MakeCIDR(cidr2, addr2)}, addrs)
 
 	// Ask for another address for a different container and check it's different
-	addr1b, _ := alloc.Allocate(container2, cidr1, true, returnFalse)
+	addr1b, _ := alloc.SimplyAllocate(container2, cidr1)
 	if addr1b.String() == testAddr1 {
 		t.Fatalf("Expected different address but got %s", addr1b.String())
 	}
 
 	// Ask for the first container again and we should get the same addresses again
-	addr1a, _ := alloc.Allocate(container1, cidr1, true, returnFalse)
+	addr1a, _ := alloc.SimplyAllocate(container1, cidr1)
 	require.Equal(t, testAddr1, addr1a.String(), "address")
-	addr2a, _ := alloc.Allocate(container1, cidr2, true, returnFalse)
+	addr2a, _ := alloc.SimplyAllocate(container1, cidr2)
 	require.Equal(t, testAddr2, addr2a.String(), "address")
 
 	// Now delete the first container, and we should get its addresses back
 	require.NoError(t, alloc.Delete(container1))
-	addr3, _ := alloc.Allocate(container3, cidr1, true, returnFalse)
+	addr3, _ := alloc.SimplyAllocate(container3, cidr1)
 	require.Equal(t, testAddr1, addr3.String(), "address")
-	addr4, _ := alloc.Allocate(container3, cidr2, true, returnFalse)
+	addr4, _ := alloc.SimplyAllocate(container3, cidr2)
 	require.Equal(t, testAddr2, addr4.String(), "address")
 
 	alloc.ContainerDied(container2)
 
 	// Resurrect
-	addr1c, err := alloc.Allocate(container2, cidr1, true, returnFalse)
+	addr1c, err := alloc.SimplyAllocate(container2, cidr1)
 	require.NoError(t, err)
 	require.Equal(t, addr1b, addr1c, "address")
 
@@ -170,7 +178,7 @@ func TestAllocatorClaim(t *testing.T) {
 	addr1, _ := address.ParseCIDR(testAddr1)
 
 	// First claim should trigger "dunno, I'm going to wait"
-	err := alloc.Claim(container3, addr1, true, true)
+	err := alloc.SimplyClaim(container3, addr1)
 	require.NoError(t, err)
 
 	alloc.Prime()
@@ -179,23 +187,23 @@ func TestAllocatorClaim(t *testing.T) {
 	router.Flush()
 
 	// Now try the claim again
-	err = alloc.Claim(container3, addr1, true, true)
+	err = alloc.SimplyClaim(container3, addr1)
 	require.NoError(t, err)
 	// Check we get this address back if we try an allocate
-	addr3, _ := alloc.Allocate(container3, subnet, true, returnFalse)
+	addr3, _ := alloc.SimplyAllocate(container3, subnet)
 	require.Equal(t, testAddr1, address.MakeCIDR(subnet, addr3).String(), "address")
 	// one more claim should still work
-	err = alloc.Claim(container3, addr1, true, true)
+	err = alloc.SimplyClaim(container3, addr1)
 	require.NoError(t, err)
 	// claim for a different container should fail
-	err = alloc.Claim(container1, addr1, true, true)
+	err = alloc.SimplyClaim(container1, addr1)
 	require.Error(t, err)
 	// claiming the address allocated on the other peer should fail
-	err = alloc.Claim(container1, address.MakeCIDR(subnet, addrx), true, true)
+	err = alloc.SimplyClaim(container1, address.MakeCIDR(subnet, addrx))
 	require.Error(t, err, "claiming address allocated on other peer should fail")
 	// Check an address outside of our universe
 	addr2, _ := address.ParseCIDR(testAddr2)
-	err = alloc.Claim(container1, addr2, true, true)
+	err = alloc.SimplyClaim(container1, addr2)
 	require.NoError(t, err)
 }
 
@@ -315,11 +323,11 @@ func TestGossipShutdown(t *testing.T) {
 	defer alloc.Stop()
 
 	alloc.claimRingForTesting()
-	alloc.Allocate(container1, subnet, true, returnFalse)
+	alloc.SimplyAllocate(container1, subnet)
 
 	alloc.Shutdown()
 
-	_, err := alloc.Allocate(container2, subnet, true, returnFalse) // trying to allocate after shutdown should fail
+	_, err := alloc.SimplyAllocate(container2, subnet) // trying to allocate after shutdown should fail
 	require.False(t, err == nil, "no address")
 
 	CheckAllExpectedMessagesSent(alloc)
@@ -454,7 +462,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		allocIndex := rand.Int31n(nodes)
 		alloc := allocs[allocIndex]
 		//common.Log.Infof("Allocate: asking allocator %d", allocIndex)
-		addr, err := alloc.Allocate(name, subnet, true, returnFalse)
+		addr, err := alloc.SimplyAllocate(name, subnet)
 
 		if err != nil {
 			panic(fmt.Sprintf("Could not allocate addr"))
@@ -511,7 +519,7 @@ func TestAllocatorFuzz(t *testing.T) {
 
 		//common.Log.Infof("Asking for %s (%s) on allocator %d again", res.name, addr, res.alloc)
 
-		newAddr, _ := alloc.Allocate(res.name, subnet, true, returnFalse)
+		newAddr, _ := alloc.SimplyAllocate(res.name, subnet)
 		oldAddr, _ := address.ParseIP(addr)
 		if newAddr != oldAddr {
 			panic(fmt.Sprintf("Got different address for repeat request for %s: %s != %s", res.name, newAddr, oldAddr))
@@ -532,7 +540,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		addressIndex := rand.Int31n(int32(subnet.Size()))
 		alloc := allocs[allocIndex]
 		addr := address.Add(subnet.Addr, address.Offset(addressIndex))
-		err := alloc.Claim(name, address.MakeCIDR(subnet, addr), true, true)
+		err := alloc.SimplyClaim(name, address.MakeCIDR(subnet, addr))
 		if err == nil {
 			noteAllocation(allocIndex, name, addr)
 		}
