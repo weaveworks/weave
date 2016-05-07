@@ -27,7 +27,7 @@ func containerAddrs(args []string) error {
 		}
 
 		for _, netDev := range netDevs {
-			fmt.Printf("%12s %s", containerID, netDev.MAC.String())
+			fmt.Printf("%12s %s %s", containerID, netDev.Name, netDev.MAC.String())
 			for _, cidr := range netDev.CIDRs {
 				prefixLength, _ := cidr.Mask.Size()
 				fmt.Printf(" %v/%v", cidr.IP, prefixLength)
