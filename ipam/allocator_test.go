@@ -27,7 +27,7 @@ func (alloc *Allocator) SimplyAllocate(ident string, cidr address.CIDR) (address
 }
 
 func (alloc *Allocator) SimplyClaim(ident string, cidr address.CIDR) error {
-	return alloc.Claim(ident, cidr, true, true)
+	return alloc.Claim(ident, cidr, true, true, returnFalse)
 }
 
 func TestAllocFree(t *testing.T) {

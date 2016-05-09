@@ -15,6 +15,7 @@ type claim struct {
 	cidr             address.CIDR
 	isContainer      bool
 	noErrorOnUnknown bool
+	hasBeenCancelled func() bool
 }
 
 // Send an error (or nil for success) back to caller listening on resultChan
@@ -33,6 +34,11 @@ func (c *claim) sendResult(result error) {
 
 // Try returns true for success (or failure), false if we need to try again later
 func (c *claim) Try(alloc *Allocator) bool {
+	if c.hasBeenCancelled() {
+		c.Cancel()
+		return true
+	}
+
 	if !alloc.ring.Contains(c.cidr.Addr) {
 		// Address not within our universe; assume user knows what they are doing
 		alloc.infof("Address %s claimed by %s - not in our range", c.cidr, c.ident)
@@ -51,11 +57,10 @@ func (c *claim) Try(alloc *Allocator) bool {
 		// success
 	case mesh.UnknownPeerName:
 		// If our ring doesn't know, it must be empty.
+		alloc.infof("Claim %s for %s: is in the range %s, but the allocator is not initialized yet; will try later.",
+			c.cidr, c.ident, alloc.universe.AsCIDRString())
 		if c.noErrorOnUnknown {
-			alloc.infof("Claim %s for %s: address allocator still initializing; will try later.", c.cidr, c.ident)
 			c.sendResult(nil)
-		} else {
-			c.sendResult(fmt.Errorf("%s is in the range %s, but the allocator is not initialized yet", c.cidr, alloc.universe.AsCIDRString()))
 		}
 		return false
 	default:
