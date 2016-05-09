@@ -103,7 +103,7 @@ func (proxy *Proxy) attachWithRetry(id string) {
 
 	j := &attachJob{id: id, tryInterval: initialInterval}
 	j.timer = time.AfterFunc(time.Duration(0), func() {
-		if err := proxy.attach(id, false); err != nil {
+		if err := proxy.attach(id, false, false); err != nil {
 			// The delay at the nth retry is a random value in the range
 			// [i-i/2,i+i/2], where i = initialInterval * 1.5^(n-1).
 			j.timer.Reset(j.tryInterval)
@@ -383,7 +383,10 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 
 // weavedocker.ContainerObserver interface
 func (proxy *Proxy) ContainerStarted(ident string) {
-	proxy.notifyWaiters(ident, proxy.attach(ident, true))
+	// In case of attach failure, if we have a request waiting on the start, kill the container,
+	// otherwise assume it is a Docker-initated restart and kill the process inside.
+	err := proxy.attach(ident, true, proxy.waitChan(ident) == nil)
+	proxy.notifyWaiters(ident, err)
 }
 
 func containerShouldAttach(container *docker.Container) bool {
@@ -438,18 +441,20 @@ func (proxy *Proxy) waitForStart(r *http.Request) error {
 	return nil
 }
 
-// If some other operation is waiting for a container to start, join in the wait
-func (proxy *Proxy) waitForStartByIdent(ident string) error {
-	var ch chan error
+func (proxy *Proxy) waitChan(ident string) chan error {
 	proxy.Lock()
+	defer proxy.Unlock()
 	for _, wait := range proxy.waiters {
 		if ident == wait.ident && !wait.done {
-			ch = wait.ch
-			break
+			return wait.ch
 		}
 	}
-	proxy.Unlock()
-	if ch != nil {
+	return nil
+}
+
+// If some other operation is waiting for a container to start, join in the wait
+func (proxy *Proxy) waitForStartByIdent(ident string) error {
+	if ch := proxy.waitChan(ident); ch != nil {
 		Log.Debugf("Wait for start of container %s", ident)
 		return <-ch
 	}
@@ -461,7 +466,7 @@ func (proxy *Proxy) ContainerDestroyed(ident string) {}
 
 // Check if this container needs to be attached, if so then attach it,
 // and return nil on success or not needed.
-func (proxy *Proxy) attach(containerID string, orDie bool) error {
+func (proxy *Proxy) attach(containerID string, orDie, killProcess bool) error {
 	container, err := proxy.client.InspectContainer(containerID)
 	if err != nil {
 		if _, ok := err.(*docker.NoSuchContainer); !ok {
@@ -498,7 +503,11 @@ func (proxy *Proxy) attach(containerID string, orDie bool) error {
 		args = append(args, "--no-multicast-route")
 	}
 	if orDie {
-		args = append(args, "--or-die")
+		if killProcess {
+			args = append(args, "--or-kill")
+		} else {
+			args = append(args, "--or-die")
+		}
 	}
 	args = append(args, container.ID)
 	return callWeaveAttach(container, args)
