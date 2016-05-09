@@ -1,3 +1,22 @@
+## Release 1.5.1
+
+Bug fixes and minor improvements
+
+* Persisted data that was rendered invalid by changing peer name or
+  allocation range is detected and removed automatically, preventing
+  crashes and hangs #2246/#2209/#2249
+* `weave rmpeer` persists the range takeover in case the peer on which
+  it was executed dies subsequently #2238
+* Launching a container with an explicit `WEAVE_CIDR` in the
+  allocation range now waits instead of erroring if the allocator
+  hasn't finished initialising #2232/#2265
+* Weave DNS now responds to AAAA queries with an empty answer section,
+  instead of NXDOMAIN which could be cached and block subsequent
+  resolution of A records #2244/#2252
+* Many improvements to the documentation.
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.5.1).
+
 ## Release 1.5.0
 
 ## Highlights
