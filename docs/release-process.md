@@ -138,6 +138,8 @@ Finally, for **Mainline** releases only:
 * For a mainline release vX.Y.0, create a release branch X.Y from the
   tag and push to GitHub - this will result in X.Y.0 site docs being
   published to https://www.weave.works
+* Add the new version of `weave-net` to the checkpoint system at
+  https://checkpoint-api.weave.works/admin
 
 ## Troubleshooting
 
