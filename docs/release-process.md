@@ -133,7 +133,6 @@ Finally, for **Mainline** releases only:
 ### Finish up
 
 * If not on master, merge branch into master and push to GitHub.
-* Merge the branch you are on into `latest_release_doc_updates` and push to GitHub.
 * Close the [milestone](https://github.com/weaveworks/weave/milestones) in GitHub and create the next milestone
 * Update the `#weavenetwork` topic heading on freenode (requires 'chanops' permission)
 * For a mainline release vX.Y.0, create a release branch X.Y from the
