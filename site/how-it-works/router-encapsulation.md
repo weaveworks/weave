@@ -45,7 +45,7 @@ the same peer. And in this instance, it will fit as many frames as possible into
 UDP packet.
 
 The meta data for each frame contains the names of the capturing and
-the destination peers. Since the name of the capturing peer name is
+the destination peers. Since the name of the capturing peer is
 associated with the source MAC of the captured payload, it allows
 receiving peers to build up their mappings of which client MAC
 addresses are local to which peers. 
