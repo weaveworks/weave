@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+
+cd $SRCDIR/test
+eval $(./gce.sh hosts)
+export COVERAGE=true
+./run_all.sh

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+
+sudo apt-get -q update && sudo apt-get -q install bc jq
+bin/setup-circleci-secrets "$SECRET_PASSWORD"
+mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR
+cd $SRCDIR; git submodule update --init
+if [ "$CIRCLE_NODE_INDEX" = "0" ] ; then
+    cd $SRCDIR/test; ./gce.sh make_template
+fi
+cd $SRCDIR/build
+../tools/rebuild-image weaveworks/weavebuild . Dockerfile build.sh
+touch $SRCDIR/.build.uptodate
+sudo chown -R ubuntu /usr/local/go
