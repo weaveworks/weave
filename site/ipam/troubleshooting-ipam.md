@@ -43,3 +43,24 @@ the total allocation range and default subnet. Columns are as follows:
       for more
 * 'Range' - total allocation range set by `--ipalloc-range`
 * 'DefaultSubnet' - default subnet set by `--ipalloc-default-subnet`
+
+Information regarding the division of the IP allocation range amongst
+peers and their reachability can be obtained with
+
+```
+$ weave status ipam
+00:00:00:00:00:01(one)      349526 IPs (33.3% of total)
+00:00:00:00:00:02(two)      349525 IPs (33.3% of total)
+00:00:00:00:00:03(three)    349525 IPs (33.3% of total) - unreachable!
+```
+
+Columns are as follows:
+
+* Peer Name and Nickname
+* Absolute quantity/percentage of allocation range managed by peer
+* Indication of unreachability. This means that the peer is not
+  visible (directly or indirectly) to the peer on which `weave status
+  ipam` was run; whilst this could be a transient condition due to a
+  partition, it may be because the peer has failed and needs to be
+  removed administratively - see [Starting, Stopping and Removing
+  Peers](/site/ipam/stop-remove-peers-ipam.md) for more details.
