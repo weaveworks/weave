@@ -60,8 +60,16 @@ check_attached
 
 assert_raises "timeout 90 cat <( run_many )"
 
+# Start a container that needs IPAM, then restart it when the router is stopped
+proxy_start_container $HOST1 -di --name=c3 --restart=always
+assert_raises "exec_on $HOST1 c3 $CHECK_ETHWE_UP"
+weave_on $HOST1 stop-router
+docker_on $HOST1 restart c3
+weave_on $HOST1 launch-router
+sleep 5
+assert_raises "exec_on $HOST1 c3 $CHECK_ETHWE_UP"
+
 # Restarting proxy shouldn't kill unattachable containers
-proxy_start_container $HOST1 -di --name=c3 --restart=always # Use ipam, so it won't be attachable w/o weave
 weave_on $HOST1 stop
 weave_on $HOST1 launch-proxy
 assert_raises "exec_on $HOST1 c3 $CHECK_ETHWE_UP"
