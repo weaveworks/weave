@@ -2,6 +2,8 @@
 
 set -e
 
+source "$STATE"
+
 if [ "$CIRCLE_NODE_INDEX" = "0" ] ; then
     go get github.com/mattn/goveralls
     goveralls -repotoken $COVERALLS_REPO_TOKEN -coverprofile=$SRCDIR/test/profile.cov -service=circleci

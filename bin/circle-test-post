@@ -2,6 +2,8 @@
 
 set -e
 
+source "$STATE"
+
 cd $SRCDIR/test
 ./gce.sh destroy
 test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh)

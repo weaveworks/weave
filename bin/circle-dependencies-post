@@ -2,6 +2,8 @@
 
 set -e
 
+source "$STATE"
+
 sudo apt-get -q update && sudo apt-get -q install bc jq
 bin/setup-circleci-secrets "$SECRET_PASSWORD"
 mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR

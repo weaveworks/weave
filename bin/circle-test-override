@@ -2,6 +2,8 @@
 
 set -e
 
+source "$STATE"
+
 cd $SRCDIR/test
 eval $(./gce.sh hosts)
 export COVERAGE=true

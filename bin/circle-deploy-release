@@ -2,6 +2,8 @@
 
 set -e
 
+source "$STATE"
+
 go get github.com/weaveworks/wordepress
 cd /home/ubuntu/src/github.com/weaveworks/wordepress
 git checkout v1.0.0

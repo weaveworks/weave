@@ -2,6 +2,8 @@
 
 set -e
 
+source "$STATE"
+
 cd $SRCDIR
 make lint
 COVERDIR=test/coverage make RM= tests
