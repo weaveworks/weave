@@ -511,9 +511,11 @@ func (alloc *Allocator) OnGossipUnicast(sender mesh.PeerName, msg []byte) error 
 	alloc.actionChan <- func() {
 		switch msg[0] {
 		case msgSpaceRequest:
-			// some other peer asked us for space
+			alloc.debugln("Peer", sender, "asked me for space")
 			r, err := decodeRange(msg[1:])
-			if err == nil {
+			// If we don't have a ring, just ignore a request for space.
+			// They'll probably ask again later.
+			if err == nil && !alloc.ring.Empty() {
 				alloc.donateSpace(r, sender)
 			}
 			resultChan <- err
@@ -822,7 +824,6 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	// more.
 	defer alloc.sendRingUpdate(to)
 
-	alloc.debugln("Peer", to, "asked me for space")
 	chunk, ok := alloc.space.Donate(r)
 	if !ok {
 		free := alloc.space.NumFreeAddressesInRange(r)
