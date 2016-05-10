@@ -133,6 +133,13 @@ stop_weave_on() {
     fi
 }
 
+delete_persistence() {
+    for host in "$@" ; do
+        docker_on $host rm -v weavedb >/dev/null
+        docker_on $host rm weave >/dev/null
+    done
+}
+
 exec_on() {
     host=$1
     container=$2
