@@ -419,7 +419,6 @@ func (alloc *Allocator) Shutdown() {
 			alloc.persistRing()
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
-			time.Sleep(100 * time.Millisecond)
 		}
 		doneChan <- struct{}{}
 	}
