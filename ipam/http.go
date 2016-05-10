@@ -38,7 +38,7 @@ func writeAddresses(w http.ResponseWriter, cidrs []address.CIDR) {
 	}
 }
 
-func hasBeenCanceled(dockerCli *docker.Client, closedChan <-chan bool, ident string, checkAlive bool) func() bool {
+func hasBeenCancelled(dockerCli *docker.Client, closedChan <-chan bool, ident string, checkAlive bool) func() bool {
 	return func() bool {
 		select {
 		case <-closedChan:
@@ -62,7 +62,7 @@ func cancellationErr(w http.ResponseWriter, err error) bool {
 
 func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.ResponseWriter, ident string, checkAlive bool, subnet address.CIDR) {
 	addr, err := alloc.Allocate(ident, subnet, checkAlive,
-		hasBeenCanceled(dockerCli, w.(http.CloseNotifier).CloseNotify(), ident, checkAlive))
+		hasBeenCancelled(dockerCli, w.(http.CloseNotifier).CloseNotify(), ident, checkAlive))
 	if err != nil {
 		if !cancellationErr(w, err) {
 			badRequest(w, err)
@@ -74,7 +74,7 @@ func (alloc *Allocator) handleHTTPAllocate(dockerCli *docker.Client, w http.Resp
 
 func (alloc *Allocator) handleHTTPClaim(dockerCli *docker.Client, w http.ResponseWriter, ident string, cidr address.CIDR, checkAlive, noErrorOnUnknown bool) {
 	err := alloc.Claim(ident, cidr, checkAlive, noErrorOnUnknown,
-		hasBeenCanceled(dockerCli, w.(http.CloseNotifier).CloseNotify(), ident, checkAlive))
+		hasBeenCancelled(dockerCli, w.(http.CloseNotifier).CloseNotify(), ident, checkAlive))
 	if err != nil {
 		if !cancellationErr(w, err) {
 			badRequest(w, fmt.Errorf("Unable to claim: %s", err))
