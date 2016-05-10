@@ -2,15 +2,35 @@
 
 set -e
 
-echo "SKIP_TESTS=1" > "$STATE"
+# We need jq to analyse the PR files JSON, so install that first
+sudo apt-get -q update && sudo apt-get -q install bc jq
+
+rm -f "$STATE" && touch "$STATE"
+
+if [ -n "$CI_PULL_REQUEST" -a "$CI_PULL_REQUEST" = "$CI_PULL_REQUESTS" ] ; then
+    if PR=$(echo "$CI_PULL_REQUEST" | grep -oP '(?<=^https://github.com/weaveworks/weave/pull/)[0-9]+$') ; then
+        if FILES=$(curl -s https://api.github.com/repos/weaveworks/weave/pulls/$PR/files | jq -r '.[]|.filename') ; then
+            echo "PR touches [$FILES]"
+            if ! echo "$FILES" | grep -v ^site/ ; then
+                echo "PR contains site changes only - skipping tests"
+                echo "SKIP_TESTS=1" >> "$STATE"
+            else
+                echo "PR contains non-site changes - running tests"
+            fi
+        else
+            echo "Unable to get files for PR $PR" >&2
+        fi
+    else
+        echo "Unable to extract PR number from $CI_PULL_REQUEST" >&2
+    fi
+fi
 
 source "$STATE"
 
-sudo apt-get -q update && sudo apt-get -q install bc jq
-bin/setup-circleci-secrets "$SECRET_PASSWORD"
 mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR
 
 if [ -z "$SKIP_TESTS" ] ; then
+    bin/setup-circleci-secrets "$SECRET_PASSWORD"
     cd $SRCDIR; git submodule update --init
     if [ "$CIRCLE_NODE_INDEX" = "0" ] ; then
         cd $SRCDIR/test; ./gce.sh make_template
