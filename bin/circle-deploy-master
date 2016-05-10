@@ -4,10 +4,12 @@ set -e
 
 source "$STATE"
 
-docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-cd $SRCDIR
-make clean-bin
-make publish
+if [ -z "$SKIP_TESTS" ] ; then
+    docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+    cd $SRCDIR
+    make clean-bin
+    make publish
+fi
 
 go get github.com/weaveworks/wordepress
 cd /home/ubuntu/src/github.com/weaveworks/wordepress

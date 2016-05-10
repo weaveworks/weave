@@ -4,11 +4,13 @@ set -e
 
 source "$STATE"
 
-cd $SRCDIR
-make lint
-COVERDIR=test/coverage make RM= tests
-make COVERAGE=true RM= all
-make testrunner
+if [ -z "$SKIP_TESTS" ] ; then
+    cd $SRCDIR
+    make lint
+    COVERDIR=test/coverage make RM= tests
+    make COVERAGE=true RM= all
+    make testrunner
 
-cd $SRCDIR/test
-./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh
+    cd $SRCDIR/test
+    ./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh
+fi

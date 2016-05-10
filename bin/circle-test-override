@@ -4,7 +4,9 @@ set -e
 
 source "$STATE"
 
-cd $SRCDIR/test
-eval $(./gce.sh hosts)
-export COVERAGE=true
-./run_all.sh
+if [ -z "$SKIP_TESTS" ] ; then
+    cd $SRCDIR/test
+    eval $(./gce.sh hosts)
+    export COVERAGE=true
+    ./run_all.sh
+fi
