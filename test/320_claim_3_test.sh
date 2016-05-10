@@ -13,8 +13,8 @@ delete_persistence() {
 
 start_suite "Claiming addresses"
 
-weave_on $HOST1 launch-router
-weave_on $HOST2 launch-router $HOST1
+weave_on $HOST1 launch-router --ipalloc-range $UNIVERSE
+weave_on $HOST2 launch-router --ipalloc-range $UNIVERSE $HOST1
 
 start_container $HOST1 --name=c1
 start_container $HOST2 --name=c2
@@ -28,8 +28,8 @@ stop_weave_on $HOST2
 delete_persistence $HOST1 $HOST2
 
 # Start hosts in reverse order so c1's address has to be claimed from host2
-weave_on $HOST2 launch-router
-weave_on $HOST1 launch-router $HOST2
+weave_on $HOST2 launch-router --ipalloc-range $UNIVERSE
+weave_on $HOST1 launch-router --ipalloc-range $UNIVERSE $HOST2
 
 # Start another container on host2, so if it hasn't relinquished c1's
 # address it would give that out as the first available.
@@ -47,12 +47,12 @@ delete_persistence $HOST1 $HOST2
 
 # Now make host1 attempt to claim from host2, when host2 is stopped
 # the point being to check whether host1 will hang trying to talk to host2
-weave_on $HOST2 launch-router
+weave_on $HOST2 launch-router --ipalloc-range $UNIVERSE
 # Introduce host3 to remember the IPAM CRDT when we stop host2
-weave_on $HOST3 launch-router $HOST2
+weave_on $HOST3 launch-router --ipalloc-range $UNIVERSE $HOST2
 weave_on $HOST3 prime
 stop_weave_on $HOST2
-weave_on $HOST1 launch-router $HOST3
+weave_on $HOST1 launch-router --ipalloc-range $UNIVERSE $HOST3
 
 stop_weave_on $HOST1
 stop_weave_on $HOST2
