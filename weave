@@ -2308,6 +2308,7 @@ EOF
         plugin_disabled || util_op remove-plugin-network weave || warn_plugin_active
         warn_if_stopping_proxy_in_env
         call_weave DELETE /peer >/dev/null 2>&1 || true
+        fractional_sleep 0.5 # Allow some time for broadcast updates to go out
         for NAME in $PLUGIN_CONTAINER_NAME $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true
