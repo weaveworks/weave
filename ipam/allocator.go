@@ -508,7 +508,7 @@ func (alloc *Allocator) annotatePeernames(names []mesh.PeerName) []string {
 // NB: the function is invoked by the gossip library routines and should be
 //     registered manually.
 func (alloc *Allocator) PeerGone(peerName mesh.PeerName) {
-	alloc.debugln("PeerGone: peer %s", peerName)
+	alloc.debugf("PeerGone: peer %s", peerName)
 
 	alloc.actionChan <- func() {
 		ringPeers := alloc.ring.PeerNames()
