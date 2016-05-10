@@ -3,6 +3,7 @@
 . ./config.sh
 
 UNIVERSE=10.32.0.0/12
+C1=10.40.0.1
 
 delete_persistence() {
     for host in "$@" ; do
@@ -13,12 +14,11 @@ delete_persistence() {
 
 start_suite "Claiming addresses"
 
-weave_on $HOST1 launch-router --ipalloc-range $UNIVERSE
+weave_on $HOST1 launch-router --ipalloc-range $UNIVERSE $HOST2
 weave_on $HOST2 launch-router --ipalloc-range $UNIVERSE $HOST1
 
-start_container $HOST1 --name=c1
-start_container $HOST2 --name=c2
-C1=$(container_ip $HOST1 c1)
+start_container $HOST1 $C1/12 --name=c1
+start_container $HOST2        --name=c2
 assert_raises "exec_on $HOST2 c2 $PING $C1"
 
 stop_weave_on $HOST1
