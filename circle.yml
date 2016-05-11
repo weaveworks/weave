@@ -17,41 +17,23 @@ dependencies:
   cache_directories:
     - "~/docker"
   post:
-    - "sudo apt-get update && sudo apt-get install bc jq"
-    - curl https://sdk.cloud.google.com | bash
-    - bin/setup-circleci-secrets "$SECRET_PASSWORD"
-    - "mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR"
-    - "cd $SRCDIR; git submodule update --init"
-    - cd $SRCDIR/test; ./gce.sh make_template:
-        parallel: false
-    - "cd $SRCDIR/build; ../tools/rebuild-image weaveworks/weavebuild . Dockerfile build.sh && touch $SRCDIR/.build.uptodate"
+    - bin/circle-dependencies-post
 
 test:
+  pre:
+    - "$SRCDIR/bin/circle-test-pre":
+        parallel: true
   override:
-    - cd $SRCDIR; make lint:
-        parallel: true
-    - cd $SRCDIR; COVERDIR=test/coverage make RM= tests:
-        parallel: true
-    - cd $SRCDIR; make COVERAGE=true RM= all:
-        parallel: true
-    - cd $SRCDIR; make testrunner:
-        parallel: true
-    - cd $SRCDIR/test; ./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh:
-        parallel: true
-    - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
+    - "$SRCDIR/bin/circle-test-override":
         parallel: true
         timeout: 300
   post:
-    - cd $SRCDIR/test; ./gce.sh destroy:
-        parallel: true
-    - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh):
+    - "$SRCDIR/bin/circle-test-post":
         parallel: true
 
 teardown:
   pre:
-    - test "$CIRCLE_NODE_INDEX" != "0" || (go get github.com/mattn/goveralls && goveralls -repotoken $COVERALLS_REPO_TOKEN -coverprofile=$SRCDIR/test/profile.cov -service=circleci || true):
-        parallel: true
-    - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; cp coverage.* $CIRCLE_ARTIFACTS):
+    - "$SRCDIR/bin/circle-teardown-pre":
         parallel: true
 
 deployment:
@@ -59,20 +41,14 @@ deployment:
     branch: /[0-9]+\.[0-9]+/
     owner: weaveworks
     commands:
-      - go get github.com/weaveworks/wordepress && cd /home/ubuntu/src/github.com/weaveworks/wordepress && git checkout v1.0.0 && cd cmd/wordepress && go get
-      - cd $SRCDIR; bin/publish-site "$WP_LIVE_URL" "$WP_LIVE_USER" "$WP_LIVE_PASSWORD"
-  hub:
+      - "$SRCDIR/bin/circle-deploy-release"
+  master:
     branch: master
     owner: weaveworks
     commands:
-      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-      - cd $SRCDIR; make clean-bin
-      - cd $SRCDIR; make publish
-      - go get github.com/weaveworks/wordepress && cd /home/ubuntu/src/github.com/weaveworks/wordepress && git checkout v1.0.0 && cd cmd/wordepress && go get
-      - cd $SRCDIR; bin/publish-site "$WP_DEV_URL" "$WP_DEV_USER" "$WP_DEV_PASSWORD"
+      - "$SRCDIR/bin/circle-deploy-master"
   issues:
     branch: /.*/
     owner: weaveworks
     commands:
-      - go get github.com/weaveworks/wordepress && cd /home/ubuntu/src/github.com/weaveworks/wordepress && git checkout v1.0.0 && cd cmd/wordepress && go get
-      - cd $SRCDIR; bin/publish-site "$WP_DEV_URL" "$WP_DEV_USER" "$WP_DEV_PASSWORD"
+      - "$SRCDIR/bin/circle-deploy-issues"
