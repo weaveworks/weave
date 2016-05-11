@@ -9,18 +9,6 @@ check_attached() {
     assert_dns_record $HOST1 c1 $NAME $C2
 }
 
-wait_for_proxy() {
-    for i in $(seq 1 120); do
-        echo "Waiting for proxy to start"
-        if proxy docker_on $1 info > /dev/null 2>&1 ; then
-            return
-        fi
-        sleep 1
-    done
-    echo "Timed out waiting for proxy to start" >&2
-    exit 1
-}
-
 N=50
 # Create and remove a lot of containers in a small subnet; the failure
 # mode is that this takes a long time as it has to wait for the old
