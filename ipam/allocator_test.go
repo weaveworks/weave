@@ -343,7 +343,7 @@ func TestNoFrag(t *testing.T) {
 		allocs[2].actionChan <- func() {
 			resultChan <- len(allocs[2].ring.Entries)
 		}
-		require.True(t, <-resultChan < 5, "excessive ring fragmentation")
+		require.True(t, <-resultChan < 7, "excessive ring fragmentation")
 		stopNetworkOfAllocators(allocs, router)
 	}
 }

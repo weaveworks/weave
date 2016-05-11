@@ -35,6 +35,35 @@ func (r Range) AsCIDRString() string {
 	return CIDR{Addr: r.Start, PrefixLen: prefixLen}.String()
 }
 
+// return the highest bit set in a
+// algorithm from http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+func msb(v Count) Count {
+	v |= v >> 1
+	v |= v >> 2
+	v |= v >> 4
+	v |= v >> 8
+	v |= v >> 16
+	// Cast to 64-bit to avoid overflow when original v >= 0x80000000
+	return Count((uint64(v) + 1) / 2)
+}
+
+func (r Range) BiggestPow2AlignedRange() Range {
+	sizeMsb := Offset(msb(r.Size()))
+	maskedSize := Offset(r.Size()) & (sizeMsb - 1)
+	maskedStart := Offset(r.Start) & (sizeMsb - 1)
+	if maskedStart == 0 {
+		return NewRange(r.Start, sizeMsb)
+	}
+	if sizeMsb-maskedStart <= maskedSize {
+		return NewRange(Add(r.Start, sizeMsb-maskedStart), sizeMsb)
+	}
+	size := sizeMsb / 2
+	if size >= maskedStart {
+		return NewRange(Add(r.Start, size-maskedStart), size)
+	}
+	return NewRange(Add(r.Start, sizeMsb-maskedStart), size)
+}
+
 func MakeCIDR(subnet CIDR, addr Address) CIDR {
 	return CIDR{Addr: addr, PrefixLen: subnet.PrefixLen}
 }
