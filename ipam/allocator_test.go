@@ -220,7 +220,7 @@ func (alloc *Allocator) pause() func() {
 }
 
 func TestCancel(t *testing.T) {
-	const cidr = "10.0.1.7/26"
+	const cidr = "10.0.4.0/26"
 	router := gossip.NewTestRouter(0.0)
 
 	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2)
@@ -281,7 +281,7 @@ func TestCancel(t *testing.T) {
 
 func TestCancelOnDied(t *testing.T) {
 	const (
-		cidr       = "10.0.1.7/26"
+		cidr       = "10.0.4.0/26"
 		container1 = "abcdef"
 	)
 
@@ -334,7 +334,7 @@ func TestGossipShutdown(t *testing.T) {
 }
 
 func TestNoFrag(t *testing.T) {
-	const cidr = "10.0.1.7/22"
+	const cidr = "10.0.4.0/22"
 	resultChan := make(chan int)
 	for i := 0; i < 100; i++ {
 		allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
@@ -343,13 +343,13 @@ func TestNoFrag(t *testing.T) {
 		allocs[2].actionChan <- func() {
 			resultChan <- len(allocs[2].ring.Entries)
 		}
-		require.True(t, <-resultChan < 7, "excessive ring fragmentation")
+		require.True(t, <-resultChan < 6, "excessive ring fragmentation")
 		stopNetworkOfAllocators(allocs, router)
 	}
 }
 
 func TestTransfer(t *testing.T) {
-	const cidr = "10.0.1.7/22"
+	const cidr = "10.0.4.0/22"
 	allocs, router, subnet := makeNetworkOfAllocators(3, cidr)
 	defer stopNetworkOfAllocators(allocs, router)
 	alloc0 := allocs[0]
@@ -389,7 +389,7 @@ func TestTransfer(t *testing.T) {
 }
 
 func TestFakeRouterSimple(t *testing.T) {
-	const cidr = "10.0.1.7/22"
+	const cidr = "10.0.4.0/22"
 	allocs, router, subnet := makeNetworkOfAllocators(2, cidr)
 	defer stopNetworkOfAllocators(allocs, router)
 
@@ -407,7 +407,7 @@ func TestAllocatorFuzz(t *testing.T) {
 		nodes        = 5
 		maxAddresses = 1000
 		concurrency  = 5
-		cidr         = "10.0.1.7/22"
+		cidr         = "10.0.4.0/22"
 	)
 	allocs, router, subnet := makeNetworkOfAllocators(nodes, cidr)
 	defer stopNetworkOfAllocators(allocs, router)
