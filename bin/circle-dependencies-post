@@ -9,6 +9,7 @@ rm -f "$STATE" && touch "$STATE"
 
 if [ -n "$CI_PULL_REQUEST" -a "$CI_PULL_REQUEST" = "$CI_PULL_REQUESTS" ] ; then
     if PR=$(echo "$CI_PULL_REQUEST" | grep -oP '(?<=^https://github.com/weaveworks/weave/pull/)[0-9]+$') ; then
+        echo "GH_PR=$PR" >> "$STATE"
         if FILES=$(curl -s https://api.github.com/repos/weaveworks/weave/pulls/$PR/files | jq -r '.[]|.filename') ; then
             echo "PR touches [$FILES]"
             if ! echo "$FILES" | grep -v ^site/ ; then
