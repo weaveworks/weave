@@ -21,7 +21,7 @@ On `$HOST1` run:
 
     host1$ weave launch
     host1$ eval $(weave env)
-    host1$ docker run --name a1 -ti ubuntu
+    host1$ docker run --name a1 -ti ubuntu:trusty
 
 Where, 
 
@@ -49,7 +49,7 @@ To launch Weave Net on an additional host and create a peer connection, run the 
 
     host2$ weave launch $HOST1
     host2$ eval $(weave env)
-    host2$ docker run --name a2 -ti ubuntu
+    host2$ docker run --name a2 -ti ubuntu:trusty
 
 As noted above, the same steps are repeated for `$HOST2`. The only difference, besides the application container’s name, is that `$HOST2` is told to peer with Weave Net on `$HOST1` during launch. 
 
