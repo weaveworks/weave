@@ -3,16 +3,9 @@
 set -e
 set -o pipefail
 
+source "$(dirname "$(readlink -f "$0")")/circle-functions"
+
 source "$STATE"
-
-go get github.com/weaveworks/wordepress
-cd /home/ubuntu/src/github.com/weaveworks/wordepress
-git checkout v1.0.0
-cd cmd/wordepress
-go get
-
-cd $SRCDIR
-bin/publish-site "$WP_DEV_URL" "$WP_DEV_USER" "$WP_DEV_PASSWORD"
 
 site_changes() {
     curl -s https://api.github.com/repos/weaveworks/weave/pulls/$1/files |
@@ -39,6 +32,11 @@ post_comment() {
             -H 'Content-Type: application/json' \
             https://api.github.com/repos/weaveworks/weave/issues/$GH_PR/comments > /dev/null
 }
+
+install_wordepress v1.0.0
+
+cd $SRCDIR
+bin/publish-site "$WP_DEV_URL" "$WP_DEV_USER" "$WP_DEV_PASSWORD"
 
 if [ -n "$WP_GH_COMMENT_TOKEN" -a -n "$GH_PR" ] ; then
     echo ">>> Adding doc changelog to GitHub PR $GH_PR"
