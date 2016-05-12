@@ -13,20 +13,6 @@ delete_persistence() {
     done
 }
 
-wait_for_container_ip() {
-    host=$1
-    container=$2
-    for i in $(seq 1 120); do
-        echo "Waiting for $container ip at $host"
-        if container_ip $host $container > /dev/null 2>&1 ; then
-            return
-        fi
-        sleep 1
-    done
-    echo "Timed out waiting for $container ip at $host" >&2
-    exit 1
-}
-
 start_suite "Claiming addresses"
 
 weave_on $HOST1 launch-router --ipalloc-range $UNIVERSE $HOST2
@@ -86,7 +72,7 @@ assert_raises "proxy_start_container $HOST1 -e WEAVE_CIDR=10.3.0.1/12"
 
 # Launch host2, so that host1 can establish the ring.
 weave_on $HOST2 launch --ipalloc-range $UNIVERSE $HOST1
-wait_for_container_ip $HOST1 c4
+wait_for_attached $HOST1 c4
 assert_raises "[ $(container_ip $HOST1 c4) == $C4 ]"
 
 end_suite

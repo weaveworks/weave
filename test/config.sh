@@ -197,6 +197,20 @@ container_pid() {
     docker_on $1 inspect -f '{{.State.Pid}}' $2
 }
 
+wait_for_attached() {
+    host=$1
+    container=$2
+    for i in $(seq 1 10); do
+        echo "Waiting for $container on $host to be attached"
+        if exec_on $host $container $CHECK_ETHWE_UP > /dev/null 2>&1 ; then
+            return
+        fi
+        sleep 1
+    done
+    echo "Timed out waiting for $container on $host to be attached" >&2
+    exit 1
+}
+
 # assert_dns_record <host> <container> <name> [<ip> ...]
 assert_dns_record() {
     local host=$1
