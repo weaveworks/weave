@@ -315,6 +315,10 @@ extra_hosts_args() {
     done
 }
 
+kill_container() {
+    docker kill $1 >/dev/null 2>&1 || true
+}
+
 
 check_docker_version
 
@@ -373,7 +377,10 @@ elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
     CONTAINER=$(docker $DOCKER_CLIENT_ARGS run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
-    exec_remote attach $CIDR_ARGS --or-die $DNS_EXTRA_HOSTS_ARGS $ATTACH_ARGS $CONTAINER >/dev/null
+    if ! exec_remote attach $CIDR_ARGS $DNS_EXTRA_HOSTS_ARGS $ATTACH_ARGS $CONTAINER >/dev/null ; then
+        kill_container $CONTAINER
+        exit 1
+    fi
     echo $CONTAINER
     exit 0
 fi
@@ -828,24 +835,9 @@ with_container_netns() {
     return $STATUS
 }
 
-kill_container() {
-    docker kill $1 >/dev/null 2>&1 || true
-}
-
-kill_container_process() {
-    kill -9 $(docker inspect --format='{{.State.Pid}}' $1) >/dev/null 2>&1 || true
-}
-
 with_container_netns_or_die() {
     if ! with_container_netns "$@" >/dev/null ; then
         kill_container $1
-        exit 1
-    fi
-}
-
-with_container_netns_or_kill() {
-    if ! with_container_netns "$@" >/dev/null ; then
-        kill_container_process $1
         exit 1
     fi
 }
@@ -1472,13 +1464,6 @@ ipam_cidrs() {
 ipam_cidrs_or_die() {
     if ! ipam_cidrs "$@" ; then
         kill_container $2
-        exit 1
-    fi
-}
-
-ipam_cidrs_or_kill() {
-    if ! ipam_cidrs "$@" ; then
-        kill_container_process $2
         exit 1
     fi
 }
@@ -2156,12 +2141,6 @@ EOF
         shift $CIDR_ARG_COUNT
         while [ $# -gt 0 ]; do
             case "$1" in
-                --or-die)
-                    ATTACH_TYPE="_or_die"
-                    ;;
-                --or-kill)
-                    ATTACH_TYPE="_or_kill"
-                    ;;
                 --rewrite-hosts)
                     REWRITE_HOSTS=1
                     ;;
@@ -2184,9 +2163,9 @@ EOF
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         create_bridge
-        ipam_cidrs$ATTACH_TYPE allocate $CONTAINER $CIDR_ARGS
+        ipam_cidrs allocate $CONTAINER $CIDR_ARGS
         [ -n "$REWRITE_HOSTS" ] && rewrite_etc_hosts $DNS_EXTRA_HOSTS
-        with_container_netns$ATTACH_TYPE $CONTAINER attach $ALL_CIDRS >/dev/null
+        with_container_netns $CONTAINER attach $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
