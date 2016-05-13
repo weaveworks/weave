@@ -35,7 +35,7 @@ func (r Range) AsCIDRString() string {
 	return CIDR{Addr: r.Start, PrefixLen: prefixLen}.String()
 }
 
-// return the highest bit set in a
+// return the highest bit set in v
 // algorithm from http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
 func msb(v Count) Count {
 	v |= v >> 1
@@ -47,7 +47,7 @@ func msb(v Count) Count {
 	return Count((uint64(v) + 1) / 2)
 }
 
-func (r Range) BiggestPow2AlignedRange() Range {
+func (r Range) BiggestCIDRRange() Range {
 	sizeMsb := Offset(msb(r.Size()))
 	maskedSize := Offset(r.Size()) & (sizeMsb - 1)
 	maskedStart := Offset(r.Start) & (sizeMsb - 1)

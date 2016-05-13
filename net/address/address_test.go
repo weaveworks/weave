@@ -20,17 +20,17 @@ func isPower2(x Count) bool {
 }
 
 func TestBiggestPow2AlignedRange(t *testing.T) {
-	require.Equal(t, NewRange(0, 1), NewRange(0, 1).BiggestPow2AlignedRange())
-	require.Equal(t, NewRange(0, 2), NewRange(0, 3).BiggestPow2AlignedRange())
-	require.Equal(t, NewRange(1, 1), NewRange(1, 2).BiggestPow2AlignedRange())
-	require.Equal(t, NewRange(0, 0x40000000), NewRange(0, 0x7fffffff).BiggestPow2AlignedRange())
-	require.Equal(t, NewRange(0xfffffffe, 1), NewRange(0xfffffffe, 1).BiggestPow2AlignedRange())
+	require.Equal(t, NewRange(0, 1), NewRange(0, 1).BiggestCIDRRange())
+	require.Equal(t, NewRange(1, 1), NewRange(1, 2).BiggestCIDRRange())
+	require.Equal(t, NewRange(2, 2), NewRange(1, 3).BiggestCIDRRange())
+	require.Equal(t, NewRange(0, 0x40000000), NewRange(0, 0x7fffffff).BiggestCIDRRange())
+	require.Equal(t, NewRange(0xfffffffe, 1), NewRange(0xfffffffe, 1).BiggestCIDRRange())
 	prop := func(start Address, size Offset) bool {
 		if size > Offset(0xffffffff)-Offset(start) { // out of range
 			return true
 		}
 		r := NewRange(start, size)
-		result := r.BiggestPow2AlignedRange()
+		result := r.BiggestCIDRRange()
 		return r.Contains(result.Start) &&
 			r.Contains(result.End-1) &&
 			isPower2(result.Size()) &&

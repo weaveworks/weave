@@ -122,7 +122,7 @@ func (s *Space) biggestFreeRange(r address.Range) (biggest address.Range) {
 	biggestSize := address.Count(0)
 	s.walkFree(r, func(chunk address.Range) bool {
 		if size := chunk.Size(); size >= biggestSize {
-			chunk = chunk.BiggestPow2AlignedRange()
+			chunk = chunk.BiggestCIDRRange()
 			if size = chunk.Size(); size >= biggestSize {
 				biggest = chunk
 				biggestSize = size
