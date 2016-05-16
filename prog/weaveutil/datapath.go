@@ -31,19 +31,6 @@ func deleteDatapath(args []string) error {
 	return odp.DeleteDatapath(args[0])
 }
 
-// Checks whether a datapath can be created by actually creating and destroying it
-func checkDatapath(args []string) error {
-	if len(args) != 1 {
-		cmdUsage("check-datapath", "<datapath>")
-	}
-
-	if err := createDatapath(args); err != nil {
-		return err
-	}
-
-	return odp.DeleteDatapath(args[0])
-}
-
 func addDatapathInterface(args []string) error {
 	if len(args) != 2 {
 		cmdUsage("add-datapath-interface", "<datapath> <interface>")
