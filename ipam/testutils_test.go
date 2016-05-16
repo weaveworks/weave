@@ -129,8 +129,7 @@ type mockDB struct{}
 func (d *mockDB) Load(_ string, _ interface{}) (bool, error) { return false, nil }
 func (d *mockDB) Save(_ string, _ interface{}) error         { return nil }
 
-func makeAllocator(name string, cidrStr string, quorum uint, isCIDRAligned bool,
-	mon monitor.Monitor) (*Allocator, address.CIDR) {
+func makeAllocator(name string, cidrStr string, quorum uint, mon monitor.Monitor) (*Allocator, address.CIDR) {
 	peername, err := mesh.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
@@ -142,16 +141,15 @@ func makeAllocator(name string, cidrStr string, quorum uint, isCIDRAligned bool,
 	}
 
 	return NewAllocator(Config{
-		OurName:       peername,
-		OurUID:        mesh.PeerUID(rand.Int63()),
-		OurNickname:   "nick-" + name,
-		Universe:      cidr,
-		IsObserver:    quorum == 0,
-		Quorum:        func() uint { return quorum },
-		Db:            new(mockDB),
-		IsKnownPeer:   func(mesh.PeerName) bool { return true },
-		IsCIDRAligned: isCIDRAligned,
-		Monitor:       mon,
+		OurName:     peername,
+		OurUID:      mesh.PeerUID(rand.Int63()),
+		OurNickname: "nick-" + name,
+		Universe:    cidr,
+		IsObserver:  quorum == 0,
+		Quorum:      func() uint { return quorum },
+		Db:          new(mockDB),
+		IsKnownPeer: func(mesh.PeerName) bool { return true },
+		Monitor:     mon,
 	}), cidr
 }
 
@@ -159,13 +157,13 @@ func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string,
 	quorum uint) (*Allocator, address.CIDR) {
 
 	return makeAllocatorWithMockGossipAndMonitor(t, name, universeCIDR, quorum,
-		false, monitor.NewNullMonitor())
+		monitor.NewNullMonitor())
 }
 
 func makeAllocatorWithMockGossipAndMonitor(t *testing.T, name string, universeCIDR string, quorum uint,
-	isCIDRAligned bool, mon monitor.Monitor) (*Allocator, address.CIDR) {
+	mon monitor.Monitor) (*Allocator, address.CIDR) {
 
-	alloc, subnet := makeAllocator(name, universeCIDR, quorum, isCIDRAligned, mon)
+	alloc, subnet := makeAllocator(name, universeCIDR, quorum, mon)
 	gossip := &mockGossipComms{T: t, name: name}
 	alloc.SetInterfaces(gossip)
 	alloc.Start()
@@ -177,7 +175,7 @@ func (alloc *Allocator) claimRingForTesting(allocs ...*Allocator) {
 	for _, alloc2 := range allocs {
 		peers = append(peers, alloc2.ourName)
 	}
-	alloc.ring.ClaimForPeers(normalizeConsensus(peers), false)
+	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
 	alloc.space.AddRanges(alloc.ring.OwnedRanges())
 }
 
@@ -227,10 +225,10 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 }
 
 func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
-	return makeNetworkOfAllocatorsWithMonitor(size, cidr, false, monitor.NewNullMonitor())
+	return makeNetworkOfAllocatorsWithMonitor(size, cidr, monitor.NewNullMonitor())
 }
 
-func makeNetworkOfAllocatorsWithMonitor(size int, cidr string, isCIDRAligned bool,
+func makeNetworkOfAllocatorsWithMonitor(size int, cidr string,
 	mon monitor.Monitor) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
 
 	gossipRouter := gossip.NewTestRouter(0.0)
@@ -240,7 +238,7 @@ func makeNetworkOfAllocatorsWithMonitor(size int, cidr string, isCIDRAligned boo
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
 		alloc, subnet = makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", i),
-			cidr, uint(size/2+1), isCIDRAligned, mon)
+			cidr, uint(size/2+1), mon)
 		alloc.SetInterfaces(gossipRouter.Connect(alloc.ourName, alloc))
 		alloc.Start()
 		allocs[i] = alloc

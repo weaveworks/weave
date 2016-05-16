@@ -540,19 +540,19 @@ func TestClaimForPeers(t *testing.T) {
 	// Different end to usual so we get a number of addresses that a)
 	// is smaller than the max number of peers, and b) is divisible by
 	// some number of peers. This maximises coverage of edge cases.
-	end := dot10
+	end := dot8
 	peers := makePeers(numPeers)
 	// Test for a range of peer counts
 	for i := 0; i < numPeers; i++ {
 		ring := New(start, end, peers[0])
-		ring.ClaimForPeers(peers[:i+1], false)
+		ring.ClaimForPeers(peers[:i+1])
 	}
 }
 
 func TestClaimForPeersCIDRAligned(t *testing.T) {
 	peers := makePeers(3)
-	ring := New(start, end+1, peers[0])
-	ring.ClaimForPeers(peers, true)
+	ring := New(start, end, peers[0])
+	ring.ClaimForPeers(peers)
 	expectedRanges := []address.Range{
 		address.NewRange(start, 128),                     // 10.0.0.0/25
 		address.NewRange(address.Add(start, 128), 64),    // 10.0.0.128/26
@@ -562,10 +562,6 @@ func TestClaimForPeersCIDRAligned(t *testing.T) {
 		r := address.NewRange(entry.Token, entry.Free)
 		require.Equal(t, expectedRanges[i], r, "")
 	}
-
-	// Test whether allocation panics due to too small ring
-	ring = New(start, start+1, peers[0])
-	require.Panics(t, func() { ring.ClaimForPeers(peers, true) }, "")
 }
 
 type addressSlice []address.Address
@@ -791,7 +787,7 @@ func TestFuzzRingHard(t *testing.T) {
 }
 
 func (r *Ring) ClaimItAll() {
-	r.ClaimForPeers([]mesh.PeerName{r.Peer}, false)
+	r.ClaimForPeers([]mesh.PeerName{r.Peer})
 }
 
 func (es entries) String() string {

@@ -74,22 +74,20 @@ type Allocator struct {
 	isKnownPeer       func(mesh.PeerName) bool
 	quorum            func() uint
 	now               func() time.Time
-	isCIDRAligned     bool            // should donate only CIDR aligned ranges
 	monitor           monitor.Monitor // monitor tracks changes in address ranges owned by us
 }
 
 type Config struct {
-	OurName       mesh.PeerName
-	OurUID        mesh.PeerUID
-	OurNickname   string
-	Seed          []mesh.PeerName
-	Universe      address.CIDR
-	IsObserver    bool
-	Quorum        func() uint
-	Db            db.DB
-	IsKnownPeer   func(name mesh.PeerName) bool
-	IsCIDRAligned bool
-	Monitor       monitor.Monitor
+	OurName     mesh.PeerName
+	OurUID      mesh.PeerUID
+	OurNickname string
+	Seed        []mesh.PeerName
+	Universe    address.CIDR
+	IsObserver  bool
+	Quorum      func() uint
+	Db          db.DB
+	IsKnownPeer func(name mesh.PeerName) bool
+	Monitor     monitor.Monitor
 }
 
 // NewAllocator creates and initialises a new Allocator
@@ -103,20 +101,19 @@ func NewAllocator(config Config) *Allocator {
 	}
 
 	return &Allocator{
-		ourName:       config.OurName,
-		seed:          config.Seed,
-		universe:      config.Universe,
-		ring:          ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName),
-		owned:         make(map[string]ownedData),
-		db:            config.Db,
-		paxos:         participant,
-		nicknames:     map[mesh.PeerName]string{config.OurName: config.OurNickname},
-		isKnownPeer:   config.IsKnownPeer,
-		quorum:        config.Quorum,
-		dead:          make(map[string]time.Time),
-		now:           time.Now,
-		isCIDRAligned: config.IsCIDRAligned,
-		monitor:       config.Monitor,
+		ourName:     config.OurName,
+		seed:        config.Seed,
+		universe:    config.Universe,
+		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName),
+		owned:       make(map[string]ownedData),
+		db:          config.Db,
+		paxos:       participant,
+		nicknames:   map[mesh.PeerName]string{config.OurName: config.OurNickname},
+		isKnownPeer: config.IsKnownPeer,
+		quorum:      config.Quorum,
+		dead:        make(map[string]time.Time),
+		now:         time.Now,
+		monitor:     config.Monitor,
 	}
 }
 
@@ -714,7 +711,7 @@ func (alloc *Allocator) establishRing() {
 
 func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
-	alloc.ring.ClaimForPeers(normalizeConsensus(peers), alloc.isCIDRAligned)
+	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
 	// We assume that the peer has not possessed any address ranges before
 	err := alloc.monitor.HandleUpdate(nil, alloc.ring.OwnedAndMergedRanges())
 	if err != nil {

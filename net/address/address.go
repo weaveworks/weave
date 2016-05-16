@@ -132,6 +132,8 @@ func ParseIP(s string) (Address, error) {
 	return 0, &net.ParseError{Type: "IP Address", Text: s}
 }
 
+// ParseCIDR parses s as a CIDR notation IP address and mask and returns
+// a host network address with a prefix len.
 func ParseCIDR(s string) (CIDR, error) {
 	if ip, ipnet, err := net.ParseCIDR(s); err != nil {
 		return CIDR{}, err

@@ -414,18 +414,12 @@ func (r *Ring) AllRangeInfo() (result []RangeInfo) {
 
 // ClaimForPeers claims the entire ring for the array of peers passed
 // in.  Only works for empty rings.
-//
-// isCIDRAligned denotes whether the claimed ranges should be CIDR-aligned.
-func (r *Ring) ClaimForPeers(peers []mesh.PeerName, isCIDRAligned bool) {
+func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	common.Assert(r.Empty())
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
-	if isCIDRAligned {
-		r.createEntriesCIDR(peers)
-		return
-	}
-	r.createEntries(peers)
+	r.createEntriesCIDR(peers)
 	r.Seeds = peers
 }
 
@@ -460,13 +454,14 @@ func (r *Ring) createEntries(peers []mesh.PeerName) {
 func (r *Ring) createEntriesCIDR(peers []mesh.PeerName) {
 	var fun func(from, to address.Address, peers []mesh.PeerName)
 
-	common.AssertWithMsg(
-		r.Range().IsCIDR(),
-		fmt.Sprintf("%s range is not CIDR", r.Range()))
-	common.AssertWithMsg(
-		int(r.Range().Size()) >= len(peers),
-		fmt.Sprintf("%d IP is too little for %d peers",
-			r.Range().Size(), len(peers)))
+	common.AssertWithMsg(r.Range().IsCIDR(), fmt.Sprintf("%s range is not CIDR", r.Range()))
+
+	// TODO(mp) maybe try to split into as many as possible CIDRs instead of giving away
+	//			the whole range to the first peer.
+	if size := r.Range().Size(); size < address.Count(len(peers)) {
+		r.Entries.insert(entry{Token: r.Start, Peer: peers[0], Free: address.Offset(size)})
+		return
+	}
 
 	fun = func(from, to address.Address, peers []mesh.PeerName) {
 		share := address.Subtract(to, from)

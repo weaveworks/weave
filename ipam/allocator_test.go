@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	testStart1 = "10.0.1.0"
+	testStart1 = "10.0.0.0"
 	testStart2 = "10.0.2.0"
 	testStart3 = "10.0.3.0"
 )
@@ -224,12 +224,10 @@ func TestCancel(t *testing.T) {
 	const cidr = "10.0.4.0/26"
 	router := gossip.NewTestRouter(0.0)
 
-	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2,
-		false, monitor.NewNullMonitor())
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2, monitor.NewNullMonitor())
 	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 
-	alloc2, _ := makeAllocator("02:00:00:02:00:00", cidr, 2,
-		false, monitor.NewNullMonitor())
+	alloc2, _ := makeAllocator("02:00:00:02:00:00", cidr, 2, monitor.NewNullMonitor())
 	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc1.claimRingForTesting(alloc1, alloc2)
 	alloc2.claimRingForTesting(alloc1, alloc2)
@@ -289,8 +287,7 @@ func TestCancelOnDied(t *testing.T) {
 	)
 
 	router := gossip.NewTestRouter(0.0)
-	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2,
-		false, monitor.NewNullMonitor())
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2, monitor.NewNullMonitor())
 	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 	alloc1.Start()
 
@@ -633,8 +630,7 @@ func TestSpaceRequest(t *testing.T) {
 	require.Equal(t, cidrRanges(universe), alloc1.OwnedRanges(), "")
 
 	// Start a new peer
-	alloc2, _ := makeAllocator("02:00:00:02:00:00", universe, 2,
-		false, monitor.NewNullMonitor())
+	alloc2, _ := makeAllocator("02:00:00:02:00:00", universe, 2, monitor.NewNullMonitor())
 	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc2.Start()
 	defer alloc2.Stop()
@@ -658,7 +654,7 @@ func TestMonitor(t *testing.T) {
 	)
 
 	monChan := make(chan rangePair, 10)
-	allocs, router, _ := makeNetworkOfAllocatorsWithMonitor(2, cidr, true, newTestMonitor(monChan))
+	allocs, router, _ := makeNetworkOfAllocatorsWithMonitor(2, cidr, newTestMonitor(monChan))
 	defer stopNetworkOfAllocators(allocs, router)
 
 	cidr1, _ := address.ParseCIDR(cidr)
@@ -725,7 +721,7 @@ func TestShutdownWithMonitor(t *testing.T) {
 	)
 
 	monChan := make(chan rangePair, 10)
-	allocs, router, _ := makeNetworkOfAllocatorsWithMonitor(2, cidr, true, newTestMonitor(monChan))
+	allocs, router, _ := makeNetworkOfAllocatorsWithMonitor(2, cidr, newTestMonitor(monChan))
 	defer stopNetworkOfAllocators(allocs, router)
 
 	cidr1, _ := address.ParseCIDR(cidr)
