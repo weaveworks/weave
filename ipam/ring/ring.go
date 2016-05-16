@@ -367,32 +367,6 @@ func (r *Ring) OwnedAndMergedRanges() (result []address.Range) {
 	return r.splitRangesOverZero(result)
 }
 
-// OwnedCIDRRanges returns ordered and CIDR-aligned address ranges
-// constrained by the given req range.
-func (r *Ring) OwnedCIDRRanges(req address.Range) (
-	result []address.CIDR) {
-
-	var ranges []address.Range
-	for _, curr := range r.OwnedAndMergedRanges() {
-		if req.End <= curr.Start {
-			break
-		}
-		if req.Start >= curr.End {
-			continue
-		}
-		start := address.MaxAddress(req.Start, curr.Start)
-		end := address.MinAddress(req.End, curr.End)
-
-		ranges = append(ranges, address.Range{Start: start, End: end})
-	}
-
-	for _, r := range ranges {
-		result = append(result, r.CIDRs()...)
-	}
-
-	return result
-}
-
 // For printing status
 type RangeInfo struct {
 	Peer mesh.PeerName
@@ -419,64 +393,36 @@ func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
-	r.createEntriesCIDR(peers)
+	r.createEntries(peers)
 	r.Seeds = peers
 }
 
-// createEntriesCIDR subdivides the [from,to) (CIDR) range for the given peers
+// createEntries subdivides the [from,to) (CIDR) range for the given peers
 // and creates entries for the subranges.
+// Each entry is CIRD-aligned.
 func (r *Ring) createEntries(peers []mesh.PeerName) {
-	totalSize := r.distance(r.Start, r.End)
-	share := totalSize/address.Count(len(peers)) + 1
-	remainder := totalSize % address.Count(len(peers))
-	pos := r.Start
-
-	for i, peer := range peers {
-		if address.Count(i) == remainder {
-			share--
-			if share == 0 {
-				break
-			}
-		}
-
-		r.Entries.insert(entry{Token: pos, Peer: peer, Free: share})
-		pos += address.Address(share)
-	}
-
-	common.Assert(pos == r.End)
-}
-
-// createEntriesCIDR does the same as createEntries, except that the subranges
-// are CIDR-aligned.
-//
-// The algo for the CIDR-aligned subdivision is based on splitting the range
-// into halves.
-func (r *Ring) createEntriesCIDR(peers []mesh.PeerName) {
-	var fun func(from, to address.Address, peers []mesh.PeerName)
-
 	common.AssertWithMsg(r.Range().IsCIDR(), fmt.Sprintf("%s range is not CIDR", r.Range()))
+	defer func() {
+		e := r.Entries[len(r.Entries)-1]
+		common.Assert(address.Add(e.Token, address.Offset(e.Free)) == r.End)
+	}()
 
-	// TODO(mp) maybe try to split into as many as possible CIDRs instead of giving away
-	//			the whole range to the first peer.
-	if size := r.Range().Size(); size < address.Count(len(peers)) {
-		r.Entries.insert(entry{Token: r.Start, Peer: peers[0], Free: address.Offset(size)})
-		return
-	}
-
-	fun = func(from, to address.Address, peers []mesh.PeerName) {
-		share := address.Subtract(to, from)
-		if len(peers) == 1 {
+	var subdivide func(from, to address.Address, peers []mesh.PeerName)
+	subdivide = func(from, to address.Address, peers []mesh.PeerName) {
+		share := address.Length(to, from)
+		if share == 0 {
+			return
+		}
+		if share == 1 || len(peers) == 1 {
 			r.Entries.insert(entry{Token: from, Peer: peers[0], Free: share})
 			return
 		}
-		mid := address.Add(from, share/2)
-		fun(from, mid, peers[:len(peers)/2])
-		fun(address.Add(mid, share%2), to, peers[len(peers)/2:])
+		mid := address.Add(from, address.Offset(share/2))
+		subdivide(from, mid, peers[:len(peers)/2])
+		subdivide(address.Add(mid, address.Offset(share%2)), to, peers[len(peers)/2:])
 	}
-	fun(r.Start, r.End, peers)
 
-	lastEntry := r.Entries[len(r.Entries)-1]
-	common.Assert(address.Add(lastEntry.Token, lastEntry.Free) == r.End)
+	subdivide(r.Start, r.End, peers)
 }
 
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[mesh.PeerName]string) {

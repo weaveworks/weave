@@ -361,7 +361,7 @@ function hosts {
 
 function try_connect {
     echo "Trying to connect to $1"
-	for i in {0..10}; do
+	for i in {0..120}; do
 		$SSHCMD -t $1 true && return
 		sleep 2
 	done

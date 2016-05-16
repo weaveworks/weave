@@ -2,14 +2,15 @@
 
 . ./config.sh
 
-# Skip if it is intended to run on non-AWS machine
+# Skip if it is run on non-AWS machine
 [ -z "$AWS" ] && exit 0
 
-CIDR1=10.32.0.0/13
-CIDR2=10.40.0.0/13
 UNIVERSE=10.32.0.0/12
+CIDR1=10.32.0.0/13
+CIDR2=10.40.0.0/14
+CIDR3=10.44.0.0/14
 
-function routetableid {
+routetableid() {
     host=$1
     json=$(mktemp json.XXXXXXXXXX)
     aws ec2 describe-instances                                      \
@@ -23,7 +24,7 @@ function routetableid {
     rm $json
 }
 
-function cleanup_routetable {
+cleanup_routetable() {
     id=$1
     json=$(mktemp json.XXXXXXXXXX)
     echo "Cleaning up routes"
@@ -39,13 +40,13 @@ function cleanup_routetable {
     rm $json
 }
 
-function route_exists {
+route_exists() {
     aws ec2 describe-route-tables --route-table-ids $1 |
     jq -e -r ".RouteTables[].Routes[] | select (.DestinationCidrBlock == \"$2\")" > /dev/null
     [ $? -eq 0 ]
 }
 
-function no_fastdp {
+no_fastdp() {
     weave_on $1 report -f "{{.Router.Interface}}" | grep -q -v "datapath"
 }
 
@@ -54,19 +55,22 @@ start_suite "AWS VPC"
 VPC_ROUTE_TABLE_ID=$(routetableid $HOST1)
 cleanup_routetable $VPC_ROUTE_TABLE_ID
 
-weave_on $HOST1 launch                              \
-        --ipalloc-range $UNIVERSE                   \
-        --awsvpc
-weave_on $HOST2 launch                              \
-        --ipalloc-range $UNIVERSE                   \
-        --awsvpc                                    \
-        $HOST1
+echo "starting weave"
+
+# TODO(mp) this deadlocks! because internally we call weave:expose
+#weave_on $HOST1 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST2
+weave_on $HOST1 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc
+weave_on $HOST2 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST1
+
+echo "starting containers"
 
 start_container $HOST1 --name=c1
 start_container $HOST2 --name=c2
 
+# TODO(mp) add check for destination
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR1"
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR2"
+assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3"
 
 # Check that we do not use fastdp
 assert_raises "no_fastdp $HOST1"
@@ -79,6 +83,7 @@ weave_on $HOST1 reset
 ## host1 has transferred previously owned ranges to host2
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR1" 1
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR2" 1
+assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3" 1
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $UNIVERSE"
 
 cleanup_routetable $VPC_ROUTE_TABLE_ID

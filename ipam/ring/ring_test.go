@@ -559,7 +559,7 @@ func TestClaimForPeersCIDRAligned(t *testing.T) {
 		address.NewRange(address.Add(start, 128+64), 64), // 10.0.0.192/26
 	}
 	for i, entry := range ring.Entries {
-		r := address.NewRange(entry.Token, entry.Free)
+		r := address.NewRange(entry.Token, address.Offset(entry.Free))
 		require.Equal(t, expectedRanges[i], r, "")
 	}
 }
@@ -803,34 +803,6 @@ func (es entries) String() string {
 	return buffer.String()
 }
 
-func TestOwnedCIDRRanges(t *testing.T) {
-	ring := New(start, end+1, peer1name) // 10.0.0.0/24
-	entries := []entry{
-		{ip("10.0.0.128"), peer2name, 0, 128 + 16},
-		{ip("10.0.0.16"), peer1name, 0, 1},
-		{ip("10.0.0.17"), peer2name, 0, 47},
-		{ip("10.0.0.64"), peer1name, 0, 63},
-		{ip("10.0.0.127"), peer1name, 0, 1},
-	}
-	// peer1: [10.0.0.16-10.0.0.16 10.0.0.64-10.0.0.127]
-	// peer2: [10.0.0.128-10.0.0.15 10.0.0.17-10.0.0.63]
-	for _, e := range entries {
-		ring.Entries.insert(e)
-	}
-
-	cidrs := ring.OwnedCIDRRanges(
-		address.Range{Start: start, End: end + 1})
-	require.Len(t, cidrs, 2, "")
-	require.Equal(t, "10.0.0.16/32", cidrs[0].String(), "")
-	require.Equal(t, "10.0.0.64/26", cidrs[1].String(), "")
-
-	cidrs = ring.OwnedCIDRRanges(
-		address.Range{Start: ip("10.0.0.16"), End: ip("10.0.0.66")})
-	require.Len(t, cidrs, 2, "")
-	require.Equal(t, "10.0.0.16/32", cidrs[0].String(), "")
-	require.Equal(t, "10.0.0.64/31", cidrs[1].String(), "")
-}
-
 // TODO(mp) Move the helpers bellow to testing_utils or so to DRY.
 
 func ip(s string) address.Address {
@@ -842,13 +814,13 @@ func TestOwnedAndMergedRanges(t *testing.T) {
 	ring1 := New(start, end, peer1name)
 
 	ring1.Entries.insert(
-		entry{Token: start, Peer: peer1name, Free: address.Subtract(dot10, start)})
+		entry{Token: start, Peer: peer1name, Free: address.Length(dot10, start)})
 	ring1.Entries.insert(
-		entry{Token: dot10, Peer: peer1name, Free: address.Subtract(dot245, dot10)})
+		entry{Token: dot10, Peer: peer1name, Free: address.Length(dot245, dot10)})
 	ring1.Entries.insert(
-		entry{Token: dot245, Peer: peer2name, Free: address.Subtract(dot250, dot245)})
+		entry{Token: dot245, Peer: peer2name, Free: address.Length(dot250, dot245)})
 	ring1.Entries.insert(
-		entry{Token: dot250, Peer: peer1name, Free: address.Subtract(end, dot250)})
+		entry{Token: dot250, Peer: peer1name, Free: address.Length(end, dot250)})
 
 	require.Equal(t,
 		[]address.Range{
