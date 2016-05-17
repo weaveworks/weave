@@ -125,6 +125,7 @@ func main() {
 	var (
 		justVersion        bool
 		config             mesh.Config
+		bridgeConfig       weavenet.BridgeConfig
 		networkConfig      weave.NetworkConfig
 		protocolMinVersion int
 		resume             bool
@@ -169,6 +170,8 @@ func main() {
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
 	mflag.BoolVar(&resume, []string{"-resume"}, false, "resume connections to previous peers")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
+	mflag.StringVar(&bridgeConfig.WeaveBridgeName, []string{"-weave-bridge"}, "weave", "name of weave bridge")
+	mflag.StringVar(&bridgeConfig.DockerBridgeName, []string{"-docker-bridge"}, "", "name of Docker bridge")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
 	mflag.StringVar(&password, []string{"#password", "-password"}, "", "network password")
@@ -178,6 +181,7 @@ func main() {
 	mflag.IntVar(&config.ConnLimit, []string{"#connlimit", "#-connlimit", "-conn-limit"}, 30, "connection limit (0 for unlimited)")
 	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
+	mflag.IntVar(&bridgeConfig.MTU, []string{"-mtu"}, 0, "MTU size")
 	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&statusAddr, []string{"-status-addr"}, "", "address to bind status+metrics interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
@@ -243,6 +247,16 @@ func main() {
 	} else {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
+
+	bridgeConfig.DatapathName = datapathName
+	if bridgeConfig.DockerBridgeName != "" {
+		if err := weavenet.EnforceAddrAssignType(bridgeConfig.DockerBridgeName); err != nil {
+			Log.Errorf("While checking address assignment type of %s: %s", bridgeConfig.DockerBridgeName, err)
+		}
+	}
+	bridgeType, err := weavenet.CreateBridge(&bridgeConfig)
+	checkFatal(err)
+	Log.Println("Bridge type is", bridgeType)
 
 	config.Password = determinePassword(password)
 
