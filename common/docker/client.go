@@ -157,14 +157,35 @@ func (pending pendingStarts) finish(id string) {
 }
 
 func (c *Client) AllContainerIDs() ([]string, error) {
-	all, err := c.ListContainers(docker.ListContainersOptions{All: true})
+	return c.containerIDs()
+}
+
+// ExistingContainerIDs returns a list of container IDs which either are running or
+// might be started in the future.
+func (c *Client) ExistingContainerIDs() ([]string, error) {
+	return c.containerIDs("running", "paused", "exited", "created", "restarting")
+}
+
+func (c *Client) containerIDs(states ...string) ([]string, error) {
+	var ids []string
+
+	opts := docker.ListContainersOptions{
+		All: true,
+	}
+	if len(states) > 0 {
+		opts.Filters = map[string][]string{
+			"status": states,
+		}
+	}
+
+	all, err := c.ListContainers(opts)
 	if err != nil {
 		return nil, err
 	}
-	var ids []string
 	for _, c := range all {
 		ids = append(ids, c.ID)
 	}
+
 	return ids, nil
 }
 

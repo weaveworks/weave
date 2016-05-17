@@ -309,10 +309,25 @@ func main() {
 		dnsserver *nameserver.DNSServer
 	)
 	if !noDNS {
-		ns, dnsserver = createDNSServer(dnsConfig, router.Router, isKnownPeer)
+		var existingContainerIDs []string
+
+		ns, dnsserver = createDNSServer(dnsConfig, router.Router, db, isKnownPeer)
 		observeContainers(ns)
-		ns.Start()
+
+		if dockerCli != nil {
+			existingContainerIDs, err = dockerCli.ExistingContainerIDs()
+			if err != nil {
+				Log.Fatalf("ExistingContainerIDs failed due to: %s", err)
+			}
+		}
+
+		// To restore external DNS entries we should pretend that "weave:extern"
+		// container exists.
+		existingContainerIDs = append(existingContainerIDs, "weave:extern")
+		ns.Start(existingContainerIDs)
+		ns.RestoreEntries("weave:extern")
 		defer ns.Stop()
+
 		dnsserver.ActivateAndServe()
 		defer dnsserver.Stop()
 	}
@@ -454,8 +469,10 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 	return allocator, defaultSubnet
 }
 
-func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mesh.PeerName) bool) (*nameserver.Nameserver, *nameserver.DNSServer) {
-	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, isKnownPeer)
+func createDNSServer(config dnsConfig, router *mesh.Router, db db.DB,
+	isKnownPeer func(mesh.PeerName) bool) (*nameserver.Nameserver, *nameserver.DNSServer) {
+
+	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, db, isKnownPeer)
 	router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
 	ns.SetGossip(router.NewGossip("nameserver", ns))
 	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,

@@ -9,6 +9,7 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
+	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -25,27 +26,72 @@ const (
 
 	// Used by prog/weaver/main.go and proxy/create_container_interceptor.go
 	DefaultDomain = "weave.local."
+
+	// Used as a key for stored nameserver entries in the database
+	nameserverIdent = "nameserver"
 )
 
 // Nameserver: gossip-based, in memory nameserver.
 // - Holds a sorted list of (hostname, peer, container id, ip) tuples for the whole cluster.
+// - DB handle for persisting local entries to survive container/peer restarts.
 // - This list is gossiped & merged around the cluser.
 // - Lookup-by-hostname are O(nlogn), and return a (copy of a) slice of the entries
 // - Update is O(n) for now
 type Nameserver struct {
 	sync.RWMutex
-	ourName     mesh.PeerName
-	domain      string
-	gossip      mesh.Gossip
-	entries     Entries
-	isKnownPeer func(mesh.PeerName) bool
-	quit        chan struct{}
+	ourName       mesh.PeerName
+	domain        string
+	gossip        mesh.Gossip
+	entries       Entries
+	isKnownPeer   func(mesh.PeerName) bool
+	quit          chan struct{}
+	db            db.DB
+	ready         bool
+	pendingEvents []event
 }
 
-func New(ourName mesh.PeerName, domain string, isKnownPeer func(mesh.PeerName) bool) *Nameserver {
+// dbEntry is used when storing each entry to DB.
+type dbEntry struct {
+	Entry
+	Stopped bool
+}
+
+// Set of strings
+type set map[string]struct{}
+
+func newSet(items []string) set {
+	s := set{}
+	for _, i := range items {
+		s[i] = struct{}{}
+	}
+	return s
+}
+
+func (s set) exist(item string) bool {
+	_, ok := s[item]
+	return ok
+}
+
+// Used to store pending events before nameserver has been initialized
+type eventType int
+
+const (
+	eventDestroyed eventType = iota
+	eventDied
+)
+
+type event struct {
+	eType eventType
+	ident string
+}
+
+func New(ourName mesh.PeerName, domain string, db db.DB,
+	isKnownPeer func(mesh.PeerName) bool) *Nameserver {
+
 	return &Nameserver{
 		ourName:     ourName,
 		domain:      dns.Fqdn(domain),
+		db:          db,
 		isKnownPeer: isKnownPeer,
 		quit:        make(chan struct{}),
 	}
@@ -55,7 +101,13 @@ func (n *Nameserver) SetGossip(gossip mesh.Gossip) {
 	n.gossip = gossip
 }
 
-func (n *Nameserver) Start() {
+func (n *Nameserver) Start(existingContainerIDs []string) {
+	n.Lock()
+	n.restoreFromDB(existingContainerIDs)
+	n.replayEvents()
+	n.ready = true
+	n.Unlock()
+
 	go func() {
 		ticker := time.Tick(tombstoneTimeout)
 		for {
@@ -67,6 +119,47 @@ func (n *Nameserver) Start() {
 			}
 		}
 	}()
+}
+
+// Restores local entries from the database.
+// NB: called only during the initialization.
+func (n *Nameserver) restoreFromDB(existingContainerIDs []string) {
+	n.debugf("restore: starting...")
+	defer n.debugf("restore: finished.")
+
+	if ok := n.loadEntries(); !ok {
+		return
+	}
+
+	// TODO(mp) maybe just replace with sort.Search.
+	ids := newSet(existingContainerIDs)
+
+	// Tombstone all entries and flag entries of existing containers as stopped
+	for i, e := range n.entries {
+		if e.Origin != n.ourName {
+			panic(fmt.Sprintf(
+				"restore: peer %s DB should not have contained entries of %s peer",
+				n.ourName, e.Origin))
+		}
+		if e.Tombstone == 0 {
+			n.debugf("restore: tombstoning %v...", e)
+			e.Tombstone = now()
+			e.Version++
+			if ids.exist(e.ContainerID) {
+				n.debugf("restore: stopping %v...", e)
+				e.stopped = true
+			}
+			n.entries[i] = e
+		}
+	}
+
+	// lHostname gets lost during serialization, so we need to set this field manually
+	n.entries.addLowercase()
+	n.snapshot()
+
+	entries := make(Entries, len(n.entries))
+	copy(entries, n.entries)
+	n.broadcastEntries(entries...)
 }
 
 func (n *Nameserver) Stop() {
@@ -83,12 +176,44 @@ func (n *Nameserver) broadcastEntries(es ...Entry) {
 	})
 }
 
-func (n *Nameserver) AddEntry(hostname, containerid string, origin mesh.PeerName, addr address.Address) {
+func (n *Nameserver) AddEntry(hostname, containerid string,
+	origin mesh.PeerName, addr address.Address) {
+
 	n.Lock()
-	n.infof("adding entry for %s: %s -> %s", containerid, hostname, addr.String())
-	entry := n.entries.add(hostname, containerid, origin, addr)
+	entries, found := n.restoreEntries(containerid, origin, addr)
+	if !found {
+		entries = append(entries, n.entries.add(hostname, containerid, origin, addr))
+	}
+	n.snapshot()
 	n.Unlock()
-	n.broadcastEntries(entry)
+	n.broadcastEntries(entries...)
+}
+
+func (n *Nameserver) RestoreEntries(containerid string) {
+	n.Lock()
+	entries, _ := n.restoreEntries(containerid, n.ourName, address.Address(0))
+	n.snapshot()
+	n.Unlock()
+	n.broadcastEntries(entries...)
+}
+
+func (n *Nameserver) restoreEntries(containerid string, origin mesh.PeerName,
+	addr address.Address) (Entries, bool) {
+
+	var entries Entries
+	var found bool
+
+	for i, e := range n.entries {
+		if e.Origin == origin && e.ContainerID == containerid && e.stopped {
+			if e.Addr == addr {
+				found = true
+			}
+			n.entries[i].resetStopped()
+			entries = append(entries, n.entries[i])
+		}
+	}
+
+	return entries, found
 }
 
 func (n *Nameserver) Lookup(hostname string) []address.Address {
@@ -121,20 +246,78 @@ func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
 	return match.Hostname, nil
 }
 
-func (n *Nameserver) ContainerStarted(ident string)   {}
-func (n *Nameserver) ContainerDestroyed(ident string) {}
+func (n *Nameserver) ContainerStarted(ident string) {}
+
+func (n *Nameserver) ContainerDestroyed(ident string) {
+	n.Lock()
+	if !n.ready {
+		n.pendingEvents = append(n.pendingEvents, event{eventDestroyed, ident})
+		n.Unlock()
+		return
+	}
+	entries := n.containerDestroyed(ident)
+	n.Unlock()
+	n.broadcastEntries(entries...)
+}
 
 func (n *Nameserver) ContainerDied(ident string) {
 	n.Lock()
-	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
+	if !n.ready {
+		n.pendingEvents = append(n.pendingEvents, event{eventDied, ident})
+		n.Unlock()
+		return
+	}
+	entries := n.containerDied(ident)
+	n.Unlock()
+	n.broadcastEntries(entries...)
+}
+
+func (n *Nameserver) containerDestroyed(ident string) Entries {
+	entries := n.entries.forceTombstone(n.ourName, func(e *Entry) bool {
 		if e.ContainerID == ident {
-			n.infof("container %s died; tombstoning entry %s", ident, e.String())
+			n.infof("container %s destroyed; tombstoning entry %s", ident, e.String())
+			// Unset the flag to allow the entry be removed later on;
+			// Because the flag isn't exposed to other peers, we don't
+			// need to bump the version number if the entry has been previously
+			// tombstoned.
+			e.stopped = false
 			return true
 		}
 		return false
 	})
-	n.Unlock()
-	n.broadcastEntries(entries...)
+	n.snapshot()
+	return entries
+}
+
+func (n *Nameserver) containerDied(ident string) Entries {
+	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
+		if e.ContainerID == ident {
+			n.infof("container %s died; tombstoning entry %s", ident, e.String())
+			// We might want to restore the entry if the container comes back
+			e.stopped = true
+			return true
+		}
+		return false
+	})
+	n.snapshot()
+	return entries
+}
+
+// TODO(mp) replayEvents could merge all entries and do a single broadcast
+func (n *Nameserver) replayEvents() {
+	var entries Entries
+
+	for _, e := range n.pendingEvents {
+		switch e.eType {
+		case eventDestroyed:
+			entries = n.containerDestroyed(e.ident)
+		case eventDied:
+			entries = n.containerDied(e.ident)
+		}
+		n.broadcastEntries(entries...)
+	}
+
+	n.pendingEvents = nil
 }
 
 func (n *Nameserver) PeerGone(peer mesh.PeerName) {
@@ -165,6 +348,7 @@ func (n *Nameserver) Delete(hostname, containerid, ipStr string, ip address.Addr
 		n.infof("tombstoning entry %v", e)
 		return true
 	})
+	n.snapshot()
 	n.Unlock()
 	n.broadcastEntries(entries...)
 }
@@ -174,8 +358,53 @@ func (n *Nameserver) deleteTombstones() {
 	defer n.Unlock()
 	now := time.Now().Unix()
 	n.entries.filter(func(e *Entry) bool {
-		return e.Tombstone == 0 || now-e.Tombstone <= int64(tombstoneTimeout/time.Second)
+		return e.Tombstone == 0 || e.stopped || now-e.Tombstone <= int64(tombstoneTimeout/time.Second)
 	})
+	n.snapshot()
+}
+
+// snapshot stores the local entries (Origin == n.ourName) to the database.
+// Each entry is wrapped into the dbEntry struct because the entry.stopped field is private
+// and is lost during the serialization performed by the db.
+//
+// NB: we assume that a caller has taken the nameserver' lock for reading or writing.
+func (n *Nameserver) snapshot() {
+	var dbEntries []dbEntry
+
+	for _, e := range n.entries {
+		if e.Origin == n.ourName {
+			dbEntries = append(dbEntries, dbEntry{e, e.stopped})
+		}
+	}
+
+	if err := n.db.Save(nameserverIdent, dbEntries); err != nil {
+		n.errorf("saving to DB failed due to: %s", err)
+	}
+}
+
+// loadEntries loads and unwraps entries from DB.
+func (n *Nameserver) loadEntries() bool {
+	var dbEntries []dbEntry
+
+	common.Assert(len(n.entries) == 0 && !n.ready)
+
+	ok, err := n.db.Load(nameserverIdent, &dbEntries)
+	switch {
+	case err != nil:
+		n.errorf("restore: cannot retrieve entries due to: %s", err)
+		return false
+	case !ok:
+		n.infof("restore: cannot find any entry in DB")
+		return false
+	}
+
+	for _, e := range dbEntries {
+		entry := e.Entry
+		entry.stopped = e.Stopped
+		n.entries = append(n.entries, entry)
+	}
+
+	return true
 }
 
 func (n *Nameserver) Gossip() mesh.GossipData {
@@ -233,6 +462,7 @@ func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData
 	})
 
 	newEntries := n.entries.merge(gossip.Entries)
+	n.snapshot()
 	n.Unlock() // unlock before attempting to broadcast
 
 	// Note that all overriddenEntries have been merged into our entries, either
@@ -269,6 +499,9 @@ func (n *Nameserver) debugf(fmt string, args ...interface{}) {
 }
 func (n *Nameserver) errorf(fmt string, args ...interface{}) {
 	n.logf(common.Log.Errorf, fmt, args...)
+}
+func (n *Nameserver) fatalf(fmt string, args ...interface{}) {
+	n.logf(common.Log.Fatalf, fmt, args...)
 }
 func (n *Nameserver) logf(f func(string, ...interface{}), fmt string, args ...interface{}) {
 	f("[nameserver %s] "+fmt, append([]interface{}{n.ourName}, args...)...)

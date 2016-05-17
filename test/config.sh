@@ -185,6 +185,11 @@ container_pid() {
     docker_on $1 inspect -f '{{.State.Pid}}' $2
 }
 
+restart_docker() {
+    CMD="command -v systemctl 2>/dev/null && sudo systemctl restart docker || sudo service docker restart"
+    run_on $1 sh -c "$CMD"
+}
+
 # assert_dns_record <host> <container> <name> [<ip> ...]
 assert_dns_record() {
     local host=$1

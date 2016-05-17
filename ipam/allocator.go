@@ -561,7 +561,7 @@ func (alloc *Allocator) OnGossipBroadcast(sender mesh.PeerName, msg []byte) (mes
 }
 
 type gossipState struct {
-	// We send a timstamp along with the information to be
+	// We send a timestamp along with the information to be
 	// gossipped for backwards-compatibility (previously to detect skewed clocks)
 	Now       int64
 	Nicknames map[mesh.PeerName]string
