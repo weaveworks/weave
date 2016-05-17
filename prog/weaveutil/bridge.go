@@ -43,3 +43,10 @@ func createBridge(args []string) error {
 	fmt.Println(bridgeType.String())
 	return err
 }
+
+func enforceAddrAssign(args []string) error {
+	if len(args) != 1 {
+		cmdUsage("enforce-bridge-addr-assign-type", "<bridge-name>")
+	}
+	return weavenet.EnforceAddrAssignType(args[0])
+}
