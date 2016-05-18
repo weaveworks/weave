@@ -1740,6 +1740,7 @@ launch_router() {
 
     # Create a data-only container for persistence data
     if ! docker inspect -f ' ' $DB_CONTAINER_NAME > /dev/null 2>&1 ; then
+       protect_against_docker_hang
        docker create -v /weavedb --name=$DB_CONTAINER_NAME \
            --label=weavevolumes $WEAVEDB_IMAGE >/dev/null
     fi
@@ -1803,6 +1804,7 @@ launch_proxy() {
     mkdir -p /var/run/weave
     # Create a data-only container to mount the weavewait files from
     if ! docker inspect -f ' ' $VOLUMES_CONTAINER_NAME > /dev/null 2>&1 ; then
+       protect_against_docker_hang
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
@@ -1862,6 +1864,13 @@ warn_plugin_active() {
 stop_plugin() {
     util_op remove-plugin-network weave || warn_plugin_active
     stop $PLUGIN_CONTAINER_NAME "Plugin"
+}
+
+protect_against_docker_hang() {
+    # If the plugin is not running, remove its socket so Docker doesn't try to talk to it
+    if !check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
+        rm -f /run/docker/plugins/weave.sock /run/docker/plugins/weavemesh.sock
+    fi
 }
 
 ##########################################################################################
