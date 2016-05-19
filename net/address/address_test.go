@@ -100,18 +100,6 @@ func TestIsCIDR(t *testing.T) {
 	require.True(t, NewRange(ip("10.0.0.0"), 4).IsCIDR(), "")
 }
 
-func TestHalve(t *testing.T) {
-	cidr0, _ := ParseCIDR("10.0.0.1/32")
-	_, _, ok := cidr0.Halve()
-	require.False(t, ok, "")
-
-	cidr1, _ := ParseCIDR("10.0.0.0/24")
-	a, b, ok := cidr1.Halve()
-	require.True(t, ok, "")
-	require.Equal(t, "10.0.0.0/25", a.String(), "")
-	require.Equal(t, "10.0.0.128/25", b.String(), "")
-}
-
 func TestCIDRStartAndEnd(t *testing.T) {
 	cidr, _ := ParseCIDR("10.0.0.0/24")
 	require.Equal(t, ip("10.0.0.0"), cidr.Start(), "")

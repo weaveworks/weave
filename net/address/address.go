@@ -176,17 +176,6 @@ func (cidr CIDR) HostRange() Range {
 	return NewRange(cidr.Addr+1, cidr.Size()-2)
 }
 
-// Halve splits cidr into two CIDRs of the equal size.
-// Returns false if cidr is too small, i.e. /32.
-func (cidr CIDR) Halve() (CIDR, CIDR, bool) {
-	if cidr.PrefixLen == CIDRMaxPrefixLen {
-		return CIDR{}, CIDR{}, false
-	}
-
-	return CIDR{cidr.Addr, cidr.PrefixLen + 1},
-		CIDR{Add(cidr.Addr, cidr.Size()/2), cidr.PrefixLen + 1}, true
-}
-
 func (cidr CIDR) String() string {
 	return fmt.Sprintf("%s/%d", cidr.Addr.String(), cidr.PrefixLen)
 }
@@ -237,20 +226,6 @@ func Min(a, b Count) Count {
 		return b
 	}
 	return a
-}
-
-func MinAddress(a, b Address) Address {
-	if a > b {
-		return b
-	}
-	return a
-}
-
-func MaxAddress(a, b Address) Address {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func (addr Address) Reverse() Address {
