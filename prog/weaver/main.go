@@ -446,10 +446,10 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB,
 	}
 
 	if useAWSVPC {
-		Log.Infoln("Using AWS VPC monitor")
+		Log.Infoln("Creating AWSVPC Monitor")
 		mon, err = monitor.NewAWSVPCMonitor()
 		if err != nil {
-			Log.Fatalf("Cannot start NewAwsVPCMonitor due to %s", err)
+			Log.Fatalf("Cannot create AWSVPC Monitor: %s", err)
 		}
 	}
 

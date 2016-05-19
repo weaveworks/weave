@@ -63,8 +63,8 @@ func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
 	}
 	mon.linkIndex = link.Attrs().Index
 
-	common.Log.Debugf(
-		"AWSVPC monitor has been initialized on %s instance for %s route table at %s region",
+	mon.infof(
+		"AWSVPC has been initialized on %s instance for %s route table at %s region",
 		mon.instanceID, mon.routeTableID, region)
 
 	return mon, nil
@@ -73,8 +73,9 @@ func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
 // HandleUpdate method updates the AWS VPC and the host route tables.
 func (mon *AWSVPCMonitor) HandleUpdate(old, new []address.Range) error {
 	oldCIDRs, newCIDRs := filterOutSameCIDRs(address.NewCIDRs(old), address.NewCIDRs(new))
-	common.Log.Debugf("HandleUpdate: old(%q) new(%q)", old, new)
+	mon.debugf("HandleUpdate: old(%q) new(%q)", old, new)
 
+	// TODO(mp):
 	// It might make sense to do removal first and then add entries
 	// because of the 50 routes limit. However, in such case a container might
 	// not be reachable for short period of time which we we would like to
@@ -83,7 +84,7 @@ func (mon *AWSVPCMonitor) HandleUpdate(old, new []address.Range) error {
 	// Add new entries
 	for _, cidr := range newCIDRs {
 		cidrStr := cidr.String()
-		common.Log.Debugf("Creating %s route to %s", cidrStr, mon.instanceID)
+		mon.debugf("creating %s route to %s", cidrStr, mon.instanceID)
 		_, err := mon.createVPCRoute(cidrStr)
 		// TODO(mp) check for 50 routes limit
 		// TODO(mp) maybe check for auth related errors
@@ -99,7 +100,7 @@ func (mon *AWSVPCMonitor) HandleUpdate(old, new []address.Range) error {
 	// Remove obsolete entries
 	for _, cidr := range oldCIDRs {
 		cidrStr := cidr.String()
-		common.Log.Debugf("Removing %s route", cidrStr)
+		mon.debugf("removing %s route", cidrStr)
 		_, err := mon.deleteVPCRoute(cidrStr)
 		if err != nil {
 			return fmt.Errorf("deleteVPCRoute failed: %s", err)
@@ -216,19 +217,12 @@ func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 	return nil, fmt.Errorf("cannot find routetable for %s instance", mon.instanceID)
 }
 
-// Only for debugging
-func (mon *AWSVPCMonitor) printRoutes() error {
-	link, err := netlink.LinkByIndex(mon.linkIndex)
-	if err != nil {
-		return err
-	}
-	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
-	if err != nil {
-		return err
-	}
+func (mon *AWSVPCMonitor) debugf(fmt string, args ...interface{}) {
+	common.Log.Debugf("[monitor] "+fmt, args...)
+}
 
-	common.Log.Infof("Routes: %q", routes)
-	return nil
+func (mon *AWSVPCMonitor) infof(fmt string, args ...interface{}) {
+	common.Log.Infof("[monitor] "+fmt, args...)
 }
 
 // Helpers
