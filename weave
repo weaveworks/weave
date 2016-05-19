@@ -628,7 +628,7 @@ create_bridge() {
             if [ "$BRIDGE_TYPE" = bridge -a -z "$WEAVE_NO_FASTDP" ] &&
                 util_op create-datapath $DATAPATH 2>/dev/null &&
                 util_op delete-datapath $DATAPATH 2>/dev/null ; then
-                cat <<EOF >&1
+                cat <<EOF >&2
 WEAVE_NO_FASTDP is not set, but there is already a bridge present of
 the wrong type for fast datapath.  Please do 'weave reset' to remove
 the bridge first.
@@ -636,7 +636,7 @@ EOF
                 return 1
             fi
             if [ "$BRIDGE_TYPE" != bridge -a -n "$WEAVE_NO_FASTDP" ] ; then
-                cat <<EOF >&1
+                cat <<EOF >&2
 WEAVE_NO_FASTDP is set, but there is already a weave fast datapath
 bridge present.  Please do 'weave reset' to remove the bridge first.
 EOF
