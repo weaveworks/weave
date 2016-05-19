@@ -161,7 +161,6 @@ func (mon *AWSVPCMonitor) deleteHostRoute(cidr string) error {
 }
 
 // detectRouteTableID detects AWS VPC Route Table ID of the given monitor instance.
-// TODO(mp) document the steps.
 func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 	instancesParams := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(mon.instanceID)},
@@ -177,6 +176,7 @@ func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 	vpcID := instancesResp.Reservations[0].Instances[0].VpcId
 	subnetID := instancesResp.Reservations[0].Instances[0].SubnetId
 
+	// First try to find a routing table associated with the subnet of the instance
 	tablesParams := &ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{
 			{
@@ -192,6 +192,7 @@ func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 	if len(tablesResp.RouteTables) != 0 {
 		return tablesResp.RouteTables[0].RouteTableId, nil
 	}
+	// Fallback to the default routing table
 	tablesParams = &ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{
 			{
