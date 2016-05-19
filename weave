@@ -1592,7 +1592,6 @@ launch_router() {
                 RESTART_POLICY=
                 ;;
             --awsvpc)
-                WEAVE_NO_FASTDP=1
                 AWSVPC_ARGS="--awsvpc"
                 AWSVPC=1
                 ;;
