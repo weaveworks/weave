@@ -18,19 +18,20 @@ import (
 
 type AWSVPCMonitor struct {
 	ec2          *ec2.EC2
-	instanceID   string
-	routeTableID string
-	linkIndex    int
+	instanceID   string // EC2 Instance ID
+	routeTableID string // VPC Route Table ID
+	linkIndex    int    // The weave bridge link index
 }
 
 const (
+	// TODO(mp) is it const?
 	bridgeIfName = "weave"
 )
 
 // NewAWSVPCMonitor creates and initialises AWS VPC based monitor.
 //
 // The monitor updates AWS VPC and host route tables when any changes to allocated
-// address ranges owner by a peer have been committed.
+// address ranges owned by a peer have been done.
 func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
 	var err error
 	session := session.New()
@@ -159,6 +160,8 @@ func (mon *AWSVPCMonitor) deleteHostRoute(cidr string) error {
 	return netlink.RouteDel(route)
 }
 
+// detectRouteTableID detects AWS VPC Route Table ID of the given monitor instance.
+// TODO(mp) document the steps.
 func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 	instancesParams := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(mon.instanceID)},
@@ -169,8 +172,7 @@ func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 	}
 	if len(instancesResp.Reservations) == 0 ||
 		len(instancesResp.Reservations[0].Instances) == 0 {
-		return nil, fmt.Errorf(
-			"cannot find %s instance within reservations", mon.instanceID)
+		return nil, fmt.Errorf("cannot find %s instance within reservations", mon.instanceID)
 	}
 	vpcID := instancesResp.Reservations[0].Instances[0].VpcId
 	subnetID := instancesResp.Reservations[0].Instances[0].SubnetId

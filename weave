@@ -731,7 +731,6 @@ init_bridge() {
 
     ip link set dev $BRIDGE address $MAC
 
-
     # Attempting to set the bridge MTU to a high value directly
     # fails. Bridges take the lowest MTU of their interfaces. So
     # instead we create a temporary interface with the desired
