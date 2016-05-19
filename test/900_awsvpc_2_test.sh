@@ -57,8 +57,6 @@ cleanup_routetable $VPC_ROUTE_TABLE_ID
 
 echo "starting weave"
 
-# TODO(mp) this deadlocks! because internally we call weave:expose
-#weave_on $HOST1 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST2
 weave_on $HOST1 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc
 weave_on $HOST2 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST1
 
