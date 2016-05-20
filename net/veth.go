@@ -2,9 +2,11 @@ package net
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/vishvananda/netlink"
 
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/odp"
 )
 
@@ -69,4 +71,24 @@ func CreateAndAttachVeth(localName, peerName, bridgeName string, mtu int, init f
 	}
 
 	return local, nil
+}
+
+func SetupGuest(guest netlink.Link, name string, cidrs []net.IPNet) error {
+	var err error
+	if err = netlink.LinkSetName(guest, name); err != nil {
+		return err
+	}
+	if err = netlink.LinkSetUp(guest); err != nil {
+		return err
+	}
+	if err = common.ConfigureARPCache(name); err != nil {
+		return err
+	}
+	for _, ipnet := range cidrs {
+		if err = netlink.AddrAdd(guest, &netlink.Addr{IPNet: &ipnet}); err != nil {
+			return fmt.Errorf("failed to add IP address to %q: %v", name, err)
+		}
+		arping.GratuitousArpOverIfaceByName(ipnet.IP, name)
+	}
+	return nil
 }

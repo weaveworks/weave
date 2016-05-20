@@ -100,7 +100,10 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 			return fmt.Errorf("failed to move veth to container netns: %s", err)
 		}
 		if err = common.WithNetNS(ns, func() error {
-			return setupGuestIP4(guest, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
+			if err := weavenet.SetupGuest(guest, args.IfName, []net.IPNet{result.IP4.IP}); err != nil {
+				return err
+			}
+			return setupRoutes(guest, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
 		}); err != nil {
 			return fmt.Errorf("error setting up interface: %s", err)
 		}
@@ -114,17 +117,8 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	return result.Print()
 }
 
-func setupGuestIP4(guest netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []types.Route) error {
+func setupRoutes(guest netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []types.Route) error {
 	var err error
-	if err = netlink.LinkSetName(guest, name); err != nil {
-		return err
-	}
-	if err = netlink.LinkSetUp(guest); err != nil {
-		return err
-	}
-	if err = common.ConfigureARPCache(name); err != nil {
-		return err
-	}
 	if routes == nil { // If config says nothing about routes, add a default one
 		if !ipnet.Contains(gw) {
 			// The bridge IP is not on the same subnet; add a specific route to it
@@ -135,10 +129,6 @@ func setupGuestIP4(guest netlink.Link, name string, ipnet net.IPNet, gw net.IP, 
 		}
 		routes = []types.Route{{Dst: zeroNetwork}}
 	}
-	if err = netlink.AddrAdd(guest, &netlink.Addr{IPNet: &ipnet}); err != nil {
-		return fmt.Errorf("failed to add IP address to %q: %v", name, err)
-	}
-	arping.GratuitousArpOverIfaceByName(ipnet.IP, name)
 	for _, r := range routes {
 		if r.GW != nil {
 			err = addRoute(guest, netlink.SCOPE_UNIVERSE, &r.Dst, r.GW)
