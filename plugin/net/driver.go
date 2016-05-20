@@ -101,18 +101,15 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	driver.logReq("JoinEndpoint", j, fmt.Sprintf("%s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey))
 
 	name, peerName := vethPair(j.EndpointID)
-	local, err := weavenet.CreateAndAttachVeth(name, peerName, WeaveBridge, 0)
-	if err != nil {
+	if _, err := weavenet.CreateAndAttachVeth(name, peerName, WeaveBridge, 0); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
 	}
 
-	ifname := &api.InterfaceName{
-		SrcName:   local.PeerName,
-		DstPrefix: "ethwe",
-	}
-
 	response := &api.JoinResponse{
-		InterfaceName: ifname,
+		InterfaceName: &api.InterfaceName{
+			SrcName:   peerName,
+			DstPrefix: "ethwe",
+		},
 	}
 	if !driver.noMulticastRoute {
 		multicastRoute := api.StaticRoute{
