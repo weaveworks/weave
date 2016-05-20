@@ -15,6 +15,7 @@ import (
 	"github.com/vishvananda/netns"
 	weaveapi "github.com/weaveworks/weave/api"
 	"github.com/weaveworks/weave/common"
+	weavenet "github.com/weaveworks/weave/net"
 	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
 )
 
@@ -70,7 +71,8 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		id = fmt.Sprintf("%x", data)
 	}
 
-	local, err := createAndAttach(id, conf.BrName, conf.MTU)
+	name, peerName := vethPair(id)
+	local, err := weavenet.CreateAndAttachVeth(name, peerName, conf.BrName, conf.MTU)
 	if err != nil {
 		return err
 	}
@@ -85,10 +87,6 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 	if err = netlink.LinkSetNsFd(guest, int(ns)); err != nil {
 		return cleanup(fmt.Errorf("failed to move veth to container netns: %s", err))
-	}
-
-	if err := netlink.LinkSetUp(local); err != nil {
-		return cleanup(fmt.Errorf("unable to bring veth up: %s", err))
 	}
 
 	var result *types.Result
