@@ -9,7 +9,7 @@ import (
 )
 
 // create and attach local name to the Weave bridge
-func CreateAndAttachVeth(localName, peerName, bridgeName string, mtu int) (*netlink.Veth, error) {
+func CreateAndAttachVeth(localName, peerName, bridgeName string, mtu int, init func(local, guest netlink.Link) error) (*netlink.Veth, error) {
 	maybeBridge, err := netlink.LinkByName(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
@@ -52,6 +52,16 @@ func CreateAndAttachVeth(localName, peerName, bridgeName string, mtu int) (*netl
 		}
 	default:
 		return cleanup(`device "%s" is not a bridge`, bridgeName)
+	}
+
+	if init != nil {
+		guest, err := netlink.LinkByName(peerName)
+		if err != nil {
+			return cleanup("unable to find guest veth %s: %s", peerName, err)
+		}
+		if err := init(local, guest); err != nil {
+			return cleanup("initializing veth: %s", err)
+		}
 	}
 
 	if err := netlink.LinkSetUp(local); err != nil {

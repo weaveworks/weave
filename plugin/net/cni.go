@@ -95,39 +95,27 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 
 	name, peerName := vethPair(id)
-	local, err := weavenet.CreateAndAttachVeth(name, peerName, conf.BrName, conf.MTU)
-	if err != nil {
-		return err
-	}
-
-	cleanup := func(err error) error {
-		netlink.LinkDel(local)
-		return err
-	}
-	guest, err := netlink.LinkByName(local.PeerName)
-	if err != nil {
-		return cleanup(err)
-	}
-	if err = netlink.LinkSetNsFd(guest, int(ns)); err != nil {
-		return cleanup(fmt.Errorf("failed to move veth to container netns: %s", err))
-	}
-
-	err = common.WithNetNS(ns, func() error {
-		return setupGuestIP4(local.PeerName, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
+	_, err = weavenet.CreateAndAttachVeth(name, peerName, conf.BrName, conf.MTU, func(local, guest netlink.Link) error {
+		if err = netlink.LinkSetNsFd(guest, int(ns)); err != nil {
+			return fmt.Errorf("failed to move veth to container netns: %s", err)
+		}
+		if err = common.WithNetNS(ns, func() error {
+			return setupGuestIP4(guest, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
+		}); err != nil {
+			return fmt.Errorf("error setting up interface: %s", err)
+		}
+		return nil
 	})
 	if err != nil {
-		return cleanup(fmt.Errorf("error setting up interface: %s", err))
+		return err
 	}
 
 	result.DNS = conf.DNS
 	return result.Print()
 }
 
-func setupGuestIP4(origName, name string, ipnet net.IPNet, gw net.IP, routes []types.Route) error {
-	guest, err := netlink.LinkByName(origName)
-	if err != nil {
-		return err
-	}
+func setupGuestIP4(guest netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []types.Route) error {
+	var err error
 	if err = netlink.LinkSetName(guest, name); err != nil {
 		return err
 	}
