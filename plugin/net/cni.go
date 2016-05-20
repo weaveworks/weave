@@ -55,6 +55,29 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("IP Masquerading functionality not supported")
 	}
 
+	var result *types.Result
+	// Default IPAM is Weave's own
+	if conf.IPAM.Type == "" {
+		result, err = ipamplugin.NewIpam(c.weave).Allocate(args)
+	} else {
+		result, err = ipam.ExecAdd(conf.IPAM.Type, args.StdinData)
+	}
+	if err != nil {
+		return fmt.Errorf("unable to allocate IP address: %s", err)
+	}
+	if result.IP4 == nil {
+		return fmt.Errorf("IPAM plugin failed to allocate IP address")
+	}
+
+	// If config says nothing about routes or gateway, default one will be via the bridge
+	if result.IP4.Routes == nil && result.IP4.Gateway == nil {
+		bridgeIP, err := findBridgeIP(conf.BrName, result.IP4.IP)
+		if err != nil {
+			return err
+		}
+		result.IP4.Gateway = bridgeIP
+	}
+
 	ns, err := netns.GetFromPath(args.Netns)
 	if err != nil {
 		return err
@@ -87,29 +110,6 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 	if err = netlink.LinkSetNsFd(guest, int(ns)); err != nil {
 		return cleanup(fmt.Errorf("failed to move veth to container netns: %s", err))
-	}
-
-	var result *types.Result
-	// Default IPAM is Weave's own
-	if conf.IPAM.Type == "" {
-		result, err = ipamplugin.NewIpam(c.weave).Allocate(args)
-	} else {
-		result, err = ipam.ExecAdd(conf.IPAM.Type, args.StdinData)
-	}
-	if err != nil {
-		return cleanup(fmt.Errorf("unable to allocate IP address: %s", err))
-	}
-	if result.IP4 == nil {
-		return cleanup(fmt.Errorf("IPAM plugin failed to allocate IP address"))
-	}
-
-	// If config says nothing about routes or gateway, default one will be via the bridge
-	if result.IP4.Routes == nil && result.IP4.Gateway == nil {
-		bridgeIP, err := findBridgeIP(conf.BrName, result.IP4.IP)
-		if err != nil {
-			return cleanup(err)
-		}
-		result.IP4.Gateway = bridgeIP
 	}
 
 	err = common.WithNetNS(ns, func() error {
