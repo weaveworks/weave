@@ -1,8 +1,10 @@
 package router
 
 import (
+	"fmt"
 	"math"
 	"net"
+	"os"
 	"time"
 
 	"github.com/weaveworks/mesh"
@@ -211,11 +213,10 @@ func (router *NetworkRouter) relayBroadcast(srcPeer *mesh.Peer, key PacketKey) F
 const peersIdent = "directPeers"
 
 func (router *NetworkRouter) persistPeers() {
-	// Persistence disabled pending rationalisation of the expected behaviour
-	/*if err := router.db.Save(peersIdent, router.ConnectionMaker.Targets(false)); err != nil {
+	if err := router.db.Save(peersIdent, router.ConnectionMaker.Targets(false)); err != nil {
 		log.Errorf("Error persisting peers: %s", err)
 		return
-	}*/
+	}
 }
 
 func (router *NetworkRouter) InitiateConnections(peers []string, replace bool) []error {
@@ -230,29 +231,21 @@ func (router *NetworkRouter) ForgetConnections(peers []string) {
 }
 
 func (router *NetworkRouter) InitialPeers(peers []string) ([]string, error) {
-	var storedPeers []string
-	// Persistence disabled pending rationalisation of the expected behaviour
-	/*if _, err := router.db.Load(peersIdent, &storedPeers); err != nil {
-		return nil, err
-	}*/
-
-	if storedPeers != nil && !equal(peers, storedPeers) {
-		log.Println("Overriding initial peer list with stored list:", storedPeers)
-		peers = storedPeers
-	} else {
-		log.Println("Initial set of peers:", peers)
-	}
-	return peers, nil
-}
-
-func equal(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, v := range a {
-		if v != b[i] {
-			return false
+	if _, err := os.Stat("restart.sentinel"); err == nil {
+		var storedPeers []string
+		if _, err := router.db.Load(peersIdent, &storedPeers); err != nil {
+			return nil, err
 		}
+		log.Println("Restart detected - using persisted peer list:", storedPeers)
+		return storedPeers, nil
 	}
-	return true
+
+	sentinel, err := os.Create("restart.sentinel")
+	if err != nil {
+		return nil, fmt.Errorf("error creating sentinel: %v", err)
+	}
+	sentinel.Close()
+
+	log.Println("Launch detected - using supplied peer list:", peers)
+	return peers, nil
 }
