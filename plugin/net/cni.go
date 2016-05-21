@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/appc/cni/pkg/ipam"
 	"github.com/appc/cni/pkg/skel"
@@ -112,7 +111,7 @@ func setupRoutes(guest netlink.Link, name string, ipnet net.IPNet, gw net.IP, ro
 		if !ipnet.Contains(gw) {
 			// The bridge IP is not on the same subnet; add a specific route to it
 			gw32 := &net.IPNet{IP: gw, Mask: mask32}
-			if err = addRoute(guest, netlink.SCOPE_LINK, gw32, nil); err != nil {
+			if err = weavenet.AddRoute(guest, netlink.SCOPE_LINK, gw32, nil); err != nil {
 				return err
 			}
 		}
@@ -120,28 +119,15 @@ func setupRoutes(guest netlink.Link, name string, ipnet net.IPNet, gw net.IP, ro
 	}
 	for _, r := range routes {
 		if r.GW != nil {
-			err = addRoute(guest, netlink.SCOPE_UNIVERSE, &r.Dst, r.GW)
+			err = weavenet.AddRoute(guest, netlink.SCOPE_UNIVERSE, &r.Dst, r.GW)
 		} else {
-			err = addRoute(guest, netlink.SCOPE_UNIVERSE, &r.Dst, gw)
+			err = weavenet.AddRoute(guest, netlink.SCOPE_UNIVERSE, &r.Dst, gw)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to add route '%v via %v dev %v': %v", r.Dst, gw, name, err)
 		}
 	}
 	return nil
-}
-
-func addRoute(link netlink.Link, scope netlink.Scope, dst *net.IPNet, gw net.IP) error {
-	err := netlink.RouteAdd(&netlink.Route{
-		LinkIndex: link.Attrs().Index,
-		Scope:     scope,
-		Dst:       dst,
-		Gw:        gw,
-	})
-	if os.IsExist(err) { // squash duplicate route errors
-		err = nil
-	}
-	return err
 }
 
 func findBridgeIP(bridgeName string, subnet net.IPNet) (net.IP, error) {
