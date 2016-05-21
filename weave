@@ -847,26 +847,6 @@ netnsenter() {
     nsenter --net=$CONTAINER_NETNS "$@"
 }
 
-# connect_container_to_bridge <container interface name>
-connect_container_to_bridge() {
-    ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU || return 1
-
-    if ! ethtool_tx_off_$BRIDGE_TYPE $GUEST_IFNAME ||
-        ! ip link set $GUEST_IFNAME netns $CONTAINER_NETNS ; then
-        # failed before we assigned the veth to the container's
-        # namespace
-        ip link del $LOCAL_IFNAME type veth || true
-        return 1
-    fi
-
-    if ! netnsenter ip link set $GUEST_IFNAME name $1 ||
-       ! ip link set $LOCAL_IFNAME up ||
-       ! add_iface_$BRIDGE_TYPE $LOCAL_IFNAME ||
-       ! configure_arp_cache $1 "netnsenter" ; then
-        return 1
-    fi
-}
-
 add_iface_fastdp() {
     util_op add-datapath-interface $DATAPATH $1
 }
@@ -940,59 +920,13 @@ attach() {
         return 1
     fi
 
-    if ! netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        connect_container_to_bridge $CONTAINER_IFNAME || return 1
-    fi
-
-    NEW_ADDRS=
-    for ADDR in "$@" ; do
-        if netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
-            # address was there already
-            continue
-        fi
-        netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
-        NEW_ADDRS="$NEW_ADDRS $ADDR"
-    done
-
-    netnsenter ip link set $CONTAINER_IFNAME up || return 1
-
-    for ADDR in $NEW_ADDRS ; do
-        arp_update $CONTAINER_IFNAME $ADDR "netnsenter" || true
-    done
-
-    # Route multicast packets across the weave network.
-    # This must come last in 'attach'. If you change this, change weavewait to match.
-    #
-    # The MTU lock prevents PMTU discovery for multicast
-    # destinations. Without that, the kernel sets the DF flag on
-    # multicast packets. Since RFC1122 prohibits sending of ICMP
-    # errors for packets with multicast destinations, that causes
-    # packets larger than the PMTU to be dropped silently.
-    if [ -z "$NO_MULTICAST_ROUTE" ] ; then
-        if ! netnsenter ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
-            netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME mtu lock $MTU
-        fi
-    fi
+    ATTACH_ARGS=""
+    [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
+    util_op attach-container $ATTACH_ARGS $CONTAINER_PID $BRIDGE $MTU "$@"
 }
 
 detach() {
-    netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 || return 0
-
-    for ADDR in "$@" ; do
-        if ! netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
-            # address is not there, leave the device alone
-            continue
-        fi
-        netnsenter ip addr del $ADDR dev $CONTAINER_IFNAME || return 1
-    done
-
-    if [ -n "$(netnsenter ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
-        # other addresses are left, leave the device alone
-        return 0
-    fi
-
-    # Deleting the interface will delete the multicast route we set up
-    netnsenter ip link del $CONTAINER_IFNAME type veth
+    util_op detach-container $CONTAINER_PID "$@"
 }
 
 ######################################################################

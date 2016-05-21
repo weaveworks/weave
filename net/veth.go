@@ -85,14 +85,30 @@ func SetupGuest(guest netlink.Link, name string) error {
 	return nil
 }
 
-func AddAddresses(guest netlink.Link, cidrs []*net.IPNet) error {
-	for _, ipnet := range cidrs {
-		if err := netlink.AddrAdd(guest, &netlink.Addr{IPNet: ipnet}); err != nil {
-			return fmt.Errorf("failed to add IP address to %q: %v", guest.Attrs().Name, err)
-		}
-		arping.GratuitousArpOverIfaceByName(ipnet.IP, guest.Attrs().Name)
+func AddAddresses(guest netlink.Link, cidrs []*net.IPNet) (newAddrs []*net.IPNet, err error) {
+	existingAddrs, err := netlink.AddrList(guest, netlink.FAMILY_V4)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get IP address for %q: %v", guest.Attrs().Name, err)
 	}
-	return nil
+	for _, ipnet := range cidrs {
+		if contains(existingAddrs, ipnet) {
+			continue
+		}
+		if err := netlink.AddrAdd(guest, &netlink.Addr{IPNet: ipnet}); err != nil {
+			return nil, fmt.Errorf("failed to add IP address to %q: %v", guest.Attrs().Name, err)
+		}
+		newAddrs = append(newAddrs, ipnet)
+	}
+	return newAddrs, nil
+}
+
+func contains(addrs []netlink.Addr, addr *net.IPNet) bool {
+	for _, x := range addrs {
+		if addr.IP.Equal(x.IPNet.IP) {
+			return true
+		}
+	}
+	return false
 }
 
 func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
@@ -103,13 +119,14 @@ func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
 	return err == nil
 }
 
-func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, cidrs []*net.IPNet) error {
+func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet) error {
 	if !interfaceExistsInNamespace(ns, ifName) {
 		if len(id) > 5 {
 			id = id[:5]
 		}
 		name, peerName := "vethwepl"+id, "vethwg"+id
 		_, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, func(local, guest netlink.Link) error {
+			EthtoolTXOff(peerName) // TODO: do we want to do this under fastdp?
 			if err := netlink.LinkSetNsFd(guest, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
@@ -126,13 +143,62 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 	}
 
 	if err := WithNetNSLink(ns, ifName, func(guest netlink.Link) error {
-		if err := AddAddresses(guest, cidrs); err != nil {
+		newAddresses, err := AddAddresses(guest, cidrs)
+		if err != nil {
 			return err
 		}
-		return netlink.LinkSetUp(guest)
+		if err := netlink.LinkSetUp(guest); err != nil {
+			return err
+		}
+		for _, ipnet := range newAddresses {
+			arping.GratuitousArpOverIfaceByName(ipnet.IP, ifName)
+		}
+		if withMulticastRoute {
+			/* Route multicast packets across the weave network.
+			This must come last in 'attach'. If you change this, change weavewait to match.
+
+			TODO: Add the MTU lock to prevent PMTU discovery for multicast
+			destinations. Without that, the kernel sets the DF flag on
+			multicast packets. Since RFC1122 prohibits sending of ICMP
+			errors for packets with multicast destinations, that causes
+			packets larger than the PMTU to be dropped silently.  */
+
+			_, multicast, _ := net.ParseCIDR("224.0.0.0/4")
+			if err := AddRoute(guest, netlink.SCOPE_LINK, multicast, nil); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func DetachContainer(ns netns.NsHandle, id, ifName string, cidrs []*net.IPNet) error {
+	return WithNetNSLink(ns, ifName, func(guest netlink.Link) error {
+		existingAddrs, err := netlink.AddrList(guest, netlink.FAMILY_V4)
+		if err != nil {
+			return fmt.Errorf("failed to get IP address for %q: %v", guest.Attrs().Name, err)
+		}
+		for _, ipnet := range cidrs {
+			if !contains(existingAddrs, ipnet) {
+				continue
+			}
+			if err := netlink.AddrDel(guest, &netlink.Addr{IPNet: ipnet}); err != nil {
+				return fmt.Errorf("failed to remove IP address from %q: %v", guest.Attrs().Name, err)
+			}
+		}
+		addrs, err := netlink.AddrList(guest, netlink.FAMILY_V4)
+		if err != nil {
+			return fmt.Errorf("failed to get IP address for %q: %v", guest.Attrs().Name, err)
+		}
+		if len(addrs) == 0 { // all addresses gone: remove the interface
+			if err := netlink.LinkDel(guest); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

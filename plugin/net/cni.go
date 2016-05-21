@@ -92,7 +92,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		id = fmt.Sprintf("%x", data)
 	}
 
-	if err := weavenet.AttachContainer(ns, id, args.IfName, conf.BrName, conf.MTU, []*net.IPNet{&result.IP4.IP}); err != nil {
+	if err := weavenet.AttachContainer(ns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}); err != nil {
 		return err
 	}
 	if err := weavenet.WithNetNSLink(ns, args.IfName, func(guest netlink.Link) error {
