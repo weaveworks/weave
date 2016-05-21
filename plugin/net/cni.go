@@ -10,7 +10,6 @@ import (
 	"github.com/appc/cni/pkg/ipam"
 	"github.com/appc/cni/pkg/skel"
 	"github.com/appc/cni/pkg/types"
-	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	weaveapi "github.com/weaveworks/weave/api"
@@ -94,23 +93,13 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		id = fmt.Sprintf("%x", data)
 	}
 
-	name, peerName := vethPair(id)
-	_, err = weavenet.CreateAndAttachVeth(name, peerName, conf.BrName, conf.MTU, func(local, guest netlink.Link) error {
-		if err = netlink.LinkSetNsFd(guest, int(ns)); err != nil {
-			return fmt.Errorf("failed to move veth to container netns: %s", err)
-		}
-		if err = common.WithNetNS(ns, func() error {
-			if err := weavenet.SetupGuest(guest, args.IfName, []net.IPNet{result.IP4.IP}); err != nil {
-				return err
-			}
-			return setupRoutes(guest, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
-		}); err != nil {
-			return fmt.Errorf("error setting up interface: %s", err)
-		}
-		return nil
-	})
-	if err != nil {
+	if err := weavenet.AttachContainer(ns, id, args.IfName, conf.BrName, conf.MTU, []*net.IPNet{&result.IP4.IP}); err != nil {
 		return err
+	}
+	if err := weavenet.WithNetNSLink(ns, args.IfName, func(guest netlink.Link) error {
+		return setupRoutes(guest, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
+	}); err != nil {
+		return fmt.Errorf("error setting up routes: %s", err)
 	}
 
 	result.DNS = conf.DNS
@@ -186,7 +175,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 	defer ns.Close()
-	err = common.WithNetNS(ns, func() error {
+	err = weavenet.WithNetNS(ns, func() error {
 		link, err := netlink.LinkByName(args.IfName)
 		if err != nil {
 			return err

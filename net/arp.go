@@ -1,4 +1,4 @@
-package common
+package net
 
 import "fmt"
 import "io"
