@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"strconv"
+	"syscall"
 
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/vishvananda/netns"
 
 	weavenet "github.com/weaveworks/weave/net"
@@ -11,7 +14,7 @@ import (
 
 func attach(args []string) error {
 	if len(args) < 4 {
-		cmdUsage("attach-container", "[--no-multicast-route] <pid> <bridge-name> <mtu> <cidr>...")
+		cmdUsage("attach-container", "[--no-multicast-route] <container-id> <bridge-name> <mtu> <cidr>...")
 	}
 
 	withMulticastRoute := true
@@ -20,23 +23,53 @@ func attach(args []string) error {
 		args = args[1:]
 	}
 
-	pid, err := strconv.Atoi(args[0])
+	pid, nsContainer, err := containerPidAndNs(args[0])
 	if err != nil {
 		return err
 	}
-	ns, err := netns.GetFromPid(pid)
-	if err != nil {
-		return err
+	if nsHost, err := netns.GetFromPid(1); err != nil {
+		return fmt.Errorf("unable to open host namespace: %s", err)
+	} else if nsHost.Equal(nsContainer) {
+		return fmt.Errorf("Container is running in the host network namespace, and therefore cannot be\nconnected to weave. Perhaps the container was started with --net=host.")
 	}
 	mtu, err := strconv.Atoi(args[2])
 	if err != nil && args[3] != "" {
-		return err
+		return fmt.Errorf("unable to parse mtu %q: %s", args[2], err)
 	}
 	cidrs, err := parseCIDRs(args[3:])
 	if err != nil {
 		return err
 	}
-	return weavenet.AttachContainer(ns, args[0], "ethwe", args[1], mtu, withMulticastRoute, cidrs)
+	err = weavenet.AttachContainer(nsContainer, fmt.Sprint(pid), "ethwe", args[1], mtu, withMulticastRoute, cidrs)
+	// If we detected an error but the container has died, tell the user that instead.
+	if err != nil && !processExists(pid) {
+		err = fmt.Errorf("Container %s died", args[0])
+	}
+	return err
+}
+
+func containerPidAndNs(containerID string) (int, netns.NsHandle, error) {
+	c, err := docker.NewVersionedClientFromEnv("1.18")
+	if err != nil {
+		return 0, 0, fmt.Errorf("unable to connect to docker: %s", err)
+	}
+	container, err := c.InspectContainer(containerID)
+	if err != nil {
+		return 0, 0, fmt.Errorf("unable to inspect container %s: %s", containerID, err)
+	}
+	if container.State.Pid == 0 {
+		return 0, 0, fmt.Errorf("container %s not running", containerID)
+	}
+	ns, err := netns.GetFromPid(container.State.Pid)
+	if err != nil {
+		return 0, 0, fmt.Errorf("unable to open namespace for container %s: %s", containerID, err)
+	}
+	return container.State.Pid, ns, nil
+}
+
+func processExists(pid int) bool {
+	err := syscall.Kill(pid, syscall.Signal(0))
+	return err == nil || err == syscall.EPERM
 }
 
 func parseCIDRs(args []string) (cidrs []*net.IPNet, err error) {
@@ -53,14 +86,10 @@ func parseCIDRs(args []string) (cidrs []*net.IPNet, err error) {
 
 func detach(args []string) error {
 	if len(args) < 2 {
-		cmdUsage("detach-container", "<pid> <cidr>...")
+		cmdUsage("detach-container", "<container-id> <cidr>...")
 	}
 
-	pid, err := strconv.Atoi(args[0])
-	if err != nil {
-		return err
-	}
-	ns, err := netns.GetFromPid(pid)
+	_, ns, err := containerPidAndNs(args[0])
 	if err != nil {
 		return err
 	}

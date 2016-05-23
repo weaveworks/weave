@@ -788,56 +788,11 @@ docker_bridge_ip() {
     DOCKER_BRIDGE_IP=${DOCKER_BRIDGE_IP#inet }
 }
 
-# the following borrows from https://github.com/jpetazzo/pipework
-
-# Set $CONTAINER_NETNS to the network namespace of container $1,
-# $LOCAL_IFNAME and $GUEST_IFNAME to suitable names for two ends of a
-# veth pair, specific to the container, and execute args $2 $3 ... as
-# a command. If an error is caused by container dying, swallow output
-# from error.
-with_container_netns() {
+do_or_die() {
     CONTAINER="$1"
-    CONTAINER_PID=$(docker inspect --format='{{.State.Pid}}' $CONTAINER) || return 1
-
-    if [ "$CONTAINER_PID" = 0 ] ; then
-        echo "Container $CONTAINER not running." >&2
-        exit 1
-    fi
-
-    if [ "$CONTAINER_PID" = "<no value>" ] ; then
-        echo "Container $CONTAINER unknown to Docker." >&2
-        exit 1
-    fi
-
-    CONTAINER_NETNS=/proc/$CONTAINER_PID/ns/net
-    LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
-    GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
-    IP_TMPOUT=/tmp/weave_ip_out_$$
-    IP_TMPERR=/tmp/weave_ip_err_$$
-    rm -f $IP_TMPOUT $IP_TMPERR
-
-    # Run the wrapped command
-    STATUS=0
     shift 1
-    if ! "$@" >$IP_TMPOUT 2>$IP_TMPERR ; then
-        STATUS=1
-        if [ ! -d /proc/$CONTAINER_PID ] ; then
-            echo "Container $CONTAINER died" >&2
-        else
-            echo "Failure during network configuration for container $CONTAINER:" >&2
-            cat $IP_TMPERR >&2
-        fi
-    else
-        cat $IP_TMPOUT
-        cat $IP_TMPERR >&2
-    fi
-    rm -f $IP_TMPOUT $IP_TMPERR
-    return $STATUS
-}
-
-with_container_netns_or_die() {
-    if ! with_container_netns "$@" >/dev/null ; then
-        kill_container $1
+    if ! "$@" ; then
+        kill_container $CONTAINER
         exit 1
     fi
 }
@@ -893,10 +848,6 @@ ask_version() {
     [ -n "$DOCKERIMAGE" ] && docker run --rm --net=none -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
 }
 
-######################################################################
-# functions invoked through with_container_netns
-######################################################################
-
 setup_router_iface_fastdp() {
     true
 }
@@ -914,19 +865,9 @@ container_in_host_ns() {
 }
 
 attach() {
-    if container_in_host_ns ; then
-        echo "Container is running in the host network namespace, and therefore cannot be" >&2
-        echo "connected to weave. Perhaps the container was started with --net=host." >&2
-        return 1
-    fi
-
     ATTACH_ARGS=""
     [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
-    util_op attach-container $ATTACH_ARGS $CONTAINER_PID $BRIDGE $MTU "$@"
-}
-
-detach() {
-    util_op detach-container $CONTAINER_PID "$@"
+    util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
 }
 
 ######################################################################
@@ -2052,7 +1993,7 @@ EOF
         create_bridge
         ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
         [ -n "$REWRITE_HOSTS" ] && extra_hosts_args "$@" && rewrite_etc_hosts $DNS_EXTRA_HOSTS
-        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        do_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $CONTAINER
         ;;
@@ -2072,7 +2013,7 @@ EOF
         CONTAINER=$(container_id $1)
         create_bridge
         ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
-        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        do_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
         ;;
@@ -2108,7 +2049,7 @@ EOF
         create_bridge
         ipam_cidrs allocate $CONTAINER $CIDR_ARGS
         [ -n "$REWRITE_HOSTS" ] && rewrite_etc_hosts $DNS_EXTRA_HOSTS
-        with_container_netns $CONTAINER attach $ALL_CIDRS >/dev/null
+        attach $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
@@ -2118,7 +2059,7 @@ EOF
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         ipam_cidrs lookup $CONTAINER $CIDR_ARGS
-        with_container_netns $CONTAINER detach $ALL_CIDRS >/dev/null
+        util_op detach-container $CONTAINER $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER delete_dns_fqdn $ALL_CIDRS
         for CIDR in $IPAM_CIDRS ; do
             call_weave DELETE /ip/$CONTAINER/${CIDR%/*}
@@ -2134,7 +2075,7 @@ EOF
         for CIDR in $ALL_CIDRS ; do
             call_weave PUT /ip/$CONTAINER/$CIDR?check-alive=true
         done
-        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        do_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
         ;;
