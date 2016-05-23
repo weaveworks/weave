@@ -100,6 +100,11 @@ func contains(addrs []netlink.Addr, addr *net.IPNet) bool {
 	return false
 }
 
+const (
+	VethName   = "ethwe"        // name inside container namespace
+	vethPrefix = "v" + VethName // starts with "veth" to suppress UI notifications
+)
+
 func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
 	err := WithNetNS(ns, func() error {
 		_, err := netlink.LinkByName(ifName)
@@ -110,10 +115,11 @@ func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
 
 func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet) error {
 	if !interfaceExistsInNamespace(ns, ifName) {
-		if len(id) > 5 {
-			id = id[:5]
+		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
+		if len(id) > maxIDLen {
+			id = id[:maxIDLen] // trim passed ID if too long
 		}
-		name, peerName := "vethwepl"+id, "vethwg"+id
+		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
 		_, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, func(veth netlink.Link) error {
 			EthtoolTXOff(peerName) // TODO: do we want to do this under fastdp?
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {

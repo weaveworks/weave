@@ -108,7 +108,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	response := &api.JoinResponse{
 		InterfaceName: &api.InterfaceName{
 			SrcName:   peerName,
-			DstPrefix: "ethwe",
+			DstPrefix: weavenet.VethName,
 		},
 	}
 	if !driver.noMulticastRoute {
