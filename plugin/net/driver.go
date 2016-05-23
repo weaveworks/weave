@@ -126,8 +126,8 @@ func (driver *driver) LeaveEndpoint(leave *api.LeaveRequest) error {
 	driver.logReq("LeaveEndpoint", leave, fmt.Sprintf("%s:%s", leave.NetworkID, leave.EndpointID))
 
 	name, _ := vethPair(leave.EndpointID)
-	local := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: name}}
-	if err := netlink.LinkDel(local); err != nil {
+	veth := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: name}}
+	if err := netlink.LinkDel(veth); err != nil {
 		driver.warn("LeaveEndpoint", "unable to delete veth: %s", err)
 	}
 	return nil

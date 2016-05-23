@@ -95,8 +95,8 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	if err := weavenet.AttachContainer(ns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}); err != nil {
 		return err
 	}
-	if err := weavenet.WithNetNSLink(ns, args.IfName, func(guest netlink.Link) error {
-		return setupRoutes(guest, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
+	if err := weavenet.WithNetNSLink(ns, args.IfName, func(link netlink.Link) error {
+		return setupRoutes(link, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
 	}); err != nil {
 		return fmt.Errorf("error setting up routes: %s", err)
 	}
@@ -105,13 +105,13 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	return result.Print()
 }
 
-func setupRoutes(guest netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []types.Route) error {
+func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []types.Route) error {
 	var err error
 	if routes == nil { // If config says nothing about routes, add a default one
 		if !ipnet.Contains(gw) {
 			// The bridge IP is not on the same subnet; add a specific route to it
 			gw32 := &net.IPNet{IP: gw, Mask: mask32}
-			if err = weavenet.AddRoute(guest, netlink.SCOPE_LINK, gw32, nil); err != nil {
+			if err = weavenet.AddRoute(link, netlink.SCOPE_LINK, gw32, nil); err != nil {
 				return err
 			}
 		}
@@ -119,9 +119,9 @@ func setupRoutes(guest netlink.Link, name string, ipnet net.IPNet, gw net.IP, ro
 	}
 	for _, r := range routes {
 		if r.GW != nil {
-			err = weavenet.AddRoute(guest, netlink.SCOPE_UNIVERSE, &r.Dst, r.GW)
+			err = weavenet.AddRoute(link, netlink.SCOPE_UNIVERSE, &r.Dst, r.GW)
 		} else {
-			err = weavenet.AddRoute(guest, netlink.SCOPE_UNIVERSE, &r.Dst, gw)
+			err = weavenet.AddRoute(link, netlink.SCOPE_UNIVERSE, &r.Dst, gw)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to add route '%v via %v dev %v': %v", r.Dst, gw, name, err)

@@ -11,8 +11,8 @@ import (
 	"github.com/weaveworks/weave/common/odp"
 )
 
-// create and attach local name to the Weave bridge
-func CreateAndAttachVeth(localName, peerName, bridgeName string, mtu int, init func(local, guest netlink.Link) error) (*netlink.Veth, error) {
+// create and attach a veth to the Weave bridge
+func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, init func(peer netlink.Link) error) (*netlink.Veth, error) {
 	maybeBridge, err := netlink.LinkByName(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
@@ -21,81 +21,70 @@ func CreateAndAttachVeth(localName, peerName, bridgeName string, mtu int, init f
 	if mtu == 0 {
 		mtu = maybeBridge.Attrs().MTU
 	}
-	local := &netlink.Veth{
+	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
-			Name: localName,
+			Name: name,
 			MTU:  mtu},
 		PeerName: peerName,
 	}
-	if err := netlink.LinkAdd(local); err != nil {
-		return nil, fmt.Errorf(`could not create veth pair %s-%s: %s`, local.Name, local.PeerName, err)
+	if err := netlink.LinkAdd(veth); err != nil {
+		return nil, fmt.Errorf(`could not create veth pair %s-%s: %s`, name, peerName, err)
 	}
 
 	cleanup := func(format string, a ...interface{}) (*netlink.Veth, error) {
-		netlink.LinkDel(local)
+		netlink.LinkDel(veth)
 		return nil, fmt.Errorf(format, a...)
 	}
 
 	switch maybeBridge.(type) {
 	case *netlink.Bridge:
-		if err := netlink.LinkSetMasterByIndex(local, maybeBridge.Attrs().Index); err != nil {
-			return cleanup(`unable to set master of %s: %s`, local.Name, err)
+		if err := netlink.LinkSetMasterByIndex(veth, maybeBridge.Attrs().Index); err != nil {
+			return cleanup(`unable to set master of %s: %s`, name, err)
 		}
 	case *netlink.GenericLink:
 		if maybeBridge.Type() != "openvswitch" {
 			return cleanup(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
 		}
-		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return cleanup(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
+		if err := odp.AddDatapathInterface(bridgeName, name); err != nil {
+			return cleanup(`failed to attach %s to device "%s": %s`, name, bridgeName, err)
 		}
 	case *netlink.Device:
 		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
-		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return cleanup(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
+		if err := odp.AddDatapathInterface(bridgeName, name); err != nil {
+			return cleanup(`failed to attach %s to device "%s": %s`, name, bridgeName, err)
 		}
 	default:
 		return cleanup(`device "%s" is not a bridge`, bridgeName)
 	}
 
 	if init != nil {
-		guest, err := netlink.LinkByName(peerName)
+		peer, err := netlink.LinkByName(peerName)
 		if err != nil {
-			return cleanup("unable to find guest veth %s: %s", peerName, err)
+			return cleanup("unable to find peer veth %s: %s", peerName, err)
 		}
-		if err := init(local, guest); err != nil {
+		if err := init(peer); err != nil {
 			return cleanup("initializing veth: %s", err)
 		}
 	}
 
-	if err := netlink.LinkSetUp(local); err != nil {
+	if err := netlink.LinkSetUp(veth); err != nil {
 		return cleanup("unable to bring veth up: %s", err)
 	}
 
-	return local, nil
+	return veth, nil
 }
 
-func SetupGuest(guest netlink.Link, name string) error {
-	var err error
-	if err = netlink.LinkSetName(guest, name); err != nil {
-		return err
-	}
-	if err = ConfigureARPCache(name); err != nil {
-		return err
-	}
-	return nil
-}
-
-func AddAddresses(guest netlink.Link, cidrs []*net.IPNet) (newAddrs []*net.IPNet, err error) {
-	existingAddrs, err := netlink.AddrList(guest, netlink.FAMILY_V4)
+func AddAddresses(link netlink.Link, cidrs []*net.IPNet) (newAddrs []*net.IPNet, err error) {
+	existingAddrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get IP address for %q: %v", guest.Attrs().Name, err)
+		return nil, fmt.Errorf("failed to get IP address for %q: %v", link.Attrs().Name, err)
 	}
 	for _, ipnet := range cidrs {
 		if contains(existingAddrs, ipnet) {
 			continue
 		}
-		if err := netlink.AddrAdd(guest, &netlink.Addr{IPNet: ipnet}); err != nil {
-			return nil, fmt.Errorf("failed to add IP address to %q: %v", guest.Attrs().Name, err)
+		if err := netlink.AddrAdd(link, &netlink.Addr{IPNet: ipnet}); err != nil {
+			return nil, fmt.Errorf("failed to add IP address to %q: %v", link.Attrs().Name, err)
 		}
 		newAddrs = append(newAddrs, ipnet)
 	}
@@ -125,13 +114,19 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 			id = id[:5]
 		}
 		name, peerName := "vethwepl"+id, "vethwg"+id
-		_, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, func(local, guest netlink.Link) error {
+		_, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, func(veth netlink.Link) error {
 			EthtoolTXOff(peerName) // TODO: do we want to do this under fastdp?
-			if err := netlink.LinkSetNsFd(guest, int(ns)); err != nil {
+			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
 			if err := WithNetNS(ns, func() error {
-				return SetupGuest(guest, ifName)
+				if err := netlink.LinkSetName(veth, ifName); err != nil {
+					return err
+				}
+				if err := ConfigureARPCache(ifName); err != nil {
+					return err
+				}
+				return nil
 			}); err != nil {
 				return fmt.Errorf("error setting up interface: %s", err)
 			}
@@ -142,12 +137,12 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 		}
 	}
 
-	if err := WithNetNSLink(ns, ifName, func(guest netlink.Link) error {
-		newAddresses, err := AddAddresses(guest, cidrs)
+	if err := WithNetNSLink(ns, ifName, func(veth netlink.Link) error {
+		newAddresses, err := AddAddresses(veth, cidrs)
 		if err != nil {
 			return err
 		}
-		if err := netlink.LinkSetUp(guest); err != nil {
+		if err := netlink.LinkSetUp(veth); err != nil {
 			return err
 		}
 		for _, ipnet := range newAddresses {
@@ -164,7 +159,7 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 			packets larger than the PMTU to be dropped silently.  */
 
 			_, multicast, _ := net.ParseCIDR("224.0.0.0/4")
-			if err := AddRoute(guest, netlink.SCOPE_LINK, multicast, nil); err != nil {
+			if err := AddRoute(veth, netlink.SCOPE_LINK, multicast, nil); err != nil {
 				return err
 			}
 		}
@@ -177,25 +172,25 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 }
 
 func DetachContainer(ns netns.NsHandle, id, ifName string, cidrs []*net.IPNet) error {
-	return WithNetNSLink(ns, ifName, func(guest netlink.Link) error {
-		existingAddrs, err := netlink.AddrList(guest, netlink.FAMILY_V4)
+	return WithNetNSLink(ns, ifName, func(veth netlink.Link) error {
+		existingAddrs, err := netlink.AddrList(veth, netlink.FAMILY_V4)
 		if err != nil {
-			return fmt.Errorf("failed to get IP address for %q: %v", guest.Attrs().Name, err)
+			return fmt.Errorf("failed to get IP address for %q: %v", veth.Attrs().Name, err)
 		}
 		for _, ipnet := range cidrs {
 			if !contains(existingAddrs, ipnet) {
 				continue
 			}
-			if err := netlink.AddrDel(guest, &netlink.Addr{IPNet: ipnet}); err != nil {
-				return fmt.Errorf("failed to remove IP address from %q: %v", guest.Attrs().Name, err)
+			if err := netlink.AddrDel(veth, &netlink.Addr{IPNet: ipnet}); err != nil {
+				return fmt.Errorf("failed to remove IP address from %q: %v", veth.Attrs().Name, err)
 			}
 		}
-		addrs, err := netlink.AddrList(guest, netlink.FAMILY_V4)
+		addrs, err := netlink.AddrList(veth, netlink.FAMILY_V4)
 		if err != nil {
-			return fmt.Errorf("failed to get IP address for %q: %v", guest.Attrs().Name, err)
+			return fmt.Errorf("failed to get IP address for %q: %v", veth.Attrs().Name, err)
 		}
 		if len(addrs) == 0 { // all addresses gone: remove the interface
-			if err := netlink.LinkDel(guest); err != nil {
+			if err := netlink.LinkDel(veth); err != nil {
 				return err
 			}
 		}
