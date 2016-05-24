@@ -133,6 +133,7 @@ func doChunkedResponse(w http.ResponseWriter, resp *http.Response, client *httpu
 	}
 
 	w.WriteHeader(resp.StatusCode)
+	wf.Flush()
 
 	up, remaining := client.Hijack()
 	defer up.Close()
