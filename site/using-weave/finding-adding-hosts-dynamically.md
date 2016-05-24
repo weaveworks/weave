@@ -41,6 +41,17 @@ will be forgotten, and the new hosts will be added:
 
     host# weave connect --replace $NEW_HOST1 $NEW_HOST2
 
+If Weave Net is restarted by Docker it will automatically remember any
+previous connect and forget operations, however if you stop it
+manually and launch it again it will not. If you wish to launch again
+and retain the results of those operations you can do so with
+`--resume`:
+
+    host# weave launch --resume
+
+Note that in this case you cannot specify a list of addresses as the
+previous peer list is used exclusively.
+
 For complete control over the peer topology, automatic 
 discovery can be disabled using the `--no-discovery` 
 option with `weave launch`. 
