@@ -21,6 +21,11 @@ weave_on $HOST1 connect 192.168.48.13
 check_restart $HOST1 weave
 assert_targets $HOST1 192.168.48.12 192.168.48.13
 
+# Ensure persisted peer changes are still in effect after --resume
+weave_on $HOST1 stop
+weave_on $HOST1 launch --resume
+assert_targets $HOST1 192.168.48.12 192.168.48.13
+
 # Ensure persisted peer changes are ignored after stop and subsequent restart
 weave_on $HOST1 stop
 weave_on $HOST1 launch 192.168.48.11 192.168.48.12

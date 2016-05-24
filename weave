@@ -45,7 +45,7 @@ weave launch        <same arguments as 'weave launch-router'>
                       [--no-restart] [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--no-discovery] [--no-dns]
-                      [--trusted-subnets <cidr>,...] <peer> ...
+                      [--trusted-subnets <cidr>,...] [--resume] <peer> ...
       launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
                       [--log-level=debug|info|warning|error]
                       [--no-rewrite-hosts] [--no-default-ipalloc] [--no-restart]

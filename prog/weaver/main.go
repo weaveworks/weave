@@ -151,6 +151,7 @@ func main() {
 		config             mesh.Config
 		networkConfig      weave.NetworkConfig
 		protocolMinVersion int
+		resume             bool
 		ifaceName          string
 		routerName         string
 		nickName           string
@@ -181,6 +182,7 @@ func main() {
 	mflag.StringVar(&config.Host, []string{"-host"}, "", "router host")
 	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
+	mflag.BoolVar(&resume, []string{"-resume"}, false, "resume connections to previous peers")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
@@ -218,6 +220,9 @@ func main() {
 	mflag.Parse()
 
 	peers = mflag.Args()
+	if resume && len(peers) > 0 {
+		Log.Fatalf("You must not specify an initial peer list in conjuction with --resume")
+	}
 
 	common.SetLogLevel(logLevel)
 
@@ -267,7 +272,7 @@ func main() {
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
 	Log.Println("Our name is", router.Ourself)
 
-	if peers, err = router.InitialPeers(peers); err != nil {
+	if peers, err = router.InitialPeers(resume, peers); err != nil {
 		Log.Fatal("Unable to get initial peer set: ", err)
 	}
 
