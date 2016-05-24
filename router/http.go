@@ -14,7 +14,7 @@ func (router *NetworkRouter) HandleHTTP(muxRouter *mux.Router) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, fmt.Sprint("unable to parse form: ", err), http.StatusBadRequest)
 		}
-		if errors := router.InitiateConnections(r.Form["peer"], r.FormValue("replace") == "true"); len(errors) > 0 {
+		if errors := router.InitiateConnections(r.Form["peer"], nil, r.FormValue("replace") == "true"); len(errors) > 0 {
 			http.Error(w, common.ErrorMessages(errors), http.StatusBadRequest)
 		}
 	})
