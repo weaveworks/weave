@@ -32,7 +32,7 @@ func NewCNIPlugin(weave *weaveapi.Client) *CNIPlugin {
 
 func loadNetConf(bytes []byte) (*NetConf, error) {
 	n := &NetConf{
-		BrName: "weave",
+		BrName: weavenet.WeaveBridgeName,
 	}
 	if err := json.Unmarshal(bytes, n); err != nil {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)

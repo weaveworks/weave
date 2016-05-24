@@ -15,10 +15,6 @@ import (
 	"github.com/weaveworks/weave/plugin/skel"
 )
 
-const (
-	WeaveBridge = "weave"
-)
-
 type driver struct {
 	scope            string
 	noMulticastRoute bool
@@ -101,7 +97,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	driver.logReq("JoinEndpoint", j, fmt.Sprintf("%s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey))
 
 	name, peerName := vethPair(j.EndpointID)
-	if _, err := weavenet.CreateAndAttachVeth(name, peerName, WeaveBridge, 0, nil); err != nil {
+	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, nil); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
 	}
 

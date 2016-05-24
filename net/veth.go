@@ -13,13 +13,13 @@ import (
 
 // create and attach a veth to the Weave bridge
 func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, init func(peer netlink.Link) error) (*netlink.Veth, error) {
-	maybeBridge, err := netlink.LinkByName(bridgeName)
+	bridge, err := netlink.LinkByName(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
 	}
 
 	if mtu == 0 {
-		mtu = maybeBridge.Attrs().MTU
+		mtu = bridge.Attrs().MTU
 	}
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
@@ -36,25 +36,22 @@ func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, init func(p
 		return nil, fmt.Errorf(format, a...)
 	}
 
-	switch maybeBridge.(type) {
-	case *netlink.Bridge:
-		if err := netlink.LinkSetMasterByIndex(veth, maybeBridge.Attrs().Index); err != nil {
+	switch bridgeType := DetectBridgeType(bridgeName, DatapathName); bridgeType {
+	case Bridge, BridgedFastdp:
+		if err := netlink.LinkSetMasterByIndex(veth, bridge.Attrs().Index); err != nil {
 			return cleanup(`unable to set master of %s: %s`, name, err)
 		}
-	case *netlink.GenericLink:
-		if maybeBridge.Type() != "openvswitch" {
-			return cleanup(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
+		if bridgeType == Bridge {
+			if err := EthtoolTXOff(peerName); err != nil {
+				return cleanup(`unable to set tx off on %q: %s`, peerName, err)
+			}
 		}
-		if err := odp.AddDatapathInterface(bridgeName, name); err != nil {
-			return cleanup(`failed to attach %s to device "%s": %s`, name, bridgeName, err)
-		}
-	case *netlink.Device:
-		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
+	case Fastdp:
 		if err := odp.AddDatapathInterface(bridgeName, name); err != nil {
 			return cleanup(`failed to attach %s to device "%s": %s`, name, bridgeName, err)
 		}
 	default:
-		return cleanup(`device "%s" is not a bridge`, bridgeName)
+		return cleanup(`invalid bridge configuration`)
 	}
 
 	if init != nil {
@@ -121,7 +118,6 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 		}
 		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
 		_, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, func(veth netlink.Link) error {
-			EthtoolTXOff(peerName) // TODO: do we want to do this under fastdp?
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
