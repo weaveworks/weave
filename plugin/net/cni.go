@@ -10,6 +10,7 @@ import (
 	"github.com/appc/cni/pkg/ipam"
 	"github.com/appc/cni/pkg/skel"
 	"github.com/appc/cni/pkg/types"
+	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	weaveapi "github.com/weaveworks/weave/api"
@@ -151,6 +152,7 @@ func setupGuestIP4(origName, name string, ipnet net.IPNet, gw net.IP, routes []t
 	if err = netlink.AddrAdd(guest, &netlink.Addr{IPNet: &ipnet}); err != nil {
 		return fmt.Errorf("failed to add IP address to %q: %v", name, err)
 	}
+	arping.GratuitousArpOverIfaceByName(ipnet.IP, name)
 	for _, r := range routes {
 		if r.GW != nil {
 			err = addRoute(guest, netlink.SCOPE_UNIVERSE, &r.Dst, r.GW)
