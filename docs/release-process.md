@@ -6,8 +6,6 @@
 * Create a [github token for
   github-release](https://help.github.com/articles/creating-an-access-token-for-command-line-use/);
 set and export `$GITHUB_TOKEN` with this value
-* Update all dependencies with `make update`
-* Ensure you are still on the right branch, since Go may switch to `master` as part of `make update`
 
 ## Release Types
 
