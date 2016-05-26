@@ -1,3 +1,17 @@
+## Release 1.5.2
+
+Bug fixes and minor improvements
+
+* Weave Proxy did not flush the initial http header in the Docker event stream, which could cause Docker Swarm to show all nodes pending. #2306/#2311
+* When using the CNI plugin, if a container was removed and quickly replaced by another using the same IP address, other containers might be unable to contact it. Send an address resolution protocol message to update them. #2313
+* Avoid Docker hanging for 1 minute in `weave launch` if the plugin had not shut down cleanly #2286/#2292
+* Print an error message when Weave bridge mode is changed without `weave reset` #2304
+* Eliminate spurious warning message from IP allocator on plugin shutdown #2300/#2319
+* Display error message when address requested in a subnet that is too small (/31 or /32) #2282/#2321
+* Add short wait after `weave reset` to allow updates to reach peers #2280
+* Weave was occasionally unable to claim existing IP address immediately after launch #2275/#2281
+* Refactor some integration tests to run faster and more reliably #2291
+
 ## Release 1.5.1
 
 Bug fixes and minor improvements
