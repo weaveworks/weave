@@ -3,6 +3,7 @@ package net
 import (
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/vishvananda/netlink"
 )
@@ -54,4 +55,17 @@ func forEachRoute(ignoreIfaceNames map[string]struct{}, check func(r netlink.Rou
 		}
 	}
 	return nil
+}
+
+func AddRoute(link netlink.Link, scope netlink.Scope, dst *net.IPNet, gw net.IP) error {
+	err := netlink.RouteAdd(&netlink.Route{
+		LinkIndex: link.Attrs().Index,
+		Scope:     scope,
+		Dst:       dst,
+		Gw:        gw,
+	})
+	if os.IsExist(err) { // squash duplicate route errors
+		err = nil
+	}
+	return err
 }

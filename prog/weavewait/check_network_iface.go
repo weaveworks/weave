@@ -7,6 +7,6 @@ import (
 )
 
 func checkNetwork() error {
-	_, err := weavenet.EnsureInterface("ethwe")
+	_, err := weavenet.EnsureInterface(weavenet.VethName)
 	return err
 }

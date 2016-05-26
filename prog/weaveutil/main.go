@@ -19,6 +19,8 @@ func init() {
 		"create-plugin-network":  createPluginNetwork,
 		"remove-plugin-network":  removePluginNetwork,
 		"container-addrs":        containerAddrs,
+		"attach-container":       attach,
+		"detach-container":       detach,
 	}
 }
 

@@ -2,12 +2,14 @@ package common
 
 import (
 	"fmt"
-	"github.com/vishvananda/netlink"
-	"github.com/vishvananda/netns"
 	"net"
 	"os"
-	"runtime"
 	"strings"
+
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
+
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 // Assert test is true, panic otherwise
@@ -23,25 +25,6 @@ func ErrorMessages(errors []error) string {
 		result = append(result, err.Error())
 	}
 	return strings.Join(result, "\n")
-}
-
-func WithNetNS(ns netns.NsHandle, work func() error) error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
-	oldNs, err := netns.Get()
-	if err == nil {
-		defer oldNs.Close()
-
-		err = netns.Set(ns)
-		if err == nil {
-			defer netns.Set(oldNs)
-
-			err = work()
-		}
-	}
-
-	return err
 }
 
 type NetDev struct {
@@ -63,7 +46,7 @@ func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, e
 	}
 	defer ns.Close()
 
-	err = WithNetNS(ns, func() error {
+	err = weavenet.WithNetNS(ns, func() error {
 		return forEachLink(func(link netlink.Link) error {
 			if match(link) {
 				netDev, err := linkToNetDev(link)

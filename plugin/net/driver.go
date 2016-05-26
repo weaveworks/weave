@@ -11,12 +11,8 @@ import (
 	weaveapi "github.com/weaveworks/weave/api"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
-	"github.com/weaveworks/weave/common/odp"
+	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/plugin/skel"
-)
-
-const (
-	WeaveBridge = "weave"
 )
 
 type driver struct {
@@ -100,22 +96,16 @@ func (driver *driver) EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointI
 func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error) {
 	driver.logReq("JoinEndpoint", j, fmt.Sprintf("%s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey))
 
-	local, err := createAndAttach(j.EndpointID, WeaveBridge, 0)
-	if err != nil {
+	name, peerName := vethPair(j.EndpointID)
+	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, nil); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
 	}
 
-	if err := netlink.LinkSetUp(local); err != nil {
-		return nil, driver.error("JoinEndpoint", "unable to bring up veth %s-%s: %s", local.Name, local.PeerName, err)
-	}
-
-	ifname := &api.InterfaceName{
-		SrcName:   local.PeerName,
-		DstPrefix: "ethwe",
-	}
-
 	response := &api.JoinResponse{
-		InterfaceName: ifname,
+		InterfaceName: &api.InterfaceName{
+			SrcName:   peerName,
+			DstPrefix: weavenet.VethName,
+		},
 	}
 	if !driver.noMulticastRoute {
 		multicastRoute := api.StaticRoute{
@@ -128,51 +118,12 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	return response, nil
 }
 
-// create and attach local name to the Weave bridge
-func createAndAttach(id, bridgeName string, mtu int) (*netlink.Veth, error) {
-	maybeBridge, err := netlink.LinkByName(bridgeName)
-	if err != nil {
-		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
-	}
-
-	local := vethPair(id[:5])
-	if mtu == 0 {
-		local.Attrs().MTU = maybeBridge.Attrs().MTU
-	} else {
-		local.Attrs().MTU = mtu
-	}
-	if err := netlink.LinkAdd(local); err != nil {
-		return nil, fmt.Errorf(`could not create veth pair %s-%s: %s`, local.Name, local.PeerName, err)
-	}
-
-	switch maybeBridge.(type) {
-	case *netlink.Bridge:
-		if err := netlink.LinkSetMasterByIndex(local, maybeBridge.Attrs().Index); err != nil {
-			return nil, fmt.Errorf(`unable to set master of %s: %s`, local.Name, err)
-		}
-	case *netlink.GenericLink:
-		if maybeBridge.Type() != "openvswitch" {
-			return nil, fmt.Errorf(`device "%s" is of type "%s"`, bridgeName, maybeBridge.Type())
-		}
-		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return nil, fmt.Errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
-		}
-	case *netlink.Device:
-		// Assume it's our openvswitch device, and the kernel has not been updated to report the kind.
-		if err := odp.AddDatapathInterface(bridgeName, local.Name); err != nil {
-			return nil, fmt.Errorf(`failed to attach %s to device "%s": %s`, local.Name, bridgeName, err)
-		}
-	default:
-		return nil, fmt.Errorf(`device "%s" is not a bridge`, bridgeName)
-	}
-	return local, nil
-}
-
 func (driver *driver) LeaveEndpoint(leave *api.LeaveRequest) error {
 	driver.logReq("LeaveEndpoint", leave, fmt.Sprintf("%s:%s", leave.NetworkID, leave.EndpointID))
 
-	local := vethPair(leave.EndpointID[:5])
-	if err := netlink.LinkDel(local); err != nil {
+	name, _ := vethPair(leave.EndpointID)
+	veth := &netlink.Veth{LinkAttrs: netlink.LinkAttrs{Name: name}}
+	if err := netlink.LinkDel(veth); err != nil {
 		driver.warn("LeaveEndpoint", "unable to delete veth: %s", err)
 	}
 	return nil
@@ -188,13 +139,8 @@ func (driver *driver) DiscoverDelete(disco *api.DiscoveryNotification) error {
 	return nil
 }
 
-// ===
-
-func vethPair(suffix string) *netlink.Veth {
-	return &netlink.Veth{
-		LinkAttrs: netlink.LinkAttrs{Name: "vethwl" + suffix},
-		PeerName:  "vethwg" + suffix,
-	}
+func vethPair(id string) (string, string) {
+	return "vethwl" + id[:5], "vethwg" + id[:5]
 }
 
 // logging
