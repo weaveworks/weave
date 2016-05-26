@@ -111,6 +111,20 @@ func NewAllocator(config Config) *Allocator {
 	}
 }
 
+func ParseCIDRSubnet(cidrStr string) (cidr address.CIDR, err error) {
+	cidr, err = address.ParseCIDR(cidrStr)
+	if err != nil {
+		return
+	}
+	if !cidr.IsSubnet() {
+		err = fmt.Errorf("invalid subnet - bits after network prefix are not all zero: %s", cidrStr)
+	}
+	if cidr.Size() < MinSubnetSize {
+		err = fmt.Errorf("invalid subnet - smaller than minimum size %d: %s", MinSubnetSize, cidrStr)
+	}
+	return
+}
+
 // Start runs the allocator goroutine
 func (alloc *Allocator) Start() {
 	loadedPersistedData := alloc.loadPersistedData()
