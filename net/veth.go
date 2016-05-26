@@ -3,6 +3,7 @@ package net
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
@@ -148,6 +149,8 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 			return err
 		}
 		for _, ipnet := range newAddresses {
+			// If we don't wait for a bit here, we see the arp fail to reach the bridge.
+			time.Sleep(1 * time.Millisecond)
 			arping.GratuitousArpOverIfaceByName(ipnet.IP, ifName)
 		}
 		if withMulticastRoute {
