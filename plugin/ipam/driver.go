@@ -54,6 +54,21 @@ func (i *Ipam) ReleasePool(poolID string) error {
 	return nil
 }
 
+func splitPoolID(poolID string) (subnet, iprange *net.IPNet, err error) {
+	parts := strings.Split(poolID, "-")
+	if len(parts) != 3 || parts[0] != "weave" {
+		err = fmt.Errorf("Unrecognized pool ID: %s", poolID)
+		return
+	}
+	if _, subnet, err = net.ParseCIDR(parts[1]); err != nil {
+		return
+	}
+	if _, iprange, err = net.ParseCIDR(parts[2]); err != nil {
+		return
+	}
+	return
+}
+
 func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]string) (ip *net.IPNet, _ map[string]string, err error) {
 	i.logReq("RequestAddress", poolID, address, options)
 	defer func() { i.logRes("RequestAddress", err, ip) }()
@@ -62,13 +77,8 @@ func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]
 		ip, err = i.weave.AllocateIP("_")
 		return
 	}
-	parts := strings.Split(poolID, "-")
-	if len(parts) != 3 || parts[0] != "weave" {
-		err = fmt.Errorf("Unrecognized pool ID: %s", poolID)
-		return
-	}
-	var subnet, iprange *net.IPNet
-	if _, subnet, err = net.ParseCIDR(parts[1]); err != nil {
+	subnet, iprange, err := splitPoolID(poolID)
+	if err != nil {
 		return
 	}
 	if address != nil { // try to claim specific address requested
@@ -77,9 +87,6 @@ func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]
 			return
 		}
 	} else {
-		if _, iprange, err = net.ParseCIDR(parts[2]); err != nil {
-			return
-		}
 		// We are lying slightly to IPAM here: the range is not a subnet
 		if ip, err = i.weave.AllocateIPInSubnet("_", iprange); err != nil {
 			return
@@ -91,6 +98,11 @@ func (i *Ipam) RequestAddress(poolID string, address net.IP, options map[string]
 
 func (i *Ipam) ReleaseAddress(poolID string, address net.IP) error {
 	i.logReq("ReleaseAddress", poolID, address)
+	if subnet, _, err := splitPoolID(poolID); err != nil {
+		return err
+	} else if address.Equal(subnet.IP) { // is it the gateway address we faked earlier?
+		return nil
+	}
 	return i.weave.ReleaseIPsFor(address.String())
 }
 
