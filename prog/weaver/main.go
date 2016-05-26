@@ -410,24 +410,13 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	return overlay, bridge
 }
 
-func parseAndCheckCIDR(cidrStr string) address.CIDR {
-	cidr, err := address.ParseCIDR(cidrStr)
-	checkFatal(err)
-
-	if !cidr.IsSubnet() {
-		Log.Fatalf("Invalid allocation range %s - bits after network prefix are not all zero", cidrStr)
-	}
-	if cidr.Size() < ipam.MinSubnetSize {
-		Log.Fatalf("Allocation range smaller than minimum size %d: %s", ipam.MinSubnetSize, cidrStr)
-	}
-	return cidr
-}
-
 func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
-	ipRange := parseAndCheckCIDR(config.IPRangeCIDR)
+	ipRange, err := ipam.ParseCIDRSubnet(config.IPRangeCIDR)
+	checkFatal(err)
 	defaultSubnet := ipRange
 	if config.IPSubnetCIDR != "" {
-		defaultSubnet = parseAndCheckCIDR(config.IPSubnetCIDR)
+		defaultSubnet, err = ipam.ParseCIDRSubnet(config.IPSubnetCIDR)
+		checkFatal(err)
 		if !ipRange.Range().Overlaps(defaultSubnet.Range()) {
 			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
 		}

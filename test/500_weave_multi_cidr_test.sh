@@ -122,4 +122,8 @@ assert_equal "$IPS"                                                      10.2.3.
 CID2=$(start_container $HOST1                                        net:10.2.3.0/24)
 assert_container_cidrs $HOST1 $CID2                                      10.2.3.1/24
 
+# Error conditions: host address not network, subnet too small
+assert_raises "start_container $HOST1                                net:10.2.3.2/30" 1
+assert_raises "start_container $HOST1                                net:10.2.3.2/31" 1
+
 end_suite
