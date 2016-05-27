@@ -13,6 +13,7 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/weaveworks/weave/common"
+	wnet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -23,19 +24,16 @@ type AWSVPCMonitor struct {
 	linkIndex    int    // The weave bridge link index
 }
 
-const (
-	// TODO(mp) is it const?
-	bridgeIfName = "weave"
-)
-
 // NewAWSVPCMonitor creates and initialises AWS VPC based monitor.
 //
 // The monitor updates AWS VPC and host route tables when any changes to allocated
 // address ranges owned by a peer have been done.
 func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
-	var err error
-	session := session.New()
-	mon := &AWSVPCMonitor{}
+	var (
+		err     error
+		session = session.New()
+		mon     = &AWSVPCMonitor{}
+	)
 
 	// Detect region and instance id
 	meta := ec2metadata.New(session)
@@ -57,14 +55,13 @@ func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
 	mon.routeTableID = *routeTableID
 
 	// Detect Weave bridge link index
-	link, err := netlink.LinkByName(bridgeIfName)
+	link, err := netlink.LinkByName(wnet.WeaveBridgeName)
 	if err != nil {
-		return nil, fmt.Errorf("cannot find \"%s\" interface: %s", bridgeIfName, err)
+		return nil, fmt.Errorf("cannot find \"%s\" interface: %s", wnet.WeaveBridgeName, err)
 	}
 	mon.linkIndex = link.Attrs().Index
 
-	mon.infof(
-		"AWSVPC has been initialized on %s instance for %s route table at %s region",
+	mon.infof("AWSVPC has been initialized on %s instance for %s route table at %s region",
 		mon.instanceID, mon.routeTableID, region)
 
 	return mon, nil
@@ -72,19 +69,17 @@ func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
 
 // HandleUpdate method updates the AWS VPC and the host route tables.
 func (mon *AWSVPCMonitor) HandleUpdate(old, new []address.Range) error {
-	oldCIDRs, newCIDRs := filterOutSameCIDRs(address.NewCIDRs(old), address.NewCIDRs(new))
+	oldCIDRs, newCIDRs := removeCommon(address.NewCIDRs(old), address.NewCIDRs(new))
 	mon.debugf("HandleUpdate: old(%q) new(%q)", old, new)
 
-	// TODO(mp):
-	// It might make sense to do removal first and then add entries
+	// It might make sense to do the removal first and then add entries
 	// because of the 50 routes limit. However, in such case a container might
-	// not be reachable for short period of time which we we would like to
-	// avoid.
+	// not be reachable for short period of time which is not a desired behavior.
 
 	// Add new entries
 	for _, cidr := range newCIDRs {
 		cidrStr := cidr.String()
-		mon.debugf("creating %s route to %s", cidrStr, mon.instanceID)
+		mon.debugf("adding route %s to %s", cidrStr, mon.instanceID)
 		_, err := mon.createVPCRoute(cidrStr)
 		// TODO(mp) check for 50 routes limit
 		// TODO(mp) maybe check for auth related errors
@@ -227,28 +222,28 @@ func (mon *AWSVPCMonitor) infof(fmt string, args ...interface{}) {
 
 // Helpers
 
-// filterOutSameCIDRs filters out CIDR ranges which are contained in both new
-// and old slices.
-func filterOutSameCIDRs(old, new []address.CIDR) (filteredOld, filteredNew []address.CIDR) {
+// removeCommon filters out CIDR ranges which are contained in both a and b slices.
+func removeCommon(a, b []address.CIDR) (newA, newB []address.CIDR) {
 	i, j := 0, 0
-	for i < len(old) && j < len(new) {
+
+	for i < len(a) && j < len(b) {
 		switch {
-		case old[i].Start() == new[j].Start() && old[i].End() == new[j].End():
+		case a[i].Start() == b[j].Start() && a[i].End() == b[j].End():
 			i++
 			j++
 			continue
-		case old[i].End() < new[j].End():
-			filteredOld = append(filteredOld, old[i])
+		case a[i].End() < b[j].End():
+			newA = append(newA, a[i])
 			i++
 		default:
-			filteredNew = append(filteredNew, new[j])
+			newB = append(newB, b[j])
 			j++
 		}
 	}
-	filteredOld = append(filteredOld, old[i:]...)
-	filteredNew = append(filteredNew, new[j:]...)
+	newA = append(newA, a[i:]...)
+	newB = append(newB, b[j:]...)
 
-	return filteredOld, filteredNew
+	return
 }
 
 func parseCIDR(cidr string) (*net.IPNet, error) {

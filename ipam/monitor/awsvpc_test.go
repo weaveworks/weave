@@ -22,38 +22,38 @@ var (
 	r1dot0to255 = cidr("10.0.1.0", "10.0.1.255")
 )
 
-func TestFilterNoChanges(t *testing.T) {
-	old := []address.CIDR{r0to255}
-	new := []address.CIDR{r0to255}
-	fOld, fNew := filterOutSameCIDRs(old, new)
-	require.Len(t, fOld, 0, "")
-	require.Len(t, fNew, 0, "")
+func TestRemoveCommonNoChanges(t *testing.T) {
+	a := []address.CIDR{r0to255}
+	b := []address.CIDR{r0to255}
+	newA, newB := removeCommon(a, b)
+	require.Len(t, newA, 0, "")
+	require.Len(t, newB, 0, "")
 
-	old = []address.CIDR{r0to255}
-	new = []address.CIDR{r0to3, r128to255}
-	fOld, fNew = filterOutSameCIDRs(old, new)
-	require.Equal(t, old, fOld, "")
-	require.Equal(t, new, fNew, "")
+	a = []address.CIDR{r0to255}
+	b = []address.CIDR{r0to3, r128to255}
+	newA, newB = removeCommon(a, b)
+	require.Equal(t, a, newA, "")
+	require.Equal(t, b, newB, "")
 
-	old = []address.CIDR{r0to255}
-	new = []address.CIDR{r128to255}
-	fOld, fNew = filterOutSameCIDRs(old, new)
-	require.Equal(t, old, fOld, "")
-	require.Equal(t, new, fNew, "")
+	a = []address.CIDR{r0to255}
+	b = []address.CIDR{r128to255}
+	newA, newB = removeCommon(a, b)
+	require.Equal(t, a, newA, "")
+	require.Equal(t, b, newB, "")
 
-	old = []address.CIDR{r0to255}
-	new = []address.CIDR{r0to3}
-	fOld, fNew = filterOutSameCIDRs(old, new)
-	require.Equal(t, old, fOld, "")
-	require.Equal(t, new, fNew, "")
+	a = []address.CIDR{r0to255}
+	b = []address.CIDR{r0to3}
+	newA, newB = removeCommon(a, b)
+	require.Equal(t, a, newA, "")
+	require.Equal(t, b, newB, "")
 }
 
-func TestFilter(t *testing.T) {
-	old := []address.CIDR{r0to3, r18to19, r22to23, r24to27}
-	new := []address.CIDR{r2to3, r12to13, r18to19, r1dot0to255}
-	fOld, fNew := filterOutSameCIDRs(old, new)
-	require.Equal(t, []address.CIDR{r0to3, r22to23, r24to27}, fOld, "")
-	require.Equal(t, []address.CIDR{r2to3, r12to13, r1dot0to255}, fNew, "")
+func TestRemoveCommon(t *testing.T) {
+	a := []address.CIDR{r0to3, r18to19, r22to23, r24to27}
+	b := []address.CIDR{r2to3, r12to13, r18to19, r1dot0to255}
+	newA, newB := removeCommon(a, b)
+	require.Equal(t, []address.CIDR{r0to3, r22to23, r24to27}, newA, "")
+	require.Equal(t, []address.CIDR{r2to3, r12to13, r1dot0to255}, newB, "")
 }
 
 // Helper

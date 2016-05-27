@@ -881,10 +881,7 @@ setup_router_iface_fastdp() {
 }
 
 setup_router_iface_bridge() {
-    # TODO(mp) maybe get rid of this condition
-    if [ -z "$AWSVPC" ]; then
-        create_veth $BRIDGE_IFNAME $PCAP_IFNAME add_iface_bridge $BRIDGE_IFNAME
-    fi
+    create_veth $BRIDGE_IFNAME $PCAP_IFNAME add_iface_bridge $BRIDGE_IFNAME
 }
 
 setup_router_iface_bridged_fastdp() {
