@@ -8,9 +8,10 @@ import (
 type Monitor interface {
 	// HandleUpdate is called whenever an address ring gets updated.
 	//
-	// {old,new}Ranges correspond to address ranges owned by a peer which
-	// executes the method.
-	HandleUpdate(oldRanges, newRanges []address.Range) error
+	// prevRanges corresponds to ranges which were owned by a peer before
+	// a change in the ring, while currRanges to the ones which are currently
+	// owned by the peer.
+	HandleUpdate(prevRanges, currRanges []address.Range) error
 	// String returns a user-friendly name of the monitor.
 	String() string
 }

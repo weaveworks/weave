@@ -80,8 +80,9 @@ weave_on $HOST2 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOS
 echo "starting containers"
 
 start_container $HOST1 --name=c1
-start_container $HOST2 --name=c3
+start_container $HOST2 --name=c4
 start_container $HOST1 --name=c2
+proxy_start_container $HOST1 -di --name=c3
 
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR1 $INSTANCE1"
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR2 $INSTANCE1"
@@ -92,8 +93,9 @@ assert_raises "no_fastdp $HOST1"
 assert_raises "no_fastdp $HOST2"
 
 assert_raises "exec_on $HOST1 c1 $PING c2"
-assert_raises "exec_on $HOST1 c1 $PING c3"
-assert_raises "exec_on $HOST2 c3 $PING c1"
+assert_raises "exec_on $HOST1 c1 $PING c4"
+assert_raises "exec_on $HOST2 c4 $PING c1"
+assert_raises "exec_on $HOST2 c4 $PING c3"
 
 weave_on $HOST2 stop
 # stopping should not remove the entries

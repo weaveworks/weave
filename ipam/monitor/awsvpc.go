@@ -68,16 +68,17 @@ func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
 }
 
 // HandleUpdate method updates the AWS VPC and the host route tables.
-func (mon *AWSVPCMonitor) HandleUpdate(old, new []address.Range) error {
-	oldCIDRs, newCIDRs := removeCommon(address.NewCIDRs(old), address.NewCIDRs(new))
-	mon.debugf("HandleUpdate: old(%q) new(%q)", old, new)
+func (mon *AWSVPCMonitor) HandleUpdate(prevRanges, currRanges []address.Range) error {
+	mon.debugf("replacing %q entries by %q", prevRanges, currRanges)
+
+	prev, curr := removeCommon(address.NewCIDRs(prevRanges), address.NewCIDRs(currRanges))
 
 	// It might make sense to do the removal first and then add entries
 	// because of the 50 routes limit. However, in such case a container might
-	// not be reachable for short period of time which is not a desired behavior.
+	// not be reachable for a short period of time which is not a desired behavior.
 
 	// Add new entries
-	for _, cidr := range newCIDRs {
+	for _, cidr := range curr {
 		cidrStr := cidr.String()
 		mon.debugf("adding route %s to %s", cidrStr, mon.instanceID)
 		_, err := mon.createVPCRoute(cidrStr)
@@ -93,7 +94,7 @@ func (mon *AWSVPCMonitor) HandleUpdate(old, new []address.Range) error {
 	}
 
 	// Remove obsolete entries
-	for _, cidr := range oldCIDRs {
+	for _, cidr := range prev {
 		cidrStr := cidr.String()
 		mon.debugf("removing %s route", cidrStr)
 		_, err := mon.deleteVPCRoute(cidrStr)

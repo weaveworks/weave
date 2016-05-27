@@ -253,8 +253,7 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	overlay, bridge := createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB,
-		useAWSVPC)
+	overlay, bridge := createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB, useAWSVPC)
 	networkConfig.Bridge = bridge
 
 	name := peerName(routerName, bridge.Interface())
@@ -306,8 +305,7 @@ func main() {
 		defaultSubnet address.CIDR
 	)
 	if ipamConfig.Enabled() {
-		allocator, defaultSubnet = createAllocator(router, ipamConfig, db,
-			isKnownPeer, useAWSVPC)
+		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, useAWSVPC, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
@@ -426,8 +424,7 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	return overlay, bridge
 }
 
-func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB,
-	isKnownPeer func(mesh.PeerName) bool, useAWSVPC bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, useAWSVPC bool, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 
 	var (
 		mon = monitor.Monitor(monitor.NewNullMonitor())
