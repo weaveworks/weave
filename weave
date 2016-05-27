@@ -893,35 +893,9 @@ container_in_host_ns() {
 }
 
 attach() {
-    if [[ -n "$AWSVPC" && $(echo "$@" | wc -w) -gt 1 ]]; then
-        echo -n "AWSVPC is enabled, therefore only one address can be attached to" >&2
-        echo " the container" >&2
-        return 1
-    fi
-
     ATTACH_ARGS=""
     [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
     util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
-}
-
-detach() {
-    netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 || return 0
-
-    for ADDR in "$@" ; do
-        if ! netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
-            # address is not there, leave the device alone
-            continue
-        fi
-        netnsenter ip addr del $ADDR dev $CONTAINER_IFNAME || return 1
-    done
-
-    if [ -n "$(netnsenter ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
-        # other addresses are left, leave the device alone
-        return 0
-    fi
-
-    # Deleting the interface will delete the multicast route we set up
-    netnsenter ip link del $CONTAINER_IFNAME type veth
 }
 
 ######################################################################
