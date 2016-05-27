@@ -77,7 +77,7 @@ CID=$(start_container  $HOST1             10.2.1.1/24 ip:10.2.2.1/24 net:10.2.3.
 assert_ips_and_dns     $HOST1 $CID $NAME. 10.2.1.1/24    10.2.2.1/24     10.2.3.1/24
 
 # Stop the container
-docker_on              $HOST1 stop $CID
+docker_on              $HOST1 stop -t 1 $CID
 assert_ips_and_dns     $HOST1 $CID $NAME.
 
 # Restart with three IPs

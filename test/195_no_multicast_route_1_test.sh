@@ -22,7 +22,7 @@ assert "show_multicast_route_on $HOST1 c2"
 assert "show_multicast_route_on $HOST1 c3"
 
 # Ensure current proxy options are obeyed on container start
-docker_on $HOST1 stop c2
+docker_on $HOST1 stop -t 1 c2
 weave_on $HOST1 stop-proxy
 weave_on $HOST1 launch-proxy
 
