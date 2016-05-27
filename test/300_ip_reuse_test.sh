@@ -19,11 +19,11 @@ start_container $HOST1 $C1/24 --name=c1
 start_container $HOST1 $C2/24 --name=c2
 check
 
-docker_on $HOST1 stop c2
+docker_on $HOST1 stop -t 1 c2
 start_container $HOST1 $C2/24 --name=c3
 check
 
-docker_on $HOST1 stop c3
+docker_on $HOST1 stop -t 1 c3
 start_container $HOST1 $C3/24 --name=c4
 weave_on $HOST1 attach $C2/24 c4
 check
