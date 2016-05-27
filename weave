@@ -1652,7 +1652,9 @@ launch_router() {
     populate_router
     if [ -n "$AWSVPC" ]; then
         expose
+        # TODO(mp) comment here re both
         echo 1 >/proc/sys/net/ipv4/conf/$BRIDGE/proxy_arp
+        echo 0 >/proc/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
     fi
 }
 
