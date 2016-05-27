@@ -230,13 +230,13 @@ func (router *NetworkRouter) ForgetConnections(peers []string) {
 	router.persistPeers()
 }
 
-func (router *NetworkRouter) InitialPeers(peers []string) ([]string, error) {
-	if _, err := os.Stat("restart.sentinel"); err == nil {
+func (router *NetworkRouter) InitialPeers(resume bool, peers []string) ([]string, error) {
+	if _, err := os.Stat("restart.sentinel"); err == nil || resume {
 		var storedPeers []string
 		if _, err := router.db.Load(peersIdent, &storedPeers); err != nil {
 			return nil, err
 		}
-		log.Println("Restart detected - using persisted peer list:", storedPeers)
+		log.Println("Restart/resume detected - using persisted peer list:", storedPeers)
 		return storedPeers, nil
 	}
 
