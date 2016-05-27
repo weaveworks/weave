@@ -654,6 +654,25 @@ EOF
     configure_arp_cache $BRIDGE
 }
 
+expose_ip() {
+    ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
+    for CIDR in $ALL_CIDRS ; do
+        if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
+            ip addr add dev $BRIDGE $CIDR
+            arp_update $BRIDGE $CIDR || true
+        fi
+        [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
+    done
+}
+
+expose_nat() {
+    for CIDR in $ALL_CIDRS ; do
+        add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
+        add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
+        add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
+    done
+}
+
 # create veth with ends $1-$2, and then invoke $3..., removing the
 # veth on failure. No-op of veth already exists.
 create_veth() {
@@ -2106,7 +2125,6 @@ EOF
     expose)
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
         if [ $# -eq 0 ] ; then
             FQDN=""
         else
@@ -2114,16 +2132,8 @@ EOF
             FQDN="$2"
         fi
         create_bridge --without-ethtool
-        for CIDR in $ALL_CIDRS ; do
-            if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
-                ip addr add dev $BRIDGE $CIDR
-                arp_update $BRIDGE $CIDR || true
-                add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
-                add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
-                add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-            fi
-            [ -n "$FQDN" ] && when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
-        done
+        expose_ip
+        expose_nat
         show_addrs $ALL_CIDRS
         ;;
     hide)
