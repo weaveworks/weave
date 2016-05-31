@@ -55,7 +55,7 @@ type Allocator struct {
 	stopChan          chan<- struct{}
 	ourName           mesh.PeerName
 	seed              []mesh.PeerName          // optional user supplied ring seed
-	universe          address.Range            // superset of all ranges
+	universe          address.CIDR             // superset of all ranges
 	ring              *ring.Ring               // information on ranges owned by all peers
 	space             space.Space              // more detail on ranges owned by us
 	owned             map[string]ownedData     // who owns what addresses, indexed by container-ID
@@ -80,7 +80,7 @@ type Config struct {
 	OurUID      mesh.PeerUID
 	OurNickname string
 	Seed        []mesh.PeerName
-	Universe    address.Range
+	Universe    address.CIDR
 	IsObserver  bool
 	Quorum      func() uint
 	Db          db.DB
@@ -101,7 +101,7 @@ func NewAllocator(config Config) *Allocator {
 		ourName:     config.OurName,
 		seed:        config.Seed,
 		universe:    config.Universe,
-		ring:        ring.New(config.Universe.Start, config.Universe.End, config.OurName),
+		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName),
 		owned:       make(map[string]ownedData),
 		db:          config.Db,
 		paxos:       participant,
@@ -953,7 +953,7 @@ func (alloc *Allocator) loadPersistedData() bool {
 		return false
 	}
 
-	if persistedRing.Range() != alloc.universe {
+	if persistedRing.Range() != alloc.universe.Range() {
 		overwritePersisted("Deleting persisted data for IPAM range %s; our range is %s", persistedRing.Range(), alloc.universe)
 		return false
 	}

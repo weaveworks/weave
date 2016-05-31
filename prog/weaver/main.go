@@ -427,7 +427,7 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 		OurUID:      router.Ourself.Peer.UID,
 		OurNickname: router.Ourself.Peer.NickName,
 		Seed:        config.SeedPeerNames,
-		Universe:    ipRange.Range(),
+		Universe:    ipRange,
 		IsObserver:  config.Observer,
 		Quorum:      func() uint { return determineQuorum(config.PeerCount, router) },
 		Db:          db,
