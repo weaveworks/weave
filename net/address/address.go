@@ -1,7 +1,6 @@
 package address
 
 import (
-	"errors"
 	"fmt"
 	"net"
 
@@ -10,10 +9,6 @@ import (
 
 const (
 	CIDRMaxPrefixLen = 32
-)
-
-var (
-	ErrCIDRTooSmall = errors.New("CIDR is too small")
 )
 
 // Using 32-bit integer to represent IPv4 address
@@ -32,7 +27,7 @@ func (r Range) Size() Count                { return Length(r.End, r.Start) }
 func (r Range) String() string             { return fmt.Sprintf("%s-%s", r.Start, r.End-1) }
 func (r Range) Overlaps(or Range) bool     { return !(r.Start >= or.End || r.End <= or.Start) }
 func (r Range) Contains(addr Address) bool { return addr >= r.Start && addr < r.End }
-func (r Range) Equals(or Range) bool       { return r.Start == or.Start && r.End == or.End }
+func (r Range) Equal(or Range) bool        { return r.Start == or.Start && r.End == or.End }
 
 // IsCIDR checks whether the range is CIDR.
 func (r Range) IsCIDR() bool {
@@ -178,6 +173,10 @@ func (cidr CIDR) HostRange() Range {
 
 func (cidr CIDR) String() string {
 	return fmt.Sprintf("%s/%d", cidr.Addr.String(), cidr.PrefixLen)
+}
+
+func (cidr CIDR) Equal(oc CIDR) bool {
+	return cidr.Addr == oc.Addr && cidr.PrefixLen == oc.PrefixLen
 }
 
 // FromIP4 converts an ipv4 address to our integer address type

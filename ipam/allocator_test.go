@@ -667,9 +667,9 @@ func TestMonitor(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		pair := <-monChan
 		switch {
-		case !newPeer1 && pair.new[0].Equals(addrRange("10.0.0.0", "10.0.0.1")):
+		case !newPeer1 && pair.new[0].Equal(addrRange("10.0.0.0", "10.0.0.1")):
 			newPeer1 = true
-		case !newPeer2 && pair.new[0].Equals(addrRange("10.0.0.2", "10.0.0.3")):
+		case !newPeer2 && pair.new[0].Equal(addrRange("10.0.0.2", "10.0.0.3")):
 			newPeer2 = true
 		default:
 			continue
@@ -690,17 +690,17 @@ func TestMonitor(t *testing.T) {
 		pair := <-monChan
 		switch {
 		case !newDonation1 &&
-			pair.old[0].Equals(addrRange("10.0.0.0", "10.0.0.1")) &&
-			pair.new[0].Equals(addrRange("10.0.0.0", "10.0.0.1")) &&
-			pair.new[1].Equals(addrRange("10.0.0.3", "10.0.0.3")):
+			pair.old[0].Equal(addrRange("10.0.0.0", "10.0.0.1")) &&
+			pair.new[0].Equal(addrRange("10.0.0.0", "10.0.0.1")) &&
+			pair.new[1].Equal(addrRange("10.0.0.3", "10.0.0.3")):
 			// peer1
 
 			require.Equal(t, 1, len(pair.old), "")
 			require.Equal(t, 2, len(pair.new), "")
 			newDonation1 = true
 		case !newDonation2 &&
-			pair.old[0].Equals(addrRange("10.0.0.2", "10.0.0.3")) &&
-			pair.new[0].Equals(addrRange("10.0.0.2", "10.0.0.2")):
+			pair.old[0].Equal(addrRange("10.0.0.2", "10.0.0.3")) &&
+			pair.new[0].Equal(addrRange("10.0.0.2", "10.0.0.2")):
 			// peer2
 
 			require.Equal(t, 1, len(pair.old), "")
