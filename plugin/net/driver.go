@@ -2,9 +2,11 @@ package plugin
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/docker/libnetwork/drivers/remote/api"
+	"github.com/docker/libnetwork/netlabel"
 	"github.com/docker/libnetwork/types"
 
 	"github.com/vishvananda/netlink"
@@ -15,18 +17,28 @@ import (
 	"github.com/weaveworks/weave/plugin/skel"
 )
 
-type driver struct {
-	scope            string
-	noMulticastRoute bool
-	sync.RWMutex
-	endpoints map[string]struct{}
+const (
+	MulticastOption = "works.weave.multicast"
+)
+
+type network struct {
+	hasMulticastRoute bool
 }
 
-func New(client *docker.Client, weave *weaveapi.Client, scope string, noMulticastRoute bool) (skel.Driver, error) {
+type driver struct {
+	scope  string
+	docker *docker.Client
+	sync.RWMutex
+	endpoints map[string]struct{}
+	networks  map[string]network
+}
+
+func New(client *docker.Client, weave *weaveapi.Client, scope string) (skel.Driver, error) {
 	driver := &driver{
-		noMulticastRoute: noMulticastRoute,
-		scope:            scope,
-		endpoints:        make(map[string]struct{}),
+		scope:     scope,
+		docker:    client,
+		endpoints: make(map[string]struct{}),
+		networks:  make(map[string]network),
 	}
 
 	_, err := NewWatcher(client, weave, driver)
@@ -49,11 +61,33 @@ func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
 
 func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
 	driver.logReq("CreateNetwork", create, create.NetworkID)
+	_, err := driver.setupNetworkInfo(create.NetworkID, stringOptions(create))
+	return err
+}
+
+// Deal with excessively-generic way the options get decoded from JSON
+func stringOptions(create *api.CreateNetworkRequest) map[string]string {
+	if create.Options != nil {
+		if data, found := create.Options[netlabel.GenericData]; found {
+			if options, ok := data.(map[string]interface{}); ok {
+				out := make(map[string]string, len(options))
+				for key, value := range options {
+					if str, ok := value.(string); ok {
+						out[key] = str
+					}
+				}
+				return out
+			}
+		}
+	}
 	return nil
 }
 
-func (driver *driver) DeleteNetwork(delete *api.DeleteNetworkRequest) error {
-	driver.logReq("DeleteNetwork", delete, delete.NetworkID)
+func (driver *driver) DeleteNetwork(delreq *api.DeleteNetworkRequest) error {
+	driver.logReq("DeleteNetwork", delreq, delreq.NetworkID)
+	driver.Lock()
+	delete(driver.networks, delreq.NetworkID)
+	driver.Unlock()
 	return nil
 }
 
@@ -96,6 +130,10 @@ func (driver *driver) EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointI
 func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error) {
 	driver.logReq("JoinEndpoint", j, fmt.Sprintf("%s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey))
 
+	network, err := driver.findNetworkInfo(j.NetworkID)
+	if err != nil {
+		return nil, driver.error("JoinEndpoint", "unable to find network info: %s", err)
+	}
 	name, peerName := vethPair(j.EndpointID)
 	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, nil); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
@@ -107,7 +145,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 			DstPrefix: weavenet.VethName,
 		},
 	}
-	if !driver.noMulticastRoute {
+	if network.hasMulticastRoute {
 		multicastRoute := api.StaticRoute{
 			Destination: "224.0.0.0/4",
 			RouteType:   types.CONNECTED,
@@ -116,6 +154,44 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	}
 	driver.logRes("JoinEndpoint", response)
 	return response, nil
+}
+
+func (driver *driver) findNetworkInfo(id string) (network, error) {
+	driver.Lock()
+	network, found := driver.networks[id]
+	driver.Unlock()
+	if found {
+		return network, nil
+	}
+	info, err := driver.docker.NetworkInfo(id)
+	if err != nil {
+		return network, err
+	}
+	return driver.setupNetworkInfo(id, info.Options)
+}
+
+func (driver *driver) setupNetworkInfo(id string, options map[string]string) (network, error) {
+	var network network
+	for key, value := range options {
+		switch key {
+		case MulticastOption:
+			if value == "" { // interpret "--opt works.weave.multicast" as "turn it on"
+				network.hasMulticastRoute = true
+			} else {
+				var err error
+				if network.hasMulticastRoute, err = strconv.ParseBool(value); err != nil {
+					return network, fmt.Errorf("unrecognized value %q for option %s", value, key)
+				}
+
+			}
+		default:
+			driver.warn("setupNetworkInfo", "unrecognized option: %s", key)
+		}
+	}
+	driver.Lock()
+	driver.networks[id] = network
+	driver.Unlock()
+	return network, nil
 }
 
 func (driver *driver) LeaveEndpoint(leave *api.LeaveRequest) error {

@@ -8,10 +8,13 @@ show_multicast_route_on() {
 
 start_suite "--no-multicast-route operation"
 
+# In case one is left around from a previous test
+$SSH $HOST1 docker network rm testmcasttrue testmcastfalse >/dev/null 2>&1 || true
+
 # Ensure containers run either way have no multicast route
 weave_on $HOST1 launch-router
 weave_on $HOST1 launch-proxy --no-multicast-route
-weave_on $HOST1 launch-plugin --no-multicast-route
+weave_on $HOST1 launch-plugin # plugin defaults to multicast off except for 'net=weave'
 
 start_container $HOST1 --no-multicast-route --name c1
 proxy_start_container $HOST1 --name c2
@@ -19,7 +22,16 @@ start_container_local_plugin $HOST1 --name=c3
 
 assert "show_multicast_route_on $HOST1 c1"
 assert "show_multicast_route_on $HOST1 c2"
-assert "show_multicast_route_on $HOST1 c3"
+assert "show_multicast_route_on $HOST1 c3" "224.0.0.0/4 dev ethwe0 "
+
+# Now try via docker network options
+# using ssh rather than docker -H because CircleCI docker client is older
+$SSH $HOST1 docker network create --driver weavemesh --ipam-driver weavemesh --opt works.weave.multicast=false testmcastfalse
+$SSH $HOST1 docker run --net=testmcastfalse --name c4 -di $SMALL_IMAGE /bin/sh
+assert "show_multicast_route_on $HOST1 c4"
+$SSH $HOST1 docker network create --driver weavemesh --ipam-driver weavemesh --opt works.weave.multicast testmcasttrue
+$SSH $HOST1 docker run --net=testmcasttrue --name c5 -di $SMALL_IMAGE /bin/sh
+assert "show_multicast_route_on $HOST1 c5" "224.0.0.0/4 dev ethwe0 "
 
 # Ensure current proxy options are obeyed on container start
 docker_on $HOST1 stop -t 1 c2
@@ -30,6 +42,7 @@ proxy docker_on $HOST1 start c2
 
 assert "show_multicast_route_on $HOST1 c2" "224.0.0.0/4 dev ethwe "
 
-docker_on $HOST1 rm -f c3
+docker_on $HOST1 rm -f c3 c4 c5
+$SSH $HOST1 docker network rm testmcasttrue testmcastfalse
 
 end_suite

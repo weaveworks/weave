@@ -26,6 +26,13 @@ store, but the first part of
 
 >**Note:** In the case of multiple networks using the `weave` driver, all containers are on the same virtual network but Docker allocates their addresses on different subnets so they cannot talk to each other directly.
 
+The plugin accepts the following options via `docker network create ... --opt`:
+
+ * `works.weave.multicast` -- tells weave to add a static IP
+   route for multicast traffic onto its interface.
+
+>**Note:** If you connect a container to multiple Weave networks, at
+   most one of them can have the multicast route enabled.
 
 **See Also**
 
