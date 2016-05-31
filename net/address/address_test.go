@@ -92,14 +92,6 @@ func TestSingleCIDR(t *testing.T) {
 	require.Equal(t, expectedCIDRs, r.CIDRs(), "")
 }
 
-func TestIsCIDR(t *testing.T) {
-	require.True(t, NewRange(ip("10.20.0.0"), 256).IsCIDR(), "")
-	require.True(t, NewRange(ip("10.20.0.1"), 1).IsCIDR(), "")
-	require.False(t, NewRange(ip("10.20.0.1"), 2).IsCIDR(), "")
-	require.False(t, NewRange(ip("10.20.0.0"), 254).IsCIDR(), "")
-	require.True(t, NewRange(ip("10.0.0.0"), 4).IsCIDR(), "")
-}
-
 func TestCIDRStartAndEnd(t *testing.T) {
 	cidr, _ := ParseCIDR("10.0.0.0/24")
 	require.Equal(t, ip("10.0.0.0"), cidr.Start(), "")

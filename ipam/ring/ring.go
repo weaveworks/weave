@@ -401,7 +401,6 @@ func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 // and creates entries for the subranges.
 // Each entry is CIRD-aligned.
 func (r *Ring) createEntries(peers []mesh.PeerName) {
-	common.AssertWithMsg(r.Range().IsCIDR(), fmt.Sprintf("%s range is not CIDR", r.Range()))
 	defer func() {
 		e := r.Entries[len(r.Entries)-1]
 		common.Assert(address.Add(e.Token, address.Offset(e.Free)) == r.End)

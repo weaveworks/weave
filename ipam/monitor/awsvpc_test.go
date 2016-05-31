@@ -1,12 +1,10 @@
 package monitor
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -66,7 +64,8 @@ func ip(s string) address.Address {
 // [start; end]
 func cidr(start, end string) address.CIDR {
 	c := address.Range{Start: ip(start), End: ip(end) + 1}.CIDRs()
-	common.AssertWithMsg(len(c) == 1,
-		fmt.Sprintf("Multiple CIDRs (%s) from %s to %s!", c, start, end))
+	if len(c) != 1 {
+		panic("invalid cidr")
+	}
 	return c[0]
 }
