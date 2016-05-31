@@ -151,8 +151,9 @@ func (cidr CIDR) Start() Address {
 	return cidr.Addr
 }
 
+// cidr = [Start; End)
 func (cidr CIDR) End() Address {
-	return Add(cidr.Addr, cidr.Size()-1)
+	return cidr.Range().End
 }
 
 func (cidr CIDR) IsSubnet() bool {

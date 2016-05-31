@@ -103,5 +103,5 @@ func TestIsCIDR(t *testing.T) {
 func TestCIDRStartAndEnd(t *testing.T) {
 	cidr, _ := ParseCIDR("10.0.0.0/24")
 	require.Equal(t, ip("10.0.0.0"), cidr.Start(), "")
-	require.Equal(t, ip("10.0.0.255"), cidr.End(), "")
+	require.Equal(t, ip("10.0.1.0"), cidr.End(), "")
 }
