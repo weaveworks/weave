@@ -673,13 +673,11 @@ expose_ip() {
 }
 
 expose_nat() {
-    if [ -z "$AWSVPC" ]; then
-        for CIDR in $ALL_CIDRS ; do
-            add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
-            add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
-            add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-        done
-    fi
+    for CIDR in $ALL_CIDRS ; do
+        add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
+        add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
+        add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
+    done
 }
 
 # create veth with ends $1-$2, and then invoke $3..., removing the
@@ -1625,7 +1623,7 @@ launch_router() {
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     populate_router
     if [ -n "$AWSVPC" ]; then
-        expose
+        expose_ip
         # TODO(mp) comment here re both
         echo 1 >/proc/sys/net/ipv4/conf/$BRIDGE/proxy_arp
         echo 0 >/proc/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
