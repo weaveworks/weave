@@ -172,8 +172,6 @@ func main() {
 		trustedSubnetStr   string
 		dbPrefix           string
 		useAWSVPC          bool
-		overlay            weave.NetworkOverlay
-		bridge             weave.Bridge
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -255,9 +253,12 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
+	var (
+		overlay weave.NetworkOverlay
+		bridge  weave.Bridge
+	)
 	overlay = weave.NewNullNetworkOverlay()
 	bridge = weave.NewNullBridge()
-
 	if !useAWSVPC {
 		overlay, bridge = createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB)
 	}
@@ -310,9 +311,18 @@ func main() {
 	var (
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
+		mon           monitor.Monitor
 	)
 	if ipamConfig.Enabled() {
-		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, useAWSVPC, isKnownPeer)
+		mon = monitor.NewNullMonitor()
+		if useAWSVPC {
+			Log.Infoln("Creating AWSVPC Monitor")
+			mon, err = monitor.NewAWSVPCMonitor()
+			if err != nil {
+				Log.Fatalf("Cannot create AWSVPC Monitor: %s", err)
+			}
+		}
+		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, mon, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
@@ -425,13 +435,7 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	return overlay, bridge
 }
 
-func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, useAWSVPC bool, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
-
-	var (
-		mon = monitor.Monitor(monitor.NewNullMonitor())
-		err error
-	)
-
+func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, mon monitor.Monitor, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange, err := ipam.ParseCIDRSubnet(config.IPRangeCIDR)
 	checkFatal(err)
 	defaultSubnet := ipRange
@@ -440,14 +444,6 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, u
 		checkFatal(err)
 		if !ipRange.Range().Overlaps(defaultSubnet.Range()) {
 			Log.Fatalf("IP address allocation default subnet %s does not overlap with allocation range %s", defaultSubnet, ipRange)
-		}
-	}
-
-	if useAWSVPC {
-		Log.Infoln("Creating AWSVPC Monitor")
-		mon, err = monitor.NewAWSVPCMonitor()
-		if err != nil {
-			Log.Fatalf("Cannot create AWSVPC Monitor: %s", err)
 		}
 	}
 
