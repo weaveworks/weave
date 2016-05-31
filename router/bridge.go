@@ -23,6 +23,10 @@ type BridgeConsumer func(PacketKey) FlowOp
 
 type NullBridge struct{}
 
+func NewNullBridge() NullBridge {
+	return NullBridge{}
+}
+
 func (NullBridge) InjectPacket(PacketKey) FlowOp {
 	return nil
 }

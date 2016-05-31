@@ -35,6 +35,10 @@ type OverlayForwarder interface {
 
 type NullNetworkOverlay struct{ mesh.NullOverlay }
 
+func NewNullNetworkOverlay() NullNetworkOverlay {
+	return NullNetworkOverlay{}
+}
+
 func (NullNetworkOverlay) InvalidateRoutes() {
 }
 
