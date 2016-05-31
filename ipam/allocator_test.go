@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/ipam/monitor"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/testing/gossip"
 )
@@ -224,10 +223,10 @@ func TestCancel(t *testing.T) {
 	const cidr = "10.0.4.0/26"
 	router := gossip.NewTestRouter(0.0)
 
-	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2, monitor.NewNullMonitor())
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2)
 	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 
-	alloc2, _ := makeAllocator("02:00:00:02:00:00", cidr, 2, monitor.NewNullMonitor())
+	alloc2, _ := makeAllocator("02:00:00:02:00:00", cidr, 2)
 	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc1.claimRingForTesting(alloc1, alloc2)
 	alloc2.claimRingForTesting(alloc1, alloc2)
@@ -287,7 +286,7 @@ func TestCancelOnDied(t *testing.T) {
 	)
 
 	router := gossip.NewTestRouter(0.0)
-	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2, monitor.NewNullMonitor())
+	alloc1, subnet := makeAllocator("01:00:00:02:00:00", cidr, 2)
 	alloc1.SetInterfaces(router.Connect(alloc1.ourName, alloc1))
 	alloc1.Start()
 
@@ -630,7 +629,7 @@ func TestSpaceRequest(t *testing.T) {
 	require.Equal(t, cidrRanges(universe), alloc1.OwnedRanges(), "")
 
 	// Start a new peer
-	alloc2, _ := makeAllocator("02:00:00:02:00:00", universe, 2, monitor.NewNullMonitor())
+	alloc2, _ := makeAllocator("02:00:00:02:00:00", universe, 2)
 	alloc2.SetInterfaces(router.Connect(alloc2.ourName, alloc2))
 	alloc2.Start()
 	defer alloc2.Stop()

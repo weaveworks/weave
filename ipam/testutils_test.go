@@ -129,7 +129,11 @@ type mockDB struct{}
 func (d *mockDB) Load(_ string, _ interface{}) (bool, error) { return false, nil }
 func (d *mockDB) Save(_ string, _ interface{}) error         { return nil }
 
-func makeAllocator(name string, cidrStr string, quorum uint, mon monitor.Monitor) (*Allocator, address.CIDR) {
+func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.CIDR) {
+	return makeAllocatorWithMonitor(name, cidrStr, quorum, monitor.NewNullMonitor())
+}
+
+func makeAllocatorWithMonitor(name string, cidrStr string, quorum uint, mon monitor.Monitor) (*Allocator, address.CIDR) {
 	peername, err := mesh.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
@@ -163,7 +167,7 @@ func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string,
 func makeAllocatorWithMockGossipAndMonitor(t *testing.T, name string, universeCIDR string, quorum uint,
 	mon monitor.Monitor) (*Allocator, address.CIDR) {
 
-	alloc, subnet := makeAllocator(name, universeCIDR, quorum, mon)
+	alloc, subnet := makeAllocatorWithMonitor(name, universeCIDR, quorum, mon)
 	gossip := &mockGossipComms{T: t, name: name}
 	alloc.SetInterfaces(gossip)
 	alloc.Start()
@@ -237,7 +241,7 @@ func makeNetworkOfAllocatorsWithMonitor(size int, cidr string,
 
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
-		alloc, subnet = makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", i),
+		alloc, subnet = makeAllocatorWithMonitor(fmt.Sprintf("%02d:00:00:02:00:00", i),
 			cidr, uint(size/2+1), mon)
 		alloc.SetInterfaces(gossipRouter.Connect(alloc.ourName, alloc))
 		alloc.Start()
