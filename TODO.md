@@ -12,15 +12,18 @@
 - Rebase master
 
 * Cleanup the code
-* Get rid of monitor status
+- Get rid of monitor status
 * Add the docs
 * Change alloc.universe type to address.CIDR
+* Rename useAWSVPC -> isAWSVPC
 
 - Add tests for proxy
-* * Add tests for plugin
+* Add tests for plugin
 
 ---> Disable multiple subnets
-* Check that the attach belongs to the main subnet
+* What happens if $RCIDR is not found
+
+* Do fuzz testing
 
 * Get rid of ethtool tx off for AWSVPC
 
@@ -29,13 +32,10 @@
 - Fix `weave report` re "no bridge networking"
 
 * Read on VPC routing tables again.
-* When starting AWS VPC Monitor, fail early if there are entries from the subnet // not possible because
-  some other peer might pushed entries. I could check for local entries though,
-  but it's problematic because of `weave stop` && `weave launch`.
 
-* Check how callico does the networking
-* Check how flannel does the networking
-* Check how swarm does networking on AWSVPC
+* Check how calico does the networking
+- Check how flannel does the networking
+* Check how swarm does the networking
 
 - There is a bug when `weave reset` does not clean the rt properly <= probably
   because of weave stop exec upon end_suite
@@ -48,8 +48,8 @@
 * What happens when we have thousands containers on the same host, does
   flooding bites us?
 
-* Benchmark to see whether proxy_arp sux or not.
-* What happens when we run fastdp and awsvpc at the same time.
+* Benchmark to see whether proxy_arp sux.
+- What happens when we run fastdp and awsvpc at the same time.
 * Enable --awsvpc in other tests
 * Test re-attach of containers
 * Bring $HOST3
@@ -70,6 +70,3 @@ DEBU: 2016/05/27 10:01:15.547612 [http] PUT
 /ip/weave:expose/10.32.0.1/12?noErrorOnUnknown=true
 DEBU: 2016/05/27 10:01:15.547754 [allocator 62:5e:2b:83:97:6e]: Re-Claimed
 10.32.0.1/12 for weave:expose
-
-weave report:
-"Interface": "\u003cno bridge networking\u003e",
