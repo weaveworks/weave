@@ -24,7 +24,9 @@
 
 * Get rid of ethtool tx off for AWSVPC
 
----> * Fix `weave status`
+- Fix `weave status`
+---> * Use NewNull()
+---> * Bridge Interface String()
 * Fix `weave report` re "no bridge networking"
 
 * Read on VPC routing tables again.

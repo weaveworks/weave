@@ -253,15 +253,7 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	var (
-		overlay weave.NetworkOverlay
-		bridge  weave.Bridge
-	)
-	overlay = weave.NewNullNetworkOverlay()
-	bridge = weave.NewNullBridge()
-	if !useAWSVPC {
-		overlay, bridge = createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB)
-	}
+	overlay, bridge := createOverlay(datapathName, ifaceName, useAWSVPC, config.Host, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
 	name := peerName(routerName, bridge.Interface())
@@ -408,10 +400,18 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(datapathName string, ifaceName string, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(datapathName string, ifaceName string, useAWSVPC bool, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
+	var ignoreSleeve bool
+
 	switch {
+	case useAWSVPC:
+		vpc := weave.NewAWSVPC()
+		overlay.Add("awsvpc", vpc)
+		bridge = weave.NullBridge{}
+		// Currently, we do not support any overlay with AWSVPC
+		ignoreSleeve = true
 	case datapathName != "" && ifaceName != "":
 		Log.Fatal("At most one of --datapath and --iface must be specified.")
 	case datapathName != "":
@@ -429,9 +429,13 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	default:
 		bridge = weave.NullBridge{}
 	}
-	sleeve := weave.NewSleeveOverlay(host, port)
-	overlay.Add("sleeve", sleeve)
-	overlay.SetCompatOverlay(sleeve)
+
+	if !ignoreSleeve {
+		sleeve := weave.NewSleeveOverlay(host, port)
+		overlay.Add("sleeve", sleeve)
+		overlay.SetCompatOverlay(sleeve)
+	}
+
 	return overlay, bridge
 }
 
