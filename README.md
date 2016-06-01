@@ -1,6 +1,10 @@
 # Weave Net - Weaving Containers into Applications
 
-[![Build Status](https://travis-ci.org/weaveworks/weave.svg?branch=master)](https://travis-ci.org/weaveworks/weave) [![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield&circle-token=4933c7dabb3d0383e62117565cb9d16df7b1a811)](https://circleci.com/gh/weaveworks/weave) [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
+[![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield)](https://circleci.com/gh/weaveworks/weave)
+[![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
+[![Go Report Card](https://goreportcard.com/badge/github.com/weaveworks/weave)](https://goreportcard.com/report/github.com/weaveworks/weave)
+[![Slack Status](https://slack.weave.works/badge.svg)](https://slack.weave.works)
+[![Docker Pulls](https://img.shields.io/docker/pulls/weaveworks/weave.svg?maxAge=604800)](https://hub.docker.com/r/weaveworks/weave/)
 
 # About Weaveworks
 
