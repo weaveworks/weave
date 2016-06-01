@@ -19,7 +19,8 @@ var (
 	peer2name, _ = mesh.PeerNameFromString("02:00:00:00:02:00")
 	peer3name, _ = mesh.PeerNameFromString("03:00:00:00:02:00")
 
-	start, end    = ParseIP("10.0.0.0"), ParseIP("10.0.0.255")
+	start, end    = ParseIP("10.0.0.0"), ParseIP("10.0.1.0")
+	dot8          = ParseIP("10.0.0.8")
 	dot10, dot245 = ParseIP("10.0.0.10"), ParseIP("10.0.0.245")
 	dot250        = ParseIP("10.0.0.250")
 	middle        = ParseIP("10.0.0.128")
@@ -128,24 +129,24 @@ func TestGrantSimple(t *testing.T) {
 
 	// Claim everything for peer1
 	ring1.ClaimItAll()
-	require.Equal(t, entries{{Token: start, Peer: peer1name, Free: 255}}, ring1.Entries)
+	require.Equal(t, entries{{Token: start, Peer: peer1name, Free: 256}}, ring1.Entries)
 
 	// Now grant everything to peer2
 	ring1.GrantRangeToHost(start, end, peer2name)
-	ring2.Entries = []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}}
+	ring2.Entries = []*entry{{Token: start, Peer: peer2name, Free: 256, Version: 1}}
 	require.Equal(t, ring2.Entries, ring1.Entries)
 
 	// Now spint back to peer 1
 	ring2.GrantRangeToHost(dot10, end, peer1name)
 	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 10, Version: 2},
-		{Token: dot10, Peer: peer1name, Free: 245}}
+		{Token: dot10, Peer: peer1name, Free: 246}}
 	require.Equal(t, ring2.Entries, ring1.Entries)
 
 	// And spint back to peer 2 again
 	ring1.GrantRangeToHost(dot245, end, peer2name)
 	require.Equal(t, entries{{Token: start, Peer: peer2name, Free: 10, Version: 2},
 		{Token: dot10, Peer: peer1name, Free: 235, Version: 1},
-		{Token: dot245, Peer: peer2name, Free: 10}}, ring1.Entries)
+		{Token: dot245, Peer: peer2name, Free: 11}}, ring1.Entries)
 
 	// Grant range spanning a live token
 	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 10, Version: 2},
@@ -162,7 +163,7 @@ func TestGrantSplit(t *testing.T) {
 	ring2 := New(start, end, peer2name)
 
 	// Claim everything for peer1
-	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 255}}
+	ring1.Entries = []*entry{{Token: start, Peer: peer1name, Free: 256}}
 	merge(ring2, ring1)
 	require.Equal(t, ring2.Entries, ring1.Entries)
 
@@ -170,7 +171,7 @@ func TestGrantSplit(t *testing.T) {
 	ring1.GrantRangeToHost(dot10, dot245, peer2name)
 	require.Equal(t, entries{{Token: start, Peer: peer1name, Free: 10, Version: 1},
 		{Token: dot10, Peer: peer2name, Free: 235},
-		{Token: dot245, Peer: peer1name, Free: 10}}, ring1.Entries)
+		{Token: dot245, Peer: peer1name, Free: 11}}, ring1.Entries)
 
 	ring1.assertInvariants()
 
@@ -181,7 +182,7 @@ func TestGrantSplit(t *testing.T) {
 	require.Equal(t, entries{{Token: start, Peer: peer1name, Free: 10, Version: 2},
 		{Token: dot10, Peer: peer2name, Free: 118, Version: 1},
 		{Token: middle, Peer: peer2name, Free: 117, Version: 1},
-		{Token: dot245, Peer: peer1name, Free: 10, Version: 0}}, ring1.Entries)
+		{Token: dot245, Peer: peer1name, Free: 11, Version: 0}}, ring1.Entries)
 
 	ring1.assertInvariants()
 }
@@ -196,7 +197,7 @@ func TestMergeSimple(t *testing.T) {
 	require.NoError(t, merge(ring2, ring1))
 
 	require.Equal(t, entries{{Token: start, Peer: peer1name, Free: 128, Version: 1},
-		{Token: middle, Peer: peer2name, Free: 127}}, ring1.Entries)
+		{Token: middle, Peer: peer2name, Free: 128}}, ring1.Entries)
 
 	require.Equal(t, ring2.Entries, ring1.Entries)
 
@@ -209,7 +210,7 @@ func TestMergeSimple(t *testing.T) {
 	require.NoError(t, merge(ring1, ring2))
 
 	require.Equal(t, entries{{Token: start, Peer: peer2name, Free: 128, Version: 2},
-		{Token: middle, Peer: peer1name, Free: 127, Version: 1}}, ring1.Entries)
+		{Token: middle, Peer: peer1name, Free: 128, Version: 1}}, ring1.Entries)
 
 	require.Equal(t, ring2.Entries, ring1.Entries)
 }
@@ -257,42 +258,42 @@ func TestMergeMore(t *testing.T) {
 
 	// Claim everything for peer1
 	ring1.ClaimItAll()
-	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 255}})
+	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 256}})
 	assertRing(ring2, []*entry{})
 
 	// Check the Merge sends it to the other ring
 	require.NoError(t, merge(ring2, ring1))
-	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 255}})
-	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
+	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 256}})
+	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 256}})
 
 	// Give everything to peer2
 	ring1.GrantRangeToHost(start, end, peer2name)
-	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}})
-	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
+	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 256, Version: 1}})
+	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 256}})
 
 	require.NoError(t, merge(ring2, ring1))
-	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}})
-	assertRing(ring2, []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}})
+	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 256, Version: 1}})
+	assertRing(ring2, []*entry{{Token: start, Peer: peer2name, Free: 256, Version: 1}})
 
 	// And carve off some space
 	ring2.GrantRangeToHost(middle, end, peer1name)
 	assertRing(ring2, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
-		{Token: middle, Peer: peer1name, Free: 127}})
-	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 255, Version: 1}})
+		{Token: middle, Peer: peer1name, Free: 128}})
+	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 256, Version: 1}})
 
 	// And Merge back
 	require.NoError(t, merge(ring1, ring2))
 	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
-		{Token: middle, Peer: peer1name, Free: 127}})
+		{Token: middle, Peer: peer1name, Free: 128}})
 	assertRing(ring2, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
-		{Token: middle, Peer: peer1name, Free: 127}})
+		{Token: middle, Peer: peer1name, Free: 128}})
 
 	// This should be a no-op
 	require.NoError(t, merge(ring2, ring1))
 	assertRing(ring1, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
-		{Token: middle, Peer: peer1name, Free: 127}})
+		{Token: middle, Peer: peer1name, Free: 128}})
 	assertRing(ring2, []*entry{{Token: start, Peer: peer2name, Free: 128, Version: 2},
-		{Token: middle, Peer: peer1name, Free: 127}})
+		{Token: middle, Peer: peer1name, Free: 128}})
 }
 
 func TestMergeSplit(t *testing.T) {
@@ -300,7 +301,7 @@ func TestMergeSplit(t *testing.T) {
 	ring2 := New(start, end, peer2name)
 
 	// Claim everything for peer2
-	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 255}}
+	ring1.Entries = []*entry{{Token: start, Peer: peer2name, Free: 256}}
 	require.NoError(t, merge(ring2, ring1))
 	require.Equal(t, ring2.Entries, ring1.Entries)
 
@@ -308,12 +309,12 @@ func TestMergeSplit(t *testing.T) {
 	ring2.GrantRangeToHost(dot10, dot245, peer1name)
 	require.Equal(t, entries{{Token: start, Peer: peer2name, Free: 10, Version: 1},
 		{Token: dot10, Peer: peer1name, Free: 235},
-		{Token: dot245, Peer: peer2name, Free: 10}}, ring2.Entries)
+		{Token: dot245, Peer: peer2name, Free: 11}}, ring2.Entries)
 
 	require.NoError(t, merge(ring1, ring2))
 	require.Equal(t, entries{{Token: start, Peer: peer2name, Free: 10, Version: 1},
 		{Token: dot10, Peer: peer1name, Free: 235},
-		{Token: dot245, Peer: peer2name, Free: 10}}, ring1.Entries)
+		{Token: dot245, Peer: peer2name, Free: 11}}, ring1.Entries)
 
 	require.Equal(t, ring2.Entries, ring1.Entries)
 }
@@ -355,13 +356,13 @@ func TestGossip(t *testing.T) {
 
 	// Claim everything for peer1
 	ring1.ClaimItAll()
-	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 255}})
+	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 256}})
 	assertRing(ring2, []*entry{})
 
 	// Check the Merge sends it to the other ring
 	require.NoError(t, merge(ring2, ring1))
-	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 255}})
-	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 255}})
+	assertRing(ring1, []*entry{{Token: start, Peer: peer1name, Free: 256}})
+	assertRing(ring2, []*entry{{Token: start, Peer: peer1name, Free: 256}})
 }
 
 func assertPeersWithSpace(t *testing.T, ring *Ring, start, end address.Address, expected int) []mesh.PeerName {
@@ -526,16 +527,23 @@ func makePeerName(i int) mesh.PeerName {
 	return peer
 }
 
+func makePeers(numPeers int) []mesh.PeerName {
+	peers := make([]mesh.PeerName, numPeers)
+	for i := 0; i < numPeers; i++ {
+		peers[i] = makePeerName(i)
+	}
+	return peers
+}
+
 func TestClaimForPeers(t *testing.T) {
 	const numPeers = 12
 	// Different end to usual so we get a number of addresses that a)
 	// is smaller than the max number of peers, and b) is divisible by
 	// some number of peers. This maximises coverage of edge cases.
 	end := dot10
-	peers := make([]mesh.PeerName, numPeers)
+	peers := makePeers(numPeers)
 	// Test for a range of peer counts
 	for i := 0; i < numPeers; i++ {
-		peers[i] = makePeerName(i)
 		ring := New(start, end, peers[0])
 		ring.ClaimForPeers(peers[:i+1])
 	}
