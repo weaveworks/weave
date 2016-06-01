@@ -19,15 +19,14 @@
 - Add tests for proxy
 * * Add tests for plugin
 
-* Disable multiple subnets
+---> Disable multiple subnets
 * Check that the attach belongs to the main subnet
 
 * Get rid of ethtool tx off for AWSVPC
 
 - Fix `weave status`
----> * Use NewNull()
----> * Bridge Interface String()
-* Fix `weave report` re "no bridge networking"
+- Use NewNull()
+- Fix `weave report` re "no bridge networking"
 
 * Read on VPC routing tables again.
 * When starting AWS VPC Monitor, fail early if there are entries from the subnet // not possible because
