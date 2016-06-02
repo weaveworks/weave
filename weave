@@ -90,7 +90,7 @@ weave stop
       stop-proxy
       stop-plugin
 
-weave reset
+weave reset         [--force]
       rmpeer        <peer_id> ...
 
 
@@ -2153,11 +2153,25 @@ EOF
         stop_plugin
         ;;
     reset)
-        [ $# -eq 0 ] || usage
+        [ $# -eq 0 ] || [ $# -eq 1 -a "$1" = "--force" ] || usage
         plugin_disabled || util_op remove-plugin-network weave || true
         warn_if_stopping_proxy_in_env
-        call_weave DELETE /peer >/dev/null 2>&1 || true
-        fractional_sleep 0.5 # Allow some time for broadcast updates to go out
+        res=0
+        [ "$1" = "--force" ] || check_running $CONTAINER_NAME 2>/dev/null || res=$?
+        case $res in
+            0)
+                call_weave DELETE /peer >/dev/null 2>&1 || true
+                fractional_sleep 0.5 # Allow some time for broadcast updates to go out
+                ;;
+            1)
+                # No such container; assume user already did reset
+                ;;
+            2)
+                echo "ERROR: weave is not running; unable to remove from cluster." >&2
+                echo "Re-launch weave before reset or use --force to override." >&2
+                exit 1
+                ;;
+        esac
         for NAME in $PLUGIN_CONTAINER_NAME $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true
