@@ -135,7 +135,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 		return nil, driver.error("JoinEndpoint", "unable to find network info: %s", err)
 	}
 	name, peerName := vethPair(j.EndpointID)
-	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, nil); err != nil {
+	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, false, nil); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
 	}
 

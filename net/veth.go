@@ -13,7 +13,7 @@ import (
 )
 
 // create and attach a veth to the Weave bridge
-func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, init func(peer netlink.Link) error) (*netlink.Veth, error) {
+func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, keepTXOn bool, init func(peer netlink.Link) error) (*netlink.Veth, error) {
 	bridge, err := netlink.LinkByName(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf(`bridge "%s" not present; did you launch weave?`, bridgeName)
@@ -42,7 +42,7 @@ func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, init func(p
 		if err := netlink.LinkSetMasterByIndex(veth, bridge.Attrs().Index); err != nil {
 			return cleanup(`unable to set master of %s: %s`, name, err)
 		}
-		if bridgeType == Bridge {
+		if bridgeType == Bridge && !keepTXOn {
 			if err := EthtoolTXOff(peerName); err != nil {
 				return cleanup(`unable to set tx off on %q: %s`, peerName, err)
 			}
@@ -111,14 +111,14 @@ func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
 	return err == nil
 }
 
-func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet) error {
+func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool) error {
 	if !interfaceExistsInNamespace(ns, ifName) {
 		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
 		if len(id) > maxIDLen {
 			id = id[:maxIDLen] // trim passed ID if too long
 		}
 		name, peerName := vethPrefix+"pl"+id, vethPrefix+"pg"+id
-		_, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, func(veth netlink.Link) error {
+		_, err := CreateAndAttachVeth(name, peerName, bridgeName, mtu, keepTXOn, func(veth netlink.Link) error {
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}

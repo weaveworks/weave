@@ -647,7 +647,7 @@ EOF
         fi
     fi
 
-    [ "$1" = "--without-ethtool" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
+    [ "$1" = "--without-ethtool" -o -n "$AWSVPC" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
 
     ip link set dev $BRIDGE up
 

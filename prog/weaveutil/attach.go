@@ -21,6 +21,7 @@ func attach(args []string) error {
 	}
 
 	client := api.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
+	keepTXOn := false
 	isAWSVPC := false
 	// In a case of an error, we skip applying necessary steps for AWSVPC, because
 	// "attach" should work without the weave router running.
@@ -28,6 +29,7 @@ func attach(args []string) error {
 		fmt.Fprintf(os.Stderr, "unable to determine monitor: %s; skipping AWSVPC initialization\n", err)
 	} else if mon == "awsvpc" {
 		isAWSVPC = true
+		keepTXOn = true
 	}
 
 	withMulticastRoute := true
@@ -71,7 +73,7 @@ func attach(args []string) error {
 		}
 	}
 
-	err = weavenet.AttachContainer(nsContainer, fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs)
+	err = weavenet.AttachContainer(nsContainer, fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs, keepTXOn)
 	// If we detected an error but the container has died, tell the user that instead.
 	if err != nil && !processExists(pid) {
 		err = fmt.Errorf("Container %s died", args[0])
