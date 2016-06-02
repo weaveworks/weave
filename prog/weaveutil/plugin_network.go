@@ -47,6 +47,18 @@ func removePluginNetwork(args []string) error {
 	}
 	err = d.RemoveNetwork(networkName)
 	if _, ok := err.(*docker.NoSuchNetwork); !ok && err != nil {
+		if info, err2 := d.NetworkInfo(networkName); err2 == nil {
+			if len(info.Containers) > 0 {
+				containers := ""
+				for container := range info.Containers {
+					containers += fmt.Sprintf("  %.12s ", container)
+				}
+				return fmt.Errorf(`WARNING: the following containers are still attached to network %q:
+%s
+Docker operations involving those containers may pause or fail
+while Weave is not running`, networkName, containers)
+			}
+		}
 		return fmt.Errorf("unable to remove network: %s", err)
 	}
 	return nil

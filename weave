@@ -1736,12 +1736,8 @@ plugin_disabled() {
     [ -n "$WEAVE_NO_PLUGIN" ] || ! check_docker_server_api_version 1.21
 }
 
-warn_plugin_active() {
-    echo "WARNING: docker may hang in this state; re-launch weave and remove attached containers before shutting down" >&2
-}
-
 stop_plugin() {
-    util_op remove-plugin-network weave || warn_plugin_active
+    util_op remove-plugin-network weave || true
     stop $PLUGIN_CONTAINER_NAME "Plugin"
 }
 
@@ -2178,7 +2174,7 @@ EOF
         ;;
     reset)
         [ $# -eq 0 ] || usage
-        plugin_disabled || util_op remove-plugin-network weave || warn_plugin_active
+        plugin_disabled || util_op remove-plugin-network weave || true
         warn_if_stopping_proxy_in_env
         call_weave DELETE /peer >/dev/null 2>&1 || true
         fractional_sleep 0.5 # Allow some time for broadcast updates to go out
