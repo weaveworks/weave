@@ -174,4 +174,8 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		transferred := alloc.AdminTakeoverRanges(ident)
 		fmt.Fprintf(w, "%d IPs taken over from %s\n", transferred, ident)
 	})
+
+	router.Methods("GET").Path("/monitor").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, alloc.Monitor())
+	})
 }

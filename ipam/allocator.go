@@ -546,6 +546,14 @@ func (alloc *Allocator) PeerGone(peerName mesh.PeerName) {
 	}
 }
 
+func (alloc *Allocator) Monitor() string {
+	resultChan := make(chan string)
+	alloc.actionChan <- func() {
+		resultChan <- alloc.monitor.String()
+	}
+	return <-resultChan
+}
+
 func decodeRange(msg []byte) (r address.Range, err error) {
 	decoder := gob.NewDecoder(bytes.NewReader(msg))
 	return r, decoder.Decode(&r)
