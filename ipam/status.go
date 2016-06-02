@@ -14,7 +14,6 @@ type Status struct {
 	Entries          []EntryStatus
 	PendingClaims    []ClaimStatus
 	PendingAllocates []string
-	Monitor          string
 }
 
 type EntryStatus struct {
@@ -56,8 +55,7 @@ func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
 			defaultSubnet.String(),
 			newEntryStatusSlice(allocator),
 			newClaimStatusSlice(allocator),
-			newAllocateIdentSlice(allocator),
-			allocator.monitor.String()}
+			newAllocateIdentSlice(allocator)}
 	}
 
 	return <-resultChan

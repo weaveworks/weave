@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"syscall"
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/vishvananda/netns"
 
+	"github.com/weaveworks/weave/api"
+	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 )
 
@@ -17,10 +20,26 @@ func attach(args []string) error {
 		cmdUsage("attach-container", "[--no-multicast-route] <container-id> <bridge-name> <mtu> <cidr>...")
 	}
 
+	client := api.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
+	mon, err := client.Monitor()
+	if err != nil {
+		//return fmt.Errorf("unable to determine monitor: %s", err)
+	}
+	isAWSVPC := mon == "awsvpc"
+	if isAWSVPC {
+		_, err := client.DefaultSubnet()
+		if err != nil {
+			//return fmt.Errorf("unable to determine default subnet: %s", err)
+		}
+	}
+
 	withMulticastRoute := true
 	if args[0] == "--no-multicast-route" {
 		withMulticastRoute = false
 		args = args[1:]
+	}
+	if isAWSVPC {
+		withMulticastRoute = false
 	}
 
 	pid, nsContainer, err := containerPidAndNs(args[0])
@@ -40,6 +59,7 @@ func attach(args []string) error {
 	if err != nil {
 		return err
 	}
+
 	err = weavenet.AttachContainer(nsContainer, fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs)
 	// If we detected an error but the container has died, tell the user that instead.
 	if err != nil && !processExists(pid) {

@@ -533,9 +533,10 @@ random_mac() {
 
 util_op() {
     if command_exists weaveutil ; then
-        weaveutil "$@"
+        WEAVE_HTTP_ADDR=$WEAVE_HTTP_ADDR weaveutil "$@"
     else
         docker run --rm --privileged --net=host --pid=host $(docker_sock_options) \
+            -e WEAVE_HTTP_ADDR \
             --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
     fi
 }
