@@ -14,31 +14,31 @@ type AWSVPCConnection struct {
 	errorChan       chan error
 }
 
-func (conn AWSVPCConnection) Confirm() {
+func (conn *AWSVPCConnection) Confirm() {
 	// We close the channel to notify mesh that the connection has been established.
 	close(conn.establishedChan)
 }
 
-func (conn AWSVPCConnection) EstablishedChannel() <-chan struct{} {
+func (conn *AWSVPCConnection) EstablishedChannel() <-chan struct{} {
 	return conn.establishedChan
 }
 
-func (conn AWSVPCConnection) ErrorChannel() <-chan error {
+func (conn *AWSVPCConnection) ErrorChannel() <-chan error {
 	return conn.errorChan
 }
 
-func (conn AWSVPCConnection) Stop() {}
+func (conn *AWSVPCConnection) Stop() {}
 
-func (conn AWSVPCConnection) ControlMessage(tag byte, msg []byte) {
+func (conn *AWSVPCConnection) ControlMessage(tag byte, msg []byte) {
 }
 
-func (conn AWSVPCConnection) DisplayName() string {
+func (conn *AWSVPCConnection) DisplayName() string {
 	return "awsvpc"
 }
 
 // OverlayForwarder
 
-func (conn AWSVPCConnection) Forward(key ForwardPacketKey) FlowOp {
+func (conn *AWSVPCConnection) Forward(key ForwardPacketKey) FlowOp {
 	return NoopFlowOp{}
 }
 
