@@ -21,16 +21,13 @@ func attach(args []string) error {
 	}
 
 	client := api.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), common.Log)
-	mon, err := client.Monitor()
-	if err != nil {
-		//return fmt.Errorf("unable to determine monitor: %s", err)
-	}
-	isAWSVPC := mon == "awsvpc"
-	if isAWSVPC {
-		_, err := client.DefaultSubnet()
-		if err != nil {
-			//return fmt.Errorf("unable to determine default subnet: %s", err)
-		}
+	isAWSVPC := false
+	// In a case of an error, we skip applying necessary steps for AWSVPC, because
+	// "attach" should work without the weave router running.
+	if mon, err := client.Monitor(); err != nil {
+		fmt.Fprintf(os.Stderr, "unable to determine monitor: %s; skipping AWSVPC initialization\n", err)
+	} else if mon == "awsvpc" {
+		isAWSVPC = true
 	}
 
 	withMulticastRoute := true
@@ -60,12 +57,36 @@ func attach(args []string) error {
 		return err
 	}
 
+	if isAWSVPC {
+		// Currently, we allow only IP addresses from the default subnet
+		if defaultSubnet, err := client.DefaultSubnet(); err != nil {
+			fmt.Fprintf(os.Stderr, "unable to retrieve default subnet: %s; skipping AWSVPC checks\n", err)
+		} else {
+			for _, cidr := range cidrs {
+				if !sameSubnet(cidr, defaultSubnet) {
+					format := "AWSVPC constraints violation: %s does not belong to the default subnet %s"
+					return fmt.Errorf(format, cidr, defaultSubnet)
+				}
+			}
+		}
+	}
+
 	err = weavenet.AttachContainer(nsContainer, fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs)
 	// If we detected an error but the container has died, tell the user that instead.
 	if err != nil && !processExists(pid) {
 		err = fmt.Errorf("Container %s died", args[0])
 	}
 	return err
+}
+
+// sameSubnet checks whether ip belongs to network's subnet
+func sameSubnet(ip *net.IPNet, network *net.IPNet) bool {
+	if network.Contains(ip.IP) {
+		i1, i2 := ip.Mask.Size()
+		n1, n2 := network.Mask.Size()
+		return i1 == n1 && i2 == n2
+	}
+	return false
 }
 
 func containerPidAndNs(containerID string) (int, netns.NsHandle, error) {

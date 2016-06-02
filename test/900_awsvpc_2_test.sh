@@ -6,6 +6,7 @@
 [ -z "$AWS" ] && exit 0
 
 UNIVERSE=10.32.0.0/12
+SUBNET=10.32.42.0/24
 CIDR1=10.32.0.0/13
 CIDR2=10.40.0.0/14
 CIDR3=10.44.0.0/14
@@ -87,6 +88,9 @@ proxy_start_container $HOST1 -di --name=c3
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR1 $INSTANCE1"
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR2 $INSTANCE1"
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3 $INSTANCE2"
+
+# Starting container within non-default subnet should fail
+assert_raises "proxy_start_container $HOST1 --name=c5 -e WEAVE_CIDR=net:$SUBNET" 1
 
 # Check that we do not use fastdp
 assert_raises "no_fastdp $HOST1"

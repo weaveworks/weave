@@ -20,7 +20,9 @@
 - Add tests for proxy
 * Add tests for plugin
 
----> Disable multiple subnets
+---> Disable multiple subnets (iprangecidr - universe, ipsubnetcidr - default?)
+* Check what happens when we use default subnet which is larger than the universe
+* Check that ipalloc-range does not overlap with the host subnet
 * What happens if $RCIDR is not found
 
 * Do fuzz testing
