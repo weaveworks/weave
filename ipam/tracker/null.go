@@ -13,7 +13,3 @@ func NewNullTracker() *NullTracker {
 func (t *NullTracker) HandleUpdate(prevRanges, currRanges []address.Range) error {
 	return nil
 }
-
-func (t *NullTracker) String() string {
-	return "null"
-}

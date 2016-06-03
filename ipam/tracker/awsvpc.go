@@ -110,10 +110,6 @@ func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range) err
 	return nil
 }
 
-func (t *AWSVPCTracker) String() string {
-	return "awsvpc"
-}
-
 func (t *AWSVPCTracker) createVPCRoute(cidr string) (*ec2.CreateRouteOutput, error) {
 	route := &ec2.CreateRouteInput{
 		RouteTableId:         &t.routeTableID,

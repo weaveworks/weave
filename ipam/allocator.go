@@ -74,7 +74,6 @@ type Allocator struct {
 	isKnownPeer       func(mesh.PeerName) bool
 	quorum            func() uint
 	now               func() time.Time
-	tracker           tracker.LocalRangeTracker
 }
 
 type Config struct {
@@ -94,6 +93,7 @@ type Config struct {
 func NewAllocator(config Config) *Allocator {
 	var participant paxos.Participant
 	var alloc *Allocator
+	var updateCallback func([]address.Range, []address.Range)
 
 	if config.IsObserver {
 		participant = paxos.NewObserver()
@@ -101,7 +101,6 @@ func NewAllocator(config Config) *Allocator {
 		participant = paxos.NewNode(config.OurName, config.OurUID, 0)
 	}
 
-	var updateCallback func([]address.Range, []address.Range)
 	if config.Tracker != nil {
 		updateCallback = func(prev []address.Range, curr []address.Range) {
 			err := config.Tracker.HandleUpdate(prev, curr)
@@ -124,7 +123,6 @@ func NewAllocator(config Config) *Allocator {
 		quorum:      config.Quorum,
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
-		tracker:     config.Tracker,
 	}
 	return alloc
 }
@@ -545,14 +543,6 @@ func (alloc *Allocator) PeerGone(peerName mesh.PeerName) {
 			delete(alloc.nicknames, peerName)
 		}
 	}
-}
-
-func (alloc *Allocator) LocalRangeTracker() string {
-	resultChan := make(chan string)
-	alloc.actionChan <- func() {
-		resultChan <- alloc.tracker.String()
-	}
-	return <-resultChan
 }
 
 func decodeRange(msg []byte) (r address.Range, err error) {

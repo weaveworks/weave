@@ -14,5 +14,4 @@ type LocalRangeTracker interface {
 	// Both slices have to be sorted in increasing order.
 	// Adjacent ranges within each slice might appear as separate ranges.
 	HandleUpdate(prevRanges, currRanges []address.Range) error
-	String() string
 }

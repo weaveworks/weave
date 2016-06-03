@@ -532,16 +532,6 @@ func (r *Ring) PickPeerForTransfer(isValid func(mesh.PeerName) bool) mesh.PeerNa
 	return mesh.UnknownPeerName
 }
 
-func (r *Ring) callUpdateCallback() func() {
-	if r.updateCallback == nil {
-		return func() {}
-	}
-	ranges := r.OwnedRanges()
-	return func() {
-		r.updateCallback(ranges, r.OwnedRanges())
-	}
-}
-
 // Transfer will mark all entries associated with 'from' peer as owned by 'to' peer
 // and return ranges indicating the new space we picked up
 func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
@@ -596,6 +586,16 @@ func (r *Ring) PeerNames() map[mesh.PeerName]struct{} {
 	}
 
 	return res
+}
+
+func (r *Ring) callUpdateCallback() func() {
+	if r.updateCallback == nil {
+		return func() {}
+	}
+	ranges := r.OwnedRanges()
+	return func() {
+		r.updateCallback(ranges, r.OwnedRanges())
+	}
 }
 
 func init() {
