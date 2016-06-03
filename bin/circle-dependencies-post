@@ -25,7 +25,7 @@ fi
 
 source "$STATE"
 
-mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR
+mkdir -p $SRCDIR && cp -r $(pwd)/ $(dirname $SRCDIR)
 
 if [ -n "$TEST_AND_PUBLISH" ] ; then
     bin/setup-circleci-secrets "$SECRET_PASSWORD"
