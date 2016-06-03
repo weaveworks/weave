@@ -224,19 +224,20 @@ func (t *AWSVPCTracker) infof(fmt string, args ...interface{}) {
 // Helpers
 
 // removeCommon filters out CIDR ranges which are contained in both a and b slices.
+// Both slices have to be sorted in increasing order.
 func removeCommon(a, b []address.CIDR) (newA, newB []address.CIDR) {
 	i, j := 0, 0
 
 	for i < len(a) && j < len(b) {
-		switch {
-		case a[i].Equal(b[j]):
+		if a[i].Equal(b[j]) {
 			i++
 			j++
 			continue
-		case a[i].End() < b[j].End():
+		}
+		if a[i].End() < b[j].End() {
 			newA = append(newA, a[i])
 			i++
-		default:
+		} else {
 			newB = append(newB, b[j])
 			j++
 		}

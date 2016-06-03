@@ -11,7 +11,7 @@ type LocalRangeTracker interface {
 	// prevRanges corresponds to ranges which were owned by a peer before
 	// a change in the ring, while currRanges to the ones which are currently
 	// owned by the peer.
+	// Both slices have to be sorted in increasing order.
 	HandleUpdate(prevRanges, currRanges []address.Range) error
-	// String returns a user-friendly name of the tracker.
 	String() string
 }
