@@ -107,12 +107,22 @@ assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3 $INSTANCE2"
 
 weave_on $HOST2 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST1
 
+echo ">>>>>>>>>> $HOST1"
+run_on $HOST1 docker logs weave
+echo "<<<<<<<<<<<<<<"
+
+
 weave_on $HOST1 reset
+sleep 1
 ## host1 has transferred previously owned ranges to host2
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR1"
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR2"
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR3"
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $UNIVERSE $INSTANCE2"
+
+echo ">>>>>>>>>> $HOST2"
+run_on $HOST2 docker logs weave
+echo "<<<<<<<<<<<<<<"
 
 cleanup_routetable $VPC_ROUTE_TABLE_ID
 
