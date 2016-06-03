@@ -242,16 +242,17 @@ func removeCommon(a, b []address.CIDR) (newA, newB []address.CIDR) {
 
 	for i < len(a) && j < len(b) {
 		switch {
-		case a[i].Equal(b[j]):
-			i++
-			j++
-		case a[i].End() < b[j].End():
+		case a[i].Start() < b[j].Start() || a[i].End() < b[j].End():
 			newA = append(newA, a[i])
 			i++
-		default:
+		case a[i].Start() > b[j].Start() || a[i].End() > b[j].End():
 			newB = append(newB, b[j])
 			j++
+		default:
+			i++
+			j++
 		}
+
 	}
 	newA = append(newA, a[i:]...)
 	newB = append(newB, b[j:]...)
