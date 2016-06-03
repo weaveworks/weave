@@ -114,7 +114,7 @@ func NewAllocator(config Config) *Allocator {
 		ourName:     config.OurName,
 		seed:        config.Seed,
 		universe:    config.Universe,
-		ring:        ring.NewWithCallback(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, updateCallback),
+		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, updateCallback),
 		owned:       make(map[string]ownedData),
 		db:          config.Db,
 		paxos:       participant,

@@ -96,11 +96,7 @@ func (r *Ring) checkEntries(entries entries) error {
 }
 
 // New creates an empty ring belonging to peer.
-func New(start, end address.Address, peer mesh.PeerName) *Ring {
-	return NewWithCallback(start, end, peer, nil)
-}
-
-func NewWithCallback(start, end address.Address, peer mesh.PeerName, f func([]address.Range, []address.Range)) *Ring {
+func New(start, end address.Address, peer mesh.PeerName, f func([]address.Range, []address.Range)) *Ring {
 	common.Assert(start < end)
 
 	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0), updateCallback: f}
