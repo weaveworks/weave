@@ -534,7 +534,9 @@ func callWeaveAttach(container *docker.Container, args []string) error {
 }
 
 func (proxy *Proxy) weaveCIDRs(networkMode string, env []string) ([]string, error) {
-	if networkMode == "host" || strings.HasPrefix(networkMode, "container:") {
+	if networkMode == "host" || strings.HasPrefix(networkMode, "container:") ||
+		// Anything else, other than blank/none/default/bridge, is some sort of network plugin
+		(networkMode != "" && networkMode != "none" && networkMode != "default" && networkMode != "bridge") {
 		return nil, fmt.Errorf("the container has '--net=%s'", networkMode)
 	}
 	for _, e := range env {
