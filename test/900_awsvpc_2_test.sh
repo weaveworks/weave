@@ -114,15 +114,21 @@ echo "<<<<<<<<<<<<<<"
 
 weave_on $HOST1 reset
 sleep 1
+
+aws ec2 describe-route-tables --route-table-ids $VPC_ROUTE_TABLE_ID
 ## host1 has transferred previously owned ranges to host2
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR1"
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR2"
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR3"
+
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $UNIVERSE $INSTANCE2"
 
 echo ">>>>>>>>>> $HOST2"
 run_on $HOST2 docker logs weave
 echo "<<<<<<<<<<<<<<"
+
+
+aws ec2 describe-route-tables --route-table-ids $VPC_ROUTE_TABLE_ID
 
 cleanup_routetable $VPC_ROUTE_TABLE_ID
 
