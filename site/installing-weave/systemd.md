@@ -19,7 +19,7 @@ normally placed in `/etc/systemd/system/weave.service`.
     After=docker.service
     [Service]
     EnvironmentFile=-/etc/sysconfig/weave
-    ExecStartPre=/usr/local/bin/weave launch $PEERS
+    ExecStartPre=/usr/local/bin/weave launch --no-restart $PEERS
     ExecStart=/usr/bin/docker attach weave
     ExecStop=/usr/local/bin/weave stop
     [Install]
