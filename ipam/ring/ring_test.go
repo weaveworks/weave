@@ -802,29 +802,3 @@ func (es entries) String() string {
 	fmt.Fprintf(&buffer, "]")
 	return buffer.String()
 }
-
-// TODO(mp) Move the helpers bellow to testing_utils or so to DRY.
-
-func ip(s string) address.Address {
-	addr, _ := address.ParseIP(s)
-	return addr
-}
-
-func TestOwnedAndMergedRanges(t *testing.T) {
-	ring1 := New(start, end, peer1name)
-
-	ring1.Entries.insert(
-		entry{Token: start, Peer: peer1name, Free: address.Length(dot10, start)})
-	ring1.Entries.insert(
-		entry{Token: dot10, Peer: peer1name, Free: address.Length(dot245, dot10)})
-	ring1.Entries.insert(
-		entry{Token: dot245, Peer: peer2name, Free: address.Length(dot250, dot245)})
-	ring1.Entries.insert(
-		entry{Token: dot250, Peer: peer1name, Free: address.Length(end, dot250)})
-
-	require.Equal(t,
-		[]address.Range{
-			{Start: start, End: dot245},
-			{Start: dot250, End: end},
-		}, ring1.OwnedAndMergedRanges())
-}

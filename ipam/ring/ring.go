@@ -348,25 +348,6 @@ func (r *Ring) OwnedRanges() (result []address.Range) {
 	return r.splitRangesOverZero(result)
 }
 
-// OwnedAndMergedRanges does the same as OwnedRanges, except that it returns
-// merged ranges.
-func (r *Ring) OwnedAndMergedRanges() (result []address.Range) {
-	r.assertInvariants()
-
-	for i, entry := range r.Entries {
-		if entry.Peer == r.Peer {
-			nextEntry := r.Entries.entry(i + 1)
-			if last := len(result) - 1; last >= 0 && result[last].End == entry.Token {
-				result[last].End = nextEntry.Token
-			} else {
-				result = append(result, address.Range{Start: entry.Token, End: nextEntry.Token})
-			}
-		}
-	}
-
-	return r.splitRangesOverZero(result)
-}
-
 // For printing status
 type RangeInfo struct {
 	Peer mesh.PeerName

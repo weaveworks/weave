@@ -71,7 +71,7 @@ func NewAWSVPCTracker() (*AWSVPCTracker, error) {
 func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range) error {
 	t.debugf("replacing %q entries by %q", prevRanges, currRanges)
 
-	prev, curr := removeCommon(address.NewCIDRs(prevRanges), address.NewCIDRs(currRanges))
+	prev, curr := removeCommon(address.NewCIDRs(merge(prevRanges)), address.NewCIDRs(merge(currRanges)))
 
 	// It might make sense to do the removal first and then add entries
 	// because of the 50 routes limit. However, in such case a container might
@@ -222,6 +222,22 @@ func (t *AWSVPCTracker) infof(fmt string, args ...interface{}) {
 }
 
 // Helpers
+
+// merge merges adjacent range entries.
+// The given slice has to be sorted in increasing order.
+func merge(r []address.Range) []address.Range {
+	var merged []address.Range
+
+	for i := range r {
+		if prev := len(merged) - 1; prev >= 0 && merged[prev].End == r[i].Start {
+			merged[prev].End = r[i].End
+		} else {
+			merged = append(merged, r[i])
+		}
+	}
+
+	return merged
+}
 
 // removeCommon filters out CIDR ranges which are contained in both a and b slices.
 // Both slices have to be sorted in increasing order.

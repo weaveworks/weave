@@ -434,7 +434,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
 		alloc.cancelOps(&alloc.pendingPrimes)
-		err := alloc.tracker.HandleUpdate(alloc.ring.OwnedAndMergedRanges(), nil)
+		err := alloc.tracker.HandleUpdate(alloc.ring.OwnedRanges(), nil)
 		if err != nil {
 			alloc.errorf("HandleUpdate failed: %s", err)
 		}
@@ -469,7 +469,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 			return
 		}
 
-		oldRanges := alloc.ring.OwnedAndMergedRanges()
+		oldRanges := alloc.ring.OwnedRanges()
 		newRanges := alloc.ring.Transfer(peername, alloc.ourName)
 
 		if len(newRanges) == 0 {
@@ -481,7 +481,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 		alloc.ringUpdated()
 		after := alloc.space.NumFreeAddresses()
 
-		err = alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+		err = alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedRanges())
 		if err != nil {
 			alloc.errorf("HandleUpdate failed: %s", err)
 		}
@@ -720,7 +720,7 @@ func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
 	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
 	// We assume that the peer has not possessed any address ranges before
-	err := alloc.tracker.HandleUpdate(nil, alloc.ring.OwnedAndMergedRanges())
+	err := alloc.tracker.HandleUpdate(nil, alloc.ring.OwnedRanges())
 	if err != nil {
 		alloc.errorf("HandleUpdate failed: %s", err)
 	}
@@ -819,13 +819,13 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	// If someone sent us a ring, merge it into ours. Note this will move us
 	// out of the awaiting-consensus state if we didn't have a ring already.
 	case data.Ring != nil:
-		oldRanges = alloc.ring.OwnedAndMergedRanges()
+		oldRanges = alloc.ring.OwnedRanges()
 		updated, err := alloc.ring.Merge(*data.Ring)
 		switch err {
 		case nil:
 			if updated {
 				alloc.pruneNicknames()
-				err := alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+				err := alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedRanges())
 				if err != nil {
 					alloc.errorf("HandleUpdate failed: %s", err)
 				}
@@ -900,10 +900,10 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 		return
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
-	oldRanges := alloc.ring.OwnedAndMergedRanges()
+	oldRanges := alloc.ring.OwnedRanges()
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
 	alloc.persistRing()
-	err := alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+	err := alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedRanges())
 	if err != nil {
 		alloc.errorf("HandleUpdate failed: %s", err)
 	}

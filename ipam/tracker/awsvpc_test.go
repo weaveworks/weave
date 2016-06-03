@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	r0to127     = cidr("10.0.0.0", "10.0.0.127")
 	r0to255     = cidr("10.0.0.0", "10.0.0.255")
 	r0to3       = cidr("10.0.0.0", "10.0.0.3")
 	r2to3       = cidr("10.0.0.2", "10.0.0.3")
@@ -18,6 +19,7 @@ var (
 	r24to27     = cidr("10.0.0.24", "10.0.0.27")
 	r128to255   = cidr("10.0.0.128", "10.0.0.255")
 	r1dot0to255 = cidr("10.0.1.0", "10.0.1.255")
+	r2dot0to255 = cidr("10.0.2.0", "10.0.2.255")
 )
 
 func TestRemoveCommonNoChanges(t *testing.T) {
@@ -52,6 +54,15 @@ func TestRemoveCommon(t *testing.T) {
 	newA, newB := removeCommon(a, b)
 	require.Equal(t, []address.CIDR{r0to3, r22to23, r24to27}, newA, "")
 	require.Equal(t, []address.CIDR{r2to3, r12to13, r1dot0to255}, newB, "")
+}
+
+func TestMerge(t *testing.T) {
+	ranges := []address.Range{
+		r0to127.Range(),
+		r128to255.Range(),
+		r2dot0to255.Range(),
+	}
+	require.Equal(t, []address.Range{r0to255.Range(), r2dot0to255.Range()}, merge(ranges))
 }
 
 // Helper

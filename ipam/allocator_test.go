@@ -744,23 +744,25 @@ func TestShutdownWithTracker(t *testing.T) {
 		// This should uniquely match HandleUpdate invocation on peer2 which
 		// happens after peer1 notified peer2 about the donation due to its
 		// termination:
-		case !done && len(p.old) == 1 && len(p.new) == 1:
+		case !done && len(p.old) == 1 && len(p.new) == 2:
 			require.Equal(t, addrRange("10.0.0.2", "10.0.0.3"), p.old[0], "")
-			require.Equal(t, addrRange("10.0.0.0", "10.0.0.3"), p.new[0], "")
+			require.Equal(t, addrRange("10.0.0.0", "10.0.0.1"), p.new[0], "")
+			require.Equal(t, addrRange("10.0.0.2", "10.0.0.3"), p.new[1], "")
 			// peer2 has received peer1's previously owned ranges
-
 			done = true
 		default:
 			continue
 		}
 	}
-	require.True(t, done, "")
+	require.True(t, done)
 
 	// Shutdown peer2
 	allocs[1].Shutdown()
 	p := <-trackChan
-	require.Equal(t, []address.Range{addrRange("10.0.0.0", "10.0.0.3")}, p.old, "")
-	require.Len(t, p.new, 0, "")
+	require.Equal(t,
+		[]address.Range{addrRange("10.0.0.0", "10.0.0.1"), addrRange("10.0.0.2", "10.0.0.3")},
+		p.old)
+	require.Len(t, p.new, 0)
 }
 
 func flush(c chan rangePair, count int) {
