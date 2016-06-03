@@ -157,16 +157,12 @@ func makeAllocatorWithTracker(name string, cidrStr string, quorum uint, track tr
 	}), cidr
 }
 
-func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string,
-	quorum uint) (*Allocator, address.CIDR) {
-
+func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.CIDR) {
 	return makeAllocatorWithMockGossipAndTracker(t, name, universeCIDR, quorum,
 		tracker.NewNullTracker())
 }
 
-func makeAllocatorWithMockGossipAndTracker(t *testing.T, name string, universeCIDR string, quorum uint,
-	track tracker.LocalRangeTracker) (*Allocator, address.CIDR) {
-
+func makeAllocatorWithMockGossipAndTracker(t *testing.T, name string, universeCIDR string, quorum uint, track tracker.LocalRangeTracker) (*Allocator, address.CIDR) {
 	alloc, subnet := makeAllocatorWithTracker(name, universeCIDR, quorum, track)
 	gossip := &mockGossipComms{T: t, name: name}
 	alloc.SetInterfaces(gossip)
@@ -232,17 +228,14 @@ func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestR
 	return makeNetworkOfAllocatorsWithTracker(size, cidr, tracker.NewNullTracker())
 }
 
-func makeNetworkOfAllocatorsWithTracker(size int, cidr string,
-	track tracker.LocalRangeTracker) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
-
+func makeNetworkOfAllocatorsWithTracker(size int, cidr string, track tracker.LocalRangeTracker) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
 	gossipRouter := gossip.NewTestRouter(0.0)
 	allocs := make([]*Allocator, size)
 	var subnet address.CIDR
 
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
-		alloc, subnet = makeAllocatorWithTracker(fmt.Sprintf("%02d:00:00:02:00:00", i),
-			cidr, uint(size/2+1), track)
+		alloc, subnet = makeAllocatorWithTracker(fmt.Sprintf("%02d:00:00:02:00:00", i), cidr, uint(size/2+1), track)
 		alloc.SetInterfaces(gossipRouter.Connect(alloc.ourName, alloc))
 		alloc.Start()
 		allocs[i] = alloc

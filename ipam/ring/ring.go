@@ -20,11 +20,11 @@ import (
 
 // Ring represents the ring itself
 type Ring struct {
-	Start, End     address.Address // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
-	Peer           mesh.PeerName   // name of peer owning this ring instance
-	Entries        entries         // list of entries sorted by token
-	Seeds          []mesh.PeerName // peers with which the ring was seeded
-	updateCallback func(prev, curr []address.Range)
+	Start, End address.Address // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
+	Peer       mesh.PeerName   // name of peer owning this ring instance
+	Entries    entries         // list of entries sorted by token
+	Seeds      []mesh.PeerName // peers with which the ring was seeded
+	onUpdate   func(prev, curr []address.Range)
 }
 
 func (r *Ring) assertInvariants() {
@@ -95,11 +95,19 @@ func (r *Ring) checkEntries(entries entries) error {
 	return nil
 }
 
+func (r *Ring) trackUpdates() func() {
+	if r.onUpdate == nil {
+		return func() {}
+	}
+	ranges := r.OwnedRanges()
+	return func() { r.onUpdate(ranges, r.OwnedRanges()) }
+}
+
 // New creates an empty ring belonging to peer.
 func New(start, end address.Address, peer mesh.PeerName, f func([]address.Range, []address.Range)) *Ring {
 	common.Assert(start < end)
 
-	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0), updateCallback: f}
+	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0), onUpdate: f}
 	ring.updateExportedVariables()
 	return ring
 }
@@ -127,7 +135,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 	//fmt.Printf("%s GrantRangeToHost [%v,%v) -> %s\n", r.Peer, start, end, peer)
 
 	r.assertInvariants()
-	defer r.callUpdateCallback()()
+	defer r.trackUpdates()()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
@@ -195,7 +203,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 // got updated as a result.
 func (r *Ring) Merge(gossip Ring) (bool, error) {
 	r.assertInvariants()
-	defer r.callUpdateCallback()()
+	defer r.trackUpdates()()
 	defer r.updateExportedVariables()
 
 	// Don't panic when checking the gossiped in ring.
@@ -376,15 +384,24 @@ func (r *Ring) AllRangeInfo() (result []RangeInfo) {
 func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	common.Assert(r.Empty())
 
-	defer r.callUpdateCallback()()
+	defer r.trackUpdates()()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
+
+	r.createEntries(peers)
+	r.Seeds = peers
+}
+
+// createEntries subdivides the [from,to) (CIDR) range for the given peers
+// and creates entries for the CIDR-aligned subranges.
+func (r *Ring) createEntries(peers []mesh.PeerName) {
+	var subdivide func(from, to address.Address, peers []mesh.PeerName)
+
 	defer func() {
 		e := r.Entries[len(r.Entries)-1]
 		common.Assert(address.Add(e.Token, address.Offset(e.Free)) == r.End)
 	}()
 
-	var subdivide func(from, to address.Address, peers []mesh.PeerName)
 	subdivide = func(from, to address.Address, peers []mesh.PeerName) {
 		share := address.Length(to, from)
 		if share == 0 {
@@ -398,9 +415,7 @@ func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 		subdivide(from, mid, peers[:len(peers)/2])
 		subdivide(address.Add(mid, address.Offset(share%2)), to, peers[len(peers)/2:])
 	}
-
 	subdivide(r.Start, r.End, peers)
-	r.Seeds = peers
 }
 
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[mesh.PeerName]string) {
@@ -532,7 +547,7 @@ func (r *Ring) PickPeerForTransfer(isValid func(mesh.PeerName) bool) mesh.PeerNa
 // and return ranges indicating the new space we picked up
 func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 	r.assertInvariants()
-	defer r.callUpdateCallback()()
+	defer r.trackUpdates()()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
@@ -582,16 +597,6 @@ func (r *Ring) PeerNames() map[mesh.PeerName]struct{} {
 	}
 
 	return res
-}
-
-func (r *Ring) callUpdateCallback() func() {
-	if r.updateCallback == nil {
-		return func() {}
-	}
-	ranges := r.OwnedRanges()
-	return func() {
-		r.updateCallback(ranges, r.OwnedRanges())
-	}
 }
 
 func init() {
