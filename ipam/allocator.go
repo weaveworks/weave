@@ -481,10 +481,9 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 		alloc.ringUpdated()
 		after := alloc.space.NumFreeAddresses()
 
-		// TODO(mp): Return error over resultChan
 		err = alloc.monitor.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
 		if err != nil {
-			alloc.errorf("HandleUpdate: %s", err)
+			alloc.errorf("HandleUpdate failed: %s", err)
 		}
 
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
@@ -828,7 +827,7 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 				alloc.pruneNicknames()
 				err := alloc.monitor.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
 				if err != nil {
-					return err
+					alloc.errorf("HandleUpdate failed: %s", err)
 				}
 				alloc.ringUpdated()
 			}
