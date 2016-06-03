@@ -22,7 +22,7 @@ var (
 	r2dot0to255 = cidr("10.0.2.0", "10.0.2.255")
 )
 
-func TestRemoveCommonNoChanges(t *testing.T) {
+func TestRemoveCommon(t *testing.T) {
 	a := []address.CIDR{r0to255}
 	b := []address.CIDR{r0to255}
 	newA, newB := removeCommon(a, b)
@@ -46,12 +46,10 @@ func TestRemoveCommonNoChanges(t *testing.T) {
 	newA, newB = removeCommon(a, b)
 	require.Equal(t, a, newA, "")
 	require.Equal(t, b, newB, "")
-}
 
-func TestRemoveCommon(t *testing.T) {
-	a := []address.CIDR{r0to3, r18to19, r22to23, r24to27}
-	b := []address.CIDR{r2to3, r12to13, r18to19, r1dot0to255}
-	newA, newB := removeCommon(a, b)
+	a = []address.CIDR{r0to3, r18to19, r22to23, r24to27}
+	b = []address.CIDR{r2to3, r12to13, r18to19, r1dot0to255}
+	newA, newB = removeCommon(a, b)
 	require.Equal(t, []address.CIDR{r0to3, r22to23, r24to27}, newA, "")
 	require.Equal(t, []address.CIDR{r2to3, r12to13, r1dot0to255}, newB, "")
 }
