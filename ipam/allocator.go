@@ -103,8 +103,7 @@ func NewAllocator(config Config) *Allocator {
 
 	if config.Tracker != nil {
 		updateCallback = func(prev []address.Range, curr []address.Range) {
-			err := config.Tracker.HandleUpdate(prev, curr)
-			if err != nil {
+			if err := config.Tracker.HandleUpdate(prev, curr); err != nil {
 				alloc.errorf("HandleUpdate failed: %s", err)
 			}
 		}
