@@ -664,7 +664,7 @@ func TestTracker(t *testing.T) {
 	// Check HandleUpdate invocations. 2 of them should be invoked only with new ranges.
 	newPeer1 := false
 	newPeer2 := false
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 3; i++ {
 		pair := <-trackChan
 		switch {
 		case !newPeer1 && pair.new[0].Equal(addrRange("10.0.0.0", "10.0.0.1")):
@@ -738,7 +738,7 @@ func TestShutdownWithTracker(t *testing.T) {
 	allocs[0].Shutdown()
 
 	done := false
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 4; i++ {
 		p := <-trackChan
 		switch {
 		// This should uniquely match HandleUpdate invocation on peer2 which

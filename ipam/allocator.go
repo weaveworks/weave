@@ -93,6 +93,7 @@ type Config struct {
 // NewAllocator creates and initialises a new Allocator
 func NewAllocator(config Config) *Allocator {
 	var participant paxos.Participant
+	var alloc *Allocator
 
 	if config.IsObserver {
 		participant = paxos.NewObserver()
@@ -100,11 +101,21 @@ func NewAllocator(config Config) *Allocator {
 		participant = paxos.NewNode(config.OurName, config.OurUID, 0)
 	}
 
-	return &Allocator{
+	var updateCallback func([]address.Range, []address.Range)
+	if config.Tracker != nil {
+		updateCallback = func(prev []address.Range, curr []address.Range) {
+			err := config.Tracker.HandleUpdate(prev, curr)
+			if err != nil {
+				alloc.errorf("HandleUpdate failed: %s", err)
+			}
+		}
+	}
+
+	alloc = &Allocator{
 		ourName:     config.OurName,
 		seed:        config.Seed,
 		universe:    config.Universe,
-		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName),
+		ring:        ring.NewWithCallback(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, updateCallback),
 		owned:       make(map[string]ownedData),
 		db:          config.Db,
 		paxos:       participant,
@@ -115,6 +126,7 @@ func NewAllocator(config Config) *Allocator {
 		now:         time.Now,
 		tracker:     config.Tracker,
 	}
+	return alloc
 }
 
 func ParseCIDRSubnet(cidrStr string) (cidr address.CIDR, err error) {
@@ -434,10 +446,6 @@ func (alloc *Allocator) Shutdown() {
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
 		alloc.cancelOps(&alloc.pendingPrimes)
-		err := alloc.tracker.HandleUpdate(alloc.ring.OwnedRanges(), nil)
-		if err != nil {
-			alloc.errorf("HandleUpdate failed: %s", err)
-		}
 		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
 			alloc.ring.Transfer(alloc.ourName, heir)
 			alloc.persistRing()
@@ -469,7 +477,6 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 			return
 		}
 
-		oldRanges := alloc.ring.OwnedRanges()
 		newRanges := alloc.ring.Transfer(peername, alloc.ourName)
 
 		if len(newRanges) == 0 {
@@ -480,11 +487,6 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 		before := alloc.space.NumFreeAddresses()
 		alloc.ringUpdated()
 		after := alloc.space.NumFreeAddresses()
-
-		err = alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedRanges())
-		if err != nil {
-			alloc.errorf("HandleUpdate failed: %s", err)
-		}
 
 		alloc.gossip.GossipBroadcast(alloc.Gossip())
 
@@ -719,11 +721,6 @@ func (alloc *Allocator) establishRing() {
 func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
 	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
-	// We assume that the peer has not possessed any address ranges before
-	err := alloc.tracker.HandleUpdate(nil, alloc.ring.OwnedRanges())
-	if err != nil {
-		alloc.errorf("HandleUpdate failed: %s", err)
-	}
 	alloc.ringUpdated()
 	alloc.gossip.GossipBroadcast(alloc.Gossip())
 }
@@ -814,21 +811,15 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 		alloc.nicknames[peer] = nickname
 	}
 
-	var oldRanges []address.Range
 	switch {
 	// If someone sent us a ring, merge it into ours. Note this will move us
 	// out of the awaiting-consensus state if we didn't have a ring already.
 	case data.Ring != nil:
-		oldRanges = alloc.ring.OwnedRanges()
 		updated, err := alloc.ring.Merge(*data.Ring)
 		switch err {
 		case nil:
 			if updated {
 				alloc.pruneNicknames()
-				err := alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedRanges())
-				if err != nil {
-					alloc.errorf("HandleUpdate failed: %s", err)
-				}
 				alloc.ringUpdated()
 			}
 		case ring.ErrDifferentSeeds:
@@ -900,13 +891,8 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 		return
 	}
 	alloc.debugln("Giving range", chunk, "to", to)
-	oldRanges := alloc.ring.OwnedRanges()
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
 	alloc.persistRing()
-	err := alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedRanges())
-	if err != nil {
-		alloc.errorf("HandleUpdate failed: %s", err)
-	}
 }
 
 func (alloc *Allocator) assertInvariants() {
