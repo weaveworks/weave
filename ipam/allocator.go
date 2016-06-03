@@ -11,10 +11,10 @@ import (
 
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/db"
-	"github.com/weaveworks/weave/ipam/monitor"
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -74,7 +74,7 @@ type Allocator struct {
 	isKnownPeer       func(mesh.PeerName) bool
 	quorum            func() uint
 	now               func() time.Time
-	monitor           monitor.Monitor // monitor tracks changes in address ranges owned by us
+	tracker           tracker.LocalRangeTracker
 }
 
 type Config struct {
@@ -87,7 +87,7 @@ type Config struct {
 	Quorum      func() uint
 	Db          db.DB
 	IsKnownPeer func(name mesh.PeerName) bool
-	Monitor     monitor.Monitor
+	Tracker     tracker.LocalRangeTracker
 }
 
 // NewAllocator creates and initialises a new Allocator
@@ -113,7 +113,7 @@ func NewAllocator(config Config) *Allocator {
 		quorum:      config.Quorum,
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
-		monitor:     config.Monitor,
+		tracker:     config.Tracker,
 	}
 }
 
@@ -434,7 +434,7 @@ func (alloc *Allocator) Shutdown() {
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
 		alloc.cancelOps(&alloc.pendingPrimes)
-		err := alloc.monitor.HandleUpdate(alloc.ring.OwnedAndMergedRanges(), nil)
+		err := alloc.tracker.HandleUpdate(alloc.ring.OwnedAndMergedRanges(), nil)
 		if err != nil {
 			alloc.errorf("HandleUpdate failed: %s", err)
 		}
@@ -481,7 +481,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 		alloc.ringUpdated()
 		after := alloc.space.NumFreeAddresses()
 
-		err = alloc.monitor.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+		err = alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
 		if err != nil {
 			alloc.errorf("HandleUpdate failed: %s", err)
 		}
@@ -545,10 +545,10 @@ func (alloc *Allocator) PeerGone(peerName mesh.PeerName) {
 	}
 }
 
-func (alloc *Allocator) Monitor() string {
+func (alloc *Allocator) LocalRangeTracker() string {
 	resultChan := make(chan string)
 	alloc.actionChan <- func() {
-		resultChan <- alloc.monitor.String()
+		resultChan <- alloc.tracker.String()
 	}
 	return <-resultChan
 }
@@ -720,7 +720,7 @@ func (alloc *Allocator) createRing(peers []mesh.PeerName) {
 	alloc.debugln("Paxos consensus:", peers)
 	alloc.ring.ClaimForPeers(normalizeConsensus(peers))
 	// We assume that the peer has not possessed any address ranges before
-	err := alloc.monitor.HandleUpdate(nil, alloc.ring.OwnedAndMergedRanges())
+	err := alloc.tracker.HandleUpdate(nil, alloc.ring.OwnedAndMergedRanges())
 	if err != nil {
 		alloc.errorf("HandleUpdate failed: %s", err)
 	}
@@ -825,7 +825,7 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 		case nil:
 			if updated {
 				alloc.pruneNicknames()
-				err := alloc.monitor.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+				err := alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
 				if err != nil {
 					alloc.errorf("HandleUpdate failed: %s", err)
 				}
@@ -903,7 +903,7 @@ func (alloc *Allocator) donateSpace(r address.Range, to mesh.PeerName) {
 	oldRanges := alloc.ring.OwnedAndMergedRanges()
 	alloc.ring.GrantRangeToHost(chunk.Start, chunk.End, to)
 	alloc.persistRing()
-	err := alloc.monitor.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
+	err := alloc.tracker.HandleUpdate(oldRanges, alloc.ring.OwnedAndMergedRanges())
 	if err != nil {
 		alloc.errorf("HandleUpdate failed: %s", err)
 	}

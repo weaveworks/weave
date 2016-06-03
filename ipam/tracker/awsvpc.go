@@ -1,4 +1,4 @@
-package monitor
+package tracker
 
 // TODO(mp) docs
 
@@ -17,27 +17,27 @@ import (
 	"github.com/weaveworks/weave/net/address"
 )
 
-type AWSVPCMonitor struct {
+type AWSVPCTracker struct {
 	ec2          *ec2.EC2
 	instanceID   string // EC2 Instance ID
 	routeTableID string // VPC Route Table ID
 	linkIndex    int    // The weave bridge link index
 }
 
-// NewAWSVPCMonitor creates and initialises AWS VPC based monitor.
+// NewAWSVPCTracker creates and initialises AWS VPC based tracker.
 //
-// The monitor updates AWS VPC and host route tables when any changes to allocated
+// The tracker updates AWS VPC and host route tables when any changes to allocated
 // address ranges owned by a peer have been done.
-func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
+func NewAWSVPCTracker() (*AWSVPCTracker, error) {
 	var (
 		err     error
 		session = session.New()
-		mon     = &AWSVPCMonitor{}
+		t       = &AWSVPCTracker{}
 	)
 
 	// Detect region and instance id
 	meta := ec2metadata.New(session)
-	mon.instanceID, err = meta.GetMetadata("instance-id")
+	t.instanceID, err = meta.GetMetadata("instance-id")
 	if err != nil {
 		return nil, fmt.Errorf("cannot detect instance-id: %s", err)
 	}
@@ -46,30 +46,30 @@ func NewAWSVPCMonitor() (*AWSVPCMonitor, error) {
 		return nil, fmt.Errorf("cannot detect region: %s", err)
 	}
 
-	mon.ec2 = ec2.New(session, aws.NewConfig().WithRegion(region))
+	t.ec2 = ec2.New(session, aws.NewConfig().WithRegion(region))
 
-	routeTableID, err := mon.detectRouteTableID()
+	routeTableID, err := t.detectRouteTableID()
 	if err != nil {
 		return nil, err
 	}
-	mon.routeTableID = *routeTableID
+	t.routeTableID = *routeTableID
 
 	// Detect Weave bridge link index
 	link, err := netlink.LinkByName(wnet.WeaveBridgeName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find \"%s\" interface: %s", wnet.WeaveBridgeName, err)
 	}
-	mon.linkIndex = link.Attrs().Index
+	t.linkIndex = link.Attrs().Index
 
-	mon.infof("AWSVPC has been initialized on %s instance for %s route table at %s region",
-		mon.instanceID, mon.routeTableID, region)
+	t.infof("AWSVPC has been initialized on %s instance for %s route table at %s region",
+		t.instanceID, t.routeTableID, region)
 
-	return mon, nil
+	return t, nil
 }
 
 // HandleUpdate method updates the AWS VPC and the host route tables.
-func (mon *AWSVPCMonitor) HandleUpdate(prevRanges, currRanges []address.Range) error {
-	mon.debugf("replacing %q entries by %q", prevRanges, currRanges)
+func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range) error {
+	t.debugf("replacing %q entries by %q", prevRanges, currRanges)
 
 	prev, curr := removeCommon(address.NewCIDRs(prevRanges), address.NewCIDRs(currRanges))
 
@@ -80,14 +80,14 @@ func (mon *AWSVPCMonitor) HandleUpdate(prevRanges, currRanges []address.Range) e
 	// Add new entries
 	for _, cidr := range curr {
 		cidrStr := cidr.String()
-		mon.debugf("adding route %s to %s", cidrStr, mon.instanceID)
-		_, err := mon.createVPCRoute(cidrStr)
+		t.debugf("adding route %s to %s", cidrStr, t.instanceID)
+		_, err := t.createVPCRoute(cidrStr)
 		// TODO(mp) check for 50 routes limit
 		// TODO(mp) maybe check for auth related errors
 		if err != nil {
 			return fmt.Errorf("createVPCRoutes failed: %s", err)
 		}
-		err = mon.createHostRoute(cidrStr)
+		err = t.createHostRoute(cidrStr)
 		if err != nil {
 			return fmt.Errorf("createHostRoute failed: %s", err)
 		}
@@ -96,12 +96,12 @@ func (mon *AWSVPCMonitor) HandleUpdate(prevRanges, currRanges []address.Range) e
 	// Remove obsolete entries
 	for _, cidr := range prev {
 		cidrStr := cidr.String()
-		mon.debugf("removing %s route", cidrStr)
-		_, err := mon.deleteVPCRoute(cidrStr)
+		t.debugf("removing %s route", cidrStr)
+		_, err := t.deleteVPCRoute(cidrStr)
 		if err != nil {
 			return fmt.Errorf("deleteVPCRoute failed: %s", err)
 		}
-		err = mon.deleteHostRoute(cidrStr)
+		err = t.deleteHostRoute(cidrStr)
 		if err != nil {
 			return fmt.Errorf("deleteHostRoute failed: %s", err)
 		}
@@ -110,65 +110,65 @@ func (mon *AWSVPCMonitor) HandleUpdate(prevRanges, currRanges []address.Range) e
 	return nil
 }
 
-func (mon *AWSVPCMonitor) String() string {
+func (t *AWSVPCTracker) String() string {
 	return "awsvpc"
 }
 
-func (mon *AWSVPCMonitor) createVPCRoute(cidr string) (*ec2.CreateRouteOutput, error) {
+func (t *AWSVPCTracker) createVPCRoute(cidr string) (*ec2.CreateRouteOutput, error) {
 	route := &ec2.CreateRouteInput{
-		RouteTableId:         &mon.routeTableID,
-		InstanceId:           &mon.instanceID,
+		RouteTableId:         &t.routeTableID,
+		InstanceId:           &t.instanceID,
 		DestinationCidrBlock: &cidr,
 	}
-	return mon.ec2.CreateRoute(route)
+	return t.ec2.CreateRoute(route)
 }
 
-func (mon *AWSVPCMonitor) createHostRoute(cidr string) error {
+func (t *AWSVPCTracker) createHostRoute(cidr string) error {
 	dst, err := parseCIDR(cidr)
 	if err != nil {
 		return err
 	}
 	route := &netlink.Route{
-		LinkIndex: mon.linkIndex,
+		LinkIndex: t.linkIndex,
 		Dst:       dst,
 		Scope:     netlink.SCOPE_LINK,
 	}
 	return netlink.RouteAdd(route)
 }
 
-func (mon *AWSVPCMonitor) deleteVPCRoute(cidr string) (*ec2.DeleteRouteOutput, error) {
+func (t *AWSVPCTracker) deleteVPCRoute(cidr string) (*ec2.DeleteRouteOutput, error) {
 	route := &ec2.DeleteRouteInput{
-		RouteTableId:         &mon.routeTableID,
+		RouteTableId:         &t.routeTableID,
 		DestinationCidrBlock: &cidr,
 	}
-	return mon.ec2.DeleteRoute(route)
+	return t.ec2.DeleteRoute(route)
 }
 
-func (mon *AWSVPCMonitor) deleteHostRoute(cidr string) error {
+func (t *AWSVPCTracker) deleteHostRoute(cidr string) error {
 	dst, err := parseCIDR(cidr)
 	if err != nil {
 		return err
 	}
 	route := &netlink.Route{
-		LinkIndex: mon.linkIndex,
+		LinkIndex: t.linkIndex,
 		Dst:       dst,
 		Scope:     netlink.SCOPE_LINK,
 	}
 	return netlink.RouteDel(route)
 }
 
-// detectRouteTableID detects AWS VPC Route Table ID of the given monitor instance.
-func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
+// detectRouteTableID detects AWS VPC Route Table ID of the given tracker instance.
+func (t *AWSVPCTracker) detectRouteTableID() (*string, error) {
 	instancesParams := &ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(mon.instanceID)},
+		InstanceIds: []*string{aws.String(t.instanceID)},
 	}
-	instancesResp, err := mon.ec2.DescribeInstances(instancesParams)
+	instancesResp, err := t.ec2.DescribeInstances(instancesParams)
 	if err != nil {
 		return nil, fmt.Errorf("DescribeInstances failed: %s", err)
 	}
 	if len(instancesResp.Reservations) == 0 ||
 		len(instancesResp.Reservations[0].Instances) == 0 {
-		return nil, fmt.Errorf("cannot find %s instance within reservations", mon.instanceID)
+		return nil, fmt.Errorf("cannot find %s instance within reservations", t.instanceID)
 	}
 	vpcID := instancesResp.Reservations[0].Instances[0].VpcId
 	subnetID := instancesResp.Reservations[0].Instances[0].SubnetId
@@ -182,7 +182,7 @@ func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 			},
 		},
 	}
-	tablesResp, err := mon.ec2.DescribeRouteTables(tablesParams)
+	tablesResp, err := t.ec2.DescribeRouteTables(tablesParams)
 	if err != nil {
 		return nil, fmt.Errorf("DescribeRouteTables failed: %s", err)
 	}
@@ -202,7 +202,7 @@ func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 			},
 		},
 	}
-	tablesResp, err = mon.ec2.DescribeRouteTables(tablesParams)
+	tablesResp, err = t.ec2.DescribeRouteTables(tablesParams)
 	if err != nil {
 		return nil, fmt.Errorf("DescribeRouteTables failed: %s", err)
 	}
@@ -210,15 +210,15 @@ func (mon *AWSVPCMonitor) detectRouteTableID() (*string, error) {
 		return tablesResp.RouteTables[0].RouteTableId, nil
 	}
 
-	return nil, fmt.Errorf("cannot find routetable for %s instance", mon.instanceID)
+	return nil, fmt.Errorf("cannot find routetable for %s instance", t.instanceID)
 }
 
-func (mon *AWSVPCMonitor) debugf(fmt string, args ...interface{}) {
-	common.Log.Debugf("[monitor] "+fmt, args...)
+func (t *AWSVPCTracker) debugf(fmt string, args ...interface{}) {
+	common.Log.Debugf("[tracker] "+fmt, args...)
 }
 
-func (mon *AWSVPCMonitor) infof(fmt string, args ...interface{}) {
-	common.Log.Infof("[monitor] "+fmt, args...)
+func (t *AWSVPCTracker) infof(fmt string, args ...interface{}) {
+	common.Log.Infof("[tracker] "+fmt, args...)
 }
 
 // Helpers

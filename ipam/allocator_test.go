@@ -645,15 +645,15 @@ func cidrRanges(s string) []address.Range {
 	return []address.Range{c.Range()}
 }
 
-func TestMonitor(t *testing.T) {
+func TestTracker(t *testing.T) {
 	const (
 		cidr       = "10.0.0.0/30"
 		container1 = "container-1"
 		container2 = "container-2"
 	)
 
-	monChan := make(chan rangePair, 10)
-	allocs, router, _ := makeNetworkOfAllocatorsWithMonitor(2, cidr, newTestMonitor(monChan))
+	trackChan := make(chan rangePair, 10)
+	allocs, router, _ := makeNetworkOfAllocatorsWithTracker(2, cidr, newTestTracker(trackChan))
 	defer stopNetworkOfAllocators(allocs, router)
 
 	cidr1, _ := address.ParseCIDR(cidr)
@@ -665,7 +665,7 @@ func TestMonitor(t *testing.T) {
 	newPeer1 := false
 	newPeer2 := false
 	for i := 0; i < 2; i++ {
-		pair := <-monChan
+		pair := <-trackChan
 		switch {
 		case !newPeer1 && pair.new[0].Equal(addrRange("10.0.0.0", "10.0.0.1")):
 			newPeer1 = true
@@ -687,7 +687,7 @@ func TestMonitor(t *testing.T) {
 	newDonation1 := false
 	newDonation2 := false
 	for i := 0; i < 2; i++ {
-		pair := <-monChan
+		pair := <-trackChan
 		switch {
 		case !newDonation1 &&
 			pair.old[0].Equal(addrRange("10.0.0.0", "10.0.0.1")) &&
@@ -713,14 +713,14 @@ func TestMonitor(t *testing.T) {
 	require.True(t, newDonation1 && newDonation2, "")
 }
 
-func TestShutdownWithMonitor(t *testing.T) {
+func TestShutdownWithTracker(t *testing.T) {
 	const (
 		cidr       = "10.0.0.0/30"
 		container1 = "container-1"
 	)
 
-	monChan := make(chan rangePair, 10)
-	allocs, router, _ := makeNetworkOfAllocatorsWithMonitor(2, cidr, newTestMonitor(monChan))
+	trackChan := make(chan rangePair, 10)
+	allocs, router, _ := makeNetworkOfAllocatorsWithTracker(2, cidr, newTestTracker(trackChan))
 	defer stopNetworkOfAllocators(allocs, router)
 
 	cidr1, _ := address.ParseCIDR(cidr)
@@ -728,7 +728,7 @@ func TestShutdownWithMonitor(t *testing.T) {
 	require.NoError(t, err, "")
 
 	time.Sleep(500 * time.Millisecond)
-	flush(monChan, 2)
+	flush(trackChan, 2)
 
 	// After allocation (and ring establishment):
 	// * peer1: [10.0.0.0-10.0.0.1]
@@ -739,7 +739,7 @@ func TestShutdownWithMonitor(t *testing.T) {
 
 	done := false
 	for i := 0; i < 3; i++ {
-		p := <-monChan
+		p := <-trackChan
 		switch {
 		// This should uniquely match HandleUpdate invocation on peer2 which
 		// happens after peer1 notified peer2 about the donation due to its
@@ -758,7 +758,7 @@ func TestShutdownWithMonitor(t *testing.T) {
 
 	// Shutdown peer2
 	allocs[1].Shutdown()
-	p := <-monChan
+	p := <-trackChan
 	require.Equal(t, []address.Range{addrRange("10.0.0.0", "10.0.0.3")}, p.old, "")
 	require.Len(t, p.new, 0, "")
 }
@@ -769,24 +769,24 @@ func flush(c chan rangePair, count int) {
 	}
 }
 
-type testMonitor struct {
-	monChan chan rangePair
+type testTracker struct {
+	trackChan chan rangePair
 }
 
 type rangePair struct {
 	old, new []address.Range
 }
 
-func newTestMonitor(monChan chan rangePair) *testMonitor {
-	return &testMonitor{monChan}
+func newTestTracker(trackChan chan rangePair) *testTracker {
+	return &testTracker{trackChan}
 }
 
-func (mon *testMonitor) HandleUpdate(old, new []address.Range) error {
-	mon.monChan <- rangePair{old, new}
+func (t *testTracker) HandleUpdate(old, new []address.Range) error {
+	t.trackChan <- rangePair{old, new}
 	return nil
 }
 
-func (mon *testMonitor) String() string {
+func (t *testTracker) String() string {
 	return "test"
 }
 

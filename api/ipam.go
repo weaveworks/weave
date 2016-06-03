@@ -53,12 +53,12 @@ func (client *Client) DefaultSubnet() (*net.IPNet, error) {
 	return ipnet, err
 }
 
-func (client *Client) Monitor() (string, error) {
-	mon, err := client.httpVerb("GET", fmt.Sprintf("/monitor"), nil)
+func (client *Client) LocalRangeTracker() (string, error) {
+	t, err := client.httpVerb("GET", fmt.Sprintf("/ipinfo/tracker"), nil)
 	if err != nil {
 		return "", err
 	}
-	return mon, nil
+	return t, nil
 }
 
 func parseIP(body string) (*net.IPNet, error) {

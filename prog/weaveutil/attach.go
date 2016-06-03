@@ -25,9 +25,9 @@ func attach(args []string) error {
 	isAWSVPC := false
 	// In a case of an error, we skip applying necessary steps for AWSVPC, because
 	// "attach" should work without the weave router running.
-	if mon, err := client.Monitor(); err != nil {
-		fmt.Fprintf(os.Stderr, "unable to determine monitor: %s; skipping AWSVPC initialization\n", err)
-	} else if mon == "awsvpc" {
+	if t, err := client.LocalRangeTracker(); err != nil {
+		fmt.Fprintf(os.Stderr, "unable to determine tracker: %s; skipping AWSVPC initialization\n", err)
+	} else if t == "awsvpc" {
 		isAWSVPC = true
 		keepTXOn = true
 	}

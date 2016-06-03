@@ -10,7 +10,7 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/weave/ipam/monitor"
+	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 	"github.com/weaveworks/weave/testing/gossip"
 )
@@ -130,10 +130,10 @@ func (d *mockDB) Load(_ string, _ interface{}) (bool, error) { return false, nil
 func (d *mockDB) Save(_ string, _ interface{}) error         { return nil }
 
 func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.CIDR) {
-	return makeAllocatorWithMonitor(name, cidrStr, quorum, monitor.NewNullMonitor())
+	return makeAllocatorWithTracker(name, cidrStr, quorum, tracker.NewNullTracker())
 }
 
-func makeAllocatorWithMonitor(name string, cidrStr string, quorum uint, mon monitor.Monitor) (*Allocator, address.CIDR) {
+func makeAllocatorWithTracker(name string, cidrStr string, quorum uint, track tracker.LocalRangeTracker) (*Allocator, address.CIDR) {
 	peername, err := mesh.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
@@ -153,21 +153,21 @@ func makeAllocatorWithMonitor(name string, cidrStr string, quorum uint, mon moni
 		Quorum:      func() uint { return quorum },
 		Db:          new(mockDB),
 		IsKnownPeer: func(mesh.PeerName) bool { return true },
-		Monitor:     mon,
+		Tracker:     track,
 	}), cidr
 }
 
 func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string,
 	quorum uint) (*Allocator, address.CIDR) {
 
-	return makeAllocatorWithMockGossipAndMonitor(t, name, universeCIDR, quorum,
-		monitor.NewNullMonitor())
+	return makeAllocatorWithMockGossipAndTracker(t, name, universeCIDR, quorum,
+		tracker.NewNullTracker())
 }
 
-func makeAllocatorWithMockGossipAndMonitor(t *testing.T, name string, universeCIDR string, quorum uint,
-	mon monitor.Monitor) (*Allocator, address.CIDR) {
+func makeAllocatorWithMockGossipAndTracker(t *testing.T, name string, universeCIDR string, quorum uint,
+	track tracker.LocalRangeTracker) (*Allocator, address.CIDR) {
 
-	alloc, subnet := makeAllocatorWithMonitor(name, universeCIDR, quorum, mon)
+	alloc, subnet := makeAllocatorWithTracker(name, universeCIDR, quorum, track)
 	gossip := &mockGossipComms{T: t, name: name}
 	alloc.SetInterfaces(gossip)
 	alloc.Start()
@@ -229,11 +229,11 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 }
 
 func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
-	return makeNetworkOfAllocatorsWithMonitor(size, cidr, monitor.NewNullMonitor())
+	return makeNetworkOfAllocatorsWithTracker(size, cidr, tracker.NewNullTracker())
 }
 
-func makeNetworkOfAllocatorsWithMonitor(size int, cidr string,
-	mon monitor.Monitor) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
+func makeNetworkOfAllocatorsWithTracker(size int, cidr string,
+	track tracker.LocalRangeTracker) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
 
 	gossipRouter := gossip.NewTestRouter(0.0)
 	allocs := make([]*Allocator, size)
@@ -241,8 +241,8 @@ func makeNetworkOfAllocatorsWithMonitor(size int, cidr string,
 
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
-		alloc, subnet = makeAllocatorWithMonitor(fmt.Sprintf("%02d:00:00:02:00:00", i),
-			cidr, uint(size/2+1), mon)
+		alloc, subnet = makeAllocatorWithTracker(fmt.Sprintf("%02d:00:00:02:00:00", i),
+			cidr, uint(size/2+1), track)
 		alloc.SetInterfaces(gossipRouter.Connect(alloc.ourName, alloc))
 		alloc.Start()
 		allocs[i] = alloc

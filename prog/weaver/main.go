@@ -22,7 +22,7 @@ import (
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam"
-	"github.com/weaveworks/weave/ipam/monitor"
+	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
@@ -303,18 +303,18 @@ func main() {
 	var (
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
-		mon           monitor.Monitor
+		track         tracker.LocalRangeTracker
 	)
 	if ipamConfig.Enabled() {
-		mon = monitor.NewNullMonitor()
+		track = tracker.NewNullTracker()
 		if useAWSVPC {
-			Log.Infoln("Creating AWSVPC Monitor")
-			mon, err = monitor.NewAWSVPCMonitor()
+			Log.Infoln("Creating AWSVPC LocalRangeTracker")
+			track, err = tracker.NewAWSVPCTracker()
 			if err != nil {
-				Log.Fatalf("Cannot create AWSVPC Monitor: %s", err)
+				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
 			}
 		}
-		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, mon, isKnownPeer)
+		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, track, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
@@ -439,7 +439,7 @@ func createOverlay(datapathName string, ifaceName string, useAWSVPC bool, host s
 	return overlay, bridge
 }
 
-func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, mon monitor.Monitor, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, track tracker.LocalRangeTracker, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange, err := ipam.ParseCIDRSubnet(config.IPRangeCIDR)
 	checkFatal(err)
 	defaultSubnet := ipRange
@@ -461,7 +461,7 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, m
 		Quorum:      func() uint { return determineQuorum(config.PeerCount, router) },
 		Db:          db,
 		IsKnownPeer: isKnownPeer,
-		Monitor:     mon,
+		Tracker:     track,
 	}
 
 	allocator := ipam.NewAllocator(c)
