@@ -53,10 +53,10 @@ type NetworkRouter struct {
 
 func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh.PeerName, nickName string, overlay NetworkOverlay, db db.DB) *NetworkRouter {
 	if overlay == nil {
-		overlay = NewNullNetworkOverlay()
+		overlay = NullNetworkOverlay{}
 	}
 	if networkConfig.Bridge == nil {
-		networkConfig.Bridge = NewNullBridge()
+		networkConfig.Bridge = NullBridge{}
 	}
 
 	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay, common.LogLogger()), NetworkConfig: networkConfig, db: db}

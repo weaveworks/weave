@@ -39,17 +39,7 @@ func (conn *AWSVPCConnection) DisplayName() string {
 // OverlayForwarder
 
 func (conn *AWSVPCConnection) Forward(key ForwardPacketKey) FlowOp {
-	return NoopFlowOp{}
-}
-
-// FlowOp
-
-type NoopFlowOp struct{}
-
-func (noop NoopFlowOp) Process(frame []byte, dec *EthernetDecoder, broadcast bool) {}
-
-func (noop NoopFlowOp) Discards() bool {
-	return true
+	return DiscardingFlowOp{}
 }
 
 type AWSVPC struct{}

@@ -409,7 +409,7 @@ func createOverlay(datapathName string, ifaceName string, useAWSVPC bool, host s
 	case useAWSVPC:
 		vpc := weave.NewAWSVPC()
 		overlay.Add("awsvpc", vpc)
-		bridge = weave.NewNullBridge()
+		bridge = weave.NullBridge{}
 		// Currently, we do not support any overlay with AWSVPC
 		ignoreSleeve = true
 	case datapathName != "" && ifaceName != "":
@@ -427,7 +427,7 @@ func createOverlay(datapathName string, ifaceName string, useAWSVPC bool, host s
 		bridge, err = weave.NewPcap(iface, bufSzMB*1024*1024) // bufsz flag is in MB
 		checkFatal(err)
 	default:
-		bridge = weave.NewNullBridge()
+		bridge = weave.NullBridge{}
 	}
 
 	if !ignoreSleeve {

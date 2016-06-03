@@ -387,20 +387,11 @@ func (r *Ring) AllRangeInfo() (result []RangeInfo) {
 }
 
 // ClaimForPeers claims the entire ring for the array of peers passed
-// in.  Only works for empty rings.
+// in.  Only works for empty rings. Each claimed range is CIDR-aligned.
 func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	common.Assert(r.Empty())
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
-
-	r.createEntries(peers)
-	r.Seeds = peers
-}
-
-// createEntries subdivides the [from,to) (CIDR) range for the given peers
-// and creates entries for the subranges.
-// Each entry is CIRD-aligned.
-func (r *Ring) createEntries(peers []mesh.PeerName) {
 	defer func() {
 		e := r.Entries[len(r.Entries)-1]
 		common.Assert(address.Add(e.Token, address.Offset(e.Free)) == r.End)
@@ -422,6 +413,7 @@ func (r *Ring) createEntries(peers []mesh.PeerName) {
 	}
 
 	subdivide(r.Start, r.End, peers)
+	r.Seeds = peers
 }
 
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[mesh.PeerName]string) {
