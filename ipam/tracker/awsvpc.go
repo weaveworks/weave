@@ -84,6 +84,7 @@ func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range) err
 		_, err := t.createVPCRoute(cidrStr)
 		// TODO(mp) check for 50 routes limit
 		// TODO(mp) maybe check for auth related errors
+		// TODO(mp) keep removing
 		if err != nil {
 			return fmt.Errorf("createVPCRoutes failed: %s", err)
 		}

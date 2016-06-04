@@ -93,7 +93,7 @@ type Config struct {
 func NewAllocator(config Config) *Allocator {
 	var participant paxos.Participant
 	var alloc *Allocator
-	var updateCallback func([]address.Range, []address.Range)
+	var onUpdate func([]address.Range, []address.Range)
 
 	if config.IsObserver {
 		participant = paxos.NewObserver()
@@ -102,7 +102,7 @@ func NewAllocator(config Config) *Allocator {
 	}
 
 	if config.Tracker != nil {
-		updateCallback = func(prev []address.Range, curr []address.Range) {
+		onUpdate = func(prev []address.Range, curr []address.Range) {
 			if err := config.Tracker.HandleUpdate(prev, curr); err != nil {
 				alloc.errorf("HandleUpdate failed: %s", err)
 			}
@@ -113,7 +113,7 @@ func NewAllocator(config Config) *Allocator {
 		ourName:     config.OurName,
 		seed:        config.Seed,
 		universe:    config.Universe,
-		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, updateCallback),
+		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, onUpdate),
 		owned:       make(map[string]ownedData),
 		db:          config.Db,
 		paxos:       participant,
@@ -449,6 +449,7 @@ func (alloc *Allocator) Shutdown() {
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 		}
+		// TODO(mp) add ring.Destroy() in a case heir has not been found
 		doneChan <- struct{}{}
 	}
 	<-doneChan
@@ -473,6 +474,8 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 			resultChan <- address.Count(0)
 			return
 		}
+
+		// TODO(mp) add ring.Destroy(peername)
 
 		newRanges := alloc.ring.Transfer(peername, alloc.ourName)
 
@@ -971,7 +974,10 @@ func (alloc *Allocator) loadPersistedData() bool {
 		return false
 	}
 
+	// TODO(mp) refactor
+	onUpdate := alloc.ring.GetOnUpdate()
 	alloc.ring = persistedRing
+	alloc.ring.SetOnUpdate(onUpdate)
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 
 	if ownedFound {
