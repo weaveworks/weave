@@ -974,10 +974,7 @@ func (alloc *Allocator) loadPersistedData() bool {
 		return false
 	}
 
-	// TODO(mp) refactor
-	onUpdate := alloc.ring.GetOnUpdate()
-	alloc.ring = persistedRing
-	alloc.ring.SetOnUpdate(onUpdate)
+	alloc.ring.Restore(persistedRing)
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 
 	if ownedFound {

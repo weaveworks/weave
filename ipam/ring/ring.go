@@ -103,14 +103,6 @@ func (r *Ring) trackUpdates() func() {
 	return func() { r.onUpdate(ranges, r.OwnedRanges()) }
 }
 
-func (r *Ring) GetOnUpdate() func([]address.Range, []address.Range) {
-	return r.onUpdate
-}
-
-func (r *Ring) SetOnUpdate(f func([]address.Range, []address.Range)) {
-	r.onUpdate = f
-}
-
 // New creates an empty ring belonging to peer.
 func New(start, end address.Address, peer mesh.PeerName, f func([]address.Range, []address.Range)) *Ring {
 	common.Assert(start < end)
@@ -118,6 +110,12 @@ func New(start, end address.Address, peer mesh.PeerName, f func([]address.Range,
 	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0), onUpdate: f}
 	ring.updateExportedVariables()
 	return ring
+}
+
+func (r *Ring) Restore(other *Ring) {
+	onUpdate := r.onUpdate
+	*r = *other
+	r.onUpdate = onUpdate
 }
 
 func (r *Ring) Range() address.Range {
