@@ -118,3 +118,6 @@
 [submodule "vendor/github.com/spf13/pflag"]
 	path = vendor/github.com/spf13/pflag
 	url = https://github.com/spf13/pflag
+[submodule "vendor/github.com/mgutz/ansi"]
+	path = vendor/github.com/mgutz/ansi
+	url = https://github.com/mgutz/ansi
