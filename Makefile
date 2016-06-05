@@ -60,7 +60,6 @@ BUILD_FLAGS=-i -ldflags "-extldflags \"-static\" -X main.version=$(WEAVE_VERSION
 PACKAGE_BASE=$(shell go list -e ./)
 
 all: $(WEAVE_EXPORT)
-exes: $(EXES)
 testrunner: $(RUNNER_EXE) $(TEST_TLS_EXE)
 
 $(EXES): $(BUILD_UPTODATE)
@@ -79,7 +78,7 @@ lint: $(BUILD_UPTODATE) tools/.git
 
 ifeq ($(BUILD_IN_CONTAINER),true)
 
-$(EXES) tests lint:
+exes $(EXES) tests lint:
 	git submodule update --init
 	@mkdir -p $(shell pwd)/.pkg
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
@@ -89,6 +88,8 @@ $(EXES) tests lint:
 		$(BUILD_IMAGE) COVERAGE=$(COVERAGE) WEAVE_VERSION=$(WEAVE_VERSION) $@
 
 else
+
+exes: $(EXES)
 
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(PLUGIN_EXE):
 ifeq ($(COVERAGE),true)
