@@ -92,7 +92,6 @@ else
 
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(PLUGIN_EXE):
 ifeq ($(COVERAGE),true)
-	go build -v $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "^$(PACKAGE_BASE)/") | grep -v "^$(PACKAGE_BASE)/vendor/" | paste -s -d,))
 	go test -c -o ./$@ $(BUILD_FLAGS) -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
 else
