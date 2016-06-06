@@ -9,9 +9,10 @@ menu_order: 60
  * [Using other plugin command-line arguments](#plugin-args)
 
 Docker versions 1.9 and later have a plugin mechanism for adding
-different network providers. Weave Net installs itself as a network plugin
-when you start it with `weave launch`. The Weave Docker Networking plugin is fast and easy to use and 
-best of all doesn't require an external cluster store in order to use it.  
+different network providers. Weave Net installs itself as a network
+plugin when you start it with `weave launch`. The Weave Docker
+Networking Plugin is fast and easy to use, and, unlike other
+networking plugins, does not require an external cluster store.
 
 To create a network which can span multiple Docker hosts, Weave Net peers must be connected to each other, by specifying the other hosts during `weave launch` or via
 [`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md).
