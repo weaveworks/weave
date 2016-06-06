@@ -354,8 +354,6 @@ function hosts {
 	done
 	echo export SSH=\"$SSHCMD\"
 	echo export HOSTS=\"$hosts\"
-    echo export NO_SCHEDULER=\"1\"
-    echo export AWS=\"1\"
 	rm $json
 }
 

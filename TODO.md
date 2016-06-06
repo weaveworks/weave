@@ -15,7 +15,6 @@
 * Test with multiple addr from the default subnet
 
 * Create new SSH keys or reuse the same for each test run
-* Make sure that the $AWS=1 env var is not propagated to GCE machines
 
 # Nice To Have
 

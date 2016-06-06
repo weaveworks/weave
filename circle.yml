@@ -46,7 +46,7 @@ test:
     #    timeout: 300
     - cd $SRCDIR/test; ./aws.sh setup && eval $(./aws.sh hosts) && ./setup.sh:
         parallel: false
-    - cd $SRCDIR/test; eval $(./aws.sh hosts); export COVERAGE=true; ./run_all.sh:
+    - cd $SRCDIR/test; eval $(./aws.sh hosts); export COVERAGE=true; AWS=1 ./run_all.sh:
         parallel: false
         timeout: 300
 
