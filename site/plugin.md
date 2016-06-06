@@ -101,10 +101,6 @@ To turn this off, e.g. you want to configure your own multicast
 route, add the `--no-multicast-route` flag to `weave launch-plugin`.
 
 
->Note: When using the Docker Plugin, there is no need to run `eval
- $(weave env)` to enable the Proxy. If you do, you may end up with two
- weave network interfaces and two IP addresses for each container.
-
 **See Also**
 
  * [How the Weave Network Plugin Works](/site/plugin/plugin-how-it-works.md)
