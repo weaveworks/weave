@@ -32,7 +32,7 @@ WEAVEEXEC_UPTODATE=.weaveexec.uptodate
 PLUGIN_UPTODATE=.plugin.uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(BUILD_UPTODATE) $(WEAVEDB_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEDB_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
@@ -62,7 +62,6 @@ PACKAGE_BASE=$(shell go list -e ./)
 all: $(WEAVE_EXPORT)
 testrunner: $(RUNNER_EXE) $(TEST_TLS_EXE)
 
-$(EXES): $(BUILD_UPTODATE)
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/weaver/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
@@ -73,12 +72,12 @@ $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
-tests: $(BUILD_UPTODATE) tools/.git
-lint: $(BUILD_UPTODATE) tools/.git
+tests: tools/.git
+lint: tools/.git
 
 ifeq ($(BUILD_IN_CONTAINER),true)
 
-exes $(EXES) tests lint:
+exes $(EXES) tests lint: $(BUILD_UPTODATE)
 	git submodule update --init
 	@mkdir -p $(shell pwd)/.pkg
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
@@ -175,11 +174,12 @@ endif
 publish: $(PUBLISH)
 
 clean-bin:
-	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES) $(BUILD_IMAGE)
+	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
 	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT) .pkg
 
 clean: clean-bin
-	rm -rf test/tls/*.pem test/coverage.* test/coverage
+	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
+	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE)
 
 build:
 	$(SUDO) go clean -i net
