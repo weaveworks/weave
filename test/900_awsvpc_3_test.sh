@@ -79,20 +79,31 @@ echo "starting weave"
 
 weave_on $HOST1 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc
 weave_on $HOST2 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST1
+weave_on $HOST3 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST1
 
 echo "starting containers"
+
+
+echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 1"
+aws ec2 describe-route-tables --route-table-ids $VPC_ROUTE_TABLE_ID
+echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 1"
 
 start_container $HOST1 --name=c1
 start_container $HOST2 --name=c4
 start_container $HOST1 --name=c2
 proxy_start_container $HOST1 -di --name=c3
+start_container $HOST3 --name=c5
+
+echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 2"
+aws ec2 describe-route-tables --route-table-ids $VPC_ROUTE_TABLE_ID
+echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 2"
 
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR1 $INSTANCE1"
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR2 $INSTANCE1"
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3 $INSTANCE2"
 
 # Starting container within non-default subnet should fail
-assert_raises "proxy_start_container $HOST1 --name=c5 -e WEAVE_CIDR=net:$SUBNET" 1
+assert_raises "proxy_start_container $HOST1 --name=c6 -e WEAVE_CIDR=net:$SUBNET" 1
 
 # Check that we do not use fastdp
 assert_raises "no_fastdp $HOST1"
@@ -102,6 +113,8 @@ assert_raises "exec_on $HOST1 c1 $PING c2"
 assert_raises "exec_on $HOST1 c1 $PING c4"
 assert_raises "exec_on $HOST2 c4 $PING c1"
 assert_raises "exec_on $HOST2 c4 $PING c3"
+assert_raises "exec_on $HOST1 c1 $PING c5"
+assert_raises "exec_on $HOST2 c4 $PING c5"
 
 weave_on $HOST2 stop
 # stopping should not remove the entries
@@ -110,6 +123,10 @@ assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3 $INSTANCE2"
 weave_on $HOST2 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST1
 
 weave_on $HOST1 reset
+
+echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 3"
+aws ec2 describe-route-tables --route-table-ids $VPC_ROUTE_TABLE_ID
+echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 3"
 
 ## host1 has transferred previously owned ranges to host2
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR1"
