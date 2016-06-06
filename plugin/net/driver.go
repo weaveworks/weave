@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"sync"
 
@@ -31,6 +32,7 @@ type driver struct {
 	sync.RWMutex
 	endpoints map[string]struct{}
 	networks  map[string]network
+	weave     *weaveapi.Client
 }
 
 func New(client *docker.Client, weave *weaveapi.Client, scope string) (skel.Driver, error) {
@@ -39,6 +41,7 @@ func New(client *docker.Client, weave *weaveapi.Client, scope string) (skel.Driv
 		docker:    client,
 		endpoints: make(map[string]struct{}),
 		networks:  make(map[string]network),
+		weave:     weave,
 	}
 
 	_, err := NewWatcher(client, weave, driver)
@@ -60,6 +63,27 @@ func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
 }
 
 func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
+	// TODO(mp) DRY
+	// In a case of an error, we skip applying necessary steps for AWSVPC, because
+	// "attach" should work without the weave router running.
+	if t, err := driver.weave.LocalRangeTracker(); err != nil {
+		driver.warn("CreateNetwork", "unable to determine tracker: %s; skipping AWSVPC initialization", err)
+	} else if t == "awsvpc" {
+		// Currently, we allow only subnets from the default subnet
+		if defaultSubnet, err := driver.weave.DefaultSubnet(); err != nil {
+			driver.warn("CreateNetwork", "unable to retrieve default subnet: %s; skipping AWSVPC checks", err)
+		} else {
+			for _, d := range create.IPv4Data {
+				subnet := d.Pool
+				if !sameSubnet(subnet, defaultSubnet) {
+					format := "AWSVPC constraints violation: %s does not belong to the default subnet %s"
+					return fmt.Errorf(format, subnet, defaultSubnet)
+				}
+			}
+		}
+	}
+
+	// TODO(mp) create contains IPAM, check that is belongs to the same subnet
 	driver.logReq("CreateNetwork", create, create.NetworkID)
 	_, err := driver.setupNetworkInfo(create.NetworkID, stringOptions(create))
 	return err
@@ -89,6 +113,17 @@ func (driver *driver) DeleteNetwork(delreq *api.DeleteNetworkRequest) error {
 	delete(driver.networks, delreq.NetworkID)
 	driver.Unlock()
 	return nil
+}
+
+// TODO(mp) move to helpers
+// sameSubnet checks whether ip belongs to network's subnet
+func sameSubnet(ip *net.IPNet, network *net.IPNet) bool {
+	if network.Contains(ip.IP) {
+		i1, i2 := ip.Mask.Size()
+		n1, n2 := network.Mask.Size()
+		return i1 == n1 && i2 == n2
+	}
+	return false
 }
 
 func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.CreateEndpointResponse, error) {
@@ -134,8 +169,21 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 	if err != nil {
 		return nil, driver.error("JoinEndpoint", "unable to find network info: %s", err)
 	}
+
+	// TODO(mp) DRY
+	keepTXOn := false
+	isAWSVPC := false
+	// In a case of an error, we skip applying necessary steps for AWSVPC, because
+	// "attach" should work without the weave router running.
+	if t, err := driver.weave.LocalRangeTracker(); err != nil {
+		driver.warn("JoinEndpoint", "unable to determine tracker: %s; skipping AWSVPC initialization", err)
+	} else if t == "awsvpc" {
+		isAWSVPC = true
+		keepTXOn = true
+	}
+
 	name, peerName := vethPair(j.EndpointID)
-	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, false, nil); err != nil {
+	if _, err := weavenet.CreateAndAttachVeth(name, peerName, weavenet.WeaveBridgeName, 0, keepTXOn, nil); err != nil {
 		return nil, driver.error("JoinEndpoint", "%s", err)
 	}
 
@@ -145,7 +193,7 @@ func (driver *driver) JoinEndpoint(j *api.JoinRequest) (*api.JoinResponse, error
 			DstPrefix: weavenet.VethName,
 		},
 	}
-	if network.hasMulticastRoute {
+	if network.hasMulticastRoute && !isAWSVPC {
 		multicastRoute := api.StaticRoute{
 			Destination: "224.0.0.0/4",
 			RouteType:   types.CONNECTED,
