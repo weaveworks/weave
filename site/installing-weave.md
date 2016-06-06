@@ -26,6 +26,18 @@ With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weav
   <img src="hello-screencast.png" alt="Click to watch the screencast" />
 </a>
 
+###Checkpoint
+
+Weave Net [periodically contacts Weaveworks servers for available
+versions](https://github.com/weaveworks/go-checkpoint).  New versions
+are announced in the log and in [the status
+summary](/site/troubleshooting.md#weave-status).  To disable this
+check, run:
+
+    export CHECKPOINT_DISABLE=1
+
+before launching Weave Net.
+
 ###Guides for Specific Platforms
 
 CoreOS users see [here](/guides/networking-docker-containers-with-weave-on-coreos/) for an example of installing Weave using cloud-config.
