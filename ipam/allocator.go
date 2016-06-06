@@ -93,7 +93,7 @@ type Config struct {
 func NewAllocator(config Config) *Allocator {
 	var participant paxos.Participant
 	var alloc *Allocator
-	var onUpdate func([]address.Range, []address.Range)
+	var onUpdate ring.OnUpdate
 
 	if config.IsObserver {
 		participant = paxos.NewObserver()
@@ -102,8 +102,8 @@ func NewAllocator(config Config) *Allocator {
 	}
 
 	if config.Tracker != nil {
-		onUpdate = func(prev []address.Range, curr []address.Range) {
-			if err := config.Tracker.HandleUpdate(prev, curr); err != nil {
+		onUpdate = func(prev []address.Range, curr []address.Range, local bool) {
+			if err := config.Tracker.HandleUpdate(prev, curr, local); err != nil {
 				alloc.errorf("HandleUpdate failed: %s", err)
 			}
 		}
@@ -449,7 +449,6 @@ func (alloc *Allocator) Shutdown() {
 			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 		}
-		// TODO(mp) add ring.Destroy() in a case heir has not been found
 		doneChan <- struct{}{}
 	}
 	<-doneChan
@@ -475,9 +474,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 			return
 		}
 
-		// TODO(mp) add ring.Destroy(peername)
-
-		newRanges := alloc.ring.Transfer(peername, alloc.ourName)
+		newRanges := alloc.ring.AdminTransfer(peername, alloc.ourName)
 
 		if len(newRanges) == 0 {
 			resultChan <- address.Count(0)

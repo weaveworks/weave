@@ -18,13 +18,15 @@ import (
 	"github.com/weaveworks/weave/net/address"
 )
 
+type OnUpdate func(prev, curr []address.Range, local bool)
+
 // Ring represents the ring itself
 type Ring struct {
 	Start, End address.Address // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
 	Peer       mesh.PeerName   // name of peer owning this ring instance
 	Entries    entries         // list of entries sorted by token
 	Seeds      []mesh.PeerName // peers with which the ring was seeded
-	onUpdate   func(prev, curr []address.Range)
+	onUpdate   OnUpdate
 }
 
 func (r *Ring) assertInvariants() {
@@ -96,15 +98,19 @@ func (r *Ring) checkEntries(entries entries) error {
 }
 
 func (r *Ring) trackUpdates() func() {
+	return r.trackUpdatesOfPeer(r.Peer)
+}
+
+func (r *Ring) trackUpdatesOfPeer(peer mesh.PeerName) func() {
 	if r.onUpdate == nil {
 		return func() {}
 	}
-	ranges := r.OwnedRanges()
-	return func() { r.onUpdate(ranges, r.OwnedRanges()) }
+	ranges := r.OwnedRangesOfPeer(peer)
+	return func() { r.onUpdate(ranges, r.OwnedRangesOfPeer(peer), peer == r.Peer) }
 }
 
 // New creates an empty ring belonging to peer.
-func New(start, end address.Address, peer mesh.PeerName, f func([]address.Range, []address.Range)) *Ring {
+func New(start, end address.Address, peer mesh.PeerName, f OnUpdate) *Ring {
 	common.Assert(start < end)
 
 	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0), onUpdate: f}
@@ -354,10 +360,14 @@ func (r *Ring) splitRangesOverZero(ranges []address.Range) []address.Range {
 // ranges are owned by this peer.  Will split ranges which
 // span 0 in the ring.
 func (r *Ring) OwnedRanges() (result []address.Range) {
+	return r.OwnedRangesOfPeer(r.Peer)
+}
+
+func (r *Ring) OwnedRangesOfPeer(peer mesh.PeerName) (result []address.Range) {
 	r.assertInvariants()
 
 	for i, entry := range r.Entries {
-		if entry.Peer == r.Peer {
+		if entry.Peer == peer {
 			nextEntry := r.Entries.entry(i + 1)
 			result = append(result, address.Range{Start: entry.Token, End: nextEntry.Token})
 		}
@@ -552,8 +562,20 @@ func (r *Ring) PickPeerForTransfer(isValid func(mesh.PeerName) bool) mesh.PeerNa
 // Transfer will mark all entries associated with 'from' peer as owned by 'to' peer
 // and return ranges indicating the new space we picked up
 func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
+	return r.transfer(from, to, false)
+}
+
+// Does Transfer from a dead peer
+func (r *Ring) AdminTransfer(from, to mesh.PeerName) []address.Range {
+	return r.transfer(from, to, true)
+}
+
+func (r *Ring) transfer(from, to mesh.PeerName, isAdmin bool) []address.Range {
 	r.assertInvariants()
 	defer r.trackUpdates()()
+	if isAdmin {
+		defer r.trackUpdatesOfPeer(from)()
+	}
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 

@@ -68,8 +68,8 @@ func NewAWSVPCTracker() (*AWSVPCTracker, error) {
 }
 
 // HandleUpdate method updates the AWS VPC and the host route tables.
-func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range) error {
-	t.debugf("replacing %q entries by %q", prevRanges, currRanges)
+func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range, local bool) error {
+	t.debugf("replacing %q by %q; local(%t)", prevRanges, currRanges, local)
 
 	prev, curr := removeCommon(address.NewCIDRs(merge(prevRanges)), address.NewCIDRs(merge(currRanges)))
 
@@ -82,15 +82,14 @@ func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range) err
 		cidrStr := cidr.String()
 		t.debugf("adding route %s to %s", cidrStr, t.instanceID)
 		_, err := t.createVPCRoute(cidrStr)
-		// TODO(mp) check for 50 routes limit
-		// TODO(mp) maybe check for auth related errors
-		// TODO(mp) keep removing
 		if err != nil {
 			return fmt.Errorf("createVPCRoutes failed: %s", err)
 		}
-		err = t.createHostRoute(cidrStr)
-		if err != nil {
-			return fmt.Errorf("createHostRoute failed: %s", err)
+		if local {
+			err = t.createHostRoute(cidrStr)
+			if err != nil {
+				return fmt.Errorf("createHostRoute failed: %s", err)
+			}
 		}
 	}
 
@@ -102,9 +101,11 @@ func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range) err
 		if err != nil {
 			return fmt.Errorf("deleteVPCRoute failed: %s", err)
 		}
-		err = t.deleteHostRoute(cidrStr)
-		if err != nil {
-			return fmt.Errorf("deleteHostRoute failed: %s", err)
+		if local {
+			err = t.deleteHostRoute(cidrStr)
+			if err != nil {
+				return fmt.Errorf("deleteHostRoute failed: %s", err)
+			}
 		}
 	}
 

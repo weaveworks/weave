@@ -783,13 +783,9 @@ func newTestTracker(trackChan chan rangePair) *testTracker {
 	return &testTracker{trackChan}
 }
 
-func (t *testTracker) HandleUpdate(old, new []address.Range) error {
+func (t *testTracker) HandleUpdate(old, new []address.Range, local bool) error {
 	t.trackChan <- rangePair{old, new}
 	return nil
-}
-
-func (t *testTracker) String() string {
-	return "test"
 }
 
 // Creates [start;end] address.Range.

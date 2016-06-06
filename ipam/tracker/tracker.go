@@ -13,5 +13,8 @@ type LocalRangeTracker interface {
 	// owned by the peer.
 	// Both slices have to be sorted in increasing order.
 	// Adjacent ranges within each slice might appear as separate ranges.
-	HandleUpdate(prevRanges, currRanges []address.Range) error
+	//
+	// The local parameter indicates whether the ranges belong to the peer
+	// by which the method is called.
+	HandleUpdate(prevRanges, currRanges []address.Range, local bool) error
 }

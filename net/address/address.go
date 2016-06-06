@@ -165,10 +165,6 @@ func (cidr CIDR) String() string {
 	return fmt.Sprintf("%s/%d", cidr.Addr.String(), cidr.PrefixLen)
 }
 
-func (cidr CIDR) Equal(oc CIDR) bool {
-	return cidr.Addr == oc.Addr && cidr.PrefixLen == oc.PrefixLen
-}
-
 // FromIP4 converts an ipv4 address to our integer address type
 func FromIP4(ip4 net.IP) (r Address) {
 	for _, b := range ip4.To4() {

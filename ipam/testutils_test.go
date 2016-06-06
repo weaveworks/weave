@@ -130,7 +130,7 @@ func (d *mockDB) Load(_ string, _ interface{}) (bool, error) { return false, nil
 func (d *mockDB) Save(_ string, _ interface{}) error         { return nil }
 
 func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.CIDR) {
-	return makeAllocatorWithTracker(name, cidrStr, quorum, tracker.NewNullTracker())
+	return makeAllocatorWithTracker(name, cidrStr, quorum, nil)
 }
 
 func makeAllocatorWithTracker(name string, cidrStr string, quorum uint, track tracker.LocalRangeTracker) (*Allocator, address.CIDR) {
@@ -158,8 +158,7 @@ func makeAllocatorWithTracker(name string, cidrStr string, quorum uint, track tr
 }
 
 func makeAllocatorWithMockGossip(t *testing.T, name string, universeCIDR string, quorum uint) (*Allocator, address.CIDR) {
-	return makeAllocatorWithMockGossipAndTracker(t, name, universeCIDR, quorum,
-		tracker.NewNullTracker())
+	return makeAllocatorWithMockGossipAndTracker(t, name, universeCIDR, quorum, nil)
 }
 
 func makeAllocatorWithMockGossipAndTracker(t *testing.T, name string, universeCIDR string, quorum uint, track tracker.LocalRangeTracker) (*Allocator, address.CIDR) {
@@ -225,7 +224,7 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 }
 
 func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
-	return makeNetworkOfAllocatorsWithTracker(size, cidr, tracker.NewNullTracker())
+	return makeNetworkOfAllocatorsWithTracker(size, cidr, nil)
 }
 
 func makeNetworkOfAllocatorsWithTracker(size int, cidr string, track tracker.LocalRangeTracker) ([]*Allocator, *gossip.TestRouter, address.CIDR) {

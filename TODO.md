@@ -2,11 +2,11 @@
 
 # Urgent
 
+* Add tests for rmpeer
+* Check whether reset is not async
+
 * Add the subnet checks / keep checksum offloading for the plugin
 * Test with the plugin
-
-* weave rmpeer should delete vpc routing entries for the peer if they still exist (we need peer->instanceid mapping)
-* AdminTakeoverRanges remove vpc routing entries if heir does not exist
 
 * Simplify / get rid of some tests
 * Document ipam/tracker/awsvpc.go
