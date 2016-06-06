@@ -353,6 +353,7 @@ function hosts {
 		hosts="$hostname $hosts"
 	done
 	echo export SSH=\"$SSHCMD\"
+    echo export NO_SCHEDULER=1
 	echo export HOSTS=\"$hosts\"
 	rm $json
 }

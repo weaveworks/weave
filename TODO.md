@@ -2,7 +2,6 @@
 
 # Urgent
 
-* Add tests for rmpeer
 * Check whether reset is not async
 
 * Add the subnet checks / keep checksum offloading for the plugin
@@ -11,7 +10,6 @@
 * Simplify / get rid of some tests
 * Document ipam/tracker/awsvpc.go
 
-* Add $HOST3 to awsvpc.sh
 * Test with multiple addr from the default subnet
 
 * Create new SSH keys or reuse the same for each test run

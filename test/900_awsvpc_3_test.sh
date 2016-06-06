@@ -7,9 +7,10 @@
 
 UNIVERSE=10.32.0.0/12
 SUBNET=10.32.42.0/24
-CIDR1=10.32.0.0/13
-CIDR2=10.40.0.0/14
-CIDR3=10.44.0.0/14
+CIDR1=10.32.0.0/14
+CIDR2=10.36.0.0/14
+CIDR3=10.40.0.0/14
+CIDR4=10.44.0.0/14
 
 INSTANCE_ID_CMD="curl -s -L http://169.254.169.254/latest/meta-data/instance-id"
 
@@ -71,6 +72,7 @@ start_suite "AWS VPC"
 
 INSTANCE1=$($SSH $HOST1 $INSTANCE_ID_CMD)
 INSTANCE2=$($SSH $HOST2 $INSTANCE_ID_CMD)
+INSTANCE3=$($SSH $HOST3 $INSTANCE_ID_CMD)
 
 VPC_ROUTE_TABLE_ID=$(routetableid $HOST1)
 cleanup_routetable $VPC_ROUTE_TABLE_ID
@@ -83,24 +85,16 @@ weave_on $HOST3 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOS
 
 echo "starting containers"
 
-
-echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 1"
-aws ec2 describe-route-tables --route-table-ids $VPC_ROUTE_TABLE_ID
-echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 1"
-
 start_container $HOST1 --name=c1
 start_container $HOST2 --name=c4
 start_container $HOST1 --name=c2
 proxy_start_container $HOST1 -di --name=c3
 start_container $HOST3 --name=c5
 
-echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 2"
-aws ec2 describe-route-tables --route-table-ids $VPC_ROUTE_TABLE_ID
-echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 2"
-
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR1 $INSTANCE1"
-assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR2 $INSTANCE1"
-assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3 $INSTANCE2"
+assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR2 $INSTANCE3"
+assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3 $INSTANCE1"
+assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR4 $INSTANCE2"
 
 # Starting container within non-default subnet should fail
 assert_raises "proxy_start_container $HOST1 --name=c6 -e WEAVE_CIDR=net:$SUBNET" 1
@@ -108,6 +102,7 @@ assert_raises "proxy_start_container $HOST1 --name=c6 -e WEAVE_CIDR=net:$SUBNET"
 # Check that we do not use fastdp
 assert_raises "no_fastdp $HOST1"
 assert_raises "no_fastdp $HOST2"
+assert_raises "no_fastdp $HOST3"
 
 assert_raises "exec_on $HOST1 c1 $PING c2"
 assert_raises "exec_on $HOST1 c1 $PING c4"
@@ -118,20 +113,20 @@ assert_raises "exec_on $HOST2 c4 $PING c5"
 
 weave_on $HOST2 stop
 # stopping should not remove the entries
-assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR3 $INSTANCE2"
+assert_raises "route_exists $VPC_ROUTE_TABLE_ID $CIDR4 $INSTANCE2"
 
 weave_on $HOST2 launch --log-level=debug --ipalloc-range $UNIVERSE --awsvpc $HOST1
 
 weave_on $HOST1 reset
+PEER3=$(weave_on $HOST3 report -f '{{.Router.Name}}')
+weave_on $HOST3 stop
+weave_on $HOST2 rmpeer $PEER3
 
-echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 3"
-aws ec2 describe-route-tables --route-table-ids $VPC_ROUTE_TABLE_ID
-echo "@@@@@@@@@@@@@@@@@@@@@@@@@ 3"
-
-## host1 has transferred previously owned ranges to host2
+## host1 transferred previously owned ranges to host2 and host2 took over host2 ranges
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR1"
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR2"
 assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR3"
+assert_raises "route_not_exist $VPC_ROUTE_TABLE_ID $CIDR4"
 assert_raises "route_exists $VPC_ROUTE_TABLE_ID $UNIVERSE $INSTANCE2"
 
 cleanup_routetable $VPC_ROUTE_TABLE_ID
