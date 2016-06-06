@@ -107,6 +107,3 @@ route, add the `--no-multicast-route` flag to `weave launch-plugin`.
 **See Also**
 
  * [How the Weave Network Plugin Works](/site/plugin/plugin-how-it-works.md)
- * [Plugin Command-line Arguments](/site/plugin/plug-in-command-line.md)
- 
-
