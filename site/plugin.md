@@ -22,7 +22,8 @@ After you've launched Weave Net and peered your hosts,  you can start containers
 
     $ docker run --net=weave -ti ubuntu
 
-on any of the hosts, and they can all communicate with each other.
+on any of the hosts, and they can all communicate with each other
+using any protocol, even multicast.
 
 >**Warning!** It is inadvisable to attach containers to the Weave network using the Weave Docker Networking Plugin and Weave Docker API Proxy simultaneously. Such containers will end up with two Weave network interfaces and two IP addresses, which is rarely desirable. To ensure that the proxy is not being used, do not run eval $(weave env), or docker $(weave config).
 
@@ -91,12 +92,6 @@ The plugin command-line arguments are:
    how much information to emit for debugging.
  * `--no-restart` -- remove the default policy of `--restart=always`, if
    you want to control start-up of the plugin yourself
- * `--no-multicast-route` -- stops weave from adding a static IP route for
-   multicast traffic onto its interface
-
-By default, multicast traffic is routed over the weave network.
-To turn this off, e.g. you want to configure your own multicast
-route, add the `--no-multicast-route` flag to `weave launch-plugin`.
 
 
 >Note: When using the Docker Plugin, there is no need to run `eval

@@ -32,7 +32,9 @@ The plugin accepts the following options via `docker network create ... --opt`:
    route for multicast traffic onto its interface.
 
 >**Note:** If you connect a container to multiple Weave networks, at
-   most one of them can have the multicast route enabled.
+   most one of them can have the multicast route enabled.  The `weave`
+   network created when the plugin is first launched has the multicast
+   option turned on, but for any networks you create it defaults to off.
 
 **See Also**
 
