@@ -6,7 +6,7 @@ menu_order: 60
  * [Launching Weave Net and Running Containers Using the Plugin](#launching)
  * [Restarting the Plugin](#restarting)
  * [Bypassing the Central Cluster Store When Building Docker Apps](#cluster-store)
- * [Using other plugin command-line arguments](#plugin-args)
+ * [Configuring the Plugin](#configuring)
 
 Docker versions 1.9 and later have a plugin mechanism for adding
 different network providers. Weave Net installs itself as a network
@@ -78,15 +78,16 @@ To run a Docker cluster without a central database, you need to ensure the follo
 All cross-host coordination is handled by Weave Net's "mesh" communication, using gossipDNS and eventual consistency to avoid the need for constant communication and dependency on a central cluster store.
 
 
-###<a name="plugin-args"></a>Using other plugin command-line arguments
+###<a name="configuring"></a>Configuring the Plugin
 
-If you need to give additional arguments to the plugin independently, don't
-use `weave launch`, but instead run:
+The plugin accepts a number of configuration parameters. To supply
+these, instead of running `weave launch`, start the router and plugin
+separately with:
 
     $ weave launch-router [other peers]
-    $ weave launch-plugin [plugin arguments]
+    $ weave launch-plugin [plugin parameters]
 
-The plugin command-line arguments are:
+The plugin configuration parameters are:
 
  * `--log-level=debug|info|warning|error` --tells the plugin
    how much information to emit for debugging.
