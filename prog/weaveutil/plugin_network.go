@@ -4,7 +4,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
+
+	"github.com/weaveworks/weave/plugin/net"
 )
 
 func createPluginNetwork(args []string) error {
@@ -23,6 +25,7 @@ func createPluginNetwork(args []string) error {
 			CheckDuplicate: true,
 			Driver:         driverName,
 			IPAM:           docker.IPAMOptions{Driver: driverName},
+			Options:        map[string]interface{}{plugin.MulticastOption: "true"},
 		})
 	if err != docker.ErrNetworkAlreadyExists && err != nil {
 		// Despite appearances to the contrary, CreateNetwork does
