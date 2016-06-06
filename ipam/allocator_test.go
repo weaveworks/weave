@@ -738,7 +738,7 @@ func TestShutdownWithTracker(t *testing.T) {
 	allocs[0].Shutdown()
 
 	done := false
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		p := <-trackChan
 		switch {
 		// This should uniquely match HandleUpdate invocation on peer2 which

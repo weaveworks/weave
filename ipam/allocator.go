@@ -474,7 +474,7 @@ func (alloc *Allocator) AdminTakeoverRanges(peerNameOrNickname string) address.C
 			return
 		}
 
-		newRanges := alloc.ring.AdminTransfer(peername, alloc.ourName)
+		newRanges := alloc.ring.Transfer(peername, alloc.ourName)
 
 		if len(newRanges) == 0 {
 			resultChan <- address.Count(0)

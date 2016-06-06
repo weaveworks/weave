@@ -562,20 +562,9 @@ func (r *Ring) PickPeerForTransfer(isValid func(mesh.PeerName) bool) mesh.PeerNa
 // Transfer will mark all entries associated with 'from' peer as owned by 'to' peer
 // and return ranges indicating the new space we picked up
 func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
-	return r.transfer(from, to, false)
-}
-
-// Does Transfer from a dead peer
-func (r *Ring) AdminTransfer(from, to mesh.PeerName) []address.Range {
-	return r.transfer(from, to, true)
-}
-
-func (r *Ring) transfer(from, to mesh.PeerName, isAdmin bool) []address.Range {
 	r.assertInvariants()
 	defer r.trackUpdates()()
-	if isAdmin {
-		defer r.trackUpdatesOfPeer(from)()
-	}
+	defer r.trackUpdatesOfPeer(from)()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
