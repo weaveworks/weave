@@ -623,10 +623,10 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 	binds := []string{"/var/run/weave:/var/run/weave"}
 	froms := []string{}
 	for _, addr := range unixAddrs {
-		if addr == weaveSockUnix {
+		from := strings.TrimPrefix(addr, "unix://")
+		if from == weaveSock {
 			continue
 		}
-		from := strings.TrimPrefix(addr, "unix://")
 		dir := filepath.Dir(from)
 		binds = append(binds, dir+":"+filepath.Join("/host", dir))
 		froms = append(froms, filepath.Join("/host", from))
