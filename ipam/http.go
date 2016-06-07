@@ -87,7 +87,7 @@ func (alloc *Allocator) handleHTTPClaim(dockerCli *docker.Client, w http.Respons
 }
 
 // HandleHTTP wires up ipams HTTP endpoints to the provided mux.
-func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR, dockerCli *docker.Client) {
+func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CIDR, tracker string, dockerCli *docker.Client) {
 	router.Methods("GET").Path("/ipinfo/defaultsubnet").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "%s", defaultSubnet)
 	})
@@ -173,5 +173,9 @@ func (alloc *Allocator) HandleHTTP(router *mux.Router, defaultSubnet address.CID
 		ident := mux.Vars(r)["id"]
 		transferred := alloc.AdminTakeoverRanges(ident)
 		fmt.Fprintf(w, "%d IPs taken over from %s\n", transferred, ident)
+	})
+
+	router.Methods("GET").Path("/ipinfo/tracker").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, tracker)
 	})
 }
