@@ -7,10 +7,6 @@ import (
 	"github.com/weaveworks/weave/common"
 )
 
-const (
-	CIDRMaxPrefixLen = 32
-)
-
 // Using 32-bit integer to represent IPv4 address
 type Address uint32
 type Offset uint32
@@ -80,11 +76,14 @@ type CIDR struct {
 
 // CIDRs returns a list of CIDR-aligned ranges which cover this range.
 func (r Range) CIDRs() []CIDR {
-	const fullMask = ^Address(0)
+	const (
+		fullMask         = ^Address(0)
+		cidrMaxPrefixLen = 32
+	)
 	var cidrs []CIDR
 
 	for start, end := r.Start, r.End-1; end >= start; {
-		mask, prefixLen := fullMask, CIDRMaxPrefixLen
+		mask, prefixLen := fullMask, cidrMaxPrefixLen
 		// Find the smallest mask which would cover some part of [start;end].
 		// Once we found such, apply it by OR'ing
 		for mask > 0 {
