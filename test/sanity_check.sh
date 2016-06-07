@@ -22,5 +22,6 @@ for host in $HOSTS; do
     echo "# docker info"
     docker_on $host info
     echo "# weave version"
+    docker inspect -f {{.Created}} weaveworks/weave:${WEAVE_VERSION:-latest}
     weave_on $host version
 done
