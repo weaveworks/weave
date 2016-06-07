@@ -22,6 +22,7 @@ import (
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam"
+	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
@@ -170,6 +171,7 @@ func main() {
 		datapathName       string
 		trustedSubnetStr   string
 		dbPrefix           string
+		isAWSVPC           bool
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -208,6 +210,7 @@ func main() {
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
+	mflag.BoolVar(&isAWSVPC, []string{"#awsvpc", "-awsvpc"}, false, "use AWS VPC for routing")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -250,7 +253,7 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	overlay, bridge := createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB)
+	overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
 	name := peerName(routerName, bridge.Interface())
@@ -302,7 +305,15 @@ func main() {
 		defaultSubnet address.CIDR
 	)
 	if ipamConfig.Enabled() {
-		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, isKnownPeer)
+		var t tracker.LocalRangeTracker
+		if isAWSVPC {
+			Log.Infoln("Creating AWSVPC LocalRangeTracker")
+			t, err = tracker.NewAWSVPCTracker()
+			if err != nil {
+				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
+			}
+		}
+		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, t, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
@@ -388,10 +399,18 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(datapathName string, ifaceName string, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
+	var ignoreSleeve bool
+
 	switch {
+	case isAWSVPC:
+		vpc := weave.NewAWSVPC()
+		overlay.Add("awsvpc", vpc)
+		bridge = weave.NullBridge{}
+		// Currently, we do not support any overlay with AWSVPC
+		ignoreSleeve = true
 	case datapathName != "" && ifaceName != "":
 		Log.Fatal("At most one of --datapath and --iface must be specified.")
 	case datapathName != "":
@@ -409,13 +428,17 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	default:
 		bridge = weave.NullBridge{}
 	}
-	sleeve := weave.NewSleeveOverlay(host, port)
-	overlay.Add("sleeve", sleeve)
-	overlay.SetCompatOverlay(sleeve)
+
+	if !ignoreSleeve {
+		sleeve := weave.NewSleeveOverlay(host, port)
+		overlay.Add("sleeve", sleeve)
+		overlay.SetCompatOverlay(sleeve)
+	}
+
 	return overlay, bridge
 }
 
-func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, track tracker.LocalRangeTracker, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange, err := ipam.ParseCIDRSubnet(config.IPRangeCIDR)
 	checkFatal(err)
 	defaultSubnet := ipRange
@@ -437,6 +460,7 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 		Quorum:      func() uint { return determineQuorum(config.PeerCount, router) },
 		Db:          db,
 		IsKnownPeer: isKnownPeer,
+		Tracker:     track,
 	}
 
 	allocator := ipam.NewAllocator(c)

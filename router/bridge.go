@@ -36,7 +36,7 @@ func (NullBridge) Interface() *net.Interface {
 }
 
 func (NullBridge) String() string {
-	return "<no bridge networking>"
+	return "no overlay bridge"
 }
 
 func (NullBridge) Stats() map[string]int {

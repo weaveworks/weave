@@ -18,12 +18,15 @@ import (
 	"github.com/weaveworks/weave/net/address"
 )
 
+type OnUpdate func(prev, curr []address.Range, local bool)
+
 // Ring represents the ring itself
 type Ring struct {
 	Start, End address.Address // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
 	Peer       mesh.PeerName   // name of peer owning this ring instance
 	Entries    entries         // list of entries sorted by token
 	Seeds      []mesh.PeerName // peers with which the ring was seeded
+	onUpdate   OnUpdate
 }
 
 func (r *Ring) assertInvariants() {
@@ -94,13 +97,31 @@ func (r *Ring) checkEntries(entries entries) error {
 	return nil
 }
 
+func (r *Ring) trackUpdates() func() {
+	return r.trackUpdatesOfPeer(r.Peer)
+}
+
+func (r *Ring) trackUpdatesOfPeer(peer mesh.PeerName) func() {
+	if r.onUpdate == nil {
+		return func() {}
+	}
+	ranges := r.OwnedRangesOfPeer(peer)
+	return func() { r.onUpdate(ranges, r.OwnedRangesOfPeer(peer), peer == r.Peer) }
+}
+
 // New creates an empty ring belonging to peer.
-func New(start, end address.Address, peer mesh.PeerName) *Ring {
+func New(start, end address.Address, peer mesh.PeerName, f OnUpdate) *Ring {
 	common.Assert(start < end)
 
-	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0)}
+	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0), onUpdate: f}
 	ring.updateExportedVariables()
 	return ring
+}
+
+func (r *Ring) Restore(other *Ring) {
+	onUpdate := r.onUpdate
+	*r = *other
+	r.onUpdate = onUpdate
 }
 
 func (r *Ring) Range() address.Range {
@@ -126,6 +147,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 	//fmt.Printf("%s GrantRangeToHost [%v,%v) -> %s\n", r.Peer, start, end, peer)
 
 	r.assertInvariants()
+	defer r.trackUpdates()()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
@@ -193,6 +215,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 // got updated as a result.
 func (r *Ring) Merge(gossip Ring) (bool, error) {
 	r.assertInvariants()
+	defer r.trackUpdates()()
 	defer r.updateExportedVariables()
 
 	// Don't panic when checking the gossiped in ring.
@@ -230,6 +253,7 @@ func (r *Ring) Merge(gossip Ring) (bool, error) {
 		r.Seeds = gossip.Seeds
 	}
 	r.Entries = result
+
 	return updated, nil
 }
 
@@ -336,10 +360,14 @@ func (r *Ring) splitRangesOverZero(ranges []address.Range) []address.Range {
 // ranges are owned by this peer.  Will split ranges which
 // span 0 in the ring.
 func (r *Ring) OwnedRanges() (result []address.Range) {
+	return r.OwnedRangesOfPeer(r.Peer)
+}
+
+func (r *Ring) OwnedRangesOfPeer(peer mesh.PeerName) (result []address.Range) {
 	r.assertInvariants()
 
 	for i, entry := range r.Entries {
-		if entry.Peer == r.Peer {
+		if entry.Peer == peer {
 			nextEntry := r.Entries.entry(i + 1)
 			result = append(result, address.Range{Start: entry.Token, End: nextEntry.Token})
 		}
@@ -371,6 +399,8 @@ func (r *Ring) AllRangeInfo() (result []RangeInfo) {
 // in.  Only works for empty rings. Each claimed range is CIDR-aligned.
 func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	common.Assert(r.Empty())
+
+	defer r.trackUpdates()()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 	defer func() {
@@ -527,6 +557,8 @@ func (r *Ring) PickPeerForTransfer(isValid func(mesh.PeerName) bool) mesh.PeerNa
 // and return ranges indicating the new space we picked up
 func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 	r.assertInvariants()
+	defer r.trackUpdates()()
+	defer r.trackUpdatesOfPeer(from)()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
