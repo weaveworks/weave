@@ -533,10 +533,9 @@ random_mac() {
 
 util_op() {
     if command_exists weaveutil ; then
-        WEAVE_HTTP_ADDR=$WEAVE_HTTP_ADDR weaveutil "$@"
+        weaveutil "$@"
     else
         docker run --rm --privileged --net=host --pid=host $(docker_sock_options) \
-            -e WEAVE_HTTP_ADDR \
             --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
     fi
 }
@@ -894,6 +893,8 @@ container_in_host_ns() {
 attach() {
     ATTACH_ARGS=""
     [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
+    # Relying on AWSVPC being set in 'ipam_cidrs allocate', except for 'weave restart'
+    [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
     util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
 }
 
@@ -1269,6 +1270,12 @@ ipam_reclaim_no_check_alive() {
     done
 }
 
+detect_awsvpc() {
+    # Ignoring errors here: if we cannot detect AWSVPC we will skip the relevant
+    # steps, because "attach" should work without the weave router running.
+    [ "$(call_weave GET /ipinfo/tracker)" != "awsvpc" ] || AWSVPC=1
+}
+
 # Call IPAM as necessary to lookup or allocate addresses
 #
 # $1 is one of 'lookup', 'allocate' or 'allocate_no_check_alive', $2
@@ -1285,6 +1292,11 @@ ipam_cidrs() {
         allocate)
             METHOD=POST
             CHECK_ALIVE="?check-alive=true"
+            detect_awsvpc
+            if [ -n "$AWSVPC" -a $# -gt 2 ] ; then
+                echo "Error: no IP addresses or subnets may be specified in AWSVPC mode" >&2
+                return 1
+            fi
             ;;
         allocate_no_check_alive)
             METHOD=POST
@@ -2098,6 +2110,7 @@ EOF
         for CIDR in $ALL_CIDRS ; do
             call_weave PUT /ip/$CONTAINER/$CIDR?check-alive=true
         done
+        detect_awsvpc
         do_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
