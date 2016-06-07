@@ -39,3 +39,25 @@ func TestBiggestPow2AlignedRange(t *testing.T) {
 	}
 	require.NoError(t, quick.Check(prop, &quick.Config{MaxCount: 1000000}))
 }
+
+func ip(s string) Address {
+	addr, _ := ParseIP(s)
+	return addr
+}
+
+func cidr(s string) CIDR {
+	c, err := ParseCIDR(s)
+	if err != nil {
+		panic(err)
+	}
+	return c
+}
+
+func TestCIDRs(t *testing.T) {
+	start := ip("10.0.0.1")
+	end := ip("10.0.0.9")
+	r := NewRange(start, Subtract(end, start))
+	require.Equal(t,
+		[]CIDR{cidr("10.0.0.1/32"), cidr("10.0.0.2/31"), cidr("10.0.0.4/30"), cidr("10.0.0.8/32")},
+		r.CIDRs())
+}
