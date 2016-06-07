@@ -63,6 +63,7 @@ func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
 }
 
 func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
+	// TODO(mp) shall we / how can we check that the network is using weave's IPAM?
 	// TODO(mp) DRY
 	// In a case of an error, we skip applying necessary steps for AWSVPC, because
 	// "attach" should work without the weave router running.
@@ -83,7 +84,6 @@ func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
 		}
 	}
 
-	// TODO(mp) create contains IPAM, check that is belongs to the same subnet
 	driver.logReq("CreateNetwork", create, create.NetworkID)
 	_, err := driver.setupNetworkInfo(create.NetworkID, stringOptions(create))
 	return err

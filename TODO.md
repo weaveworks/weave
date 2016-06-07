@@ -2,13 +2,8 @@
 
 # Urgent
 
-* Check whether reset is not async
-
 * Add the subnet checks / keep checksum offloading for the plugin
 * Test with the plugin
-
-* Simplify / get rid of some tests
-* Document ipam/tracker/awsvpc.go
 
 * Test with multiple addr from the default subnet
 

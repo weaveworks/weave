@@ -58,6 +58,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	if conf.IPAM.Type == "" {
 		result, err = ipamplugin.NewIpam(c.weave).Allocate(args)
 	} else {
+		// TODO(mp) check isAWSVPC !
 		result, err = ipam.ExecAdd(conf.IPAM.Type, args.StdinData)
 	}
 	if err != nil {
