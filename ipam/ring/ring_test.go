@@ -540,7 +540,7 @@ func TestClaimForPeers(t *testing.T) {
 	// Different end to usual so we get a number of addresses that a)
 	// is smaller than the max number of peers, and b) is divisible by
 	// some number of peers. This maximises coverage of edge cases.
-	end := dot10
+	end := dot8
 	peers := makePeers(numPeers)
 	// Test for a range of peer counts
 	for i := 0; i < numPeers; i++ {
