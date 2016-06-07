@@ -32,7 +32,7 @@ With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weav
 
 CoreOS users see [here](/guides/networking-docker-containers-with-weave-on-coreos/) for an example of installing Weave using cloud-config.
 
-Amazon AWS users may want to use AWSVPC?
+Amazon EC2 users may want to use [AWS-VPC mode](/site/using-weave/awsvpc.md)
 
 Amazon ECS users see [here](https://github.com/weaveworks/integrations/blob/master/aws/ecs/README.md)
 for the latest Weave AMIs and [here](http://weave.works/guides/service-discovery-with-weave-aws-ecs.html) to get started with Weave Net on ECS.

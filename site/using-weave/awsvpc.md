@@ -4,7 +4,7 @@ menu_order: 110
 ---
 
 If you are running your container infrastructure entirely within
-Amazon Web Services (AWS) EC2 (Elastic Compute Cloud), then you can
+Amazon Web Services (AWS) Elastic Compute Cloud (EC2), then you can
 choose AWS-VPC mode to connect your containers without any overlay, so
 they can operate very close to the full speed of the underlying
 network.
@@ -68,8 +68,8 @@ your cluster.
   instances. We hope to ease this limitation in future.
 - The AWS network does not support multicast.
 - The number of hosts in a cluster is limited by the maximum size of
-  your AWS route table.  This is are limited to 50 entries though you
-  can request an increase to 100.
+  your AWS route table.  This is limited to 50 entries though you
+  can request an increase to 100 by contacting Amazon.
 - All your containers must be on the same network, with no subnet
   isolation. We hope to ease this limitation in future.
 
@@ -89,3 +89,5 @@ can run:
 
  * [Using Weave Net](/site/using-weave.md)
  * [Performance measurements](/blog/weave-docker-networking-performance-aws-vpc/)
+
+(that last blog post doesn't exist yet)
