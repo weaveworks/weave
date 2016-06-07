@@ -1625,8 +1625,13 @@ launch_router() {
     populate_router
     if [ -n "$AWSVPC" ]; then
         expose_ip
-        # TODO(mp) comment here re both
+        # Set proxy_arp on the bridge, so that it could accept packets destined
+        # to containers within the same subnet but running on remote hosts.
+        # Without it, exact routes on each container are required.
         echo 1 >/proc/sys/net/ipv4/conf/$BRIDGE/proxy_arp
+        # Avoid delaying the first ARP request. Also, setting it to 0 avoids
+        # placing the request into a bounded queue as it can be seen:
+        # https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/net/ipv4/arp.c?id=refs/tags/v4.6.1#n819
         echo 0 >/proc/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
     fi
 }

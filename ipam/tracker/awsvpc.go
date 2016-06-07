@@ -1,6 +1,22 @@
 package tracker
 
-// TODO(mp) docs
+// The AWSVPC tracker tracks the IPAM ring changes and accordingly updates
+// the AWS VPC route table and, if the announced change is local
+// (denoted by local=true) to the host, the host route table.
+//
+// During the initialization, the tracker detects AWS VPC route table id which
+// is associated with the host's subnet on the AWS network. If such a table does
+// not exist, the default VPC route table is used.
+//
+// When a host A donates a range to a host B, the necessary route table
+// updates (removal) happen on the host A first, and afterwards on
+// the host B (installation).
+//
+// NB: there is a hard limit for 50 routes within any VPC route table
+// (practically, it is 48, because one route is used by the AWS Internet GW and
+// one by the AWS host subnet), therefore it is suggested to avoid
+// an excessive fragmentation within the IPAM ring which might happen due to
+// the claim operations or uneven distribution of containers across the hosts.
 
 import (
 	"fmt"
@@ -25,9 +41,6 @@ type AWSVPCTracker struct {
 }
 
 // NewAWSVPCTracker creates and initialises AWS VPC based tracker.
-//
-// The tracker updates AWS VPC and host route tables when any changes to allocated
-// address ranges owned by a peer have been done.
 func NewAWSVPCTracker() (*AWSVPCTracker, error) {
 	var (
 		err     error

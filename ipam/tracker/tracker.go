@@ -4,7 +4,7 @@ import (
 	"github.com/weaveworks/weave/net/address"
 )
 
-// LocalRangeTracker is an interface for tracking changes in ring allocations.
+// LocalRangeTracker is an interface for tracking changes in the IPAM ring.
 type LocalRangeTracker interface {
 	// HandleUpdate is called whenever an address ring gets updated.
 	//
