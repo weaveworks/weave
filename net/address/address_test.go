@@ -61,3 +61,9 @@ func TestCIDRs(t *testing.T) {
 		[]CIDR{cidr("10.0.0.1/32"), cidr("10.0.0.2/31"), cidr("10.0.0.4/30"), cidr("10.0.0.8/32")},
 		r.CIDRs())
 }
+
+func TestCIDRStartAndEnd(t *testing.T) {
+	cidr, _ := ParseCIDR("10.0.0.0/24")
+	require.Equal(t, ip("10.0.0.0"), cidr.Start(), "")
+	require.Equal(t, ip("10.0.1.0"), cidr.End(), "")
+}

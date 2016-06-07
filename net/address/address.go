@@ -125,6 +125,22 @@ func ParseCIDR(s string) (CIDR, error) {
 	}
 }
 
+func NewCIDRs(ranges []Range) (cidrs []CIDR) {
+	for _, r := range ranges {
+		cidrs = append(cidrs, r.CIDRs()...)
+	}
+	return cidrs
+}
+
+func (cidr CIDR) Start() Address {
+	return cidr.Addr
+}
+
+// cidr = [Start; End)
+func (cidr CIDR) End() Address {
+	return cidr.Range().End
+}
+
 func (cidr CIDR) IsSubnet() bool {
 	mask := cidr.Size() - 1
 	return Offset(cidr.Addr)&mask == 0
