@@ -14,6 +14,8 @@ containers to the network, but instead of wrapping up each packet and
 sending it to its destination, Weave Net instructs the AWS network
 router which ranges of container IP addresses live on which instance.
 
+![Weave Net AWS-VPC Mode](weave-net-awsvpc-1007x438.png)
+
 ###Configuring your EC2 instances to use Weave AWS-VPC mode
 
 First, your AWS instances need to be given access to change the route
