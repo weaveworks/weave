@@ -303,6 +303,7 @@ func main() {
 	var (
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
+		trackerName   string
 	)
 	if ipamConfig.Enabled() {
 		var t tracker.LocalRangeTracker
@@ -312,6 +313,7 @@ func main() {
 			if err != nil {
 				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
 			}
+			trackerName = "awsvpc"
 		}
 		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, t, isKnownPeer)
 		observeContainers(allocator)
@@ -344,7 +346,7 @@ func main() {
 	if httpAddr != "" {
 		muxRouter := mux.NewRouter()
 		if allocator != nil {
-			allocator.HandleHTTP(muxRouter, defaultSubnet, dockerCli)
+			allocator.HandleHTTP(muxRouter, defaultSubnet, trackerName, dockerCli)
 		}
 		if ns != nil {
 			ns.HandleHTTP(muxRouter, dockerCli)

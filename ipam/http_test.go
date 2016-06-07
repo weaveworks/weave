@@ -43,7 +43,7 @@ func listenHTTP(alloc *Allocator, subnet address.CIDR) int {
 	router.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, fmt.Sprintln(alloc))
 	})
-	alloc.HandleHTTP(router, subnet, nil)
+	alloc.HandleHTTP(router, subnet, "", nil)
 
 	httpListener, err := net.Listen("tcp", ":0")
 	if err != nil {
