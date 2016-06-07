@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	testStart1 = "10.0.1.0"
+	testStart1 = "10.0.0.0"
 	testStart2 = "10.0.2.0"
 	testStart3 = "10.0.3.0"
 )
@@ -643,4 +643,157 @@ func TestSpaceRequest(t *testing.T) {
 func cidrRanges(s string) []address.Range {
 	c, _ := address.ParseCIDR(s)
 	return []address.Range{c.Range()}
+}
+
+func TestTracker(t *testing.T) {
+	const (
+		cidr       = "10.0.0.0/30"
+		container1 = "container-1"
+		container2 = "container-2"
+	)
+
+	trackChan := make(chan rangePair, 10)
+	allocs, router, _ := makeNetworkOfAllocatorsWithTracker(2, cidr, newTestTracker(trackChan))
+	defer stopNetworkOfAllocators(allocs, router)
+
+	cidr1, _ := address.ParseCIDR(cidr)
+	addr1, err := allocs[0].Allocate(container1, cidr1, true, returnFalse)
+	require.Equal(t, nil, err, "")
+	require.Equal(t, ip("10.0.0.1"), addr1, "")
+
+	// Check HandleUpdate invocations. 2 of them should be invoked only with new ranges.
+	newPeer1 := false
+	newPeer2 := false
+	for i := 0; i < 3; i++ {
+		pair := <-trackChan
+		switch {
+		case !newPeer1 && pair.new[0].Equal(addrRange("10.0.0.0", "10.0.0.1")):
+			newPeer1 = true
+		case !newPeer2 && pair.new[0].Equal(addrRange("10.0.0.2", "10.0.0.3")):
+			newPeer2 = true
+		default:
+			continue
+		}
+	}
+	require.True(t, newPeer1 && newPeer2, "")
+
+	// The following allocation should trigger request for donation, because
+	// peer1 ran out of space.
+	addr2, err := allocs[0].Allocate(container2, cidr1, true, returnFalse)
+	require.Equal(t, nil, err, "")
+	require.Equal(t, ip("10.0.0.2"), addr2, "")
+
+	// Check whether HandleUpdate is invoked after donation.
+	newDonation1 := false
+	newDonation2 := false
+	for i := 0; i < 2; i++ {
+		pair := <-trackChan
+		switch {
+		case !newDonation1 &&
+			pair.old[0].Equal(addrRange("10.0.0.0", "10.0.0.1")) &&
+			pair.new[0].Equal(addrRange("10.0.0.0", "10.0.0.1")) &&
+			pair.new[1].Equal(addrRange("10.0.0.3", "10.0.0.3")):
+			// peer1
+
+			require.Equal(t, 1, len(pair.old), "")
+			require.Equal(t, 2, len(pair.new), "")
+			newDonation1 = true
+		case !newDonation2 &&
+			pair.old[0].Equal(addrRange("10.0.0.2", "10.0.0.3")) &&
+			pair.new[0].Equal(addrRange("10.0.0.2", "10.0.0.2")):
+			// peer2
+
+			require.Equal(t, 1, len(pair.old), "")
+			require.Equal(t, 1, len(pair.new), "")
+			newDonation2 = true
+		default:
+			continue
+		}
+	}
+	require.True(t, newDonation1 && newDonation2, "")
+}
+
+func TestShutdownWithTracker(t *testing.T) {
+	const (
+		cidr       = "10.0.0.0/30"
+		container1 = "container-1"
+	)
+
+	trackChan := make(chan rangePair, 10)
+	allocs, router, _ := makeNetworkOfAllocatorsWithTracker(2, cidr, newTestTracker(trackChan))
+	defer stopNetworkOfAllocators(allocs, router)
+
+	cidr1, _ := address.ParseCIDR(cidr)
+	_, err := allocs[0].Allocate(container1, cidr1, true, returnFalse)
+	require.NoError(t, err, "")
+
+	time.Sleep(500 * time.Millisecond)
+	flush(trackChan, 2)
+
+	// After allocation (and ring establishment):
+	// * peer1: [10.0.0.0-10.0.0.1]
+	// * peer2: [10.0.0.2-10.0.0.3]
+
+	// Shutdown peer1
+	allocs[0].Shutdown()
+
+	done := false
+	for i := 0; i < 5; i++ {
+		p := <-trackChan
+		switch {
+		// This should uniquely match HandleUpdate invocation on peer2 which
+		// happens after peer1 notified peer2 about the donation due to its
+		// termination:
+		case !done && len(p.old) == 1 && len(p.new) == 2:
+			require.Equal(t, addrRange("10.0.0.2", "10.0.0.3"), p.old[0], "")
+			require.Equal(t, addrRange("10.0.0.0", "10.0.0.1"), p.new[0], "")
+			require.Equal(t, addrRange("10.0.0.2", "10.0.0.3"), p.new[1], "")
+			// peer2 has received peer1's previously owned ranges
+			done = true
+		default:
+			continue
+		}
+	}
+	require.True(t, done)
+
+	// Shutdown peer2
+	allocs[1].Shutdown()
+	p := <-trackChan
+	require.Equal(t,
+		[]address.Range{addrRange("10.0.0.0", "10.0.0.1"), addrRange("10.0.0.2", "10.0.0.3")},
+		p.old)
+	require.Len(t, p.new, 0)
+}
+
+func flush(c chan rangePair, count int) {
+	for i := 0; i < count; i++ {
+		<-c
+	}
+}
+
+type testTracker struct {
+	trackChan chan rangePair
+}
+
+type rangePair struct {
+	old, new []address.Range
+}
+
+func newTestTracker(trackChan chan rangePair) *testTracker {
+	return &testTracker{trackChan}
+}
+
+func (t *testTracker) HandleUpdate(old, new []address.Range, local bool) error {
+	t.trackChan <- rangePair{old, new}
+	return nil
+}
+
+// Creates [start;end] address.Range.
+func addrRange(start, end string) address.Range {
+	return address.NewRange(ip(start), address.Subtract(ip(end)+1, ip(start)))
+}
+
+func ip(addr string) address.Address {
+	retAddr, _ := address.ParseIP(addr)
+	return retAddr
 }
