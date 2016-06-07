@@ -368,32 +368,34 @@ func (r *Ring) AllRangeInfo() (result []RangeInfo) {
 }
 
 // ClaimForPeers claims the entire ring for the array of peers passed
-// in.  Only works for empty rings.
+// in.  Only works for empty rings. Each claimed range is CIDR-aligned.
 func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	common.Assert(r.Empty())
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
+	defer func() {
+		e := r.Entries[len(r.Entries)-1]
+		common.Assert(address.Add(e.Token, address.Offset(e.Free)) == r.End)
+	}()
 
-	totalSize := r.distance(r.Start, r.End)
-	share := totalSize/address.Count(len(peers)) + 1
-	remainder := totalSize % address.Count(len(peers))
-	pos := r.Start
-
-	for i, peer := range peers {
-		if address.Count(i) == remainder {
-			share--
-			if share == 0 {
-				break
-			}
-		}
-
-		r.Entries.insert(entry{Token: pos, Peer: peer, Free: share})
-		pos += address.Address(share)
-	}
-
-	common.Assert(pos == r.End)
-
+	r.subdivide(r.Start, r.End, peers)
 	r.Seeds = peers
+}
+
+// subdivide subdivides the [from,to) CIDR for the given peers into
+// CIDR-aligned subranges.
+func (r *Ring) subdivide(from, to address.Address, peers []mesh.PeerName) {
+	share := address.Length(to, from)
+	if share == 0 {
+		return
+	}
+	if share == 1 || len(peers) == 1 {
+		r.Entries.insert(entry{Token: from, Peer: peers[0], Free: share})
+		return
+	}
+	mid := address.Add(from, address.Offset(share/2))
+	r.subdivide(from, mid, peers[:len(peers)/2])
+	r.subdivide(address.Add(mid, address.Offset(share%2)), to, peers[len(peers)/2:])
 }
 
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[mesh.PeerName]string) {
