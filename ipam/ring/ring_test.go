@@ -553,21 +553,6 @@ func TestClaimForPeers(t *testing.T) {
 	}
 }
 
-func TestClaimForPeersCIDRAligned(t *testing.T) {
-	peers := makePeers(3)
-	ring := NewRing(start, end, peers[0])
-	ring.ClaimForPeers(peers)
-	expectedRanges := []address.Range{
-		address.NewRange(start, 128),                     // 10.0.0.0/25
-		address.NewRange(address.Add(start, 128), 64),    // 10.0.0.128/26
-		address.NewRange(address.Add(start, 128+64), 64), // 10.0.0.192/26
-	}
-	for i, entry := range ring.Entries {
-		r := address.NewRange(entry.Token, address.Offset(entry.Free))
-		require.Equal(t, expectedRanges[i], r, "")
-	}
-}
-
 type addressSlice []address.Address
 
 func (s addressSlice) Len() int           { return len(s) }

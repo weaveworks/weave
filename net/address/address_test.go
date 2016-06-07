@@ -46,50 +46,20 @@ func ip(s string) Address {
 }
 
 func cidr(s string) CIDR {
-	c, _ := ParseCIDR(s)
+	c, err := ParseCIDR(s)
+	if err != nil {
+		panic(err)
+	}
 	return c
 }
 
 func TestCIDRs(t *testing.T) {
-	start := ip("192.168.1.42")
-	end := ip("192.168.2.42")
-	offset := Subtract(end, start)
-	r := NewRange(start, offset)
-	// for [192.168.1.42,192.168.2.42)
-	expectedCIDRs := []CIDR{
-		{ip("192.168.1.42"), 31},
-		{ip("192.168.1.44"), 30},
-		{ip("192.168.1.48"), 28},
-		{ip("192.168.1.64"), 26},
-		{ip("192.168.1.128"), 25},
-		{ip("192.168.2.0"), 27},
-		{ip("192.168.2.32"), 29},
-		{ip("192.168.2.40"), 31},
-	}
-	cidrs := r.CIDRs()
-
-	require.Equal(t, len(cidrs), len(expectedCIDRs), "")
-	require.Equal(t, expectedCIDRs, cidrs, "")
-}
-
-func TestSingleCIDR(t *testing.T) {
-	r := NewRange(ip("192.168.1.0"), 256)
-	expectedCIDR := CIDR{ip("192.168.1.0"), 24}
-	cidrs := r.CIDRs()
-
-	require.Equal(t, len(cidrs), 1)
-	require.Equal(t, expectedCIDR, cidrs[0])
-
-	r = NewRange(ip("192.168.1.1"), 1)
-	expectedCIDR = CIDR{ip("192.168.1.1"), 32}
-	cidrs = r.CIDRs()
-
-	require.Equal(t, len(cidrs), 1)
-	require.Equal(t, expectedCIDR, cidrs[0])
-
-	r = Range{ip("10.0.0.2"), ip("10.0.0.9")}
-	expectedCIDRs := []CIDR{cidr("10.0.0.2/31"), cidr("10.0.0.4/30"), cidr("10.0.0.8/32")}
-	require.Equal(t, expectedCIDRs, r.CIDRs(), "")
+	start := ip("10.0.0.1")
+	end := ip("10.0.0.9")
+	r := NewRange(start, Subtract(end, start))
+	require.Equal(t,
+		[]CIDR{cidr("10.0.0.1/32"), cidr("10.0.0.2/31"), cidr("10.0.0.4/30"), cidr("10.0.0.8/32")},
+		r.CIDRs())
 }
 
 func TestCIDRStartAndEnd(t *testing.T) {
