@@ -27,6 +27,11 @@ setup_host() {
 
 for HOST in $HOSTS; do
     setup_host $HOST &
+    pids="$pids $!"
 done
 
-wait
+# Wait individually for tasks so we fail-exit on any non-zero return code
+# ('wait' on its own always returns 0)
+for pid in $pids; do
+    wait $pid;
+done
