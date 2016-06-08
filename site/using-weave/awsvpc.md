@@ -3,25 +3,25 @@ title: Using IP Routing on an Amazon Web Services Virtual Private Cloud
 menu_order: 110
 ---
 
-If you are running your container infrastructure entirely within
-Amazon Web Services (AWS) Elastic Compute Cloud (EC2), then you can
-choose AWS-VPC mode to connect your containers without any overlay, so
-they can operate very close to the full speed of the underlying
-network.
+If running your container infrastructure entirely within Amazon Web Services (AWS) 
+Elastic Compute Cloud (EC2), then you can enable AWS-VPC mode. In AWS-VPC mode, 
+containers are networked without using an overlay, and allows network speeds 
+close to that of the underlying network.
 
-In this mode, Weave Net still manages IP addresses and connects
-containers to the network, but instead of wrapping up each packet and
+With AWS-VPC enabled, Weave Net manages IP addresses and connects
+containers to the network as usual, but instead of wrapping each packet and
 sending it to its destination, Weave Net instructs the AWS network
-router which ranges of container IP addresses live on which instance.
+router with the ranges of container IP addresses and the instances 
+on which they live. 
 
 ![Weave Net AWS-VPC Mode](weave-net-awsvpc-1007x438.png)
 
-###Configuring your EC2 instances to use Weave AWS-VPC mode
+###Configuring EC2 Instances to use Weave AWS-VPC Mode
 
-First, your AWS instances need to be given access to change the route
-table.  Give them an IAM Role which has this access; if you have an
-existing role then extend it or create a new one with a policy
-allowing the necessary actions:
+First, your AWS instances need to be given write access to the route
+table.  Give them an IAM Role which has the following access.  If you have an
+existing role then extend it or create a new role with a policy
+that allows the necessary actions:
 
 ```
 {
@@ -44,46 +44,47 @@ allowing the necessary actions:
 }
 ```
 
-Your Security Group must allow network traffic between instances: you
-must open TCP port 6783 which Weave Net uses to manage the network,
-and you must allow any ports which your own containers use. Remember:
-there is no network overlay in this mode so IP packets with container
+Secondly, enable your Security Group to allow network traffic between instances: 
+you must open TCP port 6783 which is the port that Weave Net uses to manage the network. 
+You must also allow any ports which your own containers use. 
+
+>>**Remember:**there is no network overlay in this mode, and so, IP packets with container
 addresses will flow over the AWS network unmodified.
 
-Also, you must disable the "Source/Destination check" on each machine,
-because Weave will be operating with IP addresses outside of the range
-allocated by Amazon.
+Also, since Weave will be operating with IP addresses outside of the 
+range allocatd by Amazon, you must disable "Source/Destination check" on each machine.
 
-###Using AWS-VPC mode
+###Using AWS-VPC Mode
 
-Launch Weave Net, adding the `--awsvpc` flag:
+Launch Weave Net with the `--awsvpc` flag:
 
     $ weave launch --awsvpc [other hosts]
 
-You still need to supply the names or IP addresses of other hosts in
+ >>Note: You will still need to supply the names or IP addresses of other hosts in
 your cluster.
 
-###Limitations
+###Present Limitations
 
 - AWS-VPC mode does not inter-operate with other Weave Net modes; it
   is all or nothing.  In this mode, all hosts in a cluster must be AWS
-  instances. We hope to ease this limitation in future.
+  instances. (We hope to ease this limitation in future.)
 - The AWS network does not support multicast.
 - The number of hosts in a cluster is limited by the maximum size of
   your AWS route table.  This is limited to 50 entries though you
   can request an increase to 100 by contacting Amazon.
-- All your containers must be on the same network, with no subnet
-  isolation. We hope to ease this limitation in future.
+- All of your containers must be on the same network, with no subnet
+  isolation. (We hope to ease this limitation in future.)
 
 ###Packet size (MTU)
 
 The Maximum Transmission Unit, or MTU, is the technical term for the
 limit on how big a single packet can be on the network. Weave Net
-defaults to 1410 bytes which works across almost all networks, but you
-can set a larger size for better performance.
+defaults to 1410 bytes. This default works across almost all networks, but for better 
+performance you can set it to a larger MTU size. 
 
-The AWS network supports packets of 9000 bytes, so in AWS-VPC mode you
-can run:
+The AWS network supports packets of up to 9000 bytes.  
+
+In AWS-VPC mode you can run the following:
 
     $ WEAVE_MTU=9000 weave launch --awsvpc host2 host3
 
