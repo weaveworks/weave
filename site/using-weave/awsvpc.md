@@ -3,9 +3,9 @@ title: Using IP Routing on an Amazon Web Services Virtual Private Cloud
 menu_order: 110
 ---
 
-If running your container infrastructure entirely within Amazon Web Services (AWS) 
-Elastic Compute Cloud (EC2), then you can enable AWS-VPC mode. In AWS-VPC mode, 
-containers are networked without using an overlay, and allows network speeds 
+If your container infrastructure is running entirely within Amazon Web Services (AWS) 
+Elastic Compute Cloud (EC2), then you can enable AWS-VPC mode with Weave Net. In AWS-VPC mode, 
+containers are networked without using an overlay and allows network speeds 
 close to that of the underlying network.
 
 With AWS-VPC enabled, Weave Net manages IP addresses and connects
