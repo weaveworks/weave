@@ -417,8 +417,8 @@ func (r *Ring) String() string {
 
 // ReportFree is used by the allocator to tell the ring how many free
 // ips are in a given range, so that ChoosePeersToAskForSpace can make
-// more intelligent decisions.
-func (r *Ring) ReportFree(freespace map[address.Address]address.Count) {
+// more intelligent decisions.  Returns true if any changes made.
+func (r *Ring) ReportFree(freespace map[address.Address]address.Count) (updated bool) {
 	r.assertInvariants()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
@@ -456,7 +456,9 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Count) {
 
 		entries[i].Free = free
 		entries[i].Version++
+		updated = true
 	}
+	return
 }
 
 type weightedPeer struct {
