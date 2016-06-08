@@ -451,7 +451,7 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Count) (updated 
 		common.Assert(free <= address.Count(maxSize))
 
 		if entries[i].Free == free {
-			return
+			continue
 		}
 
 		entries[i].Free = free
