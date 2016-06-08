@@ -14,6 +14,7 @@ import (
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -85,11 +86,14 @@ type Config struct {
 	Quorum      func() uint
 	Db          db.DB
 	IsKnownPeer func(name mesh.PeerName) bool
+	Tracker     tracker.LocalRangeTracker
 }
 
 // NewAllocator creates and initialises a new Allocator
 func NewAllocator(config Config) *Allocator {
 	var participant paxos.Participant
+	var alloc *Allocator
+	var onUpdate ring.OnUpdate
 
 	if config.IsObserver {
 		participant = paxos.NewObserver()
@@ -97,11 +101,19 @@ func NewAllocator(config Config) *Allocator {
 		participant = paxos.NewNode(config.OurName, config.OurUID, 0)
 	}
 
-	return &Allocator{
+	if config.Tracker != nil {
+		onUpdate = func(prev []address.Range, curr []address.Range, local bool) {
+			if err := config.Tracker.HandleUpdate(prev, curr, local); err != nil {
+				alloc.errorf("HandleUpdate failed: %s", err)
+			}
+		}
+	}
+
+	alloc = &Allocator{
 		ourName:     config.OurName,
 		seed:        config.Seed,
 		universe:    config.Universe,
-		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName),
+		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, onUpdate),
 		owned:       make(map[string]ownedData),
 		db:          config.Db,
 		paxos:       participant,
@@ -111,6 +123,7 @@ func NewAllocator(config Config) *Allocator {
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
 	}
+	return alloc
 }
 
 func ParseCIDRSubnet(cidrStr string) (cidr address.CIDR, err error) {
@@ -958,7 +971,7 @@ func (alloc *Allocator) loadPersistedData() bool {
 		return false
 	}
 
-	alloc.ring = persistedRing
+	alloc.ring.Restore(persistedRing)
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 
 	if ownedFound {
@@ -1067,6 +1080,9 @@ func (alloc *Allocator) fatalf(fmt string, args ...interface{}) {
 }
 func (alloc *Allocator) warnf(fmt string, args ...interface{}) {
 	alloc.logf(common.Log.Warnf, fmt, args...)
+}
+func (alloc *Allocator) errorf(fmt string, args ...interface{}) {
+	common.Log.Errorf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
 	alloc.logf(common.Log.Infof, fmt, args...)

@@ -181,6 +181,7 @@ exec_remote() {
         -e PROXY_HOST="$PROXY_HOST" \
         -e COVERAGE \
         -e CHECKPOINT_DISABLE \
+        -e AWSVPC   \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
@@ -645,7 +646,7 @@ EOF
         fi
     fi
 
-    [ "$1" = "--without-ethtool" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
+    [ "$1" = "--without-ethtool" -o -n "$AWSVPC" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
 
     ip link set dev $BRIDGE up
 
@@ -660,6 +661,12 @@ expose_ip() {
         if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
             ip addr add dev $BRIDGE $CIDR
             arp_update $BRIDGE $CIDR || true
+            # Remove a default route installed by the kernel, because awsvpc
+            # has installed it as well
+            if [ -n "$AWSVPC" ]; then
+                RCIDR=$(ip route list exact $CIDR proto kernel | head -n1 | cut -d' ' -f1)
+                [ -n "$RCIDR" ] && ip route del dev $BRIDGE proto kernel $RCIDR
+            fi
         fi
         [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
     done
@@ -886,6 +893,8 @@ container_in_host_ns() {
 attach() {
     ATTACH_ARGS=""
     [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
+    # Relying on AWSVPC being set in 'ipam_cidrs allocate', except for 'weave restart'
+    [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
     util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
 }
 
@@ -1261,6 +1270,12 @@ ipam_reclaim_no_check_alive() {
     done
 }
 
+detect_awsvpc() {
+    # Ignoring errors here: if we cannot detect AWSVPC we will skip the relevant
+    # steps, because "attach" should work without the weave router running.
+    [ "$(call_weave GET /ipinfo/tracker)" != "awsvpc" ] || AWSVPC=1
+}
+
 # Call IPAM as necessary to lookup or allocate addresses
 #
 # $1 is one of 'lookup', 'allocate' or 'allocate_no_check_alive', $2
@@ -1277,6 +1292,11 @@ ipam_cidrs() {
         allocate)
             METHOD=POST
             CHECK_ALIVE="?check-alive=true"
+            detect_awsvpc
+            if [ -n "$AWSVPC" -a $# -gt 2 ] ; then
+                echo "Error: no IP addresses or subnets may be specified in AWSVPC mode" >&2
+                return 1
+            fi
             ;;
         allocate_no_check_alive)
             METHOD=POST
@@ -1501,22 +1521,19 @@ launch_router() {
     LAUNCHING_ROUTER=1
     check_forwarding_rules
     enforce_docker_bridge_addr_assign_type
-    create_bridge
-    docker_bridge_ip
-    # We set the router name to the bridge MAC, which in turn is
-    # derived from the system UUID (if available), and thus stable
-    # across reboots.
-    PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
+
     # backward compatibility...
     if is_cidr "$1" ; then
         echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
         shift 1
     fi
+
     CONTAINER_PORT=$PORT
     ARGS=
     IPRANGE=
     IPRANGE_SPECIFIED=
 
+    docker_bridge_ip
     DNS_ROUTER_OPTS="--dns-listen-address $DOCKER_BRIDGE_IP:53"
     NO_DNS_OPT=
 
@@ -1558,6 +1575,10 @@ launch_router() {
             --no-restart)
                 RESTART_POLICY=
                 ;;
+            --awsvpc)
+                AWSVPC_ARGS="--awsvpc"
+                AWSVPC=1
+                ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
                 ;;
@@ -1565,6 +1586,13 @@ launch_router() {
         shift
     done
     eval "set -- $ARGS"
+
+    create_bridge
+    # We set the router name to the bridge MAC, which in turn is
+    # derived from the system UUID (if available), and thus stable
+    # across reboots.
+    PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
+
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
         IPRANGE="10.32.0.0/12"
         if ! check_overlap $IPRANGE ; then
@@ -1601,11 +1629,23 @@ launch_router() {
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
+        $AWSVPC_ARGS \
         --http-addr $HTTP_ADDR \
         "$@")
     setup_router_iface_$BRIDGE_TYPE
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     populate_router
+    if [ -n "$AWSVPC" ]; then
+        expose_ip
+        # Set proxy_arp on the bridge, so that it could accept packets destined
+        # to containers within the same subnet but running on remote hosts.
+        # Without it, exact routes on each container are required.
+        echo 1 >/proc/sys/net/ipv4/conf/$BRIDGE/proxy_arp
+        # Avoid delaying the first ARP request. Also, setting it to 0 avoids
+        # placing the request into a bounded queue as it can be seen:
+        # https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/net/ipv4/arp.c?id=refs/tags/v4.6.1#n819
+        echo 0 >/proc/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
+    fi
 }
 
 # Recreate the parameter values that are set when the router is first launched
@@ -1649,6 +1689,8 @@ launch_proxy() {
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
+    detect_awsvpc
+    [ -n "$AWSVPC" ] && PROXY_ARGS="$PROXY_ARGS --no-multicast-route"
     PROXY_CONTAINER=$(docker run -d --name=$PROXY_CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
@@ -2070,6 +2112,7 @@ EOF
         for CIDR in $ALL_CIDRS ; do
             call_weave PUT /ip/$CONTAINER/$CIDR?check-alive=true
         done
+        detect_awsvpc
         do_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
