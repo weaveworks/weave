@@ -48,7 +48,7 @@ Secondly, enable your Security Group to allow network traffic between instances:
 you must open TCP port 6783 which is the port that Weave Net uses to manage the network. 
 You must also allow any ports which your own containers use. 
 
->>**Remember:**there is no network overlay in this mode, and so, IP packets with container
+>>**Remember:** There is no network overlay in this mode, and so, IP packets with container
 addresses will flow over the AWS network unmodified.
 
 Also, since Weave will be operating with IP addresses outside of the 
@@ -60,7 +60,7 @@ Launch Weave Net with the `--awsvpc` flag:
 
     $ weave launch --awsvpc [other hosts]
 
- >>Note: You will still need to supply the names or IP addresses of other hosts in
+ >>**Note:** You will still need to supply the names or IP addresses of other hosts in
 your cluster.
 
 ###Present Limitations
