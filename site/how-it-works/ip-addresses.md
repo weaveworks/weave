@@ -63,4 +63,4 @@ find a match, so uses the default rule.
 
 **See Also**
 
- * [Allocating IPs in a Specific Range](/site/ip-addresses/configuring-weave.md) 
+ * [Allocating IPs in a Specific Range](/site/using-weave/configuring-weave.md)
