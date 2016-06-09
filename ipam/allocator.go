@@ -911,7 +911,9 @@ func (alloc *Allocator) reportFreeSpace() {
 	for _, r := range ranges {
 		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}
-	alloc.ring.ReportFree(freespace)
+	if alloc.ring.ReportFree(freespace) {
+		alloc.persistRing()
+	}
 }
 
 // Persistent data
