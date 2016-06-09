@@ -108,6 +108,13 @@ usage() {
     exit 1
 }
 
+handle_help_arg() {
+    if [ "$1" = "--help" ] ; then
+        usage_no_exit
+        exit 0
+    fi
+}
+
 docker_sock_options() {
     # Pass through DOCKER_HOST if it is a Unix socket;
     # a TCP socket may be secured by TLS, in which case we can't use it
@@ -325,12 +332,11 @@ check_docker_version
 
 [ "$1" = "--local" ] && shift 1 && IS_LOCAL=1
 
-if [ "$1" = "--help" -o "$1" = "help" ] ; then
-    # "--help|help" are special because we always want to process them
-    # at the client end.
-    usage_no_exit
-    exit 0
-elif [ "$1" = "version" -a -z "$IS_LOCAL" ] ; then
+# "--help|help" are special because we always want to process them
+# at the client end.
+handle_help_arg "$1" || handle_help_arg "--$1"
+
+if [ "$1" = "version" -a -z "$IS_LOCAL" ] ; then
     # non-local "version" is special because we want to show the
     # version of the script executed by the user rather than what is
     # embedded in weaveexec.
@@ -352,6 +358,7 @@ elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
     # we can't rely on our baked-in docker to support those arguments.
     shift 1
 
+    handle_help_arg "$1"
     [ "$1" = "--without-dns" ] || DNS_ARGS=$(exec_remote dns-args "$@" || true)
     shift $(dns_arg_count "$@")
 
@@ -1862,6 +1869,8 @@ deprecation_warnings() {
 [ $# -gt 0 ] || usage
 COMMAND=$1
 shift 1
+
+handle_help_arg "$1"
 
 case "$COMMAND" in
     setup)
