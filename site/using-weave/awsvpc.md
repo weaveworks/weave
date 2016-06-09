@@ -19,8 +19,8 @@ on which they live.
 ###Configuring EC2 Instances to use Weave AWS-VPC Mode
 
 First, your AWS instances need to be given write access to the route
-table.  Give them an IAM Role which has the following access.  If you have an
-existing role then extend it or create a new role with a policy
+table.  Give them an IAM Role which has the following access, or if you have an
+existing role, then extend it or create a new role with a policy
 that allows the necessary actions:
 
 ```
@@ -44,15 +44,15 @@ that allows the necessary actions:
 }
 ```
 
-Secondly, enable your Security Group to allow network traffic between instances: 
-you must open TCP port 6783 which is the port that Weave Net uses to manage the network. 
-You must also allow any ports which your own containers use. 
+Secondly, your Security Group must allow network traffic between instances.  
+You must open TCP port 6783 which is the port that Weave Net uses to manage the network and also 
+allow any ports which your own containers use. 
 
 >>**Remember:** There is no network overlay in this mode, and so, IP packets with container
 addresses will flow over the AWS network unmodified.
 
-Also, since Weave will be operating with IP addresses outside of the 
-range allocatd by Amazon, you must disable "Source/Destination check" on each machine.
+Finally, since Weave will be operating with IP addresses outside of the 
+range allocated by Amazon, you must disable "Source/Destination check" on each machine.
 
 ###Using AWS-VPC Mode
 
