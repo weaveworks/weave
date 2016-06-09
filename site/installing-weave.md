@@ -32,10 +32,14 @@ With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weav
 
 CoreOS users see [here](/guides/networking-docker-containers-with-weave-on-coreos/) for an example of installing Weave using cloud-config.
 
-Amazon EC2 users may want to use [AWS-VPC mode](/site/using-weave/awsvpc.md)
-
 Amazon ECS users see [here](https://github.com/weaveworks/integrations/blob/master/aws/ecs/README.md)
 for the latest Weave AMIs and [here](http://weave.works/guides/service-discovery-with-weave-aws-ecs.html) to get started with Weave Net on ECS.
+
+If you're on Amazon EC2, the standard installation instructions at the
+top of this page, provide the simplest setup and the most flexibility.
+A [special no-overlay mode for EC2](/site/using-weave/awsvpc.md) can
+optionally be enabled, which allows containers to communicate at the
+full speed of the underlying network.
 
 **See Also** 
 
