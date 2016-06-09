@@ -19,9 +19,14 @@ on which they live.
 ###Configuring EC2 Instances to use Weave AWS-VPC Mode
 
 First, your AWS instances need to be given write access to the route
-table.  Give them an IAM Role which has the following access, or if you have an
-existing role, then extend it or create a new role with a policy
-that allows the necessary actions:
+table via its
+[IAM Role](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html).
+If you have an existing IAM Role then extend it, otherwise create a
+new role. The role must have a
+[policy](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-policies-for-amazon-ec2.html)
+attached which allows the following
+[actions](http://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Operations.html):
+
 
 ```
 {
