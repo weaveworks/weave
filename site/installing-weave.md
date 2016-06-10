@@ -32,11 +32,10 @@ Weave Net [periodically contacts Weaveworks servers for available
 versions](https://github.com/weaveworks/go-checkpoint).  New versions
 are announced in the log and in [the status
 summary](/site/troubleshooting.md#weave-status).  To disable this
-check, run:
+check, run the following before launching Weave Net:
 
     export CHECKPOINT_DISABLE=1
 
-before launching Weave Net.
 
 ###Guides for Specific Platforms
 
