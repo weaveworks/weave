@@ -12,6 +12,7 @@ machine:
     SRCDIR: /home/ubuntu/src/github.com/weaveworks/weave
     PATH: $PATH:$HOME/.local/bin:$HOME/google-cloud-sdk/bin/
     CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+    AWS_DEFAULT_REGION: us-east-1
 
 dependencies:
   cache_directories:
