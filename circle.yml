@@ -22,7 +22,7 @@ dependencies:
     - bin/setup-circleci-secrets "$SECRET_PASSWORD"
     - "mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR"
     - "cd $SRCDIR; git submodule update --init"
-    - cd $SRCDIR/test; ./gce.sh make_template:
+    - cd $SRCDIR/test; ./cloud.sh make_template:
         parallel: false
     - "cd $SRCDIR/build; ../tools/rebuild-image weaveworks/weavebuild . Dockerfile build.sh && touch $SRCDIR/.build.uptodate"
 
@@ -36,13 +36,13 @@ test:
         parallel: true
     - cd $SRCDIR; make testrunner:
         parallel: true
-    - cd $SRCDIR/test; ./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh:
+    - cd $SRCDIR/test; ./cloud.sh setup && eval $(./cloud.sh hosts) && ./setup.sh:
         parallel: true
-    - cd $SRCDIR/test; eval $(./gce.sh hosts); export COVERAGE=true; ./run_all.sh:
+    - cd $SRCDIR/test; eval $(./cloud.sh hosts); export COVERAGE=true; ./run_all.sh:
         parallel: true
         timeout: 300
   post:
-    - cd $SRCDIR/test; ./gce.sh destroy:
+    - cd $SRCDIR/test; ./cloud.sh destroy:
         parallel: true
     - test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh):
         parallel: true
