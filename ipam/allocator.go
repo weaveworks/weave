@@ -443,10 +443,11 @@ func (alloc *Allocator) Shutdown() {
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
 		alloc.cancelOps(&alloc.pendingPrimes)
-		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
-			alloc.ring.Transfer(alloc.ourName, heir)
+		heir := alloc.pickPeerForTransfer()
+		alloc.ring.Transfer(alloc.ourName, heir)
+		alloc.space.Clear()
+		if heir != mesh.UnknownPeerName {
 			alloc.persistRing()
-			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 		}
 		doneChan <- struct{}{}
