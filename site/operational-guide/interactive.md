@@ -8,7 +8,7 @@ mode be used for exploration and evaluation only. However, if Weave is launched 
 this mode, and as long as Docker is configured to start on boot,the resulting 
 network will survive host reboots without the use of a systemd.
 
-### Bootstrap
+### Bootstrapping
 
 On the initial peer:
 
@@ -20,7 +20,9 @@ On a new peer:
 
     weave launch <extant peers>
 
-Where, `<extant peers>` means all peers in the network, initial and
+Where, 
+
+* `<extant peers>` indicates all peers in the network, initial and
 subsequently added, which have not been explicitly removed. It should
 include peers that are temporarily offline or stopped.
 
