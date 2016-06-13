@@ -7,6 +7,7 @@ The following administrative tasks are discussed:
 
 * [Configuring Weave to Start Automatically on Boot](#start-on-boot)
 * [Detecting and Reclaiming Lost IP Address Space](#detect-reclaim-ipam)
+    *[Manually Reclaiming Lost Address Space](#reclaim-address-space)
 * [Upgrading a Cluster](#cluster-upgrade)
 * [Resetting Persisted Data](#reset)
 
@@ -42,7 +43,7 @@ or possible:
 In some cases you may already be aware of the problem, as you were
 unable to execute `weave reset` successfully or because you know
 through other channels that the host has died. In these cases you can
-proceed straight to the reclaiming lost address space section.
+proceed straight to [Manually Reclaiming Lost Address Space](#reclaim-address-space).
 
 However in some scenarios it may not be obvious that space has been
 lost, in which case you can check for it periodically with the
@@ -54,6 +55,8 @@ This command lists the names of unreachable peers. If you are satisifed
 that they are truly gone, rather than temporarily unreachable due to a
 partition, you can reclaim their space manually.
 
+###<a name="manually-reclaim-address-space"></a>Manually Reclaiming Address Space
+
 When a peer dies unexpectedly the remaining peers will consider its
 address space to be unavailable even after it has remained unreachable
 for prolonged periods. There is no universally applicable time limit
@@ -61,8 +64,9 @@ after which one of the remaining peers could decide unilaterally that
 it is safe to appropriate the space for itself, and so an
 administrative action is required to reclaim it.
 
-The `weave rmpeer` command is provided to perform this task, and must
-be executed on _one_ of the remaining peers. That peer will take
+The [`weave rmpeer`](https://www.weave.works/docs/net/latest/ipam/stop-remove-peers-ipam/)
+command is provided to perform this task, and must
+be executed on _one_ of the remaining peers. That peer will then take
 ownership of the freed address space.
 
 ##<a name="cluster-upgrade"></a>Upgrading a Cluster
@@ -82,9 +86,8 @@ On each peer:
 * Start the new Weave with `weave launch <existing peer list>` (or
   `systemctl start weave` if you're using a systemd unit file)
 
-Since the first launch with the new script pulls the new container images, this 
-results in some downtime. To minimize downtime, download the new script 
-to a temporary location first:
+To minimize downtime while the new script is pulling the new container images, 
+it is recommended that you download the new script to a temporary location first:
 
 * Download the new Weave script to a temporary location, for example,
   `/path/to/new/weave`
@@ -107,4 +110,8 @@ example to withdraw a peer from one network and join it to another)
 you can issue the following command:
 
     weave reset
+    
+See Also, 
+
+ * [Allocating IP Addresses](https://www.weave.works/docs/net/latest/ipam/)
 
