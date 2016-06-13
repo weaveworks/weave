@@ -56,6 +56,30 @@ then run your containers using the Docker command-line:
     64 bytes from 10.32.0.2: icmp_seq=2 ttl=64 time=0.052 ms
 
 
+###<a name="multi"></a>Creating multiple Docker Networks
+
+Docker lets you create multiple independent networks and attach
+different sets of containers to each network. However, to coordinate
+this between hosts Docker requires that you configure a
+["key-value store](https://docs.docker.com/engine/userguide/networking/get-started-overlay/#step-1-set-up-a-key-value-store).
+
+If your Docker installation has a key-value store, you can create a
+network based on Weave Net like this:
+
+    $ docker network create --driver=weave mynetwork
+
+then use it to connect a container:
+
+    $ docker run --net=mynetwork ...
+
+or
+
+    $ docker network connect mynetwork somecontainer
+
+Containers attached to different Docker Networks are
+[isolated through subnets](https://www.weave.works/docs/net/latest/using-weave/application-isolation/).
+
+
 ###<a name="restarting"></a>Restarting the Plugin
 
 The plugin, like all Weave Net components, is started with a policy of `--restart=always`, so that it is always there after a restart or reboot. If you remove this container (for example, when using `weave reset`) before removing all endpoints created using `--net=weave`, Docker may hang for a long time when it subsequently tries to re-establish communications to the plugin.
