@@ -20,7 +20,7 @@ A uniform fixed cluster has the following characteristics:
   suited to deployments which change size infrequently as a planned
   maintenance event.
 
-### Bootstrap
+### Bootstrapping
 
 On each initial peer, at boot, via
 [systemd](/site/installing-weave/systemd.md):
