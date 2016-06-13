@@ -20,6 +20,7 @@ import (
 	"github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
 	weavenet "github.com/weaveworks/weave/net"
+	"github.com/weaveworks/weave/net/address"
 )
 
 const (
@@ -488,6 +489,10 @@ func (proxy *Proxy) attach(containerID string, orDie, killProcess bool) error {
 		return nil
 	}
 	Log.Infof("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
+	if err := validateCIDRs(cidrs); err != nil {
+		return err
+	}
+
 	args := []string{"attach"}
 	args = append(args, cidrs...)
 	if !proxy.NoRewriteHosts {
@@ -519,6 +524,23 @@ func callWeaveAttach(container *docker.Container, args []string) error {
 		return errors.New(string(stderr))
 	} else if len(stderr) > 0 {
 		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
+	}
+	return nil
+}
+
+func validateCIDRs(cidrs []string) error {
+	for _, cidr := range cidrs {
+		if cidr == "net:default" {
+			continue
+		}
+		for _, prefix := range []string{"ip:", "net:", ""} {
+			if strings.HasPrefix(cidr, prefix) {
+				if _, err := address.ParseCIDR(strings.TrimPrefix(cidr, prefix)); err == nil {
+					break
+				}
+				return fmt.Errorf("invalid WEAVE_CIDR: %s", cidr)
+			}
+		}
 	}
 	return nil
 }
