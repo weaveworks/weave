@@ -2,15 +2,15 @@
 title: Concepts
 menu_order: 10
 ---
-This section describes some essential concepts with which you will
-need to be familiar before moving on to the example deployment
+This section describes some of the essential concepts with which you will
+need to be familiar before continuing to the example deployment
 scenarios.
 
 ## Host
 
-For the purposes of this documentation we consider a host to be an
-installation of the Linux operating system which is running an
-instance of the Docker Engine. It may be executing directly on bare
+For the purposes of this documentation a host is an
+installation of the Linux operating system that is running an
+instance of the Docker Engine. The host may be executing directly on bare
 hardware or inside a virtual machine.
 
 ## Peer
@@ -19,22 +19,23 @@ A peer is a running instance of Weave Net, typically one per host.
 
 ## Peer Name
 
-Peers in the weave network are identified by a 48-bit value formatted
-like an ethernet MAC address e.g. `01:23:45:67:89:ab`. This 'peer
+Peers on the Weave network are identified by a 48-bit value formatted
+like an ethernet MAC address, for example, `01:23:45:67:89:ab`. The 'peer
 name' is used for various purposes:
 
 * Routing of packets between containers on the overlay network
 * Recording the origin peer of DNS entries
 * Recording ownership of IP address ranges
 
-Whilst it is desirable for the peer name to remain stable across
-restarts, it is essential that it is unique - if two or more peers
-share the same name chaos will ensue, including but not limited to
-double allocation of addresses and inability to route packets on the
-overlay network. Consequently when the router is launched on a host it
-derives its peer name in order of preference:
+While it is desirable for the peer name to remain stable across
+restarts, it is essential that it is unique. If two or more peers
+share the same name chaos will ensue, which includes but is not limited to
+double allocation of addresses and the inability to route packets on the
+overlay network. 
 
-* From the command line; user is responsible for uniqueness and
+When the router is launched on a host, it derives its peer name in order of preference:
+
+* From the command line, where the user is responsible for uniqueness and
   stability
 * From the BIOS product UUID, which is generally stable across
   restarts and unique across different physical hardware and certain
@@ -51,8 +52,8 @@ detail below.
 
 ## Peer Discovery
 
-Peer discovery is a mechanism which allows peers to learn about new
-weave hosts from existing peers without being explicitly told. Peer
+Peer discovery is a mechanism that allows peers to learn about new
+Weave hosts from existing peers without being explicitly told. Peer
 discovery is
 [enabled by default](/site/using-weave/finding-adding-hosts-dynamically.md).
 
@@ -101,11 +102,11 @@ scenarios:
 
 ### Consensus
 
-Alternatively, when a new network is formed for the first time peers
+Alternatively, when a new network is formed for the first time, peers
 can be configured to co-ordinate amongst themselves to automatically
 divide up the IP allocation range. This process is known as consensus
-and requires each peer to be told the total number of expected peers
-(the 'initial peer count') in order to prevent formation of disjoint
+and it requires each peer to be told the total number of expected peers
+(the 'initial peer count') in order to prevent the formation of disjointed
 groups of peers which would, ultimately, result in duplicate IP
 addresses.
 
@@ -118,10 +119,10 @@ scenarios:
 ### Observers
 
 Finally, an option is provided to start a peer as an _observer_. Such
-peers do not require either a seed peer name list nor an initial peer
+peers do not require neither a seed peer name list nor an initial peer
 count; instead they rely on the existence of other peers in the
 network which have been so configured. When an observer needs address
-space, it will ask for it from one of the peers which partook of the
+space, it asks for it from one of the peers which partook of the
 initial division, triggering consensus if necessary.
 
 Example configurations are given in the section on deployment
@@ -131,7 +132,7 @@ scenarios:
 
 ## Persistence
 
-Certain information is remembered between launches of weave (for
+Certain information is remembered between launches of Weave (for
 example across reboots):
 
 * The division of the IP allocation range amongst peers
