@@ -3,7 +3,7 @@ title: Autoscaling
 menu_order: 40
 ---
 
-### Bootstrap
+### Bootstrapping
 
 An autoscaling configuration begins with a fixed cluster:
 
@@ -21,30 +21,32 @@ changes to the configuration of the fixed cluster. As with the fixed
 cluster, dynamically added nodes recover automatically from reboots
 and partitions.
 
-### Scale-out
+### Scaling Out
 
-On additional dynamic peer, at boot, via
+On the additional dynamic peer, at boot, via
 [systemd](/site/installing-weave/systemd.md) or equivalent:
 
     weave launch --no-restart --ipalloc-init=observer $PEERS
 
-In this case `$PEERS` means all peers in the _fixed cluster_, initial
+Where, 
+
+ * `$PEERS` means all peers in the _fixed cluster_, initial
 and subsequently added, which have not been explicitly removed. It
 should include fixed peers which are temporarily offline or stopped.
 
-Note that you do not have to keep track of and specify the addresses
+You do not have to keep track of and specify the addresses
 of other dynamic peers in `$PEERS` - they will discover and connect to
 each other via the fixed cluster.
 
-> The use of `--ipalloc-init=observer` prevents dynamic peers from
-> coming to a consensus on their own - this is important to stop a
-> clique forming amongst a group of dynamically added peers if they
-> become partitioned from the fixed cluster after having learned about
-> each other via discovery.
+>>**Note:** The use of `--ipalloc-init=observer` prevents dynamic peers from
+coming to a consensus on their own - this is important to stop a
+clique forming amongst a group of dynamically added peers if they
+become partitioned from the fixed cluster after having learned about
+each other via discovery.
 
-### Scale-in
+### Scaling In
 
-On dynamic peer to be removed:
+On the dynamic peer to be removed:
 
     weave reset
 
