@@ -2,26 +2,37 @@
 title: Administrative Tasks
 menu_order: 60
 ---
-##<a name="start-on-boot"></a>Configure Weave to Start Automatically on Boot
 
-`weave launch` runs all weave's containers with a Docker restart
-policy of `always`, so as long as you have launched weave manually
-once and your system is configured to start Docker on boot then weave
-will be started automatically on system restarts.
+The following administrative tasks are discussed: 
 
-If you're aiming for a non-interactive installation, you can use
-systemd to launch weave after Docker - see [systemd
+* [Configuring Weave to Start Automatically on Boot](#start-on-boot)
+* [Detecting and Reclaiming Lost IP Address Space](#detect-reclaim-ipam)
+* [Upgrading a Cluster](#cluster-upgrade)
+* [Resetting Persisted Data](#reset)
+
+
+##<a name="start-on-boot"></a>Configuring Weave to Start Automatically on Boot
+
+`weave launch` runs all of Weave's containers with a Docker restart
+policy set to `always`.  If you have launched Weave manually at least
+once and your system is configured to start Docker on boot, then Weave
+will start automatically on system restarts.
+
+If you are aiming for a non-interactive installation, use
+systemd to launch Weave after Docker - see [systemd
 docs](/site/installing-weave/systemd.md) for details.
 
-##<a name="detect-reclaim-ipam"></a>Detect and Reclaim Lost IP Address Space
+##<a name="detect-reclaim-ipam"></a>Detecting and Reclaiming Lost IP Address Space
 
-The recommended way of removing a peer is to run `weave reset` on that
-peer before the underlying host is decommissioned or repurposed - this
+The recommended method of removing a peer is to run `weave reset` on that
+peer before the underlying host is decommissioned or repurposed. This
 ensures that the portion of the IPAM allocation range assigned to the
-peer is released for reuse. Under certain circumstances this operation
-may not be successful, or indeed possible:
+peer is released for reuse. 
 
-* If the peer in question is partitioned from the rest of the network
+Under certain circumstances this operation may not be successful, 
+or possible:
+
+* If the peer is partitioned from the rest of the network
   when `weave reset` is executed on it
 * If the underlying host is no longer available to execute `weave
   reset` due to a hardware failure or other unplanned termination (for
@@ -30,8 +41,8 @@ may not be successful, or indeed possible:
 
 In some cases you may already be aware of the problem, as you were
 unable to execute `weave reset` successfully or because you know
-through other channels that the host has died - in these cases you can
-proceed straight to the section on reclaiming lost space.
+through other channels that the host has died. In these cases you can
+proceed straight to the reclaiming lost address space section.
 
 However in some scenarios it may not be obvious that space has been
 lost, in which case you can check for it periodically with the
@@ -39,13 +50,13 @@ following command on any peer:
 
     weave status ipam
 
-This will list the names of unreachable peers; if you are satisifed
+This command lists the names of unreachable peers. If you are satisifed
 that they are truly gone, rather than temporarily unreachable due to a
 partition, you can reclaim their space manually.
 
 When a peer dies unexpectedly the remaining peers will consider its
 address space to be unavailable even after it has remained unreachable
-for prolonged periods; there is no universally applicable time limit
+for prolonged periods. There is no universally applicable time limit
 after which one of the remaining peers could decide unilaterally that
 it is safe to appropriate the space for itself, and so an
 administrative action is required to reclaim it.
@@ -54,41 +65,41 @@ The `weave rmpeer` command is provided to perform this task, and must
 be executed on _one_ of the remaining peers. That peer will take
 ownership of the freed address space.
 
-##<a name="cluster-upgrade"></a>Upgrade a Cluster
+##<a name="cluster-upgrade"></a>Upgrading a Cluster
 
 Protocol versioning and feature negotiation are employed in Weave Net
-to enable incremental rolling upgrades - each major release maintains
+to enable incremental rolling upgrades. Each major maintains
 the ability to speak to the preceding major release at a minimum, and
-connected peers only utilise features which both support. The general
-upgrade procedure is as follows:
+connected peers only utilize features which both support. 
 
-On each peer in turn:
+The general upgrade procedure is as follows:
 
-* Stop the old weave with `weave stop` (or `systemctl stop weave` if
+On each peer:
+
+* Stop the old Weave with `weave stop` (or `systemctl stop weave` if
   you're using a systemd unit file)
-* Download the new weave script and replace the existing one
-* Start the new weave with `weave launch <existing peer list>` (or
+* Download the new Weave script and replace the existing one
+* Start the new Weave with `weave launch <existing peer list>` (or
   `systemctl start weave` if you're using a systemd unit file)
 
-This will result in some downtime as the first launch with the new
-script has to pull the new container images; if you wish to minimise
-downtime you can download the new script to a temporary location
-first:
+Since the first launch with the new script pulls the new container images, this 
+results in some downtime. To minimize downtime, download the new script 
+to a temporary location first:
 
-* Download the new weave script to a temporary location e.g.
+* Download the new Weave script to a temporary location, for example,
   `/path/to/new/weave`
 * Pull the new images with `/path/to/new/weave setup`
-* Stop the old weave with `weave stop` (or `systemctl stop weave` if
+* Stop the old Weave with `weave stop` (or `systemctl stop weave` if
   you're using a systemd unit file)
 * Replace the existing script with the new one
-* Start the new weave with `weave launch <existing peer list>` (or
+* Start the new Weave with `weave launch <existing peer list>` (or
   `systemctl start weave` if you're using a systemd unit file)
 
-> NB Always check the release notes for specific versions in case
-> there are any special caveats or deviations from the standard
-> procedure.
+>>**Note:** Always check the Release Notes for specific versions in case
+there are any special caveats or deviations from the standard
+procedure.
 
-##<a name="reset"></a>Reset Persisted Data
+##<a name="reset"></a>Resetting Persisted Data
 
 Weave Net persists information in a data volume container named
 `weavedb`. If you wish to start from a completely clean slate (for
