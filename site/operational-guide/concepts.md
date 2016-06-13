@@ -119,7 +119,7 @@ scenarios:
 ### Observers
 
 Finally, an option is provided to start a peer as an _observer_. Such
-peers do not require neither a seed peer name list nor an initial peer
+peers do not require a seed peer name list or an initial peer
 count; instead they rely on the existence of other peers in the
 network which have been so configured. When an observer needs address
 space, it asks for it from one of the peers which partook of the
