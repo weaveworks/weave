@@ -37,7 +37,7 @@ For example, you can launch the proxy using all three flags, as follows:
 
 After launching the Weave Net proxy with these flags, running a container named `aws-12798186823-foo` without labels results in weaveDNS registering the hostname `my-app-foo` and not `aws-12798186823-foo`.
 
-    host1$ docker run -ti --name=aws-12798186823-foo ubuntu ping my-app-foo
+    host1$ docker run -ti --name=aws-12798186823-foo weaveworks/ubuntu ping my-app-foo
     PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=1 ttl=64 time=0.027 ms
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=2 ttl=64 time=0.067 ms
@@ -45,7 +45,7 @@ After launching the Weave Net proxy with these flags, running a container named 
 Also, running a container named `foo` with the label
 `hostname-label=aws-12798186823-foo` leads to the same hostname registration.
 
-    host1$ docker run -ti --name=foo --label=hostname-label=aws-12798186823-foo ubuntu ping my-app-foo
+    host1$ docker run -ti --name=foo --label=hostname-label=aws-12798186823-foo weaveworks/ubuntu ping my-app-foo
     PING my-app-foo.weave.local (10.32.0.2) 56(84) bytes of data.
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=1 ttl=64 time=0.031 ms
     64 bytes from my-app-foo.weave.local (10.32.0.2): icmp_seq=2 ttl=64 time=0.042 ms

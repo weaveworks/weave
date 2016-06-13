@@ -27,8 +27,8 @@ resolution, and will register themselves if they either have a
 hostname in the weaveDNS domain (`weave.local` by default) or are given an explicit container name:
 
 ```
-host1$ docker run -dti --name=pingme ubuntu
-host1$ docker run -ti  --hostname=ubuntu.weave.local ubuntu
+host1$ docker run -dti --name=pingme weaveworks/ubuntu
+host1$ docker run -ti  --hostname=ubuntu.weave.local weaveworks/ubuntu
 root@ubuntu:/# ping pingme
 ...
 ```
