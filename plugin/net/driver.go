@@ -22,23 +22,24 @@ const (
 )
 
 type network struct {
+	isOurs            bool
 	hasMulticastRoute bool
 }
 
 type driver struct {
+	name   string
 	scope  string
 	docker *docker.Client
 	sync.RWMutex
-	endpoints map[string]struct{}
-	networks  map[string]network
+	networks map[string]network
 }
 
-func New(client *docker.Client, weave *weaveapi.Client, scope string) (skel.Driver, error) {
+func New(client *docker.Client, weave *weaveapi.Client, name, scope string) (skel.Driver, error) {
 	driver := &driver{
-		scope:     scope,
-		docker:    client,
-		endpoints: make(map[string]struct{}),
-		networks:  make(map[string]network),
+		name:     name,
+		scope:    scope,
+		docker:   client,
+		networks: make(map[string]network),
 	}
 
 	_, err := NewWatcher(client, weave, driver)
@@ -61,7 +62,7 @@ func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
 
 func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
 	driver.logReq("CreateNetwork", create, create.NetworkID)
-	_, err := driver.setupNetworkInfo(create.NetworkID, stringOptions(create))
+	_, err := driver.setupNetworkInfo(create.NetworkID, true, stringOptions(create))
 	return err
 }
 
@@ -93,14 +94,10 @@ func (driver *driver) DeleteNetwork(delreq *api.DeleteNetworkRequest) error {
 
 func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.CreateEndpointResponse, error) {
 	driver.logReq("CreateEndpoint", create, create.EndpointID)
-	endID := create.EndpointID
 
 	if create.Interface == nil {
 		return nil, driver.error("CreateEndpoint", "Not supported: creating an interface from within CreateEndpoint")
 	}
-	driver.Lock()
-	driver.endpoints[endID] = struct{}{}
-	driver.Unlock()
 	resp := &api.CreateEndpointResponse{}
 
 	driver.logRes("CreateEndpoint", resp)
@@ -109,17 +106,7 @@ func (driver *driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 
 func (driver *driver) DeleteEndpoint(deleteReq *api.DeleteEndpointRequest) error {
 	driver.logReq("DeleteEndpoint", deleteReq, deleteReq.EndpointID)
-	driver.Lock()
-	delete(driver.endpoints, deleteReq.EndpointID)
-	driver.Unlock()
 	return nil
-}
-
-func (driver *driver) HasEndpoint(endpointID string) bool {
-	driver.Lock()
-	_, found := driver.endpoints[endpointID]
-	driver.Unlock()
-	return found
 }
 
 func (driver *driver) EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointInfoResponse, error) {
@@ -168,25 +155,27 @@ func (driver *driver) findNetworkInfo(id string) (network, error) {
 	if err != nil {
 		return network, err
 	}
-	return driver.setupNetworkInfo(id, info.Options)
+	return driver.setupNetworkInfo(id, info.Driver == driver.name, info.Options)
 }
 
-func (driver *driver) setupNetworkInfo(id string, options map[string]string) (network, error) {
-	var network network
-	for key, value := range options {
-		switch key {
-		case MulticastOption:
-			if value == "" { // interpret "--opt works.weave.multicast" as "turn it on"
-				network.hasMulticastRoute = true
-			} else {
-				var err error
-				if network.hasMulticastRoute, err = strconv.ParseBool(value); err != nil {
-					return network, fmt.Errorf("unrecognized value %q for option %s", value, key)
-				}
+func (driver *driver) setupNetworkInfo(id string, isOurs bool, options map[string]string) (network, error) {
+	network := network{isOurs: isOurs}
+	if isOurs {
+		for key, value := range options {
+			switch key {
+			case MulticastOption:
+				if value == "" { // interpret "--opt works.weave.multicast" as "turn it on"
+					network.hasMulticastRoute = true
+				} else {
+					var err error
+					if network.hasMulticastRoute, err = strconv.ParseBool(value); err != nil {
+						return network, fmt.Errorf("unrecognized value %q for option %s", value, key)
+					}
 
+				}
+			default:
+				driver.warn("setupNetworkInfo", "unrecognized option: %s", key)
 			}
-		default:
-			driver.warn("setupNetworkInfo", "unrecognized option: %s", key)
 		}
 	}
 	driver.Lock()
