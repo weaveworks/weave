@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 
@@ -34,6 +35,7 @@ type NetDev struct {
 }
 
 // Search the network namespace of a process for interfaces matching a predicate
+// Note that the predicate is called while the goroutine is inside the process' netns
 func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, error) {
 	var netDevs []NetDev
 
@@ -136,4 +138,21 @@ func GetBridgeNetDev(bridgeName string) ([]NetDev, error) {
 	return FindNetDevs(1, func(link netlink.Link) bool {
 		return link.Attrs().Name == bridgeName
 	})
+}
+
+// Do post-attach configuration of all veths we have created
+func ConfigureARPforVeths(processID int, prefix string) error {
+	_, err := FindNetDevs(processID, func(link netlink.Link) bool {
+		ifName := link.Attrs().Name
+		if strings.HasPrefix(ifName, prefix) {
+			weavenet.ConfigureARPCache(ifName)
+			if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err == nil {
+				for _, addr := range addrs {
+					arping.GratuitousArpOverIfaceByName(addr.IPNet.IP, ifName)
+				}
+			}
+		}
+		return false
+	})
+	return err
 }

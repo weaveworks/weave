@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	weaveapi "github.com/weaveworks/weave/api"
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 const (
@@ -43,6 +45,9 @@ func (w *watcher) ContainerStarted(id string) {
 			fqdn := fmt.Sprintf("%s.%s", info.Config.Hostname, info.Config.Domainname)
 			if err := w.weave.RegisterWithDNS(id, fqdn, net.IPAddress); err != nil {
 				w.driver.warn("ContainerStarted", "unable to register %s with weaveDNS: %s", id, err)
+			}
+			if err := common.ConfigureARPforVeths(info.State.Pid, weavenet.VethName); err != nil {
+				w.driver.warn("ContainerStarted", "unable to configure interfaces: %s", err)
 			}
 		}
 	}
