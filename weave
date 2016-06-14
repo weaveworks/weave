@@ -599,7 +599,13 @@ create_bridge() {
                 # The datapath is the bridge when there is no intermediary
                 DATAPATH="$BRIDGE"
             fi
-            if util_op create-datapath $DATAPATH ; then
+            # GCE has the lowest underlay network MTU we're likely to encounter on
+            # a local network, at 1460 bytes.  To get the overlay MTU from that we
+            # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
+            # UDP header, 8 bytes for the vxlan header, and 14 bytes for the inner
+            # ethernet header.
+            MTU=${WEAVE_MTU:-1410}
+            if util_op create-datapath $DATAPATH $MTU ; then
                 : # ODP datapath created successfully
             elif [ $? = 17 ] ; then
                 # Exit status of 17 means the kernel doesn't have ODP
@@ -710,15 +716,7 @@ create_veth() {
 }
 
 init_fastdp() {
-    # GCE has the lowest underlay network MTU we're likely to encounter on
-    # a local network, at 1460 bytes.  To get the overlay MTU from that we
-    # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
-    # UDP header, 8 bytes for the vxlan header, and 14 bytes for the inner
-    # ethernet header.
-    MTU=${WEAVE_MTU:-1410}
-
-    # create_bridge already created the datapath netdev
-    ip link set dev $DATAPATH mtu $MTU
+    true
 }
 
 init_bridge() {
