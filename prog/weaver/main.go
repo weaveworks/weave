@@ -204,8 +204,6 @@ func main() {
 
 	Log.Println("Command line options:", options())
 
-	checkForUpdates()
-
 	if prof != "" {
 		defer profile.Start(profile.CPUProfile, profile.ProfilePath(prof), profile.NoShutdownHook).Stop()
 	}
@@ -257,6 +255,13 @@ func main() {
 		}
 		dockerCli = dc
 	}
+
+	network := ""
+	if isAWSVPC {
+		network = "awsvpc"
+	}
+	checkForUpdates(dockerCli.DockerVersion(), network)
+
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
 			if err := dockerCli.AddObserver(o); err != nil {
