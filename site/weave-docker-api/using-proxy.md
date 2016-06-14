@@ -20,9 +20,8 @@ To create and start a container via the Weave Net proxy run:
 
 or, equivalently run:
 
-    host1$ docker create -ti ubuntu
-    5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
-    host1$ docker start 5ef831df61d50a1a49272357155a976595e7268e590f0a2c75693337b14e1382
+    host1$ docker create -ti --name=foo ubuntu
+    host1$ docker start foo
 
 Specific IP addresses and networks can be supplied in the `WEAVE_CIDR`
 environment variable, for example:
