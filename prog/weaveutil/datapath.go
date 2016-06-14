@@ -4,15 +4,24 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/weaveworks/weave/common/odp"
+	wnet "github.com/weaveworks/weave/net"
 )
 
 func createDatapath(args []string) error {
-	if len(args) != 1 {
-		cmdUsage("create-datapath", "<datapath>")
+	if len(args) != 2 {
+		cmdUsage("create-datapath", "<datapath> <mtu>")
 	}
-	odpSupported, err := odp.CreateDatapath(args[0])
+
+	dpName := args[0]
+	mtu, err := strconv.Atoi(args[1])
+	if err != nil {
+		return fmt.Errorf("unable to parse mtu %q: %s", args[1], err)
+	}
+
+	odpSupported, err := odp.CreateDatapath(dpName)
 	if !odpSupported {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -21,7 +30,15 @@ func createDatapath(args []string) error {
 		// status to distinguish it for the weave script.
 		os.Exit(17)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+
+	if err := wnet.SetMTU(dpName, mtu); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func deleteDatapath(args []string) error {
