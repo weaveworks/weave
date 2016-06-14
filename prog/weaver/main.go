@@ -268,6 +268,10 @@ func main() {
 	config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
 	config.PeerDiscovery = !noDiscovery
 
+	if isAWSVPC && len(config.Password) > 0 {
+		Log.Fatalf("--awsvpc mode is not compatible with the --password option")
+	}
+
 	db, err := db.NewBoltDB(dbPrefix + "data.db")
 	checkFatal(err)
 	defer db.Close()

@@ -1608,6 +1608,10 @@ launch_router() {
             exit 1
         fi
     else
+        if [ -n "$AWSVPC" -a -z "$IPRANGE" ] ; then
+            echo "ERROR: Empty --ipalloc-range is not compatible with --awsvpc." >&2
+            exit 1
+        fi
         if [ -n "$IPRANGE" ] && ! check_overlap $IPRANGE ; then
             echo "WARNING: Specified --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
             echo "Unless this is deliberate, you must pick another range and set it on all hosts." >&2
