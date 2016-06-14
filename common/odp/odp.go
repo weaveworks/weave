@@ -84,3 +84,35 @@ func AddDatapathInterface(dpname string, ifname string) error {
 	_, err = dp.CreateVport(odp.NewNetdevVportSpec(ifname))
 	return err
 }
+
+func CreateVxlanVport(dpname string, name string, portno uint16) (odp.VportID, string, error) {
+	dpif, err := odp.NewDpif()
+	if err != nil {
+		return 0, "", err
+	}
+	defer dpif.Close()
+
+	dp, err := dpif.LookupDatapath(dpname)
+	if err != nil {
+		return 0, "", err
+	}
+
+	vpname := fmt.Sprintf("%s-%d", name, portno)
+	vpid, err := dp.CreateVport(odp.NewVxlanVportSpec(vpname, portno))
+	return vpid, vpname, err
+}
+
+func DeleteVport(dpname string, vpid odp.VportID) error {
+	dpif, err := odp.NewDpif()
+	if err != nil {
+		return err
+	}
+	defer dpif.Close()
+
+	dp, err := dpif.LookupDatapath(dpname)
+	if err != nil {
+		return err
+	}
+
+	return dp.DeleteVport(vpid)
+}
