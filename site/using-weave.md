@@ -21,13 +21,13 @@ On `$HOST1` run:
 
     host1$ weave launch
     host1$ eval $(weave env)
-    host1$ docker run --name a1 -ti ubuntu:trusty
+    host1$ docker run --name a1 -ti weaveworks/ubuntu
 
 Where, 
 
  * The first line runs Weave Net. 
  * The second line configures the Weave Net environment, so that containers launched via the Docker command line are automatically attached to the Weave network, and, 
- * The third line runs the application container using [Docker commands](https://docs.Docker.com/engine/reference/commandline/daemon/). 
+ * The third line runs the [application container](/site/faq.md#own-image) using [a Docker command](https://docs.docker.com/engine/reference/run/).
 
 >**Note:** If the first command results in an error like
  `http:///var/run/Docker.sock/v1.19/containers/create: dial unix
@@ -49,7 +49,7 @@ To launch Weave Net on an additional host and create a peer connection, run the 
 
     host2$ weave launch $HOST1
     host2$ eval $(weave env)
-    host2$ docker run --name a2 -ti ubuntu:trusty
+    host2$ docker run --name a2 -ti weaveworks/ubuntu
 
 As noted above, the same steps are repeated for `$HOST2`. The only difference, besides the application container’s name, is that `$HOST2` is told to peer with Weave Net on `$HOST1` during launch. 
 

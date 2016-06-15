@@ -15,7 +15,7 @@ some ping tests.
 ```
 host2$ weave launch $HOST1
 host2$ eval $(weave env)
-host2$ docker run -dti --name=pingme ubuntu
+host2$ docker run -dti --name=pingme weaveworks/ubuntu
 
 root@ubuntu:/# ping -nq -c 1 pingme
 PING pingme.weave.local (10.32.0.2) 56(84) bytes of data.
