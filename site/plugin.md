@@ -20,7 +20,7 @@ See [Using Weave Net](/site/using-weave.md#peer-connections) for a discussion on
 
 After you've launched Weave Net and peered your hosts,  you can start containers using the following, for example:
 
-    $ docker run --net=weave -ti ubuntu
+    $ docker run --net=weave -ti weaveworks/ubuntu
 
 on any of the hosts, and they can all communicate with each other
 using any protocol, even multicast.
@@ -31,8 +31,8 @@ In order to use Weave Net's [Service Discovery](/site/weavedns.md) you
 must pass the additional arguments `--dns` and `-dns-search`, for
 which a helper is provided in the Weave script:
 
-    $ docker run --net=weave -h foo.weave.local $(weave dns-args) -tdi ubuntu
-    $ docker run --net=weave -h bar.weave.local $(weave dns-args) -ti ubuntu
+    $ docker run --net=weave -h foo.weave.local $(weave dns-args) -tdi weaveworks/ubuntu
+    $ docker run --net=weave -h bar.weave.local $(weave dns-args) -ti weaveworks/ubuntu
     # ping foo
 
 
@@ -45,11 +45,11 @@ Just launch the Weave Net router onto each host and make a peer connection with 
 
 then run your containers using the Docker command-line:
 
-    host1$ docker run --net=weave -ti ubuntu
+    host1$ docker run --net=weave -ti weaveworks/ubuntu
     root@1458e848cd90:/# hostname -i
     10.32.0.2
 
-    host2$ docker run --net=weave -ti ubuntu
+    host2$ docker run --net=weave -ti weaveworks/ubuntu
     root@8cc4b5dc5722:/# ping 10.32.0.2
 
     PING 10.32.0.2 (10.32.0.2) 56(84) bytes of data.

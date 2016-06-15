@@ -7,7 +7,7 @@ menu_order: 50
 If you don't want to use the proxy, you can also launch
 containers on to the Weave network using `weave run`:
 
-    $ weave run -ti ubuntu
+    $ weave run -ti weaveworks/ubuntu
 
 The arguments after `run` are passed through to `docker run`. Therefore you
 can freely specify whatever Docker options you need. 
@@ -17,14 +17,14 @@ this example, it obtains an automatically allocated IP.
 
 You can specify IP addresses manually instead:
 
-    $ weave run 10.2.1.1/24 -ti ubuntu
+    $ weave run 10.2.1.1/24 -ti weaveworks/ubuntu
 
 `weave run` rewrites `/etc/hosts` in the same way
 [the proxy does](/site/weave-docker-api/name-resolution-proxy.md). If you need to keep
 the original file, specify `--no-rewrite-hosts` when running
 the container:
 
-    $ weave run --no-rewrite-hosts 10.2.1.1/24 -ti ubuntu
+    $ weave run --no-rewrite-hosts 10.2.1.1/24 -ti weaveworks/ubuntu
 
 There are some limitations to starting containers using `weave run`:
 

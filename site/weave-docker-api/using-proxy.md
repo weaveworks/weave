@@ -16,17 +16,17 @@ Weave network.
 
 To create and start a container via the Weave Net proxy run:
 
-    host1$ docker run -ti ubuntu
+    host1$ docker run -ti weaveworks/ubuntu
 
 or, equivalently run:
 
-    host1$ docker create -ti --name=foo ubuntu
+    host1$ docker create -ti --name=foo weaveworks/ubuntu
     host1$ docker start foo
 
 Specific IP addresses and networks can be supplied in the `WEAVE_CIDR`
 environment variable, for example:
 
-    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti ubuntu
+    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti weaveworks/ubuntu
 
 Multiple IP addresses and networks can be supplied in the `WEAVE_CIDR`
 variable by space-separating them, as in

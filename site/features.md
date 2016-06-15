@@ -81,7 +81,7 @@ See [Using the Weave Docker API Proxy](/site/weave-docker-api/using-proxy.md).
 Weave Net can also be used as a [Docker plugin](https://docs.docker.com/engine/extend/plugins_network/).  A Docker network 
 named `weave` is created by `weave launch`, which is used as follows:
 
-    $ docker run --net=weave -ti ubuntu 
+    $ docker run --net=weave -ti weaveworks/ubuntu
 
 Using the Weave plugin enables you to take advantage of [Docker's network functionality](https://docs.docker.com/engine/extend/plugins_network/).
 
@@ -119,8 +119,8 @@ For a discussion on how Weave Net uses IPAM, see [Automatic IP Address Managemen
 Named containers are automatically registered in [weaveDNS](/site/weavedns.md), 
 and are discoverable by using standard, simple name lookups:
 
-    host1$ docker run -dti --name=service ubuntu
-    host1$ docker run -ti ubuntu
+    host1$ docker run -dti --name=service weaveworks/ubuntu
+    host1$ docker run -ti weaveworks/ubuntu
     root@7b21498fb103:/# ping service
 
 WeaveDNS also supports [load balancing](/site/weavedns/load-balance-fault-weavedns.md), [fault resilience](/site/weavedns/load-balance-fault-weavedns.md) and [hot swapping](/site/weavedns/managing-entries-weavedns.md). 
