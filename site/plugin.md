@@ -58,13 +58,13 @@ then run your containers using the Docker command-line:
 
 ###<a name="multi"></a>Creating multiple Docker Networks
 
-Docker lets you create multiple independent networks and attach
-different sets of containers to each network. However, to coordinate
-this between hosts Docker requires that you configure a
-["key-value store](https://docs.docker.com/engine/userguide/networking/get-started-overlay/#step-1-set-up-a-key-value-store).
+Docker enables you to create multiple independent networks and attach
+different sets of containers to each network. However, coordinating
+this between hosts, Docker requires that you configure a
+["key-value store"](https://docs.docker.com/engine/userguide/networking/get-started-overlay/#step-1-set-up-a-key-value-store).
 
-If your Docker installation has a key-value store, you can create a
-network based on Weave Net like this:
+If your Docker installation has a key-value store, create a network
+based on Weave Net as follows:
 
     $ docker network create --driver=weave mynetwork
 
