@@ -163,11 +163,16 @@ setup_cni() {
     fi
 }
 
+launch_router_options() {
+    [ "$1" = "launch" -o "$1" = "launch-router" ] && echo -v /:/host -e HOST_ROOT=/host
+}
+
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm \
         $(docker_run_options) \
         --pid=host \
         $(cni_volume_options "$@") \
+        $(launch_router_options "$@") \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
         -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
@@ -1625,6 +1630,10 @@ launch_router() {
            --label=weavevolumes $WEAVEDB_IMAGE >/dev/null
     fi
 
+    RESOLV_CONF=$(chroot ${HOST_ROOT:-/} readlink -f /etc/resolv.conf)
+    RESOLV_CONF_DIR=$(dirname "$RESOLV_CONF")
+    RESOLV_CONF_BASE=$(basename "$RESOLV_CONF")
+
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
@@ -1632,6 +1641,7 @@ launch_router() {
         $(docker_run_options) \
         $RESTART_POLICY \
         --volumes-from $DB_CONTAINER_NAME \
+        -v $RESOLV_CONF_DIR:/var/run/weave/etc \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
@@ -1642,6 +1652,7 @@ launch_router() {
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
         $AWSVPC_ARGS \
         --http-addr $HTTP_ADDR \
+        --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
         "$@")
     setup_router_iface_$BRIDGE_TYPE
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
