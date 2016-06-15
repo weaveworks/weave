@@ -27,7 +27,7 @@ Where,
 
  * The first line runs Weave Net. 
  * The second line configures the Weave Net environment, so that containers launched via the Docker command line are automatically attached to the Weave network, and, 
- * The third line runs the [application container](/site/faq.md#own-image) using [Docker commands](https://docs.Docker.com/engine/reference/commandline/daemon/).
+ * The third line runs the [application container](/site/faq.md#own-image) using [a Docker command](https://docs.docker.com/engine/reference/run/).
 
 >**Note:** If the first command results in an error like
  `http:///var/run/Docker.sock/v1.19/containers/create: dial unix
