@@ -21,6 +21,7 @@ package tracker
 import (
 	"fmt"
 	"net"
+	"syscall"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -77,6 +78,10 @@ func NewAWSVPCTracker() (*AWSVPCTracker, error) {
 	t.infof("AWSVPC has been initialized on %s instance for %s route table at %s region",
 		t.instanceID, t.routeTableID, region)
 
+	if err := t.restoreHostRoutes(); err != nil {
+		return nil, fmt.Errorf("unable to restore host routes: %s", err)
+	}
+
 	return t, nil
 }
 
@@ -118,6 +123,29 @@ func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range, loc
 			err = t.deleteHostRoute(cidrStr)
 			if err != nil {
 				return fmt.Errorf("deleteHostRoute failed: %s", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (t *AWSVPCTracker) restoreHostRoutes() error {
+	params := &ec2.DescribeRouteTablesInput{
+		RouteTableIds: []*string{&t.routeTableID},
+	}
+	resp, err := t.ec2.DescribeRouteTables(params)
+	if err != nil {
+		return err
+	}
+
+	for _, route := range resp.RouteTables[0].Routes {
+		if route.InstanceId != nil && *route.InstanceId == t.instanceID {
+			t.debugf("restoring route %s", *route.DestinationCidrBlock)
+			if err := t.createHostRoute(*route.DestinationCidrBlock); err != nil {
+				if errno, ok := err.(syscall.Errno); !(ok && errno == syscall.EEXIST) {
+					return err
+				}
 			}
 		}
 	}
