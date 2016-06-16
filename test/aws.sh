@@ -45,6 +45,8 @@
 #    (where $ARN is an ARN of the "weavenet-test_host" role; can be found in the
 #     role's profile page).
 # 7) The policy has been attached to the "weavenet-circleci" user.
+# 8) The "weavenetci-vpc" VPC has been created (172.32.0.0/16) with a subnet default
+#    172.32.1.0/24 subnet and the default internet gateway + auto assign public ip.
 #
 # NB: Each machine is scheduled to terminate after 30mins (via `shutdown -h`).
 # It is needed because, at the time of writing, CircleCI does not support
@@ -58,11 +60,15 @@ set -e
 : ${IMAGE_NAME:="weavenet_ci"}
 
 : ${INSTANCE_TYPE:="t2.micro"}
-: ${SEC_GROUP_NAME:="weavenet-ci"}
+: ${SEC_GROUP_NAME:="weavenetci-sec"}
 : ${TERMINATE_AFTER_MIN:=30}
+: ${INSTANCE_TAG:="weavenetci"}
 
-: ${KEY_NAME:="weavenet_ci"}
+: ${VPC_NAME:="weavenetci-vpc"}
+
+: ${KEY_NAME:="weavenetci-key"}
 : ${SSH_KEY_FILE:="$HOME/.ssh/$KEY_NAME"}
+
 
 : ${NUM_HOSTS:=3}
 : ${AWSCLI:="aws"}
@@ -75,8 +81,7 @@ if [ -n "$CIRCLECI" ]; then
 fi
 
 # Creates and runs a set of VMs.
-# Each VM is named after "host${ID}${SUFFIX}" and is tagged with the "weavenet_ci"
-# tag.
+# Each VM is named after "host${ID}${SUFFIX}" and is tagged with the "$INSTANCE_TAG" tag.
 # NOTE: each VM will be automatically terminated after $TERMINATE_AFTER_MIN minutes.
 function setup {
     # Destroy previous machines (if any)
@@ -86,6 +91,8 @@ function setup {
     image_id=$(ami_id)
     json=$(mktemp json.XXXXXXXXXX)
     echo "Creating $NUM_HOSTS instances of $image_id image"
+    SEC_GROUP_ID=$(sec_group_id)
+
     run_instances $NUM_HOSTS $image_id > $json
 
     # Assign a name to each instance and
@@ -95,7 +102,7 @@ function setup {
         $AWSCLI ec2 create-tags                             \
             --resources "$vm"                               \
             --tags "Key=Name,Value=\"$(vm_name $i)\""       \
-                   "Key=weavenet_ci,Value=\"true\""
+                   "Key=$INSTANCE_TAG,Value=\"true\""
         $AWSCLI ec2 modify-instance-attribute               \
             --instance-id "$vm"                             \
             --no-source-dest-check
@@ -186,13 +193,16 @@ function run_instances {
 
     # Check whether a necessary security group exists
     ensure_sec_group > /dev/null
+    SEC_GROUP_ID=$(sec_group_id)
+    SUBNET_ID=$(subnet_id)
 
     $AWSCLI ec2 run-instances                               \
         --image-id "$image_id"                              \
         --key-name "$KEY_NAME"                              \
         --placement "AvailabilityZone=$ZONE"                \
         --instance-type "$INSTANCE_TYPE"                    \
-        --security-groups "$SEC_GROUP_NAME"                 \
+        --security-group-ids "$SEC_GROUP_ID"                \
+        --subnet-id "$SUBNET_ID"                            \
         --iam-instance-profile Name="weavenet-test_host"    \
         --count $count
 }
@@ -200,13 +210,31 @@ function run_instances {
 function list_instances {
     $AWSCLI ec2 describe-instances                                      \
         --filters "Name=instance-state-name,Values=pending,running"     \
-                  "Name=tag:weavenet_ci,Values=true"                  \
+                  "Name=tag:$INSTANCE_TAG,Values=true"                  \
                   "Name=tag:Name,Values=$(vm_names| sed 's/ $//' | sed 's/ /,/g')"
 }
 
 function list_instances_by_id {
     ids="$1"
     $AWSCLI ec2 describe-instances --instance-ids $1
+}
+
+function vpc_id {
+    $AWSCLI ec2 describe-vpcs --filters "Name=tag:Name,Values=$VPC_NAME" \
+        | jq -r ".Vpcs[0].VpcId"
+}
+
+function sec_group_id {
+    $AWSCLI ec2 describe-security-groups                                \
+        --filters "Name=group-name,Values=$SEC_GROUP_NAME"              \
+        | jq -r ".SecurityGroups[0].GroupId"
+
+}
+
+function subnet_id {
+    VPC_ID=$(vpc_id)
+    $AWSCLI ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID"     \
+        | jq -r ".Subnets[0].SubnetId"
 }
 
 function ami_id {
@@ -318,24 +346,27 @@ function ensure_sec_group {
 }
 
 function create_sec_group {
-    echo "Creating $SEC_GROUP_NAME security group"
+    echo "Creating $SEC_GROUP_NAME security group for $VPC_NAME"
+    VPC_ID=$(vpc_id)
     $AWSCLI ec2 create-security-group               \
         --group-name "$SEC_GROUP_NAME"              \
+        --vpc-id "$VPC_ID"                          \
         --description "Weave CircleCI" > /dev/null
+    SEC_GROUP_ID=$(sec_group_id)
     $AWSCLI ec2 authorize-security-group-ingress    \
-        --group-name "$SEC_GROUP_NAME"              \
-        --source-group "$SEC_GROUP_NAME"            \
+        --group-id "$SEC_GROUP_ID"                  \
+        --source-group "$SEC_GROUP_ID"              \
         --protocol all
     $AWSCLI ec2 authorize-security-group-ingress    \
-        --group-name "$SEC_GROUP_NAME"              \
+        --group-id "$SEC_GROUP_ID"                  \
         --protocol tcp --port 22                    \
         --cidr "0.0.0.0/0"
     $AWSCLI ec2 authorize-security-group-ingress    \
-        --group-name "$SEC_GROUP_NAME"              \
+        --group-id "$SEC_GROUP_ID"                  \
         --protocol tcp --port 2375                  \
         --cidr "0.0.0.0/0"
     $AWSCLI ec2 authorize-security-group-ingress    \
-        --group-name "$SEC_GROUP_NAME"              \
+        --group-id "$SEC_GROUP_ID"                  \
         --protocol tcp --port 12375                  \
         --cidr "0.0.0.0/0"
 }

@@ -14,19 +14,12 @@ CIDR4=10.44.0.0/14
 
 INSTANCE_ID_CMD="curl -s -L http://169.254.169.254/latest/meta-data/instance-id"
 
-# TODO(mp) Detect by using instance id instead!
+# Assumes that only one route table is associated with VPC of a given instance
 routetableid() {
-    host=$1
-    json=$(mktemp json.XXXXXXXXXX)
-    aws ec2 describe-instances                                      \
-        --filters "Name=instance-state-name,Values=pending,running" \
-                  "Name=tag:weavenet_ci,Values=true"                \
-                  "Name=tag:Name,Values=$host" > $json
-    vpcid=$(jq -r ".Reservations[0].Instances[0].NetworkInterfaces[0].VpcId" $json)
-    aws ec2 describe-route-tables                                   \
-        --filters "Name=vpc-id,Values=$vpcid" > $json
-    jq -r ".RouteTables[0].RouteTableId" $json
-    rm $json
+    vpcid=$(aws ec2 describe-instances --instance-ids "$1" | \
+        jq -r ".Reservations[0].Instances[0].VpcId")
+    aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$vpcid" | \
+        jq -r ".RouteTables[0].RouteTableId"
 }
 
 cleanup_routetable() {
@@ -74,7 +67,7 @@ INSTANCE1=$($SSH $HOST1 $INSTANCE_ID_CMD)
 INSTANCE2=$($SSH $HOST2 $INSTANCE_ID_CMD)
 INSTANCE3=$($SSH $HOST3 $INSTANCE_ID_CMD)
 
-VPC_ROUTE_TABLE_ID=$(routetableid $HOST1)
+VPC_ROUTE_TABLE_ID=$(routetableid $INSTANCE1)
 cleanup_routetable $VPC_ROUTE_TABLE_ID
 
 echo "starting weave"
