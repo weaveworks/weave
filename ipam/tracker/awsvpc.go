@@ -21,6 +21,7 @@ package tracker
 import (
 	"fmt"
 	"net"
+	"syscall"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -94,14 +95,14 @@ func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range, loc
 	for _, cidr := range curr {
 		cidrStr := cidr.String()
 		t.debugf("adding route %s to %s", cidrStr, t.instanceID)
-		_, err := t.createVPCRoute(cidrStr)
-		if err != nil {
+		if _, err := t.createVPCRoute(cidrStr); err != nil {
 			return fmt.Errorf("createVPCRoutes failed: %s", err)
 		}
 		if local {
-			err = t.createHostRoute(cidrStr)
-			if err != nil {
-				return fmt.Errorf("createHostRoute failed: %s", err)
+			if err := t.createHostRoute(cidrStr); err != nil {
+				if errno, ok := err.(syscall.Errno); !(ok && errno == syscall.EEXIST) {
+					return fmt.Errorf("createHostRoute failed: %s", err)
+				}
 			}
 		}
 	}
@@ -110,13 +111,11 @@ func (t *AWSVPCTracker) HandleUpdate(prevRanges, currRanges []address.Range, loc
 	for _, cidr := range prev {
 		cidrStr := cidr.String()
 		t.debugf("removing %s route", cidrStr)
-		_, err := t.deleteVPCRoute(cidrStr)
-		if err != nil {
+		if _, err := t.deleteVPCRoute(cidrStr); err != nil {
 			return fmt.Errorf("deleteVPCRoute failed: %s", err)
 		}
 		if local {
-			err = t.deleteHostRoute(cidrStr)
-			if err != nil {
+			if err := t.deleteHostRoute(cidrStr); err != nil {
 				return fmt.Errorf("deleteHostRoute failed: %s", err)
 			}
 		}

@@ -1656,6 +1656,10 @@ launch_router() {
     setup_router_iface_$BRIDGE_TYPE
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     populate_router
+    setup_awsvpc
+}
+
+setup_awsvpc() {
     if [ -n "$AWSVPC" ]; then
         expose_ip
         # Set proxy_arp on the bridge, so that it could accept packets destined
@@ -1956,11 +1960,14 @@ EOF
     attach-router)
         check_running $CONTAINER_NAME
         enforce_docker_bridge_addr_assign_type
+        # We cannot use detect_awsvpc here, because HTTP server might not be started
+        ! docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME | grep -q -- "--awsvpc" || AWSVPC=1
         create_bridge
         fetch_router_args
         setup_router_iface_$BRIDGE_TYPE
         wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
         populate_router
+        setup_awsvpc
         ;;
     launch-proxy)
         deprecation_warnings "$@"

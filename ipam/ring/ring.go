@@ -119,6 +119,8 @@ func New(start, end address.Address, peer mesh.PeerName, f OnUpdate) *Ring {
 }
 
 func (r *Ring) Restore(other *Ring) {
+	defer r.trackUpdates()()
+
 	onUpdate := r.onUpdate
 	*r = *other
 	r.onUpdate = onUpdate
