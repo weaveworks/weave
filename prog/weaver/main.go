@@ -50,6 +50,7 @@ type dnsConfig struct {
 	TTL                    int
 	ClientTimeout          time.Duration
 	EffectiveListenAddress string
+	ResolvConf             string
 }
 
 const (
@@ -207,6 +208,7 @@ func main() {
 	mflag.IntVar(&dnsConfig.TTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
 	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
+	mflag.StringVar(&dnsConfig.ResolvConf, []string{"-resolv-conf"}, "", "path to resolver configuration for fallback DNS lookups")
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
@@ -482,8 +484,9 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, isKnownPeer)
 	router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
 	ns.SetGossip(router.NewGossip("nameserver", ns))
+	upstream := nameserver.NewUpstream(config.ResolvConf, config.EffectiveListenAddress)
 	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,
-		config.EffectiveListenAddress, uint32(config.TTL), config.ClientTimeout)
+		upstream, uint32(config.TTL), config.ClientTimeout)
 	if err != nil {
 		Log.Fatal("Unable to start dns server: ", err)
 	}
