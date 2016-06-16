@@ -188,7 +188,6 @@ exec_remote() {
         -e PROXY_HOST="$PROXY_HOST" \
         -e COVERAGE \
         -e CHECKPOINT_DISABLE \
-        -e AWSVPC   \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
