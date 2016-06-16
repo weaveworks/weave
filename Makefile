@@ -172,6 +172,9 @@ ifneq ($(UPDATE_LATEST),false)
 endif
 
 publish: $(PUBLISH)
+ifeq ($(PUBLISH_WEAVEDB),true)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push   $(DOCKERHUB_USER)/weavedb:latest
+endif
 
 clean-bin:
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
