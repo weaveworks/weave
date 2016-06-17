@@ -66,7 +66,7 @@ set -e
 
 : ${VPC_NAME:="weavenetci-vpc"}
 
-: ${KEY_NAME:="weavenetci-key"}
+: ${KEY_NAME:="weavenetci-key"} # if changed, update bin/setup-aws-secrets
 : ${SSH_KEY_FILE:="$HOME/.ssh/$KEY_NAME"}
 
 
@@ -166,7 +166,6 @@ function make_template {
 
 # Destroy VMs and remove keys.
 function destroy {
-    delete_key_pair
     json=$(mktemp json.XXXXXXXXXX)
     list_instances >> $json
     instances=""
@@ -188,8 +187,7 @@ function run_instances {
     count="$1"
     image_id="$2"
 
-    # Create keypair
-    create_key_pair > /dev/null
+    check_key_pair
 
     # Check whether a necessary security group exists
     ensure_sec_group > /dev/null
@@ -310,32 +308,8 @@ function external_ip {
               | .NetworkInterfaces[0].Association.PublicIp" $1
 }
 
-function create_key_pair {
-    function _create {
-        $AWSCLI ec2 create-key-pair --key-name $KEY_NAME 2>&1
-    }
-
-    if ! RET=$(_create); then
-        if echo "$RET" | grep -q "InvalidKeyPair\.Duplicate"; then
-            delete_key_pair
-            RET=$(_create)
-        else
-            echo "$RET"
-            exit -1
-        fi
-    fi
-
-    echo "Created $KEY_FILE keypair"
-    echo "Writing $KEY_FILE into $SSH_KEY_FILE"
-
-    echo "$RET" | jq -r .KeyMaterial > $SSH_KEY_FILE
-    chmod 400 $SSH_KEY_FILE
-}
-
-function delete_key_pair {
-    echo "Deleting $KEY_NAME keypair"
-    $AWSCLI ec2 delete-key-pair --key-name $KEY_NAME
-    rm -f "$SSH_KEY_FILE" || true
+function check_key_pair {
+    aws ec2 describe-key-pairs --key-names $KEY_NAME > /dev/null
 }
 
 function ensure_sec_group {
@@ -384,7 +358,6 @@ function hosts {
 		hosts="$hostname $hosts"
 	done
 	echo export SSH=\"$SSHCMD\"
-    echo export NO_SCHEDULER=1
 	echo export HOSTS=\"$hosts\"
     echo export AWS=1
 	rm $json
