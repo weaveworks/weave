@@ -1655,13 +1655,12 @@ launch_router() {
         "$@")
     setup_router_iface_$BRIDGE_TYPE
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-    populate_router
     setup_awsvpc
+    populate_router
 }
 
 setup_awsvpc() {
     if [ -n "$AWSVPC" ]; then
-        expose_ip
         # Set proxy_arp on the bridge, so that it could accept packets destined
         # to containers within the same subnet but running on remote hosts.
         # Without it, exact routes on each container are required.
@@ -1670,6 +1669,7 @@ setup_awsvpc() {
         # placing the request into a bounded queue as it can be seen:
         # https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/net/ipv4/arp.c?id=refs/tags/v4.6.1#n819
         echo 0 >/proc/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
+        expose_ip
     fi
 }
 
@@ -1683,7 +1683,8 @@ fetch_router_args() {
 populate_router() {
     if [ -n "$IPRANGE" ] ; then
         # Tell the newly-started weave IP allocator about existing weave IPs
-        with_container_addresses ipam_reclaim_no_check_alive weave:expose
+        # In the case of AWSVPC, we do expose before calling populate_router
+        [ -n "$AWSVPC" ] || with_container_addresses ipam_reclaim_no_check_alive weave:expose
         with_container_addresses ipam_reclaim $(docker ps -q --no-trunc)
     fi
     if [ -z "$NO_DNS_OPT" ] ; then
@@ -1966,8 +1967,8 @@ EOF
         fetch_router_args
         setup_router_iface_$BRIDGE_TYPE
         wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-        populate_router
         setup_awsvpc
+        populate_router
         ;;
     launch-proxy)
         deprecation_warnings "$@"
