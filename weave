@@ -1868,7 +1868,7 @@ stop_plugin() {
 
 protect_against_docker_hang() {
     # If the plugin is not running, remove its socket so Docker doesn't try to talk to it
-    if !check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
+    if ! check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
         rm -f /run/docker/plugins/weave.sock /run/docker/plugins/weavemesh.sock
     fi
 }
