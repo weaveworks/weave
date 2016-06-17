@@ -2322,6 +2322,7 @@ EOF
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true
         done
+        protect_against_docker_hang
         VOLUME_CONTAINERS=$(docker ps -qa --filter label=weavevolumes)
         [ -n "$VOLUME_CONTAINERS" ] && docker rm -v $VOLUME_CONTAINERS  >/dev/null 2>&1 || true
         conntrack -D -p udp --dport $PORT >/dev/null 2>&1 || true
