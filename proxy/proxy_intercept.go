@@ -77,24 +77,22 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 	}
 	defer down.Close()
 	defer up.Close()
+	defer func() {
+		if err != nil {
+			Log.Warning(err)
+		}
+	}()
 
-	if _, err := downBuf.Write([]byte("HTTP/1.1 " + resp.Status + "\n")); err != nil {
-		Log.Warning(err)
+	if _, err = downBuf.Write([]byte("HTTP/1.1 " + resp.Status + "\n")); err != nil {
 		return
 	}
-
-	if err := resp.Header.Write(downBuf); err != nil {
-		Log.Warning(err)
+	if err = resp.Header.Write(downBuf); err != nil {
 		return
 	}
-
-	if _, err := downBuf.Write([]byte("\n")); err != nil {
-		Log.Warning(err)
+	if _, err = downBuf.Write([]byte("\n")); err != nil {
 		return
 	}
-
 	if err = downBuf.Flush(); err != nil {
-		Log.Warning(err)
 		return
 	}
 
