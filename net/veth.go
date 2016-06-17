@@ -3,6 +3,7 @@ package net
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -154,6 +155,21 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 		if err != nil {
 			return err
 		}
+
+		// Add multicast ACCEPT rules for new subnets
+		for _, ipnet := range newAddresses {
+			acceptRule := []string{"-i", ifName, "-s", subnet(ipnet), "-d", "224.0.0.0/4", "-j", "ACCEPT"}
+			exists, err := ipt.Exists("filter", "INPUT", acceptRule...)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				if err := ipt.Insert("filter", "INPUT", 1, acceptRule...); err != nil {
+					return err
+				}
+			}
+		}
+
 		if err := netlink.LinkSetUp(veth); err != nil {
 			return err
 		}
@@ -208,6 +224,27 @@ func DetachContainer(ns netns.NsHandle, id, ifName string, cidrs []*net.IPNet) e
 		if err != nil {
 			return fmt.Errorf("failed to get IP address for %q: %v", veth.Attrs().Name, err)
 		}
+
+		// Remove multicast ACCEPT rules for subnets we no longer have addresses in
+		subnets := subnets(addrs)
+		rules, err := ipt.List("filter", "INPUT")
+		if err != nil {
+			return err
+		}
+		for _, rule := range rules {
+			ps := strings.Split(rule, " ")
+			if len(ps) == 10 &&
+				ps[0] == "-A" && ps[2] == "-s" && ps[4] == "-d" && ps[5] == "224.0.0.0/4" &&
+				ps[6] == "-i" && ps[7] == ifName && ps[8] == "-j" && ps[9] == "ACCEPT" {
+
+				if _, found := subnets[ps[3]]; !found {
+					if err := ipt.Delete("filter", "INPUT", ps[2:]...); err != nil {
+						return err
+					}
+				}
+			}
+		}
+
 		if len(addrs) == 0 { // all addresses gone: remove the interface
 			if err := ipt.Delete("filter", "INPUT", "-i", ifName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
 				return err
@@ -218,4 +255,17 @@ func DetachContainer(ns netns.NsHandle, id, ifName string, cidrs []*net.IPNet) e
 		}
 		return nil
 	})
+}
+
+func subnet(ipn *net.IPNet) string {
+	ones, _ := ipn.Mask.Size()
+	return fmt.Sprintf("%s/%d", ipn.IP.Mask(ipn.Mask).String(), ones)
+}
+
+func subnets(addrs []netlink.Addr) map[string]struct{} {
+	subnets := make(map[string]struct{})
+	for _, addr := range addrs {
+		subnets[subnet(addr.IPNet)] = struct{}{}
+	}
+	return subnets
 }
