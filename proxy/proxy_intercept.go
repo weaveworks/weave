@@ -78,7 +78,7 @@ func doRawStream(w http.ResponseWriter, resp *http.Response, client *httputil.Cl
 	defer down.Close()
 	defer up.Close()
 
-	if _, err := down.Write([]byte("HTTP/1.1 200 OK\n")); err != nil {
+	if _, err := down.Write([]byte("HTTP/1.1 " + resp.Status + "\n")); err != nil {
 		Log.Warning(err)
 		return
 	}
