@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
@@ -112,6 +113,11 @@ func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
 }
 
 func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
+	}
+
 	if !interfaceExistsInNamespace(ns, ifName) {
 		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
 		if len(id) > maxIDLen {
@@ -127,6 +133,9 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 					return err
 				}
 				if err := ConfigureARPCache(ifName); err != nil {
+					return err
+				}
+				if err := ipt.Append("filter", "INPUT", "-i", ifName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
 					return err
 				}
 				return nil
@@ -177,6 +186,11 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 }
 
 func DetachContainer(ns netns.NsHandle, id, ifName string, cidrs []*net.IPNet) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
+	}
+
 	return WithNetNSLink(ns, ifName, func(veth netlink.Link) error {
 		existingAddrs, err := netlink.AddrList(veth, netlink.FAMILY_V4)
 		if err != nil {
@@ -195,6 +209,9 @@ func DetachContainer(ns netns.NsHandle, id, ifName string, cidrs []*net.IPNet) e
 			return fmt.Errorf("failed to get IP address for %q: %v", veth.Attrs().Name, err)
 		}
 		if len(addrs) == 0 { // all addresses gone: remove the interface
+			if err := ipt.Delete("filter", "INPUT", "-i", ifName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
+				return err
+			}
 			if err := netlink.LinkDel(veth); err != nil {
 				return err
 			}
