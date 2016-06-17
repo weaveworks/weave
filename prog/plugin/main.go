@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 
@@ -121,7 +122,8 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 }
 
 func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
-	d, err := netplugin.New(dockerClient, weave, scope)
+	name := strings.TrimSuffix(path.Base(address), ".sock")
+	d, err := netplugin.New(dockerClient, weave, name, scope)
 	if err != nil {
 		return nil, err
 	}

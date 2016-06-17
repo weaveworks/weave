@@ -1758,6 +1758,7 @@ launch_plugin_if_not_running() {
     if ! PLUGIN_CONTAINER=$(docker run -d --name=$PLUGIN_CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
+        --pid=host \
         -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_HTTP_ADDR \
         $WEAVEPLUGIN_DOCKER_ARGS $PLUGIN_IMAGE $COVERAGE_ARGS \
