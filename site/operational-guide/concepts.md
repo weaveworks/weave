@@ -19,7 +19,7 @@ A peer is a running instance of Weave Net, typically one per host.
 
 ## Peer Name
 
-Peers on the Weave network are identified by a 48-bit value formatted
+Weave network peers are identified by a 48-bit value formatted
 like an ethernet MAC address, for example, `01:23:45:67:89:ab`. The 'peer
 name' is used for various purposes:
 
@@ -106,8 +106,8 @@ Alternatively, when a new network is formed for the first time, peers
 can be configured to co-ordinate amongst themselves to automatically
 divide up the IP allocation range. This process is known as consensus
 and it requires each peer to be told the total number of expected peers
-(the 'initial peer count') in order to prevent the formation of disjointed
-groups of peers which would, ultimately, result in duplicate IP
+(the 'initial peer count') in order to prevent the formation of disjoint
+peer groups which would, ultimately, result in duplicate IP
 addresses.
 
 Example configurations are given in the section on deployment
