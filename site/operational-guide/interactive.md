@@ -2,11 +2,12 @@
 title: Interactive Deployment
 menu_order: 20
 ---
-Since launching Weave commands in interactive mode is not amenable to automation and
-configuration management, it is recommended that launching Weave in interactive 
-mode be used for exploration and evaluation only. However, if Weave is launched in 
-this mode, and as long as Docker is configured to start on boot,the resulting 
-network will survive host reboots without the use of a systemd.
+Weave can be launched interactively on the command line, and as 
+long as Docker is configured to start on boot, Weave will survive 
+host reboots without the use of a systemd. However, since launching 
+Weave commands in interactive mode is not amenable to automation 
+and configuration management, it is recommended that deploying Weave 
+in this mode be reserved for exploration and evaluation only. 
 
 ### Bootstrapping
 
