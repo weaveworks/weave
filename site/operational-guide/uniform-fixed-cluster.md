@@ -37,7 +37,7 @@ Where,
   to compute separate lists of 'other' peers tailored to each peer -
   just supply the same complete list of peer addresses to every peer.
 
-Then on _any_ peer run the following to force concensus:
+Then on _any_ peer run the following to force consensus:
 
     weave prime
 
