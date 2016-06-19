@@ -54,7 +54,7 @@ that](/site/troubleshooting.md) before moving on.
 
 ### Adding a Peer
 
-On a new peer, at boot, via
+On the new peer, at boot, via
 [systemd](/site/installing-weave/systemd.md) run:
 
     weave launch --no-restart $PEERS
