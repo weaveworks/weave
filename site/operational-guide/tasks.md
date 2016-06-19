@@ -51,8 +51,9 @@ following command on any peer:
 
     weave status ipam
 
-This command lists the names of unreachable peers. If you are satisifed
-that they are truly gone, rather than temporarily unreachable due to a
+This command displays the peer names and nicknames, absolute quantity/percentage of allocation 
+range managed by peer and also identifies the names of unreachable peers. If you are satisifed
+that the peer is truly gone, rather than temporarily unreachable due to a
 partition, you can reclaim their space manually.
 
 ###<a name="manually-reclaim-address-space"></a>Manually Reclaiming Address Space
@@ -114,4 +115,5 @@ you can issue the following command:
 See Also, 
 
  * [Allocating IP Addresses](/site/ipam.md)
+ * [Troubleshooting the IP Allocator](/site/ipam/troubleshooting-ipam.md)
 
