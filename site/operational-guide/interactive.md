@@ -17,7 +17,7 @@ On the initial peer:
 
 ### Adding a Peer
 
-On a new peer:
+On the new peer:
 
     weave launch <extant peers>
 
