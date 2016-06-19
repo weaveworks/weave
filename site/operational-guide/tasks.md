@@ -5,18 +5,18 @@ menu_order: 60
 
 The following administrative tasks are discussed: 
 
-* [Configuring Weave to Start Automatically on Boot](#start-on-boot)
+* [Configuring Weave Net to Start Automatically on Boot](#start-on-boot)
 * [Detecting and Reclaiming Lost IP Address Space](#detect-reclaim-ipam)
     *[Manually Reclaiming Lost Address Space](#reclaim-address-space)
 * [Upgrading a Cluster](#cluster-upgrade)
 * [Resetting Persisted Data](#reset)
 
 
-##<a name="start-on-boot"></a>Configuring Weave to Start Automatically on Boot
+##<a name="start-on-boot"></a>Configuring Weave Net to Start Automatically on Boot
 
-`weave launch` runs all of Weave's containers with a Docker restart
-policy set to `always`.  If you have launched Weave manually at least
-once and your system is configured to start Docker on boot, then Weave
+`weave launch` runs all of Weave Net's containers with a Docker restart
+policy set to `always`.  If you have launched Weave Net manually at least
+once and your system is configured to start Docker on boot, then Weave Net
 will start automatically on system restarts.
 
 If you are aiming for a non-interactive installation, use
@@ -81,21 +81,21 @@ The general upgrade procedure is as follows:
 
 On each peer:
 
-* Stop the old Weave with `weave stop` (or `systemctl stop weave` if
+* Stop the old Weave Net with `weave stop` (or `systemctl stop weave` if
   you're using a systemd unit file)
-* Download the new Weave script and replace the existing one
+* Download the new Weave Net script and replace the existing one
 * Start the new Weave with `weave launch <existing peer list>` (or
   `systemctl start weave` if you're using a systemd unit file)
 
 To minimize downtime while the new script is pulling the new container images:
 
-* Download the new Weave script to a temporary location, for example,
+* Download the new Weave Net script to a temporary location, for example,
   `/path/to/new/weave`
 * Pull the new images with `/path/to/new/weave setup`
-* Stop the old Weave with `weave stop` (or `systemctl stop weave` if
+* Stop the old Weave Net with `weave stop` (or `systemctl stop weave` if
   you're using a systemd unit file)
 * Replace the existing script with the new one
-* Start the new Weave with `weave launch <existing peer list>` (or
+* Start the new Weave Net with `weave launch <existing peer list>` (or
   `systemctl start weave` if you're using a systemd unit file)
 
 >>**Note:** Always check the Release Notes for specific versions in case
