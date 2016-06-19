@@ -53,7 +53,7 @@ detail below.
 ## Peer Discovery
 
 Peer discovery is a mechanism that allows peers to learn about new
-Weave hosts from existing peers without being explicitly told. Peer
+Weave Net hosts from existing peers without being explicitly told. Peer
 discovery is
 [enabled by default](/site/using-weave/finding-adding-hosts-dynamically.md).
 
@@ -62,7 +62,7 @@ discovery is
 A network partition is a transient condition whereby some arbitrary
 subsets of peers are unable to communicate with each other for the
 duration - perhaps because a network switch has failed, or a fibre
-optic line severed. Weave is designed to allow peers and their
+optic line severed. Weave Net is designed to allow peers and their
 containers to make maximum safe progress under conditions of
 partition, healing automatically once the partition is over.
 
@@ -85,14 +85,14 @@ constraints and consequences:
 
 * Every peer added to the network _must_ receive the same seed list,
   for all time, or they will not be able to join together to form a
-  single cohesive whole
+  single cohesive whole.
 * Because the 'product UUID' and 'random value' methods of peer name
   assignment are unpredictable, the end user must by necessity also
-  specify peer names
+  specify peer names.
 * Even though every peer _must_ receive the same seed, that seed does
   _not_ have to include every peer in the network, nor does it have to
   be updated when new peers are added (in fact due to the first
-  constraint above it may not be)
+  constraint above it may not be).
 
 
 Example configurations are given in the section on deployment
@@ -132,7 +132,7 @@ scenarios:
 
 ## Persistence
 
-Certain information is remembered between launches of Weave (for
+Certain information is remembered between launches of Weave Net (for
 example across reboots):
 
 * The division of the IP allocation range amongst peers
