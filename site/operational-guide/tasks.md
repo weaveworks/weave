@@ -64,7 +64,7 @@ after which one of the remaining peers could decide unilaterally that
 it is safe to appropriate the space for itself, and so an
 administrative action is required to reclaim it.
 
-The [`weave rmpeer`](https://www.weave.works/docs/net/latest/ipam/stop-remove-peers-ipam/)
+The [`weave rmpeer`](/site/ipam/stop-remove-peers-ipam.md)
 command is provided to perform this task, and must
 be executed on _one_ of the remaining peers. That peer will then take
 ownership of the freed address space.
@@ -113,5 +113,5 @@ you can issue the following command:
     
 See Also, 
 
- * [Allocating IP Addresses](https://www.weave.works/docs/net/latest/ipam/)
+ * [Allocating IP Addresses](/site/ipam.md)
 
