@@ -87,8 +87,7 @@ On each peer:
 * Start the new Weave with `weave launch <existing peer list>` (or
   `systemctl start weave` if you're using a systemd unit file)
 
-To minimize downtime while the new script is pulling the new container images, 
-it is recommended that you download the new script to a temporary location first:
+To minimize downtime while the new script is pulling the new container images:
 
 * Download the new Weave script to a temporary location, for example,
   `/path/to/new/weave`
