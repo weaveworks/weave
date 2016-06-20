@@ -1862,11 +1862,11 @@ deprecation_warnings() {
                 shift
                 ;;
             -initpeercount|--initpeercount|-initpeercount=*|--initpeercount=*)
-                deprecation_warning $1 "--ipalloc-init"
+                deprecation_warning $1 "--ipalloc-init consensus=<count>"
                 [ ${1#--} = "initpeercount" ] && shift
                 ;;
             --init-peer-count|--init-peer-count=*)
-                deprecation_warning $1 "--ipalloc-init"
+                deprecation_warning $1 "--ipalloc-init consensus=<count>"
                 [ ${1#--} = "init-peer-count" ] && shift
                 shift
                 ;;
