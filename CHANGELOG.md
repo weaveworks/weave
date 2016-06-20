@@ -1,3 +1,25 @@
+## Release 1.6.0
+
+## Highlights
+
+* A new [AWS VPC](https://weave.works/docs/net/latest/using-weave/awsvpc/) mode
+  that leverages Amazon Virtual Private Cloud for near-native network
+  performance, as an alternative to the Sleeve and Fast Datapath
+  overlays
+* Docker 1.12 introduced some internal changes that made it
+  incompatible with previous version of Weave Net - this version
+  restores compatability
+* An [operational guide](https://weave.works/docs/net/latest/operational-guide)
+  detailing best practices for deploying and operating Weave Net
+* Changes to the target peer list are remembered across restarts,
+  making it much easier to deploy resilient networks
+* The version checkpoint now transmits network mode (e.g. 'awsvpc')
+  and kernel/docker versions to us to inform and guide our development
+  efforts. See the [installation documentation](https://weave.works/docs/net/latest/installing-weave/)
+  for instructions on disabling the checkpoint feature.
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.6.0).
+
 ## Release 1.5.2
 
 Bug fixes and minor improvements
