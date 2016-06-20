@@ -101,6 +101,4 @@ In AWS-VPC mode you can run the following:
 **See Also**
 
  * [Using Weave Net](/site/using-weave.md)
- * [Performance measurements](/blog/weave-docker-networking-performance-aws-vpc/)
 
-(that last blog post doesn't exist yet)
