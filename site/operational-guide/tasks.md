@@ -111,7 +111,8 @@ you can issue the following command:
 
     weave reset
     
-See Also, 
+
+**See Also**
 
  * [Allocating IP Addresses](/site/ipam.md)
  * [Troubleshooting the IP Allocator](/site/ipam/troubleshooting-ipam.md)
