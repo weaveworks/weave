@@ -19,8 +19,8 @@ A peer is a running instance of Weave Net, typically one per host.
 
 ## Peer Name
 
-Weave network peers are identified by a 48-bit value formatted
-like an ethernet MAC address, for example, `01:23:45:67:89:ab`. The 'peer
+Weave Net peers are identified by a 48-bit value formatted like an
+ethernet MAC address, for example, `01:23:45:67:89:ab`. The 'peer
 name' is used for various purposes:
 
 * Routing of packets between containers on the overlay network
