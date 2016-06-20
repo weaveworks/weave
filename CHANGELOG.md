@@ -8,7 +8,7 @@
   overlays
 * Docker 1.12 introduced some internal changes that made it
   incompatible with previous version of Weave Net - this version
-  restores compatability
+  restores compatibility
 * An [operational guide](https://weave.works/docs/net/latest/operational-guide)
   detailing best practices for deploying and operating Weave Net
 * Changes to the target peer list are remembered across restarts,
