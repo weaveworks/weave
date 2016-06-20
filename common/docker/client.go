@@ -84,6 +84,15 @@ func (c *Client) Info() string {
 	return fmt.Sprintf("Docker API on %s: %v", c.Endpoint(), env)
 }
 
+func (c *Client) DockerVersion() string {
+	if env, err := c.Version(); err == nil {
+		if v, found := env.Map()["Version"]; found {
+			return v
+		}
+	}
+	return "unknown"
+}
+
 // AddObserver adds an observer for docker events
 func (c *Client) AddObserver(ob ContainerObserver) error {
 	go func() {

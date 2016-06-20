@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/docker/docker/pkg/mflag"
@@ -17,7 +16,6 @@ import (
 	"github.com/pkg/profile"
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/go-checkpoint"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
@@ -30,8 +28,6 @@ import (
 )
 
 var version = "(unreleased version)"
-var checker *checkpoint.Checker
-var newVersion atomic.Value
 
 var Log = common.Log
 
@@ -51,34 +47,6 @@ type dnsConfig struct {
 	ClientTimeout          time.Duration
 	EffectiveListenAddress string
 	ResolvConf             string
-}
-
-const (
-	updateCheckPeriod = 6 * time.Hour
-)
-
-func checkForUpdates() {
-	newVersion.Store("")
-
-	handleResponse := func(r *checkpoint.CheckResponse, err error) {
-		if err != nil {
-			Log.Printf("Error checking version: %v", err)
-			return
-		}
-		if r.Outdated {
-			newVersion.Store(r.CurrentVersion)
-			Log.Printf("Weave version %s is available; please update at %s",
-				r.CurrentVersion, r.CurrentDownloadURL)
-		}
-	}
-
-	// Start background version checking
-	params := checkpoint.CheckParams{
-		Product:       "weave-net",
-		Version:       version,
-		SignatureFile: "",
-	}
-	checker = checkpoint.CheckInterval(&params, updateCheckPeriod, handleResponse)
 }
 
 func (c *ipamConfig) Enabled() bool {
@@ -238,8 +206,6 @@ func main() {
 
 	Log.Println("Command line options:", options())
 
-	checkForUpdates()
-
 	if prof != "" {
 		defer profile.Start(profile.CPUProfile, profile.ProfilePath(prof), profile.NoShutdownHook).Stop()
 	}
@@ -295,6 +261,13 @@ func main() {
 		}
 		dockerCli = dc
 	}
+
+	network := ""
+	if isAWSVPC {
+		network = "awsvpc"
+	}
+	checkForUpdates(dockerCli.DockerVersion(), network)
+
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
 			if err := dockerCli.AddObserver(o); err != nil {
