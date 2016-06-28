@@ -180,7 +180,7 @@ func main() {
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
-	mflag.BoolVar(&isAWSVPC, []string{"#awsvpc", "-awsvpc"}, false, "use AWS VPC for routing")
+	mflag.BoolVar(&isAWSVPC, []string{"-awsvpc"}, false, "use AWS VPC for routing")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
