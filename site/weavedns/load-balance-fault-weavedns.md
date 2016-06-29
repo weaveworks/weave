@@ -33,6 +33,14 @@ PING pingme.weave.local (10.32.0.2) 56(84) bytes of data.
 
 Notice how the ping reaches different addresses.
 
+However, due to
+[RFC 3484 address selection](https://tools.ietf.org/html/rfc3484#section-6)
+most DNS resolver libraries prefer certain addresses over others, to
+the point where in some circumstances the same address is always
+chosen. To avoid this behaviour, applications may want to perform
+their own address selection, e.g. by choosing a random entry from the
+result of
+[`getaddrinfo()`](http://pubs.opengroup.org/onlinepubs/9699919799/functions/getaddrinfo.html).
 
 ## <a name="fault-resilience"></a>Fault Resilience
 
