@@ -165,14 +165,14 @@ publish() {
     setup
     cd $PWD/$RELEASE_DIR
 
-    UPDATE_LATEST=false
+    IS_MAINLINE=false
     if [ "$RELEASE_TYPE" = 'MAINLINE' ] ; then
-        UPDATE_LATEST=true
+        IS_MAINLINE=true
     fi
 
     if [ "$RELEASE_TYPE" = 'PRERELEASE' ] ; then
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
-        make UPDATE_LATEST=$UPDATE_LATEST SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
+        make UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
         echo "** Docker images tagged and pushed"
 
         echo "== Publishing pre-release on GitHub"
@@ -204,7 +204,7 @@ publish() {
         echo '** Sanity checks OK for publishing tag' $LATEST_TAG as $DOCKERHUB_USER/weave:$VERSION
 
         echo "== Tagging and pushing images on docker hub as user $DOCKERHUB_USER"
-        make UPDATE_LATEST=$UPDATE_LATEST SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
+        make PUBLISH_WEAVEDB=$IS_MAINLINE UPDATE_LATEST=$IS_MAINLINE SUDO=$SUDO WEAVE_VERSION=$VERSION DOCKERHUB_USER=$DOCKERHUB_USER publish
         echo "** Docker images tagged and pushed"
 
         echo "== Publishing release on GitHub"

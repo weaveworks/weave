@@ -122,8 +122,11 @@ func (s *Space) biggestFreeRange(r address.Range) (biggest address.Range) {
 	biggestSize := address.Count(0)
 	s.walkFree(r, func(chunk address.Range) bool {
 		if size := chunk.Size(); size >= biggestSize {
-			biggest = chunk
-			biggestSize = size
+			chunk = chunk.BiggestCIDRRange()
+			if size = chunk.Size(); size >= biggestSize {
+				biggest = chunk
+				biggestSize = size
+			}
 		}
 		return false
 	})
@@ -137,9 +140,12 @@ func (s *Space) Donate(r address.Range) (address.Range, bool) {
 		return address.Range{}, false
 	}
 
-	// Donate half of that biggest free range. Note size/2 rounds down, so
-	// the resulting donation size rounds up, and in particular can't be empty.
-	biggest.Start = address.Add(biggest.Start, address.Offset(biggest.Size()/2))
+	// Donate no more than half what we have available
+	if biggest.Size() > s.NumFreeAddressesInRange(r)/2 {
+		// Note size/2 rounds down, so the resulting donation size
+		// rounds up, and in particular can't be empty.
+		biggest.Start = address.Add(biggest.Start, address.Offset(biggest.Size()/2))
+	}
 
 	s.ours = subtract(s.ours, biggest.Start, biggest.End)
 	s.free = subtract(s.free, biggest.Start, biggest.End)

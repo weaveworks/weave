@@ -2,12 +2,15 @@ package common
 
 import (
 	"fmt"
-	"github.com/vishvananda/netlink"
-	"github.com/vishvananda/netns"
 	"net"
 	"os"
-	"runtime"
 	"strings"
+
+	"github.com/j-keck/arping"
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
+
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 // Assert test is true, panic otherwise
@@ -25,25 +28,6 @@ func ErrorMessages(errors []error) string {
 	return strings.Join(result, "\n")
 }
 
-func WithNetNS(ns netns.NsHandle, work func() error) error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
-	oldNs, err := netns.Get()
-	if err == nil {
-		defer oldNs.Close()
-
-		err = netns.Set(ns)
-		if err == nil {
-			defer netns.Set(oldNs)
-
-			err = work()
-		}
-	}
-
-	return err
-}
-
 type NetDev struct {
 	Name  string
 	MAC   net.HardwareAddr
@@ -51,6 +35,7 @@ type NetDev struct {
 }
 
 // Search the network namespace of a process for interfaces matching a predicate
+// Note that the predicate is called while the goroutine is inside the process' netns
 func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, error) {
 	var netDevs []NetDev
 
@@ -63,7 +48,7 @@ func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, e
 	}
 	defer ns.Close()
 
-	err = WithNetNS(ns, func() error {
+	err = weavenet.WithNetNS(ns, func() error {
 		return forEachLink(func(link netlink.Link) error {
 			if match(link) {
 				netDev, err := linkToNetDev(link)
@@ -153,4 +138,21 @@ func GetBridgeNetDev(bridgeName string) ([]NetDev, error) {
 	return FindNetDevs(1, func(link netlink.Link) bool {
 		return link.Attrs().Name == bridgeName
 	})
+}
+
+// Do post-attach configuration of all veths we have created
+func ConfigureARPforVeths(processID int, prefix string) error {
+	_, err := FindNetDevs(processID, func(link netlink.Link) bool {
+		ifName := link.Attrs().Name
+		if strings.HasPrefix(ifName, prefix) {
+			weavenet.ConfigureARPCache(ifName)
+			if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err == nil {
+				for _, addr := range addrs {
+					arping.GratuitousArpOverIfaceByName(addr.IPNet.IP, ifName)
+				}
+			}
+		}
+		return false
+	})
+	return err
 }

@@ -14,8 +14,7 @@ type entry struct {
 	Token   address.Address // The start of this range
 	Peer    mesh.PeerName   // Who owns this range
 	Version uint32          // Version of this range
-	Free    address.Offset  // Number of free IPs in this range
-	// Note: Free should perhaps be an address.Count, but we can't change the wire protocol
+	Free    address.Count   // Number of free IPs in this range
 }
 
 func (e *entry) Equal(e2 *entry) bool {
@@ -23,7 +22,7 @@ func (e *entry) Equal(e2 *entry) bool {
 		e.Version == e2.Version
 }
 
-func (e *entry) update(peername mesh.PeerName, free address.Offset) {
+func (e *entry) update(peername mesh.PeerName, free address.Count) {
 	e.Peer = peername
 	e.Version++
 	e.Free = free

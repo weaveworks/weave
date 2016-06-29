@@ -33,7 +33,7 @@ func (g *allocate) Try(alloc *Allocator) bool {
 		return true
 	}
 
-	if !alloc.universe.Overlaps(g.r.Range()) {
+	if !alloc.universe.Range().Overlaps(g.r.Range()) {
 		g.resultChan <- allocateResult{err: fmt.Errorf("range %s out of bounds: %s", g.r, alloc.universe)}
 		return true
 	}

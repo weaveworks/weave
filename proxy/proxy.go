@@ -104,7 +104,7 @@ func (proxy *Proxy) attachWithRetry(id string) {
 
 	j := &attachJob{id: id, tryInterval: initialInterval}
 	j.timer = time.AfterFunc(time.Duration(0), func() {
-		if err := proxy.attach(id, false, false); err != nil {
+		if err := proxy.attach(id); err != nil {
 			// The delay at the nth retry is a random value in the range
 			// [i-i/2,i+i/2], where i = initialInterval * 1.5^(n-1).
 			j.timer.Reset(j.tryInterval)
@@ -384,9 +384,26 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 
 // weavedocker.ContainerObserver interface
 func (proxy *Proxy) ContainerStarted(ident string) {
-	// In case of attach failure, if we have a request waiting on the start, kill the container,
-	// otherwise assume it is a Docker-initated restart and kill the process inside.
-	err := proxy.attach(ident, true, proxy.waitChan(ident) == nil)
+	err := proxy.attach(ident)
+	if err != nil {
+		var e error
+		// attach failed: if we have a request waiting on the start, kill the container,
+		// otherwise assume it is a Docker-initated restart and kill the process inside.
+		if proxy.waitChan(ident) != nil {
+			e = proxy.client.KillContainer(docker.KillContainerOptions{ID: ident})
+		} else {
+			var c *docker.Container
+			if c, e = proxy.client.InspectContainer(ident); e == nil {
+				var process *os.Process
+				if process, e = os.FindProcess(c.State.Pid); e == nil {
+					e = process.Kill()
+				}
+			}
+		}
+		if e != nil {
+			Log.Warningf("Error killing %s: %s", ident, e)
+		}
+	}
 	proxy.notifyWaiters(ident, err)
 }
 
@@ -467,7 +484,7 @@ func (proxy *Proxy) ContainerDestroyed(ident string) {}
 
 // Check if this container needs to be attached, if so then attach it,
 // and return nil on success or not needed.
-func (proxy *Proxy) attach(containerID string, orDie, killProcess bool) error {
+func (proxy *Proxy) attach(containerID string) error {
 	container, err := proxy.client.InspectContainer(containerID)
 	if err != nil {
 		if _, ok := err.(*docker.NoSuchContainer); !ok {
@@ -507,13 +524,6 @@ func (proxy *Proxy) attach(containerID string, orDie, killProcess bool) error {
 	if proxy.NoMulticastRoute {
 		args = append(args, "--no-multicast-route")
 	}
-	if orDie {
-		if killProcess {
-			args = append(args, "--or-kill")
-		} else {
-			args = append(args, "--or-die")
-		}
-	}
 	args = append(args, container.ID)
 	return callWeaveAttach(container, args)
 }
@@ -546,7 +556,9 @@ func validateCIDRs(cidrs []string) error {
 }
 
 func (proxy *Proxy) weaveCIDRs(networkMode string, env []string) ([]string, error) {
-	if networkMode == "host" || strings.HasPrefix(networkMode, "container:") {
+	if networkMode == "host" || strings.HasPrefix(networkMode, "container:") ||
+		// Anything else, other than blank/none/default/bridge, is some sort of network plugin
+		(networkMode != "" && networkMode != "none" && networkMode != "default" && networkMode != "bridge") {
 		return nil, fmt.Errorf("the container has '--net=%s'", networkMode)
 	}
 	for _, e := range env {

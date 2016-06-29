@@ -31,11 +31,19 @@ With Weave Net downloaded onto your VMs or hosts, you are ready to launch a Weav
 Weave Net [periodically contacts Weaveworks servers for available
 versions](https://github.com/weaveworks/go-checkpoint).  New versions
 are announced in the log and in [the status
-summary](/site/troubleshooting.md#weave-status).  To disable this
-check, run the following before launching Weave Net:
+summary](/site/troubleshooting.md#weave-status).
+
+The information sent in this check is:
+
+ * Host UUID hash
+ * Kernel version
+ * Docker version
+ * Weave Net version
+ * Network mode, e.g. 'awsvpc'
+
+To disable this check, run the following before launching Weave Net:
 
     export CHECKPOINT_DISABLE=1
-
 
 ###Guides for Specific Platforms
 
@@ -43,6 +51,12 @@ CoreOS users see [here](/guides/networking-docker-containers-with-weave-on-coreo
 
 Amazon ECS users see [here](https://github.com/weaveworks/integrations/blob/master/aws/ecs/README.md)
 for the latest Weave AMIs and [here](http://weave.works/guides/service-discovery-with-weave-aws-ecs.html) to get started with Weave Net on ECS.
+
+If you're on Amazon EC2, the standard installation instructions at the
+top of this page, provide the simplest setup and the most flexibility.
+A [special no-overlay mode for EC2](/site/using-weave/awsvpc.md) can
+optionally be enabled, which allows containers to communicate at the
+full speed of the underlying network.
 
 **See Also** 
 

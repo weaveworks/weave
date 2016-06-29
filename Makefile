@@ -4,7 +4,7 @@ PUBLISH=publish_weave publish_weaveexec publish_plugin
 .PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
-SUDO=sudo -E
+SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
 BUILD_IN_CONTAINER=true
 RM=--rm
 RUN_FLAGS=-ti
@@ -32,7 +32,7 @@ WEAVEEXEC_UPTODATE=.weaveexec.uptodate
 PLUGIN_UPTODATE=.plugin.uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(BUILD_UPTODATE) $(WEAVEDB_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEDB_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
@@ -60,26 +60,24 @@ BUILD_FLAGS=-i -ldflags "-extldflags \"-static\" -X main.version=$(WEAVE_VERSION
 PACKAGE_BASE=$(shell go list -e ./)
 
 all: $(WEAVE_EXPORT)
-exes: $(EXES)
 testrunner: $(RUNNER_EXE) $(TEST_TLS_EXE)
 
-$(EXES): $(BUILD_UPTODATE)
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/weaver/*.go
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
-$(WEAVEUTIL_EXE): prog/weaveutil/*.go
+$(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
-$(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go
+$(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
-tests: $(BUILD_UPTODATE) tools/.git
-lint: $(BUILD_UPTODATE) tools/.git
+tests: tools/.git
+lint: tools/.git
 
 ifeq ($(BUILD_IN_CONTAINER),true)
 
-$(EXES) tests lint:
+exes $(EXES) tests lint: $(BUILD_UPTODATE)
 	git submodule update --init
 	@mkdir -p $(shell pwd)/.pkg
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
@@ -90,9 +88,10 @@ $(EXES) tests lint:
 
 else
 
+exes: $(EXES)
+
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(PLUGIN_EXE):
 ifeq ($(COVERAGE),true)
-	go build -v $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "^$(PACKAGE_BASE)/") | grep -v "^$(PACKAGE_BASE)/vendor/" | paste -s -d,))
 	go test -c -o ./$@ $(BUILD_FLAGS) -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
 else
@@ -173,13 +172,17 @@ ifneq ($(UPDATE_LATEST),false)
 endif
 
 publish: $(PUBLISH)
+ifeq ($(PUBLISH_WEAVEDB),true)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push   $(DOCKERHUB_USER)/weavedb:latest
+endif
 
 clean-bin:
-	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES) $(BUILD_IMAGE)
+	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
 	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT) .pkg
 
 clean: clean-bin
-	rm -rf test/tls/*.pem test/coverage.* test/coverage
+	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
+	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE)
 
 build:
 	$(SUDO) go clean -i net

@@ -18,12 +18,15 @@ import (
 	"github.com/weaveworks/weave/net/address"
 )
 
+type OnUpdate func(prev, curr []address.Range, local bool)
+
 // Ring represents the ring itself
 type Ring struct {
 	Start, End address.Address // [min, max) tokens in this ring.  Due to wrapping, min == max (effectively)
 	Peer       mesh.PeerName   // name of peer owning this ring instance
 	Entries    entries         // list of entries sorted by token
 	Seeds      []mesh.PeerName // peers with which the ring was seeded
+	onUpdate   OnUpdate
 }
 
 func (r *Ring) assertInvariants() {
@@ -40,7 +43,6 @@ var (
 	ErrTokenOutOfRange = errors.New("Token is out of range")
 	ErrDifferentSeeds  = errors.New("Received ring was seeded differently from ours!")
 	ErrDifferentRange  = errors.New("Received range differs from ours!")
-	ErrNotFound        = errors.New("No entries for peer found")
 )
 
 func errInconsistentEntry(mine, theirs *entry) error {
@@ -95,13 +97,31 @@ func (r *Ring) checkEntries(entries entries) error {
 	return nil
 }
 
+func (r *Ring) trackUpdates() func() {
+	return r.trackUpdatesOfPeer(r.Peer)
+}
+
+func (r *Ring) trackUpdatesOfPeer(peer mesh.PeerName) func() {
+	if r.onUpdate == nil {
+		return func() {}
+	}
+	ranges := r.OwnedRangesOfPeer(peer)
+	return func() { r.onUpdate(ranges, r.OwnedRangesOfPeer(peer), peer == r.Peer) }
+}
+
 // New creates an empty ring belonging to peer.
-func New(start, end address.Address, peer mesh.PeerName) *Ring {
+func New(start, end address.Address, peer mesh.PeerName, f OnUpdate) *Ring {
 	common.Assert(start < end)
 
-	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0)}
+	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0), onUpdate: f}
 	ring.updateExportedVariables()
 	return ring
+}
+
+func (r *Ring) Restore(other *Ring) {
+	onUpdate := r.onUpdate
+	*r = *other
+	r.onUpdate = onUpdate
 }
 
 func (r *Ring) Range() address.Range {
@@ -110,12 +130,12 @@ func (r *Ring) Range() address.Range {
 
 // Returns the distance between two tokens on this ring, dealing
 // with ranges which cross the origin
-func (r *Ring) distance(start, end address.Address) address.Offset {
+func (r *Ring) distance(start, end address.Address) address.Count {
 	if end > start {
-		return address.Offset(end - start)
+		return address.Count(end - start)
 	}
 
-	return address.Offset((r.End - start) + (end - r.Start))
+	return address.Count((r.End - start) + (end - r.Start))
 }
 
 // GrantRangeToHost modifies the ring such that range [start, end)
@@ -127,6 +147,7 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 	//fmt.Printf("%s GrantRangeToHost [%v,%v) -> %s\n", r.Peer, start, end, peer)
 
 	r.assertInvariants()
+	defer r.trackUpdates()()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 
@@ -190,42 +211,70 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 	r.Entries.insert(entry{Token: end, Peer: r.Peer, Free: endFree})
 }
 
-// Merge the given ring into this ring and return any new ranges added
-func (r *Ring) Merge(gossip Ring) error {
+// Merge the given ring into this ring and indicate whether this ring
+// got updated as a result.
+func (r *Ring) Merge(gossip Ring) (bool, error) {
 	r.assertInvariants()
+	defer r.trackUpdates()()
 	defer r.updateExportedVariables()
 
 	// Don't panic when checking the gossiped in ring.
 	// In this case just return any error found.
 	if err := gossip.checkInvariants(); err != nil {
-		return err
+		return false, err
 	}
 
 	if len(gossip.Seeds) > 0 && len(r.Seeds) > 0 {
 		if len(gossip.Seeds) != len(r.Seeds) {
-			return ErrDifferentSeeds
+			return false, ErrDifferentSeeds
 		}
 		for i, seed := range gossip.Seeds {
 			if seed != r.Seeds[i] {
-				return ErrDifferentSeeds
+				return false, ErrDifferentSeeds
 			}
 		}
 	}
 
 	if r.Start != gossip.Start || r.End != gossip.End {
-		return ErrDifferentRange
+		return false, ErrDifferentRange
 	}
 
-	// Now merge their ring with yours, in a temporary ring.
-	var result entries
-	addToResult := func(e entry) { result = append(result, &e) }
+	result, updated, err := r.Entries.merge(gossip.Entries, r.Peer)
 
+	if err != nil {
+		return false, err
+	}
+
+	if err := r.checkEntries(result); err != nil {
+		return false, fmt.Errorf("Merge of incoming data causes: %s", err)
+	}
+
+	if len(r.Seeds) == 0 {
+		r.Seeds = gossip.Seeds
+	}
+	r.Entries = result
+
+	return updated, nil
+}
+
+// Merge other entries into ours, and complain when that stomps on
+// entries belonging to ourPeer. Returns the merged entries and an
+// indication whether the merge resulted in any changes, i.e. the
+// result differs from the original.
+func (es entries) merge(other entries, ourPeer mesh.PeerName) (result entries, updated bool, err error) {
 	var mine, theirs *entry
 	var previousOwner *mesh.PeerName
-	// i is index into r.Entries; j is index into gossip.Entries
+	addToResult := func(e entry) { result = append(result, &e) }
+	addTheirs := func(e entry) {
+		addToResult(e)
+		updated = true
+		previousOwner = nil
+	}
+
+	// i is index into es; j is index into other
 	var i, j int
-	for i < len(r.Entries) && j < len(gossip.Entries) {
-		mine, theirs = r.Entries[i], gossip.Entries[j]
+	for i < len(es) && j < len(other) {
+		mine, theirs = es[i], other[j]
 		switch {
 		case mine.Token < theirs.Token:
 			addToResult(*mine)
@@ -233,59 +282,52 @@ func (r *Ring) Merge(gossip Ring) error {
 			i++
 		case mine.Token > theirs.Token:
 			// insert, checking that a range owned by us hasn't been split
-			if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-				return errEntryInMyRange(theirs)
+			if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
+				err = errEntryInMyRange(theirs)
+				return
 			}
-			addToResult(*theirs)
-			previousOwner = nil
+			addTheirs(*theirs)
 			j++
 		case mine.Token == theirs.Token:
 			// merge
 			switch {
 			case mine.Version >= theirs.Version:
 				if mine.Version == theirs.Version && !mine.Equal(theirs) {
-					return errInconsistentEntry(mine, theirs)
+					err = errInconsistentEntry(mine, theirs)
+					return
 				}
 				addToResult(*mine)
 				previousOwner = &mine.Peer
 			case mine.Version < theirs.Version:
-				if mine.Peer == r.Peer { // We shouldn't receive updates to our own tokens
-					return errNewerVersion(mine, theirs)
+				if mine.Peer == ourPeer { // We shouldn't receive updates to our own tokens
+					err = errNewerVersion(mine, theirs)
+					return
 				}
-				addToResult(*theirs)
-				previousOwner = nil
+				addTheirs(*theirs)
 			}
 			i++
 			j++
 		}
 	}
 
-	// At this point, either i is at the end of r or j is at the end
-	// of gossip, so copy over the remaining entries.
+	// At this point, either i is at the end of es or j is at the end
+	// of other, so copy over the remaining entries.
 
-	for ; i < len(r.Entries); i++ {
-		mine = r.Entries[i]
+	for ; i < len(es); i++ {
+		mine = es[i]
 		addToResult(*mine)
 	}
 
-	for ; j < len(gossip.Entries); j++ {
-		theirs = gossip.Entries[j]
-		if previousOwner != nil && *previousOwner == r.Peer && theirs.Peer != r.Peer {
-			return errEntryInMyRange(theirs)
+	for ; j < len(other); j++ {
+		theirs = other[j]
+		if previousOwner != nil && *previousOwner == ourPeer && theirs.Peer != ourPeer {
+			err = errEntryInMyRange(theirs)
+			return
 		}
-		addToResult(*theirs)
-		previousOwner = nil
+		addTheirs(*theirs)
 	}
 
-	if err := r.checkEntries(result); err != nil {
-		return fmt.Errorf("Merge of incoming data causes: %s", err)
-	}
-
-	if len(r.Seeds) == 0 {
-		r.Seeds = gossip.Seeds
-	}
-	r.Entries = result
-	return nil
+	return
 }
 
 // Empty returns true if the ring has no entries
@@ -318,10 +360,14 @@ func (r *Ring) splitRangesOverZero(ranges []address.Range) []address.Range {
 // ranges are owned by this peer.  Will split ranges which
 // span 0 in the ring.
 func (r *Ring) OwnedRanges() (result []address.Range) {
+	return r.OwnedRangesOfPeer(r.Peer)
+}
+
+func (r *Ring) OwnedRangesOfPeer(peer mesh.PeerName) (result []address.Range) {
 	r.assertInvariants()
 
 	for i, entry := range r.Entries {
-		if entry.Peer == r.Peer {
+		if entry.Peer == peer {
 			nextEntry := r.Entries.entry(i + 1)
 			result = append(result, address.Range{Start: entry.Token, End: nextEntry.Token})
 		}
@@ -350,32 +396,36 @@ func (r *Ring) AllRangeInfo() (result []RangeInfo) {
 }
 
 // ClaimForPeers claims the entire ring for the array of peers passed
-// in.  Only works for empty rings.
+// in.  Only works for empty rings. Each claimed range is CIDR-aligned.
 func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	common.Assert(r.Empty())
+
+	defer r.trackUpdates()()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
+	defer func() {
+		e := r.Entries[len(r.Entries)-1]
+		common.Assert(address.Add(e.Token, address.Offset(e.Free)) == r.End)
+	}()
 
-	totalSize := r.distance(r.Start, r.End)
-	share := totalSize/address.Offset(len(peers)) + 1
-	remainder := totalSize % address.Offset(len(peers))
-	pos := r.Start
-
-	for i, peer := range peers {
-		if address.Offset(i) == remainder {
-			share--
-			if share == 0 {
-				break
-			}
-		}
-
-		r.Entries.insert(entry{Token: pos, Peer: peer, Free: share})
-		pos += address.Address(share)
-	}
-
-	common.Assert(pos == r.End)
-
+	r.subdivide(r.Start, r.End, peers)
 	r.Seeds = peers
+}
+
+// subdivide subdivides the [from,to) CIDR for the given peers into
+// CIDR-aligned subranges.
+func (r *Ring) subdivide(from, to address.Address, peers []mesh.PeerName) {
+	share := address.Length(to, from)
+	if share == 0 {
+		return
+	}
+	if share == 1 || len(peers) == 1 {
+		r.Entries.insert(entry{Token: from, Peer: peers[0], Free: share})
+		return
+	}
+	mid := address.Add(from, address.Offset(share/2))
+	r.subdivide(from, mid, peers[:len(peers)/2])
+	r.subdivide(address.Add(mid, address.Offset(share%2)), to, peers[len(peers)/2:])
 }
 
 func (r *Ring) FprintWithNicknames(w io.Writer, m map[mesh.PeerName]string) {
@@ -399,8 +449,8 @@ func (r *Ring) String() string {
 
 // ReportFree is used by the allocator to tell the ring how many free
 // ips are in a given range, so that ChoosePeersToAskForSpace can make
-// more intelligent decisions.
-func (r *Ring) ReportFree(freespace map[address.Address]address.Count) {
+// more intelligent decisions.  Returns true if any changes made.
+func (r *Ring) ReportFree(freespace map[address.Address]address.Count) (updated bool) {
 	r.assertInvariants()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
@@ -432,13 +482,15 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Count) {
 		maxSize := r.distance(entry.Token, next.Token)
 		common.Assert(free <= address.Count(maxSize))
 
-		if address.Count(entries[i].Free) == free {
-			return
+		if entries[i].Free == free {
+			continue
 		}
 
-		entries[i].Free = address.Offset(free)
+		entries[i].Free = free
 		entries[i].Version++
+		updated = true
 	}
+	return
 }
 
 type weightedPeer struct {
@@ -455,7 +507,7 @@ func (ws weightedPeers) Swap(i, j int)      { ws[i], ws[j] = ws[j], ws[i] }
 // ChoosePeersToAskForSpace returns all peers we can ask for space in
 // the range [start, end), in weighted-random order.  Assumes start<end.
 func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []mesh.PeerName {
-	totalSpacePerPeer := make(map[mesh.PeerName]address.Offset)
+	totalSpacePerPeer := make(map[mesh.PeerName]address.Count)
 
 	// iterate through tokens
 	for i, entry := range r.Entries {
@@ -507,6 +559,8 @@ func (r *Ring) PickPeerForTransfer(isValid func(mesh.PeerName) bool) mesh.PeerNa
 // and return ranges indicating the new space we picked up
 func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 	r.assertInvariants()
+	defer r.trackUpdates()()
+	defer r.trackUpdatesOfPeer(from)()
 	defer r.assertInvariants()
 	defer r.updateExportedVariables()
 

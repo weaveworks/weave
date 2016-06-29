@@ -15,17 +15,22 @@ import (
 	"github.com/weaveworks/weave/net/address"
 )
 
+type mockUpstream struct {
+	config *dns.ClientConfig
+}
+
+func (mu *mockUpstream) Config() *dns.ClientConfig {
+	return mu.config
+}
+
 func startServer(t *testing.T, upstream *dns.ClientConfig) (*DNSServer, *Nameserver, int, int) {
 	peername, err := mesh.PeerNameFromString("00:00:00:02:00:00")
 	require.Nil(t, err)
 	nameserver := New(peername, "", func(mesh.PeerName) bool { return true })
-	dnsserver, err := NewDNSServer(nameserver, "weave.local.", "0.0.0.0:0", "", 30, 5*time.Second)
+	dnsserver, err := NewDNSServer(nameserver, "weave.local.", "0.0.0.0:0", &mockUpstream{upstream}, 30, 5*time.Second)
 	require.Nil(t, err)
 	udpPort := dnsserver.servers[0].PacketConn.LocalAddr().(*net.UDPAddr).Port
 	tcpPort := dnsserver.servers[1].Listener.Addr().(*net.TCPAddr).Port
-	if upstream != nil {
-		dnsserver.upstream = upstream
-	}
 	go dnsserver.ActivateAndServe()
 	return dnsserver, nameserver, udpPort, tcpPort
 }

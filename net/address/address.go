@@ -35,6 +35,35 @@ func (r Range) AsCIDRString() string {
 	return CIDR{Addr: r.Start, PrefixLen: prefixLen}.String()
 }
 
+// return the highest bit set in v
+// algorithm from http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+func msb(v Count) Count {
+	v |= v >> 1
+	v |= v >> 2
+	v |= v >> 4
+	v |= v >> 8
+	v |= v >> 16
+	// Cast to 64-bit to avoid overflow when original v >= 0x80000000
+	return Count((uint64(v) + 1) / 2)
+}
+
+func (r Range) BiggestCIDRRange() Range {
+	sizeMsb := Offset(msb(r.Size()))
+	maskedSize := Offset(r.Size()) & (sizeMsb - 1)
+	maskedStart := Offset(r.Start) & (sizeMsb - 1)
+	if maskedStart == 0 {
+		return NewRange(r.Start, sizeMsb)
+	}
+	if sizeMsb-maskedStart <= maskedSize {
+		return NewRange(Add(r.Start, sizeMsb-maskedStart), sizeMsb)
+	}
+	size := sizeMsb / 2
+	if size >= maskedStart {
+		return NewRange(Add(r.Start, size-maskedStart), size)
+	}
+	return NewRange(Add(r.Start, sizeMsb-maskedStart), size)
+}
+
 func MakeCIDR(subnet CIDR, addr Address) CIDR {
 	return CIDR{Addr: addr, PrefixLen: subnet.PrefixLen}
 }
@@ -42,6 +71,40 @@ func MakeCIDR(subnet CIDR, addr Address) CIDR {
 type CIDR struct {
 	Addr      Address
 	PrefixLen int
+}
+
+// CIDRs returns a list of CIDR-aligned ranges which cover this range.
+func (r Range) CIDRs() []CIDR {
+	const (
+		fullMask         = ^Address(0)
+		cidrMaxPrefixLen = 32
+	)
+	var cidrs []CIDR
+
+	for start, end := r.Start, r.End-1; end >= start; {
+		mask, prefixLen := fullMask, cidrMaxPrefixLen
+		// Find the smallest mask which would cover some part of [start;end].
+		// Once we found such, apply it by OR'ing
+		for mask > 0 {
+			tmpMask := mask << 1
+			// Check whether mask neither too short nor too long
+			if (start&tmpMask) != start || (start|^tmpMask) > end {
+				break
+			}
+			mask = tmpMask
+			prefixLen--
+		}
+		cidrs = append(cidrs, CIDR{start, prefixLen})
+		// Apply mask
+		start |= ^mask
+		// Check for overflow
+		if start+1 < start {
+			break
+		}
+		start++
+	}
+
+	return cidrs
 }
 
 func ParseIP(s string) (Address, error) {
@@ -60,6 +123,22 @@ func ParseCIDR(s string) (CIDR, error) {
 		prefixLen, _ := ipnet.Mask.Size()
 		return CIDR{Addr: FromIP4(ip), PrefixLen: prefixLen}, nil
 	}
+}
+
+func NewCIDRs(ranges []Range) (cidrs []CIDR) {
+	for _, r := range ranges {
+		cidrs = append(cidrs, r.CIDRs()...)
+	}
+	return cidrs
+}
+
+func (cidr CIDR) Start() Address {
+	return cidr.Addr
+}
+
+// cidr = [Start; End)
+func (cidr CIDR) End() Address {
+	return cidr.Range().End
 }
 
 func (cidr CIDR) IsSubnet() bool {
@@ -122,7 +201,7 @@ func Length(a, b Address) Count {
 	return Count(a - b)
 }
 
-func Min(a, b Offset) Offset {
+func Min(a, b Count) Count {
 	if a > b {
 		return b
 	}

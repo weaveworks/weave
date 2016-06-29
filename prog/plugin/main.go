@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 
@@ -42,7 +43,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
 	flag.StringVar(&address, "socket", "/run/docker/plugins/weave.sock", "socket on which to listen")
 	flag.StringVar(&meshAddress, "meshsocket", "/run/docker/plugins/weavemesh.sock", "socket on which to listen in mesh mode")
-	flag.BoolVar(&noMulticastRoute, "no-multicast-route", false, "do not add a multicast route to network endpoints")
+	flag.BoolVar(&noMulticastRoute, "no-multicast-route", false, "deprecated (this is now the default)")
 
 	flag.Parse()
 
@@ -73,18 +74,21 @@ func main() {
 	}
 
 	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
+	if noMulticastRoute {
+		Log.Warning("--no-multicast-route option has been removed; multicast is off by default")
+	}
 	Log.Info(dockerClient.Info())
 
-	err = run(dockerClient, weave, address, meshAddress, noMulticastRoute)
+	err = run(dockerClient, weave, address, meshAddress)
 	if err != nil {
 		Log.Fatal(err)
 	}
 }
 
-func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string, noMulticastRoute bool) error {
+func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string) error {
 	endChan := make(chan error, 1)
 	if address != "" {
-		globalListener, err := listenAndServe(dockerClient, weave, address, noMulticastRoute, endChan, "global", false)
+		globalListener, err := listenAndServe(dockerClient, weave, address, endChan, "global", false)
 		if err != nil {
 			return err
 		}
@@ -92,7 +96,7 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 		defer globalListener.Close()
 	}
 	if meshAddress != "" {
-		meshListener, err := listenAndServe(dockerClient, weave, meshAddress, noMulticastRoute, endChan, "local", true)
+		meshListener, err := listenAndServe(dockerClient, weave, meshAddress, endChan, "local", true)
 		if err != nil {
 			return err
 		}
@@ -117,8 +121,9 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 	}
 }
 
-func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, noMulticastRoute bool, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
-	d, err := netplugin.New(dockerClient, weave, scope, noMulticastRoute)
+func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {
+	name := strings.TrimSuffix(path.Base(address), ".sock")
+	d, err := netplugin.New(dockerClient, weave, name, scope)
 	if err != nil {
 		return nil, err
 	}

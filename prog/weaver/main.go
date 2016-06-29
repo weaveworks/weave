@@ -9,19 +9,18 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
-	"github.com/davecheney/profile"
 	"github.com/docker/docker/pkg/mflag"
 	"github.com/gorilla/mux"
+	"github.com/pkg/profile"
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/go-checkpoint"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
 	"github.com/weaveworks/weave/ipam"
+	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/nameserver"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
@@ -29,8 +28,6 @@ import (
 )
 
 var version = "(unreleased version)"
-var checker *checkpoint.Checker
-var newVersion atomic.Value
 
 var Log = common.Log
 
@@ -49,34 +46,7 @@ type dnsConfig struct {
 	TTL                    int
 	ClientTimeout          time.Duration
 	EffectiveListenAddress string
-}
-
-const (
-	updateCheckPeriod = 6 * time.Hour
-)
-
-func checkForUpdates() {
-	newVersion.Store("")
-
-	handleResponse := func(r *checkpoint.CheckResponse, err error) {
-		if err != nil {
-			Log.Printf("Error checking version: %v", err)
-			return
-		}
-		if r.Outdated {
-			newVersion.Store(r.CurrentVersion)
-			Log.Printf("Weave version %s is available; please update at %s",
-				r.CurrentVersion, r.CurrentDownloadURL)
-		}
-	}
-
-	// Start background version checking
-	params := checkpoint.CheckParams{
-		Product:       "weave-net",
-		Version:       version,
-		SignatureFile: "",
-	}
-	checker = checkpoint.CheckInterval(&params, updateCheckPeriod, handleResponse)
+	ResolvConf             string
 }
 
 func (c *ipamConfig) Enabled() bool {
@@ -151,6 +121,7 @@ func main() {
 		config             mesh.Config
 		networkConfig      weave.NetworkConfig
 		protocolMinVersion int
+		resume             bool
 		ifaceName          string
 		routerName         string
 		nickName           string
@@ -169,6 +140,7 @@ func main() {
 		datapathName       string
 		trustedSubnetStr   string
 		dbPrefix           string
+		isAWSVPC           bool
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
 	)
@@ -181,6 +153,7 @@ func main() {
 	mflag.StringVar(&config.Host, []string{"-host"}, "", "router host")
 	mflag.IntVar(&config.Port, []string{"#port", "-port"}, mesh.Port, "router port")
 	mflag.IntVar(&protocolMinVersion, []string{"-min-protocol-version"}, mesh.ProtocolMinVersion, "minimum weave protocol version")
+	mflag.BoolVar(&resume, []string{"-resume"}, false, "resume connections to previous peers")
 	mflag.StringVar(&ifaceName, []string{"#iface", "-iface"}, "", "name of interface to capture/inject from (disabled if blank)")
 	mflag.StringVar(&routerName, []string{"#name", "-name"}, "", "name of router (defaults to MAC of interface)")
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
@@ -203,9 +176,11 @@ func main() {
 	mflag.IntVar(&dnsConfig.TTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
 	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
+	mflag.StringVar(&dnsConfig.ResolvConf, []string{"-resolv-conf"}, "", "path to resolver configuration for fallback DNS lookups")
 	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
 	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
+	mflag.BoolVar(&isAWSVPC, []string{"-awsvpc"}, false, "use AWS VPC for routing")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -218,6 +193,9 @@ func main() {
 	mflag.Parse()
 
 	peers = mflag.Args()
+	if resume && len(peers) > 0 {
+		Log.Fatalf("You must not specify an initial peer list in conjuction with --resume")
+	}
 
 	common.SetLogLevel(logLevel)
 
@@ -228,13 +206,8 @@ func main() {
 
 	Log.Println("Command line options:", options())
 
-	checkForUpdates()
-
 	if prof != "" {
-		p := *profile.CPUProfile
-		p.ProfilePath = prof
-		p.NoShutdownHook = true
-		defer profile.Start(&p).Stop()
+		defer profile.Start(profile.CPUProfile, profile.ProfilePath(prof), profile.NoShutdownHook).Stop()
 	}
 
 	if protocolMinVersion < mesh.ProtocolMinVersion || protocolMinVersion > mesh.ProtocolMaxVersion {
@@ -248,7 +221,7 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	overlay, bridge := createOverlay(datapathName, ifaceName, config.Host, config.Port, bufSzMB)
+	overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
 	name := peerName(routerName, bridge.Interface())
@@ -263,6 +236,10 @@ func main() {
 	config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
 	config.PeerDiscovery = !noDiscovery
 
+	if isAWSVPC && len(config.Password) > 0 {
+		Log.Fatalf("--awsvpc mode is not compatible with the --password option")
+	}
+
 	db, err := db.NewBoltDB(dbPrefix + "data.db")
 	checkFatal(err)
 	defer db.Close()
@@ -270,7 +247,7 @@ func main() {
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
 	Log.Println("Our name is", router.Ourself)
 
-	if peers, err = router.InitialPeers(peers); err != nil {
+	if peers, err = router.InitialPeers(resume, peers); err != nil {
 		Log.Fatal("Unable to get initial peer set: ", err)
 	}
 
@@ -284,6 +261,13 @@ func main() {
 		}
 		dockerCli = dc
 	}
+
+	network := ""
+	if isAWSVPC {
+		network = "awsvpc"
+	}
+	checkForUpdates(dockerCli.DockerVersion(), network)
+
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
 			if err := dockerCli.AddObserver(o); err != nil {
@@ -298,13 +282,23 @@ func main() {
 	var (
 		allocator     *ipam.Allocator
 		defaultSubnet address.CIDR
+		trackerName   string
 	)
 	if ipamConfig.Enabled() {
-		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, isKnownPeer)
+		var t tracker.LocalRangeTracker
+		if isAWSVPC {
+			Log.Infoln("Creating AWSVPC LocalRangeTracker")
+			t, err = tracker.NewAWSVPCTracker()
+			if err != nil {
+				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
+			}
+			trackerName = "awsvpc"
+		}
+		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, t, isKnownPeer)
 		observeContainers(allocator)
 		ids, err := dockerCli.AllContainerIDs()
 		checkFatal(err)
-		allocator.AllContainerIDs(ids)
+		allocator.PruneOwned(ids)
 	}
 
 	var (
@@ -331,16 +325,16 @@ func main() {
 	if httpAddr != "" {
 		muxRouter := mux.NewRouter()
 		if allocator != nil {
-			allocator.HandleHTTP(muxRouter, defaultSubnet, dockerCli)
+			allocator.HandleHTTP(muxRouter, defaultSubnet, trackerName, dockerCli)
 		}
 		if ns != nil {
 			ns.HandleHTTP(muxRouter, dockerCli)
 		}
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
-		http.Handle("/", muxRouter)
+		http.Handle("/", common.LoggingHTTPHandler(muxRouter))
 		Log.Println("Listening for HTTP control messages on", httpAddr)
-		go listenAndServeHTTP(httpAddr, muxRouter)
+		go listenAndServeHTTP(httpAddr)
 	}
 
 	common.SignalHandlerLoop(router)
@@ -386,10 +380,18 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(datapathName string, ifaceName string, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
+	var ignoreSleeve bool
+
 	switch {
+	case isAWSVPC:
+		vpc := weave.NewAWSVPC()
+		overlay.Add("awsvpc", vpc)
+		bridge = weave.NullBridge{}
+		// Currently, we do not support any overlay with AWSVPC
+		ignoreSleeve = true
 	case datapathName != "" && ifaceName != "":
 		Log.Fatal("At most one of --datapath and --iface must be specified.")
 	case datapathName != "":
@@ -407,13 +409,17 @@ func createOverlay(datapathName string, ifaceName string, host string, port int,
 	default:
 		bridge = weave.NullBridge{}
 	}
-	sleeve := weave.NewSleeveOverlay(host, port)
-	overlay.Add("sleeve", sleeve)
-	overlay.SetCompatOverlay(sleeve)
+
+	if !ignoreSleeve {
+		sleeve := weave.NewSleeveOverlay(host, port)
+		overlay.Add("sleeve", sleeve)
+		overlay.SetCompatOverlay(sleeve)
+	}
+
 	return overlay, bridge
 }
 
-func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, track tracker.LocalRangeTracker, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange, err := ipam.ParseCIDRSubnet(config.IPRangeCIDR)
 	checkFatal(err)
 	defaultSubnet := ipRange
@@ -430,17 +436,19 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, i
 		OurUID:      router.Ourself.Peer.UID,
 		OurNickname: router.Ourself.Peer.NickName,
 		Seed:        config.SeedPeerNames,
-		Universe:    ipRange.Range(),
+		Universe:    ipRange,
 		IsObserver:  config.Observer,
 		Quorum:      func() uint { return determineQuorum(config.PeerCount, router) },
 		Db:          db,
 		IsKnownPeer: isKnownPeer,
+		Tracker:     track,
 	}
 
 	allocator := ipam.NewAllocator(c)
 
 	allocator.SetInterfaces(router.NewGossip("IPallocation", allocator))
 	allocator.Start()
+	router.Peers.OnGC(func(peer *mesh.Peer) { allocator.PeerGone(peer.Name) })
 
 	return allocator, defaultSubnet
 }
@@ -449,8 +457,9 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, isKnownPeer)
 	router.Peers.OnGC(func(peer *mesh.Peer) { ns.PeerGone(peer.Name) })
 	ns.SetGossip(router.NewGossip("nameserver", ns))
+	upstream := nameserver.NewUpstream(config.ResolvConf, config.EffectiveListenAddress)
 	dnsserver, err := nameserver.NewDNSServer(ns, config.Domain, config.ListenAddress,
-		config.EffectiveListenAddress, uint32(config.TTL), config.ClientTimeout)
+		upstream, uint32(config.TTL), config.ClientTimeout)
 	if err != nil {
 		Log.Fatal("Unable to start dns server: ", err)
 	}
@@ -541,7 +550,7 @@ func parsePeerNames(s string) ([]mesh.PeerName, error) {
 	return peerNames, nil
 }
 
-func listenAndServeHTTP(httpAddr string, muxRouter *mux.Router) {
+func listenAndServeHTTP(httpAddr string) {
 	protocol := "tcp"
 	if strings.HasPrefix(httpAddr, "/") {
 		os.Remove(httpAddr) // in case it's there from last time

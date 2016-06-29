@@ -249,10 +249,29 @@ assert_dns_ptr_record() {
     assert "exec_on $1 $2 getent hosts $4 | tr -s ' '" "$4 $3"
 }
 
+# Kill a container process and make sure it's restarted by Docker
+check_restart() {
+    OLD_PID=$(container_pid $1 $2)
+
+    run_on $1 sudo kill $OLD_PID
+
+    for i in $(seq 1 10); do
+        NEW_PID=$(container_pid $1 $2)
+
+        if [ $NEW_PID != 0 -a $NEW_PID != $OLD_PID ] ; then
+            return 0
+        fi
+
+        sleep 1
+    done
+
+    return 1
+}
+
 start_suite() {
     for host in $HOSTS; do
         [ -z "$DEBUG" ] || echo "Cleaning up on $host: removing all containers and resetting weave"
-        PLUGIN_FILTER=$(docker_on $host inspect -f 'grep -v {{.Id}}' weaveplugin 2>/dev/null) || PLUGIN_FILTER=cat
+        PLUGIN_FILTER=$(docker_on $host inspect -f 'grep -v {{printf "%.12s" .Id}}' weaveplugin 2>/dev/null) || PLUGIN_FILTER=cat
         rm_containers $host $(docker_on $host ps -aq 2>/dev/null | $PLUGIN_FILTER)
         weave_on $host reset 2>/dev/null
     done

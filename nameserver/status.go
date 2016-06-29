@@ -38,7 +38,7 @@ func NewStatus(ns *Nameserver, dnsServer *DNSServer) *Status {
 
 	return &Status{
 		dnsServer.domain,
-		dnsServer.upstream.Servers,
+		dnsServer.upstream.Config().Servers,
 		dnsServer.address,
 		dnsServer.ttl,
 		entryStatusSlice}

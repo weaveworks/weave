@@ -1,13 +1,17 @@
 # Weave Net - Weaving Containers into Applications
 
-[![Build Status](https://travis-ci.org/weaveworks/weave.svg?branch=master)](https://travis-ci.org/weaveworks/weave) [![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield&circle-token=4933c7dabb3d0383e62117565cb9d16df7b1a811)](https://circleci.com/gh/weaveworks/weave) [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
+[![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield)](https://circleci.com/gh/weaveworks/weave)
+[![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
+[![Go Report Card](https://goreportcard.com/badge/github.com/weaveworks/weave)](https://goreportcard.com/report/github.com/weaveworks/weave)
+[![Slack Status](https://slack.weave.works/badge.svg)](https://slack.weave.works)
+[![Docker Pulls](https://img.shields.io/docker/pulls/weaveworks/weave.svg?maxAge=604800)](https://hub.docker.com/r/weaveworks/weave/)
 
 # About Weaveworks
 
 [Weaveworks](https://www.weave.works) is the company that delivers the most productive way for developers to connect, observe and control
 Docker containers.
 
-This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, with nearly 5 million downloads to date, which enables users to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions.
+This repository contains [Weave Net](https://www.weave.works/products/weave-net/), the first product developed by Weaveworks, and with nearly 5 million downloads to date, it enables you to get started with Docker clusters and portable apps in a fraction of the time compared with other solutions.
 
 Other products from Weaveworks include [Weave Scope](https://www.weave.works/products/weave-scope/), a powerful container monitoring tool that automatically maps Docker containers and their interactions, and [Weave Flux](https://www.weave.works/products/weave-flux/), a microservice router that automates the access of containers as services.
 

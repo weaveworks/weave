@@ -58,7 +58,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 	case mesh.UnknownPeerName:
 		// If our ring doesn't know, it must be empty.
 		alloc.infof("Claim %s for %s: is in the range %s, but the allocator is not initialized yet; will try later.",
-			c.cidr, c.ident, alloc.universe.AsCIDRString())
+			c.cidr, c.ident, alloc.universe)
 		if c.noErrorOnUnknown {
 			c.sendResult(nil)
 		}

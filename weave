@@ -45,7 +45,7 @@ weave launch        <same arguments as 'weave launch-router'>
                       [--no-restart] [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
                       [--no-discovery] [--no-dns]
-                      [--trusted-subnets <cidr>,...] <peer> ...
+                      [--trusted-subnets <cidr>,...] [--resume] <peer> ...
       launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
                       [--log-level=debug|info|warning|error]
                       [--no-rewrite-hosts] [--no-default-ipalloc] [--no-restart]
@@ -90,7 +90,7 @@ weave stop
       stop-proxy
       stop-plugin
 
-weave reset
+weave reset         [--force]
       rmpeer        <peer_id> ...
 
 
@@ -106,6 +106,13 @@ EOF
 usage() {
     usage_no_exit
     exit 1
+}
+
+handle_help_arg() {
+    if [ "$1" = "--help" ] ; then
+        usage_no_exit
+        exit 0
+    fi
 }
 
 docker_sock_options() {
@@ -156,11 +163,16 @@ setup_cni() {
     fi
 }
 
+launch_router_options() {
+    [ "$1" = "launch" -o "$1" = "launch-router" ] && echo -v /:/host -e HOST_ROOT=/host
+}
+
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm \
         $(docker_run_options) \
         --pid=host \
         $(cni_volume_options "$@") \
+        $(launch_router_options "$@") \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
         -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
@@ -181,6 +193,7 @@ exec_remote() {
         -e PROXY_HOST="$PROXY_HOST" \
         -e COVERAGE \
         -e CHECKPOINT_DISABLE \
+        -e AWSVPC   \
         $WEAVEEXEC_DOCKER_ARGS $EXEC_IMAGE --local "$@"
 }
 
@@ -315,17 +328,20 @@ extra_hosts_args() {
     done
 }
 
+kill_container() {
+    docker kill $1 >/dev/null 2>&1 || true
+}
+
 
 check_docker_version
 
 [ "$1" = "--local" ] && shift 1 && IS_LOCAL=1
 
-if [ "$1" = "--help" -o "$1" = "help" ] ; then
-    # "--help|help" are special because we always want to process them
-    # at the client end.
-    usage_no_exit
-    exit 0
-elif [ "$1" = "version" -a -z "$IS_LOCAL" ] ; then
+# "--help|help" are special because we always want to process them
+# at the client end.
+handle_help_arg "$1" || handle_help_arg "--$1"
+
+if [ "$1" = "version" -a -z "$IS_LOCAL" ] ; then
     # non-local "version" is special because we want to show the
     # version of the script executed by the user rather than what is
     # embedded in weaveexec.
@@ -347,6 +363,7 @@ elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
     # we can't rely on our baked-in docker to support those arguments.
     shift 1
 
+    handle_help_arg "$1"
     [ "$1" = "--without-dns" ] || DNS_ARGS=$(exec_remote dns-args "$@" || true)
     shift $(dns_arg_count "$@")
 
@@ -373,7 +390,10 @@ elif [ "$1" = "run" -a -z "$IS_LOCAL" ] ; then
     collect_cidr_args "$@"
     shift $CIDR_ARG_COUNT
     CONTAINER=$(docker $DOCKER_CLIENT_ARGS run -e WEAVE_CIDR=none $DNS_ARGS -d "$@")
-    exec_remote attach $CIDR_ARGS --or-die $DNS_EXTRA_HOSTS_ARGS $ATTACH_ARGS $CONTAINER >/dev/null
+    if ! exec_remote attach $CIDR_ARGS $DNS_EXTRA_HOSTS_ARGS $ATTACH_ARGS $CONTAINER >/dev/null ; then
+        kill_container $CONTAINER
+        exit 1
+    fi
     echo $CONTAINER
     exit 0
 fi
@@ -579,7 +599,13 @@ create_bridge() {
                 # The datapath is the bridge when there is no intermediary
                 DATAPATH="$BRIDGE"
             fi
-            if util_op create-datapath $DATAPATH ; then
+            # GCE has the lowest underlay network MTU we're likely to encounter on
+            # a local network, at 1460 bytes.  To get the overlay MTU from that we
+            # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
+            # UDP header, 8 bytes for the vxlan header, and 14 bytes for the inner
+            # ethernet header.
+            MTU=${WEAVE_MTU:-1410}
+            if util_op create-datapath $DATAPATH $MTU ; then
                 : # ODP datapath created successfully
             elif [ $? = 17 ] ; then
                 # Exit status of 17 means the kernel doesn't have ODP
@@ -637,13 +663,38 @@ EOF
         fi
     fi
 
-    [ "$1" = "--without-ethtool" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
+    [ "$1" = "--without-ethtool" -o -n "$AWSVPC" ] || ethtool_tx_off_$BRIDGE_TYPE $BRIDGE
 
     ip link set dev $BRIDGE up
 
     # Configure the ARP cache parameters on the bridge interface for
     # the sake of 'weave expose'
     configure_arp_cache $BRIDGE
+}
+
+expose_ip() {
+    ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
+    for CIDR in $ALL_CIDRS ; do
+        if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
+            ip addr add dev $BRIDGE $CIDR
+            arp_update $BRIDGE $CIDR || true
+            # Remove a default route installed by the kernel, because awsvpc
+            # has installed it as well
+            if [ -n "$AWSVPC" ]; then
+                RCIDR=$(ip route list exact $CIDR proto kernel | head -n1 | cut -d' ' -f1)
+                [ -n "$RCIDR" ] && ip route del dev $BRIDGE proto kernel $RCIDR
+            fi
+        fi
+        [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
+    done
+}
+
+expose_nat() {
+    for CIDR in $ALL_CIDRS ; do
+        add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
+        add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
+        add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
+    done
 }
 
 # create veth with ends $1-$2, and then invoke $3..., removing the
@@ -665,15 +716,7 @@ create_veth() {
 }
 
 init_fastdp() {
-    # GCE has the lowest underlay network MTU we're likely to encounter on
-    # a local network, at 1460 bytes.  To get the overlay MTU from that we
-    # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
-    # UDP header, 8 bytes for the vxlan header, and 14 bytes for the inner
-    # ethernet header.
-    MTU=${WEAVE_MTU:-1410}
-
-    # create_bridge already created the datapath netdev
-    ip link set dev $DATAPATH mtu $MTU
+    true
 }
 
 init_bridge() {
@@ -780,71 +823,11 @@ docker_bridge_ip() {
     DOCKER_BRIDGE_IP=${DOCKER_BRIDGE_IP#inet }
 }
 
-# the following borrows from https://github.com/jpetazzo/pipework
-
-# Set $CONTAINER_NETNS to the network namespace of container $1,
-# $LOCAL_IFNAME and $GUEST_IFNAME to suitable names for two ends of a
-# veth pair, specific to the container, and execute args $2 $3 ... as
-# a command. If an error is caused by container dying, swallow output
-# from error.
-with_container_netns() {
+do_or_die() {
     CONTAINER="$1"
-    CONTAINER_PID=$(docker inspect --format='{{.State.Pid}}' $CONTAINER) || return 1
-
-    if [ "$CONTAINER_PID" = 0 ] ; then
-        echo "Container $CONTAINER not running." >&2
-        exit 1
-    fi
-
-    if [ "$CONTAINER_PID" = "<no value>" ] ; then
-        echo "Container $CONTAINER unknown to Docker." >&2
-        exit 1
-    fi
-
-    CONTAINER_NETNS=/proc/$CONTAINER_PID/ns/net
-    LOCAL_IFNAME="v${CONTAINER_IFNAME}pl${CONTAINER_PID}"
-    GUEST_IFNAME="v${CONTAINER_IFNAME}pg${CONTAINER_PID}"
-    IP_TMPOUT=/tmp/weave_ip_out_$$
-    IP_TMPERR=/tmp/weave_ip_err_$$
-    rm -f $IP_TMPOUT $IP_TMPERR
-
-    # Run the wrapped command
-    STATUS=0
     shift 1
-    if ! "$@" >$IP_TMPOUT 2>$IP_TMPERR ; then
-        STATUS=1
-        if [ ! -d /proc/$CONTAINER_PID ] ; then
-            echo "Container $CONTAINER died" >&2
-        else
-            echo "Failure during network configuration for container $CONTAINER:" >&2
-            cat $IP_TMPERR >&2
-        fi
-    else
-        cat $IP_TMPOUT
-        cat $IP_TMPERR >&2
-    fi
-    rm -f $IP_TMPOUT $IP_TMPERR
-    return $STATUS
-}
-
-kill_container() {
-    docker kill $1 >/dev/null 2>&1 || true
-}
-
-kill_container_process() {
-    kill -9 $(docker inspect --format='{{.State.Pid}}' $1) >/dev/null 2>&1 || true
-}
-
-with_container_netns_or_die() {
-    if ! with_container_netns "$@" >/dev/null ; then
-        kill_container $1
-        exit 1
-    fi
-}
-
-with_container_netns_or_kill() {
-    if ! with_container_netns "$@" >/dev/null ; then
-        kill_container_process $1
+    if ! "$@" ; then
+        kill_container $CONTAINER
         exit 1
     fi
 }
@@ -852,26 +835,6 @@ with_container_netns_or_kill() {
 # Execute arguments as a command within the $CONTAINER_NETNS network namespace
 netnsenter() {
     nsenter --net=$CONTAINER_NETNS "$@"
-}
-
-# connect_container_to_bridge <container interface name>
-connect_container_to_bridge() {
-    ip link add name $LOCAL_IFNAME mtu $MTU type veth peer name $GUEST_IFNAME mtu $MTU || return 1
-
-    if ! ethtool_tx_off_$BRIDGE_TYPE $GUEST_IFNAME ||
-        ! ip link set $GUEST_IFNAME netns $CONTAINER_NETNS ; then
-        # failed before we assigned the veth to the container's
-        # namespace
-        ip link del $LOCAL_IFNAME type veth || true
-        return 1
-    fi
-
-    if ! netnsenter ip link set $GUEST_IFNAME name $1 ||
-       ! ip link set $LOCAL_IFNAME up ||
-       ! add_iface_$BRIDGE_TYPE $LOCAL_IFNAME ||
-       ! configure_arp_cache $1 "netnsenter" ; then
-        return 1
-    fi
 }
 
 add_iface_fastdp() {
@@ -920,10 +883,6 @@ ask_version() {
     [ -n "$DOCKERIMAGE" ] && docker run --rm --net=none -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
 }
 
-######################################################################
-# functions invoked through with_container_netns
-######################################################################
-
 setup_router_iface_fastdp() {
     true
 }
@@ -941,130 +900,39 @@ container_in_host_ns() {
 }
 
 attach() {
-    if container_in_host_ns ; then
-        echo "Container is running in the host network namespace, and therefore cannot be" >&2
-        echo "connected to weave. Perhaps the container was started with --net=host." >&2
-        return 1
-    fi
-
-    if ! netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 ; then
-        connect_container_to_bridge $CONTAINER_IFNAME || return 1
-    fi
-
-    NEW_ADDRS=
-    for ADDR in "$@" ; do
-        if netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
-            # address was there already
-            continue
-        fi
-        netnsenter ip addr add $ADDR dev $CONTAINER_IFNAME || return 1
-        NEW_ADDRS="$NEW_ADDRS $ADDR"
-    done
-
-    netnsenter ip link set $CONTAINER_IFNAME up || return 1
-
-    for ADDR in $NEW_ADDRS ; do
-        arp_update $CONTAINER_IFNAME $ADDR "netnsenter" || true
-    done
-
-    # Route multicast packets across the weave network.
-    # This must come last in 'attach'. If you change this, change weavewait to match.
-    #
-    # The MTU lock prevents PMTU discovery for multicast
-    # destinations. Without that, the kernel sets the DF flag on
-    # multicast packets. Since RFC1122 prohibits sending of ICMP
-    # errors for packets with multicast destinations, that causes
-    # packets larger than the PMTU to be dropped silently.
-    if [ -z "$NO_MULTICAST_ROUTE" ] ; then
-        if ! netnsenter ip route show | grep '^224\.0\.0\.0/4' >/dev/null ; then
-            netnsenter ip route add 224.0.0.0/4 dev $CONTAINER_IFNAME mtu lock $MTU
-        fi
-    fi
-}
-
-detach() {
-    netnsenter ip link show $CONTAINER_IFNAME >/dev/null 2>&1 || return 0
-
-    for ADDR in "$@" ; do
-        if ! netnsenter ip addr show dev $CONTAINER_IFNAME | grep -F $ADDR >/dev/null ; then
-            # address is not there, leave the device alone
-            continue
-        fi
-        netnsenter ip addr del $ADDR dev $CONTAINER_IFNAME || return 1
-    done
-
-    if [ -n "$(netnsenter ip -f inet addr show dev $CONTAINER_IFNAME)" ] ; then
-        # other addresses are left, leave the device alone
-        return 0
-    fi
-
-    # Deleting the interface will delete the multicast route we set up
-    netnsenter ip link del $CONTAINER_IFNAME type veth
+    ATTACH_ARGS=""
+    [ -n "$NO_MULTICAST_ROUTE" ] && ATTACH_ARGS="--no-multicast-route"
+    # Relying on AWSVPC being set in 'ipam_cidrs allocate', except for 'weave restart'
+    [ -n "$AWSVPC" ] && ATTACH_ARGS="--no-multicast-route --keep-tx-on"
+    util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
 }
 
 ######################################################################
 # functions for interacting with containers
 ######################################################################
 
-pertinent_match_args() {
-    docker inspect -f '{{.Args}}
-        {{.Config.Env}}
-        {{.HostConfig.RestartPolicy.Name}}
-        {{.HostConfig.RestartPolicy.MaximumRetryCount}}' $1
-}
-
-args_match() {
-    prev_args="$(pertinent_match_args $1)" || return 1
-    shift
-    dummy_container=$(docker create "$@" 2>/dev/null) || return 1
-    dummy_args="$(pertinent_match_args $dummy_container)" || return 1
-    docker rm $dummy_container >/dev/null
-    [ "$prev_args"  = "$dummy_args" ]
-}
-
-# Check if a container for component $1 named $2 with image $3 and args $4... is running,
-# and start it if necessary
-start_if_necessary() {
-    component=$1
-    name=$2
-    image=$3
-    shift 3
-    image_base=${image%:*}
-    IMAGE_ID=$(docker inspect --format='{{.Id}}' $image 2>/dev/null) || true
-    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.Image}} {{.Config.Image}} {{.Id}}' $name 2>/dev/null) || true
-    CONTAINER_ID=${RUN_STATUS##* }
+# Check that a container for component $1 named $2 with image $3 is not running
+check_not_running() {
+    RUN_STATUS=$(docker inspect --format='{{.State.Running}} {{.State.Status}} {{.Config.Image}}' $2 2>/dev/null) || true
     case ${RUN_STATUS%:*} in
-        "true $IMAGE_ID "*)
-            if args_match $CONTAINER_ID "$@" ; then
-                ALREADY_RUNNING_CONTAINER=$CONTAINER_ID
-                echo $CONTAINER_ID
-            else
-                echo "$name is already running with different arguments; you can stop it with 'weave stop-$component'." >&2
-                return 1
-            fi
+        "true restarting $3")
+            echo "$2 is restarting; you can stop it with 'weave stop-$1'." >&2
+            return 3
             ;;
-        "false $IMAGE_ID "*)
-            if args_match $CONTAINER_ID "$@" ; then
-                docker start $CONTAINER_ID
-            else
-                docker rm $name >/dev/null
-                docker run -d --name=$name "$@"
-            fi
+        "true "*" $3")
+            echo "$2 is already running; you can stop it with 'weave stop-$1'." >&2
+            return 1
             ;;
-        true*$image_base)
-            echo "Found another version of $name running. Aborting." >&2
-            return 2
+        "false "*" $3")
+            docker rm $2 >/dev/null
             ;;
         true*)
-            echo "Found another running container named '$name'. Aborting." >&2
+            echo "Found another running container named '$2'. Aborting." >&2
             return 2
             ;;
         false*)
-            docker rm $name >/dev/null
-            docker run -d --name=$name "$@"
-            ;;
-        "")
-            docker run -d --name=$name "$@"
+            echo "Found another container named '$2'. Aborting." >&2
+            return 2
             ;;
     esac
 }
@@ -1228,7 +1096,7 @@ dns_args() {
     [ -n "$WITHOUT_DNS" ] && return 0
 
     docker_bridge_ip
-    DNS_ARGS="--dns $DOCKER_BRIDGE_IP"
+    DNS_ARGS="--dns=$DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         HOSTNAME="$NAME_ARG.${DNS_DOMAIN%.}"
         if [ ${#HOSTNAME} -gt 64 ] ; then
@@ -1302,7 +1170,6 @@ check_running() {
         echo  "$1 container is not present. Have you launched it?" >&2
         return 1
     elif [ "$STATUS" = "true true" ] ; then
-        [ -n "$ALREADY_RUNNING_CONTAINER" ] && return 0
         echo "$1 container is restarting." >&2
         return 2
     elif [ "$STATUS" != "true false" ] ; then
@@ -1412,6 +1279,12 @@ ipam_reclaim_no_check_alive() {
     done
 }
 
+detect_awsvpc() {
+    # Ignoring errors here: if we cannot detect AWSVPC we will skip the relevant
+    # steps, because "attach" should work without the weave router running.
+    [ "$(call_weave GET /ipinfo/tracker)" != "awsvpc" ] || AWSVPC=1
+}
+
 # Call IPAM as necessary to lookup or allocate addresses
 #
 # $1 is one of 'lookup', 'allocate' or 'allocate_no_check_alive', $2
@@ -1428,6 +1301,11 @@ ipam_cidrs() {
         allocate)
             METHOD=POST
             CHECK_ALIVE="?check-alive=true"
+            detect_awsvpc
+            if [ -n "$AWSVPC" -a $# -gt 2 ] ; then
+                echo "Error: no IP addresses or subnets may be specified in AWSVPC mode" >&2
+                return 1
+            fi
             ;;
         allocate_no_check_alive)
             METHOD=POST
@@ -1471,13 +1349,6 @@ ipam_cidrs() {
 ipam_cidrs_or_die() {
     if ! ipam_cidrs "$@" ; then
         kill_container $2
-        exit 1
-    fi
-}
-
-ipam_cidrs_or_kill() {
-    if ! ipam_cidrs "$@" ; then
-        kill_container_process $2
         exit 1
     fi
 }
@@ -1659,22 +1530,19 @@ launch_router() {
     LAUNCHING_ROUTER=1
     check_forwarding_rules
     enforce_docker_bridge_addr_assign_type
-    create_bridge
-    docker_bridge_ip
-    # We set the router name to the bridge MAC, which in turn is
-    # derived from the system UUID (if available), and thus stable
-    # across reboots.
-    PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
+
     # backward compatibility...
     if is_cidr "$1" ; then
         echo "WARNING: $1 parameter ignored; 'weave launch' no longer takes a CIDR as the first parameter" >&2
         shift 1
     fi
+
     CONTAINER_PORT=$PORT
     ARGS=
     IPRANGE=
     IPRANGE_SPECIFIED=
 
+    docker_bridge_ip
     DNS_ROUTER_OPTS="--dns-listen-address $DOCKER_BRIDGE_IP:53"
     NO_DNS_OPT=
 
@@ -1716,6 +1584,10 @@ launch_router() {
             --no-restart)
                 RESTART_POLICY=
                 ;;
+            --awsvpc)
+                AWSVPC_ARGS="--awsvpc"
+                AWSVPC=1
+                ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
                 ;;
@@ -1723,6 +1595,13 @@ launch_router() {
         shift
     done
     eval "set -- $ARGS"
+
+    create_bridge
+    # We set the router name to the bridge MAC, which in turn is
+    # derived from the system UUID (if available), and thus stable
+    # across reboots.
+    PEERNAME=$(cat /sys/class/net/$BRIDGE/address)
+
     if [ -z "$IPRANGE_SPECIFIED" ] ; then
         IPRANGE="10.32.0.0/12"
         if ! check_overlap $IPRANGE ; then
@@ -1731,6 +1610,10 @@ launch_router() {
             exit 1
         fi
     else
+        if [ -n "$AWSVPC" -a -z "$IPRANGE" ] ; then
+            echo "ERROR: Empty --ipalloc-range is not compatible with --awsvpc." >&2
+            exit 1
+        fi
         if [ -n "$IPRANGE" ] && ! check_overlap $IPRANGE ; then
             echo "WARNING: Specified --ipalloc-range $IPRANGE overlaps with existing route on host." >&2
             echo "Unless this is deliberate, you must pick another range and set it on all hosts." >&2
@@ -1744,13 +1627,18 @@ launch_router() {
            --label=weavevolumes $WEAVEDB_IMAGE >/dev/null
     fi
 
+    RESOLV_CONF=$(chroot ${HOST_ROOT:-/} readlink -f /etc/resolv.conf)
+    RESOLV_CONF_DIR=$(dirname "$RESOLV_CONF")
+    RESOLV_CONF_BASE=$(basename "$RESOLV_CONF")
+
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply
     # additional parameters, such as resource limits, to docker
     # when launching the weave container.
-    start_if_necessary router $CONTAINER_NAME $IMAGE \
+    ROUTER_CONTAINER=$(docker run -d --name=$CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
         --volumes-from $DB_CONTAINER_NAME \
+        -v $RESOLV_CONF_DIR:/var/run/weave/etc \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
@@ -1759,11 +1647,24 @@ launch_router() {
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
+        $AWSVPC_ARGS \
         --http-addr $HTTP_ADDR \
-        "$@"
+        --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
+        "$@")
     setup_router_iface_$BRIDGE_TYPE
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
-    [ -n "$ALREADY_RUNNING_CONTAINER" ] || populate_router
+    populate_router
+    if [ -n "$AWSVPC" ]; then
+        expose_ip
+        # Set proxy_arp on the bridge, so that it could accept packets destined
+        # to containers within the same subnet but running on remote hosts.
+        # Without it, exact routes on each container are required.
+        echo 1 >/proc/sys/net/ipv4/conf/$BRIDGE/proxy_arp
+        # Avoid delaying the first ARP request. Also, setting it to 0 avoids
+        # placing the request into a bounded queue as it can be seen:
+        # https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/net/ipv4/arp.c?id=refs/tags/v4.6.1#n819
+        echo 0 >/proc/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
+    fi
 }
 
 # Recreate the parameter values that are set when the router is first launched
@@ -1807,7 +1708,9 @@ launch_proxy() {
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
-    start_if_necessary proxy $PROXY_CONTAINER_NAME $EXEC_IMAGE \
+    detect_awsvpc
+    [ -n "$AWSVPC" ] && PROXY_ARGS="$PROXY_ARGS --no-multicast-route"
+    PROXY_CONTAINER=$(docker run -d --name=$PROXY_CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
         --pid=host \
@@ -1820,7 +1723,7 @@ launch_proxy() {
         -e WEAVE_HTTP_ADDR \
         -e EXEC_IMAGE=$EXEC_IMAGE \
         --entrypoint=/home/weave/weaveproxy \
-        $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS
+        $WEAVEPROXY_DOCKER_ARGS $EXEC_IMAGE $COVERAGE_ARGS $PROXY_ARGS)
     wait_for_status $PROXY_CONTAINER_NAME http_call_unix $PROXY_CONTAINER_NAME status.sock
 }
 
@@ -1841,13 +1744,24 @@ launch_plugin_if_not_running() {
         esac
         shift
     done
-    start_if_necessary plugin $PLUGIN_CONTAINER_NAME $PLUGIN_IMAGE \
+
+    retval=0
+    check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE || retval=$?
+    # If an existing plugin is running (we start it with restart=always), return its ID
+    [ $retval = 1 ] && PLUGIN_CONTAINER=$(container_id $PLUGIN_CONTAINER_NAME) && return 0
+    # Any other kind of error code from check_not_running is a failure.
+    [ $retval -gt 0 ] && return $retval
+
+    if ! PLUGIN_CONTAINER=$(docker run -d --name=$PLUGIN_CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
+        --pid=host \
         -v /run/docker/plugins:/run/docker/plugins \
         -e WEAVE_HTTP_ADDR \
         $WEAVEPLUGIN_DOCKER_ARGS $PLUGIN_IMAGE $COVERAGE_ARGS \
-        "$@"
+        "$@") ; then
+        return 1
+    fi
     wait_for_status $PLUGIN_CONTAINER_NAME http_call_unix $PLUGIN_CONTAINER_NAME status.sock
     util_op create-plugin-network weave weavemesh
 }
@@ -1856,12 +1770,8 @@ plugin_disabled() {
     [ -n "$WEAVE_NO_PLUGIN" ] || ! check_docker_server_api_version 1.21
 }
 
-warn_plugin_active() {
-    echo "WARNING: docker may hang in this state; re-launch weave and remove attached containers before shutting down" >&2
-}
-
 stop_plugin() {
-    util_op remove-plugin-network weave || warn_plugin_active
+    util_op remove-plugin-network weave || true
     stop $PLUGIN_CONTAINER_NAME "Plugin"
 }
 
@@ -1950,11 +1860,11 @@ deprecation_warnings() {
                 shift
                 ;;
             -initpeercount|--initpeercount|-initpeercount=*|--initpeercount=*)
-                deprecation_warning $1 "--ipalloc-init"
+                deprecation_warning $1 "--ipalloc-init consensus=<count>"
                 [ ${1#--} = "initpeercount" ] && shift
                 ;;
             --init-peer-count|--init-peer-count=*)
-                deprecation_warning $1 "--ipalloc-init"
+                deprecation_warning $1 "--ipalloc-init consensus=<count>"
                 [ ${1#--} = "init-peer-count" ] && shift
                 shift
                 ;;
@@ -1972,6 +1882,8 @@ deprecation_warnings() {
 [ $# -gt 0 ] || usage
 COMMAND=$1
 shift 1
+
+handle_help_arg "$1"
 
 case "$COMMAND" in
     setup)
@@ -2025,14 +1937,19 @@ EOF
         ;;
     launch)
         deprecation_warnings "$@"
+        check_not_running router $CONTAINER_NAME        $BASE_IMAGE
+        check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
+        check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
         COMMON_ARGS=$(common_launch_args "$@")
-        launch_router "$@" >/dev/null
-        launch_proxy  $COMMON_ARGS >/dev/null
-        plugin_disabled || launch_plugin_if_not_running $COMMON_ARGS >/dev/null
+        launch_router "$@"
+        launch_proxy  $COMMON_ARGS
+        plugin_disabled || launch_plugin_if_not_running $COMMON_ARGS
         ;;
     launch-router)
         deprecation_warnings "$@"
+        check_not_running router $CONTAINER_NAME $BASE_IMAGE
         launch_router "$@"
+        echo $ROUTER_CONTAINER
         ;;
     attach-router)
         check_running $CONTAINER_NAME
@@ -2045,10 +1962,13 @@ EOF
         ;;
     launch-proxy)
         deprecation_warnings "$@"
+        check_not_running proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
         launch_proxy "$@"
+        echo $PROXY_CONTAINER
         ;;
     launch-plugin)
         launch_plugin_if_not_running "$@"
+        echo $PLUGIN_CONTAINER
         ;;
     env|proxy-env)
         [ "$COMMAND" = "env" ] || deprecation_warning "$COMMAND" "'weave env'"
@@ -2132,7 +2052,7 @@ EOF
         create_bridge
         ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
         [ -n "$REWRITE_HOSTS" ] && extra_hosts_args "$@" && rewrite_etc_hosts $DNS_EXTRA_HOSTS
-        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        do_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $CONTAINER
         ;;
@@ -2152,7 +2072,7 @@ EOF
         CONTAINER=$(container_id $1)
         create_bridge
         ipam_cidrs_or_die allocate $CONTAINER $CIDR_ARGS
-        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        do_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
         ;;
@@ -2164,12 +2084,6 @@ EOF
         shift $CIDR_ARG_COUNT
         while [ $# -gt 0 ]; do
             case "$1" in
-                --or-die)
-                    ATTACH_TYPE="_or_die"
-                    ;;
-                --or-kill)
-                    ATTACH_TYPE="_or_kill"
-                    ;;
                 --rewrite-hosts)
                     REWRITE_HOSTS=1
                     ;;
@@ -2192,9 +2106,9 @@ EOF
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         create_bridge
-        ipam_cidrs$ATTACH_TYPE allocate $CONTAINER $CIDR_ARGS
+        ipam_cidrs allocate $CONTAINER $CIDR_ARGS
         [ -n "$REWRITE_HOSTS" ] && rewrite_etc_hosts $DNS_EXTRA_HOSTS
-        with_container_netns$ATTACH_TYPE $CONTAINER attach $ALL_CIDRS >/dev/null
+        attach $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
@@ -2204,7 +2118,7 @@ EOF
         [ $# -eq 1 ] || usage
         CONTAINER=$(container_id $1)
         ipam_cidrs lookup $CONTAINER $CIDR_ARGS
-        with_container_netns $CONTAINER detach $ALL_CIDRS >/dev/null
+        util_op detach-container $CONTAINER $ALL_CIDRS >/dev/null
         when_weave_running with_container_fqdn $CONTAINER delete_dns_fqdn $ALL_CIDRS
         for CIDR in $IPAM_CIDRS ; do
             call_weave DELETE /ip/$CONTAINER/${CIDR%/*}
@@ -2220,7 +2134,8 @@ EOF
         for CIDR in $ALL_CIDRS ; do
             call_weave PUT /ip/$CONTAINER/$CIDR?check-alive=true
         done
-        with_container_netns_or_die $CONTAINER attach $ALL_CIDRS
+        detect_awsvpc
+        do_or_die $CONTAINER attach $ALL_CIDRS
         when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
         echo $RES
         ;;
@@ -2251,7 +2166,6 @@ EOF
     expose)
         collect_cidr_args "$@"
         shift $CIDR_ARG_COUNT
-        ipam_cidrs allocate_no_check_alive weave:expose $CIDR_ARGS
         if [ $# -eq 0 ] ; then
             FQDN=""
         else
@@ -2259,16 +2173,8 @@ EOF
             FQDN="$2"
         fi
         create_bridge --without-ethtool
-        for CIDR in $ALL_CIDRS ; do
-            if ! ip addr show dev $BRIDGE | grep -qF $CIDR ; then
-                ip addr add dev $BRIDGE $CIDR
-                arp_update $BRIDGE $CIDR || true
-                add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
-                add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
-                add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-            fi
-            [ -n "$FQDN" ] && when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
-        done
+        expose_ip
+        expose_nat
         show_addrs $ALL_CIDRS
         ;;
     hide)
@@ -2312,11 +2218,25 @@ EOF
         stop_plugin
         ;;
     reset)
-        [ $# -eq 0 ] || usage
-        plugin_disabled || util_op remove-plugin-network weave || warn_plugin_active
+        [ $# -eq 0 ] || [ $# -eq 1 -a "$1" = "--force" ] || usage
+        plugin_disabled || util_op remove-plugin-network weave || true
         warn_if_stopping_proxy_in_env
-        call_weave DELETE /peer >/dev/null 2>&1 || true
-        fractional_sleep 0.5 # Allow some time for broadcast updates to go out
+        res=0
+        [ "$1" = "--force" ] || check_running $CONTAINER_NAME 2>/dev/null || res=$?
+        case $res in
+            0)
+                call_weave DELETE /peer >/dev/null 2>&1 || true
+                fractional_sleep 0.5 # Allow some time for broadcast updates to go out
+                ;;
+            1)
+                # No such container; assume user already did reset
+                ;;
+            2)
+                echo "ERROR: weave is not running; unable to remove from cluster." >&2
+                echo "Re-launch weave before reset or use --force to override." >&2
+                exit 1
+                ;;
+        esac
         for NAME in $PLUGIN_CONTAINER_NAME $CONTAINER_NAME $PROXY_CONTAINER_NAME ; do
             docker stop  $NAME >/dev/null 2>&1 || true
             docker rm -f $NAME >/dev/null 2>&1 || true

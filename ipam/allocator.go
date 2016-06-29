@@ -14,6 +14,7 @@ import (
 	"github.com/weaveworks/weave/ipam/paxos"
 	"github.com/weaveworks/weave/ipam/ring"
 	"github.com/weaveworks/weave/ipam/space"
+	"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -55,7 +56,7 @@ type Allocator struct {
 	stopChan          chan<- struct{}
 	ourName           mesh.PeerName
 	seed              []mesh.PeerName          // optional user supplied ring seed
-	universe          address.Range            // superset of all ranges
+	universe          address.CIDR             // superset of all ranges
 	ring              *ring.Ring               // information on ranges owned by all peers
 	space             space.Space              // more detail on ranges owned by us
 	owned             map[string]ownedData     // who owns what addresses, indexed by container-ID
@@ -80,26 +81,39 @@ type Config struct {
 	OurUID      mesh.PeerUID
 	OurNickname string
 	Seed        []mesh.PeerName
-	Universe    address.Range
+	Universe    address.CIDR
 	IsObserver  bool
 	Quorum      func() uint
 	Db          db.DB
 	IsKnownPeer func(name mesh.PeerName) bool
+	Tracker     tracker.LocalRangeTracker
 }
 
 // NewAllocator creates and initialises a new Allocator
 func NewAllocator(config Config) *Allocator {
 	var participant paxos.Participant
+	var alloc *Allocator
+	var onUpdate ring.OnUpdate
+
 	if config.IsObserver {
 		participant = paxos.NewObserver()
 	} else {
 		participant = paxos.NewNode(config.OurName, config.OurUID, 0)
 	}
-	return &Allocator{
+
+	if config.Tracker != nil {
+		onUpdate = func(prev []address.Range, curr []address.Range, local bool) {
+			if err := config.Tracker.HandleUpdate(prev, curr, local); err != nil {
+				alloc.errorf("HandleUpdate failed: %s", err)
+			}
+		}
+	}
+
+	alloc = &Allocator{
 		ourName:     config.OurName,
 		seed:        config.Seed,
 		universe:    config.Universe,
-		ring:        ring.New(config.Universe.Start, config.Universe.End, config.OurName),
+		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, onUpdate),
 		owned:       make(map[string]ownedData),
 		db:          config.Db,
 		paxos:       participant,
@@ -109,6 +123,7 @@ func NewAllocator(config Config) *Allocator {
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
 	}
+	return alloc
 }
 
 func ParseCIDRSubnet(cidrStr string) (cidr address.CIDR, err error) {
@@ -346,13 +361,13 @@ func (alloc *Allocator) ContainerStarted(ident string) {
 	}
 }
 
-func (alloc *Allocator) AllContainerIDs(ids []string) {
+func (alloc *Allocator) PruneOwned(ids []string) {
+	idmap := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		idmap[id] = struct{}{}
+	}
 	alloc.actionChan <- func() {
-		idmap := make(map[string]struct{}, len(ids))
-		for _, id := range ids {
-			idmap[id] = struct{}{}
-		}
-		alloc.syncOwned(idmap)
+		alloc.pruneOwned(idmap)
 	}
 }
 
@@ -428,10 +443,11 @@ func (alloc *Allocator) Shutdown() {
 		alloc.cancelOps(&alloc.pendingClaims)
 		alloc.cancelOps(&alloc.pendingAllocates)
 		alloc.cancelOps(&alloc.pendingPrimes)
-		if heir := alloc.pickPeerForTransfer(); heir != mesh.UnknownPeerName {
-			alloc.ring.Transfer(alloc.ourName, heir)
+		heir := alloc.pickPeerForTransfer()
+		alloc.ring.Transfer(alloc.ourName, heir)
+		alloc.space.Clear()
+		if heir != mesh.UnknownPeerName {
 			alloc.persistRing()
-			alloc.space.Clear()
 			alloc.gossip.GossipBroadcast(alloc.Gossip())
 		}
 		doneChan <- struct{}{}
@@ -511,6 +527,22 @@ func (alloc *Allocator) annotatePeernames(names []mesh.PeerName) []string {
 		}
 	}
 	return res
+}
+
+// PeerGone removes nicknames of peers which are no longer mentioned
+// in the ring. Async.
+//
+// NB: the function is invoked by the gossip library routines and should be
+//     registered manually.
+func (alloc *Allocator) PeerGone(peerName mesh.PeerName) {
+	alloc.debugf("PeerGone: peer %s", peerName)
+
+	alloc.actionChan <- func() {
+		ringPeers := alloc.ring.PeerNames()
+		if _, ok := ringPeers[peerName]; !ok {
+			delete(alloc.nicknames, peerName)
+		}
+	}
 }
 
 func decodeRange(msg []byte) (r address.Range, err error) {
@@ -759,7 +791,6 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	reader := bytes.NewReader(msg)
 	decoder := gob.NewDecoder(reader)
 	var data gossipState
-	var err error
 
 	if err := decoder.Decode(&data); err != nil {
 		return err
@@ -774,9 +805,10 @@ func (alloc *Allocator) update(sender mesh.PeerName, msg []byte) error {
 	// If someone sent us a ring, merge it into ours. Note this will move us
 	// out of the awaiting-consensus state if we didn't have a ring already.
 	case data.Ring != nil:
-		switch err = alloc.ring.Merge(*data.Ring); err {
+		updated, err := alloc.ring.Merge(*data.Ring)
+		switch err {
 		case nil:
-			if !alloc.ring.Empty() {
+			if updated {
 				alloc.pruneNicknames()
 				alloc.ringUpdated()
 			}
@@ -880,7 +912,9 @@ func (alloc *Allocator) reportFreeSpace() {
 	for _, r := range ranges {
 		freespace[r.Start] = alloc.space.NumFreeAddressesInRange(r)
 	}
-	alloc.ring.ReportFree(freespace)
+	if alloc.ring.ReportFree(freespace) {
+		alloc.persistRing()
+	}
 }
 
 // Persistent data
@@ -935,12 +969,12 @@ func (alloc *Allocator) loadPersistedData() bool {
 		return false
 	}
 
-	if persistedRing.Range() != alloc.universe {
+	if persistedRing.Range() != alloc.universe.Range() {
 		overwritePersisted("Deleting persisted data for IPAM range %s; our range is %s", persistedRing.Range(), alloc.universe)
 		return false
 	}
 
-	alloc.ring = persistedRing
+	alloc.ring.Restore(persistedRing)
 	alloc.space.UpdateRanges(alloc.ring.OwnedRanges())
 
 	if ownedFound {
@@ -1022,7 +1056,7 @@ func (alloc *Allocator) findOwner(addr address.Address) string {
 }
 
 // For each ID in the 'owned' map, remove the entry if it isn't in the map
-func (alloc *Allocator) syncOwned(ids map[string]struct{}) {
+func (alloc *Allocator) pruneOwned(ids map[string]struct{}) {
 	changed := false
 	for ident, d := range alloc.owned {
 		if !d.IsContainer {
@@ -1049,6 +1083,9 @@ func (alloc *Allocator) fatalf(fmt string, args ...interface{}) {
 }
 func (alloc *Allocator) warnf(fmt string, args ...interface{}) {
 	alloc.logf(common.Log.Warnf, fmt, args...)
+}
+func (alloc *Allocator) errorf(fmt string, args ...interface{}) {
+	common.Log.Errorf("[allocator %s] "+fmt, append([]interface{}{alloc.ourName}, args...)...)
 }
 func (alloc *Allocator) infof(fmt string, args ...interface{}) {
 	alloc.logf(common.Log.Infof, fmt, args...)
