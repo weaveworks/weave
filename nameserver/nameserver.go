@@ -199,7 +199,7 @@ func (n *Nameserver) receiveGossip(msg []byte) (mesh.GossipData, mesh.GossipData
 		return nil, nil, err
 	}
 	if delta := gossip.Timestamp - now(); delta > gossipWindow || delta < -gossipWindow {
-		return nil, nil, fmt.Errorf("clock skew of %d detected", delta)
+		return nil, nil, fmt.Errorf("host clock skew of %ds exceeds %ds limit", delta, gossipWindow)
 	}
 
 	// Filter to remove entries from unknown peers, done before we take
