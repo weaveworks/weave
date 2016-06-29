@@ -40,19 +40,20 @@ weave --help | help
       version
 
 weave launch        <same arguments as 'weave launch-router'>
-      launch-router [--password <pass>] [--name <mac>] [--nickname <nickname>]
-                      [--log-level=debug|info|warning|error]
-                      [--no-restart] [--ipalloc-init <mode>]
+      launch-router [--password <pass>] [--trusted-subnets <cidr>,...]
+                      [--name <mac>] [--nickname <nickname>]
+                      [--no-restart] [--resume] [--no-discovery] [--no-dns]
+                      [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                      [--no-discovery] [--no-dns]
-                      [--trusted-subnets <cidr>,...] [--resume] <peer> ...
-      launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
                       [--log-level=debug|info|warning|error]
+                      <peer> ...
+      launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]
                       [--no-rewrite-hosts] [--no-default-ipalloc] [--no-restart]
                       [--hostname-from-label <labelkey>]
                       [--hostname-match <regexp>]
                       [--hostname-replacement <replacement>]
                       [--rewrite-inspect]
+                      [--log-level=debug|info|warning|error]
       launch-plugin [--no-restart] [--no-multicast-route]
                       [--log-level=debug|info|warning|error]
 
