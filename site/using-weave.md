@@ -69,6 +69,17 @@ For example:
 
 Peers can also be dynamically added. See [Adding Hosts Dynamically](/site/using-weave/finding-adding-hosts-dynamically.md) for more information.
 
+####Restricting Access
+
+By default Weave Net will listen on all host IPs (i.e. 0.0.0.0). This
+can be altered with the `--host` parameter to `weave launch`, e.g. in
+order to ensure Weave Net only listens on IPs on an internal network.
+
+Standard firewall rules can be deployed to restrict access to the
+Weave Net control and data ports.
+
+For communication across untrusted networks, connections can be
+[encrypted](/site/using-weave/security-untrusted-networks.md).
 
 ###<a name="testing"></a>Testing Container Communications
 

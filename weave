@@ -41,6 +41,7 @@ weave --help | help
 
 weave launch        <same arguments as 'weave launch-router'>
       launch-router [--password <pass>] [--trusted-subnets <cidr>,...]
+                      [--host <ip_address>]
                       [--name <mac>] [--nickname <nickname>]
                       [--no-restart] [--resume] [--no-discovery] [--no-dns]
                       [--ipalloc-init <mode>]
