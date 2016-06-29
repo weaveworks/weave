@@ -30,11 +30,15 @@ To create a network which can span multiple hosts, the Weave peers must be conne
 
 See [Using Weave Net](/site/using-weave.md#peer-connections) for a discussion on peer connections. 
 
-As well as launching Weave Net, you have to run an extra command to
-perform some additional configuration of the Weave bridge:
-
     weave launch <peer hosts>
+
+Then you have to run
+
     weave expose
+
+in order assign an IP address to the Weave bridge and
+[enable access to containers from the host](/site/using-weave/host-network-integration.md),
+which is required by Kubernetes.
 
 ###Configuring Kubernetes to use the CNI Plugin
 
