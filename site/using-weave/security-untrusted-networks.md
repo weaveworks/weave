@@ -32,9 +32,17 @@ Fast datapath does not support encryption. If you supply a
 password at `weave launch` the router falls back to a slower
 `sleeve` mode that does support encryption.
 
-If some of your peers are co-located in a trusted network (for example within the boundary of your own data center) you can use the `--trusted-subnets` argument to `weave launch` to selectively disable data plane encryption as an optimization. 
+If some of your peers are co-located in a trusted network (for example
+within the boundary of your own data center) you can selectively
+disable data plane encryption as an optimization, by supplying a list
+of such networks, in CIDR notation, via the `--trusted-subnets`
+argument to `weave launch`:
+
+    weave launch --password wfvAwt7sj --trusted-subnets 10.0.2.0/24,192.168.48.0/24
 
 >**Note:** Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave Net [falls back to a slower method](/site/using-weave/fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
+
+The configured trusted subnets are shown in [`weave status`](/site/troubleshooting.md#weave-status).
 
 Be aware that:
 
