@@ -1978,6 +1978,10 @@ EOF
         echo $PROXY_CONTAINER
         ;;
     launch-plugin)
+        if ! check_running $CONTAINER_NAME 2>/dev/null ; then
+            echo "ERROR:" $CONTAINER_NAME "container must be running before plugin can be launched" >&2
+            exit 1
+        fi
         launch_plugin_if_not_running "$@"
         echo $PLUGIN_CONTAINER
         ;;
