@@ -41,7 +41,11 @@ func containerAddrs(args []string) error {
 
 func getNetDevs(bridgeName string, c *docker.Client, containerID string) ([]common.NetDev, error) {
 	if containerID == "weave:expose" {
-		return common.GetBridgeNetDev(bridgeName)
+		if netDev, err := common.GetBridgeNetDev(bridgeName); err != nil {
+			return nil, err
+		} else {
+			return []common.NetDev{netDev}, nil
+		}
 	}
 
 	container, err := c.InspectContainer(containerID)
