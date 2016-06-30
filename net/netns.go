@@ -35,3 +35,13 @@ func WithNetNSLink(ns netns.NsHandle, ifName string, work func(link netlink.Link
 		return work(link)
 	})
 }
+
+func WithNetNSLinkByPid(pid int, ifName string, work func(link netlink.Link) error) error {
+	ns, err := netns.GetFromPid(pid)
+	if err != nil {
+		return err
+	}
+	defer ns.Close()
+
+	return WithNetNSLink(ns, ifName, work)
+}

@@ -55,7 +55,7 @@ func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, e
 				if err != nil {
 					return err
 				}
-				netDevs = append(netDevs, *netDev)
+				netDevs = append(netDevs, netDev)
 			}
 			return nil
 		})
@@ -77,13 +77,13 @@ func forEachLink(f func(netlink.Link) error) error {
 	return nil
 }
 
-func linkToNetDev(link netlink.Link) (*NetDev, error) {
+func linkToNetDev(link netlink.Link) (NetDev, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
-		return nil, err
+		return NetDev{}, err
 	}
 
-	netDev := &NetDev{Name: link.Attrs().Name, MAC: link.Attrs().HardwareAddr}
+	netDev := NetDev{Name: link.Attrs().Name, MAC: link.Attrs().HardwareAddr}
 	for _, addr := range addrs {
 		netDev.CIDRs = append(netDev.CIDRs, addr.IPNet)
 	}
@@ -133,11 +133,20 @@ func GetWeaveNetDevs(processID int) ([]NetDev, error) {
 	})
 }
 
-// Get the weave bridge interface
-func GetBridgeNetDev(bridgeName string) ([]NetDev, error) {
-	return FindNetDevs(1, func(link netlink.Link) bool {
-		return link.Attrs().Name == bridgeName
+// Get the weave bridge interface.
+func GetBridgeNetDev(bridgeName string) (NetDev, error) {
+	var netdev NetDev
+
+	err := weavenet.WithNetNSLinkByPid(1, bridgeName, func(link netlink.Link) error {
+		var err error
+		netdev, err = linkToNetDev(link)
+		if err != nil {
+			return err
+		}
+		return nil
 	})
+
+	return netdev, err
 }
 
 // Do post-attach configuration of all veths we have created

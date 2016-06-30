@@ -131,23 +131,20 @@ func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, rou
 }
 
 func findBridgeIP(bridgeName string, subnet net.IPNet) (net.IP, error) {
-	netdevs, err := common.GetBridgeNetDev(bridgeName)
+	netdev, err := common.GetBridgeNetDev(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get netdev for %q bridge: %s", bridgeName, err)
 	}
-	if len(netdevs) == 0 {
-		return nil, fmt.Errorf("Could not find %q bridge", bridgeName)
-	}
-	if len(netdevs[0].CIDRs) == 0 {
+	if len(netdev.CIDRs) == 0 {
 		return nil, fmt.Errorf("Bridge %q has no IP addresses; did you forget to run 'weave expose'?", bridgeName)
 	}
-	for _, cidr := range netdevs[0].CIDRs {
+	for _, cidr := range netdev.CIDRs {
 		if subnet.Contains(cidr.IP) {
 			return cidr.IP, nil
 		}
 	}
 	// None in the required subnet; just return the first one
-	return netdevs[0].CIDRs[0].IP, nil
+	return netdev.CIDRs[0].IP, nil
 }
 
 func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {

@@ -30,6 +30,7 @@ func main() {
 		usage()
 		os.Exit(1)
 	}
+
 	cmd, found := commands[os.Args[1]]
 	if !found {
 		usage()
