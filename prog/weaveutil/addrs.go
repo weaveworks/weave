@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/fsouza/go-dockerclient"
+	"github.com/vishvananda/netlink"
 	"github.com/weaveworks/weave/common"
 )
 
@@ -11,51 +13,65 @@ func containerAddrs(args []string) error {
 		cmdUsage("container-addrs", "<bridgeName> [containerID ...]")
 	}
 	bridgeName := args[0]
+	containerIDs := args[1:]
 
-	c, err := docker.NewVersionedClientFromEnv("1.18")
+	client, err := docker.NewVersionedClientFromEnv("1.18")
 	if err != nil {
 		return err
 	}
 
-	for _, containerID := range args[1:] {
-		netDevs, err := getNetDevs(bridgeName, c, containerID)
-		if err != nil {
-			if _, ok := err.(*docker.NoSuchContainer); ok {
-				continue
+	pred, err := common.ConnectedToBridgePredicate(bridgeName)
+	if err != nil {
+		return err
+	}
+
+	containers := make(map[string]*docker.Container)
+	for _, cid := range containerIDs {
+		if containers[cid], err = client.InspectContainer(cid); err != nil {
+			containers[cid] = nil
+			if _, ok := err.(*docker.NoSuchContainer); !ok {
+				return err
 			}
+		}
+	}
+
+	// NB: Because network namespaces (netns) are changed many times inside the loop,
+	//     it's NOT safe to exec any code depending on the host netns without
+	//     wrapping with WithNetNS*.
+	for _, cid := range containerIDs {
+		netDevs, err := getNetDevs(bridgeName, client, cid, containers[cid], pred)
+		if err != nil {
 			return err
 		}
-
-		for _, netDev := range netDevs {
-			fmt.Printf("%12s %s %s", containerID, netDev.Name, netDev.MAC.String())
-			for _, cidr := range netDev.CIDRs {
-				prefixLength, _ := cidr.Mask.Size()
-				fmt.Printf(" %v/%v", cidr.IP, prefixLength)
-			}
-			fmt.Println()
-		}
+		printNetDevs(cid, netDevs)
 	}
 
 	return nil
 }
 
-func getNetDevs(bridgeName string, c *docker.Client, containerID string) ([]common.NetDev, error) {
-	if containerID == "weave:expose" {
-		if netDev, err := common.GetBridgeNetDev(bridgeName); err != nil {
-			return nil, err
-		} else {
-			return []common.NetDev{netDev}, nil
+func printNetDevs(cid string, netDevs []common.NetDev) {
+	for _, netDev := range netDevs {
+		fmt.Printf("%12s %s %s", cid, netDev.Name, netDev.MAC.String())
+		for _, cidr := range netDev.CIDRs {
+			prefixLength, _ := cidr.Mask.Size()
+			fmt.Printf(" %v/%v", cidr.IP, prefixLength)
 		}
+		fmt.Println()
+	}
+}
+
+func getNetDevs(bridgeName string, c *docker.Client, cid string, container *docker.Container, pred func(netlink.Link) bool) ([]common.NetDev, error) {
+	if cid == "weave:expose" {
+		netDev, err := common.GetBridgeNetDev(bridgeName)
+		if err != nil {
+			return nil, err
+		}
+		return []common.NetDev{netDev}, nil
 	}
 
-	container, err := c.InspectContainer(containerID)
-	if err != nil {
-		return nil, err
-	}
-
-	if container.State.Pid == 0 {
+	if container == nil || container.State.Pid == 0 {
 		return nil, nil
 	}
 
-	return common.GetWeaveNetDevs(container.State.Pid)
+	return common.GetNetDevsWithPredicate(container.State.Pid, pred)
 }

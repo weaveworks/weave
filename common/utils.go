@@ -90,29 +90,24 @@ func linkToNetDev(link netlink.Link) (NetDev, error) {
 	return netDev, nil
 }
 
-// Lookup the weave interface of a container
-func GetWeaveNetDevs(processID int) ([]NetDev, error) {
-	// Bail out if this container is running in the root namespace
-	nsToplevel, err := netns.GetFromPid(1)
+// ConnectedToBridgePredicate returns a function which is used to query whether
+// a given link is a veth interface which one end is connected to a bridge.
+// The returned function should be called from a container network namespace which
+// the bridge does NOT belong to.
+func ConnectedToBridgePredicate(bridgeName string) (func(link netlink.Link) bool, error) {
+	var br netlink.Link
+
+	err := weavenet.WithNetNSLinkByPid(1, bridgeName, func(link netlink.Link) error {
+		br = link
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to open root namespace: %s", err)
-	}
-	nsContainr, err := netns.GetFromPid(processID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to open process %d namespace: %s", processID, err)
-	}
-	if nsToplevel.Equal(nsContainr) {
-		return nil, nil
+		return nil, err
 	}
 
-	weaveBridge, err := netlink.LinkByName("weave")
-	if err != nil {
-		return nil, fmt.Errorf("Cannot find weave bridge: %s", err)
-	}
-	// Scan devices in root namespace to find those attached to weave bridge
 	indexes := make(map[int]struct{})
 	err = forEachLink(func(link netlink.Link) error {
-		if link.Attrs().MasterIndex == weaveBridge.Attrs().Index {
+		if link.Attrs().MasterIndex == br.Attrs().Index {
 			peerIndex := link.Attrs().ParentIndex
 			if peerIndex == 0 {
 				// perhaps running on an older kernel where ParentIndex doesn't work.
@@ -126,11 +121,39 @@ func GetWeaveNetDevs(processID int) ([]NetDev, error) {
 	if err != nil {
 		return nil, err
 	}
-	return FindNetDevs(processID, func(link netlink.Link) bool {
+
+	return func(link netlink.Link) bool {
 		_, isveth := link.(*netlink.Veth)
 		_, found := indexes[link.Attrs().Index]
 		return isveth && found
-	})
+	}, nil
+
+}
+
+func GetNetDevsWithPredicate(processID int, predicate func(link netlink.Link) bool) ([]NetDev, error) {
+	// Bail out if this container is running in the root namespace
+	nsToplevel, err := netns.GetFromPid(1)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open root namespace: %s", err)
+	}
+	nsContainr, err := netns.GetFromPid(processID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open process %d namespace: %s", processID, err)
+	}
+	if nsToplevel.Equal(nsContainr) {
+		return nil, nil
+	}
+
+	return FindNetDevs(processID, predicate)
+}
+
+// Lookup the weave interface of a container
+func GetWeaveNetDevs(processID int) ([]NetDev, error) {
+	p, err := ConnectedToBridgePredicate("weave")
+	if err != nil {
+		return nil, err
+	}
+	return GetNetDevsWithPredicate(processID, p)
 }
 
 // Get the weave bridge interface.
