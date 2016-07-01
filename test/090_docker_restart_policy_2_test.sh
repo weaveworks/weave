@@ -23,8 +23,8 @@ assert_raises "! check_restart $HOST1 weave"
 assert_raises "! check_restart $HOST1 weaveproxy"
 assert_raises "! check_restart $HOST1 weaveplugin"
 
-# Relaunch the plugin to prevent the `weave stop` in `end_suite`
+# Relaunch to prevent the `weave stop` in `end_suite`
 # timing out trying to remove the plugin network
-weave_on $HOST1 launch-plugin
+weave_on $HOST1 launch --no-restart
 
 end_suite
