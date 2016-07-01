@@ -82,6 +82,7 @@ func (router *NetworkRouter) Start() {
 func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 	router.PacketLogging.LogPacket("Captured", key)
 	srcMac := net.HardwareAddr(key.SrcMAC[:])
+	dstMac := net.HardwareAddr(key.DstMAC[:])
 
 	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, router.Ourself.Peer); {
 	case newSrcMac:
@@ -92,7 +93,7 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 		// associated with another peer.  This probably means
 		// we are seeing a frame we injected ourself.  That
 		// shouldn't happen, but discard it just in case.
-		log.Error("Captured frame from MAC (", srcMac, ") associated with another peer ", conflictPeer)
+		log.Error("Captured frame from MAC (", srcMac, ") to (", dstMac, ") associated with another peer ", conflictPeer)
 		return DiscardingFlowOp{}
 	}
 
@@ -101,7 +102,6 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 		return DiscardingFlowOp{}
 	}
 
-	dstMac := net.HardwareAddr(key.DstMAC[:])
 	switch dstPeer := router.Macs.Lookup(dstMac); dstPeer {
 	case router.Ourself.Peer:
 		// The packet is destined for a local MAC.  The bridge
