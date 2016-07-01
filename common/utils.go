@@ -48,7 +48,7 @@ func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, e
 	}
 	defer ns.Close()
 
-	err = weavenet.WithNetNS(ns, func() error {
+	err = weavenet.WithNetNSUnsafe(ns, func() error {
 		return forEachLink(func(link netlink.Link) error {
 			if match(link) {
 				netDev, err := linkToNetDev(link)
@@ -97,7 +97,7 @@ func linkToNetDev(link netlink.Link) (NetDev, error) {
 func ConnectedToBridgePredicate(bridgeName string) (func(link netlink.Link) bool, error) {
 	var br netlink.Link
 
-	err := weavenet.WithNetNSLinkByPid(1, bridgeName, func(link netlink.Link) error {
+	err := weavenet.WithNetNSLinkByPidUnsafe(1, bridgeName, func(link netlink.Link) error {
 		br = link
 		return nil
 	})
@@ -160,7 +160,7 @@ func GetWeaveNetDevs(processID int) ([]NetDev, error) {
 func GetBridgeNetDev(bridgeName string) (NetDev, error) {
 	var netdev NetDev
 
-	err := weavenet.WithNetNSLinkByPid(1, bridgeName, func(link netlink.Link) error {
+	err := weavenet.WithNetNSLinkByPidUnsafe(1, bridgeName, func(link netlink.Link) error {
 		var err error
 		netdev, err = linkToNetDev(link)
 		if err != nil {

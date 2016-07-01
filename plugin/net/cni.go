@@ -95,7 +95,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	if err := weavenet.AttachContainer(ns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}, false); err != nil {
 		return err
 	}
-	if err := weavenet.WithNetNSLink(ns, args.IfName, func(link netlink.Link) error {
+	if err := weavenet.WithNetNSLinkUnsafe(ns, args.IfName, func(link netlink.Link) error {
 		return setupRoutes(link, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
 	}); err != nil {
 		return fmt.Errorf("error setting up routes: %s", err)
@@ -158,7 +158,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 	defer ns.Close()
-	err = weavenet.WithNetNS(ns, func() error {
+	err = weavenet.WithNetNSUnsafe(ns, func() error {
 		link, err := netlink.LinkByName(args.IfName)
 		if err != nil {
 			return err
