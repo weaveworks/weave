@@ -48,7 +48,7 @@ func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, e
 	}
 	defer ns.Close()
 
-	err = weavenet.WithNetNS(ns, func() error {
+	err = weavenet.WithNetNSUnsafe(ns, func() error {
 		return forEachLink(func(link netlink.Link) error {
 			if match(link) {
 				netDev, err := linkToNetDev(link)
