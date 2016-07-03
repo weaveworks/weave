@@ -34,14 +34,14 @@ password at `weave launch` the router falls back to a slower
 
 If some of your peers are co-located in a trusted network (for example
 within the boundary of your own data center) you can selectively
-disable data plane encryption as an optimization, by listing such
-networks via the `--trusted-subnets` argument to `weave launch`:
+disable data plane encryption as an optimization. List these
+networks using the `--trusted-subnets` argument with `weave launch`:
 
     weave launch --password wfvAwt7sj --trusted-subnets 10.0.2.0/24,192.168.48.0/24
 
->**Note:** Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave Net [falls back to a slower method](/site/using-weave/fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
+>**Note:** Both peers must consider the other to be in a trusted subnet for this to take place. If the peers don’t agree and since fast datapath does not support encryption, Weave Net will [fall back to a slower method](/site/using-weave/fastdp.md) for transporting data between peers. 
 
-The configured trusted subnets are shown in [`weave status`](/site/troubleshooting.md#weave-status).
+Configured trusted subnets are shown in [`weave status`](/site/troubleshooting.md#weave-status).
 
 Be aware that:
 
