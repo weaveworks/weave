@@ -76,3 +76,6 @@
 [submodule "vendor/github.com/aws/aws-sdk-go"]
 	path = vendor/github.com/aws/aws-sdk-go
 	url = https://github.com/aws/aws-sdk-go
+[submodule "vendor/golang.org/x/sys"]
+	path = vendor/golang.org/x/sys
+	url = https://go.googlesource.com/sys
