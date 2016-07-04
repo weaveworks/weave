@@ -139,7 +139,7 @@ func findBridgeIP(bridgeName string, subnet net.IPNet) (net.IP, error) {
 		return nil, fmt.Errorf("Could not find %q bridge", bridgeName)
 	}
 	if len(netdevs[0].CIDRs) == 0 {
-		return nil, fmt.Errorf("Bridge %q has no IP addresses", bridgeName)
+		return nil, fmt.Errorf("Bridge %q has no IP addresses; did you forget to run 'weave expose'?", bridgeName)
 	}
 	for _, cidr := range netdevs[0].CIDRs {
 		if subnet.Contains(cidr.IP) {
