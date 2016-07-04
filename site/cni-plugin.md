@@ -11,8 +11,8 @@ manager built by Google.
 
 ###Installing the Weave Net CNI plugin
 
-The Weave Net CNI plugin is installed when you run `weave setup`, if
-your machine has the directories normally used to host CNI plugins.
+If your machine has the directories normally used to host CNI plugins, 
+then the Weave Net CNI plugin is installed when you run `weave setup`.
 
 To create those directories, run (as root):
 
@@ -25,15 +25,18 @@ Then run:
 
 ###Launching Weave Net
 
-To create a network which can span multiple hosts, the Weave peers must be connected to each other, by specifying the other hosts during `weave launch` or via
+To create a network that spans multiple hosts, the Weave peers must be connected to each other.  
+This is accomplished by specifying the other hosts during `weave launch` or via
 [`weave connect`](/site/using-weave/finding-adding-hosts-dynamically.md).
 
-See [Using Weave Net](/site/using-weave.md#peer-connections) for a discussion on peer connections. 
-
-As well as launching Weave Net, you have to run an extra command to
-perform some additional configuration of the Weave bridge:
+See [Creating Peer Connections Between Hosts](/site/using-weave.md#peer-connections) 
+for a discussion on peer connections. 
 
     weave launch <peer hosts>
+
+Next, assign an IP address to the Weave bridge and [enable access to containers from the host](/site/using-weave/host-network-integration.md),
+which is required by Kubernetes, by running the following:
+
     weave expose
 
 ###Configuring Kubernetes to use the CNI Plugin
