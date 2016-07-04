@@ -28,13 +28,23 @@ To guard against dictionary attacks, the password needs to be reasonably strong 
 
 The same password must be specified for all Weave Net peers, by default both control and data plane traffic will then use authenticated encryption. 
 
-Fast datapath does not support encryption. If you supply a
-password at `weave launch` the router falls back to a slower
-`sleeve` mode that does support encryption.
+[Fast datapath]((/site/using-weave/fastdp.md) does not support
+encryption. If you supply a password at `weave launch`, Weave Net
+falls back to the slower `sleeve` mode for encrypted communication.
 
-If some of your peers are co-located in a trusted network (for example within the boundary of your own data center) you can use the `--trusted-subnets` argument to `weave launch` to selectively disable data plane encryption as an optimization. 
+As an optimization, you can selectively disable data plane encryption
+if some of your peers are co-located in a trusted network, for example
+within the boundary of your own data center. List these networks using
+the `--trusted-subnets` argument with `weave launch`:
 
->**Note:** Both peers must consider the other to be in a trusted subnet for this to take place - if they do not agree, Weave Net [falls back to a slower method](/site/using-weave/fastdp.md) for transporting data between peers, since fast datapath does not support encryption.
+    weave launch --password wfvAwt7sj --trusted-subnets 10.0.2.0/24,192.168.48.0/24
+
+If *both* peers at the end of a connection consider the other to be in
+a trusted subnet, Weave Net attempts to establish fast datapath
+connectivity, which is unencrypted. Otherwise the slower `sleeve` mode
+is used and communication is encrypted.
+
+Configured trusted subnets are shown in [`weave status`](/site/troubleshooting.md#weave-status).
 
 Be aware that:
 
