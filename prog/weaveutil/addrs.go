@@ -13,7 +13,6 @@ func containerAddrs(args []string) error {
 		cmdUsage("container-addrs", "<bridgeName> [containerID ...]")
 	}
 	bridgeName := args[0]
-	containerIDs := args[1:]
 
 	client, err := docker.NewVersionedClientFromEnv("1.18")
 	if err != nil {
@@ -25,21 +24,33 @@ func containerAddrs(args []string) error {
 		return err
 	}
 
+	var containerIDs []string
 	containers := make(map[string]*docker.Container)
-	for _, cid := range containerIDs {
-		if containers[cid], err = client.InspectContainer(cid); err != nil {
-			containers[cid] = nil
-			if _, ok := err.(*docker.NoSuchContainer); !ok {
+
+	for _, cid := range args[1:] {
+		if cid == "weave:expose" {
+			netDev, err := common.GetBridgeNetDev(bridgeName)
+			if err != nil {
 				return err
 			}
+			printNetDevs(cid, []common.NetDev{netDev})
+			continue
 		}
+		if containers[cid], err = client.InspectContainer(cid); err != nil {
+			if _, ok := err.(*docker.NoSuchContainer); ok {
+				continue
+			}
+			return err
+		}
+		// To output in the right order, we keep the list of container IDs
+		containerIDs = append(containerIDs, cid)
 	}
 
 	// NB: Because network namespaces (netns) are changed many times inside the loop,
-	//     it's NOT safe to exec any code depending on the host netns without
+	//     it's NOT safe to exec any code depending on the root netns without
 	//     wrapping with WithNetNS*.
 	for _, cid := range containerIDs {
-		netDevs, err := getNetDevs(bridgeName, client, cid, containers[cid], pred)
+		netDevs, err := getNetDevs(client, containers[cid], pred)
 		if err != nil {
 			return err
 		}
@@ -47,6 +58,13 @@ func containerAddrs(args []string) error {
 	}
 
 	return nil
+}
+
+func getNetDevs(c *docker.Client, container *docker.Container, pred func(netlink.Link) bool) ([]common.NetDev, error) {
+	if container.State.Pid == 0 {
+		return nil, nil
+	}
+	return common.GetNetDevsWithPredicate(container.State.Pid, pred)
 }
 
 func printNetDevs(cid string, netDevs []common.NetDev) {
@@ -58,20 +76,4 @@ func printNetDevs(cid string, netDevs []common.NetDev) {
 		}
 		fmt.Println()
 	}
-}
-
-func getNetDevs(bridgeName string, c *docker.Client, cid string, container *docker.Container, pred func(netlink.Link) bool) ([]common.NetDev, error) {
-	if cid == "weave:expose" {
-		netDev, err := common.GetBridgeNetDev(bridgeName)
-		if err != nil {
-			return nil, err
-		}
-		return []common.NetDev{netDev}, nil
-	}
-
-	if container == nil || container.State.Pid == 0 {
-		return nil, nil
-	}
-
-	return common.GetNetDevsWithPredicate(container.State.Pid, pred)
 }
