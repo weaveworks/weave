@@ -267,9 +267,11 @@ func (fastdp *FastDatapath) bridge(ingress bridgePortID, key PacketKey, lock *fa
 		// If we did, we'd need to delete the flows every time
 		// we learned a new MAC address, or have a more
 		// complicated selective invalidation scheme.
+		log.Debug("fastdp: unknown dst", ingress, key)
 		mfop.Add(vetoFlowCreationFlowOp{})
 	} else {
 		// A real broadcast
+		log.Debug("fastdp: broadcast", ingress, key)
 		mfop.Add(odpEthernetFlowKey(key))
 	}
 
@@ -424,6 +426,7 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 
 	fastdp.vxlanVportIDs[udpPort] = vxlanVportID
 	fastdp.missHandlers[vxlanVportID] = func(fks odp.FlowKeys, lock *fastDatapathLock) FlowOp {
+		log.Debug("ODP miss: ", fks, " on port ", vxlanVportID)
 		tunnel := fks[odp.OVS_KEY_ATTR_TUNNEL].(odp.TunnelFlowKey)
 		tunKey := tunnel.Key()
 
@@ -939,7 +942,6 @@ func (fastdp *FastDatapath) Error(err error, stopped bool) {
 
 func (fastdp *FastDatapath) Miss(packet []byte, fks odp.FlowKeys) error {
 	ingress := fks[odp.OVS_KEY_ATTR_IN_PORT].(odp.InPortFlowKey).VportID()
-	log.Debug("ODP miss ", fks, " on port ", ingress)
 
 	lock := fastdp.startLock()
 	defer lock.unlock()
@@ -948,6 +950,7 @@ func (fastdp *FastDatapath) Miss(packet []byte, fks odp.FlowKeys) error {
 
 	handler := fastdp.getMissHandler(ingress)
 	if handler == nil {
+		log.Debug("ODP miss (no handler): ", fks, " on port ", ingress)
 		return nil
 	}
 
