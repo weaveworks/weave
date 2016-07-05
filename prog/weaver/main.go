@@ -252,6 +252,7 @@ func main() {
 	}
 
 	var dockerCli *docker.Client
+	dockerVersion := "none"
 	if dockerAPI != "" {
 		dc, err := docker.NewClient(dockerAPI)
 		if err != nil {
@@ -260,13 +261,14 @@ func main() {
 			Log.Info(dc.Info())
 		}
 		dockerCli = dc
+		dockerVersion = dockerCli.DockerVersion()
 	}
 
 	network := ""
 	if isAWSVPC {
 		network = "awsvpc"
 	}
-	checkForUpdates(dockerCli.DockerVersion(), network)
+	checkForUpdates(dockerVersion, network)
 
 	observeContainers := func(o docker.ContainerObserver) {
 		if dockerCli != nil {
