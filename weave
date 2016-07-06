@@ -1583,7 +1583,6 @@ launch_router() {
             --no-dns)
                 DNS_ROUTER_OPTS=
                 NO_DNS_OPT="--no-dns"
-                ARGS="$ARGS $1"
                 ;;
             --no-restart)
                 RESTART_POLICY=
