@@ -83,7 +83,7 @@ weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>] |
                     <ip_address> ... -h <fqdn>
       dns-lookup    <unqualified_name>
 
-weave status        [targets | connections | peers | dns]
+weave status        [targets | connections | peers | dns | ipam]
       report        [-f <format>]
       ps            [<container_id> ...]
 
