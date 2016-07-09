@@ -87,7 +87,6 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, router.Ourself.Peer); {
 	case newSrcMac:
 		log.Println("Discovered local MAC", srcMac)
-
 	case conflictPeer != nil:
 		// The MAC cache has an entry for the source MAC
 		// associated with another peer.  This probably means
