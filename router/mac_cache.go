@@ -51,11 +51,13 @@ func (cache *MacCache) add(mac net.HardwareAddr, peer *mesh.Peer, force bool) (b
 		return true, nil
 	}
 
-	if entry.peer != peer {
-		if !force {
-			return false, entry.peer
-		}
+	var conflictPeer *mesh.Peer
 
+	if entry.peer != peer {
+		conflictPeer = entry.peer
+		if !force {
+			return false, conflictPeer
+		}
 		entry.peer = peer
 	}
 
@@ -63,7 +65,7 @@ func (cache *MacCache) add(mac net.HardwareAddr, peer *mesh.Peer, force bool) (b
 		entry.lastSeen = now
 	}
 
-	return false, nil
+	return false, conflictPeer
 }
 
 func (cache *MacCache) Add(mac net.HardwareAddr, peer *mesh.Peer) (bool, *mesh.Peer) {
