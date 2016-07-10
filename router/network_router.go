@@ -84,16 +84,15 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 	srcMac := net.HardwareAddr(key.SrcMAC[:])
 	dstMac := net.HardwareAddr(key.DstMAC[:])
 
-	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, router.Ourself.Peer); {
+	switch newSrcMac, conflictPeer := router.Macs.AddForced(srcMac, router.Ourself.Peer); {
 	case newSrcMac:
-		log.Println("Discovered local MAC", srcMac)
+		log.Print("Discovered local MAC ", srcMac)
 	case conflictPeer != nil:
-		// The MAC cache has an entry for the source MAC
-		// associated with another peer.  This probably means
-		// we are seeing a frame we injected ourself.  That
-		// shouldn't happen, but discard it just in case.
-		log.Error("Captured frame from MAC (", srcMac, ") to (", dstMac, ") associated with another peer ", conflictPeer)
-		return DiscardingFlowOp{}
+		// The MAC cache has an entry for the source MAC associated
+		// with another peer. This can happen when a MAC has moved.
+		log.Print("Discovered local MAC ", srcMac, " (was at ", conflictPeer, ")")
+		// We need to clear out any flows with the MAC as the source.
+		router.Overlay.(NetworkOverlay).InvalidateRoutes()
 	}
 
 	// Discard STP broadcasts
