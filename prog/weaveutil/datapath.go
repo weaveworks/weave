@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"strconv"
 	"syscall"
@@ -92,15 +91,13 @@ func checkMTU(dpname string, mtu int) bool {
 	var (
 		vpid   libodp.VportID
 		vpname string
+		err    error
 	)
 
-	// Create a dummy vxlan vport
+	// Create a dummy vxlan vport. Retry a few times if the creation fails due
+	// to the chosen vxlan UDP port being occupied.
 	for i := 0; i < 5; i++ {
-		portno, err := getUDPPortNo()
-		if err != nil {
-			return true
-		}
-		if vpid, vpname, err = odp.CreateVxlanVport(dpname, "vxlantest", portno); err == nil {
+		if vpid, vpname, err = odp.CreateDummyVxlanVport(dpname, true); err == nil {
 			defer func() {
 				if err := odp.DeleteVport(dpname, vpid); err != nil {
 					fmt.Fprintf(os.Stderr, "unable to remove unused %q vxlan vport: %s\n", vpname, err)
@@ -108,6 +105,7 @@ func checkMTU(dpname string, mtu int) bool {
 			}()
 			break
 		} else if errno, ok := err.(syscall.Errno); !(ok && errno == syscall.EADDRINUSE) {
+			// Skip the check if something went wrong
 			return true
 		}
 	}
@@ -116,7 +114,8 @@ func checkMTU(dpname string, mtu int) bool {
 		return true
 	}
 
-	// Setting >1500 MTU on affected host' vport should fail with EINVAL
+	// Setting >1500 MTU will fail with EINVAL, if the user is affected by
+	// the kernel issue.
 	if err := wnet.SetMTU(vpname, mtu); err != nil {
 		if errno, ok := err.(syscall.Errno); ok && errno == syscall.EINVAL {
 			return false
@@ -127,14 +126,4 @@ func checkMTU(dpname string, mtu int) bool {
 	}
 
 	return true
-}
-
-// A dummy way to get an ephemeral port for UDP
-func getUDPPortNo() (uint16, error) {
-	udpconn, err := net.ListenUDP("udp4", nil)
-	if err != nil {
-		return uint16(0), err
-	}
-	defer udpconn.Close()
-	return uint16(udpconn.LocalAddr().(*net.UDPAddr).Port), nil
 }

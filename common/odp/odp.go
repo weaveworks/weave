@@ -25,19 +25,7 @@ func CreateDatapath(dpname string) (supported bool, err error) {
 		return true, err
 	}
 
-	// Pick an ephemeral port number to use in probing for vxlan
-	// support.
-	udpconn, err := net.ListenUDP("udp4", nil)
-	if err != nil {
-		return true, err
-	}
-	defer udpconn.Close()
-
-	// we leave the UDP socket open, so creating a vxlan vport on
-	// the same port number should fail.  But that's fine: It's
-	// still sufficient to probe for support.
-	portno := uint16(udpconn.LocalAddr().(*net.UDPAddr).Port)
-	vpid, err := dp.CreateVport(odp.NewVxlanVportSpec(fmt.Sprintf("vxlan-%d", portno), portno))
+	vpid, _, err := CreateDummyVxlanVport(dpname, true)
 	if nlerr, ok := err.(odp.NetlinkError); ok {
 		if syscall.Errno(nlerr) == syscall.EAFNOSUPPORT {
 			dp.Delete()
@@ -85,7 +73,7 @@ func AddDatapathInterface(dpname string, ifname string) error {
 	return err
 }
 
-func CreateVxlanVport(dpname string, name string, portno uint16) (odp.VportID, string, error) {
+func CreateDummyVxlanVport(dpname string, keepUDPSocket bool) (odp.VportID, string, error) {
 	dpif, err := odp.NewDpif()
 	if err != nil {
 		return 0, "", err
@@ -97,8 +85,24 @@ func CreateVxlanVport(dpname string, name string, portno uint16) (odp.VportID, s
 		return 0, "", err
 	}
 
-	vpname := fmt.Sprintf("%s-%d", name, portno)
+	// A dummy way to get an ephemeral port for UDP
+	udpconn, err := net.ListenUDP("udp4", nil)
+	if err != nil {
+		return 0, "", err
+	}
+	portno := uint16(udpconn.LocalAddr().(*net.UDPAddr).Port)
+	if keepUDPSocket {
+		// we leave the UDP socket open, so creating a vxlan vport on
+		// the same port number should fail.  But that's fine: It's
+		// still sufficient to probe for support.
+		defer udpconn.Close()
+	} else {
+		udpconn.Close()
+	}
+
+	vpname := fmt.Sprintf("vxlan-%d", portno)
 	vpid, err := dp.CreateVport(odp.NewVxlanVportSpec(vpname, portno))
+
 	return vpid, vpname, err
 }
 
