@@ -31,6 +31,10 @@ DOCKER_CLIENT_HOST=${DOCKER_CLIENT_HOST:-$DOCKER_HOST}
 IP_REGEXP="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 CIDR_REGEXP="$IP_REGEXP/[0-9]{1,2}"
 
+######################################################################
+# helpers that run locally, even without --local
+######################################################################
+
 usage_no_exit() {
     cat >&2 <<EOF
 Usage:
@@ -135,36 +139,6 @@ cni_volume_options() {
     [ "$1" = "setup" -o "$1" = "setup-cni" ] && echo -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni
 }
 
-create_cni_script() {
-    cat >"$1" <<EOF
-#!/bin/sh
-docker run --rm $(docker_run_options) --pid=host -i \\
- -e CNI_VERSION -e CNI_COMMAND -e CNI_CONTAINERID -e CNI_NETNS \\
- -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH $(cni_volume_options setup) \\
- $PLUGIN_IMAGE $COVERAGE_ARGS $2
-EOF
-    chmod a+x "$1"
-}
-
-create_cni_config() {
-    cat >"$1" <<EOF
-{
-    "name": "weave",
-    "type": "weave-net"
-}
-EOF
-}
-
-setup_cni() {
-    if [ -d /opt/cni/bin ] ; then
-        create_cni_script /opt/cni/bin/weave-net  --cni-net
-        create_cni_script /opt/cni/bin/weave-ipam --cni-ipam
-    fi
-    if [ -d /etc/cni/net.d -a ! -f /etc/cni/net.d/10-weave.conf ] ; then
-        create_cni_config /etc/cni/net.d/10-weave.conf
-    fi
-}
-
 launch_router_options() {
     [ "$1" = "launch" -o "$1" = "launch-router" ] && echo -v /:/host -e HOST_ROOT=/host
 }
@@ -231,50 +205,6 @@ check_docker_version() {
     fi
 }
 
-check_docker_server_api_version() {
-    # Cope with various versions of `docker version` output format
-    if ! DOCKER_API_VERSION=$(docker version -f '{{.Server.APIVersion}}' 2> /dev/null ) ; then
-        if ! DOCKER_API_VERSION=$(docker version -f '{{.Server.ApiVersion}}' 2> /dev/null ) ; then
-            if ! DOCKER_API_VERSION=$(docker version | sed -n -e 's|^Server API version: *\([0-9][0-9]*\.[0-9][0-9]\).*|\1|p') || [ -z "$DOCKER_API_VERSION" ] ; then
-                echo "ERROR: Unable to determine docker version" >&2
-                exit 1
-            fi
-        fi
-    fi
-
-    if version_lt ${DOCKER_API_VERSION}.0 ${1}.0 ; then
-        return 1
-    fi
-}
-
-enforce_docker_bridge_addr_assign_type() {
-    if ! ADDR_ASSIGN_TYPE=$(cat /sys/class/net/$DOCKER_BRIDGE/addr_assign_type 2>/dev/null) ; then
-        echo "Could not determine address assignment type of $DOCKER_BRIDGE" >&2
-        return
-    fi
-    # From include/uapi/linux/netdevice.h
-    # #define NET_ADDR_PERM       0   /* address is permanent (default) */
-    # #define NET_ADDR_RANDOM     1   /* address is generated randomly */
-    # #define NET_ADDR_STOLEN     2   /* address is stolen from other device */
-    # #define NET_ADDR_SET        3   /* address is set using dev_set_mac_address() */
-    if [ $ADDR_ASSIGN_TYPE != 3 ] ; then
-        echo "Setting $DOCKER_BRIDGE MAC (mitigate https://github.com/docker/docker/issues/14908)" >&2
-        ip link set dev $DOCKER_BRIDGE address $(random_mac) || true
-    fi
-}
-
-check_forwarding_rules() {
-    if run_iptables -C FORWARD -j REJECT --reject-with icmp-host-prohibited > /dev/null 2>&1; then
-        cat >&2 <<EOF
-WARNING: existing iptables rule
-
-    '-A FORWARD -j REJECT --reject-with icmp-host-prohibited'
-
-will block name resolution via weaveDNS - please reconfigure your firewall.
-EOF
-    fi
-}
-
 is_cidr() {
     echo "$1" | grep -E "^$CIDR_REGEXP$" >/dev/null
 }
@@ -285,20 +215,6 @@ collect_cidr_args() {
     while [ "$1" = "net:default" ] || is_cidr "$1" || is_cidr "${1#ip:}" || is_cidr "${1#net:}" ; do
         CIDR_ARGS="$CIDR_ARGS ${1#ip:}"
         CIDR_ARG_COUNT=$((CIDR_ARG_COUNT + 1))
-        shift 1
-    done
-}
-
-is_ip() {
-    echo "$1" | grep -E "^$IP_REGEXP$" >/dev/null
-}
-
-collect_ip_args() {
-    IP_ARGS=""
-    IP_COUNT=0
-    while is_ip "$1" ; do
-        IP_ARGS="$IP_ARGS $1"
-        IP_COUNT=$((IP_COUNT + 1))
         shift 1
     done
 }
@@ -334,6 +250,9 @@ kill_container() {
     docker kill $1 >/dev/null 2>&1 || true
 }
 
+######################################################################
+# main
+######################################################################
 
 check_docker_version
 
@@ -404,6 +323,10 @@ if [ -z "$IS_LOCAL" ] ; then
     exec_remote "$@"
     exit $?
 fi
+
+######################################################################
+# main (remote and --local) - settings
+######################################################################
 
 # Default restart policy for router/proxy/plugin
 RESTART_POLICY="--restart=always"
@@ -545,12 +468,56 @@ random_mac() {
 # weave and docker specific helpers
 ######################################################################
 
+check_docker_server_api_version() {
+    # Cope with various versions of `docker version` output format
+    if ! DOCKER_API_VERSION=$(docker version -f '{{.Server.APIVersion}}' 2> /dev/null ) ; then
+        if ! DOCKER_API_VERSION=$(docker version -f '{{.Server.ApiVersion}}' 2> /dev/null ) ; then
+            if ! DOCKER_API_VERSION=$(docker version | sed -n -e 's|^Server API version: *\([0-9][0-9]*\.[0-9][0-9]\).*|\1|p') || [ -z "$DOCKER_API_VERSION" ] ; then
+                echo "ERROR: Unable to determine docker version" >&2
+                exit 1
+            fi
+        fi
+    fi
+
+    if version_lt ${DOCKER_API_VERSION}.0 ${1}.0 ; then
+        return 1
+    fi
+}
+
 util_op() {
     if command_exists weaveutil ; then
         weaveutil "$@"
     else
         docker run --rm --privileged --net=host --pid=host $(docker_sock_options) \
             --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
+    fi
+}
+
+check_forwarding_rules() {
+    if run_iptables -C FORWARD -j REJECT --reject-with icmp-host-prohibited > /dev/null 2>&1; then
+        cat >&2 <<EOF
+WARNING: existing iptables rule
+
+    '-A FORWARD -j REJECT --reject-with icmp-host-prohibited'
+
+will block name resolution via weaveDNS - please reconfigure your firewall.
+EOF
+    fi
+}
+
+enforce_docker_bridge_addr_assign_type() {
+    if ! ADDR_ASSIGN_TYPE=$(cat /sys/class/net/$DOCKER_BRIDGE/addr_assign_type 2>/dev/null) ; then
+        echo "Could not determine address assignment type of $DOCKER_BRIDGE" >&2
+        return
+    fi
+    # From include/uapi/linux/netdevice.h
+    # #define NET_ADDR_PERM       0   /* address is permanent (default) */
+    # #define NET_ADDR_RANDOM     1   /* address is generated randomly */
+    # #define NET_ADDR_STOLEN     2   /* address is stolen from other device */
+    # #define NET_ADDR_SET        3   /* address is set using dev_set_mac_address() */
+    if [ $ADDR_ASSIGN_TYPE != 3 ] ; then
+        echo "Setting $DOCKER_BRIDGE MAC (mitigate https://github.com/docker/docker/issues/14908)" >&2
+        ip link set dev $DOCKER_BRIDGE address $(random_mac) || true
     fi
 }
 
@@ -1059,6 +1026,40 @@ peer_args() {
 }
 
 ######################################################################
+# CNI helpers
+######################################################################
+
+create_cni_script() {
+    cat >"$1" <<EOF
+#!/bin/sh
+docker run --rm $(docker_run_options) --pid=host -i \\
+ -e CNI_VERSION -e CNI_COMMAND -e CNI_CONTAINERID -e CNI_NETNS \\
+ -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH $(cni_volume_options setup) \\
+ $PLUGIN_IMAGE $COVERAGE_ARGS $2
+EOF
+    chmod a+x "$1"
+}
+
+create_cni_config() {
+    cat >"$1" <<EOF
+{
+    "name": "weave",
+    "type": "weave-net"
+}
+EOF
+}
+
+setup_cni() {
+    if [ -d /opt/cni/bin ] ; then
+        create_cni_script /opt/cni/bin/weave-net  --cni-net
+        create_cni_script /opt/cni/bin/weave-ipam --cni-ipam
+    fi
+    if [ -d /etc/cni/net.d -a ! -f /etc/cni/net.d/10-weave.conf ] ; then
+        create_cni_config /etc/cni/net.d/10-weave.conf
+    fi
+}
+
+######################################################################
 # weaveDNS helpers
 ######################################################################
 
@@ -1239,6 +1240,20 @@ delete_dns_fqdn() {
 
     for ADDR in "$@" ; do
         call_weave DELETE /name/$CONTAINER_ID/${ADDR%/*}?fqdn=$FQDN || true
+    done
+}
+
+is_ip() {
+    echo "$1" | grep -E "^$IP_REGEXP$" >/dev/null
+}
+
+collect_ip_args() {
+    IP_ARGS=""
+    IP_COUNT=0
+    while is_ip "$1" ; do
+        IP_ARGS="$IP_ARGS $1"
+        IP_COUNT=$((IP_COUNT + 1))
+        shift 1
     done
 }
 
@@ -1791,44 +1806,9 @@ protect_against_docker_hang() {
     fi
 }
 
-##########################################################################################
-
-[ $(id -u) = 0 ] || {
-    echo "weave must be run as 'root' when run locally" >&2
-    exit 1
-}
-
-uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
-    if ! read sys maj min ; then
-        echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
-        exit 1
-    fi
-
-    if [ "$sys" != 'Linux' ] ; then
-        echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
-        exit 1
-    fi
-
-    if ! [ \( "$maj" -eq 3 -a "$min" -ge 8 \) -o "$maj" -gt 3 ] ; then
-        echo "WARNING: Linux kernel version 3.8 or newer is required (you have ${maj}.${min})" >&2
-    fi
-}
-
-if ! command_exists ip ; then
-    echo "ERROR: ip utility is missing. Please install it." >&2
-    exit 1
-fi
-
-if ! ip netns list >/dev/null 2>&1 ; then
-    echo "ERROR: $(ip -V) does not support network namespaces." >&2
-    echo "       Please install iproute2-ss111010 or later." >&2
-    exit 1
-fi
-
-if ! command_exists nsenter ; then
-    echo "ERROR: nsenter utility missing. Please install it." >&2
-    exit 1
-fi
+######################################################################
+# argument deprecation handling
+######################################################################
 
 deprecation_warning() {
     echo "Warning: ${1%=*} is deprecated; please use $2" >&2
@@ -1887,6 +1867,47 @@ deprecation_warnings() {
         shift
     done
 }
+
+######################################################################
+# main (remote and --local)
+######################################################################
+
+[ $(id -u) = 0 ] || {
+    echo "weave must be run as 'root' when run locally" >&2
+    exit 1
+}
+
+uname -s -r | sed -n -e 's|^\([^ ]*\) \([0-9][0-9]*\)\.\([0-9][0-9]*\).*|\1 \2 \3|p' | {
+    if ! read sys maj min ; then
+        echo "ERROR: Unable to parse operating system version $(uname -s -r)" >&2
+        exit 1
+    fi
+
+    if [ "$sys" != 'Linux' ] ; then
+        echo "ERROR: Operating systems other than Linux are not supported (you have $(uname -s -r))" >&2
+        exit 1
+    fi
+
+    if ! [ \( "$maj" -eq 3 -a "$min" -ge 8 \) -o "$maj" -gt 3 ] ; then
+        echo "WARNING: Linux kernel version 3.8 or newer is required (you have ${maj}.${min})" >&2
+    fi
+}
+
+if ! command_exists ip ; then
+    echo "ERROR: ip utility is missing. Please install it." >&2
+    exit 1
+fi
+
+if ! ip netns list >/dev/null 2>&1 ; then
+    echo "ERROR: $(ip -V) does not support network namespaces." >&2
+    echo "       Please install iproute2-ss111010 or later." >&2
+    exit 1
+fi
+
+if ! command_exists nsenter ; then
+    echo "ERROR: nsenter utility missing. Please install it." >&2
+    exit 1
+fi
 
 [ $# -gt 0 ] || usage
 COMMAND=$1
