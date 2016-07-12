@@ -48,14 +48,14 @@ func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, e
 	}
 	defer ns.Close()
 
-	err = weavenet.WithNetNS(ns, func() error {
+	err = weavenet.WithNetNSUnsafe(ns, func() error {
 		return forEachLink(func(link netlink.Link) error {
 			if match(link) {
 				netDev, err := linkToNetDev(link)
 				if err != nil {
 					return err
 				}
-				netDevs = append(netDevs, *netDev)
+				netDevs = append(netDevs, netDev)
 			}
 			return nil
 		})
@@ -77,21 +77,54 @@ func forEachLink(f func(netlink.Link) error) error {
 	return nil
 }
 
-func linkToNetDev(link netlink.Link) (*NetDev, error) {
+func linkToNetDev(link netlink.Link) (NetDev, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
-		return nil, err
+		return NetDev{}, err
 	}
 
-	netDev := &NetDev{Name: link.Attrs().Name, MAC: link.Attrs().HardwareAddr}
+	netDev := NetDev{Name: link.Attrs().Name, MAC: link.Attrs().HardwareAddr}
 	for _, addr := range addrs {
 		netDev.CIDRs = append(netDev.CIDRs, addr.IPNet)
 	}
 	return netDev, nil
 }
 
-// Lookup the weave interface of a container
-func GetWeaveNetDevs(processID int) ([]NetDev, error) {
+// ConnectedToBridgePredicate returns a function which is used to query whether
+// a given link is a veth interface which one end is connected to a bridge.
+// The returned function should be called from a container network namespace which
+// the bridge does NOT belong to.
+func ConnectedToBridgePredicate(bridgeName string) (func(link netlink.Link) bool, error) {
+	indexes := make(map[int]struct{})
+
+	// Scan devices in root namespace to find those attached to weave bridge
+	err := weavenet.WithNetNSLinkByPidUnsafe(1, bridgeName,
+		func(br netlink.Link) error {
+			return forEachLink(func(link netlink.Link) error {
+				if link.Attrs().MasterIndex == br.Attrs().Index {
+					peerIndex := link.Attrs().ParentIndex
+					if peerIndex == 0 {
+						// perhaps running on an older kernel where ParentIndex doesn't work.
+						// as fall-back, assume the indexes are consecutive
+						peerIndex = link.Attrs().Index - 1
+					}
+					indexes[peerIndex] = struct{}{}
+				}
+				return nil
+			})
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	return func(link netlink.Link) bool {
+		_, isveth := link.(*netlink.Veth)
+		_, found := indexes[link.Attrs().Index]
+		return isveth && found
+	}, nil
+}
+
+func GetNetDevsWithPredicate(processID int, predicate func(link netlink.Link) bool) ([]NetDev, error) {
 	// Bail out if this container is running in the root namespace
 	nsToplevel, err := netns.GetFromPid(1)
 	if err != nil {
@@ -105,39 +138,28 @@ func GetWeaveNetDevs(processID int) ([]NetDev, error) {
 		return nil, nil
 	}
 
-	weaveBridge, err := netlink.LinkByName("weave")
-	if err != nil {
-		return nil, fmt.Errorf("Cannot find weave bridge: %s", err)
-	}
-	// Scan devices in root namespace to find those attached to weave bridge
-	indexes := make(map[int]struct{})
-	err = forEachLink(func(link netlink.Link) error {
-		if link.Attrs().MasterIndex == weaveBridge.Attrs().Index {
-			peerIndex := link.Attrs().ParentIndex
-			if peerIndex == 0 {
-				// perhaps running on an older kernel where ParentIndex doesn't work.
-				// as fall-back, assume the indexes are consecutive
-				peerIndex = link.Attrs().Index - 1
-			}
-			indexes[peerIndex] = struct{}{}
-		}
-		return nil
-	})
+	return FindNetDevs(processID, predicate)
+}
+
+// Lookup the weave interface of a container
+func GetWeaveNetDevs(processID int) ([]NetDev, error) {
+	p, err := ConnectedToBridgePredicate("weave")
 	if err != nil {
 		return nil, err
 	}
-	return FindNetDevs(processID, func(link netlink.Link) bool {
-		_, isveth := link.(*netlink.Veth)
-		_, found := indexes[link.Attrs().Index]
-		return isveth && found
-	})
+
+	return GetNetDevsWithPredicate(processID, p)
 }
 
-// Get the weave bridge interface
-func GetBridgeNetDev(bridgeName string) ([]NetDev, error) {
-	return FindNetDevs(1, func(link netlink.Link) bool {
-		return link.Attrs().Name == bridgeName
-	})
+// Get the weave bridge interface.
+// NB: Should be called from the root network namespace.
+func GetBridgeNetDev(bridgeName string) (NetDev, error) {
+	link, err := netlink.LinkByName(bridgeName)
+	if err != nil {
+		return NetDev{}, err
+	}
+
+	return linkToNetDev(link)
 }
 
 // Do post-attach configuration of all veths we have created

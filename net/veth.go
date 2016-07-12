@@ -106,7 +106,7 @@ const (
 )
 
 func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
-	err := WithNetNS(ns, func() error {
+	err := WithNetNSUnsafe(ns, func() error {
 		_, err := netlink.LinkByName(ifName)
 		return err
 	})
@@ -129,7 +129,7 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
-			if err := WithNetNS(ns, func() error {
+			if err := WithNetNSUnsafe(ns, func() error {
 				if err := netlink.LinkSetName(veth, ifName); err != nil {
 					return err
 				}
@@ -150,7 +150,7 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 		}
 	}
 
-	if err := WithNetNSLink(ns, ifName, func(veth netlink.Link) error {
+	if err := WithNetNSLinkUnsafe(ns, ifName, func(veth netlink.Link) error {
 		newAddresses, err := AddAddresses(veth, cidrs)
 		if err != nil {
 			return err
@@ -207,7 +207,7 @@ func DetachContainer(ns netns.NsHandle, id, ifName string, cidrs []*net.IPNet) e
 		return err
 	}
 
-	return WithNetNSLink(ns, ifName, func(veth netlink.Link) error {
+	return WithNetNSLinkUnsafe(ns, ifName, func(veth netlink.Link) error {
 		existingAddrs, err := netlink.AddrList(veth, netlink.FAMILY_V4)
 		if err != nil {
 			return fmt.Errorf("failed to get IP address for %q: %v", veth.Attrs().Name, err)

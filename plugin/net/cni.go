@@ -95,7 +95,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	if err := weavenet.AttachContainer(ns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}, false); err != nil {
 		return err
 	}
-	if err := weavenet.WithNetNSLink(ns, args.IfName, func(link netlink.Link) error {
+	if err := weavenet.WithNetNSLinkUnsafe(ns, args.IfName, func(link netlink.Link) error {
 		return setupRoutes(link, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
 	}); err != nil {
 		return fmt.Errorf("error setting up routes: %s", err)
@@ -131,23 +131,20 @@ func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, rou
 }
 
 func findBridgeIP(bridgeName string, subnet net.IPNet) (net.IP, error) {
-	netdevs, err := common.GetBridgeNetDev(bridgeName)
+	netdev, err := common.GetBridgeNetDev(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get netdev for %q bridge: %s", bridgeName, err)
 	}
-	if len(netdevs) == 0 {
-		return nil, fmt.Errorf("Could not find %q bridge", bridgeName)
-	}
-	if len(netdevs[0].CIDRs) == 0 {
+	if len(netdev.CIDRs) == 0 {
 		return nil, fmt.Errorf("Bridge %q has no IP addresses; did you forget to run 'weave expose'?", bridgeName)
 	}
-	for _, cidr := range netdevs[0].CIDRs {
+	for _, cidr := range netdev.CIDRs {
 		if subnet.Contains(cidr.IP) {
 			return cidr.IP, nil
 		}
 	}
 	// None in the required subnet; just return the first one
-	return netdevs[0].CIDRs[0].IP, nil
+	return netdev.CIDRs[0].IP, nil
 }
 
 func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
@@ -161,7 +158,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 	defer ns.Close()
-	err = weavenet.WithNetNS(ns, func() error {
+	err = weavenet.WithNetNSUnsafe(ns, func() error {
 		link, err := netlink.LinkByName(args.IfName)
 		if err != nil {
 			return err
