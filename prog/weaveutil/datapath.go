@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"syscall"
 
-	libodp "github.com/weaveworks/go-odp/odp"
+	wnet "github.com/weaveworks/weave/common/net"
 	"github.com/weaveworks/weave/common/odp"
-	wnet "github.com/weaveworks/weave/net"
 )
 
 func createDatapath(args []string) error {
@@ -23,7 +21,7 @@ func createDatapath(args []string) error {
 		return fmt.Errorf("unable to parse mtu %q: %s", args[1], err)
 	}
 
-	odpSupported, err := odp.CreateDatapath(dpname)
+	odpSupported, validMTU, err := odp.CreateDatapath(dpname, mtu)
 	if !odpSupported {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -36,13 +34,10 @@ func createDatapath(args []string) error {
 		return err
 	}
 
-	if mtu > 1500 {
-		// Check whether a host is exposed to https://github.com/weaveworks/weave/issues/1853
-		// If yes, fallback to 1500 MTU.
-		if !checkMTU(dpname, mtu) {
-			fmt.Fprintf(os.Stderr, "WARNING: Unable to set fastdp MTU to %d, possibly due to 4.3/4.4 kernel version. Setting MTU to 1500 instead.\n", mtu)
-			mtu = 1500
-		}
+	// Fallback to 1500 MTU if the user is exposed to the issue
+	if mtu > 1500 && !validMTU {
+		fmt.Fprintf(os.Stderr, "WARNING: Unable to set fastdp MTU to %d, possibly due to 4.3/4.4 kernel version. Setting MTU to 1500 instead.\n", mtu)
+		mtu = 1500
 	}
 
 	if err := wnet.SetMTU(dpname, mtu); err != nil {
@@ -67,7 +62,7 @@ func checkDatapath(args []string) error {
 
 	dpname := args[0]
 
-	odpSupported, err := odp.CreateDatapath(dpname)
+	odpSupported, _, err := odp.CreateDatapath(dpname, -1)
 	if err != nil {
 		return err
 	}
@@ -83,47 +78,4 @@ func addDatapathInterface(args []string) error {
 		cmdUsage("add-datapath-interface", "<datapath> <interface>")
 	}
 	return odp.AddDatapathInterface(args[0], args[1])
-}
-
-// Helpers
-
-func checkMTU(dpname string, mtu int) bool {
-	var (
-		vpid   libodp.VportID
-		vpname string
-		err    error
-	)
-
-	// Create a dummy vxlan vport. Retry a few times if the creation fails due
-	// to the chosen vxlan UDP port being occupied.
-	for i := 0; i < 5; i++ {
-		if vpid, vpname, err = odp.CreateDummyVxlanVport(dpname, true); err == nil {
-			defer func() {
-				if err := odp.DeleteVport(dpname, vpid); err != nil {
-					fmt.Fprintf(os.Stderr, "unable to remove unused %q vxlan vport: %s\n", vpname, err)
-				}
-			}()
-			break
-		} else if errno, ok := err.(syscall.Errno); !(ok && errno == syscall.EADDRINUSE) {
-			// Skip the check if something went wrong
-			return true
-		}
-	}
-	// Couldn't create the vport, skip the check
-	if vpname == "" {
-		return true
-	}
-
-	// Setting >1500 MTU will fail with EINVAL, if the user is affected by
-	// the kernel issue.
-	if err := wnet.SetMTU(vpname, mtu); err != nil {
-		if errno, ok := err.(syscall.Errno); ok && errno == syscall.EINVAL {
-			return false
-		}
-		// NB: If no link interface for the vport is found (which
-		// might be a case for SetMTU to fail), the user is probably
-		// running the <= 4.2 kernel, which is fine.
-	}
-
-	return true
 }
