@@ -28,7 +28,7 @@ To guard against dictionary attacks, the password needs to be reasonably strong 
 
 The same password must be specified for all Weave Net peers, by default both control and data plane traffic will then use authenticated encryption. 
 
-[Fast datapath]((/site/using-weave/fastdp.md) does not support
+[Fast datapath](/site/using-weave/fastdp.md) does not support
 encryption. If you supply a password at `weave launch`, Weave Net
 falls back to the slower `sleeve` mode for encrypted communication.
 
