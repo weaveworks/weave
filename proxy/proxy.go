@@ -149,14 +149,14 @@ func NewProxy(c Config) (*Proxy, error) {
 	p.client = client.Client
 
 	if !p.WithoutDNS {
-		netDevs, err := common.GetBridgeNetDev(c.DockerBridge)
+		netDev, err := common.GetBridgeNetDev(c.DockerBridge)
 		if err != nil {
 			return nil, err
 		}
-		if len(netDevs) != 1 || len(netDevs[0].CIDRs) != 1 {
+		if len(netDev.CIDRs) != 1 {
 			return nil, fmt.Errorf("Could not obtain address of %s", c.DockerBridge)
 		}
-		p.dockerBridgeIP = netDevs[0].CIDRs[0].IP.String()
+		p.dockerBridgeIP = netDev.CIDRs[0].IP.String()
 	}
 
 	p.hostnameMatchRegexp, err = regexp.Compile(c.HostnameMatch)
