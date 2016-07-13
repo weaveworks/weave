@@ -1031,9 +1031,12 @@ peer_args() {
 create_cni_script() {
     cat >"$1" <<EOF
 #!/bin/sh
+[ -z "\$CNI_NETNS" -o \$(echo "\$CNI_NETNS" | grep "^/proc/") ] || \\
+    EXTRA_VOLUMES="-v \$(dirname \$CNI_NETNS):\$(dirname \$CNI_NETNS)"
 docker run --rm $(docker_run_options) --pid=host -i \\
  -e CNI_VERSION -e CNI_COMMAND -e CNI_CONTAINERID -e CNI_NETNS \\
- -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni \\
+ -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH \\
+ -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni \$EXTRA_VOLUMES \\
  $PLUGIN_IMAGE $COVERAGE_ARGS $2
 EOF
     chmod a+x "$1"
