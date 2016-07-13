@@ -1,8 +1,14 @@
 package net
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path"
 	"runtime"
+	"strconv"
 
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
@@ -62,4 +68,65 @@ func WithNetNSLinkByPidUnsafe(pid int, ifName string, work func(link netlink.Lin
 	defer ns.Close()
 
 	return WithNetNSLinkUnsafe(ns, ifName, work)
+}
+
+// A bit safer version of WithNetNS* which creates a process executing
+// "weaveutil --netns-fd <cmd>".
+//
+// The main problem with this approach is that the weaveutil process cannot
+// create any go-routine while executing a given cmd, unless we make sure that
+// all OS threads of the Go runtime instance running the cmd is in the same
+// netns.
+//
+// TODO(mp) Fix (indirect) circular dependency (weaveutil -> net -> weaveutil)
+func WithNetNS(ns netns.NsHandle, cmd string, args ...string) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	utilExecPath, err := findUtilExec()
+	if err != nil {
+		return "", fmt.Errorf("cannot find %q executable: %s", utilExecName, err)
+	}
+
+	args = append([]string{"--netns-fd", strconv.Itoa(int(ns)), cmd}, args...)
+	// netns.Get* does not set O_CLOEXEC for netns fd, so the fd can be reused by a child
+	c := exec.Command(utilExecPath, args...)
+	c.Stdout = &stdout
+	c.Stderr = &stderr
+	err = c.Run()
+	if err != nil {
+		return "", fmt.Errorf("%s: %s", string(stderr.Bytes()), err)
+	}
+
+	return string(stdout.Bytes()), nil
+}
+
+func WithNetNSByPid(pid int, cmd string, args ...string) (string, error) {
+	ns, err := netns.GetFromPid(pid)
+	if err != nil {
+		return "", err
+	}
+
+	return WithNetNS(ns, cmd, args...)
+}
+
+// Helpers
+
+const utilExecName = "weaveutil"
+
+func findUtilExec() (string, error) {
+	// First, check whether it runs inside "weaveutil" process
+	p, err := os.Readlink("/proc/self/exe")
+	if err != nil {
+		return "", err
+	}
+	if path.Base(p) == utilExecName {
+		return p, nil
+	}
+
+	// If not, lookup $PATH
+	p, err = exec.LookPath(utilExecName)
+	if err != nil {
+		return "", err
+	}
+	return p, nil
 }
