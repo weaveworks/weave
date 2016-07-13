@@ -104,10 +104,7 @@ const (
 )
 
 func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
-	err := WithNetNSUnsafe(ns, func() error {
-		_, err := netlink.LinkByName(ifName)
-		return err
-	})
+	_, err := WithNetNS(ns, "check-iface", ifName)
 	return err == nil
 }
 
@@ -122,15 +119,7 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
-			if err := WithNetNSUnsafe(ns, func() error {
-				if err := netlink.LinkSetName(veth, ifName); err != nil {
-					return err
-				}
-				if err := ConfigureARPCache(ifName); err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
+			if _, err := WithNetNS(ns, "setup-iface", peerName, ifName); err != nil {
 				return fmt.Errorf("error setting up interface: %s", err)
 			}
 			return nil

@@ -126,9 +126,9 @@ func GetWeaveNetDevsByPeers(processID int, peers []int) ([]Dev, error) {
 	for i, peer := range peers {
 		peersStr[i] = strconv.Itoa(peer)
 	}
-	netdevsStr, err := WithNetNSByPid(processID, "veth-netdevs", strings.Join(peersStr, ","))
+	netdevsStr, err := WithNetNSByPid(processID, "list-netdevs", strings.Join(peersStr, ","))
 	if err != nil {
-		return nil, fmt.Errorf("veth-netdevs failed: %s", err)
+		return nil, fmt.Errorf("list-netdevs failed: %s", err)
 	}
 	for _, netdevStr := range strings.Split(netdevsStr, "\n") {
 		if netdevStr != "" {
