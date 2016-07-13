@@ -1616,6 +1616,7 @@ launch_router() {
     done
     eval "set -- $ARGS"
 
+    setup_cni
     create_bridge
     # We set the router name to the bridge MAC, which in turn is
     # derived from the system UUID (if available), and thus stable
