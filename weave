@@ -135,20 +135,19 @@ docker_run_options() {
     echo --privileged --net=host $(docker_sock_options)
 }
 
-cni_volume_options() {
-    [ "$1" = "setup" -o "$1" = "setup-cni" ] && echo -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni
-}
-
-launch_router_options() {
-    [ "$1" = "launch" -o "$1" = "launch-router" ] && echo -v /:/host -e HOST_ROOT=/host
+exec_options() {
+    case "$1" in
+        setup|setup-cni|launch|launch-router)
+            echo -v /:/host -e HOST_ROOT=/host
+            ;;
+    esac
 }
 
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm \
         $(docker_run_options) \
         --pid=host \
-        $(cni_volume_options "$@") \
-        $(launch_router_options "$@") \
+        $(exec_options "$@") \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
         -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
@@ -1034,7 +1033,7 @@ create_cni_script() {
 #!/bin/sh
 docker run --rm $(docker_run_options) --pid=host -i \\
  -e CNI_VERSION -e CNI_COMMAND -e CNI_CONTAINERID -e CNI_NETNS \\
- -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH $(cni_volume_options setup) \\
+ -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni \\
  $PLUGIN_IMAGE $COVERAGE_ARGS $2
 EOF
     chmod a+x "$1"
@@ -1050,12 +1049,12 @@ EOF
 }
 
 setup_cni() {
-    if [ -d /opt/cni/bin ] ; then
-        create_cni_script /opt/cni/bin/weave-net  --cni-net
-        create_cni_script /opt/cni/bin/weave-ipam --cni-ipam
+    if [ -d $HOST_ROOT/opt/cni/bin ] ; then
+        create_cni_script $HOST_ROOT/opt/cni/bin/weave-net  --cni-net
+        create_cni_script $HOST_ROOT/opt/cni/bin/weave-ipam --cni-ipam
     fi
-    if [ -d /etc/cni/net.d -a ! -f /etc/cni/net.d/10-weave.conf ] ; then
-        create_cni_config /etc/cni/net.d/10-weave.conf
+    if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conf ] ; then
+        create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf
     fi
 }
 
