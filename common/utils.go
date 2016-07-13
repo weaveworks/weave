@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 
@@ -166,21 +165,4 @@ func GetBridgeNetDev(bridgeName string) (NetDev, error) {
 	}
 
 	return linkToNetDev(link)
-}
-
-// Do post-attach configuration of all veths we have created
-func ConfigureARPforVeths(processID int, prefix string) error {
-	_, err := FindNetDevs(processID, func(link netlink.Link) bool {
-		ifName := link.Attrs().Name
-		if strings.HasPrefix(ifName, prefix) {
-			weavenet.ConfigureARPCache(ifName)
-			if addrs, err := netlink.AddrList(link, netlink.FAMILY_V4); err == nil {
-				for _, addr := range addrs {
-					arping.GratuitousArpOverIfaceByName(addr.IPNet.IP, ifName)
-				}
-			}
-		}
-		return false
-	})
-	return err
 }
