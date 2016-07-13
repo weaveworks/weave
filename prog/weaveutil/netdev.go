@@ -1,13 +1,74 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 
+	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 )
+
+// checkIface returns an error if the given interface cannot be found.
+func checkIface(args []string) error {
+	if len(args) != 1 {
+		cmdUsage("check-iface", "<iface-name>")
+	}
+	ifaceName := args[0]
+
+	if _, err := netlink.LinkByName(ifaceName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func delIface(args []string) error {
+	if len(args) != 1 {
+		cmdUsage("del-iface", "<iface-name>")
+	}
+	ifName := args[0]
+
+	link, err := netlink.LinkByName(ifName)
+	if err != nil {
+		return err
+	}
+	return netlink.LinkDel(link)
+}
+
+// setupIface renames the given iface and configures its ARP cache settings.
+func setupIface(args []string) error {
+	if len(args) != 2 {
+		cmdUsage("setup-iface", "<iface-name> <new-iface-name>")
+	}
+	ifaceName := args[0]
+	newIfName := args[1]
+
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
+	}
+
+	link, err := netlink.LinkByName(ifaceName)
+	if err != nil {
+		return err
+	}
+	if err := netlink.LinkSetName(link, newIfName); err != nil {
+		return err
+	}
+	if err := weavenet.ConfigureARPCache(newIfName); err != nil {
+		return err
+	}
+	if err := ipt.Append("filter", "INPUT", "-i", newIfName, "-d", "224.0.0.0/4", "-j", "DROP"); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func configureARP(args []string) error {
 	if len(args) != 1 {
@@ -28,6 +89,42 @@ func configureARP(args []string) error {
 					arping.GratuitousArpOverIfaceByName(addr.IPNet.IP, ifName)
 				}
 			}
+		}
+	}
+
+	return nil
+}
+
+// listNetDevs outputs network ifaces identified by the given indexes
+// in the format of weavenet.Dev.
+func listNetDevs(args []string) error {
+	if len(args) != 1 {
+		cmdUsage("list-netdevs", "<iface-index>[,<iface-index>]")
+	}
+
+	indexes := make(map[int]struct{})
+	for _, index := range strings.Split(args[0], ",") {
+		if index != "" {
+			id, err := strconv.Atoi(index)
+			if err != nil {
+				return err
+			}
+			indexes[id] = struct{}{}
+		}
+	}
+
+	links, err := netlink.LinkList()
+	if err != nil {
+		return err
+	}
+
+	for _, link := range links {
+		if _, found := indexes[link.Attrs().Index]; found {
+			netdev, err := common.LinkToNetDev(link)
+			if err != nil {
+				return err
+			}
+			fmt.Println(netdev)
 		}
 	}
 

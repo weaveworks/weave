@@ -31,11 +31,17 @@ func attach(args []string) error {
 			i++
 		}
 	}
+	containerID := args[0]
 
-	pid, nsContainer, err := containerPidAndNs(args[0])
+	pid, err := containerPid(containerID)
 	if err != nil {
 		return err
 	}
+	nsContainer, err := netns.GetFromPid(pid)
+	if err != nil {
+		return fmt.Errorf("unable to open namespace for container %s: %s", containerID, err)
+	}
+
 	if nsHost, err := netns.GetFromPid(1); err != nil {
 		return fmt.Errorf("unable to open host namespace: %s", err)
 	} else if nsHost.Equal(nsContainer) {
@@ -50,7 +56,7 @@ func attach(args []string) error {
 		return err
 	}
 
-	err = weavenet.AttachContainer(nsContainer, fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs, keepTXOn)
+	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, args[1], mtu, withMulticastRoute, cidrs, keepTXOn)
 	// If we detected an error but the container has died, tell the user that instead.
 	if err != nil && !processExists(pid) {
 		err = fmt.Errorf("Container %s died", args[0])
@@ -58,23 +64,19 @@ func attach(args []string) error {
 	return err
 }
 
-func containerPidAndNs(containerID string) (int, netns.NsHandle, error) {
+func containerPid(containerID string) (int, error) {
 	c, err := docker.NewVersionedClientFromEnv("1.18")
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to connect to docker: %s", err)
+		return 0, fmt.Errorf("unable to connect to docker: %s", err)
 	}
 	container, err := c.InspectContainer(containerID)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to inspect container %s: %s", containerID, err)
+		return 0, fmt.Errorf("unable to inspect container %s: %s", containerID, err)
 	}
 	if container.State.Pid == 0 {
-		return 0, 0, fmt.Errorf("container %s not running", containerID)
+		return 0, fmt.Errorf("container %s not running", containerID)
 	}
-	ns, err := netns.GetFromPid(container.State.Pid)
-	if err != nil {
-		return 0, 0, fmt.Errorf("unable to open namespace for container %s: %s", containerID, err)
-	}
-	return container.State.Pid, ns, nil
+	return container.State.Pid, nil
 }
 
 func processExists(pid int) bool {
@@ -99,7 +101,7 @@ func detach(args []string) error {
 		cmdUsage("detach-container", "<container-id> <cidr>...")
 	}
 
-	_, ns, err := containerPidAndNs(args[0])
+	pid, err := containerPid(args[0])
 	if err != nil {
 		return err
 	}
@@ -107,5 +109,5 @@ func detach(args []string) error {
 	if err != nil {
 		return err
 	}
-	return weavenet.DetachContainer(ns, args[0], weavenet.VethName, cidrs)
+	return weavenet.DetachContainer(weavenet.NSPathByPid(pid), args[0], weavenet.VethName, cidrs)
 }
