@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/fsouza/go-dockerclient"
@@ -21,6 +22,9 @@ func containerAddrs(args []string) error {
 
 	pred, err := common.ConnectedToBridgePredicate(bridgeName)
 	if err != nil {
+		if err.Error() == errors.New("Link not found").Error() {
+			return nil
+		}
 		return err
 	}
 
