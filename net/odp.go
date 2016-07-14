@@ -1,4 +1,4 @@
-package odp
+package net
 
 import (
 	"fmt"
@@ -6,8 +6,6 @@ import (
 	"syscall"
 
 	"github.com/weaveworks/go-odp/odp"
-
-	wnet "github.com/weaveworks/weave/common/net"
 )
 
 // ODP admin functionality
@@ -125,7 +123,7 @@ func createDummyVxlanVport(dp odp.DatapathHandle) (odp.VportID, string, error) {
 func checkMTU(vpname string, mtuToCheck int) bool {
 	// Setting >1500 MTU will fail with EINVAL, if the user is affected by
 	// the kernel issue.
-	if err := wnet.SetMTU(vpname, mtuToCheck); err != nil {
+	if err := SetMTU(vpname, mtuToCheck); err != nil {
 		if errno, ok := err.(syscall.Errno); ok && errno == syscall.EINVAL {
 			return false
 		}

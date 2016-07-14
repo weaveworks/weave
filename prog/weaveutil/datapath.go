@@ -6,8 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	wnet "github.com/weaveworks/weave/common/net"
-	"github.com/weaveworks/weave/common/odp"
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 func createDatapath(args []string) error {
@@ -21,7 +20,7 @@ func createDatapath(args []string) error {
 		return fmt.Errorf("unable to parse mtu %q: %s", args[1], err)
 	}
 
-	odpSupported, validMTU, err := odp.CreateDatapath(dpname, mtu)
+	odpSupported, validMTU, err := weavenet.CreateDatapath(dpname, mtu)
 	if !odpSupported {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -40,7 +39,7 @@ func createDatapath(args []string) error {
 		mtu = 1500
 	}
 
-	if err := wnet.SetMTU(dpname, mtu); err != nil {
+	if err := weavenet.SetMTU(dpname, mtu); err != nil {
 		return err
 	}
 
@@ -51,7 +50,7 @@ func deleteDatapath(args []string) error {
 	if len(args) != 1 {
 		cmdUsage("delete-datapath", "<datapath>")
 	}
-	return odp.DeleteDatapath(args[0])
+	return weavenet.DeleteDatapath(args[0])
 }
 
 // Checks whether a datapath can be created by actually creating and destroying it
@@ -62,7 +61,7 @@ func checkDatapath(args []string) error {
 
 	dpname := args[0]
 
-	odpSupported, _, err := odp.CreateDatapath(dpname, -1)
+	odpSupported, _, err := weavenet.CreateDatapath(dpname, -1)
 	if err != nil {
 		return err
 	}
@@ -70,12 +69,12 @@ func checkDatapath(args []string) error {
 		return fmt.Errorf("kernel does not have ODP support")
 	}
 
-	return odp.DeleteDatapath(args[0])
+	return weavenet.DeleteDatapath(args[0])
 }
 
 func addDatapathInterface(args []string) error {
 	if len(args) != 2 {
 		cmdUsage("add-datapath-interface", "<datapath> <interface>")
 	}
-	return odp.AddDatapathInterface(args[0], args[1])
+	return weavenet.AddDatapathInterface(args[0], args[1])
 }

@@ -10,8 +10,6 @@ import (
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
-
-	"github.com/weaveworks/weave/common/odp"
 )
 
 // create and attach a veth to the Weave bridge
@@ -50,7 +48,7 @@ func CreateAndAttachVeth(name, peerName, bridgeName string, mtu int, keepTXOn bo
 			}
 		}
 	case Fastdp:
-		if err := odp.AddDatapathInterface(bridgeName, name); err != nil {
+		if err := AddDatapathInterface(bridgeName, name); err != nil {
 			return cleanup(`failed to attach %s to device "%s": %s`, name, bridgeName, err)
 		}
 	default:
