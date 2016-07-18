@@ -1,5 +1,5 @@
 ---
-title: Weave CNI Plugin
+title: Integrating Kubernetes and Mesos via the CNI Plugin
 menu_order: 65
 ---
 
