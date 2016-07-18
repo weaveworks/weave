@@ -2,14 +2,23 @@
 title: Operational Guide
 menu_order: 35
 ---
-This operational guide is intended to give you an overview of how to operate and manage a Weave Network in production.
+This operational guide is intended to give you an overview of how to operate and manage a Weave Network in production. It consists of three main parts: 
 
-Topics discussed include the following: 
+* A [glossary of concepts](/site/operational-guide/concepts.md) with which you will need to be familiar
+* Detailed instructions for safely bootstrapping, growing and 
+  shrinking Weave networks in a number of different deployment
+  scenarios:
+    * An [interactive installation](/site/operational-guide/interactive.md), suitable for evaluation and 
+      development
+    * A [uniformly configured cluster](/site/operational-guide/uniform-fixed-cluster.md) with a fixed number of initial
+      nodes, suitable for automated provisioning but requiring manual
+      intervention for resizing
+    * A [heterogenous cluster](/site/operational-guide/autoscaling.md) comprising fixed and autoscaling
+      components, suitable for a base load with automated
+      scale-out/scale-in
+    * A [uniformly configured cluster](/site/operational-guide/uniform-dynamic-cluster.md) with dynamic nodes, suitable   for automated provisioning and resizing.
+* A list of [common administrative tasks](/site/operational-guide/tasks.md), such as configuring Weave Net 
+  to start on boot, upgrading clusters, cleaning up peers and 
+  reclaiming IP address space
 
- * **[Concepts](/site/operational-guide/concepts.md)**- Begin here for an overview of the terminology as well as the general concepts behind container networking with Weave Net. 
- * **[Interactive Deployment](/site/operational-guide/interactive.md)** – Describes what interactive mode is, when to use it, and how to get up and running quickly with Weave Net. 
- * **[Uniform Fixed Cluster](/site/operational-guide/uniform-fixed-cluster.md)** – Using a simple deployment scenario, where the number of nodes is equal to 1, and all peers have identical configuration, this section describes how to manually bootstrap, add, and remove peers. 
- * **[Autoscaling](/site/operational-guide/autoscaling.md)** – Beginning with a fixed cluster, how to bootstrap peers, and then how to scale them in and out is described. 
- * **[Uniform Dynamic Cluster](/site/operational-guide/uniform-dynamic-cluster.md)** – In this deployment scenario,  where the number of nodes is equal to 1, and all peers have identical configuration, bootstrapping, adding, removing peers through an automated script is described. 
- * **[Tasks](/site/operational-guide/tasks.md)** – Common administrative tasks such configuring Weave Net to start at boot, upgrading clusters, cleaning up peers, and reclaiming IP address space are described. 
 
