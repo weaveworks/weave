@@ -16,7 +16,7 @@ The following concepts are described:
     * [Seeding](#seeding)
     * [Consensus](#consensus)
     * [Observers](#observers)
-    * [Persistence](#persistence)
+ * [Persistence](#persistence)
 
 ##<a name="host"></a>Host
 
