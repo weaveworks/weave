@@ -84,7 +84,7 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 	srcMac := net.HardwareAddr(key.SrcMAC[:])
 	dstMac := net.HardwareAddr(key.DstMAC[:])
 
-	switch newSrcMac, conflictPeer := router.Macs.AddForced(srcMac, router.Ourself.Peer); {
+	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, router.Ourself.Peer); {
 	case newSrcMac:
 		log.Print("Discovered local MAC ", srcMac)
 	case conflictPeer != nil:
@@ -136,7 +136,7 @@ func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp 
 	srcMac := net.HardwareAddr(key.SrcMAC[:])
 	dstMac := net.HardwareAddr(key.DstMAC[:])
 
-	switch newSrcMac, conflictPeer := router.Macs.AddForced(srcMac, key.SrcPeer); {
+	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, key.SrcPeer); {
 	case newSrcMac:
 		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer)
 	case conflictPeer != nil:

@@ -30,7 +30,7 @@ func NewMacCache(maxAge time.Duration, onExpiry func(net.HardwareAddr, *mesh.Pee
 	return cache
 }
 
-func (cache *MacCache) add(mac net.HardwareAddr, peer *mesh.Peer, force bool) (bool, *mesh.Peer) {
+func (cache *MacCache) Add(mac net.HardwareAddr, peer *mesh.Peer) (bool, *mesh.Peer) {
 	key := macint(mac)
 	now := time.Now()
 
@@ -55,9 +55,6 @@ func (cache *MacCache) add(mac net.HardwareAddr, peer *mesh.Peer, force bool) (b
 
 	if entry.peer != peer {
 		conflictPeer = entry.peer
-		if !force {
-			return false, conflictPeer
-		}
 		entry.peer = peer
 	}
 
@@ -66,14 +63,6 @@ func (cache *MacCache) add(mac net.HardwareAddr, peer *mesh.Peer, force bool) (b
 	}
 
 	return false, conflictPeer
-}
-
-func (cache *MacCache) Add(mac net.HardwareAddr, peer *mesh.Peer) (bool, *mesh.Peer) {
-	return cache.add(mac, peer, false)
-}
-
-func (cache *MacCache) AddForced(mac net.HardwareAddr, peer *mesh.Peer) (bool, *mesh.Peer) {
-	return cache.add(mac, peer, true)
 }
 
 func (cache *MacCache) Lookup(mac net.HardwareAddr) *mesh.Peer {
