@@ -302,13 +302,20 @@ func (fastdp fastDatapathOverlay) InvalidateRoutes() {
 	log.Debug("InvalidateRoutes")
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
-	checkWarn(fastdp.deleteFlows())
+	fastdp.deleteFlowsAndMACs()
 }
 
 func (fastdp fastDatapathOverlay) InvalidateShortIDs() {
 	log.Debug("InvalidateShortIDs")
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
+	fastdp.deleteFlowsAndMACs()
+}
+
+// NB: The fastdp lock has to be taken before calling.
+func (fastdp *FastDatapath) deleteFlowsAndMACs() {
+	fastdp.sendToMAC = make(map[MAC]bridgeSender)
+	fastdp.seenMACs = make(map[MAC]struct{})
 	checkWarn(fastdp.deleteFlows())
 }
 
@@ -1023,7 +1030,7 @@ func (fastdp *FastDatapath) makeBridgeVport(vport odp.Vport) {
 
 	// Delete flows, in order to recalculate flows for broadcasts
 	// on the bridge.
-	checkWarn(fastdp.deleteFlows())
+	fastdp.deleteFlowsAndMACs()
 
 	// Packets coming from the netdev are processed by the bridge
 	fastdp.missHandlers[vportID] = func(flowKeys odp.FlowKeys, lock *fastDatapathLock) FlowOp {
