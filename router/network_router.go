@@ -81,25 +81,15 @@ func (router *NetworkRouter) Start() {
 
 func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 	router.PacketLogging.LogPacket("Captured", key)
-	srcMac := net.HardwareAddr(key.SrcMAC[:])
-	dstMac := net.HardwareAddr(key.DstMAC[:])
 
-	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, router.Ourself.Peer); {
-	case newSrcMac:
-		log.Print("Discovered local MAC ", srcMac)
-	case conflictPeer != nil:
-		// The MAC cache has an entry for the source MAC associated
-		// with another peer. This can happen when a MAC has moved.
-		log.Print("Discovered local MAC ", srcMac, " (was at ", conflictPeer, ")")
-		// We need to clear out any flows with the MAC as the source.
-		router.Overlay.(NetworkOverlay).InvalidateRoutes()
-	}
+	router.learnMAC(key, router.Ourself.Peer)
 
 	// Discard STP broadcasts
 	if key.DstMAC == [...]byte{0x01, 0x80, 0xC2, 0x00, 0x00, 0x00} {
 		return DiscardingFlowOp{}
 	}
 
+	dstMac := net.HardwareAddr(key.DstMAC[:])
 	switch dstPeer := router.Macs.Lookup(dstMac); dstPeer {
 	case router.Ourself.Peer:
 		// The packet is destined for a local MAC.  The bridge
@@ -123,6 +113,11 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 }
 
 func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp {
+	if key.SrcPeer == router.Ourself.Peer {
+		// Might happen when a MAC has moved immediately after sending a packet.
+		log.Warning("Detected loop at ", router.Ourself.Peer, " (", key, ")")
+	}
+
 	if key.DstPeer != router.Ourself.Peer {
 		// it's not for us, we're just relaying it
 		router.PacketLogging.LogForwardPacket("Relaying", key)
@@ -133,21 +128,11 @@ func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp 
 	// (because the DstPeer on a forwarded broadcast packet is
 	// always set to the peer being forwarded to)
 
-	srcMac := net.HardwareAddr(key.SrcMAC[:])
-	dstMac := net.HardwareAddr(key.DstMAC[:])
-
-	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, key.SrcPeer); {
-	case newSrcMac:
-		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer)
-	case conflictPeer != nil:
-		log.Print("Discovered remote MAC ", srcMac, " at ", key.SrcPeer, " (was at ", conflictPeer, ")")
-		// We need to clear out any flows destined to the MAC
-		// that forward to the old peer.
-		router.Overlay.(NetworkOverlay).InvalidateRoutes()
-	}
+	router.learnMAC(key.PacketKey, key.SrcPeer)
 
 	router.PacketLogging.LogForwardPacket("Injecting", key)
 	injectFop := router.Bridge.InjectPacket(key.PacketKey)
+	dstMac := net.HardwareAddr(key.DstMAC[:])
 	dstPeer := router.Macs.Lookup(dstMac)
 	if dstPeer == router.Ourself.Peer {
 		return injectFop
@@ -165,6 +150,21 @@ func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp 
 		mfop.Add(injectFop)
 		mfop.Add(relayFop)
 		return mfop
+	}
+}
+
+func (router *NetworkRouter) learnMAC(key PacketKey, srcPeer *mesh.Peer) {
+	srcMac := net.HardwareAddr(key.SrcMAC[:])
+
+	switch newSrcMac, conflictPeer := router.Macs.Add(srcMac, srcPeer); {
+	case newSrcMac:
+		log.Print("Discovered MAC ", srcMac, " at ", srcPeer)
+	case conflictPeer != nil:
+		// If it's a local MAC, then the MAC cache has an entry for the source
+		// MAC associated with another peer. This can happen when a MAC has moved.
+		log.Print("Discovered MAC ", srcMac, " at ", srcPeer, " (was at ", conflictPeer, ")")
+		// We need to clear out any flows with the MAC as the source.
+		router.Overlay.(NetworkOverlay).InvalidateRoutes()
 	}
 }
 
