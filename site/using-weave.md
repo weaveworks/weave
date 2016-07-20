@@ -51,8 +51,7 @@ Where,
 > the same shell.
 
 > **Important!** If you intend to use the
-> [Weave Docker Network Plugin](/site/plugin.md) do not run `eval
-> $(weave env)`.
+> [Weave Docker Network Plugin](/site/plugin.md) do not run `eval $(weave env)`.
 
 Weave Net must be launched once per host. The relevant container images will be pulled down from Docker Hub on demand during `weave launch`. 
 
