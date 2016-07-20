@@ -29,12 +29,30 @@ Where,
  * The second line configures the Weave Net environment, so that containers launched via the Docker command line are automatically attached to the Weave network, and, 
  * The third line runs the [application container](/site/faq.md#own-image) using [a Docker command](https://docs.docker.com/engine/reference/run/).
 
->**Note:** If the first command results in an error like
- `http:///var/run/Docker.sock/v1.19/containers/create: dial unix
- /var/run/Docker.sock: permission denied. Are you trying to connect to a TLS-enabled daemon without TLS?` then you likely need to be 'root' in order to connect to the Docker daemon. If so, run the above and all subsequent commands in a *single* root shell (e.g. one created with `sudo -s`). Do *not* prefix individual commands with `sudo`, since some commands modify environment entries and hence they all need to be executed from the same shell.
- 
+> **Note** If the first command results in an error like
+> ```
+>    Cannot connect to the Docker daemon. Is the docker daemon running on this host?
+> ```
+> or
+> ```
+>    http:///var/run/docker.sock/v1.19/containers/create: dial unix/var/run/docker.sock: permission denied. Are you trying to connect to a TLS-enabled daemon without TLS?
+> ```
+> then you likely need to be 'root' in order to connect to the Docker
+> daemon. If so, run the above and all subsequent commands in a
+> *single* root shell:
+> ```
+>    host1$ sudo -s
+>    host1# weave launch
+>    host1# eval $(weave env)
+>    host1# docker run --name a1 -ti weaveworks/ubuntu
+> ```
+> Do *not* prefix individual commands with `sudo`, since some commands
+> modify environment entries and hence they all need to be executed from
+> the same shell.
 
->**Important!** if you are running the Weave Docker Network Plugin do not run `eval $(weave env)`. See [Using the Weave Net Docker Network Plugin](/site/plugin.md) for more information.
+> **Important!** If you intend to use the
+> [Weave Docker Network Plugin](/site/plugin.md) do not run `eval
+> $(weave env)`.
 
 Weave Net must be launched once per host. The relevant container images will be pulled down from Docker Hub on demand during `weave launch`. 
 
