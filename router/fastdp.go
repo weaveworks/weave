@@ -260,20 +260,8 @@ func (fastdp *FastDatapath) bridge(ingress bridgePortID, key PacketKey, lock *fa
 	// Otherwise, it might be a real broadcast, or it might
 	// be for a MAC we don't know about yet.  Either way, we'll
 	// broadcast it.
-	mfop := NewMultiFlowOp(false)
-
-	if (key.DstMAC[0] & 1) == 0 {
-		// Not a real broadcast, so don't create a flow rule.
-		// If we did, we'd need to delete the flows every time
-		// we learned a new MAC address, or have a more
-		// complicated selective invalidation scheme.
-		log.Debug("fastdp: unknown dst", ingress, key)
-		mfop.Add(vetoFlowCreationFlowOp{})
-	} else {
-		// A real broadcast
-		log.Debug("fastdp: broadcast", ingress, key)
-		mfop.Add(odpEthernetFlowKey(key))
-	}
+	mfop := NewMultiFlowOp(true)
+	mfop.Add(odpEthernetFlowKey(key))
 
 	// Send to all ports except the one it came in on. The
 	// sendToPort map is immutable, so it is safe to iterate over
@@ -960,7 +948,7 @@ func (fastdp *FastDatapath) Miss(packet []byte, fks odp.FlowKeys) error {
 	// including the ingress in every flow makes things simpler
 	// in touchFlow.
 	mfop := NewMultiFlowOp(false, handler(fks, &lock), odpFlowKey(odp.NewInPortFlowKey(ingress)))
-	fastdp.send(mfop, packet, &lock)
+	fastdp.send(mfop, fks, packet, &lock)
 	return nil
 }
 
@@ -1057,13 +1045,15 @@ func (fastdp *FastDatapath) deleteSendToPort(portID bridgePortID) {
 }
 
 // Send a packet, creating a corresponding ODP flow rule if possible
-func (fastdp *FastDatapath) send(fops FlowOp, frame []byte, lock *fastDatapathLock) {
+
+func (fastdp *FastDatapath) send(fops FlowOp, fks odp.FlowKeys, frame []byte, lock *fastDatapathLock) {
 	// Gather the actions from actionFlowOps, execute any others
 	var dec *EthernetDecoder
 	flow := odp.NewFlowSpec()
 	createFlow := true
 
-	for _, xfop := range FlattenFlowOp(fops) {
+	xfops, broadcast := FlattenFlowOp(fops)
+	for _, xfop := range xfops {
 		switch fop := xfop.(type) {
 		case interface {
 			updateFlowSpec(*odp.FlowSpec)
@@ -1108,6 +1098,14 @@ func (fastdp *FastDatapath) send(fops FlowOp, frame []byte, lock *fastDatapathLo
 	if len(flow.Actions) != 0 {
 		lock.relock()
 		checkWarn(fastdp.dp.Execute(frame, nil, flow.Actions))
+	}
+
+	if broadcast && (flowKeysToPacketKey(fks).DstMAC[0]&1 == 0) {
+		// Not a real broadcast, so don't create a flow rule.
+		// If we did, we'd need to delete the flows every time
+		// we learned a new MAC address, or have a more
+		// complicated selective invalidation scheme.
+		createFlow = false
 	}
 
 	if createFlow {
