@@ -84,19 +84,24 @@ func (mfop *MultiFlowOp) Discards() bool {
 	return true
 }
 
-// Flatten out a FlowOp to eliminate any MultiFlowOps
-func FlattenFlowOp(fop FlowOp) []FlowOp {
+// Flatten out a FlowOp to eliminate any MultiFlowOps and return a broadcast hint
+// which is true if any MultiFlowOps has set it to true.
+func FlattenFlowOp(fop FlowOp) (fops []FlowOp, broadcast bool) {
 	return collectFlowOps(nil, fop)
 }
 
-func collectFlowOps(into []FlowOp, fop FlowOp) []FlowOp {
+func collectFlowOps(into []FlowOp, fop FlowOp) ([]FlowOp, bool) {
+	var broadcast, bcast bool
+
 	if mfop, ok := fop.(*MultiFlowOp); ok {
+		broadcast = broadcast || mfop.broadcast
 		for _, op := range mfop.ops {
-			into = collectFlowOps(into, op)
+			into, bcast = collectFlowOps(into, op)
+			broadcast = broadcast || bcast
 		}
 
-		return into
+		return into, broadcast
 	}
 
-	return append(into, fop)
+	return append(into, fop), broadcast
 }
