@@ -133,7 +133,9 @@ func NewFastDatapath(iface *net.Interface, port int) (*FastDatapath, error) {
 	}
 
 	for _, vport := range vports {
-		fastdp.makeBridgeVport(vport)
+		if vport.ID != 0 {
+			fastdp.makeBridgeVport(vport)
+		}
 	}
 
 	success = true
@@ -245,6 +247,7 @@ func (fastdp fastDatapathBridge) InjectPacket(key PacketKey) FlowOp {
 
 func (fastdp *FastDatapath) bridge(ingress bridgePortID, key PacketKey, lock *fastDatapathLock) FlowOp {
 	lock.relock()
+
 	if fastdp.sendToMAC[key.SrcMAC] == nil {
 		// Learn the source MAC
 		fastdp.sendToMAC[key.SrcMAC] = fastdp.sendToPort[ingress]
@@ -1118,7 +1121,7 @@ func (fastdp *FastDatapath) send(fops FlowOp, frame []byte, lock *fastDatapathLo
 		// to handle one packet like that, but it would be bad
 		// to introduce a stale flow.
 		if lock.deleteFlowsCount == fastdp.deleteFlowsCount {
-			log.Debug("Creating ODP flow ", flow)
+			log.Print("Creating ODP flow ", flow)
 			checkWarn(fastdp.dp.CreateFlow(flow))
 		}
 	}
