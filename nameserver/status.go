@@ -36,9 +36,10 @@ func NewStatus(ns *Nameserver, dnsServer *DNSServer) *Status {
 			entry.Tombstone})
 	}
 
+	upstreamConfig, _ := dnsServer.upstream.Config()
 	return &Status{
 		dnsServer.domain,
-		dnsServer.upstream.Config().Servers,
+		upstreamConfig.Servers,
 		dnsServer.address,
 		dnsServer.ttl,
 		entryStatusSlice}

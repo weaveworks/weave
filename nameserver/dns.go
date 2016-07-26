@@ -28,7 +28,7 @@ const (
 )
 
 type Upstream interface {
-	Config() *dns.ClientConfig
+	Config() (*dns.ClientConfig, error)
 }
 
 func NewUpstream(resolvConf, filterAddress string) Upstream {
@@ -48,27 +48,31 @@ type upstream struct {
 	lastModified  time.Time
 }
 
-func (u *upstream) Config() *dns.ClientConfig {
+func (u *upstream) Config() (*dns.ClientConfig, error) {
 	u.Lock()
 	defer u.Unlock()
 
 	// If we checked less than five seconds ago return what we already have
 	now := time.Now()
 	if now.Sub(u.lastStat) < 5*time.Second {
-		return u.cachedConfig
+		return u.cachedConfig, nil
 	}
 	u.lastStat = now
 
 	// Reread file if it has changed
-	if fi, err := os.Stat(u.resolvConf); err == nil && fi.ModTime() != u.lastModified {
+	if fi, err := os.Stat(u.resolvConf); err != nil {
+		return u.cachedConfig, err
+	} else if fi.ModTime() != u.lastModified {
 		if config, err := dns.ClientConfigFromFile(u.resolvConf); err == nil {
 			config.Servers = filter(config.Servers, u.filterAddress)
 			u.lastModified = fi.ModTime()
 			u.cachedConfig = config
+		} else {
+			return u.cachedConfig, err
 		}
 	}
 
-	return u.cachedConfig
+	return u.cachedConfig, nil
 }
 
 func filter(ss []string, s string) []string {
@@ -257,7 +261,10 @@ func (h *handler) handleRecursive(w dns.ResponseWriter, req *dns.Msg) {
 		}
 	}
 
-	upstreamConfig := h.upstream.Config()
+	upstreamConfig, err := h.upstream.Config()
+	if err != nil {
+		h.ns.errorf("unable to read upstream config: %s", err)
+	}
 	for _, server := range upstreamConfig.Servers {
 		reqCopy := req.Copy()
 		reqCopy.Id = dns.Id()

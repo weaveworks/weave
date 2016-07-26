@@ -19,8 +19,8 @@ type mockUpstream struct {
 	config *dns.ClientConfig
 }
 
-func (mu *mockUpstream) Config() *dns.ClientConfig {
-	return mu.config
+func (mu *mockUpstream) Config() (*dns.ClientConfig, error) {
+	return mu.config, nil
 }
 
 func startServer(t *testing.T, upstream *dns.ClientConfig) (*DNSServer, *Nameserver, int, int) {
