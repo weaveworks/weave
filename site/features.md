@@ -88,11 +88,6 @@ Using the Weave plugin enables you to take advantage of [Docker's network functi
 Also, Weave’s Docker Network plugin doesn't require an external cluster store and you can start and stop containers even 
 when there are network connectivity problems.
 
-
-
->*Note:* The plugin is an *alternative* to the proxy, and therefore you do
-*not* need to run `eval $(weave env)` beforehand.
-
 See [Using the Weave Docker Network Plugin](/site/plugin.md) for more details.
 
 
