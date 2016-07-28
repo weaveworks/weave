@@ -1480,11 +1480,12 @@ proxy_args() {
 
     if [ -z "$PROXY_TLS_ENABLED" -a -z "$PROXY_TLS_DETECTION_DISABLED" ] ; then
         if ! DOCKER_TLS_ARGS=$(util_op docker-tls-args) ; then
-            echo "Unable to auto-detect proxy TLS configuration; you must launch the proxy with" >&2
-            echo "'weave launch-proxy' and supply '--no-detect-tls' or TLS options." >&2
-            exit 1
+            echo -n "Warning: unable to detect proxy TLS configuration. To enable TLS, " >&2
+            echo -n "launch the proxy with 'weave launch-proxy' and supply TLS options. " >&2
+            echo "To suppress this warning, supply the '--no-detect-tls' option." >&2
+        else
+            proxy_parse_args $DOCKER_TLS_ARGS
         fi
-        proxy_parse_args $DOCKER_TLS_ARGS
     fi
     if [ -z "$PROXY_HOST" ] ; then
       case "$DOCKER_CLIENT_HOST" in
