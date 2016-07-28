@@ -5,7 +5,9 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 	"github.com/vishvananda/netlink"
+
 	"github.com/weaveworks/weave/common"
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 func containerAddrs(args []string) error {
@@ -21,6 +23,9 @@ func containerAddrs(args []string) error {
 
 	pred, err := common.ConnectedToBridgePredicate(bridgeName)
 	if err != nil {
+		if err == weavenet.ErrLinkNotFound {
+			return nil
+		}
 		return err
 	}
 
