@@ -50,9 +50,6 @@ Where,
 > modify environment entries and hence they all need to be executed from
 > the same shell.
 
-> **Important!** If you intend to use the
-> [Weave Docker Network Plugin](/site/plugin.md) do not run `eval $(weave env)`.
-
 Weave Net must be launched once per host. The relevant container images will be pulled down from Docker Hub on demand during `weave launch`. 
 
 You can also preload the images by running `weave setup`. Preloaded images are useful for automated deployments, and ensure there are no delays during later operations.

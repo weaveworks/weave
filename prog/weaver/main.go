@@ -194,7 +194,7 @@ func main() {
 
 	peers = mflag.Args()
 	if resume && len(peers) > 0 {
-		Log.Fatalf("You must not specify an initial peer list in conjuction with --resume")
+		Log.Fatalf("You must not specify an initial peer list in conjunction with --resume")
 	}
 
 	common.SetLogLevel(logLevel)
