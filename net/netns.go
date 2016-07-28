@@ -1,11 +1,14 @@
 package net
 
 import (
+	"errors"
 	"runtime"
 
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 )
+
+var ErrLinkNotFound = errors.New("Link not found")
 
 // NB: The following function is unsafe, because:
 //     - It changes a network namespace (netns) of an OS thread which runs
@@ -42,6 +45,9 @@ func WithNetNSLinkUnsafe(ns netns.NsHandle, ifName string, work func(link netlin
 	return WithNetNSUnsafe(ns, func() error {
 		link, err := netlink.LinkByName(ifName)
 		if err != nil {
+			if err.Error() == errors.New("Link not found").Error() {
+				return ErrLinkNotFound
+			}
 			return err
 		}
 		return work(link)
