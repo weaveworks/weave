@@ -96,10 +96,10 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 		return DiscardingFlowOp{}
 	}
 
-	// Discard STP broadcasts
-	if key.DstMAC == [...]byte{0x01, 0x80, 0xC2, 0x00, 0x00, 0x00} {
-		return DiscardingFlowOp{}
-	}
+	//// Discard STP broadcasts
+	//if key.DstMAC == [...]byte{0x01, 0x80, 0xC2, 0x00, 0x00, 0x00} {
+	//	return DiscardingFlowOp{}
+	//}
 
 	switch dstPeer := router.Macs.Lookup(dstMac); dstPeer {
 	case router.Ourself.Peer:
