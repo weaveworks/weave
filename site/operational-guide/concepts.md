@@ -6,18 +6,30 @@ This section describes some of the essential concepts with which you will
 need to be familiar before continuing to the example deployment
 scenarios.
 
-## Host
+The following concepts are described:
+
+ * [Host](#host)
+ * [Peer](#peer)
+ * [Peer Discovery](#peer-discovery)
+ * [Network Partition](#network-partition)
+ * [IP Address Manager- IPAM](#ip-address-manager)
+    * [Seeding](#seeding)
+    * [Consensus](#consensus)
+    * [Observers](#observers)
+ * [Persistence](#persistence)
+
+##<a name="host"></a>Host
 
 For the purposes of this documentation a host is an
 installation of the Linux operating system that is running an
 instance of the Docker Engine. The host may be executing directly on bare
 hardware or inside a virtual machine.
 
-## Peer
+##<a name="peer"></a>Peer
 
 A peer is a running instance of Weave Net, typically one per host.
 
-## Peer Name
+##<a name="peer-name"></a>Peer Name
 
 Weave Net peers are identified by a 48-bit value formatted like an
 ethernet MAC address, for example, `01:23:45:67:89:ab`. The 'peer
@@ -50,14 +62,14 @@ The appropriate strategy for assigning peer names depends on the type
 and method of your particular deployment and is discussed in more
 detail below.
 
-## Peer Discovery
+##<a name="peer-discovery"></a>Peer Discovery
 
 Peer discovery is a mechanism that allows peers to learn about new
 Weave Net hosts from existing peers without being explicitly told. Peer
 discovery is
 [enabled by default](/site/using-weave/finding-adding-hosts-dynamically.md).
 
-## Network Partition
+##<a name="network-partition"></a>Network Partition
 
 A network partition is a transient condition whereby some arbitrary
 subsets of peers are unable to communicate with each other for the
@@ -66,7 +78,7 @@ optic line severed. Weave Net is designed to allow peers and their
 containers to make maximum safe progress under conditions of
 partition, healing automatically once the partition is over.
 
-## IP Address Manager (IPAM)
+##<a name="ip-address-manager"></a>IP Address Manager (IPAM)
 
 [IPAM](/site/ipam.md) is the subsystem responsible for dividing up a
 large contiguous block of IP addresses (known as the IP allocation
@@ -77,7 +89,7 @@ When a new network is formed an initial division of the IP allocation
 range must be made. Two (mutually exclusive) mechanisms with different
 tradeoffs are provided to perform this task: seeding and consensus.
 
-### Seeding
+### <a name="seeding"></a>Seeding
 
 Seeding requires each peer to be told the list of peer names amongst
 which the address space is to be divided initially. There are some
@@ -100,7 +112,7 @@ scenarios:
 
 * [Uniform Dynamic Cluster](/site/operational-guide/uniform-dynamic-cluster.md)
 
-### Consensus
+###<a name="consensus"></a>Consensus
 
 Alternatively, when a new network is formed for the first time, peers
 can be configured to co-ordinate amongst themselves to automatically
@@ -116,7 +128,7 @@ scenarios:
 * [Interactive Deployment](/site/operational-guide/interactive.md)
 * [Uniform Fixed Cluster](/site/operational-guide/uniform-fixed-cluster.md)
 
-### Observers
+###<a name="observers"></a>Observers
 
 Finally, an option is provided to start a peer as an _observer_. Such
 peers do not require a seed peer name list or an initial peer
@@ -130,7 +142,7 @@ scenarios:
 
 * [Autoscaling](/site/operational-guide/autoscaling.md)
 
-## Persistence
+##<a name="persistence"></a>Persistence
 
 Certain information is remembered between launches of Weave Net (for
 example across reboots):
