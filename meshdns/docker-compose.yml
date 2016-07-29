@@ -1,0 +1,16 @@
+version: '2'
+
+services:
+  head:
+    image: 'weaveworks/standalone-dns'
+    ports: [ '8080:8080' ]
+    networks: [ 'test' ]
+  peer:
+    image: 'weaveworks/standalone-dns'
+    environment:
+      PEERS: 'head'
+    networks: [ 'test' ]
+
+networks:
+  test:
+    driver: bridge
