@@ -1,3 +1,5 @@
+// +build !darwin
+
 // This contains the Overlay implementation for weave's own UDP
 // encapsulation protocol ("sleeve" because a sleeve encapsulates
 // something, it's often woven, it rhymes with "weave", make up your
