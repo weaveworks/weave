@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"strings"
