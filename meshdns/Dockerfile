@@ -15,4 +15,6 @@ RUN go install -v
 
 VOLUME /db
 
-CMD /go/bin/meshdns --name=$(cat /sys/class/net/eth0/address) --db-prefix=/db --dns-listen-address=0.0.0.0:53 --resolv-conf=./resolv.conf --http-addr=0.0.0.0:8080
+EXPOSE 53/udp 53/tcp 6789/udp 6789/tcp 8080/tcp
+
+CMD /go/bin/meshdns --name=$(cat /sys/class/net/eth0/address) --db-prefix=/db --dns-listen-address=0.0.0.0:53 --resolv-conf=./resolv.conf --http-addr=0.0.0.0:8080 --port=6789
