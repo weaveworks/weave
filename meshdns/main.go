@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/pkg/mflag"
-	//"github.com/gorilla/mux"
+	"github.com/gorilla/mux"
 	"github.com/pkg/profile"
 	"github.com/weaveworks/mesh"
 
@@ -336,32 +336,32 @@ func main() {
 	defer dnsserver.Stop()
 	//}
 
-	/*
-		router.Start()
-		if errors := router.InitiateConnections(peers, false); len(errors) > 0 {
-			Log.Fatal(common.ErrorMessages(errors))
-		}
+	router.Start()
+	if errors := router.InitiateConnections(peers, false); len(errors) > 0 {
+		Log.Fatal(common.ErrorMessages(errors))
+	}
 
-		// The weave script always waits for a status call to succeed,
-		// so there is no point in doing "weave launch --http-addr ''".
-		// This is here to support stand-alone use of weaver.
-		if httpAddr != "" {
-			muxRouter := mux.NewRouter()
+	// The weave script always waits for a status call to succeed,
+	// so there is no point in doing "weave launch --http-addr ''".
+	// This is here to support stand-alone use of weaver.
+	if httpAddr != "" {
+		muxRouter := mux.NewRouter()
+		/*
 			if allocator != nil {
 				allocator.HandleHTTP(muxRouter, defaultSubnet, trackerName, dockerCli)
 			}
-			if ns != nil {
-				ns.HandleHTTP(muxRouter, dockerCli)
-			}
-			router.HandleHTTP(muxRouter)
-			HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
-			http.Handle("/", common.LoggingHTTPHandler(muxRouter))
-			Log.Println("Listening for HTTP control messages on", httpAddr)
-			go listenAndServeHTTP(httpAddr)
+		*/
+		if ns != nil {
+			ns.HandleHTTP(muxRouter, nil)
 		}
+		//router.HandleHTTP(muxRouter)
+		//HandleHTTP(muxRouter, version, router, nil, nil, ns, dnsserver)
+		http.Handle("/", common.LoggingHTTPHandler(muxRouter))
+		Log.Println("Listening for HTTP control messages on", httpAddr)
+		go listenAndServeHTTP(httpAddr)
+	}
 
-		common.SignalHandlerLoop(router)
-	*/
+	common.SignalHandlerLoop(router)
 }
 
 func options() map[string]string {
