@@ -1,21 +1,16 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/weaveworks/mesh"
 
-	"github.com/weaveworks/go-checkpoint"
-	"github.com/weaveworks/weave/ipam"
 	"github.com/weaveworks/weave/nameserver"
-	"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
 )
 
@@ -34,60 +29,6 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			return "none"
 		}
 		return strings.Join(list, ", ")
-	},
-	"printIPAMRanges": func(router weave.NetworkRouterStatus, status ipam.Status) string {
-		var buffer bytes.Buffer
-
-		type stats struct {
-			ips       uint32
-			nickname  string
-			reachable bool
-		}
-
-		peerStats := make(map[string]*stats)
-
-		for _, entry := range status.Entries {
-			s, found := peerStats[entry.Peer]
-			if !found {
-				s = &stats{nickname: entry.Nickname, reachable: entry.IsKnownPeer}
-				peerStats[entry.Peer] = s
-			}
-			s.ips += entry.Size
-		}
-
-		printOwned := func(name string, nickName string, reachable bool, ips uint32) {
-			reachableStr := ""
-			if !reachable {
-				reachableStr = "- unreachable!"
-			}
-			percentageRanges := float32(ips) * 100.0 / float32(status.RangeNumIPs)
-
-			displayName := name + "(" + nickName + ")"
-			fmt.Fprintf(&buffer, "%-37v %8d IPs (%04.1f%% of total) %s\n",
-				displayName, ips, percentageRanges, reachableStr)
-		}
-
-		// print the local info first
-		if ourStats := peerStats[router.Name]; ourStats != nil {
-			printOwned(router.Name, ourStats.nickname, true, ourStats.ips)
-		}
-
-		// and then the rest
-		for peer, stats := range peerStats {
-			if peer != router.Name {
-				printOwned(peer, stats.nickname, stats.reachable, stats.ips)
-			}
-		}
-
-		return buffer.String()
-	},
-	"allIPAMOwnersUnreachable": func(status ipam.Status) bool {
-		for _, entry := range status.Entries {
-			if entry.Size > 0 && entry.IsKnownPeer {
-				return false
-			}
-		}
-		return true
 	},
 	"printConnectionCounts": func(conns []mesh.LocalConnectionStatus) string {
 		counts := make(map[string]int)
@@ -140,7 +81,7 @@ func defTemplate(name string, text string) *template.Template {
 }
 
 var statusTemplate = defTemplate("status", `\
-        Version: {{.Version}} ({{.VersionCheck}})
+        Version: {{.Version}}
 
         Service: router
        Protocol: {{.Router.Protocol}} \
@@ -155,30 +96,6 @@ var statusTemplate = defTemplate("status", `\
         Targets: {{len .Router.Targets}}
     Connections: {{len .Router.Connections}}{{with printConnectionCounts .Router.Connections}} ({{.}}){{end}}
           Peers: {{len .Router.Peers}}{{with printPeerConnectionCounts .Router.Peers}} (with {{.}} connections){{end}}
- TrustedSubnets: {{printList .Router.TrustedSubnets}}
-{{if .IPAM}}\
-
-        Service: ipam
-{{if .IPAM.Entries}}\
-{{if allIPAMOwnersUnreachable .IPAM}}\
-         Status: all IP ranges owned by unreachable peers - use 'rmpeer' if they are dead
-{{else if len .IPAM.PendingAllocates}}\
-         Status: waiting for IP range grant from peers
-{{else}}\
-         Status: ready
-{{end}}\
-{{else if .IPAM.Paxos}}\
-{{if .IPAM.Paxos.Elector}}\
-         Status: awaiting consensus (quorum: {{.IPAM.Paxos.Quorum}}, known: {{.IPAM.Paxos.KnownNodes}})
-{{else}}\
-         Status: priming
-{{end}}\
-{{else}}\
-         Status: idle
-{{end}}\
-          Range: {{.IPAM.Range}}
-  DefaultSubnet: {{.IPAM.DefaultSubnet}}
-{{end}}\
 {{if .DNS}}\
 
         Service: dns
@@ -221,55 +138,17 @@ var dnsEntriesTemplate = defTemplate("dnsEntries", `\
 {{end}}\
 `)
 
-var ipamTemplate = defTemplate("ipamTemplate", `{{printIPAMRanges .Router .IPAM}}`)
-
-type VersionCheck struct {
-	Enabled     bool
-	NewVersion  string
-	NextCheckAt time.Time
-}
-
-func versionCheck() *VersionCheck {
-	v := &VersionCheck{}
-	if checkpoint.IsCheckDisabled() {
-		return v
-	}
-
-	v.Enabled = true
-	v.NewVersion = newVersion.Load().(string)
-	v.NextCheckAt = checker.NextCheckAt()
-
-	return v
-}
-
-func (v *VersionCheck) String() string {
-	switch {
-	case !v.Enabled:
-		return "version check update disabled"
-	case v.NewVersion != "":
-		return fmt.Sprintf("version %s available - please upgrade!",
-			v.NewVersion)
-	default:
-		return fmt.Sprintf("up to date; next check at %s",
-			v.NextCheckAt.Format("2006/01/02 15:04:05"))
-	}
-}
-
 type WeaveStatus struct {
-	Version      string
-	VersionCheck *VersionCheck              `json:"VersionCheck,omitempty"`
-	Router       *weave.NetworkRouterStatus `json:"Router,omitempty"`
-	IPAM         *ipam.Status               `json:"IPAM,omitempty"`
-	DNS          *nameserver.Status         `json:"DNS,omitempty"`
+	Version string
+	Router  *weave.NetworkRouterStatus `json:"Router,omitempty"`
+	DNS     *nameserver.Status         `json:"DNS,omitempty"`
 }
 
-func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
+func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
 	status := func() WeaveStatus {
 		return WeaveStatus{
 			version,
-			versionCheck(),
 			weave.NewNetworkRouterStatus(router),
-			ipam.NewStatus(allocator, defaultSubnet),
 			nameserver.NewStatus(ns, dnsserver)}
 	}
 	muxRouter.Methods("GET").Path("/report").Headers("Accept", "application/json").HandlerFunc(
@@ -318,5 +197,4 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 	defHandler("/status/connections", connectionsTemplate)
 	defHandler("/status/peers", peersTemplate)
 	defHandler("/status/dns", dnsEntriesTemplate)
-	defHandler("/status/ipam", ipamTemplate)
 }
