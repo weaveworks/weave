@@ -7,23 +7,23 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"runtime"
-	"strconv"
+	//"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/pkg/mflag"
-	"github.com/gorilla/mux"
+	//"github.com/gorilla/mux"
 	"github.com/pkg/profile"
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/docker"
+	//"github.com/weaveworks/weave/common/docker"
 	"github.com/weaveworks/weave/db"
-	"github.com/weaveworks/weave/ipam"
-	"github.com/weaveworks/weave/ipam/tracker"
+	//"github.com/weaveworks/weave/ipam"
+	//"github.com/weaveworks/weave/ipam/tracker"
 	"github.com/weaveworks/weave/nameserver"
-	weavenet "github.com/weaveworks/weave/net"
-	"github.com/weaveworks/weave/net/address"
+	//weavenet "github.com/weaveworks/weave/net"
+	//"github.com/weaveworks/weave/net/address"
 	weave "github.com/weaveworks/weave/router"
 )
 
@@ -31,6 +31,7 @@ var version = "(unreleased version)"
 
 var Log = common.Log
 
+/*
 type ipamConfig struct {
 	IPRangeCIDR   string
 	IPSubnetCIDR  string
@@ -39,6 +40,7 @@ type ipamConfig struct {
 	Observer      bool
 	SeedPeerNames []mesh.PeerName
 }
+*/
 
 type dnsConfig struct {
 	Domain                 string
@@ -49,6 +51,7 @@ type dnsConfig struct {
 	ResolvConf             string
 }
 
+/*
 func (c *ipamConfig) Enabled() bool {
 	var (
 		hasPeerCount = c.PeerCount > 0
@@ -106,6 +109,7 @@ func (c *ipamConfig) parseMode() error {
 
 	return nil
 }
+*/
 
 func main() {
 	procs := runtime.NumCPU()
@@ -126,28 +130,30 @@ func main() {
 		routerName         string
 		nickName           string
 		password           string
-		pktdebug           bool
-		logLevel           string
-		prof               string
-		bufSzMB            int
-		noDiscovery        bool
-		httpAddr           string
-		ipamConfig         ipamConfig
-		dockerAPI          string
-		peers              []string
-		noDNS              bool
-		dnsConfig          dnsConfig
-		datapathName       string
-		trustedSubnetStr   string
-		dbPrefix           string
-		isAWSVPC           bool
+		//pktdebug           bool
+		logLevel    string
+		prof        string
+		bufSzMB     int
+		noDiscovery bool
+		httpAddr    string
+		//ipamConfig         ipamConfig
+		//dockerAPI string
+		peers []string
+		//noDNS              bool
+		dnsConfig dnsConfig
+		//datapathName string
+		//trustedSubnetStr string
+		dbPrefix string
+		//isAWSVPC         bool
 
-		defaultDockerHost = "unix:///var/run/docker.sock"
+		//defaultDockerHost = "unix:///var/run/docker.sock"
 	)
 
-	if val := os.Getenv("DOCKER_HOST"); val != "" {
-		defaultDockerHost = val
-	}
+	/*
+		if val := os.Getenv("DOCKER_HOST"); val != "" {
+			defaultDockerHost = val
+		}
+	*/
 
 	mflag.BoolVar(&justVersion, []string{"#version", "-version"}, false, "print version and exit")
 	mflag.StringVar(&config.Host, []string{"-host"}, "", "router host")
@@ -159,28 +165,28 @@ func main() {
 	mflag.StringVar(&nickName, []string{"#nickname", "-nickname"}, "", "nickname of peer (defaults to hostname)")
 	mflag.StringVar(&password, []string{"#password", "-password"}, "", "network password")
 	mflag.StringVar(&logLevel, []string{"-log-level"}, "info", "logging level (debug, info, warning, error)")
-	mflag.BoolVar(&pktdebug, []string{"#pktdebug", "#-pktdebug", "-pkt-debug"}, false, "enable per-packet debug logging")
+	//mflag.BoolVar(&pktdebug, []string{"#pktdebug", "#-pktdebug", "-pkt-debug"}, false, "enable per-packet debug logging")
 	mflag.StringVar(&prof, []string{"#profile", "-profile"}, "", "enable profiling and write profiles to given path")
 	mflag.IntVar(&config.ConnLimit, []string{"#connlimit", "#-connlimit", "-conn-limit"}, 30, "connection limit (0 for unlimited)")
 	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
 	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
-	mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
-	mflag.StringVar(&ipamConfig.IPRangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
-	mflag.StringVar(&ipamConfig.IPSubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
-	mflag.IntVar(&ipamConfig.PeerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
-	mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
-	mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
+	//mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
+	//mflag.StringVar(&ipamConfig.IPRangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
+	//mflag.StringVar(&ipamConfig.IPSubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
+	//mflag.IntVar(&ipamConfig.PeerCount, []string{"#initpeercount", "#-initpeercount", "-init-peer-count"}, 0, "number of peers in network (for IP address allocation)")
+	//mflag.StringVar(&dockerAPI, []string{"#api", "#-api", "-docker-api"}, defaultDockerHost, "Docker API endpoint")
+	//mflag.BoolVar(&noDNS, []string{"-no-dns"}, false, "disable DNS server")
 	mflag.StringVar(&dnsConfig.Domain, []string{"-dns-domain"}, nameserver.DefaultDomain, "local domain to server requests for")
 	mflag.StringVar(&dnsConfig.ListenAddress, []string{"-dns-listen-address"}, nameserver.DefaultListenAddress, "address to listen on for DNS requests")
 	mflag.IntVar(&dnsConfig.TTL, []string{"-dns-ttl"}, nameserver.DefaultTTL, "TTL for DNS request from our domain")
 	mflag.DurationVar(&dnsConfig.ClientTimeout, []string{"-dns-fallback-timeout"}, nameserver.DefaultClientTimeout, "timeout for fallback DNS requests")
 	mflag.StringVar(&dnsConfig.EffectiveListenAddress, []string{"-dns-effective-listen-address"}, "", "address DNS will actually be listening, after Docker port mapping")
 	mflag.StringVar(&dnsConfig.ResolvConf, []string{"-resolv-conf"}, "", "path to resolver configuration for fallback DNS lookups")
-	mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
-	mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
+	//mflag.StringVar(&datapathName, []string{"-datapath"}, "", "ODP datapath name")
+	//mflag.StringVar(&trustedSubnetStr, []string{"-trusted-subnets"}, "", "comma-separated list of trusted subnets in CIDR notation")
 	mflag.StringVar(&dbPrefix, []string{"-db-prefix"}, "/weavedb/weave", "pathname/prefix of filename to store data")
-	mflag.BoolVar(&isAWSVPC, []string{"-awsvpc"}, false, "use AWS VPC for routing")
+	//mflag.BoolVar(&isAWSVPC, []string{"-awsvpc"}, false, "use AWS VPC for routing")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -215,16 +221,20 @@ func main() {
 	}
 	config.ProtocolMinVersion = byte(protocolMinVersion)
 
-	if pktdebug {
-		networkConfig.PacketLogging = packetLogging{}
-	} else {
-		networkConfig.PacketLogging = nopPacketLogging{}
-	}
+	/*
+		if pktdebug {
+			networkConfig.PacketLogging = packetLogging{}
+		} else {
+			networkConfig.PacketLogging = nopPacketLogging{}
+		}
+	*/
 
-	overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB)
-	networkConfig.Bridge = bridge
+	/*
+		overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB)
+		networkConfig.Bridge = bridge
+	*/
 
-	name := peerName(routerName, bridge.Interface())
+	name := peerName(routerName, nil)
 
 	if nickName == "" {
 		var err error
@@ -233,113 +243,125 @@ func main() {
 	}
 
 	config.Password = determinePassword(password)
-	config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
+	//config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
 	config.PeerDiscovery = !noDiscovery
 
-	if isAWSVPC && len(config.Password) > 0 {
-		Log.Fatalf("--awsvpc mode is not compatible with the --password option")
-	}
+	/*
+		if isAWSVPC && len(config.Password) > 0 {
+			Log.Fatalf("--awsvpc mode is not compatible with the --password option")
+		}
+	*/
 
 	db, err := db.NewBoltDB(dbPrefix + "data.db")
 	checkFatal(err)
 	defer db.Close()
 
-	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
+	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, nil, db)
 	Log.Println("Our name is", router.Ourself)
 
 	if peers, err = router.InitialPeers(resume, peers); err != nil {
 		Log.Fatal("Unable to get initial peer set: ", err)
 	}
 
-	var dockerCli *docker.Client
-	dockerVersion := "none"
-	if dockerAPI != "" {
-		dc, err := docker.NewClient(dockerAPI)
-		if err != nil {
-			Log.Fatal("Unable to start docker client: ", err)
-		} else {
-			Log.Info(dc.Info())
+	/*
+		var dockerCli *docker.Client
+		dockerVersion := "none"
+		if dockerAPI != "" {
+			dc, err := docker.NewClient(dockerAPI)
+			if err != nil {
+				Log.Fatal("Unable to start docker client: ", err)
+			} else {
+				Log.Info(dc.Info())
+			}
+			dockerCli = dc
+			dockerVersion = dockerCli.DockerVersion()
 		}
-		dockerCli = dc
-		dockerVersion = dockerCli.DockerVersion()
-	}
+	*/
 
-	network := ""
-	if isAWSVPC {
-		network = "awsvpc"
-	}
-	checkForUpdates(dockerVersion, network)
+	/*
+		network := ""
+		if isAWSVPC {
+			network = "awsvpc"
+		}
+		checkForUpdates(dockerVersion, network)
+	*/
 
-	observeContainers := func(o docker.ContainerObserver) {
-		if dockerCli != nil {
-			if err := dockerCli.AddObserver(o); err != nil {
-				Log.Fatal("Unable to start watcher", err)
+	/*
+		observeContainers := func(o docker.ContainerObserver) {
+			if dockerCli != nil {
+				if err := dockerCli.AddObserver(o); err != nil {
+					Log.Fatal("Unable to start watcher", err)
+				}
 			}
 		}
-	}
+	*/
 	isKnownPeer := func(name mesh.PeerName) bool {
 		return router.Peers.Fetch(name) != nil
 	}
 
-	var (
-		allocator     *ipam.Allocator
-		defaultSubnet address.CIDR
-		trackerName   string
-	)
-	if ipamConfig.Enabled() {
-		var t tracker.LocalRangeTracker
-		if isAWSVPC {
-			Log.Infoln("Creating AWSVPC LocalRangeTracker")
-			t, err = tracker.NewAWSVPCTracker()
-			if err != nil {
-				Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
+	/*
+		var (
+			allocator     *ipam.Allocator
+			defaultSubnet address.CIDR
+			trackerName   string
+		)
+		if ipamConfig.Enabled() {
+			var t tracker.LocalRangeTracker
+			if isAWSVPC {
+				Log.Infoln("Creating AWSVPC LocalRangeTracker")
+				t, err = tracker.NewAWSVPCTracker()
+				if err != nil {
+					Log.Fatalf("Cannot create AWSVPC LocalRangeTracker: %s", err)
+				}
+				trackerName = "awsvpc"
 			}
-			trackerName = "awsvpc"
+			allocator, defaultSubnet = createAllocator(router, ipamConfig, db, t, isKnownPeer)
+			observeContainers(allocator)
+			ids, err := dockerCli.AllContainerIDs()
+			checkFatal(err)
+			allocator.PruneOwned(ids)
 		}
-		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, t, isKnownPeer)
-		observeContainers(allocator)
-		ids, err := dockerCli.AllContainerIDs()
-		checkFatal(err)
-		allocator.PruneOwned(ids)
-	}
+	*/
 
 	var (
 		ns        *nameserver.Nameserver
 		dnsserver *nameserver.DNSServer
 	)
-	if !noDNS {
-		ns, dnsserver = createDNSServer(dnsConfig, router.Router, isKnownPeer)
-		observeContainers(ns)
-		ns.Start()
-		defer ns.Stop()
-		dnsserver.ActivateAndServe()
-		defer dnsserver.Stop()
-	}
+	//if !noDNS {
+	ns, dnsserver = createDNSServer(dnsConfig, router.Router, isKnownPeer)
+	//observeContainers(ns)
+	ns.Start()
+	defer ns.Stop()
+	dnsserver.ActivateAndServe()
+	defer dnsserver.Stop()
+	//}
 
-	router.Start()
-	if errors := router.InitiateConnections(peers, false); len(errors) > 0 {
-		Log.Fatal(common.ErrorMessages(errors))
-	}
-
-	// The weave script always waits for a status call to succeed,
-	// so there is no point in doing "weave launch --http-addr ''".
-	// This is here to support stand-alone use of weaver.
-	if httpAddr != "" {
-		muxRouter := mux.NewRouter()
-		if allocator != nil {
-			allocator.HandleHTTP(muxRouter, defaultSubnet, trackerName, dockerCli)
+	/*
+		router.Start()
+		if errors := router.InitiateConnections(peers, false); len(errors) > 0 {
+			Log.Fatal(common.ErrorMessages(errors))
 		}
-		if ns != nil {
-			ns.HandleHTTP(muxRouter, dockerCli)
-		}
-		router.HandleHTTP(muxRouter)
-		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
-		http.Handle("/", common.LoggingHTTPHandler(muxRouter))
-		Log.Println("Listening for HTTP control messages on", httpAddr)
-		go listenAndServeHTTP(httpAddr)
-	}
 
-	common.SignalHandlerLoop(router)
+		// The weave script always waits for a status call to succeed,
+		// so there is no point in doing "weave launch --http-addr ''".
+		// This is here to support stand-alone use of weaver.
+		if httpAddr != "" {
+			muxRouter := mux.NewRouter()
+			if allocator != nil {
+				allocator.HandleHTTP(muxRouter, defaultSubnet, trackerName, dockerCli)
+			}
+			if ns != nil {
+				ns.HandleHTTP(muxRouter, dockerCli)
+			}
+			router.HandleHTTP(muxRouter)
+			HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
+			http.Handle("/", common.LoggingHTTPHandler(muxRouter))
+			Log.Println("Listening for HTTP control messages on", httpAddr)
+			go listenAndServeHTTP(httpAddr)
+		}
+
+		common.SignalHandlerLoop(router)
+	*/
 }
 
 func options() map[string]string {
@@ -364,6 +386,7 @@ func canonicalName(f *mflag.Flag) string {
 	return ""
 }
 
+/*
 type packetLogging struct{}
 
 func (packetLogging) LogPacket(msg string, key weave.PacketKey) {
@@ -381,7 +404,9 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
+*/
 
+/*
 func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
@@ -420,7 +445,9 @@ func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host st
 
 	return overlay, bridge
 }
+*/
 
+/*
 func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, track tracker.LocalRangeTracker, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange, err := ipam.ParseCIDRSubnet(config.IPRangeCIDR)
 	checkFatal(err)
@@ -454,6 +481,7 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, t
 
 	return allocator, defaultSubnet
 }
+*/
 
 func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mesh.PeerName) bool) (*nameserver.Nameserver, *nameserver.DNSServer) {
 	ns := nameserver.New(router.Ourself.Peer.Name, config.Domain, isKnownPeer)
@@ -473,6 +501,7 @@ func createDNSServer(config dnsConfig, router *mesh.Router, isKnownPeer func(mes
 	return ns, dnsserver
 }
 
+/*
 // Pick a quorum size based on the number of peer addresses.
 func determineQuorum(initPeerCountFlag int, router *weave.NetworkRouter) uint {
 	if initPeerCountFlag > 0 {
@@ -493,6 +522,7 @@ func determineQuorum(initPeerCountFlag int, router *weave.NetworkRouter) uint {
 	Log.Println("Assuming quorum size of", quorum)
 	return quorum
 }
+*/
 
 func determinePassword(password string) []byte {
 	if password == "" {
@@ -518,6 +548,7 @@ func peerName(routerName string, iface *net.Interface) mesh.PeerName {
 	return name
 }
 
+/*
 func parseTrustedSubnets(trustedSubnetStr string) []*net.IPNet {
 	trustedSubnets := []*net.IPNet{}
 	if trustedSubnetStr == "" {
@@ -534,6 +565,7 @@ func parseTrustedSubnets(trustedSubnetStr string) []*net.IPNet {
 
 	return trustedSubnets
 }
+*/
 
 func parsePeerNames(s string) ([]mesh.PeerName, error) {
 	peerNames := []mesh.PeerName{}
