@@ -143,12 +143,22 @@ launch_router_options() {
     [ "$1" = "launch" -o "$1" = "launch-router" ] && echo -v /:/host -e HOST_ROOT=/host
 }
 
+exec_options() {
+    case "$1" in
+        # Required by create_bridge which might need machine-id
+        launch|launch-router|create-bridge|attach-router|run|start|attach|restart|expose|hide)
+            echo -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus -e HOST_ROOT=/host
+            ;;
+    esac
+}
+
 exec_remote() {
     docker $DOCKER_CLIENT_ARGS run --rm \
         $(docker_run_options) \
         --pid=host \
         $(cni_volume_options "$@") \
         $(launch_router_options "$@") \
+        $(exec_options "$@") \
         -e DOCKERHUB_USER="$DOCKERHUB_USER" \
         -e WEAVE_VERSION \
         -e WEAVE_DEBUG \
@@ -451,17 +461,21 @@ mac_from_hex() {
     read a b c d e f && printf "%02x:$b:$c:$d:$e:$f" $((0x$a & ~1 | 2))
 }
 
-mac_from_file() {
-    UUID=$(cat $1 2>/dev/null) || return 1
+mac_from_uid() {
     # We salt the input just as a precaution to avoid clashes with
     # other applications who might have had the bright idea of
     # generating MACs in the same way.
-    echo "9oBJ0Jmip-$UUID" | sha256sum | sed 's/\(..\)/\1 /g' | cut -c1-17 | mac_from_hex
+    echo "9oBJ0Jmip-$1" | sha256sum | sed 's/\(..\)/\1 /g' | cut -c1-17 | mac_from_hex
 }
 
 # Generate a random MAC value
 random_mac() {
     od -txC -An -N6 /dev/urandom | mac_from_hex
+}
+
+machineid() {
+    cat "$HOST_ROOT/etc/machine-id" 2>/dev/null && return 0 || true
+    cat "$HOST_ROOT/var/lib/dbus/machine-id" 2>/dev/null && return 0 || true
 }
 
 ######################################################################
@@ -696,16 +710,16 @@ init_bridge() {
 
     ip link add name $BRIDGE type bridge
 
-    # Derive the bridge MAC from the system (aka bios) UUID, or,
-    # failing that, the hypervisor UUID. Elsewhere we in turn derive
-    # the peer name from that, which we want to be stable across
-    # reboots but otherwise unique. The system/hypervisor UUID fits
-    # that bill, unlike, say, /etc/machine-id, which is often
-    # identical on VMs created from cloned filesystems. If we cannot
-    # determine the system/hypervisor UUID we just generate a random MAC.
-    MAC=$(mac_from_file /sys/class/dmi/id/product_uuid) || \
-        MAC=$(mac_from_file /sys/hypervisor/uuid) || \
-        MAC=$(random_mac)
+    # Derive the bridge MAC from concatenated machine-id (either systemd or
+    # dbus), the system (aka bios) UUID and the hypervisor UUID. If we cannot
+    # determine all of them we just generate a random MAC.
+    # Elsewhere we in turn derive the peer name from the bridge MAC, which we
+    # want to be stable across reboots but otherwise unique.
+
+    uid="$(machineid)"
+    uid="$uid#$(cat /sys/class/dmi/id/product_uuid 2>/dev/null || echo '')"
+    uid="$uid#$(cat /sys/hypervisor/uuid 2>/dev/null || echo '')"
+    [ "$uid" != "##" ] && MAC=$(mac_from_uid "$uid") || MAC=$(random_mac)
 
     ip link set dev $BRIDGE address $MAC
 
