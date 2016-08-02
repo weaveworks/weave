@@ -10,7 +10,7 @@ or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/),
 instead of `weave run`.
 
 
-###Attaching Containers to a Weave Network
+###<a name="attaching-containers"></a>Attaching Containers to a Weave Network
 
 There are three ways to attach containers to a Weave network (which method to use is 
 entirely up to you):
