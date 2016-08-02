@@ -14,9 +14,9 @@ instead of `weave run`.
 There are three ways to attach containers to a Weave network (which method to use is 
 entirely up to you):
 
- * The Weave Net Docker API Proxy. See [Setting Up the Weave Net Docker API Proxy](#weave-api-proxy).  
+**1.** The Weave Net Docker API Proxy. See [Setting Up the Weave Net Docker API Proxy](#weave-api-proxy).  
 
- * The Docker Network Plugin framework. The Docker Network Plugin is used when 
+**2.**  The Docker Network Plugin framework. The Docker Network Plugin is used when 
 Docker containers are started with the --net flag, for example: 
 
 `docker run --net <docker-run-options>`
@@ -30,7 +30,7 @@ Note that if a Docker container is started with the --net flag, then the Weave D
 is automatically disabled and is not used to attach containers. 
 See [Integrating Docker via the Network Plugin](plugin.md).
 
- * Containers can also be attached to the Weave network with `weave run` commands. This method also
+**3.** Containers can also be attached to the Weave network with `weave run` commands. This method also
 does not use the Weave Docker API Proxy. 
 See [Launching Containers With Weave Run (without the Proxy)](/site/weave-docker-api/launching-without-proxy.md). 
 
