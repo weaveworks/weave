@@ -298,9 +298,11 @@ func main() {
 		}
 		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, t, isKnownPeer)
 		observeContainers(allocator)
-		ids, err := dockerCli.AllContainerIDs()
-		checkFatal(err)
-		allocator.PruneOwned(ids)
+		if dockerCli != nil {
+			ids, err := dockerCli.AllContainerIDs()
+			checkFatal(err)
+			allocator.PruneOwned(ids)
+		}
 	}
 
 	var (
