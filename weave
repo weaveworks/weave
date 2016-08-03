@@ -425,7 +425,8 @@ delete_iptables_rule() {
 configure_arp_cache() {
     $2 sh -c "echo 5 >/proc/sys/net/ipv4/neigh/$1/base_reachable_time &&
               echo 2 >/proc/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
-              echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit"
+              echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit &&
+              echo 1 >/proc/sys/net/ipv4/conf/$1/arp_accept"
 }
 
 # Send out an ARP announcement
