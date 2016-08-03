@@ -91,7 +91,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		id = fmt.Sprintf("%x", data)
 	}
 
-	if err := weavenet.AttachContainer(ns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}, false); err != nil {
+	if err := weavenet.AttachContainer(ns, args.Netns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}, false); err != nil {
 		return err
 	}
 	if err := weavenet.WithNetNSLinkUnsafe(ns, args.IfName, func(link netlink.Link) error {
@@ -152,12 +152,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	ns, err := netns.GetFromPath(args.Netns)
-	if err != nil {
-		return err
-	}
-	defer ns.Close()
-	if _, err = weavenet.WithNetNS(ns, "del-iface", args.IfName); err != nil {
+	if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
 		return fmt.Errorf("error removing interface: %s", err)
 	}
 
