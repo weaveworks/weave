@@ -35,11 +35,6 @@ for a discussion on peer connections.
 
     weave launch <peer hosts>
 
-Next, assign an IP address to the Weave bridge and [enable access to containers from the host](/site/using-weave/host-network-integration.md),
-which is required by Kubernetes, by running the following:
-
-    weave expose
-
 ####Using the CNI network configuration file
 
 All CNI plugins are configured by a JSON file in the directory
@@ -49,7 +44,10 @@ file named `10-weave.conf`, which you can alter to suit your needs.
 See the [CNI Spec](https://github.com/appc/cni/blob/master/SPEC.md#network-configuration)
 for details on the format and contents of this file.
 
-By default, the Weave CNI plugin adds a default route out via the Weave bridge, so your containers can access resources on the internet.  If you do not want this, add a section to the config file that specifies no routes:
+By default, the Weave CNI plugin adds a default route out via an IP
+address on the Weave bridge, so your containers can access resources
+on the internet.  If you do not want this, add a section to the config
+file that specifies no routes:
 
     "ipam": {
         "routes": [ ]
