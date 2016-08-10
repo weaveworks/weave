@@ -29,7 +29,7 @@ case "$BRANCH" in
             if ! VERSION=$(echo "$DESCRIBE" | grep -oP '(?<=^v)[0-9]+\.[0-9]+\.[0-9]+') ; then
                 fatal "Could not infer latest $BRANCH version from $DESCRIBE"
             fi
-            TAGS="$VERSION latest"
+            TAGS="latest"
         else
             VERSION="$BRANCH"
             TAGS="$VERSION"
