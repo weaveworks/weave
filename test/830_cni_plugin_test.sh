@@ -15,7 +15,6 @@ run_on $HOST1 sudo mkdir -p /opt/cni/bin
 # setup-cni is a subset of 'weave setup', without doing any 'docker pull's
 weave_on $HOST1 setup-cni
 weave_on $HOST1 launch
-weave_on $HOST1 expose
 
 C1=$(docker_on $HOST1 run --net=none --name=c1 -dt $SMALL_IMAGE /bin/sh)
 C2=$(docker_on $HOST1 run --net=none --name=c2 -dt $SMALL_IMAGE /bin/sh)

@@ -40,6 +40,19 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 	return n, nil
 }
 
+func (c *CNIPlugin) getIP(ipamType string, args *skel.CmdArgs) (result *types.Result, err error) {
+	// Default IPAM is Weave's own
+	if ipamType == "" {
+		result, err = ipamplugin.NewIpam(c.weave).Allocate(args)
+	} else {
+		result, err = ipam.ExecAdd(ipamType, args.StdinData)
+	}
+	if err == nil && result.IP4 == nil {
+		return nil, fmt.Errorf("IPAM plugin failed to allocate IP address")
+	}
+	return result, err
+}
+
 func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	conf, err := loadNetConf(args.StdinData)
 	if err != nil {
@@ -53,24 +66,26 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("IP Masquerading functionality not supported")
 	}
 
-	var result *types.Result
-	// Default IPAM is Weave's own
-	if conf.IPAM.Type == "" {
-		result, err = ipamplugin.NewIpam(c.weave).Allocate(args)
-	} else {
-		result, err = ipam.ExecAdd(conf.IPAM.Type, args.StdinData)
-	}
+	result, err := c.getIP(conf.IPAM.Type, args)
 	if err != nil {
 		return fmt.Errorf("unable to allocate IP address: %s", err)
-	}
-	if result.IP4 == nil {
-		return fmt.Errorf("IPAM plugin failed to allocate IP address")
 	}
 
 	// If config says nothing about routes or gateway, default one will be via the bridge
 	if result.IP4.Routes == nil && result.IP4.Gateway == nil {
 		bridgeIP, err := findBridgeIP(conf.BrName, result.IP4.IP)
-		if err != nil {
+		if err == errBridgeNoIP {
+			bridgeArgs := *args
+			bridgeArgs.ContainerID = "weave:expose"
+			bridgeIPResult, err := c.getIP(conf.IPAM.Type, &bridgeArgs)
+			if err != nil {
+				return fmt.Errorf("unable to allocate IP address for bridge: %s", err)
+			}
+			if err := assignBridgeIP(conf.BrName, bridgeIPResult.IP4.IP); err != nil {
+				return fmt.Errorf("unable to assign IP address to bridge: %s", err)
+			}
+			bridgeIP = bridgeIPResult.IP4.IP.IP
+		} else if err != nil {
 			return err
 		}
 		result.IP4.Gateway = bridgeIP
@@ -130,13 +145,26 @@ func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, rou
 	return nil
 }
 
+func assignBridgeIP(bridgeName string, ipnet net.IPNet) error {
+	link, err := netlink.LinkByName(bridgeName)
+	if err != nil {
+		return err
+	}
+	if err := netlink.AddrAdd(link, &netlink.Addr{IPNet: &ipnet}); err != nil {
+		return fmt.Errorf("failed to add IP address to %q: %v", bridgeName, err)
+	}
+	return nil
+}
+
+var errBridgeNoIP = fmt.Errorf("Bridge has no IP address")
+
 func findBridgeIP(bridgeName string, subnet net.IPNet) (net.IP, error) {
 	netdev, err := common.GetBridgeNetDev(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get netdev for %q bridge: %s", bridgeName, err)
 	}
 	if len(netdev.CIDRs) == 0 {
-		return nil, fmt.Errorf("Bridge %q has no IP addresses; did you forget to run 'weave expose'?", bridgeName)
+		return nil, errBridgeNoIP
 	}
 	for _, cidr := range netdev.CIDRs {
 		if subnet.Contains(cidr.IP) {
