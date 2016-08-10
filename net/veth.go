@@ -103,16 +103,13 @@ const (
 	vethPrefix = "v" + VethName // starts with "veth" to suppress UI notifications
 )
 
-func interfaceExistsInNamespace(ns netns.NsHandle, ifName string) bool {
-	err := WithNetNSUnsafe(ns, func() error {
-		_, err := netlink.LinkByName(ifName)
-		return err
-	})
+func interfaceExistsInNamespace(nsPath string, ifName string) bool {
+	_, err := WithNetNS(nsPath, "check-iface", ifName)
 	return err == nil
 }
 
-func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool) error {
-	if !interfaceExistsInNamespace(ns, ifName) {
+func AttachContainer(ns netns.NsHandle, nsPath string, id, ifName, bridgeName string, mtu int, withMulticastRoute bool, cidrs []*net.IPNet, keepTXOn bool) error {
+	if !interfaceExistsInNamespace(nsPath, ifName) {
 		maxIDLen := IFNAMSIZ - 1 - len(vethPrefix+"pl")
 		if len(id) > maxIDLen {
 			id = id[:maxIDLen] // trim passed ID if too long
@@ -122,15 +119,7 @@ func AttachContainer(ns netns.NsHandle, id, ifName, bridgeName string, mtu int, 
 			if err := netlink.LinkSetNsFd(veth, int(ns)); err != nil {
 				return fmt.Errorf("failed to move veth to container netns: %s", err)
 			}
-			if err := WithNetNSUnsafe(ns, func() error {
-				if err := netlink.LinkSetName(veth, ifName); err != nil {
-					return err
-				}
-				if err := ConfigureARPCache(ifName); err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
+			if _, err := WithNetNS(nsPath, "setup-iface", peerName, ifName); err != nil {
 				return fmt.Errorf("error setting up interface: %s", err)
 			}
 			return nil

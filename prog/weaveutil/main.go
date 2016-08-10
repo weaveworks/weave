@@ -22,6 +22,11 @@ func init() {
 		"container-addrs":        containerAddrs,
 		"attach-container":       attach,
 		"detach-container":       detach,
+		"check-iface":            checkIface,
+		"del-iface":              delIface,
+		"setup-iface":            setupIface,
+		"configure-arp":          configureARP,
+		"list-netdevs":           listNetDevs,
 	}
 }
 

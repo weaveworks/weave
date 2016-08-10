@@ -1,7 +1,10 @@
 package net
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"os/exec"
 	"runtime"
 
 	"github.com/vishvananda/netlink"
@@ -62,4 +65,30 @@ func WithNetNSLinkByPidUnsafe(pid int, ifName string, work func(link netlink.Lin
 	defer ns.Close()
 
 	return WithNetNSLinkUnsafe(ns, ifName, work)
+}
+
+// A safe version of WithNetNS* which creates a process executing
+// "nsenter --net=<ns-path> weaveutil <cmd> [args]".
+//
+// TODO(mp) Fix (indirect) circular dependency (weaveutil -> net -> weaveutil)
+func WithNetNS(nsPath string, cmd string, args ...string) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	args = append([]string{"--net=" + nsPath, "weaveutil", cmd}, args...)
+	c := exec.Command("nsenter", args...)
+	c.Stdout = &stdout
+	c.Stderr = &stderr
+	if err := c.Run(); err != nil {
+		return "", fmt.Errorf("%s: %s", string(stderr.Bytes()), err)
+	}
+
+	return string(stdout.Bytes()), nil
+}
+
+func WithNetNSByPid(pid int, cmd string, args ...string) (string, error) {
+	return WithNetNS(NSPathByPid(pid), cmd, args...)
+}
+
+func NSPathByPid(pid int) string {
+	return fmt.Sprintf("/proc/%d/ns/net", pid)
 }

@@ -4,9 +4,7 @@ import (
 	"fmt"
 
 	"github.com/fsouza/go-dockerclient"
-	"github.com/vishvananda/netlink"
 
-	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 )
 
@@ -21,7 +19,7 @@ func containerAddrs(args []string) error {
 		return err
 	}
 
-	pred, err := common.ConnectedToBridgePredicate(bridgeName)
+	peers, err := weavenet.ConnectedToBridgePeers(bridgeName)
 	if err != nil {
 		if err == weavenet.ErrLinkNotFound {
 			return nil
@@ -34,11 +32,11 @@ func containerAddrs(args []string) error {
 
 	for _, cid := range args[1:] {
 		if cid == "weave:expose" {
-			netDev, err := common.GetBridgeNetDev(bridgeName)
+			netDev, err := weavenet.GetBridgeNetDev(bridgeName)
 			if err != nil {
 				return err
 			}
-			printNetDevs(cid, []common.NetDev{netDev})
+			printNetDevs(cid, []weavenet.Dev{netDev})
 			continue
 		}
 		if containers[cid], err = client.InspectContainer(cid); err != nil {
@@ -51,11 +49,8 @@ func containerAddrs(args []string) error {
 		containerIDs = append(containerIDs, cid)
 	}
 
-	// NB: Because network namespaces (netns) are changed many times inside the loop,
-	//     it's NOT safe to exec any code depending on the root netns without
-	//     wrapping with WithNetNS*.
 	for _, cid := range containerIDs {
-		netDevs, err := getNetDevs(client, containers[cid], pred)
+		netDevs, err := getNetDevs(client, containers[cid], peers)
 		if err != nil {
 			return err
 		}
@@ -65,14 +60,14 @@ func containerAddrs(args []string) error {
 	return nil
 }
 
-func getNetDevs(c *docker.Client, container *docker.Container, pred func(netlink.Link) bool) ([]common.NetDev, error) {
+func getNetDevs(c *docker.Client, container *docker.Container, peers []int) ([]weavenet.Dev, error) {
 	if container.State.Pid == 0 {
 		return nil, nil
 	}
-	return common.GetNetDevsWithPredicate(container.State.Pid, pred)
+	return weavenet.GetWeaveNetDevsByPeers(container.State.Pid, peers)
 }
 
-func printNetDevs(cid string, netDevs []common.NetDev) {
+func printNetDevs(cid string, netDevs []weavenet.Dev) {
 	for _, netDev := range netDevs {
 		fmt.Printf("%12s %s %s", cid, netDev.Name, netDev.MAC.String())
 		for _, cidr := range netDev.CIDRs {

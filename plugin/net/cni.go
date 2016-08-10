@@ -12,7 +12,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	weaveapi "github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
 )
@@ -107,7 +106,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		id = fmt.Sprintf("%x", data)
 	}
 
-	if err := weavenet.AttachContainer(ns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}, false); err != nil {
+	if err := weavenet.AttachContainer(ns, args.Netns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}, false); err != nil {
 		return err
 	}
 	if err := weavenet.WithNetNSLinkUnsafe(ns, args.IfName, func(link netlink.Link) error {
@@ -159,7 +158,7 @@ func assignBridgeIP(bridgeName string, ipnet net.IPNet) error {
 var errBridgeNoIP = fmt.Errorf("Bridge has no IP address")
 
 func findBridgeIP(bridgeName string, subnet net.IPNet) (net.IP, error) {
-	netdev, err := common.GetBridgeNetDev(bridgeName)
+	netdev, err := weavenet.GetBridgeNetDev(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get netdev for %q bridge: %s", bridgeName, err)
 	}
@@ -181,19 +180,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	ns, err := netns.GetFromPath(args.Netns)
-	if err != nil {
-		return err
-	}
-	defer ns.Close()
-	err = weavenet.WithNetNSUnsafe(ns, func() error {
-		link, err := netlink.LinkByName(args.IfName)
-		if err != nil {
-			return err
-		}
-		return netlink.LinkDel(link)
-	})
-	if err != nil {
+	if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
 		return fmt.Errorf("error removing interface: %s", err)
 	}
 

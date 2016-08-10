@@ -17,7 +17,6 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	weaveapi "github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
 	weavedocker "github.com/weaveworks/weave/common/docker"
 	weavenet "github.com/weaveworks/weave/net"
 	"github.com/weaveworks/weave/net/address"
@@ -149,7 +148,7 @@ func NewProxy(c Config) (*Proxy, error) {
 	p.client = client.Client
 
 	if !p.WithoutDNS {
-		netDev, err := common.GetBridgeNetDev(c.DockerBridge)
+		netDev, err := weavenet.GetBridgeNetDev(c.DockerBridge)
 		if err != nil {
 			return nil, err
 		}
@@ -625,7 +624,8 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 	if err := proxy.waitForStartByIdent(containerID); err != nil {
 		return err
 	}
-	netDevs, err := common.GetWeaveNetDevs(pid)
+
+	netDevs, err := weavenet.GetWeaveNetDevs(pid)
 	if err != nil || len(netDevs) == 0 || len(netDevs[0].CIDRs) == 0 {
 		return err
 	}
