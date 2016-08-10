@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vishvananda/netlink"
 	"github.com/weaveworks/go-odp/odp"
 	"github.com/weaveworks/mesh"
 )
@@ -418,10 +419,26 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 		return vxlanVportID, nil
 	}
 
+	name := fmt.Sprintf("vxlan-%d", udpPort)
 	vxlanVportID, err := fastdp.dp.CreateVport(
-		odp.NewVxlanVportSpec(fmt.Sprintf("vxlan-%d", udpPort), uint16(udpPort)))
+		odp.NewVxlanVportSpec(name, uint16(udpPort)))
 	if err != nil {
 		return 0, err
+	}
+
+	// If a netdev for the vxlan vport exists, we need to do an extra check
+	// to bypass the kernel bug which makes the vxlan creation to complete
+	// successfully regardless whether there were any errors when binding
+	// to the given UDP port.
+	if link, err := netlink.LinkByName(name); err == nil {
+		if link.Attrs().Flags&net.FlagUp == 0 {
+			// The netdev interface is down, so most likely bringing it up
+			// has failed due to the UDP port being in use.
+			if err := fastdp.dp.DeleteVport(vxlanVportID); err != nil {
+				log.Warning("Unable to remove vxlan vport %d: %s", vxlanVportID, err)
+			}
+			return 0, odp.NetlinkError(syscall.EADDRINUSE)
+		}
 	}
 
 	fastdp.vxlanVportIDs[udpPort] = vxlanVportID
