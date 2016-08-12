@@ -3,15 +3,38 @@ title: Integrating Docker via the API Proxy
 menu_order: 50
 ---
 
-
 The Docker API proxy automatically attaches containers to the Weave
 network when they are started using the ordinary Docker
 [command-line interface](https://docs.docker.com/reference/commandline/cli/)
 or the [remote API](https://docs.docker.com/reference/api/docker_remote_api/),
 instead of `weave run`.
 
+###<a name="attaching-containers"></a>Attaching Containers to a Weave Network
 
-###Setting Up The Weave Net Docker API Proxy
+There are three ways to attach containers to a Weave network (which method to use is 
+entirely up to you):
+
+**1.** The Weave Net Docker API Proxy. See [Setting Up the Weave Net Docker API Proxy](#weave-api-proxy).  
+
+**2.**  The Docker Network Plugin framework. The Docker Network Plugin is used when 
+Docker containers are started with the --net flag, for example: 
+
+`docker run --net <docker-run-options>`
+
+**Where,** 
+
+ * `<docker-run-options>` are the [docker run options](https://docs.docker.com/engine/reference/run/) 
+ you give to your container on start 
+
+Note that if a Docker container is started with the --net flag, then the Weave Docker API Proxy
+is automatically disabled and is not used to attach containers. 
+See [Integrating Docker via the Network Plugin](plugin.md).
+
+**3.** Containers can also be attached to the Weave network with `weave run` commands. This method also
+does not use the Weave Docker API Proxy. 
+See [Launching Containers With Weave Run (without the Proxy)](/site/weave-docker-api/launching-without-proxy.md). 
+
+###<a name="weave-api-proxy"></a>Setting Up The Weave Net Docker API Proxy
 
 The proxy sits between the Docker client (command line or API) and the
 Docker daemon, and intercepts the communication between the two. You can

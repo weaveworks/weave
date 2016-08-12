@@ -73,7 +73,7 @@ Containers started in this way that subsequently restart, either
 by an explicit `docker restart` command or by Docker restart 
 policy, are re-attached to the Weave network by the `Weave Docker API Proxy`.
 
-See [Using the Weave Docker API Proxy](/site/weave-docker-api/using-proxy.md).
+See [Integrating Docker via the API Proxy](/site/weave-docker-api.md).
 
 
 ###<a name="plugin"></a>Weave Network Docker Plugin
@@ -88,14 +88,14 @@ Using the Weave plugin enables you to take advantage of [Docker's network functi
 Also, Weave’s Docker Network plugin doesn't require an external cluster store and you can start and stop containers even 
 when there are network connectivity problems.
 
-See [Using the Weave Docker Network Plugin](/site/plugin.md) for more details.
+See [Integrating Docker via the Network Plugin](/site/plugin.md) for more details.
 
 
 ###<a name="cniplugin"></a>Weave Network CNI Plugin
 
-Weave can be used as a plugin to systems that support the [Container Network Interface](https://github.com/appc/cni), such as Kubernetes.
+Weave can be used as a plugin to systems that support the [Container Network Interface](https://github.com/appc/cni), such as Kubernetes and Mesosphere.
 
-See [Using the Weave CNI Plugin](/site/cni-plugin.md) for more details.
+See [Integrating Kubernetes and Mesos via the CNI Plugin](/site/cni-plugin.md) for more details.
 
 
 ###<a name="addressing"></a>IP Address Management (IPAM)
@@ -120,7 +120,7 @@ and are discoverable by using standard, simple name lookups:
 
 WeaveDNS also supports [load balancing](/site/weavedns/load-balance-fault-weavedns.md), [fault resilience](/site/weavedns/load-balance-fault-weavedns.md) and [hot swapping](/site/weavedns/managing-entries-weavedns.md). 
 
-See [Naming and discovery with WeaveDNS](/site/weavedns/how-works-weavedns.md).
+See [Discovering Containers with WeaveDNS](/site/weavedns.md).
  
 ###<a name="application-isolation"></a>Application Isolation
 
