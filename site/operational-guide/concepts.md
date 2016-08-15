@@ -49,16 +49,12 @@ When the router is launched on a host, it derives its peer name in order of pref
 
 * From the command line, where the user is responsible for uniqueness and
   stability
-* From the concatenated result of any of the following:
-    * The unique machine ID, which is generated either by [systemd](https://www.freedesktop.org/software/systemd/man/machine-id.html)
-      or [D-Bus](https://dbus.freedesktop.org/doc/dbus-uuidgen.1.html) and is
-      practically stable across restarts unless a user re-generates it.
-    * The BIOS product UUID, which is generally stable across
-      restarts and unique across different physical hardware and certain
-      cloned VMs
-    * The hypervisor UUID, which is generally stable across restarts
-      and unique across VMs which do not provide access to a BIOS product
-      UUID
+* From the BIOS product UUID, which is generally stable across
+  restarts and unique across different physical hardware and certain
+  cloned VMs
+* From the hypervisor UUID, which is generally stable across restarts
+  and unique across VMs which do not provide access to a BIOS product
+  UUID
 * From a random value, practically unique across different physical
   hardware and cloned VMs but not stable across restarts
 
