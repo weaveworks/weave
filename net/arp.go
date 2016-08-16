@@ -17,6 +17,9 @@ func ConfigureARPCache(name string) error {
 	if err := sysctl(fmt.Sprintf("net/ipv4/neigh/%s/ucast_solicit", name), "1"); err != nil {
 		return err
 	}
+	if err := sysctl(fmt.Sprintf("net/ipv4/conf/%s/arp_accept", name), "1"); err != nil {
+		return err
+	}
 	return nil
 }
 

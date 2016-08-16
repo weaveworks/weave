@@ -44,7 +44,6 @@ assert_raises "exec_on $HOST1 c2 $PING $C1IP"
 
 # Now remove and start a new container to see if IP address re-use breaks things
 docker_on $HOST1 rm -f c2
-sleep 1
 
 docker_on $HOST1 run --net=none --name=c3 -dt $SMALL_IMAGE /bin/sh
 
