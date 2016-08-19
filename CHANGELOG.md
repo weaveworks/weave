@@ -2,13 +2,12 @@
 
 Bug fixes and minor improvements
 
-* `weave ps` was occasionally failing to list allocated addresses of containers #2388/#2418
+* `weave ps` was occasionally failing to list allocated addresses of containers #2388/#2418/#2445
 * `weave launch[-router]` on 4.2 kernel would appear to succeed even if the fast datapath VXLAN UDP port was in use by a different process #2375/#2474
 * Launching the proxy would fail when the Docker daemon could not be detected #2457/#2424
 * The CNI plugin did not work with Apache Mesos #2394/#2442
 * Router stopped working after a restart in the AWSVPC mode #2381/#2409
 * Router crashed when the Docker API endpoint parameter was explicitly set to empty #2421/#2467
-* `weave ps` returned no error when the router was down #2445
 * The CNI plugin did not work on recent versions of Docker for Mac #2434/#2442
 * The CNI plugin assigns an IP to the bridge if necessary, which avoids failures if `weave expose` has not run yet #2471
 * Distinguish peer name collisions from attempts to connect to self in logs #2460
