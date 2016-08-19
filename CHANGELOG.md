@@ -1,3 +1,30 @@
+## Release 1.6.1
+
+Bug fixes and minor improvements
+
+* `weave ps` was occasionally failing to list allocated addresses of containers #2388/#2418
+* `weave launch[-router]` on 4.2 kernel would appear to succeed even if the fast datapath VXLAN UDP port was in use by a different process #2375/#2474
+* Launching the proxy would fail when the Docker daemon could not be detected #2457/#2424
+* The CNI plugin did not work with Apache Mesos #2394/#2442
+* Router stopped working after a restart in the AWSVPC mode #2381/#2409
+* Router crashed when the Docker API endpoint parameter was explicitly set to empty #2421/#2467
+* `weave ps` returned no error when the router was down #2445
+* The CNI plugin did not work on recent versions of Docker for Mac #2434/#2442
+* The CNI plugin assigns an IP to the bridge if necessary, which avoids failures if `weave expose` has not run yet #2471
+* Distinguish peer name collisions from attempts to connect to self in logs #2460
+* Improve host clock skew detection message #2174
+* Improve the error message returned when executing `weave launch-plugin` without the router running #2293/#2416
+* The `create-bridge` subcommand was not enabled in the fast datapath mode #2464/2466
+* Allow users to omit `weave setup[-cni]` by initializing the CNI plugin on the `launch[-router]` subcommand #2435/#2442
+* Reduce verbosity of fast datapath miss event logs #1852/#2417
+* Include the `ipam` option in the help output of the `status` subcommand #2425/#2426
+* Remove a harmless duplication of the `--no-dns` parameter #2430
+* Internal refactoring
+* Improvements to testing and building
+* Improvements to the documentation
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.6.1).
+
 ## Release 1.6.0
 
 ## Highlights
