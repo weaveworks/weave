@@ -12,9 +12,9 @@ docker_py_test() {
     # Work round https://github.com/docker/docker-py/issues/852
     docker_on $HOST1 pull busybox:buildroot-2014.02 >/dev/null
     # Get a list of the tests for use to shard
-    docker_on $HOST1 pull joffrey/docker-py >/dev/null
+    docker_on $HOST1 pull joffrey/docker-py:1.8.1 >/dev/null
     CANDIDATES=$(docker_on $HOST1 run \
-      joffrey/docker-py \
+      joffrey/docker-py:1.8.1 \
       py.test --collect-only tests/integration/ \
       | sed -En "s/\s*<Module '([[:print:]]+)'>/\1/p")
 
@@ -36,7 +36,7 @@ docker_py_test() {
         -e DOCKER_HOST=tcp://$DOCKER_BRIDGE_IP:12375 \
         -v /tmp:/tmp \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        joffrey/docker-py py.test $TESTS ; then
+        joffrey/docker-py:1.8.1 py.test $TESTS ; then
         assert_raises "true"
     else
         assert_raises "false"
