@@ -10,7 +10,7 @@ machine:
   environment:
     GOPATH: /home/ubuntu:$GOPATH
     SRCDIR: /home/ubuntu/src/github.com/weaveworks/weave
-    PATH: $PATH:$HOME/.local/bin:$HOME/google-cloud-sdk/bin/
+    PATH: $PATH:$HOME/.local/bin
     CLOUDSDK_CORE_DISABLE_PROMPTS: 1
 
 dependencies:
@@ -18,7 +18,6 @@ dependencies:
     - "~/docker"
   post:
     - "sudo apt-get update && sudo apt-get install bc jq"
-    - curl https://sdk.cloud.google.com | bash
     - bin/setup-circleci-secrets "$SECRET_PASSWORD"
     - "mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR"
     - "cd $SRCDIR; git submodule update --init"
