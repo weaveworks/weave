@@ -807,11 +807,6 @@ do_or_die() {
     fi
 }
 
-# Execute arguments as a command within the $CONTAINER_NETNS network namespace
-netnsenter() {
-    nsenter --net=$CONTAINER_NETNS "$@"
-}
-
 add_iface_fastdp() {
     util_op add-datapath-interface $DATAPATH $1
 }
@@ -856,10 +851,6 @@ ask_version() {
         echo "Unable to find $2 image." >&2
     fi
     [ -n "$DOCKERIMAGE" ] && docker run --rm --net=none -e WEAVE_CIDR=none $3 $DOCKERIMAGE $COVERAGE_ARGS --version
-}
-
-container_in_host_ns() {
-    [ -h "$CONTAINER_NETNS" -a -h "/proc/self/ns/net" -a "$(readlink $CONTAINER_NETNS)" = "$(readlink /proc/self/ns/net)" ]
 }
 
 attach() {
