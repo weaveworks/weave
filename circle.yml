@@ -24,6 +24,7 @@ dependencies:
     - cd $SRCDIR/test; ./gce.sh make_template:
         parallel: false
     - "cd $SRCDIR/build; ../tools/rebuild-image weaveworks/weavebuild . Dockerfile build.sh && touch $SRCDIR/.build.uptodate"
+    - "sudo chown -R ubuntu /usr/local/go"
 
 test:
   override:
