@@ -38,6 +38,5 @@ The plugin accepts the following options via `docker network create ... --opt`:
 
 **See Also**
 
- * [Using the Weave Net Docker Network Plugin](/site/plugin.md)
- * [Plugin Command-line Arguments](/site/plugin/plug-in-command-line.md)
+ * [Integrating Docker via the Network Plugin](/site/plugin.md)
  
