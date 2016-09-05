@@ -52,7 +52,7 @@ following command on any peer:
     weave status ipam
 
 This command displays the peer names and nicknames, absolute quantity/percentage of allocation 
-range managed by peer and also identifies the names of unreachable peers. If you are satisifed
+range managed by peer and also identifies the names of unreachable peers. If you are satisfied
 that the peer is truly gone, rather than temporarily unreachable due to a
 partition, you can reclaim their space manually.
 
