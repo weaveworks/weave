@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/mflag"
 	"github.com/gorilla/mux"
 	"github.com/pkg/profile"
+	"github.com/weaveworks/docker/pkg/mflag"
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
