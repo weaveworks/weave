@@ -10,11 +10,12 @@ import (
 )
 
 func createPluginNetwork(args []string) error {
-	if len(args) != 2 {
-		cmdUsage("create-plugin-network", "<network-name> <driver-name>")
+	if len(args) != 3 {
+		cmdUsage("create-plugin-network", "<network-name> <driver-name> <default-subnet>")
 	}
 	networkName := args[0]
 	driverName := args[1]
+	subnet := args[2]
 	d, err := newDockerClient()
 	if err != nil {
 		return err
@@ -24,8 +25,11 @@ func createPluginNetwork(args []string) error {
 			Name:           networkName,
 			CheckDuplicate: true,
 			Driver:         driverName,
-			IPAM:           docker.IPAMOptions{Driver: driverName},
-			Options:        map[string]interface{}{plugin.MulticastOption: "true"},
+			IPAM: docker.IPAMOptions{
+				Driver: driverName,
+				Config: []docker.IPAMConfig{{Subnet: subnet}},
+			},
+			Options: map[string]interface{}{plugin.MulticastOption: "true"},
 		})
 	if err != docker.ErrNetworkAlreadyExists && err != nil {
 		// Despite appearances to the contrary, CreateNetwork does
