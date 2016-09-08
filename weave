@@ -1773,7 +1773,8 @@ launch_plugin_if_not_running() {
         return 1
     fi
     wait_for_status $PLUGIN_CONTAINER_NAME http_call_unix $PLUGIN_CONTAINER_NAME status.sock
-    util_op create-plugin-network weave weavemesh
+    WEAVE_IPAM_SUBNET=$(call_weave GET /ipinfo/defaultsubnet)
+    util_op create-plugin-network weave weavemesh $WEAVE_IPAM_SUBNET
 }
 
 plugin_disabled() {
