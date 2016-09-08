@@ -6,6 +6,7 @@ import "unsafe"
 
 const (
 	SIOCETHTOOL     = 0x8946     // linux/sockios.h
+	ETHTOOL_GTXCSUM = 0x00000016 // linux/ethtool.h
 	ETHTOOL_STXCSUM = 0x00000017 // linux/ethtool.h
 	IFNAMSIZ        = 16         // linux/if.h
 )
@@ -22,16 +23,19 @@ type EthtoolValue struct {
 	Data uint32
 }
 
+func ioctlEthtool(fd int, argp uintptr) error {
+	_, _, errno := syscall.RawSyscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(SIOCETHTOOL), argp)
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
 // Disable TX checksum offload on specified interface
 func EthtoolTXOff(name string) error {
 	if len(name)+1 > IFNAMSIZ {
 		return fmt.Errorf("name too long")
 	}
-
-	value := EthtoolValue{ETHTOOL_STXCSUM, 0}
-	request := IFReqData{Data: uintptr(unsafe.Pointer(&value))}
-
-	copy(request.Name[:], name)
 
 	socket, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
 	if err != nil {
@@ -39,14 +43,18 @@ func EthtoolTXOff(name string) error {
 	}
 	defer syscall.Close(socket)
 
-	_, _, errno := syscall.RawSyscall(syscall.SYS_IOCTL,
-		uintptr(socket),
-		uintptr(SIOCETHTOOL),
-		uintptr(unsafe.Pointer(&request)))
+	// Request current value
+	value := EthtoolValue{Cmd: ETHTOOL_GTXCSUM}
+	request := IFReqData{Data: uintptr(unsafe.Pointer(&value))}
+	copy(request.Name[:], name)
 
-	if errno != 0 {
-		return errno
+	if err := ioctlEthtool(socket, uintptr(unsafe.Pointer(&request))); err != nil {
+		return err
+	}
+	if value.Data == 0 { // if already off, don't try to change
+		return nil
 	}
 
-	return nil
+	value = EthtoolValue{ETHTOOL_STXCSUM, 0}
+	return ioctlEthtool(socket, uintptr(unsafe.Pointer(&request)))
 }
