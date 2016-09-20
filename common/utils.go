@@ -130,10 +130,15 @@ func GetNetDevsWithPredicate(processID int, predicate func(link netlink.Link) bo
 	if err != nil {
 		return nil, fmt.Errorf("unable to open root namespace: %s", err)
 	}
+	defer nsToplevel.Close()
 	nsContainr, err := netns.GetFromPid(processID)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("unable to open process %d namespace: %s", processID, err)
 	}
+	defer nsContainr.Close()
 	if nsToplevel.Equal(nsContainr) {
 		return nil, nil
 	}

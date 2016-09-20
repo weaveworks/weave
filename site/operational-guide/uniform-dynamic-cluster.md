@@ -46,14 +46,14 @@ Where
 On each new peer, at boot, via
 [systemd](/site/installing-weave/systemd.md):
 
-    hostN$ weave launch --no-restart --name ::N --ipam-seed $SEED $PEERS
+    hostN$ weave launch --no-restart --name ::N --ipalloc-init seed=$SEED $PEERS
 
 Where,
 
 * `--no-restart` disables the Docker restart policy, since this will be
   handled by systemd.
 * `--name` specifies a unique name for this new peer.
-* `--ipam-seed` specifies the names of only those peers that were
+* `--ipalloc-init seed` specifies the names of only those peers that were
   involved in the initial cluster bootstrap - even if they have been
   subsequently removed from the cluster. You can view this as a kind
   of 'cluster identity',where  peers may only interoperate in the same
