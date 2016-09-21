@@ -239,12 +239,16 @@ func (router *NetworkRouter) InitialPeers(resume bool, peers []string) ([]string
 		return storedPeers, nil
 	}
 
+	log.Println("Launch detected - using supplied peer list:", peers)
+	return peers, nil
+}
+
+func (router *NetworkRouter) CreateRestartSentinel() error {
 	sentinel, err := os.Create("restart.sentinel")
 	if err != nil {
-		return nil, fmt.Errorf("error creating sentinel: %v", err)
+		return fmt.Errorf("error creating sentinel: %v", err)
 	}
 	sentinel.Close()
 
-	log.Println("Launch detected - using supplied peer list:", peers)
-	return peers, nil
+	return nil
 }

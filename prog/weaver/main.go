@@ -322,6 +322,7 @@ func main() {
 	if errors := router.InitiateConnections(peers, false); len(errors) > 0 {
 		Log.Fatal(common.ErrorMessages(errors))
 	}
+	checkFatal(router.CreateRestartSentinel())
 
 	// The weave script always waits for a status call to succeed,
 	// so there is no point in doing "weave launch --http-addr ''".
