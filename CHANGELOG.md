@@ -1,3 +1,14 @@
+## Release 1.6.2
+
+Bug fixes and minor improvements
+
+* Fixed hang after stopping and restarting on Docker 1.12 #2469/#2502
+* Avoid an error on Google container images by checking for tx offload support #2504
+* Fixed an issue where the supplied peer list could be ignored when restarting after failure #2503/#2509
+* Check for empty peer name on launch #2495/#2501
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.6.2).
+
 ## Release 1.6.1
 
 Bug fixes and minor improvements
