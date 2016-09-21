@@ -16,8 +16,10 @@ run_on $HOST1 sudo mkdir -p /opt/cni/bin
 weave_on $HOST1 setup-cni
 weave_on $HOST1 launch
 
-C1=$(docker_on $HOST1 run --net=none --name=c1 -dt $SMALL_IMAGE /bin/sh)
+C1=$(docker_on $HOST1 run --net=none --privileged --name=c1 -dt $SMALL_IMAGE /bin/sh)
 C2=$(docker_on $HOST1 run --net=none --name=c2 -dt $SMALL_IMAGE /bin/sh)
+# Enable unsolicited ARPs so that ping after the address reuse does not time out
+exec_on $HOST1 c1 sysctl -w net.ipv4.conf.all.arp_accept=1
 
 cni_connect $HOST1 c1 <<EOF
 {
@@ -25,6 +27,7 @@ cni_connect $HOST1 c1 <<EOF
     "type": "weave-net"
 }
 EOF
+
 cni_connect $HOST1 c2 <<EOF
 {
     "name": "weave",
@@ -44,7 +47,6 @@ assert_raises "exec_on $HOST1 c2 $PING $C1IP"
 
 # Now remove and start a new container to see if IP address re-use breaks things
 docker_on $HOST1 rm -f c2
-sleep 2
 
 docker_on $HOST1 run --net=none --name=c3 -dt $SMALL_IMAGE /bin/sh
 
