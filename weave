@@ -597,9 +597,17 @@ create_bridge() {
         add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p udp --dport 53  -j ACCEPT
         add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p tcp --dport 53  -j ACCEPT
 
-        # Work around the situation where there are no rules allowing traffic
-        # across our bridge. E.g. ufw
-        add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
+        if [ "$2" = "--expect-npc" ] ; then # matches usage in weave-kube launch.sh
+            # Steer traffic via the NPC
+            run_iptables -N WEAVE-NPC >/dev/null 2>&1 || true
+            add_iptables_rule filter FORWARD -o $BRIDGE -j WEAVE-NPC
+            add_iptables_rule filter FORWARD -o $BRIDGE -j LOG --log-prefix=WEAVE-NPC:
+            add_iptables_rule filter FORWARD -o $BRIDGE -j DROP
+        else
+            # Work around the situation where there are no rules allowing traffic
+            # across our bridge. E.g. ufw
+            add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
+        fi
 
         # create a chain for masquerading
         run_iptables -t nat -N WEAVE >/dev/null 2>&1 || true
@@ -1939,8 +1947,10 @@ really want to do this please set the WEAVE_NO_FASTDP environment variable.
 EOF
                 exit 1
             fi
+        else
+            shift 1
         fi
-        create_bridge --without-ethtool
+        create_bridge --without-ethtool "$@"
         ;;
     attach-bridge)
         if detect_bridge_type ; then
