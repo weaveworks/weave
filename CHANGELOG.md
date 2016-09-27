@@ -1,3 +1,12 @@
+## Release 1.7.0
+
+Highlights:
+
+* weave-kube - Deploy Weave Net to Kubernetes with a single command
+* weave-npc - Kubernetes network policy controller implementation
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.7.0).
+
 ## Release 1.6.2
 
 Bug fixes and minor improvements
