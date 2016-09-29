@@ -25,11 +25,13 @@ test:
     - "$SRCDIR/bin/circle-test-pre":
         parallel: true
   override:
-    - "$SRCDIR/bin/circle-test-override":
+    - "$SRCDIR/bin/circle-test-unit":
+        parallel: true
+    - "$SRCDIR/bin/circle-test-smoke":
         parallel: true
         timeout: 300
   post:
-    - "$SRCDIR/bin/circle-test-post":
+    - "$SRCDIR/bin/circle-test-teardown":
         parallel: true
 
 teardown:
