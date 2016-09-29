@@ -20,6 +20,7 @@ func init() {
 		"create-plugin-network":  createPluginNetwork,
 		"remove-plugin-network":  removePluginNetwork,
 		"container-addrs":        containerAddrs,
+		"process-addrs":          processAddrs,
 		"attach-container":       attach,
 		"detach-container":       detach,
 	}
