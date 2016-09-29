@@ -125,7 +125,7 @@ func ConnectedToBridgePredicate(bridgeName string) (func(link netlink.Link) bool
 }
 
 func GetNetDevsWithPredicate(processID int, predicate func(link netlink.Link) bool) ([]NetDev, error) {
-	// Bail out if this container is running in the root namespace
+	// Bail out if this process is running in the root namespace
 	nsToplevel, err := netns.GetFromPid(1)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open root namespace: %s", err)
@@ -133,6 +133,7 @@ func GetNetDevsWithPredicate(processID int, predicate func(link netlink.Link) bo
 	defer nsToplevel.Close()
 	nsContainr, err := netns.GetFromPid(processID)
 	if err != nil {
+		// Unable to find a namespace for this process - just return nothing
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
