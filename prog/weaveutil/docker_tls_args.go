@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/weaveworks/weave/common"
 )
 
 func dockerTLSArgs(args []string) error {
@@ -15,18 +17,14 @@ func dockerTLSArgs(args []string) error {
 		cmdUsage("docker-tls-args", "")
 	}
 	procRoot := "/proc"
-	dirEntries, err := ioutil.ReadDir(procRoot)
+	pids, err := common.AllPids(procRoot)
 	if err != nil {
 		return err
 	}
 
-	for _, dirEntry := range dirEntries {
-		dirName := dirEntry.Name()
-		if _, err := strconv.Atoi(dirName); err != nil {
-			continue
-		}
-
+	for _, pid := range pids {
 		isDaemon := false
+		dirName := strconv.Itoa(pid)
 		if comm, err := ioutil.ReadFile(filepath.Join(procRoot, dirName, "comm")); err != nil {
 			continue
 		} else if string(comm) == "dockerd\n" {
