@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -e
+
+source "$STATE"
+
+if [ -n "$TEST_AND_PUBLISH" ] ; then
+    docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+    cd $SRCDIR
+    make clean-bin
+    make publish
+fi
+
+cd $SRCDIR
+bin/install-wordepress v1.0.0
+bin/publish-site "$WP_DEV_URL" "$WP_DEV_USER" "$WP_DEV_PASSWORD"
