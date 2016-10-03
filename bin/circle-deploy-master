@@ -4,7 +4,7 @@ set -e
 
 source "$STATE"
 
-if [ -z "$SKIP_TESTS" ] ; then
+if [ -n "$TEST_AND_PUBLISH" ] ; then
     docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
     cd $SRCDIR
     make clean-bin

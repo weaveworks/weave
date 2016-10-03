@@ -4,7 +4,7 @@ set -e
 
 source "$STATE"
 
-if [ -z "$SKIP_TESTS" ] ; then
+if [ -n "$TEST_AND_PUBLISH" ] ; then
     cd $SRCDIR
     make lint
     COVERDIR=test/coverage make RM= tests
