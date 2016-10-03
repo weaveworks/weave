@@ -2,8 +2,6 @@
 
 set -e
 
-source "$(dirname "$(readlink -f "$0")")/circle-functions"
-
 source "$STATE"
 
 if [ -z "$SKIP_TESTS" ] ; then
@@ -13,7 +11,6 @@ if [ -z "$SKIP_TESTS" ] ; then
     make publish
 fi
 
-install_wordepress v1.0.0
-
 cd $SRCDIR
+bin/install-wordepress v1.0.0
 bin/publish-site "$WP_DEV_URL" "$WP_DEV_USER" "$WP_DEV_PASSWORD"

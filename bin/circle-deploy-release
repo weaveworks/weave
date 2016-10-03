@@ -2,11 +2,6 @@
 
 set -e
 
-source "$(dirname "$(readlink -f "$0")")/circle-functions"
-
-source "$STATE"
-
-install_wordepress v1.0.0
-
 cd $SRCDIR
+bin/install-wordepress v1.0.0
 bin/publish-site "$WP_LIVE_URL" "$WP_LIVE_USER" "$WP_LIVE_PASSWORD"
