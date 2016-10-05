@@ -1,3 +1,10 @@
+## Release 1.7.1
+
+Bug fixes and minor improvements
+
+* Added utility to recover container addresses without asking Docker #2531
+* Improved CI #2274
+
 ## Release 1.7.0
 
 Highlights:
