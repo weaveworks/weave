@@ -32,9 +32,21 @@ func checkForUpdates(dockerVersion string, network string) {
 
 	var uts syscall.Utsname
 	syscall.Uname(&uts)
+
+	release := uts.Release[:]
+	releaseBytes := make([]byte, len(release))
+	i := 0
+	for ; i < len(release); i++ {
+		if release[i] == 0 {
+			break
+		}
+		releaseBytes[i] = uint8(release[i])
+	}
+	kernelVersion := string(releaseBytes[:i])
+
 	flags := map[string]string{
 		"docker-version": dockerVersion,
-		"kernel-version": charsToString(uts.Release[:]),
+		"kernel-version": kernelVersion,
 	}
 	if network != "" {
 		flags["network"] = network
@@ -48,16 +60,4 @@ func checkForUpdates(dockerVersion string, network string) {
 		Flags:         flags,
 	}
 	checker = checkpoint.CheckInterval(&params, updateCheckPeriod, handleResponse)
-}
-
-func charsToString(ca []int8) string {
-	s := make([]byte, len(ca))
-	i := 0
-	for ; i < len(ca); i++ {
-		if ca[i] == 0 {
-			break
-		}
-		s[i] = uint8(ca[i])
-	}
-	return string(s[:i])
 }
