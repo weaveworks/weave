@@ -23,6 +23,7 @@ func init() {
 		"process-addrs":          processAddrs,
 		"attach-container":       attach,
 		"detach-container":       detach,
+		"configure-arp":          configureARP,
 	}
 }
 
