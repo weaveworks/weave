@@ -23,7 +23,7 @@ const (
 	// Maximum age of acceptable gossip messages (to account for clock skew)
 	gossipWindow = int64(tombstoneTimeout/time.Second) / 2
 
-	// Used by prog/weaver/main.go and proxy/create_container_interceptor.go
+	// Used by cmd/weaver/main.go and proxy/create_container_interceptor.go
 	DefaultDomain = "weave.local."
 )
 

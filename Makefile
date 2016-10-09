@@ -13,14 +13,14 @@ COVERAGE=
 DOCKERHUB_USER=weaveworks
 WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 
-WEAVER_EXE=prog/weaver/weaver
-WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
-SIGPROXY_EXE=prog/sigproxy/sigproxy
-WEAVEWAIT_EXE=prog/weavewait/weavewait
-WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
-WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
-WEAVEUTIL_EXE=prog/weaveutil/weaveutil
-PLUGIN_EXE=prog/plugin/plugin
+WEAVER_EXE=cmd/weaver/weaver
+WEAVEPROXY_EXE=cmd/weaveproxy/weaveproxy
+SIGPROXY_EXE=cmd/sigproxy/sigproxy
+WEAVEWAIT_EXE=cmd/weavewait/weavewait
+WEAVEWAIT_NOOP_EXE=cmd/weavewait/weavewait_noop
+WEAVEWAIT_NOMCAST_EXE=cmd/weavewait/weavewait_nomcast
+WEAVEUTIL_EXE=cmd/weaveutil/weaveutil
+PLUGIN_EXE=cmd/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
@@ -45,7 +45,7 @@ IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEDB_IMAGE)
 WEAVE_EXPORT=weave.tar.gz
 
 WEAVEEXEC_DOCKER_VERSION=1.6.2
-DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
+DOCKER_DISTRIB=cmd/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	rm $@; \
@@ -63,15 +63,15 @@ all: $(WEAVE_EXPORT)
 testrunner: $(RUNNER_EXE) $(TEST_TLS_EXE)
 
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
-$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/weaver/*.go
-$(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
-$(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go
-$(SIGPROXY_EXE): prog/sigproxy/*.go
-$(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
+$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go cmd/weaver/*.go
+$(WEAVEPROXY_EXE): proxy/*.go cmd/weaveproxy/*.go
+$(WEAVEUTIL_EXE): cmd/weaveutil/*.go net/*.go
+$(SIGPROXY_EXE): cmd/sigproxy/*.go
+$(PLUGIN_EXE): cmd/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
-$(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
-$(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
-$(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
+$(WEAVEWAIT_NOOP_EXE): cmd/weavewait/*.go
+$(WEAVEWAIT_EXE): cmd/weavewait/*.go net/*.go
+$(WEAVEWAIT_NOMCAST_EXE): cmd/weavewait/*.go net/*.go
 tests: tools/.git
 lint: tools/.git
 
@@ -128,28 +128,28 @@ $(BUILD_UPTODATE): build/*
 	$(SUDO) docker build -t $(BUILD_IMAGE) build/
 	touch $@
 
-$(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVER_IMAGE) prog/weaver
+$(WEAVER_UPTODATE): cmd/weaver/Dockerfile $(WEAVER_EXE)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVER_IMAGE) cmd/weaver
 	touch $@
 
-$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE)
-	cp weave prog/weaveexec/weave
-	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
-	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
-	cp $(WEAVEWAIT_EXE) prog/weaveexec/weavewait
-	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
-	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
-	cp $(WEAVEUTIL_EXE) prog/weaveexec/weaveutil
-	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
+$(WEAVEEXEC_UPTODATE): cmd/weaveexec/Dockerfile cmd/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE)
+	cp weave cmd/weaveexec/weave
+	cp $(SIGPROXY_EXE) cmd/weaveexec/sigproxy
+	cp $(WEAVEPROXY_EXE) cmd/weaveexec/weaveproxy
+	cp $(WEAVEWAIT_EXE) cmd/weaveexec/weavewait
+	cp $(WEAVEWAIT_NOOP_EXE) cmd/weaveexec/weavewait_noop
+	cp $(WEAVEWAIT_NOMCAST_EXE) cmd/weaveexec/weavewait_nomcast
+	cp $(WEAVEUTIL_EXE) cmd/weaveexec/weaveutil
+	cp $(DOCKER_DISTRIB) cmd/weaveexec/docker.tgz
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) cmd/weaveexec
 	touch $@
 
-$(PLUGIN_UPTODATE): prog/plugin/Dockerfile $(PLUGIN_EXE) $(WEAVEEXEC_UPTODATE)
-	$(SUDO) docker build -t $(PLUGIN_IMAGE) prog/plugin
+$(PLUGIN_UPTODATE): cmd/plugin/Dockerfile $(PLUGIN_EXE) $(WEAVEEXEC_UPTODATE)
+	$(SUDO) docker build -t $(PLUGIN_IMAGE) cmd/plugin
 	touch $@
 
-$(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile
-	$(SUDO) docker build -t $(WEAVEDB_IMAGE) prog/weavedb
+$(WEAVEDB_UPTODATE): cmd/weavedb/Dockerfile
+	$(SUDO) docker build -t $(WEAVEDB_IMAGE) cmd/weavedb
 	touch $@
 
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE)
