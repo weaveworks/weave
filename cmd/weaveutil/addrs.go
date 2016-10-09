@@ -6,8 +6,8 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"github.com/vishvananda/netlink"
 
-	"github.com/weaveworks/weave/common"
-	weavenet "github.com/weaveworks/weave/net"
+	"github.com/weaveworks/weave/pkg/common"
+	weavenet "github.com/weaveworks/weave/pkg/net"
 )
 
 func containerAddrs(args []string) error {

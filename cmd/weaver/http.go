@@ -13,10 +13,10 @@ import (
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/go-checkpoint"
-	"github.com/weaveworks/weave/ipam"
-	"github.com/weaveworks/weave/nameserver"
-	"github.com/weaveworks/weave/net/address"
-	weave "github.com/weaveworks/weave/router"
+	"github.com/weaveworks/weave/pkg/ipam"
+	"github.com/weaveworks/weave/pkg/nameserver"
+	"github.com/weaveworks/weave/pkg/net/address"
+	weave "github.com/weaveworks/weave/pkg/router"
 )
 
 var rootTemplate = template.New("root").Funcs(map[string]interface{}{

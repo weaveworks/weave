@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/weaveworks/weave/common/odp"
+	"github.com/weaveworks/weave/pkg/common/odp"
 )
 
 func createDatapath(args []string) error {

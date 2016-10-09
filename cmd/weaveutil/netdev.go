@@ -6,7 +6,7 @@ import (
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 
-	weavenet "github.com/weaveworks/weave/net"
+	weavenet "github.com/weaveworks/weave/pkg/net"
 )
 
 func configureARP(args []string) error {

@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/weaveworks/docker/pkg/mflag"
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/mflagext"
-	"github.com/weaveworks/weave/proxy"
+	"github.com/weaveworks/weave/pkg/common"
+	"github.com/weaveworks/weave/pkg/common/mflagext"
+	"github.com/weaveworks/weave/pkg/proxy"
 )
 
 var version = "(unreleased version)"

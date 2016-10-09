@@ -13,13 +13,13 @@ import (
 
 	cni "github.com/appc/cni/pkg/skel"
 	"github.com/docker/libnetwork/ipamapi"
-	weaveapi "github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
-	"github.com/weaveworks/weave/common/docker"
-	weavenet "github.com/weaveworks/weave/net"
-	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
-	netplugin "github.com/weaveworks/weave/plugin/net"
-	"github.com/weaveworks/weave/plugin/skel"
+	weaveapi "github.com/weaveworks/weave/pkg/api"
+	"github.com/weaveworks/weave/pkg/common"
+	"github.com/weaveworks/weave/pkg/common/docker"
+	weavenet "github.com/weaveworks/weave/pkg/net"
+	ipamplugin "github.com/weaveworks/weave/pkg/plugin/ipam"
+	netplugin "github.com/weaveworks/weave/pkg/plugin/net"
+	"github.com/weaveworks/weave/pkg/plugin/skel"
 )
 
 var version = "(unreleased version)"

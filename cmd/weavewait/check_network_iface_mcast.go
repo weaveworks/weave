@@ -3,7 +3,7 @@
 package main
 
 import (
-	weavenet "github.com/weaveworks/weave/net"
+	weavenet "github.com/weaveworks/weave/pkg/net"
 )
 
 func checkNetwork() error {

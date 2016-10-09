@@ -62,16 +62,16 @@ PACKAGE_BASE=$(shell go list -e ./)
 all: $(WEAVE_EXPORT)
 testrunner: $(RUNNER_EXE) $(TEST_TLS_EXE)
 
-$(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
-$(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go cmd/weaver/*.go
-$(WEAVEPROXY_EXE): proxy/*.go cmd/weaveproxy/*.go
-$(WEAVEUTIL_EXE): cmd/weaveutil/*.go net/*.go
+$(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): pkg/common/*.go pkg/common/*/*.go pkg/net/*.go pkg/net/*/*.go
+$(WEAVER_EXE): pkg/router/*.go pkg/ipam/*.go pkg/ipam/*/*.go pkg/db/*.go pkg/nameserver/*.go cmd/weaver/*.go
+$(WEAVEPROXY_EXE): pkg/proxy/*.go cmd/weaveproxy/*.go
+$(WEAVEUTIL_EXE): cmd/weaveutil/*.go pkg/net/*.go
 $(SIGPROXY_EXE): cmd/sigproxy/*.go
-$(PLUGIN_EXE): cmd/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
+$(PLUGIN_EXE): cmd/plugin/*.go pkg/plugin/*/*.go pkg/api/*.go pkg/common/*.go pkg/common/docker/*.go pkg/net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): cmd/weavewait/*.go
-$(WEAVEWAIT_EXE): cmd/weavewait/*.go net/*.go
-$(WEAVEWAIT_NOMCAST_EXE): cmd/weavewait/*.go net/*.go
+$(WEAVEWAIT_EXE): cmd/weavewait/*.go pkg/net/*.go
+$(WEAVEWAIT_NOMCAST_EXE): cmd/weavewait/*.go pkg/net/*.go
 tests: tools/.git
 lint: tools/.git
 

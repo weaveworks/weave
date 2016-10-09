@@ -1,0 +1,121 @@
+package ipam
+
+import (
+	"fmt"
+
+	"github.com/weaveworks/mesh"
+
+	"github.com/weaveworks/weave/pkg/common"
+	"github.com/weaveworks/weave/pkg/net/address"
+)
+
+type claim struct {
+	resultChan       chan<- error
+	ident            string
+	cidr             address.CIDR
+	isContainer      bool
+	noErrorOnUnknown bool
+	hasBeenCancelled func() bool
+}
+
+// Send an error (or nil for success) back to caller listening on resultChan
+func (c *claim) sendResult(result error) {
+	// Make sure we only send a result once, since listener stops listening after that
+	if c.resultChan != nil {
+		c.resultChan <- result
+		close(c.resultChan)
+		c.resultChan = nil
+		return
+	}
+	if result != nil {
+		common.Log.Errorln("[allocator] " + result.Error())
+	}
+}
+
+// Try returns true for success (or failure), false if we need to try again later
+func (c *claim) Try(alloc *Allocator) bool {
+	if c.hasBeenCancelled() {
+		c.Cancel()
+		return true
+	}
+
+	if !alloc.ring.Contains(c.cidr.Addr) {
+		// Address not within our universe; assume user knows what they are doing
+		alloc.infof("Address %s claimed by %s - not in our range", c.cidr, c.ident)
+		alloc.addOwned(c.ident, c.cidr, c.isContainer)
+		c.sendResult(nil)
+		return true
+	}
+
+	alloc.establishRing()
+
+	// If we had heard that this container died, resurrect it
+	delete(alloc.dead, c.ident) // (delete is no-op if key not in map)
+
+	switch owner := alloc.ring.Owner(c.cidr.Addr); owner {
+	case alloc.ourName:
+		// success
+	case mesh.UnknownPeerName:
+		// If our ring doesn't know, it must be empty.
+		alloc.infof("Claim %s for %s: is in the range %s, but the allocator is not initialized yet; will try later.",
+			c.cidr, c.ident, alloc.universe)
+		if c.noErrorOnUnknown {
+			c.sendResult(nil)
+		}
+		return false
+	default:
+		alloc.debugf("requesting address %s from other peer %s", c.cidr, owner)
+		err := alloc.sendSpaceRequest(owner, address.NewRange(c.cidr.Addr, 1))
+		if err != nil { // can't speak to owner right now
+			if c.noErrorOnUnknown {
+				alloc.infof("Claim %s for %s: %s; will try later.", c.cidr, c.ident, err)
+				c.sendResult(nil)
+			} else { // just tell the user they can't do this.
+				c.deniedBy(alloc, owner)
+			}
+		}
+		return false
+	}
+
+	if c.ident == "_" { // Special "I don't have a unique ID" identifier
+		c.ident = c.cidr.Addr.String()
+	}
+	// We are the owner, check we haven't given it to another container
+	switch existingIdent := alloc.findOwner(c.cidr.Addr); existingIdent {
+	case "":
+		if err := alloc.space.Claim(c.cidr.Addr); err == nil {
+			alloc.debugln("Claimed", c.cidr, "for", c.ident)
+			alloc.addOwned(c.ident, c.cidr, c.isContainer)
+			c.sendResult(nil)
+		} else {
+			c.sendResult(err)
+		}
+	case c.ident:
+		// same identifier is claiming same address; that's OK
+		alloc.debugln("Re-Claimed", c.cidr, "for", c.ident)
+		c.sendResult(nil)
+	case c.cidr.Addr.String():
+		// Address already allocated via "_" name
+		c.sendResult(fmt.Errorf("address %s already in use", c.cidr))
+	default:
+		// Addr already owned by container on this machine
+		c.sendResult(fmt.Errorf("address %s is already owned by %s", c.cidr.String(), existingIdent))
+	}
+	return true
+}
+
+func (c *claim) deniedBy(alloc *Allocator, owner mesh.PeerName) {
+	name, found := alloc.nicknames[owner]
+	if found {
+		name = " (" + name + ")"
+	}
+	c.sendResult(fmt.Errorf("address %s is owned by other peer %s%s", c.cidr.String(), owner, name))
+}
+
+func (c *claim) Cancel() {
+	c.sendResult(&errorCancelled{"Claim", c.ident})
+}
+
+func (c *claim) ForContainer(ident string) bool {
+	return c.ident == ident
+}

@@ -6,7 +6,7 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 
-	"github.com/weaveworks/weave/plugin/net"
+	"github.com/weaveworks/weave/pkg/plugin/net"
 )
 
 func createPluginNetwork(args []string) error {
