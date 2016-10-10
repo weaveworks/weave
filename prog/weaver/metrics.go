@@ -43,7 +43,7 @@ func uint64Counter(desc *prometheus.Desc, val uint64, labels ...string) promethe
 	return prometheus.MustNewConstMetric(desc, prometheus.CounterValue, float64(val), labels...)
 }
 
-var metrics []metric = []metric{
+var metrics = []metric{
 	{desc("weave_connections", "Number of peer-to-peer connections.", "state"),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
 			counts := make(map[string]int)
