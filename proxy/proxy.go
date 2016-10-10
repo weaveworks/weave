@@ -378,7 +378,7 @@ func (proxy *Proxy) listen(protoAndAddr string) (net.Listener, string, error) {
 		Log.Fatalf("Invalid protocol format: %q", proto)
 	}
 
-	return listener, fmt.Sprintf("%s://%s", proto, addr), nil
+	return &MalformedHostHeaderOverride{listener}, fmt.Sprintf("%s://%s", proto, addr), nil
 }
 
 // weavedocker.ContainerObserver interface
