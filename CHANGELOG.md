@@ -1,3 +1,14 @@
+## Release 1.7.2
+
+Bug fixes and minor improvements
+
+* Fixed an error where the Docker plugin could fail to attach a
+  container with a `bridge "weave" not present` error #2540/#2541
+* Fixed `cannot connect to itself` panic on weave launch #2527/#2543
+* Fixed inferred initial peer count when target peers includes self
+  #2481/#2543
+* Fixed compilation on Raspberry Pi #2506/#2538
+
 ## Release 1.7.1
 
 Bug fixes and minor improvements
