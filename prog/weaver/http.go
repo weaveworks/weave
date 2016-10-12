@@ -20,15 +20,7 @@ import (
 )
 
 var rootTemplate = template.New("root").Funcs(map[string]interface{}{
-	"countDNSEntries": func(entries []nameserver.EntryStatus) int {
-		count := 0
-		for _, entry := range entries {
-			if entry.Tombstone == 0 {
-				count++
-			}
-		}
-		return count
-	},
+	"countDNSEntries": countDNSEntries,
 	"printList": func(list []string) string {
 		if len(list) == 0 {
 			return "none"
@@ -117,6 +109,16 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 	},
 	"trimSuffix": strings.TrimSuffix,
 })
+
+func countDNSEntries(entries []nameserver.EntryStatus) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.Tombstone == 0 {
+			count++
+		}
+	}
+	return count
+}
 
 // Print counts in a specified order
 func printCounts(counts map[string]int, keys []string) string {
