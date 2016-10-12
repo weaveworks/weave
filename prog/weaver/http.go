@@ -55,27 +55,27 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			s.ips += entry.Size
 		}
 
-		printOwned := func(name string, nickName string, reachable bool, ips uint32) {
-			reachableStr := ""
-			if !reachable {
-				reachableStr = "- unreachable!"
-			}
+		printOwned := func(name string, nickName string, info string, ips uint32) {
 			percentageRanges := float32(ips) * 100.0 / float32(status.RangeNumIPs)
 
 			displayName := name + "(" + nickName + ")"
 			fmt.Fprintf(&buffer, "%-37v %8d IPs (%04.1f%% of total) %s\n",
-				displayName, ips, percentageRanges, reachableStr)
+				displayName, ips, percentageRanges, info)
 		}
 
 		// print the local info first
 		if ourStats := peerStats[router.Name]; ourStats != nil {
-			printOwned(router.Name, ourStats.nickname, true, ourStats.ips)
+			printOwned(router.Name, ourStats.nickname, "", ourStats.ips)
 		}
 
 		// and then the rest
 		for peer, stats := range peerStats {
 			if peer != router.Name {
-				printOwned(peer, stats.nickname, stats.reachable, stats.ips)
+				reachableStr := ""
+				if !stats.reachable {
+					reachableStr = "- unreachable!"
+				}
+				printOwned(peer, stats.nickname, reachableStr, stats.ips)
 			}
 		}
 
