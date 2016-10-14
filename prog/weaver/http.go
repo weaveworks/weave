@@ -276,6 +276,7 @@ type WeaveStatus struct {
 	DNS          *nameserver.Status         `json:"DNS,omitempty"`
 }
 
+// Read-only functions, suitable for exposing on an unprotected socket
 func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
 	status := func() WeaveStatus {
 		return WeaveStatus{
@@ -332,6 +333,4 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 	defHandler("/status/peers", peersTemplate)
 	defHandler("/status/dns", dnsEntriesTemplate)
 	defHandler("/status/ipam", ipamTemplate)
-
-	muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns))
 }

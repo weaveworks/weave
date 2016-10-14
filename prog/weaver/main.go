@@ -132,6 +132,7 @@ func main() {
 		bufSzMB            int
 		noDiscovery        bool
 		httpAddr           string
+		statusAddr         string
 		ipamConfig         ipamConfig
 		dockerAPI          string
 		peers              []string
@@ -165,6 +166,7 @@ func main() {
 	mflag.BoolVar(&noDiscovery, []string{"#nodiscovery", "#-nodiscovery", "-no-discovery"}, false, "disable peer discovery")
 	mflag.IntVar(&bufSzMB, []string{"#bufsz", "-bufsz"}, 8, "capture buffer size in MB")
 	mflag.StringVar(&httpAddr, []string{"#httpaddr", "#-httpaddr", "-http-addr"}, "", "address to bind HTTP interface to (disabled if blank, absolute path indicates unix domain socket)")
+	mflag.StringVar(&statusAddr, []string{"-status-addr"}, "", "address to bind status+metrics interface to (disabled if blank, absolute path indicates unix domain socket)")
 	mflag.StringVar(&ipamConfig.Mode, []string{"-ipalloc-init"}, "", "allocator initialisation strategy (consensus, seed or observer)")
 	mflag.StringVar(&ipamConfig.IPRangeCIDR, []string{"#iprange", "#-iprange", "-ipalloc-range"}, "", "IP address range reserved for automatic allocation, in CIDR notation")
 	mflag.StringVar(&ipamConfig.IPSubnetCIDR, []string{"#ipsubnet", "#-ipsubnet", "-ipalloc-default-subnet"}, "", "subnet to allocate within by default, in CIDR notation")
@@ -337,9 +339,20 @@ func main() {
 		}
 		router.HandleHTTP(muxRouter)
 		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
+		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
 		http.Handle("/", common.LoggingHTTPHandler(muxRouter))
 		Log.Println("Listening for HTTP control messages on", httpAddr)
-		go listenAndServeHTTP(httpAddr)
+		go listenAndServeHTTP(httpAddr, nil)
+	}
+
+	if statusAddr != "" {
+		muxRouter := mux.NewRouter()
+		HandleHTTP(muxRouter, version, router, allocator, defaultSubnet, ns, dnsserver)
+		muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns, dnsserver))
+		statusMux := http.NewServeMux()
+		statusMux.Handle("/", muxRouter)
+		Log.Println("Listening for metrics requests on", statusAddr)
+		go listenAndServeHTTP(statusAddr, statusMux)
 	}
 
 	common.SignalHandlerLoop(router)
@@ -555,7 +568,7 @@ func parsePeerNames(s string) ([]mesh.PeerName, error) {
 	return peerNames, nil
 }
 
-func listenAndServeHTTP(httpAddr string) {
+func listenAndServeHTTP(httpAddr string, handler http.Handler) {
 	protocol := "tcp"
 	if strings.HasPrefix(httpAddr, "/") {
 		os.Remove(httpAddr) // in case it's there from last time
@@ -565,7 +578,7 @@ func listenAndServeHTTP(httpAddr string) {
 	if err != nil {
 		Log.Fatal("Unable to create http listener socket: ", err)
 	}
-	err = http.Serve(l, nil)
+	err = http.Serve(l, handler)
 	if err != nil {
 		Log.Fatal("Unable to create http server", err)
 	}
