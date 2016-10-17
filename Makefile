@@ -16,6 +16,7 @@ WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=prog/weaver/weaver
 WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
+KUBEPEERS_EXE=prog/kube-peers/kube-peers
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
@@ -24,7 +25,7 @@ PLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE)
 
 BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver.uptodate
@@ -67,6 +68,7 @@ $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/we
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
+$(KUBEPEERS_EXE): prog/kube-peers/*.go
 $(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
@@ -99,7 +101,7 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEUTIL_EXE):
+$(WEAVEUTIL_EXE) $(KUBEPEERS_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
