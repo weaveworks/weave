@@ -55,7 +55,7 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	echo "    sudo go install -tags netgo std"; \
 	false; \
 }
-BUILD_FLAGS=-i -ldflags "-extldflags \"-static\" -X main.version=$(WEAVE_VERSION)" -tags netgo
+BUILD_FLAGS=-i -ldflags "-linkmode external -extldflags -static -X main.version=$(WEAVE_VERSION)" -tags netgo
 
 PACKAGE_BASE=$(shell go list -e ./)
 
