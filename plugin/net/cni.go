@@ -93,7 +93,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 
 	ns, err := netns.GetFromPath(args.Netns)
 	if err != nil {
-		return err
+		return fmt.Errorf("error accessing namespace %q: %s", args.Netns, err)
 	}
 	defer ns.Close()
 
@@ -183,7 +183,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 
 	ns, err := netns.GetFromPath(args.Netns)
 	if err != nil {
-		return err
+		return fmt.Errorf("error accessing namespace %q: %s", args.Netns, err)
 	}
 	defer ns.Close()
 	err = weavenet.WithNetNSUnsafe(ns, func() error {
@@ -194,7 +194,7 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return netlink.LinkDel(link)
 	})
 	if err != nil {
-		return fmt.Errorf("error removing interface: %s", err)
+		return fmt.Errorf("error removing interface %q: %s", args.IfName, err)
 	}
 
 	// Default IPAM is Weave's own
