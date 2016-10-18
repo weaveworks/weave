@@ -43,6 +43,7 @@ prog/weavewait/weavewait
 prog/weavewait/weavewait_noop
 prog/weavewait/weavewait_nomcast
 prog/weaveutil/weaveutil
+prog/plugin/Dockerfile
 prog/plugin/plugin
 testing/cover/cover
 testing/runner/runner

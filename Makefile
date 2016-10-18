@@ -1,7 +1,7 @@
 PUBLISH=publish_weave publish_weaveexec publish_plugin
 
 .DEFAULT: all
-.PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
+.PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests prog/plugin/Dockerfile
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
@@ -143,6 +143,9 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER
 	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
+
+prog/plugin/Dockerfile: prog/plugin/Dockerfile.template
+	sed -e "s/DOCKERHUB_USER/$(DOCKERHUB_USER)/" $^ > $@
 
 $(PLUGIN_UPTODATE): prog/plugin/Dockerfile $(PLUGIN_EXE) $(WEAVEEXEC_UPTODATE)
 	$(SUDO) docker build -t $(PLUGIN_IMAGE) prog/plugin
