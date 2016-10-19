@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/fsouza/go-dockerclient"
-	"github.com/vishvananda/netlink"
 
 	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
@@ -21,7 +20,7 @@ func containerAddrs(args []string) error {
 		return err
 	}
 
-	pred, err := common.ConnectedToBridgePredicate(bridgeName)
+	peerIDs, err := common.ConnectedToBridgeVethPeerIds(bridgeName)
 	if err != nil {
 		if err == weavenet.ErrLinkNotFound {
 			return nil
@@ -51,11 +50,8 @@ func containerAddrs(args []string) error {
 		containerIDs = append(containerIDs, cid)
 	}
 
-	// NB: Because network namespaces (netns) are changed many times inside the loop,
-	//     it's NOT safe to exec any code depending on the root netns without
-	//     wrapping with WithNetNS*.
 	for _, cid := range containerIDs {
-		netDevs, err := getNetDevs(client, containers[cid], pred)
+		netDevs, err := getNetDevs(client, containers[cid], peerIDs)
 		if err != nil {
 			return err
 		}
@@ -65,11 +61,11 @@ func containerAddrs(args []string) error {
 	return nil
 }
 
-func getNetDevs(c *docker.Client, container *docker.Container, pred func(netlink.Link) bool) ([]common.NetDev, error) {
+func getNetDevs(c *docker.Client, container *docker.Container, peerIDs []int) ([]common.NetDev, error) {
 	if container.State.Pid == 0 {
 		return nil, nil
 	}
-	return common.GetNetDevsWithPredicate(container.State.Pid, pred)
+	return common.GetNetDevsByVethPeerIds(container.State.Pid, peerIDs)
 }
 
 func printNetDevs(cid string, netDevs []common.NetDev) {

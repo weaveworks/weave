@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/vishvananda/netlink"
@@ -27,53 +29,43 @@ func ErrorMessages(errors []error) string {
 	return strings.Join(result, "\n")
 }
 
+var netdevRegExp = regexp.MustCompile(`^([^ ]+?) ([^ ]+?) \[([^]]*)\]$`)
+
 type NetDev struct {
 	Name  string
 	MAC   net.HardwareAddr
 	CIDRs []*net.IPNet
 }
 
-// Search the network namespace of a process for interfaces matching a predicate
-// Note that the predicate is called while the goroutine is inside the process' netns
-func FindNetDevs(processID int, match func(link netlink.Link) bool) ([]NetDev, error) {
-	var netDevs []NetDev
-
-	ns, err := netns.GetFromPid(processID)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	defer ns.Close()
-
-	err = weavenet.WithNetNSUnsafe(ns, func() error {
-		return forEachLink(func(link netlink.Link) error {
-			if match(link) {
-				netDev, err := linkToNetDev(link)
-				if err != nil {
-					return err
-				}
-				netDevs = append(netDevs, netDev)
-			}
-			return nil
-		})
-	})
-
-	return netDevs, err
+func (d NetDev) String() string {
+	return fmt.Sprintf("%s %s %s", d.Name, d.MAC, d.CIDRs)
 }
 
-func forEachLink(f func(netlink.Link) error) error {
-	links, err := netlink.LinkList()
-	if err != nil {
-		return err
+func ParseNetDev(netdev string) (NetDev, error) {
+	match := netdevRegExp.FindStringSubmatch(netdev)
+	if match == nil {
+		return NetDev{}, fmt.Errorf("invalid netdev: %s", netdev)
 	}
-	for _, link := range links {
-		if err := f(link); err != nil {
-			return err
+
+	iface := match[1]
+	mac, err := net.ParseMAC(match[2])
+	if err != nil {
+		return NetDev{}, fmt.Errorf("cannot parse mac %s: %s", match[2], err)
+	}
+
+	var cidrs []*net.IPNet
+	for _, cidr := range strings.Split(match[3], " ") {
+		if cidr != "" {
+			ip, ipnet, err := net.ParseCIDR(cidr)
+			if err != nil {
+				return NetDev{}, fmt.Errorf("cannot parse cidr %s: %s", cidr, err)
+			}
+			ipnet.IP = ip
+			cidrs = append(cidrs, ipnet)
 		}
 	}
-	return nil
+
+	return NetDev{Name: iface, MAC: mac, CIDRs: cidrs}, nil
 }
 
 func LinkToNetDev(link netlink.Link) (NetDev, error) {
@@ -89,48 +81,54 @@ func LinkToNetDev(link netlink.Link) (NetDev, error) {
 	return netDev, nil
 }
 
-// ConnectedToBridgePredicate returns a function which is used to query whether
-// a given link is a veth interface which one end is connected to a bridge.
-// The returned function should be called from a container network namespace which
-// the bridge does NOT belong to.
-func ConnectedToBridgePredicate(bridgeName string) (func(link netlink.Link) bool, error) {
-	indexes := make(map[int]struct{})
+// ConnectedToBridgeVethPeerIds returns peer indexes of veth links connected to
+// the given bridge. The peer index is used to query from a container netns
+// whether the container is connected to the bridge.
+func ConnectedToBridgeVethPeerIds(bridgeName string) ([]int, error) {
+	var ids []int
 
-	// Scan devices in root namespace to find those attached to weave bridge
-	err := weavenet.WithNetNSLinkByPidUnsafe(1, bridgeName,
-		func(br netlink.Link) error {
-			return forEachLink(func(link netlink.Link) error {
-				if link.Attrs().MasterIndex == br.Attrs().Index {
-					peerIndex := link.Attrs().ParentIndex
-					if peerIndex == 0 {
-						// perhaps running on an older kernel where ParentIndex doesn't work.
-						// as fall-back, assume the indexes are consecutive
-						peerIndex = link.Attrs().Index - 1
-					}
-					indexes[peerIndex] = struct{}{}
-				}
-				return nil
-			})
-		})
+	br, err := netlink.LinkByName(bridgeName)
+	if err != nil {
+		return nil, err
+	}
+	links, err := netlink.LinkList()
 	if err != nil {
 		return nil, err
 	}
 
-	return func(link netlink.Link) bool {
-		_, isveth := link.(*netlink.Veth)
-		_, found := indexes[link.Attrs().Index]
-		return isveth && found
-	}, nil
+	for _, link := range links {
+		if _, isveth := link.(*netlink.Veth); isveth && link.Attrs().MasterIndex == br.Attrs().Index {
+			peerID := link.Attrs().ParentIndex
+			if peerID == 0 {
+				// perhaps running on an older kernel where ParentIndex doesn't work.
+				// as fall-back, assume the peers are consecutive
+				peerID = link.Attrs().Index - 1
+			}
+			ids = append(ids, peerID)
+		}
+	}
+
+	return ids, nil
 }
 
-func GetNetDevsWithPredicate(processID int, predicate func(link netlink.Link) bool) ([]NetDev, error) {
-	// Bail out if this process is running in the root namespace
-	nsToplevel, err := netns.GetFromPid(1)
+// Lookup the weave interface of a container
+func GetWeaveNetDevs(processID int) ([]NetDev, error) {
+	peerIDs, err := ConnectedToBridgeVethPeerIds("weave")
+	if err != nil {
+		return nil, err
+	}
+
+	return GetNetDevsByVethPeerIds(processID, peerIDs)
+}
+
+func GetNetDevsByVethPeerIds(processID int, peerIDs []int) ([]NetDev, error) {
+	// Bail out if this container is running in the root namespace
+	netnsRoot, err := netns.GetFromPid(1)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open root namespace: %s", err)
 	}
-	defer nsToplevel.Close()
-	nsContainr, err := netns.GetFromPid(processID)
+	defer netnsRoot.Close()
+	netnsContainer, err := netns.GetFromPid(processID)
 	if err != nil {
 		// Unable to find a namespace for this process - just return nothing
 		if os.IsNotExist(err) {
@@ -138,22 +136,32 @@ func GetNetDevsWithPredicate(processID int, predicate func(link netlink.Link) bo
 		}
 		return nil, fmt.Errorf("unable to open process %d namespace: %s", processID, err)
 	}
-	defer nsContainr.Close()
-	if nsToplevel.Equal(nsContainr) {
+	defer netnsContainer.Close()
+	if netnsRoot.Equal(netnsContainer) {
 		return nil, nil
 	}
 
-	return FindNetDevs(processID, predicate)
-}
+	var netdevs []NetDev
 
-// Lookup the weave interface of a container
-func GetWeaveNetDevs(processID int) ([]NetDev, error) {
-	p, err := ConnectedToBridgePredicate("weave")
+	peersStr := make([]string, len(peerIDs))
+	for i, id := range peerIDs {
+		peersStr[i] = strconv.Itoa(id)
+	}
+	netdevsStr, err := weavenet.WithNetNSByPid(processID, "list-netdevs", strings.Join(peersStr, ","))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list-netdevs failed: %s", err)
+	}
+	for _, netdevStr := range strings.Split(netdevsStr, "\n") {
+		if netdevStr != "" {
+			netdev, err := ParseNetDev(netdevStr)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse netdev %s: %s", netdevStr, err)
+			}
+			netdevs = append(netdevs, netdev)
+		}
 	}
 
-	return GetNetDevsWithPredicate(processID, p)
+	return netdevs, nil
 }
 
 // Get the weave bridge interface.
