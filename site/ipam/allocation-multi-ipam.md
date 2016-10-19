@@ -15,13 +15,13 @@ allocation of an address from a particular subnet, set the
 `WEAVE_CIDR` environment variable to `net:<subnet>` when creating the
 container, for example:
 
-    host1$ docker run -e WEAVE_CIDR=net:10.2.7.0/24 -ti weaveworks/ubuntu
+    host1$ docker run -e WEAVE_CIDR=net:10.2.7.0/24 -ti bash
 
 You can ask for multiple addresses in different subnets and add in
 manually-assigned addresses (outside the automatic allocation range),
 for instance:
 
-    host1$ docker run -e WEAVE_CIDR="net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24" -ti weaveworks/ubuntu
+    host1$ docker run -e WEAVE_CIDR="net:10.2.7.0/24 net:10.2.8.0/24 ip:10.3.9.1/24" -ti bash
 
 >**Note:** The ".0" and ".-1" addresses in a subnet are not used, as required by
 [RFC 1122](https://tools.ietf.org/html/rfc1122#page-29)).

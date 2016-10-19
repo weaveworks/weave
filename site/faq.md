@@ -91,14 +91,6 @@ You must permit traffic to flow through TCP 6783 and UDP 6783/6784,
 which are Weave’s control and data ports.
 
 
-**<a name=own-image></a>Q: Why do you use your own Docker image `weaveworks/ubuntu`?**
-
-The official Ubuntu image does not contain the `ping` and `nc`
-commands which are used in many of our examples throughout the
-documentation. The `weaveworks/ubuntu` image is simply the official
-Ubuntu image with those two commands added.
-
-
 **See Also**
 
  * [Troubleshooting Weave](/site/troubleshooting.md)

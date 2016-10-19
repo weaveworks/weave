@@ -25,7 +25,7 @@ behaviour.
 docker run -ti \
   --dns-search=zone1.weave.local --dns-search=zone2.weave.local \
   --dns-search=corp1.com --dns-search=corp2.com \
-  --dns-search=weave.local weaveworks/ubuntu
+  --dns-search=weave.local bash
 ```
 
 ## <a name="local-domain"></a>Using a different local domain

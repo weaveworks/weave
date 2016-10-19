@@ -21,12 +21,12 @@ For example, we can launch a couple of containers on `$HOST1` and
 
 On `$HOST1`:
 
-    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti weaveworks/ubuntu
+    host1$ docker run -e WEAVE_CIDR=10.2.1.1/24 -ti bash
     root@7ca0f6ecf59f:/#
 
 And `$HOST2`:
 
-    host2$ docker run -e WEAVE_CIDR=10.2.1.2/24 -ti weaveworks/ubuntu
+    host2$ docker run -e WEAVE_CIDR=10.2.1.2/24 -ti bash
     root@04c4831fafd3:/#
 
 Then test that the container on `$HOST2` can be reached from the container on `$HOST1`:
