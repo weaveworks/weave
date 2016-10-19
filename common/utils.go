@@ -76,7 +76,7 @@ func forEachLink(f func(netlink.Link) error) error {
 	return nil
 }
 
-func linkToNetDev(link netlink.Link) (NetDev, error) {
+func LinkToNetDev(link netlink.Link) (NetDev, error) {
 	addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
 	if err != nil {
 		return NetDev{}, err
@@ -164,5 +164,5 @@ func GetBridgeNetDev(bridgeName string) (NetDev, error) {
 		return NetDev{}, err
 	}
 
-	return linkToNetDev(link)
+	return LinkToNetDev(link)
 }
