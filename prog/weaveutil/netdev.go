@@ -9,7 +9,6 @@ import (
 	"github.com/j-keck/arping"
 	"github.com/vishvananda/netlink"
 
-	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 )
 
@@ -120,7 +119,7 @@ func listNetDevs(args []string) error {
 
 	for _, link := range links {
 		if _, found := indexes[link.Attrs().Index]; found {
-			netdev, err := common.LinkToNetDev(link)
+			netdev, err := weavenet.LinkToNetDev(link)
 			if err != nil {
 				return err
 			}

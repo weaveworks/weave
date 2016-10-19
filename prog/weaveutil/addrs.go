@@ -5,7 +5,6 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 
-	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 )
 
@@ -20,7 +19,7 @@ func containerAddrs(args []string) error {
 		return err
 	}
 
-	peerIDs, err := common.ConnectedToBridgeVethPeerIds(bridgeName)
+	peerIDs, err := weavenet.ConnectedToBridgeVethPeerIds(bridgeName)
 	if err != nil {
 		if err == weavenet.ErrLinkNotFound {
 			return nil
@@ -33,11 +32,11 @@ func containerAddrs(args []string) error {
 
 	for _, cid := range args[1:] {
 		if cid == "weave:expose" {
-			netDev, err := common.GetBridgeNetDev(bridgeName)
+			netDev, err := weavenet.GetBridgeNetDev(bridgeName)
 			if err != nil {
 				return err
 			}
-			printNetDevs(cid, []common.NetDev{netDev})
+			printNetDevs(cid, []weavenet.Dev{netDev})
 			continue
 		}
 		if containers[cid], err = client.InspectContainer(cid); err != nil {
@@ -61,14 +60,14 @@ func containerAddrs(args []string) error {
 	return nil
 }
 
-func getNetDevs(c *docker.Client, container *docker.Container, peerIDs []int) ([]common.NetDev, error) {
+func getNetDevs(c *docker.Client, container *docker.Container, peerIDs []int) ([]weavenet.Dev, error) {
 	if container.State.Pid == 0 {
 		return nil, nil
 	}
-	return common.GetNetDevsByVethPeerIds(container.State.Pid, peerIDs)
+	return weavenet.GetNetDevsByVethPeerIds(container.State.Pid, peerIDs)
 }
 
-func printNetDevs(cid string, netDevs []common.NetDev) {
+func printNetDevs(cid string, netDevs []weavenet.Dev) {
 	for _, netDev := range netDevs {
 		fmt.Printf("%12s %s %s", cid, netDev.Name, netDev.MAC.String())
 		for _, cidr := range netDev.CIDRs {

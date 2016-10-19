@@ -12,7 +12,6 @@ import (
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	weaveapi "github.com/weaveworks/weave/api"
-	"github.com/weaveworks/weave/common"
 	weavenet "github.com/weaveworks/weave/net"
 	ipamplugin "github.com/weaveworks/weave/plugin/ipam"
 )
@@ -159,7 +158,7 @@ func assignBridgeIP(bridgeName string, ipnet net.IPNet) error {
 var errBridgeNoIP = fmt.Errorf("Bridge has no IP address")
 
 func findBridgeIP(bridgeName string, subnet net.IPNet) (net.IP, error) {
-	netdev, err := common.GetBridgeNetDev(bridgeName)
+	netdev, err := weavenet.GetBridgeNetDev(bridgeName)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get netdev for %q bridge: %s", bridgeName, err)
 	}
