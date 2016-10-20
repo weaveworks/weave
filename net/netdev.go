@@ -1,54 +1,20 @@
 package net
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
-	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 )
 
-var netdevRegExp = regexp.MustCompile(`^([^ ]+?) ([^ ]+?) \[([^]]*)\]$`)
-
 type Dev struct {
-	Name  string
-	MAC   net.HardwareAddr
-	CIDRs []*net.IPNet
-}
-
-func (d Dev) String() string {
-	return fmt.Sprintf("%s %s %s", d.Name, d.MAC, d.CIDRs)
-}
-
-func ParseNetDev(netdev string) (Dev, error) {
-	match := netdevRegExp.FindStringSubmatch(netdev)
-	if match == nil {
-		return Dev{}, fmt.Errorf("invalid netdev: %s", netdev)
-	}
-
-	iface := match[1]
-	mac, err := net.ParseMAC(match[2])
-	if err != nil {
-		return Dev{}, fmt.Errorf("cannot parse mac %s: %s", match[2], err)
-	}
-
-	var cidrs []*net.IPNet
-	for _, cidr := range strings.Split(match[3], " ") {
-		if cidr != "" {
-			ip, ipnet, err := net.ParseCIDR(cidr)
-			if err != nil {
-				return Dev{}, fmt.Errorf("cannot parse cidr %s: %s", cidr, err)
-			}
-			ipnet.IP = ip
-			cidrs = append(cidrs, ipnet)
-		}
-	}
-
-	return Dev{Name: iface, MAC: mac, CIDRs: cidrs}, nil
+	Name  string           `json:"Name,omitempty"`
+	MAC   net.HardwareAddr `json:"MAC,omitempty"`
+	CIDRs []*net.IPNet     `json:"CIDRs,omitempty"`
 }
 
 func LinkToNetDev(link netlink.Link) (Dev, error) {
@@ -125,26 +91,17 @@ func GetNetDevsByVethPeerIds(processID int, peerIDs []int) ([]Dev, error) {
 	}
 
 	var netdevs []Dev
-
 	peersStr := make([]string, len(peerIDs))
 	for i, id := range peerIDs {
 		peersStr[i] = strconv.Itoa(id)
 	}
-	netdevsStr, err := WithNetNSByPid(processID, "list-netdevs", strings.Join(peersStr, ","))
+	nds, err := WithNetNSByPid(processID, "list-netdevs", peersStr...)
 	if err != nil {
 		return nil, fmt.Errorf("list-netdevs failed: %s", err)
 	}
-	for _, netdevStr := range strings.Split(netdevsStr, "\n") {
-		if netdevStr != "" {
-			netdev, err := ParseNetDev(netdevStr)
-			if err != nil {
-				return nil, fmt.Errorf("cannot parse netdev %s: %s", netdevStr, err)
-			}
-			netdevs = append(netdevs, netdev)
-		}
-	}
+	err = json.Unmarshal(nds, &netdevs)
 
-	return netdevs, nil
+	return netdevs, err
 }
 
 // Get the weave bridge interface.

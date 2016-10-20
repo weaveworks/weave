@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -97,12 +98,12 @@ func configureARP(args []string) error {
 // listNetDevs outputs network ifaces identified by the given indexes
 // in the format of weavenet.Dev.
 func listNetDevs(args []string) error {
-	if len(args) != 1 {
-		cmdUsage("list-netdevs", "<iface-index>[,<iface-index>]")
+	if len(args) == 0 {
+		cmdUsage("list-netdevs", "<iface-index>[ <iface-index>]")
 	}
 
 	indexes := make(map[int]struct{})
-	for _, index := range strings.Split(args[0], ",") {
+	for _, index := range args {
 		if index != "" {
 			id, err := strconv.Atoi(index)
 			if err != nil {
@@ -117,15 +118,23 @@ func listNetDevs(args []string) error {
 		return err
 	}
 
+	var netdevs []weavenet.Dev
+
 	for _, link := range links {
 		if _, found := indexes[link.Attrs().Index]; found {
 			netdev, err := weavenet.LinkToNetDev(link)
 			if err != nil {
 				return err
 			}
-			fmt.Println(netdev)
+			netdevs = append(netdevs, netdev)
 		}
 	}
+
+	nds, err := json.Marshal(netdevs)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(nds))
 
 	return nil
 }
