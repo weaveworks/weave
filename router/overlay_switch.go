@@ -42,12 +42,27 @@ func (osw *OverlaySwitch) AddFeaturesTo(features map[string]string) {
 	features["Overlays"] = strings.Join(osw.overlayNames, " ")
 }
 
+type OverlaySwitchDiagnostics map[string]interface{}
+
 func (osw *OverlaySwitch) Diagnostics() interface{} {
-	diagnostics := make(map[string]interface{})
+	diagnostics := make(OverlaySwitchDiagnostics)
 	for name, overlay := range osw.overlays {
 		diagnostics[name] = overlay.Diagnostics()
 	}
 	return diagnostics
+}
+
+type MetricsReporter interface {
+	Metrics() interface{}
+}
+
+func (d OverlaySwitchDiagnostics) Metrics() interface{} {
+	for _, entry := range d {
+		if fastDPEntry, ok := entry.(MetricsReporter); ok {
+			return fastDPEntry.Metrics()
+		}
+	}
+	return nil
 }
 
 func (osw *OverlaySwitch) InvalidateRoutes() {
