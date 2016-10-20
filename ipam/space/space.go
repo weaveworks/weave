@@ -88,6 +88,14 @@ func (s *Space) Claim(addr address.Address) error {
 	return nil
 }
 
+func (s *Space) NumOwnedAddresses() address.Count {
+	res := address.Count(0)
+	for i := 0; i < len(s.ours); i += 2 {
+		res += address.Length(s.ours[i+1], s.ours[i])
+	}
+	return res
+}
+
 func (s *Space) NumFreeAddresses() address.Count {
 	res := address.Count(0)
 	for i := 0; i < len(s.free); i += 2 {

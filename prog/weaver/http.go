@@ -57,7 +57,8 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 
 		// print the local info first
 		if ourStats := peerStats[router.Name]; ourStats != nil {
-			printOwned(router.Name, ourStats.nickname, "", ourStats.ips)
+			activeStr := fmt.Sprintf("(%d active)", status.ActiveIPs)
+			printOwned(router.Name, ourStats.nickname, activeStr, ourStats.ips)
 		}
 
 		// and then the rest

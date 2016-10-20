@@ -10,6 +10,7 @@ type Status struct {
 	Paxos            *paxos.Status
 	Range            string
 	RangeNumIPs      int
+	ActiveIPs        int
 	DefaultSubnet    string
 	Entries          []EntryStatus
 	PendingClaims    []ClaimStatus
@@ -52,6 +53,7 @@ func NewStatus(allocator *Allocator, defaultSubnet address.CIDR) *Status {
 			paxosStatus,
 			allocator.universe.String(),
 			int(allocator.universe.Size()),
+			int(allocator.space.NumOwnedAddresses()),
 			defaultSubnet.String(),
 			newEntryStatusSlice(allocator),
 			newClaimStatusSlice(allocator),
