@@ -121,6 +121,16 @@ func countDNSEntries(entries []nameserver.EntryStatus) int {
 	return count
 }
 
+func countDNSEntriesForPeer(peername string, entries []nameserver.EntryStatus) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.Tombstone == 0 && entry.Origin == peername {
+			count++
+		}
+	}
+	return count
+}
+
 // Print counts in a specified order
 func printCounts(counts map[string]int, keys []string) string {
 	var stringCounts []string
@@ -322,4 +332,6 @@ func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRout
 	defHandler("/status/peers", peersTemplate)
 	defHandler("/status/dns", dnsEntriesTemplate)
 	defHandler("/status/ipam", ipamTemplate)
+
+	muxRouter.Methods("GET").Path("/metrics").Handler(metricsHandler(router, allocator, ns))
 }
