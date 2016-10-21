@@ -76,18 +76,6 @@ var metrics []metric = []metric{
 				ch <- intGauge(desc, metrics.Flows)
 			}
 		}},
-	{desc("weave_packets_total", "Number of packets transferred.", "flow"),
-		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
-			if metrics := fastDPMetrics(s); metrics != nil {
-				ch <- uint64Counter(desc, metrics.TotalPackets, "total")
-			}
-		}},
-	{desc("weave_bytes_total", "Number of bytes transferred.", "flow"),
-		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
-			if metrics := fastDPMetrics(s); metrics != nil {
-				ch <- uint64Counter(desc, metrics.TotalBytes, "total")
-			}
-		}},
 }
 
 func fastDPMetrics(s WeaveStatus) *weave.FastDPMetrics {
