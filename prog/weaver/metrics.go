@@ -91,10 +91,10 @@ var metrics []metric = []metric{
 }
 
 func fastDPMetrics(s WeaveStatus) *weave.FastDPMetrics {
-	if reporter, ok := s.Router.OverlayDiagnostics.(weave.MetricsReporter); ok {
-		if metrics := reporter.Metrics(); metrics != nil {
-			if fastdpMetrics, ok := metrics.(*weave.FastDPMetrics); ok {
-				return fastdpMetrics
+	if diagMap, ok := s.Router.OverlayDiagnostics.(map[string]interface{}); ok {
+		if diag, ok := diagMap["fastdp"]; ok {
+			if fastDPStats, ok := diag.(weave.FastDPStatus); ok {
+				return fastDPStats.Metrics().(*weave.FastDPMetrics)
 			}
 		}
 	}
