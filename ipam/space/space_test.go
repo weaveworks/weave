@@ -98,16 +98,19 @@ func TestSpaceAllocate(t *testing.T) {
 
 	space1 := makeSpace(start, size)
 	require.Equal(t, address.Count(20), space1.NumFreeAddresses())
+	require.Equal(t, address.Count(0), space1.NumOwnedAddresses())
 	space1.assertInvariants()
 
 	_, addr1 := space1.Allocate(address.NewRange(start, size))
 	require.Equal(t, testAddr1, addr1.String(), "address")
 	require.Equal(t, address.Count(19), space1.NumFreeAddresses())
+	require.Equal(t, address.Count(1), space1.NumOwnedAddresses())
 	space1.assertInvariants()
 
 	_, addr2 := space1.Allocate(address.NewRange(start, size))
 	require.False(t, addr2.String() == testAddr1, "address")
 	require.Equal(t, address.Count(18), space1.NumFreeAddresses())
+	require.Equal(t, address.Count(2), space1.NumOwnedAddresses())
 	require.Equal(t, address.Count(13), space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddrx)}))
 	require.Equal(t, address.Count(18), space1.NumFreeAddressesInRange(address.Range{Start: ip(testAddr1), End: ip(testAddry)}))
 	space1.assertInvariants()

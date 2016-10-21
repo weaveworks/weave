@@ -20,15 +20,7 @@ import (
 )
 
 var rootTemplate = template.New("root").Funcs(map[string]interface{}{
-	"countDNSEntries": func(entries []nameserver.EntryStatus) int {
-		count := 0
-		for _, entry := range entries {
-			if entry.Tombstone == 0 {
-				count++
-			}
-		}
-		return count
-	},
+	"countDNSEntries": countDNSEntries,
 	"printList": func(list []string) string {
 		if len(list) == 0 {
 			return "none"
@@ -55,27 +47,28 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 			s.ips += entry.Size
 		}
 
-		printOwned := func(name string, nickName string, reachable bool, ips uint32) {
-			reachableStr := ""
-			if !reachable {
-				reachableStr = "- unreachable!"
-			}
+		printOwned := func(name string, nickName string, info string, ips uint32) {
 			percentageRanges := float32(ips) * 100.0 / float32(status.RangeNumIPs)
 
 			displayName := name + "(" + nickName + ")"
 			fmt.Fprintf(&buffer, "%-37v %8d IPs (%04.1f%% of total) %s\n",
-				displayName, ips, percentageRanges, reachableStr)
+				displayName, ips, percentageRanges, info)
 		}
 
 		// print the local info first
 		if ourStats := peerStats[router.Name]; ourStats != nil {
-			printOwned(router.Name, ourStats.nickname, true, ourStats.ips)
+			activeStr := fmt.Sprintf("(%d active)", status.ActiveIPs)
+			printOwned(router.Name, ourStats.nickname, activeStr, ourStats.ips)
 		}
 
 		// and then the rest
 		for peer, stats := range peerStats {
 			if peer != router.Name {
-				printOwned(peer, stats.nickname, stats.reachable, stats.ips)
+				reachableStr := ""
+				if !stats.reachable {
+					reachableStr = "- unreachable!"
+				}
+				printOwned(peer, stats.nickname, reachableStr, stats.ips)
 			}
 		}
 
@@ -117,6 +110,26 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 	},
 	"trimSuffix": strings.TrimSuffix,
 })
+
+func countDNSEntries(entries []nameserver.EntryStatus) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.Tombstone == 0 {
+			count++
+		}
+	}
+	return count
+}
+
+func countDNSEntriesForPeer(peername string, entries []nameserver.EntryStatus) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.Tombstone == 0 && entry.Origin == peername {
+			count++
+		}
+	}
+	return count
+}
 
 // Print counts in a specified order
 func printCounts(counts map[string]int, keys []string) string {
@@ -263,6 +276,7 @@ type WeaveStatus struct {
 	DNS          *nameserver.Status         `json:"DNS,omitempty"`
 }
 
+// Read-only functions, suitable for exposing on an unprotected socket
 func HandleHTTP(muxRouter *mux.Router, version string, router *weave.NetworkRouter, allocator *ipam.Allocator, defaultSubnet address.CIDR, ns *nameserver.Nameserver, dnsserver *nameserver.DNSServer) {
 	status := func() WeaveStatus {
 		return WeaveStatus{

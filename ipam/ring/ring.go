@@ -114,7 +114,6 @@ func New(start, end address.Address, peer mesh.PeerName, f OnUpdate) *Ring {
 	common.Assert(start < end)
 
 	ring := &Ring{Start: start, End: end, Peer: peer, Entries: make([]*entry, 0), onUpdate: f}
-	ring.updateExportedVariables()
 	return ring
 }
 
@@ -151,7 +150,6 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 	r.assertInvariants()
 	defer r.trackUpdates()()
 	defer r.assertInvariants()
-	defer r.updateExportedVariables()
 
 	// ----------------- Start of Checks -----------------
 
@@ -218,7 +216,6 @@ func (r *Ring) GrantRangeToHost(start, end address.Address, peer mesh.PeerName) 
 func (r *Ring) Merge(gossip Ring) (bool, error) {
 	r.assertInvariants()
 	defer r.trackUpdates()()
-	defer r.updateExportedVariables()
 
 	// Don't panic when checking the gossiped in ring.
 	// In this case just return any error found.
@@ -404,7 +401,6 @@ func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 
 	defer r.trackUpdates()()
 	defer r.assertInvariants()
-	defer r.updateExportedVariables()
 	defer func() {
 		e := r.Entries[len(r.Entries)-1]
 		common.Assert(address.Add(e.Token, address.Offset(e.Free)) == r.End)
@@ -455,7 +451,6 @@ func (r *Ring) String() string {
 func (r *Ring) ReportFree(freespace map[address.Address]address.Count) (updated bool) {
 	r.assertInvariants()
 	defer r.assertInvariants()
-	defer r.updateExportedVariables()
 
 	common.Assert(!r.Empty())
 	entries := r.Entries
@@ -564,7 +559,6 @@ func (r *Ring) Transfer(from, to mesh.PeerName) []address.Range {
 	defer r.trackUpdates()()
 	defer r.trackUpdatesOfPeer(from)()
 	defer r.assertInvariants()
-	defer r.updateExportedVariables()
 
 	var newRanges []address.Range
 
