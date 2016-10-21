@@ -1,4 +1,4 @@
-PUBLISH=publish_weave publish_weaveexec publish_plugin
+PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube
 
 .DEFAULT: all
 .PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
@@ -31,17 +31,19 @@ BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
 PLUGIN_UPTODATE=.plugin.uptodate
+WEAVEKUBE_UPTODATE=.weavekube.uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEDB_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVEDB_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 PLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin
+WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube
 BUILD_IMAGE=$(DOCKERHUB_USER)/weavebuild
 WEAVEDB_IMAGE=$(DOCKERHUB_USER)/weavedb
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEDB_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVEDB_IMAGE)
 
 WEAVE_EXPORT=weave.tar.gz
 
@@ -151,6 +153,11 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER
 
 $(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEAVER_UPTODATE)
 	$(SUDO) docker build -f prog/plugin/Dockerfile.$(DOCKERHUB_USER) -t $(PLUGIN_IMAGE) prog/plugin
+	touch $@
+
+$(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) $(KUBEPEERS_EXE) $(PLUGIN_UPTODATE)
+	cp $(KUBEPEERS_EXE) prog/weave-kube/
+	$(SUDO) docker build -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
 	touch $@
 
 $(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile
