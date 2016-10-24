@@ -157,7 +157,21 @@ draft() {
         --name "weave" \
         --file "./weave"
 
+    github-release release $RELEASE_ARGS \
+        --user $GITHUB_USER \
+        --repo weave-kube \
+        --tag $LATEST_TAG \
+        --name "$RELEASE_NAME $VERSION" \
+        --description "$RELEASE_DESCRIPTION"
+
     sed -i -e s/:latest/:$VERSION/ -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset.yaml
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave-kube \
+        --tag $LATEST_TAG \
+        --name "weave-daemonset.yaml" \
+        --file "./prog/weave-kube/weave-daemonset.yaml"
+
     github-release upload \
         --user $GITHUB_USER \
         --repo weave \
@@ -243,6 +257,33 @@ publish() {
             --tag latest_release \
             --name "weave" \
             --file "./weave"
+
+        github-release publish \
+            --user $GITHUB_USER \
+            --repo weave-kube \
+            --tag $LATEST_TAG
+
+        if github-release info --user $GITHUB_USER --repo weave-kube \
+            --tag latest_release >/dev/null 2>&1; then
+            github-release delete \
+                --user $GITHUB_USER \
+                --repo weave-kube \
+                --tag latest_release
+        fi
+
+        github-release release \
+            --user $GITHUB_USER \
+            --repo weave-kube \
+            --tag latest_release \
+            --name "$RELEASE_NAME latest ($VERSION)" \
+            --description "[Release Notes](https://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG)"
+
+        github-release upload \
+            --user $GITHUB_USER \
+            --repo weave-kube \
+            --tag latest_release \
+            --name "weave-daemonset.yaml" \
+            --file "./prog/weave-kube/weave-daemonset.yaml"
 
         github-release upload \
             --user $GITHUB_USER \

@@ -107,6 +107,15 @@ the build script will complain otherwise.
 N.B. if you're testing the release process, push to your fork
 instead!
 
+While the git.io link for weave-kube is still pointing to the
+weave-kube repository, we also need to update the tag there:
+
+    cd ../weave-kube
+    git tag -a -m "Release $TAG" $TAG
+    git tag -af -m "Release $TAG" latest_release $TAG
+    git push -f git@github.com:weaveworks/weave latest_release
+
+
 ### Publish Release & Distributable Artefacts
 
 You can now publish the release and upload the remaining
