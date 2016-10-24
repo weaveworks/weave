@@ -157,6 +157,14 @@ draft() {
         --name "weave" \
         --file "./weave"
 
+    sed -i -e s/:latest/:$VERSION/ -e "/imagePullPolicy: Always/d" ./prog/weave-kube/weave-daemonset.yaml
+    github-release upload \
+        --user $GITHUB_USER \
+        --repo weave \
+        --tag $LATEST_TAG \
+        --name "weave-daemonset.yaml" \
+        --file "./prog/weave-kube/weave-daemonset.yaml"
+
     echo "** Draft $TYPE $RELEASE_NAME $VERSION created at"
     echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
 }
@@ -235,6 +243,13 @@ publish() {
             --tag latest_release \
             --name "weave" \
             --file "./weave"
+
+        github-release upload \
+            --user $GITHUB_USER \
+            --repo weave \
+            --tag latest_release \
+            --name "weave-daemonset.yaml" \
+            --file "./prog/weave-kube/weave-daemonset.yaml"
 
         echo "** Release $RELEASE_NAME $VERSION published at"
         echo -e "\thttps://github.com/$GITHUB_USER/weave/releases/$LATEST_TAG"
