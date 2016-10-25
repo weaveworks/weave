@@ -10,8 +10,9 @@ set -e
 : ${KEY_FILE:=/tmp/gce_private_key.json}
 : ${SSH_KEY_FILE:=$HOME/.ssh/gce_ssh_key}
 : ${PROJECT:=positive-cocoa-90213}
-: ${IMAGE:=ubuntu-14-04}
-: ${TEMPLATE_NAME:=test-template-10}
+: ${IMAGE_FAMILY:=ubuntu-1604-lts}
+: ${IMAGE_PROJECT:=ubuntu-os-cloud}
+: ${TEMPLATE_NAME:=test-template-11}
 : ${ZONE:=us-central1-a}
 : ${NUM_HOSTS:=5}
 SUFFIX=""
@@ -72,7 +73,7 @@ function install_docker_on {
 	name=$1
 	ssh -t $name sudo bash -x -s <<EOF
 curl -sSL https://get.docker.com/gpg | sudo apt-key add -
-curl -sSL https://get.docker.com/ | sh
+curl -sSL https://get.docker.com/ | sed -e s/docker-engine/docker-engine=1.11.2-0~xenial/ | sh
 apt-get update -qq;
 apt-get install -q -y --force-yes --no-install-recommends ethtool;
 usermod -a -G docker vagrant;
@@ -124,7 +125,7 @@ function setup {
 }
 
 function make_template {
-	gcloud compute instances create $TEMPLATE_NAME --image $IMAGE --zone $ZONE
+	gcloud compute instances create $TEMPLATE_NAME --image-family=$IMAGE_FAMILY --image-project=$IMAGE_PROJECT --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
 	name="$TEMPLATE_NAME.$ZONE.$PROJECT"
 	try_connect $name
