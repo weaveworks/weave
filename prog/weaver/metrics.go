@@ -62,13 +62,17 @@ var metrics []metric = []metric{
 		}},
 	{desc("weave_ips", "Number of IP addresses.", "state"),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
-			ch <- intGauge(desc, s.IPAM.RangeNumIPs, "total")
-			ch <- intGauge(desc, s.IPAM.ActiveIPs, "local-used")
+			if s.IPAM != nil {
+				ch <- intGauge(desc, s.IPAM.RangeNumIPs, "total")
+				ch <- intGauge(desc, s.IPAM.ActiveIPs, "local-used")
+			}
 		}},
 	{desc("weave_dns_entries", "Number of DNS entries.", "state"),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
-			ch <- intGauge(desc, countDNSEntries(s.DNS.Entries), "total")
-			ch <- intGauge(desc, countDNSEntriesForPeer(s.Router.Name, s.DNS.Entries), "local")
+			if s.DNS != nil {
+				ch <- intGauge(desc, countDNSEntries(s.DNS.Entries), "total")
+				ch <- intGauge(desc, countDNSEntriesForPeer(s.Router.Name, s.DNS.Entries), "local")
+			}
 		}},
 	{desc("weave_flows", "Number of FastDP flows."),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
