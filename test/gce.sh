@@ -76,13 +76,18 @@ curl -sSL https://get.docker.com/gpg | sudo apt-key add -
 curl -sSL https://get.docker.com/ | sed -e s/docker-engine/docker-engine=1.11.2-0~xenial/ | sh
 apt-get update -qq;
 apt-get install -q -y --force-yes --no-install-recommends ethtool;
+apt-get install -q -y bc jq;
 usermod -a -G docker vagrant;
 echo 'DOCKER_OPTS="-H unix:///var/run/docker.sock -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay"' >> /etc/default/docker;
 service docker restart
 EOF
 	# It seems we need a short delay for docker to start up, so I put this in
 	# a separate ssh connection.  This installs nsenter.
-	ssh -t $name sudo docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+	ssh -t $name sudo bash -x -s <<EOF
+docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+docker pull alpine
+docker pull aanand/docker-dnsutils
+EOF
 }
 
 function copy_hosts {
