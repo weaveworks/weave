@@ -13,7 +13,7 @@ func processAddrs(args []string) error {
 	}
 	bridgeName := args[0]
 
-	pred, err := common.ConnectedToBridgePredicate(bridgeName)
+	peerIDs, err := weavenet.ConnectedToBridgeVethPeerIds(bridgeName)
 	if err != nil {
 		if err == weavenet.ErrLinkNotFound {
 			return nil
@@ -26,11 +26,8 @@ func processAddrs(args []string) error {
 		return err
 	}
 
-	// NB: Because network namespaces (netns) are changed many times inside the loop,
-	//     it's NOT safe to exec any code depending on the root netns without
-	//     wrapping with WithNetNS*.
 	for _, pid := range pids {
-		netDevs, err := common.GetNetDevsWithPredicate(pid, pred)
+		netDevs, err := weavenet.GetNetDevsByVethPeerIds(pid, peerIDs)
 		if err != nil {
 			return err
 		}

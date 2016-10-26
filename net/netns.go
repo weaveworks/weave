@@ -57,19 +57,9 @@ func WithNetNSLinkUnsafe(ns netns.NsHandle, ifName string, work func(link netlin
 	})
 }
 
-func WithNetNSLinkByPidUnsafe(pid int, ifName string, work func(link netlink.Link) error) error {
-	ns, err := netns.GetFromPid(pid)
-	if err != nil {
-		return err
-	}
-	defer ns.Close()
-
-	return WithNetNSLinkUnsafe(ns, ifName, work)
-}
-
 // A safe version of WithNetNS* which creates a process executing
 // "nsenter --net=<ns-path> weaveutil <cmd> [args]".
-func WithNetNS(nsPath string, cmd string, args ...string) (string, error) {
+func WithNetNS(nsPath string, cmd string, args ...string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 
 	args = append([]string{"--net=" + nsPath, "weaveutil", cmd}, args...)
@@ -77,13 +67,13 @@ func WithNetNS(nsPath string, cmd string, args ...string) (string, error) {
 	c.Stdout = &stdout
 	c.Stderr = &stderr
 	if err := c.Run(); err != nil {
-		return "", fmt.Errorf("%s: %s", string(stderr.Bytes()), err)
+		return nil, fmt.Errorf("%s: %s", string(stderr.Bytes()), err)
 	}
 
-	return string(stdout.Bytes()), nil
+	return stdout.Bytes(), nil
 }
 
-func WithNetNSByPid(pid int, cmd string, args ...string) (string, error) {
+func WithNetNSByPid(pid int, cmd string, args ...string) ([]byte, error) {
 	return WithNetNS(NSPathByPid(pid), cmd, args...)
 }
 
