@@ -78,12 +78,15 @@ apt-get update -qq;
 apt-get install -q -y --force-yes --no-install-recommends ethtool;
 apt-get install -q -y bc jq;
 usermod -a -G docker vagrant;
-echo 'DOCKER_OPTS="-H unix:///var/run/docker.sock -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay"' >> /etc/default/docker;
-service docker restart
-EOF
-	# It seems we need a short delay for docker to start up, so I put this in
-	# a separate ssh connection.  This installs nsenter.
-	ssh -t $name sudo bash -x -s <<EOF
+mkdir -p /etc/systemd/system/docker.service.d
+cat >/etc/systemd/system/docker.service.d/override.conf  <<OVERRIDE
+[Service]
+ExecStart=
+ExecStart=/usr/bin/docker daemon -H fd:// -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay
+OVERRIDE
+systemctl daemon-reload
+systemctl restart docker
+# This installs nsenter.
 docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 docker pull alpine
 docker pull aanand/docker-dnsutils
