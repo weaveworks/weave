@@ -1,4 +1,4 @@
-$go_version = "1.4.2"
+$go_version = "1.5.2"
 
 $go_path = "/usr/local/go/bin"
 
