@@ -22,6 +22,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   config.vm.network "private_network", ip: vm_ip
   config.vm.provider :virtualbox do |vb|
+    vb.memory = 2048
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
   end
