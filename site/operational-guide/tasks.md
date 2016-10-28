@@ -20,7 +20,7 @@ once and your system is configured to start Docker on boot, then Weave Net
 will start automatically on system restarts.
 
 If you are aiming for a non-interactive installation, use
-[systemd]((/site/installing-weave/systemd.md) or a similar init system to
+[systemd](/site/installing-weave/systemd.md) or a similar init system to
 launch Weave using the `--no-restart` flag after Docker has been started.
 
 ##<a name="detect-reclaim-ipam"></a>Detecting and Reclaiming Lost IP Address Space
