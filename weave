@@ -601,7 +601,7 @@ create_bridge() {
             # Steer traffic via the NPC
             run_iptables -N WEAVE-NPC >/dev/null 2>&1 || true
             add_iptables_rule filter FORWARD -o $BRIDGE -j WEAVE-NPC
-            add_iptables_rule filter FORWARD -o $BRIDGE -j LOG --log-prefix=WEAVE-NPC:
+            add_iptables_rule filter FORWARD -o $BRIDGE -j LOG --log-prefix="Connection dropped by Weave NPC (see: bit.ly/2eNRyDF)"
             add_iptables_rule filter FORWARD -o $BRIDGE -j DROP
         else
             # Work around the situation where there are no rules allowing traffic
