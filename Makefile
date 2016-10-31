@@ -128,6 +128,9 @@ $(BUILD_UPTODATE): build/*
 	$(SUDO) docker build -t $(BUILD_IMAGE) build/
 	touch $@
 
+%/Dockerfile.$(DOCKERHUB_USER): %/Dockerfile.template
+	sed -e "s/DOCKERHUB_USER/$(DOCKERHUB_USER)/" $^ > $@
+
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
@@ -143,9 +146,6 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER
 	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
-
-prog/plugin/Dockerfile.$(DOCKERHUB_USER): prog/plugin/Dockerfile.template
-	sed -e "s/DOCKERHUB_USER/$(DOCKERHUB_USER)/" $^ > $@
 
 $(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEAVEEXEC_UPTODATE)
 	$(SUDO) docker build -f prog/plugin/Dockerfile.$(DOCKERHUB_USER) -t $(PLUGIN_IMAGE) prog/plugin
