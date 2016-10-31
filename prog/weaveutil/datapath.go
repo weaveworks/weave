@@ -4,15 +4,23 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 
-	"github.com/weaveworks/weave/common/odp"
+	weavenet "github.com/weaveworks/weave/net"
 )
 
 func createDatapath(args []string) error {
-	if len(args) != 1 {
-		cmdUsage("create-datapath", "<datapath>")
+	if len(args) != 2 {
+		cmdUsage("create-datapath", "<datapath> <mtu>")
 	}
-	odpSupported, err := odp.CreateDatapath(args[0])
+
+	dpname := args[0]
+	mtu, err := strconv.Atoi(args[1])
+	if err != nil {
+		return fmt.Errorf("unable to parse mtu %q: %s", args[1], err)
+	}
+
+	odpSupported, validMTU, err := weavenet.CreateDatapath(dpname, mtu)
 	if !odpSupported {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -21,14 +29,28 @@ func createDatapath(args []string) error {
 		// status to distinguish it for the weave script.
 		os.Exit(17)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Fallback to 1500 MTU if the user is exposed to the issue
+	if mtu > 1500 && !validMTU {
+		fmt.Fprintf(os.Stderr, "WARNING: Unable to set fastdp MTU to %d, possibly due to 4.3/4.4 kernel version. Setting MTU to 1500 instead.\n", mtu)
+		mtu = 1500
+	}
+
+	if err := weavenet.SetMTU(dpname, mtu); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func deleteDatapath(args []string) error {
 	if len(args) != 1 {
 		cmdUsage("delete-datapath", "<datapath>")
 	}
-	return odp.DeleteDatapath(args[0])
+	return weavenet.DeleteDatapath(args[0])
 }
 
 // Checks whether a datapath can be created by actually creating and destroying it
@@ -37,16 +59,22 @@ func checkDatapath(args []string) error {
 		cmdUsage("check-datapath", "<datapath>")
 	}
 
-	if err := createDatapath(args); err != nil {
+	dpname := args[0]
+
+	odpSupported, _, err := weavenet.CreateDatapath(dpname, -1)
+	if err != nil {
 		return err
 	}
+	if !odpSupported {
+		return fmt.Errorf("kernel does not have ODP support")
+	}
 
-	return odp.DeleteDatapath(args[0])
+	return weavenet.DeleteDatapath(args[0])
 }
 
 func addDatapathInterface(args []string) error {
 	if len(args) != 2 {
 		cmdUsage("add-datapath-interface", "<datapath> <interface>")
 	}
-	return odp.AddDatapathInterface(args[0], args[1])
+	return weavenet.AddDatapathInterface(args[0], args[1])
 }
