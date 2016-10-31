@@ -1,4 +1,4 @@
-PUBLISH=publish_weave publish_weaveexec publish_plugin
+PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube
 
 .DEFAULT: all
 .PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
@@ -16,6 +16,7 @@ WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
 WEAVER_EXE=prog/weaver/weaver
 WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
+KUBEPEERS_EXE=prog/kube-peers/kube-peers
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
@@ -24,23 +25,25 @@ PLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE)
 
 BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
 PLUGIN_UPTODATE=.plugin.uptodate
+WEAVEKUBE_UPTODATE=.weavekube.uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEDB_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVEDB_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 PLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin
+WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube
 BUILD_IMAGE=$(DOCKERHUB_USER)/weavebuild
 WEAVEDB_IMAGE=$(DOCKERHUB_USER)/weavedb
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEDB_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVEDB_IMAGE)
 
 WEAVE_EXPORT=weave.tar.gz
 
@@ -55,7 +58,7 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	echo "    sudo go install -tags netgo std"; \
 	false; \
 }
-BUILD_FLAGS=-i -ldflags "-extldflags \"-static\" -X main.version=$(WEAVE_VERSION)" -tags netgo
+BUILD_FLAGS=-i -ldflags "-linkmode external -extldflags -static -X main.version=$(WEAVE_VERSION)" -tags netgo
 
 PACKAGE_BASE=$(shell go list -e ./)
 
@@ -67,6 +70,7 @@ $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/we
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
+$(KUBEPEERS_EXE): prog/kube-peers/*.go
 $(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
@@ -99,7 +103,7 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEUTIL_EXE):
+$(WEAVEUTIL_EXE) $(KUBEPEERS_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
@@ -128,8 +132,11 @@ $(BUILD_UPTODATE): build/*
 	$(SUDO) docker build -t $(BUILD_IMAGE) build/
 	touch $@
 
-$(WEAVER_UPTODATE): prog/weaver/Dockerfile $(WEAVER_EXE)
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVER_IMAGE) prog/weaver
+%/Dockerfile.$(DOCKERHUB_USER): %/Dockerfile.template
+	sed -e "s/DOCKERHUB_USER/$(DOCKERHUB_USER)/" $^ > $@
+
+$(WEAVER_UPTODATE): prog/weaver/Dockerfile.$(DOCKERHUB_USER) $(WEAVER_EXE) $(WEAVEEXEC_UPTODATE)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaver/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
 $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE)
@@ -144,11 +151,13 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
-prog/plugin/Dockerfile.$(DOCKERHUB_USER): prog/plugin/Dockerfile.template
-	sed -e "s/DOCKERHUB_USER/$(DOCKERHUB_USER)/" $^ > $@
-
-$(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEAVEEXEC_UPTODATE)
+$(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEAVER_UPTODATE)
 	$(SUDO) docker build -f prog/plugin/Dockerfile.$(DOCKERHUB_USER) -t $(PLUGIN_IMAGE) prog/plugin
+	touch $@
+
+$(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) $(KUBEPEERS_EXE) $(PLUGIN_UPTODATE)
+	cp $(KUBEPEERS_EXE) prog/weave-kube/
+	$(SUDO) docker build -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
 	touch $@
 
 $(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile
