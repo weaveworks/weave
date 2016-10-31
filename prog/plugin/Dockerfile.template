@@ -1,3 +1,3 @@
-FROM DOCKERHUB_USER/weaveexec
+FROM DOCKERHUB_USER/weave
 ADD ./plugin /home/weave/
 ENTRYPOINT ["/home/weave/plugin"]
