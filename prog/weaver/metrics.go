@@ -56,7 +56,7 @@ var metrics []metric = []metric{
 			ch <- intGauge(desc, len(s.Router.Connections)-established, "non-established")
 			ch <- intGauge(desc, established, "established")
 		}},
-	{desc("weave_connection_termination_count", "Number of peer-to-peer connections terminated."),
+	{desc("weave_connection_terminations_total", "Number of peer-to-peer connections terminated."),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
 			ch <- uint64Counter(desc, uint64(s.Router.TerminationCount))
 		}},
