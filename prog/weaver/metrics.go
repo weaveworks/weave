@@ -63,8 +63,13 @@ var metrics []metric = []metric{
 	{desc("weave_ips", "Number of IP addresses.", "state"),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
 			if s.IPAM != nil {
-				ch <- intGauge(desc, s.IPAM.RangeNumIPs, "total")
 				ch <- intGauge(desc, s.IPAM.ActiveIPs, "local-used")
+			}
+		}},
+	{desc("weave_max_ips", "Number of IP addresses used by allocator."),
+		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
+			if s.IPAM != nil {
+				ch <- intGauge(desc, s.IPAM.RangeNumIPs)
 			}
 		}},
 	{desc("weave_dns_entries", "Number of DNS entries.", "state"),
