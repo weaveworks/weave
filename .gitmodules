@@ -106,3 +106,15 @@
 [submodule "vendor/k8s.io/client-go"]
 	path = vendor/k8s.io/client-go
 	url = https://github.com/kubernetes/client-go
+[submodule "vendor/github.com/pkg/errors"]
+	path = vendor/github.com/pkg/errors
+	url = https://github.com/pkg/errors
+[submodule "vendor/github.com/spf13/cobra"]
+	path = vendor/github.com/spf13/cobra
+	url = https://github.com/spf13/cobra
+[submodule "vendor/github.com/spf13/plag"]
+	path = vendor/github.com/spf13/plag
+	url = https://github.com/spf13/pflag
+[submodule "vendor/github.com/spf13/pflag"]
+	path = vendor/github.com/spf13/pflag
+	url = https://github.com/spf13/pflag
