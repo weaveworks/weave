@@ -19,6 +19,8 @@ import (
 	weave "github.com/weaveworks/weave/router"
 )
 
+var allConnectionStates = []string{"established", "pending", "retrying", "failed", "connecting"}
+
 var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 	"countDNSEntries": countDNSEntries,
 	"printList": func(list []string) string {
@@ -87,7 +89,7 @@ var rootTemplate = template.New("root").Funcs(map[string]interface{}{
 		for _, conn := range conns {
 			counts[conn.State]++
 		}
-		return printCounts(counts, []string{"established", "pending", "retrying", "failed", "connecting"})
+		return printCounts(counts, allConnectionStates)
 	},
 	"printPeerConnectionCounts": func(peers []mesh.PeerStatus) string {
 		counts := make(map[string]int)
