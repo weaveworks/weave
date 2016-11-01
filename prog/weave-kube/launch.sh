@@ -86,7 +86,7 @@ if [ -z "$IPALLOC_INIT" ]; then
 fi
 
 /home/weave/weaver --port=6783 $BRIDGE_OPTIONS \
-     --http-addr=127.0.0.1:6784 --docker-api='' --no-dns \
+     --http-addr=$HTTP_ADDR --docker-api='' --no-dns \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
      --ipalloc-init $IPALLOC_INIT \
      --name=$(cat /sys/class/net/weave/address) "$@" \
