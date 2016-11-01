@@ -157,6 +157,7 @@ exec_remote() {
         -e WEAVE_PASSWORD \
         -e WEAVE_PORT \
         -e WEAVE_HTTP_ADDR \
+        -e WEAVE_STATUS_ADDR \
         -e WEAVE_CONTAINER_NAME \
         -e WEAVE_MTU \
         -e WEAVE_NO_FASTDP \
@@ -351,6 +352,7 @@ DATAPATH_IFNAME=v${CONTAINER_IFNAME}-datapath
 PCAP_IFNAME=v${CONTAINER_IFNAME}-pcap
 PORT=${WEAVE_PORT:-6783}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
+STATUS_ADDR=${WEAVE_STATUS_ADDR:-127.0.0.1:6782}
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
 COVERAGE_ARGS=""
@@ -1663,6 +1665,7 @@ launch_router() {
         $DNS_ROUTER_OPTS $NO_DNS_OPT \
         $AWSVPC_ARGS \
         --http-addr $HTTP_ADDR \
+        --status-addr $STATUS_ADDR \
         --resolv-conf "/var/run/weave/etc/$RESOLV_CONF_BASE" \
         "$@")
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
