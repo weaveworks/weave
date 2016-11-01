@@ -6,6 +6,9 @@ set -e
 IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 
+# Default for network policy
+EXPECT_NPC=${EXPECT_NPC:-1}
+
 # kube-proxy requires that bridged traffic passes through netfilter
 if [ ! -f /proc/sys/net/bridge/bridge-nf-call-iptables ] ; then
     echo /proc/sys/net/bridge/bridge-nf-call-iptables not found >&2
@@ -41,7 +44,12 @@ fi
 
 # Need to create bridge before running weaver so we can use the peer address
 # (because of https://github.com/weaveworks/weave/issues/2480)
-/home/weave/weave --local create-bridge --force --expect-npc
+WEAVE_NPC_OPTS="--expect-npc"
+if [ "${EXPECT_NPC}" = "0" ]; then
+    WEAVE_NPC_OPTS=""
+else
+
+/home/weave --local create-bridge --force $WEAVE_NPC_OPTS
 
 # Kubernetes sets HOSTNAME to the host's hostname
 # when running a pod in host namespace.
