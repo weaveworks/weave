@@ -1,4 +1,4 @@
-PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube
+PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube publish_weave-npc
 
 .DEFAULT: all
 .PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
@@ -17,6 +17,7 @@ WEAVER_EXE=prog/weaver/weaver
 WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
 KUBEPEERS_EXE=prog/kube-peers/kube-peers
+WEAVENPC_EXE=prog/weave-npc/weave-npc
 WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
@@ -25,25 +26,27 @@ PLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE)
 
 BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
 PLUGIN_UPTODATE=.plugin.uptodate
 WEAVEKUBE_UPTODATE=.weavekube.uptodate
+WEAVENPC_UPTODATE=.weavenpc.uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVEDB_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVENPC_UPTODATE) $(WEAVEDB_UPTODATE)
 
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
 PLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin
 WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube
+WEAVENPC_IMAGE=$(DOCKERHUB_USER)/weave-npc
 BUILD_IMAGE=$(DOCKERHUB_USER)/weavebuild
 WEAVEDB_IMAGE=$(DOCKERHUB_USER)/weavedb
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVEDB_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
 
 WEAVE_EXPORT=weave.tar.gz
 
@@ -71,6 +74,7 @@ $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
 $(KUBEPEERS_EXE): prog/kube-peers/*.go
+$(WEAVENPC_EXE): prog/weave-npc/*.go npc/*.go npc/*/*.go
 $(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
@@ -103,7 +107,7 @@ else
 endif
 	$(NETGO_CHECK)
 
-$(WEAVEUTIL_EXE) $(KUBEPEERS_EXE):
+$(WEAVEUTIL_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 	$(NETGO_CHECK)
 
@@ -158,6 +162,10 @@ $(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEA
 $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(PLUGIN_UPTODATE)
 	cp $(KUBEPEERS_EXE) prog/weave-kube/
 	$(SUDO) docker build -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
+	touch $@
+
+$(WEAVENPC_UPTODATE): prog/weave-npc/Dockerfile $(WEAVENPC_EXE) prog/weave-npc/ulogd.conf
+	$(SUDO) docker build -f prog/weave-npc/Dockerfile -t $(WEAVENPC_IMAGE) prog/weave-npc
 	touch $@
 
 $(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile

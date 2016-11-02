@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"k8s.io/client-go/1.4/kubernetes"
-	"k8s.io/client-go/1.4/pkg/api"
-	"k8s.io/client-go/1.4/rest"
+	"k8s.io/client-go/kubernetes"
+	api "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
 )
 
 func getKubePeers() ([]string, error) {

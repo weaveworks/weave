@@ -46,6 +46,7 @@ prog/weaveutil/weaveutil
 prog/*/Dockerfile.weaveworks
 prog/kube-peers/kube-peers
 prog/weave-kube/kube-peers
+prog/weave-npc/weave-npc
 prog/plugin/plugin
 testing/cover/cover
 testing/runner/runner
