@@ -48,7 +48,7 @@ fi
 WEAVE_NPC_OPTS="--expect-npc"
 if [ "${EXPECT_NPC}" = "0" ]; then
     WEAVE_NPC_OPTS=""
-else
+fi
 
 /home/weave --local create-bridge --force $WEAVE_NPC_OPTS
 
