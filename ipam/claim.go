@@ -5,6 +5,7 @@ import (
 
 	"github.com/weaveworks/mesh"
 
+	"github.com/weaveworks/weave/api"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/net/address"
 )
@@ -84,7 +85,7 @@ func (c *claim) Try(alloc *Allocator) bool {
 		// Unused address, we try to claim it:
 		if err := alloc.space.Claim(c.cidr.Addr); err == nil {
 			alloc.debugln("Claimed", c.cidr, "for", c.ident)
-			if c.ident == "_" { // Special "I don't have a unique ID" identifier
+			if c.ident == api.NoContainerID {
 				alloc.addOwned(c.cidr.Addr.String(), c.cidr, c.isContainer)
 			} else {
 				alloc.addOwned(c.ident, c.cidr, c.isContainer)
@@ -93,14 +94,14 @@ func (c *claim) Try(alloc *Allocator) bool {
 		} else {
 			c.sendResult(err)
 		}
-	case (existingIdent == c.ident) || (c.ident == "_" && existingIdent == c.cidr.Addr.String()):
+	case (existingIdent == c.ident) || (c.ident == api.NoContainerID && existingIdent == c.cidr.Addr.String()):
 		// same identifier is claiming same address; that's OK
 		alloc.debugln("Re-Claimed", c.cidr, "for", c.ident)
 		c.sendResult(nil)
 	case existingIdent == c.cidr.Addr.String():
-		// Address already allocated via "_" name and current ID is a real container ID:
+		// Address already allocated via api.NoContainerID name and current ID is a real container ID:
 		c.sendResult(fmt.Errorf("address %s already in use", c.cidr))
-	case c.ident == "_":
+	case c.ident == api.NoContainerID:
 		// We do not know whether this is the same container or another one,
 		// but we also cannot prove otherwise, so we let it reclaim the address:
 		alloc.debugln("Re-Claimed", c.cidr, "for ID", c.ident, "having existing ID as", existingIdent)
