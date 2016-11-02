@@ -48,12 +48,28 @@ assert_raises "exec_on $HOST1 c2 $PING $C1IP"
 # Now remove and start a new container to see if IP address re-use breaks things
 docker_on $HOST1 rm -f c2
 
-docker_on $HOST1 run --net=none --name=c3 -dt $SMALL_IMAGE /bin/sh
+C3=$(docker_on $HOST1 run --net=none --name=c3 -dt $SMALL_IMAGE /bin/sh)
 
 cni_connect $HOST1 c3 <<EOF
 { "name": "weave", "type": "weave-net" }
 EOF
 
+C3IP=$(container_ip $HOST1 c3)
+
 assert_raises "exec_on $HOST1 c1 $PING $C2IP"
+
+
+# Ensure existing containers can reclaim their IP addresses after CNI has been used -- see #2548
+stop_weave_on $HOST1
+
+# Ensure no warning is printed to the standard error:
+ACTUAL_OUTPUT=$(weave_on $HOST1 launch-router 2>&1)
+EXPECTED_OUTPUT=$(docker_on $HOST1 inspect --format="{{.Id}}" weave)
+
+assert_raises "[ $EXPECTED_OUTPUT == $ACTUAL_OUTPUT ]"
+
+assert "$SSH $HOST1 \"curl -s -X GET 127.0.0.1:6784/ip/$C1 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'\"" "$C1IP"
+assert "$SSH $HOST1 \"curl -s -X GET 127.0.0.1:6784/ip/$C3 | grep -o -E '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'\"" "$C3IP"
+
 
 end_suite
