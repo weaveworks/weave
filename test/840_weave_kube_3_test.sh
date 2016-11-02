@@ -24,7 +24,7 @@ run_on $HOST1 "sudo systemctl start kubelet && sudo kubeadm init --token=$TOKEN"
 run_on $HOST2 "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
 run_on $HOST3 "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
 
-cat ../prog/weave-kube/weave-daemonset.yaml | run_on $HOST1 "kubectl apply -f -"
+sed -e 's/imagePullPolicy: Always/imagePullPolicy: Never/' ../prog/weave-kube/weave-daemonset.yaml | run_on $HOST1 "kubectl apply -f -"
 
 sleep 5
 
