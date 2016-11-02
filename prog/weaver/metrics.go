@@ -46,15 +46,13 @@ func uint64Counter(desc *prometheus.Desc, val uint64, labels ...string) promethe
 var metrics []metric = []metric{
 	{desc("weave_connections", "Number of peer-to-peer connections.", "state"),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
-			established := 0
+			counts := make(map[string]int)
 			for _, conn := range s.Router.Connections {
-				if conn.State == "established" {
-					established++
-				}
+				counts[conn.State]++
 			}
-
-			ch <- intGauge(desc, len(s.Router.Connections)-established, "non-established")
-			ch <- intGauge(desc, established, "established")
+			for _, state := range allConnectionStates {
+				ch <- intGauge(desc, counts[state], state)
+			}
 		}},
 	{desc("weave_connection_terminations_total", "Number of peer-to-peer connections terminated."),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
@@ -63,15 +61,19 @@ var metrics []metric = []metric{
 	{desc("weave_ips", "Number of IP addresses.", "state"),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
 			if s.IPAM != nil {
-				ch <- intGauge(desc, s.IPAM.RangeNumIPs, "total")
 				ch <- intGauge(desc, s.IPAM.ActiveIPs, "local-used")
 			}
 		}},
-	{desc("weave_dns_entries", "Number of DNS entries.", "state"),
+	{desc("weave_max_ips", "Size of IP address space used by allocator."),
+		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
+			if s.IPAM != nil {
+				ch <- intGauge(desc, s.IPAM.RangeNumIPs)
+			}
+		}},
+	{desc("weave_dns_entries", "Number of DNS entries."),
 		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
 			if s.DNS != nil {
-				ch <- intGauge(desc, countDNSEntries(s.DNS.Entries), "total")
-				ch <- intGauge(desc, countDNSEntriesForPeer(s.Router.Name, s.DNS.Entries), "local")
+				ch <- intGauge(desc, countDNSEntriesForPeer(s.Router.Name, s.DNS.Entries))
 			}
 		}},
 	{desc("weave_flows", "Number of FastDP flows."),
