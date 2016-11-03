@@ -2,9 +2,6 @@
 
 set -e
 
-# We need jq to analyse the PR files JSON, so install that first
-sudo apt-get -q update && sudo apt-get -q install bc jq
-
 echo "TEST_AND_PUBLISH=1" > "$STATE"
 
 if [ -n "$CI_PULL_REQUEST" -a "$CI_PULL_REQUEST" = "$CI_PULL_REQUESTS" ] ; then

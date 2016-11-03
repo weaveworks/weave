@@ -10,8 +10,9 @@ set -e
 : ${KEY_FILE:=/tmp/gce_private_key.json}
 : ${SSH_KEY_FILE:=$HOME/.ssh/gce_ssh_key}
 : ${PROJECT:=positive-cocoa-90213}
-: ${IMAGE:=ubuntu-14-04}
-: ${TEMPLATE_NAME:=test-template-10}
+: ${IMAGE_FAMILY:=ubuntu-1604-lts}
+: ${IMAGE_PROJECT:=ubuntu-os-cloud}
+: ${TEMPLATE_NAME:=test-template-11}
 : ${ZONE:=us-central1-a}
 : ${NUM_HOSTS:=5}
 SUFFIX=""
@@ -34,7 +35,7 @@ function vm_names {
 # Delete all vms in this account
 function destroy {
 	names="$(vm_names)"
-	if [ $(gcloud compute instances list --zone $ZONE -q $names | wc -l) -le 1 ] ; then
+	if [ $(gcloud compute instances list --zones $ZONE -q $names | wc -l) -le 1 ] ; then
 		return 0
 	fi
 	for i in {0..10}; do
@@ -72,16 +73,24 @@ function install_docker_on {
 	name=$1
 	ssh -t $name sudo bash -x -s <<EOF
 curl -sSL https://get.docker.com/gpg | sudo apt-key add -
-curl -sSL https://get.docker.com/ | sh
+curl -sSL https://get.docker.com/ | sed -e s/docker-engine/docker-engine=1.11.2-0~xenial/ | sh
 apt-get update -qq;
 apt-get install -q -y --force-yes --no-install-recommends ethtool;
+apt-get install -q -y bc jq;
 usermod -a -G docker vagrant;
-echo 'DOCKER_OPTS="-H unix:///var/run/docker.sock -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay"' >> /etc/default/docker;
-service docker restart
+mkdir -p /etc/systemd/system/docker.service.d
+cat >/etc/systemd/system/docker.service.d/override.conf  <<OVERRIDE
+[Service]
+ExecStart=
+ExecStart=/usr/bin/docker daemon -H fd:// -H unix:///var/run/alt-docker.sock -H tcp://0.0.0.0:2375 -s overlay
+OVERRIDE
+systemctl daemon-reload
+systemctl restart docker
+# This installs nsenter.
+docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
+docker pull alpine
+docker pull aanand/docker-dnsutils
 EOF
-	# It seems we need a short delay for docker to start up, so I put this in
-	# a separate ssh connection.  This installs nsenter.
-	ssh -t $name sudo docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 }
 
 function copy_hosts {
@@ -124,7 +133,7 @@ function setup {
 }
 
 function make_template {
-	gcloud compute instances create $TEMPLATE_NAME --image $IMAGE --zone $ZONE
+	gcloud compute instances create $TEMPLATE_NAME --image-family=$IMAGE_FAMILY --image-project=$IMAGE_PROJECT --zone $ZONE
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
 	name="$TEMPLATE_NAME.$ZONE.$PROJECT"
 	try_connect $name
