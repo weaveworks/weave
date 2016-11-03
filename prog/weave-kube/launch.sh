@@ -31,8 +31,8 @@ fi
 
 install_cni_plugin() {
     mkdir -p $1 || return 1
-    cp /home/weave/plugin $1/weave-net
-    cp /home/weave/plugin $1/weave-ipam
+    cp /usr/bin/weaveutil $1/weave-net
+    cp /usr/bin/weaveutil $1/weave-ipam
 }
 
 # Install CNI plugin binary to typical CNI bin location
