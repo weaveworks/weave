@@ -50,7 +50,7 @@ if [ "${EXPECT_NPC}" = "0" ]; then
     WEAVE_NPC_OPTS=""
 fi
 
-/home/weave --local create-bridge --force $WEAVE_NPC_OPTS
+/home/weave/weave --local create-bridge --force $WEAVE_NPC_OPTS
 
 # Kubernetes sets HOSTNAME to the host's hostname
 # when running a pod in host namespace.
