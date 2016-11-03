@@ -3,6 +3,11 @@ title: Integrating Kubernetes and Mesos via the CNI Plugin
 menu_order: 65
 ---
 
+> The recommended way of using Weave with Kubernetes is via the new
+> [Kubernetes Addon](/site/kube-addon.md). The instructions below
+> remain valid however, and are still the recommended method for
+> integrating with Mesos.
+
 CNI, the [_Container Network Interface_](https://github.com/containernetworking/cni),
 is a proposed standard for configuring network interfaces for Linux
 application containers.  CNI is supported by
