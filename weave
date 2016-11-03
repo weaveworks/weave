@@ -1036,7 +1036,7 @@ docker run --rm $(docker_run_options) --pid=host -i \\
  -e CNI_VERSION -e CNI_COMMAND -e CNI_CONTAINERID -e CNI_NETNS \\
  -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH \\
  -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni \$EXTRA_VOLUMES \\
- $PLUGIN_IMAGE $COVERAGE_ARGS $2
+--entrypoint=/usr/bin/weaveutil $EXEC_IMAGE $2
 EOF
     chmod a+x "$1"
 }
@@ -1052,8 +1052,8 @@ EOF
 
 setup_cni() {
     if [ -d $HOST_ROOT/opt/cni/bin ] ; then
-        create_cni_script $HOST_ROOT/opt/cni/bin/weave-net  --cni-net
-        create_cni_script $HOST_ROOT/opt/cni/bin/weave-ipam --cni-ipam
+        create_cni_script $HOST_ROOT/opt/cni/bin/weave-net  cni-net
+        create_cni_script $HOST_ROOT/opt/cni/bin/weave-ipam cni-ipam
     fi
     if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conf ] ; then
         create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf

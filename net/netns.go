@@ -57,12 +57,14 @@ func WithNetNSLinkUnsafe(ns netns.NsHandle, ifName string, work func(link netlin
 	})
 }
 
+var WeaveUtilCmd = "weaveutil"
+
 // A safe version of WithNetNS* which creates a process executing
 // "nsenter --net=<ns-path> weaveutil <cmd> [args]".
 func WithNetNS(nsPath string, cmd string, args ...string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 
-	args = append([]string{"--net=" + nsPath, "weaveutil", cmd}, args...)
+	args = append([]string{"--net=" + nsPath, WeaveUtilCmd, cmd}, args...)
 	c := exec.Command("nsenter", args...)
 	c.Stdout = &stdout
 	c.Stderr = &stderr
