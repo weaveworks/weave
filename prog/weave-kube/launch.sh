@@ -29,18 +29,49 @@ if [ ! -f /etc/cni/net.d/10-weave.conf ] ; then
 EOF
 fi
 
+SOURCE_BINARY=/usr/bin/weaveutil
+VERSION=$(/home/weave/weaver --version | sed -E 's/weave router (.*?)/\1/')
+PLUGIN="weave-plugin-$VERSION"
+
 install_cni_plugin() {
     mkdir -p $1 || return 1
-    cp /usr/bin/weaveutil $1/weave-net
-    cp /usr/bin/weaveutil $1/weave-ipam
+    if [ ! -f $1/$PLUGIN ]; then
+        cp "$SOURCE_BINARY" $1/$PLUGIN
+    fi
+}
+
+upgrade_cni_plugin_symlink() {
+    # Remove potential temporary symlink from previous failed upgrade:
+    rm -f $1/$2.tmp
+    # Atomically create a symlink to the plugin:
+    ln -s $1/$PLUGIN $1/$2.tmp && mv -f $1/$2.tmp $1/$2
+}
+
+upgrade_cni_plugin() {
+    # Check if weave-net and weave-ipam are (legacy) copies of the plugin, and
+    # if so remove these so symlinks can be used instead from now onwards.
+    if [ -f $1/weave-net  -a ! -L $1/weave-net  ];  then rm $1/weave-net;   fi
+    if [ -f $1/weave-ipam -a ! -L $1/weave-ipam ];  then rm $1/weave-ipam;  fi
+
+    # Create two symlinks to the plugin, as it has a different 
+    # behaviour depending on its name:
+    if [ "$(readlink -f $1/weave-net)" != "$1/$PLUGIN" ]; then
+        upgrade_cni_plugin_symlink $1 weave-net
+    fi
+    if [ "$(readlink -f $1/weave-ipam)" != "$1/$PLUGIN" ]; then
+        upgrade_cni_plugin_symlink $1 weave-ipam
+    fi
 }
 
 # Install CNI plugin binary to typical CNI bin location
-# with fall-back to CNI directory used by kube-up on GCI OS
-if [ ! -f /opt/cni/bin/weave-net ] ; then
-    if ! install_cni_plugin /opt/cni/bin ; then
-        install_cni_plugin /host_home/kubernetes/bin
-    fi
+# with fall-back to CNI directory used by kube-up on GCI OS.
+if install_cni_plugin /opt/cni/bin ; then
+    upgrade_cni_plugin /opt/cni/bin
+elif install_cni_plugin /host_home/kubernetes/bin ; then
+    upgrade_cni_plugin /host_home/kubernetes/bin
+else
+    echo "Failed to install the Weave CNI plugin" >&2
+    exit 1
 fi
 
 # Need to create bridge before running weaver so we can use the peer address
