@@ -12,7 +12,7 @@ set -e
 : ${PROJECT:=positive-cocoa-90213}
 : ${IMAGE_FAMILY:=ubuntu-1604-lts}
 : ${IMAGE_PROJECT:=ubuntu-os-cloud}
-: ${TEMPLATE_NAME:=test-template-11}
+: ${TEMPLATE_NAME:=test-template-12}
 : ${ZONE:=us-central1-a}
 : ${NUM_HOSTS:=5}
 SUFFIX=""
@@ -90,6 +90,26 @@ systemctl restart docker
 docker run --rm -v /usr/local/bin:/target jpetazzo/nsenter
 docker pull alpine
 docker pull aanand/docker-dnsutils
+docker pull weaveworks/hello-world
+EOF
+}
+
+function install_kubernetes_on {
+	name=$1
+	ssh -t $name sudo bash -x -s <<EOF
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
+apt-get update -qq
+apt-get install -q -y kubelet kubeadm kubectl kubernetes-cni
+systemctl --now disable kubelet
+# Pre-pull images required for Kubernetes
+docker pull gcr.io/google_containers/etcd-amd64:2.2.5
+docker pull gcr.io/google_containers/kube-apiserver-amd64:v1.4.0
+docker pull gcr.io/google_containers/kube-controller-manager-amd64:v1.4.0
+docker pull gcr.io/google_containers/kube-proxy-amd64:v1.4.0
+docker pull gcr.io/google_containers/kube-scheduler-amd64:v1.4.0
+docker pull gcr.io/google_containers/kube-discovery-amd64:1.0
+docker pull gcr.io/google_containers/pause-amd64:3.0
 EOF
 }
 
@@ -138,6 +158,7 @@ function make_template {
 	name="$TEMPLATE_NAME.$ZONE.$PROJECT"
 	try_connect $name
 	install_docker_on $name
+	install_kubernetes_on $name
 	gcloud -q compute instances delete $TEMPLATE_NAME --keep-disks boot --zone $ZONE
 	gcloud compute images create $TEMPLATE_NAME --source-disk $TEMPLATE_NAME --source-disk-zone $ZONE
 }

@@ -117,7 +117,7 @@ if [ -z "$IPALLOC_INIT" ]; then
     IPALLOC_INIT="consensus=$(peer_count $KUBE_PEERS)"
 fi
 
-/home/weave/weaver --port=6783 $BRIDGE_OPTIONS \
+/home/weave/weaver $EXTRA_ARGS --port=6783 $BRIDGE_OPTIONS \
      --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
      --ipalloc-init $IPALLOC_INIT \
