@@ -1028,6 +1028,11 @@ peer_args() {
 ######################################################################
 
 create_cni_script() {
+    # If target file is a symlink, it's probably a remnant of a weave-kube
+    # installation - if the user has now switched back to `weave launch`,
+    # we need to remove the link before rewriting the contents:
+    [ -L "$1" ] && rm "$1" # fail if we can't remove the link
+
     cat >"$1" <<EOF
 #!/bin/sh
 [ -z "\$CNI_NETNS" -o \$(echo "\$CNI_NETNS" | grep "^/proc/") ] || \\
