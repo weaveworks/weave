@@ -11,6 +11,7 @@ menu_order: 20
  * [Address Allocation (IPAM)](#addressing)
  * [Naming and Discovery](#naming-and-discovery)
  * [Application Isolation](#application-isolation)
+ * [Network Policy](#network-policy)
  * [Dynamic Network Attachment](#dynamic-network-attachment)
  * [Security](#security)
  * [Host Network Integration](#host-network-integration)
@@ -139,6 +140,11 @@ See [Isolating Applications](/site/using-weave/application-isolation.md)
 for information on how to use the isolation-through-subnets 
 technique with Weave Net.
 
+###<a name="network-policy"></a>Network Policy
+
+The Weave [Kubernetes Addon](/site/kube-addon.md) includes a network
+policy controller that implements [Kubernetes Network
+Policies](http://kubernetes.io/docs/user-guide/networkpolicies/).
 
 ###<a name="dynamic-network-attachment"></a>Dynamic Network Attachment
 
