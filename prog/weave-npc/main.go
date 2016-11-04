@@ -172,7 +172,7 @@ func main() {
 		Short: "Weaveworks Kubernetes Network Policy Controller",
 		Run:   root}
 
-	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":8686", "metrics server bind address")
+	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":6781", "metrics server bind address")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
