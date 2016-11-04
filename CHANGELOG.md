@@ -1,3 +1,14 @@
+## Release 1.8.0
+
+Highlights:
+
+* Exposed network policy controller Prometheus metrics
+  weaveworks/weave-npc#23, #2595, #2549
+* Exposed router Prometheus metrics #2535, #2547, #2523, #2579, #2578,
+  #2568, #2560, #2561
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.8.0).
+
 ## Release 1.7.2
 
 Bug fixes and minor improvements
