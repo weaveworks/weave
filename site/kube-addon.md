@@ -10,7 +10,7 @@ CNI, it is possible to install Weave Net on your cluster with a single
 command:
 
 ```
-kubectl create -f https://git.io/weave-kube
+kubectl apply -f https://git.io/weave-kube
 ```
 
 After a few seconds, you should have a Weave Net pod running on each
