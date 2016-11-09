@@ -182,7 +182,7 @@ tools/.git:
 	git submodule update --init
 
 $(RUNNER_EXE): tools/.git
-	GO15VENDOREXPERIMENT=1 make -C tools/runner
+	make -C tools/runner
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
