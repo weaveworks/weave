@@ -84,6 +84,9 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 			if err := assignBridgeIP(conf.BrName, bridgeIPResult.IP4.IP); err != nil {
 				return fmt.Errorf("unable to assign IP address to bridge: %s", err)
 			}
+			if err := weavenet.ExposeNAT(bridgeIPResult.IP4.IP); err != nil {
+				return fmt.Errorf("unable to create NAT rules: %s", err)
+			}
 			bridgeIP = bridgeIPResult.IP4.IP.IP
 		} else if err != nil {
 			return err

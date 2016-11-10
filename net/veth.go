@@ -271,3 +271,21 @@ func subnets(addrs []netlink.Addr) map[string]struct{} {
 	}
 	return subnets
 }
+
+func ExposeNAT(ipnet net.IPNet) error {
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
+	}
+	cidr := ipnet.String()
+	if err := ipt.AppendUnique("nat", "WEAVE", "-s", cidr, "-d", "224.0.0.0/4", "-j", "RETURN"); err != nil {
+		return err
+	}
+	if err := ipt.AppendUnique("nat", "WEAVE", "-d", cidr, "!", "-s", cidr, "-j", "MASQUERADE"); err != nil {
+		return err
+	}
+	if err := ipt.AppendUnique("nat", "WEAVE", "-s", cidr, "!", "-d", cidr, "-j", "MASQUERADE"); err != nil {
+		return err
+	}
+	return nil
+}
