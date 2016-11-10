@@ -661,14 +661,6 @@ expose_ip() {
     done
 }
 
-expose_nat() {
-    for CIDR in $ALL_CIDRS ; do
-        add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
-        add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
-        add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
-    done
-}
-
 # create veth with ends $1-$2, and then invoke $3..., removing the
 # veth on failure. No-op of veth already exists.
 create_veth() {
@@ -2222,7 +2214,7 @@ EOF
         fi
         create_bridge --without-ethtool
         expose_ip
-        expose_nat
+        util_op expose-nat $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
     hide)
