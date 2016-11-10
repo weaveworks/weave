@@ -67,6 +67,16 @@ func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
 	return err
 }
 
+func (driver *driver) NetworkAllocate(alloc *api.AllocateNetworkRequest) (*api.AllocateNetworkResponse, error) {
+	driver.logReq("NetworkAllocate", alloc, alloc.NetworkID)
+	return nil, nil
+}
+
+func (driver *driver) NetworkFree(free *api.FreeNetworkRequest) (*api.FreeNetworkResponse, error) {
+	driver.logReq("NetworkFree", free, free.NetworkID)
+	return nil, nil
+}
+
 // Deal with excessively-generic way the options get decoded from JSON
 func stringOptions(create *api.CreateNetworkRequest) map[string]string {
 	if create.Options != nil {
