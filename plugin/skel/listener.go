@@ -26,6 +26,8 @@ type Driver interface {
 	DeleteEndpoint(delete *api.DeleteEndpointRequest) error
 	EndpointInfo(req *api.EndpointInfoRequest) (*api.EndpointInfoResponse, error)
 	JoinEndpoint(j *api.JoinRequest) (response *api.JoinResponse, error error)
+	NetworkAllocate(*api.AllocateNetworkRequest) (*api.AllocateNetworkResponse, error)
+	NetworkFree(*api.FreeNetworkRequest) (*api.FreeNetworkResponse, error)
 	LeaveEndpoint(leave *api.LeaveRequest) error
 	DiscoverNew(discover *api.DiscoveryNotification) error
 	DiscoverDelete(delete *api.DiscoveryNotification) error
@@ -58,6 +60,8 @@ func Listen(socket net.Listener, driver Driver, ipamDriver ipamapi.Ipam) error {
 		handleMethod(networkReceiver, "EndpointOperInfo", listener.infoEndpoint)
 		handleMethod(networkReceiver, "Join", listener.joinEndpoint)
 		handleMethod(networkReceiver, "Leave", listener.leaveEndpoint)
+		handleMethod(networkReceiver, "AllocateNetwork", listener.networkAllocate)
+		handleMethod(networkReceiver, "FreeNetwork", listener.networkFree)
 	}
 
 	if ipamDriver != nil {
@@ -160,6 +164,26 @@ func (listener *listener) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := listener.d.JoinEndpoint(&join)
+	objectOrErrorResponse(w, res, err)
+}
+
+func (listener *listener) networkAllocate(w http.ResponseWriter, r *http.Request) {
+	var alloc api.AllocateNetworkRequest
+	if err := json.NewDecoder(r.Body).Decode(&alloc); err != nil {
+		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
+		return
+	}
+	res, err := listener.d.NetworkAllocate(&alloc)
+	objectOrErrorResponse(w, res, err)
+}
+
+func (listener *listener) networkFree(w http.ResponseWriter, r *http.Request) {
+	var free api.FreeNetworkRequest
+	if err := json.NewDecoder(r.Body).Decode(&free); err != nil {
+		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
+		return
+	}
+	res, err := listener.d.NetworkFree(&free)
 	objectOrErrorResponse(w, res, err)
 }
 
