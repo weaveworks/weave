@@ -44,6 +44,14 @@ wait_for_connections() {
 
 assert_raises wait_for_connections
 
+# Check we can ping between the Weave bridg IPs on each host
+HOST1EXPIP=$($SSH $HOST1 "weave expose")
+HOST2EXPIP=$($SSH $HOST2 "weave expose")
+HOST3EXPIP=$($SSH $HOST3 "weave expose")
+assert_raises "run_on $HOST1 $PING $HOST2EXPIP"
+assert_raises "run_on $HOST2 $PING $HOST1EXPIP"
+assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
+
 # See if we can get some pods running that connect to the network
 run_on $HOST1 "kubectl run hello --image=weaveworks/hello-world --replicas=3"
 
