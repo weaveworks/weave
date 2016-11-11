@@ -10,6 +10,7 @@ import (
 
 var checker *checkpoint.Checker
 var newVersion atomic.Value
+var success atomic.Value
 
 const (
 	updateCheckPeriod = 6 * time.Hour
@@ -17,9 +18,11 @@ const (
 
 func checkForUpdates(dockerVersion string, network string) {
 	newVersion.Store("")
+	success.Store(true)
 
 	handleResponse := func(r *checkpoint.CheckResponse, err error) {
 		if err != nil {
+			success.Store(false)
 			Log.Printf("Error checking version: %v", err)
 			return
 		}
