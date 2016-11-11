@@ -398,7 +398,13 @@ add_iptables_rule() {
     IPTABLES_TABLE="$1"
     shift 1
     if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1 ; then
-        run_iptables -t $IPTABLES_TABLE -A "$@" >/dev/null
+        ## Loop until we get an exit code other than "temporarily unavailable"
+        while true ; do
+            run_iptables -t $IPTABLES_TABLE -A "$@" >/dev/null && return 0
+            if [ $? != 4 ] ; then
+                return 1
+            fi
+        done
     fi
 }
 
@@ -407,7 +413,13 @@ insert_iptables_rule() {
     IPTABLES_TABLE="$1"
     shift 1
     if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1 ; then
-        run_iptables -t $IPTABLES_TABLE -I "$@" >/dev/null
+        ## Loop until we get an exit code other than "temporarily unavailable"
+        while true ; do
+            run_iptables -t $IPTABLES_TABLE -I "$@" >/dev/null && return 0
+            if [ $? != 4 ] ; then
+                return 1
+            fi
+        done
     fi
 }
 
