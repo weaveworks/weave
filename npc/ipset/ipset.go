@@ -2,6 +2,7 @@ package ipset
 
 import (
 	"os/exec"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -38,7 +39,11 @@ func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
 }
 
 func (i *ipset) AddEntry(ipsetName Name, entry string) error {
-	return doExec("add", string(ipsetName), entry)
+	err := doExec("add", string(ipsetName), entry)
+	if err != nil && strings.Contains(err.Error(), "Element cannot be added to the set: it's already added") {
+		return nil
+	}
+	return err
 }
 
 func (i *ipset) DelEntry(ipsetName Name, entry string) error {
