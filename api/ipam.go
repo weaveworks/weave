@@ -5,6 +5,15 @@ import (
 	"net"
 )
 
+// Special token used in place of a container identifier when:
+// - the caller does not know the container ID, or
+// - the caller is unsure whether IPAM was previously told the container ID.
+//
+// While addresses are typically stored under their container IDs, when this
+// token is used, the address will be stored under its own string, something
+// which should be kept in mind if the entry needs to be removed at any point.
+const NoContainerID string = "_"
+
 func (client *Client) ipamOp(ID string, op string) (*net.IPNet, error) {
 	ip, err := client.httpVerb(op, fmt.Sprintf("/ip/%s", ID), nil)
 	if err != nil {
