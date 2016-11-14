@@ -322,7 +322,7 @@ func (alloc *Allocator) Claim(ident string, cidr address.CIDR, isContainer, noEr
 // ContainerDied called from the updater interface.  Async.
 func (alloc *Allocator) ContainerDied(ident string) {
 	alloc.actionChan <- func() {
-		if alloc.hasOwned(ident) {
+		if alloc.hasOwnedByContainer(ident) {
 			alloc.debugln("Container", ident, "died; noting to remove later")
 			alloc.dead[ident] = alloc.now()
 		}
@@ -335,7 +335,7 @@ func (alloc *Allocator) ContainerDied(ident string) {
 // ContainerDestroyed called from the updater interface.  Async.
 func (alloc *Allocator) ContainerDestroyed(ident string) {
 	alloc.actionChan <- func() {
-		if alloc.hasOwned(ident) {
+		if alloc.hasOwnedByContainer(ident) {
 			alloc.debugln("Container", ident, "destroyed; removing addresses")
 			alloc.delete(ident)
 			delete(alloc.dead, ident)
@@ -996,9 +996,9 @@ func (alloc *Allocator) persistOwned() {
 
 // Owned addresses
 
-func (alloc *Allocator) hasOwned(ident string) bool {
-	_, b := alloc.owned[ident]
-	return b
+func (alloc *Allocator) hasOwnedByContainer(ident string) bool {
+	d, b := alloc.owned[ident]
+	return b && d.IsContainer
 }
 
 // NB: addr must not be owned by ident already
