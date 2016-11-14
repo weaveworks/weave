@@ -30,7 +30,7 @@ EOF
 fi
 
 SOURCE_BINARY=/usr/bin/weaveutil
-VERSION=$(/home/weave/weaver --version | sed -E 's/weave router (.*?)/\1/')
+VERSION=$(/home/weave/weaver $EXTRA_ARGS --version | sed -E 's/weave router (.*?)/\1/')
 PLUGIN="weave-plugin-$VERSION"
 
 install_cni_plugin() {
