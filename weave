@@ -398,7 +398,13 @@ add_iptables_rule() {
     IPTABLES_TABLE="$1"
     shift 1
     if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1 ; then
-        run_iptables -t $IPTABLES_TABLE -A "$@" >/dev/null
+        ## Loop until we get an exit code other than "temporarily unavailable"
+        while true ; do
+            run_iptables -t $IPTABLES_TABLE -A "$@" >/dev/null && return 0
+            if [ $? != 4 ] ; then
+                return 1
+            fi
+        done
     fi
 }
 
@@ -407,7 +413,13 @@ insert_iptables_rule() {
     IPTABLES_TABLE="$1"
     shift 1
     if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1 ; then
-        run_iptables -t $IPTABLES_TABLE -I "$@" >/dev/null
+        ## Loop until we get an exit code other than "temporarily unavailable"
+        while true ; do
+            run_iptables -t $IPTABLES_TABLE -I "$@" >/dev/null && return 0
+            if [ $? != 4 ] ; then
+                return 1
+            fi
+        done
     fi
 }
 
@@ -658,14 +670,6 @@ expose_ip() {
             fi
         fi
         [ -z "$FQDN" ] || when_weave_running put_dns_fqdn_no_check_alive weave:expose $FQDN $CIDR
-    done
-}
-
-expose_nat() {
-    for CIDR in $ALL_CIDRS ; do
-        add_iptables_rule nat WEAVE -s $CIDR -d 224.0.0.0/4 -j RETURN
-        add_iptables_rule nat WEAVE -d $CIDR ! -s $CIDR -j MASQUERADE
-        add_iptables_rule nat WEAVE -s $CIDR ! -d $CIDR -j MASQUERADE
     done
 }
 
@@ -2222,7 +2226,7 @@ EOF
         fi
         create_bridge --without-ethtool
         expose_ip
-        expose_nat
+        util_op expose-nat $ALL_CIDRS
         show_addrs $ALL_CIDRS
         ;;
     hide)

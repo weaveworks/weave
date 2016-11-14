@@ -18,17 +18,6 @@ fi
 
 echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
 
-# Create CNI config, if not already there
-if [ ! -f /etc/cni/net.d/10-weave.conf ] ; then
-    mkdir -p /etc/cni/net.d
-    cat > /etc/cni/net.d/10-weave.conf <<EOF
-{
-    "name": "weave",
-    "type": "weave-net"
-}
-EOF
-fi
-
 SOURCE_BINARY=/usr/bin/weaveutil
 VERSION=$(/home/weave/weaver --version | sed -E 's/weave router (.*?)/\1/')
 PLUGIN="weave-plugin-$VERSION"
@@ -152,7 +141,15 @@ done
     reclaim_ips "_" $IPS
 done
 
-# Expose the weave network so host processes can communicate with pods
-/home/weave/weave --local expose $WEAVE_EXPOSE_IP
+# Create CNI config, if not already there
+if [ ! -f /etc/cni/net.d/10-weave.conf ] ; then
+    mkdir -p /etc/cni/net.d
+    cat > /etc/cni/net.d/10-weave.conf <<EOF
+{
+    "name": "weave",
+    "type": "weave-net"
+}
+EOF
+fi
 
 wait $WEAVE_PID

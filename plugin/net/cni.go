@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"syscall"
 
 	"github.com/appc/cni/pkg/ipam"
 	"github.com/appc/cni/pkg/skel"
@@ -83,6 +84,9 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 			if err := assignBridgeIP(conf.BrName, bridgeIPResult.IP4.IP); err != nil {
 				return fmt.Errorf("unable to assign IP address to bridge: %s", err)
 			}
+			if err := weavenet.ExposeNAT(bridgeIPResult.IP4.IP); err != nil {
+				return fmt.Errorf("unable to create NAT rules: %s", err)
+			}
 			bridgeIP = bridgeIPResult.IP4.IP.IP
 		} else if err != nil {
 			return err
@@ -150,6 +154,11 @@ func assignBridgeIP(bridgeName string, ipnet net.IPNet) error {
 		return err
 	}
 	if err := netlink.AddrAdd(link, &netlink.Addr{IPNet: &ipnet}); err != nil {
+		// Treat as non-error if this address is already there
+		// - maybe another copy of this program just added it
+		if err == syscall.Errno(syscall.EEXIST) {
+			return nil
+		}
 		return fmt.Errorf("failed to add IP address to %q: %v", bridgeName, err)
 	}
 	return nil
