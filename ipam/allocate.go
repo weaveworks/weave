@@ -3,6 +3,7 @@ package ipam
 import (
 	"fmt"
 
+	"github.com/weaveworks/weave/api"
 	"github.com/weaveworks/weave/net/address"
 )
 
@@ -43,7 +44,7 @@ func (g *allocate) Try(alloc *Allocator) bool {
 	if ok, addr := alloc.space.Allocate(g.r.HostRange()); ok {
 		// If caller hasn't supplied a unique ID, file it under the IP address
 		// which lets the caller then release the address using DELETE /ip/address
-		if g.ident == "_" {
+		if g.ident == api.NoContainerID {
 			g.ident = addr.String()
 		}
 		alloc.debugln("Allocated", addr, "for", g.ident, "in", g.r)
