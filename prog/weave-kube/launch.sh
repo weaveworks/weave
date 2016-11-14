@@ -35,8 +35,8 @@ PLUGIN="weave-plugin-$VERSION"
 
 install_cni_plugin() {
     mkdir -p $1 || return 1
-    if [ ! -f $1/$PLUGIN ]; then
-        cp "$SOURCE_BINARY" $1/$PLUGIN
+    if [ ! -f "$1/$PLUGIN" ]; then
+        cp "$SOURCE_BINARY" "$1/$PLUGIN"
     fi
 }
 
@@ -44,7 +44,7 @@ upgrade_cni_plugin_symlink() {
     # Remove potential temporary symlink from previous failed upgrade:
     rm -f $1/$2.tmp
     # Atomically create a symlink to the plugin:
-    ln -s $1/$PLUGIN $1/$2.tmp && mv -f $1/$2.tmp $1/$2
+    ln -s "$1/$PLUGIN" $1/$2.tmp && mv -f $1/$2.tmp $1/$2
 }
 
 upgrade_cni_plugin() {
