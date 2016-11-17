@@ -1704,7 +1704,7 @@ setup_awsvpc() {
 # Recreate the parameter values that are set when the router is first launched
 fetch_router_args() {
     CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME) || return 1
-    IPRANGE=$(echo $CONTAINER_ARGS | grep -o -e '-ipalloc-range [^ ]*') || true
+    IPRANGE=$(echo $CONTAINER_ARGS | grep -o -E -e '-ipalloc-range [0-9/.]+') || true
     NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
 }
 
