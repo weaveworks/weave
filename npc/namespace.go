@@ -319,13 +319,13 @@ func equals(a, b map[string]string) bool {
 }
 
 func isDefaultDeny(namespace *coreapi.Namespace) bool {
-	nnpJson, found := namespace.ObjectMeta.Annotations["net.beta.kubernetes.io/network-policy"]
+	nnpJSON, found := namespace.ObjectMeta.Annotations["net.beta.kubernetes.io/network-policy"]
 	if !found {
 		return false
 	}
 
 	var nnp NamespaceNetworkPolicy
-	if err := json.Unmarshal([]byte(nnpJson), &nnp); err != nil {
+	if err := json.Unmarshal([]byte(nnpJSON), &nnp); err != nil {
 		log.Warn("Ignoring network policy annotation: unmarshal failed:", err)
 		// If we can't understand the annotation, behave as if it isn't present
 		return false

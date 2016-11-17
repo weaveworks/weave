@@ -494,7 +494,7 @@ func TestTransfer(t *testing.T) {
 	ring1.ClaimItAll()
 	ring1.GrantRangeToHost(middle, end, peer2name)
 	ring1.Transfer(peer2name, peer1name)
-	require.Equal(t, []address.Range{{start, middle}, {middle, end}}, ring1.OwnedRanges())
+	require.Equal(t, []address.Range{{Start: start, End: middle}, {Start: middle, End: end}}, ring1.OwnedRanges())
 
 	// Second test is what happens when a token exists at the end of a range but is transferred
 	// - does it get resurrected correctly?
@@ -503,7 +503,7 @@ func TestTransfer(t *testing.T) {
 	ring1.GrantRangeToHost(middle, end, peer2name)
 	ring1.Transfer(peer2name, peer1name)
 	ring1.GrantRangeToHost(dot10, middle, peer2name)
-	require.Equal(t, []address.Range{{start, dot10}, {middle, end}}, ring1.OwnedRanges())
+	require.Equal(t, []address.Range{{Start: start, End: dot10}, {Start: middle, End: end}}, ring1.OwnedRanges())
 }
 
 func TestOwner(t *testing.T) {
