@@ -34,12 +34,11 @@ assert_raises "weave_on $HOST1 status | grep 'version check update disabled'"
 
 
 weave_on $HOST1 reset
+# Remove any old version of the file - volume-mounting it changes the ownership to root
+$SSH $HOST1 sudo rm -f /tmp/resolv.conf.broken
 # Guarantee the version check fails by feeding an unresponsive IP address into the resolver
-$SSH $HOST1 tee /tmp/hosts.checkpoint-api > /dev/null <<EOF
-127.0.0.1 localhost
-127.1.1.1 checkpoint-api.weave.works
-EOF
-CHECKPOINT_DISABLE="" WEAVE_DOCKER_ARGS="-v /tmp/hosts.checkpoint-api:/etc/hosts" weave_on $HOST1 launch
+$SSH $HOST1 sh -c "echo 'nameserver 127.1.1.1' > /tmp/resolv.conf.broken"
+CHECKPOINT_DISABLE="" WEAVE_DOCKER_ARGS="-v /tmp/resolv.conf.broken:/etc/resolv.conf" weave_on $HOST1 launch
 
 assert "weave_on $HOST1 report -f '{{.VersionCheck.Enabled}}'" "true"
 assert "weave_on $HOST1 report -f '{{.VersionCheck.Success}}'" "false"
