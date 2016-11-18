@@ -44,7 +44,7 @@ func attach(args []string) error {
 	if nsHost, err := netns.GetFromPid(1); err != nil {
 		return fmt.Errorf("unable to open host namespace: %s", err)
 	} else if nsHost.Equal(nsContainer) {
-		return fmt.Errorf("Container is running in the host network namespace, and therefore cannot be\nconnected to weave. Perhaps the container was started with --net=host.")
+		return fmt.Errorf("Container is running in the host network namespace, and therefore cannot be\nconnected to weave - perhaps the container was started with --net=host")
 	}
 	mtu, err := strconv.Atoi(args[2])
 	if err != nil && args[3] != "" {

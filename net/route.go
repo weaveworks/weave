@@ -13,7 +13,7 @@ import (
 func CheckNetworkFree(subnet *net.IPNet, ignoreIfaceNames map[string]struct{}) error {
 	return forEachRoute(ignoreIfaceNames, func(route netlink.Route) error {
 		if route.Dst != nil && overlaps(route.Dst, subnet) {
-			return fmt.Errorf("Network %s overlaps with existing route %s on host.", subnet, route.Dst)
+			return fmt.Errorf("Network %s overlaps with existing route %s on host", subnet, route.Dst)
 		}
 		return nil
 	})
@@ -29,7 +29,7 @@ func overlaps(n1, n2 *net.IPNet) bool {
 func CheckAddressOverlap(addr net.IP, ignoreIfaceNames map[string]struct{}) error {
 	return forEachRoute(ignoreIfaceNames, func(route netlink.Route) error {
 		if route.Dst != nil && route.Dst.Contains(addr) {
-			return fmt.Errorf("Address %s overlaps with existing route %s on host.", addr, route.Dst)
+			return fmt.Errorf("Address %s overlaps with existing route %s on host", addr, route.Dst)
 		}
 		return nil
 	})

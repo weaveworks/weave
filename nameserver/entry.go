@@ -120,7 +120,7 @@ func (e1 *Entry) tombstone() bool {
 
 func check(es SortableEntries) error {
 	if !sort.IsSorted(es) {
-		return fmt.Errorf("Not sorted!")
+		return fmt.Errorf("Not sorted")
 	}
 	for i := 1; i < es.Len(); i++ {
 		if es.Get(i).equal(es.Get(i - 1)) {

@@ -41,8 +41,8 @@ var (
 	ErrNotSorted       = errors.New("Ring not sorted")
 	ErrTokenRepeated   = errors.New("Token appears twice in ring")
 	ErrTokenOutOfRange = errors.New("Token is out of range")
-	ErrDifferentSeeds  = errors.New("Received ring was seeded differently from ours!")
-	ErrDifferentRange  = errors.New("Received range differs from ours!")
+	ErrDifferentSeeds  = errors.New("Received ring was seeded differently from ours")
+	ErrDifferentRange  = errors.New("Received range differs from ours")
 )
 
 func errInconsistentEntry(mine, theirs *entry) error {
