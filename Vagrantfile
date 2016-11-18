@@ -14,6 +14,7 @@ pkgs = %w(
   git
   mercurial
   bc
+  jq
 )
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
