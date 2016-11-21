@@ -194,4 +194,9 @@ make_template)
 	if ! gcloud compute images list | grep $PROJECT | grep $TEMPLATE_NAME; then
 		make_template
 	fi
+    ;;
+
+*)
+	echo "Unknown command:" $1 >&2
+    exit 1
 esac
