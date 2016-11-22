@@ -45,7 +45,7 @@ C2IP=$(container_ip $HOST1 c2)
 assert_raises "exec_on $HOST1 c1 $PING $C2IP"
 assert_raises "exec_on $HOST1 c2 $PING $C1IP"
 
-# Now remove and start a new container to see if IP address re-use breaks things
+# Now remove and start a new container to see if anything breaks
 docker_on $HOST1 rm -f c2
 
 C3=$(docker_on $HOST1 run --net=none --name=c3 -dt $SMALL_IMAGE /bin/sh)
@@ -56,7 +56,9 @@ EOF
 
 C3IP=$(container_ip $HOST1 c3)
 
-assert_raises "exec_on $HOST1 c1 $PING $C2IP"
+# CNI shouldn't re-use the address until we call DEL
+assert_raises "[ $C2IP != $C3IP ]"
+assert_raises "exec_on $HOST1 c1 $PING $C3IP"
 
 
 # Ensure existing containers can reclaim their IP addresses after CNI has been used -- see #2548
