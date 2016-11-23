@@ -9,6 +9,7 @@ start_suite "weave status/report"
 
 
 weave_on $HOST1 launch --ipalloc-range $UNIVERSE --name 8a:3e:3e:3e:3e:3e --nickname nicknamington
+weave_on $HOST2 launch --ipalloc-range $UNIVERSE
 
 check() {
     assert "weave_on $HOST1 status | grep -oP '(?<= $1: ).*'" "$3"
@@ -27,6 +28,9 @@ assert_raises "weave_on $HOST1 report | grep nicknamington"
 weave_on $HOST1 connect 10.2.2.1
 assert "weave_on $HOST1 status targets" "10.2.2.1"
 assert "weave_on $HOST1 status connections | tr -s ' ' | cut -d ' ' -f 2" "10.2.2.1:6783"
+weave_on $HOST1 connect $HOST2
+sleep 1
+assert "weave_on $HOST1 status connections | grep -q 'mtu=1410'"
 
 assert "weave_on $HOST1 report -f '{{.VersionCheck.Enabled}}'" "false"
 assert_raises "weave_on $HOST1 status | grep 'version check update disabled'"

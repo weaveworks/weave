@@ -131,7 +131,7 @@ To view detailed information on the local Weave Net router's type `weave status 
 
 ```
 $ weave status connections
-<- 192.168.48.12:33866   established unencrypted fastdp 7e:21:4a:70:2f:45(host2)
+<- 192.168.48.12:33866   established unencrypted fastdp 7e:21:4a:70:2f:45(host2) mtu=1410
 <- 192.168.48.13:60773   pending     encrypted   fastdp 7e:ae:cd:d5:23:8d(host3)
 -> 192.168.48.14:6783    retrying    dial tcp4 192.168.48.14:6783: no route to host
 -> 192.168.48.15:6783    failed      dial tcp4 192.168.48.15:6783: no route to host, retry: 2015-08-06 18:55:38.246910357 +0000 UTC
@@ -153,7 +153,7 @@ The columns are as follows:
     * `established` - TCP connection and corresponding UDP path are up
  * Info - the failure reason for failed and retrying connections, or
    the encryption mode, data transport method, remote peer name and
-   nickname for pending and established connections
+   nickname for pending and established connections, mtu if known
 
 ### <a name="weave-status-peers"></a>List Peers
 
