@@ -19,13 +19,13 @@ fi
 echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
 
 SOURCE_BINARY=/usr/bin/weaveutil
-VERSION=$(/home/weave/weaver --version | sed -E 's/weave router (.*?)/\1/')
+VERSION=$(/home/weave/weaver $EXTRA_ARGS --version | sed -e 's/weave router //')
 PLUGIN="weave-plugin-$VERSION"
 
 install_cni_plugin() {
     mkdir -p $1 || return 1
-    if [ ! -f $1/$PLUGIN ]; then
-        cp "$SOURCE_BINARY" $1/$PLUGIN
+    if [ ! -f "$1/$PLUGIN" ]; then
+        cp "$SOURCE_BINARY" "$1/$PLUGIN"
     fi
 }
 
@@ -33,7 +33,7 @@ upgrade_cni_plugin_symlink() {
     # Remove potential temporary symlink from previous failed upgrade:
     rm -f $1/$2.tmp
     # Atomically create a symlink to the plugin:
-    ln -s $1/$PLUGIN $1/$2.tmp && mv -f $1/$2.tmp $1/$2
+    ln -s "$1/$PLUGIN" $1/$2.tmp && mv -f $1/$2.tmp $1/$2
 }
 
 upgrade_cni_plugin() {

@@ -27,7 +27,7 @@ import (
 	weave "github.com/weaveworks/weave/router"
 )
 
-var version = "(unreleased version)"
+var version = "unreleased"
 
 var Log = common.Log
 

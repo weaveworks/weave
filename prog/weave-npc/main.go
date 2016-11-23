@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	version     = "(unreleased)"
+	version     = "unreleased"
 	metricsAddr string
 )
 
