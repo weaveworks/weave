@@ -8,7 +8,7 @@ tear_down_kubeadm() {
         run_on $host "sudo systemctl stop kubelet"
         rm_containers $host $(docker_on $host ps -aq)
         run_on $host "test ! -d /var/lib/kubelet || sudo find /var/lib/kubelet -execdir findmnt -n -t tmpfs -o TARGET -T {} \; | uniq | xargs -r sudo umount"
-        run_on $host "sudo rm -r -f /etc/kubernetes /var/lib/kubelet /var/lib/etcd /etc/cni /opt/cni"
+        run_on $host "sudo rm -r -f /etc/kubernetes /var/lib/kubelet /var/lib/etcd /etc/cni /opt/cni/bin/*weave*"
     done
 }
 
