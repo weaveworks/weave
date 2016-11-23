@@ -1,3 +1,24 @@
+## Release 1.8.1
+
+Bug fixes and minor improvements
+
+* Fixed weave-npc crash from Succeeded/Failed pods #2632,#2658
+* Fixed occasional failure to create Weave bridge on node reboot
+  #2617,#2637
+* Fixed a bug where weave-kube would fail to install when run with
+  unrelease snapshot builds #2642
+* Improved conformance to CNI spec by not releasing IP addresses when
+  a container dies #2643
+* Improved troubleshooting of install failure by creating CNI config
+  after Weave Net is up #2570
+* "up to date" shown even when the version check was blocked by
+  firewall #2537,#2565,#2645
+* "Unable to claim" message on re-launching Weave after using CNI
+  #2548,#2577
+* Eliminated spurious IP reclaim operations when IPAM was disabled
+  #2567,#2644
+* Include `jq` tool in our build VM configuration #2656
+
 ## Release 1.8.0
 
 Highlights:
