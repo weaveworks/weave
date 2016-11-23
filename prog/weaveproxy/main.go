@@ -11,7 +11,7 @@ import (
 	"github.com/weaveworks/weave/proxy"
 )
 
-var version = "(unreleased version)"
+var version = "unreleased"
 
 var Log = common.Log
 

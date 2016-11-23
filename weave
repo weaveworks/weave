@@ -3,9 +3,9 @@ set -e
 
 [ -n "$WEAVE_DEBUG" ] && set -x
 
-SCRIPT_VERSION="(unreleased version)"
+SCRIPT_VERSION="unreleased"
 IMAGE_VERSION=latest
-[ "$SCRIPT_VERSION" = "(unreleased version)" ] || IMAGE_VERSION=$SCRIPT_VERSION
+[ "$SCRIPT_VERSION" = "unreleased" ] || IMAGE_VERSION=$SCRIPT_VERSION
 IMAGE_VERSION=${WEAVE_VERSION:-$IMAGE_VERSION}
 
 # - Docker versions prior to 1.6 cannot pull images from DockerHub

@@ -302,7 +302,7 @@ latest snapshot release using:
     sudo chmod a+x /usr/local/bin/weave
     weave setup
 
-Snapshot releases report the script version as "(unreleased version)",
+Snapshot releases report the script version as "unreleased",
 and the container image versions as git hashes.
 
 

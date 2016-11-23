@@ -22,7 +22,7 @@ import (
 	"github.com/weaveworks/weave/plugin/skel"
 )
 
-var version = "(unreleased version)"
+var version = "unreleased"
 
 var Log = common.Log
 
