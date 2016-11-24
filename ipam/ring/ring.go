@@ -110,12 +110,12 @@ func (r *Ring) Range() address.Range {
 
 // Returns the distance between two tokens on this ring, dealing
 // with ranges which cross the origin
-func (r *Ring) distance(start, end address.Address) address.Offset {
+func (r *Ring) distance(start, end address.Address) address.Count {
 	if end > start {
-		return address.Offset(end - start)
+		return address.Count(end - start)
 	}
 
-	return address.Offset((r.End - start) + (end - r.Start))
+	return address.Count((r.End - start) + (end - r.Start))
 }
 
 // GrantRangeToHost modifies the ring such that range [start, end)
@@ -357,12 +357,12 @@ func (r *Ring) ClaimForPeers(peers []mesh.PeerName) {
 	defer r.updateExportedVariables()
 
 	totalSize := r.distance(r.Start, r.End)
-	share := totalSize/address.Offset(len(peers)) + 1
-	remainder := totalSize % address.Offset(len(peers))
+	share := totalSize/address.Count(len(peers)) + 1
+	remainder := totalSize % address.Count(len(peers))
 	pos := r.Start
 
 	for i, peer := range peers {
-		if address.Offset(i) == remainder {
+		if address.Count(i) == remainder {
 			share--
 			if share == 0 {
 				break
@@ -432,11 +432,11 @@ func (r *Ring) ReportFree(freespace map[address.Address]address.Count) {
 		maxSize := r.distance(entry.Token, next.Token)
 		common.Assert(free <= address.Count(maxSize))
 
-		if address.Count(entries[i].Free) == free {
+		if entries[i].Free == free {
 			return
 		}
 
-		entries[i].Free = address.Offset(free)
+		entries[i].Free = free
 		entries[i].Version++
 	}
 }
@@ -455,7 +455,7 @@ func (ws weightedPeers) Swap(i, j int)      { ws[i], ws[j] = ws[j], ws[i] }
 // ChoosePeersToAskForSpace returns all peers we can ask for space in
 // the range [start, end), in weighted-random order.  Assumes start<end.
 func (r *Ring) ChoosePeersToAskForSpace(start, end address.Address) []mesh.PeerName {
-	totalSpacePerPeer := make(map[mesh.PeerName]address.Offset)
+	totalSpacePerPeer := make(map[mesh.PeerName]address.Count)
 
 	// iterate through tokens
 	for i, entry := range r.Entries {

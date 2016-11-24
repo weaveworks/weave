@@ -122,7 +122,7 @@ func Length(a, b Address) Count {
 	return Count(a - b)
 }
 
-func Min(a, b Offset) Offset {
+func Min(a, b Count) Count {
 	if a > b {
 		return b
 	}
