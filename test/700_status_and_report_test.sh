@@ -41,12 +41,17 @@ $SSH $HOST1 tee /tmp/hosts.checkpoint-api > /dev/null <<EOF
 EOF
 CHECKPOINT_DISABLE="" WEAVE_DOCKER_ARGS="-v /tmp/hosts.checkpoint-api:/etc/hosts" weave_on $HOST1 launch
 
+wait_for_version_check_error() {
+    while true; do
+        docker_on $HOST1 logs weave 2>&1 | grep 'Error checking version' && return
+        sleep 1
+    done
+}
+assert_raises "timeout 30 cat <( wait_for_version_check_error )"
+
 assert "weave_on $HOST1 report -f '{{.VersionCheck.Enabled}}'" "true"
 assert "weave_on $HOST1 report -f '{{.VersionCheck.Success}}'" "false"
 assert "weave_on $HOST1 report -f '{{.VersionCheck.NewVersion}}'" ""
-assert_raises "weave_on $HOST1 status | grep 'failed to check latest version - see logs; next check at'"
-
-
 
 weave_on $HOST1 reset
 
