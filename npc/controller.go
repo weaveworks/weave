@@ -86,7 +86,7 @@ func (npc *controller) AddPod(obj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT AddPod %#v", obj)
+	log.Infof("EVENT AddPod %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.addPod(obj), "add pod")
 	})
@@ -96,7 +96,7 @@ func (npc *controller) UpdatePod(oldObj, newObj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT UpdatePod %#v %#v", oldObj, newObj)
+	log.Infof("EVENT UpdatePod %s %s", js(oldObj), js(newObj))
 	return npc.withNS(oldObj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.updatePod(oldObj, newObj), "update pod")
 	})
@@ -106,7 +106,7 @@ func (npc *controller) DeletePod(obj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT DeletePod %#v", obj)
+	log.Infof("EVENT DeletePod %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.deletePod(obj), "delete pod")
 	})
@@ -116,7 +116,7 @@ func (npc *controller) AddNetworkPolicy(obj *extnapi.NetworkPolicy) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT AddNetworkPolicy %#v", obj)
+	log.Infof("EVENT AddNetworkPolicy %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.addNetworkPolicy(obj), "add network policy")
 	})
@@ -126,7 +126,7 @@ func (npc *controller) UpdateNetworkPolicy(oldObj, newObj *extnapi.NetworkPolicy
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT UpdateNetworkPolicy %#v %#v", oldObj, newObj)
+	log.Infof("EVENT UpdateNetworkPolicy %s %s", js(oldObj), js(newObj))
 	return npc.withNS(oldObj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.updateNetworkPolicy(oldObj, newObj), "update network policy")
 	})
@@ -136,7 +136,7 @@ func (npc *controller) DeleteNetworkPolicy(obj *extnapi.NetworkPolicy) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT DeleteNetworkPolicy %#v", obj)
+	log.Infof("EVENT DeleteNetworkPolicy %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.deleteNetworkPolicy(obj), "delete network policy")
 	})
@@ -146,7 +146,7 @@ func (npc *controller) AddNamespace(obj *coreapi.Namespace) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT AddNamespace %#v", obj)
+	log.Infof("EVENT AddNamespace %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Name, func(ns *ns) error {
 		return errors.Wrap(ns.addNamespace(obj), "add namespace")
 	})
@@ -156,7 +156,7 @@ func (npc *controller) UpdateNamespace(oldObj, newObj *coreapi.Namespace) error 
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT UpdateNamespace%#v %#v", oldObj, newObj)
+	log.Infof("EVENT UpdateNamespace %s %s", js(oldObj), js(newObj))
 	return npc.withNS(oldObj.ObjectMeta.Name, func(ns *ns) error {
 		return errors.Wrap(ns.updateNamespace(oldObj, newObj), "update namespace")
 	})
@@ -166,7 +166,7 @@ func (npc *controller) DeleteNamespace(obj *coreapi.Namespace) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT DeleteNamespace %#v", obj)
+	log.Infof("EVENT DeleteNamespace %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Name, func(ns *ns) error {
 		return errors.Wrap(ns.deleteNamespace(obj), "delete namespace")
 	})
