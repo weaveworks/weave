@@ -65,6 +65,25 @@ Kubernetes see the
 and the [NetworkPolicy API object
 definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitions/#_v1beta1_networkpolicy).
 
+### Blocked connections
+
+If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, you may want to look at the `weave-npc` container's logs:
+```
+$ kubectl logs $(kubectl get pods --all-namespaces | grep weave-net | awk '{print $2}') -n kube-system weave-npc
+```
+
+Any time the Weave Network Policy Controller blocks a connection, it will log details about it:
+
+* protocol used, 
+* source IP and port, 
+* destination IP and port, 
+
+as per the below example:
+```
+time="yyyy-MM-ddTHH:mm:ssZ" level=warning msg="TCP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
+time="yyyy-MM-ddTHH:mm:ssZ" level=warning msg="UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
+```
+
 ## Changing Configuration Options
 
 You can change the default configuration by saving and editing the

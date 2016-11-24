@@ -46,6 +46,7 @@ func gatherMetrics() {
 			tcp, _ := tcpLayer.(*layers.TCP)
 			if tcp.SYN && !tcp.ACK { // Only plain SYN constitutes a NEW TCP connection
 				blockedConnections.With(prometheus.Labels{"protocol": "tcp", "dport": strconv.Itoa(int(tcp.DstPort))}).Inc()
+				log.Warnf("TCP connection from %v:%d to %v:%d blocked by Weave NPC.", srcIP(packet), tcp.SrcPort, dstIP(packet), tcp.DstPort)
 				continue
 			}
 		}
@@ -53,9 +54,40 @@ func gatherMetrics() {
 		if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 			udp, _ := udpLayer.(*layers.UDP)
 			blockedConnections.With(prometheus.Labels{"protocol": "udp", "dport": strconv.Itoa(int(udp.DstPort))}).Inc()
+			log.Warnf("UDP connection from %v:%d to %v:%d blocked by Weave NPC.", srcIP(packet), udp.SrcPort, dstIP(packet), udp.DstPort)
 			continue
 		}
 	}
+}
+
+const unknownIP string = "<unknown IP>"
+
+func srcIP(packet gopacket.Packet) string {
+	if layer := packet.Layer(layers.LayerTypeIPv4); layer != nil {
+		if ip, ok := layer.(*layers.IPv4); ok {
+			return ip.SrcIP.String()
+		}
+	}
+	if layer := packet.Layer(layers.LayerTypeIPv6); layer != nil {
+		if ip, ok := layer.(*layers.IPv6); ok {
+			return ip.SrcIP.String()
+		}
+	}
+	return unknownIP
+}
+
+func dstIP(packet gopacket.Packet) string {
+	if layer := packet.Layer(layers.LayerTypeIPv4); layer != nil {
+		if ip, ok := layer.(*layers.IPv4); ok {
+			return ip.DstIP.String()
+		}
+	}
+	if layer := packet.Layer(layers.LayerTypeIPv6); layer != nil {
+		if ip, ok := layer.(*layers.IPv6); ok {
+			return ip.DstIP.String()
+		}
+	}
+	return unknownIP
 }
 
 func Start(addr string) error {
