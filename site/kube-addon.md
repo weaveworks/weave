@@ -90,3 +90,25 @@ You can change the default configuration by saving and editing the
 addon YAML before you `kubectl apply`. Additional arguments can be
 supplied to the Weave router process by adding them to the `command:`
 array in the yaml file.
+
+Some parameters are changed by environment variables; these can be
+inserted into the YAML file like this:
+
+```
+      containers:
+        - name: weave
+          env:
+            - name: IPALLOC_RANGE
+              value: 10.0.0.0/16
+```
+
+The list of variables you can set is:
+
+* IPALLOC_RANGE - the range of IP addresses used by Weave Net
+  and the subnet they are placed in (CIDR format; default 10.32.0.0/12)
+* EXPECT_NPC - set to 0 to disable Network Policy Controller (default is on)
+* KUBE_PEERS - list of addresses of peers in the Kubernetes cluster
+  (default is to fetch the list from the api-server)
+* IPALLOC_INIT - set the initialization mode of the [IP Address
+  Manager](/site/operational-guide/concepts.md#ip-address-manager)
+  (defaults to consensus amongst the KUBE_PEERS)
