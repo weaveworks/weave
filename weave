@@ -326,21 +326,6 @@ run_iptables() {
     iptables $IPTABLES_W "$@"
 }
 
-# Add a rule to iptables, if it doesn't exist already
-add_iptables_rule() {
-    IPTABLES_TABLE="$1"
-    shift 1
-    if ! run_iptables -t $IPTABLES_TABLE -C "$@" >/dev/null 2>&1 ; then
-        ## Loop until we get an exit code other than "temporarily unavailable"
-        while true ; do
-            run_iptables -t $IPTABLES_TABLE -A "$@" >/dev/null && return 0
-            if [ $? != 4 ] ; then
-                return 1
-            fi
-        done
-    fi
-}
-
 # Insert a rule in iptables, if it doesn't exist already
 insert_iptables_rule() {
     IPTABLES_TABLE="$1"
@@ -445,26 +430,10 @@ try_create_bridge() {
         WEAVEDB_DIR_PATH="$HOST_ROOT/$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)"
     fi
     MAC=$(util_op unique-id "$WEAVEDB_DIR_PATH/weave" "$HOST_ROOT")
-    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP")
+    BRIDGE_TYPE=$(util_op create-bridge "$DOCKER_BRIDGE" "$BRIDGE" "$DATAPATH" "$WEAVE_MTU" "$PORT" "$MAC" "$WEAVE_NO_FASTDP" "$WEAVE_NO_BRIDGED_FASTDP" "$1")
     # Set some variables that are expected by code that comes later
     [ "$BRIDGE_TYPE" != "fastdp" ] || DATAPATH="$BRIDGE"
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
-
-        if [ "$1" = "--expect-npc" ] ; then # matches usage in weave-kube launch.sh
-            # Steer traffic via the NPC
-            run_iptables -N WEAVE-NPC >/dev/null 2>&1 || true
-            add_iptables_rule filter FORWARD -o $BRIDGE -j WEAVE-NPC
-            add_iptables_rule filter FORWARD -o $BRIDGE -m state --state NEW -j NFLOG --nflog-group 86
-            add_iptables_rule filter FORWARD -o $BRIDGE -j DROP
-        else
-            # Work around the situation where there are no rules allowing traffic
-            # across our bridge. E.g. ufw
-            add_iptables_rule filter FORWARD -i $BRIDGE -o $BRIDGE -j ACCEPT
-        fi
-        # Forward from weave to the rest of the world
-        add_iptables_rule filter FORWARD -i $BRIDGE ! -o $BRIDGE -j ACCEPT
-        # and allow replies back
-        add_iptables_rule filter FORWARD -o $BRIDGE -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 }
 
 create_bridge() {
