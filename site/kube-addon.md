@@ -23,9 +23,8 @@ network.
 > alternatively if you are using the older cluster set-up scripts from
 > the Kubernetes repo, you can use
 >
-> ```
-> NETWORK_PROVIDER=cni cluster/kube-up.sh
-> ```
+>
+>     NETWORK_PROVIDER=cni cluster/kube-up.sh
 
 NB If you were previously using the [Weave CNI
 driver](/site/cni-plugin.md) from a full install of Weave Net with your
