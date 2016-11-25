@@ -34,6 +34,9 @@ function vm_names {
 
 # Delete all vms in this account
 function destroy {
+	if [ $(gcloud compute firewall-rules list test-allow-docker$SUFFIX 2>/dev/null | wc -l) -gt 0 ] ; then
+		gcloud compute firewall-rules delete test-allow-docker$SUFFIX
+	fi
 	names="$(vm_names)"
 	if [ $(gcloud compute instances list --zones $ZONE -q $names | wc -l) -le 1 ] ; then
 		return 0
@@ -124,7 +127,9 @@ function setup {
 	destroy
 
 	names="$(vm_names)"
-	gcloud compute instances create $names --image $TEMPLATE_NAME --zone $ZONE
+	gcloud compute instances create $names --image $TEMPLATE_NAME --zone $ZONE --tags test$SUFFIX --network=test
+	my_ip="$(curl -s http://ipinfo.io/ip)"
+	gcloud compute firewall-rules create test-allow-docker$SUFFIX --network=test --allow tcp:2375,tcp:12375 --target-tags test$SUFFIX --source-ranges $my_ip
 	gcloud compute config-ssh --ssh-key-file $SSH_KEY_FILE
 	sed -i '/UserKnownHostsFile=\/dev\/null/d' ~/.ssh/config
 
