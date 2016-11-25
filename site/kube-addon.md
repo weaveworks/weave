@@ -68,6 +68,7 @@ definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitio
 ### Blocked connections
 
 If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, you may want to look at the `weave-npc` container's logs:
+
 ```
 $ kubectl logs $(kubectl get pods --all-namespaces | grep weave-net | awk '{print $2}') -n kube-system weave-npc
 ```
@@ -79,9 +80,10 @@ Any time the Weave Network Policy Controller blocks a connection, it will log de
 * destination IP and port, 
 
 as per the below example:
+
 ```
-time="yyyy-MM-ddTHH:mm:ssZ" level=warning msg="TCP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
-time="yyyy-MM-ddTHH:mm:ssZ" level=warning msg="UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
+TCP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
+UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 ```
 
 ## Changing Configuration Options
