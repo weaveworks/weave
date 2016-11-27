@@ -59,9 +59,9 @@ wait_for_connections() {
 assert_raises wait_for_connections
 
 # Check we can ping between the Weave bridg IPs on each host
-HOST1EXPIP=$($SSH $HOST1 "weave expose")
-HOST2EXPIP=$($SSH $HOST2 "weave expose")
-HOST3EXPIP=$($SSH $HOST3 "weave expose")
+HOST1EXPIP=$($SSH $HOST1 "weave expose" || true)
+HOST2EXPIP=$($SSH $HOST2 "weave expose" || true)
+HOST3EXPIP=$($SSH $HOST3 "weave expose" || true)
 assert_raises "run_on $HOST1 $PING $HOST2EXPIP"
 assert_raises "run_on $HOST2 $PING $HOST1EXPIP"
 assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
