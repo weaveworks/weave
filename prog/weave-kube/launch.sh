@@ -7,6 +7,9 @@ IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-0.0.0.0:6782}
 
+# Check if the IP range overlaps anything existing on the host
+/usr/bin/weaveutil netcheck $IPALLOC_RANGE weave
+
 # Default for network policy
 EXPECT_NPC=${EXPECT_NPC:-1}
 
