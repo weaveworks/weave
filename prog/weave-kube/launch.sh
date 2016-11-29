@@ -14,12 +14,11 @@ STATUS_ADDR=${WEAVE_STATUS_ADDR:-0.0.0.0:6782}
 EXPECT_NPC=${EXPECT_NPC:-1}
 
 # kube-proxy requires that bridged traffic passes through netfilter
-if [ ! -f /proc/sys/net/bridge/bridge-nf-call-iptables ] ; then
-    echo /proc/sys/net/bridge/bridge-nf-call-iptables not found >&2
-    exit 1
+if [ -f /proc/sys/net/bridge/bridge-nf-call-iptables ] ; then
+    echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
+else
+    echo "/proc/sys/net/bridge/bridge-nf-call-iptables not found" >&2
 fi
-
-echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
 
 SOURCE_BINARY=/usr/bin/weaveutil
 VERSION=$(/home/weave/weaver $EXTRA_ARGS --version | sed -e 's/weave router //')
