@@ -15,9 +15,8 @@ The following topics are discussed:
 
 ##<a name=”install”></a> Installation
 
-In versions of Kubernetes that are 1.4 or greater and that is also configured to use
-[CNI](/site/cni-plugin.md), Weave Net can be installed onto your cluster with a single
-command:
+Weave Net can be installed onto your CNI-enabled Kubernetes cluster
+with a single command:
 
 ```
 kubectl apply -f https://git.io/weave-kube
@@ -27,14 +26,17 @@ After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
 network.
 
+**Note:** This command requires Kubernetes 1.4 or later.
+
+> CNI, the [_Container Network Interface_](https://github.com/containernetworking/cni),
+> is a proposed standard for configuring network interfaces for Linux
+> containers.
+>
 > If you do not already have a CNI-enabled cluster, you can bootstrap
 > one easily with
 > [kubeadm](http://kubernetes.io/docs/getting-started-guides/kubeadm/).
-> Alternatively if you are using the older cluster set-up scripts from
-> the Kubernetes repo, then use:
 >
->
->     NETWORK_PROVIDER=cni cluster/kube-up.sh
+> Alternatively, you can [configure CNI yourself](http://kubernetes.io/docs/admin/network-plugins/#cni)
 
 **Note:** If using the [Weave CNI
 Plugin](/site/cni-plugin.md) from a prior full install of Weave Net with your
