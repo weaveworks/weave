@@ -571,7 +571,7 @@ detect_bridge_type() {
     MTU=${WEAVE_MTU:-$(cat /sys/class/net/$BRIDGE/mtu)}
 }
 
-create_bridge() {
+try_create_bridge() {
     if ! detect_bridge_type ; then
         BRIDGE_TYPE=bridge
         if [ -z "$WEAVE_NO_FASTDP" ] ; then
@@ -654,6 +654,16 @@ EOF
     # Configure the ARP cache parameters on the bridge interface for
     # the sake of 'weave expose'
     configure_arp_cache $BRIDGE
+}
+
+create_bridge() {
+    if ! try_create_bridge "$@" ; then
+        echo "Creating bridge '$BRIDGE' failed" >&2
+        # reset to original value so we destroy both kinds
+        DATAPATH=datapath
+        destroy_bridge
+        exit 1
+    fi
 }
 
 expose_ip() {
