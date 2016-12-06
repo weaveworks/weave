@@ -155,4 +155,7 @@ if [ ! -f /etc/cni/net.d/10-weave.conf ] ; then
 EOF
 fi
 
+# Expose the weave network so host processes can communicate with pods
+/home/weave/weave --local expose $WEAVE_EXPOSE_IP
+
 wait $WEAVE_PID
