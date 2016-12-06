@@ -1,0 +1,155 @@
+#!/bin/bash
+
+kc() {
+    gcloud compute ssh awh-k8s-master -- kubectl "$@"
+}
+
+# mkns <name>
+mkns() {
+    kc apply -f -<<EOF
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: $1
+EOF
+}
+
+# mkpod <name> <namespace> <node>
+mkpod() {
+    kc apply -f -<<EOF
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: $1
+  namespace: $2
+  labels:
+    name: $1
+spec:
+  nodeName: $3
+  containers:
+  - name: echo-tcp
+    image: weaveworks/test-npc:latest
+    command:
+    - "socat"
+    - "PIPE"
+    - "TCP-LISTEN:4000,fork"
+  - name: echo-udp
+    image: weaveworks/test-npc:latest
+    command:
+    - "socat"
+    - "PIPE"
+    - "UDP-RECVFROM:4000,fork"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: $1-pod
+  namespace: $2
+spec:
+  clusterIP: "None"
+  selector:
+    name: $1
+  ports:
+  - name: echo-tcp
+    protocol: TCP
+    port: 4000
+  - name: echo-udp
+    protocol: UDP
+    port: 4000
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: $1-service
+  namespace: $2
+spec:
+  selector:
+    name: $1
+  ports:
+  - name: echo-tcp
+    protocol: TCP
+    port: 4000
+    port: 4000
+EOF
+}
+
+# setdefaultallow <namespace>
+setdefaultallow() {
+	kc annotate ns $1 net.beta.kubernetes.io/network-policy-
+}
+
+# setdefaultdeny <namespace>
+setdefaultdeny() {
+    kc apply -f -<<EOF
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: $1
+  annotations:
+    net.beta.kubernetes.io/network-policy: |
+      {   
+        "ingress": {
+          "isolation": "DefaultDeny"
+        }
+      }
+EOF
+}
+
+setup() {
+    mkns test-npc-one
+    mkns test-npc-two
+
+    mkpod p1 test-npc-one awh-k8s-01
+    mkpod p2 test-npc-one awh-k8s-01
+    mkpod p3 test-npc-one awh-k8s-02
+    mkpod p4 test-npc-two awh-k8s-01
+    mkpod p5 test-npc-two awh-k8s-02
+}
+
+teardown() {
+    kc delete namespace awh-k8s-01
+    kc delete namespace awh-k8s-02
+}
+
+# probe <source pod ns> <source pod> <destination dns>
+probe() {
+    if ! RESULT=$(echo foo | kc exec --namespace $1 -i $2 -- socat stdio tcp:$3:4000,connect-timeout=2) || [ "$RESULT" != "foo" ]; then
+        echo TCP echo "$@" failed >&2
+        return 1
+    fi
+    if ! RESULT=$(echo foo | kc exec --namespace $1 -i $2 -- socat stdio udp:$3:4000) || [ "$RESULT" != "foo" ]; then
+        echo UDP echo "$@" failed >&2
+        return 1
+    fi
+}
+
+. assert.sh
+
+setdefaultallow test-npc-one
+setdefaultallow test-npc-two
+
+assert_raises "probe test-npc-one p1 p2-pod.test-npc-one"
+assert_raises "probe test-npc-one p1 p3-pod.test-npc-one"
+assert_raises "probe test-npc-one p1 p4-pod.test-npc-two"
+assert_raises "probe test-npc-one p1 p5-pod.test-npc-two"
+assert_raises "probe test-npc-one p1 p2-service.test-npc-one"
+assert_raises "probe test-npc-one p1 p3-service.test-npc-one"
+assert_raises "probe test-npc-one p1 p4-service.test-npc-two"
+assert_raises "probe test-npc-one p1 p5-service.test-npc-two"
+
+setdefaultdeny test-npc-one
+setdefaultdeny test-npc-two
+
+assert_raises "! probe test-npc-one p1 p2-pod.test-npc-one"
+assert_raises "! probe test-npc-one p1 p3-pod.test-npc-one"
+assert_raises "! probe test-npc-one p1 p4-pod.test-npc-two"
+assert_raises "! probe test-npc-one p1 p5-pod.test-npc-two"
+assert_raises "! probe test-npc-one p1 p2-service.test-npc-one"
+assert_raises "! probe test-npc-one p1 p3-service.test-npc-one"
+assert_raises "! probe test-npc-one p1 p4-service.test-npc-two"
+assert_raises "! probe test-npc-one p1 p5-service.test-npc-two"
+
+assert_end
