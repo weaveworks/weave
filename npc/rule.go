@@ -3,9 +3,10 @@ package npc
 import (
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
 	"k8s.io/client-go/pkg/types"
+
+	"github.com/weaveworks/weave/common"
 )
 
 type ruleSpec struct {
@@ -47,7 +48,7 @@ func (rs *ruleSet) deprovision(user types.UID, current, desired map[string]*rule
 		if _, found := desired[key]; !found {
 			delete(rs.users[key], user)
 			if len(rs.users[key]) == 0 {
-				log.Infof("deleting rule: %v", spec.args)
+				common.Log.Infof("deleting rule: %v", spec.args)
 				if err := rs.ipt.Delete(TableFilter, IngressChain, spec.args...); err != nil {
 					return err
 				}
@@ -63,7 +64,7 @@ func (rs *ruleSet) provision(user types.UID, current, desired map[string]*ruleSp
 	for key, spec := range desired {
 		if _, found := current[key]; !found {
 			if _, found := rs.users[key]; !found {
-				log.Infof("adding rule: %v", spec.args)
+				common.Log.Infof("adding rule: %v", spec.args)
 				if err := rs.ipt.Append(TableFilter, IngressChain, spec.args...); err != nil {
 					return err
 				}
