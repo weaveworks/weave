@@ -337,6 +337,8 @@ CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
 PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
 PLUGIN_CONTAINER_NAME=weaveplugin
+CNI_PLUGIN_NAME="weave-plugin-$IMAGE_VERSION"
+CNI_PLUGIN_DIR=${WEAVE_CNI_PLUGIN_DIR:-$HOST_ROOT/opt/cni/bin}
 # Note VOLUMES_CONTAINER which is for weavewait should change when you upgrade Weave
 VOLUMES_CONTAINER_NAME=weavevolumes-$IMAGE_VERSION
 # DB files should remain when you upgrade, so version number not included in name
@@ -1041,23 +1043,34 @@ peer_args() {
 # CNI helpers
 ######################################################################
 
-create_cni_script() {
-    # If target file is a symlink, it's probably a remnant of a weave-kube
-    # installation - if the user has now switched back to `weave launch`,
-    # we need to remove the link before rewriting the contents:
-    [ -L "$1" ] && rm "$1" # fail if we can't remove the link
+install_cni_plugin() {
+    mkdir -p $1 || return 1
+    if [ ! -f "$1/$CNI_PLUGIN_NAME" ]; then
+        cp /usr/bin/weaveutil "$1/$CNI_PLUGIN_NAME"
+    fi
+}
 
-    cat >"$1" <<EOF
-#!/bin/sh
-[ -z "\$CNI_NETNS" -o \$(echo "\$CNI_NETNS" | grep "^/proc/") ] || \\
-    EXTRA_VOLUMES="-v \$(dirname \$CNI_NETNS):\$(dirname \$CNI_NETNS)"
-docker run --rm $(docker_run_options) --pid=host -i \\
- -e CNI_VERSION -e CNI_COMMAND -e CNI_CONTAINERID -e CNI_NETNS \\
- -e CNI_IFNAME -e CNI_ARGS -e CNI_PATH \\
- -v /etc/cni:/etc/cni -v /opt/cni:/opt/cni \$EXTRA_VOLUMES \\
---entrypoint=/usr/bin/weaveutil $EXEC_IMAGE $2
-EOF
-    chmod a+x "$1"
+upgrade_cni_plugin_symlink() {
+    # Remove potential temporary symlink from previous failed upgrade:
+    rm -f $1/$2.tmp
+    # Atomically create a symlink to the plugin:
+    ln -s "$CNI_PLUGIN_NAME" $1/$2.tmp && mv -f $1/$2.tmp $1/$2
+}
+
+upgrade_cni_plugin() {
+    # Check if weave-net and weave-ipam are (legacy) copies of the plugin, and
+    # if so remove these so symlinks can be used instead from now onwards.
+    if [ -f $1/weave-net  -a ! -L $1/weave-net  ];  then rm $1/weave-net;   fi
+    if [ -f $1/weave-ipam -a ! -L $1/weave-ipam ];  then rm $1/weave-ipam;  fi
+
+    # Create two symlinks to the plugin, as it has different
+    # behaviour depending on its name:
+    if [ "$(readlink -f $1/weave-net)" != "$CNI_PLUGIN_NAME" ]; then
+        upgrade_cni_plugin_symlink $1 weave-net
+    fi
+    if [ "$(readlink -f $1/weave-ipam)" != "$CNI_PLUGIN_NAME" ]; then
+        upgrade_cni_plugin_symlink $1 weave-ipam
+    fi
 }
 
 create_cni_config() {
@@ -1070,9 +1083,8 @@ EOF
 }
 
 setup_cni() {
-    if [ -d $HOST_ROOT/opt/cni/bin ] ; then
-        create_cni_script $HOST_ROOT/opt/cni/bin/weave-net  cni-net
-        create_cni_script $HOST_ROOT/opt/cni/bin/weave-ipam cni-ipam
+    if install_cni_plugin $CNI_PLUGIN_DIR ; then
+        upgrade_cni_plugin $CNI_PLUGIN_DIR
     fi
     if [ -d $HOST_ROOT/etc/cni/net.d -a ! -f $HOST_ROOT/etc/cni/net.d/10-weave.conf ] ; then
         create_cni_config $HOST_ROOT/etc/cni/net.d/10-weave.conf
