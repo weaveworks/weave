@@ -26,6 +26,7 @@ import (
 var (
 	version     = "unreleased"
 	metricsAddr string
+	logLevel    string
 )
 
 func handleError(err error) { common.CheckFatal(err) }
@@ -85,6 +86,7 @@ func resetIPSets(ips ipset.Interface) error {
 }
 
 func root(cmd *cobra.Command, args []string) {
+	common.SetLogLevel(logLevel)
 	common.Log.Infof("Starting Weaveworks NPC %s", version)
 
 	if err := metrics.Start(metricsAddr); err != nil {
@@ -163,6 +165,7 @@ func main() {
 		Run:   root}
 
 	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":6781", "metrics server bind address")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "-log-level", "debug", "logging level (debug, info, warning, error)")
 
 	handleError(rootCmd.Execute())
 }
