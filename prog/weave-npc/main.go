@@ -5,7 +5,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
@@ -17,6 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc"
 	"github.com/weaveworks/weave/npc/ipset"
 	"github.com/weaveworks/weave/npc/metrics"
@@ -26,13 +26,10 @@ import (
 var (
 	version     = "unreleased"
 	metricsAddr string
+	logLevel    string
 )
 
-func handleError(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
+func handleError(err error) { common.CheckFatal(err) }
 
 func makeController(getter cache.Getter, resource string,
 	objType runtime.Object, handlers cache.ResourceEventHandlerFuncs) *cache.Controller {
@@ -89,30 +86,25 @@ func resetIPSets(ips ipset.Interface) error {
 }
 
 func root(cmd *cobra.Command, args []string) {
-	log.Infof("Starting Weaveworks NPC %s", version)
+	common.SetLogLevel(logLevel)
+	common.Log.Infof("Starting Weaveworks NPC %s", version)
 
 	if err := metrics.Start(metricsAddr); err != nil {
-		log.Fatalf("Failed to start metrics: %v", err)
+		common.Log.Fatalf("Failed to start metrics: %v", err)
 	}
 
 	if err := ulogd.Start(); err != nil {
-		log.Fatalf("Failed to start ulogd: %v", err)
+		common.Log.Fatalf("Failed to start ulogd: %v", err)
 	}
 
 	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	handleError(err)
 
 	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal(err)
-	}
+	handleError(err)
 
 	ipt, err := iptables.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+	handleError(err)
 
 	ips := ipset.New()
 
@@ -163,7 +155,7 @@ func root(cmd *cobra.Command, args []string) {
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	log.Fatalf("Exiting: %v", <-signals)
+	common.Log.Fatalf("Exiting: %v", <-signals)
 }
 
 func main() {
@@ -173,8 +165,7 @@ func main() {
 		Run:   root}
 
 	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":6781", "metrics server bind address")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "-log-level", "debug", "logging level (debug, info, warning, error)")
 
-	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
-	}
+	handleError(rootCmd.Execute())
 }

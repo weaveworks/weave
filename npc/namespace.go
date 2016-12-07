@@ -3,7 +3,6 @@ package npc
 import (
 	"encoding/json"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
 	"k8s.io/client-go/pkg/api/unversioned"
 	coreapi "k8s.io/client-go/pkg/api/v1"
@@ -11,6 +10,7 @@ import (
 	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/pkg/util/uuid"
 
+	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/npc/ipset"
 )
 
@@ -327,7 +327,7 @@ func isDefaultDeny(namespace *coreapi.Namespace) bool {
 
 	var nnp NamespaceNetworkPolicy
 	if err := json.Unmarshal([]byte(nnpJSON), &nnp); err != nil {
-		log.Warn("Ignoring network policy annotation: unmarshal failed:", err)
+		common.Log.Warn("Ignoring network policy annotation: unmarshal failed:", err)
 		// If we can't understand the annotation, behave as if it isn't present
 		return false
 	}
