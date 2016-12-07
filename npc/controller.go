@@ -86,7 +86,7 @@ func (npc *controller) AddPod(obj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT AddPod %s", js(obj))
+	log.Debugf("EVENT AddPod %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.addPod(obj), "add pod")
 	})
@@ -96,7 +96,7 @@ func (npc *controller) UpdatePod(oldObj, newObj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT UpdatePod %s %s", js(oldObj), js(newObj))
+	log.Debugf("EVENT UpdatePod %s %s", js(oldObj), js(newObj))
 	return npc.withNS(oldObj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.updatePod(oldObj, newObj), "update pod")
 	})
@@ -106,7 +106,7 @@ func (npc *controller) DeletePod(obj *coreapi.Pod) error {
 	npc.Lock()
 	defer npc.Unlock()
 
-	log.Infof("EVENT DeletePod %s", js(obj))
+	log.Debugf("EVENT DeletePod %s", js(obj))
 	return npc.withNS(obj.ObjectMeta.Namespace, func(ns *ns) error {
 		return errors.Wrap(ns.deletePod(obj), "delete pod")
 	})
