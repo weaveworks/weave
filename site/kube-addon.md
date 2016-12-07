@@ -126,3 +126,6 @@ The list of variables you can set is:
 * IPALLOC\_INIT - set the initialization mode of the [IP Address
   Manager](/site/operational-guide/concepts.md#ip-address-manager)
   (defaults to consensus amongst the KUBE\_PEERS)
+* WEAVE\_EXPOSE\_IP - set the IP address used as a gateway from the
+  Weave network to the host network - this is useful if you are
+  configuring the addon as a static pod.

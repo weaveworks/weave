@@ -113,4 +113,7 @@ fi
 mkdir -p /etc/cni/net.d
 /home/weave/weave --local setup-cni
 
+# Expose the weave network so host processes can communicate with pods
+/home/weave/weave --local expose $WEAVE_EXPOSE_IP
+
 wait $WEAVE_PID
