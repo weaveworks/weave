@@ -226,6 +226,12 @@ func main() {
 	overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB)
 	networkConfig.Bridge = bridge
 
+	if bridge != nil {
+		if err := weavenet.DetectHairpin("vethwe-bridge", Log); err != nil {
+			Log.Errorf("DetectHairpin failed: %s", err)
+		}
+	}
+
 	name := peerName(routerName, bridge.Interface())
 
 	if nickName == "" {
