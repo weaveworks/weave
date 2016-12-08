@@ -50,7 +50,8 @@ type FastDatapath struct {
 	seenMACs map[MAC]struct{}
 
 	// vxlan vports associated with the given UDP ports
-	vxlanVportIDs    map[int]odp.VportID
+	vxlanUDPPorts    map[int]odp.VportID
+	vxlanVportIDs    map[odp.VportID]struct{}
 	mainVxlanVportID odp.VportID
 
 	// A singleton pool for the occasions when we need to decode
@@ -87,7 +88,8 @@ func NewFastDatapath(iface *net.Interface, port int) (*FastDatapath, error) {
 		sendToPort:    nil,
 		sendToMAC:     make(map[MAC]bridgeSender),
 		seenMACs:      make(map[MAC]struct{}),
-		vxlanVportIDs: make(map[int]odp.VportID),
+		vxlanUDPPorts: make(map[int]odp.VportID),
+		vxlanVportIDs: make(map[odp.VportID]struct{}),
 		forwarders:    make(map[mesh.PeerName]*fastDatapathForwarder),
 	}
 
@@ -433,7 +435,7 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 
-	if vxlanVportID, present := fastdp.vxlanVportIDs[udpPort]; present {
+	if vxlanVportID, present := fastdp.vxlanUDPPorts[udpPort]; present {
 		return vxlanVportID, nil
 	}
 
@@ -459,7 +461,8 @@ func (fastdp *FastDatapath) getVxlanVportID(udpPort int) (odp.VportID, error) {
 		}
 	}
 
-	fastdp.vxlanVportIDs[udpPort] = vxlanVportID
+	fastdp.vxlanUDPPorts[udpPort] = vxlanVportID
+	fastdp.vxlanVportIDs[vxlanVportID] = struct{}{}
 	fastdp.missHandlers[vxlanVportID] = func(fks odp.FlowKeys, lock *fastDatapathLock) FlowOp {
 		log.Debug("ODP miss: ", fks, " on port ", vxlanVportID)
 		tunnel := fks[odp.OVS_KEY_ATTR_TUNNEL].(odp.TunnelFlowKey)
@@ -1134,6 +1137,11 @@ func (fastdp *FastDatapath) send(fops FlowOp, frame []byte, lock *fastDatapathLo
 		}
 	}
 
+	if fastdp.isHairpinFlow(&flow) {
+		log.Error("Vetoed installation of hairpin flow ", flow)
+		return
+	}
+
 	if dec != nil {
 		// put the decoder back
 		lock.relock()
@@ -1169,6 +1177,50 @@ func (fastdp *FastDatapath) takeDecoder(lock *fastDatapathLock) *EthernetDecoder
 		fastdp.dec = nil
 	}
 	return dec
+}
+
+// A isHairpinFlow checks whether the flow is created due to enabled hairpin
+// mode on the weave bridge port which attaches the datapath. Such flow is
+// identified by either:
+//
+// * in_port == out_port, where in_port is non-vxlan vport;
+// * a packet is sent back to a vxlan tunnel it has been received from and
+//   the tunnel id is either the same or dstPeer and srcPeer are reversed.
+func (fastdp *FastDatapath) isHairpinFlow(flow *odp.FlowSpec) bool {
+	var (
+		vxlanKey odp.TunnelAttrs
+		inVport  odp.VportID
+		inVxlan  bool
+	)
+
+	for _, key := range flow.FlowKeys {
+		switch k := key.(type) {
+		case odp.InPortFlowKey:
+			inVport = k.VportID()
+		case odp.TunnelFlowKey:
+			inVxlan = true
+			vxlanKey = k.Key()
+		}
+	}
+
+	for _, action := range flow.Actions {
+		switch a := action.(type) {
+		case odp.SetTunnelAction:
+			if inVxlan && a.TunnelAttrs.TunnelId == vxlanKey.TunnelId &&
+				a.TunnelAttrs.Ipv4Src == vxlanKey.Ipv4Dst &&
+				a.TunnelAttrs.Ipv4Dst == vxlanKey.Ipv4Src {
+				return true
+			}
+		case odp.OutputAction:
+			if a.VportID() == inVport {
+				if _, ok := fastdp.vxlanVportIDs[a.VportID()]; !ok {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 type odpActionsFlowOp struct {

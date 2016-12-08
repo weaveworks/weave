@@ -124,6 +124,13 @@ func (router *NetworkRouter) handleCapturedPacket(key PacketKey) FlowOp {
 }
 
 func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp {
+	srcMac := net.HardwareAddr(key.SrcMAC[:])
+	dstMac := net.HardwareAddr(key.DstMAC[:])
+
+	if key.SrcPeer == router.Ourself.Peer {
+		log.Warn("Received own packet to peer ", key.DstPeer, " from MAC (", srcMac, ") to (", dstMac, ")")
+	}
+
 	if key.DstPeer != router.Ourself.Peer {
 		// it's not for us, we're just relaying it
 		router.PacketLogging.LogForwardPacket("Relaying", key)
@@ -133,9 +140,6 @@ func (router *NetworkRouter) handleForwardedPacket(key ForwardPacketKey) FlowOp 
 	// At this point, it's either unicast to us, or a broadcast
 	// (because the DstPeer on a forwarded broadcast packet is
 	// always set to the peer being forwarded to)
-
-	srcMac := net.HardwareAddr(key.SrcMAC[:])
-	dstMac := net.HardwareAddr(key.DstMAC[:])
 
 	switch newSrcMac, conflictPeer := router.Macs.AddForced(srcMac, key.SrcPeer); {
 	case newSrcMac:
