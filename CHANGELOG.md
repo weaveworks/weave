@@ -1,3 +1,22 @@
+## Release 1.8.2
+
+Bug fixes and minor improvements
+
+* Fixed a bug where looping flows were installed which caused high CPU
+  usage #2650, #2674
+* Fixed a bug where Kubernetes master could not contact pods #2673, #2683
+* Fixed a bug where weave-kube was crashing in a loop due to invalid
+  Weave bridge state #2657
+* Fixed a bug where iptables NAT rules were not appended due to
+  "temporary unavailable" iptables error #2679
+* Added a detection of enabling the hairpin mode on the Weave bridge port
+  which caused installation of looping flows #2674
+* Added a detection of overlaps between Weave and the host IP address
+  ranges when launching weave-kube #2669, #2672
+* Added logging of connections blocked by weave-npc #2546, #2573
+
+More details in the [change log](https://github.com/weaveworks/weave/issues?q=milestone%3A1.8.2).
+
 ## Release 1.8.1
 
 Bug fixes and minor improvements
