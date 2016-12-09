@@ -22,8 +22,7 @@ else
     fi
 fi
 
-# Need to create bridge before running weaver so we can use the peer address
-# (because of https://github.com/weaveworks/weave/issues/2480)
+# Explicitly create the bridge so we can pass --expect-npc
 WEAVE_NPC_OPTS="--expect-npc"
 if [ "${EXPECT_NPC}" = "0" ]; then
     WEAVE_NPC_OPTS=""
@@ -69,7 +68,7 @@ fi
      --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
      --ipalloc-init $IPALLOC_INIT \
-     --name=$(cat /sys/class/net/weave/address) "$@" \
+     "$@" \
      $KUBE_PEERS &
 WEAVE_PID=$!
 
