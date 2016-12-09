@@ -232,7 +232,7 @@ func main() {
 		}
 	}
 
-	name := peerName(routerName, bridge.Interface())
+	name := peerName(routerName)
 
 	if nickName == "" {
 		var err error
@@ -528,10 +528,11 @@ func determinePassword(password string) []byte {
 	return []byte(password)
 }
 
-func peerName(routerName string, iface *net.Interface) mesh.PeerName {
+func peerName(routerName string) mesh.PeerName {
 	if routerName == "" {
-		if iface == nil {
-			Log.Fatal("Either an interface must be specified with --datapath or --iface, or a name with --name")
+		iface, err := net.InterfaceByName(weavenet.WeaveBridgeName)
+		if err != nil {
+			Log.Fatalf("Unable to find bridge %q", weavenet.WeaveBridgeName)
 		}
 		routerName = iface.HardwareAddr.String()
 	}
