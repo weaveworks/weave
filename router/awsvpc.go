@@ -32,8 +32,8 @@ func (conn *AWSVPCConnection) Stop() {}
 func (conn *AWSVPCConnection) ControlMessage(tag byte, msg []byte) {
 }
 
-func (conn *AWSVPCConnection) DisplayName() string {
-	return "awsvpc"
+func (conn *AWSVPCConnection) Attrs() map[string]interface{} {
+	return map[string]interface{}{"name": "awsvpc"}
 }
 
 // OverlayForwarder

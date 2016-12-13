@@ -211,7 +211,7 @@ var targetsTemplate = defTemplate("targetsTemplate", `\
 
 var connectionsTemplate = defTemplate("connectionsTemplate", `\
 {{range .Router.Connections}}\
-{{if .Outbound}}->{{else}}<-{{end}} {{printf "%-21v" .Address}} {{printf "%-11v" .State}} {{.Info}}
+{{if .Outbound}}->{{else}}<-{{end}} {{printf "%-21v" .Address}} {{printf "%-11v" .State}} {{.Info}} {{range $key,$element := .Attrs}}{{if ne $key "name"}}{{$key}}={{$element}}{{end}}{{end}}
 {{end}}\
 `)
 
