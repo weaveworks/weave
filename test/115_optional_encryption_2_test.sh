@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 start_suite "Optional encryption via trusted subnets"
 

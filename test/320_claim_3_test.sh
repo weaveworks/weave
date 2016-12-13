@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 UNIVERSE=10.2.0.0/16
 C1=10.2.128.1

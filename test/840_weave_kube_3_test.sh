@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 tear_down_kubeadm() {
     for host in $HOSTS; do

@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 entrypoint() {
   docker_on $HOST1 inspect --format="{{.Config.Entrypoint}}" "$@"

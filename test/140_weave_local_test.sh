@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 weave_local_on() {
     host=$1

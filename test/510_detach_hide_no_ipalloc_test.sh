@@ -7,7 +7,7 @@ check() {
     assert_raises "timeout 10 cat <( $CMD )"
 }
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 start_suite "'detach' and 'hide' do not require IP allocation"
 

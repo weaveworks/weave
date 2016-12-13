@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 build_image() {
     docker_on $HOST1 build -t $1 >/dev/null - <<- EOF

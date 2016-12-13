@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 CMD="run -e WEAVE_CIDR=10.2.1.4/24 $SMALL_IMAGE $CHECK_ETHWE_UP"
 

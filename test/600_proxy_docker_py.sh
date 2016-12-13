@@ -1,7 +1,7 @@
 #! /bin/bash
 # Explicitly not called _test.sh - this isn't run, but imported by other tests.
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 IMAGE="joffrey/docker-py:1.8.1"
 
