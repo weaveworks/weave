@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 C1=10.2.3.78
 C2=10.2.3.34

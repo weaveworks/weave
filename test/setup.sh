@@ -4,7 +4,7 @@ set -e
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 (cd ./tls && ./tls $HOSTS)
 

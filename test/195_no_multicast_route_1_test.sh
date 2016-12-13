@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 show_multicast_route_on() {
     exec_on $1 $2 ip route show 224.0.0.0/4

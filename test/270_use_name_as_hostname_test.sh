@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 NAME=c1
 DOMAIN=weave.local

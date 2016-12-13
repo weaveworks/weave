@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 start_suite "Check propagation of DNS entries when gossip is delayed"
 

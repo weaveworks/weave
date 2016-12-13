@@ -1,6 +1,6 @@
 #! /bin/bash
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 start_suite "Check the proxy handles arbitrarily large http chunks"
 # docker images returns all its data as one giant http chunk.
