@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"net/http"
 	"os"
 	"strconv"
@@ -11,6 +10,8 @@ import (
 	"github.com/google/gopacket/pcapgo"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/weaveworks/weave/common"
 )
 
 var (
@@ -26,18 +27,18 @@ var (
 func gatherMetrics() {
 	pipe, err := os.Open("/var/log/ulogd.pcap")
 	if err != nil {
-		log.Fatalf("Failed to open pcap: %v", err)
+		common.Log.Fatalf("Failed to open pcap: %v", err)
 	}
 
 	reader, err := pcapgo.NewReader(pipe)
 	if err != nil {
-		log.Fatalf("Failed to read pcap header: %v", err)
+		common.Log.Fatalf("Failed to read pcap header: %v", err)
 	}
 
 	for {
 		data, _, err := reader.ReadPacketData()
 		if err != nil {
-			log.Fatalf("Failed to read pcap packet: %v", err)
+			common.Log.Fatalf("Failed to read pcap packet: %v", err)
 		}
 
 		packet := gopacket.NewPacket(data, layers.LayerTypeIPv4, gopacket.Default)
@@ -46,7 +47,7 @@ func gatherMetrics() {
 			tcp, _ := tcpLayer.(*layers.TCP)
 			if tcp.SYN && !tcp.ACK { // Only plain SYN constitutes a NEW TCP connection
 				blockedConnections.With(prometheus.Labels{"protocol": "tcp", "dport": strconv.Itoa(int(tcp.DstPort))}).Inc()
-				log.Warnf("TCP connection from %v:%d to %v:%d blocked by Weave NPC.", srcIP(packet), tcp.SrcPort, dstIP(packet), tcp.DstPort)
+				common.Log.Warnf("TCP connection from %v:%d to %v:%d blocked by Weave NPC.", srcIP(packet), tcp.SrcPort, dstIP(packet), tcp.DstPort)
 				continue
 			}
 		}
@@ -54,7 +55,7 @@ func gatherMetrics() {
 		if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 			udp, _ := udpLayer.(*layers.UDP)
 			blockedConnections.With(prometheus.Labels{"protocol": "udp", "dport": strconv.Itoa(int(udp.DstPort))}).Inc()
-			log.Warnf("UDP connection from %v:%d to %v:%d blocked by Weave NPC.", srcIP(packet), udp.SrcPort, dstIP(packet), udp.DstPort)
+			common.Log.Warnf("UDP connection from %v:%d to %v:%d blocked by Weave NPC.", srcIP(packet), udp.SrcPort, dstIP(packet), udp.DstPort)
 			continue
 		}
 	}
@@ -98,9 +99,9 @@ func Start(addr string) error {
 	http.Handle("/metrics", promhttp.Handler())
 
 	go func() {
-		log.Infof("Serving /metrics on %s", addr)
+		common.Log.Infof("Serving /metrics on %s", addr)
 		if err := http.ListenAndServe(addr, nil); err != nil {
-			log.Fatalf("Failed to bind metrics server: %v", err)
+			common.Log.Fatalf("Failed to bind metrics server: %v", err)
 		}
 	}()
 
