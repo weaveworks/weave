@@ -13,7 +13,7 @@ The following topics are discussed:
  * [Changing Configuration Options](#configuration-options)
 
 
-##<a name=”install”></a> Installation
+##<a name="install"></a> Installation
 
 Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
@@ -56,7 +56,7 @@ to the YAML file for the latest release of the Weave Net addon.
 Historic versions are archived on our [GitHub release
 page](https://github.com/weaveworks/weave/releases).
 
-###<a name=”daemon-sets”></a> Upgrading the Daemon Sets
+###<a name="daemon-sets"></a> Upgrading the Daemon Sets
 
 Kubernetes does not currently support rolling upgrades of daemon sets,
 and so you will need to perform the procedure manually:
@@ -75,7 +75,7 @@ Kubernetes see the
 and the [NetworkPolicy API object
 definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitions/#_v1beta1_networkpolicy).
 
-###<a name=”blocked-connections”></a> Troubleshooting Blocked Connections
+###<a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
 If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, check the `weave-npc` container's logs:
 
@@ -96,7 +96,7 @@ TCP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 UDP connection from 10.32.0.7:56648 to 10.32.0.11:80 blocked by Weave NPC.
 ```
 
-###<a name=”configuration-options”></a> Changing Configuration Options
+###<a name="configuration-options"></a> Changing Configuration Options
 
 The default configuration settings can be changed by saving and editing the
 addon YAML before running `kubectl apply`. Additional arguments may be
