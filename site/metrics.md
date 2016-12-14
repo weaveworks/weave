@@ -20,6 +20,19 @@ exposed:
 * `weave_dns_entries` - Number of DNS entries.
 * `weave_flows` - Number of FastDP flows.
 
+#### Publish Router Metrics Endpoint
+
+By default, when started via `weave launch`, weave listens on its local 
+interface to serve metrics. To publish your metrics throughout your cluster, 
+e.g. if your prometheus server is installed on a different host machine,
+you need to set `WEAVE_STATUS_ADDR` to your corresponding IP and port.
+Default port is 6782.
+
+`WEAVE_STATUS_ADDR=X.X.X.X:PORT`
+
+You can set `WEAVE_STATUS_ADDR=0.0.0.0:6782` to listen on all interfaces, 
+but be aware, this may expose your metrics to the public internet.
+
 ### Kubernetes Network Policy Controller Metrics
 
 The endpoint address is `localhost:6781`; the following metric is
