@@ -88,6 +88,7 @@ func (ns *ns) addPod(obj *coreapi.Pod) error {
 		return nil
 	}
 
+	setupPod(obj.Status.PodIP, !isDefaultDeny(ns.namespace))
 	return ns.podSelectors.addToMatching(obj.ObjectMeta.Labels, obj.Status.PodIP)
 }
 
@@ -104,6 +105,7 @@ func (ns *ns) updatePod(oldObj, newObj *coreapi.Pod) error {
 	}
 
 	if !hasIP(oldObj) && hasIP(newObj) {
+		setupPod(newObj.Status.PodIP, !isDefaultDeny(ns.namespace))
 		return ns.podSelectors.addToMatching(newObj.ObjectMeta.Labels, newObj.Status.PodIP)
 	}
 
