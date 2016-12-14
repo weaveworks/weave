@@ -77,10 +77,21 @@ definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitio
 
 ###<a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
-If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, check the `weave-npc` container's logs:
+If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, the first thing to do is check the `weave-npc` container's logs.
+
+To do this, first you have to find the name of the Weave Net pod running on the relevant host:
 
 ```
-$ kubectl logs $(kubectl get pods --all-namespaces | grep weave-net | awk '{print $2}') -n kube-system weave-npc
+$ kubectl get pods -n kube-system -o wide | grep weave-net
+weave-net-08y45                  2/2       Running   0          1m        10.128.0.2   host1
+weave-net-2zuhy                  2/2       Running   0          1m        10.128.0.4   host3
+weave-net-oai50                  2/2       Running   0          1m        10.128.0.3   host2
+```
+
+Select the relevant container, for example, if you want to look at host2 then pick `weave-net-oai50` and run:
+
+```
+$ kubectl logs <weave-pod-name-as-above> -n kube-system weave-npc
 ```
 
 When the Weave Network Policy Controller blocks a connection, it logs the following details about it:
