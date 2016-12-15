@@ -9,7 +9,7 @@ whitely echo Ping each host from the other
 for host in $HOSTS; do
     for other in $HOSTS; do
         if [ "$host" != "$other" ]; then
-            run_on $host $PING $other &
+            echo $(run_on $host $PING $other) &
             pids="$pids $!"
         fi
     done
