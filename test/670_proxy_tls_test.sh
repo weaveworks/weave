@@ -13,6 +13,6 @@ weave_on $HOST1 launch-proxy \
   --tlscert   $PWD/tls/$HOST1.pem \
   --tlskey    $PWD/tls/$HOST1-key.pem
 
-assert_raises "DOCKER_CERT_PATH=./tls proxy docker_on $HOST1 --tlsverify ps"
+assert_raises "DOCKER_CERT_PATH=$(dirname "$0")/tls proxy docker_on $HOST1 --tlsverify ps"
 
 end_suite
