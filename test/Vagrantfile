@@ -16,8 +16,9 @@ def configure_docker(host, hostname, ip)
 
   host.vm.box = "bento/ubuntu-16.04"
 
-  host.vm.provision :shell, :inline => "hostnamectl set-hostname "+hostname
+  host.vm.hostname=hostname
   host.vm.network "private_network", ip: ip
+  host.vm.provision :shell, :inline => "echo "+ip+" "+hostname+" >> /etc/hosts"
 
   host.vm.synced_folder ".", "/vagrant", disabled: true
 
