@@ -5,7 +5,7 @@ require './vagrant-common.rb'
 vm_ip = "172.16.0.3" # arbitrary private IP
 
 pkgs = %w(
-  docker-engine=1.10.2-0~wily
+  docker-engine=1.10.2-0~xenial
   aufs-tools
   build-essential
   ethtool
@@ -19,7 +19,7 @@ pkgs = %w(
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
-  config.vm.box = "ubuntu/wily64"
+  config.vm.box = "bento/ubuntu-16.04"
 
   config.vm.network "private_network", ip: vm_ip
   config.vm.provider :virtualbox do |vb|

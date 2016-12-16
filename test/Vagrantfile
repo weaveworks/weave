@@ -14,7 +14,7 @@ require '../vagrant-common.rb'
 def configure_docker(host, hostname, ip)
   pkgs = %w(docker-engine ethtool)
 
-  host.vm.box = "ubuntu/wily64"
+  host.vm.box = "bento/ubuntu-16.04"
 
   host.vm.provision :shell, :inline => "hostnamectl set-hostname "+hostname
   host.vm.network "private_network", ip: ip
@@ -22,7 +22,7 @@ def configure_docker(host, hostname, ip)
   host.vm.synced_folder ".", "/vagrant", disabled: true
 
   host.vm.provision :shell, :inline => "sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D"
-  host.vm.provision :shell, :inline => "echo deb https://apt.dockerproject.org/repo ubuntu-wily main > /etc/apt/sources.list.d/docker.list"
+  host.vm.provision :shell, :inline => "echo deb https://apt.dockerproject.org/repo ubuntu-xenial main > /etc/apt/sources.list.d/docker.list"
 
   install_packages host.vm, pkgs
   tweak_docker_daemon host.vm
