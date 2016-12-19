@@ -4,6 +4,8 @@
 
 set -e
 
+begin=$(date +%s)
+
 whitely echo Ping each host from the other
 
 # We wrap ping and echo in a function as we want the below parallel for loop
@@ -55,3 +57,5 @@ for host in $HOSTS; do
     pids="$pids $!"
 done
 for pid in $pids; do wait $pid; done
+
+echo "Sanity checks completed successfully in $(date -u -d @$(($(date +%s)-$begin)) +"%T")."
