@@ -9,9 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 	"github.com/weaveworks/go-odp/odp"
 	"github.com/weaveworks/mesh"
+
+	"github.com/weaveworks/weave/net/ipsec"
 )
 
 // The virtual bridge accepts packets from ODP vports and the router
@@ -39,6 +42,7 @@ type FastDatapath struct {
 	localPeer        *mesh.Peer
 	peers            *mesh.Peers
 	overlayConsumer  OverlayConsumer
+	ipsec            *ipsec.IPSec
 
 	// Bridge state: How to send to the given bridge port
 	sendToPort map[bridgePortID]bridgeSender
@@ -53,6 +57,7 @@ type FastDatapath struct {
 	vxlanUDPPorts    map[int]odp.VportID
 	vxlanVportIDs    map[odp.VportID]struct{}
 	mainVxlanVportID odp.VportID
+	mainVxlanUDPPort int
 
 	// A singleton pool for the occasions when we need to decode
 	// the packet.
@@ -62,7 +67,9 @@ type FastDatapath struct {
 	forwarders map[mesh.PeerName]*fastDatapathForwarder
 }
 
-func NewFastDatapath(iface *net.Interface, port int) (*FastDatapath, error) {
+func NewFastDatapath(iface *net.Interface, port int, encryptionEnabled bool) (*FastDatapath, error) {
+	var ipSec *ipsec.IPSec
+
 	dpif, err := odp.NewDpif()
 	if err != nil {
 		return nil, err
@@ -80,11 +87,22 @@ func NewFastDatapath(iface *net.Interface, port int) (*FastDatapath, error) {
 		return nil, err
 	}
 
+	if encryptionEnabled {
+		var err error
+		if ipSec, err = ipsec.New(log); err != nil {
+			return nil, errors.Wrap(err, "ipsec new")
+		}
+		if err := ipSec.Flush(false); err != nil {
+			return nil, errors.Wrap(err, "ipsec flush")
+		}
+	}
+
 	fastdp := &FastDatapath{
 		iface:         iface,
 		dpif:          dpif,
 		dp:            dp,
 		missHandlers:  make(map[odp.VportID]missHandler),
+		ipsec:         ipSec,
 		sendToPort:    nil,
 		sendToMAC:     make(map[MAC]bridgeSender),
 		seenMACs:      make(map[MAC]struct{}),
@@ -113,7 +131,8 @@ func NewFastDatapath(iface *net.Interface, port int) (*FastDatapath, error) {
 	// numbers to be independent, but working out how to specify
 	// them on the connecting side.  So we can wait to find out if
 	// anyone wants that.
-	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportIDHarder(port+1, 5, time.Millisecond*10)
+	fastdp.mainVxlanUDPPort = port + 1
+	fastdp.mainVxlanVportID, err = fastdp.getVxlanVportIDHarder(fastdp.mainVxlanUDPPort, 5, time.Millisecond*10)
 	if err != nil {
 		return nil, err
 	}
@@ -313,6 +332,14 @@ func (fastdp fastDatapathOverlay) InvalidateShortIDs() {
 	fastdp.lock.Lock()
 	defer fastdp.lock.Unlock()
 	checkWarn(fastdp.deleteFlows())
+}
+
+func (fastdp fastDatapathOverlay) Stop() {
+	if fastdp.ipsec != nil {
+		if err := fastdp.ipsec.Flush(true); err != nil {
+			log.Errorf("ipsec flush failed: %s", err)
+		}
+	}
 }
 
 func (fastDatapathOverlay) AddFeaturesTo(features map[string]string) {
@@ -542,6 +569,10 @@ type fastDatapathForwarder struct {
 	connUID        uint64
 	vxlanVportID   odp.VportID
 
+	sessionKey                 *[32]byte
+	isEncrypted                bool
+	isOutboundIPSecEstablished bool
+
 	lock              sync.RWMutex
 	confirmed         bool
 	remoteAddr        *net.UDPAddr
@@ -557,27 +588,25 @@ type fastDatapathForwarder struct {
 }
 
 func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectionParams) (mesh.OverlayConnection, error) {
-	if params.SessionKey != nil {
-		// No encryption support in fastdp
-		return nil, fmt.Errorf("encryption not supported")
-	}
-
 	vxlanVportID := fastdp.mainVxlanVportID
-	var remoteAddr *net.UDPAddr
+	vxlanUDPPort := fastdp.mainVxlanUDPPort
 
+	remoteAddr := makeUDPAddr(params.RemoteAddr)
 	if params.Outbound {
-		remoteAddr = makeUDPAddr(params.RemoteAddr)
+		var err error
 		// The provided address contains the main weave port
 		// number to connect to.  We need to derive the vxlan
 		// port number from that.
 		vxlanRemoteAddr := *remoteAddr
 		vxlanRemoteAddr.Port++
 		remoteAddr = &vxlanRemoteAddr
-		var err error
-		vxlanVportID, err = fastdp.getVxlanVportID(remoteAddr.Port)
+		vxlanUDPPort = remoteAddr.Port
+		vxlanVportID, err = fastdp.getVxlanVportID(vxlanUDPPort)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		remoteAddr.Port = vxlanUDPPort
 	}
 
 	localIP, err := ipv4Bytes(params.LocalAddr.IP)
@@ -592,6 +621,7 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 		sendControlMsg: params.SendControlMessage,
 		connUID:        params.ConnUID,
 		vxlanVportID:   vxlanVportID,
+		sessionKey:     params.SessionKey,
 
 		remoteAddr:        remoteAddr,
 		heartbeatInterval: FastHeartbeat,
@@ -601,7 +631,7 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 		errorChan:       make(chan error, 1),
 	}
 
-	return fwd, err
+	return fwd, nil
 }
 
 func ipv4Bytes(ip net.IP) (res [4]byte, err error) {
@@ -626,11 +656,30 @@ func (fwd *fastDatapathForwarder) Confirm() {
 		log.Fatal(fwd.logPrefix(), "already confirmed")
 	}
 
+	if fwd.fastdp.ipsec != nil && fwd.sessionKey != nil {
+		fwd.isEncrypted = true
+		log.Info("Setting up IPsec between ", fwd.fastdp.localPeer, " and ", fwd.remotePeer)
+		err := fwd.fastdp.ipsec.InitSALocal(
+			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name, fwd.connUID,
+			net.IP(fwd.localIP[:]), fwd.remoteAddr.IP,
+			fwd.remoteAddr.Port,
+			fwd.sessionKey,
+			func(msg []byte) error {
+				return fwd.sendControlMsg(FastDatapathCryptoInitSARemote, msg)
+			},
+		)
+		if err != nil {
+			log.Error(fwd.logPrefix(), "ipsec init SA local failed: ", err)
+			fwd.handleError(err)
+			return
+		}
+	}
+
 	log.Debug(fwd.logPrefix(), "confirmed")
 	fwd.fastdp.addForwarder(fwd.remotePeer.Name, fwd)
 	fwd.confirmed = true
 
-	if fwd.remoteAddr != nil {
+	if fwd.remoteAddr != nil && (!fwd.isEncrypted || fwd.isOutboundIPSecEstablished) {
 		// have the goroutine send a heartbeat straight away
 		fwd.heartbeatTimer = time.NewTimer(0)
 	} else {
@@ -719,6 +768,7 @@ func (fwd *fastDatapathForwarder) sendHeartbeat() {
 
 const (
 	FastDatapathHeartbeatAck = iota
+	FastDatapathCryptoInitSARemote
 )
 
 func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender *net.UDPAddr) {
@@ -768,6 +818,8 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 	switch tag {
 	case FastDatapathHeartbeatAck:
 		fwd.handleHeartbeatAck()
+	case FastDatapathCryptoInitSARemote:
+		fwd.handleCryptoInitSARemote(msg)
 
 	default:
 		log.Info(fwd.logPrefix(), "Ignoring unknown control message: ", tag)
@@ -787,6 +839,26 @@ func (fwd *fastDatapathForwarder) handleHeartbeatAck() {
 		if fwd.heartbeatTimer != nil {
 			fwd.heartbeatTimer.Reset(fwd.heartbeatInterval)
 		}
+	}
+}
+
+func (fwd *fastDatapathForwarder) handleCryptoInitSARemote(msg []byte) {
+	log.Info(fwd.logPrefix(), "IPSec init SA remote")
+	err := fwd.fastdp.ipsec.InitSARemote(
+		msg,
+		fwd.fastdp.localPeer.Name, fwd.remotePeer.Name, fwd.connUID,
+		net.IP(fwd.localIP[:]), fwd.remoteAddr.IP, fwd.remoteAddr.Port,
+		fwd.sessionKey,
+	)
+	if err != nil {
+		log.Warning(fwd.logPrefix(), "IPSec init SA remote failed: ", err)
+		fwd.handleError(err)
+		return
+	}
+
+	if !fwd.isOutboundIPSecEstablished {
+		fwd.isOutboundIPSecEstablished = true
+		fwd.heartbeatTimer.Reset(0)
 	}
 }
 
@@ -838,6 +910,18 @@ func (fwd *fastDatapathForwarder) Stop() {
 	fwd.lock.Lock()
 	defer fwd.lock.Unlock()
 	fwd.sendControlMsg = func(byte, []byte) error { return nil }
+
+	if fwd.isEncrypted {
+		localIP := net.IP(fwd.localIP[:])
+		log.Info("Destroying IPsec between ", fwd.fastdp.localPeer, " and ", fwd.remotePeer)
+		err := fwd.fastdp.ipsec.Destroy(
+			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name, fwd.connUID,
+			localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port,
+		)
+		if err != nil {
+			log.Errorf("ipsec destroy failed: %s", err)
+		}
+	}
 
 	// stop the heartbeat goroutine
 	if !fwd.stopped {

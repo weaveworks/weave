@@ -64,6 +64,8 @@ func (vpc AWSVPC) Diagnostics() interface{} {
 	return nil
 }
 
+func (vpc AWSVPC) Stop() {}
+
 // NetworkOverlay
 
 func (vpc AWSVPC) InvalidateRoutes() {}
