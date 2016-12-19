@@ -2,6 +2,7 @@
 
 set -e
 
+begin=$(date +%s)
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 . "$(dirname "$0")/config.sh"
@@ -59,4 +60,4 @@ for ppid in $ppids; do
     wait $ppid;
 done
 
-echo "Setup completed successfully."
+echo "Setup completed successfully in $(date -u -d @$(($(date +%s)-$begin)) +"%T")."
