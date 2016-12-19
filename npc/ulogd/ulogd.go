@@ -1,17 +1,18 @@
 package ulogd
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"io"
 	"os"
 	"os/exec"
+
+	"github.com/weaveworks/weave/common"
 )
 
 func waitForExit(cmd *exec.Cmd) {
 	if err := cmd.Wait(); err != nil {
-		log.Fatalf("ulogd terminated: %v", err)
+		common.Log.Fatalf("ulogd terminated: %v", err)
 	}
-	log.Fatal("ulogd terminated normally")
+	common.Log.Fatal("ulogd terminated normally")
 }
 
 func Start() error {

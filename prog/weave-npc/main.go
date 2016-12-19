@@ -165,7 +165,7 @@ func main() {
 		Run:   root}
 
 	rootCmd.PersistentFlags().StringVar(&metricsAddr, "metrics-addr", ":6781", "metrics server bind address")
-	rootCmd.PersistentFlags().StringVar(&logLevel, "-log-level", "debug", "logging level (debug, info, warning, error)")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "debug", "logging level (debug, info, warning, error)")
 
 	handleError(rootCmd.Execute())
 }
