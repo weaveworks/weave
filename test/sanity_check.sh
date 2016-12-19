@@ -6,10 +6,20 @@ set -e
 
 whitely echo Ping each host from the other
 
+# We wrap ping and echo in a function as we want the below parallel for loop
+# to exit early in case of a failed ping, and it cannot be done concisely,
+# e.g. using a one-liner, without losing the status code for ping.
+function check_ping() {
+    local output=$(run_on $1 $PING $2)
+    local status=$?
+    echo $output
+    return $status
+}
+
 for host in $HOSTS; do
     for other in $HOSTS; do
         if [ "$host" != "$other" ]; then
-            echo $(run_on $host $PING $other) &
+            check_ping "$host" "$other" &
             pids="$pids $!"
         fi
     done
