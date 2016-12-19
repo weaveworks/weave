@@ -16,6 +16,7 @@ function check_ping() {
     return $status
 }
 
+pids=""
 for host in $HOSTS; do
     for other in $HOSTS; do
         if [ "$host" != "$other" ]; then
@@ -25,7 +26,6 @@ for host in $HOSTS; do
     done
 done
 for pid in $pids; do wait $pid; done
-unset pids
 
 
 whitely echo Check we can reach docker
@@ -49,6 +49,7 @@ $weave_version
 EOF
 }
 
+pids=""
 for host in $HOSTS; do
     check_docker $host &
     pids="$pids $!"
