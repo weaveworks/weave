@@ -7,11 +7,12 @@ import (
 )
 
 func uniqueID(args []string) error {
-	if len(args) != 1 {
-		cmdUsage("unique-id", "<host-root>")
+	if len(args) != 2 {
+		cmdUsage("unique-id", "<db-prefix> <host-root>")
 	}
-	hostRoot := args[0]
-	uid, err := weavenet.GetSystemPeerName(hostRoot)
+	dbPrefix := args[0]
+	hostRoot := args[1]
+	uid, err := weavenet.GetSystemPeerName(dbPrefix, hostRoot)
 	if err != nil {
 		return err
 	}
