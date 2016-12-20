@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"time"
 
 	"github.com/boltdb/bolt"
 )
@@ -33,9 +34,29 @@ func NewBoltDB(dbPathname string) (*BoltDB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("[boltDB] Unable to open %s: %s", dbPathname, err)
 	}
-	// check the persistence version
-	err = db.Update(func(tx *bolt.Tx) error {
+	err = db.Update(checkVersion(false))
+	return &BoltDB{db: db}, err
+}
+
+func NewBoltDBReadOnly(dbPathname string) (*BoltDB, error) {
+	options := bolt.Options{Timeout: time.Millisecond * 50, ReadOnly: true}
+	db, err := bolt.Open(dbPathname, 0660, &options)
+	if err != nil {
+		return nil, fmt.Errorf("[boltDB] Unable to open %s: %s", dbPathname, err)
+	}
+	err = db.View(checkVersion(true))
+	if err != nil {
+		return nil, fmt.Errorf("[boltDB] Cannot use persistence file %s: %s", dbPathname, err)
+	}
+	return &BoltDB{db: db}, nil
+}
+
+func checkVersion(readOnly bool) func(tx *bolt.Tx) error {
+	return func(tx *bolt.Tx) error {
 		if top := tx.Bucket(topBucket); top == nil {
+			if readOnly {
+				return fmt.Errorf("no top bucket")
+			}
 			top, err := tx.CreateBucket(topBucket)
 			if err != nil {
 				return err
@@ -46,13 +67,12 @@ func NewBoltDB(dbPathname string) (*BoltDB, error) {
 		} else {
 			if checkVersion := top.Get(versionIdent); checkVersion != nil {
 				if checkVersion[0] != persistenceVersion[0] {
-					return fmt.Errorf("[boltDB] Cannot use persistence file %s - version %x", dbPathname, checkVersion)
+					return fmt.Errorf("mismatched version %x", checkVersion)
 				}
 			}
 		}
 		return nil
-	})
-	return &BoltDB{db: db}, err
+	}
 }
 
 func (d *BoltDB) Load(ident string, data interface{}) (bool, error) {
