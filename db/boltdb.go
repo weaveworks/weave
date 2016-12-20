@@ -23,6 +23,10 @@ var (
 	topBucket          = []byte("top")
 )
 
+const (
+	NameIdent = "peername"
+)
+
 func NewBoltDB(dbPathname string) (*BoltDB, error) {
 	db, err := bolt.Open(dbPathname, 0660, nil)
 	if err != nil {
