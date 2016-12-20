@@ -140,6 +140,11 @@ exec_options() {
         setup|setup-cni|launch|launch-router)
             echo -v /:/host -e HOST_ROOT=/host
             ;;
+        # All the other commands that may create the bridge and need machine id files.
+        # We don't mount '/' to avoid recursive mounts of '/var'
+        create-bridge|attach-router|run|start|attach|restart|expose|hide)
+            echo -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus -e HOST_ROOT=/host
+            ;;
     esac
 }
 
@@ -466,14 +471,6 @@ mac_from_hex() {
     read a b c d e f && printf "%02x:$b:$c:$d:$e:$f" $((0x$a & ~1 | 2))
 }
 
-mac_from_file() {
-    UUID=$(cat $1 2>/dev/null) || return 1
-    # We salt the input just as a precaution to avoid clashes with
-    # other applications who might have had the bright idea of
-    # generating MACs in the same way.
-    echo "9oBJ0Jmip-$UUID" | sha256sum | sed 's/\(..\)/\1 /g' | cut -c1-17 | mac_from_hex
-}
-
 # Generate a random MAC value
 random_mac() {
     od -txC -An -N6 /dev/urandom | mac_from_hex
@@ -721,16 +718,12 @@ init_bridge_prep() {
 
     ip link add name $BRIDGE type bridge
 
-    # Derive the bridge MAC from the system (aka bios) UUID, or,
-    # failing that, the hypervisor UUID. Elsewhere we in turn derive
-    # the peer name from that, which we want to be stable across
-    # reboots but otherwise unique. The system/hypervisor UUID fits
-    # that bill, unlike, say, /etc/machine-id, which is often
-    # identical on VMs created from cloned filesystems. If we cannot
-    # determine the system/hypervisor UUID we just generate a random MAC.
-    MAC=$(mac_from_file /sys/class/dmi/id/product_uuid) || \
-        MAC=$(mac_from_file /sys/hypervisor/uuid) || \
-        MAC=$(random_mac)
+    # for Docker 1.12 this needs to be docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}'
+    # so running this from 'weave --local' may fail.
+    # also if weaveexec is not on the path it will be run as a Docker container
+    # that does not have access to /etc/machine-id
+    WEAVEDB_PATH=$(docker inspect -f '{{index .Volumes "/weavedb"}}' $DB_CONTAINER_NAME 2>/dev/null)
+    MAC=$(util_op unique-id "$HOST_ROOT/$WEAVEDB_PATH/weave" "$HOST_ROOT")
 
     ip link set dev $BRIDGE address $MAC
 
