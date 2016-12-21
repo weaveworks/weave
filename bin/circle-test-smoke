@@ -9,5 +9,7 @@ if [ -n "$TEST_AND_PUBLISH" ] ; then
     cd $SRCDIR/test
     eval $(./gce.sh hosts)
     export COVERAGE=true
+    export WEAVE_NET_SANITY_CHECKS_FILES="/tmp/weave_net_sanity_check_*.log"
     ./run_all.sh
+    cp $WEAVE_NET_SANITY_CHECKS_FILES $CIRCLE_ARTIFACTS
 fi

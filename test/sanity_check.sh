@@ -5,6 +5,7 @@
 set -e
 
 begin=$(date +%s)
+sanity_checks_files=${WEAVE_NET_SANITY_CHECKS_FILES:-"/tmp/weave_net_sanity_check_*.log"}
 
 whitely echo Ping each host from the other
 
@@ -14,12 +15,17 @@ whitely echo Ping each host from the other
 function check_ping() {
     local output=$(run_on $1 $PING $2)
     local status=$?
-    echo $output
+    echo "$output" >> "${sanity_checks_files/\*/$1}"
     return $status
 }
 
 pids=""
 for host in $HOSTS; do
+    cat >> "${sanity_checks_files/\*/$host}" <<EOF
+# =====================================
+# Host Ping Check: $host
+# =====================================
+EOF
     for other in $HOSTS; do
         if [ "$host" != "$other" ]; then
             check_ping "$host" "$other" &
@@ -37,16 +43,20 @@ function check_docker() {
     docker_info=$(docker_on $1 info)
     docker_weave_version=$(docker_on $1 inspect -f {{.Created}} weaveworks/weave:${WEAVE_VERSION:-latest})
     weave_version=$(weave_on $1 version)
-    cat << EOF
-
-Host Version Info: $1
-=====================================
+    cat >> "${sanity_checks_files/\*/$1}" << EOF
+# =====================================
+# Host Version Info: $1
+# =====================================
 # docker version
 $docker_version
+
 # docker info
 $docker_info
-# weave version
+
+# docker inspect -f {{.Created}} weaveworks/weave:<version>
 $docker_weave_version
+
+# weave version
 $weave_version
 EOF
 }
