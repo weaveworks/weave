@@ -994,12 +994,12 @@ wait_for_status() {
     container="$1"
     shift
     while true ; do
-        "$@" GET /status >/dev/null 2>&1 && return 0
         if ! check_running $container >/dev/null 2>&1 ; then
             kill_container $container # stop it restarting
             echo $(death_msg $container) >&2
             return 1
         fi
+        "$@" GET /status >/dev/null 2>&1 && return 0
         fractional_sleep 0.1
     done
 }
