@@ -21,8 +21,13 @@ func CreateDatapath(dpname string) (supported bool, err error) {
 	defer dpif.Close()
 
 	dp, err := dpif.CreateDatapath(dpname)
-	if err != nil && !odp.IsDatapathNameAlreadyExistsError(err) {
-		return true, err
+	if err != nil {
+		if !odp.IsDatapathNameAlreadyExistsError(err) {
+			return true, err
+		}
+		if dp, err = dpif.LookupDatapath(dpname); err != nil {
+			return true, err
+		}
 	}
 
 	// Pick an ephemeral port number to use in probing for vxlan
