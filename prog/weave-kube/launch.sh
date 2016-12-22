@@ -6,6 +6,7 @@ set -e
 IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-0.0.0.0:6782}
+HOST_ROOT=${HOST_ROOT:-/host}
 
 # Check if the IP range overlaps anything existing on the host
 /usr/bin/weaveutil netcheck $IPALLOC_RANGE weave
@@ -102,15 +103,16 @@ done
 
 # Install CNI plugin binary to typical CNI bin location
 # with fall-back to CNI directory used by kube-up on GCI OS
-if mkdir -p /opt/cni/bin ; then
-    export WEAVE_CNI_PLUGIN_DIR=/opt/cni/bin
-elif mkdir -p /host_home/kubernetes/bin ; then
-    export WEAVE_CNI_PLUGIN_DIR=/host_home/kubernetes/bin
-else
-    echo "Failed to install the Weave CNI plugin" >&2
-    exit 1
+if ! mkdir -p $HOST_ROOT/opt/cni/bin ; then
+    if mkdir -p $HOST_ROOT/home/kubernetes/bin ; then
+        export WEAVE_CNI_PLUGIN_DIR=$HOST_ROOT/home/kubernetes/bin
+    else
+        echo "Failed to install the Weave CNI plugin" >&2
+        exit 1
+    fi
 fi
-mkdir -p /etc/cni/net.d
+mkdir -p $HOST_ROOT/etc/cni/net.d
+export HOST_ROOT
 /home/weave/weave --local setup-cni
 
 # Expose the weave network so host processes can communicate with pods
