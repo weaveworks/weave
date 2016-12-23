@@ -37,7 +37,7 @@ The most common prefix lengths are 8, 16 and 24, but there is nothing
 stopping you using a /9 network or a /26. For example, `6.250.3.1/9` is on the
 `6.128.0.0/9` network.
 
-Several websites offer calculators to decode this kind of address, see: [IP Address Guide](http://www.ipaddressguide.com/cidr).
+Several websites offer calculators to decode this kind of address, see, for example: [IP Address Guide](http://www.ipaddressguide.com/cidr).
 
 The following is an example route table for a container that is attached to a Weave
 network:
