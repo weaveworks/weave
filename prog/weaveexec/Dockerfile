@@ -1,7 +1,12 @@
 FROM alpine
 
-MAINTAINER Weaveworks Inc <help@weave.works>
-LABEL works.weave.role=system
+LABEL maintainer "Weaveworks Inc <help@weave.works>"
+LABEL works.weave.role=system \
+      org.label-schema.name="Weave Net" \
+      org.label-schema.description="Weave Net creates a virtual network that connects Docker containers across multiple hosts and enables their automatic discovery" \
+      org.label-schema.url="https://weave.works" \
+      org.label-schema.vcs-url="https://github.com/weaveworks/weave" \
+      org.label-schema.vendor="Weaveworks"
 
 WORKDIR /home/weave
 ENTRYPOINT ["/home/weave/sigproxy", "/home/weave/weave"]
