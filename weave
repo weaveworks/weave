@@ -825,8 +825,7 @@ destroy_bridge() {
 }
 
 docker_bridge_ip() {
-    DOCKER_BRIDGE_IP=$(ip -4 addr show dev $DOCKER_BRIDGE | grep -m1 -o 'inet [.0-9]*') || return 1
-    DOCKER_BRIDGE_IP=${DOCKER_BRIDGE_IP#inet }
+    DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
 }
 
 do_or_die() {
