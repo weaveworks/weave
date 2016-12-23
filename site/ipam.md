@@ -179,7 +179,7 @@ The range parameter is written in
 in this example "/16" means the first 16 bits of the address form the
 network address and the allocator is to allocate container addresses
 that all start 10.2. See [IP
-addresses and routes](/site/using-weave/service-management.md#routing) for more information.
+addresses and routes](/site/how-it-works/ip-addresses.md) for more information.
 
 Weave shares the IP address range across all peers, dynamically
 according to their needs.  If a group of peers becomes isolated from
