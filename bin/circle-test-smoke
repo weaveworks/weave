@@ -4,7 +4,21 @@ set -e
 
 source "$STATE"
 
+wait_for_test_vms() {
+    for i in $(seq 1 120); do
+        if [ -f /tmp/gce_setup_done ] ; then
+            return
+        fi
+        echo "Waiting for GCE hosts to be ready"
+        sleep 1
+    done
+    echo "Timed out waiting for GCE hosts to be ready" >&2
+    cat /tmp/gce_setup_output >&2
+    exit 1
+}
+
 if [ -n "$TEST_AND_PUBLISH" ] ; then
+    wait_for_test_vms
     cd $SRCDIR/test
     eval $(./gce.sh hosts)
     export COVERAGE=true

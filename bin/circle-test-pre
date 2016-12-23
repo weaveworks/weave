@@ -5,10 +5,10 @@ set -e
 source "$STATE"
 
 if [ -n "$TEST_AND_PUBLISH" ] ; then
-    cd $SRCDIR
-    make testrunner
-    make COVERAGE=true RM= all
-
+    rm -f /tmp/gce_setup_done
     cd $SRCDIR/test
-    ./gce.sh setup && eval $(./gce.sh hosts) && ./setup.sh
+    ./gce.sh setup > /tmp/gce_setup_output 2>&1
+    eval $(./gce.sh hosts) >> /tmp/gce_setup_output 2>&1
+    ./setup.sh >> /tmp/gce_setup_output 2>&1
+    echo "done" > /tmp/gce_setup_done
 fi

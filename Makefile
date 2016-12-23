@@ -26,7 +26,7 @@ PLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(TEST_TLS_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE)
 
 BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver.uptodate
@@ -77,6 +77,7 @@ $(KUBEPEERS_EXE): prog/kube-peers/*.go
 $(WEAVENPC_EXE): prog/weave-npc/*.go npc/*.go npc/*/*.go
 $(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
+$(RUNNER_EXE): tools/runner/*.go
 $(WEAVEWAIT_NOOP_EXE): prog/weavewait/*.go
 $(WEAVEWAIT_EXE): prog/weavewait/*.go net/*.go
 $(WEAVEWAIT_NOMCAST_EXE): prog/weavewait/*.go net/*.go
@@ -121,7 +122,7 @@ $(WEAVEWAIT_NOMCAST_EXE):
 
 # These programs need a separate rule as they fail the netgo check in
 # the main build stanza due to not importing net package
-$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE):
+$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 tests:
@@ -180,9 +181,6 @@ $(DOCKER_DISTRIB):
 
 tools/.git:
 	git submodule update --init
-
-$(RUNNER_EXE): tools/.git
-	make -C tools/runner
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)

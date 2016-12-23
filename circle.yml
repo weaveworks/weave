@@ -17,6 +17,9 @@ machine:
 dependencies:
   cache_directories:
     - "~/docker"
+    - /home/ubuntu/src/github.com/weaveworks/weave/.pkg
+    - /home/ubuntu/src/github.com/weaveworks/weave/.git/modules/vendor
+    - /home/ubuntu/src/github.com/weaveworks/weave/vendor
   post:
     - bin/circle-dependencies-post
 
@@ -24,6 +27,7 @@ test:
   pre:
     - "$SRCDIR/bin/circle-test-pre":
         parallel: true
+        background: true
   override:
     - "$SRCDIR/bin/circle-test-unit":
         parallel: true
@@ -36,6 +40,9 @@ test:
 
 teardown:
   pre:
+    - "cd $SRCDIR/test && ./gce.sh destroy":
+        parallel: true
+        background: true
     - "$SRCDIR/bin/circle-teardown-pre":
         parallel: true
 

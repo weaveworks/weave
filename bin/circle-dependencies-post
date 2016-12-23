@@ -25,7 +25,7 @@ fi
 
 source "$STATE"
 
-mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR
+mkdir -p $SRCDIR && cp -r $(pwd)/ $(dirname $SRCDIR)
 
 if [ -n "$TEST_AND_PUBLISH" ] ; then
     bin/setup-circleci-secrets "$SECRET_PASSWORD"
@@ -37,4 +37,7 @@ if [ -n "$TEST_AND_PUBLISH" ] ; then
     ../tools/rebuild-image weaveworks/weavebuild . Dockerfile build.sh
     touch $SRCDIR/.build.uptodate
     sudo chown -R ubuntu /usr/local/go
+    cd $SRCDIR
+    make testrunner
+    make COVERAGE=true RM= exes all
 fi
