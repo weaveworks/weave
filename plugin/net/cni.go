@@ -73,8 +73,8 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 
 	// If config says nothing about routes or gateway, default one will be via the bridge
 	if result.IP4.Routes == nil && result.IP4.Gateway == nil {
-		bridgeIP, err := findBridgeIP(conf.BrName, result.IP4.IP)
-		if err == errBridgeNoIP {
+		bridgeIP, err := weavenet.FindBridgeIP(conf.BrName, &result.IP4.IP)
+		if err == weavenet.ErrBridgeNoIP {
 			bridgeArgs := *args
 			bridgeArgs.ContainerID = "weave:expose"
 			bridgeIPResult, err := c.getIP(conf.IPAM.Type, &bridgeArgs)
@@ -162,25 +162,6 @@ func assignBridgeIP(bridgeName string, ipnet net.IPNet) error {
 		return fmt.Errorf("failed to add IP address to %q: %v", bridgeName, err)
 	}
 	return nil
-}
-
-var errBridgeNoIP = fmt.Errorf("Bridge has no IP address")
-
-func findBridgeIP(bridgeName string, subnet net.IPNet) (net.IP, error) {
-	netdev, err := weavenet.GetBridgeNetDev(bridgeName)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to get netdev for %q bridge: %s", bridgeName, err)
-	}
-	if len(netdev.CIDRs) == 0 {
-		return nil, errBridgeNoIP
-	}
-	for _, cidr := range netdev.CIDRs {
-		if subnet.Contains(cidr.IP) {
-			return cidr.IP, nil
-		}
-	}
-	// None in the required subnet; just return the first one
-	return netdev.CIDRs[0].IP, nil
 }
 
 func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {

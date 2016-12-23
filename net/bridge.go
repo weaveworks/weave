@@ -2,6 +2,7 @@ package net
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/vishvananda/netlink"
@@ -85,4 +86,25 @@ func DetectHairpin(portIfName string, log *logrus.Logger) error {
 	}()
 
 	return nil
+}
+
+var ErrBridgeNoIP = fmt.Errorf("Bridge has no IP address")
+
+func FindBridgeIP(bridgeName string, subnet *net.IPNet) (net.IP, error) {
+	netdev, err := GetBridgeNetDev(bridgeName)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get netdev for %q bridge: %s", bridgeName, err)
+	}
+	if len(netdev.CIDRs) == 0 {
+		return nil, ErrBridgeNoIP
+	}
+	if subnet != nil {
+		for _, cidr := range netdev.CIDRs {
+			if subnet.Contains(cidr.IP) {
+				return cidr.IP, nil
+			}
+		}
+	}
+	// No subnet, or none in the required subnet; just return the first one
+	return netdev.CIDRs[0].IP, nil
 }
