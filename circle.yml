@@ -2,7 +2,6 @@ general:
   branches:
     ignore:
       - gh\-pages
-      - /pull\/.*/
 
 machine:
   services:
