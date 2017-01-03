@@ -192,7 +192,7 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj *extnapi.NetworkPolicy) error {
 	if err := ns.nsSelectors.provision(oldObj.ObjectMeta.UID, oldNsSelectors, newNsSelectors); err != nil {
 		return err
 	}
-	if err := ns.podSelectors.provision(oldObj.ObjectMeta.UID, oldPodSelectors, newNsSelectors); err != nil {
+	if err := ns.podSelectors.provision(oldObj.ObjectMeta.UID, oldPodSelectors, newPodSelectors); err != nil {
 		return err
 	}
 	if err := ns.rules.provision(oldObj.ObjectMeta.UID, oldRules, newRules); err != nil {
