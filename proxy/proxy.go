@@ -148,14 +148,12 @@ func NewProxy(c Config) (*Proxy, error) {
 	p.client = client.Client
 
 	if !p.WithoutDNS {
-		netDev, err := weavenet.GetBridgeNetDev(c.DockerBridge)
+		ip, err := weavenet.FindBridgeIP(c.DockerBridge, nil)
 		if err != nil {
 			return nil, err
 		}
-		if len(netDev.CIDRs) != 1 {
-			return nil, fmt.Errorf("Could not obtain address of %s", c.DockerBridge)
-		}
-		p.dockerBridgeIP = netDev.CIDRs[0].IP.String()
+		p.dockerBridgeIP = ip.String()
+		Log.Infof("Using docker bridge IP for DNS: %v", p.dockerBridgeIP)
 	}
 
 	p.hostnameMatchRegexp, err = regexp.Compile(c.HostnameMatch)

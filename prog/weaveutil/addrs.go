@@ -77,3 +77,16 @@ func printNetDevs(cid string, netDevs []weavenet.Dev) {
 		fmt.Println()
 	}
 }
+
+func bridgeIP(args []string) error {
+	if len(args) < 1 {
+		cmdUsage("bridge-ip", "<bridgeName>")
+	}
+	bridgeName := args[0]
+	ip, err := weavenet.FindBridgeIP(bridgeName, nil)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%v", ip)
+	return nil
+}

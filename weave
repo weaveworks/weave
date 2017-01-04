@@ -602,7 +602,7 @@ try_create_bridge() {
             run_iptables -t filter -I FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP
         fi
 
-        [ -n "$DOCKER_BRIDGE_IP" ] || docker_bridge_ip
+        [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
 
         # forbid traffic to the Weave port from other containers
         add_iptables_rule filter INPUT -i $DOCKER_BRIDGE -p tcp --dst $DOCKER_BRIDGE_IP --dport $PORT          -j DROP
@@ -803,7 +803,7 @@ destroy_bridge() {
         run_iptables -t filter -D FORWARD -i $DOCKER_BRIDGE -o $BRIDGE -j DROP 2>/dev/null || true
     fi
 
-    [ -n "$DOCKER_BRIDGE_IP" ] || docker_bridge_ip
+    [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
 
     run_iptables -t filter -D INPUT -i $DOCKER_BRIDGE -p udp --dport 53  -j ACCEPT  >/dev/null 2>&1 || true
     run_iptables -t filter -D INPUT -i $DOCKER_BRIDGE -p tcp --dport 53  -j ACCEPT  >/dev/null 2>&1 || true
@@ -822,11 +822,6 @@ destroy_bridge() {
     run_iptables -t nat -D POSTROUTING -j WEAVE >/dev/null 2>&1 || true
     run_iptables -t nat -D POSTROUTING -o $BRIDGE -j ACCEPT >/dev/null 2>&1 || true
     run_iptables -t nat -X WEAVE >/dev/null 2>&1 || true
-}
-
-docker_bridge_ip() {
-    DOCKER_BRIDGE_IP=$(ip -4 addr show dev $DOCKER_BRIDGE | grep -m1 -o 'inet [.0-9]*') || return 1
-    DOCKER_BRIDGE_IP=${DOCKER_BRIDGE_IP#inet }
 }
 
 do_or_die() {
@@ -1132,7 +1127,7 @@ dns_args() {
     done
     [ -n "$WITHOUT_DNS" ] && return 0
 
-    docker_bridge_ip
+    [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
     DNS_ARGS="--dns=$DOCKER_BRIDGE_IP"
     if [ -n "$NAME_ARG" -a -z "$HOSTNAME_SPECIFIED" ] ; then
         HOSTNAME="$NAME_ARG.${DNS_DOMAIN%.}"
@@ -1594,7 +1589,7 @@ launch_router() {
     IPRANGE=
     IPRANGE_SPECIFIED=
 
-    docker_bridge_ip
+    [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
     DNS_ROUTER_OPTS="--dns-listen-address $DOCKER_BRIDGE_IP:53"
     NO_DNS_OPT=
 
@@ -2135,8 +2130,7 @@ EOF
         echo -n $DNS_ARGS
         ;;
     docker-bridge-ip)
-        docker_bridge_ip
-        echo -n $DOCKER_BRIDGE_IP
+        util_op bridge-ip $DOCKER_BRIDGE
         ;;
     start)
         collect_cidr_args "$@"
@@ -2234,7 +2228,7 @@ EOF
         ;;
     dns-lookup)
         [ $# -eq 1 ] || usage
-        docker_bridge_ip
+        DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
         dig @$DOCKER_BRIDGE_IP +short $1
         ;;
     expose)
