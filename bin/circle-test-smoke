@@ -5,7 +5,7 @@ set -e
 source "$STATE"
 
 if [ -n "$TEST_AND_PUBLISH" ] ; then
-    [ -n "$SECRET_PASSWORD" ] || echo "Cannot run smoke tests: no secret key" && exit 1
+    [ -n "$SECRET_PASSWORD" ] || { echo "Cannot run smoke tests: no secret key"; exit 1; }
     cd $SRCDIR/test
     eval $(./gce.sh hosts)
     export COVERAGE=true
