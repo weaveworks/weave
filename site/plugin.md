@@ -59,8 +59,29 @@ then run your containers using the Docker command-line:
 
 Docker enables you to create multiple independent networks and attach
 different sets of containers to each network. However, coordinating
-this between hosts, Docker requires that you configure a
-["key-value store"](https://docs.docker.com/engine/userguide/networking/get-started-overlay/#step-1-set-up-a-key-value-store).
+this between hosts requires that you run Docker in ["swarm mode"](https://docs.docker.com/engine/swarm/swarm-mode/) or configure a
+["key-value store"](https://docs.docker.com/engine/userguide/networking/get-started-overlay/#/set-up-a-key-value-store).
+
+Docker swarm mode requires Docker version 1.13 or later to work with
+plugins such as Weave Net.
+
+To create a new network for services in swarm mode, run:
+
+    $ docker network create --driver=weave mynetwork
+
+then use it to create a service:
+
+    $ docker service create --network=mynetwork --name myservice ...
+
+
+To create a new network to attach containers in swarm mode, run:
+
+    $ docker network create --driver=weave --attachable mynetwork
+
+then use it to connect a container:
+
+    $ docker run --net=mynetwork ...
+
 
 If your Docker installation has a key-value store, create a network
 based on Weave Net as follows:
