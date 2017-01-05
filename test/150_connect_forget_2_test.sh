@@ -11,7 +11,7 @@ direct_peers() {
 }
 
 assert_peers() {
-  assert "direct_peers $1 | sort" "$(echo "$2" | sort)"
+  assert "direct_peers $1 | sort" "$(echo -e "$2" | sort)"
 }
 
 start_suite "Connecting and forgetting routers after launch"
