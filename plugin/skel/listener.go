@@ -33,6 +33,10 @@ type Driver interface {
 	DiscoverDelete(delete *api.DiscoveryNotification) error
 }
 
+type IpamCapability interface {
+	GetCapabilities() (RequiresMACAddress bool, RequiresRequestReplay bool, err error)
+}
+
 type listener struct {
 	d Driver
 	i ipamapi.Ipam
@@ -65,6 +69,7 @@ func Listen(socket net.Listener, driver Driver, ipamDriver ipamapi.Ipam) error {
 	}
 
 	if ipamDriver != nil {
+		handleMethod(ipamReceiver, "GetCapabilities", listener.getIpamCapabilities)
 		handleMethod(ipamReceiver, "GetDefaultAddressSpaces", listener.getDefaultAddressSpaces)
 		handleMethod(ipamReceiver, "RequestPool", listener.requestPool)
 		handleMethod(ipamReceiver, "ReleasePool", listener.releasePool)
@@ -215,6 +220,20 @@ func (listener *listener) discoverDelete(w http.ResponseWriter, r *http.Request)
 }
 
 // ===
+
+func (listener *listener) getIpamCapabilities(w http.ResponseWriter, r *http.Request) {
+	c, ok := listener.i.(IpamCapability)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	requiresMACAddress, requiresRequestReplay, err := c.GetCapabilities()
+	response := &ipamapi.Capability{
+		RequiresMACAddress:    requiresMACAddress,
+		RequiresRequestReplay: requiresRequestReplay,
+	}
+	objectOrErrorResponse(w, response, err)
+}
 
 func (listener *listener) getDefaultAddressSpaces(w http.ResponseWriter, r *http.Request) {
 	local, global, err := listener.i.GetDefaultAddressSpaces()

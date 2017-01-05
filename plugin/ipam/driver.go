@@ -19,6 +19,11 @@ func NewIpam(weave *api.Client) *Ipam {
 	return &Ipam{weave: weave}
 }
 
+func (i *Ipam) GetCapabilities() (RequiresMACAddress bool, RequiresRequestReplay bool, err error) {
+	i.logReq("GetCapabilities")
+	return false, false, nil
+}
+
 func (i *Ipam) GetDefaultAddressSpaces() (string, string, error) {
 	i.logReq("GetDefaultAddressSpaces")
 	return "weavelocal", "weaveglobal", nil
