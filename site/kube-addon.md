@@ -64,6 +64,10 @@ and so you will need to perform the procedure manually:
 * Apply the updated addon manifest `kubectl apply -f https://git.io/weave-kube`
 * Kill each Weave Net pod with `kubectl delete` and then wait for it to reboot before moving on to the next pod.
 
+**Note:** If you delete all Weave Net pods at the same time they will
+  lose track of IP address range ownership, possibly leading to
+  duplicate IP addresses if you then start a new copy of Weave Net.
+
 ##<a name="npc"></a>Network Policy Controller
 
 The addon also supports the [Kubernetes policy
