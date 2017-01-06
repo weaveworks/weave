@@ -4,6 +4,9 @@ set -e
 
 echo "TEST_AND_PUBLISH=1" > "$STATE"
 
+# Avoid doing a full build if we can.  Note if the PR doesn't exist
+# when the build is kicked off, we can't run this check so we do a
+# full build.  Subsequent pushes to the same branch will have the desired behaviour
 if [ -n "$CI_PULL_REQUEST" -a "$CI_PULL_REQUEST" = "$CI_PULL_REQUESTS" ] ; then
     if PR=$(echo "$CI_PULL_REQUEST" | grep -oP '(?<=^https://github.com/weaveworks/weave/pull/)[0-9]+$') ; then
         echo "GH_PR=$PR" >> "$STATE"
