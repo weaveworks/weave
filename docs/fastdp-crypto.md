@@ -13,7 +13,7 @@ and 4 bytes salt. This combo provides the following security properties:
 
 # Key derivation
 
-For each connection direction a different key (and salt) is used. The keys
+For each connection direction a different AES-GCM key (and salt) is used. The keys
 are derived by applying HKDF (RFC 5869) to `SessionKey` which is derived by Mesh
 during the handshake. The current implementation does not do key rotations.
 

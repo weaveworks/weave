@@ -620,6 +620,7 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 		var err error
 		log.Info("setting up IPsec between ", fastdp.localPeer, " and ", params.RemotePeer)
 		spi, err = fastdp.ipsec.Protect(
+			fastdp.localPeer.Name, params.RemotePeer.Name,
 			fastdp.localPeer.ShortID, params.RemotePeer.ShortID,
 			params.LocalAddr.IP, remoteAddr.IP,
 			vxlanUDPPort,

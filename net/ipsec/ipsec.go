@@ -29,9 +29,10 @@ const (
 	mark    = uint32(0x1) << 17
 	markStr = "0x20000/0x20000"
 
-	table     = "mangle"
-	markChain = "WEAVE-IPSEC-MARK"
-	mainChain = "WEAVE-IPSEC"
+	tableMangle = "mangle"
+	tableFilter = "filter"
+	markChain   = "WEAVE-IPSEC-MARK"
+	mainChain   = "WEAVE-IPSEC"
 
 	mask   = (SPI(1) << (mesh.PeerShortIDBits)) - 1
 	spiMSB = SPI(1) << 31
@@ -60,11 +61,11 @@ func New() (*IPSec, error) {
 }
 
 // Protect establishes IPsec between given peers.
-func (ipsec *IPSec) Protect(srcPeer, dstPeer mesh.PeerShortID, srcIP, dstIP net.IP, dstPort int, masterKey *[32]byte) (SPI, error) {
-	outSPI, err := newSPI(srcPeer, dstPeer)
+func (ipsec *IPSec) Protect(srcPeer, dstPeer mesh.PeerName, srcPeerShort, dstPeerShort mesh.PeerShortID, srcIP, dstIP net.IP, dstPort int, masterKey *[32]byte) (SPI, error) {
+	outSPI, err := newSPI(srcPeerShort, dstPeerShort)
 	if err != nil {
 		return 0,
-			errors.Wrap(err, fmt.Sprintf("derive SPI (%x, %x)", srcPeer, dstPeer))
+			errors.Wrap(err, fmt.Sprintf("derive SPI (%x, %x)", srcPeerShort, dstPeerShort))
 	}
 
 	if ipsec.rc.get(srcIP, dstIP, outSPI) > 1 {
@@ -72,18 +73,15 @@ func (ipsec *IPSec) Protect(srcPeer, dstPeer mesh.PeerShortID, srcIP, dstIP net.
 		return outSPI, nil
 	}
 
-	inSPI, err := newSPI(dstPeer, srcPeer)
+	inSPI, err := newSPI(dstPeerShort, srcPeerShort)
 	if err != nil {
 		return 0,
-			errors.Wrap(err, fmt.Sprintf("derive SPI (%x, %x)", dstPeer, srcPeer))
+			errors.Wrap(err, fmt.Sprintf("derive SPI (%x, %x)", dstPeerShort, srcPeerShort))
 	}
 
-	localKey, remoteKey, err := deriveKeys(masterKey[:])
+	localKey, remoteKey, err := deriveKeys(srcPeer, dstPeer, masterKey[:])
 	if err != nil {
 		return 0, errors.Wrap(err, "derive keys")
-	}
-	if srcPeer > dstPeer {
-		localKey, remoteKey = remoteKey, localKey
 	}
 
 	ipsec.Lock()
@@ -244,10 +242,17 @@ func (rc *connRefCount) put(srcIP, dstIP net.IP, spi SPI) int {
 
 // iptables
 
+var dropMatchingNonESPRulespec = []string{
+	"!", "-p", "esp",
+	"-m", "policy", "--dir", "out", "--pol", "none",
+	"-m", "mark", "--mark", markStr,
+	"-j", "DROP",
+}
+
 func (ipsec *IPSec) installMarkRule(srcIP, dstIP net.IP, dstPort int) error {
 	rulespec := markRulespec(srcIP, dstIP, dstPort)
-	if err := ipsec.ipt.AppendUnique(table, mainChain, rulespec...); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables append (%s, %s, %s)", table, mainChain, rulespec))
+	if err := ipsec.ipt.AppendUnique(tableMangle, mainChain, rulespec...); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables append (%s, %s, %s)", tableMangle, mainChain, rulespec))
 	}
 
 	return nil
@@ -255,8 +260,8 @@ func (ipsec *IPSec) installMarkRule(srcIP, dstIP net.IP, dstPort int) error {
 
 func (ipsec *IPSec) removeMarkRule(srcIP, dstIP net.IP, dstPort int) error {
 	rulespec := markRulespec(srcIP, dstIP, dstPort)
-	if err := ipsec.ipt.Delete(table, mainChain, rulespec...); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s, %s)", table, mainChain, rulespec))
+	if err := ipsec.ipt.Delete(tableMangle, mainChain, rulespec...); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s, %s)", tableMangle, mainChain, rulespec))
 	}
 
 	return nil
@@ -272,37 +277,47 @@ func markRulespec(srcIP, dstIP net.IP, dstPort int) []string {
 }
 
 func (ipsec *IPSec) resetIPTables(destroy bool) error {
-	if err := ipsec.ipt.ClearChain(table, mainChain); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables clear (%s, %s)", table, mainChain))
+	if err := ipsec.ipt.ClearChain(tableMangle, mainChain); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables clear (%s, %s)", tableMangle, mainChain))
 	}
 
-	if err := ipsec.ipt.ClearChain(table, markChain); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables clear (%s, %s)", table, markChain))
+	if err := ipsec.ipt.ClearChain(tableMangle, markChain); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables clear (%s, %s)", tableMangle, markChain))
 	}
 
-	if err := ipsec.ipt.AppendUnique(table, "OUTPUT", "-j", mainChain); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables append (%s, %s)", table, "OUTPUT"))
+	if err := ipsec.ipt.AppendUnique(tableMangle, "OUTPUT", "-j", mainChain); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables append (%s, %s)", tableMangle, "OUTPUT"))
+	}
+
+	// drop marked traffic which does not match any XFRM policy to prevent from
+	// sending unencrypted packets
+	if err := ipsec.ipt.AppendUnique(tableFilter, "OUTPUT", dropMatchingNonESPRulespec...); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables append (%s, %s)", tableFilter, "OUTPUT"))
 	}
 
 	if !destroy {
 		rulespec := []string{"-j", "MARK", "--set-xmark", markStr}
-		if err := ipsec.ipt.Append(table, markChain, rulespec...); err != nil {
-			return errors.Wrap(err, fmt.Sprintf("iptables append (%s, %s, %s)", table, markChain, rulespec))
+		if err := ipsec.ipt.Append(tableMangle, markChain, rulespec...); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("iptables append (%s, %s, %s)", tableMangle, markChain, rulespec))
 		}
 
 		return nil
 	}
 
-	if err := ipsec.ipt.Delete(table, "OUTPUT", "-j", mainChain); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s)", table, "OUTPUT"))
+	if err := ipsec.ipt.Delete(tableFilter, "OUTPUT", dropMatchingNonESPRulespec...); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s)", tableFilter, "OUTPUT"))
 	}
 
-	if err := ipsec.ipt.DeleteChain(table, mainChain); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s)", table, mainChain))
+	if err := ipsec.ipt.Delete(tableMangle, "OUTPUT", "-j", mainChain); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s)", tableMangle, "OUTPUT"))
 	}
 
-	if err := ipsec.ipt.DeleteChain(table, markChain); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s)", table, mainChain))
+	if err := ipsec.ipt.DeleteChain(tableMangle, mainChain); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s)", tableMangle, mainChain))
+	}
+
+	if err := ipsec.ipt.DeleteChain(tableMangle, markChain); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables delete (%s, %s)", tableMangle, mainChain))
 	}
 
 	return nil
@@ -326,6 +341,9 @@ func xfrmState(srcIP, dstIP net.IP, spi SPI, key []byte) (*netlink.XfrmState, er
 			Key:    key,
 			ICVLen: 128,
 		},
+		//Limits: netlink.XfrmStateLimits{
+		//	PacketHard: 10,
+		//},
 	}, nil
 }
 
@@ -379,17 +397,38 @@ func connRefKey(srcIP, dstIP net.IP, spi SPI) (key [12]byte) {
 	return
 }
 
-func deriveKeys(masterKey []byte) ([]byte, []byte, error) {
-	keys := make([]byte, 2*keySize)
-	hkdf := hkdf.New(sha256.New, masterKey, nil, nil)
+func deriveKeys(srcPeer, dstPeer mesh.PeerName, masterKey []byte) ([]byte, []byte, error) {
+	var (
+		localKey, remoteKey []byte
+		err                 error
+	)
 
-	n, err := io.ReadFull(hkdf, keys)
-	if err != nil {
+	if localKey, err = deriveKey(srcPeer, masterKey); err != nil {
 		return nil, nil, err
 	}
-	if n != 2*keySize {
-		return nil, nil, fmt.Errorf("derived too short key: %d", n)
+	if remoteKey, err = deriveKey(dstPeer, masterKey); err != nil {
+		return nil, nil, err
 	}
 
-	return keys[:keySize], keys[keySize:], nil
+	return localKey, remoteKey, nil
+}
+
+func deriveKey(peerName mesh.PeerName, masterKey []byte) ([]byte, error) {
+	info := make([]byte, 8)
+	binary.BigEndian.PutUint64(info, uint64(peerName))
+
+	key := make([]byte, keySize)
+
+	// TODO(mp) maybe pass passwd as a salt
+	hkdf := hkdf.New(sha256.New, masterKey, nil, info)
+
+	n, err := io.ReadFull(hkdf, key)
+	if err != nil {
+		return nil, err
+	}
+	if n != keySize {
+		return nil, fmt.Errorf("derived too short key: %d", n)
+	}
+
+	return key, nil
 }
