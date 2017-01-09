@@ -7,7 +7,7 @@ assert_targets() {
     HOST=$1
     shift
     EXPECTED=$(for TARGET in $@; do echo $TARGET; done | sort)
-    assert "weave_on $HOST report | jq -r '.Router.Targets[] | tostring' | sort" "$EXPECTED"
+    assert "weave_on $HOST report -f '{{range .Router.Targets}}{{.}}{{\"\n\"}}{{end}}' | sort" "$EXPECTED"
 }
 
 start_suite "Check Docker restart uses persisted peer list"
