@@ -31,7 +31,7 @@ sed -e "s%imagePullPolicy: Always%imagePullPolicy: Never$COVERAGE_ARGS%" "$(dirn
 sleep 5
 
 wait_for_connections() {
-    for i in $(seq 1 30); do
+    for i in $(seq 1 45); do
         if run_on $HOST1 "curl -sS http://127.0.0.1:6784/status | grep \"$SUCCESS\"" ; then
             return
         fi
@@ -56,7 +56,7 @@ assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
 run_on $HOST1 "kubectl run hello --image=weaveworks/hello-world --replicas=3"
 
 wait_for_pods() {
-    for i in $(seq 1 30); do
+    for i in $(seq 1 45); do
         if run_on $HOST1 "kubectl get pods | grep 'hello.*Running'" ; then
             return
         fi
