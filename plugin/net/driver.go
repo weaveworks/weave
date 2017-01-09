@@ -43,9 +43,11 @@ func New(client *docker.Client, weave *weaveapi.Client, name, scope string) (ske
 		networks: make(map[string]network),
 	}
 
-	_, err := NewWatcher(client, weave, driver)
-	if err != nil {
-		return nil, err
+	if client != nil {
+		_, err := NewWatcher(client, weave, driver)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return driver, nil
 }
@@ -177,6 +179,9 @@ func (driver *driver) findNetworkInfo(id string) (network, error) {
 	network, found := driver.networks[id]
 	driver.Unlock()
 	if found {
+		return network, nil
+	}
+	if driver.docker == nil { // No way to look it up - TODO persist the info
 		return network, nil
 	}
 	info, err := driver.docker.NetworkInfo(id)

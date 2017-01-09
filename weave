@@ -655,7 +655,7 @@ EOF
 
     # Configure the ARP cache parameters on the bridge interface for
     # the sake of 'weave expose'
-    configure_arp_cache $BRIDGE
+    #configure_arp_cache $BRIDGE
 }
 
 create_bridge() {
