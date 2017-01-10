@@ -9,6 +9,12 @@ if [ -n "$TEST_AND_PUBLISH" ]; then
         echo "Cannot run smoke tests: no secret key"
         exit 1
     }
+    # Install Terraform and Ansible:
+    curl -fsS https://releases.hashicorp.com/terraform/0.8.5/terraform_0.8.5_linux_amd64.zip | gunzip >terraform && chmod +x terraform && sudo mv terraform /usr/bin
+    sudo apt-get update || true
+    sudo apt-get install -qq -y python-pip python-dev libffi-dev libssl-dev && pip install --user -U cffi && pip install --user ansible
+    export PATH="$PATH:$HOME/.local/bin"
+    # Run integration tests:
     export COVERAGE=true
     export WEAVE_NET_SANITY_CHECKS_FILES="$CIRCLE_ARTIFACTS/weave_net_sanity_check_*.log"
     export NAME="test-$CIRCLE_BUILD_NUM-$CIRCLE_NODE_INDEX"
