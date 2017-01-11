@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"syscall"
 
 	"github.com/weaveworks/weave/common"
 )
@@ -17,6 +18,9 @@ func waitForExit(cmd *exec.Cmd) {
 
 func Start() error {
 	cmd := exec.Command("/usr/sbin/ulogd", "-v")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Pdeathsig: syscall.SIGKILL,
+	}
 	stdout, err := cmd.StderrPipe()
 	if err != nil {
 		return err
