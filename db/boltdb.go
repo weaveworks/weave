@@ -25,6 +25,7 @@ var (
 
 const (
 	NameIdent = "peername"
+	FileName  = "data.db"
 )
 
 func NewBoltDB(dbPathname string) (*BoltDB, error) {
