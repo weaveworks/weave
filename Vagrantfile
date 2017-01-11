@@ -1,6 +1,6 @@
 VAGRANTFILE_API_VERSION = "2"
 
-require './vagrant-common.rb'
+require File.expand_path(File.join(File.dirname(__FILE__), 'vagrant-common.rb'))
 
 vm_ip = "172.16.0.3" # arbitrary private IP
 

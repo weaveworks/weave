@@ -359,3 +359,24 @@ build:
 
 run-smoketests: all testrunner
 	cd test && ./setup.sh && ./run_all.sh
+
+integration-tests: all testrunner
+# Usage:
+#   $ make \
+#     NAME="<prefix used to name VMs and other resources>" \
+#     PROVIDER="<provider among {vagrant|gcp|aws|do}>" \
+#     NUM_HOSTS="<# test machines>" \
+#     PLAYBOOK="<filename>" \
+#     RUNNER_ARGS="<...>" \
+#     TESTS="<...>" \  # Can be set to only run one or a few tests instead of the full test suite.
+#     SKIP_CREATE=1 \  # Skip the provisioning phase before running tests.
+#     SKIP_CONFIG=1 \  # Skip the configuration phase before running tests.
+#     SKIP_DESTROY=1 \ # Skip the destroy phase after running tests.
+#     ONLY_DESTROY=1 \ # Destroy the test cluster (and do not do anything else, like starting the test cluster, configuring it, or running tests).
+#     DOCKER_VERSION=<...> \
+#     KUBERNETES_VERSION=<...> \
+#     KUBERNETES_CNI_VERSION=<...> \
+#     <...> # See also run-integration-test.sh for all variables.
+#     integration-tests
+#
+	RUNNER_ARGS="-parallel" ./test/run-integration-tests.sh

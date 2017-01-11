@@ -9,7 +9,7 @@ n_machines = 3
 ip_prefix = "192.168.48"
 ip_suffix_base = 10
 
-require '../vagrant-common.rb'
+require File.expand_path(File.join(File.dirname(__FILE__), '..', 'vagrant-common.rb'))
 
 def configure_docker(host, hostname, ip)
   pkgs = %w(docker-engine ethtool)
