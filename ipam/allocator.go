@@ -920,13 +920,12 @@ func (alloc *Allocator) reportFreeSpace() {
 // Persistent data
 const (
 	ringIdent  = "ring"
-	nameIdent  = "peername"
 	ownedIdent = "ownedAddresses"
 )
 
 func (alloc *Allocator) persistRing() {
 	// It would be better if these two Save operations happened in the same transaction
-	if err := alloc.db.Save(nameIdent, alloc.ourName); err != nil {
+	if err := alloc.db.Save(db.NameIdent, alloc.ourName); err != nil {
 		alloc.fatalf("Error persisting ring data: %s", err)
 		return
 	}
@@ -938,7 +937,7 @@ func (alloc *Allocator) persistRing() {
 // Returns true if persisted data is to be used, otherwise false
 func (alloc *Allocator) loadPersistedData() bool {
 	var checkPeerName mesh.PeerName
-	nameFound, err := alloc.db.Load(nameIdent, &checkPeerName)
+	nameFound, err := alloc.db.Load(db.NameIdent, &checkPeerName)
 	if err != nil {
 		alloc.fatalf("Error loading persisted peer name: %s", err)
 	}

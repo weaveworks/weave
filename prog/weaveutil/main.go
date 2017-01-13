@@ -36,6 +36,7 @@ func init() {
 		"cni-ipam":               cniIPAM,
 		"expose-nat":             exposeNAT,
 		"bridge-ip":              bridgeIP,
+		"unique-id":              uniqueID,
 	}
 }
 

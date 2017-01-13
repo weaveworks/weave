@@ -44,6 +44,8 @@ spec:
               mountPath: /host/home
             - name: cni-conf
               mountPath: /host/etc
+            - name: dbus
+              mountPath: /host/var/lib/dbus
           resources:
             requests:
               cpu: 10m
@@ -68,3 +70,6 @@ spec:
         - name: cni-conf
           hostPath:
             path: /etc
+        - name: dbus
+          hostPath:
+            path: /var/lib/dbus

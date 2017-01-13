@@ -29,6 +29,7 @@ if [ "${EXPECT_NPC}" = "0" ]; then
     WEAVE_NPC_OPTS=""
 fi
 
+export HOST_ROOT=/host
 /home/weave/weave --local create-bridge --force $WEAVE_NPC_OPTS
 
 # Kubernetes sets HOSTNAME to the host's hostname
@@ -100,7 +101,6 @@ post_start_actions() {
         fi
     fi
     mkdir -p $HOST_ROOT/etc/cni/net.d
-    export HOST_ROOT
     /home/weave/weave --local setup-cni
 
     # Expose the weave network so host processes can communicate with pods
