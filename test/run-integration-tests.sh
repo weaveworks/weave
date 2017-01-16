@@ -32,6 +32,12 @@ RUNNER_ARGS=${RUNNER_ARGS:-""}
 DOCKER_VERSION=${DOCKER_VERSION:-1.11.2}
 KUBERNETES_VERSION=${KUBERNETES_VERSION:-1.5.2}
 KUBERNETES_CNI_VERSION=${KUBERNETES_CNI_VERSION:-0.3.0.1}
+# Google Cloud Platform image's name & usage (only used when PROVIDER is gcp):
+IMAGE_NAME=${IMAGE_NAME:-"$(echo "$APP-docker$DOCKER_VERSION-k8s$KUBERNETES_VERSION-k8scni$KUBERNETES_CNI_VERSION" | sed -e 's/[\.\_]*//g')"}
+DISK_NAME_PREFIX=${DISK_NAME_PREFIX:-$NAME}
+USE_IMAGE=${USE_IMAGE:-1}
+CREATE_IMAGE=${CREATE_IMAGE:-}
+CREATE_IMAGE_TIMEOUT_IN_SECS=${CREATE_IMAGE_TIMEOUT_IN_SECS:-600}
 # Lifecycle flags:
 SKIP_CONFIG=${SKIP_CONFIG:-}
 
@@ -47,6 +53,11 @@ function print_vars() {
     echo "DOCKER_VERSION=$DOCKER_VERSION"
     echo "KUBERNETES_VERSION=$KUBERNETES_VERSION"
     echo "KUBERNETES_CNI_VERSION=$KUBERNETES_CNI_VERSION"
+    echo "IMAGE_NAME=$IMAGE_NAME"
+    echo "DISK_NAME_PREFIX=$DISK_NAME_PREFIX"
+    echo "USE_IMAGE=$USE_IMAGE"
+    echo "CREATE_IMAGE=$CREATE_IMAGE"
+    echo "CREATE_IMAGE_TIMEOUT_IN_SECS=$CREATE_IMAGE_TIMEOUT_IN_SECS"
     echo "--- Variables: Flags ---"
     echo "SKIP_CONFIG=$SKIP_CONFIG"
 }
@@ -96,6 +107,65 @@ function provision_locally() {
             exit 1
             ;;
     esac
+}
+
+function setup_gcloud() {
+    # Authenticate:
+    gcloud auth activate-service-account --key-file "$GOOGLE_CREDENTIALS_FILE" 1>/dev/null
+    # Set current project:
+    gcloud config set project $PROJECT
+}
+
+function image_exists() {
+    gcloud compute images list | grep "$PROJECT" | grep "$IMAGE_NAME"
+}
+
+function image_ready() {
+    # GCP images seem to be listed before they are actually ready for use, 
+    # typically failing the build with: "googleapi: Error 400: The resource is not ready".
+    # We therefore consider the image to be ready once the disk of its template instance has been deleted.
+    ! gcloud compute disks list | grep "$DISK_NAME_PREFIX"
+}
+
+function wait_for_image() {
+    greenly echo "> Waiting for GCP image $IMAGE_NAME to be created..."
+    for i in $(seq "$CREATE_IMAGE_TIMEOUT_IN_SECS"); do
+        image_exists && image_ready && return 0
+        if ! ((i % 60)); then echo "Waited for $i seconds and still waiting..."; fi
+        sleep 1
+    done
+    redly echo "> Waited $CREATE_IMAGE_TIMEOUT_IN_SECS seconds for GCP image $IMAGE_NAME to be created, but image could not be found."
+    exit 1
+}
+
+# shellcheck disable=SC2155
+function create_image() {
+    if [ -n "$CREATE_IMAGE" ]; then
+        greenly echo "> Creating GCP image $IMAGE_NAME..."
+        local begin_img=$(date +%s)
+        local num_hosts=1
+        terraform apply -input=false -var "app=$APP" -var "name=$NAME" -var "num_hosts=$num_hosts" "$DIR/../tools/provisioning/gcp"
+        configure_with_ansible "$(terraform output username)" "$(terraform output public_ips)," "$(terraform output private_key_path)" $num_hosts
+        local zone=$(terraform output zone)
+        local name=$(terraform output instances_names)
+        gcloud -q compute instances delete "$name" --keep-disks boot --zone "$zone"
+        gcloud compute images create "$IMAGE_NAME" --source-disk "$name" --source-disk-zone "$zone" \
+            --description "Testing image for Weave Net based on $(terraform output image), Docker $DOCKER_VERSION, Kubernetes $KUBERNETES_VERSION and Kubernetes CNI $KUBERNETES_CNI_VERSION."
+        gcloud compute disks delete "$name" --zone "$zone"
+        terraform destroy -force "$DIR/../tools/provisioning/gcp"
+        rm terraform.tfstate*
+        echo
+        greenly echo "> Created GCP image $IMAGE_NAME in $(date -u -d @$(($(date +%s) - begin_img)) +"%T")."
+    else
+        wait_for_image
+    fi
+}
+
+function use_or_create_image() {
+    setup_gcloud
+    image_exists || create_image
+    export TF_VAR_gcp_image="$IMAGE_NAME" # Override the default image name.
+    export SKIP_CONFIG=1                  # No need to configure the image, since already done when making the template
 }
 
 function update_local_etc_hosts() {
@@ -171,6 +241,7 @@ function provision() {
             ;;
         'gcp')
             gcp_on
+            [[ "$USE_IMAGE" == 1 ]] && use_or_create_image
             provision_remotely "$1" "$2"
             ;;
         'vagrant')
@@ -184,6 +255,13 @@ function provision() {
 
     echo
     greenly echo "> Provisioning took $(date -u -d @$(($(date +%s) - begin_prov)) +"%T")."
+}
+
+function configure_with_ansible() {
+    ansible-playbook -u "$1" -i "$2" --private-key="$3" --forks="${4:-$NUM_HOSTS}" \
+        --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+        --extra-vars "docker_version=$DOCKER_VERSION kubernetes_version=$KUBERNETES_VERSION kubernetes_cni_version=$KUBERNETES_CNI_VERSION" \
+        "$DIR/../tools/config_management/$PLAYBOOK"
 }
 
 # shellcheck disable=SC2155
@@ -201,11 +279,7 @@ function configure() {
 
         # Configure the provisioned machines using Ansible, allowing up to 3 retries upon failure (e.g. APT connectivity issues, etc.):
         for i in $(seq 3); do
-            ansible-playbook -u "$1" -i "$inventory_file" --private-key="$4" --forks="$NUM_HOSTS" \
-                --ssh-extra-args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-                --extra-vars "docker_version=$DOCKER_VERSION kubernetes_version=$KUBERNETES_VERSION kubernetes_cni_version=$KUBERNETES_CNI_VERSION" \
-                "$DIR/../tools/config_management/$PLAYBOOK" \
-                && break || echo >&2 "#$i: Ansible failed. Retrying now..."
+            configure_with_ansible "$1" "$inventory_file" "$4" && break || echo >&2 "#$i: Ansible failed. Retrying now..."
         done
 
         echo

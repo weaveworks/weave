@@ -60,20 +60,7 @@ to the file `/etc/default/docker`, then restart docker.
 
 ## Updating the GCE test image
 
-When a new version of Docker is released, you'll need to update the GCE test image.
-
-To do this, pick a fresh ```TEMPLATE_NAME``` and update any commands in
-```function make_template``` in gce.sh, then run:
-
-```
-./gce.sh make_template
-```
-
-For this you'll need the GCE credentials, which can be found in ```bin/setup-circleci-secrets```,
-which you'll need to decrypt and run (its echos the secrets into know locations):
-
-```
-./bin/setup-circleci-secrets "$SECRET_PASSWORD"
-```
-
-If you don't know the password, ask tom@weave.works.
+When a new version of Docker is released, you willneed to update the GCE test image.
+To do this, change the Docker version in `run-integration-tests.sh` and push the change.
+Next build in CircleCI will detect that there is no template for this version of Docker and will first create the template before running tests.
+Subsequent builds will then simply re-use the template.

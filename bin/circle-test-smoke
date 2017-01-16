@@ -14,10 +14,16 @@ if [ -n "$TEST_AND_PUBLISH" ]; then
     sudo apt-get update || true
     sudo apt-get install -qq -y python-pip python-dev libffi-dev libssl-dev && pip install --user -U cffi && pip install --user ansible
     export PATH="$PATH:$HOME/.local/bin"
+
     # Run integration tests:
     export COVERAGE=true
     export WEAVE_NET_SANITY_CHECKS_FILES="$CIRCLE_ARTIFACTS/weave_net_sanity_check_*.log"
     export NAME="test-$CIRCLE_BUILD_NUM-$CIRCLE_NODE_INDEX"
+    export DISK_NAME_PREFIX="test-$CIRCLE_BUILD_NUM-0"
+    export USE_IMAGE=1
+    # Only attempt to create GCP image in first container, wait for it to be created otherwise:
+    [ "$CIRCLE_NODE_INDEX" == "0" ] && export CREATE_IMAGE=1
+
     cd "$SRCDIR/test" # Ensures we generate code coverage files in the right folder.
     ./run-integration-tests.sh
 fi
