@@ -1,4 +1,4 @@
-FROM alpine
+FROM alpine:3.4
 
 LABEL maintainer "Weaveworks Inc <help@weave.works>"
 LABEL works.weave.role=system \
