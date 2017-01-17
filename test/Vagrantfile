@@ -1,5 +1,3 @@
-VAGRANTFILE_API_VERSION = "2"
-
 # Necessary because the switch disabling unwanted insecure key
 # replacement in Vagrant 1.7+ is not accepted by earlier versions
 Vagrant.require_version ">= 1.7.0"
@@ -14,11 +12,12 @@ require File.expand_path(File.join(File.dirname(__FILE__), '..', 'vagrant-common
 def configure_docker(host, hostname, ip)
   pkgs = %w(docker-engine ethtool)
 
-  host.vm.box = "ubuntu/wily64"
+  host.vm.box = VAGRANT_IMAGE
 
   host.vm.provision :shell, :inline => "hostnamectl set-hostname "+hostname
   host.vm.network "private_network", ip: ip
 
+  # Disable default Vagrant shared folder, which we don't need:
   host.vm.synced_folder ".", "/vagrant", disabled: true
 
   host.vm.provision :shell, :inline => "sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D"
@@ -38,9 +37,8 @@ end
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   config.vm.provider :virtualbox do |vb|
-    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
-    vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
     vb.memory = 384
+    configure_nat_dns(vb)
   end
 
   # Disable Vagrant 1.7 per host insecure key replacement

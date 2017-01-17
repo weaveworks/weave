@@ -1,11 +1,23 @@
-$go_regexp = /FROM golang:(\S*).*?/
-$dockerfile_path = File.expand_path(File.join(File.dirname(__FILE__), 'build', 'Dockerfile'))
-$go_version = File.readlines($dockerfile_path).first { |line| line.match($go_regexp) }.match($go_regexp).captures.first
-if $go_version.nil?
-  raise ArgumentError.new("Failed to read Go version from Dockerfile.")
+VAGRANT_IMAGE = 'ubuntu/wily64'
+VAGRANTFILE_API_VERSION = '2'
+
+def get_go_version_from_build_dockerfile()
+  go_regexp = /FROM golang:(\S*).*?/
+  dockerfile_path = File.expand_path(File.join(File.dirname(__FILE__), 'build', 'Dockerfile'))
+  go_version = File.readlines(dockerfile_path).first { |line| line.match(go_regexp) }.match(go_regexp).captures.first
+  if go_version.nil?
+    raise ArgumentError.new("Failed to read Go version from Dockerfile.")
+  end
+  go_version
 end
 
-$go_path = "/usr/local/go/bin"
+GO_BINARY_PATH = '/usr/local/go/bin'
+GO_VERSION = get_go_version_from_build_dockerfile()
+
+def configure_nat_dns(vb)
+  vb.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
+  vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
+end
 
 def install_packages(vm, pkgs)
   vm.provision :shell, :inline => <<SCRIPT
@@ -28,10 +40,10 @@ end
 
 def install_go_toochain(vm)
   vm.provision :shell, :inline => <<SCRIPT
-curl -s https://storage.googleapis.com/golang/go#{$go_version}.linux-amd64.tar.gz \
+curl -s https://storage.googleapis.com/golang/go#{GO_VERSION}.linux-amd64.tar.gz \
   | tar xz -C /usr/local
-#{$go_path}/go clean -i net
-#{$go_path}/go install -tags netgo std
+#{GO_BINARY_PATH}/go clean -i net
+#{GO_BINARY_PATH}/go install -tags netgo std
 SCRIPT
 end
 
@@ -39,7 +51,7 @@ def tweak_user_env(vm)
   script = <<SCRIPT
 echo 'export GOPATH="${HOME}"' \
   >> ~vagrant/.profile
-echo 'export PATH="${HOME}/bin:#{$go_path}:${PATH}"' \
+echo 'export PATH="${HOME}/bin:#{GO_BINARY_PATH}:${PATH}"' \
   >> ~vagrant/.profile
 ln -sf ~vagrant/src/github.com/weaveworks/weave ~vagrant/
 sudo chown -R vagrant:vagrant ~vagrant/src
