@@ -92,6 +92,11 @@ func NewFastDatapath(iface *net.Interface, port int, encryptionEnabled bool) (*F
 		if ipSec, err = ipsec.New(); err != nil {
 			return nil, errors.Wrap(err, "ipsec new")
 		}
+		go func() {
+			if err := ipSec.Monitor(); err != nil {
+				log.Fatalf("ipsec monitor died: %x", err)
+			}
+		}()
 		if err := ipSec.Flush(false); err != nil {
 			return nil, errors.Wrap(err, "ipsec flush")
 		}
@@ -569,7 +574,9 @@ type fastDatapathForwarder struct {
 	connUID        uint64
 	vxlanVportID   odp.VportID
 	isEncrypted    bool
+	isSACreated    bool
 	spi            ipsec.SPI
+	sessionKey     *[32]byte
 
 	lock              sync.RWMutex
 	confirmed         bool
@@ -590,7 +597,6 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 	vxlanUDPPort := fastdp.mainVxlanUDPPort
 	var (
 		isEncrypted bool
-		spi         ipsec.SPI
 	)
 
 	remoteAddr := makeUDPAddr(params.RemoteAddr)
@@ -619,15 +625,17 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 	if fastdp.ipsec != nil && params.SessionKey != nil {
 		var err error
 		log.Info("setting up IPsec between ", fastdp.localPeer, " and ", params.RemotePeer)
-		spi, err = fastdp.ipsec.Protect(
+		err = fastdp.ipsec.ProtectInit(
 			fastdp.localPeer.Name, params.RemotePeer.Name,
-			fastdp.localPeer.ShortID, params.RemotePeer.ShortID,
 			params.LocalAddr.IP, remoteAddr.IP,
 			vxlanUDPPort,
 			params.SessionKey,
+			func(msg []byte) error {
+				return params.SendControlMessage(FastDatapathCreateSA, msg)
+			},
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "ipsec setup connection")
+			return nil, errors.Wrap(err, "ipsec protect init")
 		}
 		isEncrypted = true
 	}
@@ -640,7 +648,7 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 		connUID:        params.ConnUID,
 		vxlanVportID:   vxlanVportID,
 		isEncrypted:    isEncrypted,
-		spi:            spi,
+		sessionKey:     params.SessionKey,
 
 		remoteAddr:        remoteAddr,
 		heartbeatInterval: FastHeartbeat,
@@ -679,7 +687,7 @@ func (fwd *fastDatapathForwarder) Confirm() {
 	fwd.fastdp.addForwarder(fwd.remotePeer.Name, fwd)
 	fwd.confirmed = true
 
-	if fwd.remoteAddr != nil {
+	if fwd.remoteAddr != nil && (!fwd.isEncrypted || fwd.isSACreated) {
 		// have the goroutine send a heartbeat straight away
 		fwd.heartbeatTimer = time.NewTimer(0)
 	} else {
@@ -768,6 +776,8 @@ func (fwd *fastDatapathForwarder) sendHeartbeat() {
 
 const (
 	FastDatapathHeartbeatAck = iota
+	FastDatapathCreateSA
+	FastDatapathRekey
 )
 
 func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender *net.UDPAddr) {
@@ -796,6 +806,8 @@ func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender 
 	} else if !udpAddrsEqual(fwd.remoteAddr, sender) {
 		log.Info(fwd.logPrefix(), "Peer IP address changed to ", sender)
 		fwd.remoteAddr = sender
+
+		// TODO(mp) Shall we handle this?
 	}
 
 	if !fwd.ackedHeartbeat {
@@ -817,6 +829,27 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 	switch tag {
 	case FastDatapathHeartbeatAck:
 		fwd.handleHeartbeatAck()
+	case FastDatapathCreateSA:
+		// TODO(mp) check if encrypted
+		localIP := net.IP(fwd.localIP[:])
+		err := fwd.fastdp.ipsec.ProtectFinish(
+			msg,
+			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
+			localIP, fwd.remoteAddr.IP,
+			fwd.remoteAddr.Port,
+			fwd.sessionKey,
+			func() error {
+				return fwd.sendControlMsg(FastDatapathRekey, nil)
+			},
+		)
+		if err != nil {
+			log.Warning(fwd.logPrefix(), "ipsec protect finish failed: ", err)
+			// TODO(mp) handleError
+		} else {
+			fwd.isSACreated = true
+		}
+		fwd.heartbeatTimer.Reset(0)
+	case FastDatapathRekey:
 
 	default:
 		log.Info(fwd.logPrefix(), "Ignoring unknown control message: ", tag)
@@ -891,7 +924,10 @@ func (fwd *fastDatapathForwarder) Stop() {
 	if fwd.isEncrypted {
 		localIP := net.IP(fwd.localIP[:])
 		log.Info("tearing down IPsec between", fwd.fastdp.localPeer, " and ", fwd.remotePeer)
-		err := fwd.fastdp.ipsec.Destroy(localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port, fwd.spi)
+		err := fwd.fastdp.ipsec.Destroy(
+			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
+			localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port,
+		)
 		if err != nil {
 			log.Errorf("IPsec teardown failed: %s", err)
 		}

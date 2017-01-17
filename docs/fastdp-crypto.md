@@ -7,24 +7,25 @@ and 4 bytes salt. This combo provides the following security properties:
 * Data confidentiality.
 * Data origin authentication.
 * Integrity.
-* Partial anti-replay service (partial - because we do not rotate keys which
-  makes replay attacks possible when Sequence Number in ESP header overflows).
+* Anti-replay service.
 * Limited traffic flow confidentiality.
 
 # Key derivation
 
-For each connection direction a different AES-GCM key (and salt) is used. The keys
+For each connection direction a different AES-GCM key and salt is used. The keys
 are derived by applying HKDF (RFC 5869) to `SessionKey` which is derived by Mesh
-during the handshake. The current implementation does not do key rotations.
+during the handshake.
 
 # SPI
+
+TODO(mp): update
 
 The IPsec connection between two peers is identified by directional SPIs
 formed by concatenating `fromPeerShortID` and `toPeerShortID` and setting
 the MSB to make sure that SPI does not fall into 1-255 range which is reserved
 by IANA.
 
-# Implementation
+# Implementation Details
 
 The implementation is based on the kernel IP packet transformation framework
 called XFRM. Unfortunately, docs are barely existing and the complexity of
@@ -65,3 +66,46 @@ bytes aligned) and consists of:
 * 1 byte (NextHeader).
 * 16 bytes (ICV).
 * 0-3 bytes (Padding).
+
+# Key Exchange Protocol
+
+## Notation
+
+* A, B              - peer A and peer B.
+* SPIab, SPIba      - TODO.
+* SAab, SAba        - security association for a flow from A to B, and from B to A.
+* SPab, SPba        - security policy for a flow from A to B, and from B to A.
+* NONCEab, NONCEba  - TODO.
+
+
+## Connection Establishment
+
+```
+Peer A                                      Peer B
+-------------------------------------------------------------------------------
+mesh.InitiateConnections(B)
+
+                                <...>
+
+fastdp.PrepareConnection(),
+    block non-encrypted overlay traffic A <-> B
+    install SAba(SPIba, PASSWDba)           fastdp.PrepareConnection(),
+    CREATE_SA(SPIba, NONCEba) -->               install SAab(SPIab, PASSWDab)
+                                                <-- CREATE_SA(SPIab, NONCEab)
+
+recv CREATE_SA(...),
+    install SAab(SPIab, PASSWDab)           recv CREATE_SA(...),
+    install SPab(SPIab)                         SAME
+```
+
+## Rekeying
+
+A needs to monitor SAab, because A is responsible for incrementing SeqNo, but
+B is responsible to generating SAab.
+
+A sends REKEY, B does the stuff, replies with CREATE_SA.
+
+Peer A                                      Peer B
+-------------------------------------------------------------------------------
+
+Expires policy counter

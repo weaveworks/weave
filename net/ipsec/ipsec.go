@@ -2,8 +2,10 @@
 package ipsec
 
 // TODO(mp) install iptables rule (raw OUTPUT) which drops marked non-ESP traffic.
+// TODO(mp) with non-default port!
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
@@ -16,6 +18,7 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/crypto/hkdf"
 
 	"github.com/weaveworks/mesh"
@@ -24,7 +27,10 @@ import (
 type SPI uint32
 
 const (
-	keySize = 36 // AES-GCM key 32 bytes + 4 bytes salt
+	protoVsn = 1
+
+	keySize   = 36 // AES-GCM key 32 bytes + 4 bytes salt
+	nonceSize = 32 // HKDF nonce size
 
 	mark    = uint32(0x1) << 17
 	markStr = "0x20000/0x20000"
@@ -44,6 +50,10 @@ type IPSec struct {
 	sync.RWMutex
 	ipt *iptables.IPTables
 	rc  *connRefCount
+	// TODO(mp) type for [16]byte
+	spiByKey map[[16]byte]SPI
+	spis     map[SPI]struct{}
+	rekey    map[SPI]func() error
 }
 
 func New() (*IPSec, error) {
@@ -53,80 +63,151 @@ func New() (*IPSec, error) {
 	}
 
 	ipsec := &IPSec{
-		ipt: ipt,
-		rc:  newConnRefCount(),
+		ipt:      ipt,
+		rc:       newConnRefCount(),
+		spiByKey: make(map[[16]byte]SPI),
+		spis:     make(map[SPI]struct{}),
+		rekey:    make(map[SPI]func() error),
 	}
 
 	return ipsec, nil
 }
 
-// Protect establishes IPsec between given peers.
-func (ipsec *IPSec) Protect(srcPeer, dstPeer mesh.PeerName, srcPeerShort, dstPeerShort mesh.PeerShortID, srcIP, dstIP net.IP, dstPort int, masterKey *[32]byte) (SPI, error) {
-	outSPI, err := newSPI(srcPeerShort, dstPeerShort)
-	if err != nil {
-		return 0,
-			errors.Wrap(err, fmt.Sprintf("derive SPI (%x, %x)", srcPeerShort, dstPeerShort))
+func (ipsec *IPSec) Monitor() error {
+	// TODO(mp) close chan
+	ch := make(chan netlink.XfrmMsg)
+	errorCh := make(chan error)
+	if err := netlink.XfrmMonitor(ch, nil, errorCh, nl.XFRM_MSG_EXPIRE); err != nil {
+		return errors.Wrap(err, "xfrm monitor")
 	}
 
-	if ipsec.rc.get(srcIP, dstIP, outSPI) > 1 {
-		// IPSec has been already set up between the given peers
-		return outSPI, nil
-	}
+	for {
+		select {
+		case err := <-errorCh:
+			return err
+		case msg := <-ch:
+			if exp, ok := msg.(*netlink.XfrmMsgExpire); ok {
+				ipsec.Lock()
 
-	inSPI, err := newSPI(dstPeerShort, srcPeerShort)
-	if err != nil {
-		return 0,
-			errors.Wrap(err, fmt.Sprintf("derive SPI (%x, %x)", dstPeerShort, srcPeerShort))
-	}
+				if doRekey, ok := ipsec.rekey[SPI(exp.XfrmState.Spi)]; ok {
+					if err := doRekey(); err != nil {
+						return errors.Wrap(err, "rekey")
+					}
+				}
 
-	localKey, remoteKey, err := deriveKeys(srcPeer, dstPeer, masterKey[:])
-	if err != nil {
-		return 0, errors.Wrap(err, "derive keys")
-	}
+				ipsec.Unlock()
+			}
 
-	ipsec.Lock()
-	defer ipsec.Unlock()
-
-	if inSA, err := xfrmState(dstIP, srcIP, inSPI, remoteKey); err == nil {
-		if err := netlink.XfrmStateAdd(inSA); err != nil {
-			return 0,
-				errors.Wrap(err, fmt.Sprintf("xfrm state add (in, %s, %s, 0x%x)", inSA.Src, inSA.Dst, inSA.Spi))
 		}
-	} else {
-		return 0, errors.Wrap(err, "new xfrm state (in)")
 	}
-
-	if outSA, err := xfrmState(srcIP, dstIP, outSPI, localKey); err == nil {
-		if err := netlink.XfrmStateAdd(outSA); err != nil {
-			return 0,
-				errors.Wrap(err, fmt.Sprintf("xfrm state add (out, %s, %s, 0x%x)", outSA.Src, outSA.Dst, outSA.Spi))
-		}
-	} else {
-		return 0, errors.Wrap(err, "new xfrm state (out)")
-	}
-
-	outPolicy := xfrmPolicy(srcIP, dstIP, outSPI)
-	if err := netlink.XfrmPolicyAdd(outPolicy); err != nil {
-		return 0,
-			errors.Wrap(err, fmt.Sprintf("xfrm policy add (%s, %s, 0x%x)", srcIP, dstIP, outSPI))
-	}
-
-	if err := ipsec.installMarkRule(srcIP, dstIP, dstPort); err != nil {
-		return 0,
-			errors.Wrap(err, fmt.Sprintf("install mark rule (%s, %s, 0x%x)", srcIP, dstIP, dstPort))
-	}
-
-	return outSPI, nil
 }
 
-// Destroy tears down the previously established IPsec between two peers.
-func (ipsec *IPSec) Destroy(srcIP, dstIP net.IP, dstPort int, outSPI SPI) error {
-	var err error
-
+// SAremote->local
+func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, dstPort int, sessionKey *[32]byte, send func([]byte) error) error {
 	ipsec.Lock()
 	defer ipsec.Unlock()
 
-	count := ipsec.rc.put(srcIP, dstIP, outSPI)
+	if ipsec.rc.get(localPeer, remotePeer) > 1 {
+		// IPSec has been already set up between the given peers
+		return nil
+	}
+
+	// TODO(mp) create a chain + the following:
+	// iptables -t filter -A INPUT -p udp --dport ${dstPort} -s ${remoteIP} -d ${localIP} -j DROP
+	// iptables -t filter -A OUTPUT -p udp --dport ${dstPort} -s ${localIP} -d ${remoteIP} -j DROP
+
+	nonce, err := genNonce()
+	if err != nil {
+		return errors.Wrap(err, "generate nonce")
+	}
+	key, err := deriveKey(sessionKey[:], nonce, localPeer)
+	if err != nil {
+		return errors.Wrap(err, "derive key")
+	}
+
+	sa, err := netlink.XfrmStateAllocSpi(xfrmAllocSpiState(remoteIP, localIP))
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("ip xfrm state allocspi (in, %s, %s)", remoteIP, localIP))
+	}
+
+	spi := SPI(sa.Spi) // TODO(mp) get rid of SPI
+	if sa, err := xfrmState(remoteIP, localIP, spi, key); err == nil {
+		if err := netlink.XfrmStateUpdate(sa); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("xfrm state update (in, %s, %s, 0x%x)", sa.Src, sa.Dst, sa.Spi))
+		}
+	} else {
+		return errors.Wrap(err, "new xfrm state (in)")
+	}
+
+	if err := send(composeCreateSA(nonce, spi)); err != nil {
+		return errors.Wrap(err, "send CREATE_SA")
+	}
+
+	spiKey := connRefKey(remotePeer, localPeer)
+	ipsec.spiByKey[spiKey] = spi
+	ipsec.spis[spi] = struct{}{}
+	fmt.Printf("ProtectInit: %x -> %x\n", spiKey, spi)
+
+	return nil
+}
+
+// SAlocal->remote
+func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, dstPort int, sessionKey *[32]byte, rekey func() error) error {
+	ipsec.Lock()
+	defer ipsec.Unlock()
+
+	if size := len(createSAMsg); size != createSASize {
+		return fmt.Errorf("invalid CREATE_SA msg size: %d", size)
+	}
+	vsn, nonce, spi := parseCreateSA(createSAMsg)
+	if vsn != protoVsn {
+		return fmt.Errorf("unsupported vsn: %d", vsn)
+	}
+
+	if _, ok := ipsec.spis[spi]; ok {
+		// rekeying!
+
+	}
+
+	key, err := deriveKey(sessionKey[:], nonce, remotePeer)
+	if err != nil {
+		return errors.Wrap(err, "derive key")
+	}
+
+	if sa, err := xfrmState(localIP, remoteIP, spi, key); err == nil {
+		if err := netlink.XfrmStateAdd(sa); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("xfrm state update (out, %s, %s, 0x%x)", sa.Src, sa.Dst, sa.Spi))
+		}
+	} else {
+		return errors.Wrap(err, "new xfrm state (out)")
+	}
+
+	sp := xfrmPolicy(localIP, remoteIP, spi)
+	if err := netlink.XfrmPolicyAdd(sp); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("xfrm policy add (%s, %s, 0x%x)", localIP, remoteIP, spi))
+	}
+
+	if err := ipsec.installMarkRule(localIP, remoteIP, dstPort); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("install mark rule (%s, %s, 0x%x)", localIP, remoteIP, dstPort))
+	}
+
+	spiKey := connRefKey(localPeer, remotePeer)
+	ipsec.spiByKey[spiKey] = spi
+	ipsec.spis[spi] = struct{}{}
+	ipsec.rekey[spi] = rekey
+	fmt.Printf("ProtectFinish: %x -> %x\n", spiKey, spi)
+
+	// TODO(mp) delete:
+	// iptables -t filter -A OUTPUT -p udp --dport ${dstPort} -s ${localIP} -d ${remoteIP} -j DROP
+
+	return nil
+}
+
+func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, remotePort int) error {
+	ipsec.Lock()
+	defer ipsec.Unlock()
+
+	count := ipsec.rc.put(localPeer, remotePeer)
 	switch {
 	case count > 0:
 		return nil
@@ -134,38 +215,54 @@ func (ipsec *IPSec) Destroy(srcIP, dstIP net.IP, dstPort int, outSPI SPI) error 
 		return fmt.Errorf("IPSec invalid state")
 	}
 
-	if err = netlink.XfrmPolicyDel(xfrmPolicy(srcIP, dstIP, outSPI)); err != nil {
-		return errors.Wrap(err,
-			fmt.Sprintf("xfrm policy del (%s, %s, 0x%x)", srcIP, dstIP, outSPI))
+	// TODO(mp) delete if exists:
+	// iptables -t filter -A OUTPUT -p udp --dport ${dstPort} -s ${localIP} -d ${remoteIP} -j DROP
+
+	inSPIKey := connRefKey(remotePeer, localPeer)
+	if inSPI, ok := ipsec.spiByKey[inSPIKey]; ok {
+		inSA := &netlink.XfrmState{
+			Src:   remoteIP,
+			Dst:   localIP,
+			Proto: netlink.XFRM_PROTO_ESP,
+			Spi:   int(inSPI),
+		}
+		if err := netlink.XfrmStateDel(inSA); err != nil {
+			return errors.Wrap(err,
+				fmt.Sprintf("xfrm state del (in, %s, %s, 0x%x)", inSA.Src, inSA.Dst, inSA.Spi))
+		}
+		delete(ipsec.spiByKey, inSPIKey)
+		delete(ipsec.spis, inSPI)
 	}
 
-	inSA := &netlink.XfrmState{
-		Src:   srcIP,
-		Dst:   dstIP,
-		Proto: netlink.XFRM_PROTO_ESP,
-		Spi:   int(outSPI),
-	}
-	outSA := &netlink.XfrmState{
-		Src:   dstIP,
-		Dst:   srcIP,
-		Proto: netlink.XFRM_PROTO_ESP,
-		Spi:   int(reverseSPI(outSPI)),
-	}
-	if err = netlink.XfrmStateDel(inSA); err != nil {
-		return errors.Wrap(err,
-			fmt.Sprintf("xfrm state del (in, %s, %s, 0x%x)", inSA.Src, inSA.Dst, inSA.Spi))
-	}
-	if err = netlink.XfrmStateDel(outSA); err != nil {
-		return errors.Wrap(err,
-			fmt.Sprintf("xfrm state del (out, %s, %s, 0x%x)", outSA.Src, outSA.Dst, outSA.Spi))
-	}
+	outSPIKey := connRefKey(localPeer, remotePeer)
+	if outSPI, ok := ipsec.spiByKey[outSPIKey]; ok {
+		if err := netlink.XfrmPolicyDel(xfrmPolicy(localIP, remoteIP, outSPI)); err != nil {
+			return errors.Wrap(err,
+				fmt.Sprintf("xfrm policy del (%s, %s, 0x%x)", localIP, remoteIP, outSPI))
+		}
 
-	if err = ipsec.removeMarkRule(srcIP, dstIP, dstPort); err != nil {
-		return errors.Wrap(err,
-			fmt.Sprintf("remove mark rule (%s, %s, %d)", srcIP, dstIP, dstPort))
+		outSA := &netlink.XfrmState{
+			Src:   localIP,
+			Dst:   remoteIP,
+			Proto: netlink.XFRM_PROTO_ESP,
+			Spi:   int(outSPI),
+		}
+		if err := netlink.XfrmStateDel(outSA); err != nil {
+			return errors.Wrap(err,
+				fmt.Sprintf("xfrm state del (out, %s, %s, 0x%x)", outSA.Src, outSA.Dst, outSA.Spi))
+		}
+
+		if err := ipsec.removeMarkRule(localIP, remoteIP, remotePort); err != nil {
+			return errors.Wrap(err,
+				fmt.Sprintf("remove mark rule (%s, %s, %d)", localIP, remoteIP, remotePort))
+		}
+
+		delete(ipsec.spiByKey, outSPIKey)
+		delete(ipsec.spis, outSPI)
 	}
 
 	return nil
+
 }
 
 // Flush removes all policies/SAs established by us. Also, it removes chains and
@@ -175,8 +272,6 @@ func (ipsec *IPSec) Flush(destroy bool) error {
 	ipsec.Lock()
 	defer ipsec.Unlock()
 
-	spis := make(map[SPI]struct{})
-
 	policies, err := netlink.XfrmPolicyList(syscall.AF_INET)
 	if err != nil {
 		return errors.Wrap(err, "xfrm policy list")
@@ -184,9 +279,6 @@ func (ipsec *IPSec) Flush(destroy bool) error {
 	for _, p := range policies {
 		if p.Mark != nil && p.Mark.Value == mark && len(p.Tmpls) != 0 {
 			spi := SPI(p.Tmpls[0].Spi)
-			spis[spi] = struct{}{}
-			spis[reverseSPI(spi)] = struct{}{}
-
 			if err := netlink.XfrmPolicyDel(&p); err != nil {
 				return errors.Wrap(err, fmt.Sprintf("xfrm policy del (%s, %s, 0x%x)", p.Src, p.Dst, spi))
 			}
@@ -198,7 +290,7 @@ func (ipsec *IPSec) Flush(destroy bool) error {
 		return errors.Wrap(err, "xfrm state list")
 	}
 	for _, s := range states {
-		if _, ok := spis[SPI(s.Spi)]; ok {
+		if _, ok := ipsec.spis[SPI(s.Spi)]; ok {
 			if err := netlink.XfrmStateDel(&s); err != nil {
 				return errors.Wrap(err, fmt.Sprintf("xfrm state list (%s, %s, 0x%x)", s.Src, s.Dst, s.Spi))
 			}
@@ -219,29 +311,36 @@ func (ipsec *IPSec) Flush(destroy bool) error {
 // Mesh might simultaneously create two connections for the same peer pair which
 // could result in establishing IPsec multiple times.
 type connRefCount struct {
-	ref map[[12]byte]int
+	ref map[[16]byte]int
 }
 
 func newConnRefCount() *connRefCount {
-	return &connRefCount{ref: make(map[[12]byte]int)}
+	return &connRefCount{ref: make(map[[16]byte]int)}
 }
 
-func (rc *connRefCount) get(srcIP, dstIP net.IP, spi SPI) int {
-	key := connRefKey(srcIP, dstIP, spi)
+func (rc *connRefCount) get(srcPeer, dstPeer mesh.PeerName) int {
+	key := connRefKey(srcPeer, dstPeer)
 	rc.ref[key]++
 
 	return rc.ref[key]
 }
 
-func (rc *connRefCount) put(srcIP, dstIP net.IP, spi SPI) int {
-	key := connRefKey(srcIP, dstIP, spi)
+func (rc *connRefCount) put(srcPeer, dstPeer mesh.PeerName) int {
+	key := connRefKey(srcPeer, dstPeer)
 	rc.ref[key]--
 
 	return rc.ref[key]
 }
 
+func connRefKey(srcPeer, dstPeer mesh.PeerName) (key [16]byte) {
+	binary.BigEndian.PutUint64(key[:], uint64(srcPeer))
+	binary.BigEndian.PutUint64(key[8:], uint64(dstPeer))
+	return
+}
+
 // iptables
 
+// TODO(mp) add inbound
 var dropMatchingNonESPRulespec = []string{
 	"!", "-p", "esp",
 	"-m", "policy", "--dir", "out", "--pol", "none",
@@ -325,26 +424,33 @@ func (ipsec *IPSec) resetIPTables(destroy bool) error {
 
 // xfrm
 
+func xfrmAllocSpiState(srcIP, dstIP net.IP) *netlink.XfrmState {
+	return &netlink.XfrmState{
+		Src:          srcIP,
+		Dst:          dstIP,
+		Proto:        netlink.XFRM_PROTO_ESP,
+		Mode:         netlink.XFRM_MODE_TRANSPORT,
+		ReplayWindow: 32,
+	}
+}
+
 func xfrmState(srcIP, dstIP net.IP, spi SPI, key []byte) (*netlink.XfrmState, error) {
 	if len(key) != keySize {
 		return nil, fmt.Errorf("key should be %d bytes long", keySize)
 	}
 
-	return &netlink.XfrmState{
-		Src:   srcIP,
-		Dst:   dstIP,
-		Proto: netlink.XFRM_PROTO_ESP,
-		Mode:  netlink.XFRM_MODE_TRANSPORT,
-		Spi:   int(spi),
-		Aead: &netlink.XfrmStateAlgo{
-			Name:   "rfc4106(gcm(aes))",
-			Key:    key,
-			ICVLen: 128,
-		},
-		//Limits: netlink.XfrmStateLimits{
-		//	PacketHard: 10,
-		//},
-	}, nil
+	state := xfrmAllocSpiState(srcIP, dstIP)
+	state.Spi = int(spi)
+	state.Aead = &netlink.XfrmStateAlgo{
+		Name:   "rfc4106(gcm(aes))",
+		Key:    key,
+		ICVLen: 128,
+	}
+	state.Limits = netlink.XfrmStateLimits{
+		PacketSoft: 10,
+	}
+
+	return state, nil
 }
 
 func xfrmPolicy(srcIP, dstIP net.IP, spi SPI) *netlink.XfrmPolicy {
@@ -389,38 +495,25 @@ func reverseSPI(spi SPI) SPI {
 	return spiMSB | SPI(uint32(spi)>>mesh.PeerShortIDBits|uint32(spi&mask)<<mesh.PeerShortIDBits)
 }
 
-func connRefKey(srcIP, dstIP net.IP, spi SPI) (key [12]byte) {
-	copy(key[:], srcIP.To4())
-	copy(key[4:], dstIP.To4())
-	binary.BigEndian.PutUint32(key[8:], uint32(spi))
-
-	return
+func genNonce() ([]byte, error) {
+	buf := make([]byte, nonceSize)
+	n, err := rand.Read(buf)
+	if err != nil {
+		return nil, fmt.Errorf("crypto rand failed: %s", err)
+	}
+	if n != nonceSize {
+		return nil, fmt.Errorf("not enough random data: %d", n)
+	}
+	return buf, nil
 }
 
-func deriveKeys(srcPeer, dstPeer mesh.PeerName, masterKey []byte) ([]byte, []byte, error) {
-	var (
-		localKey, remoteKey []byte
-		err                 error
-	)
-
-	if localKey, err = deriveKey(srcPeer, masterKey); err != nil {
-		return nil, nil, err
-	}
-	if remoteKey, err = deriveKey(dstPeer, masterKey); err != nil {
-		return nil, nil, err
-	}
-
-	return localKey, remoteKey, nil
-}
-
-func deriveKey(peerName mesh.PeerName, masterKey []byte) ([]byte, error) {
+func deriveKey(sessionKey []byte, nonce []byte, peerName mesh.PeerName) ([]byte, error) {
 	info := make([]byte, 8)
 	binary.BigEndian.PutUint64(info, uint64(peerName))
 
 	key := make([]byte, keySize)
 
-	// TODO(mp) maybe pass passwd as a salt
-	hkdf := hkdf.New(sha256.New, masterKey, nil, info)
+	hkdf := hkdf.New(sha256.New, sessionKey, nonce, info)
 
 	n, err := io.ReadFull(hkdf, key)
 	if err != nil {
@@ -431,4 +524,27 @@ func deriveKey(peerName mesh.PeerName, masterKey []byte) ([]byte, error) {
 	}
 
 	return key, nil
+}
+
+// Protocol Messages
+
+const createSASize = 1 + nonceSize + 32
+
+// | 1: VSN | 32: Nonce | 32: SPI |
+func composeCreateSA(nonce []byte, spi SPI) []byte {
+	msg := make([]byte, createSASize)
+
+	msg[0] = protoVsn
+	copy(msg[1:(1+nonceSize)], nonce)
+	binary.BigEndian.PutUint32(msg[1+nonceSize:], uint32(spi))
+
+	return msg
+}
+
+func parseCreateSA(msg []byte) (uint8, []byte, SPI) {
+	nonce := make([]byte, nonceSize)
+	copy(nonce, msg[1:(1+nonceSize)])
+	spi := SPI(binary.BigEndian.Uint32(msg[1+nonceSize:]))
+
+	return msg[0], nonce, spi
 }
