@@ -2,40 +2,67 @@ This directory contains integration tests for weave.
 
 ## Requirements
 
-You need two VMs with docker >=1.6.0 installed and listening on TCP
-port 2375 (see below). You also need to be able to ssh to these VMs,
-preferably without having to input anything.
+You need three VMs with `docker` (`>=1.6.0`) installed and listening on TCP
+port `2375` (see below). You also need to be able to SSH to these VMs without 
+having to input anything.
 
-The `Vagrantfile` in this directory constructs two such VMs.
+The `Vagrantfile` in this directory constructs three such VMs.
 
-To create the VMs, open a shell and in this directory and type
+If you are [building Weave Net using Vagrant](https://www.weave.works/docs/net/latest/building/),
+it is recommended to run the tests from the build VM and not the host.
 
-    vagrant up
-
-To meet the aforementioned ssh requirement you may want to
-
-    cp ~/.vagrant.d/insecure_private_key .
 
 ## Running tests
 
-If you are [building weave using Vagrant](https://www.weave.works/docs/net/latest/building/),
-it is recommended to run the tests from the build VM and not the host.
+**TL;DR**: You can run the steps 2. to 7. below with one command: 
 
-    ./setup.sh
+    make PROVIDER=vagrant integration-tests
 
-uploads the weave images from where the Makefile puts them
-(`/var/tmp`) to the two docker hosts, and copies the weave script
-over.
+**Detailed steps**:
 
-Then you can use, e.g.,
+  1. Start the build virtual machine (see above article for more details):
 
-    ./200_dns_test.sh
+        vagrant up
 
-to run an individual test, or
+  2. Start the three testing VMs:
 
-    ./run_all.sh
+        cd test
+        vagrant up
 
-to run everything named `*_test.sh`.
+  3. SSH into the build VM and go to Weave Net's sources:
+
+        cd ..
+        vagrant ssh
+        # you are now on the build VM:
+        cd ~/weave 
+
+  4. Compile all code and dependencies:
+
+        make
+        make testrunner
+        cd test
+
+  5. Upload the weave images from where the `Makefile` puts them (`weave.tar.gz`) to 
+     the three docker hosts, `docker load` these, and copies the `weave` script over:
+
+        ./setup.sh
+
+  6. Run individual tests, e.g.:
+
+        ./200_dns_test.sh
+
+     or run all tests (everything named `*_test.sh`):
+
+        ./run_all.sh
+
+  7. Stop all VMs:
+
+        exit
+        # you are now on your host machine
+        vagrant destroy -f
+        cd test
+        vagrant destroy -f
+
 
 ## Using other VMs
 
