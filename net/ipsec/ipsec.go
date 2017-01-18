@@ -2,7 +2,6 @@
 package ipsec
 
 // TODO:
-// 1. add blocking chain and rules
 // 2. add proper lifetimes
 // 3. [16]byte -> type for the key
 // 4. get rid of SPI type
@@ -70,7 +69,7 @@ type IPSec struct {
 	ipt      *iptables.IPTables
 	rc       *connRefCount
 	spiByKey map[[16]byte]SPI
-	spis     map[SPI]struct{}
+	spis     map[SPI]bool // dir in - false, out - true
 	rekey    map[SPI]func() error
 }
 
@@ -84,7 +83,7 @@ func New() (*IPSec, error) {
 		ipt:      ipt,
 		rc:       newConnRefCount(),
 		spiByKey: make(map[[16]byte]SPI),
-		spis:     make(map[SPI]struct{}),
+		spis:     make(map[SPI]bool),
 		rekey:    make(map[SPI]func() error),
 	}
 
@@ -107,7 +106,13 @@ func (ipsec *IPSec) Monitor() error {
 			if exp, ok := msg.(*netlink.XfrmMsgExpire); ok {
 				if exp.Hard {
 					ipsec.Lock()
-					delete(ipsec.spis, SPI(exp.XfrmState.Spi))
+					spi := SPI(exp.XfrmState.Spi)
+					if dirOut, ok := ipsec.spis[spi]; ok && !dirOut {
+						if err := ipsec.removeObsoleteProtectingRule(exp.XfrmState.Dst, exp.XfrmState.Src, spi); err != nil {
+							return errors.Wrap(err, "removeObsoleteProtectingRule")
+						}
+					}
+					delete(ipsec.spis, spi)
 					ipsec.Unlock()
 				} else {
 					ipsec.Lock()
@@ -137,10 +142,8 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 	}
 
 	spiKey := connRefKey(remotePeer, localPeer)
-	var ok bool
-	var oldSPI SPI
 	if isRekey {
-		if oldSPI, ok = ipsec.spiByKey[spiKey]; !ok {
+		if _, ok := ipsec.spiByKey[spiKey]; !ok {
 			return fmt.Errorf("cannot find SPI by %x", spiKey)
 		}
 	}
@@ -173,8 +176,8 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 			return errors.Wrap(err, fmt.Sprintf("install protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, dstPort, spi))
 		}
 	} else {
-		if err := ipsec.updateProtectingRules(localIP, remoteIP, oldSPI, spi); err != nil {
-			return errors.Wrap(err, fmt.Sprintf("update protecting rules (%s, %s, %d, 0x%x, 0x%x)", localIP, remoteIP, oldSPI, spi))
+		if err := ipsec.installProtectingRuleAfterRekeying(localIP, remoteIP, spi); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("update protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, spi))
 		}
 	}
 
@@ -183,7 +186,7 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 	}
 
 	ipsec.spiByKey[spiKey] = spi
-	ipsec.spis[spi] = struct{}{}
+	ipsec.spis[spi] = false
 	fmt.Printf("ProtectInit: %x -> %x\n", spiKey, spi)
 
 	return nil
@@ -234,12 +237,9 @@ func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh
 	}
 
 	ipsec.spiByKey[spiKey] = spi
-	ipsec.spis[spi] = struct{}{}
+	ipsec.spis[spi] = true
 	ipsec.rekey[spi] = rekey
 	fmt.Printf("ProtectFinish: %x -> %x\n", spiKey, spi)
-
-	// TODO(mp) delete:
-	// iptables -t filter -A OUTPUT -p udp --dport ${dstPort} -s ${localIP} -d ${remoteIP} -j DROP
 
 	return nil
 }
@@ -390,7 +390,7 @@ func connRefKey(srcPeer, dstPeer mesh.PeerName) (key [16]byte) {
 // mangle:
 // -A INPUT -j WEAVE-IPSEC-IN															# default
 // -A WEAVE-IPSEC-IN -s $remote -d $local -m esp --espspi $spi -j WEAVE-IPSEC-IN-MARK	# ProtectInit
-// -A WEAVE-IPSEC-IN-MARK -m mark --set-xmark $mark										# default
+// -A WEAVE-IPSEC-IN-MARK --set-xmark $mark	-j MARK 									# default
 //
 // filter:
 // -A INPUT -j WEAVE-IPSEC-IN																	# default
@@ -542,13 +542,18 @@ func (ipsec *IPSec) removeProtectingRules(srcIP, dstIP net.IP, dstPort int, inSP
 }
 
 // TODO(mp) swap src/dst
-func (ipsec *IPSec) updateProtectingRules(srcIP, dstIP net.IP, inOldSPI, inNewSPI SPI) error {
-	old, new := protectingInRule(srcIP, dstIP, inOldSPI), protectingInRule(srcIP, dstIP, inNewSPI)
-	if err := ipsec.ipt.AppendUnique(new.table, new.chain, new.rulespec...); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables append unique (%s, %s, %s)", new.table, new.chain, new.rulespec))
+func (ipsec *IPSec) installProtectingRuleAfterRekeying(srcIP, dstIP net.IP, inSPI SPI) error {
+	r := protectingInRule(srcIP, dstIP, inSPI)
+	if err := ipsec.ipt.AppendUnique(r.table, r.chain, r.rulespec...); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables append unique (%s, %s, %s)", r.table, r.chain, r.rulespec))
 	}
-	if err := ipsec.ipt.Delete(old.table, old.chain, old.rulespec...); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("iptables delete unique (%s, %s, %s)", old.table, old.chain, old.rulespec))
+	return nil
+}
+
+func (ipsec *IPSec) removeObsoleteProtectingRule(srcIP, dstIP net.IP, inSPI SPI) error {
+	r := protectingInRule(srcIP, dstIP, inSPI)
+	if err := ipsec.ipt.Delete(r.table, r.chain, r.rulespec...); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables delete unique (%s, %s, %s)", r.table, r.chain, r.rulespec))
 	}
 	return nil
 }
