@@ -144,3 +144,8 @@ The list of variables you can set is:
 * WEAVE\_EXPOSE\_IP - set the IP address used as a gateway from the
   Weave network to the host network - this is useful if you are
   configuring the addon as a static pod.
+* WEAVE\_MTU - Weave Net defaults to 1410 bytes, but you can set a
+  smaller size if your underlying network has a tighter limit, or set
+  a larger size for better performance if your network supports jumbo
+  frames - see [here](/site/using-weave/fastdp.md#mtu) for more
+  details.
