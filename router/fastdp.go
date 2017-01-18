@@ -575,7 +575,6 @@ type fastDatapathForwarder struct {
 	vxlanVportID   odp.VportID
 	isEncrypted    bool
 	isSACreated    bool
-	spi            ipsec.SPI
 	sessionKey     *[32]byte
 
 	lock              sync.RWMutex
@@ -630,6 +629,7 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 			params.LocalAddr.IP, remoteAddr.IP,
 			vxlanUDPPort,
 			params.SessionKey,
+			false,
 			func(msg []byte) error {
 				return params.SendControlMessage(FastDatapathCreateSA, msg)
 			},
@@ -830,13 +830,13 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 	case FastDatapathHeartbeatAck:
 		fwd.handleHeartbeatAck()
 	case FastDatapathCreateSA:
+		fmt.Println("FastDatapathCreateSA")
 		// TODO(mp) check if encrypted
 		localIP := net.IP(fwd.localIP[:])
 		err := fwd.fastdp.ipsec.ProtectFinish(
 			msg,
 			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
-			localIP, fwd.remoteAddr.IP,
-			fwd.remoteAddr.Port,
+			localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port,
 			fwd.sessionKey,
 			func() error {
 				return fwd.sendControlMsg(FastDatapathRekey, nil)
@@ -849,7 +849,22 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 			fwd.isSACreated = true
 		}
 		fwd.heartbeatTimer.Reset(0)
+	// TODO(mp) add version
 	case FastDatapathRekey:
+		fmt.Println("FastDAtapathRekey")
+		localIP := net.IP(fwd.localIP[:])
+		err := fwd.fastdp.ipsec.ProtectInit(
+			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
+			localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port,
+			fwd.sessionKey, true,
+			func(msg []byte) error {
+				return fwd.sendControlMsg(FastDatapathCreateSA, msg)
+			},
+		)
+		if err != nil {
+			log.Warning(fwd.logPrefix(), "ipsec protect init after rekey failed: ", err)
+			// TODO(mp) handleError
+		}
 
 	default:
 		log.Info(fwd.logPrefix(), "Ignoring unknown control message: ", tag)

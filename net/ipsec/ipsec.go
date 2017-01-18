@@ -87,15 +87,22 @@ func (ipsec *IPSec) Monitor() error {
 			return err
 		case msg := <-ch:
 			if exp, ok := msg.(*netlink.XfrmMsgExpire); ok {
-				ipsec.Lock()
+				if exp.Hard {
+					ipsec.Lock()
+					delete(ipsec.spis, SPI(exp.XfrmState.Spi))
+					ipsec.Unlock()
+				} else {
+					ipsec.Lock()
 
-				if doRekey, ok := ipsec.rekey[SPI(exp.XfrmState.Spi)]; ok {
-					if err := doRekey(); err != nil {
-						return errors.Wrap(err, "rekey")
+					if doRekey, ok := ipsec.rekey[SPI(exp.XfrmState.Spi)]; ok {
+						if err := doRekey(); err != nil {
+							ipsec.Unlock()
+							return errors.Wrap(err, "rekey")
+						}
 					}
-				}
 
-				ipsec.Unlock()
+					ipsec.Unlock()
+				}
 			}
 
 		}
@@ -103,13 +110,24 @@ func (ipsec *IPSec) Monitor() error {
 }
 
 // SAremote->local
-func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, dstPort int, sessionKey *[32]byte, send func([]byte) error) error {
+func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, dstPort int, sessionKey *[32]byte, rekey bool, send func([]byte) error) error {
 	ipsec.Lock()
 	defer ipsec.Unlock()
 
-	if ipsec.rc.get(localPeer, remotePeer) > 1 {
+	if rekey {
+		fmt.Println("ProtectInit: rekey")
+	}
+
+	if !rekey && ipsec.rc.get(localPeer, remotePeer) > 1 {
 		// IPSec has been already set up between the given peers
 		return nil
+	}
+
+	spiKey := connRefKey(remotePeer, localPeer)
+	if rekey {
+		if _, ok := ipsec.spiByKey[spiKey]; !ok {
+			return fmt.Errorf("cannot find SPI by %x", spiKey)
+		}
 	}
 
 	// TODO(mp) create a chain + the following:
@@ -131,7 +149,7 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 	}
 
 	spi := SPI(sa.Spi) // TODO(mp) get rid of SPI
-	if sa, err := xfrmState(remoteIP, localIP, spi, key); err == nil {
+	if sa, err := xfrmState(remoteIP, localIP, spi, false, key); err == nil {
 		if err := netlink.XfrmStateUpdate(sa); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("xfrm state update (in, %s, %s, 0x%x)", sa.Src, sa.Dst, sa.Spi))
 		}
@@ -143,7 +161,6 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 		return errors.Wrap(err, "send CREATE_SA")
 	}
 
-	spiKey := connRefKey(remotePeer, localPeer)
 	ipsec.spiByKey[spiKey] = spi
 	ipsec.spis[spi] = struct{}{}
 	fmt.Printf("ProtectInit: %x -> %x\n", spiKey, spi)
@@ -152,6 +169,7 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 }
 
 // SAlocal->remote
+// TODO(mp) rekeying
 func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, dstPort int, sessionKey *[32]byte, rekey func() error) error {
 	ipsec.Lock()
 	defer ipsec.Unlock()
@@ -164,9 +182,11 @@ func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh
 		return fmt.Errorf("unsupported vsn: %d", vsn)
 	}
 
-	if _, ok := ipsec.spis[spi]; ok {
-		// rekeying!
+	spiKey := connRefKey(localPeer, remotePeer)
+	oldSPI, isRekey := ipsec.spiByKey[spiKey]
 
+	if isRekey {
+		fmt.Printf("ProtectFinish: rekey: %x\n", oldSPI)
 	}
 
 	key, err := deriveKey(sessionKey[:], nonce, remotePeer)
@@ -174,7 +194,7 @@ func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh
 		return errors.Wrap(err, "derive key")
 	}
 
-	if sa, err := xfrmState(localIP, remoteIP, spi, key); err == nil {
+	if sa, err := xfrmState(localIP, remoteIP, spi, true, key); err == nil {
 		if err := netlink.XfrmStateAdd(sa); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("xfrm state update (out, %s, %s, 0x%x)", sa.Src, sa.Dst, sa.Spi))
 		}
@@ -183,15 +203,20 @@ func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh
 	}
 
 	sp := xfrmPolicy(localIP, remoteIP, spi)
-	if err := netlink.XfrmPolicyAdd(sp); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("xfrm policy add (%s, %s, 0x%x)", localIP, remoteIP, spi))
+	if isRekey {
+		if err := netlink.XfrmPolicyUpdate(sp); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("xfrm policy update (%s, %s, 0x%x)", localIP, remoteIP, spi))
+		}
+	} else {
+		if err := netlink.XfrmPolicyAdd(sp); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("xfrm policy add (%s, %s, 0x%x)", localIP, remoteIP, spi))
+		}
 	}
 
 	if err := ipsec.installMarkRule(localIP, remoteIP, dstPort); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("install mark rule (%s, %s, 0x%x)", localIP, remoteIP, dstPort))
 	}
 
-	spiKey := connRefKey(localPeer, remotePeer)
 	ipsec.spiByKey[spiKey] = spi
 	ipsec.spis[spi] = struct{}{}
 	ipsec.rekey[spi] = rekey
@@ -434,20 +459,23 @@ func xfrmAllocSpiState(srcIP, dstIP net.IP) *netlink.XfrmState {
 	}
 }
 
-func xfrmState(srcIP, dstIP net.IP, spi SPI, key []byte) (*netlink.XfrmState, error) {
+func xfrmState(srcIP, dstIP net.IP, spi SPI, isOut bool, key []byte) (*netlink.XfrmState, error) {
 	if len(key) != keySize {
 		return nil, fmt.Errorf("key should be %d bytes long", keySize)
 	}
 
 	state := xfrmAllocSpiState(srcIP, dstIP)
+
 	state.Spi = int(spi)
 	state.Aead = &netlink.XfrmStateAlgo{
 		Name:   "rfc4106(gcm(aes))",
 		Key:    key,
 		ICVLen: 128,
 	}
-	state.Limits = netlink.XfrmStateLimits{
-		PacketSoft: 10,
+
+	state.Limits = netlink.XfrmStateLimits{PacketHard: 30}
+	if isOut {
+		state.Limits.PacketSoft = 10
 	}
 
 	return state, nil
@@ -474,6 +502,7 @@ func xfrmPolicy(srcIP, dstIP net.IP, spi SPI) *netlink.XfrmPolicy {
 				Spi:   int(spi),
 			},
 		},
+		// TODO(mp) limits
 	}
 }
 
