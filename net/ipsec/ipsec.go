@@ -1,8 +1,25 @@
 // package IPsec provides primitives for establishing IPsec in the fastdp mode.
 package ipsec
 
-// TODO(mp) install iptables rule (raw OUTPUT) which drops marked non-ESP traffic.
-// TODO(mp) with non-default port!
+// TODO:
+// 1. add blocking chain and rules
+// 2. add proper lifetimes
+// 3. [16]byte -> type for the key
+// 4. get rid of SPI type
+// 5. protocol msg cleanup
+// 6. better tracking of SPIs and cleanup
+// 7. rename functions and arguments
+// 8. atomic inserts
+// 9. test with non-default ports
+// 10. test on larger cluster
+// 11. vishvananda/netlink comments
+// 12. router/fastdp.go cleanup
+// 13. locks granularity
+// 14. user-configurable life-times
+// 15. tests for rekeying
+// 16. check flow
+// 17. block incoming traffic as well
+// 18. delete leftovers
 
 import (
 	"crypto/rand"
@@ -48,9 +65,8 @@ const (
 
 type IPSec struct {
 	sync.RWMutex
-	ipt *iptables.IPTables
-	rc  *connRefCount
-	// TODO(mp) type for [16]byte
+	ipt      *iptables.IPTables
+	rc       *connRefCount
 	spiByKey map[[16]byte]SPI
 	spis     map[SPI]struct{}
 	rekey    map[SPI]func() error
@@ -74,9 +90,9 @@ func New() (*IPSec, error) {
 }
 
 func (ipsec *IPSec) Monitor() error {
-	// TODO(mp) close chan
 	ch := make(chan netlink.XfrmMsg)
 	errorCh := make(chan error)
+
 	if err := netlink.XfrmMonitor(ch, nil, errorCh, nl.XFRM_MSG_EXPIRE); err != nil {
 		return errors.Wrap(err, "xfrm monitor")
 	}
@@ -104,7 +120,6 @@ func (ipsec *IPSec) Monitor() error {
 					ipsec.Unlock()
 				}
 			}
-
 		}
 	}
 }
@@ -113,10 +128,6 @@ func (ipsec *IPSec) Monitor() error {
 func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, dstPort int, sessionKey *[32]byte, rekey bool, send func([]byte) error) error {
 	ipsec.Lock()
 	defer ipsec.Unlock()
-
-	if rekey {
-		fmt.Println("ProtectInit: rekey")
-	}
 
 	if !rekey && ipsec.rc.get(localPeer, remotePeer) > 1 {
 		// IPSec has been already set up between the given peers
@@ -130,9 +141,13 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 		}
 	}
 
-	// TODO(mp) create a chain + the following:
-	// iptables -t filter -A INPUT -p udp --dport ${dstPort} -s ${remoteIP} -d ${localIP} -j DROP
-	// iptables -t filter -A OUTPUT -p udp --dport ${dstPort} -s ${localIP} -d ${remoteIP} -j DROP
+	if !rekey {
+		if _, ok := ipsec.spiByKey[connRefKey(localPeer, remotePeer)]; !ok {
+			// TODO(mp) install rules here
+			// iptables -t filter -A OUTPUT -p udp --dport ${dstPort} -s ${localIP} -d ${remoteIP} -j DROP
+		}
+		// iptables -t filter -A INPUT -p udp --dport ${dstPort} -s ${remoteIP} -d ${localIP} -j DROP
+	}
 
 	nonce, err := genNonce()
 	if err != nil {
@@ -148,7 +163,7 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 		return errors.Wrap(err, fmt.Sprintf("ip xfrm state allocspi (in, %s, %s)", remoteIP, localIP))
 	}
 
-	spi := SPI(sa.Spi) // TODO(mp) get rid of SPI
+	spi := SPI(sa.Spi)
 	if sa, err := xfrmState(remoteIP, localIP, spi, false, key); err == nil {
 		if err := netlink.XfrmStateUpdate(sa); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("xfrm state update (in, %s, %s, 0x%x)", sa.Src, sa.Dst, sa.Spi))
@@ -169,7 +184,6 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 }
 
 // SAlocal->remote
-// TODO(mp) rekeying
 func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, dstPort int, sessionKey *[32]byte, rekey func() error) error {
 	ipsec.Lock()
 	defer ipsec.Unlock()
@@ -293,6 +307,8 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remote
 // Flush removes all policies/SAs established by us. Also, it removes chains and
 // rules of iptables used for the marking. If destroy is true, the chains and
 // the marking rule won't be re-created.
+// TODO(mp) use the security context (XFRM_SEC_CTX) to identify SAs/SPs created
+//			by us.
 func (ipsec *IPSec) Flush(destroy bool) error {
 	ipsec.Lock()
 	defer ipsec.Unlock()
@@ -373,6 +389,12 @@ var dropMatchingNonESPRulespec = []string{
 	"-j", "DROP",
 }
 
+// WEAVE-IPSEC-INBOUND
+// iptables -t filter -A INPUT -p esp -m policy --dir in --pol ipsec --strict --spi $SPI -m mark --set-mark $MARK
+// WEAVE-IPSEC-OUTBOUND
+// iptables -t filter -A INPUT -p udp --dport $DPORT -s $remote -d $local -m policy --dir --pol
+var dropInNonESPRulespec = []string{}
+
 func (ipsec *IPSec) installMarkRule(srcIP, dstIP net.IP, dstPort int) error {
 	rulespec := markRulespec(srcIP, dstIP, dstPort)
 	if err := ipsec.ipt.AppendUnique(tableMangle, mainChain, rulespec...); err != nil {
@@ -399,6 +421,28 @@ func markRulespec(srcIP, dstIP net.IP, dstPort int) []string {
 	}
 
 }
+
+// INPUT:
+//
+// mangle:
+// -A INPUT -j WEAVE-IPSEC-IN
+// -A WEAVE-IPSEC-IN -s $remote -d $local -m esp --espspi $spi -j WEAVE-IPSEC-IN-MARK
+// -A WEAVE-IPSEC-IN-MARK -m mark --set-xmark $mark
+//
+// filter:
+// -A INPUT -j WEAVE-IPSEC-IN
+// -A WEAVE-IPSEC-IN -s $remote -d $local -p udp --dport $port -m mark ! --mark $mark -j DROP
+//
+//
+// OUTPUT
+//
+// mangle:
+// -A OUTPUT -j WEAVE-IPSEC-OUT
+// -A WEAVE-IPSEC-OUT -s $local -d $remote -p udp --dport $port -j WEAVE-IPSEC-OUT-MARK
+// -A WEAVE-IPSEC-OUT-MARK -j MARK --set-xmark $mark
+//
+// filter:
+// -A OUTPUT ! -p esp -m policy --dir out --pol none -m mark --mark $mark -j DROP
 
 func (ipsec *IPSec) resetIPTables(destroy bool) error {
 	if err := ipsec.ipt.ClearChain(tableMangle, mainChain); err != nil {
@@ -506,23 +550,7 @@ func xfrmPolicy(srcIP, dstIP net.IP, spi SPI) *netlink.XfrmPolicy {
 	}
 }
 
-// Helpers
-
-func newSPI(srcPeer, dstPeer mesh.PeerShortID) (SPI, error) {
-	if mesh.PeerShortIDBits > 15 { // should not happen
-		return 0, fmt.Errorf("PeerShortID too long")
-	}
-
-	spi := spiMSB | SPI(uint32(srcPeer)<<mesh.PeerShortIDBits|uint32(dstPeer))
-
-	return spi, nil
-}
-
-func reverseSPI(spi SPI) SPI {
-	spi ^= spiMSB
-
-	return spiMSB | SPI(uint32(spi)>>mesh.PeerShortIDBits|uint32(spi&mask)<<mesh.PeerShortIDBits)
-}
+// Key derivation
 
 func genNonce() ([]byte, error) {
 	buf := make([]byte, nonceSize)
