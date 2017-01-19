@@ -624,7 +624,7 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 	if fastdp.ipsec != nil && params.SessionKey != nil {
 		var err error
 		log.Info("setting up IPsec between ", fastdp.localPeer, " and ", params.RemotePeer)
-		err = fastdp.ipsec.ProtectInit(
+		err = fastdp.ipsec.InitSALocal(
 			fastdp.localPeer.Name, params.RemotePeer.Name,
 			params.LocalAddr.IP, remoteAddr.IP,
 			vxlanUDPPort,
@@ -833,7 +833,7 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 		fmt.Println("FastDatapathCreateSA")
 		// TODO(mp) check if encrypted
 		localIP := net.IP(fwd.localIP[:])
-		err := fwd.fastdp.ipsec.ProtectFinish(
+		err := fwd.fastdp.ipsec.InitSARemote(
 			msg,
 			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
 			localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port,
@@ -853,7 +853,7 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 	case FastDatapathRekey:
 		fmt.Println("FastDAtapathRekey")
 		localIP := net.IP(fwd.localIP[:])
-		err := fwd.fastdp.ipsec.ProtectInit(
+		err := fwd.fastdp.ipsec.InitSALocal(
 			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
 			localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port,
 			fwd.sessionKey, true,
