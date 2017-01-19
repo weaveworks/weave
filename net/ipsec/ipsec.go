@@ -2,7 +2,7 @@
 package ipsec
 
 // TODO:
-// * protocol msg cleanup
+// * limits
 //
 // * atomic inserts
 //
@@ -154,6 +154,7 @@ func (ipsec *IPSec) handleSoftExpire(msg *netlink.XfrmMsgExpire) error {
 
 	// Trigger rekeying
 	if spiInfo, ok := ipsec.spis[spi]; ok && spiInfo.initRekey != nil {
+		// TODO(mp) include protovsn
 		if err := spiInfo.initRekey(); err != nil {
 			return errors.Wrap(err, "init rekey")
 		}
@@ -228,7 +229,8 @@ func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, localIP, re
 	}
 
 	// Trigger the initialization on the remote peer
-	if err := initRemote(composeCreateSA(nonce, spi)); err != nil {
+	msg := &msgInitSARemote{nonce, spi}
+	if err := initRemote(msg.serialize()); err != nil {
 		return errors.Wrap(err, "initRemote CREATE_SA")
 	}
 
@@ -241,28 +243,26 @@ func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, localIP, re
 
 // InitSARemote initializes outbound ipsec to remotePeer.
 // Triggered by remotePeer.
-func (ipsec *IPSec) InitSARemote(createSAMsg []byte, localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, udpPort int, sessionKey *[32]byte, initRekey func() error) error {
+func (ipsec *IPSec) InitSARemote(msgInitSARemote []byte, localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, udpPort int, sessionKey *[32]byte, initRekey func() error) error {
 	// ID of outbound SPI
 	spiID := getSPIId(localPeer, remotePeer)
+
+	msg, err := deserializeMsgInitSARemote(msgInitSARemote)
+	if err != nil {
+		return errors.Wrap(err, "deserialize InitSARemote")
+	}
+	spi := msg.spi
 
 	ipsec.Lock()
 	defer ipsec.Unlock()
 
-	if size := len(createSAMsg); size != createSASize {
-		return fmt.Errorf("invalid CREATE_SA msg size: %d", size)
-	}
-	vsn, nonce, spi := parseCreateSA(createSAMsg)
-	if vsn != protoVsn {
-		return fmt.Errorf("unsupported vsn: %d", vsn)
-	}
-
 	// We say that the initialization happened due to re-keying if
 	// ipsec between peers has been previously established
-	// TODO(mp) move to createSAMsg
+	// TODO(mp) detect from msg
 	_, isRekey := ipsec.spiInfo[spiID]
 
 	// Derive SA key by using the received nonce
-	key, err := deriveKey(sessionKey[:], nonce, remotePeer)
+	key, err := deriveKey(sessionKey[:], msg.nonce, remotePeer)
 	if err != nil {
 		return errors.Wrap(err, "derive key")
 	}
@@ -674,25 +674,46 @@ func deriveKey(sessionKey []byte, nonce []byte, peerName mesh.PeerName) ([]byte,
 
 // Protocol Messages
 
-const createSASize = 1 + nonceSize + 32
-
-// | 1: VSN | 32: Nonce | 32: SPI |
-func composeCreateSA(nonce []byte, spi SPI) []byte {
-	msg := make([]byte, createSASize)
-
-	msg[0] = protoVsn
-	copy(msg[1:(1+nonceSize)], nonce)
-	binary.BigEndian.PutUint32(msg[1+nonceSize:], uint32(spi))
-
-	return msg
+type msgInitSARemote struct {
+	nonce []byte
+	spi   SPI
 }
 
-func parseCreateSA(msg []byte) (uint8, []byte, SPI) {
-	nonce := make([]byte, nonceSize)
-	copy(nonce, msg[1:(1+nonceSize)])
-	spi := SPI(binary.BigEndian.Uint32(msg[1+nonceSize:]))
+func deserializeMsgInitSARemote(b []byte) (*msgInitSARemote, error) {
+	if len(b) == 0 {
+		return nil, fmt.Errorf("empty msg")
+	}
+	if vsn := b[0]; vsn != protoVsn {
+		return nil, fmt.Errorf("unsupported proto vsn: %d", vsn)
+	}
 
-	return msg[0], nonce, spi
+	msg := &msgInitSARemote{}
+	b = b[1:]
+	if len(b) != msg.size() {
+		return nil, fmt.Errorf("invalid payload size: %d", len(b))
+	}
+
+	msg.nonce = make([]byte, nonceSize)
+	copy(msg.nonce, b[:nonceSize])
+	b = b[nonceSize:]
+
+	msg.spi = SPI(binary.BigEndian.Uint32(b))
+
+	return msg, nil
+}
+
+func (msg *msgInitSARemote) size() int {
+	return nonceSize + 32 // SPI
+}
+
+func (msg *msgInitSARemote) serialize() []byte {
+	b := make([]byte, msg.size()+1)
+
+	b[0] = protoVsn
+	copy(b[1:1+nonceSize], msg.nonce)
+	binary.BigEndian.PutUint32(b[1+nonceSize:], uint32(msg.spi))
+
+	return b
 }
 
 // Reference counting for outbound ipsec establishments.
