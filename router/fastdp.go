@@ -342,7 +342,7 @@ func (fastdp fastDatapathOverlay) InvalidateShortIDs() {
 func (fastdp fastDatapathOverlay) Stop() {
 	if fastdp.ipsec != nil {
 		if err := fastdp.ipsec.Flush(true); err != nil {
-			log.Errorf("IPSec reset failed: %s", err)
+			log.Errorf("ipsec flush failed: %s", err)
 		}
 	}
 }
@@ -631,11 +631,11 @@ func (fastdp fastDatapathOverlay) PrepareConnection(params mesh.OverlayConnectio
 			params.SessionKey,
 			false,
 			func(msg []byte) error {
-				return params.SendControlMessage(FastDatapathCreateSA, msg)
+				return params.SendControlMessage(FastDatapathCryptoInitSARemote, msg)
 			},
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "ipsec protect init")
+			return nil, errors.Wrap(err, "ipsec init SA local")
 		}
 		isEncrypted = true
 	}
@@ -776,8 +776,8 @@ func (fwd *fastDatapathForwarder) sendHeartbeat() {
 
 const (
 	FastDatapathHeartbeatAck = iota
-	FastDatapathCreateSA
-	FastDatapathRekey
+	FastDatapathCryptoInitSARemote
+	FastDatapathCryptoRekey
 )
 
 func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender *net.UDPAddr) {
@@ -829,8 +829,8 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 	switch tag {
 	case FastDatapathHeartbeatAck:
 		fwd.handleHeartbeatAck()
-	case FastDatapathCreateSA:
-		fmt.Println("FastDatapathCreateSA")
+	case FastDatapathCryptoInitSARemote:
+		fmt.Println("FastDatapathCryptoInitSARemote")
 		// TODO(mp) check if encrypted
 		err := fwd.fastdp.ipsec.InitSARemote(
 			msg,
@@ -838,7 +838,7 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 			net.IP(fwd.localIP[:]), fwd.remoteAddr.IP, fwd.remoteAddr.Port,
 			fwd.sessionKey,
 			func() error {
-				return fwd.sendControlMsg(FastDatapathRekey, nil)
+				return fwd.sendControlMsg(FastDatapathCryptoRekey, nil)
 			},
 		)
 		if err != nil {
@@ -849,14 +849,14 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 		}
 		fwd.heartbeatTimer.Reset(0)
 	// TODO(mp) add version
-	case FastDatapathRekey:
+	case FastDatapathCryptoRekey:
 		fmt.Println("FastDAtapathRekey")
 		err := fwd.fastdp.ipsec.InitSALocal(
 			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
 			net.IP(fwd.localIP[:]), fwd.remoteAddr.IP, fwd.remoteAddr.Port,
 			fwd.sessionKey, true,
 			func(msg []byte) error {
-				return fwd.sendControlMsg(FastDatapathCreateSA, msg)
+				return fwd.sendControlMsg(FastDatapathCryptoInitSARemote, msg)
 			},
 		)
 		if err != nil {

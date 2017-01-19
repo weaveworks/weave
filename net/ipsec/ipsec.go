@@ -3,17 +3,19 @@ package ipsec
 
 // TODO:
 // * protocol msg cleanup
-// * better tracking of SPIs and cleanup
+// * router/fastdp.go cleanup
 // * rename functions and arguments
+//
 // * atomic inserts
+//
+// * vishvananda/netlink comments
+//
 // * test with non-default ports
 // * test on larger cluster
-// * vishvananda/netlink comments
-// * router/fastdp.go cleanup
+//
 // * user-configurable life-times
 // * tests for rekeying
 // * check flow
-// * block incoming traffic as well
 
 import (
 	"crypto/rand"
@@ -98,6 +100,7 @@ func New() (*IPSec, error) {
 	return ipsec, nil
 }
 
+// Monitor monitors expiration of outbound SAs and triggers re-keying.
 func (ipsec *IPSec) Monitor() error {
 	ch := make(chan netlink.XfrmMsg)
 	errorCh := make(chan error)
@@ -122,7 +125,7 @@ func (ipsec *IPSec) Monitor() error {
 					}
 				}
 			}
-			// Ignore other types of XFRM_MSG (should not happen).
+			// Ignore the rest, as other types of XFRM_MSG_* are not expected.
 		}
 	}
 }
@@ -222,7 +225,7 @@ func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, localIP, re
 		}
 	} else {
 		if err := ipsec.updateDropNonEncrypted(localIP, remoteIP, spi); err != nil {
-			return errors.Wrap(err, fmt.Sprintf("update protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, spi))
+			return errors.Wrap(err, fmt.Sprintf("update protecting rules (%s, %s, 0x%x)", localIP, remoteIP, spi))
 		}
 	}
 
@@ -694,10 +697,10 @@ func parseCreateSA(msg []byte) (uint8, []byte, SPI) {
 	return msg[0], nonce, spi
 }
 
-// Reference counting for IPsec establishments.
+// Reference counting for outbound ipsec establishments.
 //
 // Mesh might simultaneously create two connections for the same peer pair which
-// could result in establishing IPsec multiple times.
+// could result in establishing ipsec multiple times.
 
 type connRefCount struct {
 	ref map[spiID]int

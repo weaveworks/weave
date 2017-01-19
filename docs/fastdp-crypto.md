@@ -1,5 +1,7 @@
 # Overview
 
+THIS IS WIP!!!
+
 At the high level, we use the ESP protocol (RFC 2406) in the Transport mode.
 Each packet is encrypted with AES in GCM mode (RFC 4106), with 32 bytes key
 and 4 bytes salt. This combo provides the following security properties:
@@ -17,8 +19,6 @@ are derived by applying HKDF (RFC 5869) to `SessionKey` which is derived by Mesh
 during the handshake.
 
 # SPI
-
-TODO(mp): update
 
 The IPsec connection between two peers is identified by directional SPIs
 formed by concatenating `fromPeerShortID` and `toPeerShortID` and setting
