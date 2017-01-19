@@ -135,7 +135,7 @@ func (ipsec *IPSec) handleHardExpire(msg *netlink.XfrmMsgExpire) error {
 
 	// Remove iptables inbound rule for marking ESP packets with obsolete SPI
 	if spiInfo, ok := ipsec.spis[spi]; ok && !spiInfo.isDirOut {
-		if err := ipsec.removeInboundProtectingRule(msg.XfrmState.Dst, msg.XfrmState.Src, spi); err != nil {
+		if err := ipsec.removeDropNonEncryptedInbound(msg.XfrmState.Dst, msg.XfrmState.Src, spi); err != nil {
 			return errors.Wrap(err, "remove inbound protecting rule")
 		}
 		delete(ipsec.spis, spi)
@@ -217,11 +217,11 @@ func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, localIP, re
 
 	// Install iptables rules
 	if !isRekey {
-		if err := ipsec.installProtectingRules(localIP, remoteIP, udpPort, spi); err != nil {
+		if err := ipsec.installDropNonEncrypted(localIP, remoteIP, udpPort, spi); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("install protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, udpPort, spi))
 		}
 	} else {
-		if err := ipsec.installProtectingRuleAfterRekeying(localIP, remoteIP, spi); err != nil {
+		if err := ipsec.updateDropNonEncrypted(localIP, remoteIP, spi); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("update protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, spi))
 		}
 	}
@@ -323,7 +323,7 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remote
 				fmt.Sprintf("xfrm state del (in, %s, %s, 0x%x)", inSA.Src, inSA.Dst, inSA.Spi))
 		}
 
-		if err := ipsec.removeProtectingRules(localIP, remoteIP, udpPort, inSPI); err != nil {
+		if err := ipsec.removeDropNonEncrypted(localIP, remoteIP, udpPort, inSPI); err != nil {
 			return errors.Wrap(err,
 				fmt.Sprintf("remove protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, udpPort, inSPI))
 		}
@@ -512,7 +512,7 @@ func (ipsec *IPSec) resetIPTables(destroy bool) error {
 	return nil
 }
 
-func protectingInRule(srcIP, dstIP net.IP, inSPI SPI) rule {
+func ruleMarkInboundESP(srcIP, dstIP net.IP, inSPI SPI) rule {
 	return rule{tableMangle, chainIn,
 		[]string{
 			"-s", dstIP.String(), "-d", srcIP.String(),
@@ -522,27 +522,28 @@ func protectingInRule(srcIP, dstIP net.IP, inSPI SPI) rule {
 		}}
 }
 
-func protectingRules(srcIP, dstIP net.IP, dstPort int, inSPI SPI) []rule {
+func rulesDropNonEncrypted(srcIP, dstIP net.IP, udpPort int, inSPI SPI) []rule {
+	udpPortStr := strconv.FormatUint(uint64(udpPort), 10)
 	return []rule{
-		protectingInRule(srcIP, dstIP, inSPI),
+		ruleMarkInboundESP(srcIP, dstIP, inSPI),
 		{tableFilter, chainIn,
 			[]string{
 				"-s", dstIP.String(), "-d", srcIP.String(),
-				"-p", "udp", "--dport", strconv.FormatUint(uint64(dstPort), 10),
+				"-p", "udp", "--dport", udpPortStr,
 				"-m", "mark", "!", "--mark", markStr,
 				"-j", "DROP",
 			}},
 		{tableMangle, chainOut,
 			[]string{
 				"-s", srcIP.String(), "-d", dstIP.String(),
-				"-p", "udp", "--dport", strconv.FormatUint(uint64(dstPort), 10),
+				"-p", "udp", "--dport", udpPortStr,
 				"-j", chainOutMark,
 			}},
 	}
 }
 
-func (ipsec *IPSec) installProtectingRules(srcIP, dstIP net.IP, dstPort int, inSPI SPI) error {
-	rules := protectingRules(srcIP, dstIP, dstPort, inSPI)
+func (ipsec *IPSec) installDropNonEncrypted(srcIP, dstIP net.IP, udpPort int, inSPI SPI) error {
+	rules := rulesDropNonEncrypted(srcIP, dstIP, udpPort, inSPI)
 	for _, r := range rules {
 		if err := ipsec.ipt.AppendUnique(r.table, r.chain, r.rulespec...); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("iptables append unique (%s, %s, %s)", r.table, r.chain, r.rulespec))
@@ -551,24 +552,23 @@ func (ipsec *IPSec) installProtectingRules(srcIP, dstIP net.IP, dstPort int, inS
 	return nil
 }
 
-func (ipsec *IPSec) removeProtectingRules(srcIP, dstIP net.IP, dstPort int, inSPI SPI) error {
-	if err := ipsec.resetRules(protectingRules(srcIP, dstIP, dstPort, inSPI), true); err != nil {
+func (ipsec *IPSec) removeDropNonEncrypted(srcIP, dstIP net.IP, udpPort int, inSPI SPI) error {
+	if err := ipsec.resetRules(rulesDropNonEncrypted(srcIP, dstIP, udpPort, inSPI), true); err != nil {
 		return err
 	}
 	return nil
 }
 
-// TODO(mp) swap src/dst
-func (ipsec *IPSec) installProtectingRuleAfterRekeying(srcIP, dstIP net.IP, inSPI SPI) error {
-	r := protectingInRule(srcIP, dstIP, inSPI)
+func (ipsec *IPSec) updateDropNonEncrypted(srcIP, dstIP net.IP, inSPI SPI) error {
+	r := ruleMarkInboundESP(srcIP, dstIP, inSPI)
 	if err := ipsec.ipt.AppendUnique(r.table, r.chain, r.rulespec...); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("iptables append unique (%s, %s, %s)", r.table, r.chain, r.rulespec))
 	}
 	return nil
 }
 
-func (ipsec *IPSec) removeInboundProtectingRule(srcIP, dstIP net.IP, inSPI SPI) error {
-	r := protectingInRule(srcIP, dstIP, inSPI)
+func (ipsec *IPSec) removeDropNonEncryptedInbound(srcIP, dstIP net.IP, inSPI SPI) error {
+	r := ruleMarkInboundESP(srcIP, dstIP, inSPI)
 	if err := ipsec.ipt.Delete(r.table, r.chain, r.rulespec...); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("iptables delete unique (%s, %s, %s)", r.table, r.chain, r.rulespec))
 	}
