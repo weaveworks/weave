@@ -2,7 +2,6 @@
 package ipsec
 
 // TODO:
-// * merge refcounting
 // * protocol msg cleanup
 // * better tracking of SPIs and cleanup
 // * rename functions and arguments
@@ -11,7 +10,6 @@ package ipsec
 // * test on larger cluster
 // * vishvananda/netlink comments
 // * router/fastdp.go cleanup
-// * locks granularity
 // * user-configurable life-times
 // * tests for rekeying
 // * check flow
@@ -37,8 +35,6 @@ import (
 	"github.com/weaveworks/mesh"
 )
 
-type SPI uint32
-
 const (
 	protoVsn = 1 // fastdp-crypto vsn
 
@@ -55,6 +51,8 @@ const (
 	chainOut     = "WEAVE-IPSEC-OUT"
 	chainOutMark = "WEAVE-IPSEC-OUT-MARK"
 )
+
+type SPI uint32
 
 // Used to identify:
 // - directional SPIs,
@@ -170,7 +168,7 @@ func (ipsec *IPSec) handleSoftExpire(msg *netlink.XfrmMsgExpire) error {
 // isRekey denotes whether the initialization was triggered by
 // a re-keying request.
 func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, udpPort int, sessionKey *[32]byte, isRekey bool, initRemote func([]byte) error) error {
-	// inbound SPI id
+	// ID of inbound SPI
 	spiID := getSPIId(remotePeer, localPeer)
 
 	ipsec.Lock()
@@ -243,6 +241,8 @@ func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, localIP, re
 // InitSARemote initializes outbound ipsec to remotePeer.
 // Triggered by remotePeer.
 func (ipsec *IPSec) InitSARemote(createSAMsg []byte, localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, udpPort int, sessionKey *[32]byte, initRekey func() error) error {
+	// ID of outbound SPI
+	spiID := getSPIId(localPeer, remotePeer)
 
 	ipsec.Lock()
 	defer ipsec.Unlock()
@@ -255,14 +255,18 @@ func (ipsec *IPSec) InitSARemote(createSAMsg []byte, localPeer, remotePeer mesh.
 		return fmt.Errorf("unsupported vsn: %d", vsn)
 	}
 
-	spiID := getSPIId(localPeer, remotePeer)
+	// We say that the initialization happened due to re-keying if
+	// ipsec between peers has been previously established
+	// TODO(mp) move to createSAMsg
 	_, isRekey := ipsec.spiInfo[spiID]
 
+	// Derive SA key by using the received nonce
 	key, err := deriveKey(sessionKey[:], nonce, remotePeer)
 	if err != nil {
 		return errors.Wrap(err, "derive key")
 	}
 
+	// Create SA
 	if sa, err := xfrmState(localIP, remoteIP, spi, true, key); err == nil {
 		if err := netlink.XfrmStateAdd(sa); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("xfrm state update (out, %s, %s, 0x%x)", sa.Src, sa.Dst, sa.Spi))
@@ -271,6 +275,7 @@ func (ipsec *IPSec) InitSARemote(createSAMsg []byte, localPeer, remotePeer mesh.
 		return errors.Wrap(err, "new xfrm state (out)")
 	}
 
+	// Create or update SP
 	sp := xfrmPolicy(localIP, remoteIP, spi)
 	if isRekey {
 		if err := netlink.XfrmPolicyUpdate(sp); err != nil {
@@ -289,25 +294,24 @@ func (ipsec *IPSec) InitSARemote(createSAMsg []byte, localPeer, remotePeer mesh.
 	return nil
 }
 
+// Destroy destroys any (inbound / outbound) ipsec establishment between the peers.
 func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remoteIP net.IP, udpPort int) error {
-	outSPIKey := getSPIId(localPeer, remotePeer)
-	inSPIKey := getSPIId(remotePeer, localPeer)
+	outSPIID := getSPIId(localPeer, remotePeer)
+	inSPIID := getSPIId(remotePeer, localPeer)
 
 	ipsec.Lock()
 	defer ipsec.Unlock()
 
-	// TODO(mp) other direction?
-	count := ipsec.rc.put(outSPIKey)
-	switch {
-	case count > 0:
-		return nil
-	case count < 0:
-		return fmt.Errorf("ipsec invalid state")
-	}
+	// Destroy inbound
 
-	inSPIInfo, ok := ipsec.spiInfo[inSPIKey]
-	inSPI := inSPIInfo.spi
-	if ok {
+	// We ref-count only inbound connections as outbound establishments are
+	// direct results of inbound establishments
+	count := ipsec.rc.put(inSPIID)
+	inSPIInfo, ok := ipsec.spiInfo[inSPIID]
+
+	if count == 0 && ok {
+		inSPI := inSPIInfo.spi
+
 		inSA := &netlink.XfrmState{
 			Src:   remoteIP,
 			Dst:   localIP,
@@ -318,11 +322,19 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remote
 			return errors.Wrap(err,
 				fmt.Sprintf("xfrm state del (in, %s, %s, 0x%x)", inSA.Src, inSA.Dst, inSA.Spi))
 		}
-		delete(ipsec.spiInfo, inSPIKey)
+
+		if err := ipsec.removeProtectingRules(localIP, remoteIP, udpPort, inSPI); err != nil {
+			return errors.Wrap(err,
+				fmt.Sprintf("remove protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, udpPort, inSPI))
+		}
+
+		delete(ipsec.spiInfo, inSPIID)
 		delete(ipsec.spis, inSPI)
 	}
 
-	if outSPIInfo, ok := ipsec.spiInfo[outSPIKey]; ok {
+	// Destroy outbound
+
+	if outSPIInfo, ok := ipsec.spiInfo[outSPIID]; ok {
 		if err := netlink.XfrmPolicyDel(xfrmPolicy(localIP, remoteIP, outSPIInfo.spi)); err != nil {
 			return errors.Wrap(err,
 				fmt.Sprintf("xfrm policy del (%s, %s, 0x%x)", localIP, remoteIP, outSPIInfo.spi))
@@ -339,18 +351,11 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remote
 				fmt.Sprintf("xfrm state del (out, %s, %s, 0x%x)", outSA.Src, outSA.Dst, outSA.Spi))
 		}
 
-		// TODO(mp) if cannot found inSPI?
-		if err := ipsec.removeProtectingRules(localIP, remoteIP, udpPort, inSPI); err != nil {
-			return errors.Wrap(err,
-				fmt.Sprintf("remove protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, udpPort, inSPI))
-		}
-
-		delete(ipsec.spiInfo, outSPIKey)
+		delete(ipsec.spiInfo, outSPIID)
 		delete(ipsec.spis, outSPIInfo.spi)
 	}
 
 	return nil
-
 }
 
 // Flush removes all policies/SAs established by us. Also, it removes chains and
