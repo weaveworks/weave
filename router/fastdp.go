@@ -832,11 +832,10 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 	case FastDatapathCreateSA:
 		fmt.Println("FastDatapathCreateSA")
 		// TODO(mp) check if encrypted
-		localIP := net.IP(fwd.localIP[:])
 		err := fwd.fastdp.ipsec.InitSARemote(
 			msg,
 			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
-			localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port,
+			net.IP(fwd.localIP[:]), fwd.remoteAddr.IP, fwd.remoteAddr.Port,
 			fwd.sessionKey,
 			func() error {
 				return fwd.sendControlMsg(FastDatapathRekey, nil)
@@ -852,10 +851,9 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 	// TODO(mp) add version
 	case FastDatapathRekey:
 		fmt.Println("FastDAtapathRekey")
-		localIP := net.IP(fwd.localIP[:])
 		err := fwd.fastdp.ipsec.InitSALocal(
 			fwd.fastdp.localPeer.Name, fwd.remotePeer.Name,
-			localIP, fwd.remoteAddr.IP, fwd.remoteAddr.Port,
+			net.IP(fwd.localIP[:]), fwd.remoteAddr.IP, fwd.remoteAddr.Port,
 			fwd.sessionKey, true,
 			func(msg []byte) error {
 				return fwd.sendControlMsg(FastDatapathCreateSA, msg)

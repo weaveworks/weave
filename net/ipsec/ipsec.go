@@ -40,13 +40,13 @@ import (
 type SPI uint32
 
 const (
-	protoVsn = 1
+	protoVsn = 1 // fastdp-crypto vsn
 
 	keySize   = 36 // AES-GCM key 32 bytes + 4 bytes salt
 	nonceSize = 32 // HKDF nonce size
 
-	mark    = uint32(0x1) << 17
-	markStr = "0x20000/0x20000"
+	mark    = uint32(0x1) << 17 // iptables marks
+	markStr = "0x20000/0x20000" // update if mark changes
 
 	tableMangle  = "mangle"
 	tableFilter  = "filter"
@@ -56,14 +56,24 @@ const (
 	chainOutMark = "WEAVE-IPSEC-OUT-MARK"
 )
 
-// IPSec
-
+// Used to identify:
+// - directional SPIs,
+// - ipsec establishments.
 type spiID [16]byte
+
 type spiInfo struct {
 	spi       SPI
 	isDirOut  bool
 	initRekey func() error
 }
+
+func getSPIId(srcPeer, dstPeer mesh.PeerName) (id spiID) {
+	binary.BigEndian.PutUint64(id[:], uint64(srcPeer))
+	binary.BigEndian.PutUint64(id[8:], uint64(dstPeer))
+	return
+}
+
+// IPSec
 
 type IPSec struct {
 	sync.RWMutex
@@ -344,8 +354,9 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remote
 }
 
 // Flush removes all policies/SAs established by us. Also, it removes chains and
-// rules of iptables used for the marking. If destroy is true, the chains and
-// the marking rule won't be re-created.
+// rules of iptables.
+//
+// If destroy is true, the chains and the rules won't be re-created.
 // TODO(mp) maybe use the security context (XFRM_SEC_CTX) to identify SAs/SPs created by us.
 func (ipsec *IPSec) Flush(destroy bool) error {
 	ipsec.Lock()
@@ -699,12 +710,4 @@ func (rc *connRefCount) get(id spiID) int {
 func (rc *connRefCount) put(id spiID) int {
 	rc.ref[id]--
 	return rc.ref[id]
-}
-
-// Helpers
-
-func getSPIId(srcPeer, dstPeer mesh.PeerName) (id spiID) {
-	binary.BigEndian.PutUint64(id[:], uint64(srcPeer))
-	binary.BigEndian.PutUint64(id[8:], uint64(dstPeer))
-	return
 }
