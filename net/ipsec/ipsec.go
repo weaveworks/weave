@@ -2,8 +2,7 @@
 package ipsec
 
 // TODO:
-// 2. add proper lifetimes
-// 3. [16]byte -> type for the key
+// 3. spiID -> type for the key
 // 4. get rid of SPI type
 // 5. protocol msg cleanup
 // 6. better tracking of SPIs and cleanup
@@ -18,7 +17,6 @@ package ipsec
 // 15. tests for rekeying
 // 16. check flow
 // 17. block incoming traffic as well
-// 18. delete leftovers
 
 import (
 	"crypto/rand"
@@ -57,20 +55,24 @@ const (
 	chainInMark  = "WEAVE-IPSEC-IN-MARK"
 	chainOut     = "WEAVE-IPSEC-OUT"
 	chainOutMark = "WEAVE-IPSEC-OUT-MARK"
-
-	mask   = (SPI(1) << (mesh.PeerShortIDBits)) - 1
-	spiMSB = SPI(1) << 31
 )
 
 // IPSec
 
+type spiID [16]byte
+type spiInfo struct {
+	spi       SPI
+	isDirOut  bool
+	initRekey func() error
+}
+
 type IPSec struct {
 	sync.RWMutex
-	ipt      *iptables.IPTables
-	rc       *connRefCount
-	spiByKey map[[16]byte]SPI
-	spis     map[SPI]bool // dir in - false, out - true
-	rekey    map[SPI]func() error
+	ipt *iptables.IPTables
+	rc  *connRefCount
+
+	spiInfo map[spiID]spiInfo
+	spis    map[SPI]*spiInfo
 }
 
 func New() (*IPSec, error) {
@@ -80,11 +82,10 @@ func New() (*IPSec, error) {
 	}
 
 	ipsec := &IPSec{
-		ipt:      ipt,
-		rc:       newConnRefCount(),
-		spiByKey: make(map[[16]byte]SPI),
-		spis:     make(map[SPI]bool),
-		rekey:    make(map[SPI]func() error),
+		ipt:     ipt,
+		rc:      newConnRefCount(),
+		spiInfo: make(map[spiID]spiInfo),
+		spis:    make(map[SPI]*spiInfo),
 	}
 
 	return ipsec, nil
@@ -104,23 +105,29 @@ func (ipsec *IPSec) Monitor() error {
 			return err
 		case msg := <-ch:
 			if exp, ok := msg.(*netlink.XfrmMsgExpire); ok {
+
+				spi := SPI(exp.XfrmState.Spi)
+
 				if exp.Hard {
+
 					ipsec.Lock()
-					spi := SPI(exp.XfrmState.Spi)
-					if dirOut, ok := ipsec.spis[spi]; ok && !dirOut {
+					if spiInfo, ok := ipsec.spis[spi]; ok && !spiInfo.isDirOut {
 						if err := ipsec.removeObsoleteProtectingRule(exp.XfrmState.Dst, exp.XfrmState.Src, spi); err != nil {
+							ipsec.Unlock()
 							return errors.Wrap(err, "removeObsoleteProtectingRule")
+
 						}
 					}
 					delete(ipsec.spis, spi)
 					ipsec.Unlock()
+
 				} else {
 					ipsec.Lock()
 
-					if doRekey, ok := ipsec.rekey[SPI(exp.XfrmState.Spi)]; ok {
-						if err := doRekey(); err != nil {
+					if spiInfo, ok := ipsec.spis[spi]; ok && spiInfo.initRekey != nil {
+						if err := spiInfo.initRekey(); err != nil {
 							ipsec.Unlock()
-							return errors.Wrap(err, "rekey")
+							return errors.Wrap(err, "monitor init-rekey")
 						}
 					}
 
@@ -143,7 +150,7 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 
 	spiKey := connRefKey(remotePeer, localPeer)
 	if isRekey {
-		if _, ok := ipsec.spiByKey[spiKey]; !ok {
+		if _, ok := ipsec.spiInfo[spiKey]; !ok {
 			return fmt.Errorf("cannot find SPI by %x", spiKey)
 		}
 	}
@@ -185,9 +192,9 @@ func (ipsec *IPSec) ProtectInit(localPeer, remotePeer mesh.PeerName, localIP, re
 		return errors.Wrap(err, "send CREATE_SA")
 	}
 
-	ipsec.spiByKey[spiKey] = spi
-	ipsec.spis[spi] = false
-	fmt.Printf("ProtectInit: %x -> %x\n", spiKey, spi)
+	si := spiInfo{spi: spi, isDirOut: false}
+	ipsec.spiInfo[spiKey] = si
+	ipsec.spis[spi] = &si
 
 	return nil
 }
@@ -206,11 +213,7 @@ func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh
 	}
 
 	spiKey := connRefKey(localPeer, remotePeer)
-	oldSPI, isRekey := ipsec.spiByKey[spiKey]
-
-	if isRekey {
-		fmt.Printf("ProtectFinish: rekey: %x\n", oldSPI)
-	}
+	_, isRekey := ipsec.spiInfo[spiKey]
 
 	key, err := deriveKey(sessionKey[:], nonce, remotePeer)
 	if err != nil {
@@ -236,10 +239,9 @@ func (ipsec *IPSec) ProtectFinish(createSAMsg []byte, localPeer, remotePeer mesh
 		}
 	}
 
-	ipsec.spiByKey[spiKey] = spi
-	ipsec.spis[spi] = true
-	ipsec.rekey[spi] = rekey
-	fmt.Printf("ProtectFinish: %x -> %x\n", spiKey, spi)
+	si := spiInfo{spi: spi, isDirOut: true, initRekey: rekey}
+	ipsec.spiInfo[spiKey] = si
+	ipsec.spis[spi] = &si
 
 	return nil
 }
@@ -256,11 +258,9 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remote
 		return fmt.Errorf("IPSec invalid state")
 	}
 
-	// TODO(mp) delete if exists:
-	// iptables -t filter -A OUTPUT -p udp --dport ${dstPort} -s ${localIP} -d ${remoteIP} -j DROP
-
 	inSPIKey := connRefKey(remotePeer, localPeer)
-	inSPI, ok := ipsec.spiByKey[inSPIKey]
+	inSPIInfo, ok := ipsec.spiInfo[inSPIKey]
+	inSPI := inSPIInfo.spi
 	if ok {
 		inSA := &netlink.XfrmState{
 			Src:   remoteIP,
@@ -272,35 +272,36 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remote
 			return errors.Wrap(err,
 				fmt.Sprintf("xfrm state del (in, %s, %s, 0x%x)", inSA.Src, inSA.Dst, inSA.Spi))
 		}
-		delete(ipsec.spiByKey, inSPIKey)
+		delete(ipsec.spiInfo, inSPIKey)
 		delete(ipsec.spis, inSPI)
 	}
 
 	outSPIKey := connRefKey(localPeer, remotePeer)
-	if outSPI, ok := ipsec.spiByKey[outSPIKey]; ok {
-		if err := netlink.XfrmPolicyDel(xfrmPolicy(localIP, remoteIP, outSPI)); err != nil {
+	if outSPIInfo, ok := ipsec.spiInfo[outSPIKey]; ok {
+		if err := netlink.XfrmPolicyDel(xfrmPolicy(localIP, remoteIP, outSPIInfo.spi)); err != nil {
 			return errors.Wrap(err,
-				fmt.Sprintf("xfrm policy del (%s, %s, 0x%x)", localIP, remoteIP, outSPI))
+				fmt.Sprintf("xfrm policy del (%s, %s, 0x%x)", localIP, remoteIP, outSPIInfo.spi))
 		}
 
 		outSA := &netlink.XfrmState{
 			Src:   localIP,
 			Dst:   remoteIP,
 			Proto: netlink.XFRM_PROTO_ESP,
-			Spi:   int(outSPI),
+			Spi:   int(outSPIInfo.spi),
 		}
 		if err := netlink.XfrmStateDel(outSA); err != nil {
 			return errors.Wrap(err,
 				fmt.Sprintf("xfrm state del (out, %s, %s, 0x%x)", outSA.Src, outSA.Dst, outSA.Spi))
 		}
 
+		// TODO(mp) if not found inSPI???
 		if err := ipsec.removeProtectingRules(localIP, remoteIP, remotePort, inSPI); err != nil {
 			return errors.Wrap(err,
 				fmt.Sprintf("remove protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, remotePort, inSPI))
 		}
 
-		delete(ipsec.spiByKey, outSPIKey)
-		delete(ipsec.spis, outSPI)
+		delete(ipsec.spiInfo, outSPIKey)
+		delete(ipsec.spis, outSPIInfo.spi)
 	}
 
 	return nil
@@ -310,8 +311,7 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, localIP, remote
 // Flush removes all policies/SAs established by us. Also, it removes chains and
 // rules of iptables used for the marking. If destroy is true, the chains and
 // the marking rule won't be re-created.
-// TODO(mp) use the security context (XFRM_SEC_CTX) to identify SAs/SPs created
-//			by us.
+// TODO(mp) maybe use the security context (XFRM_SEC_CTX) to identify SAs/SPs created by us.
 func (ipsec *IPSec) Flush(destroy bool) error {
 	ipsec.Lock()
 	defer ipsec.Unlock()
@@ -355,11 +355,11 @@ func (ipsec *IPSec) Flush(destroy bool) error {
 // Mesh might simultaneously create two connections for the same peer pair which
 // could result in establishing IPsec multiple times.
 type connRefCount struct {
-	ref map[[16]byte]int
+	ref map[spiID]int
 }
 
 func newConnRefCount() *connRefCount {
-	return &connRefCount{ref: make(map[[16]byte]int)}
+	return &connRefCount{ref: make(map[spiID]int)}
 }
 
 func (rc *connRefCount) get(srcPeer, dstPeer mesh.PeerName) int {
@@ -376,7 +376,7 @@ func (rc *connRefCount) put(srcPeer, dstPeer mesh.PeerName) int {
 	return rc.ref[key]
 }
 
-func connRefKey(srcPeer, dstPeer mesh.PeerName) (key [16]byte) {
+func connRefKey(srcPeer, dstPeer mesh.PeerName) (key spiID) {
 	binary.BigEndian.PutUint64(key[:], uint64(srcPeer))
 	binary.BigEndian.PutUint64(key[8:], uint64(dstPeer))
 	return
@@ -584,9 +584,13 @@ func xfrmState(srcIP, dstIP net.IP, spi SPI, isOut bool, key []byte) (*netlink.X
 		ICVLen: 128,
 	}
 
-	state.Limits = netlink.XfrmStateLimits{PacketHard: 30}
+	state.Limits = netlink.XfrmStateLimits{
+		PacketHard: 100,
+		TimeHard:   14,
+	}
 	if isOut {
-		state.Limits.PacketSoft = 10
+		state.Limits.PacketSoft = 50
+		state.Limits.TimeSoft = 10
 	}
 
 	return state, nil
@@ -626,16 +630,16 @@ func genNonce() ([]byte, error) {
 		return nil, fmt.Errorf("crypto rand failed: %s", err)
 	}
 	if n != nonceSize {
-		return nil, fmt.Errorf("not enough random data: %d", n)
+		return nil, fmt.Errorf("not enough of random data: %d", n)
 	}
 	return buf, nil
 }
 
 func deriveKey(sessionKey []byte, nonce []byte, peerName mesh.PeerName) ([]byte, error) {
+	key := make([]byte, keySize)
+
 	info := make([]byte, 8)
 	binary.BigEndian.PutUint64(info, uint64(peerName))
-
-	key := make([]byte, keySize)
 
 	hkdf := hkdf.New(sha256.New, sessionKey, nonce, info)
 

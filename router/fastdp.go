@@ -92,14 +92,14 @@ func NewFastDatapath(iface *net.Interface, port int, encryptionEnabled bool) (*F
 		if ipSec, err = ipsec.New(); err != nil {
 			return nil, errors.Wrap(err, "ipsec new")
 		}
+		if err := ipSec.Flush(false); err != nil {
+			return nil, errors.Wrap(err, "ipsec flush")
+		}
 		go func() {
 			if err := ipSec.Monitor(); err != nil {
 				log.Fatalf("ipsec monitor died: %x", err)
 			}
 		}()
-		if err := ipSec.Flush(false); err != nil {
-			return nil, errors.Wrap(err, "ipsec flush")
-		}
 	}
 
 	fastdp := &FastDatapath{
