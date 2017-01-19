@@ -30,7 +30,7 @@ func getSystemUUID(hostRoot string) ([]byte, error) {
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	if len(uuid) == 0 {
+	if len(uuid) == 0 && len(machineid) == 0 {
 		return nil, errors.New("All system IDs are blank")
 	}
 	return append(machineid, uuid...), nil
