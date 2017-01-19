@@ -2,8 +2,6 @@
 package ipsec
 
 // TODO:
-// * limits
-//
 // * atomic inserts
 //
 // * vishvananda/netlink comments
@@ -421,7 +419,7 @@ func (ipsec *IPSec) Flush(destroy bool) error {
 // mangle:
 // -A OUTPUT -j WEAVE-IPSEC-OUT																	# default
 // -A WEAVE-IPSEC-OUT -s $local -d $remote -p udp --dport $port -j WEAVE-IPSEC-OUT-MARK			# InitSALocal
-// -A WEAVE-IPSEC-OUT-MARK -j MARK --set-xmark $mark											# default
+// -A WEAVE-IPSEC-OUT-MARK --set-xmark $mark -j MARK											# default
 //
 // filter:
 // -A OUTPUT ! -p esp -m policy --dir out --pol none -m mark --mark $mark -j DROP				# default
@@ -578,6 +576,24 @@ func (ipsec *IPSec) removeDropNonEncryptedInbound(srcIP, dstIP net.IP, inSPI SPI
 
 // xfrm
 
+func xfrmStateLimits(isDirOut bool) netlink.XfrmStateLimits {
+	limits := netlink.XfrmStateLimits{
+		ByteHard: 350 * 1024 * 1024, // 350mb
+		TimeHard: 30 * 60,           // 30min
+	}
+
+	if isDirOut {
+		limits.ByteSoft = pct90(limits.ByteHard)
+		limits.TimeSoft = pct90(limits.TimeSoft)
+	}
+
+	return limits
+}
+
+func pct90(of uint64) uint64 {
+	return uint64(0.9 * float64(of))
+}
+
 func xfrmAllocSpiState(srcIP, dstIP net.IP) *netlink.XfrmState {
 	return &netlink.XfrmState{
 		Src:          srcIP,
@@ -588,7 +604,7 @@ func xfrmAllocSpiState(srcIP, dstIP net.IP) *netlink.XfrmState {
 	}
 }
 
-func xfrmState(srcIP, dstIP net.IP, spi SPI, isOut bool, key []byte) (*netlink.XfrmState, error) {
+func xfrmState(srcIP, dstIP net.IP, spi SPI, isDirOut bool, key []byte) (*netlink.XfrmState, error) {
 	if len(key) != keySize {
 		return nil, fmt.Errorf("key should be %d bytes long", keySize)
 	}
@@ -601,15 +617,7 @@ func xfrmState(srcIP, dstIP net.IP, spi SPI, isOut bool, key []byte) (*netlink.X
 		Key:    key,
 		ICVLen: 128,
 	}
-
-	state.Limits = netlink.XfrmStateLimits{
-		PacketHard: 100,
-		TimeHard:   14,
-	}
-	if isOut {
-		state.Limits.PacketSoft = 50
-		state.Limits.TimeSoft = 10
-	}
+	state.Limits = xfrmStateLimits(isDirOut)
 
 	return state, nil
 }
@@ -635,7 +643,7 @@ func xfrmPolicy(srcIP, dstIP net.IP, spi SPI) *netlink.XfrmPolicy {
 				Spi:   int(spi),
 			},
 		},
-		// TODO(mp) limits
+		// TODO(mp) maybe add hard limits
 	}
 }
 
