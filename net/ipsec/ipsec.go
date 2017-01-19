@@ -3,8 +3,6 @@ package ipsec
 
 // TODO:
 // * protocol msg cleanup
-// * router/fastdp.go cleanup
-// * rename functions and arguments
 //
 // * atomic inserts
 //
