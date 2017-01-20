@@ -200,6 +200,7 @@ func (ns *ns) updateNetworkPolicy(oldObj, newObj *extnapi.NetworkPolicy) error {
 	if err := ns.rules.provision(oldObj.ObjectMeta.UID, oldRules, newRules); err != nil {
 		return err
 	}
+	// TODO: If defaultDeny status has changed, update multicast on each pod
 
 	return nil
 }

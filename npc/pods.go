@@ -28,7 +28,7 @@ func setupPod(podIP string, allowMcast bool) {
 	}
 	err = blockMcast(pid)
 	if err != nil {
-		common.Log.Errorf("Unable to find pod with IP %q: %s", podIP, err)
+		common.Log.Errorf("Unable to block pod with IP %q: %s", podIP, err)
 		return
 	}
 }
@@ -69,7 +69,7 @@ func blockMcast(pid int) error {
 }
 
 func iptablesInNamespace(pid int, table, chain string, rulespec ...string) error {
-	args := []string{fmt.Sprintf("--net=%d", pid), "iptables", "-I", "-t", table, "-C", chain}
+	args := []string{fmt.Sprintf("--net=/proc/%d/ns/net", pid), "iptables", "-t", table, "-I", chain}
 	args = append(args, rulespec...)
 	c := exec.Command("nsenter", args...)
 	common.Log.Debugf("Running %v", c)
