@@ -1667,7 +1667,16 @@ launch_router() {
            --label=weavevolumes $WEAVEDB_IMAGE >/dev/null
     fi
 
-    RESOLV_CONF=$(chroot ${HOST_ROOT:-/} readlink -f /etc/resolv.conf)
+    # Figure out the location of the actual resolv.conf file because
+    # we want to bind mount its directory into the container.
+    if [ -L ${HOST_ROOT:-/}/etc/resolv.conf ]; then # symlink
+        # This assumes a host with readlink in FHS directories...
+        # Ideally, this would resolve the symlink manually, without
+        # using host commands.
+        RESOLV_CONF=$(chroot ${HOST_ROOT:-/} readlink -f /etc/resolv.conf)
+    else
+        RESOLV_CONF=/etc/resolv.conf
+    fi
     RESOLV_CONF_DIR=$(dirname "$RESOLV_CONF")
     RESOLV_CONF_BASE=$(basename "$RESOLV_CONF")
 
