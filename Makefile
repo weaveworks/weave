@@ -369,14 +369,10 @@ integration-tests: all testrunner
 #     PLAYBOOK="<filename>" \
 #     RUNNER_ARGS="<...>" \
 #     TESTS="<...>" \  # Can be set to only run one or a few tests instead of the full test suite.
-#     SKIP_CREATE=1 \  # Skip the provisioning phase before running tests.
-#     SKIP_CONFIG=1 \  # Skip the configuration phase before running tests.
-#     SKIP_DESTROY=1 \ # Skip the destroy phase after running tests.
-#     ONLY_DESTROY=1 \ # Destroy the test cluster (and do not do anything else, like starting the test cluster, configuring it, or running tests).
 #     DOCKER_VERSION=<...> \
 #     KUBERNETES_VERSION=<...> \
 #     KUBERNETES_CNI_VERSION=<...> \
-#     <...> # See also run-integration-test.sh for all variables.
+#     <...> # See also run-integration-test.sh for all variables and individual functions.
 #     integration-tests
 #
 	RUNNER_ARGS="-parallel" ./test/run-integration-tests.sh

@@ -194,6 +194,11 @@ function update_remote_etc_hosts() {
     for pid in $pids; do wait "$pid"; done
 }
 
+# shellcheck disable=SC2155
+function set_hosts() {
+    export HOSTS="$(echo "$ssh_hosts" | tr '\n' ' ')"
+}
+
 function provision_remotely() {
     case "$1" in
         on)
@@ -241,7 +246,7 @@ function provision() {
             ;;
         'gcp')
             gcp_on
-            [[ "$USE_IMAGE" == 1 ]] && use_or_create_image
+            [[ "$1" == "on" ]] && [[ "$USE_IMAGE" == 1 ]] && use_or_create_image
             provision_remotely "$1" "$2"
             ;;
         'vagrant')
@@ -252,7 +257,7 @@ function provision() {
             exit 1
             ;;
     esac
-
+    [ "$1" == "on" ] && set_hosts
     echo
     greenly echo "> Provisioning took $(date -u -d @$(($(date +%s) - begin_prov)) +"%T")."
 }
@@ -289,9 +294,6 @@ function configure() {
 
 # shellcheck disable=SC2155
 function run_tests() {
-    export HOSTS="$(echo "$3" | tr '\n' ' ')"
-    shift 3 # Drop the first 3 arguments, the remainder being, optionally, the list of tests to run.
-    "$DIR/setup.sh"
     echo
     greenly echo "> Running tests..."
     local begin_tests=$(date +%s)
@@ -303,36 +305,57 @@ function run_tests() {
     return $status
 }
 
+function end() {
+    echo
+    echo "> Build took $(date -u -d @$(($(date +%s) - begin)) +"%T")."
+}
+
 function main() {
     begin=$(date +%s)
+    trap end EXIT
+
     print_vars
     verify_dependencies
 
-    if [ -z "$ONLY_DESTROY" ]; then
-        provision on "$PROVIDER"
-        if [ $? -ne 0 ]; then
-            echo >&2 "> Failed to provision test host(s)."
-            exit 1
-        fi
-
-        if [ -z "$SKIP_CONFIG" ]; then
+    case "$1" in
+        "") # Provision, configure, run tests, and destroy test environment:
+            provision on "$PROVIDER"
             configure "$ssh_user" "$ssh_hosts" "${ssh_port:-22}" "$ssh_id_file"
-            if [ $? -ne 0 ]; then
-                echo >&2 "Failed to configure test host(s)."
-                exit 1
-            fi
-        fi
+            "$DIR/setup.sh"
+            run_tests "$TESTS"
+            status=$?
+            provision off "$PROVIDER"
+            exit $status
+            ;;
 
-        run_tests "$ssh_user" "$ssh_id_file" "$ssh_hosts" "$TESTS"
-        status=$?
-    fi
-    if [ -z "$SKIP_DESTROY" ]; then
-        provision off "$PROVIDER"
-    fi
+        provision)
+            provision on "$PROVIDER"
+            ;;
 
-    echo
-    greenly echo "> Build took $(date -u -d @$(($(date +%s) - begin)) +"%T")."
-    exit $status
+        configure)
+            provision on "$PROVIDER" # Vagrant and Terraform do not provision twice if VMs are already provisioned, so we just set environment variables.
+            configure "$ssh_user" "$ssh_hosts" "${ssh_port:-22}" "$ssh_id_file"
+            ;;
+
+        setup)
+            provision on "$PROVIDER" # Vagrant and Terraform do not provision twice if VMs are already provisioned, so we just set environment variables.
+            "$DIR/setup.sh"
+            ;;
+
+        test)
+            provision on "$PROVIDER" # Vagrant and Terraform do not provision twice if VMs are already provisioned, so we just set environment variables.
+            run_tests "$TESTS"
+            ;;
+
+        destroy)
+            provision off "$PROVIDER"
+            ;;
+
+        *)
+            echo "Unknown command: $1" >&2
+            exit 1
+            ;;
+    esac
 }
 
-main
+main "$@"

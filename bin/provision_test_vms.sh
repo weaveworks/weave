@@ -1,0 +1,35 @@
+#!/bin/bash
+
+set -e
+
+source "$STATE"
+
+function install_terraform() {
+    curl -fsS https://releases.hashicorp.com/terraform/0.8.5/terraform_0.8.5_linux_amd64.zip | gunzip >terraform && chmod +x terraform && sudo mv terraform /usr/bin
+}
+
+function install_ansible() {
+    sudo apt-get update || true
+    sudo apt-get install -qq -y python-pip python-dev libffi-dev libssl-dev && pip install --user -U cffi && pip install --user ansible
+    export PATH="$PATH:$HOME/.local/bin"
+}
+
+if [ -n "$TEST_AND_PUBLISH" ]; then
+    [ -n "$SECRET_KEY" ] || {
+        echo "Cannot run smoke tests: no secret key"
+        exit 1
+    }
+
+    install_terraform >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
+    install_ansible >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
+
+    # Only attempt to create GCP image in first container, wait for it to be created otherwise:
+    [ "$CIRCLE_NODE_INDEX" == "0" ] && export CREATE_IMAGE=1
+
+    # Provision and configure testing VMs:
+    rm -f "$TEST_VMS_PROV_AND_CONF_LOCK_FILE"
+    cd "$SRCDIR/test" # Ensures we generate Terraform state files in the right folder, for later use by integration tests.
+    ./run-integration-tests.sh configure >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
+    touch "$TEST_VMS_PROV_AND_CONF_LOCK_FILE"
+    echo "Test VMs now provisioned and configured. $(date)." >>"$TEST_VMS_SETUP_OUTPUT_FILE"
+fi
