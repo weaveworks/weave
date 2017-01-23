@@ -21,27 +21,27 @@ func setupPod(podIP string, allowMcast bool) {
 		common.Log.Errorf("Unable to parse pod IP %q", podIP)
 		return
 	}
-	pid, err := findPidWithWeaveIP(ip)
+	pid, _, err := findPidWithWeaveIP(ip)
 	if err != nil {
 		common.Log.Errorf("Unable to find pod with IP %q: %s", podIP, err)
 		return
 	}
-	err = blockMcast(pid)
+	err = blockMcast(pid) // TODO: pass in cidr
 	if err != nil {
 		common.Log.Errorf("Unable to block pod with IP %q: %s", podIP, err)
 		return
 	}
 }
 
-func findPidWithWeaveIP(ip net.IP) (int, error) {
+func findPidWithWeaveIP(ip net.IP) (int, *net.IPNet, error) {
 	peerIDs, err := weavenet.ConnectedToBridgeVethPeerIds(weavenet.WeaveBridgeName)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	pids, err := common.AllPids("/proc")
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	// Really we only want to look at those pids that own a namespace
@@ -51,17 +51,17 @@ func findPidWithWeaveIP(ip net.IP) (int, error) {
 	for _, pid := range pids {
 		netDevs, err := weavenet.GetNetDevsByVethPeerIds(pid, peerIDs)
 		if err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 		for _, netDev := range netDevs {
 			for _, cidr := range netDev.CIDRs {
 				if ip.Equal(cidr.IP) {
-					return pid, nil
+					return pid, cidr, nil
 				}
 			}
 		}
 	}
-	return 0, fmt.Errorf("No process found with IP %v", ip)
+	return 0, nil, fmt.Errorf("No process found with IP %v", ip)
 }
 
 func blockMcast(pid int) error {
