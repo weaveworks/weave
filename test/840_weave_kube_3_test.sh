@@ -12,13 +12,13 @@ tear_down_kubeadm() {
     done
 }
 
+tear_down_kubeadm
+
 start_suite "Test weave-kube image with Kubernetes"
 
 TOKEN=112233.445566778899000
 HOST1IP=$($SSH $HOST1 "getent hosts $HOST1 | cut -f 1 -d ' '")
 SUCCESS="6 established"
-
-tear_down_kubeadm
 
 run_on $HOST1 "sudo systemctl start kubelet && sudo kubeadm init --token=$TOKEN"
 run_on $HOST2 "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
