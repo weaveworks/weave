@@ -52,7 +52,7 @@ testing/cover/cover
 testing/runner/runner
 releases
 .*.uptodate
-weave.tar.gz
+weave*.tar.gz
 prog/weaveexec/weave
 prog/weaveexec/weavehosts
 prog/weaveexec/weaveproxy
@@ -61,9 +61,10 @@ prog/weaveexec/weavewait_noop
 prog/weaveexec/weavewait_nomcast
 prog/weaveexec/sigproxy
 prog/weaveexec/weaveutil
-prog/weaveexec/docker*.tgz
+prog/weaveexec/docker*
 Vagrantfile.local
 test/tls/tls
 test/tls/*.pem
 test/coverage
 test/coverage.*
+*qemu-*-static
