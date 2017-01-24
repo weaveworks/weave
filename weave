@@ -717,11 +717,10 @@ init_bridge_prep() {
 
     ip link add name $BRIDGE type bridge
 
-    # for Docker 1.12 this needs to be docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}'
-    # so running this from 'weave --local' may fail.
-    # also if weaveexec is not on the path it will be run as a Docker container
-    # that does not have access to /etc/machine-id
-    WEAVEDB_PATH=$(docker inspect -f '{{index .Volumes "/weavedb"}}' $DB_CONTAINER_NAME 2>/dev/null)
+    # Running this from 'weave --local' when weaveexec is not on the
+    # path will run it as a Docker container that does not have access
+    # to /etc/machine-id, so will not give the full range of persistent IDs
+    WEAVEDB_PATH=$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)
     MAC=$(util_op unique-id "$HOST_ROOT/$WEAVEDB_PATH/weave" "$HOST_ROOT")
 
     ip link set dev $BRIDGE address $MAC
