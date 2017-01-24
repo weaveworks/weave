@@ -121,3 +121,6 @@
 [submodule "vendor/github.com/mgutz/ansi"]
 	path = vendor/github.com/mgutz/ansi
 	url = https://github.com/mgutz/ansi
+[submodule "vendor/github.com/estesp/manifest-tool"]
+	path = vendor/github.com/estesp/manifest-tool
+	url = https://github.com/estesp/manifest-tool
