@@ -1,7 +1,5 @@
-PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube publish_weave-npc
-
 .DEFAULT: all
-.PHONY: all exes testrunner update tests lint publish $(PUBLISH) clean clean-bin prerequisites build run-smoketests
+.PHONY: all exes testrunner update tests lint publish-one $(PUBLISH) clean clean-bin prerequisites build run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
@@ -10,9 +8,91 @@ RM=--rm
 RUN_FLAGS=-ti
 COVERAGE=
 
-DOCKERHUB_USER=weaveworks
-WEAVE_VERSION=git-$(shell git rev-parse --short=12 HEAD)
+# This specifies the architecture we're building for
+ARCH?=amd64
 
+# We're using QEMU to be able to build Docker images for other architectures
+# from amd64 machines.
+QEMU_VERSION=v2.7.0
+
+# A list of all supported architectures here. Should be named as Go is naming platforms
+# All supported architectures must have an "ifeq" block below that customizes the parameters
+ALL_ARCHITECTURES=amd64 arm arm64
+ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64
+
+ifeq ($(ARCH),amd64)
+
+	# The architecture and version for use when downloading the docker binary
+	# Lastly the path in the tarball where the docker client binary is placed
+	WEAVEEXEC_DOCKER_ARCH?=x86_64
+	WEAVEEXEC_DOCKER_VERSION=1.6.2
+	WEAVEEXEC_DOCKER_TARBALL_PATH=usr/local/bin/docker
+
+	# The name of the alpine baseimage to use as the base for weave images
+	ALPINE_BASEIMAGE?=alpine
+
+	# The extension for the made images
+	# Specifying none means for example weaveworks/weave:latest
+	ARCH_EXT?=
+
+	# The name of the gcc we're using for compiling C code
+	CC=gcc
+	
+	# Optional parameters that can be passed when linking C code into the Go binary
+	CGO_LDFLAGS=
+endif
+ifeq ($(ARCH),arm)
+	# Here we're using a much newer version of the Docker client
+	# because Docker on ARM hasn't been released in many older versions
+	WEAVEEXEC_DOCKER_ARCH?=armel
+	WEAVEEXEC_DOCKER_VERSION=1.12.3
+	WEAVEEXEC_DOCKER_TARBALL_PATH=docker/docker
+
+	# Using the (semi-)official alpine image
+	ALPINE_BASEIMAGE=armhf/alpine:3.4
+
+	# arm images have the -arm suffix, for instance weaveworks/weave-arm:latest
+	ARCH_EXT?=-arm
+
+	# The name of the gcc binary
+	CC=arm-linux-gnueabihf-gcc
+
+	# The architecture name to use when downloading a prebuilt QEMU binary
+	QEMUARCH=arm
+	
+	# In the weaveworks/build image; libpcap libraries for arm are placed here
+	# Tell the gcc linker to search for libpcap here
+	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
+endif
+ifeq ($(ARCH),arm64)
+	# Use the arm 32-bit docker client variant
+	WEAVEEXEC_DOCKER_ARCH?=armel
+	WEAVEEXEC_DOCKER_VERSION=1.12.3
+	WEAVEEXEC_DOCKER_TARBALL_PATH=docker/docker
+
+	# Using the (semi-)official alpine image
+	ALPINE_BASEIMAGE=aarch64/alpine:edge
+
+	# arm64 images have the -arm64 suffix, for instance weaveworks/weave-arm64:latest
+	ARCH_EXT?=-arm64
+
+	# The name of the gcc binary
+	CC=aarch64-linux-gnu-gcc
+
+	# The name of the gcc binary
+	QEMUARCH=aarch64
+	
+	# In the weaveworks/build image; libpcap libraries for arm64 are placed here
+	# Tell the gcc linker to search for libpcap here
+	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
+endif
+
+# The name of the user that this Makefile should produce image artifacts for. Can/should be overridden
+DOCKERHUB_USER?=weaveworks
+# The default version that's chosen when pushing the images. Can/should be overridden
+WEAVE_VERSION?=git-$(shell git rev-parse --short=12 HEAD)
+
+# Paths to all relevant binaries that should be compiled
 WEAVER_EXE=prog/weaver/weaver
 WEAVEPROXY_EXE=prog/weaveproxy/weaveproxy
 SIGPROXY_EXE=prog/sigproxy/sigproxy
@@ -26,8 +106,10 @@ PLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 TEST_TLS_EXE=test/tls/tls
 
+# All binaries together in a list
 EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE)
 
+# These stamp files are used to mark the current state of the build; whether an image has been built or not
 BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver.uptodate
 WEAVEEXEC_UPTODATE=.weaveexec.uptodate
@@ -38,21 +120,23 @@ WEAVEDB_UPTODATE=.weavedb.uptodate
 
 IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVENPC_UPTODATE) $(WEAVEDB_UPTODATE)
 
-WEAVER_IMAGE=$(DOCKERHUB_USER)/weave
-WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec
-PLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin
-WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube
-WEAVENPC_IMAGE=$(DOCKERHUB_USER)/weave-npc
+# The names of the images. Note that the images for other architectures than amd64 have a suffix in the image name.
+WEAVER_IMAGE=$(DOCKERHUB_USER)/weave$(ARCH_EXT)
+WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec$(ARCH_EXT)
+PLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin$(ARCH_EXT)
+WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube$(ARCH_EXT)
+WEAVENPC_IMAGE=$(DOCKERHUB_USER)/weave-npc$(ARCH_EXT)
 BUILD_IMAGE=weaveworks/weavebuild
 WEAVEDB_IMAGE=$(DOCKERHUB_USER)/weavedb
 
 IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
 
-WEAVE_EXPORT=weave.tar.gz
+PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube publish_weave-npc
 
-WEAVEEXEC_DOCKER_VERSION=1.6.2
+WEAVE_EXPORT=weave$(ARCH_EXT).tar.gz
+
 DOCKER_DISTRIB=prog/weaveexec/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
-DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/x86_64/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
+DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/$(WEAVEEXEC_DOCKER_ARCH)/docker-$(WEAVEEXEC_DOCKER_VERSION).tgz
 NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	rm $@; \
 	echo "\nYour go standard library was built without the 'netgo' build tag."; \
@@ -61,6 +145,9 @@ NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	echo "    sudo go install -tags netgo std"; \
 	false; \
 }
+# The flags we are passing to go build. -extldflags -static for making a static binary, 
+# -linkmode external for linking external C libraries into the binary, -X main.version for telling the
+# Go binary which version it is, -tags netgo for enforcing the native Go DNS resolver
 BUILD_FLAGS=-i -ldflags "-linkmode external -extldflags -static -X main.version=$(WEAVE_VERSION)" -tags netgo
 
 PACKAGE_BASE=$(shell go list -e ./)
@@ -86,14 +173,16 @@ lint: tools/.git
 
 ifeq ($(BUILD_IN_CONTAINER),true)
 
+# This make target compiles all binaries inside of the weaveworks/build container
+# It bind-mounts the source into the container and passes all important variables
 exes $(EXES) tests lint: $(BUILD_UPTODATE)
 	git submodule update --init
 	@mkdir -p $(shell pwd)/.pkg
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
 	    -v $(shell pwd):/go/src/github.com/weaveworks/weave \
 		-v $(shell pwd)/.pkg:/go/pkg \
-		-e GOARCH -e GOOS -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR -e SLOW \
-		$(BUILD_IMAGE) COVERAGE=$(COVERAGE) WEAVE_VERSION=$(WEAVE_VERSION) $@
+		-e GOARCH=$(ARCH) -e CGO_ENABLED=1 -e GOOS=linux -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR -e SLOW \
+		$(BUILD_IMAGE) COVERAGE=$(COVERAGE) WEAVE_VERSION=$(WEAVE_VERSION) CC=$(CC) QEMUARCH=$(QEMUARCH) CGO_LDFLAGS=$(CGO_LDFLAGS) $@
 
 else
 
@@ -133,18 +222,35 @@ lint:
 
 endif
 
+# This rule makes sure the build image is up-to-date.
+# It also makes sure the multiarch hooks are reqistered in the kernel so the QEMU emulation works
 $(BUILD_UPTODATE): build/*
 	$(SUDO) docker build -t $(BUILD_IMAGE) build/
+	$(SUDO) docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	touch $@
 
+# Creates the Dockerfile.your-user-here file from the template
+# Also replaces all placeholders with real values
+# If the architecture is amd64, it deletes all CROSS_BUILD lines
+# but otherwise, it only removes the "CROSS_BUILD_" placeholder and downloads QEMU
 %/Dockerfile.$(DOCKERHUB_USER): %/Dockerfile.template
-	sed -e "s/DOCKERHUB_USER/$(DOCKERHUB_USER)/" $^ > $@
+	sed -e "s|DOCKERHUB_USER|$(DOCKERHUB_USER)|;s|ARCH_EXT|$(ARCH_EXT)|;s|ALPINE_BASEIMAGE|$(ALPINE_BASEIMAGE)|;s|QEMUARCH|$(QEMUARCH)|" $^ > $@
+ifeq ($(ARCH),amd64)
+	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
+	sed -i "/CROSS_BUILD_/d" $@
+else
+	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
+	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
+	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMU_VERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(shell dirname $@)
+	sed -i "s/CROSS_BUILD_//g" $@
+endif
 
+# The targets below builds the weave images
 $(WEAVER_UPTODATE): prog/weaver/Dockerfile.$(DOCKERHUB_USER) $(WEAVER_EXE) $(WEAVEEXEC_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaver/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
-$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE)
+$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE)
 	cp weave prog/weaveexec/weave
 	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
 	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
@@ -152,8 +258,9 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile prog/weaveexec/symlink $(DOCKER
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
 	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
 	cp $(WEAVEUTIL_EXE) prog/weaveexec/weaveutil
-	cp $(DOCKER_DISTRIB) prog/weaveexec/docker.tgz
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -t $(WEAVEEXEC_IMAGE) prog/weaveexec
+	tar -xf $(DOCKER_DISTRIB) $(WEAVEEXEC_DOCKER_TARBALL_PATH) -O > prog/weaveexec/docker
+	chmod +x prog/weaveexec/docker
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
 $(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEAVER_UPTODATE)
@@ -165,8 +272,8 @@ $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-k
 	$(SUDO) docker build -f prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEKUBE_IMAGE) prog/weave-kube
 	touch $@
 
-$(WEAVENPC_UPTODATE): prog/weave-npc/Dockerfile $(WEAVENPC_EXE) prog/weave-npc/ulogd.conf
-	$(SUDO) docker build -f prog/weave-npc/Dockerfile -t $(WEAVENPC_IMAGE) prog/weave-npc
+$(WEAVENPC_UPTODATE): prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) $(WEAVENPC_EXE) prog/weave-npc/ulogd.conf
+	$(SUDO) docker build -f prog/weave-npc/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVENPC_IMAGE) prog/weave-npc
 	touch $@
 
 $(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile
@@ -184,23 +291,64 @@ tools/.git:
 
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+
+# This target pushes an image, and if UPDATE_LATEST is anything but false, also updates the latest tag
+# It takes one parameter, the image name
+push_%:
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 ifneq ($(UPDATE_LATEST),false)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push $(DOCKERHUB_USER)/$*:latest
 endif
 
-publish: $(PUBLISH)
-ifeq ($(PUBLISH_WEAVEDB),true)
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push   $(DOCKERHUB_USER)/weavedb:latest
+# This rule handles the pushing of the built images
+$(PUBLISH): publish_%: $(IMAGES_UPTODATE)
+	# Tag :latest with the real version
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$*$(ARCH_EXT) $(DOCKERHUB_USER)/$*$(ARCH_EXT):$(WEAVE_VERSION)
+	# Push the image with the arch suffix for arm and arm64, and without suffix for amd64
+	$(MAKE) DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) push_$*$(ARCH_EXT)
+
+ifeq ($(ARCH),amd64)
+	# If the architecture is amd64, add the -amd64 suffix.
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION) $(DOCKERHUB_USER)/$*-amd64:$(WEAVE_VERSION)
+	# Push the image with the -amd64-suffix so BINARY-ARCH-named images exist for all arches, so manifest lists may be made and ARCH is replaceable in scripts
+	$(MAKE) DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) push_$*-amd64
 endif
+
+publish-one: $(PUBLISH)
+ifeq ($(PUBLISH_WEAVEDB),true)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push $(DOCKERHUB_USER)/weavedb:latest
+endif
+
+# This target first runs "make publish" for each architecture
+# Then it pushes the manifest lists
+publish: ./manifest-tool $(addprefix sub-publish-,$(ALL_ARCHITECTURES))
+	./manifest-tool push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/weave-kube-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/weave-kube:$(WEAVE_VERSION)
+	./manifest-tool push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/weave-npc-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/weave-npc:$(WEAVE_VERSION)
+ifneq ($(UPDATE_LATEST),false)
+	# Push the manifest list to :latest as well
+	./manifest-tool push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/weave-kube-ARCH:latest --target $(DOCKERHUB_USER)/weave-kube:latest
+	./manifest-tool push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/weave-npc-ARCH:latest --target $(DOCKERHUB_USER)/weave-npc:latest
+endif
+	
+
+sub-publish-%:
+	$(MAKE) DOCKER_HOST=$(DOCKER_HOST) clean-bin
+	$(MAKE) ARCH=$* DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) $(IMAGES_UPTODATE)
+	$(MAKE) ARCH=$* DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) publish-one
+
+./manifest-tool:
+	wget https://github.com/luxas/manifest-tool/releases/download/v0.3.0/manifest-tool
+	chmod +x manifest-tool
 
 clean-bin:
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
-	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVE_EXPORT) .pkg
+	find prog -type f -print | grep "Dockerfile." | grep -v template | xargs rm -f
+	find prog -type f -print | grep qemu- | xargs rm -f
+	rm -rf $(EXES) $(IMAGES_UPTODATE) weave*.tar.gz $(DOCKER_DISTRIB) prog/weaveexec/docker .pkg
 
 clean: clean-bin
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
-	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE)
+	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE) ./manifest-tool
 
 build:
 	$(SUDO) go clean -i net

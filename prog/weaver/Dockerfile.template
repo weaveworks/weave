@@ -1,4 +1,4 @@
-FROM DOCKERHUB_USER/weaveexec
+FROM DOCKERHUB_USER/weaveexecARCH_EXT
 WORKDIR /home/weave
 ADD ./weaver /home/weave/
 ADD weavedata.db /weavedb/
