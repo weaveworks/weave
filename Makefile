@@ -210,7 +210,7 @@ $(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 tests:
-	./tools/test -no-go-get
+	./tools/test -no-go-get -netgo -timeout 8m
 
 lint:
 	./tools/lint -nocomment -notestpackage .
