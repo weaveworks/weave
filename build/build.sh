@@ -26,6 +26,6 @@ echo "weave:*:::::::" >>/etc/shadow
 echo "weave	ALL=(ALL)	NOPASSWD: ALL" >>/etc/sudoers
 
 # Allow full write access to the Go folders for the user Weave
-chmod -R 777 /usr/local/go
+chown -R $uid:$gid /usr/local/go
 
 su weave -c "PATH=$PATH make -C $WEAVE_SRC BUILD_IN_CONTAINER=false $*"

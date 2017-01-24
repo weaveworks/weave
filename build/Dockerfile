@@ -68,13 +68,11 @@ RUN curl -sSL http://www.tcpdump.org/release/libpcap-${LIBPCAP_CROSS_VERSION}.ta
 	&& for crosscompiler in ${GCC_CROSSCOMPILERS}; do \
 		CC=${crosscompiler}-gcc ac_cv_linux_vers=2 ./configure --host=${crosscompiler} --with-pcap=linux \
 		&& make \
-		&& export LIB_DIR="/usr/local/lib/${crosscompiler}-gcc" \
-		&& export FULL_VERSION=$(cat ./VERSION) \
-		&& export MAJOR_VERSION=$(sed 's/\([0-9][0-9]*\)\..*/\1/' ./VERSION) \
+		&& export LIB_DIR="/usr/local/lib/${crosscompiler}-gcc" VER="$(cat ./VERSION)" MAJOR_VER="$(sed 's/\([0-9][0-9]*\)\..*/\1/' ./VERSION)" \
 		&& mkdir -p ${LIB_DIR} \
-		&& cp -f libpcap.so.$FULL_VERSION libpcap.a ${LIB_DIR}/ \
-		&& ln -sf libpcap.so.$FULL_VERSION ${LIB_DIR}/libpcap.so.$MAJOR_VERSION \
-		&& ln -sf libpcap.so.$MAJOR_VERSION ${LIB_DIR}/libpcap.so \
+		&& cp -f libpcap.a libpcap.so.${VER} ${LIB_DIR} \
+		&& ln -sf libpcap.so.${VER} /usr/local/lib/libpcap.so.${MAJOR_VER} \
+		&& ln -sf libpcap.so.${MAJOR_VER} /usr/local/lib/libpcap.so \
 		&& make clean; done
 
 COPY build.sh /
