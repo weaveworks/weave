@@ -287,9 +287,6 @@ $(DOCKER_DISTRIB):
 tools/.git $(MANIFEST_TOOL_DIR)/.git:
 	git submodule update --init
 
-$(PUBLISH): publish_%: $(IMAGES_UPTODATE)
-	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$* $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
-
 $(MANIFEST_TOOL_EXE): $(MANIFEST_TOOL_DIR)/.git
 	docker run -u $(shell id -u):$(shell id -g) -v $(shell pwd)/$(MANIFEST_TOOL_DIR):/go/src/github.com/estesp/manifest-tool -w /go/src/github.com/estesp/manifest-tool \
 		golang:1.7 /bin/bash -c "go build -o manifest-tool github.com/estesp/manifest-tool"
