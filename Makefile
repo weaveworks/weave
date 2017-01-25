@@ -334,10 +334,12 @@ ifneq ($(UPDATE_LATEST),false)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push $(DOCKERHUB_USER)/$*:latest
 endif
 
-# This target pushes a manifest list, and if UPDATE_LATEST is anything but false, also updates the latest tag
-# It takes one parameter, the image name
+# This target pushes a manifest list; it takes one parameter, the image name.
+# The variable UPDATE_LATEST controls whether it updates the versioned tag and/or the latest tag
 $(PUSH_ML): push_ml_%:
+ifneq ($(UPDATE_LATEST),latest-only)
 	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
+endif
 ifneq ($(UPDATE_LATEST),false)
 	# Push the manifest list to :latest as well
 	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:latest --target $(DOCKERHUB_USER)/$*:latest
