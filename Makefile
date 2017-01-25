@@ -206,7 +206,7 @@ $(WEAVEWAIT_NOMCAST_EXE):
 
 # These programs need a separate rule as they fail the netgo check in
 # the main build stanza due to not importing net package
-$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE):
+$(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE) $(MANIFEST_TOOL_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 tests:
@@ -286,10 +286,6 @@ $(DOCKER_DISTRIB):
 
 tools/.git $(MANIFEST_TOOL_DIR)/.git:
 	git submodule update --init
-
-$(MANIFEST_TOOL_EXE): $(MANIFEST_TOOL_DIR)/.git
-	docker run -u $(shell id -u):$(shell id -g) -v $(shell pwd)/$(MANIFEST_TOOL_DIR):/go/src/github.com/estesp/manifest-tool -w /go/src/github.com/estesp/manifest-tool \
-		golang:1.7 /bin/bash -c "go build -o manifest-tool github.com/estesp/manifest-tool"
 
 # CODE FOR PUBLISHING THE IMAGES
 
