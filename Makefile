@@ -33,7 +33,7 @@ ifeq ($(ARCH),amd64)
 
 # The name of the gcc we're using for compiling C code
 	CC=gcc
-	
+
 # Optional parameters that can be passed when linking C code into the Go binary
 	CGO_LDFLAGS=
 endif
@@ -52,7 +52,7 @@ ifeq ($(ARCH),arm)
 
 # The architecture name to use when downloading a prebuilt QEMU binary
 	QEMUARCH=arm
-	
+
 # In the weaveworks/build image; libpcap libraries for arm are placed here
 # Tell the gcc linker to search for libpcap here
 	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
@@ -72,7 +72,7 @@ ifeq ($(ARCH),arm64)
 
 # The architecture name to use when downloading a prebuilt QEMU binary
 	QEMUARCH=aarch64
-	
+
 # In the weaveworks/build image; libpcap libraries for arm64 are placed here
 # Tell the gcc linker to search for libpcap here
 	CGO_LDFLAGS="-L/usr/local/lib/$(CC)"
@@ -232,11 +232,11 @@ $(BUILD_UPTODATE): build/*
 	echo "DOCKERHUB_USER|$(DOCKERHUB_USER)|g;s|ARCH_EXT|$(ARCH_EXT)|g;s|ALPINE_BASEIMAGE|$(ALPINE_BASEIMAGE)|g;s|QEMUARCH|$(QEMUARCH)"
 	sed -e "s|DOCKERHUB_USER|$(DOCKERHUB_USER)|g;s|ARCH_EXT|$(ARCH_EXT)|g;s|ALPINE_BASEIMAGE|$(ALPINE_BASEIMAGE)|g;s|QEMUARCH|$(QEMUARCH)|g" $^ > $@
 ifeq ($(ARCH),amd64)
-	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
+# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
 	sed -i "/CROSS_BUILD_/d" $@
 else
-	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
-	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
+# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
+# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
 	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMU_VERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(shell dirname $@)
 	cd $(shell dirname $@) && sha256sum -c $(shell pwd)/build/shasums/qemu-$(QEMUARCH)-static.sha256sum
 	sed -i "s/CROSS_BUILD_//g" $@
@@ -306,19 +306,19 @@ publish-one-arch: $(PUBLISH)
 
 # This rule handles the pushing of the built images
 $(PUBLISH): publish_%: $(IMAGES_UPTODATE)
-	# Tag :latest with the real version
+# Tag :latest with the real version
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$*$(ARCH_EXT) $(DOCKERHUB_USER)/$*$(ARCH_EXT):$(WEAVE_VERSION)
-	# Push the image with the arch suffix for arm and arm64, and without suffix for amd64
+# Push the image with the arch suffix for arm and arm64, and without suffix for amd64
 	$(MAKE) DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) push_$*$(ARCH_EXT)
 
 ifeq ($(ARCH),amd64)
-	# If the architecture is amd64, add the -amd64 suffix.
+# If the architecture is amd64, add the -amd64 suffix.
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION) $(DOCKERHUB_USER)/$*-amd64:$(WEAVE_VERSION)
-	# If the version is latest, tag the -amd64 with latest as well
+# If the version is latest, tag the -amd64 with latest as well
 ifneq ($(UPDATE_LATEST),false)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker tag  $(DOCKERHUB_USER)/$*-amd64:$(WEAVE_VERSION) $(DOCKERHUB_USER)/$*-amd64:latest
 endif
-	# Push the image with the -amd64-suffix so BINARY-ARCH-named images exist for all arches, so manifest lists may be made and ARCH is replaceable in scripts
+# Push the image with the -amd64-suffix so BINARY-ARCH-named images exist for all arches, so manifest lists may be made and ARCH is replaceable in scripts
 	$(MAKE) DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) push_$*-amd64
 endif
 
@@ -337,7 +337,7 @@ ifneq ($(UPDATE_LATEST),latest-only)
 	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 endif
 ifneq ($(UPDATE_LATEST),false)
-	# Push the manifest list to :latest as well
+# Push the manifest list to :latest as well
 	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:latest --target $(DOCKERHUB_USER)/$*:latest
 endif
 
