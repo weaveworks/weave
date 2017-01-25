@@ -95,6 +95,11 @@ func NewFastDatapath(iface *net.Interface, port int, encryptionEnabled bool) (*F
 		if err := ipSec.Flush(false); err != nil {
 			return nil, errors.Wrap(err, "ipsec flush")
 		}
+		go func() {
+			if err := ipSec.Monitor(); err != nil {
+				log.Fatalf("ipsec monitor died: %x", err)
+			}
+		}()
 	}
 
 	fastdp := &FastDatapath{
@@ -664,6 +669,7 @@ func (fwd *fastDatapathForwarder) Confirm() {
 			net.IP(fwd.localIP[:]), fwd.remoteAddr.IP,
 			fwd.remoteAddr.Port,
 			fwd.sessionKey,
+			false,
 			func(msg []byte) error {
 				return fwd.sendControlMsg(FastDatapathCryptoInitSARemote, msg)
 			},
@@ -769,6 +775,7 @@ func (fwd *fastDatapathForwarder) sendHeartbeat() {
 const (
 	FastDatapathHeartbeatAck = iota
 	FastDatapathCryptoInitSARemote
+	FastDatapathCryptoRekey
 )
 
 func (fwd *fastDatapathForwarder) handleVxlanSpecialPacket(frame []byte, sender *net.UDPAddr) {
@@ -820,6 +827,8 @@ func (fwd *fastDatapathForwarder) ControlMessage(tag byte, msg []byte) {
 		fwd.handleHeartbeatAck()
 	case FastDatapathCryptoInitSARemote:
 		fwd.handleCryptoInitSARemote(msg)
+	case FastDatapathCryptoRekey:
+		fwd.handleCryptoRekey()
 
 	default:
 		log.Info(fwd.logPrefix(), "Ignoring unknown control message: ", tag)
@@ -842,6 +851,22 @@ func (fwd *fastDatapathForwarder) handleHeartbeatAck() {
 	}
 }
 
+func (fwd *fastDatapathForwarder) handleCryptoRekey() {
+	log.Info(fwd.logPrefix(), "IPSec init SA local (rekey)")
+	err := fwd.fastdp.ipsec.InitSALocal(
+		fwd.fastdp.localPeer.Name, fwd.remotePeer.Name, fwd.connUID,
+		net.IP(fwd.localIP[:]), fwd.remoteAddr.IP, fwd.remoteAddr.Port,
+		fwd.sessionKey, true,
+		func(msg []byte) error {
+			return fwd.sendControlMsg(FastDatapathCryptoInitSARemote, msg)
+		},
+	)
+	if err != nil {
+		log.Warning(fwd.logPrefix(), "IPSec init SA local (rekey) failed: ", err)
+		fwd.handleError(err)
+	}
+}
+
 func (fwd *fastDatapathForwarder) handleCryptoInitSARemote(msg []byte) {
 	log.Info(fwd.logPrefix(), "IPSec init SA remote")
 	err := fwd.fastdp.ipsec.InitSARemote(
@@ -849,6 +874,9 @@ func (fwd *fastDatapathForwarder) handleCryptoInitSARemote(msg []byte) {
 		fwd.fastdp.localPeer.Name, fwd.remotePeer.Name, fwd.connUID,
 		net.IP(fwd.localIP[:]), fwd.remoteAddr.IP, fwd.remoteAddr.Port,
 		fwd.sessionKey,
+		func() error {
+			return fwd.sendControlMsg(FastDatapathCryptoRekey, nil)
+		},
 	)
 	if err != nil {
 		log.Warning(fwd.logPrefix(), "IPSec init SA remote failed: ", err)

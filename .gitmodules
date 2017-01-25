@@ -3,7 +3,7 @@
 	url = https://github.com/weaveworks/build-tools
 [submodule "vendor/github.com/vishvananda/netlink"]
 	path = vendor/github.com/vishvananda/netlink
-	url = https://github.com/brb/netlink.git
+	url = https://github.com/weaveworks/netlink.git
 [submodule "vendor/github.com/gorilla/mux"]
 	path = vendor/github.com/gorilla/mux
 	url = https://github.com/gorilla/mux.git

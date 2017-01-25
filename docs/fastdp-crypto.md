@@ -38,6 +38,18 @@ Where:
 * `nonceIn` and `nonceOut` are randomly generated 32byte nonces which
   are exchanged over the encrypted control plane channel.
 
+## Key Rotation
+
+The key (and the salt) are rotated after either of the following limits of its
+security association is reached:
+
+* 350 MB of data transferred.
+* 30 min elapsed after the SA creation.
+
+The rationale for the relatively low limits is that the current implementation
+does not use [ESN][esn] in ESP, thus 32bit Sequence Number is used which might
+overflow pretty quickly.
+
 ## SPI
 
 A directional secure connection between two peers is identified with SPI.
@@ -69,6 +81,31 @@ recv InitSARemote(spi_AB, nonce_AB): <--                          {key,salt}_BA 
     create SP_AB(A<-B, spi_AB),                                   install marking rule.
     install marking rule.
 ```
+
+## Rekeying
+
+Each peer starts an asynchronous XFRM monitor which tracks SAout soft expirations.
+Once it has received the expire event, it sends the `Rekey` control message over the
+encrypted control plane:
+
+```
+Peer A                                                        Peer B
+-----------------------------------------------------------------------------------------------------------------
+
+send Rekey -->
+                                                          --> recv Rekey:
+                                                                  nonce_AB = rand(),
+                                                                  {key,salt}_AB = hkdf(sessionKey, nonce_AB, B),
+                                                                  spi_AB = allocspi(),
+                                                                  create SA_AB(A<-B, spi_AB, key_AB, salt_AB),
+                                                              <-- send InitSARemote(spi_AB, nonce_AB).
+recv InitSARemote(spi_AB, nonce_AB): <--
+    {key,salt}_AB = hkdf(sessionKey, nonce_AB, B),
+    create SA_AB(A<-B, spi_AB, key_AB, salt_AB),
+    update SP_AB(A<-B, spi_AB).
+```
+
+The obsolete instances of SA are GC'd by the kernel (hard-limit).
 
 # Implementation Details
 

@@ -1,11 +1,6 @@
 // package IPsec provides primitives for establishing IPsec in the fastdp mode.
 package ipsec
 
-// TODO:
-// * test with non-default ports.
-// * get rid of `fastdp.fwd.remoteAddr == nil` cases.
-// * wiresharking
-
 import (
 	"crypto/rand"
 	"crypto/sha256"
@@ -21,6 +16,7 @@ import (
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/crypto/hkdf"
 
 	"github.com/weaveworks/mesh"
@@ -39,6 +35,11 @@ const (
 	chainInMark  = "WEAVE-IPSEC-IN-MARK"
 	chainOut     = "WEAVE-IPSEC-OUT"
 	chainOutMark = "WEAVE-IPSEC-OUT-MARK"
+
+	// TODO
+	limitByteHard = 350 * 1024 * 1024 // 350mb
+	//limitTimeHard = 30 * 60           // 30min
+	limitTimeHard = 60 // 1min (for testing)
 )
 
 type SPI uint32
@@ -56,8 +57,9 @@ func getSPIId(srcPeer, dstPeer mesh.PeerName, connUID uint64) (id spiID) {
 }
 
 type spiInfo struct {
-	spi      SPI
-	isDirOut bool
+	spi       SPI
+	isDirOut  bool
+	initRekey func() error
 }
 
 // IPSec
@@ -88,14 +90,91 @@ func New(log *logrus.Logger) (*IPSec, error) {
 	return ipsec, nil
 }
 
+// Monitor monitors expiration of outbound SAs and triggers re-keying.
+func (ipsec *IPSec) Monitor() error {
+	ch := make(chan netlink.XfrmMsg)
+	errorCh := make(chan error)
+
+	if err := netlink.XfrmMonitor(ch, nil, errorCh, nl.XFRM_MSG_EXPIRE); err != nil {
+		return errors.Wrap(err, "xfrm monitor")
+	}
+
+	for {
+		select {
+		case err := <-errorCh:
+			return err
+		case msg := <-ch:
+			if exp, ok := msg.(*netlink.XfrmMsgExpire); ok {
+				if exp.Hard {
+					if err := ipsec.handleHardExpire(exp); err != nil {
+						return errors.Wrap(err, "hard expire")
+					}
+				} else {
+					if err := ipsec.handleSoftExpire(exp); err != nil {
+						return errors.Wrap(err, "soft expire")
+					}
+				}
+			}
+			// Ignore the rest, as other types of XFRM_MSG_* are not expected.
+		}
+	}
+}
+
+func (ipsec *IPSec) handleHardExpire(msg *netlink.XfrmMsgExpire) error {
+	ipsec.Lock()
+	defer ipsec.Unlock()
+
+	spi := SPI(msg.XfrmState.Spi)
+
+	// Remove iptables inbound rule for marking ESP packets with obsolete SPI
+	if spiInfo, ok := ipsec.spis[spi]; ok && !spiInfo.isDirOut {
+		if err := ipsec.removeDropNonEncryptedInbound(msg.XfrmState.Dst, msg.XfrmState.Src, spi); err != nil {
+			ipsec.log.Warnf("ipsec: removeDropNonEncryptedInbound failed: %s", err)
+		}
+		delete(ipsec.spis, spi)
+	} else if !ok {
+		ipsec.log.Warnf("ipsec: handleHardExpire SPI 0x%x not found", spi)
+	}
+
+	return nil
+}
+
+func (ipsec *IPSec) handleSoftExpire(msg *netlink.XfrmMsgExpire) error {
+	ipsec.Lock()
+	defer ipsec.Unlock()
+
+	spi := SPI(msg.XfrmState.Spi)
+
+	// Trigger rekeying
+	if spiInfo, ok := ipsec.spis[spi]; ok && spiInfo.initRekey != nil {
+		if err := spiInfo.initRekey(); err != nil {
+			return errors.Wrap(err, "init rekey")
+		}
+	} else if !ok {
+		ipsec.log.Warnf("ipsec: handleSoftExpire SPI 0x%x not found", spi)
+	}
+
+	return nil
+}
+
 // InitSALocal initializes inbound ipsec from remotePeer and triggers
 // the initialization on remotePeer.
-func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, connUID uint64, localIP, remoteIP net.IP, udpPort int, sessionKey *[32]byte, initRemote func([]byte) error) error {
+//
+// isRekey denotes whether the initialization was triggered by
+// a re-keying request.
+func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, connUID uint64, localIP, remoteIP net.IP, udpPort int, sessionKey *[32]byte, isRekey bool, initRemote func([]byte) error) error {
 	// ID of inbound SPI
 	spiID := getSPIId(remotePeer, localPeer, connUID)
 
 	ipsec.Lock()
 	defer ipsec.Unlock()
+
+	// Sanity check
+	if isRekey {
+		if _, ok := ipsec.spiInfo[spiID]; !ok {
+			return fmt.Errorf("cannot find SPI by %x", spiID)
+		}
+	}
 
 	// Derive SA key
 	nonce, err := genNonce()
@@ -129,8 +208,14 @@ func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, connUID uin
 	}
 
 	// Install iptables rules
-	if err := ipsec.installDropNonEncrypted(localIP, remoteIP, udpPort, spi); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("install protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, udpPort, spi))
+	if !isRekey {
+		if err := ipsec.installDropNonEncrypted(localIP, remoteIP, udpPort, spi); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("install protecting rules (%s, %s, %d, 0x%x)", localIP, remoteIP, udpPort, spi))
+		}
+	} else {
+		if err := ipsec.updateDropNonEncrypted(localIP, remoteIP, spi); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("update protecting rules (%s, %s, 0x%x)", localIP, remoteIP, spi))
+		}
 	}
 
 	si := spiInfo{spi: spi, isDirOut: false}
@@ -148,7 +233,7 @@ func (ipsec *IPSec) InitSALocal(localPeer, remotePeer mesh.PeerName, connUID uin
 
 // InitSARemote initializes outbound ipsec to remotePeer.
 // Triggered by remotePeer.
-func (ipsec *IPSec) InitSARemote(msgInitSARemote []byte, localPeer, remotePeer mesh.PeerName, connUID uint64, localIP, remoteIP net.IP, udpPort int, sessionKey *[32]byte) error {
+func (ipsec *IPSec) InitSARemote(msgInitSARemote []byte, localPeer, remotePeer mesh.PeerName, connUID uint64, localIP, remoteIP net.IP, udpPort int, sessionKey *[32]byte, initRekey func() error) error {
 	// ID of outbound SPI
 	spiID := getSPIId(localPeer, remotePeer, connUID)
 
@@ -161,7 +246,11 @@ func (ipsec *IPSec) InitSARemote(msgInitSARemote []byte, localPeer, remotePeer m
 	ipsec.Lock()
 	defer ipsec.Unlock()
 
-	ipsec.log.Infof("ipsec: InitSARemote: %s -> %s :%d 0x%x", localIP, remoteIP, udpPort, spi)
+	// We say that the initialization happened due to re-keying if
+	// ipsec between peers has been previously established
+	_, isRekey := ipsec.spiInfo[spiID]
+
+	ipsec.log.Infof("ipsec: InitSARemote: %s -> %s :%d 0x%x %t", localIP, remoteIP, udpPort, spi, isRekey)
 
 	// Derive SA key by using the received nonce
 	key, err := deriveKey(sessionKey[:], msg.nonce, remotePeer)
@@ -184,7 +273,7 @@ func (ipsec *IPSec) InitSARemote(msgInitSARemote []byte, localPeer, remotePeer m
 		return errors.Wrap(err, fmt.Sprintf("xfrm policy update (%s, %s, 0x%x)", localIP, remoteIP, spi))
 	}
 
-	si := spiInfo{spi: spi, isDirOut: true}
+	si := spiInfo{spi: spi, isDirOut: true, initRekey: initRekey}
 	ipsec.spiInfo[spiID] = si
 	ipsec.spis[spi] = &si
 
@@ -433,6 +522,14 @@ func (ipsec *IPSec) removeDropNonEncrypted(srcIP, dstIP net.IP, udpPort int, inS
 	return nil
 }
 
+func (ipsec *IPSec) updateDropNonEncrypted(srcIP, dstIP net.IP, inSPI SPI) error {
+	r := ruleMarkInboundESP(srcIP, dstIP, inSPI)
+	if err := ipsec.ipt.AppendUnique(r.table, r.chain, r.rulespec...); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("iptables append unique (%s, %s, %s)", r.table, r.chain, r.rulespec))
+	}
+	return nil
+}
+
 func (ipsec *IPSec) removeDropNonEncryptedInbound(srcIP, dstIP net.IP, inSPI SPI) error {
 	r := ruleMarkInboundESP(srcIP, dstIP, inSPI)
 	if err := ipsec.ipt.Delete(r.table, r.chain, r.rulespec...); err != nil {
@@ -442,6 +539,24 @@ func (ipsec *IPSec) removeDropNonEncryptedInbound(srcIP, dstIP net.IP, inSPI SPI
 }
 
 // xfrm
+
+func xfrmStateLimits(isDirOut bool) netlink.XfrmStateLimits {
+	limits := netlink.XfrmStateLimits{
+		ByteHard: limitByteHard,
+		TimeHard: limitTimeHard,
+	}
+
+	if isDirOut {
+		limits.ByteSoft = pct90(limits.ByteHard)
+		limits.TimeSoft = pct90(limits.TimeHard)
+	}
+
+	return limits
+}
+
+func pct90(of uint64) uint64 {
+	return uint64(0.9 * float64(of))
+}
 
 func xfrmAllocSpiState(srcIP, dstIP net.IP) *netlink.XfrmState {
 	return &netlink.XfrmState{
@@ -466,6 +581,7 @@ func xfrmState(srcIP, dstIP net.IP, spi SPI, isDirOut bool, key []byte) (*netlin
 		Key:    key,
 		ICVLen: 128,
 	}
+	state.Limits = xfrmStateLimits(isDirOut)
 
 	return state, nil
 }
