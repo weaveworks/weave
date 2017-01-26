@@ -31,11 +31,7 @@ source "$STATE"
 mkdir -p $(dirname $SRCDIR) && cp -r $(pwd)/ $SRCDIR
 
 if [ -n "$TEST_AND_PUBLISH" ] ; then
-    [ -z "$SECRET_PASSWORD" ] || bin/setup-circleci-secrets "$SECRET_PASSWORD"
     cd $SRCDIR; git submodule update --init
-    if [ "$CIRCLE_NODE_INDEX" = "0" -a -n "$SECRET_PASSWORD" ] ; then
-        cd $SRCDIR/test; ./gce.sh make_template
-    fi
     cd $SRCDIR/build
     ../tools/rebuild-image weaveworks/weavebuild . Dockerfile build.sh
     touch $SRCDIR/.build.uptodate

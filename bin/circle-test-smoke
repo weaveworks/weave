@@ -4,11 +4,14 @@ set -e
 
 source "$STATE"
 
-if [ -n "$TEST_AND_PUBLISH" ] ; then
-    [ -n "$SECRET_PASSWORD" ] || { echo "Cannot run smoke tests: no secret key"; exit 1; }
-    cd $SRCDIR/test
-    eval $(./gce.sh hosts)
+if [ -n "$TEST_AND_PUBLISH" ]; then
+    [ -n "$SECRET_KEY" ] || {
+        echo "Cannot run smoke tests: no secret key"
+        exit 1
+    }
     export COVERAGE=true
     export WEAVE_NET_SANITY_CHECKS_FILES="$CIRCLE_ARTIFACTS/weave_net_sanity_check_*.log"
-    ./run_all.sh
+    export NAME="test-$CIRCLE_BUILD_NUM-$CIRCLE_NODE_INDEX"
+    cd "$SRCDIR/test" # Ensures we generate code coverage files in the right folder.
+    ./run-integration-tests.sh
 fi
