@@ -45,6 +45,7 @@ RUN apt-get update \
 RUN go get \
 	github.com/golang/lint/golint \
 	github.com/fzipp/gocyclo \
+	gopkg.in/mvdan/sh.v1/cmd/shfmt \
 	github.com/client9/misspell/cmd/misspell
 
 # First clean, because we're gonna rebuild the std both with -race enabled and disabled
