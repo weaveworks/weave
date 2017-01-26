@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/profile"
+	"github.com/weaveworks/common/signals"
 	"github.com/weaveworks/docker/pkg/mflag"
 	"github.com/weaveworks/mesh"
 
@@ -361,7 +362,7 @@ func main() {
 		go listenAndServeHTTP(statusAddr, statusMux)
 	}
 
-	common.SignalHandlerLoop(router)
+	signals.SignalHandlerLoop(common.Log, router)
 }
 
 func options() map[string]string {

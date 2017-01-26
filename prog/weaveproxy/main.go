@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/weaveworks/common/signals"
 	"github.com/weaveworks/docker/pkg/mflag"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/mflagext"
@@ -79,5 +80,5 @@ func main() {
 	p.AttachExistingContainers()
 	go p.Serve(listeners)
 	go p.ListenAndServeStatus("/home/weave/status.sock")
-	common.SignalHandlerLoop()
+	signals.SignalHandlerLoop(common.Log)
 }
