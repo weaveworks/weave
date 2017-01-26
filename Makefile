@@ -176,7 +176,7 @@ exes $(EXES) tests lint: $(BUILD_UPTODATE)
 	$(SUDO) docker run $(RM) $(RUN_FLAGS) \
 	    -v $(shell pwd):/go/src/github.com/weaveworks/weave \
 		-v $(shell pwd)/.pkg:/go/pkg \
-		-e GOARCH=$(ARCH) -e CGO_ENABLED=1 -e GOOS=linux -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR -e SLOW \
+		-e GOARCH=$(ARCH) -e CGO_ENABLED=1 -e GOOS=linux -e CIRCLECI -e CIRCLE_BUILD_NUM -e CIRCLE_NODE_TOTAL -e CIRCLE_NODE_INDEX -e COVERDIR -e SLOW -e DEBUG \
 		$(BUILD_IMAGE) COVERAGE=$(COVERAGE) WEAVE_VERSION=$(WEAVE_VERSION) CC=$(CC) QEMUARCH=$(QEMUARCH) CGO_LDFLAGS=$(CGO_LDFLAGS) $@
 
 else
@@ -210,7 +210,7 @@ $(SIGPROXY_EXE) $(TEST_TLS_EXE) $(WEAVEWAIT_NOOP_EXE) $(RUNNER_EXE):
 	go build $(BUILD_FLAGS) -o $@ ./$(@D)
 
 tests:
-	./tools/test -no-go-get
+	./tools/test -no-go-get -netgo -timeout 8m
 
 lint:
 	./tools/lint -nocomment -notestpackage .
