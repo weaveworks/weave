@@ -345,7 +345,7 @@ clean-bin:
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
 	find prog -type f -name "Dockerfile.*" -not -name "Dockerfile.template" -print | xargs rm -f
 	find prog -type f -name "*qemu-*" -print | xargs rm -f
-	rm -rf $(EXES) $(IMAGES_UPTODATE) weave*.tar.gz $(DOCKER_DISTRIB) prog/weaveexec/docker .pkg
+	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE) weave*.tar.gz $(DOCKER_DISTRIB) prog/weaveexec/docker .pkg
 
 clean: clean-bin
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
