@@ -2,7 +2,6 @@
 
 # Do not lint the below bash scripts in Weave Net, in order to 
 # avoid breaking the build on make lint:
-bin/circle-dependencies-post
 bin/circle-deploy-issues
 bin/circle-deploy-master
 bin/circle-teardown-pre

@@ -27,6 +27,7 @@ dependencies:
   cache_directories:
     - "~/docker"
   post:
+    - bin/circle-dependencies-post-sources
     # Provision & configure testing VMs:
     - "while [ ! -d $SRCDIR ]; do sleep 1; done; $SRCDIR/bin/provision_test_vms.sh":
         parallel: true
