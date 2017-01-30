@@ -124,3 +124,6 @@
 [submodule "vendor/github.com/estesp/manifest-tool"]
 	path = vendor/github.com/estesp/manifest-tool
 	url = https://github.com/estesp/manifest-tool
+[submodule "vendor/github.com/weaveworks/common"]
+	path = vendor/github.com/weaveworks/common
+	url = https://github.com/weaveworks/common
