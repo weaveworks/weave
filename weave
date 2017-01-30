@@ -499,7 +499,7 @@ util_op() {
     if command_exists weaveutil ; then
         weaveutil "$@"
     else
-        docker run --rm --privileged --net=host --pid=host $(docker_sock_options) \
+        docker run --rm --pid=host $(docker_run_options) \
             --entrypoint=/usr/bin/weaveutil $EXEC_IMAGE "$@"
     fi
 }
