@@ -126,7 +126,10 @@ iptables -t filter -A OUTPUT ! -p esp -m policy --dir out --pol none \
          -m mark --mark ${MARK} -j DROP
 ```
 
-# Misc
+## ESN
+
+To prevent from cycling SeqNo which makes replay attacks possible, we use
+64-bit extended sequence numbers known as [ESN](esn).
 
 ## MTU
 

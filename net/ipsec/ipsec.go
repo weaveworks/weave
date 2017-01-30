@@ -195,7 +195,6 @@ func (ipsec *IPSec) Destroy(localPeer, remotePeer mesh.PeerName, connUID uint64,
 	defer ipsec.Unlock()
 
 	// Destroy inbound
-	ipsec.log.Infof(">>>>>>>>>>>>>>>>>> DESTROY <<<<<<<<<<<<<<<<<<<<<<")
 
 	if inSPIInfo, ok := ipsec.spiInfo[inSPIID]; ok {
 		ipsec.log.Infof("ipsec: destroy: in %s -> %s 0x%x", remoteIP, localIP, inSPIInfo.spi)
@@ -444,7 +443,8 @@ func xfrmAllocSpiState(srcIP, dstIP net.IP) *netlink.XfrmState {
 		Dst:          dstIP,
 		Proto:        netlink.XFRM_PROTO_ESP,
 		Mode:         netlink.XFRM_MODE_TRANSPORT,
-		ReplayWindow: 32,
+		ReplayWindow: 256,
+		ESN:          true,
 	}
 }
 
