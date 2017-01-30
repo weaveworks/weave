@@ -79,6 +79,13 @@ Kubernetes see the
 and the [NetworkPolicy API object
 definition](http://kubernetes.io/docs/api-reference/extensions/v1beta1/definitions/#_v1beta1_networkpolicy).
 
+**Note:** as of version 1.9 of Weave Net, the Network Policy
+  Controller allows all multicast traffic. Since a single multicast
+  address may be used by multiple pods, we cannot implement rules to
+  isolate them individually.  You can turn this behaviour off (block
+  all multicast traffic) by adding `--allow-mcast` as an argument to
+  `weave-npc` in the YAML configuration.
+
 ###<a name="blocked-connections"></a> Troubleshooting Blocked Connections
 
 If you suspect that legitimate traffic is being blocked by the Weave Network Policy Controller, the first thing to do is check the `weave-npc` container's logs.
