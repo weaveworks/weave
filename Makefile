@@ -292,7 +292,7 @@ tools/.git $(MANIFEST_TOOL_DIR)/.git:
 
 # This target first runs "make publish" for each architecture
 # Then it pushes the manifest lists
-publish: $(MANIFEST_TOOL_EXE) $(addprefix sub-publish-,$(ALL_ARCHITECTURES)) $(WEAVEDB_UPTODATE)
+publish: $(addprefix sub-publish-,$(ALL_ARCHITECTURES)) $(WEAVEDB_UPTODATE)
 	$(MAKE) DOCKER_HOST=$(DOCKER_HOST) DOCKERHUB_USER=$(DOCKERHUB_USER) WEAVE_VERSION=$(WEAVE_VERSION) UPDATE_LATEST=$(UPDATE_LATEST) $(PUSH_ML)
 ifeq ($(PUBLISH_WEAVEDB),true)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker push $(DOCKERHUB_USER)/weavedb:latest
@@ -333,7 +333,7 @@ endif
 
 # This target pushes a manifest list; it takes one parameter, the image name.
 # The variable UPDATE_LATEST controls whether it updates the versioned tag and/or the latest tag
-$(PUSH_ML): push_ml_%:
+$(PUSH_ML): push_ml_%: $(MANIFEST_TOOL_EXE)
 ifneq ($(UPDATE_LATEST),latest-only)
 	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:$(WEAVE_VERSION) --target $(DOCKERHUB_USER)/$*:$(WEAVE_VERSION)
 endif
