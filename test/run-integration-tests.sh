@@ -310,7 +310,24 @@ function end() {
     echo "> Build took $(date -u -d @$(($(date +%s) - begin)) +"%T")."
 }
 
+function echo_export_hosts() {
+    exec 1>&111
+    # Print a command to set HOSTS in the calling script, so that subsequent calls to
+    # test scripts can point to the right testing machines while developing:
+    echo "export HOSTS=\"$HOSTS\""
+    exec 1>&2
+}
+
 function main() {
+    # Keep a reference to stdout in another file descriptor (FD #111), and then globally redirect all stdout to stderr.
+    # This is so that HOSTS can be eval'ed in the calling script using:
+    #   $ eval $(./run-integration-tests.sh [provision|configure|setup])
+    # and ultimately subsequent calls to test scripts can point to the right testing machines during development.
+    if [ "$1" == "provision" ] || [ "$1" == "configure" ] || [ "$1" == "setup" ]; then
+        exec 111>&1 # 111 ought to match the file descriptor used in echo_export_hosts.
+        exec 1>&2
+    fi
+
     begin=$(date +%s)
     trap end EXIT
 
@@ -330,16 +347,19 @@ function main() {
 
         provision)
             provision on "$PROVIDER"
+            echo_export_hosts
             ;;
 
         configure)
             provision on "$PROVIDER" # Vagrant and Terraform do not provision twice if VMs are already provisioned, so we just set environment variables.
             configure "$ssh_user" "$ssh_hosts" "${ssh_port:-22}" "$ssh_id_file"
+            echo_export_hosts
             ;;
 
         setup)
             provision on "$PROVIDER" # Vagrant and Terraform do not provision twice if VMs are already provisioned, so we just set environment variables.
             "$DIR/setup.sh"
+            echo_export_hosts
             ;;
 
         test)
