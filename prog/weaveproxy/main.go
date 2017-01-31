@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/weaveworks/common/mflag"
 	"github.com/weaveworks/common/signals"
-	"github.com/weaveworks/docker/pkg/mflag"
 	"github.com/weaveworks/weave/common"
 	"github.com/weaveworks/weave/common/mflagext"
 	"github.com/weaveworks/weave/proxy"

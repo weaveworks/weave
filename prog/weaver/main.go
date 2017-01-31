@@ -13,8 +13,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/profile"
+	"github.com/weaveworks/common/mflag"
 	"github.com/weaveworks/common/signals"
-	"github.com/weaveworks/docker/pkg/mflag"
 	"github.com/weaveworks/mesh"
 
 	"github.com/weaveworks/weave/common"
