@@ -704,8 +704,9 @@ init_fastdp() {
     # a local network, at 1460 bytes.  To get the overlay MTU from that we
     # subtract 20 bytes for the outer IPv4 header, 8 bytes for the outer
     # UDP header, 8 bytes for the vxlan header, and 14 bytes for the inner
-    # ethernet header.
-    MTU=${WEAVE_MTU:-1410}
+    # ethernet header. In addition, we subtract 34 bytes for the ESP overhead
+    # which is needed for the vxlan encryption.
+    MTU=${WEAVE_MTU:-1376}
 
     # create_bridge already created the datapath netdev
     ip link set dev $DATAPATH mtu $MTU

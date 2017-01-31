@@ -39,8 +39,8 @@ C2=10.2.1.7
 
 start_suite "Ping over encrypted cross-host weave network (fastdp)"
 
-WEAVE_MTU=1300 weave_on $HOST1 launch --password wfvAwt7sj
-WEAVE_MTU=1300 weave_on $HOST2 launch --password wfvAwt7sj $HOST1
+weave_on $HOST1 launch --password wfvAwt7sj
+weave_on $HOST2 launch --password wfvAwt7sj $HOST1
 
 assert_raises "weave_on $HOST1 status connections | grep -P 'encrypted *fastdp'"
 assert_raises "weave_on $HOST2 status connections | grep -P 'encrypted *fastdp'"
