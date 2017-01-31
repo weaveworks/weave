@@ -12,7 +12,6 @@ LABEL works.weave.role=system \
       org.label-schema.vcs-url="https://github.com/weaveworks/weave" \
       org.label-schema.vendor="Weaveworks"
 
-WORKDIR /home/weave
 ENTRYPOINT ["/home/weave/sigproxy", "/home/weave/weave"]
 
 RUN apk add --update \
@@ -31,3 +30,4 @@ ADD ./weavewait /w/w
 ADD ./weavewait_noop /w-noop/w
 ADD ./weavewait_nomcast /w-nomcast/w
 ADD ./docker /usr/bin/
+WORKDIR /home/weave
