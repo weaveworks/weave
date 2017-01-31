@@ -256,7 +256,8 @@ func main() {
 	router := weave.NewNetworkRouter(config, networkConfig, name, nickName, overlay, db)
 	Log.Println("Our name is", router.Ourself)
 
-	if peers, err = router.InitialPeers(resume, peers); err != nil {
+	var indirectPeers []string
+	if peers, indirectPeers, err = router.InitialPeers(resume, peers); err != nil {
 		Log.Fatal("Unable to get initial peer set: ", err)
 	}
 
@@ -328,7 +329,7 @@ func main() {
 	}
 
 	router.Start()
-	if errors := router.InitiateConnections(peers, false); len(errors) > 0 {
+	if errors := router.InitiateConnections(peers, indirectPeers, false); len(errors) > 0 {
 		Log.Fatal(common.ErrorMessages(errors))
 	}
 	checkFatal(router.CreateRestartSentinel())
@@ -502,7 +503,7 @@ func determineQuorum(initPeerCountFlag int, router *weave.NetworkRouter) uint {
 		return uint(initPeerCountFlag/2 + 1)
 	}
 
-	peers := router.ConnectionMaker.Targets(true)
+	peers, _ := router.ConnectionMaker.Targets(true)
 
 	// Guess a suitable quorum size based on the list of peer
 	// addresses.  The peer list might or might not contain an

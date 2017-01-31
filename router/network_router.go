@@ -60,6 +60,7 @@ func NewNetworkRouter(config mesh.Config, networkConfig NetworkConfig, name mesh
 	}
 
 	router := &NetworkRouter{Router: mesh.NewRouter(config, name, nickName, overlay, common.LogLogger()), NetworkConfig: networkConfig, db: db}
+	router.ConnectionMaker.OnDiscovery(router.persistPeers)
 	router.Peers.OnInvalidateShortIDs(overlay.InvalidateShortIDs)
 	router.Routes.OnChange(overlay.InvalidateRoutes)
 	router.Macs = NewMacCache(macMaxAge,
@@ -213,34 +214,43 @@ func (router *NetworkRouter) relayBroadcast(srcPeer *mesh.Peer, key PacketKey) F
 }
 
 // Persisting the set of peers we are supposed to connect to
-const peersIdent = "directPeers"
+const directPeersIdent = "directPeers"
+const indirectPeersIdent = "indirectPeers"
 
 func (router *NetworkRouter) persistPeers() {
-	if err := router.db.Save(peersIdent, router.ConnectionMaker.Targets(false)); err != nil {
+	direct, indirect := router.ConnectionMaker.Targets(false)
+	if err := router.db.Save(directPeersIdent, direct); err != nil {
+		log.Errorf("Error persisting peers: %s", err)
+		return
+	}
+	if err := router.db.Save(indirectPeersIdent, indirect); err != nil {
 		log.Errorf("Error persisting peers: %s", err)
 		return
 	}
 }
 
-func (router *NetworkRouter) InitiateConnections(peers []string, replace bool) []error {
-	errors := router.ConnectionMaker.InitiateConnections(peers, replace)
+func (router *NetworkRouter) InitiateConnections(directPeers, indirectPeers []string, replace bool) []error {
+	errors := router.ConnectionMaker.InitiateConnections(directPeers, indirectPeers, replace)
 	router.persistPeers()
 	return errors
 }
 
-func (router *NetworkRouter) ForgetConnections(peers []string) {
-	router.ConnectionMaker.ForgetConnections(peers)
+func (router *NetworkRouter) ForgetConnections(directPeers []string) {
+	router.ConnectionMaker.ForgetConnections(directPeers)
 	router.persistPeers()
 }
 
-func (router *NetworkRouter) InitialPeers(resume bool, peers []string) ([]string, error) {
+func (router *NetworkRouter) InitialPeers(resume bool, peers []string) ([]string, []string, error) {
 	if _, err := os.Stat("restart.sentinel"); err == nil || resume {
-		var storedPeers []string
-		if _, err := router.db.Load(peersIdent, &storedPeers); err != nil {
-			return nil, err
+		var directPeers, indirectPeers []string
+		if _, err := router.db.Load(directPeersIdent, &directPeers); err != nil {
+			return nil, nil, err
 		}
-		log.Println("Restart/resume detected - using persisted peer list:", storedPeers)
-		return storedPeers, nil
+		if _, err := router.db.Load(indirectPeersIdent, &indirectPeers); err != nil {
+			return nil, nil, err
+		}
+		log.Println("Restart/resume detected - using persisted peer list:", directPeers)
+		return directPeers, indirectPeers, nil
 	}
 
 	log.Println("Launch detected - using supplied peer list:", peers)
