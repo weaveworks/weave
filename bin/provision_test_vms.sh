@@ -2,6 +2,13 @@
 
 set -e
 
+# Signal failures in lock file, in order to fail fast:
+function signal_failure() {
+    echo "KO" >"$TEST_VMS_PROV_AND_CONF_LOCK_FILE"
+    exit 1
+}
+trap signal_failure ERR
+
 source "$STATE"
 
 function install_terraform() {
@@ -27,9 +34,8 @@ if [ -n "$TEST_AND_PUBLISH" ]; then
     [ "$CIRCLE_NODE_INDEX" == "0" ] && export CREATE_IMAGE=1
 
     # Provision and configure testing VMs:
-    rm -f "$TEST_VMS_PROV_AND_CONF_LOCK_FILE"
     cd "$SRCDIR/test" # Ensures we generate Terraform state files in the right folder, for later use by integration tests.
     ./run-integration-tests.sh configure >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
-    touch "$TEST_VMS_PROV_AND_CONF_LOCK_FILE"
+    echo "OK" >"$TEST_VMS_PROV_AND_CONF_LOCK_FILE"
     echo "Test VMs now provisioned and configured. $(date)." >>"$TEST_VMS_SETUP_OUTPUT_FILE"
 fi
