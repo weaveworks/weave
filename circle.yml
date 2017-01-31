@@ -14,7 +14,7 @@ machine:
     PATH: $PATH:$HOME/.local/bin
     CLOUDSDK_CORE_DISABLE_PROMPTS: 1
     STATE: /home/ubuntu/state.env
-    NUM_HOSTS: 10
+    NUM_HOSTS: 16
     # Base name of VMs for integration tests:
     NAME: test-$CIRCLE_BUILD_NUM-$CIRCLE_NODE_INDEX
     TEST_VMS_SETUP_OUTPUT_FILE: $CIRCLE_ARTIFACTS/test_vms_setup_output.txt
