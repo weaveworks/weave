@@ -79,9 +79,6 @@
 [submodule "vendor/golang.org/x/sys"]
 	path = vendor/golang.org/x/sys
 	url = https://go.googlesource.com/sys
-[submodule "vendor/github.com/weaveworks/docker"]
-	path = vendor/github.com/weaveworks/docker
-	url = https://github.com/weaveworks/docker
 [submodule "vendor/github.com/beorn7/perks"]
 	path = vendor/github.com/beorn7/perks
 	url = https://github.com/beorn7/perks
