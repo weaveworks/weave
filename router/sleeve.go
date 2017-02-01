@@ -141,6 +141,10 @@ func (*SleeveOverlay) Diagnostics() interface{} {
 	return nil
 }
 
+func (*SleeveOverlay) Stop() {
+	// do nothing
+}
+
 func (sleeve *SleeveOverlay) lookupForwarder(peer mesh.PeerName) *sleeveForwarder {
 	sleeve.lock.Lock()
 	defer sleeve.lock.Unlock()

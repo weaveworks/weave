@@ -224,7 +224,9 @@ func main() {
 		networkConfig.PacketLogging = nopPacketLogging{}
 	}
 
-	overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB)
+	config.Password = determinePassword(password)
+
+	overlay, bridge := createOverlay(datapathName, ifaceName, isAWSVPC, config.Host, config.Port, bufSzMB, config.Password != nil)
 	networkConfig.Bridge = bridge
 
 	if bridge != nil {
@@ -241,7 +243,6 @@ func main() {
 		checkFatal(err)
 	}
 
-	config.Password = determinePassword(password)
 	config.TrustedSubnets = parseTrustedSubnets(trustedSubnetStr)
 	config.PeerDiscovery = !noDiscovery
 
@@ -405,7 +406,7 @@ func (nopPacketLogging) LogPacket(string, weave.PacketKey) {
 func (nopPacketLogging) LogForwardPacket(string, weave.ForwardPacketKey) {
 }
 
-func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host string, port int, bufSzMB int) (weave.NetworkOverlay, weave.Bridge) {
+func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host string, port int, bufSzMB int, enableEncryption bool) (weave.NetworkOverlay, weave.Bridge) {
 	overlay := weave.NewOverlaySwitch()
 	var bridge weave.Bridge
 	var ignoreSleeve bool
@@ -422,7 +423,7 @@ func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host st
 	case datapathName != "":
 		iface, err := weavenet.EnsureInterface(datapathName)
 		checkFatal(err)
-		fastdp, err := weave.NewFastDatapath(iface, port)
+		fastdp, err := weave.NewFastDatapath(iface, port, enableEncryption)
 		checkFatal(err)
 		bridge = fastdp.Bridge()
 		overlay.Add("fastdp", fastdp.Overlay())

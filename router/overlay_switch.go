@@ -50,6 +50,12 @@ func (osw *OverlaySwitch) Diagnostics() interface{} {
 	return diagnostics
 }
 
+func (osw *OverlaySwitch) Stop() {
+	for _, overlay := range osw.overlays {
+		overlay.Stop()
+	}
+}
+
 func (osw *OverlaySwitch) InvalidateRoutes() {
 	for _, overlay := range osw.overlays {
 		overlay.InvalidateRoutes()
