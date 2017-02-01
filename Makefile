@@ -25,7 +25,7 @@ ifeq ($(ARCH),amd64)
 	WEAVEEXEC_DOCKER_ARCH?=x86_64
 
 # The name of the alpine baseimage to use as the base for weave images
-	ALPINE_BASEIMAGE?=alpine
+	ALPINE_BASEIMAGE?=alpine:3.4
 
 # The extension for the made images
 # Specifying none means for example weaveworks/weave:latest
@@ -62,7 +62,7 @@ ifeq ($(ARCH),arm64)
 	WEAVEEXEC_DOCKER_ARCH?=armel
 
 # Using the (semi-)official alpine image
-	ALPINE_BASEIMAGE?=aarch64/alpine:3.5
+	ALPINE_BASEIMAGE?=aarch64/alpine:3.4
 
 # arm64 images have the -arm64 suffix, for instance weaveworks/weave-arm64:latest
 	ARCH_EXT?=-arm64
