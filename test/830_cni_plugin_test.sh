@@ -44,6 +44,10 @@ C2IP=$(container_ip $HOST1 c2)
 
 assert_raises "exec_on $HOST1 c1 $PING $C2IP"
 assert_raises "exec_on $HOST1 c2 $PING $C1IP"
+# Check if the route to the outside world works
+assert_raises "exec_on $HOST1 c1 $PING 8.8.8.8"
+# Container c2 should not have a default route to the world
+assert_raises "exec_on $HOST1 c2 sh -c '! $PING 8.8.8.8'"
 
 # Now remove and start a new container to see if anything breaks
 docker_on $HOST1 rm -f c2
