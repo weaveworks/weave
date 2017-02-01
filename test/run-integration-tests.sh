@@ -40,6 +40,7 @@ CREATE_IMAGE=${CREATE_IMAGE:-}
 CREATE_IMAGE_TIMEOUT_IN_SECS=${CREATE_IMAGE_TIMEOUT_IN_SECS:-600}
 # Lifecycle flags:
 SKIP_CONFIG=${SKIP_CONFIG:-}
+SKIP_DESTROY=${SKIP_DESTROY:-}
 
 function print_vars() {
     echo "--- Variables: Main ---"
@@ -60,6 +61,7 @@ function print_vars() {
     echo "CREATE_IMAGE_TIMEOUT_IN_SECS=$CREATE_IMAGE_TIMEOUT_IN_SECS"
     echo "--- Variables: Flags ---"
     echo "SKIP_CONFIG=$SKIP_CONFIG"
+    echo "SKIP_DESTROY=$SKIP_DESTROY"
 }
 
 function verify_dependencies() {
@@ -341,7 +343,7 @@ function main() {
             "$DIR/setup.sh"
             run_tests "$TESTS"
             status=$?
-            provision off "$PROVIDER"
+            [ -z "$SKIP_DESTROY" ] && provision off "$PROVIDER"
             exit $status
             ;;
 
