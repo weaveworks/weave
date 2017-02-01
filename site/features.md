@@ -52,10 +52,6 @@ Weave Net automatically chooses the fastest available method to
 transport data between peers. The best performing of these 
 (the 'fast datapath') offers near-native throughput and latency.
 
-Fast datapath does not support encryption. For full details on configuring
-Weave when you have connections that traverse untrusted networks,
-see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) for more details.
-
 See [Using Fast Datapath](/site/using-weave/fastdp.md) and
 [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
 
@@ -177,7 +173,8 @@ mechanism which you can use in conjunction with or as an
 alternative to any other security technologies you have 
 running alongside Weave. 
 
-Weave Net implements encryption and security using the Go version of [Daniel J. Bernstein's NaCl library](http://nacl.cr.yp.to/index.html).
+Weave Net implements encryption and security using the Go version of [Daniel J.  Bernstein's NaCl library](http://nacl.cr.yp.to/index.html),
+and, additionally in the case of encrypted fast datapath using [the cryptography framework of the Linux kernel](https://en.wikipedia.org/wiki/Crypto_API_(Linux)).
 
 For information on how to secure your Docker network connections, see [Securing Connections Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md) and for a more technical discussion on how Weave implements encryption see, [Weave Encryption](/site/how-it-works/encryption.md) and [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md).
 

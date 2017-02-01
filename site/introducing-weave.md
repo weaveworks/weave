@@ -42,7 +42,7 @@ See [How Fast Datapath Works](/site/using-weave/fastdp.md) for more information.
 
 Weave uses industry-standard VXLAN encapsulation between hosts. This means you can continue using your favorite packet analyzing tools, such as ‘Wireshark’ to inspect and troubleshoot protocols.
 
-###Weave Net is Secure With Built-in Encryption
+###Weave Net is Secure
 
 Weave Net traverses firewalls without requiring a TCP add-on. You can encrypt your traffic, which allows you to connect to apps on hosts even across an untrusted network.  
 

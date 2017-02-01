@@ -41,8 +41,8 @@ the `--trusted-subnets` argument with `weave launch`:
 
 If *both* peers at the end of a connection consider the other to be in
 a trusted subnet, Weave Net attempts to establish fast datapath
-connectivity, which is unencrypted. Otherwise the slower `sleeve` mode
-is used and communication is encrypted.
+connectivity, which is unencrypted. Otherwise communication is encrypted which
+imposes overheads.
 
 Configured trusted subnets are shown in [`weave status`](/site/troubleshooting.md#weave-status).
 

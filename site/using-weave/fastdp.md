@@ -18,9 +18,15 @@ You can disable fastdp by enabling the `WEAVE_NO_FASTDP` environment variable at
 
 ###Fast Datapath and Encryption
 
-Encryption does not work with fast datapath. If you enable encryption using the `--password` option to launch weave (or you use the `WEAVE_PASSWORD` environment variable), fast datapath will by default be disabled. 
+Fast datapath implements encryption using IPsec which is configured with IP
+transformation framework (XFRM) provided by the Linux kernel.
 
-When encryption is not in use there may be other conditions in which the fast datapath reverts to `sleeve mode`. Once these conditions pass, Weave Net reverts back to using fastdp. To view which mode Weave Net is using, run `weave status connections`.
+Each encrypted dataplane packet is encapsulated into [ESP](https://tools.ietf.org/html/rfc2406),
+thus in some networks a firewall rule for allowing ESP traffic needs to be installed. E.g. Google
+Cloud Platform denies ESP packets by default.
+
+See [How Weave Implements Encryption](/site/how-it-works/encryption-implementation.md)
+for more details for the fastdp encryption.
 
 ###Viewing Connection Mode Fastdp or Sleeve
 
@@ -46,12 +52,13 @@ Where fastdp indicates that fast datapath is being used on a connection. If fast
 
 The Maximum Transmission Unit, or MTU, is the technical term for the
 limit on how big a single packet can be on the network. Weave Net
-defaults to 1410 bytes, but you can set a smaller size if your
+defaults to 1376 bytes, but you can set a smaller size if your
 underlying network has a tighter limit, or set a larger size for
 better performance.
 
 The underlying network must be able to deliver packets of the size
-specified plus overheads of around 50 bytes, or else Weave Net will
+specified plus overheads of around 84-87 bytes (the final MTU should be
+divisible by four), or else Weave Net will
 fall back to Sleeve for that connection.  This requirement applies
 to _every path_ between peers. 
 
@@ -59,7 +66,7 @@ To specify a different MTU, before launching Weave Net set the
 environment variable `WEAVE_MTU`.  For example, for a typical "jumbo
 frame" configuration:
 
-    $ WEAVE_MTU=8950 weave launch host2 host3
+    $ WEAVE_MTU=8916 weave launch host2 host3
 
 **See Also**
 
