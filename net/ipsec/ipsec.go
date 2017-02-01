@@ -457,7 +457,7 @@ func xfrmState(srcIP, dstIP net.IP, spi SPI, isDirOut bool, key []byte) (*netlin
 
 	state.Spi = int(spi)
 	state.Aead = &netlink.XfrmStateAlgo{
-		Name:   "rfc4106(gcm(aes))",
+		Name:   "rfc7539esp(chacha20,poly1305)",
 		Key:    key,
 		ICVLen: 128,
 	}
