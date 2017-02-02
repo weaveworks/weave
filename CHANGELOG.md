@@ -1,3 +1,22 @@
+## Release 1.9.0
+
+Highlights:
+
+* Encryption is now available for Fast Datapath connections, which
+  greatly improves the performance. #1644,#2687
+* We now build images for Intel/AMD 64-bit, ARM and ARM 64-bit. #2713
+* Weave Net Docker images are now labelled with description, vendor, etc. #2712
+* `weave status connections` now shows the MTU #2389,#2663
+* CNI plugin is now a stand-alone binary that does not depend on Docker #2594,#2662
+* Embedded docker client updated to version 1.10.3 #2395
+
+**NOTE:** The move to multi-architecture required that we update the
+  embedded Docker client, and this has the effect that this release of
+  Weave Net will not work with Docker installations older than
+  1.10.
+
+[Full list of changes](https://github.com/weaveworks/weave/issues?q=milestone%3A1.9.0).
+
 ## Release 1.8.2
 
 Bug fixes and minor improvements
