@@ -62,7 +62,7 @@ ifeq ($(ARCH),arm64)
 	WEAVEEXEC_DOCKER_ARCH?=armel
 
 # Using the (semi-)official alpine image
-	ALPINE_BASEIMAGE?=aarch64/alpine:3.4
+	ALPINE_BASEIMAGE?=aarch64/alpine:3.5
 
 # arm64 images have the -arm64 suffix, for instance weaveworks/weave-arm64:latest
 	ARCH_EXT?=-arm64
