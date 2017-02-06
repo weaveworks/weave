@@ -214,7 +214,7 @@ tests:
 	./tools/test -no-go-get -netgo -timeout 8m
 
 lint:
-	./tools/lint -nocomment -notestpackage .
+	./tools/lint -nocomment -notestpackage
 
 endif
 
