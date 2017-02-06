@@ -36,7 +36,7 @@ KUBERNETES_CNI_VERSION=${KUBERNETES_CNI_VERSION:-0.3.0.1}
 IMAGE_NAME=${IMAGE_NAME:-"$(echo "$APP-docker$DOCKER_VERSION-k8s$KUBERNETES_VERSION-k8scni$KUBERNETES_CNI_VERSION" | sed -e 's/[\.\_]*//g')"}
 DISK_NAME_PREFIX=${DISK_NAME_PREFIX:-$NAME}
 USE_IMAGE=${USE_IMAGE:-1}
-CREATE_IMAGE=${CREATE_IMAGE:-}
+CREATE_IMAGE=${CREATE_IMAGE:-1}
 CREATE_IMAGE_TIMEOUT_IN_SECS=${CREATE_IMAGE_TIMEOUT_IN_SECS:-600}
 # Lifecycle flags:
 SKIP_CONFIG=${SKIP_CONFIG:-}
@@ -142,7 +142,7 @@ function wait_for_image() {
 
 # shellcheck disable=SC2155
 function create_image() {
-    if [ -n "$CREATE_IMAGE" ]; then
+    if [[ "$CREATE_IMAGE" == 1 ]]; then
         greenly echo "> Creating GCP image $IMAGE_NAME..."
         local begin_img=$(date +%s)
         local num_hosts=1

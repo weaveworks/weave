@@ -31,7 +31,7 @@ if [ -n "$TEST_AND_PUBLISH" ]; then
     install_ansible >>"$TEST_VMS_SETUP_OUTPUT_FILE" 2>&1
 
     # Only attempt to create GCP image in first container, wait for it to be created otherwise:
-    [ "$CIRCLE_NODE_INDEX" == "0" ] && export CREATE_IMAGE=1
+    [ "$CIRCLE_NODE_INDEX" != "0" ] && export CREATE_IMAGE=0
 
     # Provision and configure testing VMs:
     cd "$SRCDIR/test" # Ensures we generate Terraform state files in the right folder, for later use by integration tests.
