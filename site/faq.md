@@ -90,6 +90,13 @@ Yes, of course!  Weave allows you to run isolated networks and still allow open 
 You must permit traffic to flow through TCP 6783 and UDP 6783/6784,
 which are Weave’s control and data ports.
 
+The daemon also uses TCP port 6782 for [metrics](/site/metrics.md), but
+you would only need to open up this port if you wish to collect metrics
+from another host.
+
+The Weave Net daemon listens on localhost (127.0.0.1) TCP port 6784
+for commands from other Weave Net components. This port should not be
+opened to other hosts.
 
 **<a name=own-image></a>Q: Why do you use your own Docker image `weaveworks/ubuntu`?**
 
