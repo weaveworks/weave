@@ -65,14 +65,30 @@ peer for space:
   - it will continue to ask for space until it receives some, or its
     copy of the ring tells it all peers are full in that subnet.
 
+### Data persistence
+
+Key IPAM data is saved to disk, in a [BoltDB](https://github.com/boltdb/bolt)
+file, stored within a [data volume container](https://docs.docker.com/engine/userguide/containers/dockervolumes/#creating-and-mounting-a-data-volume-container)
+named `weavedb`.
+
+This file is used to persist data for various Weave Net components; for IPAM it contains:
+
+* the division of the IP allocation range amongst peers, and
+* allocation of addresses to containers on the local peer,
+
+so that it is immediately available when the peer restarts.
+
 ### Claiming an address
 
-If a Weave process is restarted, in most cases it will hear from
-another peer which ranges it used to own, but it needs to know which
-individual IP addresses are assigned to containers in order to avoid
-giving the same address out in subsequent allocation requests. The
-weave script invokes the `claim` command in `populate_ipam` to do
-this.
+If a Weave process is restarted,
+
+- if `weavedb` is present, then it loads persisted IPAM data from there, as
+described, in the previous section;
+- else, it learns from other peers which ranges it used to own.
+
+Weave Net then consults the allocator to know which individual IP addresses
+are assigned to containers, and therefore avoid giving the same address out in
+subsequent allocation requests.
 
 When the Allocator is told to claim an address, there are four
 possibilities:
