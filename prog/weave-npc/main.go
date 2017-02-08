@@ -127,7 +127,15 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.AddNamespace(obj.(*coreapi.Namespace)))
 			},
 			DeleteFunc: func(obj interface{}) {
-				handleError(npc.DeleteNamespace(obj.(*coreapi.Namespace)))
+				switch obj := obj.(type) {
+				case *coreapi.Namespace:
+					handleError(npc.DeleteNamespace(obj))
+				case cache.DeletedFinalStateUnknown:
+					// We know this object has gone away, but its final state is no longer
+					// available from the API server. Instead we use the last copy of it
+					// that we have, which is good enough for our cleanup.
+					handleError(npc.DeleteNamespace(obj.Obj.(*coreapi.Namespace)))
+				}
 			},
 			UpdateFunc: func(old, new interface{}) {
 				handleError(npc.UpdateNamespace(old.(*coreapi.Namespace), new.(*coreapi.Namespace)))
@@ -139,7 +147,15 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.AddPod(obj.(*coreapi.Pod)))
 			},
 			DeleteFunc: func(obj interface{}) {
-				handleError(npc.DeletePod(obj.(*coreapi.Pod)))
+				switch obj := obj.(type) {
+				case *coreapi.Pod:
+					handleError(npc.DeletePod(obj))
+				case cache.DeletedFinalStateUnknown:
+					// We know this object has gone away, but its final state is no longer
+					// available from the API server. Instead we use the last copy of it
+					// that we have, which is good enough for our cleanup.
+					handleError(npc.DeletePod(obj.Obj.(*coreapi.Pod)))
+				}
 			},
 			UpdateFunc: func(old, new interface{}) {
 				handleError(npc.UpdatePod(old.(*coreapi.Pod), new.(*coreapi.Pod)))
@@ -151,7 +167,15 @@ func root(cmd *cobra.Command, args []string) {
 				handleError(npc.AddNetworkPolicy(obj.(*extnapi.NetworkPolicy)))
 			},
 			DeleteFunc: func(obj interface{}) {
-				handleError(npc.DeleteNetworkPolicy(obj.(*extnapi.NetworkPolicy)))
+				switch obj := obj.(type) {
+				case *extnapi.NetworkPolicy:
+					handleError(npc.DeleteNetworkPolicy(obj))
+				case cache.DeletedFinalStateUnknown:
+					// We know this object has gone away, but its final state is no longer
+					// available from the API server. Instead we use the last copy of it
+					// that we have, which is good enough for our cleanup.
+					handleError(npc.DeleteNetworkPolicy(obj.Obj.(*extnapi.NetworkPolicy)))
+				}
 			},
 			UpdateFunc: func(old, new interface{}) {
 				handleError(npc.UpdateNetworkPolicy(old.(*extnapi.NetworkPolicy), new.(*extnapi.NetworkPolicy)))
