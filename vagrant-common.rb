@@ -10,7 +10,7 @@ $go_path = "/usr/local/go/bin"
 def install_packages(vm, pkgs)
   vm.provision :shell, :inline => <<SCRIPT
 apt-get update -qq
-apt-get install -qq -y --force-yes --no-install-recommends #{pkgs.join(' ')}
+apt-get install -qq -y --no-install-recommends #{pkgs.join(' ')}
 SCRIPT
 end
 
@@ -66,8 +66,8 @@ def cleanup(vm)
   vm.provision :shell, :inline => <<SCRIPT
 export DEBIAN_FRONTEND=noninteractive
 ## Who the hell thinks official images have to have both of these?
-/etc/init.d/chef-client stop
-/etc/init.d/puppet stop
+[ ! -f /etc/init.d/chef-client ] || /etc/init.d/chef-client stop
+[ ! -f /etc/init.d/puppet ]      || /etc/init.d/puppet stop
 apt-get -qq remove puppet chef
 apt-get -qq autoremove
 killall -9 chef-client 2>/dev/null || true
