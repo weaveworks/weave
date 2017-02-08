@@ -214,7 +214,7 @@ tests:
 	./tools/test -no-go-get -netgo -timeout 8m
 
 lint:
-	./tools/lint -nocomment -notestpackage .
+	./tools/lint -nocomment -notestpackage
 
 endif
 
@@ -359,3 +359,20 @@ build:
 
 run-smoketests: all testrunner
 	cd test && ./setup.sh && ./run_all.sh
+
+integration-tests: all testrunner
+# Usage:
+#   $ make \
+#     NAME="<prefix used to name VMs and other resources>" \
+#     PROVIDER="<provider among {vagrant|gcp|aws|do}>" \
+#     NUM_HOSTS="<# test machines>" \
+#     PLAYBOOK="<filename>" \
+#     RUNNER_ARGS="<...>" \
+#     TESTS="<...>" \  # Can be set to only run one or a few tests instead of the full test suite.
+#     DOCKER_VERSION=<...> \
+#     KUBERNETES_VERSION=<...> \
+#     KUBERNETES_CNI_VERSION=<...> \
+#     <...> # See also run-integration-test.sh for all variables and individual functions.
+#     integration-tests
+#
+	RUNNER_ARGS="-parallel" ./test/run-integration-tests.sh

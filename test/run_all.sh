@@ -11,7 +11,7 @@ fi
 whitely echo ...ok
 
 TESTS="${@:-$(find "$DIR" -name '*_test.sh')}"
-RUNNER_ARGS=""
+RUNNER_ARGS=${RUNNER_ARGS:-""}
 
 # If running on circle, use the scheduler to work out what tests to run
 if [ -n "$CIRCLECI" -a -z "$NO_SCHEDULER" ]; then

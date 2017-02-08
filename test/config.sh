@@ -30,9 +30,9 @@ HOST3=$(echo $HOSTS | cut -f 3 -d ' ')
 
 . "$DIR/assert.sh"
 
-
 SSH_DIR=${SSH_DIR:-$DIR}
-SSH=${SSH:-ssh -l vagrant -i "$SSH_DIR/insecure_private_key" -o "UserKnownHostsFile=$SSH_DIR/.ssh_known_hosts" -o CheckHostIP=no -o StrictHostKeyChecking=no}
+SSH_OPTS=${SSH_OPTS:-"-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o PasswordAuthentication=no -o IdentitiesOnly=yes -o LogLevel=ERROR"}
+SSH=${SSH:-ssh -l vagrant -i "$SSH_DIR/insecure_private_key" $SSH_OPTS}
 
 SMALL_IMAGE="alpine"
 DNS_IMAGE="aanand/docker-dnsutils"

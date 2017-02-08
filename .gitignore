@@ -68,3 +68,5 @@ test/tls/*.pem
 test/coverage
 test/coverage.*
 *qemu-*-static
+terraform.tfstate
+terraform.tfstate.backup

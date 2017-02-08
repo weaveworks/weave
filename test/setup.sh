@@ -9,8 +9,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 (cd ./tls && ./tls $HOSTS)
 
-echo "Copying weave images, scripts, and certificates to hosts, and"
-echo "  prefetch test images"
+greenly echo "> Setting up test machines: copying weave images, scripts and certificates to hosts, and prefetch test images..."
 
 exists_on() {
     docker_on $1 inspect --format=" " $2 >/dev/null 2>&1
@@ -60,4 +59,4 @@ for ppid in $ppids; do
     wait $ppid;
 done
 
-echo "Setup completed successfully in $(date -u -d @$(($(date +%s)-$begin)) +"%T")."
+greenly echo "> Setup completed successfully in $(date -u -d @$(($(date +%s)-$begin)) +"%T")."

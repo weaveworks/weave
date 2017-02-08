@@ -7,6 +7,7 @@ set -e
 begin=$(date +%s)
 sanity_checks_files=${WEAVE_NET_SANITY_CHECKS_FILES:-"/tmp/weave_net_sanity_check_*.log"}
 
+greenly echo "> Sanity-checking test machines: ping, check Docker, and check Weave..."
 whitely echo Ping each host from the other
 
 # We wrap ping and echo in a function as we want the below parallel for loop
@@ -68,4 +69,4 @@ for host in $HOSTS; do
 done
 for pid in $pids; do wait $pid; done
 
-echo "Sanity checks completed successfully in $(date -u -d @$(($(date +%s)-$begin)) +"%T")."
+greenly echo "> Sanity checks completed successfully in $(date -u -d @$(($(date +%s)-$begin)) +"%T")."

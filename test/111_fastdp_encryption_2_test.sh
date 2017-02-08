@@ -3,7 +3,7 @@
 # TODO(mp) 1. test anti-replay 2. test sleeve <-> fastdp
 # TODO(mp) test with --trusted-subnets
 
-. ./config.sh
+. "$(dirname "$0")/config.sh"
 
 HOST1_IP=$($SSH $HOST1 getent ahosts $HOST1 | grep "RAW" | cut -d' ' -f1)
 HOST2_IP=$($SSH $HOST2 getent ahosts $HOST2 | grep "RAW" | cut -d' ' -f1)

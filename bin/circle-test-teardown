@@ -6,6 +6,5 @@ source "$STATE"
 
 if [ -n "$TEST_AND_PUBLISH" ] ; then
     cd $SRCDIR/test
-    [ -z "$SECRET_PASSWORD" ] || ./gce.sh destroy
     test "$CIRCLE_NODE_INDEX" != "0" || (cd $SRCDIR/test; ./gen_coverage_reports.sh)
 fi
