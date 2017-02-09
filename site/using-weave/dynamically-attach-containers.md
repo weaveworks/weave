@@ -8,13 +8,13 @@ When containers may not know the network to which they will be attached, Weave N
 
 To illustrate...
 
-    host1$ C=$(docker run -e WEAVE_CIDR=none -dti weaveworks/ubuntu)
+    host1$ C=$(docker run -e WEAVE_CIDR=none -dti bash)
     host1$ weave attach $C
     10.2.1.3
 
 where,
 
- *  `C=$(docker run -e WEAVE_CIDR=none -dti weaveworks/ubuntu)` starts a container and assigns its ID to a variable
+ *  `C=$(docker run -e WEAVE_CIDR=none -dti bash)` starts a container and assigns its ID to a variable
  *  `weave attach` – the Weave Net command to attach to the specified container
  *  `10.2.1.3` - the allocated IP address output by `weave attach`, in this case in the default subnet
 

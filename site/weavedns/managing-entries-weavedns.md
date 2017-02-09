@@ -20,7 +20,7 @@ If you want to give the container a name in DNS *other* than its
 hostname, you can register it using the `dns-add` command. For example:
 
 ```
-$ C=$(docker run -ti weaveworks/ubuntu)
+$ C=$(docker run -ti bash)
 $ weave dns-add $C -h pingme2.weave.local
 ```
 

@@ -15,18 +15,18 @@ some ping tests.
 ```
 host2$ weave launch $HOST1
 host2$ eval $(weave env)
-host2$ docker run -dti --name=pingme weaveworks/ubuntu
+host2$ docker run -dti --name=pingme bash
 
-root@ubuntu:/# ping -nq -c 1 pingme
+bash-4.4# ping -nq -c 1 pingme
 PING pingme.weave.local (10.32.0.2) 56(84) bytes of data.
 ...
-root@ubuntu:/# ping -nq -c 1 pingme
+bash-4.4# ping -nq -c 1 pingme
 PING pingme.weave.local (10.40.0.1) 56(84) bytes of data.
 ...
-root@ubuntu:/# ping -nq -c 1 pingme
+bash-4.4# ping -nq -c 1 pingme
 PING pingme.weave.local (10.40.0.1) 56(84) bytes of data.
 ...
-root@ubuntu:/# ping -nq -c 1 pingme
+bash-4.4# ping -nq -c 1 pingme
 PING pingme.weave.local (10.32.0.2) 56(84) bytes of data.
 ...
 ```

@@ -98,14 +98,6 @@ The Weave Net daemon listens on localhost (127.0.0.1) TCP port 6784
 for commands from other Weave Net components. This port should not be
 opened to other hosts.
 
-**<a name=own-image></a>Q: Why do you use your own Docker image `weaveworks/ubuntu`?**
-
-The official Ubuntu image does not contain the `ping` and `nc`
-commands which are used in many of our examples throughout the
-documentation. The `weaveworks/ubuntu` image is simply the official
-Ubuntu image with those two commands added.
-
-
 **See Also**
 
  * [Troubleshooting Weave](/site/troubleshooting.md)
