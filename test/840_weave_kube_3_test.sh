@@ -12,11 +12,14 @@ tear_down_kubeadm() {
     done
 }
 
+howmany() { echo $#; }
+
 start_suite "Test weave-kube image with Kubernetes"
 
 TOKEN=112233.445566778899000
 HOST1IP=$($SSH $HOST1 "getent hosts $HOST1 | cut -f 1 -d ' '")
-SUCCESS="6 established"
+NUM_HOSTS=$(howmany $HOSTS)
+SUCCESS="$(( $NUM_HOSTS * ($NUM_HOSTS-1) )) established"
 
 tear_down_kubeadm
 
@@ -28,9 +31,13 @@ docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset w
 k8s_version="$(run_on $HOST1 "kubelet --version" | grep -oP "(?<=Kubernetes )v[\d\.\-beta]+")"
 k8s_version_option="$([[ "$k8s_version" > "v1.6" ]] && echo "kubernetes-version" || echo "use-kubernetes-version")"
 
-run_on $HOST1 "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN"
-run_on $HOST2 "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
-run_on $HOST3 "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
+for host in $HOSTS; do
+    if [ "$host" = "$HOST1" ] ; then
+        run_on "$host" "sudo systemctl start kubelet && sudo kubeadm init --$k8s_version_option=$k8s_version --token=$TOKEN"
+    else
+        run_on "$host" "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
+    fi
+done
 
 [ -n "$COVERAGE" ] && COVERAGE_ARGS="\\n          env:\\n            - name: EXTRA_ARGS\\n              value: \"-test.coverprofile=/home/weave/cover.prof --\""
 
