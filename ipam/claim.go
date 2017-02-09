@@ -35,7 +35,7 @@ func (c *claim) sendResult(result error) {
 
 // Try returns true for success (or failure), false if we need to try again later
 func (c *claim) Try(alloc *Allocator) bool {
-	if c.hasBeenCancelled() {
+	if c.hasBeenCancelled != nil && c.hasBeenCancelled() {
 		c.Cancel()
 		return true
 	}

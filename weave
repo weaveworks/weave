@@ -1691,6 +1691,7 @@ launch_router() {
     ROUTER_CONTAINER=$(docker run -d --name=$CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
+        --pid=host \
         --volumes-from $DB_CONTAINER_NAME \
         -v $RESOLV_CONF_DIR:/var/run/weave/etc \
         -e WEAVE_PASSWORD \

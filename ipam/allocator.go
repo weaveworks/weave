@@ -76,6 +76,11 @@ type Allocator struct {
 	now               func() time.Time
 }
 
+type PreClaim struct {
+	Ident string
+	Cidr  address.CIDR
+}
+
 type Config struct {
 	OurName     mesh.PeerName
 	OurUID      mesh.PeerUID
@@ -83,6 +88,7 @@ type Config struct {
 	Seed        []mesh.PeerName
 	Universe    address.CIDR
 	IsObserver  bool
+	PreClaims   []PreClaim
 	Quorum      func() uint
 	Db          db.DB
 	IsKnownPeer func(name mesh.PeerName) bool
@@ -123,6 +129,12 @@ func NewAllocator(config Config) *Allocator {
 		dead:        make(map[string]time.Time),
 		now:         time.Now,
 	}
+
+	alloc.pendingClaims = make([]operation, len(config.PreClaims))
+	for i, c := range config.PreClaims {
+		alloc.pendingClaims[i] = &claim{ident: c.Ident, cidr: c.Cidr}
+	}
+
 	return alloc
 }
 
@@ -155,6 +167,9 @@ func (alloc *Allocator) Start() {
 		alloc.infof("Initialising via deferred consensus")
 	default:
 		alloc.infof("Initialising as observer - awaiting IPAM data from another peer")
+	}
+	if loadedPersistedData { // do any pre-claims right away
+		alloc.tryOps(&alloc.pendingClaims)
 	}
 	actionChan := make(chan func(), mesh.ChannelSize)
 	stopChan := make(chan struct{})

@@ -128,7 +128,7 @@ type mockDB struct{}
 func (d *mockDB) Load(_ string, _ interface{}) (bool, error) { return false, nil }
 func (d *mockDB) Save(_ string, _ interface{}) error         { return nil }
 
-func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, address.CIDR) {
+func makeAllocator(name string, cidrStr string, quorum uint, preClaims ...PreClaim) (*Allocator, address.CIDR) {
 	peername, err := mesh.PeerNameFromString(name)
 	if err != nil {
 		panic(err)
@@ -145,6 +145,7 @@ func makeAllocator(name string, cidrStr string, quorum uint) (*Allocator, addres
 		OurNickname: "nick-" + name,
 		Universe:    cidr,
 		IsObserver:  quorum == 0,
+		PreClaims:   preClaims,
 		Quorum:      func() uint { return quorum },
 		Db:          new(mockDB),
 		IsKnownPeer: func(mesh.PeerName) bool { return true },
@@ -213,15 +214,19 @@ func AssertNothingSentErr(t *testing.T, ch <-chan error) {
 	}
 }
 
-func makeNetworkOfAllocators(size int, cidr string) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
+func makeNetworkOfAllocators(size int, cidr string, preClaims ...[]PreClaim) ([]*Allocator, *gossip.TestRouter, address.CIDR) {
 	gossipRouter := gossip.NewTestRouter(0.0)
 	allocs := make([]*Allocator, size)
 	var subnet address.CIDR
 
 	for i := 0; i < size; i++ {
 		var alloc *Allocator
+		preClaim := []PreClaim{}
+		if i < len(preClaims) {
+			preClaim = preClaims[i]
+		}
 		alloc, subnet = makeAllocator(fmt.Sprintf("%02d:00:00:02:00:00", i),
-			cidr, uint(size/2+1))
+			cidr, uint(size/2+1), preClaim...)
 		alloc.SetInterfaces(gossipRouter.Connect(alloc.ourName, alloc))
 		alloc.Start()
 		allocs[i] = alloc

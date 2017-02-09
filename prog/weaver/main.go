@@ -306,7 +306,9 @@ func main() {
 			}
 			trackerName = "awsvpc"
 		}
-		allocator, defaultSubnet = createAllocator(router, ipamConfig, db, t, isKnownPeer)
+		preClaims, err := findExistingAddresses(weavenet.WeaveBridgeName)
+		checkFatal(err)
+		allocator, defaultSubnet = createAllocator(router, ipamConfig, preClaims, db, t, isKnownPeer)
 		observeContainers(allocator)
 		if dockerCli != nil {
 			ids, err := dockerCli.AllContainerIDs()
@@ -445,7 +447,7 @@ func createOverlay(datapathName string, ifaceName string, isAWSVPC bool, host st
 	return overlay, bridge
 }
 
-func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, track tracker.LocalRangeTracker, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
+func createAllocator(router *weave.NetworkRouter, config ipamConfig, preClaims []ipam.PreClaim, db db.DB, track tracker.LocalRangeTracker, isKnownPeer func(mesh.PeerName) bool) (*ipam.Allocator, address.CIDR) {
 	ipRange, err := ipam.ParseCIDRSubnet(config.IPRangeCIDR)
 	checkFatal(err)
 	defaultSubnet := ipRange
@@ -464,6 +466,7 @@ func createAllocator(router *weave.NetworkRouter, config ipamConfig, db db.DB, t
 		Seed:        config.SeedPeerNames,
 		Universe:    ipRange,
 		IsObserver:  config.Observer,
+		PreClaims:   preClaims,
 		Quorum:      func() uint { return determineQuorum(config.PeerCount, router) },
 		Db:          db,
 		IsKnownPeer: isKnownPeer,

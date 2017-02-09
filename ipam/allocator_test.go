@@ -168,11 +168,13 @@ func TestAllocatorClaim(t *testing.T) {
 		container1 = "abcdef"
 		container3 = "b01df00d"
 		universe   = "10.0.3.0/24"
-		testAddr1  = "10.0.3.2/24"
+		testAddr1  = "10.0.3.5/24"
 		testAddr2  = "10.0.4.2/24"
+		testPre    = "10.0.3.1/24"
 	)
 
-	allocs, router, subnet := makeNetworkOfAllocators(2, universe)
+	preAddr, _ := address.ParseCIDR(testPre)
+	allocs, router, subnet := makeNetworkOfAllocators(2, universe, []PreClaim{{container1, preAddr}})
 	defer stopNetworkOfAllocators(allocs, router)
 	alloc := allocs[1]
 	addr1, _ := address.ParseCIDR(testAddr1)
@@ -184,6 +186,8 @@ func TestAllocatorClaim(t *testing.T) {
 	alloc.Prime()
 	// Do an allocate on the other peer, which we will try to claim later
 	addrx, err := allocs[0].Allocate(container1, subnet, true, returnFalse)
+	// Should not get the address we pre-claimed
+	require.NotEqual(t, addrx, preAddr)
 	router.Flush()
 
 	// Now try the claim again
@@ -200,6 +204,11 @@ func TestAllocatorClaim(t *testing.T) {
 	require.Error(t, err)
 	// claiming the address allocated on the other peer should fail
 	err = alloc.SimplyClaim(container1, address.MakeCIDR(subnet, addrx))
+	require.Error(t, err, "claiming address allocated on other peer should fail")
+	// claiming the pre-claimed address should fail on both peers
+	err = alloc.SimplyClaim(container3, preAddr)
+	require.Error(t, err, "claiming address allocated on other peer should fail")
+	err = allocs[0].SimplyClaim(container3, preAddr)
 	require.Error(t, err, "claiming address allocated on other peer should fail")
 	// Check an address outside of our universe
 	addr2, _ := address.ParseCIDR(testAddr2)
