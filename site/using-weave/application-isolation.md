@@ -32,7 +32,7 @@ Next, launch the two netcat containers onto the default subnet:
 And then to test the isolation, launch a few more containers onto a different subnet:
 
     host1$ docker run -e WEAVE_CIDR=net:10.2.2.0/24 --name b1 -ti weaveworks/ubuntu
-    host2$ docker run -e WEAVE_CIDR=net:10.2.2.0.24 --name b2 -ti weaveworks/ubuntu
+    host2$ docker run -e WEAVE_CIDR=net:10.2.2.0/24 --name b2 -ti weaveworks/ubuntu
 
 Ping each container to confirm that they can talk to each other, but not to the containers of our first subnet:
 
