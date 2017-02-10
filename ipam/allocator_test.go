@@ -174,7 +174,7 @@ func TestAllocatorClaim(t *testing.T) {
 	)
 
 	preAddr, _ := address.ParseCIDR(testPre)
-	allocs, router, subnet := makeNetworkOfAllocators(2, universe, []PreClaim{{container1, preAddr}})
+	allocs, router, subnet := makeNetworkOfAllocators(2, universe, []PreClaim{{container1, true, preAddr}})
 	defer stopNetworkOfAllocators(allocs, router)
 	alloc := allocs[1]
 	addr1, _ := address.ParseCIDR(testAddr1)

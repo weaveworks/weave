@@ -77,8 +77,9 @@ type Allocator struct {
 }
 
 type PreClaim struct {
-	Ident string
-	Cidr  address.CIDR
+	Ident       string
+	IsContainer bool
+	Cidr        address.CIDR
 }
 
 type Config struct {
