@@ -49,6 +49,7 @@ delete_persistence $HOST1 $HOST2
 # Now make host1 attempt to claim from host2, when host2 is stopped
 # the point being to check whether host1 will hang trying to talk to host2
 weave_on $HOST2 launch-router --ipalloc-range $UNIVERSE
+weave_on $HOST2 prime
 # Introduce host3 to remember the IPAM CRDT when we stop host2
 weave_on $HOST3 launch-router --ipalloc-range $UNIVERSE $HOST2
 weave_on $HOST3 prime
