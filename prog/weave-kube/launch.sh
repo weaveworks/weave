@@ -66,28 +66,11 @@ if [ -z "$IPALLOC_INIT" ]; then
     IPALLOC_INIT="consensus=$(peer_count $KUBE_PEERS)"
 fi
 
-reclaim_ips() {
-    ID=$1
-    shift
-    for CIDR in "$@" ; do
-        curl -s -S -X PUT "$HTTP_ADDR/ip/$ID/$CIDR" || true
-    done
-}
-
 post_start_actions() {
     # Wait for weave process to become responsive
     while true ; do
         curl $HTTP_ADDR/status >/dev/null 2>&1 && break
         sleep 1
-    done
-
-    # Tell the newly-started weave about existing weave bridge IPs
-    /usr/bin/weaveutil container-addrs weave weave:expose | while read ID IFACE MAC IPS; do
-        reclaim_ips "weave:expose" $IPS
-    done
-    # Tell weave about existing weave process IPs
-    /usr/bin/weaveutil process-addrs weave | while read ID IFACE MAC IPS; do
-        reclaim_ips "_" $IPS
     done
 
     # Install CNI plugin binary to typical CNI bin location
