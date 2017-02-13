@@ -1304,25 +1304,6 @@ check_overlap() {
     util_op netcheck $1 $BRIDGE
 }
 
-# Claim addresses for a container in IPAM.  Expects to be called from
-# with_container_addresses.
-ipam_reclaim() {
-    CONTAINER_ID="$1"
-    # The weave IP addresses of containers attached by the plugin are
-    # recorded specially in IPAM, since the container id is not know
-    # at the time.
-    [ "$2" = "$CONTAINER_IFNAME" ] || CONTAINER_ID="_"
-    for CIDR in $4 ; do
-        http_call $HTTP_ADDR PUT "/ip/$CONTAINER_ID/$CIDR?noErrorOnUnknown=true&?check-alive=true" || true
-    done
-}
-
-ipam_reclaim_no_check_alive() {
-    for CIDR in $4 ; do
-        http_call $HTTP_ADDR PUT /ip/$1/$CIDR?noErrorOnUnknown=true || true
-    done
-}
-
 detect_awsvpc() {
     # Ignoring errors here: if we cannot detect AWSVPC we will skip the relevant
     # steps, because "attach" should work without the weave router running.
@@ -1691,6 +1672,7 @@ launch_router() {
     ROUTER_CONTAINER=$(docker run -d --name=$CONTAINER_NAME \
         $(docker_run_options) \
         $RESTART_POLICY \
+        --pid=host \
         --volumes-from $DB_CONTAINER_NAME \
         -v $RESOLV_CONF_DIR:/var/run/weave/etc \
         -e WEAVE_PASSWORD \
@@ -1728,17 +1710,10 @@ setup_awsvpc() {
 # Recreate the parameter values that are set when the router is first launched
 fetch_router_args() {
     CONTAINER_ARGS=$(docker inspect -f '{{.Args}}' $CONTAINER_NAME) || return 1
-    IPRANGE=$(echo $CONTAINER_ARGS | grep -o -E -e '-ipalloc-range [0-9/.]+') || true
     NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
 }
 
 populate_router() {
-    if [ -n "$IPRANGE" ] ; then
-        # Tell the newly-started weave IP allocator about existing weave IPs
-        # In the case of AWSVPC, we do expose before calling populate_router
-        [ -n "$AWSVPC" ] || with_container_addresses ipam_reclaim_no_check_alive weave:expose
-        with_container_addresses ipam_reclaim $(docker ps -q --no-trunc)
-    fi
     if [ -z "$NO_DNS_OPT" ] ; then
         # Tell the newly-started weaveDNS about existing weave IPs
         for CONTAINER in $(docker ps -q --no-trunc) ; do
