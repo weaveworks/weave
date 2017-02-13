@@ -9,7 +9,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.network "private_network", ip: vm_ip
   config.vm.provider :virtualbox do |vb|
     vb.memory = 2048
-    configure_nat_dns(vb)    
+    configure_nat_dns(vb)
   end
 
   # Disable default Vagrant shared folder, which we don't need:
