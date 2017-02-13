@@ -27,10 +27,11 @@ type Interface interface {
 }
 
 type ipset struct {
+	refCount
 }
 
 func New() Interface {
-	return &ipset{}
+	return &ipset{refCount: newRefCount()}
 }
 
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
@@ -38,10 +39,16 @@ func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
 }
 
 func (i *ipset) AddEntry(ipsetName Name, entry string) error {
+	if i.inc(ipsetName, entry) > 1 { // already in the set
+		return nil
+	}
 	return doExec("add", string(ipsetName), entry)
 }
 
 func (i *ipset) DelEntry(ipsetName Name, entry string) error {
+	if i.dec(ipsetName, entry) > 0 { // still needed
+		return nil
+	}
 	return doExec("del", string(ipsetName), entry)
 }
 
@@ -66,4 +73,31 @@ func doExec(args ...string) error {
 		return errors.Wrapf(err, "ipset %v failed: %s", args, output)
 	}
 	return nil
+}
+
+// Reference-counting
+type key struct {
+	ipsetName Name
+	entry     string
+}
+
+// note no locking is required as all operations are serialised in the controller
+type refCount struct {
+	ref map[key]int
+}
+
+func newRefCount() refCount {
+	return refCount{ref: make(map[key]int)}
+}
+
+func (rc *refCount) inc(ipsetName Name, entry string) int {
+	k := key{ipsetName, entry}
+	rc.ref[k]++
+	return rc.ref[k]
+}
+
+func (rc *refCount) dec(ipsetName Name, entry string) int {
+	k := key{ipsetName, entry}
+	rc.ref[k]--
+	return rc.ref[k]
 }
