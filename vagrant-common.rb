@@ -18,7 +18,7 @@ end
 def get_go_version_from_build_dockerfile()
   go_regexp = /FROM golang:(\S*).*?/
   dockerfile_path = File.expand_path(File.join(File.dirname(__FILE__), 'build', 'Dockerfile'))
-  go_version = File.readlines(dockerfile_path).first { |line| line.match(go_regexp) }.match(go_regexp).captures.first
+  go_version = File.readlines(dockerfile_path).select { |line| line.match(go_regexp) }.first.match(go_regexp).captures.first
   if go_version.nil?
     raise ArgumentError.new("Failed to read Go version from Dockerfile.")
   end
