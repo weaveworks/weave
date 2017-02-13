@@ -14,9 +14,9 @@ type allocateResult struct {
 
 type allocate struct {
 	resultChan       chan<- allocateResult
-	ident            string
+	ident            string       // a container ID, something like "weave:expose", or api.NoContainerID
 	r                address.CIDR // Subnet we are trying to allocate within
-	isContainer      bool
+	isContainer      bool         // true if ident is a container ID
 	hasBeenCancelled func() bool
 }
 

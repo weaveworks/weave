@@ -76,9 +76,10 @@ type Allocator struct {
 	now               func() time.Time
 }
 
+// PreClaims are IP addresses discovered before we could initialize IPAM
 type PreClaim struct {
-	Ident       string
-	IsContainer bool
+	Ident       string // a container ID, something like "weave:expose", or api.NoContainerID
+	IsContainer bool   // true if Ident is a container ID
 	Cidr        address.CIDR
 }
 

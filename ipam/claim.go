@@ -12,10 +12,10 @@ import (
 
 type claim struct {
 	resultChan       chan<- error
-	ident            string
-	cidr             address.CIDR
-	isContainer      bool
-	noErrorOnUnknown bool
+	ident            string       // a container ID, something like "weave:expose", or api.NoContainerID
+	cidr             address.CIDR // single address being claimed
+	isContainer      bool         // true if ident is a container ID
+	noErrorOnUnknown bool         // if false, error or block if we don't know; if true return ok but keep trying
 	hasBeenCancelled func() bool
 }
 
