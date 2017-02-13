@@ -29,7 +29,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     ansible.playbook = 'tools/config_management/setup_weave-net_dev.yml'
     ansible.extra_vars = {
       go_version: GO_VERSION
-    }
+    }.merge(ansibleize(get_dependencies_version_from_file_and_env()))
   end
 end
 
