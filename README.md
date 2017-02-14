@@ -28,11 +28,11 @@ Services provided by application containers on the Weave network can be exposed 
 If you have any questions about, feedback for or a problem with Weave Net:
 
 - Read [the Weave Net docs](https://www.weave.works/docs/net/latest/introducing-weave/).
-- Invite yourself to the <a href="https://weaveworks.github.io/community-slack/"> #weave-community slack channel</a>
-- Ask a question on the <a href="https://weave-community.slack.com/messages/general/"> #weave-community slack channel </a>
-- Join the <a href="https://www.meetup.com/pro/Weave/"> Weave User Group </a> and get invited to online talks, hands-on training and meetups in your area
-- send an email to <a href="mailto:weave-users@weave.works">weave-users@weave.works</a>
-- <a href="https://github.com/weaveworks/weave/issues/new">file an issue</a>
+- Invite yourself to the <a href="https://weaveworks.github.io/community-slack/" target="_blank"> #weave-community </a> slack channel.
+- Ask a question on the <a href="https://weave-community.slack.com/messages/general/"> #weave-community</a> slack channel.
+- Join the <a href="https://www.meetup.com/pro/Weave/"> Weave User Group </a> and get invited to online talks, hands-on training and meetups in your area.
+- Send an email to <a href="mailto:weave-users@weave.works">weave-users@weave.works</a>
+- <a href="https://github.com/weaveworks/weave/issues/new">File an issue.</a>
 
 Your feedback is always welcome!
 
