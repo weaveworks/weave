@@ -53,18 +53,22 @@ func (i *ipset) DelEntry(ipsetName Name, entry string) error {
 }
 
 func (i *ipset) Flush(ipsetName Name) error {
+	i.removeSet(ipsetName)
 	return doExec("flush", string(ipsetName))
 }
 
 func (i *ipset) FlushAll() error {
+	i.refCount = newRefCount()
 	return doExec("flush")
 }
 
 func (i *ipset) Destroy(ipsetName Name) error {
+	i.removeSet(ipsetName)
 	return doExec("destroy", string(ipsetName))
 }
 
 func (i *ipset) DestroyAll() error {
+	i.refCount = newRefCount()
 	return doExec("destroy")
 }
 
@@ -100,4 +104,12 @@ func (rc *refCount) dec(ipsetName Name, entry string) int {
 	k := key{ipsetName, entry}
 	rc.ref[k]--
 	return rc.ref[k]
+}
+
+func (rc *refCount) removeSet(ipsetName Name) {
+	for k := range rc.ref {
+		if k.ipsetName == ipsetName {
+			delete(rc.ref, k)
+		}
+	}
 }
