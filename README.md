@@ -23,5 +23,20 @@ Weave Net creates a virtual network that connects Docker containers across multi
 
 Services provided by application containers on the Weave network can be exposed to the outside world, regardless of where they are running. Similarly, existing internal systems can be opened to accept connections from application containers irrespective of their location.
 
-* [Install Weave Net](https://www.weave.works/docs/net/latest/installing-weave/)
-* [Find out more about Weave Net](https://www.weave.works/products/weave-net/)
+## <a name="help"></a>Getting help
+
+If you have any questions about, feedback for or a problem with Weave Net:
+
+- Read [the Weave Net docs](https://www.weave.works/docs/net/latest/introducing-weave/).
+- Invite yourself to the <a href="https://weaveworks.github.io/community-slack/"> #weave-community slack channel</a>
+- Ask a question on the <a href="https://weave-community.slack.com/messages/general/"> #weave-community slack channel </a>
+- Join the <a href="https://www.meetup.com/Weave-User-Group/"> Weave User Group </a> and get invited to online talks, hands-on training and meetups in your area </a>
+- send an email to <a href="mailto:weave-users@weave.works">weave-users@weave.works</a>
+- <a href="https://github.com/weaveworks/weave/issues/new">file an issue</a>
+
+Your feedback is always welcome!
+
+##Further Information
+
+* [Installing Weave Net](https://www.weave.works/docs/net/latest/installing-weave/)
+* [Weave Net Product Overview](https://www.weave.works/products/weave-net/)
