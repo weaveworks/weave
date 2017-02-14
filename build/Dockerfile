@@ -62,6 +62,9 @@ RUN for platform in ${GO_CROSSPLATFORMS}; do \
 		GOOS=${platform%/*} GOARCH=${platform##*/} \
 			go install -tags netgo std; done
 
+# Allow full write access to the Go folders for anyone
+RUN chmod -R a+w /usr/local/go
+
 # The libpcap version from Debian packages is 1.6.2, matching that version here although newer versions of libpcap have been released
 # We have to cross-compile the libpcap library for the new architectures, that's what we're doing here
 ENV LIBPCAP_CROSS_VERSION=1.6.2
