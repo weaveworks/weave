@@ -16,7 +16,13 @@
       "CAP_NET_ADMIN"
     ]
   },
-  "mounts": [],
+  "mounts": [
+    {
+      "destination": "/procmount",
+      "type": "proc",
+      "source": "proc"
+    }
+  ],
   "network": {
     "type": "host"
   },
