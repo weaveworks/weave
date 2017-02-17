@@ -273,10 +273,9 @@ v2plugin: $(PLUGIN_UPTODATE)
 	docker export buildplugin | tar -x -C prog/v2-plugin/rootfs
 	docker rm buildplugin
 	cp prog/v2-plugin/launch.sh prog/v2-plugin/rootfs/home/weave/launch.sh
-	-docker plugin disable weave2
-	-docker plugin rm weave2
-	docker plugin create weave2 prog/v2-plugin
-	rm -rf prog/v2-plugin/rootfs
+	-docker plugin disable $(DOCKERHUB_USER)/weave2
+	-docker plugin rm $(DOCKERHUB_USER)/weave2
+	docker plugin create $(DOCKERHUB_USER)/weave2 prog/v2-plugin
 
 $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)
 	cp $(KUBEPEERS_EXE) prog/weave-kube/
