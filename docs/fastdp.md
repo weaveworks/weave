@@ -52,9 +52,9 @@ overlay, which has a more sophisticated dynamic mechanism for coping
 with low path MTUs.
 
 To avoid triggering this fallback in typical deployments, the datapath
-interface is statically configured with an MTU of 1410 bytes allowing
+interface is statically configured with an MTU of 1376 bytes allowing
 it to work with most underlay network provider MTUs, including GCE at
-1460 bytes (the fifty byte difference accommodates the vxlan overhead).
+1460 bytes (the eighty four byte difference accommodates the encrypted vxlan overhead).
 This value can be overridden by setting `WEAVE_MTU` at launch if
 necessary.
 

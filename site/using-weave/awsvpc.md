@@ -89,7 +89,7 @@ your cluster.
 
 The Maximum Transmission Unit, or MTU, is the technical term for the
 limit on how big a single packet can be on the network. Weave Net
-defaults to 1410 bytes. This default works across almost all networks, but for better 
+defaults to 1376 bytes. This default works across almost all networks, but for better 
 performance you can set it to a larger MTU size. 
 
 The AWS network supports packets of up to 9000 bytes.  

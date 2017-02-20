@@ -9,7 +9,8 @@ Weave Net peers
 communication
 [can be encrypted](/site/using-weave/security-untrusted-networks.md).
 
-Encryption is accomplished using the [NaCl](http://nacl.cr.yp.to/)
+Encryption of control plane traffic (TCP) and data plane traffic (UDP) of sleeve
+overlay is accomplished using the [NaCl](http://nacl.cr.yp.to/)
 crypto libraries, employing Curve25519, XSalsa20 and Poly1305 to
 encrypt and authenticate messages. Weave Net protects against
 injection and replay attacks for traffic forwarded between peers.
@@ -31,6 +32,11 @@ hand, Weave Net needs to support UDP transports, and while there are
 extensions to TLS such as [DTLS](https://tools.ietf.org/html/rfc4347)
 which can operate over UDP, these are not widely implemented and
 deployed.
+
+In the case of fast datapath, data plane traffic is encrypted by using
+[ESP of IPsec](https://tools.ietf.org/html/rfc2406).
+The process of encryption is handled by the Linux kernel and is controlled via
+the IP transformation framework (XFRM).
 
 **See Also**
 

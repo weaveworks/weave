@@ -74,9 +74,7 @@ For more information on this command, see [Using Fast Datapath](/site/using-weav
 
 **Q: Does encryption work with fastdp?**
 
-Encryption does not work with fast datapath. If you enable encryption using the `--password` option to launch Weave (or you use the `WEAVE_PASSWORD` environment variable), fast datapath will by default be disabled. 
-
-You can however have a mixture of fast datapath connections over trusted links, as well as, encrypted connections over untrusted links.
+Yes, 1.9 version of Weave Net added the encryption feature to fastdp.
 
 See [Using Fast Datapath](/site/using-weave/fastdp.md) for more information.
 
@@ -85,7 +83,7 @@ See [Using Fast Datapath](/site/using-weave/fastdp.md) for more information.
 Yes, of course!  Weave allows you to run isolated networks and still allow open communications between individual containers from those isolated networks. You can find information on how to do this in [Application Isolation](/site/using-weave/application-isolation.md).
 
 
-**Q: Which ports does Weave Net use (e.g. if I am configuring a firewall) ?**
+**<a name=ports></a>Q: Which ports does Weave Net use (e.g. if I am configuring a firewall) ?**
 
 You must permit traffic to flow through TCP 6783 and UDP 6783/6784,
 which are Weave’s control and data ports.
@@ -97,6 +95,11 @@ from another host.
 The Weave Net daemon listens on localhost (127.0.0.1) TCP port 6784
 for commands from other Weave Net components. This port should not be
 opened to other hosts.
+
+When using encrypted fast datapath, make sure that underlying
+network does not block ESP traffic (IP protocol 50). For instance
+on Google Cloud Platform a firewall rule for allowing ESP traffic has
+to be installed.
 
 **<a name=own-image></a>Q: Why do you use your own Docker image `weaveworks/ubuntu`?**
 

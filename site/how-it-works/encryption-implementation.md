@@ -107,6 +107,8 @@ attacks.
 
 ####<a name="udp"></a>Encrypting and Decrypting UDP Packets
 
+#####Sleeve
+
 UDP connections carry captured traffic between peers. For a UDP packet
 sent between peers that are using crypto, the encapsulation looks as
 follows:
@@ -179,7 +181,33 @@ contained in the set. The window spans at least 2^20 message sequence
 numbers, and hence any re-ordering between the most recent ~1 million
 messages is handled without dropping messages.
 
+#####Fast Datapath
+
+Encryption in fastdp uses [the ESP protocol of IPsec](https://tools.ietf.org/html/rfc2406)
+in the transport mode. Each VXLAN packet is encrypted with
+[AES in GCM mode](https://tools.ietf.org/html/rfc4106aesgcm), with 32 byte key and
+4 byte salt. This combo provides the following security properties:
+
+* Data confidentiality.
+* Data origin authentication.
+* Integrity.
+* Anti-replay.
+* Limited traffic flow confidentiality as VXLAN packets are fully encrypted.
+
+For each connection direction, a different AES-GCM key and salt is used.
+The pairs are derived with [HKDF](https://tools.ietf.org/html/rfc5869)
+to which we pass a randomly generated 32 byte salt transferred over the encrypted
+control plane channel between peers.
+
+To prevent from replay attacks, which are possible because of the size of
+sequence number field in ESP (4 bytes), we use extended sequence numbers
+implemented by [ESN](https://tools.ietf.org/html/rfc4304).
+
+Authentication of ESP packet integrity and origin is ensured by 16 byte
+Integrity Check Value of AES-GCM.
+
 **See Also**
 
  * [architecture documentation](https://github.com/weaveworks/weave/blob/master/docs/architecture.txt)
+ * [fastdp encryption](https://github.com/weaveworks/weave/blob/master/docs/fastdp-crypto.md)
  * [Securing Containers Across Untrusted Networks](/site/using-weave/security-untrusted-networks.md)

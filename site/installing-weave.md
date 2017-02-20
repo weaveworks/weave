@@ -58,6 +58,9 @@ A [special no-overlay mode for EC2](/site/using-weave/awsvpc.md) can
 optionally be enabled, which allows containers to communicate at the
 full speed of the underlying network.
 
+To make encryption in fast datapath work on Google Cloud Platform, see
+[here](/site/faq.md#ports).
+
 **See Also** 
 
  * [Using Weave Net](/site/using-weave.md)

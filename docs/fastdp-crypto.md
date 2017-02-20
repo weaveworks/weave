@@ -4,14 +4,15 @@ This document describes implementation details of the fast datapath encryption.
 
 At the high level, we use the ESP protocol ([RFC 2406][esp]) in the Transport
 mode. Each packet is encrypted with AES in GCM mode ([RFC 4106][aesgcm]), with
-32byte key and 4byte salt. This combo provides the following security
+32 byte key and 4 byte salt. This combo provides the following security
 properties:
 
 * Data confidentiality.
 * Data origin authentication.
 * Integrity.
-* Anti-replay service.
-* Limited traffic flow confidentiality.
+* Anti-replay.
+* Limited traffic flow confidentiality as fast datapath VXLAN packets are fully
+  encrypted.
 
 ## Notation
 
