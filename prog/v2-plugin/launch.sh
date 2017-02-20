@@ -56,23 +56,6 @@ done
 
 /home/weave/plugin --meshsocket='' --docker-api='' >/tmp/plugin.log 2>&1 &
 
-reclaim_ips() {
-    ID=$1
-    shift
-    for CIDR in "$@"; do
-        curl -s -S -X PUT "$HTTP_ADDR/ip/$ID/$CIDR" || true
-    done
-}
-
-# Tell the newly-started weave about existing weave bridge IPs
-/usr/bin/weaveutil container-addrs weave weave:expose | while read ID IFACE MAC IPS; do
-    reclaim_ips "weave:expose" $IPS
-done
-# Tell weave about existing weave process IPs
-/usr/bin/weaveutil process-addrs weave | while read ID IFACE MAC IPS; do
-    reclaim_ips "_" $IPS
-done
-
 echo "End of launch.sh" >>$LOG_FILE
 
 wait $WEAVE_PID
