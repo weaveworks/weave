@@ -54,6 +54,9 @@ func callWeave(args ...string) ([]byte, []byte, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	if err != nil {
+		Log.Debug("weave returned error: ", err)
+	}
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
