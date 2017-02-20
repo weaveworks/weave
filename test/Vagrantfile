@@ -55,6 +55,7 @@ END
         host.vm.provision 'ansible' do |ansible|
           ansible.limit = 'all'  # Disable default limit to connect to all the machines
           ansible.playbook = '../tools/config_management/setup_weave-net_test.yml'
+          ansible.extra_vars = ansibleize(get_dependencies_version_from_file_and_env())
         end
       end
     end
