@@ -37,6 +37,7 @@ func init() {
 		"expose-nat":             exposeNAT,
 		"bridge-ip":              bridgeIP,
 		"unique-id":              uniqueID,
+		"swarm-peers":            swarmPeers,
 	}
 }
 
