@@ -13,11 +13,7 @@ func swarmPeers(args []string) error {
 		return errors.Wrap(err, "docker.NewVersionedClientFromEnv")
 	}
 
-	filters := map[string][]string{
-		"membership": []string{"accepted"},
-		"role":       []string{"manager"},
-	}
-	nodes, err := client.ListNodes(docker.ListNodesOptions{Filters: filters})
+	nodes, err := client.ListNodes(docker.ListNodesOptions{})
 	if err != nil {
 		return errors.Wrap(err, "docker.ListNodes")
 	}

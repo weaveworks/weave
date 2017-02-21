@@ -14,7 +14,7 @@ echo "Starting launch.sh" >>$LOG_FILE
 # Check if the IP range overlaps anything existing on the host
 /usr/bin/weaveutil netcheck $IPALLOC_RANGE weave
 
-SWARM_PEERS=$(/usr/bin/weaveutil swarm-peers 2>>$LOG_FILE)
+SWARM_PEERS=$(/usr/bin/weaveutil swarm-peers 2>>$LOG_FILE || echo "")
 
 /home/weave/weave --local create-bridge --force >>$LOG_FILE 2>&1
 
@@ -34,8 +34,12 @@ if [ "$(/home/weave/weave --local bridge-type)" = "bridge" ]; then
 fi
 
 if [ -z "$IPALLOC_INIT" ]; then
-    # ideally we would know the peer count
-    IPALLOC_INIT="consensus=$(echo $SWARM_PEERS_COUNT | wc -l)"
+    SWARM_PEERS_COUNT=$(echo $SWARM_PEERS | wc -l)
+    IPALLOC_INIT=""
+    if [[ "$SWARM_PEERS_COUNT" != "0" ]]; then
+        # ideally we would know the peer count
+        IPALLOC_INIT="consensus=$SWARM_PEERS_COUNT"
+    fi
 fi
 
 /home/weave/weaver $EXTRA_ARGS --port=6783 $BRIDGE_OPTIONS \
