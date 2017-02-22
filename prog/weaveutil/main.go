@@ -38,6 +38,7 @@ func init() {
 		"bridge-ip":              bridgeIP,
 		"unique-id":              uniqueID,
 		"swarm-peers":            swarmPeers,
+		"is-swarm-manager":       isSwarmManager,
 	}
 }
 

@@ -27,6 +27,12 @@
       "source": "/var/run/docker.sock",
       "type": "bind",
       "options": ["rbind"]
+    },
+    {
+      "destination": "/var/lib/weave",
+      "source": "/var/lib/weave",
+      "type": "bind",
+      "options": ["rbind"]
     }
   ],
   "network": {
