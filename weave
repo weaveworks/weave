@@ -1713,14 +1713,14 @@ fetch_router_args() {
     NO_DNS_OPT=$(echo $CONTAINER_ARGS | grep -o -e '--no-dns') || true
 }
 
+populate_dns_for_one_container() {
+    [ -z "$4" ] || with_container_fqdn $1 put_dns_fqdn $4
+}
+
 populate_router() {
     if [ -z "$NO_DNS_OPT" ] ; then
         # Tell the newly-started weaveDNS about existing weave IPs
-        for CONTAINER in $(docker ps -q --no-trunc) ; do
-            if CONTAINER_IPS=$(with_container_addresses echo_ips $CONTAINER) && [ -n "$CONTAINER_IPS" ] ; then
-                with_container_fqdn $CONTAINER put_dns_fqdn $CONTAINER_IPS
-            fi
-        done
+        with_container_addresses populate_dns_for_one_container weave:allids
     fi
 }
 
