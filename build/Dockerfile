@@ -21,7 +21,7 @@ ENV GCC_CROSSCOMPILERS \
 # Temporarily add the Ubuntu repositories, because we're going to install gcc cross-compilers from there
 # Install the build-essential and crossbuild-essential-ARCH packages
 RUN echo "deb http://archive.ubuntu.com/ubuntu xenial main universe" > /etc/apt/sources.list.d/cgocrosscompiling.list \
-  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
+  && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
   && apt-get update \
   && apt-get install -y build-essential \
   && for platform in ${DEB_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
