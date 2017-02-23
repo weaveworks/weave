@@ -1009,7 +1009,7 @@ with_container_addresses() {
 }
 
 echo_addresses() {
-    echo $1 $3 $4
+    echo $(printf "%.12s" $1) $3 $4
 }
 
 echo_ips() {
@@ -2246,7 +2246,7 @@ EOF
         show_addrs $ALL_CIDRS
         ;;
     ps)
-        [ $# -eq 0 ] && CONTAINERS="weave:expose $(docker ps -q)" || CONTAINERS="$@"
+        [ $# -eq 0 ] && CONTAINERS="weave:expose weave:allids" || CONTAINERS="$@"
         with_container_addresses echo_addresses $CONTAINERS
         ;;
     stop)
