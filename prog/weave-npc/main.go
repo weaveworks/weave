@@ -80,14 +80,22 @@ func resetIPTables(ipt *iptables.IPTables) error {
 }
 
 func resetIPSets(ips ipset.Interface) error {
-	// TODO should restrict ipset operations to the `weave-` prefix:
+	// Remove ipsets prefixed `weave-` only
 
-	if err := ips.FlushAll(); err != nil {
+	sets, err := ips.List(npc.IpsetNamePrefix)
+	if (err != nil) {
+		common.Log.Errorf("Failed to retrieve list of ipsets")
 		return err
 	}
 
-	if err := ips.DestroyAll(); err != nil {
-		return err
+	 common.Log.Debugf("Got list of ipsets: %v", sets)
+
+	for _, s := range sets {
+		common.Log.Debugf("Destroying ipsets '%s'", string(s))
+		if err := ips.Destroy(s); err != nil {
+			common.Log.Errorf("Failed to destroy ipset '%s'", string(s))
+			return err
+		}
 	}
 
 	return nil
