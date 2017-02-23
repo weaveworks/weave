@@ -7,7 +7,7 @@ The following administrative tasks are discussed:
 
 * [Configuring Weave Net to Start Automatically on Boot](#start-on-boot)
 * [Detecting and Reclaiming Lost IP Address Space](#detect-reclaim-ipam)
-    *[Manually Reclaiming Lost Address Space](#reclaim-address-space)
+* [Manually Reclaiming Lost Address Space](#manually-reclaim-address-space)
 * [Upgrading a Cluster](#cluster-upgrade)
 * [Resetting Persisted Data](#reset)
 
