@@ -82,6 +82,18 @@ var metrics = []metric{
 				ch <- intGauge(desc, metrics.Flows)
 			}
 		}},
+	{desc("weave_ipam_pending_allocates", "Number of pending allocates."),
+		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
+			if s.IPAM != nil {
+				ch <- intGauge(desc, len(s.IPAM.PendingAllocates))
+			}
+		}},
+	{desc("weave_ipam_pending_claims", "Number of pending claims."),
+		func(s WeaveStatus, desc *prometheus.Desc, ch chan<- prometheus.Metric) {
+			if s.IPAM != nil {
+				ch <- intGauge(desc, len(s.IPAM.PendingClaims))
+			}
+		}},
 }
 
 func fastDPMetrics(s WeaveStatus) *weave.FastDPMetrics {
