@@ -999,12 +999,12 @@ wait_for_status() {
 
 # Call $1 for all containers, passing container ID, all MACs and all IPs
 with_container_addresses() {
-    COMMAND=$1
+    COMMAND_WCA=$1
     shift 1
 
     CONTAINER_ADDRS=$(util_op container-addrs $BRIDGE "$@") || return 1
     echo "$CONTAINER_ADDRS" |  while read CONTAINER_ID CONTAINER_IFACE CONTAINER_MAC CONTAINER_IPS; do
-        $COMMAND "$CONTAINER_ID" "$CONTAINER_IFACE" "$CONTAINER_MAC" "$CONTAINER_IPS"
+        $COMMAND_WCA "$CONTAINER_ID" "$CONTAINER_IFACE" "$CONTAINER_MAC" "$CONTAINER_IPS"
     done
 }
 
@@ -1218,12 +1218,12 @@ when_weave_running() {
 # and $3.. as additional arguments
 with_container_fqdn() {
     CONT="$1"
-    COMMAND="$2"
+    COMMAND_WCF="$2"
     shift 2
 
     CONT_FQDN=$(docker inspect --format='{{.Config.Hostname}}.{{.Config.Domainname}}' $CONT 2>/dev/null) || return 0
     CONT_NAME=${CONT_FQDN%%.*}
-    [ "$CONT_NAME" = "$CONT_FQDN" -o "$CONT_NAME." = "$CONT_FQDN" ] || $COMMAND "$CONT" "$CONT_FQDN" "$@"
+    [ "$CONT_NAME" = "$CONT_FQDN" -o "$CONT_NAME." = "$CONT_FQDN" ] || $COMMAND_WCF "$CONT" "$CONT_FQDN" "$@"
 }
 
 # Register FQDN in $2 as names for addresses $3.. under full container ID $1
