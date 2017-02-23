@@ -42,15 +42,9 @@ Yet another option is to expose a port from the container on host B and then con
 <a name="duplicate-ip"></a>
 **Q: Why am I seeing the same IP address assigned to two different containers on different hosts?**
 
-Under normal circumstances, this should never happen, but it can occur if  `weave forget` and `weave rmpeer` was run on more than one host. 
+Under normal circumstances, this should never happen, but it can occur if `weave rmpeer` was run on more than one host. 
 
-You cannot call `weave rmpeer` on more than one host. The address space, which was owned by the stale peer cannot be left dangling, and as a result it gets reassigned. In this instance, the address is reassigned to the peer on which `weave rmpeer` was run. Therefore, if you run `weave forget` and then `weave rmpeer` on more than one host at a time, it results in duplicate IPs on more than one host.
-
-Once the peers detect the inconsistency, they log the error and drop the connection that supplied the inconsistent data. The rest of the peers will carry on with their view of the world, but the network will not function correctly.
-
-Some peers may be able to communicate their claim to the others before they run `rmpeer` (i.e. it's a race), so what you can expect is a few cliques of peers that are still talking to each other, but repeatedly dropping attempted connections with peers in other cliques.
-
-For more information on see [Allocating IP Addresses](/site/ipam.md) and also, [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md).
+For more information see [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md).
 
 
 <a name="dead-node"></a>
