@@ -4,7 +4,7 @@ menu_order: 100
 ---
 
 
-
+<a name="container-ip"></a>
 **Q: How do I obtain the IP of a specific container when I'm using Weave?**
 
 You can use `weave ps <container>` to see the allocated address of a container on a Weave network.  
@@ -12,6 +12,7 @@ You can use `weave ps <container>` to see the allocated address of a container o
 See [Troubleshooting Weave - List attached containers](/site/troubleshooting.md#list-attached-containers).
 
 
+<a name="specific-ip"></a>
 **Q: My dockerized app needs to check the request of an application that uses a static IP. Is it possible to manually change the IP of a container?**
 
 
@@ -20,11 +21,13 @@ You can manually change the IP of a container using [Classless Inter-Domain Rout
 For more information, refer to [Manually Specifying the IP Address of a Container](/site/using-weave/manual-ip-address.md). 
 
 
+<a name="expose-container"></a>
 **Q: How do I expose one of my containers to the outside world?**
 
 Exposing a container to the outside world is described in [Exporting Services](/site/using-weave/service-management.md#exporting).
 
 
+<a name="legacy-network"></a>
 **Q: Can I connect my existing 'legacy' network with a Weave container network?**
 
 Yes you can. 
@@ -36,6 +39,7 @@ A simple way to accomplish this would be to run Weave on the host and then run, 
 Yet another option is to expose a port from the container on host B and then connect to it. You can read about exposing ports in [Exporting Services](/site/using-weave/service-management.md#exporting).
 
 
+<a name="duplicate-ip"></a>
 **Q: Why am I seeing the same IP address assigned to two different containers on different hosts?**
 
 Under normal circumstances, this should never happen, but it can occur if  `weave forget` and `weave rmpeer` was run on more than one host. 
@@ -49,6 +53,7 @@ Some peers may be able to communicate their claim to the others before they run 
 For more information on see [Allocating IP Addresses](/site/ipam.md) and also, [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md).
 
 
+<a name="dead-node"></a>
 **Q: What is the best practice for resetting a node that goes out of service?**
 
 When a node goes out of service, the best option is to call `weave rmpeer` on one host and then `weave forget` on all the other hosts.
@@ -56,6 +61,7 @@ When a node goes out of service, the best option is to call `weave rmpeer` on on
 See [Starting, Stopping and Removing Peers](/site/ipam/stop-remove-peers-ipam.md) for an in-depth discussion.
 
 
+<a name="performance"></a>
 **Q: What about Weave's performance? Are software defined network overlays just as fast as native networking?**
 
 All virtualization techniques have some overhead, and Weave's overhead is typically around 2-3%. Unless your system is completely bottlenecked on the network, you won't notice this during normal operation. 
@@ -65,6 +71,7 @@ Weave Net also automatically uses the fastest datapath between two hosts. When W
 For more information about fast datapath see [How Fast Datapath Works](/site/how-it-works/fastdp-how-it-works.md).
 
 
+<a name="query-fastdp"></a>
 **Q: How can I tell if Weave is using fast datapath (fastdp) or not?**
 
 To view whether Weave is using fastdp or not, you can run, `weave status connections`
@@ -72,12 +79,14 @@ To view whether Weave is using fastdp or not, you can run, `weave status connect
 For more information on this command, see [Using Fast Datapath](/site/using-weave/fastdp.md).
 
 
+<a name="encrypted-fastdp"></a>
 **Q: Does encryption work with fastdp?**
 
 Yes, 1.9 version of Weave Net added the encryption feature to fastdp.
 
 See [Using Fast Datapath](/site/using-weave/fastdp.md) for more information.
 
+<a name="app-isolation"></a>
 **Q: Can I create multiple networks where containers can communicate on one network, but are isolated from containers on other networks?**
 
 Yes, of course!  Weave allows you to run isolated networks and still allow open communications between individual containers from those isolated networks. You can find information on how to do this in [Application Isolation](/site/using-weave/application-isolation.md).
