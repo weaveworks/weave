@@ -1,7 +1,9 @@
 package ipset
 
 import (
+	"bytes"
 	"os/exec"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -22,6 +24,8 @@ type Interface interface {
 	Flush(ipsetName Name) error
 	Destroy(ipsetName Name) error
 
+	List(prefix string) ([]Name, error)
+
 	FlushAll() error
 	DestroyAll() error
 }
@@ -35,48 +39,77 @@ func New() Interface {
 }
 
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
-	return doExec("create", string(ipsetName), string(ipsetType))
+	err, _ := doExec("create", string(ipsetName), string(ipsetType))
+	return err
 }
 
 func (i *ipset) AddEntry(ipsetName Name, entry string) error {
 	if i.inc(ipsetName, entry) > 1 { // already in the set
 		return nil
 	}
-	return doExec("add", string(ipsetName), entry)
+	err, _ := doExec("add", string(ipsetName), entry)
+	return err
 }
 
 func (i *ipset) DelEntry(ipsetName Name, entry string) error {
 	if i.dec(ipsetName, entry) > 0 { // still needed
 		return nil
 	}
-	return doExec("del", string(ipsetName), entry)
+	err, _ := doExec("del", string(ipsetName), entry)
+	return err
 }
 
 func (i *ipset) Flush(ipsetName Name) error {
 	i.removeSet(ipsetName)
-	return doExec("flush", string(ipsetName))
+	err, _ := doExec("flush", string(ipsetName))
+	return err
 }
 
 func (i *ipset) FlushAll() error {
 	i.refCount = newRefCount()
-	return doExec("flush")
+	err, _ := doExec("flush")
+	return err
 }
 
 func (i *ipset) Destroy(ipsetName Name) error {
 	i.removeSet(ipsetName)
-	return doExec("destroy", string(ipsetName))
+	err, _ := doExec("destroy", string(ipsetName))
+	return err
 }
 
 func (i *ipset) DestroyAll() error {
 	i.refCount = newRefCount()
-	return doExec("destroy")
+	err, _ := doExec("destroy")
+	return err
 }
 
-func doExec(args ...string) error {
-	if output, err := exec.Command("ipset", args...).CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "ipset %v failed: %s", args, output)
+// Fetch a list of all existing sets
+func (i *ipset) List(prefix string) ([]Name, error) {
+	err, output := doExec("list","-name","-output","plain")
+
+	var selected []Name
+	if err == nil && len(output) > 0 {
+		output = bytes.TrimRight(output, "\n")
+		sets := strings.Split(string(output[:]), "\n")
+
+		plen := len(prefix)
+		for _, v := range sets {
+			if (plen <= len(v)) && (prefix == v[:len(prefix)]) {
+				selected = append(selected, Name(v))
+			}
+		}
+
 	}
-	return nil
+
+	return selected, err
+}
+
+func doExec(args ...string) (error, []byte) {
+	output, err := exec.Command("ipset", args...).CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "ipset %v failed: %s", args, output), output
+	}
+	return nil, output
 }
 
 // Reference-counting
