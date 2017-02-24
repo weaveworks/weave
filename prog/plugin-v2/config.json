@@ -29,8 +29,8 @@
       "options": ["rbind"]
     },
     {
-      "destination": "/var/lib/weave",
-      "source": "/var/lib/weave",
+      "destination": "/var/lib/",
+      "source": "/var/lib/",
       "type": "bind",
       "options": ["rbind"]
     }

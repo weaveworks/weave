@@ -9,6 +9,8 @@ STATUS_ADDR=${WEAVE_STATUS_ADDR:-0.0.0.0:6782}
 HOST_ROOT=${HOST_ROOT:-/host}
 LOG_FILE=/var/lib/weave/weaver.log
 
+mkdir /var/lib/weave || true
+
 echo "Starting launch.sh" >>$LOG_FILE
 
 # Check if the IP range overlaps anything existing on the host
@@ -47,6 +49,7 @@ fi
     --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
     --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
     --ipalloc-init $IPALLOC_INIT \
+    --log-level=debug \
     "$@" \
     $(echo $SWARM_PEERS | tr '\n' ' ') \
     >>$LOG_FILE 2>&1 &
@@ -62,7 +65,7 @@ while true; do
     sleep 1
 done
 
-/home/weave/plugin --meshsocket='' --docker-api='' >/var/lib/weave/plugin.log 2>&1 &
+/home/weave/plugin --log-level=debug --meshsocket='' --docker-api='' >/var/lib/weave/plugin.log 2>&1 &
 
 echo "End of launch.sh" >>$LOG_FILE
 
