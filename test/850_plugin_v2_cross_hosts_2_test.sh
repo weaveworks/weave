@@ -31,20 +31,23 @@ setup_master() {
 
         echo "$HOST1_IP weave-ci-registry" | sudo tee -a /etc/hosts
         docker plugin push $PLUGIN_NAME
-EOF
 
-    # Start Swarm Manager and enable the plugin
-    $SSH $HOST1<<EOF
+        # Start Swarm Manager and enable the plugin
         docker swarm init --advertise-addr=$HOST1_IP
+        echo "swarm created"
         docker plugin enable $PLUGIN_NAME
+        echo "enabled"
 EOF
 }
 
 setup_worker() {
     $SSH $HOST2<<EOF
         echo "$HOST1_IP weave-ci-registry" | sudo tee -a /etc/hosts
+        ping -nq -W 2 -c 1 weave-ci-registry
         docker swarm join --token "$1" "${HOST1_IP}:2377"
+        echo "joined"
         docker plugin install --grant-all-permissions $PLUGIN_NAME
+        docker plugin enable $PLUGIN_NAME
 EOF
 }
 
@@ -71,6 +74,7 @@ assert_raises "$SSH $HOST2 ping -nq -W 2 -c 1 weave-ci-registry"
 # Create network and service
 $SSH $HOST1<<EOF
     docker network create --driver="${PLUGIN_NAME}:latest" weave-v2
+    docker network create --driver="${PLUGIN_NAME}" weave-v2
     docker service create --name=weave1 --network=weave-v2 --replicas=2 nginx
 EOF
 
