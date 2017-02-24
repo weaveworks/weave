@@ -47,7 +47,7 @@ setup_worker() {
         docker swarm join --token "$1" "${HOST1_IP}:2377"
         echo "joined"
         docker plugin install --grant-all-permissions $PLUGIN_NAME
-        docker plugin enable $PLUGIN_NAME
+        echo "enabled worker"
 EOF
 }
 
@@ -71,10 +71,18 @@ setup_worker $($SSH $HOST1 docker swarm join-token --quiet worker)
 assert_raises "$SSH $HOST1 ping -nq -W 2 -c 1 weave-ci-registry"
 assert_raises "$SSH $HOST2 ping -nq -W 2 -c 1 weave-ci-registry"
 
+echo "creating network"
+
+
 # Create network and service
 $SSH $HOST1<<EOF
+    ps aux | grep weave
+    docker plugin ls
+    echo "pre :latest"
     docker network create --driver="${PLUGIN_NAME}:latest" weave-v2
-    docker network create --driver="${PLUGIN_NAME}" weave-v2
+    echo "post :latest"
+    cat /var/lib/weave/weaver.log
+    #docker network create --driver="${PLUGIN_NAME}" weave-v2
     docker service create --name=weave1 --network=weave-v2 --replicas=2 nginx
 EOF
 
