@@ -1,5 +1,5 @@
 .DEFAULT: all
-.PHONY: all exes testrunner update tests lint publish-one-arch $(PUBLISH) clean clean-bin prerequisites build run-smoketests
+.PHONY: all exes testrunner update tests lint publish-one-arch $(PUBLISH) clean clean-bin clean-work-dir prerequisites build run-smoketests
 
 # If you can use docker without being root, you can do "make SUDO="
 SUDO=$(shell docker info >/dev/null 2>&1 || echo "sudo -E")
@@ -107,6 +107,7 @@ BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver$(ARCH_EXT).uptodate
 WEAVEEXEC_UPTODATE=.weaveexec$(ARCH_EXT).uptodate
 PLUGIN_UPTODATE=.plugin$(ARCH_EXT).uptodate
+PLUGINV2_UPTODATE=.pluginv2$(ARCH_EXT).uptodate
 WEAVEKUBE_UPTODATE=.weavekube$(ARCH_EXT).uptodate
 WEAVENPC_UPTODATE=.weavenpc$(ARCH_EXT).uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
@@ -121,8 +122,11 @@ WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube$(ARCH_EXT)
 WEAVENPC_IMAGE=$(DOCKERHUB_USER)/weave-npc$(ARCH_EXT)
 BUILD_IMAGE=weaveworks/weavebuild
 WEAVEDB_IMAGE=$(DOCKERHUB_USER)/weavedb
+PLUGINV2_IMAGE=$(DOCKERHUB_USER)/pluginv2$(ARCH_EXT)
 
 IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
+
+PLUGINV2_WORK_DIR="prog/plugin-v2/rootfs"
 
 PUBLISH=publish_weave publish_weaveexec publish_plugin publish_weave-kube publish_weave-npc
 PUSH_ML=push_ml_weave push_ml_weaveexec push_ml_plugin push_ml_weave-kube push_ml_weave-npc
@@ -265,17 +269,19 @@ $(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEA
 	$(SUDO) docker build -f prog/plugin/Dockerfile.$(DOCKERHUB_USER) -t $(PLUGIN_IMAGE) prog/plugin
 	touch $@
 
-v2plugin: $(PLUGIN_UPTODATE)
-	-docker rm -f buildplugin
-	docker create --name=buildplugin $(PLUGIN_IMAGE) true
-	rm -rf prog/v2-plugin/rootfs
-	mkdir prog/v2-plugin/rootfs
-	docker export buildplugin | tar -x -C prog/v2-plugin/rootfs
-	docker rm buildplugin
-	cp prog/v2-plugin/launch.sh prog/v2-plugin/rootfs/home/weave/launch.sh
-	-docker plugin disable $(DOCKERHUB_USER)/weave2
-	-docker plugin rm $(DOCKERHUB_USER)/weave2
-	docker plugin create $(DOCKERHUB_USER)/weave2 prog/v2-plugin
+# TODO(mp) cleanup!
+pluginv2: prog/plugin-v2/launch.sh prog/plugin-v2/config.json $(PLUGIN_UPTODATE)
+	-$(SUDO) docker rm -f buildpluginv2
+	$(SUDO) docker create --name=buildpluginv2 $(PLUGIN_IMAGE) true
+	rm -rf $(PLUGINV2_WORK_DIR)
+	mkdir $(PLUGINV2_WORK_DIR)
+	docker export buildpluginv2 | tar -x -C $(PLUGINV2_WORK_DIR)
+	docker rm buildpluginv2
+	cp prog/plugin-v2/launch.sh $(PLUGINV2_WORK_DIR)/home/weave/launch.sh
+	-docker plugin disable $(PLUGINV2_IMAGE)
+	-docker plugin rm $(PLUGINV2_IMAGE)
+	docker plugin create $(PLUGINV2_IMAGE) prog/plugin-v2
+	#touch $@
 
 $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)
 	cp $(KUBEPEERS_EXE) prog/weave-kube/
@@ -354,13 +360,16 @@ ifneq ($(UPDATE_LATEST),false)
 	$(MANIFEST_TOOL_EXE) push from-args --platforms $(ML_PLATFORMS) --template $(DOCKERHUB_USER)/$*-ARCH:latest --target $(DOCKERHUB_USER)/$*:latest
 endif
 
+clean-work-dir:
+	rm -rf $(PLUGINV2_WORK_DIR)
+
 clean-bin:
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
 	find prog -type f -name "Dockerfile.*" -not -name "Dockerfile.template" -print | xargs rm -f
 	find prog -type f -name "*qemu-*" -print | xargs rm -f
 	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE) weave*.tar.gz $(DOCKER_DISTRIB) prog/weaveexec/docker .pkg
 
-clean: clean-bin
+clean: clean-bin clean-work-dir
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
 	rm -rf test/tls/*.pem test/coverage.* test/coverage $(BUILD_UPTODATE) $(MANIFEST_TOOL_EXE)
 
