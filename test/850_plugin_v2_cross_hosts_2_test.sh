@@ -65,6 +65,9 @@ start_suite "Test weave Docker plugin-v2"
 setup_master
 setup_worker $($SSH $HOST1 docker swarm join-token --quiet worker)
 
+assert_raises "$SSH $HOST1 ping -nq -W 2 -c 1 weave-ci-registry"
+assert_raises "$SSH $HOST2 ping -nq -W 2 -c 1 weave-ci-registry"
+
 # Create network and service
 $SSH $HOST1<<EOF
     docker network create --driver="${PLUGIN_NAME}:latest" weave-v2
