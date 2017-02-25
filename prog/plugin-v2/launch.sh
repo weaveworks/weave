@@ -16,11 +16,17 @@ echo "Starting launch.sh" >>$LOG_FILE
 # Check if the IP range overlaps anything existing on the host
 /usr/bin/weaveutil netcheck $IPALLOC_RANGE weave
 
+echo "netcheck" >>$LOG_FILE
+
 # TODO(mp) s/swarm-peers/swarm-manager-peers/
 SWARM_PEERS=$(/usr/bin/weaveutil swarm-peers 2>>$LOG_FILE)
 IS_SWARM_MANAGER=$(/usr/bin/weaveutil is-swarm-manager 2>>$LOG_FILE)
 
+echo "swarm" >>$LOG_FILE
+
 /home/weave/weave --local create-bridge --force >>$LOG_FILE 2>&1
+
+echo "create-bridge" >>$LOG_FILE
 
 # ?
 NICKNAME_ARG=""
@@ -36,6 +42,8 @@ if [ "$(/home/weave/weave --local bridge-type)" = "bridge" ]; then
     fi
     BRIDGE_OPTIONS="--iface=vethwe-pcap"
 fi
+
+echo "check-bridge" >>$LOG_FILE
 
 if [ -z "$IPALLOC_INIT" ]; then
     if [ $IS_SWARM_MANAGER == "1" ]; then
@@ -55,6 +63,8 @@ fi
     >>$LOG_FILE 2>&1 &
 WEAVE_PID=$!
 
+echo "weaver: $WEAVE_PID" >>$LOG_FILE
+
 # Wait for weave process to become responsive
 while true; do
     curl $HTTP_ADDR/status >/dev/null 2>&1 && break
@@ -65,7 +75,11 @@ while true; do
     sleep 1
 done
 
+echo "status: $WEAVE_PID" >>$LOG_FILE
+
 /home/weave/plugin --log-level=debug --meshsocket='' --docker-api='' >/var/lib/weave/plugin.log 2>&1 &
+
+echo "plugin: $!" >>$LOG_FILE
 
 echo "End of launch.sh" >>$LOG_FILE
 

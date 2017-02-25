@@ -93,6 +93,8 @@ sleep 10
 C1=$(SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $1}')
 C2_IP=$($SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $3}')
 
+echo "$C1 $C2_IP"
+
 assert_raises "exec_on $HOST1 $C1 $PING $C2_IP"
 
 cleanup

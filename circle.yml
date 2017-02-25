@@ -52,9 +52,9 @@ test:
 teardown:
   pre:
     # Destroy testing VMs:
-    - "cd $SRCDIR/test && ./run-integration-tests.sh destroy":
-        parallel: true
-        background: true
+    # - "cd $SRCDIR/test && ./run-integration-tests.sh destroy":
+    #     parallel: true
+    #     background: true
     - "$SRCDIR/bin/circle-teardown-pre":
         parallel: true
 
