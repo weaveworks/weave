@@ -1,3 +1,28 @@
+## Release 1.9.1
+
+# Bug fixes and minor improvements
+* Fix a race condition when the Weave Net container is restarted
+  which could allow a new container to be allocated the same IP
+  address as an existing one #2784,#2787
+* Handle the message type received when a pod has been deleted during
+  Kubernetes api-server fail-over #2772,#2773
+* Make weave-kube work with `dockerd --iptables=false` #2726
+* Ensure we have the right kernel modules loaded for Network Policy in weave-kube #2819
+* Reference-count addresses in Network Policy Controller, to avoid
+  errors when updates come in an unexpected order #2792,#2795
+* Allow the soft connection limit to be raised in weave-kube, so
+  larger clusters can be created #2781
+* WeaveDNS was incorrectly case-sensitive for reverse DNS lookups #2817,#2818
+
+# Build and Testing
+* Scripts to create VMs to run automated tests were rewritten to use
+  Terraform and Ansible, to make it much easier to test with different
+  versions of components such as Docker and Kubernetes #2647,#2694,#2775,#2796
+* Upgrade to latest Weaveworks common build-tools #2780
+* Improve encryption tests #2793
+* Update vishvananda/netlink library to bring in changes we had previously forked #2790
+* Slight change to the build container to avoid permission errors and slow builds #2761,#2802
+
 ## Release 1.9.0
 
 Highlights:
