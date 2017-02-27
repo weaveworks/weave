@@ -138,6 +138,8 @@ Finally, for **Mainline** releases only:
   published to https://www.weave.works
 * Add the new version of `weave-net` to the checkpoint system at
   https://checkpoint-api.weave.works/admin
+* File a PR to update the version of the daemonset at
+  https://github.com/kubernetes/kops/tree/master/upup/models/cloudup/resources/addons/networking.weave
 
 ## Troubleshooting
 
