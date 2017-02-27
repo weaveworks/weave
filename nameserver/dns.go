@@ -222,7 +222,7 @@ func (h *handler) handleReverse(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	ipStr := strings.TrimSuffix(req.Question[0].Name, "."+reverseDNSdomain)
+	ipStr := strings.TrimSuffix(strings.ToLower(req.Question[0].Name), "."+reverseDNSdomain)
 	ip, err := address.ParseIP(ipStr)
 	if err != nil {
 		h.nameError(w, req)
