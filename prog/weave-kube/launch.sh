@@ -15,6 +15,12 @@ CONN_LIMIT=${CONN_LIMIT:-30}
 # Default for network policy
 EXPECT_NPC=${EXPECT_NPC:-1}
 
+# Ensure we have the required modules for NPC
+if [ "${EXPECT_NPC}" != "0" ]; then
+    modprobe br_netfilter
+    modprobe xt_set
+fi
+
 # kube-proxy requires that bridged traffic passes through netfilter
 if ! BRIDGE_NF_ENABLED=$(cat /proc/sys/net/bridge/bridge-nf-call-iptables); then
     echo "Cannot detect bridge-nf support - network policy and iptables mode kubeproxy may not work reliably" >&2

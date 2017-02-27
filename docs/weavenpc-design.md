@@ -19,6 +19,9 @@ NetworkPolicy object updates from the k8s API server:
   network policy, containing the IP addresses of all pods in the
   namespace whose labels match that selector
 
+IPsets are implemented by the kernel module `xt_set`, without which
+weave-npc will not work.
+
 ipset names are generated deterministically from a string
 representation of the corresponding label selector. Because ipset
 names are limited to 31 characters in length, this is done by taking a
@@ -93,6 +96,9 @@ The following traffic is NOT affected:
 * Traffic originating from processes in the host network namespace
   (e.g. kubelet health checks)
 * Traffic routed from an application container to the internet
+
+The above mechanism relies on the kernel module `br_netfilter` being
+loaded and enabled via `/proc/sys/net/bridge/bridge-nf-call-iptables`.
 
 See these resources for helpful context:
 
