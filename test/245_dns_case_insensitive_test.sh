@@ -20,8 +20,9 @@ assert_dns_record $HOST1 test seeone.weave.local $C1
 assert_dns_record $HOST1 test SeeOne.weave.local $C1
 assert_dns_record $HOST1 test SEEONE.weave.local $C1
 
-assert_dns_record $HOST1 test $REVERSE_C1_LOWER seeone.weave.local
-assert_dns_record $HOST1 test $REVERSE_C1_UPPER seeone.weave.local
+# Test reverse DNS using explicit in-addr.arpa format, lower and upper case
+assert "exec_on $HOST1 test dig +short -t PTR $REVERSE_C1_LOWER" seeone.weave.local.
+assert "exec_on $HOST1 test dig +short -t PTR $REVERSE_C1_UPPER" seeone.weave.local.
 
 start_container $HOST1 $C2/24 --name=SeEtWo
 assert_dns_record $HOST1 test seetwo.weave.local $C2
