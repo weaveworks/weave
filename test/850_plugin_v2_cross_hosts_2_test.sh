@@ -34,9 +34,9 @@ setup_master() {
 
         # Start Swarm Manager and enable the plugin
         docker swarm init --advertise-addr=$HOST1_IP
-        echo "swarm created"
+
+        [ -n "$COVERAGE" ] && docker plugin set $PLUGIN_NAME EXTRA_ARGS="-test.coverprofile=/home/weave/cover.prof --"
         docker plugin enable $PLUGIN_NAME
-        echo "enabled"
 EOF
 }
 
@@ -45,9 +45,10 @@ setup_worker() {
         echo "$HOST1_IP weave-ci-registry" | sudo tee -a /etc/hosts
         ping -nq -W 2 -c 1 weave-ci-registry
         docker swarm join --token "$1" "${HOST1_IP}:2377"
-        echo "joined"
-        docker plugin install --grant-all-permissions $PLUGIN_NAME
-        echo "enabled worker"
+        docker plugin install --disable --grant-all-permissions $PLUGIN_NAME
+
+        [ -n "$COVERAGE" ] && docker plugin set $PLUGIN_NAME EXTRA_ARGS="-test.coverprofile=/home/weave/cover.prof --"
+        docker plugin enable $PLUGIN_NAME
 EOF
 }
 
@@ -56,6 +57,8 @@ cleanup() {
     for HOST in $HOSTS; do
         $SSH $HOST<<EOF
             sudo sed '/weave-ci-registry/d' /etc/hosts
+            docker service rm weave1 || true
+            docker network rm weave-v2 || true
             docker plugin disable $PLUGIN_NAME
             docker plugin remove $PLUGIN_NAME
             docker swarm leave --force
@@ -71,29 +74,22 @@ setup_worker $($SSH $HOST1 docker swarm join-token --quiet worker)
 assert_raises "$SSH $HOST1 ping -nq -W 2 -c 1 weave-ci-registry"
 assert_raises "$SSH $HOST2 ping -nq -W 2 -c 1 weave-ci-registry"
 
-echo "creating network"
-
-
 # Create network and service
 $SSH $HOST1<<EOF
     ps aux | grep weave
     docker plugin ls
-    echo "pre :latest"
     docker network create --driver="${PLUGIN_NAME}:latest" weave-v2
-    echo "post :latest"
-    cat /var/lib/weave/weaver.log
-    #docker network create --driver="${PLUGIN_NAME}" weave-v2
     docker service create --name=weave1 --network=weave-v2 --replicas=2 nginx
 EOF
 
-# TODO(mp) add wait for
+# TODO(mp) add_wait_for_service to be ready
 sleep 10
 
 # TODO(mp) ...
-C1=$(SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $1}')
+C1=$($SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $1}')
 C2_IP=$($SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $3}')
 
-echo "$C1 $C2_IP"
+echo ">>> $C1 $C2_IP"
 
 assert_raises "exec_on $HOST1 $C1 $PING $C2_IP"
 

@@ -35,6 +35,16 @@
       "options": ["rbind"]
     }
   ],
+  "env": [
+    {
+      "description": "Extra args to `weaver` and `plugin`",
+      "name": "EXTRA_ARGS",
+      "settable": [
+          "value"
+      ],
+      "value": ""
+    }
+  ],
   "network": {
     "type": "host"
   },
