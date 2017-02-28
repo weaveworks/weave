@@ -2,6 +2,10 @@
 
 set -e
 
+modprobe_safe() {
+    modprobe $1 || echo "Ignore the error if \"$1\" is built-in in the kernel"
+}
+
 # Default if not supplied - same as weave net default
 IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
@@ -17,8 +21,8 @@ EXPECT_NPC=${EXPECT_NPC:-1}
 
 # Ensure we have the required modules for NPC
 if [ "${EXPECT_NPC}" != "0" ]; then
-    modprobe br_netfilter
-    modprobe xt_set
+    modprobe_safe br_netfilter
+    modprobe_safe xt_set
 fi
 
 # kube-proxy requires that bridged traffic passes through netfilter
