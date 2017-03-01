@@ -2,6 +2,23 @@
 
 set -e
 
+modprobe_safe() {
+    modprobe $1 || echo "Ignore the error if \"$1\" is built-in in the kernel" >&2
+}
+
+# Check whether xt_set actually exists
+xt_set_exists() {
+    ipset create weave-kube-test hash:ip
+    iptables -t filter -N WEAVE-KUBE-TEST
+    if ! iptables -A WEAVE-KUBE-TEST -m set --match-set weave-kube-test src -j DROP; then
+        NOT_EXIST=1
+    fi
+    iptables -F WEAVE-KUBE-TEST
+    iptables -X WEAVE-KUBE-TEST
+    ipset destroy weave-kube-test
+    [ -z "$NOT_EXIST" ] || (echo "\"xt_set\" does not exist" >&2 && return 1)
+}
+
 # Default if not supplied - same as weave net default
 IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
@@ -17,8 +34,9 @@ EXPECT_NPC=${EXPECT_NPC:-1}
 
 # Ensure we have the required modules for NPC
 if [ "${EXPECT_NPC}" != "0" ]; then
-    modprobe br_netfilter
-    modprobe xt_set
+    modprobe_safe br_netfilter
+    modprobe_safe xt_set
+    xt_set_exists
 fi
 
 # kube-proxy requires that bridged traffic passes through netfilter
