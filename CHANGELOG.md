@@ -1,6 +1,15 @@
+## Release 1.9.2
+
+Bug fixes and minor improvements
+
+* Fix a weave-kube bug when `br_netfilter` or `xt_set` module is compiled into
+  kernel #2820/#2821
+* Detect the absence of the required `xt_set` kernel module #2821
+
 ## Release 1.9.1
 
-# Bug fixes and minor improvements
+Bug fixes and minor improvements
+
 * Fix a race condition when the Weave Net container is restarted
   which could allow a new container to be allocated the same IP
   address as an existing one #2784,#2787
@@ -14,7 +23,8 @@
   larger clusters can be created #2781
 * WeaveDNS was incorrectly case-sensitive for reverse DNS lookups #2817,#2818
 
-# Build and Testing
+Build and Testing
+
 * Scripts to create VMs to run automated tests were rewritten to use
   Terraform and Ansible, to make it much easier to test with different
   versions of components such as Docker and Kubernetes #2647,#2694,#2775,#2796
