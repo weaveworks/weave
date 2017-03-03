@@ -4,27 +4,27 @@
 
 PLUGIN_NAME="weave-ci-registry:5000/weaveworks/plugin-v2"
 HOST1_IP=$($SSH $HOST1 getent ahosts $HOST1 | grep "RAW" | cut -d' ' -f1)
-
-# TODO(mp) Add a Docker vsn check
+SERVICE="weave-850-service"
+NETWORK="weave-850-network"
 
 setup_master() {
     # Setup Docker image registry on $HOST1
     docker_on $HOST1 run -p 5000:5000 -d registry:2
 
     # Build plugin-v2 on $HOST1, because Circle "CI" runs only ancient
-    # version of Docker which does not support v2 plugins...
-    BUILD_PLUGIN_IMG="buildpluginv2-ci"
+    # version of Docker which does not support v2 plugins.
+    build_plugin_img="buildpluginv2-ci"
     rsync -az -e "$SSH" "$(dirname $0)/../prog/plugin-v2" $HOST1:~/
     $SSH $HOST1<<EOF
-        docker rmi $BUILD_PLUGIN_IMG 2>/dev/null
+        docker rmi $build_plugin_img 2>/dev/null
         docker plugin disable $PLUGIN_NAME >/dev/null
         docker plugin remove $PLUGIN_NAME 2>/dev/null
 
         WORK_DIR=$(mktemp -d)
         mkdir -p \${WORK_DIR}/rootfs
 
-        docker create --name=$BUILD_PLUGIN_IMG weaveworks/plugin true
-        docker export $BUILD_PLUGIN_IMG | tar -x -C \${WORK_DIR}/rootfs
+        docker create --name=$build_plugin_img weaveworks/plugin true
+        docker export $build_plugin_img | tar -x -C \${WORK_DIR}/rootfs
         cp \${HOME}/plugin-v2/launch.sh \${WORK_DIR}/rootfs/home/weave/launch.sh
         cp \${HOME}/plugin-v2/config.json \${WORK_DIR}
         docker plugin create $PLUGIN_NAME \${WORK_DIR}
@@ -53,46 +53,55 @@ EOF
 }
 
 cleanup() {
-    HOSTS="$HOST1 HOST2"
-    for HOST in $HOSTS; do
-        $SSH $HOST<<EOF
-            sudo sed '/weave-ci-registry/d' /etc/hosts
-            docker service rm weave1 || true
-            docker network rm weave-v2 || true
-            docker plugin disable $PLUGIN_NAME
-            docker plugin remove $PLUGIN_NAME
-            docker swarm leave --force
+    for h in $@; do
+        $SSH $h<<EOF
+            sudo sed -i '/weave-ci-registry/d' /etc/hosts
+            docker service rm $SERVICE || true
+            docker swarm leave --force || true
+            docker network rm $NETWORK || true
+            docker plugin disable -f $PLUGIN_NAME || true
+            docker plugin remove -f $PLUGIN_NAME || true
 EOF
     done
 }
 
-start_suite "Test weave Docker plugin-v2"
+wait_for_service() {
+    for i in $(seq 60); do
+        replicas=$($SSH $1 docker service ls -f="name=$2" | awk '{print $4}' | grep -v REPLICAS)
+        if [ "$replicas" == "$3/$3" ]; then
+            return
+        fi
+        echo "Waiting for \"$2\" service"
+        sleep 2
+    done
+    echo "Failed to wait for \"$2\" service" >&2
+    return 1
+}
+
+start_suite "Test Docker plugin-v2"
 
 setup_master
 setup_worker $($SSH $HOST1 docker swarm join-token --quiet worker)
 
-assert_raises "$SSH $HOST1 ping -nq -W 2 -c 1 weave-ci-registry"
-assert_raises "$SSH $HOST2 ping -nq -W 2 -c 1 weave-ci-registry"
-
 # Create network and service
 $SSH $HOST1<<EOF
-    ps aux | grep weave
-    docker plugin ls
-    docker network create --driver="${PLUGIN_NAME}:latest" weave-v2
-    docker service create --name=weave1 --network=weave-v2 --replicas=2 nginx
+    docker network create --driver="${PLUGIN_NAME}:latest" $NETWORK
+    sleep 20 # Otherwise host2 won't schedule any service container
+    docker service create --name=$SERVICE --network=$NETWORK --replicas=2 nginx
 EOF
 
-# TODO(mp) add_wait_for_service to be ready
-sleep 10
+wait_for_service $HOST1 $SERVICE 2
 
-# TODO(mp) ...
+$SSH $HOST1 "docker service ls"
+
 C1=$($SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $1}')
 C2_IP=$($SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $3}')
 
-echo ">>> $C1 $C2_IP"
+sleep 10
 
 assert_raises "exec_on $HOST1 $C1 $PING $C2_IP"
 
-cleanup
+# Failing to cleanup will make the rest of the tests to fail
+cleanup $HOST1 $HOST2
 
 end_suite
