@@ -36,6 +36,7 @@ setup_master() {
         docker swarm init --advertise-addr=$HOST1_IP
 
         [ -n "$COVERAGE" ] && docker plugin set $PLUGIN_NAME EXTRA_ARGS="-test.coverprofile=/home/weave/cover.prof --"
+        docker plugin set $PLUGIN_NAME WEAVE_PASSWORD="foobar"
         docker plugin enable $PLUGIN_NAME
 EOF
 }
@@ -48,6 +49,7 @@ setup_worker() {
         docker plugin install --disable --grant-all-permissions $PLUGIN_NAME
 
         [ -n "$COVERAGE" ] && docker plugin set $PLUGIN_NAME EXTRA_ARGS="-test.coverprofile=/home/weave/cover.prof --"
+        docker plugin set $PLUGIN_NAME WEAVE_PASSWORD="foobar"
         docker plugin enable $PLUGIN_NAME
 EOF
 }
@@ -98,6 +100,8 @@ C1=$($SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $1}')
 C2_IP=$($SSH $HOST2 weave ps | grep -v weave:expose | awk '{print $3}')
 
 sleep 10
+
+# TODO test for encryption
 
 assert_raises "exec_on $HOST1 $C1 $PING $C2_IP"
 

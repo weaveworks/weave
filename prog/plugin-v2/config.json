@@ -43,6 +43,14 @@
           "value"
       ],
       "value": ""
+    },
+    {
+      "description": "Encryption password",
+      "name": "WEAVE_PASSWORD",
+      "settable": [
+          "value"
+      ],
+      "value": ""
     }
   ],
   "network": {
