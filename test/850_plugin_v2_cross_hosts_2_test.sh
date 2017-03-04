@@ -86,6 +86,7 @@ wait_for_service() {
 start_suite "Test Docker plugin-v2"
 
 setup_master
+sleep 20 # registry seems to be async :(
 setup_worker $($SSH $HOST1 docker swarm join-token --quiet worker)
 
 # Create network and service
