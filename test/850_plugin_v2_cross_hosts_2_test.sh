@@ -38,6 +38,7 @@ setup_master() {
         [ -n "$COVERAGE" ] && docker plugin set $PLUGIN_NAME EXTRA_ARGS="-test.coverprofile=/home/weave/cover.prof --"
         docker plugin set $PLUGIN_NAME WEAVE_PASSWORD="foobar"
         docker plugin enable $PLUGIN_NAME
+        ps aux | grep weaver
 EOF
 }
 
@@ -46,7 +47,9 @@ setup_worker() {
         echo "$HOST1_IP weave-ci-registry" | sudo tee -a /etc/hosts
         ping -nq -W 2 -c 1 weave-ci-registry
         docker swarm join --token "$1" "${HOST1_IP}:2377"
+        echo "Installing..."
         docker plugin install --disable --grant-all-permissions $PLUGIN_NAME
+        echo "Done"
 
         [ -n "$COVERAGE" ] && docker plugin set $PLUGIN_NAME EXTRA_ARGS="-test.coverprofile=/home/weave/cover.prof --"
         docker plugin set $PLUGIN_NAME WEAVE_PASSWORD="foobar"
