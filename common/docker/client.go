@@ -165,13 +165,25 @@ func (pending pendingStarts) finish(id string) {
 	}
 }
 
+// AllContainerIDs returns all the IDs of Docker containers,
+// whether they are running or not.
 func (c *Client) AllContainerIDs() ([]string, error) {
-	all, err := c.ListContainers(docker.ListContainersOptions{All: true})
+	return c.containerIDs(true)
+}
+
+// RunningContainerIDs returns all the IDs of the running
+// Docker containers.
+func (c *Client) RunningContainerIDs() ([]string, error) {
+	return c.containerIDs(false)
+}
+
+func (c *Client) containerIDs(all bool) ([]string, error) {
+	containers, err := c.ListContainers(docker.ListContainersOptions{All: all})
 	if err != nil {
 		return nil, err
 	}
 	var ids []string
-	for _, c := range all {
+	for _, c := range containers {
 		ids = append(ids, c.ID)
 	}
 	return ids, nil
