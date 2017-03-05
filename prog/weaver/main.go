@@ -307,11 +307,15 @@ func main() {
 			trackerName = "awsvpc"
 		}
 		var allContainerIDs []string
+		var runningContainerIDs []string
 		if dockerCli != nil {
 			allContainerIDs, err = dockerCli.AllContainerIDs()
 			checkFatal(err)
+
+			runningContainerIDs, err = dockerCli.RunningContainerIDs()
+			checkFatal(err)
 		}
-		preClaims, err := findExistingAddresses(dockerCli, allContainerIDs, weavenet.WeaveBridgeName)
+		preClaims, err := findExistingAddresses(dockerCli, runningContainerIDs, weavenet.WeaveBridgeName)
 		checkFatal(err)
 		allocator, defaultSubnet = createAllocator(router, ipamConfig, preClaims, db, t, isKnownPeer)
 		observeContainers(allocator)
