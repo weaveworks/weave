@@ -124,3 +124,9 @@
 [submodule "vendor/github.com/containernetworking/cni"]
 	path = vendor/github.com/containernetworking/cni
 	url = https://github.com/containernetworking/cni
+[submodule "vendor/golang.org/x/net"]
+	path = vendor/golang.org/x/net
+	url = https://go.googlesource.com/net
+[submodule "vendor/google.golang.org/grpc"]
+	path = vendor/google.golang.org/grpc
+	url = https://github.com/grpc/grpc-go
