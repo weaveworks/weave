@@ -1209,6 +1209,10 @@ check_running() {
     fi
 }
 
+check_not_running_v2_plugin() {
+    is_docker_plugin_enabled "$1" && echo "$1 is already running." >&2 && return 1
+}
+
 is_docker_plugin_enabled() {
     [ "$(docker plugin inspect -f '{{ .Enabled }}' "$1" 2>/dev/null)" = "true" ]
 }
@@ -1990,6 +1994,7 @@ EOF
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
         check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
         check_not_running plugin $PLUGIN_CONTAINER_NAME $BASE_PLUGIN_IMAGE
+        check_not_running_v2_plugin "$PLUGIN_V2_NAME"
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router "$@"
         launch_proxy  $COMMON_ARGS
@@ -1998,6 +2003,7 @@ EOF
     launch-router)
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME $BASE_IMAGE
+        check_not_running_v2_plugin "$PLUGIN_V2_NAME"
         launch_router "$@"
         echo $ROUTER_CONTAINER
         ;;
@@ -2015,10 +2021,12 @@ EOF
     launch-proxy)
         deprecation_warnings "$@"
         check_not_running proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
+        check_not_running_v2_plugin "$PLUGIN_V2_NAME"
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
     launch-plugin)
+        check_not_running_v2_plugin "$PLUGIN_V2_NAME"
         if ! check_running $CONTAINER_NAME 2>/dev/null ; then
             echo "ERROR:" $CONTAINER_NAME "container must be running before plugin can be launched" >&2
             exit 1
