@@ -82,3 +82,25 @@ func findInterface(ifaceName string) (iface *net.Interface, err error) {
 	}
 	return
 }
+
+func LocalAddresses() ([]*net.IPNet, error) {
+	links, err := netlink.LinkList()
+	if err != nil {
+		return nil, err
+	}
+
+	retval := []*net.IPNet{}
+	for _, link := range links {
+		if _, isBridge := link.(*netlink.Bridge); isBridge || (link.Attrs().Flags&net.FlagLoopback) != 0 {
+			continue
+		}
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+		if err != nil {
+			return nil, err
+		}
+		for _, addr := range addrs {
+			retval = append(retval, addr.IPNet)
+		}
+	}
+	return retval, nil
+}
