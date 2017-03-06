@@ -20,6 +20,10 @@ SUCCESS="6 established"
 
 tear_down_kubeadm
 
+# Make an ipset, so we can check it doesn't get wiped out by Weave Net
+docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc create test_840_ipset bitmap:ip range 192.168.1.0/24 || true
+docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc add test_840_ipset 192.168.1.11
+
 run_on $HOST1 "sudo systemctl start kubelet && sudo kubeadm init --token=$TOKEN"
 run_on $HOST2 "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
 run_on $HOST3 "sudo systemctl start kubelet && sudo kubeadm join --token=$TOKEN $HOST1IP"
@@ -75,5 +79,8 @@ wait_for_pods() {
 assert_raises wait_for_pods
 
 tear_down_kubeadm
+
+# Destroy our test ipset, and implicitly check it is still there
+assert_raises "docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc destroy test_840_ipset"
 
 end_suite
