@@ -341,6 +341,7 @@ CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 BASE_PLUGIN_IMAGE=$DOCKERHUB_USER/plugin
 PLUGIN_IMAGE=$BASE_PLUGIN_IMAGE:$IMAGE_VERSION
 PLUGIN_CONTAINER_NAME=weaveplugin
+PLUGIN_V2_NAME="$DOCKERHUB_USER/pluginv2"
 CNI_PLUGIN_NAME="weave-plugin-$IMAGE_VERSION"
 CNI_PLUGIN_DIR=${WEAVE_CNI_PLUGIN_DIR:-$HOST_ROOT/opt/cni/bin}
 # Note VOLUMES_CONTAINER which is for weavewait should change when you upgrade Weave
@@ -1209,6 +1210,10 @@ check_running() {
         echo "$1 container is not running." >&2
         return 2
     fi
+}
+
+is_docker_plugin_enabled() {
+    [ "$(docker plugin inspect -f '{{ .Enabled }}' "$1" 2>/dev/null)" = "true" ]
 }
 
 # Execute $@ only if the weave container is running
@@ -2082,7 +2087,7 @@ EOF
             echo "        Service: proxy"
             echo "        Address: $PROXY_ADDRS"
         fi
-        if [ -z "$SUB_STATUS" ] && check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ; then
+        if [ -z "$SUB_STATUS" ] && ( is_docker_plugin_enabled "$PLUGIN_V2_NAME" || check_running $PLUGIN_CONTAINER_NAME 2>/dev/null ) ; then
             echo
             echo "        Service: plugin"
             echo "     DriverName: weave"
