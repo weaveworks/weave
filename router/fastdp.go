@@ -577,8 +577,8 @@ type fastDatapathForwarder struct {
 	confirmed         bool
 	remoteAddr        *net.UDPAddr
 	heartbeatInterval time.Duration
-	heartbeatTimer    *time.Timer
-	heartbeatTimeout  *time.Timer
+	heartbeatTimer    *time.Timer // for sending
+	heartbeatTimeout  *time.Timer // for receiving
 	ackedHeartbeat    bool
 	stopChan          chan struct{}
 	stopped           bool
@@ -856,7 +856,9 @@ func (fwd *fastDatapathForwarder) handleCryptoInitSARemote(msg []byte) {
 		return
 	}
 
-	if !fwd.isOutboundIPSecEstablished {
+	// FastDatapathCryptoInitSARemote can be received before Confirm'ing
+	// connection, thus before InitSALocal.
+	if fwd.confirmed && !fwd.isOutboundIPSecEstablished {
 		fwd.isOutboundIPSecEstablished = true
 		fwd.heartbeatTimer.Reset(0)
 	}
