@@ -1,7 +1,6 @@
 package ipset
 
 import (
-	"bytes"
 	"os/exec"
 	"strings"
 
@@ -83,22 +82,19 @@ func (i *ipset) DestroyAll() error {
 	return err
 }
 
-// Fetch a list of all existing sets
+// Fetch a list of all existing sets with a given prefix
 func (i *ipset) List(prefix string) ([]Name, error) {
 	err, output := doExec("list","-name","-output","plain")
+	if err != nil {
+		return nil, err
+	}
 
 	var selected []Name
-	if err == nil && len(output) > 0 {
-		output = bytes.TrimRight(output, "\n")
-		sets := strings.Split(string(output[:]), "\n")
-
-		plen := len(prefix)
-		for _, v := range sets {
-			if (plen <= len(v)) && (prefix == v[:len(prefix)]) {
-				selected = append(selected, Name(v))
-			}
+	sets := strings.Split(string(output), "\n")
+	for _, v := range sets {
+		if strings.HasPrefix(v, prefix) {
+			selected = append(selected, Name(v))
 		}
-
 	}
 
 	return selected, err
