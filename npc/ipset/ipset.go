@@ -38,53 +38,46 @@ func New() Interface {
 }
 
 func (i *ipset) Create(ipsetName Name, ipsetType Type) error {
-	err, _ := doExec("create", string(ipsetName), string(ipsetType))
-	return err
+	return doExec("create", string(ipsetName), string(ipsetType))
 }
 
 func (i *ipset) AddEntry(ipsetName Name, entry string) error {
 	if i.inc(ipsetName, entry) > 1 { // already in the set
 		return nil
 	}
-	err, _ := doExec("add", string(ipsetName), entry)
-	return err
+	return doExec("add", string(ipsetName), entry)
 }
 
 func (i *ipset) DelEntry(ipsetName Name, entry string) error {
 	if i.dec(ipsetName, entry) > 0 { // still needed
 		return nil
 	}
-	err, _ := doExec("del", string(ipsetName), entry)
-	return err
+	return doExec("del", string(ipsetName), entry)
 }
 
 func (i *ipset) Flush(ipsetName Name) error {
 	i.removeSet(ipsetName)
-	err, _ := doExec("flush", string(ipsetName))
-	return err
+	return doExec("flush", string(ipsetName))
 }
 
 func (i *ipset) FlushAll() error {
 	i.refCount = newRefCount()
-	err, _ := doExec("flush")
-	return err
+	return doExec("flush")
 }
 
 func (i *ipset) Destroy(ipsetName Name) error {
 	i.removeSet(ipsetName)
-	err, _ := doExec("destroy", string(ipsetName))
-	return err
+	return doExec("destroy", string(ipsetName))
 }
 
 func (i *ipset) DestroyAll() error {
 	i.refCount = newRefCount()
-	err, _ := doExec("destroy")
-	return err
+	return doExec("destroy")
 }
 
 // Fetch a list of all existing sets with a given prefix
 func (i *ipset) List(prefix string) ([]Name, error) {
-	err, output := doExec("list","-name","-output","plain")
+	output, err := exec.Command("ipset", "list", "-name", "-output", "plain").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -100,12 +93,11 @@ func (i *ipset) List(prefix string) ([]Name, error) {
 	return selected, err
 }
 
-func doExec(args ...string) (error, []byte) {
-	output, err := exec.Command("ipset", args...).CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "ipset %v failed: %s", args, output), output
+func doExec(args ...string) error {
+	if output, err := exec.Command("ipset", args...).CombinedOutput(); err != nil {
+		return errors.Wrapf(err, "ipset %v failed: %s", args, output)
 	}
-	return nil, output
+	return nil
 }
 
 // Reference-counting
