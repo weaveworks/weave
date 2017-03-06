@@ -83,12 +83,12 @@ func resetIPSets(ips ipset.Interface) error {
 	// Remove ipsets prefixed `weave-` only
 
 	sets, err := ips.List(npc.IpsetNamePrefix)
-	if (err != nil) {
+	if err != nil {
 		common.Log.Errorf("Failed to retrieve list of ipsets")
 		return err
 	}
 
-	 common.Log.Debugf("Got list of ipsets: %v", sets)
+	common.Log.Debugf("Got list of ipsets: %v", sets)
 
 	for _, s := range sets {
 		common.Log.Debugf("Destroying ipsets '%s'", string(s))
