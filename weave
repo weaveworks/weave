@@ -361,6 +361,7 @@ HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-127.0.0.1:6782}
 PROXY_PORT=12375
 PROXY_CONTAINER_NAME=weaveproxy
+PROC_PATH="/proc"
 COVERAGE_ARGS=""
 [ -n "$COVERAGE" ] && COVERAGE_ARGS="-test.coverprofile=/home/weave/cover.prof --"
 
@@ -442,9 +443,9 @@ delete_iptables_rule() {
 # makes containers react more quickly to a change in the MAC address
 # associated with an IP address.
 configure_arp_cache() {
-    $2 sh -c "echo 5 >/proc/sys/net/ipv4/neigh/$1/base_reachable_time &&
-              echo 2 >/proc/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
-              echo 1 >/proc/sys/net/ipv4/neigh/$1/ucast_solicit"
+    $2 sh -c "echo 5 >$PROC_PATH/sys/net/ipv4/neigh/$1/base_reachable_time &&
+              echo 2 >$PROC_PATH/sys/net/ipv4/neigh/$1/delay_first_probe_time &&
+              echo 1 >$PROC_PATH/sys/net/ipv4/neigh/$1/ucast_solicit"
 }
 
 # Send out an ARP announcement
@@ -725,8 +726,10 @@ init_bridge_prep() {
     # Running this from 'weave --local' when weaveexec is not on the
     # path will run it as a Docker container that does not have access
     # to /etc/machine-id, so will not give the full range of persistent IDs
-    WEAVEDB_PATH=$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)
-    MAC=$(util_op unique-id "$HOST_ROOT/$WEAVEDB_PATH/weave" "$HOST_ROOT")
+    if [ -z "$WEAVEDB_DIR_PATH" ]; then
+        WEAVEDB_DIR_PATH="$HOST_ROOT/$(docker inspect -f '{{with index .Mounts 0}}{{.Source}}{{end}}' $DB_CONTAINER_NAME 2>/dev/null)"
+    fi
+    MAC=$(util_op unique-id "$WEAVEDB_DIR_PATH/weave" "$HOST_ROOT")
 
     ip link set dev $BRIDGE address $MAC
 
@@ -1698,11 +1701,11 @@ setup_awsvpc() {
         # Set proxy_arp on the bridge, so that it could accept packets destined
         # to containers within the same subnet but running on remote hosts.
         # Without it, exact routes on each container are required.
-        echo 1 >/proc/sys/net/ipv4/conf/$BRIDGE/proxy_arp
+        echo 1 >$PROC_PATH/sys/net/ipv4/conf/$BRIDGE/proxy_arp
         # Avoid delaying the first ARP request. Also, setting it to 0 avoids
         # placing the request into a bounded queue as it can be seen:
         # https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/net/ipv4/arp.c?id=refs/tags/v4.6.1#n819
-        echo 0 >/proc/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
+        echo 0 >$PROC_PATH/sys/net/ipv4/neigh/$BRIDGE/proxy_delay
         expose_ip
     fi
 }
@@ -1945,6 +1948,22 @@ case "$COMMAND" in
     # intentionally undocumented since it assumes knowledge of weave
     # internals
     create-bridge)
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --proc-path=*)
+                    PROC_PATH="${1#*=}"
+                    shift
+                    ;;
+                --weavedb-dir-path=*)
+                    WEAVEDB_DIR_PATH="${1#*=}"
+                    shift
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+        done
+
         if [ "$1" != "--force" ] ; then
             cat 1>&2 <<EOF
 WARNING: 'weave create-bridge' is deprecated. Instead use 'weave attach-bridge'
@@ -1966,6 +1985,7 @@ EOF
         else
             shift 1
         fi
+
         create_bridge --without-ethtool "$@"
         ;;
     attach-bridge)

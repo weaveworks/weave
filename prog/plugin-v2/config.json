@@ -18,9 +18,10 @@
   },
   "mounts": [
     {
-      "destination": "/procmount",
-      "type": "proc",
-      "source": "proc"
+      "destination": "/host/proc/",
+      "type": "bind",
+      "source": "/proc/",
+      "options": ["rbind", "rw"]
     },
     {
       "destination": "/var/run/docker.sock",
@@ -29,10 +30,42 @@
       "options": ["rbind"]
     },
     {
-      "destination": "/var/lib/weave",
-      "source": "/var/lib/weave",
+      "destination": "/host/var/lib/",
+      "source": "/var/lib/",
       "type": "bind",
       "options": ["rbind"]
+    },
+    {
+      "destination": "/host/etc/",
+      "source": "/etc/",
+      "type": "bind",
+      "options": ["rbind"]
+    }
+  ],
+  "env": [
+    {
+      "description": "Extra args to `weaver` and `plugin`",
+      "name": "EXTRA_ARGS",
+      "settable": [
+          "value"
+      ],
+      "value": ""
+    },
+    {
+      "description": "Encryption password",
+      "name": "WEAVE_PASSWORD",
+      "settable": [
+          "value"
+      ],
+      "value": ""
+    },
+    {
+      "description": "MTU",
+      "name": "WEAVE_MTU",
+      "settable": [
+          "value"
+      ],
+      "value": ""
     }
   ],
   "network": {

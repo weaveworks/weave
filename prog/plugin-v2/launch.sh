@@ -7,17 +7,26 @@ IPALLOC_RANGE=${IPALLOC_RANGE:-10.32.0.0/12}
 HTTP_ADDR=${WEAVE_HTTP_ADDR:-127.0.0.1:6784}
 STATUS_ADDR=${WEAVE_STATUS_ADDR:-0.0.0.0:6782}
 HOST_ROOT=${HOST_ROOT:-/host}
-LOG_FILE=/var/lib/weave/weaver.log
+WEAVE_DIR="/host/var/lib/weave"
+LOG_FILE_WEAVER="$WEAVE_DIR/weaver.log"
+LOG_FILE_PLUGIN="$WEAVE_DIR/plugin.log"
 
-echo "Starting launch.sh" >>$LOG_FILE
+mkdir $WEAVE_DIR || true
+
+echo "Starting launch.sh" >>$LOG_FILE_WEAVER
 
 # Check if the IP range overlaps anything existing on the host
 /usr/bin/weaveutil netcheck $IPALLOC_RANGE weave
 
-SWARM_PEERS=$(/usr/bin/weaveutil swarm-manager-peers 2>>$LOG_FILE)
-! /usr/bin/weaveutil is-swarm-manager 2>>$LOG_FILE || IS_SWARM_MANAGER=1
+SWARM_PEERS=$(/usr/bin/weaveutil swarm-manager-peers 2>>$LOG_FILE_WEAVER)
+! /usr/bin/weaveutil is-swarm-manager 2>>$LOG_FILE_WEAVER || IS_SWARM_MANAGER=1
+# Prevent from restoring from a persisted peers list
+rm -f "/restart.sentinel"
 
-/home/weave/weave --local create-bridge --force >>$LOG_FILE 2>&1
+/home/weave/weave --local create-bridge \
+                          --proc-path=/host/proc \
+                          --weavedb-dir-path=$WEAVE_DIR \
+                          --force >>$LOG_FILE_WEAVER 2>&1
 
 BRIDGE_OPTIONS="--datapath=datapath"
 if [ "$(/home/weave/weave --local bridge-type)" = "bridge" ]; then
@@ -44,8 +53,10 @@ fi
     --ipalloc-range=$IPALLOC_RANGE \
     --ipalloc-init $IPALLOC_INIT \
     --nickname "$(hostname)" \
+    --log-level=debug \
+    --db-prefix="$WEAVE_DIR/weave" \
     $(echo $SWARM_PEERS | tr '\n' ' ') \
-    >>$LOG_FILE 2>&1 &
+    >>$LOG_FILE_WEAVER 2>&1 &
 WEAVE_PID=$!
 
 # Wait for weave process to become responsive
@@ -58,8 +69,9 @@ while true; do
     sleep 1
 done
 
-/home/weave/plugin --meshsocket='' --docker-api='' >/var/lib/weave/plugin.log 2>&1 &
+# TODO(mp) docker api?
+/home/weave/plugin $EXTRA_ARGS --log-level=debug --meshsocket='' --docker-api='' >>$LOG_FILE_PLUGIN 2>&1 &
 
-echo "End of launch.sh" >>$LOG_FILE
+echo "End of launch.sh" >>$LOG_FILE_WEAVER
 
 wait $WEAVE_PID
