@@ -4,8 +4,7 @@
 * Up-to-date versions of `git`, `go` etc
 * Install GitHub release tool `go get github.com/weaveworks/github-release`
 * Create a [github token for
-  github-release](https://help.github.com/articles/creating-an-access-token-for-command-line-use/);
-set and export `$GITHUB_TOKEN` with this value
+  github-release](https://help.github.com/articles/creating-an-access-token-for-command-line-use/); select the `repo` OAuth scope; set and export `$GITHUB_TOKEN` with this value
 
 ## Release Types
 
