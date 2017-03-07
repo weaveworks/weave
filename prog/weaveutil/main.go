@@ -65,6 +65,7 @@ func main() {
 	}
 	cmd, found := commands[os.Args[1]]
 	if !found {
+		fmt.Fprintf(os.Stderr, "%q cmd is not found\n", os.Args[1])
 		usage()
 		os.Exit(1)
 	}
