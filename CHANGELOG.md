@@ -1,3 +1,9 @@
+## Release 1.9.3
+
+Bug fixes and minor improvements
+
+* Fixed a race condition in Fast Datapath encrypted connections which could lead Weave Net to crash: #2824, #2825.
+
 ## Release 1.9.2
 
 Bug fixes and minor improvements
