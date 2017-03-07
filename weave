@@ -1399,10 +1399,12 @@ launch_router() {
         --volumes-from $DB_CONTAINER_NAME \
         -v $RESOLV_CONF_DIR:/var/run/weave/etc \
         -v /run/docker/plugins:/run/docker/plugins \
+        -v /etc:/host/etc -v /var/lib/dbus:/host/var/lib/dbus \
         -e WEAVE_PASSWORD \
         -e CHECKPOINT_DISABLE \
         $WEAVE_DOCKER_ARGS $IMAGE $COVERAGE_ARGS \
         --port $CONTAINER_PORT --nickname "$(hostname)" \
+        --host-root=/host \
         $(router_bridge_opts) \
         --ipalloc-range "$IPRANGE" \
         --dns-effective-listen-address $DOCKER_BRIDGE_IP \
