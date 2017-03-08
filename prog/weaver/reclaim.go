@@ -20,7 +20,7 @@ func a(cidr *net.IPNet) address.CIDR {
 
 // Get all the existing Weave IPs at startup, so we can stop IPAM
 // giving out any as duplicates
-func findExistingAddresses(dockerCli *weavedocker.Client, containerIDs []string, bridgeName string) (addrs []ipam.PreClaim, err error) {
+func findExistingAddresses(dockerCli *weavedocker.Client, bridgeName string) (addrs []ipam.PreClaim, err error) {
 	Log.Infof("Checking for pre-existing addresses on %s bridge", bridgeName)
 	// First get the address for the bridge
 	bridgeNetDev, err := weavenet.GetBridgeNetDev(bridgeName)
@@ -50,6 +50,11 @@ func findExistingAddresses(dockerCli *weavedocker.Client, containerIDs []string,
 	// Now iterate over all containers to see if they have a network
 	// namespace with an attached interface
 	if dockerCli != nil {
+		containerIDs, err := dockerCli.RunningContainerIDs()
+		if err != nil {
+			return nil, err
+		}
+
 		for _, cid := range containerIDs {
 			container, err := dockerCli.InspectContainer(cid)
 			if err != nil {
