@@ -69,8 +69,18 @@ func peerDiscoveryUpdate(discoveryEndpoint, token, peername, nickname string, ad
 	return updateResponse.Addresses, err
 }
 
-func HandleHTTPPeer(router *mux.Router, alloc *ipam.Allocator) {
+func peerDiscoveryDelete(discoveryEndpoint, token, peername string) error {
+	request := PeerUpdateRequest{Name: peername}
+	return do("DELETE", discoveryEndpoint, token, request, nil)
+}
+
+func HandleHTTPPeer(router *mux.Router, alloc *ipam.Allocator, discoveryEndpoint, token, peername string) {
 	router.Methods("DELETE").Path("/peer").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if discoveryEndpoint != "" {
+			if err := peerDiscoveryDelete(discoveryEndpoint, token, peername); err != nil {
+				Log.Errorf("Error while deleting self from peer discovery: %s", err)
+			}
+		}
 		if alloc != nil {
 			alloc.Shutdown()
 		}
@@ -79,6 +89,12 @@ func HandleHTTPPeer(router *mux.Router, alloc *ipam.Allocator) {
 
 	router.Methods("DELETE").Path("/peer/{id}").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ident := mux.Vars(r)["id"]
+		if discoveryEndpoint != "" {
+			// TODO: deal with this being either a peername or a nickname
+			if err := peerDiscoveryDelete(discoveryEndpoint, token, ident); err != nil {
+				Log.Errorf("Error while deleting self from peer discovery: %s", err)
+			}
+		}
 		if alloc != nil {
 			transferred := alloc.AdminTakeoverRanges(ident)
 			fmt.Fprintf(w, "%d IPs taken over from %s\n", transferred, ident)
