@@ -377,7 +377,7 @@ func options() map[string]string {
 		value := f.Value.String()
 		name := canonicalName(f)
 		if name == "password" {
-			value = "<elided>"
+			value = "<redacted>"
 		}
 		options[name] = value
 	})
