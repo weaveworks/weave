@@ -15,22 +15,20 @@ or
     host1$ export WEAVE_PASSWORD=wfvAwt7sj
     host1$ weave launch
 
->**NOTE**: The command line option takes precedence over the environment variable._
+>**NOTE**: The command line option takes precedence over the environment variable.
 
 > To avoid leaking your password via the kernel process table or your
 > shell history, we recommend you store it in a file and capture it
 > in a shell variable prior to launching weave: `export
 > WEAVE_PASSWORD=$(cat /path/to/password-file)`
 
-To guard against dictionary attacks, the password needs to be reasonably strong with at least 50 bits of entropy is recommended. An easy way to generate a random password that satisfies this requirement is:
+To guard against dictionary attacks, the password needs to be reasonably strong,
+with at least 50 bits of entropy. An easy way to generate a random password that
+satisfies this requirement is:
 
     < /dev/urandom tr -dc A-Za-z0-9 | head -c9 ; echo
 
 The same password must be specified for all Weave Net peers, by default both control and data plane traffic will then use authenticated encryption. 
-
-[Fast datapath](/site/using-weave/fastdp.md) does not support
-encryption. If you supply a password at `weave launch`, Weave Net
-falls back to the slower `sleeve` mode for encrypted communication.
 
 As an optimization, you can selectively disable data plane encryption
 if some of your peers are co-located in a trusted network, for example
@@ -40,9 +38,8 @@ the `--trusted-subnets` argument with `weave launch`:
     weave launch --password wfvAwt7sj --trusted-subnets 10.0.2.0/24,192.168.48.0/24
 
 If *both* peers at the end of a connection consider the other to be in
-a trusted subnet, Weave Net attempts to establish fast datapath
-connectivity, which is unencrypted. Otherwise communication is encrypted which
-imposes overheads.
+the same trusted subnet, Weave Net attempts to establish non-encrypted
+connectivity. Otherwise communication is encrypted which imposes overheads.
 
 Configured trusted subnets are shown in [`weave status`](/site/troubleshooting.md#weave-status).
 
