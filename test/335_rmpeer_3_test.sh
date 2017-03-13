@@ -14,7 +14,10 @@ weave_on $HOST3 launch $HOST1
 weave_on $HOST3 prime
 
 # nuke 1st peer
-docker_on $HOST1 kill weave
+# NOTE: docker-kill hangs (https://github.com/docker/docker/issues/31447), so we
+# kill directly the weaver process instead.
+WEAVER_PID=$(container_pid $HOST1 weave)
+run_on $HOST1 "sudo kill -9 $WEAVER_PID"
 
 # transfer its space to the 2nd
 weave_on $HOST2 rmpeer $PEER1
