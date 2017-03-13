@@ -61,17 +61,22 @@ func (driver *driver) GetCapabilities() (*api.GetCapabilityResponse, error) {
 	return caps, nil
 }
 
+// In Swarm mode, CreateNetwork is called on each Swarm node when a new service
+// is created.
 func (driver *driver) CreateNetwork(create *api.CreateNetworkRequest) error {
 	driver.logReq("CreateNetwork", create, create.NetworkID)
 	_, err := driver.setupNetworkInfo(create.NetworkID, true, stringOptions(create))
 	return err
 }
 
+// NetworkAllocate is called on a Swarm node (master) which creates the network.
+// The returned options are passed to CreateNetwork.
 func (driver *driver) NetworkAllocate(alloc *api.AllocateNetworkRequest) (*api.AllocateNetworkResponse, error) {
 	driver.logReq("NetworkAllocate", alloc, alloc.NetworkID)
-	return nil, nil
+	return &api.AllocateNetworkResponse{Options: alloc.Options}, nil
 }
 
+// NetworkFree is called on a Swarm master node which created the network.
 func (driver *driver) NetworkFree(free *api.FreeNetworkRequest) (*api.FreeNetworkResponse, error) {
 	driver.logReq("NetworkFree", free, free.NetworkID)
 	return nil, nil
@@ -95,6 +100,7 @@ func stringOptions(create *api.CreateNetworkRequest) map[string]string {
 	return nil
 }
 
+// In Swarm mode, DeleteNetwork is called after a service has been removed.
 func (driver *driver) DeleteNetwork(delreq *api.DeleteNetworkRequest) error {
 	driver.logReq("DeleteNetwork", delreq, delreq.NetworkID)
 	driver.Lock()
