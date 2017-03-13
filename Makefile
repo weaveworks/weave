@@ -93,38 +93,35 @@ WEAVEWAIT_EXE=prog/weavewait/weavewait
 WEAVEWAIT_NOOP_EXE=prog/weavewait/weavewait_noop
 WEAVEWAIT_NOMCAST_EXE=prog/weavewait/weavewait_nomcast
 WEAVEUTIL_EXE=prog/weaveutil/weaveutil
-PLUGIN_EXE=prog/plugin/plugin
 RUNNER_EXE=tools/runner/runner
 MANIFEST_TOOL_DIR=vendor/github.com/estesp/manifest-tool
 MANIFEST_TOOL_EXE=$(MANIFEST_TOOL_DIR)/manifest-tool
 TEST_TLS_EXE=test/tls/tls
 
 # All binaries together in a list
-EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(PLUGIN_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(MANIFEST_TOOL_EXE)
+EXES=$(WEAVER_EXE) $(SIGPROXY_EXE) $(KUBEPEERS_EXE) $(WEAVENPC_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE) $(RUNNER_EXE) $(TEST_TLS_EXE) $(MANIFEST_TOOL_EXE)
 
 # These stamp files are used to mark the current state of the build; whether an image has been built or not
 BUILD_UPTODATE=.build.uptodate
 WEAVER_UPTODATE=.weaver$(ARCH_EXT).uptodate
 WEAVEEXEC_UPTODATE=.weaveexec$(ARCH_EXT).uptodate
-PLUGIN_UPTODATE=.plugin$(ARCH_EXT).uptodate
 PLUGINV2_UPTODATE=.pluginv2$(ARCH_EXT).uptodate
 WEAVEKUBE_UPTODATE=.weavekube$(ARCH_EXT).uptodate
 WEAVENPC_UPTODATE=.weavenpc$(ARCH_EXT).uptodate
 WEAVEDB_UPTODATE=.weavedb.uptodate
 
-IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(PLUGIN_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVENPC_UPTODATE)
+IMAGES_UPTODATE=$(WEAVER_UPTODATE) $(WEAVEEXEC_UPTODATE) $(WEAVEKUBE_UPTODATE) $(WEAVENPC_UPTODATE)
 
 # The names of the images. Note that the images for other architectures than amd64 have a suffix in the image name.
 WEAVER_IMAGE=$(DOCKERHUB_USER)/weave$(ARCH_EXT)
 WEAVEEXEC_IMAGE=$(DOCKERHUB_USER)/weaveexec$(ARCH_EXT)
-PLUGIN_IMAGE=$(DOCKERHUB_USER)/plugin$(ARCH_EXT)
 WEAVEKUBE_IMAGE=$(DOCKERHUB_USER)/weave-kube$(ARCH_EXT)
 WEAVENPC_IMAGE=$(DOCKERHUB_USER)/weave-npc$(ARCH_EXT)
 BUILD_IMAGE=weaveworks/weavebuild
 WEAVEDB_IMAGE=$(DOCKERHUB_USER)/weavedb
 PLUGINV2_IMAGE=$(DOCKERHUB_USER)/pluginv2$(ARCH_EXT)
 
-IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(PLUGIN_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
+IMAGES=$(WEAVER_IMAGE) $(WEAVEEXEC_IMAGE) $(WEAVEKUBE_IMAGE) $(WEAVENPC_IMAGE) $(WEAVEDB_IMAGE)
 
 PLUGINV2_WORK_DIR="prog/plugin-v2/rootfs"
 
@@ -156,12 +153,12 @@ testrunner: $(RUNNER_EXE) $(TEST_TLS_EXE)
 
 $(WEAVER_EXE) $(WEAVEPROXY_EXE) $(WEAVEUTIL_EXE): common/*.go common/*/*.go net/*.go net/*/*.go
 $(WEAVER_EXE): router/*.go ipam/*.go ipam/*/*.go db/*.go nameserver/*.go prog/weaver/*.go
+$(WEAVER_EXE): api/*.go plugin/*.go plugin/*/*
 $(WEAVEPROXY_EXE): proxy/*.go prog/weaveproxy/*.go
 $(WEAVEUTIL_EXE): prog/weaveutil/*.go net/*.go plugin/net/*.go plugin/ipam/*.go db/*.go
 $(SIGPROXY_EXE): prog/sigproxy/*.go
 $(KUBEPEERS_EXE): prog/kube-peers/*.go
 $(WEAVENPC_EXE): prog/weave-npc/*.go npc/*.go npc/*/*.go
-$(PLUGIN_EXE): prog/plugin/*.go plugin/*/*.go api/*.go common/*.go common/docker/*.go net/*.go
 $(TEST_TLS_EXE): test/tls/*.go
 $(RUNNER_EXE): tools/runner/*.go
 $(MANIFEST_TOOL_EXE): $(MANIFEST_TOOL_DIR)/*.go
@@ -191,7 +188,7 @@ else
 
 exes: $(EXES)
 
-$(WEAVER_EXE) $(WEAVEPROXY_EXE) $(PLUGIN_EXE):
+$(WEAVER_EXE) $(WEAVEPROXY_EXE):
 ifeq ($(COVERAGE),true)
 	$(eval COVERAGE_MODULES := $(shell (go list ./$(@D); go list -f '{{join .Deps "\n"}}' ./$(@D) | grep "^$(PACKAGE_BASE)/") | grep -v "^$(PACKAGE_BASE)/vendor/" | paste -s -d,))
 	go test -c -o ./$@ $(BUILD_FLAGS) -v -covermode=atomic -coverpkg $(COVERAGE_MODULES) ./$(@D)/
@@ -268,14 +265,10 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexe
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
-$(PLUGIN_UPTODATE): prog/plugin/Dockerfile.$(DOCKERHUB_USER) $(PLUGIN_EXE) $(WEAVER_UPTODATE)
-	$(SUDO) docker build -f prog/plugin/Dockerfile.$(DOCKERHUB_USER) -t $(PLUGIN_IMAGE) prog/plugin
-	touch $@
-
 # TODO(mp) cleanup!
-pluginv2: prog/plugin-v2/launch.sh prog/plugin-v2/config.json $(PLUGIN_UPTODATE)
+pluginv2: prog/plugin-v2/launch.sh prog/plugin-v2/config.json $(WEAVER_UPTODATE)
 	-$(SUDO) docker rm -f buildpluginv2
-	$(SUDO) docker create --name=buildpluginv2 $(PLUGIN_IMAGE) true
+	$(SUDO) docker create --name=buildpluginv2 $(WEAVER_IMAGE) true
 	rm -rf $(PLUGINV2_WORK_DIR)
 	mkdir $(PLUGINV2_WORK_DIR)
 	docker export buildpluginv2 | tar -x -C $(PLUGINV2_WORK_DIR)

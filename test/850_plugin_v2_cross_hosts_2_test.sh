@@ -23,7 +23,7 @@ setup_master() {
         WORK_DIR=$(mktemp -d)
         mkdir -p \${WORK_DIR}/rootfs
 
-        docker create --name=$build_plugin_img weaveworks/plugin true
+        docker create --name=$build_plugin_img weaveworks/weave true
         docker export $build_plugin_img | tar -x -C \${WORK_DIR}/rootfs
         cp \${HOME}/plugin-v2/launch.sh \${WORK_DIR}/rootfs/home/weave/launch.sh
         cp \${HOME}/plugin-v2/config.json \${WORK_DIR}
@@ -38,8 +38,6 @@ setup_master() {
         [ -n "$COVERAGE" ] && docker plugin set $PLUGIN_NAME EXTRA_ARGS="-test.coverprofile=/home/weave/cover.prof --"
         #docker plugin set $PLUGIN_NAME WEAVE_PASSWORD="foobar"
         docker plugin enable $PLUGIN_NAME
-        ps aux | grep weave
-        cat /var/lib/weave/weaver.log
 EOF
 }
 
@@ -97,6 +95,9 @@ wait_for_service() {
 }
 
 start_suite "Test Docker plugin-v2"
+
+#cleanup $HOST1 $HOST2
+#exit 1
 
 setup_master
 #sleep 20 # registry seems to be async :(

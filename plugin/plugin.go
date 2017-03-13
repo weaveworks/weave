@@ -1,15 +1,12 @@
-package main
+package plugin
 
 import (
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path"
 	"strings"
-	"syscall"
 
 	"github.com/docker/libnetwork/ipamapi"
 	weaveapi "github.com/weaveworks/weave/api"
@@ -21,55 +18,21 @@ import (
 	"github.com/weaveworks/weave/plugin/skel"
 )
 
-var version = "unreleased"
-
 var Log = common.Log
 
-func main() {
-	var (
-		justVersion      bool
-		dockerAPI        string
-		address          string
-		meshAddress      string
-		logLevel         string
-		noMulticastRoute bool
-
-		defaultDockerHost = "unix:///var/run/docker.sock"
-	)
-
-	if val := os.Getenv("DOCKER_HOST"); val != "" {
-		defaultDockerHost = val
-	}
-
-	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.StringVar(&logLevel, "log-level", "info", "logging level (debug, info, warning, error)")
-	flag.StringVar(&dockerAPI, "docker-api", defaultDockerHost, "Docker API endpoint")
-	flag.StringVar(&address, "socket", "/run/docker/plugins/weave.sock", "socket on which to listen")
-	flag.StringVar(&meshAddress, "meshsocket", "/run/docker/plugins/weavemesh.sock", "socket on which to listen in mesh mode")
-	flag.BoolVar(&noMulticastRoute, "no-multicast-route", false, "deprecated (this is now the default)")
-
-	flag.Parse()
-
-	if justVersion {
-		fmt.Printf("weave plugin %s\n", version)
-		os.Exit(0)
-	}
-
-	common.SetLogLevel(logLevel)
-
-	weave := weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), Log)
+func Start(weaveAPIAddr string, dockerAPIAddr string, address string, meshAddress string, noMulticastRoute bool) {
+	weave := weaveapi.NewClient(weaveAPIAddr, Log)
 
 	var dockerClient *docker.Client
 	var err error
-	if dockerAPI != "" {
+	if dockerAPIAddr != "" {
 		// API 1.21 is the first version that supports docker network commands
-		dockerClient, err = docker.NewVersionedClient(dockerAPI, "1.21")
+		dockerClient, err = docker.NewVersionedClient(dockerAPIAddr, "1.21")
 		if err != nil {
 			Log.Fatalf("unable to connect to docker: %s", err)
 		}
 	}
 
-	Log.Println("Weave plugin", version, "Command line options:", os.Args[1:])
 	if noMulticastRoute {
 		Log.Warning("--no-multicast-route option has been removed; multicast is off by default")
 	}
@@ -79,6 +42,10 @@ func main() {
 		Log.Info(dockerClient.Info())
 	}
 
+	Log.Info("Waiting for Weave API Server...")
+	weave.WaitAPIServer(30)
+	Log.Info("Finished waiting for Weave API Server")
+
 	err = run(dockerClient, weave, address, meshAddress)
 	if err != nil {
 		Log.Fatal(err)
@@ -87,6 +54,7 @@ func main() {
 
 func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddress string) error {
 	endChan := make(chan error, 1)
+
 	if address != "" {
 		globalListener, err := listenAndServe(dockerClient, weave, address, endChan, "global", false)
 		if err != nil {
@@ -104,21 +72,13 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 		defer meshListener.Close()
 	}
 
-	statusListener, err := weavenet.ListenUnixSocket("/home/weave/status.sock")
+	statusListener, err := weavenet.ListenUnixSocket("/home/weave/plugin-status.sock")
 	if err != nil {
 		return err
 	}
 	go serveStatus(statusListener)
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	select {
-	case sig := <-sigChan:
-		Log.Debugf("Caught signal %s; shutting down", sig)
-		return nil
-	case err := <-endChan:
-		return err
-	}
+	return <-endChan
 }
 
 func listenAndServe(dockerClient *docker.Client, weave *weaveapi.Client, address string, endChan chan<- error, scope string, withIpam bool) (net.Listener, error) {

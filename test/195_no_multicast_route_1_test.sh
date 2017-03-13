@@ -12,9 +12,8 @@ start_suite "--no-multicast-route operation"
 $SSH $HOST1 docker network rm testmcasttrue testmcastfalse >/dev/null 2>&1 || true
 
 # Ensure containers run either way have no multicast route
-weave_on $HOST1 launch-router
+weave_on $HOST1 launch-router --plugin
 weave_on $HOST1 launch-proxy --no-multicast-route
-weave_on $HOST1 launch-plugin # plugin defaults to multicast off except for 'net=weave'
 
 start_container $HOST1 --no-multicast-route --name c1
 proxy_start_container $HOST1 --name c2

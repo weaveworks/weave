@@ -1,3 +1,0 @@
-FROM DOCKERHUB_USER/weaveARCH_EXT
-ADD ./plugin /home/weave/
-ENTRYPOINT ["/home/weave/plugin"]
