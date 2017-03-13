@@ -153,7 +153,6 @@ func main() {
 		advertiseAddress   string
 		pluginSocket       string
 		pluginMeshSocket   string
-		noMulticastRoute   bool
 		enablePlugin       bool
 
 		defaultDockerHost = "unix:///var/run/docker.sock"
@@ -203,7 +202,6 @@ func main() {
 	mflag.BoolVar(&enablePlugin, []string{"-plugin"}, false, "enable Docker plugin")
 	mflag.StringVar(&pluginSocket, []string{"-plugin-socket"}, "/run/docker/plugins/weave.sock", "plugin socket on which to listen")
 	mflag.StringVar(&pluginMeshSocket, []string{"-plugin-mesh-socket"}, "/run/docker/plugins/weavemesh.sock", "plugin socket on which to listen in mesh mode")
-	mflag.BoolVar(&noMulticastRoute, []string{"-no-multicast-route"}, false, "deprecated (this is now the default)")
 
 	// crude way of detecting that we probably have been started in a
 	// container, with `weave launch` --> suppress misleading paths in
@@ -407,8 +405,7 @@ func main() {
 	}
 
 	if enablePlugin {
-		// TODO(mp) do not pass pluginMeshSocket if plugin-v2 is in use
-		go plugin.Start(httpAddr, dockerAPI, pluginSocket, pluginMeshSocket, noMulticastRoute)
+		go plugin.Start(httpAddr, dockerAPI, pluginSocket, pluginMeshSocket)
 	}
 
 	signals.SignalHandlerLoop(common.Log, router)

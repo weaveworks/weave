@@ -49,7 +49,7 @@ weave launch        <same arguments as 'weave launch-router'>
                       [--no-restart] [--resume] [--no-discovery] [--no-dns]
                       [--ipalloc-init <mode>]
                       [--ipalloc-range <cidr> [--ipalloc-default-subnet <cidr>]]
-                      [--plugin [--no-multicast-route]]
+                      [--plugin]
                       [--log-level=debug|info|warning|error]
                       <peer> ...
       launch-proxy  [-H <endpoint>] [--without-dns] [--no-multicast-route]

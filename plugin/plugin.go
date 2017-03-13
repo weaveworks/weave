@@ -20,7 +20,7 @@ import (
 
 var Log = common.Log
 
-func Start(weaveAPIAddr string, dockerAPIAddr string, address string, meshAddress string, noMulticastRoute bool) {
+func Start(weaveAPIAddr string, dockerAPIAddr string, address string, meshAddress string) {
 	weave := weaveapi.NewClient(weaveAPIAddr, Log)
 
 	var dockerClient *docker.Client
@@ -33,9 +33,6 @@ func Start(weaveAPIAddr string, dockerAPIAddr string, address string, meshAddres
 		}
 	}
 
-	if noMulticastRoute {
-		Log.Warning("--no-multicast-route option has been removed; multicast is off by default")
-	}
 	if dockerClient == nil {
 		Log.Info("Running without Docker API connection")
 	} else {
