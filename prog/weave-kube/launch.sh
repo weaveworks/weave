@@ -115,8 +115,10 @@ post_start_actions() {
     /home/weave/weave --local expose $WEAVE_EXPOSE_IP
 }
 
-post_start_actions &
+# Double-forks so that post_start_actions' process gets adopted by tini as the subshell () process immediately dies:
+( post_start_actions & )
 
+# Replaces the current shell with weaver. No new process is created.
 exec /home/weave/weaver $EXTRA_ARGS --port=6783 $BRIDGE_OPTIONS \
      --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
