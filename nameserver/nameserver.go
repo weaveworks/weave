@@ -137,6 +137,9 @@ func (n *Nameserver) ContainerDied(ident string) {
 	n.broadcastEntries(entries...)
 }
 
+func (n *Nameserver) ContainerConnected(ident string)    {}
+func (n *Nameserver) ContainerDisconnected(ident string) {}
+
 func (n *Nameserver) PeerGone(peer mesh.PeerName) {
 	n.infof("peer %s gone", peer.String())
 	n.Lock()

@@ -58,3 +58,6 @@ func (w *watcher) ContainerDied(id string) {
 }
 
 func (w *watcher) ContainerDestroyed(id string) {}
+
+func (w *watcher) ContainerConnected(id string)    {}
+func (w *watcher) ContainerDisconnected(id string) {}
