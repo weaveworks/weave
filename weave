@@ -883,6 +883,24 @@ attach() {
     util_op attach-container $ATTACH_ARGS $CONTAINER $BRIDGE $MTU "$@"
 }
 
+check_not_running_v2_plugin() {
+    if is_docker_plugin_enabled $PLUGIN_V2_NAME; then
+        echo "Docker plugin \"$PLUGIN_V2_NAME\" is already running." >&2
+        return 1
+    fi
+}
+
+# Docker Plugin V2
+is_docker_plugin_enabled() {
+    util_op is-docker-plugin-enabled $PLUGIN_V2_NAME 2>/dev/null
+}
+
+# Docker Plugin (part of weaver process, so V2 or V1).
+# Assumes that plugin is running inside Docker container.
+is_plugin_enabled() {
+    docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME | grep -q -- "--plugin"
+}
+
 ######################################################################
 # functions for interacting with containers
 ######################################################################
@@ -1204,21 +1222,6 @@ check_running() {
         echo "$1 container is not running." >&2
         return 2
     fi
-}
-
-check_not_running_v2_plugin() {
-    is_docker_plugin_enabled "$1" && echo "$1 is already running." >&2 && return 1
-}
-
-# Docker Plugin V2
-is_docker_plugin_enabled() {
-    [ "$(docker plugin inspect -f '{{ .Enabled }}' "$1" 2>/dev/null)" = "true" ]
-}
-
-# Docker Plugin (part of weaver process, so V2 or V1).
-# Assumes that plugin is running inside Docker container.
-is_plugin_enabled() {
-    docker inspect -f '{{.Config.Cmd}}' $CONTAINER_NAME | grep -q -- "--plugin"
 }
 
 # Execute $@ only if the weave container is running
@@ -1981,7 +1984,7 @@ EOF
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME        $BASE_IMAGE
         check_not_running proxy  $PROXY_CONTAINER_NAME  $BASE_EXEC_IMAGE
-        check_not_running_v2_plugin "$PLUGIN_V2_NAME"
+        check_not_running_v2_plugin
         COMMON_ARGS=$(common_launch_args "$@")
         launch_router --plugin "$@"
         launch_proxy  $COMMON_ARGS
@@ -1989,7 +1992,7 @@ EOF
     launch-router)
         deprecation_warnings "$@"
         check_not_running router $CONTAINER_NAME $BASE_IMAGE
-        check_not_running_v2_plugin "$PLUGIN_V2_NAME"
+        check_not_running_v2_plugin
         launch_router "$@"
         echo $ROUTER_CONTAINER
         ;;
@@ -2007,7 +2010,7 @@ EOF
     launch-proxy)
         deprecation_warnings "$@"
         check_not_running proxy $PROXY_CONTAINER_NAME $BASE_EXEC_IMAGE
-        check_not_running_v2_plugin "$PLUGIN_V2_NAME"
+        check_not_running_v2_plugin
         launch_proxy "$@"
         echo $PROXY_CONTAINER
         ;;
@@ -2052,7 +2055,7 @@ EOF
             echo "        Service: proxy"
             echo "        Address: $PROXY_ADDRS"
         fi
-        if [ -z "$SUB_STATUS" ] && ( is_docker_plugin_enabled "$PLUGIN_V2_NAME" || is_plugin_enabled ) ; then
+        if [ -z "$SUB_STATUS" ] && ( is_docker_plugin_enabled || is_plugin_enabled ) ; then
             echo
             echo "        Service: plugin"
             echo "     DriverName: weave"

@@ -2,8 +2,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/docker/docker/client"
 	docker "github.com/fsouza/go-dockerclient"
 
 	"github.com/weaveworks/weave/plugin/net"
@@ -71,6 +73,34 @@ while Weave is not running`, networkName, containers)
 	return nil
 }
 
+// Exits with 0 if the given plugin (v2) is enabled.
+func isDockerPluginEnabled(args []string) error {
+	if len(args) != 1 {
+		cmdUsage("is-docker-plugin-enabled", "<plugin-name>")
+	}
+
+	pluginName := args[0]
+
+	// This is messed up: we are using docker/docker/client instead of
+	// fsouza/go-dockerclient because the latter does not support plugins.
+	c, err := client.NewEnvClient()
+	if err != nil {
+		return fmt.Errorf("unable to connect to docker: %s", err)
+	}
+
+	ctx := context.Background()
+	p, _, err := c.PluginInspectWithRaw(ctx, pluginName)
+	if err != nil {
+		return err
+	}
+
+	if !p.Enabled {
+		return fmt.Errorf("plugin %q is disabled", pluginName)
+	}
+
+	return nil
+}
+
 func newDockerClient() (*docker.Client, error) {
 	// API 1.21 is the first version that supports docker network
 	// commands
@@ -82,5 +112,6 @@ func newDockerClient() (*docker.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to docker: %s", err)
 	}
+
 	return c, nil
 }
