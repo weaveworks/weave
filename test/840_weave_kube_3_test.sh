@@ -52,6 +52,11 @@ assert_raises "run_on $HOST1 $PING $HOST2EXPIP"
 assert_raises "run_on $HOST2 $PING $HOST1EXPIP"
 assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
 
+# Ensure we do not generate any defunct process (e.g. launch.sh) after starting weaver:
+assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
+assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
+assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
+
 # See if we can get some pods running that connect to the network
 run_on $HOST1 "kubectl run hello --image=weaveworks/hello-world --replicas=3"
 

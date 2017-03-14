@@ -1,3 +1,7 @@
 FROM DOCKERHUB_USER/weaveARCH_EXT
 ADD ./launch.sh ./kube-peers /home/weave/
-ENTRYPOINT ["/home/weave/launch.sh"]
+
+# Add tini for signal processing and zombie killing:
+RUN apk add --update tini
+# Run launch.sh script under tini:
+ENTRYPOINT ["/sbin/tini", "--", "/home/weave/launch.sh"]
