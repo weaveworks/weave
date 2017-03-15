@@ -335,7 +335,7 @@ BASE_IMAGE=$DOCKERHUB_USER/weave
 IMAGE=$BASE_IMAGE:$IMAGE_VERSION
 CONTAINER_NAME=${WEAVE_CONTAINER_NAME:-weave}
 
-PLUGIN_V2_NAME="$DOCKERHUB_USER/pluginv2"
+PLUGIN_NAME="$DOCKERHUB_USER/net-plugin"
 CNI_PLUGIN_NAME="weave-plugin-$IMAGE_VERSION"
 CNI_PLUGIN_DIR=${WEAVE_CNI_PLUGIN_DIR:-$HOST_ROOT/opt/cni/bin}
 # Note VOLUMES_CONTAINER which is for weavewait should change when you upgrade Weave
@@ -884,15 +884,15 @@ attach() {
 }
 
 check_not_running_v2_plugin() {
-    if is_docker_plugin_enabled $PLUGIN_V2_NAME; then
-        echo "Docker plugin \"$PLUGIN_V2_NAME\" is already running." >&2
+    if is_docker_plugin_enabled $PLUGIN_NAME; then
+        echo "Docker plugin \"$PLUGIN_NAME\" is already running." >&2
         return 1
     fi
 }
 
 # Docker Plugin V2
 is_docker_plugin_enabled() {
-    util_op is-docker-plugin-enabled $PLUGIN_V2_NAME 2>/dev/null
+    util_op is-docker-plugin-enabled $PLUGIN_NAME 2>/dev/null
 }
 
 # Docker Plugin (part of weaver process, so V2 or V1).
@@ -2058,7 +2058,7 @@ EOF
         if [ -z "$SUB_STATUS" ] && is_docker_plugin_enabled ; then
             echo
             echo "        Service: plugin"
-            echo "     DriverName: $PLUGIN_V2_NAME"
+            echo "     DriverName: $PLUGIN_NAME"
         elif [ -z "$SUB_STATUS" ] && is_plugin_enabled ; then
             echo
             echo "        Service: plugin"
