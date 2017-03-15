@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"syscall"
 
 	"github.com/containernetworking/cni/pkg/ipam"
@@ -180,8 +181,11 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
-		return fmt.Errorf("error removing interface %q: %s", args.IfName, err)
+	// As of CNI 0.3 spec, runtimes can send blank if they just want the address deallocated
+	if args.Netns != "" {
+		if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
+			return fmt.Errorf("error removing interface %q: %s", args.IfName, err)
+		}
 	}
 
 	// Default IPAM is Weave's own
@@ -189,6 +193,10 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		err = ipamplugin.NewIpam(c.weave).Release(args)
 	} else {
 		err = ipam.ExecDel(conf.IPAM.Type, args.StdinData)
+	}
+	// Hack - don't know how we should detect this situation properly
+	if args.Netns == "" && strings.Contains(err.Error(), "no addresses") {
+		err = nil
 	}
 	if err != nil {
 		return fmt.Errorf("unable to release IP address: %s", err)
