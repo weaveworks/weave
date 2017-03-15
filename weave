@@ -2055,7 +2055,11 @@ EOF
             echo "        Service: proxy"
             echo "        Address: $PROXY_ADDRS"
         fi
-        if [ -z "$SUB_STATUS" ] && ( is_docker_plugin_enabled || is_plugin_enabled ) ; then
+        if [ -z "$SUB_STATUS" ] && is_docker_plugin_enabled ; then
+            echo
+            echo "        Service: plugin"
+            echo "     DriverName: $PLUGIN_V2_NAME"
+        elif [ -z "$SUB_STATUS" ] && is_plugin_enabled ; then
             echo
             echo "        Service: plugin"
             echo "     DriverName: weave"
