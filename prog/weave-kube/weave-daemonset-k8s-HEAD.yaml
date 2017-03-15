@@ -54,20 +54,13 @@ spec:
     metadata:
       labels:
         name: weave-net
-      annotations:
-        # TODO: Move this field to the Tolerations property of PodSpec once it's possible
-        scheduler.alpha.kubernetes.io/tolerations: |
-          [
-            {
-              "key": "dedicated",
-              "operator": "Equal",
-              "value": "master",
-              "effect": "NoSchedule"
-            }
-          ]
     spec:
       hostNetwork: true
       hostPID: true
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Equal
+          effect: NoSchedule
       containers:
         - name: weave
           image: weaveworks/weave-kube:latest
