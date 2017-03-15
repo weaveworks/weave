@@ -11,11 +11,15 @@ import (
 )
 
 func (i *Ipam) CmdAdd(args *skel.CmdArgs) error {
+	var conf types.NetConf
+	if err := json.Unmarshal(args.StdinData, &conf); err != nil {
+		return fmt.Errorf("failed to load netconf: %v", err)
+	}
 	result, err := i.Allocate(args)
 	if err != nil {
 		return err
 	}
-	return result.Print()
+	return types.PrintResult(result, conf.CNIVersion)
 }
 
 func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {

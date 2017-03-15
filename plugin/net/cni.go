@@ -131,7 +131,7 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	}
 
 	result.DNS = conf.DNS
-	return result.Print()
+	return types.PrintResult(result, conf.CNIVersion)
 }
 
 func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []*types.Route) error {
