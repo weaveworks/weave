@@ -266,6 +266,7 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexe
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
+# Builds Docker plugin.
 $(PLUGIN_UPTODATE): prog/plugin-v2/launch.sh prog/plugin-v2/config.json $(WEAVER_UPTODATE)
 	-$(SUDO) docker rm -f $(PLUGIN_BUILD_IMG) 2>/dev/null
 	$(SUDO) docker create --name=$(PLUGIN_BUILD_IMG) $(WEAVER_IMAGE) true
@@ -274,9 +275,12 @@ $(PLUGIN_UPTODATE): prog/plugin-v2/launch.sh prog/plugin-v2/config.json $(WEAVER
 	docker export $(PLUGIN_BUILD_IMG) | tar -x -C $(PLUGIN_WORK_DIR)
 	docker rm -f $(PLUGIN_BUILD_IMG)
 	cp prog/plugin-v2/launch.sh $(PLUGIN_WORK_DIR)/home/weave/launch.sh
-	-docker plugin disable $(PLUGIN_IMAGE) 2>/dev/null
-	-docker plugin rm $(PLUGIN_IMAGE) 2>/dev/null
-	docker plugin create $(PLUGIN_IMAGE) prog/plugin-v2
+	-docker plugin disable $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
+	-docker plugin rm $(PLUGIN_IMAGE):$(WEAVE_VERSION) 2>/dev/null
+	docker plugin create $(PLUGIN_IMAGE):$(WEAVE_VERSION) prog/plugin-v2
+	-docker plugin disable $(PLUGIN_IMAGE):latest 2>/dev/null
+	-docker plugin rm $(PLUGIN_IMAGE):latest 2>/dev/null
+	docker plugin create $(PLUGIN_IMAGE):latest prog/plugin-v2
 	touch $@
 
 $(WEAVEKUBE_UPTODATE): prog/weave-kube/Dockerfile.$(DOCKERHUB_USER) prog/weave-kube/launch.sh $(KUBEPEERS_EXE) $(WEAVER_UPTODATE)
@@ -303,6 +307,13 @@ tools/.git $(MANIFEST_TOOL_DIR)/.git:
 	git submodule update --init
 
 # CODE FOR PUBLISHING THE IMAGES
+
+# Push plugin
+plugin_publish: $(PLUGIN_UPTODATE)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):$(WEAVE_VERSION)
+ifneq ($(UPDATE_LATEST),false)
+	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker plugin push $(PLUGIN_IMAGE):latest
+endif
 
 # This target first runs "make publish" for each architecture
 # Then it pushes the manifest lists
