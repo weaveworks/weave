@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"syscall"
 
-	"github.com/appc/cni/pkg/ipam"
-	"github.com/appc/cni/pkg/skel"
-	"github.com/appc/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/ipam"
+	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	weaveapi "github.com/weaveworks/weave/api"
@@ -40,17 +42,23 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 	return n, nil
 }
 
-func (c *CNIPlugin) getIP(ipamType string, args *skel.CmdArgs) (result *types.Result, err error) {
+func (c *CNIPlugin) getIP(ipamType string, args *skel.CmdArgs) (newResult *current.Result, err error) {
+	var result types.Result
 	// Default IPAM is Weave's own
 	if ipamType == "" {
 		result, err = ipamplugin.NewIpam(c.weave).Allocate(args)
 	} else {
 		result, err = ipam.ExecAdd(ipamType, args.StdinData)
 	}
-	if err == nil && result.IP4 == nil {
+	if err != nil {
+		return nil, err
+	}
+	newResult, err = current.NewResultFromResult(result)
+	// Check if ipam returned no results without error
+	if err == nil && len(newResult.IPs) == 0 {
 		return nil, fmt.Errorf("IPAM plugin failed to allocate IP address")
 	}
-	return result, err
+	return newResult, err
 }
 
 func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
@@ -70,10 +78,12 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 	if err != nil {
 		return fmt.Errorf("unable to allocate IP address: %s", err)
 	}
+	// Only expecting one address
+	ip := result.IPs[0]
 
 	// If config says nothing about routes or gateway, default one will be via the bridge
-	if result.IP4.Routes == nil && result.IP4.Gateway == nil {
-		bridgeIP, err := weavenet.FindBridgeIP(conf.BrName, &result.IP4.IP)
+	if len(result.Routes) == 0 && ip.Gateway == nil {
+		bridgeIP, err := weavenet.FindBridgeIP(conf.BrName, &ip.Address)
 		if err == weavenet.ErrBridgeNoIP {
 			bridgeArgs := *args
 			bridgeArgs.ContainerID = "weave:expose"
@@ -81,17 +91,18 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 			if err != nil {
 				return fmt.Errorf("unable to allocate IP address for bridge: %s", err)
 			}
-			if err := assignBridgeIP(conf.BrName, bridgeIPResult.IP4.IP); err != nil {
+			bridgeCIDR := bridgeIPResult.IPs[0].Address
+			if err := assignBridgeIP(conf.BrName, bridgeCIDR); err != nil {
 				return fmt.Errorf("unable to assign IP address to bridge: %s", err)
 			}
-			if err := weavenet.ExposeNAT(bridgeIPResult.IP4.IP); err != nil {
+			if err := weavenet.ExposeNAT(bridgeCIDR); err != nil {
 				return fmt.Errorf("unable to create NAT rules: %s", err)
 			}
-			bridgeIP = bridgeIPResult.IP4.IP.IP
+			bridgeIP = bridgeCIDR.IP
 		} else if err != nil {
 			return err
 		}
-		result.IP4.Gateway = bridgeIP
+		result.IPs[0].Gateway = bridgeIP
 	}
 
 	ns, err := netns.GetFromPath(args.Netns)
@@ -110,20 +121,20 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		id = fmt.Sprintf("%x", data)
 	}
 
-	if err := weavenet.AttachContainer(args.Netns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&result.IP4.IP}, false); err != nil {
+	if err := weavenet.AttachContainer(args.Netns, id, args.IfName, conf.BrName, conf.MTU, false, []*net.IPNet{&ip.Address}, false); err != nil {
 		return err
 	}
 	if err := weavenet.WithNetNSLinkUnsafe(ns, args.IfName, func(link netlink.Link) error {
-		return setupRoutes(link, args.IfName, result.IP4.IP, result.IP4.Gateway, result.IP4.Routes)
+		return setupRoutes(link, args.IfName, ip.Address, ip.Gateway, result.Routes)
 	}); err != nil {
 		return fmt.Errorf("error setting up routes: %s", err)
 	}
 
 	result.DNS = conf.DNS
-	return result.Print()
+	return types.PrintResult(result, conf.CNIVersion)
 }
 
-func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []types.Route) error {
+func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, routes []*types.Route) error {
 	var err error
 	if routes == nil { // If config says nothing about routes, add a default one
 		if !ipnet.Contains(gw) {
@@ -133,7 +144,7 @@ func setupRoutes(link netlink.Link, name string, ipnet net.IPNet, gw net.IP, rou
 				return err
 			}
 		}
-		routes = []types.Route{{Dst: zeroNetwork}}
+		routes = []*types.Route{{Dst: zeroNetwork}}
 	}
 	for _, r := range routes {
 		if r.GW != nil {
@@ -170,8 +181,11 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
-		return fmt.Errorf("error removing interface %q: %s", args.IfName, err)
+	// As of CNI 0.3 spec, runtimes can send blank if they just want the address deallocated
+	if args.Netns != "" {
+		if _, err = weavenet.WithNetNS(args.Netns, "del-iface", args.IfName); err != nil {
+			return fmt.Errorf("error removing interface %q: %s", args.IfName, err)
+		}
 	}
 
 	// Default IPAM is Weave's own
@@ -179,6 +193,10 @@ func (c *CNIPlugin) CmdDel(args *skel.CmdArgs) error {
 		err = ipamplugin.NewIpam(c.weave).Release(args)
 	} else {
 		err = ipam.ExecDel(conf.IPAM.Type, args.StdinData)
+	}
+	// Hack - don't know how we should detect this situation properly
+	if args.Netns == "" && strings.Contains(err.Error(), "no addresses") {
+		err = nil
 	}
 	if err != nil {
 		return fmt.Errorf("unable to release IP address: %s", err)

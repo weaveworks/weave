@@ -5,19 +5,24 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/appc/cni/pkg/skel"
-	"github.com/appc/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types/current"
 )
 
 func (i *Ipam) CmdAdd(args *skel.CmdArgs) error {
+	var conf types.NetConf
+	if err := json.Unmarshal(args.StdinData, &conf); err != nil {
+		return fmt.Errorf("failed to load netconf: %v", err)
+	}
 	result, err := i.Allocate(args)
 	if err != nil {
 		return err
 	}
-	return result.Print()
+	return types.PrintResult(result, conf.CNIVersion)
 }
 
-func (i *Ipam) Allocate(args *skel.CmdArgs) (*types.Result, error) {
+func (i *Ipam) Allocate(args *skel.CmdArgs) (types.Result, error) {
 	// extract the things we care about
 	conf, err := loadIPAMConf(args.StdinData)
 	if err != nil {
@@ -46,12 +51,13 @@ func (i *Ipam) Allocate(args *skel.CmdArgs) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := &types.Result{
-		IP4: &types.IPConfig{
-			IP:      *ipnet,
+	result := &current.Result{
+		IPs: []*current.IPConfig{{
+			Version: "4",
+			Address: *ipnet,
 			Gateway: conf.Gateway,
-			Routes:  conf.Routes,
-		},
+		}},
+		Routes: conf.Routes,
 	}
 	return result, nil
 }
@@ -65,9 +71,9 @@ func (i *Ipam) Release(args *skel.CmdArgs) error {
 }
 
 type ipamConf struct {
-	Subnet  string        `json:"subnet,omitempty"`
-	Gateway net.IP        `json:"gateway,omitempty"`
-	Routes  []types.Route `json:"routes"`
+	Subnet  string         `json:"subnet,omitempty"`
+	Gateway net.IP         `json:"gateway,omitempty"`
+	Routes  []*types.Route `json:"routes"`
 }
 
 type netConf struct {

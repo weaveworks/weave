@@ -2,6 +2,7 @@ package ipset
 
 import (
 	"os/exec"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -21,6 +22,8 @@ type Interface interface {
 	DelEntry(ipsetName Name, entry string) error
 	Flush(ipsetName Name) error
 	Destroy(ipsetName Name) error
+
+	List(prefix string) ([]Name, error)
 
 	FlushAll() error
 	DestroyAll() error
@@ -70,6 +73,24 @@ func (i *ipset) Destroy(ipsetName Name) error {
 func (i *ipset) DestroyAll() error {
 	i.refCount = newRefCount()
 	return doExec("destroy")
+}
+
+// Fetch a list of all existing sets with a given prefix
+func (i *ipset) List(prefix string) ([]Name, error) {
+	output, err := exec.Command("ipset", "list", "-name", "-output", "plain").Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var selected []Name
+	sets := strings.Split(string(output), "\n")
+	for _, v := range sets {
+		if strings.HasPrefix(v, prefix) {
+			selected = append(selected, Name(v))
+		}
+	}
+
+	return selected, err
 }
 
 func doExec(args ...string) error {

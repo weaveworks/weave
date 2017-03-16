@@ -23,6 +23,10 @@ SUCCESS="$(( $NUM_HOSTS * ($NUM_HOSTS-1) )) established"
 
 tear_down_kubeadm
 
+# Make an ipset, so we can check it doesn't get wiped out by Weave Net
+docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc create test_840_ipset bitmap:ip range 192.168.1.0/24 || true
+docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc add test_840_ipset 192.168.1.11
+
 for host in $HOSTS; do
     if [ $host = $HOST1 ] ; then
 	run_on $host "sudo systemctl start kubelet && sudo kubeadm init --token=$TOKEN"
@@ -59,6 +63,11 @@ assert_raises "run_on $HOST1 $PING $HOST2EXPIP"
 assert_raises "run_on $HOST2 $PING $HOST1EXPIP"
 assert_raises "run_on $HOST3 $PING $HOST2EXPIP"
 
+# Ensure we do not generate any defunct process (e.g. launch.sh) after starting weaver:
+assert "run_on $HOST1 ps aux | grep -c '[d]efunct'" "0"
+assert "run_on $HOST2 ps aux | grep -c '[d]efunct'" "0"
+assert "run_on $HOST3 ps aux | grep -c '[d]efunct'" "0"
+
 # See if we can get some pods running that connect to the network
 run_on $HOST1 "kubectl run hello --image=weaveworks/hello-world --replicas=3"
 
@@ -77,5 +86,8 @@ wait_for_pods() {
 assert_raises wait_for_pods
 
 tear_down_kubeadm
+
+# Destroy our test ipset, and implicitly check it is still there
+assert_raises "docker_on $HOST1 run --rm --privileged --net=host --entrypoint=/usr/sbin/ipset weaveworks/weave-npc destroy test_840_ipset"
 
 end_suite

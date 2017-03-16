@@ -29,7 +29,7 @@ func newSelectorSpec(json *unversioned.LabelSelector, nsName string, ipsetType i
 		// We prefix the selector string with the namespace name when generating
 		// the shortname because you can specify the same selector in multiple
 		// namespaces - we need those to map to distinct ipsets
-		ipsetName: ipset.Name("weave-" + shortName(nsName+":"+key)),
+		ipsetName: ipset.Name(IpsetNamePrefix + shortName(nsName+":"+key)),
 		ipsetType: ipsetType}, nil
 }
 

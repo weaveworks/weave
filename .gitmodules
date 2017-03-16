@@ -61,9 +61,6 @@
 [submodule "vendor/github.com/hashicorp/go-cleanhttp"]
 	path = vendor/github.com/hashicorp/go-cleanhttp
 	url = http://github.com/hashicorp/go-cleanhttp
-[submodule "vendor/github.com/appc/cni"]
-	path = vendor/github.com/appc/cni
-	url = https://github.com/appc/cni
 [submodule "vendor/github.com/coreos/go-iptables"]
 	path = vendor/github.com/coreos/go-iptables
 	url = https://github.com/coreos/go-iptables
@@ -124,3 +121,6 @@
 [submodule "vendor/github.com/weaveworks/common"]
 	path = vendor/github.com/weaveworks/common
 	url = https://github.com/weaveworks/common
+[submodule "vendor/github.com/containernetworking/cni"]
+	path = vendor/github.com/containernetworking/cni
+	url = https://github.com/containernetworking/cni
