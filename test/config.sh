@@ -278,7 +278,16 @@ start_suite() {
     whitely echo "$@"
 }
 
+# Common postconditions to assert on each host, after each test:
+assert_common_postconditions() {
+    # Ensure we do not generate any defunct (a.k.a. zombie) process:
+    assert "run_on $1 ps aux | grep -c '[d]efunct'" "0"
+}
+
 end_suite() {
+    for host in $HOSTS; do
+        assert_common_postconditions "$host"
+    done
     whitely assert_end
     for host in $HOSTS; do
         stop_weave_on $host
