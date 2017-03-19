@@ -118,11 +118,15 @@ func (c *Client) AddObserver(ob ContainerObserver) error {
 						pending.finish(event.ID)
 						ob.ContainerDestroyed(event.ID)
 					case "network:connect":
-						pending.finish(event.ID)
-						ob.ContainerConnected(event.ID)
+						if containerID, ok := event.Actor.Attributes["container"]; ok {
+							pending.finish(containerID)
+							ob.ContainerConnected(containerID)
+						}
 					case "network:disconnect":
-						pending.finish(event.ID)
-						ob.ContainerDisconnected(event.ID)
+						if containerID, ok := event.Actor.Attributes["container"]; ok {
+							pending.finish(containerID)
+							ob.ContainerDisconnected(containerID)
+						}
 					}
 				}
 				if time.Since(start) > retryInterval {

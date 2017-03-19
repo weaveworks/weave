@@ -123,6 +123,7 @@ func (n *Nameserver) ReverseLookup(ip address.Address) (string, error) {
 
 func (n *Nameserver) ContainerStarted(ident string)   {}
 func (n *Nameserver) ContainerDestroyed(ident string) {}
+func (n *Nameserver) ContainerConnected(ident string) {}
 
 func (n *Nameserver) ContainerDied(ident string) {
 	n.Lock()
@@ -137,8 +138,18 @@ func (n *Nameserver) ContainerDied(ident string) {
 	n.broadcastEntries(entries...)
 }
 
-func (n *Nameserver) ContainerConnected(ident string)    {}
-func (n *Nameserver) ContainerDisconnected(ident string) {}
+func (n *Nameserver) ContainerDisconnected(ident string) {
+	n.Lock()
+	entries := n.entries.tombstone(n.ourName, func(e *Entry) bool {
+		if e.ContainerID == ident {
+			n.infof("container %s disconnected; tombstoning entry %s", ident, e.String())
+			return true
+		}
+		return false
+	})
+	n.Unlock()
+	n.broadcastEntries(entries...)
+}
 
 func (n *Nameserver) PeerGone(peer mesh.PeerName) {
 	n.infof("peer %s gone", peer.String())
