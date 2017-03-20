@@ -54,6 +54,9 @@ func (c *CNIPlugin) getIP(ipamType string, args *skel.CmdArgs) (newResult *curre
 	if err != nil {
 		return nil, err
 	}
+	if result == nil {
+		return nil, fmt.Errorf("Received no usable result from IPAM plugin")
+	}
 	newResult, err = current.NewResultFromResult(result)
 	// Check if ipam returned no results without error
 	if err == nil && len(newResult.IPs) == 0 {
