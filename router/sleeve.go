@@ -6,7 +6,6 @@
 package router
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -1062,7 +1061,7 @@ func (sender *udpSenderDF) dial() error {
 
 func (sender *udpSenderDF) send(msg []byte, raddr *net.UDPAddr) error {
 	// Ensure we have a socket sending to the right IP address
-	if sender.socket == nil || !bytes.Equal(sender.remoteIP, raddr.IP) {
+	if sender.socket == nil || !sender.remoteIP.Equal(raddr.IP) {
 		sender.remoteIP = raddr.IP
 		if err := sender.dial(); err != nil {
 			return err
@@ -1114,7 +1113,7 @@ func (sender *udpSenderDF) close() error {
 }
 
 func udpAddrsEqual(a *net.UDPAddr, b *net.UDPAddr) bool {
-	return bytes.Equal(a.IP, b.IP) && a.Port == b.Port && a.Zone == b.Zone
+	return a.IP.Equal(b.IP) && a.Port == b.Port && a.Zone == b.Zone
 }
 
 func allZeros(s []byte) bool {
