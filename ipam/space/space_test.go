@@ -52,12 +52,12 @@ func TestLowlevel(t *testing.T) {
 
 	s := New()
 	require.Equal(t, address.Count(0), s.NumFreeAddresses())
-	ok, got := s.Allocate(address.NewRange(0, 1000))
+	ok, _ := s.Allocate(address.NewRange(0, 1000))
 	require.False(t, ok, "allocate in empty space should fail")
 
 	s.Add(100, 100)
 	require.Equal(t, address.Count(100), s.NumFreeAddresses())
-	ok, got = s.Allocate(address.NewRange(0, 1000))
+	ok, got := s.Allocate(address.NewRange(0, 1000))
 	require.True(t, ok && got == 100, "allocate")
 	require.Equal(t, address.Count(99), s.NumFreeAddresses())
 	require.NoError(t, s.Claim(150))
@@ -68,6 +68,7 @@ func TestLowlevel(t *testing.T) {
 	wt.AssertErrorInterface(t, (*error)(nil), s.Free(100), "double free")
 
 	r, ok := s.Donate(address.NewRange(0, 1000))
+	require.True(t, ok, "donate")
 	require.Equal(t, address.NewRange(0xa0, 0x20), r, "donate")
 
 	// test Donate when addresses are scarce
@@ -78,6 +79,7 @@ func TestLowlevel(t *testing.T) {
 	require.NoError(t, s.Claim(0))
 	require.NoError(t, s.Claim(2))
 	r, ok = s.Donate(address.NewRange(0, 1000))
+	require.True(t, ok, "donate")
 	require.Equal(t, address.NewRange(1, 1), r, "donate")
 	r, ok = s.Donate(address.NewRange(0, 1000))
 	require.True(t, !ok, "donate should fail")
