@@ -186,6 +186,7 @@ func TestAllocatorClaim(t *testing.T) {
 	alloc.Prime()
 	// Do an allocate on the other peer, which we will try to claim later
 	addrx, err := allocs[0].Allocate(container1, subnet, true, returnFalse)
+	require.NoError(t, err)
 	// Should not get the address we pre-claimed
 	require.NotEqual(t, addrx, preAddr)
 	router.Flush()
