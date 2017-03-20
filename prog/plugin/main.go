@@ -94,7 +94,7 @@ func run(dockerClient *docker.Client, weave *weaveapi.Client, address, meshAddre
 	}
 	go serveStatus(statusListener)
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	select {
 	case sig := <-sigChan:
