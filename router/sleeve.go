@@ -1039,6 +1039,9 @@ func (sender *udpSenderDF) dial() error {
 	laddr := &net.IPAddr{IP: sender.localIP}
 	raddr := &net.IPAddr{IP: sender.remoteIP}
 	s, err := net.DialIP("ip4:UDP", laddr, raddr)
+	if err != nil {
+		return err
+	}
 
 	f, err := s.File()
 	if err != nil {
