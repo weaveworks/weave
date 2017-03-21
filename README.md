@@ -3,7 +3,6 @@
 [![Integration Tests](https://circleci.com/gh/weaveworks/weave/tree/master.svg?style=shield)](https://circleci.com/gh/weaveworks/weave)
 [![Coverage Status](https://coveralls.io/repos/weaveworks/weave/badge.svg)](https://coveralls.io/r/weaveworks/weave)
 [![Go Report Card](https://goreportcard.com/badge/github.com/weaveworks/weave)](https://goreportcard.com/report/github.com/weaveworks/weave)
-[![Slack Status](https://slack.weave.works/badge.svg)](https://slack.weave.works)
 [![Docker Pulls](https://img.shields.io/docker/pulls/weaveworks/weave.svg?maxAge=604800)](https://hub.docker.com/r/weaveworks/weave/)
 
 # About Weaveworks
