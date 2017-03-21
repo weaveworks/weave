@@ -45,7 +45,6 @@ func dockerTLSArgs(args []string) error {
 			switch {
 			case arg == "-d" || arg == "daemon":
 				isDaemon = true
-				break
 			case arg == "--tls", arg == "--tlsverify":
 				tlsArgs = append(tlsArgs, arg)
 			case strings.HasPrefix(arg, "--tls"):

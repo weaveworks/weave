@@ -210,9 +210,9 @@ func (alloc *Allocator) doOperation(op operation, ops *[]operation) {
 //  already succeeded.  If it is on the queue, we call
 //  cancel on it, allowing callers waiting for the resultChans
 //  to unblock.
-func (alloc *Allocator) cancelOp(op operation, ops *[]operation) {
+func (alloc *Allocator) cancelOp(opToCancel operation, ops *[]operation) {
 	for i, op := range *ops {
-		if op == op {
+		if op == opToCancel {
 			*ops = append((*ops)[:i], (*ops)[i+1:]...)
 			op.Cancel()
 			break

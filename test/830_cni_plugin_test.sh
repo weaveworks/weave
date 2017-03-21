@@ -16,10 +16,22 @@ run_on $HOST1 sudo mkdir -p /opt/cni/bin
 weave_on $HOST1 setup-cni
 weave_on $HOST1 launch
 
+C0=$(docker_on $HOST1 run --net=none --name=c0 -dt $SMALL_IMAGE /bin/sh)
 C1=$(docker_on $HOST1 run --net=none --privileged --name=c1 -dt $SMALL_IMAGE /bin/sh)
 C2=$(docker_on $HOST1 run --net=none --name=c2 -dt $SMALL_IMAGE /bin/sh)
 # Enable unsolicited ARPs so that ping after the address reuse does not time out
 exec_on $HOST1 c1 sysctl -w net.ipv4.conf.all.arp_accept=1
+
+# Contrived example to trigger the bug in #2839
+cni_connect $HOST1 c0 <<EOF
+{
+    "name": "weave",
+    "type": "weave-net",
+    "ipam": {
+        "type": "weave-ipam"
+    }
+}
+EOF
 
 cni_connect $HOST1 c1 <<EOF
 {
@@ -40,8 +52,15 @@ cni_connect $HOST1 c2 <<EOF
 }
 EOF
 
+C0IP=$(container_ip $HOST1 c0)
 C1IP=$(container_ip $HOST1 c1)
 C2IP=$(container_ip $HOST1 c2)
+
+# Check the bridge IP is different from the container IPs
+BRIP=$(container_ip $HOST1 weave:expose)
+assert_raises "[ $BRIP != $C0IP ]"
+assert_raises "[ $BRIP != $C1IP ]"
+assert_raises "[ $BRIP != $C2IP ]"
 
 assert_raises "exec_on $HOST1 c1 $PING $C2IP"
 assert_raises "exec_on $HOST1 c2 $PING $C1IP"
@@ -63,6 +82,7 @@ C3IP=$(container_ip $HOST1 c3)
 
 # CNI shouldn't re-use the address until we call DEL
 assert_raises "[ $C2IP != $C3IP ]"
+assert_raises "[ $BRIP != $C3IP ]"
 assert_raises "exec_on $HOST1 c1 $PING $C3IP"
 
 

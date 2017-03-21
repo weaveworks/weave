@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"syscall"
 
@@ -53,6 +54,9 @@ func (c *CNIPlugin) getIP(ipamType string, args *skel.CmdArgs) (newResult *curre
 	if err != nil {
 		return nil, err
 	}
+	if result == nil {
+		return nil, fmt.Errorf("Received no usable result from IPAM plugin")
+	}
 	newResult, err = current.NewResultFromResult(result)
 	// Check if ipam returned no results without error
 	if err == nil && len(newResult.IPs) == 0 {
@@ -87,6 +91,10 @@ func (c *CNIPlugin) CmdAdd(args *skel.CmdArgs) error {
 		if err == weavenet.ErrBridgeNoIP {
 			bridgeArgs := *args
 			bridgeArgs.ContainerID = "weave:expose"
+			// It would be better if libcni let us send just the desired parameters,
+			// but there is a bug: https://github.com/containernetworking/cni/issues/410
+			// so just blank out the one we want to change
+			os.Setenv("CNI_CONTAINERID", bridgeArgs.ContainerID)
 			bridgeIPResult, err := c.getIP(conf.IPAM.Type, &bridgeArgs)
 			if err != nil {
 				return fmt.Errorf("unable to allocate IP address for bridge: %s", err)
