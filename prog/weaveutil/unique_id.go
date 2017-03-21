@@ -16,6 +16,6 @@ func uniqueID(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf(uid)
+	fmt.Print(uid)
 	return nil
 }
