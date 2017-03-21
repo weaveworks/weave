@@ -1,3 +1,26 @@
+## Release 1.9.4
+
+Bug fixes and minor improvements
+
+* Support Kubernetes 1.6 by creating a new DaemonSet #2777,#2801
+* Support Kubernetes 1.6 by allowing CNI callers to send a
+  network-delete request for a container that is not running or has
+  never been attached to the network #2850
+* Leave non-weave ipsets alone in Network Policy Controller (e.g. when
+  running Weave Net alonside keepalived-vip) #2751,#2846
+* Fix various small issues revealed by 'staticcheck' tool #2843,#2857
+* Avoid leaving 'defunct' processes when weave-kube container restarts #2836,#2845
+* When using the CNI plugin with a non-standard network configuration
+  file, the weave bridge could get the same IP as a container, if
+  'weave expose' hadn't run at that point #2839,#2856
+
+Build and Testing
+
+* Check that no defunct processes remain after each test #2852
+* Update build and test scripts to work with Kubernetes 1.6 beta #2851
+
+[Full list of changes](https://github.com/weaveworks/weave/milestone/53?closed=1).
+
 ## Release 1.9.3
 
 Bug fixes and minor improvements
