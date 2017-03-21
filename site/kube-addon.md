@@ -22,6 +22,13 @@ with a single command:
 kubectl apply -f https://git.io/weave-kube
 ```
 
+**Note:** If you are using Kubernetes 1.6 or later, please use this
+  command instead:
+
+```
+kubectl apply -f https://git.io/weave-kube-1.6
+```
+
 After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
 network.
@@ -51,10 +58,24 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-The URL [https://git.io/weave-kube](https://git.io/weave-kube) points
+The URLs https://git.io/weave-kube and https://git.io/weave-kube-1.6 point
 to the YAML file for the latest release of the Weave Net addon.
 Historic versions are archived on our [GitHub release
 page](https://github.com/weaveworks/weave/releases).
+
+## Upgrading Kubernetes to version 1.6
+
+In version 1.6, Kubernetes has increased security, so we need to
+create a special service account to run Weave Net.  This is done in
+the file `weave-daemonset-k8s-1.6.yaml` attached to the release.
+
+Also, the
+[toleration](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/taint-toleration-dedicated.md)
+required to let Weave Net run on master nodes has moved from an
+annotation to a field on the DaemonSet spec object.
+
+If you have edited the Weave Net DaemonSet from a previous release,
+you will need to re-make your changes against the new version.
 
 ###<a name="daemon-sets"></a> Upgrading the Daemon Sets
 
