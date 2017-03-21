@@ -36,7 +36,7 @@ If you have any questions about, feedback for or a problem with Weave Net:
 
 Your feedback is always welcome!
 
-##Further Information
+## Further Information
 
 * [Installing Weave Net](https://www.weave.works/docs/net/latest/installing-weave/)
 * [Weave Net Product Overview](https://www.weave.works/products/weave-net/)
