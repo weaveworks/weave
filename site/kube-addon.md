@@ -20,11 +20,15 @@ with a single command:
 
 * Kubernetes versions `1.6` and above:
 
-    kubectl apply -f https://git.io/weave-kube-1.6
+```
+$ kubectl apply -f https://git.io/weave-kube-1.6
+```
 
 * Kubernetes versions up to `1.5`:
 
-    kubectl apply -f https://git.io/weave-kube
+```
+$ kubectl apply -f https://git.io/weave-kube
+```
 
 After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
