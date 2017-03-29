@@ -20,11 +20,15 @@ with a single command:
 
 * Kubernetes versions `1.6` and above:
 
-    kubectl apply -f https://git.io/weave-kube-1.6
+```
+$ kubectl apply -f https://git.io/weave-kube-1.6
+```
 
 * Kubernetes versions up to `1.5`:
 
-    kubectl apply -f https://git.io/weave-kube
+```
+$ kubectl apply -f https://git.io/weave-kube
+```
 
 After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
@@ -55,8 +59,8 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-The URLs https://git.io/weave-kube and https://git.io/weave-kube-1.6 point
-to the YAML file for the latest release of the Weave Net addon.
+The URLs [https://git.io/weave-kube](https://git.io/weave-kube) and [https://git.io/weave-kube-1.6](https://git.io/weave-kube-1.6) point
+to the YAML file for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon.
 Historic versions are archived on our [GitHub release
 page](https://github.com/weaveworks/weave/releases).
 
@@ -157,20 +161,20 @@ inserted into the YAML file like this:
 
 The list of variables you can set is:
 
-* CHECKPOINT\_DISABLE - if set to 1, disable checking for new Weave Net
+* `CHECKPOINT_DISABLE` - if set to 1, disable checking for new Weave Net
   versions (default is blank, i.e. check is enabled)
-* IPALLOC\_RANGE - the range of IP addresses used by Weave Net
-  and the subnet they are placed in (CIDR format; default 10.32.0.0/12)
-* EXPECT\_NPC - set to 0 to disable Network Policy Controller (default is on)
-* KUBE\_PEERS - list of addresses of peers in the Kubernetes cluster
+* `IPALLOC_RANGE` - the range of IP addresses used by Weave Net
+  and the subnet they are placed in (CIDR format; default `10.32.0.0/12`)
+* `EXPECT_NPC` - set to 0 to disable Network Policy Controller (default is on)
+* `KUBE_PEERS` - list of addresses of peers in the Kubernetes cluster
   (default is to fetch the list from the api-server)
-* IPALLOC\_INIT - set the initialization mode of the [IP Address
+* `IPALLOC_INIT` - set the initialization mode of the [IP Address
   Manager](/site/operational-guide/concepts.md#ip-address-manager)
-  (defaults to consensus amongst the KUBE\_PEERS)
-* WEAVE\_EXPOSE\_IP - set the IP address used as a gateway from the
+  (defaults to consensus amongst the `KUBE_PEERS`)
+* `WEAVE_EXPOSE_IP` - set the IP address used as a gateway from the
   Weave network to the host network - this is useful if you are
   configuring the addon as a static pod.
-* WEAVE\_MTU - Weave Net defaults to 1376 bytes, but you can set a
+* `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a
   smaller size if your underlying network has a tighter limit, or set
   a larger size for better performance if your network supports jumbo
   frames - see [here](/site/using-weave/fastdp.md#mtu) for more
