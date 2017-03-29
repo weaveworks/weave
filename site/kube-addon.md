@@ -59,8 +59,8 @@ Shut down Kubernetes, and _on all nodes_ perform the following:
 Then relaunch Kubernetes and install the addon as described
 above.
 
-The URLs https://git.io/weave-kube and https://git.io/weave-kube-1.6 point
-to the YAML file for the latest release of the Weave Net addon.
+The URLs [https://git.io/weave-kube](https://git.io/weave-kube) and [https://git.io/weave-kube-1.6](https://git.io/weave-kube-1.6) point
+to the YAML file for the [latest release](https://github.com/weaveworks/weave/releases/tag/latest_release) of the Weave Net addon.
 Historic versions are archived on our [GitHub release
 page](https://github.com/weaveworks/weave/releases).
 
