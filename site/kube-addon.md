@@ -18,16 +18,13 @@ The following topics are discussed:
 Weave Net can be installed onto your CNI-enabled Kubernetes cluster
 with a single command:
 
-```
-kubectl apply -f https://git.io/weave-kube
-```
+* Kubernetes versions `1.6` and above:
 
-**Note:** If you are using Kubernetes 1.6 or later, please use this
-  command instead:
+    kubectl apply -f https://git.io/weave-kube-1.6
 
-```
-kubectl apply -f https://git.io/weave-kube-1.6
-```
+* Kubernetes versions up to `1.5`:
+
+    kubectl apply -f https://git.io/weave-kube
 
 After a few seconds, a Weave Net pod should be running on each
 Node and any further pods you create will be automatically attached to the Weave
@@ -66,8 +63,9 @@ page](https://github.com/weaveworks/weave/releases).
 ## Upgrading Kubernetes to version 1.6
 
 In version 1.6, Kubernetes has increased security, so we need to
-create a special service account to run Weave Net.  This is done in
-the file `weave-daemonset-k8s-1.6.yaml` attached to the release.
+create a special service account to run Weave Net. This is done in
+the file `weave-daemonset-k8s-1.6.yaml` attached to the [Weave Net
+release](https://github.com/weaveworks/weave/releases/latest).
 
 Also, the
 [toleration](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/taint-toleration-dedicated.md)
