@@ -404,14 +404,6 @@ func (proxy *Proxy) ContainerStarted(ident string) {
 	proxy.notifyWaiters(ident, err)
 }
 
-func (proxy *Proxy) ContainerConnected(ident string) {
-	err := proxy.attach(ident)
-	// if err != nil {
-	// TODO: Not sure what is needed here.
-	// }
-	proxy.notifyWaiters(ident, err)
-}
-
 func containerShouldAttach(container *docker.Container) bool {
 	return len(container.Config.Entrypoint) > 0 && container.Config.Entrypoint[0] == weaveWaitEntrypoint[0]
 }
@@ -486,6 +478,7 @@ func (proxy *Proxy) waitForStartByIdent(ident string) error {
 
 func (proxy *Proxy) ContainerDied(ident string)         {}
 func (proxy *Proxy) ContainerDestroyed(ident string)    {}
+func (proxy *Proxy) ContainerConnected(ident string)    {}
 func (proxy *Proxy) ContainerDisconnected(ident string) {}
 
 // Check if this container needs to be attached, if so then attach it,

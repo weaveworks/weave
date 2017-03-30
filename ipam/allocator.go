@@ -24,10 +24,9 @@ const (
 	msgRingUpdate
 	msgSpaceRequestDenied
 
-	tickInterval                 = time.Second * 5
-	MinSubnetSize                = 4 // first and last addresses are excluded, so 2 would be too small
-	containerDiedTimeout         = time.Second * 30
-	containerDisconnectedTimeout = time.Second * 30
+	tickInterval         = time.Second * 5
+	MinSubnetSize        = 4 // first and last addresses are excluded, so 2 would be too small
+	containerDiedTimeout = time.Second * 30
 )
 
 // operation represents something which Allocator wants to do, but
@@ -66,7 +65,6 @@ type Allocator struct {
 	pendingClaims     []operation              // held until we know who owns the space
 	pendingPrimes     []operation              // held while our ring is empty
 	dead              map[string]time.Time     // containers we heard were dead, and when
-	disconnected      map[string]time.Time     // containers we heard were disconnected, and when
 	db                db.DB                    // persistence
 	gossip            mesh.Gossip              // our link to the outside world for sending messages
 	paxos             paxos.Participant
@@ -120,19 +118,18 @@ func NewAllocator(config Config) *Allocator {
 	}
 
 	alloc = &Allocator{
-		ourName:      config.OurName,
-		seed:         config.Seed,
-		universe:     config.Universe,
-		ring:         ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, onUpdate),
-		owned:        make(map[string]ownedData),
-		db:           config.Db,
-		paxos:        participant,
-		nicknames:    map[mesh.PeerName]string{config.OurName: config.OurNickname},
-		isKnownPeer:  config.IsKnownPeer,
-		quorum:       config.Quorum,
-		dead:         make(map[string]time.Time),
-		disconnected: make(map[string]time.Time),
-		now:          time.Now,
+		ourName:     config.OurName,
+		seed:        config.Seed,
+		universe:    config.Universe,
+		ring:        ring.New(config.Universe.Range().Start, config.Universe.Range().End, config.OurName, onUpdate),
+		owned:       make(map[string]ownedData),
+		db:          config.Db,
+		paxos:       participant,
+		nicknames:   map[mesh.PeerName]string{config.OurName: config.OurNickname},
+		isKnownPeer: config.IsKnownPeer,
+		quorum:      config.Quorum,
+		dead:        make(map[string]time.Time),
+		now:         time.Now,
 	}
 
 	alloc.pendingClaims = make([]operation, len(config.PreClaims))
@@ -381,35 +378,8 @@ func (alloc *Allocator) ContainerStarted(ident string) {
 	}
 }
 
-func (alloc *Allocator) ContainerConnected(ident string) {
-	alloc.actionChan <- func() {
-		delete(alloc.disconnected, ident) // delete is no-op if key not in map
-	}
-}
-
-func (alloc *Allocator) ContainerDisconnected(ident string) {
-	alloc.actionChan <- func() {
-		if alloc.hasOwnedByContainer(ident) {
-			alloc.debugln("Container", ident, "disconnected; noting to remove later")
-			alloc.disconnected[ident] = alloc.now()
-		}
-		// Also remove any pending ops
-		alloc.cancelOpsFor(&alloc.pendingAllocates, ident)
-		alloc.cancelOpsFor(&alloc.pendingClaims, ident)
-	}
-}
-
-func (alloc *Allocator) removeDisconnectedContainers() {
-	cutoff := alloc.now().Add(-containerDisconnectedTimeout)
-	for ident, timeOfDisconnect := range alloc.disconnected {
-		if timeOfDisconnect.Before(cutoff) {
-			if err := alloc.delete(ident); err == nil {
-				alloc.debugln("Removed addresses for container", ident)
-			}
-			delete(alloc.disconnected, ident)
-		}
-	}
-}
+func (alloc *Allocator) ContainerConnected(ident string)    {}
+func (alloc *Allocator) ContainerDisconnected(ident string) {}
 
 func (alloc *Allocator) PruneOwned(ids []string) {
 	idmap := make(map[string]struct{}, len(ids))
@@ -733,7 +703,6 @@ func (alloc *Allocator) actorLoop(actionChan <-chan func(), stopChan <-chan stru
 				alloc.tryPendingOps()
 			}
 			alloc.removeDeadContainers()
-			alloc.removeDisconnectedContainers()
 		}
 
 		alloc.assertInvariants()
