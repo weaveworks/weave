@@ -130,7 +130,7 @@ PUSH_ML=push_ml_weave push_ml_weaveexec push_ml_plugin push_ml_weave-kube push_m
 WEAVE_EXPORT=weave$(ARCH_EXT).tar.gz
 
 DOCKER_VERSION=1.10.3
-DOCKER_DISTRIB=prog/weaveexec/docker-$(DOCKER_VERSION).tgz
+DOCKER_BINARY=prog/weaveexec/docker
 DOCKER_DISTRIB_URL=https://get.docker.com/builds/Linux/$(WEAVEEXEC_DOCKER_ARCH)/docker-$(DOCKER_VERSION).tgz
 NETGO_CHECK=@strings $@ | grep cgo_stub\\\.go >/dev/null || { \
 	rm $@; \
@@ -251,7 +251,7 @@ $(WEAVER_UPTODATE): prog/weaver/Dockerfile.$(DOCKERHUB_USER) $(WEAVER_EXE) $(WEA
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaver/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVER_IMAGE) prog/weaver
 	touch $@
 
-$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexec/symlink $(DOCKER_DISTRIB) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE)
+$(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexec/symlink $(DOCKER_BINARY) weave $(SIGPROXY_EXE) $(WEAVEPROXY_EXE) $(WEAVEWAIT_EXE) $(WEAVEWAIT_NOOP_EXE) $(WEAVEWAIT_NOMCAST_EXE) $(WEAVEUTIL_EXE)
 	cp weave prog/weaveexec/weave
 	cp $(SIGPROXY_EXE) prog/weaveexec/sigproxy
 	cp $(WEAVEPROXY_EXE) prog/weaveexec/weaveproxy
@@ -259,8 +259,6 @@ $(WEAVEEXEC_UPTODATE): prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) prog/weaveexe
 	cp $(WEAVEWAIT_NOOP_EXE) prog/weaveexec/weavewait_noop
 	cp $(WEAVEWAIT_NOMCAST_EXE) prog/weaveexec/weavewait_nomcast
 	cp $(WEAVEUTIL_EXE) prog/weaveexec/weaveutil
-	tar -xf $(DOCKER_DISTRIB) usr/local/bin/docker -O > prog/weaveexec/docker
-	chmod +x prog/weaveexec/docker
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker build -f prog/weaveexec/Dockerfile.$(DOCKERHUB_USER) -t $(WEAVEEXEC_IMAGE) prog/weaveexec
 	touch $@
 
@@ -284,9 +282,17 @@ $(WEAVEDB_UPTODATE): prog/weavedb/Dockerfile
 $(WEAVE_EXPORT): $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE)
 	$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker save $(addsuffix :latest,$(IMAGES)) | gzip > $@
 
-$(DOCKER_DISTRIB):
-	curl -o $(DOCKER_DISTRIB) $(DOCKER_DISTRIB_URL)
-	cd $(shell dirname $@) && sha256sum -c $(shell pwd)/build/shasums/docker-tgz-$(WEAVEEXEC_DOCKER_ARCH).sha256sum
+$(DOCKER_BINARY):
+ifeq ($(ARCH),arm64)
+	curl -o /tmp/docker.deb https://launchpad.net/ubuntu/+archive/primary/+files/docker.io_$(DOCKER_VERSION)-0ubuntu6_$(ARCH).deb
+	cd /tmp; ar x docker.deb data.tar.xz
+	tar -xf /tmp/data.tar.xz ./usr/bin/docker -O > $(DOCKER_BINARY)
+else
+	curl -o /tmp/docker.tgz $(DOCKER_DISTRIB_URL)
+	tar -xf /tmp/docker.tgz usr/local/bin/docker -O > $(DOCKER_BINARY)
+endif
+	cd $(shell dirname $@) && sha256sum -c $(shell pwd)/build/shasums/docker-$(WEAVEEXEC_DOCKER_ARCH).sha256sum
+	chmod +x $@
 
 tools/.git $(MANIFEST_TOOL_DIR)/.git:
 	git submodule update --init
@@ -349,7 +355,7 @@ clean-bin:
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(IMAGES)
 	find prog -type f -name "Dockerfile.*" -not -name "Dockerfile.template" -print | xargs rm -f
 	find prog -type f -name "*qemu-*" -print | xargs rm -f
-	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE) weave*.tar.gz $(DOCKER_DISTRIB) prog/weaveexec/docker .pkg
+	rm -rf $(EXES) $(IMAGES_UPTODATE) $(WEAVEDB_UPTODATE) weave*.tar.gz $(DOCKER_BINARY) prog/weaveexec/docker .pkg
 
 clean: clean-bin
 	-$(SUDO) DOCKER_HOST=$(DOCKER_HOST) docker rmi $(BUILD_IMAGE)
