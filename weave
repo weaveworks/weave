@@ -89,6 +89,7 @@ weave dns-add       [<ip_address> ...] <container_id> [-h <fqdn>] |
 weave status        [targets | connections | peers | dns | ipam]
       report        [-f <format>]
       ps            [<container_id> ...]
+      full-report
 
 weave stop
       stop-router
@@ -1817,6 +1818,43 @@ protect_against_docker_hang() {
     fi
 }
 
+full_report() {
+    cat <<EOF
+#### Weave:
+\`\`\`
+$(weave report 2>&1)
+\`\`\`
+#### Docker:
+\`\`\`
+\$ docker version
+$(docker version 2>&1)
+
+\$ docker-runc --version
+$(docker-runc --version 2>&1)
+\`\`\`
+#### Logs:
+\`\`\`
+$(docker logs weave 2>&1 | grep -i error)
+\`\`\`
+#### OS:
+\`\`\`
+\$ uname -a
+$(uname -a)
+
+\$ cat /etc/\*release\*
+$(cat /etc/*release*)
+\`\`\`
+#### Network:
+\`\`\`
+\$ ip route
+$(which ip && ip route 2>&1)
+
+\$ ip -4 -o addr
+$(which ip && ip -4 -o addr 2>&1)
+\`\`\`
+EOF
+}
+
 ######################################################################
 # argument deprecation handling
 ######################################################################
@@ -2077,6 +2115,9 @@ EOF
         else
             call_weave GET /report -H 'Accept: application/json'
         fi
+        ;;
+    full-report)
+        full_report
         ;;
     run)
         dns_args "$@"
