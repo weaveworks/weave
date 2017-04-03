@@ -236,7 +236,6 @@ $(BUILD_UPTODATE): build/*
 # If the architecture is amd64, it deletes all CROSS_BUILD lines
 # but otherwise, it only removes the "CROSS_BUILD_" placeholder and downloads QEMU
 %/Dockerfile.$(DOCKERHUB_USER): %/Dockerfile.template
-	echo "DOCKERHUB_USER|$(DOCKERHUB_USER)|g;s|ARCH_EXT|$(ARCH_EXT)|g;s|ALPINE_BASEIMAGE|$(ALPINE_BASEIMAGE)|g;s|QEMUARCH|$(QEMUARCH)"
 	sed -e "s|DOCKERHUB_USER|$(DOCKERHUB_USER)|g;s|ARCH_EXT|$(ARCH_EXT)|g;s|ALPINE_BASEIMAGE|$(ALPINE_BASEIMAGE)|g;s|QEMUARCH|$(QEMUARCH)|g" $^ > $@
 ifeq ($(ARCH),amd64)
 # When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
